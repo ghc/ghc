@@ -729,25 +729,32 @@ interactDict _ wi = pprPanic "interactDict" (ppr wi)
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
 -- Add derived constraints from type-class functional dependencies.
 addFunDepWork inerts work_ev cls
+  | isImprovable work_ev
   = mapBagM_ add_fds (findDictsByClass (inert_dicts inerts) cls)
                -- No need to check flavour; fundeps work between
                -- any pair of constraints, regardless of flavour
                -- Importantly we don't throw workitem back in the
                -- worklist because this can cause loops (see #5236)
+  | otherwise
+  = return ()
   where
     work_pred = ctEvPred work_ev
     work_loc  = ctEvLoc work_ev
 
     add_fds inert_ct
+      | isImprovable inert_ev
       = emitFunDepDeriveds $
         improveFromAnother derived_loc inert_pred work_pred
                -- We don't really rewrite tys2, see below _rewritten_tys2, so that's ok
                -- NB: We do create FDs for given to report insoluble equations that arise
                -- from pairs of Givens, and also because of floating when we approximate
                -- implications. The relevant test is: typecheck/should_fail/FDsFromGivens.hs
+      | otherwise
+      = return ()
       where
-        inert_pred = ctPred inert_ct
-        inert_loc  = ctLoc inert_ct
+        inert_ev   = ctEvidence inert_ct
+        inert_pred = ctEvPred inert_ev
+        inert_loc  = ctEvLoc inert_ev
         derived_loc = work_loc { ctl_origin = FunDepOrigin1 work_pred  work_loc
                                                             inert_pred inert_loc }
 
@@ -897,7 +904,8 @@ improveLocalFunEqs :: CtEvidence -> InertCans -> TyCon -> [TcType] -> TcTyVar
 --
 -- See Note [FunDep and implicit parameter reactions]
 improveLocalFunEqs ev inerts fam_tc args fsk
-  | isGiven ev   -- See Note [No FunEq improvement for Givens]
+  | isGiven ev -- See Note [No FunEq improvement for Givens]
+    || not (isImprovable ev)
   = return ()
 
   | null improvement_eqns
@@ -941,8 +949,10 @@ improveLocalFunEqs ev inerts fam_tc args fsk
 
     --------------------
     -- See Note [Type inference for type families with injectivity]
-    do_one_injective inj_args (CFunEqCan { cc_tyargs = iargs, cc_fsk = ifsk })
-      | rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
+    do_one_injective inj_args (CFunEqCan { cc_ev = iev, cc_tyargs = iargs
+                                         , cc_fsk = ifsk })
+      | isImprovable iev
+      , rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
       = [ Pair arg iarg
         | (arg, iarg, True) <- zip3 args iargs inj_args ]
 
@@ -1443,7 +1453,8 @@ reduce_top_fun_eq old_ev fsk (ax_co, rhs_ty)
 improveTopFunEqs :: CtEvidence -> TyCon -> [TcType] -> TcTyVar -> TcS ()
 -- See Note [FunDep and implicit parameter reactions]
 improveTopFunEqs ev fam_tc args fsk
-  | isGiven ev    -- See Note [No FunEq improvement for Givens]
+  | isGiven ev            -- See Note [No FunEq improvement for Givens]
+    || not (isImprovable ev)
   = return ()
 
   | otherwise
@@ -1823,7 +1834,8 @@ doTopReactDict inerts work_item@(CDictCan { cc_ev = fl, cc_class = cls
                     ; unless s $ insertSafeOverlapFailureTcS work_item
                     ; solve_from_instance theta mk_ev }
                NoInstance ->
-                 do { try_fundep_improvement
+                 do { when (isImprovable fl) $
+                      try_fundep_improvement
                     ; continueWith work_item } }
    where
      dict_pred   = mkClassPred cls xis
