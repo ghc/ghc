@@ -617,7 +617,8 @@ rnIfaceIdDetails (IfRecSelId (Right decl) b) = IfRecSelId <$> fmap Right (rnIfac
 rnIfaceIdDetails details = pure details
 
 rnIfaceType :: Rename IfaceType
-rnIfaceType (IfaceTyVar n) = pure (IfaceTyVar n)
+rnIfaceType (IfaceTcTyVar n) = pure (IfaceTcTyVar n)
+rnIfaceType (IfaceTyVar   n) = pure (IfaceTyVar n)
 rnIfaceType (IfaceAppTy t1 t2)
     = IfaceAppTy <$> rnIfaceType t1 <*> rnIfaceType t2
 rnIfaceType (IfaceLitTy l)         = return (IfaceLitTy l)

@@ -106,17 +106,17 @@ toIfaceKind = toIfaceType
 ---------------------
 toIfaceType :: Type -> IfaceType
 -- Synonyms are retained in the interface type
-toIfaceType (TyVarTy tv)      = IfaceTyVar (toIfaceTyVar tv)
---  | isTcTyVar tv = IfaceTyVar (toIfaceTyVar tv `appendFS` consFS '_' (mkFastString (showSDocUnsafe (ppr (getUnique tv)))))
---  | otherwise
-toIfaceType (AppTy t1 t2)     = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
-toIfaceType (LitTy n)         = IfaceLitTy (toIfaceTyLit n)
-toIfaceType (ForAllTy b t)    = IfaceForAllTy (toIfaceForAllBndr b) (toIfaceType t)
+toIfaceType (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in IfaceType
+  | isTcTyVar tv            = IfaceTcTyVar tv
+  | otherwise               = IfaceTyVar (toIfaceTyVar tv)
+toIfaceType (AppTy t1 t2)   = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
+toIfaceType (LitTy n)       = IfaceLitTy (toIfaceTyLit n)
+toIfaceType (ForAllTy b t)  = IfaceForAllTy (toIfaceForAllBndr b) (toIfaceType t)
 toIfaceType (FunTy t1 t2)
-  | isPredTy t1 = IfaceDFunTy (toIfaceType t1) (toIfaceType t2)
-  | otherwise   = IfaceFunTy  (toIfaceType t1) (toIfaceType t2)
-toIfaceType (CastTy ty co)      = IfaceCastTy (toIfaceType ty) (toIfaceCoercion co)
-toIfaceType (CoercionTy co)     = IfaceCoercionTy (toIfaceCoercion co)
+  | isPredTy t1             = IfaceDFunTy (toIfaceType t1) (toIfaceType t2)
+  | otherwise               = IfaceFunTy  (toIfaceType t1) (toIfaceType t2)
+toIfaceType (CastTy ty co)  = IfaceCastTy (toIfaceType ty) (toIfaceCoercion co)
+toIfaceType (CoercionTy co) = IfaceCoercionTy (toIfaceCoercion co)
 
 toIfaceType (TyConApp tc tys)
     -- tuples

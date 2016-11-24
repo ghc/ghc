@@ -2384,8 +2384,8 @@ Anyway, that's the current story, and it is used consistently for Type and HsTyp
 ------------------
 
 pprType, pprParendType :: Type -> SDoc
-pprType       = pprIfaceType . toIfaceType
-pprParendType = pprParendIfaceType . toIfaceType
+pprType       = pprIfaceType       . tidyToIfaceType
+pprParendType = pprParendIfaceType . tidyToIfaceType
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
@@ -2394,16 +2394,21 @@ pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
 
+tidyToIfaceType :: Type -> IfaceType
+-- It's vital to tidy before converting to an IfaceType
+-- or nested binders will become indistinguishable!
+tidyToIfaceType = toIfaceType . tidyTopType
+
 ------------
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
 ------------
 pprTheta :: ThetaType -> SDoc
-pprTheta = pprIfaceContext . map toIfaceType
+pprTheta = pprIfaceContext . map tidyToIfaceType
 
 pprThetaArrowTy :: ThetaType -> SDoc
-pprThetaArrowTy = pprIfaceContextArr . map toIfaceType
+pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType
 
 ------------------
 instance Outputable Type where
@@ -2415,7 +2420,7 @@ instance Outputable TyLit where
 ------------------
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType = pprIfaceSigmaType . toIfaceType
+pprSigmaType = pprIfaceSigmaType . tidyToIfaceType
 
 pprForAll :: [TyVarBinder] -> SDoc
 pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
@@ -2428,13 +2433,21 @@ pprTvBndrs :: [TyVarBinder] -> SDoc
 pprTvBndrs tvs = sep (map pprTvBndr tvs)
 
 pprTvBndr :: TyVarBinder -> SDoc
-pprTvBndr = pprIfaceTvBndr True . toIfaceTvBndr . binderVar
+pprTvBndr = pprTyVar . binderVar
 
 pprTyVars :: [TyVar] -> SDoc
 pprTyVars tvs = sep (map pprTyVar tvs)
 
 pprTyVar :: TyVar -> SDoc
-pprTyVar = pprIfaceTvBndr True . toIfaceTvBndr
+-- Print a type variable binder with its kind (but not if *)
+-- Here we do not go via IfaceType, becuase the duplication with
+-- pprIfaceTvBndr is minimal, and the loss of uniques etc in
+-- debug printing is disastrous
+pprTyVar tv
+  | isLiftedTypeKind kind = ppr tv
+  | otherwise             = parens (ppr tv <+> dcolon <+> ppr kind)
+  where
+    kind = tyVarKind tv
 
 instance Outputable TyBinder where
   ppr (Anon ty) = text "[anon]" <+> ppr ty

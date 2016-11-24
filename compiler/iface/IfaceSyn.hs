@@ -62,7 +62,6 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( TyVarBndr(..) )
-import Type ( TyPrec(..) )
 import TyCon ( Role (..), Injectivity(..), HowAbstract(..) )
 import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
@@ -1286,6 +1285,7 @@ freeNamesIfTcArgs (ITC_Invis k ks) = freeNamesIfKind k &&& freeNamesIfTcArgs ks
 freeNamesIfTcArgs ITC_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
+freeNamesIfType (IfaceTcTyVar _)      = emptyNameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfTcArgs ts
