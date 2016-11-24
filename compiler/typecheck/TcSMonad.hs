@@ -57,6 +57,7 @@ module TcSMonad (
     removeInertCts, getPendingScDicts,
     addInertCan, addInertEq, insertFunEq,
     emitInsoluble, emitWorkNC, emitWork,
+    isImprovable,
 
     -- The Model
     kickOutAfterUnification,
@@ -1148,6 +1149,37 @@ them.  If we forget the pend_sc flag, our cunning scheme for avoiding
 generating superclasses repeatedly will fail.
 
 See Trac #11379 for a case of this.
+
+Note [Do not do improvement for WOnly]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We do improvement between two constraints (e.g. for injectivity
+or functional dependencies) only if both are "improvable". And
+we improve a constraint wrt the top-level instances only if
+it is improveable.
+
+Improvable:     [G] [WD] [D}
+Not improvable: [W]
+
+Reasons:
+
+* It's less work: fewer pairs to compare
+
+* Every [W] has a shadow [D] so nothing is lost
+
+* Consider [WD] C Int b,  where 'b' is a skolem, and
+    class C a b | a -> b
+    instance C Int Bool
+  We'll do a fundep on it and emit [D] b ~ Bool
+  That will kick out constraint [WD] C Int b
+  Then we'll split it to [W] C Int b (keep in inert)
+                     and [D] C Int b (in work list)
+  When processing the latter we'll rewrite it to
+        [D] C Int Bool
+  At that point it would be /stupid/ to interact it
+  with the inert [W] C Int b in the inert set; after all,
+  it's the very constraint from which the [D] C Int Bool
+  was split!  We can avoid this by not doing improvement
+  on [W] constraints. This came up in Trac #12860.
 -}
 
 maybeEmitShadow :: InertCans -> Ct -> TcS Ct
@@ -1197,6 +1229,12 @@ intersects_with inert_eqs free_vars
       -- InertEqs = TyVarEnv EqualCtList, and we want to see if its domain
       -- is disjoint from that of a TcTyCoVarSet.  So we drop down
       -- to the underlying UniqFM.  A bit yukky, but efficient.
+
+
+isImprovable :: CtEvidence -> Bool
+-- See Note [Do not do improvement for WOnly]
+isImprovable (CtWanted { ctev_nosh = WOnly }) = False
+isImprovable _                                = True
 
 
 {- *********************************************************************
