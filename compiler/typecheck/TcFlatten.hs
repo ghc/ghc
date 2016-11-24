@@ -1457,8 +1457,9 @@ unflatten tv_eqs funeqs
                         -- NB: unlike unflattenFmv, filling a fmv here /does/
                         --     bump the unification count; it is "improvement"
                         -- Note [Unflattening can force the solver to iterate]
-      , tyVarKind tv `eqType` typeKind rhs
-      = do { is_filled <- isFilledMetaTyVar tv
+      = ASSERT2( tyVarKind tv `eqType` typeKind rhs, ppr ct )
+           -- CTyEqCan invariant should ensure this is true
+        do { is_filled <- isFilledMetaTyVar tv
            ; elim <- case is_filled of
                False -> do { traceTcS "unflatten_eq 2" (ppr ct)
                            ; tryFill      ev eq_rel       tv rhs }
