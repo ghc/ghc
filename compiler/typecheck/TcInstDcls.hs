@@ -842,8 +842,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
              arg_wrapper = mkWpEvVarApps dfun_ev_vars <.> mkWpTyApps inst_tv_tys
 
              is_newtype = isNewTyCon class_tc
-             dfun_id_w_prags = addDFunPrags dfun_id dict_constr is_newtype
-                                 inst_tyvars dfun_ev_vars inst_tys sc_meth_ids
+             dfun_id_w_prags = addDFunPrags dfun_id sc_meth_ids
              dfun_spec_prags
                 | is_newtype = SpecPrags []
                 | otherwise  = SpecPrags spec_inst_prags
@@ -867,16 +866,17 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
    dfun_id = instanceDFunId ispec
    loc     = getSrcSpan dfun_id
 
-addDFunPrags :: DFunId -> DataCon -> Bool
-             -> [TyVar] -> [Id] -> [Type]
-             -> [Id] -> DFunId
+addDFunPrags :: DFunId -> [Id] -> DFunId
 -- DFuns need a special Unfolding and InlinePrag
 --    See Note [ClassOp/DFun selection]
 --    and Note [Single-method classes]
 -- It's easiest to create those unfoldings right here, where
 -- have all the pieces in hand, even though we are messing with
 -- Core at this point, which the typechecker doesn't usually do
-addDFunPrags dfun_id dict_con is_newtype dfun_tvs dfun_evs inst_tys sc_meth_ids
+-- However we take care to build the unfolding using the TyVars from
+-- the DFunId rather than from the skolem pieces that the typechecker
+-- is messing with.
+addDFunPrags dfun_id sc_meth_ids
  | is_newtype
   = dfun_id `setIdUnfolding`  mkInlineUnfolding (Just 0) con_app
             `setInlinePragma` alwaysInlinePragma { inl_sat = Just 0 }
@@ -884,11 +884,17 @@ addDFunPrags dfun_id dict_con is_newtype dfun_tvs dfun_evs inst_tys sc_meth_ids
  = dfun_id `setIdUnfolding`  mkDFunUnfolding dfun_bndrs dict_con dict_args
            `setInlinePragma` dfunInlinePragma
  where
-   dfun_bndrs = dfun_tvs ++ dfun_evs
-   dict_args  = map Type inst_tys ++
-                [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
    con_app    = mkLams dfun_bndrs $
                 mkApps (Var (dataConWrapId dict_con)) dict_args
+   dict_args  = map Type inst_tys ++
+                [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
+
+   (dfun_tvs, dfun_theta, clas, inst_tys) = tcSplitDFunTy (idType dfun_id)
+   ev_ids      = mkTemplateLocalsNum 1                    dfun_theta
+   dfun_bndrs  = dfun_tvs ++ ev_ids
+   clas_tc     = classTyCon clas
+   [dict_con]  = tyConDataCons clas_tc
+   is_newtype  = isNewTyCon clas_tc
 
 wrapId :: HsWrapper -> id -> HsExpr id
 wrapId wrapper id = mkHsWrap wrapper (HsVar (noLoc id))
