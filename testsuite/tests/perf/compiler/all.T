@@ -632,7 +632,7 @@ test('T6048',
             # 2014-12-01: 49987836 (x86 Windows)
             # 2016-04-06: 55701280 (x86/Linux, 64-bit machine)
 
-           (wordsize(64),  108225624, 12)])
+           (wordsize(64),  94327392, 10)])
              # 18/09/2012  97247032 amd64/Linux
              # 16/01/2014 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 18/01/2014  95960720 amd64/Linux Call Arity improvements
@@ -643,6 +643,7 @@ test('T6048',
              # 14/09/2014  88186056 amd64/Linux BPP part1 change (more NoImplicitPreludes in base)
              # 08/01/2014  95946688 amd64/Linux Mostly 4c834fd. Occasional spikes to 103822120!
              # 11/03/2016 108225624 amd64/Linux unknown reason sadly; likely gradual creep.
+             # 25/11/2016  94327392 amd64/Linux Back down again hooray; still not sure why
       ],
       compile,[''])
 
@@ -851,7 +852,10 @@ test('T10370',
 
 test('T10547',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 39165544, 20),
+          [(wordsize(64), 31041520, 20),
+          # initial:    39165544
+          # 25/11/2106: 31041520 Linux   Around the time of refactoring the constraint solver;
+          #                              but I think that only pushed it over the edge
           ]),
      ],
      compile_fail,
