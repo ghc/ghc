@@ -39,6 +39,7 @@ extern "C" {
 #endif
 
 #include "rts/Types.h"
+#include "rts/Time.h"
 
 #if __GNUC__ >= 3
 #define ATTRIBUTE_ALIGNED(n) __attribute__((aligned(n)))
@@ -143,38 +144,6 @@ void _assertFail(const char *filename, unsigned int linenum)
 
 #define FMT_SizeT    "zu"
 #define FMT_HexSizeT "zx"
-
-/* -----------------------------------------------------------------------------
-   Time values in the RTS
-   -------------------------------------------------------------------------- */
-
-// For most time values in the RTS we use a fixed resolution of nanoseconds,
-// normalising the time we get from platform-dependent APIs to this
-// resolution.
-#define TIME_RESOLUTION 1000000000
-typedef StgInt64 Time;
-
-#define TIME_MAX HS_INT64_MAX
-
-#if TIME_RESOLUTION == 1000000000
-// I'm being lazy, but it's awkward to define fully general versions of these
-#define TimeToUS(t)      ((t) / 1000)
-#define TimeToNS(t)      (t)
-#define USToTime(t)      ((Time)(t) * 1000)
-#define NSToTime(t)      ((Time)(t))
-#else
-#error Fix TimeToNS(), TimeToUS() etc.
-#endif
-
-#define SecondsToTime(t) ((Time)(t) * TIME_RESOLUTION)
-#define TimeToSeconds(t) ((t) / TIME_RESOLUTION)
-
-// Use instead of SecondsToTime() when we have a floating-point
-// seconds value, to avoid truncating it.
-INLINE_HEADER Time fsecondsToTime (double t)
-{
-    return (Time)(t * TIME_RESOLUTION);
-}
 
 /* -----------------------------------------------------------------------------
    Include everything STG-ish

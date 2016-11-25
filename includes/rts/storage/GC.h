@@ -223,61 +223,6 @@ void revertCAFs (void);
 void setKeepCAFs (void);
 
 /* -----------------------------------------------------------------------------
-   Stats
-   -------------------------------------------------------------------------- */
-
-typedef struct _GCStats {
-  StgWord64 bytes_allocated;
-  StgWord64 num_gcs;
-  StgWord64 num_byte_usage_samples;
-  StgWord64 max_bytes_used;
-  StgWord64 cumulative_bytes_used;
-  StgWord64 bytes_copied;
-  StgWord64 current_bytes_used;
-  StgWord64 current_bytes_slop;
-  StgWord64 max_bytes_slop;
-  StgWord64 peak_megabytes_allocated;
-  StgWord64 mblocks_allocated;
-  StgWord64 par_tot_bytes_copied;
-  StgWord64 par_max_bytes_copied;
-  StgDouble mutator_cpu_seconds;
-  StgDouble mutator_wall_seconds;
-  StgDouble gc_cpu_seconds;
-  StgDouble gc_wall_seconds;
-  StgDouble cpu_seconds;
-  StgDouble wall_seconds;
-} GCStats;
-void getGCStats (GCStats *s);
-bool getGCStatsEnabled (void);
-
-// These don't change over execution, so do them elsewhere
-//  StgDouble init_cpu_seconds;
-//  StgDouble init_wall_seconds;
-
-typedef struct _ParGCStats {
-  StgWord64 tot_copied;
-  StgWord64 max_copied;
-} ParGCStats;
-void getParGCStats (ParGCStats *s);
-
-/*
-typedef struct _TaskStats {
-  StgWord64 mut_time;
-  StgWord64 mut_etime;
-  StgWord64 gc_time;
-  StgWord64 gc_etime;
-} TaskStats;
-// would need to allocate arbitrarily large amount of memory
-// because it's a linked list of results
-void getTaskStats (TaskStats **s);
-// Need to stuff SparkCounters in a public header file...
-void getSparkStats (SparkCounters *s);
-*/
-
-// Returns the total number of bytes allocated since the start of the program.
-HsInt64 getAllocations (void);
-
-/* -----------------------------------------------------------------------------
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
    is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY

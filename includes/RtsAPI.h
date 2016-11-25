@@ -17,6 +17,7 @@ extern "C" {
 #endif
 
 #include "HsFFI.h"
+#include "rts/Time.h"
 
 /*
  * Running the scheduler
@@ -56,6 +57,8 @@ typedef enum {
     RtsOptsAll           // all RTS options allowed
   } RtsOptsEnabledEnum;
 
+struct GCDetails_;
+
 // The RtsConfig struct is passed (by value) to hs_init_ghc().  The
 // reason for using a struct is extensibility: we can add more
 // fields to this later without breaking existing client code.
@@ -93,21 +96,115 @@ typedef struct {
     void (* mallocFailHook) (W_ request_size /* in bytes */, const char *msg);
 
     // Called for every GC
-    void (* gcDoneHook) (unsigned int gen,
-                         W_ allocated_bytes, /* since last GC */
-                         W_ live_bytes,
-                         W_ copied_bytes,
-                         W_ max_copied_per_thread_bytes,
-                         W_ total_bytes,
-                         W_ slop_bytes,
-                         W_ sync_elapsed_ns, W_ elapsed_ns, W_ cpu_ns);
-
+    void (* gcDoneHook) (const struct GCDetails_ *stats);
 } RtsConfig;
 
 // Clients should start with defaultRtsConfig and then customise it.
 // Bah, I really wanted this to be a const struct value, but it seems
 // you can't do that in C (it generates code).
 extern const RtsConfig defaultRtsConfig;
+
+/* -----------------------------------------------------------------------------
+   Statistics
+   -------------------------------------------------------------------------- */
+
+//
+// Stats about a single GC
+//
+typedef struct GCDetails_ {
+    // The generation number of this GC
+  uint32_t gen;
+    // Number of threads used in this GC
+  uint32_t threads;
+    // Number of bytes allocated since the previous GC
+  uint64_t allocated_bytes;
+    // Total amount of live data in the heap (incliudes large + compact data)
+  uint64_t live_bytes;
+    // Total amount of live data in large objects
+  uint64_t large_objects_bytes;
+    // Total amount of live data in compact regions
+  uint64_t compact_bytes;
+    // Total amount of slop (wasted memory)
+  uint64_t slop_bytes;
+    // Total amount of memory in use by the RTS
+  uint64_t mem_in_use_bytes;
+    // Total amount of data copied during this GC
+  uint64_t copied_bytes;
+    // In parallel GC, the max amount of data copied by any one thread
+  uint64_t par_max_copied_bytes;
+    // The time elapsed during synchronisation before GC
+  Time sync_elapsed_ns;
+    // The CPU time used during GC itself
+  Time cpu_ns;
+    // The time elapsed during GC itself
+  Time elapsed_ns;
+} GCDetails;
+
+//
+// Stats about the RTS currently, and since the start of execution
+//
+typedef struct _RTSStats {
+
+  // -----------------------------------
+  // Cumulative stats about memory use
+
+    // Total number of GCs
+  uint32_t gcs;
+    // Total number of major (oldest generation) GCs
+  uint32_t major_gcs;
+    // Total bytes allocated
+  uint64_t allocated_bytes;
+    // Maximum live data (including large objects + compact regions)
+  uint64_t max_live_bytes;
+    // Maximum live data in large objects
+  uint64_t max_large_objects_bytes;
+    // Maximum live data in compact regions
+  uint64_t max_compact_bytes;
+    // Maximum slop
+  uint64_t max_slop_bytes;
+    // Maximum memory in use by the RTS
+  uint64_t max_mem_in_use_bytes;
+    // Sum of live bytes across all major GCs.  Divided by major_gcs
+    // gives the average live data over the lifetime of the program.
+  uint64_t cumulative_live_bytes;
+    // Sum of copied_bytes across all GCs
+  uint64_t copied_bytes;
+    // Sum of copied_bytes across all parallel GCs
+  uint64_t par_copied_bytes;
+    // Sum of par_max_copied_bytes across all parallel GCs
+  uint64_t cumulative_par_max_copied_bytes;
+
+  // -----------------------------------
+  // Cumulative stats about time use
+  // (we use signed values here because due to inacuracies in timers
+  // the values can occasionally go slightly negative)
+
+    // Total CPU time used by the mutator
+  Time mutator_cpu_ns;
+    // Total elapsed time used by the mutator
+  Time mutator_elapsed_ns;
+    // Total CPU time used by the GC
+  Time gc_cpu_ns;
+    // Total elapsed time used by the GC
+  Time gc_elapsed_ns;
+    // Total CPU time (at the previous GC)
+  Time cpu_ns;
+    // Total elapsed time (at the previous GC)
+  Time elapsed_ns;
+
+  // -----------------------------------
+  // Stats about the most recent GC
+
+  GCDetails gc;
+
+} RTSStats;
+
+void getRTSStats (RTSStats *s);
+int getRTSStatsEnabled (void);
+
+// Returns the total number of bytes allocated since the start of the program.
+// TODO: can we remove this?
+uint64_t getAllocations (void);
 
 /* ----------------------------------------------------------------------------
    Starting up and shutting down the Haskell RTS.

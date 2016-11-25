@@ -567,8 +567,8 @@
       SymI_HasProto(getOrSetSystemTimerThreadEventManagerStore)         \
       SymI_HasProto(getOrSetSystemTimerThreadIOManagerThreadStore)      \
       SymI_HasProto(getOrSetLibHSghcFastStringTable)                    \
-      SymI_HasProto(getGCStats)                                         \
-      SymI_HasProto(getGCStatsEnabled)                                  \
+      SymI_HasProto(getRTSStats)                                        \
+      SymI_HasProto(getRTSStatsEnabled)                                 \
       SymI_HasProto(genericRaise)                                       \
       SymI_HasProto(getProgArgv)                                        \
       SymI_HasProto(getFullProgArgv)                                    \

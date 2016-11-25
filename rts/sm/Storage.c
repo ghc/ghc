@@ -1293,6 +1293,28 @@ calcNeeded (bool force_major, memcount *blocks_needed)
     return N;
 }
 
+StgWord calcTotalLargeObjectsW (void)
+{
+    uint32_t g;
+    StgWord totalW = 0;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        totalW += generations[g].n_large_words;
+    }
+    return totalW;
+}
+
+StgWord calcTotalCompactW (void)
+{
+    uint32_t g;
+    StgWord totalW = 0;
+
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        totalW += generations[g].n_compact_blocks * BLOCK_SIZE_W;
+    }
+    return totalW;
+}
+
 /* ----------------------------------------------------------------------------
    Executable memory
 

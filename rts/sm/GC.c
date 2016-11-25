@@ -187,7 +187,7 @@ GarbageCollect (uint32_t collect_gen,
 {
   bdescr *bd;
   generation *gen;
-  StgWord live_blocks, live_words, par_max_copied, par_tot_copied;
+  StgWord live_blocks, live_words, par_max_copied;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -459,7 +459,6 @@ GarbageCollect (uint32_t collect_gen,
 
   copied = 0;
   par_max_copied = 0;
-  par_tot_copied = 0;
   {
       uint32_t i;
       for (i=0; i < n_gc_threads; i++) {
@@ -474,10 +473,8 @@ GarbageCollect (uint32_t collect_gen,
           copied += gc_threads[i]->copied;
           par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
       }
-      par_tot_copied = copied;
       if (n_gc_threads == 1) {
           par_max_copied = 0;
-          par_tot_copied = 0;
       }
   }
 
@@ -773,7 +770,7 @@ GarbageCollect (uint32_t collect_gen,
   // ok, GC over: tell the stats department what happened.
   stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
-             N, n_gc_threads, par_max_copied, par_tot_copied);
+             N, n_gc_threads, par_max_copied);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {

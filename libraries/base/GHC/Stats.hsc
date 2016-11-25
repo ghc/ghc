@@ -13,14 +13,25 @@
 -- @since 4.5.0.0
 -----------------------------------------------------------------------------
 module GHC.Stats
-    ( GCStats(..)
+    (
+    -- * Runtime statistics
+      RTSStats(..), GCDetails(..)
+    , getRTSStats
+    , getRTSStatsEnabled
+
+    -- * DEPRECATED, don't use
+    , GCStats(..)
     , getGCStats
     , getGCStatsEnabled
 ) where
 
+import Control.Applicative
 import Control.Monad
 import Data.Int
+import Data.Word
 import GHC.Base
+import GHC.Num (Num(..))
+import GHC.Real (quot, fromIntegral, (/))
 import GHC.Read ( Read )
 import GHC.Show ( Show )
 import GHC.IO.Exception
@@ -30,12 +41,163 @@ import Foreign.Ptr
 
 #include "Rts.h"
 
-foreign import ccall "getGCStats"        getGCStats_       :: Ptr () -> IO ()
+foreign import ccall "getRTSStats" getRTSStats_ :: Ptr () -> IO ()
 
 -- | Returns whether GC stats have been enabled (with @+RTS -T@, for example).
 --
--- @since 4.6.0.0
-foreign import ccall "getGCStatsEnabled" getGCStatsEnabled :: IO Bool
+-- @since 4.9.0.0
+foreign import ccall "getRTSStatsEnabled" getRTSStatsEnabled :: IO Bool
+
+--
+-- | Statistics about runtime activity since the start of the
+-- program.  This is a mirror of the C @struct RTSStats@ in @RtsAPI.h@
+--
+-- @since 4.9.0.0
+--
+data RTSStats = RTSStats {
+  -- -----------------------------------
+  -- Cumulative stats about memory use
+
+    -- | Total number of GCs
+    gcs :: Word32
+    -- | Total number of major (oldest generation) GCs
+  , major_gcs :: Word32
+    -- | Total bytes allocated
+  , allocated_bytes :: Word64
+    -- | Maximum live data (including large objects + compact regions)
+  , max_live_bytes :: Word64
+    -- | Maximum live data in large objects
+  , max_large_objects_bytes :: Word64
+    -- | Maximum live data in compact regions
+  , max_compact_bytes :: Word64
+    -- | Maximum slop
+  , max_slop_bytes :: Word64
+    -- | Maximum memory in use by the RTS
+  , max_mem_in_use_bytes :: Word64
+    -- | Sum of live bytes across all major GCs.  Divided by major_gcs
+    -- gives the average live data over the lifetime of the program.
+  , cumulative_live_bytes :: Word64
+    -- | Sum of copied_bytes across all GCs
+  , copied_bytes :: Word64
+    -- | Sum of copied_bytes across all parallel GCs
+  , par_copied_bytes :: Word64
+    -- | Sum of par_max_copied_bytes across all parallel GCs
+  , cumulative_par_max_copied_bytes :: Word64
+
+  -- -----------------------------------
+  -- Cumulative stats about time use
+  -- (we use signed values here because due to inacuracies in timers
+  -- the values can occasionally go slightly negative)
+
+    -- | Total CPU time used by the mutator
+  , mutator_cpu_ns :: RtsTime
+    -- | Total elapsed time used by the mutator
+  , mutator_elapsed_ns :: RtsTime
+    -- | Total CPU time used by the GC
+  , gc_cpu_ns :: RtsTime
+    -- | Total elapsed time used by the GC
+  , gc_elapsed_ns :: RtsTime
+    -- | Total CPU time (at the previous GC)
+  , cpu_ns :: RtsTime
+    -- | Total elapsed time (at the previous GC)
+  , elapsed_ns :: RtsTime
+
+    -- | Details about the most recent GC
+  , gc :: GCDetails
+  }
+
+--
+-- | Statistics about a single GC.  This is a mirror of the C @struct
+--   GCDetails@ in @RtsAPI.h@, with the field prefixed with @gc_@ to
+--   avoid collisions with 'RTSStats'.
+--
+data GCDetails = GCDetails {
+    -- | The generation number of this GC
+    gcdetails_gen :: Word32
+    -- | Number of threads used in this GC
+  , gcdetails_threads :: Word32
+    -- | Number of bytes allocated since the previous GC
+  , gcdetails_allocated_bytes :: Word64
+    -- | Total amount of live data in the heap (incliudes large + compact data)
+  , gcdetails_live_bytes :: Word64
+    -- | Total amount of live data in large objects
+  , gcdetails_large_objects_bytes :: Word64
+    -- | Total amount of live data in compact regions
+  , gcdetails_compact_bytes :: Word64
+    -- | Total amount of slop (wasted memory)
+  , gcdetails_slop_bytes :: Word64
+    -- | Total amount of memory in use by the RTS
+  , gcdetails_mem_in_use_bytes :: Word64
+    -- | Total amount of data copied during this GC
+  , gcdetails_copied_bytes :: Word64
+    -- | In parallel GC, the max amount of data copied by any one thread
+  , gcdetails_par_max_copied_bytes :: Word64
+    -- | The time elapsed during synchronisation before GC
+  , gcdetails_sync_elapsed_ns :: RtsTime
+    -- | The CPU time used during GC itself
+  , gcdetails_cpu_ns :: RtsTime
+    -- | The time elapsed during GC itself
+  , gcdetails_elapsed_ns :: RtsTime
+  }
+
+
+type RtsTime = Int64
+
+-- @since 4.9.0.0
+--
+getRTSStats :: IO RTSStats
+getRTSStats = do
+  statsEnabled <- getGCStatsEnabled
+  unless statsEnabled .  ioError $ IOError
+    Nothing
+    UnsupportedOperation
+    ""
+    "getGCStats: GC stats not enabled. Use `+RTS -T -RTS' to enable them."
+    Nothing
+    Nothing
+  allocaBytes (#size RTSStats) $ \p -> do
+    getRTSStats_ p
+    gcs <- (# peek RTSStats, gcs) p
+    major_gcs <- (# peek RTSStats, major_gcs) p
+    allocated_bytes <- (# peek RTSStats, allocated_bytes) p
+    max_live_bytes <- (# peek RTSStats, max_live_bytes) p
+    max_large_objects_bytes <- (# peek RTSStats, max_large_objects_bytes) p
+    max_compact_bytes <- (# peek RTSStats, max_compact_bytes) p
+    max_slop_bytes <- (# peek RTSStats, max_slop_bytes) p
+    max_mem_in_use_bytes <- (# peek RTSStats, max_mem_in_use_bytes) p
+    cumulative_live_bytes <- (# peek RTSStats, cumulative_live_bytes) p
+    copied_bytes <- (# peek RTSStats, copied_bytes) p
+    par_copied_bytes <- (# peek RTSStats, par_copied_bytes) p
+    cumulative_par_max_copied_bytes <-
+      (# peek RTSStats, cumulative_par_max_copied_bytes) p
+    mutator_cpu_ns <- (# peek RTSStats, mutator_cpu_ns) p
+    mutator_elapsed_ns <- (# peek RTSStats, mutator_elapsed_ns) p
+    gc_cpu_ns <- (# peek RTSStats, gc_cpu_ns) p
+    gc_elapsed_ns <- (# peek RTSStats, gc_elapsed_ns) p
+    cpu_ns <- (# peek RTSStats, cpu_ns) p
+    elapsed_ns <- (# peek RTSStats, elapsed_ns) p
+    let pgc = (# ptr RTSStats, gc) p
+    gc <- do
+      gcdetails_gen <- (# peek GCDetails, gen) pgc
+      gcdetails_threads <- (# peek GCDetails, threads) pgc
+      gcdetails_allocated_bytes <- (# peek GCDetails, allocated_bytes) pgc
+      gcdetails_live_bytes <- (# peek GCDetails, live_bytes) pgc
+      gcdetails_large_objects_bytes <-
+        (# peek GCDetails, large_objects_bytes) pgc
+      gcdetails_compact_bytes <- (# peek GCDetails, compact_bytes) pgc
+      gcdetails_slop_bytes <- (# peek GCDetails, slop_bytes) pgc
+      gcdetails_mem_in_use_bytes <- (# peek GCDetails, mem_in_use_bytes) pgc
+      gcdetails_copied_bytes <- (# peek GCDetails, copied_bytes) pgc
+      gcdetails_par_max_copied_bytes <-
+        (# peek GCDetails, par_max_copied_bytes) pgc
+      gcdetails_sync_elapsed_ns <- (# peek GCDetails, sync_elapsed_ns) pgc
+      gcdetails_cpu_ns <- (# peek GCDetails, cpu_ns) pgc
+      gcdetails_elapsed_ns <- (# peek GCDetails, elapsed_ns) pgc
+      return GCDetails{..}
+    return RTSStats{..}
+
+-- -----------------------------------------------------------------------------
+-- DEPRECATED API
 
 -- I'm probably violating a bucket of constraints here... oops.
 
@@ -44,6 +206,7 @@ foreign import ccall "getGCStatsEnabled" getGCStatsEnabled :: IO Bool
 -- the program started.
 --
 -- @since 4.5.0.0
+{-# DEPRECATED GCStats "Use RTSStats instead.  This will be removed in GHC 8.4.1" #-}
 data GCStats = GCStats
     { -- | Total number of bytes allocated
     bytesAllocated :: !Int64
@@ -100,16 +263,13 @@ data GCStats = GCStats
     , parMaxBytesCopied :: !Int64
     } deriving (Show, Read)
 
-    {-
-    , initCpuSeconds :: !Double
-    , initWallSeconds :: !Double
-    -}
-
 -- | Retrieves garbage collection and memory statistics as of the last
 -- garbage collection.  If you would like your statistics as recent as
 -- possible, first run a 'System.Mem.performGC'.
 --
 -- @since 4.5.0.0
+{-# DEPRECATED getGCStats
+    "Use getRTSStats instead.  This will be removed in GHC 8.4.1" #-}
 getGCStats :: IO GCStats
 getGCStats = do
   statsEnabled <- getGCStatsEnabled
@@ -120,56 +280,38 @@ getGCStats = do
     "getGCStats: GC stats not enabled. Use `+RTS -T -RTS' to enable them."
     Nothing
     Nothing
-  allocaBytes (#size GCStats) $ \p -> do
-    getGCStats_ p
-    bytesAllocated <- (# peek GCStats, bytes_allocated) p
-    numGcs <- (# peek GCStats, num_gcs ) p
-    numByteUsageSamples <- (# peek GCStats, num_byte_usage_samples ) p
-    maxBytesUsed <- (# peek GCStats, max_bytes_used ) p
-    cumulativeBytesUsed <- (# peek GCStats, cumulative_bytes_used ) p
-    bytesCopied <- (# peek GCStats, bytes_copied ) p
-    currentBytesUsed <- (# peek GCStats, current_bytes_used ) p
-    currentBytesSlop <- (# peek GCStats, current_bytes_slop) p
-    maxBytesSlop <- (# peek GCStats, max_bytes_slop) p
-    peakMegabytesAllocated <- (# peek GCStats, peak_megabytes_allocated ) p
-    mblocksAllocated <- (# peek GCStats, mblocks_allocated) p
-    {-
-    initCpuSeconds <- (# peek GCStats, init_cpu_seconds) p
-    initWallSeconds <- (# peek GCStats, init_wall_seconds) p
-    -}
-    mutatorCpuSeconds <- (# peek GCStats, mutator_cpu_seconds) p
-    mutatorWallSeconds <- (# peek GCStats, mutator_wall_seconds) p
-    gcCpuSeconds <- (# peek GCStats, gc_cpu_seconds) p
-    gcWallSeconds <- (# peek GCStats, gc_wall_seconds) p
-    cpuSeconds <- (# peek GCStats, cpu_seconds) p
-    wallSeconds <- (# peek GCStats, wall_seconds) p
-    parTotBytesCopied <- (# peek GCStats, par_tot_bytes_copied) p
-    parMaxBytesCopied <- (# peek GCStats, par_max_bytes_copied) p
+  allocaBytes (#size RTSStats) $ \p -> do
+    getRTSStats_ p
+    bytesAllocated <- (# peek RTSStats, allocated_bytes) p
+    numGcs <- (# peek RTSStats, gcs ) p
+    numByteUsageSamples <- (# peek RTSStats, major_gcs ) p
+    maxBytesUsed <- (# peek RTSStats, max_live_bytes ) p
+    cumulativeBytesUsed <- (# peek RTSStats, cumulative_live_bytes ) p
+    bytesCopied <- (# peek RTSStats, copied_bytes ) p
+    currentBytesUsed <- (# peek RTSStats, gc.live_bytes ) p
+    currentBytesSlop <- (# peek RTSStats, gc.slop_bytes) p
+    maxBytesSlop <- (# peek RTSStats, max_slop_bytes) p
+    peakMegabytesAllocated <- do
+      bytes <- (# peek RTSStats, max_mem_in_use_bytes ) p
+      return (bytes `quot` (1024*1024))
+    mblocksAllocated <- do
+      bytes <- (# peek RTSStats, gc.mem_in_use_bytes) p
+      return (bytes `quot` (1024*1024))
+    mutatorCpuSeconds <- nsToSecs <$> (# peek RTSStats, mutator_cpu_ns) p
+    mutatorWallSeconds <-
+      nsToSecs <$> (# peek RTSStats, mutator_elapsed_ns) p
+    gcCpuSeconds <- nsToSecs <$> (# peek RTSStats, gc_cpu_ns) p
+    gcWallSeconds <- nsToSecs <$> (# peek RTSStats, gc_elapsed_ns) p
+    cpuSeconds <- nsToSecs <$> (# peek RTSStats, cpu_ns) p
+    wallSeconds <- nsToSecs <$> (# peek RTSStats, elapsed_ns) p
+    parTotBytesCopied <- (# peek RTSStats, par_copied_bytes) p
+    parMaxBytesCopied <- (# peek RTSStats, cumulative_par_max_copied_bytes) p
     return GCStats { .. }
 
-{-
+nsToSecs :: Int64 -> Double
+nsToSecs ns = fromIntegral ns / (# const TIME_RESOLUTION)
 
--- Nontrivial to implement: TaskStats needs arbitrarily large
--- amounts of memory, spark stats wants to use SparkCounters
--- but that needs a new rts/ header.
-
-data TaskStats = TaskStats
-    { taskMutCpuSeconds :: Int64
-    , taskMutWallSeconds :: Int64
-    , taskGcCpuSeconds :: Int64
-    , taskGcWallSeconds :: Int64
-    } deriving (Show, Read)
-
-data SparkStats = SparkStats
-    { sparksCreated :: Int64
-    , sparksDud :: Int64
-    , sparksOverflowed :: Int64
-    , sparksConverted :: Int64
-    , sparksGcd :: Int64
-    , sparksFizzled :: Int64
-    } deriving (Show, Read)
-
--- We also could get per-generation stats, which requires a
--- non-constant but at runtime known about of memory.
-
--}
+{-# DEPRECATED getGCStatsEnabled
+    "use getRTSStatsEnabled instead.  This will be removed in GHC 8.4.1" #-}
+getGCStatsEnabled :: IO Bool
+getGCStatsEnabled = getRTSStatsEnabled

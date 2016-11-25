@@ -100,7 +100,6 @@ StgWord calcTotalAllocated   (void);
    Stats 'n' DEBUG stuff
    -------------------------------------------------------------------------- */
 
-StgWord countLargeAllocated (void);
 StgWord countOccupied       (bdescr *bd);
 StgWord calcNeeded          (bool force_major, StgWord *blocks_needed);
 
@@ -109,6 +108,9 @@ StgWord gcThreadLiveBlocks (uint32_t i, uint32_t g);
 
 StgWord genLiveWords  (generation *gen);
 StgWord genLiveBlocks (generation *gen);
+
+StgWord calcTotalLargeObjectsW (void);
+StgWord calcTotalCompactW (void);
 
 /* ----------------------------------------------------------------------------
    Storage manager internal APIs and globals
