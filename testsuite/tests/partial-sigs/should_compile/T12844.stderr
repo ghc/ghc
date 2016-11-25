@@ -1,0 +1,6 @@
+
+T12844.hs:12:9: warning: [-Wpartial-type-signatures (in -Wdefault)]
+    Found constraint wildcard ‘_’ standing for ‘(Head rngs ~ '(r, r'),
+                                                 Foo rngs)’
+    In the type signature:
+      bar :: _ => FooData rngs
