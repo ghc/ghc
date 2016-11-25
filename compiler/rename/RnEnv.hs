@@ -697,6 +697,9 @@ lookupOccRn rdr_name
 lookupKindOccRn :: RdrName -> RnM Name
 -- Looking up a name occurring in a kind
 lookupKindOccRn rdr_name
+  | isVarOcc (rdrNameOcc rdr_name)  -- See Note [Promoted variables in types]
+  = badVarInType rdr_name
+  | otherwise
   = do { typeintype <- xoptM LangExt.TypeInType
        ; if | typeintype           -> lookupTypeOccRn rdr_name
       -- With -XNoTypeInType, treat any usage of * in kinds as in scope
@@ -709,6 +712,9 @@ lookupKindOccRn rdr_name
 lookupTypeOccRn :: RdrName -> RnM Name
 -- see Note [Demotion]
 lookupTypeOccRn rdr_name
+  | isVarOcc (rdrNameOcc rdr_name)  -- See Note [Promoted variables in types]
+  = badVarInType rdr_name
+  | otherwise
   = do { mb_name <- lookupOccRn_maybe rdr_name
        ; case mb_name of {
              Just name -> return name ;
@@ -758,7 +764,25 @@ is_star, is_uni_star :: RdrName -> Bool
 is_star     = (fsLit "*" ==) . occNameFS . rdrNameOcc
 is_uni_star = (fsLit "★" ==) . occNameFS . rdrNameOcc
 
-{-
+badVarInType :: RdrName -> RnM Name
+badVarInType rdr_name
+  = do { addErr (text "Illegal promoted term variable in a type:"
+                 <+> ppr rdr_name)
+       ; return (mkUnboundNameRdr rdr_name) }
+
+{- Note [Promoted variables in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this (Trac #12686):
+   x = True
+   data Bad = Bad 'x
+
+The parser treats the quote in 'x as saying "use the term
+namespace", so we'll get (Bad x{v}), with 'x' in the
+VarName namespace.  If we don't test for this, the renamer
+will happily rename it to the x bound at top level, and then
+the typecheck falls over because it doesn't have 'x' in scope
+when kind-checking.
+
 Note [Demotion]
 ~~~~~~~~~~~~~~~
 When the user writes:
