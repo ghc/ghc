@@ -1651,7 +1651,7 @@ def normalise_prof (str):
     # sometimes under MAIN.
     str = re.sub('[ \t]*main[ \t]+Main.*\n','',str)
 
-    # We have somthing like this:
+    # We have something like this:
     #
     # MAIN         MAIN  <built-in>                 53  0  0.0   0.2  0.0  100.0
     #  CAF         Main  <entire-module>           105  0  0.0   0.3  0.0   62.5
