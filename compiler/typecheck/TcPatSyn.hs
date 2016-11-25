@@ -20,6 +20,8 @@ import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
 import TcMType
+import TcHsSyn( zonkTyVarBindersX, zonkTcTypeToTypes
+              , zonkTcTypeToType, emptyZonkEnv )
 import TysPrim
 import TysWiredIn  ( runtimeRepTy )
 import Name
@@ -292,18 +294,19 @@ tc_patsyn_finish :: Located Name  -- ^ PatSyn Name
                  -- ^ Whether fields, empty if not record PatSyn
                  -> TcM (LHsBinds Id, TcGblEnv)
 tc_patsyn_finish lname dir is_infix lpat'
-                 (univ_bndrs, req_theta, req_ev_binds, req_dicts)
-                 (ex_bndrs, ex_tys, prov_theta, prov_dicts)
+                 (univ_tvs, req_theta, req_ev_binds, req_dicts)
+                 (ex_tvs,   ex_tys,    prov_theta,   prov_dicts)
                  (args, arg_tys)
                  pat_ty field_labels
   = do { -- Zonk everything.  We are about to build a final PatSyn
          -- so there had better be no unification variables in there
-         univ_tvs'    <- mapMaybeM zonk_qtv univ_bndrs
-       ; ex_tvs'      <- mapMaybeM zonk_qtv ex_bndrs
-       ; prov_theta'  <- zonkTcTypes prov_theta
-       ; req_theta'   <- zonkTcTypes req_theta
-       ; pat_ty'      <- zonkTcType pat_ty
-       ; arg_tys'     <- zonkTcTypes arg_tys
+
+         (ze, univ_tvs') <- zonkTyVarBindersX emptyZonkEnv univ_tvs
+       ; req_theta'      <- zonkTcTypeToTypes ze req_theta
+       ; (ze, ex_tvs')   <- zonkTyVarBindersX ze ex_tvs
+       ; prov_theta'       <- zonkTcTypeToTypes ze prov_theta
+       ; pat_ty'         <- zonkTcTypeToType ze pat_ty
+       ; arg_tys'        <- zonkTcTypeToTypes ze arg_tys
 
        ; let (env1, univ_tvs) = tidyTyVarBinders emptyTidyEnv univ_tvs'
              (env2, ex_tvs)   = tidyTyVarBinders env1 ex_tvs'
@@ -357,14 +360,6 @@ tc_patsyn_finish lname dir is_infix lpat'
 
        ; traceTc "tc_patsyn_finish }" empty
        ; return (matcher_bind, tcg_env) }
-  where
-    -- This is a bit of an odd functions; why does it not occur elsewhere
-    zonk_qtv :: TcTyVarBinder -> TcM (Maybe TcTyVarBinder)
-    zonk_qtv (TvBndr tv vis)
-      = do { mb_tv' <- zonkQuantifiedTyVar False tv
-                    -- ToDo: The False means that we behave here as if
-                    -- -XPolyKinds was always on, which isn't right.
-           ; return (fmap (\tv' -> TvBndr tv' vis) mb_tv') }
 
 {-
 ************************************************************************

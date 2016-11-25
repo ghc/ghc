@@ -22,7 +22,7 @@ module TcType (
   -- Types
   TcType, TcSigmaType, TcRhoType, TcTauType, TcPredType, TcThetaType,
   TcTyVar, TcTyVarSet, TcDTyVarSet, TcTyCoVarSet, TcDTyCoVarSet,
-  TcKind, TcCoVar, TcTyCoVar, TcTyBinder, TcTyVarBinder, TcTyCon,
+  TcKind, TcCoVar, TcTyCoVar, TcTyVarBinder, TcTyCon,
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
@@ -309,7 +309,6 @@ type TcTyCoVar = Var    -- Either a TcTyVar or a CoVar
         -- T is "flattened" before quantifying over a
 
 type TcTyVarBinder = TyVarBinder
-type TcTyBinder    = TyBinder
 type TcTyCon       = TyCon   -- these can be the TcTyCon constructor
 
 -- These types do not have boxy type variables in them

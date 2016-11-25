@@ -75,7 +75,7 @@ module TcMType (
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
   zonkQuantifiedTyVar,
   quantifyTyVars, quantifyZonkedTyVars,
-  zonkTcTyCoVarBndr, zonkTcTyBinder, zonkTyConBinder,
+  zonkTcTyCoVarBndr, zonkTcTyVarBinder,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
 
@@ -90,7 +90,6 @@ module TcMType (
 import TyCoRep
 import TcType
 import Type
-import TyCon( TyConBinder )
 import Kind
 import Coercion
 import Class
@@ -1435,16 +1434,8 @@ zonkTcTyCoVarBndr tyvar
   = ASSERT2( isImmutableTyVar tyvar || (not $ isTyVar tyvar), pprTyVar tyvar )
     updateTyVarKindM zonkTcType tyvar
 
--- | Zonk a TyBinder
-zonkTcTyBinder :: TcTyBinder -> TcM TcTyBinder
-zonkTcTyBinder (Anon ty)   = Anon  <$> zonkTcType ty
-zonkTcTyBinder (Named tvb) = Named <$> zonkTyVarBinder tvb
-
-zonkTyConBinder :: TyConBinder -> TcM TyConBinder
-zonkTyConBinder = zonkTyVarBinder
-
-zonkTyVarBinder :: TyVarBndr TyVar vis -> TcM (TyVarBndr TyVar vis)
-zonkTyVarBinder (TvBndr tv vis)
+zonkTcTyVarBinder :: TyVarBndr TcTyVar vis -> TcM (TyVarBndr TcTyVar vis)
+zonkTcTyVarBinder (TvBndr tv vis)
   = do { tv' <- zonkTcTyCoVarBndr tv
        ; return (TvBndr tv' vis) }
 

@@ -27,7 +27,7 @@ module TcHsSyn (
         -- in TcMType
         zonkTopDecls, zonkTopExpr, zonkTopLExpr,
         zonkTopBndrs, zonkTyBndrsX,
-        zonkTyConBinders,
+        zonkTyVarBindersX, zonkTyVarBinderX,
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo, zonkSigType,
@@ -335,10 +335,10 @@ zonkEvVarOcc env v
   | otherwise
   = return (EvId $ zonkIdOcc env v)
 
-zonkTyBndrsX :: ZonkEnv -> [TyVar] -> TcM (ZonkEnv, [TyVar])
+zonkTyBndrsX :: ZonkEnv -> [TcTyVar] -> TcM (ZonkEnv, [TyVar])
 zonkTyBndrsX = mapAccumLM zonkTyBndrX
 
-zonkTyBndrX :: ZonkEnv -> TyVar -> TcM (ZonkEnv, TyVar)
+zonkTyBndrX :: ZonkEnv -> TcTyVar -> TcM (ZonkEnv, TyVar)
 -- This guarantees to return a TyVar (not a TcTyVar)
 -- then we add it to the envt, so all occurrences are replaced
 zonkTyBndrX env tv
@@ -348,11 +348,14 @@ zonkTyBndrX env tv
        ; let tv' = mkTyVar (tyVarName tv) ki
        ; return (extendTyZonkEnv1 env tv', tv') }
 
-zonkTyConBinders :: ZonkEnv -> [TyConBinder] -> TcM (ZonkEnv, [TyConBinder])
-zonkTyConBinders = mapAccumLM zonkTyConBinderX
+zonkTyVarBindersX :: ZonkEnv -> [TyVarBndr TcTyVar vis]
+                             -> TcM (ZonkEnv, [TyVarBndr TyVar vis])
+zonkTyVarBindersX = mapAccumLM zonkTyVarBinderX
 
-zonkTyConBinderX :: ZonkEnv -> TyConBinder -> TcM (ZonkEnv, TyConBinder)
-zonkTyConBinderX env (TvBndr tv vis)
+zonkTyVarBinderX :: ZonkEnv -> TyVarBndr TcTyVar vis
+                            -> TcM (ZonkEnv, TyVarBndr TyVar vis)
+-- Takes a TcTyVar and guarantees to return a TyVar
+zonkTyVarBinderX env (TvBndr tv vis)
   = do { (env', tv') <- zonkTyBndrX env tv
        ; return (env', TvBndr tv' vis) }
 

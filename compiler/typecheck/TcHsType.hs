@@ -1220,7 +1220,7 @@ Note [Dependent LHsQTyVars]
 We track (in the renamer) which explicitly bound variables in a
 LHsQTyVars are manifestly dependent; only precisely these variables
 may be used within the LHsQTyVars. We must do this so that kcHsTyVarBndrs
-can produce the right TcTyBinders, and tell Anon vs. Named. Earlier,
+can produce the right TyConBinders, and tell Anon vs. Named. Earlier,
 I thought it would work simply to do a free-variable check during
 kcHsTyVarBndrs, but this is bogus, because there may be unsolved
 equalities about. And we don't want to eagerly solve the equalities,
@@ -1283,7 +1283,7 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
 
            -- Now, because we're in a CUSK, quantify over the mentioned
            -- kind vars, in dependency order.
-       ; tc_binders  <- mapM zonkTyConBinder tc_binders
+       ; tc_binders  <- mapM zonkTcTyVarBinder tc_binders
        ; res_kind <- zonkTcType res_kind
        ; let tc_tvs = binderVars tc_binders
              qkvs   = tyCoVarsOfTypeWellScoped (mkTyConKind tc_binders res_kind)

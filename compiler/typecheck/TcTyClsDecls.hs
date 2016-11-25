@@ -368,7 +368,7 @@ kcTyClGroup decls
            ; kvs <- kindGeneralize (mkTyConKind kc_binders kc_res_kind)
            ; let all_binders = mkNamedTyConBinders Inferred kvs ++ kc_binders
 
-           ; (env, all_binders') <- zonkTyConBinders emptyZonkEnv all_binders
+           ; (env, all_binders') <- zonkTyVarBindersX emptyZonkEnv all_binders
            ; kc_res_kind'        <- zonkTcTypeToType env kc_res_kind
 
                       -- Make sure kc_kind' has the final, zonked kind variables
