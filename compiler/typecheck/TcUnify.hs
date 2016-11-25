@@ -684,7 +684,10 @@ tc_sub_type_ds :: CtOrigin    -- used when calling uType
 -- Here is where the work actually happens!
 -- Precondition: ty_expected is deeply skolemised
 tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
-  = go ty_actual ty_expected
+  = do { traceTc "tc_sub_type_ds" $
+         vcat [ text "ty_actual   =" <+> ppr ty_actual
+              , text "ty_expected =" <+> ppr ty_expected ]
+       ; go ty_actual ty_expected }
   where
     go ty_a ty_e | Just ty_a' <- coreView ty_a = go ty_a' ty_e
                  | Just ty_e' <- coreView ty_e = go ty_a  ty_e'
