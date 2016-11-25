@@ -822,8 +822,11 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
 
   | Just wc_var <- wcx
   = do { annotated_theta <- zonkTcTypes annotated_theta
-       ; let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
-                                        `unionVarSet` tau_tvs)
+       ; let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
+                          -- growThetaVars just like the no-type-sig case
+                          -- Omitting this caused #12844
+             seed_tvs = tyCoVarsOfTypes annotated_theta  -- These are put there
+                        `unionVarSet` tau_tvs            --       by the user
              my_theta = pickCapturedPreds free_tvs inferred_theta
 
        -- Report the inferred constraints for an extra-constraints wildcard/hole as
