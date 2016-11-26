@@ -4,6 +4,7 @@ import Base
 import Context
 import Expression
 import GHC
+import Oracles.Path
 import Rules.Libffi
 import Settings.Packages.Rts
 import Settings.Path
@@ -22,17 +23,12 @@ registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
         need [pkgDataFile context]
 
         -- Post-process inplace-pkg-config. TODO: remove, see #113, #148.
-        let path         = buildPath context
-            oldPath      = pkgPath package -/- stageDirectory stage
-            pkgConfig    = oldPath -/- "inplace-pkg-config"
-            oldBuildPath = oldPath -/- "build"
-            fixPkgConf   = unlines
-                         . map
-                         ( replace oldBuildPath path
-                         . replace (replaceSeparators '\\' oldBuildPath) path )
-                         . lines
+        top <- topDirectory
+        let path      = buildPath context
+            pkgConfig = path -/- "inplace-pkg-config"
+            oldPath   = top -/- path </> "build"
 
-        fixFile pkgConfig fixPkgConf
+        fixFile pkgConfig $ unlines . map (replace oldPath path) . lines
 
         buildWithResources rs $ Target context (GhcPkg stage) [pkgConfig] [conf]
 

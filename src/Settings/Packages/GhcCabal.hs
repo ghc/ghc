@@ -4,7 +4,7 @@ import Base
 import GHC
 import Oracles.Config.Setting
 import Predicate
-import Settings
+import Settings.Path
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = package ghcCabal ?
@@ -23,7 +23,7 @@ ghcCabalBootArgs = stage0 ? do
                  , pretty, process, time ]
         , notM windowsHost ? append [unix]
         , windowsHost ? append [win32] ]
-    path <- getBuildPath
+    context <- getContext
     mconcat
         [ append [ "-package " ++ pkgNameString pkg | pkg <- cabalDeps ]
         , arg "--make"
@@ -31,7 +31,7 @@ ghcCabalBootArgs = stage0 ? do
         , arg "-DBOOTSTRAPPING"
         , arg "-DMIN_VERSION_binary_0_8_0"
         , arg "-DGENERICS"
-        , removePair "-optP-include" $ "-optP" ++ path -/- "autogen/cabal_macros.h"
+        , removePair "-optP-include" $ "-optP" ++ autogenPath context -/- "cabal_macros.h"
         , arg "-optP-include"
         , arg $ "-optP" ++ pkgPath ghcCabal -/- "cabal_macros_boot.h"
         , arg "-ilibraries/Cabal/Cabal"

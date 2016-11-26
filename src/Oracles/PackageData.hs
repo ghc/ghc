@@ -37,10 +37,8 @@ newtype PackageDataKey = PackageDataKey (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 askPackageData :: FilePath -> String -> Action String
-askPackageData path key = do
-    let fullKey = replaceSeparators '_' $ path ++ "_" ++ key
-        file    = path -/- "package-data.mk"
-    fromMaybe "" <$> askOracle (PackageDataKey (file, fullKey))
+askPackageData path key = fromMaybe "" <$>
+    askOracle (PackageDataKey (path -/- "package-data.mk", key))
 
 -- | For each @PackageData path@ the file 'path/package-data.mk' contains a line
 -- of the form 'path_VERSION = 1.2.3.4'. @pkgData (PackageData path)@ is an

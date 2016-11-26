@@ -10,9 +10,11 @@ import Util
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
     verbosity <- lift $ getVerbosity
+    top       <- getTopDirectory
+    context   <- getContext
     mconcat [ arg "configure"
             , arg =<< getPackagePath
-            , arg =<< getContextDirectory
+            , arg $ top -/- buildPath context
             , dll0Args
             , withStaged $ Ghc CompileHs
             , withStaged GhcPkg

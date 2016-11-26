@@ -117,10 +117,11 @@ contextFiles context@Context {..} = do
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void . addOracle $ \(ModuleFilesKey (stage, package)) -> do
-        let path = buildPath $ vanillaContext stage package
+        let context = vanillaContext stage package
+            path    = buildPath context
         srcDirs <-             pkgDataList $ SrcDirs path
         modules <- fmap sort . pkgDataList $ Modules path
-        let dirs = (path -/- "autogen") : map (pkgPath package -/-) srcDirs
+        let dirs = autogenPath context : map (pkgPath package -/-) srcDirs
             modDirFiles = groupSort $ map decodeModule modules
         result <- concatForM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles

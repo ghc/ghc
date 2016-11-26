@@ -97,7 +97,7 @@ rtsPackageArgs = package rts ? do
         , builder Ghc ? arg "-Irts"
 
         , builder (GhcPkg Stage1) ? mconcat
-          [ remove ["rts/stage1/inplace-pkg-config"] -- TODO: fix, see #113
+          [ remove [path -/- "inplace-pkg-config"]
           , arg rtsConf ]
 
         , builder HsCpp ? append

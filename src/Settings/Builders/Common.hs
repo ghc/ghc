@@ -35,7 +35,6 @@ cIncludeArgs = do
     mconcat [ arg "-Iincludes"
             , arg $ "-I" ++ generatedPath
             , arg $ "-I" ++ path
-            , arg $ "-I" ++ path -/- "autogen"
             , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , append [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
 
