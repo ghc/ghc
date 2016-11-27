@@ -3,7 +3,7 @@ module Expression (
     -- * Expressions
     Expr, DiffExpr, fromDiffExpr,
     -- ** Operators
-    apply, append, arg, remove, removePair,
+    apply, append, arg, remove,
     appendSub, appendSubD, filterSub, removeSub,
     -- ** Evaluation
     interpret, interpretInContext, interpretDiff,
@@ -79,16 +79,6 @@ append x = apply (<> x)
 -- | Remove given elements from a list expression.
 remove :: Eq a => [a] -> DiffExpr [a]
 remove xs = apply $ filter (`notElem` xs)
-
--- | Remove given pair of elements from a list expression.
--- Example: removePair "-flag" "b" ["-flag", "a", "-flag", "b"] = ["-flag", "a"]
-removePair :: Eq a => a -> a -> DiffExpr [a]
-removePair x y = apply filterPair
-  where
-    filterPair (z1 : z2 : zs) = if x == z1 && y == z2
-                                then filterPair zs
-                                else z1 : filterPair (z2 : zs)
-    filterPair zs = zs
 
 -- | Apply a predicate to an expression.
 applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a

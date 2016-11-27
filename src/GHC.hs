@@ -9,7 +9,7 @@ module GHC (
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
-    defaultKnownPackages, builderProvenance, programName
+    defaultKnownPackages, builderProvenance, programName, nonCabalContext
     ) where
 
 import Builder
@@ -123,3 +123,10 @@ programName Context {..}
     | package == hpcBin = "hpc"
     | package == runGhc = "runhaskell"
     | otherwise         = pkgNameString package
+
+-- | Some contexts are special: their packages do have @.cabal@ metadata or
+-- we cannot run @ghc-cabal@ on them, e.g. because the latter hasn't been built
+-- yet (this is the case with the 'ghcCabal' package in 'Stage0').
+nonCabalContext :: Context -> Bool
+nonCabalContext Context {..} = (package `elem` [hp2ps, rts, touchy, unlit])
+    || package == ghcCabal && stage == Stage0

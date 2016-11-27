@@ -4,14 +4,12 @@ import Base
 import GHC
 import Oracles.Config.Setting
 import Predicate
-import Settings.Path
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = package ghcCabal ?
     builder Ghc ? mconcat [ ghcCabalBootArgs
                           , remove ["-no-auto-link-packages"] ]
 
--- Boostrapping ghcCabal
 -- TODO: do we need -DCABAL_VERSION=$(CABAL_VERSION)?
 ghcCabalBootArgs :: Args
 ghcCabalBootArgs = stage0 ? do
@@ -23,7 +21,6 @@ ghcCabalBootArgs = stage0 ? do
                  , pretty, process, time ]
         , notM windowsHost ? append [unix]
         , windowsHost ? append [win32] ]
-    context <- getContext
     mconcat
         [ append [ "-package " ++ pkgNameString pkg | pkg <- cabalDeps ]
         , arg "--make"
@@ -31,7 +28,6 @@ ghcCabalBootArgs = stage0 ? do
         , arg "-DBOOTSTRAPPING"
         , arg "-DMIN_VERSION_binary_0_8_0"
         , arg "-DGENERICS"
-        , removePair "-optP-include" $ "-optP" ++ autogenPath context -/- "cabal_macros.h"
         , arg "-optP-include"
         , arg $ "-optP" ++ pkgPath ghcCabal -/- "cabal_macros_boot.h"
         , arg "-ilibraries/Cabal/Cabal"

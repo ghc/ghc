@@ -5,7 +5,6 @@ import Settings.Packages.Rts
 import Target
 import Util
 
--- TODO: Why copy these include files into rts? Keep in libffi!
 libffiDependencies :: [FilePath]
 libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
 

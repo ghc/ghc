@@ -1,6 +1,7 @@
 module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
 
 import Flavour
+import GHC
 import Settings.Builders.Common
 
 ghcBuilderArgs :: Args
@@ -106,7 +107,6 @@ packageGhcArgs = do
             , isLibrary pkg ? arg (thisArg ++ compId)
             , append $ map ("-package-id " ++) pkgDepIds ]
 
--- TODO: Improve handling of "cabal_macros.h".
 includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
@@ -120,5 +120,6 @@ includeGhcArgs = do
             , cIncludeArgs
             , arg $      "-I" ++ generatedPath
             , arg $ "-optc-I" ++ generatedPath
-            , arg "-optP-include"
-            , arg $ "-optP" ++ autogenPath context -/- "cabal_macros.h" ]
+            , (not $ nonCabalContext context) ?
+              append [ "-optP-include"
+                     , "-optP" ++ autogenPath context -/- "cabal_macros.h" ] ]

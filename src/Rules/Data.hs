@@ -52,16 +52,8 @@ buildPackageData context@Context {..} = do
             let oldPath = top -/- path </> "build"
             fixFile conf $ unlines . map (replace oldPath path) . lines
 
-    -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps.
-    priority 2.0 $ do
-        when (package `elem` [hp2ps, rts, touchy, unlit]) $ dataFile %>
-            generatePackageData context
-
-        -- Bootstrapping `ghcCabal`: although `ghcCabal` is a proper cabal
-        -- package, we cannot generate the corresponding `package-data.mk` file
-        -- by running by running `ghcCabal`, because it has not yet been built.
-        when (package == ghcCabal && stage == Stage0) $ dataFile %>
-            generatePackageData context
+    priority 2.0 $ when (nonCabalContext context) $ dataFile %>
+        generatePackageData context
 
 generatePackageData :: Context -> FilePath -> Action ()
 generatePackageData context@Context {..} file = do
