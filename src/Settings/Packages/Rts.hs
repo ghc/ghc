@@ -1,6 +1,4 @@
-module Settings.Packages.Rts (
-    rtsPackageArgs, rtsConfIn, rtsConf, rtsContext, rtsLibffiLibraryName
-    ) where
+module Settings.Packages.Rts (rtsPackageArgs, rtsLibffiLibraryName) where
 
 import Base
 import GHC
@@ -9,16 +7,6 @@ import Oracles.Config.Setting
 import Oracles.Path
 import Predicate
 import Settings
-import Settings.Path
-
-rtsContext :: Context
-rtsContext = vanillaContext Stage1 rts
-
-rtsConfIn :: FilePath
-rtsConfIn = pkgPath rts -/- "package.conf.in"
-
-rtsConf :: FilePath
-rtsConf = pkgInplaceConfig rtsContext
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do

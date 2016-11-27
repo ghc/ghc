@@ -9,7 +9,6 @@ import Oracles.Dependencies
 import Oracles.Path
 import Rules.Generate
 import Rules.Libffi
-import Settings.Packages.Rts
 import Settings.Path
 import Target
 import UserSettings

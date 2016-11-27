@@ -4,7 +4,7 @@ module Settings.Path (
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath,
     pkgConfFile, packageDbDirectory, packageDbStamp, bootPackageConstraints,
     packageDependencies, objectPath, programInplacePath, programInplaceLibPath,
-    installPath, autogenPath, pkgInplaceConfig
+    installPath, autogenPath, pkgInplaceConfig, rtsContext, rtsConfIn
     ) where
 
 import Base
@@ -99,6 +99,14 @@ pkgFile context prefix suffix = do
     let path = buildPath context
     componentId <- pkgData $ ComponentId path
     return $ path -/- prefix ++ componentId ++ suffix
+
+-- | RTS is considered a Stage1 package. This determines RTS build path.
+rtsContext :: Context
+rtsContext = vanillaContext Stage1 rts
+
+-- | Path to RTS package configuration file, to be processed by HsCpp.
+rtsConfIn :: FilePath
+rtsConfIn = pkgPath rts -/- "package.conf.in"
 
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath
