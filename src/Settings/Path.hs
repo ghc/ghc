@@ -1,10 +1,11 @@
 module Settings.Path (
     stageDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
-    pkgLibraryFile0, pkgGhciLibraryFile, gmpBuildPath, gmpObjects, gmpLibraryH,
-    gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath,
-    pkgConfFile, packageDbDirectory, packageDbStamp, bootPackageConstraints,
-    packageDependencies, objectPath, programInplacePath, programInplaceLibPath,
-    installPath, autogenPath, pkgInplaceConfig, rtsContext, rtsConfIn
+    pkgLibraryFile0, pkgGhciLibraryFile, gmpContext, gmpBuildPath, gmpObjects,
+    gmpLibraryH, gmpBuildInfoPath, generatedPath, libffiContext, libffiBuildPath,
+    rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,packageDbDirectory,
+    pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
+    objectPath, programInplacePath, programInplaceLibPath, installPath,
+    autogenPath, pkgInplaceConfig
     ) where
 
 import Base
@@ -100,17 +101,25 @@ pkgFile context prefix suffix = do
     componentId <- pkgData $ ComponentId path
     return $ path -/- prefix ++ componentId ++ suffix
 
--- | RTS is considered a Stage1 package. This determines RTS build path.
+-- | RTS is considered a Stage1 package. This determines RTS build directory.
 rtsContext :: Context
 rtsContext = vanillaContext Stage1 rts
+
+-- | Path to the RTS build directory.
+rtsBuildPath :: FilePath
+rtsBuildPath = buildPath rtsContext
 
 -- | Path to RTS package configuration file, to be processed by HsCpp.
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
+-- | GMP is considered a Stage1 package. This determines GMP build directory.
+gmpContext :: Context
+gmpContext = vanillaContext Stage1 integerGmp
+
 -- | Build directory for in-tree GMP library.
 gmpBuildPath :: FilePath
-gmpBuildPath = buildRootPath -/- "stage1/gmp"
+gmpBuildPath = buildRootPath -/- stageDirectory (stage gmpContext) -/- "gmp"
 
 -- | Path to the GMP library header.
 gmpLibraryH :: FilePath
@@ -124,9 +133,13 @@ gmpObjects = gmpBuildPath -/- "objs"
 gmpBuildInfoPath :: FilePath
 gmpBuildInfoPath = pkgPath integerGmp -/- "integer-gmp.buildinfo"
 
--- | Build directory for in-tree libffi library.
+-- | Libffi is considered a Stage1 package. This determines its build directory.
+libffiContext :: Context
+libffiContext = vanillaContext Stage1 libffi
+
+-- | Build directory for in-tree Libffi library.
 libffiBuildPath :: FilePath
-libffiBuildPath = buildRootPath -/- "stage1/libffi"
+libffiBuildPath = buildPath libffiContext
 
 -- TODO: Move to buildRootPath, see #113.
 -- | Path to package database directory of a given 'Stage'. Note: StageN, N > 0,

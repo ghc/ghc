@@ -1,20 +1,13 @@
-module Rules.Libffi (rtsBuildPath, libffiRules, libffiDependencies) where
+module Rules.Libffi (libffiRules, libffiDependencies) where
 
 import Settings.Builders.Common
 import Settings.Packages.Rts
 import Target
 import Util
 
--- TODO: this should be moved elsewhere
-rtsBuildPath :: FilePath
-rtsBuildPath = buildPath rtsContext
-
 -- TODO: Why copy these include files into rts? Keep in libffi!
 libffiDependencies :: [FilePath]
 libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
-
-libffiContext :: Context
-libffiContext = vanillaContext Stage1 libffi
 
 libffiLibrary :: FilePath
 libffiLibrary = libffiBuildPath -/- "inst/lib/libffi.a"

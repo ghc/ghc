@@ -14,9 +14,6 @@ import Util
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"
 
-gmpContext :: Context
-gmpContext = vanillaContext Stage1 integerGmp
-
 gmpLibraryInTreeH :: FilePath
 gmpLibraryInTreeH = gmpBuildPath -/- "include/gmp.h"
 

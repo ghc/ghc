@@ -8,7 +8,6 @@ import Oracles.Config.Setting
 import Oracles.Dependencies
 import Oracles.Path
 import Rules.Generate
-import Rules.Libffi
 import Settings.Path
 import Target
 import UserSettings
