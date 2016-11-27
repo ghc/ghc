@@ -131,76 +131,55 @@ them out from the imp_rule_edges comprehension.
 {-
 ************************************************************************
 *                                                                      *
-\subsection[OccurAnal-main]{Counting occurrences: main function}
+                Bindings
 *                                                                      *
 ************************************************************************
 
-Bindings
-~~~~~~~~
--}
+Note [Recursive bindings: the grand plan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we come across a binding group
+  Rec { x1 = r1; ...; xn = rn }
+we treat it like this (occAnalRecBind):
 
-type ImpRuleEdges = IdEnv IdSet     -- Mapping from FVs of imported RULE LHSs to RHS FVs
+1. Occurrence-analyse each right hand side, and build a
+   "Details" for each binding to capture the results.
 
-noImpRuleEdges :: ImpRuleEdges
-noImpRuleEdges = emptyVarEnv
+   Wrap the details in a Node (details, node-id, dep-node-ids),
+   where node-id is just the unique of the binder, and
+   dep-node-ids lists all binders on which this binding depends.
+   We'll call these the "scope edges".
+   See Note [Forming the Rec groups].
 
-occAnalBind :: OccEnv           -- The incoming OccEnv
-            -> ImpRuleEdges
-            -> CoreBind
-            -> UsageDetails             -- Usage details of scope
-            -> (UsageDetails,           -- Of the whole let(rec)
-                [CoreBind])
+   All this is done by makeNode.
 
-occAnalBind env top_env (NonRec binder rhs) body_usage
-  = occAnalNonRecBind env top_env binder rhs body_usage
-occAnalBind env top_env (Rec pairs) body_usage
-  = occAnalRecBind env top_env pairs body_usage
+2. Do SCC-analysis on these Nodes.  Each SCC will become a new Rec or
+   NonRec.  The key property is that every free variable of a binding
+   is accounted for by the scope edges, so that when we are done
+   everything is still in scope.
 
------------------
-occAnalNonRecBind :: OccEnv -> ImpRuleEdges -> Var -> CoreExpr
-                  -> UsageDetails -> (UsageDetails, [CoreBind])
-occAnalNonRecBind env imp_rule_edges binder rhs body_usage
-  | isTyVar binder      -- A type let; we don't gather usage info
-  = (body_usage, [NonRec binder rhs])
+3. For each Cyclic SCC of the scope-edge SCC-analysis in (2), we
+   identify suitable loop-breakers to ensure that inlining terminates.
+   This is done by occAnalRec.
 
-  | not (binder `usedIn` body_usage)    -- It's not mentioned
-  = (body_usage, [])
+4. To do so we form a new set of Nodes, with the same details, but
+   different edges, the "loop-breaker nodes". The loop-breaker nodes
+   have both more and fewer depedencies than the scope edges
+   (see Note [Choosing loop breakers])
 
-  | otherwise                   -- It's mentioned in the body
-  = (body_usage' +++ rhs_usage4, [NonRec tagged_binder rhs'])
-  where
-    (body_usage', tagged_binder) = tagBinder body_usage binder
-    (rhs_usage1, rhs')           = occAnalNonRecRhs env tagged_binder rhs
-    rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
+   More edges: if f calls g, and g has an active rule that mentions h
+               then we add an edge from f -> h
 
-    rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
-       -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
+   Fewer edges: we only include dependencies on active rules, on rule
+                RHSs (not LHSs) and if there is an INLINE pragma only
+                on the stable unfolding (and vice versa).  The scope
+                edges must be much more inclusive.
 
-    rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $
-                 lookupVarEnv imp_rule_edges binder
-       -- See Note [Preventing loops due to imported functions rules]
+5.  The "weak fvs" of a node are, by definition:
+       the scope fvs - the loop-breaker fvs
+    See Note [Weak loop breakers], and the nd_weak field of Details
 
------------------
-occAnalRecBind :: OccEnv -> ImpRuleEdges -> [(Var,CoreExpr)]
-               -> UsageDetails -> (UsageDetails, [CoreBind])
-occAnalRecBind env imp_rule_edges pairs body_usage
-  = foldr occAnalRec (body_usage, []) sccs
-        -- For a recursive group, we
-        --      * occ-analyse all the RHSs
-        --      * compute strongly-connected components
-        --      * feed those components to occAnalRec
-  where
-    bndr_set = mkVarSet (map fst pairs)
+6.  Having formed the loop-breaker nodes
 
-    sccs :: [SCC (Node Details)]
-    sccs = {-# SCC "occAnalBind.scc" #-}
-      stronglyConnCompFromEdgedVerticesUniqR nodes
-
-    nodes :: [Node Details]
-    nodes = {-# SCC "occAnalBind.assoc" #-}
-      map (makeNode env imp_rule_edges bndr_set) pairs
-
-{-
 Note [Dead code]
 ~~~~~~~~~~~~~~~~
 Dropping dead code for a cyclic Strongly Connected Component is done
@@ -346,7 +325,7 @@ are not the same as the edges we use for computing the Rec blocks.
 That's why we compute
 
 - rec_edges          for the Rec block analysis
-- loop_breaker_edges for the loop breaker analysis
+- loop_breaker_nodes for the loop breaker analysis
 
   * Note [Finding rule RHS free vars]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -403,7 +382,7 @@ That's why we compute
 
     A "missing free variable" x is one that is mentioned in an RHS or
     INLINE or RULE of a binding in the Rec group, but where the
-    dependency on x may not show up in the loop_breaker_edges (see
+    dependency on x may not show up in the loop_breaker_nodes (see
     note [Choosing loop breakers} above).
 
     A normal "strong" loop breaker has IAmLoopBreaker False.  So
@@ -658,6 +637,68 @@ But watch out!  If 'fs' is not chosen as a loop breaker, we may get an infinite 
 This showed up when compiling Control.Concurrent.Chan.getChanContents.
 -}
 
+type ImpRuleEdges = IdEnv IdSet     -- Mapping from FVs of imported RULE LHSs to RHS FVs
+
+noImpRuleEdges :: ImpRuleEdges
+noImpRuleEdges = emptyVarEnv
+
+occAnalBind :: OccEnv           -- The incoming OccEnv
+            -> ImpRuleEdges
+            -> CoreBind
+            -> UsageDetails             -- Usage details of scope
+            -> (UsageDetails,           -- Of the whole let(rec)
+                [CoreBind])
+
+occAnalBind env top_env (NonRec binder rhs) body_usage
+  = occAnalNonRecBind env top_env binder rhs body_usage
+occAnalBind env top_env (Rec pairs) body_usage
+  = occAnalRecBind env top_env pairs body_usage
+
+-----------------
+occAnalNonRecBind :: OccEnv -> ImpRuleEdges -> Var -> CoreExpr
+                  -> UsageDetails -> (UsageDetails, [CoreBind])
+occAnalNonRecBind env imp_rule_edges binder rhs body_usage
+  | isTyVar binder      -- A type let; we don't gather usage info
+  = (body_usage, [NonRec binder rhs])
+
+  | not (binder `usedIn` body_usage)    -- It's not mentioned
+  = (body_usage, [])
+
+  | otherwise                   -- It's mentioned in the body
+  = (body_usage' +++ rhs_usage4, [NonRec tagged_binder rhs'])
+  where
+    (body_usage', tagged_binder) = tagBinder body_usage binder
+    (rhs_usage1, rhs')           = occAnalNonRecRhs env tagged_binder rhs
+    rhs_usage2 = addIdOccs rhs_usage1 (idUnfoldingVars binder)
+
+    rhs_usage3 = addIdOccs rhs_usage2 (idRuleVars binder)
+       -- See Note [Rules are extra RHSs] and Note [Rule dependency info]
+
+    rhs_usage4 = maybe rhs_usage3 (addIdOccs rhs_usage3) $
+                 lookupVarEnv imp_rule_edges binder
+       -- See Note [Preventing loops due to imported functions rules]
+
+-----------------
+occAnalRecBind :: OccEnv -> ImpRuleEdges -> [(Var,CoreExpr)]
+               -> UsageDetails -> (UsageDetails, [CoreBind])
+occAnalRecBind env imp_rule_edges pairs body_usage
+  = foldr occAnalRec (body_usage, []) sccs
+        -- For a recursive group, we
+        --      * occ-analyse all the RHSs
+        --      * compute strongly-connected components
+        --      * feed those components to occAnalRec
+        -- See Note [Recursive bindings: the grand plan]
+  where
+    bndr_set = mkVarSet (map fst pairs)
+
+    sccs :: [SCC (Node Details)]
+    sccs = {-# SCC "occAnalBind.scc" #-}
+      stronglyConnCompFromEdgedVerticesUniqR nodes
+
+    nodes :: [Node Details]
+    nodes = {-# SCC "occAnalBind.assoc" #-}
+      map (makeNode env imp_rule_edges bndr_set) pairs
+
 type Node details = (details, Unique, [Unique]) -- The Ints are gotten from the Unique,
                                                 -- which is gotten from the Id.
 data Details
@@ -676,7 +717,7 @@ data Details
 
        , nd_weak :: IdSet       -- Binders of this Rec that are mentioned in nd_uds
                                 -- but are *not* in nd_inl.  These are the ones whose
-                                -- dependencies might not be respected by loop_breaker_edges
+                                -- dependencies might not be respected by loop_breaker_nodes
                                 -- See Note [Weak loop breakers]
 
        , nd_active_rule_fvs :: IdSet   -- Free variables of the RHS of active RULES
@@ -692,6 +733,7 @@ instance Outputable Details where
              ])
 
 makeNode :: OccEnv -> ImpRuleEdges -> VarSet -> (Var, CoreExpr) -> Node Details
+-- See Note [Recursive bindings: the grand plan]
 makeNode env imp_rule_edges bndr_set (bndr, rhs)
   = (details, varUnique bndr, nonDetKeysUFM node_fvs)
     -- It's OK to use nonDetKeysUFM here as stronglyConnCompFromEdgedVerticesR
@@ -763,6 +805,7 @@ occAnalRec (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_uds}, _,
     (body_uds', tagged_bndr) = tagBinder body_uds bndr
 
         -- The Rec case is the interesting one
+        -- See Note [Recursive bindings: the grand plan]
         -- See Note [Loop breaking]
 occAnalRec (CyclicSCC nodes) (body_uds, binds)
   | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
@@ -771,42 +814,49 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (vcat
     --  [ text "weak_fvs" <+> ppr weak_fvs
-    --  , text "tagged nodes" <+> ppr tagged_nodes
-    --  , text "lb edges" <+> ppr loop_breaker_edges])
+    --  , text "tagged details" <+> ppr tagged_details_s
+    --  , text "lb nodes" <+> ppr loop_breaker_nodes])
     (final_uds, Rec pairs : binds)
 
   where
-    bndrs    = [b | (ND { nd_bndr = b }, _, _) <- nodes]
-    bndr_set = mkVarSet bndrs
+    details_s :: [Details]
+    details_s = map fstOf3 nodes
+    bndrs     = [b | (ND { nd_bndr = b }) <- details_s]
+    bndr_set  = mkVarSet bndrs
 
-        ----------------------------
-        -- Tag the binders with their occurrence info
-    tagged_nodes = map tag_node nodes
-    total_uds = foldl add_uds body_uds nodes
+    ----------------------------
+    -- Tag the binders with their occurrence info
+    tagged_details_s :: [Details]
+    tagged_details_s = map tag_details details_s
+    total_uds = foldl add_uds body_uds details_s
     final_uds = total_uds `minusVarEnv` bndr_set
-    add_uds usage_so_far (nd, _, _) = usage_so_far +++ nd_uds nd
+    add_uds usage_so_far nd = usage_so_far +++ nd_uds nd
 
-    tag_node :: Node Details -> Node Details
-    tag_node (details@ND { nd_bndr = bndr }, k, ks)
+    tag_details :: Details -> Details
+    tag_details details@(ND { nd_bndr = bndr })
       | let bndr1 = setBinderOcc total_uds bndr
-      = (details { nd_bndr = bndr1 }, k, ks)
+      = details { nd_bndr = bndr1 }
 
     ---------------------------
     -- Now reconstruct the cycle
     pairs :: [(Id,CoreExpr)]
-    pairs | isEmptyVarSet weak_fvs = reOrderNodes   0 bndr_set weak_fvs tagged_nodes       []
-          | otherwise              = loopBreakNodes 0 bndr_set weak_fvs loop_breaker_edges []
-          -- If weak_fvs is empty, the loop_breaker_edges will include all
-          -- the edges in tagged_nodes, so there isn't any point in doing
-          -- a fresh SCC computation that will yield a single CyclicSCC result.
+    pairs | isEmptyVarSet weak_fvs = reOrderNodes   0 bndr_set weak_fvs loop_breaker_nodes []
+          | otherwise              = loopBreakNodes 0 bndr_set weak_fvs loop_breaker_nodes []
+          -- If weak_fvs is empty, the loop_breaker_nodes will include
+          -- all the edges in the original scope edges [remember,
+          -- weak_fvs is the difference between scope edges and
+          -- lb-edges], so a fresh SCC computation would yield a
+          -- single CyclicSCC result; and reOrderNodes deals with
+          -- exactly that case
 
     weak_fvs :: VarSet
-    weak_fvs = mapUnionVarSet (nd_weak . fstOf3) nodes
+    weak_fvs = mapUnionVarSet nd_weak details_s
 
-        -- See Note [Choosing loop breakers] for loop_breaker_edges
-    loop_breaker_edges = map mk_node tagged_nodes
-    mk_node (details@(ND { nd_inl = inl_fvs }), k, _)
-      = (details, k, nonDetKeysUFM (extendFvs_ rule_fv_env inl_fvs))
+        -- See Note [Choosing loop breakers] for loop_breaker_nodes
+    loop_breaker_nodes :: [Node Details]
+    loop_breaker_nodes = map mk_lb_node tagged_details_s
+    mk_lb_node details@(ND { nd_bndr = b, nd_inl = inl_fvs })
+      = (details, varUnique b, nonDetKeysUFM (extendFvs_ rule_fv_env inl_fvs))
         -- It's OK to use nonDetKeysUFM here as
         -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
         -- in nondeterministic order as explained in
@@ -820,9 +870,9 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
     rule_fv_env = transClosureFV (mkVarEnv init_rule_fvs)
     init_rule_fvs   -- See Note [Finding rule RHS free vars]
       = [ (b, trimmed_rule_fvs)
-        | (ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs },_,_) <- nodes
+        | ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs } <- details_s
         , let trimmed_rule_fvs = rule_fvs `intersectVarSet` bndr_set
-        , not (isEmptyVarSet trimmed_rule_fvs)]
+        , not (isEmptyVarSet trimmed_rule_fvs) ]
 
 {-
 @loopBreakSCC@ is applied to the list of (binder,rhs) pairs for a cyclic
@@ -849,9 +899,9 @@ mk_loop_breaker (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
 
 mk_non_loop_breaker :: VarSet -> Node Details -> Binding
 -- See Note [Weak loop breakers]
-mk_non_loop_breaker used_in_rules (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
-  | bndr `elemVarSet` used_in_rules = (setIdOccInfo bndr weakLoopBreaker, rhs)
-  | otherwise                       = (bndr, rhs)
+mk_non_loop_breaker weak_fvs (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
+  | bndr `elemVarSet` weak_fvs = (setIdOccInfo bndr weakLoopBreaker, rhs)
+  | otherwise                  = (bndr, rhs)
 
 udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
@@ -874,13 +924,13 @@ loopBreakNodes depth bndr_set weak_fvs nodes binds
     loop_break_scc scc binds
       = case scc of
           AcyclicSCC node  -> mk_non_loop_breaker weak_fvs node : binds
-          CyclicSCC [node] -> mk_loop_breaker node : binds
           CyclicSCC nodes  -> reOrderNodes depth bndr_set weak_fvs nodes binds
 
 reOrderNodes :: Int -> VarSet -> VarSet -> [Node Details] -> [Binding] -> [Binding]
     -- Choose a loop breaker, mark it no-inline,
     -- do SCC analysis on the rest, and recursively sort them out
-reOrderNodes _ _ _ [] _  = panic "reOrderNodes"
+reOrderNodes _ _ _ []     _     = panic "reOrderNodes"
+reOrderNodes _ _ _ [node] binds = mk_loop_breaker node : binds
 reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
   = -- pprTrace "reOrderNodes" (text "unchosen" <+> ppr unchosen $$
     --                           text "chosen" <+> ppr chosen_nodes) $
