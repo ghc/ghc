@@ -45,8 +45,8 @@ flags below).
 
 Using the build system
 ----------------------
-Once your first build is successful, simply run `build` to rebuild. Most build artefacts
-are placed into `_build` and `inplace` directories ([#113][build-artefacts-issue]).
+Once your first build is successful, simply run `build` to rebuild. Build results
+are placed into `_build` and `inplace` directories.
 
 #### Command line flags
 
@@ -92,11 +92,10 @@ use `hadrian/UserSettings.hs` for the same purpose, see [documentation](doc/user
 
 #### Clean and full rebuild
 
-* `build clean` removes all build artefacts. Note, we are working towards a
-complete separation of GHC sources and build artefacts: [#113][build-artefacts-issue].
+* `build clean` removes all build artefacts. 
 
-* `build -B` forces Shake to rerun all rules, even if results of the previous build
-are still in the GHC tree.
+* `build -B` forces Shake to rerun all rules, even if the previous build results are
+are still up-to-date.
 
 #### Source distribution
 
@@ -156,7 +155,6 @@ helped me endure and enjoy the project.
 [ghc-preparation]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation
 [ghc-windows-quick-build]: https://ghc.haskell.org/trac/ghc/wiki/Building/Preparation/Windows#AQuickBuild
 [windows-build]: https://github.com/snowleopard/hadrian/blob/master/doc/windows.md
-[build-artefacts-issue]: https://github.com/snowleopard/hadrian/issues/113
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [dynamic-issue]: https://github.com/snowleopard/hadrian/issues/4
