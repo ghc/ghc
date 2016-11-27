@@ -104,8 +104,8 @@ builderProvenance = \case
     Ghc _ stage      -> context (pred stage) ghc
     GhcCabal         -> context Stage0 ghcCabal
     GhcCabalHsColour -> builderProvenance $ GhcCabal
-    GhcPkg Stage0    -> Nothing
-    GhcPkg _         -> context Stage0 ghcPkg
+    GhcPkg _ Stage0  -> Nothing
+    GhcPkg _ _       -> context Stage0 ghcPkg
     Haddock          -> context Stage2 haddock
     Hpc              -> context Stage1 hpcBin
     Hsc2Hs           -> context Stage0 hsc2hs

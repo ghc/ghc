@@ -23,26 +23,26 @@ getTopDirectory = lift topDirectory
 -- | Determine the location of a system 'Builder'.
 systemBuilderPath :: Builder -> Action FilePath
 systemBuilderPath builder = case builder of
-    Alex          -> fromKey "alex"
-    Ar            -> fromKey "ar"
-    Cc  _  Stage0 -> fromKey "system-cc"
-    Cc  _  _      -> fromKey "cc"
+    Alex            -> fromKey "alex"
+    Ar              -> fromKey "ar"
+    Cc  _  Stage0   -> fromKey "system-cc"
+    Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!
-    Configure _   -> return "bash configure"
-    Ghc _  Stage0 -> fromKey "system-ghc"
-    GhcPkg Stage0 -> fromKey "system-ghc-pkg"
-    Happy         -> fromKey "happy"
-    HsColour      -> fromKey "hscolour"
-    HsCpp         -> fromKey "hs-cpp"
-    Ld            -> fromKey "ld"
-    Make _        -> fromKey "make"
-    Nm            -> fromKey "nm"
-    Objdump       -> fromKey "objdump"
-    Patch         -> fromKey "patch"
-    Perl          -> fromKey "perl"
-    Ranlib        -> fromKey "ranlib"
-    Tar           -> fromKey "tar"
-    _             -> error $ "No system.config entry for " ++ show builder
+    Configure _     -> return "bash configure"
+    Ghc _  Stage0   -> fromKey "system-ghc"
+    GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Happy           -> fromKey "happy"
+    HsColour        -> fromKey "hscolour"
+    HsCpp           -> fromKey "hs-cpp"
+    Ld              -> fromKey "ld"
+    Make _          -> fromKey "make"
+    Nm              -> fromKey "nm"
+    Objdump         -> fromKey "objdump"
+    Patch           -> fromKey "patch"
+    Perl            -> fromKey "perl"
+    Ranlib          -> fromKey "ranlib"
+    Tar             -> fromKey "tar"
+    _               -> error $ "No system.config entry for " ++ show builder
   where
     fromKey key = do
         let unpack = fromMaybe . error $ "Cannot find path to builder "

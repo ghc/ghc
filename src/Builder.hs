@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
-    CcMode (..), GhcMode (..), Builder (..), trackedArgument, isOptional
+    CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..),
+    trackedArgument, isOptional
     ) where
 
 import Data.Char
@@ -18,6 +19,9 @@ data CcMode  = CompileC  | FindCDependencies deriving (Eq, Generic, Show)
 data GhcMode = CompileHs | FindHsDependencies | LinkHs
     deriving (Eq, Generic, Show)
 
+-- | GhcPkg can initialise a package database and register packages in it.
+data GhcPkgMode = Init | Update deriving (Eq, Generic, Show)
+
 -- | A 'Builder' is an external command invoked in a separate process via 'cmd'.
 -- @Ghc Stage0@ is the bootstrapping compiler.
 -- @Ghc StageN@, N > 0, is the one built in stage (N - 1).
@@ -33,7 +37,7 @@ data Builder = Alex
              | Ghc GhcMode Stage
              | GhcCabal
              | GhcCabalHsColour   -- synonym for 'GhcCabal hscolour'
-             | GhcPkg Stage
+             | GhcPkg GhcPkgMode Stage
              | Haddock
              | Happy
              | Hpc
@@ -83,3 +87,7 @@ instance NFData CcMode
 instance Binary GhcMode
 instance Hashable GhcMode
 instance NFData GhcMode
+
+instance Binary GhcPkgMode
+instance Hashable GhcPkgMode
+instance NFData GhcPkgMode

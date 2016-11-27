@@ -17,7 +17,7 @@ testRules :: Rules ()
 testRules = do
     "validate" ~> do
         needBuilder $ Ghc CompileHs Stage2
-        needBuilder $ GhcPkg Stage1
+        needBuilder $ GhcPkg Update Stage1
         needBuilder Hpc
         build $ Target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
@@ -30,7 +30,7 @@ testRules = do
         windows  <- windowsHost
         top      <- topDirectory
         compiler <- builderPath $ Ghc CompileHs Stage2
-        ghcPkg   <- builderPath $ GhcPkg Stage1
+        ghcPkg   <- builderPath $ GhcPkg Update Stage1
         haddock  <- builderPath Haddock
         threads  <- shakeThreads <$> getShakeOptions
         ghcWithNativeCodeGenInt <- fromEnum <$> ghcWithNativeCodeGen

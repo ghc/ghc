@@ -17,7 +17,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , arg $ top -/- buildPath context
             , dll0Args
             , withStaged $ Ghc CompileHs
-            , withStaged GhcPkg
+            , withStaged (GhcPkg Update)
             , bootPackageDatabaseArgs
             , libraryArgs
             , with HsColour
@@ -89,15 +89,15 @@ cppArgs = arg $ "-I" ++ generatedPath
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
-    Ar       -> "--with-ar="
-    Ld       -> "--with-ld="
-    Cc  _ _  -> "--with-gcc="
-    Ghc _ _  -> "--with-ghc="
-    Alex     -> "--with-alex="
-    Happy    -> "--with-happy="
-    GhcPkg _ -> "--with-ghc-pkg="
-    HsColour -> "--with-hscolour="
-    _        -> error $ "withBuilderKey: not supported builder " ++ show b
+    Ar         -> "--with-ar="
+    Ld         -> "--with-ld="
+    Cc  _ _    -> "--with-gcc="
+    Ghc _ _    -> "--with-ghc="
+    Alex       -> "--with-alex="
+    Happy      -> "--with-happy="
+    GhcPkg _ _ -> "--with-ghc-pkg="
+    HsColour   -> "--with-hscolour="
+    _          -> error $ "withBuilderKey: not supported builder " ++ show b
 
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args

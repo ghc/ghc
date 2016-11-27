@@ -18,10 +18,12 @@ registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
 
     matchVersionedFilePath (dir -/- pkgNameString package) "conf" ?> \conf -> do
         need [confIn]
-        buildWithResources rs $ Target context (GhcPkg stage) [confIn] [conf]
+        buildWithResources rs $
+            Target context (GhcPkg Update stage) [confIn] [conf]
 
     when (package == ghc) $ packageDbStamp stage %> \stamp -> do
         removeDirectory dir
-        buildWithResources rs $ Target (vanillaContext stage ghc) (GhcPkg stage) [] [dir]
+        buildWithResources rs $
+            Target (vanillaContext stage ghc) (GhcPkg Init stage) [] [dir]
         writeFileLines stamp []
         putSuccess $ "| Successfully initialised " ++ dir
