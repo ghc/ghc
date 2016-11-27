@@ -13,10 +13,9 @@ initArgs = initPredicate ? mconcat [ arg "init", arg =<< getOutput ]
 
 updateArgs :: Args
 updateArgs = notM initPredicate ? do
-    path      <- getBuildPath
     verbosity <- lift $ getVerbosity
     mconcat [ arg "update"
             , arg "--force"
             , verbosity < Chatty ? arg "-v0"
             , bootPackageDatabaseArgs
-            , arg $ path -/- "inplace-pkg-config" ]
+            , arg . inplacePkgConfig =<< getContext ]

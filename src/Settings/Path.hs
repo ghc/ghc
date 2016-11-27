@@ -4,7 +4,7 @@ module Settings.Path (
     gmpBuildInfoPath, generatedPath, libffiBuildPath, shakeFilesPath,
     pkgConfFile, packageDbDirectory, packageDbStamp, bootPackageConstraints,
     packageDependencies, objectPath, programInplacePath, programInplaceLibPath,
-    installPath, autogenPath
+    installPath, autogenPath, inplacePkgConfig
     ) where
 
 import Base
@@ -59,6 +59,10 @@ autogenPath context@Context {..}
     | otherwise           = autogen $ "build" -/- pkgNameString package
   where
     autogen dir = buildPath context -/- dir -/- "autogen"
+
+-- | Path to inplace package configuration of a given 'Context'.
+inplacePkgConfig :: Context -> FilePath
+inplacePkgConfig context = buildPath context -/- "inplace-pkg-config"
 
 -- | Path to the @package-data.mk@ of a given 'Context'.
 pkgDataFile :: Context -> FilePath

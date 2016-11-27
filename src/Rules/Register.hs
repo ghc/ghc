@@ -22,10 +22,10 @@ registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
         -- This produces inplace-pkg-config. TODO: Add explicit tracking.
         need [pkgDataFile context]
 
-        -- Post-process inplace-pkg-config. TODO: remove, see #113, #148.
+        -- Post-process inplace-pkg-config.
         top <- topDirectory
         let path      = buildPath context
-            pkgConfig = path -/- "inplace-pkg-config"
+            pkgConfig = inplacePkgConfig context
             oldPath   = top -/- path </> "build"
 
         fixFile pkgConfig $ unlines . map (replace oldPath path) . lines

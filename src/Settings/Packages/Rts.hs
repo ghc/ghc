@@ -18,7 +18,7 @@ rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
 rtsConf :: FilePath
-rtsConf = buildPath rtsContext -/- "package.conf.inplace"
+rtsConf = inplacePkgConfig rtsContext
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
@@ -95,10 +95,6 @@ rtsPackageArgs = package rts ? do
             , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
         , builder Ghc ? arg "-Irts"
-
-        , builder (GhcPkg Stage1) ? mconcat
-          [ remove [path -/- "inplace-pkg-config"]
-          , arg rtsConf ]
 
         , builder HsCpp ? append
           [ "-DTOP="             ++ show top
