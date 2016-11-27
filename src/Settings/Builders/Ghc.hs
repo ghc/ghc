@@ -22,6 +22,7 @@ ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
 ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do
     stage   <- getStage
+    pkg     <- getPackage
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
     gmpLibs <- if stage > Stage0
@@ -31,6 +32,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                    return $ concatMap (words . strip) buildInfo
                else return []
     mconcat [ arg "-no-auto-link-packages"
+            , nonHsMainPackage pkg ? arg "-no-hs-main"
             , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
             , append [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
 
@@ -75,7 +77,7 @@ commonGhcArgs = do
             , arg "-odir"    , arg path
             , arg "-hidir"   , arg path
             , arg "-stubdir" , arg path
-            , arg "-rtsopts" ] -- TODO: ifeq "$(HC_VERSION_GE_6_13)" "YES"
+            , (not . nonHsMainPackage) <$> getPackage ? arg "-rtsopts" ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args

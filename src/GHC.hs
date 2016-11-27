@@ -9,7 +9,8 @@ module GHC (
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
-    defaultKnownPackages, builderProvenance, programName, nonCabalContext
+    defaultKnownPackages, builderProvenance, programName, nonCabalContext,
+    nonHsMainPackage
     ) where
 
 import Builder
@@ -130,3 +131,7 @@ programName Context {..}
 nonCabalContext :: Context -> Bool
 nonCabalContext Context {..} = (package `elem` [hp2ps, rts, touchy, unlit])
     || package == ghcCabal && stage == Stage0
+
+-- | Some program packages should not be linked with Haskell main function.
+nonHsMainPackage :: Package -> Bool
+nonHsMainPackage = (`elem` [ghc, hp2ps, iservBin, touchy, unlit])

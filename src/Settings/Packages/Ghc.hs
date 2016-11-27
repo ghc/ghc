@@ -8,10 +8,7 @@ import Settings.Path
 ghcPackageArgs :: Args
 ghcPackageArgs = package ghc ? do
     stage <- getStage
-    mconcat [ builder Ghc ? mconcat
-              [ arg $ "-I" ++ buildPath (vanillaContext stage compiler)
-              , arg "-no-hs-main" ]
+    mconcat [ builder Ghc ? arg ("-I" ++ buildPath (vanillaContext stage compiler))
 
             , builder GhcCabal ?
-              ghcWithInterpreter ? notStage0 ? arg "--flags=ghci"
-            ]
+              ghcWithInterpreter ? notStage0 ? arg "--flags=ghci" ]

@@ -34,13 +34,9 @@ import Settings.Packages.Ghc
 import Settings.Packages.GhcCabal
 import Settings.Packages.GhcPrim
 import Settings.Packages.Haddock
-import Settings.Packages.Hp2ps
 import Settings.Packages.IntegerGmp
-import Settings.Packages.IservBin
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
-import Settings.Packages.Touchy
-import Settings.Packages.Unlit
 import UserSettings
 
 -- | All default command line arguments.
@@ -203,10 +199,6 @@ defaultPackageArgs = mconcat
     , ghcCabalPackageArgs
     , ghcPrimPackageArgs
     , haddockPackageArgs
-    , hp2psPackageArgs
     , integerGmpPackageArgs
-    , iservBinPackageArgs
     , rtsPackageArgs
-    , runGhcPackageArgs
-    , touchyPackageArgs
-    , unlitPackageArgs ]
+    , runGhcPackageArgs ]
