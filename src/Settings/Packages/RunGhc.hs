@@ -5,7 +5,6 @@ import Oracles.Config.Setting
 import Predicate
 
 runGhcPackageArgs :: Args
-runGhcPackageArgs = package runGhc ? do
+runGhcPackageArgs = package runGhc ? builder Ghc ? input "//Main.hs" ? do
     version <- getSetting ProjectVersion
-    builder Ghc ? input "//Main.hs" ?
-        append ["-cpp", "-DVERSION=" ++ show version]
+    append ["-cpp", "-DVERSION=" ++ show version]

@@ -8,9 +8,8 @@ ccBuilderArgs = builder Cc ? mconcat
     , argSettingList . ConfCcArgs =<< getStage
     , cIncludeArgs
 
-    , builder (Cc CompileC) ?
-        mconcat [ arg "-c", arg =<< getInput
-                , arg "-o", arg =<< getOutput ]
+    , builder (Cc CompileC) ? mconcat [ arg "-c", arg =<< getInput
+                                      , arg "-o", arg =<< getOutput ]
 
     , builder (Cc FindCDependencies) ? do
         output <- getOutput

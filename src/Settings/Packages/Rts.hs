@@ -12,10 +12,10 @@ rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
     useSystemFfi <- flag UseSystemFfi
     windows      <- windowsHost
-    case (useSystemFfi, windows) of
-      (True , False) -> return "ffi"
-      (False, False) -> return "Cffi"
-      (_    , True ) -> return "Cffi-6"
+    return $ case (useSystemFfi, windows) of
+        (True , False) -> "ffi"
+        (False, False) -> "Cffi"
+        (_    , True ) -> "Cffi-6"
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
@@ -88,8 +88,7 @@ rtsPackageArgs = package rts ? do
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName ]
-        ]
+          , "-DFFI_LIB="         ++ show libffiName ] ]
 
 -- # If we're compiling on windows, enforce that we only support XP+
 -- # Adding this here means it doesn't have to be done in individual .c files

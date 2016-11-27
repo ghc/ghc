@@ -16,7 +16,6 @@ haddockBuilderArgs = builder Haddock ? do
     path     <- getBuildPath
     version  <- getPkgData Version
     synopsis <- getPkgData Synopsis
-    hidden   <- getPkgDataList HiddenModules
     deps     <- getPkgDataList Deps
     depNames <- getPkgDataList DepNames
     hVersion <- lift . pkgData . Version $ buildPath (vanillaContext Stage2 haddock)
@@ -31,7 +30,7 @@ haddockBuilderArgs = builder Haddock ? do
         , arg $ "--title=" ++ pkgNameString pkg ++ "-" ++ version ++ ": " ++ synopsis
         , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
         , arg $ "--optghc=-D__HADDOCK_VERSION__=" ++ show (versionToInt hVersion)
-        , append $ map ("--hide=" ++) hidden
+        , append . map ("--hide=" ++) =<< getPkgDataList HiddenModules
         , append $ [ "--read-interface=../" ++ dep
                      ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
                      ++ pkgHaddockFile (vanillaContext Stage1 depPkg)

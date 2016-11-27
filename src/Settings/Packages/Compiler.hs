@@ -35,8 +35,6 @@ compilerPackageArgs = package compiler ? do
                 ghciWithDebugger flavour ?
                 notStage0 ? arg "--ghc-option=-DDEBUGGER"
               , ghcProfiled flavour ?
-                notStage0 ? arg "--ghc-pkg-option=--force"
-              ]
+                notStage0 ? arg "--ghc-pkg-option=--force" ]
 
-            , builder Haddock ? arg ("--optghc=-I" ++ path)
-            ]
+            , builder Haddock ? arg ("--optghc=-I" ++ path) ]
