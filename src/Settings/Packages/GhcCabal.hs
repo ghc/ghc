@@ -6,21 +6,12 @@ import Oracles.Config.Setting
 import Predicate
 
 ghcCabalPackageArgs :: Args
-ghcCabalPackageArgs = package ghcCabal ?
-    builder Ghc ? mconcat [ ghcCabalBootArgs
-                          , remove ["-no-auto-link-packages"] ]
-
--- TODO: do we need -DCABAL_VERSION=$(CABAL_VERSION)?
-ghcCabalBootArgs :: Args
-ghcCabalBootArgs = stage0 ? do
-    -- Note: We could have computed 'cabalDeps' instead of hard-coding it
-    -- but this doesn't worth the effort, since we plan to drop ghc-cabal
-    -- altogether at some point. See #18.
-    cabalDeps <- fromDiffExpr $ mconcat
-        [ append [ array, base, bytestring, containers, deepseq, directory
-                 , pretty, process, time ]
-        , notM windowsHost ? append [unix]
-        , windowsHost ? append [win32] ]
+ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
+    -- Note: We could compute 'cabalDeps' instead of hard-coding it but this
+    -- seems unnecessary since we plan to drop @ghc-cabal@ altogether, #18.
+    win <- lift windowsHost
+    let cabalDeps = [ array, base, bytestring, containers, deepseq, directory
+                    , pretty, process, time, if win then win32 else unix ]
     mconcat
         [ append [ "-package " ++ pkgNameString pkg | pkg <- cabalDeps ]
         , arg "--make"
