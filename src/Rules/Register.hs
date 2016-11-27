@@ -4,9 +4,6 @@ import Base
 import Context
 import Expression
 import GHC
-import Oracles.Path
-import Rules.Libffi
-import Settings.Packages.Rts
 import Settings.Path
 import Target
 import UserSettings
@@ -16,40 +13,12 @@ import Util
 -- by running the @ghc-pkg@ utility.
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
 registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
-    let dir = packageDbDirectory stage
+    let confIn = pkgInplaceConfig context
+        dir    = packageDbDirectory stage
 
     matchVersionedFilePath (dir -/- pkgNameString package) "conf" ?> \conf -> do
-        -- This produces inplace-pkg-config. TODO: Add explicit tracking.
-        need [pkgDataFile context]
-
-        -- Post-process inplace-pkg-config.
-        top <- topDirectory
-        let path      = buildPath context
-            pkgConfig = inplacePkgConfig context
-            oldPath   = top -/- path </> "build"
-
-        fixFile pkgConfig $ unlines . map (replace oldPath path) . lines
-
-        buildWithResources rs $ Target context (GhcPkg stage) [pkgConfig] [conf]
-
-    when (package == rts && stage == Stage1) $ do
-        packageDbDirectory Stage1 -/- "rts.conf" %> \conf -> do
-            need [rtsConf]
-            buildWithResources rs $ Target context (GhcPkg stage) [rtsConf] [conf]
-
-        rtsConf %> \_ -> do
-            need [pkgDataFile rtsContext, rtsConfIn]
-            build $ Target context HsCpp [rtsConfIn] [rtsConf]
-
-            let fixRtsConf = unlines
-                           . map
-                           ( replace "\"\"" ""
-                           . replace "rts/dist/build" rtsBuildPath
-                           . replace "includes/dist-derivedconstants/header" generatedPath )
-                           . filter (not . null)
-                           . lines
-
-            fixFile rtsConf fixRtsConf
+        need [confIn]
+        buildWithResources rs $ Target context (GhcPkg stage) [confIn] [conf]
 
     when (package == ghc) $ packageDbStamp stage %> \stamp -> do
         removeDirectory dir

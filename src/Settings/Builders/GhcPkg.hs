@@ -18,4 +18,4 @@ updateArgs = notM initPredicate ? do
             , arg "--force"
             , verbosity < Chatty ? arg "-v0"
             , bootPackageDatabaseArgs
-            , arg . inplacePkgConfig =<< getContext ]
+            , arg . pkgInplaceConfig =<< getContext ]

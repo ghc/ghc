@@ -18,7 +18,7 @@ rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
 rtsConf :: FilePath
-rtsConf = inplacePkgConfig rtsContext
+rtsConf = pkgInplaceConfig rtsContext
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do

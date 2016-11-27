@@ -9,6 +9,7 @@ import Oracles.Dependencies
 import Oracles.Path
 import Rules.Generate
 import Rules.Libffi
+import Settings.Packages.Rts
 import Settings.Path
 import Target
 import UserSettings
@@ -17,7 +18,8 @@ import Util
 -- | Build @package-data.mk@ by using ghc-cabal utility to process .cabal files.
 buildPackageData :: Context -> Rules ()
 buildPackageData context@Context {..} = do
-    let cabalFile = pkgCabalFile package
+    let path      = buildPath context
+        cabalFile = pkgCabalFile package
         configure = pkgPath package -/- "configure"
         dataFile  = pkgDataFile context
 
@@ -34,6 +36,23 @@ buildPackageData context@Context {..} = do
         need [cabalFile]
         build $ Target context GhcCabal [cabalFile] [mk]
         postProcessPackageData context mk
+
+    pkgInplaceConfig context %> \conf -> do
+        need [dataFile] -- ghc-cabal builds inplace package configuration file
+        if package == rts
+        then do
+            need [rtsConfIn]
+            build $ Target context HsCpp [rtsConfIn] [conf]
+            fixFile conf $ unlines
+                         . map
+                         ( replace "\"\"" ""
+                         . replace "rts/dist/build" rtsBuildPath
+                         . replace "includes/dist-derivedconstants/header" generatedPath )
+                         . lines
+        else do
+            top <- topDirectory
+            let oldPath = top -/- path </> "build"
+            fixFile conf $ unlines . map (replace oldPath path) . lines
 
     -- TODO: PROGNAME was $(CrossCompilePrefix)hp2ps.
     priority 2.0 $ do
