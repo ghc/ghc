@@ -37,7 +37,6 @@ generatedPath = buildRootPath -/- "generated"
 stageDirectory :: Stage -> FilePath
 stageDirectory = stageString
 
--- TODO: Move to buildRootPath, see #113.
 -- | Directory for binaries that are built "in place".
 programInplacePath :: FilePath
 programInplacePath = "inplace/bin"
@@ -141,7 +140,6 @@ libffiContext = vanillaContext Stage1 libffi
 libffiBuildPath :: FilePath
 libffiBuildPath = buildPath libffiContext
 
--- TODO: Move to buildRootPath, see #113.
 -- | Path to package database directory of a given 'Stage'. Note: StageN, N > 0,
 -- share the same packageDbDirectory.
 packageDbDirectory :: Stage -> FilePath
