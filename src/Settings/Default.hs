@@ -29,7 +29,6 @@ import Settings.Builders.Make
 import Settings.Builders.Tar
 import Settings.Packages.Base
 import Settings.Packages.Compiler
-import Settings.Packages.Directory
 import Settings.Packages.Ghc
 import Settings.Packages.GhcCabal
 import Settings.Packages.GhcPrim
@@ -194,7 +193,6 @@ defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
     [ basePackageArgs
     , compilerPackageArgs
-    , directoryPackageArgs
     , ghcPackageArgs
     , ghcCabalPackageArgs
     , ghcPrimPackageArgs
