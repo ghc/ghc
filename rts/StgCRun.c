@@ -141,7 +141,7 @@ StgWord8 *win32AllocStack(void)
  * we only jump to other STG procedures, so we maintain the 16n - word_size
  * alignment for these jumps.
  *
- * This gives us binary compatability with LLVM and GCC as well as dealing
+ * This gives us binary compatibility with LLVM and GCC as well as dealing
  * with the FFI. Previously we just maintianed a 16n byte alignment for
  * procedure entry and calls, which led to bugs (see #4211 and #5250).
  *

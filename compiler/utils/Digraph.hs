@@ -16,7 +16,7 @@ module Digraph(
 
         findCycle,
 
-        -- For backwards compatability with the simpler version of Digraph
+        -- For backwards compatibility with the simpler version of Digraph
         stronglyConnCompFromEdgedVerticesOrd,
         stronglyConnCompFromEdgedVerticesOrdR,
         stronglyConnCompFromEdgedVerticesUniq,
@@ -286,7 +286,7 @@ decodeSccs Graph { gr_int_graph = graph, gr_vertex_to_node = vertex_fn } forest
     mentions_itself v = v `elem` (graph ! v)
 
 
--- The following two versions are provided for backwards compatability:
+-- The following two versions are provided for backwards compatibility:
 -- See Note [Deterministic SCC]
 -- See Note [reduceNodesIntoVertices implementations]
 stronglyConnCompFromEdgedVerticesOrd
@@ -297,7 +297,7 @@ stronglyConnCompFromEdgedVerticesOrd
   = map (fmap get_node) . stronglyConnCompFromEdgedVerticesOrdR
   where get_node (n, _, _) = n
 
--- The following two versions are provided for backwards compatability:
+-- The following two versions are provided for backwards compatibility:
 -- See Note [Deterministic SCC]
 -- See Note [reduceNodesIntoVertices implementations]
 stronglyConnCompFromEdgedVerticesUniq

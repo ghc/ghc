@@ -2440,7 +2440,7 @@ pprTyVars tvs = sep (map pprTyVar tvs)
 
 pprTyVar :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
--- Here we do not go via IfaceType, becuase the duplication with
+-- Here we do not go via IfaceType, because the duplication with
 -- pprIfaceTvBndr is minimal, and the loss of uniques etc in
 -- debug printing is disastrous
 pprTyVar tv

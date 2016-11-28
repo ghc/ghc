@@ -17,7 +17,7 @@ type CommandLineOption = String
 -- | 'Plugin' is the core compiler plugin data type. Try to avoid
 -- constructing one of these directly, and just modify some fields of
 -- 'defaultPlugin' instead: this is to try and preserve source-code
--- compatability when we add fields to this.
+-- compatibility when we add fields to this.
 --
 -- Nonetheless, this API is preliminary and highly likely to change in
 -- the future.
@@ -32,7 +32,7 @@ data Plugin = Plugin {
     -- behaviour of the constraint solver.
   }
 
--- | Default plugin: does nothing at all! For compatability reasons
+-- | Default plugin: does nothing at all! For compatibility reasons
 -- you should base all your plugin definitions on this default value.
 defaultPlugin :: Plugin
 defaultPlugin = Plugin {

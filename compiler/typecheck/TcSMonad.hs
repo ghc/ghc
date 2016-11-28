@@ -1111,7 +1111,7 @@ But (a) I have been unable to come up with an example of this
     (b) see Trac #12660 for how adding the derived shadows
         of a Given led to an infinite loop.
     (c) It's unlikely that rewriting derived Givens will lead
-        to a unification becuse Givens don't mention touchable
+        to a unification because Givens don't mention touchable
         unification variables
 
 For (b) there may be other ways to solve the loop, but simply
