@@ -980,8 +980,8 @@ data Unfolding
 
   | BootUnfolding      -- ^ We have no information about the unfolding, because
                        -- this 'Id' came from an @hi-boot@ file.
-                       -- See Note [Inlining and hs-boot files] for what
-                       -- this is used for.
+                       -- See Note [Inlining and hs-boot files] in ToIface
+                       -- for what this is used for.
 
   | OtherCon [AltCon]  -- ^ It ain't one of these constructors.
                        -- @OtherCon xs@ also indicates that something has been evaluated
