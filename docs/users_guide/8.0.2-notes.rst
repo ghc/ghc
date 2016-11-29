@@ -50,6 +50,21 @@ Language
    type-checked in GHC 8.0.1 are now rejected by GHC 8.0.2. See
    :ghc-ticket:`12784` for details.
 
+-  Some programs which combine default type class method implementations and
+   overlapping instances may now fail to type-check. Here is an example: ::
+
+      class Foo a where
+        foo :: a -> [a]
+        foo _ = []
+
+      instance Foo a
+      instance Foo Int
+
+   The problem is that the overlapping ``Foo Int`` instance is not explicitly
+   marked as overlapping. To fix this, simply add an ``OVERLAPPING`` pragma: ::
+
+      instance {-# OVERLAPPING #-} Foo Int
+
 Compiler
 ~~~~~~~~
 
