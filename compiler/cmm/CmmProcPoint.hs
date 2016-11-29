@@ -243,7 +243,11 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   (CmmProc (TopInfo {info_tbls = info_tbls})
                            top_l _ g@(CmmGraph {g_entry=entry})) =
   do -- Build a map from procpoints to the blocks they reach
-     let addBlock b graphEnv =
+     let addBlock
+             :: CmmBlock
+             -> LabelMap (LabelMap CmmBlock)
+             -> LabelMap (LabelMap CmmBlock)
+         addBlock b graphEnv =
            case mapLookup bid procMap of
              Just ProcPoint -> add graphEnv bid bid b
              Just (ReachedBy set) ->
@@ -262,7 +266,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
                          regSetToList $
                          expectJust "ppLiveness" $ mapLookup pp liveness
 
-     graphEnv <- return $ foldGraphBlocks addBlock emptyBlockMap g
+     graphEnv <- return $ foldGraphBlocks addBlock mapEmpty g
 
      -- Build a map from proc point BlockId to pairs of:
      --  * Labels for their new procedures
@@ -281,13 +285,21 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
 
      -- In each new graph, add blocks jumping off to the new procedures,
      -- and replace branches to procpoints with branches to the jump-off blocks
-     let add_jump_block (env, bs) (pp, l) =
+     let add_jump_block
+             :: (LabelMap Label, [CmmBlock])
+             -> (Label, CLabel)
+             -> UniqSM (LabelMap Label, [CmmBlock])
+         add_jump_block (env, bs) (pp, l) =
            do bid <- liftM mkBlockId getUniqueM
               let b = blockJoin (CmmEntry bid GlobalScope) emptyBlock jump
                   live = ppLiveness pp
                   jump = CmmCall (CmmLit (CmmLabel l)) Nothing live 0 0 0
               return (mapInsert pp bid env, b : bs)
 
+         add_jumps
+             :: LabelMap CmmGraph
+             -> (Label, LabelMap CmmBlock)
+             -> UniqSM (LabelMap CmmGraph)
          add_jumps newGraphEnv (ppId, blockEnv) =
            do let needed_jumps = -- find which procpoints we currently branch to
                     mapFold add_if_branch_to_pp [] blockEnv
@@ -323,7 +335,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
               -- pprTrace "g' pre jumps" (ppr g') $ do
               return (mapInsert ppId g' newGraphEnv)
 
-     graphEnv <- foldM add_jumps emptyBlockMap $ mapToList graphEnv
+     graphEnv <- foldM add_jumps mapEmpty $ mapToList graphEnv
 
      let to_proc (bid, g)
              | bid == entry
@@ -360,7 +372,9 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
      -- The C back end expects to see return continuations before the
      -- call sites.  Here, we sort them in reverse order -- it gets
      -- reversed later.
-     let (_, block_order) = foldl add_block_num (0::Int, emptyBlockMap) (postorderDfs g)
+     let (_, block_order) =
+             foldl add_block_num (0::Int, mapEmpty :: LabelMap Int)
+                   (postorderDfs g)
          add_block_num (i, map) block = (i+1, mapInsert (entryLabel block) i map)
          sort_fn (bid, _) (bid', _) =
            compare (expectJust "block_order" $ mapLookup bid  block_order)

@@ -877,7 +877,8 @@ build_mapping ncgImpl (CmmProc info lbl live (ListGraph (head:blocks)))
     -- find all the blocks that just consist of a jump that can be
     -- shorted.
     -- Don't completely eliminate loops here -- that can leave a dangling jump!
-    (_, shortcut_blocks, others) = foldl split (emptyBlockSet, [], []) blocks
+    (_, shortcut_blocks, others) =
+        foldl split (setEmpty :: LabelSet, [], []) blocks
     split (s, shortcut_blocks, others) b@(BasicBlock id [insn])
         | Just jd <- canShortcut ncgImpl insn,
           Just dest <- getJumpDestBlockId ncgImpl jd,

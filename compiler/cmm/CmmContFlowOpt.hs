@@ -402,7 +402,7 @@ removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
              -- Remove any info_tbls for unreachable
 
      keep_used :: BlockEnv CmmInfoTable -> BlockEnv CmmInfoTable
-     keep_used bs = mapFoldWithKey keep emptyBlockMap bs
+     keep_used bs = mapFoldWithKey keep mapEmpty bs
 
      keep :: Label -> CmmInfoTable -> BlockEnv CmmInfoTable -> BlockEnv CmmInfoTable
      keep l i env | l `setMember` used_lbls = mapInsert l i env

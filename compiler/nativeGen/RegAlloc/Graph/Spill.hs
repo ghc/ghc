@@ -135,7 +135,7 @@ regSpill_top platform regSlotMap cmm
          = let
                 -- Slots that are already recorded as being live.
                 curSlotsLive    = fromMaybe IntSet.empty
-                                $ lookupBlockMap blockId slotMap
+                                $ mapLookup blockId slotMap
 
                 moreSlotsLive   = IntSet.fromList
                                 $ catMaybes
@@ -144,8 +144,8 @@ regSpill_top platform regSlotMap cmm
                     -- See Note [Unique Determinism and code generation]
 
                 slotMap'
-                 = insertBlockMap blockId (IntSet.union curSlotsLive moreSlotsLive)
-                                  slotMap
+                 = mapInsert blockId (IntSet.union curSlotsLive moreSlotsLive)
+                             slotMap
 
            in   slotMap'
 

@@ -381,7 +381,7 @@ cleanBackward' liveSlotsOnEntry reloadedBy noReloads acc (li : instrs)
                 let slotsReloadedByTargets
                         = IntSet.unions
                         $ catMaybes
-                        $ map (flip lookupBlockMap liveSlotsOnEntry)
+                        $ map (flip mapLookup liveSlotsOnEntry)
                         $ targets
 
                 let noReloads'
