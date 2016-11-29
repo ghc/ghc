@@ -28,6 +28,8 @@
 
   * Add `Data` instance for `Const` (#12438)
 
+  * Added `Eq1`, `Ord1`, `Read1` and `Show1` instances for `NonEmpty`.
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0
