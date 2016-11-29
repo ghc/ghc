@@ -856,7 +856,7 @@ modifyMVar_ m io =
 -- Thread waiting
 -----------------------------------------------------------------------------
 
--- Machinery needed to ensureb that we only have one copy of certain
+-- Machinery needed to ensure that we only have one copy of certain
 -- CAFs in this module even when the base package is present twice, as
 -- it is when base is dynamically loaded into GHCi.  The RTS keeps
 -- track of the single true value of the CAF, so even when the CAFs in

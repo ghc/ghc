@@ -13,7 +13,7 @@
  *          dynamically loads
  *
  *   libHSghc - a statically-linked ghc has its own copy and so will Core
- *              plugins it dynamically loads (cf CoreMonad.reinitializeGlobals)
+ *              plugins it dynamically loads.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -33,6 +33,11 @@ typedef enum {
     SystemTimerThreadEventManagerStore,
     SystemTimerThreadIOManagerThreadStore,
     LibHSghcFastStringTable,
+    LibHSghcPersistentLinkerState,
+    LibHSghcInitLinkerDone,
+    LibHSghcGlobalDynFlags,
+    LibHSghcStaticOptions,
+    LibHSghcStaticOptionsReady,
     MaxStoreKey
 } StoreKey;
 
@@ -85,58 +90,24 @@ static StgStablePtr getOrSetKey(StoreKey key, StgStablePtr ptr)
 #endif
     }
     return ret;
-}    
-
-StgStablePtr
-getOrSetGHCConcSignalSignalHandlerStore(StgStablePtr ptr)
-{
-    return getOrSetKey(GHCConcSignalSignalHandlerStore,ptr);
 }
 
-StgStablePtr
-getOrSetGHCConcWindowsPendingDelaysStore(StgStablePtr ptr)
-{
-    return getOrSetKey(GHCConcWindowsPendingDelaysStore,ptr);
-}
+#define mkStoreAccessor(name) \
+    StgStablePtr \
+    getOrSet##name(StgStablePtr ptr) \
+    { return getOrSetKey(name, ptr); }
 
-StgStablePtr
-getOrSetGHCConcWindowsIOManagerThreadStore(StgStablePtr ptr)
-{
-    return getOrSetKey(GHCConcWindowsIOManagerThreadStore,ptr);
-}
-
-StgStablePtr
-getOrSetGHCConcWindowsProddingStore(StgStablePtr ptr)
-{
-    return getOrSetKey(GHCConcWindowsProddingStore,ptr);
-}
-
-StgStablePtr
-getOrSetSystemEventThreadEventManagerStore(StgStablePtr ptr)
-{
-    return getOrSetKey(SystemEventThreadEventManagerStore,ptr);
-}
-
-StgStablePtr
-getOrSetSystemEventThreadIOManagerThreadStore(StgStablePtr ptr)
-{
-    return getOrSetKey(SystemEventThreadIOManagerThreadStore,ptr);
-}
-
-StgStablePtr
-getOrSetSystemTimerThreadEventManagerStore(StgStablePtr ptr)
-{
-    return getOrSetKey(SystemTimerThreadEventManagerStore,ptr);
-}
-
-StgStablePtr
-getOrSetSystemTimerThreadIOManagerThreadStore(StgStablePtr ptr)
-{
-    return getOrSetKey(SystemTimerThreadIOManagerThreadStore,ptr);
-}
-
-StgStablePtr
-getOrSetLibHSghcFastStringTable(StgStablePtr ptr)
-{
-    return getOrSetKey(LibHSghcFastStringTable,ptr);
-}
+mkStoreAccessor(GHCConcSignalSignalHandlerStore)
+mkStoreAccessor(GHCConcWindowsPendingDelaysStore)
+mkStoreAccessor(GHCConcWindowsIOManagerThreadStore)
+mkStoreAccessor(GHCConcWindowsProddingStore)
+mkStoreAccessor(SystemEventThreadEventManagerStore)
+mkStoreAccessor(SystemEventThreadIOManagerThreadStore)
+mkStoreAccessor(SystemTimerThreadEventManagerStore)
+mkStoreAccessor(SystemTimerThreadIOManagerThreadStore)
+mkStoreAccessor(LibHSghcFastStringTable)
+mkStoreAccessor(LibHSghcPersistentLinkerState)
+mkStoreAccessor(LibHSghcInitLinkerDone)
+mkStoreAccessor(LibHSghcGlobalDynFlags)
+mkStoreAccessor(LibHSghcStaticOptions)
+mkStoreAccessor(LibHSghcStaticOptionsReady)

@@ -305,7 +305,6 @@ just returns the original compilation pipeline, unmodified, and says
 
     install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
     install _ todo = do
-      reinitializeGlobals
       putMsgS "Hello!"
       return todo
 
@@ -313,16 +312,6 @@ Provided you compiled this plugin and registered it in a package (with
 cabal for instance,) you can then use it by just specifying
 ``-fplugin=DoNothing.Plugin`` on the command line, and during the
 compilation you should see GHC say 'Hello'.
-
-Note carefully the ``reinitializeGlobals`` call at the beginning of the
-installation function. Due to bugs in the windows linker dealing with
-``libghc``, this call is necessary to properly ensure compiler plugins
-have the same global state as GHC at the time of invocation. Without
-``reinitializeGlobals``, compiler plugins can crash at runtime because
-they may require state that hasn't otherwise been initialized.
-
-In the future, when the linking bugs are fixed, ``reinitializeGlobals``
-will be deprecated with a warning, and changed to do nothing.
 
 .. _core-plugins-in-more-detail:
 
@@ -396,7 +385,6 @@ in a module it compiles:
 
     install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
     install _ todo = do
-      reinitializeGlobals
       return (CoreDoPluginPass "Say name" pass : todo)
 
     pass :: ModGuts -> CoreM ModGuts
@@ -446,7 +434,6 @@ will print out the name of any top-level non-recursive binding with the
 
     install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
     install _ todo = do
-      reinitializeGlobals
       return (CoreDoPluginPass "Say name" pass : todo)
 
     pass :: ModGuts -> CoreM ModGuts
