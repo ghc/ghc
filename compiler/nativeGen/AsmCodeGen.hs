@@ -416,7 +416,8 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
+cmmNativeGens :: forall statics instr jumpDest.
+                 (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
@@ -428,12 +429,15 @@ cmmNativeGens :: (Outputable statics, Outputable instr, Instruction instr)
               -> Int
               -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens _ _ _ _ _ _ us [] ngs !_
-        = return (ngs, us)
+cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
+  where
+    go :: UniqSupply -> [RawCmmDecl] -> NativeGenAcc statics instr -> Int
+       -> IO (NativeGenAcc statics instr, UniqSupply)
 
-cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
-              (cmm : cmms) ngs count
- = do
+    go us [] ngs !_ =
+        return (ngs, us)
+
+    go us (cmm : cmms) ngs count = do
         let fileIds = ngs_dwarfFiles ngs
         (us', fileIds', native, imports, colorStats, linearStats)
           <- {-# SCC "cmmNativeGen" #-}
@@ -468,11 +472,10 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
                       , ngs_labels      = ngs_labels ngs ++ labels'
                       , ngs_dwarfFiles  = fileIds'
                       }
-        cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us'
-                      cmms ngs' (count + 1)
+        go us' cmms ngs' (count + 1)
 
- where  seqString []            = ()
-        seqString (x:xs)        = x `seq` seqString xs
+    seqString []            = ()
+    seqString (x:xs)        = x `seq` seqString xs
 
 
 emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()
