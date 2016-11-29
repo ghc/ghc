@@ -97,6 +97,9 @@ Compiler
 
     data TSyn = (T :: (forall k. k -> Type) -> Type)
 
+- The Mingw-w64 toolchain for the Windows version of GHC has been updated. GHC now uses
+  `GCC 6.2.0` and `binutils 1.27.2`.
+
 GHCi
 ~~~~
 

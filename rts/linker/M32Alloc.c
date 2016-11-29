@@ -336,7 +336,6 @@ void *
 m32_alloc(size_t size STG_UNUSED, size_t alignment STG_UNUSED)
 {
     barf("%s: RTS_LINKER_USE_MMAP is %d", __func__, RTS_LINKER_USE_MMAP);
-    return NULL;
 }
 
 #else
