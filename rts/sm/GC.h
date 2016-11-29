@@ -18,7 +18,7 @@
 
 #include "HeapAlloc.h"
 
-void GarbageCollect (rtsBool force_major_gc,
+void GarbageCollect (uint32_t collect_gen,
                      rtsBool do_heap_census,
                      uint32_t gc_type, Capability *cap, rtsBool idle_cap[]);
 
