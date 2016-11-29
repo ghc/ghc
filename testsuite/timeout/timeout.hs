@@ -103,28 +103,41 @@ run secs cmd =
     alloca $ \p_pi ->
     withTString cmd' $ \cmd'' ->
     do job <- createJobObjectW nullPtr nullPtr
-       let creationflags = 0
+       b_info <- setJobParameters job
+       unless b_info $ errorWin "setJobParameters"
+
+       ioPort <- createCompletionPort job
+       when (ioPort == nullPtr) $ errorWin "createCompletionPort, cannot continue."
+
+       let creationflags = cCREATE_SUSPENDED
        b <- createProcessW nullPtr cmd'' nullPtr nullPtr True
                            creationflags
                            nullPtr nullPtr p_startupinfo p_pi
        unless b $ errorWin "createProcessW"
+
        pi <- peek p_pi
-       assignProcessToJobObject job (piProcess pi)
+       b_assign <- assignProcessToJobObject job (piProcess pi)
+       unless b_assign $ errorWin "assignProcessToJobObject, cannot continue."
+
        let handleInterrupt action =
                action `onException` terminateJobObject job 99
+
        handleInterrupt $ do
           resumeThread (piThread pi)
-
           -- The program is now running
-
           let handle = piProcess pi
           let millisecs = secs * 1000
-          rc <- waitForSingleObject handle (fromIntegral millisecs)
-          if rc == cWAIT_TIMEOUT
+          rc <- waitForJobCompletion job ioPort (fromIntegral millisecs)
+          closeHandle ioPort
+
+          if not rc
               then do terminateJobObject job 99
+                      closeHandle job
                       exitWith (ExitFailure 99)
               else alloca $ \p_exitCode ->
-                    do r <- getExitCodeProcess handle p_exitCode
+                    do terminateJobObject job 0 -- Ensure it's all really dead.
+                       closeHandle job
+                       r <- getExitCodeProcess handle p_exitCode
                        if r then do ec <- peek p_exitCode
                                     let ec' = if ec == 0
                                               then ExitSuccess

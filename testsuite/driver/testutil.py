@@ -4,6 +4,8 @@ import platform
 import subprocess
 import shutil
 
+import threading
+
 def strip_quotes(s):
     # Don't wrap commands to subprocess.call/Popen in quotes.
     return s.strip('\'"')
@@ -56,3 +58,25 @@ if platform.system() == 'Windows':
     link_or_copy_file = shutil.copyfile
 else:
     link_or_copy_file = os.symlink
+
+class Watcher(object):
+    global pool
+    global evt
+    global sync_lock
+    
+    def __init__(self, count):
+        self.pool = count
+        self.evt = threading.Event()
+        self.sync_lock = threading.Lock()
+        if count <= 0:
+            self.evt.set()
+
+    def wait(self):
+        self.evt.wait()
+
+    def notify(self):
+        self.sync_lock.acquire()
+        self.pool -= 1
+        if self.pool <= 0:
+            self.evt.set()
+        self.sync_lock.release()

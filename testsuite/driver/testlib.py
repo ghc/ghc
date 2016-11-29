@@ -38,6 +38,11 @@ if config.use_threads:
 
 global wantToStop
 wantToStop = False
+
+global pool_sema
+if config.use_threads:
+    pool_sema = threading.BoundedSemaphore(value=config.threads)
+
 def stopNow():
     global wantToStop
     wantToStop = True
@@ -601,27 +606,20 @@ parallelTests = []
 aloneTests = []
 allTestNames = set([])
 
-def runTest (opts, name, func, args):
-    ok = 0
-
+def runTest(watcher, opts, name, func, args):
     if config.use_threads:
-        t.thread_pool.acquire()
-        try:
-            while config.threads<(t.running_threads+1):
-                t.thread_pool.wait()
-            t.running_threads = t.running_threads+1
-            ok=1
-            t.thread_pool.release()
-            thread.start_new_thread(test_common_thread, (name, opts, func, args))
-        except:
-            if not ok:
-                t.thread_pool.release()
+        pool_sema.acquire()
+        t = threading.Thread(target=test_common_thread,
+                             name=name,
+                             args=(watcher, name, opts, func, args))
+        t.daemon = False
+        t.start()
     else:
-        test_common_work (name, opts, func, args)
+        test_common_work(watcher, name, opts, func, args)
 
 # name  :: String
 # setup :: TestOpts -> IO ()
-def test (name, setup, func, args):
+def test(name, setup, func, args):
     global aloneTests
     global parallelTests
     global allTestNames
@@ -649,7 +647,7 @@ def test (name, setup, func, args):
 
     executeSetups([thisdir_settings, setup], name, myTestOpts)
 
-    thisTest = lambda : runTest(myTestOpts, name, func, args)
+    thisTest = lambda watcher: runTest(watcher, myTestOpts, name, func, args)
     if myTestOpts.alone:
         aloneTests.append(thisTest)
     else:
@@ -657,16 +655,11 @@ def test (name, setup, func, args):
     allTestNames.add(name)
 
 if config.use_threads:
-    def test_common_thread(name, opts, func, args):
-        t.lock.acquire()
-        try:
-            test_common_work(name,opts,func,args)
-        finally:
-            t.lock.release()
-            t.thread_pool.acquire()
-            t.running_threads = t.running_threads - 1
-            t.thread_pool.notify()
-            t.thread_pool.release()
+    def test_common_thread(watcher, name, opts, func, args):
+            try:
+                test_common_work(watcher, name, opts, func, args)
+            finally:
+                pool_sema.release()
 
 def get_package_cache_timestamp():
     if config.package_conf_cache_file == '':
@@ -679,7 +672,7 @@ def get_package_cache_timestamp():
 
 do_not_copy = ('.hi', '.o', '.dyn_hi', '.dyn_o', '.out') # 12112
 
-def test_common_work (name, opts, func, args):
+def test_common_work(watcher, name, opts, func, args):
     try:
         t.total_tests += 1
         setLocalTestOpts(opts)
@@ -779,6 +772,8 @@ def test_common_work (name, opts, func, args):
 
     except Exception as e:
         framework_fail(name, 'runTest', 'Unhandled exception: ' + str(e))
+    finally:
+        watcher.notify()
 
 def do_test(name, way, func, args, files):
     opts = getTestOpts()
@@ -831,9 +826,6 @@ def do_test(name, way, func, args, files):
                 with io.open(dst_makefile, 'w', encoding='utf8') as dst:
                     dst.write(makefile)
 
-    if config.use_threads:
-        t.lock.release()
-
     if opts.pre_cmd:
         exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, opts.pre_cmd))
         if exit_code != 0:
@@ -841,9 +833,8 @@ def do_test(name, way, func, args, files):
 
     try:
         result = func(*[name,way] + args)
-    finally:
-        if config.use_threads:
-            t.lock.acquire()
+    except:
+        pass
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
@@ -1346,21 +1337,18 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
 
 def split_file(in_fn, delimiter, out1_fn, out2_fn):
     # See Note [Universal newlines].
-    infile = io.open(in_fn, 'r', encoding='utf8', errors='replace', newline=None)
-    out1 = io.open(out1_fn, 'w', encoding='utf8', newline='')
-    out2 = io.open(out2_fn, 'w', encoding='utf8', newline='')
+    with io.open(in_fn, 'r', encoding='utf8', errors='replace', newline=None) as infile:
+        with io.open(out1_fn, 'w', encoding='utf8', newline='') as out1:
+            with io.open(out2_fn, 'w', encoding='utf8', newline='') as out2:
+                line = infile.readline()
+                while re.sub('^\s*','',line) != delimiter and line != '':
+                    out1.write(line)
+                    line = infile.readline()
 
-    line = infile.readline()
-    while (re.sub('^\s*','',line) != delimiter and line != ''):
-        out1.write(line)
-        line = infile.readline()
-    out1.close()
-
-    line = infile.readline()
-    while (line != ''):
-        out2.write(line)
-        line = infile.readline()
-    out2.close()
+                line = infile.readline()
+                while line != '':
+                    out2.write(line)
+                    line = infile.readline()
 
 # -----------------------------------------------------------------------------
 # Utils
@@ -1392,7 +1380,8 @@ def stdout_ok(name, way):
 
 def dump_stdout( name ):
    print('Stdout:')
-   print(open(in_testdir(name, 'run.stdout')).read())
+   with open(in_testdir(name, 'run.stdout')) as f:
+       print(f.read())
 
 def stderr_ok(name, way):
    actual_stderr_file = add_suffix(name, 'run.stderr')
@@ -1405,15 +1394,15 @@ def stderr_ok(name, way):
 
 def dump_stderr( name ):
    print("Stderr:")
-   print(open(in_testdir(name, 'run.stderr')).read())
+   with open(in_testdir(name, 'run.stderr')) as f:
+       print(f.read())
 
 def read_no_crs(file):
     str = ''
     try:
         # See Note [Universal newlines].
-        h = io.open(file, 'r', encoding='utf8', errors='replace', newline=None)
-        str = h.read()
-        h.close
+        with io.open(file, 'r', encoding='utf8', errors='replace', newline=None) as h:
+            str = h.read()
     except:
         # On Windows, if the program fails very early, it seems the
         # files stdout/stderr are redirected to may not get created
@@ -1422,9 +1411,8 @@ def read_no_crs(file):
 
 def write_file(file, str):
     # See Note [Universal newlines].
-    h = io.open(file, 'w', encoding='utf8', newline='')
-    h.write(str)
-    h.close
+    with io.open(file, 'w', encoding='utf8', newline='') as h:
+        h.write(str)
 
 # Note [Universal newlines]
 #
@@ -1734,7 +1722,8 @@ def if_verbose( n, s ):
 def if_verbose_dump( n, f ):
     if config.verbose >= n:
         try:
-            print(open(f).read())
+            with io.open(f) as file:
+                print(file.read())
         except:
             print('')
 
@@ -1746,34 +1735,61 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
     cmd = cmd.format(**config.__dict__)
     if_verbose(3, cmd + ('< ' + os.path.basename(stdin) if stdin else ''))
 
+    # declare the buffers to a default
+    stdin_buffer  = None
+
+    # ***** IMPORTANT *****
+    # We have to treat input and output as
+    # just binary data here. Don't try to decode
+    # it to a string, since we have tests that actually
+    # feed malformed utf-8 to see how GHC handles it.
     if stdin:
-        stdin = open(stdin, 'r')
-    if stdout:
-        stdout = open(stdout, 'w')
-    if stderr and stderr is not subprocess.STDOUT:
-        stderr = open(stderr, 'w')
+        with io.open(stdin, 'rb') as f:
+            stdin_buffer = f.read()
 
-    # cmd is a complex command in Bourne-shell syntax
-    # e.g (cd . && 'C:/users/simonpj/HEAD/inplace/bin/ghc-stage2' ...etc)
-    # Hence it must ultimately be run by a Bourne shell. It's timeout's job
-    # to invoke the Bourne shell
-    r = subprocess.call([timeout_prog, timeout, cmd],
-                        stdin=stdin, stdout=stdout, stderr=stderr)
+    stdout_buffer = u''
+    stderr_buffer = u''
 
-    if stdin:
-        stdin.close()
-    if stdout:
-        stdout.close()
-    if stderr and stderr is not subprocess.STDOUT:
-        stderr.close()
+    hStdErr = subprocess.PIPE
+    if stderr is subprocess.STDOUT:
+        hStdErr = subprocess.STDOUT
 
-    if r == 98:
+    try:
+        # cmd is a complex command in Bourne-shell syntax
+        # e.g (cd . && 'C:/users/simonpj/HEAD/inplace/bin/ghc-stage2' ...etc)
+        # Hence it must ultimately be run by a Bourne shell. It's timeout's job
+        # to invoke the Bourne shell
+
+        r = subprocess.Popen([timeout_prog, timeout, cmd],
+                             stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE,
+                             stderr=hStdErr)
+
+        stdout_buffer, stderr_buffer = r.communicate(stdin_buffer)
+    except Exception as e:
+        traceback.print_exc()
+        framework_fail(name, way, str(e))
+    finally:
+        try:
+            if stdout:
+                with io.open(stdout, 'ab') as f:
+                    f.write(stdout_buffer)
+            if stderr:
+                if stderr is not subprocess.STDOUT:
+                    with io.open(stderr, 'ab') as f:
+                        f.write(stderr_buffer)
+
+        except Exception as e:
+            traceback.print_exc()
+            framework_fail(name, way, str(e))
+
+    if r.returncode == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
         stopNow()
-    if r == 99 and getTestOpts().exit_code != 99:
+    if r.returncode == 99 and getTestOpts().exit_code != 99:
         # Only print a message when timeout killed the process unexpectedly.
         if_verbose(1, 'Timeout happened...killed process "{0}"...\n'.format(cmd))
-    return r
+    return r.returncode
 
 # -----------------------------------------------------------------------------
 # checking if ghostscript is available for checking the output of hp2ps

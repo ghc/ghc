@@ -217,9 +217,14 @@ $(eval $(call canonicalise,TOP_ABS))
 GS = gs
 CP = cp
 RM = rm -f
-PYTHON = python
+# Allow the user to override the python version, just like with validate
+ifeq "$(shell $(SHELL) -c '$(PYTHON) -c 0' 2> /dev/null && echo exists)" "exists"
+else
 ifeq "$(shell $(SHELL) -c 'python2 -c 0' 2> /dev/null && echo exists)" "exists"
 PYTHON = python2
+else
+PYTHON = python
+endif
 endif
 
 CHECK_API_ANNOTATIONS := $(abspath $(TOP)/../inplace/bin/check-api-annotations)

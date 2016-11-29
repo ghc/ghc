@@ -4,6 +4,7 @@
 
 from __future__ import print_function
 
+import signal
 import sys
 import os
 import string
@@ -37,6 +38,9 @@ os.environ['TERM'] = 'vt100'
 
 global config
 config = getConfig() # get it from testglobals
+
+def signal_handler(signal, frame):
+        stopNow()
 
 # -----------------------------------------------------------------------------
 # cmd-line options
@@ -173,6 +177,9 @@ if windows:
         raise Exception("Failure calling SetConsoleCP(65001)")
     if kernel32.SetConsoleOutputCP(65001) == 0:
         raise Exception("Failure calling SetConsoleOutputCP(65001)")
+
+    # register the interrupt handler
+    signal.signal(signal.SIGINT, signal_handler)
 else:
     # Try and find a utf8 locale to use
     # First see if we already have a UTF8 locale
@@ -237,12 +244,6 @@ if windows or darwin:
 global testopts_local
 testopts_local.x = TestOptions()
 
-if config.use_threads:
-    t.lock = threading.Lock()
-    t.thread_pool = threading.Condition(t.lock)
-    t.lockFilesWritten = threading.Lock()
-    t.running_threads = 0
-
 # if timeout == -1 then we try to calculate a sensible value
 if config.timeout == -1:
     config.timeout = int(read_no_crs(config.top + '/timeout/calibrate.out'))
@@ -302,9 +303,11 @@ for file in t_files:
     newTestDir(tempdir, os.path.dirname(file))
     try:
         if PYTHON3:
-            src = io.open(file, encoding='utf8').read()
+            with io.open(file, encoding='utf8') as f:
+                src = f.read()
         else:
-            src = open(file).read()
+            with open(file) as f:
+                src = f.read()
 
         exec(src)
     except Exception as e:
@@ -333,28 +336,34 @@ if config.list_broken:
         print('WARNING:', len(framework_failures), 'framework failures!')
         print('')
 else:
+    # completion watcher
+    watcher = Watcher(len(parallelTests))
+
     # Now run all the tests
-    if config.use_threads:
-        t.running_threads=0
     for oneTest in parallelTests:
         if stopping():
             break
-        oneTest()
-    if config.use_threads:
-        t.thread_pool.acquire()
-        while t.running_threads>0:
-            t.thread_pool.wait()
-        t.thread_pool.release()
+        oneTest(watcher)
+
+    # wait for parallel tests to finish
+    if not stopping():
+        watcher.wait()
+
+    # Run the following tests purely sequential
     config.use_threads = False
     for oneTest in aloneTests:
         if stopping():
             break
-        oneTest()
-        
+        oneTest(watcher)
+
+    # flush everything before we continue
+    sys.stdout.flush()
+
     summary(t, sys.stdout, config.no_print_summary)
 
     if config.summary_file != '':
-        summary(t, open(config.summary_file, 'w'))
+        with open(config.summary_file, 'w') as file:
+            summary(t, file)
 
 cleanup_and_exit(0)
 
