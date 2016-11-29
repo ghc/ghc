@@ -127,6 +127,7 @@ test('haddock.compiler',
             # 2015-12-15: 49395782136 (amd64/Linux) more creep, following kind-equalities
             # 2015-12-17: 58017214568 (amd64/Linux) update Haddock to master
             # 2016-06-21: 55314944264 (amd64/Linux) D2350: Make checkFamInstConsistency less expensive
+            # 2016-11-29: 60911147344 (amd64/Linux) unknown cause
 
           ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
