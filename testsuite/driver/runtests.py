@@ -1,4 +1,6 @@
-# 
+#!/usr/bin/env python3
+
+#
 # (c) Simon Marlow 2002
 #
 
@@ -24,9 +26,6 @@ import re
 import subprocess
 
 PYTHON3 = sys.version_info >= (3, 0)
-if PYTHON3:
-    print("*** WARNING: running testsuite using Python 3.\n"
-          "*** Python 3 support is experimental. See Trac #9184.")
 
 from testutil import *
 from testglobals import *
