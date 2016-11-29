@@ -490,6 +490,7 @@ Library
         GraphPpr
         IOEnv
         ListSetOps
+        ListT
         Maybes
         MonadUtils
         OrdList
