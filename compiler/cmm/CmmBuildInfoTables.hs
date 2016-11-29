@@ -85,7 +85,6 @@ This is what flattenCAFSets is doing.
 type CAFSet = Set CLabel
 type CAFEnv = BlockEnv CAFSet
 
--- First, an analysis to find live CAFs.
 cafLattice :: DataflowLattice CAFSet
 cafLattice = DataflowLattice Set.empty add
   where
@@ -93,21 +92,27 @@ cafLattice = DataflowLattice Set.empty add
         let !new' = old `Set.union` new
         in changedIf (Set.size new' > Set.size old) new'
 
-cafTransfers :: BwdTransfer CmmNode CAFSet
-cafTransfers = mkBTransfer3 first middle last
-  where first  _ live = live
-        middle m live = foldExpDeep addCaf m live
-        last   l live = foldExpDeep addCaf l (joinOutFacts cafLattice l live)
-        addCaf e set = case e of
-               CmmLit (CmmLabel c)              -> add c set
-               CmmLit (CmmLabelOff c _)         -> add c set
-               CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $ add c2 set
-               _ -> set
-        add l s = if hasCAF l then Set.insert (toClosureLbl l) s
-                              else s
+cafTransfers :: TransferFun CAFSet
+cafTransfers (BlockCC eNode middle xNode) fBase =
+    let joined = cafsInNode xNode $! joinOutFacts cafLattice xNode fBase
+        !result = foldNodesBwdOO cafsInNode middle joined
+    in mapSingleton (entryLabel eNode) result
 
+cafsInNode :: CmmNode e x -> CAFSet -> CAFSet
+cafsInNode node set = foldExpDeep addCaf node set
+  where
+    addCaf expr !set =
+        case expr of
+            CmmLit (CmmLabel c) -> add c set
+            CmmLit (CmmLabelOff c _) -> add c set
+            CmmLit (CmmLabelDiffOff c1 c2 _) -> add c1 $! add c2 set
+            _ -> set
+    add l s | hasCAF l  = Set.insert (toClosureLbl l) s
+            | otherwise = s
+
+-- | An analysis to find live CAFs.
 cafAnal :: CmmGraph -> CAFEnv
-cafAnal g = dataflowAnalBwd g [] cafLattice cafTransfers
+cafAnal cmmGraph = analyzeCmmBwd cafLattice cafTransfers cmmGraph mapEmpty
 
 -----------------------------------------------------------------------
 -- Building the SRTs

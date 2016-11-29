@@ -18,16 +18,13 @@
 --
 
 module Hoopl.Dataflow
-  ( C, O, DataflowLattice(..), OldFact(..), NewFact(..), Fact, FactBase
-  , mkFactBase
-  , JoinedFact(..)
-  , FwdPass(..), FwdTransfer, mkFTransfer3
-
-  , BwdPass(..), BwdTransfer, mkBTransfer3
-
-  , dataflowAnalFwdBlocks, dataflowAnalBwd
-  , analyzeFwd, analyzeFwdBlocks, analyzeBwd
-
+  ( C, O, Block
+  , lastNode, entryLabel
+  , foldNodesBwdOO
+  , DataflowLattice(..), OldFact(..), NewFact(..), JoinedFact(..), TransferFun
+  , Fact, FactBase
+  , getFact, mkFactBase
+  , analyzeCmmFwd, analyzeCmmBwd
   , changedIf
   , joinOutFacts
   )
@@ -69,212 +66,73 @@ data DataflowLattice a = DataflowLattice
     , fact_join :: JoinFun a
     }
 
--- TODO(michalt): This wrapper will go away once we refactor the analyze*
--- methods.
-dataflowAnalFwdBlocks
-    :: NonLocal n
-    => GenCmmGraph n
-    -> [(BlockId, f)]
-    -> DataflowLattice f
-    -> FwdTransfer n f
-    -> BlockEnv f
-dataflowAnalFwdBlocks
-        (CmmGraph {g_entry = entry, g_graph = graph}) facts lattice xfer =
-    analyzeFwdBlocks
-        lattice xfer (JustC [entry]) graph (mkFactBase lattice facts)
-
--- TODO(michalt): This wrapper will go away once we refactor the analyze*
--- methods.
-dataflowAnalBwd
-    :: NonLocal n
-    => GenCmmGraph n
-    -> [(BlockId, f)]
-    -> DataflowLattice f
-    -> BwdTransfer n f
-    -> BlockEnv f
-dataflowAnalBwd
-        (CmmGraph {g_entry = entry, g_graph = graph}) facts lattice xfer =
-    analyzeBwd lattice xfer (JustC [entry]) graph (mkFactBase lattice facts)
-
-
-----------------------------------------------------------------
---       Forward Analysis only
-----------------------------------------------------------------
-
--- | if the graph being analyzed is open at the entry, there must
---   be no other entry point, or all goes horribly wrong...
-analyzeFwd
-   :: forall n f e .  NonLocal n
-   => DataflowLattice f
-   -> FwdTransfer n f
-   -> MaybeC e [Label]
-   -> Graph n e C -> Fact e f
-   -> FactBase f
-analyzeFwd lattice (FwdTransfer3 (ftr, mtr, ltr)) entries g in_fact =
-    graph g in_fact
-  where
-    graph :: Graph n e C -> Fact e f -> FactBase f
-    graph (GMany entry blockmap NothingO)
-      = case (entries, entry) of
-         (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
-         (JustC entries, NothingO) -> body entries
-     where
-       body  :: [Label] -> Fact C f -> Fact C f
-       body entries f
-         = fixpointAnal Fwd lattice do_block entries blockmap f
-         where
-           do_block :: forall x . Block n C x -> FactBase f -> Fact x f
-           do_block b fb = block b entryFact
-             where entryFact = getFact lattice (entryLabel b) fb
-
-    -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
-    block :: forall e x . Block n e x -> f -> Fact x f
-    block BNil            f = f
-    block (BlockCO n b)   f = (ftr n `cat`  block b) f
-    block (BlockCC l b n) f = (ftr l `cat` (block b `cat` ltr n)) f
-    block (BlockOC   b n) f =              (block b `cat` ltr n) f
-
-    block (BMiddle n)     f = mtr n f
-    block (BCat b1 b2)    f = (block b1 `cat` block b2) f
-    block (BSnoc h n)     f = (block h  `cat` mtr n) f
-    block (BCons n t)     f = (mtr  n   `cat` block t) f
-
-    {-# INLINE cat #-}
-    cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
-    cat ft1 ft2 = \f -> ft2 $! ft1 f
-
--- | if the graph being analyzed is open at the entry, there must
---   be no other entry point, or all goes horribly wrong...
-analyzeFwdBlocks
-   :: forall n f e .  NonLocal n
-   => DataflowLattice f
-   -> FwdTransfer n f
-   -> MaybeC e [Label]
-   -> Graph n e C -> Fact e f
-   -> FactBase f
-analyzeFwdBlocks lattice (FwdTransfer3 (ftr, _, ltr)) entries g in_fact =
-    graph g in_fact
-  where
-    graph :: Graph n e C -> Fact e f -> FactBase f
-    graph (GMany entry blockmap NothingO)
-      = case (entries, entry) of
-         (NothingC, JustO entry)   -> block entry `cat` body (successors entry)
-         (JustC entries, NothingO) -> body entries
-     where
-       body  :: [Label] -> Fact C f -> Fact C f
-       body entries f
-         = fixpointAnal Fwd lattice do_block entries blockmap f
-         where
-           do_block :: forall x . Block n C x -> FactBase f -> Fact x f
-           do_block b fb = block b entryFact
-             where entryFact = getFact lattice (entryLabel b) fb
-
-    -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
-    block :: forall e x . Block n e x -> f -> Fact x f
-    block BNil            f = f
-    block (BlockCO n _)   f = ftr n f
-    block (BlockCC l _ n) f = (ftr l `cat` ltr n) f
-    block (BlockOC   _ n) f = ltr n f
-    block _               _ = error "analyzeFwdBlocks"
-
-    {-# INLINE cat #-}
-    cat :: forall f1 f2 f3 . (f1 -> f2) -> (f2 -> f3) -> (f1 -> f3)
-    cat ft1 ft2 = \f -> ft2 $! ft1 f
-
-----------------------------------------------------------------
---       Backward Analysis only
-----------------------------------------------------------------
-
--- | if the graph being analyzed is open at the entry, there must
---   be no other entry point, or all goes horribly wrong...
-analyzeBwd
-   :: forall n f e .  NonLocal n
-   => DataflowLattice f
-   -> BwdTransfer n f
-   -> MaybeC e [Label]
-   -> Graph n e C -> Fact C f
-   -> FactBase f
-analyzeBwd lattice (BwdTransfer3 (ftr, mtr, ltr)) entries g in_fact =
-    graph g in_fact
-  where
-    graph :: Graph n e C -> Fact C f -> FactBase f
-    graph (GMany entry blockmap NothingO)
-      = case (entries, entry) of
-         (NothingC, JustO entry)   -> body (successors entry)
-         (JustC entries, NothingO) -> body entries
-     where
-       body  :: [Label] -> Fact C f -> Fact C f
-       body entries f
-         = fixpointAnal Bwd lattice do_block entries blockmap f
-         where
-           do_block :: forall x . Block n C x -> Fact x f -> FactBase f
-           do_block b fb = mapSingleton (entryLabel b) (block b fb)
-
-    -- NB. eta-expand block, GHC can't do this by itself.  See #5809.
-    block :: forall e x . Block n e x -> Fact x f -> f
-    block BNil            f = f
-    block (BlockCO n b)   f = (ftr n `cat`  block b) f
-    block (BlockCC l b n) f = ((ftr l `cat` block b) `cat` ltr n) f
-    block (BlockOC   b n) f =              (block b `cat` ltr n) f
-
-    block (BMiddle n)     f = mtr n f
-    block (BCat b1 b2)    f = (block b1 `cat` block b2) f
-    block (BSnoc h n)     f = (block h  `cat` mtr n) f
-    block (BCons n t)     f = (mtr  n   `cat` block t) f
-
-    {-# INLINE cat #-}
-    cat :: forall f1 f2 f3 . (f2 -> f3) -> (f1 -> f2) -> (f1 -> f3)
-    cat ft1 ft2 = \f -> ft1 $! ft2 f
-
-
------------------------------------------------------------------------------
---      fixpoint
------------------------------------------------------------------------------
-
 data Direction = Fwd | Bwd
 
--- | fixpointing for analysis-only
---
-fixpointAnal :: forall n f. NonLocal n
- => Direction
- -> DataflowLattice f
- -> (Block n C C -> Fact C f -> Fact C f)
- -> [Label]
- -> LabelMap (Block n C C)
- -> Fact C f -> FactBase f
+type TransferFun f = CmmBlock -> FactBase f -> FactBase f
 
-fixpointAnal direction DataflowLattice{ fact_bot = _, fact_join = join }
-              do_block entries blockmap init_fbase
-  = loop start init_fbase
+analyzeCmmBwd, analyzeCmmFwd
+    :: DataflowLattice f
+    -> TransferFun f
+    -> CmmGraph
+    -> FactBase f
+    -> FactBase f
+analyzeCmmBwd = analyzeCmm Bwd
+analyzeCmmFwd = analyzeCmm Fwd
+
+analyzeCmm
+    :: Direction
+    -> DataflowLattice f
+    -> TransferFun f
+    -> CmmGraph
+    -> FactBase f
+    -> FactBase f
+analyzeCmm dir lattice transfer cmmGraph initFact =
+    let entry = g_entry cmmGraph
+        hooplGraph = g_graph cmmGraph
+        blockMap =
+            case hooplGraph of
+                GMany NothingO bm NothingO -> bm
+        entries = if mapNull initFact then [entry] else mapKeys initFact
+    in fixpointAnalysis dir lattice transfer entries blockMap initFact
+
+-- Fixpoint algorithm.
+fixpointAnalysis
+    :: forall f.
+       Direction
+    -> DataflowLattice f
+    -> TransferFun f
+    -> [Label]
+    -> LabelMap CmmBlock
+    -> FactBase f
+    -> FactBase f
+fixpointAnalysis direction lattice do_block entries blockmap = loop start
   where
+    -- Sorting the blocks helps to minimize the number of times we need to
+    -- process blocks. For instance, for forward analysis we want to look at
+    -- blocks in reverse postorder. Also, see comments for sortBlocks.
     blocks     = sortBlocks direction entries blockmap
-    n          = length blocks
-    block_arr  = {-# SCC "block_arr" #-} listArray (0,n-1) blocks
-    start      = {-# SCC "start" #-} [0..n-1]
+    num_blocks = length blocks
+    block_arr  = {-# SCC "block_arr" #-} listArray (0, num_blocks - 1) blocks
+    start      = {-# SCC "start" #-} [0 .. num_blocks - 1]
     dep_blocks = {-# SCC "dep_blocks" #-} mkDepBlocks direction blocks
+    join       = fact_join lattice
 
     loop
-       :: IntHeap      -- blocks still to analyse
-       -> FactBase f  -- current factbase (increases monotonically)
-       -> FactBase f
+        :: IntHeap     -- ^ Worklist, i.e., blocks to process
+        -> FactBase f  -- ^ Current result (increases monotonically)
+        -> FactBase f
+    loop []              !fbase1 = fbase1
+    loop (index : todo1) !fbase1 =
+        let block = block_arr ! index
+            out_facts = {-# SCC "do_block" #-} do_block block fbase1
+            -- For each of the outgoing edges, we join it with the current
+            -- information in fbase1 and (if something changed) we update it
+            -- and add the affected blocks to the worklist.
+            (todo2, fbase2) = {-# SCC "mapFoldWithKey" #-}
+                mapFoldWithKey
+                    (updateFact join dep_blocks) (todo1, fbase1) out_facts
+        in loop todo2 fbase2
 
-    loop []        fbase = fbase
-    loop (ix:todo) fbase =
-           let
-               blk = block_arr ! ix
-
-               out_facts = {-# SCC "do_block" #-} do_block blk fbase
-
-               !(todo', fbase') = {-# SCC "mapFoldWithKey" #-}
-                     mapFoldWithKey (updateFact join dep_blocks)
-                                    (todo,fbase) out_facts
-           in
-           -- trace ("analysing: " ++ show (entryLabel blk)) $
-           -- trace ("fbase': " ++ show (mapKeys fbase')) $ return ()
-           -- trace ("changed: " ++ show changed) $ return ()
-           -- trace ("to analyse: " ++ show to_analyse) $ return ()
-
-           loop todo' fbase'
 
 
 {-
@@ -412,7 +270,7 @@ getFact lat l fb = case lookupFact l fb of Just  f -> f
 
 -- | Returns the result of joining the facts from all the successors of the
 -- provided node or block.
-joinOutFacts :: (NonLocal n) => DataflowLattice f -> n O C -> FactBase f -> f
+joinOutFacts :: (NonLocal n) => DataflowLattice f -> n e C -> FactBase f -> f
 joinOutFacts lattice nonLocal fact_base = foldl' join (fact_bot lattice) facts
   where
     join new old = getJoined $ fact_join lattice (OldFact old) (NewFact new)
@@ -436,6 +294,17 @@ mkFactBase lattice = foldl' add mapEmpty
                     Just f2 -> getJoined $ join (OldFact f1) (NewFact f2)
         in mapInsert l newFact result
 
+-- | Folds backward over all nodes of an open-open block.
+-- Strict in the accumulator.
+foldNodesBwdOO :: (CmmNode O O -> f -> f) -> Block CmmNode O O -> f -> f
+foldNodesBwdOO funOO = go
+  where
+    go (BCat b1 b2) f = go b1 $! go b2 f
+    go (BSnoc h n) f = go h $! funOO n f
+    go (BCons n t) f = funOO n $! go t f
+    go (BMiddle n) f = funOO n f
+    go BNil f = f
+{-# INLINABLE foldNodesBwdOO #-}
 
 -- -----------------------------------------------------------------------------
 -- a Heap of Int

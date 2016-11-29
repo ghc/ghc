@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, DisambiguateRecordFields #-}
+{-# LANGUAGE GADTs, DisambiguateRecordFields, BangPatterns #-}
 
 module CmmProcPoint
     ( ProcPointSet, Status(..)
@@ -17,7 +17,7 @@ import Cmm
 import PprCmm ()
 import CmmUtils
 import CmmInfo
-import CmmLive (cmmGlobalLiveness)
+import CmmLive
 import CmmSwitch
 import Data.List (sortBy)
 import Maybes
@@ -25,7 +25,6 @@ import Control.Monad
 import Outputable
 import Platform
 import UniqSupply
-
 import Hoopl
 
 -- Compute a minimal set of proc points for a control-flow graph.
@@ -129,42 +128,44 @@ instance Outputable Status where
 --------------------------------------------------
 -- Proc point analysis
 
-procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (BlockEnv Status)
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 -- See Note [Proc-point analysis]
-procPointAnalysis procPoints g@(CmmGraph {g_graph = graph}) =
-  -- pprTrace "procPointAnalysis" (ppr procPoints) $
-  return $ dataflowAnalFwdBlocks g initProcPoints lattice forward
-  where initProcPoints = [(id, ProcPoint) | id <- setElems procPoints,
-                                            id `setMember` labelsInGraph ]
-                                    -- See Note [Non-existing proc-points]
-        labelsInGraph  = labelsDefined graph
--- transfer equations
+procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (BlockEnv Status)
+procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
+    return $
+        analyzeCmmFwd procPointLattice procPointTransfer cmmGraph initProcPoints
+  where
+    initProcPoints =
+        mkFactBase
+            procPointLattice
+            [ (id, ProcPoint)
+            | id <- setElems procPoints
+            -- See Note [Non-existing proc-points]
+            , id `setMember` labelsInGraph
+            ]
+    labelsInGraph = labelsDefined graph
 
-forward :: FwdTransfer CmmNode Status
-forward = mkFTransfer3 first middle last
-    where
-      first :: CmmNode C O -> Status -> Status
-      first (CmmEntry id _) ProcPoint = ReachedBy $ setSingleton id
-      first  _ x = x
+procPointTransfer :: TransferFun Status
+procPointTransfer block facts =
+    let label = entryLabel block
+        !fact = case getFact procPointLattice label facts of
+            ProcPoint -> ReachedBy $! setSingleton label
+            f -> f
+        result = map (\id -> (id, fact)) (successors block)
+    in mkFactBase procPointLattice result
 
-      middle _ x = x
-
-      last :: CmmNode O C -> Status -> FactBase Status
-      last l x = mkFactBase lattice $ map (\id -> (id, x)) (successors l)
-
-lattice :: DataflowLattice Status
-lattice = DataflowLattice unreached add_to
-    where unreached = ReachedBy setEmpty
-          add_to (OldFact ProcPoint) _ = NotChanged ProcPoint
-          add_to _ (NewFact ProcPoint) = Changed ProcPoint
-                       -- because of previous case
-          add_to (OldFact (ReachedBy p)) (NewFact (ReachedBy p'))
-             | setSize union > setSize p = Changed (ReachedBy union)
-             | otherwise                 = NotChanged (ReachedBy p)
-           where
-             union = setUnion p' p
+procPointLattice :: DataflowLattice Status
+procPointLattice = DataflowLattice unreached add_to
+  where
+    unreached = ReachedBy setEmpty
+    add_to (OldFact ProcPoint) _ = NotChanged ProcPoint
+    add_to _ (NewFact ProcPoint) = Changed ProcPoint -- because of previous case
+    add_to (OldFact (ReachedBy p)) (NewFact (ReachedBy p'))
+        | setSize union > setSize p = Changed (ReachedBy union)
+        | otherwise = NotChanged (ReachedBy p)
+      where
+        union = setUnion p' p
 
 ----------------------------------------------------------------------
 
