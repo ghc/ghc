@@ -1315,7 +1315,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
     -- name (cf section 8.5.1 in Haskell 2010 report).
     mkCImport = do
       let e = unpackFS entity
-      case parseCImport cconv safety (mkExtName (unLoc v)) e (L loc e) of
+      case parseCImport cconv safety (mkExtName (unLoc v)) e (L loc esrc) of
         Nothing         -> parseErrorSDoc loc (text "Malformed entity string")
         Just importSpec -> returnSpec importSpec
 
