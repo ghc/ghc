@@ -1,12 +1,12 @@
 [1 of 3] Processing p
-  [1 of 3] Compiling Q[sig]          (.hsig -> nothing)
-  [2 of 3] Compiling Q2[sig]         (.hsig -> nothing)
-  [3 of 3] Compiling P               (.hs -> nothing)
+  [1 of 3] Compiling Q[sig]           ( p/Q.hsig, nothing )
+  [2 of 3] Compiling Q2[sig]          ( p/Q2.hsig, nothing )
+  [3 of 3] Compiling P                ( p/P.hs, nothing )
 [2 of 3] Processing q
   Instantiating q
-  [1 of 3] Compiling QMe             (.hs -> .o)
-  [2 of 3] Compiling Q               (.hs -> .o)
-  [3 of 3] Compiling Q2              (.hs -> .o)
+  [1 of 3] Compiling QMe              ( q/QMe.hs, bkpfail14.out/q/QMe.o )
+  [2 of 3] Compiling Q                ( q/Q.hs, bkpfail14.out/q/Q.o )
+  [3 of 3] Compiling Q2               ( q/Q2.hs, bkpfail14.out/q/Q2.o )
 [3 of 3] Processing r
 
 bkpfail14.bkp:9:9: error:

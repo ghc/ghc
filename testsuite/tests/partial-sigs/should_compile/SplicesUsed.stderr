@@ -1,5 +1,5 @@
-[1 of 2] Compiling Splices         (.hs -> .o)
-[2 of 2] Compiling SplicesUsed     (.hs -> .o)
+[1 of 2] Compiling Splices          ( Splices.hs, Splices.o )
+[2 of 2] Compiling SplicesUsed      ( SplicesUsed.hs, SplicesUsed.o )
 
 SplicesUsed.hs:7:16: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Found type wildcard ‘_’ standing for ‘Maybe Bool’

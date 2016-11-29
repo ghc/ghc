@@ -13,8 +13,8 @@ verbosityOptions =
          , flagType = DynamicFlag
          , flagReverse = ""
          }
-  , flag { flagName = "-fshow-source-paths"
-         , flagDescription = "show module source and object paths"
+  , flag { flagName = "-fhide-source-paths"
+         , flagDescription = "hide module source and object paths"
          , flagType = DynamicFlag
          , flagReverse = ""
          }

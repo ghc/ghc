@@ -1,6 +1,6 @@
-[1 of 3] Compiling T12042[boot]     (.hs-boot -> .o-boot)
-[2 of 3] Compiling T12042a          (.hs -> .o)
-[3 of 3] Compiling T12042           (.hs -> .o)
+[1 of 3] Compiling T12042[boot]     ( T12042.hs-boot, T12042.o-boot )
+[2 of 3] Compiling T12042a          ( T12042a.hs, T12042a.o )
+[3 of 3] Compiling T12042           ( T12042.hs, T12042.o )
 
 T12042.hs:3:1: error:
     Cycle in type synonym declarations:

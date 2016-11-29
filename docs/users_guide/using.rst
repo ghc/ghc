@@ -617,6 +617,11 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
     list of some in the instances it knows about. With this flag it
     prints *all* the instances it knows about.
 
+.. ghc-flag:: -fhide-source-paths
+
+    Starting with minimal verbosity (see :ghc-flag:`-v1`), GHC displays the
+    name, the source path and the target path of each compiled module. This flag
+    can be used to reduce GHC's output by hiding source paths and target paths.
 
 The following flags control the way in which GHC displays types in error
 messages and in GHCi:
