@@ -1392,7 +1392,7 @@ repBinds (HsValBinds decs)
         ; return (ss, core_list) }
 
 rep_val_binds :: HsValBinds Name -> DsM [(SrcSpan, Core TH.DecQ)]
--- Assumes: all the binders of the binding are alrady in the meta-env
+-- Assumes: all the binders of the binding are already in the meta-env
 rep_val_binds (ValBindsOut binds sigs)
  = do { core1 <- rep_binds' (unionManyBags (map snd binds))
       ; core2 <- rep_sigs' sigs
@@ -1408,7 +1408,7 @@ rep_binds' :: LHsBinds Name -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_binds' = mapM rep_bind . bagToList
 
 rep_bind :: LHsBind Name -> DsM (SrcSpan, Core TH.DecQ)
--- Assumes: all the binders of the binding are alrady in the meta-env
+-- Assumes: all the binders of the binding are already in the meta-env
 
 -- Note GHC treats declarations of a variable (not a pattern)
 -- e.g.  x = g 5 as a Fun MonoBinds. This is indicated by a single match

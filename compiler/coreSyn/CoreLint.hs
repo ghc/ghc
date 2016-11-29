@@ -1832,7 +1832,7 @@ lintInScope loc_msg var =
 ensureEqTys :: OutType -> OutType -> MsgDoc -> LintM ()
 -- check ty2 is subtype of ty1 (ie, has same structure but usage
 -- annotations need only be consistent, not equal)
--- Assumes ty1,ty2 are have alrady had the substitution applied
+-- Assumes ty1,ty2 are have already had the substitution applied
 ensureEqTys ty1 ty2 msg = lintL (ty1 `eqType` ty2) msg
 
 lintRole :: Outputable thing

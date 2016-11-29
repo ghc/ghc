@@ -190,7 +190,7 @@ type UnboundTyVarZonker = TcTyVar -> TcM Type
         -- The TcTyVar is
         --     (a) a MetaTv
         --     (b) Flexi and
-        --     (c) its kind is alrady zonked
+        --     (c) its kind is already zonked
         -- Note [Zonking the LHS of a RULE]
 
 -- | A ZonkEnv carries around several bits.

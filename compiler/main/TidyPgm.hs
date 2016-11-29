@@ -954,7 +954,7 @@ findExternalRules omit_prags binds imp_id_rules unfold_env
         -- local binder (on LHS or RHS) that we have now discarded.
         -- (NB: ruleFreeVars only includes LocalIds)
         --
-        -- LHS: we have alrady filtered out rules that mention internal Ids
+        -- LHS: we have already filtered out rules that mention internal Ids
         --     on LHS but that isn't enough because we might have by now
         --     discarded a binding with an external Id. (How?
         --     chooseExternalIds is a bit conservative.)

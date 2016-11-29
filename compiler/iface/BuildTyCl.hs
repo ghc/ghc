@@ -431,7 +431,7 @@ newImplicitBinder :: Name                       -- Base name
                   -> TcRnIf m n Name            -- Implicit name
 -- Called in BuildTyCl to allocate the implicit binders of type/class decls
 -- For source type/class decls, this is the first occurrence
--- For iface ones, the LoadIface has alrady allocated a suitable name in the cache
+-- For iface ones, the LoadIface has already allocated a suitable name in the cache
 newImplicitBinder base_name mk_sys_occ
   = newImplicitBinderLoc base_name mk_sys_occ (nameSrcSpan base_name)
 
