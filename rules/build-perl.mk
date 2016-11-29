@@ -13,7 +13,7 @@
 
 # Build a perl script.  Invoke like this:
 #
-# driver/mangler_PERL_SRC = ghc-asm.lprl
+# driver/mangler_PERL_SRC = ghc-asm.pl
 # driver/mangler_dist_PROGNAME = ghc-asm
 #
 # $(eval $(call build-perl,driver/mangler,dist))
@@ -50,14 +50,12 @@ $(call clean-target,$1,$2,$1/$2 $$($1_$2_INPLACE))
 clean_$1 : clean_$1_$2
 
 ifneq "$$(BINDIST)" "YES"
-$1/$2/$$($1_$2_PROG).prl: $1/$$($1_PERL_SRC) $$$$(unlit_INPLACE) | $$$$(dir $$$$@)/.
-	"$$(unlit_INPLACE)" $$(UNLIT_OPTS) $$< $$@
 
-$1/$2/$$($1_$2_PROG): $1/$2/$$($1_$2_PROG).prl
+$1/$2/$$($1_$2_PROG): $1/$$/$$($1_PERL_SRC) $$$$(unlit_INPLACE) | $$$$(dir $$$$@)/.
 	$$(call removeFiles,$$@)
 	echo '#!$$(PERL)'                                  >> $$@
-	echo '$$$$TARGETPLATFORM  = "$$(TARGETPLATFORM)";' >> $$@
-	echo '$$$$TABLES_NEXT_TO_CODE  = "$(GhcEnableTablesNextToCode)";' >> $$@
+	echo 'my $$$$TARGETPLATFORM  = "$$(TARGETPLATFORM)";' >> $$@
+	echo 'my $$$$TABLES_NEXT_TO_CODE  = "$(GhcEnableTablesNextToCode)";' >> $$@
 	cat $$<                                            >> $$@
 
 $$($1_$2_INPLACE): $1/$2/$$($1_$2_PROG) | $$$$(dir $$$$@)/.

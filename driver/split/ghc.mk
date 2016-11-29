@@ -10,7 +10,7 @@
 #
 # -----------------------------------------------------------------------------
 
-driver/split_PERL_SRC  = ghc-split.lprl
+driver/split_PERL_SRC  = ghc-split.pl
 driver/split_dist_PROGNAME = ghc-split
 driver/split_dist_TOPDIR = YES
 driver/split_dist_INSTALL = YES

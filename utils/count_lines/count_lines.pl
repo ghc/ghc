@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
 
-\begin{code}
-
 use FindBin;
 
 %DirCount = ();
@@ -69,6 +67,3 @@ foreach $m (sort (keys %ModCount)) {
     $totcmts += $ModComments{$m};
 }
 printf "\n%-20s %6d %6d\n", 'TOTAL:', $tot, $totcmts;
-
-\end{code}
-

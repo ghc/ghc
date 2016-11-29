@@ -1,10 +1,9 @@
-%************************************************************************
-%*                                                                      *
-\section[Driver-obj-splitting]{Splitting into many \tr{.o} files (for libraries)}
-%*                                                                      *
-%************************************************************************
+#************************************************************************
+#*                                                                      *
+#* \section[Driver-obj-splitting]{Splitting into many \tr{.o} files (for libraries)}
+#*                                                                      *
+#************************************************************************
 
-\begin{code}
 $TargetPlatform = $TARGETPLATFORM;
 
 ($Pgm = $0) =~ s|.*/||;
@@ -209,13 +208,14 @@ sub ReadTMPIUpToAMarker {
     $str =~ tr/\r//d if $TargetPlatform =~ /-mingw32$/m; # in case Perl doesn't convert line endings
     $str;
 }
-\end{code}
+=pod
 
 We must (a)~strip the marker off the block, (b)~record any literal C
 constants that are defined here, and (c)~inject copies of any C constants
 that are used-but-not-defined here.
 
-\begin{code}
+=cut
+
 sub process_asm_block {
     local($str) = @_;
 
@@ -430,5 +430,3 @@ sub tidy_up_and_die {
     print STDERR $msg;
     exit (($return_val == 0) ? 0 : 1);
 }
-\end{code}
-

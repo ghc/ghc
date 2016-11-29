@@ -560,7 +560,7 @@ pprGotDeclaration _ _ _
 -- and one for non-PIC.
 --
 -- Whenever you change something in this assembler output, make sure
--- the splitter in driver/split/ghc-split.lprl recognizes the new output
+-- the splitter in driver/split/ghc-split.pl recognizes the new output
 
 pprImportedSymbol :: DynFlags -> Platform -> CLabel -> SDoc
 pprImportedSymbol dflags platform@(Platform { platformArch = ArchPPC, platformOS = OSDarwin }) importedLbl
