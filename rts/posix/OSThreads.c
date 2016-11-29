@@ -35,7 +35,6 @@
 #endif
 #endif
 
-#if defined(THREADED_RTS)
 #include "RtsUtils.h"
 #include "Task.h"
 
@@ -215,6 +214,8 @@ freeThreadLocalKey (ThreadLocalKey *key)
     }
 }
 
+#if defined(THREADED_RTS)
+
 static void *
 forkOS_createThreadWrapper ( void * entry )
 {
@@ -265,6 +266,23 @@ getNumberOfProcessors (void)
 
     return nproc;
 }
+
+#else /* !defined(THREADED_RTS) */
+
+int
+forkOS_createThread ( HsStablePtr entry STG_UNUSED )
+{
+    return -1;
+}
+
+void freeThreadingResources (void) { /* nothing */ }
+
+uint32_t getNumberOfProcessors (void)
+{
+    return 1;
+}
+
+#endif /* defined(THREADED_RTS) */
 
 #if defined(HAVE_SCHED_H) && defined(HAVE_SCHED_SETAFFINITY)
 // Schedules the thread to run on CPU n of m.  m may be less than the
@@ -352,23 +370,6 @@ interruptOSThread (OSThreadId id)
 {
     pthread_kill(id, SIGPIPE);
 }
-
-#else /* !defined(THREADED_RTS) */
-
-int
-forkOS_createThread ( HsStablePtr entry STG_UNUSED )
-{
-    return -1;
-}
-
-void freeThreadingResources (void) { /* nothing */ }
-
-uint32_t getNumberOfProcessors (void)
-{
-    return 1;
-}
-
-#endif /* defined(THREADED_RTS) */
 
 KernelThreadId kernelThreadId (void)
 {
