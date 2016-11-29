@@ -37,6 +37,7 @@ import StgCmmProf (curCCS)
 
 import MkGraph
 import SMRep
+import BlockId
 import Cmm
 import CmmUtils
 import CmmInfo
@@ -113,7 +114,7 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
               emit $ mkJumpExtra dflags callConv fun args updfr_off extra_stack
               return AssignedDirectly
             AssignTo res_regs _ -> do
-              k <- newLabelC
+              k <- newBlockId
               let area = Young k
                   (off, _, copyin) = copyInOflow dflags retConv area res_regs []
                   copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
@@ -215,10 +216,10 @@ slowCall fun stg_args
                   (entryCode dflags fun_iptr)
                   (nonVArgs ((P,Just funv):argsreps))
 
-             slow_lbl <- newLabelC
-             fast_lbl <- newLabelC
-             is_tagged_lbl <- newLabelC
-             end_lbl <- newLabelC
+             slow_lbl <- newBlockId
+             fast_lbl <- newBlockId
+             is_tagged_lbl <- newBlockId
+             end_lbl <- newBlockId
 
              let correct_arity = cmmEqWord dflags (funInfoArity dflags fun_iptr)
                                                   (mkIntExpr dflags n_args)

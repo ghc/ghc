@@ -32,7 +32,6 @@ import Control.Monad.Fix
 import Data.Array as Array
 import Data.Bits
 import Data.List (nub)
-import Control.Monad (liftM)
 
 import Prelude hiding ((<*>))
 
@@ -526,7 +525,7 @@ makeFixupBlock :: DynFlags -> ByteOff -> Label -> StackMap
 makeFixupBlock dflags sp0 l stack tscope assigs
   | null assigs && sp0 == sm_sp stack = return (l, [])
   | otherwise = do
-    tmp_lbl <- liftM mkBlockId $ getUniqueM
+    tmp_lbl <- newBlockId
     let sp_off = sp0 - sm_sp stack
         block = blockJoin (CmmEntry tmp_lbl tscope)
                           (maybeAddSpAdj dflags sp_off (blockFromList assigs))

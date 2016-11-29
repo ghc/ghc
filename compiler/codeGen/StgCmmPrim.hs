@@ -29,6 +29,7 @@ import StgCmmProf ( costCentreFrom, curCCS )
 import DynFlags
 import Platform
 import BasicTypes
+import BlockId
 import MkGraph
 import StgSyn
 import Cmm
@@ -1784,7 +1785,7 @@ doNewArrayOp res_r rep info payload n init = do
 
     -- Initialise all elements of the the array
     p <- assignTemp $ cmmOffsetB dflags (CmmReg arr) (hdrSize dflags rep)
-    for <- newLabelC
+    for <- newBlockId
     emitLabel for
     let loopBody =
             [ mkStore (CmmReg (CmmLocal p)) init

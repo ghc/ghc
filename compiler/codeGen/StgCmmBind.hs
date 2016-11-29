@@ -32,6 +32,7 @@ import StgCmmForeign    (emitPrimCall)
 
 import MkGraph
 import CoreSyn          ( AltCon(..), tickishIsCode )
+import BlockId
 import SMRep
 import Cmm
 import CmmInfo
@@ -485,7 +486,7 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 ; dflags <- getDynFlags
                 ; let node_points = nodeMustPointToIt dflags lf_info
                       node' = if node_points then Just node else Nothing
-                ; loop_header_id <- newLabelC
+                ; loop_header_id <- newBlockId
                 -- Extend reader monad with information that
                 -- self-recursive tail calls can be optimized into local
                 -- jumps. See Note [Self-recursive tail calls] in StgCmmExpr.

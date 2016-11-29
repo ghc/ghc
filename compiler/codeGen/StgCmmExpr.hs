@@ -427,7 +427,7 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
        ; withSequel (AssignTo [idToReg dflags (NonVoid v)] False) (cgExpr scrut)
        ; restoreCurrentCostCentre mb_cc
        ; emitComment $ mkFastString "should be unreachable code"
-       ; l <- newLabelC
+       ; l <- newBlockId
        ; emitLabel l
        ; emit (mkBranch l)  -- an infinite loop
        ; return AssignedDirectly
@@ -891,9 +891,9 @@ emitEnter fun = do
       -- code in the enclosing case expression.
       --
       AssignTo res_regs _ -> do
-       { lret <- newLabelC
+       { lret <- newBlockId
        ; let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
-       ; lcall <- newLabelC
+       ; lcall <- newBlockId
        ; updfr_off <- getUpdFrameOff
        ; let area = Young lret
        ; let (outArgs, regs, copyout) = copyOutOflow dflags NativeNodeCall Call area

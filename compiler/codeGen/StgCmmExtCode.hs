@@ -43,13 +43,13 @@ import Cmm
 import CLabel
 import MkGraph
 
--- import BasicTypes
 import BlockId
 import DynFlags
 import FastString
 import Module
 import UniqFM
 import Unique
+import UniqSupply
 
 import Control.Monad (liftM, ap)
 
@@ -89,6 +89,12 @@ instance Applicative CmmParse where
 
 instance Monad CmmParse where
   (>>=) = thenExtFC
+
+instance MonadUnique CmmParse where
+  getUniqueSupplyM = code getUniqueSupplyM
+  getUniqueM = EC $ \_ _ decls -> do
+    u <- getUniqueM
+    return (decls, u)
 
 instance HasDynFlags CmmParse where
     getDynFlags = EC (\_ _ d -> do dflags <- getDynFlags
@@ -154,9 +160,6 @@ newLabel name = do
    u <- code newUnique
    addLabel name (mkBlockId u)
    return (mkBlockId u)
-
-newBlockId :: CmmParse BlockId
-newBlockId = code F.newLabelC
 
 -- | Add add a local function to the environment.
 newFunctionName

@@ -459,7 +459,7 @@ emitSwitch _ [(_,code)] Nothing     _ _ = emit (fst code)
 
 -- Right, off we go
 emitSwitch tag_expr branches mb_deflt lo_tag hi_tag = do
-    join_lbl      <- newLabelC
+    join_lbl      <- newBlockId
     mb_deflt_lbl  <- label_default join_lbl mb_deflt
     branches_lbls <- label_branches join_lbl branches
     tag_expr'     <- assignTemp' tag_expr
@@ -517,7 +517,7 @@ emitCmmLitSwitch :: CmmExpr                    -- Tag to switch on
 emitCmmLitSwitch _scrut []       deflt = emit $ fst deflt
 emitCmmLitSwitch scrut  branches deflt = do
     scrut' <- assignTemp' scrut
-    join_lbl <- newLabelC
+    join_lbl <- newBlockId
     deflt_lbl <- label_code join_lbl deflt
     branches_lbls <- label_branches join_lbl branches
 
@@ -604,7 +604,7 @@ label_code :: BlockId -> CmmAGraphScoped -> FCode BlockId
 --  [L: code; goto J]
 -- and returns L
 label_code join_lbl (code,tsc) = do
-    lbl <- newLabelC
+    lbl <- newBlockId
     emitOutOfLine lbl (code MkGraph.<*> mkBranch join_lbl, tsc)
     return lbl
 
