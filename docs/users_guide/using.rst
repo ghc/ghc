@@ -786,6 +786,15 @@ messages and in GHCi:
                   in a’
         or by using the flag -fno-warn-unused-do-bind
 
+.. ghc-flag:: -fdiagnostics-color=(always|auto|never)
+
+    Causes GHC to display error messages with colors.  To do this, the
+    terminal must have support for ANSI color codes, or else garbled text will
+    appear.  The default value is `auto`, which means GHC will make an attempt
+    to detect whether terminal supports colors and choose accordingly.  (Note:
+    the detection mechanism is not yet implemented, so colors are off by
+    default on all platforms.)
+
 .. ghc-flag:: -ferror-spans
 
     Causes GHC to emit the full source span of the syntactic entity
