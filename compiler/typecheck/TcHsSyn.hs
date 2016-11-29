@@ -187,7 +187,9 @@ the environment manipulation is tiresome.
 -- Confused by zonking? See Note [What is zonking?] in TcMType.
 type UnboundTyVarZonker = TcTyVar -> TcM Type
         -- How to zonk an unbound type variable
-        -- The TcTyVar is (a) a MetaTv (b) Flexi and
+        -- The TcTyVar is
+        --     (a) a MetaTv
+        --     (b) Flexi and
         --     (c) its kind is alrady zonked
         -- Note [Zonking the LHS of a RULE]
 
@@ -1617,8 +1619,13 @@ zonkTvSkolemising :: UnboundTyVarZonker
 -- This variant is used for the LHS of rules
 -- See Note [Zonking the LHS of a RULE].
 zonkTvSkolemising tv
-  = do { tv' <- skolemiseUnboundMetaTyVar tv
-       ; return (mkTyVarTy tv') }
+  = do { let tv' = mkTyVar (tyVarName tv) (tyVarKind tv)
+                  -- NB: the kind of tv is already zonked
+             ty = mkTyVarTy tv'
+                  -- Make a proper TyVar (remember we
+                  -- are now done with type checking)
+       ; writeMetaTyVar tv ty
+       ; return ty }
 
 zonkTypeZapping :: UnboundTyVarZonker
 -- This variant is used for everything except the LHS of rules
@@ -1652,9 +1659,10 @@ over it!
 
 We do this in two stages.
 
-* During zonking, we skolemise 'alpha' to 'a'.  We do this by using
-  zonkTvSkolemising as the UnboundTyVarZonker in the ZonkEnv.
-  (This is the whole reason that the ZonkEnv has a UnboundTyVarZonker.)
+* During zonking, we skolemise the TcTyVar 'alpha' to TyVar 'a'.  We
+  do this by using zonkTvSkolemising as the UnboundTyVarZonker in the
+  ZonkEnv.  (This is in fact the whole reason that the ZonkEnv has a
+  UnboundTyVarZonker.)
 
 * In DsBinds, we quantify over it.  See DsBinds
   Note [Free tyvars on rule LHS]

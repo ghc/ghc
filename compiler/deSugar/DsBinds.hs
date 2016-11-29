@@ -895,7 +895,7 @@ Consider
 After type checking the LHS becomes (foo alpha (C alpha)), where alpha
 is an unbound meta-tyvar.  The zonker in TcHsSyn is careful not to
 turn the free alpha into Any (as it usually does).  Instead it turns it
-into a skolem 'a'.  See TcHsSyn Note [Zonking the LHS of a RULE].
+into a TyVar 'a'.  See TcHsSyn Note [Zonking the LHS of a RULE].
 
 Now we must quantify over that 'a'.  It's /really/ inconvenient to do that
 in the zonker, because the HsExpr data type is very large.  But it's /easy/

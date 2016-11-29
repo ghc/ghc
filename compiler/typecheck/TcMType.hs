@@ -68,7 +68,7 @@ module TcMType (
   zonkTidyTcType, zonkTidyOrigin,
   mkTypeErrorThing, mkTypeErrorThingArgs,
   tidyEvVar, tidyCt, tidySkolemInfo,
-  skolemiseUnboundMetaTyVar, skolemiseRuntimeUnk,
+  skolemiseRuntimeUnk,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarToTyVar,
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
