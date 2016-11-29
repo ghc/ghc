@@ -81,8 +81,9 @@ test('lazy-bs-alloc',
 
 test('T876',
      [stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 71904, 5),
+          [(platform('x86_64-unknown-mingw32'), 66928, 5),
               # 2015-04-03: 71904 (amd64/Windows, unknown cause)
+              # 2016-11-27: 66928 (amd64/Windows, unknown cause)
            (wordsize(64), 58128, 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis

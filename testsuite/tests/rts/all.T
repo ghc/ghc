@@ -199,8 +199,7 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
                compile_and_run, ['T6006_c.c -no-hs-main'])
 
 test('T7037',
-     [ extra_clean(['T7037_main.o','T7037_main']),
-       when(opsys("mingw32"), expect_broken(12725))],
+     [ extra_clean(['T7037_main.o','T7037_main'])],
      run_command,
      ['$MAKE -s --no-print-directory T7037'])
 
