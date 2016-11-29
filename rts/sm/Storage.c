@@ -43,7 +43,7 @@
 StgIndStatic  *dyn_caf_list        = NULL;
 StgIndStatic  *debug_caf_list      = NULL;
 StgIndStatic  *revertible_caf_list = NULL;
-rtsBool       keepCAFs;
+bool           keepCAFs;
 
 W_ large_alloc_lim;    /* GC if n_large_blocks in any nursery
                         * reaches this. */
@@ -286,7 +286,7 @@ exitStorage (void)
 }
 
 void
-freeStorage (rtsBool free_heap)
+freeStorage (bool free_heap)
 {
     stgFree(generations);
     if (free_heap) freeAllMBlocks();
@@ -505,13 +505,13 @@ StgInd* newRetainedCAF (StgRegTable *reg, StgIndStatic *caf)
 
 // If we are using loadObj/unloadObj in the linker, then we want to
 //
-//  - retain all CAFs in statically linked code (keepCAFs == rtsTrue),
+//  - retain all CAFs in statically linked code (keepCAFs == true),
 //    because we might link a new object that uses any of these CAFs.
 //
 //  - GC CAFs in dynamically-linked code, so that we can detect when
 //    a dynamically-linked object is unloadable.
 //
-// So for this case, we set keepCAFs to rtsTrue, and link newCAF to newGCdCAF
+// So for this case, we set keepCAFs to true, and link newCAF to newGCdCAF
 // for dynamically-linked code.
 //
 StgInd* newGCdCAF (StgRegTable *reg, StgIndStatic *caf)
@@ -741,7 +741,7 @@ resizeNurseries (W_ blocks)
     resizeNurseriesEach(blocks / n_nurseries);
 }
 
-rtsBool
+bool
 getNewNursery (Capability *cap)
 {
     StgWord i;
@@ -753,28 +753,28 @@ getNewNursery (Capability *cap)
         if (i < n_nurseries) {
             if (cas(&next_nursery[node], i, i+n_numa_nodes) == i) {
                 assignNurseryToCapability(cap, i);
-                return rtsTrue;
+                return true;
             }
         } else if (n_numa_nodes > 1) {
             // Try to find an unused nursery chunk on other nodes.  We'll get
             // remote memory, but the rationale is that avoiding GC is better
             // than avoiding remote memory access.
-            rtsBool lost = rtsFalse;
+            bool lost = false;
             for (n = 0; n < n_numa_nodes; n++) {
                 if (n == node) continue;
                 i = next_nursery[n];
                 if (i < n_nurseries) {
                     if (cas(&next_nursery[n], i, i+n_numa_nodes) == i) {
                         assignNurseryToCapability(cap, i);
-                        return rtsTrue;
+                        return true;
                     } else {
-                        lost = rtsTrue; /* lost a race */
+                        lost = true; /* lost a race */
                     }
                 }
             }
-            if (!lost) return rtsFalse;
+            if (!lost) return false;
         } else {
-            return rtsFalse;
+            return false;
         }
     }
 }
@@ -1244,7 +1244,7 @@ W_ gcThreadLiveBlocks (uint32_t i, uint32_t g)
  * blocks since all the data will be copied.
  */
 extern W_
-calcNeeded (rtsBool force_major, memcount *blocks_needed)
+calcNeeded (bool force_major, memcount *blocks_needed)
 {
     W_ needed = 0, blocks;
     uint32_t g, N;
@@ -1442,7 +1442,7 @@ AdjustorWritable allocateExec (W_ bytes, AdjustorExecutable *exec_ret)
             exec_block->u.back = bd;
         }
         bd->u.back = NULL;
-        setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsTrue);
+        setExecutable(bd->start, bd->blocks * BLOCK_SIZE, true);
         exec_block = bd;
     }
     *(exec_block->free) = n;  // store the size of this chunk
@@ -1479,7 +1479,7 @@ void freeExec (void *addr)
         if (bd != exec_block) {
             debugTrace(DEBUG_gc, "free exec block %p", bd->start);
             dbl_link_remove(bd, &exec_block);
-            setExecutable(bd->start, bd->blocks * BLOCK_SIZE, rtsFalse);
+            setExecutable(bd->start, bd->blocks * BLOCK_SIZE, false);
             freeGroup(bd);
         } else {
             bd->free = bd->start;

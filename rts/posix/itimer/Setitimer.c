@@ -73,7 +73,7 @@ stopTicker(void)
 }
 
 void
-exitTicker (rtsBool wait STG_UNUSED)
+exitTicker (bool wait STG_UNUSED)
 {
     return;
 }

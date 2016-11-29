@@ -19,7 +19,7 @@
 StgTSO* raiseAsync (Capability *cap,
                     StgTSO *tso,
                     StgClosure *exception,
-                    rtsBool stop_at_atomically,
+                    bool stop_at_atomically,
                     StgUpdateFrame *stop_here);
 
 void throwToSingleThreaded (Capability *cap,
@@ -29,7 +29,7 @@ void throwToSingleThreaded (Capability *cap,
 void throwToSingleThreaded_ (Capability *cap,
                              StgTSO *tso,
                              StgClosure *exception,
-                             rtsBool stop_at_atomically);
+                             bool stop_at_atomically);
 
 void throwToSelf (Capability *cap,
                   StgTSO *tso,

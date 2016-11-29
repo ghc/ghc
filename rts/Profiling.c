@@ -111,7 +111,7 @@ static  CostCentreStack * appendCCS       ( CostCentreStack *ccs1,
                                             CostCentreStack *ccs2 );
 static  CostCentreStack * actualPush_     ( CostCentreStack *ccs, CostCentre *cc,
                                             CostCentreStack *new_ccs );
-static  rtsBool           ignoreCCS       ( CostCentreStack *ccs );
+static  bool              ignoreCCS       ( CostCentreStack *ccs );
 static  void              countTickss     ( CostCentreStack *ccs );
 static  void              inheritCosts    ( CostCentreStack *ccs );
 static  uint32_t           numDigits       ( StgInt i );
@@ -680,34 +680,26 @@ addToIndexTable (IndexTable *it, CostCentreStack *new_ccs,
 /* We omit certain system-related CCs and CCSs from the default
  * reports, so as not to cause confusion.
  */
-static rtsBool
+static bool
 ignoreCC (CostCentre *cc)
 {
-    if (RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
+    return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
         (   cc == CC_OVERHEAD
          || cc == CC_DONT_CARE
          || cc == CC_GC
          || cc == CC_SYSTEM
-         || cc == CC_IDLE)) {
-        return rtsTrue;
-    } else {
-        return rtsFalse;
-    }
+         || cc == CC_IDLE);
 }
 
-static rtsBool
+static bool
 ignoreCCS (CostCentreStack *ccs)
 {
-    if (RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
+    return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
         (   ccs == CCS_OVERHEAD
          || ccs == CCS_DONT_CARE
          || ccs == CCS_GC
          || ccs == CCS_SYSTEM
-         || ccs == CCS_IDLE)) {
-        return rtsTrue;
-    } else {
-        return rtsFalse;
-    }
+         || ccs == CCS_IDLE);
 }
 
 /* -----------------------------------------------------------------------------
@@ -892,7 +884,7 @@ reportCCSProfiling( void )
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
             showStgWord64(total_alloc * sizeof(W_),
-                                 temp, rtsTrue/*commas*/));
+                          temp, true/*commas*/));
 
     fprintf(prof_file, "  (excludes profiling overheads)\n\n");
 
@@ -1154,7 +1146,7 @@ fprintCCS( FILE *f, CostCentreStack *ccs )
 }
 
 // Returns: True if the call stack ended with CAF
-static rtsBool fprintCallStack (CostCentreStack *ccs)
+static bool fprintCallStack (CostCentreStack *ccs)
 {
     CostCentreStack *prev;
 
@@ -1175,7 +1167,7 @@ static rtsBool fprintCallStack (CostCentreStack *ccs)
 void
 fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
 {
-    rtsBool is_caf;
+    bool is_caf;
     StgPtr frame;
     StgStack *stack;
     CostCentreStack *prev_ccs;

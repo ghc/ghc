@@ -10,15 +10,15 @@
 #define AWAITEVENT_H
 
 #if !defined(THREADED_RTS)
-/* awaitEvent(rtsBool wait)
+/* awaitEvent(bool wait)
  *
  * Checks for blocked threads that need to be woken.
  *
  * Called from STG :  NO
  * Locks assumed   :  sched_mutex
  */
-RTS_PRIVATE void awaitEvent(rtsBool wait);  /* In posix/Select.c or
-                                             * win32/AwaitEvent.c */
+RTS_PRIVATE void awaitEvent(bool wait);  /* In posix/Select.c or
+                                          * win32/AwaitEvent.c */
 #endif
 
 #endif /* AWAITEVENT_H */

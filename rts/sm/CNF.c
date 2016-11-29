@@ -391,7 +391,7 @@ unroll_memcpy(StgPtr to, StgPtr from, StgWord size)
         *(to++) = *(from++);
 }
 
-static rtsBool
+static bool
 allocate_in_compact (StgCompactNFDataBlock *block, StgWord sizeW, StgPtr *at)
 {
     bdescr *bd;
@@ -401,16 +401,16 @@ allocate_in_compact (StgCompactNFDataBlock *block, StgWord sizeW, StgPtr *at)
     bd = Bdescr((StgPtr)block);
     top = bd->start + BLOCK_SIZE_W * bd->blocks;
     if (bd->free + sizeW > top)
-        return rtsFalse;
+        return false;
 
     free = bd->free;
     bd->free += sizeW;
     *at = free;
 
-    return rtsTrue;
+    return true;
 }
 
-static rtsBool
+static bool
 block_is_full (StgCompactNFDataBlock *block)
 {
     bdescr *bd;
@@ -431,7 +431,7 @@ block_is_full (StgCompactNFDataBlock *block)
     return (bd->free + sizeW > top);
 }
 
-static rtsBool
+static bool
 allocate_loop (Capability       *cap,
                StgCompactNFData *str,
                StgWord           sizeW,
@@ -444,7 +444,7 @@ allocate_loop (Capability       *cap,
  retry:
     if (str->nursery != NULL) {
         if (allocate_in_compact(str->nursery, sizeW, at))
-            return rtsTrue;
+            return true;
 
         if (block_is_full (str->nursery)) {
             str->nursery = str->nursery->next;
@@ -455,7 +455,7 @@ allocate_loop (Capability       *cap,
         block = str->nursery->next;
         while (block != NULL) {
             if (allocate_in_compact(block, sizeW, at))
-                return rtsTrue;
+                return true;
 
             block = block->next;
         }
@@ -466,7 +466,7 @@ allocate_loop (Capability       *cap,
     if (next_size >= BLOCKS_PER_MBLOCK * BLOCK_SIZE)
         next_size = BLOCKS_PER_MBLOCK * BLOCK_SIZE;
     if (next_size < sizeW * sizeof(StgWord) + sizeof(StgCompactNFDataBlock))
-        return rtsFalse;
+        return false;
 
     block = compactAppendBlock(cap, str, next_size);
     ASSERT (str->nursery != NULL);
@@ -505,13 +505,13 @@ copy_tag (Capability        *cap,
     *p = TAG_CLOSURE(tag, (StgClosure*)to);
 }
 
-STATIC_INLINE rtsBool
+STATIC_INLINE bool
 object_in_compact (StgCompactNFData *str, StgClosure *p)
 {
     bdescr *bd;
 
     if (!HEAP_ALLOCED(p))
-        return rtsFalse;
+        return false;
 
     bd = Bdescr((P_)p);
     return (bd->flags & BF_COMPACT) != 0 &&
@@ -694,7 +694,7 @@ scavenge_loop (Capability            *cap,
 }
 
 #ifdef DEBUG
-static rtsBool
+static bool
 objectIsWHNFData (StgClosure *what)
 {
     switch (get_itbl(what)->type) {
@@ -710,18 +710,18 @@ objectIsWHNFData (StgClosure *what)
     case MUT_ARR_PTRS_FROZEN0:
     case SMALL_MUT_ARR_PTRS_FROZEN:
     case SMALL_MUT_ARR_PTRS_FROZEN0:
-        return rtsTrue;
+        return true;
 
     case IND:
     case BLACKHOLE:
         return objectIsWHNFData(UNTAG_CLOSURE(((StgInd*)what)->indirectee));
 
     default:
-        return rtsFalse;
+        return false;
     }
 }
 
-static rtsBool
+static bool
 verify_mut_arr_ptrs (StgCompactNFData *str,
                      StgMutArrPtrs    *a)
 {
@@ -731,13 +731,13 @@ verify_mut_arr_ptrs (StgCompactNFData *str,
     q = (StgPtr)&a->payload[a->ptrs];
     for (; p < q; p++) {
         if (!object_in_compact(str, UNTAG_CLOSURE(*(StgClosure**)p)))
-            return rtsFalse;
+            return false;
     }
 
-    return rtsTrue;
+    return true;
 }
 
-static rtsBool
+static bool
 verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
 {
     bdescr *bd;
@@ -751,23 +751,23 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
         q = (StgClosure*)p;
 
         if (!LOOKS_LIKE_CLOSURE_PTR(q))
-            return rtsFalse;
+            return false;
 
         info = get_itbl(q);
         switch (info->type) {
         case CONSTR_1_0:
             if (!object_in_compact(str, UNTAG_CLOSURE(q->payload[0])))
-                return rtsFalse;
+                return false;
         case CONSTR_0_1:
             p += sizeofW(StgClosure) + 1;
             break;
 
         case CONSTR_2_0:
             if (!object_in_compact(str, UNTAG_CLOSURE(q->payload[1])))
-                return rtsFalse;
+                return false;
         case CONSTR_1_1:
             if (!object_in_compact(str, UNTAG_CLOSURE(q->payload[0])))
-                return rtsFalse;
+                return false;
         case CONSTR_0_2:
             p += sizeofW(StgClosure) + 2;
             break;
@@ -780,7 +780,7 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
 
             for (i = 0; i < info->layout.payload.ptrs; i++)
                 if (!object_in_compact(str, UNTAG_CLOSURE(q->payload[i])))
-                    return rtsFalse;
+                    return false;
 
             p += sizeofW(StgClosure) + info->layout.payload.ptrs +
                 info->layout.payload.nptrs;
@@ -794,7 +794,7 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
         case MUT_ARR_PTRS_FROZEN:
         case MUT_ARR_PTRS_FROZEN0:
             if (!verify_mut_arr_ptrs(str, (StgMutArrPtrs*)p))
-                return rtsFalse;
+                return false;
             p += mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
             break;
 
@@ -806,7 +806,7 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
 
             for (i = 0; i < arr->ptrs; i++)
                 if (!object_in_compact(str, UNTAG_CLOSURE(arr->payload[i])))
-                    return rtsFalse;
+                    return false;
 
             p += sizeofW(StgSmallMutArrPtrs) + arr->ptrs;
             break;
@@ -817,14 +817,14 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
             break;
 
         default:
-            return rtsFalse;
+            return false;
         }
     }
 
-    return rtsTrue;
+    return true;
 }
 
-static rtsBool
+static bool
 verify_consistency_loop (StgCompactNFData *str)
 {
     StgCompactNFDataBlock *block;
@@ -832,11 +832,11 @@ verify_consistency_loop (StgCompactNFData *str)
     block = compactGetFirstBlock(str);
     do {
         if (!verify_consistency_block(str, block))
-            return rtsFalse;
+            return false;
         block = block->next;
     } while (block && block->owner);
 
-    return rtsTrue;
+    return true;
 }
 #endif
 
@@ -938,7 +938,7 @@ compactAllocateBlock(Capability            *cap,
     return block;
 }
 
-STATIC_INLINE rtsBool
+STATIC_INLINE bool
 any_needs_fixup(StgCompactNFDataBlock *block)
 {
     // ->next pointers are always valid, even if some blocks were
@@ -947,11 +947,11 @@ any_needs_fixup(StgCompactNFDataBlock *block)
 
     do {
         if (block->self != block)
-            return rtsTrue;
+            return true;
         block = block->next;
     } while (block && block->owner);
 
-    return rtsFalse;
+    return false;
 }
 
 #ifdef DEBUG
@@ -1029,7 +1029,7 @@ find_pointer(StgWord *fixup_table, uint32_t count, StgClosure *q)
     return NULL;
 }
 
-static rtsBool
+static bool
 fixup_one_pointer(StgWord *fixup_table, uint32_t count, StgClosure **p)
 {
     StgWord tag;
@@ -1042,17 +1042,17 @@ fixup_one_pointer(StgWord *fixup_table, uint32_t count, StgClosure **p)
 
     block = find_pointer(fixup_table, count, q);
     if (block == NULL)
-        return rtsFalse;
+        return false;
     if (block == block->self)
-        return rtsTrue;
+        return true;
 
     q = (StgClosure*)((W_)q - (W_)block->self + (W_)block);
     *p = TAG_CLOSURE(tag, q);
 
-    return rtsTrue;
+    return true;
 }
 
-static rtsBool
+static bool
 fixup_mut_arr_ptrs (StgWord          *fixup_table,
                     uint32_t               count,
                     StgMutArrPtrs    *a)
@@ -1063,13 +1063,13 @@ fixup_mut_arr_ptrs (StgWord          *fixup_table,
     q = (StgPtr)&a->payload[a->ptrs];
     for (; p < q; p++) {
         if (!fixup_one_pointer(fixup_table, count, (StgClosure**)p))
-            return rtsFalse;
+            return false;
     }
 
-    return rtsTrue;
+    return true;
 }
 
-static rtsBool
+static bool
 fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
 {
     const StgInfoTable *info;
@@ -1086,7 +1086,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
         case CONSTR_1_0:
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[0]))
-                return rtsFalse;
+                return false;
         case CONSTR_0_1:
             p += sizeofW(StgClosure) + 1;
             break;
@@ -1094,11 +1094,11 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
         case CONSTR_2_0:
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[1]))
-                return rtsFalse;
+                return false;
         case CONSTR_1_1:
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[0]))
-                return rtsFalse;
+                return false;
         case CONSTR_0_2:
             p += sizeofW(StgClosure) + 2;
             break;
@@ -1112,7 +1112,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
             for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
                 if (!fixup_one_pointer(fixup_table, count, (StgClosure **)p))
-                    return rtsFalse;
+                    return false;
             }
             p += info->layout.payload.nptrs;
             break;
@@ -1137,7 +1137,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             for (i = 0; i < arr->ptrs; i++) {
                 if (!fixup_one_pointer(fixup_table, count,
                                        &arr->payload[i]))
-                    return rtsFalse;
+                    return false;
             }
 
             p += sizeofW(StgSmallMutArrPtrs) + arr->ptrs;
@@ -1157,11 +1157,11 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
         default:
             debugBelch("Invalid non-NFData closure (type %d) in Compact\n",
                        info->type);
-            return rtsFalse;
+            return false;
         }
     }
 
-    return rtsTrue;
+    return true;
 }
 
 static int
@@ -1203,18 +1203,18 @@ build_fixup_table (StgCompactNFDataBlock *block, uint32_t *pcount)
     return table;
 }
 
-static rtsBool
+static bool
 fixup_loop(StgCompactNFDataBlock *block, StgClosure **proot)
 {
     StgWord *table;
-    rtsBool ok;
+    bool ok;
     uint32_t count;
 
     table = build_fixup_table (block, &count);
 
     do {
         if (!fixup_block(block, table, count)) {
-            ok = rtsFalse;
+            ok = false;
             goto out;
         }
 
@@ -1277,7 +1277,7 @@ static StgClosure *
 maybe_fixup_internal_pointers (StgCompactNFDataBlock *block,
                                StgClosure            *root)
 {
-    rtsBool ok;
+    bool ok;
     StgClosure **proot;
 
     // Check for fast path

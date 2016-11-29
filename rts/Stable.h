@@ -39,7 +39,7 @@ void    markStableTables      ( evac_fn evac, void *user );
 
 void    threadStableTables    ( evac_fn evac, void *user );
 void    gcStableTables        ( void );
-void    updateStableTables    ( rtsBool full );
+void    updateStableTables    ( bool full );
 
 void    stableLock            ( void );
 void    stableUnlock          ( void );

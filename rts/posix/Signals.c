@@ -331,7 +331,7 @@ unblockUserSignals(void)
     sigprocmask(SIG_SETMASK, &savedSignals, NULL);
 }
 
-rtsBool
+bool
 anyUserHandlers(void)
 {
     return n_haskell_handlers != 0;
@@ -585,7 +585,7 @@ empty_handler (int sig STG_UNUSED)
    -------------------------------------------------------------------------- */
 
 static void sigtstp_handler(int sig);
-static void set_sigtstp_action (rtsBool handle);
+static void set_sigtstp_action (bool handle);
 
 static void
 sigtstp_handler (int sig STG_UNUSED)
@@ -612,7 +612,7 @@ sigtstp_handler (int sig STG_UNUSED)
 }
 
 static void
-set_sigtstp_action (rtsBool handle)
+set_sigtstp_action (bool handle)
 {
     struct sigaction sa;
     if (handle) {
@@ -728,7 +728,7 @@ initDefaultHandlers(void)
         sysErrorBelch("warning: failed to install SIGUSR2 handler");
     }
 
-    set_sigtstp_action(rtsTrue);
+    set_sigtstp_action(true);
 }
 
 void
@@ -749,7 +749,7 @@ resetDefaultHandlers(void)
         sysErrorBelch("warning: failed to uninstall SIGPIPE handler");
     }
 
-    set_sigtstp_action(rtsFalse);
+    set_sigtstp_action(false);
 }
 
 #endif /* RTS_USER_SIGNALS */

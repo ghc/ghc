@@ -37,7 +37,7 @@ int TRACE_cap;
 static Mutex trace_utx;
 #endif
 
-static rtsBool eventlog_enabled;
+static bool eventlog_enabled;
 
 /* ---------------------------------------------------------------------------
    Starting up / shuttting down the tracing facilities

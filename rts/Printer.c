@@ -635,7 +635,7 @@ const char *lookupGHCName( void *addr )
  * rubbish like the obj-splitting symbols
  */
 
-static rtsBool isReal( flagword flags STG_UNUSED, const char *name )
+static bool isReal( flagword flags STG_UNUSED, const char *name )
 {
 #if 0
     /* ToDo: make this work on BFD */
@@ -643,15 +643,15 @@ static rtsBool isReal( flagword flags STG_UNUSED, const char *name )
     if (tp == N_TEXT || tp == N_DATA) {
         return (name[0] == '_' && name[1] != '_');
     } else {
-        return rtsFalse;
+        return false;
     }
 #else
     if (*name == '\0'  ||
         (name[0] == 'g' && name[1] == 'c' && name[2] == 'c') ||
         (name[0] == 'c' && name[1] == 'c' && name[2] == '.')) {
-        return rtsFalse;
+        return false;
     }
-    return rtsTrue;
+    return true;
 #endif
 }
 

@@ -71,7 +71,7 @@ stopTicker(void)
 }
 
 void
-exitTicker (rtsBool wait)
+exitTicker (bool wait)
 {
     if (timer_queue != NULL) {
         DeleteTimerQueueEx(timer_queue, wait ? INVALID_HANDLE_VALUE : NULL);

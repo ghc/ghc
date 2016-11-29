@@ -76,7 +76,7 @@ void* popWSDeque (WSDeque *q);
 
 // Push onto the "write" end of the pool.  Return true if the push
 // succeeded, or false if the deque is full.
-rtsBool pushWSDeque (WSDeque *q, void *elem);
+bool pushWSDeque (WSDeque *q, void *elem);
 
 // Removes all elements from the deque
 EXTERN_INLINE void discardElements (WSDeque *q);
@@ -93,7 +93,7 @@ void * stealWSDeque (WSDeque *q);
 // "guesses" whether a deque is empty. Can return false negatives in
 //  presence of concurrent steal() calls, and false positives in
 //  presence of a concurrent pushBottom().
-EXTERN_INLINE rtsBool looksEmptyWSDeque (WSDeque* q);
+EXTERN_INLINE bool looksEmptyWSDeque (WSDeque* q);
 
 EXTERN_INLINE long dequeElements   (WSDeque *q);
 
@@ -110,7 +110,7 @@ dequeElements (WSDeque *q)
     return ((long)b - (long)t);
 }
 
-EXTERN_INLINE rtsBool
+EXTERN_INLINE bool
 looksEmptyWSDeque (WSDeque *q)
 {
     return (dequeElements(q) <= 0);

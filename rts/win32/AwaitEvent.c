@@ -25,7 +25,7 @@
 static uint32_t workerWaitingForRequests = 0;
 
 void
-awaitEvent(rtsBool wait)
+awaitEvent(bool wait)
 {
   do {
     /* Try to de-queue completed IO requests

@@ -21,13 +21,13 @@
 # endif
 
 /* debugging routines */
-void checkSanity        ( rtsBool after_gc, rtsBool major_gc );
+void checkSanity        ( bool after_gc, bool major_gc );
 void checkNurserySanity ( nursery *nursery );
 void checkHeapChain     ( bdescr *bd );
 void checkHeapChunk     ( StgPtr start, StgPtr end );
 void checkLargeObjects  ( bdescr *bd );
 void checkTSO           ( StgTSO* tso );
-void checkGlobalTSOList ( rtsBool checkTSOs );
+void checkGlobalTSOList ( bool checkTSOs );
 void checkStaticObjects ( StgClosure* static_objects );
 void checkStackChunk    ( StgPtr sp, StgPtr stack_end );
 StgOffset checkStackFrame ( StgPtr sp );
@@ -35,7 +35,7 @@ StgOffset checkClosure  ( const StgClosure* p );
 
 void checkRunQueue      (Capability *cap);
 
-void memInventory (rtsBool show);
+void memInventory (bool show);
 
 void checkBQ (StgTSO *bqe, StgClosure *closure);
 

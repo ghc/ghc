@@ -17,7 +17,7 @@
 
 #include "BeginPrivate.h"
 
-rtsBool anyUserHandlers(void);
+bool anyUserHandlers(void);
 
 #if !defined(THREADED_RTS)
 extern siginfo_t pending_handler_buf[];

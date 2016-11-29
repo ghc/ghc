@@ -59,7 +59,7 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
               munmap(oc->image, n);
           }
           oc->image = new;
-          oc->imageMapped = rtsTrue;
+          oc->imageMapped = true;
           oc->fileSize = n + (sizeof(SymbolExtra) * count);
           oc->symbol_extras = (SymbolExtra *) (oc->image + n);
       }

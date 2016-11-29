@@ -93,10 +93,10 @@ LowResTime getDelayTarget (HsInt us)
  * if this is true, then our time has expired.
  * (idea due to Andy Gill).
  */
-static rtsBool wakeUpSleepingThreads (LowResTime now)
+static bool wakeUpSleepingThreads (LowResTime now)
 {
     StgTSO *tso;
-    rtsBool flag = rtsFalse;
+    bool flag = false;
 
     while (sleeping_queue != END_TSO_QUEUE) {
         tso = sleeping_queue;
@@ -110,7 +110,7 @@ static rtsBool wakeUpSleepingThreads (LowResTime now)
                                        (unsigned long)tso->id));
         // MainCapability: this code is !THREADED_RTS
         pushOnRunQueue(&MainCapability,tso);
-        flag = rtsTrue;
+        flag = true;
     }
     return flag;
 }
@@ -217,13 +217,13 @@ static enum FdState fdPollWriteState (int fd)
  *
  */
 void
-awaitEvent(rtsBool wait)
+awaitEvent(bool wait)
 {
     StgTSO *tso, *prev, *next;
     fd_set rfd,wfd;
     int numFound;
     int maxfd = -1;
-    rtsBool seen_bad_fd = rtsFalse;
+    bool seen_bad_fd = false;
     struct timeval tv, *ptv;
     LowResTime now;
 
@@ -330,7 +330,7 @@ awaitEvent(rtsBool wait)
       while ((numFound = select(maxfd+1, &rfd, &wfd, NULL, ptv)) < 0) {
           if (errno != EINTR) {
             if ( errno == EBADF ) {
-                seen_bad_fd = rtsTrue;
+                seen_bad_fd = true;
                 break;
             } else {
                 sysErrorBelch("select");
@@ -418,7 +418,7 @@ awaitEvent(rtsBool wait)
                       debugBelch("Killing blocked thread %lu on bad fd=%i\n",
                                  (unsigned long)tso->id, fd));
                   raiseAsync(&MainCapability, tso,
-                      (StgClosure *)blockedOnBadFD_closure, rtsFalse, NULL);
+                      (StgClosure *)blockedOnBadFD_closure, false, NULL);
                   break;
               case RTS_FD_IS_READY:
                   IF_DEBUG(scheduler,

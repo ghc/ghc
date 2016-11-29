@@ -292,7 +292,7 @@ hs_add_root(void (*init_root)(void) STG_UNUSED)
  ------------------------------------------------------------------------- */
 
 static void
-hs_exit_(rtsBool wait_foreign)
+hs_exit_(bool wait_foreign)
 {
     uint32_t g, i;
 
@@ -346,7 +346,7 @@ hs_exit_(rtsBool wait_foreign)
      * (e.g. pthread) may fire even after we exit, which may segfault as we've
      * already freed the capabilities.
      */
-    exitTimer(rtsTrue);
+    exitTimer(true);
 
     // set the terminal settings back to what they were
 #if !defined(mingw32_HOST_OS)
@@ -454,14 +454,14 @@ static void flushStdHandles(void)
 void
 hs_exit(void)
 {
-    hs_exit_(rtsTrue);
+    hs_exit_(true);
     // be safe; this might be a DLL
 }
 
 void
 hs_exit_nowait(void)
 {
-    hs_exit_(rtsFalse);
+    hs_exit_(false);
     // do not wait for outstanding foreign calls to return; if they return in
     // the future, they will block indefinitely.
 }
@@ -478,7 +478,7 @@ shutdownHaskellAndExit(int n, int fastExit)
 {
     if (!fastExit) {
         // we're about to exit(), no need to wait for foreign calls to return.
-        hs_exit_(rtsFalse);
+        hs_exit_(false);
     }
 
     stg_exit(n);
@@ -491,7 +491,7 @@ void
 shutdownHaskellAndSignal(int sig, int fastExit)
 {
     if (!fastExit) {
-        hs_exit_(rtsFalse);
+        hs_exit_(false);
     }
 
     exitBySignal(sig);

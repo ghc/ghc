@@ -972,13 +972,13 @@ run_BCO:
                // "rts_stop_next_breakpoint" flag is true OR if the
                // breakpoint flag for this particular expression is
                // true
-               if (rts_stop_next_breakpoint == rtsTrue ||
+               if (rts_stop_next_breakpoint == true ||
                    ((StgWord8*)breakPoints->payload)[arg2_array_index]
-                     == rtsTrue)
+                     == true)
                {
                   // make sure we don't automatically stop at the
                   // next breakpoint
-                  rts_stop_next_breakpoint = rtsFalse;
+                  rts_stop_next_breakpoint = false;
 
                   // allocate memory for a new AP_STACK, enough to
                   // store the top stack frame plus an
@@ -1617,7 +1617,7 @@ run_BCO:
             Sp[0] = (W_)&stg_ret_p_info;
 
             SAVE_THREAD_STATE();
-            tok = suspendThread(&cap->r, interruptible ? rtsTrue : rtsFalse);
+            tok = suspendThread(&cap->r, interruptible);
 
             // We already made a copy of the arguments above.
             ffi_call(cif, fn, ret, argptrs);

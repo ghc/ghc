@@ -81,7 +81,7 @@ IOWorkerProc(PVOID param)
          * be above some threshold.
          *
          */
-        rc = WaitForMultipleObjects( 2, hWaits, FALSE, INFINITE );
+        rc = WaitForMultipleObjects( 2, hWaits, false, INFINITE );
 
         if (rc == WAIT_OBJECT_0) {
             // we received the exit event
@@ -307,30 +307,30 @@ StartIOManager(void)
 
     mmresult = timeGetDevCaps(&timecaps, sizeof(timecaps));
     if (mmresult != MMSYSERR_NOERROR) {
-        return FALSE;
+        return false;
     }
     sleepResolution = timecaps.wPeriodMin;
     mmresult = timeBeginPeriod(sleepResolution);
     if (mmresult != MMSYSERR_NOERROR) {
-        return FALSE;
+        return false;
     }
 
     wq = NewWorkQueue();
-    if ( !wq ) return FALSE;
+    if ( !wq ) return false;
 
     ioMan = (IOManagerState*)malloc(sizeof(IOManagerState));
 
     if (!ioMan) {
         FreeWorkQueue(wq);
-        return FALSE;
+        return false;
     }
 
     /* A manual-reset event */
-    hExit = CreateEvent ( NULL, TRUE, FALSE, NULL );
+    hExit = CreateEvent ( NULL, true, false, NULL );
     if ( !hExit ) {
         FreeWorkQueue(wq);
         free(ioMan);
-        return FALSE;
+        return false;
     }
 
     ioMan->hExitEvent = hExit;
@@ -344,7 +344,7 @@ StartIOManager(void)
     ioMan->active_work_items = NULL;
     ioMan->sleepResolution = sleepResolution;
 
-    return TRUE;
+    return true;
 }
 
 /*
@@ -466,7 +466,7 @@ AddDelayRequest ( unsigned int   usecs,
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
     unsigned int reqID;
-    if (!ioMan || !wItem) return FALSE;
+    if (!ioMan || !wItem) return false;
     reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
@@ -491,7 +491,7 @@ AddProcRequest ( void* proc,
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
     unsigned int reqID;
-    if (!ioMan || !wItem) return FALSE;
+    if (!ioMan || !wItem) return false;
     reqID = ioMan->requestID++;
 
     /* Fill in the blanks */
@@ -506,7 +506,7 @@ AddProcRequest ( void* proc,
     return depositWorkItem(reqID, wItem);
 }
 
-void ShutdownIOManager ( rtsBool wait_threads )
+void ShutdownIOManager ( bool wait_threads )
 {
     int num;
     MMRESULT mmresult;

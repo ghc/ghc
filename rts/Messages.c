@@ -46,7 +46,7 @@ void sendMessage(Capability *from_cap, Capability *to_cap, Message *msg)
     if (to_cap->running_task == NULL) {
         to_cap->running_task = myTask();
             // precond for releaseCapability_()
-        releaseCapability_(to_cap,rtsFalse);
+        releaseCapability_(to_cap,false);
     } else {
         interruptCapability(to_cap);
     }

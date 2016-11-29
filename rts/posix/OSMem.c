@@ -130,10 +130,10 @@ my_mmap (void *addr, W_ size, int operation)
     {
         if(addr)    // try to allocate at address
             err = vm_allocate(mach_task_self(),(vm_address_t*) &ret,
-                              size, FALSE);
+                              size, false);
         if(!addr || err)    // try to allocate anywhere
             err = vm_allocate(mach_task_self(),(vm_address_t*) &ret,
-                              size, TRUE);
+                              size, true);
     }
 
     if(err) {
@@ -145,7 +145,7 @@ my_mmap (void *addr, W_ size, int operation)
     }
 
     if(operation & MEM_COMMIT) {
-        vm_protect(mach_task_self(), (vm_address_t)ret, size, FALSE,
+        vm_protect(mach_task_self(), (vm_address_t)ret, size, false,
                    VM_PROT_READ|VM_PROT_WRITE);
     }
 
@@ -399,7 +399,7 @@ StgWord64 getPhysicalMemorySize (void)
     return physMemSize;
 }
 
-void setExecutable (void *p, W_ len, rtsBool exec)
+void setExecutable (void *p, W_ len, bool exec)
 {
     StgWord pageSize = getPageSize();
 
@@ -562,12 +562,12 @@ void osReleaseHeapMemory(void)
 
 #endif
 
-rtsBool osNumaAvailable(void)
+bool osNumaAvailable(void)
 {
 #if HAVE_LIBNUMA
     return (numa_available() != -1);
 #else
-    return rtsFalse;
+    return false;
 #endif
 }
 

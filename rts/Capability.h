@@ -53,12 +53,12 @@ struct Capability_ {
 
     // true if this Capability is running Haskell code, used for
     // catching unsafe call-ins.
-    rtsBool in_haskell;
+    bool in_haskell;
 
     // Has there been any activity on this Capability since the last GC?
     uint32_t idle;
 
-    rtsBool disabled;
+    bool disabled;
 
     // The run queue.  The Task owning this Capability has exclusive
     // access to its run queue, so can wake up threads without
@@ -204,7 +204,7 @@ struct Capability_ {
   ASSERT_TASK_ID(task);
 
 #if defined(THREADED_RTS)
-rtsBool checkSparkCountInvariant (void);
+bool checkSparkCountInvariant (void);
 #endif
 
 // Converts a *StgRegTable into a *Capability.
@@ -232,14 +232,14 @@ void moreCapabilities (uint32_t from, uint32_t to);
 #if defined(THREADED_RTS)
 void releaseCapability           (Capability* cap);
 void releaseAndWakeupCapability  (Capability* cap);
-void releaseCapability_ (Capability* cap, rtsBool always_wakeup);
+void releaseCapability_ (Capability* cap, bool always_wakeup);
 // assumes cap->lock is held
 #else
 // releaseCapability() is empty in non-threaded RTS
 INLINE_HEADER void releaseCapability  (Capability* cap STG_UNUSED) {};
 INLINE_HEADER void releaseAndWakeupCapability  (Capability* cap STG_UNUSED) {};
 INLINE_HEADER void releaseCapability_ (Capability* cap STG_UNUSED,
-                                       rtsBool always_wakeup STG_UNUSED) {};
+                                       bool always_wakeup STG_UNUSED) {};
 #endif
 
 // declared in includes/rts/Threads.h:
@@ -266,7 +266,7 @@ typedef enum {
 //
 typedef struct {
     SyncType type;              // The kind of synchronisation
-    rtsBool *idle;
+    bool *idle;
     Task *task;                 // The Task performing the sync
 } PendingSync;
 
@@ -306,7 +306,7 @@ EXTERN_INLINE void recordClosureMutated (Capability *cap, StgClosure *p);
 // On return: *pCap is NULL if the capability was released.  The
 // current task should then re-acquire it using waitForCapability().
 //
-rtsBool yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed);
+bool yieldCapability (Capability** pCap, Task *task, bool gcAllowed);
 
 // Wakes up a worker thread on just one Capability, used when we
 // need to service some global event.
@@ -320,7 +320,7 @@ void prodAllCapabilities (void);
 
 // Attempt to gain control of a Capability if it is free.
 //
-rtsBool tryGrabCapability (Capability *cap, Task *task);
+bool tryGrabCapability (Capability *cap, Task *task);
 
 // Try to find a spark to run
 //
@@ -328,9 +328,9 @@ StgClosure *findSpark (Capability *cap);
 
 // True if any capabilities have sparks
 //
-rtsBool anySparks (void);
+bool anySparks (void);
 
-INLINE_HEADER rtsBool emptySparkPoolCap (Capability *cap);
+INLINE_HEADER bool emptySparkPoolCap (Capability *cap);
 INLINE_HEADER uint32_t sparkPoolSizeCap  (Capability *cap);
 INLINE_HEADER void    discardSparksCap  (Capability *cap);
 
@@ -345,7 +345,7 @@ extern void grabCapability (Capability **pCap);
 
 // Shut down all capabilities.
 //
-void shutdownCapabilities(Task *task, rtsBool wait_foreign);
+void shutdownCapabilities(Task *task, bool wait_foreign);
 
 // cause all capabilities to context switch as soon as possible.
 void contextSwitchAllCapabilities(void);
@@ -361,7 +361,7 @@ void freeCapabilities (void);
 
 // For the GC:
 void markCapability (evac_fn evac, void *user, Capability *cap,
-                     rtsBool no_mark_sparks USED_IF_THREADS);
+                     bool no_mark_sparks USED_IF_THREADS);
 
 void markCapabilities (evac_fn evac, void *user);
 
@@ -390,7 +390,7 @@ typedef struct PutMVar_ {
 
 #ifdef THREADED_RTS
 
-INLINE_HEADER rtsBool emptyInbox(Capability *cap);
+INLINE_HEADER bool emptyInbox(Capability *cap);
 
 #endif // THREADED_RTS
 
@@ -427,7 +427,7 @@ recordClosureMutated (Capability *cap, StgClosure *p)
 
 
 #if defined(THREADED_RTS)
-INLINE_HEADER rtsBool
+INLINE_HEADER bool
 emptySparkPoolCap (Capability *cap)
 { return looksEmpty(cap->sparks); }
 
@@ -467,7 +467,7 @@ contextSwitchCapability (Capability *cap)
 
 #ifdef THREADED_RTS
 
-INLINE_HEADER rtsBool emptyInbox(Capability *cap)
+INLINE_HEADER bool emptyInbox(Capability *cap)
 {
     return (cap->inbox == (Message*)END_TSO_QUEUE &&
             cap->putMVars == NULL);

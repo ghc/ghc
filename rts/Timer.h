@@ -10,6 +10,6 @@
 #define TIMER_H
 
 RTS_PRIVATE void initTimer (void);
-RTS_PRIVATE void exitTimer (rtsBool wait);
+RTS_PRIVATE void exitTimer (bool wait);
 
 #endif /* TIMER_H */

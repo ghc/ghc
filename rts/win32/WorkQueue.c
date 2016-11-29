@@ -99,7 +99,7 @@ GetWorkQueueHandle ( WorkQueue* pq )
  * Function: GetWork
  *
  * Fetch a work item from the queue, blocking if none available.
- * Return value indicates of FALSE indicates error/fatal condition.
+ * Return value indicates of false indicates error/fatal condition.
  */
 BOOL
 GetWork ( WorkQueue* pq, void** ppw )
@@ -108,11 +108,11 @@ GetWork ( WorkQueue* pq, void** ppw )
 
   if (!pq) {
     queue_error("GetWork", "NULL WorkQueue object");
-    return FALSE;
+    return false;
   }
   if (!ppw) {
     queue_error("GetWork", "NULL WorkItem object");
-    return FALSE;
+    return false;
   }
 
   /* Block waiting for work item to become available */
@@ -120,7 +120,7 @@ GetWork ( WorkQueue* pq, void** ppw )
          != WAIT_OBJECT_0 ) {
     queue_error_rc("GetWork.WaitForSingleObject(workAvailable)",
                    ( (WAIT_FAILED == rc) ? GetLastError() : rc));
-    return FALSE;
+    return false;
   }
 
   return FetchWork(pq,ppw);
@@ -130,7 +130,7 @@ GetWork ( WorkQueue* pq, void** ppw )
  * Function: FetchWork
  *
  * Fetch a work item from the queue, blocking if none available.
- * Return value indicates of FALSE indicates error/fatal condition.
+ * Return value indicates of false indicates error/fatal condition.
  */
 BOOL
 FetchWork ( WorkQueue* pq, void** ppw )
@@ -139,11 +139,11 @@ FetchWork ( WorkQueue* pq, void** ppw )
 
   if (!pq) {
     queue_error("FetchWork", "NULL WorkQueue object");
-    return FALSE;
+    return false;
   }
   if (!ppw) {
     queue_error("FetchWork", "NULL WorkItem object");
-    return FALSE;
+    return false;
   }
 
   EnterCriticalSection(&pq->queueLock);
@@ -155,17 +155,17 @@ FetchWork ( WorkQueue* pq, void** ppw )
   LeaveCriticalSection(&pq->queueLock);
   if ( 0 == rc ) {
     queue_error_rc("FetchWork.ReleaseSemaphore()", GetLastError());
-    return FALSE;
+    return false;
   }
 
-  return TRUE;
+  return true;
 }
 
 /*
  * Function: SubmitWork
  *
  * Add work item to the queue, blocking if no room available.
- * Return value indicates of FALSE indicates error/fatal condition.
+ * Return value indicates of false indicates error/fatal condition.
  */
 BOOL
 SubmitWork ( WorkQueue* pq, void* pw )
@@ -174,11 +174,11 @@ SubmitWork ( WorkQueue* pq, void* pw )
 
   if (!pq) {
     queue_error("SubmitWork", "NULL WorkQueue object");
-    return FALSE;
+    return false;
   }
   if (!pw) {
     queue_error("SubmitWork", "NULL WorkItem object");
-    return FALSE;
+    return false;
   }
 
   /* Block waiting for work item to become available */
@@ -187,7 +187,7 @@ SubmitWork ( WorkQueue* pq, void* pw )
     queue_error_rc("SubmitWork.WaitForSingleObject(workAvailable)",
                    ( (WAIT_FAILED == rc) ? GetLastError() : rc));
 
-    return FALSE;
+    return false;
   }
 
   EnterCriticalSection(&pq->queueLock);
@@ -197,10 +197,10 @@ SubmitWork ( WorkQueue* pq, void* pw )
   LeaveCriticalSection(&pq->queueLock);
   if ( 0 == rc ) {
     queue_error_rc("SubmitWork.ReleaseSemaphore()", GetLastError());
-    return FALSE;
+    return false;
   }
 
-  return TRUE;
+  return true;
 }
 
 /* Error handling */

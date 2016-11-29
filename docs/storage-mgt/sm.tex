@@ -287,8 +287,8 @@ and returns it to the storage manager.
 A macro in @include/StgStorage.h@.
 \item[@ExtendNursery(hp, hplim)@] closes the current allocation area and 
 tries to find a new allocation area in the nursery. 
-If it succeeds, it sets @hp@ and @hplim@ appropriately and returns @rtsTrue@; 
-otherwise, it returns @rtsFalse@,
+If it succeeds, it sets @hp@ and @hplim@ appropriately and returns @true@; 
+otherwise, it returns @false@,
 which means that the nursery has been exhausted. 
 The new allocation area is not necessarily contiguous with the old one.
 A macro in @Storage.h@.
@@ -477,7 +477,7 @@ collector makes an efficient use of heap memory.
 \item[@void *mark\_root(StgClosure **root)@] informs the garbage collector
 that @*root@ is an object in the root set. It replaces @*root@ by 
 the new location of the object. @GC.c@.
-\item[@void GarbageCollect(void (*get\_roots)(evac\_fn), rtsBool force\_major\_gc)@]
+\item[@void GarbageCollect(void (*get\_roots)(evac\_fn), bool force\_major\_gc)@]
 performs a garbage collection. 
 @get_roots()@ is a function which is called by the garbage collector when
 it wishes to find all the objects in the root set (other than those
@@ -487,9 +487,9 @@ Therefore it is incumbent on the caller to find the root set.
 or not. If a major garbage collection is not required, the garbage collector
 decides an oldest generation $g$ to garbage collect on its own.
 @GC.c@.
-\item[@rtsBool doYouWantToGC(void)@] returns @rtsTrue@ if the garbage
+\item[@bool doYouWantToGC(void)@] returns @true@ if the garbage
 collector is ready to perform a garbage collection. Specifically, it returns
-@rtsTrue@ if the number of allocated blocks since the last garbage collection
+@true@ if the number of allocated blocks since the last garbage collection
 (@alloc_blocks@ in @Storage.c@) exceeds an approximate limit 
 (@alloc_blocks_lim@ in @Storage.c@).
 @Storage.h@.
@@ -700,11 +700,11 @@ The overall structure of a garbage collection is as follows:
 During initialization, the garbage collector first decides which generation
 to garbage collect.
 Specifically, 
-if the argument @force_major_gc@ to @GarbageCollect()@ is @rtsFalse@,
+if the argument @force_major_gc@ to @GarbageCollect()@ is @FALSE@,
 it decides the greatest generation number $N$ such
 that the number of blocks allocated in step $0$ of generation $N$ exceeds
 @generations[@$N$@].max_blocks@. 
-If the argument @force_major_gc@ to @GarbageCollect()@ is @rtsTrue@,
+If the argument @force_major_gc@ to @GarbageCollect()@ is @true@,
 $N$ is set to the greatest generation number, namely, 
 $@RtsFlags.GcFlags.generations@ - 1$.
 The garbage collector considers up to generation $N$ for garbage collection.
@@ -805,7 +805,7 @@ The rationale is that the contents of @r@ cannot be updated any more,
 and thus @r@ is always survived by @o@; @o@ is live as long as @r@ is.
 Therefore, we wish @r@ to be evacuated to the same generation $M$ as @r@
 currently resides (not to its next step).
-If the evacuation succeeds (indicated by a @rtsFalse@ value of a variable
+If the evacuation succeeds (indicated by a @FALSE@ value of a variable
 @failed_to_evac@, declared in @GC.c@) for every object @o@, @r@ is removed 
 from the list @mut_once_list@ because it does not hold any backward 
 inter-generational pointers.\footnote{It turns out that @r@ can have only

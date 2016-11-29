@@ -256,9 +256,9 @@ closeTraverseStack( void )
 }
 
 /* -----------------------------------------------------------------------------
- * Returns rtsTrue if the whole stack is empty.
+ * Returns true if the whole stack is empty.
  * -------------------------------------------------------------------------- */
-static INLINE rtsBool
+static INLINE bool
 isEmptyRetainerStack( void )
 {
     return (firstStack == currentStack) && stackTop == stackLimit;
@@ -282,10 +282,10 @@ retainerStackBlocks( void )
 #endif
 
 /* -----------------------------------------------------------------------------
- * Returns rtsTrue if stackTop is at the stack boundary of the current stack,
+ * Returns true if stackTop is at the stack boundary of the current stack,
  * i.e., if the current stack chunk is empty.
  * -------------------------------------------------------------------------- */
-static INLINE rtsBool
+static INLINE bool
 isOnBoundary( void )
 {
     return stackTop == currentStackBoundary;
@@ -762,7 +762,7 @@ popOff(void) {
  *  the next object.
  *  If the topmost stack element indicates no more objects are left, pop
  *  off the stack element until either an object can be retrieved or
- *  the current stack chunk becomes empty, indicated by rtsTrue returned by
+ *  the current stack chunk becomes empty, indicated by true returned by
  *  isOnBoundary(), in which case *c is set to NULL.
  *  Note:
  *    It is okay to call this function even when the current stack chunk
@@ -952,7 +952,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
             barf("Invalid object *c in pop()");
             return;
         }
-    } while (rtsTrue);
+    } while (true);
 }
 
 /* -----------------------------------------------------------------------------
@@ -1000,9 +1000,9 @@ maybeInitRetainerSet( StgClosure *c )
 }
 
 /* -----------------------------------------------------------------------------
- * Returns rtsTrue if *c is a retainer.
+ * Returns true if *c is a retainer.
  * -------------------------------------------------------------------------- */
-static INLINE rtsBool
+static INLINE bool
 isRetainer( StgClosure *c )
 {
     switch (get_itbl(c)->type) {
@@ -1040,7 +1040,7 @@ isRetainer( StgClosure *c )
         // WEAK objects are roots; there is separate code in which traversing
         // begins from WEAK objects.
     case WEAK:
-        return rtsTrue;
+        return true;
 
         //
         // False case
@@ -1080,7 +1080,7 @@ isRetainer( StgClosure *c )
         // immutable arrays
     case MUT_ARR_PTRS_FROZEN:
     case MUT_ARR_PTRS_FROZEN0:
-        return rtsFalse;
+        return false;
 
         //
         // Error case
@@ -1099,7 +1099,7 @@ isRetainer( StgClosure *c )
     case INVALID_OBJECT:
     default:
         barf("Invalid object in isRetainer(): %d", get_itbl(c)->type);
-        return rtsFalse;
+        return false;
     }
 }
 
@@ -1600,8 +1600,8 @@ inner_loop:
     retainerSetOfc = retainerSetOf(c);
 
     // Now compute s:
-    //    isRetainer(cp) == rtsTrue => s == NULL
-    //    isRetainer(cp) == rtsFalse => s == cp.retainer
+    //    isRetainer(cp) == true => s == NULL
+    //    isRetainer(cp) == false => s == cp.retainer
     if (isRetainer(cp))
         s = NULL;
     else
@@ -1790,7 +1790,7 @@ computeRetainerSet( void )
     // object (computing sumOfNewCostExtra and updating costArray[] when
     // debugging retainer profiler).
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-        // NOT TRUE: even G0 has a block on its mutable list
+        // NOT true: even G0 has a block on its mutable list
         // ASSERT(g != 0 || (generations[g].mut_list == NULL));
 
         // Traversing through mut_list is necessary

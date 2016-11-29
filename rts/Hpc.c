@@ -120,7 +120,7 @@ readTix(void) {
   while(tix_ch != ']') {
     tmpModule = (HpcModuleInfo *)stgMallocBytes(sizeof(HpcModuleInfo),
                                                 "Hpc.readTix");
-    tmpModule->from_file = rtsTrue;
+    tmpModule->from_file = true;
     expect('T');
     expect('i');
     expect('x');
@@ -279,7 +279,7 @@ hs_hpc_module(char *modName,
           tixArr[i] = 0;
       }
       tmpModule->next = modules;
-      tmpModule->from_file = rtsFalse;
+      tmpModule->from_file = false;
       modules = tmpModule;
       insertHashTable(moduleHash, (StgWord)modName, tmpModule);
   }
@@ -308,7 +308,7 @@ hs_hpc_module(char *modName,
           stgFree(tmpModule->modName);
           stgFree(tmpModule->tixArr);
       }
-      tmpModule->from_file = rtsFalse;
+      tmpModule->from_file = false;
   }
 }
 

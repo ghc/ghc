@@ -200,7 +200,7 @@ threadPaused(Capability *cap, StgTSO *tso)
     uint32_t words_to_squeeze = 0;
     uint32_t weight           = 0;
     uint32_t weight_pending   = 0;
-    rtsBool prev_was_update_frame = rtsFalse;
+    bool prev_was_update_frame = false;
     StgWord heuristic_says_squeeze;
 
     // Check to see whether we have threads waiting to raise
@@ -300,7 +300,7 @@ threadPaused(Capability *cap, StgTSO *tso)
                 // And continue with threadPaused; there might be
                 // yet more computation to suspend.
                 frame = (StgClosure *)(tso->stackobj->sp + 2);
-                prev_was_update_frame = rtsFalse;
+                prev_was_update_frame = false;
                 continue;
             }
 
@@ -342,7 +342,7 @@ threadPaused(Capability *cap, StgTSO *tso)
                 weight += weight_pending;
                 weight_pending = 0;
             }
-            prev_was_update_frame = rtsTrue;
+            prev_was_update_frame = true;
             break;
 
         case UNDERFLOW_FRAME:
@@ -355,7 +355,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             uint32_t frame_size = stack_frame_sizeW(frame);
             weight_pending += frame_size;
             frame = (StgClosure *)((StgPtr)frame + frame_size);
-            prev_was_update_frame = rtsFalse;
+            prev_was_update_frame = false;
         }
         }
     }
@@ -373,7 +373,7 @@ end:
         words_to_squeeze, weight,
         heuristic_says_squeeze ? "YES" : "NO");
 
-    if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
+    if (RtsFlags.GcFlags.squeezeUpdFrames == true &&
         heuristic_says_squeeze) {
         stackSqueeze(cap, tso, (StgPtr)frame);
         tso->flags |= TSO_SQUEEZED;

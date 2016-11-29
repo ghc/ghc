@@ -17,9 +17,9 @@ addIORequest(int   fd,
 extern unsigned int addDelayRequest(int   usecs);
 extern unsigned int addDoProcRequest(void* proc, void* param);
 extern int  startupAsyncIO(void);
-extern void shutdownAsyncIO(rtsBool wait_threads);
+extern void shutdownAsyncIO(bool wait_threads);
 
-extern int awaitRequests(rtsBool wait);
+extern int awaitRequests(bool wait);
 
 extern void abandonRequestWait(void);
 extern void resetAbandonRequestWait(void);

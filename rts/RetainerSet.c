@@ -130,7 +130,7 @@ singleton(retainer r)
 /* -----------------------------------------------------------------------------
  *   Finds or creates a retainer set *rs augmented with r.
  *   Invariants:
- *     r is not a member of rs, i.e., isMember(r, rs) returns rtsFalse.
+ *     r is not a member of rs, i.e., isMember(r, rs) returns false.
  *     rs is not NULL.
  *   Note:
  *     We could check if rs is NULL, in which case this function call

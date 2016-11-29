@@ -1192,7 +1192,7 @@ static void setOcInitialStatus(ObjectCode* oc) {
 
 ObjectCode*
 mkOc( pathchar *path, char *image, int imageSize,
-      rtsBool mapped, char *archiveMemberName, int misalignment ) {
+      bool mapped, char *archiveMemberName, int misalignment ) {
    ObjectCode* oc;
 
    IF_DEBUG(linker, debugBelch("mkOc: start\n"));
@@ -1357,7 +1357,7 @@ preloadObjectFile (pathchar *path)
 
 #endif /* RTS_LINKER_USE_MMAP */
 
-   oc = mkOc(path, image, fileSize, rtsTrue, NULL, misalignment);
+   oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
    return oc;
 }
@@ -1573,7 +1573,7 @@ HsInt resolveObjs (void)
 /* -----------------------------------------------------------------------------
  * delete an object from the pool
  */
-static HsInt unloadObj_ (pathchar *path, rtsBool just_purge)
+static HsInt unloadObj_ (pathchar *path, bool just_purge)
 {
     ObjectCode *oc, *prev, *next;
     HsBool unloadedAnyObj = HS_BOOL_FALSE;
@@ -1631,7 +1631,7 @@ static HsInt unloadObj_ (pathchar *path, rtsBool just_purge)
 HsInt unloadObj (pathchar *path)
 {
     ACQUIRE_LOCK(&linker_mutex);
-    HsInt r = unloadObj_(path, rtsFalse);
+    HsInt r = unloadObj_(path, false);
     RELEASE_LOCK(&linker_mutex);
     return r;
 }
@@ -1639,7 +1639,7 @@ HsInt unloadObj (pathchar *path)
 HsInt purgeObj (pathchar *path)
 {
     ACQUIRE_LOCK(&linker_mutex);
-    HsInt r = unloadObj_(path, rtsTrue);
+    HsInt r = unloadObj_(path, true);
     RELEASE_LOCK(&linker_mutex);
     return r;
 }

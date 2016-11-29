@@ -19,7 +19,7 @@
 
 void initStorage(void);
 void exitStorage(void);
-void freeStorage(rtsBool free_heap);
+void freeStorage(bool free_heap);
 
 // Adding more Capabilities later: this function allocates nurseries
 // and initialises other storage-related things.
@@ -30,7 +30,7 @@ void storageAddCapabilities (uint32_t from, uint32_t to);
    -------------------------------------------------------------------------- */
 
 INLINE_HEADER
-rtsBool doYouWantToGC(Capability *cap)
+bool doYouWantToGC(Capability *cap)
 {
     return (cap->r.rCurrentNursery->link == NULL ||
             g0->n_new_large_words >= large_alloc_lim);
@@ -73,7 +73,7 @@ void     clearNursery         (Capability *cap);
 void     resizeNurseries      (StgWord blocks);
 void     resizeNurseriesFixed (void);
 StgWord  countNurseryBlocks   (void);
-rtsBool  getNewNursery        (Capability *cap);
+bool     getNewNursery        (Capability *cap);
 
 /* -----------------------------------------------------------------------------
    Allocation accounting
@@ -102,7 +102,7 @@ StgWord calcTotalAllocated   (void);
 
 StgWord countLargeAllocated (void);
 StgWord countOccupied       (bdescr *bd);
-StgWord calcNeeded          (rtsBool force_major, StgWord *blocks_needed);
+StgWord calcNeeded          (bool force_major, StgWord *blocks_needed);
 
 StgWord gcThreadLiveWords  (uint32_t i, uint32_t g);
 StgWord gcThreadLiveBlocks (uint32_t i, uint32_t g);

@@ -171,17 +171,17 @@ typedef void OSThreadProcAttr OSThreadProc(void *);
 
 extern int  createOSThread        ( OSThreadId* tid, char *name,
                                     OSThreadProc *startProc, void *param);
-extern rtsBool osThreadIsAlive    ( OSThreadId id );
-extern void interruptOSThread (OSThreadId id);
+extern bool osThreadIsAlive       ( OSThreadId id );
+extern void interruptOSThread     (OSThreadId id);
 
 //
 // Condition Variables
 //
 extern void initCondition         ( Condition* pCond );
 extern void closeCondition        ( Condition* pCond );
-extern rtsBool broadcastCondition ( Condition* pCond );
-extern rtsBool signalCondition    ( Condition* pCond );
-extern rtsBool waitCondition      ( Condition* pCond, Mutex* pMut );
+extern bool broadcastCondition    ( Condition* pCond );
+extern bool signalCondition       ( Condition* pCond );
+extern bool waitCondition         ( Condition* pCond, Mutex* pMut );
 
 //
 // Mutexes

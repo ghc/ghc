@@ -233,7 +233,7 @@ stealWSDeque (WSDeque *q)
 
 /* enqueue an element. Should always succeed by resizing the array
    (not implemented yet, silently fails in that case). */
-rtsBool
+bool
 pushWSDeque (WSDeque* q, void * elem)
 {
     StgWord t;
@@ -267,7 +267,7 @@ pushWSDeque (WSDeque* q, void * elem)
             */
 #if defined(DISCARD_NEW)
             ASSERT_WSDEQUE_INVARIANTS(q);
-            return rtsFalse; // we didn't push anything
+            return false; // we didn't push anything
 #else
             /* could make room by incrementing the top position here.  In
              * this case, should use CASTOP. If this fails, someone else has
@@ -291,5 +291,5 @@ pushWSDeque (WSDeque* q, void * elem)
     q->bottom = b + 1;
 
     ASSERT_WSDEQUE_INVARIANTS(q);
-    return rtsTrue;
+    return true;
 }

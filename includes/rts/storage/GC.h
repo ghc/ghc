@@ -248,7 +248,7 @@ typedef struct _GCStats {
   StgDouble wall_seconds;
 } GCStats;
 void getGCStats (GCStats *s);
-rtsBool getGCStatsEnabled (void);
+bool getGCStatsEnabled (void);
 
 // These don't change over execution, so do them elsewhere
 //  StgDouble init_cpu_seconds;
@@ -288,7 +288,7 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
 
 /* set to disable CAF garbage collection in GHCi. */
 /* (needed when dynamic libraries are used). */
-extern rtsBool keepCAFs;
+extern bool keepCAFs;
 
 INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
 {

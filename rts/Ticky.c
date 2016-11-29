@@ -261,7 +261,7 @@ PrintTickyInfo(void)
  *
  * This of course refers to the -ticky version that uses PERM_INDs to
  * determine the number of closures entered 0/1/>1.  KSW 1999-04.  */
-  COND_PR_CTR(ENT_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"E!NT_PERM_IND_ctr requires +RTS -Z");
+  COND_PR_CTR(ENT_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == false,"E!NT_PERM_IND_ctr requires +RTS -Z");
 
   PR_CTR(ENT_AP_ctr);
   PR_CTR(ENT_PAP_ctr);
@@ -334,10 +334,10 @@ PrintTickyInfo(void)
 
   PR_CTR(UPD_NEW_IND_ctr);
   /* see comment on ENT_PERM_IND_ctr */
-  COND_PR_CTR(UPD_NEW_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"U!PD_NEW_PERM_IND_ctr requires +RTS -Z");
+  COND_PR_CTR(UPD_NEW_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == false,"U!PD_NEW_PERM_IND_ctr requires +RTS -Z");
   PR_CTR(UPD_OLD_IND_ctr);
   /* see comment on ENT_PERM_IND_ctr */
-  COND_PR_CTR(UPD_OLD_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == rtsFalse,"U!PD_OLD_PERM_IND_ctr requires +RTS -Z");
+  COND_PR_CTR(UPD_OLD_PERM_IND_ctr,RtsFlags.GcFlags.squeezeUpdFrames == false,"U!PD_OLD_PERM_IND_ctr requires +RTS -Z");
 
   PR_CTR(GC_SEL_ABANDONED_ctr);
   PR_CTR(GC_SEL_MINOR_ctr);

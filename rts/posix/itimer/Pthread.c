@@ -198,7 +198,7 @@ stopTicker(void)
 
 /* There may be at most one additional tick fired after a call to this */
 void
-exitTicker (rtsBool wait)
+exitTicker (bool wait)
 {
     ASSERT(!exited);
     exited = 1;

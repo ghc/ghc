@@ -602,7 +602,7 @@ rts_unlock (Capability *cap)
     // random point in the future, which causes problems for
     // freeTaskManager().
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap,rtsFalse);
+    releaseCapability_(cap,false);
 
     // Finally, we can release the Task to the free list.
     boundTaskExiting(task);

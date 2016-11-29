@@ -63,8 +63,8 @@
  *               it contained.
  *
  *   cond_lock_tvar - lock a specified TVar (STM_FG_LOCKS only) if it
- *               contains a specified value.  Return TRUE if this succeeds,
- *               FALSE otherwise.
+ *               contains a specified value.  Return true if this succeeds,
+ *               false otherwise.
  *
  *   unlock_tvar - release the lock on a specified TVar (STM_FG_LOCKS only),
  *               storing a specified value in place of the lock entry.
@@ -96,9 +96,6 @@
 
 #include <stdio.h>
 
-#define TRUE 1
-#define FALSE 0
-
 // ACQ_ASSERT is used for assertions which are only required for
 // THREADED_RTS builds with fine-grained locking.
 
@@ -112,31 +109,27 @@
 
 /*......................................................................*/
 
-// If SHAKE is defined then validation will sometimes spuriously fail.  They help test
-// unusual code paths if genuine contention is rare
-
 #define TRACE(_x...) debugTrace(DEBUG_stm, "STM: " _x)
 
+// If SHAKE is defined then validation will sometimes spuriously fail.  They help test
+// unusual code paths if genuine contention is rare
 #ifdef SHAKE
-static const int do_shake = TRUE;
-#else
-static const int do_shake = FALSE;
-#endif
 static int shake_ctr = 0;
 static int shake_lim = 1;
 
 static int shake(void) {
-  if (do_shake) {
     if (((shake_ctr++) % shake_lim) == 0) {
       shake_ctr = 1;
       shake_lim ++;
-      return TRUE;
+      return true;
     }
-    return FALSE;
-  } else {
-    return FALSE;
-  }
+    return false;
 }
+#else
+static int shake(void) {
+    return false;
+}
+#endif
 
 /*......................................................................*/
 
@@ -158,7 +151,7 @@ static int shake(void) {
     __limit = TREC_CHUNK_NUM_ENTRIES;                                           \
   }                                                                             \
  exit_for_each:                                                                 \
-  if (FALSE) goto exit_for_each;                                                \
+  if (false) goto exit_for_each;                                                \
 } while (0)
 
 #define BREAK_FOR_EACH goto exit_for_each
@@ -179,7 +172,7 @@ static int shake(void) {
 #if defined(STM_UNIPROC)
 #undef IF_STM_UNIPROC
 #define IF_STM_UNIPROC(__X)  do { __X } while (0)
-static const StgBool config_use_read_phase = FALSE;
+static const StgBool config_use_read_phase = false;
 
 static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
   TRACE("%p : lock_stm()", trec);
@@ -221,7 +214,7 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
 
 static StgBool lock_inv(StgAtomicInvariant *inv STG_UNUSED) {
   // Nothing -- uniproc
-  return TRUE;
+  return true;
 }
 
 static void unlock_inv(StgAtomicInvariant *inv STG_UNUSED) {
@@ -233,7 +226,7 @@ static void unlock_inv(StgAtomicInvariant *inv STG_UNUSED) {
 
 #undef IF_STM_CG_LOCK
 #define IF_STM_CG_LOCK(__X)  do { __X } while (0)
-static const StgBool config_use_read_phase = FALSE;
+static const StgBool config_use_read_phase = false;
 static volatile StgTRecHeader *smp_locked = NULL;
 
 static void lock_stm(StgTRecHeader *trec) {
@@ -282,7 +275,7 @@ static StgBool cond_lock_tvar(StgTRecHeader *trec STG_UNUSED,
 
 static StgBool lock_inv(StgAtomicInvariant *inv STG_UNUSED) {
   // Nothing -- protected by STM lock
-  return TRUE;
+  return true;
 }
 
 static void unlock_inv(StgAtomicInvariant *inv STG_UNUSED) {
@@ -294,7 +287,7 @@ static void unlock_inv(StgAtomicInvariant *inv STG_UNUSED) {
 
 #undef IF_STM_FG_LOCKS
 #define IF_STM_FG_LOCKS(__X) do { __X } while (0)
-static const StgBool config_use_read_phase = TRUE;
+static const StgBool config_use_read_phase = true;
 
 static void lock_stm(StgTRecHeader *trec STG_UNUSED) {
   TRACE("%p : lock_stm()", trec);
@@ -640,7 +633,7 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
       dirty_TVAR(cap,s); // we modified first_watch_queue_entry
     }
     free_stg_tvar_watch_queue(cap, q);
-    unlock_tvar(cap, trec, s, saw, FALSE);
+    unlock_tvar(cap, trec, s, saw, false);
   });
 }
 
@@ -679,16 +672,15 @@ static void merge_update_into(Capability *cap,
                               StgTRecHeader *t,
                               StgTVar *tvar,
                               StgClosure *expected_value,
-                              StgClosure *new_value) {
-  int found;
-
+                              StgClosure *new_value)
+{
   // Look for an entry in this trec
-  found = FALSE;
+  bool found = false;
   FOR_EACH_ENTRY(t, e, {
     StgTVar *s;
     s = e -> tvar;
     if (s == tvar) {
-      found = TRUE;
+      found = true;
       if (e -> expected_value != expected_value) {
         // Must abort if the two entries start from different values
         TRACE("%p : update entries inconsistent at %p (%p vs %p)",
@@ -717,10 +709,8 @@ static void merge_read_into(Capability *cap,
                             StgTVar *tvar,
                             StgClosure *expected_value)
 {
-  int found;
   StgTRecHeader *t;
-
-  found = FALSE;
+  bool found = false;
 
   //
   // See #7493
@@ -747,7 +737,7 @@ static void merge_read_into(Capability *cap,
   {
     FOR_EACH_ENTRY(t, e, {
       if (e -> tvar == tvar) {
-        found = TRUE;
+        found = true;
         if (e -> expected_value != expected_value) {
             // Must abort if the two entries start from different values
             TRACE("%p : read entries inconsistent at %p (%p vs %p)",
@@ -808,7 +798,7 @@ static void revert_ownership(Capability *cap STG_UNUSED,
       StgTVar *s;
       s = e -> tvar;
       if (tvar_is_locked(s, trec)) {
-          unlock_tvar(cap, trec, s, e -> expected_value, TRUE);
+          unlock_tvar(cap, trec, s, e -> expected_value, true);
       }
     }
   });
@@ -838,7 +828,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
 
   if (shake()) {
     TRACE("%p : shake, pretending trec is invalid when it may not be", trec);
-    return FALSE;
+    return false;
   }
 
   ASSERT((trec -> state == TREC_ACTIVE) ||
@@ -853,7 +843,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
         TRACE("%p : trying to acquire %p", trec, s);
         if (!cond_lock_tvar(trec, s, e -> expected_value)) {
           TRACE("%p : failed to acquire %p", trec, s);
-          result = FALSE;
+          result = false;
           BREAK_FOR_EACH;
         }
       } else {
@@ -862,13 +852,13 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
           TRACE("%p : will need to check %p", trec, s);
           if (s -> current_value != e -> expected_value) {
             TRACE("%p : doesn't match", trec);
-            result = FALSE;
+            result = false;
             BREAK_FOR_EACH;
           }
           e -> num_updates = s -> num_updates;
           if (s -> current_value != e -> expected_value) {
             TRACE("%p : doesn't match (race)", trec);
-            result = FALSE;
+            result = false;
             BREAK_FOR_EACH;
           } else {
             TRACE("%p : need to check version %ld", trec, e -> num_updates);
@@ -897,7 +887,7 @@ static StgBool validate_and_acquire_ownership (Capability *cap,
 // this kind of algorithm.
 
 static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
-  StgBool result = TRUE;
+  StgBool result = true;
 
   ASSERT(config_use_read_phase);
   IF_STM_FG_LOCKS({
@@ -913,7 +903,7 @@ static StgBool check_read_only(StgTRecHeader *trec STG_UNUSED) {
         if (s -> current_value != e -> expected_value ||
             s -> num_updates != e -> num_updates) {
           TRACE("%p : mismatch", trec);
-          result = FALSE;
+          result = false;
           BREAK_FOR_EACH;
         }
       }
@@ -950,14 +940,14 @@ void stmPreGCHook (Capability *cap) {
 static volatile StgInt64 max_commits = 0;
 
 #if defined(THREADED_RTS)
-static volatile StgWord token_locked = FALSE;
+static volatile StgWord token_locked = false;
 
 static void getTokenBatch(Capability *cap) {
-  while (cas((void *)&token_locked, FALSE, TRUE) == TRUE) { /* nothing */ }
+  while (cas((void *)&token_locked, false, true) == true) { /* nothing */ }
   max_commits += TOKEN_BATCH_SIZE;
   TRACE("%p : cap got token batch, max_commits=%" FMT_Int64, cap, max_commits);
   cap -> transaction_tokens = TOKEN_BATCH_SIZE;
-  token_locked = FALSE;
+  token_locked = false;
 }
 
 static void getToken(Capability *cap) {
@@ -1069,7 +1059,6 @@ void stmCondemnTransaction(Capability *cap,
 
 StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *t;
-  StgBool result;
 
   TRACE("%p : stmValidateNestOfTransactions", trec);
   ASSERT(trec != NO_TREC);
@@ -1080,9 +1069,9 @@ StgBool stmValidateNestOfTransactions(Capability *cap, StgTRecHeader *trec) {
   lock_stm(trec);
 
   t = trec;
-  result = TRUE;
+  StgBool result = true;
   while (t != NO_TREC) {
-    result &= validate_and_acquire_ownership(cap, t, TRUE, FALSE);
+    result &= validate_and_acquire_ownership(cap, t, true, false);
     t = t -> enclosing_trec;
   }
 
@@ -1136,7 +1125,7 @@ static void disconnect_invariant(Capability *cap,
   FOR_EACH_ENTRY(last_execution, e, {
     StgTVar *s = e -> tvar;
     StgTVarWatchQueue *q = s -> first_watch_queue_entry;
-    DEBUG_ONLY( StgBool found = FALSE );
+    DEBUG_ONLY( StgBool found = false );
     TRACE("  looking for trec on tvar=%p", s);
     for (q = s -> first_watch_queue_entry;
          q != END_STM_WATCH_QUEUE;
@@ -1158,7 +1147,7 @@ static void disconnect_invariant(Capability *cap,
         }
         TRACE("  found it in watch queue entry %p", q);
         free_stg_tvar_watch_queue(cap, q);
-        DEBUG_ONLY( found = TRUE );
+        DEBUG_ONLY( found = true );
         break;
       }
     }
@@ -1273,7 +1262,7 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
              q != END_STM_WATCH_QUEUE;
              q = q -> next_queue_entry) {
           if (watcher_is_invariant(q)) {
-            StgBool found = FALSE;
+            StgBool found = false;
             StgInvariantCheckQueue *q2;
             TRACE("%p : Touching invariant %p", trec, q -> closure);
             for (q2 = trec -> invariants_to_check;
@@ -1281,7 +1270,7 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
                  q2 = q2 -> next_queue_entry) {
               if (q2 -> invariant == (StgAtomicInvariant*)(q -> closure)) {
                 TRACE("%p : Already found %p", trec, q -> closure);
-                found = TRUE;
+                found = true;
                 break;
               }
             }
@@ -1297,7 +1286,7 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
           }
         }
 
-        unlock_tvar(cap, trec, s, old, FALSE);
+        unlock_tvar(cap, trec, s, old, false);
       }
     }
     c = c -> prev_chunk;
@@ -1315,7 +1304,6 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
 /*......................................................................*/
 
 StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
-  int result;
   StgInt64 max_commits_at_start = max_commits;
   StgBool touched_invariants;
   StgBool use_read_phase;
@@ -1386,7 +1374,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
   use_read_phase = ((config_use_read_phase) && (!touched_invariants));
 
-  result = validate_and_acquire_ownership(cap, trec, (!use_read_phase), TRUE);
+  bool result = validate_and_acquire_ownership(cap, trec, (!use_read_phase), true);
   if (result) {
     // We now know that all the updated locations hold their expected values.
     ASSERT(trec -> state == TREC_ACTIVE);
@@ -1402,7 +1390,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
       max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
                                 (n_capabilities * TOKEN_BATCH_SIZE));
       if (((max_concurrent_commits >> 32) > 0) || shake()) {
-        result = FALSE;
+        result = false;
       }
     }
 
@@ -1446,12 +1434,12 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
           IF_STM_FG_LOCKS({
             s -> num_updates ++;
           });
-          unlock_tvar(cap, trec, s, e -> new_value, TRUE);
+          unlock_tvar(cap, trec, s, e -> new_value, true);
         }
         ACQ_ASSERT(!tvar_is_locked(s, trec));
       });
     } else {
-        revert_ownership(cap, trec, FALSE);
+        revert_ownership(cap, trec, false);
     }
   }
 
@@ -1468,7 +1456,6 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
 
 StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   StgTRecHeader *et;
-  int result;
   ASSERT(trec != NO_TREC && trec -> enclosing_trec != NO_TREC);
   TRACE("%p : stmCommitNestedTransaction() into %p", trec, trec -> enclosing_trec);
   ASSERT((trec -> state == TREC_ACTIVE) || (trec -> state == TREC_CONDEMNED));
@@ -1476,7 +1463,7 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
   lock_stm(trec);
 
   et = trec -> enclosing_trec;
-  result = validate_and_acquire_ownership(cap, trec, (!config_use_read_phase), TRUE);
+  bool result = validate_and_acquire_ownership(cap, trec, (!config_use_read_phase), true);
   if (result) {
     // We now know that all the updated locations hold their expected values.
 
@@ -1497,13 +1484,13 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
         StgTVar *s;
         s = e -> tvar;
         if (entry_is_update(e)) {
-            unlock_tvar(cap, trec, s, e -> expected_value, FALSE);
+            unlock_tvar(cap, trec, s, e -> expected_value, false);
         }
         merge_update_into(cap, et, s, e -> expected_value, e -> new_value);
         ACQ_ASSERT(s -> current_value != (StgClosure *)trec);
       });
     } else {
-        revert_ownership(cap, trec, FALSE);
+        revert_ownership(cap, trec, false);
     }
   }
 
@@ -1519,7 +1506,6 @@ StgBool stmCommitNestedTransaction(Capability *cap, StgTRecHeader *trec) {
 /*......................................................................*/
 
 StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
-  int result;
   TRACE("%p : stmWait(%p)", trec, tso);
   ASSERT(trec != NO_TREC);
   ASSERT(trec -> enclosing_trec == NO_TREC);
@@ -1527,7 +1513,7 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
          (trec -> state == TREC_CONDEMNED));
 
   lock_stm(trec);
-  result = validate_and_acquire_ownership(cap, trec, TRUE, TRUE);
+  bool result = validate_and_acquire_ownership(cap, trec, true, true);
   if (result) {
     // The transaction is valid so far so we can actually start waiting.
     // (Otherwise the transaction was not valid and the thread will have to
@@ -1560,14 +1546,13 @@ StgBool stmWait(Capability *cap, StgTSO *tso, StgTRecHeader *trec) {
 
 void
 stmWaitUnlock(Capability *cap, StgTRecHeader *trec) {
-    revert_ownership(cap, trec, TRUE);
+    revert_ownership(cap, trec, true);
     unlock_stm(trec);
 }
 
 /*......................................................................*/
 
 StgBool stmReWait(Capability *cap, StgTSO *tso) {
-  int result;
   StgTRecHeader *trec = tso->trec;
 
   TRACE("%p : stmReWait", trec);
@@ -1577,14 +1562,14 @@ StgBool stmReWait(Capability *cap, StgTSO *tso) {
          (trec -> state == TREC_CONDEMNED));
 
   lock_stm(trec);
-  result = validate_and_acquire_ownership(cap, trec, TRUE, TRUE);
+  bool result = validate_and_acquire_ownership(cap, trec, true, true);
   TRACE("%p : validation %s", trec, result ? "succeeded" : "failed");
   if (result) {
     // The transaction remains valid -- do nothing because it is already on
     // the wait queues
     ASSERT(trec -> state == TREC_WAITING);
     park_tso(tso);
-    revert_ownership(cap, trec, TRUE);
+    revert_ownership(cap, trec, true);
   } else {
     // The transcation has become invalid.  We can now remove it from the wait
     // queues.

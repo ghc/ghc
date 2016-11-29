@@ -428,7 +428,7 @@ StgWord64 getPhysicalMemorySize (void)
     return physMemSize;
 }
 
-void setExecutable (void *p, W_ len, rtsBool exec)
+void setExecutable (void *p, W_ len, bool exec)
 {
     DWORD dwOldProtect = 0;
     if (VirtualProtect (p, len,
@@ -499,7 +499,7 @@ void osReleaseHeapMemory (void)
 
 #endif
 
-rtsBool osNumaAvailable(void)
+bool osNumaAvailable(void)
 {
     return osNumaNodes() > 1;
 }

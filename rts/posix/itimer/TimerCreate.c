@@ -76,7 +76,7 @@ stopTicker(void)
 }
 
 void
-exitTicker (rtsBool wait STG_UNUSED)
+exitTicker (bool wait STG_UNUSED)
 {
     // Before deleting the timer set the signal to ignore to avoid the
     // possibility of the signal being delivered after the timer is deleted.

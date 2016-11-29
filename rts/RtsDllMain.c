@@ -37,7 +37,7 @@ DllMain ( HINSTANCE hInstance STG_UNUSED
 
   //case DLL_PROCESS_DETACH: shutdownHaskell();
   }
-  return TRUE;
+  return true;
 }
 
 #endif

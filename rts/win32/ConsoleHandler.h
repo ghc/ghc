@@ -41,7 +41,7 @@ extern StgInt stg_pending_events;
  * runnable. A console handler is used to handle termination events (Ctrl+C)
  * and isn't considered a 'user handler'.
  */
-#define anyUserHandlers() (rtsFalse)
+#define anyUserHandlers() (false)
 
 /*
  * Function: startSignalHandlers()

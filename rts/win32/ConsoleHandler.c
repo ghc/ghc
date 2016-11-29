@@ -15,7 +15,7 @@ extern int stg_InstallConsoleEvent(int action, StgStablePtr *handler);
 static BOOL WINAPI shutdown_handler(DWORD dwCtrlType);
 static BOOL WINAPI generic_handler(DWORD dwCtrlType);
 
-static rtsBool deliver_event = rtsTrue;
+static bool deliver_event = true;
 StgInt console_handler = STG_SIG_DFL;
 
 #if !defined(THREADED_RTS)
@@ -83,7 +83,7 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
 
     case CTRL_CLOSE_EVENT:
         /* see generic_handler() comment re: this event */
-        return FALSE;
+        return false;
     case CTRL_C_EVENT:
     case CTRL_BREAK_EVENT:
 
@@ -95,11 +95,11 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
         } else {
             interruptStgRts();
         }
-        return TRUE;
+        return true;
 
         /* shutdown + logoff events are not handled here. */
     default:
-        return FALSE;
+        return false;
     }
 }
 
@@ -112,14 +112,14 @@ static BOOL WINAPI shutdown_handler(DWORD dwCtrlType)
  */
 void initDefaultHandlers(void)
 {
-    if ( !SetConsoleCtrlHandler(shutdown_handler, TRUE) ) {
+    if ( !SetConsoleCtrlHandler(shutdown_handler, true) ) {
         errorBelch("warning: failed to install default console handler");
     }
 }
 
 void resetDefaultHandlers(void)
 {
-    if ( !SetConsoleCtrlHandler(shutdown_handler, FALSE) ) {
+    if ( !SetConsoleCtrlHandler(shutdown_handler, false) ) {
         errorBelch("warning: failed to uninstall default console handler");
     }
 }
@@ -135,7 +135,7 @@ void resetDefaultHandlers(void)
 void
 blockUserSignals(void)
 {
-    deliver_event = rtsFalse;
+    deliver_event = false;
 }
 
 
@@ -147,7 +147,7 @@ blockUserSignals(void)
 void
 unblockUserSignals(void)
 {
-    deliver_event = rtsTrue;
+    deliver_event = true;
 }
 
 
@@ -227,9 +227,9 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
          * the user of the app will be unable to kill/close it. Not
          * good, so disable the delivery for now.
          */
-        return FALSE;
+        return false;
     default:
-        if (!deliver_event) return TRUE;
+        if (!deliver_event) return true;
 
 #if defined(THREADED_RTS)
         sendIOManagerEvent((StgWord8) ((dwCtrlType<<1) | 1));
@@ -242,7 +242,7 @@ static BOOL WINAPI generic_handler(DWORD dwCtrlType)
         // we need to wake up awaitEvent()
         abandonRequestWait();
 #endif
-        return TRUE;
+        return true;
     }
 }
 
@@ -260,13 +260,13 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
     switch (action) {
     case STG_SIG_IGN:
         console_handler = STG_SIG_IGN;
-        if ( !SetConsoleCtrlHandler(NULL, TRUE) ) {
+        if ( !SetConsoleCtrlHandler(NULL, true) ) {
             errorBelch("warning: unable to ignore console events");
         }
         break;
     case STG_SIG_DFL:
         console_handler = STG_SIG_IGN;
-        if ( !SetConsoleCtrlHandler(NULL, FALSE) ) {
+        if ( !SetConsoleCtrlHandler(NULL, false) ) {
             errorBelch("warning: unable to restore default console event "
                        "handling");
         }
@@ -280,7 +280,7 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
 #endif
         if (previous_hdlr < 0 || previous_hdlr == STG_SIG_HAN) {
           /* Only install generic_handler() once */
-          if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
+          if ( !SetConsoleCtrlHandler(generic_handler, true) ) {
             errorBelch("warning: unable to install console event handler");
           }
         }

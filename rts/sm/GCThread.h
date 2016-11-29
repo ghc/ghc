@@ -138,7 +138,7 @@ typedef struct gc_thread_ {
     StgClosure* static_objects;            // live static objects
     StgClosure* scavenged_static_objects;  // static objects scavenged so far
 
-    W_ gc_count;                 // number of GCs this thread has done
+    W_ gc_count;                   // number of GCs this thread has done
 
     // block that is currently being scanned
     bdescr *     scan_bd;
@@ -154,7 +154,7 @@ typedef struct gc_thread_ {
     // --------------------
     // evacuate flags
 
-    uint32_t evac_gen_no;               // Youngest generation that objects
+    uint32_t evac_gen_no;          // Youngest generation that objects
                                    // should be evacuated to in
                                    // evacuate().  (Logically an
                                    // argument to evacuate, but it's
@@ -162,11 +162,11 @@ typedef struct gc_thread_ {
                                    // optimise it into a per-thread
                                    // variable).
 
-    rtsBool failed_to_evac;        // failure to evacuate an object typically
+    bool failed_to_evac;           // failure to evacuate an object typically
                                    // Causes it to be recorded in the mutable
                                    // object list
 
-    rtsBool eager_promotion;       // forces promotion to the evac gen
+    bool eager_promotion;          // forces promotion to the evac gen
                                    // instead of the to-space
                                    // corresponding to the object
 

@@ -181,7 +181,7 @@ startupAsyncIO()
 }
 
 void
-shutdownAsyncIO(rtsBool wait_threads)
+shutdownAsyncIO(bool wait_threads)
 {
     ShutdownIOManager(wait_threads);
     if (completed_req_event != INVALID_HANDLE_VALUE) {
@@ -216,7 +216,7 @@ shutdownAsyncIO(rtsBool wait_threads)
  * to complete if the 'completedTable' is empty.
  */
 int
-awaitRequests(rtsBool wait)
+awaitRequests(bool wait)
 {
 #ifndef THREADED_RTS
   // none of this is actually used in the threaded RTS
@@ -231,7 +231,7 @@ start:
     // Nothing immediately available & we won't wait
     if ((!wait && completed_hw == 0)
 #if 0
-        // If we just return when wait==rtsFalse, we'll go into a busy
+        // If we just return when wait==false, we'll go into a busy
         // wait loop, so I disabled this condition --SDM 18/12/2003
         (issued_reqs == 0 && completed_hw == 0)
 #endif

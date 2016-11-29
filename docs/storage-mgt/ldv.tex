@@ -244,7 +244,7 @@ If retainer profiling is being performed, @ldvTime@ is equal to $0$,
 and @LDV_recordUse()@ causes no side effect.\footnote{Due to this
 interference with LDVU profiling, retainer profiling slows down a bit;
 for instance, checking @ldvTime@ against $0$ in the above example
-would always evaluate to @rtsFalse@ during retainer profiling.
+would always evaluate to @false@ during retainer profiling.
 However, this is the price to be paid for our decision not to employ a
 separate field for LDVU profiling.}
 
@@ -646,7 +646,7 @@ with LDVU profiling.
 
 \begin{description}
 \item[GC.c] invokes @LdvCensusForDead()@ before tidying up, sets @hasBeenAnyGC@ to 
-  @rtsTrue@, and changes @copy()@ and @copyPart()@.
+  @true@, and changes @copy()@ and @copyPart()@.
   Invokes @LDV_recordDead()@ and @LDV_recordDead_FILL_SLOP_DYNAMIC()@.
 \item[Itimer.c] changes @handle_tick()@.
 \item[LdvProfile.c] implements the LDVU profiling engine. 

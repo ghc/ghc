@@ -53,7 +53,7 @@ static void throwToSendMsg (Capability *cap USED_IF_THREADS,
 
 static void
 throwToSingleThreaded__ (Capability *cap, StgTSO *tso, StgClosure *exception,
-                         rtsBool stop_at_atomically, StgUpdateFrame *stop_here)
+                         bool stop_at_atomically, StgUpdateFrame *stop_here)
 {
     // Thread already dead?
     if (tso->what_next == ThreadComplete || tso->what_next == ThreadKilled) {
@@ -69,12 +69,12 @@ throwToSingleThreaded__ (Capability *cap, StgTSO *tso, StgClosure *exception,
 void
 throwToSingleThreaded (Capability *cap, StgTSO *tso, StgClosure *exception)
 {
-    throwToSingleThreaded__(cap, tso, exception, rtsFalse, NULL);
+    throwToSingleThreaded__(cap, tso, exception, false, NULL);
 }
 
 void
 throwToSingleThreaded_ (Capability *cap, StgTSO *tso, StgClosure *exception,
-                        rtsBool stop_at_atomically)
+                        bool stop_at_atomically)
 {
     throwToSingleThreaded__ (cap, tso, exception, stop_at_atomically, NULL);
 }
@@ -82,7 +82,7 @@ throwToSingleThreaded_ (Capability *cap, StgTSO *tso, StgClosure *exception,
 void // cannot return a different TSO
 suspendComputation (Capability *cap, StgTSO *tso, StgUpdateFrame *stop_here)
 {
-    throwToSingleThreaded__ (cap, tso, NULL, rtsFalse, stop_here);
+    throwToSingleThreaded__ (cap, tso, NULL, false, stop_here);
 }
 
 /* -----------------------------------------------------------------------------
@@ -272,7 +272,7 @@ check_target:
     {
         if ((target->flags & TSO_BLOCKEX) == 0) {
             // It's on our run queue and not blocking exceptions
-            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            raiseAsync(cap, target, msg->exception, false, NULL);
             return THROWTO_SUCCESS;
         } else {
             blockedThrowTo(cap,target,msg);
@@ -337,7 +337,7 @@ check_target:
         // nobody else can wake up this TSO after we claim the message
         doneWithMsgThrowTo(m);
 
-        raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+        raiseAsync(cap, target, msg->exception, false, NULL);
         return THROWTO_SUCCESS;
     }
 
@@ -391,7 +391,7 @@ check_target:
         } else {
             // revoke the MVar operation
             removeFromMVarBlockedQueue(target);
-            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            raiseAsync(cap, target, msg->exception, false, NULL);
             unlockClosure((StgClosure *)mvar, info);
             return THROWTO_SUCCESS;
         }
@@ -410,7 +410,7 @@ check_target:
             // future, but that doesn't matter.
             ASSERT(target->block_info.bh->header.info == &stg_MSG_BLACKHOLE_info);
             OVERWRITE_INFO(target->block_info.bh, &stg_IND_info);
-            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            raiseAsync(cap, target, msg->exception, false, NULL);
             return THROWTO_SUCCESS;
         }
     }
@@ -429,7 +429,7 @@ check_target:
             unlockTSO(target);
             return THROWTO_BLOCKED;
         } else {
-            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            raiseAsync(cap, target, msg->exception, false, NULL);
             unlockTSO(target);
             return THROWTO_SUCCESS;
         }
@@ -476,7 +476,7 @@ check_target:
             return THROWTO_BLOCKED;
         } else {
             removeFromQueues(cap,target);
-            raiseAsync(cap, target, msg->exception, rtsFalse, NULL);
+            raiseAsync(cap, target, msg->exception, false, NULL);
             return THROWTO_SUCCESS;
         }
 #endif
@@ -776,7 +776,7 @@ removeFromQueues(Capability *cap, StgTSO *tso)
 
 StgTSO *
 raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
-           rtsBool stop_at_atomically, StgUpdateFrame *stop_here)
+           bool stop_at_atomically, StgUpdateFrame *stop_here)
 {
     const StgRetInfoTable *info;
     StgPtr sp, frame;

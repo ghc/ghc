@@ -43,8 +43,8 @@ getIOManagerEvent (void)
 
     if (io_manager_event == INVALID_HANDLE_VALUE) {
         hRes = CreateEvent ( NULL, // no security attrs
-                             TRUE, // manual reset
-                             FALSE, // initial state,
+                             true, // manual reset
+                             false, // initial state,
                              NULL ); // event name: NULL for private events
         if (hRes == NULL) {
             sysErrorBelch("getIOManagerEvent");

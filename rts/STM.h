@@ -92,7 +92,7 @@ void stmCondemnTransaction(Capability *cap, StgTRecHeader *trec);
   it is nested, are still valid.
 
   Note: the caller can assume that once stmValidateTransaction has
-  returned FALSE for a given trec then that transaction will never
+  returned false for a given trec then that transaction will never
   again be valid -- we rely on this in Schedule.c when kicking invalid
   threads at GC (in case they are stuck looping)
 */

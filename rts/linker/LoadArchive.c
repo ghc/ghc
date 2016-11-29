@@ -429,7 +429,7 @@ static HsInt loadArchive_ (pathchar *path)
             sprintf(archiveMemberName, "%" PATH_FMT "(%.*s)",
                     path, (int)thisFileNameSize, fileName);
 
-            oc = mkOc(path, image, memberSize, rtsFalse, archiveMemberName
+            oc = mkOc(path, image, memberSize, false, archiveMemberName
                      , misalignment);
 
             stgFree(archiveMemberName);

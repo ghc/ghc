@@ -128,7 +128,7 @@ typedef struct Task_ {
     // or just continue immediately.  It's a workaround for the fact
     // that signalling a condition variable doesn't do anything if the
     // thread is already running, but we want it to be sticky.
-    rtsBool wakeup;
+    bool wakeup;
 #endif
 
     // If the task owns a Capability, task->cap points to it.  (occasionally a
@@ -149,12 +149,12 @@ typedef struct Task_ {
     uint32_t n_spare_incalls;
     struct InCall_ *spare_incalls;
 
-    rtsBool    worker;          // == rtsTrue if this is a worker Task
-    rtsBool    stopped;         // == rtsTrue between newBoundTask and
+    bool    worker;          // == true if this is a worker Task
+    bool    stopped;         // == true between newBoundTask and
                                 // boundTaskExiting, or in a worker Task.
 
     // So that we can detect when a finalizer illegally calls back into Haskell
-    rtsBool running_finalizers;
+    bool running_finalizers;
 
     // if >= 0, this Capability will be used for in-calls
     int preferred_capability;
@@ -169,7 +169,7 @@ typedef struct Task_ {
 
 } Task;
 
-INLINE_HEADER rtsBool
+INLINE_HEADER bool
 isBoundTask (Task *task)
 {
     return (task->incall->tso != NULL);
@@ -180,7 +180,7 @@ isBoundTask (Task *task)
 //  (b) it has not left and re-entered Haskell, in which case
 //      task->incall->prev_stack would be non-NULL.
 //
-INLINE_HEADER rtsBool
+INLINE_HEADER bool
 isWorker (Task *task)
 {
     return (task->worker && task->incall->prev_stack == NULL);

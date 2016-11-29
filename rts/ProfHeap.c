@@ -98,7 +98,7 @@ static void aggregateCensusInfo( void );
 
 static void dumpCensus( Census *census );
 
-static rtsBool closureSatisfiesConstraints( const StgClosure* p );
+static bool closureSatisfiesConstraints( const StgClosure* p );
 
 /* ----------------------------------------------------------------------------
  * Find the "closure identity", which is a unique pointer representing
@@ -156,14 +156,14 @@ closureIdentity( const StgClosure *p )
  * Profiling type predicates
  * ----------------------------------------------------------------------- */
 #ifdef PROFILING
-STATIC_INLINE rtsBool
+STATIC_INLINE bool
 doingLDVProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV
             || RtsFlags.ProfFlags.bioSelector != NULL);
 }
 
-rtsBool
+bool
 doingRetainerProfiling( void )
 {
     return (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER
@@ -283,7 +283,7 @@ nextEra( void )
 
         if (era == max_era) {
             errorBelch("Maximum number of censuses reached.");
-            if (rtsConfig.rts_opts_suggestions == rtsTrue) {
+            if (rtsConfig.rts_opts_suggestions == true) {
                 if (rtsConfig.rts_opts_enabled == RtsOptsAll)  {
                     errorBelch("Use `+RTS -i' to reduce censuses.");
                 } else  {
@@ -361,7 +361,7 @@ void endProfiling( void )
 #endif /* !PROFILING */
 
 static void
-printSample(rtsBool beginSample, StgDouble sampleValue)
+printSample(bool beginSample, StgDouble sampleValue)
 {
     fprintf(hp_file, "%s %f\n",
             (beginSample ? "BEGIN_SAMPLE" : "END_SAMPLE"),
@@ -448,8 +448,8 @@ initHeapProfiling(void)
     fprintf(hp_file, "SAMPLE_UNIT \"seconds\"\n");
     fprintf(hp_file, "VALUE_UNIT \"bytes\"\n");
 
-    printSample(rtsTrue, 0);
-    printSample(rtsFalse, 0);
+    printSample(true, 0);
+    printSample(false, 0);
 
 #ifdef PROFILING
     if (doingRetainerProfiling()) {
@@ -509,8 +509,8 @@ endHeapProfiling(void)
     stgFree(censuses);
 
     seconds = mut_user_time();
-    printSample(rtsTrue, seconds);
-    printSample(rtsFalse, seconds);
+    printSample(true, seconds);
+    printSample(false, seconds);
     fclose(hp_file);
 }
 
@@ -569,7 +569,7 @@ fprint_ccs(FILE *fp, CostCentreStack *ccs, uint32_t max_length)
     fprintf(fp, "%s", buf);
 }
 
-rtsBool
+bool
 strMatchesSelector( const char* str, const char* sel )
 {
    const char* p;
@@ -582,14 +582,14 @@ strMatchesSelector( const char* str, const char* sel )
        }
        // Match if all of str used and have reached the end of a sel fragment.
        if (*p == '\0' && (*sel == ',' || *sel == '\0'))
-           return rtsTrue;
+           return true;
 
        // No match.  Advance sel to the start of the next elem.
        while (*sel != ',' && *sel != '\0') sel++;
        if (*sel == ',') sel++;
 
        /* Run out of sel ?? */
-       if (*sel == '\0') return rtsFalse;
+       if (*sel == '\0') return false;
    }
 }
 
@@ -599,31 +599,31 @@ strMatchesSelector( const char* str, const char* sel )
  * Figure out whether a closure should be counted in this census, by
  * testing against all the specified constraints.
  * -------------------------------------------------------------------------- */
-static rtsBool
+static bool
 closureSatisfiesConstraints( const StgClosure* p )
 {
 #if !defined(PROFILING)
     (void)p;   /* keep gcc -Wall happy */
-    return rtsTrue;
+    return true;
 #else
-   rtsBool b;
+   bool b;
 
    // The CCS has a selected field to indicate whether this closure is
    // deselected by not being mentioned in the module, CC, or CCS
    // selectors.
    if (!p->header.prof.ccs->selected) {
-       return rtsFalse;
+       return false;
    }
 
    if (RtsFlags.ProfFlags.descrSelector) {
        b = strMatchesSelector( (GET_PROF_DESC(get_itbl((StgClosure *)p))),
                                  RtsFlags.ProfFlags.descrSelector );
-       if (!b) return rtsFalse;
+       if (!b) return false;
    }
    if (RtsFlags.ProfFlags.typeSelector) {
        b = strMatchesSelector( (GET_PROF_TYPE(get_itbl((StgClosure *)p))),
                                 RtsFlags.ProfFlags.typeSelector );
-       if (!b) return rtsFalse;
+       if (!b) return false;
    }
    if (RtsFlags.ProfFlags.retainerSelector) {
        RetainerSet *rs;
@@ -638,13 +638,13 @@ closureSatisfiesConstraints( const StgClosure* p )
                for (i = 0; i < rs->num; i++) {
                    b = strMatchesSelector( rs->element[i]->cc->label,
                                            RtsFlags.ProfFlags.retainerSelector );
-                   if (b) return rtsTrue;
+                   if (b) return true;
                }
            }
        }
-       return rtsFalse;
+       return false;
    }
-   return rtsTrue;
+   return true;
 #endif /* PROFILING */
 }
 
@@ -766,7 +766,7 @@ dumpCensus( Census *census )
     counter *ctr;
     ssize_t count;
 
-    printSample(rtsTrue, census->time);
+    printSample(true, census->time);
     traceHeapProfSampleBegin(era);
 
 #ifdef PROFILING
@@ -781,7 +781,7 @@ dumpCensus( Census *census )
                 (unsigned long)(census->prim) * sizeof(W_));
         fprintf(hp_file, "DRAG\t%lu\n",
                 (unsigned long)(census->drag_total) * sizeof(W_));
-        printSample(rtsFalse, census->time);
+        printSample(false, census->time);
         return;
     }
 #endif
@@ -865,12 +865,12 @@ dumpCensus( Census *census )
         fprintf(hp_file, "\t%" FMT_Word "\n", (W_)count * sizeof(W_));
     }
 
-    printSample(rtsFalse, census->time);
+    printSample(false, census->time);
 }
 
 
 static void heapProfObject(Census *census, StgClosure *p, size_t size,
-                           rtsBool prim
+                           bool prim
 #ifndef PROFILING
                            STG_UNUSED
 #endif
@@ -960,7 +960,7 @@ heapCensusCompactList(Census *census, bdescr *bd)
         StgCompactNFDataBlock *block = (StgCompactNFDataBlock*)bd->start;
         StgCompactNFData *str = block->owner;
         heapProfObject(census, (StgClosure*)str,
-                       compact_nfdata_full_sizeW(str), rtsTrue);
+                       compact_nfdata_full_sizeW(str), true);
     }
 }
 
@@ -973,7 +973,7 @@ heapCensusChain( Census *census, bdescr *bd )
     StgPtr p;
     const StgInfoTable *info;
     size_t size;
-    rtsBool prim;
+    bool prim;
 
     for (; bd != NULL; bd = bd->link) {
 
@@ -984,7 +984,7 @@ heapCensusChain( Census *census, bdescr *bd )
         if (bd->flags & BF_PINNED) {
             StgClosure arr;
             SET_HDR(&arr, &stg_ARR_WORDS_info, CCS_PINNED);
-            heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, rtsTrue);
+            heapProfObject(census, &arr, bd->blocks * BLOCK_SIZE_W, true);
             continue;
         }
 
@@ -998,14 +998,14 @@ heapCensusChain( Census *census, bdescr *bd )
         if (bd->flags & BF_LARGE
             && get_itbl((StgClosure *)p)->type == ARR_WORDS) {
             size = arr_words_sizeW((StgArrBytes *)p);
-            prim = rtsTrue;
+            prim = true;
             heapProfObject(census, (StgClosure *)p, size, prim);
             continue;
         }
 
         while (p < bd->free) {
             info = get_itbl((const StgClosure *)p);
-            prim = rtsFalse;
+            prim = false;
 
             switch (info->type) {
 
@@ -1055,7 +1055,7 @@ heapCensusChain( Census *census, bdescr *bd )
                 break;
 
             case BCO:
-                prim = rtsTrue;
+                prim = true;
                 size = bco_sizeW((StgBCO *)p);
                 break;
 
@@ -1067,7 +1067,7 @@ heapCensusChain( Census *census, bdescr *bd )
             case MUT_PRIM:
             case MUT_VAR_CLEAN:
             case MUT_VAR_DIRTY:
-                prim = rtsTrue;
+                prim = true;
                 size = sizeW_fromITBL(info);
                 break;
 
@@ -1084,7 +1084,7 @@ heapCensusChain( Census *census, bdescr *bd )
                 break;
 
             case ARR_WORDS:
-                prim = rtsTrue;
+                prim = true;
                 size = arr_words_sizeW((StgArrBytes*)p);
                 break;
 
@@ -1092,7 +1092,7 @@ heapCensusChain( Census *census, bdescr *bd )
             case MUT_ARR_PTRS_DIRTY:
             case MUT_ARR_PTRS_FROZEN:
             case MUT_ARR_PTRS_FROZEN0:
-                prim = rtsTrue;
+                prim = true;
                 size = mut_arr_ptrs_sizeW((StgMutArrPtrs *)p);
                 break;
 
@@ -1100,12 +1100,12 @@ heapCensusChain( Census *census, bdescr *bd )
             case SMALL_MUT_ARR_PTRS_DIRTY:
             case SMALL_MUT_ARR_PTRS_FROZEN:
             case SMALL_MUT_ARR_PTRS_FROZEN0:
-                prim = rtsTrue;
+                prim = true;
                 size = small_mut_arr_ptrs_sizeW((StgSmallMutArrPtrs *)p);
                 break;
 
             case TSO:
-                prim = rtsTrue;
+                prim = true;
 #ifdef PROFILING
                 if (RtsFlags.ProfFlags.includeTSOs) {
                     size = sizeofW(StgTSO);
@@ -1121,7 +1121,7 @@ heapCensusChain( Census *census, bdescr *bd )
 #endif
 
             case STACK:
-                prim = rtsTrue;
+                prim = true;
 #ifdef PROFILING
                 if (RtsFlags.ProfFlags.includeTSOs) {
                     size = stack_sizeW((StgStack*)p);
@@ -1137,7 +1137,7 @@ heapCensusChain( Census *census, bdescr *bd )
 #endif
 
             case TREC_CHUNK:
-                prim = rtsTrue;
+                prim = true;
                 size = sizeofW(StgTRecChunk);
                 break;
 

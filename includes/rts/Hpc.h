@@ -20,7 +20,7 @@ typedef struct _HpcModuleInfo {
   StgWord32 tickCount;          // number of ticks
   StgWord32 hashNo;             // Hash number for this module's mix info
   StgWord64 *tixArr;            // tix Array; local for this module
-  rtsBool from_file;            // data was read from the .tix file
+  bool from_file;               // data was read from the .tix file
   struct _HpcModuleInfo *next;
 } HpcModuleInfo;
 

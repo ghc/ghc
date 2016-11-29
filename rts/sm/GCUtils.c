@@ -192,7 +192,7 @@ push_scanned_block (bdescr *bd, gen_workspace *ws)
 StgPtr
 todo_block_full (uint32_t size, gen_workspace *ws)
 {
-    rtsBool urgent_to_push, can_extend;
+    bool urgent_to_push, can_extend;
     StgPtr p;
     bdescr *bd;
 

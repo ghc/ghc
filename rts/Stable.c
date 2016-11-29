@@ -588,7 +588,7 @@ gcStableTables( void )
  * -------------------------------------------------------------------------- */
 
 void
-updateStableTables(rtsBool full)
+updateStableTables(bool full)
 {
     if (full && addrToStableHash != NULL && 0 != keyCountHashTable(addrToStableHash)) {
         freeHashTable(addrToStableHash,NULL);

@@ -99,19 +99,19 @@ closeCondition( Condition* pCond )
   return;
 }
 
-rtsBool
+bool
 broadcastCondition ( Condition* pCond )
 {
   return (pthread_cond_broadcast(pCond) == 0);
 }
 
-rtsBool
+bool
 signalCondition ( Condition* pCond )
 {
   return (pthread_cond_signal(pCond) == 0);
 }
 
-rtsBool
+bool
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
   return (pthread_cond_wait(pCond,pMut) == 0);
@@ -150,12 +150,12 @@ osThreadId(void)
   return pthread_self();
 }
 
-rtsBool
+bool
 osThreadIsAlive(OSThreadId id STG_UNUSED)
 {
     // no good way to implement this on POSIX, AFAICT.  Returning true
     // is safe.
-    return rtsTrue;
+    return true;
 }
 
 void

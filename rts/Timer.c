@@ -134,7 +134,7 @@ stopTimer(void)
 }
 
 void
-exitTimer (rtsBool wait)
+exitTimer (bool wait)
 {
     if (RtsFlags.MiscFlags.tickInterval != 0) {
         exitTicker(wait);

@@ -264,7 +264,7 @@ extern /*Str*/HashTable *symhash;
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
-                  rtsBool mapped, char *archiveMemberName,
+                  bool mapped, char *archiveMemberName,
                   int misalignment
                   );
 

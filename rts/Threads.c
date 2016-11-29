@@ -194,7 +194,7 @@ void rts_disableThreadAllocationLimit(StgPtr tso)
    Fails fatally if the TSO is not on the queue.
    -------------------------------------------------------------------------- */
 
-rtsBool // returns True if we modified queue
+bool // returns true if we modified queue
 removeThreadFromQueue (Capability *cap, StgTSO **queue, StgTSO *tso)
 {
     StgTSO *t, *prev;
@@ -205,33 +205,33 @@ removeThreadFromQueue (Capability *cap, StgTSO **queue, StgTSO *tso)
             if (prev) {
                 setTSOLink(cap,prev,t->_link);
                 t->_link = END_TSO_QUEUE;
-                return rtsFalse;
+                return false;
             } else {
                 *queue = t->_link;
                 t->_link = END_TSO_QUEUE;
-                return rtsTrue;
+                return true;
             }
         }
     }
     barf("removeThreadFromQueue: not found");
 }
 
-rtsBool // returns True if we modified head or tail
+bool // returns true if we modified head or tail
 removeThreadFromDeQueue (Capability *cap,
                          StgTSO **head, StgTSO **tail, StgTSO *tso)
 {
     StgTSO *t, *prev;
-    rtsBool flag = rtsFalse;
+    bool flag = false;
 
     prev = NULL;
     for (t = *head; t != END_TSO_QUEUE; prev = t, t = t->_link) {
         if (t == tso) {
             if (prev) {
                 setTSOLink(cap,prev,t->_link);
-                flag = rtsFalse;
+                flag = false;
             } else {
                 *head = t->_link;
-                flag = rtsTrue;
+                flag = true;
             }
             t->_link = END_TSO_QUEUE;
             if (*tail == tso) {
@@ -240,7 +240,7 @@ removeThreadFromDeQueue (Capability *cap,
                 } else {
                     *tail = END_TSO_QUEUE;
                 }
-                return rtsTrue;
+                return true;
             } else {
                 return flag;
             }
@@ -503,7 +503,7 @@ isThreadBound(StgTSO* tso USED_IF_THREADS)
 #if defined(THREADED_RTS)
   return (tso->bound != NULL);
 #endif
-  return rtsFalse;
+  return false;
 }
 
 /* -----------------------------------------------------------------------------
@@ -749,7 +749,7 @@ threadStackUnderflow (Capability *cap, StgTSO *tso)
    NOTE: this should be kept in sync with stg_tryPutMVarzh in PrimOps.cmm
    ------------------------------------------------------------------------- */
 
-rtsBool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
+bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
 {
     const StgInfoTable *info;
     StgMVarTSOQueue *q;
@@ -761,7 +761,7 @@ rtsBool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value)
 #if defined(THREADED_RTS)
         unlockClosure((StgClosure*)mvar, info);
 #endif
-        return rtsFalse;
+        return false;
     }
 
     q = mvar->head;
@@ -774,7 +774,7 @@ loop:
 
         mvar->value = value;
         unlockClosure((StgClosure*)mvar, &stg_MVAR_DIRTY_info);
-        return rtsTrue;
+        return true;
     }
     if (q->header.info == &stg_IND_info ||
         q->header.info == &stg_MSG_NULL_info) {
@@ -819,7 +819,7 @@ loop:
 
     unlockClosure((StgClosure*)mvar, info);
 
-    return rtsTrue;
+    return true;
 }
 
 /* ----------------------------------------------------------------------------

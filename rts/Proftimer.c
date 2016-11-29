@@ -14,22 +14,22 @@
 #include "Capability.h"
 
 #ifdef PROFILING
-static rtsBool do_prof_ticks = rtsFalse;       // enable profiling ticks
+static bool do_prof_ticks = false;       // enable profiling ticks
 #endif
 
-static rtsBool do_heap_prof_ticks = rtsFalse;  // enable heap profiling ticks
+static bool do_heap_prof_ticks = false;  // enable heap profiling ticks
 
 // Number of ticks until next heap census
 static int ticks_to_heap_profile;
 
 // Time for a heap profile on the next context switch
-rtsBool performHeapProfile;
+bool performHeapProfile;
 
 void
 stopProfTimer( void )
 {
 #ifdef PROFILING
-    do_prof_ticks = rtsFalse;
+    do_prof_ticks = false;
 #endif
 }
 
@@ -37,14 +37,14 @@ void
 startProfTimer( void )
 {
 #ifdef PROFILING
-    do_prof_ticks = rtsTrue;
+    do_prof_ticks = true;
 #endif
 }
 
 void
 stopHeapProfTimer( void )
 {
-    do_heap_prof_ticks = rtsFalse;
+    do_heap_prof_ticks = false;
 }
 
 void
@@ -52,14 +52,14 @@ startHeapProfTimer( void )
 {
     if (RtsFlags.ProfFlags.doHeapProfile &&
         RtsFlags.ProfFlags.heapProfileIntervalTicks > 0) {
-        do_heap_prof_ticks = rtsTrue;
+        do_heap_prof_ticks = true;
     }
 }
 
 void
 initProfTimer( void )
 {
-    performHeapProfile = rtsFalse;
+    performHeapProfile = false;
 
     ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
 
@@ -85,7 +85,7 @@ handleProfTick(void)
         ticks_to_heap_profile--;
         if (ticks_to_heap_profile <= 0) {
             ticks_to_heap_profile = RtsFlags.ProfFlags.heapProfileIntervalTicks;
-            performHeapProfile = rtsTrue;
+            performHeapProfile = true;
         }
     }
 }

@@ -63,31 +63,31 @@ closeCondition( Condition* pCond )
   return;
 }
 
-rtsBool
+bool
 broadcastCondition ( Condition* pCond )
 {
   PulseEvent(*pCond);
-  return rtsTrue;
+  return true;
 }
 
-rtsBool
+bool
 signalCondition ( Condition* pCond )
 {
     if (SetEvent(*pCond) == 0) {
         sysErrorBelch("SetEvent");
         stg_exit(EXIT_FAILURE);
     }
-    return rtsTrue;
+    return true;
 }
 
-rtsBool
+bool
 waitCondition ( Condition* pCond, Mutex* pMut )
 {
   RELEASE_LOCK(pMut);
   WaitForSingleObject(*pCond, INFINITE);
   /* Hmm..use WaitForMultipleObjects() ? */
   ACQUIRE_LOCK(pMut);
-  return rtsTrue;
+  return true;
 }
 
 void
@@ -133,7 +133,7 @@ osThreadId()
   return GetCurrentThreadId();
 }
 
-rtsBool
+bool
 osThreadIsAlive(OSThreadId id)
 {
     DWORD exit_code;
@@ -166,7 +166,7 @@ void
 initMutex (Mutex* pMut)
 {
   HANDLE h = CreateMutex ( NULL,  /* default sec. attributes */
-                           FALSE, /* not owned => initially signalled */
+                           TRUE, /* not owned => initially signalled */
                            NULL
                            );
   *pMut = h;

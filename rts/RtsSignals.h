@@ -19,7 +19,7 @@
 
 #else
 
-#define signals_pending() (rtsFalse)
+#define signals_pending() (false)
 
 #endif
 

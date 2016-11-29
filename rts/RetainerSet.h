@@ -116,9 +116,9 @@ extern RetainerSet rs_MANY;
 //   it is not easy either to write it as a macro (due to my lack of C
 //   programming experience). Sungwoo
 //
-// rtsBool isMember(retainer, retainerSet *);
+// bool isMember(retainer, retainerSet *);
 /*
-  Returns rtsTrue if r is a member of *rs.
+  Returns true if r is a member of *rs.
   Invariants:
     rs is not NULL.
   Note:
@@ -129,19 +129,19 @@ extern RetainerSet rs_MANY;
  */
 
 #define BINARY_SEARCH_THRESHOLD   8
-INLINE_HEADER rtsBool
+INLINE_HEADER bool
 isMember(retainer r, RetainerSet *rs)
 {
   int i, left, right;       // must be int, not uint32_t (because -1 can appear)
   retainer ri;
 
-  if (rs == &rs_MANY) { return rtsTrue; }
+  if (rs == &rs_MANY) { return true; }
 
   if (rs->num < BINARY_SEARCH_THRESHOLD) {
     for (i = 0; i < (int)rs->num; i++) {
       ri = rs->element[i];
-      if (r == ri) return rtsTrue;
-      else if (r < ri) return rtsFalse;
+      if (r == ri) return true;
+      else if (r < ri) return false;
     }
   } else {
     left = 0;
@@ -149,12 +149,12 @@ isMember(retainer r, RetainerSet *rs)
     while (left <= right) {
       i = (left + right) / 2;
       ri = rs->element[i];
-      if (r == ri) return rtsTrue;
+      if (r == ri) return true;
       else if (r < ri) right = i - 1;
       else left = i + 1;
     }
   }
-  return rtsFalse;
+  return false;
 }
 
 // Finds or creates a retainer set augmented with a new retainer.

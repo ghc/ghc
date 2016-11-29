@@ -82,7 +82,7 @@ Capability * rts_unsafeGetMyCapability (void)
 }
 
 #if defined(THREADED_RTS)
-STATIC_INLINE rtsBool
+STATIC_INLINE bool
 globalWorkToDo (void)
 {
     return sched_state >= SCHED_INTERRUPTING
@@ -96,7 +96,7 @@ findSpark (Capability *cap)
 {
   Capability *robbed;
   StgClosurePtr spark;
-  rtsBool retry;
+  bool retry;
   uint32_t i = 0;
 
   if (!emptyRunQueue(cap) || cap->n_returning_tasks != 0) {
@@ -107,7 +107,7 @@ findSpark (Capability *cap)
   }
 
   do {
-      retry = rtsFalse;
+      retry = false;
 
       // first try to get a spark from our own pool.
       // We should be using reclaimSpark(), because it works without
@@ -130,7 +130,7 @@ findSpark (Capability *cap)
           return spark;
       }
       if (!emptySparkPoolCap(cap)) {
-          retry = rtsTrue;
+          retry = true;
       }
 
       if (n_capabilities == 1) { return NULL; } // makes no sense...
@@ -158,7 +158,7 @@ findSpark (Capability *cap)
           if (spark == NULL && !emptySparkPoolCap(robbed)) {
               // we conflicted with another thread while trying to steal;
               // try again later.
-              retry = rtsTrue;
+              retry = true;
           }
 
           if (spark != NULL) {
@@ -179,17 +179,17 @@ findSpark (Capability *cap)
 // The result is only valid for an instant, of course, so in a sense
 // is immediately invalid, and should not be relied upon for
 // correctness.
-rtsBool
+bool
 anySparks (void)
 {
     uint32_t i;
 
     for (i=0; i < n_capabilities; i++) {
         if (!emptySparkPoolCap(capabilities[i])) {
-            return rtsTrue;
+            return true;
         }
     }
-    return rtsFalse;
+    return false;
 }
 #endif
 
@@ -247,9 +247,9 @@ initCapability (Capability *cap, uint32_t i)
 
     cap->no = i;
     cap->node = capNoToNumaNode(i);
-    cap->in_haskell        = rtsFalse;
+    cap->in_haskell        = false;
     cap->idle              = 0;
-    cap->disabled          = rtsFalse;
+    cap->disabled          = false;
 
     cap->run_queue_hd      = END_TSO_QUEUE;
     cap->run_queue_tl      = END_TSO_QUEUE;
@@ -482,8 +482,8 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
                cap->no, task->incall->tso ? "bound task" : "worker",
                serialisableTaskId(task));
     ACQUIRE_LOCK(&task->lock);
-    if (task->wakeup == rtsFalse) {
-        task->wakeup = rtsTrue;
+    if (task->wakeup == false) {
+        task->wakeup = true;
         // the wakeup flag is needed because signalCondition() doesn't
         // flag the condition if the thread is already runniing, but we want
         // it to be sticky.
@@ -503,7 +503,7 @@ giveCapabilityToTask (Capability *cap USED_IF_DEBUG, Task *task)
 #if defined(THREADED_RTS)
 void
 releaseCapability_ (Capability* cap,
-                    rtsBool always_wakeup)
+                    bool always_wakeup)
 {
     Task *task;
 
@@ -586,7 +586,7 @@ void
 releaseCapability (Capability* cap USED_IF_THREADS)
 {
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, rtsFalse);
+    releaseCapability_(cap, false);
     RELEASE_LOCK(&cap->lock);
 }
 
@@ -594,7 +594,7 @@ void
 releaseAndWakeupCapability (Capability* cap USED_IF_THREADS)
 {
     ACQUIRE_LOCK(&cap->lock);
-    releaseCapability_(cap, rtsTrue);
+    releaseCapability_(cap, true);
     RELEASE_LOCK(&cap->lock);
 }
 
@@ -620,7 +620,7 @@ enqueueWorker (Capability* cap USED_IF_THREADS)
     {
         debugTrace(DEBUG_sched, "%d spare workers already, exiting",
                    cap->n_spare_workers);
-        releaseCapability_(cap,rtsFalse);
+        releaseCapability_(cap,false);
         // hold the lock until after workerTaskStop; c.f. scheduleWorker()
         workerTaskStop(task);
         RELEASE_LOCK(&cap->lock);
@@ -648,7 +648,7 @@ static Capability * waitForWorkerCapability (Task *task)
         // task->lock held, cap->lock not held
         if (!task->wakeup) waitCondition(&task->cond, &task->lock);
         cap = task->cap;
-        task->wakeup = rtsFalse;
+        task->wakeup = false;
         RELEASE_LOCK(&task->lock);
 
         debugTrace(DEBUG_sched, "woken up on capability %d", cap->no);
@@ -713,7 +713,7 @@ static Capability * waitForReturnCapability (Task *task)
         // task->lock held, cap->lock not held
         if (!task->wakeup) waitCondition(&task->cond, &task->lock);
         cap = task->cap;
-        task->wakeup = rtsFalse;
+        task->wakeup = false;
         RELEASE_LOCK(&task->lock);
 
         // now check whether we should wake up...
@@ -843,9 +843,9 @@ void waitForCapability (Capability **pCap, Task *task)
 #if defined (THREADED_RTS)
 
 /* See Note [GC livelock] in Schedule.c for why we have gcAllowed
-   and return the rtsBool */
-rtsBool /* Did we GC? */
-yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
+   and return the bool */
+bool /* Did we GC? */
+yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
 {
     Capability *cap = *pCap;
 
@@ -861,7 +861,7 @@ yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
                 traceSparkCounters(cap);
                 // See Note [migrated bound threads 2]
                 if (task->cap == cap) {
-                    return rtsTrue;
+                    return true;
                 }
             }
         }
@@ -870,7 +870,7 @@ yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
     debugTrace(DEBUG_sched, "giving up capability %d", cap->no);
 
     // We must now release the capability and wait to be woken up again.
-    task->wakeup = rtsFalse;
+    task->wakeup = false;
 
     ACQUIRE_LOCK(&cap->lock);
 
@@ -879,7 +879,7 @@ yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
         enqueueWorker(cap);
     }
 
-    releaseCapability_(cap, rtsFalse);
+    releaseCapability_(cap, false);
 
     if (isWorker(task) || isBoundTask(task)) {
         RELEASE_LOCK(&cap->lock);
@@ -906,7 +906,7 @@ yieldCapability (Capability** pCap, Task *task, rtsBool gcAllowed)
 
     ASSERT_FULL_CAPABILITY_INVARIANTS(cap,task);
 
-    return rtsFalse;
+    return false;
 }
 
 #endif /* THREADED_RTS */
@@ -954,7 +954,7 @@ prodCapability (Capability *cap, Task *task)
     ACQUIRE_LOCK(&cap->lock);
     if (!cap->running_task) {
         cap->running_task = task;
-        releaseCapability_(cap,rtsTrue);
+        releaseCapability_(cap,true);
     }
     RELEASE_LOCK(&cap->lock);
 }
@@ -970,21 +970,21 @@ prodCapability (Capability *cap, Task *task)
 
 #if defined (THREADED_RTS)
 
-rtsBool
+bool
 tryGrabCapability (Capability *cap, Task *task)
 {
     int r;
-    if (cap->running_task != NULL) return rtsFalse;
+    if (cap->running_task != NULL) return false;
     r = TRY_ACQUIRE_LOCK(&cap->lock);
-    if (r != 0) return rtsFalse;
+    if (r != 0) return false;
     if (cap->running_task != NULL) {
         RELEASE_LOCK(&cap->lock);
-        return rtsFalse;
+        return false;
     }
     task->cap = cap;
     cap->running_task = task;
     RELEASE_LOCK(&cap->lock);
-    return rtsTrue;
+    return true;
 }
 
 
@@ -1008,7 +1008,7 @@ tryGrabCapability (Capability *cap, Task *task)
 static void
 shutdownCapability (Capability *cap USED_IF_THREADS,
                     Task *task USED_IF_THREADS,
-                    rtsBool safe USED_IF_THREADS)
+                    bool safe USED_IF_THREADS)
 {
 #if defined(THREADED_RTS)
     uint32_t i;
@@ -1062,7 +1062,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
         if (!emptyRunQueue(cap) || cap->spare_workers) {
             debugTrace(DEBUG_sched,
                        "runnable threads or workers still alive, yielding");
-            releaseCapability_(cap,rtsFalse); // this will wake up a worker
+            releaseCapability_(cap,false); // this will wake up a worker
             RELEASE_LOCK(&cap->lock);
             yieldThread();
             continue;
@@ -1106,7 +1106,7 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
 }
 
 void
-shutdownCapabilities(Task *task, rtsBool safe)
+shutdownCapabilities(Task *task, bool safe)
 {
     uint32_t i;
     for (i=0; i < n_capabilities; i++) {
@@ -1157,7 +1157,7 @@ freeCapabilities (void)
 
 void
 markCapability (evac_fn evac, void *user, Capability *cap,
-                rtsBool no_mark_sparks USED_IF_THREADS)
+                bool no_mark_sparks USED_IF_THREADS)
 {
     InCall *incall;
 
@@ -1191,12 +1191,12 @@ markCapabilities (evac_fn evac, void *user)
 {
     uint32_t n;
     for (n = 0; n < n_capabilities; n++) {
-        markCapability(evac, user, capabilities[n], rtsFalse);
+        markCapability(evac, user, capabilities[n], false);
     }
 }
 
 #if defined(THREADED_RTS)
-rtsBool checkSparkCountInvariant (void)
+bool checkSparkCountInvariant (void)
 {
     SparkCounters sparks = { 0, 0, 0, 0, 0, 0 };
     StgWord64 remaining = 0;

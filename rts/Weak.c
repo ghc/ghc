@@ -39,7 +39,7 @@ runAllCFinalizers(StgWeak *list)
 
     task = myTask();
     if (task != NULL) {
-        task->running_finalizers = rtsTrue;
+        task->running_finalizers = true;
     }
 
     for (w = list; w; w = w->link) {
@@ -56,7 +56,7 @@ runAllCFinalizers(StgWeak *list)
     }
 
     if (task != NULL) {
-        task->running_finalizers = rtsFalse;
+        task->running_finalizers = false;
     }
 }
 
@@ -87,7 +87,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
     task = myTask();
     if (task != NULL) {
-        task->running_finalizers = rtsTrue;
+        task->running_finalizers = true;
     }
 
     // count number of finalizers, and kill all the weak pointers first...
@@ -116,7 +116,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
     }
 
     if (task != NULL) {
-        task->running_finalizers = rtsFalse;
+        task->running_finalizers = false;
     }
 
     // No finalizers to run?

@@ -60,9 +60,6 @@
  */
 #define X86_64_ELF_NONPIC_HACK 1
 
-#define FALSE 0
-#define TRUE  1
-
 #if defined(sparc_HOST_ARCH)
 #  define ELF_TARGET_SPARC  /* Used inside <elf.h> */
 #elif defined(i386_HOST_ARCH)
@@ -591,7 +588,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    ("Portable Formats Specification, Version 1.1"). */
 static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
 {
-    *is_bss = FALSE;
+    *is_bss = false;
 
     if (hdr->sh_type == SHT_PROGBITS
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_EXECINSTR)) {
@@ -620,7 +617,7 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
     if (hdr->sh_type == SHT_NOBITS
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
         /* .bss-style section */
-        *is_bss = TRUE;
+        *is_bss = true;
         return SECTIONKIND_RWDATA;
     }
 
@@ -683,7 +680,7 @@ ocGetNames_ELF ( ObjectCode* oc )
    }
 
    for (i = 0; i < shnum; i++) {
-      int         is_bss = FALSE;
+      int         is_bss = false;
       SectionKind kind   = getSectionKind_ELF(&shdr[i], &is_bss);
       SectionAlloc alloc = SECTION_NOMEM;
       void *start = NULL, *mapped_start = NULL;
@@ -750,7 +747,7 @@ ocGetNames_ELF ( ObjectCode* oc )
       // ie we should use j = shdr[i].sh_info
       for (j = 0; j < nent; j++) {
 
-         char  isLocal  = FALSE; /* avoids uninit-var warning */
+         char  isLocal  = false; /* avoids uninit-var warning */
          HsBool isWeak  = HS_BOOL_FALSE;
          SymbolAddr* ad  = NULL;
          SymbolName* nm  = strtab + stab[j].st_name;
@@ -773,7 +770,7 @@ ocGetNames_ELF ( ObjectCode* oc )
             address.  Otherwise leave ad == NULL. */
 
          if (shndx == SHN_COMMON) {
-            isLocal = FALSE;
+            isLocal = false;
             ad = stgCallocBytes(1, stab[j].st_size, "ocGetNames_ELF(COMMON)");
             /*
             debugBelch("COMMON symbol, size %d name %s\n",
@@ -813,8 +810,8 @@ ocGetNames_ELF ( ObjectCode* oc )
             ad = (SymbolAddr*)((intptr_t)sections[secno].start +
                          (intptr_t)stab[j].st_value);
             if (ELF_ST_BIND(stab[j].st_info)==STB_LOCAL) {
-               isLocal = TRUE;
-               isWeak = FALSE;
+               isLocal = true;
+               isWeak = false;
             } else { /* STB_GLOBAL or STB_WEAK */
 #ifdef ELF_FUNCTION_DESC
                /* dlsym() and the initialisation table both give us function
@@ -825,7 +822,7 @@ ocGetNames_ELF ( ObjectCode* oc )
 #endif
                IF_DEBUG(linker,debugBelch( "addOTabName(GLOB): %10p  %s %s\n",
                                       ad, oc->fileName, nm ));
-               isLocal = FALSE;
+               isLocal = false;
                isWeak = (ELF_ST_BIND(stab[j].st_info)==STB_WEAK);
             }
          }
@@ -1627,7 +1624,7 @@ int ocRunInit_ELF( ObjectCode *oc )
    // it here, please file a bug report if it affects you.
    for (i = 0; i < elf_shnum(ehdr); i++) {
       init_t *init_start, *init_end, *init;
-      int is_bss = FALSE;
+      int is_bss = false;
       SectionKind kind = getSectionKind_ELF(&shdr[i], &is_bss);
       if (kind == SECTIONKIND_CODE_OR_RODATA
        && 0 == memcmp(".init", sh_strtab + shdr[i].sh_name, 5)) {

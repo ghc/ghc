@@ -14,7 +14,7 @@
 #define END_BLOCKED_EXCEPTIONS_QUEUE ((MessageThrowTo*)END_TSO_QUEUE)
 
 StgTSO * unblockOne (Capability *cap, StgTSO *tso);
-StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, rtsBool allow_migrate);
+StgTSO * unblockOne_ (Capability *cap, StgTSO *tso, bool allow_migrate);
 
 void checkBlockingQueues (Capability *cap, StgTSO *tso);
 void tryWakeupThread     (Capability *cap, StgTSO *tso);
@@ -32,8 +32,8 @@ void wakeupThreadOnCapability (Capability *cap,
 void updateThunk         (Capability *cap, StgTSO *tso,
                           StgClosure *thunk, StgClosure *val);
 
-rtsBool removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso);
-rtsBool removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, StgTSO *tso);
+bool removeThreadFromQueue     (Capability *cap, StgTSO **queue, StgTSO *tso);
+bool removeThreadFromDeQueue   (Capability *cap, StgTSO **head, StgTSO **tail, StgTSO *tso);
 
 StgBool isThreadBound (StgTSO* tso);
 
@@ -41,7 +41,7 @@ StgBool isThreadBound (StgTSO* tso);
 void threadStackOverflow  (Capability *cap, StgTSO *tso);
 W_   threadStackUnderflow (Capability *cap, StgTSO *tso);
 
-rtsBool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
+bool performTryPutMVar(Capability *cap, StgMVar *mvar, StgClosure *value);
 
 #ifdef DEBUG
 void printThreadBlockage (StgTSO *tso);

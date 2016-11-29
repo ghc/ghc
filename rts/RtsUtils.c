@@ -155,7 +155,7 @@ heapOverflow(void)
         rtsConfig.outOfHeapHook(0/*unknown request size*/,
                                 (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 
-        heap_overflow = rtsTrue;
+        heap_overflow = true;
     }
 }
 
@@ -187,7 +187,7 @@ time_str(void)
    -------------------------------------------------------------------------- */
 
 char *
-showStgWord64(StgWord64 x, char *s, rtsBool with_commas)
+showStgWord64(StgWord64 x, char *s, bool with_commas)
 {
     if (with_commas) {
         if (x < (StgWord64)1e3)

@@ -232,20 +232,11 @@ stat_startGCSync (gc_thread *gct)
    Called at the beginning of each GC
    -------------------------------------------------------------------------- */
 
-static uint32_t rub_bell = 0;
-
 void
 stat_startGC (Capability *cap, gc_thread *gct)
 {
-    uint32_t bell = RtsFlags.GcFlags.ringBell;
-
-    if (bell) {
-        if (bell > 1) {
-            debugBelch(" GC ");
-            rub_bell = 1;
-        } else {
-            debugBelch("\007");
-        }
+    if (RtsFlags.GcFlags.ringBell) {
+        debugBelch("\007");
     }
 
     getProcessTimes(&gct->gc_start_cpu, &gct->gc_start_elapsed);
@@ -391,11 +382,6 @@ stat_endGC (Capability *cap, gc_thread *gct,
 
         if (slop > max_slop) max_slop = slop;
     }
-
-    if (rub_bell) {
-        debugBelch("\b\b\b  \b\b\b");
-        rub_bell = 0;
-    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -496,7 +482,7 @@ StgInt TOTAL_CALLS=1;
 /* Report the value of a counter */
 #define REPORT(counter) \
   { \
-    showStgWord64(counter,temp,rtsTrue/*commas*/); \
+    showStgWord64(counter,temp,true/*commas*/); \
     statsPrintf("  (" #counter ")  : %s\n",temp);                               \
   }
 
@@ -589,21 +575,21 @@ stat_exit (void)
 
         if (RtsFlags.GcFlags.giveStats >= SUMMARY_GC_STATS) {
             showStgWord64(GC_tot_alloc*sizeof(W_),
-                                 temp, rtsTrue/*commas*/);
+                                 temp, true/*commas*/);
             statsPrintf("%16s bytes allocated in the heap\n", temp);
 
             showStgWord64(GC_tot_copied*sizeof(W_),
-                                 temp, rtsTrue/*commas*/);
+                                 temp, true/*commas*/);
             statsPrintf("%16s bytes copied during GC\n", temp);
 
             if ( residency_samples > 0 ) {
                 showStgWord64(max_residency*sizeof(W_),
-                                     temp, rtsTrue/*commas*/);
+                                     temp, true/*commas*/);
                 statsPrintf("%16s bytes maximum residency (%" FMT_Word " sample(s))\n",
                         temp, residency_samples);
             }
 
-            showStgWord64(max_slop*sizeof(W_), temp, rtsTrue/*commas*/);
+            showStgWord64(max_slop*sizeof(W_), temp, true/*commas*/);
             statsPrintf("%16s bytes maximum slop\n", temp);
 
             statsPrintf("%16" FMT_SizeT " MB total memory in use (%" FMT_SizeT " MB lost due to fragmentation)\n\n",
@@ -686,11 +672,11 @@ stat_exit (void)
 #endif
 
             if (mut_cpu == 0) {
-                showStgWord64(0, temp, rtsTrue/*commas*/);
+                showStgWord64(0, temp, true/*commas*/);
             } else {
                 showStgWord64(
                     (StgWord64)((GC_tot_alloc*sizeof(W_)) / TimeToSecondsDbl(mut_cpu)),
-                    temp, rtsTrue/*commas*/);
+                    temp, true/*commas*/);
             }
 
             statsPrintf("  Alloc rate    %s bytes per MUT second\n\n", temp);
@@ -852,7 +838,7 @@ extern HsInt64 getAllocations( void )
 
 /* EZY: I'm not convinced I got all the casting right. */
 
-extern rtsBool getGCStatsEnabled( void )
+extern bool getGCStatsEnabled( void )
 {
     return RtsFlags.GcFlags.giveStats != NO_GC_STATS;
 }

@@ -22,7 +22,7 @@ extern StgTSO *exception_threads;
 
 void    collectFreshWeakPtrs   ( void );
 void    initWeakForGC          ( void );
-rtsBool traverseWeakPtrList    ( void );
+bool    traverseWeakPtrList    ( void );
 void    markWeakPtrList        ( void );
 void    scavengeLiveWeak       ( StgWeak * );
 

@@ -13,7 +13,7 @@
 
 #include "BeginPrivate.h"
 
-extern rtsBool running_finalizers;
+extern bool running_finalizers;
 extern StgWeak * dead_weak_ptr_list;
 
 void runCFinalizers(StgCFinalizerList *list);
