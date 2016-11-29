@@ -40,6 +40,11 @@ Flag stage3
     Default: False
     Manual: True
 
+Flag terminfo
+    Description: Build GHC with terminfo support on non-Windows platforms.
+    Default: True
+    Manual: True
+
 Library
     Default-Language: Haskell2010
     Exposed: False
@@ -64,6 +69,8 @@ Library
     if os(windows)
         Build-Depends: Win32  == 2.3.*
     else
+        if flag(terminfo)
+            Build-Depends: terminfo == 0.4.*
         Build-Depends: unix   == 2.7.*
 
     if flag(ghci)
