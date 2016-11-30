@@ -8,6 +8,7 @@ plugin = defaultPlugin { installCoreToDos = install }
     where
         install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
         install _ todos = do
+            reinitializeGlobals
 
             putMsgS "T7702Plugin"
 

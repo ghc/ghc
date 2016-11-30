@@ -48,12 +48,6 @@ import Control.Monad
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 
-#if __GLASGOW_HASKELL__ >= 709
-import Foreign
-#else
-import Foreign.Safe
-#endif
-
 
 -----------------------------------------------------------------------------
 -- Static flags
@@ -97,21 +91,9 @@ parseStaticFlagsFull flagsAvailable args = do
 
 -- holds the static opts while they're being collected, before
 -- being unsafely read by unpacked_static_opts below.
-#if STAGE < 2
 GLOBAL_VAR(v_opt_C, [], [String])
 GLOBAL_VAR(v_opt_C_ready, False, Bool)
-#else
-SHARED_GLOBAL_VAR( v_opt_C
-                 , getOrSetLibHSghcStaticOptions
-                 , "getOrSetLibHSghcStaticOptions"
-                 , []
-                 , [String])
-SHARED_GLOBAL_VAR( v_opt_C_ready
-                 , getOrSetLibHSghcStaticOptionsReady
-                 , "getOrSetLibHSghcStaticOptionsReady"
-                 , False
-                 , Bool)
-#endif
+
 
 staticFlags :: [String]
 staticFlags = unsafePerformIO $ do

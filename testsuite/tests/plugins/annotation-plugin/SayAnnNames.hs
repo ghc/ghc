@@ -13,6 +13,7 @@ plugin = defaultPlugin {
 
 install :: [CommandLineOption] -> [CoreToDo] -> CoreM [CoreToDo]
 install _ todo = do
+  reinitializeGlobals
   return (CoreDoPluginPass "Say name" pass : todo)
 
 pass :: ModGuts -> CoreM ModGuts
