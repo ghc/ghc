@@ -95,7 +95,7 @@ Compiler
 -  A code generator bug which resulted in segmentation faults in compiled
    programs has been fixed (see :ghc-ticket:`12757`).
 
--  GHC now supports systems whose C compiler which produce position-independent
+-  GHC now supports systems whose C compiler produces position-independent
    executables by default. (see :ghc-ticket:`12579`).
 
 -  GHC can now be built on systems which use the ``gold`` linker by default
@@ -108,8 +108,8 @@ Compiler
 -  The :ghc-flag:`-Wredundant-constraints` flag has been removed from the
    :ghc-flag:`-Wall` flag set (see :ghc-ticket:`10635`).
 
--  Added :ghc-flag:`-fdefer-out-of-scope-variables`, which converts variable
-   out of scope variables errors into warnings.
+-  Added :ghc-flag:`-fdefer-out-of-scope-variables`, which converts
+   out-of-scope variable errors into warnings.
 
 -  The RTS :ghc-flag:`-xb` now reads the base heap address in any base,
    defaulting to decimal, hexadecimal if the address starts with ``0x``, and
@@ -135,11 +135,11 @@ Runtime system
 ~~~~~~~~~~~~~~
 
 - The Runtime linker on Windows is once again recognizing POSIX functions under their
-  "deprecated" name. e.g. "strdup" will now be recognizes and internally forwarded to "_strdup".
+  "deprecated" name. e.g. "strdup" will now be recognized and internally forwarded to "_strdup".
   If you have existing code already using the correct names (e.g. _strdup) then this will just continue
   to work and no change is needed. For more information about how the forwarding is done please see
-  `MSDN <https://msdn.microsoft.com/en-us/library/ms235384.aspx>`_ . This should now introduce the same behavior
-  both compiled and interpreted. (see :ghc-ticket:`12497`).
+  `MSDN <https://msdn.microsoft.com/en-us/library/ms235384.aspx>`_ . This should now introduce the same
+  behavior both compiled and interpreted. (see :ghc-ticket:`12497`).
 
 - Profiles from the cost-center profiler now provide source span information.
   (see :ghc-ticket:`11543`).
