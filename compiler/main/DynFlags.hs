@@ -220,7 +220,6 @@ import System.Console.Terminfo (SetupTermError, Terminal, getCapability,
                                 setupTermFromEnv, termColors)
 import System.Posix (queryTerminal, stdError)
 #elif defined mingw32_HOST_OS
-import Foreign (Ptr, with, peek)
 import System.Environment (lookupEnv)
 import qualified Graphics.Win32 as Win32
 #endif
