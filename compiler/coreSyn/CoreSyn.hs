@@ -169,10 +169,11 @@ These data types are the heart of the compiler
 -- *  Primitive literals
 --
 -- *  Applications: note that the argument may be a 'Type'.
---
---    See "CoreSyn#let_app_invariant" for another invariant
+--    See Note [CoreSyn let/app invariant]
+--    See Note [Levity polymorphism invariants]
 --
 -- *  Lambda abstraction
+--    See Note [Levity polymorphism invariants]
 --
 -- *  Recursive and non recursive @let@s. Operationally
 --    this corresponds to allocating a thunk for the things
@@ -186,6 +187,7 @@ These data types are the heart of the compiler
 --    the meaning of /lifted/ vs. /unlifted/).
 --
 --    See Note [CoreSyn let/app invariant]
+--    See Note [Levity polymorphism invariants]
 --
 --    #type_let#
 --    We allow a /non-recursive/ let to bind a type variable, thus:
@@ -199,7 +201,7 @@ These data types are the heart of the compiler
 --    in a Let expression, rather than at top level.  We may want to revist
 --    this choice.
 --
--- *  Case split. Operationally this corresponds to evaluating
+-- *  Case expression. Operationally this corresponds to evaluating
 --    the scrutinee (expression examined) to weak head normal form
 --    and then examining at most one level of resulting constructor (i.e. you
 --    cannot do nested pattern matching directly with this).
@@ -380,6 +382,19 @@ Th let/app invariant is initially enforced by DsUtils.mkCoreLet and mkCoreApp
 Note [CoreSyn case invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See #case_invariants#
+
+Note [Levity polymorphism invariants]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The levity-polymorphism invariants are these:
+
+* The type of a term-binder must not be levity-polymorphic
+* The type of the argument of an App must not be levity-polymorphic.
+
+A type (t::TYPE r) is "levity polymorphic" if 'r' has any free variables.
+
+For example
+  (\(r::RuntimeRep). \(a::TYPE r). \(x::a). e
+is illegal because x's type has kind (TYPE r), which has 'r' free.
 
 Note [CoreSyn let goal]
 ~~~~~~~~~~~~~~~~~~~~~~~

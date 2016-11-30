@@ -142,7 +142,7 @@ module TcType (
   mkClassPred,
   isDictLikeTy,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
-  isRuntimeRepVar, isRuntimeRepPolymorphic,
+  isRuntimeRepVar, isLevityPolymorphic,
   isVisibleBinder, isInvisibleBinder,
 
   -- Type substitutions

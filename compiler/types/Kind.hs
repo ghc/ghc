@@ -14,7 +14,7 @@ module Kind (
 
         classifiesTypeWithValues,
         isStarKind, isStarKindSynonymTyCon,
-        isRuntimeRepPolymorphic
+        isLevityPolymorphic
        ) where
 
 #include "HsVersions.h"
@@ -77,10 +77,10 @@ returnsTyCon _  _                  = False
 returnsConstraintKind :: Kind -> Bool
 returnsConstraintKind = returnsTyCon constraintKindTyConKey
 
--- | Tests whether the given type (which should look like "TYPE ...") has any
--- free variables
-isRuntimeRepPolymorphic :: Kind -> Bool
-isRuntimeRepPolymorphic k
+-- | Tests whether the given kind (which should look like "TYPE ...")
+-- has any free variables
+isLevityPolymorphic :: Kind -> Bool
+isLevityPolymorphic k
   = not $ isEmptyVarSet $ tyCoVarsOfType k
 
 --------------------------------------------
