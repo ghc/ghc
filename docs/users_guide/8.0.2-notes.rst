@@ -86,6 +86,19 @@ Language
 
       instance {-# OVERLAPPING #-} Foo Int
 
+-  GHC now adheres more closely to the Haskell 2010 Report with respect to
+   defaulting rules. As a result, GHC will now reject some defaulting rules
+   which GHC 8.0.1 and earlier would accept. For example, this is now
+   rejected ::
+
+      module Foo where
+      default (Bool)
+
+   because when the :ghc-flag:`-XExtendedDefaultRules` extension is not
+   enabled, defaulting rules only work for the ``Num`` class, of which ``Bool``
+   is not an instance. To make GHC accept the above program, simply enable the
+   :ghc-flag:`-XExtendedDefaultRules` extension.
+
 Compiler
 ~~~~~~~~
 
