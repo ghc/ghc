@@ -541,11 +541,24 @@ void osDecommitMemory(void *at, W_ size)
 
 #ifdef MADV_FREE
     // Try MADV_FREE first, FreeBSD has both and MADV_DONTNEED
-    // just swaps memory out
+    // just swaps memory out. Linux >= 4.5 has both DONTNEED and FREE; either
+    // will work as they both allow the system to free anonymous pages.
+    // It is important that we try both methods as the kernel which we were
+    // built on may differ from the kernel we are now running on.
     r = madvise(at, size, MADV_FREE);
-#else
-    r = madvise(at, size, MADV_DONTNEED);
+    if(r < 0) {
+        if (errno == EINVAL) {
+            // Perhaps the system doesn't support MADV_FREE; fall-through and
+            // try MADV_DONTNEED.
+        } else {
+            sysErrorBelch("unable to decommit memory");
+        }
+    } else {
+        return;
+    }
 #endif
+
+    r = madvise(at, size, MADV_DONTNEED);
     if(r < 0)
         sysErrorBelch("unable to decommit memory");
 }
