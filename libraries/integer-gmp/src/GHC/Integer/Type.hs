@@ -1793,7 +1793,7 @@ byteArrayToBigNat# ba# n0#
 
     n#  = fmssl (n0# -# 1#)
 
-    -- find most signifcant set limb, return normalized size
+    -- find most significant set limb, return normalized size
     fmssl i#
       | isTrue# (i# <# 0#)                             = 0#
       | isTrue# (neWord# (indexWordArray# ba# i#) 0##) = i# +# 1#

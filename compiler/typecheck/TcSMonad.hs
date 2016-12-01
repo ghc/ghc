@@ -1155,7 +1155,7 @@ Note [Do not do improvement for WOnly]
 We do improvement between two constraints (e.g. for injectivity
 or functional dependencies) only if both are "improvable". And
 we improve a constraint wrt the top-level instances only if
-it is improveable.
+it is improvable.
 
 Improvable:     [G] [WD] [D}
 Not improvable: [W]

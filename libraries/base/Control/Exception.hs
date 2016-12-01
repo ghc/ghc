@@ -305,7 +305,7 @@ exceptions is that they normally can occur anywhere, but within a
 interruptible (or call other interruptible operations).  In many cases
 these operations may themselves raise exceptions, such as I\/O errors,
 so the caller will usually be prepared to handle exceptions arising from the
-operation anyway.  To perfom an explicit poll for asynchronous exceptions
+operation anyway.  To perform an explicit poll for asynchronous exceptions
 inside 'mask', use 'allowInterrupt'.
 
 Sometimes it is too onerous to handle exceptions in the middle of a

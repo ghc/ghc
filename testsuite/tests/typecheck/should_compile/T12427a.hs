@@ -20,7 +20,7 @@ h11 y = case y of T1 _ v -> v
 -- Failed in 8.0.1
 -- Succeeds in 8.2 because the pattern match has
 --   no existentials, so it doesn't matter than
---   v is polymoprhic
+--   v is polymorphic
 h12 y = case y of T2 v -> v
 
 -- Inference

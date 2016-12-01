@@ -750,7 +750,7 @@ mkRuntimeErrorId name
 'error' and 'undefined' have types
         error     :: forall (v :: RuntimeRep) (a :: TYPE v). String -> a
         undefined :: forall (v :: RuntimeRep) (a :: TYPE v). a
-Notice the runtime-representation polymophism. This ensures that
+Notice the runtime-representation polymorphism. This ensures that
 "error" can be instantiated at unboxed as well as boxed types.
 This is OK because it never returns, so the return type is irrelevant.
 -}

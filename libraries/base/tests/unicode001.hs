@@ -1,4 +1,4 @@
--- !!! Tests the various character classifiactions for a selection of Unicode
+-- !!! Tests the various character classifications for a selection of Unicode
 -- characters.
 
 module Main where

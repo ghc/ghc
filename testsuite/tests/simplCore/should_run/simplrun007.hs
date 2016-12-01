@@ -15,7 +15,7 @@ main = do phex (I# (uncheckedIShiftL#  (negateInt# 5#) 2#))
 
 phex x = putStrLn (showSigned (\x -> ("0x"++) . showHex x) 0 x "")
 
-{- Too wordsize-dependant
+{- Too wordsize-dependent
 phex x = putStrLn (hex x)
 hex x = "0x" ++ [onedigit (fromIntegral ((x `shiftR` (i*4)) .&. 0xF))
                  | i <- [digits-1,digits-2..0]]

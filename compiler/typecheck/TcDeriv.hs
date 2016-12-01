@@ -368,7 +368,7 @@ Consider this (see Trac #1954):
   newtype P a = MkP (IO a) deriving Monad
 
 If you compile with -Wunused-binds you do not expect the warning
-"Defined but not used: data consructor MkP". Yet the newtype deriving
+"Defined but not used: data constructor MkP". Yet the newtype deriving
 code does not explicitly mention MkP, but it should behave as if you
 had written
   instance Monad P where

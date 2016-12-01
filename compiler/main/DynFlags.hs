@@ -893,7 +893,7 @@ data DynFlags = DynFlags {
 
   nextWrapperNum        :: IORef (ModuleEnv Int),
 
-  -- | Machine dependant flags (-m<blah> stuff)
+  -- | Machine dependent flags (-m<blah> stuff)
   sseVersion            :: Maybe SseVersion,
   avx                   :: Bool,
   avx2                  :: Bool,
@@ -2969,7 +2969,7 @@ dynamic_flags_deps = [
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "ddump-debug"        (setDumpFlag Opt_D_dump_debug)
 
-        ------ Machine dependant (-m<blah>) stuff ---------------------------
+        ------ Machine dependent (-m<blah>) stuff ---------------------------
 
   , make_ord_flag defGhcFlag "msse"         (noArg (\d ->
                                                   d { sseVersion = Just SSE1 }))

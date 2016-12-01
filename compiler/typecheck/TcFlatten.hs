@@ -1322,7 +1322,7 @@ It is easy to implement, in TcInteract.kick_out, by only kicking out an inert
 only if (a) the work item can rewrite the inert AND
         (b) the inert cannot rewrite the work item
 
-This is signifcantly harder to think about. It can save a LOT of work
+This is significantly harder to think about. It can save a LOT of work
 in occurs-check cases, but we don't care about them much.  Trac #5837
 is an example; all the constraints here are Givens
 
