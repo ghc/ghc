@@ -4937,7 +4937,8 @@ Functional dependencies
 
     Allow use of functional dependencies in class declarations.
 
-Functional dependencies are implemented as described by [Jones2000]_.Mark Jones in
+Functional dependencies are implemented as described by Mark Jones in
+[Jones2000]_.
 
 Functional dependencies are introduced by a vertical bar in the syntax
 of a class declaration; e.g. ::
