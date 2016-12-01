@@ -19,7 +19,15 @@ f x = do
 foreign export ccall "f" f :: Int -> IO ()
 
 #ifdef mingw32_HOST_OS
-foreign import stdcall safe "Sleep" _sleep :: Int -> IO ()
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+
+foreign import WINDOWS_CCONV safe "Sleep" _sleep :: Int -> IO ()
 usleep n = _sleep (n `quot` 1000)
 #else
 foreign import ccall safe "usleep" usleep  :: Int -> IO ()
