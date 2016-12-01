@@ -1283,17 +1283,17 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
     with io.open(script, 'w', encoding='utf8') as f:
         # set the prog name and command-line args to match the compiled
         # environment.
-        f.write(u':set prog ' + name + u'\n')
-        f.write(u':set args ' + opts.extra_run_opts + u'\n')
+        f.write(':set prog ' + name + '\n')
+        f.write(':set args ' + opts.extra_run_opts + '\n')
         # Add marker lines to the stdout and stderr output files, so we
         # can separate GHCi's output from the program's.
-        f.write(u':! echo ' + delimiter)
-        f.write(u':! echo 1>&2 ' + delimiter)
+        f.write(':! echo ' + delimiter)
+        f.write(':! echo 1>&2 ' + delimiter)
         # Set stdout to be line-buffered to match the compiled environment.
-        f.write(u'System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
+        f.write('System.IO.hSetBuffering System.IO.stdout System.IO.LineBuffering\n')
         # wrapping in GHC.TopHandler.runIO ensures we get the same output
         # in the event of an exception as for the compiled program.
-        f.write(u'GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
+        f.write('GHC.TopHandler.runIOFastExit Main.main Prelude.>> Prelude.return ()\n')
 
     stdin = in_testdir(opts.stdin if opts.stdin else add_suffix(name, 'stdin'))
     if os.path.exists(stdin):
@@ -1568,7 +1568,7 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
-    return u' '.join(w for w in str.split())
+    return ' '.join(w for w in str.split())
 
 callSite_re = re.compile(r', called at (.+):[\d]+:[\d]+ in [\w\-\.]+:')
 
@@ -1621,7 +1621,7 @@ def normalise_errmsg( str ):
     # Also filter out bullet characters.  This is because bullets are used to
     # separate error sections, and tests shouldn't be sensitive to how the
     # the division happens.
-    bullet = u'•'.encode('utf8') if isinstance(str, bytes) else u'•'
+    bullet = '•'.encode('utf8') if isinstance(str, bytes) else '•'
     str = str.replace(bullet, '')
     return str
 
@@ -1712,7 +1712,7 @@ def normalise_asm( str ):
           out.append(instr[0] + ' ' + instr[1])
         else:
           out.append(instr[0])
-    out = u'\n'.join(out)
+    out = '\n'.join(out)
     return out
 
 def if_verbose( n, s ):
@@ -1747,8 +1747,8 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
         with io.open(stdin, 'rb') as f:
             stdin_buffer = f.read()
 
-    stdout_buffer = u''
-    stderr_buffer = u''
+    stdout_buffer = ''
+    stderr_buffer = ''
 
     hStdErr = subprocess.PIPE
     if stderr is subprocess.STDOUT:
@@ -1978,7 +1978,7 @@ def printTestInfosSummary(file, testInfos):
     file.write('\n')
 
 def modify_lines(s, f):
-    s = u'\n'.join([f(l) for l in s.splitlines()])
+    s = '\n'.join([f(l) for l in s.splitlines()])
     if s and s[-1] != '\n':
         # Prevent '\ No newline at end of file' warnings when diffing.
         s += '\n'
