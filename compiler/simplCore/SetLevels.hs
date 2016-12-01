@@ -83,6 +83,7 @@ import Demand           ( StrictSig )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( isUnliftedType, Type, mkLamTypes )
+import Kind             ( isLevityPolymorphic, typeKind )
 import BasicTypes       ( Arity, RecFlag(..) )
 import UniqSupply
 import Util
@@ -487,6 +488,9 @@ lvlMFE strict_ctxt env ann_expr
          -- Can't let-bind it; see Note [Unlifted MFEs]
          -- This includes coercions, which we don't want to float anyway
          -- NB: no need to substitute cos isUnliftedType doesn't change
+  || isLevityPolymorphic (typeKind (exprType expr))
+         -- We can't let-bind levity polymorphic expressions
+         -- See Note [Levity polymorphism invariants] in CoreSyn
   || notWorthFloating ann_expr abs_vars
   || not float_me
   =     -- Don't float it out
