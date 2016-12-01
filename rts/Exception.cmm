@@ -456,7 +456,7 @@ stg_raisezh /* explicit stack */
     /* ToDo: currently this is a hack.  Would be much better if
      * the info was only displayed for an *uncaught* exception.
      */
-    if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags) != 0::I32) {
+    if (RtsFlags_ProfFlags_showCCSOnException(RtsFlags) != 0::CBool) {
         SAVE_THREAD_STATE();
         ccall fprintCCS_stderr(CCCS "ptr",
                                      exception "ptr",
