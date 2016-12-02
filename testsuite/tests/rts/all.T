@@ -345,3 +345,5 @@ test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])
+test('T12903', [ when(opsys('mingw32'), skip)], compile_and_run, [''])
+

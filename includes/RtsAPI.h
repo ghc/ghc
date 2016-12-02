@@ -245,6 +245,10 @@ void rts_evalIO (/* inout */ Capability **,
                  /* in    */ HaskellObj p,
                  /* out */   HaskellObj *ret);
 
+void rts_evalStableIOMain (/* inout */ Capability **,
+                           /* in    */ HsStablePtr s,
+                           /* out */   HsStablePtr *ret);
+
 void rts_evalStableIO (/* inout */ Capability **,
                        /* in    */ HsStablePtr s,
                        /* out */   HsStablePtr *ret);
