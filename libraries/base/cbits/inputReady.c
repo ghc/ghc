@@ -7,6 +7,9 @@
 /* select and supporting types is not Posix */
 /* #include "PosixSource.h" */
 #include "HsBase.h"
+#if !defined(_WIN32)
+#include <poll.h>
+#endif
 
 /*
  * inputReady(fd) checks to see whether input is available on the file
@@ -16,19 +19,41 @@
 int
 fdReady(int fd, int write, int msecs, int isSock)
 {
-    if 
-#if defined(_WIN32)
-    ( isSock ) {
+
+#if !defined(_WIN32)
+
+    // We only handle msecs == 0 on non-Windows, because this is the
+    // only case we need.  Non-zero waiting is handled by the IO manager.
+    if (msecs != 0) {
+        fprintf(stderr, "fdReady: msecs != 0, this shouldn't happen");
+        abort();
+    }
+
+    struct pollfd fds[1];
+
+    fds[0].fd = fd;
+    fds[0].events = write ? POLLOUT : POLLIN;
+    fds[0].revents = 0;
+
+    int res;
+    while ((res = poll(fds, 1, 0)) < 0) {
+        if (errno != EINTR) {
+            return (-1);
+        }
+    }
+
+    // res is the number of FDs with events
+    return (res > 0);
+
 #else
-    ( 1 ) {
-#endif
+
+    if (isSock) {
 	int maxfd, ready;
 	fd_set rfd, wfd;
 	struct timeval tv;
         if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
-            /* avoid memory corruption on too large FDs */
-            errno = EINVAL;
-            return -1;
+            fprintf(stderr, "fdReady: fd is too big");
+            abort();
         }
 	FD_ZERO(&rfd);
 	FD_ZERO(&wfd);
@@ -54,7 +79,6 @@ fdReady(int fd, int write, int msecs, int isSock)
 	/* 1 => Input ready, 0 => not ready, -1 => error */
 	return (ready);
     }
-#if defined(_WIN32)
     else {
 	DWORD rc;
 	HANDLE hFile = (HANDLE)_get_osfhandle(fd);
