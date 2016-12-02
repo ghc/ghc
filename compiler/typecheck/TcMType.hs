@@ -53,7 +53,7 @@ module TcMType (
 
   --------------------------------
   -- Instantiation
-  newMetaTyVars, newMetaTyVarX,
+  newMetaTyVars, newMetaTyVarX, newMetaTyVarsX,
   newMetaSigTyVars, newMetaSigTyVarX,
   newSigTyVar, newWildCardX,
   tcInstType,
@@ -811,6 +811,10 @@ newMetaTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- an existing TyVar. We substitute kind variables in the kind.
 newMetaTyVarX subst tyvar = new_meta_tv_x TauTv subst tyvar
 
+newMetaTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+-- Just like newMetaTyVars, but start with an existing substitution.
+newMetaTyVarsX subst = mapAccumLM newMetaTyVarX subst
+
 newMetaSigTyVarX :: TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 -- Just like newMetaTyVarX, but make a SigTv
 newMetaSigTyVarX subst tyvar = new_meta_tv_x SigTv subst tyvar
@@ -827,6 +831,10 @@ new_meta_tv_x info subst tv
         ; let name   = mkSystemName uniq (getOccName tv)
                        -- See Note [Name of an instantiated type variable]
               kind   = substTyUnchecked subst (tyVarKind tv)
+                       -- NOTE: Trac #12549 is fixed so we could use
+                       -- substTy here, but the tc_infer_args problem
+                       -- is not yet fixed so leaving as unchecked for now.
+                       -- OLD NOTE:
                        -- Unchecked because we call newMetaTyVarX from
                        -- tcInstBinderX, which is called from tc_infer_args
                        -- which does not yet take enough trouble to ensure

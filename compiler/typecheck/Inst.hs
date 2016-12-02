@@ -227,27 +227,45 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- then  wrap e :: rho
 -- That is, wrap :: ty ~> rho
 
-deeplyInstantiate orig ty
+deeplyInstantiate orig ty =
+  deeply_instantiate orig
+                     (mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty)))
+                     ty
+
+deeply_instantiate :: CtOrigin
+                   -> TCvSubst
+                   -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
+-- Internal function to deeply instantiate that builds on an existing subst.
+-- It extends the input substitution and applies the final subtitution to
+-- the types on return.  See #12549.
+
+deeply_instantiate orig subst ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
-  = do { (subst, tvs') <- newMetaTyVars tvs
-       ; ids1  <- newSysLocalIds (fsLit "di") (substTysUnchecked subst arg_tys)
-       ; let theta' = substThetaUnchecked subst theta
+  = do { (subst', tvs') <- newMetaTyVarsX subst tvs
+       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst' arg_tys)
+       ; let theta' = substTheta subst' theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
        ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
                                                 , text "type" <+> ppr ty
                                                 , text "with" <+> ppr tvs'
                                                 , text "args:" <+> ppr ids1
                                                 , text "theta:" <+>  ppr theta'
-                                                , text "subst:" <+> ppr subst ])
-       ; (wrap2, rho2) <- deeplyInstantiate orig (substTyUnchecked subst rho)
+                                                , text "subst:" <+> ppr subst'])
+       ; (wrap2, rho2) <- deeply_instantiate orig subst' rho
        ; return (mkWpLams ids1
                     <.> wrap2
                     <.> wrap1
                     <.> mkWpEvVarApps ids1,
                  mkFunTys arg_tys rho2) }
 
-  | otherwise = return (idHsWrapper, ty)
-
+  | otherwise
+  = do { let ty' = substTy subst ty
+       ; traceTc "deeply_instantiate final subst"
+                 (vcat [ text "origin:"   <+> pprCtOrigin orig
+                       , text "type:"     <+> ppr ty
+                       , text "new type:" <+> ppr ty'
+                       , text "subst:"    <+> ppr subst ])
+      ; return (idHsWrapper, ty') }
 
 {-
 ************************************************************************
