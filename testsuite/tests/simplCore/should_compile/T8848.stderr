@@ -6,10 +6,10 @@ Rule fired: Class op fmap
 Rule fired: Class op fmap
 Rule fired: Class op fmap
 Rule fired: Class op $p1Applicative
-Rule fired: Class op <$
+Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
+Rule fired: Class op <$
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op <$
@@ -41,18 +41,18 @@ Rule fired: SPEC $c<*> @ 'Z
 Rule fired: SPEC $c*> @ 'Z
 Rule fired: SPEC $c<* @ 'Z
 Rule fired: SPEC $fApplicativeShape @ 'Z
-Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
-Rule fired: Class op <*>
-Rule fired: Class op $p1Applicative
-Rule fired: Class op <$
-Rule fired: Class op <*>
 Rule fired: SPEC $fApplicativeShape @ 'Z
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op <$
+Rule fired: Class op <*>
+Rule fired: Class op $p1Applicative
+Rule fired: Class op <$
+Rule fired: Class op <*>
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired: SPEC $c*> @ 'Z
 Rule fired: SPEC $c<* @ 'Z

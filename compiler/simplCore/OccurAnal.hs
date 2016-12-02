@@ -34,7 +34,9 @@ import VarEnv
 import Var
 import Demand           ( argOneShots, argsOneShots )
 import Maybes           ( orElse )
-import Digraph          ( SCC(..), stronglyConnCompFromEdgedVerticesUniqR )
+import Digraph          ( SCC(..), Node
+                        , stronglyConnCompFromEdgedVerticesUniq
+                        , stronglyConnCompFromEdgedVerticesUniqR )
 import Unique
 import UniqFM
 import Util
@@ -45,7 +47,7 @@ import Control.Arrow    ( second )
 {-
 ************************************************************************
 *                                                                      *
-\subsection[OccurAnal-main]{Counting occurrences: main function}
+    occurAnalysePgm, occurAnalyseExpr, occurAnalyseExpr_NoBinderSwap
 *                                                                      *
 ************************************************************************
 
@@ -512,7 +514,7 @@ things right. For example, it might be that the rule LHS mentions an imported Id
 and another module has a RULE that can rewrite that imported Id to one of our local
 Ids.
 
-Note [Specialising imported functions]
+Note [Specialising imported functions] (referred to from Specialise)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 BUT for *automatically-generated* rules, the programmer can't be
 responsible for the "programmer error" in Note [Rules for imported
@@ -640,10 +642,9 @@ But watch out!  If 'fs' is not chosen as a loop breaker, we may get an infinite 
 This showed up when compiling Control.Concurrent.Chan.getChanContents.
 -}
 
-type ImpRuleEdges = IdEnv IdSet     -- Mapping from FVs of imported RULE LHSs to RHS FVs
-
-noImpRuleEdges :: ImpRuleEdges
-noImpRuleEdges = emptyVarEnv
+------------------------------------------------------------------
+--                 occAnalBind
+------------------------------------------------------------------
 
 occAnalBind :: OccEnv           -- The incoming OccEnv
             -> ImpRuleEdges
@@ -692,111 +693,23 @@ occAnalRecBind env imp_rule_edges pairs body_usage
         --      * feed those components to occAnalRec
         -- See Note [Recursive bindings: the grand plan]
   where
+    sccs :: [SCC Details]
+    sccs = {-# SCC "occAnalBind.scc" #-}
+           stronglyConnCompFromEdgedVerticesUniq nodes
+
+    nodes :: [LetrecNode]
+    nodes = {-# SCC "occAnalBind.assoc" #-}
+            map (makeNode env imp_rule_edges bndr_set) pairs
+
     bndr_set = mkVarSet (map fst pairs)
 
-    sccs :: [SCC (Node Details)]
-    sccs = {-# SCC "occAnalBind.scc" #-}
-      stronglyConnCompFromEdgedVerticesUniqR nodes
-
-    nodes :: [Node Details]
-    nodes = {-# SCC "occAnalBind.assoc" #-}
-      map (makeNode env imp_rule_edges bndr_set) pairs
-
-type Node details = (details, Unique, [Unique]) -- The Ints are gotten from the Unique,
-                                                -- which is gotten from the Id.
-data Details
-  = ND { nd_bndr :: Id          -- Binder
-       , nd_rhs  :: CoreExpr    -- RHS, already occ-analysed
-
-       , nd_uds  :: UsageDetails  -- Usage from RHS, and RULES, and stable unfoldings
-                                  -- ignoring phase (ie assuming all are active)
-                                  -- See Note [Forming Rec groups]
-
-       , nd_inl  :: IdSet       -- Free variables of
-                                --   the stable unfolding (if present and active)
-                                --   or the RHS (if not)
-                                -- but excluding any RULES
-                                -- This is the IdSet that may be used if the Id is inlined
-
-       , nd_weak :: IdSet       -- Binders of this Rec that are mentioned in nd_uds
-                                -- but are *not* in nd_inl.  These are the ones whose
-                                -- dependencies might not be respected by loop_breaker_nodes
-                                -- See Note [Weak loop breakers]
-
-       , nd_active_rule_fvs :: IdSet   -- Free variables of the RHS of active RULES
-  }
-
-instance Outputable Details where
-   ppr nd = text "ND" <> braces
-             (sep [ text "bndr =" <+> ppr (nd_bndr nd)
-                  , text "uds =" <+> ppr (nd_uds nd)
-                  , text "inl =" <+> ppr (nd_inl nd)
-                  , text "weak =" <+> ppr (nd_weak nd)
-                  , text "rule =" <+> ppr (nd_active_rule_fvs nd)
-             ])
-
-makeNode :: OccEnv -> ImpRuleEdges -> VarSet -> (Var, CoreExpr) -> Node Details
--- See Note [Recursive bindings: the grand plan]
-makeNode env imp_rule_edges bndr_set (bndr, rhs)
-  = (details, varUnique bndr, nonDetKeysUFM node_fvs)
-    -- It's OK to use nonDetKeysUFM here as stronglyConnCompFromEdgedVerticesR
-    -- is still deterministic with edges in nondeterministic order as
-    -- explained in Note [Deterministic SCC] in Digraph.
-  where
-    details = ND { nd_bndr = bndr
-                 , nd_rhs  = rhs'
-                 , nd_uds  = rhs_usage3
-                 , nd_weak = node_fvs `minusVarSet` inl_fvs
-                 , nd_inl  = inl_fvs
-                 , nd_active_rule_fvs = active_rule_fvs }
-
-    -- Constructing the edges for the main Rec computation
-    -- See Note [Forming Rec groups]
-    (rhs_usage1, rhs') = occAnalRecRhs env rhs
-    rhs_usage2 = addIdOccs rhs_usage1 all_rule_fvs   -- Note [Rules are extra RHSs]
-                                                     -- Note [Rule dependency info]
-    rhs_usage3 = case mb_unf_fvs of
-                   Just unf_fvs -> addIdOccs rhs_usage2 unf_fvs
-                   Nothing      -> rhs_usage2
-    node_fvs = udFreeVars bndr_set rhs_usage3
-
-    -- Finding the free variables of the rules
-    is_active = occ_rule_act env :: Activation -> Bool
-    rules = filterOut isBuiltinRule (idCoreRules bndr)
-    rules_w_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
-    rules_w_fvs = maybe id (\ids -> ((AlwaysActive, ids):)) (lookupVarEnv imp_rule_edges bndr)
-                   -- See Note [Preventing loops due to imported functions rules]
-                  [ (ru_act rule, fvs)
-                  | rule <- rules
-                  , let fvs = exprFreeVars (ru_rhs rule)
-                              `delVarSetList` ru_bndrs rule
-                  , not (isEmptyVarSet fvs) ]
-    all_rule_fvs = rule_lhs_fvs `unionVarSet` rule_rhs_fvs
-    rule_rhs_fvs = mapUnionVarSet snd rules_w_fvs
-    rule_lhs_fvs = mapUnionVarSet (\ru -> exprsFreeVars (ru_args ru)
-                                          `delVarSetList` ru_bndrs ru) rules
-    active_rule_fvs = unionVarSets [fvs | (a,fvs) <- rules_w_fvs, is_active a]
-
-    -- Finding the free variables of the INLINE pragma (if any)
-    unf        = realIdUnfolding bndr     -- Ignore any current loop-breaker flag
-    mb_unf_fvs = stableUnfoldingVars unf
-
-    -- Find the "nd_inl" free vars; for the loop-breaker phase
-    inl_fvs = case mb_unf_fvs of
-                Nothing -> udFreeVars bndr_set rhs_usage1 -- No INLINE, use RHS
-                Just unf_fvs -> unf_fvs
-                      -- We could check for an *active* INLINE (returning
-                      -- emptyVarSet for an inactive one), but is_active
-                      -- isn't the right thing (it tells about
-                      -- RULE activation), so we'd need more plumbing
-
 -----------------------------
-occAnalRec :: SCC (Node Details)
+occAnalRec :: SCC Details
            -> (UsageDetails, [CoreBind])
            -> (UsageDetails, [CoreBind])
 
         -- The NonRec case is just like a Let (NonRec ...) above
-occAnalRec (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_uds}, _, _))
+occAnalRec (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_uds}))
            (body_uds, binds)
   | not (bndr `usedIn` body_uds)
   = (body_uds, binds)           -- See Note [Dead code]
@@ -810,7 +723,7 @@ occAnalRec (AcyclicSCC (ND { nd_bndr = bndr, nd_rhs = rhs, nd_uds = rhs_uds}, _,
         -- The Rec case is the interesting one
         -- See Note [Recursive bindings: the grand plan]
         -- See Note [Loop breaking]
-occAnalRec (CyclicSCC nodes) (body_uds, binds)
+occAnalRec (CyclicSCC details_s) (body_uds, binds)
   | not (any (`usedIn` body_uds) bndrs) -- NB: look at body_uds, not total_uds
   = (body_uds, binds)                   -- See Note [Dead code]
 
@@ -822,23 +735,23 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
     (final_uds, Rec pairs : binds)
 
   where
-    details_s :: [Details]
-    details_s = map fstOf3 nodes
-    bndrs     = [b | (ND { nd_bndr = b }) <- details_s]
-    bndr_set  = mkVarSet bndrs
+    bndrs    = map nd_bndr details_s
+    bndr_set = mkVarSet bndrs
 
     ----------------------------
-    -- Tag the binders with their occurrence info
-    tagged_details_s :: [Details]
-    tagged_details_s = map tag_details details_s
+    -- Compute usage details
     total_uds = foldl add_uds body_uds details_s
     final_uds = total_uds `minusVarEnv` bndr_set
     add_uds usage_so_far nd = usage_so_far +++ nd_uds nd
 
-    tag_details :: Details -> Details
-    tag_details details@(ND { nd_bndr = bndr })
-      | let bndr1 = setBinderOcc total_uds bndr
-      = details { nd_bndr = bndr1 }
+    ------------------------------
+        -- See Note [Choosing loop breakers] for loop_breaker_nodes
+    loop_breaker_nodes :: [LetrecNode]
+    loop_breaker_nodes = mkLoopBreakerNodes bndr_set total_uds details_s
+
+    ------------------------------
+    weak_fvs :: VarSet
+    weak_fvs = mapUnionVarSet nd_weak details_s
 
     ---------------------------
     -- Now reconstruct the cycle
@@ -852,35 +765,24 @@ occAnalRec (CyclicSCC nodes) (body_uds, binds)
           -- single CyclicSCC result; and reOrderNodes deals with
           -- exactly that case
 
-    weak_fvs :: VarSet
-    weak_fvs = mapUnionVarSet nd_weak details_s
 
-        -- See Note [Choosing loop breakers] for loop_breaker_nodes
-    loop_breaker_nodes :: [Node Details]
-    loop_breaker_nodes = map mk_lb_node tagged_details_s
-    mk_lb_node details@(ND { nd_bndr = b, nd_inl = inl_fvs })
-      = (details, varUnique b, nonDetKeysUFM (extendFvs_ rule_fv_env inl_fvs))
-        -- It's OK to use nonDetKeysUFM here as
-        -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
-        -- in nondeterministic order as explained in
-        -- Note [Deterministic SCC] in Digraph.
+------------------------------------------------------------------
+--                 Loop breaking
+------------------------------------------------------------------
 
-    ------------------------------------
-    rule_fv_env :: IdEnv IdSet
-        -- Maps a variable f to the variables from this group
-        --      mentioned in RHS of active rules for f
-        -- Domain is *subset* of bound vars (others have no rule fvs)
-    rule_fv_env = transClosureFV (mkVarEnv init_rule_fvs)
-    init_rule_fvs   -- See Note [Finding rule RHS free vars]
-      = [ (b, trimmed_rule_fvs)
-        | ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs } <- details_s
-        , let trimmed_rule_fvs = rule_fvs `intersectVarSet` bndr_set
-        , not (isEmptyVarSet trimmed_rule_fvs) ]
+type Binding = (Id,CoreExpr)
 
+loopBreakNodes :: Int
+               -> VarSet        -- All binders
+               -> VarSet        -- Binders whose dependencies may be "missing"
+                                -- See Note [Weak loop breakers]
+               -> [LetrecNode]
+               -> [Binding]             -- Append these to the end
+               -> [Binding]
 {-
-@loopBreakSCC@ is applied to the list of (binder,rhs) pairs for a cyclic
-strongly connected component (there's guaranteed to be a cycle).  It returns the
-same pairs, but
+loopBreakNodes is applied to the list of nodes for a cyclic strongly
+connected component (there's guaranteed to be a cycle).  It returns
+the same nodes, but
         a) in a better order,
         b) with some of the Ids having a IAmALoopBreaker pragma
 
@@ -894,29 +796,6 @@ that the simplifier will generally do a good job if it works from top bottom,
 recording inlinings for any Ids which aren't marked as "no-inline" as it goes.
 -}
 
-type Binding = (Id,CoreExpr)
-
-mk_loop_breaker :: Node Details -> Binding
-mk_loop_breaker (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
-  = (setIdOccInfo bndr strongLoopBreaker, rhs)
-
-mk_non_loop_breaker :: VarSet -> Node Details -> Binding
--- See Note [Weak loop breakers]
-mk_non_loop_breaker weak_fvs (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
-  | bndr `elemVarSet` weak_fvs = (setIdOccInfo bndr weakLoopBreaker, rhs)
-  | otherwise                  = (bndr, rhs)
-
-udFreeVars :: VarSet -> UsageDetails -> VarSet
--- Find the subset of bndrs that are mentioned in uds
-udFreeVars bndrs uds = intersectUFM_C (\b _ -> b) bndrs uds
-
-loopBreakNodes :: Int
-               -> VarSet        -- All binders
-               -> VarSet        -- Binders whose dependencies may be "missing"
-                                -- See Note [Weak loop breakers]
-               -> [Node Details]
-               -> [Binding]             -- Append these to the end
-               -> [Binding]
 -- Return the bindings sorted into a plausible order, and marked with loop breakers.
 loopBreakNodes depth bndr_set weak_fvs nodes binds
   = go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
@@ -929,9 +808,10 @@ loopBreakNodes depth bndr_set weak_fvs nodes binds
           AcyclicSCC node  -> mk_non_loop_breaker weak_fvs node : binds
           CyclicSCC nodes  -> reOrderNodes depth bndr_set weak_fvs nodes binds
 
-reOrderNodes :: Int -> VarSet -> VarSet -> [Node Details] -> [Binding] -> [Binding]
+----------------------------------
+reOrderNodes :: Int -> VarSet -> VarSet -> [LetrecNode] -> [Binding] -> [Binding]
     -- Choose a loop breaker, mark it no-inline,
-    -- do SCC analysis on the rest, and recursively sort them out
+    -- and call loopBreakNodes on the rest
 reOrderNodes _ _ _ []     _     = panic "reOrderNodes"
 reOrderNodes _ _ _ [node] binds = mk_loop_breaker node : binds
 reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
@@ -940,93 +820,54 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
     loopBreakNodes new_depth bndr_set weak_fvs unchosen $
     (map mk_loop_breaker chosen_nodes ++ binds)
   where
-    (chosen_nodes, unchosen) = choose_loop_breaker (score node) [node] [] nodes
+    (chosen_nodes, unchosen) = chooseLoopBreaker approximate_lb
+                                                 (nd_score (fstOf3 node))
+                                                 [node] [] nodes
 
-    approximate_loop_breaker = depth >= 2
-    new_depth | approximate_loop_breaker = 0
-              | otherwise                = depth+1
+    approximate_lb = depth >= 2
+    new_depth | approximate_lb = 0
+              | otherwise      = depth+1
         -- After two iterations (d=0, d=1) give up
         -- and approximate, returning to d=0
 
-    choose_loop_breaker :: Int                  -- Best score so far
-                        -> [Node Details]       -- Nodes with this score
-                        -> [Node Details]       -- Nodes with higher scores
-                        -> [Node Details]       -- Unprocessed nodes
-                        -> ([Node Details], [Node Details])
-        -- This loop looks for the bind with the lowest score
-        -- to pick as the loop  breaker.  The rest accumulate in
-    choose_loop_breaker _ loop_nodes acc []
-        = (loop_nodes, acc)        -- Done
+mk_loop_breaker :: LetrecNode -> Binding
+mk_loop_breaker (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
+  = (setIdOccInfo bndr strongLoopBreaker, rhs)
 
-        -- If approximate_loop_breaker is True, we pick *all*
-        -- nodes with lowest score, else just one
-        -- See Note [Complexity of loop breaking]
-    choose_loop_breaker loop_sc loop_nodes acc (node : nodes)
-        | sc < loop_sc  -- Lower score so pick this new one
-        = choose_loop_breaker sc [node] (loop_nodes ++ acc) nodes
+mk_non_loop_breaker :: VarSet -> LetrecNode -> Binding
+-- See Note [Weak loop breakers]
+mk_non_loop_breaker weak_fvs (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
+  | bndr `elemVarSet` weak_fvs = (setIdOccInfo bndr weakLoopBreaker, rhs)
+  | otherwise                  = (bndr, rhs)
 
-        | approximate_loop_breaker && sc == loop_sc
-        = choose_loop_breaker loop_sc (node : loop_nodes) acc nodes
+----------------------------------
+chooseLoopBreaker :: Bool             -- True <=> Too many iterations,
+                                      --          so approximate
+                  -> NodeScore            -- Best score so far
+                  -> [LetrecNode]       -- Nodes with this score
+                  -> [LetrecNode]       -- Nodes with higher scores
+                  -> [LetrecNode]       -- Unprocessed nodes
+                  -> ([LetrecNode], [LetrecNode])
+    -- This loop looks for the bind with the lowest score
+    -- to pick as the loop  breaker.  The rest accumulate in
+chooseLoopBreaker _ _ loop_nodes acc []
+  = (loop_nodes, acc)        -- Done
 
-        | otherwise     -- Higher score so don't pick it
-        = choose_loop_breaker loop_sc loop_nodes (node : acc) nodes
-        where
-          sc = score node
+    -- If approximate_loop_breaker is True, we pick *all*
+    -- nodes with lowest score, else just one
+    -- See Note [Complexity of loop breaking]
+chooseLoopBreaker approx_lb loop_sc loop_nodes acc (node : nodes)
+  | approx_lb
+  , rank sc == rank loop_sc
+  = chooseLoopBreaker approx_lb loop_sc (node : loop_nodes) acc nodes
 
-    score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
-    score (ND { nd_bndr = bndr, nd_rhs = rhs }, _, _)
-        | not (isId bndr) = 100     -- A type or cercion variable is never a loop breaker
+  | sc `betterLB` loop_sc  -- Better score so pick this new one
+  = chooseLoopBreaker approx_lb sc [node] (loop_nodes ++ acc) nodes
 
-        | isDFunId bndr = 9   -- Never choose a DFun as a loop breaker
-                              -- Note [DFuns should not be loop breakers]
-
-        | Just be_very_keen <- hasStableCoreUnfolding_maybe (idUnfolding bndr)
-        = if be_very_keen then 6    -- Note [Loop breakers and INLINE/INLINABLE pragmas]
-                          else 3
-               -- Data structures are more important than INLINE pragmas
-               -- so that dictionary/method recursion unravels
-               -- Note that this case hits all stable unfoldings, so we
-               -- never look at 'rhs' for stable unfoldings. That's right, because
-               -- 'rhs' is irrelevant for inlining things with a stable unfolding
-
-        | is_con_app rhs = 5  -- Data types help with cases: Note [Constructor applications]
-
-        | exprIsTrivial rhs = 10  -- Practically certain to be inlined
-                -- Used to have also: && not (isExportedId bndr)
-                -- But I found this sometimes cost an extra iteration when we have
-                --      rec { d = (a,b); a = ...df...; b = ...df...; df = d }
-                -- where df is the exported dictionary. Then df makes a really
-                -- bad choice for loop breaker
-
-
--- If an Id is marked "never inline" then it makes a great loop breaker
--- The only reason for not checking that here is that it is rare
--- and I've never seen a situation where it makes a difference,
--- so it probably isn't worth the time to test on every binder
---      | isNeverActive (idInlinePragma bndr) = -10
-
-        | isOneOcc (idOccInfo bndr) = 2  -- Likely to be inlined
-
-        | canUnfold (realIdUnfolding bndr) = 1
-                -- The Id has some kind of unfolding
-                -- Ignore loop-breaker-ness here because that is what we are setting!
-
-        | otherwise = 0
-
-        -- Checking for a constructor application
-        -- Cheap and cheerful; the simplifier moves casts out of the way
-        -- The lambda case is important to spot x = /\a. C (f a)
-        -- which comes up when C is a dictionary constructor and
-        -- f is a default method.
-        -- Example: the instance for Show (ST s a) in GHC.ST
-        --
-        -- However we *also* treat (\x. C p q) as a con-app-like thing,
-        --      Note [Closure conversion]
-    is_con_app (Var v)    = isConLikeId v
-    is_con_app (App f _)  = is_con_app f
-    is_con_app (Lam _ e)  = is_con_app e
-    is_con_app (Tick _ e) = is_con_app e
-    is_con_app _          = False
+  | otherwise              -- Worse score so don't pick it
+  = chooseLoopBreaker approx_lb loop_sc loop_nodes (node : acc) nodes
+  where
+    sc = nd_score (fstOf3 node)
 
 {-
 Note [Complexity of loop breaking]
@@ -1150,6 +991,362 @@ ToDo: try using the occurrence info for the inline'd binder.
 
 [March 97] We do the same for atomic RHSs.  Reason: see notes with loopBreakSCC.
 [June 98, SLPJ]  I've undone this change; I don't understand it.  See notes with loopBreakSCC.
+
+
+************************************************************************
+*                                                                      *
+                   Making nodes
+*                                                                      *
+************************************************************************
+-}
+
+type ImpRuleEdges = IdEnv IdSet     -- Mapping from FVs of imported RULE LHSs to RHS FVs
+
+noImpRuleEdges :: ImpRuleEdges
+noImpRuleEdges = emptyVarEnv
+
+type LetrecNode = Node Unique Details  -- Node comes from Digraph
+                                       -- The Unique key is gotten from the Id
+data Details
+  = ND { nd_bndr :: Id          -- Binder
+       , nd_rhs  :: CoreExpr    -- RHS, already occ-analysed
+
+       , nd_uds  :: UsageDetails  -- Usage from RHS, and RULES, and stable unfoldings
+                                  -- ignoring phase (ie assuming all are active)
+                                  -- See Note [Forming Rec groups]
+
+       , nd_inl  :: IdSet       -- Free variables of
+                                --   the stable unfolding (if present and active)
+                                --   or the RHS (if not)
+                                -- but excluding any RULES
+                                -- This is the IdSet that may be used if the Id is inlined
+
+       , nd_weak :: IdSet       -- Binders of this Rec that are mentioned in nd_uds
+                                -- but are *not* in nd_inl.  These are the ones whose
+                                -- dependencies might not be respected by loop_breaker_nodes
+                                -- See Note [Weak loop breakers]
+
+       , nd_active_rule_fvs :: IdSet   -- Free variables of the RHS of active RULES
+
+       , nd_score :: NodeScore
+  }
+
+instance Outputable Details where
+   ppr nd = text "ND" <> braces
+             (sep [ text "bndr =" <+> ppr (nd_bndr nd)
+                  , text "uds =" <+> ppr (nd_uds nd)
+                  , text "inl =" <+> ppr (nd_inl nd)
+                  , text "weak =" <+> ppr (nd_weak nd)
+                  , text "rule =" <+> ppr (nd_active_rule_fvs nd)
+             ])
+
+-- The NodeScore is compared lexicographically;
+--      e.g. lower rank wins regardless of size
+type NodeScore = ( Int     -- Rank: lower => more likely to be picked as loop breaker
+                 , Int     -- Size of rhs: higher => more likely to be picked as LB
+                           -- Maxes out at maxExprSize; we just use it to prioritise
+                           -- small functions
+                 , Bool )  -- Was it a loop breaker before?
+                           -- True => more likely to be picked
+                           -- Note [Loop breakers, node scoring, and stability]
+
+rank :: NodeScore -> Int
+rank (r, _, _) = r
+
+makeNode :: OccEnv -> ImpRuleEdges -> VarSet
+         -> (Var, CoreExpr) -> LetrecNode
+-- See Note [Recursive bindings: the grand plan]
+makeNode env imp_rule_edges bndr_set (bndr, rhs)
+  = (details, varUnique bndr, nonDetKeysUFM node_fvs)
+    -- It's OK to use nonDetKeysUFM here as stronglyConnCompFromEdgedVerticesR
+    -- is still deterministic with edges in nondeterministic order as
+    -- explained in Note [Deterministic SCC] in Digraph.
+  where
+    details = ND { nd_bndr            = bndr
+                 , nd_rhs             = rhs'
+                 , nd_uds             = rhs_usage3
+                 , nd_inl             = inl_fvs
+                 , nd_weak            = node_fvs `minusVarSet` inl_fvs
+                 , nd_active_rule_fvs = active_rule_fvs
+                 , nd_score           = pprPanic "makeNodeDetails" (ppr bndr) }
+
+    -- Constructing the edges for the main Rec computation
+    -- See Note [Forming Rec groups]
+    (rhs_usage1, rhs') = occAnalRecRhs env rhs
+    rhs_usage2 = addIdOccs rhs_usage1 all_rule_fvs   -- Note [Rules are extra RHSs]
+                                                     -- Note [Rule dependency info]
+    rhs_usage3 = case mb_unf_fvs of
+                   Just unf_fvs -> addIdOccs rhs_usage2 unf_fvs
+                   Nothing      -> rhs_usage2
+    node_fvs = udFreeVars bndr_set rhs_usage3
+
+    -- Finding the free variables of the rules
+    is_active = occ_rule_act env :: Activation -> Bool
+    rules = filterOut isBuiltinRule (idCoreRules bndr)
+    rules_w_fvs :: [(Activation, VarSet)]    -- Find the RHS fvs
+    rules_w_fvs = maybe id (\ids -> ((AlwaysActive, ids):)) (lookupVarEnv imp_rule_edges bndr)
+                   -- See Note [Preventing loops due to imported functions rules]
+                  [ (ru_act rule, fvs)
+                  | rule <- rules
+                  , let fvs = exprFreeVars (ru_rhs rule)
+                              `delVarSetList` ru_bndrs rule
+                  , not (isEmptyVarSet fvs) ]
+    all_rule_fvs = rule_lhs_fvs `unionVarSet` rule_rhs_fvs
+    rule_rhs_fvs = mapUnionVarSet snd rules_w_fvs
+    rule_lhs_fvs = mapUnionVarSet (\ru -> exprsFreeVars (ru_args ru)
+                                          `delVarSetList` ru_bndrs ru) rules
+    active_rule_fvs = unionVarSets [fvs | (a,fvs) <- rules_w_fvs, is_active a]
+
+    -- Finding the free variables of the INLINE pragma (if any)
+    unf        = realIdUnfolding bndr     -- Ignore any current loop-breaker flag
+    mb_unf_fvs = stableUnfoldingVars unf
+
+    -- Find the "nd_inl" free vars; for the loop-breaker phase
+    inl_fvs = case mb_unf_fvs of
+                Nothing -> udFreeVars bndr_set rhs_usage1 -- No INLINE, use RHS
+                Just unf_fvs -> unf_fvs
+                      -- We could check for an *active* INLINE (returning
+                      -- emptyVarSet for an inactive one), but is_active
+                      -- isn't the right thing (it tells about
+                      -- RULE activation), so we'd need more plumbing
+
+mkLoopBreakerNodes :: VarSet -> UsageDetails -> [Details] -> [LetrecNode]
+-- Does three things
+--   a) tag each binder with its occurrence info
+--   b) add a NodeScore to each node
+--   c) make a Node with the right dependency edges for
+--      the loop-breaker SCC analysis
+mkLoopBreakerNodes bndr_set total_uds details_s
+  = map mk_lb_node details_s
+  where
+    mk_lb_node nd@(ND { nd_bndr = bndr, nd_rhs = rhs, nd_inl = inl_fvs })
+      = (nd', varUnique bndr, nonDetKeysUFM lb_deps)
+              -- It's OK to use nonDetKeysUFM here as
+              -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
+              -- in nondeterministic order as explained in
+              -- Note [Deterministic SCC] in Digraph.
+      where
+        nd'     = nd { nd_bndr = bndr', nd_score = score }
+        bndr'   = setBinderOcc total_uds bndr
+        score   = nodeScore bndr bndr' rhs lb_deps
+        lb_deps = extendFvs_ rule_fv_env inl_fvs
+
+    rule_fv_env :: IdEnv IdSet
+        -- Maps a variable f to the variables from this group
+        --      mentioned in RHS of active rules for f
+        -- Domain is *subset* of bound vars (others have no rule fvs)
+    rule_fv_env = transClosureFV (mkVarEnv init_rule_fvs)
+    init_rule_fvs   -- See Note [Finding rule RHS free vars]
+      = [ (b, trimmed_rule_fvs)
+        | ND { nd_bndr = b, nd_active_rule_fvs = rule_fvs } <- details_s
+        , let trimmed_rule_fvs = rule_fvs `intersectVarSet` bndr_set
+        , not (isEmptyVarSet trimmed_rule_fvs) ]
+
+
+------------------------------------------
+nodeScore :: Id        -- Binder has old occ-info (just for loop-breaker-ness)
+          -> Id        -- Binder with new occ-info
+          -> CoreExpr  -- RHS
+          -> VarSet    -- Loop-breaker dependencies
+          -> NodeScore
+nodeScore old_bndr new_bndr bind_rhs lb_deps
+  | not (isId old_bndr)     -- A type or cercion variable is never a loop breaker
+  = (100, 0, False)
+
+  | old_bndr `elemVarSet` lb_deps  -- Self-recursive things are great loop breakers
+  = (0, 0, True)                   -- See Note [Self-recursion and loop breakers]
+
+  | otherwise  -- An Id has an unfolding
+  = case id_unfolding of
+      DFunUnfolding { df_args = args }
+        -- Never choose a DFun as a loop breaker
+        -- Note [DFuns should not be loop breakers]
+        -> (9, length args, is_lb)
+
+      CoreUnfolding { uf_src = src, uf_tmpl = unf_rhs, uf_guidance = guide }
+        | isStableSource src
+        -> case guide of
+             UnfWhen {}                      -> (6, cheapExprSize unf_rhs, is_lb)
+             UnfIfGoodArgs { ug_size = size} -> (3, size,                  is_lb)
+             UnfNever                        -> (0, 0,                     is_lb)
+              -- See Note [Loop breakers and INLINE/INLINABLE pragmas] for
+              -- the 6 vs 3 choice
+
+         -- Note that this case hits /all/ stable unfoldings, so we
+         -- never look at 'bind_rhs' for stable unfoldings. That's right, because
+         -- 'rhs' is irrelevant for inlining things with a stable unfolding
+
+         -- Data structures are more important than INLINE pragmas
+         -- so that dictionary/method recursion unravels
+
+      _ | exprIsTrivial bind_rhs
+        -> mk_score 10  -- Practically certain to be inlined
+          -- Used to have also: && not (isExportedId bndr)
+          -- But I found this sometimes cost an extra iteration when we have
+          --      rec { d = (a,b); a = ...df...; b = ...df...; df = d }
+          -- where df is the exported dictionary. Then df makes a really
+          -- bad choice for loop breaker
+
+        | is_con_app bind_rhs   -- Data types help with cases: Note [Constructor applications]
+        -> mk_score 5
+
+        | isOneOcc (idOccInfo new_bndr)
+        -> mk_score 2  -- Likely to be inlined
+
+        | canUnfold id_unfolding   -- The Id has some kind of unfolding
+        -> mk_score 1
+
+        | otherwise
+        -> (0, 0, is_lb)
+
+  where
+    mk_score :: Int -> NodeScore
+    mk_score rank = (rank, rhs_size, is_lb)
+
+    is_lb    = isStrongLoopBreaker (idOccInfo old_bndr)
+    rhs_size = case id_unfolding of
+                 CoreUnfolding { uf_guidance = guidance }
+                    | UnfIfGoodArgs { ug_size = size } <- guidance
+                    -> size
+                 _  -> cheapExprSize bind_rhs
+
+    id_unfolding = realIdUnfolding old_bndr
+       -- realIdUnfolding: Ignore loop-breaker-ness here because
+       -- that is what we are setting!
+
+        -- Checking for a constructor application
+        -- Cheap and cheerful; the simplifier moves casts out of the way
+        -- The lambda case is important to spot x = /\a. C (f a)
+        -- which comes up when C is a dictionary constructor and
+        -- f is a default method.
+        -- Example: the instance for Show (ST s a) in GHC.ST
+        --
+        -- However we *also* treat (\x. C p q) as a con-app-like thing,
+        --      Note [Closure conversion]
+    is_con_app (Var v)    = isConLikeId v
+    is_con_app (App f _)  = is_con_app f
+    is_con_app (Lam _ e)  = is_con_app e
+    is_con_app (Tick _ e) = is_con_app e
+    is_con_app _          = False
+
+maxExprSize :: Int
+maxExprSize = 20  -- Rather arbitrary
+
+cheapExprSize :: CoreExpr -> Int
+-- Maxes out at maxExprSize
+cheapExprSize e
+  = go 0 e
+  where
+    go n e | n >= maxExprSize = n
+           | otherwise        = go1 n e
+
+    go1 n (Var {})        = n+1
+    go1 n (Lit {})        = n+1
+    go1 n (Type {})       = n
+    go1 n (Coercion {})   = n
+    go1 n (Tick _ e)      = go1 n e
+    go1 n (Cast e _)      = go1 n e
+    go1 n (App f a)       = go (go1 n f) a
+    go1 n (Lam b e)
+      | isTyVar b         = go1 n e
+      | otherwise         = go (n+1) e
+    go1 n (Let b e)       = gos (go1 n e) (rhssOfBind b)
+    go1 n (Case e _ _ as) = gos (go1 n e) (rhssOfAlts as)
+
+    gos n [] = n
+    gos n (e:es) | n >= maxExprSize = n
+                 | otherwise        = gos (go1 n e) es
+
+betterLB :: NodeScore -> NodeScore -> Bool
+-- If  n1 `betterLB` n2  then choose n1 as the loop breaker
+betterLB (rank1, size1, lb1) (rank2, size2, _)
+  | rank1 < rank2 = True
+  | rank1 > rank2 = False
+  | size1 < size2 = False   -- Make the bigger n2 into the loop breaker
+  | size1 > size2 = True
+  | lb1           = True    -- Tie-break: if n1 was a loop breaker before, choose it
+  | otherwise     = False   -- See Note [Loop breakers, node scoring, and stability]
+
+{- Note [Self-recursion and loop breakers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+   rec { f = ...f...g...
+       ; g = .....f...   }
+then 'f' has to be a loop breaker anyway, so we may as well choose it
+right away, so that g can inline freely.
+
+This is really just a cheap hack. Consider
+   rec { f = ...g...
+       ; g = ..f..h...
+      ;  h = ...f....}
+Here f or g are better loop breakers than h; but we might accidentally
+choose h.  Finding the minimal set of loop breakers is hard.
+
+Note [Loop breakers, node scoring, and stability]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+To choose a loop breaker, we give a NodeScore to each node in the SCC,
+and pick the one with the best score (according to 'betterLB').
+
+We need to be jolly careful (Trac #12425, #12234) about the stability
+of this choice. Suppose we have
+
+    let rec { f = ...g...g...
+            ; g = ...f...f... }
+    in
+    case x of
+      True  -> ...f..
+      False -> ..f...
+
+In each iteration of the simplifier the occurrence analyser OccAnal
+chooses a loop breaker. Suppose in iteration 1 it choose g as the loop
+breaker. That means it is free to inline f.
+
+Suppose that GHC decides to inline f in the branches of the case, but
+(for some reason; eg it is not satureated) in the rhs of g. So we get
+
+    let rec { f = ...g...g...
+            ; g = ...f...f... }
+    in
+    case x of
+      True  -> ...g...g.....
+      False -> ..g..g....
+
+Now suppose that, for some reason, in the next iteraion the occurrence
+analyser chooses f as the loop breaker, so it can freely inling g. And
+again for some reason the simplifer inlines g at its calls in the case
+branches, but not in the RHS of f. Then we get
+
+    let rec { f = ...g...g...
+            ; g = ...f...f... }
+    in
+    case x of
+      True  -> ...(...f...f...)...(...f..f..).....
+      False -> ..(...f...f...)...(..f..f...)....
+
+You can see where this is going! Each iteration of the simplifier
+doubles the number of calls to f or g. No wonder GHC is slow!
+
+(In the particular example in comment:3 of #12425, f and g are the two
+mutually recursive fmap instances for CondT and Result. They are both
+marked INLINE which, oddly, is why they don't inline in each other's
+RHS, because the call there is not saturated.)
+
+The root cause is that we flip-flop on our choice of loop breaker. I
+always thought it didn't matter, and indeed for any single iteration
+to terminate, it doesn't matter. But when we iterate, it matters a
+lot!!
+
+So The Plan is this:
+   If there is a tie, choose the node that
+   was a loop breaker last time round
+
+Hence the is_lb field of NodeScore
+
+************************************************************************
+*                                                                      *
+                   Right hand sides
+*                                                                      *
+************************************************************************
 -}
 
 occAnalRecRhs :: OccEnv -> CoreExpr    -- Rhs
@@ -1183,19 +1380,6 @@ occAnalNonRecRhs env bndr rhs
     dmd        = idDemandInfo bndr
     active     = isAlwaysActive (idInlineActivation bndr)
     not_stable = not (isStableUnfolding (idUnfolding bndr))
-
-addIdOccs :: UsageDetails -> VarSet -> UsageDetails
-addIdOccs usage id_set = nonDetFoldUFM addIdOcc usage id_set
-  -- It's OK to use nonDetFoldUFM here because addIdOcc commutes
-
-addIdOcc :: Id -> UsageDetails -> UsageDetails
-addIdOcc v u | isId v    = addOneOcc u v NoOccInfo
-             | otherwise = u
-        -- Give a non-committal binder info (i.e NoOccInfo) because
-        --   a) Many copies of the specialised thing can appear
-        --   b) We don't want to substitute a BIG expression inside a RULE
-        --      even if that's the only occurrence of the thing
-        --      (Same goes for INLINE.)
 
 {-
 Note [Cascading inlines]
@@ -1238,8 +1422,12 @@ This is worse than the slow cascade, so we only want to say "certainly_inline"
 if it really is certain.  Look at the note with preInlineUnconditionally
 for the various clauses.
 
-Expressions
-~~~~~~~~~~~
+
+************************************************************************
+*                                                                      *
+                Expressions
+*                                                                      *
+************************************************************************
 -}
 
 occAnal :: OccEnv
@@ -1419,12 +1607,15 @@ occAnalApp env (Var fun, args, ticks)
     uds = fun_uds +++ final_args_uds
 
     !(args_uds, args') = occAnalArgs env args one_shots
-    !final_args_uds = markManyIf (isRhsEnv env && is_exp) args_uds
+    !final_args_uds
+       | isRhsEnv env && is_exp = mapVarEnv markInsideLam args_uds
+       | otherwise              = args_uds
        -- We mark the free vars of the argument of a constructor or PAP
-       -- as "many", if it is the RHS of a let(rec).
-       -- This means that nothing gets inlined into a constructor argument
-       -- position, which is what we want.  Typically those constructor
-       -- arguments are just variables, or trivial expressions.
+       -- as "inside-lambda", if it is the RHS of a let(rec).
+       -- This means that nothing gets inlined into a constructor or PAP
+       -- argument position, which is what we want.  Typically those
+       -- constructor arguments are just variables, or trivial expressions.
+       -- We use inside-lam because it's like eta-expanding the PAP.
        --
        -- This is the *whole point* of the isRhsEnv predicate
        -- See Note [Arguments of let-bound constructors]
@@ -1888,6 +2079,23 @@ emptyDetails = (emptyVarEnv :: UsageDetails)
 
 usedIn :: Id -> UsageDetails -> Bool
 v `usedIn` details = isExportedId v || v `elemVarEnv` details
+
+addIdOccs :: UsageDetails -> VarSet -> UsageDetails
+addIdOccs usage id_set = nonDetFoldUFM addIdOcc usage id_set
+  -- It's OK to use nonDetFoldUFM here because addIdOcc commutes
+
+addIdOcc :: Id -> UsageDetails -> UsageDetails
+addIdOcc v u | isId v    = addOneOcc u v NoOccInfo
+             | otherwise = u
+        -- Give a non-committal binder info (i.e NoOccInfo) because
+        --   a) Many copies of the specialised thing can appear
+        --   b) We don't want to substitute a BIG expression inside a RULE
+        --      even if that's the only occurrence of the thing
+        --      (Same goes for INLINE.)
+
+udFreeVars :: VarSet -> UsageDetails -> VarSet
+-- Find the subset of bndrs that are mentioned in uds
+udFreeVars bndrs uds = intersectUFM_C (\b _ -> b) bndrs uds
 
 type IdWithOccInfo = Id
 

@@ -872,3 +872,24 @@ test('T12227',
      compile,
      # Use `-M1G` to prevent memory thrashing with ghc-8.0.1.
      ['-O2 -ddump-hi -ddump-to-file +RTS -M1G'])
+
+test('T12425',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 125831400, 5),
+          # initial:    125831400
+          ]),
+     ],
+     compile,
+     [''])
+
+test('T12234',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 72958288, 5),
+          # initial:    72958288
+          ]),
+     ],
+     compile,
+     [''])
+

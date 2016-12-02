@@ -57,7 +57,7 @@ module CoreSyn (
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding, hasStableCoreUnfolding_maybe,
+        isStableUnfolding,
         isClosedUnfolding, hasSomeUnfolding,
         isBootUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
@@ -1255,18 +1255,6 @@ expandUnfolding_maybe :: Unfolding -> Maybe CoreExpr
 -- The key point here is that CONLIKE things can be expanded
 expandUnfolding_maybe (CoreUnfolding { uf_expandable = True, uf_tmpl = rhs }) = Just rhs
 expandUnfolding_maybe _                                                       = Nothing
-
-hasStableCoreUnfolding_maybe :: Unfolding -> Maybe Bool
--- Just True  <=> has stable inlining, very keen to inline (eg. INLINE pragma)
--- Just False <=> has stable inlining, open to inlining it (eg. INLINABLE pragma)
--- Nothing    <=> not stable, or cannot inline it anyway
-hasStableCoreUnfolding_maybe (CoreUnfolding { uf_src = src, uf_guidance = guide })
-   | isStableSource src
-   = case guide of
-       UnfWhen {}       -> Just True
-       UnfIfGoodArgs {} -> Just False
-       UnfNever         -> Nothing
-hasStableCoreUnfolding_maybe _ = Nothing
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CoreUnfolding { uf_src = InlineCompulsory }) = True
