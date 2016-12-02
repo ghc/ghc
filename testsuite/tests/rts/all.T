@@ -375,4 +375,5 @@ test('numa001', [ extra_run_opts('8'), extra_ways(['debug_numa']) ]
 test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])
+test('T12903', [ when(opsys('mingw32'), skip)], compile_and_run, [''])
 

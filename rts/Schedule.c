@@ -2103,7 +2103,10 @@ forkProcess(HsStablePtr *entry
         ioManagerStartCap(&cap);
 #endif
 
-        rts_evalStableIO(&cap, entry, NULL);  // run the action
+        // Install toplevel exception handlers, so interruption
+        // signal will be sent to the main thread.
+        // See Trac #12903
+        rts_evalStableIOMain(&cap, entry, NULL);  // run the action
         rts_checkSchedStatus("forkProcess",cap);
 
         rts_unlock(cap);

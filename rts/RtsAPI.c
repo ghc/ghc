@@ -461,6 +461,35 @@ void rts_evalIO (/* inout */ Capability **cap,
 }
 
 /*
+ * rts_evalStableIOMain() is suitable for calling main Haskell thread
+ * stored in (StablePtr (IO a)) it calls rts_evalStableIO but wraps
+ * function in GHC.TopHandler.runMainIO that installs top_handlers.
+ * See Trac #12903.
+ */
+void rts_evalStableIOMain(/* inout */ Capability **cap,
+                          /* in    */ HsStablePtr s,
+                          /* out   */ HsStablePtr *ret)
+{
+    StgTSO* tso;
+    StgClosure *p, *r, *w;
+    SchedulerStatus stat;
+
+    p = (StgClosure *)deRefStablePtr(s);
+    w = rts_apply(*cap, &base_GHCziTopHandler_runMainIO_closure, p);
+    tso = createStrictIOThread(*cap, RtsFlags.GcFlags.initialStkSize, w);
+    // async exceptions are always blocked by default in the created
+    // thread.  See #1048.
+    tso->flags |= TSO_BLOCKEX | TSO_INTERRUPTIBLE;
+    scheduleWaitThread(tso,&r,cap);
+    stat = rts_getSchedStatus(*cap);
+
+    if (stat == Success && ret != NULL) {
+        ASSERT(r != NULL);
+        *ret = getStablePtr((StgPtr)r);
+    }
+}
+
+/*
  * rts_evalStableIO() is suitable for calling from Haskell.  It
  * evaluates a value of the form (StablePtr (IO a)), forcing the
  * action's result to WHNF before returning.  The result is returned
