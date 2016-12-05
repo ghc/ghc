@@ -767,7 +767,7 @@ test('T9872c',
 test('T9872d',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 506691240, 5),
+          [(wordsize(64), 478169352, 5),
           # 2014-12-18    796071864   Initally created
           # 2014-12-18    739189056   Reduce type families even more eagerly
           # 2015-01-07    687562440   TrieMap leaf compression
@@ -775,6 +775,8 @@ test('T9872d',
           # 2015-12-11    566134504   TypeInType; see #11196
           # 2016-02-08    534693648   Improved a bit by tyConRolesRepresentational
           # 2016-03-18    506691240   optimize Unify & zonking
+          # 2016-12-05    478169352   using tyConIsTyFamFree, I think, but only
+          #                           a 1% improvement 482 -> 478
            (wordsize(32), 264566040, 5)
           # some date     328810212
           # 2015-07-11    350369584

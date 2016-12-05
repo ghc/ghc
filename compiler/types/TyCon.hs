@@ -627,7 +627,7 @@ data TyCon
         synIsTau     :: Bool,   -- True <=> the RHS of this synonym does not
                                  --          have any foralls, after expanding any
                                  --          nested synonyms
-        synIsFamFree  :: Bool    -- True <=> the RHS of this synonym does mention
+        synIsFamFree  :: Bool    -- True <=> the RHS of this synonym does not mention
                                  --          any type synonym families (data families
                                  --          are fine), again after expanding any
                                  --          nested synonyms
