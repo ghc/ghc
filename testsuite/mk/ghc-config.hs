@@ -42,6 +42,12 @@ main = do
         _ -> "NO"
   putStrLn $ "MinGhcVersion711" ++ '=':minGhcVersion711
 
+  let minGhcVersion801 = case lookup "Project version" fields of
+        Just v
+          | parseVersion v >= [8,1] -> "YES"
+        _ -> "NO"
+  putStrLn $ "MinGhcVersion801" ++ '=':minGhcVersion801
+
 
 getGhcFieldOrFail :: [(String,String)] -> String -> String -> IO ()
 getGhcFieldOrFail fields mkvar key
