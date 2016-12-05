@@ -518,9 +518,9 @@ uint32_t osNumaNodes(void)
     return numNumaNodes;
 }
 
-StgWord osNumaMask(void)
+uint64_t osNumaMask(void)
 {
-    StgWord numaMask;
+    uint64_t numaMask;
     if (!GetNumaNodeProcessorMask(0, &numaMask))
     {
         return 1;
@@ -561,7 +561,7 @@ void osBindMBlocksToNode(
                 }
                 else {
                     sysErrorBelch(
-                        "osBindMBlocksToNode: VirtualAllocExNuma MEM_RESERVE %llu bytes "
+                        "osBindMBlocksToNode: VirtualAllocExNuma MEM_RESERVE %" FMT_Word " bytes "
                         "at address %p bytes failed",
                                         size, addr);
                 }

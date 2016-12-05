@@ -593,7 +593,7 @@ uint32_t osNumaNodes(void)
 #endif
 }
 
-StgWord osNumaMask(void)
+uint64_t osNumaMask(void)
 {
 #if HAVE_LIBNUMA
     struct bitmask *mask;

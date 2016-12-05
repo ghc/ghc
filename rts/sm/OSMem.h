@@ -21,7 +21,7 @@ StgWord64 getPhysicalMemorySize (void);
 void setExecutable (void *p, W_ len, bool exec);
 bool osNumaAvailable(void);
 uint32_t osNumaNodes(void);
-StgWord osNumaMask(void);
+uint64_t osNumaMask(void);
 void osBindMBlocksToNode(void *addr, StgWord size, uint32_t node);
 
 INLINE_HEADER size_t

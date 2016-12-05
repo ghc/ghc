@@ -68,10 +68,12 @@ static UChar *cstring_from_COFF_symbol_name(
     UChar* name,
     UChar* strtab);
 
+#if defined(x86_64_HOST_ARCH)
 static size_t makeSymbolExtra_PEi386(
     ObjectCode* oc,
     size_t s,
     char* symbol);
+#endif
 
 static void addDLLHandle(
     pathchar* dll_name,

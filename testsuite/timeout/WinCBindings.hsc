@@ -314,7 +314,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h CreateProcessW"
                    -> BOOL -> DWORD -> LPVOID -> LPCTSTR -> LPSTARTUPINFO
                    -> LPPROCESS_INFORMATION -> IO BOOL
 
-foreign import WINDOWS_CCONV unsafe "string.h" memset :: Ptr a -> CInt -> CSize -> IO (Ptr a)
+foreign import ccall unsafe "string.h" memset :: Ptr a -> CInt -> CSize -> IO (Ptr a)
 
 foreign import WINDOWS_CCONV unsafe "windows.h SetInformationJobObject"
     setInformationJobObject :: HANDLE -> JOBOBJECTINFOCLASS -> LPVOID -> DWORD -> IO BOOL
@@ -328,6 +328,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h GetQueuedCompletionStatus"
 setJobParameters :: HANDLE -> IO BOOL
 setJobParameters hJob = alloca $ \p_jeli -> do
     let jeliSize = sizeOf (undefined :: JOBOBJECT_EXTENDED_LIMIT_INFORMATION)
+
     _ <- memset p_jeli 0 $ fromIntegral jeliSize
     -- Configure all child processes associated with the job to terminate when the
     -- Last process in the job terminates. This prevent half dead processes and that

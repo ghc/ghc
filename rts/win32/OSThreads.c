@@ -328,6 +328,7 @@ getNumberOfProcessorsGroups (void)
     return n_groups;
 }
 
+#if x86_64_HOST_ARCH
 static uint8_t*
 getProcessorsDistribution (void)
 {
@@ -342,7 +343,6 @@ getProcessorsDistribution (void)
         cpuGroupDistCache = malloc(n_groups * sizeof(uint8_t));
         memset(cpuGroupDistCache, MAXIMUM_PROCESSORS, n_groups * sizeof(uint8_t));
 
-#if x86_64_HOST_ARCH
         /* We still support Windows Vista. Which means we can't rely
         on the API being available. So we'll have to resolve manually.  */
         HMODULE kernel = GetModuleHandleW(L"kernel32");
@@ -357,11 +357,11 @@ getProcessorsDistribution (void)
                 IF_DEBUG(scheduler, debugBelch("[*] Number of active processors in group %u detected: %u\n", i, cpuGroupDistCache[i]));
             }
         }
-#endif
     }
 
     return cpuGroupDistCache;
 }
+#endif
 
 static uint32_t*
 getProcessorsCumulativeSum(void)
@@ -376,10 +376,10 @@ getProcessorsCumulativeSum(void)
         uint8_t n_groups = getNumberOfProcessorsGroups();
         cpuGroupCumulativeCache = malloc(n_groups * sizeof(uint32_t));
         memset(cpuGroupCumulativeCache, 0, n_groups * sizeof(uint32_t));
-        uint8_t* proc_dist = getProcessorsDistribution();
-        uint32_t cum_num_proc = 0;
 
 #if x86_64_HOST_ARCH
+        uint8_t* proc_dist = getProcessorsDistribution();
+        uint32_t cum_num_proc = 0;
         for (int i = 0; i < n_groups; i++)
         {
             cpuGroupCumulativeCache[i] = cum_num_proc;
@@ -593,11 +593,11 @@ void releaseThreadNode (void)
 {
     if (osNumaAvailable())
     {
-        StgWord processMask;
-        StgWord systemMask;
+        PDWORD_PTR processMask = NULL;
+        PDWORD_PTR systemMask = NULL;
         if (!GetProcessAffinityMask(GetCurrentProcess(),
-                                   &processMask,
-                                   &systemMask))
+                                    processMask,
+                                    systemMask))
         {
             sysErrorBelch(
                 "releaseThreadNode: Error resetting affinity of thread: %lu",
@@ -605,7 +605,7 @@ void releaseThreadNode (void)
             stg_exit(EXIT_FAILURE);
         }
 
-        if (!SetThreadAffinityMask(GetCurrentThread(), processMask))
+        if (!SetThreadAffinityMask(GetCurrentThread(), *processMask))
         {
             sysErrorBelch(
                 "releaseThreadNode: Error reseting NUMA affinity mask of thread: %lu.",
