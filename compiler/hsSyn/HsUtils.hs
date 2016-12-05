@@ -78,7 +78,8 @@ module HsUtils(
   collectLStmtsBinders, collectStmtsBinders,
   collectLStmtBinders, collectStmtBinders,
 
-  hsLTyClDeclBinders, hsTyClForeignBinders, hsPatSynSelectors,
+  hsLTyClDeclBinders, hsTyClForeignBinders,
+  hsPatSynSelectors, getPatSynBinds,
   hsForeignDeclsBinders, hsGroupBinders, hsDataFamInstBinders,
   hsDataDefnBinders,
 
@@ -975,6 +976,11 @@ addPatSynSelector bind sels
   | L _ (PatSynBind (PSB { psb_args = RecordPatSyn as })) <- bind
   = map (unLoc . recordPatSynSelectorId) as ++ sels
   | otherwise = sels
+
+getPatSynBinds :: [(RecFlag, LHsBinds id)] -> [PatSynBind id id]
+getPatSynBinds binds
+  = [ psb | (_, lbinds) <- binds
+          , L _ (PatSynBind psb) <- bagToList lbinds ]
 
 -------------------
 hsLInstDeclBinders :: LInstDecl name -> ([Located name], [LFieldOcc name])

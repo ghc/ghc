@@ -40,7 +40,7 @@ module TcEnv(
         wrongThingErr, pprBinders,
 
         tcAddDataFamConPlaceholders, tcAddPatSynPlaceholders,
-        getPatSynBinds, getTypeSigNames,
+        getTypeSigNames,
         tcExtendRecEnv,         -- For knot-tying
 
         -- Instances
@@ -99,7 +99,6 @@ import Module
 import Outputable
 import Encoding
 import FastString
-import Bag
 import ListSetOps
 import Util
 import Maybes( MaybeErr(..) )
@@ -587,12 +586,6 @@ tcAddPatSynPlaceholders pat_syns thing_inside
   = tcExtendKindEnv2 [ (name, APromotionErr PatSynPE)
                      | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
-
-getPatSynBinds :: [(RecFlag, LHsBinds Name)] -> [PatSynBind Name Name]
-getPatSynBinds binds
-  = [ psb | (_, lbinds) <- binds
-          , L _ (PatSynBind psb) <- bagToList lbinds ]
-
 
 getTypeSigNames :: [LSig Name] -> NameSet
 -- Get the names that have a user type sig

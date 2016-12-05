@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ScopedTypeVariables, BangPatterns #-}
 
 {-
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
@@ -285,15 +285,24 @@ rnValBindsRHS :: HsSigCtxt
 rnValBindsRHS ctxt (ValBindsIn mbinds sigs)
   = do { (sigs', sig_fvs) <- renameSigs ctxt sigs
        ; binds_w_dus <- mapBagM (rnLBind (mkSigTvFn sigs')) mbinds
-       ; case depAnalBinds binds_w_dus of
-           (anal_binds, anal_dus) -> return (valbind', valbind'_dus)
-              where
-                valbind' = ValBindsOut anal_binds sigs'
-                valbind'_dus = anal_dus `plusDU` usesOnly sig_fvs
-                               -- Put the sig uses *after* the bindings
-                               -- so that the binders are removed from
-                               -- the uses in the sigs
-       }
+       ; let !(anal_binds, anal_dus) = depAnalBinds binds_w_dus
+
+       ; let patsyn_fvs = foldr (unionNameSet . psb_fvs) emptyNameSet $
+                          getPatSynBinds anal_binds
+                -- The uses in binds_w_dus for PatSynBinds do not include
+                -- variables used in the patsyn builders; see
+                -- Note [Pattern synonym builders don't yield dependencies]
+                -- But psb_fvs /does/ include those builder fvs.  So we
+                -- add them back in here to avoid bogus warnings about
+                -- unused variables (Trac #12548)
+
+             valbind'_dus = anal_dus `plusDU` usesOnly sig_fvs
+                                     `plusDU` usesOnly patsyn_fvs
+                            -- Put the sig uses *after* the bindings
+                            -- so that the binders are removed from
+                            -- the uses in the sigs
+
+        ; return (ValBindsOut anal_binds sigs', valbind'_dus) }
 
 rnValBindsRHS _ b = pprPanic "rnValBindsRHS" (ppr b)
 
@@ -665,18 +674,18 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                 -- As well as dependency analysis, we need these for the
                 -- MonoLocalBinds test in TcBinds.decideGeneralisationPlan
 
-        ; let bind' = bind{ psb_args = details'
+              bind' = bind{ psb_args = details'
                           , psb_def = pat'
                           , psb_dir = dir'
                           , psb_fvs = fvs' }
-        ; let selector_names = case details' of
+              selector_names = case details' of
                                  RecordPatSyn names ->
                                   map (unLoc . recordPatSynSelectorId) names
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind', name : selector_names , fvs1)
-          -- See Note [Pattern synonym builders don't yield dependencies]
+          -- Why fvs1?  See Note [Pattern synonym builders don't yield dependencies]
       }
   where
     lookupVar = wrapLocM lookupOccRn
@@ -702,17 +711,24 @@ f (P x) = C2 x
 In this case, 'P' needs to be typechecked in two passes:
 
 1. Typecheck the pattern definition of 'P', which fully determines the
-type of 'P'. This step doesn't require knowing anything about 'f',
-since the builder definition is not looked at.
+   type of 'P'. This step doesn't require knowing anything about 'f',
+   since the builder definition is not looked at.
 
 2. Typecheck the builder definition, which needs the typechecked
-definition of 'f' to be in scope.
+   definition of 'f' to be in scope; done by calls oo tcPatSynBuilderBind
+   in TcBinds.tcValBinds.
 
 This behaviour is implemented in 'tcValBinds', but it crucially
 depends on 'P' not being put in a recursive group with 'f' (which
 would make it look like a recursive pattern synonym a la 'pattern P =
 P' which is unsound and rejected).
 
+So:
+ * We do not include builder fvs in the Uses returned by rnPatSynBind
+   (which is then used for dependency analysis)
+ * But we /do/ include them in the psb_fvs for the PatSynBind
+ * In rnValBinds we record these builder uses, to avoid bogus
+   unused-variable warnings (Trac #12548)
 -}
 
 {- *********************************************************************
