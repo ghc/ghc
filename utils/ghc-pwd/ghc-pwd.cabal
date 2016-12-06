@@ -15,5 +15,4 @@ Executable ghc-pwd
     Default-Language: Haskell2010
     Main-Is: Main.hs
     Build-Depends: base       >= 3   && < 5,
-                   directory  >= 1   && < 1.3
-
+                   directory  >= 1   && < 1.4

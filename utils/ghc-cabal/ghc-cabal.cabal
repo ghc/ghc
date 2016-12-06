@@ -22,6 +22,6 @@ Executable ghc-cabal
     Build-Depends: base       >= 3   && < 5,
                    bytestring >= 0.10 && < 0.11,
                    Cabal      == 1.24.*,
-                   directory  >= 1.1 && < 1.3,
+                   directory  >= 1.1 && < 1.4,
                    filepath   >= 1.2 && < 1.5
 

@@ -44,6 +44,6 @@ Library
     build-depends: base       >= 4.7 && < 4.10,
                    binary     == 0.8.*,
                    bytestring == 0.10.*,
-                   directory  == 1.2.*,
+                   directory  >= 1.2 && < 1.4,
                    filepath   >= 1.3 && < 1.5,
                    ghc-boot-th == @ProjectVersionMunged@
