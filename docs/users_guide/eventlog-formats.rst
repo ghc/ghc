@@ -107,3 +107,38 @@ A variable-length event encoding a heap sample broken down by,
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``String``: type or closure description, or module name
+
+
+.. _statistical-profiler-formats:
+
+Statistical profiler formats
+----------------------------
+
+Samples
+~~~~~~~
+
+A block of samples from statistical profiling. A sample consists of a sample
+value (e.g. an instruction pointer address) and a weight (e.g. how many times
+the sample pointer was seen).
+
+ * ``EVENT_STAT_PROF_SAMPLES`` (variable length)
+   * ``Word8``: Capability number
+   * ``Word8``: Sample trigger type
+   * ``Word8``: Sample value type
+   * Encoded samples
+
+The samples themselves are represented with a compressed encoding. Each sample
+is represented by,
+
+ * ``Word8``: Sample and weight encoding type
+   * top 4-bits: Sample encoding type
+     * ``0x0``: 8-bit positive offset to previous address
+     * ``0x1``: 8-bit negative offset to previous address
+     * ``0x4``: 32-bit positive offset to previous address
+     * ``0x5``: 32-bit negative offset to previous address
+     * ``0xf``: direct encoding
+   * bottom 4-bits: weight encoding type
+     * ``0``: ``weight == 1``
+     * ``1``: weight encoded as ``Word8``
+     * ``2``: weight encoded as ``Word16``
+     * ``4``: weight encoded as ``Word32``
