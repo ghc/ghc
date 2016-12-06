@@ -1137,7 +1137,12 @@ instance Eq ImpItemSpec where
   p1 == p2 = case p1 `compare` p2 of EQ -> True; _ -> False
 
 instance Ord ImpItemSpec where
-   compare is1 is2 = is_iloc is1 `compare` is_iloc is2
+   compare is1 is2 =
+    case (is1, is2) of
+      (ImpAll, ImpAll) -> EQ
+      (ImpAll, _)      -> GT
+      (_, ImpAll)      -> LT
+      (ImpSome _ l1, ImpSome _ l2) -> l1 `compare` l2
 
 
 bestImport :: [ImportSpec] -> ImportSpec
