@@ -171,10 +171,13 @@ mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stm
 -- We have to make a top-level decl for the string,
 -- and return a literal pointing to it
 mkByteStringCLit uniq bytes
-  = (CmmLabel lbl, CmmData sec $ Statics lbl [CmmString bytes])
+  = (CmmLabel lbl, CmmData (Section sec lbl)  $ Statics lbl [CmmString bytes])
   where
     lbl = mkStringLitLabel uniq
-    sec = Section ReadOnlyData lbl
+    -- This can not happen for String literals (as there \NUL is replaced by
+    -- C0 80). However, it can happen with Addr# literals.
+    sec = if 0 `elem` bytes then ReadOnlyData else CString
+
 mkDataLits :: Section -> CLabel -> [CmmLit] -> GenCmmDecl CmmStatics info stmt
 -- Build a data-segment data block
 mkDataLits section lbl lits

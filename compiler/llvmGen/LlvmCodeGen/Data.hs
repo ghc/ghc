@@ -59,6 +59,7 @@ isSecConstant (Section t _) = case t of
     ReadOnlyData            -> True
     RelocatableReadOnlyData -> True
     ReadOnlyData16          -> True
+    CString                 -> True
     Data                    -> False
     UninitialisedData       -> False
     (OtherSection _)        -> False
@@ -72,6 +73,7 @@ llvmSectionType t = case t of
     ReadOnlyData16          -> fsLit ".rodata.cst16"
     Data                    -> fsLit ".data"
     UninitialisedData       -> fsLit ".bss"
+    CString                 -> fsLit ".cstring"
     (OtherSection _)        -> panic "llvmSectionType: unknown section type"
 
 -- | Format a Cmm Section into a LLVM section name

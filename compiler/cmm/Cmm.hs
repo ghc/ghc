@@ -172,6 +172,7 @@ data SectionType
   | RelocatableReadOnlyData
   | UninitialisedData
   | ReadOnlyData16      -- .rodata.cst16 on x86_64, 16-byte aligned
+  | CString
   | OtherSection String
   deriving (Show)
 

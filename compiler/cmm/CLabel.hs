@@ -1088,6 +1088,10 @@ pprCLabel platform (DeadStripPreventer lbl)
  | cGhcWithNativeCodeGen == "YES"
    = pprCLabel platform lbl <> text "_dsp"
 
+pprCLabel _ (StringLitLabel u)
+ | cGhcWithNativeCodeGen == "YES"
+  = pprUnique u <> ptext (sLit "_str")
+
 pprCLabel platform lbl
    = getPprStyle $ \ sty ->
      if cGhcWithNativeCodeGen == "YES" && asmStyle sty
@@ -1109,8 +1113,8 @@ pprAsmCLbl _ lbl
    = pprCLbl lbl
 
 pprCLbl :: CLabel -> SDoc
-pprCLbl (StringLitLabel u)
-  = pprUnique u <> text "_str"
+pprCLbl (StringLitLabel _)
+  = panic "pprCLbl StringLitLabel"
 
 pprCLbl (CaseLabel u CaseReturnPt)
   = hcat [pprUnique u, text "_ret"]

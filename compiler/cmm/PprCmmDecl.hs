@@ -170,4 +170,5 @@ pprSectionType s = doubleQuotes (ptext t)
     RelocatableReadOnlyData
                       -> sLit "relreadonly"
     UninitialisedData -> sLit "uninitialised"
+    CString           -> sLit "cstring"
     OtherSection s'   -> sLit s' -- Not actually a literal though.

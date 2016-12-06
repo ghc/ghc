@@ -44,6 +44,8 @@ import Outputable
 
 import Data.Word
 
+import Data.Char
+
 import Data.Bits
 
 -- -----------------------------------------------------------------------------
@@ -140,10 +142,10 @@ pprBasicBlock info_env (BasicBlock blockid instrs)
 pprDatas :: (Alignment, CmmStatics) -> SDoc
 pprDatas (align, (Statics lbl dats))
  = vcat (pprAlign align : pprLabel lbl : map pprData dats)
- -- TODO: could remove if align == 1
 
 pprData :: CmmStatic -> SDoc
-pprData (CmmString str) = pprASCII str
+pprData (CmmString str)
+ = ptext (sLit "\t.asciz ") <> doubleQuotes (pprASCII str)
 
 pprData (CmmUninitialised bytes)
  = sdocWithPlatform $ \platform ->
@@ -172,10 +174,20 @@ pprLabel lbl = pprGloblDecl lbl
 
 pprASCII :: [Word8] -> SDoc
 pprASCII str
-  = vcat (map do1 str) $$ do1 0
+  = hcat (map (do1 . fromIntegral) str)
     where
-       do1 :: Word8 -> SDoc
-       do1 w = text "\t.byte\t" <> int (fromIntegral w)
+       do1 :: Int -> SDoc
+       do1 w | '\t' <- chr w = ptext (sLit "\\t")
+       do1 w | '\n' <- chr w = ptext (sLit "\\n")
+       do1 w | '"'  <- chr w = ptext (sLit "\\\"")
+       do1 w | '\\' <- chr w = ptext (sLit "\\\\")
+       do1 w | isPrint (chr w) = char (chr w)
+       do1 w | otherwise = char '\\' <> octal w
+
+       octal :: Int -> SDoc
+       octal w = int ((w `div` 64) `mod` 8)
+                  <> int ((w `div` 8) `mod` 8)
+                  <> int (w `mod` 8)
 
 pprAlign :: Int -> SDoc
 pprAlign bytes
@@ -418,10 +430,12 @@ pprAlignForSection seg =
        | target32Bit platform ->
           case seg of
            ReadOnlyData16    -> int 4
+           CString           -> int 1
            _                 -> int 2
        | otherwise ->
           case seg of
            ReadOnlyData16    -> int 4
+           CString           -> int 1
            _                 -> int 3
       -- Other: alignments are given as bytes.
       _
@@ -429,10 +443,12 @@ pprAlignForSection seg =
           case seg of
            Text              -> text "4,0x90"
            ReadOnlyData16    -> int 16
+           CString           -> int 1
            _                 -> int 4
        | otherwise ->
           case seg of
            ReadOnlyData16    -> int 16
+           CString           -> int 1
            _                 -> int 8
 
 pprDataItem :: CmmLit -> SDoc

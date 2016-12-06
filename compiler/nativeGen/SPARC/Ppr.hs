@@ -339,6 +339,9 @@ pprAlignForSection seg =
                         -> sLit ".align 8"
       UninitialisedData -> sLit ".align 8"
       ReadOnlyData16    -> sLit ".align 16"
+      -- TODO: This is copied from the ReadOnlyData case, but it can likely be
+      -- made more efficient.
+      CString           -> sLit ".align 8"
       OtherSection _    -> panic "PprMach.pprSectionHeader: unknown section")
 
 -- | Pretty print a data item.

@@ -348,6 +348,12 @@ pprAlignForSection seg =
        ReadOnlyData16
         | osDarwin       -> sLit ".align 4"
         | otherwise      -> sLit ".align 4"
+       -- TODO: This is copied from the ReadOnlyData case, but it can likely be
+       -- made more efficient.
+       CString
+        | osDarwin       -> sLit ".align 2"
+        | ppc64          -> sLit ".align 3"
+        | otherwise      -> sLit ".align 2"
        OtherSection _    -> panic "PprMach.pprSectionAlign: unknown section"
 
 pprDataItem :: CmmLit -> SDoc
