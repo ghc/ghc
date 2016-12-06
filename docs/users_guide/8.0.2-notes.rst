@@ -68,8 +68,25 @@ Language
         foo :: m ()
 
 -  Some programs using :ghc-flag:`-XDefaultSignatures` that incorrectly
-   type-checked in GHC 8.0.1 are now rejected by GHC 8.0.2. See
-   :ghc-ticket:`12784` for details.
+   type-checked in GHC 8.0.1 are now rejected by GHC 8.0.2. Here is a
+   characteristic example: ::
+
+      class Monad m => MonadSupply m where
+        fresh :: m Integer
+        default fresh :: (MonadTrans t, MonadSupply m) => t m Integer
+        fresh = lift fresh
+
+      instance MonadSupply m => MonadSupply (IdentityT m)
+
+   Note that the ``m`` in the default type signature is being used in
+   a completely different way than the ``m`` in the non-default signature!
+   We can fix this (in a backwards-compatible way) like so: ::
+
+      class Monad m => MonadSupply m where
+        fresh :: m Integer
+        default fresh :: (MonadTrans t, MonadSupply m', m ~ t m') => m Integer
+                         -- Same 'm Integer' after the '=>'
+        fresh = lift fresh
 
 -  Some programs which combine default type class method implementations and
    overlapping instances may now fail to type-check. Here is an example: ::
