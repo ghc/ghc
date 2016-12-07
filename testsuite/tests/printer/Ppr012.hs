@@ -1,5 +1,3 @@
-{-# OPTIONS  -O -ddump-stranal #-}
-
 module Dead1(foo) where
 
 foo :: Int -> Int
