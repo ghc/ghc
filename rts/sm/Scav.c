@@ -105,13 +105,26 @@ scavengeTSO (StgTSO *tso)
    Scavenging compact objects
    ------------------------------------------------------------------------- */
 
+typedef struct {
+    // We must save gct when calling mapHashTable(), which is compiled
+    // without GCThread.h and so uses a different calling convention.
+    // See also GC.c:mark_root where we do a similar thing.
+    gc_thread *saved_gct;
+    HashTable *newHash;
+} MapHashData;
+
 static void
-evacuate_hash_entry(HashTable *newHash, StgWord key, const void *value)
+evacuate_hash_entry(MapHashData *dat, StgWord key, const void *value)
 {
     StgClosure *p = (StgClosure*)key;
+#ifdef THREADED_RTS
+    gc_thread *old_gct = gct;
+#endif
 
+    SET_GCT(dat->saved_gct);
     evacuate(&p);
-    insertHashTable(newHash, (StgWord)p, value);
+    insertHashTable(dat->newHash, (StgWord)p, value);
+    SET_GCT(old_gct);
 }
 
 static void
@@ -122,8 +135,11 @@ scavenge_compact(StgCompactNFData *str)
     gct->eager_promotion = false;
 
     if (str->hash) {
+        MapHashData dat;
+        dat.saved_gct = gct;
         HashTable *newHash = allocHashTable();
-        mapHashTable(str->hash, (void*)newHash, (MapHashFn)evacuate_hash_entry);
+        dat.newHash = newHash;
+        mapHashTable(str->hash, (void*)&dat, (MapHashFn)evacuate_hash_entry);
         freeHashTable(str->hash, NULL);
         str->hash = newHash;
     }
