@@ -267,13 +267,13 @@ TICK_VAR(2)
    Assertions and Debuggery
    -------------------------------------------------------------------------- */
 
-#define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; }
+#define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; } doNothing()
 
 #ifdef DEBUG
 #if IN_STG_CODE
-#define IF_DEBUG(c,s)  if (RtsFlags[0].DebugFlags.c) { s; }
+#define IF_DEBUG(c,s)  if (RtsFlags[0].DebugFlags.c) { s; } doNothing()
 #else
-#define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; }
+#define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; } doNothing()
 #endif
 #else
 #define IF_DEBUG(c,s)  doNothing()

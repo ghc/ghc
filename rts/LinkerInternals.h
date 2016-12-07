@@ -259,18 +259,12 @@ extern /*Str*/HashTable *symhash;
 #define USE_CONTIGUOUS_MMAP 0
 #endif
 
-#include "EndPrivate.h"
-
 HsInt isAlreadyLoaded( pathchar *path );
 HsInt loadOc( ObjectCode* oc );
 ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                   bool mapped, char *archiveMemberName,
                   int misalignment
                   );
-
-#ifdef darwin_HOST_OS
-int machoGetMisalignment( FILE * f );
-#endif /* darwin_HOST_OS */
 
 #if defined (mingw32_HOST_OS)
 /* We use myindex to calculate array addresses, rather than
@@ -313,4 +307,5 @@ char *cstring_from_section_name(
 #define MAP_ANONYMOUS 0
 #endif
 
+#include "EndPrivate.h"
 #endif /* LINKERINTERNALS_H */
