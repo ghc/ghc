@@ -30,6 +30,15 @@
 #endif
 
 /*
+ * We want to avoid using the SIGALRM signals whenever possible as these signals
+ * interrupt system calls (see #10840) and can be overridden by user code. On
+ * Darwin we can use a dedicated thread and usleep.
+ */
+#if defined(darwin_HOST_OS)
+#define USE_PTHREAD_FOR_ITIMER
+#endif
+
+/*
  * On Linux in the threaded RTS we can use timerfd_* (introduced in Linux
  * 2.6.25) and a thread instead of alarm signals. It avoids the risk of
  * interrupting syscalls (see #10840) and the risk of being accidentally
