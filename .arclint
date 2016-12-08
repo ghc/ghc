@@ -53,6 +53,22 @@
         "2": "disabled"
       }
     },
+    "cabal": {
+      "type": "text",
+      "include": ["(\\.cabal(\\.in)?$)"],
+      "severity": {
+        "5": "disabled",
+        "2": "warning"
+      }
+    },
+    "other-text": {
+      "type": "text",
+      "include": ["(.travis.yml?)", "(.md$)", "(.txt$)"],
+      "severity": {
+        "5": "disabled",
+        "2": "warning"
+      }
+    },
     "check-binaries": {
       "type": "external-json",
       "external-json.script": "python .arc-linters/check-binaries.py"
