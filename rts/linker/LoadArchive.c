@@ -62,7 +62,7 @@ static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
         /* search for the right arch */
         int n = fread(tmp, 1, 12, f);
         if (n != 12) {
-            errorBelch("Failed reading arch from `%s'", path);
+            errorBelch("Failed reading arch from `%" PATH_FMT "'", path);
             return false;
         }
         cputype = read4Bytes(tmp);
@@ -82,21 +82,21 @@ static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
         /* Seek to the correct architecture */
         int n = fseek(f, nfat_offset, SEEK_SET);
         if (n != 0) {
-            errorBelch("Failed to seek to arch in `%s'", path);
+            errorBelch("Failed to seek to arch in `%" PATH_FMT "'", path);
             return false;
         }
 
         /* Read the header */
         n = fread(tmp, 1, 8, f);
         if (n != 8) {
-            errorBelch("Failed reading header from `%s'", path);
+            errorBelch("Failed reading header from `%" PATH_FMT "'", path);
             return false;
         }
 
         /* Check the magic number */
         if (strncmp(tmp, "!<arch>\n", 8) != 0) {
-            errorBelch("couldn't find archive in `%s' at offset %d", path,
-                        nfat_offset);
+            errorBelch("couldn't find archive in `%" PATH_FMT "'"
+                       "at offset %d", path, nfat_offset);
             return false;
         }
     }
@@ -126,12 +126,14 @@ static StgBool readThinArchiveMember(int n, int memberSize, pathchar* path,
     stgFree(dirName);
     member = pathopen(memberPath, WSTR("rb"));
     if (!member) {
-        errorBelch("loadObj: can't read thin archive `%s'", memberPath);
+        errorBelch("loadObj: can't read thin archive `%" PATH_FMT "'",
+                   memberPath);
         goto inner_fail;
     }
     n = fread(image, 1, memberSize, member);
     if (n != memberSize) {
-        errorBelch("loadArchive: error whilst reading `%s'", fileName);
+        errorBelch("loadArchive: error whilst reading `%s'",
+                   fileName);
         goto inner_fail;
     }
     has_succeeded = true;
@@ -152,12 +154,12 @@ static StgBool checkFatArchive(char magic[static 20], FILE* f, pathchar* path)
     if (read4Bytes(magic) == FAT_MAGIC)
         success = loadFatArchive(magic, f, path);
     else
-        errorBelch("loadArchive: Neither an archive, nor a fat archive: `%s'",
-                path);
+        errorBelch("loadArchive: Neither an archive, nor a fat archive: "
+                   "`%" PATH_FMT "'", path);
 #else
     (void)magic;
     (void)f;
-    errorBelch("loadArchive: Not an archive: `%s'", path);
+    errorBelch("loadArchive: Not an archive: `%" PATH_FMT "'", path);
 #endif
     return success;
 }
@@ -186,21 +188,21 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
         n = atoi(fileName + 1);
         if (gnuFileIndex == NULL) {
             errorBelch("loadArchive: GNU-variant filename "
-                    "without an index while reading from `%s'",
+                    "without an index while reading from `%" PATH_FMT "'",
                     path);
             return false;
         }
         if (n < 0 || n > gnuFileIndexSize) {
             errorBelch("loadArchive: GNU-variant filename "
                     "offset %d out of range [0..%d] "
-                    "while reading filename from `%s'",
+                    "while reading filename from `%" PATH_FMT "'",
                     n, gnuFileIndexSize, path);
             return false;
         }
         if (n != 0 && gnuFileIndex[n - 1] != '\n') {
             errorBelch("loadArchive: GNU-variant filename offset "
                     "%d invalid (range [0..%d]) while reading "
-                    "filename from `%s'",
+                    "filename from `%" PATH_FMT "'",
                     n, gnuFileIndexSize, path);
             return false;
         }
@@ -227,8 +229,9 @@ lookupGNUArchiveIndex(int gnuFileIndexSize, char **fileName_,
         *thisFileNameSize = 0;
     }
     else {
-        errorBelch("loadArchive: invalid GNU-variant filename `%.16s'"
-                   " while reading filename from `%s'", fileName, path);
+        errorBelch("loadArchive: invalid GNU-variant filename `%.16s' "
+                   "while reading filename from `%" PATH_FMT "'",
+                   fileName, path);
         return false;
     }
 
@@ -394,7 +397,8 @@ static HsInt loadArchive_ (pathchar *path)
                 }
                 n = fread(fileName, 1, thisFileNameSize, f);
                 if (n != thisFileNameSize) {
-                    errorBelch("Failed reading filename from `%s'", path);
+                    errorBelch("Failed reading filename from `%" PATH_FMT "'",
+                               path);
                     goto fail;
                 }
                 fileName[thisFileNameSize] = 0;
@@ -404,7 +408,7 @@ static HsInt loadArchive_ (pathchar *path)
                 thisFileNameSize = strlen(fileName);
             } else {
                 errorBelch("BSD-variant filename size not found "
-                           "while reading filename from `%s'", path);
+                           "while reading filename from `%" PATH_FMT "'", path);
                 goto fail;
             }
         }
@@ -555,7 +559,7 @@ static HsInt loadArchive_ (pathchar *path)
         else if (isGnuIndex) {
             if (gnuFileIndex != NULL) {
                 FAIL("GNU-variant index found, but already have an index, \
-while reading filename from `%s'", path);
+while reading filename from `%" PATH_FMT "'", path);
             }
             DEBUG_LOG("Found GNU-variant file index\n");
 #if RTS_LINKER_USE_MMAP
@@ -587,7 +591,8 @@ while reading filename from `%s'", path);
 #endif
         }
         else {
-            DEBUG_LOG("'%s' does not appear to be an object file\n", fileName);
+            DEBUG_LOG("`%s' does not appear to be an object file\n",
+                      fileName);
             if (!isThin || thisFileNameSize == 0) {
                 n = fseek(f, memberSize, SEEK_CUR);
                 if (n != 0)

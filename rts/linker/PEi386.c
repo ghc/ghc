@@ -1158,7 +1158,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       if (addr != NULL || isWeak == HS_BOOL_TRUE) {
 
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
-         IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname);)
+         IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname));
          ASSERT(i >= 0 && i < oc->n_symbols);
          /* cstring_from_COFF_symbol_name always succeeds. */
          oc->symbols[i] = (SymbolName*)sname;
