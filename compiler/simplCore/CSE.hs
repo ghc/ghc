@@ -240,26 +240,34 @@ cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind env (NonRec b e)
-  = (env2, NonRec b'' e')
+  = (env2, NonRec b2 e2)
   where
-    (env1, b') = addBinder env b
-    (env2, (b'', e')) = cseRhs env1 b b' e
+    e1               = tryForCSE env e
+    (env1, b1)       = addBinder env b
+    (env2, (b2, e2)) = addBinding env1 b b1 e1
 
 cseBind env (Rec pairs)
   = (env2, Rec pairs')
   where
-    (env1, bs')    = addRecBinders env (map fst pairs)
-    (env2, pairs') = mapAccumL cse_rhs env1 (bs' `zip` pairs)
-    cse_rhs env (b', (b,e)) = cseRhs env b b' e
+    (bndrs, rhss)  = unzip pairs
+    (env1, bndrs1) = addRecBinders env bndrs
+    rhss1          = map (tryForCSE env1) rhss
+                     -- Process rhss in extended env1
+    (env2, pairs') = mapAccumL cse_rhs env1 (zip3 bndrs bndrs1 rhss1)
+    cse_rhs env (b, b1, e1) = addBinding env b b1 e1
 
-cseRhs :: CSEnv -> InId -> OutId -> InExpr -> (CSEnv, (OutId, OutExpr))
-cseRhs env in_id out_id rhs
+addBinding :: CSEnv                      -- Includes InId->OutId cloning
+           -> InId
+           -> OutId -> OutExpr           -- Processed binding
+           -> (CSEnv, (OutId, OutExpr))  -- Final env and binding
+-- Extend the CSE env with a mapping [rhs -> out-id]
+-- unless we can instead just substitute [in-id -> rhs]
+addBinding env in_id out_id rhs'
   | no_cse      = (env,                              (out_id, rhs'))
   | ok_to_subst = (extendCSSubst env in_id rhs',     (out_id, rhs'))
   | otherwise   = (extendCSEnv env rhs' id_expr', (zapped_id, rhs'))
   where
     id_expr'  = varToCoreExpr out_id
-    rhs'      = tryForCSE env rhs
     zapped_id = zapIdUsageInfo out_id
        -- Putting the Id into the cs_map makes it possible that
        -- it'll become shared more than it is now, which would
@@ -316,15 +324,17 @@ cseExpr env (Case e bndr ty alts)  = cseCase env e bndr ty alts
 
 cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
 cseCase env scrut bndr ty alts
-  = Case scrut' bndr3 ty (map cse_alt alts)
+  = Case scrut2 bndr3 ty (map cse_alt alts)
   where
+    scrut1 = tryForCSE env scrut
+
     bndr1 = zapIdOccInfo bndr
       -- Zapping the OccInfo is needed because the extendCSEnv
       -- in cse_alt may mean that a dead case binder
       -- becomes alive, and Lint rejects that
     (env1, bndr2)              = addBinder env bndr1
-    (alt_env, (bndr3, scrut')) = cseRhs env1 bndr bndr2 scrut
-         -- cseRhs: see Note [CSE for case expressions]
+    (alt_env, (bndr3, scrut2)) = addBinding env1 bndr bndr2 scrut1
+         -- addBinding: see Note [CSE for case expressions]
 
     con_target :: OutExpr
     con_target = lookupSubst alt_env bndr
