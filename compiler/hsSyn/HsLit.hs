@@ -23,7 +23,7 @@ import BasicTypes ( FractionalLit(..),SourceText(..),pprWithSourceText )
 import Type       ( Type )
 import Outputable
 import FastString
-import PlaceHolder ( PostTc,PostRn,DataId,OutputableBndrId, HasOccNameId )
+import PlaceHolder ( PostTc,PostRn,DataId,OutputableBndrId )
 
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
@@ -185,8 +185,7 @@ pp_st_suffix NoSourceText         _ doc = doc
 pp_st_suffix (SourceText st) suffix _   = text st <> suffix
 
 -- in debug mode, print the expression that it's resolved to, too
-instance (OutputableBndrId id, HasOccNameId id)
-           => Outputable (HsOverLit id) where
+instance (OutputableBndrId id) => Outputable (HsOverLit id) where
   ppr (OverLit {ol_val=val, ol_witness=witness})
         = ppr val <+> (ifPprDebug (parens (pprExpr witness)))
 

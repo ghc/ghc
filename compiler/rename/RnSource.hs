@@ -798,11 +798,13 @@ rnTyFamInstEqn :: Maybe (Name, [Name])
                -> RnM (TyFamInstEqn Name, FreeVars)
 rnTyFamInstEqn mb_cls (TyFamEqn { tfe_tycon = tycon
                                 , tfe_pats  = pats
+                                , tfe_fixity = fixity
                                 , tfe_rhs   = rhs })
   = do { (tycon', pats', rhs', fvs) <-
            rnFamInstDecl (TySynCtx tycon) mb_cls tycon pats rhs rnTySyn
        ; return (TyFamEqn { tfe_tycon = tycon'
                           , tfe_pats  = pats'
+                          , tfe_fixity = fixity
                           , tfe_rhs   = rhs' }, fvs) }
 
 rnTyFamDefltEqn :: Name
@@ -810,12 +812,14 @@ rnTyFamDefltEqn :: Name
                 -> RnM (TyFamDefltEqn Name, FreeVars)
 rnTyFamDefltEqn cls (TyFamEqn { tfe_tycon = tycon
                               , tfe_pats  = tyvars
+                              , tfe_fixity = fixity
                               , tfe_rhs   = rhs })
   = bindHsQTyVars ctx Nothing (Just cls) [] tyvars $ \ tyvars' _ ->
     do { tycon'      <- lookupFamInstName (Just cls) tycon
        ; (rhs', fvs) <- rnLHsType ctx rhs
        ; return (TyFamEqn { tfe_tycon = tycon'
                           , tfe_pats  = tyvars'
+                          , tfe_fixity = fixity
                           , tfe_rhs   = rhs' }, fvs) }
   where
     ctx = TyFamilyCtx tycon
@@ -825,11 +829,13 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
                   -> RnM (DataFamInstDecl Name, FreeVars)
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
                                           , dfid_pats  = pats
+                                          , dfid_fixity = fixity
                                           , dfid_defn  = defn })
   = do { (tycon', pats', (defn', _), fvs) <-
            rnFamInstDecl (TyDataCtx tycon) mb_cls tycon pats defn rnDataDefn
        ; return (DataFamInstDecl { dfid_tycon = tycon'
                                  , dfid_pats  = pats'
+                                 , dfid_fixity = fixity
                                  , dfid_defn  = defn'
                                  , dfid_fvs   = fvs }, fvs) }
 
@@ -1632,7 +1638,8 @@ rnTyClDecl (FamDecl { tcdFam = decl })
   = do { (decl', fvs) <- rnFamDecl Nothing decl
        ; return (FamDecl decl', fvs) }
 
-rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdRhs = rhs })
+rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
+                      tcdFixity = fixity, tcdRhs = rhs })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- freeKiTyVarsKindVars <$> extractHsTyRdrTyVars rhs
        ; let doc = TySynCtx tycon
@@ -1642,11 +1649,13 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdRhs = rhs })
                                     do { (rhs', fvs) <- rnTySyn doc rhs
                                        ; return ((tyvars', rhs'), fvs) }
        ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
+                         , tcdFixity = fixity
                          , tcdRhs = rhs', tcdFVs = fvs }, fvs) }
 
 -- "data", "newtype" declarations
 -- both top level and (for an associated type) in an instance decl
-rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn })
+rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
+                       tcdFixity = fixity, tcdDataDefn = defn })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- extractDataDefnKindVars defn
        ; let doc = TyDataCtx tycon
@@ -1662,11 +1671,13 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars, tcdDataDefn = defn 
        ; let cusk = hsTvbAllKinded tyvars' &&
                     (not typeintype || no_kvs)
        ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
+                          , tcdFixity = fixity
                           , tcdDataDefn = defn', tcdDataCusk = cusk
                           , tcdFVs = fvs }, fvs) }
 
 rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
-                        tcdTyVars = tyvars, tcdFDs = fds, tcdSigs = sigs,
+                        tcdTyVars = tyvars, tcdFixity = fixity,
+                        tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
                         tcdDocs = docs})
   = do  { lcls' <- lookupLocatedTopBndrRn lcls
@@ -1720,7 +1731,8 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
         ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
-                              tcdTyVars = tyvars', tcdFDs = fds', tcdSigs = sigs',
+                              tcdTyVars = tyvars', tcdFixity = fixity,
+                              tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
                               tcdDocs = docs', tcdFVs = all_fvs },
                   all_fvs ) }
@@ -1811,6 +1823,7 @@ rnFamDecl :: Maybe Name -- Just cls => this FamilyDecl is nested
           -> FamilyDecl RdrName
           -> RnM (FamilyDecl Name, FreeVars)
 rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
+                             , fdFixity = fixity
                              , fdInfo = info, fdResultSig = res_sig
                              , fdInjectivityAnn = injectivity })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
@@ -1825,6 +1838,7 @@ rnFamDecl mb_cls (FamilyDecl { fdLName = tycon, fdTyVars = tyvars
                ; return ( (tyvars', res_sig', injectivity') , fv_kind ) }
        ; (info', fv2) <- rn_info info
        ; return (FamilyDecl { fdLName = tycon', fdTyVars = tyvars'
+                            , fdFixity = fixity
                             , fdInfo = info', fdResultSig = res_sig'
                             , fdInjectivityAnn = injectivity' }
                 , fv1 `plusFV` fv2) }

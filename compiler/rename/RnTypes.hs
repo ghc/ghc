@@ -50,7 +50,7 @@ import FieldLabel
 
 import Util
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
-                          Fixity(..), FixityDirection(..) )
+                          Fixity(..), FixityDirection(..), LexicalFixity(..) )
 import Outputable
 import FastString
 import Maybes

@@ -15,6 +15,7 @@ module TcGenFunctor (
         gen_Functor_binds, gen_Foldable_binds, gen_Traversable_binds
     ) where
 
+import BasicTypes ( LexicalFixity(..) )
 import Bag
 import DataCon
 import FastString

@@ -137,11 +137,12 @@ mkClassDecl :: SrcSpan
 mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
   = do { (binds, sigs, ats, at_insts, _, docs) <- cvBindsAndSigs where_cls
        ; let cxt = fromMaybe (noLoc []) mcxt
-       ; (cls, tparams,ann) <- checkTyClHdr True tycl_hdr
+       ; (cls, tparams, fixity, ann) <- checkTyClHdr True tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (text "class") whereDots cls tparams
        ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
        ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars
+                                  , tcdFixity = fixity
                                   , tcdFDs = snd (unLoc fds)
                                   , tcdSigs = mkClassOpSigs sigs
                                   , tcdMeths = binds
@@ -157,10 +158,12 @@ mkATDefault :: LTyFamInstDecl RdrName
 -- We use the Either monad because this also called
 -- from Convert.hs
 mkATDefault (L loc (TyFamInstDecl { tfid_eqn = L _ e }))
-      | TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_rhs = rhs } <- e
+      | TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_fixity = fixity
+                 , tfe_rhs = rhs } <- e
       = do { tvs <- checkTyVars (text "default") equalsDots tc (hsib_body pats)
            ; return (L loc (TyFamEqn { tfe_tycon = tc
                                      , tfe_pats = tvs
+                                     , tfe_fixity = fixity
                                      , tfe_rhs = rhs })) }
 
 mkTyData :: SrcSpan
@@ -172,11 +175,12 @@ mkTyData :: SrcSpan
          -> HsDeriving RdrName
          -> P (LTyClDecl RdrName)
 mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
-  = do { (tc, tparams,ann) <- checkTyClHdr False tycl_hdr
+  = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
+                                   tcdFixity = fixity,
                                    tcdDataDefn = defn,
                                    tcdDataCusk = PlaceHolder,
                                    tcdFVs = placeHolderNames })) }
@@ -203,19 +207,21 @@ mkTySynonym :: SrcSpan
             -> LHsType RdrName  -- RHS
             -> P (LTyClDecl RdrName)
 mkTySynonym loc lhs rhs
-  = do { (tc, tparams,ann) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (text "type") equalsDots tc tparams
        ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars
+                                , tcdFixity = fixity
                                 , tcdRhs = rhs, tcdFVs = placeHolderNames })) }
 
 mkTyFamInstEqn :: LHsType RdrName
                -> LHsType RdrName
                -> P (TyFamInstEqn RdrName,[AddAnn])
 mkTyFamInstEqn lhs rhs
-  = do { (tc, tparams, ann) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; return (TyFamEqn { tfe_tycon = tc
                           , tfe_pats  = mkHsImplicitBndrs tparams
+                          , tfe_fixity = fixity
                           , tfe_rhs   = rhs },
                  ann) }
 
@@ -228,12 +234,13 @@ mkDataFamInst :: SrcSpan
               -> HsDeriving RdrName
               -> P (LInstDecl RdrName)
 mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
-  = do { (tc, tparams,ann) <- checkTyClHdr False tycl_hdr
+  = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
        ; return (L loc (DataFamInstD (
                   DataFamInstDecl { dfid_tycon = tc
                                   , dfid_pats = mkHsImplicitBndrs tparams
+                                  , dfid_fixity = fixity
                                   , dfid_defn = defn, dfid_fvs = placeHolderNames }))) }
 
 mkTyFamInst :: SrcSpan
@@ -250,11 +257,12 @@ mkFamDecl :: SrcSpan
           -> Maybe (LInjectivityAnn RdrName)   -- Injectivity annotation
           -> P (LTyClDecl RdrName)
 mkFamDecl loc info lhs ksig injAnn
-  = do { (tc, tparams, ann) <- checkTyClHdr False lhs
+  = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr info) equals_or_where tc tparams
        ; return (L loc (FamDecl (FamilyDecl{ fdInfo      = info, fdLName = tc
                                            , fdTyVars    = tyvars
+                                           , fdFixity    = fixity
                                            , fdResultSig = ksig
                                            , fdInjectivityAnn = injAnn }))) }
   where
@@ -722,39 +730,41 @@ checkTyClHdr :: Bool               -- True  <=> class header
              -> LHsType RdrName
              -> P (Located RdrName,          -- the head symbol (type or class name)
                    [LHsType RdrName],        -- parameters of head symbol
+                   LexicalFixity,         -- the declaration is in infix format
                    [AddAnn]) -- API Annotation for HsParTy when stripping parens
 -- Well-formedness check and decomposition of type and class heads.
 -- Decomposes   T ty1 .. tyn   into    (T, [ty1, ..., tyn])
 --              Int :*: Bool   into    (:*:, [Int, Bool])
 -- returning the pieces
 checkTyClHdr is_cls ty
-  = goL ty [] []
+  = goL ty [] [] Prefix
   where
-    goL (L l ty) acc ann = go l ty acc ann
+    goL (L l ty) acc ann fix = go l ty acc ann fix
 
-    go l (HsTyVar _ (L _ tc)) acc ann
-      | isRdrTc tc               = return (L l tc, acc, ann)
-    go _ (HsOpTy t1 ltc@(L _ tc) t2) acc ann
-      | isRdrTc tc               = return (ltc, t1:t2:acc, ann)
-    go l (HsParTy ty)    acc ann = goL ty acc (ann ++ mkParensApiAnn l)
-    go _ (HsAppTy t1 t2) acc ann = goL t1 (t2:acc) ann
-    go _ (HsAppsTy ts)   acc ann
-      | Just (head, args) <- getAppsTyHead_maybe ts = goL head (args ++ acc) ann
+    go l (HsTyVar _ (L _ tc)) acc ann fix
+      | isRdrTc tc               = return (L l tc, acc, fix, ann)
+    go _ (HsOpTy t1 ltc@(L _ tc) t2) acc ann _fix
+      | isRdrTc tc               = return (ltc, t1:t2:acc, Infix, ann)
+    go l (HsParTy ty)    acc ann fix = goL ty acc (ann ++ mkParensApiAnn l) fix
+    go _ (HsAppTy t1 t2) acc ann fix = goL t1 (t2:acc) ann fix
+    go _ (HsAppsTy ts)   acc ann _fix
+      | Just (head, args, fixity) <- getAppsTyHead_maybe ts
+      = goL head (args ++ acc) ann fixity
 
-    go _ (HsAppsTy [L _ (HsAppInfix (L loc star))]) [] ann
+    go _ (HsAppsTy [L _ (HsAppInfix (L loc star))]) [] ann fix
       | occNameFS (rdrNameOcc star) == fsLit "*"
-      = return (L loc (nameRdrName starKindTyConName), [], ann)
+      = return (L loc (nameRdrName starKindTyConName), [], fix, ann)
       | occNameFS (rdrNameOcc star) == fsLit "★"
-      = return (L loc (nameRdrName unicodeStarKindTyConName), [], ann)
+      = return (L loc (nameRdrName unicodeStarKindTyConName), [], fix, ann)
 
-    go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann
-      = return (L l (nameRdrName tup_name), ts, ann)
+    go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann fix
+      = return (L l (nameRdrName tup_name), ts, fix, ann)
       where
         arity = length ts
         tup_name | is_cls    = cTupleTyConName arity
                  | otherwise = getName (tupleTyCon Boxed arity)
                  -- See Note [Unit tuples] in HsTypes  (TODO: is this still relevant?)
-    go l _  _  _
+    go l _ _ _ _
       = parseErrorSDoc l (text "Malformed head of type or class declaration:"
                           <+> ppr ty)
 
@@ -926,7 +936,7 @@ checkFunBind :: SDoc
              -> [AddAnn]
              -> SrcSpan
              -> Located RdrName
-             -> FunctionFixity
+             -> LexicalFixity
              -> [LHsExpr RdrName]
              -> Maybe (LHsType RdrName)
              -> Located (GRHSs RdrName (LHsExpr RdrName))
@@ -1031,7 +1041,7 @@ splitBang (L _ (OpApp l_arg bang@(L _ (HsVar (L _ op))) _ r_arg))
 splitBang _ = Nothing
 
 isFunLhs :: LHsExpr RdrName
-      -> P (Maybe (Located RdrName, FunctionFixity, [LHsExpr RdrName],[AddAnn]))
+      -> P (Maybe (Located RdrName, LexicalFixity, [LHsExpr RdrName],[AddAnn]))
 -- A variable binding is parsed as a FunBind.
 -- Just (fun, is_infix, arg_pats) if e is a function LHS
 --

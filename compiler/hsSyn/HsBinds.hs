@@ -22,7 +22,7 @@ import {-# SOURCE #-} HsExpr ( pprExpr, LHsExpr,
                                GRHSs, pprPatBind )
 import {-# SOURCE #-} HsPat  ( LPat )
 
-import PlaceHolder ( PostTc,PostRn,DataId,OutputableBndrId,HasOccNameId )
+import PlaceHolder ( PostTc,PostRn,DataId,OutputableBndrId )
 import HsTypes
 import PprCore ()
 import CoreSyn
@@ -437,15 +437,13 @@ Specifically,
     it's just an error thunk
 -}
 
-instance (OutputableBndrId idL, OutputableBndrId idR,
-          HasOccNameId idL, HasOccNameId idR)
+instance (OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsLocalBindsLR idL idR) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
   ppr EmptyLocalBinds = empty
 
-instance (OutputableBndrId idL, OutputableBndrId idR,
-          HasOccNameId idL, HasOccNameId idR)
+instance (OutputableBndrId idL, OutputableBndrId idR)
         => Outputable (HsValBindsLR idL idR) where
   ppr (ValBindsIn binds sigs)
    = pprDeclList (pprLHsBindsForUser binds sigs)
@@ -461,16 +459,14 @@ instance (OutputableBndrId idL, OutputableBndrId idR,
      pp_rec Recursive    = text "rec"
      pp_rec NonRecursive = text "nonrec"
 
-pprLHsBinds :: (OutputableBndrId idL, OutputableBndrId idR,
-                HasOccNameId idL, HasOccNameId idR)
+pprLHsBinds :: (OutputableBndrId idL, OutputableBndrId idR)
             => LHsBindsLR idL idR -> SDoc
 pprLHsBinds binds
   | isEmptyLHsBinds binds = empty
   | otherwise = pprDeclList (map ppr (bagToList binds))
 
 pprLHsBindsForUser :: (OutputableBndrId idL, OutputableBndrId idR,
-                       OutputableBndrId id2, HasOccNameId id2,
-                       HasOccNameId idL, HasOccNameId idR)
+                       OutputableBndrId id2)
                    => LHsBindsLR idL idR -> [LSig id2] -> [SDoc]
 --  pprLHsBindsForUser is different to pprLHsBinds because
 --  a) No braces: 'let' and 'where' include a list of HsBindGroups
@@ -561,13 +557,11 @@ So the desugarer tries to do a better job:
                                       in (fm,gm)
 -}
 
-instance (OutputableBndrId idL, OutputableBndrId idR,
-          HasOccNameId idL, HasOccNameId idR)
+instance (OutputableBndrId idL, OutputableBndrId idR)
          => Outputable (HsBindLR idL idR) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: (OutputableBndrId idL, OutputableBndrId idR,
-                 HasOccNameId idL,  HasOccNameId idR)
+ppr_monobind :: (OutputableBndrId idL, OutputableBndrId idR)
              => HsBindLR idL idR -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })
@@ -623,7 +617,7 @@ instance (OutputableBndr id) => Outputable (ABExport id) where
            , nest 2 (pprTcSpecPrags prags)
            , nest 2 (text "wrap:" <+> ppr wrap)]
 
-instance (OutputableBndr idL, OutputableBndrId idR, HasOccNameId idR)
+instance (OutputableBndr idL, OutputableBndrId idR)
           => Outputable (PatSynBind idL idR) where
   ppr (PSB{ psb_id = (L _ psyn), psb_args = details, psb_def = pat,
             psb_dir = dir })
@@ -695,12 +689,11 @@ data IPBind id
   = IPBind (Either (Located HsIPName) id) (LHsExpr id)
 deriving instance (DataId name) => Data (IPBind name)
 
-instance (OutputableBndrId id, HasOccNameId id)
-        => Outputable (HsIPBinds id) where
+instance (OutputableBndrId id ) => Outputable (HsIPBinds id) where
   ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs)
                         $$ ifPprDebug (ppr ds)
 
-instance (OutputableBndrId id, HasOccNameId id) => Outputable (IPBind id) where
+instance (OutputableBndrId id ) => Outputable (IPBind id) where
   ppr (IPBind lr rhs) = name <+> equals <+> pprExpr (unLoc rhs)
     where name = case lr of
                    Left (L _ ip) -> pprBndr LetBind ip
@@ -957,11 +950,10 @@ signatures. Since some of the signatures contain a list of names, testing for
 equality is not enough -- we have to check if they overlap.
 -}
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (Sig name) where
+instance (OutputableBndrId name ) => Outputable (Sig name) where
     ppr sig = ppr_sig sig
 
-ppr_sig :: (OutputableBndrId name, HasOccNameId name) => Sig name -> SDoc
+ppr_sig :: (OutputableBndrId name ) => Sig name -> SDoc
 ppr_sig (TypeSig vars ty)    = pprVarSig (map unLoc vars) (ppr ty)
 ppr_sig (ClassOpSig is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
@@ -1021,7 +1013,7 @@ instance Outputable TcSpecPrag where
   ppr (SpecPrag var _ inl)
     = text "SPECIALIZE" <+> pprSpec var (text "<type>") inl
 
-pprMinimalSig :: (OutputableBndr name, HasOccName name)
+pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (Located name) -> SDoc
 pprMinimalSig (L _ bf) = text "MINIMAL" <+> ppr (fmap unLoc bf)
 

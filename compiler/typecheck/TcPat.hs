@@ -1186,8 +1186,7 @@ polyPatSig sig_ty
   = hang (text "Illegal polymorphic type signature in pattern:")
        2 (ppr sig_ty)
 
-lazyUnliftedPatErr :: (OutputableBndrId name, HasOccNameId name)
-                   => Pat name -> TcM ()
+lazyUnliftedPatErr :: (OutputableBndrId name) => Pat name -> TcM ()
 lazyUnliftedPatErr pat
   = failWithTc $
     hang (text "A lazy (~) pattern cannot contain unlifted types:")

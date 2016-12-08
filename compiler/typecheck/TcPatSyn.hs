@@ -764,22 +764,19 @@ tcCheckPatSynPat = go
     go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
     go1   CoPat{}             = panic "CoPat in output of renamer"
 
-asPatInPatSynErr :: (OutputableBndrId name, HasOccNameId name)
-                 => Pat name -> TcM a
+asPatInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain as-patterns (@):")
        2 (ppr pat)
 
-thInPatSynErr :: (OutputableBndrId name, HasOccNameId name)
-              => Pat name -> TcM a
+thInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 thInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain Template Haskell:")
        2 (ppr pat)
 
-nPlusKPatInPatSynErr :: (OutputableBndrId name, HasOccNameId name)
-                     => Pat name -> TcM a
+nPlusKPatInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 nPlusKPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain n+k-pattern:")

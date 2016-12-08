@@ -42,7 +42,7 @@ import NameSet
 import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps       ( findDupsEq )
-import BasicTypes       ( RecFlag(..) )
+import BasicTypes       ( RecFlag(..), LexicalFixity(..) )
 import Digraph          ( SCC(..) )
 import Bag
 import Util

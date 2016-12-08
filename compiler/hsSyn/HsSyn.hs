@@ -44,6 +44,7 @@ import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
+import OccName          ( HasOccName(..) )
 
 -- others:
 import Outputable
@@ -108,8 +109,8 @@ data HsModule name
      -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (HsModule name)
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (HsModule name) where
+instance (OutputableBndrId name, HasOccName name)
+  => Outputable (HsModule name) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports

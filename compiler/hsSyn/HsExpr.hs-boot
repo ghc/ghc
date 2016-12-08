@@ -11,7 +11,7 @@ import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} HsPat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
-import PlaceHolder ( DataId, OutputableBndrId, HasOccNameId )
+import PlaceHolder ( DataId, OutputableBndrId )
 import Data.Data hiding ( Fixity )
 
 type role HsExpr nominal
@@ -34,27 +34,24 @@ instance (Data body,DataId id) => Data (MatchGroup id body)
 instance (Data body,DataId id) => Data (GRHSs id body)
 instance (DataId id) => Data (SyntaxExpr id)
 
-instance (OutputableBndrId id, HasOccNameId id) => Outputable (HsExpr id)
-instance (OutputableBndrId id, HasOccNameId id) => Outputable (HsCmd id)
+instance (OutputableBndrId id) => Outputable (HsExpr id)
+instance (OutputableBndrId id) => Outputable (HsCmd id)
 
 type LHsExpr a = Located (HsExpr a)
 
-pprLExpr :: (OutputableBndrId id, HasOccNameId id) => LHsExpr id -> SDoc
+pprLExpr :: (OutputableBndrId id) => LHsExpr id -> SDoc
 
-pprExpr :: (OutputableBndrId id,HasOccNameId id) => HsExpr id -> SDoc
+pprExpr :: (OutputableBndrId id) => HsExpr id -> SDoc
 
-pprSplice :: (OutputableBndrId id, HasOccNameId id)
-          => HsSplice id -> SDoc
+pprSplice :: (OutputableBndrId id) => HsSplice id -> SDoc
 
-pprSpliceDecl ::  (OutputableBndrId id, HasOccNameId id)
+pprSpliceDecl ::  (OutputableBndrId id)
           => HsSplice id -> SpliceExplicitFlag -> SDoc
 
 pprPatBind :: (OutputableBndrId bndr,
                OutputableBndrId id,
-               HasOccNameId id,
-               HasOccNameId bndr,
                Outputable body)
            => LPat bndr -> GRHSs id body -> SDoc
 
-pprFunBind :: (OutputableBndrId idR, HasOccNameId idR, Outputable body)
+pprFunBind :: (OutputableBndrId idR, Outputable body)
            => MatchGroup idR body -> SDoc

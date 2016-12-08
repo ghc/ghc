@@ -232,6 +232,7 @@ module GHC (
         defaultFixity, maxPrecedence,
         negateFixity,
         compareFixity,
+        LexicalFixity(..),
 
         -- ** Source locations
         SrcLoc(..), RealSrcLoc,

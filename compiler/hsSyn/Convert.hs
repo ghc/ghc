@@ -182,8 +182,9 @@ cvtDec (TySynD tc tvs rhs)
   = do  { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
         ; rhs' <- cvtType rhs
         ; returnJustL $ TyClD $
-          SynDecl { tcdLName = tc'
-                  , tcdTyVars = tvs', tcdFVs = placeHolderNames
+          SynDecl { tcdLName = tc', tcdTyVars = tvs'
+                  , tcdFixity = Prefix
+                  , tcdFVs = placeHolderNames
                   , tcdRhs = rhs' } }
 
 cvtDec (DataD ctxt tc tvs ksig constrs derivs)
@@ -207,6 +208,7 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
                                 , dd_kindSig = ksig'
                                 , dd_cons = cons', dd_derivs = derivs' }
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
+                                        , tcdFixity = Prefix
                                         , tcdDataDefn = defn
                                         , tcdDataCusk = PlaceHolder
                                         , tcdFVs = placeHolderNames }) }
@@ -222,6 +224,7 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
                                 , dd_cons = [con']
                                 , dd_derivs = derivs' }
         ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
+                                    , tcdFixity = Prefix
                                     , tcdDataDefn = defn
                                     , tcdDataCusk = PlaceHolder
                                     , tcdFVs = placeHolderNames }) }
@@ -237,6 +240,7 @@ cvtDec (ClassD ctxt cl tvs fds decs)
         ; at_defs <- mapM cvt_at_def ats'
         ; returnJustL $ TyClD $
           ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
+                    , tcdFixity = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
                     , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = []
@@ -282,7 +286,7 @@ cvtDec (DataFamilyD tc tvs kind)
   = do { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
        ; result <- cvtMaybeKindToFamilyResultSig kind
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl DataFamily tc' tvs' result Nothing }
+         FamilyDecl DataFamily tc' tvs' Prefix result Nothing }
 
 cvtDec (DataInstD ctxt tc tys ksig constrs derivs)
   = do { (ctxt', tc', typats') <- cvt_tyinst_hdr ctxt tc tys
@@ -297,6 +301,7 @@ cvtDec (DataInstD ctxt tc tys ksig constrs derivs)
        ; returnJustL $ InstD $ DataFamInstD
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn
+                                         , dfid_fixity = Prefix
                                          , dfid_fvs = placeHolderNames } }}
 
 cvtDec (NewtypeInstD ctxt tc tys ksig constr derivs)
@@ -311,6 +316,7 @@ cvtDec (NewtypeInstD ctxt tc tys ksig constr derivs)
        ; returnJustL $ InstD $ DataFamInstD
            { dfid_inst = DataFamInstDecl { dfid_tycon = tc', dfid_pats = typats'
                                          , dfid_defn = defn
+                                         , dfid_fixity = Prefix
                                          , dfid_fvs = placeHolderNames } }}
 
 cvtDec (TySynInstD tc eqn)
@@ -323,13 +329,13 @@ cvtDec (TySynInstD tc eqn)
 cvtDec (OpenTypeFamilyD head)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl OpenTypeFamily tc' tyvars' result' injectivity' }
+         FamilyDecl OpenTypeFamily tc' tyvars' Prefix result' injectivity' }
 
 cvtDec (ClosedTypeFamilyD head eqns)
   = do { (tc', tyvars', result', injectivity') <- cvt_tyfam_head head
        ; eqns' <- mapM (cvtTySynEqn tc') eqns
        ; returnJustL $ TyClD $ FamDecl $
-         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tyvars' result'
+         FamilyDecl (ClosedTypeFamily (Just eqns')) tc' tyvars' Prefix result'
                                       injectivity' }
 
 cvtDec (TH.RoleAnnotD tc roles)
@@ -384,6 +390,7 @@ cvtTySynEqn tc (TySynEqn lhs rhs)
         ; rhs' <- cvtType rhs
         ; returnL $ TyFamEqn { tfe_tycon = tc
                              , tfe_pats = mkHsImplicitBndrs lhs'
+                             , tfe_fixity = Prefix
                              , tfe_rhs = rhs' } }
 
 ----------------

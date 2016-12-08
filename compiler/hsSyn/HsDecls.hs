@@ -98,8 +98,7 @@ import Name
 import BasicTypes
 import Coercion
 import ForeignCall
-import PlaceHolder ( PostTc,PostRn,PlaceHolder(..),DataId, OutputableBndrId,
-                     HasOccNameId )
+import PlaceHolder ( PostTc,PostRn,PlaceHolder(..),DataId, OutputableBndrId )
 import NameSet
 
 -- others:
@@ -111,7 +110,7 @@ import SrcLoc
 
 import Bag
 import Maybes
-import Data.Data        hiding (TyCon,Fixity)
+import Data.Data        hiding (TyCon,Fixity, Infix)
 
 {-
 ************************************************************************
@@ -252,8 +251,7 @@ appendGroups
         hs_vects  = vects1 ++ vects2,
         hs_docs   = docs1  ++ docs2 }
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (HsDecl name) where
+instance (OutputableBndrId name) => Outputable (HsDecl name) where
     ppr (TyClD dcl)             = ppr dcl
     ppr (ValD binds)            = ppr binds
     ppr (DefD def)              = ppr def
@@ -269,8 +267,7 @@ instance (OutputableBndrId name, HasOccNameId name)
     ppr (DocD doc)              = ppr doc
     ppr (RoleAnnotD ra)         = ppr ra
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (HsGroup name) where
+instance (OutputableBndrId name) => Outputable (HsGroup name) where
     ppr (HsGroup { hs_valds  = val_decls,
                    hs_tyclds = tycl_decls,
                    hs_derivds = deriv_decls,
@@ -314,8 +311,7 @@ data SpliceDecl id
         SpliceExplicitFlag
 deriving instance (DataId id) => Data (SpliceDecl id)
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (SpliceDecl name) where
+instance (OutputableBndrId name) => Outputable (SpliceDecl name) where
    ppr (SpliceDecl (L _ e) f) = pprSpliceDecl e f
 
 {-
@@ -484,6 +480,7 @@ data TyClDecl name
     SynDecl { tcdLName  :: Located name           -- ^ Type constructor
             , tcdTyVars :: LHsQTyVars name        -- ^ Type variables; for an associated type
                                                   --   these include outer binders
+            , tcdFixity :: LexicalFixity    -- ^ Fixity used in the declaration
             , tcdRhs    :: LHsType name           -- ^ RHS of type declaration
             , tcdFVs    :: PostRn name NameSet }
 
@@ -504,6 +501,7 @@ data TyClDecl name
                                                   --       type F a = a -> a
                                                   -- Here the type decl for 'f' includes 'a'
                                                   -- in its tcdTyVars
+             , tcdFixity  :: LexicalFixity -- ^ Fixity used in the declaration
              , tcdDataDefn :: HsDataDefn name
              , tcdDataCusk :: PostRn name Bool    -- ^ does this have a CUSK?
              , tcdFVs      :: PostRn name NameSet }
@@ -511,6 +509,7 @@ data TyClDecl name
   | ClassDecl { tcdCtxt    :: LHsContext name,          -- ^ Context...
                 tcdLName   :: Located name,             -- ^ Name of the class
                 tcdTyVars  :: LHsQTyVars name,          -- ^ Class type variables
+                tcdFixity  :: LexicalFixity, -- ^ Fixity used in the declaration
                 tcdFDs     :: [Located (FunDep (Located name))],
                                                         -- ^ Functional deps
                 tcdSigs    :: [LSig name],              -- ^ Methods' signatures
@@ -633,19 +632,21 @@ hsDeclHasCusk (ClassDecl { tcdTyVars = tyvars }) = hsTvbAllKinded tyvars
 -- Pretty-printing TyClDecl
 -- ~~~~~~~~~~~~~~~~~~~~~~~~
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (TyClDecl name) where
+instance (OutputableBndrId name) => Outputable (TyClDecl name) where
 
     ppr (FamDecl { tcdFam = decl }) = ppr decl
-    ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdRhs = rhs })
+    ppr (SynDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
+                 , tcdRhs = rhs })
       = hang (text "type" <+>
-              pp_vanilla_decl_head ltycon tyvars [] <+> equals)
+              pp_vanilla_decl_head ltycon tyvars fixity [] <+> equals)
           4 (ppr rhs)
 
-    ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdDataDefn = defn })
-      = pp_data_defn (pp_vanilla_decl_head ltycon tyvars) defn
+    ppr (DataDecl { tcdLName = ltycon, tcdTyVars = tyvars, tcdFixity = fixity
+                  , tcdDataDefn = defn })
+      = pp_data_defn (pp_vanilla_decl_head ltycon tyvars fixity) defn
 
     ppr (ClassDecl {tcdCtxt = context, tcdLName = lclas, tcdTyVars = tyvars,
+                    tcdFixity = fixity,
                     tcdFDs  = fds,
                     tcdSigs = sigs, tcdMeths = methods,
                     tcdATs = ats, tcdATDefs = at_defs})
@@ -659,11 +660,10 @@ instance (OutputableBndrId name, HasOccNameId name)
                                      pprLHsBindsForUser methods sigs) ]
       where
         top_matter = text "class"
-                     <+> pp_vanilla_decl_head lclas tyvars (unLoc context)
-                     <+> pprFundeps (map unLoc fds)
+                    <+> pp_vanilla_decl_head lclas tyvars fixity (unLoc context)
+                    <+> pprFundeps (map unLoc fds)
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (TyClGroup name) where
+instance (OutputableBndrId name) => Outputable (TyClGroup name) where
   ppr (TyClGroup { group_tyclds = tyclds
                  , group_roles = roles
                  , group_instds = instds
@@ -673,16 +673,16 @@ instance (OutputableBndrId name, HasOccNameId name)
       ppr roles $$
       ppr instds
 
-pp_vanilla_decl_head :: (OutputableBndrId name, HasOccNameId name)
-   => Located name
+pp_vanilla_decl_head :: (OutputableBndrId name) => Located name
    -> LHsQTyVars name
+   -> LexicalFixity
    -> HsContext name
    -> SDoc
-pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) context
+pp_vanilla_decl_head thing (HsQTvs { hsq_explicit = tyvars }) fixity context
  = hsep [pprHsContext context, pp_tyvars tyvars]
   where
     pp_tyvars (varl:varsr)
-      | isSymOcc $ occName (unLoc thing)
+      | fixity == Infix
          = hsep [ppr (unLoc varl), pprInfixOcc (unLoc thing)
          , hsep (map (ppr.unLoc) varsr)]
       | otherwise = hsep [ pprPrefixOcc (unLoc thing)
@@ -892,6 +892,7 @@ data FamilyDecl name = FamilyDecl
   { fdInfo           :: FamilyInfo name              -- type/data, closed/open
   , fdLName          :: Located name                 -- type constructor
   , fdTyVars         :: LHsQTyVars name              -- type variables
+  , fdFixity         :: LexicalFixity         -- Fixity used in the declaration
   , fdResultSig      :: LFamilyResultSig name        -- result signature
   , fdInjectivityAnn :: Maybe (LInjectivityAnn name) -- optional injectivity ann
   }
@@ -955,18 +956,18 @@ resultVariableName :: FamilyResultSig a -> Maybe a
 resultVariableName (TyVarSig sig) = Just $ hsLTyVarName sig
 resultVariableName _              = Nothing
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (FamilyDecl name) where
+instance (OutputableBndrId name) => Outputable (FamilyDecl name) where
   ppr = pprFamilyDecl TopLevel
 
-pprFamilyDecl :: (OutputableBndrId name, HasOccNameId name)
+pprFamilyDecl :: (OutputableBndrId name)
               => TopLevelFlag -> FamilyDecl name -> SDoc
 pprFamilyDecl top_level (FamilyDecl { fdInfo = info, fdLName = ltycon
                                     , fdTyVars = tyvars
+                                    , fdFixity = fixity
                                     , fdResultSig = L _ result
                                     , fdInjectivityAnn = mb_inj })
   = vcat [ pprFlavour info <+> pp_top_level <+>
-           pp_vanilla_decl_head ltycon tyvars [] <+>
+           pp_vanilla_decl_head ltycon tyvars fixity [] <+>
            pp_kind <+> pp_inj <+> pp_where
          , nest 2 $ pp_eqns ]
   where
@@ -1076,7 +1077,7 @@ data HsDerivingClause name
     }
 deriving instance (DataId id) => Data (HsDerivingClause id)
 
-instance (OutputableBndrId name, HasOccNameId name)
+instance (OutputableBndrId name)
        => Outputable (HsDerivingClause name) where
   ppr (HsDerivingClause { deriv_clause_strategy = dcs
                         , deriv_clause_tys      = L _ dct })
@@ -1193,7 +1194,7 @@ hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
 hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
 
-pp_data_defn :: (OutputableBndrId name, HasOccNameId name)
+pp_data_defn :: (OutputableBndrId name)
                   => (HsContext name -> SDoc)   -- Printing the header
                   -> HsDataDefn name
                   -> SDoc
@@ -1217,27 +1218,23 @@ pp_data_defn pp_hdr (HsDataDefn { dd_ND = new_or_data, dd_ctxt = L _ context
                Just kind -> dcolon <+> ppr kind
     pp_derivings (L _ ds) = vcat (map ppr ds)
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (HsDataDefn name) where
+instance (OutputableBndrId name) => Outputable (HsDataDefn name) where
    ppr d = pp_data_defn (\_ -> text "Naked HsDataDefn") d
 
 instance Outputable NewOrData where
   ppr NewType  = text "newtype"
   ppr DataType = text "data"
 
-pp_condecls :: (OutputableBndrId name, HasOccNameId name)
-            => [LConDecl name] -> SDoc
+pp_condecls :: (OutputableBndrId name) => [LConDecl name] -> SDoc
 pp_condecls cs@(L _ ConDeclGADT{} : _) -- In GADT syntax
   = hang (text "where") 2 (vcat (map ppr cs))
 pp_condecls cs                    -- In H98 syntax
   = equals <+> sep (punctuate (text " |") (map ppr cs))
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (ConDecl name) where
+instance (OutputableBndrId name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
-pprConDecl :: (OutputableBndrId name, HasOccNameId name)
-           => ConDecl name -> SDoc
+pprConDecl :: (OutputableBndrId name) => ConDecl name -> SDoc
 pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_qvars = mtvs
                        , con_cxt = mcxt
@@ -1348,9 +1345,10 @@ type TyFamDefltEqn name = TyFamEqn name (LHsQTyVars name)
 -- See Note [Type family instance declarations in HsSyn]
 data TyFamEqn name pats
   = TyFamEqn
-       { tfe_tycon :: Located name
-       , tfe_pats  :: pats
-       , tfe_rhs   :: LHsType name }
+       { tfe_tycon  :: Located name
+       , tfe_pats   :: pats
+       , tfe_fixity :: LexicalFixity    -- ^ Fixity used in the declaration
+       , tfe_rhs    :: LHsType name }
     -- ^
     --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual'
 
@@ -1382,6 +1380,7 @@ data DataFamInstDecl name
   = DataFamInstDecl
        { dfid_tycon     :: Located name
        , dfid_pats      :: HsTyPats   name       -- LHS
+       , dfid_fixity    :: LexicalFixity    -- ^ Fixity used in the declaration
        , dfid_defn      :: HsDataDefn name       -- RHS
        , dfid_fvs       :: PostRn name NameSet } -- Free vars for dependency analysis
     -- ^
@@ -1440,11 +1439,10 @@ data InstDecl name  -- Both class and family instances
       { tfid_inst :: TyFamInstDecl name }
 deriving instance (DataId id) => Data (InstDecl id)
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (TyFamInstDecl name) where
+instance (OutputableBndrId name) => Outputable (TyFamInstDecl name) where
   ppr = pprTyFamInstDecl TopLevel
 
-pprTyFamInstDecl :: (OutputableBndrId name, HasOccNameId name)
+pprTyFamInstDecl :: (OutputableBndrId name)
                  => TopLevelFlag -> TyFamInstDecl name -> SDoc
 pprTyFamInstDecl top_lvl (TyFamInstDecl { tfid_eqn = eqn })
    = text "type" <+> ppr_instance_keyword top_lvl <+> ppr_fam_inst_eqn eqn
@@ -1453,56 +1451,57 @@ ppr_instance_keyword :: TopLevelFlag -> SDoc
 ppr_instance_keyword TopLevel    = text "instance"
 ppr_instance_keyword NotTopLevel = empty
 
-ppr_fam_inst_eqn :: (OutputableBndrId name, HasOccNameId name)
-                 => LTyFamInstEqn name -> SDoc
+ppr_fam_inst_eqn :: (OutputableBndrId name) => LTyFamInstEqn name -> SDoc
 ppr_fam_inst_eqn (L _ (TyFamEqn { tfe_tycon = tycon
                                 , tfe_pats  = pats
+                                , tfe_fixity = fixity
                                 , tfe_rhs   = rhs }))
-    = pp_fam_inst_lhs tycon pats [] <+> equals <+> ppr rhs
+    = pp_fam_inst_lhs tycon pats fixity [] <+> equals <+> ppr rhs
 
-ppr_fam_deflt_eqn :: (OutputableBndrId name, HasOccNameId name)
-                  => LTyFamDefltEqn name -> SDoc
+ppr_fam_deflt_eqn :: (OutputableBndrId name) => LTyFamDefltEqn name -> SDoc
 ppr_fam_deflt_eqn (L _ (TyFamEqn { tfe_tycon = tycon
                                  , tfe_pats  = tvs
+                                 , tfe_fixity = fixity
                                  , tfe_rhs   = rhs }))
-    = text "type" <+> pp_vanilla_decl_head tycon tvs [] <+> equals <+> ppr rhs
+    = text "type" <+> pp_vanilla_decl_head tycon tvs fixity []
+                  <+> equals <+> ppr rhs
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (DataFamInstDecl name) where
+instance (OutputableBndrId name) => Outputable (DataFamInstDecl name) where
   ppr = pprDataFamInstDecl TopLevel
 
-pprDataFamInstDecl :: (OutputableBndrId name, HasOccNameId name)
+pprDataFamInstDecl :: (OutputableBndrId name)
                    => TopLevelFlag -> DataFamInstDecl name -> SDoc
 pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_tycon = tycon
                                             , dfid_pats  = pats
+                                            , dfid_fixity = fixity
                                             , dfid_defn  = defn })
   = pp_data_defn pp_hdr defn
   where
-    pp_hdr ctxt = ppr_instance_keyword top_lvl <+> pp_fam_inst_lhs tycon pats ctxt
+    pp_hdr ctxt = ppr_instance_keyword top_lvl
+              <+> pp_fam_inst_lhs tycon pats fixity ctxt
 
 pprDataFamInstFlavour :: DataFamInstDecl name -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_defn = (HsDataDefn { dd_ND = nd }) })
   = ppr nd
 
-pp_fam_inst_lhs :: (OutputableBndrId name, HasOccNameId name)
-   => Located name
+pp_fam_inst_lhs :: (OutputableBndrId name) => Located name
    -> HsTyPats name
+   -> LexicalFixity
    -> HsContext name
    -> SDoc
-pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) context
+pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) fixity context
                                               -- explicit type patterns
    = hsep [ pprHsContext context, pp_pats typats]
    where
      pp_pats (patl:patsr)
-       | isSymOcc $ occName (unLoc thing)
+       | fixity == Infix
           = hsep [pprParendHsType (unLoc patl), pprInfixOcc (unLoc thing)
           , hsep (map (pprParendHsType.unLoc) patsr)]
        | otherwise = hsep [ pprPrefixOcc (unLoc thing)
                    , hsep (map (pprParendHsType.unLoc) (patl:patsr))]
      pp_pats [] = empty
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (ClsInstDecl name) where
+instance (OutputableBndrId name) => Outputable (ClsInstDecl name) where
     ppr (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = binds
                      , cid_sigs = sigs, cid_tyfam_insts = ats
                      , cid_overlap_mode = mbOverlap
@@ -1540,8 +1539,7 @@ ppOverlapPragma mb =
     maybe_stext (SourceText src) _   = text src <+> text "#-}"
 
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (InstDecl name) where
+instance (OutputableBndrId name) => Outputable (InstDecl name) where
     ppr (ClsInstD     { cid_inst  = decl }) = ppr decl
     ppr (TyFamInstD   { tfid_inst = decl }) = ppr decl
     ppr (DataFamInstD { dfid_inst = decl }) = ppr decl
@@ -1582,8 +1580,7 @@ data DerivDecl name = DerivDecl
         }
 deriving instance (DataId name) => Data (DerivDecl name)
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (DerivDecl name) where
+instance (OutputableBndrId name) => Outputable (DerivDecl name) where
     ppr (DerivDecl { deriv_type = ty
                    , deriv_strategy = ds
                    , deriv_overlap_mode = o })
@@ -1617,8 +1614,7 @@ data DefaultDecl name
         -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (DefaultDecl name)
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (DefaultDecl name) where
+instance (OutputableBndrId name) => Outputable (DefaultDecl name) where
 
     ppr (DefaultDecl tys)
       = text "default" <+> parens (interpp'SP tys)
@@ -1721,8 +1717,7 @@ data ForeignExport = CExport  (Located CExportSpec) -- contains the calling
 -- pretty printing of foreign declarations
 --
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (ForeignDecl name) where
+instance (OutputableBndrId name) => Outputable (ForeignDecl name) where
   ppr (ForeignImport { fd_name = n, fd_sig_ty = ty, fd_fi = fimport })
     = hang (text "foreign import" <+> ppr fimport <+> ppr n)
          2 (dcolon <+> ppr ty)
@@ -1828,14 +1823,12 @@ collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 pprFullRuleName :: Located (SourceText, RuleName) -> SDoc
 pprFullRuleName (L _ (st, n)) = pprWithSourceText st (doubleQuotes $ ftext n)
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (RuleDecls name) where
+instance (OutputableBndrId name) => Outputable (RuleDecls name) where
   ppr (HsRules st rules)
     = pprWithSourceText st (text "{-# RULES")
           <+> vcat (punctuate semi (map ppr rules)) <+> text "#-}"
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (RuleDecl name) where
+instance (OutputableBndrId name) => Outputable (RuleDecl name) where
   ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
         = sep [pprFullRuleName name <+> ppr act,
                nest 4 (pp_forall <+> pprExpr (unLoc lhs)),
@@ -1844,8 +1837,7 @@ instance (OutputableBndrId name, HasOccNameId name)
           pp_forall | null ns   = empty
                     | otherwise = forAllLit <+> fsep (map ppr ns) <> dot
 
-instance (OutputableBndrId name, HasOccNameId name)
-        => Outputable (RuleBndr name) where
+instance (OutputableBndrId name) => Outputable (RuleBndr name) where
    ppr (RuleBndr name) = ppr name
    ppr (RuleBndrSig name ty) = parens (ppr name <> dcolon <> ppr ty)
 
@@ -1932,8 +1924,7 @@ lvectInstDecl (L _ (HsVectInstIn _))  = True
 lvectInstDecl (L _ (HsVectInstOut _)) = True
 lvectInstDecl _                       = False
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (VectDecl name) where
+instance (OutputableBndrId name) => Outputable (VectDecl name) where
   ppr (HsVect _ v rhs)
     = sep [text "{-# VECTORISE" <+> ppr v,
            nest 4 $
@@ -2054,8 +2045,7 @@ data AnnDecl name = HsAnnotation
       -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (AnnDecl name)
 
-instance (OutputableBndrId name, HasOccNameId name)
-       => Outputable (AnnDecl name) where
+instance (OutputableBndrId name) => Outputable (AnnDecl name) where
     ppr (HsAnnotation _ provenance expr)
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
 

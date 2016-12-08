@@ -36,6 +36,7 @@ module BasicTypes(
         defaultFixity, maxPrecedence, minPrecedence,
         negateFixity, funTyFixity,
         compareFixity,
+        LexicalFixity(..),
 
         RecFlag(..), isRec, isNonRec, boolToRecFlag,
         Origin(..), isGenerated,
@@ -107,7 +108,7 @@ import FastString
 import Outputable
 import SrcLoc ( Located,unLoc )
 import StaticFlags( opt_PprStyle_Debug )
-import Data.Data hiding (Fixity)
+import Data.Data hiding (Fixity, Prefix, Infix)
 import Data.Function (on)
 
 {-
@@ -432,6 +433,15 @@ compareFixity (Fixity _ prec1 dir1) (Fixity _ prec2 dir2)
     right        = (False, True)
     left         = (False, False)
     error_please = (True,  False)
+
+-- |Captures the fixity of declarations as they are parsed. This is not
+-- necessarily the same as the fixity declaration, as the normal fixity may be
+-- overridden using parens or backticks.
+data LexicalFixity = Prefix | Infix deriving (Typeable,Data,Eq)
+
+instance Outputable LexicalFixity where
+  ppr Prefix = text "Prefix"
+  ppr Infix  = text "Infix"
 
 {-
 ************************************************************************
