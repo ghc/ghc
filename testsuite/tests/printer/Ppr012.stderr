@@ -1,9 +1,0 @@
-
-Ppr012.hs:12:1: warning: [-Winline-rule-shadowing]
-    Rule "bar/foo" may never fire because ‘foo’ might inline first
-    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘foo’
-
-Ppr012.ppr.hs:11:11: warning: [-Winline-rule-shadowing]
-    Rule "bar/foo" may never fire because ‘foo’ might inline first
-    Probable fix: add an INLINE[n] or NOINLINE[n] pragma for ‘foo’
-
