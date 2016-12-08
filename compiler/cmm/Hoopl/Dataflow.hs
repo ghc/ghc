@@ -30,7 +30,6 @@ module Hoopl.Dataflow
   )
 where
 
-import BlockId
 import Cmm
 
 import Data.Array

@@ -39,6 +39,7 @@ import Reg
 import Instruction
 
 import BlockId
+import Hoopl
 import Cmm hiding (RegSet)
 import PprCmm()
 
@@ -65,7 +66,7 @@ type RegMap a = UniqFM a
 emptyRegMap :: UniqFM a
 emptyRegMap = emptyUFM
 
-type BlockMap a = BlockEnv a
+type BlockMap a = LabelMap a
 
 
 -- | A top level thing which carries liveness information.
@@ -167,7 +168,7 @@ data Liveness
 -- | Stash regs live on entry to each basic block in the info part of the cmm code.
 data LiveInfo
         = LiveInfo
-                (BlockEnv CmmStatics)     -- cmm info table static stuff
+                (LabelMap CmmStatics)     -- cmm info table static stuff
                 [BlockId]                 -- entry points (first one is the
                                           -- entry point for the proc).
                 (Maybe (BlockMap RegSet)) -- argument locals live on entry to this block
@@ -685,7 +686,7 @@ sccBlocks blocks entries = map (fmap get_node) sccs
 
         g1 = graphFromEdgedVerticesUniq nodes
 
-        reachable :: BlockSet
+        reachable :: LabelSet
         reachable = setFromList [ id | (_,id,_) <- reachablesG g1 roots ]
 
         g2 = graphFromEdgedVerticesUniq [ node | node@(_,id,_) <- nodes

@@ -112,7 +112,7 @@ if a proc-point does not exist anymore then we will get compiler panic.
 See #8205.
 -}
 
-type ProcPointSet = BlockSet
+type ProcPointSet = LabelSet
 
 data Status
   = ReachedBy ProcPointSet  -- set of proc points that directly reach the block
@@ -131,7 +131,7 @@ instance Outputable Status where
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 -- See Note [Proc-point analysis]
-procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (BlockEnv Status)
+procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (LabelMap Status)
 procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
     return $
         analyzeCmmFwd procPointLattice procPointTransfer cmmGraph initProcPoints
@@ -176,7 +176,7 @@ procPointLattice = DataflowLattice unreached add_to
 -- Extract the set of Continuation BlockIds, see Note [Continuation BlockIds].
 callProcPoints      :: CmmGraph -> ProcPointSet
 callProcPoints g = foldGraphBlocks add (setSingleton (g_entry g)) g
-  where add :: CmmBlock -> BlockSet -> BlockSet
+  where add :: CmmBlock -> LabelSet -> LabelSet
         add b set = case lastNode b of
                       CmmCall {cml_cont = Just k} -> setInsert k set
                       CmmForeignCall {succ=k}     -> setInsert k set
@@ -238,7 +238,7 @@ extendPPSet platform g blocks procPoints =
 -- Input invariant: A block should only be reachable from a single ProcPoint.
 -- ToDo: use the _ret naming convention that the old code generator
 -- used. -- EZY
-splitAtProcPoints :: DynFlags -> CLabel -> ProcPointSet-> ProcPointSet -> BlockEnv Status ->
+splitAtProcPoints :: DynFlags -> CLabel -> ProcPointSet-> ProcPointSet -> LabelMap Status ->
                      CmmDecl -> UniqSM [CmmDecl]
 splitAtProcPoints dflags entry_label callPPs procPoints procMap
                   (CmmProc (TopInfo {info_tbls = info_tbls})
@@ -388,7 +388,7 @@ splitAtProcPoints _ _ _ _ _ t@(CmmData _ _) = return [t]
 
 -- Only called from CmmProcPoint.splitAtProcPoints. NB. does a
 -- recursive lookup, see comment below.
-replaceBranches :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+replaceBranches :: LabelMap BlockId -> CmmGraph -> CmmGraph
 replaceBranches env cmmg
   = {-# SCC "replaceBranches" #-}
     ofBlockMap (g_entry cmmg) $ mapMap f $ toBlockMap cmmg

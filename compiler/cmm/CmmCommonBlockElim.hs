@@ -66,7 +66,7 @@ elimCommonBlocks g = replaceLabels env $ copyTicks env g
 -- (so avoid comparing them again)
 type DistinctBlocks = [CmmBlock]
 type Key = [Label]
-type Subst = BlockEnv BlockId
+type Subst = LabelMap BlockId
 
 -- The outer list groups by hash. We retain this grouping throughout.
 iterate :: Subst -> [[(Key, DistinctBlocks)]] -> Subst
@@ -186,9 +186,9 @@ dont_care _other         = False
 -- Utilities: equality and substitution on the graph.
 
 -- Given a map ``subst'' from BlockID -> BlockID, we define equality.
-eqBid :: BlockEnv BlockId -> BlockId -> BlockId -> Bool
+eqBid :: LabelMap BlockId -> BlockId -> BlockId -> Bool
 eqBid subst bid bid' = lookupBid subst bid == lookupBid subst bid'
-lookupBid :: BlockEnv BlockId -> BlockId -> BlockId
+lookupBid :: LabelMap BlockId -> BlockId -> BlockId
 lookupBid subst bid = case mapLookup bid subst of
                         Just bid  -> lookupBid subst bid
                         Nothing -> bid
@@ -266,7 +266,7 @@ eqMaybeWith _ _ _ = False
 -- the same ticks as the respective "source" blocks. This not only
 -- means copying ticks, but also adjusting tick scopes where
 -- necessary.
-copyTicks :: BlockEnv BlockId -> CmmGraph -> CmmGraph
+copyTicks :: LabelMap BlockId -> CmmGraph -> CmmGraph
 copyTicks env g
   | mapNull env = g
   | otherwise   = ofBlockMap (g_entry g) $ mapMap copyTo blockMap

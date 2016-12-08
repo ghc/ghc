@@ -26,6 +26,7 @@ import Reg
 import TargetReg
 
 import BlockId
+import Hoopl
 import CodeGen.Platform
 import Cmm
 import FastString
@@ -964,7 +965,7 @@ allocMoreStack platform slots proc@(CmmProc info lbl live (ListGraph code)) = do
       alloc   = mkStackAllocInstr   platform delta
       dealloc = mkStackDeallocInstr platform delta
 
-      new_blockmap :: BlockEnv BlockId
+      new_blockmap :: LabelMap BlockId
       new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
 
       insert_stack_insns (BasicBlock id insns)
@@ -1002,7 +1003,7 @@ canShortcut _                    = Nothing
 -- This helper shortcuts a sequence of branches.
 -- The blockset helps avoid following cycles.
 shortcutJump :: (BlockId -> Maybe JumpDest) -> Instr -> Instr
-shortcutJump fn insn = shortcutJump' fn (setEmpty :: BlockSet) insn
+shortcutJump fn insn = shortcutJump' fn (setEmpty :: LabelSet) insn
   where shortcutJump' fn seen insn@(JXX cc id) =
           if setMember id seen then insn
           else case fn id of

@@ -57,7 +57,7 @@ type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
 type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
-type RawCmmGroup = GenCmmGroup CmmStatics (BlockEnv CmmStatics) CmmGraph
+type RawCmmGroup = GenCmmGroup CmmStatics (LabelMap CmmStatics) CmmGraph
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl
@@ -94,7 +94,7 @@ type CmmDecl = GenCmmDecl CmmStatics CmmTopInfo CmmGraph
 type RawCmmDecl
    = GenCmmDecl
         CmmStatics
-        (BlockEnv CmmStatics)
+        (LabelMap CmmStatics)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -114,7 +114,7 @@ type CmmBwdRewrite f = BwdRewrite UniqSM CmmNode f
 --     Info Tables
 -----------------------------------------------------------------------------
 
-data CmmTopInfo   = TopInfo { info_tbls  :: BlockEnv CmmInfoTable
+data CmmTopInfo   = TopInfo { info_tbls  :: LabelMap CmmInfoTable
                             , stack_info :: CmmStackInfo }
 
 topInfoTable :: GenCmmDecl a CmmTopInfo (GenCmmGraph n) -> Maybe CmmInfoTable

@@ -9,7 +9,6 @@ where
 
 import Hoopl
 import Digraph
-import BlockId
 import Bitmap
 import CLabel
 import PprCmmDecl ()
@@ -83,7 +82,7 @@ This is what flattenCAFSets is doing.
 -- Finding the CAFs used by a procedure
 
 type CAFSet = Set CLabel
-type CAFEnv = BlockEnv CAFSet
+type CAFEnv = LabelMap CAFSet
 
 cafLattice :: DataflowLattice CAFSet
 cafLattice = DataflowLattice Set.empty add
@@ -292,7 +291,7 @@ flatten env cafset = foldSet (lookup env) Set.empty cafset
 bundle :: Map CLabel CAFSet
        -> (CAFEnv, CmmDecl)
        -> (CAFSet, Maybe CLabel)
-       -> (BlockEnv CAFSet, CmmDecl)
+       -> (LabelMap CAFSet, CmmDecl)
 bundle flatmap (env, decl@(CmmProc infos _lbl _ g)) (closure_cafs, mb_lbl)
   = ( mapMapWithKey get_cafs (info_tbls infos), decl )
  where
@@ -316,7 +315,7 @@ bundle _flatmap (_, decl) _
   = ( mapEmpty, decl )
 
 
-flattenCAFSets :: [(CAFEnv, [CmmDecl])] -> [(BlockEnv CAFSet, CmmDecl)]
+flattenCAFSets :: [(CAFEnv, [CmmDecl])] -> [(LabelMap CAFSet, CmmDecl)]
 flattenCAFSets cpsdecls = zipWith (bundle flatmap) zipped localCAFs
    where
      zipped    = [ (env,decl) | (env,decls) <- cpsdecls, decl <- decls ]
@@ -342,8 +341,8 @@ doSRTs dflags topSRT tops
     setSRT (topSRT, rst) (_, decl) =
       return (topSRT, decl : rst)
 
-buildSRTs :: DynFlags -> TopSRT -> BlockEnv CAFSet
-          -> UniqSM (TopSRT, [CmmDecl], BlockEnv C_SRT)
+buildSRTs :: DynFlags -> TopSRT -> LabelMap CAFSet
+          -> UniqSM (TopSRT, [CmmDecl], LabelMap C_SRT)
 buildSRTs dflags top_srt caf_map
   = foldM doOne (top_srt, [], mapEmpty) (mapToList caf_map)
   where
@@ -359,7 +358,7 @@ buildSRTs dflags top_srt caf_map
 - Each one needs an SRT.
 - We get the CAFSet for each one from the CAFEnv
 - flatten gives us
-    [(BlockEnv CAFSet, CmmDecl)]
+    [(LabelMap CAFSet, CmmDecl)]
 -
 -}
 
@@ -372,7 +371,7 @@ buildSRTs dflags top_srt caf_map
    instructions for forward refs.  --SDM
 -}
 
-updInfoSRTs :: BlockEnv C_SRT -> CmmDecl -> CmmDecl
+updInfoSRTs :: LabelMap C_SRT -> CmmDecl -> CmmDecl
 updInfoSRTs srt_env (CmmProc top_info top_l live g) =
   CmmProc (top_info {info_tbls = mapMapWithKey updInfoTbl (info_tbls top_info)}) top_l live g
   where updInfoTbl l info_tbl

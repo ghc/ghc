@@ -20,7 +20,7 @@ import Reg
 
 import GraphBase
 
-import BlockId
+import Hoopl (mapLookup)
 import Cmm
 import UniqFM
 import UniqSet

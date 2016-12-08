@@ -17,6 +17,7 @@ where
 import Reg
 
 import BlockId
+import Hoopl
 import DynFlags
 import Cmm hiding (topInfoTable)
 import Platform
@@ -43,13 +44,13 @@ noUsage  = RU [] []
 type NatCmm instr
         = GenCmmGroup
                 CmmStatics
-                (BlockEnv CmmStatics)
+                (LabelMap CmmStatics)
                 (ListGraph instr)
 
 type NatCmmDecl statics instr
         = GenCmmDecl
                 statics
-                (BlockEnv CmmStatics)
+                (LabelMap CmmStatics)
                 (ListGraph instr)
 
 
@@ -59,7 +60,7 @@ type NatBasicBlock instr
 
 -- | Returns the info table associated with the CmmDecl's entry point,
 -- if any.
-topInfoTable :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> Maybe i
+topInfoTable :: GenCmmDecl a (LabelMap i) (ListGraph b) -> Maybe i
 topInfoTable (CmmProc infos _ _ (ListGraph (b:_)))
   = mapLookup (blockId b) infos
 topInfoTable _
@@ -67,7 +68,7 @@ topInfoTable _
 
 -- | Return the list of BlockIds in a CmmDecl that are entry points
 -- for this proc (i.e. they may be jumped to from outside this proc).
-entryBlocks :: GenCmmDecl a (BlockEnv i) (ListGraph b) -> [BlockId]
+entryBlocks :: GenCmmDecl a (LabelMap i) (ListGraph b) -> [BlockId]
 entryBlocks (CmmProc info _ _ (ListGraph code)) = entries
   where
         infos = mapKeys info

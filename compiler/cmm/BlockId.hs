@@ -5,9 +5,6 @@
 module BlockId
   ( BlockId, mkBlockId -- ToDo: BlockId should be abstract, but it isn't yet
   , newBlockId
-  , BlockSet, BlockEnv
-  , IsSet(..)
-  , IsMap(..)
   , blockLbl, infoTblLbl
   ) where
 
@@ -52,15 +49,3 @@ blockLbl label = mkEntryLabel (mkFCallName (getUnique label) "block") NoCafRefs
 
 infoTblLbl :: BlockId -> CLabel
 infoTblLbl label = mkInfoTableLabel (mkFCallName (getUnique label) "block") NoCafRefs
-
--- Block environments: Id blocks
-type BlockEnv a = Hoopl.LabelMap a
-
-instance Outputable a => Outputable (BlockEnv a) where
-  ppr = ppr . mapToList
-
--- Block sets
-type BlockSet = Hoopl.LabelSet
-
-instance Outputable BlockSet where
-  ppr = ppr . setElems

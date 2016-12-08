@@ -1,4 +1,5 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Hoopl (
     module Compiler.Hoopl,
@@ -19,3 +20,10 @@ import Compiler.Hoopl hiding
   )
 
 import Hoopl.Dataflow
+import Outputable
+
+instance Outputable LabelSet where
+  ppr = ppr . setElems
+
+instance Outputable a => Outputable (LabelMap a) where
+  ppr = ppr . mapToList

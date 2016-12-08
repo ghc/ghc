@@ -162,7 +162,7 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr -> UniqSM (NatCmmDecl statics instr),
-    ncgMakeFarBranches        :: BlockEnv CmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr]
+    ncgMakeFarBranches        :: LabelMap CmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr]
     }
 
 --------------------
@@ -761,7 +761,7 @@ sequenceTop ncgImpl (CmmProc info lbl live (ListGraph blocks)) =
 
 sequenceBlocks
         :: Instruction instr
-        => BlockEnv i
+        => LabelMap i
         -> [NatBasicBlock instr]
         -> [NatBasicBlock instr]
 
@@ -796,7 +796,7 @@ mkNode :: (Instruction t)
        -> (GenBasicBlock t, BlockId, [BlockId])
 mkNode block@(BasicBlock id instrs) = (block, id, getOutEdges instrs)
 
-seqBlocks :: BlockEnv i -> [(GenBasicBlock t1, BlockId, [BlockId])]
+seqBlocks :: LabelMap i -> [(GenBasicBlock t1, BlockId, [BlockId])]
                         -> [GenBasicBlock t1]
 seqBlocks infos blocks = placeNext pullable0 todo0
   where
@@ -864,8 +864,8 @@ shortcutBranches dflags ncgImpl tops
     mapping = foldr plusUFM emptyUFM mappings
 
 build_mapping :: NcgImpl statics instr jumpDest
-              -> GenCmmDecl d (BlockEnv t) (ListGraph instr)
-              -> (GenCmmDecl d (BlockEnv t) (ListGraph instr), UniqFM jumpDest)
+              -> GenCmmDecl d (LabelMap t) (ListGraph instr)
+              -> (GenCmmDecl d (LabelMap t) (ListGraph instr), UniqFM jumpDest)
 build_mapping _ top@(CmmData _ _) = (top, emptyUFM)
 build_mapping _ (CmmProc info lbl live (ListGraph []))
   = (CmmProc info lbl live (ListGraph []), emptyUFM)

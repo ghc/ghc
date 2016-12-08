@@ -33,6 +33,7 @@ import Reg
 
 import CodeGen.Platform
 import BlockId
+import Hoopl
 import DynFlags
 import Cmm
 import CmmInfo
@@ -117,7 +118,7 @@ allocMoreStack platform slots (CmmProc info lbl live (ListGraph code)) = do
         alloc   = mkStackAllocInstr   platform delta
         dealloc = mkStackDeallocInstr platform delta
 
-        new_blockmap :: BlockEnv BlockId
+        new_blockmap :: LabelMap BlockId
         new_blockmap = mapFromList (zip entries (map mkBlockId uniqs))
 
         insert_stack_insns (BasicBlock id insns)
@@ -655,7 +656,7 @@ ppc_takeRegRegMoveInstr _  = Nothing
 -- big, we have to work around this limitation.
 
 makeFarBranches
-        :: BlockEnv CmmStatics
+        :: LabelMap CmmStatics
         -> [NatBasicBlock Instr]
         -> [NatBasicBlock Instr]
 makeFarBranches info_env blocks

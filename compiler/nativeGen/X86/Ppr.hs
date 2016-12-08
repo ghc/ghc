@@ -32,7 +32,7 @@ import Reg
 import PprBase
 
 
-import BlockId
+import Hoopl
 import BasicTypes       (Alignment)
 import DynFlags
 import Cmm              hiding (topInfoTable)
@@ -116,7 +116,7 @@ pprSizeDecl lbl
    then text "\t.size" <+> ppr lbl <> ptext (sLit ", .-") <> ppr lbl
    else empty
 
-pprBasicBlock :: BlockEnv CmmStatics -> NatBasicBlock Instr -> SDoc
+pprBasicBlock :: LabelMap CmmStatics -> NatBasicBlock Instr -> SDoc
 pprBasicBlock info_env (BasicBlock blockid instrs)
   = sdocWithDynFlags $ \dflags ->
     maybe_infotable $$

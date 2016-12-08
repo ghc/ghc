@@ -40,7 +40,7 @@ liveLattice = DataflowLattice emptyRegSet add
         in changedIf (sizeRegSet join > sizeRegSet old) join
 
 -- | A mapping from block labels to the variables live on entry
-type BlockEntryLiveness r = BlockEnv (CmmLive r)
+type BlockEntryLiveness r = LabelMap (CmmLive r)
 
 -----------------------------------------------------------------------------
 -- | Calculated liveness info for a CmmGraph

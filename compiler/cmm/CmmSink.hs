@@ -5,7 +5,6 @@ module CmmSink (
 
 import Cmm
 import CmmOpt
-import BlockId
 import CmmLive
 import CmmUtils
 import Hoopl
@@ -154,7 +153,7 @@ cmmSink dflags graph = ofBlockList (g_entry graph) $ sink mapEmpty $ blocks
 
   join_pts = findJoinPoints blocks
 
-  sink :: BlockEnv Assignments -> [CmmBlock] -> [CmmBlock]
+  sink :: LabelMap Assignments -> [CmmBlock] -> [CmmBlock]
   sink _ [] = []
   sink sunk (b:bs) =
     -- pprTrace "sink" (ppr lbl) $
@@ -253,12 +252,12 @@ annotate dflags live nodes = snd $ foldr ann (live,[]) nodes
 --
 -- Find the blocks that have multiple successors (join points)
 --
-findJoinPoints :: [CmmBlock] -> BlockEnv Int
+findJoinPoints :: [CmmBlock] -> LabelMap Int
 findJoinPoints blocks = mapFilter (>1) succ_counts
  where
   all_succs = concatMap successors blocks
 
-  succ_counts :: BlockEnv Int
+  succ_counts :: LabelMap Int
   succ_counts = foldr (\l -> mapInsertWith (+) l 1) mapEmpty all_succs
 
 --

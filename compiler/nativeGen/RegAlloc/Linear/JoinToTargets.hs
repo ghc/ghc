@@ -17,6 +17,7 @@ import Instruction
 import Reg
 
 import BlockId
+import Hoopl
 import Digraph
 import DynFlags
 import Outputable

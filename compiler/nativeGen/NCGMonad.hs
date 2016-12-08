@@ -42,6 +42,7 @@ import Format
 import TargetReg
 
 import BlockId
+import Hoopl
 import CLabel           ( CLabel, mkAsmTempLabel )
 import Debug
 import FastString       ( FastString )

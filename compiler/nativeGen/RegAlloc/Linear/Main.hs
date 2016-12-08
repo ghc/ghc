@@ -118,6 +118,7 @@ import Instruction
 import Reg
 
 import BlockId
+import Hoopl
 import Cmm hiding (RegSet)
 
 import Digraph

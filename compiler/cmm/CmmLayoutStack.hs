@@ -187,7 +187,7 @@ instance Outputable StackMap where
 
 
 cmmLayoutStack :: DynFlags -> ProcPointSet -> ByteOff -> CmmGraph
-               -> UniqSM (CmmGraph, BlockEnv StackMap)
+               -> UniqSM (CmmGraph, LabelMap StackMap)
 cmmLayoutStack dflags procpoints entry_args
                graph@(CmmGraph { g_entry = entry })
   = do
@@ -206,18 +206,18 @@ cmmLayoutStack dflags procpoints entry_args
 
 
 layout :: DynFlags
-       -> BlockSet                      -- proc points
-       -> BlockEnv CmmLocalLive         -- liveness
+       -> LabelSet                      -- proc points
+       -> LabelMap CmmLocalLive         -- liveness
        -> BlockId                       -- entry
        -> ByteOff                       -- stack args on entry
 
-       -> BlockEnv StackMap             -- [final] stack maps
+       -> LabelMap StackMap             -- [final] stack maps
        -> ByteOff                       -- [final] Sp high water mark
 
        -> [CmmBlock]                    -- [in] blocks
 
        -> UniqSM
-          ( BlockEnv StackMap           -- [out] stack maps
+          ( LabelMap StackMap           -- [out] stack maps
           , ByteOff                     -- [out] Sp high water mark
           , [CmmBlock]                  -- [out] new blocks
           )
@@ -316,7 +316,7 @@ isGcJump _something_else = False
 -- unnecessarily pessimistic, but probably not in the code we
 -- generate.
 
-collectContInfo :: [CmmBlock] -> (ByteOff, BlockEnv ByteOff)
+collectContInfo :: [CmmBlock] -> (ByteOff, LabelMap ByteOff)
 collectContInfo blocks
   = (maximum ret_offs, mapFromList (catMaybes mb_argss))
  where
@@ -344,7 +344,7 @@ collectContInfo blocks
 -- on the stack and need to be immediately saved across a call, we
 -- want to just leave them where they are on the stack.
 --
-procMiddle :: BlockEnv StackMap -> CmmNode e x -> StackMap -> StackMap
+procMiddle :: LabelMap StackMap -> CmmNode e x -> StackMap -> StackMap
 procMiddle stackmaps node sm
   = case node of
      CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot area off) _)
@@ -355,7 +355,7 @@ procMiddle stackmaps node sm
      _other
        -> sm
 
-getStackLoc :: Area -> ByteOff -> BlockEnv StackMap -> StackLoc
+getStackLoc :: Area -> ByteOff -> LabelMap StackMap -> StackLoc
 getStackLoc Old       n _         = n
 getStackLoc (Young l) n stackmaps =
   case mapLookup l stackmaps of
@@ -383,8 +383,8 @@ getStackLoc (Young l) n stackmaps =
 -- extra code that goes *after* the Sp adjustment.
 
 handleLastNode
-   :: DynFlags -> ProcPointSet -> BlockEnv CmmLocalLive -> BlockEnv ByteOff
-   -> BlockEnv StackMap -> StackMap -> CmmTickScope
+   :: DynFlags -> ProcPointSet -> LabelMap CmmLocalLive -> LabelMap ByteOff
+   -> LabelMap StackMap -> StackMap -> CmmTickScope
    -> Block CmmNode O O
    -> CmmNode O C
    -> UniqSM
@@ -392,7 +392,7 @@ handleLastNode
       , ByteOff            -- amount to adjust Sp
       , CmmNode O C        -- new last node
       , [CmmBlock]         -- new blocks
-      , BlockEnv StackMap  -- stackmaps for the continuations
+      , LabelMap StackMap  -- stackmaps for the continuations
       )
 
 handleLastNode dflags procpoints liveness cont_info stackmaps
@@ -424,7 +424,7 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
                  , ByteOff
                  , CmmNode O C
                  , [CmmBlock]
-                 , BlockEnv StackMap
+                 , LabelMap StackMap
                  )
      lastCall lbl cml_args cml_ret_args cml_ret_off
       =  ( assignments
@@ -457,7 +457,7 @@ handleLastNode dflags procpoints liveness cont_info stackmaps
                                 , ByteOff
                                 , CmmNode O C
                                 , [CmmBlock]
-                                , BlockEnv StackMap )
+                                , LabelMap StackMap )
 
      handleBranches
          -- Note [diamond proc point]
@@ -561,7 +561,7 @@ fixupStack old_stack new_stack = concatMap move new_locs
 setupStackFrame
              :: DynFlags
              -> BlockId                 -- label of continuation
-             -> BlockEnv CmmLocalLive   -- liveness
+             -> LabelMap CmmLocalLive   -- liveness
              -> ByteOff      -- updfr
              -> ByteOff      -- bytes of return values on stack
              -> StackMap     -- current StackMap
@@ -772,7 +772,7 @@ allocate dflags ret_off live stackmap@StackMap{ sm_sp = sp0
 --
 manifestSp
    :: DynFlags
-   -> BlockEnv StackMap  -- StackMaps for other blocks
+   -> LabelMap StackMap  -- StackMaps for other blocks
    -> StackMap           -- StackMap for this block
    -> ByteOff            -- Sp on entry to the block
    -> ByteOff            -- SpHigh
@@ -813,7 +813,7 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     fixup_blocks' = map (mapBlock3' (id, adj_post_sp, id)) fixup_blocks
 
 
-getAreaOff :: BlockEnv StackMap -> (Area -> StackLoc)
+getAreaOff :: LabelMap StackMap -> (Area -> StackLoc)
 getAreaOff _ Old = 0
 getAreaOff stackmaps (Young l) =
   case mapLookup l stackmaps of
@@ -918,7 +918,7 @@ optStackCheck n = -- Note [Always false stack check]
 -- StackMap will invalidate its mapping there.
 --
 elimStackStores :: StackMap
-                -> BlockEnv StackMap
+                -> LabelMap StackMap
                 -> (Area -> ByteOff)
                 -> [CmmNode O O]
                 -> [CmmNode O O]
@@ -940,7 +940,7 @@ elimStackStores stackmap stackmaps area_off nodes
 -- Update info tables to include stack liveness
 
 
-setInfoTableStackMap :: DynFlags -> BlockEnv StackMap -> CmmDecl -> CmmDecl
+setInfoTableStackMap :: DynFlags -> LabelMap StackMap -> CmmDecl -> CmmDecl
 setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l v g)
   = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l v g
   where
