@@ -98,16 +98,19 @@ pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
       subsection | splitSections = char '.' <> ppr suffix
                  | otherwise     = empty
-  in  text ".section " <> ptext header <> subsection
+  in  text ".section " <> ptext (header dflags) <> subsection
   where
-    header = case t of
+    header dflags = case t of
       Text -> sLit ".text"
       Data -> sLit ".data"
       ReadOnlyData -> sLit ".rodata"
       RelocatableReadOnlyData -> sLit ".data.rel.ro"
       UninitialisedData -> sLit ".bss"
       ReadOnlyData16 -> sLit ".rodata.cst16"
-      CString -> sLit ".rodata.str1.1,\"aMS\",@progbits,1"
+      CString
+        | OSMinGW32 <- platformOS (targetPlatform dflags)
+          -> sLit ".rdata,\"dr\""
+        | otherwise -> sLit ".rodata.str1.1,\"aMS\",@progbits,1"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
 
