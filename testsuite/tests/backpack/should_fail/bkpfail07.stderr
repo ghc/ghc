@@ -8,9 +8,9 @@
   [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
 
 bkpfail07.bkp:6:9: error:
-    • Type constructor ‘h[A=<A>]:T.T’ has conflicting definitions in the module
+    • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file
-      Main module: data h[A=<A>]:T.T = h[A=<A>]:T.T GHC.Types.Bool
-      Hsig file:  data h[A=<A>]:T.T = h[A=<A>]:T.T GHC.Types.Int
-      The constructors do not match: The types for ‘h[A=<A>]:T.T’ differ
+      Main module: data T = T GHC.Types.Bool
+      Hsig file:  data T = T GHC.Types.Int
+      The constructors do not match: The types for ‘T’ differ
     • while checking that h[A=<A>]:H implements signature H in p[H=h[A=<A>]:H]

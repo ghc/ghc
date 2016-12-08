@@ -7,10 +7,9 @@
     [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail17.out/p/p-2W6J7O3LvroH97zGxbPEGF/ShouldFail.o )
 
 <no location info>: error:
-    Type constructor ‘Data.Either.Either’ has conflicting definitions in the module
+    Type constructor ‘Either’ has conflicting definitions in the module
     and its hsig file
-    Main module: data Data.Either.Either a b
-                   = Data.Either.Left a | Data.Either.Right b
-    Hsig file:  type role Data.Either.Either representational phantom phantom
-                data Data.Either.Either a b c = Data.Either.Left a
+    Main module: data Either a b = Left a | Right b
+    Hsig file:  type role Either representational phantom phantom
+                data Either a b c = Left a
     The types have different kinds

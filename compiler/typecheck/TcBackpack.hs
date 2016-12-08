@@ -553,6 +553,13 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
     let avails = calculateAvails dflags
                     impl_iface False{- safe -} False{- boot -}
     updGblEnv (\tcg_env -> tcg_env {
+        -- Setting tcg_rdr_env to treat all exported entities from
+        -- the implementing module as in scope improves error messages,
+        -- as it reduces the amount of qualification we need.  Unfortunately,
+        -- we still end up qualifying references to external modules
+        -- (see bkpfail07 for an example); we'd need to record more
+        -- information in ModIface to solve this.
+        tcg_rdr_env = tcg_rdr_env tcg_env `plusGlobalRdrEnv` impl_gr,
         tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
         }) $ do
 

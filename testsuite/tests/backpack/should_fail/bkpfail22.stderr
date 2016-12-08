@@ -14,7 +14,7 @@
     [1 of 2] Compiling H2[sig]          ( q/H2.hsig, bkpfail22.out/q/q-FjwGsuDQ5qiKUCvnEATUA9/H2.o )
 
 bkpfail22.bkp:16:9: error:
-    Type constructor ‘badimpl:H2.S’ has conflicting definitions in the module
+    Type constructor ‘S’ has conflicting definitions in the module
     and its hsig file
-    Main module: type badimpl:H2.S = ()
-    Hsig file:  type badimpl:H2.S = GHC.Types.Bool
+    Main module: type S = ()
+    Hsig file:  type S = GHC.Types.Bool

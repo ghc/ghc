@@ -7,9 +7,9 @@
 [3 of 3] Processing r
 
 bkpfail13.bkp:8:9: error:
-    • Identifier ‘q:QMe.f’ has conflicting definitions in the module
+    • Identifier ‘f’ has conflicting definitions in the module
       and its hsig file
-      Main module: q:QMe.f :: GHC.Types.Bool
-      Hsig file:  q:QMe.f :: GHC.Types.Int
+      Main module: f :: GHC.Types.Bool
+      Hsig file:  f :: GHC.Types.Int
       The two types are different
     • while checking that q:QMe implements signature Q in p[Q=q:QMe]
