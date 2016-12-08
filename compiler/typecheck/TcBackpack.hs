@@ -538,12 +538,23 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
     let insts = indefUnitIdInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv
-    -- for its exports
+    -- for its exports.  Also, add its 'ImportAvails' to 'tcg_imports',
+    -- so that we treat all orphan instances it provides as visible
+    -- when we verify that all instances are checked (see #12945), and so that
+    -- when we eventually write out the interface we record appropriate
+    -- dependency information.
     impl_iface <- initIfaceTcRn $
         loadSysInterface (text "checkImplements 1") impl_mod
     let impl_gr = mkGlobalRdrEnv
                     (gresFromAvails Nothing (mi_exports impl_iface))
         nsubst = mkNameShape (moduleName impl_mod) (mi_exports impl_iface)
+
+    dflags <- getDynFlags
+    let avails = calculateAvails dflags
+                    impl_iface False{- safe -} False{- boot -}
+    updGblEnv (\tcg_env -> tcg_env {
+        tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
+        }) $ do
 
     -- STEP 2: Load the *unrenamed, uninstantiated* interface for
     -- the ORIGINAL signature.  We are going to eventually rename it,
@@ -579,15 +590,10 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
     tcg_env <- getGblEnv
     checkHsigIface tcg_env impl_gr sig_details
 
-    -- STEP 7: Make sure we have the right exports and imports,
-    -- in case we're going to serialize this out (only relevant
-    -- if we're actually instantiating).
-    dflags <- getDynFlags
-    let avails = calculateAvails dflags
-                    impl_iface False{- safe -} False{- boot -}
+    -- STEP 7: Return the updated 'TcGblEnv' with the signature exports,
+    -- so we write them out.
     return tcg_env {
-        tcg_exports = mi_exports sig_iface,
-        tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
+        tcg_exports = mi_exports sig_iface
         }
 
 -- | Given 'tcg_mod', instantiate a 'ModIface' from the indefinite
