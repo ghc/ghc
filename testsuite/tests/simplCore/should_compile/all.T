@@ -250,3 +250,8 @@ test('T9509',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T9509'])
+test('T12603',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T12603'])
+
