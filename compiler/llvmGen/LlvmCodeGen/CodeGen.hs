@@ -845,8 +845,7 @@ genStore addr@(CmmMachOp (MO_Sub _) [
 
 -- generic case
 genStore addr val
-    = do other <- getTBAAMeta otherN
-         genStore_slow addr val other
+    = getTBAAMeta topN >>= genStore_slow addr val
 
 -- | CmmStore operation
 -- This is a special case for storing to a global register pointer
@@ -1494,8 +1493,7 @@ genLoad atomic e@(CmmMachOp (MO_Sub _) [
 
 -- generic case
 genLoad atomic e ty
-    = do other <- getTBAAMeta otherN
-         genLoad_slow atomic e ty other
+    = getTBAAMeta topN >>= genLoad_slow atomic e ty
 
 -- | Handle CmmLoad expression.
 -- This is a special case for loading from a global register pointer
