@@ -17,7 +17,7 @@ module Haddock.Convert where
 -- instance heads, which aren't TyThings, so just export everything.
 
 import Bag ( emptyBag )
-import BasicTypes ( TupleSort(..), SourceText(..) )
+import BasicTypes ( TupleSort(..), SourceText(..), LexicalFixity(..) )
 import Class
 import CoAxiom
 import ConLike
@@ -77,6 +77,7 @@ tyThingToLHsDecl t = case t of
          { tcdCtxt = synifyCtx (classSCTheta cl)
          , tcdLName = synifyName cl
          , tcdTyVars = synifyTyVars (classTyVars cl)
+         , tcdFixity = Prefix
          , tcdFDs = map (\ (l,r) -> noLoc
                         (map (noLoc . getName) l, map (noLoc . getName) r) ) $
                          snd $ classTvsFds cl
@@ -114,6 +115,7 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
     in TyFamEqn { tfe_tycon = name
                 , tfe_pats  = HsIB { hsib_body = typats
                                    , hsib_vars = map tyVarName tkvs }
+                , tfe_fixity = Prefix
                 , tfe_rhs   = hs_rhs }
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl Name)
@@ -145,6 +147,8 @@ synifyTyCon _coax tc
                                    , hsq_explicit = zipWith mk_hs_tv (fst (splitFunTys (tyConKind tc)))
                                                                 alphaTyVars --a, b, c... which are unfortunately all kind *
                                    , hsq_dependent = emptyNameSet }
+
+           , tcdFixity = Prefix
 
            , tcdDataDefn = HsDataDefn { dd_ND = DataType  -- arbitrary lie, they are neither
                                                     -- algebraic data nor newtype:
@@ -180,6 +184,7 @@ synifyTyCon _coax tc
       FamilyDecl { fdInfo = i
                  , fdLName = synifyName tc
                  , fdTyVars = synifyTyVars (tyConTyVars tc)
+                 , fdFixity = Prefix
                  , fdResultSig =
                        synifyFamilyResultSig resultVar (tyConResKind tc)
                  , fdInjectivityAnn =
@@ -191,6 +196,7 @@ synifyTyCon coax tc
   | Just ty <- synTyConRhs_maybe tc
   = return $ SynDecl { tcdLName = synifyName tc
                      , tcdTyVars = synifyTyVars (tyConTyVars tc)
+                     , tcdFixity = Prefix
                      , tcdRhs = synifyType WithinType ty
                      , tcdFVs = placeHolderNamesTc }
   | otherwise =
@@ -233,7 +239,8 @@ synifyTyCon coax tc
                     , dd_derivs  = alg_deriv }
  in case lefts consRaw of
   [] -> return $
-        DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdDataDefn = defn
+        DataDecl { tcdLName = name, tcdTyVars = tyvars, tcdFixity = Prefix
+                 , tcdDataDefn = defn
                  , tcdDataCusk = False, tcdFVs = placeHolderNamesTc }
   dataConErrs -> Left $ unlines dataConErrs
 

@@ -34,7 +34,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
-import GHC hiding (FunctionFixity(..))
+import GHC hiding (LexicalFixity(..))
 import GHC.Exts
 import Name
 import BooleanFormula

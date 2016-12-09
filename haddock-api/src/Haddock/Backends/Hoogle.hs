@@ -85,7 +85,7 @@ dropHsDocTy = f
         f (HsDocTy a _) = f $ unL a
         f x = x
 
-outHsType :: (OutputableBndrId a, HasOccNameId a)
+outHsType :: (OutputableBndrId a)
           => DynFlags -> HsType a -> String
 outHsType dflags = out dflags . dropHsDocTy
 
@@ -182,6 +182,7 @@ ppClass dflags decl subdocs = (out dflags decl{tcdSigs=[]} ++ ppTyFams) :  ppMet
         tyFamEqnToSyn tfe = SynDecl
             { tcdLName = tfe_tycon tfe
             , tcdTyVars = tfe_pats tfe
+            , tcdFixity = tfe_fixity tfe
             , tcdRhs = tfe_rhs tfe
             , tcdFVs = emptyNameSet
             }

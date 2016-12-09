@@ -47,7 +47,7 @@ import Data.Function
 import Data.Ord              ( comparing )
 
 import DynFlags (Language(..))
-import GHC hiding ( NoLink, moduleInfo,FunctionFixity(..) )
+import GHC hiding ( NoLink, moduleInfo,LexicalFixity(..) )
 import Name
 import Module
 

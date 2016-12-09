@@ -344,7 +344,7 @@ data InstType name
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
 
-instance (OutputableBndrId a, HasOccNameId a)
+instance (OutputableBndrId a)
          => Outputable (InstType a) where
   ppr (ClassInst { .. }) = text "ClassInst"
       <+> ppr clsiCtx
