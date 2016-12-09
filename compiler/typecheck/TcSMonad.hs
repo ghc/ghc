@@ -3052,6 +3052,7 @@ deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
                                , ic_status = IC_Unsolved
                                , ic_binds  = ev_binds
                                , ic_env    = env
+                               , ic_needed = emptyVarSet
                                , ic_info   = skol_info }
       ; updWorkListTcS (extendWorkListImplic imp)
       ; let cobndrs    = zip skol_tvs kind_cos

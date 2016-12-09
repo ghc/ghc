@@ -1135,6 +1135,7 @@ buildImplicationFor tclvl skol_info skol_tvs given wanted
                              , ic_status  = IC_Unsolved
                              , ic_binds = ev_binds_var
                              , ic_env = env
+                             , ic_needed = emptyVarSet
                              , ic_info = skol_info }
 
        ; return (unitBag implic, TcEvBinds ev_binds_var) }

@@ -811,6 +811,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , ic_wanted = mkImplicWC sc_meth_implics
                                   , ic_status = IC_Unsolved
                                   , ic_binds  = dfun_ev_binds_var
+                                  , ic_needed = emptyVarSet
                                   , ic_env    = env
                                   , ic_info   = InstSkol }
 
@@ -1024,6 +1025,7 @@ checkInstConstraints thing_inside
                              , ic_wanted = wanted
                              , ic_status = IC_Unsolved
                              , ic_binds  = ev_binds_var
+                             , ic_needed = emptyVarSet
                              , ic_env    = env
                              , ic_info   = InstSkol }
 
