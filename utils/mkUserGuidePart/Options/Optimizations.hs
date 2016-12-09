@@ -15,6 +15,11 @@ optimizationsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-case-merge"
          }
+  , flag { flagName = "-fcase-folding"
+         , flagDescription = "Enable constant folding in case expressions. Implied by :ghc-flag:`-O`."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-case-folding"
+         }
   , flag { flagName = "-fcmm-elim-common-blocks"
          , flagDescription =
            "Enable Cmm common block elimination. Implied by :ghc-flag:`-O`."

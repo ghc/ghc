@@ -895,3 +895,16 @@ test('T12234',
      compile,
      [''])
 
+test('T12877',
+     [ stats_num_field('bytes allocated',
+          [(wordsize(64), 197582248, 5),
+          # initial:      197582248 (Linux)
+          ])
+     , compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 135979000, 5),
+          # initial:      135979000 (Linux)
+          ]),
+     ],
+     compile_and_run,
+     ['-O2'])
+

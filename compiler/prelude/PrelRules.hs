@@ -15,7 +15,12 @@ ToDo:
 {-# LANGUAGE CPP, RankNTypes #-}
 {-# OPTIONS_GHC -optc-DNON_POSIX_SOURCE #-}
 
-module PrelRules ( primOpRules, builtinRules ) where
+module PrelRules
+   ( primOpRules
+   , builtinRules
+   , caseRules
+   )
+where
 
 #include "HsVersions.h"
 #include "../includes/MachDeps.h"
@@ -1385,3 +1390,53 @@ match_smallIntegerTo primOp _ _ _ [App (Var x) y]
   | idName x == smallIntegerName
   = Just $ App (Var (mkPrimOpId primOp)) y
 match_smallIntegerTo _ _ _ _ _ = Nothing
+
+
+
+--------------------------------------------------------
+-- Constant folding through case-expressions
+--
+-- cf Scrutinee Constant Folding in simplCore/SimplUtils
+--------------------------------------------------------
+
+-- | Match the scrutinee of a case and potentially return a new scrutinee and a
+-- function to apply to each literal alternative.
+caseRules :: CoreExpr -> Maybe (CoreExpr, Integer -> Integer)
+caseRules scrut = case scrut of
+
+   -- v `op` x#
+   App (App (Var f) v) (Lit l)
+      | Just op <- isPrimOpId_maybe f
+      , Just x  <- isLitValue_maybe l ->
+      case op of
+         WordAddOp -> Just (v, \y -> y-x      )
+         IntAddOp  -> Just (v, \y -> y-x      )
+         WordSubOp -> Just (v, \y -> y+x      )
+         IntSubOp  -> Just (v, \y -> y+x      )
+         XorOp     -> Just (v, \y -> y `xor` x)
+         XorIOp    -> Just (v, \y -> y `xor` x)
+         _         -> Nothing
+
+   -- x# `op` v
+   App (App (Var f) (Lit l)) v
+      | Just op <- isPrimOpId_maybe f
+      , Just x  <- isLitValue_maybe l ->
+      case op of
+         WordAddOp -> Just (v, \y -> y-x      )
+         IntAddOp  -> Just (v, \y -> y-x      )
+         WordSubOp -> Just (v, \y -> x-y      )
+         IntSubOp  -> Just (v, \y -> x-y      )
+         XorOp     -> Just (v, \y -> y `xor` x)
+         XorIOp    -> Just (v, \y -> y `xor` x)
+         _         -> Nothing
+
+   -- op v
+   App (Var f) v
+      | Just op <- isPrimOpId_maybe f ->
+      case op of
+         NotOp     -> Just (v, \y -> complement y)
+         NotIOp    -> Just (v, \y -> complement y)
+         IntNegOp  -> Just (v, \y -> negate y    )
+         _         -> Nothing
+
+   _ -> Nothing

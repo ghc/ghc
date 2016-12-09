@@ -29,7 +29,7 @@ module Literal
         , inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
         , isZeroLit
         , litFitsInChar
-        , litValue
+        , litValue, isLitValue, isLitValue_maybe, mapLitValue
 
         -- ** Coercions
         , word2IntLit, int2WordLit
@@ -59,6 +59,7 @@ import Data.ByteString (ByteString)
 import Data.Int
 import Data.Word
 import Data.Char
+import Data.Maybe ( isJust )
 import Data.Data ( Data )
 import Numeric ( fromRat )
 
@@ -271,13 +272,37 @@ isZeroLit _              = False
 -- | Returns the 'Integer' contained in the 'Literal', for when that makes
 -- sense, i.e. for 'Char', 'Int', 'Word' and 'LitInteger'.
 litValue  :: Literal -> Integer
-litValue (MachChar   c) = toInteger $ ord c
-litValue (MachInt    i) = i
-litValue (MachInt64  i) = i
-litValue (MachWord   i) = i
-litValue (MachWord64 i) = i
-litValue (LitInteger i _) = i
-litValue l = pprPanic "litValue" (ppr l)
+litValue l = case isLitValue_maybe l of
+   Just x  -> x
+   Nothing -> pprPanic "litValue" (ppr l)
+
+-- | Returns the 'Integer' contained in the 'Literal', for when that makes
+-- sense, i.e. for 'Char', 'Int', 'Word' and 'LitInteger'.
+isLitValue_maybe  :: Literal -> Maybe Integer
+isLitValue_maybe (MachChar   c)   = Just $ toInteger $ ord c
+isLitValue_maybe (MachInt    i)   = Just i
+isLitValue_maybe (MachInt64  i)   = Just i
+isLitValue_maybe (MachWord   i)   = Just i
+isLitValue_maybe (MachWord64 i)   = Just i
+isLitValue_maybe (LitInteger i _) = Just i
+isLitValue_maybe _                = Nothing
+
+-- | Apply a function to the 'Integer' contained in the 'Literal', for when that
+-- makes sense, e.g. for 'Char', 'Int', 'Word' and 'LitInteger'.
+mapLitValue  :: (Integer -> Integer) -> Literal -> Literal
+mapLitValue f (MachChar   c)   = MachChar (fchar c)
+   where fchar = chr . fromInteger . f . toInteger . ord
+mapLitValue f (MachInt    i)   = MachInt (f i)
+mapLitValue f (MachInt64  i)   = MachInt64 (f i)
+mapLitValue f (MachWord   i)   = MachWord (f i)
+mapLitValue f (MachWord64 i)   = MachWord64 (f i)
+mapLitValue f (LitInteger i t) = LitInteger (f i) t
+mapLitValue _ l                = pprPanic "mapLitValue" (ppr l)
+
+-- | Indicate if the `Literal` contains an 'Integer' value, e.g. 'Char',
+-- 'Int', 'Word' and 'LitInteger'.
+isLitValue  :: Literal -> Bool
+isLitValue = isJust . isLitValue_maybe
 
 {-
         Coercions
