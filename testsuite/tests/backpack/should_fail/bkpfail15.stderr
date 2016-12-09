@@ -14,4 +14,4 @@ bkpfail15.bkp:8:9: error:
       Main module: f :: GHC.Types.Bool
       Hsig file:  f :: GHC.Types.Int
       The two types are different
-    • while checking that q:Q implements signature Q in p[A=<A>, Q=q:Q]
+    • while checking that q:Q implements signature Q in p[A=<A>,Q=q:Q]

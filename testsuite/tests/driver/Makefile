@@ -636,3 +636,8 @@ T10923:
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O0 -c T10923.hs
 	# should NOT output "compilation is NOT required"
 	"$(TEST_HC)" $(TEST_HC_OPTS) -v1 -O -c T10923.hs
+
+.PHONY: T12955
+T12955:
+	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T12955
+	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T12955 -fbuilding-cabal-package

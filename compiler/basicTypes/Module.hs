@@ -690,21 +690,10 @@ instance Outputable IndefUnitId where
       ppr cid <>
         (if not (null insts) -- pprIf
           then
-            -- TODO: Print an instantiation if (1) we would not have qualified
-            -- the module and (2) the module name and module agree
-            let -- is_wanted (mod_name, mod) = qualModule sty mod
-                --                         || mod_name /= moduleName mod
-                (wanted, unwanted) = (insts, [])
-                    {-
-                    -- This was more annoying than helpful
-                    | debugStyle sty = (insts, [])
-                    | otherwise = partition is_wanted insts
-                    -}
-            in brackets (hsep
+            brackets (hcat
                 (punctuate comma $
                     [ ppr modname <> text "=" <> ppr m
-                    | (modname, m) <- wanted] ++
-                    if not (null unwanted) then [text "..."] else []))
+                    | (modname, m) <- insts]))
           else empty)
      where
       cid   = indefUnitIdComponentId uid

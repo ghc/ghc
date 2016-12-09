@@ -2049,6 +2049,24 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod)
                               $$ text "Saw:" <+> quotes (ppr mod_name)
                               $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
+        when (hsc_src == HsigFile && isNothing (lookup mod_name (thisUnitIdInsts dflags))) $
+            let suggested_instantiated_with =
+                    hcat (punctuate comma $
+                        [ ppr k <> text "=" <> ppr v
+                        | (k,v) <- ((mod_name, mkHoleModule mod_name)
+                                : thisUnitIdInsts dflags)
+                        ])
+            in throwOneError $ mkPlainErrMsg dflags' mod_loc $
+                text "Unexpected signature:" <+> quotes (ppr mod_name)
+                $$ if gopt Opt_BuildingCabalPackage dflags
+                    then parens (text "Try adding" <+> quotes (ppr mod_name)
+                            <+> text "to the"
+                            <+> quotes (text "signatures")
+                            <+> text "field in your Cabal file.")
+                    else parens (text "Try passing -instantiated-with=\"" <>
+                                 suggested_instantiated_with <> text "\"" $$
+                                text "replacing <" <> ppr mod_name <> text "> as necessary.")
+
                 -- Find the object timestamp, and return the summary
         obj_timestamp <-
            if isObjectTarget (hscTarget (hsc_dflags hsc_env))
