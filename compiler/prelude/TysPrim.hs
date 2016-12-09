@@ -32,12 +32,12 @@ module TysPrim(
         funTyCon, funTyConName,
         primTyCons,
 
-        charPrimTyCon,          charPrimTy,
-        intPrimTyCon,           intPrimTy,
-        wordPrimTyCon,          wordPrimTy,
-        addrPrimTyCon,          addrPrimTy,
-        floatPrimTyCon,         floatPrimTy,
-        doublePrimTyCon,        doublePrimTy,
+        charPrimTyCon,          charPrimTy, charPrimTyConName,
+        intPrimTyCon,           intPrimTy, intPrimTyConName,
+        wordPrimTyCon,          wordPrimTy, wordPrimTyConName,
+        addrPrimTyCon,          addrPrimTy, addrPrimTyConName,
+        floatPrimTyCon,         floatPrimTy, floatPrimTyConName,
+        doublePrimTyCon,        doublePrimTy, doublePrimTyConName,
 
         voidPrimTyCon,          voidPrimTy,
         statePrimTyCon,         mkStatePrimTy,

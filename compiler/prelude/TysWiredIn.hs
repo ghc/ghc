@@ -34,6 +34,9 @@ module TysWiredIn (
         gtDataCon, gtDataConId,
         promotedLTDataCon, promotedEQDataCon, promotedGTDataCon,
 
+        -- * Boxign primitive types
+        boxingDataCon_maybe,
+
         -- * Char
         charTyCon, charDataCon, charTyCon_RDR,
         charTy, stringTy, charTyConName,
@@ -143,6 +146,7 @@ import TyCon
 import Class            ( Class, mkClass )
 import RdrName
 import Name
+import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv )
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
                           SourceText(..) )
@@ -1174,6 +1178,30 @@ ptrRepLiftedTy = mkTyConTy ptrRepLiftedDataConTyCon
      The boxed primitive types: Char, Int, etc
 *                                                                      *
 ********************************************************************* -}
+
+boxingDataCon_maybe :: TyCon -> Maybe DataCon
+--    boxingDataCon_maybe Char# = C#
+--    boxingDataCon_maybe Int#  = I#
+--    ... etc ...
+-- See Note [Boxing primitive types]
+boxingDataCon_maybe tc
+  = lookupNameEnv boxing_constr_env (tyConName tc)
+
+boxing_constr_env :: NameEnv DataCon
+boxing_constr_env
+  = mkNameEnv [(charPrimTyConName  , charDataCon  )
+              ,(intPrimTyConName   , intDataCon   )
+              ,(wordPrimTyConName  , wordDataCon  )
+              ,(floatPrimTyConName , floatDataCon )
+              ,(doublePrimTyConName, doubleDataCon) ]
+
+{- Note [Boxing primitive types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+For a handful of primitive types (Int, Char, Word, Flaot, Double),
+we can readily box and an unboxed version (Int#, Char# etc) using
+the corresponding data constructor.  This is useful in a couple
+of places, notably let-floating -}
+
 
 charTy :: Type
 charTy = mkTyConTy charTyCon
