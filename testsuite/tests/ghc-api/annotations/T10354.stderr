@@ -1,3 +1,0 @@
-
-Test10354.hs:13:8: error:
-    Not in scope: type constructor or class ‘ForceError’

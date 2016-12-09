@@ -1,9 +1,0 @@
-
-Test10268.hs:5:6: error:
-    Variable not in scope: footemplate :: Language.Haskell.TH.Lib.ExpQ
-
-Test10268.hs:7:14: error:
-    Not in scope: type constructor or class ‘Pattern’
-
-Test10268.hs:10:10: error:
-    Not in scope: type constructor or class ‘Pattern’

@@ -19,9 +19,11 @@ import Control.Monad
 import System.IO
 
 main = do
-  [libdir] <- getArgs
+  libdir : args <- getArgs
   runGhc (Just libdir) $ do
-    dflags <- getSessionDynFlags
+    dflags0 <- getSessionDynFlags
+    (dflags, _, _) <- parseDynamicFlags dflags0
+      (map (mkGeneralLocated "on the commandline") args)
     setSessionDynFlags $ dflags { hscTarget = HscNothing
                                 , ghcLink  = LinkInMemory
                                 , verbosity = 0 -- silence please
