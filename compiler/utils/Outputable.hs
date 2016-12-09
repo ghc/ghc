@@ -71,7 +71,7 @@ module Outputable (
         alwaysQualifyPackages, neverQualifyPackages,
         QualifyName(..), queryQual,
         sdocWithDynFlags, sdocWithPlatform,
-        getPprStyle, withPprStyle, withPprStyleDoc,
+        getPprStyle, withPprStyle, withPprStyleDoc, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
         ifPprDebug, qualName, qualModule, qualPackage,
@@ -133,7 +133,7 @@ import GHC.Show         ( showMultiLineString )
 -}
 
 data PprStyle
-  = PprUser PrintUnqualified Depth
+  = PprUser PrintUnqualified Depth Coloured
                 -- Pretty-print in a way that will make sense to the
                 -- ordinary user; must be very close to Haskell
                 -- syntax, etc.
@@ -156,6 +156,9 @@ data CodeStyle = CStyle         -- The format of labels differs for C and assemb
 data Depth = AllTheWay
            | PartWay Int        -- 0 => stop
 
+data Coloured
+  = Uncoloured
+  | Coloured
 
 -- -----------------------------------------------------------------------------
 -- Printing original names
@@ -262,7 +265,16 @@ cmdlineParserStyle = mkUserStyle alwaysQualify AllTheWay
 mkUserStyle :: PrintUnqualified -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
-   | otherwise          = PprUser unqual depth
+   | otherwise          = PprUser unqual depth Uncoloured
+
+setStyleColoured :: Bool -> PprStyle -> PprStyle
+setStyleColoured col style =
+  case style of
+    PprUser q d _ -> PprUser q d c
+    _             -> style
+  where
+    c | col       = Coloured
+      | otherwise = Uncoloured
 
 instance Outputable PprStyle where
   ppr (PprUser {})  = text "user-style"
@@ -313,9 +325,9 @@ withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
-  SDC{sdocStyle=PprUser _ (PartWay 0)} -> Pretty.text "..."
-  SDC{sdocStyle=PprUser q (PartWay n)} ->
-    runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1))}
+  SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
+  SDC{sdocStyle=PprUser q (PartWay n) c} ->
+    runSDoc d ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
   _ -> runSDoc d ctx
 
 -- | Truncate a list that is longer than the current depth.
@@ -324,10 +336,10 @@ pprDeeperList f ds
   | null ds   = f []
   | otherwise = SDoc work
  where
-  work ctx@SDC{sdocStyle=PprUser q (PartWay n)}
+  work ctx@SDC{sdocStyle=PprUser q (PartWay n) c}
    | n==0      = Pretty.text "..."
    | otherwise =
-      runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1))}
+      runSDoc (f (go 0 ds)) ctx{sdocStyle = PprUser q (PartWay (n-1)) c}
    where
      go _ [] = []
      go i (d:ds) | i >= n    = [text "...."]
@@ -337,8 +349,8 @@ pprDeeperList f ds
 pprSetDepth :: Depth -> SDoc -> SDoc
 pprSetDepth depth doc = SDoc $ \ctx ->
     case ctx of
-        SDC{sdocStyle=PprUser q _} ->
-            runSDoc doc ctx{sdocStyle = PprUser q depth}
+        SDC{sdocStyle=PprUser q _ c} ->
+            runSDoc doc ctx{sdocStyle = PprUser q depth c}
         _ ->
             runSDoc doc ctx
 
@@ -352,19 +364,19 @@ sdocWithPlatform :: (Platform -> SDoc) -> SDoc
 sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
 
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser q _)  mod occ = queryQualifyName q mod occ
-qualName (PprDump q)    mod occ = queryQualifyName q mod occ
-qualName _other         mod _   = NameQual (moduleName mod)
+qualName (PprUser q _ _) mod occ = queryQualifyName q mod occ
+qualName (PprDump q)     mod occ = queryQualifyName q mod occ
+qualName _other          mod _   = NameQual (moduleName mod)
 
 qualModule :: PprStyle -> QueryQualifyModule
-qualModule (PprUser q _)  m = queryQualifyModule q m
-qualModule (PprDump q)    m = queryQualifyModule q m
-qualModule _other        _m = True
+qualModule (PprUser q _ _)  m = queryQualifyModule q m
+qualModule (PprDump q)      m = queryQualifyModule q m
+qualModule _other          _m = True
 
 qualPackage :: PprStyle -> QueryQualifyPackage
-qualPackage (PprUser q _)  m = queryQualifyPackage q m
-qualPackage (PprDump q)    m = queryQualifyPackage q m
-qualPackage _other        _m = True
+qualPackage (PprUser q _ _)  m = queryQualifyPackage q m
+qualPackage (PprDump q)      m = queryQualifyPackage q m
+qualPackage _other          _m = True
 
 queryQual :: PprStyle -> PrintUnqualified
 queryQual s = QueryQualify (qualName s)
@@ -388,8 +400,8 @@ debugStyle PprDebug = True
 debugStyle _other   = False
 
 userStyle ::  PprStyle -> Bool
-userStyle (PprUser _ _) = True
-userStyle _other        = False
+userStyle (PprUser {}) = True
+userStyle _other       = False
 
 ifPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
 ifPprDebug d = SDoc $ \ctx ->
@@ -712,15 +724,17 @@ colType = colBlueFg
 --
 -- Only takes effect if colours are enabled.
 coloured :: PprColour -> SDoc -> SDoc
--- TODO: coloured _ sdoc ctxt | coloursDisabled = sdoc ctxt
 coloured col@(PprColour c) sdoc =
   sdocWithDynFlags $ \dflags ->
     if overrideWith (canUseColor dflags) (useColor dflags)
     then SDoc $ \ctx@SDC{ sdocLastColour = PprColour lc } ->
-         let ctx' = ctx{ sdocLastColour = col } in
-         Pretty.zeroWidthText c
-           Pretty.<> runSDoc sdoc ctx'
-           Pretty.<> Pretty.zeroWidthText lc
+         case ctx of
+           SDC{ sdocStyle = PprUser _ _ Coloured } ->
+             let ctx' = ctx{ sdocLastColour = col } in
+             Pretty.zeroWidthText c
+               Pretty.<> runSDoc sdoc ctx'
+               Pretty.<> Pretty.zeroWidthText lc
+           _ -> runSDoc sdoc ctx
     else sdoc
 
 bold :: SDoc -> SDoc

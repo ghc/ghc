@@ -168,10 +168,17 @@ instance Show ErrMsg where
 pprMessageBag :: Bag MsgDoc -> SDoc
 pprMessageBag msgs = vcat (punctuate blankLine (bagToList msgs))
 
+-- | Make an unannotated error message with location info.
 mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
 mkLocMessage = mkLocMessageAnn Nothing
 
-mkLocMessageAnn :: Maybe String -> Severity -> SrcSpan -> MsgDoc -> MsgDoc
+-- | Make a possibly annotated error message with location info.
+mkLocMessageAnn
+  :: Maybe String                       -- ^ optional annotation
+  -> Severity                           -- ^ severity
+  -> SrcSpan                            -- ^ location
+  -> MsgDoc                             -- ^ message
+  -> MsgDoc
   -- Always print the location, even if it is unhelpful.  Error messages
   -- are supposed to be in a standard format, and one without a location
   -- would look strange.  Better to say explicitly "<no location info>".
@@ -180,25 +187,23 @@ mkLocMessageAnn ann severity locn msg
       let locn' = if gopt Opt_ErrorSpans dflags
                   then ppr locn
                   else ppr (srcSpanStart locn)
-      in bold (hang (locn' <> colon <+> sevInfo <> optAnn) 4 msg)
+          -- Add prefixes, like    Foo.hs:34: warning:
+          --                           <the warning message>
+          prefix = locn' <> colon <+>
+                   coloured (colBold `mappend` sevColor) sevText <> optAnn
+      in bold (hang prefix 4 msg)
   where
-    -- Add prefixes, like    Foo.hs:34: warning:
-    --                           <the warning message>
-    (sevInfo, sevColor) =
+    (sevText, sevColor) =
       case severity of
-        SevWarning ->
-          (coloured sevColor (text "warning:"), colBold `mappend` colMagentaFg)
-        SevError ->
-          (coloured sevColor (text "error:"), colBold `mappend` colRedFg)
-        SevFatal ->
-          (coloured sevColor (text "fatal:"), colBold `mappend` colRedFg)
-        _ ->
-          (empty, mempty)
+        SevWarning -> (text "warning:", colMagentaFg)
+        SevError   -> (text "error:", colRedFg)
+        SevFatal   -> (text "fatal:", colRedFg)
+        _          -> (empty, mempty)
 
     -- Add optional information
     optAnn = case ann of
       Nothing -> text ""
-      Just i -> text " [" <> coloured sevColor (text i) <> text "]"
+      Just i  -> text " [" <> coloured sevColor (text i) <> text "]"
 
 makeIntoWarning :: WarnReason -> ErrMsg -> ErrMsg
 makeIntoWarning reason err = err

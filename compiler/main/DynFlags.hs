@@ -1791,7 +1791,7 @@ defaultLogAction dflags reason severity srcSpan style msg
       SevInfo        -> printErrs msg style
       SevFatal       -> printErrs msg style
       _              -> do hPutChar stderr '\n'
-                           printErrs message style
+                           printErrs message (setStyleColoured True style)
                            -- careful (#2302): printErrs prints in UTF-8,
                            -- whereas converting to string first and using
                            -- hPutStr would just emit the low 8 bits of
