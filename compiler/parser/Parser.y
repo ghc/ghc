@@ -1053,11 +1053,11 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
   | {- empty -}                 { Nothing }
 
 deriv_strategy :: { Maybe (Located DerivStrategy) }
-  : 'stock'                     {% ajs (Just (sL1 $1 DerivStock))
+  : 'stock'                     {% ajs (Just (sL1 $1 StockStrategy))
                                        [mj AnnStock $1] }
-  | 'anyclass'                  {% ajs (Just (sL1 $1 DerivAnyclass))
+  | 'anyclass'                  {% ajs (Just (sL1 $1 AnyclassStrategy))
                                        [mj AnnAnyclass $1] }
-  | 'newtype'                   {% ajs (Just (sL1 $1 DerivNewtype))
+  | 'newtype'                   {% ajs (Just (sL1 $1 NewtypeStrategy))
                                        [mj AnnNewtype $1] }
   | {- empty -}                 { Nothing }
 

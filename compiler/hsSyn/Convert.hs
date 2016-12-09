@@ -1143,9 +1143,9 @@ cvtDerivClause (TH.DerivClause ds ctxt)
        ; returnL $ HsDerivingClause ds' ctxt' }
 
 cvtDerivStrategy :: TH.DerivStrategy -> Hs.DerivStrategy
-cvtDerivStrategy TH.Stock    = Hs.DerivStock
-cvtDerivStrategy TH.Anyclass = Hs.DerivAnyclass
-cvtDerivStrategy TH.Newtype  = Hs.DerivNewtype
+cvtDerivStrategy TH.StockStrategy    = Hs.StockStrategy
+cvtDerivStrategy TH.AnyclassStrategy = Hs.AnyclassStrategy
+cvtDerivStrategy TH.NewtypeStrategy  = Hs.NewtypeStrategy
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
 cvtType = cvtTypeKind "type"

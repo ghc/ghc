@@ -126,7 +126,8 @@ templateHaskellNames = [
     overlappableDataConName, overlappingDataConName, overlapsDataConName,
     incoherentDataConName,
     -- DerivStrategy
-    stockDataConName, anyclassDataConName, newtypeDataConName,
+    stockStrategyDataConName, anyclassStrategyDataConName,
+    newtypeStrategyDataConName,
     -- TExp
     tExpDataConName,
     -- RuleBndr
@@ -591,10 +592,11 @@ overlapsDataConName     = thCon (fsLit "Overlaps")     overlapsDataConKey
 incoherentDataConName   = thCon (fsLit "Incoherent")   incoherentDataConKey
 
 -- data DerivStrategy = ...
-stockDataConName, anyclassDataConName, newtypeDataConName :: Name
-stockDataConName    = thCon (fsLit "Stock")    stockDataConKey
-anyclassDataConName = thCon (fsLit "Anyclass") anyclassDataConKey
-newtypeDataConName  = thCon (fsLit "Newtype")  newtypeDataConKey
+stockStrategyDataConName, anyclassStrategyDataConName,
+  newtypeStrategyDataConName :: Name
+stockStrategyDataConName    = thCon (fsLit "StockStrategy")    stockDataConKey
+anyclassStrategyDataConName = thCon (fsLit "AnyclassStrategy") anyclassDataConKey
+newtypeStrategyDataConName  = thCon (fsLit "NewtypeStrategy")  newtypeDataConKey
 
 {- *********************************************************************
 *                                                                      *

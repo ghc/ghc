@@ -538,18 +538,19 @@ instance Outputable Origin where
 -- | Which technique the user explicitly requested when deriving an instance.
 data DerivStrategy
   -- See Note [Deriving strategies] in TcDeriv
-  = DerivStock    -- ^ GHC's \"standard\" strategy, which is to implement a
-                  --   custom instance for the data type. This only works for
-                  --   certain types that GHC knows about (e.g., 'Eq', 'Show',
-                  --   'Functor' when @-XDeriveFunctor@ is enabled, etc.)
-  | DerivAnyclass -- ^ @-XDeriveAnyClass@
-  | DerivNewtype  -- ^ @-XGeneralizedNewtypeDeriving@
+  = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
+                     --   custom instance for the data type. This only works
+                     --   for certain types that GHC knows about (e.g., 'Eq',
+                     --   'Show', 'Functor' when @-XDeriveFunctor@ is enabled,
+                     --   etc.)
+  | AnyclassStrategy -- ^ @-XDeriveAnyClass@
+  | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
   deriving (Eq, Data)
 
 instance Outputable DerivStrategy where
-    ppr DerivStock    = text "stock"
-    ppr DerivAnyclass = text "anyclass"
-    ppr DerivNewtype  = text "newtype"
+    ppr StockStrategy    = text "stock"
+    ppr AnyclassStrategy = text "anyclass"
+    ppr NewtypeStrategy  = text "newtype"
 
 {-
 ************************************************************************

@@ -128,9 +128,9 @@ isDerivSpecAnyClass _                     = False
 
 -- A DerivSpecMechanism can be losslessly converted to a DerivStrategy.
 mechanismToStrategy :: DerivSpecMechanism -> DerivStrategy
-mechanismToStrategy (DerivSpecStock{})    = DerivStock
-mechanismToStrategy (DerivSpecNewtype{})  = DerivNewtype
-mechanismToStrategy (DerivSpecAnyClass{}) = DerivAnyclass
+mechanismToStrategy (DerivSpecStock{})    = StockStrategy
+mechanismToStrategy (DerivSpecNewtype{})  = NewtypeStrategy
+mechanismToStrategy (DerivSpecAnyClass{}) = AnyclassStrategy
 
 instance Outputable DerivSpecMechanism where
   ppr = ppr . mechanismToStrategy

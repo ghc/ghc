@@ -977,12 +977,12 @@ mkDataTypeEqn :: DynFlags
 mkDataTypeEqn dflags overlap_mode tvs cls cls_tys
               tycon tc_args rep_tc rep_tc_args mtheta deriv_strat
   = case deriv_strat of
-      Just DerivStock -> mk_eqn_stock dflags mtheta cls cls_tys rep_tc
-                           go_for_it bale_out
-      Just DerivAnyclass -> mk_eqn_anyclass dflags rep_tc cls
-                              go_for_it bale_out
+      Just StockStrategy    -> mk_eqn_stock dflags mtheta cls cls_tys rep_tc
+                                go_for_it bale_out
+      Just AnyclassStrategy -> mk_eqn_anyclass dflags rep_tc cls
+                                go_for_it bale_out
       -- GeneralizedNewtypeDeriving makes no sense for non-newtypes
-      Just DerivNewtype -> bale_out gndNonNewtypeErr
+      Just NewtypeStrategy  -> bale_out gndNonNewtypeErr
       -- Lacking a user-requested deriving strategy, we will try to pick
       -- between the stock or anyclass strategies
       Nothing -> mk_eqn_no_mechanism dflags tycon mtheta cls cls_tys rep_tc
@@ -1100,11 +1100,11 @@ mkNewTypeEqn dflags overlap_mode tvs
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
   = ASSERT( length cls_tys + 1 == classArity cls )
     case deriv_strat of
-      Just DerivStock -> mk_eqn_stock dflags mtheta cls cls_tys rep_tycon
-                           go_for_it_other bale_out
-      Just DerivAnyclass -> mk_eqn_anyclass dflags rep_tycon cls
-                              go_for_it_other bale_out
-      Just DerivNewtype ->
+      Just StockStrategy    -> mk_eqn_stock dflags mtheta cls cls_tys rep_tycon
+                                 go_for_it_other bale_out
+      Just AnyclassStrategy -> mk_eqn_anyclass dflags rep_tycon cls
+                                 go_for_it_other bale_out
+      Just NewtypeStrategy  ->
         -- Since the user explicitly asked for GeneralizedNewtypeDeriving, we
         -- don't need to perform all of the checks we normally would, such as
         -- if the class being derived is known to produce ill-roled coercions

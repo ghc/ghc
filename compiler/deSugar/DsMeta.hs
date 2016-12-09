@@ -2017,9 +2017,9 @@ repDerivStrategy mds =
     Nothing -> nothing
     Just (L _ ds) ->
       case ds of
-        DerivStock    -> just =<< dataCon stockDataConName
-        DerivAnyclass -> just =<< dataCon anyclassDataConName
-        DerivNewtype  -> just =<< dataCon newtypeDataConName
+        StockStrategy    -> just =<< dataCon stockStrategyDataConName
+        AnyclassStrategy -> just =<< dataCon anyclassStrategyDataConName
+        NewtypeStrategy  -> just =<< dataCon newtypeStrategyDataConName
   where
   nothing = coreNothing derivStrategyTyConName
   just    = coreJust    derivStrategyTyConName
