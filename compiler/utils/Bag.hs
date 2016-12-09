@@ -18,6 +18,7 @@ module Bag (
         concatBag, catBagMaybes, foldBag, foldrBag, foldlBag,
         isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
         listToBag, bagToList, mapAccumBagL,
+        concatMapBag, mapMaybeBag,
         foldrBagM, foldlBagM, mapBagM, mapBagM_,
         flatMapBagM, flatMapBagPairM,
         mapAndUnzipBagM, mapAccumBagLM,
@@ -30,6 +31,7 @@ import Util
 import MonadUtils
 import Control.Monad
 import Data.Data
+import Data.Maybe( mapMaybe )
 import Data.List ( partition, mapAccumL )
 import qualified Data.Foldable as Foldable
 
@@ -215,6 +217,20 @@ mapBag _ EmptyBag        = EmptyBag
 mapBag f (UnitBag x)     = UnitBag (f x)
 mapBag f (TwoBags b1 b2) = TwoBags (mapBag f b1) (mapBag f b2)
 mapBag f (ListBag xs)    = ListBag (map f xs)
+
+concatMapBag :: (a -> Bag b) -> Bag a -> Bag b
+concatMapBag _ EmptyBag        = EmptyBag
+concatMapBag f (UnitBag x)     = f x
+concatMapBag f (TwoBags b1 b2) = unionBags (concatMapBag f b1) (concatMapBag f b2)
+concatMapBag f (ListBag xs)    = foldr (unionBags . f) emptyBag xs
+
+mapMaybeBag :: (a -> Maybe b) -> Bag a -> Bag b
+mapMaybeBag _ EmptyBag        = EmptyBag
+mapMaybeBag f (UnitBag x)     = case f x of
+                                  Nothing -> EmptyBag
+                                  Just y  -> UnitBag y
+mapMaybeBag f (TwoBags b1 b2) = unionBags (mapMaybeBag f b1) (mapMaybeBag f b2)
+mapMaybeBag f (ListBag xs)    = ListBag (mapMaybe f xs)
 
 mapBagM :: Monad m => (a -> m b) -> Bag a -> m (Bag b)
 mapBagM _ EmptyBag        = return EmptyBag

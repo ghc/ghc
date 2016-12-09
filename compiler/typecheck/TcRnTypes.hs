@@ -1740,8 +1740,22 @@ tyCoFVsOfBag tvs_of = foldrBag (unionFV . tvs_of) emptyFV
 
 --------------------------
 dropDerivedSimples :: Cts -> Cts
-dropDerivedSimples simples = filterBag isWantedCt simples
-                             -- simples are all Wanted or Derived
+-- Drop all Derived constraints, but make [W] back into [WD],
+-- so that if we re-simplify these constraints we will get all
+-- the right derived constraints re-generated.  Forgetting this
+-- step led to #12936
+dropDerivedSimples simples = mapMaybeBag dropDerivedCt simples
+
+dropDerivedCt :: Ct -> Maybe Ct
+dropDerivedCt ct
+  = case ctEvFlavour ev of
+      Wanted WOnly -> Just (ct { cc_ev = ev_wd })
+      Wanted _     -> Just ct
+      _            -> ASSERT( isDerivedCt ct ) Nothing
+                      -- simples are all Wanted or Derived
+  where
+    ev    = ctEvidence ct
+    ev_wd = ev { ctev_nosh = WDeriv }
 
 dropDerivedInsols :: Cts -> Cts
 -- See Note [Dropping derived constraints]
