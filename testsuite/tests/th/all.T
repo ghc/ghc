@@ -440,6 +440,7 @@ test('T12478_3', omit_ways(['ghci']), compile, ['-v0'])
 test('T12478_4', omit_ways(['ghci']), compile_fail, ['-v0'])
 test('T12513', omit_ways(['ghci']), compile_fail, ['-v0'])
 test('T12530', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
+test('T12646', normal, compile, ['-v0'])
 test('T12788', extra_clean(['T12788_Lib.hi', 'T12788_Lib.o']),
                multimod_compile_fail,
                ['T12788.hs', '-v0 ' + config.ghc_th_way_flags])

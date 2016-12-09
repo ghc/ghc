@@ -124,6 +124,11 @@ Template Haskell
 
 -  Make quoting and reification return the same types.  (:ghc-ticket:`11629`)
 
+-  More kind annotations appear in the left-hand sides of reified closed
+   type family equations, in order to disambiguate types that would otherwise
+   be ambiguous in the presence of :ghc-flag:`-XPolyKinds`.
+   (:ghc-ticket:`12646`)
+
 Runtime system
 ~~~~~~~~~~~~~~
 

@@ -1357,11 +1357,16 @@ reifyThing thing = pprPanic "reifyThing" (pprTcTyThingCategory thing)
 
 -------------------------------------------
 reifyAxBranch :: TyCon -> CoAxBranch -> TcM TH.TySynEqn
-reifyAxBranch fam_tc (CoAxBranch { cab_lhs = args, cab_rhs = rhs })
+reifyAxBranch fam_tc (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
             -- remove kind patterns (#8884)
-  = do { args' <- mapM reifyType (filterOutInvisibleTypes fam_tc args)
+  = do { let lhs_types_only = filterOutInvisibleTypes fam_tc lhs
+       ; lhs' <- reifyTypes lhs_types_only
+       ; annot_th_lhs <- zipWith3M annotThType (mkIsPolyTvs fam_tvs)
+                                   lhs_types_only lhs'
        ; rhs'  <- reifyType rhs
-       ; return (TH.TySynEqn args' rhs') }
+       ; return (TH.TySynEqn annot_th_lhs rhs') }
+  where
+    fam_tvs = filterOutInvisibleTyVars fam_tc (tyConTyVars fam_tc)
 
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
