@@ -24,11 +24,6 @@ from testglobals import *
 from testutil import *
 from extra_files import extra_src_files
 
-try:
-    basestring
-except: # Python 3
-    basestring = (str,bytes)
-
 if config.use_threads:
     import threading
     try:
@@ -554,7 +549,8 @@ def join_normalisers(*a):
         Taken from http://stackoverflow.com/a/2158532/946226
         """
         for el in l:
-            if isinstance(el, collections.Iterable) and not isinstance(el, basestring):
+            if (isinstance(el, collections.Iterable)
+                and not isinstance(el, (bytes, str))):
                 for sub in flatten(el):
                     yield sub
             else:
@@ -833,7 +829,7 @@ def do_test(name, way, func, args, files):
 
     try:
         result = func(*[name,way] + args)
-    except:
+    except Exception:
         pass
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
@@ -841,7 +837,7 @@ def do_test(name, way, func, args, files):
 
     try:
         passFail = result['passFail']
-    except:
+    except (KeyError, TypeError):
         passFail = 'No passFail found'
 
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
@@ -882,7 +878,7 @@ def badResult(result):
         if result['passFail'] == 'pass':
             return False
         return True
-    except:
+    except (KeyError, TypeError):
         return True
 
 def passed():
@@ -1403,7 +1399,7 @@ def read_no_crs(file):
         # See Note [Universal newlines].
         with io.open(file, 'r', encoding='utf8', errors='replace', newline=None) as h:
             str = h.read()
-    except:
+    except Exception:
         # On Windows, if the program fails very early, it seems the
         # files stdout/stderr are redirected to may not get created
         pass
@@ -1724,7 +1720,7 @@ def if_verbose_dump( n, f ):
         try:
             with io.open(f) as file:
                 print(file.read())
-        except:
+        except Exception:
             print('')
 
 def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
@@ -1747,8 +1743,8 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
         with io.open(stdin, 'rb') as f:
             stdin_buffer = f.read()
 
-    stdout_buffer = ''
-    stderr_buffer = ''
+    stdout_buffer = b''
+    stderr_buffer = b''
 
     hStdErr = subprocess.PIPE
     if stderr is subprocess.STDOUT:
