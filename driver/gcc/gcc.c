@@ -17,6 +17,8 @@ int main(int argc, char** argv) {
     char *preArgv[4];
     char *oldPath;
     char *newPath;
+    char *base;
+    char *version;
     int n;
 
     binDir = getExecutablePath();
@@ -42,18 +44,23 @@ int main(int argc, char** argv) {
         die("putenv failed\n");
     }
 
+    /* GCC Version. */
+    version = mkString("%d.%d.%d", __GNUC__, __GNUC_MINOR__, __GNUC_PATCHLEVEL__);
+
     /* Without these -B args, gcc will still work. However, if you
        have a mingw installation in c:/mingw then it will use files
        from that in preference to the in-tree files. */
     preArgv[0] = mkString("-B%s", binDir);
     preArgv[1] = mkString("-B%s/../lib", binDir);
 #ifdef __MINGW64__
-    preArgv[2] = mkString("-B%s/../lib/gcc/x86_64-w64-mingw32/6.2.0", binDir);
-    preArgv[3] = mkString("-B%s/../libexec/gcc/x86_64-w64-mingw32/6.2.0", binDir);
+    base = mkString("x86_64-w64-mingw32");
 #else
-    preArgv[2] = mkString("-B%s/../lib/gcc/i686-w64-mingw32/6.2.0", binDir);
-    preArgv[3] = mkString("-B%s/../libexec/gcc/i686-w64-mingw32/6.2.0", binDir);
+    base = mkString("i686-w64-mingw32");
 #endif
+
+    preArgv[2] = mkString("-B%s/../lib/gcc/%s/%s"    , binDir, base, version);
+    preArgv[3] = mkString("-B%s/../libexec/gcc/%s/%s", binDir, base, version);
+
     run(exePath, 4, preArgv, argc - 1, argv + 1);
 }
 
