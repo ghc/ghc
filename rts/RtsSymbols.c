@@ -107,7 +107,8 @@
       RTS_WIN32_ONLY(SymI_HasProto(_imp___iob))          \
       RTS_WIN64_ONLY(SymI_HasProto(__iob_func))          \
       /* see Note [Symbols for MinGW's printf] */        \
-      SymI_HasProto(_lock_file)
+      SymI_HasProto(_lock_file)                          \
+      SymI_HasProto(_unlock_file)
 
 #define RTS_MINGW_COMPAT_SYMBOLS                         \
       SymI_HasProto_deprecated(access)                   \
