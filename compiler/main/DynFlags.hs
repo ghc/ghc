@@ -221,7 +221,6 @@ import System.Console.Terminfo (SetupTermError, Terminal, getCapability,
                                 setupTermFromEnv, termColors)
 import System.Posix (queryTerminal, stdError)
 #elif defined mingw32_HOST_OS
-import Foreign (Ptr, with, peek)
 import System.Environment (lookupEnv)
 import qualified Graphics.Win32 as Win32
 #endif
@@ -233,6 +232,13 @@ import qualified Data.IntSet as IntSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
+
+#if __GLASGOW_HASKELL__ >= 709
+import Foreign
+#else
+import Foreign.Safe
+#endif
+
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -5142,7 +5148,15 @@ defaultGlobalDynFlags =
   where
     settings = panic "v_unsafeGlobalDynFlags: not initialised"
 
+#if STAGE < 2
 GLOBAL_VAR(v_unsafeGlobalDynFlags, defaultGlobalDynFlags, DynFlags)
+#else
+SHARED_GLOBAL_VAR( v_unsafeGlobalDynFlags
+                 , getOrSetLibHSghcGlobalDynFlags
+                 , "getOrSetLibHSghcGlobalDynFlags"
+                 , defaultGlobalDynFlags
+                 , DynFlags )
+#endif
 
 unsafeGlobalDynFlags :: DynFlags
 unsafeGlobalDynFlags = unsafePerformIO $ readIORef v_unsafeGlobalDynFlags

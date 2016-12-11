@@ -285,13 +285,6 @@ originally assigned to those FastStrings.  Thus the lookup fails since the
 domain of the GlobalRdrEnv is affected by the RdrName's OccName's FastString's
 unique.
 
-The old `reinitializeGlobals` mechanism is enough to provide the plugin with
-read-access to the table, but it insufficient in the general case where the
-plugin may allocate FastStrings. This mutates the supply for the FastStrings'
-unique, and that needs to be propagated back to the compiler's instance of the
-global variable.  Such propagation is beyond the `reinitializeGlobals`
-mechanism.
-
 Maintaining synchronization of the two instances of this global is rather
 difficult because of the uses of `unsafePerformIO` in this module.  Not
 synchronizing them risks breaking the rather major invariant that two

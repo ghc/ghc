@@ -1,11 +1,10 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, TupleSections, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-cse #-}
+-- -fno-cse is needed for GLOBAL_VAR's to behave properly
+
 --
 --  (c) The University of Glasgow 2002-2006
 --
-
--- -fno-cse is needed for GLOBAL_VAR's to behave properly
-
 -- | The dynamic linker for GHCi.
 --
 -- This module deals with the top-level issues of dynamic linking,
@@ -16,10 +15,7 @@ module Linker ( getHValue, showLinkerState,
                 extendLinkEnv, deleteFromLinkEnv,
                 extendLoadedPkgs,
                 linkPackages,initDynLinker,linkModule,
-                linkCmdLineLibs,
-
-                -- Saving/restoring globals
-                PersistentLinkerState, saveLinkerGlobals, restoreLinkerGlobals
+                linkCmdLineLibs
         ) where
 
 #include "HsVersions.h"
@@ -66,6 +62,11 @@ import System.Directory
 
 import Exception
 
+#if __GLASGOW_HASKELL__ >= 709
+import Foreign
+#else
+import Foreign.Safe
+#endif
 
 {- **********************************************************************
 
@@ -84,9 +85,22 @@ library to side-effect the PLS and for those changes to be reflected here.
 The PersistentLinkerState maps Names to actual closures (for
 interpreted code only), for use during linking.
 -}
-
+#if STAGE < 2
 GLOBAL_VAR_M(v_PersistentLinkerState, newMVar (panic "Dynamic linker not initialised"), MVar PersistentLinkerState)
 GLOBAL_VAR(v_InitLinkerDone, False, Bool) -- Set True when dynamic linker is initialised
+#else
+SHARED_GLOBAL_VAR_M( v_PersistentLinkerState
+                   , getOrSetLibHSghcPersistentLinkerState
+                   , "getOrSetLibHSghcPersistentLinkerState"
+                   , newMVar (panic "Dynamic linker not initialised")
+                   , MVar PersistentLinkerState)
+-- Set True when dynamic linker is initialised
+SHARED_GLOBAL_VAR( v_InitLinkerDone
+                 , getOrSetLibHSghcInitLinkerDone
+                 , "getOrSetLibHSghcInitLinkerDone"
+                 , False
+                 , Bool)
+#endif
 
 modifyPLS_ :: (PersistentLinkerState -> IO PersistentLinkerState) -> IO ()
 modifyPLS_ f = readIORef v_PersistentLinkerState >>= flip modifyMVar_ f
@@ -1428,17 +1442,3 @@ maybePutStr dflags s
 
 maybePutStrLn :: DynFlags -> String -> IO ()
 maybePutStrLn dflags s = maybePutStr dflags (s ++ "\n")
-
-{- **********************************************************************
-
-        Tunneling global variables into new instance of GHC library
-
-  ********************************************************************* -}
-
-saveLinkerGlobals :: IO (MVar PersistentLinkerState, Bool)
-saveLinkerGlobals = liftM2 (,) (readIORef v_PersistentLinkerState) (readIORef v_InitLinkerDone)
-
-restoreLinkerGlobals :: (MVar PersistentLinkerState, Bool) -> IO ()
-restoreLinkerGlobals (pls, ild) = do
-    writeIORef v_PersistentLinkerState pls
-    writeIORef v_InitLinkerDone ild

@@ -595,6 +595,11 @@
       SymI_HasProto(getOrSetLibHSghcFastStringTable)                    \
       SymI_HasProto(getRTSStats)                                        \
       SymI_HasProto(getRTSStatsEnabled)                                 \
+      SymI_HasProto(getOrSetLibHSghcPersistentLinkerState)              \
+      SymI_HasProto(getOrSetLibHSghcInitLinkerDone)                     \
+      SymI_HasProto(getOrSetLibHSghcGlobalDynFlags)                     \
+      SymI_HasProto(getOrSetLibHSghcStaticOptions)                      \
+      SymI_HasProto(getOrSetLibHSghcStaticOptionsReady)                 \
       SymI_HasProto(genericRaise)                                       \
       SymI_HasProto(getProgArgv)                                        \
       SymI_HasProto(getFullProgArgv)                                    \

@@ -17,14 +17,23 @@
 #ifndef RTS_GLOBALS_H
 #define RTS_GLOBALS_H
 
-StgStablePtr getOrSetGHCConcSignalSignalHandlerStore(StgStablePtr value);
-StgStablePtr getOrSetGHCConcWindowsPendingDelaysStore(StgStablePtr ptr);
-StgStablePtr getOrSetGHCConcWindowsIOManagerThreadStore(StgStablePtr ptr);
-StgStablePtr getOrSetGHCConcWindowsProddingStore(StgStablePtr ptr);
-StgStablePtr getOrSetSystemEventThreadEventManagerStore(StgStablePtr ptr);
-StgStablePtr getOrSetSystemEventThreadIOManagerThreadStore(StgStablePtr ptr);
-StgStablePtr getOrSetSystemTimerThreadEventManagerStore(StgStablePtr ptr);
-StgStablePtr getOrSetSystemTimerThreadIOManagerThreadStore(StgStablePtr ptr);
-StgStablePtr getOrSetLibHSghcFastStringTable(StgStablePtr ptr);
+#define mkStoreAccessorPrototype(name)                                  \
+    StgStablePtr                                                        \
+    getOrSet##name(StgStablePtr ptr);
+
+mkStoreAccessorPrototype(GHCConcSignalSignalHandlerStore)
+mkStoreAccessorPrototype(GHCConcWindowsPendingDelaysStore)
+mkStoreAccessorPrototype(GHCConcWindowsIOManagerThreadStore)
+mkStoreAccessorPrototype(GHCConcWindowsProddingStore)
+mkStoreAccessorPrototype(SystemEventThreadEventManagerStore)
+mkStoreAccessorPrototype(SystemEventThreadIOManagerThreadStore)
+mkStoreAccessorPrototype(SystemTimerThreadEventManagerStore)
+mkStoreAccessorPrototype(SystemTimerThreadIOManagerThreadStore)
+mkStoreAccessorPrototype(LibHSghcFastStringTable)
+mkStoreAccessorPrototype(LibHSghcPersistentLinkerState)
+mkStoreAccessorPrototype(LibHSghcInitLinkerDone)
+mkStoreAccessorPrototype(LibHSghcGlobalDynFlags)
+mkStoreAccessorPrototype(LibHSghcStaticOptions)
+mkStoreAccessorPrototype(LibHSghcStaticOptionsReady)
 
 #endif /* RTS_GLOBALS_H */
