@@ -386,9 +386,11 @@ test('T12497', [ unless(opsys('mingw32'), skip)
 
 # This test sometimes produces out of sequence samples in the profasm way, but
 # not reliably, so we just skip it. See ticket #15065.
+# Test is being skipped on darwin due to it's flakiness.
 test('T12903', [ when(opsys('mingw32'), skip)
-	       , omit_ways(['ghci', 'profasm'])
-	       ], compile_and_run, [''])
+               , when(opsys('darwin'), skip)
+	           , omit_ways(['ghci', 'profasm'])]
+	       , compile_and_run, [''])
 
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
 test('T13894', normal, compile_and_run, [''])
