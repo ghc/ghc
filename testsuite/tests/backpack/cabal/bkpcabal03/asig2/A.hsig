@@ -1,0 +1,2 @@
+signature A where
+g :: Int

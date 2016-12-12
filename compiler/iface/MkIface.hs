@@ -107,6 +107,7 @@ import Fingerprint
 import Exception
 import UniqFM
 import UniqDFM
+import Packages
 
 import Control.Monad
 import Data.Function
@@ -1172,6 +1173,8 @@ checkVersions hsc_env mod_summary iface
 
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
+       ; recomp <- checkMergedSignatures mod_summary iface
+       ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkHsig mod_summary iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkDependencies hsc_env mod_summary iface
@@ -1193,7 +1196,7 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = udfmToUfm mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}
+    }}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
@@ -1224,6 +1227,20 @@ checkFlagHash hsc_env iface = do
         False -> out_of_date_hash "flags changed"
                      (text "  Module flags have changed")
                      old_hash new_hash
+
+-- Check that the set of signatures we are merging in match.
+-- If the -unit-id flags change, this can change too.
+checkMergedSignatures :: ModSummary -> ModIface -> IfG RecompileRequired
+checkMergedSignatures mod_summary iface = do
+    dflags <- getDynFlags
+    let old_merged = sort [ mod | UsageMergedRequirement{ usg_mod = mod } <- mi_usages iface ]
+        new_merged = case Map.lookup (ms_mod_name mod_summary)
+                                     (requirementContext (pkgState dflags)) of
+                        Nothing -> []
+                        Just r -> sort $ map (indefModuleToModule dflags) r
+    if old_merged == new_merged
+        then up_to_date (text "signatures to merge in unchanged" $$ ppr new_merged)
+        else return (RecompBecause "signatures to merge in changed")
 
 -- If the direct imports of this module are resolved to targets that
 -- are not among the dependencies of the previous interface file,
