@@ -246,7 +246,3 @@ test('T12212', normal, compile, ['-O'])
 test('noinline01', only_ways(['optasm']), compile, ['-ddump-stg -dsuppress-uniques -O'])
 test('par01', only_ways(['optasm']), compile, ['-ddump-prep -dsuppress-uniques -O2'])
 test('T12776', normal, compile, ['-O2'])
-test('T12603',
-     normal,
-     run_command,
-     ['$MAKE -s --no-print-directory T12603'])

@@ -82,11 +82,9 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( isUnliftedType, Type, mkLamTypes, splitTyConApp_maybe )
+import Type             ( isUnliftedType, Type, mkLamTypes )
 import Kind             ( isLevityPolymorphic, typeKind )
 import BasicTypes       ( Arity, RecFlag(..) )
-import DataCon          ( dataConOrigResTy )
-import TysWiredIn
 import UniqSupply
 import Util
 import Outputable
@@ -294,7 +292,7 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
 -}
 
-lvlExpr env (_, AnnType ty)     = return (Type (CoreSubst.substTy (le_subst env) ty))
+lvlExpr env (_, AnnType ty)     = return (Type (substTy (le_subst env) ty))
 lvlExpr env (_, AnnCoercion co) = return (Coercion (substCo (le_subst env) co))
 lvlExpr env (_, AnnVar v)       = return (lookupVar env v)
 lvlExpr _   (_, AnnLit lit)     = return (Lit lit)
@@ -465,7 +463,7 @@ lvlMFE ::  Bool                 -- True <=> strict context [body of case or let]
 -- the expression, so that it can itself be floated.
 
 lvlMFE _ env (_, AnnType ty)
-  = return (Type (CoreSubst.substTy (le_subst env) ty))
+  = return (Type (substTy (le_subst env) ty))
 
 -- No point in floating out an expression wrapped in a coercion or note
 -- If we do we'll transform  lvl = e |> co
@@ -486,33 +484,29 @@ lvlMFE True env e@(_, AnnCase {})
 lvlMFE strict_ctxt env ann_expr
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
-  || isLevityPolymorphic (typeKind expr_ty)
+  || isUnliftedType (exprType expr)
+         -- Can't let-bind it; see Note [Unlifted MFEs]
+         -- This includes coercions, which we don't want to float anyway
+         -- NB: no need to substitute cos isUnliftedType doesn't change
+  || isLevityPolymorphic (typeKind (exprType expr))
          -- We can't let-bind levity polymorphic expressions
          -- See Note [Levity polymorphism invariants] in CoreSyn
-  || notWorthFloating expr abs_vars
+  || notWorthFloating ann_expr abs_vars
   || not float_me
   =     -- Don't float it out
     lvlExpr env ann_expr
 
-  | Just (wrap_float, wrap_use)
-       <- canFloat_maybe strict_ctxt rhs_env abs_vars expr_ty
-  = do { expr1 <- lvlExpr rhs_env ann_expr
-       ; let abs_expr = mkLams abs_vars_w_lvls (wrap_float expr1)
-       ; var <- newLvlVar abs_expr is_bot
-       ; return (Let (NonRec (TB var (FloatMe dest_lvl)) abs_expr)
-                     (wrap_use (mkVarApps (Var var) abs_vars))) }
-
-  | otherwise
-  = lvlExpr env ann_expr
-
+  | otherwise   -- Float it out!
+  = do { expr' <- lvlFloatRhs abs_vars dest_lvl env ann_expr
+       ; var   <- newLvlVar expr' is_bot
+       ; return (Let (NonRec (TB var (FloatMe dest_lvl)) expr')
+                     (mkVarApps (Var var) abs_vars)) }
   where
     expr     = deAnnotate ann_expr
-    expr_ty  = exprType expr
     fvs      = freeVarsOf ann_expr
     is_bot   = exprIsBottom expr      -- Note [Bottoming floats]
     dest_lvl = destLevel env fvs (isFunction ann_expr) is_bot
     abs_vars = abstractVars dest_lvl env fvs
-    (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
 
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
@@ -539,67 +533,14 @@ lvlMFE strict_ctxt env ann_expr
           -- Also a strict contxt includes uboxed values, and they
           -- can't be bound at top level
 
-
-canFloat_maybe :: Bool -> LevelEnv -> [Var] -> Type
-               -> Maybe ( LevelledExpr -> LevelledExpr   -- Wrep the flaot
-                        , LevelledExpr -> LevelledExpr)  -- Wrap the use
--- See Note [Floating MFEs of unlifted type]
-canFloat_maybe strict_ctxt env abs_vars expr_ty
-  | not need_guard   -- No wrapping needed
-  = Just (id, id)
-
-  | strict_ctxt
-  , Just (tc, _) <- splitTyConApp_maybe expr_ty
-  , Just dc <- boxingDataCon_maybe tc
-  , let dc_res_ty = dataConOrigResTy dc  -- No free type variables
-        [bx_bndr, ubx_bndr] = mkTemplateLocals [dc_res_ty, expr_ty]
-        l1 = incMinorLvl (le_ctxt_lvl env)
-        l2 = incMinorLvl l1
-  = Just ( \e -> Case e (TB ubx_bndr (StayPut l1)) dc_res_ty
-                   [(DEFAULT, [], mkConApp dc [Var ubx_bndr])]
-         , \e -> Case e (TB bx_bndr (StayPut l1)) expr_ty
-                   [(DataAlt dc, [TB ubx_bndr (StayPut l2)], Var ubx_bndr)] )
-
-  | otherwise          -- e.g. do not float unboxed tuples
-  = Nothing
-
-  where
-    is_unlifted = isUnliftedType expr_ty
-    need_guard = not (any isId abs_vars) && is_unlifted
-
-{- Note [Floating MFEs of unlifted type]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have
-   case f x of (r::Int#) -> blah
-we'd like to float (f x). But it's not trivial because it has type
-Int#, and we don't want to evaluate it to early.  But we can instead
-float a boxed version
-   y = case f x of r -> I# r
-and replace the original (f x) with
-   case (case y of I# r -> r) of r -> blah
-
-Being able to float unboxed expressions is sometimes important; see
-Trac #12603.  I'm not sure how /often/ it is important, but it's
-not hard to achieve.
-
-We only do it for a fixed collection of types for which we have a
-convenient boxing constructor (see boxingDataCon_maybe).  In
-particular we /don't/ do it for unboxed tuples; it's better to float
-the components of the tuple individually.
-
-The work is done by canFloat_maybe, which constructs both the code
-that wraps the floating binding, and the code to appear at the
-original use site.
-
-I did experiment with a form of boxing that works for any type, namely
-wrapping in a function.  In our example
-
-   let y = case f x of r -> \v. f x
-   in case y void of r -> blah
-
-It works fine, but it's 50% slower (based on some crude benchmarking).
-I suppose we could do it for types not covered by boxingDataCon_maybe,
-but it's more code and I'll wait to see if anyone wants it.
+{-
+Note [Unlifted MFEs]
+~~~~~~~~~~~~~~~~~~~~
+We don't float unlifted MFEs, which potentially loses big opportunites.
+For example:
+        \x -> f (h y)
+where h :: Int -> Int# is expensive. We'd like to float the (h y) outside
+the \x, but we don't because it's unboxed.  Possible solution: box it.
 
 Note [Bottoming floats]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -661,7 +602,7 @@ annotateBotStr id Nothing            = id
 annotateBotStr id (Just (arity, sig)) = id `setIdArity` arity
                                            `setIdStrictness` sig
 
-notWorthFloating :: CoreExpr -> [Var] -> Bool
+notWorthFloating :: CoreExprWithFVs -> [Var] -> Bool
 -- Returns True if the expression would be replaced by
 -- something bigger than it is now.  For example:
 --   abs_vars = tvars only:  return True if e is trivial,
@@ -676,26 +617,26 @@ notWorthFloating :: CoreExpr -> [Var] -> Bool
 notWorthFloating e abs_vars
   = go e (count isId abs_vars)
   where
-    go (Var {}) n    = n >= 0
-    go (Lit lit) n   = ASSERT( n==0 )
-                       litIsTrivial lit   -- Note [Floating literals]
-    go (Tick t e) n  = not (tickishIsCode t) && go e n
-    go (Cast e _)  n = go e n
-    go (App e arg) n
-       | (Type {}) <- arg     = go e n
-       | (Coercion {}) <- arg = go e n
-       | n==0                 = False
-       | is_triv arg          = go e (n-1)
-       | otherwise            = False
-    go _ _                    = False
+    go (_, AnnVar {}) n    = n >= 0
+    go (_, AnnLit lit) n   = ASSERT( n==0 )
+                             litIsTrivial lit   -- Note [Floating literals]
+    go (_, AnnTick t e) n  = not (tickishIsCode t) && go e n
+    go (_, AnnCast e _)  n = go e n
+    go (_, AnnApp e arg) n
+       | (_, AnnType {}) <- arg = go e n
+       | (_, AnnCoercion {}) <- arg = go e n
+       | n==0                   = False
+       | is_triv arg            = go e (n-1)
+       | otherwise              = False
+    go _ _                      = False
 
-    is_triv (Lit {})              = True        -- Treat all literals as trivial
-    is_triv (Var {})              = True        -- (ie not worth floating)
-    is_triv (Cast e _)            = is_triv e
-    is_triv (App e (Type {}))     = is_triv e
-    is_triv (App e (Coercion {})) = is_triv e
-    is_triv (Tick t e)            = not (tickishIsCode t) && is_triv e
-    is_triv _                     = False
+    is_triv (_, AnnLit {})                = True        -- Treat all literals as trivial
+    is_triv (_, AnnVar {})                = True        -- (ie not worth floating)
+    is_triv (_, AnnCast e _)              = is_triv e
+    is_triv (_, AnnApp e (_, AnnType {})) = is_triv e
+    is_triv (_, AnnApp e (_, AnnCoercion {})) = is_triv e
+    is_triv (_, AnnTick t e)              = not (tickishIsCode t) && is_triv e
+    is_triv _                             = False
 
 {-
 Note [Floating literals]
@@ -1160,14 +1101,15 @@ newPolyBndrs dest_lvl
                              mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
-                             poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
+                             poly_ty = mkLamTypes abs_vars (substTy subst (idType bndr))
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> Bool                -- Whether it is bottom
           -> LvlM Id
 newLvlVar lvld_rhs is_bot
   = do { uniq <- getUniqueM
-       ; return (add_bot_info (mk_id uniq)) }
+       ; return (add_bot_info (mk_id uniq))
+       }
   where
     add_bot_info var  -- We could call annotateBotStr always, but the is_bot
                       -- flag just tells us when we don't need to do so
@@ -1175,11 +1117,10 @@ newLvlVar lvld_rhs is_bot
        | otherwise = var
     de_tagged_rhs = deTagExpr lvld_rhs
     rhs_ty = exprType de_tagged_rhs
-
     mk_id uniq
       -- See Note [Grand plan for static forms] in SimplCore.
-      | isJust $ collectStaticPtrSatArgs $ snd $
-        collectTyBinders de_tagged_rhs
+      | isJust $ collectStaticPtrSatArgs $ snd $ collectTyBinders $
+                                                   deTagExpr lvld_rhs
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
