@@ -376,9 +376,5 @@ test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])
 
-# Test is being skipped on darwin due to it's flakiness.
-# See 12956
-test('T12903', [when(opsys('mingw32'), skip),
-                when(opsys('darwin'), skip)],
-     compile_and_run, [''])
+test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
 
