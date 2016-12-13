@@ -647,7 +647,6 @@
       SymI_HasProto(rts_eval)                                           \
       SymI_HasProto(rts_evalIO)                                         \
       SymI_HasProto(rts_evalLazyIO)                                     \
-      SymI_HasProto(rts_evalStableIOMain)                               \
       SymI_HasProto(rts_evalStableIO)                                   \
       SymI_HasProto(rts_eval_)                                          \
       SymI_HasProto(rts_getBool)                                        \
