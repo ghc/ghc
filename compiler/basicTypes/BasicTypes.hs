@@ -692,7 +692,7 @@ pprSafeOverlap False = empty
 ************************************************************************
 -}
 
-data TyPrec   -- See Note [Prededence in types]
+data TyPrec   -- See Note [Precedence in types] in TyCoRep.hs
   = TopPrec         -- No parens
   | FunPrec         -- Function args; no parens for tycon apps
   | TyOpPrec        -- Infix operator

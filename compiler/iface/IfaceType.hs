@@ -188,7 +188,7 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
 
 {- Note [TcTyVars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Nowadays (since Nov 16) we pretty-print a Type by converting to an
+Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to an
 IfaceType and pretty printing that.  This eliminates a lot of
 pretty-print duplication, and it matches what we do with
 pretty-printing TyThings.
@@ -966,7 +966,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   | tc `ifaceTyConHasKey` tYPETyConKey
   , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
   , rep `ifaceTyConHasKey` ptrRepLiftedDataConKey
-  = unicodeSyntax (char '★') (char '*')
+  = kindStar
 
   | tc `ifaceTyConHasKey` tYPETyConKey
   , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
@@ -1050,22 +1050,23 @@ ppr_iface_tc_app pp _ tc [ty]
   | tc `ifaceTyConHasKey` parrTyConKey = pprPromotionQuote tc <> paBrackets (pp TopPrec ty)
 
 ppr_iface_tc_app pp ctxt_prec tc tys
-  | not (isSymOcc (nameOccName tc_name))
+  |  tc `ifaceTyConHasKey` starKindTyConKey
+  || tc `ifaceTyConHasKey` liftedTypeKindTyConKey
+  || tc `ifaceTyConHasKey` unicodeStarKindTyConKey
+  = kindStar   -- Handle unicode; do not wrap * in parens
+
+  | tc `ifaceTyConHasKey` unliftedTypeKindTyConKey
+  = ppr tc  -- Do not wrap # in parens
+
+  | not (isSymOcc (nameOccName (ifaceTyConName tc)))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp TyConPrec) tys)
 
   | [ty1,ty2] <- tys  -- Infix, two arguments;
                       -- we know nothing of precedence though
   = pprIfaceInfixApp pp ctxt_prec (ppr tc) ty1 ty2
 
-  |  tc `ifaceTyConHasKey` starKindTyConKey
-  || tc `ifaceTyConHasKey` unliftedTypeKindTyConKey
-  || tc `ifaceTyConHasKey` unicodeStarKindTyConKey
-  = ppr tc   -- Do not wrap *, # in parens
-
   | otherwise
   = pprIfacePrefixApp ctxt_prec (parens (ppr tc)) (map (pp TyConPrec) tys)
-  where
-    tc_name = ifaceTyConName tc
 
 pprSum :: Arity -> IsPromoted -> IfaceTcArgs -> SDoc
 pprSum _arity is_promoted args

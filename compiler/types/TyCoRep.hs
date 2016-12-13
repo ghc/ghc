@@ -2368,7 +2368,7 @@ works just by setting the initial context precedence very high.
 Note [Precedence in types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 We don't keep the fixity of type operators in the operator. So the pretty printer
-operates the following precedene structre:
+follows the following precedence order:
    Type constructor application   binds more tightly than
    Operator applications          which bind more tightly than
    Function arrow
@@ -2378,7 +2378,7 @@ meaning          (a :+: (T b)) -> c
 
 Maybe operator applications should bind a bit less tightly?
 
-Anyway, that's the current story, and it is used consistently for Type and HsType
+Anyway, that's the current story; it is used consistently for Type and HsType.
 -}
 
 ------------------

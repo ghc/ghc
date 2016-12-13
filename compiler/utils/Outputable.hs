@@ -29,7 +29,7 @@ module Outputable (
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine, forAllLit,
+        blankLine, forAllLit, kindStar,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
         sep, cat,
@@ -589,6 +589,9 @@ rbrace     = docToSDoc $ Pretty.rbrace
 
 forAllLit :: SDoc
 forAllLit = unicodeSyntax (char '∀') (text "forall")
+
+kindStar :: SDoc
+kindStar = unicodeSyntax (char '★') (char '*')
 
 unicodeSyntax :: SDoc -> SDoc -> SDoc
 unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
