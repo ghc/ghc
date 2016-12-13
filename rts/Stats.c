@@ -398,7 +398,7 @@ stat_endGC (Capability *cap, gc_thread *gct,
         if (RtsFlags.GcFlags.giveStats == VERBOSE_GC_STATS) {
             W_ faults = getPageFaults();
 
-            statsPrintf("%9" FMT_Word " %9" FMT_Word " %9" FMT_Word,
+            statsPrintf("%9" FMT_Word64 " %9" FMT_Word64 " %9" FMT_Word64,
                         stats.gc.allocated_bytes, stats.gc.copied_bytes,
                         stats.gc.live_bytes);
 
