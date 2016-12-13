@@ -500,7 +500,7 @@ indicates that there's no data, we call threadWaitRead.
 -}
 
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
-readRawBufferPtr loc !fd buf off len
+readRawBufferPtr loc !fd !buf !off !len
   | isNonBlocking fd = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- throwErrnoIfMinus1 loc
                                 (unsafe_fdReady (fdFD fd) 0 0 0)
@@ -517,7 +517,7 @@ readRawBufferPtr loc !fd buf off len
 
 -- return: -1 indicates EOF, >=0 is bytes read
 readRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO Int
-readRawBufferPtrNoBlock loc !fd buf off len
+readRawBufferPtrNoBlock loc !fd !buf !off !len
   | isNonBlocking fd  = unsafe_read -- unsafe is ok, it can't block
   | otherwise    = do r <- unsafe_fdReady (fdFD fd) 0 0 0
                       if r /= 0 then safe_read
@@ -533,7 +533,7 @@ readRawBufferPtrNoBlock loc !fd buf off len
    safe_read    = do_read (c_safe_read (fdFD fd) (buf `plusPtr` off) len)
 
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-writeRawBufferPtr loc !fd buf off len
+writeRawBufferPtr loc !fd !buf !off !len
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
                      if r /= 0
@@ -548,7 +548,7 @@ writeRawBufferPtr loc !fd buf off len
     safe_write    = do_write (c_safe_write (fdFD fd) (buf `plusPtr` off) len)
 
 writeRawBufferPtrNoBlock :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-writeRawBufferPtrNoBlock loc !fd buf off len
+writeRawBufferPtrNoBlock loc !fd !buf !off !len
   | isNonBlocking fd = unsafe_write -- unsafe is ok, it can't block
   | otherwise   = do r <- unsafe_fdReady (fdFD fd) 1 0 0
                      if r /= 0 then write
@@ -571,12 +571,12 @@ foreign import ccall unsafe "fdReady"
 #else /* mingw32_HOST_OS.... */
 
 readRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-readRawBufferPtr loc !fd buf off len
+readRawBufferPtr loc !fd !buf !off !len
   | threaded  = blockingReadRawBufferPtr loc fd buf off len
   | otherwise = asyncReadRawBufferPtr    loc fd buf off len
 
 writeRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-writeRawBufferPtr loc !fd buf off len
+writeRawBufferPtr loc !fd !buf !off !len
   | threaded  = blockingWriteRawBufferPtr loc fd buf off len
   | otherwise = asyncWriteRawBufferPtr    loc fd buf off len
 
@@ -589,7 +589,7 @@ writeRawBufferPtrNoBlock = writeRawBufferPtr
 -- Async versions of the read/write primitives, for the non-threaded RTS
 
 asyncReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-asyncReadRawBufferPtr loc !fd buf off len = do
+asyncReadRawBufferPtr loc !fd !buf !off !len = do
     (l, rc) <- asyncRead (fromIntegral (fdFD fd)) (fdIsSocket_ fd)
                         (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
@@ -598,7 +598,7 @@ asyncReadRawBufferPtr loc !fd buf off len = do
       else return (fromIntegral l)
 
 asyncWriteRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-asyncWriteRawBufferPtr loc !fd buf off len = do
+asyncWriteRawBufferPtr loc !fd !buf !off !len = do
     (l, rc) <- asyncWrite (fromIntegral (fdFD fd)) (fdIsSocket_ fd)
                   (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
@@ -609,14 +609,14 @@ asyncWriteRawBufferPtr loc !fd buf off len = do
 -- Blocking versions of the read/write primitives, for the threaded RTS
 
 blockingReadRawBufferPtr :: String -> FD -> Ptr Word8 -> Int -> CSize -> IO CInt
-blockingReadRawBufferPtr loc fd buf off len
+blockingReadRawBufferPtr loc !fd !buf !off !len
   = throwErrnoIfMinus1Retry loc $
         if fdIsSocket fd
            then c_safe_recv (fdFD fd) (buf `plusPtr` off) (fromIntegral len) 0
            else c_safe_read (fdFD fd) (buf `plusPtr` off) (fromIntegral len)
 
 blockingWriteRawBufferPtr :: String -> FD -> Ptr Word8-> Int -> CSize -> IO CInt
-blockingWriteRawBufferPtr loc fd buf off len
+blockingWriteRawBufferPtr loc !fd !buf !off !len
   = throwErrnoIfMinus1Retry loc $
         if fdIsSocket fd
            then c_safe_send  (fdFD fd) (buf `plusPtr` off) (fromIntegral len) 0
