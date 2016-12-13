@@ -975,10 +975,8 @@ ppr_sig (SpecInstSig src ty)
 ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
 ppr_sig (PatSynSig names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
-ppr_sig (SCCFunSig _ fn Nothing)
-  = pragBrackets (text "SCC" <+> ppr fn)
-ppr_sig (SCCFunSig src fn (Just str))
-  = pragSrcBrackets  src "{-# SCC#-}" (ppr fn <+> ppr str)
+ppr_sig (SCCFunSig src fn mlabel)
+  = pragSrcBrackets src "{-# SCC" (ppr fn <+> maybe empty ppr mlabel )
 
 instance OutputableBndr name => Outputable (FixitySig name) where
   ppr (FixitySig names fixity) = sep [ppr fixity, pprops]
