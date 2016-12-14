@@ -1113,8 +1113,8 @@ pprAsmCLbl _ lbl
    = pprCLbl lbl
 
 pprCLbl :: CLabel -> SDoc
-pprCLbl (StringLitLabel _)
-  = panic "pprCLbl StringLitLabel"
+pprCLbl (StringLitLabel u)
+  = pprUnique u <> text "_str"
 
 pprCLbl (CaseLabel u CaseReturnPt)
   = hcat [pprUnique u, text "_ret"]
