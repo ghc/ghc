@@ -1,6 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
+import Control.Monad (when)
 import Data.Data hiding (Fixity)
 import Data.List
 import Bag
@@ -20,15 +21,27 @@ import System.FilePath
 import qualified Data.ByteString as B
 import qualified Data.Map        as Map
 
-main::IO()
+usage :: String
+usage = unlines
+    [ "usage: check-ppr [--dump] (libdir) (file)"
+    , ""
+    , "where libdir is the GHC library directory (e.g. the output of"
+    , "ghc --print-libdir) and file is the file to parse."
+    , "The --dump flag causes check-ppr to produce .new and .old files"
+    , "containing dumps of the new and old ASTs in the event of a match"
+    , "failure."
+    ]
+
+main :: IO()
 main = do
   args <- getArgs
   case args of
-   [libdir,fileName] -> testOneFile libdir fileName
-   _ -> putStrLn "invoke with the libdir and a file to parse."
+   [libdir,fileName] -> testOneFile libdir fileName False
+   ["--dump", libdir,fileName] -> testOneFile libdir fileName True
+   _ -> putStrLn usage
 
-testOneFile :: FilePath -> String -> IO ()
-testOneFile libdir fileName = do
+testOneFile :: FilePath -> String -> Bool -> IO ()
+testOneFile libdir fileName dumpOldNew = do
        p <- parseOneFile libdir fileName
        let
          origAst = showAstData 0 (pm_parsed_source p)
@@ -56,6 +69,9 @@ testOneFile libdir fileName = do
            putStrLn origAst
            putStrLn "\n===================================\nNew\n\n"
            putStrLn newAstStr
+           when dumpOldNew $ do
+               writeFile (fileName <.> "old") origAst
+               writeFile (fileName <.> "new") newAstStr
            exitFailure
 
 
