@@ -77,4 +77,8 @@ verbosityOptions =
            "Summarise timing stats for GHC (same as ``+RTS -tstderr``)."
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-fshow-hole-constraints"
+         , flagDescription = "Show constraints when reporting typed holes"
+         , flagType = DynamicFlag
+         }
   ]

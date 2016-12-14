@@ -539,6 +539,7 @@ data GeneralFlag
                     -- instead of just the start position.
    | Opt_PprCaseAsLet
    | Opt_PprShowTicks
+   | Opt_ShowHoleConstraints
 
    -- Suppress all coercions, them replacing with '...'
    | Opt_SuppressCoercions
@@ -3654,7 +3655,8 @@ fFlagsDeps = [
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
-  flagSpec "hide-source-paths"                Opt_HideSourcePaths
+  flagSpec "hide-source-paths"                Opt_HideSourcePaths,
+  flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@

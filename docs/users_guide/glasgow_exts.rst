@@ -9696,6 +9696,33 @@ Here are some more details:
    implementation terms, they are reported by the renamer rather than
    the type checker.)
 
+There's a flag for controlling the amount of context information shown for
+typed holes:
+
+.. ghc-flag:: -fshow-hole-constraints
+
+    When reporting typed holes, also print constraints that are in scope.
+    Example: ::
+
+        f :: Eq a => a -> Bool
+        f x = _
+
+    results in the following message:
+
+    .. code-block:: none
+
+        show_constraints.hs:4:7: error:
+            • Found hole: _ :: Bool
+            • In the expression: _
+              In an equation for ‘f’: f x = _
+            • Relevant bindings include
+                x :: a (bound at show_constraints.hs:4:3)
+                f :: a -> Bool (bound at show_constraints.hs:4:1)
+              Constraints include
+                Eq a (from the type signature for:
+                             f :: Eq a => a -> Bool
+                      at show_constraints.hs:3:1-22)
+
 
 .. _partial-type-signatures:
 

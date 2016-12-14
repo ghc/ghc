@@ -1022,8 +1022,16 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
   -- Explicit holes, like "_" or "_f"
   = do { (ctxt, binds_msg, ct) <- relevantBindings False ctxt ct
                -- The 'False' means "don't filter the bindings"; see Trac #8191
+
+       ; show_hole_constraints <- goptM Opt_ShowHoleConstraints
+       ; let constraints_msg
+               | isExprHoleCt ct, show_hole_constraints
+                  = givenConstraintsMsg ctxt
+               | otherwise = empty
+
        ; mkErrorMsgFromCt ctxt ct $
-            important hole_msg `mappend` relevant_bindings binds_msg }
+            important hole_msg `mappend`
+            relevant_bindings (binds_msg $$ constraints_msg) }
 
   where
     occ     = holeOcc hole
@@ -1070,6 +1078,23 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
 
 mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 
+
+-- See Note [Constraints include ...]
+givenConstraintsMsg :: ReportErrCtxt -> SDoc
+givenConstraintsMsg ctxt =
+    let constraints :: [(Type, RealSrcSpan)]
+        constraints =
+          do { Implic{ ic_given = given, ic_env = env } <- cec_encl ctxt
+             ; constraint <- given
+             ; return (varType constraint, tcl_loc env) }
+
+        pprConstraint (constraint, loc) =
+          ppr constraint <+> nest 2 (parens (text "from" <+> ppr loc))
+
+    in ppUnless (null constraints) $
+         hang (text "Constraints include")
+            2 (vcat $ map pprConstraint constraints)
+
 pp_with_type :: OccName -> Type -> SDoc
 pp_with_type occ ty = hang (pprPrefixOcc occ) 2 (dcolon <+> pprType ty)
 
@@ -1093,6 +1118,24 @@ mkIPErr ctxt cts
     (ct1:_) = cts
 
 {-
+Note [Constraints include ...]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'givenConstraintsMsg' returns the "Constraints include ..." message enabled by
+-fshow-hole-constraints. For example, the following hole:
+
+    foo :: (Eq a, Show a) => a -> String
+    foo x = _
+
+would generate the message:
+
+    Constraints include
+      Eq a (from foo.hs:1:1-36)
+      Show a (from foo.hs:1:1-36)
+
+Constraints are displayed in order from innermost (closest to the hole) to
+outermost. There's currently no filtering or elimination of duplicates.
+
+
 Note [OutOfScope exact matches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When constructing an out-of-scope error message, we not only generate a list of
