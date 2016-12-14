@@ -95,7 +95,7 @@ Compiler
 
   to define a synonym of ``T``, you must write::
 
-    data TSyn = (T :: (forall k. k -> Type) -> Type)
+    type TSyn = (T :: (forall k. k -> Type) -> Type)
 
 - The Mingw-w64 toolchain for the Windows version of GHC has been updated. GHC now uses
   `GCC 6.2.0` and `binutils 2.27`.
