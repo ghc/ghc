@@ -34,6 +34,9 @@
 # Profile the stage2 compiler:
 #BuildFlavour = prof
 
+# Profile the stage2 compiler (LLVM backend):
+#BuildFlavour = prof-llvm
+
 # A development build, working on the stage 1 compiler:
 #BuildFlavour = devel1
 
