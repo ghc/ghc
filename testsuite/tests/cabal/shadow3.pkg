@@ -4,3 +4,4 @@ id: shadow-1-XXX
 key: shadow-1-XXX
 abi: bbb
 depends:
+abi-depends:

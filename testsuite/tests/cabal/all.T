@@ -101,3 +101,10 @@ test('shadow',
                   'local1shadow2.package.conf',
                   'local1shadow2.package.conf.old']),
      run_command, ['$MAKE -s --no-print-directory shadow'])
+
+test('T12485a',
+     extra_clean(['T12485a.hi', 'T1750.out',
+                  'T12485a.package.conf',
+                  'T12485b.package.conf',
+                  'T12485c.package.conf']),
+     run_command, ['$MAKE -s --no-print-directory T12485a'])

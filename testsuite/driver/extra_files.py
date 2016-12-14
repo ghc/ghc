@@ -88,6 +88,7 @@ extra_src_files = {
   'T12035j': ['T12035.hs', 'T12035a.hs', 'T12035.hs-boot'],
   'T12042': ['T12042.hs', 'T12042a.hs', 'T12042.hs-boot'],
   'T12485': ['a.pkg', 'b.pkg', 'Main.hs'],
+  'T12485a': ['shadow1.pkg', 'shadow2.pkg', 'shadow3.pkg'],
   'T12733': ['p/', 'q/', 'Setup.hs'],
   'T1372': ['p1/', 'p2/'],
   'T1407': ['A.c'],

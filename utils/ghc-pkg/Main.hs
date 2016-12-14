@@ -1107,6 +1107,7 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.packageName        = packageName pkg,
        GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
        GhcPkg.depends            = depends pkg,
+       GhcPkg.abiDepends         = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
        GhcPkg.abiHash            = unAbiHash (abiHash pkg),
        GhcPkg.importDirs         = importDirs pkg,
        GhcPkg.hsLibraries        = hsLibraries pkg,

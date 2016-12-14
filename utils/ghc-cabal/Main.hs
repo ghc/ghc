@@ -316,7 +316,7 @@ generate directory distdir dll0Modules config_args
           do cwd <- getCurrentDirectory
              let ipid = mkUnitId (display (packageId pd))
              let installedPkgInfo = inplaceInstalledPackageInfo cwd distdir
-                                        pd (mkAbiHash "") lib lbi clbi
+                                        pd (mkAbiHash "inplace") lib lbi clbi
                  final_ipi = mangleIPI directory distdir lbi $ installedPkgInfo {
                                  Installed.installedUnitId = ipid,
                                  Installed.compatPackageKey = display (packageId pd),

@@ -302,6 +302,7 @@ buildUnit session cid insts lunit = do
                                 $ deps ++ [ moduleUnitId mod
                                           | (_, mod) <- insts
                                           , not (isHoleModule mod) ],
+            abiDepends = [],
             ldOptions = case session of
                             TcSession -> []
                             _ -> obj_files,

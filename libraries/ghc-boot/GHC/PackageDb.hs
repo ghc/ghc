@@ -66,7 +66,8 @@ import System.Directory
 
 
 -- | This is a subset of Cabal's 'InstalledPackageInfo', with just the bits
--- that GHC is interested in.
+-- that GHC is interested in.  See Cabal's documentation for a more detailed
+-- description of all of the fields.
 --
 data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulename mod
    = InstalledPackageInfo {
@@ -78,6 +79,9 @@ data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulenam
        packageVersion     :: Version,
        abiHash            :: String,
        depends            :: [instunitid],
+       -- | Like 'depends', but each dependency is annotated with the
+       -- ABI hash we expect the dependency to respect.
+       abiDepends         :: [(instunitid, String)],
        importDirs         :: [FilePath],
        hsLibraries        :: [String],
        extraLibraries     :: [String],
@@ -159,6 +163,7 @@ emptyInstalledPackageInfo =
        packageVersion     = Version [] [],
        abiHash            = "",
        depends            = [],
+       abiDepends         = [],
        importDirs         = [],
        hsLibraries        = [],
        extraLibraries     = [],
@@ -307,7 +312,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
   put (InstalledPackageInfo
          unitId componentId instantiatedWith sourcePackageId
          packageName packageVersion
-         abiHash depends importDirs
+         abiHash depends abiDepends importDirs
          hsLibraries extraLibraries extraGHCiLibraries
          libraryDirs libraryDynDirs
          frameworks frameworkDirs
@@ -325,6 +330,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
              instantiatedWith)
     put abiHash
     put (map toStringRep depends)
+    put (map (\(k,v) -> (toStringRep k, v)) abiDepends)
     put importDirs
     put hsLibraries
     put extraLibraries
@@ -355,6 +361,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     instantiatedWith   <- get
     abiHash            <- get
     depends            <- get
+    abiDepends         <- get
     importDirs         <- get
     hsLibraries        <- get
     extraLibraries     <- get
@@ -383,6 +390,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
               (fromStringRep packageName) packageVersion
               abiHash
               (map fromStringRep depends)
+              (map (\(k,v) -> (fromStringRep k, v)) abiDepends)
               importDirs
               hsLibraries extraLibraries extraGHCiLibraries
               libraryDirs libraryDynDirs

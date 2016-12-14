@@ -136,12 +136,14 @@ LOCAL_GHC_PKGSHADOW13 = '$(GHC_PKG)' --no-user-package-db -f $(PKGCONFSHADOW1) -
 
 # Test package shadowing behaviour.
 #
-#     localshadow1.package.conf:  shadowdep-1-XXX <- shadow-1-XXX
-#     localshadow2.package.conf:                     shadow-1-XXX
+# The general principle is that we shadow in order of declarations,
+# but we determine what gets overridden based on ABI dependencies.
 #
-# If the ABI hash of boths shadow-1s are the same, we'll just accept
-# the later shadow version.  However, if the ABIs are different, we
-# should complain!
+# Here is the structure of our databases (unitid=abi):
+#
+#     localshadow1.package.conf:  shadowdep-1-XXX=ddd -> shadow-1-XXX=aaa
+#     localshadow2.package.conf:                         shadow-1-XXX=bbb
+#     localshadow3.package.conf:                         shadow-1-XXX=aaa
 shadow:
 	rm -rf $(PKGCONFSHADOW1) $(PKGCONFSHADOW2) $(PKGCONFSHADOW3) shadow.hs shadow.o shadow.hi shadow.out shadow.hs shadow.hi
 	$(LOCAL_GHC_PKGSHADOW1) init $(PKGCONFSHADOW1)
@@ -164,8 +166,8 @@ shadow:
 	if '$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW1) -package-db $(PKGCONFSHADOW2) -package shadowdep -c shadow.hs -fno-code; then false; else true; fi
 #
 # Reversing the orders of the configs fixes the problem, because now
-# the shadow-1-XXX defined in the same DB as shadowdep shadows
-# shadow-1-XXX in localshadow2.package.conf
+# we prefer the shadow-1 from the first database, which has the correct
+# ABI hash for shadowdep-1.
 #
 	@echo "should SUCCEED:"
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW2) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code
@@ -174,6 +176,31 @@ shadow:
 #
 	@echo "should SUCCEED:"
 	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db $(PKGCONFSHADOW3) -package-db $(PKGCONFSHADOW1) -package shadowdep -c shadow.hs -fno-code
+
+# Test that order we pass databases doesn't matter
+#
+#     1. shadow-1-XXX=aaa
+#     2. shadowdep-1-XXX=ddd (shadow-1-XXX=aaa)
+#     3. shadow-1-XXX=bbb
+.PHONY: T12485a
+T12485a:
+	rm -rf T12485a.package.conf T12485b.package.conf T12485c.package.conf
+	'$(GHC_PKG)' --no-user-package-db init T12485a.package.conf
+	'$(GHC_PKG)' --no-user-package-db init T12485b.package.conf
+	'$(GHC_PKG)' --no-user-package-db init T12485c.package.conf
+	'$(GHC_PKG)' --no-user-package-db -f T12485a.package.conf register -v0 --force shadow1.pkg
+	'$(GHC_PKG)' --no-user-package-db -f T12485b.package.conf register -v0 --force shadow2.pkg
+	'$(GHC_PKG)' --no-user-package-db -f T12485c.package.conf register -v0 --force shadow3.pkg
+	echo "main = return ()" > T12485a.hs
+	# Normal test
+	@echo "should SUCCEED"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db T12485a.package.conf -package-db T12485b.package.conf -package shadowdep -c T12485a.hs -fno-code
+	# Reversed test
+	@echo "should SUCCEED"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db T12485b.package.conf -package-db T12485a.package.conf -package shadowdep -c T12485a.hs -fno-code
+	# Shadow OK, as long as correct one is chosen eventually, even when reversed
+	@echo "should SUCCEED"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -package-db T12485b.package.conf -package-db T12485c.package.conf -package-db T12485a.package.conf -package shadowdep -c T12485a.hs -fno-code
 
 # If we pass --global, we should ignore instances in the user database
 T5442a:

@@ -83,6 +83,7 @@ import System.Directory
 import System.FilePath as FilePath
 import qualified System.FilePath.Posix as FilePath.Posix
 import Control.Monad
+import Data.Graph (stronglyConnComp, SCC(..))
 import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
@@ -95,7 +96,6 @@ import qualified Data.Semigroup as Semigroup
 #endif
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
-import qualified FiniteMap as Map
 import qualified Data.Set as Set
 
 -- ---------------------------------------------------------------------------
@@ -1024,14 +1024,30 @@ updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap
 
 -- ----------------------------------------------------------------------------
 
-type IsShadowed = Bool
+-- | The reason why a package is unusable.
 data UnusablePackageReason
-  = IgnoredWithFlag
-  | MissingDependencies IsShadowed [InstalledUnitId]
+  = -- | We ignored it explicitly using @-ignore-package@.
+    IgnoredWithFlag
+    -- | This package transitively depends on a package that was never present
+    -- in any of the provided databases.
+  | BrokenDependencies   [InstalledUnitId]
+    -- | This package transitively depends on a package involved in a cycle.
+    -- Note that the list of 'InstalledUnitId' reports the direct dependencies
+    -- of this package that (transitively) depended on the cycle, and not
+    -- the actual cycle itself (which we report separately at high verbosity.)
+  | CyclicDependencies   [InstalledUnitId]
+    -- | This package transitively depends on a package which was ignored.
+  | IgnoredDependencies  [InstalledUnitId]
+    -- | This package transitively depends on a package which was
+    -- shadowed by an ABI-incompatible package.
+  | ShadowedDependencies [InstalledUnitId]
+
 instance Outputable UnusablePackageReason where
     ppr IgnoredWithFlag = text "[ignored with flag]"
-    ppr (MissingDependencies b uids) =
-        brackets (if b then text "shadowed" else empty <+> ppr uids)
+    ppr (BrokenDependencies uids)   = brackets (text "broken" <+> ppr uids)
+    ppr (CyclicDependencies uids)   = brackets (text "cyclic" <+> ppr uids)
+    ppr (IgnoredDependencies uids)  = brackets (text "ignored" <+> ppr uids)
+    ppr (ShadowedDependencies uids) = brackets (text "shadowed" <+> ppr uids)
 
 type UnusablePackages = Map InstalledUnitId
                             (PackageConfig, UnusablePackageReason)
@@ -1040,12 +1056,27 @@ pprReason :: SDoc -> UnusablePackageReason -> SDoc
 pprReason pref reason = case reason of
   IgnoredWithFlag ->
       pref <+> text "ignored due to an -ignore-package flag"
-  MissingDependencies is_shadowed deps ->
-      pref <+> text "unusable due to"
-           <+> (if is_shadowed then text "shadowed"
-                               else text "missing or recursive")
-           <+> text "dependencies:" $$
+  BrokenDependencies deps ->
+      pref <+> text "unusable due to missing dependencies:" $$
         nest 2 (hsep (map ppr deps))
+  CyclicDependencies deps ->
+      pref <+> text "unusable due to cyclic dependencies:" $$
+        nest 2 (hsep (map ppr deps))
+  IgnoredDependencies deps ->
+      pref <+> text "unusable due to ignored dependencies:" $$
+        nest 2 (hsep (map ppr deps))
+  ShadowedDependencies deps ->
+      pref <+> text "unusable due to shadowed dependencies:" $$
+        nest 2 (hsep (map ppr deps))
+
+reportCycles :: DynFlags -> [SCC PackageConfig] -> IO ()
+reportCycles dflags sccs = mapM_ report sccs
+  where
+    report (AcyclicSCC _) = return ()
+    report (CyclicSCC vs) =
+        debugTraceMsg dflags 2 $
+          text "these packages are involved in a cycle:" $$
+            nest 2 (hsep (map (ppr . unitId) vs))
 
 reportUnusable :: DynFlags -> UnusablePackages -> IO ()
 reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
@@ -1057,36 +1088,60 @@ reportUnusable dflags pkgs = mapM_ report (Map.toList pkgs)
 
 -- ----------------------------------------------------------------------------
 --
--- Detect any packages that have missing dependencies, and also any
--- mutually-recursive groups of packages (loops in the package graph
--- are not allowed).  We do this by taking the least fixpoint of the
--- dependency graph, repeatedly adding packages whose dependencies are
--- satisfied until no more can be added.
+-- Utilities on the database
 --
-findBroken :: IsShadowed
-           -> [PackageConfig]
-           -> Map InstalledUnitId PackageConfig
-           -> UnusablePackages
-findBroken is_shadowed pkgs pkg_map0 = go [] pkg_map0 pkgs
- where
-   go avail pkg_map not_avail =
-     case partitionWith (depsAvailable pkg_map) not_avail of
-        ([], not_avail) ->
-            Map.fromList [ (unitId p, (p, MissingDependencies is_shadowed deps))
-                         | (p,deps) <- not_avail ]
-        (new_avail, not_avail) ->
-            go (new_avail ++ avail) pkg_map' (map fst not_avail)
-            where pkg_map' = Map.insertList
-                             [ (unitId p, p) | p <- new_avail ]
-                             pkg_map
 
-   depsAvailable :: InstalledPackageIndex
+-- | A reverse dependency index, mapping an 'InstalledUnitId' to
+-- the 'InstalledUnitId's which have a dependency on it.
+type RevIndex = Map InstalledUnitId [InstalledUnitId]
+
+-- | Compute the reverse dependency index of a package database.
+reverseDeps :: InstalledPackageIndex -> RevIndex
+reverseDeps db = Map.foldl' go Map.empty db
+  where
+    go r pkg = foldl' (go' (unitId pkg)) r (depends pkg)
+    go' from r to = Map.insertWith (++) to [from] r
+
+-- | Given a list of 'InstalledUnitId's to remove, a database,
+-- and a reverse dependency index (as computed by 'reverseDeps'),
+-- remove those packages, plus any packages which depend on them.
+-- Returns the pruned database, as well as a list of 'PackageConfig's
+-- that was removed.
+removePackages :: [InstalledUnitId] -> RevIndex
+               -> InstalledPackageIndex
+               -> (InstalledPackageIndex, [PackageConfig])
+removePackages uids index m = go uids (m,[])
+  where
+    go [] (m,pkgs) = (m,pkgs)
+    go (uid:uids) (m,pkgs)
+        | Just pkg <- Map.lookup uid m
+        = case Map.lookup uid index of
+            Nothing    -> go uids (Map.delete uid m, pkg:pkgs)
+            Just rdeps -> go (rdeps ++ uids) (Map.delete uid m, pkg:pkgs)
+        | otherwise
+        = go uids (m,pkgs)
+
+-- | Given a 'PackageConfig' from some 'InstalledPackageIndex',
+-- return all entries in 'depends' which correspond to packages
+-- that do not exist in the index.
+depsNotAvailable :: InstalledPackageIndex
                  -> PackageConfig
-                 -> Either PackageConfig (PackageConfig, [InstalledUnitId])
-   depsAvailable pkg_map pkg
-        | null dangling = Left pkg
-        | otherwise     = Right (pkg, dangling)
-        where dangling = filter (not . (`Map.member` pkg_map)) (depends pkg)
+                 -> [InstalledUnitId]
+depsNotAvailable pkg_map pkg = filter (not . (`Map.member` pkg_map)) (depends pkg)
+
+-- | Given a 'PackageConfig' from some 'InstalledPackageIndex'
+-- return all entries in 'abiDepends' which correspond to packages
+-- that do not exist, OR have mismatching ABIs.
+depsAbiMismatch :: InstalledPackageIndex
+                -> PackageConfig
+                -> [InstalledUnitId]
+depsAbiMismatch pkg_map pkg = map fst . filter (not . abiMatch) $ abiDepends pkg
+  where
+    abiMatch (dep_uid, abi)
+        | Just dep_pkg <- Map.lookup dep_uid pkg_map
+        = abiHash dep_pkg == abi
+        | otherwise
+        = False
 
 -- -----------------------------------------------------------------------------
 -- Ignore packages
@@ -1101,6 +1156,98 @@ ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
         -- missing package is not an error for -ignore-package,
         -- because a common usage is to -ignore-package P as
         -- a preventative measure just in case P exists.
+
+-- ----------------------------------------------------------------------------
+--
+-- Merging databases
+--
+
+-- | Given a list of databases, merge them together, where
+-- packages with the same unit id in later databases override
+-- earlier ones.  This does NOT check if the resulting database
+-- makes sense (that's done by 'validateDatabase').
+mergeDatabases :: DynFlags -> [(FilePath, [PackageConfig])]
+               -> IO InstalledPackageIndex
+mergeDatabases dflags = foldM merge Map.empty
+  where
+    merge pkg_map (db_path, db) = do
+      debugTraceMsg dflags 2 $
+          text "loading package database" <+> text db_path
+      forM_ (Set.toList override_set) $ \pkg ->
+          debugTraceMsg dflags 2 $
+              text "package" <+> ppr pkg <+>
+              text "overrides a previously defined package"
+      return pkg_map'
+     where
+      db_map = mk_pkg_map db
+      mk_pkg_map = Map.fromList . map (\p -> (unitId p, p))
+
+      -- The set of UnitIds which appear in both db and pkgs.  These are the
+      -- ones that get overridden.  Compute this just to give some
+      -- helpful debug messages at -v2
+      override_set :: Set InstalledUnitId
+      override_set = Set.intersection (Map.keysSet db_map)
+                                      (Map.keysSet pkg_map)
+
+      -- Now merge the sets together (NB: in case of duplicate,
+      -- first argument preferred)
+      pkg_map' :: InstalledPackageIndex
+      pkg_map' = Map.union db_map pkg_map
+
+-- | Validates a database, removing unusable packages from it
+-- (this includes removing packages that the user has explicitly
+-- ignored.)  Our general strategy:
+--
+-- 1. Remove all broken packages (dangling dependencies)
+-- 2. Remove all packages that are cyclic
+-- 3. Apply ignore flags
+-- 4. Remove all packages which have deps with mismatching ABIs
+--
+validateDatabase :: DynFlags -> InstalledPackageIndex
+                 -> (InstalledPackageIndex, UnusablePackages, [SCC PackageConfig])
+validateDatabase dflags pkg_map1 =
+    (pkg_map5, unusable, sccs)
+  where
+    ignore_flags = reverse (ignorePackageFlags dflags)
+
+    -- Compute the reverse dependency index
+    index = reverseDeps pkg_map1
+
+    -- Helper function
+    mk_unusable mk_err dep_matcher m uids =
+      Map.fromList [ (unitId pkg, (pkg, mk_err (dep_matcher m pkg)))
+                   | pkg <- uids ]
+
+    -- Find broken packages
+    directly_broken = filter (not . null . depsNotAvailable pkg_map1)
+                             (Map.elems pkg_map1)
+    (pkg_map2, broken) = removePackages (map unitId directly_broken) index pkg_map1
+    unusable_broken = mk_unusable BrokenDependencies depsNotAvailable pkg_map2 broken
+
+    -- Find recursive packages
+    sccs = stronglyConnComp [ (pkg, unitId pkg, depends pkg)
+                            | pkg <- Map.elems pkg_map2 ]
+    getCyclicSCC (CyclicSCC vs) = map unitId vs
+    getCyclicSCC (AcyclicSCC _) = []
+    (pkg_map3, cyclic) = removePackages (concatMap getCyclicSCC sccs) index pkg_map2
+    unusable_cyclic = mk_unusable CyclicDependencies depsNotAvailable pkg_map3 cyclic
+
+    -- Apply ignore flags
+    directly_ignored = ignorePackages ignore_flags (Map.elems pkg_map3)
+    (pkg_map4, ignored) = removePackages (Map.keys directly_ignored) index pkg_map3
+    unusable_ignored = mk_unusable IgnoredDependencies depsNotAvailable pkg_map4 ignored
+
+    -- Knock out packages whose dependencies don't agree with ABI
+    -- (i.e., got invalidated due to shadowing)
+    directly_shadowed = filter (not . null . depsAbiMismatch pkg_map4)
+                               (Map.elems pkg_map4)
+    (pkg_map5, shadowed) = removePackages (map unitId directly_shadowed) index pkg_map4
+    unusable_shadowed = mk_unusable ShadowedDependencies depsAbiMismatch pkg_map5 shadowed
+
+    unusable = directly_ignored `Map.union` unusable_ignored
+                                `Map.union` unusable_broken
+                                `Map.union` unusable_cyclic
+                                `Map.union` unusable_shadowed
 
 -- -----------------------------------------------------------------------------
 -- When all the command-line options are in, we can process our package
@@ -1124,25 +1271,24 @@ mkPackageState dflags dbs preload0 = do
 
     1. We want to build a single, unified package database based
        on all of the input databases, which upholds the invariant that
-       there is only one package per any UnitId, and that there are no
-       dangling dependencies. We'll do this by successively merging each
-       input database into this unified database:
+       there is only one package per any UnitId and there are no
+       dangling dependencies.  We'll do this by merging, and
+       then successively filtering out bad dependencies.
 
-       a) if an input database defines unit ID that is already in
+       a) Merge all the databases together.
+          If an input database defines unit ID that is already in
           the unified database, that package SHADOWS the existing
-          package in the current unified database
-            * for every such shadowed package, we remove it and any
-              packages which transitively depend on it from the
-              unified datbase
+          package in the current unified database.
 
-       b) remove packages selected by -ignore-package from input database
+       b) Remove all packages with missing dependencies, or
+          mutually recursive dependencies.
 
-       c) remove any packages with missing dependencies or mutually recursive
-          dependencies from the input database
+       b) Remove packages selected by -ignore-package from input database
+
+       c) Remove all packages which depended on packages that are now
+          shadowed by an ABI-incompatible package
 
        d) report (with -v) any packages that were removed by steps 1-3
-
-       e) merge the input database into the unified database
 
     2. We want to look at the flags controlling package visibility,
        and build a mapping of what module names are in scope and
@@ -1170,75 +1316,23 @@ mkPackageState dflags dbs preload0 = do
 -}
 
   let other_flags = reverse (packageFlags dflags)
-      ignore_flags = reverse (ignorePackageFlags dflags)
   debugTraceMsg dflags 2 $
       text "package flags" <+> ppr other_flags
 
-  let merge (pkg_map, prev_unusable) (db_path, db) = do
-            debugTraceMsg dflags 2 $
-                text "loading package database" <+> text db_path
-            forM_ (Set.toList shadow_set) $ \pkg ->
-                debugTraceMsg dflags 2 $
-                    text "package" <+> ppr pkg <+>
-                    text "shadows a previously defined package"
-            reportUnusable dflags unusable
-            -- NB: an unusable unit ID can become usable again
-            -- if it's validly specified in a later package stack.
-            -- Keep unusable up-to-date!
-            return (pkg_map', (prev_unusable `Map.difference` pkg_map')
-                                    `Map.union` unusable)
-        where -- The set of UnitIds which appear in both
-              -- db and pkgs (to be shadowed from pkgs)
-              shadow_set :: Set InstalledUnitId
-              shadow_set = foldr ins Set.empty db
-                where ins pkg s
-                        -- If the package from the upper database is
-                        -- in the lower database, and the ABIs don't
-                        -- match...
-                        | Just old_pkg <- Map.lookup (unitId pkg) pkg_map
-                        , abiHash old_pkg /= abiHash pkg
-                        -- ...add this unit ID to the set of unit IDs
-                        -- which (transitively) should be shadowed from
-                        -- the lower database.
-                        = Set.insert (unitId pkg) s
-                        | otherwise
-                        = s
-              -- Remove shadow_set from pkg_map...
-              shadowed_pkgs0 :: [PackageConfig]
-              shadowed_pkgs0 = filter (not . (`Set.member` shadow_set) . unitId)
-                                      (Map.elems pkg_map)
-              -- ...and then remove anything transitively broken
-              -- this way.
-              shadowed = findBroken True shadowed_pkgs0 Map.empty
-              shadowed_pkgs :: [PackageConfig]
-              shadowed_pkgs = filter (not . (`Map.member` shadowed) . unitId)
-                                     shadowed_pkgs0
+  -- Merge databases together, without checking validity
+  pkg_map1 <- mergeDatabases dflags dbs
 
-              -- Apply ignore flags to db (TODO: could extend command line
-              -- flag format to support per-database ignore now!  More useful
-              -- than what we have now.)
-              ignored = ignorePackages ignore_flags db
-              db2 = filter (not . (`Map.member` ignored) . unitId) db
+  -- Now that we've merged everything together, prune out unusable
+  -- packages.
+  let (pkg_map2, unusable, sccs) = validateDatabase dflags pkg_map1
 
-              -- Look for broken packages (either from ignore, or possibly
-              -- because the db was broken to begin with)
-              mk_pkg_map = Map.fromList . map (\p -> (unitId p, p))
-              broken = findBroken False db2 (mk_pkg_map shadowed_pkgs)
-              db3 = filter (not . (`Map.member` broken) . unitId) db2
+  reportCycles dflags sccs
+  reportUnusable dflags unusable
 
-              unusable = shadowed `Map.union` ignored
-                                  `Map.union` broken
-
-              -- Now merge the sets together (NB: later overrides
-              -- earlier!)
-              pkg_map' :: Map InstalledUnitId PackageConfig
-              pkg_map' = mk_pkg_map (shadowed_pkgs ++ db3)
-
-  (pkg_map1, unusable) <- foldM merge (Map.empty, Map.empty) dbs
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
   pkgs1 <- foldM (applyTrustFlag dflags unusable)
-                 (Map.elems pkg_map1) (reverse (trustFlags dflags))
+                 (Map.elems pkg_map2) (reverse (trustFlags dflags))
   let prelim_pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs1
 
   --
