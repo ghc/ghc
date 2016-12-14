@@ -46,7 +46,9 @@
 #include "win32/AsyncIO.h"
 #endif
 
-#if !defined(mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
+#include <fenv.h>
+#else
 #include "posix/TTY.h"
 #endif
 
@@ -69,10 +71,18 @@ static void flushStdHandles(void);
 
 #define X86_INIT_FPU 0
 
-#if X86_INIT_FPU
 static void
 x86_init_fpu ( void )
 {
+#if defined(mingw32_HOST_OS) && !X86_INIT_FPU
+    /* Mingw-w64 does a stupid thing. They set the FPU precision to extended mode by default.
+    The reasoning is that it's for compatibility with GNU Linux ported libraries. However the
+    problem is this is incompatible with the standard Windows double precision mode.  In fact,
+    if we create a new OS thread then Windows will reset the FPU to double precision mode.
+    So we end up with a weird state where the main thread by default has a different precision
+    than any child threads. */
+    fesetenv(FE_PC53_ENV);
+#elif X86_INIT_FPU
   __volatile unsigned short int fpu_cw;
 
   // Grab the control word
@@ -87,7 +97,25 @@ x86_init_fpu ( void )
 
   // Store the new control word back
   __asm __volatile ("fldcw %0" : : "m" (fpu_cw));
+#else
+    return;
+#endif
 }
+
+#if defined(mingw32_HOST_OS)
+/* And now we have to override the build in ones in Mingw-W64's CRT. */
+void _fpreset(void)
+{
+    x86_init_fpu();
+}
+
+#ifdef __GNUC__
+void __attribute__((alias("_fpreset"))) fpreset(void);
+#else
+void fpreset(void) {
+    _fpreset();
+}
+#endif
 #endif
 
 /* -----------------------------------------------------------------------------
@@ -244,9 +272,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     startupAsyncIO();
 #endif
 
-#if X86_INIT_FPU
     x86_init_fpu();
-#endif
 
     startupHpc();
 
