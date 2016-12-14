@@ -691,6 +691,7 @@ isBuiltInOcc_maybe occ =
 
       -- unboxed tuple data/tycon
       "(##)"  -> Just $ tup_name Unboxed 0
+      "Unit#" -> Just $ tup_name Unboxed 1
       _ | Just rest <- "(#" `stripPrefix` name
         , (commas, rest') <- BS.span (==',') rest
         , "#)" <- rest'

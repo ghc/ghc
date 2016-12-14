@@ -16,6 +16,9 @@
   * Add support for attaching deriving strategies to `deriving` statements
     (#10598)
 
+  * `unboxedTupleTypeName` and `unboxedTupleDataName` now work for unboxed
+    0-tuples and 1-tuples (#12977)
+
 ## 2.11.0.0  *May 2016*
 
   * Bundled with GHC 8.0.1

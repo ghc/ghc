@@ -1187,20 +1187,17 @@ unboxedTupleDataName :: Int -> Name
 -- | Unboxed tuple type constructor
 unboxedTupleTypeName :: Int -> Name
 
-unboxedTupleDataName 0 = error "unboxedTupleDataName 0"
-unboxedTupleDataName 1 = error "unboxedTupleDataName 1"
-unboxedTupleDataName n = mk_unboxed_tup_name (n-1) DataName
-
-unboxedTupleTypeName 0 = error "unboxedTupleTypeName 0"
-unboxedTupleTypeName 1 = error "unboxedTupleTypeName 1"
-unboxedTupleTypeName n = mk_unboxed_tup_name (n-1) TcClsName
+unboxedTupleDataName n = mk_unboxed_tup_name n DataName
+unboxedTupleTypeName n = mk_unboxed_tup_name n TcClsName
 
 mk_unboxed_tup_name :: Int -> NameSpace -> Name
-mk_unboxed_tup_name n_commas space
-  = Name occ (NameG space (mkPkgName "ghc-prim") tup_mod)
+mk_unboxed_tup_name n space
+  = Name (mkOccName tup_occ) (NameG space (mkPkgName "ghc-prim") tup_mod)
   where
-    occ = mkOccName ("(#" ++ replicate n_commas ',' ++ "#)")
-    tup_mod = mkModName "GHC.Tuple"
+    tup_occ | n == 1    = "Unit#" -- See Note [One-tuples] in TysWiredIn
+            | otherwise = "(#" ++ replicate n_commas ',' ++ "#)"
+    n_commas = n - 1
+    tup_mod  = mkModName "GHC.Tuple"
 
 -----------------------------------------------------
 --              Locations
