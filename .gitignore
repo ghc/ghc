@@ -32,6 +32,7 @@ foo*
 *.dyn_o
 *.dyn_hi
 __pycache__
+*.SYMDEF*
 
 log
 tags
