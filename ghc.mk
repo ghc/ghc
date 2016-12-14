@@ -432,9 +432,7 @@ else # CLEANING
 
 PACKAGES_STAGE0 = binary Cabal/Cabal hpc ghc-boot-th ghc-boot hoopl transformers template-haskell
 ifeq "$(Windows_Host)" "NO"
-ifneq "$(HostOS_CPP)" "ios"
 PACKAGES_STAGE0 += terminfo
-endif
 endif
 
 PACKAGES_STAGE1 += ghc-prim
@@ -472,9 +470,7 @@ PACKAGES_STAGE1 += xhtml
 endif
 
 ifeq "$(Windows_Target)" "NO"
-ifneq "$(TargetOS_CPP)" "ios"
 PACKAGES_STAGE1 += terminfo
-endif
 endif
 PACKAGES_STAGE1 += haskeline
 PACKAGES_STAGE1 += ghci
