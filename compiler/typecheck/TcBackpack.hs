@@ -549,6 +549,11 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
                     (gresFromAvails Nothing (mi_exports impl_iface))
         nsubst = mkNameShape (moduleName impl_mod) (mi_exports impl_iface)
 
+    -- Load all the orphans, so the subsequent 'checkHsigIface' sees
+    -- all the instances it needs to
+    loadModuleInterfaces (text "Loading orphan modules (from implementor of hsig)")
+                         (dep_orphs (mi_deps impl_iface))
+
     dflags <- getDynFlags
     let avails = calculateAvails dflags
                     impl_iface False{- safe -} False{- boot -}
