@@ -900,8 +900,12 @@ test('T12877',
           [(wordsize(64), 197582248, 5),
           # initial:      197582248 (Linux)
           ])
+
      , compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 135979000, 5),
+          [(platform('x86_64-unknown-mingw32'), 118644280, 5),
+          # initial:      118644280
+
+           (wordsize(64), 135979000, 5),
           # initial:      135979000 (Linux)
           ]),
      ],
