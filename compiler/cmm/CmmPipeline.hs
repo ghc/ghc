@@ -109,8 +109,8 @@ cpsTop hsc_env proc =
        g <- if splitting_proc_points
             then do
                ------------- Split into separate procedures -----------------------
-               pp_map  <- {-# SCC "procPointAnalysis" #-} runUniqSM $
-                          procPointAnalysis proc_points g
+               let pp_map = {-# SCC "procPointAnalysis" #-}
+                            procPointAnalysis proc_points g
                dumpWith dflags Opt_D_dump_cmm_procmap "procpoint map" $
                     ppr pp_map
                g <- {-# SCC "splitAtProcPoints" #-} runUniqSM $

@@ -131,10 +131,9 @@ instance Outputable Status where
 -- Once you know what the proc-points are, figure out
 -- what proc-points each block is reachable from
 -- See Note [Proc-point analysis]
-procPointAnalysis :: ProcPointSet -> CmmGraph -> UniqSM (LabelMap Status)
+procPointAnalysis :: ProcPointSet -> CmmGraph -> LabelMap Status
 procPointAnalysis procPoints cmmGraph@(CmmGraph {g_graph = graph}) =
-    return $
-        analyzeCmmFwd procPointLattice procPointTransfer cmmGraph initProcPoints
+    analyzeCmmFwd procPointLattice procPointTransfer cmmGraph initProcPoints
   where
     initProcPoints =
         mkFactBase
@@ -189,36 +188,31 @@ minimalProcPointSet :: Platform -> ProcPointSet -> CmmGraph
 minimalProcPointSet platform callProcPoints g
   = extendPPSet platform g (postorderDfs g) callProcPoints
 
-extendPPSet :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqSM ProcPointSet
+extendPPSet
+    :: Platform -> CmmGraph -> [CmmBlock] -> ProcPointSet -> UniqSM ProcPointSet
 extendPPSet platform g blocks procPoints =
-    do env <- procPointAnalysis procPoints g
-       -- pprTrace "extensPPSet" (ppr env) $ return ()
-       let add block pps = let id = entryLabel block
-                           in  case mapLookup id env of
-                                 Just ProcPoint -> setInsert id pps
-                                 _ -> pps
-           procPoints' = foldGraphBlocks add setEmpty g
-           newPoints = mapMaybe ppSuccessor blocks
-           newPoint  = listToMaybe newPoints
-           ppSuccessor b =
-               let nreached id = case mapLookup id env `orElse`
-                                       pprPanic "no ppt" (ppr id <+> ppr b) of
-                                   ProcPoint -> 1
-                                   ReachedBy ps -> setSize ps
-                   block_procpoints = nreached (entryLabel b)
-                   -- | Looking for a successor of b that is reached by
-                   -- more proc points than b and is not already a proc
-                   -- point.  If found, it can become a proc point.
-                   newId succ_id = not (setMember succ_id procPoints') &&
-                                   nreached succ_id > block_procpoints
-               in  listToMaybe $ filter newId $ successors b
-{-
-       case newPoints of
-           []  -> return procPoints'
-           pps -> extendPPSet g blocks
-                    (foldl extendBlockSet procPoints' pps)
--}
-       case newPoint of
+    let env = procPointAnalysis procPoints g
+        add block pps = let id = entryLabel block
+                        in  case mapLookup id env of
+                              Just ProcPoint -> setInsert id pps
+                              _ -> pps
+        procPoints' = foldGraphBlocks add setEmpty g
+        newPoints = mapMaybe ppSuccessor blocks
+        newPoint  = listToMaybe newPoints
+        ppSuccessor b =
+            let nreached id = case mapLookup id env `orElse`
+                                    pprPanic "no ppt" (ppr id <+> ppr b) of
+                                ProcPoint -> 1
+                                ReachedBy ps -> setSize ps
+                block_procpoints = nreached (entryLabel b)
+                -- | Looking for a successor of b that is reached by
+                -- more proc points than b and is not already a proc
+                -- point.  If found, it can become a proc point.
+                newId succ_id = not (setMember succ_id procPoints') &&
+                                nreached succ_id > block_procpoints
+            in  listToMaybe $ filter newId $ successors b
+
+    in case newPoint of
          Just id ->
              if setMember id procPoints'
                 then panic "added old proc pt"
