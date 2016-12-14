@@ -150,4 +150,5 @@ test('T12757', normal, compile_and_run, [''])
 test('T12855', normal, compile_and_run, [''])
 test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
                 when(opsys('darwin'), expect_broken(12937)),
+                when(opsys('mingw32'), expect_broken(12965)),
                 only_ways(['normal']) ], compile_and_run, [''])
