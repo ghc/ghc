@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE UnboxedTuples #-}
+{-# LANGUAGE CPP, UnboxedTuples #-}
 
 module UniqSupply (
         -- * Main data type
@@ -37,6 +37,8 @@ import MonadUtils
 import Control.Monad
 import Data.Bits
 import Data.Char
+
+#include "Unique.h"
 
 {-
 ************************************************************************
@@ -73,7 +75,7 @@ takeUniqFromSupply :: UniqSupply -> (Unique, UniqSupply)
 -- ^ Obtain the 'Unique' from this particular 'UniqSupply', and a new supply
 
 mkSplitUniqSupply c
-  = case ord c `shiftL` 24 of
+  = case ord c `shiftL` UNIQUE_BITS of
      mask -> let
         -- here comes THE MAGIC:
 

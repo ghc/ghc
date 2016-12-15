@@ -8,6 +8,7 @@
 comparison key in the compiler.
 
 If there is any single operation that needs to be fast, it is @Unique@
+
 comparison.  Unsurprisingly, there is quite a bit of huff-and-puff
 directed to that end.
 
@@ -63,6 +64,7 @@ module Unique (
     ) where
 
 #include "HsVersions.h"
+#include "Unique.h"
 
 import BasicTypes
 import FastString
@@ -124,6 +126,11 @@ deriveUnique (MkUnique i) delta = mkUnique 'X' (i + delta)
 -- newTagUnique changes the "domain" of a unique to a different char
 newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
+-- | How many bits are devoted to the unique index (as opposed to the class
+-- character).
+uniqueMask :: Int
+uniqueMask = (1 `shiftL` UNIQUE_BITS) - 1
+
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
 -- No 64-bit bugs here, as long as we have at least 32 bits. --JSM
@@ -136,15 +143,15 @@ mkUnique :: Char -> Int -> Unique       -- Builds a unique from pieces
 mkUnique c i
   = MkUnique (tag .|. bits)
   where
-    tag  = ord c `shiftL` 24
-    bits = i .&. 16777215 {-``0x00ffffff''-}
+    tag  = ord c `shiftL` UNIQUE_BITS
+    bits = i .&. uniqueMask
 
 unpkUnique (MkUnique u)
   = let
         -- as long as the Char may have its eighth bit set, we
         -- really do need the logical right-shift here!
-        tag = chr (u `shiftR` 24)
-        i   = u .&. 16777215 {-``0x00ffffff''-}
+        tag = chr (u `shiftR` UNIQUE_BITS)
+        i   = u .&. uniqueMask
     in
     (tag, i)
 
