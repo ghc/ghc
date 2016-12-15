@@ -1,18 +1,35 @@
-
+#include <assert.h>
 #include "Rts.h"
+#include "Unique.h"
 
 static HsInt GenSymCounter = 0;
 static HsInt GenSymInc = 1;
 
+#define UNIQUE_MASK ((1ULL << UNIQUE_BITS) - 1)
+
+STATIC_INLINE void checkUniqueRange(HsInt u STG_UNUSED) {
+#if DEBUG
+    // Uh oh! We will overflow next time a unique is requested.
+    assert(h != UNIQUE_MASK);
+#endif
+}
+
 HsInt genSym(void) {
 #if defined(THREADED_RTS)
     if (n_capabilities == 1) {
-        return GenSymCounter = (GenSymCounter + GenSymInc) & 0xFFFFFF;
+        GenSymCounter = (GenSymCounter + GenSymInc) & UNIQUE_MASK;
+        checkUniqueRange(GenSymCounter);
+        return GenSymCounter;
     } else {
-        return atomic_inc((StgWord *)&GenSymCounter, GenSymInc) & 0xFFFFFF;
+        HsInt n = atomic_inc((StgWord *)&GenSymCounter, GenSymInc)
+          & UNIQUE_MASK;
+        checkUniqueRange(n);
+        return n;
     }
 #else
-    return GenSymCounter = (GenSymCounter + GenSymInc) & 0xFFFFFF;
+    GenSymCounter = (GenSymCounter + GenSymInc) & UNIQUE_MASK;
+    checkUniqueRange(GenSymCounter);
+    return GenSymCounter;
 #endif
 }
 
