@@ -35,3 +35,7 @@ class Foo a where
     baz :: a -> a -> Bool
     quux :: a -> a -> Bool
     {-# MINIMAL bar, (foo, baq | foo, quux) #-}
+
+class Foo2 a where
+  f :: a
+  {-# MiNiMaL f #-}

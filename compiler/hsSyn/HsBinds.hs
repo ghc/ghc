@@ -972,7 +972,8 @@ ppr_sig (InlineSig var inl)
                                    <+> pprPrefixOcc (unLoc var))
 ppr_sig (SpecInstSig src ty)
   = pragSrcBrackets src "{-# SPECIALISE" (text "instance" <+> ppr ty)
-ppr_sig (MinimalSig _ bf)         = pragBrackets (pprMinimalSig bf)
+ppr_sig (MinimalSig src bf)
+  = pragSrcBrackets src "{-# MINIMAL" (pprMinimalSig bf)
 ppr_sig (PatSynSig names sig_ty)
   = text "pattern" <+> pprVarSig (map unLoc names) (ppr sig_ty)
 ppr_sig (SCCFunSig src fn mlabel)
@@ -1013,7 +1014,7 @@ instance Outputable TcSpecPrag where
 
 pprMinimalSig :: (OutputableBndr name)
               => LBooleanFormula (Located name) -> SDoc
-pprMinimalSig (L _ bf) = text "MINIMAL" <+> ppr (fmap unLoc bf)
+pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 
 {-
 ************************************************************************
