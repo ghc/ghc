@@ -30,7 +30,114 @@ stg_ap_0_fast ( P_ fun )
     IF_DEBUG(sanity,
         ccall checkStackFrame(Sp "ptr"));
 
+#if !defined(PROFILING)
+
     ENTER(fun);
+
+#else
+
+/*
+  Note [Evaluating functions with profiling]
+
+  If we evaluate something like
+
+    let f = {-# SCC "f" #-} g
+
+  where g is a function, then updating the thunk for f to point to g
+  would be incorrect: we've lost the SCC annotation.  In general, when
+  we evaluate a function and the current CCS is different from the one
+  stored in the function, we need to return a function with the
+  correct CCS in it.
+
+  The mechanism we use to wrap the function is to create a
+  zero-argument PAP as a proxy object to hold the new CCS, and return
+  that.
+*/
+
+again:
+    W_  info;
+    W_ untaggedfun;
+    untaggedfun = UNTAG(fun);
+    info = %INFO_PTR(untaggedfun);
+    switch [INVALID_OBJECT .. N_CLOSURE_TYPES]
+        (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {
+        case
+            IND,
+            IND_STATIC:
+        {
+            fun = StgInd_indirectee(fun);
+            goto again;
+        }
+        case
+            FUN,
+            FUN_1_0,
+            FUN_0_1,
+            FUN_2_0,
+            FUN_1_1,
+            FUN_0_2,
+            FUN_STATIC,
+            BCO:
+        {
+            if (CCCS == StgHeader_ccs(untaggedfun)) {
+                return (fun);
+            } else {
+                // We're going to build a new PAP, with zero extra
+                // arguments and therefore the same arity as the
+                // original function.  In other words, we're using a
+                // zero-argument PAP as an indirection to the
+                // function, so that we can attach a different CCS to
+                // it.
+                HP_CHK_GEN(SIZEOF_StgPAP);
+                TICK_ALLOC_PAP(SIZEOF_StgPAP, 0);
+                // attribute this allocation to the "overhead of profiling"
+                CCS_ALLOC(BYTES_TO_WDS(SIZEOF_StgPAP), CCS_OVERHEAD);
+                P_ pap;
+                W_ arity;
+                pap = Hp - SIZEOF_StgPAP + WDS(1);
+                SET_HDR(pap, stg_PAP_info, CCCS);
+                arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));
+                StgPAP_arity(pap) = arity;
+                StgPAP_fun(pap)   = fun;
+                StgPAP_n_args(pap) = 0;
+                return (pap);
+            }
+        }
+        case PAP:
+        {
+            if (CCCS == StgHeader_ccs(untaggedfun)) {
+                return (fun);
+            } else {
+                // We're going to copy this PAP, and put the new CCS in it
+                fun = untaggedfun;
+                W_ size;
+                size = SIZEOF_StgPAP + WDS(TO_W_(StgPAP_n_args(fun)));
+                HP_CHK_GEN(size);
+                TICK_ALLOC_PAP(size, 0);
+                // attribute this allocation to the "overhead of profiling"
+                CCS_ALLOC(BYTES_TO_WDS(SIZEOF_StgPAP), CCS_OVERHEAD);
+                P_ pap;
+                pap = Hp - size + WDS(1);
+                SET_HDR(pap, stg_PAP_info, CCCS);
+                StgPAP_arity(pap) = StgPAP_arity(fun);
+                StgPAP_n_args(pap) = StgPAP_n_args(fun);
+                StgPAP_fun(pap)   = StgPAP_fun(fun);
+                W_ i;
+                i = TO_W_(StgPAP_n_args(fun));
+            loop:
+                if (i == 0) {
+                    return (pap);
+                }
+                i = i - 1;
+                StgPAP_payload(pap,i) = StgPAP_payload(fun,i);
+                goto loop;
+            }
+        }
+        default:
+        {
+            jump %ENTRY_CODE(info) (UNTAG(fun));
+        }
+    }
+#endif
 }
 
 /* -----------------------------------------------------------------------------

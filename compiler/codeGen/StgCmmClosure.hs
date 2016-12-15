@@ -565,8 +565,10 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
 
 getCallMethod dflags name id (LFReEntrant _ _ arity _ _) n_args _v_args _cg_loc
               _self_loop_info
-  | n_args == 0    = ASSERT( arity /= 0 )
-                     ReturnIt        -- No args at all
+  | n_args == 0 -- No args at all
+  && not (gopt Opt_SccProfilingOn dflags)
+     -- See Note [Evaluating functions with profiling] in rts/Apply.cmm
+  = ASSERT( arity /= 0 ) ReturnIt
   | n_args < arity = SlowCall        -- Not enough args
   | otherwise      = DirectEntry (enterIdLabel dflags name (idCafInfo id)) arity
 

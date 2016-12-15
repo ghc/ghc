@@ -47,7 +47,9 @@ test('scc002', [], compile_and_run, [''])
 test('scc003', [], compile_and_run,
      ['-fno-state-hack']) # Note [consistent stacks]
 
-test('T5654', [expect_broken(5654)], compile_and_run, [''])
+test('T5654-O0', [only_ways(['prof'])], compile_and_run, [''])
+
+test('T5654-O1', [only_ways(['profasm'])], compile_and_run, [''])
 
 test('T5654b-O0', [only_ways(['prof'])], compile_and_run, [''])
 
