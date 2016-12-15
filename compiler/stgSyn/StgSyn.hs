@@ -24,8 +24,11 @@ module StgSyn (
         combineStgBinderInfo,
 
         -- a set of synonyms for the most common (only :-) parameterisation
-        StgArg,
-        StgBinding, StgExpr, StgRhs, StgAlt,
+        StgArg, StgBinding, StgExpr, StgRhs, StgAlt,
+
+        -- a set of synonyms to distinguish in- and out variants
+        InStgArg,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt,
+        OutStgArg, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
 
         -- StgOp
         StgOp(..),
@@ -551,7 +554,24 @@ type StgExpr     = GenStgExpr     Id Id
 type StgRhs      = GenStgRhs      Id Id
 type StgAlt      = GenStgAlt      Id Id
 
+{- Many passes apply a substitution, and it's very handy to have type
+   synonyms to remind us whether or not the subsitution has been applied.
+   See CoreSyn for precedence in Core land
+-}
+
+type InStgBinding  = StgBinding
+type InStgArg      = StgArg
+type InStgExpr     = StgExpr
+type InStgRhs      = StgRhs
+type InStgAlt      = StgAlt
+type OutStgBinding = StgBinding
+type OutStgArg     = StgArg
+type OutStgExpr    = StgExpr
+type OutStgRhs     = StgRhs
+type OutStgAlt     = StgAlt
+
 {-
+
 ************************************************************************
 *                                                                      *
 \subsubsection[UpdateFlag-datatype]{@UpdateFlag@}

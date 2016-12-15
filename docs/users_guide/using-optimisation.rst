@@ -186,6 +186,14 @@ list.
     optimisation. Switching this off can be useful if you have some
     ``unsafePerformIO`` expressions that you don't want commoned-up.
 
+.. ghc-flag:: -fstg-cse
+
+    :default: on
+
+    Enables the common-sub-expression elimination optimisation on the STG
+    intermediate language, where it is able to common up some subexpressions
+    that differ in their types, but not their represetation.
+
 .. ghc-flag:: -fdicts-cheap
 
     A very experimental flag that makes dictionary-valued expressions

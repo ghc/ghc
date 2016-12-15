@@ -15,7 +15,11 @@ module TrieMap(
    LooseTypeMap,
    MaybeMap,
    ListMap,
-   TrieMap(..), insertTM, deleteTM
+   TrieMap(..), insertTM, deleteTM,
+   LiteralMap,
+   lkDFreeVar, xtDFreeVar,
+   lkDNamed, xtDNamed,
+   (>.>), (|>), (|>>),
  ) where
 
 import CoreSyn

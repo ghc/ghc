@@ -477,10 +477,6 @@ this exhaustive list can be empty!
 
 -- Pre-cloning or substitution
 type InBndr     = CoreBndr
-type InVar      = Var
-type InTyVar    = TyVar
-type InCoVar    = CoVar
-type InId       = Id
 type InType     = Type
 type InKind     = Kind
 type InBind     = CoreBind
@@ -491,10 +487,6 @@ type InCoercion = Coercion
 
 -- Post-cloning or substitution
 type OutBndr     = CoreBndr
-type OutVar      = Var
-type OutId       = Id
-type OutTyVar    = TyVar
-type OutCoVar    = CoVar
 type OutType     = Type
 type OutKind     = Kind
 type OutCoercion = Coercion

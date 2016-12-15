@@ -28,6 +28,10 @@ module Id (
         -- * The main types
         Var, Id, isId,
 
+        -- * In and Out variants
+        InVar,  InId,
+        OutVar, OutId,
+
         -- ** Simple construction
         mkGlobalId, mkVanillaGlobal, mkVanillaGlobalWithInfo,
         mkLocalId, mkLocalCoVar, mkLocalIdOrCoVar,
@@ -114,6 +118,8 @@ import BasicTypes
 
 -- Imported and re-exported
 import Var( Id, CoVar, DictId,
+            InId,  InVar,
+            OutId, OutVar,
             idInfo, idDetails, globaliseId, varType,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var

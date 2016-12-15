@@ -264,11 +264,6 @@ extendRho rho x (UnaryVal val)
 
 --------------------------------------------------------------------------------
 
-type OutStgExpr = StgExpr
-type InStgAlt   = StgAlt
-type InStgArg   = StgArg
-type OutStgArg  = StgArg
-
 unarise :: UniqSupply -> [StgBinding] -> [StgBinding]
 unarise us binds = initUs_ us (mapM (unariseBinding emptyVarEnv) binds)
 

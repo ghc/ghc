@@ -17,6 +17,7 @@ import SCCfinal         ( stgMassageForProfiling )
 import StgLint          ( lintStgBindings )
 import StgStats         ( showStgStats )
 import UnariseStg       ( unarise )
+import StgCse           ( stgCse )
 
 import DynFlags
 import Module           ( Module )
@@ -64,21 +65,26 @@ stg2stg dflags module_name binds
 
     -------------------------------------------
     do_stg_pass (binds, us, ccs) to_do
-      = let
-            (us1, us2) = splitUniqSupply us
-        in
-        case to_do of
+      = case to_do of
           D_stg_stats ->
              trace (showStgStats binds)
-             end_pass us2 "StgStats" ccs binds
+             end_pass us "StgStats" ccs binds
 
           StgDoMassageForProfiling ->
              {-# SCC "ProfMassage" #-}
              let
+                 (us1, us2) = splitUniqSupply us
                  (collected_CCs, binds3)
                    = stgMassageForProfiling dflags module_name us1 binds
              in
              end_pass us2 "ProfMassage" collected_CCs binds3
+
+          StgCSE ->
+             {-# SCC "StgCse" #-}
+             let
+                 binds' = stgCse binds
+             in
+             end_pass us "StgCse" ccs binds'
 
     end_pass us2 what ccs binds2
       = do -- report verbosely, if required
@@ -96,19 +102,15 @@ stg2stg dflags module_name binds
 
 -- | Optional Stg-to-Stg passes.
 data StgToDo
-  = StgDoMassageForProfiling  -- should be (next to) last
+  = StgCSE
+  | StgDoMassageForProfiling  -- should be (next to) last
   | D_stg_stats
 
 -- | Which optional Stg-to-Stg passes to run. Depends on flags, ways etc.
 getStgToDo :: DynFlags -> [StgToDo]
 getStgToDo dflags
-  = todo2
+  = [ StgCSE                   | gopt Opt_StgCSE dflags] ++
+    [ StgDoMassageForProfiling | WayProf `elem` ways dflags] ++
+    [ D_stg_stats              | stg_stats ]
   where
         stg_stats = gopt Opt_StgStats dflags
-
-        todo1 = if stg_stats then [D_stg_stats] else []
-
-        todo2 | WayProf `elem` ways dflags
-              = StgDoMassageForProfiling : todo1
-              | otherwise
-              = todo1
