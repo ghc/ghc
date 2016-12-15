@@ -20,5 +20,5 @@ Proxy (RuntimeRep -> Constraint) TYPE
 Proxy Constraint Constraint
 Proxy Constraint Constraint
 Proxy Constraint Constraint
-Proxy RuntimeRep 'PtrRepLifted
+Proxy RuntimeRep 'LiftedRep
 RealWorld

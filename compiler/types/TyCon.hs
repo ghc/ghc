@@ -67,7 +67,7 @@ module TyCon(
         isTyConAssoc, tyConAssoc_maybe,
         isImplicitTyCon,
         isTyConWithSrcDataCons,
-        isTcTyCon,
+        isTcTyCon, isTcLevPoly,
 
         -- ** Extracting information out of TyCons
         tyConName,
@@ -870,7 +870,7 @@ instance Binary HowAbstract where
 -- up things like @RuntimeRep@'s @PrimRep@ by known-key every time.
 data RuntimeRepInfo
   = NoRRI       -- ^ an ordinary promoted data con
-  | RuntimeRep ([Type] -> PrimRep)
+  | RuntimeRep ([Type] -> [PrimRep])
       -- ^ A constructor of @RuntimeRep@. The argument to the function should
       -- be the list of arguments to the promoted datacon.
   | VecCount Int         -- ^ A constructor of @VecCount@
@@ -1269,12 +1269,13 @@ CmmType GcPtrCat W32 on a 64-bit machine.
 -- and store values of this type.
 data PrimRep
   = VoidRep
-  | PtrRep
+  | LiftedRep
+  | UnliftedRep   -- ^ Unlifted pointer
   | IntRep        -- ^ Signed, word-sized value
   | WordRep       -- ^ Unsigned, word-sized value
   | Int64Rep      -- ^ Signed, 64 bit value (with 32-bit words only)
   | Word64Rep     -- ^ Unsigned, 64 bit value (with 32-bit words only)
-  | AddrRep       -- ^ A pointer, but /not/ to a Haskell value (use 'PtrRep')
+  | AddrRep       -- ^ A pointer, but /not/ to a Haskell value (use '(Un)liftedRep')
   | FloatRep
   | DoubleRep
   | VecRep Int PrimElemRep  -- ^ A vector
@@ -1304,8 +1305,9 @@ isVoidRep VoidRep = True
 isVoidRep _other  = False
 
 isGcPtrRep :: PrimRep -> Bool
-isGcPtrRep PtrRep = True
-isGcPtrRep _      = False
+isGcPtrRep LiftedRep   = True
+isGcPtrRep UnliftedRep = True
+isGcPtrRep _           = False
 
 -- | Find the size of a 'PrimRep', in words
 primRepSizeW :: DynFlags -> PrimRep -> Int
@@ -1316,7 +1318,8 @@ primRepSizeW dflags Word64Rep        = wORD64_SIZE `quot` wORD_SIZE dflags
 primRepSizeW _      FloatRep         = 1    -- NB. might not take a full word
 primRepSizeW dflags DoubleRep        = dOUBLE_SIZE dflags `quot` wORD_SIZE dflags
 primRepSizeW _      AddrRep          = 1
-primRepSizeW _      PtrRep           = 1
+primRepSizeW _      LiftedRep        = 1
+primRepSizeW _      UnliftedRep      = 1
 primRepSizeW _      VoidRep          = 0
 primRepSizeW dflags (VecRep len rep) = len * primElemRepSizeB rep `quot` wORD_SIZE dflags
 
@@ -1518,9 +1521,9 @@ mkTcTyCon name binders res_kind unsat scoped_tvs
             , tyConArity   = length binders
             , tcTyConScopedTyVars = scoped_tvs }
 
--- | Create an unlifted primitive 'TyCon', such as @Int#@
+-- | Create an unlifted primitive 'TyCon', such as @Int#@.
 mkPrimTyCon :: Name -> [TyConBinder]
-            -> Kind   -- ^ /result/ kind
+            -> Kind   -- ^ /result/ kind, never levity-polymorphic
             -> [Role] -> TyCon
 mkPrimTyCon name binders res_kind roles
   = mkPrimTyCon' name binders res_kind roles True (Just $ mkPrelTyConRepName name)
@@ -1543,7 +1546,9 @@ mkLiftedPrimTyCon name binders res_kind roles
   where rep_nm = mkPrelTyConRepName name
 
 mkPrimTyCon' :: Name -> [TyConBinder]
-             -> Kind    -- ^ /result/ kind
+             -> Kind    -- ^ /result/ kind, never levity-polymorphic
+                        -- (If you need a levity-polymorphic PrimTyCon, change
+                        --  isTcLevPoly.)
              -> [Role]
              -> Bool -> Maybe TyConRepName -> TyCon
 mkPrimTyCon' name binders res_kind roles is_unlifted rep_nm
@@ -2042,6 +2047,20 @@ tyConCType_maybe _ = Nothing
 isTcTyCon :: TyCon -> Bool
 isTcTyCon (TcTyCon {}) = True
 isTcTyCon _            = False
+
+-- | Could this TyCon ever be levity-polymorphic when fully applied?
+-- True is safe. False means we're sure. Does only a quick check
+-- based on the TyCon's category.
+-- Precondition: The fully-applied TyCon has kind (TYPE blah)
+isTcLevPoly :: TyCon -> Bool
+isTcLevPoly FunTyCon{}           = False
+isTcLevPoly (AlgTyCon { algTcParent = UnboxedAlgTyCon }) = True
+isTcLevPoly AlgTyCon{}           = False
+isTcLevPoly SynonymTyCon{}       = True
+isTcLevPoly FamilyTyCon{}        = True
+isTcLevPoly PrimTyCon{}          = False
+isTcLevPoly tc@PromotedDataCon{} = pprPanic "isTcLevPoly datacon" (ppr tc)
+isTcLevPoly tc@TcTyCon{}         = pprPanic "isTcLevPoly TcTyCon" (ppr tc)
 
 {-
 -----------------------------------------------

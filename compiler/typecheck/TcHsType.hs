@@ -65,7 +65,6 @@ import VarSet
 import TyCon
 import ConLike
 import DataCon
-import TysPrim ( tYPE )
 import Class
 import Name
 import NameEnv
@@ -605,8 +604,11 @@ tc_hs_type mode (HsSumTy hs_tys) exp_kind
   = do { let arity = length hs_tys
        ; arg_kinds <- mapM (\_ -> newOpenTypeKind) hs_tys
        ; tau_tys   <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
-       ; let arg_tys = map (getRuntimeRepFromKind "tc_hs_type HsSumTy") arg_kinds ++ tau_tys
-       ; checkExpectedKind (mkTyConApp (sumTyCon arity) arg_tys) (tYPE unboxedSumRepDataConTy) exp_kind
+       ; let arg_reps = map (getRuntimeRepFromKind "tc_hs_type HsSumTy") arg_kinds
+             arg_tys  = arg_reps ++ tau_tys
+       ; checkExpectedKind (mkTyConApp (sumTyCon arity) arg_tys)
+                           (unboxedSumKind arg_reps)
+                           exp_kind
        }
 
 --------- Promoted lists and tuples
@@ -717,8 +719,7 @@ finish_tuple tup_sort tau_tys tau_kinds exp_kind
   = do { traceTc "finish_tuple" (ppr res_kind $$ ppr tau_kinds $$ ppr exp_kind)
        ; let arg_tys  = case tup_sort of
                    -- See also Note [Unboxed tuple RuntimeRep vars] in TyCon
-                 UnboxedTuple    -> map (getRuntimeRepFromKind "finish_tuple") tau_kinds
-                                    ++ tau_tys
+                 UnboxedTuple    -> tau_reps ++ tau_tys
                  BoxedTuple      -> tau_tys
                  ConstraintTuple -> tau_tys
        ; tycon <- case tup_sort of
@@ -733,10 +734,9 @@ finish_tuple tup_sort tau_tys tau_kinds exp_kind
        ; checkExpectedKind (mkTyConApp tycon arg_tys) res_kind exp_kind }
   where
     arity = length tau_tys
+    tau_reps = map (getRuntimeRepFromKind "finish_tuple") tau_kinds
     res_kind = case tup_sort of
-                 UnboxedTuple
-                   | arity == 0  -> tYPE voidRepDataConTy
-                   | otherwise   -> unboxedTupleKind
+                 UnboxedTuple    -> unboxedTupleKind tau_reps
                  BoxedTuple      -> liftedTypeKind
                  ConstraintTuple -> constraintKind
 

@@ -49,7 +49,7 @@ module IfaceType (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TysWiredIn ( ptrRepLiftedDataConTyCon )
+import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
 
 import DynFlags
 import StaticFlags ( opt_PprStyle_Debug )
@@ -296,7 +296,7 @@ isIfaceLiftedTypeKind (IfaceTyConApp tc ITC_Nil)
 isIfaceLiftedTypeKind (IfaceTyConApp tc
                        (ITC_Vis (IfaceTyConApp ptr_rep_lifted ITC_Nil) ITC_Nil))
   =  tc `ifaceTyConHasKey` tYPETyConKey
-  && ptr_rep_lifted `ifaceTyConHasKey` ptrRepLiftedDataConKey
+  && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
 isIfaceLiftedTypeKind _ = False
 
 splitIfaceSigmaTy :: IfaceType -> ([IfaceForAllBndr], [IfacePredType], IfaceType)
@@ -779,7 +779,7 @@ defaultRuntimeRepVars = go emptyFsEnv
 
     go subs (IfaceTyVar tv)
       | tv `elemFsEnv` subs
-      = IfaceTyConApp ptrRepLifted ITC_Nil
+      = IfaceTyConApp liftedRep ITC_Nil
 
     go subs (IfaceFunTy kind ty)
       = IfaceFunTy (go subs kind) (go subs ty)
@@ -795,10 +795,10 @@ defaultRuntimeRepVars = go emptyFsEnv
 
     go _ other = other
 
-    ptrRepLifted :: IfaceTyCon
-    ptrRepLifted =
+    liftedRep :: IfaceTyCon
+    liftedRep =
         IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
-      where dc_name = getName ptrRepLiftedDataConTyCon
+      where dc_name = getName liftedRepDataConTyCon
 
     isRuntimeRep :: IfaceType -> Bool
     isRuntimeRep (IfaceTyConApp tc _) =
@@ -965,13 +965,8 @@ pprTyTcApp' ctxt_prec tc tys dflags style
 
   | tc `ifaceTyConHasKey` tYPETyConKey
   , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
-  , rep `ifaceTyConHasKey` ptrRepLiftedDataConKey
+  , rep `ifaceTyConHasKey` liftedRepDataConKey
   = kindStar
-
-  | tc `ifaceTyConHasKey` tYPETyConKey
-  , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
-  , rep `ifaceTyConHasKey` ptrRepUnliftedDataConKey
-  = char '#'
 
   | not opt_PprStyle_Debug
   , tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
@@ -1054,9 +1049,6 @@ ppr_iface_tc_app pp ctxt_prec tc tys
   || tc `ifaceTyConHasKey` liftedTypeKindTyConKey
   || tc `ifaceTyConHasKey` unicodeStarKindTyConKey
   = kindStar   -- Handle unicode; do not wrap * in parens
-
-  | tc `ifaceTyConHasKey` unliftedTypeKindTyConKey
-  = ppr tc  -- Do not wrap # in parens
 
   | not (isSymOcc (nameOccName (ifaceTyConName tc)))
   = pprIfacePrefixApp ctxt_prec (ppr tc) (map (pp TyConPrec) tys)

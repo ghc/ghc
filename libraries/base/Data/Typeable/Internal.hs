@@ -355,14 +355,11 @@ instance Show TypeRep where
         where
           tcList = tyConOf @[] Proxy
       [TypeRep _ ptrRepCon _ []]
-        | tycon == tcTYPE && ptrRepCon == tc'PtrRepLifted
+        | tycon == tcTYPE && ptrRepCon == tc'LiftedRep
           -> showChar '*'
-        | tycon == tcTYPE && ptrRepCon == tc'PtrRepUnlifted
-          -> showChar '#'
         where
-          tcTYPE            = tyConOf @TYPE            Proxy
-          tc'PtrRepLifted   = tyConOf @'PtrRepLifted   Proxy
-          tc'PtrRepUnlifted = tyConOf @'PtrRepUnlifted Proxy
+          tcTYPE         = tyConOf @TYPE            Proxy
+          tc'LiftedRep   = tyConOf @'LiftedRep      Proxy
       [a,r] | tycon == tcFun  -> showParen (p > 8) $
                                  showsPrec 9 a .
                                  showString " -> " .

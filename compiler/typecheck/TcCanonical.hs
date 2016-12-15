@@ -25,7 +25,6 @@ import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import Outputable
 import DynFlags( DynFlags )
-import VarSet
 import NameSet
 import RdrName
 
@@ -461,7 +460,7 @@ mk_strict_superclasses rec_clss ev cls tys
                                   (mkEvScSelectors (EvId evar) cls tys)
        ; concatMapM (mk_superclasses rec_clss) sc_evs }
 
-  | isEmptyVarSet (tyCoVarsOfTypes tys)
+  | all noFreeVarsOfType tys
   = return [] -- Wanteds with no variables yield no deriveds.
               -- See Note [Improvement from Ground Wanteds]
 

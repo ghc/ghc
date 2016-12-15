@@ -207,7 +207,7 @@ same_fields flds1 flds2
 
 -----------------
 selectConMatchVars :: [Type] -> ConArgPats -> DsM [Id]
-selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDs arg_tys
+selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDsNoLP arg_tys
 selectConMatchVars _       (PrefixCon ps)   = selectMatchVars (map unLoc ps)
 selectConMatchVars _       (InfixCon p1 p2) = selectMatchVars [unLoc p1, unLoc p2]
 

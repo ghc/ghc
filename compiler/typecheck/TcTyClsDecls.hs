@@ -2303,7 +2303,7 @@ checkValidDataCon dflags existential_ok tc con
 
           -- Check all argument types for validity
         ; checkValidType ctxt (dataConUserType con)
-        ; mapM_ (checkForRepresentationPolymorphism empty)
+        ; mapM_ (checkForLevPoly empty)
                 (dataConOrigArgTys con)
 
           -- Extra checks for newtype data constructors
@@ -2439,6 +2439,13 @@ checkValidClass cls
                 --   class Error e => Game b mv e | b -> mv e where
                 --      newBoard :: MonadState b m => m ()
                 -- Here, MonadState has a fundep m->b, so newBoard is fine
+
+           -- a method cannot be levity polymorphic, as we have to store the
+           -- method in a dictionary
+           -- example of what this prevents:
+           --   class BoundedX (a :: TYPE r) where minBound :: a
+           -- See Note [Levity polymorphism checking] in DsMonad
+        ; checkForLevPoly empty tau1
 
         ; unless constrained_class_methods $
           mapM_ check_constraint (tail (theta1 ++ theta2))

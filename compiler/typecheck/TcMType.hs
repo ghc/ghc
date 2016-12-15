@@ -81,7 +81,11 @@ module TcMType (
 
   zonkEvVar, zonkWC, zonkSimples, zonkId, zonkCt, zonkSkolemInfo,
 
-  tcGetGlobalTyCoVars
+  tcGetGlobalTyCoVars,
+
+  ------------------------------
+  -- Levity polymorphism
+  ensureNotLevPoly, checkForLevPoly, checkForLevPolyX, formatLevPolyErr
   ) where
 
 #include "HsVersions.h"
@@ -1011,7 +1015,7 @@ zonkQuantifiedTyVar default_kind tv
     zonk_meta_tv :: TcTyVar -> TcM (Maybe TcTyVar)
     zonk_meta_tv tv
       | isRuntimeRepVar tv   -- Never quantify over a RuntimeRep var
-      = do { writeMetaTyVar tv ptrRepLiftedTy
+      = do { writeMetaTyVar tv liftedRepTy
            ; return Nothing }
 
       | default_kind         -- -XNoPolyKinds and this is a kind var
@@ -1569,3 +1573,55 @@ tidySkolemInfo env (SigSkol cx ty)      = SigSkol cx (tidyType env ty)
 tidySkolemInfo env (InferSkol ids)      = InferSkol (mapSnd (tidyType env) ids)
 tidySkolemInfo env (UnifyForAllSkol ty) = UnifyForAllSkol (tidyType env ty)
 tidySkolemInfo _   info                 = info
+
+-------------------------------------------------------------------------
+{-
+%************************************************************************
+%*                                                                      *
+             Levity polymorphism checks
+*                                                                      *
+************************************************************************
+
+See Note [Levity polymorphism checking] in DsMonad
+
+-}
+
+-- | According to the rules around representation polymorphism
+-- (see https://ghc.haskell.org/trac/ghc/wiki/NoSubKinds), no binder
+-- can have a representation-polymorphic type. This check ensures
+-- that we respect this rule. It is a bit regrettable that this error
+-- occurs in zonking, after which we should have reported all errors.
+-- But it's hard to see where else to do it, because this can be discovered
+-- only after all solving is done. And, perhaps most importantly, this
+-- isn't really a compositional property of a type system, so it's
+-- not a terrible surprise that the check has to go in an awkward spot.
+ensureNotLevPoly :: Type  -- its zonked type
+                 -> SDoc  -- where this happened
+                 -> TcM ()
+ensureNotLevPoly ty doc
+  = whenNoErrs $   -- sometimes we end up zonking bogus definitions of type
+                   -- forall a. a. See, for example, test ghci/scripts/T9140
+    checkForLevPoly doc ty
+
+  -- See Note [Levity polymorphism checking] in DsMonad
+checkForLevPoly :: SDoc -> Type -> TcM ()
+checkForLevPoly = checkForLevPolyX addErr
+
+checkForLevPolyX :: Monad m
+                 => (SDoc -> m ())  -- how to report an error
+                 -> SDoc -> Type -> m ()
+checkForLevPolyX add_err extra ty
+  | isTypeLevPoly ty
+  = add_err (formatLevPolyErr ty $$ extra)
+  | otherwise
+  = return ()
+
+formatLevPolyErr :: Type  -- levity-polymorphic type
+                 -> SDoc
+formatLevPolyErr ty
+  = hang (text "A levity-polymorphic type is not allowed here:")
+       2 (vcat [ text "Type:" <+> ppr tidy_ty
+               , text "Kind:" <+> ppr tidy_ki ])
+  where
+    (tidy_env, tidy_ty) = tidyOpenType emptyTidyEnv ty
+    tidy_ki             = tidyType tidy_env (typeKind ty)

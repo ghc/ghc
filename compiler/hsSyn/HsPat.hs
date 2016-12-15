@@ -28,8 +28,8 @@ module HsPat (
 
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
-        isUnliftedHsBind, looksLazyPatBind,
-        isUnliftedLPat, isBangedLPat, isBangedPatBind,
+        looksLazyPatBind,
+        isBangedLPat, isBangedPatBind,
         hsPatNeedsParens,
         isIrrefutableHsPat,
 
@@ -555,19 +555,6 @@ patterns are treated specially, of course.
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
 
-isUnliftedLPat :: LPat id -> Bool
-isUnliftedLPat (L _ (ParPat p))             = isUnliftedLPat p
-isUnliftedLPat (L _ (TuplePat _ Unboxed _)) = True
-isUnliftedLPat (L _ (SumPat _ _ _ _))       = True
-isUnliftedLPat _                            = False
-
-isUnliftedHsBind :: HsBind id -> Bool
--- A pattern binding with an outermost bang or unboxed tuple or sum must be
--- matched strictly.
--- Defined in this module because HsPat is above HsBinds in the import graph
-isUnliftedHsBind (PatBind { pat_lhs = p }) = isUnliftedLPat p
-isUnliftedHsBind _                         = False
-
 isBangedPatBind :: HsBind id -> Bool
 isBangedPatBind (PatBind {pat_lhs = pat}) = isBangedLPat pat
 isBangedPatBind _ = False
@@ -582,15 +569,20 @@ looksLazyPatBind :: HsBind id -> Bool
 --     a StrictHsBind (as above) or
 --     a VarPat
 -- In particular, returns True of a pattern binding with a compound pattern, like (I# x)
-looksLazyPatBind (PatBind { pat_lhs = p }) = looksLazyLPat p
-looksLazyPatBind _                         = False
+-- Looks through AbsBinds
+looksLazyPatBind (PatBind { pat_lhs = p })
+  = looksLazyLPat p
+looksLazyPatBind (AbsBinds { abs_binds = binds })
+  = anyBag (looksLazyPatBind . unLoc) binds
+looksLazyPatBind (AbsBindsSig { abs_sig_bind = L _ bind })
+  = looksLazyPatBind bind
+looksLazyPatBind _
+  = False
 
 looksLazyLPat :: LPat id -> Bool
 looksLazyLPat (L _ (ParPat p))             = looksLazyLPat p
 looksLazyLPat (L _ (AsPat _ p))            = looksLazyLPat p
 looksLazyLPat (L _ (BangPat {}))           = False
-looksLazyLPat (L _ (TuplePat _ Unboxed _)) = False
-looksLazyLPat (L _ (SumPat _ _ _ _))       = False
 looksLazyLPat (L _ (VarPat {}))            = False
 looksLazyLPat (L _ (WildPat {}))           = False
 looksLazyLPat _                            = True

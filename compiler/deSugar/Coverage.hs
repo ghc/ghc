@@ -21,6 +21,7 @@ import HsSyn
 import Module
 import Outputable
 import DynFlags
+import ConLike
 import Control.Monad
 import SrcLoc
 import ErrUtils
@@ -509,6 +510,8 @@ addBinTickLHsExpr boxLabel (L pos e0)
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
 addTickHsExpr e@(HsVar (L _ id)) = do freeVar id; return e
 addTickHsExpr (HsUnboundVar {})  = panic "addTickHsExpr.HsUnboundVar"
+addTickHsExpr e@(HsConLikeOut con)
+  | Just id <- conLikeWrapId_maybe con = do freeVar id; return e
 addTickHsExpr e@(HsIPVar _)      = return e
 addTickHsExpr e@(HsOverLit _)    = return e
 addTickHsExpr e@(HsOverLabel _)  = return e

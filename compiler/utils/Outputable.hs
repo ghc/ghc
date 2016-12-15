@@ -205,6 +205,12 @@ data QualifyName   -- Given P:M.T
   | NameNotInScope2      -- It's not in scope at all, and M.T is already bound in
                          -- the current scope, so we must refer to it as "P:M.T"
 
+instance Outputable QualifyName where
+  ppr NameUnqual      = text "NameUnqual"
+  ppr (NameQual _mod) = text "NameQual"  -- can't print the mod without module loops :(
+  ppr NameNotInScope1 = text "NameNotInScope1"
+  ppr NameNotInScope2 = text "NameNotInScope2"
+
 reallyAlwaysQualifyNames :: QueryQualifyName
 reallyAlwaysQualifyNames _ _ = NameNotInScope2
 

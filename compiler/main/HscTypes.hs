@@ -2964,4 +2964,3 @@ nameOfObject other       = pprPanic "nameOfObject" (ppr other)
 byteCodeOfObject :: Unlinked -> CompiledByteCode
 byteCodeOfObject (BCOs bc) = bc
 byteCodeOfObject other     = pprPanic "byteCodeOfObject" (ppr other)
-

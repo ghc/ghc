@@ -44,9 +44,8 @@ If we just say
 then the simple-optimiser that the desugarer runs will eta-reduce to
   unsafeCoerce :: forall (a:*) (b:*). a -> b
   unsafeCoerce = unsafeCoerce#
-And that, sadly, is ill-typed because unsafeCoerce# has OpenKind type variables
-And rightly so, because we shouldn't be calling unsafeCoerce# in a higher
-order way; it has a compulsory unfolding 
+But we shouldn't be calling unsafeCoerce# in a higher
+order way; it has a compulsory unfolding
    unsafeCoerce# a b x = x |> UnsafeCo a b
 and we really rely on it being inlined pronto. But the simple-optimiser doesn't.
 The identity function local_id delays the eta reduction just long enough
@@ -58,5 +57,4 @@ Sigh. This is horrible, but then so is unsafeCoerce.
 unsafeCoerce :: a -> b
 unsafeCoerce x = local_id (unsafeCoerce# x)
   -- See Note [Unsafe coerce magic] in basicTypes/MkId
-  -- NB: Do not eta-reduce this definition, else the type checker 
-  -- give usafeCoerce the same (dangerous) type as unsafeCoerce#
+  -- NB: Do not eta-reduce this definition (see above)

@@ -6,9 +6,9 @@
 Desugaring exporessions.
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, MultiWayIf #-}
 
-module DsExpr ( dsExpr, dsLExpr, dsLocalBinds
+module DsExpr ( dsExpr, dsLExpr, dsLExprNoLP, dsLocalBinds
               , dsValBinds, dsLit, dsSyntaxExpr ) where
 
 #include "HsVersions.h"
@@ -41,6 +41,7 @@ import MkCore
 import DynFlags
 import CostCentre
 import Id
+import MkId
 import Module
 import ConLike
 import DataCon
@@ -65,12 +66,14 @@ import Control.Monad
 ************************************************************************
 -}
 
-dsLocalBinds :: HsLocalBinds Id -> CoreExpr -> DsM CoreExpr
-dsLocalBinds EmptyLocalBinds    body = return body
-dsLocalBinds (HsValBinds binds) body = dsValBinds binds body
-dsLocalBinds (HsIPBinds binds)  body = dsIPBinds  binds body
+dsLocalBinds :: LHsLocalBinds Id -> CoreExpr -> DsM CoreExpr
+dsLocalBinds (L _   EmptyLocalBinds)    body = return body
+dsLocalBinds (L loc (HsValBinds binds)) body = putSrcSpanDs loc $
+                                               dsValBinds binds body
+dsLocalBinds (L _ (HsIPBinds binds))    body = dsIPBinds  binds body
 
 -------------------------
+-- caller sets location
 dsValBinds :: HsValBinds Id -> CoreExpr -> DsM CoreExpr
 dsValBinds (ValBindsOut binds _) body = foldrM ds_val_bind body binds
 dsValBinds (ValBindsIn {})       _    = panic "dsValBinds ValBindsIn"
@@ -89,25 +92,72 @@ dsIPBinds (IPBinds ip_binds ev_binds) body
            return (Let (NonRec n e') body)
 
 -------------------------
+-- caller sets location
 ds_val_bind :: (RecFlag, LHsBinds Id) -> CoreExpr -> DsM CoreExpr
 -- Special case for bindings which bind unlifted variables
 -- We need to do a case right away, rather than building
 -- a tuple and doing selections.
 -- Silently ignore INLINE and SPECIALISE pragmas...
 ds_val_bind (NonRecursive, hsbinds) body
-  | [L loc bind] <- bagToList hsbinds,
+  | [L loc bind] <- bagToList hsbinds
         -- Non-recursive, non-overloaded bindings only come in ones
         -- ToDo: in some bizarre case it's conceivable that there
         --       could be dict binds in the 'binds'.  (See the notes
         --       below.  Then pattern-match would fail.  Urk.)
-    unliftedMatchOnly bind
-  = putSrcSpanDs loc (dsUnliftedBind bind body)
+  , isUnliftedHsBind bind
+  = putSrcSpanDs loc $
+     -- see Note [Strict binds checks] in DsBinds
+    if is_polymorphic bind
+    then errDsCoreExpr (poly_bind_err bind)
+            -- data Ptr a = Ptr Addr#
+            -- f x = let p@(Ptr y) = ... in ...
+            -- Here the binding for 'p' is polymorphic, but does
+            -- not mix with an unlifted binding for 'y'.  You should
+            -- use a bang pattern.  Trac #6078.
+
+    else do { when (looksLazyPatBind bind) $
+              warnIfSetDs Opt_WarnUnbangedStrictPatterns (unlifted_must_be_bang bind)
+        -- Complain about a binding that looks lazy
+        --    e.g.    let I# y = x in ...
+        -- Remember, in checkStrictBinds we are going to do strict
+        -- matching, so (for software engineering reasons) we insist
+        -- that the strictness is manifest on each binding
+        -- However, lone (unboxed) variables are ok
+
+
+            ; dsUnliftedBind bind body }
+  where
+    is_polymorphic (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs })
+                     = not (null tvs && null evs)
+    is_polymorphic (AbsBindsSig { abs_tvs = tvs, abs_ev_vars = evs })
+                     = not (null tvs && null evs)
+    is_polymorphic _ = False
+
+    unlifted_must_be_bang bind
+      = hang (text "Pattern bindings containing unlifted types should use" $$
+              text "an outermost bang pattern:")
+           2 (ppr bind)
+
+    poly_bind_err bind
+      = hang (text "You can't mix polymorphic and unlifted bindings:")
+           2 (ppr bind) $$
+        text "Probable fix: add a type signature"
+
+ds_val_bind (is_rec, binds) _body
+  | anyBag (isUnliftedHsBind . unLoc) binds  -- see Note [Strict binds checks] in DsBinds
+  = ASSERT( isRec is_rec )
+    errDsCoreExpr $
+    hang (text "Recursive bindings for unlifted types aren't allowed:")
+       2 (vcat (map ppr (bagToList binds)))
 
 -- Ordinary case for bindings; none should be unlifted
-ds_val_bind (_is_rec, binds) body
-  = do  { (force_vars,prs) <- dsLHsBinds binds
+ds_val_bind (is_rec, binds) body
+  = do  { MASSERT( isRec is_rec || isSingletonBag binds )
+               -- we should never produce a non-recursive list of multiple binds
+
+        ; (force_vars,prs) <- dsLHsBinds binds
         ; let body' = foldr seqVar body force_vars
-        ; ASSERT2( not (any (isUnliftedType . idType . fst) prs), ppr _is_rec $$ ppr binds )
+        ; ASSERT2( not (any (isUnliftedType . idType . fst) prs), ppr is_rec $$ ppr binds )
           case prs of
             [] -> return body
             _  -> return (Let (Rec prs) body') }
@@ -170,20 +220,6 @@ dsUnliftedBind (PatBind {pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) body
 
 dsUnliftedBind bind body = pprPanic "dsLet: unlifted" (ppr bind $$ ppr body)
 
-----------------------
-unliftedMatchOnly :: HsBind Id -> Bool
-unliftedMatchOnly (AbsBinds { abs_binds = lbinds })
-  = anyBag (unliftedMatchOnly . unLoc) lbinds
-unliftedMatchOnly (AbsBindsSig { abs_sig_bind = L _ bind })
-  = unliftedMatchOnly bind
-unliftedMatchOnly (PatBind { pat_lhs = lpat, pat_rhs_ty = rhs_ty })
-  =  isUnliftedType rhs_ty
-  || isUnliftedLPat lpat
-  || any (isUnliftedType . idType) (collectPatBinders lpat)
-unliftedMatchOnly (FunBind { fun_id = L _ id })
-  = isUnliftedType (idType id)
-unliftedMatchOnly _ = False -- I hope!  Checked immediately by caller in fact
-
 {-
 ************************************************************************
 *                                                                      *
@@ -194,7 +230,26 @@ unliftedMatchOnly _ = False -- I hope!  Checked immediately by caller in fact
 
 dsLExpr :: LHsExpr Id -> DsM CoreExpr
 
-dsLExpr (L loc e) = putSrcSpanDs loc $ dsExpr e
+dsLExpr (L loc e)
+  = putSrcSpanDs loc $
+    do { core_expr <- dsExpr e
+   -- uncomment this check to test the hsExprType function in TcHsSyn
+   --    ; MASSERT2( exprType core_expr `eqType` hsExprType e
+   --              , ppr e <+> dcolon <+> ppr (hsExprType e) $$
+   --                ppr core_expr <+> dcolon <+> ppr (exprType core_expr) )
+       ; return core_expr }
+
+-- | Variant of 'dsLExpr' that ensures that the result is not levity
+-- polymorphic. This should be used when the resulting expression will
+-- be an argument to some other function.
+-- See Note [Levity polymorphism checking] in DsMonad
+-- See Note [Levity polymorphism invariants] in CoreSyn
+dsLExprNoLP :: LHsExpr Id -> DsM CoreExpr
+dsLExprNoLP (L loc e)
+  = putSrcSpanDs loc $
+    do { e' <- dsExpr e
+       ; dsNoLevPolyExpr e' (text "In the type of expression:" <+> ppr e)
+       ; return e' }
 
 dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e)              = dsLExpr e
@@ -202,6 +257,7 @@ dsExpr (ExprWithTySigOut e _) = dsLExpr e
 dsExpr (HsVar (L _ var))      = return (varToCoreExpr var)
                                 -- See Note [Desugaring vars]
 dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
+dsExpr (HsConLikeOut con)     = return (dsConLike con)
 dsExpr (HsIPVar _)            = panic "dsExpr: HsIPVar"
 dsExpr (HsOverLabel _)        = panic "dsExpr: HsOverLabel"
 dsExpr (HsLit lit)            = dsLit lit
@@ -227,7 +283,7 @@ dsExpr (HsLamCase matches)
        ; return $ Lam discrim_var matching_code }
 
 dsExpr e@(HsApp fun arg)
-  = mkCoreAppDs (text "HsApp" <+> ppr e) <$> dsLExpr fun <*> dsLExpr arg
+  = mkCoreAppDs (text "HsApp" <+> ppr e) <$> dsLExpr fun <*> dsLExprNoLP arg
 
 dsExpr (HsAppTypeOut e _)
     -- ignore type arguments here; they're in the wrappers instead at this point
@@ -275,10 +331,10 @@ will sort it out.
 
 dsExpr e@(OpApp e1 op _ e2)
   = -- for the type of y, we need the type of op's 2nd argument
-    mkCoreAppsDs (text "opapp" <+> ppr e) <$> dsLExpr op <*> mapM dsLExpr [e1, e2]
+    mkCoreAppsDs (text "opapp" <+> ppr e) <$> dsLExpr op <*> mapM dsLExprNoLP [e1, e2]
 
 dsExpr (SectionL expr op)       -- Desugar (e !) to ((!) e)
-  = mkCoreAppDs (text "sectionl" <+> ppr expr) <$> dsLExpr op <*> dsLExpr expr
+  = mkCoreAppDs (text "sectionl" <+> ppr expr) <$> dsLExpr op <*> dsLExprNoLP expr
 
 -- dsLExpr (SectionR op expr)   -- \ x -> op x expr
 dsExpr e@(SectionR op expr) = do
@@ -287,8 +343,8 @@ dsExpr e@(SectionR op expr) = do
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
         -- See comment with SectionL
     y_core <- dsLExpr expr
-    x_id <- newSysLocalDs x_ty
-    y_id <- newSysLocalDs y_ty
+    x_id <- newSysLocalDsNoLP x_ty
+    y_id <- newSysLocalDsNoLP y_ty
     return (bindNonRec y_id y_core $
             Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e) core_op [Var x_id, Var y_id]))
 
@@ -296,7 +352,7 @@ dsExpr (ExplicitTuple tup_args boxity)
   = do { let go (lam_vars, args) (L _ (Missing ty))
                     -- For every missing expression, we need
                     -- another lambda in the desugaring.
-               = do { lam_var <- newSysLocalDs ty
+               = do { lam_var <- newSysLocalDsNoLP ty
                     ; return (lam_var : lam_vars, Var lam_var : args) }
              go (lam_vars, args) (L _ (Present expr))
                     -- Expressions that are present don't generate
@@ -338,7 +394,7 @@ dsExpr (HsCase discrim matches)
 
 -- Pepe: The binds are in scope in the body but NOT in the binding group
 --       This is to avoid silliness in breakpoints
-dsExpr (HsLet (L _ binds) body) = do
+dsExpr (HsLet binds body) = do
     body' <- dsLExpr body
     dsLocalBinds binds body'
 
@@ -391,7 +447,7 @@ dsExpr (ExplicitPArr ty []) = do
 dsExpr (ExplicitPArr ty xs) = do
     singletonP <- dsDPHBuiltin singletonPVar
     appP       <- dsDPHBuiltin appPVar
-    xs'        <- mapM dsLExpr xs
+    xs'        <- mapM dsLExprNoLP xs
     let unary  fn x   = mkApps (Var fn) [Type ty, x]
         binary fn x y = mkApps (Var fn) [Type ty, x, y]
 
@@ -404,10 +460,10 @@ dsExpr (ArithSeq expr witness seq)
                    ; dsSyntaxExpr fl [newArithSeq] }
 
 dsExpr (PArrSeq expr (FromTo from to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, to]
+  = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, to]
 
 dsExpr (PArrSeq expr (FromThenTo from thn to))
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
+  = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, thn, to]
 
 dsExpr (PArrSeq _ _)
   = panic "DsExpr.dsExpr: Infinite parallel array!"
@@ -426,7 +482,7 @@ See Note [Grand plan for static forms] in StaticPtrTable for an overview.
 -}
 
 dsExpr (HsStatic _ expr@(L loc _)) = do
-    expr_ds <- dsLExpr expr
+    expr_ds <- dsLExprNoLP expr
     let ty = exprType expr_ds
     makeStaticId <- dsLookupGlobalId makeStaticName
 
@@ -478,7 +534,7 @@ dsExpr (RecordCon { rcon_con_expr = con_expr, rcon_flds = rbinds
              mk_arg (arg_ty, fl)
                = case findField (rec_flds rbinds) (flSelector fl) of
                    (rhs:rhss) -> ASSERT( null rhss )
-                                 dsLExpr rhs
+                                 dsLExprNoLP rhs
                    []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (ppr (flLabel fl))
              unlabelled_bottom arg_ty = mkErrorAppDs rEC_CON_ERROR_ID arg_ty Outputable.empty
 
@@ -592,10 +648,8 @@ dsExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = fields
                                          field_labels arg_ids
                  mk_val_arg fl pat_arg_id
                      = nlHsVar (lookupNameEnv upd_fld_env (flSelector fl) `orElse` pat_arg_id)
-                 -- SAFE: the typechecker will complain if the synonym is
-                 -- not bidirectional
-                 wrap_id = expectJust "dsExpr:mk_alt" (conLikeWrapId_maybe con)
-                 inst_con = noLoc $ HsWrap wrap (HsVar (noLoc wrap_id))
+
+                 inst_con = noLoc $ HsWrap wrap (HsConLikeOut con)
                         -- Reconstruct with the WrapId so that unpacking happens
                  -- The order here is because of the order in `TcPatSyn`.
                  wrap = mkWpEvVarApps theta_vars                                <.>
@@ -702,7 +756,10 @@ dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
        ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
        ; core_res_wrap  <- dsHsWrapper res_wrap
        ; let wrapped_args = zipWith ($) core_arg_wraps arg_exprs
+       ; zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_doc n | n <- [1..] ]
        ; return (core_res_wrap (mkApps fun wrapped_args)) }
+  where
+    mk_doc n = text "In the" <+> speakNth n <+> text "argument of" <+> quotes (ppr expr)
 
 findField :: [LHsRecField Id arg] -> Name -> [arg]
 findField rbinds sel
@@ -774,7 +831,7 @@ dsExplicitList :: Type -> Maybe (SyntaxExpr Id) -> [LHsExpr Id]
 -- See Note [Desugaring explicit lists]
 dsExplicitList elt_ty Nothing xs
   = do { dflags <- getDynFlags
-       ; xs' <- mapM dsLExpr xs
+       ; xs' <- mapM dsLExprNoLP xs
        ; if length xs' > maxBuildLength
                 -- Don't generate builds if the list is very long.
          || length xs' == 0
@@ -795,23 +852,23 @@ dsExplicitList elt_ty (Just fln) xs
 
 dsArithSeq :: PostTcExpr -> (ArithSeqInfo Id) -> DsM CoreExpr
 dsArithSeq expr (From from)
-  = App <$> dsExpr expr <*> dsLExpr from
+  = App <$> dsExpr expr <*> dsLExprNoLP from
 dsArithSeq expr (FromTo from to)
   = do dflags <- getDynFlags
        warnAboutEmptyEnumerations dflags from Nothing to
        expr' <- dsExpr expr
-       from' <- dsLExpr from
-       to'   <- dsLExpr to
+       from' <- dsLExprNoLP from
+       to'   <- dsLExprNoLP to
        return $ mkApps expr' [from', to']
 dsArithSeq expr (FromThen from thn)
-  = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn]
+  = mkApps <$> dsExpr expr <*> mapM dsLExprNoLP [from, thn]
 dsArithSeq expr (FromThenTo from thn to)
   = do dflags <- getDynFlags
        warnAboutEmptyEnumerations dflags from (Just thn) to
        expr' <- dsExpr expr
-       from' <- dsLExpr from
-       thn'  <- dsLExpr thn
-       to'   <- dsLExpr to
+       from' <- dsLExprNoLP from
+       thn'  <- dsLExprNoLP thn
+       to'   <- dsLExprNoLP to
        return $ mkApps expr' [from', thn', to']
 
 {-
@@ -837,7 +894,7 @@ dsDo stmts
            ; rest <- goL stmts
            ; dsSyntaxExpr then_expr [rhs2, rest] }
 
-    go _ (LetStmt (L _ binds)) stmts
+    go _ (LetStmt binds) stmts
       = do { rest <- goL stmts
            ; dsLocalBinds binds rest }
 
@@ -931,6 +988,22 @@ handle_failure pat match fail_op
 mk_fail_msg :: DynFlags -> Located e -> String
 mk_fail_msg dflags pat = "Pattern match failure in do expression at " ++
                          showPpr dflags (getLoc pat)
+
+{-
+************************************************************************
+*                                                                      *
+   Desugaring ConLikes
+*                                                                      *
+************************************************************************
+-}
+
+dsConLike :: ConLike -> CoreExpr
+dsConLike (RealDataCon dc) = Var (dataConWrapId dc)
+dsConLike (PatSynCon ps) = case patSynBuilder ps of
+  Just (id, add_void)
+    | add_void  -> mkCoreApp (text "dsConLike" <+> ppr ps) (Var id) (Var voidPrimId)
+    | otherwise -> Var id
+  _ -> pprPanic "dsConLike" (ppr ps)
 
 {-
 ************************************************************************

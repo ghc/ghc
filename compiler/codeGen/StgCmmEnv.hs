@@ -193,7 +193,4 @@ idToReg :: DynFlags -> NonVoid Id -> LocalReg
 -- about accidental collision
 idToReg dflags (NonVoid id)
              = LocalReg (idUnique id)
-                        (case idPrimRep id of VoidRep -> pprPanic "idToReg" (ppr id)
-                                              _ -> primRepCmmType dflags (idPrimRep id))
-
-
+                        (primRepCmmType dflags (idPrimRep id))

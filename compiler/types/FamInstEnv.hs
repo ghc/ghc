@@ -1234,8 +1234,6 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 --
 -- However, ty' can be something like (Maybe (F ty)), where
 -- (F ty) is a redex.
---
--- Its a bit like Type.repType, but handles type families too
 
 topNormaliseType_maybe env ty
   = topNormaliseTypeX stepper mkTransCo ty

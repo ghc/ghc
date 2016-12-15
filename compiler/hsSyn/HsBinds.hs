@@ -63,6 +63,9 @@ Global bindings (where clauses)
 -- | Haskell Local Bindings
 type HsLocalBinds id = HsLocalBindsLR id id
 
+-- | Located Haskell local bindings
+type LHsLocalBinds id = Located (HsLocalBinds id)
+
 -- | Haskell Local Bindings with separate Left and Right identifier types
 --
 -- Bindings in a 'let' expression
@@ -81,6 +84,8 @@ data HsLocalBindsLR idL idR
 
   | EmptyLocalBinds
       -- ^ Empty Local Bindings
+
+type LHsLocalBindsLR idL idR = Located (HsLocalBindsLR idL idR)
 
 deriving instance (DataId idL, DataId idR)
   => Data (HsLocalBindsLR idL idR)

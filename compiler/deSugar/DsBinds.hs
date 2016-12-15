@@ -58,7 +58,7 @@ import SrcLoc
 import Maybes
 import OrdList
 import Bag
-import BasicTypes hiding ( TopLevel )
+import BasicTypes
 import DynFlags
 import FastString
 import Util
@@ -75,24 +75,42 @@ import Control.Monad
 -- | Desugar top level binds, strict binds are treated like normal
 -- binds since there is no good time to force before first usage.
 dsTopLHsBinds :: LHsBinds Id -> DsM (OrdList (Id,CoreExpr))
-dsTopLHsBinds binds = fmap (toOL . snd) (ds_lhs_binds binds)
+dsTopLHsBinds binds
+     -- see Note [Strict binds checks]
+  | not (isEmptyBag unlifted_binds) || not (isEmptyBag bang_binds)
+  = do { mapBagM_ (top_level_err "bindings for unlifted types") unlifted_binds
+       ; mapBagM_ (top_level_err "strict pattern bindings")    bang_binds
+       ; return nilOL }
+
+  | otherwise
+  = do { (force_vars, prs) <- dsLHsBinds binds
+       ; when debugIsOn $
+         do { xstrict <- xoptM LangExt.Strict
+            ; MASSERT2( null force_vars || xstrict, ppr binds $$ ppr force_vars ) }
+              -- with -XStrict, even top-level vars are listed as force vars.
+
+       ; return (toOL prs) }
+
+  where
+    unlifted_binds = filterBag (isUnliftedHsBind . unLoc) binds
+    bang_binds     = filterBag (isBangedPatBind  . unLoc) binds
+
+    top_level_err desc (L loc bind)
+      = putSrcSpanDs loc $
+        errDs (hang (text "Top-level" <+> text desc <+> text "aren't allowed:")
+                  2 (ppr bind))
+
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
 -- later be forced in the binding gorup body, see Note [Desugar Strict binds]
-dsLHsBinds :: LHsBinds Id
-           -> DsM ([Id], [(Id,CoreExpr)])
-dsLHsBinds binds = do { (force_vars, binds') <- ds_lhs_binds binds
-                      ; return (force_vars, binds') }
-
-------------------------
-
-ds_lhs_binds :: LHsBinds Id -> DsM ([Id], [(Id,CoreExpr)])
-
-ds_lhs_binds binds
-  = do { ds_bs <- mapBagM dsLHsBind binds
+dsLHsBinds :: LHsBinds Id -> DsM ([Id], [(Id,CoreExpr)])
+dsLHsBinds binds
+  = do { MASSERT( allBag (not . isUnliftedHsBind . unLoc) binds )
+       ; ds_bs <- mapBagM dsLHsBind binds
        ; return (foldBag (\(a, a') (b, b') -> (a ++ b, a' ++ b'))
                          id ([], []) ds_bs) }
 
+------------------------
 dsLHsBind :: LHsBind Id
           -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBind (L loc bind) = do dflags <- getDynFlags
@@ -168,7 +186,7 @@ dsHsBind dflags
   = -- See Note [AbsBinds wrappers] in HsBinds
     addDictsDs (toTcTypeBag (listToBag dicts)) $
          -- addDictsDs: push type constraints deeper for pattern match check
-    do { (_, bind_prs) <- ds_lhs_binds binds
+    do { (_, bind_prs) <- dsLHsBinds binds
        ; let core_bind = Rec bind_prs
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; core_wrap <- dsHsWrapper wrap -- Usually the identity
@@ -192,7 +210,7 @@ dsHsBind dflags
          (AbsBinds { abs_tvs = [], abs_ev_vars = []
                    , abs_exports = exports
                    , abs_ev_binds = ev_binds, abs_binds = binds })
-  = do { (force_vars, bind_prs) <- ds_lhs_binds binds
+  = do { (force_vars, bind_prs) <- dsLHsBinds binds
        ; let mk_bind (ABE { abe_wrap = wrap
                           , abe_poly = global
                           , abe_mono = local
@@ -213,7 +231,7 @@ dsHsBind dflags
          -- See Note [Desugaring AbsBinds]
   = addDictsDs (toTcTypeBag (listToBag dicts)) $
          -- addDictsDs: push type constraints deeper for pattern match check
-     do { (local_force_vars, bind_prs) <- ds_lhs_binds binds
+     do { (local_force_vars, bind_prs) <- dsLHsBinds binds
         ; let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
                               | (lcl_id, rhs) <- bind_prs ]
                 -- Monomorphic recursion possible, hence Rec
@@ -589,6 +607,38 @@ tuple `t`, thus:
 
 See https://ghc.haskell.org/trac/ghc/wiki/StrictPragma for a more
 detailed explanation of the desugaring of strict bindings.
+
+Note [Strict binds checks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are several checks around properly formed strict bindings. They
+all link to this Note. These checks must be here in the desugarer because
+we cannot know whether or not a type is unlifted until after zonking, due
+to levity polymorphism. These checks all used to be handled in the typechecker
+in checkStrictBinds (before Jan '17).
+
+We define an "unlifted bind" to be any bind that binds an unlifted id. Note that
+
+  x :: Char
+  (# True, x #) = blah
+
+is *not* an unlifted bind. Unlifted binds are detected by HsUtils.isUnliftedHsBind.
+
+Define a "banged bind" to have a top-level bang. Detected by HsPat.isBangedPatBind.
+Define a "strict bind" to be either an unlifted bind or a banged bind.
+
+The restrictions are:
+  1. Strict binds may not be top-level. Checked in dsTopLHsBinds.
+
+  2. Unlifted binds must also be banged. (There is no trouble to compile an unbanged
+     unlifted bind, but an unbanged bind looks lazy, and we don't want users to be
+     surprised by the strictness of an unlifted bind.) Checked in first clause
+     of DsExpr.ds_val_bind.
+
+  3. Unlifted binds may not have polymorphism (#6078). (That is, no quantified type
+     variables or constraints.) Checked in first clause
+     of DsExpr.ds_val_bind.
+
+  4. Unlifted binds may not be recursive. Checked in second clause of ds_val_bind.
 
 -}
 
@@ -1056,11 +1106,16 @@ dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
 dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; return (w1 . w2) }
-dsHsWrapper (WpFun c1 c2 t1)  = do { x  <- newSysLocalDs t1
+ -- See comments on WpFun in TcEvidence for an explanation of what
+ -- the specification of this clause is
+dsHsWrapper (WpFun c1 c2 t1 doc)
+                              = do { x  <- newSysLocalDsNoLP t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
-                                   ; return (\e -> Lam x (w2 (app e (w1 (Var x))))) }
+                                         arg     = w1 (Var x)
+                                   ; dsNoLevPolyExpr arg doc
+                                   ; return (\e -> (Lam x (w2 (app e arg)))) }
 dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
                                 return $ \e -> mkCastDs e co
 dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
@@ -1106,6 +1161,8 @@ dsEvTerm (EvCast tm co)
 dsEvTerm (EvDFunApp df tys tms)
   = do { tms' <- mapM dsEvTerm tms
        ; return $ Var df `mkTyApps` tys `mkApps` tms' }
+  -- The use of mkApps here is OK vis-a-vis levity polymorphism because
+  -- the terms are always evidence variables with types of kind Constraint
 
 dsEvTerm (EvCoercion co) = return (Coercion co)
 dsEvTerm (EvSuperClass d n)

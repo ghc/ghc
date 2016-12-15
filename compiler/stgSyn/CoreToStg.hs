@@ -472,16 +472,25 @@ coreToStgExpr (Let bind body) = do
 coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
 
 mkStgAltType :: Id -> [CoreAlt] -> AltType
-mkStgAltType bndr alts = case repType (idType bndr) of
-    UnaryRep rep_ty -> case tyConAppTyCon_maybe rep_ty of
-        Just tc | isUnliftedTyCon tc -> PrimAlt tc
-                | isAbstractTyCon tc -> look_for_better_tycon
-                | isAlgTyCon tc      -> AlgAlt tc
-                | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
-                                        PolyAlt
-        Nothing                      -> PolyAlt
-    MultiRep slots -> MultiValAlt (length slots)
+mkStgAltType bndr alts
+  | isUnboxedTupleType bndr_ty || isUnboxedSumType bndr_ty
+  = MultiValAlt (length prim_reps)  -- always use MultiValAlt for unboxed tuples
+
+  | otherwise
+  = case prim_reps of
+      [LiftedRep] -> case tyConAppTyCon_maybe (unwrapType bndr_ty) of
+        Just tc
+          | isAbstractTyCon tc -> look_for_better_tycon
+          | isAlgTyCon tc      -> AlgAlt tc
+          | otherwise          -> ASSERT2( _is_poly_alt_tycon tc, ppr tc )
+                                  PolyAlt
+        Nothing                -> PolyAlt
+      [unlifted] -> PrimAlt unlifted
+      not_unary  -> MultiValAlt (length not_unary)
   where
+   bndr_ty   = idType bndr
+   prim_reps = typePrimRep bndr_ty
+
    _is_poly_alt_tycon tc
         =  isFunTyCon tc
         || isPrimTyCon tc   -- "Any" is lifted but primitive
@@ -650,8 +659,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
         arg_ty = exprType arg
         stg_arg_ty = stgArgType stg_arg
         bad_args = (isUnliftedType arg_ty && not (isUnliftedType stg_arg_ty))
-                || (map typePrimRep (repTypeArgs arg_ty)
-                        /= map typePrimRep (repTypeArgs stg_arg_ty))
+                || (typePrimRep arg_ty /= typePrimRep stg_arg_ty)
         -- In GHCi we coerce an argument of type BCO# (unlifted) to HValue (lifted),
         -- and pass it to a function expecting an HValue (arg_ty).  This is ok because
         -- we can treat an unlifted value as lifted.  But the other way round
@@ -802,7 +810,8 @@ mkStgRhs' con_updateable rhs_fvs bndr binder_info rhs
   | StgConApp con args _ <- unticked_rhs
   , not (con_updateable con args)
   = -- CorePrep does this right, but just to make sure
-    ASSERT(not (isUnboxedTupleCon con || isUnboxedSumCon con))
+    ASSERT2( not (isUnboxedTupleCon con || isUnboxedSumCon con)
+           , ppr bndr $$ ppr con $$ ppr args)
     StgRhsCon noCCS con args
   | otherwise
   = StgRhsClosure noCCS binder_info

@@ -15,7 +15,7 @@ The "tc" prefix is for "TypeChecker", because the type checker
 is the principal client.
 -}
 
-{-# LANGUAGE CPP, MultiWayIf #-}
+{-# LANGUAGE CPP, MultiWayIf, FlexibleContexts #-}
 
 module TcType (
   --------------------------------
@@ -60,7 +60,8 @@ module TcType (
   tcSplitForAllTy_maybe,
   tcSplitForAllTys, tcSplitPiTys, tcSplitForAllTyVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
-  tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
+  tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
+  tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcRepSplitTyConApp_maybe,
   tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
@@ -142,7 +143,7 @@ module TcType (
   mkClassPred,
   isDictLikeTy,
   tcSplitDFunTy, tcSplitDFunHead, tcSplitMethodTy,
-  isRuntimeRepVar, isLevityPolymorphic,
+  isRuntimeRepVar, isKindLevPoly,
   isVisibleBinder, isInvisibleBinder,
 
   -- Type substitutions
@@ -172,6 +173,7 @@ module TcType (
   tyCoFVsOfType, tyCoFVsOfTypes,
   tyCoVarsOfTypeDSet, tyCoVarsOfTypesDSet, closeOverKindsDSet,
   tyCoVarsOfTypeList, tyCoVarsOfTypesList,
+  noFreeVarsOfType,
 
   --------------------------------
   -- Transforming Types to TcTypes
@@ -198,7 +200,7 @@ import ForeignCall
 import VarSet
 import Coercion
 import Type
-import RepType (tyConPrimRep)
+import RepType
 import TyCon
 
 -- others:
@@ -1398,7 +1400,7 @@ tcSplitFunTy_maybe _                                    = Nothing
 tcSplitFunTysN :: Arity                      -- N: Number of desired args
                -> TcRhoType
                -> Either Arity               -- Number of missing arrows
-                        ([TcSigmaType],      -- Arg types (N or fewer)
+                        ([TcSigmaType],      -- Arg types (always N types)
                          TcSigmaType)        -- The rest of the type
 -- ^ Split off exactly the specified number argument types
 -- Returns
@@ -1422,6 +1424,14 @@ tcFunArgTy    ty = fst (tcSplitFunTy ty)
 
 tcFunResultTy :: Type -> Type
 tcFunResultTy ty = snd (tcSplitFunTy ty)
+
+-- | Strips off n *visible* arguments and returns the resulting type
+tcFunResultTyN :: HasDebugCallStack => Arity -> Type -> Type
+tcFunResultTyN n ty
+  | Right (_, res_ty) <- tcSplitFunTysN n ty
+  = res_ty
+  | otherwise
+  = pprPanic "tcFunResultTyN" (ppr n <+> ppr ty)
 
 -----------------------
 tcSplitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -2279,7 +2289,7 @@ marshalableTyCon :: DynFlags -> TyCon -> Validity
 marshalableTyCon dflags tc
   | isUnliftedTyCon tc
   , not (isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc)
-  , tyConPrimRep tc /= VoidRep -- Note [Marshalling VoidRep]
+  , not (null (tyConPrimRep tc)) -- Note [Marshalling void]
   = validIfUnliftedFFITypes dflags
   | otherwise
   = boxedMarshalableTyCon tc
@@ -2317,7 +2327,7 @@ legalFIPrimResultTyCon :: DynFlags -> TyCon -> Validity
 legalFIPrimResultTyCon dflags tc
   | isUnliftedTyCon tc
   , isUnboxedTupleTyCon tc || isUnboxedSumTyCon tc
-     || tyConPrimRep tc /= VoidRep   -- Note [Marshalling VoidRep]
+     || not (null (tyConPrimRep tc))   -- Note [Marshalling void]
   = validIfUnliftedFFITypes dflags
 
   | otherwise
@@ -2332,8 +2342,8 @@ validIfUnliftedFFITypes dflags
   | otherwise = NotValid (text "To marshal unlifted types, use UnliftedFFITypes")
 
 {-
-Note [Marshalling VoidRep]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Marshalling void]
+~~~~~~~~~~~~~~~~~~~~~~~
 We don't treat State# (whose PrimRep is VoidRep) as marshalable.
 In turn that means you can't write
         foreign import foo :: Int -> State# RealWorld

@@ -1,4 +1,5 @@
 {-# LANGUAGE PatternSynonyms, MagicHash #-}
+{-# OPTIONS_GHC -Wunbanged-strict-patterns -Werror=unbanged-strict-patterns #-}
 module ShouldFail where
 
 import GHC.Base

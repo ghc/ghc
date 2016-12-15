@@ -404,6 +404,9 @@ For example
   \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
 is illegal because x's type has kind (TYPE r), which has 'r' free.
 
+See Note [Levity polymorphism checking] in DsMonad to see where these
+invariants are established for user-written code.
+
 Note [CoreSyn let goal]
 ~~~~~~~~~~~~~~~~~~~~~~~
 * The simplifier tries to ensure that if the RHS of a let is a constructor

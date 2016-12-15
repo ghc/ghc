@@ -47,7 +47,6 @@ import VarSet
 import Util
 import Outputable
 import qualified GHC.LanguageExtensions as LangExt
-import Control.Monad
 import Control.Arrow  ( second )
 import ListSetOps ( getNth )
 
@@ -336,7 +335,7 @@ tc_pat penv (BangPat pat) pat_ty thing_inside
   = do  { (pat', res) <- tc_lpat pat pat_ty penv thing_inside
         ; return (BangPat pat', res) }
 
-tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
+tc_pat penv (LazyPat pat) pat_ty thing_inside
   = do  { (pat', (res, pat_ct))
                 <- tc_lpat pat pat_ty (makeLazy penv) $
                    captureConstraints thing_inside
@@ -345,18 +344,6 @@ tc_pat penv lpat@(LazyPat pat) pat_ty thing_inside
         ; emitConstraints pat_ct
         -- captureConstraints/extendConstraints:
         --   see Note [Hopping the LIE in lazy patterns]
-
-        -- Check there are no unlifted types under the lazy pattern
-        -- This is a very unsatisfactory test.  We have to zonk because
-        -- the binder-tys are typically just a unification variable,
-        -- which should by now have been unified... but it might be
-        -- deferred for the constraint solver...Ugh!  Also
-        -- collecting the pattern binders again is not very cool.
-        -- But it's all very much a corner case: a lazy pattern with
-        -- unboxed types inside it
-        ; bndr_tys <- mapM (zonkTcType . idType) (collectPatBinders pat')
-        ; when (any isUnliftedType bndr_tys)
-               (lazyUnliftedPatErr lpat)
 
         -- Check that the expected pattern type is itself lifted
         ; pat_ty <- readExpType pat_ty
@@ -406,10 +393,11 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
 
         ; overall_pat_ty <- readExpType overall_pat_ty
         ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
-                                    overall_pat_ty inf_res_ty
+                                    overall_pat_ty inf_res_ty doc
                -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
                --                (overall_pat_ty -> inf_res_ty)
               expr_wrap = expr_wrap2' <.> expr_wrap1
+              doc = text "When checking the view pattern function:" <+> (ppr expr)
         ; return (ViewPat (mkLHsWrap expr_wrap expr') pat' overall_pat_ty, res) }
 
 -- Type signatures in patterns
@@ -1185,9 +1173,3 @@ polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
   = hang (text "Illegal polymorphic type signature in pattern:")
        2 (ppr sig_ty)
-
-lazyUnliftedPatErr :: (OutputableBndrId name) => Pat name -> TcM ()
-lazyUnliftedPatErr pat
-  = failWithTc $
-    hang (text "A lazy (~) pattern cannot contain unlifted types:")
-       2 (ppr pat)

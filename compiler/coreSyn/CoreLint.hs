@@ -795,6 +795,12 @@ lintCoreArg fun_ty (Type arg_ty)
 
 lintCoreArg fun_ty arg
   = do { arg_ty <- lintCoreExpr arg
+           -- See Note [Levity polymorphism invariants] in CoreSyn
+       ; lintL (not (isTypeLevPoly arg_ty))
+           (text "Levity-polymorphic argument:" <+>
+             (ppr arg <+> dcolon <+> parens (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))))
+          -- check for levity polymorphism first, because otherwise isUnliftedType panics
+
        ; checkL (not (isUnliftedType arg_ty) || exprOkForSpeculation arg)
                 (mkLetAppMsg arg)
        ; lintValApp arg fun_ty arg_ty }
@@ -1028,10 +1034,9 @@ lintIdBndr top_lvl id linterF
            (mkNonTopExternalNameMsg id)
 
        ; (ty, k) <- lintInTy (idType id)
-
-       -- Check for levity polymorphism
-       ; lintL (not (isLevityPolymorphic k))
-           (text "RuntimeRep-polymorphic binder:" <+>
+          -- See Note [Levity polymorphism invariants] in CoreSyn
+       ; lintL (not (isKindLevPoly k))
+           (text "Levity-polymorphic binder:" <+>
                  (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
 
        ; let id' = setIdType id ty
@@ -1085,7 +1090,7 @@ lintType ty@(TyConApp tc tys)
   = lintType ty'   -- Expand type synonyms, so that we do not bogusly complain
                    --  about un-saturated type synonyms
 
-  | isUnliftedTyCon tc || isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
+  | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
        -- Also type synonyms and type families
   , length tys < tyConArity tc
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
@@ -1128,7 +1133,7 @@ lintKind :: OutKind -> LintM ()
 -- If you edit this function, you may need to update the GHC formalism
 -- See Note [GHC Formalism]
 lintKind k = do { sk <- lintType k
-                ; unless ((isStarKind sk) || (isUnliftedTypeKind sk))
+                ; unless (classifiesTypeWithValues sk)
                          (addErrL (hang (text "Ill-kinded kind:" <+> ppr k)
                                       2 (text "has kind:" <+> ppr sk))) }
 
@@ -1398,15 +1403,17 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
                      2 (vcat [ text "From:" <+> ppr ty1
                              , text "  To:" <+> ppr ty2])
      isUnBoxed :: PrimRep -> Bool
-     isUnBoxed PtrRep = False
-     isUnBoxed _      = True
+     isUnBoxed = not . isGcPtrRep
+
+       -- see #9122 for discussion of these checks
      checkTypes t1 t2
-       = case (repType t1, repType t2) of
-           (UnaryRep _, UnaryRep _) ->
-              validateCoercion (typePrimRep t1) (typePrimRep t2)
-           (MultiRep rep1, MultiRep rep2) ->
-              checkWarnL (rep1 == rep2) (report "multi values with different reps")
-           _  -> addWarnL (report "multi rep and unary rep")
+       = do { checkWarnL (reps1 `equalLength` reps2)
+                         (report "values with different # of reps")
+            ; zipWithM_ validateCoercion reps1 reps2 }
+       where
+         reps1 = typePrimRep t1
+         reps2 = typePrimRep t2
+
      validateCoercion :: PrimRep -> PrimRep -> LintM ()
      validateCoercion rep1 rep2
        = do { dflags <- getDynFlags

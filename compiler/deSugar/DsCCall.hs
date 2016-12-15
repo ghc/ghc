@@ -84,6 +84,7 @@ follows:
 
 dsCCall :: CLabelString -- C routine to invoke
         -> [CoreExpr]   -- Arguments (desugared)
+                        -- Precondition: none have levity-polymorphic types
         -> Safety       -- Safety of the call
         -> Type         -- Type of the result: IO t
         -> DsM CoreExpr -- Result, of type ???
@@ -122,13 +123,15 @@ mkFCall dflags uniq the_fcall val_args res_ty
     ty      = mkInvForAllTys tyvars body_ty
     the_fcall_id = mkFCallId dflags uniq the_fcall ty
 
-unboxArg :: CoreExpr                    -- The supplied argument
+unboxArg :: CoreExpr                    -- The supplied argument, not levity-polymorphic
          -> DsM (CoreExpr,              -- To pass as the actual argument
                  CoreExpr -> CoreExpr   -- Wrapper to unbox the arg
                 )
 -- Example: if the arg is e::Int, unboxArg will return
 --      (x#::Int#, \W. case x of I# x# -> W)
 -- where W is a CoreExpr that probably mentions x#
+
+-- always returns a non-levity-polymorphic expression
 
 unboxArg arg
   -- Primtive types: nothing to unbox

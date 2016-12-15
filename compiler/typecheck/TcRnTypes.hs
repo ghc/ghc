@@ -3083,6 +3083,7 @@ ctoHerald = text "arising from"
 exprCtOrigin :: HsExpr Name -> CtOrigin
 exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
+exprCtOrigin (HsConLikeOut {})  = panic "exprCtOrigin HsConLikeOut"
 exprCtOrigin (HsRecFld f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
 exprCtOrigin (HsOverLabel l)    = OverLabelOrigin l
 exprCtOrigin (HsIPVar ip)       = IPOccOrigin ip

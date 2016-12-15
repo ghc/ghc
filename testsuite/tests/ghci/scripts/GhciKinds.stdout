@@ -10,4 +10,8 @@ F (Maybe Bool) :: *
 forall a. F (Maybe a) :: *
 = Char
 $(unboxedTupleT 2) :: forall (k0 :: RuntimeRep) (k1 :: RuntimeRep).
-                      TYPE k0 -> TYPE k1 -> TYPE 'UnboxedTupleRep
+                      TYPE k0
+                      -> TYPE k1
+                      -> TYPE
+                           ('TupleRep
+                              ((':) RuntimeRep k0 ((':) RuntimeRep k1 ('[] RuntimeRep))))

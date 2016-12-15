@@ -42,6 +42,7 @@ import TcEvidence
 import TyCon
 import CoAxiom
 import DataCon
+import ConLike
 import Class
 import Var
 import VarEnv
@@ -835,7 +836,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                      --    con_app_tys  = MkD ty1 ty2
                      --    con_app_scs  = MkD ty1 ty2 sc1 sc2
                      --    con_app_args = MkD ty1 ty2 sc1 sc2 op1 op2
-             con_app_tys  = wrapId (mkWpTyApps inst_tys) (dataConWrapId dict_constr)
+             con_app_tys  = mkHsWrap (mkWpTyApps inst_tys)
+                                     (HsConLikeOut (RealDataCon dict_constr))
                        -- NB: We *can* have covars in inst_tys, in the case of
                        -- promoted GADT constructors.
 
@@ -892,6 +894,8 @@ addDFunPrags dfun_id sc_meth_ids
  where
    con_app    = mkLams dfun_bndrs $
                 mkApps (Var (dataConWrapId dict_con)) dict_args
+                 -- mkApps is OK because of the checkForLevPoly call in checkValidClass
+                 -- See Note [Levity polymorphism checking] in DsMonad
    dict_args  = map Type inst_tys ++
                 [mkVarApps (Var id) dfun_bndrs | id <- sc_meth_ids]
 

@@ -175,8 +175,9 @@ There are some restrictions on the use of primitive types:
    binding.
 
 -  You may bind unboxed variables in a (non-recursive, non-top-level)
-   pattern binding, but you must make any such pattern-match strict. For
-   example, rather than:
+   pattern binding, but you must make any such pattern-match strict.
+   (Failing to do so emits a warning :ghc-flag:`-Wunbanged-strict-patterns`.)
+   For example, rather than:
 
    ::
 
@@ -226,10 +227,6 @@ In particular, the ``IO`` and ``ST`` monads use unboxed tuples to avoid
 unnecessary allocation during sequences of operations.
 
 There are some restrictions on the use of unboxed tuples:
-
--  Values of unboxed tuple types are subject to the same restrictions as
-   other unboxed types; i.e. they may not be stored in polymorphic data
-   structures or passed to polymorphic functions.
 
 -  The typical use of unboxed tuples is simply to return multiple
    values, binding those multiple results with a ``case`` expression,
@@ -8015,47 +8012,42 @@ these flags, especially :ghc-flag:`-fprint-explicit-kinds`.
 
 .. index::
    single: TYPE
-   single: representation polymorphism
+   single: levity polymorphism
 
 .. _runtime-rep:
 
-Runtime representation polymorphism
-===================================
+Levity polymorphism
+===================
 
 In order to allow full flexibility in how kinds are used, it is necessary
 to use the kind system to differentiate between boxed, lifted types
 (normal, everyday types like ``Int`` and ``[Bool]``) and unboxed, primitive
-types (:ref:`primitives`) like ``Int#``. We thus have so-called representation
+types (:ref:`primitives`) like ``Int#``. We thus have so-called levity
 polymorphism.
-
-.. note::
-   For quite some time, this idea was known as *levity* polymorphism, when
-   it differentiated between only lifted and unlifted types. Now that it
-   differentiates between any runtime representations, the name has been
-   changed. But anything you've read or heard about levity polymorphism
-   likely applies to the story told here -- this is just a small generalisation.
 
 Here are the key definitions, all available from ``GHC.Exts``: ::
 
   TYPE :: RuntimeRep -> *   -- highly magical, built into GHC
 
-  data RuntimeRep = PtrRepLifted     -- for things like `Int`
-                  | PtrRepUnlifted   -- for things like `Array#`
-                  | IntRep           -- for things like `Int#`
+  data RuntimeRep = LiftedRep     -- for things like `Int`
+                  | UnliftedRep   -- for things like `Array#`
+                  | IntRep        -- for `Int#`
+		  | TupleRep [RuntimeRep]  -- unboxed tuples, indexed by the representations of the elements
+		  | SumRep [RuntimeRep]    -- unboxed sums, indexed by the representations of the disjuncts
                   | ...
 
-  type * = TYPE PtrRepLifted    -- * is just an ordinary type synonym
+  type * = TYPE LiftedRep    -- * is just an ordinary type synonym
 
 The idea is that we have a new fundamental type constant ``TYPE``, which
 is parameterised by a ``RuntimeRep``. We thus get ``Int# :: TYPE 'IntRep``
-and ``Bool :: TYPE 'PtrRepLifted``. Anything with a type of the form
+and ``Bool :: TYPE 'LiftedRep``. Anything with a type of the form
 ``TYPE x`` can appear to either side of a function arrow ``->``. We can
 thus say that ``->`` has type
-``TYPE r1 -> TYPE r2 -> TYPE 'PtrRepLifted``. The result is always lifted
+``TYPE r1 -> TYPE r2 -> TYPE 'LiftedRep``. The result is always lifted
 because all functions are lifted in GHC.
 
-No representation-polymorphic variables
----------------------------------------
+No levity-polymorphic variables or arguments
+--------------------------------------------
 
 If GHC didn't have to compile programs that run in the real world, that
 would be the end of the story. But representation polymorphism can cause
@@ -8072,10 +8064,10 @@ In particular, when we call ``bad``, we must somehow pass ``x`` into
 ``bad``. How wide (that is, how many bits) is ``x``? Is it a pointer?
 What kind of register (floating-point or integral) should ``x`` go in?
 It's all impossible to say, because ``x``'s type, ``TYPE r2`` is
-representation polymorphic. We thus forbid such constructions, via the
+levity polymorphic. We thus forbid such constructions, via the
 following straightforward rule:
 
-    No variable may have a representation-polymorphic type.
+    No variable may have a levity-polymorphic type.
 
 This eliminates ``bad`` because the variable ``x`` would have a
 representation-polymorphic type.
@@ -8086,15 +8078,20 @@ However, not all is lost. We can still do this: ::
          (a -> b) -> a -> b
   f $ x = f x
 
-Here, only ``b`` is representation polymorphic. There are no variables
-with a representation polymorphic type. And the code generator has no
+Here, only ``b`` is levity polymorphic. There are no variables
+with a levity-polymorphic type. And the code generator has no
 trouble with this. Indeed, this is the true type of GHC's ``$`` operator,
 slightly more general than the Haskell 98 version.
 
-Representation-polymorphic bottoms
-----------------------------------
+Because the code generator must store and move arguments as well
+as variables, the logic above applies equally well to function arguments,
+which may not be levity-polymorphic.
+  
 
-We can use representation polymorphism to good effect with ``error``
+Levity-polymorphic bottoms
+--------------------------
+
+We can use levity polymorphism to good effect with ``error``
 and ``undefined``, whose types are given here: ::
 
   undefined :: forall (r :: RuntimeRep) (a :: TYPE r).
@@ -8102,25 +8099,25 @@ and ``undefined``, whose types are given here: ::
   error :: forall (r :: RuntimeRep) (a :: TYPE r).
            HasCallStack => String -> a
 
-These functions do not bind a representation-polymorphic variable, and
+These functions do not bind a levity-polymorphic variable, and
 so are accepted. Their polymorphism allows users to use these to conveniently
 stub out functions that return unboxed types.
 
-Printing representation-polymorphic types
------------------------------------------
+Printing levity-polymorphic types
+---------------------------------
 
 .. ghc-flag:: -Wprint-explicit-runtime-rep
 
   Print ``RuntimeRep`` parameters as they appear; otherwise, they are
-  defaulted to ``'PtrRepLifted``.
+  defaulted to ``'LiftedRep``.
 
-Most GHC users will not need to worry about representation polymorphism
-or unboxed types. For these users, see the representation polymorphism
+Most GHC users will not need to worry about levity polymorphism
+or unboxed types. For these users, seeing the levity polymorphism
 in the type of ``$`` is unhelpful. And thus, by default, it is suppressed,
-by supposing all type variables of type ``RuntimeType`` to be ``'PtrRepLifted``
-when printing, and printing ``TYPE 'PtrRepLifted`` as ``*``.
+by supposing all type variables of type ``RuntimeRep`` to be ``'LiftedRep``
+when printing, and printing ``TYPE 'LiftedRep`` as ``*``.
 
-Should you wish to see representation polymorphism in your types, enable
+Should you wish to see levity polymorphism in your types, enable
 the flag :ghc-flag:`-fprint-explicit-runtime-reps`.
 
 .. _type-level-literals:

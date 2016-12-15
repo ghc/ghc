@@ -321,7 +321,7 @@ collect (_, e) = go [] e
   where
     go xs e | Just e' <- bcView e = go xs e'
     go xs (AnnLam x (_,e))
-      | repTypeArgs (idType x) `lengthExceeds` 1
+      | typePrimRep (idType x) `lengthExceeds` 1
       = multiValException
       | otherwise
       = go (x:xs) e
@@ -551,8 +551,6 @@ schemeE d s p (AnnCase (_,scrut) _ _ []) = schemeE d s p scrut
 
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
    | isUnboxedTupleCon dc -- handles pairs with one void argument (e.g. state token)
-   , [rep_ty1] <- repTypeArgs (idType bind1)
-   , [rep_ty2] <- repTypeArgs (idType bind2)
         -- Convert
         --      case .... of x { (# V'd-thing, a #) -> ... }
         -- to
@@ -561,23 +559,25 @@ schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1, bind2], rhs)])
         --
         -- Note that it does not matter losing the void-rep thing from the
         -- envt (it won't be bound now) because we never look such things up.
-   , Just res <- case () of
-                   _ | isVoidTy rep_ty1 && not (isVoidTy rep_ty2)
+   , Just res <- case (typePrimRep (idType bind1), typePrimRep (idType bind2)) of
+                   ([], [_])
                      -> Just $ doCase d s p scrut bind2 [(DEFAULT, [], rhs)] (Just bndr)
-                     | isVoidTy rep_ty2 && not (isVoidTy rep_ty1)
+                   ([_], [])
                      -> Just $ doCase d s p scrut bind1 [(DEFAULT, [], rhs)] (Just bndr)
-                     | otherwise
-                     -> Nothing
+                   _ -> Nothing
    = res
 
 schemeE d s p (AnnCase scrut bndr _ [(DataAlt dc, [bind1], rhs)])
    | isUnboxedTupleCon dc
-   , repTypeArgs (idType bndr) `lengthIs` 1 -- handles unit tuples
+   , length (typePrimRep (idType bndr)) <= 1 -- handles unit tuples
    = doCase d s p scrut bind1 [(DEFAULT, [], rhs)] (Just bndr)
 
 schemeE d s p (AnnCase scrut bndr _ alt@[(DEFAULT, [], _)])
    | isUnboxedTupleType (idType bndr)
-   , [ty] <- repTypeArgs (idType bndr)
+   , Just ty <- case typePrimRep (idType bndr) of
+       [_]  -> Just (unwrapType (idType bndr))
+       []   -> Just voidPrimTy
+       _    -> Nothing
        -- handles any pattern with a single non-void binder; in particular I/O
        -- monad returns (# RealWorld#, a #)
    = doCase d s p scrut (bndr `setIdType` ty) alt (Just bndr)
@@ -793,7 +793,7 @@ doCase  :: Word -> Sequel -> BCEnv
         -> Maybe Id  -- Just x <=> is an unboxed tuple case with scrut binder, don't enter the result
         -> BcM BCInstrList
 doCase d s p (_,scrut) bndr alts is_unboxed_tuple
-  | repTypeArgs (idType bndr) `lengthExceeds` 1
+  | typePrimRep (idType bndr) `lengthExceeds` 1
   = multiValException
   | otherwise
   = do
@@ -970,7 +970,7 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
 
          pargs _ [] = return []
          pargs d (a:az)
-            = let [arg_ty] = repTypeArgs (exprType (deAnnotate' a))
+            = let arg_ty = unwrapType (exprType (deAnnotate' a))
 
               in case tyConAppTyCon_maybe arg_ty of
                     -- Don't push the FO; instead push the Addr# it
@@ -1195,24 +1195,22 @@ maybe_getCCallReturnRep :: Type -> Maybe PrimRep
 maybe_getCCallReturnRep fn_ty
    = let
        (_a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
-       r_reps = repTypeArgs r_ty
+       r_reps = typePrimRepArgs r_ty
 
        blargh :: a -- Used at more than one type
        blargh = pprPanic "maybe_getCCallReturn: can't handle:"
                          (pprType fn_ty)
      in
        case r_reps of
-         [] -> panic "empty repTypeArgs"
-         [ty]
-           | typePrimRep ty == PtrRep
-            -> blargh
-           | isVoidTy ty
-            -> Nothing
-           | otherwise
-            -> Just (typePrimRep ty)
+         []            -> panic "empty typePrimRepArgs"
+         [VoidRep]     -> Nothing
+         [rep]
+           | isGcPtrRep rep -> blargh
+           | otherwise      -> Just rep
+
                  -- if it was, it would be impossible to create a
                  -- valid return value placeholder on the stack
-         _  -> blargh
+         _             -> blargh
 
 maybe_is_tagToEnum_call :: AnnExpr' Id DVarSet -> Maybe (AnnExpr' Id DVarSet, [Name])
 -- Detect and extract relevant info for the tagToEnum kludge.
@@ -1224,7 +1222,7 @@ maybe_is_tagToEnum_call app
   = Nothing
   where
     extract_constr_Names ty
-           | [rep_ty] <- repTypeArgs ty
+           | rep_ty <- unwrapType ty
            , Just tyc <- tyConAppTyCon_maybe rep_ty
            , isDataTyCon tyc
            = map (getName . dataConWorkId) (tyConDataCons tyc)
@@ -1331,8 +1329,7 @@ pushAtom d p (AnnCase (_, a) _ _ []) -- trac #12128
    = pushAtom d p a
 
 pushAtom d p (AnnVar v)
-   | [rep_ty] <- repTypeArgs (idType v)
-   , V <- typeArgRep rep_ty
+   | [] <- typePrimRep (idType v)
    = return (nilOL, 0)
 
    | isFCallId v
@@ -1542,7 +1539,11 @@ bcIdArgRep :: Id -> ArgRep
 bcIdArgRep = toArgRep . bcIdPrimRep
 
 bcIdPrimRep :: Id -> PrimRep
-bcIdPrimRep = typePrimRep . bcIdUnaryType
+bcIdPrimRep id
+  | [rep] <- typePrimRepArgs (idType id)
+  = rep
+  | otherwise
+  = pprPanic "bcIdPrimRep" (ppr id <+> dcolon <+> ppr (idType id))
 
 isFollowableArg :: ArgRep -> Bool
 isFollowableArg P = True
@@ -1551,11 +1552,6 @@ isFollowableArg _ = False
 isVoidArg :: ArgRep -> Bool
 isVoidArg V = True
 isVoidArg _ = False
-
-bcIdUnaryType :: Id -> UnaryType
-bcIdUnaryType x = case repTypeArgs (idType x) of
-    [rep_ty] -> rep_ty
-    _ -> pprPanic "bcIdUnaryType" (ppr x $$ ppr (idType x))
 
 -- See bug #1257
 multiValException :: a
@@ -1625,12 +1621,12 @@ isVAtom _                     = False
 atomPrimRep :: AnnExpr' Id ann -> PrimRep
 atomPrimRep e | Just e' <- bcView e = atomPrimRep e'
 atomPrimRep (AnnVar v)              = bcIdPrimRep v
-atomPrimRep (AnnLit l)              = typePrimRep (literalType l)
+atomPrimRep (AnnLit l)              = typePrimRep1 (literalType l)
 
 -- Trac #12128:
 -- A case expresssion can be an atom because empty cases evaluate to bottom.
 -- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
-atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == PtrRep) PtrRep
+atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == [LiftedRep]) LiftedRep
 atomPrimRep (AnnCoercion {})        = VoidRep
 atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate' other))
 
@@ -1648,7 +1644,7 @@ mkStackOffsets original_depth szsw
    = map (subtract 1) (tail (scanl (+) original_depth szsw))
 
 typeArgRep :: Type -> ArgRep
-typeArgRep = toArgRep . typePrimRep
+typeArgRep = toArgRep . typePrimRep1
 
 -- -----------------------------------------------------------------------------
 -- The bytecode generator's monad

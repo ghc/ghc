@@ -11,7 +11,7 @@
 module CmmUtils(
         -- CmmType
         primRepCmmType, slotCmmType, slotForeignHint,
-        typeCmmType, typeForeignHint,
+        typeCmmType, typeForeignHint, primRepForeignHint,
 
         -- CmmLit
         zeroCLit, mkIntCLit,
@@ -65,7 +65,7 @@ module CmmUtils(
 #include "HsVersions.h"
 
 import TyCon    ( PrimRep(..), PrimElemRep(..) )
-import RepType  ( UnaryType, SlotTy (..), typePrimRep )
+import RepType  ( UnaryType, SlotTy (..), typePrimRep1 )
 
 import SMRep
 import Cmm
@@ -90,7 +90,8 @@ import Hoopl
 
 primRepCmmType :: DynFlags -> PrimRep -> CmmType
 primRepCmmType _      VoidRep          = panic "primRepCmmType:VoidRep"
-primRepCmmType dflags PtrRep           = gcWord dflags
+primRepCmmType dflags LiftedRep        = gcWord dflags
+primRepCmmType dflags UnliftedRep      = gcWord dflags
 primRepCmmType dflags IntRep           = bWord dflags
 primRepCmmType dflags WordRep          = bWord dflags
 primRepCmmType _      Int64Rep         = b64
@@ -120,11 +121,12 @@ primElemRepCmmType FloatElemRep  = f32
 primElemRepCmmType DoubleElemRep = f64
 
 typeCmmType :: DynFlags -> UnaryType -> CmmType
-typeCmmType dflags ty = primRepCmmType dflags (typePrimRep ty)
+typeCmmType dflags ty = primRepCmmType dflags (typePrimRep1 ty)
 
 primRepForeignHint :: PrimRep -> ForeignHint
 primRepForeignHint VoidRep      = panic "primRepForeignHint:VoidRep"
-primRepForeignHint PtrRep       = AddrHint
+primRepForeignHint LiftedRep    = AddrHint
+primRepForeignHint UnliftedRep  = AddrHint
 primRepForeignHint IntRep       = SignedHint
 primRepForeignHint WordRep      = NoHint
 primRepForeignHint Int64Rep     = SignedHint
@@ -142,7 +144,7 @@ slotForeignHint FloatSlot     = NoHint
 slotForeignHint DoubleSlot    = NoHint
 
 typeForeignHint :: UnaryType -> ForeignHint
-typeForeignHint = primRepForeignHint . typePrimRep
+typeForeignHint = primRepForeignHint . typePrimRep1
 
 ---------------------------------------------------
 --

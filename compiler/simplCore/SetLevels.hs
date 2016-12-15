@@ -65,6 +65,7 @@ module SetLevels (
 import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType
+                        , isExprLevPoly
                         , exprOkForSpeculation
                         , collectMakeStaticArgs
                         )
@@ -82,7 +83,6 @@ import Demand           ( StrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( isUnliftedType, Type, mkLamTypes, splitTyConApp_maybe )
-import Kind             ( isLevityPolymorphic, typeKind )
 import BasicTypes       ( Arity, RecFlag(..) )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -485,7 +485,7 @@ lvlMFE True env e@(_, AnnCase {})
 lvlMFE strict_ctxt env ann_expr
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
-  || isLevityPolymorphic (typeKind expr_ty)
+  || isExprLevPoly expr
          -- We can't let-bind levity polymorphic expressions
          -- See Note [Levity polymorphism invariants] in CoreSyn
   || notWorthFloating expr abs_vars

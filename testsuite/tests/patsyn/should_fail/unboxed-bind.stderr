@@ -1,6 +1,8 @@
 
-unboxed-bind.hs:10:11:
-    Pattern bindings containing unlifted types should use an outermost bang pattern:
+unboxed-bind.hs:11:11: warning: [-Wunbanged-strict-patterns (in -Wextra)]
+    Pattern bindings containing unlifted types should use
+    an outermost bang pattern:
       P arg = x
-    In the expression: let P arg = x in arg
-    In an equation for ‘f’: f x = let P arg = x in arg
+
+<no location info>: error: 
+Failing due to -Werror.

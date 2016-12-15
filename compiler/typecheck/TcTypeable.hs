@@ -139,9 +139,9 @@ mkModIdRHS :: Module -> TcM (LHsExpr Id)
 mkModIdRHS mod
   = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
        ; trNameLit <- mkTrNameLit
-       ; return $ nlHsApps (dataConWrapId trModuleDataCon)
-                           [ trNameLit (unitIdFS (moduleUnitId mod))
-                           , trNameLit (moduleNameFS (moduleName mod)) ]
+       ; return $ nlHsDataCon trModuleDataCon
+                  `nlHsApp` trNameLit (unitIdFS (moduleUnitId mod))
+                  `nlHsApp` trNameLit (moduleNameFS (moduleName mod))
        }
 
 {- *********************************************************************
@@ -245,8 +245,8 @@ mkTrNameLit :: TcM (FastString -> LHsExpr Id)
 mkTrNameLit = do
     trNameSDataCon <- tcLookupDataCon trNameSDataConName
     let trNameLit :: FastString -> LHsExpr Id
-        trNameLit fs = nlHsApps (dataConWrapId trNameSDataCon)
-                                [nlHsLit (mkHsStringPrimLit fs)]
+        trNameLit fs = nlHsDataCon trNameSDataCon
+                       `nlHsApp` nlHsLit (mkHsStringPrimLit fs)
     return trNameLit
 
 -- | Make bindings for the type representations of a 'TyCon' and its
@@ -272,10 +272,11 @@ mkTyConRepBinds stuff@(Stuff {..}) tycon
 mkTyConRepRHS :: TypeableStuff -> TyCon -> LHsExpr Id
 mkTyConRepRHS (Stuff {..}) tycon = rep_rhs
   where
-    rep_rhs = nlHsApps (dataConWrapId trTyConDataCon)
-                       [ nlHsLit (word64 high), nlHsLit (word64 low)
-                       , mod_rep
-                       , trNameLit (mkFastString tycon_str) ]
+    rep_rhs = nlHsDataCon trTyConDataCon
+              `nlHsApp` nlHsLit (word64 high)
+              `nlHsApp` nlHsLit (word64 low)
+              `nlHsApp` mod_rep
+              `nlHsApp` trNameLit (mkFastString tycon_str)
 
     tycon_str = add_tick (occNameString (getOccName tycon))
     add_tick s | isPromotedDataCon tycon = '\'' : s

@@ -1469,6 +1469,7 @@ tcIdInfo ignore_prags name ty info = do
     tcPrag info (HsArity arity)    = return (info `setArityInfo` arity)
     tcPrag info (HsStrictness str) = return (info `setStrictnessInfo` str)
     tcPrag info (HsInline prag)    = return (info `setInlinePragInfo` prag)
+    tcPrag info HsLevity           = return (info `setNeverLevPoly` ty)
 
         -- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsUnfold lb if_unf)

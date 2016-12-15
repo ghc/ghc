@@ -130,12 +130,13 @@ gen_Functor_binds loc tycon
     data_cons = tyConDataCons tycon
     fun_name = L loc fmap_RDR
     fmap_bind = mkRdrFunBind fun_name eqns
+    fun_match_ctxt = FunRhs fun_name Prefix
 
-    fmap_eqn con = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
+    fmap_eqn con = evalState (match_for_con fun_match_ctxt [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_fmap con
 
-    eqns | null data_cons = [mkSimpleMatch (FunRhs fun_name Prefix)
+    eqns | null data_cons = [mkSimpleMatch fun_match_ctxt
                                            [nlWildPat, nlWildPat]
                                            (error_Expr "Void fmap")]
          | otherwise      = map fmap_eqn data_cons
@@ -153,7 +154,7 @@ gen_Functor_binds loc tycon
                    -- fmap f = \x b -> h (x (g b))
                  , ft_tup = \t gs -> do
                      gg <- sequence gs
-                     mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
+                     mkSimpleLam $ mkSimpleTupleCase (match_for_con CaseAlt) t gg
                    -- fmap f = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
                  , ft_ty_app = \_ g -> nlHsApp fmap_Expr <$> g
                    -- fmap f = fmap g
@@ -162,9 +163,10 @@ gen_Functor_binds loc tycon
                  , ft_co_var = panic "contravariant" }
 
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
-    match_for_con :: [LPat RdrName] -> DataCon -> [LHsExpr RdrName]
+    match_for_con :: HsMatchContext RdrName
+                  -> [LPat RdrName] -> DataCon -> [LHsExpr RdrName]
                   -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
-    match_for_con = mkSimpleConMatch CaseAlt $
+    match_for_con ctxt = mkSimpleConMatch ctxt $
         \con_name xs -> return $ nlHsApps con_name xs  -- Con x1 x2 ..
 
 {-

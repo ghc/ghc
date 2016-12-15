@@ -444,7 +444,18 @@ tidy1 v (AsPat (L _ var) pat)
 -}
 
 tidy1 v (LazyPat pat)
-  = do  { (_,sel_prs) <- mkSelectorBinds [] pat (Var v)
+    -- This is a convenient place to check for unlifted types under a lazy pattern.
+    -- Doing this check during type-checking is unsatisfactory because we may
+    -- not fully know the zonked types yet. We sure do here.
+  = do  { let unlifted_bndrs = filter (isUnliftedType . idType) (collectPatBinders pat)
+        ; unless (null unlifted_bndrs) $
+          putSrcSpanDs (getLoc pat) $
+          errDs (hang (text "A lazy (~) pattern cannot bind variables of unlifted type." $$
+                       text "Unlifted variables:")
+                    2 (vcat (map (\id -> ppr id <+> dcolon <+> ppr (idType id))
+                                 unlifted_bndrs)))
+
+        ; (_,sel_prs) <- mkSelectorBinds [] pat (Var v)
         ; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
         ; return (mkCoreLets sel_binds, WildPat (idType v)) }
 
@@ -705,7 +716,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
         ; locn   <- getSrcSpanDs
 
         ; new_vars    <- case matches of
-                           []    -> mapM newSysLocalDs arg_tys
+                           []    -> mapM newSysLocalDsNoLP arg_tys
                            (m:_) -> selectMatchVars (map unLoc (hsLMatchPats m))
 
         ; eqns_info   <- mapM (mk_eqn_info new_vars) matches
@@ -951,6 +962,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     -- we have to compare the wrappers
     exp (HsWrap h e) (HsWrap h' e') = wrap h h' && exp e e'
     exp (HsVar i) (HsVar i') =  i == i'
+    exp (HsConLikeOut c) (HsConLikeOut c') = c == c'
     -- the instance for IPName derives using the id, so this works if the
     -- above does
     exp (HsIPVar i) (HsIPVar i') = i == i'
@@ -1012,7 +1024,7 @@ viewLExprEq (e1,_) (e2,_) = lexp e1 e2
     --        equating different ways of writing a coercion)
     wrap WpHole WpHole = True
     wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
-    wrap (WpFun w1 w2 _)   (WpFun w1' w2' _)   = wrap w1 w1' && wrap w2 w2'
+    wrap (WpFun w1 w2 _ _) (WpFun w1' w2' _ _) = wrap w1 w1' && wrap w2 w2'
     wrap (WpCast co)       (WpCast co')        = co `eqCoercion` co'
     wrap (WpEvApp et1)     (WpEvApp et2)       = et1 `ev_term` et2
     wrap (WpTyApp t)       (WpTyApp t')        = eqType t t'

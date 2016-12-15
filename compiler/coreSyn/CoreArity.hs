@@ -987,6 +987,10 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
        = go n subst' ty' (EtaVar tv' : eis)
 
        | Just (arg_ty, res_ty) <- splitFunTy_maybe ty
+       , not (isTypeLevPoly arg_ty)
+          -- See Note [Levity polymorphism invariants] in CoreSyn
+          -- See also test case typecheck/should_run/EtaExpandLevPoly
+
        , let (subst', eta_id') = freshEtaId n subst arg_ty
            -- Avoid free vars of the original expression
        = go (n-1) subst' res_ty (EtaVar eta_id' : eis)
@@ -1001,7 +1005,8 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
          go n subst ty' (EtaCo co : eis)
 
        | otherwise       -- We have an expression of arity > 0,
-                         -- but its type isn't a function.
+                         -- but its type isn't a function, or a binder
+                         -- is levity-polymorphic
        = WARN( True, (ppr orig_n <+> ppr orig_ty) $$ ppr orig_expr )
          (getTCvInScope subst, reverse eis)
         -- This *can* legitmately happen:
@@ -1009,6 +1014,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
         -- playing fast and loose with types (Happy does this a lot).
         -- So we simply decline to eta-expand.  Otherwise we'd end up
         -- with an explicit lambda having a non-function type
+
 
 
 --------------

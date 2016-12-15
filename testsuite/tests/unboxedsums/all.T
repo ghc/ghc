@@ -21,7 +21,7 @@ test('ffi1', normal, compile_fail, [''])
 test('thunk', only_ways(['normal']), compile_and_run, [''])
 test('T12375', only_ways(['normal']), compile_and_run, [''])
 test('empty_sum', only_ways(['normal']), compile_and_run, [''])
-test('sum_rr', normal, compile_fail, [''])
+test('sum_rr', normal, compile, [''])
 test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 
 # TODO: Need to run this in --slow mode only
@@ -30,3 +30,5 @@ test('T12711', only_ways(['ghci']), ghci_script, ['T12711.script'])
 #       extra_files([ "unboxedsums" + str(i) + ".hs" for i in range(1, 12) ])],
 #      run_command,
 #      ['$MAKE -s --no-print-directory sum_api_annots'])
+
+test('UbxSumLevPoly', normal, compile, [''])

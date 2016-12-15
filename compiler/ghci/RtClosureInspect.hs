@@ -735,7 +735,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
          traceTR (text "Following a MutVar")
          contents_tv <- newVar liftedTypeKind
          contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
-         ASSERT(isUnliftedTypeKind $ typeKind my_ty) return ()
+         ASSERT(isUnliftedType my_ty) return ()
          (mutvar_ty,_) <- instScheme $ quantifyType $ mkFunTy
                             contents_ty (mkTyConApp tycon [world,contents_ty])
          addConstraint (mkFunTy contents_tv my_ty) mutvar_ty
@@ -805,9 +805,9 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 (nonPtrs clos)
            (ptr_i, ws, terms1) <- go ptr_i ws tys
            return (ptr_i, ws, unboxedTupleTerm ty terms0 : terms1)
       | otherwise
-      = case repTypeArgs ty of
+      = case typePrimRepArgs ty of
           [rep_ty] ->  do
-            (ptr_i, ws, term0)  <- go_rep ptr_i ws ty (typePrimRep rep_ty)
+            (ptr_i, ws, term0)  <- go_rep ptr_i ws ty rep_ty
             (ptr_i, ws, terms1) <- go ptr_i ws tys
             return (ptr_i, ws, term0 : terms1)
           rep_tys -> do
@@ -818,18 +818,18 @@ extractSubTerms recurse clos = liftM thdOf3 . go 0 (nonPtrs clos)
     go_unary_types ptr_i ws [] = return (ptr_i, ws, [])
     go_unary_types ptr_i ws (rep_ty:rep_tys) = do
       tv <- newVar liftedTypeKind
-      (ptr_i, ws, term0)  <- go_rep ptr_i ws tv (typePrimRep rep_ty)
+      (ptr_i, ws, term0)  <- go_rep ptr_i ws tv rep_ty
       (ptr_i, ws, terms1) <- go_unary_types ptr_i ws rep_tys
       return (ptr_i, ws, term0 : terms1)
 
-    go_rep ptr_i ws ty rep = case rep of
-      PtrRep -> do
-        t <- appArr (recurse ty) (ptrs clos) ptr_i
-        return (ptr_i + 1, ws, t)
-      _ -> do
-        dflags <- getDynFlags
-        let (ws0, ws1) = splitAt (primRepSizeW dflags rep) ws
-        return (ptr_i, ws1, Prim ty ws0)
+    go_rep ptr_i ws ty rep
+      | isGcPtrRep rep
+      = do t <- appArr (recurse ty) (ptrs clos) ptr_i
+           return (ptr_i + 1, ws, t)
+      | otherwise
+      = do dflags <- getDynFlags
+           let (ws0, ws1) = splitAt (primRepSizeW dflags rep) ws
+           return (ptr_i, ws1, Prim ty ws0)
 
     unboxedTupleTerm ty terms
       = Term ty (Right (tupleDataCon Unboxed (length terms)))
@@ -919,17 +919,15 @@ findPtrTys i ty
   = findPtrTyss i elem_tys
 
   | otherwise
-  = -- Can't directly call repTypeArgs here -- we lose type information in
-    -- some cases (e.g. singleton tuples)
-    case repType ty of
-      UnaryRep rep_ty | typePrimRep rep_ty == PtrRep -> return (i + 1, [(i, ty)])
-                      | otherwise                    -> return (i,     [])
-      MultiRep slot_tys ->
-        foldM (\(i, extras) rep_ty ->
-                if typePrimRep rep_ty == PtrRep
+  = case typePrimRep ty of
+      [rep] | isGcPtrRep rep -> return (i + 1, [(i, ty)])
+            | otherwise      -> return (i,     [])
+      prim_reps              ->
+        foldM (\(i, extras) prim_rep ->
+                if isGcPtrRep prim_rep
                   then newVar liftedTypeKind >>= \tv -> return (i + 1, extras ++ [(i, tv)])
                   else return (i, extras))
-              (i, []) (map slotTyToType slot_tys)
+              (i, []) prim_reps
 
 findPtrTyss :: Int
             -> [Type]
@@ -955,7 +953,7 @@ getDataConArgTys :: DataCon -> Type -> TR [Type]
 --
 -- I believe that con_app_ty should not have any enclosing foralls
 getDataConArgTys dc con_app_ty
-  = do { let UnaryRep rep_con_app_ty = repType con_app_ty
+  = do { let rep_con_app_ty = unwrapType con_app_ty
        ; traceTR (text "getDataConArgTys 1" <+> (ppr con_app_ty $$ ppr rep_con_app_ty
                    $$ ppr (tcSplitTyConApp_maybe rep_con_app_ty)))
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
@@ -1193,7 +1191,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                         text " in presence of newtype evidence " <> ppr new_tycon)
                (_, vars) <- instTyVars (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon (mkTyVarTys vars)
-                   UnaryRep rep_ty = repType ty'
+                   rep_ty = unwrapType ty'
                _ <- liftTcM (unifyType noThing ty rep_ty)
         -- assumes that reptype doesn't ^^^^ touch tyconApp args
                return ty'
@@ -1235,14 +1233,13 @@ dictsView ty = ty
 isMonomorphic :: RttiType -> Bool
 isMonomorphic ty = noExistentials && noUniversals
  where (tvs, _, ty')  = tcSplitSigmaTy ty
-       noExistentials = isEmptyVarSet (tyCoVarsOfType ty')
+       noExistentials = noFreeVarsOfType ty'
        noUniversals   = null tvs
 
 -- Use only for RTTI types
 isMonomorphicOnNonPhantomArgs :: RttiType -> Bool
 isMonomorphicOnNonPhantomArgs ty
-  | UnaryRep rep_ty <- repType ty
-  , Just (tc, all_args) <- tcSplitTyConApp_maybe rep_ty
+  | Just (tc, all_args) <- tcSplitTyConApp_maybe (unwrapType ty)
   , phantom_vars  <- tyConPhantomTyVars tc
   , concrete_args <- [ arg | (tyv,arg) <- tyConTyVars tc `zip` all_args
                            , tyv `notElem` phantom_vars]

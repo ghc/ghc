@@ -60,13 +60,13 @@ infixr 5 :
 data Constraint
 
 -- | The kind of types with values. For example @Int :: Type@.
-type Type = TYPE 'PtrRepLifted
+type Type = TYPE 'LiftedRep
 
 -- | A backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type * = TYPE 'PtrRepLifted
+type * = TYPE 'LiftedRep
 
 -- | A unicode backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type ★ = TYPE 'PtrRepLifted
+type ★ = TYPE 'LiftedRep
 
 {- *********************************************************************
 *                                                                      *
@@ -357,7 +357,7 @@ data SPEC = SPEC | SPEC2
 
 {- *********************************************************************
 *                                                                      *
-                    RuntimeRep
+                    Levity polymorphism
 *                                                                      *
 ********************************************************************* -}
 
@@ -374,9 +374,10 @@ data SPEC = SPEC | SPEC2
 -- a further distinction is made, between lifted types (that contain ⊥),
 -- and unlifted ones (that don't).
 data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
-                | PtrRepLifted    -- ^ lifted; represented by a pointer
-                | PtrRepUnlifted  -- ^ unlifted; represented by a pointer
-                | VoidRep         -- ^ erased entirely
+                | TupleRep [RuntimeRep]     -- ^ An unboxed tuple of the given reps
+                | SumRep [RuntimeRep]       -- ^ An unboxed sum of the given reps
+                | LiftedRep       -- ^ lifted; represented by a pointer
+                | UnliftedRep     -- ^ unlifted; represented by a pointer
                 | IntRep          -- ^ signed, word-sized value
                 | WordRep         -- ^ unsigned, word-sized value
                 | Int64Rep        -- ^ signed, 64-bit value (on 32-bit only)
@@ -384,8 +385,6 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | AddrRep         -- ^ A pointer, but /not/ to a Haskell value
                 | FloatRep        -- ^ a 32-bit floating point number
                 | DoubleRep       -- ^ a 64-bit floating point number
-                | UnboxedTupleRep -- ^ An unboxed tuple; this doesn't specify a concrete rep
-                | UnboxedSumRep   -- ^ An unboxed sum; this doesn't specify a concrete rep
 
 -- See also Note [Wiring in RuntimeRep] in TysWiredIn
 

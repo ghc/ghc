@@ -37,7 +37,7 @@ import Demand
 import OccName          ( OccName, pprOccName, mkVarOccFS )
 import TyCon            ( TyCon, isPrimTyCon, PrimRep(..) )
 import Type
-import RepType          ( typePrimRep, tyConPrimRep )
+import RepType          ( typePrimRep1, tyConPrimRep1 )
 import BasicTypes       ( Arity, Fixity(..), FixityDirection(..), Boxity(..),
                           SourceText(..) )
 import ForeignCall      ( CLabelString )
@@ -579,10 +579,10 @@ data PrimOpResultInfo
 getPrimOpResultInfo :: PrimOp -> PrimOpResultInfo
 getPrimOpResultInfo op
   = case (primOpInfo op) of
-      Dyadic  _ ty                        -> ReturnsPrim (typePrimRep ty)
-      Monadic _ ty                        -> ReturnsPrim (typePrimRep ty)
-      Compare _ _                         -> ReturnsPrim (tyConPrimRep intPrimTyCon)
-      GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep tc)
+      Dyadic  _ ty                        -> ReturnsPrim (typePrimRep1 ty)
+      Monadic _ ty                        -> ReturnsPrim (typePrimRep1 ty)
+      Compare _ _                         -> ReturnsPrim (tyConPrimRep1 intPrimTyCon)
+      GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep1 tc)
                          | otherwise      -> ReturnsAlg tc
                          where
                            tc = tyConAppTyCon ty

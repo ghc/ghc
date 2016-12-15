@@ -121,7 +121,7 @@ selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
 selectMatchVar (VarPat var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
 selectMatchVar (AsPat var _) = return (unLoc var)
-selectMatchVar other_pat     = newSysLocalDs (hsPatType other_pat)
+selectMatchVar other_pat     = newSysLocalDsNoLP (hsPatType other_pat)
                                   -- OK, better make up one...
 
 {-
@@ -736,7 +736,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDs pat_ty
+       ; val_var <- newSysLocalDsNoLP pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }

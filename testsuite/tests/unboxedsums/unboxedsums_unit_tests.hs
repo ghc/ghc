@@ -46,7 +46,7 @@ layout_tests = sequence_
   where
     assert_layout tn tys layout =
       let
-        layout_ret = ubxSumRepType tys
+        layout_ret = ubxSumRepType (map typePrimRep tys)
       in
         assert (layout_ret == layout)
                tn

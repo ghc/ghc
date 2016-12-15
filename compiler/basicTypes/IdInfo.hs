@@ -8,6 +8,8 @@
 Haskell. [WDP 94/11])
 -}
 
+{-# LANGUAGE CPP #-}
+
 module IdInfo (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
@@ -66,7 +68,13 @@ module IdInfo (
 
         -- ** Tick-box Info
         TickBoxOp(..), TickBoxId,
+
+        -- ** Levity info
+        LevityInfo, levityInfo, setNeverLevPoly, setLevityInfoWithType,
+        isNeverLevPolyIdInfo
     ) where
+
+#include "HsVersions.h"
 
 import CoreSyn
 
@@ -78,10 +86,12 @@ import BasicTypes
 import DataCon
 import TyCon
 import PatSyn
+import Type
 import ForeignCall
 import Outputable
 import Module
 import Demand
+import Util
 
 -- infixl so you can say (id `set` a `set` b)
 infixl  1 `setRuleInfo`,
@@ -92,7 +102,9 @@ infixl  1 `setRuleInfo`,
           `setOccInfo`,
           `setCafInfo`,
           `setStrictnessInfo`,
-          `setDemandInfo`
+          `setDemandInfo`,
+          `setNeverLevPoly`,
+          `setLevityInfoWithType`
 
 {-
 ************************************************************************
@@ -127,7 +139,8 @@ data IdDetails
                                 -- or class operation of a class
 
   | PrimOpId PrimOp             -- ^ The 'Id' is for a primitive operator
-  | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call
+  | FCallId ForeignCall         -- ^ The 'Id' is for a foreign call.
+                                -- Type will be simple: no type families, newtypes, etc
 
   | TickBoxOpId TickBoxOp       -- ^ The 'Id' is for a HPC tick box (both traditional and binary)
 
@@ -169,18 +182,18 @@ pprIdDetails :: IdDetails -> SDoc
 pprIdDetails VanillaId = empty
 pprIdDetails other     = brackets (pp other)
  where
-   pp VanillaId         = panic "pprIdDetails"
-   pp (DataConWorkId _) = text "DataCon"
-   pp (DataConWrapId _) = text "DataConWrapper"
-   pp (ClassOpId {})    = text "ClassOp"
-   pp (PrimOpId _)      = text "PrimOp"
-   pp (FCallId _)       = text "ForeignCall"
-   pp (TickBoxOpId _)   = text "TickBoxOp"
-   pp (DFunId nt)       = text "DFunId" <> ppWhen nt (text "(nt)")
+   pp VanillaId               = panic "pprIdDetails"
+   pp (DataConWorkId _)       = text "DataCon"
+   pp (DataConWrapId _)       = text "DataConWrapper"
+   pp (ClassOpId {})          = text "ClassOp"
+   pp (PrimOpId _)            = text "PrimOp"
+   pp (FCallId _)             = text "ForeignCall"
+   pp (TickBoxOpId _)         = text "TickBoxOp"
+   pp (DFunId nt)             = text "DFunId" <> ppWhen nt (text "(nt)")
    pp (RecSelId { sel_naughty = is_naughty })
-                         = brackets $ text "RecSel"
-                            <> ppWhen is_naughty (text "(naughty)")
-   pp CoVarId           = text "CoVarId"
+                              = brackets $ text "RecSel" <>
+                                           ppWhen is_naughty (text "(naughty)")
+   pp CoVarId                 = text "CoVarId"
 
 {-
 ************************************************************************
@@ -221,8 +234,10 @@ data IdInfo
         strictnessInfo  :: StrictSig,      --  ^ A strictness signature
 
         demandInfo      :: Demand,       -- ^ ID demand information
-        callArityInfo :: !ArityInfo    -- ^ How this is called.
+        callArityInfo   :: !ArityInfo,   -- ^ How this is called.
                                          -- n <=> all calls have at least n arguments
+
+        levityInfo      :: LevityInfo    -- ^ when applied, will this Id ever have a levity-polymorphic type?
     }
 
 -- Setters
@@ -272,7 +287,8 @@ vanillaIdInfo
             occInfo             = NoOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
-            callArityInfo     = unknownArity
+            callArityInfo       = unknownArity,
+            levityInfo          = NoLevityInfo
            }
 
 -- | More informative 'IdInfo' we can use when we know the 'Id' has no CAF references
@@ -520,3 +536,51 @@ data TickBoxOp
 
 instance Outputable TickBoxOp where
     ppr (TickBox mod n)         = text "tick" <+> ppr (mod,n)
+
+{-
+************************************************************************
+*                                                                      *
+   Levity
+*                                                                      *
+************************************************************************
+
+Note [Levity info]
+~~~~~~~~~~~~~~~~~~
+
+Ids store whether or not they can be levity-polymorphic at any amount
+of saturation. This is helpful in optimizing the levity-polymorphism check
+done in the desugarer, where we can usually learn that something is not
+levity-polymorphic without actually figuring out its type. See
+isExprLevPoly in CoreUtils for where this info is used. Storing
+this is required to prevent perf/compiler/T5631 from blowing up.
+
+-}
+
+-- See Note [Levity info]
+data LevityInfo = NoLevityInfo  -- always safe
+                | NeverLevityPolymorphic
+  deriving Eq
+
+instance Outputable LevityInfo where
+  ppr NoLevityInfo           = text "NoLevityInfo"
+  ppr NeverLevityPolymorphic = text "NeverLevityPolymorphic"
+
+-- | Marks an IdInfo describing an Id that is never levity polymorphic (even when
+-- applied). The Type is only there for checking that it's really never levity
+-- polymorphic
+setNeverLevPoly :: HasDebugCallStack => IdInfo -> Type -> IdInfo
+setNeverLevPoly info ty
+  = ASSERT2( not (resultIsLevPoly ty), ppr ty )
+    info { levityInfo = NeverLevityPolymorphic }
+
+setLevityInfoWithType :: IdInfo -> Type -> IdInfo
+setLevityInfoWithType info ty
+  | not (resultIsLevPoly ty)
+  = info { levityInfo = NeverLevityPolymorphic }
+  | otherwise
+  = info
+
+isNeverLevPolyIdInfo :: IdInfo -> Bool
+isNeverLevPolyIdInfo info
+  | NeverLevityPolymorphic <- levityInfo info = True
+  | otherwise                                 = False

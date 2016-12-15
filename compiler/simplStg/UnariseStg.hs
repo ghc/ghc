@@ -209,7 +209,7 @@ import Outputable
 import RepType
 import StgSyn
 import Type
-import TysPrim (intPrimTyCon, intPrimTy)
+import TysPrim (intPrimTy)
 import TysWiredIn
 import UniqSupply
 import Util
@@ -225,7 +225,7 @@ import qualified Data.IntMap as IM
 --
 --   x :-> MultiVal [a,b,c] in rho
 --
--- iff  x's repType is a MultiRep, or equivalently
+-- iff  x's typePrimRep is not a singleton, or equivalently
 --      x's type is an unboxed tuple, sum or void.
 --
 --    x :-> UnaryVal x'
@@ -487,24 +487,24 @@ mapTupleIdBinders
 mapTupleIdBinders ids args0 rho0
   = ASSERT(not (any (isVoidTy . stgArgType) args0))
     let
-      ids_unarised :: [(Id, RepType)]
-      ids_unarised = map (\id -> (id, repType (idType id))) ids
+      ids_unarised :: [(Id, [PrimRep])]
+      ids_unarised = map (\id -> (id, typePrimRep (idType id))) ids
 
-      map_ids :: UnariseEnv -> [(Id, RepType)] -> [StgArg] -> UnariseEnv
+      map_ids :: UnariseEnv -> [(Id, [PrimRep])] -> [StgArg] -> UnariseEnv
       map_ids rho [] _  = rho
-      map_ids rho ((x, x_rep) : xs) args =
+      map_ids rho ((x, x_reps) : xs) args =
         let
-          x_arity = length (repTypeSlots x_rep)
+          x_arity = length x_reps
           (x_args, args') =
             ASSERT(args `lengthAtLeast` x_arity)
             splitAt x_arity args
 
           rho'
-            | isMultiRep x_rep
-            = extendRho rho x (MultiVal x_args)
-            | otherwise
+            | x_arity == 1
             = ASSERT(x_args `lengthIs` 1)
               extendRho rho x (UnaryVal (head x_args))
+            | otherwise
+            = extendRho rho x (MultiVal x_args)
         in
           map_ids rho' xs args'
     in
@@ -521,9 +521,9 @@ mapSumIdBinders
 mapSumIdBinders [id] args rho0
   = ASSERT(not (any (isVoidTy . stgArgType) args))
     let
-      arg_slots = concatMap (repTypeSlots . repType . stgArgType) args
-      id_slots  = repTypeSlots (repType (idType id))
-      layout1   = layout arg_slots id_slots
+      arg_slots = map primRepSlot $ concatMap (typePrimRep . stgArgType) args
+      id_slots  = map primRepSlot $ typePrimRep (idType id)
+      layout1   = layoutUbxSum arg_slots id_slots
     in
       if isMultiValBndr id
         then extendRho rho0 id (MultiVal [ args !! i | i <- layout1 ])
@@ -550,12 +550,12 @@ mkUbxSum
   -> [OutStgArg]  -- Final tuple arguments
 mkUbxSum dc ty_args args0
   = let
-      (_ : sum_slots) = ubxSumRepType ty_args
+      (_ : sum_slots) = ubxSumRepType (map typePrimRep ty_args)
         -- drop tag slot
 
       tag = dataConTag dc
 
-      layout'  = layout sum_slots (mapMaybe (typeSlotTy . stgArgType) args0)
+      layout'  = layoutUbxSum sum_slots (mapMaybe (typeSlotTy . stgArgType) args0)
       tag_arg  = StgLitArg (MachInt (fromIntegral tag))
       arg_idxs = IM.fromList (zipEqual "mkUbxSum" layout' args0)
 
@@ -656,12 +656,12 @@ unariseFunArgBinders rho xs = second concat <$> mapAccumLM unariseFunArgBinder r
 unariseFunArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
 -- Result list of binders is never empty
 unariseFunArgBinder rho x  =
-  case repType (idType x) of
-    UnaryRep _     -> return (rho, [x])
-    MultiRep []    -> return (extendRho rho x (MultiVal []), [voidArgId])
-                            -- NB: do not remove void binders
-    MultiRep slots -> do
-      xs <- mkIds (mkFastString "us") (map slotTyToType slots)
+  case typePrimRep (idType x) of
+    []   -> return (extendRho rho x (MultiVal []), [voidArgId])
+                           -- NB: do not remove void binders
+    [_]  -> return (rho, [x])
+    reps -> do
+      xs <- mkIds (mkFastString "us") (map primRepToType reps)
       return (extendRho rho x (MultiVal (map StgVarArg xs)), xs)
 
 --------------------------------------------------------------------------------
@@ -687,10 +687,10 @@ unariseConArgBinders rho xs = second concat <$> mapAccumLM unariseConArgBinder r
 
 unariseConArgBinder :: UnariseEnv -> Id -> UniqSM (UnariseEnv, [Id])
 unariseConArgBinder rho x =
-  case repType (idType x) of
-    UnaryRep _     -> return (rho, [x])
-    MultiRep slots -> do
-      xs <- mkIds (mkFastString "us") (map slotTyToType slots)
+  case typePrimRep (idType x) of
+    [_]  -> return (rho, [x])
+    reps -> do
+      xs <- mkIds (mkFastString "us") (map primRepToType reps)
       return (extendRho rho x (MultiVal (map StgVarArg xs)), xs)
 
 unariseFreeVars :: UnariseEnv -> [InId] -> [OutId]
@@ -720,7 +720,11 @@ mkId :: FastString -> UnaryType -> UniqSM Id
 mkId = mkSysLocalOrCoVarM
 
 isMultiValBndr :: Id -> Bool
-isMultiValBndr = isMultiRep . repType . idType
+isMultiValBndr id
+  | [_] <- typePrimRep (idType id)
+  = False
+  | otherwise
+  = True
 
 isUnboxedSumBndr :: Id -> Bool
 isUnboxedSumBndr = isUnboxedSumType . idType
@@ -732,7 +736,7 @@ mkTuple :: [StgArg] -> StgExpr
 mkTuple args = StgConApp (tupleDataCon Unboxed (length args)) args (map stgArgType args)
 
 tagAltTy :: AltType
-tagAltTy = PrimAlt intPrimTyCon
+tagAltTy = PrimAlt IntRep
 
 tagTy :: Type
 tagTy = intPrimTy

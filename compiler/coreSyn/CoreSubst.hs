@@ -502,7 +502,7 @@ substIdBndr _doc rec_subst subst@(Subst in_scope env tvs cvs) old_id
 
     old_ty = idType old_id
     no_type_change = (isEmptyVarEnv tvs && isEmptyVarEnv cvs) ||
-                     isEmptyVarSet (tyCoVarsOfType old_ty)
+                     noFreeVarsOfType old_ty
 
         -- new_id has the right IdInfo
         -- The lazy-set is because we're in a loop here, with
@@ -622,7 +622,7 @@ substCo subst co = Coercion.substCo (getTCvSubst subst) co
 
 substIdType :: Subst -> Id -> Id
 substIdType subst@(Subst _ _ tv_env cv_env) id
-  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env) || isEmptyVarSet (tyCoVarsOfType old_ty) = id
+  | (isEmptyVarEnv tv_env && isEmptyVarEnv cv_env) || noFreeVarsOfType old_ty = id
   | otherwise   = setIdType id (substTy subst old_ty)
                 -- The tyCoVarsOfType is cheaper than it looks
                 -- because we cache the free tyvars of the type
@@ -1058,7 +1058,12 @@ maybe_substitute subst b r
   , isAlwaysActive (idInlineActivation b)       -- Note [Inline prag in simplOpt]
   , not (isStableUnfolding (idUnfolding b))
   , not (isExportedId b)
-  , not (isUnliftedType (idType b)) || exprOkForSpeculation r
+  , let id_ty = idType b
+     -- A levity-polymorphic id? Impossible you say?
+     -- See Note [Levity polymorphism invariants] in CoreSyn
+     -- Ah, but it *is* possible in the compulsory unfolding of unsafeCoerce#
+     -- This check prevents the isUnliftedType check from panicking.
+  , isTypeLevPoly id_ty || not (isUnliftedType (idType b)) || exprOkForSpeculation r
   = Just (extendIdSubst subst b r)
 
   | otherwise

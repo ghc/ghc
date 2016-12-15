@@ -16,7 +16,7 @@ module Bag (
         elemBag, lengthBag,
         filterBag, partitionBag, partitionBagWith,
         concatBag, catBagMaybes, foldBag, foldrBag, foldlBag,
-        isEmptyBag, isSingletonBag, consBag, snocBag, anyBag,
+        isEmptyBag, isSingletonBag, consBag, snocBag, anyBag, allBag,
         listToBag, bagToList, mapAccumBagL,
         concatMapBag, mapMaybeBag,
         foldrBagM, foldlBagM, mapBagM, mapBagM_,
@@ -109,6 +109,12 @@ filterBagM pred (TwoBags b1 b2) = do
 filterBagM pred (ListBag vs) = do
   sat <- filterM pred vs
   return (listToBag sat)
+
+allBag :: (a -> Bool) -> Bag a -> Bool
+allBag _ EmptyBag        = True
+allBag p (UnitBag v)     = p v
+allBag p (TwoBags b1 b2) = allBag p b1 && allBag p b2
+allBag p (ListBag xs)    = all p xs
 
 anyBag :: (a -> Bool) -> Bag a -> Bool
 anyBag _ EmptyBag        = False

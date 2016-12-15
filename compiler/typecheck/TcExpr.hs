@@ -388,8 +388,9 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
-             wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty
+             wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
                      <.> wrap_arg1
+             doc = text "When looking at the argument to ($)"
 
        ; return (OpApp (mkLHsWrap wrap1 arg1') op' fix arg2') }
 
@@ -1230,9 +1231,12 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; (inner_wrap, args', inner_res_ty)
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
-           ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty <.> wrap
+           ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
                     , Left arg' : args'
                     , inner_res_ty ) }
+      where
+        doc = text "When checking the" <+> speakNth n <+>
+              text "argument to" <+> quotes (ppr fun)
 
     ty_app_err ty arg
       = do { (_, ty) <- zonkTidyTcType emptyTidyEnv ty
@@ -1356,9 +1360,10 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
            ; return ( result
                     , match_wrapper <.>
                       mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
-                              arg_ty res_ty ) }
+                              arg_ty res_ty doc ) }
       where
         herald = text "This rebindable syntax expects a function with"
+        doc = text "When checking a rebindable syntax operator arising from" <+> ppr orig
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypeET orig GenSigCtxt the_ty rho_ty
@@ -1631,21 +1636,21 @@ tc_infer_id lbl id_name
     return_data_con con
        -- For data constructors, must perform the stupid-theta check
       | null stupid_theta
-      = return_id con_wrapper_id
+      = return (HsConLikeOut (RealDataCon con), con_ty)
 
       | otherwise
        -- See Note [Instantiating stupid theta]
-      = do { let (tvs, theta, rho) = tcSplitSigmaTy (idType con_wrapper_id)
+      = do { let (tvs, theta, rho) = tcSplitSigmaTy con_ty
            ; (subst, tvs') <- newMetaTyVars tvs
            ; let tys'   = mkTyVarTys tvs'
                  theta' = substTheta subst theta
                  rho'   = substTy subst rho
            ; wrap <- instCall (OccurrenceOf id_name) tys' theta'
            ; addDataConStupidTheta con tys'
-           ; return (mkHsWrap wrap (HsVar (noLoc con_wrapper_id)), rho') }
+           ; return (mkHsWrap wrap (HsConLikeOut (RealDataCon con)), rho') }
 
       where
-        con_wrapper_id = dataConWrapId con
+        con_ty         = dataConUserType con
         stupid_theta   = dataConStupidTheta con
 
     check_naughty id

@@ -6,6 +6,7 @@
 Printing of Core syntax
 -}
 
+{-# LANGUAGE MultiWayIf #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module PprCore (
         pprCoreExpr, pprParendExpr,

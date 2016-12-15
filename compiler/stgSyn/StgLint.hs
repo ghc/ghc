@@ -196,21 +196,19 @@ lintStgExpr (StgCase scrut bndr alts_type alts) = runMaybeT $ do
 
     in_scope <- MaybeT $ liftM Just $
      case alts_type of
-        AlgAlt tc     -> check_bndr tc >> return True
-        PrimAlt tc    -> check_bndr tc >> return True
+        AlgAlt tc     -> check_bndr (tyConPrimRep tc) >> return True
+        PrimAlt rep   -> check_bndr [rep]             >> return True
         MultiValAlt _ -> return False -- Binder is always dead in this case
         PolyAlt       -> return True
 
     MaybeT $ addInScopeVars [bndr | in_scope] $
              lintStgAlts alts scrut_ty
   where
-    scrut_ty          = idType bndr
-    UnaryRep scrut_rep = repType scrut_ty -- Not used if scrutinee is unboxed tuple or sum
-    check_bndr tc = case tyConAppTyCon_maybe scrut_rep of
-                        Just bndr_tc -> checkL (tc == bndr_tc) bad_bndr
-                        Nothing      -> addErrL bad_bndr
+    scrut_ty        = idType bndr
+    scrut_reps      = typePrimRep scrut_ty
+    check_bndr reps = checkL (scrut_reps == reps) bad_bndr
                   where
-                     bad_bndr = mkDefltMsg bndr tc
+                     bad_bndr = mkDefltMsg bndr reps
 
 lintStgAlts :: [StgAlt]
             -> Type               -- Type of scrutinee
@@ -418,20 +416,18 @@ stgEqType :: Type -> Type -> Bool
 -- Fundamentally this is a losing battle because of unsafeCoerce
 
 stgEqType orig_ty1 orig_ty2
-  = gos (repType orig_ty1) (repType orig_ty2)
+  = gos (typePrimRep orig_ty1) (typePrimRep orig_ty2)
   where
-    gos :: RepType -> RepType -> Bool
-    gos (MultiRep slots1) (MultiRep slots2)
-      = slots1 == slots2
-    gos (UnaryRep ty1) (UnaryRep ty2) = go ty1 ty2
-    gos _ _ = False
+    gos :: [PrimRep] -> [PrimRep] -> Bool
+    gos [_]   [_]   = go orig_ty1 orig_ty2
+    gos reps1 reps2 = reps1 == reps2
 
     go :: UnaryType -> UnaryType -> Bool
     go ty1 ty2
       | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
       , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
       , let res = if tc1 == tc2
-                  then equalLength tc_args1 tc_args2 && and (zipWith (gos `on` repType) tc_args1 tc_args2)
+                  then equalLength tc_args1 tc_args2 && and (zipWith (gos `on` typePrimRep) tc_args1 tc_args2)
                   else  -- TyCons don't match; but don't bleat if either is a
                         -- family TyCon because a coercion might have made it
                         -- equal to something else
@@ -462,10 +458,10 @@ _mkCaseAltMsg _alts
   = ($$) (text "In some case alternatives, type of alternatives not all same:")
             (Outputable.empty) -- LATER: ppr alts
 
-mkDefltMsg :: Id -> TyCon -> MsgDoc
-mkDefltMsg bndr tc
-  = ($$) (text "Binder of a case expression doesn't match type of scrutinee:")
-         (ppr bndr $$ ppr (idType bndr) $$ ppr tc)
+mkDefltMsg :: Id -> [PrimRep] -> MsgDoc
+mkDefltMsg bndr reps
+  = ($$) (text "Binder of a case expression doesn't match representation of scrutinee:")
+         (ppr bndr $$ ppr (idType bndr) $$ ppr reps)
 
 mkFunAppMsg :: Type -> [Type] -> StgExpr -> MsgDoc
 mkFunAppMsg fun_ty arg_tys expr

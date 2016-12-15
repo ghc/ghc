@@ -30,7 +30,6 @@ import TcRnTypes
 import TcRnMonad
 import TcType
 import TcMType
-import TcHsSyn ( checkForRepresentationPolymorphism )
 import TcValidity ( checkValidType )
 import TcUnify( tcSkolemise, unifyType, noThing )
 import Inst( topInstantiate )
@@ -390,7 +389,7 @@ tcPatSynSig name sig_ty
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty
-       ; mapM_ (checkForRepresentationPolymorphism empty) arg_tys
+       ; mapM_ (checkForLevPoly empty) arg_tys
 
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs

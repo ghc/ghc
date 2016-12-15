@@ -3,6 +3,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedFFITypes #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 module GHC.Integer.Logarithms
     ( wordLog2#
@@ -43,7 +44,7 @@ integerLogBase# :: Integer -> Integer -> Int#
 integerLogBase# (S# 2#) m = integerLog2# m
 integerLogBase# b m = e'
   where
-    (# _, e' #) = go b
+    !(# _, e' #) = go b
 
     go pw | m `ltInteger` pw = (# m, 0# #)
     go pw = case go (sqrInteger pw) of

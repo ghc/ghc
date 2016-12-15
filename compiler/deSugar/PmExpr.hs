@@ -20,6 +20,7 @@ import Id
 import Name
 import NameSet
 import DataCon
+import ConLike
 import TysWiredIn
 import Outputable
 import Util
@@ -230,6 +231,7 @@ lhsExprToPmExpr (L _ e) = hsExprToPmExpr e
 hsExprToPmExpr :: HsExpr Id -> PmExpr
 
 hsExprToPmExpr (HsVar         x) = PmExprVar (idName (unLoc x))
+hsExprToPmExpr (HsConLikeOut  c) = PmExprVar (conLikeName c)
 hsExprToPmExpr (HsOverLit  olit) = PmExprLit (PmOLit False olit)
 hsExprToPmExpr (HsLit       lit) = PmExprLit (PmSLit lit)
 

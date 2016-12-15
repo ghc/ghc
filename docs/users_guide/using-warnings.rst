@@ -49,6 +49,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wincomplete-patterns`
         * :ghc-flag:`-Wdodgy-exports`
         * :ghc-flag:`-Wdodgy-imports`
+        * :ghc-flag:`-Wunbanged-strict-patterns`
 
 .. ghc-flag:: -Wall
 
@@ -1030,6 +1031,12 @@ of ``-W(no-)*``.
     which causes the pre-processor to warn on uses of the `#if` directive on
     undefined identifiers.
 
+.. ghc-flag:: -Wunbanged-strict-patterns
+
+    This flag warns whenever you write a pattern that binds a variable whose
+    type is unlifted, and yet the pattern is not a bang pattern nor a bare variable.
+    See :ref:`glasgow-unboxed` for informatino about unlifted types.
+    
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)

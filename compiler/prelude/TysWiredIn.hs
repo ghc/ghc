@@ -62,7 +62,7 @@ module TysWiredIn (
         nilDataCon, nilDataConName, nilDataConKey,
         consDataCon_RDR, consDataCon, consDataConName,
         promotedNilDataCon, promotedConsDataCon,
-        mkListTy,
+        mkListTy, mkPromotedListTy,
 
         -- * Maybe
         maybeTyCon, maybeTyConName,
@@ -76,6 +76,8 @@ module TysWiredIn (
         unitTyCon, unitDataCon, unitDataConId, unitTy, unitTyConKey,
         pairTyCon,
         unboxedUnitTyCon, unboxedUnitDataCon,
+        unboxedTupleKind, unboxedSumKind,
+
         -- ** Constraint tuples
         cTupleTyConName, cTupleTyConNames, isCTupleTyConName,
         cTupleDataConName, cTupleDataConNames,
@@ -89,7 +91,7 @@ module TysWiredIn (
         -- * Kinds
         typeNatKindCon, typeNatKind, typeSymbolKindCon, typeSymbolKind,
         isLiftedTypeKindTyConName, liftedTypeKind, constraintKind,
-        starKindTyCon, starKindTyConName, unboxedTupleKind,
+        starKindTyCon, starKindTyConName,
         unicodeStarKindTyCon, unicodeStarKindTyConName,
         liftedTypeKindTyCon, constraintKindTyCon,
 
@@ -105,14 +107,13 @@ module TysWiredIn (
         -- * RuntimeRep and friends
         runtimeRepTyCon, vecCountTyCon, vecElemTyCon,
 
-        runtimeRepTy, ptrRepLiftedTy, ptrRepLiftedDataCon, ptrRepLiftedDataConTyCon,
+        runtimeRepTy, liftedRepTy, liftedRepDataCon, liftedRepDataConTyCon,
 
-        vecRepDataConTyCon, ptrRepUnliftedDataConTyCon,
+        vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
-        voidRepDataConTy, intRepDataConTy,
+        liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy,
         wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy,
-        floatRepDataConTy, doubleRepDataConTy, unboxedTupleRepDataConTy,
-        unboxedSumRepDataConTy,
+        floatRepDataConTy, doubleRepDataConTy,
 
         vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
         vec64DataConTy,
@@ -140,6 +141,7 @@ import Id
 import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
+import RepType
 import DataCon
 import {-# SOURCE #-} ConLike
 import TyCon
@@ -340,7 +342,7 @@ It has these properties:
     environment (e.g. see Rules.matchRule for one example)
 
   * If (Any k) is the type of a value, it must be a /lifted/ value. So
-    if we have (Any @(TYPE rr)) then rr must be 'PtrRepLifted.  See
+    if we have (Any @(TYPE rr)) then rr must be 'LiftedRep.  See
     Note [TYPE and RuntimeRep] in TysPrim.  This is a convenient
     invariant, and makes isUnliftedTyCon well-defined; otherwise what
     would (isUnliftedTyCon Any) be?
@@ -401,19 +403,20 @@ liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type")
 starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKindTyConKey starKindTyCon
 unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
 
-runtimeRepTyConName, vecRepDataConName :: Name
+runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 runtimeRepTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "RuntimeRep") runtimeRepTyConKey runtimeRepTyCon
 vecRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "VecRep") vecRepDataConKey vecRepDataCon
+tupleRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "TupleRep") tupleRepDataConKey tupleRepDataCon
+sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") sumRepDataConKey sumRepDataCon
 
 -- See Note [Wiring in RuntimeRep]
 runtimeRepSimpleDataConNames :: [Name]
 runtimeRepSimpleDataConNames
   = zipWith3Lazy mk_special_dc_name
-      [ fsLit "PtrRepLifted", fsLit "PtrRepUnlifted"
-      , fsLit "VoidRep", fsLit "IntRep"
+      [ fsLit "LiftedRep", fsLit "UnliftedRep"
+      , fsLit "IntRep"
       , fsLit "WordRep", fsLit "Int64Rep", fsLit "Word64Rep"
-      , fsLit "AddrRep", fsLit "FloatRep", fsLit "DoubleRep"
-      , fsLit "UnboxedTupleRep", fsLit "UnboxedSumRep" ]
+      , fsLit "AddrRep", fsLit "FloatRep", fsLit "DoubleRep" ]
       runtimeRepSimpleDataConKeys
       runtimeRepSimpleDataCons
 
@@ -575,10 +578,9 @@ constraintKindTyCon :: TyCon
 constraintKindTyCon = pcTyCon False constraintKindTyConName
                               Nothing [] []
 
-liftedTypeKind, constraintKind, unboxedTupleKind :: Kind
-liftedTypeKind   = tYPE ptrRepLiftedTy
+liftedTypeKind, constraintKind :: Kind
+liftedTypeKind   = tYPE liftedRepTy
 constraintKind   = mkTyConApp constraintKindTyCon []
-unboxedTupleKind = tYPE unboxedTupleRepDataConTy
 
 -- mkFunKind and mkForAllKind are defined here
 -- solely so that TyCon can use them via a SOURCE import
@@ -814,6 +816,18 @@ boxedTupleArr, unboxedTupleArr :: Array Int (TyCon,DataCon)
 boxedTupleArr   = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Boxed   i | i <- [0..mAX_TUPLE_SIZE]]
 unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mAX_TUPLE_SIZE]]
 
+-- | Given the TupleRep/SumRep tycon and list of RuntimeReps of the unboxed
+-- tuple/sum arguments, produces the return kind of an unboxed tuple/sum type
+-- constructor. @unboxedTupleSumKind [IntRep, LiftedRep] --> TYPE (TupleRep/SumRep
+-- [IntRep, LiftedRep])@
+unboxedTupleSumKind :: TyCon -> [Type] -> Kind
+unboxedTupleSumKind tc rr_tys
+  = tYPE (mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys])
+
+-- | Specialization of 'unboxedTupleSumKind' for tuples
+unboxedTupleKind :: [Type] -> Kind
+unboxedTupleKind = unboxedTupleSumKind tupleRepDataConTyCon
+
 mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple Boxed arity = (tycon, tuple_con)
   where
@@ -848,15 +862,14 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
 
-    tc_res_kind | arity == 0 = tYPE voidRepDataConTy  -- Nullary unboxed tuple
-                | otherwise  = unboxedTupleKind
+    tc_res_kind = unboxedTupleKind rr_tys
 
     tc_arity    = arity * 2
     flavour     = UnboxedAlgTyCon
 
-    dc_tvs     = binderVars tc_binders
-    dc_arg_tys = mkTyVarTys (drop arity dc_tvs)
-    tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
+    dc_tvs               = binderVars tc_binders
+    (rr_tys, dc_arg_tys) = splitAt arity (mkTyVarTys dc_tvs)
+    tuple_con            = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Unboxed
     modu    = gHC_PRIM
@@ -952,6 +965,10 @@ sumDataCon alt arity
 unboxedSumArr :: Array Int (TyCon, Array Int DataCon)
 unboxedSumArr = listArray (2,mAX_SUM_SIZE) [mk_sum i | i <- [2..mAX_SUM_SIZE]]
 
+-- | Specialization of 'unboxedTupleSumKind' for sums
+unboxedSumKind :: [Type] -> Kind
+unboxedSumKind = unboxedTupleSumKind sumRepDataConTyCon
+
 -- | Create type constructor and data constructors for n-ary unboxed sum.
 mk_sum :: Arity -> (TyCon, Array ConTagZ DataCon)
 mk_sum arity = (tycon, sum_cons)
@@ -962,12 +979,11 @@ mk_sum arity = (tycon, sum_cons)
     tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
                                         (\ks -> map tYPE ks)
 
-    tyvars = mkTemplateTyVars (replicate arity runtimeRepTy ++
-                               map (tYPE . mkTyVarTy) (take arity tyvars))
+    tyvars = binderVars tc_binders
 
-    tc_res_kind = tYPE unboxedSumRepDataConTy
+    tc_res_kind = unboxedSumKind rr_tys
 
-    open_tvs = drop arity tyvars
+    (rr_tys, tyvar_tys) = splitAt arity (mkTyVarTys tyvars)
 
     tc_name = mkWiredInName gHC_PRIM (mkSumTyConOcc arity) tc_uniq
                             (ATyCon tycon) BuiltInSyntax
@@ -984,7 +1000,7 @@ mk_sum arity = (tycon, sum_cons)
                                             (AConLike (RealDataCon dc))
                                             BuiltInSyntax
                 in dc
-    tyvar_tys = mkTyVarTys open_tvs
+
     tc_uniq   = mkSumTyConUnique   arity
     dc_uniq i = mkSumDataConUnique i arity
 
@@ -1062,25 +1078,26 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
 
 -- Type syononyms; see Note [TYPE and RuntimeRep] in TysPrim
--- type Type = tYPE 'PtrRepLifted
--- type *    = tYPE 'PtrRepLifted
--- type *    = tYPE 'PtrRepLifted  -- Unicode variant
+-- type Type = tYPE 'LiftedRep
+-- type *    = tYPE 'LiftedRep
+-- type *    = tYPE 'LiftedRep  -- Unicode variant
 
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
                                        [] liftedTypeKind []
-                                       (tYPE ptrRepLiftedTy)
+                                       (tYPE liftedRepTy)
 
 starKindTyCon         = buildSynTyCon starKindTyConName
                                        [] liftedTypeKind []
-                                       (tYPE ptrRepLiftedTy)
+                                       (tYPE liftedRepTy)
 
 unicodeStarKindTyCon  = buildSynTyCon unicodeStarKindTyConName
                                        [] liftedTypeKind []
-                                       (tYPE ptrRepLiftedTy)
+                                       (tYPE liftedRepTy)
 
 runtimeRepTyCon :: TyCon
 runtimeRepTyCon = pcNonEnumTyCon runtimeRepTyConName Nothing []
-                          (vecRepDataCon : runtimeRepSimpleDataCons)
+                          (vecRepDataCon : tupleRepDataCon :
+                           sumRepDataCon : runtimeRepSimpleDataCons)
 
 vecRepDataCon :: DataCon
 vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
@@ -1091,37 +1108,64 @@ vecRepDataCon = pcSpecialDataCon vecRepDataConName [ mkTyConTy vecCountTyCon
     prim_rep_fun [count, elem]
       | VecCount n <- tyConRuntimeRepInfo (tyConAppTyCon count)
       , VecElem  e <- tyConRuntimeRepInfo (tyConAppTyCon elem)
-      = VecRep n e
+      = [VecRep n e]
     prim_rep_fun args
       = pprPanic "vecRepDataCon" (ppr args)
 
 vecRepDataConTyCon :: TyCon
 vecRepDataConTyCon = promoteDataCon vecRepDataCon
 
-ptrRepUnliftedDataConTyCon :: TyCon
-ptrRepUnliftedDataConTyCon = promoteDataCon ptrRepUnliftedDataCon
+tupleRepDataCon :: DataCon
+tupleRepDataCon = pcSpecialDataCon tupleRepDataConName [ mkListTy runtimeRepTy ]
+                                   runtimeRepTyCon (RuntimeRep prim_rep_fun)
+  where
+    prim_rep_fun [rr_ty_list]
+      = concatMap (runtimeRepPrimRep doc) rr_tys
+      where
+        rr_tys = extractPromotedList rr_ty_list
+        doc    = text "tupleRepDataCon" <+> ppr rr_tys
+    prim_rep_fun args
+      = pprPanic "tupleRepDataCon" (ppr args)
+
+tupleRepDataConTyCon :: TyCon
+tupleRepDataConTyCon = promoteDataCon tupleRepDataCon
+
+sumRepDataCon :: DataCon
+sumRepDataCon = pcSpecialDataCon sumRepDataConName [ mkListTy runtimeRepTy ]
+                                 runtimeRepTyCon (RuntimeRep prim_rep_fun)
+  where
+    prim_rep_fun [rr_ty_list]
+      = map slotPrimRep (ubxSumRepType prim_repss)
+      where
+        rr_tys     = extractPromotedList rr_ty_list
+        doc        = text "sumRepDataCon" <+> ppr rr_tys
+        prim_repss = map (runtimeRepPrimRep doc) rr_tys
+    prim_rep_fun args
+      = pprPanic "sumRepDataCon" (ppr args)
+
+sumRepDataConTyCon :: TyCon
+sumRepDataConTyCon = promoteDataCon sumRepDataCon
 
 -- See Note [Wiring in RuntimeRep]
 runtimeRepSimpleDataCons :: [DataCon]
-ptrRepLiftedDataCon, ptrRepUnliftedDataCon :: DataCon
-runtimeRepSimpleDataCons@(ptrRepLiftedDataCon : ptrRepUnliftedDataCon : _)
+liftedRepDataCon :: DataCon
+runtimeRepSimpleDataCons@(liftedRepDataCon : _)
   = zipWithLazy mk_runtime_rep_dc
-    [ PtrRep, PtrRep, VoidRep, IntRep, WordRep, Int64Rep
-    , Word64Rep, AddrRep, FloatRep, DoubleRep
-    , panic "unboxed tuple PrimRep", panic "unboxed sum PrimRep" ]
+    [ LiftedRep, UnliftedRep, IntRep, WordRep, Int64Rep
+    , Word64Rep, AddrRep, FloatRep, DoubleRep ]
     runtimeRepSimpleDataConNames
   where
     mk_runtime_rep_dc primrep name
-      = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> primrep))
+      = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> [primrep]))
 
 -- See Note [Wiring in RuntimeRep]
-voidRepDataConTy, intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
-  word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy,
-  unboxedTupleRepDataConTy, unboxedSumRepDataConTy :: Type
-[_, _, voidRepDataConTy, intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
-   word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy,
-   unboxedTupleRepDataConTy, unboxedSumRepDataConTy] = map (mkTyConTy . promoteDataCon)
-                                   runtimeRepSimpleDataCons
+liftedRepDataConTy, unliftedRepDataConTy,
+  intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
+  word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy :: Type
+[liftedRepDataConTy, unliftedRepDataConTy,
+   intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
+   word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy]
+  = map (mkTyConTy . promoteDataCon) runtimeRepSimpleDataCons
 
 vecCountTyCon :: TyCon
 vecCountTyCon = pcNonEnumTyCon vecCountTyConName Nothing []
@@ -1167,12 +1211,12 @@ int8ElemRepDataConTy, int16ElemRepDataConTy, int32ElemRepDataConTy,
   doubleElemRepDataConTy] = map (mkTyConTy . promoteDataCon)
                                 vecElemDataCons
 
-ptrRepLiftedDataConTyCon :: TyCon
-ptrRepLiftedDataConTyCon = promoteDataCon ptrRepLiftedDataCon
+liftedRepDataConTyCon :: TyCon
+liftedRepDataConTyCon = promoteDataCon liftedRepDataCon
 
--- The type ('PtrRepLifted)
-ptrRepLiftedTy :: Type
-ptrRepLiftedTy = mkTyConTy ptrRepLiftedDataConTyCon
+-- The type ('LiftedRep)
+liftedRepTy :: Type
+liftedRepTy = mkTyConTy liftedRepDataConTyCon
 
 {- *********************************************************************
 *                                                                      *
@@ -1570,3 +1614,36 @@ promotedGTDataCon     = promoteDataCon gtDataCon
 promotedConsDataCon, promotedNilDataCon :: TyCon
 promotedConsDataCon   = promoteDataCon consDataCon
 promotedNilDataCon    = promoteDataCon nilDataCon
+
+-- | Make a *promoted* list.
+mkPromotedListTy :: Kind   -- ^ of the elements of the list
+                 -> [Type] -- ^ elements
+                 -> Type
+mkPromotedListTy k tys
+  = foldr cons nil tys
+  where
+    cons :: Type  -- element
+         -> Type  -- list
+         -> Type
+    cons elt list = mkTyConApp promotedConsDataCon [k, elt, list]
+
+    nil :: Type
+    nil = mkTyConApp promotedNilDataCon [k]
+
+-- | Extract the elements of a promoted list. Panics if the type is not a
+-- promoted list
+extractPromotedList :: Type    -- ^ The promoted list
+                    -> [Type]
+extractPromotedList tys = go tys
+  where
+    go list_ty
+      | Just (tc, [_k, t, ts]) <- splitTyConApp_maybe list_ty
+      = ASSERT( tc `hasKey` consDataConKey )
+        t : go ts
+
+      | Just (tc, [_k]) <- splitTyConApp_maybe list_ty
+      = ASSERT( tc `hasKey` nilDataConKey )
+        []
+
+      | otherwise
+      = pprPanic "extractPromotedList" (ppr tys)

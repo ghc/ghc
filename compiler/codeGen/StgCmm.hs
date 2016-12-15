@@ -232,10 +232,10 @@ cgDataCon data_con
             -- We're generating info tables, so we don't know and care about
             -- what the actual arguments are. Using () here as the place holder.
             arg_reps :: [NonVoid PrimRep]
-            arg_reps = [ NonVoid (typePrimRep rep_ty)
+            arg_reps = [ NonVoid rep_ty
                        | ty <- dataConRepArgTys data_con
-                       , rep_ty <- repTypeArgs ty
-                       , not (isVoidTy rep_ty)]
+                       , rep_ty <- typePrimRep ty
+                       , not (isVoidRep rep_ty) ]
 
         ; emitClosureAndInfoTable dyn_info_tbl NativeDirectCall [] $
             -- NB: the closure pointer is assumed *untagged* on

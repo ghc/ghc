@@ -33,8 +33,7 @@ import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan )
-import PrelNames ( typeableClassName, hasKey, ptrRepLiftedDataConKey
-                 , ptrRepUnliftedDataConKey )
+import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey )
 import Id
 import Var
 import VarSet
@@ -1464,7 +1463,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
              extra2 = important $ mkEqInfoMsg ct ty1 ty2
 
              interesting_tyvars
-               = filter (not . isEmptyVarSet . tyCoVarsOfType . tyVarKind) $
+               = filter (not . noFreeVarsOfType . tyVarKind) $
                  filter isTyVar $
                  fvVarList $
                  tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
@@ -1689,20 +1688,14 @@ misMatchMsg ct oriented ty1 ty2
   = misMatchMsg ct (Just IsSwapped) ty2 ty1
 
   -- These next two cases are when we're about to report, e.g., that
-  -- 'PtrRepLifted doesn't match 'VoidRep. Much better just to say
+  -- 'LiftedRep doesn't match 'VoidRep. Much better just to say
   -- lifted vs. unlifted
   | Just (tc1, []) <- splitTyConApp_maybe ty1
-  , tc1 `hasKey` ptrRepLiftedDataConKey
+  , tc1 `hasKey` liftedRepDataConKey
   = lifted_vs_unlifted
 
   | Just (tc2, []) <- splitTyConApp_maybe ty2
-  , tc2 `hasKey` ptrRepLiftedDataConKey
-  = lifted_vs_unlifted
-
-  | Just (tc1, []) <- splitTyConApp_maybe ty1
-  , Just (tc2, []) <- splitTyConApp_maybe ty2
-  ,    (tc1 `hasKey` ptrRepLiftedDataConKey && tc2 `hasKey` ptrRepUnliftedDataConKey)
-    || (tc1 `hasKey` ptrRepUnliftedDataConKey && tc2 `hasKey` ptrRepLiftedDataConKey)
+  , tc2 `hasKey` liftedRepDataConKey
   = lifted_vs_unlifted
 
   | otherwise  -- So now we have Nothing or (Just IsSwapped)

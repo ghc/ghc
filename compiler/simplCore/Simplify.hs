@@ -1157,6 +1157,10 @@ simplCast env body co0 cont0
        addCoerce co (ApplyToVal { sc_arg = arg, sc_env = arg_se
                                 , sc_dup = dup, sc_cont = tail })
          | Just (co1, co2) <- pushCoValArg co
+         , Pair _ new_ty <- coercionKind co1
+         , not (isTypeLevPoly new_ty)  -- without this check, we get a lev-poly arg
+                                       -- See Note [Levity polymorphism invariants] in CoreSyn
+                                       -- test: typecheck/should_run/EtaExpandLevPoly
          = do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
                    -- When we build the ApplyTo we can't mix the OutCoercion
                    -- 'co' with the InExpr 'arg', so we simplify

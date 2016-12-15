@@ -316,6 +316,7 @@ data IfaceInfoItem
   | HsUnfold        Bool             -- True <=> isStrongLoopBreaker is true
                     IfaceUnfolding   -- See Note [Expose recursive functions]
   | HsNoCafRefs
+  | HsLevity                         -- Present <=> never levity polymorphic
 
 -- NB: Specialisations and rules come in separately and are
 -- only later attached to the Id.  Partial reason: some are orphans.
@@ -1156,6 +1157,7 @@ instance Outputable IfaceInfoItem where
   ppr (HsArity arity)       = text "Arity:" <+> int arity
   ppr (HsStrictness str) = text "Strictness:" <+> pprIfaceStrictSig str
   ppr HsNoCafRefs           = text "HasNoCafRefs"
+  ppr HsLevity              = text "Never levity-polymorphic"
 
 instance Outputable IfaceUnfolding where
   ppr (IfCompulsory e)     = text "<compulsory>" <+> parens (ppr e)
@@ -1817,6 +1819,7 @@ instance Binary IfaceInfoItem where
     put_ bh (HsUnfold lb ad)      = putByte bh 2 >> put_ bh lb >> put_ bh ad
     put_ bh (HsInline ad)         = putByte bh 3 >> put_ bh ad
     put_ bh HsNoCafRefs           = putByte bh 4
+    put_ bh HsLevity              = putByte bh 5
     get bh = do
         h <- getByte bh
         case h of
@@ -1826,7 +1829,8 @@ instance Binary IfaceInfoItem where
                     ad <- get bh
                     return (HsUnfold lb ad)
             3 -> liftM HsInline $ get bh
-            _ -> return HsNoCafRefs
+            4 -> return HsNoCafRefs
+            _ -> return HsLevity
 
 instance Binary IfaceUnfolding where
     put_ bh (IfCoreUnfold s e) = do

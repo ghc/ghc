@@ -82,7 +82,7 @@ data TyCon (a :: k) where
   Arrow :: TyCon (->)
   TYPE  :: TyCon TYPE
   RuntimeRep :: TyCon RuntimeRep
-  PtrRepLifted' :: TyCon 'PtrRepLifted
+  LiftedRep' :: TyCon 'LiftedRep
   -- If extending, add to eqTyCon too
 
 eqTyCon :: TyCon a -> TyCon b -> Maybe (a :~~: b)
@@ -94,7 +94,7 @@ eqTyCon Maybe Maybe = Just HRefl
 eqTyCon Arrow Arrow = Just HRefl
 eqTyCon TYPE TYPE = Just HRefl
 eqTyCon RuntimeRep RuntimeRep = Just HRefl
-eqTyCon PtrRepLifted' PtrRepLifted' = Just HRefl
+eqTyCon LiftedRep' LiftedRep' = Just HRefl
 eqTyCon _ _ = Nothing
 
 -- Check whether or not a type is really a plain old tycon;
@@ -212,7 +212,7 @@ instance TyConAble []        where tyCon = List
 instance TyConAble Maybe     where tyCon = Maybe
 instance TyConAble (->)      where tyCon = Arrow
 instance TyConAble TYPE      where tyCon = TYPE
-instance TyConAble 'PtrRepLifted   where tyCon = PtrRepLifted'
+instance TyConAble 'LiftedRep   where tyCon = LiftedRep'
 instance TyConAble RuntimeRep    where tyCon = RuntimeRep
 
 -- Can't just define Typeable the way we want, because the instances

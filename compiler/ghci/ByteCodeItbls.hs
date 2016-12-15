@@ -16,7 +16,7 @@ import HscTypes
 import Name             ( Name, getName )
 import NameEnv
 import DataCon          ( DataCon, dataConRepArgTys, dataConIdentity )
-import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons, isVoidRep )
+import TyCon            ( TyCon, tyConFamilySize, isDataTyCon, tyConDataCons )
 import RepType
 import StgCmmLayout     ( mkVirtConstrSizes )
 import StgCmmClosure    ( tagForCon, NonVoid (..) )
@@ -56,9 +56,7 @@ make_constr_itbls hsc_env cons =
   mk_itbl dcon conNo = do
      let rep_args = [ NonVoid prim_rep
                     | arg <- dataConRepArgTys dcon
-                    , slot_ty <- repTypeSlots (repType arg)
-                    , let prim_rep = slotPrimRep slot_ty
-                    , not (isVoidRep prim_rep) ]
+                    , prim_rep <- typePrimRep arg ]
 
          (tot_wds, ptr_wds) =
              mkVirtConstrSizes dflags rep_args

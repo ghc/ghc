@@ -62,7 +62,7 @@ import PprCore     ( {- instances -} )
 import PrimOp      ( PrimOp, PrimCall )
 import TyCon       ( PrimRep(..), TyCon )
 import Type        ( Type )
-import RepType     ( typePrimRep )
+import RepType     ( typePrimRep1 )
 import Unique      ( Unique )
 import Util
 
@@ -104,10 +104,10 @@ isDllConApp dflags this_mod con args
     = isDllName dflags this_mod (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
-    -- NB: typePrimRep is legit because any free variables won't have
+    -- NB: typePrimRep1 is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool
-    is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep (idType v))
+    is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep1 (idType v))
                              && isDllName dflags this_mod (idName v)
     is_dll_arg _             = False
 
@@ -124,9 +124,10 @@ isDllConApp dflags this_mod con args
 --    $WT1 = T1 Int (Coercion (Refl Int))
 -- The coercion argument here gets VoidRep
 isAddrRep :: PrimRep -> Bool
-isAddrRep AddrRep = True
-isAddrRep PtrRep  = True
-isAddrRep _       = False
+isAddrRep AddrRep     = True
+isAddrRep LiftedRep   = True
+isAddrRep UnliftedRep = True
+isAddrRep _           = False
 
 -- | Type of an @StgArg@
 --
@@ -533,10 +534,11 @@ type GenStgAlt bndr occ
      GenStgExpr bndr occ)       -- ...right-hand side.
 
 data AltType
-  = PolyAlt             -- Polymorphic (a type variable)
+  = PolyAlt             -- Polymorphic (a lifted type variable)
   | MultiValAlt Int     -- Multi value of this arity (unboxed tuple or sum)
+                        -- the arity could indeed be 1 for unary unboxed tuple
   | AlgAlt      TyCon   -- Algebraic data type; the AltCons will be DataAlts
-  | PrimAlt     TyCon   -- Primitive data type; the AltCons will be LitAlts
+  | PrimAlt     PrimRep -- Primitive data type; the AltCons (if any) will be LitAlts
 
 {-
 ************************************************************************

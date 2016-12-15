@@ -39,8 +39,8 @@ import ForeignCall
 import Id
 import PrimOp
 import TyCon
-import Type
-import RepType          ( isVoidTy, countConRepArgs )
+import Type             ( isUnliftedType )
+import RepType          ( isVoidTy, countConRepArgs, primRepSlot )
 import CostCentre       ( CostCentreStack, currentCCS )
 import Maybes
 import Util
@@ -49,6 +49,7 @@ import Outputable
 
 import Control.Monad (unless,void)
 import Control.Arrow (first)
+import Data.Function ( on )
 
 import Prelude hiding ((<*>))
 
@@ -402,14 +403,23 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
   = -- assignment suffices for unlifted types
     do { dflags <- getDynFlags
        ; unless reps_compatible $
-           panic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
+           pprPanic "cgCase: reps do not match, perhaps a dodgy unsafeCoerce?"
+                    (pp_bndr v $$ pp_bndr bndr)
        ; v_info <- getCgIdInfo v
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
        ; bindArgToReg (NonVoid bndr)
        ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
-    reps_compatible = idPrimRep v == idPrimRep bndr
+    reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
+      -- Must compare SlotTys, not proper PrimReps, because with unboxed sums,
+      -- the types of the binders are generated from slotPrimRep and might not
+      -- match. Test case:
+      --   swap :: (# Int | Int #) -> (# Int | Int #)
+      --   swap (# x | #) = (# | x #)
+      --   swap (# | y #) = (# y | #)
+
+    pp_bndr id = ppr id <+> dcolon <+> ppr (idType id) <+> parens (ppr (idPrimRep id))
 
 {- Note [Dodgy unsafeCoerce 2, #3132]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -163,8 +163,8 @@ assertNonVoidStgArgs args = ASSERT(not (any (isVoidTy . stgArgType) args))
 -- Why are these here?
 
 idPrimRep :: Id -> PrimRep
-idPrimRep id = typePrimRep (idType id)
-    -- NB: typePrimRep fails on unboxed tuples,
+idPrimRep id = typePrimRep1 (idType id)
+    -- NB: typePrimRep1 fails on unboxed tuples,
     --     but by StgCmm no Ids have unboxed tuple type
 
 addIdReps :: [NonVoid Id] -> [NonVoid (PrimRep, Id)]
@@ -176,7 +176,7 @@ addArgReps = map (\arg -> let arg' = fromNonVoid arg
                            in NonVoid (argPrimRep arg', arg'))
 
 argPrimRep :: StgArg -> PrimRep
-argPrimRep arg = typePrimRep (stgArgType arg)
+argPrimRep arg = typePrimRep1 (stgArgType arg)
 
 
 -----------------------------------------------------------------------------
@@ -292,8 +292,8 @@ might_be_a_function :: Type -> Bool
 -- Return False only if we are *sure* it's a data type
 -- Look through newtypes etc as much as poss
 might_be_a_function ty
-  | UnaryRep rep <- repType ty
-  , Just tc <- tyConAppTyCon_maybe rep
+  | [LiftedRep] <- typePrimRep ty
+  , Just tc <- tyConAppTyCon_maybe (unwrapType ty)
   , isDataTyCon tc
   = False
   | otherwise
