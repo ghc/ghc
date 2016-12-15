@@ -30,6 +30,9 @@
 
   * Added `Eq1`, `Ord1`, `Read1` and `Show1` instances for `NonEmpty`.
 
+  * Add wrappers for `blksize_t`, `blkcnt_t`, `clockid_t`, `fsblkcnt_t`,
+    `fsfilcnt_t`, `id_t`, `key_t` and `timer_t` to System.Posix.Types (#12795)
+
   * Raw buffer operations in `GHC.IO.FD` are now strict in the buffer, offset, and length operations (#9696)
 
 ## 4.9.0.0  *May 2016*
