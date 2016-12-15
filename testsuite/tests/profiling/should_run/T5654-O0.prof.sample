@@ -1,0 +1,28 @@
+	Thu Dec  8 11:35 2016 Time and Allocation Profiling Report  (Final)
+
+	   T5654-O0 +RTS -p -RTS
+
+	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
+	total alloc =      39,184 bytes  (excludes profiling overheads)
+
+COST CENTRE MODULE           SRC              %time %alloc
+
+MAIN        MAIN             <built-in>         0.0    1.0
+CAF         GHC.IO.Handle.FD <entire-module>    0.0   88.3
+CAF         GHC.IO.Encoding  <entire-module>    0.0    7.1
+CAF         GHC.Conc.Signal  <entire-module>    0.0    1.6
+
+
+                                                                         individual      inherited
+COST CENTRE MODULE                SRC                 no.     entries  %time %alloc   %time %alloc
+
+MAIN        MAIN                  <built-in>          104          0    0.0    1.0     0.0  100.0
+ CAF        Main                  <entire-module>     207          0    0.0    0.9     0.0    1.4
+  f         Main                  T5654-O0.hs:7:1-5   209          1    0.0    0.1     0.0    0.1
+  main      Main                  T5654-O0.hs:13:1-21 208          1    0.0    0.3     0.0    0.4
+   f        Main                  T5654-O0.hs:7:1-5   210          0    0.0    0.0     0.0    0.1
+    g       Main                  T5654-O0.hs:11:1-11 211          1    0.0    0.1     0.0    0.1
+ CAF        GHC.Conc.Signal       <entire-module>     201          0    0.0    1.6     0.0    1.6
+ CAF        GHC.IO.Encoding       <entire-module>     191          0    0.0    7.1     0.0    7.1
+ CAF        GHC.IO.Encoding.Iconv <entire-module>     189          0    0.0    0.6     0.0    0.6
+ CAF        GHC.IO.Handle.FD      <entire-module>     181          0    0.0   88.3     0.0   88.3

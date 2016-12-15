@@ -288,7 +288,13 @@
 //    explicit jumps, for use when we are doing the stack management
 //    ourselves.
 
+#if defined(PROFILING)
+// See Note [Evaluating functions with profiling] in rts/Apply.cmm
+#define ENTER(x) jump stg_ap_0_fast(x);
+#else
 #define ENTER(x) ENTER_(return,x)
+#endif
+
 #define ENTER_R1() ENTER_(RET_R1,R1)
 
 #define RET_R1(x) jump %ENTRY_CODE(Sp(0)) [R1]

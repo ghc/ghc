@@ -1,9 +1,9 @@
-	Sat Jun  4 11:59 2016 Time and Allocation Profiling Report  (Final)
+	Thu Dec  8 15:23 2016 Time and Allocation Profiling Report  (Final)
 
 	   T680 +RTS -hc -p -RTS
 
 	total time  =        0.00 secs   (0 ticks @ 1000 us, 1 processor)
-	total alloc =     752,952 bytes  (excludes profiling overheads)
+	total alloc =     753,032 bytes  (excludes profiling overheads)
 
 COST CENTRE MODULE           SRC                    %time %alloc
 
@@ -17,26 +17,26 @@ foo.bar.\   Main             T680.hs:(8,11)-(9,38)    0.0   38.2
                                                                                     individual      inherited
 COST CENTRE          MODULE                SRC                   no.     entries  %time %alloc   %time %alloc
 
-MAIN                 MAIN                  <built-in>             46          0    0.0    0.1     0.0  100.0
- CAF                 Main                  <entire-module>        91          0    0.0    0.0     0.0   93.6
-  k                  Main                  T680.hs:12:1-17        95          1    0.0    0.0     0.0    0.0
-   foo               Main                  T680.hs:(2,1)-(9,38)   96          1    0.0    0.0     0.0    0.0
-    foo.bar          Main                  T680.hs:(5,3)-(9,38)  100          1    0.0    0.0     0.0    0.0
-     foo.bar.k'      Main                  T680.hs:6:9-34        104          1    0.0    0.0     0.0    0.0
-      k.\            Main                  T680.hs:12:16         105          1    0.0    0.0     0.0    0.0
-  main               Main                  T680.hs:20:1-14        92          1    0.0    0.0     0.0    0.0
-  r                  Main                  T680.hs:18:1-26        94          1    0.0    0.0     0.0   93.5
-   k                 Main                  T680.hs:12:1-17        97          0    0.0    0.0     0.0   93.5
-    foo              Main                  T680.hs:(2,1)-(9,38)   98          0    0.0    0.0     0.0   93.5
-     foo.\           Main                  T680.hs:3:12-40        99       4001    0.0   25.5     0.0   25.5
-     foo.bar         Main                  T680.hs:(5,3)-(9,38)  101          0    0.0   29.8     0.0   68.0
-      foo.bar.\      Main                  T680.hs:(8,11)-(9,38) 102       4001    0.0   38.2     0.0   38.2
-       foo.bar.\.k'' Main                  T680.hs:8:15-27       103       4000    0.0    0.0     0.0    0.0
-      foo.bar.k'     Main                  T680.hs:6:9-34        106          0    0.0    0.0     0.0    0.0
- CAF                 GHC.IO.Handle.FD      <entire-module>        84          0    0.0    4.6     0.0    4.6
- CAF                 GHC.IO.Handle.Text    <entire-module>        83          0    0.0    0.0     0.0    0.0
- CAF                 GHC.Conc.Signal       <entire-module>        80          0    0.0    0.1     0.0    0.1
- CAF                 GHC.IO.Encoding       <entire-module>        78          0    0.0    0.4     0.0    0.4
- CAF                 GHC.Show              <entire-module>        76          0    0.0    0.0     0.0    0.0
- CAF                 GHC.IO.Encoding.Iconv <entire-module>        62          0    0.0    0.0     0.0    0.0
- main                Main                  T680.hs:20:1-14        93          0    0.0    1.2     0.0    1.2
+MAIN                 MAIN                  <built-in>            104          0    0.0    0.1     0.0  100.0
+ CAF                 Main                  <entire-module>       207          0    0.0    0.0     0.0   93.5
+  k                  Main                  T680.hs:12:1-17       211          1    0.0    0.0     0.0    0.0
+   foo               Main                  T680.hs:(2,1)-(9,38)  212          1    0.0    0.0     0.0    0.0
+    foo.bar          Main                  T680.hs:(5,3)-(9,38)  216          1    0.0    0.0     0.0    0.0
+     foo.bar.k'      Main                  T680.hs:6:9-34        220          1    0.0    0.0     0.0    0.0
+      k.\            Main                  T680.hs:12:16         221          1    0.0    0.0     0.0    0.0
+  main               Main                  T680.hs:20:1-14       208          1    0.0    0.0     0.0    0.0
+  r                  Main                  T680.hs:18:1-26       210          1    0.0    0.0     0.0   93.5
+   k                 Main                  T680.hs:12:1-17       213          0    0.0    0.0     0.0   93.5
+    foo              Main                  T680.hs:(2,1)-(9,38)  214          0    0.0    0.0     0.0   93.5
+     foo.\           Main                  T680.hs:3:12-40       215       4001    0.0   25.5     0.0   25.5
+     foo.bar         Main                  T680.hs:(5,3)-(9,38)  217          0    0.0   29.8     0.0   68.0
+      foo.bar.\      Main                  T680.hs:(8,11)-(9,38) 218       4001    0.0   38.2     0.0   38.2
+       foo.bar.\.k'' Main                  T680.hs:8:15-27       219       4000    0.0    0.0     0.0    0.0
+      foo.bar.k'     Main                  T680.hs:6:9-34        222          0    0.0    0.0     0.0    0.0
+ CAF                 GHC.Conc.Signal       <entire-module>       201          0    0.0    0.1     0.0    0.1
+ CAF                 GHC.IO.Encoding       <entire-module>       191          0    0.0    0.4     0.0    0.4
+ CAF                 GHC.IO.Encoding.Iconv <entire-module>       189          0    0.0    0.0     0.0    0.0
+ CAF                 GHC.IO.Handle.FD      <entire-module>       181          0    0.0    4.6     0.0    4.6
+ CAF                 GHC.IO.Handle.Text    <entire-module>       179          0    0.0    0.0     0.0    0.0
+ CAF                 GHC.Show              <entire-module>       165          0    0.0    0.0     0.0    0.0
+ main                Main                  T680.hs:20:1-14       209          0    0.0    1.2     0.0    1.2
