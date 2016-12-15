@@ -1,11 +1,21 @@
+{-# LANGUAGE MagicHash #-}
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE UnboxedTuples #-}
+
 module Main where
 
-import Data.Array.IO
-import Data.Word
+import GHC.Exts
+import GHC.Base
 
 -- Try to overflow BLOCK_ROUND_UP in the computation of req_blocks in allocate()
--- Here we invoke allocate() via newByteArray# and the array package.
+-- Here we invoke allocate() via newByteArray#.
 -- Request a number of bytes close to HS_WORD_MAX,
 -- subtracting a few words for overhead in newByteArray#.
--- Allocate Word32s (rather than Word8s) to get around bounds-checking in array.
-main = newArray (0,maxBound `div` 4 - 10) 0 :: IO (IOUArray Word Word32)
+main :: IO ()
+main =
+    IO $ \s1# ->
+           case newByteArray# (maxInt# -# 10#) s1# of
+             (# s2#, _ #) -> (# s2#, () #)
+  where
+    maxInt# :: Int#
+    !(I# maxInt#) = maxBound
