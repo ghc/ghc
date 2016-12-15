@@ -100,6 +100,18 @@ Compiler
 - The Mingw-w64 toolchain for the Windows version of GHC has been updated. GHC now uses
   `GCC 6.2.0` and `binutils 2.27`.
 
+- Previously, :ghc-flag:`-Wmissing-methods` would not warn whenever a type
+  class method beginning with an underscore was not implemented in an instance.
+  For instance, this code would compile without any warnings: ::
+
+     class Foo a where
+       _Bar :: a -> Int
+
+     instance Foo Int
+
+  :ghc-flag:`-Wmissing-methods` will now warn that ``_Bar`` is not implemented
+  in the ``Foo Int`` instance.
+
 GHCi
 ~~~~
 

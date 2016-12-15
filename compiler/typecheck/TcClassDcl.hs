@@ -293,12 +293,10 @@ tcClassMinimalDef _clas sigs op_info
                    (\bf -> addWarnTc NoReason (warningMinimalDefIncomplete bf))
         return mindef
   where
-    -- By default require all methods without a default
-    -- implementation whose names don't start with '_'
+    -- By default require all methods without a default implementation
     defMindef :: ClassMinimalDef
     defMindef = mkAnd [ noLoc (mkVar name)
-                      | (name, _, Nothing) <- op_info
-                      , not (startsWithUnderscore (getOccName name)) ]
+                      | (name, _, Nothing) <- op_info ]
 
 instantiateMethod :: Class -> Id -> [TcType] -> TcType
 -- Take a class operation, say

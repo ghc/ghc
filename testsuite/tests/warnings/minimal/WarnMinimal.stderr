@@ -30,6 +30,12 @@ WarnMinimal.hs:84:1: warning:
       but there is no default implementation.
     • In the class declaration for ‘Cheater’
 
+WarnMinimal.hs:88:1: warning:
+    • The MINIMAL pragma does not require:
+        ‘_cheater2’
+      but there is no default implementation.
+    • In the class declaration for ‘Cheater2’
+
 WarnMinimal.hs:92:1: warning:
     • The MINIMAL pragma does not require:
         ‘cheater3b’
@@ -45,7 +51,7 @@ WarnMinimal.hs:99:10: warning: [-Wmissing-methods (in -Wdefault)]
 
 WarnMinimal.hs:105:10: warning: [-Wmissing-methods (in -Wdefault)]
     • No explicit implementation for
-        ‘needed’
+        ‘needed’ and ‘_alsoNeeded’
     • In the instance declaration for ‘NoExplicit Int’
 
 WarnMinimal.hs:116:10: warning: [-Wmissing-methods (in -Wdefault)]

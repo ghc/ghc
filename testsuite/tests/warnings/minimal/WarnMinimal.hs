@@ -87,7 +87,7 @@ class Cheater a where  -- WARNING LINE
 
 class Cheater2 a where
   _cheater2 :: a
-  {-# MINIMAL #-} -- no warning
+  {-# MINIMAL #-} -- warning!
 
 class Cheater3 a where  -- WARNING LINE
   cheater3, cheater3b :: a
@@ -100,7 +100,7 @@ instance Num Bool where  -- WARNING LINE
 
 class NoExplicit a where
   needed :: a
-  _optional :: a
+  _alsoNeeded :: a
 
 instance NoExplicit Int where  -- WARNING LINE
 
