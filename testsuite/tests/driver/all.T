@@ -501,3 +501,5 @@ test('T10923',
 test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 
 test('T12955', normal, run_command, ['$MAKE -s --no-print-directory T12955'])
+
+test('T12971', expect_broken(12971), run_command, ['$MAKE -s --no-print-directory T12971'])

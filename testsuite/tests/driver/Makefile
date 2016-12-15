@@ -641,3 +641,8 @@ T10923:
 T12955:
 	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T12955
 	! "$(TEST_HC)" $(TEST_HC_OPTS) --make T12955 -fbuilding-cabal-package
+
+.PHONY: T12971
+T12971:
+	mkdir -p ä
+	! TMP=ä "$(TEST_HC)" $(TEST_HC_OPTS) --make T12971
