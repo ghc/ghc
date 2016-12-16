@@ -339,8 +339,12 @@ SupportsSplitObjs := $(strip \
                                $(filter NO,$(GhcUnregisterised))),\
                           YES,NO))
 
-# By default, enable SplitObjs for the libraries if this build supports it
-SplitObjs=$(SupportsSplitObjs)
+# By default, enable SplitObjs for the libraries if this build supports it.
+# Unless SplitSections is enabled - then let that take precedence.
+SplitObjs = $(strip \
+    $(if $(and $(filter YES,$(SupportsSplitObjs)),\
+               $(filter NO,$(SplitSections))),\
+         YES,NO))
 
 # ----------------------------------------------------------------------------
 # Section splitting
@@ -349,9 +353,16 @@ SplitObjs=$(SupportsSplitObjs)
 # like SplitObjs, but doesn't require post-processing and splitting of object
 # files.
 #
-# Set SplitSections=YES in your build.mk to enable.
-
-SplitSections=NO
+# Set SplitSections=YES or NO in your build.mk to override the default.
+#
+# This is not supported on Darwin (where you can use subsections-via-symbols
+# instead) and Windows is not yet working. (See #11445 and related tickets.)
+OsSupportsSplitSections=$(strip $(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES))
+SupportsSplitSections = $(strip \
+                    $(if $(and $(filter YES,$(OsSupportsSplitSections)),\
+                               $(filter YES,$(LdIsGNULd))),\
+                          YES,NO))
+SplitSections ?= $(SupportsSplitSections)
 
 # ----------------------------------------------------------------------------
 
