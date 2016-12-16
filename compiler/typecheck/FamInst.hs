@@ -7,6 +7,7 @@ module FamInst (
         checkFamInstConsistency, tcExtendLocalFamInstEnv,
         tcLookupDataFamInst, tcLookupDataFamInst_maybe,
         tcInstNewTyCon_maybe, tcTopNormaliseNewTypeTF_maybe,
+        checkRecFamInstConsistency,
         newFamInst,
 
         -- * Injectivity
@@ -41,8 +42,10 @@ import VarSet
 import Bag( Bag, unionBags, unitBag )
 import Control.Monad
 import Unique
+import NameEnv
 import Data.Set (Set)
 import qualified Data.Set as Set
+import Data.List
 
 #include "HsVersions.h"
 
@@ -116,6 +119,9 @@ modules where both modules occur in the `HscTypes.dep_finsts' set (of the
 `HscTypes.Dependencies') of one of our directly imported modules must have
 already been checked.  Everything else, we check now.  (So that we can be
 certain that the modules in our `HscTypes.dep_finsts' are consistent.)
+
+There is some fancy footwork regarding hs-boot module loops, see
+Note [Don't check hs-boot type family instances too early]
 -}
 
 -- The optimisation of overlap tests is based on determining pairs of modules
@@ -181,7 +187,14 @@ listToSet l = Set.fromList l
 --
 -- See Note [Checking family instance consistency] for more
 -- details.
-checkFamInstConsistency :: [Module] -> [Module] -> TcM ()
+--
+-- This function doesn't check ALL instances for consistency,
+-- only ones that aren't involved in recursive knot-tying
+-- loops; see Note [Don't check hs-boot type family instances too early].
+-- It returns a modified 'TcGblEnv' that has saved the
+-- instances that need to be checked later; use 'checkRecFamInstConsistency'
+-- to check those.
+checkFamInstConsistency :: [Module] -> [Module] -> TcM TcGblEnv
 checkFamInstConsistency famInstMods directlyImpMods
   = do { dflags     <- getDynFlags
        ; (eps, hpt) <- getEpsAndHpt
@@ -210,7 +223,10 @@ checkFamInstConsistency famInstMods directlyImpMods
                  -- See Note [ModulePairSet determinism and performance]
              }
 
-       ; mapM_ (check hpt_fam_insts) toCheckPairs
+       ; pending_checks <- mapM (check hpt_fam_insts) toCheckPairs
+       ; tcg_env <- getGblEnv
+       ; return tcg_env { tcg_pending_fam_checks
+                           = foldl' (plusNameEnv_C (++)) emptyNameEnv pending_checks }
        }
   where
     allPairs []     = []
@@ -219,11 +235,56 @@ checkFamInstConsistency famInstMods directlyImpMods
     check hpt_fam_insts (ModulePair m1 m2)
       = do { env1 <- getFamInsts hpt_fam_insts m1
            ; env2 <- getFamInsts hpt_fam_insts m2
-           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))
-                   (famInstEnvElts env1)
-           ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2))
-                   (famInstEnvElts env1)
+           -- Note [Don't check hs-boot type family instances too early]
+           -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+           -- Family instance consistency checking involves checking that
+           -- the family instances of our imported modules are consistent with
+           -- one another; this might lead you to think that this process
+           -- has nothing to do with the module we are about to typecheck.
+           -- Not so!  If a type family was defined in the hs-boot file
+           -- of the current module, we are NOT allowed to poke the TyThing
+           -- for this family: since we haven't typechecked the definition
+           -- yet (checkFamInstConsistency is called during renaming),
+           -- we won't be able to find our local copy in if_rec_types.
+           -- Failing to do this lead to #11062.
+           --
+           -- So, we have to defer the checks for family instances that
+           -- refer to families that are locally defined.
+           --
+           -- See also Note [Tying the knot] and Note [Type-checking inside the knot]
+           -- for why we are doing this at all.
+           ; this_mod <- getModule
+           ; let (check_now, check_later)
+                    -- NB: == this_mod only holds if there's an hs-boot file;
+                    -- otherwise we cannot possible see instances for families
+                    -- *defined by the module we are compiling* in imports.
+                    = partition ((/= this_mod) . nameModule . fi_fam)
+                                (famInstEnvElts env1)
+           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
+           ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
+           ; let check_later_map =
+                    extendNameEnvList_C (++) emptyNameEnv
+                        [(fi_fam finst, [finst]) | finst <- check_later]
+           ; return (mapNameEnv (\xs -> [(xs, env2)]) check_later_map)
  }
+
+-- | Given a 'TyCon' that has been incorporated into the type
+-- environment (the knot is tied), if it is a type family, check
+-- that all deferred instances for it are consistent.
+-- See Note [Don't check hs-boot type family instances too early]
+checkRecFamInstConsistency :: TyCon -> TcM ()
+checkRecFamInstConsistency tc = do
+   tcg_env <- getGblEnv
+   let checkConsistency tc
+        | isFamilyTyCon tc
+        , Just pairs <- lookupNameEnv (tcg_pending_fam_checks tcg_env)
+                                      (tyConName tc)
+        = forM_ pairs $ \(check_now, env2) -> do
+            mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
+            mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
+        | otherwise
+        = return ()
+   checkConsistency tc
 
 
 getFamInsts :: ModuleEnv FamInstEnv -> Module -> TcM FamInstEnv

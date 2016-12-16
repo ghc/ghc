@@ -347,9 +347,9 @@ tcRnImports hsc_env import_decls
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
-        ; checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
+        ; tcg_env <- checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
 
-        ; getGblEnv } }
+        ; return tcg_env } }
 
 {-
 ************************************************************************

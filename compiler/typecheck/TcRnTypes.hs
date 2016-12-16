@@ -501,6 +501,13 @@ data TcGblEnv
         tcg_fam_inst_env :: FamInstEnv, -- ^ Ditto for family instances
         tcg_ann_env      :: AnnEnv,     -- ^ And for annotations
 
+        -- | Family instances we have to check for consistency.
+        -- Invariant: each FamInst in the list's fi_fam matches the
+        -- key of the entry in the 'NameEnv'.  This gets consumed
+        -- by 'checkRecFamInstConsistency'.
+        -- See Note [Don't check hs-boot type family instances too early]
+        tcg_pending_fam_checks :: NameEnv [([FamInst], FamInstEnv)],
+
                 -- Now a bunch of things about this module that are simply
                 -- accumulated, but never consulted until the end.
                 -- Nevertheless, it's convenient to accumulate them along

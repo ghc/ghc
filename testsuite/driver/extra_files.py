@@ -60,6 +60,7 @@ extra_src_files = {
   'T10955dyn': ['A.c', 'B.c'],
   'T10971d': ['T10971c.hs'],
   'T11018': ['Test11018.hs'],
+  'T11062': ['T11062.hs','T11062.hs-boot','T11062a.hs'],
   'T11072gcc': ['A.c', 'T11072.hs'],
   'T11072msvc': ['A.c', 'T11072.hs', 'libAS.def', 'i686/', 'x86_64/'],
   'T11223_link_order_a_b_2_fail': ['bar.c', 'foo.c', 'foo3.hs'],

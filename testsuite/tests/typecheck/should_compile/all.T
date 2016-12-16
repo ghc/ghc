@@ -497,6 +497,8 @@ test('T10770a', expect_broken(10770), compile, [''])
 test('T10770b', expect_broken(10770), compile, [''])
 test('T10935', normal, compile, [''])
 test('T10971a', normal, compile, [''])
+test('T11062', extra_clean(['T11062.hi-boot', 'T11062.o-boot', 'T11062a.hi', 'T11062a.o']),
+     multimod_compile, ['T11062', '-v0'])
 test('T11237', normal, compile, [''])
 test('T10592', normal, compile, [''])
 test('T11305', normal, compile, [''])
