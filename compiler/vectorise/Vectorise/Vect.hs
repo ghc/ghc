@@ -84,7 +84,7 @@ vRec vs es = (Rec (zip vvs ves), Rec (zip lvs les))
     (vvs, lvs) = unzip vs
     (ves, les) = unzip es
 
--- |Make a vectorised let expresion.
+-- |Make a vectorised let expression.
 --
 vLet :: VBind -> VExpr -> VExpr
 vLet = zipWithVect Let

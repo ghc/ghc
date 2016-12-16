@@ -703,7 +703,7 @@ match _ _ e@Tick{} _
 -- Consider matching
 --      \x->f      against    \f->f
 -- When we meet the lambdas we must remember to rename f to f' in the
--- second expresion.  The RnEnv2 does that.
+-- second expression.  The RnEnv2 does that.
 --
 -- Consider matching
 --      forall a. \b->b    against   \a->3

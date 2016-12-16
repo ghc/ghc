@@ -479,7 +479,7 @@ guessOutputFile = modifySession $ \env ->
 
         name_exe = do
 #if defined(mingw32_HOST_OS)
-          -- we must add the .exe extention unconditionally here, otherwise
+          -- we must add the .exe extension unconditionally here, otherwise
           -- when name has an extension of its own, the .exe extension will
           -- not be added by DriverPipeline.exeFileName.  See #2248
           name' <- fmap (<.> "exe") name

@@ -86,7 +86,7 @@ The smart constructors (`mkAnd` and `mkOr`) do some attempt to simplify expressi
     Implemented by mkAnd' / mkOr'
  3. Conjunction with false, disjunction with true is simplified, i.e.
      `mkAnd [mkFalse,x]` becomes `mkFalse`.
- 4. Common subexpresion elimination:
+ 4. Common subexpression elimination:
      `mkAnd [x,x,y]` is reduced to just `mkAnd [x,y]`.
 
 This simplification is not exhaustive, in the sense that it will not produce

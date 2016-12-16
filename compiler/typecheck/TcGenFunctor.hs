@@ -727,7 +727,7 @@ Deriving Functor, Foldable, and Traversable all require generating expressions
 which perform an operation on each argument of a data constructor depending
 on the argument's type. In particular, a generated operation can be different
 depending on whether the type mentions the last type variable of the datatype
-(e.g., if you have data T a = MkT a Int, then a generated foldr expresion would
+(e.g., if you have data T a = MkT a Int, then a generated foldr expression would
 fold over the first argument of MkT, but not the second).
 
 This pattern is abstracted with the FFoldType datatype, which provides hooks

@@ -1033,7 +1033,7 @@ lookupVar le v = case lookupVarEnv (le_env le) v of
                     _              -> Var v
 
 abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
-        -- Find the variables in fvs, free vars of the target expresion,
+        -- Find the variables in fvs, free vars of the target expression,
         -- whose level is greater than the destination level
         -- These are the ones we are going to abstract out
         --

@@ -357,7 +357,7 @@ stripTicksTop p = go []
         go ts other            = (reverse ts, other)
 
 -- | Strip ticks satisfying a predicate from top of an expression,
--- returning the remaining expresion
+-- returning the remaining expression
 stripTicksTopE :: (Tickish Id -> Bool) -> Expr b -> Expr b
 stripTicksTopE p = go
   where go (Tick t e) | p t = go e

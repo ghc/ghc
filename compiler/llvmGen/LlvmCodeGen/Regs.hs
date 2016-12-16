@@ -102,7 +102,7 @@ stgTBAA
     , (heapN,  fsLit "heap",  Just topN)
     , (rxN,    fsLit "rx",    Just heapN)
     , (baseN,  fsLit "base",  Just topN)
-    -- FIX: Not 100% sure if this heirarchy is complete.  I think the big thing
+    -- FIX: Not 100% sure if this hierarchy is complete.  I think the big thing
     -- is Sp is never aliased, so might want to change the hierarchy to have Sp
     -- on its own branch that is never aliased (e.g never use top as a TBAA
     -- node).

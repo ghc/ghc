@@ -468,7 +468,7 @@ callArityAnal arity int (Lam v e)
   where
     (ae, e') = callArityAnal (arity - 1) (int `delVarSet` v) e
 
--- Application. Increase arity for the called expresion, nothing to know about
+-- Application. Increase arity for the called expression, nothing to know about
 -- the second
 callArityAnal arity int (App e (Type t))
     = second (\e -> App e (Type t)) $ callArityAnal arity int e
