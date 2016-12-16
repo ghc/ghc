@@ -61,7 +61,6 @@ customBuild rs opts target@Target {..} = do
                     cmd [Cwd output] [path] "x" (top -/- input)
 
             Configure dir -> do
-                need [dir -/- "configure"]
                 -- Inject /bin/bash into `libtool`, instead of /bin/sh
                 let env = AddEnv "CONFIG_SHELL" "/bin/bash"
                 cmd Shell cmdEcho env [Cwd dir] [path] opts argList
@@ -76,9 +75,7 @@ customBuild rs opts target@Target {..} = do
                 Stdout output <- cmd (Stdin input) [path] argList
                 writeFileChanged file output
 
-            Make dir -> do
-                need [dir -/- "Makefile"]
-                cmd Shell cmdEcho path ["-C", dir] argList
+            Make dir -> cmd Shell cmdEcho path ["-C", dir] argList
 
             _  -> cmd [path] argList
 
@@ -170,6 +167,7 @@ isInternal = isJust . builderProvenance
 -- | Make sure a 'Builder' exists and rebuild it if out of date.
 needBuilder :: Builder -> Action ()
 needBuilder (Configure dir) = need [dir -/- "configure"]
+needBuilder (Make      dir) = need [dir -/- "Makefile"]
 needBuilder builder         = when (isInternal builder) $ do
     path <- builderPath builder
     need [path]
