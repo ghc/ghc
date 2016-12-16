@@ -952,7 +952,7 @@ labelDynamic dflags this_pkg this_mod lbl =
    -- is the RTS in a DLL or not?
    RtsLabel _           -> (WayDyn `elem` ways dflags) && (this_pkg /= rtsUnitId)
 
-   IdLabel n _ _        -> isDllName dflags this_pkg this_mod n
+   IdLabel n _ _        -> isDllName dflags this_mod n
 
    -- When compiling in the "dyn" way, each package is to be linked into
    -- its own shared library.

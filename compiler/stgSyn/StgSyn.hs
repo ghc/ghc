@@ -98,17 +98,15 @@ data GenStgArg occ
 isDllConApp :: DynFlags -> Module -> DataCon -> [StgArg] -> Bool
 isDllConApp dflags this_mod con args
  | platformOS (targetPlatform dflags) == OSMinGW32
-    = isDllName dflags this_pkg this_mod (dataConName con) || any is_dll_arg args
+    = isDllName dflags this_mod (dataConName con) || any is_dll_arg args
  | otherwise = False
   where
     -- NB: typePrimRep is legit because any free variables won't have
     -- unlifted type (there are no unlifted things at top level)
     is_dll_arg :: StgArg -> Bool
     is_dll_arg (StgVarArg v) =  isAddrRep (typePrimRep (idType v))
-                             && isDllName dflags this_pkg this_mod (idName v)
+                             && isDllName dflags this_mod (idName v)
     is_dll_arg _             = False
-
-    this_pkg = thisPackage dflags
 
 -- True of machine addresses; these are the things that don't
 -- work across DLLs. The key point here is that VoidRep comes

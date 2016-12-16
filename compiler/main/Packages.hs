@@ -1747,11 +1747,11 @@ displayInstalledUnitId dflags uid =
     fmap sourcePackageIdString (lookupInstalledPackage dflags uid)
 
 -- | Will the 'Name' come from a dynamically linked library?
-isDllName :: DynFlags -> UnitId {- not used -} -> Module -> Name -> Bool
+isDllName :: DynFlags -> Module -> Name -> Bool
 -- Despite the "dll", I think this function just means that
 -- the symbol comes from another dynamically-linked package,
 -- and applies on all platforms, not just Windows
-isDllName dflags _this_pkg this_mod name
+isDllName dflags this_mod name
   | WayDyn `notElem` ways dflags = False
   | Just mod <- nameModule_maybe name
     -- Issue #8696 - when GHC is dynamically linked, it will attempt

@@ -1132,18 +1132,15 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
 
     init_env = (init_occ_env, emptyVarEnv)
 
-    this_pkg = thisPackage dflags
-
     tidy _           env []     = (env, [])
     tidy cvt_integer env (b:bs)
-        = let (env1, b')  = tidyTopBind dflags this_pkg this_mod
+        = let (env1, b')  = tidyTopBind dflags this_mod
                                         cvt_integer unfold_env env b
               (env2, bs') = tidy cvt_integer env1 bs
           in  (env2, b':bs')
 
 ------------------------
 tidyTopBind  :: DynFlags
-             -> UnitId
              -> Module
              -> (Integer -> CoreExpr)
              -> UnfoldEnv
@@ -1151,17 +1148,19 @@ tidyTopBind  :: DynFlags
              -> CoreBind
              -> (TidyEnv, CoreBind)
 
-tidyTopBind dflags this_pkg this_mod cvt_integer unfold_env
+tidyTopBind dflags this_mod cvt_integer unfold_env
             (occ_env,subst1) (NonRec bndr rhs)
   = (tidy_env2,  NonRec bndr' rhs')
   where
     Just (name',show_unfold) = lookupVarEnv unfold_env bndr
-    caf_info      = hasCafRefs dflags this_pkg this_mod (subst1, cvt_integer) (idArity bndr) rhs
-    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name' (bndr, rhs)
+    caf_info      = hasCafRefs dflags this_mod (subst1, cvt_integer)
+                               (idArity bndr) rhs
+    (bndr', rhs') = tidyTopPair dflags show_unfold tidy_env2 caf_info name'
+                                (bndr, rhs)
     subst2        = extendVarEnv subst1 bndr bndr'
     tidy_env2     = (occ_env, subst2)
 
-tidyTopBind dflags this_pkg this_mod cvt_integer unfold_env
+tidyTopBind dflags this_mod cvt_integer unfold_env
             (occ_env, subst1) (Rec prs)
   = (tidy_env2, Rec prs')
   where
@@ -1179,7 +1178,7 @@ tidyTopBind dflags this_pkg this_mod cvt_integer unfold_env
         -- the CafInfo for a recursive group says whether *any* rhs in
         -- the group may refer indirectly to a CAF (because then, they all do).
     caf_info
-        | or [ mayHaveCafRefs (hasCafRefs dflags this_pkg this_mod
+        | or [ mayHaveCafRefs (hasCafRefs dflags this_mod
                                           (subst1, cvt_integer)
                                           (idArity bndr) rhs)
              | (bndr,rhs) <- prs ] = MayHaveCafRefs
@@ -1331,15 +1330,15 @@ type CafRefEnv = (VarEnv Id, Integer -> CoreExpr)
   -- The Integer -> CoreExpr is the desugaring function for Integer literals
   -- See Note [Disgusting computation of CafRefs]
 
-hasCafRefs :: DynFlags -> UnitId -> Module
+hasCafRefs :: DynFlags -> Module
            -> CafRefEnv -> Arity -> CoreExpr
            -> CafInfo
-hasCafRefs dflags this_pkg this_mod p@(_,cvt_integer) arity expr
+hasCafRefs dflags this_mod p@(_,cvt_integer) arity expr
   | is_caf || mentions_cafs = MayHaveCafRefs
   | otherwise               = NoCafRefs
  where
   mentions_cafs   = cafRefsE p expr
-  is_dynamic_name = isDllName dflags this_pkg this_mod
+  is_dynamic_name = isDllName dflags this_mod
   is_caf = not (arity > 0 || rhsIsStatic (targetPlatform dflags) is_dynamic_name cvt_integer expr)
 
   -- NB. we pass in the arity of the expression, which is expected
