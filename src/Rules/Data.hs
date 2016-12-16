@@ -47,10 +47,8 @@ buildPackageData context@Context {..} = do
                          . replace "rts/dist/build" rtsBuildPath
                          . replace "includes/dist-derivedconstants/header" generatedPath )
                          . lines
-        else do
-            top <- topDirectory
-            let oldPath = top -/- path </> "build"
-            fixFile conf $ unlines . map (replace oldPath path) . lines
+        else
+            fixFile conf $ unlines . map (replace (path </> "build") path) . lines
 
     priority 2.0 $ when (nonCabalContext context) $ dataFile %>
         generatePackageData context
