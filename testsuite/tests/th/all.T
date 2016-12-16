@@ -445,3 +445,5 @@ test('T12788', extra_clean(['T12788_Lib.hi', 'T12788_Lib.o']),
                multimod_compile_fail,
                ['T12788.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T12977', normal, compile, ['-v0'])
+test('T12993', expect_broken(12993), multimod_compile,
+     ['T12993.hs', '-v0'])
