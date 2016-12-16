@@ -1363,10 +1363,13 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
         dumpIfSet_dyn dflags Opt_D_dump_cmm_verbose "Parsed Cmm" (ppr cmm)
         (_, cmmgroup) <- cmmPipeline hsc_env initTopSRT cmm
         rawCmms <- cmmToRawCmm dflags (Stream.yield cmmgroup)
-        _ <- codeOutput dflags no_mod output_filename no_loc NoStubs [] rawCmms
+        let -- Make up a module name to give the NCG. We can't pass bottom here
+            -- lest we reproduce #11784.
+            mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
+            cmm_mod = mkModule (thisPackage dflags) mod_name
+        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] rawCmms
         return ()
   where
-    no_mod = panic "hscCompileCmmFile: no_mod"
     no_loc = ModLocation{ ml_hs_file  = Just filename,
                           ml_hi_file  = panic "hscCompileCmmFile: no hi file",
                           ml_obj_file = panic "hscCompileCmmFile: no obj file" }
