@@ -439,6 +439,13 @@ data FrontendResult
 --        signatures (we just generate blank object files for
 --        hsig files.)
 --
+--        A corrolary of this is that the following invariant holds at any point
+--        past desugaring,
+--
+--            if I have a Module, this_mod, in hand representing the module
+--            currently being compiled,
+--            then moduleUnitId this_mod == thisPackage dflags
+--
 --      - For any code involving Names, we want semantic modules.
 --        See lookupIfaceTop in IfaceEnv, mkIface and addFingerprints
 --        in MkIface, and tcLookupGlobal in TcEnv
