@@ -85,6 +85,10 @@ doubleToBytes d
 -- If -split-section was specified, include the suffix label, otherwise just
 -- print the section type. For Darwin, where subsections-for-symbols are
 -- used instead, only print section type.
+--
+-- For string literals, additional flags are specified to enable merging of
+-- identical strings in the linker. With -split-sections each string also gets
+-- a unique section to allow strings from unused code to be GC'd.
 
 pprSectionHeader :: Platform -> Section -> SDoc
 pprSectionHeader platform (Section t suffix) =
@@ -98,7 +102,8 @@ pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
   let splitSections = gopt Opt_SplitSections dflags
       subsection | splitSections = char '.' <> ppr suffix
                  | otherwise     = empty
-  in  text ".section " <> ptext (header dflags) <> subsection
+  in  text ".section " <> ptext (header dflags) <> subsection <>
+      flags dflags
   where
     header dflags = case t of
       Text -> sLit ".text"
@@ -109,10 +114,16 @@ pprGNUSectionHeader t suffix = sdocWithDynFlags $ \dflags ->
       ReadOnlyData16 -> sLit ".rodata.cst16"
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
-          -> sLit ".rdata,\"dr\""
-        | otherwise -> sLit ".rodata.str1.1,\"aMS\",@progbits,1"
+          -> sLit ".rdata"
+        | otherwise -> sLit ".rodata.str"
       OtherSection _ ->
         panic "PprBase.pprGNUSectionHeader: unknown section type"
+    flags dflags = case t of
+      CString
+        | OSMinGW32 <- platformOS (targetPlatform dflags)
+          -> text ",\"dr\""
+        | otherwise -> text ",\"aMS\",@progbits,1"
+      _ -> empty
 
 -- XCOFF doesn't support relocating label-differences, so we place all
 -- RO sections into .text[PR] sections
