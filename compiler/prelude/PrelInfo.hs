@@ -46,6 +46,7 @@ module PrelInfo (
 #include "HsVersions.h"
 
 import KnownUniques
+import Unique           ( isValidKnownKeyUnique )
 
 import ConLike          ( ConLike(..) )
 import THNames          ( templateHaskellNames )
@@ -158,6 +159,10 @@ knownKeyNames
 -- | Check the known-key names list of consistency.
 knownKeyNamesOkay :: [Name] -> Maybe String
 knownKeyNamesOkay all_names
+  | ns@(_:_) <- filter (not . isValidKnownKeyUnique . getUnique) all_names
+  = Just $ "    Out-of-range known-key uniques: ["
+        ++ intercalate ", " (map (occNameString . nameOccName) ns) ++
+         "]"
   | null badNamesPairs
   = Nothing
   | otherwise

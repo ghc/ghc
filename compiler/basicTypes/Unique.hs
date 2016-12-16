@@ -36,6 +36,7 @@ module Unique (
         newTagUnique,                   -- Used in CgCase
         initTyVarUnique,
         nonDetCmpUnique,
+        isValidKnownKeyUnique,          -- Used in PrelInfo.knownKeyNamesOkay
 
         -- ** Making built-in uniques
 
@@ -156,6 +157,15 @@ unpkUnique (MkUnique u)
         i   = u .&. uniqueMask
     in
     (tag, i)
+
+-- | The interface file symbol-table encoding assumes that known-key uniques fit
+-- in 30-bits; verify this.
+--
+-- See Note [Symbol table representation of names] in BinIface for details.
+isValidKnownKeyUnique :: Unique -> Bool
+isValidKnownKeyUnique u =
+    case unpkUnique u of
+      (c, x) -> ord c < 0xff && x <= (1 `shiftL` 22)
 
 {-
 ************************************************************************
