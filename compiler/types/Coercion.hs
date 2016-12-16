@@ -340,7 +340,7 @@ splitTyConAppCo_maybe (Refl r ty)
        ; let args = zipWith mkReflCo (tyConRolesX r tc) tys
        ; return (tc, args) }
 splitTyConAppCo_maybe (TyConAppCo _ tc cos) = Just (tc, cos)
-splitTyConAppCo_maybe (FunCo _ arg res)     = Just (funTyCon, cos)
+splitTyConAppCo_maybe (FunCo _ arg res)     = Just (funTyCon Omega, cos)
   where cos = [mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
 splitTyConAppCo_maybe _                     = Nothing
 

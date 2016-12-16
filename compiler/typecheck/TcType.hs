@@ -1302,7 +1302,7 @@ getDFunTyKey (TyVarTy tv)            = getOccName tv
 getDFunTyKey (TyConApp tc _)         = getOccName tc
 getDFunTyKey (LitTy x)               = getDFunTyLitKey x
 getDFunTyKey (AppTy fun _)           = getDFunTyKey fun
-getDFunTyKey (FunTy _ _ _)           = getOccName funTyCon
+getDFunTyKey (FunTy w _ _)           = getOccName (funTyCon w)
 getDFunTyKey (ForAllTy _ t)          = getDFunTyKey t
 getDFunTyKey (CastTy ty _)           = getDFunTyKey ty
 getDFunTyKey t@(CoercionTy _)        = pprPanic "getDFunTyKey" (ppr t)
@@ -1463,8 +1463,8 @@ tcTyConAppTyCon_maybe ty
   | Just ty' <- tcView ty = tcTyConAppTyCon_maybe ty'
 tcTyConAppTyCon_maybe (TyConApp tc _)
   = Just tc
-tcTyConAppTyCon_maybe (FunTy _ _ _)
-  = Just funTyCon
+tcTyConAppTyCon_maybe (FunTy w _ _)
+  = Just (funTyCon w)
 tcTyConAppTyCon_maybe _
   = Nothing
 
@@ -1492,10 +1492,10 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
 -- decomposing tycon applications] in TcCanonical for details.
 tcRepSplitTyConApp_maybe' :: HasCallStack => Type -> Maybe (TyCon, [Type])
 tcRepSplitTyConApp_maybe' (TyConApp tc tys)          = Just (tc, tys)
-tcRepSplitTyConApp_maybe' (FunTy _ arg res)
+tcRepSplitTyConApp_maybe' (FunTy w arg res)
   | Just arg_rep <- getRuntimeRep_maybe arg
   , Just res_rep <- getRuntimeRep_maybe res
-  = Just (funTyCon, [arg_rep, res_rep, arg, res])
+  = Just (funTyCon w, [arg_rep, res_rep, arg, res])
 tcRepSplitTyConApp_maybe' _                          = Nothing
 
 
@@ -1753,7 +1753,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
       = go vis env arg arg' <!> go vis env res res'
     eqFunTy vis env arg res ty@(AppTy{})
       | Just (tc, [_, _, arg', res']) <- get_args ty []
-      , tc == funTyCon
+      , tc == funTyCon Omega
       = go vis env arg arg' <!> go vis env res res'
       where
         get_args :: Type -> [Type] -> Maybe (TyCon, [Type])

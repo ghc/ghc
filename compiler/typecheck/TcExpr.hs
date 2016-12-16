@@ -24,6 +24,7 @@ import THNames( liftStringName, liftName )
 import HsSyn
 import TcHsSyn
 import TcRnMonad
+import TcEnv            ( tcEmitBindingUsage )
 import TcUnify
 import BasicTypes
 import Inst
@@ -1640,6 +1641,10 @@ tc_infer_id lbl id_name
              ATcId { tct_id = id }
                -> do { check_naughty id        -- Note [Local record selectors]
                      ; checkThLocalId id
+                     -- TODO: arnaud: I'm not sure being here guarantees that
+                     -- the variable is actually in the local context. Maybe
+                     -- it's not sufficient either. Harden if not the case.
+                     ; tcEmitBindingUsage $ unitUE id_name One
                      ; return_id id }
 
              AGlobal (AnId id)

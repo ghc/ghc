@@ -1212,7 +1212,7 @@ cvtTypeKind ty_str ty
            ArrowT-- TODO: arnaud: linear syntax for template haskell.
              | [x',y'] <- tys' -> returnL (HsFunTy x' Omega y')
              | otherwise ->
-                  mk_apps (HsTyVar NotPromoted (noLoc (getRdrName funTyCon)))
+                  mk_apps (HsTyVar NotPromoted (noLoc (getRdrName (funTyCon Omega)))) -- TODO: arnaud: fix when the above is done
                           tys'
            ListT
              | [x']    <- tys' -> returnL (HsListTy x')

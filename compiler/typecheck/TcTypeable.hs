@@ -343,7 +343,7 @@ mkPrimTypeableTodos
 ghcPrimTypeableTyCons :: [TyCon]
 ghcPrimTypeableTyCons = concat
     [ [ runtimeRepTyCon, vecCountTyCon, vecElemTyCon
-      , funTyCon, tupleTyCon Unboxed 0 ]
+      , funTyCon Omega, tupleTyCon Unboxed 0 ]
     , map (tupleTyCon Unboxed) [2..mAX_TUPLE_SIZE]
     , map sumTyCon [2..mAX_SUM_SIZE]
     , primTyCons

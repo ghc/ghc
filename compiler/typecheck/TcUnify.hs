@@ -368,7 +368,7 @@ matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> 
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
 matchExpectedTyConApp tc orig_ty
-  = ASSERT(tc /= funTyCon) go orig_ty
+  = ASSERT(tc /= (funTyCon Omega)) go orig_ty -- TODO: arnaud, probably should use a predicate rather than equality, this is probably a bug as it stands, where non-omega function types can pass through.
   where
     go ty
        | Just ty' <- tcView ty

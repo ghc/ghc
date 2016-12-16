@@ -325,17 +325,22 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 ************************************************************************
 -}
 
-funTyConName :: Name
-funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
+funTyConName :: Rig -> Name
+funTyConName Zero = mkPrimTyConName (fsLit "(->_0)") funTyConKey (funTyCon Zero)
+funTyConName One = mkPrimTyConName (fsLit "(⊸)") funTyConKey (funTyCon One)
+funTyConName Omega = mkPrimTyConName (fsLit "(->)") funTyConKey (funTyCon Omega)
 
+-- TODO: arnaud: without Rig, funTyCon (and funTyConName) was allocated a single
+-- time, now it's allocated at every call. It may be worth a bit of boilerplate
+-- to make the allocation unique as it used to.
 -- | The @(->)@ type constructor.
 --
 -- @
 -- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
 --         TYPE rep1 -> TYPE rep2 -> *
 -- @
-funTyCon :: TyCon
-funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
+funTyCon :: Rig -> TyCon
+funTyCon w = mkFunTyCon w (funTyConName w) tc_bndrs tc_rep_nm
   where
     tc_bndrs = [ TvBndr runtimeRep1TyVar (NamedTCB Inferred)
                , TvBndr runtimeRep2TyVar (NamedTCB Inferred)
@@ -343,7 +348,7 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
                ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
                                              , tYPE runtimeRep2Ty
                                              ]
-    tc_rep_nm = mkPrelTyConRepName funTyConName
+    tc_rep_nm = mkPrelTyConRepName (funTyConName w)
 
 {-
 ************************************************************************

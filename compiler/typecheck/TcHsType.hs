@@ -503,18 +503,18 @@ tc_lhs_type mode (L span ty) exp_kind
        ; return ty' }
 
 ------------------------------------------
-tc_fun_type :: TcTyMode -> LHsType Name -> LHsType Name -> TcKind -> TcM TcType
-tc_fun_type mode ty1 ty2 exp_kind = case mode_level mode of
+tc_fun_type :: TcTyMode -> Rig -> LHsType Name -> LHsType Name -> TcKind -> TcM TcType
+tc_fun_type mode weight ty1 ty2 exp_kind = case mode_level mode of
   TypeLevel ->
     do { arg_k <- newOpenTypeKind
        ; res_k <- newOpenTypeKind
        ; ty1' <- tc_lhs_type mode ty1 arg_k
        ; ty2' <- tc_lhs_type mode ty2 res_k
-       ; checkExpectedKind (mkFunTy Omega ty1' ty2') liftedTypeKind exp_kind }
+       ; checkExpectedKind (mkFunTy weight ty1' ty2') liftedTypeKind exp_kind }
   KindLevel ->  -- no representation polymorphism in kinds. yet.
     do { ty1' <- tc_lhs_type mode ty1 liftedTypeKind
        ; ty2' <- tc_lhs_type mode ty2 liftedTypeKind
-       ; checkExpectedKind (mkFunTy Omega ty1' ty2') liftedTypeKind exp_kind } -- TODO: arnaud: probably not correct
+       ; checkExpectedKind (mkFunTy weight ty1' ty2') liftedTypeKind exp_kind }
 
 ------------------------------------------
 -- See also Note [Bidirectional type checking]
@@ -548,14 +548,12 @@ tc_hs_type _ ty@(HsSpliceTy {}) _exp_kind
   = failWithTc (text "Unexpected type splice:" <+> ppr ty)
 
 ---------- Functions and applications
--- Type elaboration forgets about the weight (core does not know about
--- linearity yet).
-tc_hs_type mode (HsFunTy ty1 _weight ty2) exp_kind
-  = tc_fun_type mode ty1 ty2 exp_kind
+tc_hs_type mode (HsFunTy ty1 weight ty2) exp_kind
+  = tc_fun_type mode weight ty1 ty2 exp_kind
 
 tc_hs_type mode (HsOpTy ty1 (L _ op) ty2) exp_kind
   | op `hasKey` funTyConKey
-  = tc_fun_type mode ty1 ty2 exp_kind
+  = tc_fun_type mode Omega ty1 ty2 exp_kind -- TODO: arnaud: propagage weight of the type of operators somehow
 
 --------- Foralls
 tc_hs_type mode (HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind

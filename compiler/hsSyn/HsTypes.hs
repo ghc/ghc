@@ -963,7 +963,7 @@ splitHsFunType (L _ (HsFunTy x _weight y))
 splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ (L _ fn))) tys | fn == funTyConName
+    go (L _ (HsTyVar _ (L _ fn))) tys | fn == (funTyConName Omega) -- TODO: arnaud harder but should be done for all arity
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = (t1:args, res)
@@ -1334,6 +1334,7 @@ ppr_fun_ty ctxt_prec ty1 weight ty2
   = let p1 = ppr_mono_lty FunPrec ty1
         p2 = ppr_mono_lty TopPrec ty2
         arr = case weight of
+          Zero -> "->_0"
           One -> "⊸"
           Omega -> "ω"
     in

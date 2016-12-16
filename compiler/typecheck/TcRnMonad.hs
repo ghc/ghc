@@ -143,6 +143,7 @@ import HscTypes
 import Module
 import RdrName
 import Name
+import Weight
 import Type
 
 import TcType
@@ -313,6 +314,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
  = do { tvs_var      <- newIORef emptyVarSet
       ; lie_var      <- newIORef emptyWC
       ; errs_var     <- newIORef (emptyBag, emptyBag)
+      ; usage_var    <- newIORef zeroUE ;
       ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,     -- Should be over-ridden very soon!
@@ -322,6 +324,7 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_th_bndrs   = emptyNameEnv,
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
+                tcl_usage      = usage_var,
                 tcl_bndrs      = [],
                 tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,

@@ -356,7 +356,7 @@ orphNamesOfType (TyConApp tycon tys) = orphNamesOfTyCon tycon
                                        `unionNameSet` orphNamesOfTypes tys
 orphNamesOfType (ForAllTy bndr res)  = orphNamesOfType (binderKind bndr)
                                        `unionNameSet` orphNamesOfType res
-orphNamesOfType (FunTy _ arg res)    = unitNameSet funTyConName    -- NB!  See Trac #8535
+orphNamesOfType (FunTy w arg res)    = unitNameSet (funTyConName w)    -- NB!  See Trac #8535
                                        `unionNameSet` orphNamesOfType arg
                                        `unionNameSet` orphNamesOfType res
 orphNamesOfType (AppTy fun arg)      = orphNamesOfType fun `unionNameSet` orphNamesOfType arg

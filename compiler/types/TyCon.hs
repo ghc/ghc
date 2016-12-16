@@ -42,7 +42,7 @@ module TyCon(
         -- ** Predicates on TyCons
         isAlgTyCon, isVanillaAlgTyCon,
         isClassTyCon, isFamInstTyCon,
-        isFunTyCon,
+        isFunTyCon, isFunTyConWeight,
         isPrimTyCon,
         isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon,
         isUnboxedSumTyCon, isPromotedTupleTyCon,
@@ -132,6 +132,7 @@ import Binary
 import Var
 import Class
 import BasicTypes
+import Weight
 import DynFlags
 import ForeignCall
 import Name
@@ -529,7 +530,8 @@ data TyCon
         tyConKind    :: Kind,             -- ^ Kind of this TyCon
         tyConArity   :: Arity,            -- ^ Arity
 
-        tcRepName :: TyConRepName
+        tcFunWeight :: Rig,     -- ^ The weight on the arrow
+        tcRepName   :: TyConRepName
     }
 
   -- | Algebraic data types, from
@@ -1336,8 +1338,8 @@ So we compromise, and move their Kind calculation to the call site.
 -- | Given the name of the function type constructor and it's kind, create the
 -- corresponding 'TyCon'. It is recomended to use 'TyCoRep.funTyCon' if you want
 -- this functionality
-mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
-mkFunTyCon name binders rep_nm
+mkFunTyCon :: Rig -> Name -> [TyConBinder] -> Name -> TyCon
+mkFunTyCon weight name binders rep_nm
   = FunTyCon {
         tyConUnique  = nameUnique name,
         tyConName    = name,
@@ -1345,6 +1347,7 @@ mkFunTyCon name binders rep_nm
         tyConResKind = liftedTypeKind,
         tyConKind    = mkTyConKind binders liftedTypeKind,
         tyConArity   = length binders,
+        tcFunWeight  = weight,
         tcRepName    = rep_nm
     }
 
@@ -1572,6 +1575,12 @@ mkPromotedDataCon con name rep_name binders res_kind roles rep_info
 isFunTyCon :: TyCon -> Bool
 isFunTyCon (FunTyCon {}) = True
 isFunTyCon _             = False
+
+-- TODO: arnaud: eventually, it may be best to replace isFunTyCon by this one,
+-- as returning a boolean, ignoring he weight, can be a source of bugs
+isFunTyConWeight :: TyCon -> Maybe Rig
+isFunTyConWeight (FunTyCon { tcFunWeight = w }) = Just w
+isFunTyConWeight _             = Nothing
 
 -- | Test if the 'TyCon' is algebraic but abstract (invisible data constructors)
 isAbstractTyCon :: TyCon -> Bool

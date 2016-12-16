@@ -1009,7 +1009,7 @@ forceSpecArgTy env ty
 
 forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
-  , tycon /= funTyCon
+  , tycon /= (funTyCon Omega) -- TODO: arnaud: this is probably not what we actually want
       = tyConName tycon == specTyConName
         || lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
         || any (forceSpecArgTy env) tys

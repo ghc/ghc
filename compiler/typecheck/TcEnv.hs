@@ -31,7 +31,7 @@ module TcEnv(
         tcExtendLetEnv, tcExtendLetEnvIds,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendIdBndrs, tcExtendLocalTypeEnv,
-        isTypeClosedLetBndr,
+        isTypeClosedLetBndr, tcEmitBindingUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupTyVar,
@@ -105,6 +105,7 @@ import Util
 import Maybes( MaybeErr(..) )
 import qualified GHC.LanguageExtensions as LangExt
 
+import Control.Monad ( foldM )
 import Data.IORef
 import Data.List
 
@@ -498,7 +499,10 @@ tc_extend_local_env top_lvl extra_env thing_inside
         ; env1 <- tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage
         ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
-        ; setLclEnv env2 thing_inside }
+        ; (local_usage,env3) <- push_fresh_usage env2
+        ; result <- setLclEnv env3 thing_inside
+        ; check_then_pop_usage local_usage
+        ; return result }
   where
     extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, Weighted TcTyThing)] -> TcLclEnv -> TcLclEnv
     -- Extend the local LocalRdrEnv and Template Haskell staging env simultaneously
@@ -512,6 +516,28 @@ tc_extend_local_env top_lvl extra_env thing_inside
                                 -- (GlobalRdrEnv handles the top level)
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, Weighted _ ATcId {}) <- pairs] }
+
+    check_then_pop_usage :: TcRef UsageEnv -> TcM ()
+    -- Checks that the usage of the newly introduced binders is compatible with
+    -- their weight. If so, combines the usage of non-new binders to |uenv|
+    check_then_pop_usage local_usage
+      = do { u0 <- readTcRef local_usage
+           ; uok <- foldM (\u (x,w_) -> deleteBinder (weightedWeight w_) x u) u0 extra_env
+           ; env <- getLclEnv
+           ; let usage = tcl_usage env
+           ; updTcRef usage (addUE uok) }
+
+    deleteBinder :: Rig -> Name -> UsageEnv -> TcM UsageEnv
+    deleteBinder w x uenv =
+      case deleteUEAsserting w x uenv of
+        Just uenv' -> return uenv'
+        Nothing    -> pprPanic "Incorrect weight" (ppr w)
+
+    push_fresh_usage :: TcLclEnv -> TcM (TcRef UsageEnv,TcLclEnv)
+    push_fresh_usage env
+      = do { usage <- newTcRef zeroUE
+           ; return ( usage , env { tcl_usage = usage } ) }
+
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, Weighted TcTyThing)] -> TcM TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
@@ -559,6 +585,13 @@ tcExtendIdBndrs bndrs thing_inside
   = do { traceTc "tcExtendIdBndrs" (ppr bndrs)
        ; updLclEnv (\env -> env { tcl_bndrs = bndrs ++ tcl_bndrs env })
                    thing_inside }
+
+tcEmitBindingUsage :: UsageEnv -> TcM ()
+tcEmitBindingUsage ue
+  = do { lcl_env <- getLclEnv
+       ; let usage = tcl_usage lcl_env
+       ; updTcRef usage (addUE ue) }
+
 
 
 {- *********************************************************************
