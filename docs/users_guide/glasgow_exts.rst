@@ -9343,10 +9343,8 @@ example: ::
 
     newtype Swizzle' = MkSwizzle' (Ord a => [a] -> [a])
 
-As of GHC 7.10, this is deprecated. The
-:ghc-flag:`-Wcontext-quantification` flag detects this situation and issues
-a warning. In GHC 8.0 this flag was deprecated and declarations such as
-``MkSwizzle'`` will cause an out-of-scope error.
+Since GHC 8.0 declarations such as ``MkSwizzle'`` will cause an out-of-scope
+error.
 
 As for type signatures, implicit quantification happens for
 non-overloaded types too. So if you write this: ::

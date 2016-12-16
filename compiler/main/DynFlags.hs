@@ -614,7 +614,6 @@ data WarningFlag =
    | Opt_WarnUnusedMatches
    | Opt_WarnUnusedTypePatterns
    | Opt_WarnUnusedForalls
-   | Opt_WarnContextQuantification -- remove in 8.2
    | Opt_WarnWarningsDeprecations
    | Opt_WarnDeprecatedFlags
    | Opt_WarnAMP -- Introduced in GHC 7.8, obsolete since 7.10
@@ -3466,8 +3465,6 @@ wWarningFlagsDeps = [
   flagSpec "dodgy-foreign-imports"       Opt_WarnDodgyForeignImports,
   flagSpec "dodgy-imports"               Opt_WarnDodgyImports,
   flagSpec "empty-enumerations"          Opt_WarnEmptyEnumerations,
-  depFlagSpec "context-quantification"   Opt_WarnContextQuantification
-    "it is subsumed by an error message that cannot be disabled",
   depFlagSpec "duplicate-constraints"    Opt_WarnDuplicateConstraints
     "it is subsumed by -Wredundant-constraints",
   flagSpec "redundant-constraints"       Opt_WarnRedundantConstraints,
