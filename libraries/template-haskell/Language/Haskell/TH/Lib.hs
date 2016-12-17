@@ -4,10 +4,112 @@
 
 {-# LANGUAGE CPP #-}
 
-module Language.Haskell.TH.Lib where
+module Language.Haskell.TH.Lib (
     -- All of the exports from this module should
     -- be "public" functions.  The main module TH
     -- re-exports them all.
+
+    -- * Library functions
+    -- ** Abbreviations
+        InfoQ, ExpQ, TExpQ, DecQ, DecsQ, ConQ, TypeQ, TyLitQ, CxtQ, PredQ,
+        DerivClauseQ, MatchQ, ClauseQ, BodyQ, GuardQ, StmtQ, RangeQ,
+        SourceStrictnessQ, SourceUnpackednessQ, BangQ, BangTypeQ, VarBangTypeQ,
+        StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ, FieldPatQ, RuleBndrQ,
+        TySynEqnQ, PatSynDirQ, PatSynArgsQ,
+
+    -- ** Constructors lifted to 'Q'
+    -- *** Literals
+        intPrimL, wordPrimL, floatPrimL, doublePrimL, integerL, rationalL,
+        charL, stringL, stringPrimL, charPrimL,
+    -- *** Patterns
+        litP, varP, tupP, unboxedTupP, unboxedSumP, conP, uInfixP, parensP,
+        infixP, tildeP, bangP, asP, wildP, recP,
+        listP, sigP, viewP,
+        fieldPat,
+
+    -- *** Pattern Guards
+        normalB, guardedB, normalG, normalGE, patG, patGE, match, clause,
+
+    -- *** Expressions
+        dyn, varE, unboundVarE, conE, litE, appE, appTypeE, uInfixE, parensE,
+        staticE, infixE, infixApp, sectionL, sectionR,
+        lamE, lam1E, lamCaseE, tupE, unboxedTupE, unboxedSumE, condE, multiIfE,
+        letE, caseE, appsE, listE, sigE, recConE, recUpdE, stringE, fieldExp,
+    -- **** Ranges
+    fromE, fromThenE, fromToE, fromThenToE,
+
+    -- ***** Ranges with more indirection
+    arithSeqE,
+    fromR, fromThenR, fromToR, fromThenToR,
+    -- **** Statements
+    doE, compE,
+    bindS, letS, noBindS, parS,
+
+    -- *** Types
+        forallT, varT, conT, appT, arrowT, infixT, uInfixT, parensT, equalityT,
+        listT, tupleT, unboxedTupleT, unboxedSumT, sigT, litT, wildCardT,
+        promotedT, promotedTupleT, promotedNilT, promotedConsT,
+    -- **** Type literals
+    numTyLit, strTyLit,
+    -- **** Strictness
+    noSourceUnpackedness, sourceNoUnpack, sourceUnpack,
+    noSourceStrictness, sourceLazy, sourceStrict,
+    isStrict, notStrict, unpacked,
+    bang, bangType, varBangType, strictType, varStrictType,
+    -- **** Class Contexts
+    cxt, classP, equalP,
+    -- **** Constructors
+    normalC, recC, infixC, forallC, gadtC, recGadtC,
+
+    -- *** Kinds
+    varK, conK, tupleK, arrowK, listK, appK, starK, constraintK,
+
+    -- *** Type variable binders
+    plainTV, kindedTV,
+
+    -- *** Roles
+    nominalR, representationalR, phantomR, inferR,
+
+    -- *** Top Level Declarations
+    -- **** Data
+    valD, funD, tySynD, dataD, newtypeD,
+    derivClause, DerivClause(..), DerivStrategy(..),
+    -- **** Class
+    classD, instanceD, instanceWithOverlapD, Overlap(..),
+    sigD, standaloneDerivD, standaloneDerivWithStrategyD, defaultSigD,
+
+    -- **** Role annotations
+    roleAnnotD,
+    -- **** Type Family / Data Family
+    dataFamilyD, openTypeFamilyD, closedTypeFamilyD, dataInstD,
+    familyNoKindD, familyKindD, closedTypeFamilyNoKindD, closedTypeFamilyKindD,
+    newtypeInstD, tySynInstD,
+    typeFam, dataFam, tySynEqn, injectivityAnn, noSig, kindSig, tyVarSig,
+
+    -- **** Fixity
+    infixLD, infixRD, infixND,
+
+    -- **** Foreign Function Interface (FFI)
+    cCall, stdCall, cApi, prim, javaScript,
+    unsafe, safe, interruptible, forImpD,
+
+    -- **** Functional dependencies
+    funDep,
+
+    -- **** Pragmas
+    ruleVar, typedRuleVar,
+    valueAnnotation, typeAnnotation, moduleAnnotation,
+    pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,
+    pragLineD,
+
+    -- **** Pattern Synonyms
+    patSynD, patSynSigD, unidir, implBidir, explBidir, prefixPatSyn,
+    infixPatSyn, recordPatSyn,
+
+    -- ** Reify
+    thisModule
+
+   ) where
 
 import Language.Haskell.TH.Syntax hiding (Role, InjectivityAnn)
 import qualified Language.Haskell.TH.Syntax as TH

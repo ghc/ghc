@@ -19,6 +19,17 @@
   * `unboxedTupleTypeName` and `unboxedTupleDataName` now work for unboxed
     0-tuples and 1-tuples (#12977)
 
+  * `Language.Haskell.TH` now reexports all of `Language.Haskell.TH.Lib`.
+    (#12992). This causes `Language.Haskell.TH` to export more types and
+    functions that it did before:
+    - `TExp`, `BangQ`, and `FieldExpQ`
+    - `unboxedTupP`, `unboxedTupE` and `unboundVarE`
+    - `infixLD`, `infixRD`, and `infixND`
+    - `unboxedTupleT` and `wildCardT`
+    - `plainTV` and `kindedTV`
+    - `interruptible` and `funDep`
+    - `valueAnnotation`, `typeAnnotation`, and `moduleAnnotation`
+
 ## 2.11.0.0  *May 2016*
 
   * Bundled with GHC 8.0.1
