@@ -207,7 +207,7 @@ $1_$2_$3_ALL_LD_OPTS = \
 
 # Options for passing to GHC when we use it for linking
 $1_$2_$3_GHC_LD_OPTS = \
- $$(addprefix -optl-Wl, $$($1_$2_$3_ALL_LD_OPTS)) \
+ $$(addprefix -optl, $$($1_$2_$3_ALL_LD_OPTS)) \
  $$($1_$2_$3_MOST_HC_OPTS)
 
 $1_$2_$3_ALL_AS_OPTS = \
