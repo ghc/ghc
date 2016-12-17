@@ -10,60 +10,9 @@
 #include "Cmm.h"
 #include "sm/ShouldCompact.h"
 
-
-//
-// compactAddWithSharing#
-//   :: State# RealWorld
-//   -> Compact#
-//   -> a
-//   -> (# State# RealWorld, a #)
-//
-stg_compactAddWithSharingzh (P_ compact, P_ p)
-{
-    W_ hash;
-    ASSERT(StgCompactNFData_hash(compact) == NULL);
-    (hash) = ccall allocHashTable();
-    StgCompactNFData_hash(compact) = hash;
-
-    // Note [compactAddWorker result]
-    //
-    // compactAddWorker needs somewhere to store the result - this is
-    // so that it can be tail-recursive.  It must be an address that
-    // doesn't move during GC, so we can't use heap or stack.
-    // Therefore we have a special field in the StgCompactNFData
-    // object to hold the final result of compaction.
-    W_ pp;
-    pp = compact + SIZEOF_StgHeader + OFFSET_StgCompactNFData_result;
-    call stg_compactAddWorkerzh(compact, p, pp);
-    ccall freeHashTable(StgCompactNFData_hash(compact), NULL);
-    StgCompactNFData_hash(compact) = NULL;
-#ifdef DEBUG
-    ccall verifyCompact(compact);
-#endif
-    return (P_[pp]);
-}
-
-
-//
-// compactAdd#
-//   :: State# RealWorld
-//   -> Compact#
-//   -> a
-//   -> (# State# RealWorld, a #)
-//
-stg_compactAddzh (P_ compact, P_ p)
-{
-    ASSERT(StgCompactNFData_hash(compact) == NULL);
-
-    W_ pp; // See Note [compactAddWorker result]
-    pp = compact + SIZEOF_StgHeader + OFFSET_StgCompactNFData_result;
-    call stg_compactAddWorkerzh(compact, p, pp);
-#ifdef DEBUG
-    ccall verifyCompact(compact);
-#endif
-    return (P_[pp]);
-}
-
+import CLOSURE base_GHCziIOziException_cannotCompactFunction_closure;
+import CLOSURE base_GHCziIOziException_cannotCompactMutable_closure;
+import CLOSURE base_GHCziIOziException_cannotCompactPinned_closure;
 
 //
 // Allocate space for a new object in the compact region.  We first try
@@ -308,6 +257,58 @@ eval:
     }}
 
     ccall barf("stg_compactWorkerzh");
+}
+
+//
+// compactAddWithSharing#
+//   :: State# RealWorld
+//   -> Compact#
+//   -> a
+//   -> (# State# RealWorld, a #)
+//
+stg_compactAddWithSharingzh (P_ compact, P_ p)
+{
+    W_ hash;
+    ASSERT(StgCompactNFData_hash(compact) == NULL);
+    (hash) = ccall allocHashTable();
+    StgCompactNFData_hash(compact) = hash;
+
+    // Note [compactAddWorker result]
+    //
+    // compactAddWorker needs somewhere to store the result - this is
+    // so that it can be tail-recursive.  It must be an address that
+    // doesn't move during GC, so we can't use heap or stack.
+    // Therefore we have a special field in the StgCompactNFData
+    // object to hold the final result of compaction.
+    W_ pp;
+    pp = compact + SIZEOF_StgHeader + OFFSET_StgCompactNFData_result;
+    call stg_compactAddWorkerzh(compact, p, pp);
+    ccall freeHashTable(StgCompactNFData_hash(compact), NULL);
+    StgCompactNFData_hash(compact) = NULL;
+#ifdef DEBUG
+    ccall verifyCompact(compact);
+#endif
+    return (P_[pp]);
+}
+
+//
+// compactAdd#
+//   :: State# RealWorld
+//   -> Compact#
+//   -> a
+//   -> (# State# RealWorld, a #)
+//
+stg_compactAddzh (P_ compact, P_ p)
+{
+    ASSERT(StgCompactNFData_hash(compact) == NULL);
+
+    W_ pp; // See Note [compactAddWorker result]
+    pp = compact + SIZEOF_StgHeader + OFFSET_StgCompactNFData_result;
+    call stg_compactAddWorkerzh(compact, p, pp);
+#ifdef DEBUG
+    ccall verifyCompact(compact);
+#endif
+    return (P_[pp]);
 }
 
 stg_compactSizzezh (P_ compact)
