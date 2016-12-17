@@ -57,6 +57,7 @@ stg_ap_0_fast ( P_ fun )
 again:
     W_  info;
     W_ untaggedfun;
+    W_ arity;
     untaggedfun = UNTAG(fun);
     info = %INFO_PTR(untaggedfun);
     switch [INVALID_OBJECT .. N_CLOSURE_TYPES]
@@ -68,6 +69,11 @@ again:
             fun = StgInd_indirectee(fun);
             goto again;
         }
+        case BCO:
+        {
+            arity = TO_W_(StgBCO_arity(untaggedfun));
+            goto dofun;
+        }
         case
             FUN,
             FUN_1_0,
@@ -75,9 +81,10 @@ again:
             FUN_2_0,
             FUN_1_1,
             FUN_0_2,
-            FUN_STATIC,
-            BCO:
+            FUN_STATIC:
         {
+            arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));
+        dofun:
             if (CCCS == StgHeader_ccs(untaggedfun)) {
                 return (fun);
             } else {
@@ -92,10 +99,8 @@ again:
                 // attribute this allocation to the "overhead of profiling"
                 CCS_ALLOC(BYTES_TO_WDS(SIZEOF_StgPAP), CCS_OVERHEAD);
                 P_ pap;
-                W_ arity;
                 pap = Hp - SIZEOF_StgPAP + WDS(1);
                 SET_HDR(pap, stg_PAP_info, CCCS);
-                arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));
                 StgPAP_arity(pap) = arity;
                 StgPAP_fun(pap)   = fun;
                 StgPAP_n_args(pap) = 0;
