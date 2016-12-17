@@ -189,14 +189,15 @@ $1_$2_$3_GHC_CC_OPTS = \
  $$(addprefix -optc, $$($1_$2_$3_ALL_CC_OPTS)) \
  $$($1_$2_$3_MOST_HC_OPTS)
 
-# Options for passing to plain ld
+# Options for passing to gcc for linking
 $1_$2_$3_ALL_LD_OPTS = \
  $$(WAY_$3_LD_OPTS) \
  $$($1_$2_DIST_LD_OPTS) \
  $$($1_$2_$3_LD_OPTS) \
  $$($1_$2_EXTRA_LD_OPTS) \
  $$(EXTRA_LD_OPTS) \
- $$(CONF_LD_LINKER_OPTS_STAGE$4)
+ $$(foreach o,$$(EXTRA_LD_LINKER_OPTS),-optl-Wl$$(comma)$$o) \
+ $$(foreach o,$$(CONF_LD_LINKER_OPTS_STAGE$4),-optl-Wl$$(comma)$$o)
 
 # Options for passing to GHC when we use it for linking
 $1_$2_$3_GHC_LD_OPTS = \
