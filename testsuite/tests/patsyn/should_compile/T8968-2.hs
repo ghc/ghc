@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs, KindSignatures, PatternSynonyms #-}
+{-# LANGUAGE GADTs, KindSignatures, PatternSynonyms, FlexibleContexts #-}
 module ShouldCompile where
 
 data X :: (* -> *) -> * -> * where

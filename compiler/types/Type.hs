@@ -1198,12 +1198,13 @@ interfaces.  Notably this plays a role in tcTySigs in TcBinds.hs.
                                 ~~~~~~~~
 -}
 
--- | Make a dependent forall.
+-- | Make a dependent forall over an Inferred (as opposed to Specified)
+-- variable
 mkInvForAllTy :: TyVar -> Type -> Type
 mkInvForAllTy tv ty = ASSERT( isTyVar tv )
                       ForAllTy (TvBndr tv Inferred) ty
 
--- | Like mkForAllTys, but assumes all variables are dependent and invisible,
+-- | Like mkForAllTys, but assumes all variables are dependent and Inferred,
 -- a common case
 mkInvForAllTys :: [TyVar] -> Type -> Type
 mkInvForAllTys tvs ty = ASSERT( all isTyVar tvs )

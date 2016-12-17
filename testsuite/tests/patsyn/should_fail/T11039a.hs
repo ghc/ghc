@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE PatternSynonyms, TypeFamilies #-}
 module T11039a where
 
 data A a = A a
