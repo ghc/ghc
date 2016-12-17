@@ -89,6 +89,8 @@ instance Show StringBuffer where
 -- -----------------------------------------------------------------------------
 -- Creation / Destruction
 
+-- | Read a file into a 'StringBuffer'.  The resulting buffer is automatically
+-- managed by the garbage collector.
 hGetStringBuffer :: FilePath -> IO StringBuffer
 hGetStringBuffer fname = do
    h <- openBinaryFile fname ReadMode
@@ -161,6 +163,8 @@ appendStringBuffers sb1 sb2
           calcLen sb = len sb - cur sb
           size =  sb1_len + sb2_len
 
+-- | Encode a 'String' into a 'StringBuffer' as UTF-8.  The resulting buffer
+-- is automatically managed by the garbage collector.
 stringToStringBuffer :: String -> StringBuffer
 stringToStringBuffer str =
  unsafePerformIO $ do
@@ -175,10 +179,15 @@ stringToStringBuffer str =
 -- -----------------------------------------------------------------------------
 -- Grab a character
 
--- Getting our fingers dirty a little here, but this is performance-critical
+-- | Return the first UTF-8 character of a nonempty 'StringBuffer' and as well
+-- the remaining portion (analogous to 'Data.List.uncons').  __Warning:__ The
+-- behavior is undefined if the 'StringBuffer' is empty.  The result shares
+-- the same buffer as the original.  Similar to 'utf8DecodeChar', if the
+-- character cannot be decoded as UTF-8, '\0' is returned.
 {-# INLINE nextChar #-}
 nextChar :: StringBuffer -> (Char,StringBuffer)
 nextChar (StringBuffer buf len (I# cur#)) =
+  -- Getting our fingers dirty a little here, but this is performance-critical
   inlinePerformIO $ do
     withForeignPtr buf $ \(Ptr a#) -> do
         case utf8DecodeChar# (a# `plusAddr#` cur#) of
@@ -186,6 +195,10 @@ nextChar (StringBuffer buf len (I# cur#)) =
              let cur' = I# (cur# +# nBytes#) in
              return (C# c#, StringBuffer buf len cur')
 
+-- | Return the first UTF-8 character of a nonempty 'StringBuffer' (analogous
+-- to 'Data.List.head').  __Warning:__ The behavior is undefined if the
+-- 'StringBuffer' is empty.  Similar to 'utf8DecodeChar', if the character
+-- cannot be decoded as UTF-8, '\0' is returned.
 currentChar :: StringBuffer -> Char
 currentChar = fst . nextChar
 
@@ -200,29 +213,50 @@ prevChar (StringBuffer buf _   cur) _     =
 -- -----------------------------------------------------------------------------
 -- Moving
 
+-- | Return a 'StringBuffer' with the first UTF-8 character removed (analogous
+-- to 'Data.List.tail').  __Warning:__ The behavior is undefined if the
+-- 'StringBuffer' is empty.  The result shares the same buffer as the
+-- original.
 stepOn :: StringBuffer -> StringBuffer
 stepOn s = snd (nextChar s)
 
-offsetBytes :: Int -> StringBuffer -> StringBuffer
+-- | Return a 'StringBuffer' with the first @n@ bytes removed.  __Warning:__
+-- If there aren't enough characters, the returned 'StringBuffer' will be
+-- invalid and any use of it may lead to undefined behavior.  The result
+-- shares the same buffer as the original.
+offsetBytes :: Int                      -- ^ @n@, the number of bytes
+            -> StringBuffer
+            -> StringBuffer
 offsetBytes i s = s { cur = cur s + i }
 
+-- | Compute the difference in offset between two 'StringBuffer's that share
+-- the same buffer.  __Warning:__ The behavior is undefined if the
+-- 'StringBuffer's use separate buffers.
 byteDiff :: StringBuffer -> StringBuffer -> Int
 byteDiff s1 s2 = cur s2 - cur s1
 
+-- | Check whether a 'StringBuffer' is empty (analogous to 'Data.List.null').
 atEnd :: StringBuffer -> Bool
 atEnd (StringBuffer _ l c) = l == c
 
 -- -----------------------------------------------------------------------------
 -- Conversion
 
-lexemeToString :: StringBuffer -> Int {-bytes-} -> String
+-- | Decode the first @n@ bytes of a 'StringBuffer' as UTF-8 into a 'String'.
+-- Similar to 'utf8DecodeChar', if the character cannot be decoded as UTF-8,
+-- they will be replaced with '\0'.
+lexemeToString :: StringBuffer
+               -> Int                   -- ^ @n@, the number of bytes
+               -> String
 lexemeToString _ 0 = ""
 lexemeToString (StringBuffer buf _ cur) bytes =
   inlinePerformIO $
     withForeignPtr buf $ \ptr ->
       utf8DecodeString (ptr `plusPtr` cur) bytes
 
-lexemeToFastString :: StringBuffer -> Int {-bytes-} -> FastString
+lexemeToFastString :: StringBuffer
+                   -> Int               -- ^ @n@, the number of bytes
+                   -> FastString
 lexemeToFastString _ 0 = nilFS
 lexemeToFastString (StringBuffer buf _ cur) len =
    inlinePerformIO $
