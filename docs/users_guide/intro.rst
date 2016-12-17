@@ -146,14 +146,6 @@ numbering GHC versions:
     branch. For example, ``6.8.1.20040225`` would be a snapshot of the
     ``6.8`` branch during the development of ``6.8.2``.
 
-    The value of ``__GLASGOW_HASKELL__`` for a snapshot release is the
-    integer ⟨xyy⟩. You should never write any conditional code which
-    tests for this value, however: since interfaces change on a
-    day-to-day basis, and we don't have finer granularity in the values
-    of ``__GLASGOW_HASKELL__``, you should only conditionally compile
-    using predicates which test whether ``__GLASGOW_HASKELL__`` is equal
-    to, later than, or earlier than a given major release.
-
     We may make snapshot releases of the HEAD `available for
     download <http://www.haskell.org/ghc/dist/current/dist/>`__, and the
     latest sources are available from
