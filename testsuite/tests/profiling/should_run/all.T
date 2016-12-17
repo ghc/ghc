@@ -13,7 +13,7 @@ test('T11489', [req_profiling, extra_clean(['T11489.prof', 'T11489.hp'])],
 
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)
-setTestOpts(extra_ways(['prof']))
+setTestOpts(extra_ways(['prof', 'ghci-ext-prof']))
 setTestOpts(only_ways(prof_ways))
 setTestOpts(keep_prof_callstacks)
 
@@ -21,7 +21,8 @@ extra_prof_ways = ['prof', 'prof_hc_hb', 'prof_hb', 'prof_hd', 'prof_hy', 'prof_
 
 expect_broken_for_10037 = expect_broken_for(
   10037,
-  [w for w in prof_ways if w not in opt_ways]) # e.g. prof and profllvm
+  [w for w in prof_ways if w not in opt_ways and w != 'ghci-ext-prof'])
+     # e.g. prof and profllvm
 
 test('heapprof001',
      [when(have_profiling(), extra_ways(extra_prof_ways)), extra_run_opts('7')],
@@ -69,7 +70,12 @@ test('T949', [extra_ways(extra_prof_ways)], compile_and_run, [''])
 # The results for 'prof' are fine, but the ordering changes.
 # We care more about getting the optimised results right, so ignoring
 # this for now.
-test('ioprof', [expect_broken_for_10037, exit_code(1)], compile_and_run,
+test('ioprof',
+     [expect_broken_for_10037,
+      exit_code(1),
+      omit_ways(['ghci-ext-prof']) # doesn't work with exit_code(1)
+     ],
+     compile_and_run,
      ['-fno-full-laziness -fno-state-hack']) # Note [consistent stacks]
 
 # These two examples are from the User's Guide:
@@ -89,11 +95,17 @@ test('T5559', [], compile_and_run, [''])
 #       -fno-state-hack
 #       -fno-full-laziness
 
-test('callstack001', [expect_broken_for_10037],
+test('callstack001',
      # unoptimised results are different w.r.t. CAF attribution
-     compile_and_run, ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
+     [ expect_broken_for_10037,
+       omit_ways(['ghci-ext-prof']), # produces a different stack
+     ], compile_and_run,
+     ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
-test('callstack002', [], compile_and_run,
+test('callstack002',
+     [ omit_ways(['ghci-ext-prof']), # produces a different stack
+     ],
+     compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
 # Should not stack overflow with -prof -fprof-auto

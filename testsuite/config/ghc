@@ -30,7 +30,7 @@ config.other_ways         = ['prof', 'normal_h',
                              'llvm', 'debugllvm',
                              'profllvm', 'profoptllvm', 'profthreadedllvm',
                              'debug',
-                             'ghci-ext',
+                             'ghci-ext', 'ghci-ext-prof',
                              'ext-interp']
 
 if (ghc_with_native_codegen == 1):
@@ -100,6 +100,7 @@ config.way_flags = {
     'profoptllvm'      : ['-O', '-prof', '-static', '-fprof-auto', '-fllvm'],
     'profthreadedllvm' : ['-O', '-prof', '-static', '-fprof-auto', '-threaded', '-fllvm'],
     'ghci-ext'         : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '+RTS', '-I0.1', '-RTS'],
+    'ghci-ext-prof'    : ['--interactive', '-v0', '-ignore-dot-ghci', '-fno-ghci-history', '-fexternal-interpreter', '-prof', '+RTS', '-I0.1', '-RTS'],
     'ext-interp' : ['-fexternal-interpreter'],
    }
 
@@ -137,6 +138,7 @@ config.way_rts_flags = {
     'profoptllvm'      : ['-hc', '-p'],
     'profthreadedllvm' : ['-p'],
     'ghci-ext'         : [],
+    'ghci-ext-prof'    : [],
     'ext-interp'       : [],
    }
 
