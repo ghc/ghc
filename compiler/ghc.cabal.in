@@ -357,6 +357,7 @@ Library
         StaticFlags
         StaticPtrTable
         SysTools
+        SysTools.Terminal
         Elf
         TidyPgm
         Ctype
