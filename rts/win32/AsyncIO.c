@@ -40,8 +40,8 @@
 
 typedef struct CompletedReq {
     unsigned int   reqID;
-    int            len;
-    int            errCode;
+    HsInt          len;
+    HsInt          errCode;
 } CompletedReq;
 
 #define MAX_REQUESTS 200
@@ -58,9 +58,9 @@ static int              issued_reqs;
 static void
 onIOComplete(unsigned int reqID,
              int   fd STG_UNUSED,
-             int   len,
+             HsInt len,
              void* buf STG_UNUSED,
-             int   errCode)
+             HsInt errCode)
 {
     DWORD dwRes;
     /* Deposit result of request in queue/table..when there's room. */
@@ -106,9 +106,9 @@ onIOComplete(unsigned int reqID,
 
 unsigned int
 addIORequest(int   fd,
-             int   forWriting,
-             int   isSock,
-             int   len,
+             bool  forWriting,
+             bool  isSock,
+             HsInt len,
              char* buf)
 {
     EnterCriticalSection(&queue_lock);
@@ -122,7 +122,7 @@ addIORequest(int   fd,
 }
 
 unsigned int
-addDelayRequest(int usecs)
+addDelayRequest(HsInt usecs)
 {
     EnterCriticalSection(&queue_lock);
     issued_reqs++;

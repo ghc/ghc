@@ -284,7 +284,7 @@ IOWorkerProc(PVOID param)
 }
 
 static
-BOOL
+bool
 NewIOWorkerThread(IOManagerState* iom)
 {
     unsigned threadId;
@@ -296,7 +296,7 @@ NewIOWorkerThread(IOManagerState* iom)
                                  &threadId) );
 }
 
-BOOL
+bool
 StartIOManager(void)
 {
     HANDLE hExit;
@@ -429,9 +429,9 @@ depositWorkItem( unsigned int reqID,
  */
 int
 AddIORequest ( int   fd,
-               BOOL  forWriting,
-               BOOL  isSocket,
-               int   len,
+               bool  forWriting,
+               bool  isSocket,
+               HsInt len,
                char* buffer,
                CompletionProc onCompletion)
 {
@@ -461,7 +461,7 @@ AddIORequest ( int   fd,
  * the request queue.
  */
 BOOL
-AddDelayRequest ( unsigned int   usecs,
+AddDelayRequest ( HsInt          usecs,
                   CompletionProc onCompletion)
 {
     WorkItem* wItem = (WorkItem*)malloc(sizeof(WorkItem));
