@@ -1199,6 +1199,49 @@ mk_unboxed_tup_name n space
     n_commas = n - 1
     tup_mod  = mkModName "GHC.Tuple"
 
+-- Unboxed sum data and type constructors
+-- | Unboxed sum data constructor
+unboxedSumDataName :: SumAlt -> SumArity -> Name
+-- | Unboxed sum type constructor
+unboxedSumTypeName :: SumArity -> Name
+
+unboxedSumDataName alt arity
+  | alt > arity
+  = error $ prefix ++ "Index out of bounds." ++ debug_info
+
+  | alt <= 0
+  = error $ prefix ++ "Alt must be > 0." ++ debug_info
+
+  | arity < 2
+  = error $ prefix ++ "Arity must be >= 2." ++ debug_info
+
+  | otherwise
+  = Name (mkOccName sum_occ)
+         (NameG DataName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+
+  where
+    prefix     = "unboxedSumDataName: "
+    debug_info = " (alt: " ++ show alt ++ ", arity: " ++ show arity ++ ")"
+
+    -- Synced with the definition of mkSumDataConOcc in TysWiredIn
+    sum_occ = '(' : '#' : bars nbars_before ++ '_' : bars nbars_after ++ "#)"
+    bars i = replicate i '|'
+    nbars_before = alt - 1
+    nbars_after  = arity - alt
+
+unboxedSumTypeName arity
+  | arity < 2
+  = error $ "unboxedSumTypeName: Arity must be >= 2."
+         ++ " (arity: " ++ show arity ++ ")"
+
+  | otherwise
+  = Name (mkOccName sum_occ)
+         (NameG TcClsName (mkPkgName "ghc-prim") (mkModName "GHC.Prim"))
+
+  where
+    -- Synced with the definition of mkSumTyConOcc in TysWiredIn
+    sum_occ = '(' : '#' : replicate (arity - 1) '|' ++ "#)"
+
 -----------------------------------------------------
 --              Locations
 -----------------------------------------------------

@@ -438,6 +438,7 @@ test('T12478_1', omit_ways(['ghci']), compile_and_run,
 test('T12478_2', omit_ways(['ghci']), compile_and_run, ['-v0'])
 test('T12478_3', omit_ways(['ghci']), compile, ['-v0'])
 test('T12478_4', omit_ways(['ghci']), compile_fail, ['-v0'])
+test('T12478_5', omit_ways(['ghci']), compile, ['-v0'])
 test('T12513', omit_ways(['ghci']), compile_fail, ['-v0'])
 test('T12530', normal, compile, ['-v0 -ddump-splices -dsuppress-uniques'])
 test('T12646', normal, compile, ['-v0'])

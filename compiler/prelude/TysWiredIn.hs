@@ -709,7 +709,7 @@ isBuiltInOcc_maybe occ =
         , Just rest'' <- "_" `stripPrefix` rest'
         , (pipes2, rest''') <- BS.span (=='|') rest''
         , "#)" <- rest'''
-             -> let arity = BS.length pipes1 + BS.length pipes2
+             -> let arity = BS.length pipes1 + BS.length pipes2 + 1
                     alt = BS.length pipes1 + 1
                 in Just $ dataConName $ sumDataCon alt arity
       _ -> Nothing

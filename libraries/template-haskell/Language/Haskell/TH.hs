@@ -60,6 +60,8 @@ module Language.Haskell.TH(
         -- ** Built-in names
         tupleTypeName, tupleDataName,   -- Int -> Name
         unboxedTupleTypeName, unboxedTupleDataName, -- :: Int -> Name
+        unboxedSumTypeName, -- :: SumArity -> Name
+        unboxedSumDataName, -- :: SumAlt -> SumArity -> Name
 
     -- * The algebraic data types
     -- | The lowercase versions (/syntax operators/) of these constructors are

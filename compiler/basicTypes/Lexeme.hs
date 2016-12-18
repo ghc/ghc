@@ -156,8 +156,10 @@ okConIdOcc :: String -> Bool
 okConIdOcc str = okIdOcc str ||
                  is_tuple_name1 True  str ||
                    -- Is it a boxed tuple...
-                 is_tuple_name1 False str
-                   -- ...or an unboxed tuple (Trac #12407)?
+                 is_tuple_name1 False str ||
+                   -- ...or an unboxed tuple (Trac #12407)...
+                 is_sum_name1 str
+                   -- ...or an unboxed sum (Trac #12514)?
   where
     -- check for tuple name, starting at the beginning
     is_tuple_name1 True  ('(' : rest)       = is_tuple_name2 True  rest
@@ -171,6 +173,18 @@ okConIdOcc str = okIdOcc str ||
     is_tuple_name2 boxed (ws  : rest)
       | isSpace ws                    = is_tuple_name2 boxed rest
     is_tuple_name2 _     _            = False
+
+    -- check for sum name, starting at the beginning
+    is_sum_name1 ('(' : '#' : rest) = is_sum_name2 False rest
+    is_sum_name1 _                  = False
+
+    -- check for sum tail, only allowing at most one underscore
+    is_sum_name2 _          "#)"         = True
+    is_sum_name2 underscore ('|' : rest) = is_sum_name2 underscore rest
+    is_sum_name2 False      ('_' : rest) = is_sum_name2 True rest
+    is_sum_name2 underscore (ws  : rest)
+      | isSpace ws                       = is_sum_name2 underscore rest
+    is_sum_name2 _          _            = False
 
 -- | Is this an acceptable symbolic constructor name, assuming it
 -- starts with an acceptable character?
