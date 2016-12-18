@@ -363,7 +363,7 @@ test('T9405', [extra_clean(['T9405.ticky']), when(msys(), expect_broken(12714))]
 test('T11788', when(ghc_dynamic(), skip),
               run_command, ['$MAKE -s --no-print-directory T11788'])
 
-test('T10296a', [extra_clean(['T10296a.o','T10296a_c.o','T10296a'])],
+test('T10296a', [ req_smp, extra_clean(['T10296a.o','T10296a_c.o','T10296a'])],
                 run_command,
                 ['$MAKE -s --no-print-directory T10296a'])
 
