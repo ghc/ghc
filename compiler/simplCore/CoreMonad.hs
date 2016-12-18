@@ -49,16 +49,12 @@ module CoreMonad (
     debugTraceMsg, debugTraceMsgS,
     dumpIfSet_dyn,
 
-#ifdef GHCI
     -- * Getting 'Name's
     thNameToGhcName
-#endif
   ) where
 
-#ifdef GHCI
 import Name( Name )
 import TcRnMonad        ( initTcForLookup )
-#endif
 import CoreSyn
 import HscTypes
 import Module
@@ -94,10 +90,8 @@ import Control.Applicative ( Alternative(..) )
 
 import Prelude hiding   ( read )
 
-#ifdef GHCI
 import {-# SOURCE #-} TcSplice ( lookupThName_maybe )
 import qualified Language.Haskell.TH as TH
-#endif
 
 {-
 ************************************************************************
@@ -812,7 +806,6 @@ instance MonadThings CoreM where
 ************************************************************************
 -}
 
-#ifdef GHCI
 -- | Attempt to convert a Template Haskell name to one that GHC can
 -- understand. Original TH names such as those you get when you use
 -- the @'foo@ syntax will be translated to their equivalent GHC name
@@ -823,4 +816,3 @@ thNameToGhcName :: TH.Name -> CoreM (Maybe Name)
 thNameToGhcName th_name = do
     hsc_env <- getHscEnv
     liftIO $ initTcForLookup hsc_env (lookupThName_maybe th_name)
-#endif

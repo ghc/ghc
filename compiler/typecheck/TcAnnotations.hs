@@ -10,14 +10,10 @@
 
 module TcAnnotations ( tcAnnotations, annCtxt ) where
 
-#ifdef GHCI
 import {-# SOURCE #-} TcSplice ( runAnnotation )
 import Module
 import DynFlags
 import Control.Monad ( when )
-#else
-import DynFlags ( WarnReason(NoReason) )
-#endif
 
 import HsSyn
 import Annotations
@@ -26,21 +22,7 @@ import TcRnMonad
 import SrcLoc
 import Outputable
 
-#ifndef GHCI
-
 tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
--- No GHCI; emit a warning (not an error) and ignore. cf Trac #4268
-tcAnnotations [] = return []
-tcAnnotations anns@(L loc _ : _)
-  = do { setSrcSpan loc $ addWarnTc NoReason $
-             (text "Ignoring ANN annotation" <> plural anns <> comma
-             <+> text "because this is a stage-1 compiler or doesn't support GHCi")
-       ; return [] }
-
-#else
-
-tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
--- GHCI exists, typecheck the annotations
 tcAnnotations anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl Name -> TcM Annotation
@@ -63,7 +45,6 @@ annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
 annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
 annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
-#endif
 
 annCtxt :: (OutputableBndrId id) => AnnDecl id -> SDoc
 annCtxt ann

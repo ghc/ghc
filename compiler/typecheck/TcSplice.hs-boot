@@ -8,12 +8,10 @@ import TcRnTypes( TcM, TcId )
 import TcType   ( ExpRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
 
-#ifdef GHCI
 import HsSyn      ( LHsType, LPat, LHsDecl, ThModFinalizers )
 import RdrName    ( RdrName )
 import TcRnTypes  ( SpliceType )
 import qualified Language.Haskell.TH as TH
-#endif
 
 tcSpliceExpr :: HsSplice Name
              -> ExpRhoType
@@ -29,7 +27,6 @@ tcTypedBracket :: HsBracket Name
 
 runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
 
-#ifdef GHCI
 tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr TcId) -> TcM (LHsExpr TcId)
 
 runMetaE :: LHsExpr TcId -> TcM (LHsExpr RdrName)
@@ -41,4 +38,3 @@ lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQuasi :: TH.Q a -> TcM a
 runRemoteModFinalizers :: ThModFinalizers -> TcM ()
 finishTH :: TcM ()
-#endif

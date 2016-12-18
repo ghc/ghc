@@ -46,7 +46,9 @@ module GHCi
   ) where
 
 import GHCi.Message
+#ifdef GHCI
 import GHCi.Run
+#endif
 import GHCi.RemoteTypes
 import GHCi.ResolvedBCO
 import GHCi.BreakArray (BreakArray)
@@ -71,7 +73,11 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString.Lazy as LB
 import Data.IORef
 import Foreign hiding (void)
+#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS (CostCentre,CostCentreStack)
+#else
+import GHC.Stack (CostCentre,CostCentreStack)
+#endif
 import System.Exit
 import Data.Maybe
 import GHC.IO.Handle.Types (Handle)
@@ -148,6 +154,12 @@ Other Notes on Remote GHCi
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
+#ifndef GHCI
+needExtInt :: IO a
+needExtInt = throwIO
+  (InstallationError "this operation requires -fexternal-interpreter")
+#endif
+
 -- | Run a command in the interpreter's context.  With
 -- @-fexternal-interpreter@, the command is serialized and sent to an
 -- external iserv process, and the response is deserialized (hence the
@@ -160,8 +172,11 @@ iservCmd hsc_env@HscEnv{..} msg
        uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
          iservCall iserv msg
  | otherwise = -- Just run it directly
+#ifdef GHCI
    run msg
-
+#else
+   needExtInt
+#endif
 
 -- Note [uninterruptibleMask_ and iservCmd]
 --
@@ -357,7 +372,11 @@ lookupSymbol hsc_env@HscEnv{..} str
                writeIORef iservLookupSymbolCache $! addToUFM cache str p
                return (Just p)
  | otherwise =
+#ifdef GHCI
    fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
+#else
+   needExtInt
+#endif
 
 lookupClosure :: HscEnv -> String -> IO (Maybe HValueRef)
 lookupClosure hsc_env str =
@@ -603,8 +622,14 @@ wormholeRef dflags r
   | gopt Opt_ExternalInterpreter dflags
   = throwIO (InstallationError
       "this operation requires -fno-external-interpreter")
+#ifdef GHCI
   | otherwise
   = localRef r
+#else
+  | otherwise
+  = throwIO (InstallationError
+      "can't wormhole a value in a stage1 compiler")
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Misc utils

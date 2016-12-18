@@ -17,21 +17,15 @@ TcSplice: Template Haskell splices
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module TcSplice(
-     -- These functions are defined in stage1 and stage2
-     -- The raise civilised errors in stage1
      tcSpliceExpr, tcTypedBracket, tcUntypedBracket,
 --     runQuasiQuoteExpr, runQuasiQuotePat,
 --     runQuasiQuoteDecl, runQuasiQuoteType,
      runAnnotation,
 
-#ifdef GHCI
-     -- These ones are defined only in stage2, and are
-     -- called only in stage2 (ie GHCI is on)
      runMetaE, runMetaP, runMetaT, runMetaD, runQuasi,
      tcTopSpliceExpr, lookupThName_maybe,
      defaultRunMeta, runMeta', runRemoteModFinalizers,
      finishTH
-#endif
       ) where
 
 #include "HsVersions.h"
@@ -51,7 +45,6 @@ import TcEnv
 
 import Control.Monad
 
-#ifdef GHCI
 import GHCi.Message
 import GHCi.RemoteTypes
 import GHCi
@@ -130,7 +123,6 @@ import Data.Typeable ( typeOf, Typeable, TypeRep, typeRep )
 import Data.Data (Data)
 import Data.Proxy    ( Proxy (..) )
 import GHC.Exts         ( unsafeCoerce# )
-#endif
 
 {-
 ************************************************************************
@@ -238,16 +230,6 @@ quotationCtxtDoc br_body
          2 (ppr br_body)
 
 
-#ifndef GHCI
-tcSpliceExpr  e _      = failTH e "Template Haskell splice"
-
--- runQuasiQuoteExpr q = failTH q "quasiquote"
--- runQuasiQuotePat  q = failTH q "pattern quasiquote"
--- runQuasiQuoteType q = failTH q "type quasiquote"
--- runQuasiQuoteDecl q = failTH q "declaration quasiquote"
-runAnnotation   _ q = failTH q "annotation"
-
-#else
   -- The whole of the rest of the file is the else-branch (ie stage2 only)
 
 {-
@@ -2015,5 +1997,3 @@ such fields defined in the module (see the test case
 overloadedrecflds/should_fail/T11103.hs).  The "proper" fix requires changes to
 the TH AST to make it able to represent duplicate record fields.
 -}
-
-#endif  /* GHCI */

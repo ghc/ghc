@@ -30,7 +30,11 @@ import PrimOp
 import SMRep
 
 import Data.Word
+#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS (CostCentre)
+#else
+import GHC.Stack (CostCentre)
+#endif
 
 -- ----------------------------------------------------------------------------
 -- Bytecode instructions

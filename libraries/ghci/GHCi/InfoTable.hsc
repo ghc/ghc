@@ -6,9 +6,11 @@
 -- We use the RTS data structures directly via hsc2hs.
 --
 module GHCi.InfoTable
-  ( mkConInfoTable
-  , peekItbl, StgInfoTable(..)
+  ( peekItbl, StgInfoTable(..)
   , conInfoPtr
+#ifdef GHCI
+  , mkConInfoTable
+#endif
   ) where
 
 #if !defined(TABLES_NEXT_TO_CODE)
@@ -20,6 +22,66 @@ import GHC.Ptr
 import GHC.Exts
 import System.IO.Unsafe
 
+type ItblCodes = Either [Word8] [Word32]
+
+-- Get definitions for the structs, constants & config etc.
+#include "Rts.h"
+
+-- Ultra-minimalist version specially for constructors
+#if SIZEOF_VOID_P == 8
+type HalfWord = Word32
+#elif SIZEOF_VOID_P == 4
+type HalfWord = Word16
+#else
+#error Uknown SIZEOF_VOID_P
+#endif
+
+type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
+
+data StgInfoTable = StgInfoTable {
+   entry  :: Maybe EntryFunPtr, -- Just <=> not ghciTablesNextToCode
+   ptrs   :: HalfWord,
+   nptrs  :: HalfWord,
+   tipe   :: HalfWord,
+   srtlen :: HalfWord,
+   code   :: Maybe ItblCodes -- Just <=> ghciTablesNextToCode
+  }
+
+peekItbl :: Ptr StgInfoTable -> IO StgInfoTable
+peekItbl a0 = do
+#if defined(TABLES_NEXT_TO_CODE)
+  let entry' = Nothing
+#else
+  entry' <- Just <$> (#peek StgInfoTable, entry) a0
+#endif
+  ptrs' <- (#peek StgInfoTable, layout.payload.ptrs) a0
+  nptrs' <- (#peek StgInfoTable, layout.payload.nptrs) a0
+  tipe' <- (#peek StgInfoTable, type) a0
+  srtlen' <- (#peek StgInfoTable, srt_bitmap) a0
+  return StgInfoTable
+    { entry  = entry'
+    , ptrs   = ptrs'
+    , nptrs  = nptrs'
+    , tipe   = tipe'
+    , srtlen = srtlen'
+    , code   = Nothing
+    }
+
+-- | Convert a pointer to an StgConInfo into an info pointer that can be
+-- used in the header of a closure.
+conInfoPtr :: Ptr () -> Ptr ()
+conInfoPtr ptr
+ | ghciTablesNextToCode = ptr `plusPtr` (#size StgConInfoTable)
+ | otherwise            = ptr
+
+ghciTablesNextToCode :: Bool
+#ifdef TABLES_NEXT_TO_CODE
+ghciTablesNextToCode = True
+#else
+ghciTablesNextToCode = False
+#endif
+
+#ifdef GHCI /* To end */
 mkConInfoTable
    :: Int     -- ptr words
    -> Int     -- non-ptr words
@@ -51,8 +113,6 @@ mkConInfoTable ptr_words nonptr_words tag ptrtag con_desc =
 
 -- -----------------------------------------------------------------------------
 -- Building machine code fragments for a constructor's entry code
-
-type ItblCodes = Either [Word8] [Word32]
 
 funPtrToInt :: FunPtr a -> Int
 funPtrToInt (FunPtr a) = I## (addr2Int## a)
@@ -280,9 +340,6 @@ byte7 w = fromIntegral (w `shiftR` 56)
 -- -----------------------------------------------------------------------------
 -- read & write intfo tables
 
--- Get definitions for the structs, constants & config etc.
-#include "Rts.h"
-
 -- entry point for direct returns for created constr itbls
 foreign import ccall "&stg_interp_constr1_entry" stg_interp_constr1_entry :: EntryFunPtr
 foreign import ccall "&stg_interp_constr2_entry" stg_interp_constr2_entry :: EntryFunPtr
@@ -302,30 +359,11 @@ interpConstrEntry = [ error "pointer tag 0"
                     , stg_interp_constr6_entry
                     , stg_interp_constr7_entry ]
 
--- Ultra-minimalist version specially for constructors
-#if SIZEOF_VOID_P == 8
-type HalfWord = Word32
-#elif SIZEOF_VOID_P == 4
-type HalfWord = Word16
-#else
-#error Uknown SIZEOF_VOID_P
-#endif
-
 data StgConInfoTable = StgConInfoTable {
    conDesc   :: Ptr Word8,
    infoTable :: StgInfoTable
 }
 
-type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
-
-data StgInfoTable = StgInfoTable {
-   entry  :: Maybe EntryFunPtr, -- Just <=> not ghciTablesNextToCode
-   ptrs   :: HalfWord,
-   nptrs  :: HalfWord,
-   tipe   :: HalfWord,
-   srtlen :: HalfWord,
-   code   :: Maybe ItblCodes -- Just <=> ghciTablesNextToCode
-  }
 
 pokeConItbl
   :: Ptr StgConInfoTable -> Ptr StgConInfoTable -> StgConInfoTable
@@ -364,26 +402,6 @@ pokeItbl a0 itbl = do
     Just (Right xs) -> pokeArray code_offset xs
 #endif
 
-peekItbl :: Ptr StgInfoTable -> IO StgInfoTable
-peekItbl a0 = do
-#if defined(TABLES_NEXT_TO_CODE)
-  let entry' = Nothing
-#else
-  entry' <- Just <$> (#peek StgInfoTable, entry) a0
-#endif
-  ptrs' <- (#peek StgInfoTable, layout.payload.ptrs) a0
-  nptrs' <- (#peek StgInfoTable, layout.payload.nptrs) a0
-  tipe' <- (#peek StgInfoTable, type) a0
-  srtlen' <- (#peek StgInfoTable, srt_bitmap) a0
-  return StgInfoTable
-    { entry  = entry'
-    , ptrs   = ptrs'
-    , nptrs  = nptrs'
-    , tipe   = tipe'
-    , srtlen = srtlen'
-    , code   = Nothing
-    }
-
 newExecConItbl :: StgInfoTable -> [Word8] -> IO (FunPtr ())
 newExecConItbl obj con_desc
    = alloca $ \pcode -> do
@@ -407,13 +425,6 @@ foreign import ccall unsafe "allocateExec"
 
 foreign import ccall unsafe "flushExec"
   _flushExec :: CUInt -> Ptr a -> IO ()
-
--- | Convert a pointer to an StgConInfo into an info pointer that can be
--- used in the header of a closure.
-conInfoPtr :: Ptr () -> Ptr ()
-conInfoPtr ptr
- | ghciTablesNextToCode = ptr `plusPtr` (#size StgConInfoTable)
- | otherwise            = ptr
 
 -- -----------------------------------------------------------------------------
 -- Constants and config
@@ -443,10 +454,4 @@ rtsIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
 
 cONSTR :: Int   -- Defined in ClosureTypes.h
 cONSTR = (#const CONSTR)
-
-ghciTablesNextToCode :: Bool
-#ifdef TABLES_NEXT_TO_CODE
-ghciTablesNextToCode = True
-#else
-ghciTablesNextToCode = False
-#endif
+#endif /* GHCI */
