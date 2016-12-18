@@ -250,7 +250,7 @@ test('linker_unload',
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
-test('T8242', [ only_ways(threaded_ways), ignore_stdout ],
+test('T8242', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
 test('T8124', [ only_ways(threaded_ways), omit_ways(['ghci']),
