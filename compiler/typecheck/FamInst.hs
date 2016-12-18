@@ -257,7 +257,7 @@ checkFamInstConsistency famInstMods directlyImpMods
            ; let (check_now, check_later)
                     -- NB: == this_mod only holds if there's an hs-boot file;
                     -- otherwise we cannot possible see instances for families
-                    -- *defined by the module we are compiling* in imports.
+                    -- defined by the module we are compiling in imports.
                     = partition ((/= this_mod) . nameModule . fi_fam)
                                 (famInstEnvElts env1)
            ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
