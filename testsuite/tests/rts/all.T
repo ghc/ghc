@@ -247,7 +247,7 @@ test('linker_unload',
      run_command,
      ['$MAKE -s --no-print-directory linker_unload'])
 
-test('T8209', [ only_ways(threaded_ways), ignore_stdout ],
+test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
 
 test('T8242', [ only_ways(threaded_ways), ignore_stdout ],
