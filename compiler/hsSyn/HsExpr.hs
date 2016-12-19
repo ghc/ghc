@@ -48,8 +48,10 @@ import Data.Data hiding (Fixity(..))
 import qualified Data.Data as Data (Fixity(..))
 import Data.Maybe (isNothing)
 
+#ifdef GHCI
 import GHCi.RemoteTypes ( ForeignRef )
 import qualified Language.Haskell.TH as TH (Q)
+#endif
 
 {-
 ************************************************************************
@@ -2045,13 +2047,24 @@ isTypedSplice _                  = False   -- Quasi-quotes are untyped splices
 -- See Note [Delaying modFinalizers in untyped splices] in RnSplice. For how
 -- this is used.
 --
+#ifdef GHCI
 newtype ThModFinalizers = ThModFinalizers [ForeignRef (TH.Q ())]
+#else
+data ThModFinalizers = ThModFinalizers
+#endif
 
 -- A Data instance which ignores the argument of 'ThModFinalizers'.
+#ifdef GHCI
 instance Data ThModFinalizers where
   gunfold _ z _ = z $ ThModFinalizers []
   toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
   dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
+#else
+instance Data ThModFinalizers where
+  gunfold _ z _ = z ThModFinalizers
+  toConstr  a   = mkConstr (dataTypeOf a) "ThModFinalizers" [] Data.Prefix
+  dataTypeOf a  = mkDataType "HsExpr.ThModFinalizers" [toConstr a]
+#endif
 
 -- | Haskell Spliced Thing
 --

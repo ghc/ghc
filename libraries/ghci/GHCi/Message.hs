@@ -1,6 +1,5 @@
-{-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving, ScopedTypeVariables,
-    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards,
-    CPP #-}
+{-# LANGUAGE GADTs, DeriveGeneric, StandaloneDeriving,
+    GeneralizedNewtypeDeriving, ExistentialQuantification, RecordWildCards #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing -fno-warn-orphans #-}
 
 -- |
@@ -15,7 +14,6 @@ module GHCi.Message
   , QResult(..)
   , EvalStatus_(..), EvalStatus, EvalResult(..), EvalOpts(..), EvalExpr(..)
   , SerializableException(..)
-  , toSerializableException, fromSerializableException
   , THResult(..), THResultType(..)
   , ResumeContext(..)
   , QState(..)
@@ -42,11 +40,7 @@ import Data.Dynamic
 import Data.IORef
 import Data.Map (Map)
 import GHC.Generics
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
-#endif
 import qualified Language.Haskell.TH        as TH
 import qualified Language.Haskell.TH.Syntax as TH
 import System.Exit
@@ -358,28 +352,7 @@ data SerializableException
   | EOtherException String
   deriving (Generic, Show)
 
-toSerializableException :: SomeException -> SerializableException
-toSerializableException ex
-  | Just UserInterrupt <- fromException ex  = EUserInterrupt
-  | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
-  | otherwise = EOtherException (show (ex :: SomeException))
-
-fromSerializableException :: SerializableException -> SomeException
-fromSerializableException EUserInterrupt = toException UserInterrupt
-fromSerializableException (EExitCode c) = toException c
-fromSerializableException (EOtherException str) = toException (ErrorCall str)
-
--- NB: Replace this with a derived instance once we depend on GHC 8.0
--- as the minimum
-instance Binary ExitCode where
-  put ExitSuccess      = putWord8 0
-  put (ExitFailure ec) = putWord8 1 `mappend` put ec
-  get = do
-    w <- getWord8
-    case w of
-      0 -> pure ExitSuccess
-      _ -> ExitFailure <$> get
-
+instance Binary ExitCode
 instance Binary SerializableException
 
 data THResult a

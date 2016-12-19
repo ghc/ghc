@@ -64,7 +64,6 @@ Library
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
-                   ghci == @ProjectVersionMunged@,
                    hoopl      >= 3.10.2 && < 3.11
 
     if os(windows)
@@ -73,6 +72,9 @@ Library
         if flag(terminfo)
             Build-Depends: terminfo == 0.4.*
         Build-Depends: unix   == 2.7.*
+
+    if flag(ghci)
+        Build-Depends: ghci == @ProjectVersionMunged@
 
     GHC-Options: -Wall -fno-warn-name-shadowing
 
@@ -603,6 +605,16 @@ Library
             Dwarf
             Dwarf.Types
             Dwarf.Constants
+
+    if !flag(stage1)
+        -- ghc:Serialized moved to ghc-boot:GHC.Serialized.  So for
+        -- compatibility with GHC 7.10 and earlier, we reexport it
+        -- under the old name.
+        reexported-modules:
+            ghc-boot:GHC.Serialized as Serialized
+
+    if flag(ghci)
+        Exposed-Modules:
             Convert
             ByteCodeTypes
             ByteCodeAsm
@@ -615,10 +627,3 @@ Library
             RtClosureInspect
             DebuggerUtils
             GHCi
-
-    if !flag(stage1)
-        -- ghc:Serialized moved to ghc-boot:GHC.Serialized.  So for
-        -- compatibility with GHC 7.10 and earlier, we reexport it
-        -- under the old name.
-        reexported-modules:
-            ghc-boot:GHC.Serialized as Serialized

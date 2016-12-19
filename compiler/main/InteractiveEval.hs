@@ -10,6 +10,7 @@
 -- -----------------------------------------------------------------------------
 
 module InteractiveEval (
+#ifdef GHCI
         Resume(..), History(..),
         execStmt, ExecOptions(..), execOptions, ExecResult(..), resumeExec,
         runDecls, runDeclsWithLocation,
@@ -39,14 +40,17 @@ module InteractiveEval (
         Term(..), obtainTermFromId, obtainTermFromVal, reconstructType,
         -- * Depcreated API (remove in GHC 7.14)
         RunResult(..), runStmt, runStmtWithLocation,
+#endif
         ) where
+
+#ifdef GHCI
 
 #include "HsVersions.h"
 
 import InteractiveEvalTypes
 
 import GHCi
-import GHCi.Message
+import GHCi.Run
 import GHCi.RemoteTypes
 import GhcMonad
 import HscMain
@@ -975,3 +979,4 @@ reconstructType hsc_env bound id = do
 
 mkRuntimeUnkTyVar :: Name -> Kind -> TyVar
 mkRuntimeUnkTyVar name kind = mkTcTyVar name kind RuntimeUnk
+#endif /* GHCI */

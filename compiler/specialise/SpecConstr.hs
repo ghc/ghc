@@ -13,8 +13,10 @@ ToDo [Oct 2013]
 {-# LANGUAGE CPP #-}
 
 module SpecConstr(
-        specConstrProgram,
-        SpecConstrAnnotation(..)
+        specConstrProgram
+#ifdef GHCI
+        , SpecConstrAnnotation(..)
+#endif
     ) where
 
 #include "HsVersions.h"
@@ -59,9 +61,12 @@ import PrelNames        ( specTyConName )
 import Module
 
 -- See Note [Forcing specialisation]
-
+#ifndef GHCI
+type SpecConstrAnnotation = ()
+#else
 import TyCon ( TyCon )
 import GHC.Exts( SpecConstrAnnotation(..) )
+#endif
 
 {-
 -----------------------------------------------------
@@ -949,6 +954,11 @@ ignoreType    :: ScEnv -> Type   -> Bool
 ignoreDataCon  :: ScEnv -> DataCon -> Bool
 forceSpecBndr :: ScEnv -> Var    -> Bool
 
+#ifndef GHCI
+ignoreType    _ _  = False
+ignoreDataCon  _ _ = False
+#else /* GHCI */
+
 ignoreDataCon env dc = ignoreTyCon env (dataConTyCon dc)
 
 ignoreType env ty
@@ -959,6 +969,7 @@ ignoreType env ty
 ignoreTyCon :: ScEnv -> TyCon -> Bool
 ignoreTyCon env tycon
   = lookupUFM (sc_annotations env) tycon == Just NoSpecConstr
+#endif /* GHCI */
 
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
@@ -973,7 +984,9 @@ forceSpecArgTy env ty
   | Just (tycon, tys) <- splitTyConApp_maybe ty
   , tycon /= funTyCon
       = tyConName tycon == specTyConName
+#ifdef GHCI
         || lookupUFM (sc_annotations env) tycon == Just ForceSpecConstr
+#endif
         || any (forceSpecArgTy env) tys
 
 forceSpecArgTy _ _ = False

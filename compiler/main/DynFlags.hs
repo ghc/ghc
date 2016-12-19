@@ -124,7 +124,9 @@ module DynFlags (
         -- * Compiler configuration suitable for display to the user
         compilerInfo,
 
+#ifdef GHCI
         rtsIsProfiled,
+#endif
         dynamicGhc,
 
 #include "GHCConstantsHaskellExports.hs"
@@ -3611,6 +3613,12 @@ supportedExtensions :: [String]
 supportedExtensions = concatMap toFlagSpecNamePair xFlags
   where
     toFlagSpecNamePair flg
+#ifndef GHCI
+      -- make sure that `ghc --supported-extensions` omits
+      -- "TemplateHaskell" when it's known to be unsupported. See also
+      -- GHC #11102 for rationale
+      | flagSpecFlag flg == LangExt.TemplateHaskell  = [noName]
+#endif
       | otherwise = [name, noName]
       where
         noName = "No" ++ name
@@ -4147,6 +4155,7 @@ foreign import ccall unsafe "rts_isProfiled" rtsIsProfiledIO :: IO CInt
 rtsIsProfiled :: Bool
 rtsIsProfiled = unsafeDupablePerformIO rtsIsProfiledIO /= 0
 
+#ifdef GHCI
 -- Consult the RTS to find whether GHC itself has been built with
 -- dynamic linking.  This can't be statically known at compile-time,
 -- because we build both the static and dynamic versions together with
@@ -4155,6 +4164,10 @@ foreign import ccall unsafe "rts_isDynamic" rtsIsDynamicIO :: IO CInt
 
 dynamicGhc :: Bool
 dynamicGhc = unsafeDupablePerformIO rtsIsDynamicIO /= 0
+#else
+dynamicGhc :: Bool
+dynamicGhc = False
+#endif
 
 setWarnSafe :: Bool -> DynP ()
 setWarnSafe True  = getCurLoc >>= \l -> upd (\d -> d { warnSafeOnLoc = l })
@@ -4187,8 +4200,24 @@ setIncoherentInsts True = do
   upd (\d -> d { incoherentOnLoc = l })
 
 checkTemplateHaskellOk :: TurnOnFlag -> DynP ()
+#ifdef GHCI
 checkTemplateHaskellOk _turn_on
   = getCurLoc >>= \l -> upd (\d -> d { thOnLoc = l })
+#else
+-- In stage 1, Template Haskell is simply illegal, except with -M
+-- We don't bleat with -M because there's no problem with TH there,
+-- and in fact GHC's build system does ghc -M of the DPH libraries
+-- with a stage1 compiler
+checkTemplateHaskellOk turn_on
+  | turn_on = do dfs <- liftEwM getCmdLineState
+                 case ghcMode dfs of
+                    MkDepend -> return ()
+                    _        -> addErr msg
+  | otherwise = return ()
+  where
+    msg = "Template Haskell requires GHC with interpreter support\n    " ++
+          "Perhaps you are using a stage-1 compiler?"
+#endif
 
 {- **********************************************************************
 %*                                                                      *

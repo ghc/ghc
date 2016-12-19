@@ -7,14 +7,12 @@
 
 module Coverage (addTicksToBinds, hpcInitCode) where
 
+#ifdef GHCI
 import qualified GHCi
 import GHCi.RemoteTypes
 import Data.Array
 import ByteCodeTypes
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
 #endif
 import Type
 import HsSyn
@@ -131,6 +129,9 @@ guessSourceFile binds orig_file =
 
 
 mkModBreaks :: HscEnv -> Module -> Int -> [MixEntry_] -> IO ModBreaks
+#ifndef GHCI
+mkModBreaks _hsc_env _mod _count _entries = return emptyModBreaks
+#else
 mkModBreaks hsc_env mod count entries
   | HscInterpreted <- hscTarget (hsc_dflags hsc_env) = do
     breakArray <- GHCi.newBreakArray hsc_env (length entries)
@@ -164,6 +165,7 @@ mkCCSArray hsc_env modul count entries = do
     mk_one (srcspan, decl_path, _, _) = (name, src)
       where name = concat (intersperse "." decl_path)
             src = showSDoc dflags (ppr srcspan)
+#endif
 
 
 writeMixEntries

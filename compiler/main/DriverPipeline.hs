@@ -2054,7 +2054,11 @@ doCpp dflags raw input_fn output_fn = do
 
     backend_defs <- getBackendDefs dflags
 
+#ifdef GHCI
     let th_defs = [ "-D__GLASGOW_HASKELL_TH__" ]
+#else
+    let th_defs = [ "-D__GLASGOW_HASKELL_TH__=0" ]
+#endif
     -- Default CPP defines in Haskell source
     ghcVersionH <- getGhcVersionPathName dflags
     let hsSourceCppOpts = [ "-include", ghcVersionH ]
