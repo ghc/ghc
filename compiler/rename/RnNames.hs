@@ -1147,6 +1147,8 @@ warnUnusedImportDecls gbl_env
          printMinimalImports usage }
 
 -- | Warn the user about top level binders that lack type signatures.
+-- Called /after/ type inference, so that we can report the
+-- inferred type of the function
 warnMissingSignatures :: TcGblEnv -> RnM ()
 warnMissingSignatures gbl_env
   = do { let exports = availsToNameSet (tcg_exports gbl_env)

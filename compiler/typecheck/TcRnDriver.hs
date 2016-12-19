@@ -267,6 +267,9 @@ tcRnModuleTcRnM hsc_env hsc_src
         tcg_env <- return (tcg_env { tcg_doc_hdr = maybe_doc_hdr }) ;
 
                 -- Report unused names
+                -- Do this /after/ type inference, so that when reporting
+                -- a function with no type signature we can give the
+                -- inferred type
         reportUnusedNames export_ies tcg_env ;
 
                 -- add extra source files to tcg_dependent_files
