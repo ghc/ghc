@@ -369,21 +369,24 @@ waitForJobCompletion hJob ioPort timeout
         loop = do
           res <- getQueuedCompletionStatus ioPort p_CompletionCode p_CompletionKey
                                            p_Overlapped timeout
-          completionCode <- peek p_CompletionCode
+          case res of
+            False -> return ()
+            True  -> do
+                completionCode <- peek p_CompletionCode
+                if completionCode == cJOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO
+                           then return ()
+                   else if completionCode == cJOB_OBJECT_MSG_EXIT_PROCESS
+                           then loop -- Debug point, do nothing for now
+                   else if completionCode == cJOB_OBJECT_MSG_NEW_PROCESS
+                           then loop -- Debug point, do nothing for now
+                           else loop
 
-          if completionCode == cJOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO
-                     then return ()
-             else if completionCode == cJOB_OBJECT_MSG_EXIT_PROCESS
-                     then loop
-             else if completionCode == cJOB_OBJECT_MSG_NEW_PROCESS
-                     then loop
-                     else loop
+    loop -- Kick it all off
 
-    loop
+    overlapped <- peek p_Overlapped
+    code       <- peek $ p_CompletionCode
 
-    overlapped    <- peek p_Overlapped
-    completionKey <- peek $ castPtr p_CompletionKey
-    return $ if overlapped == nullPtr && completionKey /= hJob
+    return $ if overlapped == nullPtr && code /= cJOB_OBJECT_MSG_ACTIVE_PROCESS_ZERO
                 then False -- Timeout occurred. *dark voice* YOU HAVE FAILED THIS TEST!.
                 else True
 #endif
