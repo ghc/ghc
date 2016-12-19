@@ -563,7 +563,7 @@ lintRhs rhs
         -- imitate @lintCoreExpr (App ...)@
         [] -> do
           fun_ty <- lintCoreExpr fun
-          addLoc (AnExpr rhs') $ foldM lintCoreArg fun_ty args
+          addLoc (AnExpr rhs') $ lintCoreArgs fun_ty args
 -- Rejects applications of the data constructor @StaticPtr@ if it finds any.
 lintRhs rhs = lintCoreExpr rhs
 
@@ -572,6 +572,14 @@ lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
   | isStableSource src
   = do { ty <- lintCoreExpr rhs
        ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "unfolding") ty) }
+
+lintIdUnfolding bndr bndr_ty (DFunUnfolding { df_con = con, df_bndrs = bndrs
+                                            , df_args = args })
+  = do { ty <- lintBinders bndrs $ \ bndrs' ->
+               do { res_ty <- lintCoreArgs (dataConRepType con) args
+                  ; return (mkLamTypes bndrs' res_ty) }
+       ; ensureEqTys bndr_ty ty (mkRhsMsg bndr (text "dfun unfolding") ty) }
+
 lintIdUnfolding  _ _ _
   = return ()       -- Do not Lint unstable unfoldings, because that leads
                     -- to exponential behaviour; c.f. CoreFVs.idUnfoldingVars
@@ -694,7 +702,7 @@ lintCoreExpr e@(App _ _)
            _     -> go
   where
     go = do { fun_ty <- lintCoreExpr fun
-            ; addLoc (AnExpr e) $ foldM lintCoreArg fun_ty args }
+            ; addLoc (AnExpr e) $ lintCoreArgs fun_ty args }
 
     (fun, args) = collectArgs e
 
@@ -790,6 +798,10 @@ check is not fully reliable, and we keep both around.
 The basic version of these functions checks that the argument is a
 subtype of the required type, as one would expect.
 -}
+
+
+lintCoreArgs  :: OutType -> [CoreArg] -> LintM OutType
+lintCoreArgs fun_ty args = foldM lintCoreArg fun_ty args
 
 lintCoreArg  :: OutType -> CoreArg -> LintM OutType
 lintCoreArg fun_ty (Type arg_ty)
