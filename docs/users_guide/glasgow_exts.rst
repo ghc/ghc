@@ -1443,6 +1443,10 @@ not the Prelude versions:
    functions must match the Prelude types very closely. Details are in
    flux; if you want to use this, ask!
 
+-  List notation, such as ``[x,y]`` or ``[m..n]`` can also be treated
+   via rebindable syntax if you use `-XOverloadedLists`;
+   see :ref:`overloaded-lists`.
+
 :ghc-flag:`-XRebindableSyntax` implies :ghc-flag:`-XNoImplicitPrelude`.
 
 In all cases (apart from arrow notation), the static semantics should be
