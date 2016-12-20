@@ -3555,7 +3555,19 @@ am a (b,s) = do
   addAnnotation l b (gl s)
   return av
 
--- |Add a list of AddAnns to the given AST element
+-- | Add a list of AddAnns to the given AST element.  For example,
+-- the parsing rule for @let@ looks like:
+--
+-- @
+--      | 'let' binds 'in' exp    {% ams (sLL $1 $> $ HsLet (snd $ unLoc $2) $4)
+--                                       (mj AnnLet $1:mj AnnIn $3
+--                                         :(fst $ unLoc $2)) }
+-- @
+--
+-- This adds an AnnLet annotation for @let@, an AnnIn for @in@, as well
+-- as any annotations that may arise in the binds. This will include open
+-- and closing braces if they are used to delimit the let expressions.
+--
 ams :: Located a -> [AddAnn] -> P (Located a)
 ams a@(L l _) bs = addAnnsAt l bs >> return a
 

@@ -23,21 +23,40 @@ import Data.Data
 {-
 Note [Api annotations]
 ~~~~~~~~~~~~~~~~~~~~~~
-In order to do source to source conversions using the GHC API, the
-locations of all elements of the original source needs to be tracked.
-This includes keywords such as 'let' / 'in' / 'do' etc as well as
-punctuation such as commas and braces, and also comments.
+Given a parse tree of a Haskell module, how can we reconstruct
+the original Haskell source code, retaining all whitespace and
+source code comments?  We need to track the locations of all
+elements from the original source: this includes keywords such as
+'let' / 'in' / 'do' etc as well as punctuation such as commas and
+braces, and also comments.  We collectively refer to this
+metadata as the "API annotations".
 
-These are captured in a structure separate from the parse tree, and
-returned in the pm_annotations field of the ParsedModule type.
+Rather than annotate the resulting parse tree with these locations
+directly (this would be a major change to some fairly core data
+structures in GHC), we instead capture locations for these elements in a
+structure separate from the parse tree, and returned in the
+pm_annotations field of the ParsedModule type.
 
-The non-comment annotations are stored indexed to the SrcSpan of the
-AST element containing them, together with a AnnKeywordId value
-identifying the specific keyword being captured.
+The full ApiAnns type is
+
+> type ApiAnns = ( Map.Map ApiAnnKey [SrcSpan]                  -- non-comments
+>                , Map.Map SrcSpan [Located AnnotationComment]) -- comments
+
+NON-COMMENT ELEMENTS
+
+Intuitively, every AST element directly contains a bag of keywords
+(keywords can show up more than once in a node: a semicolon i.e. newline
+can show up multiple times before the next AST element), each of which
+needs to be associated with its location in the original source code.
+
+Consequently, the structure that records non-comment elements is logically
+a two level map, from the SrcSpan of the AST element containing it, to
+a map from keywords ('AnnKeyWord') to all locations of the keyword directly
+in the AST element:
 
 > type ApiAnnKey = (SrcSpan,AnnKeywordId)
 >
-> Map.Map ApiAnnKey SrcSpan
+> Map.Map ApiAnnKey [SrcSpan]
 
 So
 
@@ -50,35 +69,44 @@ would result in the AST element
 and the annotations
 
   (span,AnnLet) having the location of the 'let' keyword
+  (span,AnnEqual) having the location of the '=' sign
   (span,AnnIn)  having the location of the 'in' keyword
 
+For any given element in the AST, there is only a set number of
+keywords that are applicable for it (e.g., you'll never see an
+'import' keyword associated with a let-binding.)  The set of allowed
+keywords is documented in a comment associated with the constructor
+of a given AST element, although the ground truth is in Parser
+and RdrHsSyn (which actually add the annotations; see #13012).
 
-The comments are indexed to the SrcSpan of the lowest AST element
-enclosing them
+COMMENT ELEMENTS
+
+Every comment is associated with a *located* AnnotationComment.
+We associate comments with the lowest (most specific) AST element
+enclosing them:
 
 > Map.Map SrcSpan [Located AnnotationComment]
 
-So the full ApiAnns type is
+PARSER STATE
 
-> type ApiAnns = ( Map.Map ApiAnnKey SrcSpan
->                , Map.Map SrcSpan [Located AnnotationComment])
-
-
-This is done in the lexer / parser as follows.
-
-
-The PState variable in the lexer has the following variables added
+There are three fields in PState (the parser state) which play a role
+with annotations.
 
 >  annotations :: [(ApiAnnKey,[SrcSpan])],
 >  comment_q :: [Located AnnotationComment],
 >  annotations_comments :: [(SrcSpan,[Located AnnotationComment])]
 
-The first and last store the values that end up in the ApiAnns value
-at the end via Map.fromList
+The 'annotations' and 'annotations_comments' fields are simple: they simply
+accumulate annotations that will end up in 'ApiAnns' at the end
+(after they are passed to Map.fromList).
 
-The comment_q captures comments as they are seen in the token stream,
+The 'comment_q' field captures comments as they are seen in the token stream,
 so that when they are ready to be allocated via the parser they are
-available.
+available (at the time we lex a comment, we don't know what the enclosing
+AST node of it is, so we can't associate it with a SrcSpan in
+annotations_comments).
+
+PARSER EMISSION OF ANNOTATIONS
 
 The parser interacts with the lexer using the function
 
@@ -88,35 +116,11 @@ which takes the AST element SrcSpan, the annotation keyword and the
 target SrcSpan.
 
 This adds the annotation to the `annotations` field of `PState` and
-transfers any comments in `comment_q` to the `annotations_comments`
-field.
-
-Parser
-------
-
-The parser implements a number of helper types and methods for the
-capture of annotations
-
-> type AddAnn = (SrcSpan -> P ())
->
-> mj :: AnnKeywordId -> Located e -> (SrcSpan -> P ())
-> mj a l = (\s -> addAnnotation s a (gl l))
-
-AddAnn represents the addition of an annotation a to a provided
-SrcSpan, and `mj` constructs an AddAnn value.
-
-> ams :: Located a -> [AddAnn] -> P (Located a)
-> ams a@(L l _) bs = (mapM_ (\a -> a l) bs) >> return a
-
-So the production in Parser.y for the HsLet AST element is
-
-        | 'let' binds 'in' exp    {% ams (sLL $1 $> $ HsLet (snd $ unLoc $2) $4)
-                                         (mj AnnLet $1:mj AnnIn $3
-                                           :(fst $ unLoc $2)) }
-
-This adds an AnnLet annotation for 'let', an AnnIn for 'in', as well
-as any annotations that may arise in the binds. This will include open
-and closing braces if they are used to delimit the let expressions.
+transfers any comments in `comment_q` WHICH ARE ENCLOSED by
+the SrcSpan of this element to the `annotations_comments`
+field.  (Comments which are outside of this annotation are deferred
+until later. 'allocateComments' in 'Lexer' is responsible for
+making sure we only attach comments that actually fit in the 'SrcSpan'.)
 
 The wiki page describing this feature is
 https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations
@@ -124,9 +128,11 @@ https://ghc.haskell.org/trac/ghc/wiki/ApiAnnotations
 -}
 -- ---------------------------------------------------------------------
 
+-- If you update this, update the Note [Api annotations] above
 type ApiAnns = ( Map.Map ApiAnnKey [SrcSpan]
                , Map.Map SrcSpan [Located AnnotationComment])
 
+-- If you update this, update the Note [Api annotations] above
 type ApiAnnKey = (SrcSpan,AnnKeywordId)
 
 

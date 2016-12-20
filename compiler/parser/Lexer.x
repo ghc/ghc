@@ -2797,6 +2797,21 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 -- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
 --   the AST construct the annotation belongs to; together with the
 --   AnnKeywordId, this is is the key of the annotation map
+--
+--   This type is useful for places in the parser where it is not yet
+--   known what SrcSpan an annotation should be added to.  The most
+--   common situation is when we are parsing a list: the annotations
+--   need to be associated with the AST element that *contains* the
+--   list, not the list itself.  'AddAnn' lets us defer adding the
+--   annotations until we finish parsing the list and are now parsing
+--   the enclosing element; we then apply the 'AddAnn' to associate
+--   the annotations.  Another common situation is where a common fragment of
+--   the AST has been factored out but there is no separate AST node for
+--   this fragment (this occurs in class and data declarations). In this
+--   case, the annotation belongs to the parent data declaration.
+--
+--   The usual way an 'AddAnn' is created is using the 'mj' ("make jump")
+--   function, and then it can be discharged using the 'ams' function.
 type AddAnn = SrcSpan -> P ()
 
 addAnnotation :: SrcSpan          -- SrcSpan of enclosing AST construct
