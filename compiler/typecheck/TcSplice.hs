@@ -1704,7 +1704,7 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
        ; req'        <- reifyCxt req
        ; exTyVars'   <- reifyTyVars exTyVars Nothing
        ; prov'       <- reifyCxt prov
-       ; tau'        <- reifyType (mkFunTys argTys resTy)
+       ; tau'        <- reifyType (mkFunTys (map unrestricted argTys) resTy) -- arnaud: TODO: incorrect unrestricted. Fix Template Haskell.
        ; return $ TH.ForallT univTyVars' req'
                 $ TH.ForallT exTyVars' prov' tau' }
 

@@ -1506,8 +1506,8 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
              -- Kind generalisation
        ; let all_user_tvs = imp_tvs ++ exp_tvs
        ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys all_user_tvs $
-                                            mkFunTys ctxt $
-                                            mkFunTys arg_tys $
+                                            mkFunTys (map unrestricted ctxt) $
+                                            mkFunTys (map unrestricted arg_tys) $
                                             unitTy)
                  -- That type is a lie, of course. (It shouldn't end in ()!)
                  -- And we could construct a proper result type from the info
@@ -1557,8 +1557,8 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
            <- tcGadtSigType (ppr names) (unLoc $ head names) ty
 
        ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys user_tvs $
-                                            mkFunTys ctxt $
-                                            mkFunTys arg_tys $
+                                            mkFunTys (map unrestricted ctxt) $
+                                            mkFunTys (map unrestricted arg_tys) $
                                             res_ty)
        ; tkvs <- quantifyZonkedTyVars emptyVarSet vars
 

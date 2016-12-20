@@ -36,6 +36,7 @@ import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
 import Type( mkTyVarBinders )
+import Weight
 
 import DynFlags
 import Var      ( TyVar, tyVarName, tyVarKind )
@@ -368,8 +369,8 @@ tcPatSynSig name sig_ty
 
        -- Kind generalisation
        ; kvs <- kindGeneralize $
-                build_patsyn_type [] implicit_tvs univ_tvs req
-                                  ex_tvs prov body_ty
+                build_patsyn_type [] implicit_tvs univ_tvs (map unrestricted req) -- TODO: arnaud: probably incorrect, to fix when pattern synonyms are done
+                                  ex_tvs (map unrestricted prov) body_ty -- TODO: arnaud: also probably incorrect
 
        -- These are /signatures/ so we zonk to squeeze out any kind
        -- unification variables.  Do this after quantifyTyVars which may
@@ -384,7 +385,7 @@ tcPatSynSig name sig_ty
 
        -- Now do validity checking
        ; checkValidType ctxt $
-         build_patsyn_type kvs implicit_tvs univ_tvs req ex_tvs prov body_ty
+         build_patsyn_type kvs implicit_tvs univ_tvs (map unrestricted req) ex_tvs (map unrestricted prov) body_ty -- TODO: arnaud: both unrestricted probably incorrect
 
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here

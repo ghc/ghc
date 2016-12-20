@@ -215,6 +215,7 @@ import VarEnv
 import PrelNames
 import TysWiredIn( coercibleClass, unitTyCon, unitTyConKey
                  , listTyCon, constraintKind )
+import Weight
 import BasicTypes
 import Util
 import Bag
@@ -1292,7 +1293,7 @@ mkSpecSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
 mkSpecSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Specified tyvars) ty
 
 mkPhiTy :: [PredType] -> Type -> Type
-mkPhiTy = mkFunTys
+mkPhiTy = mkFunTys . map unrestricted
 
 ---------------
 getDFunTyKey :: Type -> OccName -- Get some string from a type, to be used to
@@ -1429,7 +1430,7 @@ tcSplitNestedSigmaTys ty
     -- underneath it.
   | Just (arg_tys, tvs1, theta1, rho1) <- tcDeepSplitSigmaTy_maybe ty
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkFunTys arg_tys rho2)
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkFunTys (map unrestricted arg_tys) rho2) -- TODO: arnaud: I don't know what this is yet, but unrestricted, here, is most certainly wrong.
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
 

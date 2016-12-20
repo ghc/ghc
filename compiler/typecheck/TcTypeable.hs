@@ -24,6 +24,7 @@ import TysWiredIn ( tupleTyCon, sumTyCon, runtimeRepTyCon
                   , nilDataCon, consDataCon )
 import Id
 import Type
+import Weight
 import Kind ( isTYPEApp )
 import TyCon
 import DataCon
@@ -461,7 +462,7 @@ builtInKindReps :: [(Kind, Name)]
 builtInKindReps =
     [ (star, starKindRepName)
     , (mkFunTyOm star star, starArrStarKindRepName)
-    , (mkFunTys [star, star] star, starArrStarArrStarKindRepName)
+    , (mkFunTys [unrestricted star, unrestricted star] star, starArrStarArrStarKindRepName)
     ]
   where
     star = liftedTypeKind

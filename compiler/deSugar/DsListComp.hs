@@ -26,6 +26,7 @@ import DynFlags
 import CoreUtils
 import Id
 import Type
+import Weight
 import TysWiredIn
 import Match
 import PrelNames
@@ -414,7 +415,7 @@ mkZipBind elt_tys = do
     elt_tuple_ty      = mkBigCoreTupTy elt_tys
     elt_tuple_list_ty = mkListTy elt_tuple_ty
 
-    zip_fn_ty         = mkFunTys elt_list_tys elt_tuple_list_ty
+    zip_fn_ty         = mkFunTys (map unrestricted elt_list_tys) elt_tuple_list_ty
 
     mk_case (as, a', as') rest
           = Case (Var as) as elt_tuple_list_ty

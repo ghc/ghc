@@ -30,6 +30,7 @@ import DsUtils
 
 import TcType
 import Type
+import Weight
 import Id   ( Id )
 import Coercion
 import PrimOp
@@ -118,7 +119,7 @@ mkFCall dflags uniq the_fcall val_args res_ty
     mkApps (mkVarApps (Var the_fcall_id) tyvars) val_args
   where
     arg_tys = map exprType val_args
-    body_ty = (mkFunTys arg_tys res_ty)
+    body_ty = (mkFunTys (map unrestricted arg_tys) res_ty)
     tyvars  = tyCoVarsOfTypeWellScoped body_ty
     ty      = mkInvForAllTys tyvars body_ty
     the_fcall_id = mkFCallId dflags uniq the_fcall ty

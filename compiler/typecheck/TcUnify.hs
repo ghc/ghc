@@ -184,7 +184,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; result       <- thing_inside (reverse acc_arg_tys ++ (map unrestricted more_arg_tys)) res_ty
            ; more_arg_tys <- mapM readExpType more_arg_tys
            ; res_ty       <- readExpType res_ty
-           ; let unif_fun_ty = mkFunTys more_arg_tys res_ty
+           ; let unif_fun_ty = mkFunTys (map unrestricted more_arg_tys) res_ty -- TODO: arnaud: check but I believe these are arrows with unknown weight, therefore it's correct to default to Omega
            ; wrap <- tcSubTypeDS AppOrigin GenSigCtxt unif_fun_ty fun_ty
                          -- Not a good origin at all :-(
            ; return (result, wrap) }
@@ -209,7 +209,7 @@ matchActualFunTys :: Outputable a
                   -> Maybe a   -- the thing with type TcSigmaType
                   -> Arity
                   -> TcSigmaType
-                  -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+                  -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
 -- If    matchActualFunTys n ty = (wrap, [t1,..,tn], ty_r)
 -- then  wrap : ty ~> (t1 -> ... -> tn -> ty_r)
 matchActualFunTys herald ct_orig mb_thing arity ty
@@ -223,9 +223,9 @@ matchActualFunTysPart :: Outputable a
                       -> Maybe a  -- the thing with type TcSigmaType
                       -> Arity
                       -> TcSigmaType
-                      -> [TcSigmaType] -- reversed args. See (*) below.
+                      -> [Weighted TcSigmaType] -- reversed args. See (*) below.
                       -> Arity   -- overall arity of the function, for errs
-                      -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+                      -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
 matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
                       orig_old_args full_arity
   = go arity orig_old_args orig_ty
@@ -256,9 +256,9 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     --
     -- Refactoring is welcome.
     go :: Arity
-       -> [TcSigmaType] -- accumulator of arguments (reversed)
+       -> [Weighted TcSigmaType] -- accumulator of arguments (reversed)
        -> TcSigmaType   -- the remainder of the type as we're processing
-       -> TcM (HsWrapper, [TcSigmaType], TcSigmaType)
+       -> TcM (HsWrapper, [Weighted TcSigmaType], TcSigmaType)
     go 0 _ ty = return (idHsWrapper, [], ty)
 
     go n acc_args ty
@@ -272,11 +272,11 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args ty
       | Just ty' <- tcView ty = go n acc_args ty'
 
-    go n acc_args (FunTy _ arg_ty res_ty)
+    go n acc_args (FunTy w arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
-        do { (wrap_res, tys, ty_r) <- go (n-1) (arg_ty : acc_args) res_ty
-           ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc
-                    , arg_ty : tys, ty_r ) }
+        do { (wrap_res, tys, ty_r) <- go (n-1) (Weighted w arg_ty : acc_args) res_ty
+           ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc -- TODO: arnaud: the wrapper may need linear type information
+                    , Weighted w arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -310,12 +310,12 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     defer n fun_ty
       = do { arg_tys <- replicateM n newOpenFlexiTyVarTy
            ; res_ty  <- newOpenFlexiTyVarTy
-           ; let unif_fun_ty = mkFunTys arg_tys res_ty
+           ; let unif_fun_ty = mkFunTys (map unrestricted arg_tys) res_ty -- TODO: arnaud: check but I believe these are arrows of unknown weight so it's correct to default to Omega
            ; co <- unifyType mb_thing fun_ty unif_fun_ty
-           ; return (mkWpCastN co, arg_tys, res_ty) }
+           ; return (mkWpCastN co, map unrestricted arg_tys, res_ty) }
 
     ------------
-    mk_ctxt :: [TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
+    mk_ctxt :: [Weighted TcSigmaType] -> TcSigmaType -> TidyEnv -> TcM (TidyEnv, MsgDoc)
     mk_ctxt arg_tys res_ty env
       = do { let ty = mkFunTys arg_tys res_ty
            ; (env1, zonked) <- zonkTidyTcType env ty

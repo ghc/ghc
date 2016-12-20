@@ -661,8 +661,8 @@ mkFunTyOm :: Type -> Type -> Type
 mkFunTyOm = mkFunTy Omega
 
 -- | Make nested arrow types
-mkFunTys :: [Type] -> Type -> Type
-mkFunTys tys ty = foldr (mkFunTy Omega) ty tys
+mkFunTys :: [Weighted Type] -> Type -> Type
+mkFunTys tys ty = foldr (\(Weighted w t) -> mkFunTy w t) ty tys
 -- FIXME: arnaud: see at use-site how to best refine this. Probably the list argument should be of pairs `(Rig,Type)`.
 
 mkForAllTy :: TyVar -> ArgFlag -> Type -> Type

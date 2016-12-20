@@ -351,7 +351,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
   , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
   = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
        ; let arg2_exp_ty = res_ty
-       ; arg1' <- tcArg op arg1 arg1_ty 1
+       ; arg1' <- tcArg op arg1 (unrestricted arg1_ty) 1
        ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
                   tc_poly_expr_nc arg2 arg2_exp_ty
        ; arg2_ty <- readExpType arg2_exp_ty
@@ -383,7 +383,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        --
        -- The *result* type can have any kind (Trac #8739),
        -- so we don't need to check anything for that
-       ; _ <- unifyKind (Just arg2_sigma) (typeKind arg2_sigma) liftedTypeKind
+       ; _ <- unifyKind (Just (weightedThing arg2_sigma)) (typeKind (weightedThing arg2_sigma)) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -395,7 +395,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
        ; let op' = L loc (HsWrap (mkWpTyApps [ getRuntimeRep "tcExpr ($)" res_ty
-                                             , arg2_sigma
+                                             , weightedThing arg2_sigma
                                              , res_ty])
                                  (HsVar (L lv op_id)))
              -- arg1' :: arg1_ty
@@ -404,7 +404,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
-             wrap1 = mkWpFun idHsWrapper wrap_res arg2_sigma res_ty doc
+             wrap1 = mkWpFun idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
 
@@ -431,10 +431,10 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
 tcExpr expr@(SectionR op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
-       ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just op) 2 op_ty
+       ; (wrap_fun, [Weighted w arg1_ty, arg2_ty], op_res_ty) <-
+           matchActualFunTys (mk_op_msg op) fn_orig (Just op) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
-                                 (mkFunTy Omega arg1_ty op_res_ty) res_ty -- arnaud: TODO: operator sections could have linear types too. The weight should be derived from the operator's type.
+                                 (mkFunTy w arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op arg2 arg2_ty 2
        ; return ( mkHsWrap wrap_res $
                   SectionR (mkLHsWrap wrap_fun op') arg2' ) }
@@ -486,7 +486,7 @@ tcExpr expr@(ExplicitTuple tup_args boxity) res_ty
            { Boxed   -> newFlexiTyVarTys arity liftedTypeKind
            ; Unboxed -> replicateM arity newOpenFlexiTyVarTy }
        ; let actual_res_ty
-                 = mkFunTys [ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args]
+                 = mkFunTys [unrestricted ty | (ty, (L _ (Missing _))) <- arg_tys `zip` tup_args] -- TODO: arnaud: tuple constructors should probably be linear, using unrestricted for now until case is correct
                             (mkTupleTy boxity arg_tys)
 
        ; wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "ExpTuple")
@@ -1257,7 +1257,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; (inner_wrap, args', inner_res_ty)
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
-           ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
+           ; return ( mkWpFun idHsWrapper inner_wrap (weightedThing arg_ty) res_ty doc <.> wrap
                     , Left arg' : args'
                     , inner_res_ty ) }
       where
@@ -1273,11 +1273,13 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 ----------------
 tcArg :: LHsExpr Name                    -- The function (for error messages)
       -> LHsExpr Name                    -- Actual arguments
-      -> TcRhoType                       -- expected arg type
+      -> Weighted TcRhoType              -- expected (weighted) arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr TcId)             -- Resulting argument
-tcArg fun arg ty arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
-                          tcPolyExprNC arg ty
+tcArg fun arg (Weighted weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $ do
+                          (usage,result) <- tcCollectingUsage $ tcPolyExprNC arg ty
+                          tcEmitBindingUsage $ scaleUE weight usage
+                          return result
 
 ----------------
 tcTupArgs :: [LHsTupArg Name] -> [TcSigmaType] -> TcM [LHsTupArg TcId]
@@ -1412,7 +1414,7 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
            <- matchActualFunTys herald orig noThing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
-           <- tc_syn_args_e arg_tys arg_shapes $ \ arg_results ->
+           <- tc_syn_args_e (map weightedThing arg_tys) arg_shapes $ \ arg_results -> -- TODO: arnaud: quite possibly incorrect here. I don't know what we're checking yet
               tc_syn_arg    res_ty  res_shape  $ \ res_results ->
               thing_inside (arg_results ++ res_results)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }

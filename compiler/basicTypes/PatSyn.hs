@@ -29,6 +29,7 @@ import Name
 import Outputable
 import Unique
 import Util
+import Weight
 import BasicTypes
 import Var
 import FieldLabel
@@ -424,6 +425,6 @@ pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
         , pprType sigma_ty ]
   where
     sigma_ty = mkForAllTys ex_tvs  $
-               mkFunTys prov_theta $
-               mkFunTys orig_args orig_res_ty
+               mkFunTys (map unrestricted prov_theta) $
+               mkFunTys (map unrestricted orig_args) orig_res_ty
     insert_empty_ctxt = null req_theta && not (null prov_theta && null ex_tvs)

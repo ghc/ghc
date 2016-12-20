@@ -17,6 +17,7 @@ import Module
 import TyCon
 import CoAxiom
 import Type
+import Weight
 import Id
 import Var
 import Name
@@ -91,7 +92,7 @@ buildPADict vect_tc prepr_ax pdata_tc pdatas_tc repr
           -- Build the type of the dictionary function.
       ; pa_cls <- builtin paClass
       ; let dfun_ty = mkInvForAllTys tvs
-                    $ mkFunTys (map varType val_args)
+                    $ mkFunTys (map (unrestricted . varType) val_args)
                                (mkClassPred pa_cls [inst_ty])
 
           -- Set the unfolding for the inliner.

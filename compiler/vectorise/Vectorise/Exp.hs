@@ -31,6 +31,7 @@ import DataCon
 import TyCon
 import TcType
 import Type
+import Weight
 import TyCoRep
 import Var
 import VarEnv
@@ -638,7 +639,7 @@ mkScalarFun arg_tys res_ty expr
        }
   | otherwise
   = do { traceVt "mkScalarFun: " $ ppr expr $$ text "  ::" <+>
-                                   ppr (mkFunTys arg_tys res_ty)
+                                   ppr (mkFunTys (map unrestricted arg_tys) res_ty)
 
        ; fn_var  <- hoistExpr (fsLit "fn") expr DontInline
        ; zipf    <- zipScalars arg_tys res_ty

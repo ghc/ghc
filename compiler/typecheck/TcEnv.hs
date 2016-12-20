@@ -32,6 +32,7 @@ module TcEnv(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendIdBndrs, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr, tcEmitBindingUsage,
+        tcCollectingUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupTyVar,

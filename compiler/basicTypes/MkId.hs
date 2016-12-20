@@ -44,6 +44,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import Weight
 import FamInstEnv
 import Coercion
 import TcType
@@ -981,7 +982,7 @@ mkPrimOpId prim_op
   = id
   where
     (tyvars,arg_tys,res_ty, arity, strict_sig) = primOpSig prim_op
-    ty   = mkSpecForAllTys tyvars (mkFunTys arg_tys res_ty)
+    ty   = mkSpecForAllTys tyvars (mkFunTys (map unrestricted arg_tys) res_ty)
     name = mkWiredInName gHC_PRIM (primOpOcc prim_op)
                          (mkPrimOpIdUnique (primOpTag prim_op))
                          (AnId id) UserSyntax
@@ -1261,7 +1262,7 @@ coerceId = pcMiscPrelId coerceName ty info
                                            , liftedTypeKind
                                            , alphaTy, betaTy ]
     ty        = mkSpecForAllTys [alphaTyVar, betaTyVar] $
-                mkFunTys [eqRTy, alphaTy] betaTy
+                mkFunTys [unrestricted eqRTy, unrestricted alphaTy] betaTy
 
     [eqR,x,eq] = mkTemplateLocals [eqRTy, alphaTy, eqRPrimTy]
     rhs = mkLams [alphaTyVar, betaTyVar, eqR, x] $

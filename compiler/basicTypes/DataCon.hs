@@ -65,6 +65,7 @@ import Type
 import ForeignCall ( CType )
 import Coercion
 import Unify
+import Weight
 import TyCon
 import FieldLabel
 import Class
@@ -808,7 +809,7 @@ mkDataCon name declared_infix prom_info
     rep_arg_tys = dataConRepArgTys con
 
     rep_ty = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $
-             mkFunTys rep_arg_tys $
+             mkFunTys (map unrestricted rep_arg_tys) $ -- TODO: arnaud: that unrestricted is more than a little fishy.
              mkTyConApp rep_tycon (mkTyVarTys (binderVars univ_tvs))
 
       -- See Note [Promoted data constructors] in TyCon
@@ -1111,8 +1112,8 @@ dataConUserType (MkData { dcUnivTyVars = univ_tvs,
                           dcOrigResTy = res_ty })
   = mkForAllTys (filterEqSpec eq_spec univ_tvs) $
     mkForAllTys ex_tvs $
-    mkFunTys theta $
-    mkFunTys arg_tys $
+    mkFunTys (map unrestricted theta) $ -- TODO: arnaud: and following line: when constructor types are handled properly, this unrestricted should disapear.
+    mkFunTys (map unrestricted arg_tys) $
     res_ty
 
 -- | Finds the instantiated types of the arguments required to construct a 'DataCon' representation

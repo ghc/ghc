@@ -402,7 +402,7 @@ tcPatSynMatcher (L loc name) lpat
                | is_unlifted = ([nlHsVar voidPrimId], [voidPrimTy])
                | otherwise   = (args,                 arg_tys)
              cont_ty = mkInfSigmaTy ex_tvs prov_theta $
-                       mkFunTys cont_arg_tys res_ty
+                       mkFunTys (map unrestricted cont_arg_tys) res_ty -- TODO: arnaud: unrestricted probably wrong here
 
              fail_ty  = mkFunTyOm voidPrimTy res_ty -- TODO: arnaud: unsure about Omega here
 
@@ -411,7 +411,7 @@ tcPatSynMatcher (L loc name) lpat
        ; cont         <- newSysLocalId (fsLit "cont")  cont_ty
        ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
 
-       ; let matcher_tau   = mkFunTys [pat_ty, cont_ty, fail_ty] res_ty
+       ; let matcher_tau   = mkFunTys (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau
              matcher_id    = mkExportedVanillaId matcher_name matcher_sigma
                              -- See Note [Exported LocalIds] in Id
@@ -504,8 +504,8 @@ mkPatSynBuilderId dir (L _ name)
              builder_sigma  = add_void need_dummy_arg $
                               mkForAllTys univ_bndrs $
                               mkForAllTys ex_bndrs $
-                              mkFunTys theta $
-                              mkFunTys arg_tys $
+                              mkFunTys (map unrestricted theta) $ -- TODO: arnaud: and following line probably wrong
+                              mkFunTys (map unrestricted arg_tys) $
                               pat_ty
              builder_id     = mkExportedVanillaId builder_name builder_sigma
               -- See Note [Exported LocalIds] in Id

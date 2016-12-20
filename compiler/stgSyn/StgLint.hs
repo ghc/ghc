@@ -22,6 +22,7 @@ import Name             ( getSrcLoc )
 import ErrUtils         ( MsgDoc, Severity(..), mkLocMessage )
 import Type
 import RepType
+import Weight
 import TyCon
 import Util
 import SrcLoc
@@ -135,7 +136,7 @@ lintStgRhs (StgRhsClosure _ _ _ _ binders expr)
   = addLoc (LambdaBodyOf binders) $
       addInScopeVars binders $ runMaybeT $ do
         body_ty <- MaybeT $ lintStgExpr expr
-        return (mkFunTys (map idType binders) body_ty)
+        return (mkFunTys (map (unrestricted . idType) binders) body_ty)
 
 lintStgRhs rhs@(StgRhsCon _ con args) = do
     -- TODO: Check arg_tys

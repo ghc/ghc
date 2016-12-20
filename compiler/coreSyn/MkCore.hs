@@ -65,6 +65,7 @@ import PrelNames
 import HsUtils          ( mkChunkified, chunkify )
 import TcType           ( mkSpecSigmaTy )
 import Type
+import Weight
 import Coercion         ( isCoVar )
 import TysPrim
 import DataCon          ( DataCon, dataConWorkId )
@@ -605,7 +606,7 @@ mkBuildExpr :: (MonadThings m, MonadUnique m)
 mkBuildExpr elt_ty mk_build_inside = do
     [n_tyvar] <- newTyVars [alphaTyVar]
     let n_ty = mkTyVarTy n_tyvar
-        c_ty = mkFunTys [elt_ty, n_ty] n_ty
+        c_ty = mkFunTys [unrestricted elt_ty, unrestricted n_ty] n_ty
     [c, n] <- sequence [mkSysLocalM (fsLit "c") c_ty, mkSysLocalM (fsLit "n") n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
