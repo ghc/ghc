@@ -214,6 +214,48 @@ void interp_shutdown ( void )
 
 #endif
 
+#ifdef PROFILING
+
+//
+// Build a zero-argument PAP with the current CCS
+// See Note [Evaluating functions with profiling] in Apply.cmm
+//
+STATIC_INLINE
+StgClosure * newEmptyPAP (Capability *cap,
+                          StgClosure *tagged_obj, // a FUN or a BCO
+                          uint32_t arity)
+{
+    StgPAP *pap = (StgPAP *)allocate(cap, sizeofW(StgPAP));
+    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
+    pap->arity = arity;
+    pap->n_args = 0;
+    pap->fun = tagged_obj;
+    return (StgClosure *)pap;
+}
+
+//
+// Make an exact copy of a PAP, except that we combine the current CCS with the
+// CCS in the PAP.  See Note [Evaluating functions with profiling] in Apply.cmm
+//
+STATIC_INLINE
+StgClosure * copyPAP  (Capability *cap, StgPAP *oldpap)
+{
+    uint32_t size = PAP_sizeW(oldpap->n_args);
+    StgPAP *pap = (StgPAP *)allocate(cap, size);
+    enterFunCCS(&cap->r, oldpap->header.prof.ccs);
+    SET_HDR(pap, &stg_PAP_info, cap->r.rCCCS);
+    pap->arity = oldpap->arity;
+    pap->n_args = oldpap->n_args;
+    pap->fun = oldpap->fun;
+    uint32_t i;
+    for (i = 0; i < ((StgPAP *)pap)->n_args; i++) {
+        pap->payload[i] = oldpap->payload[i];
+    }
+    return (StgClosure *)pap;
+}
+
+#endif
+
 static StgWord app_ptrs_itbl[] = {
     (W_)&stg_ap_p_info,
     (W_)&stg_ap_pp_info,
@@ -343,6 +385,8 @@ eval_obj:
     case CONSTR_1_1:
     case CONSTR_0_2:
     case CONSTR_NOCAF:
+        break;
+
     case FUN:
     case FUN_1_0:
     case FUN_0_1:
@@ -350,15 +394,30 @@ eval_obj:
     case FUN_1_1:
     case FUN_0_2:
     case FUN_STATIC:
+#ifdef PROFILING
+        if (cap->r.rCCCS != obj->header.prof.ccs) {
+            tagged_obj =
+                newEmptyPAP(cap, tagged_obj, get_fun_itbl(obj)->f.arity);
+        }
+#endif
+        break;
+
     case PAP:
-        // already in WHNF
+#ifdef PROFILING
+        if (cap->r.rCCCS != obj->header.prof.ccs) {
+            tagged_obj = copyPAP(cap, (StgPAP *)obj);
+        }
+#endif
         break;
 
     case BCO:
-    {
         ASSERT(((StgBCO *)obj)->arity > 0);
+#ifdef PROFILING
+        if (cap->r.rCCCS != obj->header.prof.ccs) {
+            tagged_obj = newEmptyPAP(cap, tagged_obj, ((StgBCO *)obj)->arity);
+        }
+#endif
         break;
-    }
 
     case AP:    /* Copied from stg_AP_entry. */
     {
@@ -380,7 +439,7 @@ eval_obj:
         // restore the CCCS after evaluating the AP
         Sp -= 2;
         Sp[1] = (W_)cap->r.rCCCS;
-        Sp[0] = (W_)&stg_restore_cccs_info;
+        Sp[0] = (W_)&stg_restore_cccs_eval_info;
 #endif
 
         Sp -= sizeofW(StgUpdateFrame);
@@ -425,7 +484,7 @@ eval_obj:
         // restore the CCCS after evaluating the closure
         Sp -= 2;
         Sp[1] = (W_)cap->r.rCCCS;
-        Sp[0] = (W_)&stg_restore_cccs_info;
+        Sp[0] = (W_)&stg_restore_cccs_eval_info;
 #endif
         Sp -= 2;
         Sp[1] = (W_)tagged_obj;
@@ -465,7 +524,8 @@ do_return:
         // NOTE: not using get_itbl().
         info = ((StgClosure *)Sp)->header.info;
 
-        if (info == (StgInfoTable *)&stg_restore_cccs_info) {
+        if (info == (StgInfoTable *)&stg_restore_cccs_info ||
+            info == (StgInfoTable *)&stg_restore_cccs_eval_info) {
             cap->r.rCCCS = (CostCentreStack*)Sp[1];
             Sp += 2;
             goto do_return;

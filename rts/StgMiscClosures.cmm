@@ -55,6 +55,16 @@ INFO_TABLE_RET (stg_restore_cccs, RET_SMALL, W_ info_ptr, W_ cccs)
     jump %ENTRY_CODE(Sp(0)) [*]; // NB. all registers live!
 }
 
+
+INFO_TABLE_RET (stg_restore_cccs_eval, RET_SMALL, W_ info_ptr, W_ cccs)
+    return (P_ ret)
+{
+#if defined(PROFILING)
+    CCCS = cccs;
+#endif
+    jump stg_ap_0_fast(ret);
+}
+
 /* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */

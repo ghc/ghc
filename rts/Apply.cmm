@@ -52,6 +52,10 @@ stg_ap_0_fast ( P_ fun )
   The mechanism we use to wrap the function is to create a
   zero-argument PAP as a proxy object to hold the new CCS, and return
   that.
+
+  If the closure we evaluated is itself a PAP, we cannot make a nested
+  PAP, so we copy the original PAP and set the CCS in the new PAP to
+  enterFunCCS(pap->header.prof.ccs).
 */
 
 again:
@@ -122,6 +126,8 @@ again:
                 CCS_ALLOC(BYTES_TO_WDS(SIZEOF_StgPAP), CCS_OVERHEAD);
                 P_ pap;
                 pap = Hp - size + WDS(1);
+                // We'll lose the original PAP, so we should enter its CCS
+                ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(fun) "ptr");
                 SET_HDR(pap, stg_PAP_info, CCCS);
                 StgPAP_arity(pap) = StgPAP_arity(fun);
                 StgPAP_n_args(pap) = StgPAP_n_args(fun);
@@ -136,6 +142,27 @@ again:
                 StgPAP_payload(pap,i) = StgPAP_payload(fun,i);
                 goto loop;
             }
+        }
+        case AP,
+             AP_STACK,
+             BLACKHOLE,
+             WHITEHOLE,
+             THUNK,
+             THUNK_1_0,
+             THUNK_0_1,
+             THUNK_2_0,
+             THUNK_1_1,
+             THUNK_0_2,
+             THUNK_STATIC,
+             THUNK_SELECTOR:
+        {
+            // The thunk might evaluate to a function, so we have to come
+            // back here again to adjust its CCS if necessary.  The
+            // stg_restore_ccs_eval stack frame does that.
+            STK_CHK_GEN();
+            jump %ENTRY_CODE(info)
+                (stg_restore_cccs_eval_info, CCCS)
+                (UNTAG(fun));
         }
         default:
         {

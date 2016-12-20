@@ -97,8 +97,7 @@ test('T5559', [], compile_and_run, [''])
 
 test('callstack001',
      # unoptimised results are different w.r.t. CAF attribution
-     [ expect_broken_for_10037,
-       omit_ways(['ghci-ext-prof']), # produces a different stack
+     [ omit_ways(['ghci-ext-prof']), # produces a different stack
      ], compile_and_run,
      ['-fprof-auto-calls -fno-full-laziness -fno-state-hack'])
 
