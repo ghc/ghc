@@ -533,10 +533,9 @@ tc_extend_local_env top_lvl extra_env thing_inside
         Just uenv' -> return uenv'
         Nothing    -> do
           let actual_weight = lookupUE uenv x
-          addErrTc $ text "Variable" <+> ppr x <+>
-                     text "is used with weigh" <+> ppr actual_weight <+>
-                     text "but incompatible weight" <+> ppr w <+>
-                     text "was expected."
+          addErrTc $ text "Couldn't match expected weight" <+> quotes (ppr w) <+>
+                     text "of variable" <+> quotes (ppr x) <+>
+                     text "with actual weight" <+> quotes (ppr actual_weight)
           -- In case of error, recover by pretending that the weight usage was correct
           return $ deleteUE x uenv
 
