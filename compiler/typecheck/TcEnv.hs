@@ -499,9 +499,8 @@ tc_extend_local_env top_lvl extra_env thing_inside
         ; env1 <- tcExtendLocalTypeEnv env0 extra_env
         ; stage <- getStage
         ; let env2 = extend_local_env (top_lvl, thLevel stage) extra_env env1
-        ; (local_usage,env3) <- push_fresh_usage env2
-        ; result <- setLclEnv env3 thing_inside
-        ; check_then_pop_usage local_usage
+        ; (local_usage,result) <- setLclEnv env2 (tcCollectingUsage thing_inside)
+        ; check_then_add_usage local_usage
         ; return result }
   where
     extend_local_env :: (TopLevelFlag, ThLevel) -> [(Name, Weighted TcTyThing)] -> TcLclEnv -> TcLclEnv
@@ -517,12 +516,11 @@ tc_extend_local_env top_lvl extra_env thing_inside
             , tcl_th_bndrs = extendNameEnvList th_bndrs  -- We only track Ids in tcl_th_bndrs
                                  [(n, thlvl) | (n, Weighted _ ATcId {}) <- pairs] }
 
-    check_then_pop_usage :: TcRef UsageEnv -> TcM ()
+    check_then_add_usage :: UsageEnv -> TcM ()
     -- Checks that the usage of the newly introduced binders is compatible with
     -- their weight. If so, combines the usage of non-new binders to |uenv|
-    check_then_pop_usage local_usage
-      = do { u0 <- readTcRef local_usage
-           ; uok <- foldM (\u (x,w_) -> deleteBinder (weightedWeight w_) x u) u0 extra_env
+    check_then_add_usage u0
+      = do { uok <- foldM (\u (x,w_) -> deleteBinder (weightedWeight w_) x u) u0 extra_env
            ; env <- getLclEnv
            ; let usage = tcl_usage env
            ; updTcRef usage (addUE uok) }
@@ -538,12 +536,6 @@ tc_extend_local_env top_lvl extra_env thing_inside
                      text "with actual weight" <+> quotes (ppr actual_weight)
           -- In case of error, recover by pretending that the weight usage was correct
           return $ deleteUE x uenv
-
-    push_fresh_usage :: TcLclEnv -> TcM (TcRef UsageEnv,TcLclEnv)
-    push_fresh_usage env
-      = do { usage <- newTcRef zeroUE
-           ; return ( usage , env { tcl_usage = usage } ) }
-
 
 tcExtendLocalTypeEnv :: TcLclEnv -> [(Name, Weighted TcTyThing)] -> TcM TcLclEnv
 tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
@@ -582,6 +574,24 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
         -- when typechecking the methods.
         --
         -- Nor must we generalise g over any kind variables free in r's kind
+
+-- | |tcCollectingUsage thing_inside| runs |thing_inside| and returns the usage
+-- information which was collected as part of the execution of
+-- |thing_inside|. Careful: |tcCollectingUsage thing_inside| itself does not
+-- report any usage information, it's up to the programmer to incorporate the
+-- returned usage information into the larger context appropriately.
+tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)
+tcCollectingUsage thing_inside
+  = do { env0 <- getLclEnv
+       ; (local_usage_ref,env1) <- push_fresh_usage env0
+       ; result <- setLclEnv env1 thing_inside
+       ; local_usage <- readTcRef local_usage_ref
+       ; return (local_usage,result) }
+  where
+    push_fresh_usage :: TcLclEnv -> TcM (TcRef UsageEnv,TcLclEnv)
+    push_fresh_usage env
+      = do { usage <- newTcRef zeroUE
+           ; return ( usage , env { tcl_usage = usage } ) }
 
 -------------------------------------------------------------
 -- Extending the TcIdBinderStack, used only for error messages
