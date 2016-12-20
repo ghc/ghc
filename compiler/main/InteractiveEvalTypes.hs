@@ -9,14 +9,10 @@
 -- -----------------------------------------------------------------------------
 
 module InteractiveEvalTypes (
-#ifdef GHCI
         Resume(..), History(..), ExecResult(..),
         SingleStep(..), isStep, ExecOptions(..),
         BreakInfo(..)
-#endif
         ) where
-
-#ifdef GHCI
 
 import GHCi.RemoteTypes
 import GHCi.Message (EvalExpr, ResumeContext)
@@ -29,7 +25,11 @@ import SrcLoc
 import Exception
 
 import Data.Word
+#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
+#else
+import GHC.Stack as GHC.Stack.CCS
+#endif
 
 data ExecOptions
  = ExecOptions
@@ -91,4 +91,3 @@ data History
         historyBreakInfo :: BreakInfo,
         historyEnclosingDecls :: [String]  -- declarations enclosing the breakpoint
    }
-#endif

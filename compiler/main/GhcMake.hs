@@ -31,9 +31,7 @@ module GhcMake(
 
 #include "HsVersions.h"
 
-#ifdef GHCI
 import qualified Linker         ( unload )
-#endif
 
 import DriverPhases
 import DriverPipeline
@@ -563,13 +561,7 @@ findPartiallyCompletedCycles modsDone theGraph
 unload :: HscEnv -> [Linkable] -> IO ()
 unload hsc_env stable_linkables -- Unload everthing *except* 'stable_linkables'
   = case ghcLink (hsc_dflags hsc_env) of
-#ifdef GHCI
         LinkInMemory -> Linker.unload hsc_env stable_linkables
-#else
-        LinkInMemory -> panic "unload: no interpreter"
-                                -- urgh.  avoid warnings:
-                                hsc_env stable_linkables
-#endif
         _other -> return ()
 
 -- -----------------------------------------------------------------------------

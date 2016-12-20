@@ -1,4 +1,4 @@
-{-# LANGUAGE MagicHash, RecordWildCards, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE CPP, MagicHash, RecordWildCards, GeneralizedNewtypeDeriving #-}
 --
 --  (c) The University of Glasgow 2002-2006
 --
@@ -34,7 +34,11 @@ import Data.Array.Base  ( UArray(..) )
 import Data.ByteString (ByteString)
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
+#else
+import GHC.Stack as GHC.Stack.CCS
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Compiled Byte Code

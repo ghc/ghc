@@ -341,16 +341,12 @@ lookupExactOcc_either name
                        ; if name `inLocalRdrEnvScope` lcl_env
                          then return (Right name)
                          else
-#ifdef GHCI
                          do { th_topnames_var <- fmap tcg_th_topnames getGblEnv
                             ; th_topnames <- readTcRef th_topnames_var
                             ; if name `elemNameSet` th_topnames
                               then return (Right name)
                               else return (Left exact_nm_err)
                             }
-#else /* !GHCI */
-                         return (Left exact_nm_err)
-#endif /* !GHCI */
                        }
            gres -> return (Left (sameNameErr gres))   -- Ugh!  See Note [Template Haskell ambiguity]
        }

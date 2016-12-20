@@ -10,7 +10,6 @@
 --
 module GHCi.Run
   ( run, redirectInterrupts
-  , toSerializableException, fromSerializableException
   ) where
 
 import GHCi.CreateBCO
@@ -36,7 +35,6 @@ import Foreign
 import Foreign.C
 import GHC.Conc.Sync
 import GHC.IO hiding ( bracket )
-import System.Exit
 import System.Mem.Weak  ( deRefWeak )
 import Unsafe.Coerce
 
@@ -222,17 +220,6 @@ tryEval io = do
   case e of
     Left ex -> return (EvalException (toSerializableException ex))
     Right a -> return (EvalSuccess a)
-
-toSerializableException :: SomeException -> SerializableException
-toSerializableException ex
-  | Just UserInterrupt <- fromException ex  = EUserInterrupt
-  | Just (ec::ExitCode) <- fromException ex = (EExitCode ec)
-  | otherwise = EOtherException (show (ex :: SomeException))
-
-fromSerializableException :: SerializableException -> SomeException
-fromSerializableException EUserInterrupt = toException UserInterrupt
-fromSerializableException (EExitCode c) = toException c
-fromSerializableException (EOtherException str) = toException (ErrorCall str)
 
 -- This function sets up the interpreter for catching breakpoints, and
 -- resets everything when the computation has stopped running.  This
