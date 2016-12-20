@@ -531,7 +531,14 @@ tc_extend_local_env top_lvl extra_env thing_inside
     deleteBinder w x uenv =
       case deleteUEAsserting w x uenv of
         Just uenv' -> return uenv'
-        Nothing    -> pprPanic "Incorrect weight" (ppr w)
+        Nothing    -> do
+          let actual_weight = lookupUE uenv x
+          addErrTc $ text "Variable" <+> ppr x <+>
+                     text "is used with weigh" <+> ppr actual_weight <+>
+                     text "but incompatible weight" <+> ppr w <+>
+                     text "was expected."
+          -- In case of error, recover by pretending that the weight usage was correct
+          return $ deleteUE x uenv
 
     push_fresh_usage :: TcLclEnv -> TcM (TcRef UsageEnv,TcLclEnv)
     push_fresh_usage env

@@ -94,6 +94,7 @@ scaleUE :: Rig -> UsageEnv -> UsageEnv
 scaleUE w (UsageEnv e) = UsageEnv $
   mapNameEnv (w*) e
 
+-- TODO: arnaud: both delete function: unify argument order with existing similar functions.
 -- | |deleteUEAsserting w x env| deletes the binding to |x| in |env| under one
 -- condition: if |x| is bound to |w'| in |env|, then |w'| must be a subweight of
 -- |w|, if |x| is not bound in |env| then |Zero| must be a subweight of |W|. If
@@ -105,3 +106,15 @@ deleteUEAsserting w x (UsageEnv e) | Just w' <- lookupNameEnv e x = do
 deleteUEAsserting w x (UsageEnv e) = do
   guard (subweight Zero w)
   return $ UsageEnv e
+
+deleteUE :: Name -> UsageEnv -> UsageEnv
+deleteUE x (UsageEnv e) = UsageEnv $ delFromNameEnv e x
+
+
+-- | |lookupUE x env| returns the weight assigned to |x| in |env|, if |x| is not
+-- bound in |env|, then returns |Zero|.
+lookupUE :: UsageEnv -> Name -> Rig
+lookupUE (UsageEnv e) x =
+  case lookupNameEnv e x of
+    Just w  -> w
+    Nothing -> Zero
