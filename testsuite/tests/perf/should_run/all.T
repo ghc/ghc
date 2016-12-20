@@ -445,3 +445,10 @@ test('T9339',
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
+
+test('T12996',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(64),    76776, 5) ]),
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O2'])
