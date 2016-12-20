@@ -63,6 +63,7 @@ RTS_RET(stg_maskUninterruptiblezh_ret);
 RTS_RET(stg_maskAsyncExceptionszh_ret);
 RTS_RET(stg_stack_underflow_frame);
 RTS_RET(stg_restore_cccs);
+RTS_RET(stg_restore_cccs_eval);
 
 // RTS_FUN(stg_interp_constr1_entry);
 // RTS_FUN(stg_interp_constr2_entry);
