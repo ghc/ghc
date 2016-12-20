@@ -446,6 +446,14 @@ tc_infer_hs_type mode (HsKindSig ty sig)
   = do { sig' <- tc_lhs_kind (kindLevel mode) sig
        ; ty' <- tc_lhs_type mode ty sig'
        ; return (ty', sig') }
+-- HsSpliced is an annotation produced by 'RnSplice.rnSpliceType' to communicate
+-- the splice location to the typechecker. Here we skip over it in order to have
+-- the same kind inferred for a given expression whether it was produced from
+-- splices or not.
+--
+-- See Note [Delaying modFinalizers in untyped splices].
+tc_infer_hs_type mode (HsSpliceTy (HsSpliced _ (HsSplicedTy ty)) _)
+  = tc_infer_hs_type mode ty
 tc_infer_hs_type mode (HsDocTy ty _) = tc_infer_lhs_type mode ty
 tc_infer_hs_type _    (HsCoreTy ty)  = return (ty, typeKind ty)
 tc_infer_hs_type mode other_ty
