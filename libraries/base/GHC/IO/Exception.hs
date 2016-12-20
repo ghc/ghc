@@ -129,12 +129,12 @@ allocationLimitExceeded = toException AllocationLimitExceeded
 
 -----
 
--- |Compaction found an object that cannot be compacted.  Functions
+-- | Compaction found an object that cannot be compacted.  Functions
 -- cannot be compacted, nor can mutable objects or pinned objects.
 -- See 'Data.Compact.compact'.
 --
 -- @since 4.10.0.0
-data CompactionFailed = CompactionFailed String
+newtype CompactionFailed = CompactionFailed String
 
 -- | @since 4.10.0.0
 instance Exception CompactionFailed where
