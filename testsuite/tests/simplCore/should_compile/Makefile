@@ -7,6 +7,14 @@ T3990:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T3990.hs | grep 'test_case'
         # Grep output should show an unpacked constructor
 
+T9509:
+	$(RM) -f T9509*.o T9509*.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9509a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9509.hs -funfolding-use-threshold=20 \
+              -ddump-rule-rewrites | grep SPEC
+        # Grep output should show a SPEC rule firing
+        # The unfolding use threshold is to prevent foo inlining before it is specialised
+
 T8832:
 	$(RM) -f T8832.o T8832.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T8832.hs | grep '^[a-zA-Z0-9]\+ ='
