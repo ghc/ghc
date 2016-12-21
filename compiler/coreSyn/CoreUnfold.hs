@@ -944,40 +944,52 @@ smallEnoughToInline _ _
   = False
 
 ----------------
-certainlyWillInline :: DynFlags -> Unfolding -> Maybe Unfolding
+
+certainlyWillInline :: DynFlags -> IdInfo -> Maybe Unfolding
 -- Sees if the unfolding is pretty certain to inline
 -- If so, return a *stable* unfolding for it, that will always inline
-certainlyWillInline dflags unf@(CoreUnfolding { uf_guidance = guidance, uf_tmpl = expr })
-  = case guidance of
-      UnfNever   -> Nothing
-      UnfWhen {} -> Just (unf { uf_src = InlineStable })
+certainlyWillInline dflags fn_info
+  = case unfoldingInfo fn_info of
+      CoreUnfolding { uf_tmpl = e, uf_guidance = g }
+        | loop_breaker -> Nothing       -- Won't inline, so try w/w
+        | otherwise    -> do_cunf e g   -- Depends on size, so look at that
 
-      -- The UnfIfGoodArgs case seems important.  If we w/w small functions
-      -- binary sizes go up by 10%!  (This is with SplitObjs.)  I'm not totally
-      -- sure whyy.
-      UnfIfGoodArgs { ug_size = size, ug_args = args }
-         | not (null args)  -- See Note [certainlyWillInline: be careful of thunks]
-         , let arity = length args
-         , size - (10 * (arity + 1)) <= ufUseThreshold dflags
-         -> Just (unf { uf_src      = InlineStable
-                      , uf_guidance = UnfWhen { ug_arity     = arity
-                                              , ug_unsat_ok  = unSaturatedOk
-                                              , ug_boring_ok = inlineBoringOk expr } })
-                -- Note the "unsaturatedOk". A function like  f = \ab. a
-                -- will certainly inline, even if partially applied (f e), so we'd
-                -- better make sure that the transformed inlining has the same property
+      DFunUnfolding {} -> Just fn_unf  -- Don't w/w DFuns; it never makes sense
+                                       -- to do so, and even if it is currently a
+                                       -- loop breaker, it may not be later
 
-      _  -> Nothing
+      _other_unf       -> Nothing
 
-certainlyWillInline _ unf@(DFunUnfolding {})
-  = Just unf
+  where
+    loop_breaker = isStrongLoopBreaker (occInfo fn_info)
+    fn_unf       = unfoldingInfo fn_info
 
-certainlyWillInline _ _
-  = Nothing
+    do_cunf :: CoreExpr -> UnfoldingGuidance -> Maybe Unfolding
+    do_cunf _ UnfNever     = Nothing
+    do_cunf _ (UnfWhen {}) = Just (fn_unf { uf_src = InlineStable })
+                             -- INLINE functions have UnfWhen
 
-{-
-Note [certainlyWillInline: be careful of thunks]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        -- The UnfIfGoodArgs case seems important.  If we w/w small functions
+        -- binary sizes go up by 10%!  (This is with SplitObjs.)
+        -- I'm not totally sure why.
+        -- INLINABLE functions come via this path
+        --    See Note [certainlyWillInline: INLINABLE]
+    do_cunf expr (UnfIfGoodArgs { ug_size = size, ug_args = args })
+      | not (null args)  -- See Note [certainlyWillInline: be careful of thunks]
+      , let arity = length args
+      , size - (10 * (arity + 1)) <= ufUseThreshold dflags
+      = Just (fn_unf { uf_src      = InlineStable
+                     , uf_guidance = UnfWhen { ug_arity     = arity
+                                             , ug_unsat_ok  = unSaturatedOk
+                                             , ug_boring_ok = inlineBoringOk expr } })
+             -- Note the "unsaturatedOk". A function like  f = \ab. a
+             -- will certainly inline, even if partially applied (f e), so we'd
+             -- better make sure that the transformed inlining has the same property
+      | otherwise
+      = Nothing
+
+{- Note [certainlyWillInline: be careful of thunks]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Don't claim that thunks will certainly inline, because that risks work
 duplication.  Even if the work duplication is not great (eg is_cheap
 holds), it can make a big difference in an inner loop In Trac #5623 we
