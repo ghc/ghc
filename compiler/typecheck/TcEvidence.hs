@@ -7,7 +7,7 @@ module TcEvidence (
   -- HsWrapper
   HsWrapper(..),
   (<.>), mkWpTyApps, mkWpEvApps, mkWpEvVarApps, mkWpTyLams,
-  mkWpLams, mkWpLet, mkWpCastN, mkWpCastR,
+  mkWpLams, mkWpLet, mkWpCastN, mkWpCastR, collectHsWrapBinders,
   mkWpFun, mkWpFuns, idHsWrapper, isIdHsWrapper, pprHsWrapper,
 
   -- Evidence bindings
@@ -266,6 +266,23 @@ idHsWrapper = WpHole
 isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
 isIdHsWrapper _      = False
+
+collectHsWrapBinders :: HsWrapper -> ([Var], HsWrapper)
+-- Collect the outer lambda binders of a HsWrapper,
+-- stopping as soon as you get to a non-lambda binder
+collectHsWrapBinders wrap = go wrap []
+  where
+    -- go w ws = collectHsWrapBinders (w <.> w1 <.> ... <.> wn)
+    go :: HsWrapper -> [HsWrapper] -> ([Var], HsWrapper)
+    go (WpEvLam v)       wraps = add_lam v (gos wraps)
+    go (WpTyLam v)       wraps = add_lam v (gos wraps)
+    go (WpCompose w1 w2) wraps = go w1 (w2:wraps)
+    go wrap              wraps = ([], foldl (<.>) wrap wraps)
+
+    gos []     = ([], WpHole)
+    gos (w:ws) = go w ws
+
+    add_lam v (vs,w) = (v:vs, w)
 
 {-
 ************************************************************************

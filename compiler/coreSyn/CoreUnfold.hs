@@ -147,48 +147,48 @@ mkInlinableUnfolding dflags expr
     expr' = simpleOptExpr expr
     is_bot = isJust (exprBotStrictness_maybe expr')
 
-specUnfolding :: DynFlags -> Subst -> [Var] -> [CoreExpr] -> Unfolding -> Unfolding
+specUnfolding :: [Var] -> (CoreExpr -> CoreExpr) -> Arity -> Unfolding -> Unfolding
 -- See Note [Specialising unfoldings]
--- specUnfolding subst new_bndrs spec_args unf
---   = \new_bndrs. (subst( unf ) spec_args)
+-- specUnfolding spec_bndrs spec_app arity_decrease unf
+--   = \spec_bndrs. spec_app( unf )
 --
--- Precondition: in-scope(subst) `superset` fvs( spec_args )
-specUnfolding _ subst new_bndrs spec_args
-              df@(DFunUnfolding { df_bndrs = bndrs, df_con = con , df_args = args })
-  = ASSERT2( length bndrs >= length spec_args, ppr df $$ ppr spec_args $$ ppr new_bndrs )
-    mkDFunUnfolding (new_bndrs ++ extra_bndrs) con
-                    (map (substExpr spec_doc subst2) args)
+specUnfolding spec_bndrs spec_app arity_decrease
+              df@(DFunUnfolding { df_bndrs = old_bndrs, df_con = con, df_args = args })
+  = ASSERT2( arity_decrease == count isId old_bndrs - count isId spec_bndrs, ppr df )
+    mkDFunUnfolding spec_bndrs con (map spec_arg args)
+      -- There is a hard-to-check assumption here that the spec_app has
+      -- enough applications to exactly saturate the old_bndrs
+      -- For DFunUnfoldings we transform
+      --       \old_bndrs. MkD <op1> ... <opn>
+      -- to
+      --       \new_bndrs. MkD (spec_app(\old_bndrs. <op1>)) ... ditto <opn>
+      -- The ASSERT checks the value part of that
   where
-    subst1 = extendSubstList subst (bndrs `zip` spec_args)
-    (subst2, extra_bndrs) = substBndrs subst1 (dropList spec_args bndrs)
+    spec_arg arg = simpleOptExpr (spec_app (mkLams old_bndrs arg))
+                   -- The beta-redexes created by spec_app will be
+                   -- simplified away by simplOptExpr
 
-specUnfolding _dflags subst new_bndrs spec_args
+specUnfolding spec_bndrs spec_app arity_decrease
               (CoreUnfolding { uf_src = src, uf_tmpl = tmpl
                              , uf_is_top = top_lvl
                              , uf_guidance = old_guidance })
  | isStableSource src  -- See Note [Specialising unfoldings]
- , UnfWhen { ug_arity = old_arity
-           , ug_unsat_ok = unsat_ok
+ , UnfWhen { ug_arity     = old_arity
+           , ug_unsat_ok  = unsat_ok
            , ug_boring_ok = boring_ok } <- old_guidance
- = let guidance = UnfWhen { ug_arity = old_arity - count isValArg spec_args
-                                     + count isId new_bndrs
-                          , ug_unsat_ok = unsat_ok
+ = let guidance = UnfWhen { ug_arity     = old_arity - arity_decrease
+                          , ug_unsat_ok  = unsat_ok
                           , ug_boring_ok = boring_ok }
-       new_tmpl = simpleOptExpr $ mkLams new_bndrs $
-                  mkApps (substExpr spec_doc subst tmpl) spec_args
-                   -- The beta-redexes created here will be simplified
-                   -- away by simplOptExpr in mkUnfolding
+       new_tmpl = simpleOptExpr (mkLams spec_bndrs (spec_app tmpl))
+                   -- The beta-redexes created by spec_app will be
+                   -- simplified away by simplOptExpr
 
    in mkCoreUnfolding src top_lvl new_tmpl guidance
 
-specUnfolding _ _ _ _ _ = noUnfolding
+specUnfolding _ _ _ _ = noUnfolding
 
-spec_doc :: SDoc
-spec_doc = text "specUnfolding"
-
-{-
-Note [Specialising unfoldings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Specialising unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When we specialise a function for some given type-class arguments, we use
 specUnfolding to specialise its unfolding.  Some important points:
 
@@ -997,6 +997,13 @@ found that the WorkWrap phase thought that
        y = case x of F# v -> F# (v +# v)
 was certainlyWillInline, so the addition got duplicated.
 
+Note [certainlyWillInline: INLINABLE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+certainlyWillInline /must/ return Nothing for a large INLINABLE thing,
+even though we have a stable inlining, so that strictness w/w takes
+place.  It makes a big difference to efficiency, and the w/w pass knows
+how to transfer the INLINABLE info to the worker; see WorkWrap
+Note [Worker-wrapper for INLINABLE functions]
 
 ************************************************************************
 *                                                                      *

@@ -214,8 +214,9 @@ dsExpr (HsOverLit lit)        = dsOverLit lit
 
 dsExpr (HsWrap co_fn e)
   = do { e' <- dsExpr e
-       ; wrapped_e <- dsHsWrapper co_fn e'
+       ; wrap' <- dsHsWrapper co_fn
        ; dflags <- getDynFlags
+       ; let wrapped_e = wrap' e'
        ; warnAboutIdentities dflags e' (exprType wrapped_e)
        ; return wrapped_e }
 
@@ -748,9 +749,11 @@ dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
                          , syn_arg_wraps = arg_wraps
                          , syn_res_wrap  = res_wrap })
              arg_exprs
-  = do { args <- zipWithM dsHsWrapper arg_wraps arg_exprs
-       ; fun  <- dsExpr expr
-       ; dsHsWrapper res_wrap $ mkApps fun args }
+  = do { fun            <- dsExpr expr
+       ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
+       ; core_res_wrap  <- dsHsWrapper res_wrap
+       ; let wrapped_args = zipWith ($) core_arg_wraps arg_exprs
+       ; return (core_res_wrap (mkApps fun wrapped_args)) }
 
 findField :: [LHsRecField Id arg] -> Name -> [arg]
 findField rbinds sel

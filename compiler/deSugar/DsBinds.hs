@@ -127,9 +127,10 @@ dsHsBind dflags
  = do   { (args, body) <- matchWrapper
                            (FunRhs (noLoc $ idName fun) Prefix)
                            Nothing matches
+        ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
-        ; rhs <- dsHsWrapper co_fn (mkLams args body')
-        ; let core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
+              rhs   = core_wrap (mkLams args body')
+              core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
               force_var =
                 if xopt LangExt.Strict dflags
                    && matchGroupArity matches == 0 -- no need to force lambdas
@@ -170,12 +171,13 @@ dsHsBind dflags
     do { (_, bind_prs) <- ds_lhs_binds binds
        ; let core_bind = Rec bind_prs
        ; ds_binds <- dsTcEvBinds_s ev_binds
-       ; rhs <- dsHsWrapper wrap $  -- Usually the identity
-                mkLams tyvars $ mkLams dicts $
-                mkCoreLets ds_binds $
-                Let core_bind $
-                Var local
+       ; core_wrap <- dsHsWrapper wrap -- Usually the identity
 
+       ; let rhs = core_wrap $
+                   mkLams tyvars $ mkLams dicts $
+                   mkCoreLets ds_binds $
+                   Let core_bind $
+                   Var local
        ; (spec_binds, rules) <- dsSpecs rhs prags
 
        ; let   global'  = addIdSpecialisations global rules
@@ -195,10 +197,10 @@ dsHsBind dflags
                           , abe_poly = global
                           , abe_mono = local
                           , abe_prags = prags })
-              = do { rhs <- dsHsWrapper wrap (Var local)
+              = do { core_wrap <- dsHsWrapper wrap
                    ; return (makeCorePair dflags global
                                           (isDefaultMethod prags)
-                                          0 rhs) }
+                                          0 (core_wrap (Var local))) }
        ; main_binds <- mapM mk_bind exports
 
        ; ds_binds <- dsTcEvBinds_s ev_binds
@@ -238,11 +240,11 @@ dsHsBind dflags
                            , abe_mono = local, abe_prags = spec_prags })
                          -- See Note [AbsBinds wrappers] in HsBinds
                 = do { tup_id  <- newSysLocalDs tup_ty
-                     ; rhs <- dsHsWrapper wrap $
-                              mkLams tyvars $ mkLams dicts $
-                              mkTupleSelector all_locals local tup_id $
-                              mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
-                     ; let rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
+                     ; core_wrap <- dsHsWrapper wrap
+                     ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
+                                 mkTupleSelector all_locals local tup_id $
+                                 mkVarApps (Var poly_tup_id) (tyvars ++ dicts)
+                           rhs_for_spec = Let (NonRec poly_tup_id poly_tup_rhs) rhs
                      ; (spec_binds, rules) <- dsSpecs rhs_for_spec spec_prags
                      ; let global' = (global `setInlinePragma` defaultInlinePragma)
                                              `addIdSpecialisations` rules
@@ -317,10 +319,10 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
     do { (args, body) <- matchWrapper
                            (FunRhs (noLoc $ idName global) Prefix)
                            Nothing matches
-       ; let body' = mkOptTickBox tick body
-       ; fun_rhs <- dsHsWrapper co_fn $
-                    mkLams args body'
-       ; let force_vars
+       ; core_wrap <- dsHsWrapper co_fn
+       ; let body'   = mkOptTickBox tick body
+             fun_rhs = core_wrap (mkLams args body')
+             force_vars
                | xopt LangExt.Strict dflags
                , matchGroupArity matches == 0 -- no need to force lambdas
                = [global]
@@ -629,32 +631,39 @@ dsSpec mb_poly_rhs (L loc (SpecPrag poly_id spec_co spec_inl))
        ; let poly_name = idName poly_id
              spec_occ  = mkSpecOcc (getOccName poly_name)
              spec_name = mkInternalName uniq spec_occ (getSrcSpan poly_name)
-       ; (bndrs, ds_lhs) <- liftM collectBinders
-                                  (dsHsWrapper spec_co (Var poly_id))
-       ; let spec_ty = mkLamTypes bndrs (exprType ds_lhs)
+             (spec_bndrs, spec_app) = collectHsWrapBinders spec_co
+               -- spec_co looks like
+               --         \spec_bndrs. [] spec_args
+               -- perhaps with the body of the lambda wrapped in some WpLets
+               -- E.g. /\a \(d:Eq a). let d2 = $df d in [] (Maybe a) d2
+
+       ; core_app <- dsHsWrapper spec_app
+
+       ; let ds_lhs  = core_app (Var poly_id)
+             spec_ty = mkLamTypes spec_bndrs (exprType ds_lhs)
        ; -- pprTrace "dsRule" (vcat [ text "Id:" <+> ppr poly_id
          --                         , text "spec_co:" <+> ppr spec_co
          --                         , text "ds_rhs:" <+> ppr ds_lhs ]) $
-         case decomposeRuleLhs bndrs ds_lhs of {
+         case decomposeRuleLhs spec_bndrs ds_lhs of {
            Left msg -> do { warnDs NoReason msg; return Nothing } ;
            Right (rule_bndrs, _fn, args) -> do
 
        { dflags <- getDynFlags
        ; this_mod <- getModule
        ; let fn_unf    = realIdUnfolding poly_id
-             unf_fvs   = stableUnfoldingVars fn_unf `orElse` emptyVarSet
-             in_scope  = mkInScopeSet (unf_fvs `unionVarSet` exprsFreeVars args)
-             spec_unf  = specUnfolding dflags (mkEmptySubst in_scope) bndrs args fn_unf
+             spec_unf  = specUnfolding spec_bndrs core_app arity_decrease fn_unf
              spec_id   = mkLocalId spec_name spec_ty
                             `setInlinePragma` inl_prag
                             `setIdUnfolding`  spec_unf
+             arity_decrease = count isValArg args - count isId spec_bndrs
+
        ; rule <- dsMkUserRule this_mod is_local_id
                         (mkFastString ("SPEC " ++ showPpr dflags poly_name))
                         rule_act poly_name
                         rule_bndrs args
-                        (mkVarApps (Var spec_id) bndrs)
+                        (mkVarApps (Var spec_id) spec_bndrs)
 
-       ; spec_rhs <- dsHsWrapper spec_co poly_rhs
+       ; let spec_rhs = mkLams spec_bndrs (core_app poly_rhs)
 
 -- Commented out: see Note [SPECIALISE on INLINE functions]
 --       ; when (isInlinePragma id_inl)
@@ -1037,22 +1046,25 @@ a mistake.  That's what the isDeadBinder call detects.
 
 -}
 
-dsHsWrapper :: HsWrapper -> CoreExpr -> DsM CoreExpr
-dsHsWrapper WpHole            e = return e
-dsHsWrapper (WpTyApp ty)      e = return $ App e (Type ty)
-dsHsWrapper (WpLet ev_binds)  e = do bs <- dsTcEvBinds ev_binds
-                                     return (mkCoreLets bs e)
-dsHsWrapper (WpCompose c1 c2) e = do { e1 <- dsHsWrapper c2 e
-                                     ; dsHsWrapper c1 e1 }
-dsHsWrapper (WpFun c1 c2 t1)  e = do { x <- newSysLocalDs t1
-                                     ; e1 <- dsHsWrapper c1 (Var x)
-                                     ; e2 <- dsHsWrapper c2 (mkCoreAppDs (text "dsHsWrapper") e e1)
-                                     ; return (Lam x e2) }
-dsHsWrapper (WpCast co)       e = ASSERT(coercionRole co == Representational)
-                                  return $ mkCastDs e co
-dsHsWrapper (WpEvLam ev)      e = return $ Lam ev e
-dsHsWrapper (WpTyLam tv)      e = return $ Lam tv e
-dsHsWrapper (WpEvApp    tm)   e = liftM (App e) (dsEvTerm tm)
+dsHsWrapper :: HsWrapper -> DsM (CoreExpr -> CoreExpr)
+dsHsWrapper WpHole            = return $ \e -> e
+dsHsWrapper (WpTyApp ty)      = return $ \e -> App e (Type ty)
+dsHsWrapper (WpEvLam ev)      = return $ Lam ev
+dsHsWrapper (WpTyLam tv)      = return $ Lam tv
+dsHsWrapper (WpLet ev_binds)  = do { bs <- dsTcEvBinds ev_binds
+                                   ; return (mkCoreLets bs) }
+dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
+                                   ; w2 <- dsHsWrapper c2
+                                   ; return (w1 . w2) }
+dsHsWrapper (WpFun c1 c2 t1)  = do { x  <- newSysLocalDs t1
+                                   ; w1 <- dsHsWrapper c1
+                                   ; w2 <- dsHsWrapper c2
+                                   ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
+                                   ; return (\e -> Lam x (w2 (app e (w1 (Var x))))) }
+dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
+                                return $ \e -> mkCastDs e co
+dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
+                                   ; return (\e -> App e core_tm) }
 
 --------------------------------------
 dsTcEvBinds_s :: [TcEvBinds] -> DsM [CoreBind]

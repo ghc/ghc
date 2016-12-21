@@ -253,8 +253,9 @@ matchCoercion (var:vars) ty (eqns@(eqn1:_))
         ; var' <- newUniqueId var pat_ty'
         ; match_result <- match (var':vars) ty $
                           map (decomposeFirstPat getCoPat) eqns
-        ; rhs' <- dsHsWrapper co (Var var)
-        ; return (mkCoLetMatchResult (NonRec var' rhs') match_result) }
+        ; core_wrap <- dsHsWrapper co
+        ; let bind = NonRec var' (core_wrap (Var var))
+        ; return (mkCoLetMatchResult bind match_result) }
 matchCoercion _ _ _ = panic "matchCoercion"
 
 matchView :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult

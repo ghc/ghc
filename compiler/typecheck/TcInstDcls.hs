@@ -1523,7 +1523,7 @@ mk_meth_spec_prags meth_id spec_inst_prags spec_prags_for_me
              -- a warning from the desugarer
        | otherwise
        = [ L inst_loc (SpecPrag meth_id wrap inl)
-         | L inst_loc (SpecPrag _ wrap inl) <- spec_inst_prags]
+         | L inst_loc (SpecPrag _       wrap inl) <- spec_inst_prags]
 
 
 mkDefMethBind :: Class -> [Type] -> Id -> Name -> TcM (LHsBind Name, [LSig Name])

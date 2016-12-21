@@ -1024,7 +1024,8 @@ to substitute sc -> sc_flt in the RHS
 -}
 
 specBind :: SpecEnv                     -- Use this for RHSs
-         -> CoreBind
+         -> CoreBind                    -- Binders are already cloned by cloneBindSM,
+                                        -- but RHSs are un-processed
          -> UsageDetails                -- Info on how the scope of the binding
          -> SpecM ([CoreBind],          -- New bindings
                    UsageDetails)        -- And info to pass upstream
@@ -1093,9 +1094,9 @@ specBind rhs_env (Rec pairs) body_uds
 ---------------------------
 specDefns :: SpecEnv
           -> UsageDetails               -- Info on how it is used in its scope
-          -> [(Id,CoreExpr)]            -- The things being bound and their un-processed RHS
-          -> SpecM ([Id],               -- Original Ids with RULES added
-                    [(Id,CoreExpr)],    -- Extra, specialised bindings
+          -> [(OutId,InExpr)]           -- The things being bound and their un-processed RHS
+          -> SpecM ([OutId],            -- Original Ids with RULES added
+                    [(OutId,OutExpr)],  -- Extra, specialised bindings
                     UsageDetails)       -- Stuff to fling upwards from the specialised versions
 
 -- Specialise a list of bindings (the contents of a Rec), but flowing usages
@@ -1114,7 +1115,7 @@ specDefns env uds ((bndr,rhs):pairs)
 ---------------------------
 specDefn :: SpecEnv
          -> UsageDetails                -- Info on how it is used in its scope
-         -> Id -> CoreExpr              -- The thing being bound and its un-processed RHS
+         -> OutId -> InExpr             -- The thing being bound and its un-processed RHS
          -> SpecM (Id,                  -- Original Id with added RULES
                    [(Id,CoreExpr)],     -- Extra, specialised bindings
                    UsageDetails)        -- Stuff to fling upwards from the specialised versions
@@ -1140,7 +1141,7 @@ specCalls :: Maybe Module      -- Just this_mod  =>  specialising imported fn
           -> SpecEnv
           -> [CoreRule]                 -- Existing RULES for the fn
           -> [CallInfo]
-          -> Id -> CoreExpr
+          -> OutId -> InExpr
           -> SpecM ([CoreRule],         -- New RULES for the fn
                     [(Id,CoreExpr)],    -- Extra, specialised bindings
                     UsageDetails)       -- New usage details from the specialised RHSs
@@ -1317,17 +1318,11 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                   = (inl_prag { inl_inline = EmptyInlineSpec }, noUnfolding)
 
                   | otherwise
-                  = (inl_prag, specUnfolding dflags spec_unf_subst poly_tyvars
-                                             spec_unf_args fn_unf)
+                  = (inl_prag, specUnfolding poly_tyvars spec_app
+                                             arity_decrease fn_unf)
 
-                spec_unf_args  = ty_args ++ spec_dict_args
-                spec_unf_subst = CoreSubst.setInScope (se_subst env)
-                                    (CoreSubst.substInScope (se_subst rhs_env2))
-                  -- Extend the in-scope set to satisfy the precondition of
-                  -- specUnfolding, namely that in-scope(unf_subst) includes
-                  -- the free vars of spec_unf_args.  The in-scope set of rhs_env2
-                  -- is just the ticket; but the actual substitution we want is
-                  -- the same old one from 'env'
+                arity_decrease = length spec_dict_args
+                spec_app e = (e `mkApps` ty_args) `mkApps` spec_dict_args
 
                 --------------------------------------
                 -- Adding arity information just propagates it a bit faster

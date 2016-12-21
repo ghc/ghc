@@ -616,8 +616,8 @@ dsCmd _ids local_vars _stack_ty _res_ty (HsCmdArrForm op _ _ args) env_ids = do
 
 dsCmd ids local_vars stack_ty res_ty (HsCmdWrap wrap cmd) env_ids = do
     (core_cmd, env_ids') <- dsCmd ids local_vars stack_ty res_ty cmd env_ids
-    wrapped_cmd <- dsHsWrapper wrap core_cmd
-    return (wrapped_cmd, env_ids')
+    core_wrap <- dsHsWrapper wrap
+    return (core_wrap core_cmd, env_ids')
 
 dsCmd _ _ _ _ _ c = pprPanic "dsCmd" (ppr c)
 
