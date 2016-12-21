@@ -157,25 +157,70 @@ class (Functor t, Foldable t) => Traversable t where
     -- from left to right, and collect the results. For a version that ignores
     -- the results see 'Data.Foldable.traverse_'.
     traverse :: Applicative f => (a -> f b) -> t a -> f (t b)
+    {-# INLINE traverse #-}  -- See Note [Inline default methods]
     traverse f = sequenceA . fmap f
 
     -- | Evaluate each action in the structure from left to right, and
     -- and collect the results. For a version that ignores the results
     -- see 'Data.Foldable.sequenceA_'.
     sequenceA :: Applicative f => t (f a) -> f (t a)
+    {-# INLINE sequenceA #-}  -- See Note [Inline default methods]
     sequenceA = traverse id
 
     -- | Map each element of a structure to a monadic action, evaluate
     -- these actions from left to right, and collect the results. For
     -- a version that ignores the results see 'Data.Foldable.mapM_'.
     mapM :: Monad m => (a -> m b) -> t a -> m (t b)
+    {-# INLINE mapM #-}  -- See Note [Inline default methods]
     mapM = traverse
 
     -- | Evaluate each monadic action in the structure from left to
     -- right, and collect the results. For a version that ignores the
     -- results see 'Data.Foldable.sequence_'.
     sequence :: Monad m => t (m a) -> m (t a)
+    {-# INLINE sequence #-}  -- See Note [Inline default methods]
     sequence = sequenceA
+
+{- Note [Inline default methods]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+   class ... => Traversable t where
+       ...
+       mapM :: Monad m => (a -> m b) -> t a -> m (t b)
+       mapM = traverse   -- Default method
+
+   instance Traversable [] where
+       {-# INLINE traverse #-}
+       traverse = ...code for traverse on lists ...
+
+This gives rise to a list-instance of mapM looking like this
+
+  $fTraversable[]_$ctaverse = ...code for traverse on lists...
+       {-# INLINE $fTraversable[]_$ctaverse #-}
+  $fTraversable[]_$cmapM    = $fTraversable[]_$ctraverse
+
+Now the $ctraverse obediently inlines into the RHS of $cmapM, /but/
+that's all!  We get
+
+  $fTraversable[]_$cmapM = ...code for traverse on lists...
+
+with NO INLINE pragma!  This happens even though 'traverse' had an
+INLINE pragma becuase the author knew it should be inlined pretty
+vigorously.
+
+Indeed, it turned out that the rhs of $cmapM was just too big to
+inline, so all uses of mapM on lists used a terribly inefficient
+dictionary-passing style, because of its 'Monad m =>' type.  Disaster!
+
+Solution: add an INLINE pragma on the default method:
+
+   class ... => Traversable t where
+       ...
+       mapM :: Monad m => (a -> m b) -> t a -> m (t b)
+       {-# INLINE mapM #-}     -- VERY IMPORTANT!
+       mapM = traverse
+-}
 
 -- instances for Prelude types
 
