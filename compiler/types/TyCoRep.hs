@@ -123,7 +123,10 @@ module TyCoRep (
         tidyTopType,
         tidyKind,
         tidyCo, tidyCos,
-        tidyTyVarBinder, tidyTyVarBinders
+        tidyTyVarBinder, tidyTyVarBinders,
+
+        -- * Sizes
+        typeSize, coercionSize, provSize
     ) where
 
 #include "HsVersions.h"
@@ -2743,3 +2746,58 @@ tidyCo env@(_, subst) co
 
 tidyCos :: TidyEnv -> [Coercion] -> [Coercion]
 tidyCos env = map (tidyCo env)
+
+
+{- *********************************************************************
+*                                                                      *
+                   typeSize, coercionSize
+*                                                                      *
+********************************************************************* -}
+
+-- NB: We put typeSize/coercionSize here because they are mutually
+--     recursive, and have the CPR property.  If we have mutual
+--     recursion across a hi-boot file, we don't get the CPR property
+--     and these functions allocate a tremendous amount of rubbish.
+--     It's not critical (because typeSize is really only used in
+--     debug mode, but I tripped over and example (T5642) in which
+--     typeSize was one of the biggest single allocators in all of GHC.
+--     And it's easy to fix, so I did.
+
+-- NB: typeSize does not respect `eqType`, in that two types that
+--     are `eqType` may return different sizes. This is OK, because this
+--     function is used only in reporting, not decision-making.
+
+typeSize :: Type -> Int
+typeSize (LitTy {})                 = 1
+typeSize (TyVarTy {})               = 1
+typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
+typeSize (FunTy t1 t2)              = typeSize t1 + typeSize t2
+typeSize (ForAllTy (TvBndr tv _) t) = typeSize (tyVarKind tv) + typeSize t
+typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
+typeSize (CastTy ty co)             = typeSize ty + coercionSize co
+typeSize (CoercionTy co)            = coercionSize co
+
+coercionSize :: Coercion -> Int
+coercionSize (Refl _ ty)         = typeSize ty
+coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
+coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
+coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
+coercionSize (CoVarCo _)         = 1
+coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
+coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
+coercionSize (SymCo co)          = 1 + coercionSize co
+coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
+coercionSize (NthCo _ co)        = 1 + coercionSize co
+coercionSize (LRCo  _ co)        = 1 + coercionSize co
+coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
+coercionSize (CoherenceCo c1 c2) = 1 + coercionSize c1 + coercionSize c2
+coercionSize (KindCo co)         = 1 + coercionSize co
+coercionSize (SubCo co)          = 1 + coercionSize co
+coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
+
+provSize :: UnivCoProvenance -> Int
+provSize UnsafeCoerceProv    = 1
+provSize (PhantomProv co)    = 1 + coercionSize co
+provSize (ProofIrrelProv co) = 1 + coercionSize co
+provSize (PluginProv _)      = 1
+provSize (HoleProv h)        = pprPanic "provSize hits a hole" (ppr h)

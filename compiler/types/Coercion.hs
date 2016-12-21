@@ -150,30 +150,6 @@ setCoVarUnique = setVarUnique
 setCoVarName :: CoVar -> Name -> CoVar
 setCoVarName   = setVarName
 
-coercionSize :: Coercion -> Int
-coercionSize (Refl _ ty)         = typeSize ty
-coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
-coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (CoVarCo _)         = 1
-coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
-coercionSize (SymCo co)          = 1 + coercionSize co
-coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
-coercionSize (NthCo _ co)        = 1 + coercionSize co
-coercionSize (LRCo  _ co)        = 1 + coercionSize co
-coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
-coercionSize (CoherenceCo c1 c2) = 1 + coercionSize c1 + coercionSize c2
-coercionSize (KindCo co)         = 1 + coercionSize co
-coercionSize (SubCo co)          = 1 + coercionSize co
-coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
-
-provSize :: UnivCoProvenance -> Int
-provSize UnsafeCoerceProv    = 1
-provSize (PhantomProv co)    = 1 + coercionSize co
-provSize (ProofIrrelProv co) = 1 + coercionSize co
-provSize (PluginProv _)      = 1
-provSize (HoleProv h)        = pprPanic "provSize hits a hole" (ppr h)
 
 {-
 %************************************************************************

@@ -1733,27 +1733,6 @@ predTypeEqRel ty
 {-
 %************************************************************************
 %*                                                                      *
-                   Size
-*                                                                      *
-************************************************************************
--}
-
--- NB: This function does not respect `eqType`, in that two types that
--- are `eqType` may return different sizes. This is OK, because this
--- function is used only in reporting, not decision-making.
-typeSize :: Type -> Int
-typeSize (LitTy {})                 = 1
-typeSize (TyVarTy {})               = 1
-typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (ForAllTy (TvBndr tv _) t) = typeSize (tyVarKind tv) + typeSize t
-typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
-typeSize (CastTy ty co)             = typeSize ty + coercionSize co
-typeSize (CoercionTy co)            = coercionSize co
-
-{-
-%************************************************************************
-%*                                                                      *
          Well-scoped tyvars
 *                                                                      *
 ************************************************************************

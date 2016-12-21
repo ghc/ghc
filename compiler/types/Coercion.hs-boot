@@ -39,7 +39,6 @@ mkCoercionType :: Role -> Type -> Type -> Type
 
 data LiftingContext
 liftCoSubst :: Role -> LiftingContext -> Type -> Coercion
-coercionSize :: Coercion -> Int
 seqCo :: Coercion -> ()
 
 coercionKind :: Coercion -> Pair Type
