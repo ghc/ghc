@@ -7,11 +7,6 @@
 {-# LANGUAGE CPP #-}
 
 module SimplEnv (
-        -- * Basic types
-        InId, InBind, InExpr, InAlt, InArg, InType, InBndr, InVar,
-        OutId, OutTyVar, OutBind, OutExpr, OutAlt, OutArg, OutType, OutBndr, OutVar,
-        InCoercion, OutCoercion,
-
         -- * The simplifier mode
         setMode, getMode, updMode,
 
@@ -61,35 +56,6 @@ import Outputable
 import Util
 
 import Data.List
-
-{-
-************************************************************************
-*                                                                      *
-\subsection[Simplify-types]{Type declarations}
-*                                                                      *
-************************************************************************
--}
-
-type InBndr     = CoreBndr
-type InVar      = Var                   -- Not yet cloned
-type InId       = Id                    -- Not yet cloned
-type InType     = Type                  -- Ditto
-type InBind     = CoreBind
-type InExpr     = CoreExpr
-type InAlt      = CoreAlt
-type InArg      = CoreArg
-type InCoercion = Coercion
-
-type OutBndr     = CoreBndr
-type OutVar      = Var                  -- Cloned
-type OutId       = Id                   -- Cloned
-type OutTyVar    = TyVar                -- Cloned
-type OutType     = Type                 -- Cloned
-type OutCoercion = Coercion
-type OutBind     = CoreBind
-type OutExpr     = CoreExpr
-type OutAlt      = CoreAlt
-type OutArg      = CoreArg
 
 {-
 ************************************************************************

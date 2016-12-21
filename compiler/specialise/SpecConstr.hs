@@ -788,15 +788,6 @@ data ScEnv = SCE { sc_dflags    :: DynFlags,
              }
 
 ---------------------
--- As we go, we apply a substitution (sc_subst) to the current term
-type InExpr = CoreExpr          -- _Before_ applying the subst
-type InVar  = Var
-
-type OutExpr = CoreExpr         -- _After_ applying the subst
-type OutId   = Id
-type OutVar  = Var
-
----------------------
 type HowBoundEnv = VarEnv HowBound      -- Domain is OutVars
 
 ---------------------

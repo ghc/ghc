@@ -935,11 +935,6 @@ countFreeIds = nonDetFoldUDFM add 0
 ************************************************************************
 -}
 
-type InVar  = Var   -- Pre  cloning
-type InId   = Id    -- Pre  cloning
-type OutVar = Var   -- Post cloning
-type OutId  = Id    -- Post cloning
-
 data LevelEnv
   = LE { le_switches :: FloatOutSwitches
        , le_ctxt_lvl :: Level           -- The current level

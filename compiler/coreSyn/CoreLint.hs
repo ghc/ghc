@@ -601,23 +601,11 @@ the desugarer.
 ************************************************************************
 -}
 
-type InType      = Type
-type InCoercion  = Coercion
-type InVar       = Var
-type InTyVar     = Var
-type InCoVar     = Var
-
-type OutType     = Type -- Substitution has been applied to this,
-                        -- but has not been linted yet
-type OutKind     = Kind
+-- For OutType, OutKind, the substitution has been applied,
+--                       but has not been linted yet
 
 type LintedType  = Type -- Substitution applied, and type is linted
 type LintedKind  = Kind
-
-type OutCoercion    = Coercion
-type OutVar         = Var
-type OutTyVar       = TyVar
-type OutCoVar       = Var
 
 lintCoreExpr :: CoreExpr -> LintM OutType
 -- The returned type has the substitution from the monad

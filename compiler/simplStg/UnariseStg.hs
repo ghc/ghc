@@ -265,8 +265,6 @@ extendRho rho x (UnaryVal val)
 --------------------------------------------------------------------------------
 
 type OutStgExpr = StgExpr
-type InId       = Id
-type OutId      = Id
 type InStgAlt   = StgAlt
 type InStgArg   = StgArg
 type OutStgArg  = StgArg

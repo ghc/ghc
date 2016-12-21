@@ -17,7 +17,7 @@ import Id               ( Id, idType, idUnfolding, idInlineActivation
 import CoreUtils        ( mkAltExpr
                         , exprIsTrivial, exprOkForSpeculation
                         , stripTicksE, stripTicksT, mkTicks )
-import Type             ( Type, tyConAppArgs, isUnliftedType )
+import Type             ( tyConAppArgs, isUnliftedType )
 import CoreSyn
 import Outputable
 import BasicTypes       ( isAlwaysActive )
@@ -367,15 +367,6 @@ cseCase env scrut bndr ty alts
 *                                                                      *
 ************************************************************************
 -}
-
-type InExpr  = CoreExpr         -- Pre-cloning
-type InId    = Id
-type InAlt   = CoreAlt
-type InType  = Type
-
-type OutExpr  = CoreExpr        -- Post-cloning
-type OutId    = Id
-type OutType  = Type
 
 data CSEnv
   = CS { cs_subst :: Subst  -- Maps InBndrs to OutExprs

@@ -81,6 +81,7 @@ import Data.List
 
 import TysWiredIn
 
+
 {-
 ************************************************************************
 *                                                                      *
@@ -906,14 +907,6 @@ simpleOptPgm dflags this_mod binds rules vects
       = case simple_opt_bind subst bind of
           (subst', Nothing)    -> (subst', binds')
           (subst', Just bind') -> (subst', bind':binds')
-
-----------------------
-type InVar   = Var
-type OutVar  = Var
-type InId    = Id
-type OutId   = Id
-type InExpr  = CoreExpr
-type OutExpr = CoreExpr
 
 -- In these functions the substitution maps InVar -> OutExpr
 
