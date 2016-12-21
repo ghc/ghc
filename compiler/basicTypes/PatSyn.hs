@@ -48,7 +48,7 @@ import Data.List
 -- | Pattern Synonym
 --
 -- See Note [Pattern synonym representation]
--- See Note [Pattern synonym signatures]
+-- See Note [Pattern synonym signature contexts]
 data PatSyn
   = MkPatSyn {
         psName        :: Name,
@@ -107,7 +107,7 @@ data PatSyn
              -- See Note [Builder for pattern synonyms with unboxed type]
   }
 
-{- Note [Pattern synonym signatures]
+{- Note [Pattern synonym signature contexts]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In a pattern synonym signature we write
    pattern P :: req => prov => t1 -> ... tn -> res_ty
