@@ -866,9 +866,11 @@ test('T10547',
 test('T12227',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1822822016, 5),
+          [(wordsize(64), 1715827784, 5),
           # 2016-07-11    5650186880 (Windows) before fix for #12227
           # 2016-07-11    1822822016 (Windows) after fix for #12227
+          # 2016-12-20    1715827784 after d250d493 (INLINE in Traversable dms)
+          #                          (or thereabouts in the commit history)
           ]),
      ],
      compile,
