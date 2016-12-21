@@ -890,7 +890,9 @@ test('T12425',
 test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 72958288, 5),
+          [(platform('x86_64-unknown-mingw32'), 77949232, 5),
+          # initial:    77949232
+           (wordsize(64), 72958288, 5),
           # initial:    72958288
           ]),
      ],
