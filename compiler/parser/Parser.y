@@ -316,6 +316,48 @@ correctly, see the README in (REPO)/utils/check-api-annotations for details on
 how to set up a test using the check-api-annotations utility, and interpret the
 output it generates.
 
+Note [Parsing lists]
+---------------------
+You might be wondering why we spend so much effort encoding our lists this
+way:
+
+importdecls
+        : importdecls ';' importdecl
+        | importdecls ';'
+        | importdecl
+        | {- empty -}
+
+This might seem like an awfully roundabout way to declare a list; plus, to add
+insult to injury you have to reverse the results at the end.  The answer is that
+left recursion prevents us from running out of stack space when parsing long
+sequences.  See: https://www.haskell.org/happy/doc/html/sec-sequences.html for
+more guidance.
+
+By adding/removing branches, you can affect what lists are accepted.  Here
+are the most common patterns, rewritten as regular expressions for clarity:
+
+    -- Equivalent to: ';'* (x ';'+)* x?  (can be empty, permits leading/trailing semis)
+    xs : xs ';' x
+       | xs ';'
+       | x
+       | {- empty -}
+
+    -- Equivalent to x (';' x)* ';'*  (non-empty, permits trailing semis)
+    xs : xs ';' x
+       | xs ';'
+       | x
+
+    -- Equivalent to ';'* alts (';' alts)* ';'* (non-empty, permits leading/trailing semis)
+    alts : alts1
+         | ';' alts
+    alts1 : alts1 ';' alt
+          | alts1 ';'
+          | alt
+
+    -- Equivalent to x (',' x)+ (non-empty, no trailing semis)
+    xs : x
+       | x ',' xs
+
 -- -----------------------------------------------------------------------------
 
 -}
@@ -664,6 +706,8 @@ body2   :: { ([AddAnn]
         :  '{' top '}'                          { (moc $1:mcc $3
                                                    :(fst $2), snd $2) }
         |  missing_module_keyword top close     { ([],snd $2) }
+
+
 
 top     :: { ([AddAnn]
              ,([LImportDecl RdrName], [LHsDecl RdrName])) }
