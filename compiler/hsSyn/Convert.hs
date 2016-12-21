@@ -1363,8 +1363,8 @@ cvtInjectivityAnnotation (TH.InjectivityAnn annLHS annRHS)
 
 cvtPatSynSigTy :: TH.Type -> CvtM (LHsType RdrName)
 -- pattern synonym types are of peculiar shapes, which is why we treat
--- them separately from regular types; see NOTE [Pattern synonym
--- signatures and Template Haskell]
+-- them separately from regular types;
+-- see Note [Pattern synonym type signatures and Template Haskell]
 cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
   | null exis, null provs = cvtType (ForallT univs reqs ty)
   | null univs, null reqs = do { l   <- getL
