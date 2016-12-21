@@ -66,9 +66,13 @@ main = do hSetBuffering stdout LineBuffering
 
 syntax_error :: [String]
 syntax_error =
-    ["syntax: ghc-cabal configure <configure-args> -- <distdir> <directory>...",
-     "        ghc-cabal install <ghc-pkg> <directory> <distdir> <destdir> <prefix> <args>...",
-     "        ghc-cabal hscolour <distdir> <directory> <args>..."]
+    ["syntax: ghc-cabal configure <directory> <distdir> <dll0modules> <args>...",
+     "        ghc-cabal copy <directory> <distdir> <strip> <destdir> <prefix> <libdir> <docdir> <libways> <args>...",
+     "        ghc-cabal register <directory> <distdir> <ghc> <ghcpkg> <topdir> <destdir> <prefix> <libdir> <docdir> <relocatable> <args>...",
+     "        ghc-cabal hscolour <directory> <distdir> <args>...",
+     "        ghc-cabal check <directory>",
+     "        ghc-cabal sdist <directory> <distdir>",
+     "        ghc-cabal --version"]
 
 die :: [String] -> IO a
 die errs = do mapM_ (hPutStrLn stderr) errs
