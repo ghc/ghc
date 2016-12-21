@@ -2,7 +2,7 @@
 
 module T4816 where
 
-data Silly a = Sillly a
+data Silly a = Silly a
 
 data Baz o = Baz {
      foo :: o,

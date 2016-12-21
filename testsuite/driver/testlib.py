@@ -630,7 +630,7 @@ def test(name, setup, func, args):
             return
         else:
             # Note [Mutating config.only]
-            # config.only is initiallly the set of tests requested by
+            # config.only is initially the set of tests requested by
             # the user (via 'make TEST='). We then remove all tests that
             # we've already seen (in .T files), so that we can later
             # report on any tests we couldn't find and error out.
