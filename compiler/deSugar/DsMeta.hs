@@ -724,8 +724,8 @@ rep_ty_sig mk_sig loc sig_ty nm
 
 rep_patsyn_ty_sig :: SrcSpan -> LHsSigType Name -> Located Name
                   -> DsM (SrcSpan, Core TH.DecQ)
--- represents a pattern synonym type signature; see NOTE [Pattern
--- synonym signatures and Template Haskell]
+-- represents a pattern synonym type signature;
+-- see Note [Pattern synonym type signatures and Template Haskell] in Convert
 rep_patsyn_ty_sig loc sig_ty nm
   = do { nm1 <- lookupLOcc nm
        ; ty1 <- repHsPatSynSigType sig_ty
