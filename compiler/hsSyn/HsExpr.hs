@@ -2338,6 +2338,15 @@ isMonadCompExpr (ParStmtCtxt ctxt)   = isMonadCompExpr ctxt
 isMonadCompExpr (TransStmtCtxt ctxt) = isMonadCompExpr ctxt
 isMonadCompExpr _                    = False
 
+-- | Should pattern match failure in a 'HsStmtContext' be desugared using
+-- 'MonadFail'?
+isMonadFailStmtContext :: HsStmtContext id -> Bool
+isMonadFailStmtContext MonadComp    = True
+isMonadFailStmtContext DoExpr       = True
+isMonadFailStmtContext MDoExpr      = True
+isMonadFailStmtContext GhciStmtCtxt = True
+isMonadFailStmtContext _            = False
+
 matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})  = text "="
 matchSeparator CaseAlt      = text "->"
@@ -2414,6 +2423,9 @@ pprStmtContext (TransStmtCtxt c)
  | opt_PprStyle_Debug = sep [text "transformed branch of", pprAStmtContext c]
  | otherwise          = pprStmtContext c
 
+instance (Outputable id, Outputable (NameOrRdrName id))
+      => Outputable (HsStmtContext id) where
+    ppr = pprStmtContext
 
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: Outputable id

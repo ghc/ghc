@@ -803,9 +803,16 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _ _)) thing_inside
         ; (bind_op, fvs1) <- lookupStmtName ctxt bindMName
 
         ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
-        ; let failFunction | xMonadFailEnabled = failMName
-                           | otherwise         = failMName_preMFP
-        ; (fail_op, fvs2) <- lookupSyntaxName failFunction
+        ; let getFailFunction
+                -- For non-monadic contexts (e.g. guard patterns, list
+                -- comprehensions, etc.) we should not need to fail
+                | not (isMonadFailStmtContext ctxt)
+                                    = return (err, emptyFVs)
+                | xMonadFailEnabled = lookupSyntaxName failMName
+                | otherwise         = lookupSyntaxName failMName_preMFP
+                where err = pprPanic "rnStmt: fail function forced"
+                                     (text "context:" <+> ppr ctxt)
+        ; (fail_op, fvs2) <- getFailFunction
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
         { (thing, fvs3) <- thing_inside (collectPatBinders pat')
