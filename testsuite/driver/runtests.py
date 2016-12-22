@@ -255,7 +255,7 @@ print('Timeout is ' + str(config.timeout))
 if config.rootdirs == []:
     config.rootdirs = ['.']
 
-t_files = set(findTFiles(config.rootdirs))
+t_files = list(findTFiles(config.rootdirs))
 
 print('Found', len(t_files), '.T files...')
 
