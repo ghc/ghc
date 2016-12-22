@@ -2894,9 +2894,9 @@ simplLetUnfolding env top_lvl id new_rhs unf
   | isStableUnfolding unf
   = simplUnfolding env top_lvl id unf
   | otherwise
-  = bottoming `seq`  -- See Note [Force bottoming field]
+  = is_bottoming `seq`  -- See Note [Force bottoming field]
     do { dflags <- getDynFlags
-       ; return (mkUnfolding dflags InlineRhs (isTopLevel top_lvl) bottoming new_rhs) }
+       ; return (mkUnfolding dflags InlineRhs is_top_lvl is_bottoming new_rhs) }
             -- We make an  unfolding *even for loop-breakers*.
             -- Reason: (a) It might be useful to know that they are WHNF
             --         (b) In TidyPgm we currently assume that, if we want to
@@ -2904,7 +2904,8 @@ simplLetUnfolding env top_lvl id new_rhs unf
             --             to expose.  (We could instead use the RHS, but currently
             --             we don't.)  The simple thing is always to have one.
   where
-    bottoming = isBottomingId id
+    is_top_lvl   = isTopLevel top_lvl
+    is_bottoming = isBottomingId id
 
 simplUnfolding :: SimplEnv-> TopLevelFlag -> InId -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
@@ -2935,20 +2936,20 @@ simplUnfolding env top_lvl id unf
                             -- See Note [Top-level flag on inline rules] in CoreUnfold
 
                   _other              -- Happens for INLINABLE things
-                     -> bottoming `seq` -- See Note [Force bottoming field]
+                     -> is_bottoming `seq` -- See Note [Force bottoming field]
                         do { dflags <- getDynFlags
-                           ; return (mkUnfolding dflags src is_top_lvl bottoming expr') } }
+                           ; return (mkUnfolding dflags src is_top_lvl is_bottoming expr') } }
                 -- If the guidance is UnfIfGoodArgs, this is an INLINABLE
                 -- unfolding, and we need to make sure the guidance is kept up
                 -- to date with respect to any changes in the unfolding.
 
         | otherwise -> return noUnfolding   -- Discard unstable unfoldings
   where
-    bottoming = isBottomingId id
-    is_top_lvl = isTopLevel top_lvl
-    act        = idInlineActivation id
-    rule_env   = updMode (updModeForStableUnfoldings act) env
-               -- See Note [Simplifying inside stable unfoldings] in SimplUtils
+    is_top_lvl   = isTopLevel top_lvl
+    is_bottoming = isBottomingId id
+    act          = idInlineActivation id
+    rule_env     = updMode (updModeForStableUnfoldings act) env
+         -- See Note [Simplifying inside stable unfoldings] in SimplUtils
 
 {-
 Note [Force bottoming field]
