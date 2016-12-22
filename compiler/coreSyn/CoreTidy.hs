@@ -55,30 +55,30 @@ tidyBind env (Rec prs)
 
 ------------  Expressions  --------------
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
-tidyExpr env (Var v)     =  Var (tidyVarOcc env v)
-tidyExpr env (Type ty)  =  Type (tidyType env ty)
+tidyExpr env (Var v)       = Var (tidyVarOcc env v)
+tidyExpr env (Type ty)     = Type (tidyType env ty)
 tidyExpr env (Coercion co) = Coercion (tidyCo env co)
-tidyExpr _   (Lit lit)   =  Lit lit
-tidyExpr env (App f a)   =  App (tidyExpr env f) (tidyExpr env a)
-tidyExpr env (Tick t e) =  Tick (tidyTickish env t) (tidyExpr env e)
-tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyCo env co)
+tidyExpr _   (Lit lit)     = Lit lit
+tidyExpr env (App f a)     = App (tidyExpr env f) (tidyExpr env a)
+tidyExpr env (Tick t e)    = Tick (tidyTickish env t) (tidyExpr env e)
+tidyExpr env (Cast e co)   = Cast (tidyExpr env e) (tidyCo env co)
 
 tidyExpr env (Let b e)
   = tidyBind env b      =: \ (env', b') ->
     Let b' (tidyExpr env' e)
 
 tidyExpr env (Case e b ty alts)
-  = tidyBndr env b      =: \ (env', b) ->
+  = tidyBndr env b  =: \ (env', b) ->
     Case (tidyExpr env e) b (tidyType env ty)
-         (map (tidyAlt b env') alts)
+         (map (tidyAlt env') alts)
 
 tidyExpr env (Lam b e)
   = tidyBndr env b      =: \ (env', b) ->
     Lam b (tidyExpr env' e)
 
 ------------  Case alternatives  --------------
-tidyAlt :: CoreBndr -> TidyEnv -> CoreAlt -> CoreAlt
-tidyAlt _case_bndr env (con, vs, rhs)
+tidyAlt :: TidyEnv -> CoreAlt -> CoreAlt
+tidyAlt env (con, vs, rhs)
   = tidyBndrs env vs    =: \ (env', vs) ->
     (con, vs, tidyExpr env' rhs)
 
