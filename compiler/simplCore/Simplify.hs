@@ -2065,10 +2065,13 @@ simplAlts env scrut case_bndr alts cont'
   = do  { let env0 = zapFloats env
 
         ; (env1, case_bndr1) <- simplBinder env0 case_bndr
+        ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
+              env2       = modifyInScope env1 case_bndr2
+              -- See Note [Case-binder evaluated-ness]
 
         ; fam_envs <- getFamEnvs
-        ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env1 scrut
-                                                       case_bndr case_bndr1 alts
+        ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env2 scrut
+                                                       case_bndr case_bndr2 alts
 
         ; (imposs_deflt_cons, in_alts) <- prepareAlts scrut' case_bndr' alts
           -- NB: it's possible that the returned in_alts is empty: this is handled
@@ -2203,7 +2206,22 @@ zapBndrOccInfo keep_occ_info pat_id
   | keep_occ_info = pat_id
   | otherwise     = zapIdOccInfo pat_id
 
-{-
+{- Note [Case binder evaluated-ness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We pin on a (OtherCon []) unfolding to the case-binder of a Case,
+even though it'll be over-ridden in every case alternative with a more
+informative unfolding.  Why?  Because suppose a later, less clever, pass
+simply replaces all occurrences of the case binder with the binder itself;
+then Lint may complain about the let/app invariant.  Example
+    case e of b { DEFAULT -> let v = reallyUnsafePtrEq# b y in ....
+                ; K       -> blah }
+
+The let/app invariant requires that y is evaluated in the call to
+reallyUnsafePtrEq#, which it is.  But we still want that to be true if we
+propagate binders to occurrences.
+
+This showed up in Trac #13027.
+
 Note [Add unfolding for scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general it's unlikely that a variable scrutinee will appear

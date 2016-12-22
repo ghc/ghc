@@ -205,6 +205,8 @@ tidyLetBndr rec_tidy_env env@(tidy_env, var_env) (id,rhs)
                     `setUnfoldingInfo`  new_unf
 
         new_unf | isStableUnfolding old_unf = tidyUnfolding rec_tidy_env old_unf old_unf
+                | isEvaldUnfolding  old_unf = evaldUnfolding
+                                              -- See Note [Preserve evaluatedness]
                 | otherwise                 = noUnfolding
         old_unf = unfoldingInfo old_info
     in
