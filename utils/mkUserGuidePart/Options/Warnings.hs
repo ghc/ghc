@@ -421,7 +421,7 @@ warningsOptions =
   , flag { flagName = "-Wdeferred-out-of-scope-variables"
          , flagDescription =
            "Report warnings when variable out-of-scope errors are "++
-           ":ref:`deferred until runtime <defer-out-of-scope-variables>`. "++
+           ":ref:`deferred until runtime. "++
            "See :ghc-flag:`-fdefer-out-of-scope-variables`."
          , flagType = DynamicFlag
          , flagReverse = "-Wno-deferred-out-of-scope-variables"
