@@ -800,6 +800,12 @@ messages and in GHCi:
     the detection mechanism is not yet implemented, so colors are off by
     default on all platforms.)
 
+.. ghc-flag:: -f[no-]diagnostics-show-caret
+
+    Controls whether GHC displays a line of the original source code where the
+    error was detected.  This also affects the associated caret symbol that
+    points at the region of code at fault.  The flag is on by default.
+
 .. ghc-flag:: -ferror-spans
 
     Causes GHC to emit the full source span of the syntactic entity

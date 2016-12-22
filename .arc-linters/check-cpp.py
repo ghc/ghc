@@ -25,9 +25,9 @@ logger.debug(sys.argv)
 
 path = sys.argv[1]
 warnings = []
-r = re.compile(r'ASSERT\s+\(')
+r = re.compile(rb'ASSERT\s+\(')
 if os.path.isfile(path):
-    with open(path) as f:
+    with open(path, 'rb') as f:
         for lineno, line in enumerate(f):
             if r.search(line):
                 warning = {

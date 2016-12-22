@@ -68,6 +68,10 @@ verbosityOptions =
          , flagDescription = "Use colors in error messages"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-f[no-]diagnostics-show-caret"
+         , flagDescription = "Whether to show snippets of original source code"
+         , flagType = DynamicFlag
+         }
   , flag { flagName = "-ferror-spans"
          , flagDescription = "Output full span in error messages"
          , flagType = DynamicFlag

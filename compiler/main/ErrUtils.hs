@@ -35,6 +35,7 @@ module ErrUtils (
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
+        getCaretDiagnostic,
 
         -- * Dump files
         dumpIfSet, dumpIfSet_dyn, dumpIfSet_dyn_printer,
@@ -60,6 +61,8 @@ import Outputable
 import Panic
 import SrcLoc
 import DynFlags
+import FastString (unpackFS)
+import StringBuffer (hGetStringBuffer, len, lexemeToString)
 
 import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
@@ -74,6 +77,7 @@ import Data.Time
 import Control.Monad
 import Control.Monad.IO.Class
 import System.IO
+import System.IO.Error  ( catchIOError )
 import GHC.Conc         ( getAllocationCounter )
 import System.CPUTime
 
@@ -190,20 +194,99 @@ mkLocMessageAnn ann severity locn msg
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
           prefix = locn' <> colon <+>
-                   coloured (colBold `mappend` sevColor) sevText <> optAnn
+                   coloured sevColour sevText <> optAnn
       in bold (hang prefix 4 msg)
   where
-    (sevText, sevColor) =
+    sevColour = colBold `mappend` getSeverityColour severity
+
+    sevText =
       case severity of
-        SevWarning -> (text "warning:", colMagentaFg)
-        SevError   -> (text "error:", colRedFg)
-        SevFatal   -> (text "fatal:", colRedFg)
-        _          -> (empty, mempty)
+        SevWarning -> text "warning:"
+        SevError   -> text "error:"
+        SevFatal   -> text "fatal:"
+        _          -> empty
 
     -- Add optional information
     optAnn = case ann of
       Nothing -> text ""
-      Just i  -> text " [" <> coloured sevColor (text i) <> text "]"
+      Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
+
+getSeverityColour :: Severity -> PprColour
+getSeverityColour SevWarning = colMagentaFg
+getSeverityColour SevError   = colRedFg
+getSeverityColour SevFatal   = colRedFg
+getSeverityColour _          = mempty
+
+getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
+getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
+getCaretDiagnostic severity (RealSrcSpan span) = do
+  caretDiagnostic <$> getSrcLine (srcSpanFile span) (row - 1)
+
+  where
+
+    getSrcLine fn i = do
+      (getLine i <$> readFile' (unpackFS fn))
+        `catchIOError` \ _ ->
+          pure Nothing
+
+    getLine i contents =
+      case drop i (lines contents) of
+        srcLine : _ -> Just srcLine
+        [] -> Nothing
+
+    readFile' fn = do
+      -- StringBuffer has advantages over readFile:
+      -- (a) no lazy IO, otherwise IO exceptions may occur in pure code
+      -- (b) always UTF-8, rather than some system-dependent encoding
+      --     (Haskell source code must be UTF-8 anyway)
+      buf <- hGetStringBuffer fn
+      pure (fix <$> lexemeToString buf (len buf))
+
+    -- allow user to visibly see that their code is incorrectly encoded
+    -- (StringBuffer.nextChar uses \0 to represent undecodable characters)
+    fix '\0' = '\xfffd'
+    fix c    = c
+
+    sevColour = colBold `mappend` getSeverityColour severity
+
+    marginColour = colBold `mappend` colBlueFg
+
+    row = srcSpanStartLine span
+    rowStr = show row
+    multiline = row /= srcSpanEndLine span
+
+    stripNewlines = filter (/= '\n')
+
+    caretDiagnostic Nothing = empty
+    caretDiagnostic (Just srcLineWithNewline) =
+      coloured marginColour (text marginSpace) <>
+      text ("\n") <>
+      coloured marginColour (text marginRow) <>
+      text (" " ++ srcLinePre) <>
+      coloured sevColour (text srcLineSpan) <>
+      text (srcLinePost ++ "\n") <>
+      coloured marginColour (text marginSpace) <>
+      coloured sevColour (text (" " ++ caretLine))
+
+      where
+
+        srcLine = stripNewlines srcLineWithNewline
+
+        start = srcSpanStartCol span - 1
+        end | multiline = length srcLine
+            | otherwise = srcSpanEndCol span - 1
+        width = max 1 (end - start)
+
+        marginWidth = length rowStr
+        marginSpace = replicate marginWidth ' ' ++ " |"
+        marginRow   = rowStr ++ " |"
+
+        (srcLinePre,  srcLineRest) = splitAt start srcLine
+        (srcLineSpan, srcLinePost) = splitAt width srcLineRest
+
+        caretEllipsis | multiline = "..."
+                      | otherwise = ""
+        caretLine = replicate start ' ' ++ replicate width '^' ++ caretEllipsis
 
 makeIntoWarning :: WarnReason -> ErrMsg -> ErrMsg
 makeIntoWarning reason err = err
