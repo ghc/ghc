@@ -280,32 +280,16 @@ mk_alt return_result (Nothing, wrap_result)
        return (ccall_res_ty, the_alt)
 
 mk_alt return_result (Just prim_res_ty, wrap_result)
-                -- The ccall returns a non-() value
-  | isUnboxedTupleType prim_res_ty= do
-    let
-        Just ls = tyConAppArgs_maybe prim_res_ty
-        arity = 1 + length ls
-    args_ids@(result_id:as) <- mapM newSysLocalDs ls
-    state_id <- newSysLocalDs realWorldStatePrimTy
-    let
-        the_rhs = return_result (Var state_id)
-                                (wrap_result (Var result_id) : map Var as)
-        ccall_res_ty = mkTupleTy Unboxed (realWorldStatePrimTy : ls)
-        the_alt      = ( DataAlt (tupleDataCon Unboxed arity)
-                       , (state_id : args_ids)
-                       , the_rhs
-                       )
-    return (ccall_res_ty, the_alt)
-
-  | otherwise = do
-    result_id <- newSysLocalDs prim_res_ty
-    state_id <- newSysLocalDs realWorldStatePrimTy
-    let
-        the_rhs = return_result (Var state_id)
+  = -- The ccall returns a non-() value
+    ASSERT2( isPrimitiveType prim_res_ty, ppr prim_res_ty )
+             -- True because resultWrapper ensures it is so
+    do { result_id <- newSysLocalDs prim_res_ty
+       ; state_id <- newSysLocalDs realWorldStatePrimTy
+       ; let the_rhs = return_result (Var state_id)
                                 [wrap_result (Var result_id)]
-        ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
-        the_alt      = (DataAlt (tupleDataCon Unboxed 2), [state_id, result_id], the_rhs)
-    return (ccall_res_ty, the_alt)
+             ccall_res_ty = mkTupleTy Unboxed [realWorldStatePrimTy, prim_res_ty]
+             the_alt      = (DataAlt (tupleDataCon Unboxed 2), [state_id, result_id], the_rhs)
+       ; return (ccall_res_ty, the_alt) }
 
 
 resultWrapper :: Type
@@ -314,48 +298,57 @@ resultWrapper :: Type
 -- resultWrapper deals with the result *value*
 -- E.g. foreign import foo :: Int -> IO T
 -- Then resultWrapper deals with marshalling the 'T' part
+-- So if    resultWrapper ty = (Just ty_rep, marshal)
+--  then      marshal (e :: ty_rep) :: ty
+-- That is, 'marshal' wrape the result returned by the foreign call,
+-- of type ty_rep, into the value Haskell expected, of type 'ty'
+--
+-- Invariant: ty_rep is always a primitive type
+--            i.e. (isPrimitiveType ty_rep) is True
+
 resultWrapper result_ty
   -- Base case 1: primitive types
   | isPrimitiveType result_ty
   = return (Just result_ty, \e -> e)
 
   -- Base case 2: the unit type ()
-  | Just (tc,_) <- maybe_tc_app, tc `hasKey` unitTyConKey
+  | Just (tc,_) <- maybe_tc_app
+  , tc `hasKey` unitTyConKey
   = return (Nothing, \_ -> Var unitDataConId)
 
   -- Base case 3: the boolean type
-  | Just (tc,_) <- maybe_tc_app, tc `hasKey` boolTyConKey
-  = do
-    dflags <- getDynFlags
-    return
-     (Just intPrimTy, \e -> mkWildCase e intPrimTy
-                                   boolTy
-                                   [(DEFAULT                    ,[],Var trueDataConId ),
-                                    (LitAlt (mkMachInt dflags 0),[],Var falseDataConId)])
+  | Just (tc,_) <- maybe_tc_app
+  , tc `hasKey` boolTyConKey
+  = do { dflags <- getDynFlags
+       ; let marshal_bool e
+               = mkWildCase e intPrimTy boolTy
+                   [ (DEFAULT                    ,[],Var trueDataConId )
+                   , (LitAlt (mkMachInt dflags 0),[],Var falseDataConId)]
+       ; return (Just intPrimTy, marshal_bool) }
 
   -- Newtypes
   | Just (co, rep_ty) <- topNormaliseNewType_maybe result_ty
-  = do (maybe_ty, wrapper) <- resultWrapper rep_ty
-       return (maybe_ty, \e -> mkCastDs (wrapper e) (mkSymCo co))
+  = do { (maybe_ty, wrapper) <- resultWrapper rep_ty
+       ; return (maybe_ty, \e -> mkCastDs (wrapper e) (mkSymCo co)) }
 
   -- The type might contain foralls (eg. for dummy type arguments,
   -- referring to 'Ptr a' is legal).
   | Just (tyvar, rest) <- splitForAllTy_maybe result_ty
-  = do (maybe_ty, wrapper) <- resultWrapper rest
-       return (maybe_ty, \e -> Lam tyvar (wrapper e))
+  = do { (maybe_ty, wrapper) <- resultWrapper rest
+       ; return (maybe_ty, \e -> Lam tyvar (wrapper e)) }
 
   -- Data types with a single constructor, which has a single arg
   -- This includes types like Ptr and ForeignPtr
-  | Just (tycon, tycon_arg_tys, data_con, data_con_arg_tys) <- splitDataProductType_maybe result_ty,
-    dataConSourceArity data_con == 1
-  = do dflags <- getDynFlags
-       let
-           (unwrapped_res_ty : _) = data_con_arg_tys
-           narrow_wrapper         = maybeNarrow dflags tycon
-       (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
-       return
-         (maybe_ty, \e -> mkApps (Var (dataConWrapId data_con))
-                                 (map Type tycon_arg_tys ++ [wrapper (narrow_wrapper e)]))
+  | Just (tycon, tycon_arg_tys) <- maybe_tc_app
+  , Just data_con <- isDataProductTyCon_maybe tycon  -- One construtor, no existentials
+  , [unwrapped_res_ty] <- dataConInstOrigArgTys data_con tycon_arg_tys  -- One argument
+  = do { dflags <- getDynFlags
+       ; (maybe_ty, wrapper) <- resultWrapper unwrapped_res_ty
+       ; let narrow_wrapper = maybeNarrow dflags tycon
+             marshal_con e  = Var (dataConWrapId data_con)
+                              `mkTyApps` tycon_arg_tys
+                              `App` wrapper (narrow_wrapper e)
+       ; return (maybe_ty, marshal_con) }
 
   | otherwise
   = pprPanic "resultWrapper" (ppr result_ty)
