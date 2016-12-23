@@ -46,7 +46,7 @@ import CoreSyn
 import PprCore          ()      -- Instances
 import OccurAnal        ( occurAnalyseExpr )
 import CoreSubst hiding( substTy )
-import CoreArity       ( manifestArity, exprBotStrictness_maybe )
+import CoreArity       ( manifestArity )
 import CoreUtils
 import Id
 import DataCon
@@ -63,7 +63,6 @@ import Outputable
 import ForeignCall
 
 import qualified Data.ByteString as BS
-import Data.Maybe
 
 {-
 ************************************************************************
@@ -74,12 +73,13 @@ import Data.Maybe
 -}
 
 mkTopUnfolding :: DynFlags -> Bool -> CoreExpr -> Unfolding
-mkTopUnfolding dflags = mkUnfolding dflags InlineRhs True {- Top level -}
+mkTopUnfolding dflags is_bottoming rhs
+  = mkUnfolding dflags InlineRhs True is_bottoming rhs
 
 mkImplicitUnfolding :: DynFlags -> CoreExpr -> Unfolding
 -- For implicit Ids, do a tiny bit of optimising first
 mkImplicitUnfolding dflags expr
-    = mkTopUnfolding dflags False (simpleOptExpr expr)
+  = mkTopUnfolding dflags False (simpleOptExpr expr)
 
 -- Note [Top-level flag on inline rules]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -88,7 +88,8 @@ mkImplicitUnfolding dflags expr
 -- Simplify.simplUnfolding.
 
 mkSimpleUnfolding :: DynFlags -> CoreExpr -> Unfolding
-mkSimpleUnfolding dflags = mkUnfolding dflags InlineRhs False False
+mkSimpleUnfolding dflags rhs
+  = mkUnfolding dflags InlineRhs False False rhs
 
 mkDFunUnfolding :: [Var] -> DataCon -> [CoreExpr] -> Unfolding
 mkDFunUnfolding bndrs con ops
@@ -120,7 +121,7 @@ mkWorkerUnfolding dflags work_fn
   = mkCoreUnfolding src top_lvl new_tmpl guidance
   where
     new_tmpl = simpleOptExpr (work_fn tmpl)
-    guidance = calcUnfoldingGuidance dflags new_tmpl
+    guidance = calcUnfoldingGuidance dflags False new_tmpl
 
 mkWorkerUnfolding _ _ _ = noUnfolding
 
@@ -142,10 +143,9 @@ mkInlineUnfolding mb_arity expr
 
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding
 mkInlinableUnfolding dflags expr
-  = mkUnfolding dflags InlineStable True is_bot expr'
+  = mkUnfolding dflags InlineStable False False expr'
   where
     expr' = simpleOptExpr expr
-    is_bot = isJust (exprBotStrictness_maybe expr')
 
 specUnfolding :: [Var] -> (CoreExpr -> CoreExpr) -> Arity -> Unfolding -> Unfolding
 -- See Note [Specialising unfoldings]
@@ -231,26 +231,27 @@ mkCoreUnfolding src top_lvl expr guidance
                     uf_expandable   = exprIsExpandable expr,
                     uf_guidance     = guidance }
 
-mkUnfolding :: DynFlags -> UnfoldingSource -> Bool -> Bool -> CoreExpr
+mkUnfolding :: DynFlags -> UnfoldingSource
+            -> Bool       -- Is top-level
+            -> Bool       -- Definitely a bottoming binding
+                          -- (only relevant for top-level bindings)
+            -> CoreExpr
             -> Unfolding
 -- Calculates unfolding guidance
 -- Occurrence-analyses the expression before capturing it
-mkUnfolding dflags src top_lvl is_bottoming expr
-  | top_lvl && is_bottoming
-  , not (exprIsTrivial expr)
-  = NoUnfolding    -- See Note [Do not inline top-level bottoming functions]
-  | otherwise
+mkUnfolding dflags src is_top_lvl is_bottoming expr
   = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
                       -- See Note [Occurrrence analysis of unfoldings]
                     uf_src          = src,
-                    uf_is_top       = top_lvl,
+                    uf_is_top       = is_top_lvl,
                     uf_is_value     = exprIsHNF        expr,
                     uf_is_conlike   = exprIsConLike    expr,
                     uf_expandable   = exprIsExpandable expr,
                     uf_is_work_free = exprIsWorkFree   expr,
                     uf_guidance     = guidance }
   where
-    guidance = calcUnfoldingGuidance dflags expr
+    is_top_bottoming = is_top_lvl && is_bottoming
+    guidance         = calcUnfoldingGuidance dflags is_top_bottoming expr
         -- NB: *not* (calcUnfoldingGuidance (occurAnalyseExpr expr))!
         -- See Note [Calculate unfolding guidance on the non-occ-anal'd expression]
 
@@ -328,12 +329,13 @@ inlineBoringOk e
 
 calcUnfoldingGuidance
         :: DynFlags
-        -> CoreExpr    -- Expression to look at
+        -> Bool          -- Definitely a top-level, bottoming binding
+        -> CoreExpr      -- Expression to look at
         -> UnfoldingGuidance
-calcUnfoldingGuidance dflags (Tick t expr)
+calcUnfoldingGuidance dflags is_top_bottoming (Tick t expr)
   | not (tickishIsCode t)  -- non-code ticks don't matter for unfolding
-  = calcUnfoldingGuidance dflags expr
-calcUnfoldingGuidance dflags expr
+  = calcUnfoldingGuidance dflags is_top_bottoming expr
+calcUnfoldingGuidance dflags is_top_bottoming expr
   = case sizeExpr dflags bOMB_OUT_SIZE val_bndrs body of
       TooBig -> UnfNever
       SizeIs size cased_bndrs scrut_discount
@@ -341,6 +343,10 @@ calcUnfoldingGuidance dflags expr
         -> UnfWhen { ug_unsat_ok = unSaturatedOk
                    , ug_boring_ok =  boringCxtOk
                    , ug_arity = n_val_bndrs }   -- Note [INLINE for small functions]
+
+        | is_top_bottoming
+        -> UnfNever   -- See Note [Do not inline top-level bottoming functions]
+
         | otherwise
         -> UnfIfGoodArgs { ug_args  = map (mk_discount cased_bndrs) val_bndrs
                          , ug_size  = size
