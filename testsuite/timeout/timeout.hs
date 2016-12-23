@@ -109,6 +109,14 @@ run secs cmd =
        ioPort <- createCompletionPort job
        when (ioPort == nullPtr) $ errorWin "createCompletionPort, cannot continue."
 
+       -- We're explicitly turning off handle inheritance to prevent misc handles
+       -- from being inherited by the child. Notable we don't want the I/O CP and
+       -- Job handles to be inherited. So we mark them as non-inheritable.
+       setHandleInformation job cHANDLE_FLAG_INHERIT 0
+       setHandleInformation job cHANDLE_FLAG_INHERIT 0
+
+       -- Now create the process suspended so we can add it to the job and then resume.
+       -- This is so we don't miss any events on the receiving end of the I/O port.
        let creationflags = cCREATE_SUSPENDED
        b <- createProcessW nullPtr cmd'' nullPtr nullPtr True
                            creationflags

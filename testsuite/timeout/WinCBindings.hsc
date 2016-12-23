@@ -293,6 +293,9 @@ cWAIT_TIMEOUT = #const WAIT_TIMEOUT
 cCREATE_SUSPENDED :: DWORD
 cCREATE_SUSPENDED = #const CREATE_SUSPENDED
 
+cHANDLE_FLAG_INHERIT :: DWORD
+cHANDLE_FLAG_INHERIT = #const HANDLE_FLAG_INHERIT
+
 foreign import WINDOWS_CCONV unsafe "windows.h GetExitCodeProcess"
     getExitCodeProcess :: HANDLE -> LPDWORD -> IO BOOL
 
@@ -325,13 +328,16 @@ foreign import WINDOWS_CCONV unsafe "windows.h CreateIoCompletionPort"
 foreign import WINDOWS_CCONV unsafe "windows.h GetQueuedCompletionStatus"
     getQueuedCompletionStatus :: HANDLE -> LPDWORD -> PULONG_PTR -> Ptr LPOVERLAPPED -> DWORD -> IO BOOL
 
+foreign import WINDOWS_CCONV unsafe "windows.h SetHandleInformation"
+    setHandleInformation :: HANDLE -> DWORD -> DWORD -> IO BOOL
+
 setJobParameters :: HANDLE -> IO BOOL
 setJobParameters hJob = alloca $ \p_jeli -> do
     let jeliSize = sizeOf (undefined :: JOBOBJECT_EXTENDED_LIMIT_INFORMATION)
 
     _ <- memset p_jeli 0 $ fromIntegral jeliSize
     -- Configure all child processes associated with the job to terminate when the
-    -- Last process in the job terminates. This prevent half dead processes and that
+    -- last handle to the job is closed. This prevent half dead processes and that
     -- hanging ghc-iserv.exe process that happens when you interrupt the testsuite.
     (#poke JOBOBJECT_EXTENDED_LIMIT_INFORMATION, BasicLimitInformation.LimitFlags)
       p_jeli cJOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
