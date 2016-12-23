@@ -654,8 +654,7 @@ arityApp (ATop [])     _     = ATop []
 arityApp (ATop (_:as)) cheap = floatIn cheap (ATop as)
 
 andArityType :: ArityType -> ArityType -> ArityType   -- Used for branches of a 'case'
-andArityType (ABot n1) (ABot n2)
-  = ABot (n1 `min` n2)
+andArityType (ABot n1) (ABot n2)  = ABot (n1 `max` n2) -- Note [ABot branches: use max]
 andArityType (ATop as)  (ABot _)  = ATop as
 andArityType (ABot _)   (ATop bs) = ATop bs
 andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
@@ -664,7 +663,15 @@ andArityType (ATop as)  (ATop bs) = ATop (as `combine` bs)
     combine []     bs     = takeWhile isOneShotInfo bs
     combine as     []     = takeWhile isOneShotInfo as
 
-{-
+{- Note [ABot branches: use max]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider   case x of
+             True  -> \x.  error "urk"
+             False -> \xy. error "urk2"
+
+Remember: ABot n means "if you apply to n args, it'll definitely diverge".
+So we need (ABot 2) for the whole thing, the /max/ of the ABot arities.
+
 Note [Combining case branches]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
