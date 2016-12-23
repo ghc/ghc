@@ -412,26 +412,20 @@ list.
 
 .. ghc-flag:: -fregs-graph
 
-    :default: off due to a performance regression bug (:ghc-ticket:`7679`)
-
-    *Only applies in combination with the native code generator.* Use the graph
-    colouring register allocator for register allocation in the native code
-    generator. By default, GHC uses a simpler, faster linear register allocator.
-    The downside being that the linear register allocator usually generates
-    worse code.
-
-    Note that the graph colouring allocator is a bit experimental and may fail
-    when faced with code with high register pressure :ghc-ticket:`8657`.
+    *Off by default due to a performance regression bug. Only applies in
+    combination with the native code generator.* Use the graph colouring
+    register allocator for register allocation in the native code
+    generator. By default, GHC uses a simpler, faster linear register
+    allocator. The downside being that the linear register allocator
+    usually generates worse code.
 
 .. ghc-flag:: -fregs-iterative
 
-    :default: off
-
-    *Only applies in combination with the native code generator.* Use the
-    iterative coalescing graph colouring register allocator for register
-    allocation in the native code generator. This is the same register allocator
-    as the :ghc-flag:`-fregs-graph` one but also enables iterative coalescing
-    during register allocation.
+    *Off by default, only applies in combination with the native code
+    generator.* Use the iterative coalescing graph colouring register
+    allocator for register allocation in the native code generator. This
+    is the same register allocator as the ``-fregs-graph`` one but also
+    enables iterative coalescing during register allocation.
 
 .. ghc-flag:: -fsimplifier-phases=<n>
 
