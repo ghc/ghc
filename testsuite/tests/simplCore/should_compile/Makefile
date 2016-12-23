@@ -167,6 +167,10 @@ T5615:
 	-grep 'remInt#' T5615.dump-simpl
 	grep -c '1999#' T5615.dump-simpl
 
+# When this one works there are no 'plusWord' left at all
+T12877:
+	-('$(TEST_HC)' $(TEST_HC_OPTS) -c -O T12877.hs -ddump-simpl | grep 'plusWord')
+
 T13025:
 	$(RM) -f T13025.o T13025.hi T13025a.o T13025a.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025a.hs

@@ -1,3 +1,4 @@
+module Bug where
 -- This ugly cascading case reduces to:
 --    case x of
 --       0 -> "0"
@@ -111,7 +112,3 @@ test x = case x of
                                                                                                       34 -> "0"
                                                                                                       35 -> "1"
                                                                                                       _  -> "n"
-
-main :: IO ()
-main = do
-   putStrLn [last (concat (fmap test [0..12345678]))]
