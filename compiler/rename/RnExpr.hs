@@ -763,6 +763,25 @@ rnStmtsWithFreeVars ctxt rnBody (lstmt@(L loc _) : lstmts) thing_inside
         ; return (((stmts1 ++ stmts2), thing), fvs) }
 
 ----------------------
+
+{-
+Note [Failing pattern matches in Stmts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Many things desugar to HsStmts including monadic things like `do` and `mdo`
+statements, pattern guards, and list comprehensions (see 'HsStmtContext' for an
+exhaustive list). How we deal with pattern match failure is context-dependent.
+
+ * In the case of list comprehensions and pattern guards we don't need any 'fail'
+   function; the desugarer ignores the fail function field of 'BindStmt' entirely.
+ * In the case of monadic contexts (e.g. monad comprehensions, do, and mdo
+   expressions) we want pattern match failure to be desugared to the appropriate
+   'fail' function (either that of Monad or MonadFail, depending on whether
+   -XMonadFailDesugaring is enabled.)
+
+At one point we failed to make this distinction, leading to #11216.
+-}
+
 rnStmt :: Outputable (body RdrName)
        => HsStmtContext Name
        -> (Located (body RdrName) -> RnM (Located (body Name), FreeVars))
@@ -805,13 +824,12 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _ _)) thing_inside
         ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
         ; let getFailFunction
                 -- For non-monadic contexts (e.g. guard patterns, list
-                -- comprehensions, etc.) we should not need to fail
+                -- comprehensions, etc.) we should not need to fail.
+                -- See Note [Failing pattern matches in Stmts]
                 | not (isMonadFailStmtContext ctxt)
-                                    = return (err, emptyFVs)
+                                    = return (noSyntaxExpr, emptyFVs)
                 | xMonadFailEnabled = lookupSyntaxName failMName
                 | otherwise         = lookupSyntaxName failMName_preMFP
-                where err = pprPanic "rnStmt: fail function forced"
-                                     (text "context:" <+> ppr ctxt)
         ; (fail_op, fvs2) <- getFailFunction
 
         ; rnPat (StmtCtxt ctxt) pat $ \ pat' -> do
