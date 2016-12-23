@@ -1255,10 +1255,10 @@ tidyTopIdInfo dflags rhs_tidy_env name orig_rhs tidy_rhs idinfo show_unfold caf_
 
     sig = strictnessInfo idinfo
     final_sig | not $ isTopSig sig
-                 = WARN( _bottom_hidden sig , ppr name ) sig
-                 -- try a cheap-and-cheerful bottom analyser
-                 | Just (_, nsig) <- mb_bot_str = nsig
-                 | otherwise                    = sig
+              = WARN( _bottom_hidden sig , ppr name ) sig
+              -- try a cheap-and-cheerful bottom analyser
+              | Just (_, nsig) <- mb_bot_str = nsig
+              | otherwise                    = sig
 
     _bottom_hidden id_sig = case mb_bot_str of
                                   Nothing         -> False
