@@ -228,6 +228,8 @@ instance Foldable NonEmpty where
   foldl1 f ~(a :| as) = foldl f a as
   foldMap f ~(a :| as) = f a `mappend` foldMap f as
   fold ~(m :| ms) = m `mappend` fold ms
+  length = length
+  toList = toList
 
 -- | Extract the first element of the stream.
 head :: NonEmpty a -> a
@@ -507,8 +509,8 @@ nubBy eq (a :| as) = a :| List.nubBy eq (List.filter (\b -> not (eq a b)) as)
 -- > transpose . transpose /= id
 transpose :: NonEmpty (NonEmpty a) -> NonEmpty (NonEmpty a)
 transpose = fmap fromList
-          . fromList . List.transpose . Foldable.toList
-          . fmap Foldable.toList
+          . fromList . List.transpose . toList
+          . fmap toList
 
 -- | 'sortBy' for 'NonEmpty', behaves the same as 'Data.List.sortBy'
 sortBy :: (a -> a -> Ordering) -> NonEmpty a -> NonEmpty a
