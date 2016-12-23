@@ -608,7 +608,7 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
-           (wordsize(64), 57861352, 10)])
+           (wordsize(64), 50253880, 5)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -634,6 +634,10 @@ test('T5837',
              #                          compilation pipeline
              # 2017-01-24 57861352  amd64/Linux, very likely due to the top-level strings
              #                          in Core patch.
+             # 2017-02-07 50253880  Another improvement in SetLevels.  I don't think
+             #                      all the gain here is from this patch, but I think it
+             #                      just pushed it over the edge, so I'm re-centreing, and
+             #                      changing to 5% tolerance
       ],
       compile, ['-freduction-depth=50'])
 
@@ -827,12 +831,16 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64), 861862608, 5),
-
+        [(wordsize(64), 884436192, 5),
          # 2015-08-04    999826288     initial value
          # 2016-04-14   1066246248     Final demand analyzer run
          # 2016-06-18    984268712     shuffling around of Data.Functor.Identity
-         # 2017-0123     861862608     worker/wrapper evald-ness flags; 10% improvement!
+         # 2017-01-20    920101608     Improvement to SetLevels apparently saved 4.2% in
+         #                             compiler allocation.  Program size seems virtually
+         #                             unchanged; maybe the compiler itself is a little faster
+         # 2017-01-23    861862608     worker/wrapper evald-ness flags; another 5% improvement!
+         # 2017-02-01    894486272     Join points
+         # 2017-02-07    884436192     Another improvement to SetLevels
 
          (wordsize(32),  515672240, 5)   # Put in your value here if you hit this
          # 2016-04-06    515672240     (x86/Linux) initial value
@@ -942,9 +950,10 @@ test('T13035',
 test('T13056',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-         [(wordsize(64), 546800240, 5),
+         [(wordsize(64), 524611224, 5),
          # 2017-01-06    520166912 initial
          # 2017-01-31    546800240 Join points (#12988)
+         # 2017-02-07    524611224 new SetLevels
          ]),
      ],
      compile,

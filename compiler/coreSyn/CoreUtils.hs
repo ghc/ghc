@@ -1586,11 +1586,12 @@ don't want to discard a seq on it.
 -}
 
 -- | Can we bind this 'CoreExpr' at the top level?
-exprIsTopLevelBindable :: CoreExpr -> Bool
+exprIsTopLevelBindable :: CoreExpr -> Type -> Bool
 -- See Note [CoreSyn top-level string literals]
-exprIsTopLevelBindable expr
+-- Precondition: exprType expr = ty
+exprIsTopLevelBindable expr ty
   = exprIsLiteralString expr
-  || not (isUnliftedType (exprType expr))
+  || not (isUnliftedType ty)
 
 exprIsLiteralString :: CoreExpr -> Bool
 exprIsLiteralString (Lit (MachStr _)) = True

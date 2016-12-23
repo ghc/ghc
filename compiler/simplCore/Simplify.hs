@@ -654,7 +654,7 @@ makeTrivialWithInfo :: TopLevelFlag -> SimplEnv
 -- Returned SimplEnv has same substitution as incoming one
 makeTrivialWithInfo top_lvl env context info expr
   | exprIsTrivial expr                          -- Already trivial
-  || not (bindingOk top_lvl expr)               -- Cannot trivialise
+  || not (bindingOk top_lvl expr expr_ty)       -- Cannot trivialise
                                                 --   See Note [Cannot trivialise]
   = return (env, expr)
   | otherwise           -- See Note [Take care] below
@@ -676,11 +676,11 @@ makeTrivialWithInfo top_lvl env context info expr
   where
     expr_ty = exprType expr
 
-bindingOk :: TopLevelFlag -> CoreExpr -> Bool
+bindingOk :: TopLevelFlag -> CoreExpr -> Type -> Bool
 -- True iff we can have a binding of this expression at this level
 -- Precondition: the type is the type of the expression
-bindingOk top_lvl expr
-  | isTopLevel top_lvl = exprIsTopLevelBindable expr
+bindingOk top_lvl expr expr_ty
+  | isTopLevel top_lvl = exprIsTopLevelBindable expr expr_ty
   | otherwise          = True
 
 {-
