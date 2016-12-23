@@ -1196,6 +1196,18 @@ Just (':', [Char], ['a', unpackCString# "bc"]).
 We need to be careful about UTF8 strings here. ""# contains a ByteString, so
 we must parse it back into a FastString to split off the first character.
 That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
+
+Note [Push coercions in exprIsConApp_maybe]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In Trac #13025 I found a case where we had
+    op (df @t1 @t2)     -- op is a ClassOp
+where
+    df = (/\a b. K e1 e2) |> g
+
+To get this to come out we need to simplify on the fly
+   ((/\a b. K e1 e2) |> g) @t1 @t2
+
+Hence the use of pushCoArgs.
 -}
 
 data ConCont = CC [CoreExpr] Coercion
@@ -1209,12 +1221,16 @@ exprIsConApp_maybe (in_scope, id_unf) expr
   = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
   where
     go :: Either InScopeSet Subst
+             -- Left in-scope  means "empty substitution"
+             -- Right subst    means "apply this substitution to the CoreExpr"
        -> CoreExpr -> ConCont
        -> Maybe (DataCon, [Type], [CoreExpr])
     go subst (Tick t expr) cont
        | not (tickishIsCode t) = go subst expr cont
-    go subst (Cast expr co1) (CC [] co2)
-       = go subst expr (CC [] (subst_co subst co1 `mkTransCo` co2))
+    go subst (Cast expr co1) (CC args co2)
+       | Just (args', co1') <- pushCoArgs (subst_co subst co1) args
+            -- See Note [Push coercions in exprIsConApp_maybe]
+       = go subst expr (CC args' (co1' `mkTransCo` co2))
     go subst (App fun arg) (CC args co)
        = go subst fun (CC (subst_arg subst arg : args) co)
     go subst (Lam var body) (CC (arg:args) co)
@@ -1267,6 +1283,36 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
+
+pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Coercion)
+pushCoArgs co []         = return ([], co)
+pushCoArgs co (arg:args) = do { (arg',  co1) <- pushCoArg  co  arg
+                              ; (args', co2) <- pushCoArgs co1 args
+                              ; return (arg':args', co2) }
+
+pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
+-- We have (fun |> co) arg, and we want to transform it to
+--         (fun arg) |> co
+-- This may fail, e.g. if (fun :: N) where N is a newtype
+-- C.f. simplCast in Simplify.hs
+
+pushCoArg co arg
+  = case arg of
+      Type ty | isForAllTy tyL
+        -> ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
+           Just (Type ty, mkInstCo co (mkNomReflCo ty))
+
+      _ | isFunTy tyL
+        , [co1, co2] <- decomposeCo 2 co
+              -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
+              -- then co1 :: tyL1 ~ tyR1
+              --      co2 :: tyL2 ~ tyR2
+        -> ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
+           Just (mkCast arg (mkSymCo co1), co2)
+
+      _ -> Nothing
+  where
+    Pair tyL tyR = coercionKind co
 
 -- See Note [exprIsConApp_maybe on literal strings]
 dealWithStringLiteral :: Var -> BS.ByteString -> Coercion

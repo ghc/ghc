@@ -166,3 +166,9 @@ T5615:
 	-grep 'quotInt#' T5615.dump-simpl
 	-grep 'remInt#' T5615.dump-simpl
 	grep -c '1999#' T5615.dump-simpl
+
+T13025:
+	$(RM) -f T13025.o T13025.hi T13025a.o T13025a.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025.hs -ddump-simpl | grep HEq_sc | wc
+	# No lines should match 'HEq_sc' so wc should output zeros
