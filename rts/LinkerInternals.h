@@ -12,6 +12,10 @@
 #include "Rts.h"
 #include "Hash.h"
 
+#if RTS_LINKER_USE_MMAP
+#include <sys/mman.h>
+#endif
+
 #include "BeginPrivate.h"
 
 typedef void SymbolAddr;
@@ -287,6 +291,12 @@ char *cstring_from_section_name(
     unsigned char* name,
     unsigned char* strtab);
 #endif /* mingw32_HOST_OS */
+
+/* MAP_ANONYMOUS is MAP_ANON on some systems,
+   e.g. OS X (before Sierra), OpenBSD etc */
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
+#endif
 
 /* Which object file format are we targetting? */
 #if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)

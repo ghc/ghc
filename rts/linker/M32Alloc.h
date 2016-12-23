@@ -19,11 +19,6 @@
 
 #endif
 
-/* MAP_ANONYMOUS is MAP_ANON on some systems, e.g. OS X, OpenBSD etc */
-#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-
 #include "BeginPrivate.h"
 
 #if RTS_LINKER_USE_MMAP
