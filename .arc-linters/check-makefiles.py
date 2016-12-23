@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Warn for use of `--interactive` inside Makefiles (#11468).
 #

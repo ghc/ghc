@@ -71,17 +71,17 @@
     },
     "check-binaries": {
       "type": "external-json",
-      "external-json.script": "python .arc-linters/check-binaries.py"
+      "external-json.script": "python3 .arc-linters/check-binaries.py"
     },
     "check-makefiles": {
       "type": "external-json",
       "include": ["(Makefile$)"],
-      "external-json.script": "python .arc-linters/check-makefiles.py"
+      "external-json.script": "python3 .arc-linters/check-makefiles.py"
     },
     "bad-assert-clang-cpp": {
       "type": "external-json",
       "include": ["(\\.(l?hs|x|y\\.pp)(\\.in)?$)", "(\\.(c|h)$)"],
-      "external-json.script": "python .arc-linters/check-cpp.py"
+      "external-json.script": "python3 .arc-linters/check-cpp.py"
     }
   },
 

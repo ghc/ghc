@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # A linter to warn for ASSERT macros which are separated from their argument
 # list by a space, which Clang's CPP barfs on
