@@ -1,7 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE RankNTypes #-}
 
-import Control.Monad (when)
 import Data.Data hiding (Fixity)
 import Data.List
 import Bag
