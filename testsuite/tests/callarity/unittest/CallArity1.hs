@@ -24,9 +24,9 @@ import CoreLint
 import FastString
 
 -- Build IDs. use mkTemplateLocal, more predictable than proper uniques
-go, go2, x, d, n, y, z, scrut :: Id
-[go, go2, x,d, n, y, z, scrut, f] = mkTestIds
-    (words "go go2 x d n y z scrut f")
+go, go2, x, d, n, y, z, scrutf, scruta :: Id
+[go, go2, x,d, n, y, z, scrutf, scruta, f] = mkTestIds
+    (words "go go2 x d n y z scrutf scruta f")
     [ mkFunTys [intTy, intTy] intTy
     , mkFunTys [intTy, intTy] intTy
     , intTy
@@ -34,6 +34,7 @@ go, go2, x, d, n, y, z, scrut :: Id
     , mkFunTys [intTy] intTy
     , intTy
     , intTy
+    , mkFunTys [boolTy] boolTy
     , boolTy
     , mkFunTys [intTy, intTy] intTy -- protoypical external function
     ]
@@ -168,7 +169,7 @@ main = do
         getSessionDynFlags >>= setSessionDynFlags . flip gopt_set Opt_SuppressUniques
         dflags <- getSessionDynFlags
         liftIO $ forM_ exprs $ \(n,e) -> do
-            case lintExpr dflags [f,scrut] e of
+            case lintExpr dflags [f,scrutf,scruta] e of
                 Just msg -> putMsg dflags (msg $$ text "in" <+> text n)
                 Nothing -> return ()
             putMsg dflags (text n <> char ':')
@@ -184,7 +185,7 @@ main = do
 mkLApps :: Id -> [Integer] -> CoreExpr
 mkLApps v = mkApps (Var v) . map mkLit
 
-mkACase = mkIfThenElse (Var scrut)
+mkACase = mkIfThenElse (mkVarApps (Var scrutf) [scruta])
 
 mkTestId :: Int -> String -> Type -> Id
 mkTestId i s ty = mkSysLocal (mkFastString s) (mkBuiltinUnique i) ty

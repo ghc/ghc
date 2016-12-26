@@ -15,7 +15,7 @@ import BasicTypes
 import CoreSyn
 import Id
 import CoreArity ( typeArity )
-import CoreUtils ( exprIsHNF, exprIsTrivial )
+import CoreUtils ( exprIsCheap, exprIsTrivial )
 --import Outputable
 import UnVarGraph
 import Demand
@@ -192,7 +192,7 @@ Using the result: Eta-Expansion
 We use the result of these two analyses to decide whether we can eta-expand the
 rhs of a let-bound variable.
 
-If the variable is already a function (exprIsHNF), and all calls to the
+If the variable is already a function (exprIsCheap), and all calls to the
 variables have a higher arity than the current manifest arity (i.e. the number
 of lambdas), expand.
 
@@ -318,7 +318,7 @@ the analysis of `e2` will not report anything about `x`. To ensure that
 `callArityBind` does still do the right thing we have to take that into account
 everytime we would be lookup up `x` in the analysis result of `e2`.
   * Instead of calling lookupCallArityRes, we return (0, True), indicating
-    that this variable might be called many times with no variables.
+    that this variable might be called many times with no arguments.
   * Instead of checking `calledWith x`, we assume that everything can be called
     with it.
   * In the recursive case, when calclulating the `cross_calls`, if there is
@@ -395,6 +395,17 @@ the case for Core!
     arguments mentioned in the strictness signature.
     See #10176 for a real-world-example.
 
+Note [What is a thunk]
+~~~~~~~~~~~~~~~~~~~~~~
+
+Originally, everything that is not in WHNF (`exprIsWHNF`) is considered a
+thunk, not eta-expanded, to avoid losing any sharing. This is also how the
+published papers on Call Arity describe it.
+
+In practice, there are thunks that do a just little work, such as
+pattern-matching on a variable, and the benefits of eta-expansion likely
+oughtweigh the cost of doing that repeatedly. Therefore, this implementation of
+Call Arity considers everything that is not cheap (`exprIsCheap`) as a thunk.
 -}
 
 -- Main entry point
@@ -533,7 +544,7 @@ callArityBind boring_vars ae_body int (NonRec v rhs)
     --          (vcat [ppr v, ppr ae_body, ppr int, ppr ae_rhs, ppr safe_arity])
     (final_ae, NonRec v' rhs')
   where
-    is_thunk = not (exprIsHNF rhs)
+    is_thunk = not (exprIsCheap rhs) -- see note [What is a thunk]
     -- If v is boring, we will not find it in ae_body, but always assume (0, False)
     boring = v `elemVarSet` boring_vars
 
@@ -603,7 +614,7 @@ callArityBind boring_vars ae_body int b@(Rec binds)
 
             | otherwise
             -- We previously analized this with a different arity (or not at all)
-            = let is_thunk = not (exprIsHNF rhs)
+            = let is_thunk = not (exprIsCheap rhs) -- see note [What is a thunk]
 
                   safe_arity | is_thunk    = 0  -- See Note [Thunks in recursive groups]
                              | otherwise   = new_arity
