@@ -46,8 +46,8 @@ test('divbyzero',
       # do not generate an exception (interrupt) for integer
       # division by zero but the result is undefined.
       # C programs compiled with gcc exit normally, so do we.
-      when(platform('powerpc64-unknown-linux'), exit_code(0)),
-      when(platform('powerpc64le-unknown-linux'), exit_code(0)),
+      when(platform('powerpc64-unknown-linux'), [ignore_stdout, exit_code(0)]),
+      when(platform('powerpc64le-unknown-linux'), [ignore_stdout, exit_code(0)]),
       when(opsys('mingw32'), exit_code(1)),
       # The output under OS X is too unstable to readily compare
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(136)]),

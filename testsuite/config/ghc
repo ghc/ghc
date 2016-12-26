@@ -165,6 +165,9 @@ def get_compiler_info():
     s = re.sub('[\r\n]', '', s)
     rtsInfoDict = dict(eval(s))
 
+    # external interpreter needs RTS linker support
+    config.have_ext_interp = compilerInfoDict["target has RTS linker"] == "YES"
+
     # See Note [Replacing backward slashes in config.libdir].
     config.libdir = compilerInfoDict['LibDir'].replace('\\', '/')
 

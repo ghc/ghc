@@ -78,7 +78,13 @@
 #if defined(dragonfly_HOST_OS)
 #include <sys/tls.h>
 #endif
-
+/*
+   Note [runtime-linker-support]
+   -----------------------------
+   When adding support for a new platform to the runtime linker please
+   update `$TOP/configure.ac` under heading `Does target have runtime
+   linker support?`.
+ */
 /* `symhash` is a Hash table mapping symbol names to RtsSymbolInfo.
    This hashtable will contain information on all symbols
    that we know of, however the .o they are in may not be loaded.
@@ -99,7 +105,7 @@
 
    This is to enable lazy loading of symbols. Eager loading is problematic
    as it means that all symbols must be available, even those which we will
-   never use. This is especially painful of Windows, where the number of
+   never use. This is especially painful on Windows, where the number of
    libraries required to link things like mingwex grows to be quite high.
 
    We proceed through these stages as follows,
@@ -108,12 +114,12 @@
      perform a quick scan/indexing of the ObjectCode. All the work
      required to actually load the ObjectCode is done.
 
-     All symbols from the ObjectCode is also inserted into
+     All symbols from the ObjectCode are also inserted into
      `symhash`, where possible duplicates are handled via the semantics
      described in `ghciInsertSymbolTable`.
 
      This phase will produce ObjectCode with status `OBJECT_LOADED` or `OBJECT_NEEDED`
-     depending on whether they are an archive members or not.
+     depending on whether they are an archive member or not.
 
    * During initialization we load ObjectCode, perform relocations, execute
      static constructors etc. This phase may trigger other ObjectCodes to
@@ -131,10 +137,10 @@
      This phase will produce ObjectCode with status `OBJECT_RESOLVED` if
      the previous status was `OBJECT_NEEDED`.
 
-   * Lookup symbols is used to lookup any symbols required, both during initial
+   * lookupSymbols is used to lookup any symbols required, both during initial
      link and during statement and expression compilations in the REPL.
-     Declaration of e.g. an foreign import, will eventually call lookupSymbol
-     which will either fail (symbol unknown) or succeed (and possibly triggered a
+     Declaration of e.g. a foreign import, will eventually call lookupSymbol
+     which will either fail (symbol unknown) or succeed (and possibly trigger a
      load).
 
      This phase may transition an ObjectCode from `OBJECT_LOADED` to `OBJECT_RESOLVED`

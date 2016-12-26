@@ -9,8 +9,9 @@ def f(name, opts):
 setTestOpts(f)
 setTestOpts(req_interp)
 # TH should work with -fexternal-interpreter too
-setTestOpts(extra_ways(['ext-interp']))
-setTestOpts(only_ways(['normal','ghci','ext-interp']))
+if config.have_ext_interp :
+       setTestOpts(extra_ways(['ext-interp']))
+       setTestOpts(only_ways(['normal','ghci','ext-interp']))
 
 test('TH_mkName', normal, compile, ['-v0'])
 test('TH_1tuple', normal, compile_fail, ['-v0'])

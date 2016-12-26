@@ -262,6 +262,18 @@ AC_ARG_ENABLE(unregisterised,
 )
 AC_SUBST(Unregisterised)
 
+dnl ** Does target have runtime linker support?
+dnl --------------------------------------------------------------
+case "$target" in
+    powerpc64-*|powerpc64le-*|powerpc-ibm-aix*)
+        HaskellHaveRTSLinker=NO
+        ;;
+    *)
+        HaskellHaveRTSLinker=YES
+        ;;
+esac
+AC_SUBST(HaskellHaveRTSLinker)
+
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
 FP_FIND_ROOT
 

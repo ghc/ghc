@@ -192,7 +192,7 @@ else
 ArchSupportsSMP=$(strip $(patsubst $(TargetArch_CPP), YES, $(findstring $(TargetArch_CPP), i386 x86_64 sparc powerpc powerpc64 powerpc64le aarch64)))
 endif
 
-# The THREADED_RTS requites `BaseReg` to be in a register and the
+# The THREADED_RTS requires `BaseReg` to be in a register and the
 # `GhcUnregisterised` mode doesn't allow that.
 GhcWithSMP := $(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
