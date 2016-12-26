@@ -68,7 +68,6 @@ import System.Directory (doesDirectoryExist)
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
-import StaticFlags (discardStaticFlags)
 import Packages
 import Panic (handleGhcException)
 import Module
@@ -410,18 +409,9 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
     parseGhcFlags dynflags = do
       -- TODO: handle warnings?
 
-      -- NOTA BENE: We _MUST_ discard any static flags here, because we cannot
-      -- rely on Haddock to parse them, as it only parses the DynFlags. Yet if
-      -- we pass any, Haddock will fail. Since StaticFlags are global to the
-      -- GHC invocation, there's also no way to reparse/save them to set them
-      -- again properly.
-      --
-      -- This is a bit of a hack until we get rid of the rest of the remaining
-      -- StaticFlags. See GHC issue #8276.
-      let flags' = discardStaticFlags flags
-      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags')
+      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags)
       if not (null rest)
-        then throwE ("Couldn't parse GHC options: " ++ unwords flags')
+        then throwE ("Couldn't parse GHC options: " ++ unwords flags)
         else return dynflags'
 
 -------------------------------------------------------------------------------
