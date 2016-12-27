@@ -9,10 +9,13 @@
 module RnModIface(
     rnModIface,
     rnModExports,
+    tcRnModIface,
+    tcRnModExports,
     ) where
 
 #include "HsVersions.h"
 
+import SrcLoc
 import Outputable
 import HscTypes
 import Module
@@ -21,6 +24,7 @@ import Avail
 import IfaceSyn
 import FieldLabel
 import Var
+import ErrUtils
 
 import Name
 import TcRnMonad
@@ -34,8 +38,38 @@ import DynFlags
 
 import qualified Data.Traversable as T
 
+import Bag
+import Data.IORef
 import NameShape
 import IfaceEnv
+
+tcRnMsgMaybe :: IO (Either ErrorMessages a) -> TcM a
+tcRnMsgMaybe do_this = do
+    r <- liftIO $ do_this
+    case r of
+        Left errs -> do
+            addMessages (emptyBag, errs)
+            failM
+        Right x -> return x
+
+tcRnModIface :: [(ModuleName, Module)] -> Maybe NameShape -> ModIface -> TcM ModIface
+tcRnModIface x y z = do
+    hsc_env <- getTopEnv
+    tcRnMsgMaybe $ rnModIface hsc_env x y z
+
+tcRnModExports :: [(ModuleName, Module)] -> ModIface -> TcM [AvailInfo]
+tcRnModExports x y = do
+    hsc_env <- getTopEnv
+    tcRnMsgMaybe $ rnModExports hsc_env x y
+
+failWithRn :: SDoc -> ShIfM a
+failWithRn doc = do
+    errs_var <- fmap sh_if_errs getGblEnv
+    dflags <- getDynFlags
+    errs <- readTcRef errs_var
+    -- TODO: maybe associate this with a source location?
+    writeTcRef errs_var (errs `snocBag` mkPlainErrMsg dflags noSrcSpan doc)
+    failM
 
 -- | What we have a generalized ModIface, which corresponds to
 -- a module that looks like p[A=<A>]:B.  We need a *specific* ModIface, e.g.
@@ -58,7 +92,7 @@ import IfaceEnv
 -- should be Foo.T; then we'll also rename this (this is used
 -- when loading an interface to merge it into a requirement.)
 rnModIface :: HscEnv -> [(ModuleName, Module)] -> Maybe NameShape
-           -> ModIface -> IO ModIface
+           -> ModIface -> IO (Either ErrorMessages ModIface)
 rnModIface hsc_env insts nsubst iface = do
     initRnIface hsc_env iface insts nsubst $ do
         mod <- rnModule (mi_module iface)
@@ -81,7 +115,7 @@ rnModIface hsc_env insts nsubst iface = do
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
-rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO [AvailInfo]
+rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either ErrorMessages [AvailInfo])
 rnModExports hsc_env insts iface
     = initRnIface hsc_env iface insts Nothing
     $ mapM rnAvailInfo (mi_exports iface)
@@ -94,19 +128,28 @@ rnModExports hsc_env insts iface
 ************************************************************************
 -}
 
--- | Initialize the 'ShIfM' monad.
+-- | Run a computation in the 'ShIfM' monad.
 initRnIface :: HscEnv -> ModIface -> [(ModuleName, Module)] -> Maybe NameShape
-            -> ShIfM a -> IO a
-initRnIface hsc_env iface insts nsubst do_this =
-    let hsubst = listToUFM insts
-        rn_mod = renameHoleModule (hsc_dflags hsc_env) hsubst
+            -> ShIfM a -> IO (Either ErrorMessages a)
+initRnIface hsc_env iface insts nsubst do_this = do
+    errs_var <- newIORef emptyBag
+    let dflags = hsc_dflags hsc_env
+        hsubst = listToUFM insts
+        rn_mod = renameHoleModule dflags hsubst
         env = ShIfEnv {
             sh_if_module = rn_mod (mi_module iface),
             sh_if_semantic_module = rn_mod (mi_semantic_module iface),
             sh_if_hole_subst = listToUFM insts,
-            sh_if_shape = nsubst
+            sh_if_shape = nsubst,
+            sh_if_errs = errs_var
         }
-    in initTcRnIf 'c' hsc_env env () do_this
+    -- Modeled off of 'initTc'
+    res <- initTcRnIf 'c' hsc_env env () $ tryM do_this
+    msgs <- readIORef errs_var
+    case res of
+        Left _                          -> return (Left msgs)
+        Right r | not (isEmptyBag msgs) -> return (Left msgs)
+                | otherwise             -> return (Right r)
 
 -- | Environment for 'ShIfM' monads.
 data ShIfEnv = ShIfEnv {
@@ -123,7 +166,9 @@ data ShIfEnv = ShIfEnv {
         -- the names in the interface.  If this is 'Nothing', then
         -- we just load the target interface and look at the export
         -- list to determine the renaming.
-        sh_if_shape :: Maybe NameShape
+        sh_if_shape :: Maybe NameShape,
+        -- Mutable reference to keep track of errors (similar to 'tcl_errs')
+        sh_if_errs :: IORef ErrorMessages
     }
 
 getHoleSubst :: ShIfM ShHoleSubst
@@ -215,10 +260,21 @@ rnIfaceGlobal n = do
        , isHoleModule m'
       -- NB: this could be Nothing for computeExports, we have
       -- nothing to say.
-      -> do fmap (case mb_nsubst of
-                   Nothing -> id
-                   Just nsubst -> substNameShape nsubst)
-                $ setNameModule (Just m') n
+      -> do n' <- setNameModule (Just m') n
+            case mb_nsubst of
+                Nothing -> return n'
+                Just nsubst ->
+                    case maybeSubstNameShape nsubst n' of
+                        -- TODO: would love to have context
+                        -- TODO: This will give an unpleasant message if n'
+                        -- is a constructor; then we'll suggest adding T
+                        -- but it won't work.
+                        Nothing -> failWithRn $ vcat [
+                            text "The identifier" <+> ppr (occName n') <+>
+                                text "does not exist in the local signature.",
+                            parens (text "Try adding it to the export list of the hsig file.")
+                            ]
+                        Just n'' -> return n''
        -- Fastpath: we are renaming p[H=<H>]:A.T, in which case the
        -- export list is irrelevant.
        | not (isHoleModule m)
@@ -239,7 +295,14 @@ rnIfaceGlobal n = do
             iface <- liftIO . initIfaceCheck (text "rnIfaceGlobal") hsc_env
                             $ loadSysInterface (text "rnIfaceGlobal") m''
             let nsubst = mkNameShape (moduleName m) (mi_exports iface)
-            return (substNameShape nsubst n)
+            case maybeSubstNameShape nsubst n of
+                Nothing -> failWithRn $ vcat [
+                    text "The identifier" <+> ppr (occName n) <+>
+                        -- NB: report m' because it's more user-friendly
+                        text "does not exist in the signature for" <+> ppr m',
+                    parens (text "Try adding it to the export list in that hsig file.")
+                    ]
+                Just n' -> return n'
 
 -- | Rename a DFun name. Here is where we ensure that DFuns have the correct
 -- module as described in Note [Bogus DFun renamings].

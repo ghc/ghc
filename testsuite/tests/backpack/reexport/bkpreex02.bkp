@@ -10,7 +10,7 @@ unit timpl where
 unit q where
     dependency timpl
     dependency p[H=<H>,T=<T>]
-    signature T(T) where
+    signature T(module T, T) where
         import TImpl
     module A where
         import H

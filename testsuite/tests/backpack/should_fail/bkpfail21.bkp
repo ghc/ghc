@@ -1,12 +1,12 @@
 unit p where
     signature A where
         data T
-    signature C(T) where
+    signature C(module C, T) where
         import A
 unit q where
     signature B where
         data T
-    signature C(T) where
+    signature C(module C, T) where
         import B
 unit r where
     dependency p[A=<H1>,C=<H3>]

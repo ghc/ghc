@@ -1,0 +1,14 @@
+[1 of 4] Processing sig
+  [1 of 1] Compiling A[sig]           ( sig/A.hsig, nothing )
+[2 of 4] Processing blub
+  [1 of 2] Compiling A[sig]           ( blub/A.hsig, nothing )
+  [2 of 2] Compiling M                ( blub/M.hs, nothing )
+[3 of 4] Processing impl
+  Instantiating impl
+  [1 of 1] Compiling A                ( impl/A.hs, bkp43.out/impl/A.o )
+[4 of 4] Processing all
+  Instantiating all
+  [1 of 1] Including blub[A=impl:A]
+    Instantiating blub[A=impl:A]
+    [1 of 2] Compiling A[sig]           ( blub/A.hsig, bkp43.out/blub/blub-EMBMWyCjWt1EWXmIjSqmRG/A.o )
+    [2 of 2] Compiling M                ( blub/M.hs, bkp43.out/blub/blub-EMBMWyCjWt1EWXmIjSqmRG/M.o )

@@ -17,6 +17,7 @@ module TcBackpack (
 ) where
 
 import Packages
+import TcRnExports
 import DynFlags
 import HsSyn
 import RdrName
@@ -46,6 +47,7 @@ import FastString
 import Maybes
 import TcEnv
 import Var
+import IfaceSyn
 import PrelNames
 import qualified Data.Map as Map
 
@@ -311,17 +313,41 @@ tcRnCheckUnitId hsc_env uid =
 
 -- | Top-level driver for signature merging (run after typechecking
 -- an @hsig@ file).
-tcRnMergeSignatures :: HscEnv -> RealSrcSpan -> ModIface
+tcRnMergeSignatures :: HscEnv -> RealSrcSpan -> HsParsedModule -> ModIface
                     -> IO (Messages, Maybe TcGblEnv)
-tcRnMergeSignatures hsc_env real_loc iface =
+tcRnMergeSignatures hsc_env real_loc hsmod iface =
   withTiming (pure dflags)
              (text "Signature merging" <+> brackets (ppr this_mod))
              (const ()) $
   initTc hsc_env HsigFile False this_mod real_loc $
-    mergeSignatures iface
+    mergeSignatures hsmod iface
  where
   dflags   = hsc_dflags hsc_env
   this_mod = mi_module iface
+
+thinModIface :: [AvailInfo] -> ModIface -> ModIface
+thinModIface avails iface =
+    iface {
+        mi_exports = avails,
+        -- mi_fixities = ...,
+        -- mi_warns = ...,
+        -- mi_anns = ...,
+        -- TODO: The use of nameOccName here is a bit dodgy, because
+        -- perhaps there might be two IfaceTopBndr that are the same
+        -- OccName but different Name.  Requires better understanding
+        -- of invariants here.
+        mi_decls = filter (decl_pred . snd) (mi_decls iface)
+        -- mi_insts = ...,
+        -- mi_fam_insts = ...,
+    }
+  where
+    occs = mkOccSet [ occName n
+                    | a <- avails
+                    , n <- availNames a ]
+    -- NB: Never drop DFuns
+    decl_pred IfaceId{ ifIdDetails = IfDFunId } = True
+    decl_pred decl =
+        nameOccName (ifName decl) `elemOccSet` occs
 
 -- Note [Blank hsigs for all requirements]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -336,8 +362,8 @@ tcRnMergeSignatures hsc_env real_loc iface =
 -- from 'requirementMerges' into this signature, producing
 -- a final 'TcGblEnv' that matches the local signature and
 -- all required signatures.
-mergeSignatures :: ModIface -> TcRn TcGblEnv
-mergeSignatures lcl_iface0 = do
+mergeSignatures :: HsParsedModule -> ModIface -> TcRn TcGblEnv
+mergeSignatures hsmod lcl_iface0 = do
     -- The lcl_iface0 is the ModIface for the local hsig
     -- file, which is guaranteed to exist, see
     -- Note [Blank hsigs for all requirements]
@@ -346,41 +372,68 @@ mergeSignatures lcl_iface0 = do
     tcg_env <- getGblEnv
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
+        mb_exports = hsmodExports (unLoc (hpm_module hsmod))
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
     let reqs = requirementMerges dflags (moduleName (tcg_mod tcg_env))
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
-    ireq_ifaces <- forM reqs $ \(IndefModule iuid mod_name) ->
+    ireq_ifaces0 <- forM reqs $ \(IndefModule iuid mod_name) ->
            fmap fst
          . withException
          . flip (findAndReadIface (text "mergeSignatures")) False
          $ fst (splitModuleInsts (mkModule (IndefiniteUnitId iuid) mod_name))
 
     -- STEP 3: Get the unrenamed exports of all these interfaces, and
-    -- dO shaping on them.
+    -- do shaping on them.
     let extend_ns nsubst as = liftIO $ extendNameShape hsc_env nsubst as
-        gen_subst nsubst ((IndefModule iuid _), ireq_iface) = do
+        gen_subst (nsubst,ifaces) (imod@(IndefModule iuid _), ireq_iface) = do
             let insts = indefUnitIdInsts iuid
-            as1 <- liftIO $ rnModExports hsc_env insts ireq_iface
-            mb_r <- extend_ns nsubst as1
+            as1 <- tcRnModExports insts ireq_iface
+            let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
+                pkg = getInstalledPackageDetails dflags inst_uid
+                rdr_env = mkGlobalRdrEnv (gresFromAvails Nothing as1)
+            (thinned_iface, as2) <- case mb_exports of
+                    Just (L loc _)
+                      | null (exposedModules pkg) -> setSrcSpan loc $ do
+                        -- Suppress missing errors; we'll pick em up
+                        -- when we test exports on the final thing
+                        (msgs, mb_r) <- tryTc $
+                            setGblEnv tcg_env {
+                                tcg_rdr_env = rdr_env
+                            } $ exports_from_avail mb_exports rdr_env
+                                    (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
+                        case mb_r of
+                            Just (_, as2) -> return (thinModIface as2 ireq_iface, as2)
+                            Nothing -> addMessages msgs >> failM
+                    _ -> return (ireq_iface, as1)
+            mb_r <- extend_ns nsubst as2
             case mb_r of
                 Left err -> failWithTc err
-                Right nsubst' -> return nsubst'
+                Right nsubst' -> return (nsubst',(imod, thinned_iface):ifaces)
         nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports lcl_iface0)
-    nsubst <- foldM gen_subst nsubst0 (zip reqs ireq_ifaces)
-    let exports = nameShapeExports nsubst
-    tcg_env <- return tcg_env {
-        tcg_rdr_env = mkGlobalRdrEnv (gresFromAvails Nothing exports),
+    (nsubst, rev_thinned_ifaces) <- foldM gen_subst (nsubst0, []) (zip reqs ireq_ifaces0)
+    let thinned_ifaces = reverse rev_thinned_ifaces
+        exports        = nameShapeExports nsubst
+        rdr_env        = mkGlobalRdrEnv (gresFromAvails Nothing exports)
+    setGblEnv tcg_env {
+        tcg_rdr_env = rdr_env,
         tcg_exports = exports,
         tcg_dus     = usesOnly (availsToNameSetWithSelectors exports)
-        }
+        } $ do
+    tcg_env <- getGblEnv
+
+    -- Make sure we didn't refer to anything that doesn't actually exist
+    _ <- exports_from_avail mb_exports rdr_env
+                        (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
+
+    failIfErrsM
 
     -- STEP 4: Rename the interfaces
-    ext_ifaces <- forM (zip reqs ireq_ifaces) $ \((IndefModule iuid _), ireq_iface) ->
-        liftIO (rnModIface hsc_env (indefUnitIdInsts iuid) (Just nsubst) ireq_iface)
-    lcl_iface <- liftIO $ rnModIface hsc_env (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
+    ext_ifaces <- forM thinned_ifaces $ \((IndefModule iuid _), ireq_iface) ->
+        tcRnModIface (indefUnitIdInsts iuid) (Just nsubst) ireq_iface
+    lcl_iface <- tcRnModIface (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
 
     -- STEP 5: Typecheck the interfaces
@@ -591,8 +644,7 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
     failIfErrsM
 
     -- STEP 4: Now that the export is complete, rename the interface...
-    hsc_env <- getTopEnv
-    sig_iface <- liftIO $ rnModIface hsc_env insts (Just nsubst) isig_iface
+    sig_iface <- tcRnModIface insts (Just nsubst) isig_iface
 
     -- STEP 5: ...and typecheck it.  (Note that in both cases, the nsubst
     -- lets us determine how top-level identifiers should be handled.)

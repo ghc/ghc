@@ -10,7 +10,7 @@ unit p where
     -- Known bug: GHC will not eagerly report an error here although
     -- it could, if it more aggressively checked for type-compatibility
     -- when a hole gets resolved
-    signature H(T(..)) where
+    signature H(module H, T(..)) where
         import T
 unit h-impl where
     dependency t-impl

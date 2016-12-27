@@ -7,5 +7,5 @@
 
 bkpfail29.bkp:8:9: error:
     Cycle in type synonym declarations:
-      bkpfail29.bkp:8:9-18: {A.S} from external module
-      bkpfail29.bkp:7:9-14: {A.T} from external module
+      bkpfail29.bkp:8:9-18: S from external module
+      bkpfail29.bkp:7:9-14: T from external module

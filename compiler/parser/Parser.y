@@ -643,7 +643,12 @@ unitdecl :: { LHsUnitDecl PackageName }
              { sL1 $2 $ DeclD SignatureD $3 Nothing }
         | 'dependency' unitid mayberns
              { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $2
-                                              , idModRenaming = $3 }) }
+                                              , idModRenaming = $3
+                                              , idSignatureInclude = False }) }
+        | 'dependency' 'signature' unitid
+             { sL1 $1 $ IncludeD (IncludeDecl { idUnitId = $3
+                                              , idModRenaming = Nothing
+                                              , idSignatureInclude = True }) }
 
 -----------------------------------------------------------------------------
 -- Module Header

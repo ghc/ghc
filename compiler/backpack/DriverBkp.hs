@@ -104,11 +104,20 @@ computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])
     reqs = uniqDSetToList (unionManyUniqDSets (map (get_reqs . unLoc) (hsunitBody unit)))
     get_reqs (DeclD SignatureD (L _ modname) _) = unitUniqDSet modname
     get_reqs (DeclD ModuleD _ _) = emptyUniqDSet
-    get_reqs (IncludeD (IncludeDecl (L _ hsuid) _)) =
+    get_reqs (IncludeD (IncludeDecl (L _ hsuid) _ _)) =
         unitIdFreeHoles (convertHsUnitId hsuid)
 
 -- | Tiny enum for all types of Backpack operations we may do.
-data SessionType = ExeSession | TcSession | CompSession
+data SessionType
+    -- | A compilation operation which will result in a
+    -- runnable executable being produced.
+    = ExeSession
+    -- | A type-checking operation which produces only
+    -- interface files, no object files.
+    | TcSession
+    -- | A compilation operation which produces both
+    -- interface files and object files.
+    | CompSession
     deriving (Eq)
 
 -- | Create a temporary Session to do some sort of type checking or
@@ -208,11 +217,19 @@ compileUnit cid insts = do
     lunit <- getSource cid
     buildUnit CompSession cid insts lunit
 
--- Invariant: this NEVER returns InstalledUnitId
-hsunitDeps :: HsUnit HsComponentId -> [(UnitId, ModRenaming)]
-hsunitDeps unit = concatMap get_dep (hsunitBody unit)
+-- | Compute the dependencies with instantiations of a syntactic
+-- HsUnit; e.g., wherever you see @dependency p[A=<A>]@ in a
+-- unit file, return the 'UnitId' corresponding to @p[A=<A>]@.
+-- The @include_sigs@ parameter controls whether or not we also
+-- include @dependency signature@ declarations in this calculation.
+--
+-- Invariant: this NEVER returns InstalledUnitId.
+hsunitDeps :: Bool {- include sigs -} -> HsUnit HsComponentId -> [(UnitId, ModRenaming)]
+hsunitDeps include_sigs unit = concatMap get_dep (hsunitBody unit)
   where
-    get_dep (L _ (IncludeD (IncludeDecl (L _ hsuid) mb_lrn))) = [(convertHsUnitId hsuid, go mb_lrn)]
+    get_dep (L _ (IncludeD (IncludeDecl (L _ hsuid) mb_lrn is_sig)))
+        | include_sigs || not is_sig = [(convertHsUnitId hsuid, go mb_lrn)]
+        | otherwise = []
       where
         go Nothing = ModRenaming True []
         go (Just lrns) = ModRenaming False (map convRn lrns)
@@ -223,7 +240,11 @@ hsunitDeps unit = concatMap get_dep (hsunitBody unit)
 
 buildUnit :: SessionType -> ComponentId -> [(ModuleName, Module)] -> LHsUnit HsComponentId -> BkpM ()
 buildUnit session cid insts lunit = do
-    let deps_w_rns = hsunitDeps (unLoc lunit)
+    -- NB: include signature dependencies ONLY when typechecking.
+    -- If we're compiling, it's not necessary to recursively
+    -- compile a signature since it isn't going to produce
+    -- any object files.
+    let deps_w_rns = hsunitDeps (session == TcSession) (unLoc lunit)
         raw_deps = map fst deps_w_rns
     dflags <- getDynFlags
     -- The compilation dependencies are just the appropriately filled
@@ -273,11 +294,7 @@ buildUnit session cid insts lunit = do
             obj_files = concatMap getOfiles linkables
 
         let compat_fs = (case cid of ComponentId fs -> fs)
-            cand_compat_pn = PackageName compat_fs
-            compat_pn = case session of
-                            TcSession -> cand_compat_pn
-                            _ | [] <- insts -> cand_compat_pn
-                              | otherwise -> PackageName compat_fs
+            compat_pn = PackageName compat_fs
 
         return InstalledPackageInfo {
             -- Stub data
@@ -336,7 +353,7 @@ buildUnit session cid insts lunit = do
 compileExe :: LHsUnit HsComponentId -> BkpM ()
 compileExe lunit = do
     msgUnitId mainUnitId
-    let deps_w_rns = hsunitDeps (unLoc lunit)
+    let deps_w_rns = hsunitDeps False (unLoc lunit)
         deps = map fst deps_w_rns
         -- no renaming necessary
     forM_ (zip [1..] deps) $ \(i, dep) ->
@@ -562,7 +579,8 @@ renameHsUnits dflags m units = map (fmap renameHsUnit) units
     renameHsUnitDecl (IncludeD idecl) =
         IncludeD IncludeDecl {
             idUnitId = fmap renameHsUnitId (idUnitId idecl),
-            idModRenaming = idModRenaming idecl
+            idModRenaming = idModRenaming idecl,
+            idSignatureInclude = idSignatureInclude idecl
         }
 
     renameHsUnitId :: HsUnitId PackageName -> HsUnitId HsComponentId
@@ -713,7 +731,9 @@ hsModuleToModSummary :: PackageName
                      -> Located (HsModule RdrName)
                      -> BkpM ModSummary
 hsModuleToModSummary pn hsc_src modname
-                     hsmod@(L loc (HsModule _ _ imps _ _ _)) = do
+                     hsmod = do
+    let imps = hsmodImports (unLoc hsmod)
+        loc  = getLoc hsmod
     hsc_env <- getSession
     -- Sort of the same deal as in DriverPipeline's getLocation
     -- Use the PACKAGE NAME to find the location

@@ -15,10 +15,13 @@ unit p where
         class Eq a => Bloop a b | a -> b where
             data GMap a (v :: * -> *) :: *
             xa :: a -> a -> Bool
-            xa = (==)
+            -- TODO: Putting default definitions in the signature file
+            -- causes references to DFuns, which we choke on. These should
+            -- be disallowed.
+            -- xa = (==)
             y :: a -> a -> Ordering
-            default y :: Ord a => a -> a -> Ordering
-            y = compare
+            -- default y :: Ord a => a -> a -> Ordering
+            -- y = compare
             {-# MINIMAL xa | y #-}
         -- type instance Elem Int = Bool
         -- pattern Blub n = ("foo", n)
@@ -37,10 +40,10 @@ unit q where
         class Eq a => Bloop a b | a -> b where
             data GMap a (v :: * -> *) :: *
             xa :: a -> a -> Bool
-            xa = (==)
+            -- xa = (==)
             y :: a -> a -> Ordering
-            default y :: Ord a => a -> a -> Ordering
-            y = compare
+            -- default y :: Ord a => a -> a -> Ordering
+            -- y = compare
             {-# MINIMAL xa | y #-}
         -- type instance Elem Int = Bool
         -- pattern Blub n = ("foo", n)
@@ -73,10 +76,10 @@ unit h-impl where
         class Eq a => Bloop a b | a -> b where
             data GMap a (v :: * -> *) :: *
             xa :: a -> a -> Bool
-            xa = (==)
+            -- xa = (==)
             y :: a -> a -> Ordering
-            default y :: Ord a => a -> a -> Ordering
-            y = compare
+            -- default y :: Ord a => a -> a -> Ordering
+            -- y = compare
             {-# MINIMAL xa | y #-}
 unit s where
     dependency r[H=h-impl:H]

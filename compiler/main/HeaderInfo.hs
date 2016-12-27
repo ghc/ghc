@@ -74,8 +74,10 @@ getImports dflags buf filename source_filename = do
         then throwIO $ mkSrcErr errs
         else
           case rdr_module of
-            L _ (HsModule mb_mod _ imps _ _ _) ->
+            L _ hsmod ->
               let
+                mb_mod = hsmodName hsmod
+                imps = hsmodImports hsmod
                 main_loc = srcLocSpan (mkSrcLoc (mkFastString source_filename) 1 1)
                 mod = mb_mod `orElse` L main_loc mAIN_NAME
                 (src_idecls, ord_idecls) = partition (ideclSource.unLoc) imps

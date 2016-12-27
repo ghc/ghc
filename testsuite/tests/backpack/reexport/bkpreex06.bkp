@@ -1,7 +1,7 @@
 unit p where
     signature A1 where
         data A = A { foo :: Int, bar :: Bool }
-    signature A2(foo) where
+    signature A2(module A2, foo) where
         import A1(foo)
 unit q where
     signature A2 where

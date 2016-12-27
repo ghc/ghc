@@ -1,0 +1,10 @@
+unit p where
+    signature A where
+        data T
+        x :: Bool
+    signature B where
+        import A
+        y :: T
+unit q where
+    dependency signature p[A=<A>,B=<B>]
+    signature A (x) where

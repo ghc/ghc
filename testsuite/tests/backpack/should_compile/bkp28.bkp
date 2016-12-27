@@ -3,7 +3,7 @@ unit i where
         data I = I
 unit p where
     dependency i
-    signature A(I,f,g) where
+    signature A(module A, I) where
         import I
         f :: I -> I
         g :: I

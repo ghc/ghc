@@ -1,0 +1,10 @@
+[1 of 2] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B[sig]           ( p/B.hsig, nothing )
+[2 of 2] Processing q
+  [1 of 2] Compiling A[sig]           ( q/A.hsig, nothing )
+  [2 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
+
+<no location info>: error:
+    The identifier T does not exist in the signature for <A>
+    (Try adding it to the export list in that hsig file.)

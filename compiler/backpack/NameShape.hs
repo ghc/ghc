@@ -7,6 +7,7 @@ module NameShape(
     extendNameShape,
     nameShapeExports,
     substNameShape,
+    maybeSubstNameShape,
     ) where
 
 #include "HsVersions.h"
@@ -133,6 +134,15 @@ substNameShape ns n | nameModule n == ns_module ns
                     = n'
                     | otherwise
                     = n
+
+-- | Like 'substNameShape', but returns @Nothing@ if no substitution
+-- works.
+maybeSubstNameShape :: NameShape -> Name -> Maybe Name
+maybeSubstNameShape ns n
+    | nameModule n == ns_module ns
+    = lookupOccEnv (ns_map ns) (occName n)
+    | otherwise
+    = Nothing
 
 -- | The 'Module' of any 'Name's a 'NameShape' has action over.
 ns_module :: NameShape -> Module

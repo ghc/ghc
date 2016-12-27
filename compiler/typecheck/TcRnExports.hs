@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
-module TcRnExports (tcRnExports) where
+module TcRnExports (tcRnExports, exports_from_avail) where
 
 import HsSyn
 import PrelNames
@@ -115,7 +115,8 @@ tcRnExports :: Bool       -- False => no 'module M(..) where' header at all
 tcRnExports explicit_mod exports
           tcg_env@TcGblEnv { tcg_mod     = this_mod,
                               tcg_rdr_env = rdr_env,
-                              tcg_imports = imports }
+                              tcg_imports = imports,
+                              tcg_src     = hsc_src }
  = unsetWOptM Opt_WarnWarningsDeprecations $
        -- Do not report deprecations arising from the export
        -- list, to avoid bleating about re-exporting a deprecated
@@ -136,8 +137,14 @@ tcRnExports explicit_mod exports
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
 
+        ; let do_it = exports_from_avail real_exports rdr_env imports this_mod
         ; (rn_exports, final_avails)
-            <- exports_from_avail real_exports rdr_env imports this_mod
+            <- if hsc_src == HsigFile
+                then do (msgs, mb_r) <- tryTc do_it
+                        case mb_r of
+                            Just r  -> return r
+                            Nothing -> addMessages msgs >> failM
+                else checkNoErrs $ do_it
         ; let final_ns     = availsToNameSetWithSelectors final_avails
 
         ; traceRn "rnExports: Exports:" (ppr final_avails)
@@ -185,7 +192,7 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
   = do ExportAccum ie_names _ exports
-        <-  checkNoErrs $ foldAndRecoverM do_litem emptyExportAccum rdr_items
+        <-  foldAndRecoverM do_litem emptyExportAccum rdr_items
        let final_exports = nubAvails exports -- Combine families
        return (Just ie_names, final_exports)
   where

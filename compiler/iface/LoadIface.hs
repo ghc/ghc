@@ -75,6 +75,7 @@ import RnModIface
 import UniqDSet
 
 import Control.Monad
+import Control.Exception
 import Data.IORef
 import System.FilePath
 
@@ -540,8 +541,12 @@ computeInterface doc_str hi_boot_file mod0 = do
             case r of
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
-                    r <- liftIO (rnModIface hsc_env (indefUnitIdInsts (indefModuleUnitId indef)) Nothing iface0)
-                    return (Succeeded (r, path))
+                    r <- liftIO $
+                        rnModIface hsc_env (indefUnitIdInsts (indefModuleUnitId indef))
+                                   Nothing iface0
+                    case r of
+                        Right x -> return (Succeeded (x, path))
+                        Left errs -> liftIO . throwIO . mkSrcErr $ errs
                 Failed err -> return (Failed err)
         (mod, _) ->
             findAndReadIface doc_str mod hi_boot_file
