@@ -174,5 +174,5 @@ T12877:
 T13025:
 	$(RM) -f T13025.o T13025.hi T13025a.o T13025a.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025a.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025.hs -ddump-simpl | grep HEq_sc | wc
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025.hs -ddump-simpl | grep -c HEq_sc
 	# No lines should match 'HEq_sc' so wc should output zeros
