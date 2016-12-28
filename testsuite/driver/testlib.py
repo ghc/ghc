@@ -16,6 +16,7 @@ import time
 import datetime
 import copy
 import glob
+import sys
 from math import ceil, trunc
 import collections
 import subprocess
@@ -823,14 +824,14 @@ def do_test(name, way, func, args, files):
                     dst.write(makefile)
 
     if opts.pre_cmd:
-        exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, opts.pre_cmd))
+        exit_code = runCmd('cd "{0}" && {1}'.format(opts.testdir, override_options(opts.pre_cmd)),
+                           stderr = subprocess.STDOUT,
+                           print_output = config.verbose >= 3)
+
         if exit_code != 0:
             framework_fail(name, way, 'pre_cmd failed: {0}'.format(exit_code))
 
-    try:
-        result = func(*[name,way] + args)
-    except Exception:
-        pass
+    result = func(*[name,way] + args)
 
     if opts.expect not in ['pass', 'fail', 'missing-lib']:
         framework_fail(name, way, 'bad expected ' + opts.expect)
@@ -866,6 +867,18 @@ def do_test(name, way, func, args, files):
     else:
         framework_fail(name, way, 'bad result ' + passFail)
 
+# Make is often invoked with -s, which means if it fails, we get
+# no feedback at all. This is annoying. So let's remove the option
+# if found and instead have the testsuite decide on what to do
+# with the output.
+def override_options(pre_cmd):
+    if config.verbose >= 4 and bool(re.match('\$make', pre_cmd, re.I)):
+        return pre_cmd.replace('-s'      , '') \
+                      .replace('--silent', '') \
+                      .replace('--quiet' , '')
+
+    return pre_cmd
+
 def framework_fail(name, way, reason):
     opts = getTestOpts()
     directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
@@ -899,7 +912,7 @@ def failBecause(reason, tag=None):
 # run_command.
 
 def run_command( name, way, cmd ):
-    return simple_run( name, '', cmd, '' )
+    return simple_run( name, '', override_options(cmd), '' )
 
 # -----------------------------------------------------------------------------
 # GHCi tests
@@ -1230,7 +1243,7 @@ def simple_run(name, way, prog, extra_run_opts):
     # check the exit code
     if exit_code != opts.exit_code:
         if config.verbose >= 1 and _expect_pass(way):
-            print('Wrong exit code (expected', opts.exit_code, ', actual', exit_code, ')')
+            print('Wrong exit code for ' + name + '(' + way + ')' + '(expected', opts.exit_code, ', actual', exit_code, ')')
             dump_stdout(name)
             dump_stderr(name)
         return failBecause('bad exit code')
@@ -1317,7 +1330,7 @@ def interpreter_run(name, way, extra_hc_opts, top_mod):
 
     # check the exit code
     if exit_code != getTestOpts().exit_code:
-        print('Wrong exit code (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
+        print('Wrong exit code for ' + name + '(' + way + ') (expected', getTestOpts().exit_code, ', actual', exit_code, ')')
         dump_stdout(name)
         dump_stderr(name)
         return failBecause('bad exit code')
@@ -1375,9 +1388,11 @@ def stdout_ok(name, way):
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
-   print('Stdout:')
-   with open(in_testdir(name, 'run.stdout')) as f:
-       print(f.read())
+    with open(in_testdir(name, 'run.stdout')) as f:
+        str = f.read().strip()
+        if str:
+            print("Stdout (", name, "):")
+            print(str)
 
 def stderr_ok(name, way):
    actual_stderr_file = add_suffix(name, 'run.stderr')
@@ -1389,9 +1404,11 @@ def stderr_ok(name, way):
                           whitespace_normaliser=normalise_whitespace)
 
 def dump_stderr( name ):
-   print("Stderr:")
-   with open(in_testdir(name, 'run.stderr')) as f:
-       print(f.read())
+    with open(in_testdir(name, 'run.stderr')) as f:
+        str = f.read().strip()
+        if str:
+            print("Stderr (", name, "):")
+            print(str)
 
 def read_no_crs(file):
     str = ''
@@ -1522,14 +1539,16 @@ def compare_outputs(way, kind, normaliser, expected_file, actual_file,
 
         if config.verbose >= 1 and _expect_pass(way):
             # See Note [Output comparison].
-            r = os.system('diff -uw "{0}" "{1}"'.format(expected_normalised_path,
-                                                        actual_normalised_path))
+            r = runCmd('diff -uw "{0}" "{1}"'.format(expected_normalised_path,
+                                                        actual_normalised_path),
+                        print_output = 1)
 
             # If for some reason there were no non-whitespace differences,
             # then do a full diff
             if r == 0:
-                r = os.system('diff -u "{0}" "{1}"'.format(expected_normalised_path,
-                                                           actual_normalised_path))
+                r = runCmd('diff -u "{0}" "{1}"'.format(expected_normalised_path,
+                                                           actual_normalised_path),
+                           print_output = 1)
 
         if config.accept and (getTestOpts().expect == 'fail' or
                               way in getTestOpts().expect_fail_for):
@@ -1607,18 +1626,30 @@ def normalise_errmsg( str ):
     #    hacky solution is used in place of more sophisticated filename
     #    mangling
     str = re.sub('([^\\s])\\.exe', '\\1', str)
+
     # normalise slashes, minimise Windows/Unix filename differences
     str = re.sub('\\\\', '/', str)
+
     # The inplace ghc's are called ghc-stage[123] to avoid filename
     # collisions, so we need to normalise that to just "ghc"
     str = re.sub('ghc-stage[123]', 'ghc', str)
+
     # Error messages simetimes contain integer implementation package
     str = re.sub('integer-(gmp|simple)-[0-9.]+', 'integer-<IMPL>-<VERSION>', str)
+
     # Also filter out bullet characters.  This is because bullets are used to
     # separate error sections, and tests shouldn't be sensitive to how the
     # the division happens.
     bullet = '•'.encode('utf8') if isinstance(str, bytes) else '•'
     str = str.replace(bullet, '')
+
+    # Windows only, this is a bug in hsc2hs but it is preventing
+    # stable output for the testsuite. See Trac #9775. For now we filter out this
+    # warning message to get clean output.
+    if config.msys:
+        str = re.sub('Failed to remove file (.*); error= (.*)$', '', str)
+        str = re.sub('DeleteFile "(.+)": permission denied \(Access is denied\.\)(.*)$', '', str)
+
     return str
 
 # normalise a .prof file, so that we can reasonably compare it against
@@ -1723,7 +1754,7 @@ def if_verbose_dump( n, f ):
         except Exception:
             print('')
 
-def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
+def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, print_output=0):
     timeout_prog = strip_quotes(config.timeout_prog)
     timeout = str(int(ceil(config.timeout * timeout_multiplier)))
 
@@ -1762,22 +1793,20 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0):
                              stderr=hStdErr)
 
         stdout_buffer, stderr_buffer = r.communicate(stdin_buffer)
-    except Exception as e:
-        traceback.print_exc()
-        framework_fail(name, way, str(e))
     finally:
-        try:
-            if stdout:
-                with io.open(stdout, 'ab') as f:
-                    f.write(stdout_buffer)
-            if stderr:
-                if stderr is not subprocess.STDOUT:
-                    with io.open(stderr, 'ab') as f:
-                        f.write(stderr_buffer)
+        if config.verbose >= 1 and print_output >= 1:
+            if stdout_buffer:
+                sys.stdout.buffer.write(stdout_buffer)
+            if stderr_buffer:
+                sys.stderr.buffer.write(stderr_buffer)
 
-        except Exception as e:
-            traceback.print_exc()
-            framework_fail(name, way, str(e))
+        if stdout:
+            with io.open(stdout, 'ab') as f:
+                f.write(stdout_buffer)
+        if stderr:
+            if stderr is not subprocess.STDOUT:
+                with io.open(stderr, 'ab') as f:
+                    f.write(stderr_buffer)
 
     if r.returncode == 98:
         # The python timeout program uses 98 to signal that ^C was pressed
@@ -1865,16 +1894,25 @@ def find_expected_file(name, suff):
 if config.msys:
     import stat
     def cleanup():
+        testdir = getTestOpts().testdir
+
         def on_error(function, path, excinfo):
             # At least one test (T11489) removes the write bit from a file it
             # produces. Windows refuses to delete read-only files with a
             # permission error. Try setting the write bit and try again.
             if excinfo[1].errno == 13:
                 os.chmod(path, stat.S_IWRITE)
-                os.unlink(path)
+                function(path)
 
-        testdir = getTestOpts().testdir
         shutil.rmtree(testdir, ignore_errors=False, onerror=on_error)
+
+        if os.path.exists(testdir):
+            # And now we try to cleanup the folder again, since the above
+            # Would have removed the problematic file(s), but not the folder.
+            # The onerror doesn't seem to be raised during the tree walk, only
+            # afterwards to report the failures.
+            # See https://bugs.python.org/issue8523 and https://bugs.python.org/issue19643
+            shutil.rmtree(testdir, ignore_errors=False)
 else:
     def cleanup():
         testdir = getTestOpts().testdir
