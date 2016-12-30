@@ -459,8 +459,21 @@ mergeSignatures hsmod lcl_iface0 = do
     tcg_env <- getGblEnv
 
     -- Make sure we didn't refer to anything that doesn't actually exist
-    _ <- exports_from_avail mb_exports rdr_env
+    (mb_lies, _) <- exports_from_avail mb_exports rdr_env
                         (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
+
+    -- If you tried to explicitly export an identifier that has a warning
+    -- attached to it, that's probably a mistake.  Warn about it.
+    case mb_lies of
+      Nothing -> return ()
+      Just lies ->
+        forM_ (concatMap (\(L loc x) -> map (L loc) (ieNames x)) lies) $ \(L loc n) ->
+          setSrcSpan loc $
+            unless (nameOccName n `elemOccSet` ok_to_use) $
+                addWarn NoReason $ vcat [
+                    text "Exported identifier" <+> quotes (ppr n) <+> text "will cause warnings if used.",
+                    parens (text "To suppress this warning, remove" <+> quotes (ppr n) <+> text "from the export list of this signature.")
+                    ]
 
     failIfErrsM
 
