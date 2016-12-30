@@ -67,6 +67,7 @@ stage0Packages = do
              , ghcBoot
              , ghcBootTh
              , ghcCabal
+             , ghci
              , ghcPkg
              , hsc2hs
              , hoopl
