@@ -7,3 +7,7 @@
 [3 of 3] Processing q
   [1 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
   [2 of 2] Compiling Q                ( q/Q.hs, nothing )
+
+bkp36.bkp:20:16: warning: [-Wdeprecations (in -Wdefault)]
+    In the use of type constructor or class ‘T’ (imported from B):
+    "Inherited requirements from non-signature libraries (libraries with modules) should not be used, as this mode of use is not compatible with PVP-style version bounds.  Instead, copy the declaration to the local hsig file or move the signature to a library of its own and add that library as a dependency."

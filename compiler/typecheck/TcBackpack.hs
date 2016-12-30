@@ -16,6 +16,7 @@ module TcBackpack (
     instantiateSignature,
 ) where
 
+import BasicTypes (StringLiteral(..), SourceText(..))
 import Packages
 import TcRnExports
 import DynFlags
@@ -358,6 +359,16 @@ thinModIface avails iface =
 -- the wheels of recompilation avoidance which assumes that
 -- source files always exist.
 
+inheritedSigPvpWarning :: WarningTxt
+inheritedSigPvpWarning =
+    WarningTxt (noLoc NoSourceText) [noLoc (StringLiteral NoSourceText (fsLit msg))]
+  where
+    msg = "Inherited requirements from non-signature libraries (libraries " ++
+          "with modules) should not be used, as this mode of use is not " ++
+          "compatible with PVP-style version bounds.  Instead, copy the " ++
+          "declaration to the local hsig file or move the signature to a " ++
+          "library of its own and add that library as a dependency."
+
 -- | Given a local 'ModIface', merge all inherited requirements
 -- from 'requirementMerges' into this signature, producing
 -- a final 'TcGblEnv' that matches the local signature and
@@ -385,10 +396,20 @@ mergeSignatures hsmod lcl_iface0 = do
          . flip (findAndReadIface (text "mergeSignatures")) False
          $ fst (splitModuleInsts (mkModule (IndefiniteUnitId iuid) mod_name))
 
-    -- STEP 3: Get the unrenamed exports of all these interfaces, and
-    -- do shaping on them.
+    -- STEP 3: Get the unrenamed exports of all these interfaces,
+    -- thin it according to the export list, and do shaping on them.
     let extend_ns nsubst as = liftIO $ extendNameShape hsc_env nsubst as
-        gen_subst (nsubst,ifaces) (imod@(IndefModule iuid _), ireq_iface) = do
+        -- This function gets run on every inherited interface, and
+        -- it's responsible for:
+        --
+        --  1. Merging the exports of the interface into @nsubst@,
+        --  2. Adding these exports to the "OK to import" set (@oks@)
+        --  if they came from a package with no exposed modules
+        --  (this means we won't report a PVP error in this case), and
+        --  3. Thinning the interface according to an explicit export
+        --  list.
+        --
+        gen_subst (nsubst,oks,ifaces) (imod@(IndefModule iuid _), ireq_iface) = do
             let insts = indefUnitIdInsts iuid
             as1 <- tcRnModExports insts ireq_iface
             let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
@@ -408,19 +429,32 @@ mergeSignatures hsmod lcl_iface0 = do
                             Just (_, as2) -> return (thinModIface as2 ireq_iface, as2)
                             Nothing -> addMessages msgs >> failM
                     _ -> return (ireq_iface, as1)
+            let oks' | null (exposedModules pkg)
+                     = extendOccSetList oks (exportOccs as2)
+                     | otherwise
+                     = oks
             mb_r <- extend_ns nsubst as2
             case mb_r of
                 Left err -> failWithTc err
-                Right nsubst' -> return (nsubst',(imod, thinned_iface):ifaces)
+                Right nsubst' -> return (nsubst',oks',(imod, thinned_iface):ifaces)
         nsubst0 = mkNameShape (moduleName inner_mod) (mi_exports lcl_iface0)
-    (nsubst, rev_thinned_ifaces) <- foldM gen_subst (nsubst0, []) (zip reqs ireq_ifaces0)
+        ok_to_use0 = mkOccSet (exportOccs (mi_exports lcl_iface0))
+    -- Process each interface, getting the thinned interfaces as well as
+    -- the final, full set of exports @nsubst@ and the exports which are
+    -- "ok to use" (we won't attach 'inheritedSigPvpWarning' to them.)
+    (nsubst, ok_to_use, rev_thinned_ifaces)
+        <- foldM gen_subst (nsubst0, ok_to_use0, []) (zip reqs ireq_ifaces0)
     let thinned_ifaces = reverse rev_thinned_ifaces
         exports        = nameShapeExports nsubst
         rdr_env        = mkGlobalRdrEnv (gresFromAvails Nothing exports)
+        warn_occs      = filter (not . (`elemOccSet` ok_to_use)) (exportOccs exports)
+        warns | null warn_occs = NoWarnings
+              | otherwise = WarnSome $ map (\o -> (o, inheritedSigPvpWarning)) warn_occs
     setGblEnv tcg_env {
         tcg_rdr_env = rdr_env,
         tcg_exports = exports,
-        tcg_dus     = usesOnly (availsToNameSetWithSelectors exports)
+        tcg_dus     = usesOnly (availsToNameSetWithSelectors exports),
+        tcg_warns   = warns
         } $ do
     tcg_env <- getGblEnv
 
@@ -583,6 +617,9 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
   where
    dflags = hsc_dflags hsc_env
 
+exportOccs :: [AvailInfo] -> [OccName]
+exportOccs = concatMap (map occName . availNames)
+
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified
 -- explicitly.)
@@ -635,7 +672,7 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
 
     -- STEP 3: Check that the implementing interface exports everything
     -- we need.  (Notice we IGNORE the Modules in the AvailInfos.)
-    forM_ (concatMap (map occName . availNames) (mi_exports isig_iface)) $ \occ ->
+    forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
             [] -> addErr $ quotes (ppr occ)
                     <+> text "is exported by the hsig file, but not exported the module"
