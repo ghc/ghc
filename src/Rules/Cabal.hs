@@ -4,6 +4,7 @@ import Distribution.Package as DP
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Text
+import Distribution.Types.Dependency
 import Distribution.Verbosity
 
 import Base
