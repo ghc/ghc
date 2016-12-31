@@ -91,6 +91,7 @@ executable hadrian
                        , Settings.Packages.Compiler
                        , Settings.Packages.Ghc
                        , Settings.Packages.GhcCabal
+                       , Settings.Packages.Ghci
                        , Settings.Packages.GhcPrim
                        , Settings.Packages.Haddock
                        , Settings.Packages.IntegerGmp
