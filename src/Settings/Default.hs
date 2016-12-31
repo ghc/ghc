@@ -90,8 +90,9 @@ stage1Packages = do
             , append $ [ array
                        , base
                        , bytestring
-                       , containers
+                       , compact
                        , compareSizes
+                       , containers
                        , deepseq
                        , directory
                        , filepath
