@@ -259,10 +259,10 @@ control specifically plugin packages:
     need to be explicitly exposed using
     :ghc-flag:`-plugin-package` options.
 
-To declare a dependency on a plugin, add it to the ``ghc-plugins`` field
-in Cabal.  You should only put a plugin in ``build-depends`` if you
-require compatibility with older versions of Cabal, or also have a source
-import on the plugin in question.
+At the moment, the only way to specify a dependency on a plugin
+in Cabal is to put it in ``build-depends`` (which uses the conventional
+:ghc-flag:`-package-id` flag); however, in the future there
+will be a separate field for specifying plugin dependencies specifically.
 
 .. _writing-compiler-plugins:
 
