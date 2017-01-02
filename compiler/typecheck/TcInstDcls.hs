@@ -46,7 +46,8 @@ import Class
 import Var
 import VarEnv
 import VarSet
-import PrelNames  ( typeableClassName, genericClassNames )
+import PrelNames  ( typeableClassName, genericClassNames
+                  , knownNatClassName, knownSymbolClassName )
 import Bag
 import BasicTypes
 import DynFlags
@@ -518,9 +519,10 @@ doClsInstErrorChecks inst_info
          -- In hs-boot files there should be no bindings
       ; failIfTc (is_boot && not no_binds) badBootDeclErr
 
-         -- Handwritten instances of the poly-kinded Typeable
-         -- class are always forbidden
-      ; failIfTc (clas_nm == typeableClassName) typeable_err
+         -- Handwritten instances of any rejected
+         -- class is always forbidden
+         -- #12837
+      ; failIfTc (clas_nm `elem` rejectedClassNames) clas_err
 
          -- Check for hand-written Generic instances (disallowed in Safe Haskell)
       ; when (clas_nm `elem` genericClassNames) $
@@ -538,11 +540,14 @@ doClsInstErrorChecks inst_info
                          text "Replace the following instance:")
                       2 (pprInstanceHdr ispec)
 
-    -- Report an error or a warning for a Typeable instances.
+    -- Report an error or a warning for certain class instances.
     -- If we are working on an .hs-boot file, we just report a warning,
     -- and ignore the instance.  We do this, to give users a chance to fix
     -- their code.
-    typeable_err = text "Class" <+> quotes (ppr clas_nm)
+    rejectedClassNames = [ typeableClassName
+                         , knownNatClassName
+                         , knownSymbolClassName ]
+    clas_err = text "Class" <+> quotes (ppr clas_nm)
                     <+> text "does not support user-specified instances"
 
 {-
