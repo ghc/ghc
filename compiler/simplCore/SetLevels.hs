@@ -66,7 +66,7 @@ import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType
                         , exprOkForSpeculation
-                        , collectStaticPtrSatArgs
+                        , collectMakeStaticArgs
                         )
 import CoreArity        ( exprBotStrictness_maybe )
 import CoreFVs          -- all of it
@@ -1187,7 +1187,7 @@ newLvlVar lvld_rhs
 
     mk_id uniq rhs_ty
       -- See Note [Grand plan for static forms] in SimplCore.
-      | isJust $ collectStaticPtrSatArgs $ snd $
+      | isJust $ collectMakeStaticArgs $ snd $
         collectTyBinders de_tagged_rhs
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty

@@ -20,7 +20,7 @@ import CoreFVs
 import CoreTidy
 import CoreMonad
 import CorePrep
-import CoreUtils        (rhsIsStatic, collectStaticPtrSatArgs)
+import CoreUtils        (rhsIsStatic)
 import CoreStats        (coreBindsStats, CoreStats(..))
 import CoreLint
 import Literal
@@ -373,12 +373,12 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; type_env2    = extendTypeEnvWithPatSyns tidy_patsyns type_env1
 
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
-
-              -- See Note [Injecting implicit bindings]
-              ; all_tidy_binds = implicit_binds ++ tidy_binds
-
-              -- See SimplCore Note [Grand plan for static forms]
-              ; spt_init_code = sptModuleInitCode mod all_tidy_binds
+              }
+            -- See SimplCore Note [Grand plan for static forms]
+        ; (spt_init_code, tidy_binds') <-
+             sptCreateStaticBinds hsc_env mod tidy_binds
+        ; let { -- See Note [Injecting implicit bindings]
+                all_tidy_binds = implicit_binds ++ tidy_binds'
 
               -- Get the TyCons to generate code for.  Careful!  We must use
               -- the untidied TypeEnv here, because we need
@@ -638,27 +638,19 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   -- same list every time this module is compiled), in contrast to the
   -- bindings, which are ordered non-deterministically.
   init_work_list = zip init_ext_ids init_ext_ids
-  init_ext_ids   = sortBy (compare `on` getOccName) $
-                   map fst $ filter is_external flatten_binds
+  init_ext_ids   = sortBy (compare `on` getOccName) $ filter is_external binders
 
   -- An Id should be external if either (a) it is exported,
   -- (b) it appears in the RHS of a local rule for an imported Id, or
-  -- (c) it is the vectorised version of an imported Id, or
-  -- (d) it is a static pointer (see notes in StaticPtrTable.hs).
+  -- (c) it is the vectorised version of an imported Id.
   -- See Note [Which rules to expose]
-  is_external (id, e) = isExportedId id || id `elemVarSet` rule_rhs_vars
-                      || id `elemVarSet` vect_var_vs
-                      || isStaticPtrApp e
-
-  isStaticPtrApp :: CoreExpr -> Bool
-  isStaticPtrApp (collectTyBinders -> (_, e)) =
-    isJust $ collectStaticPtrSatArgs e
+  is_external id = isExportedId id || id `elemVarSet` rule_rhs_vars
+                 || id `elemVarSet` vect_var_vs
 
   rule_rhs_vars  = mapUnionVarSet ruleRhsFreeVars imp_id_rules
   vect_var_vs    = mkVarSet [var_v | (var, var_v) <- eltsUDFM vect_vars, isGlobalId var]
 
-  flatten_binds    = flattenBinds binds
-  binders          = map fst flatten_binds
+  binders          = map fst $ flattenBinds binds
   implicit_binders = bindersOfBinds implicit_binds
   binder_set       = mkVarSet binders
 

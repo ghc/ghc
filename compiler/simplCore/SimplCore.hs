@@ -1044,37 +1044,50 @@ Here is a running example:
   in a nested let, we are fine.
 
 * The desugarer replaces the static form with an application of the
-  data constructor 'StaticPtr' (defined in module GHC.StaticPtr of
+  function 'makeStatic' (defined in module GHC.StaticPtr.Internal of
   base).  So we get
 
    f x = let k = map toUpper
-         in ...(StaticPtr <fingerprint> k)...
+         in ...(makeStatic (StaticPtrInfo "pkg" "module" location) k)...
 
-* The simplifier runs the FloatOut pass which moves the applications
-  of 'StaticPtr' to the top level. Thus the FloatOut pass is always
-  executed, even when optimizations are disabled.  So we get
+* The simplifier runs the FloatOut pass which moves the calls to 'makeStatic'
+  to the top level. Thus the FloatOut pass is always executed, even when
+  optimizations are disabled.  So we get
 
    k = map toUpper
-   static_ptr = StaticPtr <fingerprint> k
+   static_ptr = makeStatic info k
    f x = ...static_ptr...
 
   The FloatOut pass is careful to produce an /exported/ Id for a floated
-  'StaticPtr', so the binding is not removed by the simplifier (see #12207).
+  'makeStatic' call, so the binding is not removed or inlined by the
+  simplifier.
   E.g. the code for `f` above might look like
 
-    static_ptr = StaticPtr <fingerprint> k
-    f x = ...(staticKey static_ptr)...
+    static_ptr = makeStatic info k
+    f x = ...(case static_ptr of ...)...
 
-  which might correctly be simplified to
+  which might be simplified to
 
-    f x = ...<fingerprint>...
+    f x = ...(case makeStatic info k of ...)...
 
   BUT the top-level binding for static_ptr must remain, so that it can be
   collected to populate the Static Pointer Table.
 
-* The CoreTidy pass produces a C function which inserts all the
-  floated 'StaticPtr' in the static pointer table (see the call to
-  StaticPtrTable.sptModuleInitCode in TidyPgm). CoreTidy pass also
-  exports the Ids of floated 'StaticPtr's so they can be linked with
-  the C function.
+  Making the binding exported also has a necessary effect during the
+  CoreTidy pass.
+
+* The CoreTidy pass replaces all bindings of the form
+
+  b = /\ ... -> makeStatic info value
+
+  with
+
+  b = /\ ... -> StaticPtr key info value
+
+  where a distinct key is generated for each binding.
+
+  We produce also a C function which inserts all these bindings in the static
+  pointer table (see the call to StaticPtrTable.sptCreateStaticBinds in
+  TidyPgm). As the Ids of floated static pointers are exported, they can be
+  linked with the C function.
 -}

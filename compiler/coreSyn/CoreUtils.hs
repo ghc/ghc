@@ -48,13 +48,13 @@ module CoreUtils (
         stripTicksE, stripTicksT,
 
         -- * StaticPtr
-        collectStaticPtrSatArgs
+        collectMakeStaticArgs
     ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
-import PrelNames ( staticPtrDataConName )
+import PrelNames ( makeStaticName )
 import PprCore
 import CoreFVs( exprFreeVars )
 import Var
@@ -2217,16 +2217,13 @@ isEmptyTy ty
 *****************************************************
 -}
 
--- | @collectStaticPtrSatArgs e@ yields @Just (s, args)@ when @e = s args@
--- and @s = StaticPtr@ and the application of @StaticPtr@ is saturated.
+-- | @collectMakeStaticArgs (makeStatic t info e)@ yields
+-- @Just (makeStatic, t, info, e)@.
 --
--- Yields @Nothing@ otherwise.
-collectStaticPtrSatArgs :: Expr b -> Maybe (Expr b, [Arg b])
-collectStaticPtrSatArgs e
-    | (fun@(Var b), args, _) <- collectArgsTicks (const True) e
-    , Just con <- isDataConId_maybe b
-    , dataConName con == staticPtrDataConName
-    , length args == 5
-    = Just (fun, args)
-collectStaticPtrSatArgs _
-    = Nothing
+-- Returns @Nothing@ for every other expression.
+collectMakeStaticArgs
+  :: CoreExpr -> Maybe (CoreExpr, Type, CoreExpr, CoreExpr)
+collectMakeStaticArgs e
+    | (fun@(Var b), [Type t, info, arg], _) <- collectArgsTicks (const True) e
+    , idName b == makeStaticName = Just (fun, t, info, arg)
+collectMakeStaticArgs _          = Nothing

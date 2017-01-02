@@ -27,7 +27,6 @@ import FamInstEnv( topNormaliseType )
 import DsMeta
 import HsSyn
 
-import Platform
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
 --     needs to see source types
 import TcType
@@ -56,11 +55,7 @@ import Bag
 import Outputable
 import PatSyn
 
-import Data.List        ( intercalate )
-import Data.IORef       ( atomicModifyIORef' )
-
 import Control.Monad
-import GHC.Fingerprint
 
 {-
 ************************************************************************
@@ -423,24 +418,17 @@ dsExpr (PArrSeq _ _)
 Static Pointers
 ~~~~~~~~~~~~~~~
 
+See Note [Grand plan for static forms] in SimplCore for an overview.
+
     g = ... static f ...
 ==>
-    g = ... StaticPtr
-              w0 w1
-              (StaticPtrInfo "current pkg key" "current module" "N")
-              f
-        ...
-
-Where we obtain w0 and w1 from
-
-   Fingerprint w0 w1 = fingerprintString "pkgKey:module:N"
+    g = ... makeStatic (StaticPtrInfo "pkg key" "module" loc) f ...
 -}
 
 dsExpr (HsStatic _ expr@(L loc _)) = do
     expr_ds <- dsLExpr expr
     let ty = exprType expr_ds
-    staticPtrInfoDataCon <- dsLookupDataCon staticPtrInfoDataConName
-    staticPtrDataCon     <- dsLookupDataCon staticPtrDataConName
+    makeStaticId <- dsLookupGlobalId makeStaticName
 
     dflags <- getDynFlags
     let (line, col) = case loc of
@@ -452,48 +440,18 @@ dsExpr (HsStatic _ expr@(L loc _)) = do
                      [ Type intTy              , Type intTy
                      , mkIntExprInt dflags line, mkIntExprInt dflags col
                      ]
+
     this_mod <- getModule
+    staticPtrInfoDataCon <- dsLookupDataCon staticPtrInfoDataConName
     info <- mkConApp staticPtrInfoDataCon <$>
             (++[srcLoc]) <$>
             mapM mkStringExprFS
                  [ unitIdFS $ moduleUnitId this_mod
                  , moduleNameFS $ moduleName this_mod
                  ]
-    Fingerprint w0 w1 <- mkStaticPtrFingerprint this_mod
+
     putSrcSpanDs loc $ return $
-      mkConApp staticPtrDataCon [ Type ty
-                                , mkWord64LitWordRep dflags w0
-                                , mkWord64LitWordRep dflags w1
-                                , info
-                                , expr_ds
-                                ]
-
-  where
-    -- | Choose either 'Word64#' or 'Word#' to represent the arguments of the
-    -- 'Fingerprint' data constructor.
-    mkWord64LitWordRep dflags
-      | platformWordSize (targetPlatform dflags) < 8 = mkWord64LitWord64
-      | otherwise = mkWordLit dflags . toInteger
-
-    mkStaticPtrFingerprint :: Module -> DsM Fingerprint
-    mkStaticPtrFingerprint this_mod = do
-      n <- mkGenPerModuleNum this_mod
-      return $ fingerprintString $ intercalate ":"
-        [ unitIdString $ moduleUnitId this_mod
-        , moduleNameString $ moduleName this_mod
-        , show n
-        ]
-
-    mkGenPerModuleNum :: Module -> DsM Int
-    mkGenPerModuleNum this_mod = do
-      dflags <- getDynFlags
-      let -- Note [Generating fresh names for ccall wrapper]
-          -- in compiler/typecheck/TcEnv.hs
-          wrapperRef = nextWrapperNum dflags
-      wrapperNum <- liftIO $ atomicModifyIORef' wrapperRef $ \mod_env ->
-        let num = lookupWithDefaultModuleEnv mod_env 0 this_mod
-         in (extendModuleEnv mod_env this_mod (num + 1), num)
-      return wrapperNum
+      mkCoreApps (Var makeStaticId) [ Type ty, info, expr_ds ]
 
 {-
 \noindent
