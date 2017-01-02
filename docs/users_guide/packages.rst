@@ -235,15 +235,6 @@ The GHC command line options that control packages are:
     reserves the right to interpret other characters in a special
     way in later releases.
 
-.. ghc-flag:: -library-name ⟨hash⟩
-
-    Tells GHC that the source of a Backpack file and its textual
-    dependencies is uniquely identified by ⟨hash⟩. Library names are
-    determined by Cabal; a usual recipe for a library name is that it is
-    the hash source package identifier of a package, as well as the
-    version hashes of all its textual dependencies. GHC will then use
-    this library name to generate more unit IDs.
-
 .. ghc-flag:: -trust ⟨pkg⟩
 
     This option causes the install package ⟨pkg⟩ to be both exposed and
