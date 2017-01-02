@@ -336,8 +336,14 @@ We return a (bogus) EWildPat in each case.
 -}
 
 rnExpr EWildPat        = return (hsHoleExpr, emptyFVs)   -- "_" is just a hole
-rnExpr e@(EAsPat {})   =
-  patSynErr e (text "Did you mean to enable TypeApplications?")
+rnExpr e@(EAsPat {})
+  = do { opt_TypeApplications <- xoptM LangExt.TypeApplications
+       ; let msg | opt_TypeApplications
+                    = "Type application syntax requires a space before '@'"
+                 | otherwise
+                    = "Did you mean to enable TypeApplications?"
+       ; patSynErr e (text msg)
+       }
 rnExpr e@(EViewPat {}) = patSynErr e empty
 rnExpr e@(ELazyPat {}) = patSynErr e empty
 
