@@ -425,6 +425,8 @@ class Functor f => Applicative f where
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
 (<**>) = liftA2 (flip ($))
 
+{-# INLINABLE (<**>) #-}
+
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
 liftA :: Applicative f => (a -> b) -> f a -> f b
