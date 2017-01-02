@@ -708,23 +708,14 @@ body2   :: { ([AddAnn]
         |  missing_module_keyword top close     { ([],snd $2) }
 
 
-
 top     :: { ([AddAnn]
              ,([LImportDecl RdrName], [LHsDecl RdrName])) }
-        : importdecls                   { (fst $1
-                                          ,(reverse $ snd $1,[]))}
-        | importdecls ';' cvtopdecls    {% if null (snd $1)
-                                             then return ((mj AnnSemi $2:(fst $1))
-                                                         ,(reverse $ snd $1,$3))
-                                             else do
-                                              { addAnnotation (gl $ head $ snd $1)
-                                                              AnnSemi (gl $2)
-                                              ; return (fst $1
-                                                       ,(reverse $ snd $1,$3)) }}
-        | cvtopdecls                    { ([],([],$1)) }
+        : semis top1                            { ($1, $2) }
 
-cvtopdecls :: { [LHsDecl RdrName] }
-        : topdecls                              { cvTopDecls $1 }
+top1    :: { ([LImportDecl RdrName], [LHsDecl RdrName]) }
+        : importdecls_semi topdecls_semi        { (reverse $1, cvTopDecls $2) }
+        | importdecls_semi topdecls             { (reverse $1, cvTopDecls $2) }
+        | importdecls                           { (reverse $1, []) }
 
 -----------------------------------------------------------------------------
 -- Module declaration & imports only
@@ -744,12 +735,19 @@ header  :: { Located (HsModule RdrName) }
                           Nothing)) }
 
 header_body :: { [LImportDecl RdrName] }
-        :  '{'            importdecls           { snd $2 }
-        |      vocurly    importdecls           { snd $2 }
+        :  '{'            header_top            { $2 }
+        |      vocurly    header_top            { $2 }
 
 header_body2 :: { [LImportDecl RdrName] }
-        :  '{' importdecls                      { snd $2 }
-        |  missing_module_keyword importdecls   { snd $2 }
+        :  '{' header_top                       { $2 }
+        |  missing_module_keyword header_top    { $2 }
+
+header_top :: { [LImportDecl RdrName] }
+        :  semis header_top_importdecls         { $2 }
+
+header_top_importdecls :: { [LImportDecl RdrName] }
+        :  importdecls_semi                     { $1 }
+        |  importdecls                          { $1 }
 
 -----------------------------------------------------------------------------
 -- The Export List
@@ -836,25 +834,31 @@ qcname  :: { Located RdrName }  -- Variable or type constructor
 -----------------------------------------------------------------------------
 -- Import Declarations
 
--- import decls can be *empty*, or even just a string of semicolons
--- whereas topdecls must contain at least one topdecl.
+-- importdecls and topdecls must contain at least one declaration;
+-- top handles the fact that these may be optional.
 
-importdecls :: { ([AddAnn],[LImportDecl RdrName]) }
-        : importdecls ';' importdecl
-                                {% if null (snd $1)
-                                     then return (mj AnnSemi $2:fst $1,$3 : snd $1)
-                                     else do
-                                      { addAnnotation (gl $ head $ snd $1)
-                                                      AnnSemi (gl $2)
-                                      ; return (fst $1,$3 : snd $1) } }
-        | importdecls ';'       {% if null (snd $1)
-                                     then return ((mj AnnSemi $2:fst $1),snd $1)
-                                     else do
-                                       { addAnnotation (gl $ head $ snd $1)
-                                                       AnnSemi (gl $2)
-                                       ; return $1} }
-        | importdecl             { ([],[$1]) }
-        | {- empty -}            { ([],[]) }
+-- One or more semicolons
+semis1  :: { [AddAnn] }
+semis1  : semis1 ';'  { mj AnnSemi $2 : $1 }
+        | ';'         { [mj AnnSemi $1] }
+
+-- Zero or more semicolons
+semis   :: { [AddAnn] }
+semis   : semis ';'   { mj AnnSemi $2 : $1 }
+        | {- empty -} { [] }
+
+-- No trailing semicolons, non-empty
+importdecls :: { [LImportDecl RdrName] }
+importdecls
+        : importdecls_semi importdecl
+                                { $2 : $1 }
+
+-- May have trailing semicolons, can be empty
+importdecls_semi :: { [LImportDecl RdrName] }
+importdecls_semi
+        : importdecls_semi importdecl semis1
+                                {% ams $2 $3 >> return ($2 : $1) }
+        | {- empty -}           { [] }
 
 importdecl :: { LImportDecl RdrName }
         : 'import' maybe_src maybe_safe optqualified maybe_pkg modid maybeas maybeimpspec
@@ -932,12 +936,14 @@ ops     :: { Located (OrdList (Located RdrName)) }
 -----------------------------------------------------------------------------
 -- Top-Level Declarations
 
+-- No trailing semicolons, non-empty
 topdecls :: { OrdList (LHsDecl RdrName) }
-        : topdecls ';' topdecl        {% addAnnotation (oll $1) AnnSemi (gl $2)
-                                         >> return ($1 `appOL` unitOL $3) }
-        | topdecls ';'                {% addAnnotation (oll $1) AnnSemi (gl $2)
-                                         >> return $1 }
-        | topdecl                     { unitOL $1 }
+        : topdecls_semi topdecl        { $1 `snocOL` $2 }
+
+-- May have trailing semicolons, can be empty
+topdecls_semi :: { OrdList (LHsDecl RdrName) }
+        : topdecls_semi topdecl semis1 {% ams $2 $3 >> return ($1 `snocOL` $2) }
+        | {- empty -}                  { nilOL }
 
 topdecl :: { LHsDecl RdrName }
         : cl_decl                               { sL1 $1 (TyClD (unLoc $1)) }
@@ -2543,8 +2549,8 @@ cvtopbody :: { ([AddAnn],[LHsDecl RdrName]) }
         |      vocurly    cvtopdecls0 close    { ([],$2) }
 
 cvtopdecls0 :: { [LHsDecl RdrName] }
-        : {- empty -}           { [] }
-        | cvtopdecls            { $1 }
+        : topdecls_semi         { cvTopDecls $1 }
+        | topdecls              { cvTopDecls $1 }
 
 -----------------------------------------------------------------------------
 -- Tuple expressions
