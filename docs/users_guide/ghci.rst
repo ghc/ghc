@@ -1017,7 +1017,7 @@ is given, the following additional differences apply:
 -  Rule 2 above is relaxed thus: *All* of the classes ``Ci`` are
    single-parameter type classes.
 
--  Rule 3 above is relaxed this: At least one of the classes ``Ci`` is
+-  Rule 3 above is relaxed thus: At least one of the classes ``Ci`` is
    an *interactive class* (defined below).
 
 -  The unit type ``()`` and the list type ``[]`` are added to the start of
