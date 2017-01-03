@@ -235,3 +235,16 @@ instance Applicative Complex where
 -- | @since 4.9.0.0
 instance Monad Complex where
   a :+ b >>= f = realPart (f a) :+ imagPart (f b)
+
+-- -----------------------------------------------------------------------------
+-- Rules on Complex
+
+{-# RULES
+
+"realToFrac/a->Complex Double"
+  realToFrac = \x -> realToFrac x :+ (0 :: Double)
+
+"realToFrac/a->Complex Float"
+  realToFrac = \x -> realToFrac x :+ (0 :: Float)
+
+  #-}
