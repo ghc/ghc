@@ -423,7 +423,8 @@ class Functor f => Applicative f where
 
 -- | A variant of '<*>' with the arguments reversed.
 (<**>) :: Applicative f => f a -> f (a -> b) -> f b
-(<**>) = liftA2 (flip ($))
+(<**>) = liftA2 (\a f -> f a)
+-- Don't use $ here, see the note at the top of the page
 
 -- | Lift a function to actions.
 -- This function may be used as a value for `fmap` in a `Functor` instance.
