@@ -902,7 +902,6 @@ test('T12234',
      compile,
      [''])
 
-
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
@@ -912,3 +911,13 @@ test('T13035',
      ],
      compile,
      [''] )
+
+test('T13056',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('bytes allocated',
+         [(wordsize(64), 520166912, 5),
+         # 2017-01-06    520166912 initial
+         ]),
+     ],
+     compile,
+     ['-O1'])
