@@ -1,5 +1,13 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
+## 4.9.1.0  *Jan 2017*
+
+  * Bundled with GHC 8.0.2
+
+  * Performance improvements in `Read` implementation
+
+  * Teach event manager to use poll instead of select (#12912)
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0

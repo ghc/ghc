@@ -1,6 +1,6 @@
 # Changelog for [`template-haskell` package](http://hackage.haskell.org/package/template-haskell)
 
-## 2.11.1.0  Nov 2016
+## 2.11.1.0  Jan 2017
 
   * Bundled with GHC 8.0.2
 
