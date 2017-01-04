@@ -1155,7 +1155,6 @@ postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
   | not active                  = False
   | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
                                         -- because it might be referred to "earlier"
-  | isExportedId bndr           = False
   | isStableUnfolding unfolding = False -- Note [Stable unfoldings and postInlineUnconditionally]
   | isTopLevel top_lvl          = False -- Note [Top level and postInlineUnconditionally]
   | exprIsTrivial rhs           = True
@@ -1248,6 +1247,10 @@ ones that are trivial):
     bindings used in multiple case branches.
 
   * The inliner should inline trivial things at call sites anyway.
+
+  * The Id might be exported.  We could check for that separately,
+    but since we aren't going to postInlineUnconditinoally /any/
+    top-level bindings, we don't need to test.
 
 Note [Stable unfoldings and postInlineUnconditionally]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
