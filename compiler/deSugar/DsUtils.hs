@@ -40,14 +40,14 @@ module DsUtils (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}   Match ( matchSimply )
+import {-# SOURCE #-} Match  ( matchSimply )
+import {-# SOURCE #-} DsExpr ( dsLExpr )
 
 import HsSyn
 import TcHsSyn
 import TcType( tcSplitTyConApp )
 import CoreSyn
 import DsMonad
-import {-# SOURCE #-} DsExpr ( dsLExpr )
 
 import CoreUtils
 import MkCore
@@ -55,7 +55,6 @@ import MkId
 import Id
 import Literal
 import TyCon
--- import ConLike
 import DataCon
 import PatSyn
 import Type
@@ -68,6 +67,7 @@ import UniqSet
 import UniqSupply
 import Module
 import PrelNames
+import Name( isInternalName )
 import Outputable
 import SrcLoc
 import Util
@@ -546,8 +546,9 @@ mkCoreAppDs _ (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2
   = Case arg1 case_bndr ty2 [(DEFAULT,[],arg2)]
   where
     case_bndr = case arg1 of
-                   Var v1 | isLocalId v1 -> v1        -- Note [Desugaring seq (2) and (3)]
-                   _                     -> mkWildValBinder ty1
+                   Var v1 | isInternalName (idName v1)
+                          -> v1        -- Note [Desugaring seq (2) and (3)]
+                   _      -> mkWildValBinder ty1
 
 mkCoreAppDs s fun arg = mkCoreApp s fun arg  -- The rest is done in MkCore
 

@@ -474,7 +474,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
          -- Check the rhs
     do { ty <- lintRhs rhs
-       ; lintBinder binder -- Check match to RHS type
+       ; lint_bndr binder -- Check match to RHS type
        ; binder_ty <- applySubstTy (idType binder)
        ; ensureEqTys binder_ty ty (mkRhsMsg binder (text "RHS") ty)
 
@@ -488,14 +488,6 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; checkL (not (isStrictId binder)
             || (isNonRec rec_flag && not (isTopLevel top_lvl_flag)))
            (mkStrictMsg binder)
-
-        -- Check that if the binder is local, it is not marked as exported
-       ; checkL (not (isExportedId binder) || isTopLevel top_lvl_flag)
-           (mkNonTopExportedMsg binder)
-
-        -- Check that if the binder is local, it does not have an external name
-       ; checkL (not (isExternalName (Var.varName binder)) || isTopLevel top_lvl_flag)
-           (mkNonTopExternalNameMsg binder)
 
        ; flags <- getLintFlags
        ; when (lf_check_inline_loop_breakers flags
@@ -540,8 +532,8 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
    where
     -- If you edit this function, you may need to update the GHC formalism
     -- See Note [GHC Formalism]
-    lintBinder var | isId var  = lintIdBndr var $ \_ -> (return ())
-                   | otherwise = return ()
+    lint_bndr var | isId var  = lintIdBndr top_lvl_flag var $ \_ -> return ()
+                  | otherwise = return ()
 
 -- | Checks the RHS of top-level bindings. It only differs from 'lintCoreExpr'
 -- in that it doesn't reject applications of the data constructor @StaticPtr@
@@ -662,13 +654,13 @@ lintCoreExpr (Let (NonRec bndr rhs) body)
   | isId bndr
   = do  { lintSingleBinding NotTopLevel NonRecursive (bndr,rhs)
         ; addLoc (BodyOfLetRec [bndr])
-                 (lintAndScopeId bndr $ \_ -> (lintCoreExpr body)) }
+                 (lintIdBndr NotTopLevel bndr $ \_ -> lintCoreExpr body) }
 
   | otherwise
   = failWithL (mkLetErr bndr rhs)       -- Not quite accurate
 
 lintCoreExpr (Let (Rec pairs) body)
-  = lintAndScopeIds bndrs       $ \_ ->
+  = lintIdBndrs bndrs       $ \_ ->
     do  { checkL (null dups) (dupVars dups)
         ; mapM_ (lintSingleBinding NotTopLevel Recursive) pairs
         ; addLoc (BodyOfLetRec bndrs) (lintCoreExpr body) }
@@ -741,7 +733,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
      ; subst <- getTCvSubst
      ; ensureEqTys var_ty scrut_ty (mkScrutMsg var var_ty scrut_ty subst)
 
-     ; lintAndScopeId var $ \_ ->
+     ; lintIdBndr NotTopLevel var $ \_ ->
        do { -- Check the alternatives
             mapM_ (lintCoreAlt scrut_ty alt_ty) alts
           ; checkCaseAlts e scrut_ty alts
@@ -986,9 +978,9 @@ lintBinders (var:vars) linterF = lintBinder var $ \var' ->
 -- See Note [GHC Formalism]
 lintBinder :: Var -> (Var -> LintM a) -> LintM a
 lintBinder var linterF
-  | isTyVar var = lintTyBndr var linterF
-  | isCoVar var = lintCoBndr var linterF
-  | otherwise   = lintIdBndr var linterF
+  | isTyVar var = lintTyBndr             var linterF
+  | isCoVar var = lintCoBndr             var linterF
+  | otherwise   = lintIdBndr NotTopLevel var linterF
 
 lintTyBndr :: InTyVar -> (OutTyVar -> LintM a) -> LintM a
 lintTyBndr tv thing_inside
@@ -1006,33 +998,40 @@ lintCoBndr cv thing_inside
                (text "CoVar with non-coercion type:" <+> pprTyVar cv)
        ; updateTCvSubst subst' (thing_inside cv') }
 
-lintIdBndr :: Id -> (Id -> LintM a) -> LintM a
--- Do substitution on the type of a binder and add the var with this
--- new type to the in-scope set of the second argument
--- ToDo: lint its rules
-
-lintIdBndr id linterF
-  = do  { lintAndScopeId id $ \id' -> linterF id' }
-
-lintAndScopeIds :: [Var] -> ([Var] -> LintM a) -> LintM a
-lintAndScopeIds ids linterF
+lintIdBndrs :: [Var] -> ([Var] -> LintM a) -> LintM a
+lintIdBndrs ids linterF
   = go ids
   where
     go []       = linterF []
-    go (id:ids) = lintAndScopeId id $ \id ->
-                  lintAndScopeIds ids $ \ids ->
+    go (id:ids) = lintIdBndr NotTopLevel id $ \id ->
+                  lintIdBndrs           ids $ \ids ->
                   linterF (id:ids)
 
-lintAndScopeId :: InVar -> (OutVar -> LintM a) -> LintM a
-lintAndScopeId id linterF
+lintIdBndr :: TopLevelFlag -> InVar -> (OutVar -> LintM a) -> LintM a
+-- Do substitution on the type of a binder and add the var with this
+-- new type to the in-scope set of the second argument
+-- ToDo: lint its rules
+lintIdBndr top_lvl id linterF
   = do { flags <- getLintFlags
        ; checkL (not (lf_check_global_ids flags) || isLocalId id)
                 (text "Non-local Id binder" <+> ppr id)
                 -- See Note [Checking for global Ids]
+
+       -- Check that if the binder is nested, it is not marked as exported
+       ; checkL (not (isExportedId id) || isTopLevel top_lvl)
+           (mkNonTopExportedMsg id)
+
+       -- Check that if the binder is nested, it does not have an external name
+       ; checkL (not (isExternalName (Var.varName id)) || isTopLevel top_lvl)
+           (mkNonTopExternalNameMsg id)
+
        ; (ty, k) <- lintInTy (idType id)
+
+       -- Check for levity polymorphism
        ; lintL (not (isLevityPolymorphic k))
            (text "RuntimeRep-polymorphic binder:" <+>
                  (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
+
        ; let id' = setIdType id ty
        ; addInScopeVar id' $ (linterF id') }
 
