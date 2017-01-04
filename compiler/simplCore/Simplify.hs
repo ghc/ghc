@@ -1437,7 +1437,7 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
   -- the continuation, leaving just the bottoming expression.  But the
   -- type might not be right, so we may have to add a coerce.
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
-  = return (env, castBottomExpr res cont_ty)  -- contination to discard, else we do it
+  = return (env, castBottomExpr res cont_ty)  -- continuation to discard, else we do it
   where                                       -- again and again!
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont

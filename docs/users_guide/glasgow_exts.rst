@@ -3872,7 +3872,7 @@ generates ::
 
       instance Num Dollars
 
-One can think of this instance being implementated with the same code as the
+One can think of this instance being implemented with the same code as the
 ``Num Int`` instance, but with ``Dollars`` and ``getDollars`` added wherever
 necessary in order to make it typecheck. (In practice, GHC uses a somewhat
 different approach to code generation. See the :ref:`precise-gnd-specification`

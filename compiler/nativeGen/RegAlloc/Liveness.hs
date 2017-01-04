@@ -801,7 +801,7 @@ computeLiveness
         -> [SCC (LiveBasicBlock instr)]
         -> ([SCC (LiveBasicBlock instr)],       -- instructions annotated with list of registers
                                                 -- which are "dead after this instruction".
-               BlockMap RegSet)                 -- blocks annontated with set of live registers
+               BlockMap RegSet)                 -- blocks annotated with set of live registers
                                                 -- on entry to the block.
 
 computeLiveness platform sccs
