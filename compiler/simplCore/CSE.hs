@@ -22,8 +22,7 @@ import CoreSyn
 import Outputable
 import BasicTypes       ( isAlwaysActive )
 import TrieMap
-
-import Data.List
+import Data.List        ( mapAccumL )
 
 {-
                         Simple common sub-expression
@@ -63,7 +62,7 @@ We can simply add clones to the substitution already described.
 
 Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Let-bindings have two cases, implemnted by cseRhs.
+Let-bindings have two cases, implemnted by addBinding.
 
 * Trivial RHS:
      let x = y in ...(h x)....
@@ -95,8 +94,18 @@ Let-bindings have two cases, implemnted by cseRhs.
   we CSE the (h y) call to x.
 
 Notice that
-  - the trivial-RHS situation extends the substitution (cs_subst)
-  - the non-trivial-RHS situation extends the reverse mapping (cs_map)
+  - The trivial-RHS situation extends the substitution (cs_subst)
+  - The non-trivial-RHS situation extends the reverse mapping (cs_map)
+
+Notice also that in the trivial-RHS case we leave behind a binding
+  x = y
+even though we /also/ carry a substitution x -> y.  Can we just drop
+the binding instead?  Well, not at top level! See SimplUtils
+Note [Top level and postInlineUnconditionally]; and in any case CSE
+applies only to the /bindings/ of the program, and we leave it to the
+simplifier to propate effects to the RULES.  Finally, it doesn't seem
+worth the effort to discard the nested bindings because the simplifier
+will do it next.
 
 Note [CSE for case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -104,7 +113,7 @@ Consider
   case scrut_expr of x { ...alts... }
 This is very like a strict let-binding
   let !x = scrut_expr in ...
-So we use (cseRhs x scrut_expr) to process scrut_expr and x, and as a
+So we use (addBinding x scrut_expr) to process scrut_expr and x, and as a
 result all the stuff under Note [CSE for bindings] applies directly.
 
 For example:
@@ -119,7 +128,7 @@ For example:
   want to keep it as (wild1:as), but for CSE purpose that's a bad
   idea.
 
-  By using cseRhs we add the binding (wild1 -> a) to the substitution,
+  By using addBinding we add the binding (wild1 -> a) to the substitution,
   which does exactly the right thing.
 
   (Notice this is exactly backwards to what the simplifier does, which
@@ -130,7 +139,7 @@ For example:
 * Non-trivial scrutinee
      case (f x) of y { pat -> ...let y = f x in ... }
 
-  By using cseRhs we'll add (f x :-> y) to the cs_map, and
+  By using addBinding we'll add (f x :-> y) to the cs_map, and
   thereby CSE the inner (f x) to y.
 
 Note [CSE for INLINE and NOINLINE]
@@ -223,7 +232,7 @@ a case where we had
 This is a vanishingly strange corner case, but we still have
 to check.
 
-We do the check in cseRhs, but it can't fire when cseRhs is called
+We do the check in addBinding, but it can't fire when addBinding is called
 from a let-binding, because they are always ok-for-speculation.  Never
 mind!
 
@@ -240,11 +249,11 @@ cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
 
 cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind env (NonRec b e)
-  = (env2, NonRec b2 e2)
+  = (env2, NonRec b2 e1)
   where
-    e1               = tryForCSE env e
-    (env1, b1)       = addBinder env b
-    (env2, (b2, e2)) = addBinding env1 b b1 e1
+    e1         = tryForCSE env e
+    (env1, b1) = addBinder env b
+    (env2, b2) = addBinding env1 b b1 e1
 
 cseBind env (Rec pairs)
   = (env2, Rec pairs')
@@ -253,19 +262,22 @@ cseBind env (Rec pairs)
     (env1, bndrs1) = addRecBinders env bndrs
     rhss1          = map (tryForCSE env1) rhss
                      -- Process rhss in extended env1
-    (env2, pairs') = mapAccumL cse_rhs env1 (zip3 bndrs bndrs1 rhss1)
-    cse_rhs env (b, b1, e1) = addBinding env b b1 e1
+    (env2, pairs') = foldl do_one (env1, []) (zip3 bndrs bndrs1 rhss1)
+    do_one (env, pairs) (b, b1, e1)
+         = (env1, (b2, e1) : pairs)
+       where
+         (env1, b2) = addBinding env b b1 e1
 
 addBinding :: CSEnv                      -- Includes InId->OutId cloning
            -> InId
            -> OutId -> OutExpr           -- Processed binding
-           -> (CSEnv, (OutId, OutExpr))  -- Final env and binding
+           -> (CSEnv, OutId)             -- Final env, final bndr
 -- Extend the CSE env with a mapping [rhs -> out-id]
 -- unless we can instead just substitute [in-id -> rhs]
 addBinding env in_id out_id rhs'
-  | no_cse      = (env,                              (out_id, rhs'))
-  | ok_to_subst = (extendCSSubst env in_id rhs',     (out_id, rhs'))
-  | otherwise   = (extendCSEnv env rhs' id_expr', (zapped_id, rhs'))
+  | no_cse      = (env,                              out_id)
+  | ok_to_subst = (extendCSSubst env in_id rhs',     out_id)
+  | otherwise   = (extendCSEnv env rhs' id_expr', zapped_id)
   where
     id_expr'  = varToCoreExpr out_id
     zapped_id = zapIdUsageInfo out_id
@@ -309,22 +321,22 @@ tryForCSE env expr
     -- useful in practice, but upholds our semantics.
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
-cseExpr env (Type t)               = Type (substTy (csEnvSubst env) t)
-cseExpr env (Coercion c)           = Coercion (substCo (csEnvSubst env) c)
-cseExpr _   (Lit lit)              = Lit lit
-cseExpr env (Var v)                = lookupSubst env v
-cseExpr env (App f a)              = App (cseExpr env f) (tryForCSE env a)
-cseExpr env (Tick t e)             = Tick t (cseExpr env e)
-cseExpr env (Cast e co)            = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
-cseExpr env (Lam b e)              = let (env', b') = addBinder env b
-                                     in Lam b' (cseExpr env' e)
-cseExpr env (Let bind e)           = let (env', bind') = cseBind env bind
-                                     in Let bind' (cseExpr env' e)
-cseExpr env (Case e bndr ty alts)  = cseCase env e bndr ty alts
+cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
+cseExpr env (Coercion c)          = Coercion (substCo (csEnvSubst env) c)
+cseExpr _   (Lit lit)             = Lit lit
+cseExpr env (Var v)               = lookupSubst env v
+cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE env a)
+cseExpr env (Tick t e)            = Tick t (cseExpr env e)
+cseExpr env (Cast e co)           = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
+cseExpr env (Lam b e)             = let (env', b') = addBinder env b
+                                    in Lam b' (cseExpr env' e)
+cseExpr env (Let bind e)          = let (env', bind') = cseBind env bind
+                                    in Let bind' (cseExpr env' e)
+cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 
 cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
 cseCase env scrut bndr ty alts
-  = Case scrut2 bndr3 ty (map cse_alt alts)
+  = Case scrut1 bndr3 ty (map cse_alt alts)
   where
     scrut1 = tryForCSE env scrut
 
@@ -332,8 +344,8 @@ cseCase env scrut bndr ty alts
       -- Zapping the OccInfo is needed because the extendCSEnv
       -- in cse_alt may mean that a dead case binder
       -- becomes alive, and Lint rejects that
-    (env1, bndr2)              = addBinder env bndr1
-    (alt_env, (bndr3, scrut2)) = addBinding env1 bndr bndr2 scrut1
+    (env1, bndr2)    = addBinder env bndr1
+    (alt_env, bndr3) = addBinding env1 bndr bndr2 scrut1
          -- addBinding: see Note [CSE for case expressions]
 
     con_target :: OutExpr
