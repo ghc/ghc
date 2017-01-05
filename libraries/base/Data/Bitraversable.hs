@@ -1,4 +1,5 @@
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -28,6 +29,7 @@ module Data.Bitraversable
 import Control.Applicative
 import Data.Bifunctor
 import Data.Bifoldable
+import Data.Coerce
 import Data.Functor.Identity (Identity(..))
 import Data.Functor.Utils (StateL(..), StateR(..))
 import GHC.Generics (K1(..))
@@ -217,14 +219,29 @@ bimapAccumR f g s t
 -- | A default definition of 'bimap' in terms of the 'Bitraversable'
 -- operations.
 --
+-- @'bimapDefault' f g ≡
+--     'runIdentity' . 'bitraverse' ('Identity' . f) ('Identity' . g)@
+--
 -- @since 4.10.0.0
-bimapDefault :: Bitraversable t => (a -> b) -> (c -> d) -> t a c -> t b d
-bimapDefault f g = runIdentity . bitraverse (Identity . f) (Identity . g)
+bimapDefault :: forall t a b c d . Bitraversable t
+             => (a -> b) -> (c -> d) -> t a c -> t b d
+-- See Note [Function coercion] in Data.Functor.Utils.
+bimapDefault = coerce
+  (bitraverse :: (a -> Identity b)
+              -> (c -> Identity d) -> t a c -> Identity (t b d))
+{-# INLINE bimapDefault #-}
 
 -- | A default definition of 'bifoldMap' in terms of the 'Bitraversable'
 -- operations.
 --
+-- @'bifoldMapDefault' f g ≡
+--    'getConst' . 'bitraverse' ('Const' . f) ('Const' . g)@
+--
 -- @since 4.10.0.0
-bifoldMapDefault :: (Bitraversable t, Monoid m)
+bifoldMapDefault :: forall t m a b . (Bitraversable t, Monoid m)
                  => (a -> m) -> (b -> m) -> t a b -> m
-bifoldMapDefault f g = getConst . bitraverse (Const . f) (Const . g)
+-- See Note [Function coercion] in Data.Functor.Utils.
+bifoldMapDefault = coerce
+  (bitraverse :: (a -> Const m ())
+              -> (b -> Const m ()) -> t a b -> Const m (t () ()))
+{-# INLINE bifoldMapDefault #-}

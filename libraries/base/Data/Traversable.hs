@@ -1,6 +1,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE TypeOperators #-}
@@ -53,6 +54,7 @@ module Data.Traversable (
 -- It is convenient to use 'Const' here but this means we must
 -- define a few instances here which really belong in Control.Applicative
 import Control.Applicative ( Const(..), ZipList(..) )
+import Data.Coerce
 import Data.Either ( Either(..) )
 import Data.Foldable ( Foldable )
 import Data.Functor
@@ -348,11 +350,24 @@ mapAccumR f s t = runStateR (traverse (StateR . flip f) t) s
 --   instance, provided that 'traverse' is defined. (Using
 --   `fmapDefault` with a `Traversable` instance defined only by
 --   'sequenceA' will result in infinite recursion.)
-fmapDefault :: Traversable t => (a -> b) -> t a -> t b
+--
+-- @
+-- 'fmapDefault' f ≡ 'runIdentity' . 'traverse' ('Identity' . f)
+-- @
+fmapDefault :: forall t a b . Traversable t
+            => (a -> b) -> t a -> t b
 {-# INLINE fmapDefault #-}
-fmapDefault f = runIdentity . traverse (Identity . f)
+-- See Note [Function coercion] in Data.Functor.Utils.
+fmapDefault = coerce (traverse :: (a -> Identity b) -> t a -> Identity (t b))
 
 -- | This function may be used as a value for `Data.Foldable.foldMap`
 -- in a `Foldable` instance.
-foldMapDefault :: (Traversable t, Monoid m) => (a -> m) -> t a -> m
-foldMapDefault f = getConst . traverse (Const . f)
+--
+-- @
+-- 'foldMapDefault' f ≡ 'getConst' . 'traverse' ('Const' . f)
+-- @
+foldMapDefault :: forall t m a . (Traversable t, Monoid m)
+               => (a -> m) -> t a -> m
+{-# INLINE foldMapDefault #-}
+-- See Note [Function coercion] in Data.Functor.Utils.
+foldMapDefault = coerce (traverse :: (a -> Const m ()) -> t a -> Const m (t ()))
