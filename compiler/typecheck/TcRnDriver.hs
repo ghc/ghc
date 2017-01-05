@@ -66,6 +66,7 @@ import TcExpr
 import TcRnMonad
 import TcRnExports
 import TcEvidence
+import qualified BooleanFormula as BF
 import PprTyThing( pprTyThing )
 import MkIface( tyThingToIfaceDecl )
 import Coercion( pprCoAxiom )
@@ -905,9 +906,13 @@ checkBootTyCon is_boot tc1 tc2
            check (eqTypeX env op_ty1 op_ty2)
                  (text "The types of" <+> pname1 <+>
                   text "are different") `andThenCheck`
-           check (eqMaybeBy eqDM def_meth1 def_meth2)
-                 (text "The default methods associated with" <+> pname1 <+>
-                  text "are different")
+           if is_boot
+               then check (eqMaybeBy eqDM def_meth1 def_meth2)
+                          (text "The default methods associated with" <+> pname1 <+>
+                           text "are different")
+               else check (subDM op_ty1 def_meth1 def_meth2)
+                          (text "The default methods associated with" <+> pname1 <+>
+                           text "are not compatible")
          where
           name1 = idName id1
           name2 = idName id2
@@ -926,6 +931,26 @@ checkBootTyCon is_boot tc1 tc2
        eqDM (_, VanillaDM)    (_, VanillaDM)    = True
        eqDM (_, GenericDM t1) (_, GenericDM t2) = eqTypeX env t1 t2
        eqDM _ _ = False
+
+       -- NB: first argument is from hsig, second is from real impl.
+       -- Order of pattern matching matters.
+       subDM _ Nothing _ = True
+       subDM _ _ Nothing = False
+       -- If the hsig wrote:
+       --
+       --   f :: a -> a
+       --   default f :: a -> a
+       --
+       -- this should be validly implementable using an old-fashioned
+       -- vanilla default method.
+       subDM t1 (Just (_, GenericDM t2)) (Just (_, VanillaDM))
+        = eqTypeX env t1 t2
+       -- This case can occur when merging signatures
+       subDM t1 (Just (_, VanillaDM)) (Just (_, GenericDM t2))
+        = eqTypeX env t1 t2
+       subDM _ (Just (_, VanillaDM)) (Just (_, VanillaDM)) = True
+       subDM _ (Just (_, GenericDM t1)) (Just (_, GenericDM t2))
+        = eqTypeX env t1 t2
 
        -- Ignore the location of the defaults
        eqATDef Nothing             Nothing             = True
@@ -948,7 +973,9 @@ checkBootTyCon is_boot tc1 tc2
     check (eqListBy (eqTypeX env) sc_theta1 sc_theta2)
           (text "The class constraints do not match") `andThenCheck`
     checkListBy eqSig op_stuff1 op_stuff2 (text "methods") `andThenCheck`
-    checkListBy eqAT ats1 ats2 (text "associated types")
+    checkListBy eqAT ats1 ats2 (text "associated types") `andThenCheck`
+    check (classMinimalDef c1 `BF.implies` classMinimalDef c2)
+        (text "The MINIMAL pragmas are not compatible")
 
   | Just syn_rhs1 <- synTyConRhs_maybe tc1
   , Just syn_rhs2 <- synTyConRhs_maybe tc2

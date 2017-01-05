@@ -1,0 +1,13 @@
+{-# LANGUAGE DefaultSignatures #-}
+unit p where
+    signature A where
+        class C a where
+            f :: a -> a
+            default f :: a -> a
+    signature B where
+unit i where
+    module A where
+        class C a where
+            f :: a -> a
+unit r where
+    dependency p[A=i:A,B=<B>]

@@ -71,6 +71,7 @@ import FastString
 import BasicTypes hiding ( SuccessFlag(..) )
 import ListSetOps
 import GHC.Fingerprint
+import qualified BooleanFormula as BF
 
 import Data.List
 import Control.Monad
@@ -212,9 +213,22 @@ mergeIfaceDecl :: IfaceDecl -> IfaceDecl -> IfaceDecl
 mergeIfaceDecl d1 d2
     | isAbstractIfaceDecl d1 = d2
     | isAbstractIfaceDecl d2 = d1
+    | IfaceClass{ ifSigs = ops1, ifMinDef = bf1 } <- d1
+    , IfaceClass{ ifSigs = ops2, ifMinDef = bf2 } <- d2
+    = let ops = nameEnvElts $
+                  plusNameEnv_C mergeIfaceClassOp
+                    (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
+                    (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
+      in d1 { ifSigs = ops
+            , ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
+            }
     -- It doesn't matter; we'll check for consistency later when
     -- we merge, see 'mergeSignatures'
     | otherwise              = d1
+
+mergeIfaceClassOp :: IfaceClassOp -> IfaceClassOp -> IfaceClassOp
+mergeIfaceClassOp op1@(IfaceClassOp _ _ (Just _)) _ = op1
+mergeIfaceClassOp _ op2 = op2
 
 -- | Merge two 'OccEnv's of 'IfaceDecl's by 'OccName'.
 mergeIfaceDecls :: OccEnv IfaceDecl -> OccEnv IfaceDecl -> OccEnv IfaceDecl

@@ -304,10 +304,11 @@ rnIfaceGlobal n = do
                     ]
                 Just n' -> return n'
 
--- | Rename a DFun name. Here is where we ensure that DFuns have the correct
--- module as described in Note [Bogus DFun renamings].
-rnIfaceDFun :: Name -> ShIfM Name
-rnIfaceDFun name = do
+-- | Rename an implicit name, e.g., a DFun or default method.
+-- Here is where we ensure that DFuns have the correct module as described in
+-- Note [Bogus DFun renamings].
+rnIfaceImplicit :: Name -> ShIfM Name
+rnIfaceImplicit name = do
     hmap <- getHoleSubst
     dflags <- getDynFlags
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
@@ -385,7 +386,7 @@ rnIfaceClsInst cls_inst = do
     --    mentions DFuns since they are implicitly exported. See
     --    Note [Signature merging DFuns])  The important thing is that it's
     --    consistent everywhere.
-    dfun <- rnIfaceDFun (ifDFun cls_inst)
+    dfun <- rnIfaceImplicit (ifDFun cls_inst)
     return cls_inst { ifInstCls = n
                     , ifInstTys = tys
                     , ifDFun = dfun
@@ -408,8 +409,10 @@ rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl d@IfaceId{} = do
             name <- case ifIdDetails d of
-                      IfDFunId -> rnIfaceDFun (ifName d)
-                      _        -> rnIfaceGlobal (ifName d)
+                      IfDFunId -> rnIfaceImplicit (ifName d)
+                      _ | isDefaultMethodOcc (occName (ifName d))
+                        -> rnIfaceImplicit (ifName d)
+                        | otherwise -> rnIfaceGlobal (ifName d)
             ty <- rnIfaceType (ifType d)
             details <- rnIfaceIdDetails (ifIdDetails d)
             info <- rnIfaceIdInfo (ifIdInfo d)

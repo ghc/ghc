@@ -23,6 +23,8 @@ import MonadUtils
 import Outputable
 import Binary
 import SrcLoc
+import Unique
+import UniqSet
 
 ----------------------------------------------------------------------
 -- Boolean formula type and smart constructors
@@ -157,11 +159,36 @@ And xs `impliesAtom` y = any (\x -> (unLoc x) `impliesAtom` y) xs
 Or  xs `impliesAtom` y = all (\x -> (unLoc x) `impliesAtom` y) xs
 Parens x `impliesAtom` y = (unLoc x) `impliesAtom` y
 
-implies :: Eq a => BooleanFormula a -> BooleanFormula a -> Bool
-x `implies` Var y  = x `impliesAtom` y
-x `implies` And ys = all (implies x . unLoc) ys
-x `implies` Or ys  = any (implies x . unLoc) ys
-x `implies` Parens y  = x `implies` (unLoc y)
+implies :: Uniquable a => BooleanFormula a -> BooleanFormula a -> Bool
+implies e1 e2 = go (Clause emptyUniqSet [e1]) (Clause emptyUniqSet [e2])
+  where
+    go :: Uniquable a => Clause a -> Clause a -> Bool
+    go l@Clause{ clauseExprs = hyp:hyps } r =
+        case hyp of
+            Var x | memberClauseAtoms x r -> True
+                  | otherwise -> go (extendClauseAtoms l x) { clauseExprs = hyps } r
+            Parens hyp' -> go l { clauseExprs = unLoc hyp':hyps }     r
+            And hyps'  -> go l { clauseExprs = map unLoc hyps' ++ hyps } r
+            Or hyps'   -> all (\hyp' -> go l { clauseExprs = unLoc hyp':hyps } r) hyps'
+    go l r@Clause{ clauseExprs = con:cons } =
+        case con of
+            Var x | memberClauseAtoms x l -> True
+                  | otherwise -> go l (extendClauseAtoms r x) { clauseExprs = cons }
+            Parens con' -> go l r { clauseExprs = unLoc con':cons }
+            And cons'   -> all (\con' -> go l r { clauseExprs = unLoc con':cons }) cons'
+            Or cons'    -> go l r { clauseExprs = map unLoc cons' ++ cons }
+    go _ _ = False
+
+-- A small sequent calculus proof engine.
+data Clause a = Clause {
+        clauseAtoms :: UniqSet a,
+        clauseExprs :: [BooleanFormula a]
+    }
+extendClauseAtoms :: Uniquable a => Clause a -> a -> Clause a
+extendClauseAtoms c x = c { clauseAtoms = addOneToUniqSet (clauseAtoms c) x }
+
+memberClauseAtoms :: Uniquable a => a -> Clause a -> Bool
+memberClauseAtoms x c = x `elementOfUniqSet` clauseAtoms c
 
 ----------------------------------------------------------------------
 -- Pretty printing

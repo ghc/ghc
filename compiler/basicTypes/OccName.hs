@@ -57,7 +57,7 @@ module OccName (
         isDerivedOccName,
         mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
-        mkDefaultMethodOcc,
+        mkDefaultMethodOcc, isDefaultMethodOcc,
         mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkClassDataConOcc, mkDictOcc, mkIPOcc,
@@ -594,6 +594,12 @@ isDerivedOccName occ =
      '$':c:_ | isAlphaNum c -> True   -- E.g.  $wfoo
      c:':':_ | isAlphaNum c -> True   -- E.g.  N:blah   newtype coercions
      _other                 -> False
+
+isDefaultMethodOcc :: OccName -> Bool
+isDefaultMethodOcc occ =
+   case occNameString occ of
+     '$':'d':'m':_ -> True
+     _ -> False
 
 mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,

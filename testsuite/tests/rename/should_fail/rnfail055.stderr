@@ -93,6 +93,7 @@ RnFail055.hs-boot:28:1: error:
                    m2 :: a -> b
                    {-# MINIMAL m2 #-}
     The methods do not match: There are different numbers of methods
+    The MINIMAL pragmas are not compatible
 
 RnFail055.hs-boot:29:1: error:
     Class ‘C3’ has conflicting definitions in the module

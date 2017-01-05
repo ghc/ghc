@@ -3,32 +3,14 @@ bkp15.bkp:1:26: warning:
     -XDatatypeContexts is deprecated: It was widely considered a misfeature, and has been removed from the Haskell language.
 [1 of 5] Processing p
   [1 of 1] Compiling H[sig]           ( p/H.hsig, nothing )
-
-bkp15.bkp:15:9: warning:
-    • The MINIMAL pragma does not require:
-        ‘xa’ and ‘y’
-      but there is no default implementation.
-    • In the class declaration for ‘Bloop’
 [2 of 5] Processing q
   [1 of 1] Compiling H[sig]           ( q/H.hsig, nothing )
-
-bkp15.bkp:40:9: warning:
-    • The MINIMAL pragma does not require:
-        ‘xa’ and ‘y’
-      but there is no default implementation.
-    • In the class declaration for ‘Bloop’
 [3 of 5] Processing r
   [1 of 2] Compiling H[sig]           ( r/H.hsig, nothing )
   [2 of 2] Compiling M                ( r/M.hs, nothing )
 [4 of 5] Processing h-impl
   Instantiating h-impl
   [1 of 1] Compiling H                ( h-impl/H.hs, bkp15.out/h-impl/H.o )
-
-bkp15.bkp:76:9: warning:
-    • The MINIMAL pragma does not require:
-        ‘xa’ and ‘y’
-      but there is no default implementation.
-    • In the class declaration for ‘Bloop’
 [5 of 5] Processing s
   Instantiating s
   [1 of 1] Including r[H=h-impl:H]

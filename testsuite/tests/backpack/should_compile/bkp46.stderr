@@ -1,0 +1,12 @@
+[1 of 3] Processing p
+  [1 of 2] Compiling A[sig]           ( p/A.hsig, nothing )
+  [2 of 2] Compiling B                ( p/B.hs, nothing )
+[2 of 3] Processing i
+  Instantiating i
+  [1 of 1] Compiling A                ( i/A.hs, bkp46.out/i/A.o )
+[3 of 3] Processing m
+  Instantiating m
+  [1 of 1] Including p[A=i:A]
+    Instantiating p[A=i:A]
+    [1 of 2] Compiling A[sig]           ( p/A.hsig, bkp46.out/p/p-CtJxD03mJqIIVJzOga8l4X/A.o )
+    [2 of 2] Compiling B                ( p/B.hs, bkp46.out/p/p-CtJxD03mJqIIVJzOga8l4X/B.o )

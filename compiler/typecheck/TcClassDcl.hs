@@ -29,6 +29,7 @@ import TcMType
 import Type     ( getClassPredTys_maybe, piResultTys )
 import TcType
 import TcRnMonad
+import DriverPhases (HscSource(..))
 import BuildTyCl( TcMethInfo )
 import Class
 import Coercion ( pprCoAxiom )
@@ -95,6 +96,10 @@ Death to "ExpandingDicts".
 ************************************************************************
 -}
 
+illegalHsigDefaultMethod :: Name -> SDoc
+illegalHsigDefaultMethod n =
+    text "Illegal default method(s) in class definition of" <+> ppr n <+> text "in hsig file"
+
 tcClassSigs :: Name                -- Name of the class
             -> [LSig Name]
             -> LHsBinds Name
@@ -113,9 +118,19 @@ tcClassSigs clas sigs def_methods
                    | n <- dm_bind_names, not (n `elemNameSet` op_names) ]
                    -- Value binding for non class-method (ie no TypeSig)
 
-       ; sequence_ [ failWithTc (badGenericMethod clas n)
-                   | (n,_) <- gen_dm_prs, not (n `elem` dm_bind_names) ]
-                   -- Generic signature without value binding
+       ; tcg_env <- getGblEnv
+       ; if tcg_src tcg_env == HsigFile
+            then
+               -- Error if we have value bindings
+               -- (Generic signatures without value bindings indicate
+               -- that a default of this form is expected to be
+               -- provided.)
+               when (not (null def_methods)) $
+                failWithTc (illegalHsigDefaultMethod clas)
+            else
+               -- Error for each generic signature without value binding
+               sequence_ [ failWithTc (badGenericMethod clas n)
+                         | (n,_) <- gen_dm_prs, not (n `elem` dm_bind_names) ]
 
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return op_info }
@@ -289,8 +304,12 @@ tcClassMinimalDef _clas sigs op_info
         -- That is, the given mindef should at least ensure that the
         -- class ops without default methods are required, since we
         -- have no way to fill them in otherwise
-        whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
-                   (\bf -> addWarnTc NoReason (warningMinimalDefIncomplete bf))
+        tcg_env <- getGblEnv
+        -- However, only do this test when it's not an hsig file,
+        -- since you can't write a default implementation.
+        when (tcg_src tcg_env /= HsigFile) $
+            whenIsJust (isUnsatisfied (mindef `impliesAtom`) defMindef) $
+                       (\bf -> addWarnTc NoReason (warningMinimalDefIncomplete bf))
         return mindef
   where
     -- By default require all methods without a default implementation
