@@ -921,3 +921,12 @@ test('T13056',
      ],
      compile,
      ['-O1'])
+
+test('T12707',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 1271577192, 5),
+          # initial:    1271577192
+          ]),
+     ],
+     compile,
+     [''])
