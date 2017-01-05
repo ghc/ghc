@@ -137,6 +137,7 @@ import Maybes
 
 import DynFlags
 import ErrUtils
+import Platform ( platformOS, OS(OSDarwin) )
 
 import Outputable
 import NameEnv
@@ -1392,7 +1393,8 @@ doCodeGen hsc_env this_mod data_tycons
     -- we generate one SRT for the whole module.
     let
      pipeline_stream
-      | gopt Opt_SplitObjs dflags || gopt Opt_SplitSections dflags
+      | gopt Opt_SplitObjs dflags || gopt Opt_SplitSections dflags ||
+        platformOS (targetPlatform dflags) == OSDarwin
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline us cmmgroup = do
                 let (topSRT', us') = initUs us emptySRT

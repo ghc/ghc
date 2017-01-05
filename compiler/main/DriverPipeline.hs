@@ -1794,6 +1794,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
               in ["-L" ++ l] ++ ["-Wl,-rpath", "-Wl," ++ libpath]
          | otherwise = ["-L" ++ l]
 
+    let dead_strip = if osMachOTarget (platformOS platform)
+                      then ["-Wl,-dead_strip"]
+                      else []
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
@@ -1808,16 +1811,17 @@ linkBinary' staticLink dflags o_files dep_packages = do
                                  -- HS packages, because libtool doesn't accept other options.
                                  -- In the case of iOS these need to be added by hand to the
                                  -- final link in Xcode.
-            else other_flags ++ package_hs_libs ++ extra_libs -- -Wl,-u,<sym> contained in other_flags
-                                                              -- needs to be put before -l<package>,
-                                                              -- otherwise Solaris linker fails linking
-                                                              -- a binary with unresolved symbols in RTS
-                                                              -- which are defined in base package
-                                                              -- the reason for this is a note in ld(1) about
-                                                              -- '-u' option: "The placement of this option
-                                                              -- on the command line is significant.
-                                                              -- This option must be placed before the library
-                                                              -- that defines the symbol."
+            else other_flags ++ dead_strip ++ package_hs_libs ++ extra_libs
+                 -- -Wl,-u,<sym> contained in other_flags
+                 -- needs to be put before -l<package>,
+                 -- otherwise Solaris linker fails linking
+                 -- a binary with unresolved symbols in RTS
+                 -- which are defined in base package
+                 -- the reason for this is a note in ld(1) about
+                 -- '-u' option: "The placement of this option
+                 -- on the command line is significant.
+                 -- This option must be placed before the library
+                 -- that defines the symbol."
 
     -- frameworks
     pkg_framework_opts <- getPkgFrameworkOpts dflags platform dep_packages
