@@ -86,7 +86,7 @@ import Control.Monad( (>=>) )
 -- The Trie --
 --------------
 
--- A lookup trie for data constructor appliations, i.e.
+-- A lookup trie for data constructor applications, i.e.
 -- keys of type `(DataCon, [StgArg])`, following the patterns in TrieMap.
 
 data StgArgMap a = SAM

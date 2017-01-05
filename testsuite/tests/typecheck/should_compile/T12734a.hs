@@ -93,7 +93,7 @@ test_ghc_err = test_gr @(KT A '[Type] IO)
   = Con m (Stack lrs (Layer4 bind))
 --> inline lrs
 [W] Con m (Stack '[Type] (Layer4 bind))
---> isntance
+--> instance
 [W] Con m (Stack '[] bind)
     --> Monad m
 +

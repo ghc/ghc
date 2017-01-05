@@ -103,7 +103,7 @@ emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
 graphFromEdgedVertices
         :: ReduceFn key payload
         -> [Node key payload]           -- The graph; its ok for the
-                                        -- out-list to contain keys which arent
+                                        -- out-list to contain keys which aren't
                                         -- a vertex key, they are ignored
         -> Graph (Node key payload)
 graphFromEdgedVertices _reduceFn []            = emptyGraph
@@ -122,7 +122,7 @@ graphFromEdgedVertices reduceFn edged_vertices =
 graphFromEdgedVerticesOrd
         :: Ord key
         => [Node key payload]           -- The graph; its ok for the
-                                        -- out-list to contain keys which arent
+                                        -- out-list to contain keys which aren't
                                         -- a vertex key, they are ignored
         -> Graph (Node key payload)
 graphFromEdgedVerticesOrd = graphFromEdgedVertices reduceNodesIntoVerticesOrd
@@ -132,7 +132,7 @@ graphFromEdgedVerticesOrd = graphFromEdgedVertices reduceNodesIntoVerticesOrd
 graphFromEdgedVerticesUniq
         :: Uniquable key
         => [Node key payload]           -- The graph; its ok for the
-                                        -- out-list to contain keys which arent
+                                        -- out-list to contain keys which aren't
                                         -- a vertex key, they are ignored
         -> Graph (Node key payload)
 graphFromEdgedVerticesUniq = graphFromEdgedVertices reduceNodesIntoVerticesUniq

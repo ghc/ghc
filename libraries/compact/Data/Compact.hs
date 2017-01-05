@@ -55,7 +55,7 @@ getCompact (Compact _ obj _) = obj
 --
 -- If the structure contains any internal sharing, the shared data
 -- will be duplicated during the compaction process.  Loops if the
--- structure constains cycles.
+-- structure contains cycles.
 --
 -- The NFData constraint is just to ensure that the object contains no
 -- functions, 'compact' does not actually use it.  If your object

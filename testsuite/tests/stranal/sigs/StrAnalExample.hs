@@ -1,4 +1,4 @@
--- Just an example on how to create tests that test the strictness analizer
+-- Just an example on how to create tests that test the strictness analyzer
 
 module StrAnalExample where
 

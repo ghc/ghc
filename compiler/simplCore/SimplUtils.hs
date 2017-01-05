@@ -1249,7 +1249,7 @@ ones that are trivial):
   * The inliner should inline trivial things at call sites anyway.
 
   * The Id might be exported.  We could check for that separately,
-    but since we aren't going to postInlineUnconditinoally /any/
+    but since we aren't going to postInlineUnconditionally /any/
     top-level bindings, we don't need to test.
 
 Note [Stable unfoldings and postInlineUnconditionally]

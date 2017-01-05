@@ -208,7 +208,7 @@ that's all!  We get
   $fTraversable[]_$cmapM = ...code for traverse on lists...
 
 with NO INLINE pragma!  This happens even though 'traverse' had an
-INLINE pragma becuase the author knew it should be inlined pretty
+INLINE pragma because the author knew it should be inlined pretty
 vigorously.
 
 Indeed, it turned out that the rhs of $cmapM was just too big to

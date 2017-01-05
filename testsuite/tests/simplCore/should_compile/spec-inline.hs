@@ -1,4 +1,4 @@
-{- This test checks that specialiations can apply inside
+{- This test checks that specialisations can apply inside
    wrappers.  In particular, the wrapper for 'foo' should
    look like
 

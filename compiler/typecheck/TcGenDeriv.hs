@@ -1494,7 +1494,7 @@ Example:
 
 Note that (mkNameG_d "package-name" "ModuleName" "Foo") is equivalent to what
 'Foo would be when using the -XTemplateHaskell extension. To make sure that
--XDeriveLift can be used on stage-1 compilers, however, we expliticly invoke
+-XDeriveLift can be used on stage-1 compilers, however, we explicitly invoke
 makeG_d.
 -}
 

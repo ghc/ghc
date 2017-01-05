@@ -563,7 +563,7 @@ cpeRhsE env (Case scrut bndr ty alts)
 
 cvtLitInteger :: DynFlags -> Id -> Maybe DataCon -> Integer -> CoreExpr
 -- Here we convert a literal Integer to the low-level
--- represenation. Exactly how we do this depends on the
+-- representation. Exactly how we do this depends on the
 -- library that implements Integer.  If it's GMP we
 -- use the S# data constructor for small literals.
 -- See Note [Integer literals] in Literal
