@@ -1197,6 +1197,22 @@ coercion. Because coercions are irrelevant anyway, there is no point in doing
 this. So, whenever we encounter a coercion, we just say that it won't change.
 That's what the CoercionTy case is doing within normalise_type.
 
+Note [Normalisation and type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We need to be a bit careful about normalising in the presence of type
+synonyms (Trac #13035).  Suppose S is a type synonym, and we have
+   S t1 t2
+If S is family-free (on its RHS) we can just normalise t1 and t2 and
+reconstruct (S t1' t2').   Expanding S could not reveal any new redexes
+because type families are saturated.
+
+But if S has a type family on its RHS we expand /before/ normalising
+the args t1, t2.  If we normalise t1, t2 first, we'll re-normalise them
+after expansion, and that can lead to /exponential/ behavour; see Trac #13035.
+
+Notice, though, that expanding first can in principle duplicate t1,t2,
+which might contain redexes. I'm sure you could conjure up an exponential
+case by that route too, but it hasn't happened in practice yet!
 -}
 
 topNormaliseType :: FamInstEnvs -> Type -> Type
@@ -1248,18 +1264,24 @@ normaliseTcApp env role tc tys
 -- See Note [Normalising types] about the LiftingContext
 normalise_tc_app :: TyCon -> [Type] -> NormM (Coercion, Type)
 normalise_tc_app tc tys
-  = do { (args_co, ntys) <- normalise_tc_args tc tys
-       ; case expandSynTyCon_maybe tc ntys of
-         { Just (tenv, rhs, ntys') ->
-           do { (co2, ninst_rhs)
-                  <- normalise_type (substTy (mkTvSubstPrs tenv) rhs)
-              ; return $
-                if isReflCo co2
-                then (args_co,                 mkTyConApp tc ntys)
-                else (args_co `mkTransCo` co2, mkAppTys ninst_rhs ntys') }
-         ; Nothing ->
+  | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  , not (isFamFreeTyCon tc)  -- Expand and try again
+  = -- A synonym with type families in the RHS
+    -- Expand and try again
+    -- See Note [Normalisation and type synonyms]
+    normalise_type (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+
+  | not (isTypeFamilyTyCon tc)
+  = -- A synonym with no type families in the RHS; or data type etc
+    -- Just normalise the arguments and rebuild
+    do { (args_co, ntys) <- normalise_tc_args tc tys
+       ; return (args_co, mkTyConApp tc ntys) }
+
+  | otherwise
+  = -- A type-family application
     do { env <- getEnv
        ; role <- getRole
+       ; (args_co, ntys) <- normalise_tc_args tc tys
        ; case reduceTyFamApp_maybe env role tc ntys of
            Just (first_co, ty')
              -> do { (rest_co,nty) <- normalise_type ty'
@@ -1267,7 +1289,7 @@ normalise_tc_app tc tys
                             , nty ) }
            _ -> -- No unique matching family instance exists;
                 -- we do not do anything
-                return (args_co, mkTyConApp tc ntys) }}}
+                return (args_co, mkTyConApp tc ntys) }
 
 ---------------
 -- | Normalise arguments to a tycon
@@ -1309,8 +1331,8 @@ normalise_type :: Type                     -- old type
 -- See Note [Normalising types]
 -- Try to not to disturb type synonyms if possible
 
-normalise_type
-  = go
+normalise_type ty
+  = go ty
   where
     go (TyConApp tc tys) = normalise_tc_app tc tys
     go ty@(LitTy {})     = do { r <- getRole

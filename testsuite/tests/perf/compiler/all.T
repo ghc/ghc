@@ -898,3 +898,14 @@ test('T12234',
      ],
      compile,
      [''])
+
+
+test('T13035',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 90595208, 5),
+          # 2017-01-05   90595208 initial
+          ]),
+     ],
+     compile,
+     [''] )
