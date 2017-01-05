@@ -1,6 +1,7 @@
 
 #include "cwrapper.h"
 #include "getLocation.h"
+#include "isMinTTY.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
@@ -15,8 +16,8 @@ int main(int argc, char** argv) {
     char *exePath;
     char *preArgv[1];
 
-    if (getenv("_")) {
-        printf("WARNING: GHCi invoked via 'ghci.exe' in *nix-like shells (cygwin-bash, in particular)\n");
+    if (isMinTTY()) {
+        printf("WARNING: GHCi invoked via 'ghci.exe' in MinTTY consoles (e.g., Cygwin or MSYS)\n");
         printf("         doesn't handle Ctrl-C well; use the 'ghcii.sh' shell wrapper instead\n");
         fflush(stdout);
     }

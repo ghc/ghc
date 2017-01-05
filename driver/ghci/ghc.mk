@@ -29,7 +29,7 @@ install_driver_ghci:
 
 else # Windows_Host...
 
-driver/ghci_dist_C_SRCS  = ghci.c ../utils/cwrapper.c ../utils/getLocation.c
+driver/ghci_dist_C_SRCS  = ghci.c ../utils/cwrapper.c ../utils/getLocation.c ../utils/isMinTTY.c
 driver/ghci_dist_CC_OPTS += -I driver/utils
 driver/ghci_dist_PROGNAME = ghci
 driver/ghci_dist_INSTALL = YES
