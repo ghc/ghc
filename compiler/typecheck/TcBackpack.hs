@@ -16,7 +16,7 @@ module TcBackpack (
     instantiateSignature,
 ) where
 
-import BasicTypes (StringLiteral(..), SourceText(..))
+import BasicTypes (StringLiteral(..), SourceText(..), defaultFixity)
 import Packages
 import TcRnExports
 import DynFlags
@@ -45,6 +45,7 @@ import HscTypes
 import Outputable
 import Type
 import FastString
+import RnEnv
 import Maybes
 import TcEnv
 import Var
@@ -67,6 +68,33 @@ import {-# SOURCE #-} TcRnDriver
 
 #include "HsVersions.h"
 
+fixityMisMatch :: TyThing -> Fixity -> Fixity -> SDoc
+fixityMisMatch real_thing real_fixity sig_fixity =
+    vcat [ppr real_thing <+> text "has conflicting fixities in the module",
+          text "and its hsig file",
+          text "Main module:" <+> ppr_fix real_fixity,
+          text "Hsig file:" <+> ppr_fix sig_fixity]
+  where
+    ppr_fix f =
+        ppr f <+>
+        (if f == defaultFixity
+            then parens (text "default")
+            else empty)
+
+checkHsigDeclM :: ModIface -> TyThing -> TyThing -> TcRn ()
+checkHsigDeclM sig_iface sig_thing real_thing = do
+    let name = getName real_thing
+    -- TODO: Distinguish between signature merging and signature
+    -- implementation cases.
+    checkBootDeclM False sig_thing real_thing
+    real_fixity <- lookupFixityRn name
+    let sig_fixity = case mi_fix_fn sig_iface (occName name) of
+                        Nothing -> defaultFixity
+                        Just f -> f
+    when (real_fixity /= sig_fixity) $
+      addErrAt (nameSrcSpan name)
+        (fixityMisMatch real_thing real_fixity sig_fixity)
+
 -- | Given a 'ModDetails' of an instantiated signature (note that the
 -- 'ModDetails' must be knot-tied consistently with the actual implementation)
 -- and a 'GlobalRdrEnv' constructed from the implementor of this interface,
@@ -76,8 +104,8 @@ import {-# SOURCE #-} TcRnDriver
 -- Note that it is already assumed that the implementation *exports*
 -- a sufficient set of entities, since otherwise the renaming and then
 -- typechecking of the signature 'ModIface' would have failed.
-checkHsigIface :: TcGblEnv -> GlobalRdrEnv -> ModDetails -> TcRn ()
-checkHsigIface tcg_env gr
+checkHsigIface :: TcGblEnv -> GlobalRdrEnv -> ModIface -> ModDetails -> TcRn ()
+checkHsigIface tcg_env gr sig_iface
   ModDetails { md_insts = sig_insts, md_fam_insts = sig_fam_insts,
                md_types = sig_type_env, md_exports = sig_exports   } = do
     traceTc "checkHsigIface" $ vcat
@@ -116,7 +144,8 @@ checkHsigIface tcg_env gr
         r <- tcLookupImported_maybe name
         case r of
           Failed err -> addErr err
-          Succeeded real_thing -> checkBootDeclM False sig_thing real_thing
+          Succeeded real_thing -> checkHsigDeclM sig_iface sig_thing real_thing
+
       -- The hsig did NOT define this function; that means it must
       -- be a reexport.  In this case, make sure the 'Name' of the
       -- reexport matches the 'Name exported here.
@@ -483,6 +512,11 @@ mergeSignatures hsmod lcl_iface0 = do
     lcl_iface <- tcRnModIface (thisUnitIdInsts dflags) (Just nsubst) lcl_iface0
     let ifaces = lcl_iface : ext_ifaces
 
+    -- STEP 4.1: Merge fixities (we'll verify shortly) tcg_fix_env
+    let fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
+                            | (occ, f) <- concatMap mi_fixities ifaces
+                            , rdr_elt <- lookupGlobalRdrEnv rdr_env occ ]
+
     -- STEP 5: Typecheck the interfaces
     let type_env_var = tcg_type_env_var tcg_env
 
@@ -516,7 +550,8 @@ mergeSignatures hsmod lcl_iface0 = do
     setGblEnv tcg_env {
         tcg_tcs = typeEnvTyCons type_env,
         tcg_patsyns = typeEnvPatSyns type_env,
-        tcg_type_env = type_env
+        tcg_type_env = type_env,
+        tcg_fix_env = fix_env
         } $ do
     tcg_env <- getGblEnv
 
@@ -537,7 +572,7 @@ mergeSignatures hsmod lcl_iface0 = do
               , isDFunId id
               = return ()
               | Just thing <- lookupTypeEnv type_env (getName sig_thing)
-              = checkBootDeclM False sig_thing thing
+              = checkHsigDeclM iface sig_thing thing
               | otherwise
               = panic "mergeSignatures check_ty"
         mapM_ check_ty (typeEnvElts (md_types details))
@@ -660,6 +695,9 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
     dflags <- getDynFlags
     let avails = calculateAvails dflags
                     impl_iface False{- safe -} False{- boot -}
+        fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
+                            | (occ, f) <- mi_fixities impl_iface
+                            , rdr_elt <- lookupGlobalRdrEnv impl_gr occ ]
     updGblEnv (\tcg_env -> tcg_env {
         -- Setting tcg_rdr_env to treat all exported entities from
         -- the implementing module as in scope improves error messages,
@@ -668,7 +706,10 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
         -- (see bkpfail07 for an example); we'd need to record more
         -- information in ModIface to solve this.
         tcg_rdr_env = tcg_rdr_env tcg_env `plusGlobalRdrEnv` impl_gr,
-        tcg_imports = tcg_imports tcg_env `plusImportAvails` avails
+        tcg_imports = tcg_imports tcg_env `plusImportAvails` avails,
+        -- This is here so that when we call 'lookupFixityRn' for something
+        -- directly implemented by the module, we grab the right thing
+        tcg_fix_env = fix_env
         }) $ do
 
     -- STEP 2: Load the *unrenamed, uninstantiated* interface for
@@ -702,7 +743,7 @@ checkImplements impl_mod (IndefModule uid mod_name) = do
 
     -- STEP 6: Check that it's sufficient
     tcg_env <- getGblEnv
-    checkHsigIface tcg_env impl_gr sig_details
+    checkHsigIface tcg_env impl_gr sig_iface sig_details
 
     -- STEP 7: Return the updated 'TcGblEnv' with the signature exports,
     -- so we write them out.
