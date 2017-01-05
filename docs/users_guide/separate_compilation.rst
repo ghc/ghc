@@ -662,86 +662,302 @@ A hs-boot file is written in a subset of Haskell:
 Module signatures
 -----------------
 
-GHC supports the specification of module signatures, which both
-implementations and users can typecheck against separately. This
-functionality should be considered experimental for now; some details,
-especially for type classes and type families, may change. This system
-was originally described in `Backpack: Retrofitting Haskell with
-Interfaces <http://plv.mpi-sws.org/backpack/>`__. Signature files are
-somewhat similar to ``hs-boot`` files, but have the ``hsig`` extension
-and behave slightly differently.
+GHC 8.2 supports module signatures (``hsig`` files), which allow you to
+write a signature in place of a module implementation, deferring the
+choice of implementation until a later point in time.  This feature is
+not intended to be used without `Cabal
+<http://www.haskell.org/cabal/>`__; this manual entry will focus
+on the syntax and semantics of signatures.
 
-Suppose that I have modules ``String.hs`` and ``A.hs``, thus: ::
+To start with an example, suppose you had a module ``A`` which made use of some
+string operations.  Using normal module imports, you would only
+be able to pick a particular implementation of strings::
 
-    module Text where
-        data Text = Text String
+    module Str where
+        type Str = String
 
-        empty :: Text
-        empty = Text ""
+        empty :: Str
+        empty = ""
 
-        toString :: Text -> String
-        toString (Text s) = s
+        toString :: Str -> String
+        toString s = s
 
     module A where
         import Text
         z = toString empty
 
-Presently, module ``A`` depends explicitly on a concrete implementation
-of ``Text``. What if we wanted to a signature ``Text``, so we could vary
-the implementation with other possibilities (e.g. packed UTF-8 encoded
-bytestrings)? To do this, we can write a signature :file:`TextSig.hsig`, and
-modify ``A`` to include the signature instead: ::
+By replacing ``Str.hs`` with a signature ``Str.hsig``, ``A`` (and
+any other modules in this package) are now parametrized by
+a string implementation::
 
-    module TextSig where
-        data Text
-        empty :: Text
-        toString :: Text -> String
+    signature Str where
+        data Str
+        empty :: Str
+        toString :: Str -> String
+
+We can typecheck ``A`` against this signature, or we can instantiate
+``Str`` with a module that provides the following declarations.  Refer
+to Cabal's documentation for a more in-depth discussion on how to
+instantiate signatures.
+
+Module signatures actually consist of two closely related features:
+
+- The ability to define an ``hsig`` file, containing type definitions
+  and type signature for values which can be used by modules that
+  import the signature, and must be provided by the eventual
+  implementing module, and
+
+- The ability to *inherit* required signatures from packages we
+  depend upon, combining the signatures into a single merged
+  signature which reflects the requirements of any locally defined
+  signature, as well as the requirements of our dependencies.
+
+A signature file is denoted by an ``hsig`` file; every required
+signature must have an ``hsig`` file (even if it is an empty one),
+including required signatures inherited from dependencies.  Signatures
+can be imported using an ordinary ``import Sig`` declaration.
+
+``hsig`` files are written in a variant of Haskell similar
+to ``hs-boot`` files, but with some slight changes:
+
+- The header of a signature is ``signature A where ...`` (instead
+  of the usual ``module A where ...``).
+
+- Import statements and scoping rules are exactly as in Haskell.
+  To mention a non-Prelude type or class, you must import it.
+
+- Unlike regular modules, the exports and defined entities of
+  a signature include not only those written in the local
+  ``hsig`` file, but also those from inherited signatures
+  (as inferred from the :ghc-flag:`-package-id` flags).
+  These entities are not considered in scope when typechecking
+  the local ``hsig`` file, but are available for import by
+  any module or signature which imports the signature.  The
+  one exception to this rule is the export list, described
+  below.
+
+  If a declaration occurs in multiple inherited signatures,
+  they will be *merged* together.  For values, we require
+  that the types from both signatures match exactly; however,
+  other declarations may merge in more interesting ways.
+  The merging operation in these cases has the effect of
+  textually replacing all occurrences of the old name with
+  a reference to the new, merged declaration.  For example,
+  if we have the following two signatures::
+
+    signature A where
+        data T
+        f :: T -> T
+
+    signature A where
+        data T = MkT
+        g :: T
+
+  the resulting merged signature would be::
+
+    signature A where
+        data T = MkT
+        f :: T -> T
+        g :: T
+
+- The export list of a signature applies the final export list
+  of a signature after merging inherited signatures; in particular, it
+  may refer to entities which are not declared in the body of the
+  local ``hsig`` file.  The set of entities that are required by a
+  signature is defined exclusively by its exports; if an entity
+  is not mentioned in the export list, it is not required.  This means
+  that a library author can provide an omnibus signature containing the
+  type of every function someone might want to use, while a client thins
+  down the exports to the ones they actually require.  For example,
+  supposing that you have inherited a signature for strings, you might
+  write a local signature of this form, listing only the entities
+  that you need::
+
+    signature Str (Str, empty, append, concat) where
+        -- empty
+
+  A few caveats apply here.  First, it is illegal to export an entity
+  which refers to a locally defined type which itself is not exported
+  (GHC will report an error in this case).  Second, signatures which
+  come from dependencies which expose modules cannot be thinned in this
+  way (after all, the dependency itself may need the entity); these
+  requirements are unconditionally exported, but are associated with
+  a warning discouraging their use by a module.  To use an entity
+  defined by such a signature, add its declaration to your local
+  ``hsig`` file.
+
+- A signature can reexport an entity brought into scope by an import.
+  In this case, we indicate that any implementation of the module
+  must export this very same entity.  For example, this signature
+  must be implemented by a module which itself reexports ``Int``::
+
+    signature A (Int) where
+        import Prelude (Int)
+
+    -- can be implemented by:
+    module A (Int) where
+        import Prelude (Int)
+
+  Conversely, any entity requested by a signature can be provided
+  by a reexport from the implementing module.  This is different from
+  ``hs-boot`` files, which require every entity to be defined
+  locally in the implementing module.
+
+- The declarations and types from signatures of dependencies
+  that will be merged in are not in scope when type checking
+  an ``hsig`` file.  To refer to any such type, you must
+  declare it yourself::
+
+    -- OK, assuming we inherited an A that defines T
+    signature A (T) where
+        -- empty
+
+    -- Not OK
+    signature A (T, f) where
+        f :: T -> T
+
+    -- OK
+    signature A (T, f) where
+        data T
+        f :: T -> T
+
+- There must be no value declarations, but there can be type signatures
+  for values.  For example, we might define the signature::
+
+        signature A where
+            double :: Int -> Int
+
+  A module implementing ``A`` would have to export the function
+  ``double`` with a type definitionally equal to the signature.
+  Note that this means you can't implement ``double`` using
+  a polymorphic function ``double :: Num a => a -> a``.
+
+  Note that signature matching does check if *fixity* matches, so be
+  sure specify fixity of ordinary identifiers if you intend to use them
+  with backticks.
+
+- Fixity, type synonym, open type/data family declarations
+  are permitted as in normal Haskell.
+
+- Closed type family declarations are permitted as in normal
+  Haskell.  They can also be given abstractly, as in the
+  following example::
+
+    type family ClosedFam a where ..
+
+  The ``..`` is meant literally -- you shoudl write two dots in
+  your file.  The ``where`` clause distinguishes closed families
+  from open ones.
+
+- A data type declaration can either be given in full, exactly
+  as in Haskell, or it can be given abstractly, by omitting the '='
+  sign and everything tha follows.  For example: ::
+
+        signature A where
+            data T a b
+
+  Abstract data types can be implemented not only with data
+  declarations, but also newtypes and type synonyms (with the
+  restriction that a type synonym must be fully eta-reduced,
+  e.g., ``type T = ...`` to be accepted.)  For example,
+  the following are all valid implementations of the T above::
+
+        -- Algebraic data type
+        data T a b = MkT a b
+
+        -- Newtype
+        newtype T a b = MkT (a, b)
+
+        -- Type synonym
+        data T2 a b = MkT2 a a b b
+        type T = T2
+
+  Data type declarations merge only with other data type
+  declarations which match exactly, except abstract data,
+  which can merge with ``data``, ``newtype`` or ``type``
+  declarations.  Merges with type synonyms are especially useful:
+  suppose you are using a package of strings which has left the type of
+  characters in the string unspecified::
+
+        signature Str where
+            data Str
+            data Elem
+            head :: Str -> Elem
+
+  If you locally define a signature which specifies
+  ``type Elem = Char``, you can now use ``head`` from the
+  inherited signature as if it returned a ``Char``.
+
+  If you do not write out the constructors, you may need to give
+  a kind and/or role annotation to tell GHC what the kinds or roles
+  of the type variables are, if they are not the default (``*`` and
+  representational).  It will be obvious if you've gotten it wrong when
+  you try implementing the signature.
+
+- A class declarations can either be abstract or concrete.  An
+  abstract class is one with no superclasses or class methods::
+
+    signature A where
+        class Key k
+
+  It can be implemented in any way, with any set of superclasses
+  and methods; however, modules depending on an abstract class
+  are not permitted to define instances (as of GHC 8.2, this
+  restriction is not checked, see :ghc-ticket:`13086`.)
+  These declarations can be implemented by type synonyms
+  of kind ``Constraint``; this can be useful if you want to parametrize
+  over a constraint in functions.  For example, with the
+  ``ConstraintKinds`` extension, this type synonym is avalid
+  implementation of the signature above::
 
     module A where
-        import TextSig
-        z = toString empty
+        type Key = Eq
 
-To compile these two files, we need to specify what module we would like
-to use to implement the signature. This can be done by compiling the
-implementation, and then using the :ghc-flag:`-sig-of` flag to specify the
-implementation backing a signature:
+  A concrete class specifies its superclasses, methods,
+  default method signatures (but not their implementations)
+  and a ``MINIMAL`` pragma.  Unlike regular Haskell classes,
+  you don't have to explicitly declare a default for a method
+  to make it optional vis-a-vis the ``MINIMAL`` pragma.
 
-.. code-block:: none
+  When merging class declarations, we require that the superclasses
+  and methods match exactly; however, ``MINIMAL`` pragmas are logically
+  ORed together, and a method with a default signature will merge
+  successfully against one that does not.
 
-    ghc -c Text.hs
-    ghc -c TextSig.hsig -sig-of "TextSig is main:Text"
-    ghc -c A.hs
+- You can include instance declarations as in Haskell; just omit the
+  "where" part.  An instance declaration need not be implemented directly;
+  if an instance can be derived based on instances in the environment,
+  it is considered implemented.  For example, the following signature::
 
-To specify multiple signatures, use a comma-separated list. The
-``-sig-of`` parameter is required to specify the backing implementations
-of all home modules, even in one-shot compilation mode. At the moment,
-you must specify the full module name (unit ID, colon, and then
-module name), although in the future we may support more user-friendly
-syntax.
+    signature A where
+        data Str
+        instance Eq Str
 
-.. ghc-flag:: -sig-of "<sig> is <package>:<module>"
+  is considered implemented by the following module, since there
+  are instances of ``Eq`` for ``[]`` and ``Char`` which can be combined
+  to form an instance ``Eq [Char]``::
 
-    Specify the module to be used at the implementation for the 
-    given signature.
+    module A where
+        type Str = [Char]
 
-To just type-check an interface file, no ``-sig-of`` is necessary;
-instead, just pass the options ``-fno-code -fwrite-interface``. ``hsig``
-files will generate normal interface files which other files can also
-use to type-check against. However, at the moment, we always assume that
-an entity defined in a signature is a unique identifier (even though we
-may happen to know it is type equal with another identifier). In the
-future, we will support passing shaping information to the compiler in
-order to let it know about these type equalities.
+  Unlike other declarations, for which only the entities declared
+  in a signature file are brought into scope, instances from the
+  implementation are always brought into scope, even if they were
+  not declared in the signature file.  This means that a module may
+  typecheck against a signature, but not against a matching
+  implementation.  You can avoid situations like this by never
+  defining orphan instances inside a package that has signatures.
 
-Just like ``hs-boot`` files, when an ``hsig`` file is compiled it is
-checked for type consistency against the backing implementation.
-Signature files are also written in a subset of Haskell essentially
-identical to that of ``hs-boot`` files.
+  Instance declarations are only merged if their heads are exactly
+  the same, so it is possible to get into a situation where GHC
+  thinks that instances in a signature are overlapping, even if
+  they are implemented in a non-overlapping way.  If this is
+  giving you problems give us a shout.
 
-There is one important gotcha with the current implementation:
-currently, instances from backing implementations will "leak" code that
-uses signatures, and explicit instance declarations in signatures are
-forbidden. This behavior will be subject to change.
+Known limitations:
+
+- Algebraic data types specified in a signature cannot be implemented using
+  pattern synonyms.  See :ghc-ticket:`12717`
 
 .. _using-make:
 
