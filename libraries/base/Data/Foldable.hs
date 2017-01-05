@@ -21,23 +21,22 @@
 -----------------------------------------------------------------------------
 
 module Data.Foldable (
-    -- * Folds
     Foldable(..),
-    -- ** Special biased folds
+    -- * Special biased folds
     foldrM,
     foldlM,
-    -- ** Folding actions
-    -- *** Applicative actions
+    -- * Folding actions
+    -- ** Applicative actions
     traverse_,
     for_,
     sequenceA_,
     asum,
-    -- *** Monadic actions
+    -- ** Monadic actions
     mapM_,
     forM_,
     sequence_,
     msum,
-    -- ** Specialized folds
+    -- * Specialized folds
     concat,
     concatMap,
     and,
@@ -46,7 +45,7 @@ module Data.Foldable (
     all,
     maximumBy,
     minimumBy,
-    -- ** Searches
+    -- * Searches
     notElem,
     find
     ) where
