@@ -27,7 +27,7 @@ import GHC.Base ( Functor(..), flip )
 
 -- $setup
 -- Allow the use of Prelude in doctests.
--- >>> import Prelude
+-- >>> import Prelude hiding ((<$>))
 
 infixl 4 <$>
 
