@@ -9,7 +9,7 @@ import {-# SOURCE #-} Settings.Default
 perfFlavour :: Flavour
 perfFlavour = defaultFlavour
     { name = "perf"
-    , args = defaultArgs <> perfArgs }
+    , args = defaultBuilderArgs <> perfArgs <> defaultPackageArgs }
 
 optimise :: Context -> Bool
 optimise Context {..} =

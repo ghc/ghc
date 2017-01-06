@@ -15,8 +15,10 @@ compilerPackageArgs = package compiler ? do
     path    <- getBuildPath
     mconcat [ builder Alex ? arg "--latin1"
 
-            , builder (Ghc CompileHs) ?
-              inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
+            , builder (Ghc CompileHs) ? mconcat
+              [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
+              , input "//Parser.hs" ?
+                append ["-O0", "-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
 
             , builder GhcCabal ? mconcat
               [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)

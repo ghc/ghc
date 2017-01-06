@@ -9,7 +9,7 @@ import {-# SOURCE #-} Settings.Default
 quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
-    , args        = defaultArgs <> quickArgs
+    , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
     , libraryWays = defaultLibraryWays <> quickLibraryWays }
 
 optimise :: Context -> Bool

@@ -7,7 +7,7 @@ import {-# SOURCE #-} Settings.Default
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"
-    , args        = defaultArgs <> quickestArgs
+    , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
     , libraryWays = defaultLibraryWays <> quickestLibraryWays }
 
 quickestArgs :: Args

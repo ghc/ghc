@@ -9,7 +9,7 @@ import {-# SOURCE #-} Settings.Default
 profFlavour :: Flavour
 profFlavour = defaultFlavour
     { name        = "prof"
-    , args        = defaultArgs <> profArgs
+    , args        = defaultBuilderArgs <> profArgs <> defaultPackageArgs
     , ghcProfiled = True }
 
 optimise :: Context -> Bool
