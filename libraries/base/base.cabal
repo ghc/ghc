@@ -252,6 +252,7 @@ Library
         GHC.IOArray
         GHC.IORef
         GHC.Int
+        GHC.LargeTuple
         GHC.List
         GHC.MVar
         GHC.Natural

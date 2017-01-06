@@ -17,6 +17,9 @@ mAX_TUPLE_SIZE :: Int
 mAX_TUPLE_SIZE = 62 -- Should really match the number
                     -- of decls in Data.Tuple
 
+sMALL_TUPLE_SIZE :: Int
+sMALL_TUPLE_SIZE = 15 -- XXX Document these properly
+
 mAX_CTUPLE_SIZE :: Int   -- Constraint tuples
 mAX_CTUPLE_SIZE = 62     -- Should match the number of decls in GHC.Classes
 

@@ -137,7 +137,8 @@ import {-# SOURCE #-} KnownUniques
 -- others:
 import CoAxiom
 import Id
-import Constants        ( mAX_TUPLE_SIZE, mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
+import Constants        ( mAX_TUPLE_SIZE, sMALL_TUPLE_SIZE,
+                          mAX_CTUPLE_SIZE, mAX_SUM_SIZE )
 import Module           ( Module )
 import Type
 import DataCon
@@ -830,7 +831,9 @@ mk_tuple Boxed arity = (tycon, tuple_con)
     tuple_con  = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Boxed
-    modu    = gHC_TUPLE
+    modu
+      | arity <= sMALL_TUPLE_SIZE = gHC_TUPLE
+      | otherwise                 = gHC_LARGETUPLE
     tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
                          (ATyCon tycon) BuiltInSyntax
     dc_name = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
