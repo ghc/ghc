@@ -2,7 +2,7 @@
 -- | Convenient predicates
 module Predicate (
     module Expression, stage, stage0, stage1, stage2, notStage0, builder,
-    package, notPackage, input, output, way
+    package, notPackage, input, inputs, output, outputs, way
     ) where
 
 import Base
@@ -52,9 +52,17 @@ instance BuilderLike a => BuilderLike (FilePath -> a) where
 input :: FilePattern -> Predicate
 input f = any (f ?==) <$> getInputs
 
+-- | Does any of the input files match any of the given patterns?
+inputs :: [FilePattern] -> Predicate
+inputs = anyM input
+
 -- | Does any of the output files match a given pattern?
 output :: FilePattern -> Predicate
 output f = any (f ?==) <$> getOutputs
+
+-- | Does any of the output files match any of the given patterns?
+outputs :: [FilePattern] -> Predicate
+outputs = anyM output
 
 -- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate
