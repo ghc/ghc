@@ -321,6 +321,13 @@ data IfLclEnv
 
         if_nsubst :: Maybe NameShape,
 
+        -- This field is used to make sure "implicit" declarations
+        -- (anything that cannot be exported in mi_exports) get
+        -- wired up correctly in typecheckIfacesForMerging.  Most
+        -- of the time it's @Nothing@.  See Note [The implicit TypeEnv]
+        -- in TcIface.
+        if_implicits_env :: Maybe TypeEnv,
+
         if_tv_env  :: FastStringEnv TyVar,     -- Nested tyvar bindings
         if_id_env  :: FastStringEnv Id         -- Nested id binding
     }

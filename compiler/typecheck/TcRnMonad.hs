@@ -124,6 +124,7 @@ module TcRnMonad(
   failIfM,
   forkM_maybe,
   forkM,
+  setImplicitEnvM,
 
   withException,
 
@@ -1670,6 +1671,7 @@ mkIfLclEnv mod loc boot
                                 if_loc     = loc,
                                 if_boot    = boot,
                                 if_nsubst  = Nothing,
+                                if_implicits_env = Nothing,
                                 if_tv_env  = emptyFsEnv,
                                 if_id_env  = emptyFsEnv }
 
@@ -1799,6 +1801,9 @@ forkM doc thing_inside
                         Nothing -> pgmError "Cannot continue after interface file error"
                                    -- pprPanic "forkM" doc
                         Just r  -> r) }
+
+setImplicitEnvM :: TypeEnv -> IfL a -> IfL a
+setImplicitEnvM tenv m = updLclEnv (\lcl -> lcl { if_implicits_env = Just tenv }) m
 
 {-
 Note [Masking exceptions in forkM_maybe]

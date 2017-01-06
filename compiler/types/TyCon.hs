@@ -997,6 +997,14 @@ data FamTyConFlav
    -- | Built-in type family used by the TypeNats solver
    | BuiltInSynFamTyCon BuiltInSynFamily
 
+instance Outputable FamTyConFlav where
+    ppr (DataFamilyTyCon n) = text "data family" <+> ppr n
+    ppr OpenSynFamilyTyCon = text "open type family"
+    ppr (ClosedSynFamilyTyCon Nothing) = text "closed type family"
+    ppr (ClosedSynFamilyTyCon (Just coax)) = text "closed type family" <+> ppr coax
+    ppr AbstractClosedSynFamilyTyCon = text "abstract closed type family"
+    ppr (BuiltInSynFamTyCon _) = text "built-in type family"
+
 {- Note [Closed type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * In an open type family you can add new instances later.  This is the

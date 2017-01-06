@@ -7,6 +7,7 @@ Type checking of type signatures in interface files
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE NondecreasingIndentation #-}
 
 module TcIface (
         tcLookupImported_maybe,
@@ -204,6 +205,7 @@ typecheckIface iface
 isAbstractIfaceDecl :: IfaceDecl -> Bool
 isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon _ } = True
 isAbstractIfaceDecl IfaceClass{ ifCtxt = [], ifSigs = [], ifATs = [] } = True
+isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceAbstractClosedSynFamilyTyCon } = True
 isAbstractIfaceDecl _ = False
 
 -- | Merge two 'IfaceDecl's together, preferring a non-abstract one.  If
@@ -276,7 +278,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- Build the initial environment
     -- NB: Don't include dfuns here, because we don't want to
-    -- serialize them out.  See Note [Bogus DFun renamings]
+    -- serialize them out.  See Note [Bogus DFun renamings] in RnModIface
     let mk_decl_env decls
             = mkOccEnv [ (getOccName decl, decl)
                        | decl <- decls
@@ -295,13 +297,15 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
 
     -- OK, now typecheck each ModIface using this environment
     details <- forM ifaces $ \iface -> do
-        -- DO NOT load these decls into the mutable variable: we did
-        -- that already!
-        decls     <- loadDecls ignore_prags (mi_decls iface)
-        let type_env = mkNameEnv decls
+        -- See Note [The implicit TypeEnv]
+        type_env <- fixM $ \type_env -> do
+            setImplicitEnvM type_env $ do
+                decls <- loadDecls ignore_prags (mi_decls iface)
+                return (mkNameEnv decls)
         -- But note that we use this type_env to typecheck references to DFun
         -- in 'IfaceInst'
-        insts     <- mapM (tcIfaceInstWithDFunTypeEnv type_env) (mi_insts iface)
+        setImplicitEnvM type_env $ do
+        insts     <- mapM tcIfaceInst (mi_insts iface)
         fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
         rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         anns      <- tcIfaceAnnotations (mi_anns iface)
@@ -333,10 +337,14 @@ typecheckIfaceForInstantiate nsubst iface =
                         (text "typecheckIfaceForInstantiate")
                         (mi_boot iface) nsubst $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
-    decls     <- loadDecls ignore_prags (mi_decls iface)
-    let type_env = mkNameEnv decls
+    -- See Note [The implicit TypeEnv]
+    type_env <- fixM $ \type_env -> do
+        setImplicitEnvM type_env $ do
+            decls     <- loadDecls ignore_prags (mi_decls iface)
+            return (mkNameEnv decls)
     -- See Note [Bogus DFun renamings]
-    insts     <- mapM (tcIfaceInstWithDFunTypeEnv type_env) (mi_insts iface)
+    setImplicitEnvM type_env $ do
+    insts     <- mapM tcIfaceInst (mi_insts iface)
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
     rules     <- tcIfaceRules ignore_prags (mi_rules iface)
     anns      <- tcIfaceAnnotations (mi_anns iface)
@@ -350,6 +358,33 @@ typecheckIfaceForInstantiate nsubst iface =
                         , md_vect_info = vect_info
                         , md_exports   = exports
                         }
+
+-- Note [The implicit TypeEnv]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- As described in 'typecheckIfacesForMerging', the splendid innovation
+-- of signature merging is to rewrite all Names in each of the signatures
+-- we are merging together to a pre-merged structure; this is the key
+-- ingredient that lets us solve some problems when merging type
+-- synonyms.
+--
+-- However in the case of DFuns and CoAxioms, this strategy goes
+-- *too far*.  In particular, the reference to a DFun or CoAxiom in
+-- an instance declaration or closed type family (respectively) will
+-- refer to the merged declaration.  However, checkBootDeclM only
+-- ever looks at the embedded structure when performing its comparison;
+-- by virtue of the fact that everything's been pointed to the merged
+-- declaration, you'll never notice there's a difference even if there
+-- is one.
+--
+-- The solution is, for reference to implicit entities, we go straight
+-- for the local TypeEnv corresponding to the entities from this particular
+-- signature; this logic is in 'tcIfaceImplicit'.
+--
+-- There is also some fixM business because families need to refer to
+-- coercion axioms, which are all in the big pile of decls.  I didn't
+-- feel like untangling first so the fixM is a convenient way to get things
+-- where they need to be.
+--
 
 {-
 ************************************************************************
@@ -858,25 +893,7 @@ tcIfaceInst (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
                           , ifInstCls = cls, ifInstTys = mb_tcs
                           , ifInstOrph = orph })
   = do { dfun <- forkM (text "Dict fun" <+> ppr dfun_name) $
-                 tcIfaceExtId dfun_name
-       ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-       ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
-
--- | Typecheck an 'IfaceClsInst', but rather than using 'tcIfaceGlobal',
--- resolve the 'ifDFun' using a passed in 'TypeEnv'.
---
--- Why do we do it this way?  See Note [Bogus DFun renamings]
-tcIfaceInstWithDFunTypeEnv :: TypeEnv -> IfaceClsInst -> IfL ClsInst
-tcIfaceInstWithDFunTypeEnv tenv
-            (IfaceClsInst { ifDFun = dfun_name, ifOFlag = oflag
-                          , ifInstCls = cls, ifInstTys = mb_tcs
-                          , ifInstOrph = orph })
-  = do { dfun <- case lookupTypeEnv tenv dfun_name of
-                    Nothing -> pprPanic "tcIfaceInstWithDFunTypeEnv"
-                        (ppr dfun_name $$ ppr tenv)
-                    Just (AnId dfun) -> return dfun
-                    Just tything -> pprPanic "tcIfaceInstWithDFunTypeEnv"
-                        (ppr dfun_name <+> ppr tything)
+                    fmap tyThingId (tcIfaceImplicit dfun_name)
        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
        ; return (mkImportedInstance cls mb_tcs' dfun_name dfun oflag orph) }
 
@@ -1618,7 +1635,7 @@ tcIfaceTyCon (IfaceTyCon name info)
            IsPromoted    -> promoteDataCon $ tyThingDataCon thing }
 
 tcIfaceCoAxiom :: Name -> IfL (CoAxiom Branched)
-tcIfaceCoAxiom name = do { thing <- tcIfaceGlobal name
+tcIfaceCoAxiom name = do { thing <- tcIfaceImplicit name
                          ; return (tyThingCoAxiom thing) }
 
 tcIfaceDataCon :: Name -> IfL DataCon
@@ -1632,6 +1649,17 @@ tcIfaceExtId name = do { thing <- tcIfaceGlobal name
                        ; case thing of
                           AnId id -> return id
                           _       -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
+
+-- See Note [The implicit TypeEnv]
+tcIfaceImplicit :: Name -> IfL TyThing
+tcIfaceImplicit n = do
+    lcl_env <- getLclEnv
+    case if_implicits_env lcl_env of
+        Nothing -> tcIfaceGlobal n
+        Just tenv ->
+            case lookupTypeEnv tenv n of
+                Nothing -> pprPanic "tcIfaceInst" (ppr n $$ ppr tenv)
+                Just tything -> return tything
 
 {-
 ************************************************************************

@@ -1066,6 +1066,8 @@ checkBootTyCon is_boot tc1 tc2
   = ASSERT(tc1 == tc2)
     let eqFamFlav OpenSynFamilyTyCon   OpenSynFamilyTyCon = True
         eqFamFlav (DataFamilyTyCon {}) (DataFamilyTyCon {}) = True
+        -- This case only happens for hsig merging:
+        eqFamFlav AbstractClosedSynFamilyTyCon AbstractClosedSynFamilyTyCon = True
         eqFamFlav AbstractClosedSynFamilyTyCon (ClosedSynFamilyTyCon {}) = True
         eqFamFlav (ClosedSynFamilyTyCon {}) AbstractClosedSynFamilyTyCon = True
         eqFamFlav (ClosedSynFamilyTyCon ax1) (ClosedSynFamilyTyCon ax2)
@@ -1077,8 +1079,11 @@ checkBootTyCon is_boot tc1 tc2
     in
     -- check equality of roles, family flavours and injectivity annotations
     check (roles1 == roles2) roles_msg `andThenCheck`
-    check (eqFamFlav fam_flav1 fam_flav2) empty `andThenCheck`
-    check (injInfo1 == injInfo2) empty
+    check (eqFamFlav fam_flav1 fam_flav2)
+        (ifPprDebug $
+            text "Family flavours" <+> ppr fam_flav1 <+> text "and" <+> ppr fam_flav2 <+>
+            text "do not match") `andThenCheck`
+    check (injInfo1 == injInfo2) (text "Injectivities do not match")
 
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)

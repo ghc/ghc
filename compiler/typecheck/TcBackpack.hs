@@ -135,6 +135,8 @@ checkHsigIface tcg_env gr sig_iface
     dfun_names = map getName sig_insts
     check_export name
       -- Skip instances, we'll check them later
+      -- TODO: Actually this should never happen, because DFuns are
+      -- never exported...
       | name `elem` dfun_names = return ()
       -- See if we can find the type directly in the hsig ModDetails
       -- TODO: need to special case wired in names
@@ -559,23 +561,23 @@ mergeSignatures hsmod lcl_iface0 = do
     tcg_env <- (\x -> foldM x tcg_env infos)
              $ \tcg_env (iface, details) -> do
 
-        -- For every TyThing in the type environment, compare it for
-        -- compatibility with the merged environment, but skip
-        -- DFunIds and implicit TyThings.
-        let check_ty sig_thing
-              -- We'll check these with the parent
-              | isImplicitTyThing sig_thing
-              = return ()
-              -- These aren't in the type environment; checked
-              -- when merging instances
-              | AnId id <- sig_thing
-              , isDFunId id
-              = return ()
-              | Just thing <- lookupTypeEnv type_env (getName sig_thing)
-              = checkHsigDeclM iface sig_thing thing
+        let check_export name
+              | Just sig_thing <- lookupTypeEnv (md_types details) name
+              = case lookupTypeEnv type_env (getName sig_thing) of
+                  Just thing -> checkHsigDeclM iface sig_thing thing
+                  Nothing -> panic "mergeSignatures: check_export"
+              -- Oops! We're looking for this export but it's
+              -- not actually in the type environment of the signature's
+              -- ModDetails.
+              --
+              -- NB: This case happens because the we're iterating
+              -- over the union of all exports, so some interfaces
+              -- won't have everything.  Note that md_exports is nonsense
+              -- (it's the same as exports); maybe we should fix this
+              -- eventually.
               | otherwise
-              = panic "mergeSignatures check_ty"
-        mapM_ check_ty (typeEnvElts (md_types details))
+              = return ()
+        mapM_ check_export (map availName exports)
 
         -- Note [Signature merging instances]
         -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

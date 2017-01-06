@@ -466,7 +466,7 @@ rnIfaceDecl d@IfaceClass{} = do
                      , ifSigs = sigs
                      }
 rnIfaceDecl d@IfaceAxiom{} = do
-            name <- rnIfaceGlobal (ifName d)
+            name <- rnIfaceImplicit (ifName d)
             tycon <- rnIfaceTyCon (ifTyCon d)
             ax_branches <- mapM rnIfaceAxBranch (ifAxBranches d)
             return d { ifName = name
@@ -497,7 +497,7 @@ rnIfaceDecl d@IfacePatSyn{} =  do
 
 rnIfaceFamTyConFlav :: Rename IfaceFamTyConFlav
 rnIfaceFamTyConFlav (IfaceClosedSynFamilyTyCon (Just (n, axs)))
-    = IfaceClosedSynFamilyTyCon . Just <$> ((,) <$> rnIfaceGlobal n
+    = IfaceClosedSynFamilyTyCon . Just <$> ((,) <$> rnIfaceImplicit n
                                                 <*> mapM rnIfaceAxBranch axs)
 rnIfaceFamTyConFlav flav = pure flav
 
