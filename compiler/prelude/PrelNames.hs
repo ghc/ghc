@@ -383,7 +383,6 @@ basicKnownKeyNames
         , ghciIoClassName, ghciStepIoMName
 
         -- StaticPtr
-        , makeStaticName
         , staticPtrTyConName
         , staticPtrDataConName, staticPtrInfoDataConName
         , fromStaticPtrName
@@ -521,9 +520,6 @@ gHC_STACK_TYPES = mkBaseModule (fsLit "GHC.Stack.Types")
 
 gHC_STATICPTR :: Module
 gHC_STATICPTR = mkBaseModule (fsLit "GHC.StaticPtr")
-
-gHC_STATICPTR_INTERNAL :: Module
-gHC_STATICPTR_INTERNAL = mkBaseModule (fsLit "GHC.StaticPtr.Internal")
 
 gHC_FINGERPRINT_TYPE :: Module
 gHC_FINGERPRINT_TYPE = mkBaseModule (fsLit "GHC.Fingerprint.Type")
@@ -1390,10 +1386,6 @@ frontendPluginTyConName :: Name
 frontendPluginTyConName = tcQual pLUGINS (fsLit "FrontendPlugin") frontendPluginTyConKey
 
 -- Static pointers
-makeStaticName :: Name
-makeStaticName =
-    varQual gHC_STATICPTR_INTERNAL (fsLit "makeStatic") makeStaticKey
-
 staticPtrInfoTyConName :: Name
 staticPtrInfoTyConName =
     tcQual gHC_STATICPTR (fsLit "StaticPtrInfo") staticPtrInfoTyConKey
@@ -2227,9 +2219,6 @@ pushCallStackKey  = mkPreludeMiscIdUnique 518
 
 fromStaticPtrClassOpKey :: Unique
 fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 519
-
-makeStaticKey :: Unique
-makeStaticKey = mkPreludeMiscIdUnique 520
 
 {-
 ************************************************************************

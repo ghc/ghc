@@ -312,7 +312,6 @@ Library
         Data.Functor.Utils
         Data.OldList
         Foreign.ForeignPtr.Imp
-        GHC.StaticPtr.Internal
         System.Environment.ExecutablePath
         System.CPUTime.Utils
 
