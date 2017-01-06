@@ -56,7 +56,7 @@ rtsPackageArgs = package rts ? do
 
           , way == threaded ? arg "-DTHREADED_RTS"
 
-          , (input "//RtsMessages.c" ||^ input "//Trace.c") ?
+          , inputs ["//RtsMessages.c", "//Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
 
           , input "//RtsUtils.c" ? append
@@ -76,11 +76,10 @@ rtsPackageArgs = package rts ? do
             , "-DGhcUnregisterised="         ++ show ghcUnreg
             , "-DGhcEnableTablesNextToCode=" ++ show ghcEnableTNC ]
 
-            , input "//Evac.c"     ? arg "-funroll-loops"
-            , input "//Evac_thr.c" ? arg "-funroll-loops"
+            , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
 
-            , input "//Evac_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ]
-            , input "//Scav_thr.c" ? append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
+            , inputs ["//Evac_thr.c", "//Scav_thr.c"] ?
+              append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
 
         , builder Ghc ? arg "-Irts"
 
