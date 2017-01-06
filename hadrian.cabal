@@ -86,6 +86,7 @@ executable hadrian
                        , Settings.Builders.Tar
                        , Settings.Default
                        , Settings.Flavours.Perf
+                       , Settings.Flavours.Prof
                        , Settings.Flavours.Quick
                        , Settings.Flavours.Quickest
                        , Settings.Packages.Base
