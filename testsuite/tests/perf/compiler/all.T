@@ -501,7 +501,7 @@ test('T5321Fun',
              # 2014-09-03: 299656164     (specialisation and inlining)
              # 10/12/2014: 206406188     #  Improvements in constraint solver
              # 2016-04-06: 279922360 x86/Linux
-            (wordsize(64), 565883176, 10)])
+            (wordsize(64), 497356688, 5)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
@@ -515,6 +515,9 @@ test('T5321Fun',
              #  (undefined now takes an implicit parameter and GHC -O0 does
              #  not recognize that the application is bottom)
              # 11/12/2015: 565883176     #  TypeInType (see #11196)
+             # 06/01/2017: 497356688     #  Small coercion optimisations
+                                         #  The actual decrease was only 2%; earlier
+                                         #    commits had drifted down
       ],
       compile,[''])
 

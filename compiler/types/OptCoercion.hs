@@ -301,7 +301,7 @@ opt_co4 env sym rep r (CoherenceCo co1 co2)
            else opt_trans in_scope (mkCoherenceCo col1' co2') cor1'
 
   | otherwise
-  = wrapSym sym $ CoherenceCo (opt_co4_wrap env False rep r co1) co2'
+  = wrapSym sym $ mkCoherenceCo (opt_co4_wrap env False rep r co1) co2'
   where co1' = opt_co4_wrap env sym   rep   r       co1
         co2' = opt_co4_wrap env False False Nominal co2
         in_scope = lcInScopeSet env

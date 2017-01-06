@@ -35,6 +35,7 @@ import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
 import CoreArity
+import CoreSubst        ( pushCoTyArg, pushCoValArg )
 --import PrimOp           ( tagToEnumKey ) -- temporalily commented out. See #8326
 import Rules            ( mkRuleInfo, lookupRule, getRules )
 import TysPrim          ( voidPrimTy ) --, intPrimTy ) -- temporalily commented out. See #8326
@@ -1144,65 +1145,38 @@ simplCast env body co0 cont0
         ; cont1 <- addCoerce co1 cont0
         ; simplExprF env body cont1 }
   where
-       addCoerce co cont = add_coerce co (coercionKind co) cont
+       addCoerce :: OutCoercion -> SimplCont -> SimplM SimplCont
+       addCoerce co1 (CastIt co2 cont)
+         = addCoerce (mkTransCo co1 co2) cont
 
-       add_coerce _co (Pair s1 k1) cont     -- co :: ty~ty
-         | s1 `eqType` k1 = return cont    -- is a no-op
+       addCoerce co cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
+         | Just (arg_ty', co') <- pushCoTyArg co arg_ty
+         = do { tail' <- addCoerce co' tail
+              ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
 
-       add_coerce co1 (Pair s1 _k2) (CastIt co2 cont)
-         | (Pair _l1 t1) <- coercionKind co2
-                --      e |> (g1 :: S1~L) |> (g2 :: L~T1)
-                -- ==>
-                --      e,                       if S1=T1
-                --      e |> (g1 . g2 :: S1~T1)  otherwise
-                --
+       addCoerce co (ApplyToVal { sc_arg = arg, sc_env = arg_se
+                                , sc_dup = dup, sc_cont = tail })
+         | Just (co1, co2) <- pushCoValArg co
+         = do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
+                   -- When we build the ApplyTo we can't mix the OutCoercion
+                   -- 'co' with the InExpr 'arg', so we simplify
+                   -- to make it all consistent.  It's a bit messy.
+                   -- But it isn't a common case.
+                   -- Example of use: Trac #995
+              ; tail' <- addCoerce co2 tail
+              ; return (ApplyToVal { sc_arg  = mkCast arg' co1
+                                   , sc_env  = arg_se'
+                                   , sc_dup  = dup'
+                                   , sc_cont = tail' }) }
+
+       addCoerce co cont
+         | isReflexiveCo co = return cont
+         | otherwise        = return (CastIt co cont)
+                -- It's worth checking isReflexiveCo.
                 -- For example, in the initial form of a worker
                 -- we may find  (coerce T (coerce S (\x.e))) y
                 -- and we'd like it to simplify to e[y/x] in one round
                 -- of simplification
-         , s1 `eqType` t1  = return cont     -- The coerces cancel out
-         | otherwise       = return (CastIt (mkTransCo co1 co2) cont)
-
-       add_coerce co (Pair s1s2 _t1t2) cont@(ApplyToTy { sc_arg_ty = arg_ty, sc_cont = tail })
-                -- (f |> g) ty  --->   (f ty) |> (g @ ty)
-                -- This implements the PushT rule from the paper
-         | isForAllTy s1s2
-         = do { cont' <- addCoerce new_cast tail
-              ; return (cont { sc_cont = cont' }) }
-         where
-           new_cast = mkInstCo co (mkNomReflCo arg_ty)
-
-       add_coerce co (Pair s1s2 t1t2) (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                                  , sc_dup = dup, sc_cont = cont })
-         | isFunTy s1s2   -- This implements the Push rule from the paper
-         , isFunTy t1t2   -- Check t1t2 to ensure 'arg' is a value arg
-                --      (e |> (g :: s1s2 ~ t1->t2)) f
-                -- ===>
-                --      (e (f |> (arg g :: t1~s1))
-                --      |> (res g :: s2->t2)
-                --
-                -- t1t2 must be a function type, t1->t2, because it's applied
-                -- to something but s1s2 might conceivably not be
-                --
-                -- When we build the ApplyTo we can't mix the out-types
-                -- with the InExpr in the argument, so we simply substitute
-                -- to make it all consistent.  It's a bit messy.
-                -- But it isn't a common case.
-                --
-                -- Example of use: Trac #995
-         = do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
-              ; cont'                <- addCoerce co2 cont
-              ; return (ApplyToVal { sc_arg  = mkCast arg' (mkSymCo co1)
-                                   , sc_env  = arg_se'
-                                   , sc_dup  = dup'
-                                   , sc_cont = cont' }) }
-         where
-           -- we split coercion t1->t2 ~ s1->s2 into t1 ~ s1 and
-           -- t2 ~ s2 with left and right on the curried form:
-           --    (->) t1 t2 ~ (->) s1 s2
-           [co1, co2] = decomposeCo 2 co
-
-       add_coerce co _ cont = return (CastIt co cont)
 
 simplArg :: SimplEnv -> DupFlag -> StaticEnv -> CoreExpr
          -> SimplM (DupFlag, StaticEnv, OutExpr)

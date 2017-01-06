@@ -853,7 +853,10 @@ mkNthCo n (Refl r ty)
           | otherwise
           = False
 
-mkNthCo n (TyConAppCo _ _ cos) = cos `getNth` n
+mkNthCo 0 (ForAllCo _ kind_co _) = kind_co
+  -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
+  -- then (nth 0 co :: k1 ~ k2)
+mkNthCo n (TyConAppCo _ _ arg_cos) = arg_cos `getNth` n
 mkNthCo n co = NthCo n co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion

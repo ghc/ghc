@@ -34,6 +34,7 @@ module CoreSubst (
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
+        pushCoArg, pushCoValArg, pushCoTyArg
     ) where
 
 #include "HsVersions.h"
@@ -1245,13 +1246,13 @@ exprIsConApp_maybe (in_scope, id_unf) expr
 
         | Just con <- isDataConWorkId_maybe fun
         , count isValArg args == idArity fun
-        = dealWithCoercion co con args
+        = pushCoDataCon con args co
 
         -- Look through dictionary functions; see Note [Unfolding DFuns]
         | DFunUnfolding { df_bndrs = bndrs, df_con = con, df_args = dfun_args } <- unfolding
         , bndrs `equalLength` args    -- See Note [DFun arity check]
         , let subst = mkOpenSubst in_scope (bndrs `zip` args)
-        = dealWithCoercion co con (map (substExpr (text "exprIsConApp1") subst) dfun_args)
+        = pushCoDataCon con (map (substExpr (text "exprIsConApp1") subst) dfun_args) co
 
         -- Look through unfoldings, but only arity-zero one;
         -- if arity > 0 we are effectively inlining a function call,
@@ -1284,35 +1285,6 @@ exprIsConApp_maybe (in_scope, id_unf) expr
     extend (Left in_scope) v e = Right (extendSubst (mkEmptySubst in_scope) v e)
     extend (Right s)       v e = Right (extendSubst s v e)
 
-pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Coercion)
-pushCoArgs co []         = return ([], co)
-pushCoArgs co (arg:args) = do { (arg',  co1) <- pushCoArg  co  arg
-                              ; (args', co2) <- pushCoArgs co1 args
-                              ; return (arg':args', co2) }
-
-pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
--- We have (fun |> co) arg, and we want to transform it to
---         (fun arg) |> co
--- This may fail, e.g. if (fun :: N) where N is a newtype
--- C.f. simplCast in Simplify.hs
-
-pushCoArg co arg
-  = case arg of
-      Type ty | isForAllTy tyL
-        -> ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
-           Just (Type ty, mkInstCo co (mkNomReflCo ty))
-
-      _ | isFunTy tyL
-        , [co1, co2] <- decomposeCo 2 co
-              -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
-              -- then co1 :: tyL1 ~ tyR1
-              --      co2 :: tyL2 ~ tyR2
-        -> ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
-           Just (mkCast arg (mkSymCo co1), co2)
-
-      _ -> Nothing
-  where
-    Pair tyL tyR = coercionKind co
 
 -- See Note [exprIsConApp_maybe on literal strings]
 dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
@@ -1323,7 +1295,7 @@ dealWithStringLiteral :: Var -> BS.ByteString -> Coercion
 -- generates a string literal directly.
 dealWithStringLiteral _   str co
   | BS.null str
-  = dealWithCoercion co nilDataCon [Type charTy]
+  = pushCoDataCon nilDataCon [Type charTy] co
 
 dealWithStringLiteral fun str co
   = let strFS = mkFastStringByteString str
@@ -1337,67 +1309,7 @@ dealWithStringLiteral fun str co
                  else App (Var fun)
                           (Lit (MachStr charTail))
 
-    in dealWithCoercion co consDataCon [Type charTy, char, rest]
-
-dealWithCoercion :: Coercion -> DataCon -> [CoreExpr]
-                 -> Maybe (DataCon, [Type], [CoreExpr])
-dealWithCoercion co dc dc_args
-  | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
-  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
-  = Just (dc, map exprToType univ_ty_args, rest_args)
-
-  | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
-  , to_tc == dataConTyCon dc
-        -- These two tests can fail; we might see
-        --      (C x y) `cast` (g :: T a ~ S [a]),
-        -- where S is a type function.  In fact, exprIsConApp
-        -- will probably not be called in such circumstances,
-        -- but there't nothing wrong with it
-
-  =     -- Here we do the KPush reduction rule as described in "Down with kinds"
-        -- The transformation applies iff we have
-        --      (C e1 ... en) `cast` co
-        -- where co :: (T t1 .. tn) ~ to_ty
-        -- The left-hand one must be a T, because exprIsConApp returned True
-        -- but the right-hand one might not be.  (Though it usually will.)
-    let
-        tc_arity       = tyConArity to_tc
-        dc_univ_tyvars = dataConUnivTyVars dc
-        dc_ex_tyvars   = dataConExTyVars dc
-        arg_tys        = dataConRepArgTys dc
-
-        non_univ_args  = dropList dc_univ_tyvars dc_args
-        (ex_args, val_args) = splitAtList dc_ex_tyvars non_univ_args
-
-        -- Make the "Psi" from the paper
-        omegas = decomposeCo tc_arity co
-        (psi_subst, to_ex_arg_tys)
-          = liftCoSubstWithEx Representational
-                              dc_univ_tyvars
-                              omegas
-                              dc_ex_tyvars
-                              (map exprToType ex_args)
-
-          -- Cast the value arguments (which include dictionaries)
-        new_val_args = zipWith cast_arg arg_tys val_args
-        cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
-
-        to_ex_args = map Type to_ex_arg_tys
-
-        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
-                         ppr arg_tys, ppr dc_args,
-                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc ]
-    in
-    ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
-    ASSERT2( equalLength val_args arg_tys, dump_doc )
-    Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
-
-  | otherwise
-  = Nothing
-
-  where
-    Pair from_ty to_ty = coercionKind co
-
+    in pushCoDataCon consDataCon [Type charTy, char, rest] co
 
 {-
 Note [Unfolding DFuns]
@@ -1489,11 +1401,107 @@ exprIsLambda_maybe _ _e
       Nothing
 
 
+{- *********************************************************************
+*                                                                      *
+              The "push rules"
+*                                                                      *
+************************************************************************
+
+Here we implement the "push rules" from FC papers:
+
+* The push-argument ules, where we can move a coercion past an argument.
+  We have
+      (fun |> co) arg
+  and we want to transform it to
+    (fun arg') |> co'
+  for some suitable co' and tranformed arg'.
+
+* The PushK rule for data constructors.  We have
+       (K e1 .. en) |> co
+  and we want to tranform to
+       (K e1' .. en')
+  by pushing the coercion into the oarguments
+-}
+
+pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Coercion)
+pushCoArgs co []         = return ([], co)
+pushCoArgs co (arg:args) = do { (arg',  co1) <- pushCoArg  co  arg
+                              ; (args', co2) <- pushCoArgs co1 args
+                              ; return (arg':args', co2) }
+
+pushCoArg :: Coercion -> CoreArg -> Maybe (CoreArg, Coercion)
+-- We have (fun |> co) arg, and we want to transform it to
+--         (fun arg) |> co
+-- This may fail, e.g. if (fun :: N) where N is a newtype
+-- C.f. simplCast in Simplify.hs
+-- 'co' is always Representational
+
+pushCoArg co (Type ty) = do { (ty', co') <- pushCoTyArg co ty
+                            ; return (Type ty', co') }
+pushCoArg co val_arg   = do { (arg_co, co') <- pushCoValArg co
+                            ; return (mkCast val_arg arg_co, co') }
+
+pushCoTyArg :: Coercion -> Type -> Maybe (Type, Coercion)
+-- We have (fun |> co) @ty
+-- Push the coercion through to return
+--         (fun @ty') |> co'
+-- 'co' is always Representational
+pushCoTyArg co ty
+  | tyL `eqType` tyR
+  = Just (ty, mkRepReflCo (piResultTy tyR ty))
+
+  | isForAllTy tyL
+  = ASSERT2( isForAllTy tyR, ppr co $$ ppr ty )
+    Just (ty `mkCastTy` mkSymCo co1, co2)
+
+  | otherwise
+  = Nothing
+  where
+    Pair tyL tyR = coercionKind co
+       -- co :: tyL ~ tyR
+       -- tyL = forall (a1 :: k1). ty1
+       -- tyR = forall (a2 :: k2). ty2
+
+    co1 = mkNthCo 0 co
+       -- co1 :: k1 ~ k2
+       -- Note that NthCo can extract an equality between the kinds
+       -- of the types related by a coercion between forall-types.
+       -- See the NthCo case in CoreLint.
+
+    co2 = mkInstCo co (mkCoherenceLeftCo (mkNomReflCo ty) co1)
+        -- co2 :: ty1[ (ty|>co1)/a1 ] ~ ty2[ ty/a2 ]
+        -- Arg of mkInstCo is always nominal, hence mkNomReflCo
+
+pushCoValArg :: Coercion -> Maybe (Coercion, Coercion)
+-- We have (fun |> co) arg
+-- Push the coercion through to return
+--         (fun (arg |> co_arg)) |> co_res
+-- 'co' is always Representational
+pushCoValArg co
+  | tyL `eqType` tyR
+  = Just (mkRepReflCo arg, mkRepReflCo res)
+
+  | isFunTy tyL
+  , [co1, co2] <- decomposeCo 2 co
+              -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
+              -- then co1 :: tyL1 ~ tyR1
+              --      co2 :: tyL2 ~ tyR2
+  = ASSERT2( isFunTy tyR, ppr co $$ ppr arg )
+    Just (mkSymCo co1, co2)
+
+  | otherwise
+  = Nothing
+  where
+    (arg, res)   = splitFunTy tyR
+    Pair tyL tyR = coercionKind co
+
 pushCoercionIntoLambda
     :: InScopeSet -> Var -> CoreExpr -> Coercion -> Maybe (Var, CoreExpr)
+-- This implements the Push rule from the paper on coercions
+--    (\x. e) |> co
+-- ===>
+--    (\x'. e |> co')
 pushCoercionIntoLambda in_scope x e co
-    -- This implements the Push rule from the paper on coercions
-    -- Compare with simplCast in Simplify
     | ASSERT(not (isTyVar x) && not (isCoVar x)) True
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_s1,_s2) <- splitFunTy_maybe s1s2
@@ -1510,3 +1518,64 @@ pushCoercionIntoLambda in_scope x e co
     | otherwise
     = pprTrace "exprIsLambda_maybe: Unexpected lambda in case" (ppr (Lam x e))
       Nothing
+
+pushCoDataCon :: DataCon -> [CoreExpr] -> Coercion
+              -> Maybe (DataCon
+                       , [Type]      -- Universal type args
+                       , [CoreExpr]) -- All other args incl existentials
+-- Implement the KPush reduction rule as described in "Down with kinds"
+-- The transformation applies iff we have
+--      (C e1 ... en) `cast` co
+-- where co :: (T t1 .. tn) ~ to_ty
+-- The left-hand one must be a T, because exprIsConApp returned True
+-- but the right-hand one might not be.  (Though it usually will.)
+pushCoDataCon dc dc_args co
+  | isReflCo co || from_ty `eqType` to_ty  -- try cheap test first
+  , let (univ_ty_args, rest_args) = splitAtList (dataConUnivTyVars dc) dc_args
+  = Just (dc, map exprToType univ_ty_args, rest_args)
+
+  | Just (to_tc, to_tc_arg_tys) <- splitTyConApp_maybe to_ty
+  , to_tc == dataConTyCon dc
+        -- These two tests can fail; we might see
+        --      (C x y) `cast` (g :: T a ~ S [a]),
+        -- where S is a type function.  In fact, exprIsConApp
+        -- will probably not be called in such circumstances,
+        -- but there't nothing wrong with it
+
+  = let
+        tc_arity       = tyConArity to_tc
+        dc_univ_tyvars = dataConUnivTyVars dc
+        dc_ex_tyvars   = dataConExTyVars dc
+        arg_tys        = dataConRepArgTys dc
+
+        non_univ_args  = dropList dc_univ_tyvars dc_args
+        (ex_args, val_args) = splitAtList dc_ex_tyvars non_univ_args
+
+        -- Make the "Psi" from the paper
+        omegas = decomposeCo tc_arity co
+        (psi_subst, to_ex_arg_tys)
+          = liftCoSubstWithEx Representational
+                              dc_univ_tyvars
+                              omegas
+                              dc_ex_tyvars
+                              (map exprToType ex_args)
+
+          -- Cast the value arguments (which include dictionaries)
+        new_val_args = zipWith cast_arg arg_tys val_args
+        cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
+
+        to_ex_args = map Type to_ex_arg_tys
+
+        dump_doc = vcat [ppr dc,      ppr dc_univ_tyvars, ppr dc_ex_tyvars,
+                         ppr arg_tys, ppr dc_args,
+                         ppr ex_args, ppr val_args, ppr co, ppr from_ty, ppr to_ty, ppr to_tc ]
+    in
+    ASSERT2( eqType from_ty (mkTyConApp to_tc (map exprToType $ takeList dc_univ_tyvars dc_args)), dump_doc )
+    ASSERT2( equalLength val_args arg_tys, dump_doc )
+    Just (dc, to_tc_arg_tys, to_ex_args ++ new_val_args)
+
+  | otherwise
+  = Nothing
+
+  where
+    Pair from_ty to_ty = coercionKind co
