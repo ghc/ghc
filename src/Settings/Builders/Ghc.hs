@@ -7,12 +7,11 @@ import Settings.Builders.Common
 ghcBuilderArgs :: Args
 ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
     needTouchy
-    mconcat [ commonGhcArgs
+    mconcat [ arg "-Wall"
+            , commonGhcArgs
             , arg "-H32m"
             , stage0    ? arg "-O"
             , notStage0 ? arg "-O2"
-            , arg "-Wall"
-            , arg "-fwarn-tabs"
             , splitObjectsArgs
             , ghcLinkArgs
             , builder (Ghc CompileHs) ? arg "-c"

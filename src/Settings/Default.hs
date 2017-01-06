@@ -41,10 +41,7 @@ import UserSettings
 
 -- | All default command line arguments.
 defaultArgs :: Args
-defaultArgs = mconcat
-    [ defaultBuilderArgs
-    , defaultPackageArgs
-    , builder Ghc ? remove ["-Wall", "-fwarn-tabs"] ] -- TODO: Fix warning Args.
+defaultArgs = defaultBuilderArgs <> defaultPackageArgs
 
 -- | Packages that are built by default. You can change this by editing
 -- 'userPackages' in "UserSettings".
