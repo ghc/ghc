@@ -1,5 +1,5 @@
 Name: mkUserGuidePart
-Version: 0.1
+Version: @ProjectVersionMunged@
 Copyright: XXX
 License: BSD3
 -- XXX License-File: LICENSE
@@ -47,5 +47,9 @@ Executable mkUserGuidePart
         Options.Verbosity
         Options.Warnings
     Build-Depends: base       >= 3   && < 5,
-                   ghc
+                   -- mkUserGuidePart uses the compiler's DynFlags to determine
+                   -- a few options-related properties of the compiler.
+                   -- Consequently we should make sure we are building against
+                   -- the right compiler.
+                   ghc        == @ProjectVersionMunged@
 
