@@ -2,7 +2,7 @@ module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
     getContextDirectory, getBuildPath, stagePackages, builderPath,
-    getBuilderPath, isSpecified, latestBuildStage, programPath
+    getBuilderPath, isSpecified, latestBuildStage, programPath, programContext
     ) where
 
 import Base
@@ -61,6 +61,11 @@ flavour = fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
     unknownFlavour = error $ "Unknown build flavour: " ++ flavourName
     flavours       = hadrianFlavours ++ userFlavours
     flavourName    = fromMaybe "default" cmdFlavour
+
+programContext :: Stage -> Package -> Context
+programContext stage pkg
+    | pkg == ghc && ghcProfiled flavour = Context stage pkg profiling
+    | otherwise = vanillaContext stage pkg
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

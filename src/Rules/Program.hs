@@ -30,7 +30,7 @@ wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
     let installStage = do
-            latest <- latestBuildStage package -- isJust below is safe
+            latest <- latestBuildStage package -- fromJust below is safe
             return $ if package == ghc then stage else fromJust latest
 
     buildPath context -/- programName context <.> exe %>
@@ -68,15 +68,14 @@ buildWrapper context@Context {..} wrapper wrapperPath binPath = do
         quote (pkgNameString package) ++ " (" ++ show stage ++ ")."
 
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
--- TODO: Do we need to consider other ways when building programs?
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinary rs context@Context {..} bin = do
     binDeps <- if stage == Stage0 && package == ghcCabal
         then hsSources context
         else do
-            ways <- interpretInContext context getLibraryWays
             deps <- contextDependencies context
-            needContext [ dep { way = w } | dep <- deps, w <- ways ]
+            ways <- interpretInContext context (getLibraryWays <> getRtsWays)
+            needContext $ deps ++ [ rtsContext { way = w } | w <- ways ]
             let path = buildPath context
             cObjs  <- map (objectPath context) <$> pkgDataList (CSrcs path)
             hsObjs <- hsObjects context

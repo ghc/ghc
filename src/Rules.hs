@@ -49,7 +49,7 @@ topLevelTargets = do
                     docs <- interpretInContext context $ buildHaddock flavour
                     need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
                 else do -- otherwise build a program
-                    need =<< maybeToList <$> programPath context
+                    need =<< maybeToList <$> programPath (programContext stage pkg)
 
 packageRules :: Rules ()
 packageRules = do
@@ -61,13 +61,15 @@ packageRules = do
     let readPackageDb  = [(packageDb, 1)]
         writePackageDb = [(packageDb, maxConcurrentReaders)]
 
-    -- TODO: not all build rules make sense for all stage/package combinations
     let contexts        = liftM3 Context        allStages knownPackages allWays
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
+        programContexts = liftM2 programContext allStages knownPackages
 
     forM_ contexts $ mconcat
         [ Rules.Compile.compilePackage readPackageDb
         , Rules.Library.buildPackageLibrary ]
+
+    forM_ programContexts $ Rules.Program.buildProgram readPackageDb
 
     forM_ vanillaContexts $ mconcat
         [ Rules.Data.buildPackageData
@@ -75,7 +77,6 @@ packageRules = do
         , Rules.Documentation.buildPackageDocumentation
         , Rules.Library.buildPackageGhciLibrary
         , Rules.Generate.generatePackageCode
-        , Rules.Program.buildProgram readPackageDb
         , Rules.Register.registerPackage writePackageDb ]
 
 buildRules :: Rules ()
