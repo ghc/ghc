@@ -10,7 +10,8 @@ quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
-    , libraryWays = defaultLibraryWays <> quickLibraryWays }
+    , libraryWays = append [vanilla]
+    , rtsWays     = append [vanilla, threaded] }
 
 optimise :: Context -> Bool
 optimise Context {..} =
@@ -20,6 +21,3 @@ quickArgs :: Args
 quickArgs = builder Ghc ? do
     context <- getContext
     if optimise context then arg "-O" else arg "-O0"
-
-quickLibraryWays :: Ways
-quickLibraryWays = remove [profiling]
