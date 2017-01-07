@@ -118,7 +118,6 @@ stage2Packages = do
              , ghcTags       ] ++
              [ haddock | doc ]
 
--- TODO: What about profilingDynamic way? Do we need platformSupportsSharedLibs?
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
 -- * We build 'profiling' way when stage > Stage0.

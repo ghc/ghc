@@ -10,8 +10,7 @@ quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
-    , libraryWays = append [vanilla]
-    , rtsWays     = append [vanilla, threaded] }
+    , libraryWays = append [vanilla] }
 
 optimise :: Context -> Bool
 optimise Context {..} =

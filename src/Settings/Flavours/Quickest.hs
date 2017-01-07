@@ -6,10 +6,10 @@ import {-# SOURCE #-} Settings.Default
 
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
-    { name         = "quickest"
-    , args         = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
-    , libraryWays  = append [vanilla]
-    , rtsWays      = quickestRtsWays }
+    { name        = "quickest"
+    , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
+    , libraryWays = append [vanilla]
+    , rtsWays     = quickestRtsWays }
 
 quickestArgs :: Args
 quickestArgs = builder Ghc ? arg "-O0"
