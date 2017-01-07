@@ -905,7 +905,7 @@ fuzzyLookup user_entered possibilites
   where
     -- Work out an approriate match threshold:
     -- We report a candidate if its edit distance is <= the threshold,
-    -- The threshhold is set to about a quarter of the # of characters the user entered
+    -- The threshold is set to about a quarter of the # of characters the user entered
     --   Length    Threshold
     --     1         0          -- Don't suggest *any* candidates
     --     2         1          -- for single-char identifiers
