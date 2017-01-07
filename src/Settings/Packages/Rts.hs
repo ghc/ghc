@@ -61,7 +61,10 @@ rtsPackageArgs = package rts ? do
           -- be inlined. See also #90.
           , arg "-O2"
 
-          , way == threaded ? arg "-DTHREADED_RTS"
+          , Debug     `wayUnit` way          ? arg "-DDEBUG"
+          , way `elem` [debug, debugDynamic] ? arg "-DTICKY_TICKY"
+          , Profiling `wayUnit` way          ? arg "-DPROFILING"
+          , Threaded  `wayUnit` way          ? arg "-DTHREADED_RTS"
 
           , inputs ["//RtsMessages.c", "//Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
