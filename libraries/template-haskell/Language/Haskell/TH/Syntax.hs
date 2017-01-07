@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP, DeriveDataTypeable,
              DeriveGeneric, FlexibleInstances, DefaultSignatures,
-             RankNTypes, RoleAnnotations, ScopedTypeVariables #-}
+             RankNTypes, RoleAnnotations, ScopedTypeVariables,
+             Trustworthy #-}
 
 {-# OPTIONS_GHC -fno-warn-inline-rule-shadowing #-}
 
