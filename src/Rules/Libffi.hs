@@ -55,8 +55,8 @@ libffiRules = do
             forM_ hs $ \header ->
                 copyFile header (rtsBuildPath -/- takeFileName header)
 
-            libffiName <- rtsLibffiLibraryName
-            copyFile libffiLibrary (rtsBuildPath -/- "lib" ++ libffiName <.> "a")
+            ways <- interpretInContext libffiContext (getLibraryWays <> getRtsWays)
+            forM_ ways $ \way -> copyFile libffiLibrary =<< rtsLibffiLibrary way
 
             putSuccess $ "| Successfully built custom library 'libffi'"
 

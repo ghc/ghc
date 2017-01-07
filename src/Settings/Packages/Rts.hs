@@ -1,4 +1,4 @@
-module Settings.Packages.Rts (rtsPackageArgs, rtsLibffiLibraryName) where
+module Settings.Packages.Rts (rtsPackageArgs, rtsLibffiLibrary) where
 
 import Base
 import GHC
@@ -7,6 +7,7 @@ import Oracles.Config.Setting
 import Oracles.Path
 import Predicate
 import Settings
+import Settings.Path
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
@@ -16,6 +17,12 @@ rtsLibffiLibraryName = do
         (True , False) -> "ffi"
         (False, False) -> "Cffi"
         (_    , True ) -> "Cffi-6"
+
+rtsLibffiLibrary :: Way -> Action FilePath
+rtsLibffiLibrary way = do
+    name <- rtsLibffiLibraryName
+    suf  <- libsuf way
+    return $ rtsBuildPath -/- "lib" ++ name ++ suf
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
@@ -38,7 +45,7 @@ rtsPackageArgs = package rts ? do
     way            <- getWay
     path           <- getBuildPath
     top            <- getTopDirectory
-    libffiName     <- lift $ rtsLibffiLibraryName
+    libffiName     <- lift rtsLibffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     mconcat
