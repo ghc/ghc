@@ -27,15 +27,7 @@ allStages = [minBound ..]
 -- | This rule 'need' all top-level build targets.
 topLevelTargets :: Rules ()
 topLevelTargets = do
-
     want $ Rules.Generate.installTargets
-
-    -- TODO: Do we want libffiLibrary to be a top-level target?
-
-    action $ do -- TODO: Add support for all rtsWays
-        rtsLib    <- pkgLibraryFile $ rtsContext { way = vanilla  }
-        rtsThrLib <- pkgLibraryFile $ rtsContext { way = threaded }
-        need [ rtsLib, rtsThrLib ]
 
     forM_ allStages $ \stage ->
         forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
@@ -48,7 +40,7 @@ topLevelTargets = do
                     libs <- mapM (pkgLibraryFile . Context stage pkg) ways
                     docs <- interpretInContext context $ buildHaddock flavour
                     need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
-                else do -- otherwise build a program
+                else -- otherwise build a program
                     need =<< maybeToList <$> programPath (programContext stage pkg)
 
 packageRules :: Rules ()
