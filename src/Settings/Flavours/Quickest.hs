@@ -8,10 +8,8 @@ quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
-    , libraryWays = defaultLibraryWays <> quickestLibraryWays }
+    , libraryWays = append [vanilla]
+    , rtsWays     = append [vanilla] }
 
 quickestArgs :: Args
 quickestArgs = builder Ghc ? arg "-O0"
-
-quickestLibraryWays :: Ways
-quickestLibraryWays = remove [profiling]

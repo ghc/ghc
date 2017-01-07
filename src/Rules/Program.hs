@@ -73,9 +73,10 @@ buildBinary rs context@Context {..} bin = do
     binDeps <- if stage == Stage0 && package == ghcCabal
         then hsSources context
         else do
-            deps <- contextDependencies context
-            ways <- interpretInContext context (getLibraryWays <> getRtsWays)
-            needContext $ deps ++ [ rtsContext { way = w } | w <- ways ]
+            needContext =<< contextDependencies context
+            when (package == ghc) $ do
+                ways <- interpretInContext context (getLibraryWays <> getRtsWays)
+                needContext [ rtsContext { way = w } | w <- ways ]
             let path = buildPath context
             cObjs  <- map (objectPath context) <$> pkgDataList (CSrcs path)
             hsObjs <- hsObjects context
