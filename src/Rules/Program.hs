@@ -74,7 +74,7 @@ buildBinary rs context@Context {..} bin = do
         then hsSources context
         else do
             needContext =<< contextDependencies context
-            when (package == ghc) $ do
+            when (stage > Stage0) $ do
                 ways <- interpretInContext context (getLibraryWays <> getRtsWays)
                 needContext [ rtsContext { way = w } | w <- ways ]
             let path = buildPath context
