@@ -823,6 +823,7 @@ ppr_expr (OpApp e1 op _ e2)
   = case unLoc op of
       HsVar (L _ v) -> pp_infixly v
       HsRecFld f    -> pp_infixly f
+      HsUnboundVar h@TrueExprHole{} -> pp_infixly (unboundVarOcc h)
       _             -> pp_prefixly
   where
     pp_e1 = pprDebugParendExpr e1   -- In debug mode, add parens

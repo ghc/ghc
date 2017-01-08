@@ -3132,6 +3132,9 @@ varop   :: { Located RdrName }
 qop     :: { LHsExpr RdrName }   -- used in sections
         : qvarop                { sL1 $1 $ HsVar $1 }
         | qconop                { sL1 $1 $ HsVar $1 }
+        | '`' '_' '`'           {% ams (sLL $1 $> EWildPat)
+                                       [mj AnnBackquote $1,mj AnnVal $2
+                                       ,mj AnnBackquote $3] }
 
 qopm    :: { LHsExpr RdrName }   -- used in sections
         : qvaropm               { sL1 $1 $ HsVar $1 }
