@@ -3,8 +3,8 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    buildRootPath, userFlavours, userKnownPackages, validating,
-    turnWarningsIntoErrors, verboseCommands, putBuild, putSuccess
+    buildRootPath, userFlavours, userKnownPackages, verboseCommands,
+    putBuild, putSuccess
     ) where
 
 import System.Console.ANSI
@@ -28,21 +28,6 @@ userFlavours = []
 -- build flavour, modifying the list of packages that are built by default.
 userKnownPackages :: [Package]
 userKnownPackages = []
-
--- | User defined flags. Note the following type semantics:
--- * @Bool@: a plain Boolean flag whose value is known at compile time.
--- * @Action Bool@: a flag whose value can depend on the build environment.
--- * @Predicate@: a flag whose value can depend on the build environment and
--- on the current build target.
-
--- TODO: This should be set automatically when validating.
-validating :: Bool
-validating = False
-
--- TODO: Replace with stage2 ? arg "-Werror"? Also see #251.
--- | To enable -Werror in Stage2 set turnWarningsIntoErrors = stage2.
-turnWarningsIntoErrors :: Predicate
-turnWarningsIntoErrors = return False
 
 -- | Set to True to print full command lines during the build process. Note,
 -- this is a Predicate, hence you can enable verbose output only for certain

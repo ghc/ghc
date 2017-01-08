@@ -2,8 +2,12 @@ module Flavour (Flavour (..)) where
 
 import Expression
 
--- TODO: Merge {libraryWays, rtsWays}, and {dynamicGhcPrograms, ghcProfiled...}.
 -- | 'Flavour' is a collection of build settings that fully define a GHC build.
+-- Note the following type semantics:
+-- * @Bool@: a plain Boolean flag whose value is known at compile time.
+-- * @Action Bool@: a flag whose value can depend on the build environment.
+-- * @Predicate@: a flag whose value can depend on the build environment and
+-- on the current build target.
 data Flavour = Flavour
     { name               :: String    -- ^ Flavour name, to set from command line.
     , args               :: Args      -- ^ Use these command line arguments.

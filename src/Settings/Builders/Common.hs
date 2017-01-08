@@ -41,16 +41,14 @@ cIncludeArgs = do
 ldArgs :: Args
 ldArgs = mempty
 
--- TODO: put all validating options together in one file
 cArgs :: Args
-cArgs = validating ? cWarnings
+cArgs = mempty
 
 -- TODO: should be in a different file
 cWarnings :: Args
 cWarnings = do
     let gccGe46 = notM $ (flag GccIsClang ||^ flag GccLt46)
-    mconcat [ turnWarningsIntoErrors ? arg "-Werror"
-            , arg "-Wall"
+    mconcat [ arg "-Wall"
             , flag GccIsClang ? arg "-Wno-unknown-pragmas"
             , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
             , gccGe46 ? arg "-Wno-error=inline" ]
