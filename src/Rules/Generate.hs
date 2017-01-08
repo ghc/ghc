@@ -6,6 +6,7 @@ module Rules.Generate (
 import Base
 import Context hiding (package)
 import Expression
+import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Predicate
@@ -17,6 +18,7 @@ import Rules.Generators.GhcSplit
 import Rules.Generators.GhcVersionH
 import Rules.Generators.VersionHs
 import Rules.Libffi
+import Settings
 import Settings.Path
 import Target
 import UserSettings
@@ -70,7 +72,8 @@ compilerDependencies = do
     mconcat [ return [platformH stage]
             , return includesDependencies
             , return derivedConstantsDependencies
-            , notStage0 ? return (gmpLibraryH : libffiDependencies)
+            , notStage0 ? integerLibrary flavour == integerGmp ? return [gmpLibraryH]
+            , notStage0 ? return libffiDependencies
             , return $ fmap (path -/-)
                   [ "primop-can-fail.hs-incl"
                   , "primop-code-size.hs-incl"
