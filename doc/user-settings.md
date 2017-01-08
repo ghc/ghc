@@ -24,6 +24,7 @@ data Flavour = Flavour
     { name               :: String    -- ^ Flavour name, to set from command line.
     , args               :: Args      -- ^ Use these command line arguments.
     , packages           :: Packages  -- ^ Build these packages.
+    , integerLibrary     :: Package   -- ^ Either 'integerGmp' or 'integerSimple'.
     , libraryWays        :: Ways      -- ^ Build libraries these ways.
     , rtsWays            :: Ways      -- ^ Build RTS these ways.
     , splitObjects       :: Predicate -- ^ Build split objects.
@@ -111,24 +112,30 @@ userPackage = library "user-package"
 You will also need to add `userPackage` to a specific build stage by modifying
 `userPackages` as otherwise it will not be built.
 
-You can choose which integer library to use when builing GHC by setting
-`integerLibrary`. Possible values are: `integerGmp` (default) and `integerSimple`.
+You can choose which integer library to use when builing GHC using the
+`integerLibrary` setting of the build flavour. Possible values are: `integerGmp`
+(default) and `integerSimple`.
 ```haskell
--- | Choose the integer library: 'integerGmp' or 'integerSimple'.
-integerLibrary :: Package
-integerLibrary = integerGmp
+simpleFlavour :: Flavour
+simpleFlavour = defaultFlavour { name = "simple", integerLibrary = integerSimple }
 ```
 ## Build ways
 
 Packages can be built in a number of ways, such as `vanilla`, `profiling` (with
 profiling information enabled), and many others as defined in `src/Way.hs`. You
 can change the default build ways by modifying `libraryWays` and `rtsWays` fields
-of the `Flavour` record as required. As an example, below we remove `dynamic`
-from the list of library ways but keep `rts` package ways unchanged:
+of the `Flavour` record as required. As an example, below we remove `profiling`
+from the list of library ways:
 ```haskell
-userFlavour :: Flavour
-userFlavour = defaultFlavour { name = "user", libraryWays = defaultLibraryWays <> remove [dynamic] }
+noProfilingFlavour :: Flavour
+noProfilingFlavour = defaultFlavour
+    { name        = "no-profiling"
+    , libraryWays = defaultLibraryWays <> remove [profiling]
+    , ghcProfiled = False } -- Can't build profiled GHC without profiled libraries
 ```
+Note that `rtsWays` is computed from `libraryWays` by default, therefore the above
+change will lead to the removal of `threadedProfiling` way from `rtsWays`. To
+change this behaviour, you can override the default `rtsWays` setting.
 
 ## Verbose command lines
 
