@@ -2,7 +2,8 @@ module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
     getContextDirectory, getBuildPath, stagePackages, builderPath,
-    getBuilderPath, isSpecified, latestBuildStage, programPath, programContext
+    getBuilderPath, isSpecified, latestBuildStage, programPath, programContext,
+    integerLibraryName
     ) where
 
 import Base
@@ -61,6 +62,9 @@ flavour = fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
     unknownFlavour = error $ "Unknown build flavour: " ++ flavourName
     flavours       = hadrianFlavours ++ userFlavours
     flavourName    = fromMaybe "default" cmdFlavour
+
+integerLibraryName :: String
+integerLibraryName = pkgNameString $ integerLibrary flavour
 
 programContext :: Stage -> Package -> Context
 programContext stage pkg

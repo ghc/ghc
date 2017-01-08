@@ -3,7 +3,7 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    buildRootPath, userFlavours, userKnownPackages, integerLibrary, validating,
+    buildRootPath, userFlavours, userKnownPackages, validating,
     turnWarningsIntoErrors, verboseCommands, putBuild, putSuccess
     ) where
 
@@ -11,7 +11,6 @@ import System.Console.ANSI
 
 import Base
 import Flavour
-import GHC
 import Predicate
 
 -- See doc/user-settings.md for instructions.
@@ -29,10 +28,6 @@ userFlavours = []
 -- build flavour, modifying the list of packages that are built by default.
 userKnownPackages :: [Package]
 userKnownPackages = []
-
--- | Choose the integer library: 'integerGmp' or 'integerSimple'.
-integerLibrary :: Package
-integerLibrary = integerGmp
 
 -- | User defined flags. Note the following type semantics:
 -- * @Bool@: a plain Boolean flag whose value is known at compile time.

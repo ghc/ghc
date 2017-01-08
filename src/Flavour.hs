@@ -8,6 +8,7 @@ data Flavour = Flavour
     { name               :: String    -- ^ Flavour name, to set from command line.
     , args               :: Args      -- ^ Use these command line arguments.
     , packages           :: Packages  -- ^ Build these packages.
+    , integerLibrary     :: Package   -- ^ Either 'integerGmp' or 'integerSimple'.
     , libraryWays        :: Ways      -- ^ Build libraries these ways.
     , rtsWays            :: Ways      -- ^ Build RTS these ways.
     , splitObjects       :: Predicate -- ^ Build split objects.

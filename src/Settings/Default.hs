@@ -37,7 +37,6 @@ import Settings.Packages.Haddock
 import Settings.Packages.IntegerGmp
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
-import UserSettings
 
 -- | All default command line arguments.
 defaultArgs :: Args
@@ -100,7 +99,7 @@ stage1Packages = do
                        , haskeline
                        , hpcBin
                        , hsc2hs
-                       , integerLibrary
+                       , integerLibrary flavour
                        , pretty
                        , process
                        , rts
@@ -147,6 +146,7 @@ defaultFlavour = Flavour
     { name               = "default"
     , args               = defaultArgs
     , packages           = defaultPackages
+    , integerLibrary     = integerGmp
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , splitObjects       = defaultSplitObjects

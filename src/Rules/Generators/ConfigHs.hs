@@ -8,7 +8,6 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Rules.Generators.Common
 import Settings
-import UserSettings
 
 generateConfigHs :: Expr String
 generateConfigHs = do
@@ -21,10 +20,10 @@ generateConfigHs = do
     cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
     cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     cBooterVersion      <- getSetting GhcVersion
-    let cIntegerLibraryType | integerLibrary == integerGmp    = "IntegerGMP"
-                            | integerLibrary == integerSimple = "IntegerSimple"
-                            | otherwise = error $ "Unknown integer library: "
-                                          ++ show integerLibrary ++ "."
+    let cIntegerLibraryType
+            | integerLibrary flavour == integerGmp    = "IntegerGMP"
+            | integerLibrary flavour == integerSimple = "IntegerSimple"
+            | otherwise = error $ "Unknown integer library: " ++ integerLibraryName
     cSupportsSplitObjs         <- yesNo supportsSplitObjects
     cGhcWithInterpreter        <- yesNo ghcWithInterpreter
     cGhcWithNativeCodeGen      <- yesNo ghcWithNativeCodeGen
@@ -72,7 +71,7 @@ generateConfigHs = do
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         , "cIntegerLibrary       :: String"
-        , "cIntegerLibrary       = " ++ show (pkgNameString integerLibrary)
+        , "cIntegerLibrary       = " ++ show integerLibraryName
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
         , "cSupportsSplitObjs    :: String"
