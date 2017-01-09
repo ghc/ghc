@@ -120,6 +120,9 @@ modules where both modules occur in the `HscTypes.dep_finsts' set (of the
 already been checked.  Everything else, we check now.  (So that we can be
 certain that the modules in our `HscTypes.dep_finsts' are consistent.)
 
+XXX Presumably, each of our imports has itself already been checked against
+its dep_finsts, as well.
+
 There is some fancy footwork regarding hs-boot module loops, see
 Note [Don't check hs-boot type family instances too early]
 -}
@@ -211,7 +214,7 @@ checkFamInstConsistency famInstMods directlyImpMods
                                . md_fam_insts . hm_details
              ; hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi)
                                            | hmi <- eltsHpt hpt]
-             ; groups        = map (dep_finsts . mi_deps . modIface)
+             ; groups        = map (\mod -> mod : (dep_finsts . mi_deps . modIface $ mod))
                                    directlyImpMods
              ; okPairs       = listToSet $ concatMap allPairs groups
                  -- instances of okPairs are consistent
