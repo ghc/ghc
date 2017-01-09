@@ -86,10 +86,11 @@ executable hadrian
                        , Settings.Builders.Tar
                        , Settings.Default
                        , Settings.Flavours.Development
-                       , Settings.Flavours.Perf
-                       , Settings.Flavours.Prof
+                       , Settings.Flavours.Performance
+                       , Settings.Flavours.Profiled
                        , Settings.Flavours.Quick
                        , Settings.Flavours.Quickest
+                       , Settings.Optimisation
                        , Settings.Packages.Base
                        , Settings.Packages.Compiler
                        , Settings.Packages.Ghc

@@ -1,10 +1,9 @@
 module Settings.Flavours.Quick (quickFlavour) where
 
-import Context
 import Flavour
-import GHC
 import Predicate
 import {-# SOURCE #-} Settings.Default
+import Settings.Optimisation
 
 quickFlavour :: Flavour
 quickFlavour = defaultFlavour
@@ -12,11 +11,10 @@ quickFlavour = defaultFlavour
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
     , libraryWays = append [vanilla] }
 
-optimise :: Context -> Bool
-optimise Context {..} =
-    package `elem` [compiler, ghc] || stage == Stage1 && isLibrary package
-
+-- TODO: the hsLibrary setting seems wrong, but it matches mk/flavours/quick.mk
 quickArgs :: Args
-quickArgs = builder Ghc ? do
-    context <- getContext
-    if optimise context then arg "-O" else arg "-O0"
+quickArgs = optimisationArgs $ Optimisation
+    { hsDefault  = append ["-O0", "-H64m"]
+    , hsLibrary  = notStage0 ? arg "-O"
+    , hsCompiler =    stage0 ? arg "-O"
+    , hsGhc      =    stage0 ? arg "-O" }

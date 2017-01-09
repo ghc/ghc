@@ -27,6 +27,7 @@ import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.Tar
+import Settings.Optimisation
 import Settings.Packages.Base
 import Settings.Packages.Compiler
 import Settings.Packages.Ghc
@@ -42,8 +43,16 @@ import Settings.Packages.RunGhc
 defaultArgs :: Args
 defaultArgs = mconcat
     [ defaultBuilderArgs
-    , builder Ghc ? mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2", arg "-H32m"]
+    , optimisationArgs defaultOptimisation
     , defaultPackageArgs ]
+
+-- | Default optimisation settings.
+defaultOptimisation :: Optimisation
+defaultOptimisation = Optimisation
+    { hsDefault  = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2", arg "-H32m"]
+    , hsLibrary  = mempty
+    , hsCompiler = mempty
+    , hsGhc      = mempty }
 
 -- | Packages that are built by default. You can change this by editing
 -- 'userPackages' in "UserSettings".

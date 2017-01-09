@@ -3,6 +3,7 @@ module Settings.Flavours.Quickest (quickestFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
+import Settings.Optimisation
 
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
@@ -12,7 +13,11 @@ quickestFlavour = defaultFlavour
     , rtsWays     = quickestRtsWays }
 
 quickestArgs :: Args
-quickestArgs = builder Ghc ? arg "-O0"
+quickestArgs = optimisationArgs $ Optimisation
+    { hsDefault  = append ["-O0", "-H64m"]
+    , hsLibrary  = mempty
+    , hsCompiler = mempty
+    , hsGhc      = mempty }
 
 quickestRtsWays :: Ways
 quickestRtsWays = mconcat
