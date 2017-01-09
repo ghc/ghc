@@ -700,8 +700,15 @@ zonk_eq_types = go
     go ty1 ty2
       | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
       , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe ty2
-      , tc1 == tc2
-      = tycon tc1 tys1 tys2
+      = if tc1 == tc2 && tys1 `equalLength` tys2
+          -- Crucial to check for equal-length args, because
+          -- we cannot assume that the two args to 'go' have
+          -- the same kind.  E.g go (Proxy *      (Maybe Int))
+          --                        (Proxy (*->*) Maybe)
+          -- We'll call (go (Maybe Int) Maybe)
+          -- See Trac #13083
+        then tycon tc1 tys1 tys2
+        else bale_out ty1 ty2
 
     go ty1 ty2
       | Just (ty1a, ty1b) <- tcRepSplitAppTy_maybe ty1
@@ -714,12 +721,14 @@ zonk_eq_types = go
       | lit1 == lit2
       = return (Right ty1)
 
-    go ty1 ty2 = return $ Left (Pair ty1 ty2)
-      -- we don't handle more complex forms here
+    go ty1 ty2 = bale_out ty1 ty2
+      -- We don't handle more complex forms here
+
+    bale_out ty1 ty2 = return $ Left (Pair ty1 ty2)
 
     tyvar :: SwapFlag -> TcTyVar -> TcType
           -> TcS (Either (Pair TcType) TcType)
-      -- try to do as little as possible, as anything we do here is redundant
+      -- Try to do as little as possible, as anything we do here is redundant
       -- with flattening. In particular, no need to zonk kinds. That's why
       -- we don't use the already-defined zonking functions
     tyvar swapped tv ty

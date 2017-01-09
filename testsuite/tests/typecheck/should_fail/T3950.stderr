@@ -5,7 +5,7 @@ T3950.hs:15:8: error:
         w :: (* -> * -> *) -> *
         Sealed :: (* -> *) -> *
       Expected type: Maybe (w (Id p))
-        Actual type: Maybe (Sealed (Id p x0))
+        Actual type: Maybe (Sealed (Id p0 x0))
     • In the expression: Just rp'
       In an equation for ‘rp’:
           rp _
