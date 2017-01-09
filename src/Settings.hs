@@ -15,6 +15,7 @@ import GHC
 import Oracles.PackageData
 import Oracles.Path
 import {-# SOURCE #-} Settings.Default
+import Settings.Flavours.Development
 import Settings.Flavours.Perf
 import Settings.Flavours.Prof
 import Settings.Flavours.Quick
@@ -53,8 +54,9 @@ getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
 getPkgDataList key = lift . pkgDataList . key =<< getBuildPath
 
 hadrianFlavours :: [Flavour]
-hadrianFlavours = [ defaultFlavour, perfFlavour, profFlavour, quickFlavour
-                  , quickestFlavour ]
+hadrianFlavours =
+    [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
+    , perfFlavour, profFlavour, quickFlavour, quickestFlavour ]
 
 flavour :: Flavour
 flavour = fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours

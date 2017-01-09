@@ -40,7 +40,10 @@ import Settings.Packages.RunGhc
 
 -- | All default command line arguments.
 defaultArgs :: Args
-defaultArgs = defaultBuilderArgs <> defaultPackageArgs
+defaultArgs = mconcat
+    [ defaultBuilderArgs
+    , builder Ghc ? mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2", arg "-H32m"]
+    , defaultPackageArgs ]
 
 -- | Packages that are built by default. You can change this by editing
 -- 'userPackages' in "UserSettings".

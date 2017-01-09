@@ -38,7 +38,7 @@ readBuildHaddock :: Either String (Untracked -> Untracked)
 readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
 
 readFlavour :: Maybe String -> Either String (Untracked -> Untracked)
-readFlavour ms = Right $ \flags -> flags { flavour = ms }
+readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
 
 readProgressColour :: Maybe String -> Either String (Untracked -> Untracked)
 readProgressColour ms =
@@ -74,7 +74,7 @@ readSplitObjects = Right $ \flags -> flags { splitObjects = True }
 cmdFlags :: [OptDescr (Either String (Untracked -> Untracked))]
 cmdFlags =
     [ Option [] ["flavour"] (OptArg readFlavour "FLAVOUR")
-      "Build flavour (default, quick or quickest)."
+      "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
     , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
