@@ -67,7 +67,6 @@ import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 #endif
 import MonadUtils
-import Data.Function (fix)
 import Data.Maybe
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
@@ -390,12 +389,12 @@ lintCoreBindings dflags pass local_in_scope binds
                       _              -> True
 
     -- See Note [Checking StaticPtrs]
-    check_static_ptrs = xopt LangExt.StaticPointers dflags &&
-                        case pass of
-                          CoreDoFloatOutwards _ -> True
-                          CoreTidy              -> True
-                          CorePrep              -> True
-                          _                     -> False
+    check_static_ptrs | not (xopt LangExt.StaticPointers dflags) = AllowAnywhere
+                      | otherwise = case pass of
+                          CoreDoFloatOutwards _ -> AllowAtTopLevel
+                          CoreTidy              -> RejectEverywhere
+                          CorePrep              -> AllowAtTopLevel
+                          _                     -> AllowAnywhere
 
     binders = bindersOfBinds binds
     (_, dups) = removeDups compare binders
@@ -536,28 +535,32 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
                   | otherwise = return ()
 
 -- | Checks the RHS of top-level bindings. It only differs from 'lintCoreExpr'
--- in that it doesn't reject applications of the data constructor @StaticPtr@
--- when they appear at the top level.
+-- in that it doesn't reject occurrences of the function 'makeStatic' when they
+-- appear at the top level and @lf_check_static_ptrs == AllowAtTopLevel@.
 --
 -- See Note [Checking StaticPtrs].
 lintRhs :: CoreExpr -> LintM OutType
--- Allow applications of the data constructor @StaticPtr@ at the top
--- but produce errors otherwise.
-lintRhs rhs
-    | (binders0, rhs') <- collectTyBinders rhs
-    , Just (fun, args) <- collectStaticPtrSatArgs rhs'
-    = flip fix binders0 $ \loopBinders binders -> case binders of
+lintRhs rhs = fmap lf_check_static_ptrs getLintFlags >>= go
+  where
+    -- Allow occurrences of 'makeStatic' at the top-level but produce errors
+    -- otherwise.
+    go AllowAtTopLevel
+      | (binders0, rhs') <- collectTyBinders rhs
+      , Just (fun, t, info, e) <- collectMakeStaticArgs rhs'
+      = foldr
         -- imitate @lintCoreExpr (Lam ...)@
-        var : vars -> addLoc (LambdaBodyOf var) $
-                      lintBinder var $ \var' ->
-                      do { body_ty <- loopBinders vars
-                         ; return $ mkLamType var' body_ty }
+        (\var loopBinders ->
+          addLoc (LambdaBodyOf var) $
+            lintBinder var $ \var' ->
+              do { body_ty <- loopBinders
+                 ; return $ mkLamType var' body_ty }
+        )
         -- imitate @lintCoreExpr (App ...)@
-        [] -> do
-          fun_ty <- lintCoreExpr fun
-          addLoc (AnExpr rhs') $ lintCoreArgs fun_ty args
--- Rejects applications of the data constructor @StaticPtr@ if it finds any.
-lintRhs rhs = lintCoreExpr rhs
+        (do fun_ty <- lintCoreExpr fun
+            addLoc (AnExpr rhs') $ lintCoreArgs fun_ty [Type t, info, e]
+        )
+        binders0
+    go _ = lintCoreExpr rhs
 
 lintIdUnfolding :: Id -> Type -> Unfolding -> LintM ()
 lintIdUnfolding bndr bndr_ty (CoreUnfolding { uf_tmpl = rhs, uf_src = src })
@@ -673,11 +676,10 @@ lintCoreExpr e@(App _ _)
          -- Check for a nested occurrence of the StaticPtr constructor.
          -- See Note [Checking StaticPtrs].
          case fun of
-           Var b | lf_check_static_ptrs lf
-                 , Just con <- isDataConId_maybe b
-                 , dataConName con == staticPtrDataConName
+           Var b | lf_check_static_ptrs lf /= AllowAnywhere
+                 , idName b == makeStaticName
                  -> do
-              failWithL $ text "Found StaticPtr nested in an expression: " <+>
+              failWithL $ text "Found makeStatic nested in an expression: " <+>
                           ppr e
            _     -> go
   where
@@ -1609,13 +1611,24 @@ data LintEnv
 data LintFlags
   = LF { lf_check_global_ids           :: Bool -- See Note [Checking for global Ids]
        , lf_check_inline_loop_breakers :: Bool -- See Note [Checking for INLINE loop breakers]
-       , lf_check_static_ptrs          :: Bool -- See Note [Checking StaticPtrs]
+       , lf_check_static_ptrs          :: StaticPtrCheck
+                                             -- ^ See Note [Checking StaticPtrs]
     }
+
+-- See Note [Checking StaticPtrs]
+data StaticPtrCheck
+    = AllowAnywhere
+        -- ^ Allow 'makeStatic' to occur anywhere.
+    | AllowAtTopLevel
+        -- ^ Allow 'makeStatic' calls at the top-level only.
+    | RejectEverywhere
+        -- ^ Reject any 'makeStatic' occurrence.
+  deriving Eq
 
 defaultLintFlags :: LintFlags
 defaultLintFlags = LF { lf_check_global_ids = False
                       , lf_check_inline_loop_breakers = True
-                      , lf_check_static_ptrs = False
+                      , lf_check_static_ptrs = AllowAnywhere
                       }
 
 newtype LintM a =
@@ -1633,32 +1646,19 @@ top-level ones. See Note [Exported LocalIds] and Trac #9857.
 
 Note [Checking StaticPtrs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-See SimplCore Note [Grand plan for static forms] for an overview.
+See Note [Grand plan for static forms] in StaticPtrTable for an overview.
 
-Every occurrence of the data constructor @StaticPtr@ should be moved
-to the top level by the FloatOut pass.  It's vital that we don't have
-nested StaticPtr uses after CorePrep, because we populate the Static
+Every occurrence of the function 'makeStatic' should be moved to the
+top level by the FloatOut pass.  It's vital that we don't have nested
+'makeStatic' occurrences after CorePrep, because we populate the Static
 Pointer Table from the top-level bindings. See SimplCore Note [Grand
 plan for static forms].
 
 The linter checks that no occurrence is left behind, nested within an
-expression. The check is enabled only:
-
-* After the FloatOut, CorePrep, and CoreTidy passes.
-  We could check more often, but the condition doesn't hold until
-  after the first FloatOut pass.
-
-* When the module uses the StaticPointers language extension. This is
-  a little hack.  This optimization arose from the need to compile
-  GHC.StaticPtr, which otherwise would be rejected because of the
-  following binding for the StaticPtr data constructor itself:
-
-    StaticPtr = \a b1 b2 b3 b4 -> StaticPtr a b1 b2 b3 b4
-
-  which contains an application of `StaticPtr` nested within the
-  lambda abstractions.  This binding is injected by CorePrep.
-
-  Note that GHC.StaticPtr is itself compiled without -XStaticPointers.
+expression. The check is enabled only after the FloatOut, CorePrep,
+and CoreTidy passes and only if the module uses the StaticPointers
+language extension. Checking more often doesn't help since the condition
+doesn't hold until after the first FloatOut pass.
 
 Note [Type substitution]
 ~~~~~~~~~~~~~~~~~~~~~~~~

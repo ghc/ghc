@@ -14,7 +14,7 @@ module MkCore (
         mkIntExpr, mkIntExprInt,
         mkIntegerExpr,
         mkFloatExpr, mkDoubleExpr,
-        mkCharExpr, mkStringExpr, mkStringExprFS,
+        mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
 
         -- * Floats
         FloatBind(..), wrapFloat,
@@ -270,16 +270,19 @@ mkStringExprFS :: MonadThings m => FastString -> m CoreExpr  -- Result :: String
 
 mkStringExpr str = mkStringExprFS (mkFastString str)
 
-mkStringExprFS str
+mkStringExprFS = mkStringExprFSWith lookupId
+
+mkStringExprFSWith :: Monad m => (Name -> m Id) -> FastString -> m CoreExpr
+mkStringExprFSWith lookupM str
   | nullFS str
   = return (mkNilExpr charTy)
 
   | all safeChar chars
-  = do unpack_id <- lookupId unpackCStringName
+  = do unpack_id <- lookupM unpackCStringName
        return (App (Var unpack_id) lit)
 
   | otherwise
-  = do unpack_utf8_id <- lookupId unpackCStringUtf8Name
+  = do unpack_utf8_id <- lookupM unpackCStringUtf8Name
        return (App (Var unpack_utf8_id) lit)
 
   where

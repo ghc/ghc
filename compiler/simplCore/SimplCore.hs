@@ -205,7 +205,7 @@ getCoreToDo dflags
                            ))
 
     -- Static forms are moved to the top level with the FloatOut pass.
-    -- See Note [Grand plan for static forms].
+    -- See Note [Grand plan for static forms] in StaticPtrTable.
     static_ptrs_float_outwards =
       runWhen static_ptrs $ CoreDoFloatOutwards FloatOutSwitches
         { floatOutLambdas   = Just 0
@@ -267,7 +267,8 @@ getCoreToDo dflags
                 -- the simplifier.
         else
            -- Even with full laziness turned off, we still need to float static
-           -- forms to the top level. See Note [Grand plan for static forms].
+           -- forms to the top level. See Note [Grand plan for static forms] in
+           -- StaticPtrTable.
            static_ptrs_float_outwards,
 
         simpl_phases,
@@ -1024,57 +1025,3 @@ transferIdInfo exported_id local_id
                                (ruleInfo local_info)
         -- Remember to set the function-name field of the
         -- rules as we transfer them from one function to another
-
-
-{- Note [Grand plan for static forms]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Static forms go through the compilation phases as follows.
-Here is a running example:
-
-   f x = let k = map toUpper
-         in ...(static k)...
-
-* The renamer looks for out-of-scope names in the body of the static
-  form, as always If all names are in scope, the free variables of the
-  body are stored in AST at the location of the static form.
-
-* The typechecker verifies that all free variables occurring in the
-  static form are closed (see Note [Bindings with closed types] in
-  TcRnTypes).  In our example, 'k' is closed, even though it is bound
-  in a nested let, we are fine.
-
-* The desugarer replaces the static form with an application of the
-  data constructor 'StaticPtr' (defined in module GHC.StaticPtr of
-  base).  So we get
-
-   f x = let k = map toUpper
-         in ...(StaticPtr <fingerprint> k)...
-
-* The simplifier runs the FloatOut pass which moves the applications
-  of 'StaticPtr' to the top level. Thus the FloatOut pass is always
-  executed, even when optimizations are disabled.  So we get
-
-   k = map toUpper
-   static_ptr = StaticPtr <fingerprint> k
-   f x = ...static_ptr...
-
-  The FloatOut pass is careful to produce an /exported/ Id for a floated
-  'StaticPtr', so the binding is not removed by the simplifier (see #12207).
-  E.g. the code for `f` above might look like
-
-    static_ptr = StaticPtr <fingerprint> k
-    f x = ...(staticKey static_ptr)...
-
-  which might correctly be simplified to
-
-    f x = ...<fingerprint>...
-
-  BUT the top-level binding for static_ptr must remain, so that it can be
-  collected to populate the Static Pointer Table.
-
-* The CoreTidy pass produces a C function which inserts all the
-  floated 'StaticPtr' in the static pointer table (see the call to
-  StaticPtrTable.sptModuleInitCode in TidyPgm). CoreTidy pass also
-  exports the Ids of floated 'StaticPtr's so they can be linked with
-  the C function.
--}
