@@ -745,13 +745,13 @@ warnMissingSpecs dflags callers
 
 wantSpecImport :: DynFlags -> Unfolding -> Bool
 -- See Note [Specialise imported INLINABLE things]
-wantSpecImport dflags unf
+wantSpecImport _dflags unf
  = case unf of
      NoUnfolding      -> False
      BootUnfolding    -> False
      OtherCon {}      -> False
      DFunUnfolding {} -> True
-     CoreUnfolding { uf_src = src, uf_guidance = _guidance } -> True
+     CoreUnfolding { uf_src = _src, uf_guidance = _guidance } -> True
 
 {-
        | gopt Opt_SpecialiseAggressively dflags -> True
