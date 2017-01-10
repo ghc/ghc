@@ -346,8 +346,7 @@ finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
           dump_stats (Linear.pprStats (concat (ngs_natives ngs)) linearStats)
 
         -- write out the imports
-        Pretty.printDoc Pretty.LeftMode (pprCols dflags) h
-                $ withPprStyleDoc dflags (mkCodeStyle AsmStyle)
+        printSDocLn Pretty.LeftMode dflags h (mkCodeStyle AsmStyle)
                 $ makeImportsDoc dflags (concat (ngs_imports ngs))
         return us'
   where
@@ -481,8 +480,8 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
 emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()
 emitNativeCode dflags h sdoc = do
 
-        {-# SCC "pprNativeCode" #-} Pretty.bufLeftRender h
-                $ withPprStyleDoc dflags (mkCodeStyle AsmStyle) sdoc
+        {-# SCC "pprNativeCode" #-} bufLeftRenderSDoc dflags h
+                                      (mkCodeStyle AsmStyle) sdoc
 
         -- dump native code
         dumpIfSet_dyn dflags

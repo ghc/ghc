@@ -46,7 +46,6 @@ import DynFlags
 import FastString
 import Cmm              hiding ( succ )
 import Outputable as Outp
-import qualified Pretty as Prt
 import Platform
 import UniqFM
 import Unique
@@ -330,8 +329,8 @@ renderLlvm sdoc = do
     -- Write to output
     dflags <- getDynFlags
     out <- getEnv envOutput
-    let doc = Outp.withPprStyleDoc dflags (Outp.mkCodeStyle Outp.CStyle) sdoc
-    liftIO $ Prt.bufLeftRender out doc
+    liftIO $ Outp.bufLeftRenderSDoc dflags out
+               (Outp.mkCodeStyle Outp.CStyle) sdoc
 
     -- Dump, if requested
     dumpIfSetLlvm Opt_D_dump_llvm "LLVM Code" sdoc

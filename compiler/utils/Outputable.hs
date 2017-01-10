@@ -43,7 +43,8 @@ module Outputable (
         colWhiteFg, colBinder, colCoerc, colDataCon, colType,
 
         -- * Converting 'SDoc' into strings and outputing it
-        printForC, printForAsm, printForUser, printForUserPartWay,
+        printSDoc, printSDocLn, printForUser, printForUserPartWay,
+        printForC, bufLeftRenderSDoc,
         pprCode, mkCodeStyle,
         showSDoc, showSDocUnsafe, showSDocOneLine,
         showSDocForUser, showSDocDebug, showSDocDump, showSDocDumpOneLine,
@@ -94,6 +95,7 @@ import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 import {-# SOURCE #-}   StaticFlags( opt_PprStyle_Debug, opt_NoDebugOutput )
 
+import BufWrite (BufHandle)
 import FastString
 import qualified Pretty
 import Util
@@ -103,6 +105,7 @@ import Panic
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
 
+import Control.Exception (finally)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.Char
@@ -298,6 +301,11 @@ code (either C or assembly), or generating interface files.
 ************************************************************************
 -}
 
+-- | Represents a pretty-printable document.
+--
+-- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
+-- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
+-- abstraction layer.
 newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
 data SDocContext = SDC
@@ -320,6 +328,9 @@ initSDocContext dflags sty = SDC
 withPprStyle :: PprStyle -> SDoc -> SDoc
 withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 
+-- | This is not a recommended way to render 'SDoc', since it breaks the
+-- abstraction layer of 'SDoc'.  Prefer to use 'printSDoc', 'printSDocLn',
+-- 'bufLeftRenderSDoc', or 'renderWithStyle' instead.
 withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
 withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
@@ -409,27 +420,43 @@ ifPprDebug d = SDoc $ \ctx ->
         SDC{sdocStyle=PprDebug} -> runSDoc d ctx
         _                       -> Pretty.empty
 
+-- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
+--   terminal doesn't get screwed up by the ANSI color codes if an exception
+--   is thrown during pretty-printing.
+printSDoc :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
+printSDoc mode dflags handle sty doc =
+  Pretty.printDoc_ mode cols handle (runSDoc doc ctx)
+    `finally`
+      Pretty.printDoc_ mode cols handle (runSDoc (coloured colReset empty) ctx)
+  where
+    cols = pprCols dflags
+    ctx = initSDocContext dflags sty
+
+-- | Like 'printSDoc' but appends an extra newline.
+printSDocLn :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
+printSDocLn mode dflags handle sty doc =
+  printSDoc mode dflags handle sty (doc $$ text "")
+
 printForUser :: DynFlags -> Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser dflags handle unqual doc
-  = Pretty.printDoc PageMode (pprCols dflags) handle
-      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual AllTheWay)))
+  = printSDocLn PageMode dflags handle (mkUserStyle unqual AllTheWay) doc
 
 printForUserPartWay :: DynFlags -> Handle -> Int -> PrintUnqualified -> SDoc
                     -> IO ()
 printForUserPartWay dflags handle d unqual doc
-  = Pretty.printDoc PageMode (pprCols dflags) handle
-      (runSDoc doc (initSDocContext dflags (mkUserStyle unqual (PartWay d))))
+  = printSDocLn PageMode dflags handle (mkUserStyle unqual (PartWay d)) doc
 
--- printForC, printForAsm do what they sound like
+-- | Like 'printSDocLn' but specialized with 'LeftMode' and
+-- @'PprCode' 'CStyle'@.  This is typically used to output C-- code.
 printForC :: DynFlags -> Handle -> SDoc -> IO ()
 printForC dflags handle doc =
-  Pretty.printDoc LeftMode (pprCols dflags) handle
-    (runSDoc doc (initSDocContext dflags (PprCode CStyle)))
+  printSDocLn LeftMode dflags handle (PprCode CStyle) doc
 
-printForAsm :: DynFlags -> Handle -> SDoc -> IO ()
-printForAsm dflags handle doc =
-  Pretty.printDoc LeftMode (pprCols dflags) handle
-    (runSDoc doc (initSDocContext dflags (PprCode AsmStyle)))
+-- | An efficient variant of 'printSDoc' specialized for 'LeftMode' that
+-- outputs to a 'BufHandle'.
+bufLeftRenderSDoc :: DynFlags -> BufHandle -> PprStyle -> SDoc -> IO ()
+bufLeftRenderSDoc dflags bufHandle sty doc =
+  Pretty.bufLeftRender bufHandle (runSDoc doc (initSDocContext dflags sty))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
