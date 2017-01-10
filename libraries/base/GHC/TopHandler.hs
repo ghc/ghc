@@ -3,6 +3,7 @@
            , NoImplicitPrelude
            , MagicHash
            , UnboxedTuples
+           , UnliftedFFITypes
   #-}
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -50,6 +51,30 @@ import GHC.ConsoleHandler
 import Data.Dynamic (toDyn)
 #endif
 
+-- Note [rts_setMainThread must be called unsafely]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- rts_setMainThread must be called as unsafe, because it
+-- dereferences the Weak# and manipulates the raw Haskell value
+-- behind it.  Therefore, it must not race with a garbage collection.
+
+-- Note [rts_setMainThread has an unsound type]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- 'rts_setMainThread' is imported with type Weak# ThreadId -> IO (),
+-- but this is an unsound type for it: it grabs the /key/ of the
+-- 'Weak#' object, which isn't tracked by the type at all.
+-- That this works at all is a consequence of the fact that
+-- 'mkWeakThreadId' produces a 'Weak#' with a 'ThreadId#' as the key
+-- This is fairly robust, in that 'mkWeakThreadId' wouldn't work
+-- otherwise, but it still is sufficiently non-trivial to justify an
+-- ASSERT in rts/TopHandler.c.
+
+-- see Note [rts_setMainThread must be called unsafely] and
+-- Note [rts_setMainThread has an unsound type]
+foreign import ccall unsafe "rts_setMainThread"
+  setMainThread :: Weak# ThreadId -> IO ()
+
 -- | 'runMainIO' is wrapped around 'Main.main' (or whatever main is
 -- called in the program).  It catches otherwise uncaught exceptions,
 -- and also flushes stdout\/stderr before exiting.
@@ -58,6 +83,7 @@ runMainIO main =
     do
       main_thread_id <- myThreadId
       weak_tid <- mkWeakThreadId main_thread_id
+      case weak_tid of (Weak w) -> setMainThread w
       install_interrupt_handler $ do
            m <- deRefWeak weak_tid
            case m of
@@ -149,7 +175,10 @@ real_handler exit se = do
            reportStackOverflow
            exit 2
 
-      Just UserInterrupt  -> exitInterrupted
+      Just UserInterrupt -> exitInterrupted
+
+      Just HeapOverflow -> exit 251
+           -- the RTS has already emitted a message to stderr
 
       _ -> case fromException se of
            -- only the main thread gets ExitException exceptions

@@ -42,6 +42,7 @@
 #include "ThreadPaused.h"
 #include "Messages.h"
 #include "Stable.h"
+#include "TopHandler.h"
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -72,9 +73,14 @@ StgTSO *blocked_queue_tl = NULL;
 StgTSO *sleeping_queue = NULL;    // perhaps replace with a hash table?
 #endif
 
-/* Set to true when the latest garbage collection failed to reclaim
- * enough space, and the runtime should proceed to shut itself down in
- * an orderly fashion (emitting profiling info etc.)
+// Bytes allocated since the last time a HeapOverflow exception was thrown by
+// the RTS
+uint64_t allocated_bytes_at_heapoverflow = 0;
+
+/* Set to true when the latest garbage collection failed to reclaim enough
+ * space, and the runtime should proceed to shut itself down in an orderly
+ * fashion (emitting profiling info etc.), OR throw an exception to the main
+ * thread, if it is still alive.
  */
 bool heap_overflow = false;
 
@@ -1888,24 +1894,46 @@ delete_threads_and_gc:
         releaseGCThreads(cap, idle_cap);
     }
 #endif
-
     if (heap_overflow && sched_state < SCHED_INTERRUPTING) {
-        // GC set the heap_overflow flag, so we should proceed with
-        // an orderly shutdown now.  Ultimately we want the main
-        // thread to return to its caller with HeapExhausted, at which
-        // point the caller should call hs_exit().  The first step is
-        // to delete all the threads.
-        //
-        // Another way to do this would be to raise an exception in
-        // the main thread, which we really should do because it gives
-        // the program a chance to clean up.  But how do we find the
-        // main thread?  It should presumably be the same one that
-        // gets ^C exceptions, but that's all done on the Haskell side
-        // (GHC.TopHandler).
-        sched_state = SCHED_INTERRUPTING;
-        goto delete_threads_and_gc;
-    }
+        // GC set the heap_overflow flag.  We should throw an exception if we
+        // can, or shut down otherwise.
 
+        // Get the thread to which Ctrl-C is thrown
+        StgTSO *main_thread = getTopHandlerThread();
+        if (main_thread == NULL) {
+            // GC set the heap_overflow flag, and there is no main thread to
+            // throw an exception to, so we should proceed with an orderly
+            // shutdown now.  Ultimately we want the main thread to return to
+            // its caller with HeapExhausted, at which point the caller should
+            // call hs_exit().  The first step is to delete all the threads.
+            sched_state = SCHED_INTERRUPTING;
+            goto delete_threads_and_gc;
+        }
+
+        heap_overflow = false;
+        const uint64_t allocation_count = getAllocations();
+        if (RtsFlags.GcFlags.heapLimitGrace <
+              allocation_count - allocated_bytes_at_heapoverflow ||
+              allocated_bytes_at_heapoverflow == 0) {
+            allocated_bytes_at_heapoverflow = allocation_count;
+            // We used to simply exit, but throwing an exception gives the
+            // program a chance to clean up.  It also lets the exception be
+            // caught.
+
+            // FIXME this is not a good way to tell a program to release
+            // resources.  It is neither reliable (the RTS crashes if it fails
+            // to allocate memory from the OS) nor very usable (it is always
+            // thrown to the main thread, which might not be able to do anything
+            // useful with it).  We really should have a more general way to
+            // release resources in low-memory conditions.  Nevertheless, this
+            // is still a big improvement over just exiting.
+
+            // FIXME again: perhaps we should throw a synchronous exception
+            // instead an asynchronous one, or have a way for the program to
+            // register a handler to be called when heap overflow happens.
+            throwToSelf(cap, main_thread, heapOverflow_closure);
+        }
+    }
 #ifdef SPARKBALANCE
     /* JB
        Once we are all together... this would be the place to balance all
@@ -2607,6 +2635,8 @@ initScheduler(void)
 #endif
 
   ACQUIRE_LOCK(&sched_mutex);
+
+  allocated_bytes_at_heapoverflow = 0;
 
   /* A capability holds the state a native thread needs in
    * order to execute STG code. At least one capability is

@@ -10,6 +10,7 @@
 #include "RtsSymbols.h"
 
 #include "Rts.h"
+#include "TopHandler.h"
 #include "HsFFI.h"
 
 #include "sm/Storage.h"
@@ -747,6 +748,7 @@
       SymI_HasProto(rts_setThreadAllocationCounter)                     \
       SymI_HasProto(rts_enableThreadAllocationLimit)                    \
       SymI_HasProto(rts_disableThreadAllocationLimit)                   \
+      SymI_HasProto(rts_setMainThread)                                  \
       SymI_HasProto(setProgArgv)                                        \
       SymI_HasProto(startupHaskell)                                     \
       SymI_HasProto(shutdownHaskell)                                    \

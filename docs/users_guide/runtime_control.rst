@@ -644,6 +644,20 @@ performance.
     ``-F`` parameter will be reduced in order to avoid exceeding the
     maximum heap size.
 
+.. rts-flag:: -Mgrace= ⟨size⟩
+
+    :default: 1M
+
+    .. index::
+       single: heap size, grace
+
+    If the program's heap exceeds the value set by :rts-flag:`-M`, the
+    RTS throws an exception to the program, and the program gets an
+    additional quota of allocation before the exception is raised
+    again, the idea being so that the program can execute its
+    exception handlers. ``-Mgrace=`` controls the size of this
+    additional quota.
+
 .. rts-flag:: --numa
               --numa=<mask>
 

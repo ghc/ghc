@@ -36,6 +36,7 @@
 #include "LinkerInternals.h"
 #include "LibdwPool.h"
 #include "sm/CNF.h"
+#include "TopHandler.h"
 
 #if defined(PROFILING)
 # include "ProfHeap.h"
@@ -242,6 +243,9 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)runHandlersPtr_closure);
 #endif
 
+    // Initialize the top-level handler system
+    initTopHandler();
+
     /* initialise the shared Typeable store */
     initGlobalStore();
 
@@ -413,6 +417,9 @@ hs_exit_(bool wait_foreign)
 
     /* free the Static Pointer Table */
     exitStaticPtrTable();
+
+    /* remove the top-level handler */
+    exitTopHandler();
 
     /* free the stable pointer table */
     exitStableTables();

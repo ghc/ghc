@@ -14,9 +14,16 @@ The highlights since the 8.0 branch are:
 
 - TODO FIXME
 - SCC annotations can now be used for declarations.
+- Heap overflow throws an exception in certain circumstances.
 
 Full details
 ------------
+
+- Heap overflow throws a catchable exception, provided that it was detected
+  by the RTS during a GC cycle due to the program exceeding a limit set by
+  ``+RTS -M``, and not due to an allocation being refused by the operating
+  system.  This exception is thrown to the same thread that receives
+  ``UserInterrupt`` exceptions, and may be caught by user programs.
 
 Language
 ~~~~~~~~

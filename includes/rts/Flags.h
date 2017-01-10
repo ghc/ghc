@@ -15,6 +15,10 @@
 #define RTS_FLAGS_H
 
 #include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include "stg/Types.h"
+#include "Time.h"
 
 /* For defaults, see the @initRtsFlagsDefaults@ routine. */
 
@@ -70,6 +74,12 @@ typedef struct _GC_FLAGS {
                                  * extra space is given to the thread
                                  * to handle the exception before we
                                  * raise it again.
+                                 */
+    StgWord heapLimitGrace;     /* units: *blocks*
+                                 * After a HeapOverflow exception has
+                                 * been raised, how much extra space is
+                                 * given to the thread to handle the
+                                 * exception before we raise it again.
                                  */
 
     bool numa;                   /* Use NUMA */

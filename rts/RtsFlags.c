@@ -129,7 +129,7 @@ void initRtsFlagsDefaults(void)
         maxStkSize = 8 * 1024 * 1024;
 
     RtsFlags.GcFlags.statsFile          = NULL;
-    RtsFlags.GcFlags.giveStats          = NO_GC_STATS;
+    RtsFlags.GcFlags.giveStats          = COLLECT_GC_STATS;
 
     RtsFlags.GcFlags.maxStkSize         = maxStkSize / sizeof(W_);
     RtsFlags.GcFlags.initialStkSize     = 1024 / sizeof(W_);
@@ -141,6 +141,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.nurseryChunkSize   = 0;
     RtsFlags.GcFlags.minOldGenSize      = (1024 * 1024)       / BLOCK_SIZE;
     RtsFlags.GcFlags.maxHeapSize        = 0;    /* off by default */
+    RtsFlags.GcFlags.heapLimitGrace     = (1024 * 1024);
     RtsFlags.GcFlags.heapSizeSuggestion = 0;    /* none */
     RtsFlags.GcFlags.heapSizeSuggestionAuto = false;
     RtsFlags.GcFlags.pcFreeHeap         = 3;    /* 3% */
@@ -427,6 +428,11 @@ usage_text[] = {
 #endif
 "  -xq       The allocation limit given to a thread after it receives",
 "            an AllocationLimitExceeded exception. (default: 100k)",
+"",
+"  -Mgrace=<n>",
+"            The amount of allocation after the program receives a",
+"            HeapOverflow exception before the exception is thrown again, if",
+"            the program is still exceeding the heap limit.",
 "",
 "RTS options may also be specified using the GHCRTS environment variable.",
 "",
@@ -905,11 +911,16 @@ error = true;
 
               case 'M':
                   OPTION_UNSAFE;
-                  RtsFlags.GcFlags.maxHeapSize =
-                      decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX)
-                      / BLOCK_SIZE;
-                  /* user give size in *bytes* but "maxHeapSize" is in
-                   * *blocks* */
+                  if (0 == strncmp("grace=", rts_argv[arg] + 2, 6)) {
+                      RtsFlags.GcFlags.heapLimitGrace =
+                          decodeSize(rts_argv[arg], 8, BLOCK_SIZE, HS_WORD_MAX);
+                  } else {
+                      RtsFlags.GcFlags.maxHeapSize =
+                          decodeSize(rts_argv[arg], 2, BLOCK_SIZE, HS_WORD_MAX)
+                          / BLOCK_SIZE;
+                      // user give size in *bytes* but "maxHeapSize" is in
+                      // *blocks*
+                  }
                   break;
 
               case 'm':
