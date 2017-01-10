@@ -2488,14 +2488,14 @@ aexp2   :: { LHsExpr RdrName }
         -- correct Haskell (you'd have to write '((+ 3), (4 -))')
         -- but the less cluttered version fell out of having texps.
         | '(' texp ')'                  {% ams (sLL $1 $> (HsPar $2)) [mop $1,mcp $3] }
-        | '(' tup_exprs ')'             {% do { e <- mkSumOrTuple Boxed (comb2 $1 $3) $2
-                                              ; ams (sLL $1 $> e) [mop $1,mcp $3] } }
+        | '(' tup_exprs ')'             {% do { e <- mkSumOrTuple Boxed (comb2 $1 $3) (snd $2)
+                                              ; ams (sLL $1 $> e) ((mop $1:fst $2) ++ [mcp $3]) } }
 
         | '(#' texp '#)'                {% ams (sLL $1 $> (ExplicitTuple [L (gl $2)
                                                          (Present $2)] Unboxed))
                                                [mo $1,mc $3] }
-        | '(#' tup_exprs '#)'           {% do { e <- mkSumOrTuple Unboxed (comb2 $1 $3) $2
-                                              ; ams (sLL $1 $> e) [mo $1,mc $3] } }
+        | '(#' tup_exprs '#)'           {% do { e <- mkSumOrTuple Unboxed (comb2 $1 $3) (snd $2)
+                                              ; ams (sLL $1 $> e) ((mo $1:fst $2) ++ [mc $3]) } }
 
         | '[' list ']'      {% ams (sLL $1 $> (snd $2)) (mos $1:mcs $3:(fst $2)) }
         | '[:' parr ':]'    {% ams (sLL $1 $> (snd $2)) (mo $1:mc $3:(fst $2)) }
@@ -2584,24 +2584,20 @@ texp :: { LHsExpr RdrName }
         | exp '->' texp   {% ams (sLL $1 $> $ EViewPat $1 $3) [mu AnnRarrow $2] }
 
 -- Always at least one comma or bar.
-tup_exprs :: { SumOrTuple }
+tup_exprs :: { ([AddAnn],SumOrTuple) }
            : texp commas_tup_tail
                           {% do { addAnnotation (gl $1) AnnComma (fst $2)
-                                ; return (Tuple ((sL1 $1 (Present $1)) : snd $2)) } }
+                                ; return ([],Tuple ((sL1 $1 (Present $1)) : snd $2)) } }
 
-           | texp bars
-                          {% do { mapM_ (\ll -> addAnnotation ll AnnVbar ll) (fst $2)
-                                ; return (Sum 1  (snd $2 + 1) $1) } }
+           | texp bars    { (mvbars (fst $2), Sum 1  (snd $2 + 1) $1) }
 
            | commas tup_tail
                 {% do { mapM_ (\ll -> addAnnotation ll AnnComma ll) (fst $1)
                       ; return
-                           (Tuple (map (\l -> L l missingTupArg) (fst $1) ++ $2)) } }
+                           ([],Tuple (map (\l -> L l missingTupArg) (fst $1) ++ $2)) } }
 
            | bars texp bars0
-                {% do { mapM_ (\ll -> addAnnotation ll AnnVbar ll) (fst $1)
-                      ; mapM_ (\ll -> addAnnotation ll AnnVbar ll) (fst $3)
-                      ; return (Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2) } }
+                { (mvbars (fst $1) ++ mvbars (fst $3), Sum (snd $1 + 1) (snd $1 + snd $3 + 1) $2) }
 
 -- Always starts with commas; always follows an expr
 commas_tup_tail :: { (SrcSpan,[LHsTupArg RdrName]) }
@@ -3669,6 +3665,11 @@ mcs ll = mj AnnCloseS ll
 --  entry for each SrcSpan
 mcommas :: [SrcSpan] -> [AddAnn]
 mcommas ss = map (\s -> mj AnnCommaTuple (L s ())) ss
+
+-- |Given a list of the locations of '|'s, provide a [AddAnn] with an AnnVbar
+--  entry for each SrcSpan
+mvbars :: [SrcSpan] -> [AddAnn]
+mvbars ss = map (\s -> mj AnnVbar (L s ())) ss
 
 -- |Get the location of the last element of a OrdList, or noSrcSpan
 oll :: OrdList (Located a) -> SrcSpan

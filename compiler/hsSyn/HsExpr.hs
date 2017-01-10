@@ -364,9 +364,16 @@ data HsExpr id
         [LHsTupArg id]
         Boxity
 
+  -- | Used for unboxed sum types
+  --
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(#'@,
+  --          'ApiAnnotation.AnnVbar', 'ApiAnnotation.AnnClose' @'#)'@,
+  --
+  --  There will be multiple 'ApiAnnotation.AnnVbar', (1 - alternative) before
+  --  the expression, (arity - alternative) after it
   | ExplicitSum
-          ConTag -- Alternative (one-based)
-          Arity  -- Sum arity
+          ConTag --  Alternative (one-based)
+          Arity  --  Sum arity
           (LHsExpr id)
           (PostTc id [Type])   -- the type arguments
 

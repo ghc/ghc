@@ -43,6 +43,7 @@ extra_src_files = {
   'T10358': ['Test10358.hs'],
   'T10396': ['Test10396.hs'],
   'T10399': ['Test10399.hs'],
+  'T12417': ['Test12417.hs'],
   'T10420': ['rule-defining-plugin/'],
   'T10458': ['A.c'],
   'T10529a': ['hpc_sample_non_existing_module.tix'],

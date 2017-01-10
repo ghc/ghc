@@ -133,3 +133,7 @@ T11430:
 .PHONY: load-main
 load-main:
 	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" load-main.hs
+
+.PHONY: T12417
+T12417:
+	$(CHECK_API_ANNOTATIONS) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" Test12417.hs
