@@ -153,7 +153,7 @@ filter pred (x:xs)
   | pred x         = x : filter pred xs
   | otherwise      = filter pred xs
 
-{-# NOINLINE [0] filterFB #-}
+{-# INLINE [0] filterFB #-} -- See Note [Inline FB functions]
 filterFB :: (a -> b -> b) -> (a -> Bool) -> a -> b -> b
 filterFB c p x r | p x       = x `c` r
                  | otherwise = r
@@ -204,6 +204,28 @@ We hope that one of the two measure kick in:
 
 The oneShot annotations used in this module are correct, as we only use them in
 argumets to foldr, where we know how the arguments are called.
+-}
+
+{-
+Note [Inline FB functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+After fusion rules successfully fire, we are usually left with one or more calls
+to list-producing functions abstracted over cons and nil. Here we call them
+FB functions because their names usually end with 'FB'. It's a good idea to
+inline FB functions because:
+
+* They are higher-order functions and therefore benefits from inlining.
+
+* When the final consumer is a left fold, inlining the FB functions is the only
+  way to make arity expansion to happen. See Note [Left fold via right fold].
+
+For this reason we mark all FB functions INLINE [0]. The [0] phase-specifier
+ensures that calls to FB functions can be written back to the original form
+when no fusion happens.
+
+Without these inline pragmas, the loop in perf/should_run/T13001 won't be
+allocation-free. Also see Trac #13001.
 -}
 
 -- ----------------------------------------------------------------------------
@@ -267,7 +289,7 @@ scanl                   = scanlGo
     foldr (scanlFB f (:)) (constScanl []) bs a = tail (scanl f a bs)
  #-}
 
-{-# INLINE [0] scanlFB #-}
+{-# INLINE [0] scanlFB #-} -- See Note [Inline FB functions]
 scanlFB :: (b -> a -> b) -> (b -> c -> c) -> a -> (b -> c) -> b -> c
 scanlFB f c = \b g -> oneShot (\x -> let b' = f x b in b' `c` g b')
   -- See Note [Left folds via right fold]
@@ -305,7 +327,7 @@ scanl' = scanlGo'
     foldr (scanlFB' f (:)) (flipSeqScanl' []) bs a = tail (scanl' f a bs)
  #-}
 
-{-# INLINE [0] scanlFB' #-}
+{-# INLINE [0] scanlFB' #-} -- See Note [Inline FB functions]
 scanlFB' :: (b -> a -> b) -> (b -> c -> c) -> a -> (b -> c) -> b -> c
 scanlFB' f c = \b g -> oneShot (\x -> let !b' = f x b in b' `c` g b')
   -- See Note [Left folds via right fold]
@@ -372,7 +394,7 @@ strictUncurryScanr :: (a -> b -> c) -> (a, b) -> c
 strictUncurryScanr f pair = case pair of
                               (x, y) -> f x y
 
-{-# INLINE [0] scanrFB #-}
+{-# INLINE [0] scanrFB #-} -- See Note [Inline FB functions]
 scanrFB :: (a -> b -> b) -> (b -> c -> c) -> a -> (b, c) -> (b, c)
 scanrFB f c = \x (r, est) -> (f x r, r `c` est)
 
@@ -428,7 +450,7 @@ minimum xs              =  foldl1 min xs
 iterate :: (a -> a) -> a -> [a]
 iterate f x =  x : iterate f (f x)
 
-{-# NOINLINE [0] iterateFB #-}
+{-# INLINE [0] iterateFB #-} -- See Note [Inline FB functions]
 iterateFB :: (a -> b -> b) -> (a -> a) -> a -> b
 iterateFB c f x0 = go x0
   where go x = x `c` go (f x)
@@ -445,7 +467,7 @@ repeat :: a -> [a]
 -- The pragma just gives the rules more chance to fire
 repeat x = xs where xs = x : xs
 
-{-# INLINE [0] repeatFB #-}     -- ditto
+{-# INLINE [0] repeatFB #-}     -- ditto -- See Note [Inline FB functions]
 repeatFB :: (a -> b -> b) -> a -> b
 repeatFB c x = xs where xs = x `c` xs
 
@@ -486,7 +508,7 @@ takeWhile p (x:xs)
             | p x       =  x : takeWhile p xs
             | otherwise =  []
 
-{-# INLINE [0] takeWhileFB #-}
+{-# INLINE [0] takeWhileFB #-} -- See Note [Inline FB functions]
 takeWhileFB :: (a -> Bool) -> (a -> b -> b) -> b -> a -> b -> b
 takeWhileFB p c n = \x r -> if p x then x `c` r else n
 
@@ -572,7 +594,7 @@ unsafeTake m   (x:xs) = x : unsafeTake (m - 1) xs
 flipSeqTake :: a -> Int -> a
 flipSeqTake x !_n = x
 
-{-# INLINE [0] takeFB #-}
+{-# INLINE [0] takeFB #-} -- See Note [Inline FB functions]
 takeFB :: (a -> b -> b) -> b -> a -> (Int -> b) -> Int -> b
 -- The \m accounts for the fact that takeFB is used in a higher-order
 -- way by takeFoldr, so it's better to inline.  A good example is
@@ -914,7 +936,7 @@ zip []     _bs    = []
 zip _as    []     = []
 zip (a:as) (b:bs) = (a,b) : zip as bs
 
-{-# INLINE [0] zipFB #-}
+{-# INLINE [0] zipFB #-} -- See Note [Inline FB functions]
 zipFB :: ((a, b) -> c -> d) -> a -> b -> c -> d
 zipFB c = \x y r -> (x,y) `c` r
 
@@ -953,7 +975,7 @@ zipWith f  (a:as) (b:bs) = f a b : zipWith f as bs
 
 -- zipWithFB must have arity 2 since it gets two arguments in the "zipWith"
 -- rule; it might not get inlined otherwise
-{-# INLINE [0] zipWithFB #-}
+{-# INLINE [0] zipWithFB #-} -- See Note [Inline FB functions]
 zipWithFB :: (a -> b -> c) -> (d -> e -> a) -> d -> e -> b -> c
 zipWithFB c f = \x y r -> (x `f` y) `c` r
 

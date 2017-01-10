@@ -1098,7 +1098,7 @@ words s                 =  case dropWhile {-partain:Char.-}isSpace s of
 "wordsList" [1] wordsFB (:) [] = words
  #-}
 wordsFB :: ([Char] -> b -> b) -> b -> String -> b
-{-# NOINLINE [0] wordsFB #-}
+{-# INLINE [0] wordsFB #-} -- See Note [Inline FB functions] in GHC.List
 wordsFB c n = go
   where
     go s = case dropWhile isSpace s of

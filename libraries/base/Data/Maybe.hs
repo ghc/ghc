@@ -293,7 +293,7 @@ mapMaybe f (x:xs) =
 "mapMaybeList" [1]  forall f. foldr (mapMaybeFB (:) f) [] = mapMaybe f
   #-}
 
-{-# NOINLINE [0] mapMaybeFB #-}
+{-# INLINE [0] mapMaybeFB #-} -- See Note [Inline FB functions] in GHC.List
 mapMaybeFB :: (b -> r -> r) -> (a -> Maybe b) -> a -> r -> r
 mapMaybeFB cons f x next = case f x of
   Nothing -> next

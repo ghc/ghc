@@ -124,6 +124,7 @@ sortWith f = sortBy (\x y -> compare (f x) (f y))
 groupWith :: Ord b => (a -> b) -> [a] -> [[a]]
 groupWith f xs = build (\c n -> groupByFB c n (\x y -> f x == f y) (sortWith f xs))
 
+{-# INLINE [0] groupByFB #-} -- See Note [Inline FB functions] in GHC.List
 groupByFB :: ([a] -> lst -> lst) -> lst -> (a -> a -> Bool) -> [a] -> lst
 groupByFB c n eq xs0 = groupByFBCore xs0
   where groupByFBCore [] = n
