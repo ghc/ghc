@@ -460,3 +460,13 @@ test('T13001',
       only_ways(['normal'])],
      compile_and_run,
      ['-O2'])
+
+test('T12990',
+    [stats_num_field('bytes allocated',
+                     [ (wordsize(64), 21640904, 5) ]),
+                     # 2017-01-03     34440936  w/o inlining unsaturated
+                     #                          constructor wrappers
+                     # 2017-01-03     21640904 inline wrappers
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O2'])

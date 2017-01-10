@@ -466,6 +466,32 @@ newtype DataConBoxer = DCB ([Type] -> [Var] -> UniqSM ([Var], [CoreBind]))
                        -- Bind these src-level vars, returning the
                        -- rep-level vars to bind in the pattern
 
+{-
+Note [Inline partially-applied constructor wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We allow the wrapper to inline when partially applied to avoid
+boxing values unnecessarily. For example, consider
+
+   data Foo a = Foo !Int a
+
+   instance Traversable Foo where
+     traverse f (Foo i a) = Foo i <$> f a
+
+This desugars to
+
+   traverse f foo = case foo of
+        Foo i# a -> let i = I# i#
+                    in map ($WFoo i) (f a)
+
+If the wrapper `$WFoo` is not inlined, we get a fruitless reboxing of `i`.
+But if we inline the wrapper, we get
+
+   map (\a. case i of I# i# a -> Foo i# a) (f a)
+
+and now case-of-known-constructor eliminates the redundant allocation.
+-}
+
 mkDataConRep :: DynFlags
              -> FamInstEnvs
              -> Name
@@ -498,16 +524,16 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              wrap_arg_dmds = map mk_dmd arg_ibangs
              mk_dmd str | isBanged str = evalDmd
                         | otherwise           = topDmd
-                 -- The Cpr info can be important inside INLINE rhss, where the
-                 -- wrapper constructor isn't inlined.
-                 -- And the argument strictness can be important too; we
-                 -- may not inline a constructor when it is partially applied.
-                 -- For example:
-                 --      data W = C !Int !Int !Int
-                 --      ...(let w = C x in ...(w p q)...)...
-                 -- we want to see that w is strict in its two arguments
 
-             wrap_unf = mkInlineUnfolding (Just wrap_arity) wrap_rhs
+             -- The wrapper will usually be inlined (see wrap_unf), so its
+             -- strictness and CPR info is usually irrelevant. But this is
+             -- not always the case; GHC may choose not to inline it. In
+             -- particular, the wrapper constructor is not inlined inside
+             -- an INLINE rhs or when it is not applied to any arguments.
+             -- See Note [Inline partially-applied constructor wrappers]
+             -- Passing Nothing here allows the wrapper to inline when
+             -- unsaturated.
+             wrap_unf = mkInlineUnfolding Nothing wrap_rhs
              wrap_tvs = (univ_tvs `minusList` map eqSpecTyVar eq_spec) ++ ex_tvs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
