@@ -399,7 +399,7 @@ synifyType _ (TyConApp tc tys)
   | tc `hasKey` ipClassKey
   , [name, ty] <- tys
   , Just x <- isStrLitTy name
-  = noLoc $ HsIParamTy (HsIPName x) (synifyType WithinType ty)
+  = noLoc $ HsIParamTy (noLoc $ HsIPName x) (synifyType WithinType ty)
   -- and equalities
   | tc `hasKey` eqTyConKey
   , [ty1, ty2] <- tys

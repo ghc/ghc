@@ -997,7 +997,7 @@ ppr_mono_ty _         (HsKindSig ty kind) u q =
     parens (ppr_mono_lty pREC_TOP ty u q <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TOP ty u q)
-ppr_mono_ty ctxt_prec (HsIParamTy n ty)   u q =
+ppr_mono_ty ctxt_prec (HsIParamTy (L _ n) ty) u q =
     maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsRecTy {})        _ _ = toHtml "{..}"
