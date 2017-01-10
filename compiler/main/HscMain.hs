@@ -137,7 +137,7 @@ import Maybes
 
 import DynFlags
 import ErrUtils
-import Platform ( platformOS, OS(OSDarwin) )
+import Platform ( platformOS, osSubsectionsViaSymbols )
 
 import Outputable
 import NameEnv
@@ -1394,7 +1394,7 @@ doCodeGen hsc_env this_mod data_tycons
     let
      pipeline_stream
       | gopt Opt_SplitObjs dflags || gopt Opt_SplitSections dflags ||
-        platformOS (targetPlatform dflags) == OSDarwin
+        osSubsectionsViaSymbols (platformOS (targetPlatform dflags))
         = {-# SCC "cmmPipeline" #-}
           let run_pipeline us cmmgroup = do
                 let (topSRT', us') = initUs us emptySRT

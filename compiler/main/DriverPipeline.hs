@@ -1794,7 +1794,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
               in ["-L" ++ l] ++ ["-Wl,-rpath", "-Wl," ++ libpath]
          | otherwise = ["-L" ++ l]
 
-    let dead_strip = if osMachOTarget (platformOS platform)
+    let dead_strip = if osSubsectionsViaSymbols (platformOS platform)
                       then ["-Wl,-dead_strip"]
                       else []
     let lib_paths = libraryPaths dflags

@@ -14,6 +14,7 @@ module Platform (
         isARM,
         osElfTarget,
         osMachOTarget,
+        osSubsectionsViaSymbols,
         platformUsesFrameworks,
         platformBinariesAreStaticLibs,
 )
@@ -160,6 +161,11 @@ platformUsesFrameworks = osUsesFrameworks . platformOS
 osBinariesAreStaticLibs :: OS -> Bool
 osBinariesAreStaticLibs OSiOS = True
 osBinariesAreStaticLibs _     = False
+
+osSubsectionsViaSymbols :: OS -> Bool
+osSubsectionsViaSymbols OSDarwin = True
+osSubsectionsViaSymbols OSiOS    = True
+osSubsectionsViaSymbols _        = False
 
 platformBinariesAreStaticLibs :: Platform -> Bool
 platformBinariesAreStaticLibs = osBinariesAreStaticLibs . platformOS
