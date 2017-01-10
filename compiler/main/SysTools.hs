@@ -860,7 +860,7 @@ getLinkerInfo' dflags = do
                      -- Note [Windows stack usage]
                      -- Force static linking of libGCC
                      -- Note [Windows static libGCC]
-                   , "-static-libgcc" ]
+                   , "-Xlinker", "--stack=0x800000,0x800000", "-static-libgcc" ]
                _ -> do
                  -- In practice, we use the compiler as the linker here. Pass
                  -- -Wl,--version to get linker version info.
