@@ -45,6 +45,7 @@ html_logo = None
 html_static_path = ['images']
 # Convert quotes and dashes to typographically correct entities
 html_use_smartypants = True
+html_use_opensearch = 'https://downloads.haskell.org/~ghc/master/users-guide'
 html_show_copyright = True
 
 # If true, an OpenSearch description file will be output, and all pages will
