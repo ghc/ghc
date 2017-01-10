@@ -1716,8 +1716,8 @@ ctype   :: { LHsType RdrName }
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
                                                      , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
-                                             [mj AnnVal $1,mu AnnDcolon $2] }
+        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy $1 $3))
+                                             [mu AnnDcolon $2] }
         | type                        { $1 }
 
 ----------------------
@@ -1741,8 +1741,8 @@ ctypedoc :: { LHsType RdrName }
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
                                                      , hst_body = $3 }) }
-        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy (unLoc $1) $3))
-                                             [mj AnnVal $1,mu AnnDcolon $2] }
+        | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy $1 $3))
+                                             [mu AnnDcolon $2] }
         | typedoc                     { $1 }
 
 ----------------------

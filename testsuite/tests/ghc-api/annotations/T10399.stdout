@@ -10,7 +10,6 @@
 ((Test10399.hs:10:1-35,AnnSemi), [Test10399.hs:12:1]),
 ((Test10399.hs:10:1-35,AnnType), [Test10399.hs:10:1-4]),
 ((Test10399.hs:10:12-35,AnnDcolon), [Test10399.hs:10:24-25]),
-((Test10399.hs:10:12-35,AnnVal), [Test10399.hs:10:12-22]),
 ((Test10399.hs:12:1-66,AnnEqual), [Test10399.hs:12:8]),
 ((Test10399.hs:12:1-66,AnnFunId), [Test10399.hs:12:1-6]),
 ((Test10399.hs:12:1-66,AnnSemi), [Test10399.hs:14:1]),

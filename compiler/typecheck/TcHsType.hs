@@ -632,7 +632,7 @@ tc_hs_type mode (HsExplicitTupleTy _ tys) exp_kind
     arity = length tys
 
 --------- Constraint types
-tc_hs_type mode (HsIParamTy n ty) exp_kind
+tc_hs_type mode (HsIParamTy (L _ n) ty) exp_kind
   = do { MASSERT( isTypeLevel (mode_level mode) )
        ; ty' <- tc_lhs_type mode ty liftedTypeKind
        ; let n' = mkStrLitTy $ hsIPNameFS n

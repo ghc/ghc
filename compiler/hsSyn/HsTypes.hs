@@ -497,7 +497,7 @@ data HsType name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | HsIParamTy          HsIPName         -- (?x :: ty)
+  | HsIParamTy          (Located HsIPName) -- (?x :: ty)
                         (LHsType name)   -- Implicit parameters as they occur in contexts
       -- ^
       -- > (?x :: ty)
