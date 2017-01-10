@@ -328,23 +328,24 @@ StripLibraries=NO
 #		system needs to do other special magic if you are
 #		doing object-file splitting
 
-ArchSupportsSplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO))
-OsSupportsSplitObjs=$(strip $(if $(filter $(TargetOS_CPP),mingw32 linux darwin solaris2 freebsd dragonfly netbsd openbsd),YES,NO))
+ArchSupportsSplitObjs=$(if $(filter \
+  $(TargetArch_CPP),i386 x86_64 powerpc sparc),YES,NO)#
+
+# We used to support splitting on Darwin, but there is no point, since Darwin
+# uses subsections via symbols
+OsSupportsSplitObjs=$(if $(filter $(TargetOS_CPP),\
+   mingw32 linux solaris2 freebsd dragonfly netbsd openbsd),YES,NO)
 SplitObjsBroken = @SplitObjsBroken@
 
-SupportsSplitObjs := $(strip \
-                    $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
-                               $(filter YES,$(OsSupportsSplitObjs)),\
-                               $(filter NO,$(SplitObjsBroken)),\
-                               $(filter NO,$(GhcUnregisterised))),\
-                          YES,NO))
+SupportsSplitObjs := $(if $(and $(filter YES,$(ArchSupportsSplitObjs)),\
+                                $(filter YES,$(OsSupportsSplitObjs)),\
+                                $(filter NO,$(SplitObjsBroken)),\
+                                $(filter YES,$(GhcWithNativeCodeGen))),YES,NO)
 
 # By default, enable SplitObjs for the libraries if this build supports it.
 # Unless SplitSections is enabled - then let that take precedence.
-SplitObjs = $(strip \
-    $(if $(and $(filter YES,$(SupportsSplitObjs)),\
-               $(filter NO,$(SplitSections))),\
-         YES,NO))
+SplitObjs = $(if $(and $(filter YES,$(SupportsSplitObjs)),\
+                       $(filter NO,$(SplitSections))),YES,NO)
 
 # ----------------------------------------------------------------------------
 # Section splitting
@@ -357,11 +358,9 @@ SplitObjs = $(strip \
 #
 # This is not supported on Darwin (where you can use subsections-via-symbols
 # instead) and Windows is not yet working. (See #11445 and related tickets.)
-OsSupportsSplitSections=$(strip $(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES))
-SupportsSplitSections = $(strip \
-                    $(if $(and $(filter YES,$(OsSupportsSplitSections)),\
-                               $(filter YES,$(LdIsGNULd))),\
-                          YES,NO))
+OsSupportsSplitSections=$(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES)
+SupportsSplitSections :=$(if $(and $(filter YES,$(OsSupportsSplitSections)),\
+                                   $(filter YES,$(LdIsGNULd))),YES,NO)
 SplitSections ?= $(SupportsSplitSections)
 
 # ----------------------------------------------------------------------------
