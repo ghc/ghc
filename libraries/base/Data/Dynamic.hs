@@ -24,7 +24,7 @@
 module Data.Dynamic
   (
 
-        -- Module Data.Typeable re-exported for convenience
+        -- * Module Data.Typeable re-exported for convenience
         module Data.Typeable,
 
         -- * The @Dynamic@ type
