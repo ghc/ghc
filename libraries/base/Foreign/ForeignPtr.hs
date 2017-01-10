@@ -35,6 +35,7 @@ module Foreign.ForeignPtr (
         -- ** Low-level operations
         , touchForeignPtr
         , castForeignPtr
+        , plusForeignPtr
 
         -- ** Allocating managed memory
         , mallocForeignPtr

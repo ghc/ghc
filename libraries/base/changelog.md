@@ -35,6 +35,8 @@
 
   * Raw buffer operations in `GHC.IO.FD` are now strict in the buffer, offset, and length operations (#9696)
 
+  * Add `plusForeignPtr` to `Foreign.ForeignPtr`.
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0

@@ -38,6 +38,7 @@ module Foreign.ForeignPtr.Imp
         , unsafeForeignPtrToPtr
         , touchForeignPtr
         , castForeignPtr
+        , plusForeignPtr
 
         -- ** Allocating managed memory
         , mallocForeignPtr

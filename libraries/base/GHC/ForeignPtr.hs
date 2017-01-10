@@ -39,6 +39,7 @@ module GHC.ForeignPtr
         touchForeignPtr,
         unsafeForeignPtrToPtr,
         castForeignPtr,
+        plusForeignPtr,
         newConcForeignPtr,
         addForeignPtrConcFinalizer,
         finalizeForeignPtr
@@ -433,6 +434,12 @@ castForeignPtr :: ForeignPtr a -> ForeignPtr b
 -- ^This function casts a 'ForeignPtr'
 -- parameterised by one type into another type.
 castForeignPtr = coerce
+
+plusForeignPtr :: ForeignPtr a -> Int -> ForeignPtr b
+-- ^Advances the given address by the given offset in bytes.
+--
+-- @since 4.10.0.0
+plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
 
 -- | Causes the finalizers associated with a foreign pointer to be run
 -- immediately.
