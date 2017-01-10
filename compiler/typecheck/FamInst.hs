@@ -415,8 +415,14 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
 
 -- Add new locally-defined family instances
 tcExtendLocalFamInstEnv :: [FamInst] -> TcM a -> TcM a
+tcExtendLocalFamInstEnv [] thing_inside = thing_inside
 tcExtendLocalFamInstEnv fam_insts thing_inside
- = do { env <- getGblEnv
+ = do { env0 <- getGblEnv
+      ; let this_mod = tcg_mod env0
+            imports = tcg_imports env0
+      ; loadModuleInterfaces (text "Loading family-instance modules")
+                             (filter (/= this_mod) (imp_finsts imports))
+      ; env <- getGblEnv
       ; (inst_env', fam_insts') <- foldlM addLocalFamInst
                                        (tcg_fam_inst_env env, tcg_fam_insts env)
                                        fam_insts
