@@ -243,34 +243,49 @@ mergeIfaceDecls = plusOccEnv_C mergeIfaceDecl
 -- merge them together.  So in particular, we have to take a different
 -- strategy for knot-tying: we first speculatively merge the declarations
 -- to get the "base" truth for what we believe the types will be
--- (this is "type computation.")  Then we read everything in and check
--- for compatibility.
+-- (this is "type computation.")  Then we read everything in relative
+-- to this truth and check for compatibility.
 --
--- Consider this example:
+-- During the merge process, we may need to nondeterministically
+-- pick a particular declaration to use, if multiple signatures define
+-- the declaration ('mergeIfaceDecl').  If, for all choices, there
+-- are no type synonym cycles in the resulting merged graph, then
+-- we can show that our choice cannot matter. Consider the
+-- set of entities which the declarations depend on: by assumption
+-- of acyclicity, we can assume that these have already been shown to be equal
+-- to each other (otherwise merging will fail).  Then it must
+-- be the case that all candidate declarations here are type-equal
+-- (the choice doesn't matter) or there is an inequality (in which
+-- case merging will fail.)
 --
---      H :: [ data A;      type B = A              ]
---      H :: [ type A = C;              data C      ]
---      H :: [ type A = (); data B;     type C = B; ]
+-- Unfortunately, the choice can matter if there is a cycle.  Consider the
+-- following merge:
 --
--- We attempt to make a type synonym cycle, which is solved if we
--- take the hint that @type A = ()@.  But actually we can and should
--- reject this: the 'Name's of C and () are different, so the declarations
--- of A are incompatible. (Thus there's no problem if we pick a
--- particular declaration of 'A' over another.)
+--      signature H where { type A = C;  type B = A; data C      }
+--      signature H where { type A = (); data B;     type C = B  }
 --
--- Here's another one:
+-- If we pick @type A = C@ as our representative, there will be
+-- a cycle and merging will fail. But if we pick @type A = ()@ as
+-- our representative, no cycle occurs, and we instead conclude
+-- that all of the types are unit.  So it seems that we either
+-- (a) need a stronger acyclicity check which considers *all*
+-- possible choices from a merge, or (b) we must find a selection
+-- of declarations which is acyclic, and show that this is always
+-- the "best" choice we could have made (ezyang conjecture's this
+-- is the case but does not have a proof).  For now this is
+-- not implemented.
 --
---      H :: [ data Int;    type B = Int;           ]
---      H :: [ type Int=C;              data C      ]
---      H :: [ export Int;  data B;     type C = B; ]
+-- It's worth noting that at the moment, a data constructor and a
+-- type synonym are never compatible.  Consider:
 --
--- We'll properly reject this too: a reexport of Int is a data
--- constructor, whereas type Int=C is a type synonym: incompatible
--- types.
+--      signature H where { type Int=C;         type B = Int; data C = Int}
+--      signature H where { export Prelude.Int; data B;       type C = B; }
 --
--- Perhaps the renamer is too fussy when it comes to ambiguity (requiring
--- original names to match, rather than just the types after type synonym
--- expansion) to match, but that's what we have for Haskell today.
+-- This will be rejected, because the reexported Int in the second
+-- signature (a proper data type) is never considered equal to a
+-- type synonym.  Perhaps this should be relaxed, where a type synonym
+-- in a signature is considered implemented by a data type declaration
+-- which matches the reference of the type synonym.
 typecheckIfacesForMerging :: Module -> [ModIface] -> IORef TypeEnv -> IfM lcl (TypeEnv, [ModDetails])
 typecheckIfacesForMerging mod ifaces tc_env_var =
   -- cannot be boot (False)
