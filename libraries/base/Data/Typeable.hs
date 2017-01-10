@@ -68,7 +68,6 @@ module Data.Typeable
         TyCon,          -- abstract, instance of: Eq, Show, Typeable
                         -- For now don't export Module, to avoid name clashes
         tyConFingerprint,
-        tyConString,
         tyConPackage,
         tyConModule,
         tyConName,

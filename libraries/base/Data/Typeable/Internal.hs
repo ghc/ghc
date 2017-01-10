@@ -38,7 +38,7 @@ module Data.Typeable.Internal (
 
     -- * TyCon
     TyCon,   -- Abstract
-    tyConPackage, tyConModule, tyConName, tyConString, tyConFingerprint,
+    tyConPackage, tyConModule, tyConName, tyConFingerprint,
     mkTyCon3, mkTyCon3#,
     rnfTyCon,
 
@@ -102,12 +102,6 @@ tyConName (TyCon _ _ _ n) = trNameString n
 trNameString :: TrName -> String
 trNameString (TrNameS s) = unpackCString# s
 trNameString (TrNameD s) = s
-
--- | Observe string encoding of a type representation
-{-# DEPRECATED tyConString "renamed to 'tyConName'; 'tyConModule' and 'tyConPackage' are also available." #-}
--- deprecated in 7.4
-tyConString :: TyCon   -> String
-tyConString = tyConName
 
 tyConFingerprint :: TyCon -> Fingerprint
 tyConFingerprint (TyCon hi lo _ _)
