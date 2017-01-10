@@ -147,11 +147,6 @@ module GHC (
         InteractiveEval.back,
         InteractiveEval.forward,
 
-        -- ** Deprecated API
-        RunResult(..),
-        runStmt, runStmtWithLocation,
-        resume,
-
         -- * Abstract syntax elements
 
         -- ** Packages
