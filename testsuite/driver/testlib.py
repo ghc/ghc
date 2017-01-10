@@ -1801,11 +1801,11 @@ def runCmd(cmd, stdin=None, stdout=None, stderr=None, timeout_multiplier=1.0, pr
                 sys.stderr.buffer.write(stderr_buffer)
 
         if stdout:
-            with io.open(stdout, 'ab') as f:
+            with io.open(stdout, 'wb') as f:
                 f.write(stdout_buffer)
         if stderr:
             if stderr is not subprocess.STDOUT:
-                with io.open(stderr, 'ab') as f:
+                with io.open(stderr, 'wb') as f:
                     f.write(stderr_buffer)
 
     if r.returncode == 98:
