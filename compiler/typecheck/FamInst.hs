@@ -314,8 +314,8 @@ checkFamInstConsistency famInstMods directlyImpMods
                     -- defined by the module we are compiling in imports.
                     = partition ((/= this_mod) . nameModule . fi_fam)
                                 (famInstEnvElts env1)
-           ; mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
-           ; mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
+           ; mapM_ (checkForConflicts [env2])            check_now
+           ; mapM_ (checkForInjectivityConflicts [env2]) check_now
            ; let check_later_map =
                     extendNameEnvList_C (++) emptyNameEnv
                         [(fi_fam finst, [finst]) | finst <- check_later]
@@ -334,8 +334,8 @@ checkRecFamInstConsistency tc = do
         , Just pairs <- lookupNameEnv (tcg_pending_fam_checks tcg_env)
                                       (tyConName tc)
         = forM_ pairs $ \(check_now, env2) -> do
-            mapM_ (checkForConflicts (emptyFamInstEnv, env2))           check_now
-            mapM_ (checkForInjectivityConflicts (emptyFamInstEnv,env2)) check_now
+            mapM_ (checkForConflicts [env2])            check_now
+            mapM_ (checkForInjectivityConflicts [env2]) check_now
         | otherwise
         = return ()
    checkConsistency tc
@@ -479,9 +479,26 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
  = do { env <- getGblEnv
       ; let this_mod = tcg_mod env
             imports = tcg_imports env
+
+{-
+          -- Load the interfaces for all of our dependencies that define
+          -- family instances. We must do this so that in addLocalFamInst
+          -- below, the eps_fam_inst_env will contain all the instances
+          -- we are supposed to check consistency against.
       ; loadModuleInterfaces (text "Loading family-instance modules")
                              (filter (/= this_mod) (imp_finsts imports))
-      ; (inst_env', fam_insts') <- foldlM addLocalFamInst
+-}
+
+            -- XXX
+      ; hpt <- getHpt
+      ; let hmiModule     = mi_module . hm_iface
+            hmiFamInstEnv = extendFamInstEnvList emptyFamInstEnv
+                            . md_fam_insts . hm_details
+            hpt_fam_insts = mkModuleEnv [ (hmiModule hmi, hmiFamInstEnv hmi)
+                                        | hmi <- eltsHpt hpt]
+      ; finsts <- mapM (getFamInsts hpt_fam_insts) (filter (/= this_mod) (imp_finsts imports))
+
+      ; (inst_env', fam_insts') <- foldlM (addLocalFamInst finsts)
                                        (tcg_fam_inst_env env, tcg_fam_insts env)
                                        fam_insts
       ; let env' = env { tcg_fam_insts    = fam_insts'
@@ -493,12 +510,15 @@ tcExtendLocalFamInstEnv fam_insts thing_inside
 -- and then add it to the home inst env
 -- This must be lazy in the fam_inst arguments, see Note [Lazy axiom match]
 -- in FamInstEnv.hs
-addLocalFamInst :: (FamInstEnv,[FamInst])
+addLocalFamInst :: [FamInstEnv]
+                -> (FamInstEnv,[FamInst])
                 -> FamInst
                 -> TcM (FamInstEnv, [FamInst])
-addLocalFamInst (home_fie, my_fis) fam_inst
+addLocalFamInst imp_fies (home_fie, my_fis) fam_inst
+        -- imp_fies includes all our imp_finsts
         -- home_fie includes home package and this module
-        -- my_fies is just the ones from this module
+        -- (XXX do we really need to check these?)
+        -- my_fis is just the ones from this module
   = do { traceTc "addLocalFamInst" (ppr fam_inst)
 
        ; isGHCi <- getIsGHCi
@@ -512,16 +532,9 @@ addLocalFamInst (home_fie, my_fis) fam_inst
                | isGHCi    = deleteFromFamInstEnv home_fie fam_inst
                | otherwise = home_fie
 
-           -- Fetch imported instances, so that we report
+           -- Retrieve imported instances, so that we report
            -- overlaps correctly
-           -- XXX Technically, we ought to only fetch those instances
-           -- which are visible from this module.
-           -- And indeed, rather than getting the WHOLE eps_fam_inst_env,
-           -- if we just pulled the 'FamInstEnv's of our dependencies,
-           -- we wouldn't need this "action at a distance" loadModuleInterfaces,
-           -- above, I think.
-       ; eps <- getEps
-       ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
+       ; let inst_envs  = home_fie' : imp_fies
              home_fie'' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
@@ -544,9 +557,11 @@ Check whether a single family instance conflicts with those in two instance
 environments (one for the EPS and one for the HPT).
 -}
 
-checkForConflicts :: FamInstEnvs -> FamInst -> TcM Bool
+checkForConflicts :: [FamInstEnv] -> FamInst -> TcM Bool
 checkForConflicts inst_envs fam_inst
-  = do { let conflicts = lookupFamInstEnvConflicts inst_envs fam_inst
+  = do { let conflicts = concatMap
+                         (\e -> lookupFamInstEnvConflicts e fam_inst)
+                         inst_envs
              no_conflicts = null conflicts
        ; traceTc "checkForConflicts" $
          vcat [ ppr (map fim_instance conflicts)
@@ -560,13 +575,15 @@ checkForConflicts inst_envs fam_inst
 -- violating injectivity annotation supplied by the user. Returns True when
 -- this is possible and False if adding this equation would violate injectivity
 -- annotation.
-checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM Bool
+checkForInjectivityConflicts :: [FamInstEnv] -> FamInst -> TcM Bool
 checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon
     -- type family is injective in at least one argument
     , Injective inj <- familyTyConInjectivityInfo tycon = do
     { let axiom = coAxiomSingleBranch fi_ax
-          conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
+          conflicts = concatMap
+                      (\e -> lookupFamInstEnvInjectivityConflicts inj e famInst)
+                      instEnvs
           -- see Note [Verifying injectivity annotation] in FamInstEnv
           errs = makeInjectivityErrors fi_ax axiom inj conflicts
     ; mapM_ (\(err, span) -> setSrcSpan span $ addErr err) errs

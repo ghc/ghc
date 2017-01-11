@@ -742,7 +742,7 @@ lookupFamInstEnv
      match _ _ tpl_tys tys = tcMatchTys tpl_tys tys
 
 lookupFamInstEnvConflicts
-    :: FamInstEnvs
+    :: FamInstEnv
     -> FamInst          -- Putative new instance
     -> [FamInstMatch]   -- Conflicting matches (don't look at the fim_tys field)
 -- E.g. when we are about to add
@@ -752,8 +752,8 @@ lookupFamInstEnvConflicts
 --
 -- Precondition: the tycon is saturated (or over-saturated)
 
-lookupFamInstEnvConflicts envs fam_inst@(FamInst { fi_axiom = new_axiom })
-  = lookup_fam_inst_env my_unify envs fam tys
+lookupFamInstEnvConflicts env fam_inst@(FamInst { fi_axiom = new_axiom })
+  = lookup_fam_inst_env' my_unify env fam tys
   where
     (fam, tys) = famInstSplitLHS fam_inst
         -- In example above,   fam tys' = F [b]
@@ -868,14 +868,14 @@ See also Note [Injective type families] in TyCon
 lookupFamInstEnvInjectivityConflicts
     :: [Bool]         -- injectivity annotation for this type family instance
                       -- INVARIANT: list contains at least one True value
-    ->  FamInstEnvs   -- all type instances seens so far
+    ->  FamInstEnv    -- type instances seen so far to check against
     ->  FamInst       -- new type instance that we're checking
     -> [CoAxBranch]   -- conflicting instance delcarations
-lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
+lookupFamInstEnvInjectivityConflicts injList ie
                              fam_inst@(FamInst { fi_axiom = new_axiom })
   -- See Note [Verifying injectivity annotation]. This function implements
   -- check (1.B1) for open type families described there.
-  = lookup_inj_fam_conflicts home_ie ++ lookup_inj_fam_conflicts pkg_ie
+  = lookup_inj_fam_conflicts ie
     where
       fam        = famInstTyCon fam_inst
       new_branch = coAxiomSingleBranch new_axiom
