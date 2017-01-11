@@ -338,14 +338,20 @@ tcRnImports hsc_env import_decls
 --      ; traceIf (text "rdr_env: " <+> ppr rdr_env)
         ; failIfErrsM
 
-                -- Load any orphan-module and family instance-module
-                -- interfaces, so that their rules and instance decls will be
-                -- found.  But filter out a self hs-boot: these instances
-                -- will be checked when we define them locally.
+                -- Load any orphan-module (including orphan family
+                -- instance-module) interfaces, so that their rules and
+                -- instance decls will be found.  But filter out a
+                -- self hs-boot: these instances will be checked when
+                -- we define them locally.
+                -- (We don't need to load non-orphan family instance
+                -- modules until either we try to use the instances they
+                -- define or we define our own family instances, at which
+                -- point we need to check them for consistency.)
         ; loadModuleInterfaces (text "Loading orphan modules")
                                (filter (/= this_mod) (imp_orphs imports))
 
-                -- Check type-family consistency
+                -- Check type-family consistency between imports.
+                -- See Note [The type family instance consistency story]
         ; traceRn "rn1: checking family instance consistency" empty
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods

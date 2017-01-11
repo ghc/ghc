@@ -632,7 +632,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
    -- B.  If we rename module A to A2, when the dep_finsts of B changes, we need
    -- to make sure that C gets rebuilt. Effectively, the dep_finsts are part of
    -- the exports of B, because C always considers them when checking
-   -- consistency.
+   -- consistency. XXX this doesn't seem to work properly (#13099)
    --
    -- A full discussion is in #12723.
    --

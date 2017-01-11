@@ -50,6 +50,56 @@ import Data.List
 #include "HsVersions.h"
 
 {-
+Note [The type family instance consistency story]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To preserve type safety we must ensure that for any given module, all
+the type family instances used either in that module or in any module
+it directly or indirectly imports are consistent. How do we do this?
+
+* Call a module which defines at least one type family instance a
+"family instance module". This flag `mi_finsts` is recorded in the
+interface file.
+
+* For every module we calculate the set of all of its direct and
+indirect dependencies that are family instance modules. This list
+`dep_finsts` is also recorded in the interface file so we can compute
+this list for a module from the lists for its direct dependencies.
+
+* When type checking a module M we check consistency of all the type
+family instances that are either provided by its `dep_finsts` or
+defined in the module M itself. This is a pairwise check, i.e., for
+every pair of instances we must check that they are consistent.
+
+- For family instances coming from `dep_finsts`, this is checked in
+checkFamInstConsistency, called from tcRnImports, and in
+checkRecFamInstConsistency, called from tcTyClGroup. See Note
+[Checking family instance consistency] for details on this check (and
+in particular how we avoid having to do all these checks for every
+module we compile).
+
+- That leaves checking the family instances defined in M itself
+against instances defined in either M or its `dep_finsts`. This is
+checked in `tcExtendLocalFamInstEnv'.
+
+Disclaimer: I haven't really thought about how all this works in the
+hs-boot case yet.
+
+There's one other catch: we just checked consistency of the family
+instances *defined* by M or its imports, but this is not by definition
+the same thing as the family instances *used* by M or its imports.
+Specifically, we need to ensure when we use a type family instance
+while compiling M that this instance was really defined from either M
+or one of its imports, rather than being an instance that we happened
+to know about from reading an interface file in the course of
+compiling an unrelated module. Otherwise, we'll end up with no record
+of the fact that M depends on this family instance and type safety
+will be compromised. See #13102.
+
+To accomplish this, XXX
+-}
+
+{-
 ************************************************************************
 *                                                                      *
                  Making a FamInst
@@ -189,7 +239,8 @@ listToSet l = Set.fromList l
 --    modules which are already known to be consistent).
 --
 -- See Note [Checking family instance consistency] for more
--- details.
+-- details, and Note [The type family instance consistency story]
+-- for the big picture.
 --
 -- This function doesn't check ALL instances for consistency,
 -- only ones that aren't involved in recursive knot-tying
@@ -413,16 +464,23 @@ tcTopNormaliseNewTypeTF_maybe faminsts rdr_env ty
 ************************************************************************
 -}
 
--- Add new locally-defined family instances
+-- Add new locally-defined family instances, checking consistency with
+-- previous locally-defined family instances as well as all instances
+-- available from imported modules. This requires loading all of our
+-- imports that define family instances (if we haven't loaded them already).
 tcExtendLocalFamInstEnv :: [FamInst] -> TcM a -> TcM a
+
+-- If we weren't actually given any instances to add, then we don't want
+-- to go to the bother of loading family instance module dependencies.
 tcExtendLocalFamInstEnv [] thing_inside = thing_inside
+
+-- Otherwise proceed...
 tcExtendLocalFamInstEnv fam_insts thing_inside
- = do { env0 <- getGblEnv
-      ; let this_mod = tcg_mod env0
-            imports = tcg_imports env0
+ = do { env <- getGblEnv
+      ; let this_mod = tcg_mod env
+            imports = tcg_imports env
       ; loadModuleInterfaces (text "Loading family-instance modules")
                              (filter (/= this_mod) (imp_finsts imports))
-      ; env <- getGblEnv
       ; (inst_env', fam_insts') <- foldlM addLocalFamInst
                                        (tcg_fam_inst_env env, tcg_fam_insts env)
                                        fam_insts
@@ -454,8 +512,14 @@ addLocalFamInst (home_fie, my_fis) fam_inst
                | isGHCi    = deleteFromFamInstEnv home_fie fam_inst
                | otherwise = home_fie
 
-           -- Load imported instances, so that we report
+           -- Fetch imported instances, so that we report
            -- overlaps correctly
+           -- XXX Technically, we ought to only fetch those instances
+           -- which are visible from this module.
+           -- And indeed, rather than getting the WHOLE eps_fam_inst_env,
+           -- if we just pulled the 'FamInstEnv's of our dependencies,
+           -- we wouldn't need this "action at a distance" loadModuleInterfaces,
+           -- above, I think.
        ; eps <- getEps
        ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
              home_fie'' = extendFamInstEnv home_fie fam_inst
