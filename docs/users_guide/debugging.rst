@@ -38,6 +38,10 @@ Dumping out compiler intermediate structures
 
         Dump parser output
 
+    .. ghc-flag:: -ddump-parsed-ast
+
+        Dump parser output as a syntax tree
+
     .. ghc-flag:: -ddump-rn
 
         Dump renamer output

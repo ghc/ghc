@@ -313,6 +313,7 @@ Library
         HsSyn
         HsTypes
         HsUtils
+        HsDumpAst
         BinIface
         BinFingerprint
         BuildTyCl

@@ -339,6 +339,7 @@ data DumpFlag
    | Opt_D_dump_simpl_trace
    | Opt_D_dump_occur_anal
    | Opt_D_dump_parsed
+   | Opt_D_dump_parsed_ast
    | Opt_D_dump_rn
    | Opt_D_dump_shape
    | Opt_D_dump_simpl
@@ -2780,6 +2781,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_occur_anal)
   , make_ord_flag defGhcFlag "ddump-parsed"
         (setDumpFlag Opt_D_dump_parsed)
+  , make_ord_flag defGhcFlag "ddump-parsed-ast"
+        (setDumpFlag Opt_D_dump_parsed_ast)
   , make_ord_flag defGhcFlag "ddump-rn"
         (setDumpFlag Opt_D_dump_rn)
   , make_ord_flag defGhcFlag "ddump-simpl"
