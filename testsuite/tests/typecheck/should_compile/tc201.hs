@@ -14,7 +14,7 @@ soon).
 
 -}
 
-module ShoudlCompile where
+module ShouldCompile where
 
         class (Monad m) => Stream m h | h->m where
                 vMkIOError :: h -> Int

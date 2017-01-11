@@ -280,7 +280,7 @@ reasons:
     TyVars, bring 'k' and 'a' into scope, and kind check the
     signature for 'foo'.  In doing so we call solveEqualities to
     solve any kind equalities in foo's signature.  So the solver
-    may see free occurences of 'k'.
+    may see free occurrences of 'k'.
 
 It's convenient to simply treat these TyVars as skolem constants,
 which of course they are.  So
@@ -930,7 +930,7 @@ data TcDepVars  -- See Note [Dependent type variables]
   = DV { dv_kvs :: DTyCoVarSet  -- "kind" variables (dependent)
        , dv_tvs :: DTyVarSet    -- "type" variables (non-dependent)
          -- A variable may appear in both sets
-         -- E.g.   T k (x::k)    The first occurence of k makes it
+         -- E.g.   T k (x::k)    The first occurrence of k makes it
          --                      show up in dv_tvs, the second in dv_kvs
          -- See Note [Dependent type variables]
     }
@@ -982,7 +982,7 @@ So:  dv_kvs            are the kind variables of the type
 Note that
 
 * A variable can occur in both.
-      T k (x::k)    The first occurence of k makes it
+      T k (x::k)    The first occurrence of k makes it
                     show up in dv_tvs, the second in dv_kvs
 
 * We include any coercion variables in the "dependent",

@@ -557,7 +557,7 @@ data Tickish id =
   -- valid. Note that it is still undesirable though, as this reduces
   -- their usefulness for debugging and profiling. Therefore we will
   -- generally try only to make use of this property where it is
-  -- neccessary to enable optimizations.
+  -- necessary to enable optimizations.
   | SourceNote
     { sourceSpan :: RealSrcSpan -- ^ Source covered
     , sourceName :: String      -- ^ Name for source location

@@ -845,13 +845,13 @@ to ``hs-boot`` files, but with some slight changes:
 
     type family ClosedFam a where ..
 
-  The ``..`` is meant literally -- you shoudl write two dots in
+  The ``..`` is meant literally -- you should write two dots in
   your file.  The ``where`` clause distinguishes closed families
   from open ones.
 
 - A data type declaration can either be given in full, exactly
   as in Haskell, or it can be given abstractly, by omitting the '='
-  sign and everything tha follows.  For example: ::
+  sign and everything that follows.  For example: ::
 
         signature A where
             data T a b
@@ -907,7 +907,7 @@ to ``hs-boot`` files, but with some slight changes:
   These declarations can be implemented by type synonyms
   of kind ``Constraint``; this can be useful if you want to parametrize
   over a constraint in functions.  For example, with the
-  ``ConstraintKinds`` extension, this type synonym is avalid
+  ``ConstraintKinds`` extension, this type synonym is a valid
   implementation of the signature above::
 
     module A where

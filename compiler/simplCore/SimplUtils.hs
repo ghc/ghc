@@ -1121,7 +1121,7 @@ only have *forward* references. Hence, it's safe to discard the binding
 
 NOTE: This isn't our last opportunity to inline.  We're at the binding
 site right now, and we'll get another opportunity when we get to the
-ocurrence(s)
+occurrence(s)
 
 Note that we do this unconditional inlining only for trival RHSs.
 Don't inline even WHNFs inside lambdas; doing so may simply increase

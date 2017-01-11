@@ -403,7 +403,7 @@ instance Outputable ChildLookupResult where
   ppr (FoundFL fls) = text "FoundFL:" <+> ppr fls
   ppr (NameErr _) = text "Error"
 
--- Left biased accumulation monoid. Chooses the left-most positive occurence.
+-- Left biased accumulation monoid. Chooses the left-most positive occurrence.
 instance Monoid ChildLookupResult where
   mempty = NameNotFound
   NameNotFound `mappend` m2 = m2
@@ -568,7 +568,7 @@ data DisambigInfo
 
 instance Monoid DisambigInfo where
   mempty = NoOccurence
-  -- This is the key line: We prefer disambiguated occurences to other
+  -- This is the key line: We prefer disambiguated occurrences to other
   -- names.
   UniqueOccurence _ `mappend` DisambiguatedOccurence g' = DisambiguatedOccurence g'
   DisambiguatedOccurence g' `mappend` UniqueOccurence _ = DisambiguatedOccurence g'

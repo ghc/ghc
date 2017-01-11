@@ -271,7 +271,7 @@ mergeIfaceDecls = plusOccEnv_C mergeIfaceDecl
 -- (a) need a stronger acyclicity check which considers *all*
 -- possible choices from a merge, or (b) we must find a selection
 -- of declarations which is acyclic, and show that this is always
--- the "best" choice we could have made (ezyang conjecture's this
+-- the "best" choice we could have made (ezyang conjectures this
 -- is the case but does not have a proof).  For now this is
 -- not implemented.
 --

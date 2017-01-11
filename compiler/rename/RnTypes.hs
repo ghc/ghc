@@ -1530,7 +1530,7 @@ extractHsTyRdrTyVars :: LHsType RdrName -> RnM FreeKiTyVars
 -- It's used when making the for-alls explicit.
 -- Does not return any wildcards
 -- When the same name occurs multiple times in the types, only the first
--- occurence is returned.
+-- occurrence is returned.
 -- See Note [Kind and type-variable binders]
 extractHsTyRdrTyVars ty
   = do { FKTV kis k_set tys t_set all <- extract_lty TypeLevel ty emptyFKTV
@@ -1540,20 +1540,20 @@ extractHsTyRdrTyVars ty
 
 -- | Extracts free type and kind variables from types in a list.
 -- When the same name occurs multiple times in the types, only the first
--- occurence is returned and the rest is filtered out.
+-- occurrence is returned and the rest is filtered out.
 -- See Note [Kind and type-variable binders]
 extractHsTysRdrTyVars :: [LHsType RdrName] -> RnM FreeKiTyVars
 extractHsTysRdrTyVars tys
   = rmDupsInRdrTyVars <$> extractHsTysRdrTyVarsDups tys
 
 -- | Extracts free type and kind variables from types in a list.
--- When the same name occurs multiple times in the types, all occurences
+-- When the same name occurs multiple times in the types, all occurrences
 -- are returned.
 extractHsTysRdrTyVarsDups :: [LHsType RdrName] -> RnM FreeKiTyVars
 extractHsTysRdrTyVarsDups tys
   = extract_ltys TypeLevel tys emptyFKTV
 
--- | Removes multiple occurences of the same name from FreeKiTyVars.
+-- | Removes multiple occurrences of the same name from FreeKiTyVars.
 rmDupsInRdrTyVars :: FreeKiTyVars -> FreeKiTyVars
 rmDupsInRdrTyVars (FKTV kis k_set tys t_set all)
   = FKTV (nubL kis) k_set (nubL tys) t_set (nubL all)

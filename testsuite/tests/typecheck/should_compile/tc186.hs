@@ -4,7 +4,7 @@
 -- and the constraint (Foo (t::? -> s::*)) didn't match Foo (a::* -> b::*).
 -- Solution is to zap the expected type in TcEpxr.tc_expr(HsOverLit). 
 
-module ShoudlCompile where
+module ShouldCompile where
 
 class Foo a where
      foo :: a

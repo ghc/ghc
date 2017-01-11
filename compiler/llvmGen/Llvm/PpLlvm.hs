@@ -137,7 +137,7 @@ ppLlvmFunction fun =
         $+$ newLine
         $+$ newLine
 
--- | Print out a function defenition header.
+-- | Print out a function definition header.
 ppLlvmFunctionHeader :: LlvmFunctionDecl -> [LMString] -> SDoc
 ppLlvmFunctionHeader (LlvmFunctionDecl n l c r varg p a) args
   = let varg' = case varg of

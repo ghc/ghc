@@ -1316,7 +1316,7 @@ allLazyNested is_rec (Floats IfUnboxedOk _) = isNonRec is_rec
 --          x = lazy @ (forall a. a) y @ Bool
 --
 -- When we inline 'x' after eliminating 'lazy', we need to replace
--- occurences of 'x' with 'y @ bool', not just 'y'.  Situations like
+-- occurrences of 'x' with 'y @ bool', not just 'y'.  Situations like
 -- this can easily arise with higher-rank types; thus, cpe_env must
 -- map to CoreExprs, not Ids.
 

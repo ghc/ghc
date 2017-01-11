@@ -427,7 +427,7 @@ test('T5631',
         # 2015-12-21:     1198327544 (Mac) TypeApplications (will fix with #11196)
         # 2015-03-18:     1124068664 (Mac) optimize Unify & zonking
         # 2016-10-19:     1024926024 (amd64/Linux) Refactor traceRn interface (#12617)
-        # 2016-11-10:     1077429456 (amd64/Linux) Stop -dno-debug-output supressing -ddump-tc-trace
+        # 2016-11-10:     1077429456 (amd64/Linux) Stop -dno-debug-output suppressing -ddump-tc-trace
 
        only_ways(['normal'])
       ],

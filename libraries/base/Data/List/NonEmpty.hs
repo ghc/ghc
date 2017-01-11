@@ -491,7 +491,7 @@ unzip :: Functor f => f (a,b) -> (f a, f b)
 unzip xs = (fst <$> xs, snd <$> xs)
 
 -- | The 'nub' function removes duplicate elements from a list. In
--- particular, it keeps only the first occurence of each element.
+-- particular, it keeps only the first occurrence of each element.
 -- (The name 'nub' means \'essence\'.)
 -- It is a special case of 'nubBy', which allows the programmer to
 -- supply their own inequality test.

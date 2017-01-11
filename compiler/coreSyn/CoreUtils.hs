@@ -591,7 +591,7 @@ filterAlts _tycon inst_tys imposs_cons alts
     impossible_alt _  _                         = False
 
 refineDefaultAlt :: [Unique] -> TyCon -> [Type]
-                 -> [AltCon]  -- Constructors tha cannot match the DEFAULT (if any)
+                 -> [AltCon]  -- Constructors that cannot match the DEFAULT (if any)
                  -> [CoreAlt]
                  -> (Bool, [CoreAlt])
 -- Refine the default alterantive to a DataAlt,
