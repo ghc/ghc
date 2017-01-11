@@ -1,78 +1,78 @@
 
            ===============================================
-            The Glasgow Haskell Compiler -- version 8.0.1
+            The Glasgow Haskell Compiler -- version 8.0.2
            ===============================================
 
-The GHC developers are very pleased to announce the release of the first
-new super-major version of our Haskell compiler in six years, GHC 8.0.1.
+The GHC team is happy to at last announce the 8.0.2 release of the
+Glasgow Haskell Compiler. Source and binary distributions are available
+at
 
-This release features dozens of exciting developments including,
+    http://downloads.haskell.org/~ghc/8.0.2/
 
- * A more refined interface for implicit call-stacks, allowing libraries to
-   provide more helpful runtime error messages to users
+This is the second release of the 8.0 series and fixes nearly
+two-hundred bugs. These include,
 
- * The introduction of the DuplicateRecordFields language extension, allowing
-   multiple record types to declare fields of the same name
+  * Interface file build determinism (#4012).
 
- * Significant improvements in error message readability and content, including
-   facilities for libraries to provide custom error messages, more aggressive
-   warnings for fragile rewrite rules, and more helpful errors for missing
-   imports
+  * Compatibility with macOS Sierra and GCC compilers which compile 
+    position-independent executables by default
 
- * A rewritten and substantially more thorough pattern match checker, providing
-   more precise exhaustiveness checking in GADT pattern matches
+  * Compatibility with systems which use the gold linker
 
- * More reliable debugging information including experimental backtrace support,
-   allowing better integration with traditional debugging tools
+  * Runtime linker fixes on Windows (see #12797)
 
- * Support for desugaring do-notation to use Applicative combinators, allowing
-   the intuitive do notation to be used in settings which previously required
-   the direct use of Applicative combinators
+  * A compiler bug which resulted in undefined reference errors while
+    compiling some packages (see #12076)
 
- * The introduction of Strict and StrictData language extensions, allowing
-   modules to be compiled with strict-by-default evaluation of bindings
+  * A number of memory consistency bugs in the runtime system
 
- * Great improvements in portability, including more reliable linking on
-   Windows, a new PPC64 code generator, support for the AIX operating system,
-   unregisterised m68k support, and significant stabilization on ARM targets
+  * A number of efficiency issues in the threaded runtime which manifest
+    on larger core counts and large numbers of bound threads.
 
- * A greatly improved user's guide, with beautiful and modern PDF and HTML
-   output
+  * A typechecker bug which caused some programs using
+    -XDefaultSignatures to be incorrectly accepted.
 
- * Introduction of type application syntax, reducing the need for proxies
+  * More than two-hundred other bugs. See Trac [1] for a complete
+    listing.
 
- * More complete support for pattern synonyms, including record pattern synonyms
-   and the ability to export patterns "bundled" with a type, as you would a data
-   constructor
+  * #12757, which lead to broken runtime behavior and even crashes in
+    the presence of primitive strings.
 
- * Support for injective type families and recursive superclass relationships
+  * #12844, a type inference issue affecting partial type signatures.
 
- * An improved generics representation leveraging GHC's support for type-level
-   literals
+  * A bump of the `directory` library, fixing buggy path
+    canonicalization behavior (#12894). Unfortunately this required a
+    major version bump in `directory` and minor bumps in several other
+    libraries.
 
- * The TypeInType extension, which unifies types and kinds, allowing GHC to
-   reason about kind equality and enabling promotion of more constructs to the
-   type level
+  * #12912, where use of the `select` system call would lead to runtime
+    system failures with large numbers of open file handles.
 
- * ...and more!
+  * #10635, wherein -Wredundant-constraints was included in the -Wall
+    warning set
 
-A more thorough list of the changes included in this release can be found in the
-release notes,
+A more detailed list of the changes included in this release can be
+found in the release notes,
 
-    https://downloads.haskell.org/~ghc/8.0.1/docs/html/users_guide/8.0.1-notes.html
+    https://downloads.haskell.org/~ghc/8.0.2/docs/html/users_guide/8.0.2-notes.html
 
-As always, we have collected various points of interest for users of previous
-GHC releases on the GHC 8.0 migration page,
+Please note that this release breaks with our usual tendency to avoid
+major version bumps of core libraries in minor GHC releases by including
+an upgrade of the `directory` library to 1.3.0.0.
 
-    https://ghc.haskell.org/trac/ghc/wiki/Migration/8.0
+Also note that, due to a rather serious bug (#13100) affecting Windows
+noticed late in the release cycle, the Windows binary distributions were
+produced using a slightly patched [2] source tree. Users compiling from
+source for Windows should be certain to include this patch in their
+build.
 
-Please let us know if you encounter anything missing or unclear on this page.
+This release is the result of six months of effort by the GHC
+development community. We'd like to thank everyone who has contributed
+code, bug reports, and feedback to this release. It's only due to
+their efforts that GHC remains a vibrant and exciting project.
 
-This release is the culmination of nearly eighteen months of effort by over one
-hundred contributors. We'd like to thank everyone who has contributed code, bug
-reports, and feedback over the past year. It's only because of their efforts
-that GHC continues to evolve.
-
+[1] https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.0.2&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority
+[2] http://downloads.haskell.org/~ghc/8.0.2/0001-SysTools-Revert-linker-flags-change.patch
 
 How to get it
 ~~~~~~~~~~~~~
@@ -81,7 +81,6 @@ Both the source tarball and binary distributions for a wide variety of platforms
 are available at,
 
     http://www.haskell.org/ghc/
-
 
 Background
 ~~~~~~~~~~
@@ -96,7 +95,6 @@ large collection of libraries, and support for various language extensions,
 including concurrency, exceptions, and foreign language interfaces. GHC is
 distributed under a BSD-style open source license.
 
-
 Supported Platforms
 ~~~~~~~~~~~~~~~~~~~
 
@@ -110,7 +108,6 @@ Building Guide describes how to go about porting to a new platform:
 
     http://ghc.haskell.org/trac/ghc/wiki/Building
 
-
 Developers
 ~~~~~~~~~~
 
@@ -118,7 +115,6 @@ We welcome new contributors. Instructions on getting started with hacking on GHC
 are available from GHC's developer site,
 
     http://ghc.haskell.org/trac/ghc/
-
 
 Community Resources
 ~~~~~~~~~~~~~~~~~~~
