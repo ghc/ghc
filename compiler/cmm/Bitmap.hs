@@ -22,6 +22,7 @@ import SMRep
 import DynFlags
 import Util
 
+import Data.Foldable (foldl')
 import Data.Bits
 
 {-|
@@ -39,7 +40,10 @@ mkBitmap dflags stuff = chunkToBitmap dflags chunk : mkBitmap dflags rest
 
 chunkToBitmap :: DynFlags -> [Bool] -> StgWord
 chunkToBitmap dflags chunk =
-  foldr (.|.) (toStgWord dflags 0) [ toStgWord dflags 1 `shiftL` n | (True,n) <- zip chunk [0..] ]
+  foldl' (.|.) (toStgWord dflags 0) [ oneAt n | (True,n) <- zip chunk [0..] ]
+  where
+    oneAt :: Int -> StgWord
+    oneAt i = toStgWord dflags 1 `shiftL` i
 
 -- | Make a bitmap where the slots specified are the /ones/ in the bitmap.
 -- eg. @[0,1,3], size 4 ==> 0xb@.
@@ -61,7 +65,7 @@ intsToBitmap dflags size = go 0
     go !pos slots
       | size <= pos = []
       | otherwise =
-        (foldr (.|.) (toStgWord dflags 0) (map (\i->oneAt (i - pos)) these)) :
+        (foldl' (.|.) (toStgWord dflags 0) (map (\i->oneAt (i - pos)) these)) :
           go (pos + word_sz) rest
       where
         (these,rest) = span (< (pos + word_sz)) slots
@@ -87,7 +91,7 @@ intsToReverseBitmap dflags size = go 0
     go !pos slots
       | size <= pos = []
       | otherwise =
-        (foldr xor (toStgWord dflags init) (map (\i->oneAt (i - pos)) these)) :
+        (foldl' xor (toStgWord dflags init) (map (\i->oneAt (i - pos)) these)) :
           go (pos + word_sz) rest
       where
         (these,rest) = span (< (pos + word_sz)) slots
