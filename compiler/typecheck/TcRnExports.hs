@@ -476,13 +476,13 @@ lookupExportChild parent rdr_name
   -- `checkPatSynParent`.
   traceRn "lookupExportChild original_gres:" (ppr original_gres)
   case picked_gres original_gres of
-    NoOccurence ->
+    NoOccurrence ->
       noMatchingParentErr original_gres
-    UniqueOccurence g ->
+    UniqueOccurrence g ->
       checkPatSynParent parent (gre_name g)
-    DisambiguatedOccurence g ->
+    DisambiguatedOccurrence g ->
       checkFld g
-    AmbiguousOccurence gres ->
+    AmbiguousOccurrence gres ->
       mkNameClashErr gres
     where
         -- Convert into FieldLabel if necessary
@@ -547,42 +547,42 @@ lookupExportChild parent rdr_name
         right_parent p
           | Just cur_parent <- getParent p
             = if parent == cur_parent
-                then DisambiguatedOccurence p
-                else NoOccurence
+                then DisambiguatedOccurrence p
+                else NoOccurrence
           | otherwise
-            = UniqueOccurence p
+            = UniqueOccurrence p
 
 -- This domain specific datatype is used to record why we decided it was
 -- possible that a GRE could be exported with a parent.
 data DisambigInfo
-       = NoOccurence
+       = NoOccurrence
           -- The GRE could never be exported. It has the wrong parent.
-       | UniqueOccurence GlobalRdrElt
+       | UniqueOccurrence GlobalRdrElt
           -- The GRE has no parent. It could be a pattern synonym.
-       | DisambiguatedOccurence GlobalRdrElt
+       | DisambiguatedOccurrence GlobalRdrElt
           -- The parent of the GRE is the correct parent
-       | AmbiguousOccurence [GlobalRdrElt]
+       | AmbiguousOccurrence [GlobalRdrElt]
           -- For example, two normal identifiers with the same name are in
-          -- scope. They will both be resolved to "UniqueOccurence" and the
+          -- scope. They will both be resolved to "UniqueOccurrence" and the
           -- monoid will combine them to this failing case.
 
 instance Monoid DisambigInfo where
-  mempty = NoOccurence
+  mempty = NoOccurrence
   -- This is the key line: We prefer disambiguated occurrences to other
   -- names.
-  UniqueOccurence _ `mappend` DisambiguatedOccurence g' = DisambiguatedOccurence g'
-  DisambiguatedOccurence g' `mappend` UniqueOccurence _ = DisambiguatedOccurence g'
+  UniqueOccurrence _ `mappend` DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
+  DisambiguatedOccurrence g' `mappend` UniqueOccurrence _ = DisambiguatedOccurrence g'
 
 
-  NoOccurence `mappend` m = m
-  m `mappend` NoOccurence = m
-  UniqueOccurence g `mappend` UniqueOccurence g' = AmbiguousOccurence [g, g']
-  UniqueOccurence g `mappend` AmbiguousOccurence gs = AmbiguousOccurence (g:gs)
-  DisambiguatedOccurence g `mappend` DisambiguatedOccurence g'  = AmbiguousOccurence [g, g']
-  DisambiguatedOccurence g `mappend` AmbiguousOccurence gs = AmbiguousOccurence (g:gs)
-  AmbiguousOccurence gs `mappend` UniqueOccurence g' = AmbiguousOccurence (g':gs)
-  AmbiguousOccurence gs `mappend` DisambiguatedOccurence g' = AmbiguousOccurence (g':gs)
-  AmbiguousOccurence gs `mappend` AmbiguousOccurence gs' = AmbiguousOccurence (gs ++ gs')
+  NoOccurrence `mappend` m = m
+  m `mappend` NoOccurrence = m
+  UniqueOccurrence g `mappend` UniqueOccurrence g' = AmbiguousOccurrence [g, g']
+  UniqueOccurrence g `mappend` AmbiguousOccurrence gs = AmbiguousOccurrence (g:gs)
+  DisambiguatedOccurrence g `mappend` DisambiguatedOccurrence g'  = AmbiguousOccurrence [g, g']
+  DisambiguatedOccurrence g `mappend` AmbiguousOccurrence gs = AmbiguousOccurrence (g:gs)
+  AmbiguousOccurrence gs `mappend` UniqueOccurrence g' = AmbiguousOccurrence (g':gs)
+  AmbiguousOccurrence gs `mappend` DisambiguatedOccurrence g' = AmbiguousOccurrence (g':gs)
+  AmbiguousOccurrence gs `mappend` AmbiguousOccurrence gs' = AmbiguousOccurrence (gs ++ gs')
 
 
 
