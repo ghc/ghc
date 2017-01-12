@@ -9,8 +9,7 @@ import Settings.Optimisation
 developmentFlavour :: Stage -> Flavour
 developmentFlavour ghcStage = defaultFlavour
     { name = "devel" ++ show (fromEnum ghcStage)
-    , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs
-    , libraryWays = append [vanilla] }
+    , args = defaultBuilderArgs <> developmentArgs ghcStage <> defaultPackageArgs }
 
 developmentArgs :: Stage -> Args
 developmentArgs ghcStage = do
