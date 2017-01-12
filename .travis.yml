@@ -3,6 +3,7 @@ sudo: true
 matrix:
     include:
         - os: linux
+          env: MODE="--flavour=quickest"
           addons:
               apt:
                   packages:
@@ -15,9 +16,11 @@ matrix:
               - PATH="/opt/cabal/1.22/bin:$PATH"
 
         - os: osx
+          env: MODE="--flavour=quickest --integer-simple"
           before_install:
               - brew update
               - brew install ghc cabal-install
+              -
 
 install:
     # Add Cabal to PATH
@@ -45,7 +48,7 @@ script:
     - ./build.sh selftest
 
     # Build GHC
-    - ./build.sh -j --flavour=quickest --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
+    - ./build.sh -j $MODE --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
 
     # Test GHC binary
     - cd ..
