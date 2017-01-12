@@ -214,12 +214,7 @@ import qualified Data.IntSet as IntSet
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
 
-#if __GLASGOW_HASKELL__ >= 709
-import Foreign
-#else
-import Foreign.Safe
-#endif
-
+import Foreign (Ptr) -- needed for 2nd stage
 
 -- Note [Updating flag description in the User's Guide]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

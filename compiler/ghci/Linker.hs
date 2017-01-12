@@ -62,11 +62,7 @@ import System.Directory
 
 import Exception
 
-#if __GLASGOW_HASKELL__ >= 709
-import Foreign
-#else
-import Foreign.Safe
-#endif
+import Foreign (Ptr) -- needed for 2nd stage
 
 {- **********************************************************************
 

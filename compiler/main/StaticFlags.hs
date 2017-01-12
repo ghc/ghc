@@ -48,12 +48,7 @@ import Control.Monad
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 
-#if __GLASGOW_HASKELL__ >= 709
-import Foreign
-#else
-import Foreign.Safe
-#endif
-
+import Foreign (Ptr) -- needed for 2nd stage
 
 -----------------------------------------------------------------------------
 -- Static flags
