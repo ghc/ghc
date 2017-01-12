@@ -45,7 +45,7 @@ type Iterator a = IORef (IORef (List a))
 
 
 -------------------------------------------
--- auxilliary functions
+-- auxiliary functions
 
 
 

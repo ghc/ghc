@@ -177,7 +177,7 @@ fillBytes dest char size = do
   _ <- memset dest (fromIntegral char) (fromIntegral size)
   return ()
 
--- auxilliary routines
+-- auxiliary routines
 -- -------------------
 
 -- |Basic C routines needed for memory copying

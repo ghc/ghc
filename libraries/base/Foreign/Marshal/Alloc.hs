@@ -198,7 +198,7 @@ free :: Ptr a -> IO ()
 free  = _free
 
 
--- auxilliary routines
+-- auxiliary routines
 -- -------------------
 
 -- asserts that the pointer returned from the action in the second argument is

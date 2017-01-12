@@ -44,7 +44,7 @@ type Iterator a = IORef (MVar (List a))
 -- iterators are private
 
 -------------------------------------------
--- auxilliary functions
+-- auxiliary functions
 
 
 

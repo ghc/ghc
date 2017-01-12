@@ -290,7 +290,7 @@ PLTSize(void)
    stashed into unused fields in the first section header.
 
    For symbols, there seems to have been no place in the actual symbol table
-   for the extra bits, so the indexes have been moved into an auxilliary
+   for the extra bits, so the indexes have been moved into an auxiliary
    section instead.
    For symbols in sections beyond 0xff00, the symbol's st_shndx will be an
    escape value (SHN_XINDEX), and the actual 32-bit section number for symbol N

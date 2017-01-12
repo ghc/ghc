@@ -195,7 +195,7 @@ initBuiltinVars (Builtins { })
         mk_tup n name = (tupleDataCon Boxed n, name)
 
 
--- Auxilliary look up functions -----------------------------------------------
+-- Auxiliary look up functions -----------------------------------------------
 
 -- |Lookup a variable given its name and the module that contains it.
 externalVar :: FastString -> DsM Var
