@@ -398,7 +398,7 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
     ghcMode   = CompManager,
     ghcLink   = NoLink
     }
-  let dynflags'' = gopt_unset dynflags' Opt_SplitObjs
+  let dynflags'' = updOptLevel 0 $ gopt_unset dynflags' Opt_SplitObjs
   defaultCleanupHandler dynflags'' $ do
       -- ignore the following return-value, which is a list of packages
       -- that may need to be re-linked: Haddock doesn't do any
