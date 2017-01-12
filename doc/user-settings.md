@@ -34,7 +34,9 @@ data Flavour = Flavour
     , ghcProfiled        :: Bool      -- ^ Build profiled GHC.
     , ghcDebugged        :: Bool }    -- ^ Build GHC with debug information.
 ```
-Hadrian provides several built-in flavours (`defaultFlavour`, `quickFlavour`, and
+Hadrian provides several
+[built-in flavours](https://github.com/snowleopard/hadrian/blob/master/doc/flavours.md)
+(`defaultFlavour`, `quickFlavour`, and
 a few others), which can be activated from the command line, e.g. `--flavour=quick`.
 Users can define new build flavours by adding them to `userFlavours` list:
 ```haskell
