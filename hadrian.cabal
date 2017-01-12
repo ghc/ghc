@@ -90,7 +90,7 @@ executable hadrian
                        , Settings.Flavours.Profiled
                        , Settings.Flavours.Quick
                        , Settings.Flavours.Quickest
-                       , Settings.Optimisation
+                       , Settings.SourceArgs
                        , Settings.Packages.Base
                        , Settings.Packages.Compiler
                        , Settings.Packages.Ghc

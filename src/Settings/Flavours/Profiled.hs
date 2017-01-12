@@ -3,7 +3,7 @@ module Settings.Flavours.Profiled (profiledFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.Optimisation
+import Settings.SourceArgs
 
 profiledFlavour :: Flavour
 profiledFlavour = defaultFlavour
@@ -12,7 +12,7 @@ profiledFlavour = defaultFlavour
     , ghcProfiled = True }
 
 profiledArgs :: Args
-profiledArgs = optimisationArgs $ Optimisation
+profiledArgs = sourceArgs $ SourceArgs
     { hsDefault  = append ["-O0", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler = arg "-O"

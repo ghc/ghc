@@ -3,7 +3,7 @@ module Settings.Flavours.Performance (performanceFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.Optimisation
+import Settings.SourceArgs
 
 performanceFlavour :: Flavour
 performanceFlavour = defaultFlavour
@@ -11,7 +11,7 @@ performanceFlavour = defaultFlavour
     , args = defaultBuilderArgs <> performanceArgs <> defaultPackageArgs }
 
 performanceArgs :: Args
-performanceArgs = optimisationArgs $ Optimisation
+performanceArgs = sourceArgs $ SourceArgs
     { hsDefault  = append ["-O", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"]
