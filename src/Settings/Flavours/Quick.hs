@@ -3,7 +3,6 @@ module Settings.Flavours.Quick (quickFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.SourceArgs
 
 quickFlavour :: Flavour
 quickFlavour = defaultFlavour
@@ -11,7 +10,6 @@ quickFlavour = defaultFlavour
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
     , libraryWays = append [vanilla] }
 
--- TODO: the hsLibrary setting seems wrong, but it matches mk/flavours/quick.mk
 quickArgs :: Args
 quickArgs = sourceArgs $ SourceArgs
     { hsDefault  = append ["-O0", "-H64m"]

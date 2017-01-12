@@ -3,7 +3,6 @@ module Settings.Flavours.Development (developmentFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.SourceArgs
 
 -- TODO: Implement an equivalent of LAX_DEPENDENCIES = YES setting, see #250.
 developmentFlavour :: Stage -> Flavour

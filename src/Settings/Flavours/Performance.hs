@@ -3,7 +3,6 @@ module Settings.Flavours.Performance (performanceFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.SourceArgs
 
 performanceFlavour :: Flavour
 performanceFlavour = defaultFlavour

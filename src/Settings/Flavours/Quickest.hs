@@ -3,7 +3,6 @@ module Settings.Flavours.Quickest (quickestFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.SourceArgs
 
 quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour

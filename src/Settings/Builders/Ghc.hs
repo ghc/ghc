@@ -1,4 +1,4 @@
-module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, commonGhcArgs) where
+module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs) where
 
 import Flavour
 import GHC
@@ -52,7 +52,10 @@ ghcMBuilderArgs = builder (Ghc FindHsDependencies) ? do
             , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
             , append =<< getInputs ]
 
--- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockBuilderArgs.
+haddockGhcArgs :: Args
+haddockGhcArgs = mconcat [ commonGhcArgs, append =<< getPkgDataList HsArgs ]
+
+-- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockGhcArgs.
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
@@ -66,7 +69,6 @@ commonGhcArgs = do
             , wayGhcArgs
             , packageGhcArgs
             , includeGhcArgs
-            , append =<< getPkgDataList HsArgs
             , append $ map ("-optc" ++) confCc
             , append $ map ("-optP" ++) confCpp
             , append $ map ("-optP" ++) cppArgs

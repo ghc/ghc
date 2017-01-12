@@ -1,6 +1,7 @@
 module Settings.Default (
-    defaultBuilderArgs, defaultPackageArgs, defaultArgs, defaultPackages,
-    defaultLibraryWays, defaultRtsWays, defaultFlavour, defaultSplitObjects
+    SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
+    defaultArgs, defaultPackages, defaultLibraryWays, defaultRtsWays,
+    defaultFlavour, defaultSplitObjects
     ) where
 
 import Base
@@ -9,6 +10,7 @@ import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
+import Oracles.PackageData
 import Predicate
 import Settings
 import Settings.Builders.Alex
@@ -27,7 +29,6 @@ import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.Tar
-import Settings.SourceArgs
 import Settings.Packages.Base
 import Settings.Packages.Compiler
 import Settings.Packages.Ghc
@@ -39,6 +40,24 @@ import Settings.Packages.IntegerGmp
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
 
+-- TODO: Move C source arguments here
+-- | Default and package-specific source arguments.
+data SourceArgs = SourceArgs
+    { hsDefault  :: Args
+    , hsLibrary  :: Args
+    , hsCompiler :: Args
+    , hsGhc      :: Args }
+
+-- | Concatenate source arguments in appropriate order.
+sourceArgs :: SourceArgs -> Args
+sourceArgs SourceArgs {..} = builder Ghc ? do
+    pkg       <- getPackage
+    mconcat [ hsDefault
+            , append =<< getPkgDataList HsArgs
+            , isLibrary pkg    ? hsLibrary
+            , package compiler ? hsCompiler
+            , package ghc      ? hsGhc ]
+
 -- | All default command line arguments.
 defaultArgs :: Args
 defaultArgs = mconcat
@@ -46,7 +65,7 @@ defaultArgs = mconcat
     , sourceArgs defaultSourceArgs
     , defaultPackageArgs ]
 
--- | Default optimisation settings.
+-- | Default source arguments, e.g. optimisation settings.
 defaultSourceArgs :: SourceArgs
 defaultSourceArgs = SourceArgs
     { hsDefault  = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2", arg "-H32m"]

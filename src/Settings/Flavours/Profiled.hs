@@ -3,7 +3,6 @@ module Settings.Flavours.Profiled (profiledFlavour) where
 import Flavour
 import Predicate
 import {-# SOURCE #-} Settings.Default
-import Settings.SourceArgs
 
 profiledFlavour :: Flavour
 profiledFlavour = defaultFlavour

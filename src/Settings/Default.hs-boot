@@ -1,10 +1,19 @@
 module Settings.Default (
-    defaultBuilderArgs, defaultPackageArgs, defaultArgs, defaultPackages,
-    defaultLibraryWays, defaultRtsWays, defaultFlavour, defaultSplitObjects
+    SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
+    defaultArgs, defaultPackages, defaultLibraryWays, defaultRtsWays,
+    defaultFlavour, defaultSplitObjects
     ) where
 
 import Flavour
 import Predicate
+
+data SourceArgs = SourceArgs
+    { hsDefault  :: Args
+    , hsLibrary  :: Args
+    , hsCompiler :: Args
+    , hsGhc      :: Args }
+
+sourceArgs :: SourceArgs -> Args
 
 defaultBuilderArgs, defaultPackageArgs, defaultArgs :: Args
 defaultPackages :: Packages
