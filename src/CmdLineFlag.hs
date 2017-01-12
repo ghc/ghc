@@ -1,7 +1,7 @@
 module CmdLineFlag (
-    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, cmdProgressColour,
-    ProgressColour (..), cmdProgressInfo, ProgressInfo (..), cmdSkipConfigure,
-    cmdSplitObjects
+    putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, cmdIntegerSimple,
+    cmdProgressColour, ProgressColour (..), cmdProgressInfo, ProgressInfo (..),
+    cmdSkipConfigure, cmdSplitObjects
     ) where
 
 import Data.IORef
@@ -15,6 +15,7 @@ import System.IO.Unsafe
 data Untracked = Untracked
     { buildHaddock   :: Bool
     , flavour        :: Maybe String
+    , integerSimple  :: Bool
     , progressColour :: ProgressColour
     , progressInfo   :: ProgressInfo
     , skipConfigure  :: Bool
@@ -29,6 +30,7 @@ defaultUntracked :: Untracked
 defaultUntracked = Untracked
     { buildHaddock   = False
     , flavour        = Nothing
+    , integerSimple  = False
     , progressColour = Auto
     , progressInfo   = Normal
     , skipConfigure  = False
@@ -39,6 +41,9 @@ readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
 
 readFlavour :: Maybe String -> Either String (Untracked -> Untracked)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
+
+readIntegerSimple :: Either String (Untracked -> Untracked)
+readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
 
 readProgressColour :: Maybe String -> Either String (Untracked -> Untracked)
 readProgressColour ms =
@@ -77,6 +82,8 @@ cmdFlags =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
+    , Option [] ["integer-simple"] (NoArg readIntegerSimple)
+      "Build GHC with integer-simple library."
     , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
       "Use colours in progress info (Never, Auto or Always)."
     , Option [] ["progress-info"] (OptArg readProgressInfo "STYLE")
@@ -104,6 +111,9 @@ cmdBuildHaddock = buildHaddock getCmdLineFlags
 
 cmdFlavour :: Maybe String
 cmdFlavour = flavour getCmdLineFlags
+
+cmdIntegerSimple :: Bool
+cmdIntegerSimple = integerSimple getCmdLineFlags
 
 cmdProgressColour :: ProgressColour
 cmdProgressColour = progressColour getCmdLineFlags
