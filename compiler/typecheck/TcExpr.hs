@@ -604,8 +604,8 @@ tcExpr (HsStatic fvs expr) res_ty
                              [liftedTypeKind, expr_ty]
         -- Insert the constraints of the static form in a global list for later
         -- validation.
-        ; stWC <- tcg_static_wc <$> getGblEnv
-        ; updTcRef stWC (andWC lie)
+        ; emitStaticConstraints lie
+
         -- Wrap the static form with the 'fromStaticPtr' call.
         ; fromStaticPtr <- newMethodFromName StaticOrigin fromStaticPtrName p_ty
         ; let wrap = mkWpTyApps [expr_ty]
