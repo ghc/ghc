@@ -1067,9 +1067,8 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
     loc_msg tv
        | isTyVar tv
        = case tcTyVarDetails tv of
-          SkolemTv {} -> pprSkol (cec_encl ctxt) tv
-          MetaTv {}   -> quotes (ppr tv) <+> text "is an ambiguous type variable"
-          det -> pprTcTyVarDetails det
+           MetaTv {} -> quotes (ppr tv) <+> text "is an ambiguous type variable"
+           _         -> extraTyVarInfo ctxt tv
        | otherwise
        = sdocWithDynFlags $ \dflags ->
          if gopt Opt_PrintExplicitCoercions dflags
@@ -1449,7 +1448,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
      -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
         [ important $ misMatchOrCND ctxt ct oriented ty1 ty2
-        , important $ extraTyVarInfo ctxt tv1 ty2
+        , important $ extraTyVarEqInfo ctxt tv1 ty2
         , report
         ]
 
@@ -1497,7 +1496,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
   , tv1 `elem` skols
   = mkErrorMsgFromCt ctxt ct $ mconcat
         [ important $ misMatchMsg ct oriented ty1 ty2
-        , important $ extraTyVarInfo ctxt tv1 ty2
+        , important $ extraTyVarEqInfo ctxt tv1 ty2
         , report
         ]
 
@@ -1538,7 +1537,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
                       , nest 2 $ text "inside the constraints:" <+> pprEvVarTheta given
                       , nest 2 $ text "bound by" <+> ppr skol_info
                       , nest 2 $ text "at" <+> ppr (tcl_loc env) ]
-             tv_extra = important $ extraTyVarInfo ctxt tv1 ty2
+             tv_extra = important $ extraTyVarEqInfo ctxt tv1 ty2
              add_sig  = important $ suggestAddSig ctxt ty1 ty2
        ; mkErrorMsgFromCt ctxt ct $ mconcat
             [msg, tclvl_extra, tv_extra, add_sig, report] }
@@ -1641,24 +1640,27 @@ pp_givens givens
                 2 (sep [ text "bound by" <+> ppr skol_info
                        , text "at" <+> ppr (tcl_loc env) ])
 
-extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
+extraTyVarEqInfo :: ReportErrCtxt -> TcTyVar -> TcType -> SDoc
 -- Add on extra info about skolem constants
 -- NB: The types themselves are already tidied
-extraTyVarInfo ctxt tv1 ty2
-  = tv_extra tv1 $$ ty_extra ty2
+extraTyVarEqInfo ctxt tv1 ty2
+  = extraTyVarInfo ctxt tv1 $$ ty_extra ty2
   where
-    implics = cec_encl ctxt
     ty_extra ty = case tcGetTyVar_maybe ty of
-                    Just tv -> tv_extra tv
+                    Just tv -> extraTyVarInfo ctxt tv
                     Nothing -> empty
 
-    tv_extra tv
-      | let pp_tv = quotes (ppr tv)
-      = case tcTyVarDetails tv of
+extraTyVarInfo :: ReportErrCtxt -> TcTyVar -> SDoc
+extraTyVarInfo ctxt tv
+  = ASSERT2( isTyVar tv, ppr tv )
+    case tcTyVarDetails tv of
           SkolemTv {}   -> pprSkol implics tv
           FlatSkol {}   -> pp_tv <+> text "is a flattening type variable"
           RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
           MetaTv {}     -> empty
+  where
+    implics = cec_encl ctxt
+    pp_tv = quotes (ppr tv)
 
 suggestAddSig :: ReportErrCtxt -> TcType -> TcType -> SDoc
 -- See Note [Suggest adding a type signature]
