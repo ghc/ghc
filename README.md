@@ -6,7 +6,7 @@ Hadrian
 Hadrian is a new build system for the [Glasgow Haskell Compiler][ghc]. It is based
 on [Shake][shake] and we hope that it will eventually replace the current
 [`make`-based build system][make]. If you are curious about the rationale behind the
-project and the architecture of the new build system you can find more details in
+project and the architecture of the build system you can find more details in
 this [Haskell Symposium 2016 paper][paper] and this [Haskell eXchange 2016 talk][talk].
 
 The new build system can work side-by-side with the existing build system. Note, there is
@@ -52,9 +52,11 @@ are placed into `_build` and `inplace` directories.
 
 In addition to standard Shake flags (try `--help`), the build system
 currently supports several others:
-* `--flavour=FLAVOUR`: choose a build flavour. Two settings are currently supported:
-`default` and `quick` (adds `-O0` flag to all GHC invocations and disables library
-profiling, which speeds up builds by 3-4x).
+* `--flavour=FLAVOUR`: choose a build flavour. The following settings are currently supported:
+`default`, `quick`, `quickest`, `perf`, `prof`, `devel1` and `devel2`. As an example, the
+`quickest` flavour adds `-O0` flag to all GHC invocations and builds libraries only in the
+`vanilla` way, which speeds up builds by 3-4x. Build flavours are documented
+[here](https://github.com/snowleopard/hadrian/blob/master/doc/flavours.md).
 
 * `--haddock`: build Haddock documentation.
 
@@ -117,10 +119,10 @@ zero (see [#197][test-issue]).
 Current limitations
 -------------------
 The new build system still lacks many important features:
-* We only build `vanilla` and `profiling` way: [#4][dynamic-issue].
+* There is currently no support for the `dynamic` build way: [#4][dynamic-issue].
 * Validation is not implemented: [#187][validation-issue].
 * Only HTML Haddock documentation is supported (use `--haddock` flag). 
-* Build flavours and conventional command line flags are not implemented: [#188][flavours-issue].
+* Not all modes of the old build system are supported, e.g. [#250][freeze-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
 * There is no support for installation or binary distribution: [#219][install-issue].
 
@@ -159,7 +161,7 @@ helped me endure and enjoy the project.
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
 [dynamic-issue]: https://github.com/snowleopard/hadrian/issues/4
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187
-[flavours-issue]: https://github.com/snowleopard/hadrian/issues/188
+[freeze-issue]: https://github.com/snowleopard/hadrian/issues/250
 [cross-compilation-issue]: https://github.com/snowleopard/hadrian/issues/177
 [install-issue]: https://github.com/snowleopard/hadrian/issues/219
 [milestones]: https://github.com/snowleopard/hadrian/milestones
