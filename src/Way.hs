@@ -24,7 +24,7 @@ data WayUnit = Threaded
              | Profiling
              | Logging
              | Dynamic
-             deriving (Eq, Enum, Bounded)
+             deriving (Bounded, Enum, Eq, Ord)
 
 -- TODO: get rid of non-derived Show instances
 instance Show WayUnit where
@@ -73,6 +73,9 @@ instance Read Way where
 
 instance Eq Way where
     Way a == Way b = a == b
+
+instance Ord Way where
+    compare (Way a) (Way b) = compare a b
 
 -- | Build default _vanilla_ way.
 vanilla :: Way
