@@ -60,6 +60,9 @@ currently supports several others:
 
 * `--haddock`: build Haddock documentation.
 
+* `--integer-simple`: build GHC using the `integer-simple` integer library (instead
+of `integer-gmp`).
+
 * `--progress-colour=MODE`: choose whether to use colours when printing build progress
 info. There are three settings: `never` (do not use colours), `auto` (attempt to detect
 whether the console supports colours; this is the default setting), and `always` (use
