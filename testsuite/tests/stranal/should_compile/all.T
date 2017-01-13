@@ -52,4 +52,5 @@ test('T11770', [ checkCoreString('OneShot') ], compile, ['-ddump-simpl'])
 test('T13031', normal, run_command,
          ['$MAKE -s --no-print-directory T13031'])
 
-
+test('T13077', normal, compile, [''])
+test('T13077a', normal, compile, [''])

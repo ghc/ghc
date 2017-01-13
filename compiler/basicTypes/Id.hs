@@ -94,7 +94,7 @@ module Id (
         isNeverLevPolyId,
 
         -- ** Writing 'IdInfo' fields
-        setIdUnfolding,
+        setIdUnfolding, setCaseBndrEvald,
         setIdArity,
         setIdCallArity,
 
@@ -112,7 +112,7 @@ module Id (
 
 #include "HsVersions.h"
 
-import CoreSyn ( CoreRule, Unfolding( NoUnfolding ) )
+import CoreSyn ( CoreRule, evaldUnfolding, Unfolding( NoUnfolding ) )
 
 import IdInfo
 import BasicTypes
@@ -616,6 +616,15 @@ idDemandInfo       id = demandInfo (idInfo id)
 
 setIdDemandInfo :: Id -> Demand -> Id
 setIdDemandInfo id dmd = modifyIdInfo (`setDemandInfo` dmd) id
+
+setCaseBndrEvald :: StrictnessMark -> Id -> Id
+-- Used for variables bound by a case expressions, both the case-binder
+-- itself, and any pattern-bound variables that are argument of a
+-- strict constructor.  It just marks the variable as already-evaluated,
+-- so that (for example) a subsequent 'seq' can be dropped
+setCaseBndrEvald str id
+  | isMarkedStrict str = id `setIdUnfolding` evaldUnfolding
+  | otherwise          = id
 
         ---------------------------------
         -- SPECIALISATION

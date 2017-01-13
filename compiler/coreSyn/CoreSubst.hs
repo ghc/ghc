@@ -640,8 +640,7 @@ substIdInfo subst new_id info
   where
     old_rules     = ruleInfo info
     old_unf       = unfoldingInfo info
-    nothing_to_do = isEmptyRuleInfo old_rules && isClosedUnfolding old_unf
-
+    nothing_to_do = isEmptyRuleInfo old_rules && not (isFragileUnfolding old_unf)
 
 ------------------
 -- | Substitutes for the 'Id's within an unfolding
@@ -1104,8 +1103,10 @@ subst_opt_id_bndr subst@(Subst in_scope id_subst tv_subst cv_subst) old_id
   where
     id1    = uniqAway in_scope old_id
     id2    = setIdType id1 (substTy subst (idType old_id))
-    new_id = zapFragileIdInfo id2       -- Zaps rules, worker-info, unfolding
-                                        -- and fragile OccInfo
+    new_id = zapFragileIdInfo id2
+             -- Zaps rules, worker-info, unfolding, and fragile OccInfo
+             -- The unfolding and rules will get added back later, by add_info
+
     new_in_scope = in_scope `extendInScopeSet` new_id
 
         -- Extend the substitution if the unique has changed,
@@ -1126,7 +1127,8 @@ add_info :: Subst -> InVar -> OutVar -> OutVar
 add_info subst old_bndr new_bndr
  | isTyVar old_bndr = new_bndr
  | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
- where mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+ where
+   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
 
 simpleUnfoldingFun :: IdUnfoldingFun
 simpleUnfoldingFun id

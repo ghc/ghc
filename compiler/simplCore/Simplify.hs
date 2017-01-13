@@ -25,8 +25,7 @@ import Name             ( Name, mkSystemVarName, isExternalName, getOccFS )
 import Coercion hiding  ( substCo, substCoVar )
 import OptCoercion      ( optCoercion )
 import FamInstEnv       ( topNormaliseType_maybe )
-import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness
-                        , isMarkedStrict, dataConRepArgTys ) --, dataConTyCon, dataConTag, fIRST_TAG )
+import DataCon          ( DataCon, dataConWorkId, dataConRepStrictness, dataConRepArgTys )
 --import TyCon            ( isEnumerationTyCon ) -- temporalily commented out. See #8326
 import CoreMonad        ( Tick(..), SimplifierMode(..) )
 import CoreSyn
@@ -1261,7 +1260,7 @@ simplLamBndrs :: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
 simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 
 -------------
-simplLamBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
+simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 -- Used for lambda binders.  These sometimes have unfoldings added by
 -- the worker/wrapper pass that must be preserved, because they can't
 -- be reconstructed from context.  For example:
@@ -1269,7 +1268,7 @@ simplLamBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
 --      fw a b x{=(a,b)} = ...
 -- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
 simplLamBndr env bndr
-  | isId bndr && hasSomeUnfolding old_unf   -- Special case
+  | isId bndr && isFragileUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
        ; unf'          <- simplUnfolding env1 NotTopLevel bndr old_unf
        ; let bndr2 = bndr1 `setIdUnfolding` unf'
@@ -2136,9 +2135,7 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
         where
           go [] [] = []
           go (v:vs') strs | isTyVar v = v : go vs' strs
-          go (v:vs') (str:strs)
-            | isMarkedStrict str = eval v : go vs' strs
-            | otherwise          = zap v  : go vs' strs
+          go (v:vs') (str:strs) = zap str v : go vs' strs
           go _ _ = pprPanic "cat_evals"
                     (ppr con $$
                      ppr vs  $$
@@ -2151,8 +2148,9 @@ simplAlt env scrut' _ case_bndr' cont' (DataAlt con, vs, rhs)
                                     -- NB: If this panic triggers, note that
                                     -- NoStrictnessMark doesn't print!
 
-          zap v  = zapIdOccInfo v   -- See Note [Case alternative occ info]
-          eval v = zap v `setIdUnfolding` evaldUnfolding
+          zap str v = setCaseBndrEvald str $ -- Add eval'dness info
+                      zapIdOccInfo v         -- And kill occ info;
+                                             -- see Note [Case alternative occ info]
 
 addAltUnfoldings :: SimplEnv -> Maybe OutExpr -> OutId -> OutExpr -> SimplM SimplEnv
 addAltUnfoldings env scrut case_bndr con_app

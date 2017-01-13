@@ -1673,12 +1673,10 @@ dataConInstPat fss uniqs con inst_tys
       -- Make value vars, instantiating types
     arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
     mk_id_var uniq fs ty str
-      = mkLocalIdOrCoVarWithInfo name (Type.substTy full_subst ty) info
+      = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
+        mkLocalIdOrCoVar name (Type.substTy full_subst ty)
       where
         name = mkInternalName uniq (mkVarOccFS fs) noSrcSpan
-        info | isMarkedStrict str = vanillaIdInfo `setUnfoldingInfo` evaldUnfolding
-             | otherwise          = vanillaIdInfo
-             -- See Note [Mark evaluated arguments]
 
 {-
 Note [Mark evaluated arguments]

@@ -64,8 +64,7 @@ module CoreSyn (
         maybeUnfoldingTemplate, otherCons,
         isValueUnfolding, isEvaldUnfolding, isCheapUnfolding,
         isExpandableUnfolding, isConLikeUnfolding, isCompulsoryUnfolding,
-        isStableUnfolding,
-        isClosedUnfolding, hasSomeUnfolding,
+        isStableUnfolding, isFragileUnfolding, hasSomeUnfolding,
         isBootUnfolding,
         canUnfold, neverUnfoldGuidance, isStableSource,
 
@@ -1159,7 +1158,7 @@ data UnfoldingSource
                        -- to the current RHS during compilation as with
                        -- InlineRhs.
                        --
-                       -- See Note [InlineRules]
+                       -- See Note [InlineStable]
 
   | InlineCompulsory   -- Something that *has* no binding, so you *must* inline it
                        -- Only a few primop-like things have this property
@@ -1350,11 +1349,6 @@ isStableUnfolding (CoreUnfolding { uf_src = src }) = isStableSource src
 isStableUnfolding (DFunUnfolding {})               = True
 isStableUnfolding _                                = False
 
-isClosedUnfolding :: Unfolding -> Bool          -- No free variables
-isClosedUnfolding (CoreUnfolding {}) = False
-isClosedUnfolding (DFunUnfolding {}) = False
-isClosedUnfolding _                  = True
-
 -- | Only returns False if there is no unfolding information available at all
 hasSomeUnfolding :: Unfolding -> Bool
 hasSomeUnfolding NoUnfolding   = False
@@ -1369,12 +1363,34 @@ neverUnfoldGuidance :: UnfoldingGuidance -> Bool
 neverUnfoldGuidance UnfNever = True
 neverUnfoldGuidance _        = False
 
+isFragileUnfolding :: Unfolding -> Bool
+-- An unfolding is fragile if it mentions free variables or
+-- is otherwise subject to change.  A robust one can be kept.
+-- See Note [Fragile unfoldings]
+isFragileUnfolding (CoreUnfolding {}) = True
+isFragileUnfolding (DFunUnfolding {}) = True
+isFragileUnfolding _                  = False
+  -- NoUnfolding, BootUnfolding, OtherCon are all non-fragile
+
 canUnfold :: Unfolding -> Bool
 canUnfold (CoreUnfolding { uf_guidance = g }) = not (neverUnfoldGuidance g)
 canUnfold _                                   = False
 
-{-
-Note [InlineRules]
+{- Note [Fragile unfoldings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An unfolding is "fragile" if it mentions free variables (and hence would
+need substitution) or might be affeceted by optimisation.  The non-fragile
+ones are
+
+   NoUnfolding, BootUnfolding
+
+   OtherCon {}    If we know this binder (say a lambda binder) will be
+                  bound to an evaluated thing, we weant to retain that
+                  info in simpleOptExpr; see Trac #13077.
+
+We consider even a StableUnfolding as fragile, because it needs substitution.
+
+Note [InlineStable]
 ~~~~~~~~~~~~~~~~~
 When you say
       {-# INLINE f #-}

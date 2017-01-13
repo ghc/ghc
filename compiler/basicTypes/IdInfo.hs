@@ -514,12 +514,20 @@ zapUsedOnceInfo info
 
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- ^ Zap info that depends on free variables
-zapFragileInfo info
-  = Just (info `setRuleInfo` emptyRuleInfo
-               `setUnfoldingInfo` noUnfolding
-               `setOccInfo` zapFragileOcc occ)
+zapFragileInfo info@(IdInfo { occInfo = occ, unfoldingInfo = unf })
+  = new_unf `seq`  -- The unfolding field is not (currently) strict, so we
+                   -- force it here to avoid a (zapFragileUnfolding unf) thunk
+                   -- which might leak space
+    Just (info `setRuleInfo` emptyRuleInfo
+               `setUnfoldingInfo` new_unf
+               `setOccInfo`       zapFragileOcc occ)
   where
-    occ = occInfo info
+    new_unf = zapFragileUnfolding unf
+
+zapFragileUnfolding :: Unfolding -> Unfolding
+zapFragileUnfolding unf
+ | isFragileUnfolding unf = noUnfolding
+ | otherwise              = unf
 
 {-
 ************************************************************************
