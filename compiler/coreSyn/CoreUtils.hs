@@ -68,6 +68,7 @@ import PrimOp
 import Id
 import IdInfo
 import Type
+import TyCoRep( TyBinder(..) )
 import Coercion
 import TyCon
 import Unique
@@ -1286,18 +1287,19 @@ app_ok primop_ok fun args
                 -- to take the arguments into account
 
       PrimOpId op
-        | isDivOp op              -- Special case for dividing operations that fail
-        , [arg1, Lit lit] <- args -- only if the divisor is zero
+        | isDivOp op
+        , [arg1, Lit lit] <- args
         -> not (isZeroLit lit) && expr_ok primop_ok arg1
-                  -- Often there is a literal divisor, and this
-                  -- can get rid of a thunk in an inner looop
-
-        | DataToTagOp <- op      -- See Note [dataToTag speculation]
-        -> True
+              -- Special case for dividing operations that fail
+              -- In general they are NOT ok-for-speculation
+              -- (which primop_ok will catch), but they ARE OK
+              -- if the divisor is definitely non-zero.
+              -- Often there is a literal divisor, and this
+              -- can get rid of a thunk in an inner looop
 
         | otherwise
-        -> primop_ok op                   -- A bit conservative: we don't really need
-        && all (expr_ok primop_ok) args   -- to care about lazy arguments, but this is easy
+        -> primop_ok op     -- Check the primop itself
+        && and (zipWith arg_ok arg_tys args)  -- Check the arguments
 
       _other -> isUnliftedType (idType fun)          -- c.f. the Var case of exprIsHNF
              || idArity fun > n_val_args             -- Partial apps
@@ -1305,6 +1307,14 @@ app_ok primop_ok fun args
                  isEvaldUnfolding (idUnfolding fun)) -- Let-bound values
              where
                n_val_args = valArgCount args
+  where
+    (arg_tys, _) = splitPiTys (idType fun)
+
+    arg_ok :: TyBinder -> Expr b -> Bool
+    arg_ok (Named _) _ = True   -- A type argument
+    arg_ok (Anon ty) arg        -- A term argument
+       | isUnliftedType ty = expr_ok primop_ok arg
+       | otherwise         = True  -- See Note [Primops with lifted arguments]
 
 -----------------------------
 altsAreExhaustive :: [Alt b] -> Bool
@@ -1386,26 +1396,33 @@ One could try to be clever, but the easy fix is simpy to regard
 a non-exhaustive case as *not* okForSpeculation.
 
 
-Note [dataToTag speculation]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Is this OK?
-   f x = let v::Int# = dataToTag# x
-         in ...
-We say "yes", even though 'x' may not be evaluated.  Reasons
+Note [Primops with lifted arguments]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Is this ok-for-speculation (see Trac #13027)?
+   reallyUnsafePtrEq# a b
+Well, yes.  The primop accepts lifted arguments and does not
+evaluate them.  Indeed, in general primops are, well, primitive
+and do not perform evaluation.
 
-  * dataToTag#'s strictness means that its argument often will be
-    evaluated, but FloatOut makes that temporarily untrue
-         case x of y -> let v = dataToTag# y in ...
-    -->
-         case x of y -> let v = dataToTag# x in ...
-    Note that we look at 'x' instead of 'y' (this is to improve
-    floating in FloatOut).  So Lint complains.
+There is one primop, dataToTag#, which does /require/ a lifted
+argument to be evaluted.  To ensure this, CorePrep adds an
+eval if it can't see the the argument is definitely evaluated
+(see [dataToTag magic] in CorePrep).
 
-    Moreover, it really *might* improve floating to let the
-    v-binding float out
+We make no attempt to guarantee that dataToTag#'s argument is
+evaluated here.  Main reason: it's very fragile to test for the
+evaluatedness of a lifted argument.  Consider
+    case x of y -> let v = dataToTag# y in ...
 
-  * CorePrep makes sure dataToTag#'s argument is evaluated, just
-    before code gen.  Until then, it's not guaranteed
+where x/y have type Int, say.  'y' looks evaluated (by the enclosing
+case) so all is well.  Now the FloatOut pass does a binder-swap (for
+very good reasons), changing to
+   case x of y -> let v = dataToTag# x in ...
+
+See also Note [dataToTag#] in primops.txt.pp.
+
+Bottom line:
+  * in exprOkForSpeculation we simply ignore all lifted arguments.
 
 
 ************************************************************************
