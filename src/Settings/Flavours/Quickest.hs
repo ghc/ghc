@@ -13,7 +13,7 @@ quickestFlavour = defaultFlavour
 
 quickestArgs :: Args
 quickestArgs = sourceArgs $ SourceArgs
-    { hsDefault  = append ["-O0", "-H64m"]
+    { hsDefault  = append ["-O0", "-H32m"]
     , hsLibrary  = mempty
     , hsCompiler = mempty
     , hsGhc      = mempty }

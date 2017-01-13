@@ -12,7 +12,7 @@ quickFlavour = defaultFlavour
 
 quickArgs :: Args
 quickArgs = sourceArgs $ SourceArgs
-    { hsDefault  = append ["-O0", "-H64m"]
+    { hsDefault  = append ["-O0", "-H32m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler =    stage0 ? arg "-O"
     , hsGhc      =    stage0 ? arg "-O" }

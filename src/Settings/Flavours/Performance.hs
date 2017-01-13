@@ -11,7 +11,7 @@ performanceFlavour = defaultFlavour
 
 performanceArgs :: Args
 performanceArgs = sourceArgs $ SourceArgs
-    { hsDefault  = append ["-O", "-H64m"]
+    { hsDefault  = append ["-O", "-H32m"]
     , hsLibrary  = notStage0 ? arg "-O2"
     , hsCompiler = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"]
     , hsGhc      = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2"] }
