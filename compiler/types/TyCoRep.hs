@@ -409,8 +409,9 @@ same kinds.
 -- ('Named') or nondependent ('Anon'). They may also be visible or not.
 -- See Note [TyBinders]
 data TyBinder
-  = Named TyVarBinder
-  | Anon Type   -- Visibility is determined by the type (Constraint vs. *)
+  = Named TyVarBinder   -- A type-lambda binder
+  | Anon Type           -- A term-lambda binder
+                        -- Visibility is determined by the type (Constraint vs. *)
   deriving Data.Data
 
 -- | Remove the binder's variable from the set, if the binder has
@@ -437,7 +438,7 @@ A TyBinder represents the type of binders -- that is, the type of an
 argument to a Pi-type. GHC Core currently supports two different
 Pi-types:
 
- * A non-dependent function,
+ * A non-dependent function type,
    written with ->, e.g. ty1 -> ty2
    represented as FunTy ty1 ty2
 
@@ -447,12 +448,8 @@ Pi-types:
 
 Both Pi-types classify terms/types that take an argument. In other
 words, if `x` is either a function or a polytype, `x arg` makes sense
-(for an appropriate `arg`). It is thus often convenient to group
-Pi-types together.  This is ForAllTy.
+(for an appropriate `arg`).
 
-The two constructors for TyBinder sort out the two different possibilities.
-`Named` builds a polytype, while `Anon` builds an ordinary function.
-(ForAllTy (Anon arg) res used to be called FunTy arg res.)
 
 Note [TyBinders and ArgFlags]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
