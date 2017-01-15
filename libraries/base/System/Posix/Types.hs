@@ -92,13 +92,9 @@ module System.Posix.Types (
 #if defined(HTYPE_KEY_T)
   CKey(..),
 #endif
--- We can't support CTimer (timer_t) yet, as FPTOOLS_CHECK_HTYPE doesn't have
--- the ability to discern pointer types (like void*, which timer_t usually is)
--- from non-pointer types. See GHC Trac #12998.
---
--- #if defined(HTYPE_TIMER_T)
---   CTimer(..),
--- #endif
+#if defined(HTYPE_TIMER_T)
+  CTimer(..),
+#endif
 
   Fd(..),
 
@@ -212,6 +208,10 @@ INTEGRAL_TYPE_WITH_CTYPE(CId,id_t,HTYPE_ID_T)
 #if defined(HTYPE_KEY_T)
 -- | @since 4.10.0.0
 INTEGRAL_TYPE_WITH_CTYPE(CKey,key_t,HTYPE_KEY_T)
+#endif
+#if defined(HTYPE_TIMER_T)
+-- | @since 4.10.0.0
+OPAQUE_TYPE_WITH_CTYPE(CTimer,timer_t,HTYPE_TIMER_T)
 #endif
 
 -- Make an Fd type rather than using CInt everywhere

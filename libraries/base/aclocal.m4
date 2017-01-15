@@ -131,26 +131,43 @@ AC_DEFUN([FPTOOLS_CHECK_HTYPE_ELSE],[
 
         if test "$HTYPE_IS_INTEGRAL" -eq 0
         then
-            FP_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
-                           [FPTOOLS_HTYPE_INCLUDES],
-                           [AC_CV_NAME_supported=no])
-            FP_COMPUTE_INT([HTYPE_IS_DOUBLE],[sizeof($1) == sizeof(double)],
-                           [FPTOOLS_HTYPE_INCLUDES],
-                           [AC_CV_NAME_supported=no])
-            FP_COMPUTE_INT([HTYPE_IS_LDOUBLE],[sizeof($1) == sizeof(long double)],
-                           [FPTOOLS_HTYPE_INCLUDES],
-                           [AC_CV_NAME_supported=no])
-            if test "$HTYPE_IS_FLOAT" -eq 1
+            dnl If the C type isn't an integer, we check if it's a pointer type
+            dnl by trying to dereference one of its values. If that fails to
+            dnl compile, it's not a pointer, so we check to see if it's a
+            dnl floating-point type.
+            AC_COMPILE_IFELSE(
+                [AC_LANG_PROGRAM(
+                    [FPTOOLS_HTYPE_INCLUDES],
+                    [$1 val; *val;]
+                )],
+                [HTYPE_IS_POINTER=yes],
+                [HTYPE_IS_POINTER=no])
+
+            if test "$HTYPE_IS_POINTER" = yes
             then
-                AC_CV_NAME=Float
-            elif test "$HTYPE_IS_DOUBLE" -eq 1
-            then
-                AC_CV_NAME=Double
-            elif test "$HTYPE_IS_LDOUBLE" -eq 1
-            then
-                AC_CV_NAME=LDouble
+                AC_CV_NAME="Ptr ()"
             else
-                AC_CV_NAME_supported=no
+                FP_COMPUTE_INT([HTYPE_IS_FLOAT],[sizeof($1) == sizeof(float)],
+                               [FPTOOLS_HTYPE_INCLUDES],
+                               [AC_CV_NAME_supported=no])
+                FP_COMPUTE_INT([HTYPE_IS_DOUBLE],[sizeof($1) == sizeof(double)],
+                               [FPTOOLS_HTYPE_INCLUDES],
+                               [AC_CV_NAME_supported=no])
+                FP_COMPUTE_INT([HTYPE_IS_LDOUBLE],[sizeof($1) == sizeof(long double)],
+                               [FPTOOLS_HTYPE_INCLUDES],
+                               [AC_CV_NAME_supported=no])
+                if test "$HTYPE_IS_FLOAT" -eq 1
+                then
+                    AC_CV_NAME=Float
+                elif test "$HTYPE_IS_DOUBLE" -eq 1
+                then
+                    AC_CV_NAME=Double
+                elif test "$HTYPE_IS_LDOUBLE" -eq 1
+                then
+                    AC_CV_NAME=LDouble
+                else
+                    AC_CV_NAME_supported=no
+                fi
             fi
         else
             FP_COMPUTE_INT([HTYPE_IS_SIGNED],[(($1)(-1)) < (($1)0)],
