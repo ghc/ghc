@@ -540,6 +540,9 @@ Bugs in GHC
    in the compiler's internal representation and can be unified producing
    unexpected results. See :ghc-ticket:`11715` for one example.
 
+-  Because of a toolchain limitation we are unable to support full Unicode paths
+   on WIndows. On Windows we support up to Latin-1. See :ghc-ticket:`12971` for more.
+
 .. _bugs-ghci:
 
 Bugs in GHCi (the interactive GHC)

@@ -1240,7 +1240,11 @@ runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
     getResponseFile args = do
       fp <- newTempName dflags "rsp"
       withFile fp WriteMode $ \h -> do
+#if defined(mingw32_HOST_OS)
+          hSetEncoding h latin1
+#else
           hSetEncoding h utf8
+#endif
           hPutStr h $ unlines $ map escape args
       return fp
 

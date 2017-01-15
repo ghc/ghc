@@ -645,4 +645,4 @@ T12955:
 .PHONY: T12971
 T12971:
 	mkdir -p ä
-	! TMP=ä "$(TEST_HC)" $(TEST_HC_OPTS) --make T12971
+	TMP=ä "$(TEST_HC)" $(TEST_HC_OPTS) --make T12971
