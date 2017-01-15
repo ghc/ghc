@@ -240,10 +240,11 @@ addDLL_PEi386( pathchar *dll_name )
 
 error:
    stgFree(buf);
-   sysErrorBelch("addDLL: %" PATH_FMT " (Win32 error %lu)", dll_name, GetLastError());
 
+   char* errormsg = malloc(sizeof(char) * 80);
+   snprintf(errormsg, 80, "addDLL: %" PATH_FMT " or dependencies not loaded. (Win32 error %lu)", dll_name, GetLastError());
    /* LoadLibrary failed; return a ptr to the error msg. */
-   return "addDLL: could not load DLL";
+   return errormsg;
 }
 
 pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
