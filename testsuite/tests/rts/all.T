@@ -13,6 +13,12 @@ test('testmblockalloc',
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
+
+def normalise_address(str):
+    return re.sub('Access violation in generated code when reading [0]+',
+                  'Access violation in generated code when reading ADDRESS',
+                  str)
+
 test('derefnull',
      [# LLVM Optimiser considers dereference of a null pointer
       # undefined and marks the code as unreachable which means
@@ -29,7 +35,7 @@ test('derefnull',
       when(platform('i386-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('x86_64-apple-darwin'), [ignore_stderr, exit_code(139)]),
       when(platform('powerpc-apple-darwin'), [ignore_stderr, exit_code(139)]),
-      when(opsys('mingw32'), exit_code(1)),
+      when(opsys('mingw32'), [exit_code(1), normalise_fun(normalise_address)]),
       # since these test are supposed to crash the
       # profile report will be empty always.
       # so disable the check for profiling
@@ -180,7 +186,7 @@ def checkDynAsm(actual_file, normaliser):
 # to somehow extract out the name of DLLs to do that
 
 test('T5435_v_asm', when(arch('powerpc64') or arch('powerpc64le'),
-     expect_broken(11259)), 
+     expect_broken(11259)),
      run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
 test('T5435_v_gcc', when(arch('powerpc64') or arch('powerpc64le'),
      expect_broken(11259)),
@@ -371,7 +377,7 @@ test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 
 test('numa001', [ extra_run_opts('8'), extra_ways(['debug_numa']) ]
                 , compile_and_run, [''])
-                
+
 test('T12497', [ unless(opsys('mingw32'), skip)
                ],
                run_command, ['$MAKE -s --no-print-directory T12497'])

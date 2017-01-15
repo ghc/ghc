@@ -32,6 +32,7 @@ PVOID __hs_handle = NULL;
 long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
 {
     long action = EXCEPTION_CONTINUE_SEARCH;
+    ULONG_PTR what;
 
     // When the system unwinds the VEH stack after having handled an excn,
     // return immediately.
@@ -49,7 +50,12 @@ long WINAPI __hs_exception_handler(struct _EXCEPTION_POINTERS *exception_data)
                 action = EXCEPTION_CONTINUE_EXECUTION;
                 break;
             case EXCEPTION_ACCESS_VIOLATION:
-                fprintf(stdout, "Segmentation fault/access violation in generated code\n");
+                what = exception_data->ExceptionRecord->ExceptionInformation[0];
+                fprintf(stdout, "Access violation in generated code"
+                                " when %s %p\n"
+                                , what == 0 ? "reading" : what == 1 ? "writing" : what == 8 ? "executing data at" : "?"
+                                , (void*) exception_data->ExceptionRecord->ExceptionInformation[1]
+                                );
                 action = EXCEPTION_CONTINUE_EXECUTION;
                 break;
             default:;
