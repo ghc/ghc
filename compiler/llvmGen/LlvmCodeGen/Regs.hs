@@ -97,7 +97,8 @@ alwaysLive = [BaseReg, Sp, Hp, SpLim, HpLim, node]
 -- | STG Type Based Alias Analysis hierarchy
 stgTBAA :: [(Unique, LMString, Maybe Unique)]
 stgTBAA
-  = [ (topN,   fsLit "top",   Nothing)
+  = [ (rootN,  fsLit "root",   Nothing)
+    , (topN,   fsLit "top",   Just rootN)
     , (stackN, fsLit "stack", Just topN)
     , (heapN,  fsLit "heap",  Just topN)
     , (rxN,    fsLit "rx",    Just heapN)
@@ -109,7 +110,11 @@ stgTBAA
     ]
 
 -- | Id values
-topN, stackN, heapN, rxN, baseN :: Unique
+-- The `rootN` node is the root (there can be more than one) of the TBAA
+-- hierarchy and as of LLVM 4.0 should *only* be referenced by other nodes. It
+-- should never occur in any LLVM instruction statement.
+rootN, topN, stackN, heapN, rxN, baseN :: Unique
+rootN  = getUnique (fsLit "LlvmCodeGen.Regs.rootN")
 topN   = getUnique (fsLit "LlvmCodeGen.Regs.topN")
 stackN = getUnique (fsLit "LlvmCodeGen.Regs.stackN")
 heapN  = getUnique (fsLit "LlvmCodeGen.Regs.heapN")
