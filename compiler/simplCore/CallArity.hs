@@ -115,7 +115,7 @@ Note [Analysis II: The Co-Called analysis]
 ------------------------------------------
 
 The second part is more sophisticated. For reasons explained below, it is not
-sufficient to simply know how often an expression evalutes a variable. Instead
+sufficient to simply know how often an expression evaluates a variable. Instead
 we need to know which variables are possibly called together.
 
 The data structure here is an undirected graph of variables, which is provided

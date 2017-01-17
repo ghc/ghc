@@ -11564,7 +11564,7 @@ optionally had by adding ``!`` in front of a variable.
 
        case x of !y -> rhs
 
-   which evalutes ``x``. Similarly, if ``newtype Age = MkAge Int``, then ::
+   which evaluates ``x``. Similarly, if ``newtype Age = MkAge Int``, then ::
 
        case x of MkAge i -> rhs
 

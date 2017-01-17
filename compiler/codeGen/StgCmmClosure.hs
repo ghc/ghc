@@ -828,7 +828,7 @@ we run into issues like Trac #10414. Specifically:
 
   * It is dangerous to black-hole a non-updatable thunk because
      - is not updated (of course)
-     - hence, if it is black-holed and another thread tries to evalute
+     - hence, if it is black-holed and another thread tries to evaluate
        it, that thread will block forever
     This actually happened in Trac #10414.  So we do not black-hole
     non-updatable thunks.

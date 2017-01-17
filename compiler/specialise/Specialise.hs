@@ -1784,8 +1784,8 @@ This makes b), c), d) trivial and pushes a) towards the end. The deduplication
 is done by using a TrieMap for membership tests on CallKey. This lets us delete
 the nondeterministic Ord CallKey instance.
 
-An alternative approach would be to augument the Map the same way that UniqDFM
-is augumented, by keeping track of insertion order and using it to order the
+An alternative approach would be to augment the Map the same way that UniqDFM
+is augmented, by keeping track of insertion order and using it to order the
 resulting lists. It would mean keeping the nondeterministic Ord CallKey
 instance making it easy to reintroduce nondeterminism in the future.
 -}
