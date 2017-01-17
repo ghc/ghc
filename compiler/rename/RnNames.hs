@@ -1488,11 +1488,11 @@ badImportItemErrDataCon dataType_occ iface decl_spec ie
              <+> text "is a data constructor of"
              <+> quotes dataType
          , text "To import it use"
-         , nest 2 $ quotes (text "import")
+         , nest 2 $ text "import"
              <+> ppr (is_mod decl_spec)
              <> parens_sp (dataType <> parens_sp datacon)
          , text "or"
-         , nest 2 $ quotes (text "import")
+         , nest 2 $ text "import"
              <+> ppr (is_mod decl_spec)
              <> parens_sp (dataType <> text "(..)")
          ]
