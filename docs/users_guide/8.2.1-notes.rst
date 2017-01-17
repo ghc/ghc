@@ -151,13 +151,32 @@ Template Haskell
 Runtime system
 ~~~~~~~~~~~~~~
 
--  TODO FIXME.
+- TODO FIXME.
+
+- Added support for *Compact Regions*, which offer a way to manually
+  move long-lived data outside of the heap so that the garbage
+  collector does not have to trace it repeatedly.  Compacted data can
+  also be serialized, stored, and deserialized again later by the same
+  program.  For more details see the :compact-ref:`Data.Compact
+  <Data-Compact.html>` module.
+
+- There is new support for improving performance on machines with a
+  Non-Uniform Memory Architecture (NUMA).  See :rts-flag:`--numa`.
+  This is supported on Linux and Windows systems.
+
+- The garbage collector can be told to use fewer threads than the
+  global number of capabilities set by :rts-flag:`-N`.  See
+  :rts-flag:`-qn`, and a `blog post
+  <http://simonmar.github.io/posts/2016-12-08-Haskell-in-the-datacentre.html>`_
+  that describes this.
 
 - The :ref:`heap profiler <prof-heap>` can now emit heap census data to the GHC
   event log, allowing heap profiles to be correlated with other tracing events
   (see :ghc-ticket:`11094`).
 
-- Added NUMA support to Windows.
+- Some bugs have been fixed in the stack-trace implementation in the
+  profiler that sometimes resulted in incorrect stack traces and
+  costs attributed to the wrong cost centre stack (see :ghc-ticket:`5654`).
 
 - Added processor group support for Windows. This allows the runtime to allocate
   threads to all cores in systems which have multiple processor groups.
