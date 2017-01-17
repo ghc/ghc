@@ -242,7 +242,7 @@ In \ottdrulename{Co\_UnivCo}, function $ \textsf{compatibleUnBoxedTys} $ stands 
     appropriate element of the target tuple;
 \end{itemize}
 For function implementation see \coderef{coreSyn/CoreLint.lhs}{checkTypes}.
-For futher discussion see \url{https://ghc.haskell.org/trac/ghc/wiki/BadUnsafeCoercions}.
+For further discussion see \url{https://ghc.haskell.org/trac/ghc/wiki/BadUnsafeCoercions}.
 
 \subsection{Type constructors}
 

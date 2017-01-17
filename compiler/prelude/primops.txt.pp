@@ -2615,7 +2615,7 @@ binder-swap on the case, to give
 
 Now FloatOut might float that v-binding outside the \z.  But that is
 bad because that might mean x gest evaluated much too early!  (CorePrep
-adds an eval to a dataToTag# call, to ensure that the agument really is
+adds an eval to a dataToTag# call, to ensure that the argument really is
 evaluated; see CorePrep Note [dataToTag magic].)
 
 Solution: make DataToTag into a can_fail primop.  That will stop it floating

@@ -1539,7 +1539,7 @@ Tricky point: make sure that we analyse in the 'virgin' pass. Consider
 In the virgin pass for 'f' we'll give 'f' a very strict (bottom) type.
 That might mean that we analyse the sub-expression containing the
 E = "...rec g..." stuff in a bottom demand.  Suppose we *didn't analyse*
-E, but just retuned botType.
+E, but just returned botType.
 
 Then in the *next* (non-virgin) iteration for 'f', we might analyse E
 in a weaker demand, and that will trigger doing a fixpoint iteration

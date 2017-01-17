@@ -835,7 +835,7 @@ mkStgRhs' con_updateable rhs_fvs bndr binder_info rhs
 --           and lots of PAP_enters.
 --
 --         - in the case where the thunk is top-level, we save building
---           a black hole and futhermore the thunk isn't considered to
+--           a black hole and furthermore the thunk isn't considered to
 --           be a CAF any more, so it doesn't appear in any SRTs.
 --
 -- We do it here, because the arity information is accurate, and we need

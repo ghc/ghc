@@ -1295,7 +1295,7 @@ app_ok primop_ok fun args
               -- (which primop_ok will catch), but they ARE OK
               -- if the divisor is definitely non-zero.
               -- Often there is a literal divisor, and this
-              -- can get rid of a thunk in an inner looop
+              -- can get rid of a thunk in an inner loop
 
         | otherwise
         -> primop_ok op     -- Check the primop itself

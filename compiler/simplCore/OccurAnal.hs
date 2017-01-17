@@ -931,7 +931,7 @@ It's particularly bad to make a DFun into a loop breaker.  See
 Note [How instance declarations are translated] in TcInstDcls
 
 We give DFuns a higher score than ordinary CONLIKE things because
-if there's a choice we want the DFun to be the non-looop breker. Eg
+if there's a choice we want the DFun to be the non-loop breaker. Eg
 
 rec { sc = /\ a \$dC. $fBWrap (T a) ($fCT @ a $dC)
 

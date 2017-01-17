@@ -210,7 +210,7 @@ This only makes sense if either
   b) the type variable 'a' is an argument to f (and hence fs)
 
 Actually, (a) may hold for value arguments too, in which case
-we may not want to pass them.  Supose 'x' is in scope at f's
+we may not want to pass them.  Suppose 'x' is in scope at f's
 defn, but xs is not.  Then we'd like
 
         f_spec xs = let p = (:) [a] x xs in ....as before....

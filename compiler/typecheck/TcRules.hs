@@ -214,7 +214,7 @@ Consider
        f b True = ...
     #-}
 Here we *must* solve the wanted (Eq a) from the given (Eq a)
-resulting from skolemising the agument type of g.  So we
+resulting from skolemising the argument type of g.  So we
 revert to SimplCheck when going under an implication.
 
 

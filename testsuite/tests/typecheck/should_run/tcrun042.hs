@@ -1,11 +1,11 @@
 {-# LANGUAGE TupleSections, RankNTypes, ImpredicativeTypes #-}
 
--- Sept 16: This test involves wholesale use of impredicative polymorhism
+-- Sept 16: This test involves wholesale use of impredicative polymorphism
 --          and I'm amazed it has worked for so long. Anyway it is now
---          failing, which is OK.  We don't really suport impredicative
+--          failing, which is OK.  We don't really support impredicative
 --          polymorphism!
 --
--- The test was added by Max in 5e8ff849, appretly to test tuple sections
+-- The test was added by Max in 5e8ff849, apparently to test tuple sections
 
 module Main where
 

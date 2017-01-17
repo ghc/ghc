@@ -855,7 +855,7 @@ The idea is that
   - (K2c): If this holds, we can't pass through this triple infinitely
     often, because if we did then fs>=f, fw>=f, hence by (R2)
       * either fw>=fs, contradicting K2c
-      * or fs>=fw; so by the agument in K2b we can't have a loop
+      * or fs>=fw; so by the argument in K2b we can't have a loop
 
   - (K2d): if a not in s, we hae no further opportunity to apply the
     work item, similar to (K2b)

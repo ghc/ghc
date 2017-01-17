@@ -312,7 +312,7 @@ Note [Flattening one-tuples]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 This family of functions creates a tuple of variables/expressions/types.
   mkCoreTup [e1,e2,e3] = (e1,e2,e3)
-What if there is just one variable/expression/type in the agument?
+What if there is just one variable/expression/type in the argument?
 We could do one of two things:
 
 * Flatten it out, so that
