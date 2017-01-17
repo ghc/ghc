@@ -292,7 +292,8 @@ mkDictSelId name clas
 
     info | new_tycon
          = base_info `setInlinePragInfo` alwaysInlinePragma
-                     `setUnfoldingInfo`  mkInlineUnfolding (Just 1) (mkDictSelRhs clas val_index)
+                     `setUnfoldingInfo`  mkInlineUnfoldingWithArity 1
+                                           (mkDictSelRhs clas val_index)
                    -- See Note [Single-method classes] in TcInstDcls
                    -- for why alwaysInlinePragma
 
@@ -533,7 +534,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
              -- See Note [Inline partially-applied constructor wrappers]
              -- Passing Nothing here allows the wrapper to inline when
              -- unsaturated.
-             wrap_unf = mkInlineUnfolding Nothing wrap_rhs
+             wrap_unf = mkInlineUnfolding wrap_rhs
              wrap_tvs = (univ_tvs `minusList` map eqSpecTyVar eq_spec) ++ ex_tvs
              wrap_rhs = mkLams wrap_tvs $
                         mkLams wrap_args $
@@ -1091,7 +1092,7 @@ dollarId = pcMiscPrelId dollarName ty
     fun_ty = mkFunTy alphaTy openBetaTy
     ty     = mkSpecForAllTys [runtimeRep2TyVar, alphaTyVar, openBetaTyVar] $
              mkFunTy fun_ty fun_ty
-    unf    = mkInlineUnfolding (Just 2) rhs
+    unf    = mkInlineUnfoldingWithArity 2 rhs
     [f,x]  = mkTemplateLocals [fun_ty, alphaTy]
     rhs    = mkLams [runtimeRep2TyVar, alphaTyVar, openBetaTyVar, f, x] $
              App (Var f) (Var x)

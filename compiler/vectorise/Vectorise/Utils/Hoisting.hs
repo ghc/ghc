@@ -62,7 +62,7 @@ hoistExpr fs expr inl
   where
     mk_inline var = case inl of
                       Inline arity -> var `setIdUnfolding`
-                                      mkInlineUnfolding (Just arity) expr
+                                      mkInlineUnfoldingWithArity arity expr
                       DontInline   -> var
 
 hoistVExpr :: VExpr -> Inline -> VM VVar

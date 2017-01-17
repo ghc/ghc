@@ -17,7 +17,7 @@ import Vectorise.Env
 import Vectorise.Monad
 
 import HscTypes hiding      ( MonadThings(..) )
-import CoreUnfold           ( mkInlineUnfolding )
+import CoreUnfold           ( mkInlineUnfoldingWithArity )
 import PprCore
 import CoreSyn
 import CoreMonad            ( CoreM, getHscEnv )
@@ -325,7 +325,7 @@ vectTopBinder var inline expr
     }
   where
     unfolding = case inline of
-                  Inline arity -> mkInlineUnfolding (Just arity) expr
+                  Inline arity -> mkInlineUnfoldingWithArity arity expr
                   DontInline   -> noUnfolding
 {-
 !!!TODO: dfuns and unfoldings:

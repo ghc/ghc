@@ -23,7 +23,8 @@ module CoreUnfold (
         noUnfolding, mkImplicitUnfolding,
         mkUnfolding, mkCoreUnfolding,
         mkTopUnfolding, mkSimpleUnfolding, mkWorkerUnfolding,
-        mkInlineUnfolding, mkInlinableUnfolding, mkWwInlineRule,
+        mkInlineUnfolding, mkInlineUnfoldingWithArity,
+        mkInlinableUnfolding, mkWwInlineRule,
         mkCompulsoryUnfolding, mkDFunUnfolding,
         specUnfolding,
 
@@ -125,20 +126,34 @@ mkWorkerUnfolding dflags work_fn
 
 mkWorkerUnfolding _ _ _ = noUnfolding
 
-mkInlineUnfolding :: Maybe Arity -> CoreExpr -> Unfolding
-mkInlineUnfolding mb_arity expr
+-- | Make an unfolding that may be used unsaturated
+-- (ug_unsat_ok = unSaturatedOk) and that is reported as having its
+-- manifest arity (the number of outer lambdas applications will
+-- resolve before doing any work).
+mkInlineUnfolding :: CoreExpr -> Unfolding
+mkInlineUnfolding expr
   = mkCoreUnfolding InlineStable
                     True         -- Note [Top-level flag on inline rules]
                     expr' guide
   where
     expr' = simpleOptExpr expr
-    guide = case mb_arity of
-              Nothing    -> UnfWhen { ug_arity = manifestArity expr'
-                                    , ug_unsat_ok = unSaturatedOk
-                                    , ug_boring_ok = boring_ok }
-              Just arity -> UnfWhen { ug_arity = arity
-                                    , ug_unsat_ok = needSaturated
-                                    , ug_boring_ok = boring_ok }
+    guide = UnfWhen { ug_arity = manifestArity expr'
+                    , ug_unsat_ok = unSaturatedOk
+                    , ug_boring_ok = boring_ok }
+    boring_ok = inlineBoringOk expr'
+
+-- | Make an unfolding that will be used once the RHS has been saturated
+-- to the given arity.
+mkInlineUnfoldingWithArity :: Arity -> CoreExpr -> Unfolding
+mkInlineUnfoldingWithArity arity expr
+  = mkCoreUnfolding InlineStable
+                    True         -- Note [Top-level flag on inline rules]
+                    expr' guide
+  where
+    expr' = simpleOptExpr expr
+    guide = UnfWhen { ug_arity = arity
+                    , ug_unsat_ok = needSaturated
+                    , ug_boring_ok = boring_ok }
     boring_ok = inlineBoringOk expr'
 
 mkInlinableUnfolding :: DynFlags -> CoreExpr -> Unfolding

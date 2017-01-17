@@ -378,12 +378,12 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
         -- And eta-expand the RHS; see Note [Eta-expanding INLINE things]
        , let real_arity = dict_arity + arity
         -- NB: The arity in the InlineRule takes account of the dictionaries
-       = ( gbl_id `setIdUnfolding` mkInlineUnfolding (Just real_arity) rhs
+       = ( gbl_id `setIdUnfolding` mkInlineUnfoldingWithArity real_arity rhs
          , etaExpand real_arity rhs)
 
        | otherwise
        = pprTrace "makeCorePair: arity missing" (ppr gbl_id) $
-         (gbl_id `setIdUnfolding` mkInlineUnfolding Nothing rhs, rhs)
+         (gbl_id `setIdUnfolding` mkInlineUnfolding rhs, rhs)
 
 dictArity :: [Var] -> Arity
 -- Don't count coercion variables in arity

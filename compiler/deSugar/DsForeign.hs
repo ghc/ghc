@@ -272,7 +272,8 @@ dsFCall fn_id co fcall mDeclHeader = do
         wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkLams (tvs ++ args) wrapper_body
         wrap_rhs'    = Cast wrap_rhs co
-        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfolding (Just (length args)) wrap_rhs'
+        fn_id_w_inl  = fn_id `setIdUnfolding` mkInlineUnfoldingWithArity
+                                                (length args) wrap_rhs'
 
     return ([(work_id, work_rhs), (fn_id_w_inl, wrap_rhs')], empty, cDoc)
 

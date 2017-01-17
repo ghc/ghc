@@ -2494,7 +2494,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                       DataAlt dc -> setIdUnfolding case_bndr unf
                           where
                                  -- See Note [Case binders and join points]
-                             unf = mkInlineUnfolding Nothing rhs
+                             unf = mkInlineUnfolding rhs
                              rhs = mkConApp2 dc (tyConAppArgs scrut_ty) bndrs'
 
                       LitAlt {} -> WARN( True, text "mkDupableAlt"
