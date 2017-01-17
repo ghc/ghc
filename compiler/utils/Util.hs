@@ -123,7 +123,9 @@ module Util (
         hashString,
 
         -- * Call stacks
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
         GHC.Stack.CallStack,
+#endif
         HasCallStack,
         HasDebugCallStack,
         prettyCurrentCallStack,
