@@ -118,6 +118,7 @@ if test "$ac_cv_type_long_long" = yes; then
 FPTOOLS_CHECK_HTYPE(long long)
 FPTOOLS_CHECK_HTYPE(unsigned long long)
 fi
+FPTOOLS_CHECK_HTYPE(bool)
 FPTOOLS_CHECK_HTYPE(float)
 FPTOOLS_CHECK_HTYPE(double)
 FPTOOLS_CHECK_HTYPE(ptrdiff_t)

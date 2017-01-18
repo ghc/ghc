@@ -54,6 +54,7 @@ done
 dnl FPTOOLS_HTYPE_INCLUDES
 AC_DEFUN([FPTOOLS_HTYPE_INCLUDES],
 [
+#include <stdbool.h>
 #include <stdio.h>
 #include <stddef.h>
 

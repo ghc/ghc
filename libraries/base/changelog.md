@@ -33,6 +33,9 @@
   * Add wrappers for `blksize_t`, `blkcnt_t`, `clockid_t`, `fsblkcnt_t`,
     `fsfilcnt_t`, `id_t`, `key_t`, and `timer_t` to System.Posix.Types (#12795)
 
+  * Add `CBool`, a wrapper around C's `bool` type, to `Foreign.C.Types`
+    (#13136)
+
   * Raw buffer operations in `GHC.IO.FD` are now strict in the buffer, offset, and length operations (#9696)
 
   * Add `plusForeignPtr` to `Foreign.ForeignPtr`.

@@ -44,7 +44,7 @@ module Foreign.C.Types
         , CShort(..),   CUShort(..),  CInt(..),      CUInt(..)
         , CLong(..),    CULong(..)
         , CPtrdiff(..), CSize(..),    CWchar(..),    CSigAtomic(..)
-        , CLLong(..),   CULLong(..)
+        , CLLong(..),   CULLong(..), CBool(..)
         , CIntPtr(..),  CUIntPtr(..), CIntMax(..),   CUIntMax(..)
 
           -- ** Numeric types
@@ -126,6 +126,11 @@ INTEGRAL_TYPE(CLLong,HTYPE_LONG_LONG)
 -- | Haskell type representing the C @unsigned long long@ type.
 INTEGRAL_TYPE(CULLong,HTYPE_UNSIGNED_LONG_LONG)
 
+-- | Haskell type representing the C @bool@ type.
+--
+-- @since 4.10.0.0
+INTEGRAL_TYPE_WITH_CTYPE(CBool,bool,HTYPE_BOOL)
+
 {-# RULES
 "fromIntegral/a->CChar"   fromIntegral = \x -> CChar   (fromIntegral x)
 "fromIntegral/a->CSChar"  fromIntegral = \x -> CSChar  (fromIntegral x)
@@ -150,6 +155,7 @@ INTEGRAL_TYPE(CULLong,HTYPE_UNSIGNED_LONG_LONG)
 "fromIntegral/CULong->a"  fromIntegral = \(CULong  x) -> fromIntegral x
 "fromIntegral/CLLong->a"  fromIntegral = \(CLLong  x) -> fromIntegral x
 "fromIntegral/CULLong->a" fromIntegral = \(CULLong x) -> fromIntegral x
+"fromIntegral/CBool->a"   fromIntegral = \(CBool   x) -> fromIntegral x
  #-}
 
 -- | Haskell type representing the C @float@ type.
