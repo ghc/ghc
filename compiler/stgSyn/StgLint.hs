@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module StgLint ( lintStgBindings ) where
+module StgLint ( lintStgTopBindings ) where
 
 import StgSyn
 
@@ -54,12 +54,12 @@ generation.  Solution: don't use it!  (KSW 2000-05).
 *                                                                      *
 ************************************************************************
 
-@lintStgBindings@ is the top-level interface function.
+@lintStgTopBindings@ is the top-level interface function.
 -}
 
-lintStgBindings :: String -> [StgBinding] -> [StgBinding]
+lintStgTopBindings :: String -> [StgTopBinding] -> [StgTopBinding]
 
-lintStgBindings whodunnit binds
+lintStgTopBindings whodunnit binds
   = {-# SCC "StgLint" #-}
     case (initL (lint_binds binds)) of
       Nothing  -> binds
@@ -68,16 +68,19 @@ lintStgBindings whodunnit binds
                               text whodunnit <+> text "***",
                         msg,
                         text "*** Offending Program ***",
-                        pprStgBindings binds,
+                        pprStgTopBindings binds,
                         text "*** End of Offense ***"])
   where
-    lint_binds :: [StgBinding] -> LintM ()
+    lint_binds :: [StgTopBinding] -> LintM ()
 
     lint_binds [] = return ()
     lint_binds (bind:binds) = do
-        binders <- lintStgBinds bind
+        binders <- lint_bind bind
         addInScopeVars binders $
             lint_binds binds
+
+    lint_bind (StgTopLifted bind) = lintStgBinds bind
+    lint_bind (StgTopStringLit v _) = return [v]
 
 lintStgArg :: StgArg -> LintM (Maybe Type)
 lintStgArg (StgLitArg lit) = return (Just (literalType lit))

@@ -89,9 +89,10 @@ bcoFreeNames bco
 
 -- Top level assembler fn.
 assembleBCOs
-  :: HscEnv -> [ProtoBCO Name] -> [TyCon] -> Maybe ModBreaks
+  :: HscEnv -> [ProtoBCO Name] -> [TyCon] -> [RemotePtr ()]
+  -> Maybe ModBreaks
   -> IO CompiledByteCode
-assembleBCOs hsc_env proto_bcos tycons modbreaks = do
+assembleBCOs hsc_env proto_bcos tycons top_strs modbreaks = do
   itblenv <- mkITbls hsc_env tycons
   bcos    <- mapM (assembleBCO (hsc_dflags hsc_env)) proto_bcos
   (bcos',ptrs) <- mallocStrings hsc_env bcos
@@ -99,7 +100,7 @@ assembleBCOs hsc_env proto_bcos tycons modbreaks = do
     { bc_bcos = bcos'
     , bc_itbls =  itblenv
     , bc_ffis = concat (map protoBCOFFIs proto_bcos)
-    , bc_strs = ptrs
+    , bc_strs = top_strs ++ ptrs
     , bc_breaks = modbreaks
     }
 

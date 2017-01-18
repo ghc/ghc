@@ -191,7 +191,9 @@ These data types are the heart of the compiler
 --
 --    The right hand sides of all top-level and recursive @let@s
 --    /must/ be of lifted type (see "Type#type_classification" for
---    the meaning of /lifted/ vs. /unlifted/).
+--    the meaning of /lifted/ vs. /unlifted/). There is one exception
+--    to this rule, top-level @let@s are allowed to bind primitive
+--    string literals, see Note [CoreSyn top-level string literals].
 --
 --    See Note [CoreSyn let/app invariant]
 --    See Note [Levity polymorphism invariants]
@@ -360,6 +362,46 @@ See #toplevel_invariant#
 Note [CoreSyn letrec invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 See #letrec_invariant#
+
+Note [CoreSyn top-level string literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As an exception to the usual rule that top-level binders must be lifted,
+we allow binding primitive string literals (of type Addr#) of type Addr# at the
+top level. This allows us to share string literals earlier in the pipeline and
+crucially allows other optimizations in the Core2Core pipeline to fire.
+Consider,
+
+  f n = let a::Addr# = "foo"#
+        in \x -> blah
+
+In order to be able to inline `f`, we would like to float `a` to the top.
+Another option would be to inline `a`, but that would lead to duplicating string
+literals, which we want to avoid. See Trac #8472.
+
+The solution is simply to allow top-level unlifted binders. We can't allow
+arbitrary unlifted expression at the top-level though, unlifted binders cannot
+be thunks, so we just allow string literals.
+
+Also see Note [Compilation plan for top-level string literals].
+
+Note [Compilation plan for top-level string literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Here is a summary on how top-level string literals are handled by various
+parts of the compilation pipeline.
+
+* In the source language, there is no way to bind a primitive string literal
+  at the top leve.
+
+* In Core, we have a special rule that permits top-level Addr# bindings. See
+  Note [CoreSyn top-level string literals]. Core-to-core passes may introduce
+  new top-level string literals.
+
+* In STG, top-level string literals are explicitly represented in the syntax
+  tree.
+
+* A top-level string literal may end up exported from a module. In this case,
+  in the object file, the content of the exported literal is given a label with
+  the _bytes suffix.
 
 Note [CoreSyn let/app invariant]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

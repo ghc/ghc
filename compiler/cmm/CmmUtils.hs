@@ -72,7 +72,6 @@ import Cmm
 import BlockId
 import CLabel
 import Outputable
-import Unique
 import DynFlags
 import Util
 import CodeGen.Platform
@@ -169,13 +168,13 @@ zeroExpr dflags = CmmLit (zeroCLit dflags)
 mkWordCLit :: DynFlags -> Integer -> CmmLit
 mkWordCLit dflags wd = CmmInt wd (wordWidth dflags)
 
-mkByteStringCLit :: Unique -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stmt)
+mkByteStringCLit
+  :: CLabel -> [Word8] -> (CmmLit, GenCmmDecl CmmStatics info stmt)
 -- We have to make a top-level decl for the string,
 -- and return a literal pointing to it
-mkByteStringCLit uniq bytes
-  = (CmmLabel lbl, CmmData (Section sec lbl)  $ Statics lbl [CmmString bytes])
+mkByteStringCLit lbl bytes
+  = (CmmLabel lbl, CmmData (Section sec lbl) $ Statics lbl [CmmString bytes])
   where
-    lbl = mkStringLitLabel uniq
     -- This can not happen for String literals (as there \NUL is replaced by
     -- C0 80). However, it can happen with Addr# literals.
     sec = if 0 `elem` bytes then ReadOnlyData else CString

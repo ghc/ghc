@@ -1,21 +1,31 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 33, types: 20, coercions: 0}
+Result size of Tidy Core = {terms: 37, types: 22, coercions: 0}
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
-$trModule1 :: TrName
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+$trModule1 :: Addr#
 [GblId, Caf=NoCafRefs]
-$trModule1 = GHC.Types.TrNameS "main"#
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 $trModule2 :: TrName
 [GblId, Caf=NoCafRefs]
-$trModule2 = GHC.Types.TrNameS "T9400"#
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+$trModule3 :: Addr#
+[GblId, Caf=NoCafRefs]
+$trModule3 = "T9400"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule4 :: TrName
+[GblId, Caf=NoCafRefs]
+$trModule4 = GHC.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T9400.$trModule :: Module
 [GblId, Caf=NoCafRefs]
-T9400.$trModule = GHC.Types.Module $trModule1 $trModule2
+T9400.$trModule = GHC.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 22, types: 15, coercions: 0}
 main :: IO ()

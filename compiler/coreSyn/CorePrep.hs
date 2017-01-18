@@ -1168,7 +1168,9 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b) bs = occurAnalyseRHSs b : bs
-    get b            _  = pprPanic "corePrepPgm" (ppr b)
+    get (FloatCase var body _) bs  =
+      occurAnalyseRHSs (NonRec var body) : bs
+    get b _ = pprPanic "corePrepPgm" (ppr b)
 
     -- See Note [Dead code in CorePrep]
     occurAnalyseRHSs (NonRec x e) = NonRec x (occurAnalyseExpr_NoBinderSwap e)

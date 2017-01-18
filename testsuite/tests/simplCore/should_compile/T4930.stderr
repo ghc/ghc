@@ -1,15 +1,31 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 45, types: 17, coercions: 0}
+Result size of Tidy Core = {terms: 49, types: 19, coercions: 0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+T4930.$trModule4 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T4930.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T4930.$trModule2 :: GHC.Types.TrName
+T4930.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T4930.$trModule2 = GHC.Types.TrNameS "main"#
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T4930.$trModule3 = GHC.Types.TrNameS T4930.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+T4930.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T4930.$trModule2 = "T4930"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T4930.$trModule1 :: GHC.Types.TrName
@@ -17,8 +33,8 @@ T4930.$trModule1 :: GHC.Types.TrName
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T4930.$trModule1 = GHC.Types.TrNameS "T4930"#
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T4930.$trModule1 = GHC.Types.TrNameS T4930.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T4930.$trModule :: GHC.Types.Module
@@ -28,7 +44,7 @@ T4930.$trModule :: GHC.Types.Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T4930.$trModule =
-  GHC.Types.Module T4930.$trModule2 T4930.$trModule1
+  GHC.Types.Module T4930.$trModule3 T4930.$trModule1
 
 Rec {
 -- RHS size: {terms: 23, types: 6, coercions: 0}

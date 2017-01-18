@@ -39,7 +39,7 @@ test('T1969',
              # 2013-11-13 17 (x86/Windows, 64bit machine)
              # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 30 (x86/Linux, 64bit machine)
-           (wordsize(64), 55, 20)]),
+           (wordsize(64), 68, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -51,6 +51,8 @@ test('T1969',
              # 2013-09-11 30, 15 (adapt to Phab CI)
              # 2015-06-03 41, (amd64/Linux) use +RTS -G1
              # 2015-10-28 55, (amd64/Linux) emit Typeable at definition site
+             # 2016-10-20 68, (amd64/Linux) allow top-level string literals
+             #                See the comment 16 on #8472.
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -827,7 +829,7 @@ test('T9233',
 test('T10370',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 33049168, 15),
+          [(wordsize(64), 38221184, 15),
           # 2015-10-22    19548720
           # 2016-02-24    22823976   Changing Levity to RuntimeRep; not sure why this regresses though, even after some analysis
           # 2016-04-14    28256896   final demand analyzer run
@@ -838,14 +840,17 @@ test('T10370',
           #     affected stats on bootstrapped GHC.  However,
           #     when I set -i0.01 with profiling, the heap profiles
           #     were identical, so I think it's just GC noise.
+          # 2016-10-20    38221184   Allow top-level string literals.
+          #                          See the comment 16 on #8472.
            (wordsize(32), 11371496, 15),
           # 2015-10-22    11371496
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 121, 15),
+          [(wordsize(64), 146, 15),
           # 2015-10-22     76
           # 2016-04-14    101 final demand analyzer run
           # 2016-08-08    121 see above
+          # 2017-01-18    146 Allow top-level string literals in Core
            (wordsize(32),  39, 15),
           # 2015-10-22     39
           ]),
@@ -883,8 +888,9 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 125831400, 5),
+          [(wordsize(64), 133380960, 5),
           # initial:    125831400
+          # 2017-01-18: 133380960  Allow top-level string literals in Core
           ]),
      ],
      compile,
@@ -906,8 +912,9 @@ test('T12234',
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 90595208, 5),
+          [(wordsize(64), 95269000, 5),
           # 2017-01-05   90595208 initial
+          # 2017-01-19   95269000 Allow top-level string literals in Core
           ]),
      ],
      compile,

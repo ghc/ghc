@@ -1339,7 +1339,7 @@ than the ordinary arity of the dfun: see Note [DFun unfoldings] in CoreSyn
 exprIsLiteral_maybe :: InScopeEnv -> CoreExpr -> Maybe Literal
 -- Same deal as exprIsConApp_maybe, but much simpler
 -- Nevertheless we do need to look through unfoldings for
--- Integer literals, which are vigorously hoisted to top level
+-- Integer and string literals, which are vigorously hoisted to top level
 -- and not subsequently inlined
 exprIsLiteral_maybe env@(_, id_unf) e
   = case e of

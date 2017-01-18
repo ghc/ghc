@@ -14,7 +14,7 @@ generation.
 module StgSyn (
         GenStgArg(..),
 
-        GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
+        GenStgTopBinding(..), GenStgBinding(..), GenStgExpr(..), GenStgRhs(..),
         GenStgAlt, AltType(..),
 
         UpdateFlag(..), isUpdatable,
@@ -24,11 +24,12 @@ module StgSyn (
         combineStgBinderInfo,
 
         -- a set of synonyms for the most common (only :-) parameterisation
-        StgArg, StgBinding, StgExpr, StgRhs, StgAlt,
+        StgArg,
+        StgTopBinding, StgBinding, StgExpr, StgRhs, StgAlt,
 
         -- a set of synonyms to distinguish in- and out variants
-        InStgArg,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt,
-        OutStgArg, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
+        InStgArg,  InStgTopBinding,  InStgBinding,  InStgExpr,  InStgRhs,  InStgAlt,
+        OutStgArg, OutStgTopBinding, OutStgBinding, OutStgExpr, OutStgRhs, OutStgAlt,
 
         -- StgOp
         StgOp(..),
@@ -39,13 +40,14 @@ module StgSyn (
         stgArgType,
         stripStgTicksTop,
 
-        pprStgBinding, pprStgBindings
+        pprStgBinding, pprStgTopBindings
     ) where
 
 #include "HsVersions.h"
 
 import CoreSyn     ( AltCon, Tickish )
 import CostCentre  ( CostCentreStack )
+import Data.ByteString ( ByteString )
 import Data.List   ( intersperse )
 import DataCon
 import DynFlags
@@ -78,6 +80,12 @@ are the boring things [except note the @GenStgRhs@], parameterised
 with respect to binder and occurrence information (just as in
 @CoreSyn@):
 -}
+
+-- | A top-level binding.
+data GenStgTopBinding bndr occ
+-- See Note [CoreSyn top-level string literals]
+  = StgTopLifted (GenStgBinding bndr occ)
+  | StgTopStringLit bndr ByteString
 
 data GenStgBinding bndr occ
   = StgNonRec bndr (GenStgRhs bndr occ)
@@ -421,11 +429,13 @@ stgRhsArity (StgRhsCon _ _ _) = 0
 -- is that `TidyPgm` computed the CAF info on the `Id` but some transformations
 -- have taken place since then.
 
-topStgBindHasCafRefs :: GenStgBinding bndr Id -> Bool
-topStgBindHasCafRefs (StgNonRec _ rhs)
+topStgBindHasCafRefs :: GenStgTopBinding bndr Id -> Bool
+topStgBindHasCafRefs (StgTopLifted (StgNonRec _ rhs))
   = topRhsHasCafRefs rhs
-topStgBindHasCafRefs (StgRec binds)
+topStgBindHasCafRefs (StgTopLifted (StgRec binds))
   = any topRhsHasCafRefs (map snd binds)
+topStgBindHasCafRefs StgTopStringLit{}
+  = False
 
 topRhsHasCafRefs :: GenStgRhs bndr Id -> Bool
 topRhsHasCafRefs (StgRhsClosure _ _ _ upd _ body)
@@ -550,6 +560,7 @@ data AltType
 This happens to be the only one we use at the moment.
 -}
 
+type StgTopBinding = GenStgTopBinding Id Id
 type StgBinding  = GenStgBinding  Id Id
 type StgArg      = GenStgArg      Id
 type StgExpr     = GenStgExpr     Id Id
@@ -561,16 +572,18 @@ type StgAlt      = GenStgAlt      Id Id
    See CoreSyn for precedence in Core land
 -}
 
-type InStgBinding  = StgBinding
-type InStgArg      = StgArg
-type InStgExpr     = StgExpr
-type InStgRhs      = StgRhs
-type InStgAlt      = StgAlt
-type OutStgBinding = StgBinding
-type OutStgArg     = StgArg
-type OutStgExpr    = StgExpr
-type OutStgRhs     = StgRhs
-type OutStgAlt     = StgAlt
+type InStgTopBinding  = StgTopBinding
+type InStgBinding     = StgBinding
+type InStgArg         = StgArg
+type InStgExpr        = StgExpr
+type InStgRhs         = StgRhs
+type InStgAlt         = StgAlt
+type OutStgTopBinding = StgTopBinding
+type OutStgBinding    = StgBinding
+type OutStgArg        = StgArg
+type OutStgExpr       = StgExpr
+type OutStgRhs        = StgRhs
+type OutStgAlt        = StgAlt
 
 {-
 
@@ -635,6 +648,15 @@ Robin Popplestone asked for semi-colon separators on STG binds; here's
 hoping he likes terminators instead...  Ditto for case alternatives.
 -}
 
+pprGenStgTopBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
+                 => GenStgTopBinding bndr bdee -> SDoc
+
+pprGenStgTopBinding (StgTopStringLit bndr str)
+  = hang (hsep [pprBndr LetBind bndr, equals])
+        4 (pprHsBytes str <> semi)
+pprGenStgTopBinding (StgTopLifted bind)
+  = pprGenStgBinding bind
+
 pprGenStgBinding :: (OutputableBndr bndr, Outputable bdee, Ord bdee)
                  => GenStgBinding bndr bdee -> SDoc
 
@@ -653,11 +675,16 @@ pprGenStgBinding (StgRec pairs)
 pprStgBinding :: StgBinding -> SDoc
 pprStgBinding  bind  = pprGenStgBinding bind
 
-pprStgBindings :: [StgBinding] -> SDoc
-pprStgBindings binds = vcat $ intersperse blankLine (map pprGenStgBinding binds)
+pprStgTopBindings :: [StgTopBinding] -> SDoc
+pprStgTopBindings binds
+  = vcat $ intersperse blankLine (map pprGenStgTopBinding binds)
 
 instance (Outputable bdee) => Outputable (GenStgArg bdee) where
     ppr = pprStgArg
+
+instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
+                => Outputable (GenStgTopBinding bndr bdee) where
+    ppr = pprGenStgTopBinding
 
 instance (OutputableBndr bndr, Outputable bdee, Ord bdee)
                 => Outputable (GenStgBinding bndr bdee) where

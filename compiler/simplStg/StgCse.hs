@@ -240,7 +240,7 @@ substPairs env bndrs = mapAccumL go env bndrs
 
 -- Main entry point
 
-stgCse :: [InStgBinding] -> [OutStgBinding]
+stgCse :: [InStgTopBinding] -> [OutStgTopBinding]
 stgCse binds = snd $ mapAccumL stgCseTopLvl emptyInScopeSet binds
 
 -- Top level bindings.
@@ -250,15 +250,16 @@ stgCse binds = snd $ mapAccumL stgCseTopLvl emptyInScopeSet binds
 -- But we still have to collect the set of in-scope variables, otherwise
 -- uniqAway might shadow a top-level closure.
 
-stgCseTopLvl :: InScopeSet -> InStgBinding -> (InScopeSet, OutStgBinding)
-stgCseTopLvl in_scope (StgNonRec bndr rhs)
+stgCseTopLvl :: InScopeSet -> InStgTopBinding -> (InScopeSet, OutStgTopBinding)
+stgCseTopLvl in_scope t@(StgTopStringLit _ _) = (in_scope, t)
+stgCseTopLvl in_scope (StgTopLifted (StgNonRec bndr rhs))
     = (in_scope'
-      , StgNonRec bndr (stgCseTopLvlRhs in_scope rhs))
+      , StgTopLifted (StgNonRec bndr (stgCseTopLvlRhs in_scope rhs)))
   where in_scope' = in_scope `extendInScopeSet` bndr
 
-stgCseTopLvl in_scope (StgRec eqs)
+stgCseTopLvl in_scope (StgTopLifted (StgRec eqs))
     = ( in_scope'
-      , StgRec [ (bndr, stgCseTopLvlRhs in_scope' rhs) | (bndr, rhs) <- eqs ])
+      , StgTopLifted (StgRec [ (bndr, stgCseTopLvlRhs in_scope' rhs) | (bndr, rhs) <- eqs ]))
   where in_scope' = in_scope `extendInScopeSetList` [ bndr | (bndr, _) <- eqs ]
 
 stgCseTopLvlRhs :: InScopeSet -> InStgRhs -> OutStgRhs

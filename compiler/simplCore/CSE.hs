@@ -15,6 +15,7 @@ import Var              ( Var )
 import Id               ( Id, idType, idUnfolding, idInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo )
 import CoreUtils        ( mkAltExpr
+                        , exprIsLiteralString
                         , stripTicksE, stripTicksT, mkTicks )
 import Literal          ( litIsTrivial )
 import Type             ( tyConAppArgs )
@@ -253,22 +254,22 @@ had
 -}
 
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram binds = snd (mapAccumL cseBind emptyCSEnv binds)
+cseProgram binds = snd (mapAccumL (cseBind True) emptyCSEnv binds)
 
-cseBind :: CSEnv -> CoreBind -> (CSEnv, CoreBind)
-cseBind env (NonRec b e)
+cseBind :: Bool -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
+cseBind toplevel env (NonRec b e)
   = (env2, NonRec b2 e1)
   where
-    e1         = tryForCSE env e
+    e1         = tryForCSE toplevel env e
     (env1, b1) = addBinder env b
     (env2, b2) = addBinding env1 b b1 e1
 
-cseBind env (Rec pairs)
+cseBind toplevel env (Rec pairs)
   = (env2, Rec pairs')
   where
     (bndrs, rhss)  = unzip pairs
     (env1, bndrs1) = addRecBinders env bndrs
-    rhss1          = map (tryForCSE env1) rhss
+    rhss1          = map (tryForCSE toplevel env1) rhss
                      -- Process rhss in extended env1
     (env2, pairs') = foldl do_one (env1, []) (zip3 bndrs bndrs1 rhss1)
     do_one (env, pairs) (b, b1, e1)
@@ -311,8 +312,38 @@ addBinding env in_id out_id rhs'
                    Lit l  -> litIsTrivial l
                    _      -> False
 
-tryForCSE :: CSEnv -> InExpr -> OutExpr
-tryForCSE env expr
+{-
+Note [Take care with literal strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Consider this example:
+
+  x = "foo"#
+  y = "foo"#
+  ...x...y...x...y....
+
+We would normally turn this into:
+
+  x = "foo"#
+  y = x
+  ...x...x...x...x....
+
+But this breaks an invariant of Core, namely that the RHS of a top-level binding
+of type Addr# must be a string literal, not another variable. See Note
+[CoreSyn top-level string literals] in CoreSyn.
+
+For this reason, we special case top-level bindings to literal strings and leave
+the original RHS unmodified. This produces:
+
+  x = "foo"#
+  y = "foo"#
+  ...x...x...x...x....
+-}
+
+tryForCSE :: Bool -> CSEnv -> InExpr -> OutExpr
+tryForCSE toplevel env expr
+  | toplevel && exprIsLiteralString expr = expr
+      -- See Note [Take care with literal strings]
   | Just e <- lookupCSEnv env expr'' = mkTicks ticks e
   | otherwise                        = expr'
     -- The varToCoreExpr is needed if we have
@@ -333,12 +364,12 @@ cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
 cseExpr env (Coercion c)          = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)             = Lit lit
 cseExpr env (Var v)               = lookupSubst env v
-cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE env a)
+cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE False env a)
 cseExpr env (Tick t e)            = Tick t (cseExpr env e)
 cseExpr env (Cast e co)           = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)             = let (env', b') = addBinder env b
                                     in Lam b' (cseExpr env' e)
-cseExpr env (Let bind e)          = let (env', bind') = cseBind env bind
+cseExpr env (Let bind e)          = let (env', bind') = cseBind False env bind
                                     in Let bind' (cseExpr env' e)
 cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 
@@ -346,7 +377,7 @@ cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
 cseCase env scrut bndr ty alts
   = Case scrut1 bndr3 ty (map cse_alt alts)
   where
-    scrut1 = tryForCSE env scrut
+    scrut1 = tryForCSE False env scrut
 
     bndr1 = zapIdOccInfo bndr
       -- Zapping the OccInfo is needed because the extendCSEnv
@@ -369,14 +400,14 @@ cseCase env scrut bndr ty alts
                 --      case x of { True -> ....True.... }
                 -- Don't replace True by x!
                 -- Hence the 'null args', which also deal with literals and DEFAULT
-        = (DataAlt con, args', tryForCSE new_env rhs)
+        = (DataAlt con, args', tryForCSE False new_env rhs)
         where
           (env', args') = addBinders alt_env args
           new_env       = extendCSEnv env' con_expr con_target
           con_expr      = mkAltExpr (DataAlt con) args' arg_tys
 
     cse_alt (con, args, rhs)
-        = (con, args', tryForCSE env' rhs)
+        = (con, args', tryForCSE False env' rhs)
         where
           (env', args') = addBinders alt_env args
 

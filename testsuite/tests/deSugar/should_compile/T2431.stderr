@@ -1,6 +1,6 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 36, types: 30, coercions: 1}
+Result size of Tidy Core = {terms: 44, types: 34, coercions: 1}
 
 -- RHS size: {terms: 2, types: 4, coercions: 1}
 T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
@@ -21,25 +21,40 @@ absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>x]
 absurd = \ (@ a) (x :: Int :~: Bool) -> case x of { }
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
-$trModule1 :: GHC.Types.TrName
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+$trModule1 :: GHC.Prim.Addr#
 [GblId, Caf=NoCafRefs]
-$trModule1 = GHC.Types.TrNameS "main"#
+$trModule1 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 $trModule2 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$trModule2 = GHC.Types.TrNameS "T2431"#
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+$trModule3 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule3 = "T2431"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0}
+$trModule4 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule4 = GHC.Types.TrNameS $trModule3
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T2431.$trModule :: GHC.Types.Module
 [GblId, Caf=NoCafRefs]
-T2431.$trModule = GHC.Types.Module $trModule1 $trModule2
+T2431.$trModule = GHC.Types.Module $trModule2 $trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+$tc'Refl1 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$tc'Refl1 = "'Refl"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-$tc'Refl1 :: GHC.Types.TrName
+$tc'Refl2 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$tc'Refl1 = GHC.Types.TrNameS "'Refl"#
+$tc'Refl2 = GHC.Types.TrNameS $tc'Refl1
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T2431.$tc'Refl :: GHC.Types.TyCon
@@ -49,12 +64,17 @@ T2431.$tc'Refl =
     15026191172322750497##
     3898273167927206410##
     T2431.$trModule
-    $tc'Refl1
+    $tc'Refl2
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+$tc:~:1 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$tc:~:1 = ":~:"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-$tc:~:1 :: GHC.Types.TrName
+$tc:~:2 :: GHC.Types.TrName
 [GblId, Caf=NoCafRefs]
-$tc:~:1 = GHC.Types.TrNameS ":~:"#
+$tc:~:2 = GHC.Types.TrNameS $tc:~:1
 
 -- RHS size: {terms: 5, types: 0, coercions: 0}
 T2431.$tc:~: :: GHC.Types.TyCon
@@ -64,7 +84,7 @@ T2431.$tc:~: =
     9759653149176674453##
     12942818337407067047##
     T2431.$trModule
-    $tc:~:1
+    $tc:~:2
 
 
 

@@ -75,7 +75,7 @@ countN = Map.singleton
 ************************************************************************
 -}
 
-showStgStats :: [StgBinding] -> String
+showStgStats :: [StgTopBinding] -> String
 
 showStgStats prog
   = "STG Statistics:\n\n"
@@ -99,10 +99,8 @@ showStgStats prog
     s (SingleEntryBinds _)    = "SingleEntryBinds_Nested    "
     s (UpdatableBinds _)      = "UpdatableBinds_Nested      "
 
-gatherStgStats :: [StgBinding] -> StatEnv
-
-gatherStgStats binds
-  = combineSEs (map (statBinding True{-top-level-}) binds)
+gatherStgStats :: [StgTopBinding] -> StatEnv
+gatherStgStats binds = combineSEs (map statTopBinding binds)
 
 {-
 ************************************************************************
@@ -111,6 +109,10 @@ gatherStgStats binds
 *                                                                      *
 ************************************************************************
 -}
+
+statTopBinding :: StgTopBinding -> StatEnv
+statTopBinding (StgTopStringLit _ _) = countOne Literals
+statTopBinding (StgTopLifted bind) = statBinding True bind
 
 statBinding :: Bool -- True <=> top-level; False <=> nested
             -> StgBinding

@@ -42,8 +42,8 @@ stgMassageForProfiling
         :: DynFlags
         -> Module                       -- module name
         -> UniqSupply                   -- unique supply
-        -> [StgBinding]                 -- input
-        -> (CollectedCCs, [StgBinding])
+        -> [StgTopBinding]              -- input
+        -> (CollectedCCs, [StgTopBinding])
 
 stgMassageForProfiling dflags mod_name _us stg_binds
   = let
@@ -69,23 +69,27 @@ stgMassageForProfiling dflags mod_name _us stg_binds
     all_cafs_ccs = mkSingletonCCS all_cafs_cc
 
     ----------
-    do_top_bindings :: [StgBinding] -> MassageM [StgBinding]
+    do_top_bindings :: [StgTopBinding] -> MassageM [StgTopBinding]
 
     do_top_bindings [] = return []
 
-    do_top_bindings (StgNonRec b rhs : bs) = do
+    do_top_bindings (StgTopLifted (StgNonRec b rhs) : bs) = do
         rhs' <- do_top_rhs b rhs
         bs' <- do_top_bindings bs
-        return (StgNonRec b rhs' : bs')
+        return (StgTopLifted (StgNonRec b rhs') : bs')
 
-    do_top_bindings (StgRec pairs : bs) = do
+    do_top_bindings (StgTopLifted (StgRec pairs) : bs) = do
         pairs2 <- mapM do_pair pairs
         bs' <- do_top_bindings bs
-        return (StgRec pairs2 : bs')
+        return (StgTopLifted (StgRec pairs2) : bs')
       where
         do_pair (b, rhs) = do
              rhs2 <- do_top_rhs b rhs
              return (b, rhs2)
+
+    do_top_bindings (b@StgTopStringLit{} : bs) = do
+        bs' <- do_top_bindings bs
+        return (b : bs')
 
     ----------
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs

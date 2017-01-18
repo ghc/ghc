@@ -29,6 +29,7 @@ module CoreUtils (
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
+        exprIsLiteralString, exprIsTopLevelBindable,
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', eqExpr,
@@ -1580,6 +1581,17 @@ regarded as HNF if the expression they surround is HNF, because the
 tick is there to tell us that the expression was evaluated, so we
 don't want to discard a seq on it.
 -}
+
+-- | Can we bind this 'CoreExpr' at the top level?
+exprIsTopLevelBindable :: CoreExpr -> Bool
+-- See Note [CoreSyn top-level string literals]
+exprIsTopLevelBindable expr
+  = exprIsLiteralString expr
+  || not (isUnliftedType (exprType expr))
+
+exprIsLiteralString :: CoreExpr -> Bool
+exprIsLiteralString (Lit (MachStr _)) = True
+exprIsLiteralString _ = False
 
 {-
 ************************************************************************

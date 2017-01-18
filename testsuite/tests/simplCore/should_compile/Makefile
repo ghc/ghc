@@ -185,3 +185,8 @@ T13025:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025a.hs
 	-'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13025.hs -ddump-simpl | grep -c HEq_sc
 	# No lines should match 'HEq_sc' so wc should output zeros
+
+.PHONY: str-rules
+str-rules:
+	$(RM) -f str-rules.hi str-rules.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O str-rules.hs -ddump-simpl | grep -o '"@@@[^"].*"#' | sort

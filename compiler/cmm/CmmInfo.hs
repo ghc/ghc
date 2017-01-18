@@ -400,7 +400,7 @@ mkProfLits _ (ProfilingInfo td cd)
 newStringLit :: [Word8] -> UniqSM (CmmLit, GenCmmDecl CmmStatics info stmt)
 newStringLit bytes
   = do { uniq <- getUniqueM
-       ; return (mkByteStringCLit uniq bytes) }
+       ; return (mkByteStringCLit (mkStringLitLabel uniq) bytes) }
 
 
 -- Misc utils

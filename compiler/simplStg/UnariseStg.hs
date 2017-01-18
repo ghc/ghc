@@ -264,8 +264,13 @@ extendRho rho x (UnaryVal val)
 
 --------------------------------------------------------------------------------
 
-unarise :: UniqSupply -> [StgBinding] -> [StgBinding]
-unarise us binds = initUs_ us (mapM (unariseBinding emptyVarEnv) binds)
+unarise :: UniqSupply -> [StgTopBinding] -> [StgTopBinding]
+unarise us binds = initUs_ us (mapM (unariseTopBinding emptyVarEnv) binds)
+
+unariseTopBinding :: UnariseEnv -> StgTopBinding -> UniqSM StgTopBinding
+unariseTopBinding rho (StgTopLifted bind)
+  = StgTopLifted <$> unariseBinding rho bind
+unariseTopBinding _ bind@StgTopStringLit{} = return bind
 
 unariseBinding :: UnariseEnv -> StgBinding -> UniqSM StgBinding
 unariseBinding rho (StgNonRec x rhs)

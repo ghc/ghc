@@ -14,7 +14,7 @@ import StgSyn
 
 import CostCentre       ( CollectedCCs )
 import SCCfinal         ( stgMassageForProfiling )
-import StgLint          ( lintStgBindings )
+import StgLint          ( lintStgTopBindings )
 import StgStats         ( showStgStats )
 import UnariseStg       ( unarise )
 import StgCse           ( stgCse )
@@ -29,8 +29,8 @@ import Control.Monad
 
 stg2stg :: DynFlags                  -- includes spec of what stg-to-stg passes to do
         -> Module                    -- module name (profiling only)
-        -> [StgBinding]              -- input...
-        -> IO ( [StgBinding]         -- output program...
+        -> [StgTopBinding]           -- input...
+        -> IO ( [StgTopBinding]      -- output program...
               , CollectedCCs)        -- cost centre information (declared and used)
 
 stg2stg dflags module_name binds
@@ -48,19 +48,19 @@ stg2stg dflags module_name binds
                 <- foldM do_stg_pass (binds', us0, ccs) (getStgToDo dflags)
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "Pre unarise:"
-                        (pprStgBindings processed_binds)
+                        (pprStgTopBindings processed_binds)
 
         ; let un_binds = unarise us1 processed_binds
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:"
-                        (pprStgBindings un_binds)
+                        (pprStgTopBindings un_binds)
 
         ; return (un_binds, cost_centres)
    }
 
   where
     stg_linter = if gopt Opt_DoStgLinting dflags
-                 then lintStgBindings
+                 then lintStgTopBindings
                  else ( \ _whodunnit binds -> binds )
 
     -------------------------------------------

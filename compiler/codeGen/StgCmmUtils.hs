@@ -322,7 +322,7 @@ newStringCLit str = newByteStringCLit (map (fromIntegral . ord) str)
 newByteStringCLit :: [Word8] -> FCode CmmLit
 newByteStringCLit bytes
   = do  { uniq <- newUnique
-        ; let (lit, decl) = mkByteStringCLit uniq bytes
+        ; let (lit, decl) = mkByteStringCLit (mkStringLitLabel uniq) bytes
         ; emitDecl decl
         ; return lit }
 

@@ -40,7 +40,10 @@ import MkGraph
 import Name
 import Outputable
 import StgSyn
+import Type
+import TysPrim
 import UniqFM
+import Util
 import VarEnv
 
 -------------------------------------
@@ -125,8 +128,15 @@ getCgIdInfo id
                 -- Should be imported; make up a CgIdInfo for it
           let name = idName id
         ; if isExternalName name then
-              let ext_lbl = CmmLabel (mkClosureLabel name $ idCafInfo id)
-              in return (litIdInfo dflags id (mkLFImported id) ext_lbl)
+              let ext_lbl
+                      | isUnliftedType (idType id) =
+                          -- An unlifted external Id must refer to a top-level
+                          -- string literal. See Note [Bytes label] in CLabel.
+                          ASSERT( idType id `eqType` addrPrimTy )
+                          mkBytesLabel name
+                      | otherwise = mkClosureLabel name $ idCafInfo id
+              in return $
+                  litIdInfo dflags id (mkLFImported id) (CmmLabel ext_lbl)
           else
               cgLookupPanic id -- Bug
         }}}

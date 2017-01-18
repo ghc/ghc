@@ -67,6 +67,7 @@ import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType
                         , isExprLevPoly
                         , exprOkForSpeculation
+                        , exprIsTopLevelBindable
                         , collectMakeStaticArgs
                         )
 import CoreArity        ( exprBotStrictness_maybe )
@@ -494,7 +495,7 @@ lvlMFE strict_ctxt env ann_expr
     lvlExpr env ann_expr
 
   | Just (wrap_float, wrap_use)
-       <- canFloat_maybe rhs_env strict_ctxt float_is_lam expr_ty
+       <- canFloat_maybe rhs_env strict_ctxt float_is_lam expr
   = do { expr1 <- lvlExpr rhs_env ann_expr
        ; let abs_expr = mkLams abs_vars_w_lvls (wrap_float expr1)
        ; var <- newLvlVar abs_expr
@@ -507,7 +508,6 @@ lvlMFE strict_ctxt env ann_expr
 
   where
     expr         = deAnnotate ann_expr
-    expr_ty      = exprType expr
     fvs          = freeVarsOf ann_expr
     is_bot       = isJust mb_bot_str
     mb_bot_str   = exprBotStrictness_maybe expr
@@ -544,12 +544,12 @@ lvlMFE strict_ctxt env ann_expr
 canFloat_maybe :: LevelEnv
                -> Bool      -- Strict context
                -> Bool      -- The float has a value lambda
-               -> Type
+               -> CoreExpr
                -> Maybe ( LevelledExpr -> LevelledExpr   -- Wrep the flaot
                         , LevelledExpr -> LevelledExpr)  -- Wrap the use
 -- See Note [Floating MFEs of unlifted type]
-canFloat_maybe env strict_ctxt float_is_lam expr_ty
-  | float_is_lam || not (isUnliftedType expr_ty)
+canFloat_maybe env strict_ctxt float_is_lam expr
+  | float_is_lam || exprIsTopLevelBindable expr
   = Just (id, id) -- No wrapping needed if the type is lifted, or
                   -- if we are wrapping it in one or more value lambdas
 
@@ -568,6 +568,7 @@ canFloat_maybe env strict_ctxt float_is_lam expr_ty
 
   | otherwise          -- e.g. do not float unboxed tuples
   = Nothing
+  where expr_ty = exprType expr
 
 {- Note [Floating MFEs of unlifted type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

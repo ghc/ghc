@@ -1,15 +1,31 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 64, types: 41, coercions: 0}
+Result size of Tidy Core = {terms: 68, types: 43, coercions: 0}
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+T4908.$trModule4 :: Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T4908.$trModule4 = "main"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
-T4908.$trModule2 :: TrName
+T4908.$trModule3 :: TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 20}]
-T4908.$trModule2 = GHC.Types.TrNameS "main"#
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T4908.$trModule3 = GHC.Types.TrNameS T4908.$trModule4
+
+-- RHS size: {terms: 1, types: 0, coercions: 0}
+T4908.$trModule2 :: Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T4908.$trModule2 = "T4908"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T4908.$trModule1 :: TrName
@@ -17,8 +33,8 @@ T4908.$trModule1 :: TrName
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 40 20}]
-T4908.$trModule1 = GHC.Types.TrNameS "T4908"#
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T4908.$trModule1 = GHC.Types.TrNameS T4908.$trModule2
 
 -- RHS size: {terms: 3, types: 0, coercions: 0}
 T4908.$trModule :: Module
@@ -28,7 +44,7 @@ T4908.$trModule :: Module
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
 T4908.$trModule =
-  GHC.Types.Module T4908.$trModule2 T4908.$trModule1
+  GHC.Types.Module T4908.$trModule3 T4908.$trModule1
 
 Rec {
 -- RHS size: {terms: 19, types: 5, coercions: 0}

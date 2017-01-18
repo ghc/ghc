@@ -446,6 +446,14 @@ test('T9339',
      compile_and_run,
      ['-O2'])
 
+test('T8472',
+     [stats_num_field('bytes allocated',
+                      [ (wordsize(32),    50000, 80)
+                      , (wordsize(64),    51424, 80) ]),
+      only_ways(['normal'])],
+     compile_and_run,
+     ['-O2'])
+
 test('T12996',
      [stats_num_field('bytes allocated',
                       [ (wordsize(64),    76776, 5) ]),

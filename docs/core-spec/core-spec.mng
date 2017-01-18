@@ -100,7 +100,9 @@ The datatype that represents expressions:
 There are a few key invariants about expressions:
 \begin{itemize}
 \item The right-hand sides of all top-level and recursive $[[let]]$s
-must be of lifted type.
+must be of lifted type, with one exception: the right-hand side of a top-level
+$[[let]]$ may be of type \texttt{Addr#} if it's a primitive string literal.
+See \verb|#top_level_invariant#| in \ghcfile{coreSyn/CoreSyn.hs}.
 \item The right-hand side of a non-recursive $[[let]]$ and the argument
 of an application may be of unlifted type, but only if the expression
 is ok-for-speculation. See \verb|#let_app_invariant#| in \ghcfile{coreSyn/CoreSyn.lhs}.

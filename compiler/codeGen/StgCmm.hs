@@ -24,6 +24,7 @@ import StgCmmHpc
 import StgCmmTicky
 
 import Cmm
+import CmmUtils
 import CLabel
 
 import StgSyn
@@ -45,6 +46,7 @@ import BasicTypes
 import OrdList
 import MkGraph
 
+import qualified Data.ByteString as BS
 import Data.IORef
 import Control.Monad (when,void)
 import Util
@@ -53,7 +55,7 @@ codeGen :: DynFlags
         -> Module
         -> [TyCon]
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
-        -> [StgBinding]                -- Bindings to convert
+        -> [StgTopBinding]             -- Bindings to convert
         -> HpcInfo
         -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
                                         -- be interleaved with output
@@ -113,8 +115,8 @@ This is so that we can write the top level processing in a compositional
 style, with the increasing static environment being plumbed as a state
 variable. -}
 
-cgTopBinding :: DynFlags -> StgBinding -> FCode ()
-cgTopBinding dflags (StgNonRec id rhs)
+cgTopBinding :: DynFlags -> StgTopBinding -> FCode ()
+cgTopBinding dflags (StgTopLifted (StgNonRec id rhs))
   = do  { id' <- maybeExternaliseId dflags id
         ; let (info, fcode) = cgTopRhs dflags NonRecursive id' rhs
         ; fcode
@@ -122,7 +124,7 @@ cgTopBinding dflags (StgNonRec id rhs)
                         -- so we find it when we look up occurrences
         }
 
-cgTopBinding dflags (StgRec pairs)
+cgTopBinding dflags (StgTopLifted (StgRec pairs))
   = do  { let (bndrs, rhss) = unzip pairs
         ; bndrs' <- Prelude.mapM (maybeExternaliseId dflags) bndrs
         ; let pairs' = zip bndrs' rhss
@@ -132,6 +134,13 @@ cgTopBinding dflags (StgRec pairs)
         ; sequence_ fcodes
         }
 
+cgTopBinding dflags (StgTopStringLit id str)
+  = do  { id' <- maybeExternaliseId dflags id
+        ; let label = mkBytesLabel (idName id')
+        ; let (lit, decl) = mkByteStringCLit label (BS.unpack str)
+        ; emitDecl decl
+        ; addBindC (litIdInfo dflags id' mkLFStringLit lit)
+        }
 
 cgTopRhs :: DynFlags -> RecFlag -> Id -> StgRhs -> (CgIdInfo, FCode ())
         -- The Id is passed along for setting up a binding...

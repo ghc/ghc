@@ -1363,7 +1363,7 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
 
 doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
-            -> [StgBinding]
+            -> [StgTopBinding]
             -> HpcInfo
             -> IO (Stream IO CmmGroup ())
          -- Note we produce a 'Stream' of CmmGroups, so that the
@@ -1429,7 +1429,7 @@ doCodeGen hsc_env this_mod data_tycons
 
 
 myCoreToStg :: DynFlags -> Module -> CoreProgram
-            -> IO ( [StgBinding] -- output program
+            -> IO ( [StgTopBinding] -- output program
                   , CollectedCCs) -- cost centre info (declared and used)
 myCoreToStg dflags this_mod prepd_binds = do
     let stg_binds
