@@ -1227,6 +1227,7 @@ get_op :: LHsExpr Name -> Name
 -- See RnExpr.rnUnboundVar
 get_op (L _ (HsVar (L _ n)))   = n
 get_op (L _ (HsUnboundVar uv)) = mkUnboundName (unboundVarOcc uv)
+get_op (L _ (HsRecFld (Unambiguous _ n))) = n
 get_op other                   = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
