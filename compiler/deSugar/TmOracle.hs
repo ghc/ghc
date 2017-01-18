@@ -26,7 +26,6 @@ import PmExpr
 
 import Id
 import Name
-import TysWiredIn
 import Type
 import HsLit
 import TcHsSyn
@@ -113,12 +112,12 @@ solveComplexEq solver_state@(standby, (unhandled, env)) eq@(e1, e2) = case eq of
   (PmExprCon c1 ts1, PmExprCon c2 ts2)
     | c1 == c2  -> foldlM solveComplexEq solver_state (zip ts1 ts2)
     | otherwise -> Nothing
-  (PmExprCon c [], PmExprEq t1 t2)
-    | c == trueDataCon  -> solveComplexEq solver_state (t1, t2)
-    | c == falseDataCon -> Just (eq:standby, (unhandled, env))
-  (PmExprEq t1 t2, PmExprCon c [])
-    | c == trueDataCon  -> solveComplexEq solver_state (t1, t2)
-    | c == falseDataCon -> Just (eq:standby, (unhandled, env))
+  (PmExprCon _ [], PmExprEq t1 t2)
+    | isTruePmExpr e1  -> solveComplexEq solver_state (t1, t2)
+    | isFalsePmExpr e1 -> Just (eq:standby, (unhandled, env))
+  (PmExprEq t1 t2, PmExprCon _ [])
+    | isTruePmExpr e2   -> solveComplexEq solver_state (t1, t2)
+    | isFalsePmExpr e2  -> Just (eq:standby, (unhandled, env))
 
   (PmExprVar x, PmExprVar y)
     | x == y    -> Just solver_state

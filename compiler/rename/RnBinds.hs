@@ -950,6 +950,13 @@ renameSig ctxt sig@(SCCFunSig st v s)
   = do  { new_v <- lookupSigOccRn ctxt sig v
         ; return (SCCFunSig st new_v s, emptyFVs) }
 
+-- COMPLETE Sigs can refer to imported IDs which is why we use
+-- lookupLocatedOccRn rather than lookupSigOccRn
+renameSig _ctxt (CompleteMatchSig s (L l bf) mty)
+  = do new_bf <- traverse lookupLocatedOccRn bf
+       new_mty  <- traverse lookupLocatedOccRn mty
+       return (CompleteMatchSig s (L l new_bf) new_mty, emptyFVs)
+
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
@@ -990,6 +997,9 @@ okHsSig ctxt (L _ sig)
 
      (SCCFunSig {}, HsBootCtxt {}) -> False
      (SCCFunSig {}, _)             -> True
+
+     (CompleteMatchSig {}, TopSigCtxt {} ) -> True
+     (CompleteMatchSig {}, _)              -> False
 
 -------------------
 findDupSigs :: [LSig RdrName] -> [[(Located RdrName, Sig RdrName)]]

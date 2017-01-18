@@ -4512,6 +4512,10 @@ synonyms, there is no restriction on the right-hand side pattern.
 
 Pattern synonyms cannot be defined recursively.
 
+:ref:`complete-pragma` can be specified in order to tell
+the pattern match exhaustiveness checker that a set of pattern synonyms is
+complete.
+
 .. _patsyn-impexp:
 
 Import and export of pattern synonyms
@@ -12758,6 +12762,80 @@ field of the constructor ``T`` is not unpacked.
 The ``{-# SOURCE #-}`` pragma is used only in ``import`` declarations,
 to break a module loop. It is described in detail in
 :ref:`mutual-recursion`.
+
+.. _complete-pragma:
+
+``COMPLETE`` pragmas
+--------------------
+
+The ``COMPLETE`` pragma is used to inform the pattern match checker that a
+certain set of patterns is complete and that any function which matches
+on all the specified patterns is total.
+
+The most common usage of ``COMPLETE`` pragmas is with
+:ref:`pattern-synonyms`.
+On its own, the checker is very naive and assumes that any match involving
+a pattern synonym will fail. As a result, any pattern match on a
+pattern synonym is regarded as
+incomplete unless the user adds a catch-all case.
+
+For example, the data types ``2 * A`` and ``A + A`` are isomorphic but some
+computations are more naturally expressed in terms of one or the other. To
+get the best of both worlds, we can choose one as our implementation and then
+provide a set of pattern synonyms so that users can use the other representation
+if they desire. We can then specify a ``COMPLETE`` pragma in order to
+inform the pattern match checker that a function which matches on both ``LeftChoice``
+and ``RightChoice`` is total.
+
+::
+
+  data Choice a = Choice Bool a
+
+  pattern LeftChoice :: a -> Choice a
+  pattern LeftChoice a = Choice False a
+
+  pattern RightChoice :: a -> Choice a
+  pattern RightChoice a = Choice True a
+
+  {-# COMPLETE LeftChoice, RightChoice #-}
+
+  foo :: Choice Int -> Int
+  foo (LeftChoice n) = n * 2
+  foo (RightChoice n) = n - 2
+
+``COMPLETE`` pragmas are only used by the pattern match checker. If a function
+definition matches on all the constructors specified in the pragma then the
+compiler will produce no warning.
+
+``COMPLETE`` pragmas can contain any data constructors or pattern synonyms
+which are in scope. Once defined, they are automatically imported and exported
+from modules. ``COMPLETE`` pragmas should be thought of as asserting a universal
+truth about a set of patterns and as a result, should not be used to silence
+context specific incomplete match warnings.
+
+When specifing a ``COMPLETE`` pragma, the result types of all patterns must
+be consistent with each other. This is a sanity check as it would be impossible
+to match on all the patterns if the types were inconsistent.
+
+The result type must also be unambiguous. Usually this can be inferred but
+when all the pattern synonyms in a group are polymorphic in the constructor
+the user must provide a type signature.
+
+::
+  class LL f where
+    go :: f a -> ()
+
+  instance LL [] where
+    go _ = ()
+
+  pattern T :: LL f => f a
+  pattern T <- (go -> ())
+
+  {-# COMPLETE T :: [] #-}
+
+  -- No warning
+  foo :: [a] -> Int
+  foo T = 5
 
 .. _overlap-pragma:
 

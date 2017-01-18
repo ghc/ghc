@@ -163,6 +163,7 @@ mkBootModDetailsTc hsc_env
                              , md_anns      = []
                              , md_exports   = exports
                              , md_vect_info = noVectInfo
+                             , md_complete_sigs = []
                              })
         }
   where
@@ -318,6 +319,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_rules     = imp_rules
                               , mg_vect_info = vect_info
                               , mg_anns      = anns
+                              , mg_complete_sigs = complete_sigs
                               , mg_deps      = deps
                               , mg_foreign   = foreign_stubs
                               , mg_hpc_info  = hpc_info
@@ -425,7 +427,8 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                                 md_vect_info = tidy_vect_info,
                                 md_fam_insts = fam_insts,
                                 md_exports   = exports,
-                                md_anns      = anns      -- are already tidy
+                                md_anns      = anns,      -- are already tidy
+                                md_complete_sigs = complete_sigs
                               })
         }
   where

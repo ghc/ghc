@@ -1,0 +1,4 @@
+
+completesig04.hs:3:1: error:
+    • Cannot form a group of complete patterns from patterns ‘Just’ and ‘Left’ as they match different type constructors (‘Maybe’ resp. ‘Either’)
+    • In {-# COMPLETE Just, Left #-}

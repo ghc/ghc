@@ -441,6 +441,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  '{-# OVERLAPPABLE'       { L _ (IToverlappable_prag _) }
  '{-# OVERLAPS'           { L _ (IToverlaps_prag _) }
  '{-# INCOHERENT'         { L _ (ITincoherent_prag _) }
+ '{-# COMPLETE'           { L _ (ITcomplete_prag _)   }
  '#-}'                    { L _ ITclose_prag }
 
  '..'           { L _ ITdotdot }                        -- reserved symbols
@@ -1672,6 +1673,10 @@ opt_asig :: { ([AddAnn],Maybe (LHsType RdrName)) }
         : {- empty -}                   { ([],Nothing) }
         | '::' atype                    { ([mu AnnDcolon $1],Just $2) }
 
+opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
+             : {- empty -}              { ([], Nothing) }
+             | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
+
 sigtype :: { LHsType RdrName }
         : ctype                            { $1 }
 
@@ -2247,6 +2252,13 @@ sigdecl :: { LHsDecl RdrName }
                      [mj AnnInfix $1,mj AnnVal $2] }
 
         | pattern_synonym_sig   { sLL $1 $> . SigD . unLoc $ $1 }
+
+        | '{-# COMPLETE' con_list opt_tyconsig  '#-}'
+                {% let (dcolon, tc) = $3
+                   in ams
+                       (sLL $1 $>
+                         (SigD (CompleteMatchSig (getCOMPLETE_PRAGs $1) $2 tc)))
+                    ([ mo $1 ] ++ dcolon ++ [mc $4]) }
 
         -- This rule is for both INLINE and INLINABLE pragmas
         | '{-# INLINE' activation qvar '#-}'
@@ -3393,6 +3405,7 @@ getTH_ID_TY_SPLICE (L _ (ITidTyEscape x)) = x
 getINLINE       (L _ (ITinline_prag _ inl conl)) = (inl,conl)
 getSPEC_INLINE  (L _ (ITspec_inline_prag _ True))  = (Inline,  FunLike)
 getSPEC_INLINE  (L _ (ITspec_inline_prag _ False)) = (NoInline,FunLike)
+getCOMPLETE_PRAGs (L _ (ITcomplete_prag x)) = x
 
 getDOCNEXT (L _ (ITdocCommentNext x)) = x
 getDOCPREV (L _ (ITdocCommentPrev x)) = x

@@ -297,7 +297,8 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_dependent_files = dependent_files_var,
                 tcg_tc_plugins     = [],
                 tcg_top_loc        = loc,
-                tcg_static_wc      = static_wc_var
+                tcg_static_wc      = static_wc_var,
+                tcg_complete_matches = []
              } ;
              lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,

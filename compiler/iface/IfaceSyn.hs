@@ -19,6 +19,7 @@ module IfaceSyn (
         IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
         IfaceAxBranch(..),
         IfaceTyConParent(..),
+        IfaceCompleteMatch(..),
 
         -- * Binding names
         IfaceTopBndr,
@@ -294,6 +295,11 @@ data IfaceAnnotation
   }
 
 type IfaceAnnTarget = AnnTarget OccName
+
+data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] IfExtName
+
+
+
 
 -- Here's a tricky case:
 --   * Compile with -O module A, and B which imports A.f
@@ -2090,3 +2096,7 @@ instance Binary IfaceTyConParent where
                 pr <- get bh
                 ty <- get bh
                 return $ IfDataInstance ax pr ty
+
+instance Binary IfaceCompleteMatch where
+  put_ bh (IfaceCompleteMatch cs ts) = put_ bh cs >> put_ bh ts
+  get bh = IfaceCompleteMatch <$> get bh <*> get bh

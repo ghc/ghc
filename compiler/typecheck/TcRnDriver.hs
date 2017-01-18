@@ -253,7 +253,7 @@ tcRnModuleTcRnM hsc_env hsc_src
         tcg_env <- tcRnExports explicit_mod_hdr export_ies tcg_env ;
         traceRn "rn4b: after exports" empty ;
 
-                -- Check that main is exported (must be after rnExports)
+                -- Check that main is exported (must be after tcRnExports)
         checkMainExported tcg_env ;
 
         -- Compare the hi-boot iface (if any) with the real thing

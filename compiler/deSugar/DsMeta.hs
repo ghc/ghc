@@ -737,6 +737,7 @@ rep_sig (L loc (SpecSig nm tys ispec))
 rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
+rep_sig (L _   (CompleteMatchSig {})) = notHandled "CompleteMatchSig" empty
 
 rep_ty_sig :: Name -> SrcSpan -> LHsSigType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)

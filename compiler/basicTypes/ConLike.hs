@@ -21,6 +21,7 @@ module ConLike (
         , conLikeResTy
         , conLikeFieldType
         , conLikesWithFields
+        , conLikeIsInfix
     ) where
 
 #include "HsVersions.h"
@@ -185,3 +186,7 @@ conLikesWithFields :: [ConLike] -> [FieldLabelString] -> [ConLike]
 conLikesWithFields con_likes lbls = filter has_flds con_likes
   where has_flds dc = all (has_fld dc) lbls
         has_fld dc lbl = any (\ fl -> flLabel fl == lbl) (conLikeFieldLabels dc)
+
+conLikeIsInfix :: ConLike -> Bool
+conLikeIsInfix (RealDataCon dc) = dataConIsInfix dc
+conLikeIsInfix (PatSynCon ps)   = patSynIsInfix  ps

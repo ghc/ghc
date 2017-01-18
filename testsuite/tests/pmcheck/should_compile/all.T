@@ -40,7 +40,7 @@ test('T11303', normal, compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-
 test('T11276', compile_timeout_multiplier(0.01), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 test('T11303b', compile_timeout_multiplier(0.01), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
 test('T11374', compile_timeout_multiplier(0.01), compile, ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
-test('T11195', compile_timeout_multiplier(0.40), compile, ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M1G -RTS'])
+test('T11195', compile_timeout_multiplier(0.40), compile, ['-package ghc -fwarn-incomplete-patterns -fwarn-overlapping-patterns +RTS -M2G -RTS'])
 
 # Other tests
 test('pmc001', [], compile,

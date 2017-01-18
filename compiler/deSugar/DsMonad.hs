@@ -35,7 +35,7 @@ module DsMonad (
         getDictsDs, addDictsDs, getTmCsDs, addTmCsDs,
 
         -- Iterations for pm checking
-        incrCheckPmIterDs, resetPmIterDs,
+        incrCheckPmIterDs, resetPmIterDs, dsGetCompleteMatches,
 
         -- Warnings and errors
         DsWarning, warnDs, warnIfSetDs, errDs, errDsCoreExpr,
@@ -83,6 +83,7 @@ import FastString
 import Maybes
 import Var (EvVar)
 import qualified GHC.LanguageExtensions as LangExt
+import UniqFM ( lookupWithDefaultUFM )
 
 import Data.IORef
 import Control.Monad
@@ -152,17 +153,19 @@ type DsWarning = (SrcSpan, SDoc)
 
 initDs :: HscEnv
        -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
+       -> [CompleteMatch]
        -> DsM a
        -> IO (Messages, Maybe a)
 -- Print errors and warnings, if any arise
 
-initDs hsc_env mod rdr_env type_env fam_inst_env thing_inside
+initDs hsc_env mod rdr_env type_env fam_inst_env complete_matches thing_inside
   = do  { msg_var <- newIORef (emptyBag, emptyBag)
+        ; let all_matches = (hptCompleteSigs hsc_env) ++ complete_matches
         ; pm_iter_var      <- newIORef 0
         ; let dflags                   = hsc_dflags hsc_env
               (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env
                                                   fam_inst_env msg_var
-                                                  pm_iter_var
+                                                  pm_iter_var all_matches
 
         ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
                           loadDAP $
@@ -241,8 +244,9 @@ initDsTc thing_inside
         ; let type_env = tcg_type_env tcg_env
               rdr_env  = tcg_rdr_env tcg_env
               fam_inst_env = tcg_fam_inst_env tcg_env
+              complete_matches = tcg_complete_matches tcg_env
               ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                                  msg_var pm_iter_var
+                                  msg_var pm_iter_var complete_matches
         ; setEnvs ds_envs thing_inside
         }
 
@@ -270,13 +274,15 @@ initTcDsForSolver thing_inside
          thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-         -> IORef Messages -> IORef Int -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
+         -> IORef Messages -> IORef Int -> [CompleteMatch]
+         -> (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
                              False -- not boot!
         real_span = realSrcLocSpan (mkRealSrcLoc (moduleNameFS (moduleName mod)) 1 1)
+        completeMatchMap = mkCompleteMatchMap complete_matches
         gbl_env = DsGblEnv { ds_mod     = mod
                            , ds_fam_inst_env = fam_inst_env
                            , ds_if_env  = (if_genv, if_lenv)
@@ -284,6 +290,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
                            , ds_msgs    = msg_var
                            , ds_dph_env = emptyGlobalRdrEnv
                            , ds_parr_bi = panic "DsMonad: uninitialised ds_parr_bi"
+                           , ds_complete_matches = completeMatchMap
                            }
         lcl_env = DsLclEnv { dsl_meta    = emptyNameEnv
                            , dsl_loc     = real_span
@@ -292,6 +299,7 @@ mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
                            , dsl_pm_iter = pmvar
                            }
     in (gbl_env, lcl_env)
+
 
 -- Attempt to load the given module and return its exported entities if successful.
 --
@@ -607,6 +615,12 @@ dsGetFamInstEnvs
 
 dsGetMetaEnv :: DsM (NameEnv DsMetaVal)
 dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
+
+-- | The @COMPLETE@ pragams provided by the user for a given `TyCon`.
+dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
+dsGetCompleteMatches tc = do
+  env <- getGblEnv
+  return $ (lookupWithDefaultUFM (ds_complete_matches env) [] tc)
 
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
 dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (dsl_meta env) name) }

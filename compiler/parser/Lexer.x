@@ -636,6 +636,7 @@ data Token
   | ITunpack_prag       SourceText
   | ITnounpack_prag     SourceText
   | ITann_prag          SourceText
+  | ITcomplete_prag     SourceText
   | ITclose_prag
   | IToptions_prag String
   | ITinclude_prag String
@@ -2716,7 +2717,7 @@ ignoredPrags = Map.fromList (map ignored pragmas)
                      -- CFILES is a hugs-only thing.
                      pragmas = options_pragmas ++ ["cfiles", "contract"]
 
-oneWordPrags = Map.fromList([
+oneWordPrags = Map.fromList [
      ("rules", rulePrag),
      ("inline",
          strtoken (\s -> (ITinline_prag (SourceText s) Inline FunLike))),
@@ -2744,7 +2745,9 @@ oneWordPrags = Map.fromList([
      ("overlappable", strtoken (\s -> IToverlappable_prag (SourceText s))),
      ("overlapping", strtoken (\s -> IToverlapping_prag (SourceText s))),
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
-     ("ctype", strtoken (\s -> ITctype (SourceText s)))])
+     ("ctype", strtoken (\s -> ITctype (SourceText s))),
+     ("complete", strtoken (\s -> ITcomplete_prag (SourceText s)))
+     ]
 
 twoWordPrags = Map.fromList([
      ("inline conlike",

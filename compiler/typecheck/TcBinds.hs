@@ -37,7 +37,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, mkTyVarBinder )
+import Type( mkStrLitTy, tidyOpenType, mkTyVarBinder, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn( cTupleTyConName )
 import Id
@@ -62,6 +62,7 @@ import TcValidity (checkValidType)
 import Unique (getUnique)
 import UniqFM
 import qualified GHC.LanguageExtensions as LangExt
+import ConLike
 
 import Control.Monad
 
@@ -185,12 +186,114 @@ tcTopBinds binds sigs
                ; return (gbl, lcl) }
         ; specs <- tcImpPrags sigs   -- SPECIALISE prags for imported Ids
 
-        ; let { tcg_env' = tcg_env { tcg_imp_specs = specs ++ tcg_imp_specs tcg_env }
+        ; complete_matches <- setEnvs (tcg_env, tcl_env) $ tcCompleteSigs sigs
+        ; traceTc "complete_matches" (ppr binds $$ ppr sigs)
+        ; traceTc "complete_matches" (ppr complete_matches)
+
+        ; let { tcg_env' = tcg_env { tcg_imp_specs
+                                      = specs ++ tcg_imp_specs tcg_env
+                                   , tcg_complete_matches
+                                      = complete_matches
+                                          ++ tcg_complete_matches tcg_env }
                            `addTypecheckedBinds` map snd binds' }
 
         ; return (tcg_env', tcl_env) }
         -- The top level bindings are flattened into a giant
         -- implicitly-mutually-recursive LHsBinds
+
+
+-- Note [Typechecking Complete Matches]
+-- Much like when a user bundled a pattern synonym, the result types of
+-- all the constructors in the match pragma must be consistent.
+--
+-- If we allowed pragmas with inconsistent types then it would be
+-- impossible to ever match every constructor in the list and so
+-- the pragma would be useless.
+
+
+
+
+
+-- This is only used in `tcCompleteSig`. We fold over all the conlikes,
+-- this accumulator keeps track of the first `ConLike` with a concrete
+-- return type. After fixing the return type, all other constructors with
+-- a fixed return type must agree with this.
+--
+-- The fields of `Fixed` cache the first conlike and its return type so
+-- that that we can compare all the other conlikes to it. The conlike is
+-- stored for error messages.
+--
+-- `Nothing` in the case that the type is fixed by a type signature
+data CompleteSigType = AcceptAny | Fixed (Maybe ConLike) TyCon
+
+tcCompleteSigs  :: [LSig Name] -> TcM [CompleteMatch]
+tcCompleteSigs sigs =
+  let
+      doOne :: Sig Name -> TcM (Maybe CompleteMatch)
+      doOne c@(CompleteMatchSig _ lns mtc)
+        = fmap Just $ do
+           addErrCtxt (text "In" <+> ppr c) $
+            case mtc of
+              Nothing -> infer_complete_match
+              Just tc -> check_complete_match tc
+        where
+
+          checkCLTypes acc = foldM checkCLType (acc, []) (unLoc lns)
+
+          infer_complete_match = do
+            (res, cls) <- checkCLTypes AcceptAny
+            case res of
+              AcceptAny -> failWithTc ambiguousError
+              Fixed _ tc  -> return $ CompleteMatch cls tc
+
+          check_complete_match tc_name = do
+            ty_con <- tcLookupLocatedTyCon tc_name
+            (_, cls) <- checkCLTypes (Fixed Nothing ty_con)
+            return $ CompleteMatch cls ty_con
+      doOne _ = return Nothing
+
+      ambiguousError :: SDoc
+      ambiguousError =
+        text "A type signature must be provided for a set of polymorphic"
+          <+> text "pattern synonyms."
+
+
+      -- See note [Typechecking Complete Matches]
+      checkCLType :: (CompleteSigType, [ConLike]) -> Located Name
+                  -> TcM (CompleteSigType, [ConLike])
+      checkCLType (cst, cs) n = do
+        cl <- addLocM tcLookupConLike n
+        let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
+              res_ty_con = fst <$> splitTyConApp_maybe res_ty
+        case (cst, res_ty_con) of
+          (AcceptAny, Nothing) -> return (AcceptAny, cl:cs)
+          (AcceptAny, Just tc) -> return (Fixed (Just cl) tc, cl:cs)
+          (Fixed mfcl tc, Nothing)  -> return (Fixed mfcl tc, cl:cs)
+          (Fixed mfcl tc, Just tc') ->
+            if tc == tc'
+              then return (Fixed mfcl tc, cl:cs)
+              else case mfcl of
+                     Nothing ->
+                      addErrCtxt (text "In" <+> ppr cl) $
+                        failWithTc typeSigErrMsg
+                     Just cl -> failWithTc (errMsg cl)
+             where
+              typeSigErrMsg :: SDoc
+              typeSigErrMsg =
+                text "Couldn't match expected type"
+                      <+> quotes (ppr tc)
+                      <+> text "with"
+                      <+> quotes (ppr tc')
+
+              errMsg :: ConLike -> SDoc
+              errMsg fcl =
+                text "Cannot form a group of complete patterns from patterns"
+                  <+> quotes (ppr fcl) <+> text "and" <+> quotes (ppr cl)
+                  <+> text "as they match different type constructors"
+                  <+> parens (quotes (ppr tc)
+                               <+> text "resp."
+                               <+> quotes (ppr tc'))
+  in  mapMaybeM (addLocM doOne) sigs
 
 tcRecSelBinds :: HsValBinds Name -> TcM TcGblEnv
 tcRecSelBinds (ValBindsOut binds sigs)

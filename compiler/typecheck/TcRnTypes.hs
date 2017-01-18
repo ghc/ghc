@@ -43,11 +43,11 @@ module TcRnTypes(
         IdBindingInfo(..),
         IsGroupClosed(..),
         SelfBootInfo(..),
-        pprTcTyThingCategory, pprPECategory,
+        pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
 
         -- Desugaring types
         DsM, DsLclEnv(..), DsGblEnv(..), PArrBuiltin(..),
-        DsMetaEnv, DsMetaVal(..),
+        DsMetaEnv, DsMetaVal(..), CompleteMatchMap, mkCompleteMatchMap,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
@@ -174,6 +174,7 @@ import FastString
 import qualified GHC.LanguageExtensions as LangExt
 import Fingerprint
 import Util
+import UniqFM ( emptyUFM, addToUFM_C, UniqFM )
 
 import Control.Monad (ap, liftM, msum)
 #if __GLASGOW_HASKELL__ > 710
@@ -181,11 +182,13 @@ import qualified Control.Monad.Fail as MonadFail
 #endif
 import Data.Set      ( Set )
 
-import Data.Map      ( Map )
+import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
 import Data.Typeable ( TypeRep )
 import GHCi.Message
 import GHCi.RemoteTypes
+
+import Data.List (foldl')
 
 import qualified Language.Haskell.TH as TH
 
@@ -376,7 +379,17 @@ data DsGblEnv
                                                 -- exported entities of 'Data.Array.Parallel' iff
                                                 -- '-XParallelArrays' was given; otherwise, empty
         , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
+        , ds_complete_matches :: CompleteMatchMap
+           -- Additional complete pattern matches
         }
+
+type CompleteMatchMap = UniqFM [CompleteMatch]
+
+mkCompleteMatchMap :: [CompleteMatch] -> CompleteMatchMap
+mkCompleteMatchMap cms = foldl' insertMatch emptyUFM cms
+  where
+    insertMatch :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
+    insertMatch ufm c@(CompleteMatch _ t) = addToUFM_C (++) ufm t [c]
 
 instance ContainsModule DsGblEnv where
     extractModule = ds_mod
@@ -651,9 +664,10 @@ data TcGblEnv
         tcg_top_loc :: RealSrcSpan,
         -- ^ The RealSrcSpan this module came from
 
-        tcg_static_wc :: TcRef WantedConstraints
-        -- ^ Wanted constraints of static forms.
+        tcg_static_wc :: TcRef WantedConstraints,
+          -- ^ Wanted constraints of static forms.
         -- See Note [Constraints in static forms].
+        tcg_complete_matches :: [CompleteMatch]
     }
 
 -- NB: topModIdentity, not topModSemantic!

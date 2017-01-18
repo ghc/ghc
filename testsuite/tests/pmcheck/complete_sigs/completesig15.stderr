@@ -1,0 +1,4 @@
+
+completesig15.hs:12:1: error:
+    • A type signature must be provided for a set of polymorphic pattern synonyms.
+    • In {-# COMPLETE P #-}
