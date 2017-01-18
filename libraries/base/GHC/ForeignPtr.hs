@@ -71,12 +71,14 @@ import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 -- class 'Storable'.
 --
 data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
-        -- we cache the Addr# in the ForeignPtr object, but attach
-        -- the finalizer to the IORef (or the MutableByteArray# in
-        -- the case of a MallocPtr).  The aim of the representation
-        -- is to make withForeignPtr efficient; in fact, withForeignPtr
-        -- should be just as efficient as unpacking a Ptr, and multiple
-        -- withForeignPtrs can share an unpacked ForeignPtr.  Note
+        -- The Addr# in the ForeignPtr object is intentionally stored
+        -- separately from the finalizer. The primay aim of the
+        -- representation is to make withForeignPtr efficient; in fact,
+        -- withForeignPtr should be just as efficient as unpacking a
+        -- Ptr, and multiple withForeignPtrs can share an unpacked
+        -- ForeignPtr. As a secondary benefit, this representation
+        -- allows pointers to subregions within the same overall block
+        -- to share the same finalizer (see 'plusForeignPtr'). Note
         -- that touchForeignPtr only has to touch the ForeignPtrContents
         -- object, because that ensures that whatever the finalizer is
         -- attached to is kept alive.
@@ -437,6 +439,14 @@ castForeignPtr = coerce
 
 plusForeignPtr :: ForeignPtr a -> Int -> ForeignPtr b
 -- ^Advances the given address by the given offset in bytes.
+--
+-- The new 'ForeignPtr' shares the finalizer of the original,
+-- equivalent from a finalization standpoint to just creating another
+-- reference to the original. That is, the finalizer will not be
+-- called before the new 'ForeignPtr' is unreachable, nor will it be
+-- called an additional time due to this call, and the finalizer will
+-- be called with the same address that it would have had this call
+-- not happened, *not* the new address.
 --
 -- @since 4.10.0.0
 plusForeignPtr (ForeignPtr addr c) (I# d) = ForeignPtr (plusAddr# addr d) c
