@@ -11,7 +11,7 @@ import Outputable
 -- following design:
 -- * Metadata can be constructed in a few different ways (See below).
 -- * After which it can either be attached to LLVM statements to pass along
--- extra information to the optimizer and code generator OR specificially named
+-- extra information to the optimizer and code generator OR specifically named
 -- metadata has an affect on the whole module (i.e., linking behaviour).
 --
 --

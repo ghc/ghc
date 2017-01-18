@@ -515,7 +515,7 @@ the stack. See Note [Overlapping global registers] for implications.
    VFPv2/VFPv3/NEON registers
    s0-s15/d0-d7/q0-q3    Argument / result/ scratch registers
    s16-s31/d8-d15/q4-q7  callee-saved registers (must be preserved across
-                         subrutine calls)
+                         subroutine calls)
 
    VFPv3/NEON registers (added to the VFPv2 registers set)
    d16-d31/q8-q15        Argument / result/ scratch registers
@@ -572,7 +572,7 @@ the stack. See Note [Overlapping global registers] for implications.
    FPU/SIMD registers
 
    s/d/q/v0-v7    Argument / result/ scratch registers
-   s/d/q/v8-v15   callee-saved registers (must be preserved across subrutine calls,
+   s/d/q/v8-v15   callee-saved registers (must be preserved across subroutine calls,
                   but only bottom 64-bit value needs to be preserved)
    s/d/q/v16-v31  temporary registers
 

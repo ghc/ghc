@@ -151,7 +151,7 @@ data LlvmStatement
   | Store LlvmVar LlvmVar
 
   {- |
-    Mutliway branch
+    Multiway branch
       * scrutinee: Variable or constant which must be of integer type that is
                    determines which arm is chosen.
       * def:       The default label if there is no match in target.

@@ -953,7 +953,7 @@ over them, for two reasons
   add it to the ic_skols of the residual implication.
 
   Note that we /only/ do this to the residual implication. We don't
-  complicate the quantified type varialbes of 'f' for downstream code;
+  complicate the quantified type variables of 'f' for downstream code;
   it's just a device to make the error message generator know what to
   report.
 

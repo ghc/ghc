@@ -1369,7 +1369,7 @@ However, watch out:
 Note [Interaction of exprIsWorkFree and lone variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The lone-variable test says "don't inline if a case expression
-scrutines a lone variable whose unfolding is cheap".  It's very
+scrutinises a lone variable whose unfolding is cheap".  It's very
 important that, under these circumstances, exprIsConApp_maybe
 can spot a constructor application. So, for example, we don't
 consider

@@ -801,7 +801,7 @@ chooseOrphanAnchor :: NameSet -> IsOrphan
 -- Something (rule, instance) is relate to all the Names in this
 -- list. Choose one of them to be an "anchor" for the orphan.  We make
 -- the choice deterministic to avoid gratuitious changes in the ABI
--- hash (Trac #4012).  Specficially, use lexicographic comparison of
+-- hash (Trac #4012).  Specifically, use lexicographic comparison of
 -- OccName rather than comparing Uniques
 --
 -- NB: 'minimum' use Ord, and (Ord OccName) works lexicographically

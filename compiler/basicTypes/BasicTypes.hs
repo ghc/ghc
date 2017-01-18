@@ -910,7 +910,7 @@ instance Outputable OccInfo where
 {-
 ************************************************************************
 *                                                                      *
-                Default method specfication
+                Default method specification
 *                                                                      *
 ************************************************************************
 

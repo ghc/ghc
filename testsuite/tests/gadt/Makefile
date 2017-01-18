@@ -4,7 +4,7 @@ include $(TOP)/mk/test.mk
 
 .PHONY: gadt17 gadt23
 
-# A mulit-module test that made GHC 6.4.1 crash
+# A multi-module test that made GHC 6.4.1 crash
 gadt17:
 	@$(RM) gadt17.hi Gadt17_help.hi
 	@$(RM) A$(OBJSUFFIX)

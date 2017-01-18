@@ -2576,7 +2576,7 @@ Consider this
 If we make a join point with c but not c# we get
   $j = \c -> ....c....
 
-But if later inlining scrutines the c, thus
+But if later inlining scrutinises the c, thus
 
   $j = \c -> ... case c of { I# y -> ... } ...
 

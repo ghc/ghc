@@ -256,7 +256,7 @@ hsExprToPmExpr e@(ExplicitList _elem_ty mb_ol elems)
 hsExprToPmExpr (ExplicitPArr _elem_ty elems)
   = PmExprCon (parrFakeCon (length elems)) (map lhsExprToPmExpr elems)
 
--- we want this but we would have to make evrything monadic :/
+-- we want this but we would have to make everything monadic :/
 -- ./compiler/deSugar/DsMonad.hs:397:dsLookupDataCon :: Name -> DsM DataCon
 --
 -- hsExprToPmExpr (RecordCon   c _ binds) = do

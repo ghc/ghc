@@ -1143,7 +1143,7 @@ ocRunInit_MachO ( ObjectCode *oc )
         // flag.  We should do this elsewhere in the Mach-O linker code
         // too.  Note that the system linker will *refuse* to honor
         // sections which don't have this flag, so this could cause
-        // weird behavior divergence (albeit reproduceable).
+        // weird behavior divergence (albeit reproducible).
         if (0 == strcmp(sections[i].sectname,"__mod_init_func")) {
             char *init_startC = image + sections[i].offset;
             init_t *init = (init_t*)init_startC;

@@ -113,7 +113,7 @@ vVarApps lc (ve, le) vvs
     (vs, ls) = unzip vvs
 
 
-vCaseDEFAULT :: VExpr  -- scrutiniy
+vCaseDEFAULT :: VExpr  -- scrutinee
              -> VVar   -- bnder
              -> Type   -- type of vectorised version
              -> Type   -- type of lifted version

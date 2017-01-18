@@ -1147,7 +1147,7 @@ instance Ord ImpItemSpec where
 
 bestImport :: [ImportSpec] -> ImportSpec
 -- Given a non-empty bunch of ImportSpecs, return the one that
--- imported the item most specficially (e.g. by name), using
+-- imported the item most specifically (e.g. by name), using
 -- textually-first as a tie breaker. This is used when reporting
 -- redundant imports
 bestImport iss

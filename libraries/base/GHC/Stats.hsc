@@ -86,7 +86,7 @@ data RTSStats = RTSStats {
 
   -- -----------------------------------
   -- Cumulative stats about time use
-  -- (we use signed values here because due to inacuracies in timers
+  -- (we use signed values here because due to inaccuracies in timers
   -- the values can occasionally go slightly negative)
 
     -- | Total CPU time used by the mutator

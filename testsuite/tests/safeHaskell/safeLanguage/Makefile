@@ -39,7 +39,7 @@ safeRecomp01:
 cleanSafeRecomp02:
 	rm -rf SafeRecomp02 SafeRecomp02.o SafeRecomp02.hi SafeRecomp02_A.o SafeRecomp02_A.hi
 
-# mutli module program
+# multi module program
 safeRecomp02:
 	$(MAKE) -s --no-print-directory cleanSafeRecomp02
 	

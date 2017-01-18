@@ -423,7 +423,7 @@ emptyInert
 
 {- Note [Solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When we apply a top-level instance declararation, we add the "solved"
+When we apply a top-level instance declaration, we add the "solved"
 dictionary to the inert_solved_dicts.  In general, we use it to avoid
 creating a new EvVar when we have a new goal that we have solved in
 the past.

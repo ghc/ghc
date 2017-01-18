@@ -533,7 +533,7 @@ data TyCon
     }
 
   -- | Algebraic data types, from
-  --     - @data@ declararations
+  --     - @data@ declarations
   --     - @newtype@ declarations
   --     - data instance declarations
   --     - type instance declarations

@@ -566,7 +566,7 @@ above (Above p g1 q1)  g2 q2 = above p g1 (above q1 g2 q2)
 above p@(Beside{})     g  q  = aboveNest (reduceDoc p) g 0 (reduceDoc q)
 above p g q                  = aboveNest p             g 0 (reduceDoc q)
 
--- Specfication: aboveNest p g k q = p $g$ (nest k q)
+-- Specification: aboveNest p g k q = p $g$ (nest k q)
 aboveNest :: RDoc -> Bool -> Int -> RDoc -> RDoc
 aboveNest _                   _ k _ | k `seq` False = undefined
 aboveNest NoDoc               _ _ _ = NoDoc

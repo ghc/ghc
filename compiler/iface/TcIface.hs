@@ -517,7 +517,7 @@ interface files for types mentioned in the arg types.
 
 E.g.
         data Foo.S = MkS Baz.T
-Mabye we can get away without even loading the interface for Baz!
+Maybe we can get away without even loading the interface for Baz!
 
 This is not just a performance thing.  Suppose we have
         data Foo.S = MkS Baz.T

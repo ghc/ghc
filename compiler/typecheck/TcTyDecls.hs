@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1999
 
 
-Analysis functions over data types.  Specficially, detecting recursive types.
+Analysis functions over data types.  Specifically, detecting recursive types.
 
 This stuff is only used for source-code decls; it's recorded in interface
 files for imported data types.

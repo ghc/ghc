@@ -1785,7 +1785,7 @@ tcHsPartialSigType
   -> LHsSigWcType Name        -- The type signature
   -> TcM ( [(Name, TcTyVar)]  -- Wildcards
          , Maybe TcTyVar      -- Extra-constraints wildcard
-         , [TcTyVar]          -- Implicitly and explicitly bound type varialbes
+         , [TcTyVar]          -- Implicitly and explicitly bound type variables
          , TcThetaType        -- Theta part
          , TcType )           -- Tau part
 tcHsPartialSigType ctxt sig_ty

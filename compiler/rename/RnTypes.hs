@@ -1231,7 +1231,7 @@ get_op other                   = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
 -- derived instances may have correctly-associated things to
--- in the right operarand.  So we just check that the right operand is OK
+-- in the right operand.  So we just check that the right operand is OK
 right_op_ok :: Fixity -> HsExpr Name -> Bool
 right_op_ok fix1 (OpApp _ _ fix2 _)
   = not error_please && associate_right
