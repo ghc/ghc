@@ -86,6 +86,8 @@ stage0Packages = do
     ios <- lift iosHost
     append $ [ binary
              , cabal
+             , checkApiAnnotations
+             , compareSizes
              , compiler
              , deriveConstants
              , dllSplit
@@ -97,6 +99,7 @@ stage0Packages = do
              , ghcCabal
              , ghci
              , ghcPkg
+             , ghcTags
              , hsc2hs
              , hoopl
              , hp2ps
@@ -118,7 +121,6 @@ stage1Packages = do
                        , base
                        , bytestring
                        , compact
-                       , compareSizes
                        , containers
                        , deepseq
                        , directory
@@ -142,11 +144,7 @@ stage1Packages = do
                        [ xhtml    | doc     ] ]
 
 stage2Packages :: Packages
-stage2Packages = do
-    doc <- buildHaddock flavour
-    append $ [ checkApiAnnotations
-             , ghcTags       ] ++
-             [ haddock | doc ]
+stage2Packages = buildHaddock flavour ? append [ haddock ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
