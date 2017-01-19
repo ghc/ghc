@@ -34,10 +34,10 @@ import TcType ( tcSplitSigmaTy )
 import TyCon
 import Type
 import TyCoRep
-import TysPrim ( alphaTyVars, unliftedTypeKindTyConName )
+import TysPrim ( alphaTyVars )
 import TysWiredIn ( listTyConName, starKindTyConName, unitTy )
 import PrelNames ( hasKey, eqTyConKey, ipClassKey
-                 , tYPETyConKey, ptrRepLiftedDataConKey, ptrRepUnliftedDataConKey )
+                 , tYPETyConKey, liftedRepDataConKey )
 import Unique ( getUnique )
 import Util ( filterByList, filterOut )
 import Var
@@ -378,12 +378,8 @@ synifyType _ (TyConApp tc tys)
   -- Use */# instead of TYPE 'Lifted/TYPE 'Unlifted (#473)
   | tc `hasKey` tYPETyConKey
   , [TyConApp lev []] <- tys
-  , lev `hasKey` ptrRepLiftedDataConKey
+  , lev `hasKey` liftedRepDataConKey
   = noLoc (HsTyVar NotPromoted (noLoc starKindTyConName))
-  | tc `hasKey` tYPETyConKey
-  , [TyConApp lev []] <- tys
-  , lev `hasKey` ptrRepUnliftedDataConKey
-  = noLoc (HsTyVar NotPromoted (noLoc unliftedTypeKindTyConName))
   -- Use non-prefix tuple syntax where possible, because it looks nicer.
   | Just sort <- tyConTuple_maybe tc
   , tyConArity tc == length tys
