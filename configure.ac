@@ -399,24 +399,6 @@ FP_CURSES
 
 XCODE_VERSION()
 
-SplitObjsBroken=NO
-if test "$TargetOS_CPP" = "darwin"
-then
-    # Split objects is broken (#4013) with XCode < 3.2
-    if test "$XCodeVersion1" -lt 3
-    then
-        SplitObjsBroken=YES
-    else
-        if test "$XCodeVersion1" -eq 3
-        then
-            if test "$XCodeVersion2" -lt 2
-            then
-                SplitObjsBroken=YES
-            fi
-        fi
-    fi
-fi
-AC_SUBST([SplitObjsBroken])
 
 dnl ** Building a cross compiler?
 dnl --------------------------------------------------------------
@@ -600,23 +582,25 @@ AC_SUBST([GhcLibsWithUnix])
 dnl ** does #! work?
 AC_SYS_INTERPRETER()
 
+# Check for split-objs
+SplitObjsBroken=NO
 dnl ** look for `perl'
 case $HostOS_CPP in
 cygwin32|mingw32)
-    PerlCmd=$hardtop/inplace/perl/perl
-    ;;
+  PerlCmd=$hardtop/inplace/perl/perl
+  ;;
 *)
-    AC_PATH_PROG(PerlCmd,perl)
+    AC_PATH_PROG([PerlCmd],[perl])
     if test -z "$PerlCmd"
     then
-        echo "You must install perl before you can continue"
-        echo "Perhaps it is already installed, but not in your PATH?"
-        exit 1
+        AC_MSG_WARN([No Perl on PATH, disabling split object support])
+        SplitObjsBroken=YES
     else
         FPTOOLS_CHECK_PERL_VERSION
     fi
     ;;
 esac
+AC_SUBST([SplitObjsBroken])
 
 dnl ** look for GCC and find out which version
 dnl     Figure out which C compiler to use.  Gcc is preferred.
