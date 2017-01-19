@@ -368,18 +368,42 @@ thinModIface avails iface =
         -- perhaps there might be two IfaceTopBndr that are the same
         -- OccName but different Name.  Requires better understanding
         -- of invariants here.
-        mi_decls = filter (decl_pred . snd) (mi_decls iface)
+        mi_decls = exported_decls ++ non_exported_decls ++ dfun_decls
         -- mi_insts = ...,
         -- mi_fam_insts = ...,
     }
   where
-    occs = mkOccSet [ occName n
-                    | a <- avails
-                    , n <- availNames a ]
-    -- NB: Never drop DFuns
-    decl_pred IfaceId{ ifIdDetails = IfDFunId } = True
-    decl_pred decl =
-        nameOccName (ifName decl) `elemOccSet` occs
+    decl_pred occs decl = nameOccName (ifName decl) `elemOccSet` occs
+    filter_decls occs = filter (decl_pred occs . snd) (mi_decls iface)
+
+    exported_occs = mkOccSet [ occName n
+                             | a <- avails
+                             , n <- availNames a ]
+    exported_decls = filter_decls exported_occs
+
+    non_exported_occs = mkOccSet [ occName n
+                                 | (_, d) <- exported_decls
+                                 , n <- ifaceDeclNonExportedRefs d ]
+    non_exported_decls = filter_decls non_exported_occs
+
+    dfun_pred IfaceId{ ifIdDetails = IfDFunId } = True
+    dfun_pred _ = False
+    dfun_decls = filter (dfun_pred . snd) (mi_decls iface)
+
+-- | The list of 'Name's of *non-exported* 'IfaceDecl's which this
+-- 'IfaceDecl' may refer to.  A non-exported 'IfaceDecl' should be kept
+-- after thinning if an *exported* 'IfaceDecl' (or 'mi_insts', perhaps)
+-- refers to it; we can't decide to keep it by looking at the exports
+-- of a module after thinning.  Keep this synchronized with
+-- 'rnIfaceDecl'.
+ifaceDeclNonExportedRefs :: IfaceDecl -> [Name]
+ifaceDeclNonExportedRefs d@IfaceFamily{} =
+    case ifFamFlav d of
+        IfaceClosedSynFamilyTyCon (Just (n, _))
+            -> [n]
+        _   -> []
+ifaceDeclNonExportedRefs _ = []
+
 
 -- Note [Blank hsigs for all requirements]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

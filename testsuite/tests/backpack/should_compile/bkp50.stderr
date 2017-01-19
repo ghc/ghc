@@ -1,0 +1,4 @@
+[1 of 2] Processing p
+  [1 of 1] Compiling A[sig]           ( p/A.hsig, nothing )
+[2 of 2] Processing q
+  [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
