@@ -9,6 +9,7 @@ Haskell. [WDP 94/11])
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module IdInfo (
         -- * The IdDetails type
