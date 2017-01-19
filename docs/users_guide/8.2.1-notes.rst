@@ -226,6 +226,9 @@ See ``changelog.md`` in the ``base`` package for full release notes.
   provided in GHC's version of the ``Read`` class, and allows users to write
   more efficient ``Read1`` and ``Read2`` instances.
 
+- Add ``type family AppendSymbol (m :: Symbol) (n :: Symbol) :: Symbol`` to
+  ``GHC.TypeLits``
+
 binary
 ~~~~~~
 

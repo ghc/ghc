@@ -1769,6 +1769,9 @@ callStackTyConKey = mkPreludeTyConUnique 183
 typeRepTyConKey :: Unique
 typeRepTyConKey = mkPreludeTyConUnique 184
 
+typeSymbolAppendFamNameKey :: Unique
+typeSymbolAppendFamNameKey = mkPreludeTyConUnique 185
+
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES TyConUniques 200-299
 -----------------------------------------------------

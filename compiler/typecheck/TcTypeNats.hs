@@ -12,6 +12,7 @@ module TcTypeNats
   , typeNatSubTyCon
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
+  , typeSymbolAppendTyCon
   ) where
 
 import Type
@@ -33,10 +34,14 @@ import PrelNames  ( gHC_TYPELITS
                   , typeNatSubTyFamNameKey
                   , typeNatCmpTyFamNameKey
                   , typeSymbolCmpTyFamNameKey
+                  , typeSymbolAppendFamNameKey
                   )
-import FastString ( FastString, fsLit )
+import FastString ( FastString
+                  , fsLit, nilFS, nullFS, unpackFS, mkFastString, appendFS
+                  )
 import qualified Data.Map as Map
 import Data.Maybe ( isJust )
+import Data.List  ( isPrefixOf, isSuffixOf )
 
 {-------------------------------------------------------------------------------
 Built-in type constructors for functions on type-level nats
@@ -51,6 +56,7 @@ typeNatTyCons =
   , typeNatSubTyCon
   , typeNatCmpTyCon
   , typeSymbolCmpTyCon
+  , typeSymbolAppendTyCon
   ]
 
 typeNatAddTyCon :: TyCon
@@ -154,6 +160,16 @@ typeSymbolCmpTyCon =
     , sfInteractInert = \_ _ _ _ -> []
     }
 
+typeSymbolAppendTyCon :: TyCon
+typeSymbolAppendTyCon = mkTypeSymbolFunTyCon2 name
+  BuiltInSynFamily
+    { sfMatchFam      = matchFamAppendSymbol
+    , sfInteractTop   = interactTopAppendSymbol
+    , sfInteractInert = interactInertAppendSymbol
+    }
+  where
+  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "AppendSymbol")
+                typeSymbolAppendFamNameKey typeSymbolAppendTyCon
 
 
 
@@ -169,6 +185,16 @@ mkTypeNatFunTyCon2 op tcb =
     Nothing
     NotInjective
 
+-- Make a binary built-in constructor of kind: Symbol -> Symbol -> Symbol
+mkTypeSymbolFunTyCon2 :: Name -> BuiltInSynFamily -> TyCon
+mkTypeSymbolFunTyCon2 op tcb =
+  mkFamilyTyCon op
+    (mkTemplateAnonTyConBinders [ typeSymbolKind, typeSymbolKind ])
+    typeSymbolKind
+    Nothing
+    (BuiltInSynFamTyCon tcb)
+    Nothing
+    NotInjective
 
 
 {-------------------------------------------------------------------------------
@@ -183,6 +209,7 @@ axAddDef
   , axLeqDef
   , axCmpNatDef
   , axCmpSymbolDef
+  , axAppendSymbolDef
   , axAdd0L
   , axAdd0R
   , axMul0L
@@ -198,6 +225,8 @@ axAddDef
   , axLeq0L
   , axSubDef
   , axSub0R
+  , axAppendSymbol0R
+  , axAppendSymbol0L
   :: CoAxiomRule
 
 axAddDef = mkBinAxiom "AddDef" typeNatAddTyCon $
@@ -222,9 +251,22 @@ axCmpSymbolDef =
     , coaxrRole      = Nominal
     , coaxrProves    = \cs ->
         do [Pair s1 s2, Pair t1 t2] <- return cs
-           [s2', t2'] <- traverse isStrLitTy [s2, t2]
+           s2' <- isStrLitTy s2
+           t2' <- isStrLitTy t2
            return (mkTyConApp typeSymbolCmpTyCon [s1,t1] ===
                    ordering (compare s2' t2')) }
+
+axAppendSymbolDef = CoAxiomRule
+    { coaxrName      = fsLit "AppendSymbolDef"
+    , coaxrAsmpRoles = [Nominal, Nominal]
+    , coaxrRole      = Nominal
+    , coaxrProves    = \cs ->
+        do [Pair s1 s2, Pair t1 t2] <- return cs
+           s2' <- isStrLitTy s2
+           t2' <- isStrLitTy t2
+           let z = mkStrLitTy (appendFS s2' t2')
+           return (mkTyConApp typeSymbolAppendTyCon [s1, t1] === z)
+    }
 
 axSubDef = mkBinAxiom "SubDef" typeNatSubTyCon $
               \x y -> fmap num (minus x y)
@@ -245,6 +287,10 @@ axCmpNatRefl    = mkAxiom1 "CmpNatRefl"
 axCmpSymbolRefl = mkAxiom1 "CmpSymbolRefl"
                 $ \(Pair s _) -> (cmpSymbol s s) === ordering EQ
 axLeq0L     = mkAxiom1 "Leq0L"    $ \(Pair s _) -> (num 0 <== s) === bool True
+axAppendSymbol0R  = mkAxiom1 "Concat0R"
+            $ \(Pair s t) -> (mkStrLitTy nilFS `appendSymbol` s) === t
+axAppendSymbol0L  = mkAxiom1 "Concat0L"
+            $ \(Pair s t) -> (s `appendSymbol` mkStrLitTy nilFS) === t
 
 typeNatCoAxiomRules :: Map.Map FastString CoAxiomRule
 typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
@@ -254,6 +300,7 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axLeqDef
   , axCmpNatDef
   , axCmpSymbolDef
+  , axAppendSymbolDef
   , axAdd0L
   , axAdd0R
   , axMul0L
@@ -268,6 +315,8 @@ typeNatCoAxiomRules = Map.fromList $ map (\x -> (coaxrName x, x))
   , axCmpSymbolRefl
   , axLeq0L
   , axSubDef
+  , axAppendSymbol0R
+  , axAppendSymbol0L
   ]
 
 
@@ -296,6 +345,9 @@ cmpNat s t = mkTyConApp typeNatCmpTyCon [s,t]
 
 cmpSymbol :: Type -> Type -> Type
 cmpSymbol s t = mkTyConApp typeSymbolCmpTyCon [s,t]
+
+appendSymbol :: Type -> Type -> Type
+appendSymbol s t = mkTyConApp typeSymbolAppendTyCon [s, t]
 
 (===) :: Type -> Type -> Pair Type
 x === y = Pair x y
@@ -352,8 +404,9 @@ mkBinAxiom str tc f =
     , coaxrRole      = Nominal
     , coaxrProves    = \cs ->
         do [Pair s1 s2, Pair t1 t2] <- return cs
-           [s2', t2'] <- traverse isNumLitTy [s2, t2]
-           z          <- f s2' t2'
+           s2' <- isNumLitTy s2
+           t2' <- isNumLitTy t2
+           z   <- f s2' t2'
            return (mkTyConApp tc [s1,t1] === z)
     }
 
@@ -444,6 +497,16 @@ matchFamCmpSymbol [s,t]
         mbY = isStrLitTy t
 matchFamCmpSymbol _ = Nothing
 
+matchFamAppendSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
+matchFamAppendSymbol [s,t]
+  | Just x <- mbX, nullFS x = Just (axAppendSymbol0R, [t], t)
+  | Just y <- mbY, nullFS y = Just (axAppendSymbol0L, [s], s)
+  | Just x <- mbX, Just y <- mbY =
+    Just (axAppendSymbolDef, [s,t], mkStrLitTy (appendFS x y))
+  where
+  mbX = isStrLitTy s
+  mbY = isStrLitTy t
+matchFamAppendSymbol _ = Nothing
 
 {-------------------------------------------------------------------------------
 Interact with axioms
@@ -542,8 +605,26 @@ interactTopCmpSymbol [s,t] r
   | Just EQ <- isOrderingLitTy r = [ s === t ]
 interactTopCmpSymbol _ _ = []
 
+interactTopAppendSymbol :: [Xi] -> Xi -> [Pair Type]
+interactTopAppendSymbol [s,t] r
+  -- (AppendSymbol a b ~ "") => (a ~ "", b ~ "")
+  | Just z <- mbZ, nullFS z =
+    [s === mkStrLitTy nilFS, t === mkStrLitTy nilFS ]
 
+  -- (AppendSymbol "foo" b ~ "foobar") => (b ~ "bar")
+  | Just x <- fmap unpackFS mbX, Just z <- fmap unpackFS mbZ, x `isPrefixOf` z =
+    [ t === mkStrLitTy (mkFastString $ drop (length x) z) ]
 
+  -- (AppendSymbol f "bar" ~ "foobar") => (f ~ "foo")
+  | Just y <- fmap unpackFS mbY, Just z <- fmap unpackFS mbZ, y `isSuffixOf` z =
+    [ t === mkStrLitTy (mkFastString $ take (length z - length y) z) ]
+
+  where
+  mbX = isStrLitTy s
+  mbY = isStrLitTy t
+  mbZ = isStrLitTy r
+
+interactTopAppendSymbol _ _ = []
 
 {-------------------------------------------------------------------------------
 Interaction with inerts
@@ -592,9 +673,12 @@ interactInertLeq [x1,y1] z1 [x2,y2] z2
 interactInertLeq _ _ _ _ = []
 
 
-
-
-
+interactInertAppendSymbol :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
+interactInertAppendSymbol [x1,y1] z1 [x2,y2] z2
+  | sameZ && tcEqType x1 x2         = [ y1 === y2 ]
+  | sameZ && tcEqType y1 y2         = [ x1 === x2 ]
+  where sameZ = tcEqType z1 z2
+interactInertAppendSymbol _ _ _ _ = []
 
 
 

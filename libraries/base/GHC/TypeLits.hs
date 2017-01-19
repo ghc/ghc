@@ -35,6 +35,7 @@ module GHC.TypeLits
 
     -- * Functions on type literals
   , type (<=), type (<=?), type (+), type (*), type (^), type (-)
+  , AppendSymbol
   , CmpNat, CmpSymbol
 
   -- * User-defined type errors
@@ -203,6 +204,10 @@ type family (m :: Nat) ^ (n :: Nat) :: Nat
 -- @since 4.7.0.0
 type family (m :: Nat) - (n :: Nat) :: Nat
 
+-- | Concatenation of type-level symbols.
+--
+-- @since 4.10.0.0
+type family AppendSymbol (m ::Symbol) (n :: Symbol) :: Symbol
 
 -- | A description of a custom type error.
 data {-kind-} ErrorMessage = Text Symbol
