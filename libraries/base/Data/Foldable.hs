@@ -270,6 +270,8 @@ class Foldable t where
 
 -- | @since 2.01
 instance Foldable Maybe where
+    foldMap = maybe mempty
+
     foldr _ z Nothing = z
     foldr f z (Just x) = f x z
 
