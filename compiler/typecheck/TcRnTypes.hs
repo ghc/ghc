@@ -324,7 +324,7 @@ data IfLclEnv
         -- This field is used to make sure "implicit" declarations
         -- (anything that cannot be exported in mi_exports) get
         -- wired up correctly in typecheckIfacesForMerging.  Most
-        -- of the time it's @Nothing@.  See Note [The implicit TypeEnv]
+        -- of the time it's @Nothing@.  See Note [Resolving never-exported Names in TcIface]
         -- in TcIface.
         if_implicits_env :: Maybe TypeEnv,
 

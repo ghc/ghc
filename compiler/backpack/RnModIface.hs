@@ -71,7 +71,7 @@ failWithRn doc = do
     writeTcRef errs_var (errs `snocBag` mkPlainErrMsg dflags noSrcSpan doc)
     failM
 
--- | What we have a generalized ModIface, which corresponds to
+-- | What we have is a generalized ModIface, which corresponds to
 -- a module that looks like p[A=<A>]:B.  We need a *specific* ModIface, e.g.
 -- p[A=q():A]:B (or maybe even p[A=<B>]:B) which we load
 -- up (either to merge it, or to just use during typechecking).
@@ -304,18 +304,49 @@ rnIfaceGlobal n = do
                     ]
                 Just n' -> return n'
 
--- | Rename an implicit name, e.g., a DFun or default method.
+-- | Rename an implicit name, e.g., a DFun or coercion axiom.
 -- Here is where we ensure that DFuns have the correct module as described in
--- Note [Bogus DFun renamings].
-rnIfaceImplicit :: Name -> ShIfM Name
-rnIfaceImplicit name = do
+-- Note [rnIfaceNeverExported].
+rnIfaceNeverExported :: Name -> ShIfM Name
+rnIfaceNeverExported name = do
     hmap <- getHoleSubst
     dflags <- getDynFlags
     iface_semantic_mod <- fmap sh_if_semantic_module getGblEnv
     let m = renameHoleModule dflags hmap $ nameModule name
-    -- Doublecheck that this DFun was, indeed, locally defined.
+    -- Doublecheck that this DFun/coercion axiom was, indeed, locally defined.
     MASSERT2( iface_semantic_mod == m, ppr iface_semantic_mod <+> ppr m )
     setNameModule (Just m) name
+
+-- Note [rnIfaceNeverExported]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For the high-level overview, see
+-- Note [Handling never-exported TyThings under Backpack]
+--
+-- When we see a reference to an entity that was defined in a signature,
+-- 'rnIfaceGlobal' relies on the identifier in question being part of the
+-- exports of the implementing 'ModIface', so that we can use the exports to
+-- decide how to rename the identifier.  Unfortunately, references to 'DFun's
+-- and 'CoAxiom's will run into trouble under this strategy, because they are
+-- never exported.
+--
+-- Let us consider first what should happen in the absence of promotion.  In
+-- this setting, a reference to a 'DFun' or a 'CoAxiom' can only occur inside
+-- the signature *that is defining it* (as there are no Core terms in
+-- typechecked-only interface files, there's no way for a reference to occur
+-- besides from the defining 'ClsInst' or closed type family).  Thus,
+-- it doesn't really matter what names we give the DFun/CoAxiom, as long
+-- as it's consistent between the declaration site and the use site.
+--
+-- We have to make sure that these bogus names don't get propagated,
+-- but it is fine: see Note [Signature merging DFuns] for the fixups
+-- to the names we do before writing out the merged interface.
+-- (It's even easier for instantiation, since the DFuns all get
+-- dropped entirely; the instances are reexported implicitly.)
+--
+-- Unfortunately, this strategy is not enough in the presence of promotion
+-- (see bug #13149), where modules which import the signature may make
+-- reference to their coercions.  It's not altogether clear how to
+-- fix this case, but it is definitely a bug!
 
 -- PILES AND PILES OF BOILERPLATE
 
@@ -326,67 +357,7 @@ rnIfaceClsInst cls_inst = do
     n <- rnIfaceGlobal (ifInstCls cls_inst)
     tys <- mapM rnMaybeIfaceTyCon (ifInstTys cls_inst)
 
-    -- Note [Bogus DFun renamings]
-    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    -- Every 'IfaceClsInst' is associated with a DFun; in fact, when
-    -- we are typechecking only, it is the ONLY place a DFun Id
-    -- can appear.  This DFun must refer to a DFun that is defined
-    -- elsewhere in the 'ModIface'.
-    --
-    -- Unfortunately, DFuns are not exported (don't appear in
-    -- mi_exports), so we can't look at the exports (as we do in
-    -- rnIfaceGlobal) to rename it.
-    --
-    -- We have to rename it to *something*.  So what we do depends
-    -- on the situation:
-    --
-    --  * If the instance wasn't defined in a signature, the DFun
-    --    have a name like p[A=<A>]:B.$fShowFoo.  This is the
-    --    easy case: just apply the module substitution to the
-    --    unit id and go our merry way.
-    --
-    --  * If the instance was defined in a signature, we are in
-    --    an interesting situation.  Suppose we are instantiating
-    --    the signature:
-    --
-    --      signature H where
-    --          instance F T           -- {H.$fxFT}
-    --      module H where
-    --          instance F T where ... -- p[]:H.$fFT
-    --
-    --    In an ideal world, we would map {H.$fxFT} to p[]:H.$fFT.
-    --    But we have no idea what the correct DFun is: the OccNames
-    --    don't match up.  Nor do we really want to wire up {H.$fxFT}
-    --    to p[]:H.$fFT: we'd rather have it point at the DFun
-    --    from the *signature's* interface, and use that type to
-    --    find the actual instance we want to compare against.
-    --
-    --    So, to handle this case, we have to do several things:
-    --
-    --      * In 'rnIfaceClsInst', we just blindly rename the
-    --        the identifier to something that looks vaguely plausible.
-    --        In the instantiating case, we just map {H.$fxFT}
-    --        to p[]:H.$fxFT.  In the merging case, we map
-    --        {H.$fxFT} to {H2.$fxFT}.
-    --
-    --      * In 'lookupIfaceTop', we arrange for the top-level DFun
-    --        to be assigned the very same identifier we picked
-    --        during renaming (p[]:H.$fxFT)
-    --
-    --      * Finally, in 'tcIfaceInstWithDFunTypeEnv', we make sure
-    --        to grab the correct 'TyThing' for the DFun directly
-    --        from the local type environment (which was constructed
-    --        using 'Name's from 'lookupIfaceTop').
-    --
-    --    It's all a bit of a giant Rube Goldberg machine, but it
-    --    seems to work!  Note that the name we pick here doesn't
-    --    really matter, since we throw it out shortly after
-    --    (for merging, we rename all of the DFuns so that they
-    --    are unique; for instantiation, the final interface never
-    --    mentions DFuns since they are implicitly exported. See
-    --    Note [Signature merging DFuns])  The important thing is that it's
-    --    consistent everywhere.
-    dfun <- rnIfaceImplicit (ifDFun cls_inst)
+    dfun <- rnIfaceNeverExported (ifDFun cls_inst)
     return cls_inst { ifInstCls = n
                     , ifInstTys = tys
                     , ifDFun = dfun
@@ -409,9 +380,9 @@ rnIfaceDecl' (fp, decl) = (,) fp <$> rnIfaceDecl decl
 rnIfaceDecl :: Rename IfaceDecl
 rnIfaceDecl d@IfaceId{} = do
             name <- case ifIdDetails d of
-                      IfDFunId -> rnIfaceImplicit (ifName d)
+                      IfDFunId -> rnIfaceNeverExported (ifName d)
                       _ | isDefaultMethodOcc (occName (ifName d))
-                        -> rnIfaceImplicit (ifName d)
+                        -> rnIfaceNeverExported (ifName d)
                         | otherwise -> rnIfaceGlobal (ifName d)
             ty <- rnIfaceType (ifType d)
             details <- rnIfaceIdDetails (ifIdDetails d)
@@ -466,7 +437,7 @@ rnIfaceDecl d@IfaceClass{} = do
                      , ifSigs = sigs
                      }
 rnIfaceDecl d@IfaceAxiom{} = do
-            name <- rnIfaceImplicit (ifName d)
+            name <- rnIfaceNeverExported (ifName d)
             tycon <- rnIfaceTyCon (ifTyCon d)
             ax_branches <- mapM rnIfaceAxBranch (ifAxBranches d)
             return d { ifName = name
@@ -497,7 +468,7 @@ rnIfaceDecl d@IfacePatSyn{} =  do
 
 rnIfaceFamTyConFlav :: Rename IfaceFamTyConFlav
 rnIfaceFamTyConFlav (IfaceClosedSynFamilyTyCon (Just (n, axs)))
-    = IfaceClosedSynFamilyTyCon . Just <$> ((,) <$> rnIfaceImplicit n
+    = IfaceClosedSynFamilyTyCon . Just <$> ((,) <$> rnIfaceNeverExported n
                                                 <*> mapM rnIfaceAxBranch axs)
 rnIfaceFamTyConFlav flav = pure flav
 

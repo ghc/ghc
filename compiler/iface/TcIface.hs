@@ -293,7 +293,8 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
     -- Build the initial environment
     -- NB: Don't include dfuns here, because we don't want to
-    -- serialize them out.  See Note [Bogus DFun renamings] in RnModIface
+    -- serialize them out.  See Note [rnIfaceNeverExported] in RnModIface
+    -- NB: But coercions are OK, because they will have the right OccName.
     let mk_decl_env decls
             = mkOccEnv [ (getOccName decl, decl)
                        | decl <- decls
@@ -312,7 +313,7 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
 
     -- OK, now typecheck each ModIface using this environment
     details <- forM ifaces $ \iface -> do
-        -- See Note [The implicit TypeEnv]
+        -- See Note [Resolving never-exported Names in TcIface]
         type_env <- fixM $ \type_env -> do
             setImplicitEnvM type_env $ do
                 decls <- loadDecls ignore_prags (mi_decls iface)
@@ -345,19 +346,19 @@ typecheckIfacesForMerging mod ifaces tc_env_var =
 -- implementing module, which we will use to give our top-level
 -- declarations the correct 'Name's even when the implementor
 -- provided them with a reexport, and (2) we have to deal with
--- DFun silliness (see Note [Bogus DFun renamings])
+-- DFun silliness (see Note [rnIfaceNeverExported])
 typecheckIfaceForInstantiate :: NameShape -> ModIface -> IfM lcl ModDetails
 typecheckIfaceForInstantiate nsubst iface =
   initIfaceLclWithSubst (mi_semantic_module iface)
                         (text "typecheckIfaceForInstantiate")
                         (mi_boot iface) nsubst $ do
     ignore_prags <- goptM Opt_IgnoreInterfacePragmas
-    -- See Note [The implicit TypeEnv]
+    -- See Note [Resolving never-exported Names in TcIface]
     type_env <- fixM $ \type_env -> do
         setImplicitEnvM type_env $ do
             decls     <- loadDecls ignore_prags (mi_decls iface)
             return (mkNameEnv decls)
-    -- See Note [Bogus DFun renamings]
+    -- See Note [rnIfaceNeverExported]
     setImplicitEnvM type_env $ do
     insts     <- mapM tcIfaceInst (mi_insts iface)
     fam_insts <- mapM tcIfaceFamInst (mi_fam_insts iface)
@@ -374,31 +375,38 @@ typecheckIfaceForInstantiate nsubst iface =
                         , md_exports   = exports
                         }
 
--- Note [The implicit TypeEnv]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Note [Resolving never-exported Names in TcIface]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- For the high-level overview, see
+-- Note [Handling never-exported TyThings under Backpack]
+--
 -- As described in 'typecheckIfacesForMerging', the splendid innovation
 -- of signature merging is to rewrite all Names in each of the signatures
 -- we are merging together to a pre-merged structure; this is the key
 -- ingredient that lets us solve some problems when merging type
 -- synonyms.
 --
--- However in the case of DFuns and CoAxioms, this strategy goes
--- *too far*.  In particular, the reference to a DFun or CoAxiom in
--- an instance declaration or closed type family (respectively) will
--- refer to the merged declaration.  However, checkBootDeclM only
--- ever looks at the embedded structure when performing its comparison;
--- by virtue of the fact that everything's been pointed to the merged
+-- However, when a 'Name' refers to a NON-exported entity, as is the
+-- case with the DFun of a ClsInst, or a CoAxiom of a type family,
+-- this strategy causes problems: if we pick one and rewrite all
+-- references to a shared 'Name', we will accidentally fail to check
+-- if the DFun or CoAxioms are compatible, as they will never be
+-- checked--only exported entities are checked for compatibility,
+-- and a non-exported TyThing is checked WHEN we are checking the
+-- ClsInst or type family for compatibility in checkBootDeclM.
+-- By virtue of the fact that everything's been pointed to the merged
 -- declaration, you'll never notice there's a difference even if there
 -- is one.
 --
--- The solution is, for reference to implicit entities, we go straight
--- for the local TypeEnv corresponding to the entities from this particular
--- signature; this logic is in 'tcIfaceImplicit'.
+-- Fortunately, there are only a few places in the interface declarations
+-- where this can occur, so we replace those calls with 'tcIfaceImplicit',
+-- which will consult a local TypeEnv that records any never-exported
+-- TyThings which we should wire up with.
 --
--- There is also some fixM business because families need to refer to
--- coercion axioms, which are all in the big pile of decls.  I didn't
--- feel like untangling first so the fixM is a convenient way to get things
--- where they need to be.
+-- Note that we actually knot-tie this local TypeEnv (the 'fixM'), because a
+-- type family can refer to a coercion axiom, all of which are done in one go
+-- when we typecheck 'mi_decls'.  An alternate strategy would be to typecheck
+-- coercions first before type families, but that seemed more fragile.
 --
 
 {-
@@ -1666,7 +1674,7 @@ tcIfaceExtId name = do { thing <- tcIfaceGlobal name
                           AnId id -> return id
                           _       -> pprPanic "tcIfaceExtId" (ppr name$$ ppr thing) }
 
--- See Note [The implicit TypeEnv]
+-- See Note [Resolving never-exported Names in TcIface]
 tcIfaceImplicit :: Name -> IfL TyThing
 tcIfaceImplicit n = do
     lcl_env <- getLclEnv
