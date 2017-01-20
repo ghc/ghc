@@ -24,5 +24,3 @@ blug = error "Urk"
 
 foo :: Bool
 foo = blug undefined
-
-

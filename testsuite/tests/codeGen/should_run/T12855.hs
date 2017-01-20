@@ -6,4 +6,3 @@ import qualified Data.ByteString.Char8 as S8
 
 main :: IO ()
 main = (S8.concat (map S.singleton (S.unpack (S8.pack "<foo>"))) == S8.empty) `seq` return ()
-

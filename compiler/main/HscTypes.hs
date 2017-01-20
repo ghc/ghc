@@ -1890,7 +1890,7 @@ isImplicitTyThing (ATyCon tc)   = isImplicitTyCon tc
 isImplicitTyThing (ACoAxiom ax) = isImplicitCoAxiom ax
 
 -- | tyThingParent_maybe x returns (Just p)
--- when pprTyThingInContext sould print a declaration for p
+-- when pprTyThingInContext should print a declaration for p
 -- (albeit with some "..." in it) when asked to show x
 -- It returns the *immediate* parent.  So a datacon returns its tycon
 -- but the tycon could be the associated type of a class, so it in turn

@@ -4,21 +4,15 @@
 T.length :: T.Integer
 class N a
 class S a
-class C a b where
-  c1 :: N b => a -> b
-  c2 :: (N b, S b) => a -> b
-  c3 :: a1 -> b
-  c4 :: a1 -> b
-  {-# MINIMAL c1, c2, c3, c4 #-}
+class C a b
+  ...
 c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a. a -> b
 c4 :: C a b => forall a1. a1 -> b
 -- imported via Control.Monad
-class (GHC.Base.Alternative m, Monad m) =>
-      MonadPlus (m :: * -> *) where
-  mzero :: m a
-  mplus :: m a -> m a -> m a
+class (GHC.Base.Alternative m, Monad m) => MonadPlus (m :: * -> *)
+  ...
 mplus :: MonadPlus m => forall a. m a -> m a -> m a
 mzero :: MonadPlus m => forall a. m a
 -- imported via Control.Monad, Prelude
@@ -27,12 +21,8 @@ mzero :: MonadPlus m => forall a. m a
 fail :: Monad m => forall a. GHC.Base.String -> m a
 return :: Monad m => forall a. a -> m a
 -- imported via Control.Monad, Prelude, T
-class GHC.Base.Applicative m => Monad (m :: * -> *) where
-  (>>=) :: m a -> (a -> m b) -> m b
-  (>>) :: m a -> m b -> m b
-  return :: a -> m a
-  fail :: GHC.Base.String -> m a
-  {-# MINIMAL (>>=) #-}
+class GHC.Base.Applicative m => Monad (m :: * -> *)
+  ...
 -- imported via Data.Maybe
 catMaybes :: [Maybe a] -> [a]
 fromJust :: Maybe a -> a
@@ -45,35 +35,26 @@ maybe :: b -> (a -> b) -> Maybe a -> b
 maybeToList :: Maybe a -> [a]
 -- imported via Data.Maybe, Prelude
 Just :: a -> Maybe a
-data Maybe a = Nothing | Just a
+data Maybe a = ...
 Nothing :: Maybe a
 -- imported via Prelude
 (+) :: GHC.Num.Num a => a -> a -> a
 (=<<) :: Monad m => (a -> m b) -> m a -> m b
-class Eq a where
-  (GHC.Classes.==) :: a -> a -> GHC.Types.Bool
-  (GHC.Classes./=) :: a -> a -> GHC.Types.Bool
-  {-# MINIMAL (==) | (/=) #-}
+class Eq a
+  ...
 -- imported via Prelude, T
 Prelude.length ::
   Data.Foldable.Foldable t => forall a. t a -> GHC.Types.Int
 -- imported via T
-data T.Integer
-  = integer-gmp-1.0.0.1:GHC.Integer.Type.S# !GHC.Prim.Int#
-  | integer-gmp-1.0.0.1:GHC.Integer.Type.Jp# {-# UNPACK #-}integer-gmp-1.0.0.1:GHC.Integer.Type.BigNat
-  | integer-gmp-1.0.0.1:GHC.Integer.Type.Jn# {-# UNPACK #-}integer-gmp-1.0.0.1:GHC.Integer.Type.BigNat
+data T.Integer = ...
 T.length :: Data.ByteString.Internal.ByteString -> GHC.Types.Int
 :browse! T
 -- defined locally
 T.length :: T.Integer
 class N a
 class S a
-class C a b where
-  c1 :: N b => a -> b
-  c2 :: (N b, S b) => a -> b
-  c3 :: a1 -> b
-  c4 :: a1 -> b
-  {-# MINIMAL c1, c2, c3, c4 #-}
+class C a b
+  ...
 c1 :: (C a b, N b) => a -> b
 c2 :: (C a b, N b, S b) => a -> b
 c3 :: C a b => forall a. a -> b
@@ -83,12 +64,8 @@ c4 :: C a b => forall a1. a1 -> b
 T.length :: T.Integer
 class N a
 class S a
-class C a b where
-  c1 :: N b => a -> b
-  c2 :: (N b, S b) => a -> b
-  c3 :: forall a1. a1 -> b
-  c4 :: forall a1. a1 -> b
-  {-# MINIMAL c1, c2, c3, c4 #-}
+class C a b
+  ...
 c1 :: forall a b. (C a b, N b) => a -> b
 c2 :: forall a b. (C a b, N b, S b) => a -> b
 c3 :: forall a b. C a b => forall a. a -> b
@@ -117,3 +94,4 @@ Ghci025C.g :: forall {a}. Num a => a -> a
 Ghci025C.h :: forall {a}. Integral a => a -> a
 -- defined locally
 f :: forall {a}. Num a => a -> a
+

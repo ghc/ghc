@@ -17,4 +17,3 @@ data FooData rngs
 class Foo xs where foo :: (Head xs ~ '(r,r')) => FooData xs
 
 type family Head (xs :: [k]) where Head (x ': xs) = x
-

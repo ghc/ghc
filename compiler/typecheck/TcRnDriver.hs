@@ -59,6 +59,8 @@ import Plugins ( tcPlugin )
 import DynFlags
 import StaticFlags
 import HsSyn
+import IfaceSyn ( ShowSub(..), showToHeader )
+import IfaceType( ShowForAllFlag(..) )
 import PrelNames
 import RdrName
 import TcHsSyn
@@ -67,7 +69,7 @@ import TcRnMonad
 import TcRnExports
 import TcEvidence
 import qualified BooleanFormula as BF
-import PprTyThing( pprTyThing )
+import PprTyThing( pprTyThingInContext )
 import MkIface( tyThingToIfaceDecl )
 import Coercion( pprCoAxiom )
 import CoreFVs( orphNamesOfFamInst )
@@ -1177,17 +1179,33 @@ badReexportedBootThing is_boot name name'
 
 bootMisMatch :: Bool -> SDoc -> TyThing -> TyThing -> SDoc
 bootMisMatch is_boot extra_info real_thing boot_thing
-  = vcat [ppr real_thing <+>
-          text "has conflicting definitions in the module",
-          text "and its" <+>
-            (if is_boot then text "hs-boot file"
-                       else text "hsig file"),
-          text "Main module:" <+> PprTyThing.pprTyThing real_thing,
-          (if is_boot
-            then text "Boot file:  "
-            else text "Hsig file: ")
-            <+> PprTyThing.pprTyThing boot_thing,
-          extra_info]
+  = pprBootMisMatch is_boot extra_info real_thing real_doc boot_doc
+  where
+    to_doc
+      = pprTyThingInContext $ showToHeader { ss_forall =
+                                              if is_boot
+                                                then ShowForAllMust
+                                                else ShowForAllWhen }
+
+    real_doc = to_doc real_thing
+    boot_doc = to_doc boot_thing
+
+    pprBootMisMatch :: Bool -> SDoc -> TyThing -> SDoc -> SDoc -> SDoc
+    pprBootMisMatch is_boot extra_info real_thing real_doc boot_doc
+      = vcat
+          [ ppr real_thing <+>
+            text "has conflicting definitions in the module",
+            text "and its" <+>
+              (if is_boot
+                then text "hs-boot file"
+                else text "hsig file"),
+            text "Main module:" <+> real_doc,
+              (if is_boot
+                then text "Boot file:  "
+                else text "Hsig file: ")
+                <+> boot_doc,
+            extra_info
+          ]
 
 instMisMatch :: Bool -> ClsInst -> SDoc
 instMisMatch is_boot inst
@@ -2492,7 +2510,7 @@ ppr_tydecls tycons
   = vcat [ ppr (tyThingToIfaceDecl (ATyCon tc))
          | tc <- sortBy (comparing getOccName) tycons ]
     -- The Outputable instance for IfaceDecl uses
-    -- showAll, which is what we want here, whereas
+    -- showToIface, which is what we want here, whereas
     -- pprTyThing uses ShowSome.
 
 {-
@@ -2533,4 +2551,3 @@ loadTcPlugins hsc_env =
   where
     load_plugin (_, plug, opts) = tcPlugin plug opts
 #endif
-

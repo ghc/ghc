@@ -2475,7 +2475,7 @@ instance Outputable TyLit where
 ------------------
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType = pprIfaceSigmaType . tidyToIfaceType
+pprSigmaType = (pprIfaceSigmaType ShowForAllWhen) . tidyToIfaceType
 
 pprForAll :: [TyVarBinder] -> SDoc
 pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)

@@ -11,6 +11,7 @@ type IfLclName = FastString
 type IfaceKind = IfaceType
 type IfacePredType = IfaceType
 
+data ShowForAllFlag
 data IfaceType
 data IfaceTyCon
 data IfaceTyLit
@@ -23,7 +24,7 @@ type IfaceForAllBndr  = TyVarBndr IfaceTvBndr ArgFlag
 instance Outputable IfaceType
 
 pprIfaceType, pprParendIfaceType :: IfaceType -> SDoc
-pprIfaceSigmaType :: IfaceType -> SDoc
+pprIfaceSigmaType :: ShowForAllFlag -> IfaceType -> SDoc
 pprIfaceTyLit :: IfaceTyLit -> SDoc
 pprIfaceForAll :: [IfaceForAllBndr] -> SDoc
 pprIfaceTvBndr :: Bool -> IfaceTvBndr -> SDoc
