@@ -722,6 +722,9 @@ callSize
  -> Int  -- ^ number of value args that are void
  -> Int
 callSize n_val_args voids = 10 * (1 + n_val_args - voids)
+        -- The 1+ is for the function itself
+        -- Add 1 for each non-trivial arg;
+        -- the allocation cost, as in let(rec)
 
 -- | The size of a jump to a join point
 jumpSize
@@ -748,9 +751,6 @@ funSize dflags top_args fun n_val_args voids
     size | is_join              = jumpSize n_val_args voids
          | not some_val_args    = 0
          | otherwise            = callSize n_val_args voids
-        -- The 1+ is for the function itself
-        -- Add 1 for each non-trivial arg;
-        -- the allocation cost, as in let(rec)
 
         --                  DISCOUNTS
         --  See Note [Function and non-function discounts]
