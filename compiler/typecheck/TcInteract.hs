@@ -1367,7 +1367,7 @@ emitFunDepDeriveds fd_eqns
           ; mapM_ (unifyDerived loc Nominal) eqs }
      | otherwise
      = do { traceTcS "emitFunDepDeriveds 2" (ppr (ctl_depth loc) $$ ppr eqs)
-          ; (subst, _) <- instFlexiTcS tvs  -- Takes account of kind substitution
+          ; subst <- instFlexi tvs  -- Takes account of kind substitution
           ; mapM_ (do_one_eq loc subst) eqs }
 
     do_one_eq loc subst (Pair ty1 ty2)
@@ -1500,13 +1500,13 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
     -- family but we only want to derive equalities from one such equation.
     concatMapM (injImproveEqns injective_args) (take 1 $
       buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
-                           fi_tys fi_rhs (const Nothing))
+                           fi_tvs fi_tys fi_rhs (const Nothing))
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
   = concatMapM (injImproveEqns injective_args) $
       buildImprovementData (fromBranches (co_ax_branches ax))
-                           cab_lhs cab_rhs Just
+                           cab_tvs cab_lhs cab_rhs Just
 
   | otherwise
   = return []
@@ -1514,6 +1514,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   where
       buildImprovementData
           :: [a]                     -- axioms for a TF (FamInst or CoAxBranch)
+          -> (a -> [TyVar])          -- get bound tyvars of an axiom
           -> (a -> [Type])           -- get LHS of an axiom
           -> (a -> Type)             -- get RHS of an axiom
           -> (a -> Maybe CoAxBranch) -- Just => apartness check required
@@ -1523,34 +1524,35 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
              -- , RHS-unifying substitution
              -- , axiom variables without substitution
              -- , Maybe matching axiom [Nothing - open TF, Just - closed TF ] )
-      buildImprovementData axioms axiomLHS axiomRHS wrap =
+      buildImprovementData axioms axiomTVs axiomLHS axiomRHS wrap =
           [ (ax_args, subst, unsubstTvs, wrap axiom)
           | axiom <- axioms
           , let ax_args = axiomLHS axiom
-          , let ax_rhs  = axiomRHS axiom
+                ax_rhs  = axiomRHS axiom
+                ax_tvs  = axiomTVs axiom
           , Just subst <- [tcUnifyTyWithTFs False ax_rhs rhs_ty]
-          , let tvs           = tyCoVarsOfTypesList ax_args
-                notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
-                unsubstTvs    = filter (notInSubst <&&> isTyVar) tvs ]
+          , let notInSubst tv = not (tv `elemVarEnv` getTvSubstEnv subst)
+                unsubstTvs    = filter (notInSubst <&&> isTyVar) ax_tvs ]
+                   -- The order of unsubstTvs is important; it must be
+                   -- in telescope order e.g. (k:*) (a:k)
 
       injImproveEqns :: [Bool]
                      -> ([Type], TCvSubst, [TyCoVar], Maybe CoAxBranch)
                      -> TcS [TypeEqn]
-      injImproveEqns inj_args (ax_args, theta, unsubstTvs, cabr) = do
-        (theta', _) <- instFlexiTcS unsubstTvs
-        -- The use of deterministically ordered list for `unsubstTvs`
-        -- is not strictly necessary here, we only use the substitution
-        -- part of the result of instFlexiTcS. If we used the second
-        -- part of the tuple, which is the range of the substitution then
-        -- the order could be important.
-        let subst = theta `unionTCvSubst` theta'
-        return [ Pair (substTyUnchecked subst ax_arg) arg
-                   -- NB: the ax_arg part is on the left
-                   -- see Note [Improvement orientation]
-               | case cabr of
-                  Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
-                  _          -> True
-               , (ax_arg, arg, True) <- zip3 ax_args args inj_args ]
+      injImproveEqns inj_args (ax_args, subst, unsubstTvs, cabr)
+        = do { subst <- instFlexiX subst unsubstTvs
+                  -- If the current substitution bind [k -> *], and
+                  -- one of the un-substituted tyvars is (a::k), we'd better
+                  -- be sure to apply the current substitution to a's kind.
+                  -- Hence instFlexiX.   Trac #13135 was an example.
+
+             ; return [ Pair (substTyUnchecked subst ax_arg) arg
+                        -- NB: the ax_arg part is on the left
+                        -- see Note [Improvement orientation]
+                      | case cabr of
+                          Just cabr' -> apartnessCheck (substTys subst ax_args) cabr'
+                          _          -> True
+                      , (ax_arg, arg, True) <- zip3 ax_args args inj_args ] }
 
 
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion

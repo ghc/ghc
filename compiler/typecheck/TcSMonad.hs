@@ -90,7 +90,7 @@ module TcSMonad (
     instDFunType,                              -- Instantiation
 
     -- MetaTyVars
-    newFlexiTcSTy, instFlexiTcS,
+    newFlexiTcSTy, instFlexi, instFlexiX,
     cloneMetaTyVar, demoteUnfilledFmv,
 
     TcLevel, isTouchableMetaTyVarTcS,
@@ -2790,21 +2790,21 @@ demoteUnfilledFmv fmv
                    do { tv_ty <- TcM.newFlexiTyVarTy (tyVarKind fmv)
                       ; TcM.writeMetaTyVar fmv tv_ty } }
 
-instFlexiTcS :: [TKVar] -> TcS (TCvSubst, [TcType])
-instFlexiTcS tvs = wrapTcS (mapAccumLM inst_one emptyTCvSubst tvs)
-  where
-     inst_one subst tv
-         = do { ty' <- instFlexiTcSHelper (tyVarName tv)
-                                          (substTyUnchecked subst (tyVarKind tv))
-              ; return (extendTvSubst subst tv ty', ty') }
+instFlexi :: [TKVar] -> TcS TCvSubst
+instFlexi = instFlexiX emptyTCvSubst
 
-instFlexiTcSHelper :: Name -> Kind -> TcM TcType
-instFlexiTcSHelper tvname kind
+instFlexiX :: TCvSubst -> [TKVar] -> TcS TCvSubst
+instFlexiX subst tvs
+  = wrapTcS (foldlM instFlexiHelper subst tvs)
+
+instFlexiHelper :: TCvSubst -> TKVar -> TcM TCvSubst
+instFlexiHelper subst tv
   = do { uniq <- TcM.newUnique
        ; details <- TcM.newMetaDetails TauTv
-       ; let name = setNameUnique tvname uniq
-       ; return (mkTyVarTy (mkTcTyVar name kind details)) }
-
+       ; let name = setNameUnique (tyVarName tv) uniq
+             kind = substTyUnchecked subst (tyVarKind tv)
+             ty'  = mkTyVarTy (mkTcTyVar name kind details)
+       ; return (extendTvSubst subst tv ty') }
 
 
 -- Creating and setting evidence variables and CtFlavors
