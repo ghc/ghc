@@ -166,7 +166,10 @@ def get_compiler_info():
     rtsInfoDict = dict(eval(s))
 
     # external interpreter needs RTS linker support
-    config.have_ext_interp = compilerInfoDict["target has RTS linker"] == "YES"
+    # If the field is not present (GHC 8.0 and earlier), assume we don't
+    # have -fexternal-interpreter (though GHC 8.0 actually does)
+    # so we can still run most tests.
+    config.have_ext_interp = compilerInfoDict.get("target has RTS linker", "NO") == "YES"
 
     # See Note [Replacing backward slashes in config.libdir].
     config.libdir = compilerInfoDict['LibDir'].replace('\\', '/')
