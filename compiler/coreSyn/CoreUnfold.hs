@@ -50,6 +50,7 @@ import CoreSubst hiding( substTy )
 import CoreArity       ( manifestArity )
 import CoreUtils
 import Id
+import Demand          ( isBottomingSig )
 import DataCon
 import Literal
 import PrimOp
@@ -1034,6 +1035,10 @@ certainlyWillInline dflags fn_info
       , case inlinePragmaSpec (inlinePragInfo fn_info) of
           NoInline -> False -- NOINLINE; do not say certainlyWillInline!
           _        -> True  -- INLINE, INLINABLE, or nothing
+      , not (isBottomingSig (strictnessInfo fn_info))
+              -- Do not unconditionally inline a bottoming functions even if
+              -- it seems smallish. We've carefully lifted it out to top level,
+              -- so we don't want to re-inline it.
       , let arity = length args
       , size - (10 * (arity + 1)) <= ufUseThreshold dflags
       = Just (fn_unf { uf_src      = InlineStable
