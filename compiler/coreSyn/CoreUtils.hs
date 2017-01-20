@@ -25,7 +25,7 @@ module CoreUtils (
         exprType, coreAltType, coreAltsType, isExprLevPoly,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
         getIdFromTrivialExpr_maybe,
-        exprIsCheap, exprIsExpandable, exprIsCheap', CheapAppFun,
+        exprIsCheap, exprIsExpandable, exprIsOk, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
@@ -78,6 +78,7 @@ import DynFlags
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
+import BasicTypes       ( Arity )
 import Platform
 import Util
 import Pair
@@ -1015,29 +1016,7 @@ heap-allocates noFactor's argument.  At the moment (May 12) we are just
 going to put up with this, because the previous more aggressive inlining
 (which treated 'noFactor' as work-free) was duplicating primops, which
 in turn was making inner loops of array calculations runs slow (#5623)
--}
 
-exprIsWorkFree :: CoreExpr -> Bool
--- See Note [exprIsWorkFree]
-exprIsWorkFree e = go 0 e
-  where    -- n is the number of value arguments
-    go _ (Lit {})                     = True
-    go _ (Type {})                    = True
-    go _ (Coercion {})                = True
-    go n (Cast e _)                   = go n e
-    go n (Case scrut _ _ alts)        = foldl (&&) (exprIsWorkFree scrut)
-                                              [ go n rhs | (_,_,rhs) <- alts ]
-         -- See Note [Case expressions are work-free]
-    go _ (Let {})                     = False
-    go n (Var v)                      = isCheapApp v n
-    go n (Tick t e) | tickishCounts t = False
-                    | otherwise       = go n e
-    go n (Lam x e)  | isRuntimeVar x = n==0 || go (n-1) e
-                    | otherwise      = go n e
-    go n (App f e)  | isRuntimeArg e = exprIsWorkFree e && go (n+1) f
-                    | otherwise      = go n f
-
-{-
 Note [Case expressions are work-free]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Are case-expressions work-free?  Consider
@@ -1049,6 +1028,8 @@ that increased allocation slightly.  It's a fairly small effect, and at
 the moment we go for the slightly more aggressive version which treats
 (case x of ....) as work-free if the alternatives are.
 
+Moreover it improves arities of overloaded functions where
+there is only dictionary selection (no construction) involved
 
 Note [exprIsCheap]   See also Note [Interaction of exprIsCheap and lone variables]
 ~~~~~~~~~~~~~~~~~~   in CoreUnfold.hs
@@ -1086,137 +1067,166 @@ Note that exprIsHNF does not imply exprIsCheap.  Eg
         let x = fac 20 in Just x
 This responds True to exprIsHNF (you can discard a seq), but
 False to exprIsCheap.
+
+Note [exprIsExpandable]
+~~~~~~~~~~~~~~~~~~~~~~~
+An expression is "expandable" if we are willing to dupicate it, if doing
+so might make a RULE or case-of-constructor fire.  Mainly this means
+data-constructor applications, but it's a bit more generous than exprIsCheap
+because it is true of "CONLIKE" Ids: see Note [CONLIKE pragma] in BasicTypes.
+
+It is used to set the uf_expandable field of an Unfolding, and that
+in turn is used
+  * In RULE matching
+  * In exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe
+
+But take care: exprIsExpandable should /not/ be true of primops.  I
+found this in test T5623a:
+    let q = /\a. Ptr a (a +# b)
+    in case q @ Float of Ptr v -> ...q...
+
+q's inlining should not be expandable, else exprIsConApp_maybe will
+say that (q @ Float) expands to (Ptr a (a +# b)), and that will
+duplicate the (a +# b) primop, which we should not do lightly.
+(It's quite hard to trigger this bug, but T13155 does so for GHC 8.0.)
+
+
+Note [Arguments in exprIsOk]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What predicate should we apply to the argument of an application?  We
+used to say "exprIsTrivial arg" due to concerns about duplicating
+nested constructor applications, but see #4978.  The principle here is
+that
+   let x = a +# b in c *# x
+should behave equivalently to
+   c *# (a +# b)
+Since lets with cheap RHSs are accepted, so should paps with cheap arguments
 -}
 
+--------------------
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsCheap' isCheapApp
+exprIsCheap = exprIsOk isCheapApp
 
-exprIsExpandable :: CoreExpr -> Bool
-exprIsExpandable = exprIsCheap' isExpandableApp -- See Note [CONLIKE pragma] in BasicTypes
+exprIsExpandable :: CoreExpr -> Bool -- See Note [exprIsExpandable]
+exprIsExpandable = exprIsOk isExpandableApp
 
-exprIsCheap' :: CheapAppFun -> CoreExpr -> Bool
-exprIsCheap' _        (Lit _)      = True
-exprIsCheap' _        (Type _)    = True
-exprIsCheap' _        (Coercion _) = True
-exprIsCheap' _        (Var _)      = True
-exprIsCheap' good_app (Cast e _)   = exprIsCheap' good_app e
-exprIsCheap' good_app (Lam x e)    = isRuntimeVar x
-                                  || exprIsCheap' good_app e
+exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
+exprIsWorkFree = exprIsOk isWorkFreeApp
 
-exprIsCheap' good_app (Case e _ _ alts) = exprIsCheap' good_app e &&
-                                          and [exprIsCheap' good_app rhs | (_,_,rhs) <- alts]
-        -- Experimentally, treat (case x of ...) as cheap
-        -- (and case __coerce x etc.)
-        -- This improves arities of overloaded functions where
-        -- there is only dictionary selection (no construction) involved
-
-exprIsCheap' good_app (Tick t e)
-  | tickishCounts t = False
-  | otherwise       = exprIsCheap' good_app e
-     -- never duplicate counting ticks.  If we get this wrong, then
-     -- HPC's entry counts will be off (check test in
-     -- libraries/hpc/tests/raytrace)
-
-exprIsCheap' good_app (Let (NonRec _ b) e)
-  = exprIsCheap' good_app b && exprIsCheap' good_app e
-exprIsCheap' good_app (Let (Rec prs) e)
-  = all (exprIsCheap' good_app . snd) prs && exprIsCheap' good_app e
-
-exprIsCheap' good_app other_expr        -- Applications and variables
-  = go other_expr []
+--------------------
+exprIsOk :: CheapAppFun -> CoreExpr -> Bool
+exprIsOk ok_app e
+  = ok e
   where
-        -- Accumulate value arguments, then decide
-    go (Cast e _) val_args                 = go e val_args
-    go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
-                          | otherwise      = go f val_args
+    ok e = go 0 e
 
-    go (Var _) [] = True
-         -- Just a type application of a variable
-         -- (f t1 t2 t3) counts as WHNF
-         -- This case is probably handeld by the good_app case
-         -- below, which should have a case for n=0, but putting
-         -- it here too is belt and braces; and it's such a common
-         -- case that checking for null directly seems like a
-         -- good plan
+    -- n is the number of value arguments
+    go n (Var v)                      = ok_app v n
+    go _ (Lit {})                     = True
+    go _ (Type {})                    = True
+    go _ (Coercion {})                = True
+    go n (Cast e _)                   = go n e
+    go n (Case scrut _ _ alts)        = foldl (&&) (ok scrut)
+                                        [ go n rhs | (_,_,rhs) <- alts ]
+    go n (Tick t e) | tickishCounts t = False
+                    | otherwise       = go n e
+    go n (Lam x e)  | isRuntimeVar x  = n==0 || go (n-1) e
+                    | otherwise       = go n e
+    go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
+                    | otherwise       = go n f
+    go _ (Let {})                     = False
 
-    go (Var f) args
-       | good_app f (length args)  -- Typically holds of data constructor applications
-       = go_pap args               -- E.g. good_app = isCheapApp below
+      -- Case: see Note [Case expressions are work-free]
+      -- App:  see Note [Arugments in exprIsOk]
+      -- Let:  the old exprIsCheap worked through lets
 
-       | otherwise
-        = case idDetails f of
-                RecSelId {}         -> go_sel args
-                ClassOpId {}        -> go_sel args
-                PrimOpId op         -> go_primop op args
-                _ | isBottomingId f -> True
-                  | otherwise       -> False
-                        -- Application of a function which
-                        -- always gives bottom; we treat this as cheap
-                        -- because it certainly doesn't need to be shared!
 
-    go (Tick t e) args
-      | not (tickishCounts t) -- don't duplicate counting ticks, see above
-      = go e args
+-------------------------------------
+type CheapAppFun = Id -> Arity -> Bool
+  -- Is an application of this function to n *value* args
+  -- always cheap, assuming the arguments are cheap?
+  -- True mainly of data constructors, partial applications;
+  -- but with minor variations:
+  --    isWorkFreeApp
+  --    isCheapApp
+  --    isExpandableApp
 
-    go _ _ = False
+  -- NB: isCheapApp and isExpandableApp are called from outside
+  --     this module, so don't be tempted to move the notRedex
+  --     stuff into the call site in exprIsOk, and remove it
+  --     from the CheapAppFun implementations
 
-    --------------
-    go_pap args = all (exprIsCheap' good_app) args
-        -- Used to be "all exprIsTrivial args" due to concerns about
-        -- duplicating nested constructor applications, but see #4978.
-        -- The principle here is that
-        --    let x = a +# b in c *# x
-        -- should behave equivalently to
-        --    c *# (a +# b)
-        -- Since lets with cheap RHSs are accepted,
-        -- so should paps with cheap arguments
 
-    --------------
-    go_primop op args = primOpIsCheap op && all (exprIsCheap' good_app) args
+notRedex :: CheapAppFun
+notRedex fn n_val_args
+  =  n_val_args == 0           -- No value args
+  || n_val_args < idArity fn   -- Partial application
+  || isBottomingId fn   -- OK to duplicate calls to bottom;
+                        -- it certainly doesn't need to be shared!
+
+isWorkFreeApp :: CheapAppFun
+isWorkFreeApp fn n_val_args
+  | notRedex fn n_val_args
+  = True
+  | otherwise
+  = case idDetails fn of
+      DataConWorkId {} -> True
+      _                -> False
+
+isCheapApp :: CheapAppFun
+isCheapApp fn n_val_args
+  | notRedex fn n_val_args
+  = True
+  | otherwise
+  = case idDetails fn of
+      DataConWorkId {} -> True
+      RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
+      ClassOpId {}     -> n_val_args == 1
+      PrimOpId op      -> primOpIsCheap op
+      _                -> False
         -- In principle we should worry about primops
         -- that return a type variable, since the result
         -- might be applied to something, but I'm not going
         -- to bother to check the number of args
 
-    --------------
-    go_sel [arg] = exprIsCheap' good_app arg    -- I'm experimenting with making record selection
-    go_sel _     = False                -- look cheap, so we will substitute it inside a
-                                        -- lambda.  Particularly for dictionary field selection.
-                -- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
-                --      there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
-
--------------------------------------
-type CheapAppFun = Id -> Int -> Bool
-  -- Is an application of this function to n *value* args
-  -- always cheap, assuming the arguments are cheap?
-  -- Mainly true of partial applications, data constructors,
-  -- and of course true if the number of args is zero
-
-isCheapApp :: CheapAppFun
-isCheapApp fn n_val_args
-  =  isDataConWorkId fn
-  || n_val_args == 0
-  || n_val_args < idArity fn
-
 isExpandableApp :: CheapAppFun
 isExpandableApp fn n_val_args
-  =  isConLikeId fn
-  || n_val_args < idArity fn
-  || go n_val_args (idType fn)
+  | notRedex fn n_val_args
+  = True
+  | isConLikeId fn
+  = True
+  | otherwise
+  = case idDetails fn of
+      DataConWorkId {} -> True
+      RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
+      ClassOpId {}     -> n_val_args == 1
+      PrimOpId {}      -> False
+      _                -> all_pred_args n_val_args (idType fn)
+
   where
   -- See if all the arguments are PredTys (implicit params or classes)
   -- If so we'll regard it as expandable; see Note [Expandable overloadings]
-  -- This incidentally picks up the (n_val_args = 0) case
-     go 0 _ = True
-     go n_val_args ty
+     all_pred_args n_val_args ty
+       | n_val_args == 0
+       = True
+
        | Just (bndr, ty) <- splitPiTy_maybe ty
        = caseBinder bndr
-           (\_tv -> go n_val_args ty)
-           (\bndr_ty -> isPredTy bndr_ty && go (n_val_args-1) ty)
+           (\_tv -> all_pred_args n_val_args ty)
+           (\bndr_ty -> isPredTy bndr_ty && all_pred_args (n_val_args-1) ty)
+
        | otherwise
        = False
 
-{-
+{- Note [Record selection]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+I'm experimenting with making record selection
+look cheap, so we will substitute it inside a
+lambda.  Particularly for dictionary field selection.
+
+BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
+there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
+
 Note [Expandable overloadings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose the user wrote this

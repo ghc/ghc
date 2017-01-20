@@ -113,6 +113,10 @@ T5327:
 T5623:
 	$(RM) -f T5623.hi T5623.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T5623.hs -O -ddump-prep | grep -c "plusAddr#"
+T13155:
+	$(RM) -f T13155.hi T13155.o
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13155.hs -O -ddump-prep | grep -c "plusAddr#"
+        # There should be only one plusAddr#!
 
 .PHONY: T4138
 T4138:

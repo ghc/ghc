@@ -498,9 +498,9 @@ getBotArity _        = Nothing
 mk_cheap_fn :: DynFlags -> CheapAppFun -> CheapFun
 mk_cheap_fn dflags cheap_app
   | not (gopt Opt_DictsCheap dflags)
-  = \e _     -> exprIsCheap' cheap_app e
+  = \e _     -> exprIsOk cheap_app e
   | otherwise
-  = \e mb_ty -> exprIsCheap' cheap_app e
+  = \e mb_ty -> exprIsOk cheap_app e
              || case mb_ty of
                   Nothing -> False
                   Just ty -> isDictLikeTy ty
