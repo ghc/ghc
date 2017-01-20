@@ -1135,12 +1135,8 @@ ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
     text "UnsafeCo" <+> ppr r <+>
     pprParendIfaceType ty1 <+> pprParendIfaceType ty2
 
-ppr_co ctxt_prec (IfaceUnivCo (IfaceHoleProv u) _ _ _)
- = maybeParen ctxt_prec TyConPrec $
-   sdocWithDynFlags $ \dflags ->
-     if gopt Opt_PrintExplicitCoercions dflags
-       then braces $ ppr u
-       else braces $ text "a hole"
+ppr_co _ctxt_prec (IfaceUnivCo (IfaceHoleProv u) _ _ _)
+ = braces $ ppr u
 
 ppr_co _         (IfaceUnivCo _ _ ty1 ty2)
   = angleBrackets ( ppr ty1 <> comma <+> ppr ty2 )
