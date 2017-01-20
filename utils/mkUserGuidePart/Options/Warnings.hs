@@ -445,4 +445,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-deriving-typeable"
          }
+  , flag { flagName = "-Wmissing-home-modules"
+         , flagDescription =
+           "warn when encountering a home module imported, but not listed "++
+           "on the command line. Useful for cabal to ensure GHC won't pick "++
+           "up modules, not listed neither in ``exposed-modules``, nor in "++
+           "``other-modules``."
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-missing-home-modules"
+         }
   ]

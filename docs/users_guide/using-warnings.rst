@@ -66,6 +66,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wmissing-local-signatures`
         * :ghc-flag:`-Wmissing-exported-signatures`
         * :ghc-flag:`-Wmissing-import-lists`
+        * :ghc-flag:`-Wmissing-home-modules`
         * :ghc-flag:`-Widentities`
 
 .. ghc-flag:: -Wcompat
@@ -1035,8 +1036,18 @@ of ``-W(no-)*``.
 
     This flag warns whenever you write a pattern that binds a variable whose
     type is unlifted, and yet the pattern is not a bang pattern nor a bare variable.
-    See :ref:`glasgow-unboxed` for informatino about unlifted types.
-    
+    See :ref:`glasgow-unboxed` for information about unlifted types.
+
+.. ghc-flag:: -Wmissing-home-modules
+
+    :since: 8.2
+
+    When a module provided by the package currently being compiled
+    (i.e. the "home" package) is imported, but not explicitly listed in
+    command line as a target. Useful for Cabal to ensure GHC won't
+    pick up modules, not listed neither in ``exposed-modules``, nor in
+    ``other-modules``.
+
 If you're feeling really paranoid, the :ghc-flag:`-dcore-lint` option is a good choice.
 It turns on heavyweight intra-pass sanity-checking within GHC. (It checks GHC's
 sanity, not yours.)
