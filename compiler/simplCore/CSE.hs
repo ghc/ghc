@@ -15,9 +15,9 @@ import Var              ( Var )
 import Id               ( Id, idType, idUnfolding, idInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo )
 import CoreUtils        ( mkAltExpr
-                        , exprIsTrivial, exprOkForSpeculation
                         , stripTicksE, stripTicksT, mkTicks )
-import Type             ( tyConAppArgs, isUnliftedType )
+import Literal          ( litIsTrivial )
+import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
 import BasicTypes       ( isAlwaysActive )
@@ -62,9 +62,10 @@ We can simply add clones to the substitution already described.
 
 Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Let-bindings have two cases, implemnted by addBinding.
+Let-bindings have two cases, implemented by addBinding.
 
-* Trivial RHS:
+* SUBSTITUTE: applies when the RHS is a variable or literal
+
      let x = y in ...(h x)....
 
   Here we want to extend the /substitution/ with x -> y, so that the
@@ -72,7 +73,7 @@ Let-bindings have two cases, implemnted by addBinding.
   NB: the substitution maps InIds, so we extend the substitution with
       a biding for the original InId 'x'
 
-  How can we have a trivial RHS? Doens't the simplifier inline them?
+  How can we have a variable on the RHS? Doesn't the simplifier inline them?
 
     - First, the original RHS might have been (g z) which has CSE'd
       with an enclosing (let y = g z in ...).  This is super-important.
@@ -87,17 +88,29 @@ Let-bindings have two cases, implemnted by addBinding.
     - Second, we use cseRHS for case expression scrutinees too;
       see Note [CSE for case expressions]
 
-* Non-trivial RHS
+* EXTEND THE REVERSE MAPPING: applies in all other cases
+
      let x = h y in ...(h y)...
 
   Here we want to extend the /reverse mapping (cs_map)/ so that
   we CSE the (h y) call to x.
 
-Notice that
-  - The trivial-RHS situation extends the substitution (cs_subst)
-  - The non-trivial-RHS situation extends the reverse mapping (cs_map)
+  Note that we use EXTEND even for a trivial expression, provided it
+  is not a variable or literal. In particular this /includes/ type
+  applications. This can be important (Trac #13156); e.g.
+     case f @ Int of { r1 ->
+     case f @ Int of { r2 -> ...
+  Here we want to common-up the two uses of (f @ Int) so we can
+  remove one of the case expressions.
 
-Notice also that in the trivial-RHS case we leave behind a binding
+  See also Note [Corner case for case expressions] for another
+  reason not to use SUBSTITUTE for all trivial expressions.
+
+Notice that
+  - The SUBSTITUTE situation extends the substitution (cs_subst)
+  - The EXTEND situation extends the reverse mapping (cs_map)
+
+Notice also that in the SUBSTITUTE case we leave behind a binding
   x = y
 even though we /also/ carry a substitution x -> y.  Can we just drop
 the binding instead?  Well, not at top level! See SimplUtils
@@ -217,24 +230,19 @@ modules might see that.  So it seems dodgy and we don't do it.
 
 Note [Corner case for case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consdider
+Here is another reason that we do not use SUBSTITUTE for
+all trivial expressions. Consider
    case x |> co of (y::Array# Int) { ... }
 
-Is it ok to extend the substutition with (y -> x |> co)?
-Because y is of unlifted type, this is only OK if (x |> co) is
-ok-for-speculation, else we'll destroy the let/app invariant.
-But surely it is ok-for-speculation, becasue it's a trivial
-expression, and x's type is also unlifted, presumably.
+We do not want to extend the substitution with (y -> x |> co); since y
+is of unlifted type, this would desroy the let/app invariant if (x |>
+co) was not ok-for-speculation.
 
-Well, maybe not if you are using unsafe casts.  I actually found
-a case where we had
+But surely (x |> co) is ok-for-speculation, becasue it's a trivial
+expression, and x's type is also unlifted, presumably.  Well, maybe
+not if you are using unsafe casts.  I actually found a case where we
+had
    (x :: HValue) |> (UnsafeCo :: HValue ~ Array# Int)
-This is a vanishingly strange corner case, but we still have
-to check.
-
-We do the check in addBinding, but it can't fire when addBinding is called
-from a let-binding, because they are always ok-for-speculation.  Never
-mind!
 
 
 ************************************************************************
@@ -275,9 +283,9 @@ addBinding :: CSEnv                      -- Includes InId->OutId cloning
 -- Extend the CSE env with a mapping [rhs -> out-id]
 -- unless we can instead just substitute [in-id -> rhs]
 addBinding env in_id out_id rhs'
-  | no_cse      = (env,                              out_id)
-  | ok_to_subst = (extendCSSubst env in_id rhs',     out_id)
-  | otherwise   = (extendCSEnv env rhs' id_expr', zapped_id)
+  | no_cse    = (env,                              out_id)
+  | use_subst = (extendCSSubst env in_id rhs',     out_id)
+  | otherwise = (extendCSEnv env rhs' id_expr', zapped_id)
   where
     id_expr'  = varToCoreExpr out_id
     zapped_id = zapIdUsageInfo out_id
@@ -296,15 +304,15 @@ addBinding env in_id out_id rhs'
           || isStableUnfolding (idUnfolding out_id)
              -- See Note [CSE for stable unfoldings]
 
+    -- Should we use SUBSTITUTE or EXTEND?
     -- See Note [CSE for bindings]
-    ok_to_subst = exprIsTrivial rhs'
-               && (not (isUnliftedType (idType out_id))
-                   || exprOkForSpeculation rhs')
-               -- See Note [Corner case for case expressions]
+    use_subst = case rhs' of
+                   Var {} -> True
+                   Lit l  -> litIsTrivial l
+                   _      -> False
 
 tryForCSE :: CSEnv -> InExpr -> OutExpr
 tryForCSE env expr
-  | exprIsTrivial expr'              = expr'       -- No point
   | Just e <- lookupCSEnv env expr'' = mkTicks ticks e
   | otherwise                        = expr'
     -- The varToCoreExpr is needed if we have

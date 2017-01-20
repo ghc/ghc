@@ -1,0 +1,2 @@
+    case GHC.List.reverse @ a x of sat { __DEFAULT ->
+    case case g x of {

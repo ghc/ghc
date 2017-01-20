@@ -261,4 +261,4 @@ test('T13025',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13025'])
-
+test('T13156', normal, run_command, ['$MAKE -s --no-print-directory T13156'])
