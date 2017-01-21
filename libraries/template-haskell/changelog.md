@@ -16,6 +16,8 @@
   * Add support for attaching deriving strategies to `deriving` statements
     (#10598)
 
+  * Add support for `COMPLETE` pragmas. (#13098)
+
   * `unboxedTupleTypeName` and `unboxedTupleDataName` now work for unboxed
     0-tuples and 1-tuples (#12977)
 

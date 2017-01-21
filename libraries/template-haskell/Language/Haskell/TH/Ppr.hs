@@ -527,6 +527,9 @@ instance Ppr Pragma where
             target1 (ValueAnnotation v) = ppr v
     ppr (LineP line file)
        = text "{-# LINE" <+> int line <+> text (show file) <+> text "#-}"
+    ppr (CompleteP cls mty)
+       = text "{-# COMPLETE" <+> (fsep $ punctuate comma $ map ppr cls)
+                <+> maybe empty (\ty -> dcolon <+> ppr ty) mty
 
 ------------------------------
 instance Ppr Inline where

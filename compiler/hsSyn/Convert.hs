@@ -709,6 +709,11 @@ cvtPragmaD (LineP line file)
   = do { setL (srcLocSpan (mkSrcLoc (fsLit file) line 1))
        ; return Nothing
        }
+cvtPragmaD (CompleteP cls mty)
+  = do { cls' <- noLoc <$> mapM cNameL cls
+       ; mty'  <- traverse tconNameL mty
+       ; returnJustL $ Hs.SigD
+                   $ CompleteMatchSig NoSourceText cls' mty' }
 
 dfltActivation :: TH.Inline -> Activation
 dfltActivation TH.NoInline = NeverActive

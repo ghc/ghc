@@ -737,7 +737,8 @@ rep_sig (L loc (SpecSig nm tys ispec))
 rep_sig (L loc (SpecInstSig _ ty))    = rep_specialiseInst ty loc
 rep_sig (L _   (MinimalSig {}))       = notHandled "MINIMAL pragmas" empty
 rep_sig (L _   (SCCFunSig {}))        = notHandled "SCC pragmas" empty
-rep_sig (L _   (CompleteMatchSig {})) = notHandled "CompleteMatchSig" empty
+rep_sig (L loc (CompleteMatchSig _st cls mty)) = rep_complete_sig cls mty loc
+
 
 rep_ty_sig :: Name -> SrcSpan -> LHsSigType Name -> Located Name
            -> DsM (SrcSpan, Core TH.DecQ)
@@ -831,6 +832,21 @@ repPhases (ActiveBefore _ i) = do { MkC arg <- coreIntLit i
 repPhases (ActiveAfter _ i)  = do { MkC arg <- coreIntLit i
                                   ; dataCon' fromPhaseDataConName [arg] }
 repPhases _                  = dataCon allPhasesDataConName
+
+rep_complete_sig :: Located [Located Name]
+                 -> Maybe (Located Name)
+                 -> SrcSpan
+                 -> DsM [(SrcSpan, Core TH.DecQ)]
+rep_complete_sig (L _ cls) mty loc
+  = do { mty' <- rep_maybe_name mty
+       ; cls' <- repList nameTyConName lookupLOcc cls
+       ; sig <- repPragComplete cls' mty'
+       ; return [(loc, sig)] }
+  where
+    rep_maybe_name Nothing = coreNothing nameTyConName
+    rep_maybe_name (Just n) = do
+      cn <- lookupLOcc n
+      coreJust nameTyConName cn
 
 -------------------------------------------------------
 --                      Types
@@ -2100,6 +2116,9 @@ repPragSpecInl (MkC nm) (MkC ty) (MkC inline) (MkC phases)
 
 repPragSpecInst :: Core TH.TypeQ -> DsM (Core TH.DecQ)
 repPragSpecInst (MkC ty) = rep2 pragSpecInstDName [ty]
+
+repPragComplete :: Core [TH.Name] -> Core (Maybe TH.Name) -> DsM (Core TH.DecQ)
+repPragComplete (MkC cls) (MkC mty) = rep2 pragCompleteDName [cls, mty]
 
 repPragRule :: Core String -> Core [TH.RuleBndrQ] -> Core TH.ExpQ
             -> Core TH.ExpQ -> Core TH.Phases -> DsM (Core TH.DecQ)

@@ -100,7 +100,7 @@ module Language.Haskell.TH.Lib (
     ruleVar, typedRuleVar,
     valueAnnotation, typeAnnotation, moduleAnnotation,
     pragInlD, pragSpecD, pragSpecInlD, pragSpecInstD, pragRuleD, pragAnnD,
-    pragLineD,
+    pragLineD, pragCompleteD,
 
     -- **** Pattern Synonyms
     patSynD, patSynSigD, unidir, implBidir, explBidir, prefixPatSyn,
@@ -556,6 +556,9 @@ pragAnnD target expr
 
 pragLineD :: Int -> String -> DecQ
 pragLineD line file = return $ PragmaD $ LineP line file
+
+pragCompleteD :: [Name] -> Maybe Name -> DecQ
+pragCompleteD cls mty = return $ PragmaD $ CompleteP cls mty
 
 dataInstD :: CxtQ -> Name -> [TypeQ] -> Maybe Kind -> [ConQ] -> [DerivClauseQ]
           -> DecQ

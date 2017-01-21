@@ -1764,6 +1764,8 @@ data Pragma = InlineP         Name Inline RuleMatch Phases
             | RuleP           String [RuleBndr] Exp Exp Phases
             | AnnP            AnnTarget Exp
             | LineP           Int String
+            | CompleteP       [Name] (Maybe Name)
+                -- ^ @{ {\-\# COMPLETE C_1, ..., C_i [ :: T ] \#-} }@
         deriving( Show, Eq, Ord, Data, Generic )
 
 data Inline = NoInline
