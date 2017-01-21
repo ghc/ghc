@@ -428,6 +428,7 @@ extra_src_files = {
   'parser.prog001': ['Read006.hs', 'Read007.hs'],
   'pat-syn-bundle': ['Bundle1.hs', 'BundleInternal1.hs'],
   'pat-syn-trans-bundle': ['Bundle.hs', 'BundleInternal.hs', 'TransBundle.hs'],
+  'path_with_commas': ['test.pkg', 'Main.hs', 'Dummy.hs'],
   'pkg02': ['A.hs', 'Foreign.hs'],
   'plugins01': ['simple-plugin/'],
   'plugins02': ['simple-plugin/'],

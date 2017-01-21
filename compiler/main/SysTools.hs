@@ -1588,7 +1588,8 @@ linkDynLib dflags0 o_files dep_packages
              osMachOTarget (platformOS (targetPlatform dflags)) ) &&
            dynLibLoader dflags == SystemDependent &&
            WayDyn `elem` ways dflags
-            = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+            = ["-L" ++ l, "-Xlinker", "-rpath", "-Xlinker", l]
+              -- See Note [-Xlinker -rpath vs -Wl,-rpath]
          | otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags

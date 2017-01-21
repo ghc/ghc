@@ -1742,6 +1742,20 @@ getHCFilePackages filename =
 -- read any interface files), so the user must explicitly specify all
 -- the packages.
 
+{-
+Note [-Xlinker -rpath vs -Wl,-rpath]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+-Wl takes a comma-separated list of options which in the case of
+-Wl,-rpath -Wl,some,path,with,commas parses the the path with commas
+as separate options.
+Buck, the build system, produces paths with commas in them.
+
+-Xlinker doesn't have this disadvantage and as far as I can tell
+it is supported by both gcc and clang. Anecdotally nvcc supports
+-Xlinker, but not -Wl.
+-}
+
 linkBinary :: DynFlags -> [FilePath] -> [InstalledUnitId] -> IO ()
 linkBinary = linkBinary' False
 
@@ -1770,8 +1784,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
                             then "$ORIGIN" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
+                  -- See Note [-Xlinker -rpath vs -Wl,-rpath]
                   rpath = if gopt Opt_RPath dflags
-                          then ["-Wl,-rpath",      "-Wl," ++ libpath]
+                          then ["-Xlinker", "-rpath", "-Xlinker", libpath]
                           else []
                   -- Solaris 11's linker does not support -rpath-link option. It silently
                   -- ignores it and then complains about next option which is -l<some
@@ -1781,7 +1796,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                   -- elf_begin: I/O error: region read: Is a directory
                   rpathlink = if (platformOS platform) == OSSolaris2
                               then []
-                              else ["-Wl,-rpath-link", "-Wl," ++ l]
+                              else ["-Xlinker", "-rpath-link", "-Xlinker", l]
               in ["-L" ++ l] ++ rpathlink ++ rpath
          | osMachOTarget (platformOS platform) &&
            dynLibLoader dflags == SystemDependent &&
@@ -1791,7 +1806,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                             then "@loader_path" </>
                                  (l `makeRelativeTo` full_output_fn)
                             else l
-              in ["-L" ++ l] ++ ["-Wl,-rpath", "-Wl," ++ libpath]
+              in ["-L" ++ l] ++ ["-Xlinker", "-rpath", "-Xlinker", libpath]
          | otherwise = ["-L" ++ l]
 
     let dead_strip = if osSubsectionsViaSymbols (platformOS platform)

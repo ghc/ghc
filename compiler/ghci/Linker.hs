@@ -880,18 +880,23 @@ dynLoadObjs hsc_env pls objs = do
                         concatMap
                             (\(lp, l) ->
                                  [ Option ("-L" ++ lp)
-                                 , Option ("-Wl,-rpath")
-                                 , Option ("-Wl," ++ lp)
+                                 , Option "-Xlinker"
+                                 , Option "-rpath"
+                                 , Option "-Xlinker"
+                                 , Option lp
                                  , Option ("-l" ++  l)
                                  ])
                             (temp_sos pls)
                         ++ concatMap
                              (\lp ->
                                  [ Option ("-L" ++ lp)
-                                 , Option ("-Wl,-rpath")
-                                 , Option ("-Wl," ++ lp)
+                                 , Option "-Xlinker"
+                                 , Option "-rpath"
+                                 , Option "-Xlinker"
+                                 , Option lp
                                  ])
                              minus_big_ls
+                        -- See Note [-Xlinker -rpath vs -Wl,-rpath]
                         ++ map (\l -> Option ("-l" ++ l)) minus_ls,
                       -- Add -l options and -L options from dflags.
                       --
