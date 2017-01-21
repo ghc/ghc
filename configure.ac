@@ -1212,7 +1212,7 @@ fi
 
 echo "\
    Tools to build Sphinx HTML documentation available: $BUILD_SPHINX_HTML
-   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"]
+   Tools to build Sphinx PDF documentation available: $BUILD_SPHINX_PDF"
 
 echo "----------------------------------------------------------------------
 "
