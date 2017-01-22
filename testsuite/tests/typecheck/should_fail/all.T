@@ -168,9 +168,7 @@ test('tcfail182', normal, compile_fail, [''])
 test('tcfail183', normal, compile_fail, [''])
 test('tcfail184', normal, compile_fail, [''])
 test('tcfail185', normal, compile_fail, [''])
-test('tcfail186',
-     extra_clean(['Tcfail186_Help.hi', 'Tcfail186_Help.o']),
-     multimod_compile_fail, ['tcfail186', '-v0'])
+test('tcfail186', [], multimod_compile_fail, ['tcfail186', '-v0'])
 test('tcfail187', normal, compile_fail, [''])
 
 test('tcfail188', normal, compile, [''])
@@ -215,8 +213,7 @@ test('T3950', normal, compile_fail, [''])
 test('T3966', normal, compile_fail, ['-O'])
 test('IPFail', normal, compile_fail, [''])
 
-test('T3468', extra_clean(['T3468.hi-boot', 'T3468.o-boot', 'T3468a.hi', 'T3468a.o']),
-     multimod_compile_fail, ['T3468', '-v0'])
+test('T3468', [], multimod_compile_fail, ['T3468', '-v0'])
 test('T2846b', normal, compile_fail, [''])
 test('FrozenErrorTests', normal, compile_fail, [''])
 test('SCLoop', normal, compile_fail, [''])
@@ -274,12 +271,7 @@ test('T5957', normal, compile_fail, [''])
 test('T6001', normal, compile_fail, [''])
 test('T6022', normal, compile_fail, [''])
 test('T5853', normal, compile_fail, [''])
-test('T6018fail', extra_clean([ 'T6018fail.hi' , 'T6018fail.o'
-                              , 'T6018Afail.hi', 'T6018Afail.o'
-                              , 'T6018Bfail.hi', 'T6018Bfail.o'
-                              , 'T6018Cfail.hi', 'T6018Cfail.o'
-                              , 'T6018Dfail.hi', 'T6018Dfail.o'])
-    , multimod_compile_fail, ['T6018fail', '-no-hs-main -c'])
+test('T6018fail', [], multimod_compile_fail, ['T6018fail', '-no-hs-main -c'])
 test('T6018failclosed', normal, compile_fail, [''])
 test('T6018failclosed2', normal, compile_fail, [''])
 test('T6078', normal, compile_fail, [''])
@@ -337,8 +329,7 @@ test('T8450', normal, compile_fail, [''])
 test('T8514', normal, compile_fail, [''])
 test('ContextStack1', normal, compile_fail, ['-freduction-depth=10'])
 test('ContextStack2', normal, compile, [''])
-test('T8570', extra_clean(['T85570a.o', 'T8570a.hi','T85570b.o', 'T8570b.hi']),
-     multimod_compile_fail, ['T8570', '-v0'])
+test('T8570', [], multimod_compile_fail, ['T8570', '-v0'])
 test('T8603', normal, compile_fail, [''])
 test('TcStaticPointersFail01', [], compile_fail, [''])
 test('TcStaticPointersFail02', [], compile_fail, [''])
@@ -370,12 +361,9 @@ test('T9858a', normal, compile_fail, [''])
 test('T9858b', normal, compile_fail, [''])
 test('T9858e', normal, compile_fail, [''])
 
-test('T10285',
-     extra_clean(['T10285a.hi', 'T10285a.o']),
-     multimod_compile_fail, ['T10285', '-v0'])
+test('T10285', [], multimod_compile_fail, ['T10285', '-v0'])
 test('T10351', normal, compile_fail, [''])
-test('T10534', extra_clean(['T10534a.hi', 'T10534a.o']),
-     multimod_compile_fail, ['T10534', '-v0'])
+test('T10534', [], multimod_compile_fail, ['T10534', '-v0'])
 test('T10495', normal, compile_fail, [''])
 test('VtaFail', normal, compile_fail, [''])
 
@@ -388,7 +376,7 @@ test('T10836', normal, compile_fail, [''])
 test('T10715', normal, compile, [''])
 test('T10715b', normal, compile_fail, [''])
 test('T10971b', normal, compile_fail, [''])
-test('T10971d', extra_clean(['T10971c.hi', 'T10971c.o']), multimod_compile_fail, ['T10971d','-v0'])
+test('T10971d', [], multimod_compile_fail, ['T10971d', '-v0'])
 test('CustomTypeErrors01', normal, compile_fail, [''])
 test('CustomTypeErrors02', normal, compile_fail, [''])
 test('CustomTypeErrors03', normal, compile_fail, [''])
@@ -412,12 +400,9 @@ test('T11947a', normal, compile_fail, [''])
 test('T11948', normal, compile_fail, [''])
 test('T11990a', normal, compile_fail, [''])
 test('T11990b', normal, compile_fail, [''])
-test('T12035', extra_clean(['T12035.hi-boot', 'T12035.o-boot', 'T12035a.hi', 'T12035a.o']),
-     multimod_compile_fail, ['T12035', '-v0'])
-test('T12035j', [ req_smp, extra_clean(['T12035.hi-boot', 'T12035.o-boot', 'T12035a.hi', 'T12035a.o']) ],
-     multimod_compile_fail, ['T12035', '-j2 -v0'])
-test('T12063', [ expect_broken(12063), extra_clean(['T12063.hi-boot', 'T12063.o-boot', 'T12063a.hi', 'T12063a.o']) ],
-     multimod_compile_fail, ['T12063', '-v0'])
+test('T12035', [], multimod_compile_fail, ['T12035', '-v0'])
+test('T12035j', [req_smp], multimod_compile_fail, ['T12035', '-j2 -v0'])
+test('T12063', [expect_broken(12063)], multimod_compile_fail, ['T12063', '-v0'])
 test('T11974b', normal, compile_fail, [''])
 test('T12151', normal, compile_fail, [''])
 test('T7437', normal, compile_fail, [''])
@@ -430,7 +415,7 @@ test('T12529', normal, compile_fail, [''])
 test('T12729', normal, compile_fail, [''])
 test('T12785b', normal, compile_fail, [''])
 test('T12803', normal, compile_fail, [''])
-test('T12042', extra_clean(['T12042a.hi', 'T12042a.o', 'T12042.hi-boot', 'T12042.o-boot']), multimod_compile_fail, ['T12042', ''])
+test('T12042', [], multimod_compile_fail, ['T12042', ''])
 test('T12966', normal, compile_fail, [''])
 test('T12837', normal, compile_fail, [''])
 test('T12921', normal, compile_fail, [''])

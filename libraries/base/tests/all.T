@@ -47,7 +47,7 @@ test('trace001', normal, compile_and_run, [''])
 test('hGetBuf002', normal, compile_and_run, [''])
 test('hGetBuf003', normal, compile_and_run, [''])
 test('hPutBuf001', normal, compile_and_run, [''])
-test('hPutBuf002', extra_clean(['hPutBuf002.out']), compile_and_run, [''])
+test('hPutBuf002', [], compile_and_run, [''])
 
 test('char001', 	normal, compile_and_run, [''])
 test('char002', 	normal, compile_and_run, [''])
@@ -92,16 +92,11 @@ test('list002', when(fast(), skip), compile_and_run, [''])
 test('list003', when(fast(), skip), compile_and_run, [''])
 test('isSuffixOf', normal, compile_and_run, [''])
 
-test('memo001',
-     [extra_run_opts('+RTS -A10k -RTS'),
-      extra_clean(['Memo1.hi', 'Memo1.o'])],
-     multimod_compile_and_run,
-     ['memo001',''])
+test('memo001', [extra_run_opts('+RTS -A10k -RTS')], multimod_compile_and_run,
+     ['memo001', ''])
 
-test('memo002',
-     [extra_run_opts('20'),
-      extra_clean(['Memo2.hi', 'Memo2.o'])],
-	multimod_compile_and_run, ['memo002',''])
+test('memo002', [extra_run_opts('20')], multimod_compile_and_run,
+     ['memo002', ''])
 
 test('stableptr001',
      [when(fast(), skip), extra_run_opts('+RTS -K8m -RTS')],

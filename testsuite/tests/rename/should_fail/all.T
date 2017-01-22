@@ -39,9 +39,7 @@ test('rnfail035', normal, compile_fail, [''])
 
 test('rnfail039', normal, compile_fail, [''])
 
-test('rnfail040',
-     extra_clean(['Rnfail040_A.hi', 'Rnfail040_A.o']),
-     multimod_compile_fail, ['rnfail040', '-v0'])
+test('rnfail040', [], multimod_compile_fail, ['rnfail040', '-v0'])
 test('rnfail041', normal, compile_fail, [''])
 test('rnfail042', normal, compile_fail, [''])
 
@@ -49,10 +47,7 @@ test('rnfail043', unless(doing_ghci, skip), compile_fail, ['-v0'])
 test('rnfail044', normal, compile_fail, [''])
 test('rnfail045', normal, compile_fail, [''])
 test('rnfail046', normal, compile_fail, [''])
-test('rnfail047',
-     extra_clean(['RnFail047_A.hi-boot', 'RnFail047_A.o-boot']),
-     multimod_compile_fail,
-     ['rnfail047', '-v0'])
+test('rnfail047', [], multimod_compile_fail, ['rnfail047', '-v0'])
 test('rnfail048', normal, compile_fail, [''])
 test('rnfail049', normal, compile_fail, [''])
 test('rnfail050', normal, compile_fail, [''])
@@ -60,11 +55,7 @@ test('rnfail051', normal, compile_fail, [''])
 test('rnfail052', normal, compile_fail, [''])
 test('rnfail053', normal, compile_fail, [''])
 test('rnfail054', normal, compile_fail, [''])
-test('rnfail055',
-     extra_clean(['RnFail055.hi-boot', 'RnFail055.o-boot',
-                  'RnFail055_aux.hi',  'RnFail055_aux.o']),
-     multimod_compile_fail,
-     ['RnFail055','-v0'])
+test('rnfail055', [], multimod_compile_fail, ['RnFail055', '-v0'])
 test('rnfail056', normal, compile_fail, [''])
 test('rnfail057', normal, compile_fail, [''])
 
@@ -83,22 +74,14 @@ test('mc14', normal, compile_fail, [''])
 test('T5211', normal, compile, [''])  # Warnings only
 test('T1595a', normal, compile_fail, [''])
 test('T5281', normal, multimod_compile, ['T5281', '-v0'])  # Warnings only
-test('T5372',
-     extra_clean(['T5372a.hi', 'T5372a.o']),
-     multimod_compile_fail,
-     ['T5372','-v0'])
-test('T5385',
-     extra_clean(['T5385a.hi', 'T5385a.o']),
-     multimod_compile_fail,
-     ['T5385','-v0'])
+test('T5372', [], multimod_compile_fail, ['T5372', '-v0'])
+test('T5385', [], multimod_compile_fail, ['T5385', '-v0'])
 test('T5513', normal, compile_fail, [''])
 test('T5533', normal, compile_fail, [''])
 test('T5589', normal, compile_fail, [''])
 test('Misplaced', normal, compile_fail, [''])
 test('T5657', normal, compile_fail, [''])
-test('T5745',
-     extra_clean(['T5745a.hi', 'T5745a.o', 'T5745b.hi', 'T5745b.o']),
-     multimod_compile_fail, ['T5745', '-v0'])
+test('T5745', [], multimod_compile_fail, ['T5745', '-v0'])
 test('T5892a', normal, compile_fail, ['-package containers'])
 test('T5892b', normal, compile_fail, ['-package containers'])
 test('T5951', normal, compile_fail, [''])
@@ -117,9 +100,7 @@ test('T8149', normal, compile, [''])
 test('RnStaticPointersFail01', [], compile_fail, [''])
 test('RnStaticPointersFail02', [], compile_fail, [''])
 test('RnStaticPointersFail03', [], compile_fail, ['-dsuppress-uniques'])
-test('T9006',
-     extra_clean(['T9006a.hi', 'T9006a.o']),
-     multimod_compile_fail, ['T9006', '-v0'])
+test('T9006', [], multimod_compile_fail, ['T9006', '-v0'])
 test('T9156', normal, compile_fail, [''])
 test('T9177', normal, compile_fail, [''])
 test('T9177a', normal, compile_fail, [''])

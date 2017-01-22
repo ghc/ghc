@@ -4,7 +4,4 @@ def f( name, opts ):
 
 setTestOpts(f)
 
-test('Cpr001',
-     extra_clean(['Cpr001_imp.hi', 'Cpr001_imp.o', 'Cpr001_imp.comp.stderr']),
-     multimod_compile,
-     ['Cpr001', '-v0'])
+test('Cpr001', [], multimod_compile, ['Cpr001', '-v0'])

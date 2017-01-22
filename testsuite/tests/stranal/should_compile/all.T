@@ -31,7 +31,7 @@ test('newtype', req_profiling, compile, ['-prof -fprof-auto'])
 test('T1988', normal, compile, [''])
 test('T8467', normal, compile, [''])
 test('T8037', normal, compile, [''])
-test('T8743', [ extra_clean(['T8743.o-boot', 'T8743a.hi', 'T8743a.o', 'T8743.hi-boot']) ], multimod_compile, ['T8743', '-v0'])
+test('T8743', [], multimod_compile, ['T8743', '-v0'])
 
 # T10482
 #   The intent here is to check that $wfoo has type

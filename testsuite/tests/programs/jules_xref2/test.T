@@ -1,6 +1,3 @@
 
-test('jules_xref2',
-     [when(fast(), skip), extra_clean(['Main.hi', 'Main.o'])],
-     multimod_compile_and_run,
+test('jules_xref2', [when(fast(), skip)], multimod_compile_and_run,
      ['Main', ''])
-

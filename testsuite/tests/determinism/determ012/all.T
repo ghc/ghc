@@ -1,4 +1,1 @@
-test('determ012',
-     extra_clean(['A.o', 'A.hi', 'A.normal.hi']),
-     run_command,
-     ['$MAKE -s --no-print-directory determ012'])
+test('determ012', [], run_command, ['$MAKE -s --no-print-directory determ012'])

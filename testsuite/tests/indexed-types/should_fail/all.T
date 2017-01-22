@@ -29,12 +29,7 @@ test('NonLinearSigErr', normal, compile, [''])
 
 test('GADTwrong1', normal, compile_fail, [''])
 
-test('Over',
-     extra_clean(['OverA.hi', 'OverA.o',
-                  'OverB.hi', 'OverB.o',
-                  'OverC.hi', 'OverC.o']),
-     multimod_compile_fail,
-     ['OverD', '-no-hs-main -c -v0'])
+test('Over', [], multimod_compile_fail, ['OverD', '-no-hs-main -c -v0'])
 
 test('SkolemOccursLoop', expect_fail, compile_fail, [''])
 
@@ -85,10 +80,7 @@ test('Overlap11', normal, compile_fail, [''])
 test('Overlap15', normal, compile_fail, [''])
 test('T7194', normal, compile_fail, [''])
 test('T7354', normal, compile_fail, [''])
-test('T7354a',
-     extra_clean(['T7354b.o', 'T7354b.hi']),
-     run_command,
-     ['$MAKE -s --no-print-directory T7354a'])
+test('T7354a', [], run_command, ['$MAKE -s --no-print-directory T7354a'])
 test('T7536', normal, compile_fail, [''])
 
 test('T7729', normal, compile_fail, [''])
@@ -100,14 +92,10 @@ test('T7967', normal, compile_fail, [''])
 
 test('T7938', normal, compile_fail, [''])
 
-test('ClosedFam3', extra_clean(['ClosedFam3.o-boot', 'ClosedFam3.hi-boot', 'ClosedFam3a.hi', 'ClosedFam3a.o']),
-     multimod_compile_fail, ['ClosedFam3', '-v0'])
+test('ClosedFam3', [], multimod_compile_fail, ['ClosedFam3', '-v0'])
 test('ClosedFam4', normal, compile_fail, [''])
 test('T8155', normal, compile_fail, [''])
-test('T8227',
-     extra_clean(['T8227a.o', 'T8227a.hi']),
-     run_command,
-     ['$MAKE -s --no-print-directory T8227'])
+test('T8227', [], run_command, ['$MAKE -s --no-print-directory T8227'])
 test('T8129',
      normal,
      run_command,

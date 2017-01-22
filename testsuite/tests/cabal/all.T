@@ -1,25 +1,14 @@
 def normaliseDynlibNames(str):
     return re.sub('-ghc[0-9.]+\.', '-ghc<VERSION>.', str)
 
-test('ghcpkg01',
-     extra_clean(['local01.package.conf',
-                  'local01.package.conf.old']),
-     run_command,
-     ['$MAKE -s --no-print-directory ghcpkg01'])
+test('ghcpkg01', [], run_command, ['$MAKE -s --no-print-directory ghcpkg01'])
 
 # Use ignore_stderr to prevent (when HADDOCK_DOCS=NO):
 #  warning: haddock-interfaces .. doesn't exist or isn't a file
-test('ghcpkg02',
-     [ignore_stderr,
-      extra_clean(['package.conf.ghcpkg02', 'package.conf.ghcpkg02.old'])],
-     run_command,
+test('ghcpkg02', [ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory ghcpkg02'])
 
-test('ghcpkg03',
-     [extra_clean(['local03.package.conf',
-                   'local03.package.conf.old']),
-      normalise_errmsg_fun(normaliseDynlibNames)],
-     run_command,
+test('ghcpkg03', [normalise_errmsg_fun(normaliseDynlibNames)], run_command,
      ['$MAKE -s --no-print-directory ghcpkg03'])
 
 def normalise_package_order(s):
@@ -28,12 +17,7 @@ def normalise_package_order(s):
                   'newtestpkg-2.0 testpkg-1.2.3.4',
                   s)
 
-test('ghcpkg04',
-     [
-      normalise_errmsg_fun(normalise_package_order),
-      extra_clean(['local04.package.conf',
-                   'local04.package.conf.old'])],
-     run_command,
+test('ghcpkg04', [normalise_errmsg_fun(normalise_package_order)], run_command,
      ['$MAKE -s --no-print-directory ghcpkg04'])
 
 # Sometimes we get spurious warnings from ghc-pkg about missing
@@ -42,69 +26,26 @@ def normalise_haddock_junk( str ):
     return re.sub(r'Warning: haddock.*\n', '', str)
 
 test('ghcpkg05',
-     [ extra_clean(['local05a.package.conf',
-                    'local05a.package.conf.old',
-                    'local05b.package.conf',
-                    'local05b.package.conf.old']),
-       normalise_errmsg_fun(normalise_haddock_junk, normaliseDynlibNames)
-       ],
-     run_command,
-     ['$MAKE -s --no-print-directory ghcpkg05'])
-test('ghcpkg06',
-     [extra_clean(['local06.package.conf',
-                   'local06.package.conf.old'])],
-     run_command,
-     ['$MAKE -s --no-print-directory ghcpkg06'])
+     [normalise_errmsg_fun(normalise_haddock_junk, normaliseDynlibNames)],
+     run_command, ['$MAKE -s --no-print-directory ghcpkg05'])
+test('ghcpkg06', [], run_command, ['$MAKE -s --no-print-directory ghcpkg06'])
 
-test('ghcpkg07',
-     extra_clean(['local07.package.conf',
-                  'local07.package.conf.old']),
-     run_command,
-     ['$MAKE -s --no-print-directory ghcpkg07'])
+test('ghcpkg07', [], run_command, ['$MAKE -s --no-print-directory ghcpkg07'])
 
 # Test that we *can* compile a module that also belongs to a package
 # (this was disallowed in GHC 6.4 and earlier)
 test('pkg01', normal, compile, [''])
 
-test('T1750',
-     extra_clean(['T1750.hs', 'T1750.out',
-                  'localT1750.package.conf',
-                  'localT1750.package.conf.old']),
-     run_command, ['$MAKE -s --no-print-directory T1750'])
+test('T1750', [], run_command, ['$MAKE -s --no-print-directory T1750'])
 
-test('T5442a',
-     [extra_clean(['package.conf.T5442a.global', 'package.conf.T5442a.user'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T5442a'])
+test('T5442a', [], run_command, ['$MAKE -s --no-print-directory T5442a'])
 
-test('T5442b',
-     [extra_clean(['package.conf.T5442b.global', 'package.conf.T5442b.user'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T5442b'])
+test('T5442b', [], run_command, ['$MAKE -s --no-print-directory T5442b'])
 
-test('T5442c',
-     [extra_clean(['package.conf.T5442c.global', 'package.conf.T5442c.user',
-                   'package.conf.T5442c.extra'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T5442c'])
+test('T5442c', [], run_command, ['$MAKE -s --no-print-directory T5442c'])
 
-test('T5442d',
-     [extra_clean(['package.conf.T5442d.global', 'package.conf.T5442d.user',
-                   'package.conf.T5442d.extra'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T5442d'])
+test('T5442d', [], run_command, ['$MAKE -s --no-print-directory T5442d'])
 
-test('shadow',
-     extra_clean(['shadow.out', 'shadow.hs', 'shadow.hi',
-                  'local1shadow1.package.conf',
-                  'local1shadow1.package.conf.old',
-                  'local1shadow2.package.conf',
-                  'local1shadow2.package.conf.old']),
-     run_command, ['$MAKE -s --no-print-directory shadow'])
+test('shadow', [], run_command, ['$MAKE -s --no-print-directory shadow'])
 
-test('T12485a',
-     extra_clean(['T12485a.hi', 'T1750.out',
-                  'T12485a.package.conf',
-                  'T12485b.package.conf',
-                  'T12485c.package.conf']),
-     run_command, ['$MAKE -s --no-print-directory T12485a'])
+test('T12485a', [], run_command, ['$MAKE -s --no-print-directory T12485a'])

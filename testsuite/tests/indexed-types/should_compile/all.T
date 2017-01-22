@@ -27,19 +27,10 @@ test('RelaxedExamples', normal, compile, [''])
 test('NonLinearLHS', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
-test('ind2',
-     extra_clean(['Ind2_help.hi', 'Ind2_help.o']),
-     multimod_compile,
-     ['ind2', '-v0'])
-test('impexp',
-     extra_clean(['Exp.hi', 'Exp.o', 'Imp.hi', 'Imp.o']),
-     multimod_compile,
-     ['Imp', '-w -no-hs-main -c'])
+test('ind2', [], multimod_compile, ['ind2', '-v0'])
+test('impexp', [], multimod_compile, ['Imp', '-w -no-hs-main -c'])
 
-test('ATLoop',
-     extra_clean(['ATLoop_help.o','ATLoop_help.hi']),
-     multimod_compile,
-     ['ATLoop.hs','-v0'])
+test('ATLoop', [], multimod_compile, ['ATLoop.hs', '-v0'])
 
 test('Deriving', normal, compile, [''])
 test('DerivingNewType', normal, compile, [''])
@@ -48,10 +39,7 @@ test('Records', normal, compile, [''])
 # The point about this test is that it compiles NewTyCo1 and NewTyCo2
 # *separately*
 #
-test('NewTyCo',
-     extra_clean(['NewTyCo1.o', 'NewTyCo1.hi', 'NewTyCo2.o', 'NewTyCo2.hi']),
-     run_command,
-     ['$MAKE -s --no-print-directory NewTyCo'])
+test('NewTyCo', [], run_command, ['$MAKE -s --no-print-directory NewTyCo'])
 
 test('Infix', normal, compile, [''])
 test('Kind', normal, compile, [''])
@@ -180,10 +168,7 @@ test('HO', normal, compile, [''])
 
 # The point about this test is that it compiles the two T5955
 # modules *separately*
-test('T5955',
-     extra_clean(['T5955.o', 'T5955.hi', 'T5955a.o', 'T5955a.hi']),
-     run_command,
-     ['$MAKE -s --no-print-directory T5955'])
+test('T5955', [], run_command, ['$MAKE -s --no-print-directory T5955'])
 
 test('T6152',
      normal,
@@ -231,10 +216,8 @@ test('T8500',
 
 test('T8018', normal, compile, [''])
 test('T8020', normal, compile, [''])
-test('ClosedFam1', extra_clean(['ClosedFam1.o-boot', 'ClosedFam1.hi-boot', 'ClosedFam1a.o', 'ClosedFam1a.hi']),
-     multimod_compile, ['ClosedFam1', '-v0'])
-test('ClosedFam2', extra_clean(['ClosedFam2.o-boot', 'ClosedFam2.hi-boot', 'ClosedFam2a.o', 'ClosedFam2a.hi']),
-     multimod_compile, ['ClosedFam2', '-v0'])
+test('ClosedFam1', [], multimod_compile, ['ClosedFam1', '-v0'])
+test('ClosedFam2', [], multimod_compile, ['ClosedFam2', '-v0'])
 test('T8651', normal, compile, [''])
 test('T8889', normal, compile, [''])
 test('T8913', normal, compile, [''])
@@ -247,10 +230,7 @@ test('Sock', normal, compile, [''])
 test('T9211', normal, compile, [''])
 test('T9747', normal, compile, [''])
 test('T9582', normal, compile, [''])
-test('T9840',
-     extra_clean(['T9840.hi-boot', 'T9840.o-boot', 'T9840a.hi', 'T9840a.o']),
-     multimod_compile,
-     ['T9840', '-v0'])
+test('T9840', [], multimod_compile, ['T9840', '-v0'])
 test('T9090', normal, compile, [''])
 test('T10020', normal, compile, [''])
 test('T10079', normal, compile, [''])

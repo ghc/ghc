@@ -61,10 +61,7 @@ test('T7128', normal, compile,[''])
 test('T7151', normal, compile_fail,[''])
 test('T7095', normal, compile,[''])
 test('T7090', normal, compile,[''])
-test('T7272',
-     extra_clean(['T7272a.hi', 'T7272a.o', 'T7272.hi-boot', 'T7272.o-boot']),
-     multimod_compile,
-     ['T7272.hs', '-v0'])
+test('T7272', [], multimod_compile, ['T7272.hs', '-v0'])
 test('T7176', normal, compile,[''])
 test('T7224', normal, compile_fail,[''])
 test('T7230', normal, compile_fail,[''])

@@ -1,15 +1,12 @@
 # Test for #1227, #1418
 
 test('heapprof002',
-     [ pre_cmd('cp heapprof001.hs heapprof002.hs')
-     , extra_clean(['heapprof002.hs'])
-     , extra_ways(['normal_h'])
-     , extra_run_opts('7')
-     ],
+     [pre_cmd('cp heapprof001.hs heapprof002.hs'), extra_ways(['normal_h']),
+      extra_run_opts('7')],
      compile_and_run, [''])
 
-test('T11489', [req_profiling, extra_clean(['T11489.prof', 'T11489.hp'])],
-     run_command, ['$MAKE -s --no-print-directory T11489'])
+test('T11489', [req_profiling], run_command,
+     ['$MAKE -s --no-print-directory T11489'])
 
 # Below this line, run tests only with profiling ways.
 setTestOpts(req_profiling)

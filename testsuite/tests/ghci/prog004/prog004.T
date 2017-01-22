@@ -3,7 +3,5 @@ def f(name, opts):
         opts.skip = 1
 setTestOpts(f)
 
-test('ghciprog004',
-     extra_clean(['ctest.c', 'ctest.o']),
-     run_command,
+test('ghciprog004', [], run_command,
      ['$MAKE -s --no-print-directory ghciprog004'])

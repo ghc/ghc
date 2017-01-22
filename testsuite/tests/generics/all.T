@@ -26,17 +26,13 @@ test('T5462Yes2', outputdir('out_T5462Yes2')
 test('T5462No1', outputdir('out_T5462No1')
     , multimod_compile_fail, ['T5462No1', '-iGFunctor'])
 
-test('T5884',      extra_clean(['T5884Other.o', 'T5884Other.hi'])
-    , multimod_compile, ['T5884Other', '-v0'])
+test('T5884', [], multimod_compile, ['T5884Other', '-v0'])
 test('GenNewtype', normal, compile_and_run, [''])
 
 test('GenDerivOutput1_0', normal, compile, ['-dsuppress-uniques'])
 test('GenDerivOutput1_1', normal, compile, ['-dsuppress-uniques'])
 
-test('T7878', extra_clean(['T7878A.o'     ,'T7878A.hi'
-                          ,'T7878A.o-boot','T7878A.hi-boot'
-                          ,'T7878B.o'     ,'T7878B.hi']),
-              multimod_compile, ['T7878', '-v0'])
+test('T7878', [], multimod_compile, ['T7878', '-v0'])
 
 test('T8468', normal, compile_fail, [''])
 test('T8479', normal, compile, [''])

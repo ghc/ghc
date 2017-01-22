@@ -71,43 +71,36 @@ test('ffi012', skip_if_not_windows, compile_and_run, [''])
 test('ffi013', normal, compile_and_run, [''])
 
 # threaded2 sometimes gives ffi014: Main_dDu: interrupted
-test('ffi014',
-     [only_ways(['threaded1','threaded2']), extra_clean(['ffi014_cbits.o'])],
-     compile_and_run, ['ffi014_cbits.c'])
+test('ffi014', [only_ways(['threaded1', 'threaded2'])], compile_and_run,
+     ['ffi014_cbits.c'])
 
 # GHCi can't handle the separate C file (ToDo: fix this somehow)
-test('ffi015', [ omit_ways(['ghci']), extra_clean(['ffi015_cbits.o']) ],
-               compile_and_run, ['ffi015_cbits.c'])
+test('ffi015', [omit_ways(['ghci'])], compile_and_run, ['ffi015_cbits.c'])
 
 # GHCi can't handle foreign import "&"
 test('ffi016', omit_ways(['ghci']), compile_and_run, [''])
 
 test('ffi017', normal, compile_and_run, [''])
 
-test('ffi018', [ omit_ways(['ghci']), extra_clean(['ffi018_c.o']) ],
-               compile_and_run, ['ffi018_c.c'])
+test('ffi018', [omit_ways(['ghci'])], compile_and_run, ['ffi018_c.c'])
 
-test('ffi018_ghci', [ only_ways(['ghci']),
-                      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup'),
-                      extra_clean(['ffi018_ghci_c.o']) ],
-                    compile_and_run, ['ffi018_ghci_c.o'])
+test('ffi018_ghci',
+     [only_ways(['ghci']),
+      pre_cmd('$MAKE -s --no-print-directory ffi018_ghci_setup')],
+     compile_and_run, ['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
 
 # This one originally failed only GHCi, but doesn't hurt to test all ways.
 test('T1679', normal, compile_and_run, [''])
 
-test('T1288', [ omit_ways(['ghci']),
-                extra_clean(['T1288_c.o']) ],
-              compile_and_run, ['T1288_c.c'])
-test('T1288_ghci', [ only_ways(['ghci']),
-                     pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup'),
-                     extra_clean(['T1288_ghci_c.o']) ],
-                   compile_and_run, ['T1288_ghci_c.o'])
+test('T1288', [omit_ways(['ghci'])], compile_and_run, ['T1288_c.c'])
+test('T1288_ghci',
+     [only_ways(['ghci']),
+      pre_cmd('$MAKE -s --no-print-directory T1288_ghci_setup')],
+     compile_and_run, ['T1288_ghci_c.o'])
 
-test('T2276', [ omit_ways(['ghci']), 
-                extra_clean(['T2276_c.o']) ],
-              compile_and_run, ['T2276_c.c'])
+test('T2276', [omit_ways(['ghci'])], compile_and_run, ['T2276_c.c'])
 test('T2276_ghci', [ only_ways(['ghci']),
                      when(opsys('darwin'), skip), # stdcall not supported on OS X
                      pre_cmd('$MAKE -s --no-print-directory T2276_ghci_setup'),
@@ -116,18 +109,13 @@ test('T2276_ghci', [ only_ways(['ghci']),
 
 test('T2469', normal, compile_and_run, ['-optc-std=gnu99'])
 
-test('T2594',
-     [extra_clean(['T2594_c.o']), omit_ways(['ghci'])],
-     compile_and_run,
-     ['T2594_c.c'])
+test('T2594', [omit_ways(['ghci'])], compile_and_run, ['T2594_c.c'])
 
-test('fptr01', [ omit_ways(['ghci']), extra_clean(['fptr01_c.o']) ],
-               compile_and_run, ['fptr01_c.c'])
+test('fptr01', [omit_ways(['ghci'])], compile_and_run, ['fptr01_c.c'])
 test('fptr02', normal, compile_and_run, [''])
 
-test('fptrfail01', [ omit_ways(['ghci']), exit_code(1),
-                     extra_clean(['fptrfail01_c.o']) ],
-                   compile_and_run, ['fptrfail01_c.c'])
+test('fptrfail01', [omit_ways(['ghci']), exit_code(1)], compile_and_run,
+     ['fptrfail01_c.c'])
 
 test('T2917a', normal, compile_and_run, [''])
 
@@ -148,8 +136,7 @@ else:
 	flagsForT4038 = ['']
 test('T4038', normal, compile_and_run, flagsForT4038)
 
-test('T4221', [ omit_ways(['ghci']), extra_clean(['T4221_c.o']) ],
-                compile_and_run, ['T4221_c.c'])
+test('T4221', [omit_ways(['ghci'])], compile_and_run, ['T4221_c.c'])
 
 test('T5402', [ omit_ways(['ghci']),
                 exit_code(42),
@@ -168,41 +155,23 @@ test('T5594', [ omit_ways(['ghci']),
                 # needs it.
                 compile_and_run, ['T5594_c.c -no-hs-main'])
 
-test('Capi_Ctype_001',
-     extra_clean(['Capi_Ctype_A_001.o', 'Capi_Ctype_A_001.hi',
-                  'capi_ctype_001_c.o',
-                  'Capi_Ctype_A_001.hs', 'Capi_Ctype_001.hs']),
-     run_command,
+test('Capi_Ctype_001', [], run_command,
      ['$MAKE -s --no-print-directory Capi_Ctype_001'])
 
-test('Capi_Ctype_002',
-     extra_clean(['Capi_Ctype_A_002.o', 'Capi_Ctype_A_002.hi',
-                  'Capi_Ctype_A_002.hs']),
-     run_command,
+test('Capi_Ctype_002', [], run_command,
      ['$MAKE -s --no-print-directory Capi_Ctype_002'])
 
-test('ffi_parsing_001',
-     [omit_ways(['ghci']), extra_clean(['ffi_parsing_001_c.o'])],
-     compile_and_run,
+test('ffi_parsing_001', [omit_ways(['ghci'])], compile_and_run,
      ['ffi_parsing_001_c.c'])
 
-test('capi_value',
-     [omit_ways(['ghci']), extra_clean(['capi_value_c.o'])],
-     compile_and_run,
-     ['capi_value_c.c'])
+test('capi_value', [omit_ways(['ghci'])], compile_and_run, ['capi_value_c.c'])
 
 test('T7170', exit_code(1), compile_and_run, [''])
 
-test('T4012',
-     [extra_clean(['T4012_A.hi', 'T4012_A.o', 'T4012_B.hi', 'T4012_B.o']),
-      expect_broken_for(7388, ['ghci'])],
-     multimod_compile_and_run,
+test('T4012', [expect_broken_for(7388, ['ghci'])], multimod_compile_and_run,
      ['T4012', ''])
 
-test('T8083',
-     [omit_ways(['ghci']), extra_clean(['T8083_c.o'])],
-     compile_and_run,
-     ['T8083_c.c'])
+test('T8083', [omit_ways(['ghci'])], compile_and_run, ['T8083_c.c'])
 
 test('ffi023', [ omit_ways(['ghci']),
                 extra_clean(['ffi023_c.o']),
@@ -213,13 +182,6 @@ test('ffi023', [ omit_ways(['ghci']),
                 # needs it.
               compile_and_run, ['ffi023_c.c'])
 
-test('T12134',
-     [omit_ways(['ghci']), extra_clean(['T12134_c.o'])],
-     compile_and_run,
-     ['T12134_c.c'])
+test('T12134', [omit_ways(['ghci'])], compile_and_run, ['T12134_c.c'])
 
-test('T12614',
-     [omit_ways(['ghci']), extra_clean(['T12614_c.o'])],
-     compile_and_run,
-     ['T12614_c.c'])
-
+test('T12614', [omit_ways(['ghci'])], compile_and_run, ['T12614_c.c'])

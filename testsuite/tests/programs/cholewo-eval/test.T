@@ -1,5 +1,2 @@
-test('cholewo-eval',
-     [when(fast(), skip),
-      extra_clean(['Main.hi', 'Main.o', 'Arr.hi', 'Arr.o'])],
-     multimod_compile_and_run,
+test('cholewo-eval', [when(fast(), skip)], multimod_compile_and_run,
      ['Main', ''])

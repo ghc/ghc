@@ -11,9 +11,7 @@ test('', normal, compile_fail, [''])
 
 test('', normal, compile, [''])
 
-test('', extra_clean(['.hi', '.o']), 
-     multimod_compile_fail, ['', '-v0'])
+test('', [], multimod_compile_fail, ['', '-v0'])
 
-test('', extra_clean(['.hi', '.o']), 
-     multimod_compile, ['', '-v0'])
+test('', [], multimod_compile, ['', '-v0'])
 """

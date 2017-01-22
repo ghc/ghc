@@ -128,18 +128,14 @@ test('traceEvent', [ omit_ways(['dyn'] + prof_ways),
                      extra_run_opts('+RTS -ls -RTS') ],
                    compile_and_run, ['-eventlog'])
 
-test('T4059',
-     extra_clean(['T4059_c.o']),
-     run_command,
-     ['$MAKE -s --no-print-directory T4059'])
+test('T4059', [], run_command, ['$MAKE -s --no-print-directory T4059'])
 
 # Test for #4274
-test('exec_signals', [
-     when(opsys('mingw32'), skip),
-     pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
-     cmd_prefix('./exec_signals_prepare'),
-     extra_clean(['exec_signals_child', 'exec_signals_prepare'])
-    ], compile_and_run, [''])
+test('exec_signals',
+     [when(opsys('mingw32'), skip),
+      pre_cmd('$MAKE -s --no-print-directory exec_signals-prep'),
+      cmd_prefix('./exec_signals_prepare')],
+     compile_and_run, [''])
 
 test('return_mem_to_os', normal, compile_and_run, [''])
 
@@ -158,10 +154,7 @@ test('T5250', [ config_T5250,
                 omit_ways(['ghci']) ],
               compile_and_run, ['spalign.c'])
 
-test('T5423',
-     extra_clean(['T5423_cmm.o']),
-     run_command,
-     ['$MAKE -s --no-print-directory T5423'])
+test('T5423', [], run_command, ['$MAKE -s --no-print-directory T5423'])
 
 # Workaround bug #8458: old dlopen opens sections in the wrong order,
 # so we just accept both orders.
@@ -204,25 +197,20 @@ test('T6006', [ omit_ways(prof_ways + ['ghci']),
                  # needs it.
                compile_and_run, ['T6006_c.c -no-hs-main'])
 
-test('T7037',
-     [ extra_clean(['T7037_main.o','T7037_main'])],
-     run_command,
-     ['$MAKE -s --no-print-directory T7037'])
+test('T7037', [], run_command, ['$MAKE -s --no-print-directory T7037'])
 
 test('T7087', exit_code(1), compile_and_run, [''])
 test('T7160', normal, compile_and_run, [''])
 
-test('T7040', [ extra_clean(['T7040_c.o']), omit_ways(['ghci']) ],
-     compile_and_run, ['T7040_c.c'])
+test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
 
-test('T7040_ghci', [ only_ways(['ghci']),
-                      pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup'),
-                      extra_clean(['T7040_ghci_c.o']) ],
-                    compile_and_run, ['T7040_ghci_c.o'])
+test('T7040_ghci',
+     [only_ways(['ghci']),
+      pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup')],
+     compile_and_run, ['T7040_ghci_c.o'])
 
-test('T7227', [ extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS'),
-                extra_clean(['T7227.stat']) ]
-            , compile_and_run, [''] )
+test('T7227', [extra_run_opts('+RTS -tT7227.stat --machine-readable -RTS')],
+     compile_and_run, [''])
 
 test('T7636', [ exit_code(1), extra_run_opts('100000') ], compile_and_run, [''] )
 
@@ -240,18 +228,14 @@ test('T7815', [ multi_cpu_race,
 test('ffishutdown', [ignore_stderr, only_ways(['threaded1','threaded2'])],
      compile_and_run, [''])
 
-test('T7919',
-     [extra_clean(['T7919A.o','T7919A.hi', 'T7919A.dyn_o','T7919A.dyn_hi']),
-      when(fast(), skip), omit_ways(prof_ways)],
-     compile_and_run, [config.ghc_th_way_flags])
+test('T7919', [when(fast(), skip), omit_ways(prof_ways)], compile_and_run,
+     [config.ghc_th_way_flags])
 
 test('T8035', normal, compile_and_run, [''])
 
 test('linker_unload',
-     [ when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259)),
-       extra_clean(['Test.o','Test.hi', 'linker_unload']) ],
-     run_command,
-     ['$MAKE -s --no-print-directory linker_unload'])
+     [when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
+     run_command, ['$MAKE -s --no-print-directory linker_unload'])
 
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
               compile_and_run, [''])
@@ -298,21 +282,13 @@ test('overflow1', [ exit_code(251) ], compile_and_run, [''])
 test('overflow2', [ exit_code(251) ], compile_and_run, [''])
 test('overflow3', [ exit_code(251) ], compile_and_run, [''])
 
-test('linker_error1',
-     [ extra_clean(['linker_error1.o','linker_error1']), ignore_stderr ],
-     run_command,
+test('linker_error1', [ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory linker_error1'])
 
-test('linker_error2',
-     [ extra_clean(['linker_error2.o','linker_error2_c.o', 'linker_error2']),
-       ignore_stderr ],
-     run_command,
+test('linker_error2', [ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory linker_error2'])
 
-test('linker_error3',
-     [ extra_clean(['linker_error3.o','linker_error3_c.o', 'linker_error3']),
-       ignore_stderr ],
-     run_command,
+test('linker_error3', [ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory linker_error3'])
 
 def grep_stderr(pattern):
@@ -363,15 +339,14 @@ test('T10904', [ omit_ways(['ghci']), extra_run_opts('20000') ],
 test('T10728', [extra_run_opts('+RTS -maxN3 -RTS'), only_ways(['threaded2'])],
                compile_and_run, [''])
 
-test('T9405', [extra_clean(['T9405.ticky']), when(msys(), expect_broken(12714))],
-              run_command, ['$MAKE -s --no-print-directory T9405'])
+test('T9405', [when(msys(), expect_broken(12714))], run_command,
+     ['$MAKE -s --no-print-directory T9405'])
 
 test('T11788', when(ghc_dynamic(), skip),
               run_command, ['$MAKE -s --no-print-directory T11788'])
 
-test('T10296a', [ req_smp, extra_clean(['T10296a.o','T10296a_c.o','T10296a'])],
-                run_command,
-                ['$MAKE -s --no-print-directory T10296a'])
+test('T10296a', [req_smp], run_command,
+     ['$MAKE -s --no-print-directory T10296a'])
 
 test('T10296b', [only_ways('threaded2')], compile_and_run, [''])
 

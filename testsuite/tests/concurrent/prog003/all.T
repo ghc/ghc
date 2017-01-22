@@ -10,25 +10,6 @@
 # occasionally, but at least the test is here for posterity.
 
 test('concprog003',
-     [when(fast(), skip),
-      extra_clean([
-           'BackList2.hi', 'BackList2.o',
-           'ImmList.hi', 'ImmList.o',
-           'MainMVarList.hi', 'MainMVarList.o',
-           'TestDataParser.hi', 'TestDataParser.o',
-           'CASList.hi', 'CASList.o',
-           'IOList.hi', 'IOList.o',
-           'MVarListLockCoupling.hi', 'MVarListLockCoupling.o',
-           'TestRun.hi', 'TestRun.o',
-           'Collate.hi', 'Collate.o',
-           'LazyList2.hi', 'LazyList2.o',
-           'RefInterface.hi', 'RefInterface.o',
-           'Collection.hi', 'Collection.o',
-           'Main.hi', 'Main.o',
-           'TestData.hi', 'TestData.o'
-         ]),
-      reqlib('random'),
-      extra_run_opts('IMM -t test-8-3000-3000-2-1-4'),
-     ],
-     multimod_compile_and_run,
-     ['Main',''])
+     [when(fast(), skip), reqlib('random'),
+      extra_run_opts('IMM -t test-8-3000-3000-2-1-4')],
+     multimod_compile_and_run, ['Main', ''])

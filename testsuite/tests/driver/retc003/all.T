@@ -1,6 +1,1 @@
-test('retc003',
-     extra_clean(['Data/Char.hs', 'Data/Char.hi', 'Data/Char.o',
-                  'A.o', 'A.hi',
-                  'err']),
-     run_command,
-     ['$MAKE -s --no-print-directory retc003'])
+test('retc003', [], run_command, ['$MAKE -s --no-print-directory retc003'])

@@ -12,9 +12,7 @@ test('drvfail011', normal, compile_fail, [''])
 test('drvfail012', normal, compile_fail, [''])
 test('drvfail013', normal, compile_fail, [''])
 test('drvfail015', normal, compile_fail, [''])
-test('drvfail016',
-     extra_clean(['drvfail016.hi-boot', 'drvfail016.o-boot']),
-     run_command,
+test('drvfail016', [], run_command,
      ['$MAKE --no-print-directory -s drvfail016'])
 test('T1830_1', normal, compile_fail, [''])
 test('T2394', normal, compile_fail, [''])
@@ -35,10 +33,7 @@ test('T5287', normal, compile_fail, [''])
 test('T5478', normal, compile_fail, [''])
 test('T5686', normal, compile_fail, [''])
 test('T5922', normal, compile_fail, [''])
-test('T1133A',
-     extra_clean(['T1133A.o-boot', 'T1133A.hi-boot', 'T1133Aa.o', 'T1133Aa.hi']),
-     run_command,
-     ['$MAKE --no-print-directory -s T1133A'])
+test('T1133A', [], run_command, ['$MAKE --no-print-directory -s T1133A'])
 # 5863a was removed as it was out of date re: fixing #9858
 test('T7959', normal, compile_fail, [''])
 

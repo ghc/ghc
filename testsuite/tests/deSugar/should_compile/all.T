@@ -75,27 +75,14 @@ test('T2395', normal, compile, [''])
 test('T4371', normal, compile, [''])
 test('T4439', normal, compile, [''])
 test('T4488', normal, compile, [''])
-test('T4870',
-     [only_ways(['optasm']),
-      extra_clean(['T4870a.hi', 'T4870a.o'])],
-     multimod_compile,
-     ['T4870', '-v0'])
+test('T4870', [only_ways(['optasm'])], multimod_compile, ['T4870', '-v0'])
 test('T5117', normal, compile, [''])
-test('T5252',
-     extra_clean(['T5252a.hi', 'T5252a.o']),
-     run_command,
-     ['$MAKE -s --no-print-directory T5252'])
+test('T5252', [], run_command, ['$MAKE -s --no-print-directory T5252'])
 test('T5455', normal, compile, [''])
-test('T5001',
-     [only_ways(['optasm']),
-      extra_clean(['T5001a.hi', 'T5001a.o'])],
-     multimod_compile,
-     ['T5001', '-v0'])
+test('T5001', [only_ways(['optasm'])], multimod_compile, ['T5001', '-v0'])
 
 # T5252Take2 failed when compiled *wihtout* optimisation
-test('T5252Take2',
-     extra_clean(['T5252Take2a.hi', 'T5252Take2a.o']),
-     run_command,
+test('T5252Take2', [], run_command,
      ['$MAKE -s --no-print-directory T5252Take2'])
 test('T2431', normal, compile, ['-ddump-simpl -dsuppress-uniques'])
 test('T7669', normal, compile, [''])

@@ -4,16 +4,10 @@ test('integerConversions', normal, compile_and_run, [''])
 test('integerGmpInternals', [reqlib('integer-gmp'), omit_ways('ghci')], compile_and_run, [''])
 test('plusMinusInteger', [reqlib('integer-gmp'), omit_ways('ghci')], compile_and_run, [''])
 test('integerConstantFolding',
-     [extra_clean(['integerConstantFolding.simpl']),
-      when(compiler_debugged(), expect_broken(11006))],
-     run_command,
+     [when(compiler_debugged(), expect_broken(11006))], run_command,
      ['$MAKE -s --no-print-directory integerConstantFolding'])
-test('fromToInteger',
-     extra_clean(['fromToInteger.simpl']),
-     run_command,
+test('fromToInteger', [], run_command,
      ['$MAKE -s --no-print-directory fromToInteger'])
-test('IntegerConversionRules',
-     extra_clean(['IntegerConversionRules.simpl']),
-     run_command,
+test('IntegerConversionRules', [], run_command,
      ['$MAKE -s --no-print-directory IntegerConversionRules'])
 test('gcdInteger', normal, compile_and_run, [''])

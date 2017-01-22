@@ -227,12 +227,9 @@ test('conc045', normal, compile_and_run, [''])
 test('conc058', normal, compile_and_run, [''])
 
 test('conc059',
-     [
-      only_ways(['threaded1','threaded2']),
-      pre_cmd('$MAKE -s --no-print-directory conc059_setup'),
-      extra_clean(['conc059_c.o'])],
-     compile_and_run,
-     ['conc059_c.c -no-hs-main'])
+     [only_ways(['threaded1', 'threaded2']),
+      pre_cmd('$MAKE -s --no-print-directory conc059_setup')],
+     compile_and_run, ['conc059_c.c -no-hs-main'])
 
 # This test sometimes just exits successfully
 # when run the threaded2 way. The problem hasn't been diagnosed yet
@@ -268,13 +265,9 @@ test('hs_try_putmvar001',
 # A benchmark for hs_try_putmvar() vs. foreign export
 # This one should work for both threaded and non-threaded RTS
 test('hs_try_putmvar002',
-     [
-     pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
-     extra_clean(['hs_try_putmvar002_c.o']),
-     extra_run_opts('1 8 10000')
-     ],
-     compile_and_run,
-     ['hs_try_putmvar002_c.c'])
+     [pre_cmd('$MAKE -s --no-print-directory hs_try_putmvar002_setup'),
+      extra_run_opts('1 8 10000')],
+     compile_and_run, ['hs_try_putmvar002_c.c'])
 
 # Another benchmark for hs_try_putmvar() vs. foreign export
 test('hs_try_putmvar003',

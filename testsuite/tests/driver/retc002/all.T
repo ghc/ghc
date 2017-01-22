@@ -1,6 +1,2 @@
-test('retc002',
-     [when(fast(), skip),
-      clean_cmd('$MAKE -s clean')],
-     run_command,
+test('retc002', [when(fast(), skip)], run_command,
      ['$MAKE -s --no-print-directory retc002'])
-

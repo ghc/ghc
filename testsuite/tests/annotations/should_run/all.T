@@ -7,14 +7,10 @@ setTestOpts(when(fast(), skip))
 # now, just disable the profiling and dynamic ways, and use
 # config.ghc_th_way_flags.
 test('annrun01',
-     [extra_clean(['Annrun01_Help.hi', 'Annrun01_Help.o',
-                    'annrun01.hi', 'annrun01.o',
-                    'Config.hs', 'Config.hi', 'Config.o']),
-      pre_cmd('$MAKE -s --no-print-directory config'),
+     [pre_cmd('$MAKE -s --no-print-directory config'),
       omit_ways(['dyn'] + prof_ways)],
-      multimod_compile_and_run,
-      ['annrun01', '-package ghc ' + config.ghc_th_way_flags]
-    )
+     multimod_compile_and_run,
+     ['annrun01', '-package ghc ' + config.ghc_th_way_flags])
 
 """"
 Helpful things to C+P:
@@ -23,9 +19,7 @@ test('', normal, compile_fail, [''])
 
 test('', normal, compile, [''])
 
-test('', extra_clean(['.hi', '.o']), 
-     multimod_compile_fail, ['', '-v0'])
+test('', [], multimod_compile_fail, ['', '-v0'])
 
-test('', extra_clean(['.hi', '.o']), 
-     multimod_compile, ['', '-v0'])
+test('', [], multimod_compile, ['', '-v0'])
 """
