@@ -298,6 +298,18 @@ This is a bit of a change from an earlier era when we remoselessly
 insisted on real TcTyVars in the type checker.  But that seems
 unnecessary (for skolems, TyVars are fine) and it's now very hard
 to guarantee, with the advent of kind equalities.
+
+Note [Coercion variables in free variable lists]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There are several places in the GHC codebase where functions like
+tyCoVarsOfType, tyCoVarsOfCt, et al. are used to compute the free type
+variables of a type. The "Co" part of these functions' names shouldn't be
+dismissed, as it is entirely possible that they will include coercion variables
+in addition to type variables! As a result, there are some places in TcType
+where we must take care to check that a variable is a _type_ variable (using
+isTyVar) before calling tcTyVarDetails--a partial function that is not defined
+for coercion variables--on the variable. Failing to do so led to
+GHC Trac #12785.
 -}
 
 -- See Note [TcTyVars in the typechecker]
@@ -1065,6 +1077,7 @@ isTouchableOrFmv ctxt_tclvl tv
 
 isTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isTouchableMetaTyVar ctxt_tclvl tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl }
@@ -1072,13 +1085,16 @@ isTouchableMetaTyVar ctxt_tclvl tv
                     ppr tv $$ ppr tv_tclvl $$ ppr ctxt_tclvl )
            tv_tclvl `sameDepthAs` ctxt_tclvl
       _ -> False
+  | otherwise = False
 
 isFloatedTouchableMetaTyVar :: TcLevel -> TcTyVar -> Bool
 isFloatedTouchableMetaTyVar ctxt_tclvl tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
       MetaTv { mtv_tclvl = tv_tclvl } -> tv_tclvl `strictlyDeeperThan` ctxt_tclvl
       _ -> False
+  | otherwise = False
 
 isImmutableTyVar :: TyVar -> Bool
 isImmutableTyVar tv = isSkolemTyVar tv
@@ -1091,10 +1107,12 @@ isTyConableTyVar tv
         -- True of a meta-type variable that can be filled in
         -- with a type constructor application; in particular,
         -- not a SigTv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         MetaTv { mtv_info = SigTv } -> False
         _                           -> True
+  | otherwise = True
 
 isFmvTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
@@ -1124,16 +1142,20 @@ isSkolemTyVar tv
         _other    -> True
 
 isOverlappableTyVar tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         SkolemTv _ overlappable -> overlappable
         _                       -> False
+  | otherwise = False
 
 isMetaTyVar tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
         MetaTv {} -> True
         _         -> False
+  | otherwise = False
 
 -- isAmbiguousTyVar is used only when reporting type errors
 -- It picks out variables that are unbound, namely meta
@@ -1141,10 +1163,12 @@ isMetaTyVar tv
 -- RtClosureInspect.zonkRTTIType.  These are "ambiguous" in
 -- the sense that they stand for an as-yet-unknown type
 isAmbiguousTyVar tv
+  | isTyVar tv -- See Note [Coercion variables in free variable lists]
   = case tcTyVarDetails tv of
         MetaTv {}     -> True
         RuntimeUnk {} -> True
         _             -> False
+  | otherwise = False
 
 isMetaTyVarTy :: TcType -> Bool
 isMetaTyVarTy (TyVarTy tv) = isMetaTyVar tv
