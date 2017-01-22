@@ -503,7 +503,7 @@ test('T5321Fun',
              # 2014-09-03: 299656164     (specialisation and inlining)
              # 10/12/2014: 206406188     #  Improvements in constraint solver
              # 2016-04-06: 279922360 x86/Linux
-            (wordsize(64), 497356688, 5)])
+            (wordsize(64), 525895608, 5)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
@@ -520,6 +520,12 @@ test('T5321Fun',
              # 06/01/2017: 497356688     #  Small coercion optimisations
                                          #  The actual decrease was only 2%; earlier
                                          #    commits had drifted down
+             # 22/01/2017: 525895608     #  Allow top-level string literals in Core. I'm not
+                                         #    convinced that this patch is
+                                         #    responsible for all of this
+                                         #    change, however. Namely I am
+                                         #    quite skeptical of the downward
+                                         #    "drift" reported above
       ],
       compile,[''])
 
@@ -932,8 +938,9 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1271577192, 5),
+          [(wordsize(64), 1348865648, 5),
           # initial:    1271577192
+          # 2017-01-22: 1348865648  Allow top-level strings in Core
           ]),
      ],
      compile,
