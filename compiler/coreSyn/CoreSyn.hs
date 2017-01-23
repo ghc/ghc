@@ -809,7 +809,8 @@ tickishPlace SourceNote{}  = PlaceNonLam
 -- making the second tick redundant.
 tickishContains :: Eq b => Tickish b -> Tickish b -> Bool
 tickishContains (SourceNote sp1 n1) (SourceNote sp2 n2)
-  = n1 == n2 && containsSpan sp1 sp2
+  = containsSpan sp1 sp2 && n1 == n2
+    -- compare the String last
 tickishContains t1 t2
   = t1 == t2
 
