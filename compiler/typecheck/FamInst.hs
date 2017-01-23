@@ -233,8 +233,17 @@ checkFamInstConsistency famInstMods directlyImpMods
     allPairs (m:ms) = map (modulePair m) ms ++ allPairs ms
 
     check hpt_fam_insts (ModulePair m1 m2)
-      = do { env1 <- getFamInsts hpt_fam_insts m1
-           ; env2 <- getFamInsts hpt_fam_insts m2
+      = do { env1' <- getFamInsts hpt_fam_insts m1
+           ; env2' <- getFamInsts hpt_fam_insts m2
+           -- We're checking each element of env1 against env2.
+           -- The cost of that is dominated by the size of env1, because
+           -- for each instance in env1 we look it up in the type family
+           -- environment env2, and lookup is cheap.
+           -- The code below ensures that env1 is the smaller environment.
+           ; let sizeE1 = famInstEnvSize env1'
+                 sizeE2 = famInstEnvSize env2'
+                 (env1, env2) = if sizeE1 < sizeE2 then (env1', env2')
+                                                   else (env2', env1')
            -- Note [Don't check hs-boot type family instances too early]
            -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
            -- Family instance consistency checking involves checking that

@@ -12,7 +12,7 @@ module FamInstEnv (
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
         extendFamInstEnv, deleteFromFamInstEnv, extendFamInstEnvList,
-        identicalFamInstHead, famInstEnvElts, familyInstances,
+        identicalFamInstHead, famInstEnvElts, famInstEnvSize, familyInstances,
 
         -- * CoAxioms
         mkCoAxBranch, mkBranchedCoAxiom, mkUnbranchedCoAxiom, mkSingleCoAxiom,
@@ -399,6 +399,11 @@ emptyFamInstEnv = emptyUDFM
 famInstEnvElts :: FamInstEnv -> [FamInst]
 famInstEnvElts fi = [elt | FamIE elts <- eltsUDFM fi, elt <- elts]
   -- See Note [FamInstEnv determinism]
+
+famInstEnvSize :: FamInstEnv -> Int
+famInstEnvSize = nonDetFoldUDFM (\(FamIE elt) sum -> sum + length elt) 0
+  -- It's OK to use nonDetFoldUDFM here since we're just computing the
+  -- size.
 
 familyInstances :: (FamInstEnv, FamInstEnv) -> TyCon -> [FamInst]
 familyInstances (pkg_fie, home_fie) fam

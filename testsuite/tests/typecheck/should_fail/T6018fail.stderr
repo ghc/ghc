@@ -9,10 +9,10 @@ T6018Afail.hs:7:15: error:
       G Char Bool Int = Int -- Defined at T6018Afail.hs:7:15
       G Bool Int Char = Int -- Defined at T6018fail.hs:15:15
 
-T6018Dfail.hs:7:15: error:
+T6018Cfail.hs:8:15: error:
     Type family equations violate injectivity annotation:
-      T6018Bfail.H Bool Int Char = Int -- Defined at T6018Dfail.hs:7:15
       T6018Bfail.H Char Bool Int = Int -- Defined at T6018Cfail.hs:8:15
+      T6018Bfail.H Bool Int Char = Int -- Defined at T6018Dfail.hs:7:15
 
 T6018fail.hs:13:15: error:
     Type family equations violate injectivity annotation:
