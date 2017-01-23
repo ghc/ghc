@@ -62,8 +62,11 @@ import Bag
 import Util
 import Outputable
 import ForeignCall
+import VarEnv
 
+import Control.Applicative ((<|>))
 import qualified Data.ByteString as BS
+import Debug.Trace
 
 {-
 ************************************************************************
@@ -501,43 +504,51 @@ sizeExpr :: DynFlags
 -- Note [Computing the size of an expression]
 
 sizeExpr dflags bOMB_OUT_SIZE top_args expr
-  = size_up expr
+  = size_up emptyInScopeSet expr
   where
-    size_up (Cast e _) = size_up e
-    size_up (Tick _ e) = size_up e
-    size_up (Type _)   = sizeZero           -- Types cost nothing
-    size_up (Coercion _) = sizeZero
-    size_up (Lit lit)  = sizeN (litSize lit)
-    size_up (Var f) | isRealWorldId f = sizeZero
+    size_up :: InScopeSet -> CoreExpr -> ExprSize
+    size_up is (Cast e _) = size_up is e
+    size_up is (Tick _ e) = size_up is e
+    size_up _ (Type _)   = sizeZero           -- Types cost nothing
+    size_up _ (Coercion _) = sizeZero
+    size_up _ (Lit lit)  = sizeN (litSize lit)
+    size_up _ (Var f) | isRealWorldId f = sizeZero
                       -- Make sure we get constructor discounts even
                       -- on nullary constructors
-                    | otherwise       = size_up_call f [] 0
+                      | otherwise       = size_up_call f [] 0
 
-    size_up (App fun arg)
-      | isTyCoArg arg = size_up fun
-      | otherwise     = size_up arg  `addSizeNSD`
-                        size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
+    size_up is (App fun arg)
+      | isTyCoArg arg = size_up is fun
+      | otherwise     = size_up is arg   `addSizeNSD`
+                        size_up_app is fun [arg] (if isRealWorldExpr arg then 1 else 0)
 
-    size_up (Lam b e)
-      | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)
-      | otherwise = size_up e
+    size_up is (Lam b e)
+      | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up is e `addSizeN` 10)
+      | otherwise = size_up is e
 
-    size_up (Let (NonRec binder rhs) body)
-      = size_up rhs             `addSizeNSD`
-        size_up body            `addSizeN`
+    size_up is (Let (NonRec binder rhs) body)
+      = let
+          is' = extendInScopeSet is binder
+        in
+        size_up is  rhs             `addSizeNSD`
+        size_up is' body            `addSizeN`
         (if isUnliftedType (idType binder) then 0 else 10)
                 -- For the allocation
                 -- If the binder has an unlifted type there is no allocation
 
-    size_up (Let (Rec pairs) body)
-      = foldr (addSizeNSD . size_up . snd)
-              (size_up body `addSizeN` (10 * length pairs))     -- (length pairs) for the allocation
+    size_up is (Let (Rec pairs) body)
+      = let
+          is' = extendInScopeSetList is (map fst pairs)
+        in
+        foldr (addSizeNSD . size_up is' . snd)
+              (size_up is' body
+                `addSizeN` (10 * length pairs))     -- (length pairs) for the allocation
               pairs
 
-    size_up (Case e _ _ alts)
-        | Just v <- is_top_arg e -- We are scrutinising an argument variable
+    size_up is (Case e _ _ alts)
+        | Just v <- is_top_arg e <|> is_free_var e  -- We are scrutinising an argument variable or a free variable
         = let
-            alt_sizes = map size_up_alt alts
+            alt_sizes = map (size_up_alt is) alts
 
                   -- alts_size tries to compute a good discount for
                   -- the case when we are scrutinising an argument variable
@@ -569,9 +580,12 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
           is_top_arg (Cast e _) = is_top_arg e
           is_top_arg _ = Nothing
 
+          is_free_var (Var v) | not (v `elemInScopeSet` is) = Just v
+          is_free_var (Cast e _) = is_free_var e
+          is_free_var _ = Nothing
 
-    size_up (Case e _ _ alts) = size_up e  `addSizeNSD`
-                                foldr (addAltSize . size_up_alt) case_size alts
+    size_up is (Case e _ _ alts) = size_up is e  `addSizeNSD`
+                                   foldr (addAltSize . size_up_alt is) case_size alts
       where
           case_size
            | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-10)
@@ -608,15 +622,15 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 
     ------------
     -- size_up_app is used when there's ONE OR MORE value args
-    size_up_app (App fun arg) args voids
-        | isTyCoArg arg                  = size_up_app fun args voids
-        | isRealWorldExpr arg            = size_up_app fun (arg:args) (voids + 1)
-        | otherwise                      = size_up arg  `addSizeNSD`
-                                           size_up_app fun (arg:args) voids
-    size_up_app (Var fun)     args voids = size_up_call fun args voids
-    size_up_app (Tick _ expr) args voids = size_up_app expr args voids
-    size_up_app (Cast expr _) args voids = size_up_app expr args voids
-    size_up_app other         args voids = size_up other `addSizeN`
+    size_up_app is (App fun arg) args voids
+        | isTyCoArg arg                  = size_up_app is fun args voids
+        | isRealWorldExpr arg            = size_up_app is fun (arg:args) (voids + 1)
+        | otherwise                      = size_up is arg  `addSizeNSD`
+                                           size_up_app is fun (arg:args) voids
+    size_up_app _  (Var fun)     args voids = size_up_call fun args voids
+    size_up_app is (Tick _ expr) args voids = size_up_app is expr args voids
+    size_up_app is (Cast expr _) args voids = size_up_app is expr args voids
+    size_up_app is other         args voids = size_up is other `addSizeN`
                                            callSize (length args) voids
        -- if the lhs is not an App or a Var, or an invisible thing like a
        -- Tick or Cast, then we should charge for a complete call plus the
@@ -633,7 +647,10 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
            _                -> funSize dflags top_args fun (length val_args) voids
 
     ------------
-    size_up_alt (_con, _bndrs, rhs) = size_up rhs `addSizeN` 10
+    size_up_alt :: InScopeSet -> Alt Var -> ExprSize
+    size_up_alt is (_con, bndrs, rhs) = size_up is' rhs `addSizeN` 10
+      where is' = extendInScopeSetList is bndrs
+
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
         --
