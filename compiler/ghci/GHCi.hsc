@@ -599,7 +599,7 @@ ForeignRef
 ----------
 
 A ForeignRef is a RemoteRef with a finalizer that will free the
-'RemoteRef' when it is gargabe collected.  We mostly use ForeignHValue
+'RemoteRef' when it is garbage collected.  We mostly use ForeignHValue
 on the GHC side.
 
 The finalizer adds the RemoteRef to the iservPendingFrees list in the

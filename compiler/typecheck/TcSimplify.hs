@@ -667,7 +667,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
          -- they had better be unifiable at the outer_tclvl!
          -- Example:   envt mentions alpha[1]
          --            tau_ty = beta[2] -> beta[2]
-         --            consraints = alpha ~ [beta]
+         --            constraints = alpha ~ [beta]
          -- we don't quantify over beta (since it is fixed by envt)
          -- so we must promote it!  The inferred type is just
          --   f :: beta -> beta

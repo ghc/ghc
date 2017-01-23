@@ -86,7 +86,7 @@ changes the order.
 
 
 Hmm.  Perhaps a good improvement strategy would be:
-  - first do improvement against the instance declartions
+  - first do improvement against the instance declarations
   - and only then do pairwise improvement between constraints
 
 I've implemented that, and indeed it improves the result.

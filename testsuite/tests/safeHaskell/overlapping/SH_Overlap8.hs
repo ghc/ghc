@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 -- | Overlapping instances, but with a single parameter type-class and no
--- orphans. So `SH_Overlap8` decided to explictly depend on `SH_Overlap8_A`
+-- orphans. So `SH_Overlap8` decided to explicitly depend on `SH_Overlap8_A`
 -- since that's where the type-class `C` with function `f` is defined.
 --
 -- Question: Safe or Unsafe? Safe

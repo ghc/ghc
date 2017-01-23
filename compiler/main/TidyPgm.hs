@@ -1411,7 +1411,7 @@ First, Template Haskell.  Consider (Trac #2386) this
           data T = Yay String
           makeOne = [| Yay "Yep" |]
 Notice that T is exported abstractly, but makeOne effectively exports it too!
-A module that splices in $(makeOne) will then look for a declartion of Yay,
+A module that splices in $(makeOne) will then look for a declaration of Yay,
 so it'd better be there.  Hence, brutally but simply, we switch off type
 constructor trimming if TH is enabled in this module.
 

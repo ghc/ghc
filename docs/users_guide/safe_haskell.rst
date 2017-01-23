@@ -85,7 +85,7 @@ due to the presence of functions like ``unsafePerformIO``. Safe Haskell
 gives users enough guarantees about the type system to allow them to
 build such secure systems.
 
-As an example, lets define an interface for a plugin system where the
+As an example, let's define an interface for a plugin system where the
 plugin authors are untrusted, possibly malicious third-parties. We do
 this by restricting the plugin interface to pure functions or to a
 restricted ``IO`` monad that we have defined. The restricted ``IO``
@@ -137,7 +137,7 @@ We then compile the ``Danger`` plugin using the new Safe Haskell
     runMe :: RIO ()
     runMe = ...
 
-Before going into the Safe Haskell details, lets point out some of the
+Before going into the Safe Haskell details, let's point out some of the
 reasons this security mechanism would fail without Safe Haskell:
 
 - The design attempts to restrict the operations that ``Danger`` can perform by

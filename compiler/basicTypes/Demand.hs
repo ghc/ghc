@@ -1351,7 +1351,7 @@ type DmdShell   -- Describes the "outer shell"
    = JointDmd (Str ()) (Use ())
 
 toCleanDmd :: Demand -> Type -> (DmdShell, CleanDemand)
--- Splicts a Demand into its "shell" and the inner "clean demand"
+-- Splits a Demand into its "shell" and the inner "clean demand"
 toCleanDmd (JD { sd = s, ud = u }) expr_ty
   = (JD { sd = ss, ud = us }, JD { sd = s', ud = u' })
     -- See Note [Analyzing with lazy demand and lambdas]
@@ -1764,7 +1764,7 @@ something like: U(AAASAAAAA).  Then replace the 'S' by the demand 'd'.
 
 For single-method classes, which are represented by newtypes the signature
 of 'op' won't look like U(...), so the splitProdDmd_maybe will fail.
-That's fine: if we are doing strictness analysis we are also doing inling,
+That's fine: if we are doing strictness analysis we are also doing inlining,
 so we'll have inlined 'op' into a cast.  So we can bale out in a conservative
 way, returning nopDmdType.
 

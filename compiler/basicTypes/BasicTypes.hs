@@ -414,7 +414,7 @@ Consider
 \begin{verbatim}
         a `op1` b `op2` c
 \end{verbatim}
-@(compareFixity op1 op2)@ tells which way to arrange appication, or
+@(compareFixity op1 op2)@ tells which way to arrange application, or
 whether there's an error.
 -}
 

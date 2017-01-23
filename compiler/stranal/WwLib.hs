@@ -551,7 +551,7 @@ BUT if f is strict in the Ord dictionary, we might unpack it, to get
 and the type-class specialiser can't specialise that.  An example is
 Trac #6056.
 
-Moreover, dictinoaries can have a lot of fields, so unpacking them can
+Moreover, dictionaries can have a lot of fields, so unpacking them can
 increase closure sizes.
 
 Conclusion: don't unpack dictionaries.

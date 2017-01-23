@@ -520,7 +520,7 @@ emptyPackageIfaceTable :: PackageIfaceTable
 emptyPackageIfaceTable = emptyModuleEnv
 
 pprHPT :: HomePackageTable -> SDoc
--- A bit aribitrary for now
+-- A bit arbitrary for now
 pprHPT hpt = pprUDFM hpt $ \hms ->
     vcat [ hang (ppr (mi_module (hm_iface hm)))
               2 (ppr (md_types (hm_details hm)))

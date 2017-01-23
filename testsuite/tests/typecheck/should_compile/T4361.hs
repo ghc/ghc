@@ -22,7 +22,7 @@ moduloBasisx p = let x :: ()
                      x = upLinSolvRing p
                  in ()
 
-  -- This is very delicate!  The contraint (LinSolvRing (Pol a))
+  -- This is very delicate!  The constraint (LinSolvRing (Pol a))
   -- arises in the RHS of x, and we must be careful *not* to simplify
   -- it with the instance declaration "XXXX", else we get the
   -- unsatisfiable constraint (EuclideanRing a). In effect, the

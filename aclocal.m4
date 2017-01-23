@@ -2134,7 +2134,7 @@ AC_DEFUN([MAYBE_OVERRIDE_STAGE0],[
 # sets CPP command and its arguments
 #
 # $1 = the variable to set to CPP command
-# $2 = the varibale to set to CPP command arguments
+# $2 = the variable to set to CPP command arguments
 
 AC_DEFUN([FP_CPP_CMD_WITH_ARGS],[
 dnl ** what cpp to use?

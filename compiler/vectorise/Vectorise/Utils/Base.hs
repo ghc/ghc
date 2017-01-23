@@ -87,7 +87,7 @@ mkClosureTypes = mkBuiltinTyConApps closureTyCon
 mkPReprType :: Type -> VM Type
 mkPReprType ty = mkBuiltinTyConApp preprTyCon [ty]
 
--- | Make an appliction of the 'PData' tycon to some argument.
+-- | Make an application of the 'PData' tycon to some argument.
 --
 mkPDataType :: Type -> VM Type
 mkPDataType ty = mkBuiltinTyConApp pdataTyCon [ty]

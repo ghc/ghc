@@ -300,7 +300,7 @@ vectTopBinder var inline expr
  = do {   -- Vectorise the type attached to the var.
       ; vty  <- vectType (idType var)
 
-          -- If there is a vectorisation declartion for this binding, make sure its type matches
+          -- If there is a vectorisation declaration for this binding, make sure its type matches
       ; (_, vectDecl) <- lookupVectDecl var
       ; case vectDecl of
           Nothing             -> return ()

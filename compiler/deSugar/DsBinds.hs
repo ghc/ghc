@@ -102,7 +102,7 @@ dsTopLHsBinds binds
 
 
 -- | Desugar all other kind of bindings, Ids of strict binds are returned to
--- later be forced in the binding gorup body, see Note [Desugar Strict binds]
+-- later be forced in the binding group body, see Note [Desugar Strict binds]
 dsLHsBinds :: LHsBinds Id -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds
   = do { MASSERT( allBag (not . isUnliftedHsBind . unLoc) binds )
@@ -1052,7 +1052,7 @@ simplOptExpr occurrence-analyses and simplifies the LHS:
    (a) Inline any remaining dictionary bindings (which hopefully
        occur just once)
 
-   (b) Substitute trivial lets so that they don't get in the way
+   (b) Substitute trivial lets, so that they don't get in the way.
        Note that we substitute the function too; we might
        have this as a LHS:  let f71 = M.f Int in f71
 

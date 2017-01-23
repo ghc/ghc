@@ -236,7 +236,7 @@ all trivial expressions. Consider
    case x |> co of (y::Array# Int) { ... }
 
 We do not want to extend the substitution with (y -> x |> co); since y
-is of unlifted type, this would desroy the let/app invariant if (x |>
+is of unlifted type, this would destroy the let/app invariant if (x |>
 co) was not ok-for-speculation.
 
 But surely (x |> co) is ok-for-speculation, becasue it's a trivial

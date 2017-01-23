@@ -1029,7 +1029,7 @@ addDataConStupidTheta data_con inst_tys
 {-
 Note [Arrows and patterns]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-(Oct 07) Arrow noation has the odd property that it involves
+(Oct 07) Arrow notation has the odd property that it involves
 "holes in the scope". For example:
   expr :: Arrow a => a () Int
   expr = proc (y,z) -> do

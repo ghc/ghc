@@ -1063,7 +1063,7 @@ tryEtaReducePrep _ _ = Nothing
 
 Note [Pin demand info on floats]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We pin demand info on floated lets so that we can see the one-shot thunks.
+We pin demand info on floated lets, so that we can see the one-shot thunks.
 -}
 
 data FloatingBind

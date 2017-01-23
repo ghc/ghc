@@ -2923,7 +2923,7 @@ pprPatSkolInfo (RealDataCon dc)
   = sep [ text "a pattern with constructor:"
         , nest 2 $ ppr dc <+> dcolon
           <+> pprType (dataConUserType dc) <> comma ]
-          -- pprType prints forall's regardless of -fprint-explict-foralls
+          -- pprType prints forall's regardless of -fprint-explicit-foralls
           -- which is what we want here, since we might be saying
           -- type variable 't' is bound by ...
 

@@ -885,7 +885,7 @@ mkCoherenceCo co1 co2     = CoherenceCo co1 co2
 mkCoherenceRightCo :: Coercion -> Coercion -> Coercion
 mkCoherenceRightCo c1 c2 = mkSymCo (mkCoherenceCo (mkSymCo c1) c2)
 
--- | An explictly directed synonym of mkCoherenceCo. The second
+-- | An explicitly directed synonym of mkCoherenceCo. The second
 -- coercion must be representational.
 mkCoherenceLeftCo :: Coercion -> Coercion -> Coercion
 mkCoherenceLeftCo = mkCoherenceCo

@@ -1121,7 +1121,7 @@ the programmer actually wrote, so you can't find it out from the Name.
 
 Furthermore, the second argument is guaranteed not to be another
 operator application.  Why? Because the parser parses all
-operator appications left-associatively, EXCEPT negation, which
+operator applications left-associatively, EXCEPT negation, which
 we need to handle specially.
 Infix types are read in a *right-associative* way, so that
         a `op` b `op` c

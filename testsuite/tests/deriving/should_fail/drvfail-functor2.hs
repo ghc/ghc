@@ -14,7 +14,7 @@ newtype OnSecondArg a = OnSecondArg (Either a a)
 newtype NoArguments = NoArguments Int
    deriving (Functor)
 
--- Derive Functor on a type with extra stupid-contraints on 'a'
+-- Derive Functor on a type with extra stupid-constraints on 'a'
 
 data Eq a => StupidConstraint a = StupidType a
    deriving (Functor)

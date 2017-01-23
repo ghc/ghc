@@ -171,7 +171,7 @@ warnMissingHomeModules hsc_env mod_graph =
     targetid_to_name (TargetModule name) = name
     targetid_to_name (TargetFile file _) =
       -- We can get a file even if module name in specified in command line
-      -- because it can be converted in guessTarget. So lets convert it back.
+      -- because it can be converted in guessTarget. So let's convert it back.
       mkModuleName (fst $ splitExtension file)
 
 -- | Describes which modules of the module graph need to be loaded.

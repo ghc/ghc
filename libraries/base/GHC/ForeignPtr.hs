@@ -72,7 +72,7 @@ import GHC.Ptr          ( Ptr(..), FunPtr(..) )
 --
 data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
         -- The Addr# in the ForeignPtr object is intentionally stored
-        -- separately from the finalizer. The primay aim of the
+        -- separately from the finalizer. The primary aim of the
         -- representation is to make withForeignPtr efficient; in fact,
         -- withForeignPtr should be just as efficient as unpacking a
         -- Ptr, and multiple withForeignPtrs can share an unpacked

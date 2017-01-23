@@ -808,7 +808,7 @@ Conclusion:
 Note [Literal integer size]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Literal integers *can* be big (mkInteger [...coefficients...]), but
-need not be (S# n).  We just use an aribitrary big-ish constant here
+need not be (S# n).  We just use an arbitrary big-ish constant here
 so that, in particular, we don't inline top-level defns like
    n = S# 5
 There's no point in doing so -- any optimisations will see the S#

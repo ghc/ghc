@@ -345,7 +345,7 @@ such as   f :: a -> a
 
 A HsSigType is just a HsImplicitBndrs wrapping a LHsType.
  * The HsImplicitBndrs binds the /implicitly/ quantified tyvars
- * The LHsType binds the /explictly/ quantified tyvars
+ * The LHsType binds the /explicitly/ quantified tyvars
 
 E.g. For a signature like
    f :: forall (a::k). blah
@@ -354,7 +354,7 @@ we get
         , hsib_body = HsForAllTy { hst_bndrs = [(a::*)]
                                  , hst_body = blah }
 The implicit kind variable 'k' is bound by the HsIB;
-the explictly forall'd tyvar 'a' is bounnd by the HsForAllTy
+the explicitly forall'd tyvar 'a' is bound by the HsForAllTy
 -}
 
 mkHsImplicitBndrs :: thing -> HsImplicitBndrs RdrName thing
@@ -433,7 +433,7 @@ data HsType name
       { hst_ctxt :: LHsContext name       -- Context C => blah
       , hst_body :: LHsType name }
 
-  | HsTyVar             Promoted -- whether explictly promoted, for the pretty
+  | HsTyVar             Promoted -- whether explicitly promoted, for the pretty
                                  -- printer
                         (Located name)
                   -- Type variable, type constructor, or data constructor

@@ -191,7 +191,7 @@ commands = [
   -- Library:  add song to playlist and play it
   -- Browse:   either add song to playlist and play it, or :move-in
   , command "default-action" [help|
-      depending on the item under the cursor, somthing different happens:
+      depending on the item under the cursor, something different happens:
 
       - *Playlist* start playing the song under the cursor
 

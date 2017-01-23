@@ -1311,9 +1311,9 @@ Suppose that GHC decides to inline f in the branches of the case, but
       True  -> ...g...g.....
       False -> ..g..g....
 
-Now suppose that, for some reason, in the next iteraion the occurrence
-analyser chooses f as the loop breaker, so it can freely inling g. And
-again for some reason the simplifer inlines g at its calls in the case
+Now suppose that, for some reason, in the next iteration the occurrence
+analyser chooses f as the loop breaker, so it can freely inline g. And
+again for some reason the simplifier inlines g at its calls in the case
 branches, but not in the RHS of f. Then we get
 
     let rec { f = ...g...g...
