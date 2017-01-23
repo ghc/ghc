@@ -523,8 +523,9 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                         size_up_app is fun [arg] (if isRealWorldExpr arg then 1 else 0)
 
     size_up is (Lam b e)
-      | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up is e `addSizeN` 10)
-      | otherwise = size_up is e
+      | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up is' e `addSizeN` 10)
+      | otherwise = size_up is' e
+      where is' = extendInScopeSet is b
 
     size_up is (Let (NonRec binder rhs) body)
       = let
