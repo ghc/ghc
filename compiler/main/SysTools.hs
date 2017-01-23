@@ -85,7 +85,11 @@ import qualified System.Posix.Internals
 #else /* Must be Win32 */
 import Foreign
 import Foreign.C.String
-import qualified System.Win32.Info as Info
+#if MIN_VERSION_Win32(2,5,0)
+import qualified System.Win32.Types as Win32
+#else
+import qualified System.Win32.Info as Win32
+#endif
 import Control.Exception (finally)
 import Foreign.Ptr (FunPtr, castPtrToFunPtr)
 import System.Win32.Types (DWORD, LPTSTR, HANDLE)
@@ -1514,7 +1518,7 @@ getFinalPath name = do
                                                      (fILE_ATTRIBUTE_NORMAL .|. fILE_FLAG_BACKUP_SEMANTICS)
                                                      Nothing
                       let fnPtr = makeGetFinalPathNameByHandle $ castPtrToFunPtr addr
-                      path    <- Info.try "GetFinalPathName"
+                      path    <- Win32.try "GetFinalPathName"
                                     (\buf len -> fnPtr handle buf len 0) 512
                                     `finally` closeHandle handle
                       return $ Just path
