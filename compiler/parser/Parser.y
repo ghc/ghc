@@ -793,7 +793,7 @@ export  :: { OrdList (LIE RdrName) }
                                           >>= \ie -> amsu (sLL $1 $> ie) (fst $ unLoc $2) }
         |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents $2))
                                              [mj AnnModule $1] }
-        |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar $2))
+        |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar (sLL $1 $> (IEPattern $2))))
                                              [mj AnnPattern $1] }
 
 export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
@@ -803,13 +803,13 @@ export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
                                             (as ++ [mop $1,mcp $3] ++ fst $2, ie) }
 
 
-qcnames :: { ([AddAnn], [Located (Maybe RdrName)]) }
+qcnames :: { ([AddAnn], [Located ImpExpQcSpec]) }
   : {- empty -}                   { ([],[]) }
   | qcnames1                      { $1 }
 
-qcnames1 :: { ([AddAnn], [Located (Maybe RdrName)]) }     -- A reversed list
+qcnames1 :: { ([AddAnn], [Located ImpExpQcSpec]) }     -- A reversed list
         :  qcnames1 ',' qcname_ext_w_wildcard  {% case (head (snd $1)) of
-                                                    l@(L _ Nothing) ->
+                                                    l@(L _ ImpExpQcWildcard) ->
                                                        return ([mj AnnComma $2, mj AnnDotdot l]
                                                                ,(snd (unLoc $3)  : snd $1))
                                                     l -> (ams (head (snd $1)) [mj AnnComma $2] >>
@@ -822,14 +822,15 @@ qcnames1 :: { ([AddAnn], [Located (Maybe RdrName)]) }     -- A reversed list
 
 -- Variable, data constructor or wildcard
 -- or tagged type constructor
-qcname_ext_w_wildcard :: { Located ([AddAnn],Located (Maybe RdrName)) }
-        :  qcname_ext               { sL1 $1 ([],Just `fmap` $1) }
-        |  '..'                     { sL1 $1 ([mj AnnDotdot $1], sL1 $1 Nothing) }
+qcname_ext_w_wildcard :: { Located ([AddAnn], Located ImpExpQcSpec) }
+        :  qcname_ext               { sL1 $1 ([],$1) }
+        |  '..'                     { sL1 $1 ([mj AnnDotdot $1], sL1 $1 ImpExpQcWildcard)  }
 
-qcname_ext :: { Located RdrName }
-        :  qcname                   { $1 }
-        |  'type' oqtycon           {% amms (mkTypeImpExp (sLL $1 $> (unLoc $2)))
-                                            [mj AnnType $1,mj AnnVal $2] }
+qcname_ext :: { Located ImpExpQcSpec }
+        :  qcname                   { sL1 $1 (ImpExpQcName $1) }
+        |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
+                                          ; ams (sLL $1 $> (ImpExpQcType n))
+                                                [mj AnnType $1] } }
 
 qcname  :: { Located RdrName }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions

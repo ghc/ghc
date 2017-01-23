@@ -133,7 +133,8 @@ tcRnExports explicit_mod exports
                  | explicit_mod = exports
                  | ghcLink dflags == LinkInMemory = Nothing
                  | otherwise
-                          = Just (noLoc [noLoc (IEVar (noLoc main_RDR_Unqual))])
+                          = Just (noLoc [noLoc
+                              (IEVar (noLoc (IEName $ noLoc main_RDR_Unqual)))])
                         -- ToDo: the 'noLoc' here is unhelpful if 'main'
                         --       turns out to be out of scope
 
@@ -267,18 +268,19 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
     -------------
     lookup_ie :: IE RdrName -> RnM (IE Name, AvailInfo)
     lookup_ie (IEVar (L l rdr))
-        = do (name, avail) <- lookupGreAvailRn rdr
-             return (IEVar (L l name), avail)
+        = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
+             return (IEVar (L l (replaceWrappedName rdr name)), avail)
 
     lookup_ie (IEThingAbs (L l rdr))
-        = do (name, avail) <- lookupGreAvailRn rdr
-             return (IEThingAbs (L l name), avail)
+        = do (name, avail) <- lookupGreAvailRn $ ieWrappedName rdr
+             return (IEThingAbs (L l (replaceWrappedName rdr name)), avail)
 
-    lookup_ie ie@(IEThingAll n)
+    lookup_ie ie@(IEThingAll n')
         = do
-            (n, avail, flds) <- lookup_ie_all ie n
+            (n, avail, flds) <- lookup_ie_all ie n'
             let name = unLoc n
-            return (IEThingAll n, AvailTC name (name:avail) flds)
+            return (IEThingAll (replaceLWrappedName n' (unLoc n))
+                   , AvailTC name (name:avail) flds)
 
 
     lookup_ie ie@(IEThingWith l wc sub_rdrs _)
@@ -290,7 +292,9 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                 NoIEWildcard -> return (lname, [], [])
                 IEWildcard _ -> lookup_ie_all ie l
             let name = unLoc lname
-            return (IEThingWith lname wc subs (map noLoc (flds ++ all_flds)),
+                subs' = map (replaceLWrappedName l . unLoc) subs
+            return (IEThingWith (replaceLWrappedName l name) wc subs'
+                                (map noLoc (flds ++ all_flds)),
                     AvailTC name (name : avails ++ all_avail)
                                  (flds ++ all_flds))
 
@@ -299,23 +303,24 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
-    lookup_ie_with :: Located RdrName -> [Located RdrName]
+    lookup_ie_with :: LIEWrappedName RdrName -> [LIEWrappedName RdrName]
                    -> RnM (Located Name, [Located Name], [Name], [FieldLabel])
     lookup_ie_with (L l rdr) sub_rdrs
-        = do name <- lookupGlobalOccRn rdr
-             (non_flds, flds) <- lookupChildrenExport name sub_rdrs
+        = do name <- lookupGlobalOccRn $ ieWrappedName rdr
+             (non_flds, flds) <- lookupChildrenExport name
+                                                  (map ieLWrappedName sub_rdrs)
              if isUnboundName name
                 then return (L l name, [], [name], [])
                 else return (L l name, non_flds
                             , map unLoc non_flds
                             , map unLoc flds)
-    lookup_ie_all :: IE RdrName -> Located RdrName
+    lookup_ie_all :: IE RdrName -> LIEWrappedName RdrName
                   -> RnM (Located Name, [Name], [FieldLabel])
     lookup_ie_all ie (L l rdr) =
-          do name <- lookupGlobalOccRn rdr
+          do name <- lookupGlobalOccRn $ ieWrappedName rdr
              let gres = findChildren kids_env name
                  (non_flds, flds) = classifyGREs gres
-             addUsedKids rdr gres
+             addUsedKids (ieWrappedName rdr) gres
              warnDodgyExports <- woptM Opt_WarnDodgyExports
              when (null gres) $
                   if isTyConName name
@@ -765,8 +770,9 @@ dupExport_ok n ie1 ie2
   = not (  single ie1 || single ie2
         || (explicit_in ie1 && explicit_in ie2) )
   where
-    explicit_in (IEModuleContents _) = False                -- module M
-    explicit_in (IEThingAll r) = nameOccName n == rdrNameOcc (unLoc r)  -- T(..)
+    explicit_in (IEModuleContents _) = False                   -- module M
+    explicit_in (IEThingAll r)
+      = nameOccName n == rdrNameOcc (ieWrappedName $ unLoc r)  -- T(..)
     explicit_in _              = True
 
     single IEVar {}      = True

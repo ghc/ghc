@@ -19,5 +19,8 @@ In a test Makefile
 
 See examples in (REPO_HOME)/testsuite/tests/printer/Makefile
 
-If passed the --dump flag check-ppr will produce .new and .old files containing
-the ASTs before and after round-tripping to aid debugging.
+The utility generates the following files for ToBeTested.hs
+
+  - ToBeTested.ppr.hs      : the ppr result
+  - ToBeTested.hs.ast      : the AST of the original source
+  - ToBeTested.hs.ast.new  : the AST of the re-parsed ppr source

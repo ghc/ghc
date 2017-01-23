@@ -56,6 +56,7 @@ module   RdrHsSyn (
 
         -- Help with processing exports
         ImpExpSubSpec(..),
+        ImpExpQcSpec(..),
         mkModuleImpExp,
         mkTypeImpExp,
         mkImpExpSubSpec,
@@ -1436,30 +1437,37 @@ mkExtName rdrNm = mkFastString (occNameString (rdrNameOcc rdrNm))
 
 data ImpExpSubSpec = ImpExpAbs
                    | ImpExpAll
-                   | ImpExpList [Located RdrName]
-                   | ImpExpAllWith [Located (Maybe RdrName)]
+                   | ImpExpList [Located ImpExpQcSpec]
+                   | ImpExpAllWith [Located ImpExpQcSpec]
 
-mkModuleImpExp :: Located RdrName -> ImpExpSubSpec -> P (IE RdrName)
-mkModuleImpExp n@(L l name) subs =
+data ImpExpQcSpec = ImpExpQcName (Located RdrName)
+                  | ImpExpQcType (Located RdrName)
+                  | ImpExpQcWildcard
+
+mkModuleImpExp :: Located ImpExpQcSpec -> ImpExpSubSpec -> P (IE RdrName)
+mkModuleImpExp (L l specname) subs =
   case subs of
     ImpExpAbs
-      | isVarNameSpace (rdrNameSpace name) -> return $ IEVar  n
-      | otherwise                          -> IEThingAbs . L l <$> nameT
-    ImpExpAll                              -> IEThingAll . L l <$> nameT
-    ImpExpList xs                          ->
-      (\newName -> IEThingWith (L l newName) NoIEWildcard xs []) <$> nameT
+      | isVarNameSpace (rdrNameSpace name)
+                               -> return $ IEVar (L l (ieNameFromSpec specname))
+      | otherwise              -> IEThingAbs . L l <$> nameT
+    ImpExpAll                  -> IEThingAll . L l <$> nameT
+    ImpExpList xs              ->
+      (\newName -> IEThingWith (L l newName) NoIEWildcard (wrapped xs) [])
+        <$> nameT
     ImpExpAllWith xs                       ->
       do allowed <- extension patternSynonymsEnabled
          if allowed
           then
             let withs = map unLoc xs
                 pos   = maybe NoIEWildcard IEWildcard
-                          (findIndex isNothing withs)
-                ies   = [L l n | L l (Just n) <- xs]
+                          (findIndex isImpExpQcWildcard withs)
+                ies   = wrapped $ filter (not . isImpExpQcWildcard . unLoc) xs
             in (\newName -> IEThingWith (L l newName) pos ies []) <$> nameT
           else parseErrorSDoc l
             (text "Illegal export form (use PatternSynonyms to enable)")
   where
+    name = ieNameVal specname
     nameT =
       if isVarNameSpace (rdrNameSpace name)
         then parseErrorSDoc l
@@ -1469,7 +1477,17 @@ mkModuleImpExp n@(L l name) subs =
                    then text "If" <+> quotes (ppr name) <+> text "is a type constructor"
                     <+> text "then enable ExplicitNamespaces and use the 'type' keyword."
                    else empty)
-        else return $ name
+        else return $ ieNameFromSpec specname
+
+    ieNameVal (ImpExpQcName ln)  = unLoc ln
+    ieNameVal (ImpExpQcType ln)  = unLoc ln
+    ieNameVal (ImpExpQcWildcard) = panic "ieNameVal got wildcard"
+
+    ieNameFromSpec (ImpExpQcName ln)  = IEName ln
+    ieNameFromSpec (ImpExpQcType ln)  = IEType ln
+    ieNameFromSpec (ImpExpQcWildcard) = panic "ieName got wildcard"
+
+    wrapped = map (\(L l x) -> L l (ieNameFromSpec x))
 
 mkTypeImpExp :: Located RdrName   -- TcCls or Var name space
              -> P (Located RdrName)
@@ -1492,15 +1510,18 @@ checkImportSpec ie@(L _ specs) =
         $+$ text "pattern synonyms with types in module exports.")
 
 -- In the correct order
-mkImpExpSubSpec :: [Located (Maybe RdrName)] -> P ([AddAnn], ImpExpSubSpec)
+mkImpExpSubSpec :: [Located ImpExpQcSpec] -> P ([AddAnn], ImpExpSubSpec)
 mkImpExpSubSpec [] = return ([], ImpExpList [])
-mkImpExpSubSpec [L l Nothing] =
-  return ([\s -> addAnnotation s AnnDotdot l], ImpExpAll)
+mkImpExpSubSpec [L _ ImpExpQcWildcard] =
+  return ([], ImpExpAll)
 mkImpExpSubSpec xs =
-  if (any (isNothing . unLoc) xs)
+  if (any (isImpExpQcWildcard . unLoc) xs)
     then return $ ([], ImpExpAllWith xs)
-    else return $ ([], ImpExpList ([L l x | L l (Just x) <- xs]))
+    else return $ ([], ImpExpList xs)
 
+isImpExpQcWildcard :: ImpExpQcSpec -> Bool
+isImpExpQcWildcard ImpExpQcWildcard = True
+isImpExpQcWildcard _                = False
 
 -----------------------------------------------------------------------------
 -- Misc utils

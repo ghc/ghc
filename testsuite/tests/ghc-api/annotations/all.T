@@ -27,3 +27,4 @@ test('T11332',      ignore_stderr, run_command, ['$MAKE -s --no-print-directory 
 test('T11430',      ignore_stderr, run_command, ['$MAKE -s --no-print-directory T11430'])
 test('load-main',   ignore_stderr, run_command, ['$MAKE -s --no-print-directory load-main'])
 test('T12417',      ignore_stderr, run_command, ['$MAKE -s --no-print-directory T12417'])
+test('T13163',      ignore_stderr, run_command, ['$MAKE -s --no-print-directory T13163'])

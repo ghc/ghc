@@ -873,18 +873,19 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     lookup_ie ie = handle_bad_import $ do
       case ie of
         IEVar (L l n) -> do
-            (name, avail, _) <- lookup_name n
-            return ([(IEVar (L l name), trimAvail avail name)], [])
+            (name, avail, _) <- lookup_name $ ieWrappedName n
+            return ([(IEVar (L l (replaceWrappedName n name)),
+                                                  trimAvail avail name)], [])
 
         IEThingAll (L l tc) -> do
-            (name, avail, mb_parent) <- lookup_name tc
+            (name, avail, mb_parent) <- lookup_name $ ieWrappedName tc
             let warns = case avail of
                           Avail {}                     -- e.g. f(..)
-                            -> [DodgyImport tc]
+                            -> [DodgyImport $ ieWrappedName tc]
 
                           AvailTC _ subs fs
                             | null (drop 1 subs) && null fs -- e.g. T(..) where T is a synonym
-                            -> [DodgyImport tc]
+                            -> [DodgyImport $ ieWrappedName tc]
 
                             | not (is_qual decl_spec)  -- e.g. import M( T(..) )
                             -> [MissingImportList]
@@ -892,7 +893,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                             | otherwise
                             -> []
 
-                renamed_ie = IEThingAll (L l name)
+                renamed_ie = IEThingAll (L l (replaceWrappedName tc name))
                 sub_avails = case avail of
                                Avail {}              -> []
                                AvailTC name2 subs fs -> [(renamed_ie, AvailTC name2 (subs \\ [name]) fs)]
@@ -902,23 +903,26 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
               Just parent -> return ((renamed_ie, AvailTC parent [name] []) : sub_avails, warns)
                              -- associated type
 
-        IEThingAbs (L l tc)
+        IEThingAbs (L l tc')
             | want_hiding   -- hiding ( C )
                        -- Here the 'C' can be a data constructor
                        --  *or* a type/class, or even both
-            -> let tc_name = lookup_name tc
+            -> let tc = ieWrappedName tc'
+                   tc_name = lookup_name tc
                    dc_name = lookup_name (setRdrNameSpace tc srcDataName)
                in
                case catIELookupM [ tc_name, dc_name ] of
                  []    -> failLookupWith BadImport
-                 names -> return ([mkIEThingAbs l name | name <- names], [])
+                 names -> return ([mkIEThingAbs tc' l name | name <- names], [])
             | otherwise
-            -> do nameAvail <- lookup_name tc
-                  return ([mkIEThingAbs l nameAvail], [])
+            -> do nameAvail <- lookup_name (ieWrappedName tc')
+                  return ([mkIEThingAbs tc' l nameAvail]
+                         , [])
 
-        IEThingWith (L l rdr_tc) wc rdr_ns rdr_fs ->
+        IEThingWith (L l rdr_tc) wc rdr_ns' rdr_fs ->
           ASSERT2(null rdr_fs, ppr rdr_fs) do
-           (name, AvailTC _ ns subflds, mb_parent) <- lookup_name rdr_tc
+           (name, AvailTC _ ns subflds, mb_parent)
+                                         <- lookup_name (ieWrappedName rdr_tc)
 
            -- Look up the children in the sub-names of the parent
            let subnames = case ns of   -- The tc is first in ns,
@@ -926,32 +930,41 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
                                        -- See the AvailTC Invariant in Avail.hs
                             (n1:ns1) | n1 == name -> ns1
                                      | otherwise  -> ns
+               rdr_ns = map ieLWrappedName rdr_ns'
            case lookupChildren (map Left subnames ++ map Right subflds) rdr_ns of
              Nothing                      -> failLookupWith BadImport
              Just (childnames, childflds) ->
                case mb_parent of
                  -- non-associated ty/cls
                  Nothing
-                   -> return ([(IEThingWith (L l name) wc childnames childflds,
+                   -> return ([(IEThingWith (L l name') wc childnames'
+                                                           childflds,
                                AvailTC name (name:map unLoc childnames) (map unLoc childflds))],
                               [])
+                   where name' = replaceWrappedName rdr_tc name
+                         childnames' = map to_ie_post_rn childnames
+                         -- childnames' = postrn_ies childnames
                  -- associated ty
                  Just parent
-                   -> return ([(IEThingWith (L l name) wc childnames childflds,
+                   -> return ([(IEThingWith (L l name') wc childnames'
+                                                           childflds,
                                 AvailTC name (map unLoc childnames) (map unLoc childflds)),
-                               (IEThingWith (L l name) wc childnames childflds,
+                               (IEThingWith (L l name') wc childnames'
+                                                           childflds,
                                 AvailTC parent [name] [])],
                               [])
+                   where name' = replaceWrappedName rdr_tc name
+                         childnames' = map to_ie_post_rn childnames
 
         _other -> failLookupWith IllegalImport
         -- could be IEModuleContents, IEGroup, IEDoc, IEDocNamed
         -- all errors.
 
       where
-        mkIEThingAbs l (n, av, Nothing    ) = (IEThingAbs (L l n),
-                                               trimAvail av n)
-        mkIEThingAbs l (n, _,  Just parent) = (IEThingAbs (L l n),
-                                               AvailTC parent [n] [])
+        mkIEThingAbs tc l (n, av, Nothing    )
+          = (IEThingAbs (L l (replaceWrappedName tc n)), trimAvail av n)
+        mkIEThingAbs tc l (n, _,  Just parent)
+          = (IEThingAbs (L l (replaceWrappedName tc n)), AvailTC parent [n] [])
 
         handle_bad_import m = catchIELookup m $ \err -> case err of
           BadImport | want_hiding -> return ([], [BadImportW])
@@ -995,7 +1008,7 @@ gresFromIE decl_spec (L loc ie, avail)
   = gresFromAvail prov_fn avail
   where
     is_explicit = case ie of
-                    IEThingAll (L _ name) -> \n -> n == name
+                    IEThingAll (L _ name) -> \n -> n == ieWrappedName name
                     _                     -> \_ -> True
     prov_fn name
       = Just (ImpSpec { is_decl = decl_spec, is_item = item_spec })
@@ -1251,15 +1264,19 @@ findImportUsage imports used_gres
               _other -> emptyNameSet -- No explicit import list => no unused-name list
 
         add_unused :: IE Name -> NameSet -> NameSet
-        add_unused (IEVar (L _ n))      acc = add_unused_name n acc
-        add_unused (IEThingAbs (L _ n)) acc = add_unused_name n acc
-        add_unused (IEThingAll (L _ n)) acc = add_unused_all  n acc
+        add_unused (IEVar (L _ n))      acc
+                                       = add_unused_name (ieWrappedName n) acc
+        add_unused (IEThingAbs (L _ n)) acc
+                                       = add_unused_name (ieWrappedName n) acc
+        add_unused (IEThingAll (L _ n)) acc
+                                       = add_unused_all  (ieWrappedName n) acc
         add_unused (IEThingWith (L _ p) wc ns fs) acc =
-          add_wc_all (add_unused_with p xs acc)
-          where xs = map unLoc ns ++ map (flSelector . unLoc) fs
+          add_wc_all (add_unused_with (ieWrappedName p) xs acc)
+          where xs = map (ieWrappedName . unLoc) ns
+                          ++ map (flSelector . unLoc) fs
                 add_wc_all = case wc of
                             NoIEWildcard -> id
-                            IEWildcard _ -> add_unused_all p
+                            IEWildcard _ -> add_unused_all (ieWrappedName p)
         add_unused _ acc = acc
 
         add_unused_name n acc
@@ -1394,24 +1411,29 @@ printMinimalImports imports_w_usage
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
     to_ie _ (Avail n)
-       = [IEVar (noLoc n)]
+       = [IEVar (to_ie_post_rn $ noLoc n)]
     to_ie _ (AvailTC n [m] [])
-       | n==m = [IEThingAbs (noLoc n)]
+       | n==m = [IEThingAbs (to_ie_post_rn $ noLoc n)]
     to_ie iface (AvailTC n ns fs)
       = case [(xs,gs) |  AvailTC x xs gs <- mi_exports iface
                  , x == n
                  , x `elem` xs    -- Note [Partial export]
                  ] of
-           [xs] | all_used xs -> [IEThingAll (noLoc n)]
-                | otherwise   -> [IEThingWith (noLoc n) NoIEWildcard
-                                              (map noLoc (filter (/= n) ns))
-                                              (map noLoc fs)]
+           [xs] | all_used xs -> [IEThingAll (to_ie_post_rn $ noLoc n)]
+                | otherwise   ->
+                   [IEThingWith (to_ie_post_rn $ noLoc n) NoIEWildcard
+                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
+                                (map noLoc fs)]
                                           -- Note [Overloaded field import]
            _other | all_non_overloaded fs
-                              -> map (IEVar . noLoc) $ ns ++ map flSelector fs
-                  | otherwise -> [IEThingWith (noLoc n) NoIEWildcard
-                                              (map noLoc (filter (/= n) ns)) (map noLoc fs)]
+                              -> map (IEVar . to_ie_post_rn_var . noLoc) $ ns
+                                 ++ map flSelector fs
+                  | otherwise ->
+                      [IEThingWith (to_ie_post_rn $ noLoc n) NoIEWildcard
+                                (map (to_ie_post_rn . noLoc) (filter (/= n) ns))
+                                (map noLoc fs)]
         where
+
           fld_lbls = map flLabel fs
 
           all_used (avail_occs, avail_flds)
@@ -1419,6 +1441,18 @@ printMinimalImports imports_w_usage
                     && all (`elem` fld_lbls) (map flLabel avail_flds)
 
           all_non_overloaded = all (not . flIsOverloaded)
+
+to_ie_post_rn_var :: (HasOccName name) => Located name -> LIEWrappedName name
+to_ie_post_rn_var (L l n)
+  | isDataOcc $ occName n = L l (IEPattern (L l n))
+  | otherwise             = L l (IEName    (L l n))
+
+
+to_ie_post_rn :: (HasOccName name) => Located name -> LIEWrappedName name
+to_ie_post_rn (L l n)
+  | isTcOcc occ && isSymOcc occ = L l (IEType (L l n))
+  | otherwise                   = L l (IEName (L l n))
+  where occ = occName n
 
 {-
 Note [Partial export]
@@ -1528,7 +1562,7 @@ dodgyImportWarn item = dodgyMsg (text "import") item
 dodgyMsg :: (OutputableBndr n, HasOccName n) => SDoc -> n -> SDoc
 dodgyMsg kind tc
   = sep [ text "The" <+> kind <+> ptext (sLit "item")
-                             <+> quotes (ppr (IEThingAll (noLoc tc)))
+                     <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
                 <+> text "suggests that",
           quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
           text "but it has none" ]
