@@ -237,6 +237,27 @@ So in repTopDs we bring the binders into scope with mkGenSyms and addBinds.
 And we use lookupOcc, rather than lookupBinder
 in repTyClD and repC.
 
+Note [Don't quantify implicit type variables in quotes]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If you're not careful, it's suprisingly easy to take this quoted declaration:
+
+  [d| idProxy :: forall proxy (b :: k). proxy b -> proxy b
+      idProxy x = x
+    |]
+
+and have Template Haskell turn it into this:
+
+  idProxy :: forall k proxy (b :: k). proxy b -> proxy b
+  idProxy x = x
+
+Notice that we explicitly quantifed the variable `k`! This is quite bad, as the
+latter declaration requires -XTypeInType, while the former does not. Not to
+mention that the latter declaration isn't even what the user wrote in the
+first place.
+
+Usually, the culprit behind these bugs is taking implicitly quantified type
+variables (often from the hsib_vars field of HsImplicitBinders) and putting
+them into a `ForallT` or `ForallC`. Doing so caused #13018 and #13123.
 -}
 
 -- represent associated family instances
@@ -623,27 +644,30 @@ repC (L _ (ConDeclH98 { con_name = con
        }
 
 repC (L _ (ConDeclGADT { con_names = cons
-                       , con_type = res_ty@(HsIB { hsib_vars = con_vars })}))
+                       , con_type = res_ty@(HsIB { hsib_vars = imp_tvs })}))
   | (details, res_ty', L _ [] , []) <- gadtDetails
-  , [] <- con_vars
+  , [] <- imp_tvs
     -- no implicit or explicit variables, no context = no need for a forall
   = do { let doc = text "In the constructor for " <+> ppr (head cons)
        ; (hs_details, gadt_res_ty) <-
            updateGadtResult failWithDs doc details res_ty'
        ; repGadtDataCons cons hs_details gadt_res_ty }
 
-  | (details,res_ty',ctxt, tvs) <- gadtDetails
+  | (details,res_ty',ctxt, exp_tvs) <- gadtDetails
   = do { let doc = text "In the constructor for " <+> ppr (head cons)
-             con_tvs = HsQTvs { hsq_implicit = []
-                              , hsq_explicit = (map (noLoc . UserTyVar . noLoc)
-                                                   con_vars) ++ tvs
+             con_tvs = HsQTvs { hsq_implicit  = imp_tvs
+                              , hsq_explicit  = exp_tvs
                               , hsq_dependent = emptyNameSet }
+             -- NB: Don't put imp_tvs into the hsq_explicit field above
+             -- See Note [Don't quantify implicit type variables in quotes]
        ; addTyVarBinds con_tvs $ \ ex_bndrs -> do
        { (hs_details, gadt_res_ty) <-
            updateGadtResult failWithDs doc details res_ty'
        ; c'    <- repGadtDataCons cons hs_details gadt_res_ty
        ; ctxt' <- repContext (unLoc ctxt)
-       ; rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) } }
+       ; if null exp_tvs && null (unLoc ctxt)
+         then return c'
+         else rep2 forallCName ([unC ex_bndrs, unC ctxt', unC c']) } }
   where
      gadtDetails = gadtDeclDetails res_ty
 
@@ -737,18 +761,21 @@ rep_wc_ty_sig :: Name -> SrcSpan -> LHsSigWcType Name -> Located Name
     -- We must special-case the top-level explicit for-all of a TypeSig
     -- See Note [Scoped type variables in bindings]
 rep_wc_ty_sig mk_sig loc sig_ty nm
-  | HsIB { hsib_vars = implicit_tvs, hsib_body = hs_ty } <- hswc_body sig_ty
+  | HsIB { hsib_body = hs_ty } <- hswc_body sig_ty
   , (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy hs_ty
   = do { nm1 <- lookupLOcc nm
        ; let rep_in_scope_tv tv = do { name <- lookupBinder (hsLTyVarName tv)
                                      ; repTyVarBndrWithKind tv name }
-             all_tvs = map (noLoc . UserTyVar . noLoc) implicit_tvs ++ explicit_tvs
-       ; th_tvs  <- repList tyVarBndrTyConName rep_in_scope_tv all_tvs
+       ; th_explicit_tvs <- repList tyVarBndrTyConName rep_in_scope_tv
+                                    explicit_tvs
+         -- NB: Don't pass any implicit type variables to repList above
+         -- See Note [Don't quantify implicit type variables in quotes]
+
        ; th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
-       ; ty1 <- if null all_tvs && null (unLoc ctxt)
+       ; ty1 <- if null explicit_tvs && null (unLoc ctxt)
                 then return th_ty
-                else repTForall th_tvs th_ctxt th_ty
+                else repTForall th_explicit_tvs th_ctxt th_ty
        ; sig <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
 
@@ -887,35 +914,38 @@ repContext ctxt = do preds <- repList typeQTyConName repLTy ctxt
                      repCtxt preds
 
 repHsSigType :: LHsSigType Name -> DsM (Core TH.TypeQ)
-repHsSigType (HsIB { hsib_vars = vars
+repHsSigType (HsIB { hsib_vars = implicit_tvs
                    , hsib_body = body })
   | (explicit_tvs, ctxt, ty) <- splitLHsSigmaTy body
-  = addTyVarBinds (HsQTvs { hsq_implicit = []
-                          , hsq_explicit = map (noLoc . UserTyVar . noLoc) vars ++
-                                           explicit_tvs
+  = addTyVarBinds (HsQTvs { hsq_implicit = implicit_tvs
+                          , hsq_explicit = explicit_tvs
                           , hsq_dependent = emptyNameSet })
-                  $ \ th_tvs ->
+    -- NB: Don't pass implicit_tvs to the hsq_explicit field above
+    -- See Note [Don't quantify implicit type variables in quotes]
+                  $ \ th_explicit_tvs ->
     do { th_ctxt <- repLContext ctxt
        ; th_ty   <- repLTy ty
-       ; if null vars && null explicit_tvs && null (unLoc ctxt)
+       ; if null explicit_tvs && null (unLoc ctxt)
          then return th_ty
-         else repTForall th_tvs th_ctxt th_ty }
+         else repTForall th_explicit_tvs th_ctxt th_ty }
 
 repHsPatSynSigType :: LHsSigType Name -> DsM (Core TH.TypeQ)
 repHsPatSynSigType (HsIB { hsib_vars = implicit_tvs
                          , hsib_body = body })
-  = addTyVarBinds (newTvs (impls ++ univs)) $ \th_univs ->
-      addTyVarBinds (newTvs exis) $ \th_exis ->
+  = addTyVarBinds (newTvs implicit_tvs univs) $ \th_univs ->
+      addTyVarBinds (newTvs [] exis) $ \th_exis ->
     do { th_reqs  <- repLContext reqs
        ; th_provs <- repLContext provs
        ; th_ty    <- repLTy ty
        ; repTForall th_univs th_reqs =<< (repTForall th_exis th_provs th_ty) }
   where
-    impls = map (noLoc . UserTyVar . noLoc) implicit_tvs
-    newTvs tvs = HsQTvs
-      { hsq_implicit  = []
-      , hsq_explicit  = tvs
+    newTvs impl_tvs expl_tvs = HsQTvs
+      { hsq_implicit  = impl_tvs
+      , hsq_explicit  = expl_tvs
       , hsq_dependent = emptyNameSet }
+    -- NB: Don't pass impl_tvs to the hsq_explicit field above
+    -- See Note [Don't quantify implicit type variables in quotes]
+
     (univs, reqs, exis, provs, ty) = splitLHsPatSynTy body
 
 repHsSigWcType :: LHsSigWcType Name -> DsM (Core TH.TypeQ)

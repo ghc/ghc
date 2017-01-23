@@ -367,3 +367,5 @@ test('T12788', [], multimod_compile_fail,
      ['T12788.hs', '-v0 ' + config.ghc_th_way_flags])
 test('T12977', normal, compile, ['-v0'])
 test('T12993', normal, multimod_compile, ['T12993.hs', '-v0'])
+test('T13018', normal, compile, ['-v0'])
+test('T13123', normal, compile, ['-v0'])

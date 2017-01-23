@@ -148,6 +148,42 @@ Template Haskell
    be ambiguous in the presence of :ghc-flag:`-XPolyKinds`.
    (:ghc-ticket:`12646`)
 
+-  Quoted type signatures are more accurate with respect to implicitly
+   quantified type variables. Before, if you quoted this: ::
+
+     [d| id :: a -> a
+         id x = x
+       |]
+
+   then the code that Template Haskell would give back to you would actually be
+   this instead: ::
+
+     id :: forall a. a -> a
+     id x = x
+
+   That is, quoting would explicitly quantify all type variables, even ones
+   that were implicitly quantified in the source. This could be especially
+   harmful if a kind variable was implicitly quantified. For example, if
+   you took this quoted declaration: ::
+
+     [d| idProxy :: forall proxy (b :: k). proxy b -> proxy b
+         idProxy x = x
+       |]
+
+   and tried to splice it back in, you'd get this instead: ::
+
+     idProxy :: forall k proxy (b :: k). proxy b -> proxy b
+     idProxy x = x
+
+   Now ``k`` is explicitly quantified, and that requires turning on
+   :ghc-flag:`-XTypeInType`, whereas the original declaration did not!
+
+   Template Haskell quoting now respects implicit quantification in type
+   signatures, so the quoted declarations above now correctly leave the
+   type variables ``a`` and ``k`` as implicitly quantified.
+   (:ghc-ticket:`13018` and :ghc-ticket:`13123`)
+
+
 Runtime system
 ~~~~~~~~~~~~~~
 
