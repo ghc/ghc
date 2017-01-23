@@ -251,6 +251,11 @@ Dumping out compiler intermediate structures
     aren't). This flag makes debugging output appear in the more verbose
     debug style.
 
+.. ghc-flag:: -dppr-ticks
+
+    Includes "ticks" in the pretty-printer output.
+
+
 .. _formatting dumps:
 
 Formatting dumps
