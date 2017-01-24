@@ -344,15 +344,13 @@ isOneLineSpan (UnhelpfulSpan _) = False
 -- that it covers at least as much source code. True where spans are equal.
 containsSpan :: RealSrcSpan -> RealSrcSpan -> Bool
 containsSpan s1 s2
-  =  srcSpanEndCol s1 >= srcSpanEndCol s2
-  && srcSpanStartCol s1 <= srcSpanStartCol s2
-  && srcSpanEndLine s1 >= srcSpanEndLine s2
-  && srcSpanStartLine s1 <= srcSpanStartLine s2
-  && srcSpanFile s1 == srcSpanFile s2
-  -- ordered roughly by the likelihood of failing:
-  --   * we're more likely to be comparing source spans from the same file
-  --   * we're more likely to be comparing source spans on the same line
-
+  = (srcSpanStartLine s1, srcSpanStartCol s1)
+       <= (srcSpanStartLine s2, srcSpanStartCol s2)
+    && (srcSpanEndLine s1, srcSpanEndCol s1)
+       >= (srcSpanEndLine s2, srcSpanEndCol s2)
+    && (srcSpanFile s1 == srcSpanFile s2)
+    -- We check file equality last because it is (presumably?) least
+    -- likely to fail.
 {-
 %************************************************************************
 %*                                                                      *
