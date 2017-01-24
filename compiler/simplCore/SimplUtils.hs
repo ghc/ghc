@@ -64,6 +64,7 @@ import PrelRules
 import Literal
 
 import Control.Monad    ( when )
+import Data.List        ( sortBy )
 
 {-
 ************************************************************************
@@ -1926,7 +1927,7 @@ mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 mkCase2 dflags scrut bndr alts_ty alts
   | gopt Opt_CaseFolding dflags
   , Just (scrut',f) <- caseRules dflags scrut
-  = mkCase3 dflags scrut' bndr alts_ty (map (mapAlt f) alts)
+  = mkCase3 dflags scrut' bndr alts_ty (new_alts f)
   | otherwise
   = mkCase3 dflags scrut bndr alts_ty alts
   where
@@ -1945,6 +1946,9 @@ mkCase2 dflags scrut bndr alts_ty alts
     wrap_rhs l rhs
       | isDeadBinder bndr = rhs
       | otherwise         = Let (NonRec bndr l) rhs
+
+    -- We need to re-sort the alternatives to preserve the #case_invariants#
+    new_alts f = sortBy cmpAlt (map (mapAlt f) alts)
 
     mapAlt f alt@(c,bs,e) = case c of
       DEFAULT          -> (c, bs, wrap_rhs scrut e)
