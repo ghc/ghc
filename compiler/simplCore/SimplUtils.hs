@@ -1925,7 +1925,7 @@ mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 
 mkCase2 dflags scrut bndr alts_ty alts
   | gopt Opt_CaseFolding dflags
-  , Just (scrut',f) <- caseRules scrut
+  , Just (scrut',f) <- caseRules dflags scrut
   = mkCase3 dflags scrut' bndr alts_ty (map (mapAlt f) alts)
   | otherwise
   = mkCase3 dflags scrut bndr alts_ty alts

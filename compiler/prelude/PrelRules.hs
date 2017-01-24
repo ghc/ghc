@@ -539,24 +539,50 @@ isMaxBound _      (MachWord64 i) = i == toInteger (maxBound :: Word64)
 isMaxBound _      _              = False
 
 
--- Note that we *don't* warn the user about overflow. It's not done at
--- runtime either, and compilation of completely harmless things like
+-- Note [Word/Int underflow/overflow]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- According to the Haskell Report 2010 (Sections 18.1 and 23.1 about signed and
+-- unsigned integral types): "All arithmetic is performed modulo 2^n, where n is
+-- the number of bits in the type."
+--
+-- GHC stores Word# and Int# constant values as Integer. Core optimizations such
+-- as constant folding must ensure that the Integer value remains in the valid
+-- target Word/Int range (see #13172). The following functions are used to
+-- ensure this.
+--
+-- Note that we *don't* warn the user about overflow. It's not done at runtime
+-- either, and compilation of completely harmless things like
 --    ((124076834 :: Word32) + (2147483647 :: Word32))
--- would yield a warning. Instead we simply squash the value into the
--- *target* Int/Word range.
-intResult :: DynFlags -> Integer -> Maybe CoreExpr
-intResult dflags result = Just (mkIntVal dflags result')
-    where result' = case platformWordSize (targetPlatform dflags) of
-                    4 -> toInteger (fromInteger result :: Int32)
-                    8 -> toInteger (fromInteger result :: Int64)
-                    w -> panic ("intResult: Unknown platformWordSize: " ++ show w)
+-- doesn't yield a warning. Instead we simply squash the value into the *target*
+-- Int/Word range.
 
+-- | Ensure the given Integer is in the target Int range
+intResult' :: DynFlags -> Integer -> Integer
+intResult' dflags result = case platformWordSize (targetPlatform dflags) of
+   4 -> toInteger (fromInteger result :: Int32)
+   8 -> toInteger (fromInteger result :: Int64)
+   w -> panic ("intResult: Unknown platformWordSize: " ++ show w)
+
+-- | Ensure the given Integer is in the target Word range
+wordResult' :: DynFlags -> Integer -> Integer
+wordResult' dflags result = case platformWordSize (targetPlatform dflags) of
+   4 -> toInteger (fromInteger result :: Word32)
+   8 -> toInteger (fromInteger result :: Word64)
+   w -> panic ("wordResult: Unknown platformWordSize: " ++ show w)
+
+-- | Create an Int literal expression while ensuring the given Integer is in the
+-- target Int range
+intResult :: DynFlags -> Integer -> Maybe CoreExpr
+intResult dflags result = Just (mkIntVal dflags (intResult' dflags result))
+
+-- | Create a Word literal expression while ensuring the given Integer is in the
+-- target Word range
 wordResult :: DynFlags -> Integer -> Maybe CoreExpr
-wordResult dflags result = Just (mkWordVal dflags result')
-    where result' = case platformWordSize (targetPlatform dflags) of
-                    4 -> toInteger (fromInteger result :: Word32)
-                    8 -> toInteger (fromInteger result :: Word64)
-                    w -> panic ("wordResult: Unknown platformWordSize: " ++ show w)
+wordResult dflags result = Just (mkWordVal dflags (wordResult' dflags result))
+
+
+
 
 inversePrimOp :: PrimOp -> RuleM CoreExpr
 inversePrimOp primop = do
@@ -1406,20 +1432,24 @@ match_smallIntegerTo _ _ _ _ _ = Nothing
 
 -- | Match the scrutinee of a case and potentially return a new scrutinee and a
 -- function to apply to each literal alternative.
-caseRules :: CoreExpr -> Maybe (CoreExpr, Integer -> Integer)
-caseRules scrut = case scrut of
+caseRules :: DynFlags -> CoreExpr -> Maybe (CoreExpr, Integer -> Integer)
+caseRules dflags scrut = case scrut of
+
+   -- We need to call wordResult' and intResult' to ensure that the literal
+   -- alternatives remain in Word/Int target ranges (cf Note [Word/Int
+   -- underflow/overflow] and #13172).
 
    -- v `op` x#
    App (App (Var f) v) (Lit l)
       | Just op <- isPrimOpId_maybe f
       , Just x  <- isLitValue_maybe l ->
       case op of
-         WordAddOp -> Just (v, \y -> y-x      )
-         IntAddOp  -> Just (v, \y -> y-x      )
-         WordSubOp -> Just (v, \y -> y+x      )
-         IntSubOp  -> Just (v, \y -> y+x      )
-         XorOp     -> Just (v, \y -> y `xor` x)
-         XorIOp    -> Just (v, \y -> y `xor` x)
+         WordAddOp -> Just (v, \y -> wordResult' dflags $ y-x      )
+         IntAddOp  -> Just (v, \y -> intResult'  dflags $ y-x      )
+         WordSubOp -> Just (v, \y -> wordResult' dflags $ y+x      )
+         IntSubOp  -> Just (v, \y -> intResult'  dflags $ y+x      )
+         XorOp     -> Just (v, \y -> wordResult' dflags $ y `xor` x)
+         XorIOp    -> Just (v, \y -> intResult'  dflags $ y `xor` x)
          _         -> Nothing
 
    -- x# `op` v
@@ -1427,21 +1457,21 @@ caseRules scrut = case scrut of
       | Just op <- isPrimOpId_maybe f
       , Just x  <- isLitValue_maybe l ->
       case op of
-         WordAddOp -> Just (v, \y -> y-x      )
-         IntAddOp  -> Just (v, \y -> y-x      )
-         WordSubOp -> Just (v, \y -> x-y      )
-         IntSubOp  -> Just (v, \y -> x-y      )
-         XorOp     -> Just (v, \y -> y `xor` x)
-         XorIOp    -> Just (v, \y -> y `xor` x)
+         WordAddOp -> Just (v, \y -> wordResult' dflags $ y-x      )
+         IntAddOp  -> Just (v, \y -> intResult'  dflags $ y-x      )
+         WordSubOp -> Just (v, \y -> wordResult' dflags $ x-y      )
+         IntSubOp  -> Just (v, \y -> intResult'  dflags $ x-y      )
+         XorOp     -> Just (v, \y -> wordResult' dflags $ y `xor` x)
+         XorIOp    -> Just (v, \y -> intResult'  dflags $ y `xor` x)
          _         -> Nothing
 
    -- op v
    App (Var f) v
       | Just op <- isPrimOpId_maybe f ->
       case op of
-         NotOp     -> Just (v, \y -> complement y)
-         NotIOp    -> Just (v, \y -> complement y)
-         IntNegOp  -> Just (v, \y -> negate y    )
+         NotOp     -> Just (v, \y -> wordResult' dflags $ complement y)
+         NotIOp    -> Just (v, \y -> intResult'  dflags $ complement y)
+         IntNegOp  -> Just (v, \y -> intResult'  dflags $ negate y    )
          _         -> Nothing
 
    _ -> Nothing
