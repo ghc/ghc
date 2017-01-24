@@ -152,11 +152,11 @@ imports src@(_, imps, _, _) =
     everything (<|>) ie src ++ mapMaybe (imp . GHC.unLoc) imps
   where
     ie term = case cast term of
-        (Just (GHC.IEVar v)) -> pure $ var v
-        (Just (GHC.IEThingAbs t)) -> pure $ typ t
-        (Just (GHC.IEThingAll t)) -> pure $ typ t
+        (Just (GHC.IEVar v)) -> pure $ var $ GHC.ieLWrappedName v
+        (Just (GHC.IEThingAbs t)) -> pure $ typ $ GHC.ieLWrappedName t
+        (Just (GHC.IEThingAll t)) -> pure $ typ $ GHC.ieLWrappedName t
         (Just (GHC.IEThingWith t _ vs _fls)) ->
-          [typ t] ++ map var vs
+          [typ $ GHC.ieLWrappedName t] ++ map (var . GHC.ieLWrappedName) vs
         _ -> empty
     typ (GHC.L sspan name) = (sspan, RtkType name)
     var (GHC.L sspan name) = (sspan, RtkVar name)
