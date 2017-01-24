@@ -128,7 +128,7 @@ tcMatchTysX subst tys1 tys2
 tcMatchTyKisX :: TCvSubst        -- ^ Substitution to extend
               -> [Type]          -- ^ Template
               -> [Type]          -- ^ Target
-              -> Maybe TCvSubst  -- ^ One-shot subtitution
+              -> Maybe TCvSubst  -- ^ One-shot substitution
 tcMatchTyKisX subst tys1 tys2
   = tc_match_tys_x True subst tys1 tys2
 

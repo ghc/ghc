@@ -648,7 +648,7 @@ But when adding to the UsedRdrNames we must make that qualification
 explicit (saying "used  M.f"), otherwise we get "Redundant import of M.f".
 
 So we make up a suitable (fake) RdrName.  But be careful
-   import qualifed M
+   import qualified M
    import M( C(f) )
    instance C T where
      f x = x
@@ -1155,7 +1155,7 @@ lookupQualifiedNameGHCi rdr_name
                         ; return [] } }
 
       | otherwise
-      = do { traceRn "lookupQualifedNameGHCi: off" (ppr rdr_name)
+      = do { traceRn "lookupQualifiedNameGHCi: off" (ppr rdr_name)
            ; return [] }
 
     doc = text "Need to find" <+> ppr rdr_name

@@ -138,7 +138,7 @@ type Assignment = (LocalReg, CmmExpr, AbsMem)
   -- the RHS of the assignment.
 
 type Assignments = [Assignment]
-  -- A sequence of assignements; kept in *reverse* order
+  -- A sequence of assignments; kept in *reverse* order
   -- So the list [ x=e1, y=e2 ] means the sequence of assignments
   --     y = e2
   --     x = e1

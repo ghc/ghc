@@ -4612,7 +4612,7 @@ interpretPackageEnv dflags = do
     envError env = liftMaybeT . throwGhcExceptionIO . CmdLineError $
          "Package environment "
       ++ show env
-      ++ " (specified in GHC_ENVIRIONMENT) not found"
+      ++ " (specified in GHC_ENVIRONMENT) not found"
 
 
 -- If we're linking a binary, then only targets that produce object

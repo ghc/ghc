@@ -518,7 +518,7 @@ this exhaustive list can be empty!
 ********************************************************************* -}
 
 {- Many passes apply a substitution, and it's very handy to have type
-   synonyms to remind us whether or not the subsitution has been applied -}
+   synonyms to remind us whether or not the substitution has been applied -}
 
 -- Pre-cloning or substitution
 type InBndr     = CoreBndr
@@ -1380,13 +1380,13 @@ canUnfold _                                   = False
 {- Note [Fragile unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An unfolding is "fragile" if it mentions free variables (and hence would
-need substitution) or might be affeceted by optimisation.  The non-fragile
+need substitution) or might be affected by optimisation.  The non-fragile
 ones are
 
    NoUnfolding, BootUnfolding
 
    OtherCon {}    If we know this binder (say a lambda binder) will be
-                  bound to an evaluated thing, we weant to retain that
+                  bound to an evaluated thing, we want to retain that
                   info in simpleOptExpr; see Trac #13077.
 
 We consider even a StableUnfolding as fragile, because it needs substitution.

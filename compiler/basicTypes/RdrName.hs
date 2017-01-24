@@ -836,7 +836,7 @@ greLabel (GRE{gre_name = n, gre_par = FldParent{}})     = Just (occNameFS (nameO
 greLabel _                                              = Nothing
 
 unQualOK :: GlobalRdrElt -> Bool
--- ^ Test if an unqualifed version of this thing would be in scope
+-- ^ Test if an unqualified version of this thing would be in scope
 unQualOK (GRE {gre_lcl = lcl, gre_imp = iss })
   | lcl = True
   | otherwise = any unQualSpecOK iss
@@ -851,7 +851,7 @@ as 'rdr', say "x".  It does two things:
     * Unqualified, as 'x'    if want_unqual  is Unqual _
 
 (b) for that subset, filter the provenance field (gre_lcl and gre_imp)
-    to ones that brought it into scope qualifed or unqualified resp.
+    to ones that brought it into scope qualified or unqualified resp.
 
 Example:
       module A ( f ) where
@@ -881,7 +881,7 @@ pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 --    * Unqualified, as 'x'    if want_unqual  is Unqual _
 --
 -- Return each such GRE, with its ImportSpecs filtered, to reflect
--- how it is in scope qualifed or unqualified respectively.
+-- how it is in scope qualified or unqualified respectively.
 -- See Note [GRE filtering]
 pickGREs (Unqual {})  gres = mapMaybe pickUnqualGRE     gres
 pickGREs (Qual mod _) gres = mapMaybe (pickQualGRE mod) gres

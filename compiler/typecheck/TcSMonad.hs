@@ -840,7 +840,7 @@ The idea is that
 
 * (K2) is about inertness.  Intuitively, any infinite chain T^0(f,t),
   T^1(f,t), T^2(f,T).... must pass through the new work item infnitely
-  often, since the substution without the work item is inert; and must
+  often, since the substitution without the work item is inert; and must
   pass through at least one of the triples in S infnitely often.
 
   - (K2a): if not(fs>=fs) then there is no f that fs can rewrite (fs>=f),
@@ -1279,7 +1279,7 @@ lookupFlattenTyVar ieqs ftv
 
 {- Note [lookupFlattenTyVar]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Supppose we have an injective function F and
+Suppose we have an injective function F and
   inert_funeqs:   F t1 ~ fsk1
                   F t2 ~ fsk2
   inert_eqs:      fsk1 ~ fsk2

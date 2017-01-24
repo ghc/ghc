@@ -250,7 +250,7 @@ and have Template Haskell turn it into this:
   idProxy :: forall k proxy (b :: k). proxy b -> proxy b
   idProxy x = x
 
-Notice that we explicitly quantifed the variable `k`! This is quite bad, as the
+Notice that we explicitly quantified the variable `k`! This is quite bad, as the
 latter declaration requires -XTypeInType, while the former does not. Not to
 mention that the latter declaration isn't even what the user wrote in the
 first place.

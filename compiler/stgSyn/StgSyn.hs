@@ -568,7 +568,7 @@ type StgRhs      = GenStgRhs      Id Id
 type StgAlt      = GenStgAlt      Id Id
 
 {- Many passes apply a substitution, and it's very handy to have type
-   synonyms to remind us whether or not the subsitution has been applied.
+   synonyms to remind us whether or not the substitution has been applied.
    See CoreSyn for precedence in Core land
 -}
 

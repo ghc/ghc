@@ -191,7 +191,7 @@ data IfaceClassOp
                  IfaceType                         -- Class op type
                  (Maybe (DefMethSpec IfaceType))   -- Default method
                  -- The types of both the class op itself,
-                 -- and the default method, are *not* quantifed
+                 -- and the default method, are *not* quantified
                  -- over the class variables
 
 data IfaceAT = IfaceAT  -- See Class.ClassATItem

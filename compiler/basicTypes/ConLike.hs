@@ -147,7 +147,7 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 
 -- | The \"full signature\" of the 'ConLike' returns, in order:
 --
--- 1) The universally quanitifed type variables
+-- 1) The universally quantified type variables
 --
 -- 2) The existentially quantified type variables
 --

@@ -809,7 +809,7 @@ instance MonadThings CoreM where
 -- | Attempt to convert a Template Haskell name to one that GHC can
 -- understand. Original TH names such as those you get when you use
 -- the @'foo@ syntax will be translated to their equivalent GHC name
--- exactly. Qualified or unqualifed TH names will be dynamically bound
+-- exactly. Qualified or unqualified TH names will be dynamically bound
 -- to names in the module being compiled, if possible. Exact TH names
 -- will be bound to the name they represent, exactly.
 thNameToGhcName :: TH.Name -> CoreM (Maybe Name)
