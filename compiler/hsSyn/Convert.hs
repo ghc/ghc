@@ -510,10 +510,17 @@ cvtConstr (ForallC tvs ctxt con)
         ; L _ con'    <- cvtConstr con
         ; returnL $ case con' of
                 ConDeclGADT { con_type = conT } ->
-                  con' { con_type =
-                         HsIB PlaceHolder
-                         (noLoc $ HsForAllTy (hsq_explicit tvs') $
-                          (noLoc $ HsQualTy (L loc ctxt') (hsib_body conT))) }
+                  let hs_ty
+                        | null tvs = rho_ty
+                        | otherwise = noLoc $ HsForAllTy
+                                                { hst_bndrs = hsq_explicit tvs'
+                                                , hst_body  = rho_ty }
+                      rho_ty
+                        | null ctxt = hsib_body conT
+                        | otherwise = noLoc $ HsQualTy
+                                                { hst_ctxt = L loc ctxt'
+                                                , hst_body = hsib_body conT }
+                  in con' { con_type = HsIB PlaceHolder hs_ty }
                 ConDeclH98  {} ->
                   let qvars = case (tvs, con_qvars con') of
                         ([], Nothing) -> Nothing
