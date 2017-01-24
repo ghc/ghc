@@ -2,8 +2,6 @@ TOP=../../..
 include $(TOP)/mk/boilerplate.mk
 include $(TOP)/mk/test.mk
 
-LOCAL_GHC_PKG = '$(GHC_PKG)' --no-user-package-db -f $(LOCAL_PKGCONF)
-
 # Test 1: ghci -Ldir -lfoo
 #   with dir/libfoo.a
 
