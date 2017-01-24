@@ -9,6 +9,7 @@ import Reg
 import Panic
 import Platform
 
+import Data.Foldable (foldl')
 import Data.Word
 import Data.Bits
 
@@ -27,7 +28,7 @@ releaseReg _ _
 
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
-        = foldr releaseReg noFreeRegs (allocatableRegs platform)
+        = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazily
 getFreeRegs platform cls (FreeRegs f) = go f 0

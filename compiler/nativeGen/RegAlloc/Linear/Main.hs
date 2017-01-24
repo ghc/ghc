@@ -351,7 +351,8 @@ initBlock id block_live
                           Nothing ->
                             setFreeRegsR    (frInitFreeRegs platform)
                           Just live ->
-                            setFreeRegsR $ foldr (frAllocateReg platform) (frInitFreeRegs platform) [ r | RegReal r <- nonDetEltsUFM live ]
+                            setFreeRegsR $ foldl' (flip $ frAllocateReg platform) (frInitFreeRegs platform)
+                                                  [ r | RegReal r <- nonDetEltsUFM live ]
                             -- See Note [Unique Determinism and code generation]
                         setAssigR       emptyRegMap
 
@@ -685,7 +686,7 @@ clobberRegs clobbered
         let platform = targetPlatform dflags
 
         freeregs        <- getFreeRegsR
-        setFreeRegsR $! foldr (frAllocateReg platform) freeregs clobbered
+        setFreeRegsR $! foldl' (flip $ frAllocateReg platform) freeregs clobbered
 
         assig           <- getAssigR
         setAssigR $! clobber assig (nonDetUFMToList assig)

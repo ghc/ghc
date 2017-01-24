@@ -11,6 +11,7 @@ import Platform
 
 import Data.Word
 import Data.Bits
+import Data.Foldable (foldl')
 
 newtype FreeRegs = FreeRegs Word32
     deriving Show
@@ -27,7 +28,7 @@ releaseReg _ _
 
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
-        = foldr releaseReg noFreeRegs (allocatableRegs platform)
+        = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: Platform -> RegClass -> FreeRegs -> [RealReg] -- lazily
 getFreeRegs platform cls (FreeRegs f) = go f 0

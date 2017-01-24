@@ -13,7 +13,7 @@ import Platform
 
 import Data.Word
 import Data.Bits
--- import Data.List
+import Data.Foldable (foldl')
 
 
 --------------------------------------------------------------------------------
@@ -45,7 +45,7 @@ noFreeRegs = FreeRegs 0 0 0
 -- | The initial set of free regs.
 initFreeRegs :: Platform -> FreeRegs
 initFreeRegs platform
- =      foldr (releaseReg platform) noFreeRegs allocatableRegs
+ =      foldl' (flip $ releaseReg platform) noFreeRegs allocatableRegs
 
 
 -- | Get all the free registers of this class.

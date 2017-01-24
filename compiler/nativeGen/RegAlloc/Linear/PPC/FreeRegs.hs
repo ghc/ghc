@@ -11,7 +11,7 @@ import Platform
 
 import Data.Word
 import Data.Bits
--- import Data.List
+import Data.Foldable (foldl')
 
 -- The PowerPC has 32 integer and 32 floating point registers.
 -- This is 32bit PowerPC, so Word64 is inefficient - two Word32s are much
@@ -39,7 +39,7 @@ releaseReg _ _
         = panic "RegAlloc.Linear.PPC.releaseReg: bad reg"
 
 initFreeRegs :: Platform -> FreeRegs
-initFreeRegs platform = foldr releaseReg noFreeRegs (allocatableRegs platform)
+initFreeRegs platform = foldl' (flip releaseReg) noFreeRegs (allocatableRegs platform)
 
 getFreeRegs :: RegClass -> FreeRegs -> [RealReg]        -- lazily
 getFreeRegs cls (FreeRegs g f)

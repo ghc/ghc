@@ -25,6 +25,7 @@ import Unique
 import UniqFM
 import UniqSet
 
+import Data.Foldable (foldl')
 
 -- | For a jump instruction at the end of a block, generate fixup code so its
 --      vregs are in the correct regs for its destination.
@@ -128,7 +129,7 @@ joinToTargets_first block_live new_blocks block_id instr dest dests
 
         -- free up the regs that are not live on entry to this block.
         freeregs        <- getFreeRegsR
-        let freeregs' = foldr (frReleaseReg platform) freeregs to_free
+        let freeregs' = foldl' (flip $ frReleaseReg platform) freeregs to_free
 
         -- remember the current assignment on entry to this block.
         setBlockAssigR (mapInsert dest (freeregs', src_assig) block_assig)
