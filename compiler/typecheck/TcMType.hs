@@ -1139,7 +1139,7 @@ variables (the MetaTv constructor of TcTyVarDetails) are represented by mutable
 variables (known as TcRefs).
 
 Zonking is the process of ripping out these mutable variables and replacing them
-with a real TcType. This involves traversing the entire type expression, but the
+with a real Type. This involves traversing the entire type expression, but the
 interesting part of replacing the mutable variables occurs in zonkTyVarOcc.
 
 There are two ways to zonk a Type:
