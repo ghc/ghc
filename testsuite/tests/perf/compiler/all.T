@@ -605,7 +605,7 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
-           (wordsize(64), 52597024, 10)])
+           (wordsize(64), 57861352, 10)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -629,6 +629,8 @@ test('T5837',
              # 2016-10-25 52597024  amd64/Linux, the test now passes (hooray), and so
              #                          allocates more because it goes right down the
              #                          compilation pipeline
+             # 2017-01-24 57861352  amd64/Linux, very likely due to the top-level strings
+             #                          in Core patch.
       ],
       compile, ['-freduction-depth=50'])
 
