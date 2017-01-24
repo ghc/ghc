@@ -194,6 +194,7 @@ import GHC.Serialized   ( Serialized )
 
 import Foreign
 import Control.Monad    ( guard, liftM, when, ap )
+import Data.Foldable    ( foldl' )
 import Data.IORef
 import Data.Time
 import Exception
@@ -1124,10 +1125,10 @@ mkIfaceHashCache :: [(Fingerprint,IfaceDecl)]
 mkIfaceHashCache pairs
   = \occ -> lookupOccEnv env occ
   where
-    env = foldr add_decl emptyOccEnv pairs
-    add_decl (v,d) env0 = foldr add env0 (ifaceDeclFingerprints v d)
+    env = foldl' add_decl emptyOccEnv pairs
+    add_decl env0 (v,d) = foldl' add env0 (ifaceDeclFingerprints v d)
       where
-        add (occ,hash) env0 = extendOccEnv env0 occ (occ,hash)
+        add env0 (occ,hash) = extendOccEnv env0 occ (occ,hash)
 
 emptyIfaceHashCache :: OccName -> Maybe (OccName, Fingerprint)
 emptyIfaceHashCache _occ = Nothing
