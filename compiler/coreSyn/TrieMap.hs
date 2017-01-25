@@ -795,7 +795,7 @@ data TypeMapX a
 -- | squeeze out any synonyms, convert Constraint to *, and change TyConApps
 -- to nested AppTys. Why the last one? See Note [Equality on AppTys] in Type
 trieMapView :: Type -> Maybe Type
-trieMapView ty | Just ty' <- coreViewOneStarKind ty = Just ty'
+trieMapView ty | Just ty' <- coreView ty = Just ty'
 trieMapView (TyConApp tc tys@(_:_)) = Just $ foldl AppTy (TyConApp tc []) tys
 trieMapView (FunTy arg res)
   = Just ((TyConApp funTyCon [] `AppTy` arg) `AppTy` res)
@@ -811,8 +811,8 @@ instance TrieMap TypeMapX where
 
 instance Eq (DeBruijn Type) where
   env_t@(D env t) == env_t'@(D env' t')
-    | Just new_t  <- coreViewOneStarKind t  = D env new_t == env_t'
-    | Just new_t' <- coreViewOneStarKind t' = env_t       == D env' new_t'
+    | Just new_t  <- coreView t  = D env new_t == env_t'
+    | Just new_t' <- coreView t' = env_t       == D env' new_t'
     | otherwise
     = case (t, t') of
         (CastTy t1 _, _)  -> D env t1 == D env t'

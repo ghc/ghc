@@ -792,7 +792,7 @@ unify_ty ty1 (TyVarTy tv2) kco
 unify_ty ty1 ty2 _kco
   | Just (tc1, tys1) <- splitTyConApp_maybe ty1
   , Just (tc2, tys2) <- splitTyConApp_maybe ty2
-  = if tc1 == tc2 || (isStarKind ty1 && isStarKind ty2)
+  = if tc1 == tc2
     then if isInjectiveTyCon tc1 Nominal
          then unify_tys tys1 tys2
          else do { let inj | isTypeFamilyTyCon tc1
@@ -1209,7 +1209,7 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
             -> Coercion   -- ^ :: kind of R type of substed ty ~N R kind of co
             -> Maybe LiftCoEnv
 ty_co_match menv subst ty co lkco rkco
-  | Just ty' <- coreViewOneStarKind ty = ty_co_match menv subst ty' co lkco rkco
+  | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
 
   -- handle Refl case:
   | tyCoVarsOfType ty `isNotInDomainOf` subst

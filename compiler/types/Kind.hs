@@ -8,18 +8,16 @@ module Kind (
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind,
         isConstraintKind,
-        returnsTyCon, returnsConstraintKind,
-        isConstraintKindCon,
+        returnsConstraintKind,
         okArrowArgKind, okArrowResultKind,
 
         classifiesTypeWithValues,
-        isStarKind, isStarKindSynonymTyCon,
         isKindLevPoly
        ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type       ( typeKind, coreViewOneStarKind )
+import {-# SOURCE #-} Type       ( typeKind, coreView )
 
 import TyCoRep
 import TyCon
@@ -35,58 +33,24 @@ import Util
 *                                                                      *
 ************************************************************************
 
-Note [Kind Constraint and kind *]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The kind Constraint is the kind of classes and other type constraints.
-The special thing about types of kind Constraint is that
- * They are displayed with double arrow:
-     f :: Ord a => a -> a
- * They are implicitly instantiated at call sites; so the type inference
-   engine inserts an extra argument of type (Ord a) at every call site
-   to f.
-
-However, once type inference is over, there is *no* distinction between
-Constraint and *.  Indeed we can have coercions between the two. Consider
-   class C a where
-     op :: a -> a
-For this single-method class we may generate a newtype, which in turn
-generates an axiom witnessing
-    C a ~ (a -> a)
-so on the left we have Constraint, and on the right we have *.
-See Trac #7451.
-
-Bottom line: although '*' and 'Constraint' are distinct TyCons, with
-distinct uniques, they are treated as equal at all times except
-during type inference.
 -}
-
-isConstraintKind :: Kind -> Bool
-isConstraintKindCon :: TyCon -> Bool
-
-isConstraintKindCon   tc = tyConUnique tc == constraintKindTyConKey
-
-isConstraintKind (TyConApp tc _) = isConstraintKindCon tc
-isConstraintKind _               = False
 
 -- | Does the given type "end" in the given tycon? For example @k -> [a] -> *@
 -- ends in @*@ and @Maybe a -> [a]@ ends in @[]@.
-returnsTyCon :: Unique -> Type -> Bool
-returnsTyCon tc_u (ForAllTy _ ty)  = returnsTyCon tc_u ty
-returnsTyCon tc_u (FunTy    _ ty)  = returnsTyCon tc_u ty
-returnsTyCon tc_u (TyConApp tc' _) = tc' `hasKey` tc_u
-returnsTyCon _  _                  = False
-
-returnsConstraintKind :: Kind -> Bool
-returnsConstraintKind = returnsTyCon constraintKindTyConKey
+returnsConstraintKind :: Type -> Bool
+returnsConstraintKind = go
+  where
+    go (ForAllTy _ ty)  = go ty
+    go (FunTy    _ ty)  = go ty
+    go other            = isConstraintKind other
 
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 isKindLevPoly :: Kind -> Bool
-isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
-                      -- the isStarKind check is necessary b/c of Constraint
+isKindLevPoly k = ASSERT2( _is_type, ppr k )
                   go k
   where
-    go ty | Just ty' <- coreViewOneStarKind ty = go ty'
+    go ty | Just ty' <- coreView ty = go ty'
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
     go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
@@ -125,23 +89,9 @@ okArrowResultKind = classifiesTypeWithValues
 -- like *, #, TYPE Lifted, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
-classifiesTypeWithValues t | Just t' <- coreViewOneStarKind t = classifiesTypeWithValues t'
+classifiesTypeWithValues t | Just t' <- coreView t = classifiesTypeWithValues t'
 classifiesTypeWithValues (TyConApp tc [_]) = tc `hasKey` tYPETyConKey
 classifiesTypeWithValues _ = False
-
--- | Is this kind equivalent to *?
-isStarKind :: Kind -> Bool
-isStarKind k | Just k' <- coreViewOneStarKind k = isStarKind k'
-isStarKind (TyConApp tc [TyConApp ptr_rep []])
-  =  tc      `hasKey` tYPETyConKey
-  && ptr_rep `hasKey` liftedRepDataConKey
-isStarKind _ = False
-                              -- See Note [Kind Constraint and kind *]
-
--- | Is the tycon @Constraint@?
-isStarKindSynonymTyCon :: TyCon -> Bool
-isStarKindSynonymTyCon _ = False
-
 
 {- Note [Levity polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

@@ -1204,8 +1204,9 @@ lazyId = pcMiscPrelId lazyIdName ty info
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
-    info = noCafIdInfo `setNeverLevPoly` ty
-    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
+    info = noCafIdInfo
+    ty  = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
+                          (mkFunTy openAlphaTy openAlphaTy)
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
@@ -1414,7 +1415,7 @@ Implementing 'lazy' is a bit tricky:
 
 Note [noinlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~
-noinline :: forall a. a -> a
+noinline :: forall (r :: RuntimeRep) (a :: TYPE r). a -> a
 
 'noinline' is used to make sure that a function f is never inlined,
 e.g., as in 'noinline f x'.  Ordinarily, the identity function with NOINLINE
@@ -1426,6 +1427,8 @@ running the simplifier.
 'noinline' needs to be wired-in because it gets inserted automatically
 when we serialize an expression to the interface format, and we DON'T
 want use its fingerprints.
+
+It must be levity-polymorphic because it is sometimes used on Constraints.
 
 
 Note [runRW magic]

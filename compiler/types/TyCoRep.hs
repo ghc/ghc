@@ -40,7 +40,7 @@ module TyCoRep (
         mkTyConTy, mkTyVarTy, mkTyVarTys,
         mkFunTy, mkFunTys, mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
-        isLiftedTypeKind, isUnliftedTypeKind,
+        isLiftedTypeKind, isUnliftedTypeKind, isConstraintKind,
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
         isRuntimeRepKindedTy, dropRuntimeRepArgs,
         sameVis,
@@ -697,8 +697,7 @@ is_TYPE f (TyConApp tc [arg])
       go ty = f ty
 is_TYPE _ _ = False
 
--- | This version considers Constraint to be distinct from *. Returns True
--- if the argument is equivalent to Type and False otherwise.
+-- | Returns True if the argument is equivalent to Type and False otherwise.
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind = is_TYPE is_lifted
   where
@@ -711,8 +710,16 @@ isLiftedTypeKind = is_TYPE is_lifted
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind = is_TYPE is_unlifted
   where
-    is_unlifted (TyConApp rr _args) = not (rr `hasKey` liftedRepDataConKey)
+    is_unlifted (TyConApp rr _args) = not (isLiftedRuntimeRepTyCon rr)
     is_unlifted _                   = False
+
+-- | Returns True if this kind is Constraint
+isConstraintKind :: Kind -> Bool
+isConstraintKind = is_TYPE is_constraint
+  where
+    is_constraint (TyConApp constraint_rep [])
+      = constraint_rep `hasKey` constraintRepDataConKey
+    is_constraint _ = False
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool

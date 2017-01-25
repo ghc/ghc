@@ -495,8 +495,12 @@ toIfaceVar v
     | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
        -- Foreign calls have special syntax
     | isBootUnfolding (idUnfolding v)
-    = IfaceApp (IfaceApp (IfaceExt noinlineIdName) (IfaceType (toIfaceType (idType v))))
-               (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
+    , let ty = idType v
+          rep = getRuntimeRep "toIfaceVar" ty
+    = (IfaceExt noinlineIdName)
+        `IfaceApp` (IfaceType (toIfaceType rep))
+        `IfaceApp` (IfaceType (toIfaceType ty))
+        `IfaceApp` (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
        -- See Note [Inlining and hs-boot files]
     | isExternalName name                        = IfaceExt name
     | otherwise                                  = IfaceLcl (getOccFS name)

@@ -49,7 +49,7 @@ module TyCon(
         isTypeSynonymTyCon,
         mightBeUnsaturatedTyCon,
         isPromotedDataCon, isPromotedDataCon_maybe,
-        isKindTyCon, isLiftedTypeKindTyConName,
+        isKindTyCon, isLiftedTypeKindTyConName, isLiftedRuntimeRepTyCon,
         isTauTyCon, isFamFreeTyCon,
 
         isDataTyCon, isProductTyCon, isDataProductTyCon_maybe,
@@ -2010,6 +2010,12 @@ isLiftedTypeKindTyConName
   = (`hasKey` liftedTypeKindTyConKey) <||>
     (`hasKey` starKindTyConKey) <||>
     (`hasKey` unicodeStarKindTyConKey)
+
+-- | Does this RuntimeRep TyCon classify lifted types?
+-- Currently, true for LiftedRep and ConstraintRep
+isLiftedRuntimeRepTyCon :: TyCon -> Bool
+isLiftedRuntimeRepTyCon tc
+  = tc `hasKey` liftedRepDataConKey || tc `hasKey` constraintRepDataConKey
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is

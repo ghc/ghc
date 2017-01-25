@@ -142,7 +142,7 @@ module Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView, coreViewOneStarKind,
+        coreView,
 
         tyConsOfType,
 
@@ -316,16 +316,6 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
 coreView _ = Nothing
-
--- | Like 'coreView', but it also "expands" @Constraint@ to become
--- @TYPE LiftedRep@.
-{-# INLINE coreViewOneStarKind #-}
-coreViewOneStarKind :: Type -> Maybe Type
-coreViewOneStarKind ty
-  | Just ty' <- coreView ty   = Just ty'
-  | TyConApp tc [] <- ty
-  , isStarKindSynonymTyCon tc = Just liftedTypeKind
-  | otherwise                 = Nothing
 
 -----------------------------------------------
 expandTypeSynonyms :: Type -> Type
@@ -1883,7 +1873,7 @@ getRuntimeRepFromKind :: HasDebugCallStack
                       -> Type -> Type
 getRuntimeRepFromKind err = go
   where
-    go k | Just k' <- coreViewOneStarKind k = go k'
+    go k | Just k' <- coreView k = go k'
     go k
       | (_tc, [arg]) <- splitTyConApp k
       = ASSERT2( _tc `hasKey` tYPETyConKey, text err $$ ppr k )
@@ -2086,8 +2076,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
     go env t1 t2
-      | Just t1' <- coreViewOneStarKind t1 = go env t1' t2
-      | Just t2' <- coreViewOneStarKind t2 = go env t1 t2'
+      | Just t1' <- coreView t1 = go env t1' t2
+      | Just t2' <- coreView t2 = go env t1 t2'
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2
@@ -2139,14 +2129,10 @@ nonDetCmpTypesX _   []        _         = LT
 nonDetCmpTypesX _   _         []        = GT
 
 -------------
--- | Compare two 'TyCon's. NB: This should /never/ see the "star synonyms",
--- as recognized by Kind.isStarKindSynonymTyCon. See Note
--- [Kind Constraint and kind *] in Kind.
--- See Note [nonDetCmpType nondeterminism]
+-- | Compare two 'TyCon's. See Note [nonDetCmpType nondeterminism]
 nonDetCmpTc :: TyCon -> TyCon -> Ordering
 nonDetCmpTc tc1 tc2
-  = ASSERT( not (isStarKindSynonymTyCon tc1) && not (isStarKindSynonymTyCon tc2) )
-    u1 `nonDetCmpUnique` u2
+  = u1 `nonDetCmpUnique` u2
   where
     u1  = tyConUnique tc1
     u2  = tyConUnique tc2

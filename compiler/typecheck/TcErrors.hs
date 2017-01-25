@@ -1687,15 +1687,12 @@ misMatchMsg ct oriented ty1 ty2
   | Just NotSwapped <- oriented
   = misMatchMsg ct (Just IsSwapped) ty2 ty1
 
-  -- These next two cases are when we're about to report, e.g., that
+  -- This case is when we're about to report, e.g., that
   -- 'LiftedRep doesn't match 'VoidRep. Much better just to say
   -- lifted vs. unlifted
   | Just (tc1, []) <- splitTyConApp_maybe ty1
-  , tc1 `hasKey` liftedRepDataConKey
-  = lifted_vs_unlifted
-
-  | Just (tc2, []) <- splitTyConApp_maybe ty2
-  , tc2 `hasKey` liftedRepDataConKey
+  , Just (tc2, []) <- splitTyConApp_maybe ty2
+  , isLiftedRuntimeRepTyCon tc1 /= isLiftedRuntimeRepTyCon tc2
   = lifted_vs_unlifted
 
   | otherwise  -- So now we have Nothing or (Just IsSwapped)
