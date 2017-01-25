@@ -4,6 +4,7 @@ import Distribution.Package as DP
 import Distribution.PackageDescription
 import Distribution.PackageDescription.Parse
 import Distribution.Text
+import Distribution.Types.CondTree
 import Distribution.Types.Dependency
 import Distribution.Verbosity
 
@@ -49,4 +50,4 @@ collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []
 collectDeps (Just (CondNode _ deps ifs)) = deps ++ concatMap f ifs
   where
-    f (_, t, mt) = collectDeps (Just t) ++ collectDeps mt
+    f (CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt
