@@ -1602,7 +1602,7 @@ statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
     wordPrimTyConKey, wordTyConKey, word8TyConKey, word16TyConKey,
     word32PrimTyConKey, word32TyConKey, word64PrimTyConKey, word64TyConKey,
-    liftedConKey, unliftedConKey, anyBoxConKey, kindConKey, boxityConKey,
+    anyBoxConKey, kindConKey, boxityConKey,
     typeConKey, threadIdPrimTyConKey, bcoPrimTyConKey, ptrTyConKey,
     funPtrTyConKey, tVarPrimTyConKey, eqPrimTyConKey,
     eqReprPrimTyConKey, eqPhantPrimTyConKey, voidPrimTyConKey,
@@ -1624,8 +1624,6 @@ word32PrimTyConKey                      = mkPreludeTyConUnique 63
 word32TyConKey                          = mkPreludeTyConUnique 64
 word64PrimTyConKey                      = mkPreludeTyConUnique 65
 word64TyConKey                          = mkPreludeTyConUnique 66
-liftedConKey                            = mkPreludeTyConUnique 67
-unliftedConKey                          = mkPreludeTyConUnique 68
 anyBoxConKey                            = mkPreludeTyConUnique 69
 kindConKey                              = mkPreludeTyConUnique 70
 boxityConKey                            = mkPreludeTyConUnique 71
@@ -1904,20 +1902,20 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 runtimeRepSimpleDataConKeys :: [Unique]
-liftedRepDataConKey :: Unique
+liftedRepDataConKey, constraintRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(
-  liftedRepDataConKey : _)
-  = map mkPreludeDataConUnique [74..82]
+  liftedRepDataConKey : _ : constraintRepDataConKey : _)
+  = map mkPreludeDataConUnique [74..83]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [83..88]
+vecCountDataConKeys = map mkPreludeDataConUnique [84..89]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [89..98]
+vecElemDataConKeys = map mkPreludeDataConUnique [90..99]
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 100-150

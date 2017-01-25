@@ -57,7 +57,7 @@ infixr 5 :
 ********************************************************************* -}
 
 -- | The kind of constraints, like @Show a@
-data Constraint
+type Constraint = TYPE 'ConstraintRep
 
 -- | The kind of types with values. For example @Int :: Type@.
 type Type = TYPE 'LiftedRep
@@ -378,6 +378,7 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | SumRep [RuntimeRep]       -- ^ An unboxed sum of the given reps
                 | LiftedRep       -- ^ lifted; represented by a pointer
                 | UnliftedRep     -- ^ unlifted; represented by a pointer
+                | ConstraintRep   -- ^ lifted; a constraint
                 | IntRep          -- ^ signed, word-sized value
                 | WordRep         -- ^ unsigned, word-sized value
                 | Int64Rep        -- ^ signed, 64-bit value (on 32-bit only)

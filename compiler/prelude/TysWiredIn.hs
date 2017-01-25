@@ -111,7 +111,8 @@ module TysWiredIn (
 
         vecRepDataConTyCon, tupleRepDataConTyCon, sumRepDataConTyCon,
 
-        liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy,
+        liftedRepDataConTy, unliftedRepDataConTy, constraintRepDataConTy,
+        intRepDataConTy,
         wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy,
         floatRepDataConTy, doubleRepDataConTy,
 
@@ -413,7 +414,7 @@ sumRepDataConName = mkWiredInDataConName UserSyntax gHC_TYPES (fsLit "SumRep") s
 runtimeRepSimpleDataConNames :: [Name]
 runtimeRepSimpleDataConNames
   = zipWith3Lazy mk_special_dc_name
-      [ fsLit "LiftedRep", fsLit "UnliftedRep"
+      [ fsLit "LiftedRep", fsLit "UnliftedRep", fsLit "ConstraintRep"
       , fsLit "IntRep"
       , fsLit "WordRep", fsLit "Int64Rep", fsLit "Word64Rep"
       , fsLit "AddrRep", fsLit "FloatRep", fsLit "DoubleRep" ]
@@ -575,8 +576,9 @@ typeNatKind    = mkTyConTy typeNatKindCon
 typeSymbolKind = mkTyConTy typeSymbolKindCon
 
 constraintKindTyCon :: TyCon
-constraintKindTyCon = pcTyCon False constraintKindTyConName
-                              Nothing [] []
+constraintKindTyCon = buildSynTyCon constraintKindTyConName []
+                                    liftedTypeKind []
+                                    (tYPE constraintRepDataConTy)
 
 liftedTypeKind, constraintKind :: Kind
 liftedTypeKind   = tYPE liftedRepTy
@@ -1151,7 +1153,8 @@ runtimeRepSimpleDataCons :: [DataCon]
 liftedRepDataCon :: DataCon
 runtimeRepSimpleDataCons@(liftedRepDataCon : _)
   = zipWithLazy mk_runtime_rep_dc
-    [ LiftedRep, UnliftedRep, IntRep, WordRep, Int64Rep
+    [ LiftedRep, UnliftedRep, LiftedRep  -- <-- that's for ConstraintRep
+    , IntRep, WordRep, Int64Rep
     , Word64Rep, AddrRep, FloatRep, DoubleRep ]
     runtimeRepSimpleDataConNames
   where
@@ -1159,10 +1162,10 @@ runtimeRepSimpleDataCons@(liftedRepDataCon : _)
       = pcSpecialDataCon name [] runtimeRepTyCon (RuntimeRep (\_ -> [primrep]))
 
 -- See Note [Wiring in RuntimeRep]
-liftedRepDataConTy, unliftedRepDataConTy,
+liftedRepDataConTy, unliftedRepDataConTy, constraintRepDataConTy,
   intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
   word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy :: Type
-[liftedRepDataConTy, unliftedRepDataConTy,
+[liftedRepDataConTy, unliftedRepDataConTy, constraintRepDataConTy,
    intRepDataConTy, wordRepDataConTy, int64RepDataConTy,
    word64RepDataConTy, addrRepDataConTy, floatRepDataConTy, doubleRepDataConTy]
   = map (mkTyConTy . promoteDataCon) runtimeRepSimpleDataCons

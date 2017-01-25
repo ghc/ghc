@@ -140,7 +140,7 @@ isStarKind _ = False
 
 -- | Is the tycon @Constraint@?
 isStarKindSynonymTyCon :: TyCon -> Bool
-isStarKindSynonymTyCon tc = tc `hasKey` constraintKindTyConKey
+isStarKindSynonymTyCon _ = False
 
 
 {- Note [Levity polymorphism]

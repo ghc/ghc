@@ -1852,7 +1852,8 @@ isLiftedType_maybe ty = go (getRuntimeRep "isLiftedType_maybe" ty)
   where
     go rr | Just rr' <- coreView rr = go rr'
     go (TyConApp lifted_rep [])
-      | lifted_rep `hasKey` liftedRepDataConKey = Just True
+      |  lifted_rep `hasKey` liftedRepDataConKey
+      || lifted_rep `hasKey` constraintRepDataConKey = Just True
     go (TyConApp {}) = Just False -- everything else is unlifted
     go _             = Nothing    -- levity polymorphic
 
