@@ -159,7 +159,7 @@ ns_module = mkHoleModule . ns_mod_name
 -- | Substitution on @{A.T}@.  We enforce the invariant that the
 -- 'nameModule' of keys of this map have 'moduleUnitId' @hole@
 -- (meaning that if we have a hole substitution, the keys of the map
--- are never affected.)  Alternately, this is ismorphic to
+-- are never affected.)  Alternately, this is isomorphic to
 -- @Map ('ModuleName', 'OccName') 'Name'@.
 type ShNameSubst = NameEnv Name
 
