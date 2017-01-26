@@ -62,6 +62,7 @@
 
 // Count of how many outstanding hs_init()s there have been.
 static int hs_init_count = 0;
+static bool rts_shutdown = false;
 
 static void flushStdHandles(void);
 
@@ -144,6 +145,10 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     if (hs_init_count > 1) {
         // second and subsequent inits are ignored
         return;
+    }
+    if (rts_shutdown) {
+        errorBelch("hs_init_ghc: reinitializing the RTS after shutdown is not currently supported");
+        stg_exit(1);
     }
 
     setlocale(LC_CTYPE,"");
@@ -338,6 +343,7 @@ hs_exit_(bool wait_foreign)
         // ignore until it's the last one
         return;
     }
+    rts_shutdown = true;
 
     /* start timing the shutdown */
     stat_startExit();
