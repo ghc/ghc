@@ -738,7 +738,6 @@ availFromGRE (GRE { gre_name = me, gre_par = parent })
       NoParent   | isTyConName me -> AvailTC me [me] []
                  | otherwise      -> avail   me
       FldParent p mb_lbl -> AvailTC p [] [mkFieldLabel me mb_lbl]
-        where
 
 mkFieldLabel :: Name -> Maybe FastString -> FieldLabel
 mkFieldLabel me mb_lbl =

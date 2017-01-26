@@ -1109,7 +1109,6 @@ dataConUserType (MkData { dcUnivTyVars = univ_tvs,
     mkFunTys theta $
     mkFunTys arg_tys $
     res_ty
-  where
 
 -- | Finds the instantiated types of the arguments required to construct a 'DataCon' representation
 -- NB: these INCLUDE any dictionary args

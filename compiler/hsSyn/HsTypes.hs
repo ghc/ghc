@@ -1053,7 +1053,6 @@ splitLHsInstDeclTy (HsIB { hsib_vars = itkvs
   = (itkvs ++ map hsLTyVarName tvs, cxt, body_ty)
          -- Return implicitly bound type and kind vars
          -- For an instance decl, all of them are in scope
-  where
 
 getLHsInstDeclHead :: LHsSigType name -> LHsType name
 getLHsInstDeclHead inst_ty

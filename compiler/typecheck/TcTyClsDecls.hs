@@ -324,7 +324,7 @@ See also Note [Kind checking recursive type and class declarations]
 kcTyClGroup :: [LTyClDecl Name] -> TcM [TcTyCon]
 
 -- Kind check this group, kind generalize, and return the resulting local env
--- This bindds the TyCons and Classes of the group, but not the DataCons
+-- This binds the TyCons and Classes of the group, but not the DataCons
 -- See Note [Kind checking for type and class decls]
 -- Third return value is Nothing if the tycon be unsaturated; otherwise,
 -- the arity

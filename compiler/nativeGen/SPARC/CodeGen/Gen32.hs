@@ -234,8 +234,6 @@ getRegister (CmmMachOp mop [x, y])
       MO_S_Shr rep      -> trivialCode rep SRA x y
 
       _                 -> pprPanic "getRegister(sparc) - binary CmmMachOp (1)" (pprMachOp mop)
-  where
-
 
 getRegister (CmmLoad mem pk) = do
     Amode src code <- getAmode mem
