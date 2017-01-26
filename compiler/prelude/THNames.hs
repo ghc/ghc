@@ -67,7 +67,7 @@ templateHaskellNames = [
     classDName, instanceWithOverlapDName,
     standaloneDerivWithStrategyDName, sigDName, forImpDName,
     pragInlDName, pragSpecDName, pragSpecInlDName, pragSpecInstDName,
-    pragRuleDName, pragAnnDName, defaultSigDName,
+    pragRuleDName, pragCompleteDName, pragAnnDName, defaultSigDName,
     dataFamilyDName, openTypeFamilyDName, closedTypeFamilyDName,
     dataInstDName, newtypeInstDName, tySynInstDName,
     infixLDName, infixRDName, infixNDName,
