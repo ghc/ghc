@@ -17,8 +17,7 @@ Note [The Type-related module hierarchy]
 
 -- We expose the relevant stuff from this module via the Type module
 {-# OPTIONS_HADDOCK hide #-}
-{-# LANGUAGE CPP, DeriveDataTypeable, DeriveFunctor, DeriveFoldable,
-             DeriveTraversable, MultiWayIf #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, MultiWayIf #-}
 {-# LANGUAGE ImplicitParams #-}
 
 module TyCoRep (
