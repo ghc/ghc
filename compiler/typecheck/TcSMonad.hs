@@ -2529,7 +2529,7 @@ emitInsoluble ct
       | already_there = is
       | otherwise     = is { inert_cans = ics { inert_insols = old_insols `snocCts` ct } }
       where
-        already_there = not (isWantedCt ct) && anyBag (tcEqType this_pred . ctPred) old_insols
+        already_there = not (isWantedCt ct) && anyBag (eqType this_pred . ctPred) old_insols
              -- See Note [Do not add duplicate derived insolubles]
 
 newTcRef :: a -> TcS (TcRef a)

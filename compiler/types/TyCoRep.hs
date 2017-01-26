@@ -1187,8 +1187,8 @@ role and kind, which is done in the UnivCo constructor.
 data UnivCoProvenance
   = UnsafeCoerceProv   -- ^ From @unsafeCoerce#@. These are unsound.
 
-  | PhantomProv KindCoercion -- ^ See Note [Phantom coercions]. Only in Phantom
-                             -- roled coercions
+  | PhantomProv        -- ^ See Note [Phantom coercions]. Only in Phantom
+                       -- roled coercions
 
   | ProofIrrelProv KindCoercion  -- ^ From the fact that any two coercions are
                                  --   considered equivalent. See Note [ProofIrrelProv].
@@ -1202,7 +1202,7 @@ data UnivCoProvenance
 
 instance Outputable UnivCoProvenance where
   ppr UnsafeCoerceProv   = text "(unsafeCoerce#)"
-  ppr (PhantomProv _)    = text "(phantom)"
+  ppr PhantomProv        = text "(phantom)"
   ppr (ProofIrrelProv _) = text "(proof irrel.)"
   ppr (PluginProv str)   = parens (text "plugin" <+> brackets (text str))
   ppr (HoleProv hole)    = parens (text "hole" <> ppr hole)
@@ -1231,9 +1231,7 @@ Then we have
      T s ~R T t
 for any old s,t. The witness for this is (TyConAppCo T Rep co),
 where (co :: s ~P t) is a phantom coercion built with PhantomProv.
-The role of the UnivCo is always Phantom.  The Coercion stored is the
-(nominal) kind coercion between the types
-   kind(s) ~N kind (t)
+The role of the UnivCo is always Phantom.
 
 Note [Coercion holes]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1469,7 +1467,7 @@ tyCoVarsOfProv prov = fvVarSet $ tyCoFVsOfProv prov
 
 tyCoFVsOfProv :: UnivCoProvenance -> FV
 tyCoFVsOfProv UnsafeCoerceProv    fv_cand in_scope acc = emptyFV fv_cand in_scope acc
-tyCoFVsOfProv (PhantomProv co)    fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
+tyCoFVsOfProv PhantomProv         fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfProv (ProofIrrelProv co) fv_cand in_scope acc = tyCoFVsOfCo co fv_cand in_scope acc
 tyCoFVsOfProv (PluginProv _)      fv_cand in_scope acc = emptyFV fv_cand in_scope acc
 tyCoFVsOfProv (HoleProv _)        fv_cand in_scope acc = emptyFV fv_cand in_scope acc
@@ -1523,7 +1521,7 @@ coVarsOfCo (AxiomRuleCo _ cs)  = coVarsOfCos cs
 
 coVarsOfProv :: UnivCoProvenance -> CoVarSet
 coVarsOfProv UnsafeCoerceProv    = emptyVarSet
-coVarsOfProv (PhantomProv co)    = coVarsOfCo co
+coVarsOfProv PhantomProv         = emptyVarSet
 coVarsOfProv (ProofIrrelProv co) = coVarsOfCo co
 coVarsOfProv (PluginProv _)      = emptyVarSet
 coVarsOfProv (HoleProv _)        = emptyVarSet
@@ -1593,7 +1591,7 @@ noFreeVarsOfCo (AxiomRuleCo _ cs)     = all noFreeVarsOfCo cs
 -- isEmptyVarSet . tyCoVarsOfProv, but faster in the non-forall case.
 noFreeVarsOfProv :: UnivCoProvenance -> Bool
 noFreeVarsOfProv UnsafeCoerceProv    = True
-noFreeVarsOfProv (PhantomProv co)    = noFreeVarsOfCo co
+noFreeVarsOfProv PhantomProv         = True
 noFreeVarsOfProv (ProofIrrelProv co) = noFreeVarsOfCo co
 noFreeVarsOfProv (PluginProv {})     = True
 noFreeVarsOfProv (HoleProv {})       = True -- matches with coVarsOfProv, but I'm unsure
@@ -2258,7 +2256,7 @@ subst_co subst co
                                 in cs1 `seqList` AxiomRuleCo c cs1
 
     go_prov UnsafeCoerceProv     = UnsafeCoerceProv
-    go_prov (PhantomProv kco)    = PhantomProv (go kco)
+    go_prov PhantomProv          = PhantomProv
     go_prov (ProofIrrelProv kco) = ProofIrrelProv (go kco)
     go_prov p@(PluginProv _)     = p
     go_prov p@(HoleProv _)       = p
@@ -2798,7 +2796,7 @@ tidyCo env@(_, subst) co
                                in cos1 `seqList` AxiomRuleCo ax cos1
 
     go_prov UnsafeCoerceProv    = UnsafeCoerceProv
-    go_prov (PhantomProv co)    = PhantomProv (go co)
+    go_prov PhantomProv         = PhantomProv
     go_prov (ProofIrrelProv co) = ProofIrrelProv (go co)
     go_prov p@(PluginProv _)    = p
     go_prov p@(HoleProv _)      = p
@@ -2856,7 +2854,7 @@ coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
 
 provSize :: UnivCoProvenance -> Int
 provSize UnsafeCoerceProv    = 1
-provSize (PhantomProv co)    = 1 + coercionSize co
+provSize PhantomProv         = 1
 provSize (ProofIrrelProv co) = 1 + coercionSize co
 provSize (PluginProv _)      = 1
 provSize (HoleProv h)        = pprPanic "provSize hits a hole" (ppr h)

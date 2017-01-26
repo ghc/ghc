@@ -234,7 +234,7 @@ toIfaceCoercion (AxiomRuleCo co cs) = IfaceAxiomRuleCo (coaxrName co)
 
 toIfaceUnivCoProv :: UnivCoProvenance -> IfaceUnivCoProv
 toIfaceUnivCoProv UnsafeCoerceProv    = IfaceUnsafeCoerceProv
-toIfaceUnivCoProv (PhantomProv co)    = IfacePhantomProv (toIfaceCoercion co)
+toIfaceUnivCoProv PhantomProv         = IfacePhantomProv
 toIfaceUnivCoProv (ProofIrrelProv co) = IfaceProofIrrelProv (toIfaceCoercion co)
 toIfaceUnivCoProv (PluginProv str)    = IfacePluginProv str
 toIfaceUnivCoProv (HoleProv h)        = IfaceHoleProv (chUnique h)

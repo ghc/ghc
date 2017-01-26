@@ -759,7 +759,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
                            -- an arrow, it's better not to update.
                         ; let eq_orig' = case eq_orig of
                                 TypeEqOrigin { uo_actual   = orig_ty_actual }
-                                  |  orig_ty_actual `tcEqType` ty_actual
+                                  |  orig_ty_actual `eqType` ty_actual
                                   ,  not (isIdHsWrapper wrap)
                                   -> eq_orig { uo_actual = rho_a }
                                 _ -> eq_orig
@@ -1342,8 +1342,8 @@ uType origin t_or_k orig_ty1 orig_ty2
 
     ------------------
     defer ty1 ty2   -- See Note [Check for equality before deferring]
-      | ty1 `tcEqType` ty2 = return (mkNomReflCo ty1)
-      | otherwise          = uType_defer origin t_or_k ty1 ty2
+      | ty1 `eqType` ty2 = return (mkNomReflCo ty1)
+      | otherwise        = uType_defer origin t_or_k ty1 ty2
 
     ------------------
     go_app s1 t1 s2 t2
@@ -2103,7 +2103,7 @@ occCheckExpand tv ty
 
     ------------------
     go_prov _   UnsafeCoerceProv    = return UnsafeCoerceProv
-    go_prov env (PhantomProv co)    = PhantomProv <$> go_co env co
+    go_prov _   PhantomProv         = return PhantomProv
     go_prov env (ProofIrrelProv co) = ProofIrrelProv <$> go_co env co
     go_prov _   p@(PluginProv _)    = return p
     go_prov _   p@(HoleProv _)      = return p

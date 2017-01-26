@@ -1184,7 +1184,9 @@ data MatchEnv = ME { me_tmpls :: TyVarSet
 -- nominal coercions where it can do so.
 liftCoMatch :: TyCoVarSet -> Type -> Coercion -> Maybe LiftingContext
 liftCoMatch tmpls ty co
-  = do { cenv1 <- ty_co_match menv emptyVarEnv ki ki_co ki_ki_co ki_ki_co
+  = do { ki_co <- promoteCoercion co
+       ; let Pair co_lkind co_rkind = coercionKind ki_co
+       ; cenv1 <- ty_co_match menv emptyVarEnv ki ki_co ki_ki_co ki_ki_co
        ; cenv2 <- ty_co_match menv cenv1       ty co
                               (mkNomReflCo co_lkind) (mkNomReflCo co_rkind)
        ; return (LC (mkEmptyTCvSubst in_scope) cenv2) }
@@ -1195,10 +1197,7 @@ liftCoMatch tmpls ty co
     -- in ty are in tmpls
 
     ki       = typeKind ty
-    ki_co    = promoteCoercion co
     ki_ki_co = mkNomReflCo liftedTypeKind
-
-    Pair co_lkind co_rkind = coercionKind ki_co
 
 -- | 'ty_co_match' does all the actual work for 'liftCoMatch'.
 ty_co_match :: MatchEnv   -- ^ ambient helpful info
@@ -1311,14 +1310,14 @@ ty_co_match_app menv subst ty1 ty1args co2 co2args
   = ty_co_match_app menv subst ty1' (ty1a : ty1args) co2' (co2a : co2args)
 
   | otherwise
-  = do { subst1 <- ty_co_match menv subst ki1 ki2 ki_ki_co ki_ki_co
+  = do { ki2 <- promoteCoercion co2
+       ; subst1 <- ty_co_match menv subst ki1 ki2 ki_ki_co ki_ki_co
        ; let Pair lkco rkco = mkNomReflCo <$> coercionKind ki2
        ; subst2 <- ty_co_match menv subst1 ty1 co2 lkco rkco
        ; let Pair lkcos rkcos = traverse (fmap mkNomReflCo . coercionKind) co2args
        ; ty_co_match_args menv subst2 ty1args co2args lkcos rkcos }
   where
     ki1 = typeKind ty1
-    ki2 = promoteCoercion co2
     ki_ki_co = mkNomReflCo liftedTypeKind
 
 ty_co_match_args :: MatchEnv -> LiftCoEnv -> [Type]

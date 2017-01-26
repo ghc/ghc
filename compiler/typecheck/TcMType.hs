@@ -94,7 +94,6 @@ module TcMType (
 import TyCoRep
 import TcType
 import Type
-import Kind
 import Coercion
 import Class
 import Var
@@ -681,7 +680,7 @@ writeMetaTyVarRef tyvar ref ty
        ; zonked_ty_kind <- zonkTcType ty_kind
        ; let kind_check_ok = isPredTy tv_kind  -- Don't check kinds for updates
                                                -- to coercion variables
-                          || tcEqKind zonked_ty_kind zonked_tv_kind
+                          || eqType zonked_ty_kind zonked_tv_kind
 
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
                            2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)

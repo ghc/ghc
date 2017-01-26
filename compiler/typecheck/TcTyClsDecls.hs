@@ -44,7 +44,6 @@ import FamInstEnv
 import Coercion
 import Type
 import TyCoRep   -- for checkValidRoles
-import Kind
 import Class
 import CoAxiom
 import TyCon

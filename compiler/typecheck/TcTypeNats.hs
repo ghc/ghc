@@ -17,7 +17,7 @@ module TcTypeNats
 
 import Type
 import Pair
-import TcType     ( TcType, tcEqType )
+import TcType     ( TcType, eqType )
 import TyCon      ( TyCon, FamTyConFlav(..), mkFamilyTyCon
                   , Injectivity(..) )
 import Coercion   ( Role(..) )
@@ -474,7 +474,7 @@ matchFamLeq [s,t]
   | Just 0 <- mbX = Just (axLeq0L, [t], bool True)
   | Just x <- mbX, Just y <- mbY =
     Just (axLeqDef, [s,t], bool (x <= y))
-  | tcEqType s t  = Just (axLeqRefl, [s], bool True)
+  | eqType s t  = Just (axLeqRefl, [s], bool True)
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamLeq _ = Nothing
@@ -483,7 +483,7 @@ matchFamCmpNat :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamCmpNat [s,t]
   | Just x <- mbX, Just y <- mbY =
     Just (axCmpNatDef, [s,t], ordering (compare x y))
-  | tcEqType s t = Just (axCmpNatRefl, [s], ordering EQ)
+  | eqType s t = Just (axCmpNatRefl, [s], ordering EQ)
   where mbX = isNumLitTy s
         mbY = isNumLitTy t
 matchFamCmpNat _ = Nothing
@@ -492,7 +492,7 @@ matchFamCmpSymbol :: [Type] -> Maybe (CoAxiomRule, [Type], Type)
 matchFamCmpSymbol [s,t]
   | Just x <- mbX, Just y <- mbY =
     Just (axCmpSymbolDef, [s,t], ordering (compare x y))
-  | tcEqType s t = Just (axCmpSymbolRefl, [s], ordering EQ)
+  | eqType s t = Just (axCmpSymbolRefl, [s], ordering EQ)
   where mbX = isStrLitTy s
         mbY = isStrLitTy t
 matchFamCmpSymbol _ = Nothing
@@ -632,40 +632,40 @@ Interaction with inerts
 
 interactInertAdd :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertAdd [x1,y1] z1 [x2,y2] z2
-  | sameZ && tcEqType x1 x2         = [ y1 === y2 ]
-  | sameZ && tcEqType y1 y2         = [ x1 === x2 ]
-  where sameZ = tcEqType z1 z2
+  | sameZ && eqType x1 x2         = [ y1 === y2 ]
+  | sameZ && eqType y1 y2         = [ x1 === x2 ]
+  where sameZ = eqType z1 z2
 interactInertAdd _ _ _ _ = []
 
 interactInertSub :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertSub [x1,y1] z1 [x2,y2] z2
-  | sameZ && tcEqType x1 x2         = [ y1 === y2 ]
-  | sameZ && tcEqType y1 y2         = [ x1 === x2 ]
-  where sameZ = tcEqType z1 z2
+  | sameZ && eqType x1 x2         = [ y1 === y2 ]
+  | sameZ && eqType y1 y2         = [ x1 === x2 ]
+  where sameZ = eqType z1 z2
 interactInertSub _ _ _ _ = []
 
 interactInertMul :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertMul [x1,y1] z1 [x2,y2] z2
-  | sameZ && known (/= 0) x1 && tcEqType x1 x2 = [ y1 === y2 ]
-  | sameZ && known (/= 0) y1 && tcEqType y1 y2 = [ x1 === x2 ]
-  where sameZ   = tcEqType z1 z2
+  | sameZ && known (/= 0) x1 && eqType x1 x2 = [ y1 === y2 ]
+  | sameZ && known (/= 0) y1 && eqType y1 y2 = [ x1 === x2 ]
+  where sameZ   = eqType z1 z2
 
 interactInertMul _ _ _ _ = []
 
 interactInertExp :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertExp [x1,y1] z1 [x2,y2] z2
-  | sameZ && known (> 1) x1 && tcEqType x1 x2 = [ y1 === y2 ]
-  | sameZ && known (> 0) y1 && tcEqType y1 y2 = [ x1 === x2 ]
-  where sameZ = tcEqType z1 z2
+  | sameZ && known (> 1) x1 && eqType x1 x2 = [ y1 === y2 ]
+  | sameZ && known (> 0) y1 && eqType y1 y2 = [ x1 === x2 ]
+  where sameZ = eqType z1 z2
 
 interactInertExp _ _ _ _ = []
 
 
 interactInertLeq :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertLeq [x1,y1] z1 [x2,y2] z2
-  | bothTrue && tcEqType x1 y2 && tcEqType y1 x2 = [ x1 === y1 ]
-  | bothTrue && tcEqType y1 x2                 = [ (x1 <== y2) === bool True ]
-  | bothTrue && tcEqType y2 x1                 = [ (x2 <== y1) === bool True ]
+  | bothTrue && eqType x1 y2 && eqType y1 x2 = [ x1 === y1 ]
+  | bothTrue && eqType y1 x2                 = [ (x1 <== y2) === bool True ]
+  | bothTrue && eqType y2 x1                 = [ (x2 <== y1) === bool True ]
   where bothTrue = isJust $ do True <- isBoolLitTy z1
                                True <- isBoolLitTy z2
                                return ()
@@ -675,9 +675,9 @@ interactInertLeq _ _ _ _ = []
 
 interactInertAppendSymbol :: [Xi] -> Xi -> [Xi] -> Xi -> [Pair Type]
 interactInertAppendSymbol [x1,y1] z1 [x2,y2] z2
-  | sameZ && tcEqType x1 x2         = [ y1 === y2 ]
-  | sameZ && tcEqType y1 y2         = [ x1 === x2 ]
-  where sameZ = tcEqType z1 z2
+  | sameZ && eqType x1 x2         = [ y1 === y2 ]
+  | sameZ && eqType y1 y2         = [ x1 === x2 ]
+  where sameZ = eqType z1 z2
 interactInertAppendSymbol _ _ _ _ = []
 
 

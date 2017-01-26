@@ -134,7 +134,7 @@ module Type (
         tyCoVarsOfTypesWellScoped,
 
         -- * Type comparison
-        eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes, nonDetCmpTypeX,
+        eqType, eqTypeX, eqTypes, nonDetCmpType, nonDetCmpTypes,
         nonDetCmpTypesX, nonDetCmpTc,
         eqVarBndrs,
 
@@ -394,7 +394,7 @@ expandTypeSynonyms ty
     go_co subst (AxiomRuleCo ax cs) = AxiomRuleCo ax (map (go_co subst) cs)
 
     go_prov _     UnsafeCoerceProv    = UnsafeCoerceProv
-    go_prov subst (PhantomProv co)    = PhantomProv (go_co subst co)
+    go_prov _     PhantomProv         = PhantomProv
     go_prov subst (ProofIrrelProv co) = ProofIrrelProv (go_co subst co)
     go_prov _     p@(PluginProv _)    = p
     go_prov _     (HoleProv h)        = pprPanic "expandTypeSynonyms hit a hole" (ppr h)
@@ -523,7 +523,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
     go (SubCo co)          = mksubco <$> go co
 
     go_prov UnsafeCoerceProv    = return UnsafeCoerceProv
-    go_prov (PhantomProv co)    = PhantomProv <$> go co
+    go_prov PhantomProv         = return PhantomProv
     go_prov (ProofIrrelProv co) = ProofIrrelProv <$> go co
     go_prov p@(PluginProv _)    = return p
     go_prov (HoleProv _)        = panic "mapCoercion"
@@ -2229,7 +2229,7 @@ tyConsOfType ty
      go_co (AxiomRuleCo _ cs)      = go_cos cs
 
      go_prov UnsafeCoerceProv    = emptyNameEnv
-     go_prov (PhantomProv co)    = go_co co
+     go_prov PhantomProv         = emptyNameEnv
      go_prov (ProofIrrelProv co) = go_co co
      go_prov (PluginProv _)      = emptyNameEnv
      go_prov (HoleProv _)        = emptyNameEnv

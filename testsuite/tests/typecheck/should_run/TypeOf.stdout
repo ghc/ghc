@@ -9,16 +9,16 @@ TypeRep
 Bool
 Ordering
 Int -> Int
-Proxy Constraint (Eq Int)
-Proxy Constraint (Int,Int)
+Proxy (TYPE 'ConstraintRep) (Eq Int)
+Proxy * (Int,Int)
 Proxy Symbol "hello world"
 Proxy Nat 1
 Proxy [Nat] (': Nat 1 (': Nat 2 (': Nat 3 '[])))
 Proxy Ordering 'EQ
-Proxy (RuntimeRep -> Constraint) TYPE
-Proxy Constraint Constraint
-Proxy Constraint Constraint
-Proxy Constraint Constraint
+Proxy (RuntimeRep -> *) TYPE
+Proxy * *
+Proxy * *
+Proxy * *
 Proxy RuntimeRep 'LiftedRep
 Proxy (Nat,Symbol) ('(,) Nat Symbol 1 "hello")
-Proxy (Constraint -> Constraint -> Constraint) ~~
+Proxy (* -> * -> TYPE 'ConstraintRep) ~~

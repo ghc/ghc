@@ -47,7 +47,7 @@ returnsConstraintKind = go
 -- | Tests whether the given kind (which should look like @TYPE x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 isKindLevPoly :: Kind -> Bool
-isKindLevPoly k = ASSERT2( _is_type, ppr k )
+isKindLevPoly k = ASSERT2( _is_type k, ppr k )
                   go k
   where
     go ty | Just ty' <- coreView ty = go ty'
@@ -60,9 +60,13 @@ isKindLevPoly k = ASSERT2( _is_type, ppr k )
     go CastTy{}          = True
     go CoercionTy{}      = True
 
-    _is_type
-      | TyConApp typ [_] <- k
+    _is_type ty
+      | Just ty' <- coreView ty
+      = _is_type ty'
+
+      | TyConApp typ [_] <- ty
       = typ `hasKey` tYPETyConKey
+
       | otherwise
       = False
 

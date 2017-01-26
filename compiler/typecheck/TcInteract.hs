@@ -356,7 +356,7 @@ runTcPlugins plugins all_cts
 
     eqCt :: Ct -> Ct -> Bool
     eqCt c c' = ctFlavour c == ctFlavour c'
-             && ctPred c `tcEqType` ctPred c'
+             && ctPred c `eqType` ctPred c'
 
     add :: [(EvTerm,Ct)] -> SolvedCts -> SolvedCts
     add xs scs = foldl' addOne scs xs
@@ -647,7 +647,7 @@ interactIrred :: InertCans -> Ct -> TcS (StopOrContinue Ct)
 interactIrred inerts workItem@(CIrredEvCan { cc_ev = ev_w })
   | let pred = ctEvPred ev_w
         (matching_irreds, others)
-          = partitionBag (\ct -> ctPred ct `tcEqTypeNoKindCheck` pred)
+          = partitionBag (\ct -> ctPred ct `eqType` pred)
                          (inert_irreds inerts)
   , (ct_i : rest) <- bagToList matching_irreds
   , let ctev_i = ctEvidence ct_i
@@ -782,7 +782,7 @@ interactGivenIP inerts workItem@(CDictCan { cc_ev = ev, cc_class = cls
 
     -- Pick out any Given constraints for the same implicit parameter
     is_this_ip (CDictCan { cc_ev = ev, cc_tyargs = ip_str':_ })
-       = isGiven ev && ip_str `tcEqType` ip_str'
+       = isGiven ev && ip_str `eqType` ip_str'
     is_this_ip _ = False
 
 interactGivenIP _ wi = pprPanic "interactGivenIP" (ppr wi)
@@ -954,7 +954,7 @@ improveLocalFunEqs work_ev inerts fam_tc args fsk
     do_one_injective inj_args (CFunEqCan { cc_tyargs = inert_args
                                          , cc_fsk = ifsk, cc_ev = inert_ev })
       | isImprovable inert_ev
-      , rhs `tcEqType` lookupFlattenTyVar ieqs ifsk
+      , rhs `eqType` lookupFlattenTyVar ieqs ifsk
       = mk_fd_eqns inert_ev $
             [ Pair arg iarg
             | (arg, iarg, True) <- zip3 args inert_args inj_args ]
@@ -1140,7 +1140,7 @@ inertsCanDischarge inerts tv rhs ev
   | (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs inerts tv
                          , ev_i `eqCanDischarge` ev
-                         , rhs_i `tcEqType` rhs ]
+                         , rhs_i `eqType` rhs ]
   =  -- Inert:     a ~ ty
      -- Work item: a ~ ty
     Just (ev_i, NotSwapped, keep_deriv ev_i)
@@ -1149,7 +1149,7 @@ inertsCanDischarge inerts tv rhs ev
   , (ev_i : _) <- [ ev_i | CTyEqCan { cc_ev = ev_i, cc_rhs = rhs_i }
                              <- findTyEqs inerts tv_rhs
                          , ev_i `eqCanDischarge` ev
-                         , rhs_i `tcEqType` mkTyVarTy tv ]
+                         , rhs_i `eqType` mkTyVarTy tv ]
   =  -- Inert:     a ~ b
      -- Work item: b ~ a
      Just (ev_i, IsSwapped, keep_deriv ev_i)

@@ -306,12 +306,20 @@ opt_co4 env sym rep r (CoherenceCo co1 co2)
         co2' = opt_co4_wrap env False False Nominal co2
         in_scope = lcInScopeSet env
 
-opt_co4 env sym _rep r (KindCo co)
+opt_co4 env sym rep r (KindCo co)
   = ASSERT( r == Nominal )
-    let kco' = promoteCoercion co in
-    case kco' of
-      KindCo co' -> promoteCoercion (opt_co1 env sym co')
-      _          -> opt_co4_wrap env sym False Nominal kco'
+    let m_kco' = promoteCoercion co in
+    case m_kco' of
+      Just (KindCo co') -> fall_through co'
+      Just kco'         -> opt_co4_wrap env sym rep Nominal kco'
+      Nothing           -> fall_through co
+
+  where
+    fall_through co' = let co'' = opt_co1 env sym co' in
+                       case promoteCoercion co'' of
+                         Just pco -> wrapRole rep r pco
+                         Nothing  -> mkKindCo co''
+
   -- This might be able to be optimized more to do the promotion
   -- and substitution/optimization at the same time
 
@@ -331,17 +339,16 @@ opt_co4 env sym rep r (AxiomRuleCo co cs)
 -- be a phantom, but the output sure will be.
 opt_phantom :: LiftingContext -> SymFlag -> Coercion -> NormalCo
 opt_phantom env sym co
-  = opt_univ env sym (PhantomProv (mkKindCo co)) Phantom ty1 ty2
+  = opt_univ env sym PhantomProv Phantom ty1 ty2
   where
     Pair ty1 ty2 = coercionKind co
 
 opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
          -> Type -> Type -> Coercion
-opt_univ env sym (PhantomProv h) _r ty1 ty2
-  | sym       = mkPhantomCo h' ty2' ty1'
-  | otherwise = mkPhantomCo h' ty1' ty2'
+opt_univ env sym PhantomProv _r ty1 ty2
+  | sym       = mkPhantomCo ty2' ty1'
+  | otherwise = mkPhantomCo ty1' ty2'
   where
-    h' = opt_co4 env sym False Nominal h
     ty1' = substTy (lcSubstLeft  env) ty1
     ty2' = substTy (lcSubstRight env) ty2
 
@@ -383,7 +390,7 @@ opt_univ env sym prov role oty1 oty2
   where
     prov' = case prov of
       UnsafeCoerceProv   -> prov
-      PhantomProv kco    -> PhantomProv $ opt_co4_wrap env sym False Nominal kco
+      PhantomProv        -> PhantomProv
       ProofIrrelProv kco -> ProofIrrelProv $ opt_co4_wrap env sym False Nominal kco
       PluginProv _       -> prov
       HoleProv h         -> pprPanic "opt_univ fell into a hole" (ppr h)
@@ -512,8 +519,8 @@ opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
   where
     -- if the provenances are different, opt'ing will be very confusing
     opt_trans_prov UnsafeCoerceProv      UnsafeCoerceProv      = Just UnsafeCoerceProv
-    opt_trans_prov (PhantomProv kco1)    (PhantomProv kco2)
-      = Just $ PhantomProv $ opt_trans is kco1 kco2
+    opt_trans_prov PhantomProv           PhantomProv
+      = Just PhantomProv
     opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)
       = Just $ ProofIrrelProv $ opt_trans is kco1 kco2
     opt_trans_prov (PluginProv str1)     (PluginProv str2)     | str1 == str2 = Just p1

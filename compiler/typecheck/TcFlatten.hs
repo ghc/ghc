@@ -1495,7 +1495,7 @@ unflatten tv_eqs funeqs
       | isFmvTyVar tv
       = do { ty1 <- zonkTcTyVar tv
            ; rhs' <- zonkTcType rhs
-           ; if ty1 `tcEqType` rhs'
+           ; if ty1 `eqType` rhs'
              then do { setReflEvidence ev eq_rel rhs'
                      ; return rest }
              else return (mkNonCanonical ev `consCts` rest) }

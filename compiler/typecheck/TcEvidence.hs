@@ -106,7 +106,7 @@ tcDowngradeRole        :: Role -> Role -> TcCoercion -> TcCoercion
 mkTcAxiomRuleCo        :: CoAxiomRule -> [TcCoercion] -> TcCoercionR
 mkTcCoherenceLeftCo    :: TcCoercion -> TcCoercionN -> TcCoercion
 mkTcCoherenceRightCo   :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcPhantomCo          :: TcCoercionN -> TcType -> TcType -> TcCoercionP
+mkTcPhantomCo          :: TcType -> TcType -> TcCoercionP
 mkTcKindCo             :: TcCoercion -> TcCoercionN
 mkTcCoVarCo            :: CoVar -> TcCoercion
 

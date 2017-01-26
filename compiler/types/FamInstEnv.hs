@@ -1239,6 +1239,8 @@ topNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Coercion, Type)
 --
 -- However, ty' can be something like (Maybe (F ty)), where
 -- (F ty) is a redex.
+--
+-- NB: This might change the kind of the type, if it unwraps a newtype-class.
 
 topNormaliseType_maybe env ty
   = topNormaliseTypeX stepper mkTransCo ty
@@ -1627,7 +1629,7 @@ allTyVarsInTy = go
     go_cos = foldr (unionVarSet . go_co) emptyVarSet
 
     go_prov UnsafeCoerceProv    = emptyVarSet
-    go_prov (PhantomProv co)    = go_co co
+    go_prov PhantomProv         = emptyVarSet
     go_prov (ProofIrrelProv co) = go_co co
     go_prov (PluginProv _)      = emptyVarSet
     go_prov (HoleProv _)        = emptyVarSet

@@ -127,7 +127,7 @@ synonymTyConsOfType ty
      go_co (AxiomRuleCo _ cs)     = go_co_s cs
 
      go_prov UnsafeCoerceProv     = emptyNameEnv
-     go_prov (PhantomProv co)     = go_co co
+     go_prov PhantomProv          = emptyNameEnv
      go_prov (ProofIrrelProv co)  = go_co co
      go_prov (PluginProv _)       = emptyNameEnv
      go_prov (HoleProv _)         = emptyNameEnv

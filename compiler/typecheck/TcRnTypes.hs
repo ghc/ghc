@@ -1506,7 +1506,7 @@ data Ct
        --   * tv not in tvs(rhs)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * typeKind ty `tcEqKind` typeKind tv
+       --   * typeKind ty `eqType` typeKind tv
        --   * rhs may have at most one top-level cast
        --   * rhs (perhaps under the one cast) is not necessarily function-free,
        --       but it has no top-level function.

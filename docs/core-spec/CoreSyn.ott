@@ -131,8 +131,8 @@ g {{ tex \gamma }}, h {{ tex \eta }} :: 'Coercion_' ::= {{ com Coercions, \coder
     {{ tex [[forall]] [[z]]{:}[[h]].[[g]] }}
   | n                       ::   :: CoVarCo       {{ com \ctor{CoVarCo}: Variable }}
   | C ind </ gi // i />     ::   :: AxiomInstCo   {{ com \ctor{AxiomInstCo}: Axiom application }}
-  | prov < t1 , t2 > _ R ^ ( h ) ::  :: UnivCo    {{ com \ctor{UnivCo}: Universal coercion }}
-    {{ tex {}_{[[prov]]}{\langle [[t1]], [[t2]] \rangle}_{[[R]]}^{[[h]]} }}
+  | prov < t1 , t2 > _ R    ::  :: UnivCo    {{ com \ctor{UnivCo}: Universal coercion }}
+    {{ tex {}_{[[prov]]}{\langle [[t1]], [[t2]] \rangle}_{[[R]]} }}
   | sym g                   ::   :: SymCo         {{ com \ctor{SymCo}: Symmetry }}
   | g1 ; g2                 ::   :: TransCo       {{ com \ctor{TransCo}: Transitivity }}
   | mu </ ti // i /> $ </ gj // j />
@@ -152,8 +152,8 @@ prov :: 'UnivCoProvenance_' ::= {{ com \ctor{UnivCo} provenance, \coderef{types/
     {{ tex \mathsf{unsafe} }}
   | PhantomProv        ::   :: PhantomProv       {{ com From the need for a phantom coercion }}
     {{ tex \mathsf{phant} }}
-  | ProofIrrelProv     ::   :: ProofIrrelProv    {{ com From proof irrelevance }}
-    {{ tex \mathsf{irrel} }}
+  | ProofIrrelProv ^ ( h )   ::   :: ProofIrrelProv    {{ com From proof irrelevance }}
+    {{ tex \mathsf{irrel}^{[[h]]} }}
 
 LorR :: 'LeftOrRight_' ::= {{ com left or right deconstructor, \coderef{types/TyCoRep.lhs}{LeftOrRight} }}
   | Left             ::   :: CLeft                {{ com \ctor{CLeft}: Left projection }}

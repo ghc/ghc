@@ -218,24 +218,22 @@ phi = t1 k1 ~Rep# k2 t2
 --------------------- :: CoVarCoRepr
 G |-co z_phi : t1 k1 ~Rep k2 t2
 
-G |-co h : k1 *~Nom * k2
 G |-ty t1 : k1
 G |-ty t2 : k2
 (R <= Ph \/ not (classifiesTypeWithValues k1)) \\/ (not (classifiesTypeWithValues k2) \/ compatibleUnBoxedTys t1 t2)
 ------------------------------------------------------ :: UnivCoUnsafe
-G |-co UnsafeCoerceProv <t1, t2>_R^(h) : t1 k1~R k2 t2
+G |-co UnsafeCoerceProv <t1, t2>_R : t1 k1~R k2 t2
 
-G |-co h : k1 *~Nom * k2
 G |-ty t1 : k1
 G |-ty t2 : k2
 -------------------------------------------------- :: UnivCoPhantom
-G |-co PhantomProv <t1,t2>_Ph^(h) : t1 k1~Ph k2 t2
+G |-co PhantomProv <t1,t2>_Ph : t1 k1~Ph k2 t2
 
 G |-co h : phi1 *~Nom * phi2
 G |-ty g1 : phi1
 G |-ty g2 : phi2
 -------------------------------------------------- :: UnivCoProofIrrel
-G |-co ProofIrrelProv <g1,g2>_R^(h) : g1 phi1~R phi2 g2
+G |-co ProofIrrelProv^(h) <g1,g2>_R : g1 phi1~R phi2 g2
 
 G |-co g : t1 k1~R k2 t2
 ------------------------- :: SymCo
@@ -298,7 +296,7 @@ G |-ty t1 |> h : k1'
 ---------------------------------- :: CoherenceCo
 G |-co g |> h : t1 |> h k1'~R k2 t2
 
-G |-co g : t1 k1~R k2 t2
+G |-co g : t1 k1~Nom k2 t2
 -------------------------- :: KindCo
 G |-co kind g : k1 *~Nom * k2
 

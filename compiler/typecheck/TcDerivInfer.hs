@@ -130,7 +130,7 @@ inferConstraints tvs main_cls cls_tys inst_ty rep_tc rep_tc_args mkTheta
     is_generic  = main_cls `hasKey` genClassKey
     is_generic1 = main_cls `hasKey` gen1ClassKey
     -- is_functor_like: see Note [Inferring the instance context]
-    is_functor_like = typeKind inst_ty `tcEqKind` typeToTypeKind
+    is_functor_like = typeKind inst_ty `eqType` typeToTypeKind
                    || is_generic1 -- Technically, Generic1 requires a type of
                                   -- kind (k -> *), not (* -> *), but we still
                                   -- label it "functor-like" to make sure

@@ -72,7 +72,7 @@ module TcType (
   -- Predicates.
   -- Again, newtypes are opaque
   eqType, eqTypes, nonDetCmpType, nonDetCmpTypes, eqTypeX,
-  pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
+  pickyEqType, tcEqTypeVis,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
@@ -878,7 +878,7 @@ exactTyCoVarsOfType ty
     goCos cos = foldr (unionVarSet . goCo) emptyVarSet cos
 
     goProv UnsafeCoerceProv     = emptyVarSet
-    goProv (PhantomProv kco)    = goCo kco
+    goProv PhantomProv          = emptyVarSet
     goProv (ProofIrrelProv kco) = goCo kco
     goProv (PluginProv _)       = emptyVarSet
     goProv (HoleProv _)         = emptyVarSet
@@ -1536,31 +1536,12 @@ tcSplitMethodTy ty
 *                                                                      *
 ********************************************************************* -}
 
-tcEqKind :: TcKind -> TcKind -> Bool
-tcEqKind = tcEqType
-
-tcEqType :: TcType -> TcType -> Bool
--- tcEqType is a proper implements the same Note [Non-trivial definitional
--- equality] (in TyCoRep) as `eqType`, but Type.eqType believes (* ==
--- Constraint), and that is NOT what we want in the type checker!
-tcEqType ty1 ty2
-  = isNothing (tc_eq_type coreView ki1 ki2) &&
-    isNothing (tc_eq_type coreView ty1 ty2)
-  where
-    ki1 = typeKind ty1
-    ki2 = typeKind ty2
-
--- | Just like 'tcEqType', but will return True for types of different kinds
--- as long as their non-coercion structure is identical.
-tcEqTypeNoKindCheck :: TcType -> TcType -> Bool
-tcEqTypeNoKindCheck ty1 ty2
-  = isNothing $ tc_eq_type coreView ty1 ty2
-
--- | Like 'tcEqType', but returns information about whether the difference
+-- | Like 'eqType', but returns information about whether the difference
 -- is visible in the case of a mismatch.
 -- @Nothing@    : the types are equal
 -- @Just True@  : the types differ, and the point of difference is visible
 -- @Just False@ : the types differ, and the point of difference is invisible
+-- Only called in TcErrors, so it can be a bit slow
 tcEqTypeVis :: TcType -> TcType -> Maybe Bool
 tcEqTypeVis ty1 ty2
   = tc_eq_type coreView ty1 ty2 <!> invis (tc_eq_type coreView ki1 ki2)
@@ -1579,9 +1560,11 @@ Just _vis      <!> Just True = Just True
 Just vis       <!> _         = Just vis
 infixr 3 <!>
 
--- | Real worker for 'tcEqType'. No kind check!
+-- | Real worker for 'tcEqTypeVis'. No kind check!
 tc_eq_type :: (TcType -> Maybe TcType)  -- ^ @coreView@, if you want unwrapping
            -> Type -> Type -> Maybe Bool
+  -- This duplicates much of the code in eqType, but we don't want our eqType workhorse
+  -- to worry about visibility. So we keep this reimplementation around.
 tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
   where
     go vis env t1 t2 | Just t1' <- view_fun t1 = go vis env t1' t2
@@ -1636,11 +1619,10 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
 
--- | Like 'pickyEqTypeVis', but returns a Bool for convenience
-pickyEqType :: TcType -> TcType -> Bool
--- Check when two types _look_ the same, _including_ synonyms.
+-- | Check when two types _look_ the same, _including_ synonyms.
 -- So (pickyEqType String [Char]) returns False
 -- This ignores kinds and coercions, because this is used only for printing.
+pickyEqType :: TcType -> TcType -> Bool
 pickyEqType ty1 ty2
   = isNothing $
     tc_eq_type (const Nothing) ty1 ty2
@@ -1824,7 +1806,7 @@ isImprovementPred :: PredType -> Bool
 -- Either it's an equality, or has some functional dependency
 isImprovementPred ty
   = case classifyPredType ty of
-      EqPred NomEq t1 t2 -> not (t1 `tcEqType` t2)
+      EqPred NomEq t1 t2 -> not (t1 `eqType` t2)
       EqPred ReprEq _ _  -> False
       ClassPred cls _    -> classHasFds cls
       IrredPred {}       -> True -- Might have equalities after reduction?

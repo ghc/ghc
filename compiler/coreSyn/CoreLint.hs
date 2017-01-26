@@ -1393,8 +1393,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
        ; case prov of
            UnsafeCoerceProv -> return ()  -- no extra checks
 
-           PhantomProv kco    -> do { lintRole co Phantom r
-                                    ; check_kinds kco k1 k2 }
+           PhantomProv        -> lintRole co Phantom r
 
            ProofIrrelProv kco -> do { lintL (isCoercionTy ty1) $
                                           mkBadProofIrrelMsg ty1 co
@@ -1567,7 +1566,8 @@ lintCoercion (CoherenceCo co1 co2)
        ; return (k1', k2, lhsty, t2, r) }
 
 lintCoercion (KindCo co)
-  = do { (k1, k2, _, _, _) <- lintCoercion co
+  = do { (k1, k2, _, _, r) <- lintCoercion co
+       ; lintRole co Nominal r
        ; return (liftedTypeKind, liftedTypeKind, k1, k2, Nominal) }
 
 lintCoercion (SubCo co')

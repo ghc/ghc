@@ -375,6 +375,10 @@ tcLookupDataFamInst_maybe fam_inst_envs tc tc_args
 --    co : ty ~R rep_ty
 --    gres are the GREs for the data constructors that
 --                          had to be in scope
+--
+-- NB: The returned type might have a different kind than the input,
+-- if we have unwrapped a class-newtype (of kind Constraint) to reveal
+-- its representation (of kind Type)
 tcTopNormaliseNewTypeTF_maybe :: FamInstEnvs
                               -> GlobalRdrEnv
                               -> Type

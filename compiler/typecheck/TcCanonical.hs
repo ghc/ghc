@@ -583,7 +583,7 @@ can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
 -- Check only when flat because the zonk_eq_types check in canEqNC takes
 -- care of the non-flat case.
 can_eq_nc' True _rdr_env _envs ev ReprEq ty1 _ ty2 _
-  | ty1 `tcEqType` ty2
+  | ty1 `eqType` ty2
   = canEqReflexive ev ReprEq ty1
 
 -- When working with ReprEq, unwrap newtypes.
@@ -1394,9 +1394,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
      -- Trac #12593
   = rewriteEqEvidence ev swapped xi1 xi2' co1 co2
     `andWhenContinue` \ new_ev ->
-    homogeniseRhsKind new_ev eq_rel xi1 xi2' $ \new_new_ev xi2'' ->
-    CTyEqCan { cc_ev = new_new_ev, cc_tyvar = tv1
-             , cc_rhs = xi2'', cc_eq_rel = eq_rel }
+    homogeniseRhsKind new_ev eq_rel tv1 xi2'
 
   | otherwise  -- Occurs check error (or a forall)
   = do { traceTcS "canEqTyVar2 occurs check error" (ppr tv1 $$ ppr xi2)
@@ -1437,19 +1435,22 @@ canEqReflexive ev eq_rel ty
 -- See Note [Equalities with incompatible kinds]
 homogeniseRhsKind :: CtEvidence -- ^ the evidence to homogenise
                   -> EqRel
-                  -> TcType              -- ^ original LHS
+                  -> TyVar               -- ^ original LHS
                   -> Xi                  -- ^ original RHS
-                  -> (CtEvidence -> Xi -> Ct)
-                           -- ^ how to build the homogenised constraint;
-                           -- the 'Xi' is the new RHS
                   -> TcS (StopOrContinue Ct)
-homogeniseRhsKind ev eq_rel lhs rhs build_ct
-  | k1 `tcEqType` k2
+       -- produces a CTyEqCan if possible, or a CIrredEvCan if not
+       -- the "not" case is only because of a heterogeneous representational
+       -- given: we can't use mkKindCo on a representational coercion.
+homogeniseRhsKind ev eq_rel tv rhs
+  | k1 `eqType` k2
   = continueWith (build_ct ev rhs)
 
   | CtGiven { ctev_evar = evar } <- ev
     -- tm :: (lhs :: k1) ~ (rhs :: k2)
-  = do { kind_ev_id <- newBoundEvVarId kind_pty
+  = if eq_rel == ReprEq
+    then continueWith (CIrredEvCan { cc_ev = ev })
+    else
+    do { kind_ev_id <- newBoundEvVarId kind_pty
                                        (EvCoercion $
                                         mkTcKindCo $ mkTcCoVarCo evar)
            -- kind_ev_id :: (k1 :: *) ~# (k2 :: *)
@@ -1494,7 +1495,9 @@ homogeniseRhsKind ev eq_rel lhs rhs build_ct
              ; continueWith (build_ct type_ev rhs') }}
 
   where
-    k1 = typeKind lhs
+    lhs = mkTyVarTy tv
+
+    k1 = tyVarKind tv
     k2 = typeKind rhs
 
     kind_pty = mkHeteroPrimEqPred liftedTypeKind liftedTypeKind k1 k2
@@ -1502,6 +1505,10 @@ homogeniseRhsKind ev eq_rel lhs rhs build_ct
 
     loc  = ctev_loc ev
     role = eqRelRole eq_rel
+
+    build_ct new_ev new_rhs
+      = CTyEqCan { cc_ev = new_ev, cc_tyvar = tv
+                 , cc_rhs = new_rhs, cc_eq_rel = eq_rel }
 
 {-
 Note [Canonical orientation for tyvar/tyvar equality constraints]
@@ -1817,9 +1824,7 @@ unifyWanted :: CtLoc -> Role
 -- Very good short-cut when the two types are equal, or nearly so
 -- See Note [unifyWanted and unifyDerived]
 -- The returned coercion's role matches the input parameter
-unifyWanted loc Phantom ty1 ty2
-  = do { kind_co <- unifyWanted loc Nominal (typeKind ty1) (typeKind ty2)
-       ; return (mkPhantomCo kind_co ty1 ty2) }
+unifyWanted _ Phantom ty1 ty2 = return (mkPhantomCo ty1 ty2)
 
 unifyWanted loc role orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
@@ -1855,7 +1860,7 @@ unifyWanted loc role orig_ty1 orig_ty2
     go ty1 ty2 = bale_out ty1 ty2
 
     bale_out ty1 ty2
-       | ty1 `tcEqType` ty2 = return (mkTcReflCo role ty1)
+       | ty1 `eqType` ty2 = return (mkTcReflCo role ty1)
         -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
        | otherwise = emitNewWantedEq loc role orig_ty1 orig_ty2
 
@@ -1898,7 +1903,7 @@ unify_derived loc role    orig_ty1 orig_ty2
     go ty1 ty2 = bale_out ty1 ty2
 
     bale_out ty1 ty2
-       | ty1 `tcEqType` ty2 = return ()
+       | ty1 `eqType` ty2 = return ()
         -- Check for equality; e.g. a ~ a, or (m a) ~ (m a)
        | otherwise = emitNewDerivedEq loc role orig_ty1 orig_ty2
 

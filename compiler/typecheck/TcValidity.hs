@@ -1458,7 +1458,7 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc _at_tvs at_tys
     (kind_shapes, type_shapes) = partitionInvisibles fam_tc snd arg_shapes
 
     check_arg :: AssocInstArgShape -> Bool
-    check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
+    check_arg (Just exp_ty, at_ty) = exp_ty `eqType` at_ty
     check_arg (Nothing,     _    ) = True -- Arg position does not correspond
                                           -- to a class variable
     check_poly_args :: [(Maybe Type,Type)] -> Bool
@@ -1871,7 +1871,7 @@ fvCo (AxiomRuleCo _ cs)     = concatMap fvCo cs
 
 fvProv :: UnivCoProvenance -> [TyCoVar]
 fvProv UnsafeCoerceProv    = []
-fvProv (PhantomProv co)    = fvCo co
+fvProv PhantomProv         = []
 fvProv (ProofIrrelProv co) = fvCo co
 fvProv (PluginProv _)      = []
 fvProv (HoleProv h)        = pprPanic "fvProv falls into a hole" (ppr h)

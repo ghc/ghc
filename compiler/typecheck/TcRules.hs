@@ -350,7 +350,7 @@ simplifyRule name lhs_wanted rhs_wanted
       = case dest of  -- See Note [Quantifying over coercion holes]
           HoleDest hole
             | EqPred NomEq t1 t2 <- classifyPredType pred
-            , t1 `tcEqType` t2
+            , t1 `eqType` t2
             -> do { -- These are trivial. Don't quantify. But do fill in
                     -- the hole.
                   ; fillCoercionHole hole (mkTcNomReflCo t1)

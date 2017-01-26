@@ -32,7 +32,7 @@ module Coercion (
         mkNthCo, mkNthCoRole, mkLRCo,
         mkInstCo, mkAppCo, mkAppCos, mkTyConAppCo, mkFunCo, mkFunCos,
         mkForAllCo, mkForAllCos, mkHomoForAllCos, mkHomoForAllCos_NoRefl,
-        mkPhantomCo, mkHomoPhantomCo, toPhantomCo,
+        mkPhantomCo, toPhantomCo,
         mkUnsafeCo, mkHoleCo, mkUnivCo, mkSubCo,
         mkAxiomInstCo, mkProofIrrelCo,
         downgradeRole, maybeSubCo, mkAxiomRuleCo,
@@ -204,7 +204,7 @@ ppr_co _ (UnivCo p r t1 t2)
   where
     ppr_prov = case p of
       HoleProv h          -> text "hole:"   <> ppr h
-      PhantomProv kind_co -> text "phant:"  <> ppr kind_co
+      PhantomProv         -> text "phant"
       ProofIrrelProv co   -> text "irrel:"  <> ppr co
       PluginProv s        -> text "plugin:" <> text s
       UnsafeCoerceProv    -> text "unsafe"
@@ -611,15 +611,7 @@ mkTransAppCo r1 co1 ty1a ty1b r2 co2 ty2a ty2b r3
 -- How incredibly fiddly! Is there a better way??
   = case (r1, r2, r3) of
       (_,                _,                Phantom)
-        -> mkPhantomCo kind_co (mkAppTy ty1a ty2a) (mkAppTy ty1b ty2b)
-        where -- ty1a :: k1a -> k2a
-              -- ty1b :: k1b -> k2b
-              -- ty2a :: k1a
-              -- ty2b :: k1b
-              -- ty1a ty2a :: k2a
-              -- ty1b ty2b :: k2b
-              kind_co1 = mkKindCo co1        -- :: k1a -> k2a ~N k1b -> k2b
-              kind_co  = mkNthCo 1 kind_co1  -- :: k2a ~N k2b
+        -> mkPhantomCo (mkAppTy ty1a ty2a) (mkAppTy ty1b ty2b)
 
       (_,                _,                Nominal)
         -> ASSERT( r1 == Nominal && r2 == Nominal )
@@ -894,9 +886,9 @@ infixl 5 `mkCoherenceCo`
 infixl 5 `mkCoherenceRightCo`
 infixl 5 `mkCoherenceLeftCo`
 
+-- | Nominal coercions only
 mkKindCo :: Coercion -> Coercion
 mkKindCo (Refl _ ty) = Refl Nominal (typeKind ty)
-mkKindCo (UnivCo (PhantomProv h) _ _ _)    = h
 mkKindCo (UnivCo (ProofIrrelProv h) _ _ _) = h
 mkKindCo co
   | Pair ty1 ty2 <- coercionKind co
@@ -906,7 +898,8 @@ mkKindCo co
   , typeKind ty1 `eqType` typeKind ty2
   = Refl Nominal (typeKind ty1)
   | otherwise
-  = KindCo co
+  = ASSERT( coercionRole co == Nominal )
+    KindCo co
 
 -- input coercion is Nominal; see also Note [Role twiddling functions]
 mkSubCo :: Coercion -> Coercion
@@ -996,32 +989,22 @@ setNominalRole_maybe (CoherenceCo co1 co2)
   = CoherenceCo <$> setNominalRole_maybe co1 <*> pure co2
 setNominalRole_maybe (UnivCo prov _ co1 co2)
   | case prov of UnsafeCoerceProv -> True   -- it's always unsafe
-                 PhantomProv _    -> False  -- should always be phantom
+                 PhantomProv      -> False  -- should always be phantom
                  ProofIrrelProv _ -> True   -- it's always safe
                  PluginProv _     -> False  -- who knows? This choice is conservative.
                  HoleProv _       -> False  -- no no no.
   = Just $ UnivCo prov Nominal co1 co2
 setNominalRole_maybe _ = Nothing
 
--- | Make a phantom coercion between two types. The coercion passed
--- in must be a nominal coercion between the kinds of the
--- types.
-mkPhantomCo :: Coercion -> Type -> Type -> Coercion
-mkPhantomCo h t1 t2
-  = mkUnivCo (PhantomProv h) Phantom t1 t2
-
--- | Make a phantom coercion between two types of the same kind.
-mkHomoPhantomCo :: Type -> Type -> Coercion
-mkHomoPhantomCo t1 t2
-  = ASSERT( k1 `eqType` typeKind t2 )
-    mkPhantomCo (mkNomReflCo k1) t1 t2
-  where
-    k1 = typeKind t1
+-- | Make a phantom coercion between two types.
+mkPhantomCo :: Type -> Type -> Coercion
+mkPhantomCo t1 t2
+  = mkUnivCo PhantomProv Phantom t1 t2
 
 -- takes any coercion and turns it into a Phantom coercion
 toPhantomCo :: Coercion -> Coercion
 toPhantomCo co
-  = mkPhantomCo (mkKindCo co) ty1 ty2
+  = mkPhantomCo ty1 ty2
   where Pair ty1 ty2 = coercionKind co
 
 -- Convert args to a TyConAppCo Nominal to the same TyConAppCo Representational
@@ -1058,58 +1041,61 @@ ltRole Nominal          _       = True
 
 -- | like mkKindCo, but aggressively & recursively optimizes to avoid using
 -- a KindCo constructor. The output role is nominal.
-promoteCoercion :: Coercion -> Coercion
+promoteCoercion :: Coercion -> Maybe Coercion
 
 -- First cases handles anything that should yield refl.
 promoteCoercion co = case co of
 
     _ | ki1 `eqType` ki2
-      -> mkNomReflCo (typeKind ty1)
+      -> Just $ mkNomReflCo (typeKind ty1)
      -- no later branch should return refl
      --    The ASSERT( False )s throughout
      -- are these cases explicitly, but they should never fire.
 
     Refl _ ty -> ASSERT( False )
-                 mkNomReflCo (typeKind ty)
+                 Just $ mkNomReflCo (typeKind ty)
 
     TyConAppCo _ tc args
       | Just co' <- instCoercions (mkNomReflCo (tyConKind tc)) args
-      -> co'
+      -> Just co'
       | otherwise
-      -> mkKindCo co
+      -> mk_kind_co
 
     AppCo co1 arg
-      | Just co' <- instCoercion (coercionKind (mkKindCo co1))
-                                 (promoteCoercion co1) arg
-      -> co'
+      | Nominal /= coercionRole co1
+      -> Nothing
+
+      | Just co' <- do pco1 <- promoteCoercion co1
+                       instCoercion (coercionKind (mkKindCo co1)) pco1 arg
+      -> Just co'
       | otherwise
-      -> mkKindCo co
+      -> Just $ mkKindCo co
 
     ForAllCo _ _ g
       -> promoteCoercion g
 
     CoVarCo {}
-      -> mkKindCo co
+      -> mk_kind_co
 
     AxiomInstCo {}
-      -> mkKindCo co
+      -> mk_kind_co
 
     UnivCo UnsafeCoerceProv _ t1 t2
-      -> mkUnsafeCo Nominal (typeKind t1) (typeKind t2)
-    UnivCo (PhantomProv kco) _ _ _
-      -> kco
+      -> Just $ mkUnsafeCo Nominal (typeKind t1) (typeKind t2)
+    UnivCo PhantomProv _ _ _
+      -> Nothing
     UnivCo (ProofIrrelProv kco) _ _ _
-      -> kco
+      -> Just kco
     UnivCo (PluginProv _) _ _ _
-      -> mkKindCo co
+      -> mk_kind_co
     UnivCo (HoleProv _) _ _ _
-      -> mkKindCo co
+      -> mk_kind_co
 
     SymCo g
-      -> mkSymCo (promoteCoercion g)
+      -> mkSymCo <$> promoteCoercion g
 
     TransCo co1 co2
-      -> mkTransCo (promoteCoercion co1) (promoteCoercion co2)
+      -> mkTransCo <$> promoteCoercion co1 <*> promoteCoercion co2
 
     NthCo n co1
       | Just (_, args) <- splitTyConAppCo_maybe co1
@@ -1118,10 +1104,10 @@ promoteCoercion co = case co of
 
       | Just _ <- splitForAllCo_maybe co
       , n == 0
-      -> ASSERT( False ) mkNomReflCo liftedTypeKind
+      -> ASSERT( False ) Just $ mkNomReflCo liftedTypeKind
 
       | otherwise
-      -> mkKindCo co
+      -> mk_kind_co
 
     LRCo lr co1
       | Just (lco, rco) <- splitAppCo_maybe co1
@@ -1130,31 +1116,38 @@ promoteCoercion co = case co of
            CRight -> promoteCoercion rco
 
       | otherwise
-      -> mkKindCo co
+      -> Just $ mkKindCo co
 
     InstCo g _
       -> promoteCoercion g
 
     CoherenceCo g h
-      -> mkSymCo h `mkTransCo` promoteCoercion g
+      -> (mkSymCo h `mkTransCo`) <$> promoteCoercion g
 
     KindCo _
       -> ASSERT( False )
-         mkNomReflCo liftedTypeKind
+         Just $ mkNomReflCo liftedTypeKind
 
     SubCo g
       -> promoteCoercion g
 
     AxiomRuleCo {}
-      -> mkKindCo co
+      -> mk_kind_co
 
   where
-    Pair ty1 ty2 = coercionKind co
+    (Pair ty1 ty2, role) = coercionKindRole co
     ki1 = typeKind ty1
     ki2 = typeKind ty2
 
--- | say @g = promoteCoercion h@. Then, @instCoercion g w@ yields @Just g'@,
--- where @g' = promoteCoercion (h w)@.
+    mk_kind_co
+      | Nominal <- role
+      = Just $ mkKindCo co
+      | otherwise
+      = Nothing
+
+
+-- | say @Just g = promoteCoercion h@. Then, @instCoercion g w@ yields @Just g'@,
+-- where @Just g' = promoteCoercion (h w)@.
 -- fails if this is not possible, if @g@ coerces between a forall and an ->
 -- or if second parameter has a representational role and can't be used
 -- with an InstCo. The result role matches is representational.
@@ -1339,6 +1332,8 @@ topNormaliseNewType_maybe :: Type -> Maybe (Coercion, Type)
 -- topNormaliseType_maybe, which should be a drop-in replacement for
 -- topNormaliseNewType_maybe
 -- If topNormliseNewType_maybe ty = Just (co, ty'), then co : ty ~R ty'
+--
+-- NB: This may change the kind of the type, if we unwrap a class-newtype.
 topNormaliseNewType_maybe ty
   = topNormaliseTypeX unwrapNewTypeStepper mkTransCo ty
 
@@ -1516,8 +1511,7 @@ ty_co_subst lc role ty
                                                   (substRightCo lc co)
       where kco = go Nominal (coercionType co)
 
-    lift_phantom ty = mkPhantomCo (go Nominal (typeKind ty))
-                                  (substTy (lcSubstLeft  lc) ty)
+    lift_phantom ty = mkPhantomCo (substTy (lcSubstLeft  lc) ty)
                                   (substTy (lcSubstRight lc) ty)
 
 {-
@@ -1656,7 +1650,7 @@ seqCo (AxiomRuleCo _ cs)        = seqCos cs
 
 seqProv :: UnivCoProvenance -> ()
 seqProv UnsafeCoerceProv    = ()
-seqProv (PhantomProv co)    = seqCo co
+seqProv PhantomProv         = ()
 seqProv (ProofIrrelProv co) = seqCo co
 seqProv (PluginProv _)      = ()
 seqProv (HoleProv _)        = ()

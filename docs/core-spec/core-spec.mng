@@ -30,7 +30,7 @@ System FC, as implemented in GHC\footnote{This
 document was originally prepared by Richard Eisenberg (\texttt{eir@cis.upenn.edu}),
 but it should be maintained by anyone who edits the functions or data structures
 mentioned in this file. Please feel free to contact Richard for more information.}\\
-\Large 23 October, 2015
+\Large 25 January, 2017
 \end{center}
 
 \section{Introduction}
@@ -101,7 +101,7 @@ There are a few key invariants about expressions:
 \begin{itemize}
 \item The right-hand sides of all top-level and recursive $[[let]]$s
 must be of lifted type, with one exception: the right-hand side of a top-level
-$[[let]]$ may be of type \texttt{Addr#} if it's a primitive string literal.
+$[[let]]$ may be of type \texttt{Addr\#} if it's a primitive string literal.
 See \verb|#top_level_invariant#| in \ghcfile{coreSyn/CoreSyn.hs}.
 \item The right-hand side of a non-recursive $[[let]]$ and the argument
 of an application may be of unlifted type, but only if the expression
@@ -188,8 +188,10 @@ the payload in a \texttt{Refl} must not be built with \texttt{CoercionTy}.
 \end{itemize}
 
 The \texttt{UnivCo} constructor takes several arguments: the two types coerced
-between, a coercion relating these types' kinds, a role for the universal coercion,
-and a provenance. The provenance states what created the universal coercion:
+between, a role for the universal coercion,
+and a provenance. The provenance states what created the universal coercion.
+In the \texttt{ProofIrrelProv} case, there is also a coercion $[[h]]$ that
+witnesses the equality between the types' kinds.
 
 \gram{\ottprov}
 

@@ -257,7 +257,7 @@ data IfaceCoercion
 
 data IfaceUnivCoProv
   = IfaceUnsafeCoerceProv
-  | IfacePhantomProv IfaceCoercion
+  | IfacePhantomProv
   | IfaceProofIrrelProv IfaceCoercion
   | IfacePluginProv String
   | IfaceHoleProv Unique
@@ -408,7 +408,7 @@ substIfaceType env ty
     go_cos = map go_co
 
     go_prov IfaceUnsafeCoerceProv    = IfaceUnsafeCoerceProv
-    go_prov (IfacePhantomProv co)    = IfacePhantomProv (go_co co)
+    go_prov IfacePhantomProv         = IfacePhantomProv
     go_prov (IfaceProofIrrelProv co) = IfaceProofIrrelProv (go_co co)
     go_prov (IfacePluginProv str)    = IfacePluginProv str
     go_prov (IfaceHoleProv h)        = IfaceHoleProv h
@@ -972,6 +972,11 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   , rep `ifaceTyConHasKey` liftedRepDataConKey
   = kindStar
 
+  | tc `ifaceTyConHasKey` tYPETyConKey
+  , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
+  , rep `ifaceTyConHasKey` constraintRepDataConKey
+  = text "Constraint"
+
   | not opt_PprStyle_Debug
   , tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
   = text "(TypeError ...)"   -- Suppress detail unles you _really_ want to see
@@ -1514,9 +1519,7 @@ instance Binary IfaceCoercion where
 
 instance Binary IfaceUnivCoProv where
   put_ bh IfaceUnsafeCoerceProv = putByte bh 1
-  put_ bh (IfacePhantomProv a) = do
-          putByte bh 2
-          put_ bh a
+  put_ bh IfacePhantomProv      = putByte bh 2
   put_ bh (IfaceProofIrrelProv a) = do
           putByte bh 3
           put_ bh a
@@ -1531,8 +1534,7 @@ instance Binary IfaceUnivCoProv where
       tag <- getByte bh
       case tag of
            1 -> return $ IfaceUnsafeCoerceProv
-           2 -> do a <- get bh
-                   return $ IfacePhantomProv a
+           2 -> return $ IfacePhantomProv
            3 -> do a <- get bh
                    return $ IfaceProofIrrelProv a
            4 -> do a <- get bh

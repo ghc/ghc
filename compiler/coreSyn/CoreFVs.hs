@@ -388,7 +388,7 @@ orphNamesOfCo (AxiomRuleCo _ cs)    = orphNamesOfCos cs
 
 orphNamesOfProv :: UnivCoProvenance -> NameSet
 orphNamesOfProv UnsafeCoerceProv    = emptyNameSet
-orphNamesOfProv (PhantomProv co)    = orphNamesOfCo co
+orphNamesOfProv PhantomProv         = emptyNameSet
 orphNamesOfProv (ProofIrrelProv co) = orphNamesOfCo co
 orphNamesOfProv (PluginProv _)      = emptyNameSet
 orphNamesOfProv (HoleProv _)        = emptyNameSet

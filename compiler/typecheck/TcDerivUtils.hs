@@ -331,7 +331,7 @@ canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
 canDeriveAnyClass dflags _tycon clas
   | not (xopt LangExt.DeriveAnyClass dflags)
   = Just (text "Try enabling DeriveAnyClass")
-  | not (any (target_kind `tcEqKind`) [ liftedTypeKind, typeToTypeKind ])
+  | not (any (target_kind `eqType`) [ liftedTypeKind, typeToTypeKind ])
   = Just (text "The last argument of class" <+> quotes (ppr clas)
           <+> text "does not have kind * or (* -> *)")
   | otherwise

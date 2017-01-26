@@ -1392,8 +1392,8 @@ gen_data dflags data_type_name constr_names loc rep_tc
     tycon_kind = case tyConFamInst_maybe rep_tc of
                     Just (fam_tc, _) -> tyConKind fam_tc
                     Nothing          -> tyConKind rep_tc
-    gcast_binds | tycon_kind `tcEqKind` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
-                | tycon_kind `tcEqKind` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
+    gcast_binds | tycon_kind `eqType` kind1 = mk_gcast dataCast1_RDR gcast1_RDR
+                | tycon_kind `eqType` kind2 = mk_gcast dataCast2_RDR gcast2_RDR
                 | otherwise                 = emptyBag
     mk_gcast dataCast_RDR gcast_RDR
       = unitBag (mk_easy_FunBind loc dataCast_RDR [nlVarPat f_RDR]

@@ -12,8 +12,6 @@ piResultTy :: Type -> Type -> Type
 typeKind :: Type -> Kind
 eqType :: Type -> Type -> Bool
 
-coreViewOneStarKind :: Type -> Maybe Type
-
 partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
 
 coreView :: Type -> Maybe Type

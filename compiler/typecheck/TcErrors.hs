@@ -17,7 +17,6 @@ import TcType
 import RnEnv( unknownNameSuggestions )
 import Type
 import TyCoRep
-import Kind
 import Unify            ( tcMatchTys )
 import Module
 import FamInst
@@ -33,7 +32,7 @@ import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan )
-import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey )
+import PrelNames ( typeableClassName )
 import Id
 import Var
 import VarSet

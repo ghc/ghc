@@ -82,8 +82,8 @@ opt_trans_rule is in_co1@(UnivCo p1 r1 tyl1 _tyr1)
     -- if the provenances are different, opt'ing will be very confusing
     opt_trans_prov UnsafeCoerceProv UnsafeCoerceProv
       = Just UnsafeCoerceProv
-    opt_trans_prov (PhantomProv kco1) (PhantomProv kco2)
-      = Just $ PhantomProv $ opt_trans is kco1 kco2
+    opt_trans_prov PhantomProv PhantomProv
+      = Just $ PhantomProv
     opt_trans_prov (ProofIrrelProv kco1) (ProofIrrelProv kco2)
       = Just $ ProofIrrelProv $ opt_trans is kco1 kco2
     opt_trans_prov (PluginProv str1) (PluginProv str2)
