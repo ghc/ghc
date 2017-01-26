@@ -260,7 +260,7 @@ cvtDec (InstanceD o ctxt ty decs)
         ; unless (null fams') (failWith (mkBadDecMsg doc fams'))
         ; ctxt' <- cvtContext ctxt
         ; L loc ty' <- cvtType ty
-        ; let inst_ty' = L loc $ HsQualTy { hst_ctxt = ctxt', hst_body = L loc ty' }
+        ; let inst_ty' = mkHsQualTy ctxt loc ctxt' $ L loc ty'
         ; returnJustL $ InstD $ ClsInstD $
           ClsInstDecl { cid_poly_ty = mkLHsSigType inst_ty'
                       , cid_binds = binds'
@@ -346,7 +346,7 @@ cvtDec (TH.RoleAnnotD tc roles)
 cvtDec (TH.StandaloneDerivD ds cxt ty)
   = do { cxt' <- cvtContext cxt
        ; L loc ty'  <- cvtType ty
-       ; let inst_ty' = L loc $ HsQualTy { hst_ctxt = cxt', hst_body = L loc ty' }
+       ; let inst_ty' = mkHsQualTy cxt loc cxt' $ L loc ty'
        ; returnJustL $ DerivD $
          DerivDecl { deriv_strategy = fmap (L loc . cvtDerivStrategy) ds
                    , deriv_type = mkLHsSigType inst_ty'
@@ -510,16 +510,9 @@ cvtConstr (ForallC tvs ctxt con)
         ; L _ con'    <- cvtConstr con
         ; returnL $ case con' of
                 ConDeclGADT { con_type = conT } ->
-                  let hs_ty
-                        | null tvs = rho_ty
-                        | otherwise = noLoc $ HsForAllTy
-                                                { hst_bndrs = hsq_explicit tvs'
-                                                , hst_body  = rho_ty }
-                      rho_ty
-                        | null ctxt = hsib_body conT
-                        | otherwise = noLoc $ HsQualTy
-                                                { hst_ctxt = L loc ctxt'
-                                                , hst_body = hsib_body conT }
+                  let hs_ty  = mkHsForAllTy tvs noSrcSpan tvs' rho_ty
+                      rho_ty = mkHsQualTy ctxt noSrcSpan (L loc ctxt')
+                                                         (hsib_body conT)
                   in con' { con_type = HsIB PlaceHolder hs_ty }
                 ConDeclH98  {} ->
                   let qvars = case (tvs, con_qvars con') of
@@ -1221,12 +1214,8 @@ cvtTypeKind ty_str ty
                    ; cxt' <- cvtContext cxt
                    ; ty'  <- cvtType ty
                    ; loc <- getL
-                   ; let hs_ty | null tvs  = rho_ty
-                               | otherwise = L loc (HsForAllTy { hst_bndrs = hsQTvExplicit tvs'
-                                                               , hst_body  = rho_ty })
-                         rho_ty | null cxt  = ty'
-                                | otherwise = L loc (HsQualTy { hst_ctxt = cxt'
-                                                              , hst_body = ty' })
+                   ; let hs_ty  = mkHsForAllTy tvs loc tvs' rho_ty
+                         rho_ty = mkHsQualTy cxt loc cxt' ty'
 
                    ; return hs_ty }
 
@@ -1432,6 +1421,47 @@ unboxedSumChecks alt arity
                       , nest 2 $ text "Sums must have an arity of at least 2" ]
     | otherwise
     = return ()
+
+-- | If passed an empty list of 'TH.TyVarBndr's, this simply returns the
+-- third argument (an 'LHsType'). Otherwise, return an 'HsForAllTy'
+-- using the provided 'LHsQTyVars' and 'LHsType'.
+mkHsForAllTy :: [TH.TyVarBndr]
+             -- ^ The original Template Haskell type variable binders
+             -> SrcSpan
+             -- ^ The location of the returned 'LHsType' if it needs an
+             --   explicit forall
+             -> LHsQTyVars name
+             -- ^ The converted type variable binders
+             -> LHsType name
+             -- ^ The converted rho type
+             -> LHsType name
+             -- ^ The complete type, quantified with a forall if necessary
+mkHsForAllTy tvs loc tvs' rho_ty
+  | null tvs  = rho_ty
+  | otherwise = L loc $ HsForAllTy { hst_bndrs = hsQTvExplicit tvs'
+                                   , hst_body = rho_ty }
+
+-- | If passed an empty 'TH.Cxt', this simply returns the third argument
+-- (an 'LHsType'). Otherwise, return an 'HsQualTy' using the provided
+-- 'LHsContext' and 'LHsType'.
+
+-- It's important that we don't build an HsQualTy if the context is empty,
+-- as the pretty-printer for HsType _always_ prints contexts, even if
+-- they're empty. See Trac #13183.
+mkHsQualTy :: TH.Cxt
+           -- ^ The original Template Haskell context
+           -> SrcSpan
+           -- ^ The location of the returned 'LHsType' if it needs an
+           --   explicit context
+           -> LHsContext name
+           -- ^ The converted context
+           -> LHsType name
+           -- ^ The converted tau type
+           -> LHsType name
+           -- ^ The complete type, qualified with a context if necessary
+mkHsQualTy ctxt loc ctxt' ty
+  | null ctxt = ty
+  | otherwise = L loc $ HsQualTy { hst_ctxt = ctxt', hst_body = ty }
 
 --------------------------------------------------------------------
 --      Turning Name back into RdrName
