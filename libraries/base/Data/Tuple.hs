@@ -11,7 +11,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 --
--- The tuple data types, and associated functions.
+-- Functions associated with the tuple data types.
 --
 -----------------------------------------------------------------------------
 
