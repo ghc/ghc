@@ -43,6 +43,8 @@
   * Add `type family AppendSymbol (m :: Symbol) (n :: Symbol) :: Symbol` to `GHC.TypeLits`
     (#12162)
 
+  * The type of `asProxyTypeOf` in `Data.Proxy` has been generalized (#12805)
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0

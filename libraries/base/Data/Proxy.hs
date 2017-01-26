@@ -113,6 +113,6 @@ instance MonadPlus Proxy
 -- It is usually used as an infix operator, and its typing forces its first
 -- argument (which is usually overloaded) to have the same type as the tag
 -- of the second.
-asProxyTypeOf :: a -> Proxy a -> a
+asProxyTypeOf :: a -> proxy a -> a
 asProxyTypeOf = const
 {-# INLINE asProxyTypeOf #-}
