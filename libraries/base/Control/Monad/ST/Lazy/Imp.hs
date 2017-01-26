@@ -89,12 +89,11 @@ instance Monad (ST s) where
            in
            k_a new_s
 
-{-# NOINLINE runST #-}
 -- | Return the value computed by a state transformer computation.
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
-runST st = case st of ST the_st -> let (r,_) = the_st (S# realWorld#) in r
+runST (ST st) = runRW# (\s -> case st (S# s) of (r, _) -> r)
 
 -- | Allow the result of a state transformer computation to be used (lazily)
 -- inside the computation.
