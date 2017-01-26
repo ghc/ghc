@@ -1142,7 +1142,7 @@ shiftRNegBigNat x@(BN# xba#) n#
   where
     xn# = sizeofBigNat# x
     yn# = xn# -# nlimbs#
-    nlimbs# = quotInt# n# GMP_LIMB_BITS#
+    nlimbs# = quotInt# (n# -# 1#) GMP_LIMB_BITS#
 
 
 orBigNat :: BigNat -> BigNat -> BigNat

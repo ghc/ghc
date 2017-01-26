@@ -105,7 +105,10 @@ integer_gmp_mpn_rshift (mp_limb_t rp[], const mp_limb_t sp[], mp_size_t sn,
 /* Twos-complement version of 'integer_gmp_mpn_rshift' for performing
  * arithmetic right shifts on "negative" MPNs.
  *
- * Same pre-conditions as 'integer_gmp_mpn_rshift'
+ * pre-conditions:
+ *  - 0 < count < sn*GMP_NUMB_BITS
+ *  - rn = sn - floor((count - 1) / GMP_NUMB_BITS)
+ *  - sn > 0
  *
  * This variant is needed to operate on MPNs interpreted as negative
  * numbers, which require "rounding" towards minus infinity iff a
@@ -117,7 +120,7 @@ integer_gmp_mpn_rshift_2c (mp_limb_t rp[], const mp_limb_t sp[],
 {
   const mp_size_t    limb_shift = count / GMP_NUMB_BITS;
   const unsigned int bit_shift  = count % GMP_NUMB_BITS;
-  const mp_size_t    rn         = sn - limb_shift;
+  mp_size_t    rn         = sn - limb_shift;
 
   // whether non-zero bits were shifted out
   bool nz_shift_out = false;
@@ -125,8 +128,13 @@ integer_gmp_mpn_rshift_2c (mp_limb_t rp[], const mp_limb_t sp[],
   if (bit_shift) {
     if (mpn_rshift(rp, &sp[limb_shift], rn, bit_shift))
       nz_shift_out = true;
-  } else
+  } else {
+    // rp was allocated (rn + 1) limbs, to prevent carry
+    // on mpn_add_1 when all the bits of {rp, rn} are 1.
+    memset(&rp[rn], 0, sizeof(mp_limb_t));
     memcpy(rp, &sp[limb_shift], rn*sizeof(mp_limb_t));
+    rn++;
+  }
 
   if (!nz_shift_out)
     for (unsigned i = 0; i < limb_shift; i++)
