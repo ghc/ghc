@@ -18,6 +18,8 @@ test('overloadedrecfldsfail12', [], multimod_compile_fail,
 test('overloadedrecfldsfail13', normal, compile_fail, [''])
 test('overloadedrecfldsfail14', normal, compile_fail, [''])
 test('overloadedlabelsfail01', normal, compile_fail, [''])
+test('overloadedlabelsfail02', normal, compile_fail, [''])
+test('overloadedlabelsfail03', normal, compile_fail, [''])
 test('T11103', normal, compile_fail, [''])
 test('T11167_ambiguous_fixity', [], multimod_compile_fail,
      ['T11167_ambiguous_fixity', ''])

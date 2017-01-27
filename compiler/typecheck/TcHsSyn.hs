@@ -623,8 +623,7 @@ zonkExpr _ e@(HsConLikeOut {}) = return e
 zonkExpr _ (HsIPVar id)
   = return (HsIPVar id)
 
-zonkExpr _ (HsOverLabel l)
-  = return (HsOverLabel l)
+zonkExpr _ e@HsOverLabel{} = return e
 
 zonkExpr env (HsLit (HsRat f ty))
   = do new_ty <- zonkTcTypeToType env ty

@@ -514,7 +514,7 @@ addTickHsExpr e@(HsConLikeOut con)
   | Just id <- conLikeWrapId_maybe con = do freeVar id; return e
 addTickHsExpr e@(HsIPVar _)      = return e
 addTickHsExpr e@(HsOverLit _)    = return e
-addTickHsExpr e@(HsOverLabel _)  = return e
+addTickHsExpr e@(HsOverLabel{})  = return e
 addTickHsExpr e@(HsLit _)        = return e
 addTickHsExpr (HsLam matchgroup) = liftM HsLam (addTickMatchGroup True matchgroup)
 addTickHsExpr (HsLamCase mgs)    = liftM HsLamCase (addTickMatchGroup True mgs)

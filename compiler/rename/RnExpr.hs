@@ -126,8 +126,12 @@ rnExpr (HsVar (L l v))
 rnExpr (HsIPVar v)
   = return (HsIPVar v, emptyFVs)
 
-rnExpr (HsOverLabel v)
-  = return (HsOverLabel v, emptyFVs)
+rnExpr (HsOverLabel _ v)
+  = do { rebindable_on <- xoptM LangExt.RebindableSyntax
+       ; if rebindable_on
+         then do { fromLabel <- lookupOccRn (mkVarUnqual (fsLit "fromLabel"))
+                 ; return (HsOverLabel (Just fromLabel) v, unitFV fromLabel) }
+         else return (HsOverLabel Nothing v, emptyFVs) }
 
 rnExpr (HsLit lit@(HsString src s))
   = do { opt_OverloadedStrings <- xoptM LangExt.OverloadedStrings

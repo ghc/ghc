@@ -5,4 +5,4 @@ import GHC.OverloadedLabels
 import Language.Haskell.TH
 
 instance IsLabel x (Q [Dec]) where
-  fromLabel _ = [d| main = putStrLn "Ok" |]
+  fromLabel = [d| main = putStrLn "Ok" |]

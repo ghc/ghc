@@ -20,7 +20,7 @@ import Data.Proxy ( Proxy(..) )
 import GHC.TypeLits ( Symbol )
 
 instance x ~ y => IsLabel x (Proxy y) where
-  fromLabel _ = Proxy
+  fromLabel = Proxy
 
 data Elem (x :: Symbol) g where
   Top :: Elem x (x ': g)
@@ -45,7 +45,7 @@ data Tm g where
 deriving instance Show (Tm g)
 
 instance IsElem x g => IsLabel x (Tm g) where
-  fromLabel _ = Var (which :: Elem x g)
+  fromLabel = Var (which :: Elem x g)
 
 lam :: Proxy x -> Tm (x ': g) -> Tm g
 lam _ = Lam

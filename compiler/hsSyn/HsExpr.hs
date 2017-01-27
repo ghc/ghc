@@ -293,9 +293,9 @@ data HsExpr id
   | HsRecFld (AmbiguousFieldOcc id) -- ^ Variable pointing to record selector
                                     -- Not in use after typechecking
 
-  | HsOverLabel FastString   -- ^ Overloaded label (See Note [Overloaded labels]
-                             --   in GHC.OverloadedLabels)
-                             --   NB: Not in use after typechecking
+  | HsOverLabel (Maybe id) FastString
+     -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
+     --   NB: Not in use after typechecking
 
   | HsIPVar   HsIPName       -- ^ Implicit parameter (not in use after typechecking)
   | HsOverLit (HsOverLit id) -- ^ Overloaded literals
@@ -819,7 +819,7 @@ ppr_expr (HsVar (L _ v))  = pprPrefixOcc v
 ppr_expr (HsUnboundVar uv)= pprPrefixOcc (unboundVarOcc uv)
 ppr_expr (HsConLikeOut c) = pprPrefixOcc c
 ppr_expr (HsIPVar v)      = ppr v
-ppr_expr (HsOverLabel l)  = char '#' <> ppr l
+ppr_expr (HsOverLabel _ l)= char '#' <> ppr l
 ppr_expr (HsLit lit)      = ppr lit
 ppr_expr (HsOverLit lit)  = ppr lit
 ppr_expr (HsPar e)        = parens (ppr_lexpr e)

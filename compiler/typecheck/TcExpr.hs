@@ -60,7 +60,6 @@ import TysWiredIn
 import TysPrim( intPrimTy )
 import PrimOp( tagToEnumKey )
 import PrelNames
-import MkId ( proxyHashId )
 import DynFlags
 import SrcLoc
 import Util
@@ -216,21 +215,28 @@ tcExpr e@(HsIPVar x) res_ty
                           unwrapIP $ mkClassPred ipClass [x,ty]
   origin = IPOccOrigin x
 
-tcExpr e@(HsOverLabel l) res_ty  -- See Note [Type-checking overloaded labels]
-  = do { isLabelClass <- tcLookupClass isLabelClassName
-       ; alpha <- newOpenFlexiTyVarTy
-       ; let lbl = mkStrLitTy l
-             pred = mkClassPred isLabelClass [lbl, alpha]
-       ; loc <- getSrcSpanM
-       ; var <- emitWantedEvVar origin pred
-       ; let proxy_arg = L loc (mkHsWrap (mkWpTyApps [typeSymbolKind, lbl])
-                                         (HsVar (L loc proxyHashId)))
-             tm = L loc (fromDict pred (HsVar (L loc var))) `HsApp` proxy_arg
-       ; tcWrapResult e tm alpha res_ty }
+tcExpr e@(HsOverLabel mb_fromLabel l) res_ty
+  = do { -- See Note [Type-checking overloaded labels]
+         loc <- getSrcSpanM
+       ; case mb_fromLabel of
+           Just fromLabel -> tcExpr (applyFromLabel loc fromLabel) res_ty
+           Nothing -> do { isLabelClass <- tcLookupClass isLabelClassName
+                         ; alpha <- newFlexiTyVarTy liftedTypeKind
+                         ; let pred = mkClassPred isLabelClass [lbl, alpha]
+                         ; loc <- getSrcSpanM
+                         ; var <- emitWantedEvVar origin pred
+                         ; tcWrapResult e (fromDict pred (HsVar (L loc var)))
+                                        alpha res_ty } }
   where
-  -- Coerces a dictionary for `IsLabel "x" t` into `Proxy# x -> t`.
+  -- Coerces a dictionary for `IsLabel "x" t` into `t`,
+  -- or `HasField "x" r a into `r -> a`.
   fromDict pred = HsWrap $ mkWpCastR $ unwrapIP pred
   origin = OverLabelOrigin l
+  lbl = mkStrLitTy l
+
+  applyFromLabel loc fromLabel =
+    L loc (HsVar (L loc fromLabel)) `HsAppType`
+      mkEmptyWildCardBndrs (L loc (HsTyLit (HsStrTy NoSourceText l)))
 
 tcExpr (HsLam match) res_ty
   = do  { (match', wrap) <- tcMatchLambda herald match_ctxt match res_ty
@@ -265,19 +271,27 @@ tcExpr e@(ExprWithTySig expr sig_ty) res_ty
 {-
 Note [Type-checking overloaded labels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Recall that (in GHC.OverloadedLabels) we have
+Recall that we have
 
+  module GHC.OverloadedLabels where
     class IsLabel (x :: Symbol) a where
-      fromLabel :: Proxy# x -> a
+      fromLabel :: a
 
-When we see an overloaded label like `#foo`, we generate a fresh
-variable `alpha` for the type and emit an `IsLabel "foo" alpha`
-constraint.  Because the `IsLabel` class has a single method, it is
-represented by a newtype, so we can coerce `IsLabel "foo" alpha` to
-`Proxy# "foo" -> alpha` (just like for implicit parameters).  We then
-apply it to `proxy#` of type `Proxy# "foo"`.
+We translate `#foo` to `fromLabel @"foo"`, where we use
 
-That is, we translate `#foo` to `fromLabel (proxy# :: Proxy# "foo")`.
+ * the in-scope `fromLabel` if `RebindableSyntax` is enabled; or if not
+ * `GHC.OverloadedLabels.fromLabel`.
+
+In the `RebindableSyntax` case, the renamer will have filled in the
+first field of `HsOverLabel` with the `fromLabel` function to use, and
+we simply apply it to the appropriate visible type argument.
+
+In the `OverloadedLabels` case, when we see an overloaded label like
+`#foo`, we generate a fresh variable `alpha` for the type and emit an
+`IsLabel "foo" alpha` constraint.  Because the `IsLabel` class has a
+single method, it is represented by a newtype, so we can coerce
+`IsLabel "foo" alpha` to `alpha` (just like for implicit parameters).
+
 -}
 
 
