@@ -1525,12 +1525,26 @@ isPredTy ty = go ty []
     go_k k [] = isConstraintKind k
     go_k k (arg:args) = case piResultTy_maybe k arg of
                           Just k' -> go_k k' args
-                          Nothing -> pprTrace "isPredTy" (ppr ty)
+                          Nothing -> WARN( True, text "isPredTy" <+> ppr ty )
                                      False
-       -- This last case should not happen; but it does if we
-       -- we call isPredTy during kind checking, especially if
-       -- there is actually a kind error.  Example that showed
-       -- this up: polykinds/T11399
+       -- This last case shouldn't happen under most circumstances. It can
+       -- occur if we call isPredTy during kind checking, especially if one
+       -- of the following happens:
+       --
+       -- 1. There is actually a kind error.  Example in which this showed up:
+       --    polykinds/T11399
+       -- 2. A type constructor application appears to be oversaturated. An
+       --    example of this occurred in GHC Trac #13187:
+       --
+       --      {-# LANGUAGE PolyKinds #-}
+       --      type Const a b = b
+       --      f :: Const Int (,) Bool Char -> Char
+       --
+       --    This code is actually fine, since Const is polymorphic in its
+       --    return kind. It does show that isPredTy could possibly report a
+       --    false negative if a constraint is similarly oversaturated, but
+       --    it's hard to do better than isPredTy currently does without
+       --    zonking, so we punt on such cases for now.
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
