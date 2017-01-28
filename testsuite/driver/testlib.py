@@ -1893,26 +1893,41 @@ def find_expected_file(name, suff):
 
 if config.msys:
     import stat
+    import time
     def cleanup():
         testdir = getTestOpts().testdir
-
+        max_attemps = 5
+        retries = max_attemps
         def on_error(function, path, excinfo):
             # At least one test (T11489) removes the write bit from a file it
             # produces. Windows refuses to delete read-only files with a
             # permission error. Try setting the write bit and try again.
-            if excinfo[1].errno == 13:
-                os.chmod(path, stat.S_IWRITE)
-                function(path)
+            os.chmod(path, stat.S_IWRITE)
+            function(path)
 
-        shutil.rmtree(testdir, ignore_errors=False, onerror=on_error)
+        # On Windows we have to retry the delete a couple of times.
+        # The reason for this is that a FileDelete command just marks a
+        # file for deletion. The file is really only removed when the last
+        # handle to the file is closed. Unfortunately there are a lot of
+        # system services that can have a file temporarily opened using a shared
+        # readonly lock, such as the built in AV and search indexer.
+        #
+        # We can't really guarantee that these are all off, so what we can do is
+        # whenever after a rmtree the folder still exists to try again and wait a bit.
+        #
+        # Based on what I've seen from the tests on CI server, is that this is relatively rare.
+        # So overall we won't be retrying a lot. If after a reasonable amount of time the folder is
+        # still locked then abort the current test by throwing an exception, this so it won't fail
+        # with an even more cryptic error.
+        #
+        # See Trac #13162
+        while retries > 0 and os.path.exists(testdir):
+            time.sleep((max_attemps-retries)*6)
+            shutil.rmtree(testdir, onerror=on_error, ignore_errors=False)
+            retries=-1
 
-        if os.path.exists(testdir):
-            # And now we try to cleanup the folder again, since the above
-            # Would have removed the problematic file(s), but not the folder.
-            # The onerror doesn't seem to be raised during the tree walk, only
-            # afterwards to report the failures.
-            # See https://bugs.python.org/issue8523 and https://bugs.python.org/issue19643
-            shutil.rmtree(testdir, ignore_errors=False)
+        if retries == 0 and os.path.exists(testdir):
+            raise Exception("Unable to remove folder '" + testdir + "'. Unable to start current test.")
 else:
     def cleanup():
         testdir = getTestOpts().testdir
