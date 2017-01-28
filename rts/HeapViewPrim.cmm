@@ -1,0 +1,53 @@
+#include "Cmm.h"
+
+aToWordzh (P_ clos)
+{
+    return (clos);
+}
+
+slurpClosurezh ( P_ closure )
+{
+    W_ info, ptrs, nptrs, p, ptrs_arr, dat_arr;
+    info  = %GET_STD_INFO(UNTAG(closure));
+
+    ptrs  = TO_W_(%INFO_PTRS(info));
+    nptrs = TO_W_(%INFO_NPTRS(info));
+
+    W_ clos;
+    clos = UNTAG(closure);
+
+    W_ len;
+    (len) = foreign "C" gtc_heap_view_closureSize(clos "ptr");
+
+    W_ ptrs_arr_sz, ptrs_arr_cards, dat_arr_sz;
+    dat_arr_sz = SIZEOF_StgArrBytes + WDS(len);
+
+    ALLOC_PRIM_P (dat_arr_sz, slurpClosurezh, closure);
+
+    dat_arr = Hp - dat_arr_sz + WDS(1);
+
+
+    SET_HDR(dat_arr, stg_ARR_WORDS_info, CCCS);
+    StgArrBytes_bytes(dat_arr) = WDS(len);
+    p = 0;
+for:
+    if(p < len) {
+         W_[BYTE_ARR_CTS(dat_arr) + WDS(p)] = W_[clos + WDS(p)];
+         p = p + 1;
+         goto for;
+    }
+
+    W_ ptrArray;
+
+    ("ptr" ptrArray) = foreign "C" gtc_heap_view_closurePtrs(MyCapability() "ptr", clos "ptr");
+
+    return (info, dat_arr, ptrArray);
+}
+
+
+reallyUnsafePtrEqualityUpToTag (W_ clos1, W_  clos2)
+{
+    clos1 = UNTAG(clos1);
+    clos2 = UNTAG(clos2);
+    return (clos1 == clos2);
+}
