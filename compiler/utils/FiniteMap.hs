@@ -24,6 +24,6 @@ deleteList :: Ord key => [key] -> Map key elt -> Map key elt
 deleteList ks m = foldl (flip Map.delete) m ks
 
 foldRight        :: (elt -> a -> a) -> a -> Map key elt -> a
-foldRight        = Map.fold
+foldRight        = Map.foldr
 foldRightWithKey :: (key -> elt -> a -> a) -> a -> Map key elt -> a
 foldRightWithKey = Map.foldrWithKey

@@ -360,10 +360,10 @@ mapUDFM :: (elt1 -> elt2) -> UniqDFM elt1 -> UniqDFM elt2
 mapUDFM f (UDFM m i) = UDFM (M.map (fmap f) m) i
 
 anyUDFM :: (elt -> Bool) -> UniqDFM elt -> Bool
-anyUDFM p (UDFM m _i) = M.fold ((||) . p . taggedFst) False m
+anyUDFM p (UDFM m _i) = M.foldr ((||) . p . taggedFst) False m
 
 allUDFM :: (elt -> Bool) -> UniqDFM elt -> Bool
-allUDFM p (UDFM m _i) = M.fold ((&&) . p . taggedFst) True m
+allUDFM p (UDFM m _i) = M.foldr ((&&) . p . taggedFst) True m
 
 instance Monoid (UniqDFM a) where
   mempty = emptyUDFM
