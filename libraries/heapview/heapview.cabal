@@ -1,6 +1,6 @@
 name:           heapview
 version:        1.0.0.0
--- NOTE: Don't forget to update ./changelog.md
+
 license:        BSD3
 license-file:   LICENSE
 maintainer:     libraries@haskell.org
@@ -36,14 +36,15 @@ library
     UnboxedTuples
     UnliftedFFITypes
 
-  build-depends: rts          == 1.0.*
-               , ghc-prim     == 0.5.0.0
-               , base         >= 4.9.0 && < 4.11
-               , binary       >= 0.5 && < 0.9
-               , bytestring   >= 0.10.6.0
-               , containers   >= 0.5 && < 0.6
-               , deepseq      >= 1.4
-               , transformers >= 0.2 && < 0.6
+  build-depends: rts              == 1.0.*
+               , ghc-prim         == 0.5.0.0
+               , base             >= 4.9.0 && < 4.11
+               , binary           >= 0.5 && < 0.9
+               , bytestring       >= 0.10.6.0
+               , containers       >= 0.5 && < 0.6
+               , deepseq          >= 1.4
+               , template-haskell == 2.12.*
+               , transformers     >= 0.2 && < 0.6
 
   ghc-options: -Wall
 

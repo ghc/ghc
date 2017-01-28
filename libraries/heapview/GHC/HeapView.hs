@@ -69,7 +69,12 @@ import Data.Foldable    ( Foldable )
 import qualified Data.Foldable as F
 import Data.Traversable ( Traversable )
 import qualified Data.Traversable as T
+import qualified Data.IntMap as M
 import Control.Monad
+import Control.Monad.Trans.State
+import Control.Monad.Trans.Class
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Writer.Strict
 import Control.Exception.Base (evaluate)
 
 import GHC.Disassembler
@@ -201,67 +206,72 @@ sizeOfPointee addr = sizeOf (typeHack addr)
    Needs to be synchronized with
    <http://hackage.haskell.org/trac/ghc/browser/includes/rts/storage/ClosureTypes.h>
  -}
-data ClosureType =
-          INVALID_OBJECT
-        | CONSTR
-        | CONSTR_1_0
-        | CONSTR_0_1
-        | CONSTR_2_0
-        | CONSTR_1_1
-        | CONSTR_0_2
-        | CONSTR_STATIC
-        | CONSTR_NOCAF_STATIC
-        | FUN
-        | FUN_1_0
-        | FUN_0_1
-        | FUN_2_0
-        | FUN_1_1
-        | FUN_0_2
-        | FUN_STATIC
-        | THUNK
-        | THUNK_1_0
-        | THUNK_0_1
-        | THUNK_2_0
-        | THUNK_1_1
-        | THUNK_0_2
-        | THUNK_STATIC
-        | THUNK_SELECTOR
-        | BCO
-        | AP
-        | PAP
-        | AP_STACK
-        | IND
-        | IND_PERM
-        | IND_STATIC
-        | RET_BCO
-        | RET_SMALL
-        | RET_BIG
-        | RET_FUN
-        | UPDATE_FRAME
-        | CATCH_FRAME
-        | UNDERFLOW_FRAME
-        | STOP_FRAME
-        | BLOCKING_QUEUE
-        | BLACKHOLE
-        | MVAR_CLEAN
-        | MVAR_DIRTY
-        | ARR_WORDS
-        | MUT_ARR_PTRS_CLEAN
-        | MUT_ARR_PTRS_DIRTY
-        | MUT_ARR_PTRS_FROZEN0
-        | MUT_ARR_PTRS_FROZEN
-        | MUT_VAR_CLEAN
-        | MUT_VAR_DIRTY
-        | WEAK
-        | PRIM
-        | MUT_PRIM
-        | TSO
-        | STACK
-        | TREC_CHUNK
-        | ATOMICALLY_FRAME
-        | CATCH_RETRY_FRAME
-        | CATCH_STM_FRAME
-        | WHITEHOLE
+data ClosureType
+    = INVALID_OBJECT
+    | CONSTR
+    | CONSTR_1_0
+    | CONSTR_0_1
+    | CONSTR_2_0
+    | CONSTR_1_1
+    | CONSTR_0_2
+    | CONSTR_NOCAF
+    | FUN
+    | FUN_1_0
+    | FUN_0_1
+    | FUN_2_0
+    | FUN_1_1
+    | FUN_0_2
+    | FUN_STATIC
+    | THUNK
+    | THUNK_1_0
+    | THUNK_0_1
+    | THUNK_2_0
+    | THUNK_1_1
+    | THUNK_0_2
+    | THUNK_STATIC
+    | THUNK_SELECTOR
+    | BCO
+    | AP
+    | PAP
+    | AP_STACK
+    | IND
+    | IND_STATIC
+    | RET_BCO
+    | RET_SMALL
+    | RET_BIG
+    | RET_FUN
+    | UPDATE_FRAME
+    | CATCH_FRAME
+    | UNDERFLOW_FRAME
+    | STOP_FRAME
+    | BLOCKING_QUEUE
+    | BLACKHOLE
+    | MVAR_CLEAN
+    | MVAR_DIRTY
+    | TVAR
+    | ARR_WORDS
+    | MUT_ARR_PTRS_CLEAN
+    | MUT_ARR_PTRS_DIRTY
+    | MUT_ARR_PTRS_FROZEN0
+    | MUT_ARR_PTRS_FROZEN
+    | MUT_VAR_CLEAN
+    | MUT_VAR_DIRTY
+    | WEAK
+    | PRIM
+    | MUT_PRIM
+    | TSO
+    | STACK
+    | TREC_CHUNK
+    | ATOMICALLY_FRAME
+    | CATCH_RETRY_FRAME
+    | CATCH_STM_FRAME
+    | WHITEHOLE
+    | SMALL_MUT_ARR_PTRS_CLEAN
+    | SMALL_MUT_ARR_PTRS_DIRTY
+    | SMALL_MUT_ARR_PTRS_FROZEN0
+    | SMALL_MUT_ARR_PTRS_FROZEN
+    | COMPACT_NFDATA
+    | N_CLOSURE_TYPES
  deriving (Show, Eq, Enum, Ord)
 
 {-| This is the main data type of this module, representing a Haskell value on
@@ -271,106 +281,106 @@ data ClosureType =
   The data type is parametrized by the type to store references in, which
   is usually a 'Box' with appropriate type synonym 'Closure'.
  -}
-data GenClosure b =
-    ConsClosure {
-        info         :: StgInfoTable
+data GenClosure b
+  = ConsClosure
+        { info       :: StgInfoTable
         , ptrArgs    :: [b]
         , dataArgs   :: [Word]
         , pkg        :: String
         , modl       :: String
         , name       :: String
-    } |
-    ThunkClosure {
-        info         :: StgInfoTable
+        }
+  | ThunkClosure
+        { info       :: StgInfoTable
         , ptrArgs    :: [b]
         , dataArgs   :: [Word]
-    } |
-    SelectorClosure {
-        info         :: StgInfoTable
+        }
+  | SelectorClosure
+        { info       :: StgInfoTable
         , selectee   :: b
-    } |
-    IndClosure {
-        info         :: StgInfoTable
+        }
+  | IndClosure
+        { info       :: StgInfoTable
         , indirectee   :: b
-    } |
-    BlackholeClosure {
-        info         :: StgInfoTable
+        }
+  | BlackholeClosure
+        { info       :: StgInfoTable
         , indirectee   :: b
-    } |
+        }
     -- In GHCi, if Linker.h would allow a reverse lookup, we could for exported
     -- functions fun actually find the name here.
     -- At least the other direction works via "lookupSymbol
     -- base_GHCziBase_zpzp_closure" and yields the same address (up to tags)
-    APClosure {
-        info         :: StgInfoTable
+  | APClosure
+        { info       :: StgInfoTable
         , arity      :: HalfWord
         , n_args     :: HalfWord
         , fun        :: b
         , payload    :: [b]
-    } |
-    PAPClosure {
-        info         :: StgInfoTable
+        }
+  | PAPClosure
+        { info       :: StgInfoTable
         , arity      :: HalfWord
         , n_args     :: HalfWord
         , fun        :: b
         , payload    :: [b]
-    } |
-    APStackClosure {
-        info         :: StgInfoTable
+        }
+  | APStackClosure
+        { info       :: StgInfoTable
         , fun        :: b
         , payload    :: [b]
-    } |
-    BCOClosure {
-        info         :: StgInfoTable
+        }
+  | BCOClosure
+        { info       :: StgInfoTable
         , instrs     :: b
         , literals   :: b
         , bcoptrs    :: b
         , arity      :: HalfWord
         , size       :: HalfWord
         , bitmap     :: Word
-    } |
-    ArrWordsClosure {
-        info         :: StgInfoTable
+        }
+  | ArrWordsClosure
+        { info       :: StgInfoTable
         , bytes      :: Word
         , arrWords   :: [Word]
-    } |
-    MutArrClosure {
-        info         :: StgInfoTable
+        }
+  | MutArrClosure
+        { info       :: StgInfoTable
         , mccPtrs    :: Word
         , mccSize    :: Word
         , mccPayload :: [b]
         -- Card table ignored
-    } |
-    MutVarClosure {
-        info         :: StgInfoTable
+        }
+  | MutVarClosure
+        { info       :: StgInfoTable
         , var        :: b
-    } |
-    MVarClosure {
-        info         :: StgInfoTable
+        }
+  | MVarClosure
+        { info       :: StgInfoTable
         , queueHead  :: b
         , queueTail  :: b
         , value      :: b
-    } |
-    FunClosure {
-        info         :: StgInfoTable
+        }
+  | FunClosure
+        { info       :: StgInfoTable
         , ptrArgs    :: [b]
         , dataArgs   :: [Word]
-    } |
-    BlockingQueueClosure {
-        info         :: StgInfoTable
+        }
+  | BlockingQueueClosure
+        { info       :: StgInfoTable
         , link       :: b
         , blackHole  :: b
         , owner      :: b
         , queue      :: b
-    } |
-    OtherClosure {
-        info         :: StgInfoTable
+        }
+  | OtherClosure
+        { info       :: StgInfoTable
         , hvalues    :: [b]
         , rawWords   :: [Word]
-    } |
-    UnsupportedClosure {
-        info         :: StgInfoTable
-    }
+        }
+  | UnsupportedClosure
+        { info       :: StgInfoTable
+        }
  deriving (Show, Functor, Foldable, Traversable)
 
 
@@ -511,7 +521,7 @@ getClosureData x = do
     (iptr, wds, ptrs) <- getClosureRaw x
     itbl <- peek iptr
     case tipe itbl of
-        t | t >= CONSTR && t <= CONSTR_NOCAF_STATIC -> do
+        t | t >= CONSTR && t <= CONSTR_NOCAF -> do
             (pkg, modl, name) <- dataConInfoPtrToNames iptr
             if modl == "ByteCodeInstr" && name == "BreakInfo"
               then return $ UnsupportedClosure itbl

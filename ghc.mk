@@ -464,6 +464,7 @@ PACKAGES_STAGE1 += template-haskell
 PACKAGES_STAGE1 += hoopl
 PACKAGES_STAGE1 += transformers
 PACKAGES_STAGE1 += compact
+PACKAGES_STAGE1 += heapview
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
