@@ -83,8 +83,8 @@ instance Show Box where
 -- after garbage collection, become the same object.
 areBoxesEqual :: Box -> Box -> IO Bool
 areBoxesEqual (Box a) (Box b) = case reallyUnsafePtrEqualityUpToTag# a b of
-    0# -> return False
-    _  -> return True
+    0# -> pure False
+    _  -> pure True
 
 
 {-|
@@ -113,10 +113,10 @@ asBox x = Box (unsafeCoerce# x)
    provided here does _not_ support writing.
  -}
 data StgInfoTable = StgInfoTable {
-   ptrs   :: HalfWord,
-   nptrs  :: HalfWord,
-   cltype :: ClosureType,
-   srtlen :: HalfWord
+   ptrs   :: !HalfWord,
+   nptrs  :: !HalfWord,
+   cltype :: !ClosureType,
+   srtlen :: !HalfWord
   }
   deriving (Show)
 
@@ -256,103 +256,103 @@ data ClosureType
  -}
 data GenClosure b
   = ConsClosure
-        { info       :: StgInfoTable
-        , ptrArgs    :: [b]
-        , dataArgs   :: [Word]
-        , pkg        :: String
-        , modl       :: String
-        , name       :: String
+        { info       :: !StgInfoTable
+        , ptrArgs    :: ![b]
+        , dataArgs   :: ![Word]
+        , pkg        :: !String
+        , modl       :: !String
+        , name       :: !String
         }
   | ThunkClosure
-        { info       :: StgInfoTable
-        , ptrArgs    :: [b]
-        , dataArgs   :: [Word]
+        { info       :: !StgInfoTable
+        , ptrArgs    :: ![b]
+        , dataArgs   :: ![Word]
         }
   | SelectorClosure
-        { info       :: StgInfoTable
-        , selectee   :: b
+        { info       :: !StgInfoTable
+        , selectee   :: !b
         }
   | IndClosure
-        { info       :: StgInfoTable
-        , indirectee   :: b
+        { info       :: !StgInfoTable
+        , indirectee :: !b
         }
   | BlackholeClosure
-        { info       :: StgInfoTable
-        , indirectee   :: b
+        { info       :: !StgInfoTable
+        , indirectee :: !b
         }
     -- In GHCi, if Linker.h would allow a reverse lookup, we could for exported
     -- functions fun actually find the name here.
     -- At least the other direction works via "lookupSymbol
     -- base_GHCziBase_zpzp_closure" and yields the same address (up to tags)
   | APClosure
-        { info       :: StgInfoTable
-        , arity      :: HalfWord
-        , n_args     :: HalfWord
-        , fun        :: b
-        , payload    :: [b]
+        { info       :: !StgInfoTable
+        , arity      :: !HalfWord
+        , n_args     :: !HalfWord
+        , fun        :: !b
+        , payload    :: ![b]
         }
   | PAPClosure
-        { info       :: StgInfoTable
-        , arity      :: HalfWord
-        , n_args     :: HalfWord
-        , fun        :: b
-        , payload    :: [b]
+        { info       :: !StgInfoTable
+        , arity      :: !HalfWord
+        , n_args     :: !HalfWord
+        , fun        :: !b
+        , payload    :: ![b]
         }
   | APStackClosure
-        { info       :: StgInfoTable
-        , fun        :: b
-        , payload    :: [b]
+        { info       :: !StgInfoTable
+        , fun        :: !b
+        , payload    :: ![b]
         }
   | BCOClosure
-        { info       :: StgInfoTable
-        , instrs     :: b
-        , literals   :: b
-        , bcoptrs    :: b
-        , arity      :: HalfWord
-        , size       :: HalfWord
-        , bitmap     :: Word
+        { info       :: !StgInfoTable
+        , instrs     :: !b
+        , literals   :: !b
+        , bcoptrs    :: !b
+        , arity      :: !HalfWord
+        , size       :: !HalfWord
+        , bitmap     :: !Word
         }
   | ArrWordsClosure
-        { info       :: StgInfoTable
-        , bytes      :: Word
-        , arrWords   :: [Word]
+        { info       :: !StgInfoTable
+        , bytes      :: !Word
+        , arrWords   :: ![Word]
         }
   | MutArrClosure
-        { info       :: StgInfoTable
-        , mccPtrs    :: Word
-        , mccSize    :: Word
-        , mccPayload :: [b]
+        { info       :: !StgInfoTable
+        , mccPtrs    :: !Word
+        , mccSize    :: !Word
+        , mccPayload :: ![b]
         -- Card table ignored
         }
   | MutVarClosure
-        { info       :: StgInfoTable
-        , var        :: b
+        { info       :: !StgInfoTable
+        , var        :: !b
         }
   | MVarClosure
-        { info       :: StgInfoTable
-        , queueHead  :: b
-        , queueTail  :: b
-        , value      :: b
+        { info       :: !StgInfoTable
+        , queueHead  :: !b
+        , queueTail  :: !b
+        , value      :: !b
         }
   | FunClosure
-        { info       :: StgInfoTable
-        , ptrArgs    :: [b]
-        , dataArgs   :: [Word]
+        { info       :: !StgInfoTable
+        , ptrArgs    :: ![b]
+        , dataArgs   :: ![Word]
         }
   | BlockingQueueClosure
-        { info       :: StgInfoTable
-        , link       :: b
-        , blackHole  :: b
-        , owner      :: b
-        , queue      :: b
+        { info       :: !StgInfoTable
+        , link       :: !b
+        , blackHole  :: !b
+        , owner      :: !b
+        , queue      :: !b
         }
   | OtherClosure
-        { info       :: StgInfoTable
-        , hvalues    :: [b]
-        , rawWords   :: [Word]
+        { info       :: !StgInfoTable
+        , hvalues    :: ![b]
+        , rawWords   :: ![Word]
         }
   | UnsupportedClosure
-        { info       :: StgInfoTable
+        { info       :: !StgInfoTable
         }
  deriving (Show, Functor, Foldable, Traversable)
 
@@ -406,7 +406,7 @@ getClosureRaw x =
             void $ evaluate nelems
             -- The following deep evaluation is crucial to avoid crashes (but why)?
             mapM_ evaluate rawWords
-            return (Ptr iptr, rawWords, ptrList)
+            pure (Ptr iptr, rawWords, ptrList)
 
 -- From compiler/ghci/RtClosureInspect.hs
 amap' :: (t -> b) -> Array Int t -> [b]
@@ -421,7 +421,7 @@ dataConInfoPtrToNames ptr = do
     conDescAddress <- getConDescAddress ptr
     wl <- peekArray0 0 conDescAddress
     let (pkg, modl, name) = parse wl
-    return (b2s pkg, b2s modl, b2s name)
+    pure (b2s pkg, b2s modl, b2s name)
   where
     b2s :: [Word8] -> String
     b2s = fmap (chr . fromIntegral)
@@ -430,7 +430,7 @@ dataConInfoPtrToNames ptr = do
     getConDescAddress ptr'
       | True = do
           offsetToString <- peek (ptr' `plusPtr` (negate wORD_SIZE))
-          return $ (ptr' `plusPtr` stdInfoTableSizeB)
+          pure $ (ptr' `plusPtr` stdInfoTableSizeB)
                     `plusPtr` (fromIntegral (offsetToString :: Word))
     -- This is code for !ghciTablesNextToCode:
     {-
@@ -497,21 +497,21 @@ getClosureData x = do
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
             (pkg, modl, name) <- dataConInfoPtrToNames iptr
             if modl == "ByteCodeInstr" && name == "BreakInfo"
-              then return $ UnsupportedClosure itbl
-              else return $ ConsClosure itbl ptrs (drop (length ptrs + 1) wds) pkg modl name
+              then pure $ UnsupportedClosure itbl
+              else pure $ ConsClosure itbl ptrs (drop (length ptrs + 1) wds) pkg modl name
 
         t | t >= THUNK && t <= THUNK_STATIC -> do
-            return $ ThunkClosure itbl ptrs (drop (length ptrs + 2) wds)
+            pure $ ThunkClosure itbl ptrs (drop (length ptrs + 2) wds)
 
         t | t >= FUN && t <= FUN_STATIC -> do
-            return $ FunClosure itbl ptrs (drop (length ptrs + 1) wds)
+            pure $ FunClosure itbl ptrs (drop (length ptrs + 1) wds)
 
         AP -> do
             unless (length ptrs >= 1) $
                 fail "Expected at least 1 ptr argument to AP"
             unless (length wds >= 3) $
                 fail "Expected at least 3 raw words to AP"
-            return $ APClosure itbl
+            pure $ APClosure itbl
                 (fromIntegral $ wds !! 2)
                 (fromIntegral $ shiftR (wds !! 2) (wORD_SIZE_IN_BITS `div` 2))
                 (head ptrs) (tail ptrs)
@@ -521,7 +521,7 @@ getClosureData x = do
                 fail "Expected at least 1 ptr argument to PAP"
             unless (length wds >= 3) $
                 fail "Expected at least 3 raw words to AP"
-            return $ PAPClosure itbl
+            pure $ PAPClosure itbl
                 (fromIntegral $ wds !! 2)
                 (fromIntegral $ shiftR (wds !! 2) (wORD_SIZE_IN_BITS `div` 2))
                 (head ptrs) (tail ptrs)
@@ -529,32 +529,32 @@ getClosureData x = do
         AP_STACK -> do
             unless (length ptrs >= 1) $
                 fail "Expected at least 1 ptr argument to AP_STACK"
-            return $ APStackClosure itbl (head ptrs) (tail ptrs)
+            pure $ APStackClosure itbl (head ptrs) (tail ptrs)
 
         THUNK_SELECTOR -> do
             unless (length ptrs >= 1) $
                 fail "Expected at least 1 ptr argument to THUNK_SELECTOR"
-            return $ SelectorClosure itbl (head ptrs)
+            pure $ SelectorClosure itbl (head ptrs)
 
         IND -> do
             unless (length ptrs >= 1) $
                 fail "Expected at least 1 ptr argument to IND"
-            return $ IndClosure itbl (head ptrs)
+            pure $ IndClosure itbl (head ptrs)
         IND_STATIC -> do
             unless (length ptrs >= 1) $
                 fail "Expected at least 1 ptr argument to IND_STATIC"
-            return $ IndClosure itbl (head ptrs)
+            pure $ IndClosure itbl (head ptrs)
         BLACKHOLE -> do
             unless (length ptrs >= 1) $
                 fail "Expected at least 1 ptr argument to BLACKHOLE"
-            return $ BlackholeClosure itbl (head ptrs)
+            pure $ BlackholeClosure itbl (head ptrs)
 
         BCO -> do
             unless (length ptrs >= 3) $
                 fail $ "Expected at least 3 ptr argument to BCO, found " ++ show (length ptrs)
             unless (length wds >= 6) $
                 fail $ "Expected at least 6 words to BCO, found " ++ show (length wds)
-            return $ BCOClosure itbl (ptrs !! 0) (ptrs !! 1) (ptrs !! 2)
+            pure $ BCOClosure itbl (ptrs !! 0) (ptrs !! 1) (ptrs !! 2)
                 (fromIntegral $ wds !! 4)
                 (fromIntegral $ shiftR (wds !! 4) (wORD_SIZE_IN_BITS `div` 2))
                 (wds !! 5)
@@ -562,30 +562,30 @@ getClosureData x = do
         ARR_WORDS -> do
             unless (length wds >= 2) $
                 fail $ "Expected at least 2 words to ARR_WORDS, found " ++ show (length wds)
-            return $ ArrWordsClosure itbl (wds !! 1) (drop 2 wds)
+            pure $ ArrWordsClosure itbl (wds !! 1) (drop 2 wds)
 
         t | t == MUT_ARR_PTRS_FROZEN || t == MUT_ARR_PTRS_FROZEN0 -> do
             unless (length wds >= 3) $
                 fail $ "Expected at least 3 words to MUT_ARR_PTRS_FROZEN0 found " ++ show (length wds)
-            return $ MutArrClosure itbl (wds !! 1) (wds !! 2) ptrs
+            pure $ MutArrClosure itbl (wds !! 1) (wds !! 2) ptrs
 
         t | t == MUT_VAR_CLEAN || t == MUT_VAR_DIRTY ->
-            return $ MutVarClosure itbl (head ptrs)
+            pure $ MutVarClosure itbl (head ptrs)
 
         t | t == MVAR_CLEAN || t == MVAR_DIRTY -> do
             unless (length ptrs >= 3) $
                 fail $ "Expected at least 3 ptrs to MVAR, found " ++ show (length ptrs)
-            return $ MVarClosure itbl (ptrs !! 0) (ptrs !! 1) (ptrs !! 2)
+            pure $ MVarClosure itbl (ptrs !! 0) (ptrs !! 1) (ptrs !! 2)
 
         BLOCKING_QUEUE ->
-            return $ OtherClosure itbl ptrs wds
-        --    return $ BlockingQueueClosure itbl
+            pure $ OtherClosure itbl ptrs wds
+        --    pure $ BlockingQueueClosure itbl
         --        (ptrs !! 0) (ptrs !! 1) (ptrs !! 2) (ptrs !! 3)
 
-        --  return $ OtherClosure itbl ptrs wds
+        --  pure $ OtherClosure itbl ptrs wds
         --
         _ ->
-            return $ UnsupportedClosure itbl
+            pure $ UnsupportedClosure itbl
 
 -- | Like 'getClosureData', but taking a 'Box', so it is easier to work with.
 getBoxedClosureData :: Box -> IO Closure
