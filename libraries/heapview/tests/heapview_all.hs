@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 
 import GHC.Exts
-import GHC.HeapView
+import GHC.Exts.HeapView
 import Control.DeepSeq
 
 import System.Environment

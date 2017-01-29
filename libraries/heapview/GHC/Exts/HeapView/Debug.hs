@@ -1,7 +1,7 @@
 -- | Utilities to debug "GHC.HeapView".
-module GHC.HeapView.Debug where
+module GHC.Exts.HeapView.Debug where
 
-import GHC.HeapView
+import GHC.Exts.HeapView
 import Text.Printf
 import System.IO
 import Control.Monad

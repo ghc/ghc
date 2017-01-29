@@ -43,5 +43,5 @@ library
 
   ghc-options: -Wall
 
-  exposed-modules: GHC.HeapView
-                   GHC.HeapView.Debug
+  exposed-modules: GHC.Exts.HeapView
+                   GHC.Exts.HeapView.Debug

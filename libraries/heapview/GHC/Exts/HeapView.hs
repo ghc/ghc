@@ -10,7 +10,7 @@ values, i.e. to investigate sharing and lazy evaluation.
 -}
 
 
-module GHC.HeapView (
+module GHC.Exts.HeapView (
     -- * Heap data types
     GenClosure(..),
     Closure,
