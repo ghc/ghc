@@ -89,6 +89,7 @@ module CLabel (
         addLabelSize,
 
         foreignLabelStdcallInfo,
+        isBytesLabel,
         isForeignLabel,
         mkCCLabel, mkCCSLabel,
 
@@ -572,6 +573,11 @@ addLabelSize (ForeignLabel str _ src  fod) sz
     = ForeignLabel str (Just sz) src fod
 addLabelSize label _
     = label
+
+-- | Whether label is a top-level string literal
+isBytesLabel :: CLabel -> Bool
+isBytesLabel (IdLabel _ _ Bytes) = True
+isBytesLabel _lbl = False
 
 -- | Whether label is a non-haskell label (defined in C code)
 isForeignLabel :: CLabel -> Bool

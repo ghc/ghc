@@ -1007,7 +1007,8 @@ pprExternDecl _in_srt lbl
         hcat [ visibility, label_type lbl,
                lparen, ppr lbl, text ");" ]
  where
-  label_type lbl | isForeignLabel lbl && isCFunctionLabel lbl = text "FF_"
+  label_type lbl | isBytesLabel lbl     = text "B_"
+                 | isForeignLabel lbl && isCFunctionLabel lbl = text "FF_"
                  | isCFunctionLabel lbl = text "F_"
                  | otherwise            = text "I_"
 
