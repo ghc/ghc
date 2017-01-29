@@ -48,7 +48,5 @@ library
 
   ghc-options: -Wall
 
-  exposed-modules: GHC.AssertNF
-                   GHC.Disassembler
-                   GHC.HeapView
+  exposed-modules: GHC.HeapView
                    GHC.HeapView.Debug
