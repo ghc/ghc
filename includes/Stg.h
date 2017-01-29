@@ -224,6 +224,7 @@ typedef StgWord StgWordArray[];
 typedef StgFunPtr       F_;
 
 #define EB_(X)    extern char X[]
+#define IB_(X)    static char X[]
 #define EI_(X)          extern StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 #define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
 #define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
