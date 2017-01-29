@@ -138,7 +138,7 @@ import {-# SOURCE #-} DataCon( dataConFullSig
                              , DataCon, filterEqSpec )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
                           , tyCoVarsOfTypesWellScoped
-                          , coreView, typeKind )
+                          , coreView, typeKind, mkCastTy )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -2180,7 +2180,9 @@ subst_ty subst ty
                                (ForAllTy $! ((TvBndr $! tv') vis)) $!
                                             (subst_ty subst' ty)
     go (LitTy n)         = LitTy $! n
-    go (CastTy ty co)    = (CastTy $! (go ty)) $! (subst_co subst co)
+    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
+               -- NB: mkCastTy, not CastTy. The subst_co might make something
+               -- reflexive
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 substTyVar :: TCvSubst -> TyVar -> Type

@@ -1,12 +1,13 @@
 module Type where
 import TyCon
 import Var ( TyVar )
-import {-# SOURCE #-} TyCoRep( Type, Kind )
+import {-# SOURCE #-} TyCoRep( Type, Kind, Coercion )
 
 isPredTy     :: Type -> Bool
 isCoercionTy :: Type -> Bool
 
 mkAppTy :: Type -> Type -> Type
+mkCastTy :: Type -> Coercion -> Type
 piResultTy :: Type -> Type -> Type
 
 typeKind :: Type -> Kind
