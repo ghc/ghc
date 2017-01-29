@@ -26,11 +26,11 @@ main = do
         unless eq $ fail "Doesn't reference list"
 
     getClosureData args >>= \ cl ->
-        unless (tipe (info cl) == CONSTR_0_1) $
+        unless (cltype (info cl) == CONSTR_0_1) $
             fail $ "Not a CONSTR_0_1"
 
     getClosureData x >>= \ cl ->
-        unless (tipe (info cl) == THUNK_2_0) $ do
+        unless (cltype (info cl) == THUNK_2_0) $ do
             fail "Not a THUNK_2_0"
 
 
@@ -40,13 +40,13 @@ main = do
         t = f m' list2
 
     getClosureData f >>= \ cl -> do
-        unless (tipe (info cl) == FUN_1_1) $ do
+        unless (cltype (info cl) == FUN_1_1) $ do
             fail "Not a FUN_1_1"
         unless (dataArgs cl == [42]) $ do
             fail "Wrong data arg"
 
     getClosureData t >>= \ cl -> do
-        unless (tipe (info cl) == THUNK) $ do
+        unless (cltype (info cl) == THUNK) $ do
             fail "Not a THUNK"
         unless (dataArgs cl == [23]) $ do
             fail "Wrong data arg"

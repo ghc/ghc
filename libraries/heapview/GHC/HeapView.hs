@@ -115,7 +115,7 @@ asBox x = Box (unsafeCoerce# x)
 data StgInfoTable = StgInfoTable {
    ptrs   :: HalfWord,
    nptrs  :: HalfWord,
-   tipe   :: ClosureType,
+   cltype :: ClosureType,
    srtlen :: HalfWord
   }
   deriving (Show)
@@ -142,13 +142,13 @@ instance Storable StgInfoTable where
       $ do
            ptrs'   <- load
            nptrs'  <- load
-           tipe'   <- load
+           cltype' <- load
            srtlen' <- load
            return
               StgInfoTable {
                  ptrs   = ptrs',
                  nptrs  = nptrs',
-                 tipe   = toEnum (fromIntegral (tipe'::HalfWord)),
+                 cltype = toEnum (fromIntegral (cltype'::HalfWord)),
                  srtlen = srtlen'
               }
 
@@ -493,7 +493,7 @@ getClosureData :: a -> IO Closure
 getClosureData x = do
     (iptr, wds, ptrs) <- getClosureRaw x
     itbl <- peek iptr
-    case tipe itbl of
+    case cltype itbl of
         t | t >= CONSTR && t <= CONSTR_NOCAF -> do
             (pkg, modl, name) <- dataConInfoPtrToNames iptr
             if modl == "ByteCodeInstr" && name == "BreakInfo"
