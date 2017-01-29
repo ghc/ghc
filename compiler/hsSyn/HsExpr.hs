@@ -719,14 +719,20 @@ Note [Parens in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~
 HsPar (and ParPat in patterns, HsParTy in types) is used as follows
 
-  * Generally HsPar is optional; the pretty printer adds parens where
-    necessary.  Eg (HsApp f (HsApp g x)) is fine, and prints 'f (g x)'
-
-  * HsPars are pretty printed as '( .. )' regardless of whether
-    or not they are strictly necssary
+  * HsPar is required; the pretty printer does not add parens.
 
   * HsPars are respected when rearranging operator fixities.
     So   a * (b + c)  means what it says (where the parens are an HsPar)
+
+  * For ParPat and HsParTy the pretty printer does add parens but this should be
+    a no-op for ParsedSource, based on the pretty printer round trip feature
+    introduced in
+    https://phabricator.haskell.org/rGHC499e43824bda967546ebf95ee33ec1f84a114a7c
+
+  * ParPat and HsParTy are pretty printed as '( .. )' regardless of whether or
+    not they are strictly necssary. This should be addressed when #13238 is
+    completed, to be treated the same as HsPar.
+
 
 Note [Sections in HsSyn]
 ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -949,7 +955,7 @@ ppr_expr (RecordCon { rcon_con_name = con_id, rcon_flds = rbinds })
   = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd { rupd_expr = L _ aexp, rupd_flds = rbinds })
-  = hang (pprParendExpr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
+  = hang (ppr aexp) 2 (braces (fsep (punctuate comma (map ppr rbinds))))
 
 ppr_expr (ExprWithTySig expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -962,8 +968,8 @@ ppr_expr (ArithSeq _ _ info) = brackets (ppr info)
 ppr_expr (PArrSeq  _ info) = paBrackets (ppr info)
 
 ppr_expr EWildPat       = char '_'
-ppr_expr (ELazyPat e)   = char '~' <> pprParendLExpr e
-ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendLExpr e
+ppr_expr (ELazyPat e)   = char '~' <> ppr e
+ppr_expr (EAsPat v e)   = ppr v <> char '@' <> ppr e
 ppr_expr (EViewPat p e) = ppr p <+> text "->" <+> ppr e
 
 ppr_expr (HsSCC st (StringLiteral stl lbl) expr)
@@ -971,11 +977,11 @@ ppr_expr (HsSCC st (StringLiteral stl lbl) expr)
          -- no doublequotes if stl empty, for the case where the SCC was written
          -- without quotes.
           <+> pprWithSourceText stl (ftext lbl) <+> text "#-}",
-          pprParendLExpr expr ]
+          ppr expr ]
 
 ppr_expr (HsWrap co_fn e)
-  = pprHsWrapper co_fn (\parens -> if parens then pprParendExpr e
-                                             else pprExpr       e)
+  = pprHsWrapper co_fn (\parens -> if parens then pprExpr e
+                                             else pprExpr e)
 
 ppr_expr (HsSpliceE s)         = pprSplice s
 ppr_expr (HsBracket b)         = pprHsBracket b
@@ -988,7 +994,7 @@ ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [text "proc", ppr pat, ptext (sLit "->"), ppr cmd]
 
 ppr_expr (HsStatic _ e)
-  = hsep [text "static", pprParendLExpr e]
+  = hsep [text "static", ppr e]
 
 ppr_expr (HsTick tickish exp)
   = pprTicks (ppr exp) $
@@ -1043,7 +1049,7 @@ ppr_apps (HsAppTypeOut (L _ fun) arg) args
   = ppr_apps fun (Right (LHsWcTypeX arg) : args)
 ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
   where
-    pp (Left arg)                             = pprParendLExpr arg
+    pp (Left arg)                             = ppr arg
     pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
       = char '@' <> pprParendHsType arg
 
@@ -1274,7 +1280,7 @@ ppr_cmd (HsCmdPar c) = parens (ppr_lcmd c)
 
 ppr_cmd (HsCmdApp c e)
   = let (fun, args) = collect_args c [e] in
-    hang (ppr_lcmd fun) 2 (sep (map pprParendLExpr args))
+    hang (ppr_lcmd fun) 2 (sep (map ppr args))
   where
     collect_args (L _ (HsCmdApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)

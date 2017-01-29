@@ -1501,7 +1501,8 @@ defineMacro overwrite s = do
     -- > ghciStepIO . definition :: String -> IO String
     let stringTy = nlHsTyVar stringTy_RDR
         ioM = nlHsTyVar (getRdrName ioTyConName) `nlHsAppTy` stringTy
-        body = nlHsVar compose_RDR `mkHsApp` step `mkHsApp` expr
+        body = nlHsVar compose_RDR `mkHsApp` (nlHsPar step)
+                                   `mkHsApp` (nlHsPar expr)
         tySig = mkLHsSigWcType (stringTy `nlHsFunTy` ioM)
         new_expr = L (getLoc expr) $ ExprWithTySig body tySig
     hv <- GHC.compileParsedExprRemote new_expr

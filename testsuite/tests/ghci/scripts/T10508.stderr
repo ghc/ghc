@@ -4,7 +4,7 @@
       Expected type: IO Prelude.String
         Actual type: IO (a0 -> a0)
     • In the expression: return id
-      In the second argument of ‘(.)’, namely ‘\ _ -> return id’
+      In the second argument of ‘(.)’, namely ‘(\ _ -> return id)’
       In the expression:
           (.)
             (GHC.GHCi.ghciStepIO :: IO Prelude.String -> IO Prelude.String)

@@ -29,14 +29,16 @@
         (HsVar 
          ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
      ({ <no location info> }
-      (HsApp 
+      (HsPar 
        ({ <no location info> }
-        (HsConLikeOut 
-         ({abstract:ConLike}))) 
-       ({ <no location info> }
-        (HsLit 
-         (HsStringPrim 
-          (NoSourceText) "Peano"))))))) 
+        (HsApp 
+         ({ <no location info> }
+          (HsConLikeOut 
+           ({abstract:ConLike}))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsStringPrim 
+            (NoSourceText) "Peano"))))))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v rFM} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
@@ -65,14 +67,16 @@
         (HsVar 
          ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
      ({ <no location info> }
-      (HsApp 
+      (HsPar 
        ({ <no location info> }
-        (HsConLikeOut 
-         ({abstract:ConLike}))) 
-       ({ <no location info> }
-        (HsLit 
-         (HsStringPrim 
-          (NoSourceText) "'Zero"))))))) 
+        (HsApp 
+         ({ <no location info> }
+          (HsConLikeOut 
+           ({abstract:ConLike}))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsStringPrim 
+            (NoSourceText) "'Zero"))))))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Succ{v rH3} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
@@ -101,14 +105,16 @@
         (HsVar 
          ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
      ({ <no location info> }
-      (HsApp 
+      (HsPar 
        ({ <no location info> }
-        (HsConLikeOut 
-         ({abstract:ConLike}))) 
-       ({ <no location info> }
-        (HsLit 
-         (HsStringPrim 
-          (NoSourceText) "'Succ"))))))) 
+        (HsApp 
+         ({ <no location info> }
+          (HsConLikeOut 
+           ({abstract:ConLike}))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsStringPrim 
+            (NoSourceText) "'Succ"))))))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})} 
@@ -120,6 +126,19 @@
         (HsConLikeOut 
          ({abstract:ConLike}))) 
        ({ <no location info> }
+        (HsPar 
+         ({ <no location info> }
+          (HsApp 
+           ({ <no location info> }
+            (HsConLikeOut 
+             ({abstract:ConLike}))) 
+           ({ <no location info> }
+            (HsLit 
+             (HsStringPrim 
+              (NoSourceText) "main"))))))))) 
+     ({ <no location info> }
+      (HsPar 
+       ({ <no location info> }
         (HsApp 
          ({ <no location info> }
           (HsConLikeOut 
@@ -127,16 +146,7 @@
          ({ <no location info> }
           (HsLit 
            (HsStringPrim 
-            (NoSourceText) "main"))))))) 
-     ({ <no location info> }
-      (HsApp 
-       ({ <no location info> }
-        (HsConLikeOut 
-         ({abstract:ConLike}))) 
-       ({ <no location info> }
-        (HsLit 
-         (HsStringPrim 
-          (NoSourceText) "DumpTypecheckedAst"))))))) 
+            (NoSourceText) "DumpTypecheckedAst"))))))))) 
    (False))),
  ({ DumpTypecheckedAst.hs:11:1-23 }
   (AbsBinds 

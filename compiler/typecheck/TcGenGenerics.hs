@@ -330,7 +330,8 @@ mkBindsRep gk tycon =
         -- across all cases of a from/to definition, and can be factored out
         -- to save some allocations during typechecking.
         -- See Note [Generics compilation speed tricks]
-        from_eqn = mkHsCaseAlt x_Pat $ mkM1_E $ nlHsCase x_Expr from_matches
+        from_eqn = mkHsCaseAlt x_Pat $ mkM1_E
+                                       $ nlHsPar $ nlHsCase x_Expr from_matches
         to_eqn   = mkHsCaseAlt (mkM1_P x_Pat) $ nlHsCase x_Expr to_matches
 
         from_matches  = [mkHsCaseAlt pat rhs | (pat,rhs) <- from_alts]
@@ -769,8 +770,10 @@ genLR_E :: Int -> Int -> LHsExpr RdrName -> LHsExpr RdrName
 genLR_E i n e
   | n == 0       = error "impossible"
   | n == 1       = e
-  | i <= div n 2 = nlHsVar l1DataCon_RDR `nlHsApp` genLR_E i     (div n 2) e
-  | otherwise    = nlHsVar r1DataCon_RDR `nlHsApp` genLR_E (i-m) (n-m)     e
+  | i <= div n 2 = nlHsVar l1DataCon_RDR `nlHsApp`
+                                            nlHsPar (genLR_E i     (div n 2) e)
+  | otherwise    = nlHsVar r1DataCon_RDR `nlHsApp`
+                                            nlHsPar (genLR_E (i-m) (n-m)     e)
                      where m = div n 2
 
 --------------------------------------------------------------------------------

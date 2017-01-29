@@ -734,12 +734,6 @@ illegalTypedSplice = text "Typed splices may not appear in untyped brackets"
 illegalUntypedSplice :: SDoc
 illegalUntypedSplice = text "Untyped splices may not appear in typed brackets"
 
--- spliceResultDoc :: OutputableBndr id => LHsExpr id -> SDoc
--- spliceResultDoc expr
---  = vcat [ hang (text "In the splice:")
---              2 (char '$' <> pprParendExpr expr)
---        , text "To see what the splice expanded to, use -ddump-splices" ]
-
 checkThLocalName :: Name -> RnM ()
 checkThLocalName name
   | isUnboundName name   -- Do not report two errors for

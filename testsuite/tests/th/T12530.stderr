@@ -5,6 +5,6 @@ T12530.hs:(8,3)-(15,6): Splicing declarations
         g = undefined @(_) @(a) |]
   ======>
     f :: Maybe Int -> Maybe Int
-    f = id @Maybe Int
+    f = id @(Maybe Int)
     g :: forall a. a
     g = undefined @_ @a

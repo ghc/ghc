@@ -46,3 +46,4 @@ test('Ppr045', ignore_stderr, run_command, ['$MAKE -s --no-print-directory ppr04
 test('Ppr046', ignore_stderr, run_command, ['$MAKE -s --no-print-directory ppr046'])
 test('Ppr047', expect_fail, run_command, ['$MAKE -s --no-print-directory ppr047'])
 test('Ppr048', ignore_stderr, run_command, ['$MAKE -s --no-print-directory ppr048'])
+test('T13199', ignore_stderr, run_command, ['$MAKE -s --no-print-directory T13199'])

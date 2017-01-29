@@ -1825,7 +1825,7 @@ too_many_args fun args
     hang (text "Too many type arguments to" <+> text fun <> colon)
        2 (sep (map pp args))
   where
-    pp (Left e)                             = pprParendLExpr e
+    pp (Left e)                             = ppr e
     pp (Right (HsWC { hswc_body = L _ t })) = pprParendHsType t
 
 

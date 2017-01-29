@@ -754,9 +754,10 @@ cvtClause :: HsMatchContext RdrName
           -> TH.Clause -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
 cvtClause ctxt (Clause ps body wheres)
   = do  { ps' <- cvtPats ps
+        ; pps <- mapM wrap_conpat ps'
         ; g'  <- cvtGuard body
         ; ds' <- cvtLocalDecs (text "a where clause") wheres
-        ; returnL $ Hs.Match ctxt ps' Nothing
+        ; returnL $ Hs.Match ctxt pps Nothing
                              (GRHSs g' (noLoc ds')) }
 
 
@@ -773,12 +774,13 @@ cvtl e = wrapL (cvt e)
       | overloadedLit l = do { l' <- cvtOverLit l; return $ HsOverLit l' }
       | otherwise       = do { l' <- cvtLit l;     return $ HsLit l' }
     cvt (AppE x@(LamE _ _) y) = do { x' <- cvtl x; y' <- cvtl y
-                                   ; return $ HsApp (mkLHsPar x') y' }
+                                   ; return $ HsApp (mkLHsPar x') (mkLHsPar y')}
     cvt (AppE x y)            = do { x' <- cvtl x; y' <- cvtl y
-                                   ; return $ HsApp x' y' }
+                                   ; return $ HsApp (mkLHsPar x') (mkLHsPar y')}
     cvt (AppTypeE e t) = do { e' <- cvtl e
                             ; t' <- cvtType t
-                            ; return $ HsAppType e' $ mkHsWildCardBndrs t' }
+                            ; tp <- wrap_apps t'
+                            ; return $ HsAppType e' $ mkHsWildCardBndrs tp }
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; return $ HsLam (mkMatchGroup FromSource
                                              [mkSimpleMatch LambdaExpr ps' e'])}
@@ -983,9 +985,12 @@ cvtMatch :: HsMatchContext RdrName
          -> TH.Match -> CvtM (Hs.LMatch RdrName (LHsExpr RdrName))
 cvtMatch ctxt (TH.Match p body decs)
   = do  { p' <- cvtPat p
+        ; lp <- case ctxt of
+            CaseAlt -> return p'
+            _       -> wrap_conpat p'
         ; g' <- cvtGuard body
         ; decs' <- cvtLocalDecs (text "a where clause") decs
-        ; returnL $ Hs.Match ctxt [p'] Nothing
+        ; returnL $ Hs.Match ctxt [lp] Nothing
                              (GRHSs g' (noLoc decs')) }
 
 cvtGuard :: TH.Body -> CvtM [LGRHS RdrName (LHsExpr RdrName)]
@@ -1077,13 +1082,17 @@ cvtp (UnboxedSumP p alt arity)
                             ; unboxedSumChecks alt arity
                             ; return $ SumPat p' alt arity placeHolderType }
 cvtp (ConP s ps)       = do { s' <- cNameL s; ps' <- cvtPats ps
-                            ; return $ ConPatIn s' (PrefixCon ps') }
+                            ; pps <- mapM wrap_conpat ps'
+                            ; return $ ConPatIn s' (PrefixCon pps) }
 cvtp (InfixP p1 s p2)  = do { s' <- cNameL s; p1' <- cvtPat p1; p2' <- cvtPat p2
                             ; wrapParL ParPat $
                               ConPatIn s' (InfixCon (mkParPat p1') (mkParPat p2')) }
                             -- See Note [Operator association]
 cvtp (UInfixP p1 s p2) = do { p1' <- cvtPat p1; cvtOpAppP p1' s p2 } -- Note [Converting UInfix]
-cvtp (ParensP p)       = do { p' <- cvtPat p; return $ ParPat p' }
+cvtp (ParensP p)       = do { p' <- cvtPat p;
+                            ; case p' of  -- may be wrapped ConPatIn
+                                (L _ (ParPat {})) -> return $ unLoc p'
+                                _                 -> return $ ParPat p' }
 cvtp (TildeP p)        = do { p' <- cvtPat p; return $ LazyPat p' }
 cvtp (BangP p)         = do { p' <- cvtPat p; return $ BangPat p' }
 cvtp (TH.AsP s p)      = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
@@ -1105,6 +1114,12 @@ cvtPatFld (s,p)
                                          = L ls $ mkFieldOcc (L ls s')
                                      , hsRecFieldArg = p'
                                      , hsRecPun      = False}) }
+
+wrap_conpat :: Hs.LPat RdrName -> CvtM (Hs.LPat RdrName)
+wrap_conpat p@(L _ (ConPatIn _ (InfixCon{})))   = returnL $ ParPat p
+wrap_conpat p@(L _ (ConPatIn _ (PrefixCon []))) = return p
+wrap_conpat p@(L _ (ConPatIn _ (PrefixCon _)))  = returnL $ ParPat p
+wrap_conpat p                                   = return p
 
 {- | @cvtOpAppP x op y@ converts @op@ and @y@ and produces the operator application @x `op` y@.
 The produced tree of infix patterns will be left-biased, provided @x@ is.
@@ -1295,8 +1310,17 @@ cvtTypeKind ty_str ty
 -- | Constructs an application of a type to arguments passed in a list.
 mk_apps :: HsType RdrName -> [LHsType RdrName] -> CvtM (LHsType RdrName)
 mk_apps head_ty []       = returnL head_ty
-mk_apps head_ty (ty:tys) = do { head_ty' <- returnL head_ty
-                              ; mk_apps (HsAppTy head_ty' ty) tys }
+mk_apps head_ty (ty:tys) =
+  do { head_ty' <- returnL head_ty
+     ; p_ty      <- add_parens ty
+     ; mk_apps (HsAppTy head_ty' p_ty) tys }
+  where
+    add_parens t@(L _ HsAppTy{}) = returnL (HsParTy t)
+    add_parens t                 = return t
+
+wrap_apps  :: LHsType RdrName -> CvtM (LHsType RdrName)
+wrap_apps t@(L _ HsAppTy {}) = returnL (HsParTy t)
+wrap_apps t                  = return t
 
 -- | Constructs an arrow type with a specified return type
 mk_arr_apps :: [LHsType RdrName] -> HsType RdrName -> CvtM (LHsType RdrName)

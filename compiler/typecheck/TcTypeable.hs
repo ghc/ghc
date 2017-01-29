@@ -140,8 +140,8 @@ mkModIdRHS mod
   = do { trModuleDataCon <- tcLookupDataCon trModuleDataConName
        ; trNameLit <- mkTrNameLit
        ; return $ nlHsDataCon trModuleDataCon
-                  `nlHsApp` trNameLit (unitIdFS (moduleUnitId mod))
-                  `nlHsApp` trNameLit (moduleNameFS (moduleName mod))
+                 `nlHsApp` (nlHsPar $ trNameLit (unitIdFS (moduleUnitId mod)))
+                 `nlHsApp` (nlHsPar $ trNameLit (moduleNameFS (moduleName mod)))
        }
 
 {- *********************************************************************
@@ -276,7 +276,7 @@ mkTyConRepRHS (Stuff {..}) tycon = rep_rhs
               `nlHsApp` nlHsLit (word64 high)
               `nlHsApp` nlHsLit (word64 low)
               `nlHsApp` mod_rep
-              `nlHsApp` trNameLit (mkFastString tycon_str)
+              `nlHsApp` (nlHsPar $ trNameLit (mkFastString tycon_str))
 
     tycon_str = add_tick (occNameString (getOccName tycon))
     add_tick s | isPromotedDataCon tycon = '\'' : s

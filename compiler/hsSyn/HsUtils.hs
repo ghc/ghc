@@ -384,7 +384,7 @@ nlLitPat :: HsLit -> LPat id
 nlLitPat l = noLoc (LitPat l)
 
 nlHsApp :: LHsExpr id -> LHsExpr id -> LHsExpr id
-nlHsApp f x = noLoc (HsApp f x)
+nlHsApp f x = noLoc (HsApp f (mkLHsPar x))
 
 nlHsSyntaxApps :: SyntaxExpr id -> [LHsExpr id] -> LHsExpr id
 nlHsSyntaxApps (SyntaxExpr { syn_expr      = fun
