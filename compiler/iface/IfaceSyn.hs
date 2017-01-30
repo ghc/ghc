@@ -298,6 +298,10 @@ type IfaceAnnTarget = AnnTarget OccName
 
 data IfaceCompleteMatch = IfaceCompleteMatch [IfExtName] IfExtName
 
+instance Outputable IfaceCompleteMatch where
+  ppr (IfaceCompleteMatch cls ty) = text "COMPLETE" <> colon <+> ppr cls
+                                                    <+> dcolon <+> ppr ty
+
 
 
 

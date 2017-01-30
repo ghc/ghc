@@ -1011,6 +1011,7 @@ pprModIface iface
         , ppr (mi_warns iface)
         , pprTrustInfo (mi_trust iface)
         , pprTrustPkg (mi_trust_pkg iface)
+        , vcat (map ppr (mi_complete_sigs iface))
         ]
   where
     pp_hsc_src HsBootFile = text "[boot]"
