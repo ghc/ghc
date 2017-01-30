@@ -1648,11 +1648,12 @@ eitherTyConKey                          = mkPreludeTyConUnique 84
 
 -- Kind constructors
 liftedTypeKindTyConKey, tYPETyConKey,
-  constraintKindTyConKey,
+  constraintKindTyConKey, visibilityTyConKey,
   starKindTyConKey, unicodeStarKindTyConKey, runtimeRepTyConKey,
   vecCountTyConKey, vecElemTyConKey :: Unique
 liftedTypeKindTyConKey                  = mkPreludeTyConUnique 87
 tYPETyConKey                            = mkPreludeTyConUnique 88
+visibilityTyConKey                      = mkPreludeTyConUnique 89
 constraintKindTyConKey                  = mkPreludeTyConUnique 92
 starKindTyConKey                        = mkPreludeTyConUnique 93
 unicodeStarKindTyConKey                 = mkPreludeTyConUnique 94
@@ -1847,6 +1848,11 @@ fingerprintDataConKey                   = mkPreludeDataConUnique 35
 srcLocDataConKey :: Unique
 srcLocDataConKey                        = mkPreludeDataConUnique 37
 
+-- of the GHC.Types.Visibility datatype
+visibleDataConKey, invisibleDataConKey :: Unique
+visibleDataConKey                       = mkPreludeDataConUnique 38
+invisibleDataConKey                     = mkPreludeDataConUnique 39
+
 trTyConTyConKey, trTyConDataConKey,
   trModuleTyConKey, trModuleDataConKey,
   trNameTyConKey, trNameSDataConKey, trNameDDataConKey,
@@ -1902,20 +1908,20 @@ sumRepDataConKey                        = mkPreludeDataConUnique 73
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 runtimeRepSimpleDataConKeys :: [Unique]
-liftedRepDataConKey, constraintRepDataConKey :: Unique
+liftedRepDataConKey :: Unique
 runtimeRepSimpleDataConKeys@(
-  liftedRepDataConKey : _ : constraintRepDataConKey : _)
-  = map mkPreludeDataConUnique [74..83]
+  liftedRepDataConKey : _)
+  = map mkPreludeDataConUnique [74..82]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecCount
 vecCountDataConKeys :: [Unique]
-vecCountDataConKeys = map mkPreludeDataConUnique [84..89]
+vecCountDataConKeys = map mkPreludeDataConUnique [83..88]
 
 -- See Note [Wiring in RuntimeRep] in TysWiredIn
 -- VecElem
 vecElemDataConKeys :: [Unique]
-vecElemDataConKeys = map mkPreludeDataConUnique [90..99]
+vecElemDataConKeys = map mkPreludeDataConUnique [89..98]
 
 ---------------- Template Haskell -------------------
 --      THNames.hs: USES DataUniques 100-150
@@ -2065,7 +2071,7 @@ breakpointJumpIdKey           = mkPreludeMiscIdUnique 113
 breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 114
 breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 115
 
-inlineIdKey, noinlineIdKey :: Unique
+inlineIdKey, noinlineIdKey, noinlineCIdKey :: Unique
 inlineIdKey                   = mkPreludeMiscIdUnique 120
 -- see below
 
@@ -2078,6 +2084,7 @@ coercionTokenIdKey :: Unique
 coercionTokenIdKey    = mkPreludeMiscIdUnique 124
 
 noinlineIdKey                 = mkPreludeMiscIdUnique 125
+noinlineCIdKey                = mkPreludeMiscIdUnique 126
 
 rationalToFloatIdKey, rationalToDoubleIdKey :: Unique
 rationalToFloatIdKey   = mkPreludeMiscIdUnique 130
@@ -2311,4 +2318,5 @@ pretendNameIsInScope :: Name -> Bool
 pretendNameIsInScope n
   = any (n `hasKey`)
     [ starKindTyConKey, liftedTypeKindTyConKey, tYPETyConKey
-    , runtimeRepTyConKey, liftedRepDataConKey ]
+    , runtimeRepTyConKey, liftedRepDataConKey, visibleDataConKey
+    , visibilityTyConKey ]

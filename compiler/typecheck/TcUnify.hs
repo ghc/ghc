@@ -52,7 +52,7 @@ import Name ( isSystemName )
 import Inst
 import TyCon
 import TysWiredIn
-import TysPrim( tYPE )
+import TysPrim( tYPEvis )
 import Var
 import VarSet
 import VarEnv
@@ -917,7 +917,7 @@ promoteTcType :: TcLevel -> TcType -> TcM (TcCoercion, TcType)
 -- promoteTcType level ty = (co, ty')
 --   * Returns ty'  whose max level is just 'level'
 --             and  whose kind is ~# to the kind of 'ty'
---             and  whose kind has form TYPE rr
+--             and  whose kind has form TYPE v rr
 --   * and co :: ty ~ ty'
 --   * and emits constraints to justify the coercion
 promoteTcType dest_lvl ty
@@ -930,7 +930,7 @@ promoteTcType dest_lvl ty
     promote_it  -- Emit a constraint  (alpha :: TYPE rr) ~ ty
                 -- where alpha and rr are fresh and from level dest_lvl
       = do { rr      <- newMetaTyVarTyAtLevel dest_lvl runtimeRepTy
-           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPE rr)
+           ; prom_ty <- newMetaTyVarTyAtLevel dest_lvl (tYPEvis rr)
            ; let eq_orig = TypeEqOrigin { uo_actual   = ty
                                         , uo_expected = prom_ty
                                         , uo_thing    = Nothing }
@@ -939,7 +939,7 @@ promoteTcType dest_lvl ty
            ; return (co, prom_ty) }
 
     dont_promote_it :: TcM (TcCoercion, TcType)
-    dont_promote_it  -- Check that ty :: TYPE rr, for some (fresh) rr
+    dont_promote_it  -- Check that ty :: TYPEvis rr, for some (fresh) rr
       = do { res_kind <- newOpenTypeKind
            ; let ty_kind = typeKind ty
                  kind_orig = TypeEqOrigin { uo_actual   = ty_kind

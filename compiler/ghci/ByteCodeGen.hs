@@ -553,10 +553,10 @@ schemeE d s p exp@(AnnTick (Breakpoint _id _fvs) _rhs)
           -- type and hence won't be bound in the environment, but the
           -- breakpoint will otherwise work fine.
           --
-          -- NB (Trac #12007) this /also/ applies for if (ty :: TYPE r), where
+          -- NB (Trac #12007) this /also/ applies for if (ty :: TYPEvis r), where
           --    r :: RuntimeRep is a variable. This can happen in the
           --    continuations for a pattern-synonym matcher
-          --    match = /\(r::RuntimeRep) /\(a::TYPE r).
+          --    match = /\(r::RuntimeRep) /\(a::TYPEvis r).
           --            \(k :: Int -> a) \(v::T).
           --            case v of MkV n -> k n
           -- Here (k n) :: a :: Type r, so we don't know if it's lifted

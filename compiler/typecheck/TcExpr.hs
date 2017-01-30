@@ -361,7 +361,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        ; arg2'  <- tcArg op arg2 arg2_sigma 2
 
        -- Make sure that the argument type has kind '*'
-       --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPE r). (a->b) -> a -> b
+       --   ($) :: forall (r:RuntimeRep) (a:*) (b:TYPEvis r). (a->b) -> a -> b
        -- Eg we do not want to allow  (D#  $  4.0#)   Trac #5570
        --    (which gives a seg fault)
        --

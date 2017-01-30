@@ -49,7 +49,7 @@ module IfaceType (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
+import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon, visibleDataConTyCon )
 
 import DynFlags
 import StaticFlags ( opt_PprStyle_Debug )
@@ -62,7 +62,6 @@ import BasicTypes
 import Binary
 import Outputable
 import FastString
-import FastStringEnv
 import UniqFM
 import Util
 
@@ -294,8 +293,10 @@ isIfaceLiftedTypeKind :: IfaceKind -> Bool
 isIfaceLiftedTypeKind (IfaceTyConApp tc ITC_Nil)
   = isLiftedTypeKindTyConName (ifaceTyConName tc)
 isIfaceLiftedTypeKind (IfaceTyConApp tc
-                       (ITC_Vis (IfaceTyConApp ptr_rep_lifted ITC_Nil) ITC_Nil))
+                       (ITC_Vis (IfaceTyConApp vis ITC_Nil)
+                        (ITC_Vis (IfaceTyConApp ptr_rep_lifted ITC_Nil) ITC_Nil)))
   =  tc `ifaceTyConHasKey` tYPETyConKey
+  && vis `ifaceTyConHasKey` visibleDataConKey
   && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
 isIfaceLiftedTypeKind _ = False
 
@@ -727,13 +728,13 @@ Note [Defaulting RuntimeRep variables]
 
 RuntimeRep variables are considered by many (most?) users to be little more than
 syntactic noise. When the notion was introduced there was a signficant and
-understandable push-back from those with pedagogy in mind, which argued that
+understandable push-back from those with pedagogy in mind, who argued that
 RuntimeRep variables would throw a wrench into nearly any teach approach since
 they appear in even the lowly ($) function's type,
 
-    ($) :: forall (w :: RuntimeRep) a (b :: TYPE w). (a -> b) -> a -> b
+    ($) :: forall (w :: RuntimeRep) a (b :: TYPEvis w). (a -> b) -> a -> b
 
-which is significantly less readable than its non RuntimeRep-polymorphic type of
+which is significantly less readable than its non levity-polymorphic type of
 
     ($) :: (a -> b) -> a -> b
 
@@ -747,10 +748,11 @@ PtrLiftedRep. This is done in a pass right before pretty-printing
 (defaultRuntimeRepVars, controlled by -fprint-explicit-runtime-reps)
 -}
 
--- | Default 'RuntimeRep' variables to 'LiftedPtr'. e.g.
+-- | Default 'RuntimeRep' variables to 'LiftedPtr' and 'Visibility' variables
+-- to 'Visible'. e.g.
 --
 -- @
--- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
+-- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPEvis r).
 --        (a -> b) -> a -> b
 -- @
 --
@@ -765,10 +767,14 @@ PtrLiftedRep. This is done in a pass right before pretty-printing
 defaultRuntimeRepVars :: IfaceType -> IfaceType
 defaultRuntimeRepVars = go emptyFsEnv
   where
-    go :: FastStringEnv () -> IfaceType -> IfaceType
+    go :: FastStringEnv Bool  -- True => LiftedRep; False => Visible
+       -> IfaceType -> IfaceType
     go subs (IfaceForAllTy bndr ty)
       | isRuntimeRep var_kind
-      = let subs' = extendFsEnv subs var ()
+      = let subs' = extendFsEnv subs var True
+        in go subs' ty
+      | isVisibility var_kind
+      = let subs' = extendFsEnv subs var False
         in go subs' ty
       | otherwise
       = IfaceForAllTy (TvBndr (var, go subs var_kind) (binderArgFlag bndr))
@@ -778,8 +784,8 @@ defaultRuntimeRepVars = go emptyFsEnv
         (var, var_kind) = binderVar bndr
 
     go subs (IfaceTyVar tv)
-      | tv `elemFsEnv` subs
-      = IfaceTyConApp liftedRep ITC_Nil
+      | Just b <- lookupFsEnv subs tv
+      = IfaceTyConApp (if b then liftedRep else visible) ITC_Nil
 
     go subs (IfaceFunTy kind ty)
       = IfaceFunTy (go subs kind) (go subs ty)
@@ -800,10 +806,20 @@ defaultRuntimeRepVars = go emptyFsEnv
         IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
       where dc_name = getName liftedRepDataConTyCon
 
+    visible :: IfaceTyCon
+    visible =
+        IfaceTyCon dc_name (IfaceTyConInfo IsPromoted IfaceNormalTyCon)
+      where dc_name = getName visibleDataConTyCon
+
     isRuntimeRep :: IfaceType -> Bool
     isRuntimeRep (IfaceTyConApp tc _) =
         tc `ifaceTyConHasKey` runtimeRepTyConKey
     isRuntimeRep _ = False
+
+    isVisibility :: IfaceType -> Bool
+    isVisibility (IfaceTyConApp tc _) =
+        tc `ifaceTyConHasKey` visibilityTyConKey
+    isVisibility _ = False
 
 eliminateRuntimeRep :: (IfaceType -> SDoc) -> IfaceType -> SDoc
 eliminateRuntimeRep f ty = sdocWithDynFlags $ \dflags ->
@@ -968,13 +984,15 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   = pprIfaceTyList ctxt_prec ty1 ty2
 
   | tc `ifaceTyConHasKey` tYPETyConKey
-  , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
+  , ITC_Vis (IfaceTyConApp vis ITC_Nil) (ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil) <- tys
+  , vis `ifaceTyConHasKey` visibleDataConKey
   , rep `ifaceTyConHasKey` liftedRepDataConKey
   = kindStar
 
   | tc `ifaceTyConHasKey` tYPETyConKey
-  , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
-  , rep `ifaceTyConHasKey` constraintRepDataConKey
+  , ITC_Vis (IfaceTyConApp vis ITC_Nil) (ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil) <- tys
+  , vis `ifaceTyConHasKey` invisibleDataConKey
+  , rep `ifaceTyConHasKey` liftedRepDataConKey
   = text "Constraint"
 
   | not opt_PprStyle_Debug

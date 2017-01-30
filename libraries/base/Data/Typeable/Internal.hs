@@ -354,12 +354,14 @@ instance Show TypeRep where
         | tycon == tcList -> showChar '[' . shows x . showChar ']'
         where
           tcList = tyConOf @[] Proxy
-      [TypeRep _ ptrRepCon _ []]
+      [TypeRep _ visCon _ [], TypeRep _ ptrRepCon _ []]
         | tycon == tcTYPE && ptrRepCon == tc'LiftedRep
-          -> showChar '*'
+          -> if visCon == tc'Visible then showChar '*'
+                                     else showString "Constraint"
         where
           tcTYPE         = tyConOf @TYPE            Proxy
           tc'LiftedRep   = tyConOf @'LiftedRep      Proxy
+          tc'Visible     = tyConOf @'Visible        Proxy
       [a,r] | tycon == tcFun  -> showParen (p > 8) $
                                  showsPrec 9 a .
                                  showString " -> " .

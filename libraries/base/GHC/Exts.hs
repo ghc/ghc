@@ -60,7 +60,7 @@ module GHC.Exts
         type (~~),
 
         -- * Representation polymorphism
-        GHC.Prim.TYPE, RuntimeRep(..), VecCount(..), VecElem(..),
+        GHC.Prim.TYPE, RuntimeRep(..), Visibility(..), VecCount(..), VecElem(..),
 
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the,

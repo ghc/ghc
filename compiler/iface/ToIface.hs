@@ -53,7 +53,7 @@ import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import TysPrim ( eqPrimTyCon, eqReprPrimTyCon )
 import TysWiredIn ( heqTyCon )
-import MkId ( noinlineIdName )
+import MkId ( noinlineIdName, noinlineCIdName )
 import PrelNames
 import Name
 import BasicTypes
@@ -495,12 +495,11 @@ toIfaceVar v
     | Just fcall <- isFCallId_maybe v            = IfaceFCall fcall (toIfaceType (idType v))
        -- Foreign calls have special syntax
     | isBootUnfolding (idUnfolding v)
-    , let ty = idType v
-          rep = getRuntimeRep "toIfaceVar" ty
-    = (IfaceExt noinlineIdName)
-        `IfaceApp` (IfaceType (toIfaceType rep))
-        `IfaceApp` (IfaceType (toIfaceType ty))
-        `IfaceApp` (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
+    = let id_ty = idType v
+          noinline_name | isConstraintKind (typeKind id_ty) = noinlineCIdName
+                        | otherwise                         = noinlineIdName
+      in IfaceApp (IfaceApp (IfaceExt noinline_name) (IfaceType (toIfaceType id_ty)))
+                  (IfaceExt name) -- don't use mkIfaceApps, or infinite loop
        -- See Note [Inlining and hs-boot files]
     | isExternalName name                        = IfaceExt name
     | otherwise                                  = IfaceLcl (getOccFS name)

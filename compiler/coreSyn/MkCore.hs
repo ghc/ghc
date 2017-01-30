@@ -719,7 +719,7 @@ tYPE_ERROR_ID                   = mkRuntimeErrorId typeErrorName
 
 mkRuntimeErrorId :: Name -> Id
 -- Error function
---   with type:  forall (r:RuntimeRep) (a:TYPE r). Addr# -> a
+--   with type:  forall (r:RuntimeRep) (a:TYPEvis r). Addr# -> a
 --   with arity: 1
 -- which diverges after being given one argument
 -- The Addr# is expected to be the address of
@@ -751,9 +751,9 @@ mkRuntimeErrorId name
 {- Note [Error and friends have an "open-tyvar" forall]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'error' and 'undefined' have types
-        error     :: forall (v :: RuntimeRep) (a :: TYPE v). String -> a
-        undefined :: forall (v :: RuntimeRep) (a :: TYPE v). a
-Notice the runtime-representation polymorphism. This ensures that
+        error     :: forall (v :: RuntimeRep) (a :: TYPEvis v). String -> a
+        undefined :: forall (v :: RuntimeRep) (a :: TYPEvis v). a
+Notice the levity polymorphism. This ensures that
 "error" can be instantiated at unboxed as well as boxed types.
 This is OK because it never returns, so the return type is irrelevant.
 -}

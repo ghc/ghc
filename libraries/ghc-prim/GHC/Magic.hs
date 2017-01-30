@@ -3,8 +3,6 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE TypeInType #-}
-{-# LANGUAGE ExplicitForAll #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -26,7 +24,6 @@
 module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
 
 import GHC.Prim
-import GHC.Types
 import GHC.CString ()
 
 -- | The call @inline f@ arranges that 'f' is inlined, regardless of
@@ -51,19 +48,9 @@ inline x = x
 -- | The call @noinline f@ arranges that 'f' will not be inlined.
 -- It is removed during CorePrep so that its use imposes no overhead
 -- (besides the fact that it blocks inlining.)
--- NB: This will cause an error if not used fully applied.
 {-# NOINLINE noinline #-}
-noinline :: forall (r :: RuntimeRep) (a :: TYPE r). a -> a
-noinline = noinline
-  -- This must be levity-polymorphic because ifaces use noinline to
-  -- enforce loop breakers when hs-boot files are in play.
-  -- See Note [Inlining and hs-boot files] in ToIface.
-  -- Sometimes, we have to noinline a dictionary, hence this generality.
-  -- (See GHC.IO, where we noinline a dictionary for (Exception IOException),
-  -- imported via an hs-boot file.)
-  -- The silly definition is necessary because (noinline x = x) would
-  -- violate the levity-polymorphism restrictions. It all goes away
-  -- in CorePrep anyway.
+noinline :: a -> a
+noinline x = x
 
 -- | The 'lazy' function restrains strictness analysis a little. The
 -- call @lazy e@ means the same as 'e', but 'lazy' has a magical

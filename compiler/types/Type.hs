@@ -1836,14 +1836,13 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 -- | Returns Just True if this type is surely lifted, Just False
 -- if it is surely unlifted, Nothing if we can't be sure (i.e., it is
 -- levity polymorphic), and panics if the kind does not have the shape
--- TYPE r.
+-- TYPE v r.
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
 isLiftedType_maybe ty = go (getRuntimeRep "isLiftedType_maybe" ty)
   where
     go rr | Just rr' <- coreView rr = go rr'
     go (TyConApp lifted_rep [])
-      |  lifted_rep `hasKey` liftedRepDataConKey
-      || lifted_rep `hasKey` constraintRepDataConKey = Just True
+      |  lifted_rep `hasKey` liftedRepDataConKey = Just True
     go (TyConApp {}) = Just False -- everything else is unlifted
     go _             = Nothing    -- levity polymorphic
 
@@ -1875,7 +1874,7 @@ getRuntimeRepFromKind err = go
   where
     go k | Just k' <- coreView k = go k'
     go k
-      | (_tc, [arg]) <- splitTyConApp k
+      | (_tc, [_vis, arg]) <- splitTyConApp k
       = ASSERT2( _tc `hasKey` tYPETyConKey, text err $$ ppr k )
         arg
     go k = pprPanic "getRuntimeRep" (text err $$
@@ -2163,7 +2162,7 @@ typeLiteralKind l =
 
 -- | Returns True if a type is levity polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.
--- Precondition: The type has kind (TYPE blah)
+-- Precondition: The type has kind (TYPE v blah)
 isTypeLevPoly :: Type -> Bool
 isTypeLevPoly = go
   where
@@ -2180,8 +2179,8 @@ isTypeLevPoly = go
     check_kind = isKindLevPoly . typeKind
 
 -- | Looking past all pi-types, is the end result potentially levity polymorphic?
--- Example: True for (forall r (a :: TYPE r). String -> a)
--- Example: False for (forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)
+-- Example: True for (forall r (a :: TYPEvis r). String -> a)
+-- Example: False for (forall r1 r2 (a :: TYPEvis r1) (b :: TYPEvis r2). a -> b -> Type)
 resultIsLevPoly :: Type -> Bool
 resultIsLevPoly = isTypeLevPoly . snd . splitPiTys
 

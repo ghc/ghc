@@ -417,7 +417,7 @@ inferResultToType :: InferResult -> TcM Type
 inferResultToType (IR { ir_uniq = u, ir_lvl = tc_lvl
                       , ir_ref = ref })
   = do { rr  <- newMetaTyVarTyAtLevel tc_lvl runtimeRepTy
-       ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPE rr)
+       ; tau <- newMetaTyVarTyAtLevel tc_lvl (tYPEvis rr)
              -- See Note [TcLevel of ExpType]
        ; writeMutVar ref (Just tau)
        ; traceTc "Forcing ExpType to be monomorphic:"
@@ -787,10 +787,10 @@ newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 newOpenTypeKind :: TcM TcKind
 newOpenTypeKind
   = do { rr <- newFlexiTyVarTy runtimeRepTy
-       ; return (tYPE rr) }
+       ; return (tYPEvis rr) }
 
 -- | Create a tyvar that can be a lifted or unlifted type.
--- Returns alpha :: TYPE kappa, where both alpha and kappa are fresh
+-- Returns alpha :: TYPEvis kappa, where both alpha and kappa are fresh
 newOpenFlexiTyVarTy :: TcM TcType
 newOpenFlexiTyVarTy
   = do { kind <- newOpenTypeKind
@@ -982,7 +982,7 @@ zonkQuantifiedTyVar :: Bool     -- True  <=> this is a kind var and -XNoPolyKind
                     -> TcM (Maybe TcTyVar)
 -- The quantified type variables often include meta type variables
 -- we want to freeze them into ordinary type variables, and
--- default their kind (e.g. from TYPE v to TYPE Lifted)
+-- default their kind (e.g. from TYPEvis v to TYPEvis Lifted)
 -- The meta tyvar is updated to point to the new skolem TyVar.  Now any
 -- bound occurrences of the original type variable will get zonked to
 -- the immutable version.

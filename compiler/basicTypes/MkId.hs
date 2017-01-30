@@ -31,7 +31,7 @@ module MkId (
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey, runRWId,
         coercionTokenId, magicDictId, coerceId,
-        proxyHashId, noinlineIdName,
+        proxyHashId, noinlineIdName, noinlineCIdName,
 
         -- Re-export error Ids
         module PrelRules
@@ -95,23 +95,14 @@ There are several reasons why an Id might appear in the wiredInIds:
     also have a description in primops.txt.pp, where they are called
     'pseudoops'.
 
-(2) The 'error' function, eRROR_ID, is wired in because we don't yet have
-    a way to express in an interface file that the result type variable
-    is 'open'; that is can be unified with an unboxed type
-
-    [The interface file format now carry such information, but there's
-    no way yet of expressing at the definition site for these
-    error-reporting functions that they have an 'open'
-    result type. -- sof 1/99]
-
-(3) Other error functions (rUNTIME_ERROR_ID) are wired in (a) because
+(2) Other error functions (rUNTIME_ERROR_ID) are wired in (a) because
     the desugarer generates code that mentions them directly, and
-    (b) for the same reason as eRROR_ID
+    (b) for the same reason as eRROR_ID. (These appear in MkCore.)
 
-(4) lazyId is wired in because the wired-in version overrides the
-    strictness of the version defined in GHC.Base
+(3) lazyId is wired in because the wired-in version overrides the
+    strictness of the version defined in GHC.Magic
 
-(5) noinlineId is wired in because when we serialize to interfaces
+(4) noinlineId is wired in because when we serialize to interfaces
     we may insert noinline statements.
 
 In cases (2-4), the function has a definition in a library module, and
@@ -122,7 +113,7 @@ is right here.
 
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId, dollarId, oneShotId, runRWId, noinlineId]
+  =  [lazyId, dollarId, oneShotId, runRWId, noinlineId, noinlineCId]
   ++ errorIds           -- Defined in MkCore
   ++ ghcPrimIds
 
@@ -1068,15 +1059,12 @@ unsafeCoerce# isn't so much a PrimOp as a phantom identifier, that
 just gets expanded into a type coercion wherever it occurs.  Hence we
 add it as a built-in Id with an unfolding here.
 
-The type variables we use here are "open" type variables: this means
-they can unify with both unlifted and lifted types.  Hence we provide
-another gun with which to shoot yourself in the foot.
 -}
 
 lazyIdName, unsafeCoerceName, nullAddrName, seqName,
    realWorldName, voidPrimIdName, coercionTokenName,
    magicDictName, coerceName, proxyName, dollarName, oneShotName,
-   runRWName, noinlineIdName :: Name
+   runRWName, noinlineIdName, noinlineCIdName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
@@ -1090,7 +1078,8 @@ proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHash
 dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 runRWName         = mkWiredInIdName gHC_MAGIC (fsLit "runRW#")         runRWKey           runRWId
-noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
+noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline")       noinlineIdKey      noinlineId
+noinlineCIdName   = mkWiredInIdName gHC_PRIM  (fsLit "noinlineC")      noinlineCIdKey     noinlineCId
 
 dollarId :: Id  -- Note [dollarId magic]
 dollarId = pcMiscPrelId dollarName ty
@@ -1125,10 +1114,10 @@ unsafeCoerceId
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
     -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-    --                         (a :: TYPE r1) (b :: TYPE r2).
+    --                         (a :: TYPEvis r1) (b :: TYPEvis r2).
     --                         a -> b
     bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
-                               (\ks -> map tYPE ks)
+                               (\ks -> map tYPEvis ks)
 
     [_, _, a, b] = mkTyVarTys bndrs
 
@@ -1204,9 +1193,17 @@ lazyId = pcMiscPrelId lazyIdName ty info
 noinlineId :: Id -- See Note [noinlineId magic]
 noinlineId = pcMiscPrelId noinlineIdName ty info
   where
-    info = noCafIdInfo
-    ty  = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar]
-                          (mkFunTy openAlphaTy openAlphaTy)
+    info = noCafIdInfo `setNeverLevPoly` ty
+    ty  = mkSpecForAllTys [alphaTyVar] (mkFunTy alphaTy alphaTy)
+
+-- See Note [noinlineId magic]
+noinlineCId :: Id
+noinlineCId = pcMiscPrelId noinlineCIdName ty info
+  where
+    info = noCafIdInfo `setNeverLevPoly` ty
+    ty   = mkSpecForAllTys [a] (mkFunTy a_ty a_ty)
+    a:_  = mkTemplateTyVars [constraintKind]
+    a_ty = mkTyVarTy a
 
 oneShotId :: Id -- See Note [The oneShot function]
 oneShotId = pcMiscPrelId oneShotName ty info
@@ -1304,7 +1301,7 @@ unboxed values (unsafeCoerce 3#).
 
 In contrast unsafeCoerce# is even more dangerous because you *can* use
 it on unboxed things, (unsafeCoerce# 3#) :: Int. Its type is
-   forall (r1 :: RuntimeRep) (r2 :: RuntimeRep) (a: TYPE r1) (b: TYPE r2). a -> b
+   forall (r1 :: RuntimeRep) (r2 :: RuntimeRep) (a: TYPEvis r1) (b: TYPEvis r2). a -> b
 
 Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
@@ -1415,7 +1412,7 @@ Implementing 'lazy' is a bit tricky:
 
 Note [noinlineId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~
-noinline :: forall (r :: RuntimeRep) (a :: TYPE r). a -> a
+noinline :: forall a. a -> a
 
 'noinline' is used to make sure that a function f is never inlined,
 e.g., as in 'noinline f x'.  Ordinarily, the identity function with NOINLINE
@@ -1426,10 +1423,12 @@ running the simplifier.
 
 'noinline' needs to be wired-in because it gets inserted automatically
 when we serialize an expression to the interface format, and we DON'T
-want use its fingerprints.
+want to use its fingerprints.
 
-It must be levity-polymorphic because it is sometimes used on Constraints.
-
+In cases where we have recursive dictionaries, we sometimes have to
+to use noinline on a dictionary. The type of noinline won't work on
+a type of kind Constraint, so we define noinlineC to work on Constraints.
+See also Note [Inlining and hs-boot files] in ToIfce.
 
 Note [runRW magic]
 ~~~~~~~~~~~~~~~~~~
@@ -1465,7 +1464,7 @@ no further floating will occur. This allows us to safely inline things like
 While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
 to be open-kinded,
 
-    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
+    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPEvis r)
            => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 

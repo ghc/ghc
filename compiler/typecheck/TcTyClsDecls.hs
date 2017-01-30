@@ -273,7 +273,7 @@ Monad c in bop's type signature means that D must have kind Type->Type.
 Note: we don't treat type synonyms specially (we used to, in the past);
 in particular, even if we have a type synonym cycle, we still kind check
 it normally, and test for cycles later (checkSynCycles).  The reason
-we can get away with this is because we have more systematic TYPE r
+we can get away with this is because we have more systematic TYPEvis r
 inference, which means that we can do unification between kinds that
 aren't lifted (this historically was not true.)
 
@@ -2442,7 +2442,7 @@ checkValidClass cls
            -- a method cannot be levity polymorphic, as we have to store the
            -- method in a dictionary
            -- example of what this prevents:
-           --   class BoundedX (a :: TYPE r) where minBound :: a
+           --   class BoundedX (a :: TYPEvis r) where minBound :: a
            -- See Note [Levity polymorphism checking] in DsMonad
         ; checkForLevPoly empty tau1
 

@@ -46,7 +46,7 @@ import qualified Data.IntSet as IS
 
 type NvUnaryType = Type
 type UnaryType   = Type
-     -- Both are always a value type; i.e. its kind is TYPE rr
+     -- Both are always a value type; i.e. its kind is TYPE v rr
      -- for some rr; moreover the rr is never a variable.
      --
      --   NvUnaryType : never an unboxed tuple or sum, or void
@@ -153,7 +153,7 @@ ubxSumRepType :: [[PrimRep]] -> [SlotTy]
 ubxSumRepType constrs0
   -- These first two cases never classify an actual unboxed sum, which always
   -- has at least two disjuncts. But it could happen if a user writes, e.g.,
-  -- forall (a :: TYPE (SumRep [IntRep])). ...
+  -- forall (a :: TYPEvis (SumRep [IntRep])). ...
   -- which could never be instantiated. We still don't want to panic.
   | length constrs0 < 2
   = [WordSlot]
@@ -331,21 +331,17 @@ tyConPrimRep1 tc = case tyConPrimRep tc of
   [rep] -> rep
   _     -> pprPanic "tyConPrimRep1" (ppr tc $$ ppr (tyConPrimRep tc))
 
--- | Take a kind (of shape @TYPE rr@) and produce the 'PrimRep's
+-- | Take a kind (of shape @TYPE v rr@) and produce the 'PrimRep's
 -- of values of types of this kind.
 kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
   | Just ki' <- coreView ki
   = kindPrimRep doc ki'
-kindPrimRep doc (TyConApp typ [runtime_rep])
+kindPrimRep doc (TyConApp typ [_vis, runtime_rep])
   = ASSERT( typ `hasKey` tYPETyConKey )
     runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
-
-  -- TODO (RAE): Remove:
-  -- WARN( True, text "kindPrimRep defaulting to LiftedRep on" <+> ppr ki $$ doc )
-  -- [LiftedRep]  -- this can happen legitimately for, e.g., Any
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes.
@@ -362,4 +358,4 @@ runtimeRepPrimRep doc rr_ty
 -- | Convert a PrimRep back to a Type. Used only in the unariser to give types
 -- to fresh Ids. Really, only the type's representation matters.
 primRepToType :: PrimRep -> Type
-primRepToType = anyTypeOfKind . tYPE . primRepToRuntimeRep
+primRepToType = anyTypeOfKind . tYPEvis . primRepToRuntimeRep

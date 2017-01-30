@@ -1,6 +1,6 @@
 {-# LANGUAGE MagicHash, NoImplicitPrelude, TypeFamilies, UnboxedTuples,
              MultiParamTypeClasses, RoleAnnotations, CPP, TypeOperators,
-             PolyKinds #-}
+             TypeInType #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Types
@@ -32,7 +32,8 @@ module GHC.Types (
         Nat, Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, RuntimeRep(..), Type, type (*), type (★), Constraint,
+        TYPE, RuntimeRep(..), Visibility(..), Type, type (*), type (★), Constraint,
+        TYPEvis,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -57,16 +58,19 @@ infixr 5 :
 ********************************************************************* -}
 
 -- | The kind of constraints, like @Show a@
-type Constraint = TYPE 'ConstraintRep
+type Constraint = TYPE 'Invisible 'LiftedRep
 
 -- | The kind of types with values. For example @Int :: Type@.
-type Type = TYPE 'LiftedRep
+type Type = TYPE 'Visible 'LiftedRep
 
 -- | A backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type * = TYPE 'LiftedRep
+type * = TYPE 'Visible 'LiftedRep
 
 -- | A unicode backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type ★ = TYPE 'LiftedRep
+type ★ = TYPE 'Visible 'LiftedRep
+
+-- | The kind of visible types, but with a configurable representation.
+type TYPEvis = TYPE 'Visible
 
 {- *********************************************************************
 *                                                                      *
@@ -378,7 +382,6 @@ data RuntimeRep = VecRep VecCount VecElem   -- ^ a SIMD vector type
                 | SumRep [RuntimeRep]       -- ^ An unboxed sum of the given reps
                 | LiftedRep       -- ^ lifted; represented by a pointer
                 | UnliftedRep     -- ^ unlifted; represented by a pointer
-                | ConstraintRep   -- ^ lifted; a constraint
                 | IntRep          -- ^ signed, word-sized value
                 | WordRep         -- ^ unsigned, word-sized value
                 | Int64Rep        -- ^ signed, 64-bit value (on 32-bit only)
@@ -408,6 +411,15 @@ data VecElem = Int8ElemRep
              | Word64ElemRep
              | FloatElemRep
              | DoubleElemRep
+
+-- | GHC also distinguishes between types whose values are passed /visibly/
+-- versus ones that aren't. To wit, values of 'Constraint' types are always
+-- passed /invisibily/; other values are visible.
+--
+-- NB: This feature of GHC's type system is quite likely to change in the
+-- future, as we hope to make the choice of visibility based on the arrow
+-- used, not the type's kind.
+data Visibility = Visible | Invisible
 
 {- *********************************************************************
 *                                                                      *

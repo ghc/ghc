@@ -385,7 +385,7 @@ tcPatSynMatcher (L loc name) lpat
        ; tv_name <- newNameAt (mkTyVarOcc "r")   loc
        ; let rr_tv  = mkTcTyVar rr_name runtimeRepTy vanillaSkolemTv
              rr     = mkTyVarTy rr_tv
-             res_tv = mkTcTyVar tv_name (tYPE rr) vanillaSkolemTv
+             res_tv = mkTcTyVar tv_name (tYPEvis rr) vanillaSkolemTv
              res_ty = mkTyVarTy res_tv
              is_unlifted = null args && null prov_dicts
              (cont_args, cont_arg_tys)

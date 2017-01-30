@@ -693,10 +693,6 @@ cpeApp top_env expr
             = go fun (CpeTick tickish : as) depth
         go terminal as depth = (terminal, as, depth)
 
-    replace_with_arg env arg args depth
-      = let (terminal, args', depth') = collect_args arg
-        in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
-
     cpe_app :: CorePrepEnv
             -> CoreExpr
             -> [ArgInfo]
@@ -704,6 +700,8 @@ cpeApp top_env expr
             -> UniqSM (Floats, CpeRhs)
     cpe_app env (Var f) (CpeApp Type{} : CpeApp arg : args) depth
         | f `hasKey` lazyIdKey          -- Replace (lazy a) with a, and
+       || f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
+       || f `hasKey` noinlineCIdKey     -- Replace (noinlineC a) with a
         -- Consider the code:
         --
         --      lazy (f x) y
@@ -717,13 +715,8 @@ cpeApp top_env expr
         --      }
         --
         -- rather than the far superior "f x y".  Test case is par01.
-        = replace_with_arg env arg args depth
-
-      -- NB: noinline has a RuntimeRep arg and a type arg
-    cpe_app env (Var f) (CpeApp Type{} : CpeApp Type{} : CpeApp arg : args) depth
-        | f `hasKey` noinlineIdKey      -- Replace (noinline a) with a
-        = replace_with_arg env arg args depth
-
+        = let (terminal, args', depth') = collect_args arg
+          in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
     cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
         | f `hasKey` runRWKey
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this

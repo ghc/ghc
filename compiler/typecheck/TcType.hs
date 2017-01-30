@@ -358,7 +358,7 @@ data InferResult
                             --           i.e. return a SigmaType
        , ir_ref  :: IORef (Maybe TcType) }
          -- The type that fills in this hole should be a Type,
-         -- that is, its kind should be (TYPE rr) for some rr
+         -- that is, its kind should be (TYPEvis rr) for some rr
 
 type ExpSigmaType = ExpType
 type ExpRhoType   = ExpType

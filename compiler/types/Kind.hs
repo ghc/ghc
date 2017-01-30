@@ -44,7 +44,7 @@ returnsConstraintKind = go
     go (FunTy    _ ty)  = go ty
     go other            = isConstraintKind other
 
--- | Tests whether the given kind (which should look like @TYPE x@)
+-- | Tests whether the given kind (which should look like @TYPE v x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 isKindLevPoly :: Kind -> Bool
 isKindLevPoly k = ASSERT2( _is_type k, ppr k )
@@ -64,7 +64,7 @@ isKindLevPoly k = ASSERT2( _is_type k, ppr k )
       | Just ty' <- coreView ty
       = _is_type ty'
 
-      | TyConApp typ [_] <- ty
+      | TyConApp typ [_, _] <- ty
       = typ `hasKey` tYPETyConKey
 
       | otherwise
@@ -90,17 +90,16 @@ okArrowResultKind = classifiesTypeWithValues
 -- indistinguishable
 
 -- | Does this classify a type allowed to have values? Responds True to things
--- like *, #, TYPE Lifted, TYPE v, Constraint.
+-- like *, #, TYPEvis Lifted, TYPE v r, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
--- ^ True of any sub-kind of OpenTypeKind
 classifiesTypeWithValues t | Just t' <- coreView t = classifiesTypeWithValues t'
-classifiesTypeWithValues (TyConApp tc [_]) = tc `hasKey` tYPETyConKey
+classifiesTypeWithValues (TyConApp tc [_,_]) = tc `hasKey` tYPETyConKey
 classifiesTypeWithValues _ = False
 
 {- Note [Levity polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Is this type legal?
-   (a :: TYPE rep) -> Int
+   (a :: TYPEvis rep) -> Int
    where 'rep :: RuntimeRep'
 
 You might think not, because no lambda can have a
@@ -108,7 +107,7 @@ runtime-rep-polymorphic binder.  So no lambda has the
 above type.  BUT here's a way it can be useful (taken from
 Trac #12708):
 
-  data T rep (a :: TYPE rep)
+  data T rep (a :: TYPEvis rep)
      = MkT (a -> Int)
 
   x1 :: T LiftedRep Int
@@ -120,6 +119,6 @@ Trac #12708):
 Note that the lambdas are just fine!
 
 Hence, okArrowArgKind and okArrowResultKind both just
-check that the type is of the form (TYPE r) for some
+check that the type is of the form (TYPEvis r) for some
 representation type r.
 -}

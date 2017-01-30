@@ -685,24 +685,27 @@ mkTyConTy tycon = TyConApp tycon []
 Some basic functions, put here to break loops eg with the pretty printer
 -}
 
-is_TYPE :: (   Type    -- the single argument to TYPE; not a synonym
+is_TYPE :: (   Type    -- the Visibility argument to TYPE; not a synonym
+            -> Type    -- the RuntimeRep argument to TYPE; not a synonym
             -> Bool )  -- what to return
         -> Kind -> Bool
 is_TYPE f ki | Just ki' <- coreView ki = is_TYPE f ki'
-is_TYPE f (TyConApp tc [arg])
+is_TYPE f (TyConApp tc [vis, rep])
   | tc `hasKey` tYPETyConKey
-  = go arg
+  = go vis rep
     where
-      go ty | Just ty' <- coreView ty = go ty'
-      go ty = f ty
+      go vis rep | Just vis' <- coreView vis = go vis' rep
+                 | Just rep' <- coreView rep = go vis  rep'
+                 | otherwise                 = f  vis  rep
 is_TYPE _ _ = False
 
 -- | Returns True if the argument is equivalent to Type and False otherwise.
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind = is_TYPE is_lifted
   where
-    is_lifted (TyConApp lifted_rep []) = lifted_rep `hasKey` liftedRepDataConKey
-    is_lifted _                        = False
+    is_lifted (TyConApp vis []) (TyConApp lifted_rep [])
+      = vis `hasKey` visibleDataConKey && lifted_rep `hasKey` liftedRepDataConKey
+    is_lifted _ _ = False
 
 -- | Returns True if the kind classifies unlifted types and False otherwise.
 -- Note that this returns False for levity-polymorphic kinds, which may
@@ -710,16 +713,16 @@ isLiftedTypeKind = is_TYPE is_lifted
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind = is_TYPE is_unlifted
   where
-    is_unlifted (TyConApp rr _args) = not (isLiftedRuntimeRepTyCon rr)
-    is_unlifted _                   = False
+    is_unlifted _ (TyConApp rr _args) = not (isLiftedRuntimeRepTyCon rr)
+    is_unlifted _ _                   = False
 
 -- | Returns True if this kind is Constraint
 isConstraintKind :: Kind -> Bool
 isConstraintKind = is_TYPE is_constraint
   where
-    is_constraint (TyConApp constraint_rep [])
-      = constraint_rep `hasKey` constraintRepDataConKey
-    is_constraint _ = False
+    is_constraint (TyConApp invis []) (TyConApp constraint_rep [])
+      = invis `hasKey` invisibleDataConKey && constraint_rep `hasKey` liftedRepDataConKey
+    is_constraint _ _ = False
 
 -- | Is this the type 'RuntimeRep'?
 isRuntimeRepTy :: Type -> Bool

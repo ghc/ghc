@@ -1042,7 +1042,7 @@ maybe_substitute :: Subst -> InVar -> OutExpr -> Maybe Subst
     --   either extends subst with (in_var -> out_rhs)
     --   or     returns Nothing
 maybe_substitute subst b r
-  | Type ty <- r        -- let a::* = TYPE ty in <body>
+  | Type ty <- r        -- let a::* = Type ty in <body>
   = ASSERT( isTyVar b )
     Just (extendTvSubst subst b ty)
 

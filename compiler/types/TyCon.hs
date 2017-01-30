@@ -345,7 +345,7 @@ The contents of an unboxed tuple may have any representation. Accordingly,
 the kind of the unboxed tuple constructor is runtime-representation
 polymorphic. For example,
 
-   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep). TYPE q -> TYPE r -> #
+   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep). TYPEvis q -> TYPEvis r -> #
 
 These extra tyvars (v and w) cause some delicate processing around tuples,
 where we used to be able to assume that the tycon arity and the
@@ -2012,10 +2012,10 @@ isLiftedTypeKindTyConName
     (`hasKey` unicodeStarKindTyConKey)
 
 -- | Does this RuntimeRep TyCon classify lifted types?
--- Currently, true for LiftedRep and ConstraintRep
+-- Currently, true for LiftedRep
 isLiftedRuntimeRepTyCon :: TyCon -> Bool
 isLiftedRuntimeRepTyCon tc
-  = tc `hasKey` liftedRepDataConKey || tc `hasKey` constraintRepDataConKey
+  = tc `hasKey` liftedRepDataConKey
 
 -- | Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -2057,7 +2057,7 @@ isTcTyCon _            = False
 -- | Could this TyCon ever be levity-polymorphic when fully applied?
 -- True is safe. False means we're sure. Does only a quick check
 -- based on the TyCon's category.
--- Precondition: The fully-applied TyCon has kind (TYPE blah)
+-- Precondition: The fully-applied TyCon has kind (TYPE v blah)
 isTcLevPoly :: TyCon -> Bool
 isTcLevPoly FunTyCon{}           = False
 isTcLevPoly (AlgTyCon { algTcParent = UnboxedAlgTyCon }) = True
