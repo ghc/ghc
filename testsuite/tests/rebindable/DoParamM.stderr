@@ -11,12 +11,12 @@ DoParamM.hs:286:28: error:
         Actual type: LIO Unlocked Locked ()
     • In a stmt of a 'do' block: tlock2_do
       In the expression:
-        do { tlock2_do;
-             tlock2_do }
+        do tlock2_do
+           tlock2_do
       In an equation for ‘tlock4_do’:
           tlock4_do
-            = do { tlock2_do;
-                   tlock2_do }
+            = do tlock2_do
+                 tlock2_do
 
 DoParamM.hs:302:37: error:
     • Couldn't match type ‘Locked’ with ‘Unlocked’
@@ -24,11 +24,11 @@ DoParamM.hs:302:37: error:
         Actual type: LIO Locked Unlocked ()
     • In a stmt of a 'do' block: unlock
       In the expression:
-        do { tlock2_do;
-             unlock;
-             unlock }
+        do tlock2_do
+           unlock
+           unlock
       In an equation for ‘tlock4'_do’:
           tlock4'_do
-            = do { tlock2_do;
-                   unlock;
-                   unlock }
+            = do tlock2_do
+                 unlock
+                 unlock

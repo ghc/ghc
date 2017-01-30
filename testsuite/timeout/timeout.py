@@ -42,8 +42,12 @@ try:
         (pid2, res) = os.waitpid(pid, 0)
         if (os.WIFEXITED(res)):
             sys.exit(os.WEXITSTATUS(res))
-        else:
-            sys.exit(res)
+        elif os.WIFSIGNALED(res):
+            # represent signals using the Bourne shell convention
+            sys.exit(128 + os.WTERMSIG(res))
+        else:                           # WIFCONTINUED or WIFSTOPPED
+            killProcess(pid)
+            sys.exit(99)                # unexpected
 
 except KeyboardInterrupt:
     sys.exit(98)

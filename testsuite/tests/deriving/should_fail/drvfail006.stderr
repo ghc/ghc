@@ -1,6 +1,4 @@
 
-drvfail006.hs:9:45:
-    Can't make a derived instance of `MonadState T'
-      (even with cunning newtype deriving):
-      `MonadState' does not have arity 1
-    In the newtype declaration for `T'
+drvfail006.hs:9:45: error:
+    • ‘MonadState’ is not a unary constraint, as expected by a deriving clause
+    • In the newtype declaration for ‘T’
