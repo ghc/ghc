@@ -870,12 +870,11 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
 
     /* Symbol can be found during linking, but hasn't been relocated. Do so now.
         See Note [runtime-linker-phases] */
-    if (oc && oc->status == OBJECT_LOADED) {
+    if (oc && lbl && oc->status == OBJECT_LOADED) {
         oc->status = OBJECT_NEEDED;
         IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loading symbol '%s'\n", lbl));
         int r = ocTryLoad(oc);
         if (!r) {
-            errorBelch("Could not on-demand load symbol '%s'\n", lbl);
             return NULL;
         }
 
@@ -893,6 +892,10 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
 {
     ACQUIRE_LOCK(&linker_mutex);
     SymbolAddr* r = lookupSymbol_(lbl);
+    if (!r) {
+        errorBelch("^^ Could not load '%s', dependency unresolved. See top entry above.\n", lbl);
+        fflush(stderr);
+    }
     RELEASE_LOCK(&linker_mutex);
     return r;
 }

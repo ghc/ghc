@@ -1326,7 +1326,7 @@ ocResolve_PEi386 ( ObjectCode* oc )
             S = (size_t) lookupSymbol_( (char*)symbol );
             if ((void*)S == NULL) {
 
-                errorBelch("%" PATH_FMT ": unknown symbol `%s'\n", oc->fileName, symbol);
+                errorBelch(" | %" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
                 return false;
             }
          }
