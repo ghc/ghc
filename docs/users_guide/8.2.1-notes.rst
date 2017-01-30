@@ -45,6 +45,12 @@ Compiler
   syntax can be used, in addition to a new form for specifying the cost centre
   name. See :ref:`scc-pragma` for examples.
 
+- GHC is now much more particular about :ghc-flag:`-XDefaultSignatures`. The
+  type signature for a default method of a type class must now be the same as
+  the corresponding main method's type signature modulo differences in the
+  signatures' contexts. Otherwise, the typechecker will reject that class's
+  definition. See :ref:`class-default-signatures` for further details.
+
 - It is now possible to explicitly pick a strategy to use when deriving a
   class instance using the :ghc-flag:`-XDerivingStrategies` language extension
   (see :ref:`deriving-strategies`).

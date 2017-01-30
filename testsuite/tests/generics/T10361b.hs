@@ -16,7 +16,9 @@ class Convert a where
     type instance Result a = GResult (Rep a)
 
     convert :: a -> Result a
-    default convert :: (Generic a, GConvert (Rep a)) => a -> GResult (Rep a)
+    default convert
+            :: (Generic a, GConvert (Rep a), Result a ~ GResult (Rep a))
+            => a -> Result a
     convert x = gconvert (from x)
 
 instance Convert Float where

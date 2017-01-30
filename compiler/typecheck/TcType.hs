@@ -66,7 +66,7 @@ module TcType (
   tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
   tcGetTyVar_maybe, tcGetTyVar, nextRole,
-  tcSplitSigmaTy, tcDeepSplitSigmaTy_maybe,
+  tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
 
   ---------------------------------
   -- Predicates.
@@ -1357,6 +1357,34 @@ tcSplitSigmaTy :: Type -> ([TyVar], ThetaType, Type)
 tcSplitSigmaTy ty = case tcSplitForAllTys ty of
                         (tvs, rho) -> case tcSplitPhiTy rho of
                                         (theta, tau) -> (tvs, theta, tau)
+
+-- | Split a sigma type into its parts, going underneath as many @ForAllTy@s
+-- as possible. For example, given this type synonym:
+--
+-- @
+-- type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
+-- @
+--
+-- if you called @tcSplitSigmaTy@ on this type:
+--
+-- @
+-- forall s t a b. Each s t a b => Traversal s t a b
+-- @
+--
+-- then it would return @([s,t,a,b], [Each s t a b], Traversal s t a b)@. But
+-- if you instead called @tcSplitNestedSigmaTys@ on the type, it would return
+-- @([s,t,a,b,f], [Each s t a b, Applicative f], (a -> f b) -> s -> f t)@.
+tcSplitNestedSigmaTys :: Type -> ([TyVar], ThetaType, Type)
+-- NB: This is basically a pure version of deeplyInstantiate (from Inst) that
+-- doesn't compute an HsWrapper.
+tcSplitNestedSigmaTys ty
+    -- If there's a forall, split it apart and try splitting the rho type
+    -- underneath it.
+  | Just (arg_tys, tvs1, theta1, rho1) <- tcDeepSplitSigmaTy_maybe ty
+  = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkFunTys arg_tys rho2)
+    -- If there's no forall, we're done.
+  | otherwise = ([], [], ty)
 
 -----------------------
 tcDeepSplitSigmaTy_maybe

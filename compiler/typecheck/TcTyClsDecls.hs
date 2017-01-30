@@ -2448,16 +2448,17 @@ checkValidClass cls
         ; checkForLevPoly empty tau1
 
         ; unless constrained_class_methods $
-          mapM_ check_constraint (tail (theta1 ++ theta2))
+          mapM_ check_constraint (tail (cls_pred:op_theta))
 
-        ; check_dm ctxt sel_id dm
+        ; check_dm ctxt sel_id cls_pred tau2 dm
         }
         where
           ctxt    = FunSigCtxt op_name True -- Report redundant class constraints
           op_name = idName sel_id
           op_ty   = idType sel_id
-          (_,theta1,tau1) = tcSplitSigmaTy op_ty
-          (_,theta2,_)    = tcSplitSigmaTy tau1
+          (_,cls_pred,tau1) = tcSplitMethodTy op_ty
+          -- See Note [Splitting nested sigma types]
+          (_,op_theta,tau2) = tcSplitNestedSigmaTys tau1
 
           check_constraint :: TcPredType -> TcM ()
           check_constraint pred -- See Note [Class method constraints]
@@ -2482,21 +2483,81 @@ checkValidClass cls
         where
           fam_tvs = tyConTyVars fam_tc
 
-    check_dm :: UserTypeCtxt -> Id -> DefMethInfo -> TcM ()
+    check_dm :: UserTypeCtxt -> Id -> PredType -> Type -> DefMethInfo -> TcM ()
     -- Check validity of the /top-level/ generic-default type
     -- E.g for   class C a where
     --             default op :: forall b. (a~b) => blah
     -- we do not want to do an ambiguity check on a type with
     -- a free TyVar 'a' (Trac #11608).  See TcType
-    -- Note [TyVars and TcTyVars during type checking]
+    -- Note [TyVars and TcTyVars during type checking] in TcType
     -- Hence the mkDefaultMethodType to close the type.
-    check_dm ctxt sel_id (Just (dm_name, dm_spec@(GenericDM {})))
-      = setSrcSpan (getSrcSpan dm_name) $
+    check_dm ctxt sel_id vanilla_cls_pred vanilla_tau
+             (Just (dm_name, dm_spec@(GenericDM dm_ty)))
+      = setSrcSpan (getSrcSpan dm_name) $ do
             -- We have carefully set the SrcSpan on the generic
             -- default-method Name to be that of the generic
             -- default type signature
-        checkValidType ctxt (mkDefaultMethodType cls sel_id dm_spec)
-    check_dm _ _ _ = return ()
+
+          -- First, we check that that the method's default type signature
+          -- aligns with the non-default type signature.
+          -- See Note [Default method type signatures must align]
+          let cls_pred = mkClassPred cls $ mkTyVarTys $ classTyVars cls
+              -- Note that the second field of this tuple contains the context
+              -- of the default type signature, making it apparent that we
+              -- ignore method contexts completely when validity-checking
+              -- default type signatures. See the end of
+              -- Note [Default method type signatures must align]
+              -- to learn why this is OK.
+              --
+              -- See also Note [Splitting nested sigma types]
+              -- for an explanation of why we don't use tcSplitSigmaTy here.
+              (_, _, dm_tau) = tcSplitNestedSigmaTys dm_ty
+
+              -- Given this class definition:
+              --
+              --  class C a b where
+              --    op         :: forall p q. (Ord a, D p q)
+              --               => a -> b -> p -> (a, b)
+              --    default op :: forall r s. E r
+              --               => a -> b -> s -> (a, b)
+              --
+              -- We want to match up two types of the form:
+              --
+              --   Vanilla type sig: C aa bb => aa -> bb -> p -> (aa, bb)
+              --   Default type sig: C a  b  => a  -> b  -> s -> (a,  b)
+              --
+              -- Notice that the two type signatures can be quantified over
+              -- different class type variables! Therefore, it's important that
+              -- we include the class predicate parts to match up a with aa and
+              -- b with bb.
+              vanilla_phi_ty = mkPhiTy [vanilla_cls_pred] vanilla_tau
+              dm_phi_ty      = mkPhiTy [cls_pred] dm_tau
+
+          traceTc "check_dm" $ vcat
+              [ text "vanilla_phi_ty" <+> ppr vanilla_phi_ty
+              , text "dm_phi_ty"      <+> ppr dm_phi_ty ]
+
+          -- Actually checking that the types align is done with a call to
+          -- tcMatchTys. We need to get a match in both directions to rule
+          -- out degenerate cases like these:
+          --
+          --  class Foo a where
+          --    foo1         :: a -> b
+          --    default foo1 :: a -> Int
+          --
+          --    foo2         :: a -> Int
+          --    default foo2 :: a -> b
+          unless (isJust $ tcMatchTys [dm_phi_ty, vanilla_phi_ty]
+                                      [vanilla_phi_ty, dm_phi_ty]) $ addErrTc $
+               hang (text "The default type signature for"
+                     <+> ppr sel_id <> colon)
+                 2 (ppr dm_ty)
+            $$ (text "does not match its corresponding"
+                <+> text "non-default type signature")
+
+          -- Now do an ambiguity check on the default type signature.
+          checkValidType ctxt (mkDefaultMethodType cls sel_id dm_spec)
+    check_dm _ _ _ _ _ = return ()
 
 checkFamFlag :: Name -> TcM ()
 -- Check that we don't use families without -XTypeFamilies
@@ -2537,6 +2598,137 @@ representative example:
   class C a => D a
 
 This fixes Trac #9415, #9739
+
+Note [Default method type signatures must align]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GHC enforces the invariant that a class method's default type signature
+must "align" with that of the method's non-default type signature, as per
+GHC Trac #12918. For instance, if you have:
+
+  class Foo a where
+    bar :: forall b. Context => a -> b
+
+Then a default type signature for bar must be alpha equivalent to
+(forall b. a -> b). That is, the types must be the same modulo differences in
+contexts. So the following would be acceptable default type signatures:
+
+    default bar :: forall b. Context1 => a -> b
+    default bar :: forall x. Context2 => a -> x
+
+But the following are NOT acceptable default type signatures:
+
+    default bar :: forall b. b -> a
+    default bar :: forall x. x
+    default bar :: a -> Int
+
+Note that a is bound by the class declaration for Foo itself, so it is
+not allowed to differ in the default type signature.
+
+The default type signature (default bar :: a -> Int) deserves special mention,
+since (a -> Int) is a straightforward instantiation of (forall b. a -> b). To
+write this, you need to declare the default type signature like so:
+
+    default bar :: forall b. (b ~ Int). a -> b
+
+As noted in #12918, there are several reasons to do this:
+
+1. It would make no sense to have a type that was flat-out incompatible with
+   the non-default type signature. For instance, if you had:
+
+     class Foo a where
+       bar :: a -> Int
+       default bar :: a -> Bool
+
+   Then that would always fail in an instance declaration. So this check
+   nips such cases in the bud before they have the chance to produce
+   confusing error messages.
+
+2. Internally, GHC uses TypeApplications to instantiate the default method in
+   an instance. See Note [Default methods in instances] in TcInstDcls.
+   Thus, GHC needs to know exactly what the universally quantified type
+   variables are, and when instantiated that way, the default method's type
+   must match the expected type.
+
+3. Aesthetically, by only allowing the default type signature to differ in its
+   context, we are making it more explicit the ways in which the default type
+   signature is less polymorphic than the non-default type signature.
+
+You might be wondering: why are the contexts allowed to be different, but not
+the rest of the type signature? That's because default implementations often
+rely on assumptions that the more general, non-default type signatures do not.
+For instance, in the Enum class declaration:
+
+    class Enum a where
+      enum :: [a]
+      default enum :: (Generic a, GEnum (Rep a)) => [a]
+      enum = map to genum
+
+    class GEnum f where
+      genum :: [f a]
+
+The default implementation for enum only works for types that are instances of
+Generic, and for which their generic Rep type is an instance of GEnum. But
+clearly enum doesn't _have_ to use this implementation, so naturally, the
+context for enum is allowed to be different to accomodate this. As a result,
+when we validity-check default type signatures, we ignore contexts completely.
+
+Note that when checking whether two type signatures match, we must take care to
+split as many foralls as it takes to retrieve the tau types we which to check.
+See Note [Splitting nested sigma types].
+
+Note [Splitting nested sigma types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this type synonym and class definition:
+
+  type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
+
+  class Each s t a b where
+    each         ::                                      Traversal s t a b
+    default each :: (Traversable g, s ~ g a, t ~ g b) => Traversal s t a b
+
+It might seem obvious that the tau types in both type signatures for `each`
+are the same, but actually getting GHC to conclude this is surprisingly tricky.
+That is because in general, the form of a class method's non-default type
+signature is:
+
+  forall a. C a => forall d. D d => E a b
+
+And the general form of a default type signature is:
+
+  forall f. F f => E a f -- The variable `a` comes from the class
+
+So it you want to get the tau types in each type signature, you might find it
+reasonable to call tcSplitSigmaTy twice on the non-default type signature, and
+call it once on the default type signature. For most classes and methods, this
+will work, but Each is a bit of an exceptional case. The way `each` is written,
+it doesn't quantify any additional type variables besides those of the Each
+class itself, so the non-default type signature for `each` is actually this:
+
+  forall s t a b. Each s t a b => Traversal s t a b
+
+Notice that there _appears_ to only be one forall. But there's actually another
+forall lurking in the Traversal type synonym, so if you call tcSplitSigmaTy
+twice, you'll also go under the forall in Traversal! That is, you'll end up
+with:
+
+  (a -> f b) -> s -> f t
+
+A problem arises because you only call tcSplitSigmaTy once on the default type
+signature for `each`, which gives you
+
+  Traversal s t a b
+
+Or, equivalently:
+
+  forall f. Applicative f => (a -> f b) -> s -> f t
+
+This is _not_ the same thing as (a -> f b) -> s -> f t! So now tcMatchTy will
+say that the tau types for `each` are not equal.
+
+A solution to this problem is to use tcSplitNestedSigmaTys instead of
+tcSplitSigmaTy. tcSplitNestedSigmaTys will always split any foralls that it
+sees until it can't go any further, so if you called it on the default type
+signature for `each`, it would return (a -> f b) -> s -> f t like we desired.
 
 ************************************************************************
 *                                                                      *

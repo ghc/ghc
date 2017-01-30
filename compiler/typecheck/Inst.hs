@@ -227,6 +227,10 @@ deeplyInstantiate :: CtOrigin -> TcSigmaType -> TcM (HsWrapper, TcRhoType)
 -- and   e :: ty
 -- then  wrap e :: rho
 -- That is, wrap :: ty ~> rho
+--
+-- If you don't need the HsWrapper returned from this function, consider
+-- using tcSplitNestedSigmaTys in TcType, which is a pure alternative that
+-- only computes the returned TcRhoType.
 
 deeplyInstantiate orig ty =
   deeply_instantiate orig

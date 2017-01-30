@@ -1,5 +1,11 @@
 
 T12151.hs:9:13: error:
+    • The default type signature for put: forall t. t
+      does not match its corresponding non-default type signature
+    • When checking the class method: put :: forall a. Put a => a
+      In the class declaration for ‘Put’
+
+T12151.hs:9:13: error:
     • Could not deduce (Put a0)
       from the context: Put a
         bound by the type signature for:
