@@ -1195,7 +1195,8 @@ lookupName is_type_name s
 
     occ :: OccName
     occ | is_type_name
-        = if isLexCon occ_fs then mkTcOccFS    occ_fs
+        = if isLexVarSym occ_fs || isLexCon occ_fs
+                             then mkTcOccFS    occ_fs
                              else mkTyVarOccFS occ_fs
         | otherwise
         = if isLexCon occ_fs then mkDataOccFS occ_fs

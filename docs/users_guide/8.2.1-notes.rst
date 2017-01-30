@@ -193,6 +193,9 @@ Template Haskell
    type variables ``a`` and ``k`` as implicitly quantified.
    (:ghc-ticket:`13018` and :ghc-ticket:`13123`)
 
+- Looking up type constructors with symbol names (e.g., ``+``) now works
+  as expected (:ghc-ticket:`11046`)
+
 
 Runtime system
 ~~~~~~~~~~~~~~
