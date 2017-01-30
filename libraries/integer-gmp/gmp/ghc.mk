@@ -15,8 +15,14 @@
 # That's because the doc/ directory contents are under the GFDL,
 # which causes problems for Debian.
 
-GMP_TARBALL := $(wildcard libraries/integer-gmp/gmp/tarball/gmp*.tar.bz2)
-GMP_DIR := $(patsubst libraries/integer-gmp/gmp/tarball/%-nodoc-patched.tar.bz2,%,$(GMP_TARBALL))
+ifneq "$(BINDIST)" "YES"
+GMP_TARBALL := $(wildcard libraries/integer-gmp/gmp/gmp-tarballs/gmp*.tar.bz2)
+GMP_DIR := $(patsubst libraries/integer-gmp/gmp/gmp-tarballs/%-nodoc.tar.bz2,%,$(GMP_TARBALL))
+
+ifeq "$(GMP_TARBALL)" ""
+$(error "GMP tarball is missing; you may need to run 'git submodule update --init'.")
+endif
+endif
 
 ifneq "$(NO_CLEAN_GMP)" "YES"
 $(eval $(call clean-target,gmp,,\
@@ -119,7 +125,6 @@ libraries/integer-gmp/gmp/libgmp.a libraries/integer-gmp/gmp/gmp.h:
 	cat $(GMP_TARBALL) | $(BZIP2_CMD) -d | { cd libraries/integer-gmp/gmp && $(TAR_CMD) -xf - ; }
 	mv libraries/integer-gmp/gmp/$(GMP_DIR) libraries/integer-gmp/gmp/gmpbuild
 	cd libraries/integer-gmp/gmp && $(PATCH_CMD) -p0 < gmpsrc.patch
-	cat libraries/integer-gmp/gmp/tarball/gmp-5.0.4.patch | { cd libraries/integer-gmp/gmp/gmpbuild && $(PATCH_CMD) -p1 ; }
 	chmod +x libraries/integer-gmp/gmp/ln
 
 	# Note: We must pass `TARGETPLATFORM` to the `--host` argument of GMP's

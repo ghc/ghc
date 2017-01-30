@@ -1,6 +1,7 @@
---- gmp-5.0.3/configure	2012-02-03 16:52:49.000000000 +0100
-+++ gmpbuild/configure	2014-11-07 23:46:33.629758238 +0100
-@@ -3937,8 +3937,8 @@
+diff -Naur gmp-6.1.2/configure gmpbuild/configure
+--- gmp-6.1.2/configure	2016-12-16 10:45:32.000000000 -0500
++++ gmpbuild/configure	2017-01-29 15:18:01.037775639 -0500
+@@ -4087,8 +4087,8 @@
  #
  cclist="gcc cc"
  
@@ -11,27 +12,78 @@
  cc_cflags="-O"
  cc_64_cflags="-O"
  
---- gmp-5.0.3/memory.c	2012-02-03 16:52:49.000000000 +0100
-+++ gmpbuild/memory.c	2014-11-07 23:54:20.734523242 +0100
-@@ -24,21 +24,10 @@
- #include "gmp-impl.h"
+@@ -27273,6 +27273,9 @@
+ 	  case $host in
+ 	    *-*-darwin*)
+ 
++echo "define(<PIC_ALWAYS>,<yes>)" >> $gmp_tmpconfigm4
++
++
+ echo "include_mpn(\`x86_64/darwin.m4')" >> $gmp_tmpconfigm4i
+  ;;
+ 	    *-*-mingw* | *-*-cygwin)
+@@ -28181,7 +28181,7 @@
+ # FIXME: Upcoming version of autoconf/automake may not like broken lines.
+ #        Right now automake isn't accepting the new AC_CONFIG_FILES scheme.
+ 
+-ac_config_files="$ac_config_files Makefile mpf/Makefile mpn/Makefile mpq/Makefile mpz/Makefile printf/Makefile scanf/Makefile rand/Makefile cxx/Makefile tests/Makefile tests/devel/Makefile tests/mpf/Makefile tests/mpn/Makefile tests/mpq/Makefile tests/mpz/Makefile tests/rand/Makefile tests/misc/Makefile tests/cxx/Makefile doc/Makefile tune/Makefile demos/Makefile demos/calc/Makefile demos/expr/Makefile gmp.h:gmp-h.in"
++ac_config_files="$ac_config_files Makefile mpf/Makefile mpn/Makefile mpq/Makefile mpz/Makefile printf/Makefile scanf/Makefile rand/Makefile cxx/Makefile tests/Makefile tests/devel/Makefile tests/mpf/Makefile tests/mpn/Makefile tests/mpq/Makefile tests/mpz/Makefile tests/rand/Makefile tests/misc/Makefile tests/cxx/Makefile tune/Makefile demos/Makefile demos/calc/Makefile demos/expr/Makefile gmp.h:gmp-h.in"
+ 
+ cat >confcache <<\_ACEOF
+ # This file is a shell script that caches the results of configure
+@@ -29325,7 +29325,6 @@
+     "tests/rand/Makefile") CONFIG_FILES="$CONFIG_FILES tests/rand/Makefile" ;;
+     "tests/misc/Makefile") CONFIG_FILES="$CONFIG_FILES tests/misc/Makefile" ;;
+     "tests/cxx/Makefile") CONFIG_FILES="$CONFIG_FILES tests/cxx/Makefile" ;;
+-    "doc/Makefile") CONFIG_FILES="$CONFIG_FILES doc/Makefile" ;;
+     "tune/Makefile") CONFIG_FILES="$CONFIG_FILES tune/Makefile" ;;
+     "demos/Makefile") CONFIG_FILES="$CONFIG_FILES demos/Makefile" ;;
+     "demos/calc/Makefile") CONFIG_FILES="$CONFIG_FILES demos/calc/Makefile" ;;
+diff -Naur gmp-6.1.2/Makefile.am gmpbuild/Makefile.am
+--- gmp-6.1.2/Makefile.am	2016-12-16 10:45:27.000000000 -0500
++++ gmpbuild/Makefile.am	2017-01-29 15:14:20.764370926 -0500
+@@ -110,7 +110,7 @@
+ LIBGMPXX_LT_AGE      = 5
  
  
--/* Patched for GHC: */
--void * stgAllocForGMP   (size_t size_in_bytes);
--void * stgReallocForGMP (void *ptr, size_t old_size, size_t new_size);
--void   stgDeallocForGMP (void *ptr, size_t size);
--
--void *  (*__gmp_allocate_func) __GMP_PROTO ((size_t)) = stgAllocForGMP;
--void *  (*__gmp_reallocate_func) __GMP_PROTO ((void *, size_t, size_t))
--     = stgReallocForGMP;
--void    (*__gmp_free_func) __GMP_PROTO ((void *, size_t)) = stgDeallocForGMP;
--/*
- void *	(*__gmp_allocate_func) __GMP_PROTO ((size_t)) = __gmp_default_allocate;
- void *	(*__gmp_reallocate_func) __GMP_PROTO ((void *, size_t, size_t))
-      = __gmp_default_reallocate;
- void	(*__gmp_free_func) __GMP_PROTO ((void *, size_t)) = __gmp_default_free;
--*/
+-SUBDIRS = tests mpn mpz mpq mpf printf scanf rand cxx demos tune doc
++SUBDIRS = tests mpn mpz mpq mpf printf scanf rand cxx demos tune
+ 
+ EXTRA_DIST = configfsf.guess configfsf.sub .gdbinit INSTALL.autoconf \
+ 	     COPYING.LESSERv3 COPYINGv2 COPYINGv3
+diff -Naur gmp-6.1.2/Makefile.in gmpbuild/Makefile.in
+--- gmp-6.1.2/Makefile.in	2016-12-16 10:45:34.000000000 -0500
++++ gmpbuild/Makefile.in	2017-01-29 15:14:32.596446554 -0500
+@@ -566,7 +566,7 @@
+ LIBGMPXX_LT_CURRENT = 9
+ LIBGMPXX_LT_REVISION = 2
+ LIBGMPXX_LT_AGE = 5
+-SUBDIRS = tests mpn mpz mpq mpf printf scanf rand cxx demos tune doc
++SUBDIRS = tests mpn mpz mpq mpf printf scanf rand cxx demos tune
+ 
+ # The "test -f" support for srcdir!=builddir is similar to the automake .c.o
+ # etc rules, but with each foo.c explicitly, since $< is not portable
+diff -Naur gmp-6.1.2/configure.ac gmpbuild/configure.ac
+--- gmp-6.1.2/configure.ac	2016-12-16 10:45:27.000000000 -0500
++++ gmpbuild/configure.ac	2017-01-29 22:47:28.469558006 -0500
+@@ -3698,7 +3698,8 @@
+           AC_DEFINE(HAVE_HOST_CPU_FAMILY_x86_64)
+ 	  case $host in
+ 	    *-*-darwin*)
++	      GMP_DEFINE_RAW(["define(<PIC_ALWAYS>,<yes>)"])
+ 	      GMP_INCLUDE_MPN(x86_64/darwin.m4) ;;
+ 	    *-*-mingw* | *-*-cygwin)
+ 	      GMP_INCLUDE_MPN(x86_64/dos64.m4) ;;
+ 	    *-openbsd*)
+diff -Naur gmp-6.1.2/mpn/asm-defs.m4 gmpbuild/mpn/asm-defs.m4
+--- gmp-6.1.2/mpn/asm-defs.m4	2016-12-16 10:45:27.000000000 -0500
++++ gmpbuild/mpn/asm-defs.m4	2017-01-29 22:46:26.025176258 -0500
+@@ -1051,7 +1051,7 @@
+ dnl  systems which are always PIC.  PIC_ALWAYS established in config.m4
+ dnl  identifies these for us.
+ 
+-ifelse(`PIC_ALWAYS',`yes',`define(`PIC')')
++ifelse(PIC_ALWAYS,yes,`define(`PIC')')
  
  
- /* Default allocation functions.  In case of failure to allocate/reallocate
+ dnl  Various possible defines passed from the Makefile that are to be tested
