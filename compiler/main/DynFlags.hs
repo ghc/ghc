@@ -177,7 +177,8 @@ import Outputable
 import Foreign.C        ( CInt(..) )
 import System.IO.Unsafe ( unsafeDupablePerformIO )
 import {-# SOURCE #-} ErrUtils ( Severity(..), MsgDoc, mkLocMessageAnn
-                               , getCaretDiagnostic )
+                               , getCaretDiagnostic, dumpSDoc )
+import Json
 import SysTools.Terminal ( stderrSupportsAnsiColors )
 
 import System.IO.Unsafe ( unsafePerformIO )
@@ -379,6 +380,7 @@ data DumpFlag
    | Opt_D_dump_view_pattern_commoning
    | Opt_D_verbose_core2core
    | Opt_D_dump_debug
+   | Opt_D_dump_json
 
    deriving (Eq, Show, Enum)
 
@@ -568,6 +570,10 @@ data WarnReason = NoReason | Reason !WarningFlag
 
 instance Outputable WarnReason where
   ppr = text . show
+
+instance ToJson WarnReason where
+  json NoReason = JSNull
+  json (Reason wf) = JSString (show wf)
 
 data WarningFlag =
 -- See Note [Updating flag description in the User's Guide]
@@ -862,7 +868,9 @@ data DynFlags = DynFlags {
   ghciHistSize          :: Int,
 
   -- | MsgDoc output action: use "ErrUtils" instead of this if you can
+  initLogAction         :: IO (Maybe LogOutput),
   log_action            :: LogAction,
+  log_finaliser         :: LogFinaliser,
   flushOut              :: FlushOut,
   flushErr              :: FlushErr,
 
@@ -1629,7 +1637,13 @@ defaultDynFlags mySettings =
 
         ghciHistSize = 50, -- keep a log of length 50 by default
 
+        -- Logging
+
+        initLogAction = defaultLogOutput,
+
         log_action = defaultLogAction,
+        log_finaliser = \ _ -> return (),
+
         flushOut = defaultFlushOut,
         flushErr = defaultFlushErr,
         pprUserLength = 5,
@@ -1682,8 +1696,29 @@ interpreterDynamic dflags
   | otherwise = dynamicGhc
 
 --------------------------------------------------------------------------
+--
+-- Note [JSON Error Messages]
+--
+-- When the user requests the compiler output to be dumped as json
+-- we modify the log_action to collect all the messages in an IORef
+-- and then finally in GHC.withCleanupSession the log_finaliser is
+-- called which prints out the messages together.
+--
+-- Before the compiler calls log_action, it has already turned the `ErrMsg`
+-- into a formatted message. This means that we lose some possible
+-- information to provide to the user but refactoring log_action is quite
+-- invasive as it is called in many places. So, for now I left it alone
+-- and we can refine its behaviour as users request different output.
 
 type FatalMessager = String -> IO ()
+
+data LogOutput = LogOutput
+               { getLogAction :: LogAction
+               , getLogFinaliser :: LogFinaliser
+               }
+
+defaultLogOutput :: IO (Maybe LogOutput)
+defaultLogOutput = return $ Nothing
 
 type LogAction = DynFlags
               -> WarnReason
@@ -1693,8 +1728,42 @@ type LogAction = DynFlags
               -> MsgDoc
               -> IO ()
 
+type LogFinaliser = DynFlags -> IO ()
+
 defaultFatalMessager :: FatalMessager
 defaultFatalMessager = hPutStrLn stderr
+
+
+-- See Note [JSON Error Messages]
+jsonLogOutput :: IO (Maybe LogOutput)
+jsonLogOutput = do
+  ref <- newIORef []
+  return . Just $ LogOutput (jsonLogAction ref) (jsonLogFinaliser ref)
+
+jsonLogAction :: IORef [SDoc] -> LogAction
+jsonLogAction iref dflags reason severity srcSpan style msg
+  = do
+      addMessage . withPprStyle (mkCodeStyle CStyle) . renderJSON $
+        JSObject [ ( "span", json srcSpan )
+                 , ( "doc" , JSString (showSDoc dflags msg) )
+                 , ( "severity", json severity )
+                 , ( "reason" ,   json reason )
+                ]
+      defaultLogAction dflags reason severity srcSpan style msg
+  where
+    addMessage m = modifyIORef iref (m:)
+
+
+jsonLogFinaliser :: IORef [SDoc] -> DynFlags -> IO ()
+jsonLogFinaliser iref dflags = do
+  msgs <- readIORef iref
+  let fmt_msgs = brackets $ pprWithCommas (blankLine $$) msgs
+  output fmt_msgs
+  where
+    -- dumpSDoc uses log_action to output the dump
+    dflags' = dflags { log_action = defaultLogAction }
+    output doc = dumpSDoc dflags' neverQualify Opt_D_dump_json "" doc
+
 
 defaultLogAction :: LogAction
 defaultLogAction dflags reason severity srcSpan style msg
@@ -2063,6 +2132,9 @@ setOutputFile f d = d { outputFile = f}
 setDynOutputFile f d = d { dynOutputFile = f}
 setOutputHi   f d = d { outputHi   = f}
 
+setJsonLogAction :: DynFlags -> DynFlags
+setJsonLogAction d = d { initLogAction = jsonLogOutput }
+
 thisComponentId :: DynFlags -> ComponentId
 thisComponentId dflags =
   case thisComponentId_ dflags of
@@ -2286,9 +2358,26 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
     Just x -> liftIO (setHeapSize x)
     _      -> return ()
 
-  liftIO $ setUnsafeGlobalDynFlags dflags6
+  dflags7 <- liftIO $ setLogAction dflags6
 
-  return (dflags6, leftover, consistency_warnings ++ sh_warns ++ warns)
+  liftIO $ setUnsafeGlobalDynFlags dflags7
+
+  return (dflags7, leftover, consistency_warnings ++ sh_warns ++ warns)
+
+setLogAction :: DynFlags -> IO DynFlags
+setLogAction dflags = do
+ mlogger <- initLogAction dflags
+ return $
+    maybe
+         dflags
+         (\logger ->
+            dflags
+              { log_action    = getLogAction logger
+              , log_finaliser = getLogFinaliser logger
+              , initLogAction = return $ Nothing -- Don't initialise it twice
+              })
+         mlogger
+
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags
@@ -2890,6 +2979,9 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "dno-llvm-mangler"
         (NoArg (setGeneralFlag Opt_NoLlvmMangler)) -- hidden flag
   , make_ord_flag defGhcFlag "ddump-debug"        (setDumpFlag Opt_D_dump_debug)
+
+  , make_ord_flag defGhcFlag "ddump-json"
+        (noArg (flip dopt_set Opt_D_dump_json . setJsonLogAction ) )
 
         ------ Machine dependent (-m<blah>) stuff ---------------------------
 

@@ -490,6 +490,7 @@ Library
         GraphOps
         GraphPpr
         IOEnv
+        Json
         ListSetOps
         ListT
         Maybes

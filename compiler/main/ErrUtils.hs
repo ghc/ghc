@@ -6,6 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module ErrUtils (
         -- * Basic types
@@ -63,6 +64,7 @@ import SrcLoc
 import DynFlags
 import FastString (unpackFS)
 import StringBuffer (hGetStringBuffer, len, lexemeToString)
+import Json
 
 import System.Directory
 import System.Exit      ( ExitCode(..), exitWith )
@@ -127,6 +129,7 @@ data ErrMsg = ErrMsg {
         }
         -- The SrcSpan is used for sorting errors into line-number order
 
+
 -- | Categorise error msgs by their importance.  This is so each section can
 -- be rendered visually distinct.  See Note [Error report] for where these come
 -- from.
@@ -164,6 +167,11 @@ data Severity
     --     plus "warning:" or "error:",
     --     added by mkLocMessags
     --   o Output is intended for end users
+  deriving Show
+
+
+instance ToJson Severity where
+  json s = JSString (show s)
 
 
 instance Show ErrMsg where

@@ -6,6 +6,7 @@
 {-# LANGUAGE DeriveFoldable     #-}
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleInstances  #-}
+{-# LANGUAGE RecordWildCards    #-}
 {-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
    -- Workaround for Trac #5252 crashes the bootstrap compiler without -O
    -- When the earliest compiler we want to boostrap with is
@@ -81,6 +82,7 @@ module SrcLoc (
     ) where
 
 import Util
+import Json
 import Outputable
 import FastString
 
@@ -245,6 +247,18 @@ data SrcSpan =
 
   deriving (Eq, Ord, Show) -- Show is used by Lexer.x, because we
                            -- derive Show for Token
+
+instance ToJson SrcSpan where
+  json (UnhelpfulSpan {} ) = JSNull --JSObject [( "type", "unhelpful")]
+  json (RealSrcSpan rss)  = json rss
+
+instance ToJson RealSrcSpan where
+  json (RealSrcSpan'{..}) = JSObject [ ("file", JSString (unpackFS srcSpanFile))
+                                     , ("startLine", JSInt srcSpanSLine)
+                                     , ("startCol", JSInt srcSpanSCol)
+                                     , ("endLine", JSInt srcSpanELine)
+                                     , ("endCol", JSInt srcSpanECol)
+                                     ]
 
 instance NFData SrcSpan where
   rnf x = x `seq` ()

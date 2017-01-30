@@ -5,6 +5,7 @@ import Platform
 
 data DynFlags
 data OverridingBool
+data DumpFlag
 
 targetPlatform       :: DynFlags -> Platform
 pprUserLength        :: DynFlags -> Int

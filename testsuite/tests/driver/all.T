@@ -261,3 +261,5 @@ test('T12752pass', normal, compile, ['-DSHOULD_PASS=1 -Wcpp-undef'])
 test('T12955', normal, run_command, ['$MAKE -s --no-print-directory T12955'])
 
 test('T12971', ignore_stdout, run_command, ['$MAKE -s --no-print-directory T12971'])
+test('json', normal, compile_fail, ['-ddump-json'])
+test('json2', normal, compile, ['-ddump-types -ddump-json'])

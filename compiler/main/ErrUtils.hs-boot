@@ -1,7 +1,9 @@
 module ErrUtils where
 
-import Outputable (SDoc)
+import Outputable (SDoc, PrintUnqualified )
 import SrcLoc (SrcSpan)
+import Json
+import {-# SOURCE #-} DynFlags ( DynFlags, DumpFlag )
 
 data Severity
   = SevOutput
@@ -18,3 +20,6 @@ type MsgDoc = SDoc
 mkLocMessage :: Severity -> SrcSpan -> MsgDoc -> MsgDoc
 mkLocMessageAnn :: Maybe String -> Severity -> SrcSpan -> MsgDoc -> MsgDoc
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
+dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
+
+instance ToJson Severity

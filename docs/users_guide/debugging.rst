@@ -170,6 +170,12 @@ Dumping out compiler intermediate structures
 
         dump foreign export stubs
 
+    .. ghc-flag:: -ddump-json
+
+         Dump error messages as JSON documents. This is intended to be consumed
+         by external tooling. A good way to use it is in conjunction with
+         :ghc-flag:`-ddump-to-file`.
+
 .. ghc-flag:: -ddump-simpl-iterations
 
     Show the output of each *iteration* of the simplifier (each run of

@@ -493,6 +493,7 @@ compiler_stage2_dll0_MODULES = \
 	IdInfo \
 	IfaceSyn \
 	IfaceType \
+	Json 		\
 	ToIface \
 	InstEnv \
 	Kind \

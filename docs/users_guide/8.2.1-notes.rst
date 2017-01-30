@@ -125,6 +125,10 @@ Compiler
   :ghc-flag:`-Wmissing-methods` will now warn that ``_Bar`` is not implemented
   in the ``Foo Int`` instance.
 
+- A new flag :ghc-flag:`-ddump-json` has been added. This flag dumps compiler
+  output as JSON documents. It is experimental and will be refined depending
+  on feedback from tooling authors for the next release.
+
 GHCi
 ~~~~
 
