@@ -76,7 +76,7 @@ module GHC.Generics  (
 --   type 'Rep' (Tree a) =
 --     'D1' ('MetaData \"Tree\" \"Main\" \"package-name\" 'False)
 --       ('C1' ('MetaCons \"Leaf\" 'PrefixI 'False)
---          ('S1' '(MetaSel 'Nothing
+--          ('S1' ('MetaSel 'Nothing
 --                          'NoSourceUnpackedness
 --                          'NoSourceStrictness
 --                          'DecidedLazy)
