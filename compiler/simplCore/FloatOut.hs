@@ -497,10 +497,10 @@ addTopFloatPairs float_bag prs
     add (Rec prs1)   prs2 = prs1 ++ prs2
 
 flattenMajor :: MajorEnv -> Bag FloatBind
-flattenMajor = M.fold (unionBags . flattenMinor) emptyBag
+flattenMajor = M.foldr (unionBags . flattenMinor) emptyBag
 
 flattenMinor :: MinorEnv -> Bag FloatBind
-flattenMinor = M.fold unionBags emptyBag
+flattenMinor = M.foldr unionBags emptyBag
 
 emptyFloats :: FloatBinds
 emptyFloats = FB emptyBag M.empty

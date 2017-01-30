@@ -237,7 +237,7 @@ disjointUFM :: UniqFM elt1 -> UniqFM elt2 -> Bool
 disjointUFM (UFM x) (UFM y) = M.null (M.intersection x y)
 
 foldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
-foldUFM k z (UFM m) = M.fold k z m
+foldUFM k z (UFM m) = M.foldr k z m
 
 mapUFM :: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 mapUFM f (UFM m) = UFM (M.map f m)
@@ -285,10 +285,10 @@ ufmToSet_Directly :: UniqFM elt -> S.IntSet
 ufmToSet_Directly (UFM m) = M.keysSet m
 
 anyUFM :: (elt -> Bool) -> UniqFM elt -> Bool
-anyUFM p (UFM m) = M.fold ((||) . p) False m
+anyUFM p (UFM m) = M.foldr ((||) . p) False m
 
 allUFM :: (elt -> Bool) -> UniqFM elt -> Bool
-allUFM p (UFM m) = M.fold ((&&) . p) True m
+allUFM p (UFM m) = M.foldr ((&&) . p) True m
 
 seqEltsUFM :: ([elt] -> ()) -> UniqFM elt -> ()
 seqEltsUFM seqList = seqList . nonDetEltsUFM
@@ -312,13 +312,13 @@ nonDetKeysUFM (UFM m) = map getUnique $ M.keys m
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetFoldUFM :: (elt -> a -> a) -> a -> UniqFM elt -> a
-nonDetFoldUFM k z (UFM m) = M.fold k z m
+nonDetFoldUFM k z (UFM m) = M.foldr k z m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce
 -- nondeterminism.
 nonDetFoldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
-nonDetFoldUFM_Directly k z (UFM m) = M.foldWithKey (k . getUnique) z m
+nonDetFoldUFM_Directly k z (UFM m) = M.foldrWithKey (k . getUnique) z m
 
 -- See Note [Deterministic UniqFM] to learn about nondeterminism.
 -- If you use this please provide a justification why it doesn't introduce

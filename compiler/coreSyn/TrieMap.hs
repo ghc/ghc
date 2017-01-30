@@ -119,7 +119,7 @@ instance TrieMap IntMap.IntMap where
   emptyTM = IntMap.empty
   lookupTM k m = IntMap.lookup k m
   alterTM = xtInt
-  foldTM k m z = IntMap.fold k z m
+  foldTM k m z = IntMap.foldr k z m
   mapTM f m = IntMap.map f m
 
 xtInt :: Int -> XT a -> IntMap.IntMap a -> IntMap.IntMap a
@@ -130,7 +130,7 @@ instance Ord k => TrieMap (Map.Map k) where
   emptyTM = Map.empty
   lookupTM = Map.lookup
   alterTM k f m = Map.alter f k m
-  foldTM k m z = Map.fold k z m
+  foldTM k m z = Map.foldr k z m
   mapTM f m = Map.map f m
 
 
@@ -939,8 +939,8 @@ xtTyLit l f m =
     StrTyLit n -> m { tlm_string = tlm_string m |> Map.alter f n }
 
 foldTyLit :: (a -> b -> b) -> TyLitMap a -> b -> b
-foldTyLit l m = flip (Map.fold l) (tlm_string m)
-              . flip (Map.fold l) (tlm_number m)
+foldTyLit l m = flip (Map.foldr l) (tlm_string m)
+              . flip (Map.foldr l) (tlm_number m)
 
 -------------------------------------------------
 -- | @TypeMap a@ is a map from 'Type' to @a@.  If you are a client, this
