@@ -421,8 +421,6 @@ plusInteger (Jp# x) (Jn# y)
 -- | Subtract one 'Integer' from another.
 minusInteger :: Integer -> Integer -> Integer
 minusInteger x       (S# 0#)            = x
-minusInteger (S# 0#) (S# INT_MINBOUND#) = Jp# (wordToBigNat ABS_INT_MINBOUND##)
-minusInteger (S# 0#) (S# y#)            = S# (negateInt# y#)
 minusInteger (S# x#) (S# y#)
   = case subIntC# x# y# of
     (# z#, 0# #) -> S# z#
