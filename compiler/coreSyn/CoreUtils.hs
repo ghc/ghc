@@ -1138,7 +1138,7 @@ exprIsOk ok_app e
     go _ (Let {})                     = False
 
       -- Case: see Note [Case expressions are work-free]
-      -- App:  see Note [Arugments in exprIsOk]
+      -- App:  see Note [Arguments in exprIsOk]
       -- Let:  the old exprIsCheap worked through lets
 
 

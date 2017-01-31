@@ -14,7 +14,7 @@ f1' ~n =
   case n of
     ~a -> "case2"
 
-f2 = \a -> "lamda"
+f2 = \a -> "lambda"
 f2' = \ ~a -> "lambda2"
 
 newtype Age = MkAge Int
