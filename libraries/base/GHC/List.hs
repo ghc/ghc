@@ -59,6 +59,8 @@ badHead = errorEmptyList "head"
 {-# RULES
 "head/build"    forall (g::forall b.(a->b->b)->b->b) .
                 head (build g) = g (\x _ -> x) badHead
+"head/cheapBuild"    forall (g::forall b.(a->b->b)->b->b) .
+                head (cheapBuild g) = g (\x _ -> x) badHead
 "head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) .
                 head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
@@ -730,6 +732,8 @@ and (x:xs)      =  x && and xs
 {-# RULES
 "and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
                 and (build g) = g (&&) True
+"and/cheapBuild"     forall (g::forall b.(Bool->b->b)->b->b) .
+                     and (cheapBuild g) = g (&&) True
  #-}
 #endif
 
@@ -747,6 +751,8 @@ or (x:xs)       =  x || or xs
 {-# RULES
 "or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
                 or (build g) = g (||) False
+"or/cheapBuild"      forall (g::forall b.(Bool->b->b)->b->b) .
+                     or (cheapBuild g) = g (||) False
  #-}
 #endif
 
@@ -767,6 +773,8 @@ any p (x:xs)    = p x || any p xs
 {-# RULES
 "any/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 any p (build g) = g ((||) . p) False
+"any/cheapBuild"     forall p (g::forall b.(a->b->b)->b->b) .
+                     any p (cheapBuild g) = g ((||) . p) False
  #-}
 #endif
 
@@ -786,6 +794,8 @@ all p (x:xs)    =  p x && all p xs
 {-# RULES
 "all/build"     forall p (g::forall b.(a->b->b)->b->b) .
                 all p (build g) = g ((&&) . p) True
+"all/cheapBuild"     forall p (g::forall b.(a->b->b)->b->b) .
+                     all p (cheapBuild g) = g ((&&) . p) True
  #-}
 #endif
 
@@ -803,6 +813,8 @@ elem x (y:ys)   = x==y || elem x ys
 {-# RULES
 "elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
    . elem x (build g) = g (\ y r -> (x == y) || r) False
+"elem/cheapBuild"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+   . elem x (cheapBuild g) = g (\ y r -> (x == y) || r) False
  #-}
 #endif
 
@@ -817,6 +829,8 @@ notElem x (y:ys)=  x /= y && notElem x ys
 {-# RULES
 "notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
    . notElem x (build g) = g (\ y r -> (x /= y) && r) True
+"notElem/cheapBuild" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
+   . notElem x (cheapBuild g) = g (\ y r -> (x /= y) && r) True
  #-}
 #endif
 
@@ -900,6 +914,8 @@ foldr2_left  k _z  x  r (y:ys) = k x y (r ys)
 {-# RULES
 "foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) .
                   foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
+"foldr2/cheapleft"   forall k z ys (g::forall b.(a->b->b)->b->b) .
+                     foldr2 k z (cheapBuild g) ys = g (foldr2_left  k z) (\_ -> z) ys
  #-}
 -- There used to be a foldr2/right rule, allowing foldr2 to fuse with a build
 -- form on the right. However, this causes trouble if the right list ends in
