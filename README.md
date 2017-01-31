@@ -31,8 +31,7 @@ There are two ways to get a source tree:
   Note: cloning GHC from Github requires a special setup. See [Getting a GHC
   repository from Github] [7].
 
-  **DO NOT submit pull request directly to the github repo.**
-  *See the GHC team's working conventions re [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs).*
+  *See the GHC team's working conventions regarding [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs).* First time contributors are encouraged to get started by just sending a Pull Request.
 
 
 Building & Installing
