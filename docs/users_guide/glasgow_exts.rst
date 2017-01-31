@@ -13333,7 +13333,7 @@ Controlling what's going on in rewrite rules
    great detail what rules are being fired. If you add :ghc-flag:`-dppr-debug`
    you get a still more detailed listing.
 
--  The definition of (say) ``build`` in ``GHC/Base.lhs`` looks like
+-  The definition of (say) ``build`` in ``GHC/Base.hs`` looks like
    this: ::
 
                build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
@@ -13346,10 +13346,10 @@ Controlling what's going on in rewrite rules
    any inlining happening in the RHS of the ``INLINE`` thing. I regret
    the delicacy of this.
 
--  In ``libraries/base/GHC/Base.lhs`` look at the rules for ``map`` to
+-  In ``libraries/base/GHC/Base.hs`` look at the rules for ``map`` to
    see how to write rules that will do fusion and yet give an efficient
    program even if fusion doesn't happen. More rules in
-   ``GHC/List.lhs``.
+   ``GHC/List.hs``.
 
 .. _special-ids:
 
