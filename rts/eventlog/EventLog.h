@@ -10,6 +10,7 @@
 #define EVENTLOG_H
 
 #include "rts/EventLogFormat.h"
+#include "rts/EventLogWriter.h"
 #include "Capability.h"
 
 #include "BeginPrivate.h"
@@ -21,7 +22,7 @@
  */
 extern char *EventTagDesc[];
 
-void initEventLogging(void);
+void initEventLogging(const EventLogWriter *writer);
 void endEventLogging(void);
 void freeEventLogging(void);
 void abortEventLogging(void); // #4512 - after fork child needs to abort

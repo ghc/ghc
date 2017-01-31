@@ -18,8 +18,10 @@
 #include "GetEnv.h"
 #include "Stats.h"
 #include "eventlog/EventLog.h"
+#include "rts/EventLogWriter.h"
 #include "Threads.h"
 #include "Printer.h"
+#include "RtsFlags.h"
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -43,8 +45,15 @@ static bool eventlog_enabled;
    Starting up / shuttting down the tracing facilities
  --------------------------------------------------------------------------- */
 
+static const EventLogWriter *getEventLogWriter(void)
+{
+    return rtsConfig.eventlog_writer;
+}
+
 void initTracing (void)
 {
+    const EventLogWriter *eventlog_writer = getEventLogWriter();
+
 #ifdef THREADED_RTS
     initMutex(&trace_utx);
 #endif
@@ -82,14 +91,15 @@ void initTracing (void)
         TRACE_spark_full ||
         TRACE_user;
 
-    eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG;
+    eventlog_enabled = RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG &&
+                        eventlog_writer != NULL;
 
     /* Note: we can have any of the TRACE_* flags turned on even when
        eventlog_enabled is off. In the DEBUG way we may be tracing to stderr.
      */
 
     if (eventlog_enabled) {
-        initEventLogging();
+        initEventLogging(eventlog_writer);
     }
 }
 
@@ -109,9 +119,14 @@ void freeTracing (void)
 
 void resetTracing (void)
 {
+    const EventLogWriter *eventlog_writer;
+    eventlog_writer = getEventLogWriter();
+
     if (eventlog_enabled) {
         abortEventLogging(); // abort eventlog inherited from parent
-        initEventLogging(); // child starts its own eventlog
+        if (eventlog_writer != NULL) {
+            initEventLogging(eventlog_writer); // child starts its own eventlog
+        }
     }
 }
 

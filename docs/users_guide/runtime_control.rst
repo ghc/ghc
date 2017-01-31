@@ -177,6 +177,35 @@ e.g., on stack overflow. The hooks for these are as follows:
 
     The message printed if ``malloc`` fails.
 
+Furthermore GHC lets you specify the way event log data (:rts-flag:`-l`)
+is written through a custom `EventLogWriter`:
+
+``void initEventLogWriter(void)``
+    .. index::
+       single: initEventLogWriter
+
+    Initializes your `EventLogWriter`. This is optional.
+
+``bool writeEventLog(void *eventlog, size_t eventlog_size)``
+    .. index::
+       single: writeEventLog
+
+    Hands buffered event log data to your event log writer.
+    Required for a custom `EventLogWriter`.
+
+ ``void flushEventLog(void)``
+    .. index::
+       single: flushEventLog
+
+    Flush buffers (if any) of your custom `EventLogWriter`. This is
+    optional.
+
+ ``void stopEventLogWriter(void)``
+    .. index::
+       single: stopEventLogWriter
+
+    Called when event logging is about to stop. This is optional.
+
 .. _rts-options-misc:
 
 Miscellaneous RTS options
@@ -938,7 +967,7 @@ Tracing
    single: eventlog files
 
 When the program is linked with the :ghc-flag:`-eventlog` option
-(:ref:`options-linker`), runtime events can be logged in two ways:
+(:ref:`options-linker`), runtime events can be logged in several ways:
 
 -  In binary format to a file for later analysis by a variety of tools.
    One such tool is
@@ -946,13 +975,19 @@ When the program is linked with the :ghc-flag:`-eventlog` option
    which interprets the event log to produce a visual parallel execution
    profile of the program.
 
+-  In binary format to customized event log writer. This enables live
+   analysis of the events while the program is running.
+
 -  As text to standard output, for debugging purposes.
 
 .. rts-flag:: -l <flags>
 
-    Log events in binary format to the file :file:`{program}.eventlog`.
-    Without any ⟨flags⟩ specified, this logs a default set of events,
-    suitable for use with tools like ThreadScope.
+    Log events in binary format. Without any ⟨flags⟩ specified, this
+    logs a default set of events, suitable for use with tools like ThreadScope.
+
+    Per default the events are written to :file:`{program}.eventlog` though
+    the mechanism for writing event log data can be overriden with a custom
+    `EventLogWriter`.
 
     For some special use cases you may want more control over which
     events are included. The ⟨flags⟩ is a sequence of zero or more

@@ -240,6 +240,10 @@ Runtime system
   threads to all cores in systems which have multiple processor groups.
   (e.g. > 64 cores, see :ghc-ticket:`11054`)
 
+- Output of :ref:`Event log <rts-eventlog>` data can now be configured.
+  Enabling external tools to collect and analyze the event log data while the
+  application is still running.
+
 Build system
 ~~~~~~~~~~~~
 

@@ -26,13 +26,7 @@
 #include <unistd.h>
 #endif
 
-// PID of the process that writes to event_log_filename (#4512)
-static pid_t event_log_pid = -1;
-
-static char *event_log_filename = NULL;
-
-// File for logging events
-FILE *event_log_file = NULL;
+static const EventLogWriter *event_log_writer;
 
 #define EVENT_LOG_SIZE 2 * (1024 * 1024) // 2MB
 
@@ -232,55 +226,55 @@ static inline void postInt32(EventsBuf *eb, StgInt32 i)
 
 #define EVENT_SIZE_DYNAMIC (-1)
 
+static void
+initEventLogWriter(void)
+{
+    if (event_log_writer != NULL &&
+            event_log_writer->initEventLogWriter != NULL) {
+        event_log_writer->initEventLogWriter();
+    }
+}
+
+static bool
+writeEventLog(void *eventlog, size_t eventlog_size)
+{
+    if (event_log_writer != NULL &&
+            event_log_writer->writeEventLog != NULL) {
+        return event_log_writer->writeEventLog(eventlog, eventlog_size);
+    } else {
+        return false;
+    }
+}
+
+static void
+stopEventLogWriter(void)
+{
+    if (event_log_writer != NULL &&
+            event_log_writer->stopEventLogWriter != NULL) {
+        event_log_writer->stopEventLogWriter();
+    }
+}
+
 void
-initEventLogging(void)
+flushEventLog(void)
+{
+    if (event_log_writer != NULL &&
+            event_log_writer->flushEventLog != NULL) {
+        event_log_writer->flushEventLog();
+    }
+}
+
+void
+initEventLogging(const EventLogWriter *ev_writer)
 {
     StgWord8 t, c;
     uint32_t n_caps;
-    char *prog;
 
-    prog = stgMallocBytes(strlen(prog_name) + 1, "initEventLogging");
-    strcpy(prog, prog_name);
-#ifdef mingw32_HOST_OS
-    // on Windows, drop the .exe suffix if there is one
-    {
-        char *suff;
-        suff = strrchr(prog,'.');
-        if (suff != NULL && !strcmp(suff,".exe")) {
-            *suff = '\0';
-        }
-    }
-#endif
-
-    event_log_filename = stgMallocBytes(strlen(prog)
-                                        + 10 /* .%d */
-                                        + 10 /* .eventlog */,
-                                        "initEventLogging");
+    event_log_writer = ev_writer;
+    initEventLogWriter();
 
     if (sizeof(EventDesc) / sizeof(char*) != NUM_GHC_EVENT_TAGS) {
         barf("EventDesc array has the wrong number of elements");
-    }
-
-    if (event_log_pid == -1) { // #4512
-        // Single process
-        sprintf(event_log_filename, "%s.eventlog", prog);
-        event_log_pid = getpid();
-    } else {
-        // Forked process, eventlog already started by the parent
-        // before fork
-        event_log_pid = getpid();
-        // We don't have a FMT* symbol for pid_t, so we go via Word64
-        // to be sure of not losing range. It would be nicer to have a
-        // FMT* symbol or similar, though.
-        sprintf(event_log_filename, "%s.%" FMT_Word64 ".eventlog",
-                prog, (StgWord64)event_log_pid);
-    }
-    stgFree(prog);
-
-    /* Open event log file for writing. */
-    if ((event_log_file = fopen(event_log_filename, "wb")) == NULL) {
-        sysErrorBelch("initEventLogging: can't open %s", event_log_filename);
-        stg_exit(EXIT_FAILURE);
     }
 
     /*
@@ -522,9 +516,7 @@ endEventLogging(void)
     // Flush the end of data marker.
     printAndClearEventBuf(&eventBuf);
 
-    if (event_log_file != NULL) {
-        fclose(event_log_file);
-    }
+    stopEventLogWriter();
 }
 
 void
@@ -568,26 +560,13 @@ freeEventLogging(void)
     if (capEventBuf != NULL)  {
         stgFree(capEventBuf);
     }
-    if (event_log_filename != NULL) {
-        stgFree(event_log_filename);
-    }
-}
-
-void
-flushEventLog(void)
-{
-    if (event_log_file != NULL) {
-        fflush(event_log_file);
-    }
 }
 
 void
 abortEventLogging(void)
 {
     freeEventLogging();
-    if (event_log_file != NULL) {
-        fclose(event_log_file);
-    }
+    stopEventLogWriter();
 }
 
 /*
@@ -1287,18 +1266,13 @@ void printAndClearEventBuf (EventsBuf *ebuf)
 
     if (ebuf->begin != NULL && ebuf->pos != ebuf->begin)
     {
-        StgInt8 *begin = ebuf->begin;
-        while (begin < ebuf->pos) {
-            StgWord64 remain = ebuf->pos - begin;
-            StgWord64 written = fwrite(begin, 1, remain, event_log_file);
-            if (written == 0) {
-                debugBelch(
-                    "printAndClearEventLog: fwrite() failed to write anything;"
-                    " tried to write numBytes=%" FMT_Word64, remain);
-                resetEventsBuf(ebuf);
-                return;
-            }
-            begin += written;
+        size_t elog_size = ebuf->pos - ebuf->begin;
+        if (!writeEventLog(ebuf->begin, elog_size)) {
+            debugBelch(
+                    "printAndClearEventLog: could not flush event log"
+                );
+            resetEventsBuf(ebuf);
+            return;
         }
 
         resetEventsBuf(ebuf);
