@@ -696,7 +696,7 @@ instance Binary SrcStrictness where
       do h <- getByte bh
          case h of
            0 -> return SrcLazy
-           1 -> return SrcLazy
+           1 -> return SrcStrict
            _ -> return NoSrcStrict
 
 instance Binary SrcUnpackedness where
