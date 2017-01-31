@@ -305,7 +305,8 @@ lvlExpr env (_, AnnCast expr (_, co)) = do
 
 lvlExpr env (_, AnnTick tickish expr) = do
     expr' <- lvlExpr env expr
-    return (Tick tickish expr')
+    let tickish' = substTickish (le_subst env) tickish
+    return (Tick tickish' expr')
 
 lvlExpr env expr@(_, AnnApp _ _) = do
     let

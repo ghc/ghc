@@ -260,26 +260,21 @@ floatBody lvl arg       -- Used rec rhss, and case-alternative rhss
 {- Note [Floating past breakpoints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Notes from Peter Wortmann (re: #10052)
+We used to disallow floating out of breakpoint ticks (see #10052). However, I
+think this is too restrictive.
 
-"This case clearly means we're trying to float past a breakpoint..."
+Consider the case of an expression scoped over by a breakpoint tick,
 
-Further:
+  tick<...> (let x = ... in f x)
 
-"Breakpoints as they currently exist are the only Tikish that is not
-scoped, counting, and not splittable.
+In this case it is completely legal to float out x, despite the fact that
+breakpoint ticks are scoped,
 
-This means that we can't:
-  - Simply float code out of it, because the payload must still be covered (scoped)
-  - Copy the tick, because it would change entry counts (here: duplicate breakpoints)"
+  let x = ... in (tick<...>  f x)
 
-While this seems like an odd case, it can apparently occur in real
-life: through the combination of optimizations + GHCi usage. For an
-example, see #10052 as mentioned above. So not only does the
-interpreter not like some compiler-generated things (like unboxed
-tuples), the compiler doesn't like interpreter-introduced things!
+The reason here is that we know that the breakpoint will still be hit when the
+expression is entered since the tick still scopes over the RHS.
 
-Also see Note [GHCi and -O] in GHC.hs.
 -}
 
 floatExpr :: LevelledExpr
@@ -318,6 +313,10 @@ floatExpr (Tick tickish expr)
     (fs, annotated_defns, Tick tickish expr') }
 
   -- Note [Floating past breakpoints]
+  | Breakpoint{} <- tickish
+  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
+    (fs, floating_defns, Tick tickish expr') }
+
   | otherwise
   = pprPanic "floatExpr tick" (ppr tickish)
 
