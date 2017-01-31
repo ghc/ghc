@@ -15,7 +15,8 @@ mkBoxedTupleTy :: [Type] -> Type
 liftedTypeKind :: Kind
 constraintKind :: Kind
 
-visibleDataConTyCon, runtimeRepTyCon, vecCountTyCon, vecElemTyCon :: TyCon
+visibilityTyCon,visibleDataConTyCon, runtimeRepTyCon,
+  vecCountTyCon, vecElemTyCon :: TyCon
 runtimeRepTy, visibilityTy :: Type
 
 visibleDataConTy :: Type

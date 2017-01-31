@@ -2,7 +2,7 @@
 
 module UbxSumLevPoly where
 
--- this failed thinking that (# Any | True #) :: TYPE (SumRep [LiftedRep, b])
+-- this failed thinking that (# Any | True #) :: TYPEvis (SumRep [LiftedRep, b])
 -- But of course that b should be Lifted!
 
 -- It was due to silliness in TysWiredIn using the same uniques for different

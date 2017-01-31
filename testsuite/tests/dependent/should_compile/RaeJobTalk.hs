@@ -82,7 +82,9 @@ data TyCon (a :: k) where
   Arrow :: TyCon (->)
   TYPE  :: TyCon TYPE
   RuntimeRep :: TyCon RuntimeRep
+  Visibility :: TyCon Visibility
   LiftedRep' :: TyCon 'LiftedRep
+  Visible'   :: TyCon 'Visible
   -- If extending, add to eqTyCon too
 
 eqTyCon :: TyCon a -> TyCon b -> Maybe (a :~~: b)
@@ -94,7 +96,9 @@ eqTyCon Maybe Maybe = Just HRefl
 eqTyCon Arrow Arrow = Just HRefl
 eqTyCon TYPE TYPE = Just HRefl
 eqTyCon RuntimeRep RuntimeRep = Just HRefl
+eqTyCon Visibility Visibility = Just HRefl
 eqTyCon LiftedRep' LiftedRep' = Just HRefl
+eqTyCon Visible' Visible' = Just HRefl
 eqTyCon _ _ = Nothing
 
 -- Check whether or not a type is really a plain old tycon;
@@ -214,6 +218,8 @@ instance TyConAble (->)      where tyCon = Arrow
 instance TyConAble TYPE      where tyCon = TYPE
 instance TyConAble 'LiftedRep   where tyCon = LiftedRep'
 instance TyConAble RuntimeRep    where tyCon = RuntimeRep
+instance TyConAble Visibility where tyCon = Visibility
+instance TyConAble 'Visible where tyCon = Visible'
 
 -- Can't just define Typeable the way we want, because the instances
 -- overlap. So we have to mock up instance chains via closed type families.

@@ -27,7 +27,7 @@ main = do
   print $ typeOf (Proxy :: Proxy [1,2,3])
   print $ typeOf (Proxy :: Proxy 'EQ)
   print $ typeOf (Proxy :: Proxy TYPE)
-  print $ typeOf (Proxy :: Proxy (TYPE 'LiftedRep))
+  print $ typeOf (Proxy :: Proxy (TYPEvis 'LiftedRep))
   print $ typeOf (Proxy :: Proxy *)
   print $ typeOf (Proxy :: Proxy ★)
   print $ typeOf (Proxy :: Proxy 'LiftedRep)

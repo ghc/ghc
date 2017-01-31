@@ -234,10 +234,10 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        | otherwise        = (caseWrongArg, True)   -- Non-decomposable (eg type function)
        where
          -- When folding over an unboxed tuple, we must explicitly drop the
-         -- runtime rep arguments, or else GHC will generate twice as many
+         -- extra runtime rep arguments, or else GHC will generate twice as many
          -- variables in a unboxed tuple pattern match and expression as it
-         -- actually needs. See Trac #12399
-         (xrs,xcs) = unzip (map (go co) (dropRuntimeRepArgs args))
+         -- actually needs. See Trac #12399 and Note [Unboxed tuple extra args] in TyCon
+         (xrs,xcs) = unzip (map (go co) (dropUbxTupleExtraArgs args))
     go co (ForAllTy (TvBndr v vis) x)
        | isVisibleArgFlag vis = panic "unexpected visible binder"
        | v /= var && xc       = (caseForAll v xr,True)

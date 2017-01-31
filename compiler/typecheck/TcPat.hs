@@ -446,9 +446,9 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
               tc = tupleTyCon boxity arity
         ; (coi, arg_tys) <- matchExpectedPatTy (matchExpectedTyConApp tc)
                                                penv pat_ty
-                     -- Unboxed tuples have RuntimeRep vars, which we discard:
-                     -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-        ; let con_arg_tys = case boxity of Unboxed -> drop arity arg_tys
+                     -- Unboxed tuples have extra vars, which we discard:
+                     -- See Note [Unboxed tuple extra vars] in TyCon
+        ; let con_arg_tys = case boxity of Unboxed -> drop (arity * 2) arg_tys
                                            Boxed   -> arg_tys
         ; (pats', res) <- tc_lpats penv pats (map mkCheckExpType con_arg_tys)
                                    thing_inside

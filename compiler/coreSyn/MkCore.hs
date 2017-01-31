@@ -345,14 +345,20 @@ mkCoreTup cs  = mkCoreConApps (tupleDataCon Boxed (length cs))
 
 -- | Build a small unboxed tuple holding the specified expressions,
 -- with the given types. The types must be the types of the expressions.
--- Do not include the RuntimeRep specifiers; this function calculates them
+-- Do not include the Visibility/RuntimeRep specifiers; this function calculates them
 -- for you.
 -- Does /not/ flatten one-tuples; see Note [Flattening one-tuples]
+-- See Note [Unboxed tuple extra vars] in TyCon
 mkCoreUbxTup :: [Type] -> [CoreExpr] -> CoreExpr
 mkCoreUbxTup tys exps
   = ASSERT( tys `equalLength` exps)
     mkCoreConApps (tupleDataCon Unboxed (length tys))
-             (map (Type . getRuntimeRep "mkCoreUbxTup") tys ++ map Type tys ++ exps)
+             (map Type viss ++
+              map Type reps ++
+              map Type tys ++
+              exps)
+  where
+    (viss, reps) = mapAndUnzip (getVisRuntimeRepFromKind "mkCoreUbxTup" . typeKind) tys
 
 -- | Make a core tuple of the given boxity
 mkCoreTupBoxity :: Boxity -> [CoreExpr] -> CoreExpr

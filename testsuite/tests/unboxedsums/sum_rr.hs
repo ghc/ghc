@@ -5,4 +5,4 @@ module Example where
 import Data.Typeable
 import GHC.Exts
 
-data Wat (a :: TYPE (SumRep '[LiftedRep, IntRep])) = Wat a
+data Wat (a :: TYPEvis (SumRep '[LiftedRep, IntRep])) = Wat a

@@ -41,8 +41,8 @@ module TyCoRep (
         mkFunTy, mkFunTys, mkForAllTy, mkForAllTys,
         mkPiTy, mkPiTys,
         isLiftedTypeKind, isUnliftedTypeKind, isConstraintKind,
-        isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
-        isRuntimeRepKindedTy, dropRuntimeRepArgs,
+        isCoercionType, isRuntimeRepTy, isRuntimeRepVar, isVisibilityVar,
+        isRuntimeRepKindedTy,
         sameVis,
 
         -- * Functions over binders
@@ -53,7 +53,7 @@ module TyCoRep (
         isInvisibleBinder, isVisibleBinder,
 
         -- * Functions over coercions
-        pickLR,
+                pickLR,
 
         -- * Pretty-printing
         pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
@@ -738,14 +738,15 @@ isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
 
--- | Drops prefix of RuntimeRep constructors in 'TyConApp's. Useful for e.g.
--- dropping 'LiftedRep arguments of unboxed tuple TyCon applications:
---
---   dropRuntimeRepArgs [ 'LiftedRep, 'IntRep
---                      , String, Int# ] == [String, Int#]
---
-dropRuntimeRepArgs :: [Type] -> [Type]
-dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
+-- | Is this the type 'Visibility'?
+isVisibilityTy :: Type -> Bool
+isVisibilityTy ty | Just ty' <- coreView ty = isVisibilityTy ty'
+isVisibilityTy (TyConApp tc []) = tc `hasKey` visibilityTyConKey
+isVisibilityTy _ = False
+
+-- | Is a tyvar of type 'Visibility'?
+isVisibilityVar :: TyVar -> Bool
+isVisibilityVar = isVisibilityTy . tyVarKind
 
 {-
 %************************************************************************

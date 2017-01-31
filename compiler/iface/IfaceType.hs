@@ -1089,8 +1089,8 @@ ppr_iface_tc_app pp ctxt_prec tc tys
 
 pprSum :: Arity -> IsPromoted -> IfaceTcArgs -> SDoc
 pprSum _arity is_promoted args
-  =   -- drop the RuntimeRep vars.
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+  =   -- drop the RuntimeRep vars
+      -- See Note [Unboxed tuple extra vars] in TyCon
     let tys   = tcArgsIfaceTypes args
         args' = drop (length tys `div` 2) tys
     in pprPromotionQuoteI is_promoted
@@ -1108,11 +1108,11 @@ pprTuple sort IsPromoted args
        tupleParens sort (pprWithCommas pprIfaceType args')
 
 pprTuple sort promoted args
-  =   -- drop the RuntimeRep vars.
-      -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+  =   -- drop the extra vars.
+      -- See Note [Unboxed tuple extra vars] in TyCon
     let tys   = tcArgsIfaceTypes args
         args' = case sort of
-                  UnboxedTuple -> drop (length tys `div` 2) tys
+                  UnboxedTuple -> drop (2 * length tys `div` 3) tys
                   _            -> tys
     in
     pprPromotionQuoteI promoted <>

@@ -6,6 +6,6 @@ module LevPolyBounded where
 
 import GHC.Exts
 
-class XBounded (a :: TYPE r) where
+class XBounded (a :: TYPEvis r) where
   minBound :: a
   maxBound :: a

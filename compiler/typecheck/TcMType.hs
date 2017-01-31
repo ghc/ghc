@@ -1017,6 +1017,10 @@ zonkQuantifiedTyVar default_kind tv
       = do { writeMetaTyVar tv liftedRepTy
            ; return Nothing }
 
+      | isVisibilityVar tv   -- or a Visibility var
+      = do { writeMetaTyVar tv visibleDataConTy
+           ; return Nothing }
+
       | default_kind         -- -XNoPolyKinds and this is a kind var
       = do { _ <- default_kind_var tv
            ; return Nothing }

@@ -11,7 +11,7 @@ import GHC.Exts
 type family RepRep a ∷ RuntimeRep
 
 class HasRep a where
-  type Rep a ∷ TYPE (RepRep a)
+  type Rep a ∷ TYPEvis (RepRep a)
   repr ∷ a → Rep a
   abst ∷ Rep a → a
 

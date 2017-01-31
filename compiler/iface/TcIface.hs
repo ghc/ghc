@@ -1183,7 +1183,7 @@ tcIfaceTupleTy sort is_promoted args
                         kind_args = map typeKind args'
                   ; return (mkTyConApp tc (kind_args ++ args')) } }
 
--- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+-- See Note [Unboxed tuple extra vars] in TyCon
 tcTupleTyCon :: Bool    -- True <=> typechecking a *type* (vs. an expr)
              -> TupleSort
              -> Arity   -- the number of args. *not* the tuple arity.
@@ -1194,7 +1194,8 @@ tcTupleTyCon in_type sort arity
                             ; return (tyThingTyCon thing) }
       BoxedTuple   -> return (tupleTyCon Boxed   arity)
       UnboxedTuple -> return (tupleTyCon Unboxed arity')
-        where arity' | in_type   = arity `div` 2
+        where arity' | in_type   = arity `div` 3  -- ignore Visibility AND RuntimeRep
+                                                  -- args
                      | otherwise = arity
                       -- in expressions, we only have term args
 
@@ -1304,7 +1305,9 @@ tcIfaceExpr (IfaceTuple sort args)
        ; let con_tys = map exprType args'
              some_con_args = map Type con_tys ++ args'
              con_args = case sort of
-               UnboxedTuple -> map (Type . getRuntimeRep "tcIfaceExpr") con_tys ++ some_con_args
+                 -- See Note [Unboxed tuple extra vars] in TyCon
+               UnboxedTuple -> map Type viss ++ map Type reps ++ some_con_args
+                 where (viss, reps) = mapAndUnzip (getVisRuntimeRep "tcIfaceExpr") con_tys
                _            -> some_con_args
                         -- Put the missing type arguments back in
              con_id   = dataConWorkId (tyConSingleDataCon tc)

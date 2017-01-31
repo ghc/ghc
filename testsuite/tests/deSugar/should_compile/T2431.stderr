@@ -1,8 +1,8 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 44, types: 34, coercions: 1}
+Result size of Tidy Core = {terms: 44, types: 38, coercions: 1}
 
--- RHS size: {terms: 2, types: 4, coercions: 1}
+-- RHS size: {terms: 2, types: 5, coercions: 1}
 T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
@@ -16,7 +16,7 @@ T2431.$WRefl =
   \ (@ a) ->
     T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))
 
--- RHS size: {terms: 4, types: 8, coercions: 0}
+-- RHS size: {terms: 4, types: 9, coercions: 0}
 absurd :: forall a. (Int :~: Bool) -> a
 [GblId, Arity=1, Caf=NoCafRefs, Str=<L,U>x]
 absurd = \ (@ a) (x :: Int :~: Bool) -> case x of { }

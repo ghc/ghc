@@ -106,8 +106,9 @@ module Type (
         isAlgType, isClosedAlgType,
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
-        dropRuntimeRepArgs,
-        getRuntimeRep, getRuntimeRepFromKind,
+        isVisibilityVar,
+        dropUbxTupleExtraArgs,
+        getVisibility, getRuntimeRep, getVisRuntimeRep, getVisRuntimeRepFromKind,
 
         -- * Main data types representing Kinds
         Kind,
@@ -212,7 +213,7 @@ import NameEnv
 import Class
 import TyCon
 import TysPrim
-import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind
+import {-# SOURCE #-} TysWiredIn ( listTyCon, typeNatKind, visibilityTy
                                  , typeSymbolKind, liftedTypeKind )
 import PrelNames
 import CoAxiom
@@ -1858,25 +1859,37 @@ isUnliftedType ty
   = not (isLiftedType_maybe ty `orElse`
          pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty)))
 
+-- | Extract the Visibility classifier of a type. Panics if this is not possible.
+getVisibility :: HasDebugCallStack
+              => String   -- ^ Printed in case of an error
+              -> Type -> Type
+getVisibility err ty = fst $ getVisRuntimeRepFromKind err (typeKind ty)
+
 -- | Extract the RuntimeRep classifier of a type. Panics if this is not possible.
 getRuntimeRep :: HasDebugCallStack
               => String   -- ^ Printed in case of an error
               -> Type -> Type
-getRuntimeRep err ty = getRuntimeRepFromKind err (typeKind ty)
+getRuntimeRep err ty = snd $ getVisRuntimeRepFromKind err (typeKind ty)
 
--- | Extract the RuntimeRep classifier of a type from its kind.
--- For example, getRuntimeRepFromKind * = LiftedRep;
+-- | Extract both the Visibility and the RuntimeRep from a type's kind
+getVisRuntimeRep :: HasDebugCallStack
+                 => String  -- ^ printed in case of an error
+                 -> Type -> (Type, Type)
+getVisRuntimeRep err = getVisRuntimeRepFromKind err . typeKind
+
+-- | Extract the Visibility and RuntimeRep classifiers of a type from its kind.
+-- For example, getVisRuntimeRepFromKind * = (Visible, LiftedRep);
 -- Panics if this is not possible.
-getRuntimeRepFromKind :: HasDebugCallStack
-                      => String  -- ^ Printed in case of an error
-                      -> Type -> Type
-getRuntimeRepFromKind err = go
+getVisRuntimeRepFromKind :: HasDebugCallStack
+                         => String  -- ^ Printed in case of an error
+                         -> Type -> (Type, Type)
+getVisRuntimeRepFromKind err = go
   where
     go k | Just k' <- coreView k = go k'
     go k
-      | (_tc, [_vis, arg]) <- splitTyConApp k
+      | (_tc, [vis, arg]) <- splitTyConApp k
       = ASSERT2( _tc `hasKey` tYPETyConKey, text err $$ ppr k )
-        arg
+        (vis, arg)
     go k = pprPanic "getRuntimeRep" (text err $$
                                      ppr k <+> dcolon <+> ppr (typeKind k))
 
@@ -2183,6 +2196,18 @@ isTypeLevPoly = go
 -- Example: False for (forall r1 r2 (a :: TYPEvis r1) (b :: TYPEvis r2). a -> b -> Type)
 resultIsLevPoly :: Type -> Bool
 resultIsLevPoly = isTypeLevPoly . snd . splitPiTys
+
+-- | Drops prefix of Visibility and RuntimeRep constructors in 'TyConApp's.
+-- Useful for e.g. dropping 'LiftedRep arguments of unboxed tuple TyCon applications:
+--
+--   dropUbxTupleExtraArgs [ 'Visible, 'Visible
+--                         , 'LiftedRep, 'IntRep
+--                         , String, Int# ] == [String, Int#]
+--
+-- See also Note [Unboxed tuple extra args] in TyCon
+dropUbxTupleExtraArgs :: [Type] -> [Type]
+dropUbxTupleExtraArgs
+  = dropWhile ((isRuntimeRepTy <||> (visibilityTy `eqType`)) . typeKind)
 
 {-
 %************************************************************************

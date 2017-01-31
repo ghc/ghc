@@ -1251,10 +1251,11 @@ zonk_pat env p@(ConPatOut { pat_arg_tys = tys, pat_tvs = tyvars
 
           -- an unboxed tuple pattern (but only an unboxed tuple pattern)
           -- might have levity-polymorphic arguments. Check for this badness.
+          -- See Note [Unboxed tuple extra args] in TyCon
         ; case con of
             RealDataCon dc
               | isUnboxedTupleTyCon (dataConTyCon dc)
-              -> mapM_ (checkForLevPoly doc) (dropRuntimeRepArgs new_tys)
+              -> mapM_ (checkForLevPoly doc) (dropUbxTupleExtraArgs new_tys)
             _ -> return ()
 
         ; (env0, new_tyvars) <- zonkTyBndrsX env tyvars
@@ -1649,10 +1650,12 @@ zonkTvSkolemising tv
 zonkTypeZapping :: UnboundTyVarZonker
 -- This variant is used for everything except the LHS of rules
 -- It zaps unbound type variables to Any, except for RuntimeRep
--- vars which it zonks to LiftedRep
+-- vars which it zonks to LiftedRep and Visibility vars which
+-- it zonks to Visible
 -- Works on both types and kinds
 zonkTypeZapping tv
   = do { let ty | isRuntimeRepVar tv = liftedRepTy
+                | isVisibilityVar tv = visibleDataConTy
                 | otherwise          = anyTypeOfKind (tyVarKind tv)
        ; writeMetaTyVar tv ty
        ; return ty }

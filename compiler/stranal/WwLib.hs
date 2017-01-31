@@ -26,6 +26,7 @@ import TysWiredIn       ( tupleDataCon )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
+import Kind             ( isConstraintKind )
 import RepType          ( isVoidTy )
 import Coercion
 import FamInstEnv
@@ -821,6 +822,8 @@ every primitive type, so the function is partial.
 
 mk_absent_let :: DynFlags -> Id -> Maybe (CoreExpr -> CoreExpr)
 mk_absent_let dflags arg
+  | isConstraintKind (typeKind arg_ty)
+  = Nothing  -- TODO (RAE): Can we do better? absentError can't handle constraints
   | not (isUnliftedType arg_ty)
   = Just (Let (NonRec lifted_arg abs_rhs))
   | Just tc <- tyConAppTyCon_maybe arg_ty

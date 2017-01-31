@@ -122,7 +122,7 @@ module TyCon(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TyCoRep    ( Kind, Type, PredType, pprType )
-import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, constraintKind
+import {-# SOURCE #-} TysWiredIn ( runtimeRepTyCon, visibilityTyCon, constraintKind
                                  , vecCountTyCon, vecElemTyCon, liftedTypeKind
                                  , mkFunKind, mkForAllKind )
 import {-# SOURCE #-} DataCon    ( DataCon, dataConExTyVars, dataConFieldLabels
@@ -339,17 +339,25 @@ it's worth noting that (~#)'s parameters are at role N. Promoted data
 constructors' type arguments are at role R. All kind arguments are at role
 N.
 
-Note [Unboxed tuple RuntimeRep vars]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Unboxed tuple extra vars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The contents of an unboxed tuple may have any representation. Accordingly,
-the kind of the unboxed tuple constructor is runtime-representation
+the kind of the unboxed tuple constructor is levity
 polymorphic. For example,
 
-   (#,#) :: forall (q :: RuntimeRep) (r :: RuntimeRep). TYPEvis q -> TYPEvis r -> #
+   (#,#) :: forall (v1 :: Visibility) (v2 :: Visbiility)
+                   (q :: RuntimeRep) (r :: RuntimeRep). TYPE v1 q -> TYPE v2 r -> #
 
-These extra tyvars (v and w) cause some delicate processing around tuples,
+These extra tyvars cause some delicate processing around tuples,
 where we used to be able to assume that the tycon arity and the
 datacon arity were the same.
+
+Why the generality around Visibility? Because worker/wrapper
+likes to put dictionaries into unboxed tuples. User-written Haskell cannot access
+this generality.
+
+NB: Unboxed sums don't need this full generality, so they just have the RuntimeRep
+vars.
 
 Note [Injective type families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2000,7 +2008,7 @@ kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, starKindTyConKey, unicodeStarKindTyConKey
               , constraintKindTyConKey, tYPETyConKey ]
-  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon
+  : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, visibilityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
     tycon_with_datacons tc = getUnique tc : map getUnique (tyConDataCons tc)

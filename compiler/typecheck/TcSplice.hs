@@ -1803,10 +1803,10 @@ reify_tc_app tc tys
     tc_binders  = tyConBinders tc
     tc_res_kind = tyConResKind tc
 
-    r_tc | isUnboxedSumTyCon tc           = TH.UnboxedSumT (arity `div` 2)
-         | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 2)
-         | isPromotedTupleTyCon tc        = TH.PromotedTupleT (arity `div` 2)
-             -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
+    r_tc | isPromotedTupleTyCon tc        = TH.PromotedTupleT (arity `div` 2)
+         | isUnboxedSumTyCon tc           = TH.UnboxedSumT (arity `div` 2)
+         | isUnboxedTupleTyCon tc         = TH.UnboxedTupleT (arity `div` 3)
+             -- See Note [Unboxed tuple extra vars] in TyCon. Yes, that should be a 3.
          | isTupleTyCon tc                = if isPromotedDataCon tc
                                             then TH.PromotedTupleT arity
                                             else TH.TupleT arity

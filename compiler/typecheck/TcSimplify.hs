@@ -38,7 +38,7 @@ import TcSMonad  as TcS
 import TcType
 import TrieMap       () -- DV: for now
 import Type
-import TysWiredIn    ( liftedRepTy )
+import TysWiredIn    ( liftedRepTy, visibleDataConTy )
 import Unify         ( tcMatchTyKi )
 import Util
 import Var
@@ -1609,6 +1609,7 @@ promoteTyVarTcS tclvl tv
   = return ()
 
 -- | If the tyvar is a RuntimeRep var, set it to LiftedRep.
+-- If it's a Visibility var, set it to Visible
 defaultTyVar :: TcTyVar -> TcM ()
 -- Precondition: MetaTyVars only
 -- See Note [DefaultTyVar]
@@ -1616,6 +1617,10 @@ defaultTyVar the_tv
   | isRuntimeRepVar the_tv
   = do { traceTc "defaultTyVar RuntimeRep" (ppr the_tv)
        ; writeMetaTyVar the_tv liftedRepTy }
+
+  | isVisibilityVar the_tv
+  = do { traceTc "defaultTyVar Visibility" (ppr the_tv)
+       ; writeMetaTyVar the_tv visibleDataConTy }
 
   | otherwise = return ()    -- The common case
 
@@ -1625,6 +1630,10 @@ defaultTyVarTcS the_tv
   | isRuntimeRepVar the_tv
   = do { traceTcS "defaultTyVarTcS RuntimeRep" (ppr the_tv)
        ; unifyTyVar the_tv liftedRepTy
+       ; return True }
+  | isVisibilityVar the_tv
+  = do { traceTcS "defaultTyVarTcS Visibility" (ppr the_tv)
+       ; unifyTyVar the_tv visibleDataConTy
        ; return True }
   | otherwise
   = return False  -- the common case

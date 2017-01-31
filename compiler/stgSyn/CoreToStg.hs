@@ -583,7 +583,7 @@ coreToStgApp _ f args ticks = do
         app = case idDetails f of
                 DataConWorkId dc
                   | saturated    -> StgConApp dc args'
-                                      (dropRuntimeRepArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
+                                      (dropUbxTupleExtraArgs (fromMaybe [] (tyConAppArgs_maybe res_ty)))
 
                 -- Some primitive operator that might be implemented as a library call.
                 PrimOpId op      -> ASSERT( saturated )

@@ -861,19 +861,24 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
     tycon = mkTupleTyCon tc_name tc_binders tc_res_kind tc_arity tuple_con
                          UnboxedTuple flavour
 
-    -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-    -- Kind:  forall (k1:RuntimeRep) (k2:RuntimeRep). TYPEvis k1 -> TYPEvis k2 -> #
-    tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
-                                        (\ks -> map tYPEvis ks)
+    -- See Note [Unboxed tuple extra vars] in TyCon
+    -- Kind:  forall (v1:Visibility) (v2:Visibility)
+    --               (k1:RuntimeRep) (k2:RuntimeRep). TYPE v1 k1 -> TYPE v2 k2
+    --                                             -> TYPE (TupleRep [k1, k2])
+    tc_binders = mkTemplateTyConBinders (nOfThem arity visibilityTy ++
+                                         nOfThem arity runtimeRepTy)
+                                        (\ks -> let (vs, rs) = splitAt arity ks in
+                                                zipWith tYPE vs rs)
 
     tc_res_kind = unboxedTupleKind rr_tys
 
-    tc_arity    = arity * 2
+    tc_arity    = arity * 3
     flavour     = UnboxedAlgTyCon
 
-    dc_tvs               = binderVars tc_binders
-    (rr_tys, dc_arg_tys) = splitAt arity (mkTyVarTys dc_tvs)
-    tuple_con            = pcDataCon dc_name dc_tvs dc_arg_tys tycon
+    dc_tvs                  = binderVars tc_binders
+    (_vis_tys, rr_dc_tys)   = splitAt arity (mkTyVarTys dc_tvs)
+    (rr_tys, dc_arg_tys)    = splitAt arity rr_dc_tys
+    tuple_con               = pcDataCon dc_name dc_tvs dc_arg_tys tycon
 
     boxity  = Unboxed
     modu    = gHC_PRIM
@@ -1519,8 +1524,9 @@ mkTupleTy :: Boxity -> [Type] -> Type
 -- Special case for *boxed* 1-tuples, which are represented by the type itself
 mkTupleTy Boxed   [ty] = ty
 mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
-mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map (getRuntimeRep "mkTupleTy") tys ++ tys)
+  -- See Note [Unboxed tuple extra vars] in TyCon
+mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys)) (viss ++ reps ++ tys)
+  where (viss, reps) = mapAndUnzip (getVisRuntimeRep "mkTupleTy") tys
 
 -- | Build the type of a small tuple that holds the specified type of thing
 mkBoxedTupleTy :: [Type] -> Type

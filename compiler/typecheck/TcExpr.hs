@@ -444,11 +444,21 @@ tcExpr expr@(ExplicitTuple tup_args boxity) res_ty
              tup_tc = tupleTyCon boxity arity
        ; res_ty <- expTypeToType res_ty
        ; (coi, arg_tys) <- matchExpectedTyConApp tup_tc res_ty
-                           -- Unboxed tuples have RuntimeRep vars, which we
+                           -- Unboxed tuples have extra vars, which we
                            -- don't care about here
-                           -- See Note [Unboxed tuple RuntimeRep vars] in TyCon
-       ; let arg_tys' = case boxity of Unboxed -> drop arity arg_tys
-                                       Boxed   -> arg_tys
+                           -- See Note [Unboxed tuple extra vars] in TyCon
+       ; arg_tys' <- case boxity of
+                       Unboxed
+                         -> do { let (vis_tys, rest_tys) = splitAt arity arg_tys
+                                     force_visible ty
+                                       = unifyKind noThing ty visibleDataConTy
+
+                                  -- user-written unboxed tuples have all visible
+                                  -- arguments.
+                               ; mapM_ force_visible vis_tys
+                               ; return $ drop arity rest_tys }
+                       Boxed
+                         -> return arg_tys
        ; tup_args1 <- tcTupArgs tup_args arg_tys'
        ; return $ mkHsWrapCo coi (ExplicitTuple tup_args1 boxity) }
 
