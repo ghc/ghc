@@ -1729,7 +1729,7 @@ to ensure that instance declarations match.  For example consider
      instance Show (a->b)
      foo x = show (\_ -> True)
 
-Then we'll get a constraint (Show (p ->q)) where p has kind (TYPEvis r),
+Then we'll get a constraint (Show (p ->q)) where p has kind (TYPE r),
 and that won't match the typeKind (*) in the instance decl.  See tests
 tc217 and tc175.
 

@@ -346,7 +346,8 @@ the kind of the unboxed tuple constructor is levity
 polymorphic. For example,
 
    (#,#) :: forall (v1 :: Visibility) (v2 :: Visbiility)
-                   (q :: RuntimeRep) (r :: RuntimeRep). TYPE v1 q -> TYPE v2 r -> #
+                   (q :: RuntimeRep) (r :: RuntimeRep). TYPEV v1 q -> TYPEV v2 r
+                -> TYPE (TupleRep [q,r])
 
 These extra tyvars cause some delicate processing around tuples,
 where we used to be able to assume that the tycon arity and the
@@ -2007,7 +2008,7 @@ isKindTyCon tc = getUnique tc `elementOfUniqSet` kindTyConKeys
 kindTyConKeys :: UniqSet Unique
 kindTyConKeys = unionManyUniqSets
   ( mkUniqSet [ liftedTypeKindTyConKey, starKindTyConKey, unicodeStarKindTyConKey
-              , constraintKindTyConKey, tYPETyConKey ]
+              , constraintKindTyConKey, tYPEVTyConKey ]
   : map (mkUniqSet . tycon_with_datacons) [ runtimeRepTyCon, visibilityTyCon
                                           , vecCountTyCon, vecElemTyCon ] )
   where
@@ -2065,7 +2066,7 @@ isTcTyCon _            = False
 -- | Could this TyCon ever be levity-polymorphic when fully applied?
 -- True is safe. False means we're sure. Does only a quick check
 -- based on the TyCon's category.
--- Precondition: The fully-applied TyCon has kind (TYPE v blah)
+-- Precondition: The fully-applied TyCon has kind (TYPEV v blah)
 isTcLevPoly :: TyCon -> Bool
 isTcLevPoly FunTyCon{}           = False
 isTcLevPoly (AlgTyCon { algTcParent = UnboxedAlgTyCon }) = True

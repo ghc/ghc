@@ -32,8 +32,8 @@ module GHC.Types (
         Nat, Symbol,
         Any,
         type (~~), Coercible,
-        TYPE, RuntimeRep(..), Visibility(..), Type, type (*), type (★), Constraint,
-        TYPEvis,
+        TYPEV, RuntimeRep(..), Visibility(..), Type, type (*), type (★), Constraint,
+        TYPE,
           -- The historical type * should ideally be written as
           -- `type *`, without the parentheses. But that's a true
           -- pain to parse, and for little gain.
@@ -58,19 +58,19 @@ infixr 5 :
 ********************************************************************* -}
 
 -- | The kind of constraints, like @Show a@
-type Constraint = TYPE 'Invisible 'LiftedRep
+type Constraint = TYPEV 'Invisible 'LiftedRep
 
 -- | The kind of types with values. For example @Int :: Type@.
-type Type = TYPE 'Visible 'LiftedRep
+type Type = TYPE 'LiftedRep
 
 -- | A backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type * = TYPE 'Visible 'LiftedRep
+type * = TYPE 'LiftedRep
 
 -- | A unicode backward-compatible (pre-GHC 8.0) synonym for 'Type'
-type ★ = TYPE 'Visible 'LiftedRep
+type ★ = TYPE 'LiftedRep
 
 -- | The kind of visible types, but with a configurable representation.
-type TYPEvis = TYPE 'Visible
+type TYPE = TYPEV 'Visible
 
 {- *********************************************************************
 *                                                                      *

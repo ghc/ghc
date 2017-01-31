@@ -5,7 +5,7 @@ module Main where
 
 import GHC.Exts
 
-idint :: forall (a :: TYPEvis IntRep). a -> a
+idint :: forall (a :: TYPE IntRep). a -> a
 idint x = x
 
 five _ = idint 3# +# idint 2#
@@ -32,7 +32,7 @@ g (# b, x #) = show b ++ " " ++ show (I# x)
 h :: (# Double, Int# #) -> String
 h (# d, x #) = show d ++ " " ++ show (I# x)
 
-cond :: forall (a :: TYPEvis (TupleRep [LiftedRep, IntRep])). Bool -> a -> a -> a
+cond :: forall (a :: TYPE (TupleRep [LiftedRep, IntRep])). Bool -> a -> a -> a
 cond True x _ = x
 cond False _ x = x
 

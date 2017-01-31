@@ -80,7 +80,7 @@ data TyCon (a :: k) where
   List :: TyCon []
   Maybe :: TyCon Maybe
   Arrow :: TyCon (->)
-  TYPE  :: TyCon TYPE
+  TYPEV  :: TyCon TYPEV
   RuntimeRep :: TyCon RuntimeRep
   Visibility :: TyCon Visibility
   LiftedRep' :: TyCon 'LiftedRep
@@ -94,7 +94,7 @@ eqTyCon Char Char = Just HRefl
 eqTyCon List List = Just HRefl
 eqTyCon Maybe Maybe = Just HRefl
 eqTyCon Arrow Arrow = Just HRefl
-eqTyCon TYPE TYPE = Just HRefl
+eqTyCon TYPEV TYPEV = Just HRefl
 eqTyCon RuntimeRep RuntimeRep = Just HRefl
 eqTyCon Visibility Visibility = Just HRefl
 eqTyCon LiftedRep' LiftedRep' = Just HRefl
@@ -215,7 +215,7 @@ instance TyConAble Char      where tyCon = Char
 instance TyConAble []        where tyCon = List
 instance TyConAble Maybe     where tyCon = Maybe
 instance TyConAble (->)      where tyCon = Arrow
-instance TyConAble TYPE      where tyCon = TYPE
+instance TyConAble TYPEV      where tyCon = TYPEV
 instance TyConAble 'LiftedRep   where tyCon = LiftedRep'
 instance TyConAble RuntimeRep    where tyCon = RuntimeRep
 instance TyConAble Visibility where tyCon = Visibility

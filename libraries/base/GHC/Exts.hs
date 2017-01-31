@@ -60,7 +60,7 @@ module GHC.Exts
         type (~~),
 
         -- * Representation polymorphism
-        GHC.Prim.TYPE, TYPEvis, RuntimeRep(..), Visibility(..), VecCount(..), VecElem(..),
+        GHC.Prim.TYPEV, TYPE, RuntimeRep(..), Visibility(..), VecCount(..), VecElem(..),
 
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the,
@@ -84,7 +84,7 @@ module GHC.Exts
         IsList(..)
        ) where
 
-import GHC.Prim hiding ( coerce, TYPE )
+import GHC.Prim hiding ( coerce, TYPEV )
 import qualified GHC.Prim
 import GHC.Base hiding ( coerce )
 import GHC.Word

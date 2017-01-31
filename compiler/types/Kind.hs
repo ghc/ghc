@@ -44,7 +44,7 @@ returnsConstraintKind = go
     go (FunTy    _ ty)  = go ty
     go other            = isConstraintKind other
 
--- | Tests whether the given kind (which should look like @TYPE v x@)
+-- | Tests whether the given kind (which should look like @TYPEV v x@)
 -- is something other than a constructor tree (that is, constructors at every node).
 isKindLevPoly :: Kind -> Bool
 isKindLevPoly k = ASSERT2( _is_type k, ppr k )
@@ -65,7 +65,7 @@ isKindLevPoly k = ASSERT2( _is_type k, ppr k )
       = _is_type ty'
 
       | TyConApp typ [_, _] <- ty
-      = typ `hasKey` tYPETyConKey
+      = typ `hasKey` tYPEVTyConKey
 
       | otherwise
       = False
@@ -90,16 +90,16 @@ okArrowResultKind = classifiesTypeWithValues
 -- indistinguishable
 
 -- | Does this classify a type allowed to have values? Responds True to things
--- like *, #, TYPEvis Lifted, TYPE v r, Constraint.
+-- like *, #, TYPE Lifted, TYPEV v r, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 classifiesTypeWithValues t | Just t' <- coreView t = classifiesTypeWithValues t'
-classifiesTypeWithValues (TyConApp tc [_,_]) = tc `hasKey` tYPETyConKey
+classifiesTypeWithValues (TyConApp tc [_,_]) = tc `hasKey` tYPEVTyConKey
 classifiesTypeWithValues _ = False
 
 {- Note [Levity polymorphism]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Is this type legal?
-   (a :: TYPEvis rep) -> Int
+   (a :: TYPE rep) -> Int
    where 'rep :: RuntimeRep'
 
 You might think not, because no lambda can have a
@@ -107,7 +107,7 @@ runtime-rep-polymorphic binder.  So no lambda has the
 above type.  BUT here's a way it can be useful (taken from
 Trac #12708):
 
-  data T rep (a :: TYPEvis rep)
+  data T rep (a :: TYPE rep)
      = MkT (a -> Int)
 
   x1 :: T LiftedRep Int
@@ -119,6 +119,6 @@ Trac #12708):
 Note that the lambdas are just fine!
 
 Hence, okArrowArgKind and okArrowResultKind both just
-check that the type is of the form (TYPEvis r) for some
+check that the type is of the form (TYPE r) for some
 representation type r.
 -}

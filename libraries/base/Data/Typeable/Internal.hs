@@ -63,7 +63,7 @@ module Data.Typeable.Internal (
   ) where
 
 import GHC.Base
-import GHC.Types (TYPE)
+import GHC.Types (TYPEV)
 import GHC.Word
 import GHC.Show
 import Data.Proxy
@@ -355,11 +355,11 @@ instance Show TypeRep where
         where
           tcList = tyConOf @[] Proxy
       [TypeRep _ visCon _ [], TypeRep _ ptrRepCon _ []]
-        | tycon == tcTYPE && ptrRepCon == tc'LiftedRep
+        | tycon == tcTYPEV && ptrRepCon == tc'LiftedRep
           -> if visCon == tc'Visible then showChar '*'
                                      else showString "Constraint"
         where
-          tcTYPE         = tyConOf @TYPE            Proxy
+          tcTYPEV        = tyConOf @TYPEV           Proxy
           tc'LiftedRep   = tyConOf @'LiftedRep      Proxy
           tc'Visible     = tyConOf @'Visible        Proxy
       [a,r] | tycon == tcFun  -> showParen (p > 8) $

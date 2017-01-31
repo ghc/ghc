@@ -24,10 +24,10 @@ module TysPrim(
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
         -- Kind constructors...
-        tYPETyConName,
+        tYPEVTyConName, tYPEVTyCon,
 
         -- Kinds
-        tYPE, tYPEvis, primRepToRuntimeRep,
+        tYPEV, tYPE, primRepToRuntimeRep,
 
         funTyCon, funTyConName,
         primTyCons,
@@ -81,7 +81,7 @@ module TysPrim(
 #include "HsVersions.h"
 
 import {-# SOURCE #-} TysWiredIn
-  ( runtimeRepTy, visibilityTy, visibleDataConTy, unboxedTupleKind, liftedTypeKind
+  ( runtimeRepTy, visibilityTy, unboxedTupleKind, liftedTypeKind
   , vecRepDataConTyCon, tupleRepDataConTyCon
   , liftedRepDataConTy, unliftedRepDataConTy, intRepDataConTy
   , wordRepDataConTy, int64RepDataConTy, word64RepDataConTy, addrRepDataConTy
@@ -92,7 +92,7 @@ import {-# SOURCE #-} TysWiredIn
   , int64ElemRepDataConTy, word8ElemRepDataConTy, word16ElemRepDataConTy
   , word32ElemRepDataConTy, word64ElemRepDataConTy, floatElemRepDataConTy
   , doubleElemRepDataConTy
-  , mkPromotedListTy )
+  , mkPromotedListTy, tYPESynTyCon )
 
 import Var              ( TyVar, mkTyVar )
 import Name
@@ -152,7 +152,7 @@ primTyCons
     , eqReprPrimTyCon
     , eqPhantPrimTyCon
 
-    , tYPETyCon
+    , tYPEVTyCon
 
 #include "primop-vector-tycons.hs-incl"
     ]
@@ -271,8 +271,8 @@ mkTemplateKiTyVars
                              -- Result is anon arg kinds [ak1, .., akm]
     -> [TyVar]   -- [kv1:k1, ..., kvn:kn, av1:ak1, ..., avm:akm]
 -- Example: if you want the tyvars for
---   forall (r:RuntimeRep) (a:TYPEvis r) (b:*). blah
--- call mkTemplateKiTyVars [RuntimeRep] (\[r]. [TYPEvis r, *)
+--   forall (r:RuntimeRep) (a:TYPE r) (b:*). blah
+-- call mkTemplateKiTyVars [RuntimeRep] (\[r]. [TYPE r, *)
 mkTemplateKiTyVars kind_var_kinds mk_arg_kinds
   = kv_bndrs ++ tv_bndrs
   where
@@ -311,7 +311,7 @@ runtimeRep2Ty = mkTyVarTy runtimeRep2TyVar
 
 openAlphaTyVar, openBetaTyVar :: TyVar
 [openAlphaTyVar,openBetaTyVar]
-  = mkTemplateTyVars [tYPEvis runtimeRep1Ty, tYPEvis runtimeRep2Ty]
+  = mkTemplateTyVars [tYPE runtimeRep1Ty, tYPE runtimeRep2Ty]
 
 openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
@@ -353,7 +353,7 @@ funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
 
 Note [TYPE and RuntimeRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-All types that classify values have a kind of the form (TYPE v rr), where
+All types that classify values have a kind of the form (TYPEV v rr), where
 
     data Visibility = Visible | Invisible   -- Defined in ghc-prim:GHC.Types
 
@@ -367,19 +367,19 @@ All types that classify values have a kind of the form (TYPE v rr), where
     rr :: RuntimeRep
     v  :: Visibility
 
-    TYPE :: Visibility -> RuntimeRep -> TYPE 'LiftedRep  -- Built in
+    TYPEV :: Visibility -> RuntimeRep -> TYPEV 'Visible 'LiftedRep  -- Built in
 
 So for example:
-    Int        :: TYPE 'Visible 'LiftedRep
-    Array# Int :: TYPE 'Visible 'UnliftedRep
-    Int#       :: TYPE 'Visible 'IntRep
-    Float#     :: TYPE 'Visible 'FloatRep
-    Maybe      :: TYPE 'Visible 'LiftedRep -> TYPE 'Visible 'LiftedRep
-    (# , #)    :: TYPE 'Visible r1 -> TYPE 'Visible r2 -> TYPE 'Visible (TupleRep [r1, r2])
-    Eq         :: TYPE 'Visible 'LiftedRep -> TYPE 'Invisible 'LiftedRep
+    Int        :: TYPEV 'Visible 'LiftedRep
+    Array# Int :: TYPEV 'Visible 'UnliftedRep
+    Int#       :: TYPEV 'Visible 'IntRep
+    Float#     :: TYPEV 'Visible 'FloatRep
+    Maybe      :: TYPEV 'Visible 'LiftedRep -> TYPEV 'Visible 'LiftedRep
+    (# , #)    :: TYPEV 'Visible r1 -> TYPEV 'Visible r2 -> TYPEV 'Visible (TupleRep [r1, r2])
+    Eq         :: TYPEV 'Visible 'LiftedRep -> TYPEV 'Invisible 'LiftedRep
 
 We abbreviate '*' specially:
-    type * = TYPE 'Visible 'LiftedRep
+    type * = TYPEV 'Visible 'LiftedRep
 
 The 'v' parameter tells us whether arguments of a type of the kind are written
 visibly and 'rr' parameter tells us how the value is represented at runime.
@@ -388,10 +388,10 @@ is LiftedRep. (The other possibilities are well-formed kinds, but they are
 empty.)
 
 Because 'Visible is the vastly common case, we define
-   type TYPEvis = TYPE 'Visible
+   type TYPE = TYPEV 'Visible
 
 Generally speaking, you can't be polymorphic in 'rr'.  E.g
-   f :: forall (rr:RuntimeRep) (a:TYPEvis rr). a -> [a]
+   f :: forall (rr:RuntimeRep) (a:TYPE rr). a -> [a]
    f = /\(rr:RuntimeRep) (a:rr) \(a:rr). ...
 This is no good: we could not generate code code for 'f', because the
 calling convention for 'f' varies depending on whether the argument is
@@ -399,22 +399,22 @@ a a Int, Int#, or Float#.  (You could imagine generating specialised
 code, one for each instantiation of 'rr', but we don't do that.)
 
 Certain functions CAN be runtime-rep-polymorphic, because the code
-generator never has to manipulate a value of type 'a :: TYPEvis rr'.
+generator never has to manipulate a value of type 'a :: TYPE rr'.
 
-* error :: forall (rr:RuntimeRep) (a:TYPEvis rr). String -> a
+* error :: forall (rr:RuntimeRep) (a:TYPE rr). String -> a
   Code generator never has to manipulate the return value.
 
 * unsafeCoerce#, defined in MkId.unsafeCoerceId:
   Always inlined to be a no-op
      unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-                             (a :: TYPEvis r1) (b :: TYPEvis r2).
+                             (a :: TYPE r1) (b :: TYPE r2).
                              a -> b
 
 * Unboxed tuples, and unboxed sums, defined in TysWiredIn
   Always inlined, and hence specialised to the call site
      (#,#) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-                     (a :: TYPEvis r1) (b :: TYPEvis r2).
-                     a -> b -> TYPEvis ('TupleRep '[r1, r2])
+                     (a :: TYPE r1) (b :: TYPE r2).
+                     a -> b -> TYPE ('TupleRep '[r1, r2])
 
 Note [PrimRep and kindPrimRep]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -431,7 +431,7 @@ We need to get from one to the other; that is what kindPrimRep does.
 Suppose we have a value
    (v :: t) where (t :: k)
 Given this kind
-    k = TyConApp "TYPE" [vis, rep]
+    k = TyConApp "TYPEV" [vis, rep]
 GHC needs to be able to figure out how 'v' is represented at runtime.
 It expects 'rep' to be form
     TyConApp rr_dc args
@@ -441,21 +441,21 @@ PrimRep in the promoted data constructor itself: see TyCon.promDcRepInfo.
 
 -}
 
-tYPETyCon :: TyCon
-tYPETyConName :: Name
+tYPEVTyCon :: TyCon
+tYPEVTyConName :: Name
 
-tYPETyCon = mkKindTyCon tYPETyConName
-                        (mkTemplateAnonTyConBinders [visibilityTy, runtimeRepTy])
-                        liftedTypeKind
-                        [Nominal]
-                        (mkPrelTyConRepName tYPETyConName)
+tYPEVTyCon = mkKindTyCon tYPEVTyConName
+                         (mkTemplateAnonTyConBinders [visibilityTy, runtimeRepTy])
+                         liftedTypeKind
+                         [Nominal]
+                         (mkPrelTyConRepName tYPEVTyConName)
 
 --------------------------
 -- ... and now their names
 
 -- If you edit these, you may need to update the GHC formalism
 -- See Note [GHC Formalism] in coreSyn/CoreLint.hs
-tYPETyConName             = mkPrimTyConName (fsLit "TYPE") tYPETyConKey tYPETyCon
+tYPEVTyConName             = mkPrimTyConName (fsLit "TYPEV") tYPEVTyConKey tYPEVTyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
 mkPrimTyConName = mkPrimTcName BuiltInSyntax
@@ -467,14 +467,14 @@ mkPrimTcName built_in_syntax occ key tycon
   = mkWiredInName gHC_PRIM (mkTcOccFS occ) key (ATyCon tycon) built_in_syntax
 
 -----------------------------
--- | Given a Visibility RuntimeRep, applies TYPE to it.
+-- | Given a Visibility and RuntimeRep, applies TYPEV to it.
 -- see Note [TYPE and RuntimeRep]
-tYPE :: Type -> Type -> Type
-tYPE v rr = TyConApp tYPETyCon [v, rr]
+tYPEV :: Type -> Type -> Type
+tYPEV v rr = TyConApp tYPEVTyCon [v, rr]
 
--- | Like 'tYPE', but assumes 'Visible'
-tYPEvis :: Type -> Type
-tYPEvis = tYPE visibleDataConTy
+-- | Like 'tYPEV', but assumes 'Visible'
+tYPE :: Type -> Type
+tYPE rep = TyConApp tYPESynTyCon [rep]
 
 {-
 ************************************************************************
@@ -490,7 +490,7 @@ pcPrimTyCon name roles rep
   = mkPrimTyCon name binders result_kind roles
   where
     binders     = mkTemplateAnonTyConBinders (map (const liftedTypeKind) roles)
-    result_kind = tYPEvis (primRepToRuntimeRep rep)
+    result_kind = tYPE (primRepToRuntimeRep rep)
 
 -- | Convert a 'PrimRep' to a 'Type' of kind RuntimeRep
 -- Defined here to avoid (more) module loops

@@ -9,13 +9,13 @@ type family Boxed (a :: k) :: *
 type instance Boxed Char# = Char
 type instance Boxed Char  = Char
 
-class BoxIt (a :: TYPEvis lev) where
+class BoxIt (a :: TYPE lev) where
     boxed :: a -> Boxed a
 
 instance BoxIt Char# where boxed x = C# x
 instance BoxIt Char  where boxed = id
 
-hello :: forall (r :: RuntimeRep). forall (a :: TYPEvis r). BoxIt a => a -> Boxed a
+hello :: forall (r :: RuntimeRep). forall (a :: TYPE r). BoxIt a => a -> Boxed a
 hello x = boxed x
 {-# NOINLINE hello #-}
 

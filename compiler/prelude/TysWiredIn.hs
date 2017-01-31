@@ -94,6 +94,7 @@ module TysWiredIn (
         starKindTyCon, starKindTyConName,
         unicodeStarKindTyCon, unicodeStarKindTyConName,
         liftedTypeKindTyCon, constraintKindTyCon,
+        tYPESynTyCon,
 
         -- * Parallel arrays
         mkPArrTy,
@@ -395,11 +396,12 @@ typeSymbolKindConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Symbol")
 constraintKindTyConName :: Name
 constraintKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Constraint") constraintKindTyConKey   constraintKindTyCon
 
-liftedTypeKindTyConName, starKindTyConName, unicodeStarKindTyConName
+liftedTypeKindTyConName, starKindTyConName, unicodeStarKindTyConName, tYPESynTyConName
   :: Name
 liftedTypeKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Type") liftedTypeKindTyConKey liftedTypeKindTyCon
 starKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "*") starKindTyConKey starKindTyCon
 unicodeStarKindTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "★") unicodeStarKindTyConKey unicodeStarKindTyCon
+tYPESynTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "TYPE") tYPESynTyConKey tYPESynTyCon
 
 visibilityTyConName, runtimeRepTyConName, vecRepDataConName, tupleRepDataConName, sumRepDataConName :: Name
 visibilityTyConName = mkWiredInTyConName UserSyntax gHC_TYPES (fsLit "Visibility") visibilityTyConKey visibilityTyCon
@@ -580,10 +582,10 @@ typeSymbolKind = mkTyConTy typeSymbolKindCon
 constraintKindTyCon :: TyCon
 constraintKindTyCon = buildSynTyCon constraintKindTyConName []
                                     liftedTypeKind []
-                                    (tYPE invisibleDataConTy liftedRepTy)
+                                    (tYPEV invisibleDataConTy liftedRepTy)
 
 liftedTypeKind, constraintKind :: Kind
-liftedTypeKind   = tYPE visibleDataConTy liftedRepTy
+liftedTypeKind   = mkTyConApp liftedTypeKindTyCon []
 constraintKind   = mkTyConApp constraintKindTyCon []
 
 -- mkFunKind and mkForAllKind are defined here
@@ -822,11 +824,11 @@ unboxedTupleArr = listArray (0,mAX_TUPLE_SIZE) [mk_tuple Unboxed i | i <- [0..mA
 
 -- | Given the TupleRep/SumRep tycon and list of RuntimeReps of the unboxed
 -- tuple/sum arguments, produces the return kind of an unboxed tuple/sum type
--- constructor. @unboxedTupleSumKind [IntRep, LiftedRep] --> TYPEvis (TupleRep/SumRep
+-- constructor. @unboxedTupleSumKind [IntRep, LiftedRep] --> TYPE (TupleRep/SumRep
 -- [IntRep, LiftedRep])@
 unboxedTupleSumKind :: TyCon -> [Type] -> Kind
 unboxedTupleSumKind tc rr_tys
-  = tYPEvis (mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys])
+  = tYPE (mkTyConApp tc [mkPromotedListTy runtimeRepTy rr_tys])
 
 -- | Specialization of 'unboxedTupleSumKind' for tuples
 unboxedTupleKind :: [Type] -> Kind
@@ -863,12 +865,12 @@ mk_tuple Unboxed arity = (tycon, tuple_con)
 
     -- See Note [Unboxed tuple extra vars] in TyCon
     -- Kind:  forall (v1:Visibility) (v2:Visibility)
-    --               (k1:RuntimeRep) (k2:RuntimeRep). TYPE v1 k1 -> TYPE v2 k2
-    --                                             -> TYPE (TupleRep [k1, k2])
+    --               (k1:RuntimeRep) (k2:RuntimeRep). TYPEV v1 k1 -> TYPEV v2 k2
+    --                                             -> TYPEV (TupleRep [k1, k2])
     tc_binders = mkTemplateTyConBinders (nOfThem arity visibilityTy ++
                                          nOfThem arity runtimeRepTy)
                                         (\ks -> let (vs, rs) = splitAt arity ks in
-                                                zipWith tYPE vs rs)
+                                                zipWith tYPEV vs rs)
 
     tc_res_kind = unboxedTupleKind rr_tys
 
@@ -986,7 +988,7 @@ mk_sum arity = (tycon, sum_cons)
                          UnboxedAlgTyCon
 
     tc_binders = mkTemplateTyConBinders (nOfThem arity runtimeRepTy)
-                                        (\ks -> map tYPEvis ks)
+                                        (\ks -> map tYPE ks)
 
     tyvars = binderVars tc_binders
 
@@ -1087,24 +1089,28 @@ visibilityTy = mkTyConTy visibilityTyCon
 runtimeRepTy :: Type
 runtimeRepTy = mkTyConTy runtimeRepTyCon
 
-liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
+liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon, tYPESynTyCon :: TyCon
 
 -- Type syononyms; see Note [TYPE and RuntimeRep] in TysPrim
--- type Type = TYPE 'Visible 'LiftedRep
--- type *    = TYPE 'Visible 'LiftedRep
--- type *    = TYPE 'Visible 'LiftedRep  -- Unicode variant
+-- type Type = TYPEV 'Visible 'LiftedRep
+-- type *    = TYPEV 'Visible 'LiftedRep
+-- type *    = TYPEV 'Visible 'LiftedRep  -- Unicode variant
 
 liftedTypeKindTyCon   = buildSynTyCon liftedTypeKindTyConName
                                        [] liftedTypeKind []
-                                       (tYPE visibleDataConTy liftedRepTy)
+                                       (tYPE liftedRepTy)
 
 starKindTyCon         = buildSynTyCon starKindTyConName
                                        [] liftedTypeKind []
-                                       (tYPE visibleDataConTy liftedRepTy)
+                                       (tYPE liftedRepTy)
 
 unicodeStarKindTyCon  = buildSynTyCon unicodeStarKindTyConName
                                        [] liftedTypeKind []
-                                       (tYPE visibleDataConTy liftedRepTy)
+                                       (tYPE liftedRepTy)
+
+tYPESynTyCon          = buildSynTyCon tYPESynTyConName
+                                       [] (runtimeRepTy `mkFunTy` liftedTypeKind) []
+                                       (mkTyConApp tYPEVTyCon [visibleDataConTy])
 
 visibilityTyCon :: TyCon
 visibilityTyCon = pcTyCon True visibilityTyConName Nothing []

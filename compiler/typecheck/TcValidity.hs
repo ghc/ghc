@@ -388,7 +388,7 @@ checkTySynRhs ctxt ty
 -- | The kind expected in a certain context.
 data ContextKind = TheKind Kind   -- ^ a specific kind
                  | AnythingKind   -- ^ any kind will do
-                 | OpenKind       -- ^ something of the form @TYPEvis _@
+                 | OpenKind       -- ^ something of the form @TYPE _@
 
 -- Depending on the context, we might accept any kind (for instance, in a TH
 -- splice), or only certain kinds (like in type signatures).

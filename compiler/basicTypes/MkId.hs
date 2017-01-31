@@ -1114,10 +1114,10 @@ unsafeCoerceId
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
 
     -- unsafeCoerce# :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
-    --                         (a :: TYPEvis r1) (b :: TYPEvis r2).
+    --                         (a :: TYPE r1) (b :: TYPE r2).
     --                         a -> b
     bndrs = mkTemplateKiTyVars [runtimeRepTy, runtimeRepTy]
-                               (\ks -> map tYPEvis ks)
+                               (\ks -> map tYPE ks)
 
     [_, _, a, b] = mkTyVarTys bndrs
 
@@ -1301,7 +1301,7 @@ unboxed values (unsafeCoerce 3#).
 
 In contrast unsafeCoerce# is even more dangerous because you *can* use
 it on unboxed things, (unsafeCoerce# 3#) :: Int. Its type is
-   forall (r1 :: RuntimeRep) (r2 :: RuntimeRep) (a: TYPEvis r1) (b: TYPEvis r2). a -> b
+   forall (r1 :: RuntimeRep) (r2 :: RuntimeRep) (a: TYPE r1) (b: TYPE r2). a -> b
 
 Note [seqId magic]
 ~~~~~~~~~~~~~~~~~~
@@ -1464,7 +1464,7 @@ no further floating will occur. This allows us to safely inline things like
 While the definition of @GHC.Magic.runRW#@, we override its type in @MkId@
 to be open-kinded,
 
-    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPEvis r)
+    runRW# :: forall (r1 :: RuntimeRep). (o :: TYPE r)
            => (State# RealWorld -> (# State# RealWorld, o #))
                               -> (# State# RealWorld, o #)
 

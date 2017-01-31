@@ -685,23 +685,23 @@ mkTyConTy tycon = TyConApp tycon []
 Some basic functions, put here to break loops eg with the pretty printer
 -}
 
-is_TYPE :: (   Type    -- the Visibility argument to TYPE; not a synonym
-            -> Type    -- the RuntimeRep argument to TYPE; not a synonym
-            -> Bool )  -- what to return
-        -> Kind -> Bool
-is_TYPE f ki | Just ki' <- coreView ki = is_TYPE f ki'
-is_TYPE f (TyConApp tc [vis, rep])
-  | tc `hasKey` tYPETyConKey
+is_TYPEV :: (   Type    -- the Visibility argument to TYPEV; not a synonym
+             -> Type    -- the RuntimeRep argument to TYPEV; not a synonym
+             -> Bool )  -- what to return
+         -> Kind -> Bool
+is_TYPEV f ki | Just ki' <- coreView ki = is_TYPEV f ki'
+is_TYPEV f (TyConApp tc [vis, rep])
+  | tc `hasKey` tYPEVTyConKey
   = go vis rep
     where
       go vis rep | Just vis' <- coreView vis = go vis' rep
                  | Just rep' <- coreView rep = go vis  rep'
                  | otherwise                 = f  vis  rep
-is_TYPE _ _ = False
+is_TYPEV _ _ = False
 
 -- | Returns True if the argument is equivalent to Type and False otherwise.
 isLiftedTypeKind :: Kind -> Bool
-isLiftedTypeKind = is_TYPE is_lifted
+isLiftedTypeKind = is_TYPEV is_lifted
   where
     is_lifted (TyConApp vis []) (TyConApp lifted_rep [])
       = vis `hasKey` visibleDataConKey && lifted_rep `hasKey` liftedRepDataConKey
@@ -711,14 +711,14 @@ isLiftedTypeKind = is_TYPE is_lifted
 -- Note that this returns False for levity-polymorphic kinds, which may
 -- be specialized to a kind that classifies unlifted types.
 isUnliftedTypeKind :: Kind -> Bool
-isUnliftedTypeKind = is_TYPE is_unlifted
+isUnliftedTypeKind = is_TYPEV is_unlifted
   where
     is_unlifted _ (TyConApp rr _args) = not (isLiftedRuntimeRepTyCon rr)
     is_unlifted _ _                   = False
 
 -- | Returns True if this kind is Constraint
 isConstraintKind :: Kind -> Bool
-isConstraintKind = is_TYPE is_constraint
+isConstraintKind = is_TYPEV is_constraint
   where
     is_constraint (TyConApp invis []) (TyConApp constraint_rep [])
       = invis `hasKey` invisibleDataConKey && constraint_rep `hasKey` liftedRepDataConKey

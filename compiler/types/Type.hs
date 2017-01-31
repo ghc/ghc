@@ -1837,7 +1837,7 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 -- | Returns Just True if this type is surely lifted, Just False
 -- if it is surely unlifted, Nothing if we can't be sure (i.e., it is
 -- levity polymorphic), and panics if the kind does not have the shape
--- TYPE v r.
+-- TYPEV v r.
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
 isLiftedType_maybe ty = go (getRuntimeRep "isLiftedType_maybe" ty)
   where
@@ -1888,7 +1888,7 @@ getVisRuntimeRepFromKind err = go
     go k | Just k' <- coreView k = go k'
     go k
       | (_tc, [vis, arg]) <- splitTyConApp k
-      = ASSERT2( _tc `hasKey` tYPETyConKey, text err $$ ppr k )
+      = ASSERT2( _tc `hasKey` tYPEVTyConKey, text err $$ ppr k )
         (vis, arg)
     go k = pprPanic "getRuntimeRep" (text err $$
                                      ppr k <+> dcolon <+> ppr (typeKind k))
@@ -2175,7 +2175,7 @@ typeLiteralKind l =
 
 -- | Returns True if a type is levity polymorphic. Should be the same
 -- as (isKindLevPoly . typeKind) but much faster.
--- Precondition: The type has kind (TYPE v blah)
+-- Precondition: The type has kind (TYPEV v blah)
 isTypeLevPoly :: Type -> Bool
 isTypeLevPoly = go
   where
@@ -2192,8 +2192,8 @@ isTypeLevPoly = go
     check_kind = isKindLevPoly . typeKind
 
 -- | Looking past all pi-types, is the end result potentially levity polymorphic?
--- Example: True for (forall r (a :: TYPEvis r). String -> a)
--- Example: False for (forall r1 r2 (a :: TYPEvis r1) (b :: TYPEvis r2). a -> b -> Type)
+-- Example: True for (forall r (a :: TYPE r). String -> a)
+-- Example: False for (forall r1 r2 (a :: TYPE r1) (b :: TYPE r2). a -> b -> Type)
 resultIsLevPoly :: Type -> Bool
 resultIsLevPoly = isTypeLevPoly . snd . splitPiTys
 

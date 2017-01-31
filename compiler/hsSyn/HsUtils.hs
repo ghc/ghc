@@ -819,7 +819,7 @@ care about the strictness of the type after the =>. For checked types
 This matters. If we don't separate out the AbsBindsSig case, then GHC runs into
 a problem when compiling
 
-  undefined :: forall (r :: RuntimeRep) (a :: TYPEvis r). HasCallStack => a
+  undefined :: forall (r :: RuntimeRep) (a :: TYPE r). HasCallStack => a
 
 Looking only after the =>, we cannot tell if this is strict or not. (GHC panics
 if you try.) Looking at the whole type, on the other hand, tells you that this

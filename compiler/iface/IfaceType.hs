@@ -295,7 +295,7 @@ isIfaceLiftedTypeKind (IfaceTyConApp tc ITC_Nil)
 isIfaceLiftedTypeKind (IfaceTyConApp tc
                        (ITC_Vis (IfaceTyConApp vis ITC_Nil)
                         (ITC_Vis (IfaceTyConApp ptr_rep_lifted ITC_Nil) ITC_Nil)))
-  =  tc `ifaceTyConHasKey` tYPETyConKey
+  =  tc `ifaceTyConHasKey` tYPEVTyConKey
   && vis `ifaceTyConHasKey` visibleDataConKey
   && ptr_rep_lifted `ifaceTyConHasKey` liftedRepDataConKey
 isIfaceLiftedTypeKind _ = False
@@ -732,7 +732,7 @@ understandable push-back from those with pedagogy in mind, who argued that
 RuntimeRep variables would throw a wrench into nearly any teach approach since
 they appear in even the lowly ($) function's type,
 
-    ($) :: forall (w :: RuntimeRep) a (b :: TYPEvis w). (a -> b) -> a -> b
+    ($) :: forall (w :: RuntimeRep) a (b :: TYPE w). (a -> b) -> a -> b
 
 which is significantly less readable than its non levity-polymorphic type of
 
@@ -752,7 +752,7 @@ PtrLiftedRep. This is done in a pass right before pretty-printing
 -- to 'Visible'. e.g.
 --
 -- @
--- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPEvis r).
+-- ($) :: forall (r :: GHC.Types.RuntimeRep) a (b :: TYPE r).
 --        (a -> b) -> a -> b
 -- @
 --
@@ -983,16 +983,10 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   , ITC_Invis _ (ITC_Vis ty1 (ITC_Vis ty2 ITC_Nil)) <- tys
   = pprIfaceTyList ctxt_prec ty1 ty2
 
-  | tc `ifaceTyConHasKey` tYPETyConKey
-  , ITC_Vis (IfaceTyConApp vis ITC_Nil) (ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil) <- tys
-  , vis `ifaceTyConHasKey` visibleDataConKey
-  , rep `ifaceTyConHasKey` liftedRepDataConKey
+  | is_known_kind tc tys visibleDataConKey liftedRepDataConKey
   = kindStar
 
-  | tc `ifaceTyConHasKey` tYPETyConKey
-  , ITC_Vis (IfaceTyConApp vis ITC_Nil) (ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil) <- tys
-  , vis `ifaceTyConHasKey` invisibleDataConKey
-  , rep `ifaceTyConHasKey` liftedRepDataConKey
+  | is_known_kind tc tys invisibleDataConKey liftedRepDataConKey
   = text "Constraint"
 
   | not opt_PprStyle_Debug
@@ -1007,6 +1001,19 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   where
     info = ifaceTyConInfo tc
     tys_wo_kinds = tcArgsIfaceTypes $ stripInvisArgs dflags tys
+
+    is_known_kind tc tys vis_key rep_key
+      | tc `ifaceTyConHasKey` tYPEVTyConKey
+      , ITC_Vis (IfaceTyConApp vis ITC_Nil)
+                  (ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil) <- tys
+      = vis `ifaceTyConHasKey` vis_key && rep `ifaceTyConHasKey` rep_key
+
+      | tc `ifaceTyConHasKey` tYPESynTyConKey
+      , ITC_Vis (IfaceTyConApp rep ITC_Nil) ITC_Nil <- tys
+      = vis_key == visibleDataConKey && rep `ifaceTyConHasKey` rep_key
+
+      | otherwise
+      = False
 
 -- | Pretty-print a type-level equality.
 --

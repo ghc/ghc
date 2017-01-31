@@ -439,12 +439,12 @@ The levity-polymorphism invariants are these:
 * The type of a term-binder must not be levity-polymorphic
 * The type of the argument of an App must not be levity-polymorphic.
 
-A type (t::TYPE v r) is "levity polymorphic" if 'r' has any free variables.
+A type (t::TYPEV v r) is "levity polymorphic" if 'r' has any free variables.
 (It's OK from the code generator's point-of-view if v has free variables.)
 
 For example
-  \(r::RuntimeRep). \(a::TYPEvis r). \(x::a). e
-is illegal because x's type has kind (TYPEvis r), which has 'r' free.
+  \(r::RuntimeRep). \(a::TYPE r). \(x::a). e
+is illegal because x's type has kind (TYPE r), which has 'r' free.
 
 See Note [Levity polymorphism checking] in DsMonad to see where these
 invariants are established for user-written code.
