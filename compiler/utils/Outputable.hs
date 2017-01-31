@@ -83,7 +83,7 @@ module Outputable (
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
         pprTrace, pprTraceIt, warnPprTrace, pprSTrace,
         trace, pgmError, panic, sorry, assertPanic,
-        pprDebugAndThen,
+        pprDebugAndThen, callStackDoc
     ) where
 
 import {-# SOURCE #-}   DynFlags( DynFlags,
