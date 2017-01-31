@@ -455,6 +455,7 @@ data GeneralFlag
    | Opt_Loopification                  -- See Note [Self-recursive tail calls]
    | Opt_CprAnal
    | Opt_WorkerWrapper
+   | Opt_SolveConstantDicts
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -3661,6 +3662,7 @@ fFlagsDeps = [
   flagSpec "vectorise"                        Opt_Vectorise,
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
+  flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints
@@ -4042,6 +4044,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([1,2],   Opt_UnboxSmallStrictFields)
     , ([1,2],   Opt_CprAnal)
     , ([1,2],   Opt_WorkerWrapper)
+    , ([1,2],   Opt_SolveConstantDicts)
 
     , ([2],     Opt_LiberateCase)
     , ([2],     Opt_SpecConstr)

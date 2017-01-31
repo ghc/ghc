@@ -59,6 +59,9 @@ import DynFlags
 import Util
 import qualified GHC.LanguageExtensions as LangExt
 
+import Control.Monad.Trans.Class
+import Control.Monad.Trans.Maybe
+
 {-
 **********************************************************************
 *                                                                    *
@@ -675,6 +678,154 @@ interactIrred _ wi = pprPanic "interactIrred" (ppr wi)
                    interactDict
 *                                                                               *
 *********************************************************************************
+
+Note [Solving from instances when interacting Dicts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we interact a [W] constraint with a [G] constraint that solves it, there is
+a possibility that we could produce better code if instead we solved from a
+top-level instance declaration (See #12791, #5835). For example:
+
+    class M a b where m :: a -> b
+
+    type C a b = (Num a, M a b)
+
+    f :: C Int b => b -> Int -> Int
+    f _ x = x + 1
+
+The body of `f` requires a [W] `Num Int` instance. We could solve this
+constraint from the givens because we have `C Int b` and that provides us a
+solution for `Num Int`. This would let us produce core like the following
+(with -O2):
+
+    f :: forall b. C Int b => b -> Int -> Int
+    f = \ (@ b) ($d(%,%) :: C Int b) _ (eta1 :: Int) ->
+        + @ Int
+          (GHC.Classes.$p1(%,%) @ (Num Int) @ (M Int b) $d(%,%))
+          eta1
+          A.f1
+
+This is bad! We could do much better if we solved [W] `Num Int` directly from
+the instance that we have in scope:
+
+    f :: forall b. C Int b => b -> Int -> Int
+    f = \ (@ b) _ _ (x :: Int) ->
+        case x of { GHC.Types.I# x1 -> GHC.Types.I# (GHC.Prim.+# x1 1#) }
+
+However, there is a reason why the solver does not simply try to solve such
+constraints with top-level instances. If the solver finds a relevant instance
+declaration in scope, that instance may require a context that can't be solved
+for. A good example of this is:
+
+    f :: Ord [a] => ...
+    f x = ..Need Eq [a]...
+
+If we have instance `Eq a => Eq [a]` in scope and we tried to use it, we would
+be left with the obligation to solve the constraint Eq a, which we cannot. So we
+must be conservative in our attempt to use an instance declaration to solve the
+[W] constraint we're interested in. Our rule is that we try to solve all of the
+instance's subgoals recursively all at once. Precisely: We only attempt to
+solve constraints of the form `C1, ... Cm => C t1 ... t n`, where all the Ci are
+themselves class constraints of the form `C1', ... Cm' => C' t1' ... tn'` and we
+only succeed if the entire tree of constraints is solvable from instances.
+
+An example that succeeds:
+
+    class Eq a => C a b | b -> a where
+      m :: b -> a
+
+    f :: C [Int] b => b -> Bool
+    f x = m x == []
+
+We solve for `Eq [Int]`, which requires `Eq Int`, which we also have. This
+produces the following core:
+
+    f :: forall b. C [Int] b => b -> Bool
+    f = \ (@ b) ($dC :: C [Int] b) (x :: b) ->
+        GHC.Classes.$fEq[]_$s$c==
+          (m @ [Int] @ b $dC x) (GHC.Types.[] @ Int)
+
+An example that fails:
+
+    class Eq a => C a b | b -> a where
+      m :: b -> a
+
+    f :: C [a] b => b -> Bool
+    f x = m x == []
+
+Which, because solving `Eq [a]` demands `Eq a` which we cannot solve, produces:
+
+    f :: forall a b. C [a] b => b -> Bool
+    f = \ (@ a) (@ b) ($dC :: C [a] b) (eta :: b) ->
+        ==
+          @ [a]
+          (A.$p1C @ [a] @ b $dC)
+          (m @ [a] @ b $dC eta)
+          (GHC.Types.[] @ a)
+
+This optimization relies on coherence of dictionaries to be correct. When we
+cannot assume coherence because of IncoherentInstances then this optimization
+can change the behavior of the users code.
+
+The following four modules produce a program whose output would change depending
+on whether we apply this optimization when IncoherentInstances is in effect:
+
+#########
+    {-# LANGUAGE MultiParamTypeClasses #-}
+    module A where
+
+    class A a where
+      int :: a -> Int
+
+    class A a => C a b where
+      m :: b -> a -> a
+
+#########
+    {-# LANGUAGE MultiParamTypeClasses, FlexibleInstances #-}
+    module B where
+
+    import A
+
+    instance A a where
+      int _ = 1
+
+    instance C a [b] where
+      m _ = id
+
+#########
+    {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses, FlexibleContexts #-}
+    {-# LANGUAGE IncoherentInstances #-}
+    module C where
+
+    import A
+
+    instance A Int where
+      int _ = 2
+
+    instance C Int [Int] where
+      m _ = id
+
+    intC :: C Int a => a -> Int -> Int
+    intC _ x = int x
+
+#########
+    module Main where
+
+    import A
+    import B
+    import C
+
+    main :: IO ()
+    main = print (intC [] (0::Int))
+
+The output of `main` if we avoid the optimization under the effect of
+IncoherentInstances is `1`. If we were to do the optimization, the output of
+`main` would be `2`.
+
+It is important to emphasize that failure means that we don't produce more
+efficient code, NOT that we fail to typecheck at all! This is purely an
+an optimization: exactly the same programs should typecheck with or without this
+procedure.
+
 -}
 
 interactDict :: InertCans -> Ct -> TcS (StopOrContinue Ct)
@@ -703,18 +854,29 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
        ; let ev_cs = EvCsPushCall func (ctLocSpan loc) (getEvTerm mb_new)
        ; solveCallStack ev_w ev_cs
        ; stopWith ev_w "Wanted CallStack IP" }
-
   | Just ctev_i <- lookupInertDict inerts cls tys
-  = do { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
-       ; case inert_effect of
-           IRKeep    -> return ()
-           IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
-           IRReplace -> updInertDicts $ \ ds -> addDict ds cls tys workItem
-       ; if stop_now then
-            return (Stop ev_w (text "Dict equal" <+> parens (ppr inert_effect)))
-         else
-            continueWith workItem }
-
+  = do
+  { dflags <- getDynFlags
+  -- See Note [Solving from instances when interacting Dicts]
+  ; try_inst_res <- trySolveFromInstance dflags ev_w ctev_i
+  ; case try_inst_res of
+      Just evs -> do
+        { flip mapM_ evs $ \(ev_t, ct_ev, cls, typ) -> do
+          { setWantedEvBind (ctEvId ct_ev) ev_t
+          ; addSolvedDict ct_ev cls typ }
+        ; stopWith ev_w "interactDict/solved from instance" }
+      -- We were unable to solve the [W] constraint from in-scope instances so
+      -- we solve it from the solution in the inerts we just retrieved.
+      Nothing ->  do
+        { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
+        ; case inert_effect of
+            IRKeep    -> return ()
+            IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys
+            IRReplace -> updInertDicts $ \ ds -> addDict ds cls tys workItem
+        ; if stop_now then
+            return $ Stop ev_w (text "Dict equal" <+> parens (ppr inert_effect))
+          else
+            continueWith workItem } }
   | cls `hasKey` ipClassKey
   , isGiven ev_w
   = interactGivenIP inerts workItem
@@ -724,6 +886,81 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
        ; continueWith workItem  }
 
 interactDict _ wi = pprPanic "interactDict" (ppr wi)
+
+-- See Note [Solving from instances when interacting Dicts]
+trySolveFromInstance :: DynFlags
+                     -> CtEvidence -- Work item
+                     -> CtEvidence -- Inert we want to try to replace
+                     -> TcS (Maybe [(EvTerm, CtEvidence, Class, [TcPredType])])
+                     -- Everything we need to bind a solution for the work item
+                     -- and add the solved Dict to the cache in the main solver.
+trySolveFromInstance dflags ev_w ctev_i
+  | isWanted ev_w
+ && isGiven ctev_i
+ -- We are about to solve a [W] constraint from a [G] constraint. We take
+ -- a moment to see if we can get a better solution using an instance.
+ -- Note that we only do this for the sake of performance. Exactly the same
+ -- programs should typecheck regardless of whether we take this step or
+ -- not. See Note [Solving from instances when interacting Dicts]
+ && not (xopt LangExt.IncoherentInstances dflags)
+ -- If IncoherentInstances is on then we cannot rely on coherence of proofs
+ -- in order to justify this optimization: The proof provided by the
+ -- [G] constraint's superclass may be different from the top-level proof.
+ && gopt Opt_SolveConstantDicts dflags
+ -- Enabled by the -fsolve-constant-dicts flag
+  = runMaybeT $ try_solve_from_instance emptyDictMap ev_w
+
+  | otherwise = return Nothing
+  where
+    -- This `CtLoc` is used only to check the well-staged condition of any
+    -- candidate DFun. Our subgoals all have the same stage as our root
+    -- [W] constraint so it is safe to use this while solving them.
+    loc_w = ctEvLoc ev_w
+
+    -- Use a local cache of solved dicts while emitting EvVars for new work
+    -- We bail out of the entire computation if we need to emit an EvVar for
+    -- a subgoal that isn't a ClassPred.
+    new_wanted_cached :: DictMap CtEvidence -> TcPredType -> MaybeT TcS MaybeNew
+    new_wanted_cached cache pty
+      | ClassPred cls tys <- classifyPredType pty
+      = lift $ case findDict cache cls tys of
+          Just ctev -> return $ Cached (ctEvTerm ctev)
+          Nothing -> Fresh <$> newWantedNC loc_w pty
+      | otherwise = mzero
+
+    -- MaybeT manages early failure if we find a subgoal that cannot be solved
+    -- from instances.
+    -- Why do we need a local cache here?
+    -- 1. We can't use the global cache because it contains givens that
+    --    we specifically don't want to use to solve.
+    -- 2. We need to be able to handle recursive super classes. The
+    --    cache ensures that we remember what we have already tried to
+    --    solve to avoid looping.
+    try_solve_from_instance
+      :: DictMap CtEvidence -> CtEvidence
+      -> MaybeT TcS [(EvTerm, CtEvidence, Class, [TcPredType])]
+    try_solve_from_instance cache ev
+      | ClassPred cls tys <- classifyPredType (ctEvPred ev) = do
+      -- It is important that we add our goal to the cache before we solve!
+      -- Otherwise we may end up in a loop while solving recursive dictionaries.
+      { let cache' = addDict cache cls tys ev
+      ; inst_res <- lift $ match_class_inst dflags cls tys loc_w
+      ; case inst_res of
+          GenInst { lir_new_theta = preds
+                  , lir_mk_ev = mk_ev
+                  , lir_safe_over = safeOverlap }
+            | safeOverlap -> do
+              -- emit work for subgoals but use our local cache so that we can
+              -- solve recursive dictionaries.
+              { evc_vs <- mapM (new_wanted_cached cache') preds
+              ; subgoalBinds <- mapM (try_solve_from_instance cache')
+                                     (freshGoals evc_vs)
+              ; return $ (mk_ev (map getEvTerm evc_vs), ev, cls, preds)
+                       : concat subgoalBinds }
+
+            | otherwise -> mzero
+          _ -> mzero }
+      | otherwise = mzero
 
 addFunDepWork :: InertCans -> CtEvidence -> Class -> TcS ()
 -- Add derived constraints from type-class functional dependencies.

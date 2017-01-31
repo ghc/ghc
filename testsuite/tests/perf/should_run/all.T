@@ -1,3 +1,23 @@
+# T12791 and T5835 test that GHC uses top-level instances in places where using
+# a locally given solution would produce worse code.
+# See Note [Solving from instances when interacting Dicts]
+
+test('T5835',
+     [stats_num_field('max_bytes_used',
+           [(wordsize(64), 44312, 10)]),
+       only_ways(['normal'])
+       ],
+     compile_and_run,
+     ['-O'])
+
+test('T12791',
+     [stats_num_field('max_bytes_used',
+           [(wordsize(64), 44312, 10)]),
+       only_ways(['normal'])
+       ],
+     compile_and_run,
+     ['-O'])
+
 # Tests that newArray/newArray_ is being optimised correctly
 
 test('T10359',
@@ -346,7 +366,7 @@ test('T7954',
      ['-O'])
 
 test('T7850',
-     [stats_num_field('peak_megabytes_allocated', 
+     [stats_num_field('peak_megabytes_allocated',
                       [(wordsize(32), 2, 10),
                        (wordsize(64), 4, 10)]),
       only_ways(['normal'])],
@@ -377,7 +397,7 @@ test('T4267',
 test('T7619',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32), 36012, 10)
-                      # 32-bit close to 64-bit value; most of this very 
+                      # 32-bit close to 64-bit value; most of this very
                       # small number is standard start-up boilerplate I think
                       , (wordsize(64), 40992, 10) ]),
                       # previously, it was >400000 bytes
@@ -397,7 +417,7 @@ test('InlineByteArrayAlloc',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32), 1360036012, 5)
                       , (wordsize(64), 1440040960, 5) ]),
-         # 32 and 64 bit not so different, because 
+         # 32 and 64 bit not so different, because
          # we are allocating *byte* arrays
       only_ways(['normal'])],
      compile_and_run,
@@ -405,7 +425,7 @@ test('InlineByteArrayAlloc',
 
 test('InlineCloneArrayAlloc',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32), 800041120, 5) 
+                      [ (wordsize(32), 800041120, 5)
                       , (wordsize(64), 1600041120, 5) ]),
       only_ways(['normal'])],
      compile_and_run,

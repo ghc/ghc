@@ -30,7 +30,7 @@ module TcSMonad (
 
     newTcEvBinds,
     newWantedEq, emitNewWantedEq,
-    newWanted, newWantedEvVar, newWantedEvVarNC, newDerivedNC,
+    newWanted, newWantedEvVar, newWantedNC, newWantedEvVarNC, newDerivedNC,
     newBoundEvVarId,
     unifyTyVar, unflattenFmv, reportUnifications,
     setEvBind, setWantedEq, setEqIfWanted,
@@ -67,8 +67,8 @@ module TcSMonad (
     getSafeOverlapFailures,
 
     -- Inert CDictCans
-    lookupInertDict, findDictsByClass, addDict, addDictsByClass,
-    delDict, foldDicts, filterDicts,
+    DictMap, emptyDictMap, lookupInertDict, findDictsByClass, addDict,
+    addDictsByClass, delDict, foldDicts, filterDicts, findDict,
 
     -- Inert CTyEqCans
     EqualCtList, findTyEqs, foldTyEqs, isInInertEqs,
@@ -2914,7 +2914,7 @@ newWantedEq loc role ty1 ty2
   where
     pty = mkPrimEqPredRole role ty1 ty2
 
--- no equalities here. Use newWantedEqNC instead
+-- no equalities here. Use newWantedEq instead
 newWantedEvVarNC :: CtLoc -> TcPredType -> TcS CtEvidence
 -- Don't look up in the solved/inerts; we know it's not there
 newWantedEvVarNC loc pty
@@ -2945,6 +2945,14 @@ newWanted loc pty
   = Fresh . fst <$> newWantedEq loc role ty1 ty2
   | otherwise
   = newWantedEvVar loc pty
+
+-- deals with both equalities and non equalities. Doesn't do any cache lookups.
+newWantedNC :: CtLoc -> PredType -> TcS CtEvidence
+newWantedNC loc pty
+  | Just (role, ty1, ty2) <- getEqPredTys_maybe pty
+  = fst <$> newWantedEq loc role ty1 ty2
+  | otherwise
+  = newWantedEvVarNC loc pty
 
 emitNewDerived :: CtLoc -> TcPredType -> TcS ()
 emitNewDerived loc pred

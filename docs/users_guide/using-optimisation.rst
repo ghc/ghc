@@ -599,6 +599,37 @@ list.
     which they are called in this module. Note that specialisation must be
     enabled (by ``-fspecialise``) for this to have any effect.
 
+.. ghc-flag:: -fsolve-constant-dicts
+
+    :default on
+
+    When solving constraints, try to eagerly solve
+    super classes using availible dictionaries.
+
+    For example::
+
+      class M a b where m :: a -> b
+
+      type C a b = (Num a, M a b)
+
+      f :: C Int b => b -> Int -> Int
+      f _ x = x + 1
+
+    The body of `f` requires a `Num Int` instance. We could solve this
+    constraint from the context  because we have `C Int b` and that provides us
+    a
+    solution for `Num Int`. However, we can often produce much better code
+    by directly solving for an availible `Num Int` dictionary we might have at
+    hand. This removes potentially many layers of indirection and crucially
+    allows other optimisations to fire as the dictionary will be statically
+    known and selector functions can be inlined.
+
+    The optimisation also works for GADTs which bind dictionaries. If we
+    statically know which class dictionary we need then we will solve it
+    directly rather than indirectly using the one passed in at run time.
+
+
+
 .. ghc-flag:: -fstatic-argument-transformation
 
     Turn on the static argument transformation, which turns a recursive

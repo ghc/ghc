@@ -129,6 +129,15 @@ Compiler
   output as JSON documents. It is experimental and will be refined depending
   on feedback from tooling authors for the next release.
 
+- GHC is now able to better optimize polymorphic expressions by using known
+  superclass dictionaries where possible. Some examples:
+
+    -- uses of `Monad IO` or `Applicative IO` here are improved
+    foo :: MonadBaseControl IO m => ...
+
+    -- uses of `Monoid MyMonoid` here are improved
+    bar :: MonadWriter MyMonoid m => ...
+
 GHCi
 ~~~~
 
