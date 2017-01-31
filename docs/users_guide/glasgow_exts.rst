@@ -12838,23 +12838,21 @@ get the best of both worlds, we can choose one as our implementation and then
 provide a set of pattern synonyms so that users can use the other representation
 if they desire. We can then specify a ``COMPLETE`` pragma in order to
 inform the pattern match checker that a function which matches on both ``LeftChoice``
-and ``RightChoice`` is total.
+and ``RightChoice`` is total. ::
 
-::
+    data Choice a = Choice Bool a
 
-  data Choice a = Choice Bool a
+    pattern LeftChoice :: a -> Choice a
+    pattern LeftChoice a = Choice False a
 
-  pattern LeftChoice :: a -> Choice a
-  pattern LeftChoice a = Choice False a
+    pattern RightChoice :: a -> Choice a
+    pattern RightChoice a = Choice True a
 
-  pattern RightChoice :: a -> Choice a
-  pattern RightChoice a = Choice True a
+    {-# COMPLETE LeftChoice, RightChoice #-}
 
-  {-# COMPLETE LeftChoice, RightChoice #-}
-
-  foo :: Choice Int -> Int
-  foo (LeftChoice n) = n * 2
-  foo (RightChoice n) = n - 2
+    foo :: Choice Int -> Int
+    foo (LeftChoice n) = n * 2
+    foo (RightChoice n) = n - 2
 
 ``COMPLETE`` pragmas are only used by the pattern match checker. If a function
 definition matches on all the constructors specified in the pragma then the
@@ -12872,23 +12870,22 @@ to match on all the patterns if the types were inconsistent.
 
 The result type must also be unambiguous. Usually this can be inferred but
 when all the pattern synonyms in a group are polymorphic in the constructor
-the user must provide a type signature.
+the user must provide a type signature. ::
 
-::
-  class LL f where
-    go :: f a -> ()
+    class LL f where
+      go :: f a -> ()
 
-  instance LL [] where
-    go _ = ()
+    instance LL [] where
+      go _ = ()
 
-  pattern T :: LL f => f a
-  pattern T <- (go -> ())
+    pattern T :: LL f => f a
+    pattern T <- (go -> ())
 
-  {-# COMPLETE T :: [] #-}
+    {-# COMPLETE T :: [] #-}
 
-  -- No warning
-  foo :: [a] -> Int
-  foo T = 5
+    -- No warning
+    foo :: [a] -> Int
+    foo T = 5
 
 .. _overlap-pragma:
 
