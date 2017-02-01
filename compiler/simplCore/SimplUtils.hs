@@ -19,7 +19,7 @@ module SimplUtils (
         -- The continuation type
         SimplCont(..), DupFlag(..),
         isSimplified,
-        contIsDupable, contResultType, contHoleType,
+        contIsDupable, contResultType, contHoleType, applyContToJoinType,
         contIsTrivial, contArgs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
@@ -47,6 +47,7 @@ import CoreArity
 import CoreUnfold
 import Name
 import Id
+import IdInfo
 import Var
 import Demand
 import SimplMonad
@@ -361,6 +362,10 @@ contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
+applyContToJoinType :: JoinArity -> SimplCont -> OutType -> OutType
+applyContToJoinType ar cont ty
+  = setJoinResTy ar (contResultType cont) ty
+
 -------------------
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions, and other values
@@ -629,7 +634,7 @@ interestingArg env e = go env 0 e
     -- n is # value args to which the expression is applied
     go env n (Var v)
        | SimplEnv { seIdSubst = ids, seInScope = in_scope } <- env
-       = case lookupVarEnv ids v of
+       = case snd <$> lookupVarEnv ids v of
            Nothing                     -> go_var n (refineFromInScope in_scope v)
            Just (DoneId v')            -> go_var n (refineFromInScope in_scope v')
            Just (DoneEx e)             -> go (zapSubstEnv env)             n e
@@ -1054,7 +1059,9 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
   | isCoVar bndr                             = False -- Note [Do not inline CoVars unconditionally]
   | otherwise = case idOccInfo bndr of
                   IAmDead                    -> True -- Happens in ((\x.1) v)
-                  OneOcc in_lam True int_cxt -> try_once in_lam int_cxt
+                  occ@OneOcc { occ_one_br = True }
+                                             -> try_once (occ_in_lam occ)
+                                                         (occ_int_cxt occ)
                   _                          -> False
   where
     mode = getMode env
@@ -1180,7 +1187,8 @@ postInlineUnconditionally dflags env top_lvl bndr occ_info rhs unfolding
         --         False -> case x of ...
         -- This is very important in practice; e.g. wheel-seive1 doubles
         -- in allocation if you miss this out
-      OneOcc in_lam _one_br int_cxt     -- OneOcc => no code-duplication issue
+      OneOcc { occ_in_lam = in_lam, occ_int_cxt = int_cxt }
+               -- OneOcc => no code-duplication issue
         ->     smallEnoughToInline dflags unfolding     -- Small enough to dup
                         -- ToDo: consider discount on smallEnoughToInline if int_cxt is true
                         --
@@ -1398,9 +1406,10 @@ because the latter is not well-kinded.
 ************************************************************************
 -}
 
-tryEtaExpandRhs :: SimplEnv -> OutId -> OutExpr -> SimplM (Arity, OutExpr)
+tryEtaExpandRhs :: SimplEnv -> RecFlag -> OutId -> OutExpr
+                -> SimplM (Arity, OutExpr)
 -- See Note [Eta-expanding at let bindings]
-tryEtaExpandRhs env bndr rhs
+tryEtaExpandRhs env is_rec bndr rhs
   = do { dflags <- getDynFlags
        ; (new_arity, new_rhs) <- try_expand dflags
 
@@ -1419,8 +1428,12 @@ tryEtaExpandRhs env bndr rhs
             new_arity2 = idCallArity bndr
             new_arity  = max new_arity1 new_arity2
       , new_arity > old_arity      -- And the current manifest arity isn't enough
-      = do { tick (EtaExpansion bndr)
-           ; return (new_arity, etaExpand new_arity rhs) }
+      = if is_rec == Recursive && isJoinId bndr
+           then WARN(True, text "Can't eta-expand recursive join point:" <+>
+                             ppr bndr)
+                return (old_arity, rhs)
+           else do { tick (EtaExpansion bndr)
+                   ; return (new_arity, etaExpand new_arity rhs) }
       | otherwise
       = return (old_arity, rhs)
 

@@ -1,9 +1,10 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 40, types: 16, coercions: 0}
+Result size of Tidy Core
+  = {terms: 40, types: 16, coercions: 0, joins: 0/0}
 
 Rec {
--- RHS size: {terms: 10, types: 2, coercions: 0}
+-- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 $wxs :: GHC.Prim.Int# -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,1*U>]
 $wxs =
@@ -14,7 +15,7 @@ $wxs =
     }
 end Rec }
 
--- RHS size: {terms: 14, types: 5, coercions: 0}
+-- RHS size: {terms: 14, types: 5, coercions: 0, joins: 0/0}
 foo [InlPrag=NOINLINE] :: Int -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S(S),1*U(U)>]
 foo =
@@ -26,7 +27,7 @@ foo =
     }
     }
 
--- RHS size: {terms: 1, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule2 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
@@ -34,7 +35,7 @@ T3772.$trModule2 :: GHC.Prim.Addr#
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T3772.$trModule2 = "T3772"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
@@ -43,7 +44,7 @@ T3772.$trModule1 :: GHC.Types.TrName
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T3772.$trModule1 = GHC.Types.TrNameS T3772.$trModule2
 
--- RHS size: {terms: 1, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule4 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
@@ -51,7 +52,7 @@ T3772.$trModule4 :: GHC.Prim.Addr#
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T3772.$trModule4 = "main"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
@@ -60,7 +61,7 @@ T3772.$trModule3 :: GHC.Types.TrName
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T3772.$trModule3 = GHC.Types.TrNameS T3772.$trModule4
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,

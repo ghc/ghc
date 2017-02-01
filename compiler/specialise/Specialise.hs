@@ -23,6 +23,7 @@ import CoreSyn
 import Rules
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs, mkCast )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars, exprsFreeIdsList )
+import CoreArity        ( etaExpandToJoinPointRule )
 import UniqSupply
 import Name
 import MkId             ( voidArgId, voidPrimId )
@@ -1270,11 +1271,17 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
              let body_ty = applyTypeToArgs rhs fn_type rule_args
                  (lam_args, app_args)           -- Add a dummy argument if body_ty is unlifted
                    | isUnliftedType body_ty     -- C.f. WwLib.mkWorkerArgs
+                   , not (isJoinId fn)
                    = (poly_tyvars ++ [voidArgId], poly_tyvars ++ [voidPrimId])
                    | otherwise = (poly_tyvars, poly_tyvars)
                  spec_id_ty = mkLamTypes lam_args body_ty
+                 join_arity_change = length app_args - length rule_args
+                 spec_join_arity | Just orig_join_arity <- isJoinId_maybe fn
+                                 = Just (orig_join_arity + join_arity_change)
+                                 | otherwise
+                                 = Nothing
 
-           ; spec_f <- newSpecIdSM fn spec_id_ty
+           ; spec_f <- newSpecIdSM fn spec_id_ty spec_join_arity
            ; (spec_rhs, rhs_uds) <- specExpr rhs_env2 (mkLams lam_args body)
            ; this_mod <- getModule
            ; let
@@ -1292,7 +1299,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                             -- otherwise uniques end up there, making builds
                             -- less deterministic (See #4012 comment:61 ff)
 
-                spec_env_rule = mkRule
+                rule_wout_eta = mkRule
                                   this_mod
                                   True {- Auto generated -}
                                   is_local
@@ -1302,6 +1309,12 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                                   rule_bndrs
                                   rule_args
                                   (mkVarApps (Var spec_f) app_args)
+
+                spec_env_rule
+                  = case isJoinId_maybe fn of
+                      Just join_arity -> etaExpandToJoinPointRule join_arity
+                                                                  rule_wout_eta
+                      Nothing -> rule_wout_eta
 
                 -- Add the { d1' = dx1; d2' = dx2 } usage stuff
                 final_uds = foldr consDictBind rhs_uds dx_binds
@@ -1332,6 +1345,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
                 spec_f_w_arity = spec_f `setIdArity`      max 0 (fn_arity - n_dicts)
                                         `setInlinePragma` spec_inl_prag
                                         `setIdUnfolding`  spec_unf
+                                        `asJoinId_maybe`  spec_join_arity
 
            ; return (Just ((spec_f_w_arity, spec_rhs), final_uds, spec_env_rule)) } }
 
@@ -2260,13 +2274,14 @@ newDictBndr env b = do { uniq <- getUniqueM
                              ty' = substTy env (idType b)
                        ; return (mkUserLocalOrCoVar (nameOccName n) uniq ty' (getSrcSpan n)) }
 
-newSpecIdSM :: Id -> Type -> SpecM Id
+newSpecIdSM :: Id -> Type -> Maybe JoinArity -> SpecM Id
     -- Give the new Id a similar occurrence name to the old one
-newSpecIdSM old_id new_ty
+newSpecIdSM old_id new_ty join_arity_maybe
   = do  { uniq <- getUniqueM
         ; let name    = idName old_id
               new_occ = mkSpecOcc (nameOccName name)
               new_id  = mkUserLocalOrCoVar new_occ uniq new_ty (getSrcSpan name)
+                          `asJoinId_maybe` join_arity_maybe
         ; return new_id }
 
 {-

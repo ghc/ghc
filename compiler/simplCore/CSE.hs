@@ -11,7 +11,7 @@ module CSE (cseProgram) where
 #include "HsVersions.h"
 
 import CoreSubst
-import Var              ( Var )
+import Var              ( Var, isJoinId )
 import Id               ( Id, idType, idUnfolding, idInlineActivation
                         , zapIdOccInfo, zapIdUsageInfo )
 import CoreUtils        ( mkAltExpr
@@ -245,6 +245,18 @@ not if you are using unsafe casts.  I actually found a case where we
 had
    (x :: HValue) |> (UnsafeCo :: HValue ~ Array# Int)
 
+Note [CSE for join points?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We must not be naive about join points in CSE:
+   join j = e in
+   if b then jump j else 1 + e
+The expression (1 + jump j) is not good (see Note [Invariants on join points] in
+CoreSyn). This seems to come up quite seldom, but it happens (first seen
+compiling ppHtml in Haddock.Backends.Xhtml).
+
+We could try and be careful by tracking which join points are still valid at
+each subexpression, but since join points aren't allocated or shared, there's
+less to gain by trying to CSE them.
 
 ************************************************************************
 *                                                                      *
@@ -304,6 +316,8 @@ addBinding env in_id out_id rhs'
              -- See Note [CSE for INLINE and NOINLINE]
           || isStableUnfolding (idUnfolding out_id)
              -- See Note [CSE for stable unfoldings]
+          || isJoinId in_id
+             -- See Note [CSE for join points?]
 
     -- Should we use SUBSTITUTE or EXTEND?
     -- See Note [CSE for bindings]

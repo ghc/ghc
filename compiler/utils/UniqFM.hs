@@ -49,6 +49,7 @@ module UniqFM (
         plusUFM,
         plusUFM_C,
         plusUFM_CD,
+        plusMaybeUFM_C,
         plusUFMList,
         minusUFM,
         intersectUFM,
@@ -216,6 +217,15 @@ plusUFM_CD f (UFM xm) dx (UFM ym) dy
       (M.map (\x -> x `f` dy))
       (M.map (\y -> dx `f` y))
       xm ym
+
+plusMaybeUFM_C :: (elt -> elt -> Maybe elt)
+               -> UniqFM elt -> UniqFM elt -> UniqFM elt
+plusMaybeUFM_C f (UFM xm) (UFM ym)
+    = UFM $ M.mergeWithKey
+        (\_ x y -> x `f` y)
+        id
+        id
+        xm ym
 
 plusUFMList :: [UniqFM elt] -> UniqFM elt
 plusUFMList = foldl' plusUFM emptyUFM

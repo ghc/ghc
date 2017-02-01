@@ -16,7 +16,7 @@ module CoreToStg ( coreToStg, coreExprToStg ) where
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreUtils        ( exprType, findDefault )
+import CoreUtils        ( exprType, findDefault, isJoinBind )
 import CoreArity        ( manifestArity )
 import StgSyn
 
@@ -28,11 +28,10 @@ import Id
 import IdInfo
 import DataCon
 import CostCentre       ( noCCS )
-import VarSet
 import VarEnv
 import Module
-import Name             ( getOccName, isExternalName, nameOccName )
-import OccName          ( occNameString, occNameFS )
+import Name             ( isExternalName, nameOccName )
+import OccName          ( occNameFS )
 import BasicTypes       ( Arity )
 import TysWiredIn       ( unboxedUnitDataCon )
 import Literal
@@ -139,6 +138,10 @@ import Control.Monad (liftM, ap)
 -- Note [What is a non-escaping let]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
+-- NB: Nowadays this is recognized by the occurrence analyser by turning a
+-- "non-escaping let" into a join point. The following is then an operational
+-- account of join points.
+--
 -- Consider:
 --
 --     let x = fvs \ args -> e
@@ -155,8 +158,7 @@ import Control.Monad (liftM, ap)
 -- to the code for `x'.
 --
 -- All of this is provided x is:
---   1. non-updatable - it must have at least one parameter (see Note
---      [Join point abstraction]);
+--   1. non-updatable;
 --   2. guaranteed to be entered before the stack retreats -- ie x is not
 --      buried in a heap-allocated closure, or passed as an argument to
 --      something;
@@ -203,7 +205,7 @@ coreToStg dflags this_mod pgm
 
 coreExprToStg :: CoreExpr -> StgExpr
 coreExprToStg expr
-  = new_expr where (new_expr,_,_) = initLne emptyVarEnv (coreToStgExpr expr)
+  = new_expr where (new_expr,_) = initCts emptyVarEnv (coreToStgExpr expr)
 
 
 coreTopBindsToStg
@@ -244,7 +246,7 @@ coreTopBindToStg dflags this_mod env body_fvs (NonRec id rhs)
         how_bound = LetBound TopLet $! manifestArity rhs
 
         (stg_rhs, fvs') =
-            initLne env $ do
+            initCts env $ do
               (stg_rhs, fvs') <- coreToTopStgRhs dflags this_mod body_fvs (id,rhs)
               return (stg_rhs, fvs')
 
@@ -267,7 +269,7 @@ coreTopBindToStg dflags this_mod env body_fvs (Rec pairs)
         env' = extendVarEnvList env extra_env'
 
         (stg_rhss, fvs')
-          = initLne env' $ do
+          = initCts env' $ do
                (stg_rhss, fvss') <- mapAndUnzipM (coreToTopStgRhs dflags this_mod body_fvs) pairs
                let fvs' = unionFVInfos fvss'
                return (stg_rhss, fvs')
@@ -298,10 +300,10 @@ coreToTopStgRhs
         -> Module
         -> FreeVarsInfo         -- Free var info for the scope of the binding
         -> (Id,CoreExpr)
-        -> LneM (StgRhs, FreeVarsInfo)
+        -> CtsM (StgRhs, FreeVarsInfo)
 
 coreToTopStgRhs dflags this_mod scope_fv_info (bndr, rhs)
-  = do { (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
+  = do { (new_rhs, rhs_fvs) <- coreToStgExpr rhs
 
        ; let stg_rhs   = mkTopStgRhs dflags this_mod rhs_fvs bndr bndr_info new_rhs
              stg_arity = stgRhsArity stg_rhs
@@ -343,13 +345,8 @@ mkTopStgRhs dflags this_mod = mkStgRhs' con_updateable
 
 coreToStgExpr
         :: CoreExpr
-        -> LneM (StgExpr,       -- Decorated STG expr
-                 FreeVarsInfo,  -- Its free vars (NB free, not live)
-                 EscVarsSet)    -- Its escapees, a subset of its free vars;
-                                -- also a subset of the domain of the envt
-                                -- because we are only interested in the escapees
-                                -- for vars which might be turned into
-                                -- let-no-escaped ones.
+        -> CtsM (StgExpr,       -- Decorated STG expr
+                 FreeVarsInfo)  -- Its free vars (NB free, not live)
 
 -- The second and third components can be derived in a simple bottom up pass, not
 -- dependent on any decisions about which variables will be let-no-escaped or
@@ -360,7 +357,7 @@ coreToStgExpr
 -- No LitInteger's should be left by the time this is called. CorePrep
 -- should have converted them all to a real core representation.
 coreToStgExpr (Lit (LitInteger {})) = panic "coreToStgExpr: LitInteger"
-coreToStgExpr (Lit l)      = return (StgLit l, emptyFVInfo, emptyVarSet)
+coreToStgExpr (Lit l)      = return (StgLit l, emptyFVInfo)
 coreToStgExpr (Var v)      = coreToStgApp Nothing v               [] []
 coreToStgExpr (Coercion _) = coreToStgApp Nothing coercionTokenId [] []
 
@@ -374,15 +371,14 @@ coreToStgExpr expr@(Lam _ _)
         (args, body) = myCollectBinders expr
         args'        = filterStgBinders args
     in
-    extendVarEnvLne [ (a, LambdaBound) | a <- args' ] $ do
-    (body, body_fvs, body_escs) <- coreToStgExpr body
+    extendVarEnvCts [ (a, LambdaBound) | a <- args' ] $ do
+    (body, body_fvs) <- coreToStgExpr body
     let
         fvs             = args' `minusFVBinders` body_fvs
-        escs            = body_escs `delVarSetList` args'
         result_expr | null args' = body
                     | otherwise  = StgLam args' body
 
-    return (result_expr, fvs, escs)
+    return (result_expr, fvs)
 
 coreToStgExpr (Tick tick expr)
   = do case tick of
@@ -390,8 +386,8 @@ coreToStgExpr (Tick tick expr)
          ProfNote{}   -> return ()
          SourceNote{} -> return ()
          Breakpoint{} -> panic "coreToStgExpr: breakpoint should not happen"
-       (expr2, fvs, escs) <- coreToStgExpr expr
-       return (StgTick tick expr2, fvs, escs)
+       (expr2, fvs) <- coreToStgExpr expr
+       return (StgTick tick expr2, fvs)
 
 coreToStgExpr (Cast expr _)
   = coreToStgExpr expr
@@ -411,12 +407,11 @@ coreToStgExpr (Case scrut _ _ [])
 
 
 coreToStgExpr (Case scrut bndr _ alts) = do
-    (alts2, alts_fvs, alts_escs)
-       <- extendVarEnvLne [(bndr, LambdaBound)] $ do
-            (alts2, fvs_s, escs_s) <- mapAndUnzip3M vars_alt alts
+    (alts2, alts_fvs)
+       <- extendVarEnvCts [(bndr, LambdaBound)] $ do
+            (alts2, fvs_s) <- mapAndUnzipM vars_alt alts
             return ( alts2,
-                     unionFVInfos fvs_s,
-                     unionVarSets escs_s )
+                     unionFVInfos fvs_s )
     let
         -- Determine whether the default binder is dead or not
         -- This helps the code generator to avoid generating an assignment
@@ -428,19 +423,14 @@ coreToStgExpr (Case scrut bndr _ alts) = do
         -- since this is from the point of view of the case expr, where
         -- the default binder is not free.
         alts_fvs_wo_bndr  = bndr `minusFVBinder` alts_fvs
-        alts_escs_wo_bndr = alts_escs `delVarSet` bndr
 
         -- We tell the scrutinee that everything
         -- live in the alts is live in it, too.
-    (scrut2, scrut_fvs, _scrut_escs) <- coreToStgExpr scrut
+    (scrut2, scrut_fvs) <- coreToStgExpr scrut
 
     return (
       StgCase scrut2 bndr' (mkStgAltType bndr alts) alts2,
-      scrut_fvs `unionFVInfo` alts_fvs_wo_bndr,
-      alts_escs_wo_bndr `unionVarSet` getFVSet scrut_fvs
-                -- You might think we should have scrut_escs, not
-                -- (getFVSet scrut_fvs), but actually we can't call, and
-                -- then return from, a let-no-escape thing.
+      scrut_fvs `unionFVInfo` alts_fvs_wo_bndr
       )
   where
     vars_alt (con, binders, rhs)
@@ -449,32 +439,19 @@ coreToStgExpr (Case scrut bndr _ alts) = do
         -- See Note [Nullary unboxed tuple] in Type.hs
         -- where a nullary tuple is mapped to (State# World#)
         ASSERT( null binders )
-        do { (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
-           ; return ((DEFAULT, [], rhs2), rhs_fvs, rhs_escs) }
+        do { (rhs2, rhs_fvs) <- coreToStgExpr rhs
+           ; return ((DEFAULT, [], rhs2), rhs_fvs) }
       | otherwise
       = let     -- Remove type variables
             binders' = filterStgBinders binders
         in
-        extendVarEnvLne [(b, LambdaBound) | b <- binders'] $ do
-        (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
+        extendVarEnvCts [(b, LambdaBound) | b <- binders'] $ do
+        (rhs2, rhs_fvs) <- coreToStgExpr rhs
         return ( (con, binders', rhs2),
-                 binders' `minusFVBinders` rhs_fvs,
-                 rhs_escs `delVarSetList` binders' )
-                -- ToDo: remove the delVarSet;
-                -- since escs won't include any of these binders
-
--- Lets not only take quite a bit of work, but this is where we convert
--- then to let-no-escapes, if we wish.
--- (Meanwhile, we don't expect to see let-no-escapes...)
-
+                 binders' `minusFVBinders` rhs_fvs )
 
 coreToStgExpr (Let bind body) = do
-    (new_let, fvs, escs, _)
-       <- mfix (\ ~(_, _, _, no_binder_escapes) ->
-             coreToStgLet no_binder_escapes bind body
-          )
-
-    return (new_let, fvs, escs)
+    coreToStgLet bind body
 
 coreToStgExpr e = pprPanic "coreToStgExpr" (ppr e)
 
@@ -530,12 +507,12 @@ coreToStgApp
         -> Id                           -- Function
         -> [CoreArg]                    -- Arguments
         -> [Tickish Id]                 -- Debug ticks
-        -> LneM (StgExpr, FreeVarsInfo, EscVarsSet)
+        -> CtsM (StgExpr, FreeVarsInfo)
 
 
 coreToStgApp _ f args ticks = do
     (args', args_fvs, ticks') <- coreToStgArgs args
-    how_bound <- lookupVarLne f
+    how_bound <- lookupVarCts f
 
     let
         n_val_args       = valArgCount args
@@ -560,25 +537,6 @@ coreToStgApp _ f args ticks = do
          | f_arity > 0 && saturated = stgSatOcc -- Saturated or over-saturated function call
          | otherwise                = stgUnsatOcc       -- Unsaturated function or thunk
 
-        fun_escs
-         | not_letrec_bound      = emptyVarSet  -- Only letrec-bound escapees are interesting
-         | f_arity == n_val_args = emptyVarSet  -- A function *or thunk* with an exactly
-                                                -- saturated call doesn't escape
-                                                -- (let-no-escape applies to 'thunks' too)
-
-         | otherwise         = unitVarSet f     -- Inexact application; it does escape
-
-        -- At the moment of the call:
-
-        --  either the function is *not* let-no-escaped, in which case
-        --         nothing is live except live_in_cont
-        --      or the function *is* let-no-escaped in which case the
-        --         variables it uses are live, but still the function
-        --         itself is not.  PS.  In this case, the function's
-        --         live vars should already include those of the
-        --         continuation, but it does no harm to just union the
-        --         two regardless.
-
         res_ty = exprType (mkApps (Var f) args)
         app = case idDetails f of
                 DataConWorkId dc
@@ -602,18 +560,14 @@ coreToStgApp _ f args ticks = do
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
                 _other           -> StgApp f args'
         fvs = fun_fvs  `unionFVInfo` args_fvs
-        vars = fun_escs `unionVarSet` (getFVSet args_fvs)
-                                -- All the free vars of the args are disqualified
-                                -- from being let-no-escaped.
 
         tapp = foldr StgTick app (ticks ++ ticks')
 
     -- Forcing these fixes a leak in the code generator, noticed while
     -- profiling for trac #4367
-    app `seq` fvs `seq` seqVarSet vars `seq` return (
+    app `seq` fvs `seq` return (
         tapp,
-        fvs,
-        vars
+        fvs
      )
 
 
@@ -623,7 +577,7 @@ coreToStgApp _ f args ticks = do
 -- This is the guy that turns applications into A-normal form
 -- ---------------------------------------------------------------------------
 
-coreToStgArgs :: [CoreArg] -> LneM ([StgArg], FreeVarsInfo, [Tickish Id])
+coreToStgArgs :: [CoreArg] -> CtsM ([StgArg], FreeVarsInfo, [Tickish Id])
 coreToStgArgs []
   = return ([], emptyFVInfo, [])
 
@@ -642,7 +596,7 @@ coreToStgArgs (Tick t e : args)
 
 coreToStgArgs (arg : args) = do         -- Non-type argument
     (stg_args, args_fvs, ticks) <- coreToStgArgs args
-    (arg', arg_fvs, _escs) <- coreToStgExpr arg
+    (arg', arg_fvs) <- coreToStgExpr arg
     let
         fvs = args_fvs `unionFVInfo` arg_fvs
 
@@ -682,69 +636,40 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 -- ---------------------------------------------------------------------------
 
 coreToStgLet
-         :: Bool        -- True <=> yes, we are let-no-escaping this let
-         -> CoreBind    -- bindings
+         :: CoreBind    -- bindings
          -> CoreExpr    -- body
-         -> LneM (StgExpr,      -- new let
-                  FreeVarsInfo, -- variables free in the whole let
-                  EscVarsSet,   -- variables that escape from the whole let
-                  Bool)         -- True <=> none of the binders in the bindings
-                                -- is among the escaping vars
+         -> CtsM (StgExpr,      -- new let
+                  FreeVarsInfo) -- variables free in the whole let
 
-coreToStgLet let_no_escape bind body = do
-    (bind2, bind_fvs, bind_escs,
-     body2, body_fvs, body_escs)
-       <- mfix $ \ ~(_, _, _, _, rec_body_fvs, _) -> do
+coreToStgLet bind body = do
+    (bind2, bind_fvs,
+     body2, body_fvs)
+       <- mfix $ \ ~(_, _, _, rec_body_fvs) -> do
 
-          ( bind2, bind_fvs, bind_escs, env_ext)
+          ( bind2, bind_fvs, env_ext)
                 <- vars_bind rec_body_fvs bind
 
           -- Do the body
-          extendVarEnvLne env_ext $ do
-             (body2, body_fvs, body_escs) <- coreToStgExpr body
+          extendVarEnvCts env_ext $ do
+             (body2, body_fvs) <- coreToStgExpr body
 
-             return (bind2, bind_fvs, bind_escs,
-                     body2, body_fvs, body_escs)
+             return (bind2, bind_fvs,
+                     body2, body_fvs)
 
 
         -- Compute the new let-expression
     let
-        new_let | let_no_escape = StgLetNoEscape bind2 body2
-                | otherwise     = StgLet bind2 body2
+        new_let | isJoinBind bind = StgLetNoEscape bind2 body2
+                | otherwise       = StgLet bind2 body2
 
         free_in_whole_let
           = binders `minusFVBinders` (bind_fvs `unionFVInfo` body_fvs)
 
-        real_bind_escs = if let_no_escape then
-                            bind_escs
-                         else
-                            getFVSet bind_fvs
-                            -- Everything escapes which is free in the bindings
-
-        let_escs = (real_bind_escs `unionVarSet` body_escs) `delVarSetList` binders
-
-        all_escs = bind_escs `unionVarSet` body_escs    -- Still includes binders of
-                                                        -- this let(rec)
-
-        no_binder_escapes = isEmptyVarSet (set_of_binders `intersectVarSet` all_escs)
-
-        -- Debugging code as requested by Andrew Kennedy
-        checked_no_binder_escapes
-                | debugIsOn && not no_binder_escapes && any is_join_var binders
-                = pprTrace "Interesting!  A join var that isn't let-no-escaped" (ppr binders)
-                  False
-                | otherwise = no_binder_escapes
-
-                -- Mustn't depend on the passed-in let_no_escape flag, since
-                -- no_binder_escapes is used by the caller to derive the flag!
     return (
         new_let,
-        free_in_whole_let,
-        let_escs,
-        checked_no_binder_escapes
+        free_in_whole_let
       )
   where
-    set_of_binders = mkVarSet binders
     binders        = bindersOf bind
 
     mk_binding binder rhs
@@ -752,53 +677,44 @@ coreToStgLet let_no_escape bind body = do
 
     vars_bind :: FreeVarsInfo           -- Free var info for body of binding
               -> CoreBind
-              -> LneM (StgBinding,
+              -> CtsM (StgBinding,
                        FreeVarsInfo,
-                       EscVarsSet,        -- free vars; escapee vars
                        [(Id, HowBound)])  -- extension to environment
 
 
     vars_bind body_fvs (NonRec binder rhs) = do
-        (rhs2, bind_fvs, escs) <- coreToStgRhs body_fvs (binder,rhs)
+        (rhs2, bind_fvs) <- coreToStgRhs body_fvs (binder,rhs)
         let
             env_ext_item = mk_binding binder rhs
 
         return (StgNonRec binder rhs2,
-                bind_fvs, escs, [env_ext_item])
+                bind_fvs, [env_ext_item])
 
 
     vars_bind body_fvs (Rec pairs)
-      = mfix $ \ ~(_, rec_rhs_fvs, _, _) ->
+      = mfix $ \ ~(_, rec_rhs_fvs, _) ->
            let
                 rec_scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
                 binders = map fst pairs
                 env_ext = [ mk_binding b rhs
                           | (b,rhs) <- pairs ]
            in
-           extendVarEnvLne env_ext $ do
-              (rhss2, fvss, escss)
-                     <- mapAndUnzip3M (coreToStgRhs rec_scope_fvs) pairs
+           extendVarEnvCts env_ext $ do
+              (rhss2, fvss)
+                     <- mapAndUnzipM (coreToStgRhs rec_scope_fvs) pairs
               let
                         bind_fvs = unionFVInfos fvss
-                        escs     = unionVarSets escss
 
               return (StgRec (binders `zip` rhss2),
-                      bind_fvs, escs, env_ext)
-
-
-is_join_var :: Id -> Bool
--- A hack (used only for compiler debuggging) to tell if
--- a variable started life as a join point ($j)
-is_join_var j = occNameString (getOccName j) == "$j"
+                      bind_fvs, env_ext)
 
 coreToStgRhs :: FreeVarsInfo      -- Free var info for the scope of the binding
              -> (Id,CoreExpr)
-             -> LneM (StgRhs, FreeVarsInfo, EscVarsSet)
+             -> CtsM (StgRhs, FreeVarsInfo)
 
 coreToStgRhs scope_fv_info (bndr, rhs) = do
-    (new_rhs, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
-    return (mkStgRhs rhs_fvs bndr bndr_info new_rhs,
-            rhs_fvs, rhs_escs)
+    (new_rhs, rhs_fvs) <- coreToStgExpr rhs
+    return (mkStgRhs rhs_fvs bndr bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
@@ -814,6 +730,12 @@ mkStgRhs' con_updateable rhs_fvs bndr binder_info rhs
                    (getFVs rhs_fvs)
                    ReEntrant
                    bndrs body
+  | isJoinId bndr -- must be nullary join point
+  = ASSERT(idJoinArity bndr == 0)
+    StgRhsClosure noCCS binder_info
+                   (getFVs rhs_fvs)
+                   ReEntrant -- ignored for LNE
+                   [] rhs
   | StgConApp con args _ <- unticked_rhs
   , not (con_updateable con args)
   = -- CorePrep does this right, but just to make sure
@@ -883,18 +805,17 @@ isPAP env _               = False
 -}
 
 -- ---------------------------------------------------------------------------
--- A little monad for this let-no-escaping pass
+-- A monad for the core-to-STG pass
 -- ---------------------------------------------------------------------------
 
--- There's a lot of stuff to pass around, so we use this LneM monad to
--- help.  All the stuff here is only passed *down*.
+-- There's a lot of stuff to pass around, so we use this CtsM
+-- ("core-to-STG monad") monad to help.  All the stuff here is only passed
+-- *down*.
 
-newtype LneM a = LneM
-    { unLneM :: IdEnv HowBound
+newtype CtsM a = CtsM
+    { unCtsM :: IdEnv HowBound
              -> a
     }
-
-type EscVarsSet = IdSet
 
 data HowBound
   = ImportBound         -- Used only as a response to lookupBinding; never
@@ -937,45 +858,45 @@ topLevelBound _                   = False
 
 -- The std monad functions:
 
-initLne :: IdEnv HowBound -> LneM a -> a
-initLne env m = unLneM m env
+initCts :: IdEnv HowBound -> CtsM a -> a
+initCts env m = unCtsM m env
 
 
 
-{-# INLINE thenLne #-}
-{-# INLINE returnLne #-}
+{-# INLINE thenCts #-}
+{-# INLINE returnCts #-}
 
-returnLne :: a -> LneM a
-returnLne e = LneM $ \_ -> e
+returnCts :: a -> CtsM a
+returnCts e = CtsM $ \_ -> e
 
-thenLne :: LneM a -> (a -> LneM b) -> LneM b
-thenLne m k = LneM $ \env
-  -> unLneM (k (unLneM m env)) env
+thenCts :: CtsM a -> (a -> CtsM b) -> CtsM b
+thenCts m k = CtsM $ \env
+  -> unCtsM (k (unCtsM m env)) env
 
-instance Functor LneM where
+instance Functor CtsM where
     fmap = liftM
 
-instance Applicative LneM where
-    pure = returnLne
+instance Applicative CtsM where
+    pure = returnCts
     (<*>) = ap
 
-instance Monad LneM where
-    (>>=)  = thenLne
+instance Monad CtsM where
+    (>>=)  = thenCts
 
-instance MonadFix LneM where
-    mfix expr = LneM $ \env ->
-                       let result = unLneM (expr result) env
+instance MonadFix CtsM where
+    mfix expr = CtsM $ \env ->
+                       let result = unCtsM (expr result) env
                        in  result
 
 -- Functions specific to this monad:
 
-extendVarEnvLne :: [(Id, HowBound)] -> LneM a -> LneM a
-extendVarEnvLne ids_w_howbound expr
-   =    LneM $   \env
-   -> unLneM expr (extendVarEnvList env ids_w_howbound)
+extendVarEnvCts :: [(Id, HowBound)] -> CtsM a -> CtsM a
+extendVarEnvCts ids_w_howbound expr
+   =    CtsM $   \env
+   -> unCtsM expr (extendVarEnvList env ids_w_howbound)
 
-lookupVarLne :: Id -> LneM HowBound
-lookupVarLne v = LneM $ \env -> lookupBinding env v
+lookupVarCts :: Id -> CtsM HowBound
+lookupVarCts v = CtsM $ \env -> lookupBinding env v
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
@@ -1056,9 +977,6 @@ getFVs fvs = [id | (id, how_bound, _) <- nonDetEltsUFM fvs,
   -- bit-for-bit determinism.
   -- See Note [Unique Determinism and code generation]
                     not (topLevelBound how_bound) ]
-
-getFVSet :: FreeVarsInfo -> VarSet
-getFVSet fvs = mkVarSet (getFVs fvs)
 
 plusFVInfo :: (Var, HowBound, StgBinderInfo)
            -> (Var, HowBound, StgBinderInfo)

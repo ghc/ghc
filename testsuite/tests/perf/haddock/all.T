@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 32855223200, 5)
+          [(wordsize(64), 31115778088 , 5)
             # 2012-08-14: 5920822352 (amd64/Linux)
             # 2012-09-20: 5829972376 (amd64/Linux)
             # 2012-10-08: 5902601224 (amd64/Linux)
@@ -30,6 +30,7 @@ test('haddock.base',
             # 2015-12-17: 27812188000 (x86_64/Linux) - Move Data.Functor.* into base
             # 2016-02-25: 30987348040 (x86_64/Linux) - RuntimeRep
             # 2016-05-12: 32855223200 (x86_64/Linux) - Make Generic1 poly-kinded
+            # 2017-01-11: 31115778088 (x86_64/Linux) - Join points (#12988)
 
           ,(platform('i386-unknown-mingw32'), 4434804940, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
@@ -52,7 +53,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 25478853176 , 5)
+          [(wordsize(64), 23272708864, 5)
             # 2012-08-14: 3255435248 (amd64/Linux)
             # 2012-08-29: 3324606664 (amd64/Linux, new codegen)
             # 2012-10-08: 3373401360 (amd64/Linux)
@@ -92,6 +93,7 @@ test('haddock.Cabal',
             # 2016-10-03: 21554874976 (amd64/Linux) - Cabal update
             # 2016-10-06: 23706190072 (amd64/Linux) - Cabal update
             # 2016-12-20: 25478853176 (amd64/Linux) - Cabal update
+            # 2017-01-14: 23272708864 (amd64/Linux) - Join points (#12988)
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

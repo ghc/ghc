@@ -14,6 +14,7 @@ Haskell. [WDP 94/11])
 module IdInfo (
         -- * The IdDetails type
         IdDetails(..), pprIdDetails, coVarDetails, isCoVarDetails,
+        JoinArity, isJoinIdDetails_maybe,
         RecSelParent(..),
 
         -- * The IdInfo type
@@ -28,6 +29,7 @@ module IdInfo (
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
         zapDemandInfo, zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
+        zapTailCallInfo,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -54,6 +56,9 @@ module IdInfo (
 
         InsideLam, OneBranch,
         insideLam, notInsideLam, oneBranch, notOneBranch,
+
+        TailCallInfo(..),
+        tailCallInfo, isAlwaysTailCalled,
 
         -- ** The RuleInfo type
         RuleInfo(..),
@@ -153,6 +158,8 @@ data IdDetails
   | CoVarId    -- ^ A coercion variable
                -- This only covers /un-lifted/ coercions, of type
                -- (t1 ~# t2) or (t1 ~R# t2), not their lifted variants
+  | JoinId JoinArity           -- ^ An 'Id' for a join point taking n arguments
+       -- Note [Join points] in CoreSyn
 
 -- | Recursive Selector Parent
 data RecSelParent = RecSelData TyCon | RecSelPatSyn PatSyn deriving Eq
@@ -176,6 +183,10 @@ isCoVarDetails :: IdDetails -> Bool
 isCoVarDetails CoVarId = True
 isCoVarDetails _       = False
 
+isJoinIdDetails_maybe :: IdDetails -> Maybe JoinArity
+isJoinIdDetails_maybe (JoinId join_arity) = Just join_arity
+isJoinIdDetails_maybe _                   = Nothing
+
 instance Outputable IdDetails where
     ppr = pprIdDetails
 
@@ -195,6 +206,7 @@ pprIdDetails other     = brackets (pp other)
                               = brackets $ text "RecSel" <>
                                            ppWhen is_naughty (text "(naughty)")
    pp CoVarId                 = text "CoVarId"
+   pp (JoinId arity)          = text "JoinId" <> parens (int arity)
 
 {-
 ************************************************************************
@@ -285,7 +297,7 @@ vanillaIdInfo
             unfoldingInfo       = noUnfolding,
             oneShotInfo         = NoOneShotInfo,
             inlinePragInfo      = defaultInlinePragma,
-            occInfo             = NoOccInfo,
+            occInfo             = noOccInfo,
             demandInfo          = topDmd,
             strictnessInfo      = nopSig,
             callArityInfo       = unknownArity,
@@ -482,12 +494,16 @@ zapLamInfo info@(IdInfo {occInfo = occ, demandInfo = demand})
   where
         -- The "unsafe" occ info is the ones that say I'm not in a lambda
         -- because that might not be true for an unsaturated lambda
-    is_safe_occ (OneOcc in_lam _ _) = in_lam
-    is_safe_occ _other              = True
+    is_safe_occ occ | isAlwaysTailCalled occ     = False
+    is_safe_occ (OneOcc { occ_in_lam = in_lam }) = in_lam
+    is_safe_occ _other                           = True
 
     safe_occ = case occ of
-                 OneOcc _ once int_cxt -> OneOcc insideLam once int_cxt
-                 _other                -> occ
+                 OneOcc{} -> occ { occ_in_lam = True
+                                 , occ_tail   = NoTailCallInfo }
+                 IAmALoopBreaker{}
+                          -> occ { occ_tail   = NoTailCallInfo }
+                 _other   -> occ
 
     is_safe_dmd dmd = not (isStrictDmd dmd)
 
@@ -528,6 +544,14 @@ zapFragileUnfolding :: Unfolding -> Unfolding
 zapFragileUnfolding unf
  | isFragileUnfolding unf = noUnfolding
  | otherwise              = unf
+
+zapTailCallInfo :: IdInfo -> Maybe IdInfo
+zapTailCallInfo info
+  = case occInfo info of
+      occ | isAlwaysTailCalled occ -> Just (info `setOccInfo` safe_occ)
+          | otherwise              -> Nothing
+        where
+          safe_occ = occ { occ_tail = NoTailCallInfo }
 
 {-
 ************************************************************************

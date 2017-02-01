@@ -1,8 +1,9 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 49, types: 19, coercions: 0}
+Result size of Tidy Core
+  = {terms: 44, types: 17, coercions: 0, joins: 0/0}
 
--- RHS size: {terms: 1, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T4930.$trModule4 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
@@ -10,7 +11,7 @@ T4930.$trModule4 :: GHC.Prim.Addr#
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
 T4930.$trModule4 = "main"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T4930.$trModule3 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
@@ -19,7 +20,7 @@ T4930.$trModule3 :: GHC.Types.TrName
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T4930.$trModule3 = GHC.Types.TrNameS T4930.$trModule4
 
--- RHS size: {terms: 1, types: 0, coercions: 0}
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T4930.$trModule2 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
@@ -27,7 +28,7 @@ T4930.$trModule2 :: GHC.Prim.Addr#
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
 T4930.$trModule2 = "T4930"#
 
--- RHS size: {terms: 2, types: 0, coercions: 0}
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T4930.$trModule1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
@@ -36,7 +37,7 @@ T4930.$trModule1 :: GHC.Types.TrName
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T4930.$trModule1 = GHC.Types.TrNameS T4930.$trModule2
 
--- RHS size: {terms: 3, types: 0, coercions: 0}
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T4930.$trModule :: GHC.Types.Module
 [GblId,
  Caf=NoCafRefs,
@@ -47,24 +48,19 @@ T4930.$trModule =
   GHC.Types.Module T4930.$trModule3 T4930.$trModule1
 
 Rec {
--- RHS size: {terms: 23, types: 6, coercions: 0}
+-- RHS size: {terms: 18, types: 4, coercions: 0, joins: 0/0}
 T4930.$wfoo [InlPrag=[0], Occ=LoopBreaker]
   :: GHC.Prim.Int# -> GHC.Prim.Int#
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
 T4930.$wfoo =
   \ (ww :: GHC.Prim.Int#) ->
-    case case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# ww 5#) of {
-           False -> GHC.Types.I# (GHC.Prim.+# ww 2#);
-           True ->
-             case T4930.$wfoo ww of ww1 { __DEFAULT -> GHC.Types.I# ww1 }
-         }
-    of
-    { GHC.Types.I# ipv ->
-    GHC.Prim.+# ww 5#
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# ww 5#) of {
+      False -> GHC.Prim.+# ww 5#;
+      True -> case T4930.$wfoo ww of { __DEFAULT -> GHC.Prim.+# ww 5# }
     }
 end Rec }
 
--- RHS size: {terms: 10, types: 4, coercions: 0}
+-- RHS size: {terms: 10, types: 4, coercions: 0, joins: 0/0}
 foo [InlPrag=INLINE[0]] :: Int -> Int
 [GblId,
  Arity=1,

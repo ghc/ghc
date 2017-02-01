@@ -11,49 +11,63 @@ module CoreStats (
         CoreStats(..), coreBindsStats, exprStats,
     ) where
 
+import BasicTypes
 import CoreSyn
 import Outputable
 import Coercion
 import Var
 import Type (Type, typeSize, seqType)
-import Id (idType)
+import Id (idType, isJoinId)
 import CoreSeq (megaSeqIdInfo)
 
 data CoreStats = CS { cs_tm :: Int    -- Terms
                     , cs_ty :: Int    -- Types
-                    , cs_co :: Int }  -- Coercions
+                    , cs_co :: Int    -- Coercions
+                    , cs_vb :: Int    -- Local value bindings
+                    , cs_jb :: Int }  -- Local join bindings
 
 
 instance Outputable CoreStats where
- ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3 })
+ ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3, cs_vb = i4, cs_jb = i5 })
    = braces (sep [text "terms:"     <+> intWithCommas i1 <> comma,
                   text "types:"     <+> intWithCommas i2 <> comma,
-                  text "coercions:" <+> intWithCommas i3])
+                  text "coercions:" <+> intWithCommas i3 <> comma,
+                  text "joins:"     <+> intWithCommas i5 <> char '/' <>
+                                        intWithCommas (i4 + i5) ])
 
 plusCS :: CoreStats -> CoreStats -> CoreStats
-plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1 })
-       (CS { cs_tm = p2, cs_ty = q2, cs_co = r2 })
-  = CS { cs_tm = p1+p2, cs_ty = q1+q2, cs_co = r1+r2 }
+plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1, cs_vb = v1, cs_jb = j1 })
+       (CS { cs_tm = p2, cs_ty = q2, cs_co = r2, cs_vb = v2, cs_jb = j2 })
+  = CS { cs_tm = p1+p2, cs_ty = q1+q2, cs_co = r1+r2, cs_vb = v1+v2
+       , cs_jb = j1+j2 }
 
 zeroCS, oneTM :: CoreStats
-zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0 }
+zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0, cs_vb = 0, cs_jb = 0 }
 oneTM  = zeroCS { cs_tm = 1 }
 
 sumCS :: (a -> CoreStats) -> [a] -> CoreStats
 sumCS f = foldr (plusCS . f) zeroCS
 
 coreBindsStats :: [CoreBind] -> CoreStats
-coreBindsStats = sumCS bindStats
+coreBindsStats = sumCS (bindStats TopLevel)
 
-bindStats :: CoreBind -> CoreStats
-bindStats (NonRec v r) = bindingStats v r
-bindStats (Rec prs)    = sumCS (\(v,r) -> bindingStats v r) prs
+bindStats :: TopLevelFlag -> CoreBind -> CoreStats
+bindStats top_lvl (NonRec v r) = bindingStats top_lvl v r
+bindStats top_lvl (Rec prs)    = sumCS (\(v,r) -> bindingStats top_lvl v r) prs
 
-bindingStats :: Var -> CoreExpr -> CoreStats
-bindingStats v r = bndrStats v `plusCS` exprStats r
+bindingStats :: TopLevelFlag -> Var -> CoreExpr -> CoreStats
+bindingStats top_lvl v r = letBndrStats top_lvl v `plusCS` exprStats r
 
 bndrStats :: Var -> CoreStats
 bndrStats v = oneTM `plusCS` tyStats (varType v)
+
+letBndrStats :: TopLevelFlag -> Var -> CoreStats
+letBndrStats top_lvl v
+  | isTyVar v || isTopLevel top_lvl = bndrStats v
+  | isJoinId v = oneTM { cs_jb = 1 } `plusCS` ty_stats
+  | otherwise  = oneTM { cs_vb = 1 } `plusCS` ty_stats
+  where
+    ty_stats = tyStats (varType v)
 
 exprStats :: CoreExpr -> CoreStats
 exprStats (Var {})        = oneTM
@@ -62,7 +76,7 @@ exprStats (Type t)        = tyStats t
 exprStats (Coercion c)    = coStats c
 exprStats (App f a)       = exprStats f `plusCS` exprStats a
 exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e
-exprStats (Let b e)       = bindStats b `plusCS` exprStats e
+exprStats (Let b e)       = bindStats NotTopLevel b `plusCS` exprStats e
 exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b
                                         `plusCS` sumCS altStats as
 exprStats (Cast e co)     = coStats co `plusCS` exprStats e

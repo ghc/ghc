@@ -24,7 +24,6 @@ test('simpl020', [], multimod_compile, ['simpl020', '-v0'])
 test('simpl-T1370', normal, compile, [''])
 test('T2520', normal, compile, [''])
 
-
 test('spec001', when(fast(), skip), compile, [''])
 test('spec002', normal, compile, [''])
 test('spec003', normal, compile, [''])
@@ -99,7 +98,7 @@ test('T4918', [], run_command, ['$MAKE -s --no-print-directory T4918'])
 # result of -ddump-simpl, which is never advertised to
 # be very stable
 test('T4945',
-     expect_broken(4945),
+     normal,
      run_command,
      ['$MAKE -s --no-print-directory T4945'])
 

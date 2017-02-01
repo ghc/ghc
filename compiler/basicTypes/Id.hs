@@ -52,7 +52,7 @@ module Id (
         globaliseId, localiseId,
         setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
         zapLamIdInfo, zapIdDemandInfo, zapIdUsageInfo, zapIdUsageEnvInfo,
-        zapIdUsedOnceInfo,
+        zapIdUsedOnceInfo, zapIdTailCallInfo,
         zapFragileIdInfo, zapIdStrictness,
         transferPolyIdInfo,
 
@@ -72,6 +72,10 @@ module Id (
 
         -- ** Evidence variables
         DictId, isDictId, isEvVar,
+
+        -- ** Join variables
+        JoinId, isJoinId, isJoinId_maybe, idJoinArity,
+        asJoinId, asJoinId_maybe, zapJoinId,
 
         -- ** Inline pragma stuff
         idInlinePragma, setInlinePragma, modifyInlinePragma,
@@ -118,11 +122,12 @@ import IdInfo
 import BasicTypes
 
 -- Imported and re-exported
-import Var( Id, CoVar, DictId,
+import Var( Id, CoVar, DictId, JoinId,
             InId,  InVar,
             OutId, OutVar,
-            idInfo, idDetails, globaliseId, varType,
-            isId, isLocalId, isGlobalId, isExportedId )
+            idInfo, idDetails, setIdDetails, globaliseId, varType,
+            isId, isLocalId, isGlobalId, isExportedId,
+            isJoinId, isJoinId_maybe )
 import qualified Var
 
 import Type
@@ -157,7 +162,10 @@ infixl  1 `setIdUnfolding`,
           `idCafInfo`,
 
           `setIdDemandInfo`,
-          `setIdStrictness`
+          `setIdStrictness`,
+
+          `asJoinId`,
+          `asJoinId_maybe`
 
 {-
 ************************************************************************
@@ -546,6 +554,40 @@ isDictId id = isDictTy (idType id)
 {-
 ************************************************************************
 *                                                                      *
+              Join variables
+*                                                                      *
+************************************************************************
+-}
+
+idJoinArity :: JoinId -> JoinArity
+idJoinArity id = isJoinId_maybe id `orElse` pprPanic "idJoinArity" (ppr id)
+
+asJoinId :: Id -> JoinArity -> JoinId
+asJoinId id arity = WARN(not (isLocalId id),
+                         text "global id being marked as join var:" <+> ppr id)
+                    WARN(not (is_vanilla_or_join id),
+                         ppr id <+> pprIdDetails (idDetails id))
+                    id `setIdDetails` JoinId arity
+  where
+    is_vanilla_or_join id = case Var.idDetails id of
+                              VanillaId -> True
+                              JoinId {} -> True
+                              _         -> False
+
+zapJoinId :: Id -> Id
+-- May be a regular id already
+zapJoinId jid | isJoinId jid = zapIdTailCallInfo (jid `setIdDetails` VanillaId)
+                                 -- Core Lint may complain if still marked
+                                 -- as AlwaysTailCalled
+              | otherwise    = jid
+
+asJoinId_maybe :: Id -> Maybe JoinArity -> Id
+asJoinId_maybe id (Just arity) = asJoinId id arity
+asJoinId_maybe id Nothing      = zapJoinId id
+
+{-
+************************************************************************
+*                                                                      *
 \subsection{IdInfo stuff}
 *                                                                      *
 ************************************************************************
@@ -590,9 +632,11 @@ zapIdStrictness id = modifyIdInfo (`setStrictnessInfo` nopSig) id
 isStrictId :: Id -> Bool
 isStrictId id
   = ASSERT2( isId id, text "isStrictId: not an id: " <+> ppr id )
+         not (isJoinId id) && (
            (isStrictType (idType id)) ||
            -- Take the best of both strictnesses - old and new
            (isStrictDmd (idDemandInfo id))
+         )
 
         ---------------------------------
         -- UNFOLDING
@@ -660,7 +704,7 @@ setIdOccInfo :: Id -> OccInfo -> Id
 setIdOccInfo id occ_info = modifyIdInfo (`setOccInfo` occ_info) id
 
 zapIdOccInfo :: Id -> Id
-zapIdOccInfo b = b `setIdOccInfo` NoOccInfo
+zapIdOccInfo b = b `setIdOccInfo` noOccInfo
 
 {-
         ---------------------------------
@@ -804,6 +848,9 @@ zapIdUsageEnvInfo = zapInfo zapUsageEnvInfo
 zapIdUsedOnceInfo :: Id -> Id
 zapIdUsedOnceInfo = zapInfo zapUsedOnceInfo
 
+zapIdTailCallInfo :: Id -> Id
+zapIdTailCallInfo = zapInfo zapTailCallInfo
+
 {-
 Note [transferPolyIdInfo]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -869,13 +916,14 @@ transferPolyIdInfo old_id abstract_wrt new_id
     old_inline_prag = inlinePragInfo old_info
     old_occ_info    = occInfo old_info
     new_arity       = old_arity + arity_increase
+    new_occ_info    = zapOccTailCallInfo old_occ_info
 
     old_strictness  = strictnessInfo old_info
     new_strictness  = increaseStrictSigArity arity_increase old_strictness
 
     transfer new_info = new_info `setArityInfo` new_arity
                                  `setInlinePragInfo` old_inline_prag
-                                 `setOccInfo` old_occ_info
+                                 `setOccInfo` new_occ_info
                                  `setStrictnessInfo` new_strictness
 
 isNeverLevPolyId :: Id -> Bool

@@ -18,7 +18,7 @@ import SimplUtils
 import FamInstEnv       ( FamInstEnv )
 import Literal          ( litIsLifted ) --, mkMachInt ) -- temporalily commented out. See #8326
 import Id
-import MkId             ( seqId, voidPrimId )
+import MkId             ( seqId )
 import MkCore           ( mkImpossibleExpr, castBottomExpr )
 import IdInfo
 import Name             ( Name, mkSystemVarName, isExternalName, getOccFS )
@@ -37,10 +37,11 @@ import CoreArity
 import CoreSubst        ( pushCoTyArg, pushCoValArg )
 --import PrimOp           ( tagToEnumKey ) -- temporalily commented out. See #8326
 import Rules            ( mkRuleInfo, lookupRule, getRules )
-import TysPrim          ( voidPrimTy ) --, intPrimTy ) -- temporalily commented out. See #8326
-import BasicTypes       ( TopLevelFlag(..), isTopLevel, RecFlag(..) )
+--import TysPrim          ( intPrimTy ) -- temporalily commented out. See #8326
+import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
+                          RecFlag(..) )
 import MonadUtils       ( foldlM, mapAccumLM, liftIO )
-import Maybes           ( orElse )
+import Maybes           ( isJust, fromJust, orElse )
 --import Unique           ( hasKey ) -- temporalily commented out. See #8326
 import Control.Monad
 import Outputable
@@ -203,6 +204,35 @@ we should eta expand wherever we find a (value) lambda?  Then the eta
 expansion at a let RHS can concentrate solely on the PAP case.
 
 
+Case-of-case and join points
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we perform the case-of-case transform (or otherwise push continuations
+inward), we want to treat join points specially. Since they're always
+tail-called and we want to maintain this invariant, we can do this (for any
+evaluation context E):
+
+  E[join j = e
+    in case ... of
+         A -> jump j 1
+         B -> jump j 2
+         C -> f 3]
+
+    -->
+
+  join j = E[e]
+  in case ... of
+       A -> jump j 1
+       B -> jump j 2
+       C -> E[f 3]
+
+As is evident from the example, there are two components to this behavior:
+
+  1. When entering the RHS of a join point, copy the context inside.
+  2. When a join point is invoked, discard the outer context.
+
+Clearly we need to be very careful here to remain consistent---neither part is
+optional!
+
 ************************************************************************
 *                                                                      *
 \subsection{Bindings}
@@ -232,9 +262,11 @@ simplTopBinds env0 binds0
     simpl_binds env (bind:binds) = do { env' <- simpl_bind env bind
                                       ; simpl_binds env' binds }
 
-    simpl_bind env (Rec pairs)  = simplRecBind      env  TopLevel pairs
+    simpl_bind env (Rec pairs)  = simplRecBind env TopLevel Nothing pairs
     simpl_bind env (NonRec b r) = do { (env', b') <- addBndrRules env b (lookupRecBndr env b)
-                                     ; simplRecOrTopPair env' TopLevel NonRecursive b b' r }
+                                     ; simplRecOrTopPair env' TopLevel
+                                                         NonRecursive Nothing
+                                                         b b' r }
 
 {-
 ************************************************************************
@@ -247,10 +279,10 @@ simplRecBind is used for
         * recursive bindings only
 -}
 
-simplRecBind :: SimplEnv -> TopLevelFlag
+simplRecBind :: SimplEnv -> TopLevelFlag -> Maybe SimplCont
              -> [(InId, InExpr)]
              -> SimplM SimplEnv
-simplRecBind env0 top_lvl pairs0
+simplRecBind env0 top_lvl mb_cont pairs0
   = do  { (env_with_info, triples) <- mapAccumLM add_rules env0 pairs0
         ; env1 <- go (zapFloats env_with_info) triples
         ; return (env0 `addRecFloats` env1) }
@@ -266,7 +298,8 @@ simplRecBind env0 top_lvl pairs0
     go env [] = return env
 
     go env ((old_bndr, new_bndr, rhs) : pairs)
-        = do { env' <- simplRecOrTopPair env top_lvl Recursive old_bndr new_bndr rhs
+        = do { env' <- simplRecOrTopPair env top_lvl Recursive mb_cont
+                                         old_bndr new_bndr rhs
              ; go env' pairs }
 
 {-
@@ -278,18 +311,18 @@ It assumes the binder has already been simplified, but not its IdInfo.
 -}
 
 simplRecOrTopPair :: SimplEnv
-                  -> TopLevelFlag -> RecFlag
+                  -> TopLevelFlag -> RecFlag -> Maybe SimplCont
                   -> InId -> OutBndr -> InExpr  -- Binder and rhs
                   -> SimplM SimplEnv    -- Returns an env that includes the binding
 
-simplRecOrTopPair env top_lvl is_rec old_bndr new_bndr rhs
+simplRecOrTopPair env top_lvl is_rec mb_cont old_bndr new_bndr rhs
   = do { dflags <- getDynFlags
        ; trace_bind dflags $
            if preInlineUnconditionally dflags env top_lvl old_bndr rhs
                     -- Check for unconditional inline
            then do tick (PreInlineUnconditionally old_bndr)
                    return (extendIdSubst env old_bndr (mkContEx env rhs))
-           else simplLazyBind env top_lvl is_rec old_bndr new_bndr rhs env }
+           else simplBind env top_lvl is_rec mb_cont old_bndr new_bndr rhs env }
   where
     trace_bind dflags thing_inside
       | not (dopt Opt_D_verbose_core2core dflags)
@@ -300,7 +333,7 @@ simplRecOrTopPair env top_lvl is_rec old_bndr new_bndr rhs
         -- helps to locate the tracing for inlining and rule firing
 
 {-
-simplLazyBind is used for
+simplBind is used for
   * [simplRecOrTopPair] recursive bindings (whether top level or not)
   * [simplRecOrTopPair] top-level non-recursive bindings
   * [simplNonRecE]      non-top-level *lazy* non-recursive bindings
@@ -314,6 +347,19 @@ Nota bene:
     3. It does not check for pre-inline-unconditionally;
        that should have been done already.
 -}
+
+simplBind :: SimplEnv
+          -> TopLevelFlag -> RecFlag -> Maybe SimplCont
+          -> InId -> OutId      -- Binder, both pre-and post simpl
+                                -- The OutId has IdInfo, except arity, unfolding
+          -> InExpr -> SimplEnv -- The RHS and its environment
+          -> SimplM SimplEnv
+simplBind env top_lvl is_rec mb_cont bndr bndr1 rhs rhs_se
+  | isJoinId bndr1
+  = ASSERT(isNotTopLevel top_lvl && isJust mb_cont)
+    simplJoinBind env is_rec (fromJust mb_cont) bndr bndr1 rhs rhs_se
+  | otherwise
+  = simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
 simplLazyBind :: SimplEnv
               -> TopLevelFlag -> RecFlag
@@ -346,7 +392,10 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         -- Simplify the RHS
         ; let   rhs_cont = mkRhsStop (substTy body_env (exprType body))
-        ; (body_env1, body1) <- simplExprF body_env body rhs_cont
+        ; (body_env0, body0) <- simplExprF (zapJoinFloats body_env)
+                                           body rhs_cont
+        ; let body1     = wrapJoinFloats body_env0 body0
+              body_env1 = body_env0 `restoreJoinFloats` body_env
         -- ANF-ise a constructor or PAP rhs
         ; (body_env2, body2) <- prepareRhs top_lvl body_env1 bndr1 body1
 
@@ -367,7 +416,24 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
                         ; env' <- foldlM (addPolyBind top_lvl) env poly_binds
                         ; return (env', rhs') }
 
-        ; completeBind env' top_lvl bndr bndr1 rhs' }
+        ; completeBind env' top_lvl is_rec Nothing bndr bndr1 rhs' }
+
+simplJoinBind :: SimplEnv
+              -> RecFlag
+              -> SimplCont
+              -> InId -> OutId          -- Binder, both pre-and post simpl
+                                        -- The OutId has IdInfo, except arity,
+                                        --   unfolding
+              -> InExpr -> SimplEnv     -- The RHS and its environment
+              -> SimplM SimplEnv
+simplJoinBind env is_rec cont bndr bndr1 rhs rhs_se
+  = -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$
+    --                           ppr rhs $$ ppr (seIdSubst rhs_se)) $
+    do  { let   rhs_env     = rhs_se `setInScope` env
+
+        -- Simplify the RHS
+        ; rhs' <- simplJoinRhs rhs_env cont bndr rhs
+        ; completeBind env NotTopLevel is_rec (Just cont) bndr bndr1 rhs' }
 
 {-
 A specialised variant of simplNonRec used when the RHS is already simplified,
@@ -402,13 +468,15 @@ completeNonRecX :: TopLevelFlag -> SimplEnv
 --               See Note [CoreSyn let/app invariant] in CoreSyn
 
 completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
-  = do  { (env1, rhs1) <- prepareRhs top_lvl (zapFloats env) new_bndr new_rhs
+  = ASSERT(not (isJoinId new_bndr))
+    do  { (env1, rhs1) <- prepareRhs top_lvl (zapFloats env) new_bndr new_rhs
         ; (env2, rhs2) <-
                 if doFloatFromRhs NotTopLevel NonRecursive is_strict rhs1 env1
                 then do { tick LetFloatFromLet
                         ; return (addFloats env env1, rhs1) }   -- Add the floats to the main env
                 else return (env, wrapFloats env1 rhs1)         -- Wrap the floats around the RHS
-        ; completeBind env2 NotTopLevel old_bndr new_bndr rhs2 }
+        ; completeBind env2 NotTopLevel NonRecursive Nothing
+                       old_bndr new_bndr rhs2 }
 
 {-
 {- No, no, no!  Do not try preInlineUnconditionally in completeNonRecX
@@ -664,6 +732,8 @@ Nor does it do the atomic-argument thing
 
 completeBind :: SimplEnv
              -> TopLevelFlag            -- Flag stuck into unfolding
+             -> RecFlag                 -- Recursive binding?
+             -> Maybe SimplCont         -- Required only for join point
              -> InId                    -- Old binder
              -> OutId -> OutExpr        -- New binder and RHS
              -> SimplM SimplEnv
@@ -672,7 +742,7 @@ completeBind :: SimplEnv
 --      * or by adding to the floats in the envt
 --
 -- Precondition: rhs obeys the let/app invariant
-completeBind env top_lvl old_bndr new_bndr new_rhs
+completeBind env top_lvl is_rec mb_cont old_bndr new_bndr new_rhs
  | isCoVar old_bndr
  = case new_rhs of
      Coercion co -> return (extendCvSubst env old_bndr co)
@@ -686,10 +756,15 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 
         -- Do eta-expansion on the RHS of the binding
         -- See Note [Eta-expanding at let bindings] in SimplUtils
-      ; (new_arity, final_rhs) <- tryEtaExpandRhs env new_bndr new_rhs
+      ; (new_arity, final_rhs) <- if isJoinId new_bndr
+                                    then return (manifestArity new_rhs, new_rhs)
+                                         -- Note [Don't eta-expand join points]
+                                    else tryEtaExpandRhs env is_rec
+                                                         new_bndr new_rhs
 
         -- Simplify the unfolding
-      ; new_unfolding <- simplLetUnfolding env top_lvl old_bndr final_rhs old_unf
+      ; new_unfolding <- simplLetUnfolding env top_lvl mb_cont old_bndr
+                                           final_rhs old_unf
 
       ; dflags <- getDynFlags
       ; if postInlineUnconditionally dflags env top_lvl new_bndr occ_info
@@ -740,7 +815,8 @@ addPolyBind :: TopLevelFlag -> SimplEnv -> OutBind -> SimplM SimplEnv
 -- INVARIANT: the arity is correct on the incoming binders
 
 addPolyBind top_lvl env (NonRec poly_id rhs)
-  = do  { unfolding <- simplLetUnfolding env top_lvl poly_id rhs noUnfolding
+  = do  { unfolding <- simplLetUnfolding env top_lvl Nothing poly_id rhs
+                                         noUnfolding
                         -- Assumes that poly_id did not have an INLINE prag
                         -- which is perhaps wrong.  ToDo: think about this
         ; let final_id = setIdInfo poly_id $
@@ -793,6 +869,44 @@ After inlining f at some of its call sites the original binding may
 (for example) be no longer strictly demanded.
 The solution here is a bit ad hoc...
 
+Note [Don't eta-expand join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Similarly to CPR (see Note [Don't CPR join points] in WorkWrap), a join point
+stands well to gain from its outer binding's eta-expansion, and eta-expanding a
+join point is fraught with issues like how to deal with a cast:
+
+    let join $j1 :: IO ()
+             $j1 = ...
+             $j2 :: Int -> IO ()
+             $j2 n = if n > 0 then $j1
+                              else ...
+
+    =>
+
+    let join $j1 :: IO ()
+             $j1 = (\eta -> ...)
+                     `cast` N:IO :: State# RealWorld -> (# State# RealWorld, ())
+                                 ~  IO ()
+             $j2 :: Int -> IO ()
+             $j2 n = (\eta -> if n > 0 then $j1
+                                       else ...)
+                     `cast` N:IO :: State# RealWorld -> (# State# RealWorld, ())
+                                 ~  IO ()
+
+The cast here can't be pushed inside the lambda (since it's not casting to a
+function type), so the lambda has to stay, but it can't because it contains a
+reference to a join point. In fact, $j2 can't be eta-expanded at all. Rather
+than try and detect this situation (and whatever other situations crop up!), we
+don't bother; again, any surrounding eta-expansion will improve these join
+points anyway, since an outer cast can *always* be pushed inside. By the time
+CorePrep comes around, the code is very likely to look more like this:
+
+    let join $j1 :: State# RealWorld -> (# State# RealWorld, ())
+             $j1 = (...) eta
+             $j2 :: Int -> State# RealWorld -> (# State# RealWorld, ())
+             $j2 = if n > 0 then $j1
+                            else (...) eta
 
 ************************************************************************
 *                                                                      *
@@ -917,15 +1031,31 @@ simplExprF1 env (Case scrut bndr _ alts) cont
                                  , sc_env = env, sc_cont = cont })
 
 simplExprF1 env (Let (Rec pairs) body) cont
-  = do  { env' <- simplRecBndrs env (map fst pairs)
-                -- NB: bndrs' don't have unfoldings or rules
-                -- We add them as we go down
-
-        ; env'' <- simplRecBind env' NotTopLevel pairs
-        ; simplExprF env'' body cont }
+  = simplRecE env pairs body cont
 
 simplExprF1 env (Let (NonRec bndr rhs) body) cont
   = simplNonRecE env bndr (rhs, env) ([], body) cont
+
+---------------------------------
+-- Simplify a join point, adding the context.
+-- Context goes *inside* the lambdas. IOW, if the join point has arity n, we do:
+--   \x1 .. xn -> e => \x1 .. xn -> E[e]
+-- Note that we need the arity of the join point, since e may be a lambda
+-- (though this is unlikely). See Note [Case-of-case and join points].
+simplJoinRhs :: SimplEnv -> SimplCont -> InId -> InExpr
+             -> SimplM OutExpr
+simplJoinRhs env cont bndr expr
+  | Just arity <- isJoinId_maybe bndr
+  = simpl_join_lams arity
+  | otherwise
+  = pprPanic "simplJoinRhs" (ppr bndr)
+  where
+    simpl_join_lams arity
+      = do { (env', join_bndrs') <- simplLamBndrs env join_bndrs
+           ; join_body' <- simplExprC env' join_body cont
+           ; return $ mkLams join_bndrs' join_body' }
+      where
+        (join_bndrs, join_body) = collectNBinders arity expr
 
 ---------------------------------
 simplType :: SimplEnv -> InType -> SimplM OutType
@@ -1270,7 +1400,7 @@ simplLamBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
 simplLamBndr env bndr
   | isId bndr && isFragileUnfolding old_unf   -- Special case
   = do { (env1, bndr1) <- simplBinder env bndr
-       ; unf'          <- simplUnfolding env1 NotTopLevel bndr old_unf
+       ; unf'          <- simplUnfolding env1 NotTopLevel Nothing bndr old_unf
        ; let bndr2 = bndr1 `setIdUnfolding` unf'
        ; return (modifyInScope env1 bndr2, bndr2) }
 
@@ -1322,12 +1452,89 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
            -> simplExprF (rhs_se `setFloats` env) rhs
                          (StrictBind bndr bndrs body env cont)
 
+           | Just (bndr', rhs') <- matchOrConvertToJoinPoint bndr rhs
+           -> do { let cont_dup_res_ty = resultTypeOfDupableCont (getMode env)
+                                           [bndr'] cont
+                 ; (env1, bndr1) <- simplNonRecJoinBndr env
+                                                        cont_dup_res_ty bndr'
+                 ; (env2, bndr2) <- addBndrRules env1 bndr' bndr1
+                 ; (env3, cont_dup, cont_nodup)
+                     <- prepareLetCont (zapJoinFloats env2) [bndr'] cont
+                 ; MASSERT2(cont_dup_res_ty `eqType` contResultType cont_dup,
+                     ppr cont_dup_res_ty $$ blankLine $$
+                     ppr cont $$ blankLine $$
+                     ppr cont_dup $$ blankLine $$
+                     ppr cont_nodup)
+                 ; env4 <- simplJoinBind env3 NonRecursive cont_dup bndr' bndr2
+                                         rhs' rhs_se
+                 ; (env5, expr) <- simplLam env4 bndrs body cont_dup
+                 ; rebuild (env5 `restoreJoinFloats` env2)
+                           (wrapJoinFloats env5 expr) cont_nodup }
+
            | otherwise
            -> ASSERT( not (isTyVar bndr) )
               do { (env1, bndr1) <- simplNonRecBndr env bndr
                  ; (env2, bndr2) <- addBndrRules env1 bndr bndr1
                  ; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
                  ; simplLam env3 bndrs body cont }
+
+------------------
+simplRecE :: SimplEnv
+          -> [(InId, InExpr)]
+          -> InExpr
+          -> SimplCont
+          -> SimplM (SimplEnv, OutExpr)
+
+-- simplRecE is used for
+--  * non-top-level recursive lets in expressions
+simplRecE env pairs body cont
+  | Just pairs' <- matchOrConvertToJoinPoints pairs
+  = do  { let bndrs' = map fst pairs'
+              cont_dup_res_ty = resultTypeOfDupableCont (getMode env)
+                                                        bndrs' cont
+        ; env1 <- simplRecJoinBndrs env cont_dup_res_ty bndrs'
+                -- NB: bndrs' don't have unfoldings or rules
+                -- We add them as we go down
+        ; (env2, cont_dup, cont_nodup) <- prepareLetCont (zapJoinFloats env1)
+                                                         bndrs' cont
+        ; MASSERT2(cont_dup_res_ty `eqType` contResultType cont_dup,
+            ppr cont_dup_res_ty $$ blankLine $$
+            ppr cont $$ blankLine $$
+            ppr cont_dup $$ blankLine $$
+            ppr cont_nodup)
+        ; env3 <- simplRecBind env2 NotTopLevel (Just cont_dup) pairs'
+        ; (env4, expr) <- simplExprF env3 body cont_dup
+        ; rebuild (env4 `restoreJoinFloats` env1)
+                  (wrapJoinFloats env4 expr) cont_nodup }
+  | otherwise
+  = do  { let bndrs = map fst pairs
+        ; MASSERT(all (not . isJoinId) bndrs)
+        ; env1 <- simplRecBndrs env bndrs
+                -- NB: bndrs' don't have unfoldings or rules
+                -- We add them as we go down
+        ; env2 <- simplRecBind env1 NotTopLevel (Just cont) pairs
+        ; simplExprF env2 body cont }
+
+-- | Perform the conversion of a value binding to a join point if it's marked
+-- as 'AlwaysTailCalled'. If it's already a join point, return it as is.
+-- Otherwise return 'Nothing'.
+matchOrConvertToJoinPoint :: InBndr -> InExpr -> Maybe (JoinId, InExpr)
+matchOrConvertToJoinPoint bndr rhs
+  | not (isId bndr)
+  = Nothing
+  | isJoinId bndr
+  = -- No point in keeping tailCallInfo around; very fragile
+    Just (zapIdTailCallInfo bndr, rhs)
+  | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
+  , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
+  = Just (zapIdTailCallInfo (bndr `asJoinId` join_arity),
+          mkLams bndrs body)
+  | otherwise
+  = Nothing
+
+matchOrConvertToJoinPoints :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
+matchOrConvertToJoinPoints bndrs
+  = mapM (uncurry matchOrConvertToJoinPoint) bndrs
 
 {-
 ************************************************************************
@@ -1351,9 +1558,11 @@ simplVar env var
 simplIdF :: SimplEnv -> InId -> SimplCont -> SimplM (SimplEnv, OutExpr)
 simplIdF env var cont
   = case substId env var of
-        DoneEx e             -> simplExprF (zapSubstEnv env) e cont
+        DoneEx e             -> simplExprF (zapSubstEnv env) e trimmed_cont
         ContEx tvs cvs ids e -> simplExprF (setSubstEnv env tvs cvs ids) e cont
-        DoneId var1          -> completeCall env var1 cont
+                                  -- Don't trim; haven't already simplified
+                                  -- the join, so the cont was never copied
+        DoneId var1          -> completeCall env var1 trimmed_cont
                 -- Note [zapSubstEnv]
                 -- The template is already simplified, so don't re-substitute.
                 -- This is VITAL.  Consider
@@ -1363,6 +1572,24 @@ simplIdF env var cont
                 -- We'll clone the inner \x, adding x->x' in the id_subst
                 -- Then when we inline y, we must *not* replace x by x' in
                 -- the inlined copy!!
+  where
+    trimmed_cont | Just arity <- isJoinIdInEnv_maybe env var
+                 = trim_cont arity cont
+                 | otherwise
+                 = cont
+
+    -- Drop outer context from join point invocation
+    -- Note [Case-of-case and join points]
+    trim_cont 0 cont@(Stop {})
+      = cont
+    trim_cont 0 cont
+      = mkBoringStop (contResultType cont)
+    trim_cont n cont@(ApplyToVal { sc_cont = k })
+      = cont { sc_cont = trim_cont (n-1) k }
+    trim_cont n cont@(ApplyToTy { sc_cont = k })
+      = cont { sc_cont = trim_cont (n-1) k } -- join arity counts types!
+    trim_cont _ cont
+      = pprPanic "completeCall" $ ppr var $$ ppr cont
 
 ---------------------------------------------------------
 --      Dealing with a call site
@@ -1935,7 +2162,8 @@ rebuildCase env scrut case_bndr alts cont
 reallyRebuildCase env scrut case_bndr alts cont
   = do  {       -- Prepare the continuation;
                 -- The new subst_env is in place
-          (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
+          (env', dup_cont, nodup_cont) <- prepareCaseCont (zapJoinFloats env)
+                                                          alts cont
 
         -- Simplify the alternatives
         ; (scrut', case_bndr', alts') <- simplAlts env' scrut case_bndr alts dup_cont
@@ -1947,7 +2175,8 @@ reallyRebuildCase env scrut case_bndr alts cont
         -- Notice that rebuild gets the in-scope set from env', not alt_env
         -- (which in any case is only build in simplAlts)
         -- The case binder *not* scope over the whole returned case-expression
-        ; rebuild env' case_expr nodup_cont }
+        ; rebuild (env' `restoreJoinFloats` env)
+                  (wrapJoinFloats env' case_expr) nodup_cont }
 
 {-
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -2348,23 +2577,87 @@ prepareCaseCont :: SimplEnv
 -- The idea is that we'll transform thus:
 --          Knodup[ (case _ of { p1 -> Kdup[r1]; ...; pn -> Kdup[rn] }
 --
--- We may also return some extra bindings in SimplEnv (that scope over
--- the entire continuation)
+-- We may also return some extra value bindings in SimplEnv (that scope over
+-- the entire continuation) as well as some join points (thus must *not* float
+-- past the continuation!).
+-- Hence, the full story is this:
+--     K[case _ of { p1 -> r1; ...; pn -> rn }] ==>
+--     F_v[Knodup[F_j[ (case _ of { p1 -> Kdup[r1]; ...; pn -> Kdup[rn] }) ]]]
+-- Here F_v represents some values that got floated out and F_j represents some
+-- join points that got floated out.
 --
 -- When case-of-case is off, just make the entire continuation non-dupable
 
 prepareCaseCont env alts cont
-  | not (sm_case_case (getMode env)) = return (env, mkBoringStop (contHoleType cont), cont)
-  | not (many_alts alts)             = return (env, cont, mkBoringStop (contResultType cont))
-  | otherwise                        = mkDupableCont env cont
-  where
-    many_alts :: [InAlt] -> Bool  -- True iff strictly > 1 non-bottom alternative
-    many_alts []  = False         -- See Note [Bottom alternatives]
-    many_alts [_] = False
-    many_alts (alt:alts)
-      | is_bot_alt alt = many_alts alts
-      | otherwise      = not (all is_bot_alt alts)
+  | not (sm_case_case (getMode env))
+  = return (env, mkBoringStop (contHoleType cont), cont)
+  | not (altsWouldDup alts)
+  = return (env, cont, mkBoringStop (contResultType cont))
+  | otherwise
+  = mkDupableCont env cont
 
+prepareLetCont :: SimplEnv
+               -> [InBndr] -> SimplCont
+               -> SimplM (SimplEnv,
+                          SimplCont,   -- Dupable part
+                          SimplCont)   -- Non-dupable part
+
+-- Similar to prepareCaseCont, only for
+--     K[let { j1 = r1; ...; jn -> rn } in _]
+-- If the js are join points, this will turn into
+--     Knodup[join { j1 = Kdup[r1]; ...; jn = Kdup[rn] } in Kdup[_]].
+--
+-- When case-of-case is off and it's a join binding, just make the entire
+-- continuation non-dupable. This is necessary because otherwise
+--     case (join j = ... in case e of { A -> jump j 1; ... }) of { B -> ... }
+-- becomes
+--     join j = case ... of { B -> ... } in
+--     case (case e of { A -> jump j 1; ... }) of { B -> ... },
+-- and the reference to j is invalid.
+
+prepareLetCont env bndrs cont
+  | not (isJoinId (head bndrs))
+  = return (env, cont, mkBoringStop (contResultType cont))
+  | not (sm_case_case (getMode env))
+  = return (env, mkBoringStop (contHoleType cont), cont)
+  | otherwise
+  = mkDupableCont env cont
+
+-- Predict the result type of the dupable cont returned by prepareLetCont (= the
+-- hole type of the non-dupable part). Ugly, but sadly necessary so that we can
+-- know what the new type of a recursive join point will be before we start
+-- simplifying it.
+resultTypeOfDupableCont :: SimplifierMode
+                        -> [InBndr]
+                        -> SimplCont
+                        -> OutType   -- INVARIANT: Result type of dupable cont
+                                     -- returned by prepareLetCont
+-- IMPORTANT: This must be kept in sync with mkDupableCont!
+resultTypeOfDupableCont mode bndrs cont
+  | not (any isJoinId bndrs)   = contResultType cont
+  | not (sm_case_case mode)    = contHoleType   cont
+  | otherwise                  = go cont
+  where
+    go cont | contIsDupable cont = contResultType cont
+    go (Stop {}) = panic "typeOfDupableCont" -- Handled by previous eqn
+    go (CastIt _  cont)     = go cont
+    go cont@(TickIt {})     = contHoleType cont
+    go cont@(StrictBind {}) = contHoleType cont
+    go (StrictArg _ _ cont) = go cont
+    go cont@(ApplyToTy  {}) = go (sc_cont cont)
+    go cont@(ApplyToVal {}) = go (sc_cont cont)
+    go (Select { sc_alts = alts, sc_cont = cont })
+      | not (sm_case_case mode) = contHoleType cont
+      | not (altsWouldDup alts) = contResultType cont
+      | otherwise               = go cont
+
+altsWouldDup :: [InAlt] -> Bool -- True iff strictly > 1 non-bottom alternative
+altsWouldDup []  = False        -- See Note [Bottom alternatives]
+altsWouldDup [_] = False
+altsWouldDup (alt:alts)
+  | is_bot_alt alt = altsWouldDup alts
+  | otherwise      = not (all is_bot_alt alts)
+  where
     is_bot_alt (_,_,rhs) = exprIsBottom rhs
 
 {-
@@ -2375,9 +2668,7 @@ When we have
        of alts
 then we can just duplicate those alts because the A and C cases
 will disappear immediately.  This is more direct than creating
-join points and inlining them away; and in some cases we would
-not even create the join points (see Note [Single-alternative case])
-and we would keep the case-of-case which is silly.  See Trac #4930.
+join points and inlining them away.  See Trac #4930.
 -}
 
 mkDupableCont :: SimplEnv -> SimplCont
@@ -2422,15 +2713,6 @@ mkDupableCont env (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_env = se, sc_cont
         ; let app_cont = ApplyToVal { sc_arg = arg'', sc_env = se'
                                     , sc_dup = OkToDup, sc_cont = dup_cont }
         ; return (env'', app_cont, nodup_cont) }
-
-mkDupableCont env cont@(Select { sc_bndr = case_bndr, sc_alts = [(_, bs, _rhs)] })
---  See Note [Single-alternative case]
---  | not (exprIsDupable rhs && contIsDupable case_cont)
---  | not (isDeadBinder case_bndr)
-  | all isDeadBinder bs  -- InIds
-    && not (isUnliftedType (idType case_bndr))
-    -- Note [Single-alternative-unlifted]
-  = return (env, mkBoringStop (contHoleType cont), cont)
 
 mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                           , sc_env = se, sc_cont = cont })
@@ -2509,19 +2791,16 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                            -- The case binder is alive but trivial, so why has
                            -- it not been substituted away?
 
-              used_bndrs' | isDeadBinder case_bndr = filter abstract_over bndrs'
-                          | otherwise              = bndrs' ++ [case_bndr_w_unf]
+              final_bndrs'
+                | isDeadBinder case_bndr = filter abstract_over bndrs'
+                | otherwise              = bndrs' ++ [case_bndr_w_unf]
 
               abstract_over bndr
                   | isTyVar bndr = True -- Abstract over all type variables just in case
                   | otherwise    = not (isDeadBinder bndr)
                         -- The deadness info on the new Ids is preserved by simplBinders
-
-        ; (final_bndrs', final_args)    -- Note [Join point abstraction]
-                <- if (any isId used_bndrs')
-                   then return (used_bndrs', varsToCoreExprs used_bndrs')
-                    else do { rw_id <- newId (fsLit "w") voidPrimTy
-                            ; return ([setOneShotLambda rw_id], [Var voidPrimId]) }
+              final_args    -- Note [Join point abstraction]
+                = varsToCoreExprs final_bndrs'
 
         ; join_bndr <- newId (fsLit "$j") (mkLamTypes final_bndrs' rhs_ty')
                 -- Note [Funky mkLamTypes]
@@ -2534,10 +2813,14 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
                 one_shot v | isId v    = setOneShotLambda v
                            | otherwise = v
                 join_rhs   = mkLams really_final_bndrs rhs'
-                join_arity = exprArity join_rhs
-                join_call  = mkApps (Var join_bndr) final_args
+                arity      = length (filter (not . isTyVar) final_bndrs')
+                join_arity = length final_bndrs'
+                final_join_bndr = (join_bndr `setIdArity` arity)
+                                    `asJoinId` join_arity
+                join_call  = mkApps (Var final_join_bndr) final_args
+                final_join_bind = NonRec final_join_bndr join_rhs
 
-        ; env' <- addPolyBind NotTopLevel env (NonRec (join_bndr `setIdArity` join_arity) join_rhs)
+        ; env' <- addPolyBind NotTopLevel env final_join_bind
         ; return (env', (con, bndrs', join_call)) }
                 -- See Note [Duplicated env]
 
@@ -2660,6 +2943,12 @@ type variables as well as term variables.
 
 Note [Join point abstraction]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+NB: This note is now historical. Now that "join point" is not a fuzzy concept
+but a formal syntactic construct (as distinguished by the JoinId constructor of
+IdDetails), each of these concerns is handled separately, with no need for a
+vestigial extra argument.
+
 Join points always have at least one value argument,
 for several reasons
 
@@ -2769,114 +3058,6 @@ Unlike StrictArg, there doesn't seem anything to gain from
 duplicating a StrictBind continuation, so we don't.
 
 
-Note [Single-alternative cases]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-This case is just like the ArgOf case.  Here's an example:
-        data T a = MkT !a
-        ...(MkT (abs x))...
-Then we get
-        case (case x of I# x' ->
-              case x' <# 0# of
-                True  -> I# (negate# x')
-                False -> I# x') of y {
-          DEFAULT -> MkT y
-Because the (case x) has only one alternative, we'll transform to
-        case x of I# x' ->
-        case (case x' <# 0# of
-                True  -> I# (negate# x')
-                False -> I# x') of y {
-          DEFAULT -> MkT y
-But now we do *NOT* want to make a join point etc, giving
-        case x of I# x' ->
-        let $j = \y -> MkT y
-        in case x' <# 0# of
-                True  -> $j (I# (negate# x'))
-                False -> $j (I# x')
-In this case the $j will inline again, but suppose there was a big
-strict computation enclosing the orginal call to MkT.  Then, it won't
-"see" the MkT any more, because it's big and won't get duplicated.
-And, what is worse, nothing was gained by the case-of-case transform.
-
-So, in circumstances like these, we don't want to build join points
-and push the outer case into the branches of the inner one. Instead,
-don't duplicate the continuation.
-
-When should we use this strategy?  We should not use it on *every*
-single-alternative case:
-  e.g.  case (case ....) of (a,b) -> (# a,b #)
-Here we must push the outer case into the inner one!
-Other choices:
-
-   * Match [(DEFAULT,_,_)], but in the common case of Int,
-     the alternative-filling-in code turned the outer case into
-                case (...) of y { I# _ -> MkT y }
-
-   * Match on single alternative plus (not (isDeadBinder case_bndr))
-     Rationale: pushing the case inwards won't eliminate the construction.
-     But there's a risk of
-                case (...) of y { (a,b) -> let z=(a,b) in ... }
-     Now y looks dead, but it'll come alive again.  Still, this
-     seems like the best option at the moment.
-
-   * Match on single alternative plus (all (isDeadBinder bndrs))
-     Rationale: this is essentially  seq.
-
-   * Match when the rhs is *not* duplicable, and hence would lead to a
-     join point.  This catches the disaster-case above.  We can test
-     the *un-simplified* rhs, which is fine.  It might get bigger or
-     smaller after simplification; if it gets smaller, this case might
-     fire next time round.  NB also that we must test contIsDupable
-     case_cont *too, because case_cont might be big!
-
-     HOWEVER: I found that this version doesn't work well, because
-     we can get         let x = case (...) of { small } in ...case x...
-     When x is inlined into its full context, we find that it was a bad
-     idea to have pushed the outer case inside the (...) case.
-
-There is a cost to not doing case-of-case; see Trac #10626.
-
-Note [Single-alternative-unlifted]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here's another single-alternative where we really want to do case-of-case:
-
-data Mk1 = Mk1 Int# | Mk2 Int#
-
-M1.f =
-    \r [x_s74 y_s6X]
-        case
-            case y_s6X of tpl_s7m {
-              M1.Mk1 ipv_s70 -> ipv_s70;
-              M1.Mk2 ipv_s72 -> ipv_s72;
-            }
-        of
-        wild_s7c
-        { __DEFAULT ->
-              case
-                  case x_s74 of tpl_s7n {
-                    M1.Mk1 ipv_s77 -> ipv_s77;
-                    M1.Mk2 ipv_s79 -> ipv_s79;
-                  }
-              of
-              wild1_s7b
-              { __DEFAULT -> ==# [wild1_s7b wild_s7c];
-              };
-        };
-
-So the outer case is doing *nothing at all*, other than serving as a
-join-point.  In this case we really want to do case-of-case and decide
-whether to use a real join point or just duplicate the continuation:
-
-    let $j s7c = case x of
-                   Mk1 ipv77 -> (==) s7c ipv77
-                   Mk1 ipv79 -> (==) s7c ipv79
-    in
-    case y of
-      Mk1 ipv70 -> $j ipv70
-      Mk2 ipv72 -> $j ipv72
-
-Hence: check whether the case binder's type is unlifted, because then
-the outer case is *not* a seq.
-
 ************************************************************************
 *                                                                      *
                     Unfoldings
@@ -2885,12 +3066,13 @@ the outer case is *not* a seq.
 -}
 
 simplLetUnfolding :: SimplEnv-> TopLevelFlag
+                  -> Maybe SimplCont
                   -> InId
                   -> OutExpr
                   -> Unfolding -> SimplM Unfolding
-simplLetUnfolding env top_lvl id new_rhs unf
+simplLetUnfolding env top_lvl cont_mb id new_rhs unf
   | isStableUnfolding unf
-  = simplUnfolding env top_lvl id unf
+  = simplUnfolding env top_lvl cont_mb id unf
   | otherwise
   = is_bottoming `seq`  -- See Note [Force bottoming field]
     do { dflags <- getDynFlags
@@ -2905,9 +3087,10 @@ simplLetUnfolding env top_lvl id new_rhs unf
     is_top_lvl   = isTopLevel top_lvl
     is_bottoming = isBottomingId id
 
-simplUnfolding :: SimplEnv-> TopLevelFlag -> InId -> Unfolding -> SimplM Unfolding
+simplUnfolding :: SimplEnv -> TopLevelFlag -> Maybe SimplCont -> InId
+               -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplUnfolding env top_lvl id unf
+simplUnfolding env top_lvl cont_mb id unf
   = case unf of
       NoUnfolding -> return unf
       BootUnfolding -> return unf
@@ -2920,7 +3103,10 @@ simplUnfolding env top_lvl id unf
 
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
-        -> do { expr' <- simplExpr rule_env expr
+        -> do { expr' <- if isJoinId id
+                            then let Just cont = cont_mb
+                                 in simplJoinRhs rule_env cont id expr
+                            else simplExpr rule_env expr
               ; case guide of
                   UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things
                      -> let guide' = UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok
@@ -3010,9 +3196,11 @@ simplRules env mb_new_nm rules
     simpl_rule rule@(Rule { ru_bndrs = bndrs, ru_args = args
                           , ru_fn = fn_name, ru_rhs = rhs })
       = do { (env', bndrs') <- simplBinders env bndrs
-           ; let rule_env = updMode updModeForRules env'
+           ; let rhs_ty = substTy env' (exprType rhs)
+                 rule_cont = mkBoringStop rhs_ty
+                 rule_env  = updMode updModeForRules env'
            ; args' <- mapM (simplExpr rule_env) args
-           ; rhs'  <- simplExpr rule_env rhs
+           ; rhs'  <- simplExprC rule_env rhs rule_cont
            ; return (rule { ru_bndrs = bndrs'
                           , ru_fn    = mb_new_nm `orElse` fn_name
                           , ru_args  = args'

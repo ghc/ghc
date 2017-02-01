@@ -107,6 +107,7 @@ sortQuantVars vs = sorted_tcvs ++ ids
 mkCoreLet :: CoreBind -> CoreExpr -> CoreExpr
 mkCoreLet (NonRec bndr rhs) body        -- See Note [CoreSyn let/app invariant]
   | needsCaseBinding (idType bndr) rhs
+  , not (isJoinId bndr)
   = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
 mkCoreLet bind body
   = Let bind body

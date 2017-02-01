@@ -268,7 +268,7 @@ dmdAnal' env dmd (Case scrut case_bndr ty alts)
 -- This is used for a non-recursive local let without manifest lambdas.
 -- This is the LetUp rule in the paper “Higher-Order Cardinality Analysis”.
 dmdAnal' env dmd (Let (NonRec id rhs) body)
-  | useLetUp rhs
+  | useLetUp id rhs
   , Nothing <- unpackTrivial rhs
       -- dmdAnalRhsLetDown treats trivial right hand sides specially
       -- so if we have a trival right hand side, fall through to that.
@@ -632,7 +632,7 @@ dmdAnalRhsLetDown top_lvl rec_flag env id rhs
     trim_sums = not (isTopLevel top_lvl) -- See Note [CPR for sum types]
 
     -- See Note [CPR for thunks]
-    is_thunk = not (exprIsHNF rhs)
+    is_thunk = not (exprIsHNF rhs) && not (isJoinId id)
     not_strict
        =  isTopLevel top_lvl  -- Top level and recursive things don't
        || isJust rec_flag     -- get their demandInfo set at all
@@ -654,11 +654,13 @@ unpackTrivial _                       = Nothing
 -- down (rhs before body).
 --
 -- We use LetDown if there is a chance to get a useful strictness signature.
--- This is the case when there are manifest value lambdas.
-useLetUp :: CoreExpr -> Bool
-useLetUp (Lam v e) | isTyVar v = useLetUp e
-useLetUp (Lam _ _)             = False
-useLetUp _                     = True
+-- This is the case when there are manifest value lambdas or the binding is a
+-- join point (hence always acts like a function, not a value).
+useLetUp :: Var -> CoreExpr -> Bool
+useLetUp f _         | isJoinId f = False
+useLetUp f (Lam v e) | isTyVar v  = useLetUp f e
+useLetUp _ (Lam _ _)              = False
+useLetUp _ _                      = True
 
 
 {-

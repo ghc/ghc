@@ -325,6 +325,7 @@ toIfaceLetBndr :: Id -> IfaceLetBndr
 toIfaceLetBndr id  = IfLetBndr (occNameFS (getOccName id))
                                (toIfaceType (idType id))
                                (toIfaceIdInfo (idInfo id))
+                               (toIfaceJoinInfo (isJoinId_maybe id))
   -- Put into the interface file any IdInfo that CoreTidy.tidyLetBndr
   -- has left on the Id.  See Note [IdInfo on nested let-bindings] in IfaceSyn
 
@@ -381,6 +382,10 @@ toIfaceIdInfo id_info
     ------------  Levity polymorphism  ----------
     levity_hsinfo | isNeverLevPolyIdInfo id_info = Just HsLevity
                   | otherwise                    = Nothing
+
+toIfaceJoinInfo :: Maybe JoinArity -> IfaceJoinInfo
+toIfaceJoinInfo (Just ar) = IfaceJoinPoint ar
+toIfaceJoinInfo Nothing   = IfaceNotJoinPoint
 
 --------------------------
 toIfUnfolding :: Bool -> Unfolding -> Maybe IfaceInfoItem

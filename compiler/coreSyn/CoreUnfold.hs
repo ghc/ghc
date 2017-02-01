@@ -523,15 +523,13 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
       | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
-      = size_up rhs             `addSizeNSD`
-        size_up body            `addSizeN`
-        (if isUnliftedType (idType binder) then 0 else 10)
-                -- For the allocation
-                -- If the binder has an unlifted type there is no allocation
+      = size_up_rhs (binder, rhs) `addSizeNSD`
+        size_up body              `addSizeN`
+        size_up_alloc binder
 
     size_up (Let (Rec pairs) body)
-      = foldr (addSizeNSD . size_up . snd)
-              (size_up body `addSizeN` (10 * length pairs))     -- (length pairs) for the allocation
+      = foldr (addSizeNSD . size_up_rhs)
+              (size_up body `addSizeN` sum (map (size_up_alloc . fst) pairs))
               pairs
 
     size_up (Case e _ _ alts)
@@ -606,6 +604,14 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
               | otherwise
                 = False
 
+    size_up_rhs (bndr, rhs)
+      | Just join_arity <- isJoinId_maybe bndr
+        -- Skip arguments to join point
+      , (_bndrs, body) <- collectNBinders join_arity rhs
+      = size_up body
+      | otherwise
+      = size_up rhs
+
     ------------
     -- size_up_app is used when there's ONE OR MORE value args
     size_up_app (App fun arg) args voids
@@ -640,6 +646,16 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
         -- IMPORATANT: *do* charge 1 for the alternative, else we
         -- find that giant case nests are treated as practically free
         -- A good example is Foreign.C.Error.errrnoToIOError
+
+    ------------
+    -- Cost to allocate binding with given binder
+    size_up_alloc bndr
+      |  isTyVar bndr                 -- Doesn't exist at runtime
+      || isUnliftedType (idType bndr) -- Doesn't live in heap
+      || isJoinId bndr                -- Not allocated at all
+      = 0
+      | otherwise
+      = 10
 
     ------------
         -- These addSize things have to be here because
@@ -706,6 +722,17 @@ callSize
  -> Int
 callSize n_val_args voids = 10 * (1 + n_val_args - voids)
 
+-- | The size of a jump to a join point
+jumpSize
+ :: Int  -- ^ number of value args
+ -> Int  -- ^ number of value args that are void
+ -> Int
+jumpSize n_val_args voids = 2 * (1 + n_val_args - voids)
+  -- A jump is 20% the size of a function call. Making jumps free reopens
+  -- bug #6048, but making them any more expensive loses a 21% improvement in
+  -- spectral/puzzle. TODO Perhaps adjusting the default threshold would be a
+  -- better solution?
+
 funSize :: DynFlags -> [Id] -> Id -> Int -> Int -> ExprSize
 -- Size for functions that are not constructors or primops
 -- Note [Function applications]
@@ -715,9 +742,11 @@ funSize dflags top_args fun n_val_args voids
   | otherwise = SizeIs size arg_discount res_discount
   where
     some_val_args = n_val_args > 0
+    is_join = isJoinId fun
 
-    size | some_val_args = callSize n_val_args voids
-         | otherwise     = 0
+    size | is_join              = jumpSize n_val_args voids
+         | not some_val_args    = 0
+         | otherwise            = callSize n_val_args voids
         -- The 1+ is for the function itself
         -- Add 1 for each non-trivial arg;
         -- the allocation cost, as in let(rec)

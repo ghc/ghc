@@ -19,7 +19,8 @@ import CoreMonad        ( FloatOutSwitches(..) )
 
 import DynFlags
 import ErrUtils         ( dumpIfSet_dyn )
-import Id               ( Id, idArity, isBottomingId )
+import Id               ( Id, idArity, idType, isBottomingId,
+                          isJoinId, isJoinId_maybe )
 import Var              ( Var )
 import SetLevels
 import UniqSupply       ( UniqSupply )
@@ -27,7 +28,10 @@ import Bag
 import Util
 import Maybes
 import Outputable
+import Type
 import qualified Data.IntMap as M
+
+import Data.List        ( partition )
 
 #include "HsVersions.h"
 
@@ -104,6 +108,52 @@ vwhich might usefully be separated to
 @
 Well, maybe.  We don't do this at the moment.
 
+Note [Join points]
+~~~~~~~~~~~~~~~~~~
+Every occurrence of a join point must be a tail call (see Note [Invariants on
+join points] in CoreSyn), so we must be careful with how far we float them. The
+mechanism for doing so is the *join ceiling*, detailed in Note [Join ceiling]
+in SetLevels. For us, the significance is that a binder might be marked to be
+dropped at the nearest boundary between tail calls and non-tail calls. For
+example:
+
+  (< join j = ... in
+     let x = < ... > in
+     case < ... > of
+       A -> ...
+       B -> ...
+   >) < ... > < ... >
+
+Here the join ceilings are marked with angle brackets. Either side of an
+application is a join ceiling, as is the scrutinee position of a case
+expression or the RHS of a let binding (but not a join point).
+
+Why do we *want* do float join points at all? After all, they're never
+allocated, so there's no sharing to be gained by floating them. However, the
+other benefit of floating is making RHSes small, and this can have a significant
+impact. In particular, stream fusion has been known to produce nested loops like
+this:
+
+  joinrec j1 x1 =
+    joinrec j2 x2 =
+      joinrec j3 x3 = ... jump j1 (x3 + 1) ... jump j2 (x3 + 1) ...
+      in jump j3 x2
+    in jump j2 x1
+  in jump j1 x
+
+(Assume x1 and x2 do *not* occur free in j3.)
+
+Here j1 and j2 are wholly superfluous---each of them merely forwards its
+argument to j3. Since j3 only refers to x3, we can float j2 and j3 to make
+everything one big mutual recursion:
+
+  joinrec j1 x1 = jump j2 x1
+          j2 x2 = jump j3 x2
+          j3 x3 = ... jump j1 (x3 + 1) ... jump j2 (x3 + 1) ...
+  in jump j1 x
+
+Now the simplifier will happily inline the trivial j1 and j2, leaving only j3.
+Without floating, we're stuck with three loops instead of one.
 
 ************************************************************************
 *                                                                      *
@@ -141,8 +191,11 @@ floatTopBind bind
   = case (floatBind bind) of { (fs, floats, bind') ->
     let float_bag = flattenTopFloats floats
     in case bind' of
-      Rec prs   -> (fs, unitBag (Rec (addTopFloatPairs float_bag prs)))
-      NonRec {} -> (fs, float_bag `snocBag` bind') }
+      -- bind' can't have unlifted values or join points, so can only be one
+      -- value bind, rec or non-rec (see comment on floatBind)
+      [Rec prs]    -> (fs, unitBag (Rec (addTopFloatPairs float_bag prs)))
+      [NonRec b e] -> (fs, float_bag `snocBag` NonRec b e)
+      _            -> pprPanic "floatTopBind" (ppr bind') }
 
 {-
 ************************************************************************
@@ -152,42 +205,76 @@ floatTopBind bind
 ************************************************************************
 -}
 
-floatBind :: LevelledBind -> (FloatStats, FloatBinds, CoreBind)
+floatBind :: LevelledBind -> (FloatStats, FloatBinds, [CoreBind])
+  -- Returns a list with either
+  --   * A single non-recursive binding (value or join point), or
+  --   * The following, in order:
+  --     * Zero or more non-rec unlifted bindings
+  --     * One or both of:
+  --       * A recursive group of join binds
+  --       * A recursive group of value binds
+  -- See Note [Floating out of Rec rhss] for why things get arranged this way.
 floatBind (NonRec (TB var _) rhs)
-  = case (floatExpr rhs) of { (fs, rhs_floats, rhs') ->
+  = case (floatRhs var rhs) of { (fs, rhs_floats, rhs') ->
 
         -- A tiresome hack:
         -- see Note [Bottoming floats: eta expansion] in SetLevels
     let rhs'' | isBottomingId var = etaExpand (idArity var) rhs'
               | otherwise         = rhs'
 
-    in (fs, rhs_floats, NonRec var rhs'') }
+    in (fs, rhs_floats, [NonRec var rhs'']) }
 
 floatBind (Rec pairs)
   = case floatList do_pair pairs of { (fs, rhs_floats, new_pairs) ->
-    (fs, rhs_floats, Rec (concat new_pairs)) }
+    let (new_ul_pairss, new_other_pairss) = unzip new_pairs
+        (new_join_pairs, new_l_pairs)     = partition (isJoinId . fst)
+                                                      (concat new_other_pairss)
+        -- Can't put the join points and the values in the same rec group
+        new_rec_binds | null new_join_pairs = [ Rec new_l_pairs    ]
+                      | null new_l_pairs    = [ Rec new_join_pairs ]
+                      | otherwise           = [ Rec new_l_pairs
+                                              , Rec new_join_pairs ]
+        new_non_rec_binds = [ NonRec b e | (b, e) <- concat new_ul_pairss ]
+    in
+    (fs, rhs_floats, new_non_rec_binds ++ new_rec_binds) }
   where
+    do_pair :: (LevelledBndr, LevelledExpr)
+            -> (FloatStats, FloatBinds,
+                ([(Id,CoreExpr)],  -- Non-recursive unlifted value bindings
+                 [(Id,CoreExpr)])) -- Join points and lifted value bindings
     do_pair (TB name spec, rhs)
       | isTopLvl dest_lvl  -- See Note [floatBind for top level]
-      = case (floatExpr rhs) of { (fs, rhs_floats, rhs') ->
-        (fs, emptyFloats, addTopFloatPairs (flattenTopFloats rhs_floats) [(name, rhs')])}
+      = case (floatRhs name rhs) of { (fs, rhs_floats, rhs') ->
+        (fs, emptyFloats, ([], addTopFloatPairs (flattenTopFloats rhs_floats)
+                                                [(name, rhs')]))}
       | otherwise         -- Note [Floating out of Rec rhss]
-      = case (floatExpr rhs) of { (fs, rhs_floats, rhs') ->
+      = case (floatRhs name rhs) of { (fs, rhs_floats, rhs') ->
         case (partitionByLevel dest_lvl rhs_floats) of { (rhs_floats', heres) ->
-        case (splitRecFloats heres) of { (pairs, case_heres) ->
-        (fs, rhs_floats', (name, installUnderLambdas case_heres rhs') : pairs) }}}
+        case (splitRecFloats heres) of { (ul_pairs, pairs, case_heres) ->
+        let pairs' = (name, installUnderLambdas case_heres rhs') : pairs in
+        (fs, rhs_floats', (ul_pairs, pairs')) }}}
       where
         dest_lvl = floatSpecLevel spec
 
-splitRecFloats :: Bag FloatBind -> ([(Id,CoreExpr)], Bag FloatBind)
+splitRecFloats :: Bag FloatBind
+               -> ([(Id,CoreExpr)], -- Non-recursive unlifted value bindings
+                   [(Id,CoreExpr)], -- Join points and lifted value bindings
+                   Bag FloatBind)   -- A tail of further bindings
 -- The "tail" begins with a case
 -- See Note [Floating out of Rec rhss]
 splitRecFloats fs
-  = go [] (bagToList fs)
+  = go [] [] (bagToList fs)
   where
-    go prs (FloatLet (NonRec b r) : fs) = go ((b,r):prs) fs
-    go prs (FloatLet (Rec prs')   : fs) = go (prs' ++ prs) fs
-    go prs fs                           = (prs, listToBag fs)
+    go ul_prs prs (FloatLet (NonRec b r) : fs) | isUnliftedType (idType b)
+                                               , not (isJoinId b)
+                                               = go ((b,r):ul_prs) prs fs
+                                               | otherwise
+                                               = go ul_prs ((b,r):prs) fs
+    go ul_prs prs (FloatLet (Rec prs')   : fs) = go ul_prs (prs' ++ prs) fs
+    go ul_prs prs fs                           = (reverse ul_prs, prs,
+                                                  listToBag fs)
+                                                   -- Order only matters for
+                                                   -- non-rec
 
 installUnderLambdas :: Bag FloatBind -> CoreExpr -> CoreExpr
 -- Note [Floating out of Rec rhss]
@@ -226,6 +313,31 @@ So, gruesomely, we split the floats into
    pushed *inside* the lambdas.
 This loses full-laziness the rare situation where there is a
 FloatCase and a Rec interacting.
+
+If there are unlifted FloatLets (that *aren't* join points) among the floats,
+we can't add them to the recursive group without angering Core Lint, but since
+they must be ok-for-speculation, they can't actually be making any recursive
+calls, so we can safely pull them out and keep them non-recursive.
+
+(Why is something getting floated to <1,0> that doesn't make a recursive call?
+The case that came up in testing was that f *and* the unlifted binding were
+getting floated *to the same place*:
+
+  \x<2,0> ->
+    ... <3,0>
+    letrec { f<F<2,0>> =
+      ... let x'<F<2,0>> = x +# 1# in ...
+    } in ...
+
+Everything gets labeled "float to <2,0>" because it all depends on x, but this
+makes f and x' look mutually recursive when they're not.
+
+The test was shootout/k-nucleotide, as compiled using commit 47d5dd68 on the
+wip/join-points branch.
+
+TODO: This can probably be solved somehow in SetLevels. The difference between
+"this *is at* level <2,0>" and "this *depends on* level <2,0>" is very
+important.)
 
 Note [floatBind for top level]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -285,27 +397,28 @@ floatExpr (Coercion co) = (zeroStats, emptyFloats, Coercion co)
 floatExpr (Lit lit) = (zeroStats, emptyFloats, Lit lit)
 
 floatExpr (App e a)
-  = case (floatExpr  e) of { (fse, floats_e, e') ->
-    case (floatExpr  a) of { (fsa, floats_a, a') ->
+  = case (atJoinCeiling $ floatExpr  e) of { (fse, floats_e, e') ->
+    case (atJoinCeiling $ floatExpr  a) of { (fsa, floats_a, a') ->
     (fse `add_stats` fsa, floats_e `plusFloats` floats_a, App e' a') }}
 
 floatExpr lam@(Lam (TB _ lam_spec) _)
   = let (bndrs_w_lvls, body) = collectBinders lam
         bndrs                = [b | TB b _ <- bndrs_w_lvls]
-        bndr_lvl             = floatSpecLevel lam_spec
+        bndr_lvl             = asJoinCeilLvl (floatSpecLevel lam_spec)
         -- All the binders have the same level
         -- See SetLevels.lvlLamBndrs
+        -- Use asJoinCeilLvl to make this the join ceiling
     in
     case (floatBody bndr_lvl body) of { (fs, floats, body') ->
     (add_to_stats fs floats, floats, mkLams bndrs body') }
 
 floatExpr (Tick tickish expr)
   | tickish `tickishScopesLike` SoftScope -- not scoped, can just float
-  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
+  = case (atJoinCeiling $ floatExpr expr)    of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Tick tickish expr') }
 
   | not (tickishCounts tickish) || tickishCanSplit tickish
-  = case (floatExpr expr)    of { (fs, floating_defns, expr') ->
+  = case (atJoinCeiling $ floatExpr expr)    of { (fs, floating_defns, expr') ->
     let -- Annotate bindings floated outwards past an scc expression
         -- with the cc.  We mark that cc as "duplicated", though.
         annotated_defns = wrapTick (mkNoCount tickish) floating_defns
@@ -321,25 +434,27 @@ floatExpr (Tick tickish expr)
   = pprPanic "floatExpr tick" (ppr tickish)
 
 floatExpr (Cast expr co)
-  = case (floatExpr expr) of { (fs, floating_defns, expr') ->
+  = case (atJoinCeiling $ floatExpr expr) of { (fs, floating_defns, expr') ->
     (fs, floating_defns, Cast expr' co) }
 
 floatExpr (Let bind body)
   = case bind_spec of
       FloatMe dest_lvl
-        -> case (floatBind bind) of { (fsb, bind_floats, bind') ->
+        -> case (floatBind bind) of { (fsb, bind_floats, binds') ->
            case (floatExpr body) of { (fse, body_floats, body') ->
+           let new_bind_floats = foldr plusFloats emptyFloats
+                                   (map (unitLetFloat dest_lvl) binds') in
            ( add_stats fsb fse
-           , bind_floats `plusFloats` unitLetFloat dest_lvl bind'
+           , bind_floats `plusFloats` new_bind_floats
                          `plusFloats` body_floats
            , body') }}
 
       StayPut bind_lvl  -- See Note [Avoiding unnecessary floating]
-        -> case (floatBind bind)          of { (fsb, bind_floats, bind') ->
+        -> case (floatBind bind)          of { (fsb, bind_floats, binds') ->
            case (floatBody bind_lvl body) of { (fse, body_floats, body') ->
            ( add_stats fsb fse
            , bind_floats `plusFloats` body_floats
-           , Let bind' body') }}
+           , foldr Let body' binds' ) }}
   where
     bind_spec = case bind of
                  NonRec (TB _ s) _     -> s
@@ -350,8 +465,8 @@ floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
   = case case_spec of
       FloatMe dest_lvl  -- Case expression moves
         | [(con@(DataAlt {}), bndrs, rhs)] <- alts
-        -> case floatExpr scrut of { (fse, fde, scrut') ->
-           case floatExpr rhs   of { (fsb, fdb, rhs') ->
+        -> case atJoinCeiling $ floatExpr scrut of { (fse, fde, scrut') ->
+           case                 floatExpr rhs   of { (fsb, fdb, rhs') ->
            let
              float = unitCaseFloat dest_lvl scrut'
                           case_bndr con [b | TB b _ <- bndrs]
@@ -361,7 +476,7 @@ floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
         -> pprPanic "Floating multi-case" (ppr alts)
 
       StayPut bind_lvl  -- Case expression stays put
-        -> case floatExpr scrut of { (fse, fde, scrut') ->
+        -> case atJoinCeiling $ floatExpr scrut of { (fse, fde, scrut') ->
            case floatList (float_alt bind_lvl) alts of { (fsa, fda, alts')  ->
            (add_stats fse fsa, fda `plusFloats` fde, Case scrut' case_bndr ty alts')
            }}
@@ -369,6 +484,25 @@ floatExpr (Case scrut (TB case_bndr case_spec) ty alts)
     float_alt bind_lvl (con, bs, rhs)
         = case (floatBody bind_lvl rhs) of { (fs, rhs_floats, rhs') ->
           (fs, rhs_floats, (con, [b | TB b _ <- bs], rhs')) }
+
+floatRhs :: CoreBndr
+         -> LevelledExpr
+         -> (FloatStats, FloatBinds, CoreExpr)
+floatRhs bndr rhs
+  | Just join_arity <- isJoinId_maybe bndr
+  , Just (bndrs, body) <- try_collect join_arity rhs []
+  = case bndrs of
+      []                -> floatExpr rhs
+      (TB _ lam_spec):_ ->
+        let lvl = floatSpecLevel lam_spec in
+        case floatBody lvl body of { (fs, floats, body') ->
+        (fs, floats, mkLams [b | TB b _ <- bndrs] body') }
+  | otherwise
+  = atJoinCeiling $ floatExpr rhs
+  where
+    try_collect 0 expr      acc = Just (reverse acc, expr)
+    try_collect n (Lam b e) acc = try_collect (n-1) e (b:acc)
+    try_collect _ _         _   = Nothing
 
 {-
 Note [Avoiding unnecessary floating]
@@ -439,8 +573,10 @@ add_stats (FlS a1 b1 c1) (FlS a2 b2 c2)
   = FlS (a1 + a2) (b1 + b2) (c1 + c2)
 
 add_to_stats :: FloatStats -> FloatBinds -> FloatStats
-add_to_stats (FlS a b c) (FB tops others)
-  = FlS (a + lengthBag tops) (b + lengthBag (flattenMajor others)) (c + 1)
+add_to_stats (FlS a b c) (FB tops ceils others)
+  = FlS (a + lengthBag tops)
+        (b + lengthBag ceils + lengthBag (flattenMajor others))
+        (c + 1)
 
 {-
 ************************************************************************
@@ -474,18 +610,21 @@ type MajorEnv = M.IntMap MinorEnv         -- Keyed by major level
 type MinorEnv = M.IntMap (Bag FloatBind)  -- Keyed by minor level
 
 data FloatBinds  = FB !(Bag FloatLet)           -- Destined for top level
-                      !MajorEnv                 -- Levels other than top
+                      !(Bag FloatBind)          -- Destined for join ceiling
+                      !MajorEnv                 -- Other levels
      -- See Note [Representation of FloatBinds]
 
 instance Outputable FloatBinds where
-  ppr (FB fbs defs)
+  ppr (FB fbs ceils defs)
       = text "FB" <+> (braces $ vcat
            [ text "tops ="     <+> ppr fbs
+           , text "ceils ="    <+> ppr ceils
            , text "non-tops =" <+> ppr defs ])
 
 flattenTopFloats :: FloatBinds -> Bag CoreBind
-flattenTopFloats (FB tops defs)
+flattenTopFloats (FB tops ceils defs)
   = ASSERT2( isEmptyBag (flattenMajor defs), ppr defs )
+    ASSERT2( isEmptyBag ceils, ppr ceils )
     tops
 
 addTopFloatPairs :: Bag CoreBind -> [(Id,CoreExpr)] -> [(Id,CoreExpr)]
@@ -502,22 +641,29 @@ flattenMinor :: MinorEnv -> Bag FloatBind
 flattenMinor = M.foldr unionBags emptyBag
 
 emptyFloats :: FloatBinds
-emptyFloats = FB emptyBag M.empty
+emptyFloats = FB emptyBag emptyBag M.empty
 
 unitCaseFloat :: Level -> CoreExpr -> Id -> AltCon -> [Var] -> FloatBinds
-unitCaseFloat (Level major minor) e b con bs
-  = FB emptyBag (M.singleton major (M.singleton minor (unitBag (FloatCase e b con bs))))
+unitCaseFloat (Level major minor t) e b con bs
+  | t == JoinCeilLvl
+  = FB emptyBag floats M.empty
+  | otherwise
+  = FB emptyBag emptyBag (M.singleton major (M.singleton minor floats))
+  where
+    floats = unitBag (FloatCase e b con bs)
 
 unitLetFloat :: Level -> FloatLet -> FloatBinds
-unitLetFloat lvl@(Level major minor) b
-  | isTopLvl lvl = FB (unitBag b) M.empty
-  | otherwise    = FB emptyBag (M.singleton major (M.singleton minor floats))
+unitLetFloat lvl@(Level major minor t) b
+  | isTopLvl lvl     = FB (unitBag b) emptyBag M.empty
+  | t == JoinCeilLvl = FB emptyBag floats M.empty
+  | otherwise        = FB emptyBag emptyBag (M.singleton major
+                                              (M.singleton minor floats))
   where
     floats = unitBag (FloatLet b)
 
 plusFloats :: FloatBinds -> FloatBinds -> FloatBinds
-plusFloats (FB t1 l1) (FB t2 l2)
-  = FB (t1 `unionBags` t2) (l1 `plusMajor` l2)
+plusFloats (FB t1 c1 l1) (FB t2 c2 l2)
+  = FB (t1 `unionBags` t2) (c1 `unionBags` c2) (l1 `plusMajor` l2)
 
 plusMajor :: MajorEnv -> MajorEnv -> MajorEnv
 plusMajor = M.unionWith plusMinor
@@ -557,9 +703,10 @@ partitionByMajorLevel (Level major _) (FB tops defns)
                Just h  -> flattenMinor h
 -}
 
-partitionByLevel (Level major minor) (FB tops defns)
-  = (FB tops (outer_maj `plusMajor` M.singleton major outer_min),
-     here_min `unionBags` flattenMinor inner_min
+partitionByLevel (Level major minor typ) (FB tops ceils defns)
+  = (FB tops ceils' (outer_maj `plusMajor` M.singleton major outer_min),
+     here_min `unionBags` here_ceil
+              `unionBags` flattenMinor inner_min
               `unionBags` flattenMajor inner_maj)
 
   where
@@ -568,10 +715,28 @@ partitionByLevel (Level major minor) (FB tops defns)
                                             Nothing -> (M.empty, Nothing, M.empty)
                                             Just min_defns -> M.splitLookup minor min_defns
     here_min = mb_here_min `orElse` emptyBag
+    (here_ceil, ceils') | typ == JoinCeilLvl = (ceils, emptyBag)
+                        | otherwise          = (emptyBag, ceils)
+
+-- Like partitionByLevel, but instead split out the bindings that are marked
+-- to float to the nearest join ceiling (see Note [Join points])
+partitionAtJoinCeiling :: FloatBinds -> (FloatBinds, Bag FloatBind)
+partitionAtJoinCeiling (FB tops ceils defs)
+  = (FB tops emptyBag defs, ceils)
+
+-- Perform some action at a join ceiling, i.e., don't let join points float out
+-- (see Note [Join points])
+atJoinCeiling :: (FloatStats, FloatBinds, CoreExpr)
+              -> (FloatStats, FloatBinds, CoreExpr)
+atJoinCeiling (fs, floats, expr')
+  = (fs, floats', install ceils expr')
+  where
+    (floats', ceils) = partitionAtJoinCeiling floats
 
 wrapTick :: Tickish Id -> FloatBinds -> FloatBinds
-wrapTick t (FB tops defns)
-  = FB (mapBag wrap_bind tops) (M.map (M.map wrap_defns) defns)
+wrapTick t (FB tops ceils defns)
+  = FB (mapBag wrap_bind tops) (wrap_defns ceils)
+       (M.map (M.map wrap_defns) defns)
   where
     wrap_defns = mapBag wrap_one
 

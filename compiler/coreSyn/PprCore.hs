@@ -29,6 +29,7 @@ import Type
 import Coercion
 import DynFlags
 import BasicTypes
+import Maybes
 import Util
 import Outputable
 import FastString
@@ -113,7 +114,14 @@ ppr_bind ann (Rec binds)           = vcat (map pp binds)
 ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
   = ann expr $$ pprBndr LetBind val_bdr $$
-    hang (ppr val_bdr <+> equals) 2 (pprCoreExpr expr)
+    hang (ppr val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs) <+> equals) 2
+         (pprCoreExpr rhs)
+  where
+    (bndrs, body)          = collectBinders expr
+    (lhs_bndrs, rhs_bndrs) = splitAt (pprLamsOnLhs val_bdr) bndrs
+    rhs                    = mkLams rhs_bndrs body
+                      -- Returns ([], expr) unless it's a join point, in which
+                      -- case we want the args before the =
 
 pprParendExpr expr = ppr_expr parens expr
 pprCoreExpr   expr = ppr_expr noParens expr
@@ -131,7 +139,8 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
-ppr_expr _       (Var name)    = ppr name
+ppr_expr _       (Var name)    = ppWhen (isJoinId name) (text "jump") <+>
+                                   ppr name
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
@@ -172,7 +181,10 @@ ppr_expr add_par expr@(App {})
                              tc        = dataConTyCon dc
                              saturated = val_args `lengthIs` idArity f
 
-                   _ -> parens (hang (ppr f) 2 pp_args)
+                   _ -> parens (hang fun_doc 2 pp_args)
+                   where
+                     fun_doc | isJoinId f = text "jump" <+> ppr f
+                             | otherwise  = ppr f
 
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
@@ -239,12 +251,14 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 -- General case (recursive case, too)
 ppr_expr add_par (Let bind expr)
   = add_par $
-    sep [hang (ptext keyword) 2 (ppr_bind noAnn bind <+> text "} in"),
+    sep [hang (keyword <+> char '{') 2 (ppr_bind noAnn bind <+> text "} in"),
          pprCoreExpr expr]
   where
     keyword = case bind of
-                Rec _      -> (sLit "letrec {")
-                NonRec _ _ -> (sLit "let {")
+                NonRec b _    -> pprNonRecBndrKeyword b
+                Rec ((b,_):_) -> pprRecBndrKeyword    b
+                Rec []        -> text "let" -- This *shouldn't* happen, but
+                                            -- let's be tolerant here
 
 ppr_expr add_par (Tick tickish expr)
   = sdocWithDynFlags $ \dflags ->
@@ -315,6 +329,11 @@ instance OutputableBndr Var where
   pprBndr = pprCoreBinder
   pprInfixOcc  = pprInfixName  . varName
   pprPrefixOcc = pprPrefixName . varName
+  pprNonRecBndrKeyword bndr | isJoinId bndr = text "join"
+                            | otherwise     = text "let"
+  pprRecBndrKeyword    bndr | isJoinId bndr = text "joinrec"
+                            | otherwise     = text "letrec"
+  pprLamsOnLhs bndr = isJoinId_maybe bndr `orElse` 0
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder
@@ -398,7 +417,7 @@ pprIdBndrInfo info
     lbv_info  = oneShotInfo info
 
     has_prag  = not (isDefaultInlinePragma prag_info)
-    has_occ   = not (isNoOcc occ_info)
+    has_occ   = not (isManyOccs occ_info)
     has_dmd   = not $ isTopDmd dmd_info
     has_lbv   = not (hasNoOneShotInfo lbv_info)
 

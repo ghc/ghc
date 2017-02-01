@@ -944,6 +944,19 @@ class Outputable a => OutputableBndr a where
       -- prefix position of an application, thus   (f a b) or  ((+) x)
       -- or infix position,                 thus   (a `f` b) or  (x + y)
 
+   pprNonRecBndrKeyword, pprRecBndrKeyword :: a -> SDoc
+      -- Print which keyword introduces the binder in Core code. This should be
+      -- "let" or "letrec" for a value but "join" or "joinrec" for a join point.
+   pprNonRecBndrKeyword _ = text "let"
+   pprRecBndrKeyword    _ = text "letrec"
+
+   pprLamsOnLhs :: a -> Int
+      -- For a join point of join arity n, we want to print j = \x1 ... xn -> e
+      -- as "j x1 ... xn = e" to differentiate when a join point returns a
+      -- lambda (the first rendering looks like a nullary join point returning
+      -- an n-argument function).
+   pprLamsOnLhs _ = 0
+
 {-
 ************************************************************************
 *                                                                      *

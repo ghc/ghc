@@ -893,6 +893,15 @@ for the primitive case:
 \end{verbatim}
 
 Now @fail.33@ is a function, so it can be let-bound.
+
+We would *like* to use join points here; in fact, these "fail variables" are
+paradigmatic join points! Sadly, this breaks pattern synonyms, which desugar as
+CPS functions - i.e. they take "join points" as parameters. It's not impossible
+to imagine extending our type system to allow passing join points around (very
+carefully), but we certainly don't support it now.
+
+99.99% of the time, the fail variables wind up as join points in short order
+anyway, and the Void# doesn't do much harm.
 -}
 
 mkFailurePair :: CoreExpr       -- Result type of the whole case expression
@@ -912,6 +921,11 @@ mkFailurePair expr
 {-
 Note [Failure thunks and CPR]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(This note predates join points as formal entities (hence the quotation marks).
+We can't use actual join points here (see above); if we did, this would also
+solve the CPR problem, since join points don't get CPR'd. See Note [Don't CPR
+join points] in WorkWrap.)
+
 When we make a failure point we ensure that it
 does not look like a thunk. Example:
 

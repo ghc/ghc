@@ -606,8 +606,8 @@ rnIfaceConAlt (IfaceDataAlt data_occ) = IfaceDataAlt <$> rnIfaceGlobal data_occ
 rnIfaceConAlt alt = pure alt
 
 rnIfaceLetBndr :: Rename IfaceLetBndr
-rnIfaceLetBndr (IfLetBndr fs ty info)
-    = IfLetBndr fs <$> rnIfaceType ty <*> rnIfaceIdInfo info
+rnIfaceLetBndr (IfLetBndr fs ty info jpi)
+    = IfLetBndr fs <$> rnIfaceType ty <*> rnIfaceIdInfo info <*> pure jpi
 
 rnIfaceLamBndr :: Rename IfaceLamBndr
 rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot

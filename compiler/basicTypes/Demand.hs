@@ -304,7 +304,9 @@ splitArgStrProdDmd n (Str _ s) = splitStrProdDmd n s
 splitStrProdDmd :: Int -> StrDmd -> Maybe [ArgStr]
 splitStrProdDmd n HyperStr   = Just (replicate n strBot)
 splitStrProdDmd n HeadStr    = Just (replicate n strTop)
-splitStrProdDmd n (SProd ds) = ASSERT( ds `lengthIs` n) Just ds
+splitStrProdDmd n (SProd ds) = WARN( not (ds `lengthIs` n),
+                                     text "splitStrProdDmd" $$ ppr n $$ ppr ds )
+                               Just ds
 splitStrProdDmd _ (SCall {}) = Nothing
       -- This can happen when the programmer uses unsafeCoerce,
       -- and we don't then want to crash the compiler (Trac #9208)
@@ -586,7 +588,9 @@ seqArgUse _          = ()
 splitUseProdDmd :: Int -> UseDmd -> Maybe [ArgUse]
 splitUseProdDmd n Used        = Just (replicate n useTop)
 splitUseProdDmd n UHead       = Just (replicate n Abs)
-splitUseProdDmd n (UProd ds)  = ASSERT2( ds `lengthIs` n, text "splitUseProdDmd" $$ ppr n $$ ppr ds )
+splitUseProdDmd n (UProd ds)  = WARN( not (ds `lengthIs` n),
+                                      text "splitUseProdDmd" $$ ppr n
+                                                             $$ ppr ds )
                                 Just ds
 splitUseProdDmd _ (UCall _ _) = Nothing
       -- This can happen when the programmer uses unsafeCoerce,

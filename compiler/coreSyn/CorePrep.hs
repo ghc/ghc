@@ -204,9 +204,13 @@ corePrepTopBinds initialCorePrepEnv binds
   = go initialCorePrepEnv binds
   where
     go _   []             = return emptyFloats
-    go env (bind : binds) = do (env', bind') <- cpeBind TopLevel env bind
-                               binds' <- go env' binds
-                               return (bind' `appendFloats` binds')
+    go env (bind : binds) = do (env', floats, maybe_new_bind)
+                                 <- cpeBind TopLevel env bind
+                               MASSERT(isNothing maybe_new_bind)
+                                 -- Only join points get returned this way by
+                                 -- cpeBind, and no join point may float to top
+                               floatss <- go env' binds
+                               return (floats `appendFloats` floatss)
 
 mkDataConWorkers :: DynFlags -> ModLocation -> [TyCon] -> [CoreBind]
 -- See Note [Data constructor workers]
@@ -280,6 +284,29 @@ This is all very gruesome and horrible. It would be better to figure
 out CafInfo later, after CorePrep.  We'll do that in due course.
 Meanwhile this horrible hack works.
 
+Note [Join points and floating]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Join points can float out of other join points but not out of value bindings:
+
+  let z =
+    let  w = ... in -- can float
+    join k = ... in -- can't float
+    ... jump k ...
+  join j x1 ... xn =
+    let  y = ... in -- can float (but don't want to)
+    join h = ... in -- can float (but not much point)
+    ... jump h ...
+  in ...
+
+Here, the jump to h remains valid if h is floated outward, but the jump to k
+does not.
+
+We don't float *out* of join points. It would only be safe to float out of
+nullary join points (or ones where the arguments are all either type arguments
+or dead binders). Nullary join points aren't ever recursive, so they're always
+effectively one-shot functions, which we don't float out of. We *could* float
+join points from nullary join points, but there's no clear benefit at this
+stage.
 
 Note [Data constructor workers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -369,8 +396,12 @@ Into this one:
 -}
 
 cpeBind :: TopLevelFlag -> CorePrepEnv -> CoreBind
-        -> UniqSM (CorePrepEnv, Floats)
+        -> UniqSM (CorePrepEnv,
+                   Floats,         -- Floating value bindings
+                   Maybe CoreBind) -- Just bind' <=> returned new bind; no float
+                                   -- Nothing <=> added bind' to floats instead
 cpeBind top_lvl env (NonRec bndr rhs)
+  | not (isJoinId bndr)
   = do { (_, bndr1) <- cpCloneBndr env bndr
        ; let dmd         = idDemandInfo bndr
              is_unlifted = isUnliftedType (idType bndr)
@@ -380,7 +411,7 @@ cpeBind top_lvl env (NonRec bndr rhs)
                                           env bndr1 rhs
        -- See Note [Inlining in CorePrep]
        ; if exprIsTrivial rhs2 && isNotTopLevel top_lvl
-            then return (extendCorePrepEnvExpr env bndr rhs2, floats)
+            then return (extendCorePrepEnvExpr env bndr rhs2, floats, Nothing)
             else do {
 
        ; let new_float = mkFloat dmd is_unlifted bndr2 rhs2
@@ -388,19 +419,38 @@ cpeBind top_lvl env (NonRec bndr rhs)
         -- We want bndr'' in the envt, because it records
         -- the evaluated-ness of the binder
        ; return (extendCorePrepEnv env bndr bndr2,
-                 addFloat floats new_float) }}
+                 addFloat floats new_float,
+                 Nothing) }}
+  | otherwise -- See Note [Join points and floating]
+  = ASSERT(not (isTopLevel top_lvl)) -- can't have top-level join point
+    do { (_, bndr1) <- cpCloneBndr env bndr
+       ; (bndr2, rhs1) <- cpeJoinPair env bndr1 rhs
+       ; return (extendCorePrepEnv env bndr bndr2,
+                 emptyFloats,
+                 Just (NonRec bndr2 rhs1)) }
 
 cpeBind top_lvl env (Rec pairs)
-  = do { let (bndrs,rhss) = unzip pairs
-       ; (env', bndrs1) <- cpCloneBndrs env (map fst pairs)
+  | not (isJoinId (head bndrs))
+  = do { (env', bndrs1) <- cpCloneBndrs env bndrs
        ; stuff <- zipWithM (cpePair top_lvl Recursive topDmd False env') bndrs1 rhss
 
        ; let (floats_s, bndrs2, rhss2) = unzip3 stuff
              all_pairs = foldrOL add_float (bndrs2 `zip` rhss2)
                                            (concatFloats floats_s)
        ; return (extendCorePrepEnvList env (bndrs `zip` bndrs2),
-                 unitFloat (FloatLet (Rec all_pairs))) }
+                 unitFloat (FloatLet (Rec all_pairs)),
+                 Nothing) }
+  | otherwise -- See Note [Join points and floating]
+  = do { (env', bndrs1) <- cpCloneBndrs env bndrs
+       ; pairs1 <- zipWithM (cpeJoinPair env') bndrs1 rhss
+
+       ; let bndrs2 = map fst pairs1
+       ; return (extendCorePrepEnvList env' (bndrs `zip` bndrs2),
+                 emptyFloats,
+                 Just (Rec pairs1)) }
   where
+    (bndrs, rhss) = unzip pairs
+
         -- Flatten all the floats, and the currrent
         -- group into a single giant Rec
     add_float (FloatLet (NonRec b r)) prs2 = (b,r) : prs2
@@ -413,7 +463,8 @@ cpePair :: TopLevelFlag -> RecFlag -> Demand -> Bool
         -> UniqSM (Floats, Id, CpeRhs)
 -- Used for all bindings
 cpePair top_lvl is_rec dmd is_unlifted env bndr rhs
-  = do { (floats1, rhs1) <- cpeRhsE env rhs
+  = ASSERT(not (isJoinId bndr)) -- those should use cpeJoinPair
+    do { (floats1, rhs1) <- cpeRhsE env rhs
 
        -- See if we are allowed to float this stuff out of the RHS
        ; (floats2, rhs2) <- float_from_rhs floats1 rhs1
@@ -496,6 +547,45 @@ When InlineMe notes go away this won't happen any more.  But
 it seems good for CorePrep to be robust.
 -}
 
+---------------
+cpeJoinPair :: CorePrepEnv -> JoinId -> CoreExpr
+            -> UniqSM (JoinId, CpeRhs)
+-- Used for all join bindings
+cpeJoinPair env bndr rhs
+  = ASSERT(isJoinId bndr)
+    do { let Just join_arity = isJoinId_maybe bndr
+             (bndrs, body)   = collectNBinders join_arity rhs
+
+       ; (env', bndrs') <- cpCloneBndrs env bndrs
+
+       ; body' <- cpeBodyNF env' body -- Will let-bind the body if it starts
+                                      -- with a lambda
+
+       ; let rhs'  = mkCoreLams bndrs' body'
+             bndr' = bndr `setIdUnfolding` evaldUnfolding
+                          `setIdArity` count isId bndrs
+                            -- See Note [Arity and join points]
+
+       ; return (bndr', rhs') }
+
+{-
+Note [Arity and join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Up to now, we've allowed a join point to have an arity greater than its join
+arity (minus type arguments), since this is what's useful for eta expansion.
+However, for code gen purposes, its arity must be exactly the number of value
+arguments it will be called with, and it must have exactly that many value
+lambdas. Hence if there are extra lambdas we must let-bind the body of the RHS:
+
+  join j x y z = \w -> ... in ...
+    =>
+  join j x y z = (let f = \w -> ... in f) in ...
+
+This is also what happens with Note [Silly extra arguments]. Note that it's okay
+for us to mess with the arity because a join point is never exported.
+-}
+
 -- ---------------------------------------------------------------------------
 --              CpeRhs: produces a result satisfying CpeRhs
 -- ---------------------------------------------------------------------------
@@ -518,10 +608,12 @@ cpeRhsE _env expr@(Lit {}) = return (emptyFloats, expr)
 cpeRhsE env expr@(Var {})  = cpeApp env expr
 cpeRhsE env expr@(App {}) = cpeApp env expr
 
-cpeRhsE env (Let bind expr)
-  = do { (env', new_binds) <- cpeBind NotTopLevel env bind
-       ; (floats, body) <- cpeRhsE env' expr
-       ; return (new_binds `appendFloats` floats, body) }
+cpeRhsE env (Let bind body)
+  = do { (env', bind_floats, maybe_bind') <- cpeBind NotTopLevel env bind
+       ; (body_floats, body') <- cpeRhsE env' body
+       ; let expr' = case maybe_bind' of Just bind' -> Let bind' body'
+                                         Nothing    -> body'
+       ; return (bind_floats `appendFloats` body_floats, expr') }
 
 cpeRhsE env (Tick tickish expr)
   | tickishPlace tickish == PlaceNonLam && tickish `tickishScopesLike` SoftScope

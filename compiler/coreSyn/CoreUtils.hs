@@ -49,7 +49,10 @@ module CoreUtils (
         stripTicksE, stripTicksT,
 
         -- * StaticPtr
-        collectMakeStaticArgs
+        collectMakeStaticArgs,
+
+        -- * Join points
+        isJoinBind
     ) where
 
 #include "HsVersions.h"
@@ -2304,3 +2307,17 @@ collectMakeStaticArgs e
     | (fun@(Var b), [Type t, loc, arg], _) <- collectArgsTicks (const True) e
     , idName b == makeStaticName = Just (fun, t, loc, arg)
 collectMakeStaticArgs _          = Nothing
+
+{-
+************************************************************************
+*                                                                      *
+\subsection{Join points}
+*                                                                      *
+************************************************************************
+-}
+
+-- | Does this binding bind a join point (or a recursive group of join points)?
+isJoinBind :: CoreBind -> Bool
+isJoinBind (NonRec b _)       = isJoinId b
+isJoinBind (Rec ((b, _) : _)) = isJoinId b
+isJoinBind _                  = False

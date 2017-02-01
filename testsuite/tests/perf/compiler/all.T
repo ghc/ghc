@@ -67,7 +67,7 @@ test('T1969',
              # 2014-06-29 5949188 (x86/Linux)
              # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 9093608 (x86/Linux, 64bit machine)
-           (wordsize(64), 17285216, 15)]),
+           (wordsize(64), 19924328, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -79,6 +79,7 @@ test('T1969',
              # 2015-07-11 11670120 (amd64/Linux)
              # 2015-10-28 15017528 (amd64/Linux) emit typeable at definition site
              # 2016-10-12 17285216 (amd64/Linux) it's not entirely clear why
+             # 2017-02-01 19924328 (amd64/Linux) Join points (#12988)
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
                                  #            215582916 (x86/Windows)
@@ -439,9 +440,10 @@ test('T5631',
 test('parsing001',
      [compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 274000576, 10),
-           (wordsize(64), 581551384, 5)]),
+           (wordsize(64), 493730288, 5)]),
         # expected value: 587079016 (amd64/Linux)
         # 2016-09-01:     581551384 (amd64/Linux) Restore w/w limit (#11565)
+        # 2016-12-19:     493730288 (amd64/Linux) Join points (#12988)
        only_ways(['normal']),
       ],
      compile_fail, [''])
@@ -503,7 +505,7 @@ test('T5321Fun',
              # 2014-09-03: 299656164     (specialisation and inlining)
              # 10/12/2014: 206406188     #  Improvements in constraint solver
              # 2016-04-06: 279922360 x86/Linux
-            (wordsize(64), 525895608, 5)])
+            (wordsize(64), 498135752, 5)])
              # prev:       585521080
              # 29/08/2012: 713385808     #  (increase due to new codegen)
              # 15/05/2013: 628341952     #  (reason for decrease unknown)
@@ -526,6 +528,7 @@ test('T5321Fun',
                                          #    change, however. Namely I am
                                          #    quite skeptical of the downward
                                          #    "drift" reported above
+             # 31/01/2017: 498135752     #  Join points (#12988)
       ],
       compile,[''])
 
@@ -802,7 +805,7 @@ test('T9872d',
 test('T9961',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 537297968, 5),
+          [(wordsize(64), 571246936, 5),
           # 2015-01-12    807117816   Initally created
           # 2015-spring   772510192   Got better
           # 2015-05-22    663978160   Fix for #10370 improves it more
@@ -811,6 +814,7 @@ test('T9961',
           # 2016-03-20    519436672   x64_64/Linux   Don't use build desugaring for large lists (#11707)
           # 2016-03-24    568526784   x64_64/Linux   Add eqInt* variants (#11688)
           # 2016-09-01    537297968   x64_64/Linux   Restore w/w limit (#11565)
+          # 2016-12-19    571246936   x64_64/Linux   Join points (#12988)
            (wordsize(32), 275264188, 5)
           # was           375647160
           # 2016-04-06    275264188   x86/Linux
@@ -934,8 +938,9 @@ test('T13035',
 test('T13056',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-         [(wordsize(64), 520166912, 5),
+         [(wordsize(64), 546800240, 5),
          # 2017-01-06    520166912 initial
+         # 2017-01-31    546800240 Join points (#12988)
          ]),
      ],
      compile,
@@ -943,9 +948,10 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1348865648, 5),
+          [(wordsize(64), 1280336112, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
+          # 2017-01-31: 1280336112  Join points (#12988)
           ]),
      ],
      compile,

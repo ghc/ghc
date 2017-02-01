@@ -207,12 +207,16 @@ getCoreToDo dflags
     -- Static forms are moved to the top level with the FloatOut pass.
     -- See Note [Grand plan for static forms] in StaticPtrTable.
     static_ptrs_float_outwards =
-      runWhen static_ptrs $ CoreDoFloatOutwards FloatOutSwitches
-        { floatOutLambdas   = Just 0
-        , floatOutConstants = True
-        , floatOutOverSatApps = False
-        , floatToTopLevelOnly = True
-        }
+      runWhen static_ptrs $ CoreDoPasses
+        [ simpl_gently -- Float Out can't handle type lets (sometimes created
+                       -- by simpleOptPgm via mkParallelBindings)
+        , CoreDoFloatOutwards FloatOutSwitches
+          { floatOutLambdas   = Just 0
+          , floatOutConstants = True
+          , floatOutOverSatApps = False
+          , floatToTopLevelOnly = True
+          }
+        ]
 
     core_todo =
      if opt_level == 0 then
@@ -704,6 +708,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
                      (pprCoreBindings tagged_binds);
+           lintPassResult hsc_env CoreOccurAnal tagged_binds;
 
                 -- Get any new rules, and extend the rule base
                 -- See Note [Overall plumbing for rules] in Rules.hs

@@ -39,6 +39,10 @@ module CoreSubst (
 
 #include "HsVersions.h"
 
+import {-# SOURCE #-} CoreArity ( etaExpandToJoinPoint )
+                        -- Needed for simpleOptPgm to convert bindings to join
+                        -- points, but CoreArity uses substitutions throughout
+
 import CoreSyn
 import CoreFVs
 import CoreSeq
@@ -867,6 +871,9 @@ simpleOptExpr :: CoreExpr -> CoreExpr
 -- We also inline bindings that bind a Eq# box: see
 -- See Note [Getting the map/coerce RULE to work].
 --
+-- Also we convert functions to join points where possible (as
+-- the occurrence analyser does most of the work anyway).
+--
 -- The result is NOT guaranteed occurrence-analysed, because
 -- in  (let x = y in ....) we substitute for x; so y's occ-info
 -- may change radically
@@ -1012,8 +1019,9 @@ simple_opt_bind' subst (Rec prs)
   = (subst'', res_bind)
   where
     res_bind            = Just (Rec (reverse rev_prs'))
-    (subst', bndrs')    = subst_opt_bndrs subst (map fst prs)
-    (subst'', rev_prs') = foldl do_pr (subst', []) (prs `zip` bndrs')
+    prs'                = map (uncurry convert_if_marked) prs
+    (subst', bndrs')    = subst_opt_bndrs subst (map fst prs')
+    (subst'', rev_prs') = foldl do_pr (subst', []) (prs' `zip` bndrs')
     do_pr (subst, prs) ((b,r), b')
        = case maybe_substitute subst b r2 of
            Just subst' -> (subst', prs)
@@ -1023,7 +1031,20 @@ simple_opt_bind' subst (Rec prs)
          r2 = simple_opt_expr subst r
 
 simple_opt_bind' subst (NonRec b r)
-  = simple_opt_out_bind subst (b, simple_opt_expr subst r)
+  = simple_opt_out_bind subst (b', simple_opt_expr subst r')
+  where
+    (b', r') = convert_if_marked b r
+
+convert_if_marked :: InVar -> InExpr -> (InVar, InExpr)
+convert_if_marked bndr rhs
+  | isId bndr
+  , AlwaysTailCalled ar <- tailCallInfo (idOccInfo bndr)
+    -- Marked to become a join point
+  , (bndrs, body) <- etaExpandToJoinPoint ar rhs
+  = -- Tail call info now unnecessary
+    (zapIdTailCallInfo (bndr `asJoinId` ar), mkLams bndrs body)
+  | otherwise
+  = (bndr, rhs)
 
 ----------------------
 simple_opt_out_bind :: Subst -> (InVar, OutExpr) -> (Subst, Maybe CoreBind)
@@ -1072,8 +1093,10 @@ maybe_substitute subst b r
     safe_to_inline :: OccInfo -> Bool
     safe_to_inline (IAmALoopBreaker {})     = False
     safe_to_inline IAmDead                  = True
-    safe_to_inline (OneOcc in_lam one_br _) = (not in_lam && one_br) || trivial
-    safe_to_inline NoOccInfo                = trivial
+    safe_to_inline occ@(OneOcc {})          = (not (occ_in_lam occ) &&
+                                                occ_one_br occ)
+                                            || trivial
+    safe_to_inline (ManyOccs {})            = trivial
 
     trivial | exprIsTrivial r = True
             | (Var fun, args) <- collectArgs r

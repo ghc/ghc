@@ -1367,12 +1367,13 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
      alts' <- mapM (tcIfaceAlt scrut' tc_app) alts
      return (Case scrut' case_bndr' (coreAltsType alts') alts')
 
-tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info) rhs) body)
+tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
   = do  { name    <- newIfaceName (mkVarOccFS fs)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               name ty' info
         ; let id = mkLocalIdOrCoVarWithInfo name ty' id_info
+                     `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
         ; return (Let (NonRec id rhs') body') }
@@ -1384,11 +1385,11 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
        ; body' <- tcIfaceExpr body
        ; return (Let (Rec pairs') body') } }
  where
-   tc_rec_bndr (IfLetBndr fs ty _)
+   tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalIdOrCoVar name ty') }
-   tc_pair (IfLetBndr _ _ info, rhs) id
+          ; return (mkLocalIdOrCoVar name ty' `asJoinId_maybe` tcJoinInfo ji) }
+   tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                                 (idName id) (idType id) info
@@ -1508,6 +1509,10 @@ tcIdInfo ignore_prags name ty info = do
            ; let info1 | lb        = info `setOccInfo` strongLoopBreaker
                        | otherwise = info
            ; return (info1 `setUnfoldingInfo` unf) }
+
+tcJoinInfo :: IfaceJoinInfo -> Maybe JoinArity
+tcJoinInfo (IfaceJoinPoint ar) = Just ar
+tcJoinInfo IfaceNotJoinPoint   = Nothing
 
 tcUnfolding :: Name -> Type -> IdInfo -> IfaceUnfolding -> IfL Unfolding
 tcUnfolding name _ info (IfCoreUnfold stable if_expr)

@@ -1625,15 +1625,8 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 --        return ()
 
                 -- And build the results
-        ; let spec_id    = mkLocalIdOrCoVar spec_name (mkLamTypes spec_lam_args body_ty)
-                             -- See Note [Transfer strictness]
-                             `setIdStrictness` spec_str
-                             `setIdArity` count isId spec_lam_args
-              spec_str   = calcSpecStrictness fn spec_lam_args pats
-
-
-                -- Conditionally use result of new worker-wrapper transform
-              (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env) qvars body_ty
+        ; let (spec_lam_args, spec_call_args) = mkWorkerArgs (sc_dflags env)
+                                                             qvars body_ty
                 -- Usual w/w hack to avoid generating
                 -- a spec_rhs of unlifted type and no args
 
@@ -1641,6 +1634,18 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
                 -- Annotate the variables with the strictness information from
                 -- the function (see Note [Strictness information in worker binders])
 
+              spec_join_arity | isJoinId fn = Just (length spec_lam_args)
+                              | otherwise   = Nothing
+              spec_id    = mkLocalIdOrCoVar spec_name
+                                            (mkLamTypes spec_lam_args body_ty)
+                             -- See Note [Transfer strictness]
+                             `setIdStrictness` spec_str
+                             `setIdArity` count isId spec_lam_args
+                             `asJoinId_maybe` spec_join_arity
+              spec_str   = calcSpecStrictness fn spec_lam_args pats
+
+
+                -- Conditionally use result of new worker-wrapper transform
               spec_rhs   = mkLams spec_lam_args_str spec_body
               body_ty    = exprType spec_body
               rule_rhs   = mkVarApps (Var spec_id) spec_call_args

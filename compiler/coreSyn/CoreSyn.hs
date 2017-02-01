@@ -3,7 +3,7 @@
 (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 -}
 
-{-# LANGUAGE CPP, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
@@ -21,7 +21,7 @@ module CoreSyn (
 
         -- ** 'Expr' construction
         mkLets, mkLams,
-        mkApps, mkTyApps, mkCoApps, mkVarApps,
+        mkApps, mkTyApps, mkCoApps, mkVarApps, mkTyArg,
 
         mkIntLit, mkIntLitInt,
         mkWordLit, mkWordLitWord,
@@ -38,6 +38,7 @@ module CoreSyn (
         -- ** Simple 'Expr' access functions and predicates
         bindersOf, bindersOfBinds, rhssOfBind, rhssOfAlts,
         collectBinders, collectTyBinders, collectTyAndValBinders,
+        collectNBinders,
         collectArgs, collectArgsTicks, flattenBinds,
 
         exprToType, exprToCoercion_maybe,
@@ -75,7 +76,8 @@ module CoreSyn (
         collectAnnArgs, collectAnnArgsTicks,
 
         -- ** Operations on annotations
-        deAnnotate, deAnnotate', deAnnAlt, collectAnnBndrs,
+        deAnnotate, deAnnotate', deAnnAlt,
+        collectAnnBndrs, collectNAnnBndrs,
 
         -- * Orphanhood
         IsOrphan(..), isOrphan, notOrphan, chooseOrphanAnchor,
@@ -408,7 +410,8 @@ The let/app invariant
      the right hand side of a non-recursive 'Let', and
      the argument of an 'App',
     /may/ be of unlifted type, but only if
-    the expression is ok-for-speculation.
+    the expression is ok-for-speculation
+    or the 'Let' is for a join point.
 
 This means that the let can be floated around
 without difficulty. For example, this is OK:
@@ -510,6 +513,181 @@ this exhaustive list can be empty!
   conversion; remember STG is un-typed, so there is no need for
   the empty case to do the type conversion.
 
+Note [Join points]
+~~~~~~~~~~~~~~~~~~
+In Core, a *join point* is a specially tagged function whose only occurrences
+are saturated tail calls. A tail call can appear in these places:
+
+  1. In the branches (not the scrutinee) of a case
+  2. Underneath a let (value or join point)
+  3. Inside another join point
+
+We write a join-point declaration as
+  join j @a @b x y = e1 in e2,
+like a let binding but with "join" instead (or "join rec" for "let rec"). Note
+that we put the parameters before the = rather than using lambdas; this is
+because it's relevant how many parameters the join point takes *as a join
+point.* This number is called the *join arity,* distinct from arity because it
+counts types as well as values. Note that a join point may return a lambda! So
+  join j x = x + 1
+is different from
+  join j = \x -> x + 1
+The former has join arity 1, while the latter has join arity 0.
+
+The identifier for a join point is called a join id or a *label.* An invocation
+is called a *jump.* We write a jump using the jump keyword:
+
+  jump j 3
+
+The words *label* and *jump* are evocative of assembly code (or Cmm) for a
+reason: join points are indeed compiled as labeled blocks, and jumps become
+actual jumps (plus argument passing and stack adjustment). There is no closure
+allocated and only a fraction of the function-call overhead. Hence we would
+like as many functions as possible to become join points (see OccurAnal) and
+the type rules for join points ensure we preserve the properties that make them
+efficient.
+
+In the actual AST, a join point is indicated by the IdDetails of the binder: a
+local value binding gets 'VanillaId' but a join point gets a 'JoinId' with its
+join arity.
+
+For more details, see the paper:
+
+  Luke Maurer, Paul Downen, Zena Ariola, and Simon Peyton Jones. "Compiling
+  without continuations." Submitted to PLDI'17.
+
+  https://www.microsoft.com/en-us/research/publication/compiling-without-continuations/
+
+Note [Invariants on join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Join points must follow these invariants:
+
+  1. All occurrences must be tail calls. Each of these tail calls must pass the
+     same number of arguments, counting both types and values; we call this the
+     "join arity" (to distinguish from regular arity, which only counts values).
+  2. For join arity n, the right-hand side must begin with at least n lambdas.
+  3. If the binding is recursive, then all other bindings in the recursive group
+     must also be join points.
+  4. The binding's type must not be polymorphic in its return type (as defined
+     in Note [The polymorphism rule of join points]).
+
+Examples:
+
+  join j1  x = 1 + x in jump j (jump j x)  -- Fails 1: non-tail call
+  join j1' x = 1 + x in if even a
+                          then jump j1 a
+                          else jump j1 a b -- Fails 1: inconsistent calls
+  join j2  x = flip (+) x in j2 1 2        -- Fails 2: not enough lambdas
+  join j2' x = \y -> x + y in j3 1         -- Passes: extra lams ok
+  join j @a (x :: a) = x                   -- Fails 4: polymorphic in ret type
+
+Invariant 1 applies to left-hand sides of rewrite rules, so a rule for a join
+point must have an exact call as its LHS.
+
+Strictly speaking, invariant 3 is redundant, since a call from inside a lazy
+binding isn't a tail call. Since a let-bound value can't invoke a free join
+point, then, they can't be mutually recursive. (A Core binding group *can*
+include spurious extra bindings if the occurrence analyser hasn't run, so
+invariant 3 does still need to be checked.) For the rigorous definition of
+"tail call", see Section 3 of the paper (Note [Join points]).
+
+Invariant 4 is subtle; see Note [The polymorphism rule of join points].
+
+Core Lint will check these invariants, anticipating that any binder whose
+OccInfo is marked AlwaysTailCalled will become a join point as soon as the
+simplifier (or simpleOptPgm) runs.
+
+Note [The type of a join point]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A join point has the same type it would have as a function. That is, if it takes
+an Int and a Bool and its body produces a String, its type is `Int -> Bool ->
+String`. Natural as this may seem, it can be awkward. A join point shouldn't be
+thought to "return" in the same sense a function does---a jump is one-way. This
+is crucial for understanding how case-of-case interacts with join points:
+
+  case (join
+          j :: Int -> Bool -> String
+          j x y = ...
+        in
+          jump j z w) of
+    "" -> True
+    _  -> False
+
+The simplifier will pull the case into the join point (see Note [Case-of-case
+and join points] in Simplify):
+
+  join
+    j :: Int -> Bool -> Bool -- changed!
+    j x y = case ... of "" -> True
+                        _  -> False
+  in
+    jump j z w
+
+The body of the join point now returns a Bool, so the label `j` has to have its
+type updated accordingly. Inconvenient though this may be, it has the advantage
+that 'CoreUtils.exprType' can still return a type for any expression, including
+a jump.
+
+This differs from the paper (see Note [Invariants on join points]). In the
+paper, we instead give j the type `Int -> Bool -> forall a. a`. Then each jump
+carries the "return type" as a parameter, exactly the way other non-returning
+functions like `error` work:
+
+  case (join
+          j :: Int -> Bool -> forall a. a
+          j x y = ...
+        in
+          jump j z w @String) of
+    "" -> True
+    _  -> False
+
+Now we can move the case inward and we only have to change the jump:
+
+  join
+    j :: Int -> Bool -> forall a. a
+    j x y = case ... of "" -> True
+                        _  -> False
+  in
+    jump j z w @Bool
+
+(Core Lint would still check that the body of the join point has the right type;
+that type would simply not be reflected in the join id.)
+
+Note [The polymorphism rule of join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Invariant 4 of Note [Invariants on join points] forbids a join point to be
+polymorphic in its return type. That is, if its type is
+
+  forall a1 ... ak. t1 -> ... -> tn -> r
+
+where its join arity is k+n, none of the type parameters ai may occur free in r.
+The most direct explanation is that given
+
+  join j @a1 ... @ak x1 ... xn = e1 in e2
+
+our typing rules require `e1` and `e2` to have the same type. Therefore the type
+of `e1`---the return type of the join point---must be the same as the type of
+e2. Since the type variables aren't bound in `e2`, its type can't include them,
+and thus neither can the type of `e1`.
+
+There's a deeper explanation in terms of the sequent calculus in Section 5.3 of
+a previous paper:
+
+  Paul Downen, Luke Maurer, Zena Ariola, and Simon Peyton Jones. "Sequent
+  calculus as a compiler intermediate language." ICFP'16.
+
+  https://www.microsoft.com/en-us/research/wp-content/uploads/2016/04/sequent-calculus-icfp16.pdf
+
+The quick version: Consider the CPS term (the paper uses the sequent calculus,
+but we can translate readily):
+
+  \k -> join j @a1 ... @ak x1 ... xn = e1 k in e2 k
+
+Since `j` is a join point, it doesn't bind a continuation variable but reuses
+the variable `k` from the context. But the parameters `ai` are not in `k`'s
+scope, and `k`'s type determines the return type of `j`; thus the `ai`s don't
+appear in the return type of `j`. (Also, since `e1` and `e2` are passed the same
+continuation, they must have the same type; hence the direct explanation above.)
 
 ************************************************************************
 *                                                                      *
@@ -1534,10 +1712,16 @@ type TaggedAlt  t = Alt  (TaggedBndr t)
 instance Outputable b => Outputable (TaggedBndr b) where
   ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
 
-instance Outputable b => OutputableBndr (TaggedBndr b) where
+-- OutputableBndr Var is declared separately in PprCore; using a FlexibleContext
+-- to avoid circularity
+instance (OutputableBndr Var, Outputable b) =>
+    OutputableBndr (TaggedBndr b) where
   pprBndr _ b = ppr b   -- Simple
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b
+  pprNonRecBndrKeyword (TB b _) = pprNonRecBndrKeyword b
+  pprRecBndrKeyword    (TB b _) = pprRecBndrKeyword    b
+  pprLamsOnLhs         (TB b _) = pprLamsOnLhs         b
 
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
@@ -1584,17 +1768,17 @@ mkCoApps  f args = foldl (\ e a -> App e (Coercion a)) f args
 mkVarApps f vars = foldl (\ e a -> App e (varToCoreExpr a)) f vars
 mkConApp con args = mkApps (Var (dataConWorkId con)) args
 
-mkTyApps  f args = foldl (\ e a -> App e (typeOrCoercion a)) f args
-  where
-    typeOrCoercion ty
-      | Just co <- isCoercionTy_maybe ty = Coercion co
-      | otherwise                        = Type ty
+mkTyApps  f args = foldl (\ e a -> App e (mkTyArg a)) f args
 
 mkConApp2 :: DataCon -> [Type] -> [Var] -> Expr b
 mkConApp2 con tys arg_ids = Var (dataConWorkId con)
                             `mkApps` map Type tys
                             `mkApps` map varToCoreExpr arg_ids
 
+mkTyArg :: Type -> Expr b
+mkTyArg ty
+  | Just co <- isCoercionTy_maybe ty = Coercion co
+  | otherwise                        = Type ty
 
 -- | Create a machine integer literal expression of type @Int#@ from an @Integer@.
 -- If you want an expression of type @Int@ use 'MkCore.mkIntExpr'
@@ -1750,6 +1934,9 @@ collectBinders         :: Expr b   -> ([b],     Expr b)
 collectTyBinders       :: CoreExpr -> ([TyVar], CoreExpr)
 collectValBinders      :: CoreExpr -> ([Id],    CoreExpr)
 collectTyAndValBinders :: CoreExpr -> ([TyVar], [Id], CoreExpr)
+-- | Strip off exactly N leading lambdas (type or value). Good for use with
+-- join points.
+collectNBinders        :: Int -> Expr b -> ([b], Expr b)
 
 collectBinders expr
   = go [] expr
@@ -1774,6 +1961,13 @@ collectTyAndValBinders expr
   where
     (tvs, body1) = collectTyBinders expr
     (ids, body)  = collectValBinders body1
+
+collectNBinders orig_n orig_expr
+  = go orig_n [] orig_expr
+  where
+    go 0 bs expr      = (reverse bs, expr)
+    go n bs (Lam b e) = go (n-1) (b:bs) e
+    go _ _  _         = pprPanic "collectNBinders" $ int orig_n
 
 -- | Takes a nested application expression and returns the the function
 -- being applied and the arguments to which it is applied
@@ -1929,3 +2123,12 @@ collectAnnBndrs e
   where
     collect bs (_, AnnLam b body) = collect (b:bs) body
     collect bs body               = (reverse bs, body)
+
+-- | As 'collectNBinders' but for 'AnnExpr' rather than 'Expr'
+collectNAnnBndrs :: Int -> AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)
+collectNAnnBndrs orig_n e
+  = collect orig_n [] e
+  where
+    collect 0 bs body               = (reverse bs, body)
+    collect n bs (_, AnnLam b body) = collect (n-1) (b:bs) body
+    collect _ _  _                  = pprPanic "collectNBinders" $ int orig_n

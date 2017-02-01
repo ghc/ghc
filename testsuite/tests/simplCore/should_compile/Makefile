@@ -47,6 +47,7 @@ T5658b:
 	$(RM) -f T5658b.o T5658b.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T5658b.hs -ddump-simpl | grep -c indexIntArray
 # Trac 5658 meant that there were three calls to indexIntArray instead of two
+# (now four due to join-point discount causing W/W to stabilize unfolding)
 
 T5776:
 	$(RM) -f T5776.o T5776.hi
@@ -121,7 +122,7 @@ T13155:
 T13156:
 	$(RM) -f T13156.hi T13156.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13156.hs -O -ddump-prep -dsuppress-uniques | grep "case"
-        # There should be a single 'case case'
+        # There should be a single 'case r @ GHC.Types.Any'
 
 .PHONY: T4138
 T4138:
