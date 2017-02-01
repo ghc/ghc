@@ -85,7 +85,7 @@ pprPatSynSig nm ty
 -- | Pretty prints a pattern synonym's type; follows the usual
 -- conventions to print a pattern synonym type compactly, yet
 -- unambiguously. See the note on 'PatSynType' and the section on
--- pattern synonyms in the GHC users guide for more information.
+-- pattern synonyms in the GHC user's guide for more information.
 pprPatSynType :: PatSynType -> Doc
 pprPatSynType ty@(ForallT uniTys reqs ty'@(ForallT exTys provs ty''))
   | null exTys,  null provs = ppr (ForallT uniTys reqs ty'')

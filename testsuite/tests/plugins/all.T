@@ -12,7 +12,7 @@ test('plugins02',
 test('plugins03',
      [pre_cmd('$MAKE -s --no-print-directory -C simple-plugin package.plugins03 TOP={top}')],
      compile_fail,
-     ['-package-db simple-plugin/pkg.plugins03/local.package.conf -fplugin Simple.NonExistantPlugin -package simple-plugin'])
+     ['-package-db simple-plugin/pkg.plugins03/local.package.conf -fplugin Simple.NonExistentPlugin -package simple-plugin'])
 
 test('plugins04', [], multimod_compile_fail,
      ['plugins04', '-package ghc -fplugin HomePackagePlugin'])

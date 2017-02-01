@@ -742,7 +742,7 @@ a is the last type variable in a given datatype):
 
 * ft_var:     The type is syntactically equal to the last type variable.
               Moreover, the type appears in a covariant position (see
-              the Deriving Functor instances section of the users' guide
+              the Deriving Functor instances section of the user's guide
               for an in-depth explanation of covariance vs. contravariance).
               Example: a (covariantly)
 

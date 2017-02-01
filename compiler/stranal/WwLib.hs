@@ -465,7 +465,7 @@ To avoid this:
 
   * We use a fresh unique for both type-variable and term-variable binders
     Originally we lacked this freshness for type variables, and that led
-    to the very obscure Trac #12562.  (A type varaible in the worker shadowed
+    to the very obscure Trac #12562.  (A type variable in the worker shadowed
     an outer term-variable binding.)
 
   * Because of this cloning we have to substitute in the type/kind of the

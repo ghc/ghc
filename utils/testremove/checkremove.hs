@@ -64,8 +64,8 @@ mapFromList' xs = seqAll xs `seq` Map.fromList xs
           seqAll ((x, y) : xys) = x `seq` y `seq` seqAll xys
 
 {-
-... = OK: will happen if a file in a non-existant directory is rm'd [1]
-..D = OK: will happen if a non-existant file is rm'd [1]
+... = OK: will happen if a file in a non-existent directory is rm'd [1]
+..D = OK: will happen if a non-existent file is rm'd [1]
 .A. = suspicious: Why wasn't this file cleaned?
 .AD = OK: This is what object files look like
 B.. = suspicious: Where did the file go?

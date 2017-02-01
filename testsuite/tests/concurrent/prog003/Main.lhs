@@ -209,7 +209,7 @@ just testing
 > {-
 >     putStrLn "Start"
 >     executeTasks nl $ createTasks [1..len]
->     find nl (len+1) -- we try to find a non-existant element
+>     find nl (len+1) -- we try to find a non-existent element
 >                     -- this way, in the LazyList case, we will physically delete all (logically deleted) elements 
 > -}
 >     putStrLn "End"

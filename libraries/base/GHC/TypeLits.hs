@@ -195,7 +195,7 @@ infixl 6 :<>:
 --
 -- The polymorphic kind of this type allows it to be used in several settings.
 -- For instance, it can be used as a constraint, e.g. to provide a better error
--- message for a non-existant instance,
+-- message for a non-existent instance,
 --
 -- @
 -- -- in a context

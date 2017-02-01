@@ -1,5 +1,5 @@
-Care and feeding of your GHC Users Guide
-========================================
+Care and feeding of your GHC User's Guide
+=========================================
 
 The GHC User's Guide is the primary reference documentation
 for the Glasgow Haskell Compiler. Even more than this, it at times serves (for
@@ -157,8 +157,8 @@ language designation,
 Links
 ~~~~~
 
-Within the Users Guide
-^^^^^^^^^^^^^^^^^^^^^^
+Within the User's Guide
+^^^^^^^^^^^^^^^^^^^^^^^
 
 Frequently we want to give a name to a section so it can be referred to
 from other points in the document,

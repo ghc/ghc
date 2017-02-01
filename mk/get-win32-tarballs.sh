@@ -122,7 +122,7 @@ usage() {
     echo "Where <action> is one of,"
     echo "    download     download the necessary tarballs for the given architecture"
     echo "    fetch        download the necessary tarballs for the given architecture but doesn't verify their md5."d
-    echo "    verify       verify the existance and correctness of the necessary tarballs"
+    echo "    verify       verify the existence and correctness of the necessary tarballs"
     echo "and <arch> is one of i386, x86_64,all or mirror (which includes sources)"
 }
 

@@ -258,7 +258,7 @@ type IdSyn a = Id a
 type family IdProxySyn (a :: k) b = r | r -> a
 type instance IdProxySyn a b = (IdSyn a) b
 
--- this has bare variable in the RHS but all LHS varaiables are also bare so it
+-- this has bare variable in the RHS but all LHS variables are also bare so it
 -- should be accepted
 type family Fa (a :: k) (b :: k) = (r :: k2) | r -> k
 type instance Fa a b = a

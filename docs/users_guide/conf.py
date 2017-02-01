@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# GHC Users Guide documentation build configuration file
+# GHC User's Guide documentation build configuration file
 #
 # This file is execfile()d with the current directory set to its
 # containing dir.
@@ -37,8 +37,8 @@ exclude_patterns = ['.build', "*.gen.rst"]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = "Glasgow Haskell Compiler <release> Users Guide"
-html_short_title = "GHC %s Users Guide" % release
+html_title = "Glasgow Haskell Compiler <release> User's Guide"
+html_short_title = "GHC %s User's Guide" % release
 html_theme_path = ['.']
 html_theme = 'ghc-theme'
 html_logo = None
@@ -78,7 +78,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  ('index', 'users_guide.tex', u'GHC Users Guide Documentation',
+  ('index', 'users_guide.tex', u'GHC User\'s Guide Documentation',
    u'GHC Team', 'manual'),
 ]
 
@@ -108,7 +108,7 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  ('index', 'GHCUsersGuide', u'GHC Users Guide',
+  ('index', 'GHCUsersGuide', u'GHC User\'s Guide',
    u'GHC Team', 'GHCUsersGuide', 'The Glasgow Haskell Compiler.',
    'Compilers'),
 ]

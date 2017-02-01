@@ -764,7 +764,7 @@ Which, because solving `Eq [a]` demands `Eq a` which we cannot solve, produces:
 
 This optimization relies on coherence of dictionaries to be correct. When we
 cannot assume coherence because of IncoherentInstances then this optimization
-can change the behavior of the users code.
+can change the behavior of the user's code.
 
 The following four modules produce a program whose output would change depending
 on whether we apply this optimization when IncoherentInstances is in effect:

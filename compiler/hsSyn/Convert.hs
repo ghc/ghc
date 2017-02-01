@@ -1690,7 +1690,7 @@ specially in `deSugar/DsMeta.hs`, `hsSyn/Convert.hs`, and
 The key point is to always represent a pattern synonym's *full* type
 in cases (a) and (c) to make it clear which of the two forall
 quantifiers and/or constraint contexts are specified, and which are
-not. See GHC's users guide on pattern synonyms for more information
+not. See GHC's user's guide on pattern synonyms for more information
 about pattern synonym type signatures.
 
 -}

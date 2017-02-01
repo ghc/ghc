@@ -40,7 +40,7 @@ The design of Safe Haskell covers the following aspects:
 Safe Haskell, however, *does not offer* compilation safety. During
 compilation time it is possible for arbitrary processes to be launched,
 using for example the :ref:`custom pre-processor <pre-processor>` flag.
-This can be manipulated to either compromise a users system at
+This can be manipulated to either compromise a user's system at
 compilation time, or to modify the source code just before compilation
 to try to alter Safe Haskell flags. This is discussed further in section
 :ref:`safe-compilation`.
@@ -507,7 +507,7 @@ The reason there are two modes of checking trust is that the extra
 requirement enabled by :ghc-flag:`-fpackage-trust` causes the design of Safe
 Haskell to be invasive. Packages using Safe Haskell when the flag is
 enabled may or may not compile depending on the state of trusted
-packages on a users machine. This is both fragile, and causes
+packages on a user's machine. This is both fragile, and causes
 compilation failures for everyone, even if they aren't trying to use any
 of the guarantees provided by Safe Haskell. Disabling
 :ghc-flag:`-fpackage-trust` by default and turning it into a flag makes Safe

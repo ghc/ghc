@@ -567,7 +567,7 @@ validateGraph doc isColored graph
         , badEdges      <- minusUniqSet edges nodes
         , not $ isEmptyUniqSet badEdges
         = pprPanic "GraphOps.validateGraph"
-                (  text "Graph has edges that point to non-existant nodes"
+                (  text "Graph has edges that point to non-existent nodes"
                 $$ text "  bad edges: " <> pprUFM badEdges (vcat . map ppr)
                 $$ doc )
 

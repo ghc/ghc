@@ -16,7 +16,7 @@ type ReST = String
 
 main :: IO ()
 main = do
-  -- users guide
+  -- user's guide
   writeRestFile (usersGuideFile "what_glasgow_exts_does.gen.rst")
     $ whatGlasgowExtsDoes
   forM_ groups $ \(Group name _ theFlags) ->
@@ -45,7 +45,7 @@ whatGlasgowExtsDoes = unlines
     parseExt ext = inlineCode $ "-X" ++ show ext
 
 -- | Generate a reference table of the given set of flags. This is used in
--- the users guide.
+-- the user's guide.
 flagsTable :: [Flag] -> ReST
 flagsTable theFlags =
     table [50, 100, 30, 55]

@@ -1151,7 +1151,7 @@ data CoreRule
         -- Locality
         ru_auto :: Bool,   -- ^ @True@  <=> this rule is auto-generated
                            --               (notably by Specialise or SpecConstr)
-                           --   @False@ <=> generated at the users behest
+                           --   @False@ <=> generated at the user's behest
                            -- See Note [Trimming auto-rules] in TidyPgm
                            -- for the sole purpose of this field.
 

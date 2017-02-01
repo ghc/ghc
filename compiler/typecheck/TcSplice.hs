@@ -677,7 +677,7 @@ defaultRunMeta (MetaD r)
 defaultRunMeta (MetaAW r)
   = fmap r . runMeta' False (const empty) (const convertAnnotationWrapper)
     -- We turn off showing the code in meta-level exceptions because doing so exposes
-    -- the toAnnotationWrapper function that we slap around the users code
+    -- the toAnnotationWrapper function that we slap around the user's code
 
 ----------------
 runMetaAW :: LHsExpr Id         -- Of type AnnotationWrapper

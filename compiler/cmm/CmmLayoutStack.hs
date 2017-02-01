@@ -1003,7 +1003,7 @@ live across the call.  Our job now is to expand the call so we get
    ...
 
 Note the copyOut, which saves the results in the places that L1 is
-expecting them (see Note {safe foreign call convention]). Note also
+expecting them (see Note [safe foreign call convention]). Note also
 that safe foreign call is replace by an unsafe one in the Cmm graph.
 -}
 

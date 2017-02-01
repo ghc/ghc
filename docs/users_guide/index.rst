@@ -1,8 +1,8 @@
-.. GHC Users Guide documentation master file, created by
+.. GHC User's Guide documentation master file, created by
 
 
-Welcome to the GHC Users Guide
-==============================
+Welcome to the GHC User's Guide
+===============================
 
 Contents:
 

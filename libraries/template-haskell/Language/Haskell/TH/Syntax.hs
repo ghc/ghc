@@ -1721,7 +1721,7 @@ data DerivStrategy = StockStrategy    -- ^ A \"standard\" derived instance
 --     'PatSynSigD' either one of the universals, the existentials, or
 --     their contexts may be left empty.
 --
--- See the GHC users guide for more information on pattern synonyms
+-- See the GHC user's guide for more information on pattern synonyms
 -- and their types: https://downloads.haskell.org/~ghc/latest/docs/html/
 -- users_guide/syntax-extns.html#pattern-synonyms.
 type PatSynType = Type
