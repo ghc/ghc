@@ -356,7 +356,7 @@ The can_fail and has_side_effects properties have the following effect
 on program transformations.  Summary table is followed by details.
 
             can_fail     has_side_effects
-Discard        NO            NO
+Discard        YES           NO
 Float in       YES           YES
 Float out      NO            NO
 Duplicate      YES           NO
