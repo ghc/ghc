@@ -916,9 +916,10 @@ test('T12234',
        compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-unknown-mingw32'), 77949232, 5),
           # initial:      77949232
-           (wordsize(64), 76848856, 5),
+           (wordsize(64), 80882208, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
+          # 2017-02-01:   80882208  (Use superclass instances when solving)
           ]),
      ],
      compile,
