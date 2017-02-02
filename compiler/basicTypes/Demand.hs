@@ -1783,17 +1783,15 @@ it should not fall over.
 -}
 
 argsOneShots :: StrictSig -> Arity -> [[OneShotInfo]]
--- See Note [Computing one-shot info, and ProbOneShot]
+-- See Note [Computing one-shot info]
 argsOneShots (StrictSig (DmdType _ arg_ds _)) n_val_args
-  = go arg_ds
+  | unsaturated_call = []
+  | otherwise = go arg_ds
   where
     unsaturated_call = arg_ds `lengthExceeds` n_val_args
-    good_one_shot
-      | unsaturated_call = ProbOneShot
-      | otherwise        = OneShotLam
 
     go []               = []
-    go (arg_d : arg_ds) = argOneShots good_one_shot arg_d `cons` go arg_ds
+    go (arg_d : arg_ds) = argOneShots arg_d `cons` go arg_ds
 
     -- Avoid list tail like [ [], [], [] ]
     cons [] [] = []
@@ -1813,19 +1811,18 @@ saturatedByOneShots n (JD { ud = usg })
     go n (UCall One u) = go (n-1) u
     go _ _             = False
 
-argOneShots :: OneShotInfo     -- OneShotLam or ProbOneShot,
-            -> Demand          -- depending on saturation
+argOneShots :: Demand          -- depending on saturation
             -> [OneShotInfo]
-argOneShots one_shot_info (JD { ud = usg })
+argOneShots (JD { ud = usg })
   = case usg of
       Use _ arg_usg -> go arg_usg
       _             -> []
   where
-    go (UCall One  u) = one_shot_info : go u
+    go (UCall One  u) = OneShotLam : go u
     go (UCall Many u) = NoOneShotInfo : go u
     go _              = []
 
-{- Note [Computing one-shot info, and ProbOneShot]
+{- Note [Computing one-shot info]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider a call
     f (\pqr. e1) (\xyz. e2) e3
@@ -1835,20 +1832,6 @@ Then argsOneShots returns a [[OneShotInfo]] of
     [[OneShot,NoOneShotInfo,OneShot],  [OneShot]]
 The occurrence analyser propagates this one-shot infor to the
 binders \pqr and \xyz; see Note [Use one-shot information] in OccurAnal.
-
-But suppose f was not saturated, so the call looks like
-    f (\pqr. e1) (\xyz. e2)
-The in principle this partial application might be shared, and
-the (\prq.e1) abstraction might be called more than once.  So
-we can't mark them OneShot. But instead we return
-    [[ProbOneShot,NoOneShotInfo,ProbOneShot],  [ProbOneShot]]
-The occurrence analyser propagates this to the \pqr and \xyz
-binders.
-
-How is it used?  Well, it's quite likely that the partial application
-of f is not shared, so the float-out pass (in SetLevels.lvlLamBndrs)
-does not float MFEs out of a ProbOneShot lambda.  That currently is
-the only way that ProbOneShot is used.
 -}
 
 -- appIsBottom returns true if an application to n args

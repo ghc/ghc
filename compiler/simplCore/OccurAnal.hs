@@ -1548,7 +1548,7 @@ occAnalNonRecRhs env bndr bndrs body
          | otherwise        = rhsCtxt env
 
     -- See Note [Use one-shot info]
-    rhs_env = env1 { occ_one_shots = argOneShots OneShotLam dmd }
+    rhs_env = env1 { occ_one_shots = argOneShots dmd }
 
 
     certainly_inline -- See Note [Cascading inlines]

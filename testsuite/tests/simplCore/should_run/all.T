@@ -73,4 +73,4 @@ test('T12689broken', expect_broken(12689), compile_and_run, [''])
 test('T12689a', normal, compile_and_run, [''])
 
 test('T13172', only_ways(['optasm']), compile_and_run, ['-dcore-lint'])
-test('T13227', expect_broken(13227), compile_and_run, [''])
+test('T13227', normal, compile_and_run, [''])

@@ -210,8 +210,6 @@ type Alignment = Int -- align to next N-byte boundary (N must be a power of 2).
 -- work.
 data OneShotInfo
   = NoOneShotInfo -- ^ No information
-  | ProbOneShot   -- ^ The lambda is probably applied at most once
-                  -- See Note [Computing one-shot info, and ProbOneShot] in Demand
   | OneShotLam    -- ^ The lambda is applied at most once.
   deriving (Eq)
 
@@ -228,18 +226,13 @@ hasNoOneShotInfo _             = False
 
 worstOneShot, bestOneShot :: OneShotInfo -> OneShotInfo -> OneShotInfo
 worstOneShot NoOneShotInfo _             = NoOneShotInfo
-worstOneShot ProbOneShot   NoOneShotInfo = NoOneShotInfo
-worstOneShot ProbOneShot   _             = ProbOneShot
 worstOneShot OneShotLam    os            = os
 
 bestOneShot NoOneShotInfo os         = os
-bestOneShot ProbOneShot   OneShotLam = OneShotLam
-bestOneShot ProbOneShot   _          = ProbOneShot
 bestOneShot OneShotLam    _          = OneShotLam
 
 pprOneShotInfo :: OneShotInfo -> SDoc
 pprOneShotInfo NoOneShotInfo = empty
-pprOneShotInfo ProbOneShot   = text "ProbOneShot"
 pprOneShotInfo OneShotLam    = text "OneShot"
 
 instance Outputable OneShotInfo where

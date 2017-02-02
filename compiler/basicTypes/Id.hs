@@ -762,7 +762,7 @@ isOneShotBndr var
 
 -- | Should we apply the state hack to values of this 'Type'?
 stateHackOneShot :: OneShotInfo
-stateHackOneShot = OneShotLam         -- Or maybe ProbOneShot?
+stateHackOneShot = OneShotLam
 
 typeOneShot :: Type -> OneShotInfo
 typeOneShot ty
@@ -798,7 +798,6 @@ isStateHackType ty
 isProbablyOneShotLambda :: Id -> Bool
 isProbablyOneShotLambda id = case idStateHackOneShotInfo id of
                                OneShotLam    -> True
-                               ProbOneShot   -> True
                                NoOneShotInfo -> False
 
 setOneShotLambda :: Id -> Id
@@ -819,8 +818,6 @@ updOneShotInfo id one_shot
     do_upd = case (idOneShotInfo id, one_shot) of
                 (NoOneShotInfo, _) -> True
                 (OneShotLam,    _) -> False
-                (_, NoOneShotInfo) -> False
-                _                  -> True
 
 -- The OneShotLambda functions simply fiddle with the IdInfo flag
 -- But watch out: this may change the type of something else
