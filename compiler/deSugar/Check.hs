@@ -108,10 +108,10 @@ getResult ls = do
     -- Careful not to force unecessary results
     go :: Maybe PmResult -> PmResult -> Maybe PmResult
     go Nothing rs = Just rs
-    go old@(Just (PmResult prov rs us is)) new
+    go old@(Just (PmResult prov rs (UncoveredPatterns us) is)) new
       | null us && null rs && null is = old
       | otherwise =
-        let PmResult prov' rs' us' is' = new
+        let PmResult prov' rs' (UncoveredPatterns us') is' = new
             lr  = length rs
             lr' = length rs'
             li  = length is
@@ -123,6 +123,8 @@ getResult ls = do
               GT  -> Just new
               EQ  -> Just new
               LT  -> old
+    go (Just (PmResult _ _ (TypeOfUncovered _) _)) _new
+      = panic "getResult: No inhabitation candidates"
 
 data PatTy = PAT | VA -- Used only as a kind, to index PmPat
 
@@ -245,14 +247,42 @@ instance Monoid PartialResult where
 -- | Pattern check result
 --
 -- * Redundant clauses
--- * Not-covered clauses
+-- * Not-covered clauses (or their type, if no pattern is available)
 -- * Clauses with inaccessible RHS
+--
+-- More details about the classification of clauses into useful, redundant
+-- and with inaccessible right hand side can be found here:
+--
+--     https://ghc.haskell.org/trac/ghc/wiki/PatternMatchCheck
+--
 data PmResult =
   PmResult {
       pmresultProvenance :: Provenance
     , pmresultRedundant :: [Located [LPat Id]]
-    , pmresultUncovered :: Uncovered
+    , pmresultUncovered :: UncoveredCandidates
     , pmresultInaccessible :: [Located [LPat Id]] }
+
+-- | Either a list of patterns that are not covered, or their type, in case we
+-- have no patterns at hand. Not having patterns at hand can arise when
+-- handling EmptyCase expressions, in two cases:
+--
+-- * The type of the scrutinee is a trivially inhabited type (like Int or Char)
+-- * The type of the scrutinee cannot be reduced to WHNF.
+--
+-- In both these cases we have no inhabitation candidates for the type at hand,
+-- but we don't want to issue just a wildcard as missing. Instead, we print a
+-- type annotated wildcard, so that the user knows what kind of patterns is
+-- expected (e.g. (_ :: Int), or (_ :: F Int), where F Int does not reduce).
+data UncoveredCandidates = UncoveredPatterns Uncovered
+                         | TypeOfUncovered Type
+
+-- | The empty pattern check result
+emptyPmResult :: PmResult
+emptyPmResult = PmResult FromBuiltin [] (UncoveredPatterns []) []
+
+-- | Non-exhaustive empty case with unknown/trivial inhabitants
+uncoveredWithTy :: Type -> PmResult
+uncoveredWithTy ty = PmResult FromBuiltin [] (TypeOfUncovered ty) []
 
 {-
 %************************************************************************
@@ -281,10 +311,11 @@ checkSingle' locn var p = do
   tracePm "checkSingle: missing" (vcat (map pprValVecDebug missing))
                                  -- no guards
   PartialResult prov cs us ds <- runMany (pmcheckI clause []) missing
+  let us' = UncoveredPatterns us
   return $ case (cs,ds) of
-    (Covered,  _    )         -> PmResult prov [] us [] -- useful
-    (NotCovered, NotDiverged) -> PmResult prov m us []  -- redundant
-    (NotCovered, Diverged )   -> PmResult prov [] us m  -- inaccessible rhs
+    (Covered,  _    )         -> PmResult prov [] us' [] -- useful
+    (NotCovered, NotDiverged) -> PmResult prov m  us' [] -- redundant
+    (NotCovered, Diverged )   -> PmResult prov [] us' m  -- inaccessible rhs
   where m = [L locn [L locn p]]
 
 -- | Check a matchgroup (case, functions, etc.)
@@ -296,22 +327,30 @@ checkMatches dflags ctxt vars matches = do
                                , text "Matches:"])
                                2
                                (vcat (map ppr matches)))
-  mb_pm_res <- tryM (getResult (checkMatches' vars matches))
+  mb_pm_res <- tryM $ getResult $ case matches of
+    -- Check EmptyCase separately
+    -- See Note [Checking EmptyCase Expressions]
+    [] | [var] <- vars -> checkEmptyCase' var
+    _normal_match      -> checkMatches' vars matches
   case mb_pm_res of
     Left  _   -> warnPmIters dflags ctxt
     Right res -> dsPmWarn dflags ctxt res
 
--- | Check a matchgroup (case, functions, etc.)
+-- | Check a matchgroup (case, functions, etc.). To be called on a non-empty
+-- list of matches. For empty case expressions, use checkEmptyCase' instead.
 checkMatches' :: [Id] -> [LMatch Id (LHsExpr Id)] -> PmM PmResult
 checkMatches' vars matches
-  | null matches = return $ PmResult FromBuiltin [] [] []
+  | null matches = panic "checkMatches': EmptyCase"
   | otherwise = do
       liftD resetPmIterDs -- set the iter-no to zero
       missing    <- mkInitialUncovered vars
       tracePm "checkMatches: missing" (vcat (map pprValVecDebug missing))
       (prov, rs,us,ds) <- go matches missing
-      return
-        $ PmResult prov (map hsLMatchToLPats rs) us (map hsLMatchToLPats ds)
+      return $ PmResult {
+                   pmresultProvenance   = prov
+                 , pmresultRedundant    = map hsLMatchToLPats rs
+                 , pmresultUncovered    = UncoveredPatterns us
+                 , pmresultInaccessible = map hsLMatchToLPats ds }
   where
     go :: [LMatch Id (LHsExpr Id)] -> Uncovered
        -> PmM (Provenance
@@ -339,7 +378,113 @@ checkMatches' vars matches
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
     hsLMatchToLPats (L l (Match _ pats _ _)) = L l pats
 
-{-
+-- | Check an empty case expression. Since there are no clauses to process, we
+--   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
+--   for details.
+checkEmptyCase' :: Id -> PmM PmResult
+checkEmptyCase' var = do
+  tm_css <- map toComplex . bagToList <$> liftD getTmCsDs
+  case tmOracle initialTmState tm_css of
+    Just tm_state -> do
+      ty_css        <- liftD getDictsDs
+      fam_insts     <- liftD dsGetFamInstEnvs
+      mb_candidates <- inhabitationCandidates fam_insts (idType var)
+      case mb_candidates of
+        -- Inhabitation checking failed / the type is trivially inhabited
+        Left ty -> return (uncoveredWithTy ty)
+
+        -- A list of inhabitant candidates is available: Check for each
+        -- one for the satisfiability of the constraints it gives rise to.
+        Right candidates -> do
+          missing_m <- flip concatMapM candidates $ \(va,tm_ct,ty_cs) -> do
+            let all_ty_cs = unionBags ty_cs ty_css
+            sat_ty <- tyOracle all_ty_cs
+            return $ case (sat_ty, tmOracle tm_state (tm_ct:tm_css)) of
+              (True, Just tm_state') -> [(va, all_ty_cs, tm_state')]
+              _non_sat               -> []
+          let mkValVec (va,all_ty_cs,tm_state')
+                = ValVec [va] (MkDelta all_ty_cs tm_state')
+              uncovered = UncoveredPatterns (map mkValVec missing_m)
+          return $ if null missing_m
+            then emptyPmResult
+            else PmResult FromBuiltin [] uncovered []
+    Nothing -> return emptyPmResult
+
+-- | Generate all inhabitation candidates for a given type. The result is
+-- either (Left ty), if the type cannot be reduced to a closed algebraic type
+-- (or if it's one trivially inhabited, like Int), or (Right candidates), if it
+-- can. In this case, the candidates are the singnature of the tycon, each one
+-- accompanied by the term- and type- constraints it gives rise to.
+-- See also Note [Checking EmptyCase Expressions]
+inhabitationCandidates :: FamInstEnvs -> Type
+                       -> PmM (Either Type [(ValAbs, ComplexEq, Bag EvVar)])
+inhabitationCandidates fam_insts ty
+  = case pmTopNormaliseType_maybe fam_insts ty of
+      Just (src_ty, dcs, core_ty) -> alts_to_check src_ty core_ty dcs
+      Nothing                     -> alts_to_check ty     ty      []
+  where
+    -- All these types are trivially inhabited
+    trivially_inhabited = [ charTyCon, doubleTyCon, floatTyCon
+                          , intTyCon, wordTyCon, word8TyCon ]
+
+    -- Note: At the moment we leave all the typing and constraint fields of
+    -- PmCon empty, since we know that they are not gonna be used. Is the
+    -- right-thing-to-do to actually create them, even if they are never used?
+    build_tm :: ValAbs -> [DataCon] -> ValAbs
+    build_tm = foldr (\dc e -> PmCon (RealDataCon dc) [] [] [] [e])
+
+    -- Inhabitation candidates, using the result of pmTopNormaliseType_maybe
+    alts_to_check :: Type -> Type -> [DataCon]
+                  -> PmM (Either Type [(ValAbs, ComplexEq, Bag EvVar)])
+    alts_to_check src_ty core_ty dcs = case splitTyConApp_maybe core_ty of
+      Just (tc, _)
+        | tc `elem` trivially_inhabited -> case dcs of
+            []    -> return (Left src_ty)
+            (_:_) -> do var <- liftD $ mkPmId (toTcType core_ty)
+                        let va = build_tm (PmVar var) dcs
+                        return $ Right [(va, mkIdEq var, emptyBag)]
+        | isClosedAlgType core_ty -> liftD $ do
+            var  <- mkPmId (toTcType core_ty) -- it would be wrong to unify x
+            alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
+            return $ Right [(build_tm va dcs, eq, cs) | (va, eq, cs) <- alts]
+      -- For other types conservatively assume that they are inhabited.
+      _other -> return (Left src_ty)
+
+{- Note [Checking EmptyCase Expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Empty case expressions are strict on the scrutinee. That is, `case x of {}`
+will force argument `x`. Hence, `checkMatches` is not sufficient for checking
+empty cases, because it assumes that the match is not strict (which is true
+for all other cases, apart from EmptyCase). This gave rise to #10746. Instead,
+we do the following:
+
+1. We normalise the outermost type family redex, data family redex or newtype,
+   using pmTopNormaliseType_maybe (in types/FamInstEnv.hs). This computes 3
+   things:
+   (a) A normalised type src_ty, which is equal to the type of the scrutinee in
+       source Haskell (does not normalise newtypes or data families)
+   (b) The actual normalised type core_ty, which coincides with the result
+       topNormaliseType_maybe. This type is not necessarily equal to the input
+       type in source Haskell. And this is precicely the reason we compute (a)
+       and (c): the reasoning happens with the underlying types, but both the
+       patterns and types we print should respect newtypes and also show the
+       family type constructors and not the representation constructors.
+
+   (c) A list of all newtype data constructors dcs, each one corresponding to a
+       newtype rewrite performed in (b).
+
+   For an example see also Note [Type normalisation for EmptyCase]
+   in types/FamInstEnv.hs.
+
+2. Function checkEmptyCase' performs the check:
+   - If core_ty is not an algebraic type, then we cannot check for
+     inhabitation, so we emit (_ :: src_ty) as missing, conservatively assuming
+     that the type is inhabited.
+   - If core_ty is an algebraic type, then we unfold the scrutinee to all
+     possible constructor patterns, using inhabitationCandidates, and then
+     check each one for constraint satisfiability, same as we for normal
+     pattern match checking.
+
 %************************************************************************
 %*                                                                      *
               Transform source syntax to *our* syntax
@@ -867,6 +1012,13 @@ mkNegEq x l = (falsePmExpr, PmExprVar (idName x) `PmExprEq` PmExprLit l)
 mkPosEq :: Id -> PmLit -> ComplexEq
 mkPosEq x l = (PmExprVar (idName x), PmExprLit l)
 {-# INLINE mkPosEq #-}
+
+-- | Create a term equality of the form: `(x ~ x)`
+-- (always discharged by the term oracle)
+mkIdEq :: Id -> ComplexEq
+mkIdEq x = (PmExprVar name, PmExprVar name)
+  where name = idName x
+{-# INLINE mkIdEq #-}
 
 -- | Generate a variable pattern of a given type
 mkPmVar :: Type -> DsM (PmPat p)
@@ -1457,15 +1609,20 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
   = when (flag_i || flag_u) $ do
       let exists_r = flag_i && notNull redundant && onlyBuiltin
           exists_i = flag_i && notNull inaccessible && onlyBuiltin
-          exists_u = flag_u && notNull uncovered
+          exists_u = flag_u && (case uncovered of
+                                  TypeOfUncovered   _ -> True
+                                  UncoveredPatterns u -> notNull u)
+
       when exists_r $ forM_ redundant $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "is redundant"))
       when exists_i $ forM_ inaccessible $ \(L l q) -> do
         putSrcSpanDs l (warnDs (Reason Opt_WarnOverlappingPatterns)
                                (pprEqn q "has inaccessible right hand side"))
-      when exists_u $
-        putSrcSpanDs loc (warnDs flag_u_reason (pprEqns uncovered))
+      when exists_u $ putSrcSpanDs loc $ warnDs flag_u_reason $
+        case uncovered of
+          TypeOfUncovered ty           -> warnEmptyCase ty
+          UncoveredPatterns candidates -> pprEqns candidates
   where
     PmResult
       { pmresultProvenance = prov
@@ -1493,6 +1650,11 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
                        in  hang (text "Patterns not matched:") 4
                                 (vcat (take maxPatterns us)
                                  $$ dots maxPatterns us)
+
+    -- Print a type-annotated wildcard (for non-exhaustive `EmptyCase`s for
+    -- which we only know the type and have no inhabitants at hand)
+    warnEmptyCase ty = pp_context False ctx (text "are non-exhaustive") $ \_ ->
+      hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
 
 -- | Issue a warning when the predefined number of iterations is exceeded
 -- for the pattern match checker

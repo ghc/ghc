@@ -107,7 +107,7 @@ module Type (
 
         -- (Lifting and boxity)
         isLiftedType_maybe, isUnliftedType, isUnboxedTupleType, isUnboxedSumType,
-        isAlgType, isClosedAlgType,
+        isAlgType, isClosedAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
@@ -1941,6 +1941,12 @@ isClosedAlgType ty
       Just (tc, ty_args) | isAlgTyCon tc && not (isFamilyTyCon tc)
              -> ASSERT2( ty_args `lengthIs` tyConArity tc, ppr ty ) True
       _other -> False
+
+-- | Check whether a type is a data family type
+isDataFamilyAppType :: Type -> Bool
+isDataFamilyAppType ty = case tyConAppTyCon_maybe ty of
+                           Just tc -> isDataFamilyTyCon tc
+                           _       -> False
 
 -- | Computes whether an argument (or let right hand side) should
 -- be computed strictly or lazily, based only on its type.

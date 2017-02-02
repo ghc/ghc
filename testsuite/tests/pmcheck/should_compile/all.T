@@ -59,3 +59,27 @@ test('pmc007', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11245', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+
+# EmptyCase
+test('T10746', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase001', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase002', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase003', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase004', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase005', [], compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase006', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase007', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase008', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase009', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('EmptyCase010', [],  compile,
+     ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
