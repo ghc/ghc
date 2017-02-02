@@ -1202,7 +1202,6 @@ Main functions are:
 runMany :: (ValVec -> PmM PartialResult) -> (Uncovered -> PmM PartialResult)
 runMany _ [] = return mempty
 runMany pm (m:ms) = mappend <$> pm m <*> runMany pm ms
-{-# INLINE runMany #-}
 
 -- | Generate the initial uncovered set. It initializes the
 -- delta with all term and type constraints in scope.
