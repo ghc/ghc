@@ -46,7 +46,6 @@ import HscTypes
 import Packages         ( pprPackages, pprPackagesSimple )
 import DriverPhases
 import BasicTypes       ( failed )
-import StaticFlags
 import DynFlags
 import ErrUtils
 import FastString
@@ -113,13 +112,10 @@ main = do
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 
-    let argv1' = map (mkGeneralLocated "on the commandline") argv1
-    (argv2, staticFlagWarnings) <- parseStaticFlags argv1'
+    let argv2 = map (mkGeneralLocated "on the commandline") argv1
 
     -- 2. Parse the "mode" flags (--make, --interactive etc.)
-    (mode, argv3, modeFlagWarnings) <- parseModeFlags argv2
-
-    let flagWarnings = staticFlagWarnings ++ modeFlagWarnings
+    (mode, argv3, flagWarnings) <- parseModeFlags argv2
 
     -- If all we want to do is something like showing the version number
     -- then do it now, before we start a GHC session etc. This makes
@@ -238,10 +234,6 @@ main' postLoadMode dflags0 args flagWarnings = do
     v | v == 4 -> liftIO $ dumpPackagesSimple dflags6
       | v >= 5 -> liftIO $ dumpPackages dflags6
       | otherwise -> return ()
-
-  when (verbosity dflags6 >= 3) $ do
-        liftIO $ hPutStrLn stderr ("Hsc static flags: " ++ unwords staticFlags)
-
 
   liftIO $ initUniqSupply (initialUnique dflags6) (uniqueIncrement dflags6)
         ---------------- Final sanity checking -----------
@@ -775,17 +767,9 @@ showOptions isInteractive = putStr (unlines availableOptions)
     where
       availableOptions = concat [
         flagsForCompletion isInteractive,
-        map ('-':) (concat [
-            getFlagNames mode_flags
-          , (filterUnwantedStatic . getFlagNames $ flagsStatic)
-          , flagsStaticNames
-          ])
+        map ('-':) (getFlagNames mode_flags)
         ]
       getFlagNames opts         = map flagName opts
-      -- this is a hack to get rid of two unwanted entries that get listed
-      -- as static flags. Hopefully this hack will disappear one day together
-      -- with static flags
-      filterUnwantedStatic      = filter (`notElem`["f", "fno-"])
 
 showGhcUsage :: DynFlags -> IO ()
 showGhcUsage = showUsage False

@@ -59,7 +59,6 @@ import CoreSyn
 import HscTypes
 import Module
 import DynFlags
-import StaticFlags
 import BasicTypes       ( CompilerPhase(..) )
 import Annotations
 
@@ -251,8 +250,8 @@ bindsOnlyPass pass guts
 ************************************************************************
 -}
 
-verboseSimplStats :: Bool
-verboseSimplStats = opt_PprStyle_Debug          -- For now, anyway
+getVerboseSimplStats :: (Bool -> SDoc) -> SDoc
+getVerboseSimplStats = sdocWithPprDebug          -- For now, anyway
 
 zeroSimplCount     :: DynFlags -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool
@@ -340,7 +339,8 @@ pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
   = vcat [text "Total ticks:    " <+> int tks,
           blankLine,
           pprTickCounts dts,
-          if verboseSimplStats then
+          getVerboseSimplStats $ \dbg -> if dbg
+          then
                 vcat [blankLine,
                       text "Log (most recent first)",
                       nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
@@ -740,8 +740,8 @@ msg sev doc
                      SevDump    -> dump_sty
                      _          -> user_sty
              err_sty  = mkErrStyle dflags unqual
-             user_sty = mkUserStyle unqual AllTheWay
-             dump_sty = mkDumpStyle unqual
+             user_sty = mkUserStyle dflags unqual AllTheWay
+             dump_sty = mkDumpStyle dflags unqual
        ; liftIO $
          (log_action dflags) dflags NoReason sev loc sty doc }
 

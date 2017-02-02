@@ -531,7 +531,6 @@ compiler_stage2_dll0_MODULES = \
 	RdrName \
 	Rules \
 	SrcLoc \
-	StaticFlags \
 	StringBuffer \
 	SysTools.Terminal \
 	TcEvidence \

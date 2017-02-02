@@ -59,7 +59,6 @@ import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IO ( IO(..) )
 
-import StaticFlags( opt_PprStyle_Debug )
 import Control.Monad
 import Data.Maybe
 import Data.Array.Base
@@ -340,22 +339,22 @@ ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   return $ cparen (not (null tt) && p >= app_prec)
                   (text dc_tag <+> pprDeeperList fsep tt_docs)
 
-ppr_termM y p Term{dc=Right dc, subTerms=tt}
+ppr_termM y p Term{dc=Right dc, subTerms=tt} = do
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
   = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2)
     <+> hsep (map (ppr_term1 True) tt)
 -} -- TODO Printing infix constructors properly
-  | null sub_terms_to_show
-  = return (ppr dc)
-  | otherwise
-  = do { tt_docs <- mapM (y app_prec) sub_terms_to_show
-       ; return $ cparen (p >= app_prec) $
-         sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)] }
-  where
-    sub_terms_to_show   -- Don't show the dictionary arguments to
-                        -- constructors unless -dppr-debug is on
-      | opt_PprStyle_Debug = tt
-      | otherwise = dropList (dataConTheta dc) tt
+  tt_docs' <- mapM (y app_prec) tt
+  return $ sdocWithPprDebug $ \dbg ->
+    -- Don't show the dictionary arguments to
+    -- constructors unless -dppr-debug is on
+    let tt_docs = if dbg
+           then tt_docs'
+           else dropList (dataConTheta dc) tt_docs'
+    in if null tt_docs
+      then ppr dc
+      else cparen (p >= app_prec) $
+             sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)]
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 ppr_termM y p RefWrap{wrapped_term=t}  = do

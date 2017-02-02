@@ -73,7 +73,6 @@ import Lexeme
 import FastString
 import Pair
 import Bag
-import StaticFlags( opt_PprStyle_Debug )
 
 import Data.List  ( partition, intersperse )
 
@@ -156,9 +155,10 @@ for the instance decl, which it probably wasn't, so the decls
 produced don't get through the typechecker.
 -}
 
-gen_Eq_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
-gen_Eq_binds loc tycon
-  = (method_binds, aux_binds)
+gen_Eq_binds :: SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff)
+gen_Eq_binds loc tycon = do
+    dflags <- getDynFlags
+    return (method_binds dflags, aux_binds)
   where
     all_cons = tyConDataCons tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon all_cons
@@ -172,7 +172,7 @@ gen_Eq_binds loc tycon
 
     no_tag_match_cons = null tag_match_cons
 
-    fall_through_eqn
+    fall_through_eqn dflags
       | no_tag_match_cons   -- All constructors have arguments
       = case pat_match_cons of
           []  -> []   -- No constructors; no fall-though case
@@ -184,14 +184,18 @@ gen_Eq_binds loc tycon
       | otherwise -- One or more tag_match cons; add fall-through of
                   -- extract tags compare for equality
       = [([a_Pat, b_Pat],
-         untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
+         untag_Expr dflags tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
                     (genPrimOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
 
     aux_binds | no_tag_match_cons = emptyBag
               | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
-    method_binds = listToBag [eq_bind, ne_bind]
-    eq_bind = mk_FunBind loc eq_RDR (map pats_etc pat_match_cons ++ fall_through_eqn)
+    method_binds dflags = listToBag
+      [ eq_bind dflags
+      , ne_bind
+      ]
+    eq_bind dflags = mk_FunBind loc eq_RDR (map pats_etc pat_match_cons
+                                            ++ fall_through_eqn dflags)
     ne_bind = mk_easy_FunBind loc ne_RDR [a_Pat, b_Pat] (
                         nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
 
@@ -333,22 +337,25 @@ gtResult OrdGE      = true_Expr
 gtResult OrdGT      = true_Expr
 
 ------------
-gen_Ord_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
-gen_Ord_binds loc tycon
-  | null tycon_data_cons        -- No data-cons => invoke bale-out case
-  = (unitBag $ mk_FunBind loc compare_RDR [], emptyBag)
-  | otherwise
-  = (unitBag (mkOrdOp OrdCompare) `unionBags` other_ops, aux_binds)
+gen_Ord_binds :: SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff)
+gen_Ord_binds loc tycon = do
+    dflags <- getDynFlags
+    return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
+      then ( unitBag $ mk_FunBind loc compare_RDR []
+           , emptyBag)
+      else ( unitBag (mkOrdOp dflags OrdCompare) `unionBags` other_ops dflags
+           , aux_binds)
   where
     aux_binds | single_con_type = emptyBag
               | otherwise       = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
         -- Note [Game plan for deriving Ord]
-    other_ops | (last_tag - first_tag) <= 2     -- 1-3 constructors
-                || null non_nullary_cons        -- Or it's an enumeration
-              = listToBag [mkOrdOp OrdLT, lE, gT, gE]
-              | otherwise
-              = emptyBag
+    other_ops dflags
+      | (last_tag - first_tag) <= 2     -- 1-3 constructors
+        || null non_nullary_cons        -- Or it's an enumeration
+      = listToBag [mkOrdOp dflags OrdLT, lE, gT, gE]
+      | otherwise
+      = emptyBag
 
     negate_expr = nlHsApp (nlHsVar not_RDR)
     lE = mk_easy_FunBind loc le_RDR [a_Pat, b_Pat] $
@@ -372,37 +379,39 @@ gen_Ord_binds loc tycon
     (nullary_cons, non_nullary_cons) = partition isNullarySrcDataCon tycon_data_cons
 
 
-    mkOrdOp :: OrdOp -> LHsBind RdrName
+    mkOrdOp :: DynFlags -> OrdOp -> LHsBind RdrName
     -- Returns a binding   op a b = ... compares a and b according to op ....
-    mkOrdOp op = mk_easy_FunBind loc (ordMethRdr op) [a_Pat, b_Pat] (mkOrdOpRhs op)
+    mkOrdOp dflags op = mk_easy_FunBind loc (ordMethRdr op) [a_Pat, b_Pat]
+                                        (mkOrdOpRhs dflags op)
 
-    mkOrdOpRhs :: OrdOp -> LHsExpr RdrName
-    mkOrdOpRhs op       -- RHS for comparing 'a' and 'b' according to op
+    mkOrdOpRhs :: DynFlags -> OrdOp -> LHsExpr RdrName
+    mkOrdOpRhs dflags op       -- RHS for comparing 'a' and 'b' according to op
       | length nullary_cons <= 2  -- Two nullary or fewer, so use cases
       = nlHsCase (nlHsVar a_RDR) $
-        map (mkOrdOpAlt op) tycon_data_cons
+        map (mkOrdOpAlt dflags op) tycon_data_cons
         -- i.e.  case a of { C1 x y -> case b of C1 x y -> ....compare x,y...
         --                   C2 x   -> case b of C2 x -> ....comopare x.... }
 
       | null non_nullary_cons    -- All nullary, so go straight to comparing tags
-      = mkTagCmp op
+      = mkTagCmp dflags op
 
       | otherwise                -- Mixed nullary and non-nullary
       = nlHsCase (nlHsVar a_RDR) $
-        (map (mkOrdOpAlt op) non_nullary_cons
-         ++ [mkHsCaseAlt nlWildPat (mkTagCmp op)])
+        (map (mkOrdOpAlt dflags op) non_nullary_cons
+         ++ [mkHsCaseAlt nlWildPat (mkTagCmp dflags op)])
 
 
-    mkOrdOpAlt :: OrdOp -> DataCon -> LMatch RdrName (LHsExpr RdrName)
+    mkOrdOpAlt :: DynFlags -> OrdOp -> DataCon
+                  -> LMatch RdrName (LHsExpr RdrName)
     -- Make the alternative  (Ki a1 a2 .. av ->
-    mkOrdOpAlt op data_con
+    mkOrdOpAlt dflags op data_con
       = mkHsCaseAlt (nlConVarPat data_con_RDR as_needed)
-                    (mkInnerRhs op data_con)
+                    (mkInnerRhs dflags op data_con)
       where
         as_needed    = take (dataConSourceArity data_con) as_RDRs
         data_con_RDR = getRdrName data_con
 
-    mkInnerRhs op data_con
+    mkInnerRhs dflags op data_con
       | single_con_type
       = nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con ]
 
@@ -425,14 +434,14 @@ gen_Ord_binds loc tycon
                                  , mkHsCaseAlt nlWildPat (gtResult op) ]
 
       | tag > last_tag `div` 2  -- lower range is larger
-      = untag_Expr tycon [(b_RDR, bh_RDR)] $
+      = untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) ltInt_RDR tag_lit)
                (gtResult op) $  -- Definitely GT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
                                  , mkHsCaseAlt nlWildPat (ltResult op) ]
 
       | otherwise               -- upper range is larger
-      = untag_Expr tycon [(b_RDR, bh_RDR)] $
+      = untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
         nlHsIf (genPrimOpApp (nlHsVar bh_RDR) gtInt_RDR tag_lit)
                (ltResult op) $  -- Definitely LT
         nlHsCase (nlHsVar b_RDR) [ mkInnerEqAlt op data_con
@@ -451,11 +460,12 @@ gen_Ord_binds loc tycon
         data_con_RDR = getRdrName data_con
         bs_needed    = take (dataConSourceArity data_con) bs_RDRs
 
-    mkTagCmp :: OrdOp -> LHsExpr RdrName
+    mkTagCmp :: DynFlags -> OrdOp -> LHsExpr RdrName
     -- Both constructors known to be nullary
     -- genreates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
-    mkTagCmp op = untag_Expr tycon [(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
-                  unliftedOrdOp tycon intPrimTy op ah_RDR bh_RDR
+    mkTagCmp dflags op =
+      untag_Expr dflags tycon[(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
+        unliftedOrdOp tycon intPrimTy op ah_RDR bh_RDR
 
 mkCompareFields :: TyCon -> OrdOp -> [Type] -> LHsExpr RdrName
 -- Generates nested comparisons for (a1,a2...) against (b1,b2,...)
@@ -567,76 +577,78 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 -}
 
-gen_Enum_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
-gen_Enum_binds loc tycon
-  = (method_binds, aux_binds)
+gen_Enum_binds :: SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff)
+gen_Enum_binds loc tycon = do
+    dflags <- getDynFlags
+    return (method_binds dflags, aux_binds)
   where
-    method_binds = listToBag [
-                        succ_enum,
-                        pred_enum,
-                        to_enum,
-                        enum_from,
-                        enum_from_then,
-                        from_enum
-                    ]
+    method_binds dflags = listToBag
+      [ succ_enum      dflags
+      , pred_enum      dflags
+      , to_enum        dflags
+      , enum_from      dflags
+      , enum_from_then dflags
+      , from_enum      dflags
+      ]
     aux_binds = listToBag $ map DerivAuxBind
                   [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon]
 
     occ_nm = getOccString tycon
 
-    succ_enum
+    succ_enum dflags
       = mk_easy_FunBind loc succ_RDR [a_Pat] $
-        untag_Expr tycon [(a_RDR, ah_RDR)] $
-        nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR tycon),
+        untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
+        nlHsIf (nlHsApps eq_RDR [nlHsVar (maxtag_RDR dflags tycon),
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "succ" occ_nm "tried to take `succ' of last tag in enumeration")
-             (nlHsApp (nlHsVar (tag2con_RDR tycon))
+             (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
                     (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                         nlHsIntLit 1]))
 
-    pred_enum
+    pred_enum dflags
       = mk_easy_FunBind loc pred_RDR [a_Pat] $
-        untag_Expr tycon [(a_RDR, ah_RDR)] $
+        untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
         nlHsIf (nlHsApps eq_RDR [nlHsIntLit 0,
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
-             (nlHsApp (nlHsVar (tag2con_RDR tycon))
+             (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
                            (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                            nlHsLit (HsInt NoSourceText (-1))]))
 
-    to_enum
+    to_enum dflags
       = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
         nlHsIf (nlHsApps and_RDR
                 [nlHsApps ge_RDR [nlHsVar a_RDR, nlHsIntLit 0],
-                 nlHsApps le_RDR [nlHsVar a_RDR, nlHsVar (maxtag_RDR tycon)]])
-             (nlHsVarApps (tag2con_RDR tycon) [a_RDR])
-             (illegal_toEnum_tag occ_nm (maxtag_RDR tycon))
+                 nlHsApps le_RDR [ nlHsVar a_RDR
+                                 , nlHsVar (maxtag_RDR dflags tycon)]])
+             (nlHsVarApps (tag2con_RDR dflags tycon) [a_RDR])
+             (illegal_toEnum_tag occ_nm (maxtag_RDR dflags tycon))
 
-    enum_from
+    enum_from dflags
       = mk_easy_FunBind loc enumFrom_RDR [a_Pat] $
-          untag_Expr tycon [(a_RDR, ah_RDR)] $
+          untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           nlHsApps map_RDR
-                [nlHsVar (tag2con_RDR tycon),
+                [nlHsVar (tag2con_RDR dflags tycon),
                  nlHsPar (enum_from_to_Expr
                             (nlHsVarApps intDataCon_RDR [ah_RDR])
-                            (nlHsVar (maxtag_RDR tycon)))]
+                            (nlHsVar (maxtag_RDR dflags tycon)))]
 
-    enum_from_then
+    enum_from_then dflags
       = mk_easy_FunBind loc enumFromThen_RDR [a_Pat, b_Pat] $
-          untag_Expr tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
+          untag_Expr dflags tycon [(a_RDR, ah_RDR), (b_RDR, bh_RDR)] $
+          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
             nlHsPar (enum_from_then_to_Expr
                     (nlHsVarApps intDataCon_RDR [ah_RDR])
                     (nlHsVarApps intDataCon_RDR [bh_RDR])
                     (nlHsIf  (nlHsApps gt_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
                                                nlHsVarApps intDataCon_RDR [bh_RDR]])
                            (nlHsIntLit 0)
-                           (nlHsVar (maxtag_RDR tycon))
+                           (nlHsVar (maxtag_RDR dflags tycon))
                            ))
 
-    from_enum
+    from_enum dflags
       = mk_easy_FunBind loc fromEnum_RDR [a_Pat] $
-          untag_Expr tycon [(a_RDR, ah_RDR)] $
+          untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
           (nlHsVarApps intDataCon_RDR [ah_RDR])
 
 {-
@@ -734,35 +746,38 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 -}
 
-gen_Ix_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+gen_Ix_binds :: SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff)
 
-gen_Ix_binds loc tycon
-  | isEnumerationTyCon tycon
-  = ( enum_ixes
-    , listToBag $ map DerivAuxBind
+gen_Ix_binds loc tycon = do
+    dflags <- getDynFlags
+    return $ if isEnumerationTyCon tycon
+      then (enum_ixes dflags, listToBag $ map DerivAuxBind
                    [DerivCon2Tag tycon, DerivTag2Con tycon, DerivMaxTag tycon])
-  | otherwise
-  = (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon)))
+      else (single_con_ixes, unitBag (DerivAuxBind (DerivCon2Tag tycon)))
   where
     --------------------------------------------------------------
-    enum_ixes = listToBag [ enum_range, enum_index, enum_inRange ]
+    enum_ixes dflags = listToBag
+      [ enum_range   dflags
+      , enum_index   dflags
+      , enum_inRange dflags
+      ]
 
-    enum_range
+    enum_range dflags
       = mk_easy_FunBind loc range_RDR [nlTuplePat [a_Pat, b_Pat] Boxed] $
-          untag_Expr tycon [(a_RDR, ah_RDR)] $
-          untag_Expr tycon [(b_RDR, bh_RDR)] $
-          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR tycon]) $
+          untag_Expr dflags tycon [(a_RDR, ah_RDR)] $
+          untag_Expr dflags tycon [(b_RDR, bh_RDR)] $
+          nlHsApp (nlHsVarApps map_RDR [tag2con_RDR dflags tycon]) $
               nlHsPar (enum_from_to_Expr
                         (nlHsVarApps intDataCon_RDR [ah_RDR])
                         (nlHsVarApps intDataCon_RDR [bh_RDR]))
 
-    enum_index
+    enum_index dflags
       = mk_easy_FunBind loc unsafeIndex_RDR
                 [noLoc (AsPat (noLoc c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
-           untag_Expr tycon [(a_RDR, ah_RDR)] (
-           untag_Expr tycon [(d_RDR, dh_RDR)] (
+           untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
+           untag_Expr dflags tycon [(d_RDR, dh_RDR)] (
            let
                 rhs = nlHsVarApps intDataCon_RDR [c_RDR]
            in
@@ -773,11 +788,11 @@ gen_Ix_binds loc tycon
         )
 
     -- This produces something like `(ch >= ah) && (ch <= bh)`
-    enum_inRange
+    enum_inRange dflags
       = mk_easy_FunBind loc inRange_RDR [nlTuplePat [a_Pat, b_Pat] Boxed, c_Pat] $
-          untag_Expr tycon [(a_RDR, ah_RDR)] (
-          untag_Expr tycon [(b_RDR, bh_RDR)] (
-          untag_Expr tycon [(c_RDR, ch_RDR)] (
+          untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
+          untag_Expr dflags tycon [(b_RDR, bh_RDR)] (
+          untag_Expr dflags tycon [(c_RDR, ch_RDR)] (
           -- This used to use `if`, which interacts badly with RebindableSyntax.
           -- See #11396.
           nlHsApps and_RDR
@@ -1734,12 +1749,13 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 -}
 
-genAuxBindSpec :: SrcSpan -> AuxBindSpec -> (LHsBind RdrName, LSig RdrName)
-genAuxBindSpec loc (DerivCon2Tag tycon)
+genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
+                  -> (LHsBind RdrName, LSig RdrName)
+genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns,
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
-    rdr_name = con2tag_RDR tycon
+    rdr_name = con2tag_RDR dflags tycon
 
     sig_ty = mkLHsSigWcType $ L loc $ HsCoreTy $
              mkSpecSigmaTy (tyConTyVars tycon) (tyConStupidTheta tycon) $
@@ -1759,7 +1775,7 @@ genAuxBindSpec loc (DerivCon2Tag tycon)
                   nlHsLit (HsIntPrim NoSourceText
                                     (toInteger ((dataConTag con) - fIRST_TAG))))
 
-genAuxBindSpec loc (DerivTag2Con tycon)
+genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mk_FunBind loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
@@ -1769,13 +1785,13 @@ genAuxBindSpec loc (DerivTag2Con tycon)
              HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
              intTy `mkFunTy` mkParentType tycon
 
-    rdr_name = tag2con_RDR tycon
+    rdr_name = tag2con_RDR dflags tycon
 
-genAuxBindSpec loc (DerivMaxTag tycon)
+genAuxBindSpec dflags loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
-    rdr_name = maxtag_RDR tycon
+    rdr_name = maxtag_RDR dflags tycon
     sig_ty = mkLHsSigWcType (L loc (HsCoreTy intTy))
     rhs = nlHsApp (nlHsVar intDataCon_RDR)
                   (nlHsLit (HsIntPrim NoSourceText max_tag))
@@ -1788,8 +1804,8 @@ type SeparateBagsDerivStuff =
   -- Extra family instances (used by Generic and DeriveAnyClass)
   , Bag (FamInst) )
 
-genAuxBinds :: SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
-genAuxBinds loc b = genAuxBinds' b2 where
+genAuxBinds :: DynFlags -> SrcSpan -> BagDerivStuff -> SeparateBagsDerivStuff
+genAuxBinds dflags loc b = genAuxBinds' b2 where
   (b1,b2) = partitionBagWith splitDerivAuxBind b
   splitDerivAuxBind (DerivAuxBind x) = Left x
   splitDerivAuxBind  x               = Right x
@@ -1798,7 +1814,7 @@ genAuxBinds loc b = genAuxBinds' b2 where
   dup_check a b = if anyBag (== a) b then b else consBag a b
 
   genAuxBinds' :: BagDerivStuff -> SeparateBagsDerivStuff
-  genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec loc) (rm_dups b1)
+  genAuxBinds' = foldrBag f ( mapBag (genAuxBindSpec dflags loc) (rm_dups b1)
                             , emptyBag )
   f :: DerivStuff -> SeparateBagsDerivStuff -> SeparateBagsDerivStuff
   f (DerivAuxBind _) = panic "genAuxBinds'" -- We have removed these before
@@ -1969,11 +1985,13 @@ eq_Expr tycon ty a b
  where
    (_, _, prim_eq, _, _) = primOrdOps "Eq" tycon ty
 
-untag_Expr :: TyCon -> [( RdrName,  RdrName)] -> LHsExpr RdrName -> LHsExpr RdrName
-untag_Expr _ [] expr = expr
-untag_Expr tycon ((untag_this, put_tag_here) : more) expr
-  = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR tycon) [untag_this])) {-of-}
-      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr tycon more expr)]
+untag_Expr :: DynFlags -> TyCon -> [( RdrName,  RdrName)]
+              -> LHsExpr RdrName -> LHsExpr RdrName
+untag_Expr _ _ [] expr = expr
+untag_Expr dflags tycon ((untag_this, put_tag_here) : more) expr
+  = nlHsCase (nlHsPar (nlHsVarApps (con2tag_RDR dflags tycon)
+                                   [untag_this])) {-of-}
+      [mkHsCaseAlt (nlVarPat put_tag_here) (untag_Expr dflags tycon more expr)]
 
 enum_from_to_Expr
         :: LHsExpr RdrName -> LHsExpr RdrName
@@ -2083,25 +2101,26 @@ minusInt_RDR, tagToEnum_RDR :: RdrName
 minusInt_RDR  = getRdrName (primOpId IntSubOp   )
 tagToEnum_RDR = getRdrName (primOpId TagToEnumOp)
 
-con2tag_RDR, tag2con_RDR, maxtag_RDR :: TyCon -> RdrName
+con2tag_RDR, tag2con_RDR, maxtag_RDR :: DynFlags -> TyCon -> RdrName
 -- Generates Orig s RdrName, for the binding positions
-con2tag_RDR tycon = mk_tc_deriv_name tycon mkCon2TagOcc
-tag2con_RDR tycon = mk_tc_deriv_name tycon mkTag2ConOcc
-maxtag_RDR  tycon = mk_tc_deriv_name tycon mkMaxTagOcc
+con2tag_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkCon2TagOcc
+tag2con_RDR dflags tycon = mk_tc_deriv_name dflags tycon mkTag2ConOcc
+maxtag_RDR  dflags tycon = mk_tc_deriv_name dflags tycon mkMaxTagOcc
 
-mk_tc_deriv_name :: TyCon -> (OccName -> OccName) -> RdrName
-mk_tc_deriv_name tycon occ_fun = mkAuxBinderName (tyConName tycon) occ_fun
+mk_tc_deriv_name :: DynFlags -> TyCon -> (OccName -> OccName) -> RdrName
+mk_tc_deriv_name dflags tycon occ_fun =
+   mkAuxBinderName dflags (tyConName tycon) occ_fun
 
-mkAuxBinderName :: Name -> (OccName -> OccName) -> RdrName
+mkAuxBinderName :: DynFlags -> Name -> (OccName -> OccName) -> RdrName
 -- ^ Make a top-level binder name for an auxiliary binding for a parent name
 -- See Note [Auxiliary binders]
-mkAuxBinderName parent occ_fun
+mkAuxBinderName dflags parent occ_fun
   = mkRdrUnqual (occ_fun stable_parent_occ)
   where
     stable_parent_occ = mkOccName (occNameSpace parent_occ) stable_string
     stable_string
-      | opt_PprStyle_Debug = parent_stable
-      | otherwise = parent_stable_hash
+      | hasPprDebug dflags = parent_stable
+      | otherwise          = parent_stable_hash
     parent_stable = nameStableString parent
     parent_stable_hash =
       let Fingerprint high low = fingerprintString parent_stable

@@ -199,11 +199,11 @@ hasStockDeriving clas
                           -> TyCon
                           -> [Type]
                           -> TcM (LHsBinds RdrName, BagDerivStuff))]
-    gen_list = [ (eqClassKey,          simple gen_Eq_binds)
-               , (ordClassKey,         simple gen_Ord_binds)
-               , (enumClassKey,        simple gen_Enum_binds)
+    gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
+               , (ordClassKey,         simpleM gen_Ord_binds)
+               , (enumClassKey,        simpleM gen_Enum_binds)
                , (boundedClassKey,     simple gen_Bounded_binds)
-               , (ixClassKey,          simple gen_Ix_binds)
+               , (ixClassKey,          simpleM gen_Ix_binds)
                , (showClassKey,        with_fix_env gen_Show_binds)
                , (readClassKey,        with_fix_env gen_Read_binds)
                , (dataClassKey,        simpleM gen_Data_binds)

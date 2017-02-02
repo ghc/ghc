@@ -54,7 +54,6 @@ import NameEnv
 import UniqFM
 import Unify            ( ruleMatchTyKiX )
 import BasicTypes       ( Activation, CompilerPhase, isActive, pprRuleName )
-import StaticFlags      ( opt_PprStyle_Debug )
 import DynFlags         ( DynFlags )
 import Outputable
 import FastString
@@ -255,14 +254,14 @@ functions (lambdas) except by name, so in this case it seems like
 a good idea to treat 'M.k' as a roughTopName of the call.
 -}
 
-pprRulesForUser :: [CoreRule] -> SDoc
+pprRulesForUser :: DynFlags -> [CoreRule] -> SDoc
 -- (a) tidy the rules
 -- (b) sort them into order based on the rule name
 -- (c) suppress uniques (unless -dppr-debug is on)
 -- This combination makes the output stable so we can use in testing
 -- It's here rather than in PprCore because it calls tidyRules
-pprRulesForUser rules
-  = withPprStyle defaultUserStyle $
+pprRulesForUser dflags rules
+  = withPprStyle (defaultUserStyle dflags) $
     pprRules $
     sortBy (comparing ru_name) $
     tidyRules emptyTidyEnv rules
@@ -419,15 +418,16 @@ findBest _      (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
-  | debugIsOn = let pp_rule rule
-                        | opt_PprStyle_Debug = ppr rule
-                        | otherwise          = doubleQuotes (ftext (ru_name rule))
+  | debugIsOn = let pp_rule rule = sdocWithPprDebug $ \dbg -> if dbg
+                        then ppr rule
+                        else doubleQuotes (ftext (ru_name rule))
                 in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
-                         (vcat [if opt_PprStyle_Debug then
-                                   text "Expression to match:" <+> ppr fn <+> sep (map ppr args)
-                                else empty,
-                                text "Rule 1:" <+> pp_rule rule1,
-                                text "Rule 2:" <+> pp_rule rule2]) $
+                         (vcat [ sdocWithPprDebug $ \dbg -> if dbg
+                                   then text "Expression to match:" <+> ppr fn
+                                        <+> sep (map ppr args)
+                                   else empty
+                               , text "Rule 1:" <+> pp_rule rule1
+                               , text "Rule 2:" <+> pp_rule rule2]) $
                 findBest target (rule1,ans1) prs
   | otherwise = findBest target (rule1,ans1) prs
   where

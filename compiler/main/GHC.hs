@@ -31,7 +31,6 @@ module GHC (
         getSessionDynFlags, setSessionDynFlags,
         getProgramDynFlags, setProgramDynFlags,
         getInteractiveDynFlags, setInteractiveDynFlags,
-        parseStaticFlags,
 
         -- * Targets
         Target(..), TargetId(..), Phase,
@@ -276,7 +275,6 @@ module GHC (
  ToDo:
 
   * inline bits of HscMain here to simplify layering: hscTcExpr, hscStmt.
-  * what StaticFlags should we expose, if any?
 -}
 
 #include "HsVersions.h"
@@ -317,7 +315,6 @@ import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
 import HscTypes
 import DynFlags
-import StaticFlags
 import SysTools
 import Annotations
 import Module
@@ -479,8 +476,7 @@ withCleanupSession ghc = ghc `gfinally` cleanup
 initGhcMonad :: GhcMonad m => Maybe FilePath -> m ()
 initGhcMonad mb_top_dir
   = do { env <- liftIO $
-                do { initStaticOpts
-                   ; mySettings <- initSysTools mb_top_dir
+                do { mySettings <- initSysTools mb_top_dir
                    ; dflags <- initDynFlags (defaultDynFlags mySettings)
                    ; checkBrokenTablesNextToCode dflags
                    ; setUnsafeGlobalDynFlags dflags

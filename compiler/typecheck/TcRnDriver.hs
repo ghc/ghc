@@ -57,7 +57,6 @@ import Plugins ( tcPlugin )
 #endif
 
 import DynFlags
-import StaticFlags
 import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
 import IfaceType( ShowForAllFlag(..) )
@@ -1169,9 +1168,9 @@ missingBootThing is_boot name what
     <+> text "file, but not"
     <+> text what <+> text "the module"
 
-badReexportedBootThing :: Bool -> Name -> Name -> SDoc
-badReexportedBootThing is_boot name name'
-  = withPprStyle (mkUserStyle alwaysQualify AllTheWay) $ vcat
+badReexportedBootThing :: DynFlags -> Bool -> Name -> Name -> SDoc
+badReexportedBootThing dflags is_boot name name'
+  = withPprStyle (mkUserStyle dflags alwaysQualify AllTheWay) $ vcat
         [ text "The" <+> (if is_boot then text "hs-boot" else text "hsig")
            <+> text "file (re)exports" <+> quotes (ppr name)
         , text "but the implementing module exports a different identifier" <+> quotes (ppr name')
@@ -2461,31 +2460,33 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                 -- wobbling in testsuite output
 
 ppr_types :: TypeEnv -> SDoc
-ppr_types type_env
-  = text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
-  where
+ppr_types type_env = sdocWithPprDebug $ \dbg ->
+  let
     ids = [id | id <- typeEnvIds type_env, want_sig id]
-    want_sig id | opt_PprStyle_Debug
+    want_sig id | dbg
                 = True
                 | otherwise
                 = isExternalName (idName id) &&
                   (not (isDerivedOccName (getOccName id)))
         -- Top-level user-defined things have External names.
         -- Suppress internally-generated things unless -dppr-debug
+  in
+  text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
-ppr_tycons fam_insts type_env
-  = vcat [ text "TYPE CONSTRUCTORS"
-         ,   nest 2 (ppr_tydecls tycons)
-         , text "COERCION AXIOMS"
-         ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
-  where
+ppr_tycons fam_insts type_env = sdocWithPprDebug $ \dbg ->
+  let
     fi_tycons = famInstsRepTyCons fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]
-    want_tycon tycon | opt_PprStyle_Debug = True
-                     | otherwise          = not (isImplicitTyCon tycon) &&
-                                            isExternalName (tyConName tycon) &&
-                                            not (tycon `elem` fi_tycons)
+    want_tycon tycon | dbg        = True
+                     | otherwise  = not (isImplicitTyCon tycon) &&
+                                    isExternalName (tyConName tycon) &&
+                                    not (tycon `elem` fi_tycons)
+  in
+  vcat [ text "TYPE CONSTRUCTORS"
+       ,   nest 2 (ppr_tydecls tycons)
+       , text "COERCION AXIOMS"
+       ,   nest 2 (vcat (map pprCoAxiom (typeEnvCoAxioms type_env))) ]
 
 ppr_insts :: [ClsInst] -> SDoc
 ppr_insts []     = empty

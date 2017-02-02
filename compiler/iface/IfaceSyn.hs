@@ -64,7 +64,6 @@ import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( TyVarBndr(..) )
 import TyCon ( Role (..), Injectivity(..), HowAbstract(..) )
-import StaticFlags (opt_PprStyle_Debug)
 import Util( filterOut, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
@@ -980,7 +979,7 @@ pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
            | otherwise
            = sep [pp_field_args, arrow <+> pp_res_ty]
 
-    ppr_bang IfNoBang = ppWhen opt_PprStyle_Debug $ char '_'
+    ppr_bang IfNoBang = sdocWithPprDebug $ \dbg -> ppWhen dbg $ char '_'
     ppr_bang IfStrict = char '!'
     ppr_bang IfUnpack = text "{-# UNPACK #-}"
     ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>

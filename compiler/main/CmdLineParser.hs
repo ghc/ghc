@@ -4,8 +4,7 @@
 --
 -- | Command-line parser
 --
--- This is an abstract command-line parser used by both StaticFlags and
--- DynFlags.
+-- This is an abstract command-line parser used by DynFlags.
 --
 -- (c) The University of Glasgow 2005
 --

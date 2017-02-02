@@ -16,11 +16,10 @@ main = do
 runGhc' :: [String] -> Ghc a -> IO a
 runGhc' args act = do
     let libdir = head args
-        flags  = tail args
-    (dynFlags, _warns) <- parseStaticFlags (map noLoc flags)
+        flags  = map noLoc (tail args)
     runGhc (Just libdir) $ do
       dflags0 <- getSessionDynFlags
-      (dflags1, _leftover, _warns) <- parseDynamicFlags dflags0 dynFlags
+      (dflags1, _leftover, _warns) <- parseDynamicFlags dflags0 flags
       let dflags2 = dflags1 {
               hscTarget = HscInterpreted
             , ghcLink   = LinkInMemory

@@ -232,11 +232,12 @@ tcDeriving deriv_infos deriv_decls
         ; insts1 <- mapM genInst given_specs
         ; insts2 <- mapM genInst infer_specs
 
+        ; dflags <- getDynFlags
+
         ; let (_, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
-        ; let (binds, famInsts) = genAuxBinds loc (unionManyBags deriv_stuff)
-
-        ; dflags <- getDynFlags
+        ; let (binds, famInsts) = genAuxBinds dflags loc
+                                    (unionManyBags deriv_stuff)
 
         ; let mk_inst_infos1 = map fstOf3 insts1
         ; inst_infos1 <- apply_inst_infos mk_inst_infos1 given_specs

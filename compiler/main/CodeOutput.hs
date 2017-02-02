@@ -73,7 +73,7 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
                                                    NoReason
                                                    SevDump
                                                    noSrcSpan
-                                                   defaultDumpStyle
+                                                   (defaultDumpStyle dflags)
                                                    err
                                        ; ghcExit dflags 1
                                        }

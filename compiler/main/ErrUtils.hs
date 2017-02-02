@@ -410,7 +410,7 @@ dumpIfSet dflags flag hdr doc
                             NoReason
                             SevDump
                             noSrcSpan
-                            defaultDumpStyle
+                            (defaultDumpStyle dflags)
                             (mkDumpDoc hdr doc)
 
 -- | a wrapper around 'dumpSDoc'.
@@ -453,7 +453,7 @@ mkDumpDoc hdr doc
 dumpSDoc :: DynFlags -> PrintUnqualified -> DumpFlag -> String -> SDoc -> IO ()
 dumpSDoc dflags print_unqual flag hdr doc
  = do let mFile = chooseDumpFile dflags flag
-          dump_style = mkDumpStyle print_unqual
+          dump_style = mkDumpStyle dflags print_unqual
       case mFile of
             Just fileName
                  -> do
@@ -563,12 +563,12 @@ fatalErrorMsg'' fm msg = fm msg
 compilationProgressMsg :: DynFlags -> String -> IO ()
 compilationProgressMsg dflags msg
   = ifVerbose dflags 1 $
-    logOutput dflags defaultUserStyle (text msg)
+    logOutput dflags (defaultUserStyle dflags) (text msg)
 
 showPass :: DynFlags -> String -> IO ()
 showPass dflags what
   = ifVerbose dflags 2 $
-    logInfo dflags defaultUserStyle (text "***" <+> text what <> colon)
+    logInfo dflags (defaultUserStyle dflags) (text "***" <+> text what <> colon)
 
 -- | Time a compilation phase.
 --
@@ -602,7 +602,7 @@ withTiming :: MonadIO m
 withTiming getDFlags what force_result action
   = do dflags <- getDFlags
        if verbosity dflags >= 2
-          then do liftIO $ logInfo dflags defaultUserStyle
+          then do liftIO $ logInfo dflags (defaultUserStyle dflags)
                          $ text "***" <+> what <> colon
                   alloc0 <- liftIO getAllocationCounter
                   start <- liftIO getCPUTime
@@ -612,7 +612,7 @@ withTiming getDFlags what force_result action
                   alloc1 <- liftIO getAllocationCounter
                   -- recall that allocation counter counts down
                   let alloc = alloc0 - alloc1
-                  liftIO $ logInfo dflags defaultUserStyle
+                  liftIO $ logInfo dflags (defaultUserStyle dflags)
                       (text "!!!" <+> what <> colon <+> text "finished in"
                        <+> doublePrec 2 (realToFrac (end - start) * 1e-9)
                        <+> text "milliseconds"
@@ -625,18 +625,17 @@ withTiming getDFlags what force_result action
 
 debugTraceMsg :: DynFlags -> Int -> MsgDoc -> IO ()
 debugTraceMsg dflags val msg = ifVerbose dflags val $
-                               logInfo dflags defaultDumpStyle msg
-
+                               logInfo dflags (defaultDumpStyle dflags) msg
 putMsg :: DynFlags -> MsgDoc -> IO ()
-putMsg dflags msg = logInfo dflags defaultUserStyle msg
+putMsg dflags msg = logInfo dflags (defaultUserStyle dflags) msg
 
 printInfoForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 printInfoForUser dflags print_unqual msg
-  = logInfo dflags (mkUserStyle print_unqual AllTheWay) msg
+  = logInfo dflags (mkUserStyle dflags print_unqual AllTheWay) msg
 
 printOutputForUser :: DynFlags -> PrintUnqualified -> MsgDoc -> IO ()
 printOutputForUser dflags print_unqual msg
-  = logOutput dflags (mkUserStyle print_unqual AllTheWay) msg
+  = logOutput dflags (mkUserStyle dflags print_unqual AllTheWay) msg
 
 logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 logInfo dflags sty msg

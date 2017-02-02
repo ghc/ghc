@@ -162,7 +162,6 @@ import Bag
 import Outputable
 import UniqSupply
 import DynFlags
-import StaticFlags
 import FastString
 import Panic
 import Util
@@ -697,14 +696,14 @@ traceTcRn :: DumpFlag -> SDoc -> TcRn ()
 -- for --dump-to-file, not to decide whether or not to output
 -- That part is done by the caller
 traceTcRn flag doc
-  = do { real_doc <- prettyDoc doc
-       ; dflags   <- getDynFlags
+  = do { dflags   <- getDynFlags
+       ; real_doc <- prettyDoc dflags doc
        ; printer  <- getPrintUnqualified dflags
        ; liftIO $ dumpSDoc dflags printer flag "" real_doc  }
   where
-    -- Add current location if opt_PprStyle_Debug
-    prettyDoc :: SDoc -> TcRn SDoc
-    prettyDoc doc = if opt_PprStyle_Debug
+    -- Add current location if -dppr-debug
+    prettyDoc :: DynFlags -> SDoc -> TcRn SDoc
+    prettyDoc dflags doc = if hasPprDebug dflags
        then do { loc  <- getSrcSpanM; return $ mkLocMessage SevOutput loc doc }
        else return doc -- The full location is usually way too much
 
@@ -1300,21 +1299,23 @@ add_err_tcm tidy_env err_msg loc ctxt
 mkErrInfo :: TidyEnv -> [ErrCtxt] -> TcM SDoc
 -- Tidy the error info, trimming excessive contexts
 mkErrInfo env ctxts
---  | opt_PprStyle_Debug     -- In -dppr-debug style the output
---  = return empty           -- just becomes too voluminous
- | otherwise
- = go 0 env ctxts
+--  = do
+--       dbg <- hasPprDebug <$> getDynFlags
+--       if dbg                -- In -dppr-debug style the output
+--          then return empty  -- just becomes too voluminous
+--          else go dbg 0 env ctxts
+ = go False 0 env ctxts
  where
-   go :: Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
-   go _ _   [] = return empty
-   go n env ((is_landmark, ctxt) : ctxts)
-     | is_landmark || n < mAX_CONTEXTS -- Too verbose || opt_PprStyle_Debug
+   go :: Bool -> Int -> TidyEnv -> [ErrCtxt] -> TcM SDoc
+   go _ _ _   [] = return empty
+   go dbg n env ((is_landmark, ctxt) : ctxts)
+     | is_landmark || n < mAX_CONTEXTS -- Too verbose || dbg
      = do { (env', msg) <- ctxt env
           ; let n' = if is_landmark then n else n+1
-          ; rest <- go n' env' ctxts
+          ; rest <- go dbg n' env' ctxts
           ; return (msg $$ rest) }
      | otherwise
-     = go n env ctxts
+     = go dbg n env ctxts
 
 mAX_CONTEXTS :: Int     -- No more than this number of non-landmark contexts
 mAX_CONTEXTS = 3

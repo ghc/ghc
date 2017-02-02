@@ -239,7 +239,6 @@ import Unique
 import UniqFM
 import SrcLoc
 import DynFlags
-import StaticFlags
 import ErrUtils
 import StringBuffer
 import FastString

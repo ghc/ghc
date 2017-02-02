@@ -77,7 +77,6 @@ import Outputable
 import Unique
 import UniqFM
 import Util
-import StaticFlags( opt_PprStyle_Debug )
 import NameEnv
 
 import Data.Data
@@ -1191,8 +1190,9 @@ pprNameProvenance :: GlobalRdrElt -> SDoc
 -- ^ Print out one place where the name was define/imported
 -- (With -dppr-debug, print them all)
 pprNameProvenance (GRE { gre_name = name, gre_lcl = lcl, gre_imp = iss })
-  | opt_PprStyle_Debug = vcat pp_provs
-  | otherwise          = head pp_provs
+  = sdocWithPprDebug $ \dbg -> if dbg
+      then vcat pp_provs
+      else head pp_provs
   where
     pp_provs = pp_lcl ++ map pp_is iss
     pp_lcl = if lcl then [text "defined at" <+> ppr (nameSrcLoc name)]

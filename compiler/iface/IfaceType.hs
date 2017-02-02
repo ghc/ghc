@@ -7,6 +7,7 @@ This module defines interface types and binders
 -}
 
 {-# LANGUAGE CPP, FlexibleInstances, BangPatterns #-}
+{-# LANGUAGE MultiWayIf #-}
     -- FlexibleInstances for Binary (DefMethSpec IfaceType)
 
 module IfaceType (
@@ -52,7 +53,6 @@ module IfaceType (
 import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
 
 import DynFlags
-import StaticFlags ( opt_PprStyle_Debug )
 import TyCon hiding ( pprPromotionQuote )
 import CoAxiom
 import Var
@@ -972,15 +972,17 @@ pprTyTcApp' ctxt_prec tc tys dflags style
   , rep `ifaceTyConHasKey` liftedRepDataConKey
   = kindStar
 
-  | not opt_PprStyle_Debug
-  , tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
-  = text "(TypeError ...)"   -- Suppress detail unles you _really_ want to see
-
-  | Just doc <- ppr_equality tc (tcArgsIfaceTypes tys)
-  = doc
-
   | otherwise
-  = ppr_iface_tc_app ppr_ty ctxt_prec tc tys_wo_kinds
+  = sdocWithPprDebug $ \dbg ->
+    if | not dbg && tc `ifaceTyConHasKey` errorMessageTypeErrorFamKey
+         -- Suppress detail unles you _really_ want to see
+         -> text "(TypeError ...)"
+
+       | Just doc <- ppr_equality tc (tcArgsIfaceTypes tys)
+         -> doc
+
+       | otherwise
+         -> ppr_iface_tc_app ppr_ty ctxt_prec tc tys_wo_kinds
   where
     info = ifaceTyConInfo tc
     tys_wo_kinds = tcArgsIfaceTypes $ stripInvisArgs dflags tys

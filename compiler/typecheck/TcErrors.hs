@@ -48,7 +48,6 @@ import FastString
 import Outputable
 import SrcLoc
 import DynFlags
-import StaticFlags      ( opt_PprStyle_Debug )
 import ListSetOps       ( equivClasses )
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
@@ -2666,7 +2665,7 @@ relevantBindings want_filtering ctxt ct
                     [ ppr id | TcIdBndr_ExpType id _ _ <- tcl_bndrs lcl_env ] ]
 
        ; (tidy_env', docs, discards)
-              <- go env1 ct_tvs (maxRelevantBinds dflags)
+              <- go dflags env1 ct_tvs (maxRelevantBinds dflags)
                     emptyVarSet [] False
                     (remove_shadowing $ tcl_bndrs lcl_env)
          -- tcl_bndrs has the innermost bindings first,
@@ -2704,14 +2703,14 @@ relevantBindings want_filtering ctxt ct
           else (binding:bindingAcc, extendOccSet seenNames (occName binding)))
       ([], emptyOccSet) bindings
 
-    go :: TidyEnv -> TcTyVarSet -> Maybe Int -> TcTyVarSet -> [SDoc]
+    go :: DynFlags -> TidyEnv -> TcTyVarSet -> Maybe Int -> TcTyVarSet -> [SDoc]
        -> Bool                          -- True <=> some filtered out due to lack of fuel
        -> [TcIdBinder]
        -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
-    go tidy_env _ _ _ docs discards []
+    go _ tidy_env _ _ _ docs discards []
       = return (tidy_env, reverse docs, discards)
-    go tidy_env ct_tvs n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
+    go dflags tidy_env ct_tvs n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
       = case tc_bndr of
           TcIdBndr id top_lvl -> go2 (idName id) (idType id) top_lvl
           TcIdBndr_ExpType name et top_lvl ->
@@ -2726,7 +2725,8 @@ relevantBindings want_filtering ctxt ct
                    Nothing -> discard_it  -- No info; discard
                }
       where
-        discard_it = go tidy_env ct_tvs n_left tvs_seen docs discards tc_bndrs
+        discard_it = go dflags tidy_env ct_tvs n_left tvs_seen docs
+                        discards tc_bndrs
         go2 id_name id_type top_lvl
           = do { (tidy_env', tidy_ty) <- zonkTidyTcType tidy_env id_type
                ; traceTc "relevantBindings 1" (ppr id_name <+> dcolon <+> ppr tidy_ty)
@@ -2736,7 +2736,7 @@ relevantBindings want_filtering ctxt ct
                                     <+> ppr (getSrcLoc id_name)))]
                      new_seen = tvs_seen `unionVarSet` id_tvs
 
-               ; if (want_filtering && not opt_PprStyle_Debug
+               ; if (want_filtering && not (hasPprDebug dflags)
                                     && id_tvs `disjointVarSet` ct_tvs)
                           -- We want to filter out this binding anyway
                           -- so discard it silently
@@ -2750,12 +2750,13 @@ relevantBindings want_filtering ctxt ct
                  else if run_out n_left && id_tvs `subVarSet` tvs_seen
                           -- We've run out of n_left fuel and this binding only
                           -- mentions already-seen type variables, so discard it
-                 then go tidy_env ct_tvs n_left tvs_seen docs
+                 then go dflags tidy_env ct_tvs n_left tvs_seen docs
                          True      -- Record that we have now discarded something
                          tc_bndrs
 
                           -- Keep this binding, decrement fuel
-                 else go tidy_env' ct_tvs (dec_max n_left) new_seen (doc:docs) discards tc_bndrs }
+                 else go dflags tidy_env' ct_tvs (dec_max n_left) new_seen
+                         (doc:docs) discards tc_bndrs }
 
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>

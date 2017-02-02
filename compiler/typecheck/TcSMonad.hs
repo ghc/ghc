@@ -156,7 +156,6 @@ import UniqFM
 import UniqDFM
 import Maybes
 
-import StaticFlags( opt_PprStyle_Debug )
 import TrieMap
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
@@ -362,7 +361,8 @@ instance Outputable WorkList where
           , ppUnless (null ders) $
             text "Derived =" <+> vcat (map ppr ders)
           , ppUnless (isEmptyBag implics) $
-            if opt_PprStyle_Debug  -- Typically we only want the work list for this level
+            sdocWithPprDebug $ \dbg ->
+            if dbg  -- Typically we only want the work list for this level
             then text "Implics =" <+> vcat (map ppr (bagToList implics))
             else text "(Implics omitted)"
           ])

@@ -12,6 +12,7 @@ module OptCoercion ( optCoercion, checkAxInstCo ) where
 
 #include "HsVersions.h"
 
+import DynFlags
 import TyCoRep
 import Coercion
 import Type hiding( substTyVarBndr, substTy )
@@ -20,7 +21,6 @@ import TyCon
 import CoAxiom
 import VarSet
 import VarEnv
-import StaticFlags      ( opt_NoOptCoercion )
 import Outputable
 import FamInstEnv ( flattenTys )
 import Pair
@@ -87,7 +87,7 @@ optCoercion :: TCvSubst -> Coercion -> NormalCo
 -- ^ optCoercion applies a substitution to a coercion,
 --   *and* optimises it to reduce its size
 optCoercion env co
-  | opt_NoOptCoercion = substCo env co
+  | hasNoOptCoercion unsafeGlobalDynFlags = substCo env co
   | debugIsOn
   = let out_co = opt_co1 lc False co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co

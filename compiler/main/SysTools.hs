@@ -1353,10 +1353,12 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
               msg <- readChan chan
               case msg of
                 BuildMsg msg -> do
-                  log_action dflags dflags NoReason SevInfo noSrcSpan defaultUserStyle msg
+                  log_action dflags dflags NoReason SevInfo noSrcSpan
+                     (defaultUserStyle dflags) msg
                   loop chan hProcess t p exitcode
                 BuildError loc msg -> do
-                  log_action dflags dflags NoReason SevError (mkSrcSpan loc loc) defaultUserStyle msg
+                  log_action dflags dflags NoReason SevError (mkSrcSpan loc loc)
+                     (defaultUserStyle dflags) msg
                   loop chan hProcess t p exitcode
                 EOF ->
                   loop chan hProcess (t-1) p exitcode

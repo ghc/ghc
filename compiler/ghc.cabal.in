@@ -353,7 +353,6 @@ Library
         Plugins
         TcPluginM
         PprTyThing
-        StaticFlags
         StaticPtrTable
         SysTools
         SysTools.Terminal
