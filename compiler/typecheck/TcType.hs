@@ -62,8 +62,9 @@ module TcType (
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
-  tcSplitTyConApp, tcSplitTyConApp_maybe, tcRepSplitTyConApp_maybe,
-  tcTyConAppTyCon, tcTyConAppArgs,
+  tcSplitTyConApp, tcSplitTyConApp_maybe,
+  tcRepSplitTyConApp_maybe, tcRepSplitTyConApp_maybe',
+  tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
   tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
@@ -862,6 +863,7 @@ exactTyCoVarsOfType ty
     goCo (AppCo co arg)     = goCo co `unionVarSet` goCo arg
     goCo (ForAllCo tv k_co co)
       = goCo co `delVarSet` tv `unionVarSet` goCo k_co
+    goCo (FunCo _ co1 co2)   = goCo co1 `unionVarSet` goCo co2
     goCo (CoVarCo v)         = unitVarSet v `unionVarSet` go (varType v)
     goCo (AxiomInstCo _ _ args) = goCos args
     goCo (UnivCo p _ t1 t2)  = goProv p `unionVarSet` go t1 `unionVarSet` go t2
@@ -1420,9 +1422,21 @@ tcDeepSplitSigmaTy_maybe ty
 
 -----------------------
 tcTyConAppTyCon :: Type -> TyCon
-tcTyConAppTyCon ty = case tcSplitTyConApp_maybe ty of
-                        Just (tc, _) -> tc
-                        Nothing      -> pprPanic "tcTyConAppTyCon" (pprType ty)
+tcTyConAppTyCon ty
+  = case tcTyConAppTyCon_maybe ty of
+      Just tc -> tc
+      Nothing -> pprPanic "tcTyConAppTyCon" (pprType ty)
+
+-- | Like 'tcRepSplitTyConApp_maybe', but only returns the 'TyCon'.
+tcTyConAppTyCon_maybe :: Type -> Maybe TyCon
+tcTyConAppTyCon_maybe ty
+  | Just ty' <- coreView ty = tcTyConAppTyCon_maybe ty'
+tcTyConAppTyCon_maybe (TyConApp tc _)
+  = Just tc
+tcTyConAppTyCon_maybe (FunTy _ _)
+  = Just funTyCon
+tcTyConAppTyCon_maybe _
+  = Nothing
 
 tcTyConAppArgs :: Type -> [Type]
 tcTyConAppArgs ty = case tcSplitTyConApp_maybe ty of
@@ -1434,14 +1448,48 @@ tcSplitTyConApp ty = case tcSplitTyConApp_maybe ty of
                         Just stuff -> stuff
                         Nothing    -> pprPanic "tcSplitTyConApp" (pprType ty)
 
-tcSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+-- | Split a type constructor application into its type constructor and
+-- applied types. Note that this may fail in the case of a 'FunTy' with an
+-- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
+-- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
+-- type before using this function.
+--
+-- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
+tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 tcSplitTyConApp_maybe ty | Just ty' <- coreView ty = tcSplitTyConApp_maybe ty'
 tcSplitTyConApp_maybe ty                           = tcRepSplitTyConApp_maybe ty
 
-tcRepSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
-tcRepSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-tcRepSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-tcRepSplitTyConApp_maybe _                 = Nothing
+-- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
+tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+tcRepSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
+tcRepSplitTyConApp_maybe (FunTy arg res)
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTyCon, [arg_rep, res_rep, arg, res])
+
+  | otherwise
+  = pprPanic "tcRepSplitTyConApp_maybe" (ppr arg $$ ppr res)
+tcRepSplitTyConApp_maybe _                          = Nothing
+
+-- | Like 'tcRepSplitTyConApp_maybe', but returns 'Nothing' if,
+--
+-- 1. the type is structurally not a type constructor application, or
+--
+-- 2. the type is a function type (e.g. application of 'funTyCon'), but we
+--    currently don't even enough information to fully determine its RuntimeRep
+--    variables. For instance, @FunTy (a :: k) Int@.
+--
+-- By constrast 'tcRepSplitTyConApp_maybe' panics in the second case.
+--
+-- The behavior here is needed during canonicalization; see Note [FunTy and
+-- decomposing tycon applications] in TcCanonical for details.
+tcRepSplitTyConApp_maybe' :: HasCallStack => Type -> Maybe (TyCon, [Type])
+tcRepSplitTyConApp_maybe' (TyConApp tc tys)          = Just (tc, tys)
+tcRepSplitTyConApp_maybe' (FunTy arg res)
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTyCon, [arg_rep, res_rep, arg, res])
+tcRepSplitTyConApp_maybe' _                          = Nothing
 
 
 -----------------------
@@ -1627,6 +1675,7 @@ tc_eq_type :: (TcType -> Maybe TcType)  -- ^ @coreView@, if you want unwrapping
            -> Type -> Type -> Maybe Bool
 tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
   where
+    go :: Bool -> RnEnv2 -> Type -> Type -> Maybe Bool
     go vis env t1 t2 | Just t1' <- view_fun t1 = go vis env t1' t2
     go vis env t1 t2 | Just t2' <- view_fun t2 = go vis env t1 t2'
 
@@ -1641,8 +1690,15 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
       = go (isVisibleArgFlag vis1) env (tyVarKind tv1) (tyVarKind tv2)
           <!> go vis (rnBndr2 env tv1 tv2) ty1 ty2
           <!> check vis (vis1 == vis2)
+    -- Make sure we handle all FunTy cases since falling through to the
+    -- AppTy case means that tcRepSplitAppTy_maybe may see an unzonked
+    -- kind variable, which causes things to blow up.
     go vis env (FunTy arg1 res1) (FunTy arg2 res2)
       = go vis env arg1 arg2 <!> go vis env res1 res2
+    go vis env ty (FunTy arg res)
+      = eqFunTy vis env arg res ty
+    go vis env (FunTy arg res) ty
+      = eqFunTy vis env arg res ty
 
       -- See Note [Equality on AppTys] in Type
     go vis env (AppTy s1 t1)        ty2
@@ -1678,6 +1734,28 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
     check vis False = Just vis
 
     orig_env = mkRnEnv2 $ mkInScopeSet $ tyCoVarsOfTypes [orig_ty1, orig_ty2]
+
+    -- @eqFunTy arg res ty@ is True when @ty@ equals @FunTy arg res@. This is
+    -- sometimes hard to know directly because @ty@ might have some casts
+    -- obscuring the FunTy. And 'splitAppTy' is difficult because we can't
+    -- always extract a RuntimeRep (see Note [xyz]) if the kind of the arg or
+    -- res is unzonked/unflattened. Thus this function, which handles this
+    -- corner case.
+    eqFunTy :: Bool -> RnEnv2 -> Type -> Type -> Type -> Maybe Bool
+    eqFunTy vis env arg res (FunTy arg' res')
+      = go vis env arg arg' <!> go vis env res res'
+    eqFunTy vis env arg res ty@(AppTy{})
+      | Just (tc, [_, _, arg', res']) <- get_args ty []
+      , tc == funTyCon
+      = go vis env arg arg' <!> go vis env res res'
+      where
+        get_args :: Type -> [Type] -> Maybe (TyCon, [Type])
+        get_args (AppTy f x)       args = get_args f (x:args)
+        get_args (CastTy t _)      args = get_args t args
+        get_args (TyConApp tc tys) args = Just (tc, tys ++ args)
+        get_args _                 _    = Nothing
+    eqFunTy vis _ _ _ _
+      = Just vis
 
 -- | Like 'pickyEqTypeVis', but returns a Bool for convenience
 pickyEqType :: TcType -> TcType -> Bool

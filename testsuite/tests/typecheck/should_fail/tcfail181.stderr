@@ -9,8 +9,9 @@ tcfail181.hs:17:9: error:
       These potential instances exist:
         instance Monad IO -- Defined in ‘GHC.Base’
         instance Monad Maybe -- Defined in ‘GHC.Base’
-        instance Monad ((->) r) -- Defined in ‘GHC.Base’
-        ...plus two others
+        instance Monoid a => Monad ((,) a) -- Defined in ‘GHC.Base’
+        ...plus one other
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: foo
       In the expression: foo {bar = return True}

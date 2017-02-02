@@ -47,6 +47,8 @@ module Type (
         mkNumLitTy, isNumLitTy,
         mkStrLitTy, isStrLitTy,
 
+        getRuntimeRep_maybe, getRuntimeRepFromKind_maybe,
+
         mkCastTy, mkCoercionTy, splitCastTy_maybe,
 
         userTypeError_maybe, pprUserTypeErrorTy,
@@ -385,6 +387,8 @@ expandTypeSynonyms ty
     go_co subst (ForAllCo tv kind_co co)
       = let (subst', tv', kind_co') = go_cobndr subst tv kind_co in
         mkForAllCo tv' kind_co' (go_co subst' co)
+    go_co subst (FunCo r co1 co2)
+      = mkFunCo r (go_co subst co1) (go_co subst co2)
     go_co subst (CoVarCo cv)
       = substCoVar subst cv
     go_co subst (AxiomInstCo ax ind args)
@@ -520,6 +524,7 @@ mapCoercion mapper@(TyCoMapper { tcm_smart = smart, tcm_covar = covar
            ; co' <- mapCoercion mapper env' co
            ; return $ mkforallco tv' kind_co' co' }
         -- See Note [Efficiency for mapCoercion ForAllCo case]
+    go (FunCo r c1 c2) = mkFunCo r <$> go c1 <*> go c2
     go (CoVarCo cv) = covar env cv
     go (AxiomInstCo ax i args)
       = mkaxiominstco ax i <$> mapM go args
@@ -660,8 +665,15 @@ splitAppTy_maybe ty = repSplitAppTy_maybe ty
 repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
-repSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
-repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
+repSplitAppTy_maybe (FunTy ty1 ty2)
+  | Just rep1 <- getRuntimeRep_maybe ty1
+  , Just rep2 <- getRuntimeRep_maybe ty2
+  = Just (TyConApp funTyCon [rep1, rep2, ty1], ty2)
+
+  | otherwise
+  = pprPanic "repSplitAppTy_maybe" (ppr ty1 $$ ppr ty2)
+repSplitAppTy_maybe (AppTy ty1 ty2)
+  = Just (ty1, ty2)
 repSplitAppTy_maybe (TyConApp tc tys)
   | mightBeUnsaturatedTyCon tc || tys `lengthExceeds` tyConArity tc
   , Just (tys', ty') <- snocView tys
@@ -675,9 +687,16 @@ tcRepSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'tcSplitAppTy_maybe', but assumes that
 -- any coreView stuff is already done. Refuses to look through (c => t)
 tcRepSplitAppTy_maybe (FunTy ty1 ty2)
-  | isConstraintKind (typeKind ty1)     = Nothing  -- See Note [Decomposing fat arrow c=>t]
-  | otherwise                           = Just (TyConApp funTyCon [ty1], ty2)
-tcRepSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
+  | isConstraintKind (typeKind ty1)
+  = Nothing  -- See Note [Decomposing fat arrow c=>t]
+
+  | Just rep1 <- getRuntimeRep_maybe ty1
+  , Just rep2 <- getRuntimeRep_maybe ty2
+  = Just (TyConApp funTyCon [rep1, rep2, ty1], ty2)
+
+  | otherwise
+  = pprPanic "repSplitAppTy_maybe" (ppr ty1 $$ ppr ty2)
+tcRepSplitAppTy_maybe (AppTy ty1 ty2)    = Just (ty1, ty2)
 tcRepSplitAppTy_maybe (TyConApp tc tys)
   | mightBeUnsaturatedTyCon tc || tys `lengthExceeds` tyConArity tc
   , Just (tys', ty') <- snocView tys
@@ -707,9 +726,15 @@ splitAppTys ty = split ty ty []
             (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
-    split _   (FunTy ty1 ty2) args = ASSERT( null args )
-                                     (TyConApp funTyCon [], [ty1,ty2])
-    split orig_ty _           args = (orig_ty, args)
+    split _   (FunTy ty1 ty2) args
+      | Just rep1 <- getRuntimeRep_maybe ty1
+      , Just rep2 <- getRuntimeRep_maybe ty2
+      = ASSERT( null args )
+        (TyConApp funTyCon [], [rep1, rep2, ty1, ty2])
+
+      | otherwise
+      = pprPanic "splitAppTys" (ppr ty1 $$ ppr ty2 $$ ppr args)
+    split orig_ty _                     args  = (orig_ty, args)
 
 -- | Like 'splitAppTys', but doesn't look through type synonyms
 repSplitAppTys :: Type -> (Type, [Type])
@@ -722,8 +747,14 @@ repSplitAppTys ty = split ty []
             (tc_args1, tc_args2) = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
-    split (FunTy ty1 ty2) args = ASSERT( null args )
-                                 (TyConApp funTyCon [], [ty1, ty2])
+    split (FunTy ty1 ty2) args
+      | Just rep1 <- getRuntimeRep_maybe ty1
+      , Just rep2 <- getRuntimeRep_maybe ty2
+      = ASSERT( null args )
+        (TyConApp funTyCon [], [rep1, rep2, ty1, ty2])
+
+      | otherwise
+      = pprPanic "repSplitAppTys" (ppr ty1 $$ ppr ty2 $$ ppr args)
     split ty args = (ty, args)
 
 {-
@@ -795,6 +826,34 @@ pprUserTypeErrorTy ty =
 ---------------------------------------------------------------------
                                 FunTy
                                 ~~~~~
+
+Note [Representation of function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Functions (e.g. Int -> Char) are can be thought of as being applications
+of funTyCon (known in Haskell surface syntax as (->)),
+
+    (->) :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
+                   (a :: TYPE r1) (b :: TYPE r2).
+            a -> b -> Type
+
+However, for efficiency's sake we represent saturated applications of (->)
+with FunTy. For instance, the type,
+
+    (->) r1 r2 a b
+
+is equivalent to,
+
+    FunTy (Anon a) b
+
+Note how the RuntimeReps are implied in the FunTy representation. For this
+reason we must be careful when recontructing the TyConApp representation (see,
+for instance, splitTyConApp_maybe).
+
+In the compiler we maintain the invariant that all saturated applications of
+(->) are represented with FunTy.
+
+See #11714.
 -}
 
 isFunTy :: Type -> Bool
@@ -937,7 +996,8 @@ applyTysX tvs body_ty arg_tys
 -- its arguments.  Applies its arguments to the constructor from left to right.
 mkTyConApp :: TyCon -> [Type] -> Type
 mkTyConApp tycon tys
-  | isFunTyCon tycon, [ty1,ty2] <- tys
+  | isFunTyCon tycon
+  , [_rep1,_rep2,ty1,ty2] <- tys
   = FunTy ty1 ty2
 
   | otherwise
@@ -969,7 +1029,10 @@ tyConAppTyCon ty = tyConAppTyCon_maybe ty `orElse` pprPanic "tyConAppTyCon" (ppr
 tyConAppArgs_maybe :: Type -> Maybe [Type]
 tyConAppArgs_maybe ty | Just ty' <- coreView ty = tyConAppArgs_maybe ty'
 tyConAppArgs_maybe (TyConApp _ tys) = Just tys
-tyConAppArgs_maybe (FunTy arg res)  = Just [arg,res]
+tyConAppArgs_maybe (FunTy arg res)
+  | Just rep1 <- getRuntimeRep_maybe arg
+  , Just rep2 <- getRuntimeRep_maybe res
+  = Just [rep1, rep2, arg, res]
 tyConAppArgs_maybe _                = Nothing
 
 tyConAppArgs :: Type -> [Type]
@@ -992,16 +1055,22 @@ splitTyConApp ty = case splitTyConApp_maybe ty of
 
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor
-splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+splitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe ty                           = repSplitTyConApp_maybe ty
 
 -- | Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
 -- assumes the synonyms have already been dealt with.
-repSplitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
+repSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
-repSplitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-repSplitTyConApp_maybe _                 = Nothing
+repSplitTyConApp_maybe (FunTy arg res)
+  | Just rep1 <- getRuntimeRep_maybe arg
+  , Just rep2 <- getRuntimeRep_maybe res
+  = Just (funTyCon, [rep1, rep2, arg, res])
+  | otherwise
+  = pprPanic "repSplitTyConApp_maybe"
+             (ppr arg $$ ppr res $$ ppr (typeKind res))
+repSplitTyConApp_maybe _ = Nothing
 
 -- | Attempts to tease a list type apart and gives the type of the elements if
 -- successful (looks through type synonyms)
@@ -1101,6 +1170,7 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
                  ASSERT2( CastTy ty co `eqType` result
                         , ppr ty <+> dcolon <+> ppr (typeKind ty) $$
                           ppr co <+> dcolon <+> ppr (coercionKind co) $$
+                          ppr (CastTy ty co) <+> dcolon <+> ppr (typeKind (CastTy ty co)) $$
                           ppr result <+> dcolon <+> ppr (typeKind result) )
                  result
   where
@@ -1119,8 +1189,10 @@ mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
                  saturated_tc (decomp_args `chkAppend` args) co
 
     split_apps args (FunTy arg res) co
+      | rep_arg <- getRuntimeRep "mkCastTy.split_apps" arg
+      , rep_res <- getRuntimeRep "mkCastTy.split_apps" res
       = affix_co (tyConTyBinders funTyCon) (mkTyConTy funTyCon)
-                 (arg : res : args) co
+                 (rep_arg : rep_res : arg : res : args) co
     split_apps args ty co
       = affix_co (fst $ splitPiTys $ typeKind ty)
                  ty args co
@@ -1888,27 +1960,47 @@ isUnliftedType ty
   = not (isLiftedType_maybe ty `orElse`
          pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty)))
 
--- | Extract the RuntimeRep classifier of a type. Panics if this is not possible.
+-- | Extract the RuntimeRep classifier of a type. For instance,
+-- @getRuntimeRep_maybe Int = LiftedRep@. Returns 'Nothing' if this is not
+-- possible.
+getRuntimeRep_maybe :: HasDebugCallStack
+                    => Type -> Maybe Type
+getRuntimeRep_maybe = getRuntimeRepFromKind_maybe . typeKind
+
+-- | Extract the RuntimeRep classifier of a type. For instance,
+-- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
 getRuntimeRep :: HasDebugCallStack
               => String   -- ^ Printed in case of an error
               -> Type -> Type
-getRuntimeRep err ty = getRuntimeRepFromKind err (typeKind ty)
+getRuntimeRep err ty =
+    case getRuntimeRep_maybe ty of
+      Just r  -> r
+      Nothing -> pprPanic "getRuntimeRep"
+                          (text err $$ ppr ty <+> dcolon <+> ppr (typeKind ty))
 
--- | Extract the RuntimeRep classifier of a type from its kind.
--- For example, getRuntimeRepFromKind * = LiftedRep;
--- Panics if this is not possible.
+-- | Extract the RuntimeRep classifier of a type from its kind. For example,
+-- @getRuntimeRepFromKind * = LiftedRep@; Panics if this is not possible.
 getRuntimeRepFromKind :: HasDebugCallStack
-                      => String  -- ^ Printed in case of an error
-                      -> Type -> Type
-getRuntimeRepFromKind err = go
+                      => String -> Type -> Type
+getRuntimeRepFromKind err k =
+    case getRuntimeRepFromKind_maybe k of
+      Just r  -> r
+      Nothing -> pprPanic "getRuntimeRepFromKind"
+                          (text err $$ ppr k <+> dcolon <+> ppr (typeKind k))
+
+-- | Extract the RuntimeRep classifier of a type from its kind. For example,
+-- @getRuntimeRepFromKind * = LiftedRep@; Returns 'Nothing' if this is not
+-- possible.
+getRuntimeRepFromKind_maybe :: HasDebugCallStack
+                            => Type -> Maybe Type
+getRuntimeRepFromKind_maybe = go
   where
     go k | Just k' <- coreViewOneStarKind k = go k'
     go k
-      | (_tc, [arg]) <- splitTyConApp k
-      = ASSERT2( _tc `hasKey` tYPETyConKey, text err $$ ppr k )
-        arg
-    go k = pprPanic "getRuntimeRep" (text err $$
-                                     ppr k <+> dcolon <+> ppr (typeKind k))
+      | Just (_tc, [arg]) <- splitTyConApp_maybe k
+      = ASSERT2( _tc `hasKey` tYPETyConKey, ppr k )
+        Just arg
+    go _ = Nothing
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty
@@ -2170,6 +2262,7 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)
     go env (CastTy t1 _)       t2                  = hasCast $ go env t1 t2
     go env t1                  (CastTy t2 _)       = hasCast $ go env t1 t2
+
     go _   (CoercionTy {})     (CoercionTy {})     = TEQ
 
         -- Deal with the rest: TyVarTy < CoercionTy < AppTy < LitTy < TyConApp < ForAllTy
@@ -2291,6 +2384,7 @@ tyConsOfType ty
      go_co (TyConAppCo _ tc args)  = go_tc tc `plusNameEnv` go_cos args
      go_co (AppCo co arg)          = go_co co `plusNameEnv` go_co arg
      go_co (ForAllCo _ kind_co co) = go_co kind_co `plusNameEnv` go_co co
+     go_co (FunCo _ co1 co2)       = go_co co1 `plusNameEnv` go_co co2
      go_co (CoVarCo {})            = emptyNameEnv
      go_co (AxiomInstCo ax _ args) = go_ax ax `plusNameEnv` go_cos args
      go_co (UnivCo p _ t1 t2)      = go_prov p `plusNameEnv` go t1 `plusNameEnv` go t2

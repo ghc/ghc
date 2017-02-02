@@ -167,7 +167,7 @@ test('tc163', normal, compile, [''])
 test('tc164', normal, compile, [''])
 test('tc165', expect_broken_for(10181, ['optasm', 'optllvm']), compile, [''])
 test('tc166', normal, compile, [''])
-test('tc167', normal, compile_fail, [''])
+test('tc167', normal, compile, [''])
 test('tc168', normal, compile_fail, [''])
 test('tc169', normal, compile, [''])
 

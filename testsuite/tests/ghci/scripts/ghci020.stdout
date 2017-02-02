@@ -1,4 +1,4 @@
-data (->) a b 	-- Defined in ‘GHC.Prim’
+data (->) (a :: TYPE q) (b :: TYPE r) 	-- Defined in ‘GHC.Prim’
 infixr 0 `(->)`
 instance Monoid b => Monoid (a -> b) -- Defined in ‘GHC.Base’
 instance Applicative ((->) a) -- Defined in ‘GHC.Base’

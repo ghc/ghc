@@ -201,9 +201,9 @@ toIfaceTyLit (StrTyLit x) = IfaceStrTyLit x
 ----------------
 toIfaceCoercion :: Coercion -> IfaceCoercion
 toIfaceCoercion (Refl r ty)         = IfaceReflCo r (toIfaceType ty)
-toIfaceCoercion (TyConAppCo r tc cos)
+toIfaceCoercion co@(TyConAppCo r tc cos)
   | tc `hasKey` funTyConKey
-  , [arg,res] <- cos                = IfaceFunCo r (toIfaceCoercion arg) (toIfaceCoercion res)
+  , [_,_,_,_] <- cos                = pprPanic "toIfaceCoercion" (ppr co)
   | otherwise                       = IfaceTyConAppCo r (toIfaceTyCon tc)
                                                         (map toIfaceCoercion cos)
 toIfaceCoercion (AppCo co1 co2)     = IfaceAppCo  (toIfaceCoercion co1)
@@ -211,6 +211,8 @@ toIfaceCoercion (AppCo co1 co2)     = IfaceAppCo  (toIfaceCoercion co1)
 toIfaceCoercion (ForAllCo tv k co)  = IfaceForAllCo (toIfaceTvBndr tv)
                                                     (toIfaceCoercion k)
                                                     (toIfaceCoercion co)
+toIfaceCoercion (FunCo r co1 co2)   = IfaceFunCo r (toIfaceCoercion co1)
+                                                   (toIfaceCoercion co2)
 toIfaceCoercion (CoVarCo cv)        = IfaceCoVarCo  (toIfaceCoVar cv)
 toIfaceCoercion (AxiomInstCo con ind cos)
                                     = IfaceAxiomInstCo (coAxiomName con) ind

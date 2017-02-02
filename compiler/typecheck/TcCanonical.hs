@@ -33,6 +33,7 @@ import Util
 import Bag
 import MonadUtils
 import Control.Monad
+import Data.Maybe ( isJust )
 import Data.List  ( zip4, foldl' )
 import BasicTypes
 
@@ -540,6 +541,25 @@ track whether or not we've already flattened.
 
 It is conceivable to do a better job at tracking whether or not a type
 is flattened, but this is left as future work. (Mar '15)
+
+
+Note [FunTy and decomposing tycon applications]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When can_eq_nc' attempts to decompose a tycon application we haven't yet zonked.
+This means that we may very well have a FunTy containing a type of some unknown
+kind. For instance, we may have,
+
+    FunTy (a :: k) Int
+
+Where k is a unification variable. tcRepSplitTyConApp_maybe panics in the event
+that it sees such a type as it cannot determine the RuntimeReps which the (->)
+is applied to. Consequently, it is vital that we instead use
+tcRepSplitTyConApp_maybe', which simply returns Nothing in such a case.
+
+When this happens can_eq_nc' will fail to decompose, zonk, and try again.
+Zonking should fill the variable k, meaning that decomposition will succeed the
+second time around.
 -}
 
 canEqNC :: CtEvidence -> EqRel -> Type -> Type -> TcS (StopOrContinue Ct)
@@ -613,8 +633,9 @@ can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1@(LitTy l1) _ (LitTy l2) _
 -- Try to decompose type constructor applications
 -- Including FunTy (s -> t)
 can_eq_nc' _flat _rdr_env _envs ev eq_rel ty1 _ ty2 _
-  | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe ty2
+    --- See Note [FunTy and decomposing type constructor applications].
+  | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe' ty1
+  , Just (tc2, tys2) <- tcRepSplitTyConApp_maybe' ty2
   , not (isTypeFamilyTyCon tc1)
   , not (isTypeFamilyTyCon tc2)
   = canTyConApp ev eq_rel tc1 tys1 tc2 tys2
@@ -695,6 +716,26 @@ zonk_eq_types = go
     go (TyVarTy tv1) (TyVarTy tv2) = tyvar_tyvar tv1 tv2
     go (TyVarTy tv1) ty2           = tyvar NotSwapped tv1 ty2
     go ty1 (TyVarTy tv2)           = tyvar IsSwapped  tv2 ty1
+
+    -- We handle FunTys explicitly here despite the fact that they could also be
+    -- treated as an application. Why? Well, for one it's cheaper to just look
+    -- at two types (the argument and result types) than four (the argument,
+    -- result, and their RuntimeReps). Also, we haven't completely zonked yet,
+    -- so we may run into an unzonked type variable while trying to compute the
+    -- RuntimeReps of the argument and result types. This can be observed in
+    -- testcase tc269.
+    go ty1 ty2
+      | Just (arg1, res1) <- split1
+      , Just (arg2, res2) <- split2
+      = do { res_a <- go arg1 arg2
+           ; res_b <- go res1 res2
+           ; return $ combine_rev mkFunTy res_b res_a
+           }
+      | isJust split1 || isJust split2
+      = bale_out ty1 ty2
+      where
+        split1 = tcSplitFunTy_maybe ty1
+        split2 = tcSplitFunTy_maybe ty2
 
     go ty1 ty2
       | Just (tc1, tys1) <- tcRepSplitTyConApp_maybe ty1
@@ -1830,7 +1871,7 @@ unifyWanted loc role orig_ty1 orig_ty2
     go (FunTy s1 t1) (FunTy s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
-           ; return (mkTyConAppCo role funTyCon [co_s,co_t]) }
+           ; return (mkFunCo role co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality

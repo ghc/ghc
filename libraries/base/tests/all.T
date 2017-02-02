@@ -119,7 +119,7 @@ test('T2528', normal, compile_and_run, [''])
 test('T4006', normal, compile_and_run, [''])
 
 test('T5943', normal, compile_and_run, [''])
-test('T5962', normal, compile_and_run, [''])
+test('T5962', expect_broken(10343), compile_and_run, [''])
 test('T7034', normal, compile_and_run, [''])
 
 test('qsem001', normal, compile_and_run, [''])

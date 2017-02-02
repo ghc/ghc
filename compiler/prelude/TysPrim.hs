@@ -24,7 +24,7 @@ module TysPrim(
         openAlphaTy, openBetaTy, openAlphaTyVar, openBetaTyVar,
 
         -- Kind constructors...
-        tYPETyConName,
+        tYPETyCon, tYPETyConName,
 
         -- Kinds
         tYPE, primRepToRuntimeRep,
@@ -94,7 +94,7 @@ import {-# SOURCE #-} TysWiredIn
   , doubleElemRepDataConTy
   , mkPromotedListTy )
 
-import Var              ( TyVar, mkTyVar )
+import Var              ( TyVar, TyVarBndr(TvBndr), mkTyVar )
 import Name
 import TyCon
 import SrcLoc
@@ -328,20 +328,21 @@ openBetaTy  = mkTyVarTy openBetaTyVar
 funTyConName :: Name
 funTyConName = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
+-- | The @(->)@ type constructor.
+--
+-- @
+-- (->) :: forall (rep1 :: RuntimeRep) (rep2 :: RuntimeRep).
+--         TYPE rep1 -> TYPE rep2 -> *
+-- @
 funTyCon :: TyCon
 funTyCon = mkFunTyCon funTyConName tc_bndrs tc_rep_nm
   where
-    tc_bndrs = mkTemplateAnonTyConBinders [liftedTypeKind, liftedTypeKind]
-
-        -- You might think that (->) should have type (?? -> ? -> *), and you'd be right
-        -- But if we do that we get kind errors when saying
-        --      instance Control.Arrow (->)
-        -- because the expected kind is (*->*->*).  The trouble is that the
-        -- expected/actual stuff in the unifier does not go contra-variant, whereas
-        -- the kind sub-typing does.  Sigh.  It really only matters if you use (->) in
-        -- a prefix way, thus:  (->) Int# Int#.  And this is unusual.
-        -- because they are never in scope in the source
-
+    tc_bndrs = [ TvBndr runtimeRep1TyVar (NamedTCB Inferred)
+               , TvBndr runtimeRep2TyVar (NamedTCB Inferred)
+               ]
+               ++ mkTemplateAnonTyConBinders [ tYPE runtimeRep1Ty
+                                             , tYPE runtimeRep2Ty
+                                             ]
     tc_rep_nm = mkPrelTyConRepName funTyConName
 
 {-

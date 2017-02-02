@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+
 module Coercion where
 
 import {-# SOURCE #-} TyCoRep
@@ -8,11 +10,13 @@ import CoAxiom
 import Var
 import Outputable
 import Pair
+import Util
 
 mkReflCo :: Role -> Type -> Coercion
-mkTyConAppCo :: Role -> TyCon -> [Coercion] -> Coercion
+mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
 mkForAllCo :: TyVar -> Coercion -> Coercion -> Coercion
+mkFunCo :: Role -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion

@@ -1,6 +1,0 @@
-
-tc167.hs:8:15:
-    Expecting a lifted type, but ‘Int#’ is unlifted
-    In the first argument of ‘(->)’, namely ‘Int#’
-    In the type ‘(->) Int#’
-    In the type declaration for ‘T’

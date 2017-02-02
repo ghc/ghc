@@ -1391,7 +1391,7 @@ So we compromise, and move their Kind calculation to the call site.
 -}
 
 -- | Given the name of the function type constructor and it's kind, create the
--- corresponding 'TyCon'. It is reccomended to use 'TyCoRep.funTyCon' if you want
+-- corresponding 'TyCon'. It is recomended to use 'TyCoRep.funTyCon' if you want
 -- this functionality
 mkFunTyCon :: Name -> [TyConBinder] -> Name -> TyCon
 mkFunTyCon name binders rep_nm
@@ -1401,7 +1401,7 @@ mkFunTyCon name binders rep_nm
         tyConBinders = binders,
         tyConResKind = liftedTypeKind,
         tyConKind    = mkTyConKind binders liftedTypeKind,
-        tyConArity   = 2,
+        tyConArity   = length binders,
         tcRepName    = rep_nm
     }
 

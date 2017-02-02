@@ -737,13 +737,14 @@ test('T9675',
 test('T9872a',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 3134866040    , 5),
+          [(wordsize(64), 3304620816, 5),
           # 2014-12-10    5521332656    Initally created
           # 2014-12-16    5848657456    Flattener parameterized over roles
           # 2014-12-18    2680733672    Reduce type families even more eagerly
           # 2015-12-11    3581500440    TypeInType (see #11196)
           # 2016-04-07    3352882080    CSE improvements
           # 2016-10-19    3134866040    Refactor traceRn interface (#12617)
+          # 2017-02-01    3304620816
            (wordsize(32), 1740903516, 5)
           # was           1325592896
           # 2016-04-06    1740903516    x86/Linux

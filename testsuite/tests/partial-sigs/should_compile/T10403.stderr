@@ -41,7 +41,8 @@ T10403.hs:22:15: warning: [-Wdeferred-type-errors (in -Wdefault)]
         instance Functor IO -- Defined in ‘GHC.Base’
         instance Functor (B t) -- Defined at T10403.hs:10:10
         instance Functor I -- Defined at T10403.hs:6:10
-        ...plus four others
+        ...plus three others
+        ...plus one instance involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the second argument of ‘(.)’, namely ‘fmap (const ())’
       In the expression: H . fmap (const ())

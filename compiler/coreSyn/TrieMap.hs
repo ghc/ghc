@@ -796,9 +796,9 @@ data TypeMapX a
 -- to nested AppTys. Why the last one? See Note [Equality on AppTys] in Type
 trieMapView :: Type -> Maybe Type
 trieMapView ty | Just ty' <- coreViewOneStarKind ty = Just ty'
-trieMapView (TyConApp tc tys@(_:_)) = Just $ foldl AppTy (TyConApp tc []) tys
-trieMapView (FunTy arg res)
-  = Just ((TyConApp funTyCon [] `AppTy` arg) `AppTy` res)
+trieMapView ty
+  | Just (tc, tys@(_:_)) <- splitTyConApp_maybe ty
+  = Just $ foldl AppTy (TyConApp tc []) tys
 trieMapView _ = Nothing
 
 instance TrieMap TypeMapX where

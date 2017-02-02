@@ -284,7 +284,7 @@ extendWorkListCt :: Ct -> WorkList -> WorkList
 extendWorkListCt ct wl
  = case classifyPredType (ctPred ct) of
      EqPred NomEq ty1 _
-       | Just (tc,_) <- tcSplitTyConApp_maybe ty1
+       | Just tc <- tcTyConAppTyCon_maybe ty1
        , isTypeFamilyTyCon tc
        -> extendWorkListFunEq ct wl
 

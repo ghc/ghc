@@ -2071,6 +2071,9 @@ occCheckExpand tv ty
                                      env' = extendVarEnv env tv' tv''
                                ; body' <- go_co env' body_co
                                ; return (ForAllCo tv'' kind_co' body') }
+    go_co env (FunCo r co1 co2)         = do { co1' <- go_co env co1
+                                             ; co2' <- go_co env co2
+                                             ; return (mkFunCo r co1' co2') }
     go_co env (CoVarCo c)               = do { k' <- go env (varType c)
                                              ; return (mkCoVarCo (setVarType c k')) }
     go_co env (AxiomInstCo ax ind args) = do { args' <- mapM (go_co env) args
