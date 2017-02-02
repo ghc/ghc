@@ -566,9 +566,15 @@ prepareRhs top_lvl env0 id rhs0
         -- On the other hand, for scoping ticks we need to be able to
         -- copy them on the floats, which in turn is only allowed if
         -- we can obtain non-counting ticks.
-        | not (tickishCounts t) || tickishCanSplit t
+        | (not (tickishCounts t) || tickishCanSplit t)
         = do { (is_exp, env', rhs') <- go n_val_args (zapFloats env) rhs
-             ; let tickIt (id, expr) = (id, mkTick (mkNoCount t) expr)
+             ; let tickIt (id, expr)
+                       -- we have to take care not to tick top-level literal
+                       -- strings. See Note [CoreSyn top-level string literals].
+                     | isTopLevel top_lvl && exprIsLiteralString expr
+                     = (id, expr)
+                     | otherwise
+                     = (id, mkTick (mkNoCount t) expr)
                    floats' = seFloats $ env `addFloats` mapFloats env' tickIt
              ; return (is_exp, env' { seFloats = floats' }, Tick t rhs') }
 

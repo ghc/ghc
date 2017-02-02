@@ -383,6 +383,11 @@ The solution is simply to allow top-level unlifted binders. We can't allow
 arbitrary unlifted expression at the top-level though, unlifted binders cannot
 be thunks, so we just allow string literals.
 
+It is important to note that top-level primitive string literals cannot be
+wrapped in Ticks, as is otherwise done with lifted bindings. CoreToStg expects
+to see just a plain (Lit (MachStr ...)) expression on the RHS of primitive
+string bindings; anything else and things break. CoreLint checks this invariant.
+
 Also see Note [Compilation plan for top-level string literals].
 
 Note [Compilation plan for top-level string literals]
