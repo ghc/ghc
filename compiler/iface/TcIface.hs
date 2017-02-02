@@ -1033,8 +1033,9 @@ tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteSigs = mapM tcIfaceCompleteSig
 
 tcIfaceCompleteSig :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteSig (IfaceCompleteMatch ms t) =
-  CompleteMatch <$> (mapM tcIfaceConLike ms) <*> tcIfaceTyConByName t
+tcIfaceCompleteSig cm@(IfaceCompleteMatch ms t) =
+  forkM (text "COMPLETE" <+> ppr cm) $
+    CompleteMatch <$> mapM tcIfaceConLike ms <*> tcIfaceTyConByName t
 
 {-
 ************************************************************************
