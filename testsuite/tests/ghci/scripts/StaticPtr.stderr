@@ -1,0 +1,3 @@
+
+<interactive>: warning:
+    StaticPointers is not supported in GHCi interactive expressions.

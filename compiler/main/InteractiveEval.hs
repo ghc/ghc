@@ -116,7 +116,7 @@ getHistorySpan hsc_env History{..} =
 getModBreaks :: HomeModInfo -> ModBreaks
 getModBreaks hmi
   | Just linkable <- hm_linkable hmi,
-    [BCOs cbc] <- linkableUnlinked linkable
+    [BCOs cbc _] <- linkableUnlinked linkable
   = fromMaybe emptyModBreaks (bc_breaks cbc)
   | otherwise
   = emptyModBreaks -- probably object code

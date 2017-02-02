@@ -11984,6 +11984,13 @@ While the following definitions are rejected: ::
     ref8 (y :: a) = let x = undefined :: a
                      in static x      -- x has a non-closed type
 
+.. note::
+
+    While modules loaded in GHCi with the :ghci-cmd:`:load` command may use
+    :ghc-flag:`-XStaticPointers` and ``static`` expressions, statements
+    entered on the REPL may not. This is a limitation of GHCi; see
+    :ghc-ticket:`12356` for details.
+
 .. _typechecking-static-pointers:
 
 Static semantics of static pointers

@@ -1286,6 +1286,18 @@ upsweep mHscMessage old_hpt stable_mods cleanup sccs = do
                 hsc_env4 <- liftIO $ reTypecheckLoop hsc_env3 mod done'
                 setSession hsc_env4
 
+                        -- Add any necessary entries to the static pointer
+                        -- table. See Note [Grand plan for static forms] in
+                        -- StaticPtrTable.
+                when (hscTarget (hsc_dflags hsc_env4) == HscInterpreted) $
+                    liftIO $ hscAddSptEntries hsc_env4
+                                 [ spt
+                                 | Just linkable <- pure $ hm_linkable mod_info
+                                 , unlinked <- linkableUnlinked linkable
+                                 , BCOs _ spts <- pure unlinked
+                                 , spt <- spts
+                                 ]
+
                 upsweep' old_hpt1 done' mods (mod_index+1) nmods uids_to_check' done_holes'
 
 unitIdsToCheck :: DynFlags -> [UnitId]

@@ -377,8 +377,18 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
               ; tidy_type_env = tidyTypeEnv omit_prags type_env2
               }
           -- See Note [Grand plan for static forms] in StaticPtrTable.
-        ; (spt_init_code, tidy_binds') <-
+        ; (spt_entries, tidy_binds') <-
              sptCreateStaticBinds hsc_env mod tidy_binds
+        ; let { spt_init_code = sptModuleInitCode mod spt_entries
+              ; add_spt_init_code =
+                  case hscTarget dflags of
+                    -- If we are compiling for the interpreter we will insert
+                    -- any necessary SPT entries dynamically
+                    HscInterpreted -> id
+                    -- otherwise add a C stub to do so
+                    _              -> (`appendStubC` spt_init_code)
+              }
+
         ; let { -- See Note [Injecting implicit bindings]
                 all_tidy_binds = implicit_binds ++ tidy_binds'
 
@@ -415,11 +425,11 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
         ; return (CgGuts { cg_module   = mod,
                            cg_tycons   = alg_tycons,
                            cg_binds    = all_tidy_binds,
-                           cg_foreign  = foreign_stubs `appendStubC`
-                                         spt_init_code,
+                           cg_foreign  = add_spt_init_code foreign_stubs,
                            cg_dep_pkgs = map fst $ dep_pkgs deps,
                            cg_hpc_info = hpc_info,
-                           cg_modBreaks = modBreaks },
+                           cg_modBreaks = modBreaks,
+                           cg_spt_entries = spt_entries },
 
                    ModDetails { md_types     = tidy_type_env,
                                 md_rules     = tidy_rules,

@@ -79,10 +79,12 @@ module HscMain
     , hscFileFrontEnd, genericHscFrontend, dumpIfaceStats
     , ioMsgMaybe
     , showModuleIndex
+    , hscAddSptEntries
     ) where
 
 import Data.Data hiding (Fixity, TyCon)
 import Id
+import GHCi             ( addSptEntry )
 import GHCi.RemoteTypes ( ForeignHValue )
 import ByteCodeGen      ( byteCodeGen, coreExprToBCOs )
 import Linker
@@ -1308,7 +1310,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
 hscInteractive :: HscEnv
                -> CgGuts
                -> ModSummary
-               -> IO (Maybe FilePath, CompiledByteCode)
+               -> IO (Maybe FilePath, CompiledByteCode, [SptEntry])
 hscInteractive hsc_env cgguts mod_summary = do
     let dflags = hsc_dflags hsc_env
     let CgGuts{ -- This is the last use of the ModGuts in a compilation.
@@ -1317,7 +1319,8 @@ hscInteractive hsc_env cgguts mod_summary = do
                cg_binds    = core_binds,
                cg_tycons   = tycons,
                cg_foreign  = foreign_stubs,
-               cg_modBreaks = mod_breaks } = cgguts
+               cg_modBreaks = mod_breaks,
+               cg_spt_entries = spt_entries } = cgguts
 
         location = ms_location mod_summary
         data_tycons = filter isDataTyCon tycons
@@ -1331,10 +1334,10 @@ hscInteractive hsc_env cgguts mod_summary = do
                    corePrepPgm hsc_env this_mod location core_binds data_tycons
     -----------------  Generate byte code ------------------
     comp_bc <- byteCodeGen hsc_env this_mod prepd_binds data_tycons mod_breaks
-    ------------------ Create f-x-dynamic C-side stuff ---
+    ------------------ Create f-x-dynamic C-side stuff -----
     (_istub_h_exists, istub_c_exists)
         <- outputForeignStubs dflags this_mod location foreign_stubs
-    return (istub_c_exists, comp_bc)
+    return (istub_c_exists, comp_bc, spt_entries)
 
 ------------------------------
 
@@ -1572,6 +1575,9 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
     let src_span = srcLocSpan interactiveSrcLoc
     liftIO $ linkDecls hsc_env src_span cbc
 
+    {- Load static pointer table entries -}
+    liftIO $ hscAddSptEntries hsc_env (cg_spt_entries tidy_cg)
+
     let tcs = filterOut isImplicitTyCon (mg_tcs simpl_mg)
         patsyns = mg_patsyns simpl_mg
 
@@ -1593,6 +1599,16 @@ hscDeclsWithLocation hsc_env0 str source linenumber =
                                                 fam_insts defaults fix_env
     return (new_tythings, new_ictxt)
 
+-- | Load the given static-pointer table entries into the interpreter.
+-- See Note [Grand plan for static forms] in StaticPtrTable.
+hscAddSptEntries :: HscEnv -> [SptEntry] -> IO ()
+hscAddSptEntries hsc_env entries = do
+    let add_spt_entry :: SptEntry -> IO ()
+        add_spt_entry (SptEntry i fpr) = do
+            val <- getHValue hsc_env (idName i)
+            pprTrace "add_spt_entry" (ppr fpr <+> ppr i) $
+                addSptEntry hsc_env fpr val
+    mapM_ add_spt_entry entries
 
 {-
   Note [Fixity declarations in GHCi]

@@ -145,6 +145,9 @@ GHCi
 
 - Added :ghc-flag:`-flocal-ghci-history` which uses current directory for `.ghci-history`.
 
+- Added support for :ghc-flag:`-XStaticPointers` in interpreted modules. Note, however,
+  that ``static`` expressions are still not allowed in expressions evaluated in the REPL.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 

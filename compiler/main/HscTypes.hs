@@ -22,7 +22,7 @@ module HscTypes (
         -- * Information about modules
         ModDetails(..), emptyModDetails,
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
-        ImportedMods, ImportedModsVal(..),
+        ImportedMods, ImportedModsVal(..), SptEntry(..),
 
         ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
@@ -1281,8 +1281,12 @@ data CgGuts
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
         cg_dep_pkgs  :: ![InstalledUnitId], -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
-        cg_hpc_info  :: !HpcInfo,        -- ^ Program coverage tick box information
-        cg_modBreaks :: !(Maybe ModBreaks) -- ^ Module breakpoints
+        cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
+        cg_modBreaks :: !(Maybe ModBreaks), -- ^ Module breakpoints
+        cg_spt_entries :: [SptEntry]
+                -- ^ Static pointer table entries for static forms defined in
+                -- the module.
+                -- See Note [Grand plan for static forms] in StaticPtrTable
     }
 
 -----------------------------------
@@ -1302,6 +1306,13 @@ data ForeignStubs
 appendStubC :: ForeignStubs -> SDoc -> ForeignStubs
 appendStubC NoStubs            c_code = ForeignStubs empty c_code
 appendStubC (ForeignStubs h c) c_code = ForeignStubs h (c $$ c_code)
+
+-- | An entry to be inserted into a module's static pointer table.
+-- See Note [Grand plan for static forms] in StaticPtrTable.
+data SptEntry = SptEntry Id Fingerprint
+
+instance Outputable SptEntry where
+  ppr (SptEntry id fpr) = ppr id <> colon <+> ppr fpr
 
 {-
 ************************************************************************
@@ -2951,13 +2962,18 @@ data Unlinked
    = DotO FilePath      -- ^ An object file (.o)
    | DotA FilePath      -- ^ Static archive file (.a)
    | DotDLL FilePath    -- ^ Dynamically linked library file (.so, .dll, .dylib)
-   | BCOs CompiledByteCode    -- ^ A byte-code object, lives only in memory
+   | BCOs CompiledByteCode
+          [SptEntry]    -- ^ A byte-code object, lives only in memory. Also
+                        -- carries some static pointer table entries which
+                        -- should be loaded along with the BCOs.
+                        -- See Note [Grant plan for static forms] in
+                        -- StaticPtrTable.
 
 instance Outputable Unlinked where
    ppr (DotO path)   = text "DotO" <+> text path
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
-   ppr (BCOs bcos) = text "BCOs" <+> ppr bcos
+   ppr (BCOs bcos spt) = text "BCOs" <+> ppr bcos <+> ppr spt
 
 -- | Is this an actual file on disk we can link in somehow?
 isObject :: Unlinked -> Bool
@@ -2979,8 +2995,8 @@ nameOfObject other       = pprPanic "nameOfObject" (ppr other)
 
 -- | Retrieve the compiled byte-code if possible. Panic if it is a file-based linkable
 byteCodeOfObject :: Unlinked -> CompiledByteCode
-byteCodeOfObject (BCOs bc) = bc
-byteCodeOfObject other     = pprPanic "byteCodeOfObject" (ppr other)
+byteCodeOfObject (BCOs bc _) = bc
+byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
 
 
 -------------------------------------------

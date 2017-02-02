@@ -182,7 +182,8 @@ compileOne' m_tc_result mHscMessage
             let linkable = LM o_time this_mod [DotO object_filename]
             return hmi0 { hm_linkable = Just linkable }
         (HscRecomp cgguts summary, HscInterpreted) -> do
-            (hasStub, comp_bc) <- hscInteractive hsc_env cgguts summary
+            (hasStub, comp_bc, spt_entries) <-
+                hscInteractive hsc_env cgguts summary
 
             stub_o <- case hasStub of
                       Nothing -> return []
@@ -190,7 +191,7 @@ compileOne' m_tc_result mHscMessage
                           stub_o <- compileStub hsc_env stub_c
                           return [DotO stub_o]
 
-            let hs_unlinked = [BCOs comp_bc]
+            let hs_unlinked = [BCOs comp_bc spt_entries]
                 unlinked_time = ms_hs_date summary
               -- Why do we use the timestamp of the source file here,
               -- rather than the current time?  This works better in

@@ -323,7 +323,7 @@ import Annotations
 import Module
 import Panic
 import Platform
-import Bag              ( unitBag )
+import Bag              ( listToBag, unitBag )
 import ErrUtils
 import MonadUtils
 import Util
@@ -615,7 +615,8 @@ getProgramDynFlags = getSessionDynFlags
 setInteractiveDynFlags :: GhcMonad m => DynFlags -> m ()
 setInteractiveDynFlags dflags = do
   dflags' <- checkNewDynFlags dflags
-  modifySession $ \h -> h{ hsc_IC = (hsc_IC h) { ic_dflags = dflags' }}
+  dflags'' <- checkNewInteractiveDynFlags dflags'
+  modifySession $ \h -> h{ hsc_IC = (hsc_IC h) { ic_dflags = dflags'' }}
 
 -- | Get the 'DynFlags' used to evaluate interactive expressions.
 getInteractiveDynFlags :: GhcMonad m => m DynFlags
@@ -636,6 +637,18 @@ checkNewDynFlags dflags = do
   let (dflags', warnings) = makeDynFlagsConsistent dflags
   liftIO $ handleFlagWarnings dflags warnings
   return dflags'
+
+checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags
+checkNewInteractiveDynFlags dflags0 = do
+  dflags1 <-
+      if xopt LangExt.StaticPointers dflags0
+      then do liftIO $ printOrThrowWarnings dflags0 $ listToBag
+                [mkPlainWarnMsg dflags0 interactiveSrcSpan
+                 $ text "StaticPointers is not supported in GHCi interactive expressions."]
+              return $ xopt_unset dflags0 LangExt.StaticPointers
+      else return dflags0
+  return dflags1
+
 
 -- %************************************************************************
 -- %*                                                                      *

@@ -30,6 +30,7 @@ import GHCi.TH.Binary ()
 import GHCi.BreakArray
 
 import GHC.LanguageExtensions
+import GHC.Fingerprint
 import Control.Concurrent
 import Control.Exception
 import Data.Binary
@@ -84,6 +85,9 @@ data Message a where
 
   -- | Release 'HValueRef's
   FreeHValueRefs :: [HValueRef] -> Message ()
+
+  -- | Add entries to the Static Pointer Table
+  AddSptEntry :: Fingerprint -> HValueRef -> Message ()
 
   -- | Malloc some data and return a 'RemotePtr' to it
   MallocData :: ByteString -> Message (RemotePtr ())
@@ -446,6 +450,7 @@ getMessage = do
       30 -> Msg <$> (GetBreakpointVar <$> get <*> get)
       31 -> Msg <$> return StartTH
       32 -> Msg <$> (RunModFinalizers <$> get <*> get)
+      33 -> Msg <$> (AddSptEntry <$> get <*> get)
       _  -> Msg <$> (RunTH <$> get <*> get <*> get <*> get)
 
 putMessage :: Message a -> Put
@@ -483,7 +488,8 @@ putMessage m = case m of
   GetBreakpointVar a b        -> putWord8 30 >> put a >> put b
   StartTH                     -> putWord8 31
   RunModFinalizers a b        -> putWord8 32 >> put a >> put b
-  RunTH st q loc ty           -> putWord8 33 >> put st >> put q >> put loc >> put ty
+  AddSptEntry a b             -> putWord8 33 >> put a >> put b
+  RunTH st q loc ty           -> putWord8 34 >> put st >> put q >> put loc >> put ty
 
 -- -----------------------------------------------------------------------------
 -- Reading/writing messages

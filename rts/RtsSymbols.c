@@ -904,6 +904,7 @@
       SymI_HasProto(atomic_dec)                                         \
       SymI_HasProto(hs_spt_lookup)                                      \
       SymI_HasProto(hs_spt_insert)                                      \
+      SymI_HasProto(hs_spt_insert_stableptr)                            \
       SymI_HasProto(hs_spt_remove)                                      \
       SymI_HasProto(hs_spt_keys)                                        \
       SymI_HasProto(hs_spt_key_count)                                   \
