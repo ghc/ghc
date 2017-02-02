@@ -12,7 +12,7 @@ module MkCore (
         -- * Constructing boxed literals
         mkWordExpr, mkWordExprWord,
         mkIntExpr, mkIntExprInt,
-        mkIntegerExpr,
+        mkIntegerExpr, mkNaturalExpr,
         mkFloatExpr, mkDoubleExpr,
         mkCharExpr, mkStringExpr, mkStringExprFS, mkStringExprFSWith,
 
@@ -249,6 +249,15 @@ mkWordExprWord dflags w = mkCoreConApps wordDataCon [mkWordLitWord dflags w]
 mkIntegerExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Integer
 mkIntegerExpr i = do t <- lookupTyCon integerTyConName
                      return (Lit (mkLitInteger i (mkTyConTy t)))
+
+-- | Create a 'CoreExpr' which will evaluate to the given @Natural@
+--
+-- TODO: should we add LitNatural to Core?
+mkNaturalExpr  :: MonadThings m => Integer -> m CoreExpr  -- Result :: Natural
+mkNaturalExpr i = do iExpr <- mkIntegerExpr i
+                     fiExpr <- lookupId naturalFromIntegerName
+                     return (mkCoreApps (Var fiExpr) [iExpr])
+
 
 -- | Create a 'CoreExpr' which will evaluate to the given @Float@
 mkFloatExpr :: Float -> CoreExpr

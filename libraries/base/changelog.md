@@ -43,6 +43,10 @@
   * Add `type family AppendSymbol (m :: Symbol) (n :: Symbol) :: Symbol` to `GHC.TypeLits`
     (#12162)
 
+  * Add `GHC.TypeNats` module with `Natural`-based `KnownNat`. The `Nat`
+    operations in `GHC.TypeLits` are a thin compatibility layer on top.
+    Note: the `KnownNat` evidence is changed from an `Integer` to a `Natural`.
+
   * The type of `asProxyTypeOf` in `Data.Proxy` has been generalized (#12805)
 
 ## 4.9.0.0  *May 2016*

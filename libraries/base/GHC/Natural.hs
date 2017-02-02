@@ -36,6 +36,7 @@ module GHC.Natural
       Natural(..)
     , isValidNatural
       -- * Conversions
+    , naturalFromInteger
     , wordToNatural
     , naturalToWordMaybe
       -- * Checked subtraction
@@ -54,7 +55,7 @@ module GHC.Natural
 
 import GHC.Arr
 import GHC.Base
-import GHC.Exception
+import {-# SOURCE #-} GHC.Exception (underflowException)
 #if HAVE_GMP_BIGNAT
 import GHC.Integer.GMP.Internals
 import Data.Word
@@ -68,12 +69,26 @@ import GHC.Enum
 import GHC.List
 
 import Data.Bits
-import Data.Data
 
 default ()
 
+-------------------------------------------------------------------------------
+-- Arithmetic underflow
+-------------------------------------------------------------------------------
+
+-- We put them here because they are needed relatively early
+-- in the libraries before the Exception type has been defined yet.
+
+{-# NOINLINE underflowError #-}
+underflowError :: a
+underflowError = raise# underflowException
+
+-------------------------------------------------------------------------------
+-- Natural type
+-------------------------------------------------------------------------------
+
 #if HAVE_GMP_BIGNAT
--- TODO: if saturated arithmetic is to used, replace 'throw Underflow' by '0'
+-- TODO: if saturated arithmetic is to used, replace 'underflowError' by '0'
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
@@ -162,9 +177,7 @@ instance Read Natural where
 
 -- | @since 4.8.0.0
 instance Num Natural where
-    fromInteger (S# i#) | I# i# >= 0  = NatS# (int2Word# i#)
-    fromInteger (Jp# bn)              = bigNatToNatural bn
-    fromInteger _                     = throw Underflow
+    fromInteger          = naturalFromInteger
 
     (+) = plusNatural
     (*) = timesNatural
@@ -176,7 +189,14 @@ instance Num Natural where
     signum _             = NatS# 1##
 
     negate (NatS# 0##)   = NatS# 0##
-    negate _             = throw Underflow
+    negate _             = underflowError
+
+-- | @since 4.10.0.0
+naturalFromInteger :: Integer -> Natural
+naturalFromInteger (S# i#) | I# i# >= 0  = NatS# (int2Word# i#)
+naturalFromInteger (Jp# bn)              = bigNatToNatural bn
+naturalFromInteger _                     = underflowError
+{-# INLINE naturalFromInteger #-}
 
 -- | @since 4.8.0.0
 instance Real Natural where
@@ -262,7 +282,7 @@ instance Integral Natural where
     div    = quot
     mod    = rem
 
-    quotRem _ (NatS# 0##) = throw DivideByZero
+    quotRem _ (NatS# 0##) = divZeroError
     quotRem n (NatS# 1##) = (n,NatS# 0##)
     quotRem n@(NatS# _) (NatJ# _) = (NatS# 0##, n)
     quotRem (NatS# n) (NatS# d) = case quotRem (W# n) (W# d) of
@@ -272,14 +292,14 @@ instance Integral Natural where
     quotRem (NatJ# n) (NatJ# d) = case quotRemBigNat n d of
         (# q,r #) -> (bigNatToNatural q, bigNatToNatural r)
 
-    quot _       (NatS# 0##) = throw DivideByZero
+    quot _       (NatS# 0##) = divZeroError
     quot n       (NatS# 1##) = n
     quot (NatS# _) (NatJ# _) = NatS# 0##
     quot (NatS# n) (NatS# d) = wordToNatural (quot (W# n) (W# d))
     quot (NatJ# n) (NatS# d) = bigNatToNatural (quotBigNatWord n d)
     quot (NatJ# n) (NatJ# d) = bigNatToNatural (quotBigNat n d)
 
-    rem _         (NatS# 0##) = throw DivideByZero
+    rem _         (NatS# 0##) = divZeroError
     rem _         (NatS# 1##) = NatS# 0##
     rem n@(NatS# _) (NatJ# _) = n
     rem   (NatS# n) (NatS# d) = wordToNatural (rem (W# n) (W# d))
@@ -379,8 +399,8 @@ minusNatural :: Natural -> Natural -> Natural
 minusNatural x         (NatS# 0##) = x
 minusNatural (NatS# x) (NatS# y) = case subWordC# x y of
     (# l, 0# #) -> NatS# l
-    _           -> throw Underflow
-minusNatural (NatS# _) (NatJ# _) = throw Underflow
+    _           -> divZeroError -- underflowException
+minusNatural (NatS# _) (NatJ# _) = divZeroError -- underflowException
 minusNatural (NatJ# x) (NatS# y)
     = bigNatToNatural $ minusBigNatWord x y
 minusNatural (NatJ# x) (NatJ# y)
@@ -409,7 +429,7 @@ minusNaturalMaybe (NatJ# x) (NatJ# y)
 bigNatToNatural :: BigNat -> Natural
 bigNatToNatural bn
   | isTrue# (sizeofBigNat# bn ==# 1#) = NatS# (bigNatToWord bn)
-  | isTrue# (isNullBigNat# bn)        = throw Underflow
+  | isTrue# (isNullBigNat# bn)        = underflowError
   | otherwise                         = NatJ# bn
 
 naturalToBigNat :: Natural -> BigNat
@@ -419,7 +439,7 @@ naturalToBigNat (NatJ# bn) = bn
 -- | Convert 'Int' to 'Natural'.
 -- Throws 'Underflow' when passed a negative 'Int'.
 intToNatural :: Int -> Natural
-intToNatural i | i<0 = throw Underflow
+intToNatural i | i<0 = underflowError
 intToNatural (I# i#) = NatS# (int2Word# i#)
 
 naturalToWord :: Natural -> Word
@@ -467,7 +487,7 @@ instance Num Natural where
   {-# INLINE (+) #-}
   Natural n * Natural m = Natural (n * m)
   {-# INLINE (*) #-}
-  Natural n - Natural m | result < 0 = throw Underflow
+  Natural n - Natural m | result < 0 = underflowError
                         | otherwise  = Natural result
     where result = n - m
   {-# INLINE (-) #-}
@@ -475,10 +495,15 @@ instance Num Natural where
   {-# INLINE abs #-}
   signum (Natural n) = Natural (signum n)
   {-# INLINE signum #-}
-  fromInteger n
-    | n >= 0 = Natural n
-    | otherwise = throw Underflow
+  fromInteger = naturalFromInteger
   {-# INLINE fromInteger #-}
+
+-- | @since 4.10.0.0
+naturalFromInteger :: Integer -> Natural
+naturalFromInteger n
+  | n >= 0 = Natural n
+  | otherwise = underflowError
+{-# INLINE naturalFromInteger #-}
 
 -- | 'Natural' subtraction. Returns 'Nothing's for non-positive results.
 --
@@ -603,27 +628,13 @@ naturalToWordMaybe (Natural i)
     maxw = toInteger (maxBound :: Word)
 #endif
 
--- This follows the same style as the other integral 'Data' instances
--- defined in "Data.Data"
-naturalType :: DataType
-naturalType = mkIntType "Numeric.Natural.Natural"
-
--- | @since 4.8.0.0
-instance Data Natural where
-  toConstr x = mkIntegralConstr naturalType x
-  gunfold _ z c = case constrRep c of
-                    (IntConstr x) -> z (fromIntegral x)
-                    _ -> errorWithoutStackTrace $ "Data.Data.gunfold: Constructor " ++ show c
-                                 ++ " is not of type Natural"
-  dataTypeOf _ = naturalType
-
 -- | \"@'powModNatural' /b/ /e/ /m/@\" computes base @/b/@ raised to
 -- exponent @/e/@ modulo @/m/@.
 --
 -- @since 4.8.0.0
 powModNatural :: Natural -> Natural -> Natural -> Natural
 #if HAVE_GMP_BIGNAT
-powModNatural _           _           (NatS# 0##) = throw DivideByZero
+powModNatural _           _           (NatS# 0##) = divZeroError
 powModNatural _           _           (NatS# 1##) = NatS# 0##
 powModNatural _           (NatS# 0##) _           = NatS# 1##
 powModNatural (NatS# 0##) _           _           = NatS# 0##
@@ -635,7 +646,7 @@ powModNatural b           e           (NatJ# m)
   = bigNatToNatural (powModBigNat (naturalToBigNat b) (naturalToBigNat e) m)
 #else
 -- Portable reference fallback implementation
-powModNatural _ _ 0 = throw DivideByZero
+powModNatural _ _ 0 = divZeroError
 powModNatural _ _ 1 = 0
 powModNatural _ 0 _ = 1
 powModNatural 0 _ _ = 0

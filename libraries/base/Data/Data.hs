@@ -126,6 +126,7 @@ import Data.Version( Version(..) )
 import GHC.Base hiding (Any, IntRep, FloatRep)
 import GHC.List
 import GHC.Num
+import GHC.Natural
 import GHC.Read
 import GHC.Show
 import Text.Read( reads )
@@ -924,6 +925,23 @@ instance Data Integer where
                     _ -> errorWithoutStackTrace $ "Data.Data.gunfold: Constructor " ++ show c
                                  ++ " is not of type Integer."
   dataTypeOf _ = integerType
+
+
+------------------------------------------------------------------------------
+
+-- This follows the same style as the other integral 'Data' instances
+-- defined in "Data.Data"
+naturalType :: DataType
+naturalType = mkIntType "Numeric.Natural.Natural"
+
+-- | @since 4.8.0.0
+instance Data Natural where
+  toConstr x = mkIntegralConstr naturalType x
+  gunfold _ z c = case constrRep c of
+                    (IntConstr x) -> z (fromIntegral x)
+                    _ -> errorWithoutStackTrace $ "Data.Data.gunfold: Constructor " ++ show c
+                                 ++ " is not of type Natural"
+  dataTypeOf _ = naturalType
 
 
 ------------------------------------------------------------------------------

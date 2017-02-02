@@ -277,6 +277,7 @@ Library
         GHC.Storable
         GHC.TopHandler
         GHC.TypeLits
+        GHC.TypeNats
         GHC.Unicode
         GHC.Weak
         GHC.Word

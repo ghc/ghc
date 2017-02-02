@@ -67,7 +67,8 @@ import GHC.Types (TYPE)
 import GHC.Word
 import GHC.Show
 import Data.Proxy
-import GHC.TypeLits( KnownNat, KnownSymbol, natVal', symbolVal' )
+import GHC.TypeLits ( KnownSymbol, symbolVal' )
+import GHC.TypeNats ( KnownNat, natVal' )
 
 import GHC.Fingerprint.Type
 import {-# SOURCE #-} GHC.Fingerprint

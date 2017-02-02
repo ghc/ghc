@@ -26,11 +26,11 @@ module GHC.TypeLits
     Nat, Symbol  -- Both declared in GHC.Types in package ghc-prim
 
     -- * Linking type and value level
-  , KnownNat, natVal, natVal'
+  , N.KnownNat, natVal, natVal'
   , KnownSymbol, symbolVal, symbolVal'
-  , SomeNat(..), SomeSymbol(..)
+  , N.SomeNat(..), SomeSymbol(..)
   , someNatVal, someSymbolVal
-  , sameNat, sameSymbol
+  , N.sameNat, sameSymbol
 
 
     -- * Functions on type literals
@@ -46,24 +46,21 @@ module GHC.TypeLits
 
 import GHC.Base(Eq(..), Ord(..), Bool(True,False), Ordering(..), otherwise)
 import GHC.Types( Nat, Symbol )
-import GHC.Num(Integer)
+import GHC.Num(Integer, fromInteger)
 import GHC.Base(String)
 import GHC.Show(Show(..))
 import GHC.Read(Read(..))
+import GHC.Real(toInteger)
 import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
 import Data.Type.Equality(type (==), (:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
---------------------------------------------------------------------------------
+import GHC.TypeNats (KnownNat)
+import qualified GHC.TypeNats as N
 
--- | This class gives the integer associated with a type-level natural.
--- There are instances of the class for every concrete literal: 0, 1, 2, etc.
---
--- @since 4.7.0.0
-class KnownNat (n :: Nat) where
-  natSing :: SNat n
+--------------------------------------------------------------------------------
 
 -- | This class gives the string associated with a type-level symbol.
 -- There are instances of the class for every concrete literal: "hello", etc.
@@ -74,8 +71,7 @@ class KnownSymbol (n :: Symbol) where
 
 -- | @since 4.7.0.0
 natVal :: forall n proxy. KnownNat n => proxy n -> Integer
-natVal _ = case natSing :: SNat n of
-             SNat x -> x
+natVal p = toInteger (N.natVal p)
 
 -- | @since 4.7.0.0
 symbolVal :: forall n proxy. KnownSymbol n => proxy n -> String
@@ -84,19 +80,13 @@ symbolVal _ = case symbolSing :: SSymbol n of
 
 -- | @since 4.8.0.0
 natVal' :: forall n. KnownNat n => Proxy# n -> Integer
-natVal' _ = case natSing :: SNat n of
-             SNat x -> x
+natVal' p = toInteger (N.natVal' p)
 
 -- | @since 4.8.0.0
 symbolVal' :: forall n. KnownSymbol n => Proxy# n -> String
 symbolVal' _ = case symbolSing :: SSymbol n of
                 SSymbol x -> x
 
-
-
--- | This type represents unknown type-level natural numbers.
-data SomeNat    = forall n. KnownNat n    => SomeNat    (Proxy n)
-                  -- ^ @since 4.7.0.0
 
 -- | This type represents unknown type-level symbols.
 data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
@@ -105,9 +95,9 @@ data SomeSymbol = forall n. KnownSymbol n => SomeSymbol (Proxy n)
 -- | Convert an integer into an unknown type-level natural.
 --
 -- @since 4.7.0.0
-someNatVal :: Integer -> Maybe SomeNat
+someNatVal :: Integer -> Maybe N.SomeNat
 someNatVal n
-  | n >= 0        = Just (withSNat SomeNat (SNat n) Proxy)
+  | n >= 0        = Just (N.someNatVal (fromInteger n))
   | otherwise     = Nothing
 
 -- | Convert a string into an unknown type-level symbol.
@@ -115,28 +105,6 @@ someNatVal n
 -- @since 4.7.0.0
 someSymbolVal :: String -> SomeSymbol
 someSymbolVal n   = withSSymbol SomeSymbol (SSymbol n) Proxy
-
-
-
--- | @since 4.7.0.0
-instance Eq SomeNat where
-  SomeNat x == SomeNat y = natVal x == natVal y
-
--- | @since 4.7.0.0
-instance Ord SomeNat where
-  compare (SomeNat x) (SomeNat y) = compare (natVal x) (natVal y)
-
--- | @since 4.7.0.0
-instance Show SomeNat where
-  showsPrec p (SomeNat x) = showsPrec p (natVal x)
-
--- | @since 4.7.0.0
-instance Read SomeNat where
-  readsPrec p xs = do (a,ys) <- readsPrec p xs
-                      case someNatVal a of
-                        Nothing -> []
-                        Just n  -> [(n,ys)]
-
 
 -- | @since 4.7.0.0
 instance Eq SomeSymbol where
@@ -153,11 +121,6 @@ instance Show SomeSymbol where
 -- | @since 4.7.0.0
 instance Read SomeSymbol where
   readsPrec p xs = [ (someSymbolVal a, ys) | (a,ys) <- readsPrec p xs ]
-
-type family EqNat (a :: Nat) (b :: Nat) where
-  EqNat a a = 'True
-  EqNat a b = 'False
-type instance a == b = EqNat a b
 
 type family EqSymbol (a :: Symbol) (b :: Symbol) where
   EqSymbol a a = 'True
@@ -260,16 +223,6 @@ type family TypeError (a :: ErrorMessage) :: b where
 --------------------------------------------------------------------------------
 
 -- | We either get evidence that this function was instantiated with the
--- same type-level numbers, or 'Nothing'.
---
--- @since 4.7.0.0
-sameNat :: (KnownNat a, KnownNat b) =>
-           Proxy a -> Proxy b -> Maybe (a :~: b)
-sameNat x y
-  | natVal x == natVal y = Just (unsafeCoerce Refl)
-  | otherwise            = Nothing
-
--- | We either get evidence that this function was instantiated with the
 -- same type-level symbols, or 'Nothing'.
 --
 -- @since 4.7.0.0
@@ -282,16 +235,9 @@ sameSymbol x y
 --------------------------------------------------------------------------------
 -- PRIVATE:
 
-newtype SNat    (n :: Nat)    = SNat    Integer
 newtype SSymbol (s :: Symbol) = SSymbol String
 
-data WrapN a b = WrapN (KnownNat    a => Proxy a -> b)
 data WrapS a b = WrapS (KnownSymbol a => Proxy a -> b)
-
--- See Note [magicDictId magic] in "basicType/MkId.hs"
-withSNat :: (KnownNat a => Proxy a -> b)
-         -> SNat a      -> Proxy a -> b
-withSNat f x y = magicDict (WrapN f) x y
 
 -- See Note [magicDictId magic] in "basicType/MkId.hs"
 withSSymbol :: (KnownSymbol a => Proxy a -> b)

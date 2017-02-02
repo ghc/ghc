@@ -1151,7 +1151,7 @@ dsEvTerm :: EvTerm -> DsM CoreExpr
 dsEvTerm (EvId v)           = return (Var v)
 dsEvTerm (EvCallStack cs)   = dsEvCallStack cs
 dsEvTerm (EvTypeable ty ev) = dsEvTypeable ty ev
-dsEvTerm (EvLit (EvNum n))  = mkIntegerExpr n
+dsEvTerm (EvLit (EvNum n))  = mkNaturalExpr n
 dsEvTerm (EvLit (EvStr s))  = mkStringExprFS s
 
 dsEvTerm (EvCast tm co)

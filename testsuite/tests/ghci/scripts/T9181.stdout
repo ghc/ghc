@@ -28,15 +28,9 @@ data GHC.TypeLits.ErrorMessage where
                          -> GHC.TypeLits.ErrorMessage -> GHC.TypeLits.ErrorMessage
   (GHC.TypeLits.:$$:) :: GHC.TypeLits.ErrorMessage
                          -> GHC.TypeLits.ErrorMessage -> GHC.TypeLits.ErrorMessage
-class GHC.TypeLits.KnownNat (n :: GHC.Types.Nat) where
-  GHC.TypeLits.natSing :: GHC.TypeLits.SNat n
-  {-# MINIMAL natSing #-}
 class GHC.TypeLits.KnownSymbol (n :: GHC.Types.Symbol) where
   GHC.TypeLits.symbolSing :: GHC.TypeLits.SSymbol n
   {-# MINIMAL symbolSing #-}
-data GHC.TypeLits.SomeNat where
-  GHC.TypeLits.SomeNat :: GHC.TypeLits.KnownNat n =>
-                          (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeNat
 data GHC.TypeLits.SomeSymbol where
   GHC.TypeLits.SomeSymbol :: GHC.TypeLits.KnownSymbol n =>
                              (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeSymbol
@@ -46,22 +40,28 @@ type family (GHC.TypeLits.^) (a :: GHC.Types.Nat)
                              (b :: GHC.Types.Nat)
             :: GHC.Types.Nat
 GHC.TypeLits.natVal ::
-  GHC.TypeLits.KnownNat n => proxy n -> Integer
+  GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
-  GHC.TypeLits.KnownNat n => GHC.Prim.Proxy# n -> Integer
-GHC.TypeLits.sameNat ::
-  (GHC.TypeLits.KnownNat a, GHC.TypeLits.KnownNat b) =>
-  Data.Proxy.Proxy a
-  -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)
+  GHC.TypeNats.KnownNat n => GHC.Prim.Proxy# n -> Integer
 GHC.TypeLits.sameSymbol ::
   (GHC.TypeLits.KnownSymbol a, GHC.TypeLits.KnownSymbol b) =>
   Data.Proxy.Proxy a
   -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)
-GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeLits.SomeNat
+GHC.TypeLits.someNatVal :: Integer -> Maybe GHC.TypeNats.SomeNat
 GHC.TypeLits.someSymbolVal :: String -> GHC.TypeLits.SomeSymbol
 GHC.TypeLits.symbolVal ::
   GHC.TypeLits.KnownSymbol n => proxy n -> String
 GHC.TypeLits.symbolVal' ::
   GHC.TypeLits.KnownSymbol n => GHC.Prim.Proxy# n -> String
+class GHC.TypeNats.KnownNat (n :: GHC.Types.Nat) where
+  GHC.TypeNats.natSing :: GHC.TypeNats.SNat n
+  {-# MINIMAL natSing #-}
 data GHC.Types.Nat
+data GHC.TypeNats.SomeNat where
+  GHC.TypeNats.SomeNat :: GHC.TypeNats.KnownNat n =>
+                          (Data.Proxy.Proxy n) -> GHC.TypeNats.SomeNat
 data GHC.Types.Symbol
+GHC.TypeNats.sameNat ::
+  (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
+  Data.Proxy.Proxy a
+  -> Data.Proxy.Proxy b -> Maybe (a Data.Type.Equality.:~: b)

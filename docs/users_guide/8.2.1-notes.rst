@@ -291,6 +291,10 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 - Add ``type family AppendSymbol (m :: Symbol) (n :: Symbol) :: Symbol`` to
   ``GHC.TypeLits``
 
+- Add ``GHC.TypeNats`` module with ``Natural``-based ``KnownNat``. The ``Nat``
+  operations in ``GHC.TypeLits`` are a thin compatibility layer on top.
+  Note: the ``KnownNat`` evidence is changed from an ``Integer`` to a ``Natural``.
+
 binary
 ~~~~~~
 
