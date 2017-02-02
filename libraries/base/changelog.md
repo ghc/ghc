@@ -199,6 +199,8 @@
   * The field `spInfoName` of `GHC.StaticPtr.StaticPtrInfo` has been removed.
     The value is no longer available when constructing the `StaticPtr`.
 
+  * `VecElem` and `VecCount` now have `Enum` and `Bounded` instances.
+
 ### Generalizations
 
   * Generalize `Debug.Trace.{traceM, traceShowM}` from `Monad` to `Applicative`

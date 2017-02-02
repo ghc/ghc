@@ -1168,7 +1168,7 @@ liftedRepDataConTy, unliftedRepDataConTy,
   = map (mkTyConTy . promoteDataCon) runtimeRepSimpleDataCons
 
 vecCountTyCon :: TyCon
-vecCountTyCon = pcNonEnumTyCon vecCountTyConName Nothing []
+vecCountTyCon = pcTyCon True vecCountTyConName Nothing []
                         vecCountDataCons
 
 -- See Note [Wiring in RuntimeRep]
@@ -1187,7 +1187,7 @@ vec2DataConTy, vec4DataConTy, vec8DataConTy, vec16DataConTy, vec32DataConTy,
   vec64DataConTy] = map (mkTyConTy . promoteDataCon) vecCountDataCons
 
 vecElemTyCon :: TyCon
-vecElemTyCon = pcNonEnumTyCon vecElemTyConName Nothing [] vecElemDataCons
+vecElemTyCon = pcTyCon True vecElemTyConName Nothing [] vecElemDataCons
 
 -- See Note [Wiring in RuntimeRep]
 vecElemDataCons :: [DataCon]

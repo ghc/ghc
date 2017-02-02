@@ -395,6 +395,7 @@ data VecCount = Vec2
               | Vec16
               | Vec32
               | Vec64
+-- Enum, Bounded instances in GHC.Enum
 
 -- | Element of a SIMD vector type
 data VecElem = Int8ElemRep
@@ -407,6 +408,7 @@ data VecElem = Int8ElemRep
              | Word64ElemRep
              | FloatElemRep
              | DoubleElemRep
+-- Enum, Bounded instances in GHC.Enum
 
 {- *********************************************************************
 *                                                                      *
