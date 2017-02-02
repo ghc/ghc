@@ -2403,28 +2403,41 @@ matchTypeable clas [k,t]  -- clas = Typeable
   | isJust (tcSplitPredFunTy_maybe t) = return NoInstance   -- Qualified type
 
   -- Now cases that do work
-  | k `eqType` typeNatKind                 = doTyLit knownNatClassName    t
-  | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName t
+  | k `eqType` typeNatKind                 = doTyLit knownNatClassName         t
+  | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
+  | Just (arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
-  , onlyNamedBndrsApplied tc ks            = doTyConApp clas t ks
+  , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks
   | Just (f,kt)   <- splitAppTy_maybe t    = doTyApp    clas t f kt
 
 matchTypeable _ _ = return NoInstance
 
-doTyConApp :: Class -> Type -> [Kind] -> TcS LookupInstResult
--- Representation for type constructor applied to some kinds
-doTyConApp clas ty args
-  = return $ GenInst (map (mk_typeable_pred clas) args)
-                     (\tms -> EvTypeable ty $ EvTypeableTyCon tms)
+-- | Representation for a type @ty@ of the form @arg -> ret@.
+doFunTy :: Class -> Type -> Type -> Type -> TcS LookupInstResult
+doFunTy clas ty arg_ty ret_ty
+  = do { let preds = map (mk_typeable_pred clas) [arg_ty, ret_ty]
+             build_ev [arg_ev, ret_ev] =
+                 EvTypeable ty $ EvTypeableTrFun arg_ev ret_ev
+             build_ev _ = panic "TcInteract.doFunTy"
+       ; return $ GenInst preds build_ev True
+       }
+
+-- | Representation for type constructor applied to some kinds.
+-- 'onlyNamedBndrsApplied' has ensured that this application results in a type
+-- of monomorphic kind (e.g. all kind variables have been instantiated).
+doTyConApp :: Class -> Type -> TyCon -> [Kind] -> TcS LookupInstResult
+doTyConApp clas ty tc kind_args
+  = return $ GenInst (map (mk_typeable_pred clas) kind_args)
+                     (\kinds -> EvTypeable ty $ EvTypeableTyCon tc kinds)
                      True
 
--- Representation for concrete kinds.  We just use the kind itself,
--- but first we must make sure that we've instantiated all kind-
+-- | Representation for TyCon applications of a concrete kind. We just use the
+-- kind itself, but first we must make sure that we've instantiated all kind-
 -- polymorphism, but no more.
 onlyNamedBndrsApplied :: TyCon -> [KindOrType] -> Bool
 onlyNamedBndrsApplied tc ks
- = all isNamedTyConBinder         used_bndrs &&
-   all (not . isNamedTyConBinder) leftover_bndrs
+ = all isNamedTyConBinder used_bndrs &&
+   not (any isNamedTyConBinder leftover_bndrs)
  where
    bndrs                        = tyConBinders tc
    (used_bndrs, leftover_bndrs) = splitAtList ks bndrs
@@ -2441,10 +2454,9 @@ doTyApp clas ty f tk
   | isForAllTy (typeKind f)
   = return NoInstance -- We can't solve until we know the ctr.
   | otherwise
-  = do { traceTcS "doTyApp" (ppr clas $$ ppr ty $$ ppr f $$ ppr tk)
-       ; return $ GenInst [mk_typeable_pred clas f, mk_typeable_pred clas tk]
+  = return $ GenInst (map (mk_typeable_pred clas) [f, tk])
                      (\[t1,t2] -> EvTypeable ty $ EvTypeableTyApp t1 t2)
-                     True }
+                     True
 
 -- Emit a `Typeable` constraint for the given type.
 mk_typeable_pred :: Class -> Type -> PredType
@@ -2472,7 +2484,9 @@ To solve Typeable (Proxy (* -> *) Maybe) we
   - Then solve (Typeable (Proxy (* -> *))) with doTyConApp
 
 If we attempt to short-cut by solving it all at once, via
-doTyCOnAPp
+doTyConApp
+
+(this note is sadly truncated FIXME)
 
 
 Note [No Typeable for polytypes or qualified types]

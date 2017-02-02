@@ -1055,13 +1055,13 @@ splitTyConApp ty = case splitTyConApp_maybe ty of
 
 -- | Attempts to tease a type apart into a type constructor and the application
 -- of a number of arguments to that constructor
-splitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe ty                           = repSplitTyConApp_maybe ty
 
 -- | Like 'splitTyConApp_maybe', but doesn't look through synonyms. This
 -- assumes the synonyms have already been dealt with.
-repSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy arg res)
   | Just rep1 <- getRuntimeRep_maybe arg

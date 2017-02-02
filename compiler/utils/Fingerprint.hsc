@@ -15,6 +15,7 @@ module Fingerprint (
         fingerprintByteString,
         -- * Re-exported from GHC.Fingerprint
         Fingerprint(..), fingerprint0,
+        fingerprintFingerprints,
         fingerprintData,
         fingerprintString,
         getFileHash

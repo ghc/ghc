@@ -57,7 +57,7 @@ module OccName (
         isDerivedOccName,
         mkDataConWrapperOcc, mkWorkerOcc,
         mkMatcherOcc, mkBuilderOcc,
-        mkDefaultMethodOcc, isDefaultMethodOcc,
+        mkDefaultMethodOcc, isDefaultMethodOcc, isTypeableBindOcc,
         mkNewTyCoOcc, mkClassOpAuxOcc,
         mkCon2TagOcc, mkTag2ConOcc, mkMaxTagOcc,
         mkClassDataConOcc, mkDictOcc, mkIPOcc,
@@ -599,6 +599,16 @@ isDefaultMethodOcc :: OccName -> Bool
 isDefaultMethodOcc occ =
    case occNameString occ of
      '$':'d':'m':_ -> True
+     _ -> False
+
+-- | Is an 'OccName' one of a Typeable @TyCon@ or @Module@ binding?
+-- This is needed as these bindings are renamed differently.
+-- See Note [Grand plan for Typeable] in TcTypeable.
+isTypeableBindOcc :: OccName -> Bool
+isTypeableBindOcc occ =
+   case occNameString occ of
+     '$':'t':'c':_ -> True  -- mkTyConRepOcc
+     '$':'t':'r':_ -> True  -- Module binding
      _ -> False
 
 mkDataConWrapperOcc, mkWorkerOcc,

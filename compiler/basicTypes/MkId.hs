@@ -31,7 +31,7 @@ module MkId (
         voidPrimId, voidArgId,
         nullAddrId, seqId, lazyId, lazyIdKey, runRWId,
         coercionTokenId, magicDictId, coerceId,
-        proxyHashId, noinlineIdName,
+        proxyHashId, noinlineId, noinlineIdName,
 
         -- Re-export error Ids
         module PrelRules

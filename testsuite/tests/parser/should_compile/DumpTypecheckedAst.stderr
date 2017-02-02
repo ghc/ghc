@@ -13,32 +13,55 @@
          ({ <no location info> }
           (HsApp 
            ({ <no location info> }
-            (HsConLikeOut 
-             ({abstract:ConLike}))) 
+            (HsApp 
+             ({ <no location info> }
+              (HsApp 
+               ({ <no location info> }
+                (HsConLikeOut 
+                 ({abstract:ConLike}))) 
+               ({ <no location info> }
+                (HsLit 
+                 (HsWordPrim 
+                  (NoSourceText) 
+                  (14073232900889011755)))))) 
+             ({ <no location info> }
+              (HsLit 
+               (HsWordPrim 
+                (NoSourceText) 
+                (2739668351064589274)))))) 
            ({ <no location info> }
-            (HsLit 
-             (HsWordPrim 
-              (NoSourceText) 
-              (8575021419490388262)))))) 
+            (HsVar 
+             ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
          ({ <no location info> }
-          (HsLit 
-           (HsWordPrim 
-            (NoSourceText) 
-            (11015472196725198936)))))) 
+          (HsPar 
+           ({ <no location info> }
+            (HsApp 
+             ({ <no location info> }
+              (HsConLikeOut 
+               ({abstract:ConLike}))) 
+             ({ <no location info> }
+              (HsLit 
+               (HsStringPrim 
+                (NoSourceText) "Peano"))))))))) 
        ({ <no location info> }
-        (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
+        (HsLit 
+         (HsIntPrim 
+          (SourceText "0") 
+          (0)))))) 
      ({ <no location info> }
-      (HsPar 
-       ({ <no location info> }
-        (HsApp 
-         ({ <no location info> }
-          (HsConLikeOut 
-           ({abstract:ConLike}))) 
-         ({ <no location info> }
-          (HsLit 
-           (HsStringPrim 
-            (NoSourceText) "Peano"))))))))) 
+      (HsVar 
+       ({ <no location info> }{Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsConLikeOut 
+       ({abstract:ConLike}))) 
+     ({ <no location info> }
+      (HsConLikeOut 
+       ({abstract:ConLike}))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
@@ -51,32 +74,65 @@
          ({ <no location info> }
           (HsApp 
            ({ <no location info> }
-            (HsConLikeOut 
-             ({abstract:ConLike}))) 
+            (HsApp 
+             ({ <no location info> }
+              (HsApp 
+               ({ <no location info> }
+                (HsConLikeOut 
+                 ({abstract:ConLike}))) 
+               ({ <no location info> }
+                (HsLit 
+                 (HsWordPrim 
+                  (NoSourceText) 
+                  (13760111476013868540)))))) 
+             ({ <no location info> }
+              (HsLit 
+               (HsWordPrim 
+                (NoSourceText) 
+                (12314848029315386153)))))) 
            ({ <no location info> }
-            (HsLit 
-             (HsWordPrim 
-              (NoSourceText) 
-              (2837710233032485839)))))) 
+            (HsVar 
+             ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
          ({ <no location info> }
-          (HsLit 
-           (HsWordPrim 
-            (NoSourceText) 
-            (4722402035995040741)))))) 
+          (HsPar 
+           ({ <no location info> }
+            (HsApp 
+             ({ <no location info> }
+              (HsConLikeOut 
+               ({abstract:ConLike}))) 
+             ({ <no location info> }
+              (HsLit 
+               (HsStringPrim 
+                (NoSourceText) "'Zero"))))))))) 
+       ({ <no location info> }
+        (HsLit 
+         (HsIntPrim 
+          (SourceText "0") 
+          (0)))))) 
+     ({ <no location info> }
+      (HsVar 
+       ({ <no location info> }{Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
        ({ <no location info> }
         (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
      ({ <no location info> }
-      (HsPar 
-       ({ <no location info> }
-        (HsApp 
-         ({ <no location info> }
-          (HsConLikeOut 
-           ({abstract:ConLike}))) 
-         ({ <no location info> }
-          (HsLit 
-           (HsStringPrim 
-            (NoSourceText) "'Zero"))))))))) 
+      (HsWrap 
+       (WpTyApp 
+        (TyConApp 
+         ({abstract:TyCon}) 
+         [])) 
+       (HsConLikeOut 
+        ({abstract:ConLike})))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Succ{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
@@ -89,32 +145,94 @@
          ({ <no location info> }
           (HsApp 
            ({ <no location info> }
-            (HsConLikeOut 
-             ({abstract:ConLike}))) 
+            (HsApp 
+             ({ <no location info> }
+              (HsApp 
+               ({ <no location info> }
+                (HsConLikeOut 
+                 ({abstract:ConLike}))) 
+               ({ <no location info> }
+                (HsLit 
+                 (HsWordPrim 
+                  (NoSourceText) 
+                  (1143980031331647856)))))) 
+             ({ <no location info> }
+              (HsLit 
+               (HsWordPrim 
+                (NoSourceText) 
+                (14802086722010293686)))))) 
            ({ <no location info> }
-            (HsLit 
-             (HsWordPrim 
-              (NoSourceText) 
-              (16648669567626715052)))))) 
+            (HsVar 
+             ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
          ({ <no location info> }
-          (HsLit 
-           (HsWordPrim 
-            (NoSourceText) 
-            (1296291977643060110)))))) 
+          (HsPar 
+           ({ <no location info> }
+            (HsApp 
+             ({ <no location info> }
+              (HsConLikeOut 
+               ({abstract:ConLike}))) 
+             ({ <no location info> }
+              (HsLit 
+               (HsStringPrim 
+                (NoSourceText) "'Succ"))))))))) 
        ({ <no location info> }
-        (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
+        (HsLit 
+         (HsIntPrim 
+          (SourceText "0") 
+          (0)))))) 
+     ({ <no location info> }
+      (HsVar 
+       ({ <no location info> }{Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsPar 
+         ({ <no location info> }
+          (HsApp 
+           ({ <no location info> }
+            (HsApp 
+             ({ <no location info> }
+              (HsConLikeOut 
+               ({abstract:ConLike}))) 
+             ({ <no location info> }
+              (HsVar 
+               ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
+           ({ <no location info> }
+            (HsWrap 
+             (WpTyApp 
+              (TyConApp 
+               ({abstract:TyCon}) 
+               [])) 
+             (HsConLikeOut 
+              ({abstract:ConLike})))))))))) 
      ({ <no location info> }
       (HsPar 
        ({ <no location info> }
         (HsApp 
          ({ <no location info> }
-          (HsConLikeOut 
-           ({abstract:ConLike}))) 
+          (HsApp 
+           ({ <no location info> }
+            (HsConLikeOut 
+             ({abstract:ConLike}))) 
+           ({ <no location info> }
+            (HsVar 
+             ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
          ({ <no location info> }
-          (HsLit 
-           (HsStringPrim 
-            (NoSourceText) "'Succ"))))))))) 
+          (HsWrap 
+           (WpTyApp 
+            (TyConApp 
+             ({abstract:TyCon}) 
+             [])) 
+           (HsConLikeOut 
+            ({abstract:ConLike})))))))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})} 

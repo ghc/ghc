@@ -89,7 +89,7 @@ instance Typeable Int
 instance (Typeable a, Typeable b) => Typeable (a b)
 instance Typeable (,)
 
-instance Eq TypeRepX
+instance Eq SomeTypeRep
 
 data Dynamic where
    Dyn :: TypeRep a -> a -> Dynamic
@@ -196,19 +196,19 @@ castR ta tb = withTypeable ta (withTypeable tb castDance)
 cmpT = undefined
 compareTypeRep = undefined
 
-data TypeRepX where
-   TypeRepX :: TypeRep a -> TypeRepX
+data SomeTypeRep where
+   SomeTypeRep :: TypeRep a -> SomeTypeRep
 
-type TyMapLessTyped = Map TypeRepX Dynamic
+type TyMapLessTyped = Map SomeTypeRep Dynamic
 
 insertLessTyped    ::  forall a. Typeable a => a -> TyMapLessTyped -> TyMapLessTyped
-insertLessTyped x  =   Map.insert (TypeRepX (typeRep :: TypeRep a)) (toDynamic x)
+insertLessTyped x  =   Map.insert (SomeTypeRep (typeRep :: TypeRep a)) (toDynamic x)
 
 lookupLessTyped  ::  forall a. Typeable a => TyMapLessTyped -> Maybe a
-lookupLessTyped  =   fromDynamic <=< Map.lookup (TypeRepX (typeRep :: TypeRep a))
+lookupLessTyped  =   fromDynamic <=< Map.lookup (SomeTypeRep (typeRep :: TypeRep a))
 
-instance Ord TypeRepX where
-  compare (TypeRepX tr1) (TypeRepX tr2) = compareTypeRep tr1 tr2
+instance Ord SomeTypeRep where
+  compare (SomeTypeRep tr1) (SomeTypeRep tr2) = compareTypeRep tr1 tr2
 
 compareTypeRep :: TypeRep a -> TypeRep b -> Ordering  --  primitive
 

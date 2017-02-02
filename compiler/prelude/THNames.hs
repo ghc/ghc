@@ -678,40 +678,40 @@ derivStrategyTyConKey   = mkPreludeTyConUnique 235
 
 -- data Inline = ...
 noInlineDataConKey, inlineDataConKey, inlinableDataConKey :: Unique
-noInlineDataConKey  = mkPreludeDataConUnique 100
-inlineDataConKey    = mkPreludeDataConUnique 101
-inlinableDataConKey = mkPreludeDataConUnique 102
+noInlineDataConKey  = mkPreludeDataConUnique 200
+inlineDataConKey    = mkPreludeDataConUnique 201
+inlinableDataConKey = mkPreludeDataConUnique 202
 
 -- data RuleMatch = ...
 conLikeDataConKey, funLikeDataConKey :: Unique
-conLikeDataConKey = mkPreludeDataConUnique 103
-funLikeDataConKey = mkPreludeDataConUnique 104
+conLikeDataConKey = mkPreludeDataConUnique 203
+funLikeDataConKey = mkPreludeDataConUnique 204
 
 -- data Phases = ...
 allPhasesDataConKey, fromPhaseDataConKey, beforePhaseDataConKey :: Unique
-allPhasesDataConKey   = mkPreludeDataConUnique 105
-fromPhaseDataConKey   = mkPreludeDataConUnique 106
-beforePhaseDataConKey = mkPreludeDataConUnique 107
+allPhasesDataConKey   = mkPreludeDataConUnique 205
+fromPhaseDataConKey   = mkPreludeDataConUnique 206
+beforePhaseDataConKey = mkPreludeDataConUnique 207
 
 -- newtype TExp a = ...
 tExpDataConKey :: Unique
-tExpDataConKey = mkPreludeDataConUnique 108
+tExpDataConKey = mkPreludeDataConUnique 208
 
 -- data Overlap = ..
 overlappableDataConKey,
   overlappingDataConKey,
   overlapsDataConKey,
   incoherentDataConKey :: Unique
-overlappableDataConKey = mkPreludeDataConUnique 109
-overlappingDataConKey  = mkPreludeDataConUnique 110
-overlapsDataConKey     = mkPreludeDataConUnique 111
-incoherentDataConKey   = mkPreludeDataConUnique 112
+overlappableDataConKey = mkPreludeDataConUnique 209
+overlappingDataConKey  = mkPreludeDataConUnique 210
+overlapsDataConKey     = mkPreludeDataConUnique 211
+incoherentDataConKey   = mkPreludeDataConUnique 212
 
 -- data DerivStrategy = ...
 stockDataConKey, anyclassDataConKey, newtypeDataConKey :: Unique
-stockDataConKey    = mkPreludeDataConUnique 113
-anyclassDataConKey = mkPreludeDataConUnique 114
-newtypeDataConKey  = mkPreludeDataConUnique 115
+stockDataConKey    = mkPreludeDataConUnique 213
+anyclassDataConKey = mkPreludeDataConUnique 214
+newtypeDataConKey  = mkPreludeDataConUnique 215
 
 {- *********************************************************************
 *                                                                      *

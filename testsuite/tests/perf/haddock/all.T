@@ -5,7 +5,7 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 38425793776, 5)
+          [(wordsize(64), 25592972912, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
             # 2012-09-20:  5829972376 (amd64/Linux)
             # 2012-10-08:  5902601224 (amd64/Linux)
@@ -34,6 +34,7 @@ test('haddock.base',
             # 2017-02-11: 34819979936 (x86_64/Linux) - OccurAnal / One-Shot  (#13227)
             # 2017-02-16: 32695562088 Better Lint for join points
             # 2017-02-17: 38425793776 (x86_64/Linux) - Generalize kind of (->)
+            # 2017-02-12: 25592972912 (x86_64/Linux) - Type-indexed Typeable
 
           ,(platform('i386-unknown-mingw32'), 4434804940, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
@@ -56,7 +57,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 27784875792, 5)
+          [(wordsize(64), 18865432648, 5)
             # 2012-08-14:  3255435248 (amd64/Linux)
             # 2012-08-29:  3324606664 (amd64/Linux, new codegen)
             # 2012-10-08:  3373401360 (amd64/Linux)
@@ -100,6 +101,7 @@ test('haddock.Cabal',
             # 2017-02-11: 25533642168 (amd64/Linux) - OccurAnal / One-Shot  (#13227)
             # 2017-02-16: 23867276992  Better Lint for join points
             # 2017-02-17: 27784875792 (amd64/Linux) - Generalize kind of (->)
+            # 2017-02-12: 18865432648 (amd64/Linux) - Type-indexed Typeable
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

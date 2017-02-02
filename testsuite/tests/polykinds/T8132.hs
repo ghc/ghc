@@ -1,6 +1,7 @@
 {-# LANGUAGE MagicHash #-}
-import Data.Typeable.Internal
+import Data.Typeable
 
 data K = K
 
-instance Typeable K where typeRep# _ = undefined
+-- This used to have a RHS but now we hide typeRep#
+instance Typeable K -- where typeRep# _ = undefined

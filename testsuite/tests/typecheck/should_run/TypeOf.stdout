@@ -5,7 +5,7 @@ Word
 Double
 IO ()
 (Char,Int,[Char])
-TypeRep
+SomeTypeRep
 Bool
 Ordering
 Int -> Int
@@ -13,7 +13,7 @@ Proxy Constraint (Eq Int)
 Proxy Constraint (Int,Int)
 Proxy Symbol "hello world"
 Proxy Nat 1
-Proxy [Nat] (': Nat 1 (': Nat 2 (': Nat 3 '[])))
+Proxy [Nat] (': Nat 1 (': Nat 2 (': Nat 3 ('[] Nat))))
 Proxy Ordering 'EQ
 Proxy (RuntimeRep -> Constraint) TYPE
 Proxy Constraint Constraint
@@ -21,4 +21,4 @@ Proxy Constraint Constraint
 Proxy Constraint Constraint
 Proxy RuntimeRep 'LiftedRep
 Proxy (Nat,Symbol) ('(,) Nat Symbol 1 "hello")
-Proxy (Constraint -> Constraint -> Constraint) ~~
+Proxy (Constraint -> Constraint -> Constraint) (~~ Constraint Constraint)

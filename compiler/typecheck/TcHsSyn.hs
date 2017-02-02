@@ -615,7 +615,7 @@ zonkLExprs env exprs = mapM (zonkLExpr env) exprs
 zonkLExpr  env expr  = wrapLocM (zonkExpr env) expr
 
 zonkExpr env (HsVar (L l id))
-  = ASSERT( isNothing (isDataConId_maybe id) )
+  = ASSERT2( isNothing (isDataConId_maybe id), ppr id )
     return (HsVar (L l (zonkIdOcc env id)))
 
 zonkExpr _ e@(HsConLikeOut {}) = return e
@@ -1451,13 +1451,17 @@ zonkEvTerm env (EvSelector sel_id tys tms)
        ; return (EvSelector sel_id' tys' tms') }
 
 zonkEvTypeable :: ZonkEnv -> EvTypeable -> TcM EvTypeable
-zonkEvTypeable env (EvTypeableTyCon ts)
-  = do { ts' <- mapM (zonkEvTerm env) ts
-       ; return $ EvTypeableTyCon ts' }
+zonkEvTypeable env (EvTypeableTyCon tycon e)
+  = do { e'  <- mapM (zonkEvTerm env) e
+       ; return $ EvTypeableTyCon tycon e' }
 zonkEvTypeable env (EvTypeableTyApp t1 t2)
   = do { t1' <- zonkEvTerm env t1
        ; t2' <- zonkEvTerm env t2
        ; return (EvTypeableTyApp t1' t2') }
+zonkEvTypeable env (EvTypeableTrFun t1 t2)
+  = do { t1' <- zonkEvTerm env t1
+       ; t2' <- zonkEvTerm env t2
+       ; return (EvTypeableTrFun t1' t2') }
 zonkEvTypeable env (EvTypeableTyLit t1)
   = do { t1' <- zonkEvTerm env t1
        ; return (EvTypeableTyLit t1') }

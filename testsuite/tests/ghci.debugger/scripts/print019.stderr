@@ -5,10 +5,10 @@
       Use :print or :force to determine these types
       Relevant bindings include it :: a1 (bound at <interactive>:10:1)
       These potential instances exist:
-        instance Show TypeRep -- Defined in ‘Data.Typeable.Internal’
         instance Show Ordering -- Defined in ‘GHC.Show’
         instance Show TyCon -- Defined in ‘GHC.Show’
-        ...plus 30 others
-        ...plus 10 instances involving out-of-scope types
+        instance Show Integer -- Defined in ‘GHC.Show’
+        ...plus 29 others
+        ...plus 12 instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of an interactive GHCi command: print it

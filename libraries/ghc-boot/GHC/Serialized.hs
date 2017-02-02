@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
@@ -26,15 +28,24 @@ import Data.Data
 data Serialized = Serialized TypeRep [Word8]
 
 -- | Put a Typeable value that we are able to actually turn into bytes into a 'Serialized' value ready for deserialization later
-toSerialized :: Typeable a => (a -> [Word8]) -> a -> Serialized
-toSerialized serialize what = Serialized (typeOf what) (serialize what)
+toSerialized :: forall a. Typeable a => (a -> [Word8]) -> a -> Serialized
+toSerialized serialize what = Serialized rep (serialize what)
+  where
+    rep = typeOf what
 
 -- | If the 'Serialized' value contains something of the given type, then use the specified deserializer to return @Just@ that.
 -- Otherwise return @Nothing@.
 fromSerialized :: forall a. Typeable a => ([Word8] -> a) -> Serialized -> Maybe a
+#if MIN_VERSION_base(4,10,0)
+fromSerialized deserialize (Serialized the_type bytes)
+  | the_type == rep = Just (deserialize bytes)
+  | otherwise       = Nothing
+  where rep = typeRep (Proxy :: Proxy a)
+#else
 fromSerialized deserialize (Serialized the_type bytes)
   | the_type == typeOf (undefined :: a) = Just (deserialize bytes)
   | otherwise                           = Nothing
+#endif
 
 -- | Use a 'Data' instance to implement a serialization scheme dual to that of 'deserializeWithData'
 serializeWithData :: Data a => a -> [Word8]

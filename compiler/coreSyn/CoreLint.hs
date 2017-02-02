@@ -1031,7 +1031,7 @@ lintTyKind tyvar arg_ty
         -- and then apply it to both boxed and unboxed types.
   = do { arg_kind <- lintType arg_ty
        ; unless (arg_kind `eqType` tyvar_kind)
-                (addErrL (mkKindErrMsg tyvar arg_ty $$ (text "xx" <+> ppr arg_kind))) }
+                (addErrL (mkKindErrMsg tyvar arg_ty $$ (text "Linted Arg kind:" <+> ppr arg_kind))) }
   where
     tyvar_kind = tyVarKind tyvar
 

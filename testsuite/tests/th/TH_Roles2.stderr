@@ -4,17 +4,23 @@ TYPE CONSTRUCTORS
   data T (a :: k)
 COERCION AXIOMS
 Dependent modules: []
-Dependent packages: [array-0.5.1.1, base-4.9.0.0, deepseq-1.4.2.0,
+Dependent packages: [array-0.5.1.2, base-4.10.0.0, deepseq-1.4.3.0,
                      ghc-boot-th-8.1, ghc-prim-0.5.0.0, integer-gmp-1.0.0.1,
-                     pretty-1.1.3.3, template-haskell-2.11.0.0]
+                     pretty-1.1.3.3, template-haskell-2.12.0.0]
 
 ==================== Typechecker ====================
 TH_Roles2.$tcT
   = GHC.Types.TyCon
-      6325001754388382679##
-      4656387726417942748##
+      11651627537942629178##
+      11503899791410937231##
       TH_Roles2.$trModule
       (GHC.Types.TrNameS "T"#)
+      1
+      krep_a7XD
+krep_a7XD [InlPrag=[~]]
+  = GHC.Types.KindRepFun
+      (GHC.Types.KindRepVar 0)
+      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
 TH_Roles2.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "TH_Roles2"#)

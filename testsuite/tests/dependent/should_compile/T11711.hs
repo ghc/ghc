@@ -26,8 +26,8 @@ data TypeRep (a :: k) where
 class Typeable (a :: k) where
     typeRep :: TypeRep a
 
-data TypeRepX where
-    TypeRepX :: forall k (a :: k). TypeRep a -> TypeRepX
+data SomeTypeRep where
+    SomeTypeRep :: forall k (a :: k). TypeRep a -> SomeTypeRep
 
 eqTypeRep :: TypeRep a -> TypeRep b -> Maybe (a :~~: b)
 eqTypeRep = undefined
@@ -38,12 +38,12 @@ typeRepKind = undefined
 instance Typeable Type where
   typeRep = TrTyCon "Type" typeRep
 
-funResultTy :: TypeRepX -> TypeRepX -> Maybe TypeRepX
-funResultTy (TypeRepX f) (TypeRepX x)
+funResultTy :: SomeTypeRep -> SomeTypeRep -> Maybe SomeTypeRep
+funResultTy (SomeTypeRep f) (SomeTypeRep x)
   | Just HRefl <- (typeRep :: TypeRep Type) `eqTypeRep` typeRepKind f
   , TRFun arg res <- f
   , Just HRefl <- arg `eqTypeRep` x
-  = Just (TypeRepX res)
+  = Just (SomeTypeRep res)
   | otherwise
   = Nothing
 

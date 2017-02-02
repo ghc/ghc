@@ -438,8 +438,8 @@ inheritedSigPvpWarning =
 -- the export lists of two signatures is just merging the declarations
 -- of two signatures writ small.  Of course, in GHC Haskell, there are a
 -- few important things which are not explicitly exported but still can
--- be used:  in particular, dictionary functions for instances and
--- coercion axioms for type families also count.
+-- be used:  in particular, dictionary functions for instances, Typeable
+-- TyCon bindings, and coercion axioms for type families also count.
 --
 -- When handling these non-exported things, there two primary things
 -- we need to watch out for:

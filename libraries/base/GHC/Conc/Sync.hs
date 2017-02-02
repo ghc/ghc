@@ -99,11 +99,7 @@ module GHC.Conc.Sync
 import Foreign
 import Foreign.C
 
-#ifndef mingw32_HOST_OS
-import Data.Dynamic
-#else
 import Data.Typeable
-#endif
 import Data.Maybe
 
 import GHC.Base

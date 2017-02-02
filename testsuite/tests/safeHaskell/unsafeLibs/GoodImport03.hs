@@ -56,7 +56,6 @@ import Data.String
 import Data.Traversable
 import Data.Tuple
 import Data.Typeable
-import Data.Typeable.Internal
 import Data.Unique
 import Data.Version
 import Data.Word
@@ -112,6 +111,8 @@ import Text.Read
 import Text.Read.Lex
 import Text.Show
 import Text.Show.Functions
+
+import Type.Reflection
 
 -- import Unsafe.Coerce
 

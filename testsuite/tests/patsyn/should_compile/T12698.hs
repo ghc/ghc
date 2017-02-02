@@ -6,7 +6,7 @@ module T12698 where
 
 import GHC.Types
 import Prelude hiding ( fromInteger )
-import Data.Type.Equality
+import Data.Type.Equality hiding ((:~~:)(..))
 import Data.Kind
 import qualified Prelude
 

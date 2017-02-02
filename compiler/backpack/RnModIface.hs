@@ -405,6 +405,9 @@ rnIfaceDecl d@IfaceId{} = do
                       IfDFunId -> rnIfaceNeverExported (ifName d)
                       _ | isDefaultMethodOcc (occName (ifName d))
                         -> rnIfaceNeverExported (ifName d)
+                      -- Typeable bindings. See Note [Grand plan for Typeable].
+                      _ | isTypeableBindOcc (occName (ifName d))
+                        -> rnIfaceNeverExported (ifName d)
                         | otherwise -> rnIfaceGlobal (ifName d)
             ty <- rnIfaceType (ifType d)
             details <- rnIfaceIdDetails (ifIdDetails d)

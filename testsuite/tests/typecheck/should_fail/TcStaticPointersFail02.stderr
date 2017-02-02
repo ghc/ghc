@@ -1,13 +1,13 @@
 
 TcStaticPointersFail02.hs:9:6: error:
-    • No instance for (Data.Typeable.Internal.Typeable b)
+    • No instance for (base-4.10.0.0:Data.Typeable.Internal.Typeable b)
         arising from a static form
     • In the expression: static (undefined :: (forall a. a -> a) -> b)
       In an equation for ‘f1’:
           f1 = static (undefined :: (forall a. a -> a) -> b)
 
 TcStaticPointersFail02.hs:12:6: error:
-    • No instance for (Data.Typeable.Internal.Typeable
+    • No instance for (base-4.10.0.0:Data.Typeable.Internal.Typeable
                          (Monad m => a -> m a))
         arising from a static form
         (maybe you haven't applied a function to enough arguments?)

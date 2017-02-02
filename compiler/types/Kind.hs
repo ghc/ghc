@@ -8,6 +8,7 @@ module Kind (
         -- ** Predicates on Kinds
         isLiftedTypeKind, isUnliftedTypeKind,
         isConstraintKind,
+        isTYPEApp,
         returnsTyCon, returnsConstraintKind,
         isConstraintKindCon,
         okArrowArgKind, okArrowResultKind,
@@ -19,7 +20,9 @@ module Kind (
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type       ( typeKind, coreViewOneStarKind )
+import {-# SOURCE #-} Type    ( typeKind, coreViewOneStarKind
+                              , splitTyConApp_maybe )
+import {-# SOURCE #-} DataCon ( DataCon )
 
 import TyCoRep
 import TyCon
@@ -67,6 +70,15 @@ isConstraintKindCon   tc = tyConUnique tc == constraintKindTyConKey
 
 isConstraintKind (TyConApp tc _) = isConstraintKindCon tc
 isConstraintKind _               = False
+
+isTYPEApp :: Kind -> Maybe DataCon
+isTYPEApp (TyConApp tc args)
+  | tc `hasKey` tYPETyConKey
+  , [arg] <- args
+  , Just (tc, []) <- splitTyConApp_maybe arg
+  , Just dc <- isPromotedDataCon_maybe tc
+  = Just dc
+isTYPEApp _ = Nothing
 
 -- | Does the given type "end" in the given tycon? For example @k -> [a] -> *@
 -- ends in @*@ and @Maybe a -> [a]@ ends in @[]@.

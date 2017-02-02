@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 94, types: 48, coercions: 0, joins: 0/0}
+  = {terms: 125, types: 58, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE] :: Int -> Foo
@@ -119,13 +119,98 @@ T7360.$trModule :: GHC.Types.Module
 T7360.$trModule =
   GHC.Types.Module T7360.$trModule3 T7360.$trModule1
 
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T7360.$tcFoo1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m5]
+T7360.$tcFoo1 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7360.$tcFoo3 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
+T7360.$tcFoo3 = "Foo"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T7360.$tcFoo2 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T7360.$tcFoo2 = GHC.Types.TrNameS T7360.$tcFoo3
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T7360.$tcFoo :: GHC.Types.TyCon
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
+T7360.$tcFoo =
+  GHC.Types.TyCon
+    1581370841583180512##
+    13291578023368289311##
+    T7360.$trModule
+    T7360.$tcFoo2
+    0#
+    T7360.$tcFoo1
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+T7360.$tc'Foo4 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1]
+T7360.$tc'Foo4 =
+  GHC.Types.KindRepTyConApp
+    T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo6 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T7360.$tc'Foo6 = "'Foo1"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo5 :: GHC.Types.TrName
+[GblId,
+ Caf=NoCafRefs,
+ Str=m1,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
+T7360.$tc'Foo5 = GHC.Types.TrNameS T7360.$tc'Foo6
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo1 :: GHC.Types.TyCon
+[GblId,
+ Caf=NoCafRefs,
+ Str=m,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
+T7360.$tc'Foo1 =
+  GHC.Types.TyCon
+    3986951253261644518##
+    2515097940992351150##
+    T7360.$trModule
+    T7360.$tc'Foo5
+    0#
+    T7360.$tc'Foo4
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+T7360.$tc'Foo7 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1]
+T7360.$tc'Foo7 =
+  GHC.Types.KindRepTyConApp
+    T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
+
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo9 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo9 = "'Foo3"#
+T7360.$tc'Foo9 = "'Foo2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo8 :: GHC.Types.TrName
@@ -136,112 +221,72 @@ T7360.$tc'Foo8 :: GHC.Types.TrName
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$tc'Foo8 = GHC.Types.TrNameS T7360.$tc'Foo9
 
--- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo3 :: GHC.Types.TyCon
-[GblId,
- Caf=NoCafRefs,
- Str=m,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tc'Foo3 =
-  GHC.Types.TyCon
-    10507205234936349519##
-    8302184214013227554##
-    T7360.$trModule
-    T7360.$tc'Foo8
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo7 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo7 = "'Foo2"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo6 :: GHC.Types.TrName
-[GblId,
- Caf=NoCafRefs,
- Str=m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.$tc'Foo6 = GHC.Types.TrNameS T7360.$tc'Foo7
-
--- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
 [GblId,
  Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
 T7360.$tc'Foo2 =
   GHC.Types.TyCon
-    9825259700232563546##
-    11056638024476048052##
+    17325079864060690428##
+    2969742457748208427##
     T7360.$trModule
-    T7360.$tc'Foo6
+    T7360.$tc'Foo8
+    0#
+    T7360.$tc'Foo7
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+krep :: GHC.Types.KindRep
+[GblId, Str=m1]
+krep =
+  GHC.Types.KindRepTyConApp
+    GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+krep1 :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1]
+krep1 =
+  GHC.Types.KindRepTyConApp
+    T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo10 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Str=m4]
+T7360.$tc'Foo10 = GHC.Types.KindRepFun krep krep1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo5 :: GHC.Prim.Addr#
+T7360.$tc'Foo12 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo5 = "'Foo1"#
+T7360.$tc'Foo12 = "'Foo3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo4 :: GHC.Types.TrName
+T7360.$tc'Foo11 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.$tc'Foo4 = GHC.Types.TrNameS T7360.$tc'Foo5
+T7360.$tc'Foo11 = GHC.Types.TrNameS T7360.$tc'Foo12
 
--- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo1 :: GHC.Types.TyCon
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
- Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tc'Foo1 =
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
+T7360.$tc'Foo3 =
   GHC.Types.TyCon
-    2058692068419561651##
-    9152017373001677943##
+    3674231676522181654##
+    2694749919371021431##
     T7360.$trModule
-    T7360.$tc'Foo4
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo2 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
-T7360.$tcFoo2 = "Foo"#
-
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo1 :: GHC.Types.TrName
-[GblId,
- Caf=NoCafRefs,
- Str=m1,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
-
--- RHS size: {terms: 5, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo :: GHC.Types.TyCon
-[GblId,
- Caf=NoCafRefs,
- Str=m,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 50}]
-T7360.$tcFoo =
-  GHC.Types.TyCon
-    8358641983981300860##
-    582034888424804490##
-    T7360.$trModule
-    T7360.$tcFoo1
+    T7360.$tc'Foo11
+    0#
+    T7360.$tc'Foo10
 
 
 

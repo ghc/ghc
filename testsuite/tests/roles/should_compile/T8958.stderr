@@ -22,40 +22,96 @@ Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
 ==================== Typechecker ====================
 T8958.$tcMap
   = GHC.Types.TyCon
-      11173210732975605893##
-      6338753504925142034##
+      16542473435673943392##
+      5374201132143305512##
       T8958.$trModule
       (GHC.Types.TrNameS "Map"#)
+      0
+      krep
+krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun
+      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
+      (GHC.Types.KindRepFun
+         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
+         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep))
 T8958.$tc'MkMap
   = GHC.Types.TyCon
-      10702411725744601909##
-      8660532495248702786##
+      2942839876828444488##
+      3989137838066763457##
       T8958.$trModule
       (GHC.Types.TrNameS "'MkMap"#)
+      2
+      krep
+krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun
+      (GHC.Types.KindRepTyConApp
+         GHC.Types.$tc[]
+         ((:) @ GHC.Types.KindRep
+            (GHC.Types.KindRepTyConApp
+               GHC.Tuple.$tc(,)
+               ((:) @ GHC.Types.KindRep
+                  (GHC.Types.KindRepVar 0)
+                  ((:) @ GHC.Types.KindRep
+                     (GHC.Types.KindRepVar 1) [] @ GHC.Types.KindRep)))
+            [] @ GHC.Types.KindRep))
+      (GHC.Types.KindRepTyConApp
+         T8958.$tcMap
+         ((:) @ GHC.Types.KindRep
+            (GHC.Types.KindRepVar 0)
+            ((:) @ GHC.Types.KindRep
+               (GHC.Types.KindRepVar 1) [] @ GHC.Types.KindRep)))
 T8958.$tcRepresentational
   = GHC.Types.TyCon
-      17939208465687456137##
-      86959701938445380##
+      12809567151893673426##
+      12159693688248149156##
       T8958.$trModule
       (GHC.Types.TrNameS "Representational"#)
+      0
+      krep
+krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun
+      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
+      (GHC.Types.KindRepTyConApp
+         GHC.Types.$tcConstraint [] @ GHC.Types.KindRep)
 T8958.$tc'C:Representational
   = GHC.Types.TyCon
-      6623579006299218188##
-      18041743345929230411##
+      2358772282532242424##
+      5444038897914446879##
       T8958.$trModule
       (GHC.Types.TrNameS "'C:Representational"#)
+      1
+      krep
+krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcRepresentational
+      ((:) @ GHC.Types.KindRep
+         (GHC.Types.KindRepVar 0) [] @ GHC.Types.KindRep)
 T8958.$tcNominal
   = GHC.Types.TyCon
-      5048799062136959048##
-      4899664595355811926##
+      12224997609886144634##
+      9866011944332051160##
       T8958.$trModule
       (GHC.Types.TrNameS "Nominal"#)
+      0
+      krep
+krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun
+      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
+      (GHC.Types.KindRepTyConApp
+         GHC.Types.$tcConstraint [] @ GHC.Types.KindRep)
 T8958.$tc'C:Nominal
   = GHC.Types.TyCon
-      13167926310643805202##
-      1726092271306256063##
+      10562260635335201742##
+      1215478186250709459##
       T8958.$trModule
       (GHC.Types.TrNameS "'C:Nominal"#)
+      1
+      krep
+krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcNominal
+      ((:) @ GHC.Types.KindRep
+         (GHC.Types.KindRepVar 0) [] @ GHC.Types.KindRep)
 T8958.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)

@@ -58,32 +58,57 @@ knownUniqueName u =
 -- Anonymous sums
 --
 -- Sum arities start from 2. The encoding is a bit funny: we break up the
--- integral part into bitfields for the arity and alternative index (which is
--- taken to be 0xff in the case of the TyCon)
+-- integral part into bitfields for the arity, an alternative index (which is
+-- taken to be 0xff in the case of the TyCon), and, in the case of a datacon, a
+-- tag (used to identify the sum's TypeRep binding).
+--
+-- This layout is chosen to remain compatible with the usual unique allocation
+-- for wired-in data constructors described in Unique.hs
 --
 -- TyCon for sum of arity k:
---   00000000 kkkkkkkk 11111111
+--   00000000 kkkkkkkk 11111100
+
+-- TypeRep of TyCon for sum of arity k:
+--   00000000 kkkkkkkk 11111101
+--
 -- DataCon for sum of arity k and alternative n (zero-based):
---   00000000 kkkkkkkk nnnnnnnn
+--   00000000 kkkkkkkk nnnnnn00
+--
+-- TypeRep for sum DataCon of arity k and alternative n (zero-based):
+--   00000000 kkkkkkkk nnnnnn10
 
 mkSumTyConUnique :: Arity -> Unique
 mkSumTyConUnique arity =
     ASSERT(arity < 0xff)
-    mkUnique 'z' (arity `shiftL` 8 .|. 0xff)
+    mkUnique 'z' (arity `shiftL` 8 .|. 0xfc)
 
 mkSumDataConUnique :: ConTagZ -> Arity -> Unique
 mkSumDataConUnique alt arity
   | alt >= arity
   = panic ("mkSumDataConUnique: " ++ show alt ++ " >= " ++ show arity)
   | otherwise
-  = mkUnique 'z' (arity `shiftL` 8 + alt) {- skip the tycon -}
+  = mkUnique 'z' (arity `shiftL` 8 + alt `shiftL` 2) {- skip the tycon -}
 
 getUnboxedSumName :: Int -> Name
-getUnboxedSumName n =
-    case n .&. 0xff of
-      0xff -> tyConName $ sumTyCon arity
-      alt  -> dataConName $ sumDataCon (alt + 1) arity
-  where arity = n `shiftR` 8
+getUnboxedSumName n
+  | n .&. 0xfc == 0xfc
+  = case tag of
+      0x0 -> tyConName $ sumTyCon arity
+      0x1 -> getRep $ sumTyCon arity
+      _   -> pprPanic "getUnboxedSumName: invalid tag" (ppr tag)
+  | tag == 0x0
+  = dataConName $ sumDataCon (alt + 1) arity
+  | tag == 0x2
+  = getRep $ promoteDataCon $ sumDataCon (alt + 1) arity
+  | otherwise
+  = pprPanic "getUnboxedSumName" (ppr n)
+  where
+    arity = n `shiftR` 8
+    alt = (n .&. 0xff) `shiftR` 2
+    tag = 0x3 .&. n
+    getRep tycon =
+        fromMaybe (pprPanic "getUnboxedSumName" (ppr tycon))
+        $ tyConRepName_maybe tycon
 
 -- Note [Uniques for tuple type and data constructors]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

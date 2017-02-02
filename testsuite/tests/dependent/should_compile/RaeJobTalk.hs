@@ -11,7 +11,7 @@
 module RaeJobTalk where
 
 import Data.Type.Bool
-import Data.Type.Equality
+import Data.Type.Equality hiding ((:~~:)(..))
 import GHC.TypeLits
 import Data.Proxy
 import GHC.Exts
@@ -129,60 +129,60 @@ instance Read TyConX where
   readsPrec _ "List" = [(TyConX List, "")]
   readsPrec _ _ = []
 
--- This variant of TypeRepX allows you to specify an arbitrary
+-- This variant of SomeTypeRep allows you to specify an arbitrary
 -- constraint on the inner TypeRep
-data TypeRepX :: (forall k. k -> Constraint) -> Type where
-  TypeRepX :: forall k (c :: forall k'. k' -> Constraint) (a :: k).
-              c a => TypeRep a -> TypeRepX c
+data SomeTypeRep :: (forall k. k -> Constraint) -> Type where
+  SomeTypeRep :: forall k (c :: forall k'. k' -> Constraint) (a :: k).
+              c a => TypeRep a -> SomeTypeRep c
 
 -- This constraint is always satisfied
 class ConstTrue (a :: k) -- needs the :: k to make it a specified tyvar
 instance ConstTrue a
 
-instance Show (TypeRepX ConstTrue) where
-  show (TypeRepX tr) = show tr
+instance Show (SomeTypeRep ConstTrue) where
+  show (SomeTypeRep tr) = show tr
 
--- can't write Show (TypeRepX c) because c's kind mentions a forall,
+-- can't write Show (SomeTypeRep c) because c's kind mentions a forall,
 -- and the impredicativity check gets nervous. See #11519
-instance Show (TypeRepX IsType) where
-  show (TypeRepX tr) = show tr
+instance Show (SomeTypeRep IsType) where
+  show (SomeTypeRep tr) = show tr
 
 -- Just enough functionality to get through example. No parentheses
 -- or other niceties.
-instance Read (TypeRepX ConstTrue) where
+instance Read (SomeTypeRep ConstTrue) where
   readsPrec p s = do
     let tokens = words s
     tyreps <- mapM read_token tokens
     return (foldl1 mk_app tyreps, "")
 
     where
-      read_token :: String -> [TypeRepX ConstTrue]
-      read_token "String" = return (TypeRepX $ typeRep @String)
+      read_token :: String -> [SomeTypeRep ConstTrue]
+      read_token "String" = return (SomeTypeRep $ typeRep @String)
       read_token other = do
         (TyConX tc, _) <- readsPrec p other
-        return (TypeRepX (TyCon tc))
+        return (SomeTypeRep (TyCon tc))
 
-      mk_app :: TypeRepX ConstTrue -> TypeRepX ConstTrue -> TypeRepX ConstTrue
-      mk_app (TypeRepX f) (TypeRepX a) = case kindRep f of
+      mk_app :: SomeTypeRep ConstTrue -> SomeTypeRep ConstTrue -> SomeTypeRep ConstTrue
+      mk_app (SomeTypeRep f) (SomeTypeRep a) = case kindRep f of
         TyCon Arrow `TyApp` k1 `TyApp` _
-          | Just HRefl <- k1 `eqT` kindRep a -> TypeRepX (TyApp f a)
+          | Just HRefl <- k1 `eqT` kindRep a -> SomeTypeRep (TyApp f a)
         _ -> error "ill-kinded type"
 
--- instance Read (TypeRepX ((~~) Type))  RAE: need (~~) :: forall k1. k1 -> forall k2. k2 -> Constraint
+-- instance Read (SomeTypeRep ((~~) Type))  RAE: need (~~) :: forall k1. k1 -> forall k2. k2 -> Constraint
 -- RAE: need kind signatures on classes
 
--- TypeRepX ((~~) Type)
+-- SomeTypeRep ((~~) Type)
 -- (~~) :: forall k1 k2. k1 -> k2 -> Constraint
 -- I need: (~~) :: forall k1. k1 -> forall k2. k2 -> Constraint
 
 class k ~~ Type => IsType (x :: k)
 instance k ~~ Type => IsType (x :: k)
 
-instance Read (TypeRepX IsType) where
-  readsPrec p s = case readsPrec @(TypeRepX ConstTrue) p s of
-    [(TypeRepX tr, "")]
+instance Read (SomeTypeRep IsType) where
+  readsPrec p s = case readsPrec @(SomeTypeRep ConstTrue) p s of
+    [(SomeTypeRep tr, "")]
       | Just HRefl <- eqT (kindRep tr) (typeRep @Type)
-      -> [(TypeRepX tr, "")]
+      -> [(SomeTypeRep tr, "")]
     _ -> error "wrong kind"
 
 -----------------------------
@@ -371,7 +371,7 @@ readRows sch lst = (row : tail)
         tail           = readRows sch strTail
 
 -- Read in one line of a .schema file. Note that the type read must have kind *
-readCol :: String -> (String, TypeRepX IsType)
+readCol :: String -> (String, SomeTypeRep IsType)
 readCol str = case break isSpace str of
   (name, ' ' : ty) -> (name, read ty)
   _                -> schemaError $ "Bad parse of " ++ str
@@ -386,11 +386,11 @@ withSchema filename thing_inside = do
       cols       = map readCol schEntries
   go cols thing_inside
   where
-    go :: [(String, TypeRepX IsType)]
+    go :: [(String, SomeTypeRep IsType)]
        -> (forall (s :: TSchema). Schema s -> IO a)
        -> IO a
     go []                           thing = thing Nil
-    go ((name, TypeRepX tr) : cols) thing
+    go ((name, SomeTypeRep tr) : cols) thing
       = go cols $ \schema ->
         case someSymbolVal name of
           SomeSymbol (_ :: Proxy name) ->

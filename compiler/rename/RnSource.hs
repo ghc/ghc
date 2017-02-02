@@ -60,25 +60,22 @@ import Data.List ( sortBy, mapAccumL )
 import Data.Maybe ( isJust )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
-{-
-@rnSourceDecl@ `renames' declarations.
+{- | @rnSourceDecl@ "renames" declarations.
 It simultaneously performs dependency analysis and precedence parsing.
 It also does the following error checks:
-\begin{enumerate}
-\item
-Checks that tyvars are used properly. This includes checking
-for undefined tyvars, and tyvars in contexts that are ambiguous.
-(Some of this checking has now been moved to module @TcMonoType@,
-since we don't have functional dependency information at this point.)
-\item
-Checks that all variable occurrences are defined.
-\item
-Checks the @(..)@ etc constraints in the export list.
-\end{enumerate}
--}
 
--- Brings the binders of the group into scope in the appropriate places;
--- does NOT assume that anything is in scope already
+* Checks that tyvars are used properly. This includes checking
+  for undefined tyvars, and tyvars in contexts that are ambiguous.
+  (Some of this checking has now been moved to module @TcMonoType@,
+  since we don't have functional dependency information at this point.)
+
+* Checks that all variable occurrences are defined.
+
+* Checks the @(..)@ etc constraints in the export list.
+
+Brings the binders of the group into scope in the appropriate places;
+does NOT assume that anything is in scope already
+-}
 rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 -- Rename a top-level HsGroup; used for normal source files *and* hs-boot files
 rnSrcDecls group@(HsGroup { hs_valds   = val_decls,

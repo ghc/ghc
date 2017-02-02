@@ -174,7 +174,6 @@ Library
         Data.Type.Coercion
         Data.Type.Equality
         Data.Typeable
-        Data.Typeable.Internal
         Data.Unique
         Data.Version
         Data.Void
@@ -306,6 +305,8 @@ Library
         Text.Read.Lex
         Text.Show
         Text.Show.Functions
+        Type.Reflection
+        Type.Reflection.Unsafe
         Unsafe.Coerce
 
     other-modules:
@@ -313,6 +314,7 @@ Library
         Control.Monad.ST.Lazy.Imp
         Data.Functor.Utils
         Data.OldList
+        Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
         GHC.StaticPtr.Internal
         System.Environment.ExecutablePath

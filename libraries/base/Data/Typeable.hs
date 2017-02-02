@@ -3,6 +3,8 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE TypeOperators #-}
 
 -----------------------------------------------------------------------------
@@ -10,7 +12,7 @@
 -- Module      :  Data.Typeable
 -- Copyright   :  (c) The University of Glasgow, CWI 2001--2004
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
--- 
+--
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
@@ -26,6 +28,11 @@
 --
 -- == Compatibility Notes
 --
+-- Since GHC 8.2, GHC has supported type-indexed type representations.
+-- "Data.Typeable" provides type representations which are qualified over this
+-- index, providing an interface very similar to the "Typeable" notion seen in
+-- previous releases. For the type-indexed interface, see "Data.Reflection".
+--
 -- Since GHC 7.8, 'Typeable' is poly-kinded. The changes required for this might
 -- break some old programs involving 'Typeable'. More details on this, including
 -- how to fix your code, can be found on the
@@ -34,85 +41,99 @@
 -----------------------------------------------------------------------------
 
 module Data.Typeable
-  (
-        -- * The Typeable class
-        Typeable,
-        typeRep,
+    ( -- * The Typeable class
+      Typeable
+    , typeOf
+    , typeRep
+    , I.withTypeable
 
-        -- * Propositional equality
-        (:~:)(Refl),
+      -- * Propositional equality
+    , (:~:)(Refl)
+    , (:~~:)(HRefl)
 
-        -- * For backwards compatibility
-        typeOf, typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7,
-        Typeable1, Typeable2, Typeable3, Typeable4, Typeable5, Typeable6,
-        Typeable7,
+      -- * Type-safe cast
+    , cast
+    , eqT
+    , gcast                -- a generalisation of cast
 
-        -- * Type-safe cast
-        cast,
-        eqT,
-        gcast,                  -- a generalisation of cast
+      -- * Generalized casts for higher-order kinds
+    , gcast1               -- :: ... => c (t a) -> Maybe (c (t' a))
+    , gcast2               -- :: ... => c (t a b) -> Maybe (c (t' a b))
 
-        -- * Generalized casts for higher-order kinds
-        gcast1,                 -- :: ... => c (t a) -> Maybe (c (t' a))
-        gcast2,                 -- :: ... => c (t a b) -> Maybe (c (t' a b))
+      -- * A canonical proxy type
+    , Proxy (..)
 
-        -- * A canonical proxy type
-        Proxy (..),
+      -- * Type representations
+    , TypeRep
+    , typeRepTyCon
+    , rnfTypeRep
+    , showsTypeRep
+    , mkFunTy
 
-        -- * Type representations
-        TypeRep,        -- abstract, instance of: Eq, Show, Typeable
-        typeRepFingerprint,
-        rnfTypeRep,
-        showsTypeRep,
+      -- * Observing type representations
+    , funResultTy
+    , I.typeRepFingerprint
 
-        TyCon,          -- abstract, instance of: Eq, Show, Typeable
-                        -- For now don't export Module, to avoid name clashes
-        tyConFingerprint,
-        tyConPackage,
-        tyConModule,
-        tyConName,
-        rnfTyCon,
+      -- * Type constructors
+    , I.TyCon          -- abstract, instance of: Eq, Show, Typeable
+                       -- For now don't export Module to avoid name clashes
+    , I.tyConPackage
+    , I.tyConModule
+    , I.tyConName
+    , I.rnfTyCon
 
-        -- * Construction of type representations
-        -- mkTyCon,        -- :: String  -> TyCon
-        mkTyCon3,       -- :: String  -> String -> String -> TyCon
-        mkTyConApp,     -- :: TyCon   -> [TypeRep] -> TypeRep
-        mkAppTy,        -- :: TypeRep -> TypeRep   -> TypeRep
-        mkFunTy,        -- :: TypeRep -> TypeRep   -> TypeRep
+      -- * For backwards compatibility
+    , typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7
+    , Typeable1, Typeable2, Typeable3, Typeable4
+    , Typeable5, Typeable6, Typeable7
+    ) where
 
-        -- * Observation of type representations
-        splitTyConApp,  -- :: TypeRep -> (TyCon, [TypeRep])
-        funResultTy,    -- :: TypeRep -> TypeRep   -> Maybe TypeRep
-        typeRepTyCon,   -- :: TypeRep -> TyCon
-        typeRepArgs,    -- :: TypeRep -> [TypeRep]
-  ) where
-
-import Data.Typeable.Internal
+import qualified Data.Typeable.Internal as I
+import Data.Typeable.Internal (Typeable)
 import Data.Type.Equality
 
-import Unsafe.Coerce
 import Data.Maybe
+import Data.Proxy
+import GHC.Show
 import GHC.Base
 
--------------------------------------------------------------
+-- | A quantified type representation.
+type TypeRep = I.SomeTypeRep
+
+-- | Observe a type representation for the type of a value.
+typeOf :: forall a. Typeable a => a -> TypeRep
+typeOf _ = I.typeRepX (Proxy :: Proxy a)
+
+-- | Takes a value of type @a@ and returns a concrete representation
+-- of that type.
 --
---              Type-safe cast
---
--------------------------------------------------------------
+-- @since 4.7.0.0
+typeRep :: forall proxy a. Typeable a => proxy a -> TypeRep
+typeRep = I.typeRepX
+
+-- | Show a type representation
+showsTypeRep :: I.SomeTypeRep -> ShowS
+showsTypeRep = shows
 
 -- | The type-safe cast operation
 cast :: forall a b. (Typeable a, Typeable b) => a -> Maybe b
-cast x = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
-           then Just $ unsafeCoerce x
-           else Nothing
+cast x
+  | Just HRefl <- ta `I.eqTypeRep` tb = Just x
+  | otherwise                         = Nothing
+  where
+    ta = I.typeRep :: I.TypeRep a
+    tb = I.typeRep :: I.TypeRep b
 
 -- | Extract a witness of equality of two types
 --
 -- @since 4.7.0.0
 eqT :: forall a b. (Typeable a, Typeable b) => Maybe (a :~: b)
-eqT = if typeRep (Proxy :: Proxy a) == typeRep (Proxy :: Proxy b)
-      then Just $ unsafeCoerce Refl
-      else Nothing
+eqT
+  | Just HRefl <- ta `I.eqTypeRep` tb = Just Refl
+  | otherwise                         = Nothing
+  where
+    ta = I.typeRep :: I.TypeRep a
+    tb = I.typeRep :: I.TypeRep b
 
 -- | A flexible variation parameterised in a type constructor
 gcast :: forall a b c. (Typeable a, Typeable b) => c a -> Maybe (c b)
@@ -120,11 +141,86 @@ gcast x = fmap (\Refl -> x) (eqT :: Maybe (a :~: b))
 
 -- | Cast over @k1 -> k2@
 gcast1 :: forall c t t' a. (Typeable t, Typeable t')
-       => c (t a) -> Maybe (c (t' a)) 
+       => c (t a) -> Maybe (c (t' a))
 gcast1 x = fmap (\Refl -> x) (eqT :: Maybe (t :~: t'))
 
 -- | Cast over @k1 -> k2 -> k3@
 gcast2 :: forall c t t' a b. (Typeable t, Typeable t')
-       => c (t a b) -> Maybe (c (t' a b)) 
+       => c (t a b) -> Maybe (c (t' a b))
 gcast2 x = fmap (\Refl -> x) (eqT :: Maybe (t :~: t'))
 
+-- | Observe the type constructor of a quantified type representation.
+typeRepTyCon :: TypeRep -> TyCon
+typeRepTyCon = I.typeRepXTyCon
+
+-- | Applies a type to a function type. Returns: @Just u@ if the first argument
+-- represents a function of type @t -> u@ and the second argument represents a
+-- function of type @t@. Otherwise, returns @Nothing@.
+funResultTy :: TypeRep -> TypeRep -> Maybe TypeRep
+funResultTy (I.SomeTypeRep f) (I.SomeTypeRep x)
+  | Just HRefl <- (I.typeRep :: I.TypeRep Type) `I.eqTypeRep` I.typeRepKind f
+  , I.Fun arg res <- f
+  , Just HRefl <- arg `I.eqTypeRep` x
+  = Just (I.SomeTypeRep res)
+  | otherwise = Nothing
+
+-- | Build a function type.
+mkFunTy :: TypeRep -> TypeRep -> TypeRep
+mkFunTy (I.SomeTypeRep arg) (I.SomeTypeRep res)
+  | Just HRefl <- I.typeRepKind arg `I.eqTypeRep` liftedTy
+  , Just HRefl <- I.typeRepKind res `I.eqTypeRep` liftedTy
+  = I.SomeTypeRep (I.Fun arg res)
+  | otherwise
+  = error $ "mkFunTy: Attempted to construct function type from non-lifted "++
+            "type: arg="++show arg++", res="++show res
+  where liftedTy = I.typeRep :: I.TypeRep *
+  -- TODO: We should be able to support this but the kind of (->) must be
+  -- generalized
+
+-- | Force a 'TypeRep' to normal form.
+rnfTypeRep :: TypeRep -> ()
+rnfTypeRep = I.rnfSomeTypeRep
+
+
+-- Keeping backwards-compatibility
+typeOf1 :: forall t (a :: *). Typeable t => t a -> TypeRep
+typeOf1 _ = I.typeRepX (Proxy :: Proxy t)
+
+typeOf2 :: forall t (a :: *) (b :: *). Typeable t => t a b -> TypeRep
+typeOf2 _ = I.typeRepX (Proxy :: Proxy t)
+
+typeOf3 :: forall t (a :: *) (b :: *) (c :: *). Typeable t
+        => t a b c -> TypeRep
+typeOf3 _ = I.typeRepX (Proxy :: Proxy t)
+
+typeOf4 :: forall t (a :: *) (b :: *) (c :: *) (d :: *). Typeable t
+        => t a b c d -> TypeRep
+typeOf4 _ = I.typeRepX (Proxy :: Proxy t)
+
+typeOf5 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *). Typeable t
+        => t a b c d e -> TypeRep
+typeOf5 _ = I.typeRepX (Proxy :: Proxy t)
+
+typeOf6 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *) (f :: *).
+                Typeable t => t a b c d e f -> TypeRep
+typeOf6 _ = I.typeRepX (Proxy :: Proxy t)
+
+typeOf7 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *) (f :: *)
+                (g :: *). Typeable t => t a b c d e f g -> TypeRep
+typeOf7 _ = I.typeRepX (Proxy :: Proxy t)
+
+type Typeable1 (a :: * -> *)                               = Typeable a
+type Typeable2 (a :: * -> * -> *)                          = Typeable a
+type Typeable3 (a :: * -> * -> * -> *)                     = Typeable a
+type Typeable4 (a :: * -> * -> * -> * -> *)                = Typeable a
+type Typeable5 (a :: * -> * -> * -> * -> * -> *)           = Typeable a
+type Typeable6 (a :: * -> * -> * -> * -> * -> * -> *)      = Typeable a
+type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
+
+{-# DEPRECATED Typeable1 "renamed to 'Typeable'" #-} -- deprecated in 7.8
+{-# DEPRECATED Typeable2 "renamed to 'Typeable'" #-} -- deprecated in 7.8
+{-# DEPRECATED Typeable3 "renamed to 'Typeable'" #-} -- deprecated in 7.8
+{-# DEPRECATED Typeable4 "renamed to 'Typeable'" #-} -- deprecated in 7.8
+{-# DEPRECATED Typeable5 "renamed to 'Typeable'" #-} -- deprecated in 7.8
+{-# DEPRECATED Typeable6 "renamed to 'Typeable'" #-} -- deprecated in 7.8
+{-# DEPRECATED Typeable7 "renamed to 'Typeable'" #-} -- deprecated in 7.8

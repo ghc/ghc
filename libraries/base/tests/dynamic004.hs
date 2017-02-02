@@ -1,7 +1,6 @@
 module Main where
 
 import Data.Typeable
-import Data.Typeable.Internal
 import GHC.Fingerprint
 import Text.Printf
 

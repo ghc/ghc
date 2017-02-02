@@ -1,13 +1,15 @@
 {-# LANGUAGE MagicHash #-}
 
--- Type checking with unboxed kinds fails when (->) is used in a prefix way
+-- It used to be that (->) would have a very restrictive kind when used in
+-- prefix position. This restriction was lifted after the levity polymorphism
+-- work in 2016.
 
 module ShouldSucceed where
 import GHC.Base
 
 type T = (->) Int#
 
--- Here's the comment from TypeRep:
+-- Here's the old comment from TypeRep:
 --
 -- funTyCon = mkFunTyCon funTyConName
 --              (mkArrowKinds [liftedTypeKind, liftedTypeKind]

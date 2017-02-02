@@ -34,6 +34,7 @@
 module Data.Type.Equality (
   -- * The equality types
   (:~:)(..), type (~~),
+  (:~~:)(..),
 
   -- * Working with equality
   sym, trans, castWith, gcastWith, apply, inner, outer,
@@ -136,6 +137,13 @@ instance a ~ b => Enum (a :~: b) where
 
 -- | @since 4.7.0.0
 deriving instance a ~ b => Bounded (a :~: b)
+
+-- | Kind heterogeneous propositional equality. Like '(:~:)', @a :~~: b@ is
+-- inhabited by a terminating value if and only if @a@ is the same type as @b@.
+--
+-- @since 4.10.0.0
+data (a :: k1) :~~: (b :: k2) where
+   HRefl :: a :~~: a
 
 -- | This class contains types where you can learn the equality of two types
 -- from information contained in /terms/. Typically, only singleton types should

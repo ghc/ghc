@@ -28,7 +28,7 @@ ST () ()
 StableName ()
 StablePtr ()
 TyCon
-TypeRep
+SomeTypeRep
 Word8
 Word16
 Word32

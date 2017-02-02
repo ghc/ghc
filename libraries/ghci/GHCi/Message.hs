@@ -40,6 +40,10 @@ import Data.ByteString (ByteString)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as LB
 import Data.Dynamic
+#if MIN_VERSION_base(4,10,0)
+-- Previously this was re-exported by Data.Dynamic
+import Data.Typeable (TypeRep)
+#endif
 import Data.IORef
 import Data.Map (Map)
 import GHC.Generics
@@ -380,7 +384,7 @@ fromSerializableException (EOtherException str) = toException (ErrorCall str)
 -- as the minimum
 instance Binary ExitCode where
   put ExitSuccess      = putWord8 0
-  put (ExitFailure ec) = putWord8 1 `mappend` put ec
+  put (ExitFailure ec) = putWord8 1 >> put ec
   get = do
     w <- getWord8
     case w of

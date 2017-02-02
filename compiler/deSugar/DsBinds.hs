@@ -38,7 +38,6 @@ import CoreFVs
 import Digraph
 
 import PrelNames
-import TysPrim ( mkProxyPrimTy )
 import TyCon
 import TcEvidence
 import TcType
@@ -1195,49 +1194,71 @@ dsEvTypeable :: Type -> EvTypeable -> DsM CoreExpr
 -- This code is tightly coupled to the representation
 -- of TypeRep, in base library Data.Typeable.Internals
 dsEvTypeable ty ev
-  = do { tyCl <- dsLookupTyCon typeableClassName   -- Typeable
+  = do { tyCl <- dsLookupTyCon typeableClassName    -- Typeable
        ; let kind = typeKind ty
              Just typeable_data_con
-                 = tyConSingleDataCon_maybe tyCl      -- "Data constructor"
-                                                      -- for Typeable
+                 = tyConSingleDataCon_maybe tyCl    -- "Data constructor"
+                                                    -- for Typeable
 
-       ; rep_expr <- ds_ev_typeable ty ev
-
-       -- Build Core for (let r::TypeRep = rep in \proxy. rep)
-       -- See Note [Memoising typeOf]
-       ; repName <- newSysLocalDs (exprType rep_expr)
-       ; let proxyT = mkProxyPrimTy kind ty
-             method = bindNonRec repName rep_expr
-                      $ mkLams [mkWildValBinder proxyT] (Var repName)
+       ; rep_expr <- ds_ev_typeable ty ev           -- :: TypeRep a
 
        -- Package up the method as `Typeable` dictionary
-       ; return $ mkConApp typeable_data_con [Type kind, Type ty, method] }
+       ; return $ mkConApp typeable_data_con [Type kind, Type ty, rep_expr] }
 
+type TypeRepExpr = CoreExpr
 
+-- | Returns a @CoreExpr :: TypeRep ty@
 ds_ev_typeable :: Type -> EvTypeable -> DsM CoreExpr
--- Returns a CoreExpr :: TypeRep ty
-ds_ev_typeable ty (EvTypeableTyCon evs)
-  | Just (tc, ks) <- splitTyConApp_maybe ty
-  = do { ctr <- dsLookupGlobalId mkPolyTyConAppName
-                    -- mkPolyTyConApp :: TyCon -> [KindRep] -> [TypeRep] -> TypeRep
-       ; tyRepTc <- dsLookupTyCon typeRepTyConName  -- TypeRep (the TyCon)
-       ; let tyRepType = mkTyConApp tyRepTc []      -- TypeRep (the Type)
-             mkRep cRep kReps tReps
-               = mkApps (Var ctr) [ cRep
-                                  , mkListExpr tyRepType kReps
-                                  , mkListExpr tyRepType tReps ]
+ds_ev_typeable ty (EvTypeableTyCon tc kind_ev)
+  = do { mkTrCon <- dsLookupGlobalId mkTrConName
+                    -- mkTrCon :: forall k (a :: k). TyCon -> TypeRep k -> TypeRep a
+       ; someTypeRepTyCon <- dsLookupTyCon someTypeRepTyConName
+       ; someTypeRepDataCon <- dsLookupDataCon someTypeRepDataConName
+                    -- SomeTypeRep :: forall k (a :: k). TypeRep a -> SomeTypeRep
 
+       ; tc_rep <- tyConRep tc                      -- :: TyCon
+       ; let ks = tyConAppArgs ty
+             -- Construct a SomeTypeRep
+             toSomeTypeRep :: Type -> EvTerm -> DsM CoreExpr
+             toSomeTypeRep t ev = do
+                 rep <- getRep ev t
+                 return $ mkCoreConApps someTypeRepDataCon [Type (typeKind t), Type t, rep]
+       ; kind_arg_reps <- sequence $ zipWith toSomeTypeRep ks kind_ev   -- :: TypeRep t
+       ; let -- :: [SomeTypeRep]
+             kind_args = mkListExpr (mkTyConTy someTypeRepTyCon) kind_arg_reps
 
-       ; tcRep <- tyConRep tc
-       ; kReps <- zipWithM getRep evs ks
-       ; return (mkRep tcRep kReps []) }
+         -- Note that we use the kind of the type, not the TyCon from which it
+         -- is constructed since the latter may be kind polymorphic whereas the
+         -- former we know is not (we checked in the solver).
+       ; return $ mkApps (Var mkTrCon) [ Type (typeKind ty)
+                                       , Type ty
+                                       , tc_rep
+                                       , kind_args ]
+       }
 
 ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
   | Just (t1,t2) <- splitAppTy_maybe ty
   = do { e1  <- getRep ev1 t1
        ; e2  <- getRep ev2 t2
-       ; ctr <- dsLookupGlobalId mkAppTyName
-       ; return ( mkApps (Var ctr) [ e1, e2 ] ) }
+       ; mkTrApp <- dsLookupGlobalId mkTrAppName
+                    -- mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+                    --            TypeRep a -> TypeRep b -> TypeRep (a b)
+       ; let (k1, k2) = splitFunTy (typeKind t1)
+       ; return $ mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
+                         [ e1, e2 ] }
+
+ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
+  | Just (t1,t2) <- splitFunTy_maybe ty
+  = do { e1 <- getRep ev1 t1
+       ; e2 <- getRep ev2 t2
+       ; mkTrFun <- dsLookupGlobalId mkTrFunName
+                    -- mkTrFun :: forall r1 r2 (a :: TYPE r1) (b :: TYPE r2).
+                    --            TypeRep a -> TypeRep b -> TypeRep (a -> b)
+       ; let r1 = getRuntimeRep "ds_ev_typeable" t1
+             r2 = getRuntimeRep "ds_ev_typeable" t2
+       ; return $ mkApps (mkTyApps (Var mkTrFun) [r1, r2, t1, t2])
+                         [ e1, e2 ]
+       }
 
 ds_ev_typeable ty (EvTypeableTyLit ev)
   = do { fun  <- dsLookupGlobalId tr_fun
@@ -1248,28 +1269,26 @@ ds_ev_typeable ty (EvTypeableTyLit ev)
     ty_kind = typeKind ty
 
     -- tr_fun is the Name of
-    --       typeNatTypeRep    :: KnownNat    a => Proxy# a -> TypeRep
-    -- of    typeSymbolTypeRep :: KnownSymbol a => Proxy# a -> TypeRep
+    --       typeNatTypeRep    :: KnownNat    a => Proxy# a -> TypeRep a
+    -- of    typeSymbolTypeRep :: KnownSymbol a => Proxy# a -> TypeRep a
     tr_fun | ty_kind `eqType` typeNatKind    = typeNatTypeRepName
            | ty_kind `eqType` typeSymbolKind = typeSymbolTypeRepName
            | otherwise = panic "dsEvTypeable: unknown type lit kind"
 
-
 ds_ev_typeable ty ev
   = pprPanic "dsEvTypeable" (ppr ty $$ ppr ev)
 
-getRep :: EvTerm -> Type  -- EvTerm for Typeable ty, and ty
-       -> DsM CoreExpr    -- Return CoreExpr :: TypeRep (of ty)
-                          -- namely (typeRep# dict proxy)
+getRep :: EvTerm          -- ^ EvTerm for @Typeable ty@
+       -> Type            -- ^ The type @ty@
+       -> DsM TypeRepExpr -- ^ Return @CoreExpr :: TypeRep ty@
+                          -- namely @typeRep# dict@
 -- Remember that
---   typeRep# :: forall k (a::k). Typeable k a -> Proxy k a -> TypeRep
+--   typeRep# :: forall k (a::k). Typeable k a -> TypeRep a
 getRep ev ty
   = do { typeable_expr <- dsEvTerm ev
        ; typeRepId     <- dsLookupGlobalId typeRepIdName
        ; let ty_args = [typeKind ty, ty]
-       ; return (mkApps (mkTyApps (Var typeRepId) ty_args)
-                        [ typeable_expr
-                        , mkTyApps (Var proxyHashId) ty_args ]) }
+       ; return (mkApps (mkTyApps (Var typeRepId) ty_args) [ typeable_expr ]) }
 
 tyConRep :: TyCon -> DsM CoreExpr
 -- Returns CoreExpr :: TyCon

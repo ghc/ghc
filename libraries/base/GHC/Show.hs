@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, StandaloneDeriving,
-             MagicHash, UnboxedTuples #-}
+             MagicHash, UnboxedTuples, PolyKinds #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 #include "MachDeps.h"
@@ -201,7 +201,7 @@ deriving instance Show a => Show (Maybe a)
 
 -- | @since 2.01
 instance Show TyCon where
-  showsPrec p (TyCon _ _ _ tc_name) = showsPrec p tc_name
+  showsPrec p (TyCon _ _ _ tc_name _ _) = showsPrec p tc_name
 
 -- | @since 4.9.0.0
 instance Show TrName where
