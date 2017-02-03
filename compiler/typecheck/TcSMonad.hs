@@ -1043,7 +1043,8 @@ can rewrite it.  Then:
                [WD] fmv ~ Maybe e   -- (C)
                [WD] Foo ee ~ fmv
 
-Now the work item is rewritten by (C) and we soon get ee := e.
+See Note [Splitting WD constraints].  Now the work item is rewritten
+by (C) and we soon get ee := e.
 
 Additional notes:
 
@@ -1065,6 +1066,41 @@ Additional notes:
     * efficiency: silly to process the same thing twice
     * inert_funeqs, inert_dicts is a finite map keyed by
       the type; it's inconvenient for it to map to TWO constraints
+
+Note [Splitting WD constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We are about to add a [WD] constraint to the inert set; and we
+know that the inert set has fully rewritten it.  Should we split
+it into [W] and [D], and put the [D] in the work list for further
+work?
+
+* CDictCan (C tys) or CFunEqCan (F tys ~ fsk):
+  Yes if the inert set couuld rerite tys to make the class constraint,
+  or type family, fire.  That is, yes if the inert_eqs interects
+  with the free vars of tys.  For this test we use rewriteableTyVars
+  which ignores casts and coercions in tys, because rewriting the
+  casts or coercions won't make the thing fire more often.
+
+* CTyEqCan (a ~ ty): Yes if the inert set could rewrite 'a' or 'ty'.
+  We need to check both 'a' and 'ty' against the inert set:
+    - Inert set contains  [D] a ~ ty2
+      Then we want to put [D] a ~ ty in the worklist, so we'll
+      get [D] ty ~ ty2 with consequent good things
+
+    - Inert set constains [D] b ~ a, where b is in ty.
+      We can't just add [WD] a ~ ty[b] to the inert set, because
+      that breaks the inert-set invariants.  If we tried to
+      canonicalise another [D] constraint mentioning 'a', we'd
+      get an infinite loop
+
+  Moreover we must use the full-blown (tyVarsOfType ty) for the
+  RHS, for two reasons:
+     1. even tyvars in the casts and coercions could give
+        an infinite loop
+     2. rewritableTyVarsOfType doesn't handle foralls (just
+        because it doesn't need to)
+
+* Others: nothing is gained by splitting.
 
 Note [Examples of how Derived shadows helps completeness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1211,14 +1247,20 @@ shouldSplitWD :: InertEqs -> Ct -> Bool
 -- Precondition: 'ct' is [WD], and is inert
 -- True <=> we should split ct ito [W] and [D] because
 --          the inert_eqs can make progress on the [D]
-
+-- See Note [Splitting WD constraints]
 shouldSplitWD inert_eqs (CFunEqCan { cc_tyargs = tys })
   = inert_eqs `intersects_with` rewritableTyVarsOfTypes tys
     -- We don't need to split if the tv is the RHS fsk
 
-shouldSplitWD inert_eqs ct
-  = inert_eqs `intersects_with` rewritableTyVarsOfType (ctPred ct)
-    -- Otherwise split if the tv is mentioned at all
+shouldSplitWD inert_eqs (CDictCan { cc_tyargs = tys })
+  = inert_eqs `intersects_with` rewritableTyVarsOfTypes tys
+
+shouldSplitWD inert_eqs (CTyEqCan { cc_tyvar = tv, cc_rhs = ty })
+  =  tv `elemDVarEnv` inert_eqs
+  || inert_eqs `intersects_with` tyCoVarsOfType ty
+  -- See Note [Splitting WD constraints]
+
+shouldSplitWD _ _ = False   -- No point in splitting otherwise
 
 intersects_with :: InertEqs -> TcTyVarSet -> Bool
 intersects_with inert_eqs free_vars
