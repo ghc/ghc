@@ -669,7 +669,7 @@ test('T9020',
           [(wordsize(32), 343005716, 10),
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
-           (wordsize(64), 698401736, 10)])
+           (wordsize(64), 764866144, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -678,6 +678,7 @@ test('T9020',
            # 2016-01-26:  698401736 improvement from using ExpTypes instead of ReturnTvs
            # 2016-04-06:  852298336 Refactoring of CSE #11781
            # 2016-04-06:  698401736 Use thenIO in Applicative IO
+           # 2017-02-03:  764866144 Join points
       ],
       compile,[''])
 
