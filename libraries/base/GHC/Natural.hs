@@ -399,8 +399,8 @@ minusNatural :: Natural -> Natural -> Natural
 minusNatural x         (NatS# 0##) = x
 minusNatural (NatS# x) (NatS# y) = case subWordC# x y of
     (# l, 0# #) -> NatS# l
-    _           -> divZeroError -- underflowException
-minusNatural (NatS# _) (NatJ# _) = divZeroError -- underflowException
+    _           -> underflowError
+minusNatural (NatS# _) (NatJ# _) = underflowError
 minusNatural (NatJ# x) (NatS# y)
     = bigNatToNatural $ minusBigNatWord x y
 minusNatural (NatJ# x) (NatJ# y)
