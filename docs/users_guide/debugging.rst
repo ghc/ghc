@@ -103,7 +103,9 @@ Dumping out compiler intermediate structures
 
     .. ghc-flag:: -ddump-inlinings
 
-        Dumps inlining info from the simplifier
+        Dumps inlining info from the simplifier. Note that if used in conjunction with
+        :ghc-flag:`-dverbose-core2core` the compiler will also dump the inlinings that
+        it considers but passes up, along with its rationale.
 
     .. ghc-flag:: -ddump-stranal
 
