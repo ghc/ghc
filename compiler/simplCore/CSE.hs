@@ -6,7 +6,7 @@
 
 {-# LANGUAGE CPP #-}
 
-module CSE (cseProgram) where
+module CSE (cseProgram, cseOneExpr) where
 
 #include "HsVersions.h"
 
@@ -372,6 +372,9 @@ tryForCSE toplevel env expr
     -- expression gets eliminated. Hence we push all (!) of them on
     -- top of the replaced sub-expression. This is probably not too
     -- useful in practice, but upholds our semantics.
+
+cseOneExpr :: CoreExpr -> CoreExpr
+cseOneExpr = cseExpr emptyCSEnv
 
 cseExpr :: CSEnv -> InExpr -> OutExpr
 cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
