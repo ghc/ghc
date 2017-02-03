@@ -13,7 +13,7 @@ $Output     = $ARGV[2];
 
 &split_asm_file($ifile);
 
-open(OUTPUT, '>', $Output) ||  &tidy_up_and_die(1,"$Pgm: failed to open `$Output' (to write)\n");
+open(OUTPUT, "> $Output") ||  &tidy_up_and_die(1,"$Pgm: failed to open `$Output' (to write)\n");
 print OUTPUT "$NoOfSplitFiles\n";
 close(OUTPUT);
 
@@ -21,11 +21,14 @@ exit(0);
 
 
 sub split_asm_file {
-    (my $asm_file,) = @_;
+    local($asm_file) = @_;
     my @pieces = ();
 
-    open(TMPI, '<', $asm_file) || &tidy_up_and_die(1,"$Pgm: failed to open `$asm_file' (to read)\n");
+    open(TMPI, "< $asm_file") || &tidy_up_and_die(1,"$Pgm: failed to open `$asm_file' (to read)\n");
 
+    &collectExports_hppa() if $TargetPlatform =~ /^hppa/;
+    &collectExports_mips() if $TargetPlatform =~ /^mips/;
+    &collectDyldStuff_darwin() if $TargetPlatform =~ /-apple-darwin/;
 
     $octr = 0;  # output file counter
 
@@ -38,6 +41,10 @@ sub split_asm_file {
 
 #   &tidy_up_and_die(1,"$Pgm: no split markers in .s file!\n")
 #       if $prologue_stuff eq $s_stuff;
+
+    # lie about where this stuff came from
+    # Note the \Q: this ignores regex meta-chars in $Tmp_prefix.
+    $prologue_stuff =~ s/\Q"$Tmp_prefix.c"/"$ifile_root.hc"/gm;
 
     while ( $_ ne '' ) { # not EOF
         $octr++;
@@ -66,7 +73,7 @@ sub split_asm_file {
         # output to a file of its own
         # open a new output file...
         $ofname = "${Tmp_prefix}__${octr}.s";
-        open(OUTF, '>', $ofname) || die "$Pgm: can't open output file: $ofname\n";
+        open(OUTF, "> $ofname") || die "$Pgm: can't open output file: $ofname\n";
 
         print OUTF $prologue_stuff;
         print OUTF $pieces[$octr];
@@ -78,8 +85,94 @@ sub split_asm_file {
     close(TMPI) || &tidy_up_and_die(1,"Failed reading $asm_file\n");
 }
 
+sub collectExports_hppa { # Note: HP-PA only
+
+    %LocalExport = (); # NB: global table
+
+    while(<TMPI>) {
+        if (/^\s+\.EXPORT\s+([^,]+),.*\n/m) {
+            local($label) = $1;
+            local($body)  = "\t.IMPORT $label";
+            if (/,DATA/m) {
+                $body .= ",DATA\n";
+            } else {
+                $body .= ",CODE\n";
+            }
+            $label =~ s/\$/\\\$/gm;
+            $LocalExport{$label} = $body;
+        }
+    }
+
+    seek(TMPI, 0, 0);
+}
+
+sub collectExports_mips { # Note: MIPS only
+    # (not really sure this is necessary [WDP 95/05])
+
+    $UNDEFINED_FUNS = ''; # NB: global table
+
+    while(<TMPI>) {
+        $UNDEFINED_FUNS .= $_ if /^\t\.globl\s+\S+ \.\S+\n/m;
+        # just save 'em all
+    }
+
+    seek(TMPI, 0, 0);
+}
+
+sub collectDyldStuff_darwin {
+    local($chunk_label,$label,$cur_section,$section,$chunk,$alignment,$cur_alignment);
+
+    %DyldChunks = (); # NB: global table
+    %DyldChunksDefined = (); # NB: global table
+
+    $cur_section = '';
+    $section = '';
+    $label = '';
+    $chunk = '';
+    $alignment = '';
+    $cur_alignment = '';
+
+    while ( 1 ) {
+        $_ = <TMPI>;
+        if ( $_ eq '' || (/^L(_.+)\$.+:/m && !(/^L(.*)\$stub_binder:/m))) {
+            if ( $label ne '' ) {
+                $DyldChunksDefined{$label} .= $section . $alignment . $chunk_label . $ chunk;
+                if( $section =~ s/\.data/\.non_lazy_symbol_pointer/m ) {
+                    $chunk = "\t.indirect_symbol $label\n\t.long 0\n";
+                }
+                $DyldChunks{$label} .= $section . $alignment . $chunk_label . $chunk;
+                print STDERR "### dyld chunk: $label\n$section$alignment$chunk\n###\n" if $Dump_asm_splitting_info;
+            }
+            last if ($_ eq '');
+
+            $chunk = '';
+            $chunk_label = $_;
+            $label = $1;
+            $section = $cur_section;
+            $alignment = $cur_alignment;
+            print STDERR "label: $label\n" if $Dump_asm_splitting_info;
+        } elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data|section __IMPORT,.*|section __DATA, __la_sym_ptr(2|3),lazy_symbol_pointers)/m ) {
+            $cur_section = $_;
+            printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
+            $cur_alignment = ''
+        } elsif ( /^\s*\.section\s+__TEXT,__symbol_stub1,symbol_stubs,pure_instructions,\d+/m ) {
+            $cur_section = $_;
+            printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
+                # always make sure we align things
+            $cur_alignment = '\t.align 2'
+        } elsif ( /^\s*\.align.*/m ) {
+            $cur_alignment = $_;
+            printf STDERR "alignment: $cur_alignment\n" if $Dump_asm_splitting_info;
+        } else {
+            $chunk .= $_;
+        }
+    }
+
+    seek(TMPI, 0, 0);
+}
+
 sub ReadTMPIUpToAMarker {
-    (my $str, my $count) = @_; # already read bits
+    local($str, $count) = @_; # already read bits
 
 
     for ( $_ = <TMPI>; $_ ne '' && ! /_?__stg_split_marker/m; $_ = <TMPI> ) {
@@ -90,9 +183,18 @@ sub ReadTMPIUpToAMarker {
     # that first "real" line will stay in $_.
 
     # This loop is intended to pick up the body of the split_marker function
+    # Note that the assembler mangler will already have eliminated this code
+    # if it's been invoked (which it probably has).
 
     while ($_ ne '' && (/_?__stg_split_marker/m
                      || /^L[^C].*:$/m
+                     || /^\.stab/m
+                     || /\t\.proc/m
+                     || /\t\.stabd/m
+                     || /\t\.even/m
+                     || /\tunlk a6/m
+                     || /^\t!#PROLOGUE/m
+                     || /\t\.prologue/m
                      || /\t\.frame/m
                      # || /\t\.end/ NOT!  Let the split_marker regexp catch it
                      # || /\t\.ent/ NOT!  Let the split_marker regexp catch it
@@ -117,6 +219,8 @@ that are used-but-not-defined here.
 sub process_asm_block {
     local($str) = @_;
 
+    return(&process_asm_block_darwin($str))
+                            if $TargetPlatform =~ /-apple-darwin/m;
     return(&process_asm_block_sparc($str)) if $TargetPlatform =~ /^sparc-/m;
     return(&process_asm_block_iX86($str))  if $TargetPlatform =~ /^i[34]86-/m;
     return(&process_asm_block_x86_64($str))  if $TargetPlatform =~ /^x86_64-/m;
@@ -131,8 +235,15 @@ sub process_asm_block_sparc {
     local($str) = @_;
 
     # strip the marker
-    $str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/m;
-    $str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/m;
+    if ( $OptimiseC ) {
+        $str =~ s/_?__stg_split_marker.*:\n//m;
+    } else {
+        $str =~ s/(\.text\n\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/m;
+        $str =~ s/(\t\.align .\n)\t\.global\s+.*_?__stg_split_marker.*\n\t\.proc.*\n/$1/m;
+    }
+
+    # make sure the *.hc filename gets saved; not just ghc*.c (temp name)
+    $str =~ s/^\.stabs "(ghc\d+\.c)"/.stabs "$ifile_root.hc"/gm; # HACK HACK
 
     # remove/record any literal constants defined here
     while ( $str =~ /(\t\.align .\n\.?(L?LC\d+):\n(\t\.asci[iz].*\n)+)/m ) {
@@ -160,12 +271,12 @@ sub process_asm_block_sparc {
 }
 
 sub process_asm_block_iX86 {
-    (my $str,) = @_;
+    local($str) = @_;
 
     # strip the marker
 
-    $str =~ s/(\.text\n\t\.align .(?:,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
-    $str =~ s/(\t\.align .(?:,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
+    $str =~ s/(\.text\n\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
+    $str =~ s/(\t\.align .(,0x90)?\n)\.globl\s+.*_?__stg_split_marker.*\n/$1/m;
 
     # it seems prudent to stick on one of these:
     $str = "\.text\n\t.align 4\n" . $str;
@@ -237,6 +348,52 @@ sub process_asm_block_x86_64 {
    print STDERR "### STRIPPED BLOCK (x86_64):\n$str" if $Dump_asm_splitting_info;
 
    $str;
+}
+
+# The logic for both Darwin/PowerPC and Darwin/x86 ends up being the same.
+
+sub process_asm_block_darwin {
+    local($str) = @_;
+    local($dyld_stuff) = '';
+
+    # strip the marker
+    $str =~ s/___stg_split_marker.*\n//m;
+
+    $str =~ s/L_.*\$.*:\n(.|\n)*//m;
+
+    # remove/record any literal constants defined here
+    while ( $str =~ s/^(\s+.const.*\n\s+\.align.*\n(LC\d+):\n(\s\.(byte|short|long|fill|space|ascii).*\n)+)//m ) {
+        local($label) = $2;
+        local($body)  = $1;
+
+        &tidy_up_and_die(1,"Local constant label $label already defined!\n")
+            if $LocalConstant{$label};
+
+        $LocalConstant{$label} = $body;
+    }
+
+    # inject definitions for any local constants now used herein
+    foreach $k (keys %LocalConstant) {
+        if ( $str =~ /\b$k(\b|\[)/m ) {
+            $str = $LocalConstant{$k} . $str;
+        }
+    }
+
+    foreach $k (keys %DyldChunks) {
+        if ( $str =~ /\bL$k\$/m ) {
+            if ( $str =~ /^$k:$/m ) {
+                $dyld_stuff .= $DyldChunksDefined{$k};
+            } else {
+                $dyld_stuff .= $DyldChunks{$k};
+            }
+        }
+    }
+
+    $str .= "\n" . $dyld_stuff;
+
+    print STDERR "### STRIPPED BLOCK (darwin):\n$str" if $Dump_asm_splitting_info;
+
+    $str;
 }
 
 sub process_asm_block_powerpc_linux {
