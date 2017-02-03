@@ -359,7 +359,7 @@ SplitObjs = $(if $(and $(filter YES,$(SupportsSplitObjs)),\
 # This is not supported on Darwin (where you can use subsections-via-symbols
 # instead) and Windows is not yet working. (See #11445 and related tickets.)
 OsSupportsSplitSections=$(if $(filter $(TargetOS_CPP),mingw32 darwin),NO,YES)
-SupportsSplitSections :=$(if $(and $(filter YES,$(OsSupportsSplitSections)),\
+SupportsSplitSections=$(if $(and $(filter YES,$(OsSupportsSplitSections)),\
                                    $(filter YES,$(LdIsGNULd))),YES,NO)
 SplitSections ?= $(SupportsSplitSections)
 
