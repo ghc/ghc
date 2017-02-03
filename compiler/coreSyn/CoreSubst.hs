@@ -906,7 +906,7 @@ simpleOptPgm dflags this_mod binds rules vects
 
        ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
   where
-    occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
+    occ_anald_binds  = occurAnalysePgm this_mod False (\_ -> False) {- No rules active -}
                                        rules vects emptyVarEnv binds
     (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
 

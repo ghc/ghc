@@ -56,10 +56,11 @@ Here's the externally-callable interface:
 -}
 
 occurAnalysePgm :: Module       -- Used only in debug output
+                -> Bool
                 -> (Activation -> Bool)
                 -> [CoreRule] -> [CoreVect] -> VarSet
                 -> CoreProgram -> CoreProgram
-occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
+occurAnalysePgm this_mod remove_dead active_rule imp_rules vects vectVars binds
   | isEmptyDetails final_usage
   = occ_anald_binds
 
@@ -81,10 +82,15 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
     initial_uds = addManyOccsSet emptyDetails
                             (rulesFreeVars imp_rules `unionVarSet`
                              vectsFreeVars vects `unionVarSet`
-                             vectVars)
+                             vectVars `unionVarSet`
+                             keepAliveVars)
     -- The RULES and VECTORISE declarations keep things alive! (For VECTORISE declarations,
     -- we only get them *until* the vectoriser runs. Afterwards, these dependencies are
     -- reflected in 'vectors' — see Note [Vectorisation declarations and occurrences].)
+
+    -- Note [Do not delete dead code in the desugarer]
+    keepAliveVars | remove_dead = emptyVarSet
+                  | otherwise   = mkVarSet $ concatMap bindersOf binds
 
     -- Note [Preventing loops due to imported functions rules]
     imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
@@ -2709,3 +2715,13 @@ andTailCallInfo :: TailCallInfo -> TailCallInfo -> TailCallInfo
 andTailCallInfo info@(AlwaysTailCalled arity1) (AlwaysTailCalled arity2)
   | arity1 == arity2 = info
 andTailCallInfo _ _  = NoTailCallInfo
+
+-- Note [Do not delete dead code in the desugarer]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- GHC plugins rightly want to access code that is maybe not exported and thus
+-- “dead” from GHC's point of view. So we must not eliminate dead code before
+-- the first time a user plugin had a chance to run.
+--
+-- The desugarer runs the occurrence analyser; in that run we will add
+-- all binders to the “body” of the module, thus preventing them from being
+-- deleted or marked as dead.

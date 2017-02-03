@@ -355,8 +355,7 @@ deSugar hsc_env
 #endif
         ; (ds_binds, ds_rules_for_imps, ds_vects)
             <- simpleOptPgm dflags mod final_pgm rules_for_imps vects0
-                         -- The simpleOptPgm gets rid of type
-                         -- bindings plus any stupid dead code
+                         -- The simpleOptPgm gets rid of type bindings
 
         ; endPassIO hsc_env print_unqual CoreDesugarOpt ds_binds ds_rules_for_imps
 

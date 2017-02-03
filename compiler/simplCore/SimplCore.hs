@@ -703,7 +703,7 @@ simplifyPgmIO pass@(CoreDoSimplify max_iterations mode)
                        InitialPhase -> (mg_vect_decls guts, vectVars)
                        _            -> ([], vectVars)
                ; tagged_binds = {-# SCC "OccAnal" #-}
-                     occurAnalysePgm this_mod active_rule rules
+                     occurAnalysePgm this_mod True active_rule rules
                                      maybeVects maybeVectVars binds
                } ;
            Err.dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
