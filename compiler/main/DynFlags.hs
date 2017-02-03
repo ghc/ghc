@@ -868,6 +868,7 @@ data DynFlags = DynFlags {
   ufDictDiscount        :: Int,
   ufKeenessFactor       :: Float,
   ufDearOp              :: Int,
+  ufVeryAggressive      :: Bool,
 
   maxWorkerArgs         :: Int,
 
@@ -1638,6 +1639,7 @@ defaultDynFlags mySettings =
         ufDictDiscount      = 30,
         ufKeenessFactor     = 1.5,
         ufDearOp            = 40,
+        ufVeryAggressive    = False,
 
         maxWorkerArgs = 10,
 

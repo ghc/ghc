@@ -913,6 +913,11 @@ ufFunAppDiscount
 ufDearOp
      The size of a foreign call or not-dupable PrimOp
 
+ufVeryAggressive
+     If True, the compiler ignores all the thresholds and inlines very
+     aggressively. It still adheres to arity, simplifier phase control and
+     loop breakers.
+
 
 Note [Function applications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1155,7 +1160,7 @@ tryUnfolding dflags id lone_variable
      UnfNever -> traceInline dflags str (text "UnfNever") Nothing
 
      UnfWhen { ug_arity = uf_arity, ug_unsat_ok = unsat_ok, ug_boring_ok = boring_ok }
-        | enough_args && (boring_ok || some_benefit)
+        | enough_args && (boring_ok || some_benefit || ufVeryAggressive dflags)
                 -- See Note [INLINE for small functions (3)]
         -> traceInline dflags str (mk_doc some_benefit empty True) (Just unf_template)
         | otherwise
@@ -1165,6 +1170,8 @@ tryUnfolding dflags id lone_variable
           enough_args = (n_val_args >= uf_arity) || (unsat_ok && n_val_args > 0)
 
      UnfIfGoodArgs { ug_args = arg_discounts, ug_res = res_discount, ug_size = size }
+        | ufVeryAggressive dflags
+        -> traceInline dflags str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | is_wf && some_benefit && small_enough
         -> traceInline dflags str (mk_doc some_benefit extra_doc True) (Just unf_template)
         | otherwise
