@@ -17,7 +17,7 @@
 
 /* NOTE:
 
-   THIS FILE IS INCLUDED IN HASKELL SOURCES (ghc/compiler/ghci/ByteCodeGen.lhs).
+   THIS FILE IS INCLUDED IN HASKELL SOURCES (ghc/compiler/ghci/ByteCodeAsm.hs).
    DO NOT PUT C-SPECIFIC STUFF IN HERE!
 
    I hope that's clear :-)

@@ -24,8 +24,8 @@
  * generated code in ghc/rts/AutoApply.cmm.
  *
  *  NOTE: other places to change if you change this table:
- *       - utils/genapply/GenApply.hs: stackApplyTypes
- *       - compiler/codeGen/CgCallConv.lhs: stdPattern
+ *       - utils/genapply/Main.hs: stackApplyTypes
+ *       - compiler/codeGen/StgCmmLayout.hs: stdPattern
  */
 #define ARG_NONE     3 
 #define ARG_N        4  

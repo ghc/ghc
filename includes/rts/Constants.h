@@ -198,7 +198,7 @@
 
 /*
  * Constants for the why_blocked field of a TSO
- * NB. keep these in sync with GHC/Conc.lhs: threadStatus
+ * NB. keep these in sync with GHC/Conc/Sync.hs: threadStatus
  */
 #define NotBlocked          0
 #define BlockedOnMVar       1

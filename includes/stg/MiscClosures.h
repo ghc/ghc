@@ -232,7 +232,7 @@ RTS_THUNK(stg_ap_6_upd);
 RTS_THUNK(stg_ap_7_upd);
 
 /* standard application routines (see also utils/genapply,
- * and compiler/codeGen/CgStackery.lhs).
+ * and compiler/codeGen/StgCmmArgRep.hs).
  */
 RTS_RET(stg_ap_v);
 RTS_RET(stg_ap_f);
@@ -272,7 +272,7 @@ RTS_FUN_DECL(stg_ap_ppppp_fast);
 RTS_FUN_DECL(stg_ap_pppppp_fast);
 RTS_FUN_DECL(stg_PAP_apply);
 
-/* standard GC & stack check entry points, all defined in HeapStackCheck.hc */
+/* standard GC & stack check entry points, all defined in HeapStackCheck.cmm */
 
 RTS_FUN_DECL(stg_gc_noregs);
 
