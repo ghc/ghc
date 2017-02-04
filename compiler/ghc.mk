@@ -233,7 +233,7 @@ compiler/stage3/$(PLATFORM_H) : compiler/stage2/$(PLATFORM_H)
 	"$(CP)" $< $@
 
 # ----------------------------------------------------------------------------
-#		Generate supporting stuff for prelude/PrimOp.lhs
+#		Generate supporting stuff for prelude/PrimOp.hs
 #		from prelude/primops.txt
 
 PRIMOP_BITS_NAMES = primop-data-decl.hs-incl        \
