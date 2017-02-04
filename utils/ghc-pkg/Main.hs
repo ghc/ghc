@@ -806,7 +806,7 @@ mungePackageDBPaths top_dir db@PackageDB { packages = pkgs } =
     -- files and "package.conf.d" dirs) the pkgroot is the parent directory
     -- ${pkgroot}/package.conf  or  ${pkgroot}/package.conf.d/
 
--- TODO: This code is duplicated in compiler/main/Packages.lhs
+-- TODO: This code is duplicated in compiler/main/Packages.hs
 mungePackagePaths :: FilePath -> FilePath
                   -> InstalledPackageInfo -> InstalledPackageInfo
 -- Perform path/URL variable substitution as per the Cabal ${pkgroot} spec
