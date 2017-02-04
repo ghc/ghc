@@ -76,7 +76,7 @@ noinline x = x
 lazy :: a -> a
 lazy x = x
 -- Implementation note: its strictness and unfolding are over-ridden
--- by the definition in MkId.lhs; in both cases to nothing at all.
+-- by the definition in MkId.hs; in both cases to nothing at all.
 -- That way, 'lazy' does not get inlined, and the strictness analyser
 -- sees it as lazy.  Then the worker/wrapper phase inlines it.
 -- Result: happiness
@@ -97,7 +97,7 @@ oneShot :: forall (q :: RuntimeRep) (r :: RuntimeRep)
                   (a :: TYPE q) (b :: TYPE r).
            (a -> b) -> a -> b
 oneShot f = f
--- Implementation note: This is wired in in MkId.lhs, so the code here is
+-- Implementation note: This is wired in in MkId.hs, so the code here is
 -- mostly there to have a place for the documentation.
 
 -- | Apply a function to a 'State# RealWorld' token. When manually applying

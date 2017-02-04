@@ -59,15 +59,15 @@ implement IO exceptions.
 NOTE: The IO representation is deeply wired in to various parts of the
 system.  The following list may or may not be exhaustive:
 
-Compiler  - types of various primitives in PrimOp.lhs
+Compiler  - types of various primitives in PrimOp.hs
 
 RTS       - forceIO (StgMiscClosures.hc)
           - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast
             (Exceptions.hc)
           - raiseAsync (Schedule.c)
 
-Prelude   - GHC.IO.lhs, and several other places including
-            GHC.Exception.lhs.
+Prelude   - GHC.IO.hs, and several other places including
+            GHC.Exception.hs.
 
 Libraries - parts of hslibs/lang.
 

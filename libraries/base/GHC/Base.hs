@@ -261,7 +261,7 @@ mechanism to define mconcat and the Applicative and Monad instances for lists.
 We mark them INLINE because the inliner is not generally too keen to inline
 build forms such as the ones these desugar to without our insistence.  Defining
 these using list comprehensions instead of foldr has an additional potential
-benefit, as described in compiler/deSugar/DsListComp.lhs: if optimizations
+benefit, as described in compiler/deSugar/DsListComp.hs: if optimizations
 needed to make foldr/build forms efficient are turned off, we'll get reasonably
 efficient translations anyway.
 -}
@@ -991,7 +991,7 @@ eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
 eqString _        _        = False
 
 {-# RULES "eqString" (==) = eqString #-}
--- eqString also has a BuiltInRule in PrelRules.lhs:
+-- eqString also has a BuiltInRule in PrelRules.hs:
 --      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2)) = s1==s2
 
 
@@ -1038,7 +1038,7 @@ id x                    =  x
 
 --      SLPJ: in 5.04 etc 'assert' is in GHC.Prim,
 --      but from Template Haskell onwards it's simply
---      defined here in Base.lhs
+--      defined here in Base.hs
 assert :: Bool -> a -> a
 assert _pred r = r
 
@@ -1249,7 +1249,7 @@ a `iShiftRL#` b | isTrue# (b >=# WORD_SIZE_IN_BITS#) = 0#
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
--- There's a built-in rule (in PrelRules.lhs) for
+-- There's a built-in rule (in PrelRules.hs) for
 --      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
