@@ -2403,7 +2403,8 @@ matchSeparator LambdaExpr   = text "->"
 matchSeparator ProcExpr     = text "->"
 matchSeparator PatBindRhs   = text "="
 matchSeparator (StmtCtxt _) = text "<-"
-matchSeparator RecUpd       = panic "unused"
+matchSeparator RecUpd       = text "=" -- This can be printed by the pattern
+                                       -- match checker trace
 matchSeparator ThPatSplice  = panic "unused"
 matchSeparator ThPatQuote   = panic "unused"
 matchSeparator PatSyn       = panic "unused"
