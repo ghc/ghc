@@ -1565,11 +1565,20 @@ newVar ty
 
 -- | Like wrapFloats, but only wraps tick floats
 wrapTicks :: Floats -> CoreExpr -> (Floats, CoreExpr)
-wrapTicks (Floats flag floats0) expr = (Floats flag floats1, expr')
-  where (floats1, expr') = foldrOL go (nilOL, expr) floats0
-        go (FloatTick t) (fs, e) = ASSERT(tickishPlace t == PlaceNonLam)
-                                   (mapOL (wrap t) fs, mkTick t e)
-        go other         (fs, e) = (other `consOL` fs, e)
+wrapTicks (Floats flag floats0) expr =
+    (Floats flag (toOL $ reverse floats1), foldr mkTick expr (reverse ticks1))
+  where (floats1, ticks1) = foldlOL go ([], []) $ floats0
+        -- Deeply nested constructors will produce long lists of
+        -- redundant source note floats here. We need to eliminate
+        -- those early, as relying on mkTick to spot it after the fact
+        -- can yield O(n^3) complexity [#11095]
+        go (floats, ticks) (FloatTick t)
+          = ASSERT(tickishPlace t == PlaceNonLam)
+            (floats, if any (flip tickishContains t) ticks
+                     then ticks else t:ticks)
+        go (floats, ticks) f
+          = (foldr wrap f (reverse ticks):floats, ticks)
+
         wrap t (FloatLet bind)    = FloatLet (wrapBind t bind)
         wrap t (FloatCase b r ok) = FloatCase b (mkTick t r) ok
         wrap _ other              = pprPanic "wrapTicks: unexpected float!"
