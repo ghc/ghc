@@ -723,7 +723,7 @@ stg_finalizzeWeakzh ( gcptr w )
     //    LDV_recordDead((StgClosure *)w, sizeofW(StgWeak) - sizeofW(StgProfHeader));
     // Furthermore, when PROFILING is turned on, dead weak pointers are exactly as
     // large as weak pointers, so there is no need to fill the slop, either.
-    // See stg_DEAD_WEAK_info in StgMiscClosures.hc.
+    // See stg_DEAD_WEAK_info in StgMiscClosures.cmm.
 #endif
 
     //
@@ -1968,7 +1968,7 @@ stg_mkApUpd0zh ( P_ bco )
     W_ ap;
 
     // This function is *only* used to wrap zero-arity BCOs in an
-    // updatable wrapper (see ByteCodeLink.lhs).  An AP thunk is always
+    // updatable wrapper (see ByteCodeLink.hs).  An AP thunk is always
     // saturated and always points directly to a FUN or BCO.
     ASSERT(%INFO_TYPE(%GET_STD_INFO(bco)) == HALF_W_(BCO) &&
            StgBCO_arity(bco) == HALF_W_(0));

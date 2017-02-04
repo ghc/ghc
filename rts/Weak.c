@@ -110,7 +110,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
         // Furthermore, when PROFILING is turned on, dead weak
         // pointers are exactly as large as weak pointers, so there is
         // no need to fill the slop, either.  See stg_DEAD_WEAK_info
-        // in StgMiscClosures.hc.
+        // in StgMiscClosures.cmm.
 #endif
         SET_HDR(w, &stg_DEAD_WEAK_info, w->header.prof.ccs);
     }

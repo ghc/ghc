@@ -1323,7 +1323,7 @@ scheduleHandleThreadFinished (Capability *cap STG_UNUSED, Task *task, StgTSO *t)
 
           if (t->what_next == ThreadComplete) {
               if (task->incall->ret) {
-                  // NOTE: return val is stack->sp[1] (see StgStartup.hc)
+                  // NOTE: return val is stack->sp[1] (see StgStartup.cmm)
                   *(task->incall->ret) = (StgClosure *)task->incall->tso->stackobj->sp[1];
               }
               task->incall->rstat = Success;

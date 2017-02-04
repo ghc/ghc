@@ -21,7 +21,7 @@ RTS_PRIVATE void LdvCensusKillAll ( void );
 // address 'from'.
 //
 // Invoked when:
-//   1) Hp is incremented and exceeds HpLim (in Updates.hc).
+//   1) Hp is incremented and exceeds HpLim (in Updates.cmm).
 //   2) copypart() is called (in GC.c).
 #define LDV_FILL_SLOP(from, howMany)    \
   if (era > 0) {                                \

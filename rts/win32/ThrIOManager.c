@@ -3,7 +3,7 @@
  * (c) The GHC Team, 1998-2006
  *
  * The IO manager thread in THREADED_RTS.
- * See also libraries/base/GHC/Conc.lhs.
+ * See also libraries/base/GHC/Conc.hs.
  *
  * ---------------------------------------------------------------------------*/
 

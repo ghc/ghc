@@ -526,7 +526,7 @@ stg_block_noregs
  *       ptr to MVar   (R1)
  *       stg_block_putmvar_info
  *
- * See PrimOps.hc for a description of the workings of take/putMVar.
+ * See PrimOps.cmm for a description of the workings of take/putMVar.
  *
  * -------------------------------------------------------------------------- */
 
