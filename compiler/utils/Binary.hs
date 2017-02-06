@@ -68,7 +68,7 @@ import SrcLoc
 import Foreign
 import Data.Array
 import Data.ByteString (ByteString)
-import qualified Data.ByteString as BS
+import qualified Data.ByteString.Internal as BS
 import qualified Data.ByteString.Unsafe   as BS
 import Data.IORef
 import Data.Char                ( ord, chr )
@@ -225,35 +225,80 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
 
+be16 :: Word16 -> Word16
+#ifdef WORDS_BIGENDIAN
+be16 w = w
+#else
+be16 w = byteSwap16 w
+#endif
+{-# INLINE be16 #-}
+
+be32 :: Word32 -> Word32
+#ifdef WORDS_BIGENDIAN
+be32 w = w
+#else
+be32 w = byteSwap32 w
+#endif
+{-# INLINE be32 #-}
+
+be64 :: Word64 -> Word64
+#ifdef WORDS_BIGENDIAN
+be64 w = w
+#else
+be64 w = byteSwap64 w
+#endif
+{-# INLINE be64 #-}
+
+putPrim :: BinHandle -> Int -> (Ptr Word8 -> IO ()) -> IO ()
+putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
+  ix <- readFastMutInt ix_r
+  sz <- readFastMutInt sz_r
+  when (ix + size > sz) $
+    expandBin h (ix + size)
+  arr <- readIORef arr_r
+  withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  writeFastMutInt ix_r (ix + size)
+
+getPrim :: BinHandle -> Int -> (Ptr Word8 -> IO a) -> IO a
+getPrim (BinMem _ ix_r sz_r arr_r) size f = do
+  ix <- readFastMutInt ix_r
+  sz <- readFastMutInt sz_r
+  when (ix + size > sz) $
+      ioError (mkIOError eofErrorType "Data.Binary.getPrim" Nothing Nothing)
+  arr <- readIORef arr_r
+  w <- withForeignPtr arr $ \op -> f (op `plusPtr` ix)
+  writeFastMutInt ix_r (ix + size)
+  return w
+
 putWord8 :: BinHandle -> Word8 -> IO ()
-putWord8 h@(BinMem _ ix_r sz_r arr_r) w = do
-    ix <- readFastMutInt ix_r
-    sz <- readFastMutInt sz_r
-    -- double the size of the array if it overflows
-    if (ix >= sz)
-        then do expandBin h ix
-                putWord8 h w
-        else do arr <- readIORef arr_r
-                withForeignPtr arr $ \p -> pokeByteOff p ix w
-                writeFastMutInt ix_r (ix+1)
-                return ()
+putWord8 h w = putPrim h 1 (\op -> poke op w)
 
 getWord8 :: BinHandle -> IO Word8
-getWord8 (BinMem _ ix_r sz_r arr_r) = do
-    ix <- readFastMutInt ix_r
-    sz <- readFastMutInt sz_r
-    when (ix >= sz) $
-        ioError (mkIOError eofErrorType "Data.Binary.getWord8" Nothing Nothing)
-    arr <- readIORef arr_r
-    w <- withForeignPtr arr $ \p -> peekByteOff p ix
-    writeFastMutInt ix_r (ix+1)
-    return w
+getWord8 h = getPrim h 1 peek
+
+putWord16 :: BinHandle -> Word16 -> IO ()
+putWord16 h w = putPrim h 2 (\op -> poke (castPtr op :: Ptr Word16) (be16 w))
+
+getWord16 :: BinHandle -> IO Word16
+getWord16 h = getPrim h 2 (\op -> be16 <$> peek (castPtr op :: Ptr Word16))
+
+putWord32 :: BinHandle -> Word32 -> IO ()
+putWord32 h w = putPrim h 4 (\op -> poke (castPtr op :: Ptr Word32) (be32 w))
+
+getWord32 :: BinHandle -> IO Word32
+getWord32 h = getPrim h 4 (\op -> be32 <$> peek (castPtr op :: Ptr Word32))
+
+putWord64 :: BinHandle -> Word64 -> IO ()
+putWord64 h w = putPrim h 8 (\op -> poke (castPtr op :: Ptr Word64) (be64 w))
+
+getWord64 :: BinHandle -> IO Word64
+getWord64 h = getPrim h 8 (\op -> be64 <$> peek (castPtr op :: Ptr Word64))
 
 putByte :: BinHandle -> Word8 -> IO ()
-putByte bh w = put_ bh w
+putByte bh w = putWord8 bh w
 
 getByte :: BinHandle -> IO Word8
-getByte = getWord8
+getByte h = getWord8 h
 
 -- -----------------------------------------------------------------------------
 -- Primitve Word writes
@@ -263,58 +308,16 @@ instance Binary Word8 where
   get  = getWord8
 
 instance Binary Word16 where
-  put_ h w = do -- XXX too slow.. inline putWord8?
-    putByte h (fromIntegral (w `shiftR` 8))
-    putByte h (fromIntegral (w .&. 0xff))
-  get h = do
-    w1 <- getWord8 h
-    w2 <- getWord8 h
-    return $! ((fromIntegral w1 `shiftL` 8) .|. fromIntegral w2)
-
+  put_ h w = putWord16 h w
+  get h = getWord16 h
 
 instance Binary Word32 where
-  put_ h w = do
-    putByte h (fromIntegral (w `shiftR` 24))
-    putByte h (fromIntegral ((w `shiftR` 16) .&. 0xff))
-    putByte h (fromIntegral ((w `shiftR` 8)  .&. 0xff))
-    putByte h (fromIntegral (w .&. 0xff))
-  get h = do
-    w1 <- getWord8 h
-    w2 <- getWord8 h
-    w3 <- getWord8 h
-    w4 <- getWord8 h
-    return $! ((fromIntegral w1 `shiftL` 24) .|.
-               (fromIntegral w2 `shiftL` 16) .|.
-               (fromIntegral w3 `shiftL`  8) .|.
-               (fromIntegral w4))
+  put_ h w = putWord32 h w
+  get h = getWord32 h
 
 instance Binary Word64 where
-  put_ h w = do
-    putByte h (fromIntegral (w `shiftR` 56))
-    putByte h (fromIntegral ((w `shiftR` 48) .&. 0xff))
-    putByte h (fromIntegral ((w `shiftR` 40) .&. 0xff))
-    putByte h (fromIntegral ((w `shiftR` 32) .&. 0xff))
-    putByte h (fromIntegral ((w `shiftR` 24) .&. 0xff))
-    putByte h (fromIntegral ((w `shiftR` 16) .&. 0xff))
-    putByte h (fromIntegral ((w `shiftR`  8) .&. 0xff))
-    putByte h (fromIntegral (w .&. 0xff))
-  get h = do
-    w1 <- getWord8 h
-    w2 <- getWord8 h
-    w3 <- getWord8 h
-    w4 <- getWord8 h
-    w5 <- getWord8 h
-    w6 <- getWord8 h
-    w7 <- getWord8 h
-    w8 <- getWord8 h
-    return $! ((fromIntegral w1 `shiftL` 56) .|.
-               (fromIntegral w2 `shiftL` 48) .|.
-               (fromIntegral w3 `shiftL` 40) .|.
-               (fromIntegral w4 `shiftL` 32) .|.
-               (fromIntegral w5 `shiftL` 24) .|.
-               (fromIntegral w6 `shiftL` 16) .|.
-               (fromIntegral w7 `shiftL`  8) .|.
-               (fromIntegral w8))
+  put_ h w = putWord64 h w
+  get h = getWord64 h
 
 -- -----------------------------------------------------------------------------
 -- Primitve Int writes
@@ -471,12 +474,25 @@ instance Binary DiffTime where
 -- yes, we need Binary Integer and Binary Rational in basicTypes/Literal.hs
 
 instance Binary Integer where
-    -- XXX This is hideous
-    put_ bh i = put_ bh (show i)
-    get bh = do str <- get bh
+    put_ bh i
+      | i >= lo32 && i <= hi32 = do
+          putWord8 bh 0
+          put_ bh (fromIntegral i :: Int32)
+      | otherwise = do
+          putWord8 bh 1
+          put_ bh (show i)
+      where
+        lo32 = fromIntegral (minBound :: Int32)
+        hi32 = fromIntegral (maxBound :: Int32)
+
+    get bh = do
+      int_kind <- getWord8 bh
+      case int_kind of
+        0 -> fromIntegral <$> (get bh :: IO Int32)
+        _ -> do str <- get bh
                 case reads str of
-                    [(i, "")] -> return i
-                    _ -> fail ("Binary Integer: got " ++ show str)
+                  [(i, "")] -> return i
+                  _ -> fail ("Binary integer: got " ++ show str)
 
     {-
     -- This code is currently commented out.
@@ -714,27 +730,14 @@ getFS bh = do bs <- getBS bh
 putBS :: BinHandle -> ByteString -> IO ()
 putBS bh bs =
   BS.unsafeUseAsCStringLen bs $ \(ptr, l) -> do
-  put_ bh l
-  let
-        go n | n == l    = return ()
-             | otherwise = do
-                b <- peekElemOff (castPtr ptr) n
-                putByte bh b
-                go (n+1)
-  go 0
+    put_ bh l
+    putPrim bh l (\op -> BS.memcpy op (castPtr ptr) l)
 
 getBS :: BinHandle -> IO ByteString
 getBS bh = do
   l <- get bh :: IO Int
-  arr <- readIORef (_arr_r bh)
-  sz <- readFastMutInt (_sz_r bh)
-  off <- readFastMutInt (_off_r bh)
-  when (off + l > sz) $
-        ioError (mkIOError eofErrorType "Data.Binary.getBS" Nothing Nothing)
-  writeFastMutInt (_off_r bh) (off+l)
-  withForeignPtr arr $ \ptr -> do
-      bs <- BS.unsafePackCStringLen (castPtr $ ptr `plusPtr` off, fromIntegral l)
-      return $! BS.copy bs
+  BS.create l $ \dest -> do
+    getPrim bh l (\src -> BS.memcpy dest src l)
 
 instance Binary ByteString where
   put_ bh f = putBS bh f
