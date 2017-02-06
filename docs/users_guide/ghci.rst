@@ -655,11 +655,39 @@ The old, shadowed, version of ``T`` is displayed as
 ``main::Interactive.T`` by GHCi in an attempt to distinguish it from the
 new ``T``, which is displayed as simply ``T``.
 
-Class and type-family instance declarations are simply added to the list
-of available instances, with one exception. Since you might want to
-re-define one, a class or type-family instance *replaces* any earlier
-instance with an identical head or left hand side (respectively). (See
-:ref:`type-families`.)
+Class and type-family instance declarations are simply added to the
+list of available instances, with one exception. Since you might want
+to re-define one, a class instance *replaces* any earlier instance
+with an identical head. You aren't allowed to re-define a type family
+instance, since it might not be type safe to do so. Instead, re-define
+the whole type-family. (See :ref:`type-families`.) For example:
+
+.. code-block:: none
+
+    Prelude> type family T a b
+    Prelude> type instance T a b = a
+    Prelude> let uc :: a -> T a b; uc = id
+
+    Prelude> type instance T a b = b
+
+    <interactive>:3:15: error:
+        Conflicting family instance declarations:
+          T a b = a -- Defined at <interactive>:3:15
+          T a b = b -- Defined at <interactive>:5:15
+
+    -- Darn! We have to re-declare T.
+
+    Prelude> type family T a b
+    -- This is a brand-new T, unrelated to the old one
+    Prelude> type instance T a b = b
+    Prelude> uc 'a' :: Int
+
+    <interactive>:8:1: error:
+        • Couldn't match type ‘Char’ with ‘Int’
+          Expected type: Int
+            Actual type: Ghci1.T Char b0
+        • In the expression: uc 'a' :: Int
+          In an equation for ‘it’: it = uc 'a' :: Int
 
 .. _ghci-scope:
 

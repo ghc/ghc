@@ -1583,7 +1583,9 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           , ic_tythings   = new_tythings ++ ic_tythings ictxt
           , ic_rn_gbl_env = ic_rn_gbl_env ictxt `icExtendGblRdrEnv` new_tythings
           , ic_instances  = ( new_cls_insts ++ old_cls_insts
-                            , new_fam_insts ++ old_fam_insts )
+                            , new_fam_insts ++ fam_insts )
+                            -- we don't shadow old family instances (#7102),
+                            -- so don't need to remove them here
           , ic_default    = defaults
           , ic_fix_env    = fix_env  -- See Note [Fixity declarations in GHCi]
           }
@@ -1593,7 +1595,6 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
     -- See Note [Override identical instances in GHCi]
     (cls_insts, fam_insts) = ic_instances ictxt
     old_cls_insts = filterOut (\i -> any (identicalClsInstHead i) new_cls_insts) cls_insts
-    old_fam_insts = filterOut (\i -> any (identicalFamInstHead i) new_fam_insts) fam_insts
 
 extendInteractiveContextWithIds :: InteractiveContext -> [Id] -> InteractiveContext
 -- Just a specialised version

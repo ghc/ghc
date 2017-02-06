@@ -1,4 +1,5 @@
 --Testing type families and their shadowing
+--(But type families no longer shadow, after #7102)
 :set -XTypeFamilies
 data HTrue
 data HFalse

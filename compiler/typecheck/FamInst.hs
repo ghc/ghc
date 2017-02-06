@@ -443,31 +443,26 @@ addLocalFamInst (home_fie, my_fis) fam_inst
         -- my_fies is just the ones from this module
   = do { traceTc "addLocalFamInst" (ppr fam_inst)
 
-       ; isGHCi <- getIsGHCi
-       ; mod <- getModule
-       ; traceTc "alfi" (ppr mod $$ ppr isGHCi)
+           -- Unlike the case of class instances, don't override existing
+           -- instances in GHCi; it's unsound. See #7102.
 
-           -- In GHCi, we *override* any identical instances
-           -- that are also defined in the interactive context
-           -- See Note [Override identical instances in GHCi] in HscTypes
-       ; let home_fie'
-               | isGHCi    = deleteFromFamInstEnv home_fie fam_inst
-               | otherwise = home_fie
+       ; mod <- getModule
+       ; traceTc "alfi" (ppr mod)
 
            -- Load imported instances, so that we report
            -- overlaps correctly
        ; eps <- getEps
-       ; let inst_envs  = (eps_fam_inst_env eps, home_fie')
-             home_fie'' = extendFamInstEnv home_fie fam_inst
+       ; let inst_envs = (eps_fam_inst_env eps, home_fie)
+             home_fie' = extendFamInstEnv home_fie fam_inst
 
            -- Check for conflicting instance decls and injectivity violations
        ; no_conflict    <- checkForConflicts            inst_envs fam_inst
        ; injectivity_ok <- checkForInjectivityConflicts inst_envs fam_inst
 
        ; if no_conflict && injectivity_ok then
-            return (home_fie'', fam_inst : my_fis)
+            return (home_fie', fam_inst : my_fis)
          else
-            return (home_fie,   my_fis) }
+            return (home_fie,  my_fis) }
 
 {-
 ************************************************************************

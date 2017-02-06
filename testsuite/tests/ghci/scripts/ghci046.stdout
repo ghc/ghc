@@ -3,4 +3,4 @@ AND HTrue HTrue :: *
 AND (OR HFalse HTrue) (OR HTrue HFalse) :: *
 = HTrue
 t :: HTrue
-t :: HFalse
+t :: HTrue

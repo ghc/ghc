@@ -11,8 +11,8 @@ module FamInstEnv (
         mkImportedFamInst,
 
         FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs,
-        extendFamInstEnv, deleteFromFamInstEnv, extendFamInstEnvList,
-        identicalFamInstHead, famInstEnvElts, famInstEnvSize, familyInstances,
+        extendFamInstEnv, extendFamInstEnvList,
+        famInstEnvElts, famInstEnvSize, familyInstances,
 
         -- * CoAxioms
         mkCoAxBranch, mkBranchedCoAxiom, mkUnbranchedCoAxiom, mkSingleCoAxiom,
@@ -62,7 +62,6 @@ import SrcLoc
 import FastString
 import MonadUtils
 import Control.Monad
-import Data.Function ( on )
 import Data.List( mapAccumL, find )
 
 {-
@@ -424,33 +423,6 @@ extendFamInstEnv inst_env
   = addToUDFM_C add inst_env cls_nm (FamIE [ins_item])
   where
     add (FamIE items) _ = FamIE (ins_item:items)
-
-deleteFromFamInstEnv :: FamInstEnv -> FamInst -> FamInstEnv
--- Used only for overriding in GHCi
-deleteFromFamInstEnv inst_env fam_inst@(FamInst {fi_fam = fam_nm})
- = adjustUDFM adjust inst_env fam_nm
- where
-   adjust :: FamilyInstEnv -> FamilyInstEnv
-   adjust (FamIE items)
-     = FamIE (filterOut (identicalFamInstHead fam_inst) items)
-
-identicalFamInstHead :: FamInst -> FamInst -> Bool
--- ^ True when the LHSs are identical
--- Used for overriding in GHCi
-identicalFamInstHead (FamInst { fi_axiom = ax1 }) (FamInst { fi_axiom = ax2 })
-  =  coAxiomTyCon ax1 == coAxiomTyCon ax2
-  && numBranches brs1 == numBranches brs2
-  && and ((zipWith identical_branch `on` fromBranches) brs1 brs2)
-  where
-    brs1 = coAxiomBranches ax1
-    brs2 = coAxiomBranches ax2
-
-    identical_branch br1 br2
-      =  isJust (tcMatchTys lhs1 lhs2)
-      && isJust (tcMatchTys lhs2 lhs1)
-      where
-        lhs1 = coAxBranchLHS br1
-        lhs2 = coAxBranchLHS br2
 
 {-
 ************************************************************************
