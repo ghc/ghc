@@ -3,7 +3,7 @@
 
 -- | Accessors to GHC RTS flags.
 -- Descriptions of flags can be seen in
--- <https://www.haskell.org/ghc/docs/latest/html/users_guide/runtime-control.html GHC User's Guide>,
+-- <https://www.haskell.org/ghc/docs/latest/html/users_guide/runtime_control.html GHC User's Guide>,
 -- or by running RTS help message using @+RTS --help@.
 --
 -- @since 4.8.0.0
