@@ -61,10 +61,10 @@ system.  The following list may or may not be exhaustive:
 
 Compiler  - types of various primitives in PrimOp.hs
 
-RTS       - forceIO (StgMiscClosures.hc)
+RTS       - forceIO (StgStartup.cmm)
           - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast
-            (Exceptions.hc)
-          - raiseAsync (Schedule.c)
+            (Exception.cmm)
+          - raiseAsync (RaiseAsync.c)
 
 Prelude   - GHC.IO.hs, and several other places including
             GHC.Exception.hs.
