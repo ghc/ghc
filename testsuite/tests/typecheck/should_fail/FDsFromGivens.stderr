@@ -1,4 +1,0 @@
-
-FDsFromGivens.hs:14:1: warning: [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘g1’: g1 x = ...

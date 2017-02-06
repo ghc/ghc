@@ -1,4 +1,0 @@
-
-T10715.hs:18:1: warning: [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘doCoerce’: doCoerce = ...

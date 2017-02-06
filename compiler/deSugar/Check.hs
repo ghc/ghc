@@ -46,7 +46,7 @@ import UniqSupply
 import DsGRHSs       (isTrueLHsExpr)
 
 import Data.List     (find)
-import Data.Maybe    (isJust)
+import Data.Maybe    (isJust, fromMaybe)
 import Control.Monad (forM, when, forM_)
 import Coercion
 import TcEvidence
@@ -1210,13 +1210,12 @@ mkInitialUncovered vars = do
   ty_cs  <- liftD getDictsDs
   tm_cs  <- map toComplex . bagToList <$> liftD getTmCsDs
   sat_ty <- tyOracle ty_cs
-  return $ case (sat_ty, tmOracle initialTmState tm_cs) of
-    (True, Just tm_state) -> [ValVec patterns (MkDelta ty_cs tm_state)]
+  let initTyCs = if sat_ty then ty_cs else emptyBag
+      initTmState = fromMaybe initialTmState (tmOracle initialTmState tm_cs)
+      patterns  = map PmVar vars
     -- If any of the term/type constraints are non
-    -- satisfiable, the initial uncovered set is empty
-    _non_satisfiable      -> []
-  where
-    patterns  = map PmVar vars
+    -- satisfiable then return with the initialTmState. See #12957
+  return [ValVec patterns (MkDelta initTyCs initTmState)]
 
 -- | Increase the counter for elapsed algorithm iterations, check that the
 -- limit is not exceeded and call `pmcheck`

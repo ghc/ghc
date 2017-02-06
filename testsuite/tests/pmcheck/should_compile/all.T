@@ -59,6 +59,7 @@ test('pmc007', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
 test('T11245', [], compile,
      ['-fwarn-incomplete-patterns -fwarn-overlapping-patterns'])
+test('T12957', [], compile, ['-fwarn-overlapping-patterns'])
 
 # EmptyCase
 test('T10746', [], compile,

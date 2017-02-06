@@ -84,10 +84,6 @@ Defer01.hs:43:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
       In the expression: myOp 23
       In an equation for ‘j’: j = myOp 23
 
-Defer01.hs:47:1: warning: [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘k’: k x = ...
-
 Defer01.hs:50:5: warning: [-Wdeferred-type-errors (in -Wdefault)]
     • Couldn't match expected type ‘IO a0’
                   with actual type ‘Char -> IO ()’

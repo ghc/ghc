@@ -1,4 +1,0 @@
-
-T8392a.hs:11:1: warning: [-Woverlapping-patterns (in -Wdefault)]
-    Pattern match is redundant
-    In an equation for ‘foo’: foo x = ...
