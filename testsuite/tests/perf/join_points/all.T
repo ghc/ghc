@@ -15,7 +15,9 @@ test('join003',
   compile_and_run,
   [''])
 test('join004',
-  [stats_num_field('bytes allocated', [(wordsize(64), 48146720, 5)])],
+  [stats_num_field('bytes allocated', [(wordsize(64), 16130592, 5)])],
+   # 2017-01-24   48146720    Join point rework
+   # 2017-02-05   16130592    Do Worker/Wrapper for NOINLINE things
   compile_and_run,
   [''])
 

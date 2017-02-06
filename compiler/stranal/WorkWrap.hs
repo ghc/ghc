@@ -199,17 +199,79 @@ unfolding to the *worker*.  So we will get something like this:
 How do we "transfer the unfolding"? Easy: by using the old one, wrapped
 in work_fn! See CoreUnfold.mkWorkerUnfolding.
 
-Note [Activation for INLINABLE worker]
+Note [Worker-wrapper for NOINLINE functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to disable worker/wrapper for NOINLINE things, but it turns out
+this can cause unnecessary reboxing of values. Consider
+
+  {-# NOINLINE f #-}
+  f :: Int -> a
+  f x = error (show x)
+
+  g :: Bool -> Bool -> Int -> Int
+  g True  True  p = f p
+  g False True  p = p + 1
+  g b     False p = g b True p
+
+the strictness analysis will discover f and g are strict, but because f
+has no wrapper, the worker for g will rebox p. So we get
+
+  $wg x y p# =
+    let p = I# p# in  -- Yikes! Reboxing!
+    case x of
+      False ->
+        case y of
+          False -> $wg False True p#
+          True -> +# p# 1#
+      True ->
+        case y of
+          False -> $wg True True p#
+          True -> case f p of { }
+
+  g x y p = case p of (I# p#) -> $wg x y p#
+
+Now, in this case the reboxing will float into the True branch, an so
+the allocation will only happen on the error path. But it won't float
+inwards if there are multiple branches that call (f p), so the reboxing
+will happen on every call of g. Disaster.
+
+Solution: do worker/wrapper even on NOINLINE things; but move the
+NOINLINE pragma to the worker.
+
+(See Trac #13143 for a real-world example.)
+
+Note [Activation for workers]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Follows on from Note [Worker-wrapper for INLINABLE functions]
+
 It is *vital* that if the worker gets an INLINABLE pragma (from the
 original function), then the worker has the same phase activation as
 the wrapper (or later).  That is necessary to allow the wrapper to
 inline into the worker's unfolding: see SimplUtils
 Note [Simplifying inside stable unfoldings].
 
-Notihng is lost by giving the worker the same activation as the
-worker, because the worker won't have any chance of inlining until the
+If the original is NOINLINE, it's important that the work inherit the
+original activation. Consider
+
+  {-# NOINLINE expensive #-}
+  expensive x = x + 1
+
+  f y = let z = expensive y in ...
+
+If expensive's worker inherits the wrapper's activation, we'll get
+
+  {-# NOINLINE[0] $wexpensive #-}
+  $wexpensive x = x + 1
+  {-# INLINE[0] expensive #-}
+  expensive x = $wexpensive x
+
+  f y = let z = expensive y in ...
+
+and $wexpensive will be immediately inlined into expensive, followed by
+expensive into f. This effectively removes the original NOINLINE!
+
+Otherwise, nothing is lost by giving the worker the same activation as the
+wrapper, because the worker won't have any chance of inlining until the
 wrapper does; there's no point in giving it an earlier activation.
 
 Note [Don't w/w inline small non-loop-breaker things]
@@ -326,11 +388,7 @@ tryWW   :: DynFlags
                                         -- if two, then a worker and a
                                         -- wrapper.
 tryWW dflags fam_envs is_rec fn_id rhs
-  | isNeverActive inline_act
-        -- No point in worker/wrappering if the thing is never inlined!
-        -- Because the no-inline prag will prevent the wrapper ever
-        -- being inlined at a call site.
-  = return [ (new_fn_id, rhs) ]
+  -- See Note [Worker-wrapper for NOINLINE functions]
 
   | Just stable_unf <- certainlyWillInline dflags fn_info
   = return [ (fn_id `setIdUnfolding` stable_unf, rhs) ]
@@ -348,7 +406,6 @@ tryWW dflags fam_envs is_rec fn_id rhs
 
   where
     fn_info      = idInfo fn_id
-    inline_act   = inlinePragmaActivation (inlinePragInfo fn_info)
     (wrap_dmds, res_info) = splitStrictSig (strictnessInfo fn_info)
 
     new_fn_id = zapIdUsedOnceInfo (zapIdUsageEnvInfo fn_id)
@@ -412,13 +469,18 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
       Just (work_demands, join_arity, wrap_fn, work_fn) -> do
         work_uniq <- getUniqueM
         let work_rhs = work_fn rhs
+            work_inline = inl_inline inl_prag
+            work_act = case work_inline of
+              -- See Note [Activation for workers]
+              NoInline -> inl_act inl_prag
+              _        -> wrap_act
             work_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                     , inl_inline = inl_inline inl_prag
+                                     , inl_inline = work_inline
                                      , inl_sat    = Nothing
-                                     , inl_act    = wrap_act
+                                     , inl_act    = work_act
                                      , inl_rule   = FunLike }
               -- idl_inline: copy from fn_id; see Note [Worker-wrapper for INLINABLE functions]
-              -- idl_act: see Note [Activation for INLINABLE workers]
+              -- idl_act: see Note [Activation for workers]
               -- inl_rule: it does not make sense for workers to be constructorlike.
             work_join_arity | isJoinId fn_id = Just join_arity
                             | otherwise      = Nothing

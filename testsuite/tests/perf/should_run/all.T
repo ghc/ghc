@@ -159,8 +159,9 @@ test('MethSharing',
                       [(wordsize(32), 360940756, 5),
                     # expected value: 2685858140 (x86/OS X)
                           # expected: 360940756 (x86/Linux)
-                       (wordsize(64), 640067672, 5)]),
-                          # expected: 640067672 (amd64/Linux)
+                       (wordsize(64), 480098192, 5)]),
+                          # expected:   640067672 (amd64/Linux)
+                          # 2017-01-31: 480098192 work/wrap noinline things
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -481,10 +482,11 @@ test('T13001',
 
 test('T12990',
     [stats_num_field('bytes allocated',
-                     [ (wordsize(64), 21640904, 5) ]),
+                     [ (wordsize(64), 20040936, 5) ]),
                      # 2017-01-03     34440936  w/o inlining unsaturated
                      #                          constructor wrappers
                      # 2017-01-03     21640904 inline wrappers
+                     # 2017-01-31     20040936 work/wrap noinline things
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])

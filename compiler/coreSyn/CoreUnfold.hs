@@ -54,7 +54,7 @@ import DataCon
 import Literal
 import PrimOp
 import IdInfo
-import BasicTypes       ( Arity )
+import BasicTypes       ( Arity, InlineSpec(..), inlinePragmaSpec )
 import Type
 import PrelNames
 import TysPrim          ( realWorldStatePrimTy )
@@ -1031,6 +1031,9 @@ certainlyWillInline dflags fn_info
         --    See Note [certainlyWillInline: INLINABLE]
     do_cunf expr (UnfIfGoodArgs { ug_size = size, ug_args = args })
       | not (null args)  -- See Note [certainlyWillInline: be careful of thunks]
+      , case inlinePragmaSpec (inlinePragInfo fn_info) of
+          NoInline -> False -- NOINLINE; do not say certainlyWillInline!
+          _        -> True  -- INLINE, INLINABLE, or nothing
       , let arity = length args
       , size - (10 * (arity + 1)) <= ufUseThreshold dflags
       = Just (fn_unf { uf_src      = InlineStable

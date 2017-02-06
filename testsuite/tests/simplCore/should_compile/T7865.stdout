@@ -1,4 +1,8 @@
-expensive [InlPrag=NOINLINE] :: Int -> Int
+T7865.$wexpensive [InlPrag=NOINLINE]
+T7865.$wexpensive =
+expensive [InlPrag=INLINE[0]] :: Int -> Int
+                 case T7865.$wexpensive ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
 expensive =
-        case expensive sc1 of { GHC.Types.I# x ->
-                (case expensive x of { GHC.Types.I# x1 ->
+    case T7865.$wexpensive ww1 of ww2 { __DEFAULT -> GHC.Types.I# ww2 }
+        case T7865.$wexpensive ww1 of ww2 { __DEFAULT ->
+                 case T7865.$wexpensive ww1 of ww2 { __DEFAULT ->

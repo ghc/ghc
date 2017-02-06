@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 40, types: 16, coercions: 0, joins: 0/0}
+  = {terms: 44, types: 19, coercions: 0, joins: 0/0}
 
 Rec {
 -- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
@@ -15,17 +15,29 @@ $wxs =
     }
 end Rec }
 
--- RHS size: {terms: 14, types: 5, coercions: 0, joins: 0/0}
-foo [InlPrag=NOINLINE] :: Int -> ()
-[GblId, Arity=1, Caf=NoCafRefs, Str=<S(S),1*U(U)>]
-foo =
-  \ (n :: Int) ->
-    case n of { GHC.Types.I# y ->
-    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# y) of {
+-- RHS size: {terms: 11, types: 3, coercions: 0, joins: 0/0}
+T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
+[GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
+T3772.$wfoo =
+  \ (ww :: GHC.Prim.Int#) ->
+    case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# ww) of {
       False -> GHC.Tuple.();
-      True -> $wxs y
+      True -> $wxs ww
     }
-    }
+
+-- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
+foo [InlPrag=INLINE[0]] :: Int -> ()
+[GblId,
+ Arity=1,
+ Caf=NoCafRefs,
+ Str=<S(S),1*U(U)>,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w [Occ=Once!] :: Int) ->
+                 case w of { GHC.Types.I# ww1 [Occ=Once] -> T3772.$wfoo ww1 }}]
+foo =
+  \ (w :: Int) -> case w of { GHC.Types.I# ww1 -> T3772.$wfoo ww1 }
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule2 :: GHC.Prim.Addr#

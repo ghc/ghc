@@ -1,42 +1,51 @@
 
 ==================== Tidy Core ====================
-Result size of Tidy Core = {terms: 59, types: 41, coercions: 0}
+Result size of Tidy Core = {terms: 70, types: 63, coercions: 0}
 
--- RHS size: {terms: 39, types: 23, coercions: 0}
-pm [InlPrag=NOINLINE] :: Int -> Int -> (Int, Int)
-[GblId, Arity=2, Str=<L,U(U)><L,U(U)>m]
-pm =
-  \ (x_axr :: Int) (y_axs :: Int) ->
+-- RHS size: {terms: 39, types: 25, coercions: 0}
+T10694.$wpm [InlPrag=NOINLINE] :: Int -> Int -> (# Int, Int #)
+[GblId, Arity=2, Str=<L,U(U)><L,U(U)>]
+T10694.$wpm =
+  \ (w_sVU :: Int) (w1_sVV :: Int) ->
     let {
-      l_sVj :: Int
+      l_sUQ :: Int
       [LclId]
-      l_sVj =
-        case x_axr of { GHC.Types.I# x1_aUL -> case y_axs of { GHC.Types.I# y1_aUP -> GHC.Types.I# (GHC.Prim.+# x1_aUL y1_aUP) } } } in
+      l_sUQ = case w_sVU of { GHC.Types.I# x_aUi -> case w1_sVV of { GHC.Types.I# y_aUm -> GHC.Types.I# (GHC.Prim.+# x_aUi y_aUm) } } } in
     let {
-      l1_sVl :: Int
+      l1_sUS :: Int
       [LclId]
-      l1_sVl =
-        case x_axr of { GHC.Types.I# x1_aUV -> case y_axs of { GHC.Types.I# y1_aUZ -> GHC.Types.I# (GHC.Prim.-# x1_aUV y1_aUZ) } } } in
+      l1_sUS = case w_sVU of { GHC.Types.I# x_aUs -> case w1_sVV of { GHC.Types.I# y_aUw -> GHC.Types.I# (GHC.Prim.-# x_aUs y_aUw) } } } in
     let {
-      l2_sVk :: [Int]
-      [LclId]
-      l2_sVk = GHC.Types.: @ Int l1_sVl (GHC.Types.[] @ Int) } in
+      l2_sUR :: [Int]
+      [LclId, Unf=OtherCon []]
+      l2_sUR = GHC.Types.: @ Int l1_sUS (GHC.Types.[] @ Int) } in
     let {
-      l3_sVa :: [Int]
-      [LclId]
-      l3_sVa = GHC.Types.: @ Int l_sVj l2_sVk } in
-    (GHC.List.$w!! @ Int l3_sVa 0#, GHC.List.$w!! @ Int l3_sVa 1#)
+      l3_sUH :: [Int]
+      [LclId, Unf=OtherCon []]
+      l3_sUH = GHC.Types.: @ Int l_sUQ l2_sUR } in
+    (# GHC.List.$w!! @ Int l3_sUH 0#, GHC.List.$w!! @ Int l3_sUH 1# #)
 
--- RHS size: {terms: 8, types: 7, coercions: 0}
+-- RHS size: {terms: 10, types: 11, coercions: 0}
+pm [InlPrag=INLINE[0]] :: Int -> Int -> (Int, Int)
+[GblId,
+ Arity=2,
+ Str=<L,U(U)><L,U(U)>m,
+ Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
+         Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
+         Tmpl= \ (w_sVU [Occ=Once] :: Int) (w1_sVV [Occ=Once] :: Int) ->
+                 case T10694.$wpm w_sVU w1_sVV of { (# ww1_sW0 [Occ=Once], ww2_sW1 [Occ=Once] #) -> (ww1_sW0, ww2_sW1) }}]
+pm = \ (w_sVU :: Int) (w1_sVV :: Int) -> case T10694.$wpm w_sVU w1_sVV of { (# ww1_sW0, ww2_sW1 #) -> (ww1_sW0, ww2_sW1) }
+
+-- RHS size: {terms: 8, types: 9, coercions: 0}
 m :: Int -> Int -> Int
 [GblId,
  Arity=2,
  Str=<L,U(U)><L,U(U)>,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True, WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=2,unsat_ok=True,boring_ok=False)
-         Tmpl= \ (x_aCt [Occ=Once] :: Int) (y_aCu [Occ=Once] :: Int) ->
-                 case pm x_aCt y_aCu of { (_ [Occ=Dead], mr_aCw [Occ=Once]) -> mr_aCw }}]
-m = \ (x_aCt :: Int) (y_aCu :: Int) -> case pm x_aCt y_aCu of { (pr_aCv, mr_aCw) -> mr_aCw }
+         Tmpl= \ (x_aCT [Occ=Once] :: Int) (y_aCU [Occ=Once] :: Int) ->
+                 case pm x_aCT y_aCU of { (_ [Occ=Dead], mr_aCW [Occ=Once]) -> mr_aCW }}]
+m = \ (x_aCT :: Int) (y_aCU :: Int) -> case T10694.$wpm x_aCT y_aCU of { (# ww1_sW0, ww2_sW1 #) -> ww2_sW1 }
 
 -- RHS size: {terms: 2, types: 0, coercions: 0}
 T10694.$trModule2 :: GHC.Types.TrName
