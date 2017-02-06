@@ -171,6 +171,7 @@ instance Functor ReadP where
 instance Applicative ReadP where
     pure x = R (\k -> k x)
     (<*>) = ap
+    liftA2 = liftM2
 
 -- | @since 2.01
 instance Monad ReadP where

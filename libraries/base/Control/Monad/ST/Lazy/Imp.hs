@@ -142,6 +142,21 @@ instance Applicative (ST s) where
     -- forces the (f x, s'') pair, then they must need
     -- f or s''. To get s'', they need s'.
 
+    liftA2 f m n = ST $ \ s ->
+      let
+        {-# NOINLINE res1 #-}
+        -- See Note [Lazy ST and multithreading]
+        res1 = noDup (unST m s)
+        (x, s') = res1
+
+        {-# NOINLINE res2 #-}
+        res2 = noDup (unST n s')
+        (y, s'') = res2
+      in (f x y, s'')
+    -- We don't get to be strict in liftA2, but we clear out a
+    -- NOINLINE in comparison to the default definition, which may
+    -- help the simplifier.
+
     m *> n = ST $ \s ->
        let
          {-# NOINLINE s' #-}

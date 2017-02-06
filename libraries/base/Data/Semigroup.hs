@@ -366,7 +366,8 @@ instance Applicative Min where
   pure = Min
   a <* _ = a
   _ *> a = a
-  Min f <*> Min x = Min (f x)
+  (<*>) = coerce
+  liftA2 = coerce
 
 -- | @since 4.9.0.0
 instance Monad Min where
@@ -428,7 +429,8 @@ instance Applicative Max where
   pure = Max
   a <* _ = a
   _ *> a = a
-  Max f <*> Max x = Max (f x)
+  (<*>) = coerce
+  liftA2 = coerce
 
 -- | @since 4.9.0.0
 instance Monad Max where
@@ -533,7 +535,8 @@ instance Applicative First where
   pure x = First x
   a <* _ = a
   _ *> a = a
-  First f <*> First x = First (f x)
+  (<*>) = coerce
+  liftA2 = coerce
 
 -- | @since 4.9.0.0
 instance Monad First where
@@ -583,7 +586,8 @@ instance Applicative Last where
   pure = Last
   a <* _ = a
   _ *> a = a
-  Last f <*> Last x = Last (f x)
+  (<*>) = coerce
+  liftA2 = coerce
 
 -- | @since 4.9.0.0
 instance Monad Last where
@@ -648,6 +652,7 @@ instance Functor Option where
 instance Applicative Option where
   pure a = Option (Just a)
   Option a <*> Option b = Option (a <*> b)
+  liftA2 f (Option x) (Option y) = Option (liftA2 f x y)
 
   Option Nothing  *>  _ = Option Nothing
   _               *>  b = b

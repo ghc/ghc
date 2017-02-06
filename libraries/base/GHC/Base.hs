@@ -331,6 +331,7 @@ instance Monoid a => Monoid (Maybe a) where
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u `mappend` v, f x)
+    liftA2 f (u, x) (v, y) = (u `mappend` v, f x y)
 
 -- | @since 4.9.0.0
 instance Monoid a => Monad ((,) a) where
@@ -364,10 +365,16 @@ class  Functor f  where
 --
 -- * embed pure expressions ('pure'), and
 --
--- * sequence computations and combine their results ('<*>').
+-- * sequence computations and combine their results ('<*>' and 'liftA2').
 --
--- A minimal complete definition must include implementations of these
--- functions satisfying the following laws:
+-- A minimal complete definition must include implementations of 'pure'
+-- and of either '<*>' or 'liftA2'. If it defines both, then they must behave
+-- the same as their default definitions:
+--
+--      @('<*>') = 'liftA2' 'id'@
+--      @'liftA2' f x y = f '<$>' x '<*>' y@
+--
+-- Further, any definition must satisfy the following:
 --
 -- [/identity/]
 --
@@ -385,16 +392,27 @@ class  Functor f  where
 --
 --      @u '<*>' 'pure' y = 'pure' ('$' y) '<*>' u@
 --
+--
 -- The other methods have the following default definitions, which may
 -- be overridden with equivalent specialized implementations:
 --
---   * @u '*>' v = 'pure' ('const' 'id') '<*>' u '<*>' v@
+--   * @u '*>' v = ('id' '<$' u) '<*>' v@
 --
---   * @u '<*' v = 'pure' 'const' '<*>' u '<*>' v@
+--   * @u '<*' v = 'liftA2' 'const' u v@
 --
 -- As a consequence of these laws, the 'Functor' instance for @f@ will satisfy
 --
 --   * @'fmap' f x = 'pure' f '<*>' x@
+--
+--
+-- It may be useful to note that supposing
+--
+--      @forall x y. p (q x y) = f x . g y@
+--
+-- it follows from the above that
+--
+--      @'liftA2' p ('liftA2' q u v) = 'liftA2' f u . 'liftA2' g v@
+--
 --
 -- If @f@ is also a 'Monad', it should satisfy
 --
@@ -405,17 +423,37 @@ class  Functor f  where
 -- (which implies that 'pure' and '<*>' satisfy the applicative functor laws).
 
 class Functor f => Applicative f where
+    {-# MINIMAL pure, ((<*>) | liftA2) #-}
     -- | Lift a value.
     pure :: a -> f a
 
     -- | Sequential application.
+    --
+    -- A few functors support an implementation of '<*>' that is more
+    -- efficient than the default one.
     (<*>) :: f (a -> b) -> f a -> f b
+    (<*>) = liftA2 id
+
+    -- | Lift a binary function to actions.
+    --
+    -- Some functors support an implementation of 'liftA2' that is more
+    -- efficient than the default one. In particular, if 'fmap' is an
+    -- expensive operation, it is likely better to use 'liftA2' than to
+    -- 'fmap' over the structure and then use '<*>'.
+    liftA2 :: (a -> b -> c) -> f a -> f b -> f c
+    liftA2 f x = (<*>) (fmap f x)
 
     -- | Sequence actions, discarding the value of the first argument.
     (*>) :: f a -> f b -> f b
     a1 *> a2 = (id <$ a1) <*> a2
-    -- This is essentially the same as liftA2 (const id), but if the
-    -- Functor instance has an optimized (<$), we want to use that instead.
+    -- This is essentially the same as liftA2 (flip const), but if the
+    -- Functor instance has an optimized (<$), it may be better to use
+    -- that instead. Before liftA2 became a method, this definition
+    -- was strictly better, but now it depends on the functor. For a
+    -- functor supporting a sharing-enhancing (<$), this definition
+    -- may reduce allocation by preventing a1 from ever being fully
+    -- realized. In an implementation with a boring (<$) but an optimizing
+    -- liftA2, it would likely be better to define (*>) using liftA2.
 
     -- | Sequence actions, discarding the value of the second argument.
     (<*) :: f a -> f b -> f a
@@ -433,21 +471,14 @@ liftA f a = pure f <*> a
 -- Caution: since this may be used for `fmap`, we can't use the obvious
 -- definition of liftA = fmap.
 
--- | Lift a binary function to actions.
-liftA2 :: Applicative f => (a -> b -> c) -> f a -> f b -> f c
-liftA2 f a b = fmap f a <*> b
-
 -- | Lift a ternary function to actions.
 liftA3 :: Applicative f => (a -> b -> c -> d) -> f a -> f b -> f c -> f d
-liftA3 f a b c = fmap f a <*> b <*> c
+liftA3 f a b c = liftA2 f a b <*> c
 
 
 {-# INLINABLE liftA #-}
 {-# SPECIALISE liftA :: (a1->r) -> IO a1 -> IO r #-}
 {-# SPECIALISE liftA :: (a1->r) -> Maybe a1 -> Maybe r #-}
-{-# INLINABLE liftA2 #-}
-{-# SPECIALISE liftA2 :: (a1->a2->r) -> IO a1 -> IO a2 -> IO r #-}
-{-# SPECIALISE liftA2 :: (a1->a2->r) -> Maybe a1 -> Maybe a2 -> Maybe r #-}
 {-# INLINABLE liftA3 #-}
 {-# SPECIALISE liftA3 :: (a1->a2->a3->r) -> IO a1 -> IO a2 -> IO a3 -> IO r #-}
 {-# SPECIALISE liftA3 :: (a1->a2->a3->r) ->
@@ -596,6 +627,8 @@ liftM f m1              = do { x1 <- m1; return (f x1) }
 --
 liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
 liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
+-- Caution: since this may be used for `liftA2`, we can't use the obvious
+-- definition of liftM2 = liftA2.
 
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right (cf. 'liftM2').
@@ -657,6 +690,7 @@ instance Functor ((->) r) where
 instance Applicative ((->) a) where
     pure = const
     (<*>) f g x = f x (g x)
+    liftA2 q f g x = q (f x) (g x)
 
 -- | @since 2.01
 instance Monad ((->) r) where
@@ -677,6 +711,9 @@ instance Applicative Maybe where
 
     Just f  <*> m       = fmap f m
     Nothing <*> _m      = Nothing
+
+    liftA2 f (Just x) (Just y) = Just (f x y)
+    liftA2 _ _ _ = Nothing
 
     Just _m1 *> m2      = m2
     Nothing  *> _m2     = Nothing
@@ -714,14 +751,14 @@ class Applicative f => Alternative f where
     some v = some_v
       where
         many_v = some_v <|> pure []
-        some_v = (fmap (:) v) <*> many_v
+        some_v = liftA2 (:) v many_v
 
     -- | Zero or more.
     many :: f a -> f [a]
     many v = many_v
       where
         many_v = some_v <|> pure []
-        some_v = (fmap (:) v) <*> many_v
+        some_v = liftA2 (:) v many_v
 
 
 -- | @since 2.01
@@ -765,6 +802,8 @@ instance Applicative [] where
     pure x    = [x]
     {-# INLINE (<*>) #-}
     fs <*> xs = [f x | f <- fs, x <- xs]
+    {-# INLINE liftA2 #-}
+    liftA2 f xs ys = [f x y | x <- xs, y <- ys]
     {-# INLINE (*>) #-}
     xs *> ys  = [y | _ <- xs, y <- ys]
 
@@ -1114,9 +1153,11 @@ instance  Functor IO where
 instance Applicative IO where
     {-# INLINE pure #-}
     {-# INLINE (*>) #-}
+    {-# INLINE liftA2 #-}
     pure  = returnIO
     (*>)  = thenIO
     (<*>) = ap
+    liftA2 = liftM2
 
 -- | @since 2.01
 instance  Monad IO  where

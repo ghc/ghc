@@ -1,7 +1,8 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Data.Functor.Compose
@@ -24,6 +25,7 @@ module Data.Functor.Compose (
 import Data.Functor.Classes
 
 import Control.Applicative
+import Data.Coerce (coerce)
 import Data.Data (Data)
 import Data.Foldable (Foldable(foldMap))
 import Data.Traversable (Traversable(traverse))
@@ -106,9 +108,12 @@ instance (Traversable f, Traversable g) => Traversable (Compose f g) where
 -- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (Compose f g) where
     pure x = Compose (pure (pure x))
-    Compose f <*> Compose x = Compose ((<*>) <$> f <*> x)
+    Compose f <*> Compose x = Compose (liftA2 (<*>) f x)
+    liftA2 f (Compose x) (Compose y) =
+      Compose (liftA2 (liftA2 f) x y)
 
 -- | @since 4.9.0.0
 instance (Alternative f, Applicative g) => Alternative (Compose f g) where
     empty = Compose empty
-    Compose x <|> Compose y = Compose (x <|> y)
+    (<|>) = coerce ((<|>) :: f (g a) -> f (g a) -> f (g a))
+      :: forall a . Compose f g a -> Compose f g a -> Compose f g a

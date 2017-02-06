@@ -49,6 +49,13 @@
 
   * The type of `asProxyTypeOf` in `Data.Proxy` has been generalized (#12805)
 
+  * `liftA2` is now a method of the `Applicative` class. `liftA2` and
+    `<*>` each have a default implementation based on the other. Various
+    library functions have been updated to use `liftA2` where it might offer
+    some benefit. `liftA2` is not yet in the `Prelude`, and must currently be
+    imported from `Control.Applicative`. It is likely to be added to the
+    `Prelude` in the future. (#13191)
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0

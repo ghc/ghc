@@ -198,3 +198,11 @@ test('T11555', normal, compile_and_run, [''])
 test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', normal, compile_and_run, ['-threaded -with-rtsopts=-N2'])
+test('T13191',
+        [ stats_num_field('bytes allocated',
+                          [ (wordsize(64), 185943272, 5) ])
+        # with GHC-8.1 before liftA2 change: 325065128
+        # GHC-8.1 with custom liftA2:        185943272
+        , only_ways(['normal'])],
+      compile_and_run,
+      ['-O'])

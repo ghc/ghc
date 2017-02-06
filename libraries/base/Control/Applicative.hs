@@ -43,7 +43,7 @@ module Control.Applicative (
     Const(..), WrappedMonad(..), WrappedArrow(..), ZipList(..),
     -- * Utility functions
     (<$>), (<$), (<**>),
-    liftA, liftA2, liftA3,
+    liftA, liftA3,
     optional,
     ) where
 
@@ -74,6 +74,7 @@ instance Monad m => Functor (WrappedMonad m) where
 instance Monad m => Applicative (WrappedMonad m) where
     pure = WrapMonad . pure
     WrapMonad f <*> WrapMonad v = WrapMonad (f `ap` v)
+    liftA2 f (WrapMonad x) (WrapMonad y) = WrapMonad (liftM2 f x y)
 
 -- | @since 2.01
 instance MonadPlus m => Alternative (WrappedMonad m) where
@@ -90,7 +91,8 @@ instance Arrow a => Functor (WrappedArrow a b) where
 -- | @since 2.01
 instance Arrow a => Applicative (WrappedArrow a b) where
     pure x = WrapArrow (arr (const x))
-    WrapArrow f <*> WrapArrow v = WrapArrow (f &&& v >>> arr (uncurry id))
+    liftA2 f (WrapArrow u) (WrapArrow v) =
+      WrapArrow (u &&& v >>> arr (uncurry f))
 
 -- | @since 2.01
 instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
@@ -109,7 +111,7 @@ newtype ZipList a = ZipList { getZipList :: [a] }
 -- | @since 2.01
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
-    ZipList fs <*> ZipList xs = ZipList (zipWith id fs xs)
+    liftA2 f (ZipList xs) (ZipList ys) = ZipList (zipWith f xs ys)
 
 -- extra functions
 

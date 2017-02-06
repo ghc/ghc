@@ -549,7 +549,8 @@ Again, Traversable is much like Functor and Foldable.
 The cases are:
 
   $(traverse 'a 'a)          =  f
-  $(traverse 'a '(b1,b2))    =  \x -> case x of (x1,x2) -> (,) <$> $(traverse 'a 'b1) x1 <*> $(traverse 'a 'b2) x2
+  $(traverse 'a '(b1,b2))    =  \x -> case x of (x1,x2) ->
+     liftA2 (,) ($(traverse 'a 'b1) x1) ($(traverse 'a 'b2) x2)
   $(traverse 'a '(T b1 b2))  =  traverse $(traverse 'a 'b2)  -- when a only occurs in the last parameter, b2
 
 Like -XDeriveFoldable, -XDeriveTraversable filters out arguments whose types
@@ -601,7 +602,7 @@ gen_Traversable_binds loc tycon
                lam <- mkSimpleLam $ mkSimpleTupleCase match_for_con t gg
                return (Just lam)
              -- traverse f = \x -> case x of (a1,a2,..) ->
-             --                           (,,) <$> g1 a1 <*> g2 a2 <*> ..
+             --                           liftA2 (,,) (g1 a1) (g2 a2) <*> ..
            , ft_ty_app  = \_ g -> fmap (nlHsApp traverse_Expr) <$> g
              -- traverse f = traverse g
            , ft_forall  = \_ g -> g
@@ -609,8 +610,8 @@ gen_Traversable_binds loc tycon
            , ft_fun     = panic "function"
            , ft_bad_app = panic "in other argument" }
 
-    -- Con a1 a2 ... -> fmap (\b1 b2 ... -> Con b1 b2 ...) (g1 a1)
-    --                    <*> g2 a2 <*> ...
+    -- Con a1 a2 ... -> liftA2 (\b1 b2 ... -> Con b1 b2 ...) (g1 a1)
+    --                    (g2 a2) <*> ...
     match_for_con :: [LPat RdrName]
                   -> DataCon
                   -> [Maybe (LHsExpr RdrName)]
@@ -618,10 +619,12 @@ gen_Traversable_binds loc tycon
     match_for_con = mkSimpleConMatch2 CaseAlt $
                                              \con xs -> return (mkApCon con xs)
       where
-        -- fmap (\b1 b2 ... -> Con b1 b2 ...) x1 <*> x2 <*> ..
+        -- liftA2 (\b1 b2 ... -> Con b1 b2 ...) x1 x2 <*> ..
         mkApCon :: LHsExpr RdrName -> [LHsExpr RdrName] -> LHsExpr RdrName
         mkApCon con [] = nlHsApps pure_RDR [con]
-        mkApCon con (x:xs) = foldl appAp (nlHsApps fmap_RDR [con,x]) xs
+        mkApCon con [x] = nlHsApps fmap_RDR [con,x]
+        mkApCon con (x1:x2:xs) =
+            foldl appAp (nlHsApps liftA2_RDR [con,x1,x2]) xs
           where appAp x y = nlHsApps ap_RDR [x,y]
 
 -----------------------------------------------------------------------

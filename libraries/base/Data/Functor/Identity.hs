@@ -107,6 +107,7 @@ instance Functor Identity where
 instance Applicative Identity where
     pure     = Identity
     (<*>)    = coerce
+    liftA2   = coerce
 
 -- | @since 4.8.0.0
 instance Monad Identity where

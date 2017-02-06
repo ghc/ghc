@@ -650,8 +650,10 @@ instance  Functor STM where
 instance Applicative STM where
   {-# INLINE pure #-}
   {-# INLINE (*>) #-}
+  {-# INLINE liftA2 #-}
   pure x = returnSTM x
   (<*>) = ap
+  liftA2 = liftM2
   m *> k = thenSTM m k
 
 -- | @since 4.3.0.0

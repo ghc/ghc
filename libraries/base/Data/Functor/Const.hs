@@ -68,6 +68,7 @@ instance Functor (Const m) where
 -- | @since 2.0.1
 instance Monoid m => Applicative (Const m) where
     pure _ = Const mempty
+    liftA2 _ (Const x) (Const y) = Const (x `mappend` y)
     (<*>) = coerce (mappend :: m -> m -> m)
 -- This is pretty much the same as
 -- Const f <*> Const v = Const (f `mappend` v)

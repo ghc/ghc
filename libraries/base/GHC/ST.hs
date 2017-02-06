@@ -65,6 +65,7 @@ instance Applicative (ST s) where
     pure x = ST (\ s -> (# s, x #))
     m *> k = m >>= \ _ -> k
     (<*>) = ap
+    liftA2 = liftM2
 
 -- | @since 2.01
 instance Monad (ST s) where

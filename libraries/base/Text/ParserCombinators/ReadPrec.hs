@@ -81,6 +81,7 @@ instance Functor ReadPrec where
 instance Applicative ReadPrec where
     pure x  = P (\_ -> pure x)
     (<*>) = ap
+    liftA2 = liftM2
 
 -- | @since 2.01
 instance Monad ReadPrec where

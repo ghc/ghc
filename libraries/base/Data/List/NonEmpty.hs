@@ -101,8 +101,8 @@ import           Prelude             hiding (break, cycle, drop, dropWhile,
                                       unzip, zip, zipWith, (!!))
 import qualified Prelude
 
-import           Control.Applicative (Alternative, many)
-import           Control.Monad       (ap)
+import           Control.Applicative (Applicative (..), Alternative (many))
+import           Control.Monad       (ap, liftM2)
 import           Control.Monad.Fix
 import           Control.Monad.Zip   (MonadZip(..))
 import           Data.Data           (Data)
@@ -210,6 +210,7 @@ instance Functor NonEmpty where
 instance Applicative NonEmpty where
   pure a = a :| []
   (<*>) = ap
+  liftA2 = liftM2
 
 -- | @since 4.9.0.0
 instance Monad NonEmpty where
@@ -219,7 +220,7 @@ instance Monad NonEmpty where
 
 -- | @since 4.9.0.0
 instance Traversable NonEmpty where
-  traverse f ~(a :| as) = (:|) <$> f a <*> traverse f as
+  traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
 
 -- | @since 4.9.0.0
 instance Foldable NonEmpty where
@@ -299,7 +300,7 @@ insert a = fromList . List.insert a . Foldable.toList
 
 -- | @'some1' x@ sequences @x@ one or more times.
 some1 :: Alternative f => f a -> f (NonEmpty a)
-some1 x = (:|) <$> x <*> many x
+some1 x = liftA2 (:|) x (many x)
 
 -- | 'scanl' is similar to 'foldl', but returns a stream of successive
 -- reduced values from the left:

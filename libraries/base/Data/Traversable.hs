@@ -235,7 +235,7 @@ instance Traversable Maybe where
 instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
     traverse f = List.foldr cons_f (pure [])
-      where cons_f x ys = (:) <$> f x <*> ys
+      where cons_f x ys = liftA2 (:) (f x) ys
 
 -- | @since 4.7.0.0
 instance Traversable (Either a) where

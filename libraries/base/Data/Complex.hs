@@ -36,6 +36,7 @@ module Data.Complex
 
         )  where
 
+import GHC.Base (Applicative (..))
 import GHC.Generics (Generic, Generic1)
 import GHC.Float (Floating(..))
 import Data.Data (Data)
@@ -231,6 +232,7 @@ instance Storable a => Storable (Complex a) where
 instance Applicative Complex where
   pure a = a :+ a
   f :+ g <*> a :+ b = f a :+ g b
+  liftA2 f (x :+ y) (a :+ b) = f x a :+ f y b
 
 -- | @since 4.9.0.0
 instance Monad Complex where

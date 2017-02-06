@@ -144,27 +144,28 @@ bisequence = bitraverse id id
 
 -- | @since 4.10.0.0
 instance Bitraversable (,) where
-  bitraverse f g ~(a, b) = (,) <$> f a <*> g b
+  bitraverse f g ~(a, b) = liftA2 (,) (f a) (g b)
 
 -- | @since 4.10.0.0
 instance Bitraversable ((,,) x) where
-  bitraverse f g ~(x, a, b) = (,,) x <$> f a <*> g b
+  bitraverse f g ~(x, a, b) = liftA2 ((,,) x) (f a) (g b)
 
 -- | @since 4.10.0.0
 instance Bitraversable ((,,,) x y) where
-  bitraverse f g ~(x, y, a, b) = (,,,) x y <$> f a <*> g b
+  bitraverse f g ~(x, y, a, b) = liftA2 ((,,,) x y) (f a) (g b)
 
 -- | @since 4.10.0.0
 instance Bitraversable ((,,,,) x y z) where
-  bitraverse f g ~(x, y, z, a, b) = (,,,,) x y z <$> f a <*> g b
+  bitraverse f g ~(x, y, z, a, b) = liftA2 ((,,,,) x y z) (f a) (g b)
 
 -- | @since 4.10.0.0
 instance Bitraversable ((,,,,,) x y z w) where
-  bitraverse f g ~(x, y, z, w, a, b) = (,,,,,) x y z w <$> f a <*> g b
+  bitraverse f g ~(x, y, z, w, a, b) = liftA2 ((,,,,,) x y z w) (f a) (g b)
 
 -- | @since 4.10.0.0
 instance Bitraversable ((,,,,,,) x y z w v) where
-  bitraverse f g ~(x, y, z, w, v, a, b) = (,,,,,,) x y z w v <$> f a <*> g b
+  bitraverse f g ~(x, y, z, w, v, a, b) =
+    liftA2 ((,,,,,,) x y z w v) (f a) (g b)
 
 -- | @since 4.10.0.0
 instance Bitraversable Either where

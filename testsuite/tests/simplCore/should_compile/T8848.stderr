@@ -5,6 +5,21 @@ Rule fired: SPEC map2
 Rule fired: Class op fmap
 Rule fired: Class op fmap
 Rule fired: Class op fmap
+Rule fired: Class op liftA2
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
+Rule fired: Class op <*>
+Rule fired: Class op $p1Applicative
+Rule fired: Class op <$
+Rule fired: Class op <*>
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op $p1Applicative
+Rule fired: Class op fmap
+Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
@@ -14,16 +29,6 @@ Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op <$
 Rule fired: Class op <*>
-Rule fired: Class op $p1Applicative
-Rule fired: Class op <$
-Rule fired: Class op <*>
-Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
-Rule fired: Class op <*>
-Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
-Rule fired: Class op <*>
-Rule fired: SPEC/T8848 liftA2 @ (Shape 'Z) _ _ _
 Rule fired: Class op $p1Applicative
 Rule fired: Class op $p1Applicative
 Rule fired: SPEC $cfmap @ 'Z
@@ -38,32 +43,43 @@ Rule fired: SPEC $fFunctorShape @ 'Z
 Rule fired: SPEC $cp1Applicative @ 'Z
 Rule fired: SPEC $cpure @ 'Z
 Rule fired: SPEC $c<*> @ 'Z
+Rule fired: SPEC $cliftA2 @ 'Z
 Rule fired: SPEC $c*> @ 'Z
 Rule fired: SPEC $c<* @ 'Z
 Rule fired: SPEC $fApplicativeShape @ 'Z
 Rule fired: SPEC $fApplicativeShape @ 'Z
+Rule fired: SPEC $fApplicativeShape @ 'Z
+Rule fired: SPEC $fApplicativeShape @ 'Z
+Rule fired: SPEC $fApplicativeShape @ 'Z
+Rule fired: Class op liftA2
 Rule fired: Class op $p1Applicative
-Rule fired: Class op fmap
+Rule fired: Class op <$
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op <$
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
-Rule fired: Class op <$
+Rule fired: Class op fmap
 Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: SPEC $c<*> @ 'Z
+Rule fired: SPEC $cliftA2 @ 'Z
 Rule fired: SPEC $c*> @ 'Z
 Rule fired: SPEC $c<* @ 'Z
 Rule fired: SPEC $fApplicativeShape @ 'Z
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
 Rule fired: SPEC $fApplicativeShape @ 'Z
-Rule fired: Class op $p1Applicative
-Rule fired: Class op <$
-Rule fired: Class op <*>
-Rule fired: Class op $p1Applicative
-Rule fired: Class op <$
-Rule fired: Class op <*>
+Rule fired: Class op liftA2
+Rule fired: Class op liftA2
 Rule fired: SPEC $fApplicativeShape @ 'Z
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
@@ -71,7 +87,15 @@ Rule fired: Class op <*>
 Rule fired: Class op $p1Applicative
 Rule fired: Class op fmap
 Rule fired: Class op <*>
-Rule fired: SPEC/T8848 liftA2 @ (Shape ('S 'Z)) _ _ _
+Rule fired: SPEC $fApplicativeShape @ 'Z
+Rule fired: Class op $p1Applicative
+Rule fired: Class op <$
+Rule fired: Class op <*>
+Rule fired: Class op $p1Applicative
+Rule fired: Class op <$
+Rule fired: Class op <*>
 Rule fired: SPEC $fFunctorShape @ 'Z
 Rule fired: Class op fmap
 Rule fired: Class op fmap
+Rule fired: SPEC $c<*> @ ('S 'Z)
+Rule fired: SPEC $c<*> @ ('S 'Z)

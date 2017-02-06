@@ -88,12 +88,13 @@ instance (Foldable f, Foldable g) => Foldable (Product f g) where
 
 -- | @since 4.9.0.0
 instance (Traversable f, Traversable g) => Traversable (Product f g) where
-    traverse f (Pair x y) = Pair <$> traverse f x <*> traverse f y
+    traverse f (Pair x y) = liftA2 Pair (traverse f x) (traverse f y)
 
 -- | @since 4.9.0.0
 instance (Applicative f, Applicative g) => Applicative (Product f g) where
     pure x = Pair (pure x) (pure x)
     Pair f g <*> Pair x y = Pair (f <*> x) (g <*> y)
+    liftA2 f (Pair a b) (Pair x y) = Pair (liftA2 f a x) (liftA2 f b y)
 
 -- | @since 4.9.0.0
 instance (Alternative f, Alternative g) => Alternative (Product f g) where

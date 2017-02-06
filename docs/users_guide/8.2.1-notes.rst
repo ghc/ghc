@@ -298,6 +298,12 @@ See ``changelog.md`` in the ``base`` package for full release notes.
   operations in ``GHC.TypeLits`` are a thin compatibility layer on top.
   Note: the ``KnownNat`` evidence is changed from an ``Integer`` to a ``Natural``.
 
+- ``liftA2`` is now a method of the ``Applicative`` class. ``Traversable``
+  deriving has been modified to use ``liftA2`` for the first two elements
+  traversed in each constructor. ``liftA2`` is not yet in the ``Prelude``,
+  and must currently be imported from ``Control.Applicative``. It is likely
+  to be added to the ``Prelude`` in the future.
+
 binary
 ~~~~~~
 
