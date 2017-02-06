@@ -23,9 +23,6 @@ gmpLibrary = gmpBuildPath -/- ".libs/libgmp.a"
 gmpMakefile :: FilePath
 gmpMakefile = gmpBuildPath -/- "Makefile"
 
-gmpPatches :: [FilePath]
-gmpPatches = (gmpBase -/-) <$> ["gmpsrc.patch", "tarball/gmp-5.0.4.patch"]
-
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
                                 , builderEnvironment "AR" Ar
@@ -77,21 +74,21 @@ gmpRules = do
         -- That's because the doc/ directory contents are under the GFDL,
         -- which causes problems for Debian.
         tarball <- unifyPath . getSingleton "Exactly one GMP tarball is expected"
-               <$> getDirectoryFiles "" [gmpBase -/- "tarball/gmp*.tar.bz2"]
+               <$> getDirectoryFiles "" [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
 
         withTempDir $ \dir -> do
             let tmp = unifyPath dir
             need [tarball]
             build $ Target gmpContext Tar [tarball] [tmp]
 
-            forM_ gmpPatches $ \src -> do
-                let patch = takeFileName src
-                copyFile src $ tmp -/- patch
-                applyPatch tmp patch
+            let patch     = gmpBase -/- "gmpsrc.patch"
+                patchName = takeFileName patch
+            copyFile patch $ tmp -/- patchName
+            applyPatch tmp patchName
 
             let name    = dropExtension . dropExtension $ takeFileName tarball
                 unpack  = fromMaybe . error $ "gmpRules: expected suffix "
-                    ++ "-nodoc-patched (found: " ++ name ++ ")."
-                libName = unpack $ stripSuffix "-nodoc-patched" name
+                    ++ "-nodoc (found: " ++ name ++ ")."
+                libName = unpack $ stripSuffix "-nodoc" name
 
             moveDirectory (tmp -/- libName) gmpBuildPath
