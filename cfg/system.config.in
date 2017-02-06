@@ -30,6 +30,7 @@ ar-supports-at-file = @ArSupportsAtFile@
 cc-clang-backend    = @CC_CLANG_BACKEND@
 cc-llvm-backend     = @CC_LLVM_BACKEND@
 gcc-is-clang        = @GccIsClang@
+gcc-lt-44           = @GccLT44@
 gcc-lt-46           = @GccLT46@
 hs-cpp-args         = @HaskellCPPArgs@
 
