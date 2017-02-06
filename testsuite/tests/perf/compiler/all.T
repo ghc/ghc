@@ -917,10 +917,11 @@ test('T12234',
        compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-unknown-mingw32'), 77949232, 5),
           # initial:      77949232
-           (wordsize(64), 80882208, 5),
+           (wordsize(64), 74374440, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
           # 2017-02-01:   80882208  (Use superclass instances when solving)
+          # 2017-02-05:   74374440  (Probably OccAnal fixes)
           ]),
      ],
      compile,
@@ -929,9 +930,10 @@ test('T12234',
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 95269000, 5),
+          [(wordsize(64), 88806416, 5),
           # 2017-01-05   90595208 initial
           # 2017-01-19   95269000 Allow top-level string literals in Core
+          # 2017-02-05   88806416 Probably OccAnal fixes
           ]),
      ],
      compile,
