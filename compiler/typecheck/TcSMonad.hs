@@ -1075,8 +1075,8 @@ it into [W] and [D], and put the [D] in the work list for further
 work?
 
 * CDictCan (C tys) or CFunEqCan (F tys ~ fsk):
-  Yes if the inert set couuld rerite tys to make the class constraint,
-  or type family, fire.  That is, yes if the inert_eqs interects
+  Yes if the inert set could rewrite tys to make the class constraint,
+  or type family, fire.  That is, yes if the inert_eqs intersects
   with the free vars of tys.  For this test we use rewriteableTyVars
   which ignores casts and coercions in tys, because rewriting the
   casts or coercions won't make the thing fire more often.
@@ -1087,7 +1087,7 @@ work?
       Then we want to put [D] a ~ ty in the worklist, so we'll
       get [D] ty ~ ty2 with consequent good things
 
-    - Inert set constains [D] b ~ a, where b is in ty.
+    - Inert set contains [D] b ~ a, where b is in ty.
       We can't just add [WD] a ~ ty[b] to the inert set, because
       that breaks the inert-set invariants.  If we tried to
       canonicalise another [D] constraint mentioning 'a', we'd
