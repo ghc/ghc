@@ -1755,7 +1755,7 @@ getIfModule = do { env <- getLclEnv; return (if_mod env) }
 --------------------
 failIfM :: MsgDoc -> IfL a
 -- The Iface monad doesn't have a place to accumulate errors, so we
--- just fall over fast if one happens; it "shouldnt happen".
+-- just fall over fast if one happens; it "shouldn't happen".
 -- We use IfL here so that we can get context info out of the local env
 failIfM msg
   = do  { env <- getLclEnv

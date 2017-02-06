@@ -112,7 +112,7 @@ module GHC.Integer.GMP.Internals
     , orBigNat
     , bitBigNat
 
-      -- ** 'BigNat' comparision predicates
+      -- ** 'BigNat' comparison predicates
     , isZeroBigNat
     , isNullBigNat#
 

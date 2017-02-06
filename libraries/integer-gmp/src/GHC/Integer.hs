@@ -49,7 +49,7 @@ module GHC.Integer (
     eqInteger,  neqInteger,  leInteger,  gtInteger,  ltInteger,  geInteger,
     compareInteger,
 
-    -- ** 'Int#'-boolean valued versions of comparision predicates
+    -- ** 'Int#'-boolean valued versions of comparison predicates
     --
     -- | These operations return @0#@ and @1#@ instead of 'False' and
     -- 'True' respectively.  See

@@ -1219,7 +1219,7 @@ topNormaliseType_maybe env ty
   where
     stepper = unwrapNewTypeStepper `composeSteppers` tyFamStepper
 
-    tyFamStepper rec_nts tc tys  -- Try to step a type/data familiy
+    tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = let (args_co, ntys) = normaliseTcArgs env Representational tc tys in
           -- NB: It's OK to use normaliseTcArgs here instead of
           -- normalise_tc_args (which takes the LiftingContext described
@@ -1276,7 +1276,7 @@ pmTopNormaliseType_maybe env typ
       = NS_Done
 
     tyFamStepper :: NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
-    tyFamStepper rec_nts tc tys  -- Try to step a type/data familiy
+    tyFamStepper rec_nts tc tys  -- Try to step a type/data family
       = let (_args_co, ntys) = normaliseTcArgs env Representational tc tys in
           -- NB: It's OK to use normaliseTcArgs here instead of
           -- normalise_tc_args (which takes the LiftingContext described

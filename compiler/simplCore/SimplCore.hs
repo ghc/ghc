@@ -331,7 +331,7 @@ getCoreToDo dflags
             CoreLiberateCase,
             simpl_phase 0 ["post-liberate-case"] max_iter
             ]),         -- Run the simplifier after LiberateCase to vastly
-                        -- reduce the possiblility of shadowing
+                        -- reduce the possibility of shadowing
                         -- Reason: see Note [Shadowing] in SpecConstr.hs
 
         runWhen spec_constr CoreDoSpecConstr,

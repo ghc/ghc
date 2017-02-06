@@ -953,7 +953,7 @@ pmPatType (PmGrd  { pm_grd_pv  = pv })
 -- fresh variables of the appropriate type for arguments)
 mkOneConFull :: Id -> ConLike -> DsM (ValAbs, ComplexEq, Bag EvVar)
 --  *  x :: T tys, where T is an algebraic data type
---     NB: in the case of a data familiy, T is the *representation* TyCon
+--     NB: in the case of a data family, T is the *representation* TyCon
 --     e.g.   data instance T (a,b) = T1 a b
 --       leads to
 --            data TPair a b = T1 a b  -- The "representation" type
