@@ -1574,7 +1574,7 @@ occAnalUnfolding env rec_flag id
         | not (isStableSource src)
         -> Nothing
         | otherwise
-        -> Just $ zapDetails usage
+        -> Just $ markAllMany usage
         where
           (bndrs, body) = collectBinders rhs
           (usage, _, _) = occAnalRhs env rec_flag id bndrs body
@@ -1608,15 +1608,15 @@ occAnalRules env mb_expected_join_arity rec_flag id
         (rhs_uds, _, _) = occAnalRhs env rec_flag id rhs_bndrs rhs_body
                             -- Note [Rules are extra RHSs]
                             -- Note [Rule dependency info]
-        final_rhs_uds = adjust_tail_info bndrs $ markAllMany $
+        final_rhs_uds = adjust_tail_info args $ markAllMany $
                           (rhs_uds `delDetailsList` bndrs)
     occ_anal_rule _
       = (emptyDetails, emptyDetails)
 
-    adjust_tail_info bndrs uds -- see Note [Rules and join points]
+    adjust_tail_info args uds -- see Note [Rules and join points]
       = case mb_expected_join_arity of
-          Just ar | bndrs `lengthIs` ar -> uds
-          _                             -> markAllNonTailCalled uds
+          Just ar | args `lengthIs` ar -> uds
+          _                            -> markAllNonTailCalled uds
 {-
 Note [Cascading inlines]
 ~~~~~~~~~~~~~~~~~~~~~~~~
