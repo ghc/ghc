@@ -1,5 +1,7 @@
 # The following enables container-based travis instances
+dist: trusty
 sudo: false
+language: generic
 
 git:
   submodules: false
@@ -17,15 +19,15 @@ addons:
     #- llvm-toolchain-precise-3.7
     - ubuntu-toolchain-r-test
     packages:
-    - cabal-install-1.18
-    - ghc-7.10.3
-    - alex-3.1.3
-    - happy-1.19.4
+    - cabal-install-1.24
+    - ghc-8.0.2
+    - alex-3.1.7
+    - happy-1.19.5
     - python3
     #- llvm-3.7
 
 before_install:
- - export PATH=/opt/ghc/7.10.3/bin:/opt/cabal/1.18/bin:/opt/alex/3.1.3/bin:/opt/happy/1.19.4/bin:/usr/lib/llvm-3.7/bin:$PATH
+ - export PATH=/opt/ghc/8.0.2/bin:/opt/cabal/1.24/bin:/opt/alex/3.1.7/bin:/opt/happy/1.19.5/bin:/usr/lib/llvm-3.7/bin:$PATH
 
 # Be explicit about which protocol to use, such that we don't have to repeat the rewrite command for each.
  - git config remote.origin.url git://github.com/${TRAVIS_REPO_SLUG}.git
@@ -42,6 +44,12 @@ before_install:
  - git submodule --quiet update --recursive # Now we can be quiet again.
 
 script:
+ # try "quickest" flavor
+ - echo 'SRC_HC_OPTS        = -O0 -H64m' >> mk/validate.mk
+ - echo 'GhcStage1HcOpts    = -O'        >> mk/validate.mk
+ - echo 'GhcStage2HcOpts    = -O0'       >> mk/validate.mk
+ # split sections cost time
+ - echo 'SplitSections      = NO'        >> mk/validate.mk
  # do  not build docs
  - echo 'HADDOCK_DOCS       = NO' >> mk/validate.mk
  - echo 'BUILD_SPHINX_HTML  = NO' >> mk/validate.mk
