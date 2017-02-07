@@ -10615,7 +10615,7 @@ Using Template Haskell
 ----------------------
 
 -  The data types and monadic constructor functions for Template Haskell
-   are in the library ``Language.Haskell.THSyntax``.
+   are in the library ``Language.Haskell.TH.Syntax``.
 
 -  You can only run a function at compile time if it is imported from
    another module. That is, you can't define a function in a module, and
