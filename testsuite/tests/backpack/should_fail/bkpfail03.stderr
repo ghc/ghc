@@ -12,5 +12,6 @@
     [2 of 2] Compiling M2[sig]          ( q/M2.hsig, nothing )
 
 bkpfail03.bkp:3:9: error:
-    The hsig file (re)exports ‘M1.M’
-    but the implementing module exports a different identifier ‘M2.M’
+    • The hsig file (re)exports ‘M1.M’
+      but the implementing module exports a different identifier ‘M2.M’
+    • while checking that m2:M2 implements signature M2 in q[M2=m2:M2]

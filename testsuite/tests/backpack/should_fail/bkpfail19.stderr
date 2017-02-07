@@ -7,5 +7,6 @@
     [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail19.out/p/p-CfyUIAu1JTRCDuXEyGszXN/ShouldFail.o )
 
 <no location info>: error:
-    The hsig file (re)exports ‘Data.STRef.Lazy.newSTRef’
-    but the implementing module exports a different identifier ‘GHC.STRef.newSTRef’
+    • The hsig file (re)exports ‘Data.STRef.Lazy.newSTRef’
+      but the implementing module exports a different identifier ‘GHC.STRef.newSTRef’
+    • while checking that Data.STRef implements signature ShouldFail in p[ShouldFail=Data.STRef]

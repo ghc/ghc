@@ -29,7 +29,7 @@ module Outputable (
         semi, comma, colon, dcolon, space, equals, dot, vbar,
         arrow, larrow, darrow, arrowt, larrowt, arrowtt, larrowtt,
         lparen, rparen, lbrack, rbrack, lbrace, rbrace, underscore,
-        blankLine, forAllLit, kindStar,
+        blankLine, forAllLit, kindStar, bullet,
         (<>), (<+>), hcat, hsep,
         ($$), ($+$), vcat,
         sep, cat,
@@ -635,9 +635,18 @@ forAllLit = unicodeSyntax (char '∀') (text "forall")
 kindStar :: SDoc
 kindStar = unicodeSyntax (char '★') (char '*')
 
+bullet :: SDoc
+bullet = unicode (char '•') (char '*')
+
 unicodeSyntax :: SDoc -> SDoc -> SDoc
 unicodeSyntax unicode plain = sdocWithDynFlags $ \dflags ->
     if useUnicode dflags && useUnicodeSyntax dflags
+    then unicode
+    else plain
+
+unicode :: SDoc -> SDoc -> SDoc
+unicode unicode plain = sdocWithDynFlags $ \dflags ->
+    if useUnicode dflags
     then unicode
     else plain
 

@@ -4,4 +4,7 @@
   [1 of 1] Compiling A[sig]           ( q/A.hsig, nothing )
 
 bkpfail33.bkp:5:18: error:
-    Not in scope: type constructor or class ‘T’
+    • Not in scope: type constructor or class ‘T’
+    • while merging the signatures from:
+        • p[A=<A>]:A
+        • ...and the local signature for A

@@ -316,10 +316,7 @@ checkUnitId uid = do
             -- (because we FORCE things to be merged in), so don't check them
             when (not (isHoleModule mod)) $ do
                 checkUnitId (moduleUnitId mod)
-                _ <- addErrCtxt (text "while checking that" <+> ppr mod
-                        <+> text "implements signature" <+> ppr mod_name <+> text "in"
-                        <+> ppr uid) $
-                    mod `checkImplements` IndefModule indef mod_name
+                _ <- mod `checkImplements` IndefModule indef mod_name
                 return ()
       _ -> return () -- if it's hashed, must be well-typed
 
@@ -472,6 +469,15 @@ inheritedSigPvpWarning =
 -- logically "implicit" entities are defined indirectly in an interface
 -- file.  #13151 gives a proposal to make these *truly* implicit.
 
+merge_msg :: ModuleName -> [IndefModule] -> SDoc
+merge_msg mod_name [] =
+    text "while checking the local signature" <+> ppr mod_name <+>
+    text "for consistency"
+merge_msg mod_name reqs =
+  hang (text "while merging the signatures from" <> colon)
+   2 (vcat [ bullet <+> ppr req | req <- reqs ] $$
+      bullet <+> text "...and the local signature for" <+> ppr mod_name)
+
 -- | Given a local 'ModIface', merge all inherited requirements
 -- from 'requirementMerges' into this signature, producing
 -- a final 'TcGblEnv' that matches the local signature and
@@ -487,10 +493,13 @@ mergeSignatures hsmod lcl_iface0 = do
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
         mb_exports = hsmodExports (unLoc (hpm_module hsmod))
+        mod_name = moduleName (tcg_mod tcg_env)
 
     -- STEP 1: Figure out all of the external signature interfaces
     -- we are going to merge in.
-    let reqs = requirementMerges dflags (moduleName (tcg_mod tcg_env))
+    let reqs = requirementMerges dflags mod_name
+
+    addErrCtxt (merge_msg mod_name reqs) $ do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- forM reqs $ \(IndefModule iuid mod_name) ->
@@ -746,11 +755,18 @@ tcRnInstantiateSignature hsc_env this_mod real_loc =
 exportOccs :: [AvailInfo] -> [OccName]
 exportOccs = concatMap (map occName . availNames)
 
+impl_msg :: Module -> IndefModule -> SDoc
+impl_msg impl_mod (IndefModule req_uid req_mod_name) =
+  text "while checking that" <+> ppr impl_mod <+>
+  text "implements signature" <+> ppr req_mod_name <+>
+  text "in" <+> ppr req_uid
+
 -- | Check if module implements a signature.  (The signature is
 -- always un-hashed, which is why its components are specified
 -- explicitly.)
 checkImplements :: Module -> IndefModule -> TcRn TcGblEnv
-checkImplements impl_mod (IndefModule uid mod_name) = do
+checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
+  addErrCtxt (impl_msg impl_mod req_mod) $ do
     let insts = indefUnitIdInsts uid
 
     -- STEP 1: Load the implementing interface, and make a RdrEnv

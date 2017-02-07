@@ -364,7 +364,6 @@ formatErrDoc dflags (ErrDoc important context supplementary)
     msgs = filter (not . null) $ map (filter (not . Outputable.isEmpty dflags))
         [important, context, supplementary]
     starred = (bullet<+>) . vcat
-    bullet = text $ if DynFlags.useUnicode dflags then "•" else "*"
 
 pprErrMsgBagWithLoc :: Bag ErrMsg -> [SDoc]
 pprErrMsgBagWithLoc bag = [ pprLocErrMsg item | item <- sortMsgBag Nothing bag ]

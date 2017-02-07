@@ -10,7 +10,8 @@
     [1 of 1] Compiling A[sig]           ( p/A.hsig, bkpfail37.out/p/p-HVmFlcYSefiK5n1aDP1v7x/A.o )
 
 bkpfail37.bkp:9:9: error:
-    Identifier ‘op’ has conflicting fixities in the module
-    and its hsig file
-    Main module: infixr 4
-    Hsig file: infixr 6
+    • Identifier ‘op’ has conflicting fixities in the module
+      and its hsig file
+      Main module: infixr 4
+      Hsig file: infixr 6
+    • while checking that q:A implements signature A in p[A=q:A]
