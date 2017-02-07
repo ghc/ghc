@@ -2056,7 +2056,7 @@ But nowadays when inferring the type of a function with no type signature,
 even if there are errors inside, we still generalise its signature and
 carry on. For example
    f x = x:x
-Here we will infer somethiing like
+Here we will infer something like
    f :: forall a. a -> [a]
 with a deferred error of (a ~ [a]).  So in the deferred unsolved constraint
 'a' is now a skolem, but not one bound by the programmer in the context!

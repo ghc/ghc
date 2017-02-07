@@ -252,7 +252,7 @@ non-regular, such as
 data Nesty a = Z a | S (Nesty a) (Nest (a, a))
 
 the function argument is no longer (entirely) static, so the static argument
-transformation will do nothiing for us.
+transformation will do nothing for us.
 
 Applying the default definition of `<$` will produce a tree full of thunks that
 look like ((\_ -> x) x0), which represents unnecessary thunk allocation and

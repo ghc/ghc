@@ -11,7 +11,7 @@ data Block = Block
 block :: Q Exp
 block =
     [| Block {
-         -- Using record syntax is neccesary to trigger the bug.
+         -- Using record syntax is necessary to trigger the bug.
          blockSelector = ()
        }
     |]
