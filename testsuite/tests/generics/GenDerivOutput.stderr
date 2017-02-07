@@ -46,6 +46,9 @@ Derived class instances:
     GHC.Base.fmap f GenDerivOutput.Nil = GenDerivOutput.Nil
     GHC.Base.fmap f (GenDerivOutput.Cons a1 a2)
       = GenDerivOutput.Cons (f a1) (GHC.Base.fmap f a2)
+    (GHC.Base.<$) z GenDerivOutput.Nil = GenDerivOutput.Nil
+    (GHC.Base.<$) z (GenDerivOutput.Cons a1 a2)
+      = GenDerivOutput.Cons ((\ b1 -> z) a1) ((GHC.Base.<$) z a2)
   
   instance GHC.Generics.Generic (GenDerivOutput.Rose a) where
     GHC.Generics.from x
@@ -222,11 +225,5 @@ Derived type family instances:
                                                                                          (GenDerivOutput.List
                                                                                           GHC.Generics.:.: GHC.Generics.Rec1
                                                                                                              GenDerivOutput.Rose)))
-
-
-
-==================== Filling in method body ====================
-GHC.Base.Functor [GenDerivOutput.List]
-  GHC.Base.<$ = GHC.Base.$dm<$ @GenDerivOutput.List
 
 

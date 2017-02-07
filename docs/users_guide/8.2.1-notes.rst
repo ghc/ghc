@@ -138,6 +138,11 @@ Compiler
     -- uses of `Monoid MyMonoid` here are improved
     bar :: MonadWriter MyMonoid m => ...
 
+- GHC now derives the definition of ``<$`` when using ``DeriveFunctor``
+  rather than using the default definition. This prevents unnecessary
+  allocation and a potential space leak when deriving ``Functor`` for
+  a recursive type.
+
 GHCi
 ~~~~
 

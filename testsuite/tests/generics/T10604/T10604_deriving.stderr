@@ -24,6 +24,7 @@ Derived class instances:
   
   instance GHC.Base.Functor (T10604_deriving.Proxy *) where
     GHC.Base.fmap f T10604_deriving.Proxy = T10604_deriving.Proxy
+    (GHC.Base.<$) z T10604_deriving.Proxy = T10604_deriving.Proxy
   
   instance forall k (a :: k).
            GHC.Generics.Generic (T10604_deriving.Proxy k a) where
@@ -539,11 +540,5 @@ Derived type family instances:
                                                                    'GHC.Generics.DecidedLazy)
                                                                 (GHC.Generics.Rec0
                                                                    * GHC.Types.Int))))
-
-
-
-==================== Filling in method body ====================
-GHC.Base.Functor [T10604_deriving.Proxy *]
-  GHC.Base.<$ = GHC.Base.$dm<$ @T10604_deriving.Proxy *
 
 

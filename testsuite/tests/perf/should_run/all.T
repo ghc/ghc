@@ -490,3 +490,16 @@ test('T12990',
      only_ways(['normal'])],
     compile_and_run,
     ['-O2'])
+
+test('T13218',
+    [stats_num_field('bytes allocated',
+                     [ (wordsize(64), 82040056, 5) ]),
+                     # 8.1 with default <$  163644216
+                     # 8.1 with derived <$   82040056
+     stats_num_field('max_bytes_used',
+                     [ (wordsize(64), 359128, 10) ]),
+                     # 8.1 with default <$  64408248
+                     # 8.1 with derived <$    359128
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])

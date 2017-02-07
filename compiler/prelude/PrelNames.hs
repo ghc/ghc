@@ -256,9 +256,12 @@ basicKnownKeyNames
         -- Applicative stuff
         pureAName, apAName, thenAName,
 
+        -- Functor stuff
+        fmapName,
+
         -- Monad stuff
         thenIOName, bindIOName, returnIOName, failIOName, bindMName, thenMName,
-        returnMName, fmapName, joinMName,
+        returnMName, joinMName,
 
         -- MonadFail
         monadFailClassName, failMName, failMName_preMFP,
@@ -809,9 +812,10 @@ uFloatHash_RDR  = varQual_RDR gHC_GENERICS (fsLit "uFloat#")
 uIntHash_RDR    = varQual_RDR gHC_GENERICS (fsLit "uInt#")
 uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
 
-fmap_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR, foldMap_RDR,
-    traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
+fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
+    foldMap_RDR, traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
+replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
 pure_RDR                = nameRdrName pureAName
 ap_RDR                  = nameRdrName apAName
 liftA2_RDR              = varQual_RDR gHC_BASE (fsLit "liftA2")

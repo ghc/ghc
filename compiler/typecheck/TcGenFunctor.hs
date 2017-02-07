@@ -125,18 +125,20 @@ It is better to produce too many lambdas than to eta expand, see ticket #7436.
 
 gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Functor_binds loc tycon
-  = (unitBag fmap_bind, emptyBag)
+  = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
     data_cons = tyConDataCons tycon
-    fun_name = L loc fmap_RDR
-    fmap_bind = mkRdrFunBind fun_name eqns
-    fun_match_ctxt = FunRhs fun_name Prefix
+    fmap_name = L loc fmap_RDR
+    fmap_bind = mkRdrFunBind fmap_name fmap_eqns
+    fmap_match_ctxt = FunRhs fmap_name Prefix
 
-    fmap_eqn con = evalState (match_for_con fun_match_ctxt [f_Pat] con =<< parts) bs_RDRs
+    fmap_eqn con = flip evalState bs_RDRs $
+                     match_for_con fmap_match_ctxt [f_Pat] con =<< parts
       where
         parts = sequence $ foldDataConArgs ft_fmap con
 
-    eqns | null data_cons = [mkSimpleMatch fun_match_ctxt
+    fmap_eqns
+         | null data_cons = [mkSimpleMatch fmap_match_ctxt
                                            [nlWildPat, nlWildPat]
                                            (error_Expr "Void fmap")]
          | otherwise      = map fmap_eqn data_cons
@@ -162,12 +164,149 @@ gen_Functor_binds loc tycon
                  , ft_bad_app = panic "in other argument"
                  , ft_co_var = panic "contravariant" }
 
+    -- See Note [deriving <$]
+    replace_name = L loc replace_RDR
+    replace_bind = mkRdrFunBind replace_name replace_eqns
+    replace_match_ctxt = FunRhs replace_name Prefix
+
+    replace_eqn con = flip evalState bs_RDRs $
+        match_for_con replace_match_ctxt [z_Pat] con =<< parts
+      where
+        parts = traverse (fmap replace) $ foldDataConArgs ft_replace con
+
+    replace_eqns
+         | null data_cons = [mkSimpleMatch replace_match_ctxt
+                                           [nlWildPat, nlWildPat]
+                                           (error_Expr "Void <$")]
+         | otherwise      = map replace_eqn data_cons
+
+    ft_replace :: FFoldType (State [RdrName] Replacer)
+    ft_replace = FT { ft_triv = fmap Nested $ mkSimpleLam $ \x -> return x
+                   -- (p <$) = \x -> x
+                 , ft_var  = fmap Immediate $ mkSimpleLam $ \_ -> return z_Expr
+                   -- (p <$) = const p
+                 , ft_fun  = \g h -> do
+                     gg <- replace <$> g
+                     hh <- replace <$> h
+                     fmap Nested $ mkSimpleLam2 $ \x b -> return $
+                       nlHsApp hh (nlHsApp x (nlHsApp gg b))
+                   -- (<$) p = \x b -> h (x (g b))
+                 , ft_tup = \t gs -> do
+                     gg <- traverse (fmap replace) gs
+                     fmap Nested . mkSimpleLam $
+                          mkSimpleTupleCase (match_for_con CaseAlt) t gg
+                   -- (p <$) = \x -> case x of (a1,a2,..) -> (g1 a1,g2 a2,..)
+                 , ft_ty_app = \_ gm -> do
+                       g <- gm
+                       case g of
+                         Nested g' -> pure . Nested $
+                                          nlHsApp fmap_Expr $ g'
+                         Immediate _ -> pure . Nested $
+                                          nlHsApp replace_Expr z_Expr
+                   -- (p <$) = fmap (p <$)
+                 , ft_forall = \_ g -> g
+                 , ft_bad_app = panic "in other argument"
+                 , ft_co_var = panic "contravariant" }
+
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
     match_for_con :: HsMatchContext RdrName
                   -> [LPat RdrName] -> DataCon -> [LHsExpr RdrName]
                   -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
     match_for_con ctxt = mkSimpleConMatch ctxt $
         \con_name xs -> return $ nlHsApps con_name xs  -- Con x1 x2 ..
+
+-- See Note [deriving <$]
+data Replacer = Immediate {replace :: LHsExpr RdrName}
+              | Nested {replace :: LHsExpr RdrName}
+
+{- Note [deriving <$]
+   ~~~~~~~~~~~~~~~~~~
+
+We derive the definition of <$. Allowing this to take the default definition
+can lead to memory leaks: mapping over a structure with a constant function can
+fill the result structure with trivial thunks that retain the values from the
+original structure. The simplifier seems to handle this all right for simple
+types, but not for recursive ones. Consider
+
+data Tree a = Bin !(Tree a) a !(Tree a) | Tip deriving Functor
+
+-- fmap _ Tip = Tip
+-- fmap f (Bin l v r) = Bin (fmap f l) (f v) (fmap f r)
+
+Using the default definition of <$, we get (<$) x = fmap (\_ -> x) and that
+simplifies no further. Why is that? `fmap` is defined recursively, so GHC
+cannot inline it. The static argument transformation would turn the definition
+into a non-recursive one
+
+-- fmap f = go where
+--   go Tip = Tip
+--   go (Bin l v r) = Bin (go l) (f v) (go r)
+
+which GHC could inline, producing an efficient definion of `<$`. But there are
+several problems. First, GHC does not perform the static argument transformation
+by default, even with -O2. Second, even when it does perform the static argument
+transformation, it does so only when there are at least two static arguments,
+which is not the case for fmap. Finally, when the type in question is
+non-regular, such as
+
+data Nesty a = Z a | S (Nesty a) (Nest (a, a))
+
+the function argument is no longer (entirely) static, so the static argument
+transformation will do nothiing for us.
+
+Applying the default definition of `<$` will produce a tree full of thunks that
+look like ((\_ -> x) x0), which represents unnecessary thunk allocation and
+also retention of the previous value, potentially leaking memory. Instead, we
+derive <$ separately. Two aspects are different from fmap: the case of the
+sought type variable (ft_var) and the case of a type application (ft_ty_app).
+The interesting one is ft_ty_app. We have to distinguish two cases: the
+"immediate" case where the type argument *is* the sought type variable, and
+the "nested" case where the type argument *contains* the sought type variable.
+
+The immediate case:
+
+Suppose we have
+
+data Imm a = Imm (F ... a)
+
+Then we want to define
+
+x <$ Imm q = Imm (x <$ q)
+
+The nested case:
+
+Suppose we have
+
+data Nes a = Nes (F ... (G a))
+
+Then we want to define
+
+x <$ Nes q = Nes (fmap (x <$) q)
+
+We use the Replacer type to tag whether the expression derived for applying
+<$ to the last type variable was the ft_var case (immediate) or one of the
+others (letting ft_forall pass through as usual).
+
+We could, but do not, give tuples special treatment to improve efficiency
+in some cases. Suppose we have
+
+data Nest a = Z a | S (Nest (a,a))
+
+The optimal definition would be
+
+x <$ Z _ = Z x
+x <$ S t = S ((x, x) <$ t)
+
+which produces a result with maximal internal sharing. The reason we do not
+attempt to treat this case specially is that we have no way to give
+user-provided tuple-like types similar treatment. If the user changed the
+definition to
+
+data Pair a = Pair a a
+data Nest a = Z a | S (Nest (Pair a))
+
+they would experience a surprising degradation in performance. -}
+
 
 {-
 Utility functions related to Functor deriving.
@@ -629,11 +768,12 @@ gen_Traversable_binds loc tycon
 
 -----------------------------------------------------------------------
 
-f_Expr, z_Expr, fmap_Expr, mempty_Expr, foldMap_Expr,
+f_Expr, z_Expr, fmap_Expr, replace_Expr, mempty_Expr, foldMap_Expr,
     traverse_Expr :: LHsExpr RdrName
 f_Expr        = nlHsVar f_RDR
 z_Expr        = nlHsVar z_RDR
 fmap_Expr     = nlHsVar fmap_RDR
+replace_Expr  = nlHsVar replace_RDR
 mempty_Expr   = nlHsVar mempty_RDR
 foldMap_Expr  = nlHsVar foldMap_RDR
 traverse_Expr = nlHsVar traverse_RDR
