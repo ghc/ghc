@@ -1428,7 +1428,7 @@ repBinds b@(HsIPBinds _) = notHandled "Implicit parameters" (ppr b)
 
 repBinds (HsValBinds decs)
  = do   { let { bndrs = hsSigTvBinders decs ++ collectHsValBinders decs }
-                -- No need to worrry about detailed scopes within
+                -- No need to worry about detailed scopes within
                 -- the binding group, because we are talking Names
                 -- here, so we can safely treat it as a mutually
                 -- recursive group

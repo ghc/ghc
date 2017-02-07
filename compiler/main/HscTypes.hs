@@ -1591,7 +1591,7 @@ extendInteractiveContext ictxt new_tythings new_cls_insts new_fam_insts defaults
           }
   where
 
-    -- Discard old instances that have been fully overrridden
+    -- Discard old instances that have been fully overridden
     -- See Note [Override identical instances in GHCi]
     (cls_insts, fam_insts) = ic_instances ictxt
     old_cls_insts = filterOut (\i -> any (identicalClsInstHead i) new_cls_insts) cls_insts

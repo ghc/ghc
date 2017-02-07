@@ -451,7 +451,7 @@ cpeBind top_lvl env (Rec pairs)
   where
     (bndrs, rhss) = unzip pairs
 
-        -- Flatten all the floats, and the currrent
+        -- Flatten all the floats, and the current
         -- group into a single giant Rec
     add_float (FloatLet (NonRec b r)) prs2 = (b,r) : prs2
     add_float (FloatLet (Rec prs1))   prs2 = prs1 ++ prs2

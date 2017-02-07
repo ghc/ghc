@@ -615,7 +615,7 @@ we keep?  More subtle than you might think!
     IRReplace, to avoid unnecessary munging of the inert set.
 
 Doing the depth-check for implicit parameters, rather than making the work item
-always overrride, is important.  Consider
+always override, is important.  Consider
 
     data T a where { T1 :: (?x::Int) => T Int; T2 :: T a }
 

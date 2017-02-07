@@ -1472,7 +1472,7 @@ chooses a loop breaker. Suppose in iteration 1 it choose g as the loop
 breaker. That means it is free to inline f.
 
 Suppose that GHC decides to inline f in the branches of the case, but
-(for some reason; eg it is not satureated) in the rhs of g. So we get
+(for some reason; eg it is not saturated) in the rhs of g. So we get
 
     let rec { f = ...g...g...
             ; g = ...f...f... }
@@ -1900,7 +1900,7 @@ zapDetailsIf False uds = uds
 {-
 Note [Use one-shot information]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The occurrrence analyser propagates one-shot-lambda information in two
+The occurrence analyser propagates one-shot-lambda information in two
 situations:
 
   * Applications:  eg   build (\c n -> blah)

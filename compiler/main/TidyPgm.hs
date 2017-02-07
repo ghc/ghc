@@ -691,7 +691,7 @@ chooseExternalIds hsc_env mod omit_prags expose_all binds implicit_binds imp_id_
   init_occ_env = initTidyOccEnv avoids
 
 
-  search :: [(Id,Id)]    -- The work-list: (external id, referrring id)
+  search :: [(Id,Id)]    -- The work-list: (external id, referring id)
                          -- Make a tidy, external Name for the external id,
                          --   add it to the UnfoldEnv, and do the same for the
                          --   transitive closure of Ids it refers to

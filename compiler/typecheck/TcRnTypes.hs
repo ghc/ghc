@@ -857,7 +857,7 @@ type TcIdBinderStack = [TcIdBinder]
 data TcIdBinder
   = TcIdBndr
        TcId
-       TopLevelFlag    -- Tells whether the bindind is syntactically top-level
+       TopLevelFlag    -- Tells whether the binding is syntactically top-level
                        -- (The monomorphic Ids for a recursive group count
                        --  as not-top-level for this purpose.)
   | TcIdBndr_ExpType  -- Variant that allows the type to be specified as

@@ -98,7 +98,7 @@ mkDFunUnfolding bndrs con ops
   = DFunUnfolding { df_bndrs = bndrs
                   , df_con = con
                   , df_args = map occurAnalyseExpr ops }
-                  -- See Note [Occurrrence analysis of unfoldings]
+                  -- See Note [Occurrence analysis of unfoldings]
 
 mkWwInlineRule :: CoreExpr -> Arity -> Unfolding
 mkWwInlineRule expr arity
@@ -238,7 +238,7 @@ mkCoreUnfolding :: UnfoldingSource -> Bool -> CoreExpr
 -- Occurrence-analyses the expression before capturing it
 mkCoreUnfolding src top_lvl expr guidance
   = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
-                      -- See Note [Occurrrence analysis of unfoldings]
+                      -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
                     uf_is_top       = top_lvl,
                     uf_is_value     = exprIsHNF        expr,
@@ -257,7 +257,7 @@ mkUnfolding :: DynFlags -> UnfoldingSource
 -- Occurrence-analyses the expression before capturing it
 mkUnfolding dflags src is_top_lvl is_bottoming expr
   = CoreUnfolding { uf_tmpl         = occurAnalyseExpr expr,
-                      -- See Note [Occurrrence analysis of unfoldings]
+                      -- See Note [Occurrence analysis of unfoldings]
                     uf_src          = src,
                     uf_is_top       = is_top_lvl,
                     uf_is_value     = exprIsHNF        expr,
@@ -646,7 +646,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
         --
         -- IMPORATANT: *do* charge 1 for the alternative, else we
         -- find that giant case nests are treated as practically free
-        -- A good example is Foreign.C.Error.errrnoToIOError
+        -- A good example is Foreign.C.Error.errnoToIOError
 
     ------------
     -- Cost to allocate binding with given binder
