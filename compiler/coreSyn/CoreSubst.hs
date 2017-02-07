@@ -797,9 +797,505 @@ InlVanilla.  The WARN is just so I can see if it happens a lot.
 
 ************************************************************************
 *                                                                      *
-        The Very Simple Optimiser
+        The Simple Optimiser
 *                                                                      *
 ************************************************************************
+
+Note [The simple optimiser]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The simple optimiser is a lightweight, pure (non-monadic) function
+that rapidly does a lot of simple optimisations, including
+
+  - inlining things that occur just once,
+      or whose RHS turns out to be trivial
+  - beta reduction
+  - case of known constructor
+  - dead code elimination
+
+It does NOT do any call-site inlining; it only inlines a function if
+it can do so unconditionally, dropping the binding.  It thereby
+guarantees to leave no un-reduced beta-redexes.
+
+It is careful to follow the guidance of "Secrets of the GHC inliner",
+and in particular the pre-inline-unconditionally and
+post-inline-unconditionally story, to do effective beta reduction on
+functions called precisely once, without repeatedly optimising the same
+expression.  In fact, the simple optimiser is a good example of this
+little dance in action; the full Simplifier is a lot more complicated.
+
+-}
+
+simpleOptExpr :: CoreExpr -> CoreExpr
+-- See Note [The simple optimiser]
+-- Do simple optimisation on an expression
+-- The optimisation is very straightforward: just
+-- inline non-recursive bindings that are used only once,
+-- or where the RHS is trivial
+--
+-- We also inline bindings that bind a Eq# box: see
+-- See Note [Getting the map/coerce RULE to work].
+--
+-- Also we convert functions to join points where possible (as
+-- the occurrence analyser does most of the work anyway).
+--
+-- The result is NOT guaranteed occurrence-analysed, because
+-- in  (let x = y in ....) we substitute for x; so y's occ-info
+-- may change radically
+
+simpleOptExpr expr
+  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
+    simpleOptExprWith init_subst expr
+  where
+    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
+        -- It's potentially important to make a proper in-scope set
+        -- Consider  let x = ..y.. in \y. ...x...
+        -- Then we should remember to clone y before substituting
+        -- for x.  It's very unlikely to occur, because we probably
+        -- won't *be* substituting for x if it occurs inside a
+        -- lambda.
+        --
+        -- It's a bit painful to call exprFreeVars, because it makes
+        -- three passes instead of two (occ-anal, and go)
+
+simpleOptExprWith :: Subst -> InExpr -> OutExpr
+-- See Note [The simple optimiser]
+simpleOptExprWith subst expr
+  = simple_opt_expr init_env (occurAnalyseExpr expr)
+  where
+    init_env = SOE { soe_inl = emptyVarEnv, soe_subst = subst }
+
+----------------------
+simpleOptPgm :: DynFlags -> Module
+             -> CoreProgram -> [CoreRule] -> [CoreVect]
+             -> IO (CoreProgram, [CoreRule], [CoreVect])
+-- See Note [The simple optimiser]
+simpleOptPgm dflags this_mod binds rules vects
+  = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
+                       (pprCoreBindings occ_anald_binds $$ pprRules rules );
+
+       ; return (reverse binds', rules', vects') }
+  where
+    occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
+                                       rules vects emptyVarEnv binds
+
+    (final_env, binds') = foldl do_one (emptyEnv, []) occ_anald_binds
+    final_subst = soe_subst final_env
+
+    rules' = substRulesForImportedIds final_subst rules
+    vects' = substVects final_subst vects
+             -- We never unconditionally inline into rules,
+             -- hence pasing just a substitution
+
+    do_one (env, binds') bind
+      = case simple_opt_bind env bind of
+          (env', Nothing)    -> (env', binds')
+          (env', Just bind') -> (env', bind':binds')
+
+-- In these functions the substitution maps InVar -> OutExpr
+
+----------------------
+type SimpleClo = (SimpleOptEnv, InExpr)
+
+data SimpleOptEnv
+  = SOE { soe_inl   :: IdEnv SimpleClo
+             -- Deals with preInlineUnconditionally; things
+             -- that occur exactly once and are inlined
+             -- without having first been simplified
+
+        , soe_subst :: Subst
+             -- Deals with cloning; includes the InScopeSet
+        }
+
+instance Outputable SimpleOptEnv where
+  ppr (SOE { soe_inl = inl, soe_subst = subst })
+    = text "SOE {" <+> vcat [ text "soe_inl   =" <+> ppr inl
+                            , text "soe_subst =" <+> ppr subst ]
+                   <+> text "}"
+
+emptyEnv :: SimpleOptEnv
+emptyEnv = SOE { soe_inl = emptyVarEnv
+               , soe_subst = emptySubst }
+
+soeZapSubst :: SimpleOptEnv -> SimpleOptEnv
+soeZapSubst (SOE { soe_subst = subst })
+  = SOE { soe_inl = emptyVarEnv, soe_subst = zapSubstEnv subst }
+
+soeSetInScope :: SimpleOptEnv -> SimpleOptEnv -> SimpleOptEnv
+-- Take in-scope set from env1, and the rest from env2
+soeSetInScope (SOE { soe_subst = subst1 })
+              env2@(SOE { soe_subst = subst2 })
+  = env2 { soe_subst = setInScope subst2 (substInScope subst1) }
+
+---------------
+simple_opt_clo :: SimpleOptEnv -> SimpleClo -> OutExpr
+simple_opt_clo env (e_env, e)
+  = simple_opt_expr (soeSetInScope env e_env) e
+
+simple_opt_expr :: SimpleOptEnv -> InExpr -> OutExpr
+simple_opt_expr env expr
+  = go expr
+  where
+    subst        = soe_subst env
+    in_scope     = substInScope subst
+    in_scope_env = (in_scope, simpleUnfoldingFun)
+
+    go (Var v)
+       | Just clo <- lookupVarEnv (soe_inl env) v
+       = simple_opt_clo env clo
+       | otherwise
+       = lookupIdSubst (text "simpleOptExpr") (soe_subst env) v
+
+    go (App e1 e2)      = simple_app env e1 [(env,e2)]
+    go (Type ty)        = Type     (substTy subst ty)
+    go (Coercion co)    = Coercion (optCoercion (getTCvSubst subst) co)
+    go (Lit lit)        = Lit lit
+    go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
+    go (Cast e co)      | isReflCo co' = go e
+                        | otherwise    = Cast (go e) co'
+                        where
+                          co' = optCoercion (getTCvSubst subst) co
+
+    go (Let bind body) = case simple_opt_bind env bind of
+                           (env', Nothing)   -> simple_opt_expr env' body
+                           (env', Just bind) -> Let bind (simple_opt_expr env' body)
+
+    go lam@(Lam {})     = go_lam env [] lam
+    go (Case e b ty as)
+       -- See Note [Getting the map/coerce RULE to work]
+      | isDeadBinder b
+      , Just (con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
+      , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
+      = case altcon of
+          DEFAULT -> go rhs
+          _       -> foldr wrapLet (simple_opt_expr env' rhs) mb_prs
+            where
+              (env', mb_prs) = mapAccumL simple_out_bind env $
+                               zipEqual "simpleOptExpr" bs es
+
+         -- Note [Getting the map/coerce RULE to work]
+      | isDeadBinder b
+      , [(DEFAULT, _, rhs)] <- as
+      , isCoercionType (varType b)
+      , (Var fun, _args) <- collectArgs e
+      , fun `hasKey` coercibleSCSelIdKey
+         -- without this last check, we get #11230
+      = go rhs
+
+      | otherwise
+      = Case e' b' (substTy subst ty)
+                   (map (go_alt env') as)
+      where
+        e' = go e
+        (env', b') = subst_opt_bndr env b
+
+    ----------------------
+    go_alt env (con, bndrs, rhs)
+      = (con, bndrs', simple_opt_expr env' rhs)
+      where
+        (env', bndrs') = subst_opt_bndrs env bndrs
+
+    ----------------------
+    -- go_lam tries eta reduction
+    go_lam env bs' (Lam b e)
+       = go_lam env' (b':bs') e
+       where
+         (env', b') = subst_opt_bndr env b
+    go_lam env bs' e
+       | Just etad_e <- tryEtaReduce bs e' = etad_e
+       | otherwise                         = mkLams bs e'
+       where
+         bs = reverse bs'
+         e' = simple_opt_expr env e
+
+----------------------
+-- simple_app collects arguments for beta reduction
+simple_app :: SimpleOptEnv -> InExpr -> [SimpleClo] -> CoreExpr
+
+simple_app env (Var v) as
+  | Just (env', e) <- lookupVarEnv (soe_inl env) v
+  = simple_app (soeSetInScope env env') e as
+
+  | let unf = idUnfolding v
+  , isCompulsoryUnfolding (idUnfolding v)
+  , isAlwaysActive (idInlineActivation v)
+    -- See Note [Unfold compulsory unfoldings in LHSs]
+  = simple_app (soeZapSubst env) (unfoldingTemplate unf) as
+
+  | otherwise
+  , let out_fn = lookupIdSubst (text "simple_app") (soe_subst env) v
+  = finish_app env out_fn as
+
+simple_app env (App e1 e2) as
+  = simple_app env e1 ((env, e2) : as)
+
+simple_app env (Lam b e) (a:as)
+  = wrapLet mb_pr (simple_app env' e as)
+  where
+     (env', mb_pr) = simple_bind_pair env b Nothing a
+
+simple_app env (Tick t e) as
+  -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
+  | t `tickishScopesLike` SoftScope
+  = mkTick t $ simple_app env e as
+
+simple_app env e as
+  = finish_app env (simple_opt_expr env e) as
+
+finish_app :: SimpleOptEnv -> OutExpr -> [SimpleClo] -> OutExpr
+finish_app _ fun []
+  = fun
+finish_app env fun (arg:args)
+  = finish_app env (App fun (simple_opt_clo env arg)) args
+
+----------------------
+simple_opt_bind :: SimpleOptEnv -> InBind
+                -> (SimpleOptEnv, Maybe OutBind)
+simple_opt_bind env (NonRec b r)
+  = (env', case mb_pr of
+            Nothing    -> Nothing
+            Just (b,r) -> Just (NonRec b r))
+  where
+    (b', r') = convert_if_marked b r
+    (env', mb_pr) = simple_bind_pair env b' Nothing (env,r')
+
+simple_opt_bind env (Rec prs)
+  = (env'', res_bind)
+  where
+    res_bind          = Just (Rec (reverse rev_prs'))
+    prs'              = map (uncurry convert_if_marked) prs
+    (env', bndrs')    = subst_opt_bndrs env (map fst prs')
+    (env'', rev_prs') = foldl do_pr (env', []) (prs' `zip` bndrs')
+    do_pr (env, prs) ((b,r), b')
+       = (env', case mb_pr of
+                  Just pr -> pr : prs
+                  Nothing -> prs)
+       where
+         (env', mb_pr) = simple_bind_pair env b (Just b') (env,r)
+
+convert_if_marked :: InVar -> InExpr -> (InVar, InExpr)
+convert_if_marked bndr rhs
+  | isId bndr
+  , AlwaysTailCalled ar <- tailCallInfo (idOccInfo bndr)
+    -- Marked to become a join point
+  , (bndrs, body) <- etaExpandToJoinPoint ar rhs
+  = -- Tail call info now unnecessary
+    (zapIdTailCallInfo (bndr `asJoinId` ar), mkLams bndrs body)
+  | otherwise
+  = (bndr, rhs)
+
+----------------------
+simple_bind_pair :: SimpleOptEnv
+                 -> InVar -> Maybe OutVar
+                 -> SimpleClo
+                 -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
+    -- (simple_bind_pair subst in_var out_rhs)
+    --   either extends subst with (in_var -> out_rhs)
+    --   or     returns Nothing
+simple_bind_pair env@(SOE { soe_inl = inl_env, soe_subst = subst })
+                 in_bndr mb_out_bndr clo@(rhs_env, in_rhs)
+  | Type ty <- in_rhs        -- let a::* = TYPE ty in <body>
+  , let out_ty = substTy (soe_subst rhs_env) ty
+  = ASSERT( isTyVar in_bndr )
+    (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+
+  | Coercion co <- in_rhs
+  , let out_co = optCoercion (getTCvSubst (soe_subst rhs_env)) co
+  = ASSERT( isCoVar in_bndr )
+    (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
+
+  | pre_inline_unconditionally
+  = (env { soe_inl = extendVarEnv inl_env in_bndr clo }, Nothing)
+
+  | otherwise
+  = simple_out_bind_pair env in_bndr mb_out_bndr
+                         (simple_opt_clo env clo)
+                         occ active stable_unf
+  where
+    stable_unf = isStableUnfolding (idUnfolding in_bndr)
+    active     = isAlwaysActive (idInlineActivation in_bndr)
+    occ        = idOccInfo in_bndr
+
+    pre_inline_unconditionally :: Bool
+    pre_inline_unconditionally
+       | isCoVar in_bndr          = False    -- See Note [Do not inline CoVars unconditionally]
+       | isExportedId in_bndr     = False    --     in SimplUtils
+       | stable_unf               = False
+       | not active               = False    -- Note [Inline prag in simplOpt]
+       | not (safe_to_inline occ) = False
+       | otherwise = True
+
+        -- Unconditionally safe to inline
+    safe_to_inline :: OccInfo -> Bool
+    safe_to_inline (IAmALoopBreaker {}) = False
+    safe_to_inline IAmDead              = True
+    safe_to_inline occ@(OneOcc {})      =  not (occ_in_lam occ)
+                                        && occ_one_br occ
+    safe_to_inline (ManyOccs {})        = False
+
+-------------------
+simple_out_bind :: SimpleOptEnv -> (InVar, OutExpr)
+                -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
+simple_out_bind env@(SOE { soe_subst = subst }) (in_bndr, out_rhs)
+  | Type out_ty <- out_rhs
+  = ASSERT( isTyVar in_bndr )
+    (env { soe_subst = extendTvSubst subst in_bndr out_ty }, Nothing)
+
+  | Coercion out_co <- out_rhs
+  = ASSERT( isCoVar in_bndr )
+    (env { soe_subst = extendCvSubst subst in_bndr out_co }, Nothing)
+
+  | otherwise
+  = simple_out_bind_pair env in_bndr Nothing out_rhs
+                         (idOccInfo in_bndr) True False
+
+-------------------
+simple_out_bind_pair :: SimpleOptEnv
+                     -> InId -> Maybe OutId -> OutExpr
+                     -> OccInfo -> Bool -> Bool
+                     -> (SimpleOptEnv, Maybe (OutVar, OutExpr))
+simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
+                     occ_info active stable_unf
+  | post_inline_unconditionally
+  = ( env' { soe_subst = extendIdSubst (soe_subst env) in_bndr out_rhs }
+    , Nothing)
+
+  | otherwise
+  = ( env', Just (out_bndr, out_rhs) )
+  where
+    (env', bndr1) = case mb_out_bndr of
+                      Just out_bndr -> (env, out_bndr)
+                      Nothing       -> subst_opt_bndr env in_bndr
+    out_bndr = add_info env' in_bndr bndr1
+
+    post_inline_unconditionally :: Bool
+    post_inline_unconditionally
+       | not active                  = False
+       | isWeakLoopBreaker occ_info  = False -- If it's a loop-breaker of any kind, don't inline
+                                             -- because it might be referred to "earlier"
+       | stable_unf                  = False -- Note [Stable unfoldings and postInlineUnconditionally]
+       | isExportedId in_bndr        = False -- Note [Exported Ids and trivial RHSs]
+       | exprIsTrivial out_rhs       = True
+       | coercible_hack              = True
+       | otherwise                   = False
+
+    -- See Note [Getting the map/coerce RULE to work]
+    coercible_hack | (Var fun, args) <- collectArgs out_rhs
+                   , Just dc <- isDataConWorkId_maybe fun
+                   , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
+                   = all exprIsTrivial args
+                   | otherwise
+                   = False
+
+{- Note [Exported Ids and trivial RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We obviously do no want to unconditinally inline an Id that is exported.
+In SimplUtils, Note [Top level and postInlineUnconditionally], we
+explain why we don't inline /any/ top-level things unconditionally, even
+trivial ones.  But we do here!  Why?  In the simple optimiser
+
+  * We do no rule rewrites
+  * We do no call-site inlining
+
+Those differences obviate the reasons for not inlining a trivial rhs,
+and increase the benefit for doing so.  So we unconditaionlly inline trivial
+rhss here.
+-}
+
+----------------------
+subst_opt_bndrs :: SimpleOptEnv -> [InVar] -> (SimpleOptEnv, [OutVar])
+subst_opt_bndrs env bndrs = mapAccumL subst_opt_bndr env bndrs
+
+subst_opt_bndr :: SimpleOptEnv -> InVar -> (SimpleOptEnv, OutVar)
+subst_opt_bndr env bndr
+  | isTyVar bndr  = (env { soe_subst = subst_tv }, tv')
+  | isCoVar bndr  = (env { soe_subst = subst_cv }, cv')
+  | otherwise     = subst_opt_id_bndr env bndr
+  where
+    subst           = soe_subst env
+    (subst_tv, tv') = substTyVarBndr subst bndr
+    (subst_cv, cv') = substCoVarBndr subst bndr
+
+subst_opt_id_bndr :: SimpleOptEnv -> InId -> (SimpleOptEnv, OutId)
+-- Nuke all fragile IdInfo, unfolding, and RULES;
+--    it gets added back later by add_info
+-- Rather like SimplEnv.substIdBndr
+--
+-- It's important to zap fragile OccInfo (which CoreSubst.substIdBndr
+-- carefully does not do) because simplOptExpr invalidates it
+
+subst_opt_id_bndr (SOE { soe_subst = subst, soe_inl = inl }) old_id
+  = (SOE { soe_subst = new_subst, soe_inl = new_inl }, new_id)
+  where
+    Subst in_scope id_subst tv_subst cv_subst = subst
+
+    id1    = uniqAway in_scope old_id
+    id2    = setIdType id1 (substTy subst (idType old_id))
+    new_id = zapFragileIdInfo id2
+             -- Zaps rules, worker-info, unfolding, and fragile OccInfo
+             -- The unfolding and rules will get added back later, by add_info
+
+    new_in_scope = in_scope `extendInScopeSet` new_id
+
+    no_change = new_id == old_id
+
+        -- Extend the substitution if the unique has changed,
+        -- See the notes with substTyVarBndr for the delSubstEnv
+    new_id_subst
+      | no_change = delVarEnv id_subst old_id
+      | otherwise = extendVarEnv id_subst old_id (Var new_id)
+
+    new_subst = Subst new_in_scope new_id_subst tv_subst cv_subst
+    new_inl   = delVarEnv inl old_id
+
+----------------------
+add_info :: SimpleOptEnv -> InVar -> OutVar -> OutVar
+add_info env old_bndr new_bndr
+ | isTyVar old_bndr = new_bndr
+ | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
+ where
+   subst = soe_subst env
+   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
+
+simpleUnfoldingFun :: IdUnfoldingFun
+simpleUnfoldingFun id
+  | isAlwaysActive (idInlineActivation id) = idUnfolding id
+  | otherwise                              = noUnfolding
+
+wrapLet :: Maybe (Id,CoreExpr) -> CoreExpr -> CoreExpr
+wrapLet Nothing      body = body
+wrapLet (Just (b,r)) body = Let (NonRec b r) body
+
+{-
+Note [Inline prag in simplOpt]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If there's an INLINE/NOINLINE pragma that restricts the phase in
+which the binder can be inlined, we don't inline here; after all,
+we don't know what phase we're in.  Here's an example
+
+  foo :: Int -> Int -> Int
+  {-# INLINE foo #-}
+  foo m n = inner m
+     where
+       {-# INLINE [1] inner #-}
+       inner m = m+n
+
+  bar :: Int -> Int
+  bar n = foo n 1
+
+When inlining 'foo' in 'bar' we want the let-binding for 'inner'
+to remain visible until Phase 1
+
+Note [Unfold compulsory unfoldings in LHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the user writes `RULES map coerce = coerce` as a rule, the rule
+will only ever match if simpleOptExpr replaces coerce by its unfolding
+on the LHS, because that is the core that the rule matching engine
+will find. So do that for everything that has a compulsory
+unfolding. Also see Note [Desugaring coerce as cast] in Desugar.
+
+However, we don't want to inline 'seq', which happens to also have a
+compulsory unfolding, so we only do this unfolding only for things
+that are always-active.  See Note [User-defined RULES for seq] in MkId.
 
 Note [Getting the map/coerce RULE to work]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -847,7 +1343,7 @@ Desugar)
 Now, we need simpleOptExpr to fix this up. It does so by taking three
 separate actions:
   1. Inline certain non-recursive bindings. The choice whether to inline
-     is made in maybe_substitute. Note the rather specific check for
+     is made in simple_bind_pair. Note the rather specific check for
      MkCoercible in there.
 
   2. Stripping case expressions like the Coercible_SCSel one.
@@ -859,336 +1355,6 @@ separate actions:
 
 This is all a fair amount of special-purpose hackery, but it's for
 a good cause. And it won't hurt other RULES and such that it comes across.
-
--}
-
-simpleOptExpr :: CoreExpr -> CoreExpr
--- Do simple optimisation on an expression
--- The optimisation is very straightforward: just
--- inline non-recursive bindings that are used only once,
--- or where the RHS is trivial
---
--- We also inline bindings that bind a Eq# box: see
--- See Note [Getting the map/coerce RULE to work].
---
--- Also we convert functions to join points where possible (as
--- the occurrence analyser does most of the work anyway).
---
--- The result is NOT guaranteed occurrence-analysed, because
--- in  (let x = y in ....) we substitute for x; so y's occ-info
--- may change radically
-
-simpleOptExpr expr
-  = -- pprTrace "simpleOptExpr" (ppr init_subst $$ ppr expr)
-    simpleOptExprWith init_subst expr
-  where
-    init_subst = mkEmptySubst (mkInScopeSet (exprFreeVars expr))
-        -- It's potentially important to make a proper in-scope set
-        -- Consider  let x = ..y.. in \y. ...x...
-        -- Then we should remember to clone y before substituting
-        -- for x.  It's very unlikely to occur, because we probably
-        -- won't *be* substituting for x if it occurs inside a
-        -- lambda.
-        --
-        -- It's a bit painful to call exprFreeVars, because it makes
-        -- three passes instead of two (occ-anal, and go)
-
-simpleOptExprWith :: Subst -> InExpr -> OutExpr
-simpleOptExprWith subst expr = simple_opt_expr subst (occurAnalyseExpr expr)
-
-----------------------
-simpleOptPgm :: DynFlags -> Module
-             -> CoreProgram -> [CoreRule] -> [CoreVect]
-             -> IO (CoreProgram, [CoreRule], [CoreVect])
-simpleOptPgm dflags this_mod binds rules vects
-  = do { dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
-                       (pprCoreBindings occ_anald_binds $$ pprRules rules );
-
-       ; return (reverse binds', substRulesForImportedIds subst' rules, substVects subst' vects) }
-  where
-    occ_anald_binds  = occurAnalysePgm this_mod (\_ -> False) {- No rules active -}
-                                       rules vects emptyVarEnv binds
-    (subst', binds') = foldl do_one (emptySubst, []) occ_anald_binds
-
-    do_one (subst, binds') bind
-      = case simple_opt_bind subst bind of
-          (subst', Nothing)    -> (subst', binds')
-          (subst', Just bind') -> (subst', bind':binds')
-
--- In these functions the substitution maps InVar -> OutExpr
-
-----------------------
-simple_opt_expr :: Subst -> InExpr -> OutExpr
-simple_opt_expr subst expr
-  = go expr
-  where
-    in_scope_env = (substInScope subst, simpleUnfoldingFun)
-
-    go (Var v)          = lookupIdSubst (text "simpleOptExpr") subst v
-    go (App e1 e2)      = simple_app subst e1 [go e2]
-    go (Type ty)        = Type     (substTy subst ty)
-    go (Coercion co)    = Coercion (optCoercion (getTCvSubst subst) co)
-    go (Lit lit)        = Lit lit
-    go (Tick tickish e) = mkTick (substTickish subst tickish) (go e)
-    go (Cast e co)      | isReflCo co' = go e
-                        | otherwise    = Cast (go e) co'
-                        where
-                          co' = optCoercion (getTCvSubst subst) co
-
-    go (Let bind body) = case simple_opt_bind subst bind of
-                           (subst', Nothing)   -> simple_opt_expr subst' body
-                           (subst', Just bind) -> Let bind (simple_opt_expr subst' body)
-
-    go lam@(Lam {})     = go_lam [] subst lam
-    go (Case e b ty as)
-       -- See Note [Getting the map/coerce RULE to work]
-      | isDeadBinder b
-      , Just (con, _tys, es) <- exprIsConApp_maybe in_scope_env e'
-      , Just (altcon, bs, rhs) <- findAlt (DataAlt con) as
-      = case altcon of
-          DEFAULT -> go rhs
-          _       -> mkLets (catMaybes mb_binds) $ simple_opt_expr subst' rhs
-            where (subst', mb_binds) = mapAccumL simple_opt_out_bind subst
-                                                 (zipEqual "simpleOptExpr" bs es)
-
-         -- Note [Getting the map/coerce RULE to work]
-      | isDeadBinder b
-      , [(DEFAULT, _, rhs)] <- as
-      , isCoercionType (varType b)
-      , (Var fun, _args) <- collectArgs e
-      , fun `hasKey` coercibleSCSelIdKey
-         -- without this last check, we get #11230
-      = go rhs
-
-      | otherwise
-      = Case e' b' (substTy subst ty)
-                   (map (go_alt subst') as)
-        where
-          e' = go e
-          (subst', b') = subst_opt_bndr subst b
-
-    ----------------------
-    go_alt subst (con, bndrs, rhs)
-      = (con, bndrs', simple_opt_expr subst' rhs)
-      where
-        (subst', bndrs') = subst_opt_bndrs subst bndrs
-
-    ----------------------
-    -- go_lam tries eta reduction
-    go_lam bs' subst (Lam b e)
-       = go_lam (b':bs') subst' e
-       where
-         (subst', b') = subst_opt_bndr subst b
-    go_lam bs' subst e
-       | Just etad_e <- tryEtaReduce bs e' = etad_e
-       | otherwise                         = mkLams bs e'
-       where
-         bs = reverse bs'
-         e' = simple_opt_expr subst e
-
-----------------------
--- simple_app collects arguments for beta reduction
-simple_app :: Subst -> InExpr -> [OutExpr] -> CoreExpr
-simple_app subst (App e1 e2) as
-  = simple_app subst e1 (simple_opt_expr subst e2 : as)
-simple_app subst (Lam b e) (a:as)
-  = case maybe_substitute subst b a of
-      Just ext_subst -> simple_app ext_subst e as
-      Nothing        -> Let (NonRec b2 a) (simple_app subst' e as)
-  where
-    (subst', b') = subst_opt_bndr subst b
-    b2 = add_info subst' b b'
-simple_app subst (Var v) as
-  | isCompulsoryUnfolding (idUnfolding v)
-  , isAlwaysActive (idInlineActivation v)
-  -- See Note [Unfold compulsory unfoldings in LHSs]
-  =  simple_app subst (unfoldingTemplate (idUnfolding v)) as
-simple_app subst (Tick t e) as
-  -- Okay to do "(Tick t e) x ==> Tick t (e x)"?
-  | t `tickishScopesLike` SoftScope
-  = mkTick t $ simple_app subst e as
-simple_app subst e as
-  = foldl App (simple_opt_expr subst e) as
-
-----------------------
-simple_opt_bind,simple_opt_bind' :: Subst -> CoreBind -> (Subst, Maybe CoreBind)
-simple_opt_bind s b               -- Can add trace stuff here
-  = simple_opt_bind' s b
-
-simple_opt_bind' subst (Rec prs)
-  = (subst'', res_bind)
-  where
-    res_bind            = Just (Rec (reverse rev_prs'))
-    prs'                = map (uncurry convert_if_marked) prs
-    (subst', bndrs')    = subst_opt_bndrs subst (map fst prs')
-    (subst'', rev_prs') = foldl do_pr (subst', []) (prs' `zip` bndrs')
-    do_pr (subst, prs) ((b,r), b')
-       = case maybe_substitute subst b r2 of
-           Just subst' -> (subst', prs)
-           Nothing     -> (subst,  (b2,r2):prs)
-       where
-         b2 = add_info subst b b'
-         r2 = simple_opt_expr subst r
-
-simple_opt_bind' subst (NonRec b r)
-  = simple_opt_out_bind subst (b', simple_opt_expr subst r')
-  where
-    (b', r') = convert_if_marked b r
-
-convert_if_marked :: InVar -> InExpr -> (InVar, InExpr)
-convert_if_marked bndr rhs
-  | isId bndr
-  , AlwaysTailCalled ar <- tailCallInfo (idOccInfo bndr)
-    -- Marked to become a join point
-  , (bndrs, body) <- etaExpandToJoinPoint ar rhs
-  = -- Tail call info now unnecessary
-    (zapIdTailCallInfo (bndr `asJoinId` ar), mkLams bndrs body)
-  | otherwise
-  = (bndr, rhs)
-
-----------------------
-simple_opt_out_bind :: Subst -> (InVar, OutExpr) -> (Subst, Maybe CoreBind)
-simple_opt_out_bind subst (b, r')
-  | Just ext_subst <- maybe_substitute subst b r'
-  = (ext_subst, Nothing)
-  | otherwise
-  = (subst', Just (NonRec b2 r'))
-  where
-    (subst', b') = subst_opt_bndr subst b
-    b2 = add_info subst' b b'
-
-----------------------
-maybe_substitute :: Subst -> InVar -> OutExpr -> Maybe Subst
-    -- (maybe_substitute subst in_var out_rhs)
-    --   either extends subst with (in_var -> out_rhs)
-    --   or     returns Nothing
-maybe_substitute subst b r
-  | Type ty <- r        -- let a::* = TYPE ty in <body>
-  = ASSERT( isTyVar b )
-    Just (extendTvSubst subst b ty)
-
-  | Coercion co <- r
-  = ASSERT( isCoVar b )
-    Just (extendCvSubst subst b co)
-
-  | isId b              -- let x = e in <body>
-  , not (isCoVar b)     -- See Note [Do not inline CoVars unconditionally]
-                        -- in SimplUtils
-  , safe_to_inline (idOccInfo b)
-  , isAlwaysActive (idInlineActivation b)       -- Note [Inline prag in simplOpt]
-  , not (isStableUnfolding (idUnfolding b))
-  , not (isExportedId b)
-  , let id_ty = idType b
-     -- A levity-polymorphic id? Impossible you say?
-     -- See Note [Levity polymorphism invariants] in CoreSyn
-     -- Ah, but it *is* possible in the compulsory unfolding of unsafeCoerce#
-     -- This check prevents the isUnliftedType check from panicking.
-  , isTypeLevPoly id_ty || not (isUnliftedType (idType b)) || exprOkForSpeculation r
-  = Just (extendIdSubst subst b r)
-
-  | otherwise
-  = Nothing
-  where
-        -- Unconditionally safe to inline
-    safe_to_inline :: OccInfo -> Bool
-    safe_to_inline (IAmALoopBreaker {})     = False
-    safe_to_inline IAmDead                  = True
-    safe_to_inline occ@(OneOcc {})          = (not (occ_in_lam occ) &&
-                                                occ_one_br occ)
-                                            || trivial
-    safe_to_inline (ManyOccs {})            = trivial
-
-    trivial | exprIsTrivial r = True
-            | (Var fun, args) <- collectArgs r
-            , Just dc <- isDataConWorkId_maybe fun
-            , dc `hasKey` heqDataConKey || dc `hasKey` coercibleDataConKey
-            , all exprIsTrivial args = True
-                     -- See Note [Getting the map/coerce RULE to work]
-            | otherwise = False
-
-----------------------
-subst_opt_bndr :: Subst -> InVar -> (Subst, OutVar)
-subst_opt_bndr subst bndr
-  | isTyVar bndr  = substTyVarBndr subst bndr
-  | isCoVar bndr  = substCoVarBndr subst bndr
-  | otherwise     = subst_opt_id_bndr subst bndr
-
-subst_opt_id_bndr :: Subst -> InId -> (Subst, OutId)
--- Nuke all fragile IdInfo, unfolding, and RULES;
---    it gets added back later by add_info
--- Rather like SimplEnv.substIdBndr
---
--- It's important to zap fragile OccInfo (which CoreSubst.substIdBndr
--- carefully does not do) because simplOptExpr invalidates it
-
-subst_opt_id_bndr subst@(Subst in_scope id_subst tv_subst cv_subst) old_id
-  = (Subst new_in_scope new_id_subst tv_subst cv_subst, new_id)
-  where
-    id1    = uniqAway in_scope old_id
-    id2    = setIdType id1 (substTy subst (idType old_id))
-    new_id = zapFragileIdInfo id2
-             -- Zaps rules, worker-info, unfolding, and fragile OccInfo
-             -- The unfolding and rules will get added back later, by add_info
-
-    new_in_scope = in_scope `extendInScopeSet` new_id
-
-        -- Extend the substitution if the unique has changed,
-        -- or there's some useful occurrence information
-        -- See the notes with substTyVarBndr for the delSubstEnv
-    new_id_subst | new_id /= old_id
-                 = extendVarEnv id_subst old_id (Var new_id)
-                 | otherwise
-                 = delVarEnv id_subst old_id
-
-----------------------
-subst_opt_bndrs :: Subst -> [InVar] -> (Subst, [OutVar])
-subst_opt_bndrs subst bndrs
-  = mapAccumL subst_opt_bndr subst bndrs
-
-----------------------
-add_info :: Subst -> InVar -> OutVar -> OutVar
-add_info subst old_bndr new_bndr
- | isTyVar old_bndr = new_bndr
- | otherwise        = maybeModifyIdInfo mb_new_info new_bndr
- where
-   mb_new_info = substIdInfo subst new_bndr (idInfo old_bndr)
-
-simpleUnfoldingFun :: IdUnfoldingFun
-simpleUnfoldingFun id
-  | isAlwaysActive (idInlineActivation id) = idUnfolding id
-  | otherwise                              = noUnfolding
-
-{-
-Note [Inline prag in simplOpt]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If there's an INLINE/NOINLINE pragma that restricts the phase in
-which the binder can be inlined, we don't inline here; after all,
-we don't know what phase we're in.  Here's an example
-
-  foo :: Int -> Int -> Int
-  {-# INLINE foo #-}
-  foo m n = inner m
-     where
-       {-# INLINE [1] inner #-}
-       inner m = m+n
-
-  bar :: Int -> Int
-  bar n = foo n 1
-
-When inlining 'foo' in 'bar' we want the let-binding for 'inner'
-to remain visible until Phase 1
-
-Note [Unfold compulsory unfoldings in LHSs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When the user writes `RULES map coerce = coerce` as a rule, the rule
-will only ever match if simpleOptExpr replaces coerce by its unfolding
-on the LHS, because that is the core that the rule matching engine
-will find. So do that for everything that has a compulsory
-unfolding. Also see Note [Desugaring coerce as cast] in Desugar.
-
-However, we don't want to inline 'seq', which happens to also have a
-compulsory unfolding, so we only do this unfolding only for things
-that are always-active.  See Note [User-defined RULES for seq] in MkId.
 
 
 ************************************************************************
