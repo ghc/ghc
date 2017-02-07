@@ -68,6 +68,7 @@ The following flags are simple ways to select standard "packages" of warnings:
         * :ghc-flag:`-Wmissing-import-lists`
         * :ghc-flag:`-Wmissing-home-modules`
         * :ghc-flag:`-Widentities`
+        * :ghc-flag:`-Wredundant-constraints`
 
 .. ghc-flag:: -Wcompat
 
