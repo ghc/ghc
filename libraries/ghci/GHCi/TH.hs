@@ -193,6 +193,7 @@ instance TH.Quasi GHCiQ where
   qRunIO m = GHCiQ $ \s -> fmap (,s) m
   qAddDependentFile file = ghcCmd (AddDependentFile file)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)
+  qAddCStub str = ghcCmd (AddCStub str)
   qAddModFinalizer fin = GHCiQ (\s -> mkRemoteRef fin >>= return . (, s)) >>=
                          ghcCmd . AddModFinalizer
   qGetQ = GHCiQ $ \s ->

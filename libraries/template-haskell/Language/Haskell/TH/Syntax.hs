@@ -92,6 +92,8 @@ class Monad m => Quasi m where
 
   qAddTopDecls :: [Dec] -> m ()
 
+  qAddCStub :: String -> m ()
+
   qAddModFinalizer :: Q () -> m ()
 
   qGetQ :: Typeable a => m (Maybe a)
@@ -131,6 +133,7 @@ instance Quasi IO where
   qRecover _ _          = badIO "recover" -- Maybe we could fix this?
   qAddDependentFile _   = badIO "addDependentFile"
   qAddTopDecls _        = badIO "addTopDecls"
+  qAddCStub    _        = badIO "addCStub"
   qAddModFinalizer _    = badIO "addModFinalizer"
   qGetQ                 = badIO "getQ"
   qPutQ _               = badIO "putQ"
@@ -456,6 +459,25 @@ addDependentFile fp = Q (qAddDependentFile fp)
 addTopDecls :: [Dec] -> Q ()
 addTopDecls ds = Q (qAddTopDecls ds)
 
+-- | Add an additional C stub. The added stub will be built and included in the
+-- object file of the current module.
+--
+-- Compilation errors in the given string are reported next to the line of the
+-- enclosing splice.
+--
+-- The accuracy of the error location can be improved by adding
+-- #line pragmas in the argument. e.g.
+--
+-- > {-# LANGUAGE CPP #-}
+-- > ...
+-- > addCStub $ unlines
+-- >   [ "#line " ++ show (__LINE__ + 1) ++ " " ++ show __FILE__
+-- >   , ...
+-- >   ]
+--
+addCStub :: String -> Q ()
+addCStub str = Q (qAddCStub str)
+
 -- | Add a finalizer that will run in the Q monad after the current module has
 -- been type checked. This only makes sense when run within a top-level splice.
 --
@@ -499,6 +521,7 @@ instance Quasi Q where
   qRunIO              = runIO
   qAddDependentFile   = addDependentFile
   qAddTopDecls        = addTopDecls
+  qAddCStub           = addCStub
   qAddModFinalizer    = addModFinalizer
   qGetQ               = getQ
   qPutQ               = putQ

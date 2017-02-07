@@ -63,6 +63,9 @@ test('TH_reifyDecl2', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs2', normal, compile, ['-v0'])
 
+test('TH_addCStub1', normal, compile_and_run, ['-v0'])
+test('TH_addCStub2', normal, compile_fail, ['-v0'])
+
 test('TH_reifyMkName', normal, compile, ['-v0'])
 
 test('TH_reifyInstances', normal, compile, ['-v0'])

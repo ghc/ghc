@@ -608,6 +608,9 @@ data TcGblEnv
         tcg_th_topdecls :: TcRef [LHsDecl RdrName],
         -- ^ Top-level declarations from addTopDecls
 
+        tcg_th_cstubs :: TcRef [String],
+        -- ^ C stubs from addCStub
+
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls
 

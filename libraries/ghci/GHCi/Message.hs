@@ -237,6 +237,7 @@ data THMessage a where
   AddDependentFile :: FilePath -> THMessage (THResult ())
   AddModFinalizer :: RemoteRef (TH.Q ()) -> THMessage (THResult ())
   AddTopDecls :: [TH.Dec] -> THMessage (THResult ())
+  AddCStub :: String -> THMessage (THResult ())
   IsExtEnabled :: Extension -> THMessage (THResult Bool)
   ExtsEnabled :: THMessage (THResult [Extension])
 
@@ -272,7 +273,8 @@ getTHMessage = do
     14 -> THMsg <$> return StartRecover
     15 -> THMsg <$> EndRecover <$> get
     16 -> return (THMsg RunTHDone)
-    _  -> THMsg <$> AddModFinalizer <$> get
+    17 -> THMsg <$> AddModFinalizer <$> get
+    _  -> THMsg <$> AddCStub <$> get
 
 putTHMessage :: THMessage a -> Put
 putTHMessage m = case m of
@@ -294,6 +296,7 @@ putTHMessage m = case m of
   EndRecover a                -> putWord8 15 >> put a
   RunTHDone                   -> putWord8 16
   AddModFinalizer a           -> putWord8 17 >> put a
+  AddCStub a                  -> putWord8 18 >> put a
 
 
 data EvalOpts = EvalOpts
