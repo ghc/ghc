@@ -320,11 +320,7 @@ StgRunIsImplementedInAssembler(void)
 
         :
         : "i"(RESERVED_C_STACK_BYTES),
-#if defined(mingw32_HOST_OS)
-          "i"(80 /*stack frame size; 8 too large to make the alignment right*/)
-#else
-          "i"(48 /*stack frame size*/)
-#endif
+          "i"(STG_RUN_STACK_FRAME_SIZE /* stack frame size */)
         );
         /*
          * See Note [Stack Alignment on X86]

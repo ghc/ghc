@@ -67,11 +67,19 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
        debuggers to find their way back to the C stack.
 
        This is a bit fiddly as we assume the layout of the stack prepared
-       for us by StgRun.
+       for us by StgRun. Note that in most cases StgRun is written in assembler
+       and therefore has no associated unwind information. For this reason we
+       need to identify the platform stack pointer and return address values for
+       the StgRun's caller.
      */
 #ifdef x86_64_HOST_ARCH
-    unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + 0x38 + 8,
-           UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + 0x38];
+    // offset of 8 in MachSp value due to return address
+    unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE + 8,
+           UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE];
+#else
+    // FIXME: Fill in for other platforms
+    unwind MachSp = return,
+           UnwindReturnReg = return;
 #endif
 
     Sp = Sp + SIZEOF_StgStopFrame - WDS(2);
