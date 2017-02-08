@@ -774,7 +774,7 @@ cpeApp top_env expr
     collect_args :: CoreExpr -> (CoreExpr, [ArgInfo], Int)
     collect_args e = go e [] 0
       where
-        go (App fun arg)      as depth
+        go (App fun arg)      as !depth
             = go fun (CpeApp arg : as)
                 (if isTyCoArg arg then depth else depth + 1)
         go (Cast fun co)      as depth
