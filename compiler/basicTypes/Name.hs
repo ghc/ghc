@@ -62,7 +62,8 @@ module Name (
         isWiredInName, isBuiltInSyntax,
         isHoleName,
         wiredInNameTyThing_maybe,
-        nameIsLocalOrFrom, nameIsHomePackageImport, nameIsFromExternalPackage,
+        nameIsLocalOrFrom, nameIsHomePackage,
+        nameIsHomePackageImport, nameIsFromExternalPackage,
         stableNameCmp,
 
         -- * Class 'NamedThing' and overloaded friends
@@ -268,6 +269,15 @@ nameIsLocalOrFrom :: Module -> Name -> Bool
 nameIsLocalOrFrom from name
   | Just mod <- nameModule_maybe name = from == mod || isInteractiveModule mod
   | otherwise                         = True
+
+nameIsHomePackage :: Module -> Name -> Bool
+-- True if the Name is defined in module of this package
+nameIsHomePackage this_mod
+  = \nm -> case nameModule_maybe nm of
+              Nothing -> False
+              Just nm_mod -> moduleUnitId nm_mod == this_pkg
+  where
+    this_pkg = moduleUnitId this_mod
 
 nameIsHomePackageImport :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package

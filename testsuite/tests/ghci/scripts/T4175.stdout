@@ -28,9 +28,9 @@ instance Show () -- Defined in ‘GHC.Show’
 type instance D () a = Bool 	-- Defined at T4175.hs:22:10
 data instance B () = MkB 	-- Defined at T4175.hs:13:15
 data Maybe a = Nothing | Just a 	-- Defined in ‘GHC.Base’
-instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
 instance Monoid a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
+instance Foldable Maybe -- Defined in ‘Data.Foldable’
 instance Read a => Read (Maybe a) -- Defined in ‘GHC.Read’
 instance Applicative Maybe -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
