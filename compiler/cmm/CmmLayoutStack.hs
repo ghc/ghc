@@ -530,7 +530,7 @@ makeFixupBlock dflags sp0 l stack tscope assigs
     let sp_off = sp0 - sm_sp stack
         maybeAddUnwind block
           | debugLevel dflags > 0
-          = block `blockSnoc` CmmUnwind [(Sp, unwind_val)]
+          = block `blockSnoc` CmmUnwind [(Sp, Just unwind_val)]
           | otherwise
           = block
           where unwind_val = cmmOffset dflags (CmmReg spReg) (sm_sp stack)
@@ -805,9 +805,10 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     -- Add unwind pseudo-instructions at the beginning of each block to
     -- document Sp level for debugging
     add_unwind_info block
-      | debugLevel dflags > 0 =
-          CmmUnwind [(Sp, sp_unwind)] : block
-      | otherwise             = block
+      | debugLevel dflags > 0
+      = CmmUnwind [(Sp, Just sp_unwind)] : block
+      | otherwise
+      = block
     sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
 
     final_middle = maybeAddSpAdj dflags sp_off

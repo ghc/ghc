@@ -639,11 +639,19 @@ stmt    :: { CmmParse () }
                 { $2 >>= code . emitUnwind }
 
 unwind_regs
-        :: { CmmParse [(GlobalReg, CmmExpr)] }
-        : GLOBALREG '=' expr ',' unwind_regs
+        :: { CmmParse [(GlobalReg, Maybe CmmExpr)] }
+        : GLOBALREG '=' expr_or_unknown ',' unwind_regs
                 { do e <- $3; rest <- $5; return (($1, e) : rest) }
-        | GLOBALREG '=' expr
+        | GLOBALREG '=' expr_or_unknown
                 { do e <- $3; return [($1, e)] }
+
+-- | Used by unwind to indicate unknown unwinding values.
+expr_or_unknown
+        :: { CmmParse (Maybe CmmExpr) }
+        : 'return'
+                { do return Nothing }
+        | expr
+                { do e <- $1; return (Just e) }
 
 foreignLabel     :: { CmmParse CmmExpr }
         : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }

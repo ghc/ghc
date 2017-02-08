@@ -209,7 +209,9 @@ debugFrame u procs
                , dwCieInit  = initUws
                , dwCieProcs = map (procToFrame initUws) procs
                }
-  where initUws = Map.fromList [(Sp, UwReg Sp 0)]
+  where
+    initUws :: UnwindTable
+    initUws = Map.fromList [(Sp, Just (UwReg Sp 0))]
 
 -- | Generates unwind information for a procedure debug block
 procToFrame :: UnwindTable -> DebugBlock -> DwarfFrameProc

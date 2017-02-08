@@ -735,7 +735,7 @@ emitComment _ = return ()
 emitTick :: CmmTickish -> FCode ()
 emitTick = emitCgStmt . CgStmt . CmmTick
 
-emitUnwind :: [(GlobalReg, CmmExpr)] -> FCode ()
+emitUnwind :: [(GlobalReg, Maybe CmmExpr)] -> FCode ()
 emitUnwind regs = do
   dflags <- getDynFlags
   when (debugLevel dflags > 0) $ do

@@ -163,7 +163,7 @@ addSpUnwindings instr@(DELTA d) = do
     dflags <- getDynFlags
     if debugLevel dflags >= 1
         then do lbl <- newBlockId
-                let unwind = M.singleton MachSp (UwReg MachSp $ negate d)
+                let unwind = M.singleton MachSp (Just $ UwReg MachSp $ negate d)
                 return $ toOL [ instr, UNWIND lbl unwind ]
         else return (unitOL instr)
 addSpUnwindings instr = return $ unitOL instr
@@ -183,8 +183,8 @@ stmtToInstrs stmt = do
     CmmTick {}     -> return nilOL
 
     CmmUnwind regs -> do
-      let to_unwind_entry :: (GlobalReg, CmmExpr) -> UnwindTable
-          to_unwind_entry (reg, expr) = M.singleton reg (toUnwindExpr expr)
+      let to_unwind_entry :: (GlobalReg, Maybe CmmExpr) -> UnwindTable
+          to_unwind_entry (reg, expr) = M.singleton reg (fmap toUnwindExpr expr)
       case foldMap to_unwind_entry regs of
         tbl | M.null tbl -> return nilOL
             | otherwise  -> do

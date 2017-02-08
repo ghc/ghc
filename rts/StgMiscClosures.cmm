@@ -26,6 +26,8 @@ INFO_TABLE_RET (stg_stack_underflow_frame, UNDERFLOW_FRAME,
                 W_ info_ptr, P_ unused)
     /* no args => explicit stack */
 {
+    unwind UnwindReturnReg = return;
+
     W_ new_tso;
     W_ ret_off;
 
