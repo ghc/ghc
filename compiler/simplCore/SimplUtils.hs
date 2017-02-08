@@ -179,7 +179,7 @@ instance Outputable DupFlag where
 
 instance Outputable SimplCont where
   ppr (Stop ty interesting) = text "Stop" <> brackets (ppr interesting) <+> ppr ty
-  ppr (CastIt co cont  )    = (text "CastIt" <+> ppr co) $$ ppr cont
+  ppr (CastIt co cont  )    = (text "CastIt" <+> pprOptCo co) $$ ppr cont
   ppr (TickIt t cont)       = (text "TickIt" <+> ppr t) $$ ppr cont
   ppr (ApplyToTy  { sc_arg_ty = ty, sc_cont = cont })
     = (text "ApplyToTy" <+> pprParendType ty) $$ ppr cont

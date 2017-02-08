@@ -12,7 +12,7 @@ module PprCore (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
-        pprRules
+        pprRules, pprOptCo
     ) where
 
 import CoreSyn
@@ -130,9 +130,10 @@ noParens :: SDoc -> SDoc
 noParens pp = pp
 
 pprOptCo :: Coercion -> SDoc
+-- Print a coercion optionally; i.e. honouring -dsuppress-coercions
 pprOptCo co = sdocWithDynFlags $ \dflags ->
               if gopt Opt_SuppressCoercions dflags
-              then text "..."
+              then angleBrackets (text "Co:" <> int (coercionSize co))
               else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
 ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
