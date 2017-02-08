@@ -343,6 +343,7 @@ data DumpFlag
    | Opt_D_dump_parsed
    | Opt_D_dump_parsed_ast
    | Opt_D_dump_rn
+   | Opt_D_dump_rn_ast
    | Opt_D_dump_shape
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
@@ -353,6 +354,7 @@ data DumpFlag
    | Opt_D_dump_stranal
    | Opt_D_dump_str_signatures
    | Opt_D_dump_tc
+   | Opt_D_dump_tc_ast
    | Opt_D_dump_types
    | Opt_D_dump_rules
    | Opt_D_dump_cse
@@ -2905,6 +2907,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_parsed_ast)
   , make_ord_flag defGhcFlag "ddump-rn"
         (setDumpFlag Opt_D_dump_rn)
+  , make_ord_flag defGhcFlag "ddump-rn-ast"
+        (setDumpFlag Opt_D_dump_rn_ast)
   , make_ord_flag defGhcFlag "ddump-simpl"
         (setDumpFlag Opt_D_dump_simpl)
   , make_ord_flag defGhcFlag "ddump-simpl-iterations"
@@ -2923,6 +2927,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_str_signatures)
   , make_ord_flag defGhcFlag "ddump-tc"
         (setDumpFlag Opt_D_dump_tc)
+  , make_ord_flag defGhcFlag "ddump-tc-ast"
+        (setDumpFlag Opt_D_dump_tc_ast)
   , make_ord_flag defGhcFlag "ddump-types"
         (setDumpFlag Opt_D_dump_types)
   , make_ord_flag defGhcFlag "ddump-rules"

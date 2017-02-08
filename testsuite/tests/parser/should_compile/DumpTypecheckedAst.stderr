@@ -1,0 +1,195 @@
+
+==================== Typechecker ====================
+{Bag(Located (HsBind Var)): 
+[
+ ({ <no location info> }
+  (VarBind {Var: (main:DumpTypecheckedAst.$tcPeano{v rHa} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsApp 
+         ({ <no location info> }
+          (HsApp 
+           ({ <no location info> }
+            (HsConLikeOut 
+             ({abstract:ConLike}))) 
+           ({ <no location info> }
+            (HsLit 
+             (HsWordPrim 
+              (NoSourceText) 
+              (8575021419490388262)))))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsWordPrim 
+            (NoSourceText) 
+            (11015472196725198936)))))) 
+       ({ <no location info> }
+        (HsVar 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsLit 
+         (HsStringPrim 
+          (NoSourceText) "Peano"))))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v rFM} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsApp 
+         ({ <no location info> }
+          (HsApp 
+           ({ <no location info> }
+            (HsConLikeOut 
+             ({abstract:ConLike}))) 
+           ({ <no location info> }
+            (HsLit 
+             (HsWordPrim 
+              (NoSourceText) 
+              (2837710233032485839)))))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsWordPrim 
+            (NoSourceText) 
+            (4722402035995040741)))))) 
+       ({ <no location info> }
+        (HsVar 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsLit 
+         (HsStringPrim 
+          (NoSourceText) "'Zero"))))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: (main:DumpTypecheckedAst.$tc'Succ{v rH3} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsApp 
+         ({ <no location info> }
+          (HsApp 
+           ({ <no location info> }
+            (HsConLikeOut 
+             ({abstract:ConLike}))) 
+           ({ <no location info> }
+            (HsLit 
+             (HsWordPrim 
+              (NoSourceText) 
+              (16648669567626715052)))))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsWordPrim 
+            (NoSourceText) 
+            (1296291977643060110)))))) 
+       ({ <no location info> }
+        (HsVar 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsLit 
+         (HsStringPrim 
+          (NoSourceText) "'Succ"))))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsApp 
+         ({ <no location info> }
+          (HsConLikeOut 
+           ({abstract:ConLike}))) 
+         ({ <no location info> }
+          (HsLit 
+           (HsStringPrim 
+            (NoSourceText) "main"))))))) 
+     ({ <no location info> }
+      (HsApp 
+       ({ <no location info> }
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsLit 
+         (HsStringPrim 
+          (NoSourceText) "DumpTypecheckedAst"))))))) 
+   (False))),
+ ({ DumpTypecheckedAst.hs:11:1-23 }
+  (AbsBinds 
+   [] 
+   [] 
+   [
+    (ABE {Var: (main:DumpTypecheckedAst.main{v rqD} [lid] :: ghc-prim:GHC.Types.IO{tc 31Q}
+                                                ())} {Var: (main{v aHS} [lid] :: ghc-prim:GHC.Types.IO{tc 31Q} ())} 
+     (WpHole) 
+     (SpecPrags 
+      []))] 
+   [
+    ({abstract:TcEvBinds})] {Bag(Located (HsBind Var)): 
+   [
+    ({ DumpTypecheckedAst.hs:11:1-23 }
+     (FunBind 
+      ({ DumpTypecheckedAst.hs:11:1-4 }{Var: (main{v aHS} [lid] :: ghc-prim:GHC.Types.IO{tc 31Q} ())}) 
+      (MG 
+       ({ DumpTypecheckedAst.hs:11:1-23 }
+        [
+         ({ DumpTypecheckedAst.hs:11:1-23 }
+          (Match 
+           (FunRhs 
+            ({ DumpTypecheckedAst.hs:11:1-4 }{Name: main:DumpTypecheckedAst.main{v rqD}}) 
+            (Prefix)) 
+           [] 
+           (Nothing) 
+           (GRHSs 
+            [
+             ({ DumpTypecheckedAst.hs:11:6-23 }
+              (GRHS 
+               [] 
+               ({ DumpTypecheckedAst.hs:11:8-23 }
+                (HsApp 
+                 ({ DumpTypecheckedAst.hs:11:8-15 }
+                  (HsVar 
+                   ({ <no location info> }{Var: (base:System.IO.putStrLn{v r1J} [gid] :: base:GHC.Base.String{tc r1h}
+                                         -> ghc-prim:GHC.Types.IO{tc 31Q} ())}))) 
+                 ({ DumpTypecheckedAst.hs:11:17-23 }
+                  (HsLit 
+                   (HsString 
+                    (SourceText "\"hello\"") {FastString: "hello"})))))))] 
+            ({ <no location info> }
+             (EmptyLocalBinds)))))]) 
+       [] 
+       (TyConApp 
+        ({abstract:TyCon}) 
+        [
+         (TyConApp 
+          ({abstract:TyCon}) 
+          [])]) 
+       (FromSource)) 
+      (WpHole) {NameSet: 
+      []} 
+      []))]}))]}
+

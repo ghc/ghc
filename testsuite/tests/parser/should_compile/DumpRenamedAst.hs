@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, PolyKinds, TypeOperators, TypeFamilies #-}
 
-module DumpParsedAst where
+module DumpRenamedAst where
 
 data Peano = Zero | Succ Peano
 

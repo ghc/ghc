@@ -46,9 +46,17 @@ Dumping out compiler intermediate structures
 
         Dump renamer output
 
+    .. ghc-flag:: -ddump-rn-ast
+
+        Dump renamer output as a syntax tree
+
     .. ghc-flag:: -ddump-tc
 
         Dump typechecker output
+
+    .. ghc-flag:: -ddump-tc-ast
+
+        Dump typechecker output as a syntax tree
 
     .. ghc-flag:: -ddump-splices
 

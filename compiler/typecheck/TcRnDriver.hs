@@ -123,6 +123,8 @@ import Util
 import Bag
 import Inst (tcGetInsts)
 import qualified GHC.LanguageExtensions as LangExt
+import HsDumpAst
+import Data.Data ( Data )
 
 import Control.Monad
 
@@ -1237,7 +1239,7 @@ rnTopSrcDecls group
                    = tcg_env };
 
                 -- Dump trace of renaming part
-        rnDump (ppr rn_decls) ;
+        rnDump rn_decls ;
         return (tcg_env', rn_decls)
    }
 
@@ -1963,7 +1965,7 @@ tcUserStmt rdr_stmt@(L loc _)
              return (fix_env, emptyFVs)
             -- Don't try to typecheck if the renamer fails!
        ; traceRn "tcRnStmt" (vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs])
-       ; rnDump (ppr rn_stmt) ;
+       ; rnDump rn_stmt ;
 
        ; ghciStep <- getGhciStepIO
        ; let gi_stmt
@@ -2417,9 +2419,11 @@ loadUnqualIfaces hsc_env ictxt
 ************************************************************************
 -}
 
-rnDump :: SDoc -> TcRn ()
+rnDump :: (Outputable a, Data a) => a -> TcRn ()
 -- Dump, with a banner, if -ddump-rn
-rnDump doc = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" doc) }
+rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn))
+               ; traceOptTcRn Opt_D_dump_rn_ast
+                 (mkDumpDoc "Renamer" (text (showAstData NoBlankSrcSpan rn))) }
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
@@ -2430,13 +2434,17 @@ tcDump env
              (printForUserTcRn short_dump) ;
 
         -- Dump bindings if -ddump-tc
-        traceOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump)
+        traceOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump);
+
+        -- Dump bindings as an hsSyn AST if -ddump-tc-ast
+        traceOptTcRn Opt_D_dump_tc_ast (mkDumpDoc "Typechecker" ast_dump)
    }
   where
     short_dump = pprTcGblEnv env
     full_dump  = pprLHsBinds (tcg_binds env)
         -- NB: foreign x-d's have undefined's in their types;
         --     hence can't show the tc_fords
+    ast_dump = text (showAstData NoBlankSrcSpan (tcg_binds env))
 
 -- It's unpleasant having both pprModGuts and pprModDetails here
 pprTcGblEnv :: TcGblEnv -> SDoc
