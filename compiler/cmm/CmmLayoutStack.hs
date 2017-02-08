@@ -528,8 +528,16 @@ makeFixupBlock dflags sp0 l stack tscope assigs
   | otherwise = do
     tmp_lbl <- newBlockId
     let sp_off = sp0 - sm_sp stack
+        maybeAddUnwind block
+          | debugLevel dflags > 0
+          = block `blockSnoc` CmmUnwind [(Sp, unwind_val)]
+          | otherwise
+          = block
+          where unwind_val = cmmOffset dflags (CmmReg spReg) (sm_sp stack)
         block = blockJoin (CmmEntry tmp_lbl tscope)
-                          (maybeAddSpAdj dflags sp_off (blockFromList assigs))
+                          (  maybeAddSpAdj dflags sp_off
+                           $ maybeAddUnwind
+                           $ blockFromList assigs )
                           (CmmBranch l)
     return (tmp_lbl, [block])
 
