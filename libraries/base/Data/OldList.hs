@@ -815,6 +815,9 @@ permutations xs0        =  xs0 : perms xs0 []
 -- | The 'sort' function implements a stable sorting algorithm.
 -- It is a special case of 'sortBy', which allows the programmer to supply
 -- their own comparison function.
+--
+-- Elements are arranged from from lowest to highest, keeping duplicates in
+-- the order they appeared in the input.
 sort :: (Ord a) => [a] -> [a]
 
 -- | The 'sortBy' function is the non-overloaded version of 'sort'.
@@ -977,6 +980,9 @@ rqpart cmp x (y:ys) rle rgt r =
 -- performance advantage of only evaluating @f@ once for each element in the
 -- input list.  This is called the decorate-sort-undecorate paradigm, or
 -- Schwartzian transform.
+--
+-- Elements are arranged from from lowest to highest, keeping duplicates in
+-- the order they appeared in the input.
 --
 -- @since 4.8.0.0
 sortOn :: Ord b => (a -> b) -> [a] -> [a]
