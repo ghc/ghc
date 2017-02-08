@@ -126,7 +126,7 @@ Compiler
    programs has been fixed (see :ghc-ticket:`12757`).
 
 -  GHC now supports systems whose C compiler produces position-independent
-   executables by default. (see :ghc-ticket:`12579`).
+   executables by default. (see :ghc-ticket:`12755`).
 
 -  GHC can now be built on systems which use the ``gold`` linker by default
    (see :ghc-ticket:`12816`).
