@@ -162,7 +162,13 @@ data NcgImpl statics instr jumpDest = NcgImpl {
     ncg_x86fp_kludge          :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgExpandTop              :: [NatCmmDecl statics instr] -> [NatCmmDecl statics instr],
     ncgAllocMoreStack         :: Int -> NatCmmDecl statics instr -> UniqSM (NatCmmDecl statics instr),
-    ncgMakeFarBranches        :: LabelMap CmmStatics -> [NatBasicBlock instr] -> [NatBasicBlock instr]
+    ncgMakeFarBranches        :: LabelMap CmmStatics
+                              -> [NatBasicBlock instr] -> [NatBasicBlock instr],
+    extractUnwindPoints       :: [instr] -> [UnwindPoint]
+    -- ^ given the instruction sequence of a block, produce a list of
+    -- the block's 'UnwindPoint's
+    -- See Note [What is this unwinding business?] in Debug
+    -- and Note [Unwinding information in the NCG] in this module.
     }
 
 --------------------
@@ -209,6 +215,7 @@ x86_64NcgImpl dflags
        ,ncgAllocMoreStack         = X86.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
        ,ncgMakeFarBranches        = const id
+       ,extractUnwindPoints       = X86.CodeGen.extractUnwindPoints
    }
     where platform = targetPlatform dflags
 
@@ -228,6 +235,7 @@ ppcNcgImpl dflags
        ,ncgAllocMoreStack         = PPC.Instr.allocMoreStack platform
        ,ncgExpandTop              = id
        ,ncgMakeFarBranches        = PPC.Instr.makeFarBranches
+       ,extractUnwindPoints       = const []
    }
     where platform = targetPlatform dflags
 
@@ -247,6 +255,7 @@ sparcNcgImpl dflags
        ,ncgAllocMoreStack         = noAllocMoreStack
        ,ncgExpandTop              = map SPARC.CodeGen.Expand.expandTop
        ,ncgMakeFarBranches        = const id
+       ,extractUnwindPoints       = const []
    }
 
 --
@@ -279,7 +288,35 @@ data NativeGenAcc statics instr
         , ngs_labels      :: ![Label]
         , ngs_debug       :: ![DebugBlock]
         , ngs_dwarfFiles  :: !DwarfFiles
+        , ngs_unwinds     :: !(LabelMap [UnwindPoint])
+             -- ^ see Note [Unwinding information in the NCG]
+             -- and Note [What is this unwinding business?] in Debug.
         }
+
+{-
+Note [Unwinding information in the NCG]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unwind information is a type of metadata which allows a debugging tool
+to reconstruct the values of machine registers at the time a procedure was
+entered. For the most part, the production of unwind information is handled by
+the Cmm stage, where it is represented by CmmUnwind nodes.
+
+Unfortunately, the Cmm stage doesn't know everything necessary to produce
+accurate unwinding information. For instance, the x86-64 calling convention
+requires that the stack pointer be aligned to 16 bytes, which in turn means that
+GHC must sometimes add padding to $sp prior to performing a foreign call. When
+this happens unwind information must be updated accordingly.
+For this reason, we make the NCG backends responsible for producing
+unwinding tables (with the extractUnwindPoints function in NcgImpl).
+
+We accumulate the produced unwind tables over CmmGroups in the ngs_unwinds
+field of NativeGenAcc. This is a label map which contains an entry for each
+procedure, containing a list of unwinding points (e.g. a label and an associated
+unwinding table).
+
+See also Note [What is this unwinding business?] in Debug.
+-}
 
 nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                => DynFlags
@@ -295,7 +332,7 @@ nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
         -- Pretty if it weren't for the fact that we do lots of little
         -- printDocs here (in order to do codegen in constant space).
         bufh <- newBufHandle h
-        let ngs0 = NGS [] [] [] [] [] [] emptyUFM
+        let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
         (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
                                          cmms ngs0
         finishNativeGen dflags modLoc bufh us' ngs
@@ -386,11 +423,12 @@ cmmNativeGenStream dflags this_mod modLoc ncgImpl h us cmm_stream ngs
                              ofBlockList (panic "split_marker_entry") []
               cmms' | splitObjs  = split_marker : cmms
                     | otherwise  = cmms
-          (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap us
-                                      cmms' ngs 0
+          (ngs',us') <- cmmNativeGens dflags this_mod modLoc ncgImpl h
+                                             dbgMap us cmms' ngs 0
 
           -- Link native code information into debug blocks
-          let !ldbgs = cmmDebugLink (ngs_labels ngs') ndbgs
+          -- See Note [What is this unwinding business?] in Debug.
+          let !ldbgs = cmmDebugLink (ngs_labels ngs') (ngs_unwinds ngs') ndbgs
           dumpIfSet_dyn dflags Opt_D_dump_debug "Debug Infos"
             (vcat $ map ppr ldbgs)
 
@@ -430,7 +468,8 @@ cmmNativeGens :: forall statics instr jumpDest.
 
 cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
   where
-    go :: UniqSupply -> [RawCmmDecl] -> NativeGenAcc statics instr -> Int
+    go :: UniqSupply -> [RawCmmDecl]
+       -> NativeGenAcc statics instr -> Int
        -> IO (NativeGenAcc statics instr, UniqSupply)
 
     go us [] ngs !_ =
@@ -438,7 +477,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
 
     go us (cmm : cmms) ngs count = do
         let fileIds = ngs_dwarfFiles ngs
-        (us', fileIds', native, imports, colorStats, linearStats)
+        (us', fileIds', native, imports, colorStats, linearStats, unwinds)
           <- {-# SCC "cmmNativeGen" #-}
              cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap
                           cmm count
@@ -463,6 +502,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
                        then cmmDebugLabels isMetaInstr native else []
             !natives' = if dopt Opt_D_dump_asm_stats dflags
                         then native : ngs_natives ngs else []
+
             mCon = maybe id (:)
             ngs' = ngs{ ngs_imports     = imports : ngs_imports ngs
                       , ngs_natives     = natives'
@@ -470,6 +510,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
                       , ngs_linearStats = linearStats `mCon` ngs_linearStats ngs
                       , ngs_labels      = ngs_labels ngs ++ labels'
                       , ngs_dwarfFiles  = fileIds'
+                      , ngs_unwinds     = ngs_unwinds ngs `mapUnion` unwinds
                       }
         go us' cmms ngs' (count + 1)
 
@@ -506,7 +547,9 @@ cmmNativeGen
                 , [NatCmmDecl statics instr]                -- native code
                 , [CLabel]                                  -- things imported by this cmm
                 , Maybe [Color.RegAllocStats statics instr] -- stats for the coloring register allocator
-                , Maybe [Linear.RegAllocStats])             -- stats for the linear register allocators
+                , Maybe [Linear.RegAllocStats]              -- stats for the linear register allocators
+                , LabelMap [UnwindPoint]                    -- unwinding information for blocks
+                )
 
 cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
  = do
@@ -659,12 +702,22 @@ cmmNativeGen dflags this_mod modLoc ncgImpl us fileIds dbgMap cmm count
                 Opt_D_dump_asm_expanded "Synthetic instructions expanded"
                 (vcat $ map (pprNatCmmDecl ncgImpl) expanded)
 
+        -- generate unwinding information from cmm
+        let unwinds :: BlockMap [UnwindPoint]
+            unwinds =
+                {-# SCC "unwindingInfo" #-}
+                foldl' addUnwind mapEmpty expanded
+              where
+                addUnwind acc proc =
+                    acc `mapUnion` computeUnwinding dflags ncgImpl proc
+
         return  ( usAlloc
                 , fileIds'
                 , expanded
                 , lastMinuteImports ++ imports
                 , ppr_raStatsColor
-                , ppr_raStatsLinear)
+                , ppr_raStatsLinear
+                , unwinds )
 
 
 x86fp_kludge :: NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr -> NatCmmDecl (Alignment, CmmStatics) X86.Instr.Instr
@@ -672,6 +725,28 @@ x86fp_kludge top@(CmmData _ _) = top
 x86fp_kludge (CmmProc info lbl live (ListGraph code)) =
         CmmProc info lbl live (ListGraph $ X86.Instr.i386_insert_ffrees code)
 
+-- | Compute unwinding tables for the blocks of a procedure
+computeUnwinding :: Instruction instr
+                 => DynFlags -> NcgImpl statics instr jumpDest
+                 -> NatCmmDecl statics instr
+                    -- ^ the native code generated for the procedure
+                 -> LabelMap [UnwindPoint]
+                    -- ^ unwinding tables for all points of all blocks of the
+                    -- procedure
+computeUnwinding dflags _ _
+  | debugLevel dflags == 0         = mapEmpty
+computeUnwinding _ _ (CmmData _ _) = mapEmpty
+computeUnwinding _ ncgImpl (CmmProc _ _ _ (ListGraph blks)) =
+    -- In general we would need to push unwinding information down the
+    -- block-level call-graph to ensure that we fully account for all
+    -- relevant register writes within a procedure.
+    --
+    -- However, the only unwinding information that we care about in GHC is for
+    -- Sp. The fact that CmmLayoutStack already ensures that we have unwind
+    -- information at the beginning of every block means that there is no need
+    -- to perform this sort of push-down.
+    mapFromList [ (blk_lbl, extractUnwindPoints ncgImpl instrs)
+                | BasicBlock blk_lbl instrs <- blks ]
 
 -- | Build a doc for all the imports.
 --
@@ -928,6 +1003,9 @@ apply_mapping ncgImpl ufm (CmmProc info lbl live (ListGraph blocks))
 -- the beginning of the block.  For stacks which grow down, this value
 -- should be either zero or negative.
 
+-- Along with the stack pointer offset, we also carry along a LabelMap of
+-- DebugBlocks, which we read to generate .location directives.
+--
 -- Switching between the two monads whilst carrying along the same
 -- Unique supply breaks abstraction.  Is that bad?
 

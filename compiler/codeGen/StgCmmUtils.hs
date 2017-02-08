@@ -298,7 +298,7 @@ baseRegOffset dflags CurrentNursery = oFFSET_StgRegTable_rCurrentNursery dflags
 baseRegOffset dflags HpAlloc        = oFFSET_StgRegTable_rHpAlloc dflags
 baseRegOffset dflags GCEnter1       = oFFSET_stgGCEnter1 dflags
 baseRegOffset dflags GCFun          = oFFSET_stgGCFun dflags
-baseRegOffset _      reg            = pprPanic "baseRegOffset:" (ppr reg)
+baseRegOffset _      reg            = pprPanic "StgCmmUtils.baseRegOffset:" (ppr reg)
 
 -------------------------------------------------------------------------
 --

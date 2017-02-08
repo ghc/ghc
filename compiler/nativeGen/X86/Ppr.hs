@@ -514,22 +514,26 @@ pprDataItem' dflags lit
                 = panic "X86.Ppr.ppr_item: no match"
 
 
+asmComment :: SDoc -> SDoc
+asmComment c = ifPprDebug $ text "# " <> c
 
 pprInstr :: Instr -> SDoc
 
-pprInstr (COMMENT _) = empty -- nuke 'em
-{-
-pprInstr (COMMENT s) = text "# " <> ftext s
--}
+pprInstr (COMMENT s)
+   = asmComment (ftext s)
 
 pprInstr (LOCATION file line col _name)
    = text "\t.loc " <> ppr file <+> ppr line <+> ppr col
 
 pprInstr (DELTA d)
-   = pprInstr (COMMENT (mkFastString ("\tdelta = " ++ show d)))
+   = asmComment $ text ("\tdelta = " ++ show d)
 
 pprInstr (NEWBLOCK _)
    = panic "PprMach.pprInstr: NEWBLOCK"
+
+pprInstr (UNWIND lbl d)
+   = asmComment (text "\tunwind = " <> ppr d)
+     $$ ppr lbl <> colon
 
 pprInstr (LDATA _ _)
    = panic "PprMach.pprInstr: LDATA"

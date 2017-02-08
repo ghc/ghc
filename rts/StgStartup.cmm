@@ -70,8 +70,8 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
        for us by StgRun.
      */
 #ifdef x86_64_HOST_ARCH
-    unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + 0x38 + 8
-    unwind UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + 0x38]
+    unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + 0x38 + 8,
+           UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + 0x38];
 #endif
 
     Sp = Sp + SIZEOF_StgStopFrame - WDS(2);

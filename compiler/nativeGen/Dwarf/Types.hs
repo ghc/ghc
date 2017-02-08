@@ -35,8 +35,9 @@ import SrcLoc
 
 import Dwarf.Constants
 
+import qualified Control.Monad.Trans.State.Strict as S
+import Control.Monad (zipWithM)
 import Data.Bits
-import Data.List ( mapAccumL )
 import qualified Data.Map as Map
 import Data.Word
 import Data.Char
@@ -268,10 +269,14 @@ data DwarfFrameProc
 -- containing FDE.
 data DwarfFrameBlock
   = DwarfFrameBlock
-    { dwFdeBlock      :: CLabel
-    , dwFdeBlkHasInfo :: Bool
-    , dwFdeUnwind     :: UnwindTable
+    { dwFdeBlkHasInfo :: Bool
+    , dwFdeUnwind     :: [UnwindPoint]
+      -- ^ these unwind points must occur in the same order as they occur
+      -- in the block
     }
+
+instance Outputable DwarfFrameBlock where
+  ppr (DwarfFrameBlock hasInfo unwinds) = braces $ ppr hasInfo <+> ppr unwinds
 
 -- | Header for the @.debug_frame@ section. Here we emit the "Common
 -- Information Entry" record that etablishes general call frame
@@ -285,6 +290,7 @@ pprDwarfFrame DwarfFrame{dwCieLabel=cieLabel,dwCieInit=cieInit,dwCieProcs=procs}
         spReg       = dwarfGlobalRegNo plat Sp
         retReg      = dwarfReturnRegNo plat
         wordSize    = platformWordSize plat
+        pprInit :: (GlobalReg, UnwindExpr) -> SDoc
         pprInit (g, uw) = pprSetUnwind plat g (Nothing, uw)
 
         -- Preserve C stack pointer: This necessary to override that default
@@ -337,7 +343,8 @@ pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
         procEnd     = mkAsmTempEndLabel procLbl
         ifInfo str  = if hasInfo then text str else empty
                       -- see [Note: Info Offset]
-    in vcat [ pprData4' (ppr fdeEndLabel <> char '-' <> ppr fdeLabel)
+    in vcat [ ifPprDebug $ text "# Unwinding for" <+> ppr procLbl <> colon
+            , pprData4' (ppr fdeEndLabel <> char '-' <> ppr fdeLabel)
             , ppr fdeLabel <> colon
             , pprData4' (ppr frameLbl <> char '-' <>
                          ptext dwarfFrameLabel)    -- Reference to CIE
@@ -345,7 +352,7 @@ pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
             , pprWord (ppr procEnd <> char '-' <>
                        ppr procLbl <> ifInfo "+1") -- Block byte length
             ] $$
-       vcat (snd $ mapAccumL pprFrameBlock initUw blocks) $$
+       vcat (S.evalState (mapM pprFrameBlock blocks) initUw) $$
        wordAlign $$
        ppr fdeEndLabel <> colon
 
@@ -353,22 +360,29 @@ pprFrameProc frameLbl initUw (DwarfFrameProc procLbl hasInfo blocks)
 -- instructions where unwind information actually changes. This small
 -- optimisations saves a lot of space, as subsequent blocks often have
 -- the same unwind information.
-pprFrameBlock :: UnwindTable -> DwarfFrameBlock -> (UnwindTable, SDoc)
-pprFrameBlock oldUws (DwarfFrameBlock blockLbl hasInfo uws)
-  | uws == oldUws
-  = (oldUws, empty)
-  | otherwise
-  = (,) uws $ sdocWithPlatform $ \plat ->
-    let lbl = ppr blockLbl <> if hasInfo then text "-1" else empty
-              -- see [Note: Info Offset]
-        isChanged g v | old == Just v  = Nothing
-                      | otherwise      = Just (old, v)
-                      where old = Map.lookup g oldUws
-        changed = Map.toList $ Map.mapMaybeWithKey isChanged uws
-        died    = Map.toList $ Map.difference oldUws uws
-    in pprByte dW_CFA_set_loc $$ pprWord lbl $$
-       vcat (map (uncurry $ pprSetUnwind plat) changed) $$
-       vcat (map (pprUndefUnwind plat . fst) died)
+pprFrameBlock :: DwarfFrameBlock -> S.State UnwindTable SDoc
+pprFrameBlock (DwarfFrameBlock hasInfo uws0) =
+    vcat <$> zipWithM pprFrameDecl (True : repeat False) uws0
+  where
+    pprFrameDecl :: Bool -> UnwindPoint -> S.State UnwindTable SDoc
+    pprFrameDecl firstDecl (UnwindPoint lbl uws) = S.state $ \oldUws ->
+        let isChanged g v | old == Just v  = Nothing
+                          | otherwise      = Just (old, v)
+                          where old = Map.lookup g oldUws
+            changed = Map.toList $ Map.mapMaybeWithKey isChanged uws
+            died    = Map.toList $ Map.difference oldUws uws
+
+        in if oldUws == uws
+             then (empty, oldUws)
+             else let -- see [Note: Info Offset]
+                      needsOffset = firstDecl && hasInfo
+                      lblDoc = ppr lbl <>
+                               if needsOffset then text "-1" else empty
+                      doc = sdocWithPlatform $ \plat ->
+                           pprByte dW_CFA_set_loc $$ pprWord lblDoc $$
+                           vcat (map (uncurry $ pprSetUnwind plat) changed) $$
+                           vcat (map (pprUndefUnwind plat . fst) died)
+                  in (doc, uws)
 
 -- Note [Info Offset]
 --
@@ -442,7 +456,7 @@ pprUnwindExpr spIsCFA expr
         pprE (UwReg Sp i) | spIsCFA
                              = if i == 0
                                then pprByte dW_OP_call_frame_cfa
-                               else ppr (UwPlus (UwReg Sp 0) (UwConst i))
+                               else pprE (UwPlus (UwReg Sp 0) (UwConst i))
         pprE (UwReg g i)      = pprByte (dW_OP_breg0+dwarfGlobalRegNo plat g) $$
                                pprLEBInt i
         pprE (UwDeref u)      = pprE u $$ pprByte dW_OP_deref

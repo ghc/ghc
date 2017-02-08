@@ -17,6 +17,7 @@ import UniqSupply
 import Dwarf.Constants
 import Dwarf.Types
 
+import Control.Arrow    ( first )
 import Control.Monad    ( mfilter )
 import Data.Maybe
 import Data.List        ( sortBy )
@@ -215,20 +216,42 @@ procToFrame :: UnwindTable -> DebugBlock -> DwarfFrameProc
 procToFrame initUws blk
   = DwarfFrameProc { dwFdeProc    = dblCLabel blk
                    , dwFdeHasInfo = dblHasInfoTbl blk
-                   , dwFdeBlocks  = map (uncurry blockToFrame) blockUws
+                   , dwFdeBlocks  = map (uncurry blockToFrame)
+                                        (setHasInfo blockUws)
                    }
-  where blockUws :: [(DebugBlock, UnwindTable)]
-        blockUws = map snd $ sortBy (comparing fst) $ flatten initUws blk
-        flatten uws0 b@DebugBlock{ dblPosition=pos, dblUnwind=uws,
-                                   dblBlocks=blocks }
+  where blockUws :: [(DebugBlock, [UnwindPoint])]
+        blockUws = map snd $ sortBy (comparing fst) $ flatten blk
+
+        flatten :: DebugBlock
+                -> [(Int, (DebugBlock, [UnwindPoint]))]
+        flatten b@DebugBlock{ dblPosition=pos, dblUnwind=uws, dblBlocks=blocks }
           | Just p <- pos  = (p, (b, uws')):nested
           | otherwise      = nested -- block was optimized out
-          where uws'   = uws `Map.union` uws0
-                nested = concatMap (flatten uws') blocks
+          where uws'   = addDefaultUnwindings initUws uws
+                nested = concatMap flatten blocks
 
-blockToFrame :: DebugBlock -> UnwindTable -> DwarfFrameBlock
+        -- | If the current procedure has an info table, then we also say that
+        -- its first block has one to ensure that it gets the necessary -1
+        -- offset applied to its start address.
+        -- See Note [Info Offset] in Dwarf.Types.
+        setHasInfo :: [(DebugBlock, [UnwindPoint])]
+                   -> [(DebugBlock, [UnwindPoint])]
+        setHasInfo [] = []
+        setHasInfo (c0:cs) = first setIt c0 : cs
+          where
+            setIt child =
+              child { dblHasInfoTbl = dblHasInfoTbl child
+                                      || dblHasInfoTbl blk }
+
+blockToFrame :: DebugBlock -> [UnwindPoint] -> DwarfFrameBlock
 blockToFrame blk uws
-  = DwarfFrameBlock { dwFdeBlock      = mkAsmTempLabel $ dblLabel blk
-                    , dwFdeBlkHasInfo = dblHasInfoTbl blk
+  = DwarfFrameBlock { dwFdeBlkHasInfo = dblHasInfoTbl blk
                     , dwFdeUnwind     = uws
                     }
+
+addDefaultUnwindings :: UnwindTable -> [UnwindPoint] -> [UnwindPoint]
+addDefaultUnwindings tbl pts =
+    [ UnwindPoint lbl (tbl' `mappend` tbl)
+      -- mappend is left-biased
+    | UnwindPoint lbl tbl' <- pts
+    ]

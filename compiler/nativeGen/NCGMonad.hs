@@ -85,7 +85,6 @@ initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m
         = case unNat m init_st of { (r,st) -> (r,st) }
 
-
 instance Functor NatM where
       fmap = liftM
 

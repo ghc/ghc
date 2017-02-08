@@ -12,15 +12,17 @@
 module Debug (
 
   DebugBlock(..), dblIsEntry,
-  UnwindTable, UnwindExpr(..),
   cmmDebugGen,
   cmmDebugLabels,
   cmmDebugLink,
-  debugToMap
+  debugToMap,
 
+  -- * Unwinding information
+  UnwindTable, UnwindPoint(..),
+  UnwindExpr(..), toUnwindExpr
   ) where
 
-import BlockId         ( blockLbl )
+import BlockId
 import CLabel
 import Cmm
 import CmmUtils
@@ -56,7 +58,7 @@ data DebugBlock =
   , dblPosition   :: !(Maybe Int)  -- ^ Output position relative to
                                    -- other blocks. @Nothing@ means
                                    -- the block was optimized out
-  , dblUnwind     :: !UnwindTable  -- ^ Unwind information
+  , dblUnwind     :: [UnwindPoint]
   , dblBlocks     :: ![DebugBlock] -- ^ Nested blocks
   }
 
@@ -74,14 +76,12 @@ instance Outputable DebugBlock where
             (maybe empty ppr (dblSourceTick blk)) <+>
             (maybe (text "removed") ((text "pos " <>) . ppr)
                    (dblPosition blk)) <+>
-            pprUwMap (dblUnwind blk) $$
+            (ppr (dblUnwind blk)) <+>
             (if null (dblBlocks blk) then empty else ppr (dblBlocks blk))
-    where pprUw (g, expr) = ppr g <> char '=' <> ppr expr
-          pprUwMap = braces . hsep . punctuate comma . map pprUw . Map.toList
 
 -- | Intermediate data structure holding debug-relevant context information
 -- about a block.
-type BlockContext = (CmmBlock, RawCmmDecl, UnwindTable)
+type BlockContext = (CmmBlock, RawCmmDecl)
 
 -- | Extract debug data from a group of procedures. We will prefer
 -- source notes that come from the given module (presumably the module
@@ -127,7 +127,7 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                    | otherwise                = panic "ticksToCopy impossible"
                 where ticks = bCtxsTicks $ fromMaybe [] $ Map.lookup s blockCtxs
       ticksToCopy _ = []
-      bCtxsTicks = concatMap (blockTicks . fstOf3)
+      bCtxsTicks = concatMap (blockTicks . fst)
 
       -- Finding the "best" source tick is somewhat arbitrary -- we
       -- select the first source span, while preferring source ticks
@@ -151,7 +151,9 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
               nested = fromMaybe [] $ Map.lookup scope scopeMap
               childs = map (mkBlock False) (tail bctxs) ++
                        map (blocksForScope stick) nested
-              mkBlock top (block, prc, unwind)
+
+              mkBlock :: Bool -> BlockContext -> DebugBlock
+              mkBlock top (block, prc)
                 = DebugBlock { dblProcedure    = g_entry graph
                              , dblLabel        = label
                              , dblCLabel       = case info of
@@ -163,9 +165,9 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
                              , dblParent       = Nothing
                              , dblTicks        = ticks
                              , dblPosition     = Nothing -- see cmmDebugLink
-                             , dblUnwind       = unwind
                              , dblSourceTick   = stick
                              , dblBlocks       = blocks
+                             , dblUnwind       = []
                              }
                 where (CmmProc infos entryLbl _ graph) = prc
                       label = entryLabel block
@@ -189,29 +191,33 @@ cmmDebugGen modLoc decls = map (blocksForScope Nothing) topScopes
 --
 -- This involves a pre-order traversal, as we want blocks in rough
 -- control flow order (so ticks have a chance to be sorted in the
--- right order). We also use this opportunity to have blocks inherit
--- unwind information from their predecessor blocks where it is
--- lacking.
+-- right order).
 blockContexts :: RawCmmGroup -> Map.Map CmmTickScope [BlockContext]
 blockContexts decls = Map.map reverse $ foldr walkProc Map.empty decls
-  where walkProc CmmData{}                 m = m
+  where walkProc :: RawCmmDecl
+                 -> Map.Map CmmTickScope [BlockContext]
+                 -> Map.Map CmmTickScope [BlockContext]
+        walkProc CmmData{}                 m = m
         walkProc prc@(CmmProc _ _ _ graph) m
           | mapNull blocks = m
-          | otherwise      = snd $ walkBlock prc entry Map.empty (emptyLbls, m)
+          | otherwise      = snd $ walkBlock prc entry (emptyLbls, m)
           where blocks = toBlockMap graph
                 entry  = [mapFind (g_entry graph) blocks]
                 emptyLbls = setEmpty :: LabelSet
-        walkBlock _   []             _      c            = c
-        walkBlock prc (block:blocks) unwind (visited, m)
+
+        walkBlock :: RawCmmDecl -> [Block CmmNode C C]
+                  -> (LabelSet, Map.Map CmmTickScope [BlockContext])
+                  -> (LabelSet, Map.Map CmmTickScope [BlockContext])
+        walkBlock _   []             c            = c
+        walkBlock prc (block:blocks) (visited, m)
           | lbl `setMember` visited
-          = walkBlock prc blocks unwind (visited, m)
+          = walkBlock prc blocks (visited, m)
           | otherwise
-          = walkBlock prc blocks unwind $
-            walkBlock prc succs unwind'
+          = walkBlock prc blocks $
+            walkBlock prc succs
               (lbl `setInsert` visited,
-               insertMulti scope (block, prc, unwind') m)
+               insertMulti scope (block, prc) m)
           where CmmEntry lbl scope = firstNode block
-                unwind' = extractUnwind block `Map.union` unwind
                 (CmmProc _ _ _ graph) = prc
                 succs = map (flip mapFind (toBlockMap graph))
                             (successors (lastNode block))
@@ -234,14 +240,17 @@ cmmDebugLabels isMeta nats = seqList lbls lbls
         getBlocks _other                         = []
         allMeta (BasicBlock _ instrs) = all isMeta instrs
 
--- | Sets position fields in the debug block tree according to native
--- generated code.
-cmmDebugLink :: [Label] -> [DebugBlock] -> [DebugBlock]
-cmmDebugLink labels blocks = map link blocks
+-- | Sets position and unwind table fields in the debug block tree according to
+-- native generated code.
+cmmDebugLink :: [Label] -> LabelMap [UnwindPoint]
+             -> [DebugBlock] -> [DebugBlock]
+cmmDebugLink labels unwindPts blocks = map link blocks
   where blockPos :: LabelMap Int
         blockPos = mapFromList $ flip zip [0..] labels
         link block = block { dblPosition = mapLookup (dblLabel block) blockPos
                            , dblBlocks   = map link (dblBlocks block)
+                           , dblUnwind   = fromMaybe mempty
+                                         $ mapLookup (dblLabel block) unwindPts
                            }
 
 -- | Converts debug blocks into a label map for easier lookups
@@ -249,14 +258,158 @@ debugToMap :: [DebugBlock] -> LabelMap DebugBlock
 debugToMap = mapUnions . map go
    where go b = mapInsert (dblLabel b) b $ mapUnions $ map go (dblBlocks b)
 
+{-
+Note [What is this unwinding business?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Unwinding tables are a variety of debugging information used by debugging tools
+to reconstruct the execution history of a program at runtime. These tables
+consist of sets of "instructions", one set for every instruction in the program,
+which describe how to reconstruct the state of the machine at the point where
+the current procedure was called. For instance, consider the following annotated
+pseudo-code,
+
+  a_fun:
+    add rsp, 8            -- unwind: rsp = rsp - 8
+    mov rax, 1            -- unwind: rax = unknown
+    call another_block
+    sub rsp, 8            -- unwind: rsp = rsp
+
+We see that attached to each instruction there is an "unwind" annotation, which
+provides a relationship between each updated register and its value at the
+time of entry to a_fun. This is the sort of information that allows gdb to give
+you a stack backtrace given the execution state of your program. This
+unwinding information is captured in various ways by various debug information
+formats; in the case of DWARF (the only format supported by GHC) it is known as
+Call Frame Information (CFI) and can be found in the .debug.frames section of
+your object files.
+
+Currently we only bother to produce unwinding information for registers which
+are necessary to reconstruct flow-of-execution. On x86_64 this includes $rbp
+(which is the STG stack pointer) and $rsp (the C stack pointer).
+
+Let's consider how GHC would annotate a C-- program with unwinding information
+with a typical C-- procedure as would come from the STG-to-Cmm code generator,
+
+  entry()
+     { c2fe:
+           v :: P64 = R2;
+           if ((Sp + 8) - 32 < SpLim) (likely: False) goto c2ff; else goto c2fg;
+       c2ff:
+           R2 = v :: P64;
+           R1 = test_closure;
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;
+       c2fg:
+           I64[Sp - 8] = c2dD;
+           R1 = v :: P64;
+           Sp = Sp - 8;          // Sp updated here
+           if (R1 & 7 != 0) goto c2dD; else goto c2dE;
+       c2dE:
+           call (I64[R1])(R1) returns to c2dD, args: 8, res: 8, upd: 8;
+       c2dD:
+           w :: P64 = R1;
+           Hp = Hp + 48;
+           if (Hp > HpLim) (likely: False) goto c2fj; else goto c2fi;
+       ...
+  },
+
+Let's consider how this procedure will be decorated with unwind information
+(largely by CmmLayoutStack). Naturally, when we enter the procedure `entry` the
+value of Sp is no different from what it was at its call site. Therefore we will
+add an `unwind` statement saying this at the beginning of its unwind-annotated
+code,
+
+  entry()
+     { c2fe:
+           unwind Sp = Just Sp + 0;
+           v :: P64 = R2;
+           if ((Sp + 8) - 32 < SpLim) (likely: False) goto c2ff; else goto c2fg;
+
+After c2fe we we may pass to either c2ff or c2fg; let's first consider the
+former. In this case there is nothing in particular that we need to do other
+than reiterate what we already know about Sp,
+
+       c2ff:
+           unwind Sp = Just Sp + 0;
+           R2 = v :: P64;
+           R1 = test_closure;
+           call (stg_gc_fun)(R2, R1) args: 8, res: 0, upd: 8;
+
+In contrast, c2fg updates Sp midway through its body. To ensure that unwinding
+can happen correctly after this point we must include an unwind statement there,
+in addition to the usual beginning-of-block statement,
+
+       c2fg:
+           unwind Sp = Just Sp + 0;
+           I64[Sp - 8] = c2dD;
+           R1 = v :: P64;
+           unwind Sp = Just Sp + 8;
+           Sp = Sp - 8;
+           if (R1 & 7 != 0) goto c2dD; else goto c2dE;
+
+The remaining blocks are simple,
+
+       c2dE:
+           unwind Sp = Just Sp + 8;
+           call (I64[R1])(R1) returns to c2dD, args: 8, res: 8, upd: 8;
+       c2dD:
+           unwind Sp = Just Sp + 8;
+           w :: P64 = R1;
+           Hp = Hp + 48;
+           if (Hp > HpLim) (likely: False) goto c2fj; else goto c2fi;
+       ...
+  },
+
+
+The flow of unwinding information through the compiler is a bit convoluted:
+
+ * C-- begins life in StgCmm without any unwind information. This is because we
+   haven't actually done any register assignment or stack layout yet, so there
+   is no need for unwind information.
+
+ * CmmLayoutStack figures out how to layout each procedure's stack, and produces
+   appropriate unwinding nodes for each adjustment of the STG Sp register.
+
+ * The unwind nodes are carried through the sinking pass. Currently this is
+   guaranteed not to invalidate unwind information since it won't touch stores
+   to Sp, but this will need revisiting if CmmSink gets smarter in the future.
+
+ * Eventually we make it to the native code generator backend which can then
+   preserve the unwind nodes in its machine-specific instructions. In so doing
+   the backend can also modify or add unwinding information; this is necessary,
+   for instance, in the case of x86-64, where adjustment of $rsp may be
+   necessary during calls to native foreign code due to the native calling
+   convention.
+
+ * The NCG then retrieves the final unwinding table for each block from the
+   backend with extractUnwindPoints.
+
+ * This unwind information is converted to DebugBlocks by Debug.cmmDebugGen
+
+ * These DebugBlcosk are then converted to, e.g., DWARF unwinding tables
+   (by the Dwarf module) and emitted in the final object.
+
+See also: Note [Unwinding information in the NCG] in AsmCodeGen.
+-}
+
+-- | A label associated with an 'UnwindTable'
+data UnwindPoint = UnwindPoint !Label !UnwindTable
+
+instance Outputable UnwindPoint where
+  ppr (UnwindPoint lbl uws) =
+      braces $ ppr lbl<>colon
+      <+> hsep (punctuate comma $ map pprUw $ Map.toList uws)
+    where
+      pprUw (g, expr) = ppr g <> char '=' <> ppr expr
+
 -- | Maps registers to expressions that yield their "old" values
 -- further up the stack. Most interesting for the stack pointer Sp,
 -- but might be useful to document saved registers, too.
 type UnwindTable = Map.Map GlobalReg UnwindExpr
 
 -- | Expressions, used for unwind information
-data UnwindExpr = UwConst Int                   -- ^ literal value
-                | UwReg GlobalReg Int           -- ^ register plus offset
+data UnwindExpr = UwConst !Int                  -- ^ literal value
+                | UwReg !GlobalReg !Int         -- ^ register plus offset
                 | UwDeref UnwindExpr            -- ^ pointer dereferencing
                 | UwLabel CLabel
                 | UwPlus UnwindExpr UnwindExpr
@@ -277,17 +430,6 @@ instance Outputable UnwindExpr where
   pprPrec p (UwTimes e0 e1) | p <= 1
                             = pprPrec 2 e0 <> char '*' <> pprPrec 2 e1
   pprPrec _ other           = parens (pprPrec 0 other)
-
-extractUnwind :: CmmBlock -> UnwindTable
-extractUnwind b = go $ blockToList mid
-  where (_, mid, _) = blockSplit b
-        go :: [CmmNode O O] -> UnwindTable
-        go []       = Map.empty
-        go (x : xs) = case x of
-          CmmUnwind g so -> Map.insert g (toUnwindExpr so) $! go xs
-          CmmTick {}     -> go xs
-          _other         -> Map.empty
-                            -- TODO: Unwind statements after actual instructions
 
 -- | Conversion of Cmm expressions to unwind expressions. We check for
 -- unsupported operator usages and simplify the expression as far as

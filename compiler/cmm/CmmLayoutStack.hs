@@ -275,10 +275,11 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
        --
        let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
 
-           final_blocks = manifestSp dflags final_stackmaps stack0 sp0 final_sp_high entry0
-                              middle_pre sp_off last1 fixup_blocks
+       let final_blocks =
+               manifestSp dflags final_stackmaps stack0 sp0 final_sp_high
+                          entry0 middle_pre sp_off last1 fixup_blocks
 
-           acc_stackmaps' = mapUnion acc_stackmaps out
+       let acc_stackmaps' = mapUnion acc_stackmaps out
 
            -- If this block jumps to the GC, then we do not take its
            -- stack usage into account for the high-water mark.
@@ -793,19 +794,20 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     adj_pre_sp  = mapExpDeep (areaToSp dflags sp0            sp_high area_off)
     adj_post_sp = mapExpDeep (areaToSp dflags (sp0 - sp_off) sp_high area_off)
 
-    -- Add unwind pseudo-instructions to document Sp level for debugging
+    -- Add unwind pseudo-instructions at the beginning of each block to
+    -- document Sp level for debugging
     add_unwind_info block
-      | debugLevel dflags > 0 = CmmUnwind Sp sp_unwind : block
+      | debugLevel dflags > 0 =
+          CmmUnwind [(Sp, sp_unwind)] : block
       | otherwise             = block
     sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
 
-    final_middle = maybeAddSpAdj dflags sp_off $
-                   blockFromList $
-                   add_unwind_info $
-                   map adj_pre_sp $
-                   elimStackStores stack0 stackmaps area_off $
-                   middle_pre
-
+    final_middle = maybeAddSpAdj dflags sp_off
+                 . blockFromList
+                 . add_unwind_info
+                 . map adj_pre_sp
+                 . elimStackStores stack0 stackmaps area_off
+                 $ middle_pre
     final_last    = optStackCheck (adj_post_sp last)
 
     final_block   = blockJoin first final_middle final_last
@@ -823,9 +825,9 @@ getAreaOff stackmaps (Young l) =
 
 maybeAddSpAdj :: DynFlags -> ByteOff -> Block CmmNode O O -> Block CmmNode O O
 maybeAddSpAdj _      0      block = block
-maybeAddSpAdj dflags sp_off block
-   = block `blockSnoc` CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
-
+maybeAddSpAdj dflags sp_off block = block `blockSnoc` adj
+  where
+    adj = CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
 
 {-
 Sp(L) is the Sp offset on entry to block L relative to the base of the

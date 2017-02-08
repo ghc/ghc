@@ -635,8 +635,15 @@ stmt    :: { CmmParse () }
                 { pushStackFrame $3 $5 }
         | 'reserve' expr '=' lreg maybe_body
                 { reserveStackFrame $2 $4 $5 }
-        | 'unwind' GLOBALREG '=' expr
-                { $4 >>= code . emitUnwind $2 }
+        | 'unwind' unwind_regs ';'
+                { $2 >>= code . emitUnwind }
+
+unwind_regs
+        :: { CmmParse [(GlobalReg, CmmExpr)] }
+        : GLOBALREG '=' expr ',' unwind_regs
+                { do e <- $3; rest <- $5; return (($1, e) : rest) }
+        | GLOBALREG '=' expr
+                { do e <- $3; return [($1, e)] }
 
 foreignLabel     :: { CmmParse CmmExpr }
         : NAME                          { return (CmmLit (CmmLabel (mkForeignLabel $1 Nothing ForeignLabelInThisPackage IsFunction))) }

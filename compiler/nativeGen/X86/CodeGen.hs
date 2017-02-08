@@ -21,6 +21,7 @@
 module X86.CodeGen (
         cmmTopCodeGen,
         generateJumpTableForInstr,
+        extractUnwindPoints,
         InstrBlock
 )
 
@@ -37,7 +38,8 @@ import X86.Regs
 import X86.RegInfo
 import CodeGen.Platform
 import CPrim
-import Debug            ( DebugBlock(..) )
+import Debug            ( DebugBlock(..), UnwindPoint(..), UnwindTable
+                        , UnwindExpr(UwReg), toUnwindExpr )
 import Instruction
 import PIC
 import NCGMonad
@@ -69,9 +71,12 @@ import Util
 
 import Control.Monad
 import Data.Bits
+import Data.Foldable (fold)
 import Data.Int
 import Data.Maybe
 import Data.Word
+
+import qualified Data.Map as M
 
 is32BitPlatform :: NatM Bool
 is32BitPlatform = do
@@ -134,12 +139,13 @@ basicBlockCodeGen block = do
   mid_instrs <- stmtsToInstrs stmts
   tail_instrs <- stmtToInstrs tail
   let instrs = loc_instrs `appOL` mid_instrs `appOL` tail_instrs
+  instrs' <- fold <$> traverse addSpUnwindings instrs
   -- code generation may introduce new basic block boundaries, which
   -- are indicated by the NEWBLOCK instruction.  We must split up the
   -- instruction stream into basic blocks again.  Also, we extract
   -- LDATAs here too.
   let
-        (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs
+        (top,other_blocks,statics) = foldrOL mkBlocks ([],[],[]) instrs'
 
         mkBlocks (NEWBLOCK id) (instrs,blocks,statics)
           = ([], BasicBlock id instrs : blocks, statics)
@@ -149,6 +155,18 @@ basicBlockCodeGen block = do
           = (instr:instrs, blocks, statics)
   return (BasicBlock id top : other_blocks, statics)
 
+-- | Convert 'DELTA' instructions into 'UNWIND' instructions to capture changes
+-- in the @sp@ register. See Note [What is this unwinding business?] in Debug
+-- for details.
+addSpUnwindings :: Instr -> NatM (OrdList Instr)
+addSpUnwindings instr@(DELTA d) = do
+    dflags <- getDynFlags
+    if debugLevel dflags >= 1
+        then do lbl <- newBlockId
+                let unwind = M.singleton MachSp (UwReg MachSp $ negate d)
+                return $ toOL [ instr, UNWIND lbl unwind ]
+        else return (unitOL instr)
+addSpUnwindings instr = return $ unitOL instr
 
 stmtsToInstrs :: [CmmNode e x] -> NatM InstrBlock
 stmtsToInstrs stmts
@@ -163,7 +181,15 @@ stmtToInstrs stmt = do
   case stmt of
     CmmComment s   -> return (unitOL (COMMENT s))
     CmmTick {}     -> return nilOL
-    CmmUnwind {}   -> return nilOL
+
+    CmmUnwind regs -> do
+      let to_unwind_entry :: (GlobalReg, CmmExpr) -> UnwindTable
+          to_unwind_entry (reg, expr) = M.singleton reg (toUnwindExpr expr)
+      case foldMap to_unwind_entry regs of
+        tbl | M.null tbl -> return nilOL
+            | otherwise  -> do
+                lbl <- newBlockId
+                return $ unitOL $ UNWIND lbl tbl
 
     CmmAssign reg src
       | isFloatType ty         -> assignReg_FltCode format reg src
@@ -2264,8 +2290,7 @@ genCCall32' dflags target dest_regs args = do
             ChildCode64 code r_lo <- iselExpr64 arg
             delta <- getDeltaNat
             setDeltaNat (delta - 8)
-            let
-                r_hi = getHiVRegFromLo r_lo
+            let r_hi = getHiVRegFromLo r_lo
             return (       code `appOL`
                            toOL [PUSH II32 (OpReg r_hi), DELTA (delta - 4),
                                  PUSH II32 (OpReg r_lo), DELTA (delta - 8),
@@ -2712,6 +2737,10 @@ createJumpTable dflags ids section lbl
                   in map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
       in CmmData section (1, Statics lbl jumpTable)
+
+extractUnwindPoints :: [Instr] -> [UnwindPoint]
+extractUnwindPoints instrs =
+    [ UnwindPoint lbl unwinds | UNWIND lbl unwinds <- instrs]
 
 -- -----------------------------------------------------------------------------
 -- 'condIntReg' and 'condFltReg': condition codes into registers
