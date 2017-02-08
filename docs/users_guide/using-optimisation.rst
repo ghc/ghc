@@ -196,16 +196,20 @@ list.
 
 .. ghc-flag:: -fdicts-cheap
 
+    :default: off
+
     A very experimental flag that makes dictionary-valued expressions
     seem cheap to the optimiser.
 
 .. ghc-flag:: -fdicts-strict
 
+    :default: off
+
     Make dictionaries strict.
 
 .. ghc-flag:: -fdmd-tx-dict-sel
 
-    *On by default for ``-O0``, ``-O``, ``-O2``.*
+    :default: on
 
     Use a special demand transformer for dictionary selectors.
 
@@ -224,12 +228,16 @@ list.
 
 .. ghc-flag:: -feager-blackholing
 
+    :default: off
+
     Usually GHC black-holes a thunk only when it switches threads. This
     flag makes it do so as soon as the thunk is entered. See `Haskell on
     a shared-memory
     multiprocessor <http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/>`__.
 
 .. ghc-flag:: -fexcess-precision
+
+    :default: off
 
     When this option is given, intermediate floating point values can
     have a *greater* precision/range than the final type. Generally this
@@ -243,6 +251,8 @@ list.
     :ref:`bugs-ghc`.
 
 .. ghc-flag:: -fexpose-all-unfoldings
+
+    :default: off
 
     An experimental flag to expose all unfoldings, even for very large
     or recursive functions. This allows for all functions to be inlined
@@ -309,12 +319,16 @@ list.
 
 .. ghc-flag:: -fignore-interface-pragmas
 
+    :default: off
+
     Tells GHC to ignore all inessential information when reading
     interface files. That is, even if :file:`M.hi` contains unfolding or
     strictness information for a function, GHC will ignore that
     information.
 
 .. ghc-flag:: -flate-dmd-anal
+
+    :default: off
 
     Run demand analysis again, at the end of the simplification
     pipeline. We found some opportunities for discovering strictness
@@ -325,11 +339,12 @@ list.
 
 .. ghc-flag:: -fliberate-case
 
-    *Off by default, but enabled by -O2.* Turn on the liberate-case
-    transformation. This unrolls recursive function once in its own RHS,
-    to avoid repeated case analysis of free variables. It's a bit like
-    the call-pattern specialiser (:ghc-flag:`-fspec-constr`) but for free
-    variables rather than arguments.
+    :default: off but enabled with :ghc-flag:`-O2`.
+
+    Turn on the liberate-case transformation. This unrolls recursive function
+    once in its own RHS, to avoid repeated case analysis of free variables. It's
+    a bit like the call-pattern specialiser (:ghc-flag:`-fspec-constr`) but for
+    free variables rather than arguments.
 
 .. ghc-flag:: -fliberate-case-threshold=<n>
 
@@ -401,13 +416,19 @@ list.
 
 .. ghc-flag:: -fno-opt-coercion
 
+    :default: off
+
     Turn off the coercion optimiser.
 
 .. ghc-flag:: -fno-pre-inlining
 
+    :default: off
+
     Turn off pre-inlining.
 
 .. ghc-flag:: -fno-state-hack
+
+    :default: off
 
     Turn off the "state hack" whereby any lambda with a ``State#`` token
     as argument is considered to be single-entry, hence it is considered
@@ -415,6 +436,8 @@ list.
     and ST monad code, but it runs the risk of reducing sharing.
 
 .. ghc-flag:: -fomit-interface-pragmas
+
+    :default: off
 
     Tells GHC to omit all inessential information from the interface
     file generated for the module being compiled (say M). This means
@@ -495,9 +518,11 @@ list.
 
 .. ghc-flag:: -fspec-constr
 
-    *Off by default, but enabled by -O2.* Turn on call-pattern
-    specialisation; see `Call-pattern specialisation for Haskell
-    programs <http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm>`__.
+    :default: off but enabled by :ghc-flag:`-O2`.
+
+    Turn on call-pattern specialisation; see `Call-pattern specialisation for
+    Haskell programs
+    <http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm>`__.
 
     This optimisation specializes recursive functions according to their
     argument "shapes". This is best explained by example so consider: ::
@@ -601,7 +626,7 @@ list.
 
 .. ghc-flag:: -fsolve-constant-dicts
 
-    :default on
+    :default: on
 
     When solving constraints, try to eagerly solve
     super classes using availible dictionaries.
@@ -631,6 +656,8 @@ list.
 
 
 .. ghc-flag:: -fstatic-argument-transformation
+
+    :default: off
 
     Turn on the static argument transformation, which turns a recursive
     function into a non-recursive one with a local recursive loop. See
@@ -695,6 +722,8 @@ list.
 
 .. ghc-flag:: -funbox-strict-fields
 
+    :default: off
+
     .. index::
        single: strict constructor fields
        single: constructor fields, strict
@@ -710,6 +739,9 @@ list.
     ``-funbox-strict-fields`` to turn on unboxing by default but disable
     it for certain constructor fields using the ``NOUNPACK`` pragma (see
     :ref:`nounpack-pragma`).
+
+    Alternatively you can use :ghc-flag:`-funbox-small-strict-fields` to only
+    unbox strict fields which are "small".
 
 .. ghc-flag:: -funfolding-creation-threshold=<n>
 
