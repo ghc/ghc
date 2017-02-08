@@ -1945,19 +1945,18 @@ primop  CasMutVarOp "casMutVar#" GenPrimOp
 section "Exceptions"
 ------------------------------------------------------------------------
 
-{- Note [Strictness for mask/unmask/catch]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider this example, which comes from GHC.IO.Handle.Internals:
-   wantReadableHandle3 f ma b st
-     = case ... of
-         DEFAULT -> case ma of MVar a -> ...
-         0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
-The outer case just decides whether to mask exceptions, but we don't want
-thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
-
-For catch, we must be extra careful; see
-Note [Exceptions and strictness] in Demand
--}
+-- Note [Strictness for mask/unmask/catch]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Consider this example, which comes from GHC.IO.Handle.Internals:
+--    wantReadableHandle3 f ma b st
+--      = case ... of
+--          DEFAULT -> case ma of MVar a -> ...
+--          0#      -> maskAsynchExceptions# (\st -> case ma of MVar a -> ...)
+-- The outer case just decides whether to mask exceptions, but we don't want
+-- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
+--
+-- For catch, we must be extra careful; see
+-- Note [Exceptions and strictness] in Demand
 
 primop  CatchOp "catch#" GenPrimOp
           (State# RealWorld -> (# State# RealWorld, a #) )
