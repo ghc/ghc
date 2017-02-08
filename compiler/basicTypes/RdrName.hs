@@ -800,15 +800,16 @@ lookupGRE_Name env name
   = lookupGRE_Name_OccName env name (nameOccName name)
 
 lookupGRE_FieldLabel :: GlobalRdrEnv -> FieldLabel -> Maybe GlobalRdrElt
--- ^ Look for a particular record field selector in the environment,
--- where the selector name and field label may be different: the
--- GlobalRdrEnv is keyed on the label.
+-- ^ Look for a particular record field selector in the environment, where the
+-- selector name and field label may be different: the GlobalRdrEnv is keyed on
+-- the label.  See Note [Parents for record fields] for why this happens.
 lookupGRE_FieldLabel env fl
   = lookupGRE_Name_OccName env (flSelector fl) (mkVarOccFS (flLabel fl))
 
 lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
--- ^ Look for precisely this 'Name' in the environment, but with an
--- 'OccName' that might differ from that of the 'Name'.
+-- ^ Look for precisely this 'Name' in the environment, but with an 'OccName'
+-- that might differ from that of the 'Name'.  See 'lookupGRE_FieldLabel' and
+-- Note [Parents for record fields].
 lookupGRE_Name_OccName env name occ
   = case [ gre | gre <- lookupGlobalRdrEnv env occ
                , gre_name gre == name ] of

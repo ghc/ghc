@@ -295,6 +295,8 @@ data HsExpr id
 
   | HsOverLabel (Maybe id) FastString
      -- ^ Overloaded label (Note [Overloaded labels] in GHC.OverloadedLabels)
+     --   @Just id@ means @RebindableSyntax@ is in use, and gives the id of the
+     --   in-scope 'fromLabel'.
      --   NB: Not in use after typechecking
 
   | HsIPVar   HsIPName       -- ^ Implicit parameter (not in use after typechecking)

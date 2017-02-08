@@ -2816,8 +2816,10 @@ instFlexiHelper subst tv
        ; return (extendTvSubst subst tv ty') }
 
 tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
-           -> Id
-           -> TcS ([(Name, TcTyVar)], TcThetaType, TcType)
+                   -- ^ How to instantiate the type variables
+           -> Id   -- ^ Type to instantiate
+           -> TcS ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
+                -- (type vars, preds (incl equalities), rho)
 tcInstType inst_tyvars id = wrapTcS (TcM.tcInstType inst_tyvars id)
 
 
