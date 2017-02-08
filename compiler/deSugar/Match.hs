@@ -518,11 +518,16 @@ tidy_bang_pat v _ p@(SumPat {})    = tidy1 v p
 tidy_bang_pat v _ p@(PArrPat {})   = tidy1 v p
 
 -- Data/newtype constructors
-tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc), pat_args = args })
-  | isNewTyCon (dataConTyCon dc)   -- Newtypes: push bang inwards (Trac #9844)
-  = tidy1 v (p { pat_args = push_bang_into_newtype_arg l args })
-  | otherwise                      -- Data types: discard the bang
-  = tidy1 v p
+tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
+                               , pat_args = args
+                               , pat_arg_tys = arg_tys })
+  -- Newtypes: push bang inwards (Trac #9844)
+  =
+    if isNewTyCon (dataConTyCon dc)
+      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l ty args })
+      else tidy1 v p  -- Data types: discard the bang
+    where
+      (ty:_) = dataConInstArgTys dc arg_tys
 
 -------------------
 -- Default case, leave the bang there:
@@ -542,18 +547,24 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc), pat_args = args
 tidy_bang_pat _ l p = return (idDsWrapper, BangPat (L l p))
 
 -------------------
-push_bang_into_newtype_arg :: SrcSpan -> HsConPatDetails Id -> HsConPatDetails Id
+push_bang_into_newtype_arg :: SrcSpan
+                           -> Type -- The type of the argument we are pushing
+                                   -- onto
+                           -> HsConPatDetails Id -> HsConPatDetails Id
 -- See Note [Bang patterns and newtypes]
 -- We are transforming   !(N p)   into   (N !p)
-push_bang_into_newtype_arg l (PrefixCon (arg:args))
+push_bang_into_newtype_arg l _ty (PrefixCon (arg:args))
   = ASSERT( null args)
     PrefixCon [L l (BangPat arg)]
-push_bang_into_newtype_arg l (RecCon rf)
+push_bang_into_newtype_arg l _ty (RecCon rf)
   | HsRecFields { rec_flds = L lf fld : flds } <- rf
   , HsRecField { hsRecFieldArg = arg } <- fld
   = ASSERT( null flds)
     RecCon (rf { rec_flds = [L lf (fld { hsRecFieldArg = L l (BangPat arg) })] })
-push_bang_into_newtype_arg _ cd
+push_bang_into_newtype_arg l ty (RecCon rf) -- If a user writes !(T {})
+  | HsRecFields { rec_flds = [] } <- rf
+  = PrefixCon [L l (BangPat (noLoc (WildPat ty)))]
+push_bang_into_newtype_arg _ _ cd
   = pprPanic "push_bang_into_newtype_arg" (pprConArgs cd)
 
 {-
@@ -567,6 +578,9 @@ we definitely can't discard the bang.  Trac #9844.
 So what we do is to push the bang inwards, in the hope that it will
 get discarded there.  So we transform
    !(N pat)   into    (N !pat)
+
+But what if there is nothing to push the bang onto? In at least one instance
+a user has written !(N {}) which we translate into (N !_). See #13215
 
 
 \noindent
