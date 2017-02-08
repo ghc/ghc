@@ -1638,18 +1638,9 @@ approximateWC float_past_equalities wc
     float_wc :: TcTyCoVarSet -> WantedConstraints -> Cts
     float_wc trapping_tvs (WC { wc_simple = simples, wc_impl = implics })
       = filterBag is_floatable simples `unionBags`
-        do_bag (float_implic new_trapping_tvs) implics
+        do_bag (float_implic trapping_tvs) implics
       where
-        is_floatable ct = tyCoVarsOfCt ct `disjointVarSet` new_trapping_tvs
-        new_trapping_tvs = transCloVarSet grow trapping_tvs
-
-        grow :: VarSet -> VarSet  -- Maps current trapped tyvars to newly-trapped ones
-        grow so_far = foldrBag (grow_one so_far) emptyVarSet simples
-        grow_one so_far ct tvs
-          | ct_tvs `intersectsVarSet` so_far = tvs `unionVarSet` ct_tvs
-          | otherwise                        = tvs
-          where
-            ct_tvs = tyCoVarsOfCt ct
+        is_floatable ct = tyCoVarsOfCt ct `disjointVarSet` trapping_tvs
 
     float_implic :: TcTyCoVarSet -> Implication -> Cts
     float_implic trapping_tvs imp
@@ -1673,7 +1664,7 @@ out from inside, if they are not captured by skolems.
 The same function is used when doing type-class defaulting (see the call
 to applyDefaultingRules) to extract constraints that that might be defaulted.
 
-There are two caveats:
+There is one caveat:
 
 1.  When infering most-general types (in simplifyInfer), we do *not*
     float anything out if the implication binds equality constraints,
@@ -1696,20 +1687,32 @@ There are two caveats:
    the most-general type; and we /do/ want to float out of equalities.
    Hence the boolean flag to approximateWC.
 
-2. We do not float out an inner constraint that shares a type variable
-   (transitively) with one that is trapped by a skolem.  Eg
-       forall a.  F a ~ beta, Integral beta
-   We don't want to float out (Integral beta).  Doing so would be bad
-   when defaulting, because then we'll default beta:=Integer, and that
-   makes the error message much worse; we'd get
-       Can't solve  F a ~ Integer
-   rather than
-       Can't solve  Integral (F a)
+------ Historical note -----------
+There used to be a second caveat, driven by Trac #8155
 
-   Moreover, floating out these "contaminated" constraints doesn't help
-   when generalising either. If we generalise over (Integral b), we still
-   can't solve the retained implication (forall a. F a ~ b).  Indeed,
-   arguably that too would be a harder error to understand.
+   2. We do not float out an inner constraint that shares a type variable
+      (transitively) with one that is trapped by a skolem.  Eg
+          forall a.  F a ~ beta, Integral beta
+      We don't want to float out (Integral beta).  Doing so would be bad
+      when defaulting, because then we'll default beta:=Integer, and that
+      makes the error message much worse; we'd get
+          Can't solve  F a ~ Integer
+      rather than
+          Can't solve  Integral (F a)
+
+      Moreover, floating out these "contaminated" constraints doesn't help
+      when generalising either. If we generalise over (Integral b), we still
+      can't solve the retained implication (forall a. F a ~ b).  Indeed,
+      arguably that too would be a harder error to understand.
+
+But this transitive closure stuff gives rise to a complex rule for
+when defaulting actually happens, and one that was never documented.
+Moreover (Trac #12923), the more complex rule is sometimes NOT what
+you want.  So I simply removed the extra code to implement the
+contamination stuff.  There was zero effect on the testsuite (not even
+#8155).
+------ End of historical note -----------
+
 
 Note [DefaultTyVar]
 ~~~~~~~~~~~~~~~~~~~
