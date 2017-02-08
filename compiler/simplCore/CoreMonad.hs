@@ -83,6 +83,7 @@ import Data.Dynamic
 import Data.IORef
 import Data.Map (Map)
 import qualified Data.Map as Map
+import qualified Data.Map.Strict as MapStrict
 import Data.Word
 import Control.Monad
 import Control.Applicative ( Alternative(..) )
@@ -311,19 +312,13 @@ doSimplTick dflags tick
 doSimplTick _ _ (VerySimplCount n) = VerySimplCount (n+1)
 
 
--- Don't use Map.unionWith because that's lazy, and we want to
--- be pretty strict here!
 addTick :: TickCounts -> Tick -> TickCounts
-addTick fm tick = case Map.lookup tick fm of
-                        Nothing -> Map.insert tick 1 fm
-                        Just n  -> n1 `seq` Map.insert tick n1 fm
-                                where
-                                   n1 = n+1
-
+addTick fm tick = MapStrict.insertWith (+) tick 1 fm
 
 plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
                sc2@(SimplCount { ticks = tks2, details = dts2 })
-  = log_base { ticks = tks1 + tks2, details = Map.unionWith (+) dts1 dts2 }
+  = log_base { ticks = tks1 + tks2
+             , details = MapStrict.unionWith (+) dts1 dts2 }
   where
         -- A hackish way of getting recent log info
     log_base | null (log1 sc2) = sc1    -- Nothing at all in sc2
