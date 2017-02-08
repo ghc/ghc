@@ -51,7 +51,6 @@ import Control.Monad (forM, when, forM_)
 import Coercion
 import TcEvidence
 import IOEnv
-import Data.Monoid   ( Monoid(mappend) )
 
 import ListT (ListT(..), fold, select)
 
@@ -1606,7 +1605,7 @@ dsPmWarn :: DynFlags -> DsMatchContext -> PmResult -> DsM ()
 dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
   = when (flag_i || flag_u) $ do
       let exists_r = flag_i && notNull redundant && onlyBuiltin
-          exists_i = flag_i && notNull inaccessible && onlyBuiltin
+          exists_i = flag_i && notNull inaccessible && onlyBuiltin && not is_rec_upd
           exists_u = flag_u && (case uncovered of
                                   TypeOfUncovered   _ -> True
                                   UncoveredPatterns u -> notNull u)
@@ -1632,6 +1631,9 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     flag_u = exhaustive dflags kind
     flag_u_reason = maybe NoReason Reason (exhaustiveWarningFlag kind)
 
+    is_rec_upd = case kind of { RecUpd -> True; _ -> False }
+       -- See Note [Inaccessible warnings for record updates]
+
     onlyBuiltin = prov == FromBuiltin
 
     maxPatterns = maxUncoveredPatterns dflags
@@ -1653,6 +1655,28 @@ dsPmWarn dflags ctx@(DsMatchContext kind loc) pm_result
     -- which we only know the type and have no inhabitants at hand)
     warnEmptyCase ty = pp_context False ctx (text "are non-exhaustive") $ \_ ->
       hang (text "Patterns not matched:") 4 (underscore <+> dcolon <+> ppr ty)
+
+{- Note [Inaccessible warnings for record updates]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (Trac #12957)
+  data T a where
+    T1 :: { x :: Int } -> T Bool
+    T2 :: { x :: Int } -> T a
+    T3 :: T a
+
+  f :: T Char -> T a
+  f r = r { x = 3 }
+
+The desugarer will (conservatively generate a case for T1 even though
+it's impossible:
+  f r = case r of
+          T1 x -> T1 3   -- Inaccessible branch
+          T2 x -> T2 3
+          _    -> error "Missing"
+
+We don't want to warn about the inaccessible branch because the programmer
+didn't put it there!  So we filter out the warning here.
+-}
 
 -- | Issue a warning when the predefined number of iterations is exceeded
 -- for the pattern match checker
