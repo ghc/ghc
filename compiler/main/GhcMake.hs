@@ -414,7 +414,7 @@ load' how_much mHscMessage mod_graph = do
                  = findPartiallyCompletedCycles modsDone_names
                       mg2_with_srcimps
           let mods_to_keep
-                 = filter ((`notElem` mods_to_zap_names).ms_mod)
+                 = filter ((`Set.notMember` mods_to_zap_names).ms_mod)
                       modsDone
 
           hsc_env1 <- getSession
@@ -575,23 +575,18 @@ pruneHomePackageTable hpt summ (stable_obj, stable_bco)
 --
 -- | Return (names of) all those in modsDone who are part of a cycle as defined
 -- by theGraph.
-findPartiallyCompletedCycles :: [Module] -> [SCC ModSummary] -> [Module]
+findPartiallyCompletedCycles :: [Module] -> [SCC ModSummary] -> Set.Set Module
 findPartiallyCompletedCycles modsDone theGraph
-   = chew theGraph
-     where
-        chew [] = []
-        chew ((AcyclicSCC _):rest) = chew rest    -- acyclic?  not interesting.
-        chew ((CyclicSCC vs):rest)
-           = let names_in_this_cycle = nub (map ms_mod vs)
-                 mods_in_this_cycle
-                    = nub ([done | done <- modsDone,
-                                   done `elem` names_in_this_cycle])
-                 chewed_rest = chew rest
-             in
-             if   notNull mods_in_this_cycle
-                  && length mods_in_this_cycle < length names_in_this_cycle
-             then mods_in_this_cycle ++ chewed_rest
-             else chewed_rest
+   = Set.unions
+       [mods_in_this_cycle
+       | CyclicSCC vs <- theGraph  -- Acyclic? Not interesting.
+       , let names_in_this_cycle = Set.fromList (map ms_mod vs)
+             mods_in_this_cycle =
+                    Set.intersection (Set.fromList modsDone) names_in_this_cycle
+         -- If size mods_in_this_cycle == size names_in_this_cycle,
+         -- then this cycle has already been completed and we're not
+         -- interested.
+       , Set.size mods_in_this_cycle < Set.size names_in_this_cycle]
 
 
 -- ---------------------------------------------------------------------------
