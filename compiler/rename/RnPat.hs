@@ -618,20 +618,20 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
            ; (rdr_env, lcl_env) <- getRdrEnvs
            ; con_fields <- lookupConstructorFields con
            ; when (null con_fields) (addErr (badDotDotCon con))
-           ; let present_flds = map (occNameFS . rdrNameOcc) $ getFieldLbls flds
+           ; let present_flds = mkOccSet $ map rdrNameOcc (getFieldLbls flds)
 
                    -- For constructor uses (but not patterns)
                    -- the arg should be in scope locally;
                    -- i.e. not top level or imported
                    -- Eg.  data R = R { x,y :: Int }
                    --      f x = R { .. }   -- Should expand to R {x=x}, not R{x=x,y=y}
-                 arg_in_scope lbl = mkVarUnqual lbl `elemLocalRdrEnv` lcl_env
+                 arg_in_scope lbl = mkRdrUnqual lbl `elemLocalRdrEnv` lcl_env
 
                  (dot_dot_fields, dot_dot_gres)
                         = unzip [ (fl, gre)
                                 | fl <- con_fields
-                                , let lbl = flLabel fl
-                                , not (lbl `elem` present_flds)
+                                , let lbl = mkVarOccFS (flLabel fl)
+                                , not (lbl `elemOccSet` present_flds)
                                 , Just gre <- [lookupGRE_FieldLabel rdr_env fl]
                                               -- Check selector is in scope
                                 , case ctxt of
