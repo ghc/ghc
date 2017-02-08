@@ -49,12 +49,6 @@ module GHC.OverloadedLabels
        ) where
 
 import GHC.Base ( Symbol )
-import GHC.Records
 
 class IsLabel (x :: Symbol) a where
   fromLabel :: a
-
--- | If an overloaded label is used at function type, it will be
--- treated as an overloaded record field selector using 'HasField'.
-instance HasField x r a => IsLabel x (r -> a) where
-  fromLabel = getField @x

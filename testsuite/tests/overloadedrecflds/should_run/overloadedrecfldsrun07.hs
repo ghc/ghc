@@ -11,7 +11,7 @@
            , UndecidableInstances
   #-}
 
-import qualified GHC.OverloadedLabels as OL
+import GHC.OverloadedLabels
 import GHC.Records
 import GHC.TypeLits
 
@@ -29,8 +29,11 @@ instance {-# OVERLAPS #-} a ~ b => HasField foo (Rec ('(foo, a) ': xs)) b where
 instance HasField foo (Rec xs) b => HasField foo (Rec ('(bar, a) ': xs)) b where
   getField (_ :> vs) = getField @foo vs
 
-instance y ~ x => OL.IsLabel y (Label x) where
+instance y ~ x => IsLabel y (Label x) where
   fromLabel = Label
+
+instance HasField x r a => IsLabel x (r -> a) where
+  fromLabel = getField @x
 
 x :: Rec '[ '("foo", Int), '("bar", Bool)]
 x = #foo := 42 :> #bar := True :> Nil

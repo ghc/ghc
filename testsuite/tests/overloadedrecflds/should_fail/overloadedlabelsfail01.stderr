@@ -1,13 +1,7 @@
 
 overloadedlabelsfail01.hs:6:5: error:
-    • Ambiguous type variable ‘t0’ arising from the overloaded label ‘#x’
-      prevents the constraint ‘(IsLabel "x" t0)’ from being solved.
-      Relevant bindings include
-        a :: t0 (bound at overloadedlabelsfail01.hs:6:1)
-      Probable fix: use a type annotation to specify what ‘t0’ should be.
-      These potential instance exist:
-        instance GHC.Records.HasField x r a => IsLabel x (r -> a)
-          -- Defined in ‘GHC.OverloadedLabels’
+    • No instance for (IsLabel "x" t0)
+        arising from the overloaded label ‘#x’
     • In the expression: #x
       In an equation for ‘a’: a = #x
 
