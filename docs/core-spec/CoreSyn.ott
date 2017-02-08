@@ -342,9 +342,9 @@ terminals :: 'terminals_' ::=
   | isNewTyCon   ::   :: isNewTyCon       {{ tex \textsf{isNewTyCon} }}
   | Constraint   ::   :: Constraint       {{ tex \textsf{Constraint} }}
   | TYPE         ::   :: TYPE             {{ tex \textsf{TYPE} }}
-  | Levity       ::   :: Levity           {{ tex \textsf{Levity} }}
-  | Lifted       ::   :: Lifted           {{ tex \textsf{Lifted} }}
-  | Unlifted       ::   :: Unlifted           {{ tex \textsf{Unlifted} }}
+  | RuntimeRep   ::   :: RuntimeRep       {{ tex \textsf{RuntimeRep} }}
+  | LiftedRep    ::   :: LiftedRep        {{ tex \textsf{LiftedRep} }}
+  | UnliftedRep  ::   :: UnliftedRep      {{ tex \textsf{UnliftedRep} }}
   | no_conflict  ::   :: no_conflict      {{ tex \textsf{no\_conflict} }}
   | apart        ::   :: apart            {{ tex \textsf{apart} }}
   | kind         ::   :: kind             {{ tex \textsf{kind} }}
