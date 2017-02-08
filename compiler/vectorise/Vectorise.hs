@@ -71,7 +71,7 @@ vectModule guts@(ModGuts { mg_tcs        = tycons
 
           -- Vectorise the type environment.  This will add vectorised
           -- type constructors, their representations, and the
-          -- conrresponding data constructors.  Moreover, we produce
+          -- corresponding data constructors.  Moreover, we produce
           -- bindings for dfuns and family instances of the classes
           -- and type families used in the DPH library to represent
           -- array types.

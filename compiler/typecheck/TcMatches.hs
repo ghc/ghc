@@ -237,7 +237,7 @@ tcMatch ctxt pat_tys rhs_ty match
     tc_grhss _ (Just {}) _ _
       = panic "tc_ghrss"        -- Rejected by renamer
 
-        -- For (\x -> e), tcExpr has already said "In the expresssion \x->e"
+        -- For (\x -> e), tcExpr has already said "In the expression \x->e"
         -- so we don't want to add "In the lambda abstraction \x->e"
     add_match_ctxt match thing_inside
         = case mc_what ctxt of

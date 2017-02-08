@@ -1660,7 +1660,7 @@ atomPrimRep (AnnVar v)              = bcIdPrimRep v
 atomPrimRep (AnnLit l)              = typePrimRep1 (literalType l)
 
 -- Trac #12128:
--- A case expresssion can be an atom because empty cases evaluate to bottom.
+-- A case expression can be an atom because empty cases evaluate to bottom.
 -- See Note [Empty case alternatives] in coreSyn/CoreSyn.hs
 atomPrimRep (AnnCase _ _ ty _)      = ASSERT(typePrimRep ty == [LiftedRep]) LiftedRep
 atomPrimRep (AnnCoercion {})        = VoidRep

@@ -1112,7 +1112,7 @@ unboxed thing to f, and have it reboxed in the error cases....]
 
 However we *don't* want to do this when the argument is not actually
 taken apart in the function at all.  Otherwise we risk decomposing a
-masssive tuple which is barely used.  Example:
+massive tuple which is barely used.  Example:
 
         f :: ((Int,Int) -> String) -> (Int,Int) -> a
         f g pr = error (g pr)

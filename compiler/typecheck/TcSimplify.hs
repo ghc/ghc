@@ -1971,7 +1971,7 @@ to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
 
 applyDefaultingRules :: WantedConstraints -> TcS Bool
 -- True <=> I did some defaulting, by unifying a meta-tyvar
--- Imput WantedConstraints are not necessarily zonked
+-- Input WantedConstraints are not necessarily zonked
 
 applyDefaultingRules wanteds
   | isEmptyWC wanteds

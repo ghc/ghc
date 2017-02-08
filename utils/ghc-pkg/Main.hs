@@ -532,7 +532,7 @@ readPackageArg AsDefault str = Id `fmap` readGlobPkgId str
 data PackageDB
   = PackageDB {
       location, locationAbsolute :: !FilePath,
-      -- We need both possibly-relative and definately-absolute package
+      -- We need both possibly-relative and definitely-absolute package
       -- db locations. This is because the relative location is used as
       -- an identifier for the db, so it is important we do not modify it.
       -- On the other hand we need the absolute path in a few places

@@ -3362,7 +3362,7 @@ findBreakByLine line arr
         (comp, incomp) = partition ends_here starts_here
             where ends_here (_,pan) = GHC.srcSpanEndLine pan == line
 
--- The aim is to find the breakpionts for all the RHSs of the
+-- The aim is to find the breakpoints for all the RHSs of the
 -- equations corresponding to a binding.  So we find all breakpoints
 -- for
 --   (a) this binder only (not a nested declaration)

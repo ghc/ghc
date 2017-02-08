@@ -3050,7 +3050,7 @@ data CtOrigin
                                 -- actual desugaring to MonadFail.fail is live.
   | Shouldn'tHappenOrigin String
                             -- the user should never see this one,
-                            -- unlesss ImpredicativeTypes is on, where all
+                            -- unless ImpredicativeTypes is on, where all
                             -- bets are off
   | InstProvidedOrigin Module ClsInst
         -- Skolem variable arose when we were testing if an instance

@@ -6877,7 +6877,7 @@ completely covers the cases covered by the instance head.
 
 -  A historical note.  In the past (but no longer), GHC allowed you to
    write *multiple* type or data family instances for a single
-   asssociated type.  For example: ::
+   associated type.  For example: ::
 
        instance GMapKey Flob where
          data GMap Flob [v] = G1 v

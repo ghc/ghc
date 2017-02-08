@@ -639,7 +639,7 @@ refineDefaultAlt :: [Unique] -> TyCon -> [Type]
                  -> [AltCon]  -- Constructors that cannot match the DEFAULT (if any)
                  -> [CoreAlt]
                  -> (Bool, [CoreAlt])
--- Refine the default alterantive to a DataAlt,
+-- Refine the default alternative to a DataAlt,
 -- if there is a unique way to do so
 refineDefaultAlt us tycon tys imposs_deflt_cons all_alts
   | (DEFAULT,_,rhs) : rest_alts <- all_alts

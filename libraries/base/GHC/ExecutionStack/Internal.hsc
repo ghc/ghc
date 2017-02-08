@@ -49,7 +49,7 @@ data SrcLoc = SrcLoc { sourceFile   :: String
                      , sourceColumn :: Int
                      }
 
--- | Location information about an addresss from a backtrace.
+-- | Location information about an address from a backtrace.
 data Location = Location { objectName   :: String
                          , functionName :: String
                          , srcLoc       :: Maybe SrcLoc

@@ -4,7 +4,7 @@ The problem addressed in that ticket was that under some circumstances,
 GHC < 7.10.3 was failing to perform eta reduction deterministically.
 
 Compiling this code now (2016/03/16) under ghc-7.8.4 and git HEAD shows that
-ghc-7.8.4 produces more complicated code, with a number of extra lambadas which
+ghc-7.8.4 produces more complicated code, with a number of extra lambdas which
 are completely absent in the fast version.
 
 Git HEAD current produces:

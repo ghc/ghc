@@ -336,7 +336,7 @@ shouldSink _ _other = Nothing
 
 --
 -- discard dead assignments.  This doesn't do as good a job as
--- removeDeadAsssignments, because it would need multiple passes
+-- removeDeadAssignments, because it would need multiple passes
 -- to get all the dead code, but it catches the common case of
 -- superfluous reloads from the stack that the stack allocator
 -- leaves behind.

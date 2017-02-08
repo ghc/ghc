@@ -461,7 +461,7 @@ lvlCase env scrut_fvs scrut' case_bndr ty alts
 
     incd_lvl = incMinorLvl (le_ctxt_lvl env)
     dest_lvl = maxFvLevel (const True) env scrut_fvs
-            -- Don't abstact over type variables, hence const True
+            -- Don't abstract over type variables, hence const True
 
     lvl_alt alts_env (con, bs, rhs)
       = do { rhs' <- lvlMFE new_env True rhs
@@ -478,7 +478,7 @@ Consider this:
   f x vs = case x of { MkT y ->
              let f vs = ...(case y of I# w -> e)...f..
              in f vs
-Here we can float the (case y ...) out , because y is sure
+Here we can float the (case y ...) out, because y is sure
 to be evaluated, to give
   f x vs = case x of { MkT y ->
            caes y of I# w ->
@@ -659,7 +659,7 @@ escape a value lambda (and hence save work), for two reasons:
 
   * (Minor) Doing so may turn a dynamic allocation (done by machine
     instructions) into a static one. Minor because we are assuming
-    we are not escaping a value lambda
+    we are not escaping a value lambda.
 
 But do not so if:
      - the context is a strict, and
@@ -699,7 +699,7 @@ Exammples:
   we don't (see the use of idStrictness in lvlApp).  It's not clear
   if this test is worth the bother: it's only about CAFs!
 
-It's controlled by a flag (floatConsts) , because doing this too
+It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
 I think this is obselete; the flag seems always on.]
@@ -745,7 +745,7 @@ we'd like to float the call to error, to get
 * Bottoming floats (1): Furthermore, we want to float a bottoming
   expression even if it has free variables:
         f = \x. g (let v = h x in error ("urk" ++ v))
-  Then we'd like to abstact over 'x' can float the whole arg of g:
+  Then we'd like to abstract over 'x' can float the whole arg of g:
         lvl = \x. let v = h x in error ("urk" ++ v)
         f = \x. g (lvl x)
   To achieve this we pass is_bot to destLevel
@@ -798,7 +798,7 @@ in exchange we build a thunk, which is bad.  This case reduces allocation
 by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
 Doesn't change any other allocation at all.
 
-We will make a separate decision for the scrutinees and alterantives.
+We will make a separate decision for the scrutinees and alternatives.
 
 Note [Join points and MFEs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1144,7 +1144,7 @@ lvlFloatRhs abs_vars dest_lvl env rec mb_join_arity rhs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When float the RHS of a let-binding, we don't always want to apply
 lvlMFE to the body of a lambda, as we usually do, because the entire
-binding body is already going to the right place (dest_lvl)
+binding body is already going to the right place (dest_lvl).
 
 A particular example is the top level.  Consider
    concat = /\ a -> foldr ..a.. (++) []
@@ -1165,7 +1165,7 @@ But we must be careful!  If we had
 we /would/ want to float that (factorial 20) out!  Functions are treated
 differently: see the use of isFunction in the calls to destLevel. If
 there are only type lambdas, then destLevel will say "go to top, and
-abstract over the free tyars" and we don't want that here.
+abstract over the free tyvars" and we don't want that here.
 
 Conclusion: use lvlMFE if there are any value lambdas, lvlExpr
 otherwise.  A little subtle, and I got it wrong to start with.

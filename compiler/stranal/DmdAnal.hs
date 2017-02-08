@@ -1019,7 +1019,7 @@ mentioned in the (unsound) strictness signature, conservatively approximate the
 demand put on them (topDmd), and add that to the "lazy_fv" returned by "dmdFix".
 
 
-Note [Lamba-bound unfoldings]
+Note [Lambda-bound unfoldings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We allow a lambda-bound variable to carry an unfolding, a facility that is used
 exclusively for join points; see Note [Case binders and join points].  If so,

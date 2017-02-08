@@ -593,7 +593,7 @@ Conceptually, this class has infinitely many instances:
   ...
 
 In practice, we solve `KnownNat` predicates in the type-checker
-(see typecheck/TcInteract.hs) because we can't have infinately many instances.
+(see typecheck/TcInteract.hs) because we can't have infinitely many instances.
 The evidence (aka "dictionary") for `KnownNat` is of the form `EvLit (EvNum n)`.
 
 We make the following assumptions about dictionaries in GHC:

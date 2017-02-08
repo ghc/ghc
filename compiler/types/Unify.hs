@@ -574,7 +574,7 @@ a substitution to make two types say True to eqType. NB: eqType is
 itself not purely syntactic; it accounts for CastTys;
 see Note [Non-trivial definitional equality] in TyCoRep
 
-Unlike the "impure unifers" in the typechecker (the eager unifier in
+Unlike the "impure unifiers" in the typechecker (the eager unifier in
 TcUnify, and the constraint solver itself in TcCanonical), the pure
 unifier It does /not/ work up to ~.
 

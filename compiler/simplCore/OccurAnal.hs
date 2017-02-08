@@ -1141,7 +1141,7 @@ otherwise), the loop does not unravel nicely.
 
 @occAnalUnfolding@ deals with the question of bindings where the Id is marked
 by an INLINE pragma.  For these we record that anything which occurs
-in its RHS occurs many times.  This pessimistically assumes that ths
+in its RHS occurs many times.  This pessimistically assumes that this
 inlined binder also occurs many times in its scope, but if it doesn't
 we'll catch it next time round.  At worst this costs an extra simplifier pass.
 ToDo: try using the occurrence info for the inline'd binder.

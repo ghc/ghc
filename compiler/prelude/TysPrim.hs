@@ -425,7 +425,7 @@ GHC needs to be able to figure out how 'v' is represented at runtime.
 It expects 'rep' to be form
     TyConApp rr_dc args
 where 'rr_dc' is a promoteed data constructor from RuntimeRep. So
-now we need to go from 'dc' to the correponding PrimRep.  We store this
+now we need to go from 'dc' to the corresponding PrimRep.  We store this
 PrimRep in the promoted data constructor itself: see TyCon.promDcRepInfo.
 
 -}

@@ -15,7 +15,7 @@ import Surface
 
 import Debug.Trace
 
--- Now the parsed (expresssion) language
+-- Now the parsed (expression) language
 
 type Name = String
 

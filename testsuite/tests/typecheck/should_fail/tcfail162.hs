@@ -1,7 +1,7 @@
 
 
 
--- Kind error messsage should not contain bangs
+-- Kind error message should not contain bangs
 
 module ShouldFail where
 

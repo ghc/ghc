@@ -174,7 +174,7 @@ Now for @Char@-like closures.  We generate an assignment of the
 address of the closure to a temporary.  It would be possible simply to
 generate no code, and record the addressing mode in the environment,
 but we'd have to be careful if the argument wasn't a constant --- so
-for simplicity we just always asssign to a temporary.
+for simplicity we just always assign to a temporary.
 
 Last special case: @Int@-like closures.  We only special-case the
 situation in which the argument is a literal in the range
