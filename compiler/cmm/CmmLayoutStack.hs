@@ -802,18 +802,29 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
     adj_pre_sp  = mapExpDeep (areaToSp dflags sp0            sp_high area_off)
     adj_post_sp = mapExpDeep (areaToSp dflags (sp0 - sp_off) sp_high area_off)
 
-    -- Add unwind pseudo-instructions at the beginning of each block to
+    -- Add unwind pseudo-instruction at the beginning of each block to
     -- document Sp level for debugging
-    add_unwind_info block
+    add_initial_unwind block
       | debugLevel dflags > 0
-      = CmmUnwind [(Sp, Just sp_unwind)] : block
+      = CmmUnwind [(Sp, Just sp_unwind)] `blockCons` block
       | otherwise
       = block
-    sp_unwind = CmmRegOff (CmmGlobal Sp) (sp0 - wORD_SIZE dflags)
+      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags)
+
+    -- Add unwind pseudo-instruction right before the Sp adjustment
+    -- if there is one.
+    add_adj_unwind block
+      | debugLevel dflags > 0
+      , sp_off /= 0
+      = block `blockSnoc` CmmUnwind [(Sp, Just sp_unwind)]
+      | otherwise
+      = block
+      where sp_unwind = CmmRegOff spReg (sp0 - wORD_SIZE dflags - sp_off)
 
     final_middle = maybeAddSpAdj dflags sp_off
+                 . add_adj_unwind
+                 . add_initial_unwind
                  . blockFromList
-                 . add_unwind_info
                  . map adj_pre_sp
                  . elimStackStores stack0 stackmaps area_off
                  $ middle_pre
