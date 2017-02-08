@@ -1509,7 +1509,7 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
       Nothing      -> return (nullUsage, spec_info)
 
   | Just all_calls <- lookupVarEnv bind_calls fn
-  = -- pprTrace "specialise entry {" (ppr fn <+> ppr (length all_calls)) $
+  = -- pprTrace "specialise entry {" (ppr fn <+> ppr all_calls) $
     do  { (boring_call, all_pats) <- callsToPats env specs arg_occs all_calls
                 -- Bale out if too many specialisations
         ; let pats = filter (is_small_enough . fst) all_pats
@@ -1565,8 +1565,9 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                       Just rhs_usg | boring_call -> (spec_usg `combineUsage` rhs_usg, Nothing)
                       _                          -> (spec_usg,                      mb_unspec)
 
---        ; pprTrace "specialise return }" (ppr fn
---                                        <+> ppr (scu_calls new_usg))
+--        ; pprTrace "specialise return }" (vcat [ ppr fn
+--                                               , text "boring_call:" <+> ppr boring_call
+--                                               , text "new calls:" <+> ppr (scu_calls new_usg)]) $
           ; return (new_usg, SI (new_specs ++ specs) spec_count' mb_unspec') } }
 
 
@@ -1815,8 +1816,11 @@ callsToPats env done_specs bndr_occs calls
               is_done p = any (samePat p) done_pats
               no_recursive = map fst (filterOut (is_too_recursive env) good_pats)
 
-        ; return (any isNothing mb_pats,
-                  filterOut is_done (nubBy samePat no_recursive)) }
+--        ; pprTrace "callsToPats" (vcat [ text "calls:" <+> ppr calls
+--                                       , text "good_pats:" <+> ppr good_pats
+--                                       , text "no_recursive:" <+> ppr no_recursive ])  $
+          ; return (any isNothing mb_pats,
+                    filterOut is_done (nubBy samePat no_recursive)) }
 
 is_too_recursive :: ScEnv -> (CallPat, ValueEnv) -> Bool
     -- Count the number of recursive constructors in a call pattern,
