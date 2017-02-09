@@ -273,9 +273,11 @@ nameIsLocalOrFrom from name
 nameIsHomePackage :: Module -> Name -> Bool
 -- True if the Name is defined in module of this package
 nameIsHomePackage this_mod
-  = \nm -> case nameModule_maybe nm of
-              Nothing -> False
-              Just nm_mod -> moduleUnitId nm_mod == this_pkg
+  = \nm -> case n_sort nm of
+              External nm_mod    -> moduleUnitId nm_mod == this_pkg
+              WiredIn nm_mod _ _ -> moduleUnitId nm_mod == this_pkg
+              Internal -> True
+              System   -> False
   where
     this_pkg = moduleUnitId this_mod
 
