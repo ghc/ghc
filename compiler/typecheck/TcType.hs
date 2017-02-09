@@ -891,6 +891,8 @@ rewritableTyVarsOfTypes tys = mapUnionVarSet rewritableTyVarsOfType tys
 
 rewritableTyVarsOfType :: TcType -> TcTyVarSet
 -- Used during kick-out from the inert set
+-- This function is used for the arguments of class and type families,
+--    which should not have any foralls in them
 -- Ignores coercions and casts, because rewriting those does
 -- not help solving, and it's more efficient to ignore them
 rewritableTyVarsOfType ty

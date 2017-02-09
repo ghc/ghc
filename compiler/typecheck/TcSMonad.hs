@@ -1495,24 +1495,25 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
            -- See Note [Kicking out CFunEqCan for fundeps]
     (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)    = partitionBag     kick_out_ct irreds
-    (insols_out, insols_in) = partitionBag     kick_out_ct insols
-      -- Kick out even insolubles; see Note [Kick out insolubles]
+    (insols_out, insols_in) = partitionBag     kick_out_insol insols
 
     fr_may_rewrite :: CtFlavourRole -> Bool
     fr_may_rewrite fs = new_fr `eqMayRewriteFR` fs
         -- Can the new item rewrite the inert item?
 
-    kick_out_ct :: Ct -> Bool
-    -- Kick it out if the new CTyEqCan can rewrite the inert
-    -- one. See Note [kickOutRewritable]
-    -- Or if it has no shadow and the shadow
-    kick_out_ct ct = kick_out_ev (ctEvidence ct)
+    kick_out_insol :: Ct -> Bool
+      -- See Note [Kick out insolubles]
+    kick_out_insol (CTyEqCan { cc_tyvar = tv }) = new_tv == tv
+    kick_out_insol _                            = False
 
-    kick_out_ev :: CtEvidence -> Bool
-    -- Kick it out if the new CTyEqCan can rewrite the inert
-    -- one. See Note [kickOutRewritable]
-    kick_out_ev ev = fr_may_rewrite (ctEvFlavourRole ev)
-                  && new_tv `elemVarSet` rewritableTyVarsOfType (ctEvPred ev)
+    kick_out_ct :: Ct -> Bool
+    -- Kick it out if the new CTyEqCan can rewrite the inert one
+    -- See Note [kickOutRewritable]
+    -- Used only on CFunEqCan, CDictCan, CIrredCan
+    --   hence no forallls in (ctEvPred ev), hence rewriteableTyVarsOfType ok
+    kick_out_ct ct | let ev = ctEvidence ct
+                   = fr_may_rewrite (ctEvFlavourRole ev)
+                   && new_tv `elemVarSet` rewritableTyVarsOfType (ctEvPred ev)
                   -- NB: this includes the fsk of a CFunEqCan.  It can't
                   --     actually be rewritten, but we need to kick it out
                   --     so we get to take advantage of injectivity
