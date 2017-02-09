@@ -127,6 +127,13 @@ module. Otherwise, we'll end up with no record of the fact that M
 depends on this family instance and type safety will be compromised.
 See #13102.
 
+* It can also happen that M uses a function defined in another module
+which is not transitively imported by M. Examples include the
+desugaring of various overloaded constructs, and references inserted
+by Template Haskell splices. If that function's definition makes use
+of type family instances which are not checked against those visible
+visible from M, type safety can again be compromised. See #13251.
+
 * When a module C imports a boot module B.hs-boot, we check that C's
 type family instances are compatible with those visible from
 B.hs-boot. However, C will eventually be linked against a different
