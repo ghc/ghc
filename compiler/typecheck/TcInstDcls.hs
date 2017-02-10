@@ -988,7 +988,7 @@ tcSuperClasses :: DFunId -> Class -> [TcTyVar] -> [EvVar] -> [TcType]
 --    $Ordp1 = /\a \(d:Ord a). dfunEqList a (sc_sel d)
 --
 -- See Note [Recursive superclasses] for why this is so hard!
--- In effect, be build a special-purpose solver for the first step
+-- In effect, we build a special-purpose solver for the first step
 -- of solving each superclass constraint
 tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
   = do { (ids, binds, implics) <- mapAndUnzip3M tc_super (zip sc_theta [fIRST_TAG..])

@@ -903,7 +903,7 @@ rewritableTyVarsOfType ty
     go (TyConApp _ tys) = rewritableTyVarsOfTypes tys
     go (AppTy fun arg)  = go fun `unionVarSet` go arg
     go (FunTy arg res)  = go arg `unionVarSet` go res
-    go ty@(ForAllTy {}) = pprPanic "rewriteableTyVarOfType" (ppr ty)
+    go ty@(ForAllTy {}) = pprPanic "rewritableTyVarOfType" (ppr ty)
     go (CastTy ty _co)  = go ty
     go (CoercionTy _co) = emptyVarSet
 

@@ -78,7 +78,7 @@ extern void *adjustorCode;
  * recover the writable address, we subtract 1 word from the executable
  * address and fetch. This works because Linux kernel magic gives us two
  * pointers with different addresses that refer to the same memory. Whatever
- * you write into the writeable address can be read back at the executable
+ * you write into the writable address can be read back at the executable
  * address. This method is very efficient.
  *
  * On iOS this breaks for two reasons: 1. the two pointers do not refer to

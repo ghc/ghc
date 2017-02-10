@@ -797,7 +797,7 @@ Theorem [Stability under extension]
    is an inert generalised substitution.
 
 Conditions (T1-T3) are established by the canonicaliser
-Conditions (K1-K3) are established by TcSMonad.kickOutRewriteable
+Conditions (K1-K3) are established by TcSMonad.kickOutRewritable
 
 The idea is that
 * (T1-2) are guaranteed by exhaustively rewriting the work-item
@@ -1077,7 +1077,7 @@ work?
 * CDictCan (C tys) or CFunEqCan (F tys ~ fsk):
   Yes if the inert set could rewrite tys to make the class constraint,
   or type family, fire.  That is, yes if the inert_eqs intersects
-  with the free vars of tys.  For this test we use rewriteableTyVars
+  with the free vars of tys.  For this test we use rewritableTyVars
   which ignores casts and coercions in tys, because rewriting the
   casts or coercions won't make the thing fire more often.
 
@@ -1510,7 +1510,7 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
     -- Kick it out if the new CTyEqCan can rewrite the inert one
     -- See Note [kickOutRewritable]
     -- Used only on CFunEqCan, CDictCan, CIrredCan
-    --   hence no forallls in (ctEvPred ev), hence rewriteableTyVarsOfType ok
+    --   hence no foralls in (ctEvPred ev), hence rewritableTyVarsOfType ok
     kick_out_ct ct | let ev = ctEvidence ct
                    = fr_may_rewrite (ctEvFlavourRole ev)
                    && new_tv `elemVarSet` rewritableTyVarsOfType (ctEvPred ev)

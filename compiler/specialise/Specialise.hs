@@ -145,7 +145,7 @@ becomes
                          fl
 
 We still have recusion for non-overloaded functions which we
-speciailise, but the recursive call should get specialised to the
+specialise, but the recursive call should get specialised to the
 same recursive version.
 
 
