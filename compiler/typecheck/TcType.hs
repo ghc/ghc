@@ -1817,12 +1817,12 @@ pickCapturedPreds qtvs theta
 type PredWithSCs = (PredType, [PredType])
 
 mkMinimalBySCs :: [PredType] -> [PredType]
--- Remove predicates that can be deduced from others by superclasses
--- Result is a subset of the input
+-- Remove predicates that can be deduced from others by superclasses,
+-- including duplicate predicates. The result is a subset of the input.
 mkMinimalBySCs ptys = go preds_with_scs []
  where
    preds_with_scs :: [PredWithSCs]
-   preds_with_scs = [ (pred, transSuperClasses pred)
+   preds_with_scs = [ (pred, pred : transSuperClasses pred)
                     | pred <- ptys ]
 
    go :: [PredWithSCs]   -- Work list

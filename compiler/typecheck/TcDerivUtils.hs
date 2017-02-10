@@ -13,8 +13,8 @@ module TcDerivUtils (
         DerivSpecMechanism(..), isDerivSpecStock,
         isDerivSpecNewtype, isDerivSpecAnyClass,
         DerivContext, DerivStatus(..),
-        PredOrigin(..), ThetaOrigin, mkPredOrigin,
-        mkThetaOrigin, substPredOrigin, substThetaOrigin,
+        PredOrigin(..), ThetaOrigin(..), mkPredOrigin,
+        mkThetaOrigin, mkThetaOriginFromPreds, substPredOrigin,
         checkSideConditions, hasStockDeriving,
         canDeriveAnyClass,
         std_class_via_coercible, non_coercible_class,
@@ -151,23 +151,72 @@ data DerivStatus = CanDerive                 -- Stock class, can derive
 -- | A 'PredType' annotated with the origin of the constraint 'CtOrigin',
 -- and whether or the constraint deals in types or kinds.
 data PredOrigin = PredOrigin PredType CtOrigin TypeOrKind
-type ThetaOrigin = [PredOrigin]
+
+-- | A list of wanted 'PredOrigin' constraints ('to_wanted_origins') alongside
+-- any corresponding given constraints ('to_givens') and locally quantified
+-- type variables ('to_tvs').
+--
+-- In most cases, 'to_givens' will be empty, as most deriving mechanisms (e.g.,
+-- stock and newtype deriving) do not require given constraints. The exception
+-- is @DeriveAnyClass@, which can involve given constraints. For example,
+-- if you tried to derive an instance for the following class using
+-- @DeriveAnyClass@:
+--
+-- @
+-- class Foo a where
+--   bar :: a -> b -> String
+--   default bar :: (Show a, Ix b) => a -> b -> String
+--   bar = show
+--
+--   baz :: Eq a => a -> a -> Bool
+--   default baz :: Ord a => a -> a -> Bool
+--   baz x y = compare x y == EQ
+-- @
+--
+-- Then it would generate two 'ThetaOrigin's, one for each method:
+--
+-- @
+-- [ ThetaOrigin { to_tvs            = [b]
+--               , to_givens         = []
+--               , to_wanted_origins = [Show a, Ix b] }
+-- , ThetaOrigin { to_tvs            = []
+--               , to_givens         = [Eq a]
+--               , to_wanted_origins = [Ord a] }
+-- ]
+-- @
+data ThetaOrigin
+  = ThetaOrigin { to_tvs            :: [TyVar]
+                , to_givens         :: ThetaType
+                , to_wanted_origins :: [PredOrigin] }
 
 instance Outputable PredOrigin where
   ppr (PredOrigin ty _ _) = ppr ty -- The origin is not so interesting when debugging
 
+instance Outputable ThetaOrigin where
+  ppr (ThetaOrigin { to_tvs = tvs
+                   , to_givens = givens
+                   , to_wanted_origins = wanted_origins })
+    = hang (text "ThetaOrigin")
+         2 (vcat [ text "to_tvs            =" <+> ppr tvs
+                 , text "to_givens         =" <+> ppr givens
+                 , text "to_wanted_origins =" <+> ppr wanted_origins ])
+
 mkPredOrigin :: CtOrigin -> TypeOrKind -> PredType -> PredOrigin
 mkPredOrigin origin t_or_k pred = PredOrigin pred origin t_or_k
 
-mkThetaOrigin :: CtOrigin -> TypeOrKind -> ThetaType -> ThetaOrigin
-mkThetaOrigin origin t_or_k = map (mkPredOrigin origin t_or_k)
+mkThetaOrigin :: CtOrigin -> TypeOrKind -> [TyVar] -> ThetaType -> ThetaType
+              -> ThetaOrigin
+mkThetaOrigin origin t_or_k tvs givens
+  = ThetaOrigin tvs givens . map (mkPredOrigin origin t_or_k)
+
+-- A common case where the ThetaOrigin only contains wanted constraints, with
+-- no givens or locally scoped type variables.
+mkThetaOriginFromPreds :: [PredOrigin] -> ThetaOrigin
+mkThetaOriginFromPreds = ThetaOrigin [] []
 
 substPredOrigin :: HasCallStack => TCvSubst -> PredOrigin -> PredOrigin
 substPredOrigin subst (PredOrigin pred origin t_or_k)
   = PredOrigin (substTy subst pred) origin t_or_k
-
-substThetaOrigin :: HasCallStack => TCvSubst -> ThetaOrigin -> ThetaOrigin
-substThetaOrigin subst = map (substPredOrigin subst)
 
 {-
 ************************************************************************
@@ -270,7 +319,7 @@ checkSideConditions dflags mtheta cls cls_tys rep_tc
                  | otherwise -> DerivableClassError (classArgsErr cls cls_tys)
                    -- e.g. deriving( Eq s )
 
-  | Just err <- canDeriveAnyClass dflags rep_tc cls
+  | NotValid err <- canDeriveAnyClass dflags
   = NonDerivableClass err  -- DeriveAnyClass does not work
 
   | otherwise
@@ -324,27 +373,14 @@ sideConditions mtheta cls
     cond_vanilla = cond_stdOK mtheta True   -- Vanilla data constructors but
                                             --   allow no data cons or polytype arguments
 
-canDeriveAnyClass :: DynFlags -> TyCon -> Class -> Maybe SDoc
--- Nothing: we can (try to) derive it via an empty instance declaration
--- Just s:  we can't, reason s
--- Precondition: the class is not one of the standard ones
-canDeriveAnyClass dflags _tycon clas
+canDeriveAnyClass :: DynFlags -> Validity
+-- IsValid: we can (try to) derive it via an empty instance declaration
+-- NotValid s:  we can't, reason s
+canDeriveAnyClass dflags
   | not (xopt LangExt.DeriveAnyClass dflags)
-  = Just (text "Try enabling DeriveAnyClass")
-  | not (any (target_kind `tcEqKind`) [ liftedTypeKind, typeToTypeKind ])
-  = Just (text "The last argument of class" <+> quotes (ppr clas)
-          <+> text "does not have kind * or (* -> *)")
+  = NotValid (text "Try enabling DeriveAnyClass")
   | otherwise
-  = Nothing   -- OK!
-  where
-    -- We are making an instance  (C t1 .. tn (T s1 .. sm))
-    -- and we can only do so if the kind of C's last argument
-    -- is * or (* -> *).  Because only then can we make a reasonable
-    -- guess at the instance context
-    target_kind = tyVarKind (last (classTyVars clas))
-
-typeToTypeKind :: Kind
-typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
+  = IsValid   -- OK!
 
 type Condition = DynFlags -> TyCon -> Validity
         -- TyCon is the *representation* tycon if the data type is an indexed one

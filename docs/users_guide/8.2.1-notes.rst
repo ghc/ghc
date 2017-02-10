@@ -55,6 +55,17 @@ Compiler
   class instance using the :ghc-flag:`-XDerivingStrategies` language extension
   (see :ref:`deriving-strategies`).
 
+- :ghc-flag:`-XDeriveAnyClass` is no longer limited to type classes whose
+  argument is of kind ``*`` or ``* -> *``.
+
+- The means by which :ghc-flag:`-XDeriveAnyClass` infers instance contexts has
+  been completely overhauled. The instance context is now inferred using the
+  type signatures (and default type signatures) of the derived class's methods
+  instead of using the datatype's definition, which often led to
+  overconstrained instances or instances that didn't typecheck (or worse,
+  triggered GHC panics). See the section on
+  :ref:`DeriveAnyClass <derive-any-class>` for more details.
+
 - GHC now allows standalone deriving using :ghc-flag:`-XDeriveAnyClass` on
   any data type, even if its data constructors are not in scope. This is
   consistent with the fact that this code (in the presence of

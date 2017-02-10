@@ -54,7 +54,6 @@ test('T9600-1', normal, compile_fail, [''])
 test('T9687', normal, compile_fail, [''])
 
 test('T8984', normal, compile_fail, [''])
-test('T9968a', normal, compile_fail, [''])
 test('T10598_fail1', normal, compile_fail, [''])
 test('T10598_fail2', normal, compile_fail, [''])
 test('T10598_fail3', normal, compile_fail, [''])

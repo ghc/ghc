@@ -11,7 +11,8 @@ module TcSimplify(
        tcCheckSatisfiability,
 
        -- For Rules we need these
-       solveWanteds, runTcSDeriveds
+       solveWanteds, solveWantedsAndDrop,
+       approximateWC, runTcSDeriveds
   ) where
 
 #include "HsVersions.h"

@@ -4185,29 +4185,71 @@ Note the following details
   class on a newtype, and :ghc-flag:`-XGeneralizedNewtypeDeriving` is also on,
   :ghc-flag:`-XDeriveAnyClass` takes precedence.
 
-- :ghc-flag:`-XDeriveAnyClass` is allowed only when the last argument of the class
-  has kind ``*`` or ``(* -> *)``.  So this is not allowed: ::
+- The instance context is determined by the type signatures of the derived
+  class's methods. For instance, if the class is: ::
 
-    data T a b = MkT a b deriving( Bifunctor )
+    class Foo a where
+      bar :: a -> String
+      default bar :: Show a => a -> String
+      bar = show
 
-  because the last argument of ``Bifunctor :: (* -> * -> *) -> Constraint``
-  has the wrong kind.
+      baz :: a -> a -> Bool
+      default baz :: Ord a => a -> a -> Bool
+      baz x y = compare x y == EQ
 
-- The instance context will be generated according to the same rules
-  used when deriving ``Eq`` (if the kind of the type is ``*``), or
-  the rules for ``Functor`` (if the kind of the type is ``(* -> *)``).
-  For example ::
+  And you attempt to derive it using :ghc-flag:`-XDeriveAnyClass`: ::
 
-    instance C a => C (a,b) where ...
+    instance Eq   a => Eq   (Option a) where ...
+    instance Ord  a => Ord  (Option a) where ...
+    instance Show a => Show (Option a) where ...
 
-    data T a b = MkT a (a,b) deriving( C )
+    data Option a = None | Some a deriving Foo
 
-  The ``deriving`` clause will generate ::
+  Then the derived ``Foo`` instance will be: ::
 
-    instance C a => C (T a b) where {}
+    instance (Show a, Ord a) => Foo (Option a)
 
-  The constraints `C a` and `C (a,b)` are generated from the data
-  constructor arguments, but the latter simplifies to `C a`.
+  Since the default type signatures for ``bar`` and ``baz`` require ``Show a``
+  and ``Ord a`` constraints, respectively.
+
+  Constraints on the non-default type signatures can play a role in inferring
+  the instance context as well. For example, if you have this class: ::
+
+    class HigherEq f where
+      (==#) :: f a -> f a -> Bool
+      default (==#) :: Eq (f a) => f a -> f a -> Bool
+      x ==# y = (x == y)
+
+  And you tried to derive an instance for it: ::
+
+    instance Eq a => Eq (Option a) where ...
+    data Option a = None | Some a deriving HigherEq
+
+  Then it will fail with an error to the effect of: ::
+
+    No instance for (Eq a)
+        arising from the 'deriving' clause of a data type declaration
+
+  That is because we require an ``Eq (Option a)`` instance from the default
+  type signature for ``(==#)``, which in turn requires an ``Eq a`` instance,
+  which we don't have in scope. But if you tweak the definition of
+  ``HigherEq`` slightly: ::
+
+    class HigherEq f where
+      (==#) :: Eq a => f a -> f a -> Bool
+      default (==#) :: Eq (f a) => f a -> f a -> Bool
+      x ==# y = (x == y)
+
+  Then it becomes possible to derive a ``HigherEq Option`` instance. Note that
+  the only difference is that now the non-default type signature for ``(==#)``
+  brings in an ``Eq a`` constraint. Constraints from non-default type
+  signatures never appear in the derived instance context itself, but they can
+  be used to discharge obligations that are demanded by the default type
+  signatures. In the example above, the default type signature demanded an
+  ``Eq a`` instance, and the non-default signature was able to satisfy that
+  request, so the derived instance is simply: ::
+
+    instance HigherEq Option
 
 - :ghc-flag:`-XDeriveAnyClass` can be used with partially applied classes,
   such as ::
