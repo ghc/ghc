@@ -7,5 +7,5 @@
     [1 of 1] Compiling ShouldFail[sig]  ( p/ShouldFail.hsig, bkpfail16.out/p/p-1OqLaT7dAn947wScQQKCw5/ShouldFail.o )
 
 bkpfail16.out/p/p-1OqLaT7dAn947wScQQKCw5/../ShouldFail.hi:1:1: error:
-    • ‘Booly’ is exported by the hsig file, but not exported the module ‘Data.Bool’
+    • ‘Booly’ is exported by the hsig file, but not exported by the implementing module ‘Data.Bool’
     • while checking that Data.Bool implements signature ShouldFail in p[ShouldFail=Data.Bool]

@@ -7,9 +7,9 @@
 [3 of 3] Processing r
 
 Command line argument: -unit-id p[H=H]:0:0: error:
-    • ‘H’ is exported by the hsig file, but not exported the module ‘q:H’
+    • ‘H’ is exported by the hsig file, but not exported by the implementing module ‘q:H’
     • while checking that q:H implements signature H in p[H=q:H]
 
 Command line argument: -unit-id p[H=H]:0:0: error:
-    • ‘H’ is exported by the hsig file, but not exported the module ‘q:H’
+    • ‘H’ is exported by the hsig file, but not exported by the implementing module ‘q:H’
     • while checking that q:H implements signature H in p[H=q:H]

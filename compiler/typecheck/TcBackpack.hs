@@ -823,7 +823,8 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
     forM_ (exportOccs (mi_exports isig_iface)) $ \occ ->
         case lookupGlobalRdrEnv impl_gr occ of
             [] -> addErr $ quotes (ppr occ)
-                    <+> text "is exported by the hsig file, but not exported the module"
+                    <+> text "is exported by the hsig file, but not"
+                    <+> text "exported by the implementing module"
                     <+> quotes (ppr impl_mod)
             _ -> return ()
     failIfErrsM
