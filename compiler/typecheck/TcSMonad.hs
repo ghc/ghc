@@ -1077,9 +1077,10 @@ work?
 * CDictCan (C tys) or CFunEqCan (F tys ~ fsk):
   Yes if the inert set could rewrite tys to make the class constraint,
   or type family, fire.  That is, yes if the inert_eqs intersects
-  with the free vars of tys.  For this test we use rewritableTyVars
-  which ignores casts and coercions in tys, because rewriting the
-  casts or coercions won't make the thing fire more often.
+  with the free vars of tys.  For this test we use
+  (anyRewritableTyVar True) which ignores casts and coercions in tys,
+  because rewriting the casts or coercions won't make the thing fire
+  more often.
 
 * CTyEqCan (a ~ ty): Yes if the inert set could rewrite 'a' or 'ty'.
   We need to check both 'a' and 'ty' against the inert set:
@@ -1093,12 +1094,9 @@ work?
       canonicalise another [D] constraint mentioning 'a', we'd
       get an infinite loop
 
-  Moreover we must use the full-blown (tyVarsOfType ty) for the
-  RHS, for two reasons:
-     1. even tyvars in the casts and coercions could give
-        an infinite loop
-     2. rewritableTyVarsOfType doesn't handle foralls (just
-        because it doesn't need to)
+  Moreover we must use (anyRewritableTyVar False) for the RHS,
+  because even tyvars in the casts and coercions could give
+  an infinite loop if we don't expose it
 
 * Others: nothing is gained by splitting.
 
@@ -1248,30 +1246,31 @@ shouldSplitWD :: InertEqs -> Ct -> Bool
 -- True <=> we should split ct ito [W] and [D] because
 --          the inert_eqs can make progress on the [D]
 -- See Note [Splitting WD constraints]
+
 shouldSplitWD inert_eqs (CFunEqCan { cc_tyargs = tys })
-  = inert_eqs `intersects_with` rewritableTyVarsOfTypes tys
+  = should_split_match_args inert_eqs tys
     -- We don't need to split if the tv is the RHS fsk
 
 shouldSplitWD inert_eqs (CDictCan { cc_tyargs = tys })
-  = inert_eqs `intersects_with` rewritableTyVarsOfTypes tys
+  = should_split_match_args inert_eqs tys
+    -- NB True: ignore coercions
+    -- See Note [Splitting WD constraints]
 
 shouldSplitWD inert_eqs (CTyEqCan { cc_tyvar = tv, cc_rhs = ty })
   =  tv `elemDVarEnv` inert_eqs
-  || inert_eqs `intersects_with` tyCoVarsOfType ty
+  || anyRewritableTyVar False (`elemDVarEnv` inert_eqs) ty
+  -- NB False: do not ignore casts and coercions
   -- See Note [Splitting WD constraints]
 
 shouldSplitWD _ _ = False   -- No point in splitting otherwise
 
-intersects_with :: InertEqs -> TcTyVarSet -> Bool
-intersects_with inert_eqs free_vars
-  = not (disjointUdfmUfm inert_eqs free_vars)
-      -- Test whether the inert equalities could rewrite
-      -- a derived version of this constraint
-      -- The low-level use of disjointUFM might seem surprising.
-      -- InertEqs = TyVarEnv EqualCtList, and we want to see if its domain
-      -- is disjoint from that of a TcTyCoVarSet.  So we drop down
-      -- to the underlying UniqFM.  A bit yukky, but efficient.
-
+should_split_match_args :: InertEqs -> [TcType] -> Bool
+-- True if the inert_eqs can rewrite anything in the argument
+-- types, ignoring casts and coercions
+should_split_match_args inert_eqs tys
+  = any (anyRewritableTyVar True (`elemDVarEnv` inert_eqs)) tys
+    -- NB True: ignore casts coercions
+    -- See Note [Splitting WD constraints]
 
 isImprovable :: CtEvidence -> Bool
 -- See Note [Do not do improvement for WOnly]
@@ -1495,25 +1494,20 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
            -- See Note [Kicking out CFunEqCan for fundeps]
     (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)    = partitionBag     kick_out_ct irreds
-    (insols_out, insols_in) = partitionBag     kick_out_insol insols
+    (insols_out, insols_in) = partitionBag     kick_out_ct insols
+      -- Kick out even insolubles: See Note [Kick out insolubles]
 
     fr_may_rewrite :: CtFlavourRole -> Bool
     fr_may_rewrite fs = new_fr `eqMayRewriteFR` fs
         -- Can the new item rewrite the inert item?
 
-    kick_out_insol :: Ct -> Bool
-      -- See Note [Kick out insolubles]
-    kick_out_insol (CTyEqCan { cc_tyvar = tv }) = new_tv == tv
-    kick_out_insol _                            = False
-
     kick_out_ct :: Ct -> Bool
     -- Kick it out if the new CTyEqCan can rewrite the inert one
     -- See Note [kickOutRewritable]
-    -- Used only on CFunEqCan, CDictCan, CIrredCan
-    --   hence no foralls in (ctEvPred ev), hence rewritableTyVarsOfType ok
     kick_out_ct ct | let ev = ctEvidence ct
                    = fr_may_rewrite (ctEvFlavourRole ev)
-                   && new_tv `elemVarSet` rewritableTyVarsOfType (ctEvPred ev)
+                   && anyRewritableTyVar False (== new_tv) (ctEvPred ev)
+                  -- False: ignore casts and coercions
                   -- NB: this includes the fsk of a CFunEqCan.  It can't
                   --     actually be rewritten, but we need to kick it out
                   --     so we get to take advantage of injectivity

@@ -103,7 +103,7 @@ module TcType (
   -- * Finding "exact" (non-dead) type variables
   exactTyCoVarsOfType, exactTyCoVarsOfTypes,
   splitDepVarsOfType, splitDepVarsOfTypes, TcDepVars(..), tcDepVarSet,
-  rewritableTyVarsOfTypes, rewritableTyVarsOfType,
+  anyRewritableTyVar,
 
   -- * Extracting bound variables
   allBoundVariables, allBoundVariabless,
@@ -886,27 +886,40 @@ exactTyCoVarsOfType ty
 exactTyCoVarsOfTypes :: [Type] -> TyVarSet
 exactTyCoVarsOfTypes tys = mapUnionVarSet exactTyCoVarsOfType tys
 
-rewritableTyVarsOfTypes :: [TcType] -> TcTyVarSet
-rewritableTyVarsOfTypes tys = mapUnionVarSet rewritableTyVarsOfType tys
-
-rewritableTyVarsOfType :: TcType -> TcTyVarSet
--- Used during kick-out from the inert set
--- This function is used for the arguments of class and type families,
---    which should not have any foralls in them
--- Ignores coercions and casts, because rewriting those does
--- not help solving, and it's more efficient to ignore them
-rewritableTyVarsOfType ty
-  = go ty
+anyRewritableTyVar :: Bool -> (TcTyVar -> Bool)
+                   -> TcType -> Bool
+-- (anyRewritableTyVar ignore_cos pred ty) returns True
+--    if the 'pred' returns True of free TyVar in 'ty'
+-- Do not look inside casts and coercions if 'ignore_cos' is True
+-- See Note [anyRewritableTyVar]
+anyRewritableTyVar ignore_cos pred ty
+  = go emptyVarSet ty
   where
-    go (TyVarTy tv)     = unitVarSet tv
-    go (LitTy {})       = emptyVarSet
-    go (TyConApp _ tys) = rewritableTyVarsOfTypes tys
-    go (AppTy fun arg)  = go fun `unionVarSet` go arg
-    go (FunTy arg res)  = go arg `unionVarSet` go res
-    go ty@(ForAllTy {}) = pprPanic "rewritableTyVarOfType" (ppr ty)
-    go (CastTy ty _co)  = go ty
-    go (CoercionTy _co) = emptyVarSet
+    go_tv bound tv | tv `elemVarSet` bound = False
+                   | otherwise             = pred tv
 
+    go bound (TyVarTy tv)     = go_tv bound tv
+    go _     (LitTy {})       = False
+    go bound (TyConApp _ tys) = any (go bound) tys
+    go bound (AppTy fun arg)  = go bound fun || go bound arg
+    go bound (FunTy arg res)  = go bound arg || go bound res
+    go bound (ForAllTy tv ty) = go (bound `extendVarSet` binderVar tv) ty
+    go bound (CastTy ty co)   = go bound ty || go_co bound co
+    go bound (CoercionTy co)  = go_co bound co
+
+    go_co bound co
+      | ignore_cos = False
+      | otherwise  = varSetAny (go_tv bound) (tyCoVarsOfCo co)
+      -- We don't have an equivalent of anyRewritableTyVar for coercions
+      -- (at least not yet) so take the free vars and test them
+
+{- Note [anyRewritableTyVar]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+anyRewritableTyVar is used during kick-out from the inert set,
+to decide if, given a new equality (a ~ ty), we should kick out
+a constraint C.  Rather than gather free variables and see if 'a'
+is among them, we instead pass in a predicate; this is just efficiency.
+-}
 
 {- *********************************************************************
 *                                                                      *
