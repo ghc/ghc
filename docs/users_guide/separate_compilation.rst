@@ -662,6 +662,9 @@ A hs-boot file is written in a subset of Haskell:
 Module signatures
 -----------------
 
+.. index::
+     single: signature files; Backpack; hsig files
+
 GHC 8.2 supports module signatures (``hsig`` files), which allow you to
 write a signature in place of a module implementation, deferring the
 choice of implementation until a later point in time.  This feature is
