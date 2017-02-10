@@ -1692,18 +1692,20 @@ extract_tv t_or_k ltv@(L _ tv) acc
   | isRdrTyVar tv = case acc of
       FKTV kvs k_set tvs t_set all
         |  isTypeLevel t_or_k
-        -> do { when (occ `elemOccSet` k_set) $
+        -> do { when (not_exact && occ `elemOccSet` k_set) $
                 mixedVarsErr ltv
               ; return (FKTV kvs k_set (ltv : tvs) (t_set `extendOccSet` occ)
                              (ltv : all)) }
         |  otherwise
-        -> do { when (occ `elemOccSet` t_set) $
+        -> do { when (not_exact && occ `elemOccSet` t_set) $
                 mixedVarsErr ltv
               ; return (FKTV (ltv : kvs) (k_set `extendOccSet` occ) tvs t_set
                              (ltv : all)) }
   | otherwise     = return acc
   where
     occ = rdrNameOcc tv
+    -- See Note [TypeInType validity checking and Template Haskell]
+    not_exact = not $ isExact tv
 
 mixedVarsErr :: Located RdrName -> RnM ()
 mixedVarsErr (L loc tv)
@@ -1716,3 +1718,37 @@ mixedVarsErr (L loc tv)
 -- just used in this module; seemed convenient here
 nubL :: Eq a => [Located a] -> [Located a]
 nubL = nubBy eqLocated
+
+{-
+Note [TypeInType validity checking and Template Haskell]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+extract_tv enforces an invariant that no variable can be used as both a kind
+and a type unless -XTypeInType is enabled. It does so by accumulating two sets
+of variables' OccNames (one for type variables and one for kind variables) that
+it has seen before. If a new type variable's OccName appears in the kind set,
+then it errors, and similarly for kind variables and the type set.
+
+This relies on the assumption that any two variables with the same OccName
+are the same. While this is always true of user-written code, it is not always
+true in the presence of Template Haskell! GHC Trac #12503 demonstrates a
+scenario where two different Exact TH-generated names can have the same
+OccName. As a result, if one of these Exact names is for a type variable
+and the other Exact name is for a kind variable, then extracting them both
+can lead to a spurious error in extract_tv.
+
+To avoid such a scenario, we simply don't check the invariant in extract_tv
+when the name is Exact. This allows Template Haskell users to write code that
+uses -XPolyKinds without needing to enable -XTypeInType.
+
+This is a somewhat arbitrary design choice, as adding this special case causes
+this code to be accepted when spliced in via Template Haskell:
+
+  data T1 k e
+  class C1 b
+  instance C1 (T1 k (e :: k))
+
+Even if -XTypeInType is _not enabled. But accepting too many programs without
+the prerequisite GHC extensions is better than the alternative, where some
+programs would not be accepted unless enabling an extension which has nothing
+to do with the code itself.
+-}
