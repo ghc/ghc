@@ -63,8 +63,18 @@ test('TH_reifyDecl2', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs', normal, compile, ['-v0'])
 test('TH_reifyLocalDefs2', normal, compile, ['-v0'])
 
+
+# Checks if the error output of an appended command has the given pattern.
+def error_has(pattern):
+    swap12 = '3>&1 1>&2 2>&3 3>&-' # Swap file descriptors 1 and 2.
+    # pipefail: make a pipe fail if any of the commands fails
+    # the following fails only if both the command fails and the pattern is found
+    return('bash -o pipefail -c \'! (! "$@" {swap12}) | grep {pattern} {swap12} &> /dev/null\' --'.format(**locals()))
+
 test('TH_addCStub1', normal, compile_and_run, ['-v0'])
-test('TH_addCStub2', normal, compile_fail, ['-v0'])
+test('TH_addCStub2'
+     , [compile_cmd_prefix(error_has('TH_addCStub2.hs:13:'))]
+     , compile_fail, ['-v0'])
 
 test('TH_reifyMkName', normal, compile, ['-v0'])
 

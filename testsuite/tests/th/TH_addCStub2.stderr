@@ -1,6 +1,0 @@
-
-TH_addCStub2.hs:13:13:
-     expected ‘;’, ‘,’ or ‘)’ before ‘{’ token
-          [ "#include <stdio.h>"
-                 ^
-`gcc' failed in phase `C Compiler'. (Exit code: 1)
