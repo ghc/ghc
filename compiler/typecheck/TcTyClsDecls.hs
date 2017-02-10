@@ -198,8 +198,8 @@ tcTyClDecls tyclds role_annots
             -- type synonyms, as we have not tested for type synonym
             -- loops yet and could fall into a black hole.
        ; fixM $ \ ~rec_tyclss -> do
-           { is_boot   <- tcIsHsBootOrSig
-           ; let roles = inferRoles is_boot role_annots rec_tyclss
+           { tcg_env <- getGblEnv
+           ; let roles = inferRoles (tcg_src tcg_env) role_annots rec_tyclss
 
                  -- Populate environment with knot-tied ATyCon for TyCons
                  -- NB: if the decls mention any ill-staged data cons

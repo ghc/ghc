@@ -909,11 +909,19 @@ to ``hs-boot`` files, but with some slight changes:
   ``type Elem = Char``, you can now use ``head`` from the
   inherited signature as if it returned a ``Char``.
 
-  If you do not write out the constructors, you may need to give
-  a kind and/or role annotation to tell GHC what the kinds or roles
-  of the type variables are, if they are not the default (``*`` and
-  representational).  It will be obvious if you've gotten it wrong when
-  you try implementing the signature.
+  If you do not write out the constructors, you may need to give a kind to tell
+  GHC what the kinds of the type variables are, if they are not the default
+  ``*``.
+
+  Roles of type parameters are subject to the subtyping
+  relation ``phantom < representational < nominal``: for example,
+  an abstract type with a nominal type parameter can be implemented
+  using a concrete type with a representational type parameter.
+  Roles in signatures default to ``nominal``, which gives maximum
+  flexibility on the implementor's side.  You should only need to
+  give an explicit role annotation if a client of the signature
+  would like to coerce the abstract type in a type parameter (in which case you
+  should specify ``representational`` explicitly.)
 
 - A class declarations can either be abstract or concrete.  An
   abstract class is one with no superclasses or class methods::

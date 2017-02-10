@@ -212,25 +212,41 @@ isAbstractIfaceDecl IfaceClass{ ifCtxt = [], ifSigs = [], ifATs = [] } = True
 isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceAbstractClosedSynFamilyTyCon } = True
 isAbstractIfaceDecl _ = False
 
+ifMaybeRoles :: IfaceDecl -> Maybe [Role]
+ifMaybeRoles IfaceData    { ifRoles = rs } = Just rs
+ifMaybeRoles IfaceSynonym { ifRoles = rs } = Just rs
+ifMaybeRoles IfaceClass   { ifRoles = rs } = Just rs
+ifMaybeRoles _ = Nothing
+
 -- | Merge two 'IfaceDecl's together, preferring a non-abstract one.  If
 -- both are non-abstract we pick one arbitrarily (and check for consistency
 -- later.)
 mergeIfaceDecl :: IfaceDecl -> IfaceDecl -> IfaceDecl
 mergeIfaceDecl d1 d2
-    | isAbstractIfaceDecl d1 = d2
-    | isAbstractIfaceDecl d2 = d1
+    -- TODO: need to merge roles
+    | isAbstractIfaceDecl d1 = d2 `withRolesFrom` d1
+    | isAbstractIfaceDecl d2 = d1 `withRolesFrom` d2
     | IfaceClass{ ifSigs = ops1, ifMinDef = bf1 } <- d1
     , IfaceClass{ ifSigs = ops2, ifMinDef = bf2 } <- d2
     = let ops = nameEnvElts $
                   plusNameEnv_C mergeIfaceClassOp
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
-      in d1 { ifSigs = ops
+      in d1 { ifSigs   = ops
             , ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
-            }
+            } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
     -- we merge, see 'mergeSignatures'
-    | otherwise              = d1
+    | otherwise              = d1 `withRolesFrom` d2
+
+withRolesFrom :: IfaceDecl -> IfaceDecl -> IfaceDecl
+d1 `withRolesFrom` d2
+    | Just roles1 <- ifMaybeRoles d1
+    , Just roles2 <- ifMaybeRoles d2
+    = d1 { ifRoles = mergeRoles roles1 roles2 }
+    | otherwise = d1
+  where
+    mergeRoles roles1 roles2 = zipWith max roles1 roles2
 
 mergeIfaceClassOp :: IfaceClassOp -> IfaceClassOp -> IfaceClassOp
 mergeIfaceClassOp op1@(IfaceClassOp _ _ (Just _)) _ = op1

@@ -452,20 +452,20 @@ type RoleEnv = NameEnv [Role]        -- from tycon names to roles
 -- This, and any of the functions it calls, must *not* look at the roles
 -- field of a tycon we are inferring roles about!
 -- See Note [Role inference]
-inferRoles :: Bool -> RoleAnnotEnv -> [TyCon] -> Name -> [Role]
-inferRoles is_boot annots tycons
-  = let role_env  = initialRoleEnv is_boot annots tycons
+inferRoles :: HscSource -> RoleAnnotEnv -> [TyCon] -> Name -> [Role]
+inferRoles hsc_src annots tycons
+  = let role_env  = initialRoleEnv hsc_src annots tycons
         role_env' = irGroup role_env tycons in
     \name -> case lookupNameEnv role_env' name of
       Just roles -> roles
       Nothing    -> pprPanic "inferRoles" (ppr name)
 
-initialRoleEnv :: Bool -> RoleAnnotEnv -> [TyCon] -> RoleEnv
-initialRoleEnv is_boot annots = extendNameEnvList emptyNameEnv .
-                                map (initialRoleEnv1 is_boot annots)
+initialRoleEnv :: HscSource -> RoleAnnotEnv -> [TyCon] -> RoleEnv
+initialRoleEnv hsc_src annots = extendNameEnvList emptyNameEnv .
+                                map (initialRoleEnv1 hsc_src annots)
 
-initialRoleEnv1 :: Bool -> RoleAnnotEnv -> TyCon -> (Name, [Role])
-initialRoleEnv1 is_boot annots_env tc
+initialRoleEnv1 :: HscSource -> RoleAnnotEnv -> TyCon -> (Name, [Role])
+initialRoleEnv1 hsc_src annots_env tc
   | isFamilyTyCon tc      = (name, map (const Nominal) bndrs)
   | isAlgTyCon tc         = (name, default_roles)
   | isTypeSynonymTyCon tc = (name, default_roles)
@@ -495,8 +495,38 @@ initialRoleEnv1 is_boot annots_env tc
 
         default_role
           | isClassTyCon tc               = Nominal
-          | is_boot && isAbstractTyCon tc = Representational
+          -- Note [Default roles for abstract TyCons in hs-boot/hsig]
+          | HsBootFile <- hsc_src
+          , isAbstractTyCon tc            = Representational
+          | HsigFile   <- hsc_src
+          , isAbstractTyCon tc            = Nominal
           | otherwise                     = Phantom
+
+-- Note [Default roles for abstract TyCons in hs-boot/hsig]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- What should the default role for an abstract TyCon be?
+--
+-- Originally, we inferred phantom role for abstract TyCons
+-- in hs-boot files, because the type variables were never used.
+--
+-- This was silly, because the role of the abstract TyCon
+-- was required to match the implementation, and the roles of
+-- data types are almost never phantom.  Thus, in ticket #9204,
+-- the default was changed so be representational (the most common case).  If
+-- the implementing data type was actually nominal, you'd get an easy
+-- to understand error, and add the role annotation yourself.
+--
+-- Then Backpack was added, and with it we added role *subtyping*
+-- the matching judgment: if an abstract TyCon has a nominal
+-- parameter, it's OK to implement it with a representational
+-- parameter.  But now, the representational default is not a good
+-- one, because you should *only* request representational if
+-- you're planning to do coercions. To be maximally flexible
+-- with what data types you will accept, you want the default
+-- for hsig files is nominal.  We don't allow role subtyping
+-- with hs-boot files (it's good practice to give an exactly
+-- accurate role here, because any types that use the abstract
+-- type will propagate the role information.)
 
 irGroup :: RoleEnv -> [TyCon] -> RoleEnv
 irGroup env tcs

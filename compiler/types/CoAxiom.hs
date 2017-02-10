@@ -419,6 +419,9 @@ Roles are defined here to avoid circular dependencies.
 
 -- See Note [Roles] in Coercion
 -- defined here to avoid cyclic dependency with Coercion
+--
+-- Order of constructors matters: the Ord instance coincides with the *super*typing
+-- relation on roles.
 data Role = Nominal | Representational | Phantom
   deriving (Eq, Ord, Data.Data)
 

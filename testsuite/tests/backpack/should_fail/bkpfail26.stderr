@@ -14,7 +14,8 @@ bkpfail26.bkp:15:9: error:
     • Type constructor ‘T’ has conflicting definitions in the module
       and its hsig file
       Main module: type T a = [a]
-      Hsig file:  data T a
+      Hsig file:  type role T nominal
+                  data T a
       Illegal parameterized type synonym in implementation of abstract data.
       (Try eta reducing your type synonym so that it is nullary.)
     • while checking that q:H implements signature H in p[H=q:H]

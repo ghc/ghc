@@ -976,7 +976,7 @@ checkBootTyCon is_boot tc1 tc2
          eqListBy (eqTypeX env) (mkTyVarTys as1) (mkTyVarTys as2) &&
          eqListBy (eqTypeX env) (mkTyVarTys bs1) (mkTyVarTys bs2)
     in
-    check (roles1 == roles2) roles_msg `andThenCheck`
+    checkRoles roles1 roles2 `andThenCheck`
           -- Checks kind of class
     check (eqListBy eqFD clas_fds1 clas_fds2)
           (text "The functional dependencies do not match") `andThenCheck`
@@ -996,7 +996,7 @@ checkBootTyCon is_boot tc1 tc2
   , Just syn_rhs2 <- synTyConRhs_maybe tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    check (roles1 == roles2) roles_msg `andThenCheck`
+    checkRoles roles1 roles2 `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
 
   -- An abstract TyCon can be implemented using a type synonym, but ONLY
@@ -1034,7 +1034,7 @@ checkBootTyCon is_boot tc1 tc2
         --      type T = K Int
         --
         -- we need to drop the first role of K when comparing!
-        check (roles1 == drop (length args) (tyConRoles tc2')) roles_msg
+        checkRoles roles1 (drop (length args) (tyConRoles tc2'))
 
   -- Note [Constraint synonym implements abstract class]
   -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1066,11 +1066,10 @@ checkBootTyCon is_boot tc1 tc2
     -- massage it into the correct form before checking if roles
     -- match.
     if length tvs == length roles1
-        then check (roles1 == roles2) roles_msg
+        then checkRoles roles1 roles2
         else case tcSplitTyConApp_maybe ty of
                 Just (tc2', args) ->
-                    check (roles1 == drop (length args) (tyConRoles tc2') ++ roles2)
-                          roles_msg
+                    checkRoles roles1 (drop (length args) (tyConRoles tc2') ++ roles2)
                 Nothing -> Just roles_msg
     -- TODO: We really should check if the fundeps are satisfied, but
     -- there is not an obvious way to do this for a constraint synonym.
@@ -1094,7 +1093,7 @@ checkBootTyCon is_boot tc1 tc2
         injInfo2 = familyTyConInjectivityInfo tc2
     in
     -- check equality of roles, family flavours and injectivity annotations
-    check (roles1 == roles2) roles_msg `andThenCheck`
+    checkRoles roles1 roles2 `andThenCheck`
     check (eqFamFlav fam_flav1 fam_flav2)
         (ifPprDebug $
             text "Family flavours" <+> ppr fam_flav1 <+> text "and" <+> ppr fam_flav2 <+>
@@ -1104,7 +1103,7 @@ checkBootTyCon is_boot tc1 tc2
   | isAlgTyCon tc1 && isAlgTyCon tc2
   , Just env <- eqVarBndrs emptyRnEnv2 (tyConTyVars tc1) (tyConTyVars tc2)
   = ASSERT(tc1 == tc2)
-    check (roles1 == roles2) roles_msg `andThenCheck`
+    checkRoles roles1 roles2 `andThenCheck`
     check (eqListBy (eqTypeX env)
                      (tyConStupidTheta tc1) (tyConStupidTheta tc2))
           (text "The datatype contexts do not match") `andThenCheck`
@@ -1112,11 +1111,23 @@ checkBootTyCon is_boot tc1 tc2
 
   | otherwise = Just empty   -- two very different types -- should be obvious
   where
-    roles1 = tyConRoles tc1
+    roles1 = tyConRoles tc1 -- the abstract one
     roles2 = tyConRoles tc2
     roles_msg = text "The roles do not match." $$
                 (text "Roles on abstract types default to" <+>
                  quotes (text "representational") <+> text "in boot files.")
+
+    roles_subtype_msg = text "The roles are not compatible:" $$
+                        text "Main module:" <+> ppr roles2 $$
+                        text "Hsig file:" <+> ppr roles1
+
+    checkRoles r1 r2
+      | is_boot   = check (r1 == r2) roles_msg
+      | otherwise = check (r2 `rolesSubtypeOf` r1) roles_subtype_msg
+
+    rolesSubtypeOf [] [] = True
+    rolesSubtypeOf (x:xs) (y:ys) = x >= y && rolesSubtypeOf xs ys
+    rolesSubtypeOf _ _ = False
 
     eqAlgRhs _ AbstractTyCon _rhs2
       = checkSuccess -- rhs2 is guaranteed to be injective, since it's an AlgTyCon
