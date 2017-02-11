@@ -4,7 +4,3 @@
 [2 of 2] Processing q
   [1 of 2] Compiling H2[sig]          ( q/H2.hsig, nothing )
   [2 of 2] Compiling B                ( q/B.hs, nothing )
-
-bkp10.bkp:13:18: warning: [-Wdeprecations (in -Wdefault)]
-    In the use of type constructor or class ‘S’ (imported from H2):
-    "Inherited requirements from non-signature libraries (libraries with modules) should not be used, as this mode of use is not compatible with PVP-style version bounds.  Instead, copy the declaration to the local hsig file or move the signature to a library of its own and add that library as a dependency."

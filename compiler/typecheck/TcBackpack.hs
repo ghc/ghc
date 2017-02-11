@@ -16,7 +16,7 @@ module TcBackpack (
     instantiateSignature,
 ) where
 
-import BasicTypes (StringLiteral(..), SourceText(..), defaultFixity)
+import BasicTypes (defaultFixity)
 import Packages
 import TcRnExports
 import DynFlags
@@ -412,6 +412,7 @@ ifaceDeclNeverExportedRefs _ = []
 -- the wheels of recompilation avoidance which assumes that
 -- source files always exist.
 
+{-
 inheritedSigPvpWarning :: WarningTxt
 inheritedSigPvpWarning =
     WarningTxt (noLoc NoSourceText) [noLoc (StringLiteral NoSourceText (fsLit msg))]
@@ -421,6 +422,7 @@ inheritedSigPvpWarning =
           "compatible with PVP-style version bounds.  Instead, copy the " ++
           "declaration to the local hsig file or move the signature to a " ++
           "library of its own and add that library as a dependency."
+-}
 
 -- Note [Handling never-exported TyThings under Backpack]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -559,9 +561,15 @@ mergeSignatures hsmod lcl_iface0 = do
     let thinned_ifaces = reverse rev_thinned_ifaces
         exports        = nameShapeExports nsubst
         rdr_env        = mkGlobalRdrEnv (gresFromAvails Nothing exports)
-        warn_occs      = filter (not . (`elemOccSet` ok_to_use)) (exportOccs exports)
+        _warn_occs     = filter (not . (`elemOccSet` ok_to_use)) (exportOccs exports)
+        warns          = NoWarnings
+        {-
+        -- TODO: Warnings are transitive, but this is not what we want here:
+        -- if a module reexports an entity from a signature, that should be OK.
+        -- Not supported in current warning framework
         warns | null warn_occs = NoWarnings
               | otherwise = WarnSome $ map (\o -> (o, inheritedSigPvpWarning)) warn_occs
+        -}
     setGblEnv tcg_env {
         tcg_rdr_env = rdr_env,
         tcg_exports = exports,

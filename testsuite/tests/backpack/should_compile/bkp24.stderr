@@ -11,10 +11,6 @@
 [4 of 5] Processing q
   [1 of 2] Compiling B[sig]           ( q/B.hsig, nothing )
   [2 of 2] Compiling Q                ( q/Q.hs, nothing )
-
-bkp24.bkp:23:24: warning: [-Wdeprecations (in -Wdefault)]
-    In the use of type constructor or class ‘B’ (imported from B):
-    "Inherited requirements from non-signature libraries (libraries with modules) should not be used, as this mode of use is not compatible with PVP-style version bounds.  Instead, copy the declaration to the local hsig file or move the signature to a library of its own and add that library as a dependency."
 [5 of 5] Processing r
   Instantiating r
   [1 of 2] Including q[B=b:B]
