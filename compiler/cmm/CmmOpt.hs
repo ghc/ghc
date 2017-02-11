@@ -79,7 +79,7 @@ cmmMachOpFoldM _ op [CmmLit (CmmInt x rep)]
       MO_SS_Conv  from to -> CmmLit (CmmInt (narrowS from x) to)
       MO_UU_Conv  from to -> CmmLit (CmmInt (narrowU from x) to)
 
-      _ -> panic "cmmMachOpFoldM: unknown unary op"
+      _ -> panic $ "cmmMachOpFoldM: unknown unary op: " ++ show op
 
 
 -- Eliminate conversion NOPs
