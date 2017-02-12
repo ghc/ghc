@@ -79,6 +79,7 @@ import System.Directory
 import Data.Char
 import Data.List
 import qualified Data.Map as Map
+import qualified Data.Set as Set
 
 #ifndef mingw32_HOST_OS
 import qualified System.Posix.Internals
@@ -1068,9 +1069,11 @@ cleanTempFilesExcept dflags dont_delete
    $ mask_
    $ do let ref = filesToClean dflags
         to_delete <- atomicModifyIORef' ref $ \files ->
-            let (to_keep,to_delete) = partition (`elem` dont_delete) files
-            in  (to_keep,to_delete)
+            let res@(_to_keep, _to_delete) =
+                    partition (`Set.member` dont_delete_set) files
+            in  res
         removeTmpFiles dflags to_delete
+  where dont_delete_set = Set.fromList dont_delete
 
 
 -- Return a unique numeric temp file suffix
