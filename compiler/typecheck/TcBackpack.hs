@@ -689,8 +689,12 @@ mergeSignatures hsmod lcl_iface0 = do
             (insts, inst_env) = foldl' merge_inst
                                     (tcg_insts tcg_env, tcg_inst_env tcg_env)
                                     (md_insts details)
+            -- This is a HACK to prevent calculateAvails from including imp_mod
+            -- in the listing.  We don't want it because a module is NOT
+            -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
+            iface' = iface { mi_orphan = False, mi_finsts = False }
             avails = plusImportAvails (tcg_imports tcg_env)
-                                      (calculateAvails dflags iface False False)
+                                      (calculateAvails dflags iface' False False)
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,

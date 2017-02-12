@@ -321,6 +321,7 @@ calculateAvails :: DynFlags
                 -> ImportAvails
 calculateAvails dflags iface mod_safe' want_boot =
   let imp_mod    = mi_module iface
+      imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan iface
       has_finsts = mi_finsts iface
       deps       = mi_deps iface
@@ -353,12 +354,12 @@ calculateAvails dflags iface mod_safe' want_boot =
       -- 'imp_finsts' if it defines an orphan or instance family; thus the
       -- orph_iface/has_iface tests.
 
-      orphans | orph_iface = ASSERT( not (imp_mod `elem` dep_orphs deps) )
-                             imp_mod : dep_orphs deps
+      orphans | orph_iface = ASSERT2( not (imp_sem_mod `elem` dep_orphs deps), ppr imp_sem_mod <+> ppr (dep_orphs deps) )
+                             imp_sem_mod : dep_orphs deps
               | otherwise  = dep_orphs deps
 
-      finsts | has_finsts = ASSERT( not (imp_mod `elem` dep_finsts deps) )
-                            imp_mod : dep_finsts deps
+      finsts | has_finsts = ASSERT2( not (imp_sem_mod `elem` dep_finsts deps), ppr imp_sem_mod <+> ppr (dep_orphs deps) )
+                            imp_sem_mod : dep_finsts deps
              | otherwise  = dep_finsts deps
 
       pkg = moduleUnitId (mi_module iface)

@@ -103,6 +103,7 @@ rnModIface hsc_env insts nsubst iface = do
         decls <- mapM rnIfaceDecl' (mi_decls iface)
         insts <- mapM rnIfaceClsInst (mi_insts iface)
         fams <- mapM rnIfaceFamInst (mi_fam_insts iface)
+        deps <- rnDependencies (mi_deps iface)
         -- TODO:
         -- mi_rules
         -- mi_vect_info (LOW PRIORITY)
@@ -111,7 +112,8 @@ rnModIface hsc_env insts nsubst iface = do
                      , mi_insts = insts
                      , mi_fam_insts = fams
                      , mi_exports = exports
-                     , mi_decls = decls }
+                     , mi_decls = decls
+                     , mi_deps = deps }
 
 -- | Rename just the exports of a 'ModIface'.  Useful when we're doing
 -- shaping prior to signature merging.
@@ -119,6 +121,26 @@ rnModExports :: HscEnv -> [(ModuleName, Module)] -> ModIface -> IO (Either Error
 rnModExports hsc_env insts iface
     = initRnIface hsc_env iface insts Nothing
     $ mapM rnAvailInfo (mi_exports iface)
+
+rnDependencies :: Rename Dependencies
+rnDependencies deps = do
+    orphs  <- rnDepModules dep_orphs deps
+    finsts <- rnDepModules dep_finsts deps
+    return deps { dep_orphs = orphs, dep_finsts = finsts }
+
+rnDepModules :: (Dependencies -> [Module]) -> Dependencies -> ShIfM [Module]
+rnDepModules sel deps = do
+    hsc_env <- getTopEnv
+    hmap <- getHoleSubst
+    -- NB: It's not necessary to test if we're doing signature renaming,
+    -- because ModIface will never contain module reference for itself
+    -- in these dependencies.
+    fmap (nubSort . concat) . T.forM (sel deps) $ \mod -> do
+        dflags <- getDynFlags
+        let mod' = renameHoleModule dflags hmap mod
+        iface <- liftIO . initIfaceCheck (text "rnDepModule") hsc_env
+                        $ loadSysInterface (text "rnDepModule") mod'
+        return (mod' : sel (mi_deps iface))
 
 {-
 ************************************************************************

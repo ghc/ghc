@@ -954,6 +954,11 @@ to ``hs-boot`` files, but with some slight changes:
   they are implemented in a non-overlapping way.  If this is
   giving you problems give us a shout.
 
+- Any orphan instances which are brought into scope by an import
+  from a signature are unconditionally considered in scope, even
+  if the eventual implementing module doesn't actually import the
+  same orphans.
+
 Known limitations:
 
 - Algebraic data types specified in a signature cannot be implemented using
