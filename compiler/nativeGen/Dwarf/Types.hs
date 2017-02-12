@@ -436,10 +436,10 @@ pprSetUnwind _    Sp (Just (UwReg s _), Just (UwReg s' o')) | s == s'
 pprSetUnwind plat Sp (_, Just (UwReg s' o'))
   = if o' >= 0
     then pprByte dW_CFA_def_cfa $$
-         pprLEBWord (fromIntegral $ dwarfGlobalRegNo plat s') $$
+         pprLEBRegNo plat s' $$
          pprLEBWord (fromIntegral o')
     else pprByte dW_CFA_def_cfa_sf $$
-         pprLEBWord (fromIntegral $ dwarfGlobalRegNo plat s') $$
+         pprLEBRegNo plat s' $$
          pprLEBInt o'
 pprSetUnwind _    Sp (_, Just uw)
   = pprByte dW_CFA_def_cfa_expression $$ pprUnwindExpr False uw
@@ -449,16 +449,25 @@ pprSetUnwind plat g  (_, Just (UwDeref (UwReg Sp o)))
     pprLEBWord (fromIntegral ((-o) `div` platformWordSize plat))
   | otherwise
   = pprByte dW_CFA_offset_extended_sf $$
-    pprLEBWord (fromIntegral (dwarfGlobalRegNo plat g)) $$
+    pprLEBRegNo plat g $$
     pprLEBInt o
 pprSetUnwind plat g  (_, Just (UwDeref uw))
   = pprByte dW_CFA_expression $$
-    pprLEBWord (fromIntegral (dwarfGlobalRegNo plat g)) $$
+    pprLEBRegNo plat g $$
     pprUnwindExpr True uw
+pprSetUnwind plat g  (_, Just (UwReg g' 0))
+  | g == g'
+  = pprByte dW_CFA_same_value $$
+    pprLEBRegNo plat g
 pprSetUnwind plat g  (_, Just uw)
   = pprByte dW_CFA_val_expression $$
-    pprLEBWord (fromIntegral (dwarfGlobalRegNo plat g)) $$
+    pprLEBRegNo plat g $$
     pprUnwindExpr True uw
+
+-- | Print the register number of the given 'GlobalReg' as an unsigned LEB128
+-- encoded number.
+pprLEBRegNo :: Platform -> GlobalReg -> SDoc
+pprLEBRegNo plat = pprLEBWord . fromIntegral . dwarfGlobalRegNo plat
 
 -- | Generates a DWARF expression for the given unwind expression. If
 -- @spIsCFA@ is true, we see @Sp@ as the frame base CFA where it gets
@@ -488,7 +497,7 @@ pprUnwindExpr spIsCFA expr
 -- register to @undefined@
 pprUndefUnwind :: Platform -> GlobalReg -> SDoc
 pprUndefUnwind plat g  = pprByte dW_CFA_undefined $$
-                         pprLEBWord (fromIntegral $ dwarfGlobalRegNo plat g)
+                         pprLEBRegNo plat g
 
 
 -- | Align assembly at (machine) word boundary
