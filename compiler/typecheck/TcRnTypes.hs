@@ -475,6 +475,10 @@ data FrontendResult
 --        in the home library we are compiling.  (See LoadIface.)
 --        Similarly, in RnNames we check for self-imports using
 --        identity modules, to allow signatures to import their implementor.
+--
+--      - For recompilation avoidance, you want the identity module,
+--        since that will actually say the specific interface you
+--        want to track (and recompile if it changes)
 
 
 -- | 'TcGblEnv' describes the top-level of the module at the

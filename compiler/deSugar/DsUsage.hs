@@ -119,11 +119,16 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
              Nothing  -> ASSERT2( isSystemName name, ppr name ) mv_map
                 -- See Note [Internal used_names]
 
-             Just mod -> -- This lambda function is really just a
-                         -- specialised (++); originally came about to
-                         -- avoid quadratic behaviour (trac #2680)
-                         extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod [occ]
-                where occ = nameOccName name
+             Just mod ->
+                -- See Note [Identity versus semantic module]
+                let mod' = if isHoleModule mod
+                            then mkModule this_pkg (moduleName mod)
+                            else mod
+                -- This lambda function is really just a
+                -- specialised (++); originally came about to
+                -- avoid quadratic behaviour (trac #2680)
+                in extendModuleEnvWith (\_ xs -> occ:xs) mv_map mod' [occ]
+            where occ = nameOccName name
 
     -- We want to create a Usage for a home module if
     --  a) we used something from it; has something in used_names
