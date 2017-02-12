@@ -536,3 +536,6 @@ test('T11723', normal, compile, [''])
 test('T12987', normal, compile, [''])
 test('T11736', normal, compile, [''])
 test('T13248', expect_broken(13248), compile, [''])
+test('T11525', [unless(have_dynamic(), expect_broken(10301))], multi_compile,
+     ['', [('T11525_Plugin.hs', '-package ghc'), ('T11525.hs', '')],
+      '-dynamic'])
