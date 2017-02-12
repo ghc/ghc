@@ -745,11 +745,14 @@ bufWrite h_@Handle__{..} ptr count can_block =
                 writeIORef haByteBuffer old_buf{ bufR = w + count }
                 return count
 
-        -- else, we have to flush
-        else do debugIO "hPutBuf: flushing first"
-                old_buf' <- Buffered.flushWriteBuffer haDevice old_buf
-                        -- TODO: we should do a non-blocking flush here
-                writeIORef haByteBuffer old_buf'
+        -- else, we have to flush any existing handle buffer data
+        -- and can then write out the data in `ptr` directly.
+        else do -- No point flushing when there's nothing in the buffer.
+                when (w > 0) $ do
+                  debugIO "hPutBuf: flushing first"
+                  flushed_buf <- Buffered.flushWriteBuffer haDevice old_buf
+                          -- TODO: we should do a non-blocking flush here
+                  writeIORef haByteBuffer flushed_buf
                 -- if we can fit in the buffer, then just loop
                 if count < size
                    then bufWrite h_ ptr count can_block
