@@ -736,13 +736,30 @@ bufWrite h_@Handle__{..} ptr count can_block =
   old_buf@Buffer{ bufRaw=old_raw, bufR=w, bufSize=size }
      <- readIORef haByteBuffer
 
-  -- enough room in handle buffer?
-  if (size - w > count)
-        -- There's enough room in the buffer:
+  -- TODO: Possible optimisation:
+  --       If we know that `w + count > size`, we should write both the
+  --       handle buffer and the `ptr` in a single `writev()` syscall.
+
+  -- Need to buffer and enough room in handle buffer?
+  -- There's no need to buffer if the data to be written is larger than
+  -- the handle buffer (`count >= size`).
+  if (count < size && count <= size - w)
+        -- We need to buffer and there's enough room in the buffer:
         -- just copy the data in and update bufR.
         then do debugIO ("hPutBuf: copying to buffer, w=" ++ show w)
                 copyToRawBuffer old_raw w ptr count
-                writeIORef haByteBuffer old_buf{ bufR = w + count }
+                let copied_buf = old_buf{ bufR = w + count }
+                -- If the write filled the buffer completely, we need to flush,
+                -- to maintain the "INVARIANTS on Buffers" from
+                -- GHC.IO.Buffer.checkBuffer: "a write buffer is never full".
+                if (count == size - w)
+                  then do
+                    debugIO "hPutBuf: flushing full buffer after writing"
+                    flushed_buf <- Buffered.flushWriteBuffer haDevice copied_buf
+                            -- TODO: we should do a non-blocking flush here
+                    writeIORef haByteBuffer flushed_buf
+                  else do
+                    writeIORef haByteBuffer copied_buf
                 return count
 
         -- else, we have to flush any existing handle buffer data
