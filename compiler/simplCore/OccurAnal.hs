@@ -1547,7 +1547,7 @@ occAnalNonRecRhs env bndr bndrs body
     env1 | certainly_inline = env
          | otherwise        = rhsCtxt env
 
-    -- See Note [Use one-shot info]
+    -- See Note [Sources of one-shot information]
     rhs_env = env1 { occ_one_shots = argOneShots dmd }
 
 
@@ -1867,16 +1867,17 @@ occAnalApp env (Var fun, args, ticks)
        -- This is the *whole point* of the isRhsEnv predicate
        -- See Note [Arguments of let-bound constructors]
 
-    n_val_args = valArgCount args
+    n_val_args = valArgCount args + length (takeWhile isOneShotInfo (occ_one_shots env))
+        -- See Note [Sources of one-shot information], bullet point A'
+
     n_args     = length args
     fun_uds    = mkOneOcc env fun (n_val_args > 0) n_args
     is_exp     = isExpandableApp fun n_val_args
-           -- See Note [CONLIKE pragma] in BasicTypes
-           -- The definition of is_exp should match that in
-           -- Simplify.prepareRhs
+        -- See Note [CONLIKE pragma] in BasicTypes
+        -- The definition of is_exp should match that in Simplify.prepareRhs
 
     one_shots  = argsOneShots (idStrictness fun) n_val_args
-                 -- See Note [Use one-shot info]
+        -- See Note [Sources of one-shot information]
 
 occAnalApp env (fun, args, ticks)
   = (markAllNonTailCalled (fun_uds +++ args_uds),
@@ -1898,20 +1899,44 @@ zapDetailsIf True  uds = zapDetails uds
 zapDetailsIf False uds = uds
 
 {-
-Note [Use one-shot information]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The occurrence analyser propagates one-shot-lambda information in two
-situations:
+Note [Sources of one-shot information]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The occurrence analyser obtains one-shot-lambda information from two sources:
 
-  * Applications:  eg   build (\c n -> blah)
+A:  Saturated applications:  eg   f e1 .. en
 
-    Propagate one-shot info from the strictness signature of 'build' to
-    the \c n.
+    In general, given a call (f e1 .. en) we can propagate one-shot info from
+    f's strictness signature into e1 .. en, but /only/ if n is enough to
+    saturate the strictness signature. A stricteness signature like
 
-    This strictness signature can come from a module interface, in the case of
-    an imported function, or from a previous run of the demand analyser.
+    f :: C1(C1(L))LS
 
-  * Let-bindings:  eg   let f = \c. let ... in \n -> blah
+    means that *if f is applied to three arguments* then it will guarantee to
+    call its first argument at most once, and to call the result of that at
+    most once. But if f has fewer than three arguments, all bets are off; e.g.
+
+    map (f (\x y. expensive) e2) xs
+
+    Here the \x y abstraction may be called many times (once for each element of
+    xs) so we should not mark x and y as one-shot. But if it was
+
+    map (f (\x y. expensive) 3 2) xs
+
+    then the first argument of f will be called at most once.
+
+A': Non-obviously satuated applications: eg    build (f (\x y -> expensive))
+
+    In this case, f is only manifestly applied to one argument, so it does not
+    look saturated. So bye the previous point, we should not use its strictness
+    signature to learn about the one-shotness of \x y. But in this case we can:
+
+    build is fully applied, so we may use its strictness signature. From that
+    we learn that build calls its argument with two arguments *at most once*.
+
+    So there is really only one call to f, and it will have three arguments. In
+    that sense, f is saturated, and we may proceed as described above.
+
+B:  Let-bindings:  eg   let f = \c. let ... in \n -> blah
                         in (build f, build f)
 
     Propagate one-shot info from the demanand-info on 'f' to the
@@ -1923,6 +1948,22 @@ situations:
 Previously, the demand analyser would *also* set the one-shot information, but
 that code was buggy (see #11770), so doing it only in on place, namely here, is
 saner.
+
+Note [OneShots]
+~~~~~~~~~~~~~~~
+When analysing an expression, the occ_one_shots argument contains information
+about how the function is being used. The length of the list indicates
+how many arguments will eventually be passed to the analysed expression,
+and the OneShotInfo indicates whether this application is once or multiple times.
+
+Example:
+
+ Context of f                occ_one_shots when analysing f
+
+ f 1 2                       [OneShot, OneShot]
+ map (f 1)                   [OneShot, NoOneShotInfo]
+ build f                     [OneShot, OneShot]
+ f 1 2 `seq` f 2 1           [NoOneShotInfo, OneShot]
 
 Note [Binders in case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2008,7 +2049,7 @@ wrapAltRHS _ _ alt_usg _ alt_rhs
 
 data OccEnv
   = OccEnv { occ_encl       :: !OccEncl      -- Enclosing context information
-           , occ_one_shots  :: !OneShots     -- Tells about linearity
+           , occ_one_shots  :: !OneShots     -- See Note [OneShots]
            , occ_gbl_scrut  :: GlobalScruts
            , occ_rule_act   :: Activation -> Bool   -- Which rules are active
              -- See Note [Finding rule RHS free vars]
@@ -2037,11 +2078,8 @@ instance Outputable OccEncl where
   ppr OccRhs     = text "occRhs"
   ppr OccVanilla = text "occVanilla"
 
+-- See note [OneShots]
 type OneShots = [OneShotInfo]
-        -- []           No info
-        --
-        -- one_shot_info:ctxt    Analysing a function-valued expression that
-        --                       will be applied as described by one_shot_info
 
 initOccEnv :: (Activation -> Bool) -> OccEnv
 initOccEnv active_rule
