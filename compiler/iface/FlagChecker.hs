@@ -22,6 +22,10 @@ import System.FilePath (normalise)
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
 -- the finger print on important fields in @DynFlags@ so that
 -- the recompilation checker can use this fingerprint.
+--
+-- NB: The 'Module' parameter is the 'Module' recorded by the
+-- *interface* file, not the actual 'Module' according to our
+-- 'DynFlags'.
 fingerprintDynFlags :: DynFlags -> Module
                     -> (BinHandle -> Name -> IO ())
                     -> IO Fingerprint

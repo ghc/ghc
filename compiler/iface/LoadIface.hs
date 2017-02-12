@@ -537,7 +537,7 @@ computeInterface doc_str hi_boot_file mod0 = do
     dflags <- getDynFlags
     case splitModuleInsts mod0 of
         (imod, Just indef) | not (unitIdIsDefinite (thisPackage dflags)) -> do
-            r <- findAndReadIface doc_str imod hi_boot_file
+            r <- findAndReadIface doc_str imod mod0 hi_boot_file
             case r of
                 Succeeded (iface0, path) -> do
                     hsc_env <- getTopEnv
@@ -549,7 +549,7 @@ computeInterface doc_str hi_boot_file mod0 = do
                         Left errs -> liftIO . throwIO . mkSrcErr $ errs
                 Failed err -> return (Failed err)
         (mod, _) ->
-            findAndReadIface doc_str mod hi_boot_file
+            findAndReadIface doc_str mod mod0 hi_boot_file
 
 -- | Compute the signatures which must be compiled in order to
 -- load the interface for a 'Module'.  The output of this function
@@ -585,7 +585,7 @@ moduleFreeHolesPrecise doc_str mod
             Just ifhs  -> Just (renameFreeHoles ifhs insts)
             _otherwise -> Nothing
     readAndCache imod insts = do
-        mb_iface <- findAndReadIface (text "moduleFreeHolesPrecise" <+> doc_str) imod False
+        mb_iface <- findAndReadIface (text "moduleFreeHolesPrecise" <+> doc_str) imod mod False
         case mb_iface of
             Succeeded (iface, _) -> do
                 let ifhs = mi_free_holes iface
@@ -778,7 +778,14 @@ This actually happened with P=base, Q=ghc-prim, via the AMP warnings.
 See Trac #8320.
 -}
 
-findAndReadIface :: SDoc -> InstalledModule
+findAndReadIface :: SDoc
+                 -- The unique identifier of the on-disk module we're
+                 -- looking for
+                 -> InstalledModule
+                 -- The *actual* module we're looking for.  We use
+                 -- this to check the consistency of the requirements
+                 -- of the module we read out.
+                 -> Module
                  -> IsBootInterface     -- True  <=> Look for a .hi-boot file
                                         -- False <=> Look for .hi file
                  -> TcRnIf gbl lcl (MaybeErr MsgDoc (ModIface, FilePath))
@@ -787,7 +794,7 @@ findAndReadIface :: SDoc -> InstalledModule
 
         -- It *doesn't* add an error to the monad, because
         -- sometimes it's ok to fail... see notes with loadInterface
-findAndReadIface doc_str mod hi_boot_file
+findAndReadIface doc_str mod wanted_mod_with_insts hi_boot_file
   = do traceIf (sep [hsep [text "Reading",
                            if hi_boot_file
                              then text "[boot]"
@@ -828,14 +835,20 @@ findAndReadIface doc_str mod hi_boot_file
                                            (installedModuleName mod) err))
     where read_file file_path = do
               traceIf (text "readIFace" <+> text file_path)
-              read_result <- readIface mod file_path
+              -- Figure out what is recorded in mi_module.  If this is
+              -- a fully definite interface, it'll match exactly, but
+              -- if it's indefinite, the inside will be uninstantiated!
+              dflags <- getDynFlags
+              let wanted_mod =
+                    case splitModuleInsts wanted_mod_with_insts of
+                        (_, Nothing) -> wanted_mod_with_insts
+                        (_, Just indef_mod) ->
+                          indefModuleToModule dflags
+                            (generalizeIndefModule indef_mod)
+              read_result <- readIface wanted_mod file_path
               case read_result of
                 Failed err -> return (Failed (badIfaceFile file_path err))
-                Succeeded iface
-                    | not (mod `installedModuleEq` mi_module iface) ->
-                      return (Failed (wrongIfaceModErr iface mod file_path))
-                    | otherwise ->
-                      return (Succeeded (iface, file_path))
+                Succeeded iface -> return (Succeeded (iface, file_path))
                             -- Don't forget to fill in the package name...
           checkBuildDynamicToo (Succeeded (iface, filePath)) = do
               dflags <- getDynFlags
@@ -862,7 +875,7 @@ findAndReadIface doc_str mod hi_boot_file
 
 -- @readIface@ tries just the one file.
 
-readIface :: InstalledModule -> FilePath
+readIface :: Module -> FilePath
           -> TcRnIf gbl lcl (MaybeErr MsgDoc ModIface)
         -- Failed err    <=> file not found, or unreadable, or illegible
         -- Succeeded iface <=> successfully found and parsed
@@ -873,8 +886,10 @@ readIface wanted_mod file_path
         ; dflags <- getDynFlags
         ; case res of
             Right iface
-                -- Same deal
-                | wanted_mod `installedModuleEq` actual_mod
+                -- NB: This check is NOT just a sanity check, it is
+                -- critical for correctness of recompilation checking
+                -- (it lets us tell when -this-unit-id has changed.)
+                | wanted_mod == actual_mod
                                 -> return (Succeeded iface)
                 | otherwise     -> return (Failed err)
                 where
@@ -1130,8 +1145,16 @@ badIfaceFile file err
   = vcat [text "Bad interface file:" <+> text file,
           nest 4 err]
 
-hiModuleNameMismatchWarn :: DynFlags -> InstalledModule -> Module -> MsgDoc
-hiModuleNameMismatchWarn dflags requested_mod read_mod =
+hiModuleNameMismatchWarn :: DynFlags -> Module -> Module -> MsgDoc
+hiModuleNameMismatchWarn dflags requested_mod read_mod
+ | moduleUnitId requested_mod == moduleUnitId read_mod =
+    sep [text "Interface file contains module" <+> quotes (ppr read_mod) <> comma,
+         text "but we were expecting module" <+> quotes (ppr requested_mod),
+         sep [text "Probable cause: the source code which generated interface file",
+             text "has an incompatible module name"
+            ]
+        ]
+ | otherwise =
   -- ToDo: This will fail to have enough qualification when the package IDs
   -- are the same
   withPprStyle (mkUserStyle dflags alwaysQualify AllTheWay) $
@@ -1141,19 +1164,8 @@ hiModuleNameMismatchWarn dflags requested_mod read_mod =
          , ppr requested_mod
          , text "differs from name found in the interface file"
          , ppr read_mod
+         , parens (text "if these names look the same, try again with -dppr-debug")
          ]
-
-wrongIfaceModErr :: ModIface -> InstalledModule -> String -> SDoc
-wrongIfaceModErr iface mod file_path
-  = sep [text "Interface file" <+> iface_file,
-         text "contains module" <+> quotes (ppr (mi_module iface)) <> comma,
-         text "but we were expecting module" <+> quotes (ppr mod),
-         sep [text "Probable cause: the source code which generated",
-             nest 2 iface_file,
-             text "has an incompatible module name"
-            ]
-        ]
-  where iface_file = doubleQuotes (text file_path)
 
 homeModError :: InstalledModule -> ModLocation -> SDoc
 -- See Note [Home module load error]

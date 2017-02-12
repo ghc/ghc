@@ -1103,7 +1103,8 @@ checkOldIface hsc_env mod_summary source_modified maybe_iface
   = do  let dflags = hsc_dflags hsc_env
         showPass dflags $
             "Checking old interface for " ++
-              (showPpr dflags $ ms_mod mod_summary)
+              (showPpr dflags $ ms_mod mod_summary) ++
+              " (use -ddump-hi-diffs for more details)"
         initIfaceCheck (text "checkOldIface") hsc_env $
             check_old_iface hsc_env mod_summary source_modified maybe_iface
 
@@ -1126,10 +1127,11 @@ check_old_iface hsc_env mod_summary src_modified maybe_iface
 
         loadIface = do
              let iface_path = msHiFilePath mod_summary
-             read_result <- readIface (ms_installed_mod mod_summary) iface_path
+             read_result <- readIface (ms_mod mod_summary) iface_path
              case read_result of
                  Failed err -> do
                      traceIf (text "FYI: cannot read old interface file:" $$ nest 4 err)
+                     traceHiDiffs (text "Old interface file was invalid:" $$ nest 4 err)
                      return Nothing
                  Succeeded iface -> do
                      traceIf (text "Read the interface file" <+> text iface_path)
@@ -1187,6 +1189,11 @@ checkVersions hsc_env mod_summary iface
   = do { traceHiDiffs (text "Considering whether compilation is required for" <+>
                         ppr (mi_module iface) <> colon)
 
+       -- readIface will have verified that the InstalledUnitId matches,
+       -- but we ALSO must make sure the instantiation matches up.  See
+       -- test case bkpcabal04!
+       ; if moduleUnitId (mi_module iface) /= thisPackage (hsc_dflags hsc_env)
+            then return (RecompBecause "-this-unit-id changed", Nothing) else do {
        ; recomp <- checkFlagHash hsc_env iface
        ; if recompileRequired recomp then return (recomp, Nothing) else do {
        ; recomp <- checkMergedSignatures mod_summary iface
@@ -1212,7 +1219,7 @@ checkVersions hsc_env mod_summary iface
        ; updateEps_ $ \eps  -> eps { eps_is_boot = udfmToUfm mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
-    }}}}}
+    }}}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really

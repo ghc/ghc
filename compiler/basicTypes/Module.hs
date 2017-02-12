@@ -62,6 +62,7 @@ module Module
         splitModuleInsts,
         splitUnitIdInsts,
         generalizeIndefUnitId,
+        generalizeIndefModule,
 
         -- * Parsers
         parseModuleName,
@@ -999,6 +1000,9 @@ generalizeIndefUnitId :: IndefUnitId -> IndefUnitId
 generalizeIndefUnitId IndefUnitId{ indefUnitIdComponentId = cid
                                  , indefUnitIdInsts = insts } =
     newIndefUnitId cid (map (\(m,_) -> (m, mkHoleModule m)) insts)
+
+generalizeIndefModule :: IndefModule -> IndefModule
+generalizeIndefModule (IndefModule uid n) = IndefModule (generalizeIndefUnitId uid) n
 
 parseModuleName :: ReadP ModuleName
 parseModuleName = fmap mkModuleName

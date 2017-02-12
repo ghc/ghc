@@ -24,7 +24,7 @@ unit s where
         import D
         z = show id
 unit t where
-    dependency r[B=s:E,H=<H>]
+    dependency r[B=s[H=<H>]:E,H=<H>]
     module F where
         import D
         a = show id

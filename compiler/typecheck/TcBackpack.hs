@@ -505,10 +505,11 @@ mergeSignatures hsmod lcl_iface0 = do
 
     -- STEP 2: Read in the RAW forms of all of these interfaces
     ireq_ifaces0 <- forM reqs $ \(IndefModule iuid mod_name) ->
-           fmap fst
+        let m = mkModule (IndefiniteUnitId iuid) mod_name
+            im = fst (splitModuleInsts m)
+        in fmap fst
          . withException
-         . flip (findAndReadIface (text "mergeSignatures")) False
-         $ fst (splitModuleInsts (mkModule (IndefiniteUnitId iuid) mod_name))
+         $ findAndReadIface (text "mergeSignatures") im m False
 
     -- STEP 3: Get the unrenamed exports of all these interfaces,
     -- thin it according to the export list, and do shaping on them.
@@ -818,8 +819,9 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
     -- the ORIGINAL signature.  We are going to eventually rename it,
     -- but we must proceed slowly, because it is NOT known if the
     -- instantiation is correct.
-    let isig_mod = fst (splitModuleInsts (mkModule (IndefiniteUnitId uid) mod_name))
-    mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod False
+    let sig_mod = mkModule (IndefiniteUnitId uid) mod_name
+        isig_mod = fst (splitModuleInsts sig_mod)
+    mb_isig_iface <- findAndReadIface (text "checkImplements 2") isig_mod sig_mod False
     isig_iface <- case mb_isig_iface of
         Succeeded (iface, _) -> return iface
         Failed err -> failWithTc $

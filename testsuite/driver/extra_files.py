@@ -161,6 +161,7 @@ extra_src_files = {
   'bkpcabal01': ['p', 'q', 'impl', 'bkpcabal01.cabal', 'Setup.hs', 'Main.hs'],
   'bkpcabal02': ['p', 'q', 'bkpcabal02.cabal', 'Setup.hs'],
   'bkpcabal03': ['asig1', 'asig2', 'bkpcabal03.cabal.in1', 'bkpcabal03.cabal.in2', 'Setup.hs', 'Mod.hs'],
+  'bkpcabal04': ['p','q','bkpcabal04.cabal.in1','bkpcabal04.cabal.in2','Setup.hs'],
   'break001': ['../Test2.hs'],
   'break002': ['../Test2.hs'],
   'break003': ['../Test3.hs'],
