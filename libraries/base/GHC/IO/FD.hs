@@ -121,7 +121,7 @@ instance GHC.IO.Device.IODevice FD where
 -- varies too much though: it is 512 on Windows, 1024 on OS X and 8192
 -- on Linux.  So let's just use a decent size on every platform:
 dEFAULT_FD_BUFFER_SIZE :: Int
-dEFAULT_FD_BUFFER_SIZE = 8096
+dEFAULT_FD_BUFFER_SIZE = 8192
 
 -- | @since 4.1.0.0
 instance BufferedIO FD where
