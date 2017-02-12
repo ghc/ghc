@@ -895,10 +895,11 @@ data AlgTyConFlav
     VanillaAlgTyCon
        TyConRepName
 
-    -- | An unboxed type constructor. Note that this carries no TyConRepName
-    -- as it is not representable.
+    -- | An unboxed type constructor. The TyConRepName is a Maybe since we
+    -- currently don't allow unboxed sums to be Typeable since there are too
+    -- many of them. See #13276.
   | UnboxedAlgTyCon
-       TyConRepName
+       (Maybe TyConRepName)
 
   -- | Type constructors representing a class dictionary.
   -- See Note [ATyCon for classes] in TyCoRep
@@ -1170,7 +1171,7 @@ tyConRepName_maybe (PrimTyCon  { primRepName = mb_rep_nm })
 tyConRepName_maybe (AlgTyCon { algTcParent = parent })
   | VanillaAlgTyCon rep_nm <- parent = Just rep_nm
   | ClassTyCon _ rep_nm    <- parent = Just rep_nm
-  | UnboxedAlgTyCon rep_nm    <- parent = Just rep_nm
+  | UnboxedAlgTyCon rep_nm <- parent = rep_nm
 tyConRepName_maybe (FamilyTyCon { famTcFlav = DataFamilyTyCon rep_nm })
   = Just rep_nm
 tyConRepName_maybe (PromotedDataCon { tcRepName = rep_nm })

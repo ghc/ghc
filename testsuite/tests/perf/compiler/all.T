@@ -926,10 +926,10 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 173257664, 5),
+          [(wordsize(64), 153611448, 5),
           # initial:    125831400
           # 2017-01-18: 133380960  Allow top-level string literals in Core
-          # 2017-02-17: 173257664  Type-indexed Typeable
+          # 2017-02-17: 153611448  Type-indexed Typeable
           ]),
      ],
      compile,
