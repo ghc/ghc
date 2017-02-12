@@ -28,10 +28,6 @@ void freeProfiling  (void);
 extern FILE *prof_file;
 extern FILE *hp_file;
 
-#ifdef PROFILING
-
-void reportCCSProfiling ( void );
-
 /* A summary of an execution of a profiled program */
 typedef struct {
     /* Total bytes allocated */
@@ -40,8 +36,15 @@ typedef struct {
     unsigned int total_prof_ticks;
 } ProfilerTotals;
 
+#ifdef PROFILING
+
+void reportCCSProfiling ( void );
+
 void fprintCCS( FILE *f, CostCentreStack *ccs );
 void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso);
+
+bool ignoreCCS (CostCentreStack const *ccs);
+bool ignoreCC (CostCentre const *cc);
 
 #ifdef DEBUG
 void debugCCS( CostCentreStack *ccs );
