@@ -724,8 +724,9 @@ putFS :: BinHandle -> FastString -> IO ()
 putFS bh fs = putBS bh $ fastStringToByteString fs
 
 getFS :: BinHandle -> IO FastString
-getFS bh = do bs <- getBS bh
-              return $! mkFastStringByteString bs
+getFS bh = do
+  l  <- get bh :: IO Int
+  getPrim bh l (\src -> pure $! mkFastStringBytes src l )
 
 putBS :: BinHandle -> ByteString -> IO ()
 putBS bh bs =
