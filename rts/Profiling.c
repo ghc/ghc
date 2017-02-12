@@ -39,11 +39,6 @@ static Arena *prof_arena;
 unsigned int CC_ID  = 1;
 unsigned int CCS_ID = 1;
 
-/* figures for the profiling report.
- */
-static StgWord64 total_alloc;
-static W_      total_prof_ticks;
-
 /* Globals for opening the profiling log file(s)
  */
 static char *prof_filename; /* prof report file name = <program>.prof */
@@ -111,23 +106,28 @@ static  CostCentreStack * appendCCS       ( CostCentreStack *ccs1,
                                             CostCentreStack *ccs2 );
 static  CostCentreStack * actualPush_     ( CostCentreStack *ccs, CostCentre *cc,
                                             CostCentreStack *new_ccs );
-static  bool              ignoreCCS       ( CostCentreStack *ccs );
-static  void              countTickss     ( CostCentreStack *ccs );
+static  bool              ignoreCCS       ( CostCentreStack const *ccs );
+static  ProfilerTotals    countTickss     ( CostCentreStack const *ccs );
 static  void              inheritCosts    ( CostCentreStack *ccs );
 static  uint32_t           numDigits       ( StgInt i );
-static  void              findCCSMaxLens  ( CostCentreStack *ccs,
+static  void              findCCSMaxLens  ( CostCentreStack const *ccs,
                                             uint32_t indent,
                                             uint32_t *max_label_len,
                                             uint32_t *max_module_len,
                                             uint32_t *max_src_len,
                                             uint32_t *max_id_len );
-static  void              logCCS          ( CostCentreStack *ccs,
+static  void              logCCS          ( FILE *prof_file,
+                                            CostCentreStack const *ccs,
+                                            ProfilerTotals totals,
                                             uint32_t indent,
                                             uint32_t max_label_len,
                                             uint32_t max_module_len,
                                             uint32_t max_src_len,
                                             uint32_t max_id_len );
-static  void              reportCCS       ( CostCentreStack *ccs );
+static  void              reportPerCCCosts( FILE *prof_file, ProfilerTotals totals );
+static  void              reportCCS       ( FILE *prof_file,
+                                            CostCentreStack const *ccs,
+                                            ProfilerTotals totals );
 static  CostCentreStack * checkLoop       ( CostCentreStack *ccs,
                                             CostCentre *cc );
 static  CostCentreStack * pruneCCSTree    ( CostCentreStack *ccs );
@@ -696,7 +696,7 @@ ignoreCC (CostCentre *cc)
 }
 
 static bool
-ignoreCCS (CostCentreStack *ccs)
+ignoreCCS (CostCentreStack const *ccs)
 {
     return RtsFlags.CcFlags.doCostCentres < COST_CENTRES_ALL &&
         (   ccs == CCS_OVERHEAD
@@ -760,7 +760,7 @@ strlen_utf8 (char *s)
 }
 
 static void
-reportPerCCCosts( void )
+reportPerCCCosts( FILE *prof_file, ProfilerTotals totals )
 {
     CostCentre *cc, *next;
     uint32_t max_label_len, max_module_len, max_src_len;
@@ -774,8 +774,8 @@ reportPerCCCosts( void )
 
     for (cc = CC_LIST; cc != NULL; cc = next) {
         next = cc->link;
-        if (cc->time_ticks > total_prof_ticks/100
-            || cc->mem_alloc > total_alloc/100
+        if (cc->time_ticks > totals.total_prof_ticks/100
+            || cc->mem_alloc > totals.total_alloc/100
             || RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_ALL) {
             insertCCInSortedList(cc);
 
@@ -806,9 +806,8 @@ reportPerCCCosts( void )
                 max_src_len - strlen_utf8(cc->srcloc), "");
 
         fprintf(prof_file, " %6.1f %6.1f",
-                total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) total_prof_ticks * 100),
-                total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat)
-                                          total_alloc * 100)
+                totals.total_prof_ticks == 0 ? 0.0 : (cc->time_ticks / (StgFloat) totals.total_prof_ticks * 100),
+                totals.total_alloc == 0 ? 0.0 : (cc->mem_alloc / (StgFloat) totals.total_alloc * 100)
             );
 
         if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
@@ -826,8 +825,8 @@ reportPerCCCosts( void )
    -------------------------------------------------------------------------- */
 
 static void
-fprintHeader( uint32_t max_label_len, uint32_t max_module_len,
-                uint32_t max_src_len, uint32_t max_id_len )
+fprintHeader( FILE *prof_file, uint32_t max_label_len, uint32_t max_module_len,
+              uint32_t max_src_len, uint32_t max_id_len )
 {
     fprintf(prof_file, "%-*s %-*s %-*s %-*s %11s  %12s   %12s\n",
             max_label_len, "",
@@ -860,9 +859,7 @@ reportCCSProfiling( void )
 
     stopProfTimer();
 
-    total_prof_ticks = 0;
-    total_alloc = 0;
-    countTickss(CCS_MAIN);
+    ProfilerTotals totals = countTickss(CCS_MAIN);
 
     if (RtsFlags.CcFlags.doCostCentres == 0) return;
 
@@ -880,25 +877,25 @@ reportCCSProfiling( void )
     fprintf(prof_file, "\n\n");
 
     fprintf(prof_file, "\ttotal time  = %11.2f secs   (%lu ticks @ %d us, %d processor%s)\n",
-            ((double) total_prof_ticks *
+            ((double) totals.total_prof_ticks *
              (double) RtsFlags.MiscFlags.tickInterval) / (TIME_RESOLUTION * n_capabilities),
-            (unsigned long) total_prof_ticks,
+            (unsigned long) totals.total_prof_ticks,
             (int) TimeToUS(RtsFlags.MiscFlags.tickInterval),
             n_capabilities, n_capabilities > 1 ? "s" : "");
 
     fprintf(prof_file, "\ttotal alloc = %11s bytes",
-            showStgWord64(total_alloc * sizeof(W_),
+            showStgWord64(totals.total_alloc * sizeof(W_),
                           temp, true/*commas*/));
 
     fprintf(prof_file, "  (excludes profiling overheads)\n\n");
 
-    reportPerCCCosts();
+    reportPerCCCosts(prof_file, totals);
 
     inheritCosts(CCS_MAIN);
 
     CostCentreStack *stack = pruneCCSTree(CCS_MAIN);
     sortCCSTree(stack);
-    reportCCS(stack);
+    reportCCS(prof_file, stack, totals);
 }
 
 static uint32_t
@@ -918,8 +915,9 @@ numDigits(StgInt i) {
 }
 
 static void
-findCCSMaxLens(CostCentreStack *ccs, uint32_t indent, uint32_t *max_label_len,
-        uint32_t *max_module_len, uint32_t *max_src_len, uint32_t *max_id_len) {
+findCCSMaxLens(CostCentreStack const *ccs, uint32_t indent,
+               uint32_t *max_label_len, uint32_t *max_module_len,
+               uint32_t *max_src_len, uint32_t *max_id_len) {
     CostCentre *cc;
     IndexTable *i;
 
@@ -939,9 +937,10 @@ findCCSMaxLens(CostCentreStack *ccs, uint32_t indent, uint32_t *max_label_len,
 }
 
 static void
-logCCS(CostCentreStack *ccs, uint32_t indent,
-        uint32_t max_label_len, uint32_t max_module_len,
-        uint32_t max_src_len, uint32_t max_id_len)
+logCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals,
+       uint32_t indent,
+       uint32_t max_label_len, uint32_t max_module_len,
+       uint32_t max_src_len, uint32_t max_id_len)
 {
     CostCentre *cc;
     IndexTable *i;
@@ -966,10 +965,10 @@ logCCS(CostCentreStack *ccs, uint32_t indent,
         fprintf(prof_file,
                 " %*" FMT_Int "%11" FMT_Word64 "  %5.1f  %5.1f   %5.1f  %5.1f",
                 max_id_len, ccs->ccsID, ccs->scc_count,
-                total_prof_ticks == 0 ? 0.0 : ((double)ccs->time_ticks / (double)total_prof_ticks * 100.0),
-                total_alloc == 0 ? 0.0 : ((double)ccs->mem_alloc / (double)total_alloc * 100.0),
-                total_prof_ticks == 0 ? 0.0 : ((double)ccs->inherited_ticks / (double)total_prof_ticks * 100.0),
-                total_alloc == 0 ? 0.0 : ((double)ccs->inherited_alloc / (double)total_alloc * 100.0)
+                totals.total_prof_ticks == 0 ? 0.0 : ((double)ccs->time_ticks / (double)totals.total_prof_ticks * 100.0),
+                totals.total_alloc == 0 ? 0.0 : ((double)ccs->mem_alloc / (double)totals.total_alloc * 100.0),
+                totals.total_prof_ticks == 0 ? 0.0 : ((double)ccs->inherited_ticks / (double)totals.total_prof_ticks * 100.0),
+                totals.total_alloc == 0 ? 0.0 : ((double)ccs->inherited_alloc / (double)totals.total_alloc * 100.0)
             );
 
         if (RtsFlags.CcFlags.doCostCentres >= COST_CENTRES_VERBOSE) {
@@ -981,14 +980,14 @@ logCCS(CostCentreStack *ccs, uint32_t indent,
 
     for (i = ccs->indexTable; i != 0; i = i->next) {
         if (!i->back_edge) {
-            logCCS(i->ccs, indent+1,
+            logCCS(prof_file, i->ccs, totals, indent+1,
                    max_label_len, max_module_len, max_src_len, max_id_len);
         }
     }
 }
 
 static void
-reportCCS(CostCentreStack *ccs)
+reportCCS(FILE *prof_file, CostCentreStack const *ccs, ProfilerTotals totals)
 {
     uint32_t max_label_len, max_module_len, max_src_len, max_id_len;
 
@@ -1000,27 +999,41 @@ reportCCS(CostCentreStack *ccs)
     findCCSMaxLens(ccs, 0,
                    &max_label_len, &max_module_len, &max_src_len, &max_id_len);
 
-    fprintHeader(max_label_len, max_module_len, max_src_len, max_id_len);
-    logCCS(ccs, 0, max_label_len, max_module_len, max_src_len, max_id_len);
+    fprintHeader(prof_file,
+                 max_label_len, max_module_len, max_src_len, max_id_len);
+    logCCS(prof_file, ccs, totals, 0,
+           max_label_len, max_module_len, max_src_len, max_id_len);
 }
 
 
-/* Traverse the cost centre stack tree and accumulate
- * ticks/allocations.
- */
-static void
-countTickss(CostCentreStack *ccs)
-{
-    IndexTable *i;
+/* -----------------------------------------------------------------------------
+ * Accumulating total allocatinos and tick count
+   -------------------------------------------------------------------------- */
 
+/* Helper */
+static void
+countTickss_(CostCentreStack const *ccs, ProfilerTotals *totals)
+{
     if (!ignoreCCS(ccs)) {
-        total_alloc += ccs->mem_alloc;
-        total_prof_ticks += ccs->time_ticks;
+        totals->total_alloc += ccs->mem_alloc;
+        totals->total_prof_ticks += ccs->time_ticks;
     }
-    for (i = ccs->indexTable; i != NULL; i = i->next)
+    for (IndexTable *i = ccs->indexTable; i != NULL; i = i->next) {
         if (!i->back_edge) {
-            countTickss(i->ccs);
+            countTickss_(i->ccs, totals);
         }
+    }
+}
+
+/* Traverse the cost centre stack tree and accumulate
+ * total ticks/allocations.
+ */
+static ProfilerTotals
+countTickss(CostCentreStack const *ccs)
+{
+    ProfilerTotals totals = {0,0};
+    countTickss_(ccs, &totals);
+    return totals;
 }
 
 /* Traverse the cost centre stack tree and inherit ticks & allocs.

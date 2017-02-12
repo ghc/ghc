@@ -32,7 +32,13 @@ extern FILE *hp_file;
 
 void reportCCSProfiling ( void );
 
-void PrintNewStackDecls ( void );
+/* A summary of an execution of a profiled program */
+typedef struct {
+    /* Total bytes allocated */
+    uint64_t total_alloc;
+    /* Total number of profiler ticks */
+    unsigned int total_prof_ticks;
+} ProfilerTotals;
 
 void fprintCCS( FILE *f, CostCentreStack *ccs );
 void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso);
