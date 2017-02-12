@@ -335,10 +335,6 @@ ifeq "$$(TargetOS_CPP)" "mingw32"
 rts_CC_OPTS += -DWINVER=$(rts_WINVER)
 endif
 
-ifeq "$(SplitSections)" "YES"
-rts_CC_OPTS += -ffunction-sections -fdata-sections
-endif
-
 #-----------------------------------------------------------------------------
 # Flags for compiling specific files
 rts/RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
