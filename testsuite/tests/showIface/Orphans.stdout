@@ -1,0 +1,6 @@
+instance [orphan] IsList [Bool] = $fIsListBool
+instance IsList [X] = $fIsListX
+family instance Item [X] = D:R:ItemX
+family instance [orphan] Item [Bool] = D:R:ItemBool
+"myrule1" [orphan] forall @ a id @ (a -> a) (id @ a) = id @ a
+"myrule2" forall id @ (X -> X) f = f

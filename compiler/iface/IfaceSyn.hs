@@ -43,7 +43,7 @@ module IfaceSyn (
 
 import IfaceType
 import BinFingerprint
-import CoreSyn( IsOrphan )
+import CoreSyn( IsOrphan, isOrphan )
 import PprCore()            -- Printing DFunArgs
 import Demand
 import Class
@@ -1029,8 +1029,11 @@ pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
 
 instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
-                   ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs })
-    = sep [hsep [pprRuleName name, ppr act,
+                   ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs,
+                   ifRuleOrph = orph })
+    = sep [hsep [pprRuleName name,
+                 if isOrphan orph then text "[orphan]" else Outputable.empty,
+                 ppr act,
                  text "forall" <+> pprIfaceBndrs bndrs],
            nest 2 (sep [ppr fn <+> sep (map pprParendIfaceExpr args),
                         text "=" <+> ppr rhs])
@@ -1038,16 +1041,19 @@ instance Outputable IfaceRule where
 
 instance Outputable IfaceClsInst where
   ppr (IfaceClsInst { ifDFun = dfun_id, ifOFlag = flag
-                    , ifInstCls = cls, ifInstTys = mb_tcs})
+                    , ifInstCls = cls, ifInstTys = mb_tcs
+                    , ifInstOrph = orph })
     = hang (text "instance" <+> ppr flag
-                <+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
+              <+> (if isOrphan orph then text "[orphan]" else Outputable.empty)
+              <+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr dfun_id)
 
 instance Outputable IfaceFamInst where
   ppr (IfaceFamInst { ifFamInstFam = fam, ifFamInstTys = mb_tcs
-                    , ifFamInstAxiom = tycon_ax})
-    = hang (text "family instance" <+>
-            ppr fam <+> pprWithCommas (brackets . ppr_rough) mb_tcs)
+                    , ifFamInstAxiom = tycon_ax, ifFamInstOrph = orph })
+    = hang (text "family instance"
+              <+> (if isOrphan orph then text "[orphan]" else Outputable.empty)
+              <+> ppr fam <+> pprWithCommas (brackets . ppr_rough) mb_tcs)
          2 (equals <+> ppr tycon_ax)
 
 ppr_rough :: Maybe IfaceTyCon -> SDoc
