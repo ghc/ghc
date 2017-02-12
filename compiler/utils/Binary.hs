@@ -225,30 +225,6 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
 -- -----------------------------------------------------------------------------
 -- Low-level reading/writing of bytes
 
-be16 :: Word16 -> Word16
-#ifdef WORDS_BIGENDIAN
-be16 w = w
-#else
-be16 w = byteSwap16 w
-#endif
-{-# INLINE be16 #-}
-
-be32 :: Word32 -> Word32
-#ifdef WORDS_BIGENDIAN
-be32 w = w
-#else
-be32 w = byteSwap32 w
-#endif
-{-# INLINE be32 #-}
-
-be64 :: Word64 -> Word64
-#ifdef WORDS_BIGENDIAN
-be64 w = w
-#else
-be64 w = byteSwap64 w
-#endif
-{-# INLINE be64 #-}
-
 putPrim :: BinHandle -> Int -> (Ptr Word8 -> IO ()) -> IO ()
 putPrim h@(BinMem _ ix_r sz_r arr_r) size f = do
   ix <- readFastMutInt ix_r
@@ -277,22 +253,71 @@ getWord8 :: BinHandle -> IO Word8
 getWord8 h = getPrim h 1 peek
 
 putWord16 :: BinHandle -> Word16 -> IO ()
-putWord16 h w = putPrim h 2 (\op -> poke (castPtr op :: Ptr Word16) (be16 w))
+putWord16 h w = putPrim h 2 (\op -> do
+  pokeElemOff op 0 (fromIntegral (w `shiftR` 8))
+  pokeElemOff op 1 (fromIntegral (w .&. 0xFF))
+  )
 
 getWord16 :: BinHandle -> IO Word16
-getWord16 h = getPrim h 2 (\op -> be16 <$> peek (castPtr op :: Ptr Word16))
+getWord16 h = getPrim h 2 (\op -> do
+  w0 <- fromIntegral <$> peekElemOff op 0
+  w1 <- fromIntegral <$> peekElemOff op 1
+  return $! w0 `shiftL` 8 .|. w1
+  )
 
 putWord32 :: BinHandle -> Word32 -> IO ()
-putWord32 h w = putPrim h 4 (\op -> poke (castPtr op :: Ptr Word32) (be32 w))
+putWord32 h w = putPrim h 4 (\op -> do
+  pokeElemOff op 0 (fromIntegral (w `shiftR` 24))
+  pokeElemOff op 1 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
+  pokeElemOff op 2 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
+  pokeElemOff op 3 (fromIntegral (w .&. 0xFF))
+  )
 
 getWord32 :: BinHandle -> IO Word32
-getWord32 h = getPrim h 4 (\op -> be32 <$> peek (castPtr op :: Ptr Word32))
+getWord32 h = getPrim h 4 (\op -> do
+  w0 <- fromIntegral <$> peekElemOff op 0
+  w1 <- fromIntegral <$> peekElemOff op 1
+  w2 <- fromIntegral <$> peekElemOff op 2
+  w3 <- fromIntegral <$> peekElemOff op 3
+
+  return $! (w0 `shiftL` 24) .|.
+            (w1 `shiftL` 16) .|.
+            (w2 `shiftL` 8)  .|.
+            w3
+  )
 
 putWord64 :: BinHandle -> Word64 -> IO ()
-putWord64 h w = putPrim h 8 (\op -> poke (castPtr op :: Ptr Word64) (be64 w))
+putWord64 h w = putPrim h 8 (\op -> do
+  pokeElemOff op 0 (fromIntegral (w `shiftR` 56))
+  pokeElemOff op 1 (fromIntegral ((w `shiftR` 48) .&. 0xFF))
+  pokeElemOff op 2 (fromIntegral ((w `shiftR` 40) .&. 0xFF))
+  pokeElemOff op 3 (fromIntegral ((w `shiftR` 32) .&. 0xFF))
+  pokeElemOff op 4 (fromIntegral ((w `shiftR` 24) .&. 0xFF))
+  pokeElemOff op 5 (fromIntegral ((w `shiftR` 16) .&. 0xFF))
+  pokeElemOff op 6 (fromIntegral ((w `shiftR` 8) .&. 0xFF))
+  pokeElemOff op 7 (fromIntegral (w .&. 0xFF))
+  )
 
 getWord64 :: BinHandle -> IO Word64
-getWord64 h = getPrim h 8 (\op -> be64 <$> peek (castPtr op :: Ptr Word64))
+getWord64 h = getPrim h 8 (\op -> do
+  w0 <- fromIntegral <$> peekElemOff op 0
+  w1 <- fromIntegral <$> peekElemOff op 1
+  w2 <- fromIntegral <$> peekElemOff op 2
+  w3 <- fromIntegral <$> peekElemOff op 3
+  w4 <- fromIntegral <$> peekElemOff op 4
+  w5 <- fromIntegral <$> peekElemOff op 5
+  w6 <- fromIntegral <$> peekElemOff op 6
+  w7 <- fromIntegral <$> peekElemOff op 7
+
+  return $! (w0 `shiftL` 56) .|.
+            (w1 `shiftL` 48) .|.
+            (w2 `shiftL` 40) .|.
+            (w3 `shiftL` 32) .|.
+            (w4 `shiftL` 24) .|.
+            (w5 `shiftL` 16) .|.
+            (w6 `shiftL` 8)  .|.
+            w7
+  )
 
 putByte :: BinHandle -> Word8 -> IO ()
 putByte bh w = putWord8 bh w
