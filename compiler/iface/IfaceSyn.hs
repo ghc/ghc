@@ -726,8 +726,8 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     pp_nd = case condecls of
               IfAbstractTyCon how ->
                 case how of
-                  DistinctNominalAbstract           -> text "abstract"
-                  SkolemAbstract                    -> text "skolem"
+                  DistinctNominalAbstract           -> text "{- abstract -} data"
+                  SkolemAbstract                    -> text "{- skolem -} data"
               IfDataTyCon{}     -> text "data"
               IfNewTyCon{}      -> text "newtype"
 
