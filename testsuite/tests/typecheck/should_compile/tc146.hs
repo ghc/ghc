@@ -1,6 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 
--- The interesting thign about this one is that
+-- The interesting thing about this one is that
 -- there's an unbound type variable of kind *->*
 -- that the typechecker should default to some 
 -- arbitrary type.

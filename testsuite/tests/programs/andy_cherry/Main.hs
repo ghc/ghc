@@ -27,7 +27,7 @@
        let (style,fn,filename) = interpArgs (words "-d tex mygames.pgn")
        file <- readFile (test_dir ++ "/" ++filename)
        std_in <- getContents
-       let games = pgnParser fn file   -- parse relavent pgn games
+       let games = pgnParser fn file   -- parse relevant pgn games
        putStr (prog style std_in games)
 
 {- OLD 1.2:
@@ -37,7 +37,7 @@
        let (style,fn,filename) = interpArgs args in
        readFile filename abort                         $ \ file ->
        readChan stdin abort                            $ \ std_in ->
-       let games = pgnParser fn file   -- parse relavent pgn games
+       let games = pgnParser fn file   -- parse relevant pgn games
        in
        appendChan stdout (prog style std_in games) abort done
 -}

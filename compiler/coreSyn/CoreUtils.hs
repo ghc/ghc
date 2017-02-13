@@ -1662,7 +1662,7 @@ dataConInstPat fss uniqs con inst_tys
       -- Make the instantiating substitution for universals
     univ_subst = zipTvSubst univ_tvs inst_tys
 
-      -- Make existential type variables, applyingn and extending the substitution
+      -- Make existential type variables, applying and extending the substitution
     (full_subst, ex_bndrs) = mapAccumL mk_ex_var univ_subst
                                        (zip3 ex_tvs ex_fss ex_uniqs)
 
@@ -1844,7 +1844,7 @@ diffExpr _  _ e1 e2
 -- all possible mappings, which would be seriously expensive. So
 -- instead we simply match single bindings as far as we can. This
 -- leaves us just with mutually recursive and/or mismatching bindings,
--- which we then specuatively match by ordering them. It's by no means
+-- which we then speculatively match by ordering them. It's by no means
 -- perfect, but gets the job done well enough.
 diffBinds :: Bool -> RnEnv2 -> [(Var, CoreExpr)] -> [(Var, CoreExpr)]
           -> ([SDoc], RnEnv2)

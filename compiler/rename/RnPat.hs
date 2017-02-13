@@ -695,7 +695,7 @@ Consider (Trac #12130)
      funny = [| MkT { x = 3 } |]
 
 When we splice, neither T nor MkT are lexically in scope, so find_tycon will
-fail.  But there is no need for diambiguation anyway, so we just return Nothing
+fail.  But there is no need for disambiguation anyway, so we just return Nothing
 -}
 
 rnHsRecUpdFields

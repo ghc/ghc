@@ -611,7 +611,7 @@ Note [Decomposing fat arrow c=>t]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Can we unify (a b) with (Eq a => ty)?   If we do so, we end up with
 a partial application like ((=>) Eq a) which doesn't make sense in
-source Haskell.  In constrast, we *can* unify (a b) with (t1 -> t2).
+source Haskell.  In contrast, we *can* unify (a b) with (t1 -> t2).
 Here's an example (Trac #9858) of how you might do it:
    i :: (Typeable a, Typeable b) => Proxy (a b) -> TypeRep
    i p = typeRep p

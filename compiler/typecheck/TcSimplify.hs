@@ -1965,7 +1965,7 @@ to beta[1], and that means the (a ~ beta[1]) will be stuck, as it should be.
 
 *********************************************************************************
 *                                                                               *
-*                          Defaulting and disamgiguation                        *
+*                          Defaulting and disambiguation                        *
 *                                                                               *
 *********************************************************************************
 -}

@@ -1837,7 +1837,7 @@ computeRetainerSet( void )
  *  and reset their rs fields to NULL, which is accomplished by
  *  invoking maybeInitRetainerSet(). This function must be called
  *  before zeroing all objects reachable from scavenged_static_objects
- *  in the case of major gabage collections. See GarbageCollect() in
+ *  in the case of major garbage collections. See GarbageCollect() in
  *  GC.c.
  *  Note:
  *    The mut_once_list of the oldest generation must also be traversed?

@@ -42,7 +42,7 @@ static Mutex trace_utx;
 static bool eventlog_enabled;
 
 /* ---------------------------------------------------------------------------
-   Starting up / shuttting down the tracing facilities
+   Starting up / shutting down the tracing facilities
  --------------------------------------------------------------------------- */
 
 static const EventLogWriter *getEventLogWriter(void)

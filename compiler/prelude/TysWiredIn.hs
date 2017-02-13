@@ -34,7 +34,7 @@ module TysWiredIn (
         gtDataCon, gtDataConId,
         promotedLTDataCon, promotedEQDataCon, promotedGTDataCon,
 
-        -- * Boxign primitive types
+        -- * Boxing primitive types
         boxingDataCon_maybe,
 
         -- * Char
