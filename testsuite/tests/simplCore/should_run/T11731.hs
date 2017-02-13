@@ -10,7 +10,7 @@ wwMe :: Int -> (Int,Int) -> (Int, Int)
 wwMe 0 p =
     let a = fst p
         b = snd p
-        -- This ensure sharing of b, as seen by the demand analyzer
+        -- This ensures sharing of b, as seen by the demand analyzer
 
     in foo p `seq`
        -- This ensures that wwMe is strict in the tuple, but that the tuple

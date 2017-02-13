@@ -1061,7 +1061,7 @@ Trac #11554 shows this example, which made GHC loop:
   data A :: Type where
     B :: forall (a :: A). P a -> A
 
-In order to check the constructor B, we need have the promoted type A, but in
+In order to check the constructor B, we need to have the promoted type A, but in
 order to get that promoted type, B must first be checked. To prevent looping, a
 TyConPE promotion error is given when tcTyVar checks an ATcTyCon in kind mode.
 Any ATcTyCon is a TyCon being defined in the current recursive group (see data

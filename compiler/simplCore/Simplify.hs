@@ -2283,7 +2283,7 @@ simplAlts env scrut case_bndr alts cont'
         ; (env1, case_bndr1) <- simplBinder env0 case_bndr
         ; let case_bndr2 = case_bndr1 `setIdUnfolding` evaldUnfolding
               env2       = modifyInScope env1 case_bndr2
-              -- See Note [Case-binder evaluated-ness]
+              -- See Note [Case binder evaluated-ness]
 
         ; fam_envs <- getFamEnvs
         ; (alt_env', scrut', case_bndr') <- improveSeq fam_envs env2 scrut

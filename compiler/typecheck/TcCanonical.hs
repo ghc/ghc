@@ -443,7 +443,7 @@ mk_superclasses_of rec_clss ev cls tys
   where
     cls_nm     = className cls
     loop_found = not (isCTupleClass cls) && cls_nm `elemNameSet` rec_clss
-                 -- Tuples neveer contribute to recursion, and can be nested
+                 -- Tuples never contribute to recursion, and can be nested
     rec_clss'  = rec_clss `extendNameSet` cls_nm
     this_ct    = CDictCan { cc_ev = ev, cc_class = cls, cc_tyargs = tys
                           , cc_pend_sc = loop_found }

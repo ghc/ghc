@@ -1907,7 +1907,7 @@ A:  Saturated applications:  eg   f e1 .. en
 
     In general, given a call (f e1 .. en) we can propagate one-shot info from
     f's strictness signature into e1 .. en, but /only/ if n is enough to
-    saturate the strictness signature. A stricteness signature like
+    saturate the strictness signature. A strictness signature like
 
     f :: C1(C1(L))LS
 
@@ -1924,10 +1924,10 @@ A:  Saturated applications:  eg   f e1 .. en
 
     then the first argument of f will be called at most once.
 
-A': Non-obviously satuated applications: eg    build (f (\x y -> expensive))
+A': Non-obviously saturated applications: eg    build (f (\x y -> expensive))
 
     In this case, f is only manifestly applied to one argument, so it does not
-    look saturated. So bye the previous point, we should not use its strictness
+    look saturated. So by the previous point, we should not use its strictness
     signature to learn about the one-shotness of \x y. But in this case we can:
 
     build is fully applied, so we may use its strictness signature. From that
