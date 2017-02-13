@@ -1,0 +1,10 @@
+{-# LANGUAGE ConstraintKinds #-}
+unit p where
+    signature A(module Data.Typeable) where
+        import Data.Typeable
+unit q where
+    dependency p[A=<A>]
+    signature A(module A) where
+    module M where
+        import A
+        type X = Typeable

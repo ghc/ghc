@@ -343,17 +343,18 @@ tcRnCheckUnitId hsc_env uid =
 
 -- | Top-level driver for signature merging (run after typechecking
 -- an @hsig@ file).
-tcRnMergeSignatures :: HscEnv -> RealSrcSpan -> HsParsedModule -> ModIface
+tcRnMergeSignatures :: HscEnv -> HsParsedModule -> TcGblEnv {- from local sig -} -> ModIface
                     -> IO (Messages, Maybe TcGblEnv)
-tcRnMergeSignatures hsc_env real_loc hsmod iface =
+tcRnMergeSignatures hsc_env hpm orig_tcg_env iface =
   withTiming (pure dflags)
              (text "Signature merging" <+> brackets (ppr this_mod))
              (const ()) $
   initTc hsc_env HsigFile False this_mod real_loc $
-    mergeSignatures hsmod iface
+    mergeSignatures hpm orig_tcg_env iface
  where
   dflags   = hsc_dflags hsc_env
   this_mod = mi_module iface
+  real_loc = tcg_top_loc orig_tcg_env
 
 thinModIface :: [AvailInfo] -> ModIface -> ModIface
 thinModIface avails iface =
@@ -484,8 +485,11 @@ merge_msg mod_name reqs =
 -- from 'requirementMerges' into this signature, producing
 -- a final 'TcGblEnv' that matches the local signature and
 -- all required signatures.
-mergeSignatures :: HsParsedModule -> ModIface -> TcRn TcGblEnv
-mergeSignatures hsmod lcl_iface0 = do
+mergeSignatures :: HsParsedModule -> TcGblEnv -> ModIface -> TcRn TcGblEnv
+mergeSignatures
+  (HsParsedModule { hpm_module = L loc (HsModule { hsmodExports = mb_exports }),
+                    hpm_src_files = src_files })
+  orig_tcg_env lcl_iface0 = setSrcSpan loc $ do
     -- The lcl_iface0 is the ModIface for the local hsig
     -- file, which is guaranteed to exist, see
     -- Note [Blank hsigs for all requirements]
@@ -494,7 +498,6 @@ mergeSignatures hsmod lcl_iface0 = do
     tcg_env <- getGblEnv
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
-        mb_exports = hsmodExports (unLoc (hpm_module hsmod))
         mod_name = moduleName (tcg_mod tcg_env)
 
     -- STEP 1: Figure out all of the external signature interfaces
@@ -529,7 +532,16 @@ mergeSignatures hsmod lcl_iface0 = do
             as1 <- tcRnModExports insts ireq_iface
             let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
                 pkg = getInstalledPackageDetails dflags inst_uid
-                rdr_env = mkGlobalRdrEnv (gresFromAvails Nothing as1)
+                -- Setup the import spec correctly, so that when we apply
+                -- IEModuleContents we pick up EVERYTHING
+                ispec = ImpSpec
+                            ImpDeclSpec{
+                                is_mod  = mod_name,
+                                is_as   = mod_name,
+                                is_qual = False,
+                                is_dloc = loc
+                            } ImpAll
+                rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
             (thinned_iface, as2) <- case mb_exports of
                     Just (L loc _)
                       | null (exposedModules pkg) -> setSrcSpan loc $ do
@@ -572,7 +584,19 @@ mergeSignatures hsmod lcl_iface0 = do
               | otherwise = WarnSome $ map (\o -> (o, inheritedSigPvpWarning)) warn_occs
         -}
     setGblEnv tcg_env {
-        tcg_rdr_env = rdr_env,
+        -- The top-level GlobalRdrEnv is quite interesting.  It consists
+        -- of two components:
+        --  1. First, we reuse the GlobalRdrEnv of the local signature.
+        --     This is very useful, because it means that if we have
+        --     to print a message involving some entity that the local
+        --     signature imported, we'll qualify it accordingly.
+        --  2. Second, we need to add all of the declarations we are
+        --     going to merge in (as they need to be in scope for the
+        --     final test of the export list.)
+        tcg_rdr_env = rdr_env `plusGlobalRdrEnv` tcg_rdr_env orig_tcg_env,
+        -- Inherit imports from the local signature, so that module
+        -- rexports are picked up correctly
+        tcg_imports = tcg_imports orig_tcg_env,
         tcg_exports = exports,
         tcg_dus     = usesOnly (availsToNameSetWithSelectors exports),
         tcg_warns   = warns
@@ -580,6 +604,7 @@ mergeSignatures hsmod lcl_iface0 = do
     tcg_env <- getGblEnv
 
     -- Make sure we didn't refer to anything that doesn't actually exist
+    -- pprTrace "mergeSignatures: exports_from_avail" (ppr exports) $ return ()
     (mb_lies, _) <- exports_from_avail mb_exports rdr_env
                         (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
 
@@ -745,6 +770,8 @@ mergeSignatures hsmod lcl_iface0 = do
             tcg_insts = map snd dfun_insts,
             tcg_type_env = extendTypeEnvWithIds (tcg_type_env tcg_env) (map fst dfun_insts)
         }
+
+    addDependentFiles src_files
 
     return tcg_env
 

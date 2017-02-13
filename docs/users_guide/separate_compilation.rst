@@ -729,7 +729,7 @@ to ``hs-boot`` files, but with some slight changes:
 - Import statements and scoping rules are exactly as in Haskell.
   To mention a non-Prelude type or class, you must import it.
 
-- Unlike regular modules, the exports and defined entities of
+- Unlike regular modules, the defined entities of
   a signature include not only those written in the local
   ``hsig`` file, but also those from inherited signatures
   (as inferred from the :ghc-flag:`-package-id` flags).
@@ -763,18 +763,52 @@ to ``hs-boot`` files, but with some slight changes:
         f :: T -> T
         g :: T
 
-- The export list of a signature applies the final export list
-  of a signature after merging inherited signatures; in particular, it
-  may refer to entities which are not declared in the body of the
-  local ``hsig`` file.  The set of entities that are required by a
-  signature is defined exclusively by its exports; if an entity
-  is not mentioned in the export list, it is not required.  This means
-  that a library author can provide an omnibus signature containing the
-  type of every function someone might want to use, while a client thins
-  down the exports to the ones they actually require.  For example,
-  supposing that you have inherited a signature for strings, you might
-  write a local signature of this form, listing only the entities
-  that you need::
+- If no export list is provided for a signature, the exports of
+  a signature are all of its defined entities merged with the
+  exports of all inherited signatures.
+
+  If you want to reexport an entity from a signature, you must
+  also include a ``module SigName`` export, so that all of the
+  entities defined in the signature are exported.  For example,
+  the following module exports both ``f`` and ``Int`` from
+  ``Prelude``::
+
+    signature A(module A, Int) where
+        import Prelude (Int)
+        f :: Int
+
+  Reexports merge with local declarations; thus, the signature above
+  would successfully merge with::
+
+    signature A where
+        data Int
+
+  The only permissible implementation of such a signature is a module
+  which reexports precisely the same entity::
+
+    module A (f, Int) where
+        import Prelude (Int)
+        f = 2 :: Int
+
+  Conversely, any entity requested by a signature can be provided
+  by a reexport from the implementing module.  This is different from
+  ``hs-boot`` files, which require every entity to be defined
+  locally in the implementing module.
+
+- GHC has experimental support for *signature thinning*, which is used
+  when a signature has an explicit export list without a module export of the
+  signature itself.  In this case, the export list applies to the final export
+  list *after* merging, in particular, you may refer to entities which are not
+  declared in the body of the local ``hsig`` file.
+
+  The semantics in this case is that the set of required entities is defined
+  exclusively by its exports; if an entity is not mentioned in the export list,
+  it is not required.  The motivation behind this feature is to allow a library
+  author to provide an omnibus signature containing the type of every function
+  someone might want to use, while a client thins down the exports to the ones
+  they actually require.  For example, supposing that you have inherited a
+  signature for strings, you might write a local signature of this form, listing
+  only the entities that you need::
 
     signature Str (Str, empty, append, concat) where
         -- empty
@@ -784,27 +818,11 @@ to ``hs-boot`` files, but with some slight changes:
   (GHC will report an error in this case).  Second, signatures which
   come from dependencies which expose modules cannot be thinned in this
   way (after all, the dependency itself may need the entity); these
-  requirements are unconditionally exported, but are associated with
-  a warning discouraging their use by a module.  To use an entity
-  defined by such a signature, add its declaration to your local
-  ``hsig`` file.
+  requirements are unconditionally exported.  Finally, any module
+  reexports must refer to modules imported by the local signature
+  (even if an inherited signature exported the module).
 
-- A signature can reexport an entity brought into scope by an import.
-  In this case, we indicate that any implementation of the module
-  must export this very same entity.  For example, this signature
-  must be implemented by a module which itself reexports ``Int``::
-
-    signature A (Int) where
-        import Prelude (Int)
-
-    -- can be implemented by:
-    module A (Int) where
-        import Prelude (Int)
-
-  Conversely, any entity requested by a signature can be provided
-  by a reexport from the implementing module.  This is different from
-  ``hs-boot`` files, which require every entity to be defined
-  locally in the implementing module.
+  We may change the syntax and semantics of this feature in the future.
 
 - The declarations and types from signatures of dependencies
   that will be merged in are not in scope when type checking

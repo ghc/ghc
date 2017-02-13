@@ -420,7 +420,7 @@ hscTypecheck keep_rn mod_summary mb_rdr_module = do
             if hsc_src == HsigFile
                 then do (iface, _, _) <- liftIO $ hscSimpleIface hsc_env tc_result0 Nothing
                         ioMsgMaybe $
-                            tcRnMergeSignatures hsc_env (tcg_top_loc tc_result0) hpm iface
+                            tcRnMergeSignatures hsc_env hpm tc_result0 iface
                 else return tc_result0
 
 -- wrapper around tcRnModule to handle safe haskell extras
