@@ -830,7 +830,9 @@ data ModIface
                                               -- used when compiling this module
 
         mi_orphan     :: !WhetherHasOrphans,  -- ^ Whether this module has orphans
-        mi_finsts     :: !WhetherHasFamInst,  -- ^ Whether this module has family instances
+        mi_finsts     :: !WhetherHasFamInst,
+                -- ^ Whether this module has family instances.
+                -- See Note [The type family instance consistency story].
         mi_hsc_src    :: !HscSource,          -- ^ Boot? Signature?
 
         mi_deps     :: Dependencies,
@@ -2278,7 +2280,8 @@ data Dependencies
                         -- ^ Transitive closure of depended upon modules which
                         -- contain family instances (whether home or external).
                         -- This is used by 'checkFamInstConsistency'.  This
-                        -- does NOT include us, unlike 'imp_finsts'.
+                        -- does NOT include us, unlike 'imp_finsts'. See Note
+                        -- [The type family instance consistency story].
          }
   deriving( Eq )
         -- Equality used only for old/new comparison in MkIface.addFingerprints
