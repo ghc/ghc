@@ -1040,16 +1040,26 @@ and defaults the type variable if
 3. At least one of the classes ``Ci`` is numeric.
 
 At the GHCi prompt, or with GHC if the :ghc-flag:`-XExtendedDefaultRules` flag
-is given, the following additional differences apply:
+is given, the types are instead resolved with the following method:
 
--  Rule 2 above is relaxed thus: *All* of the classes ``Ci`` are
-   single-parameter type classes.
+Find all the unsolved constraints. Then:
 
--  Rule 3 above is relaxed thus: At least one of the classes ``Ci`` is
-   an *interactive class* (defined below).
+-  Find those that are of form ``(C a)`` where ``a`` is a type variable, and
+   partition those constraints into groups that share a common type variable ``a``.
+
+-  Keep only the groups in which at least one of the classes is an
+   **interactive class** (defined below).
+
+-  Now, for each remaining group G, try each type ``ty`` from the default-type list
+   in turn; if setting ``a = ty`` would allow the constraints in G to be completely
+   solved. If so, default ``a`` to ``ty``.
 
 -  The unit type ``()`` and the list type ``[]`` are added to the start of
    the standard list of types which are tried when doing type defaulting.
+
+Note that any multi-parameter constraints ``(D a b)`` or ``(D [a] Int)`` do not
+participate in the process (either to help or to hinder); but they must of course
+be soluble once the defaulting process is complete.
 
 The last point means that, for example, this program: ::
 

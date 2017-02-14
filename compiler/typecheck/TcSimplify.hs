@@ -2019,6 +2019,7 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
         -- Finds unary type-class constraints
         -- But take account of polykinded classes like Typeable,
         -- which may look like (Typeable * (a:*))   (Trac #8931)
+    find_unary :: Ct -> Either (Ct, Class, TyVar) Ct
     find_unary cc
         | Just (cls,tys)   <- getClassPredTys_maybe (ctPred cc)
         , [ty] <- filterOutInvisibleTypes (classTyCon cls) tys
@@ -2034,11 +2035,13 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
 
     cmp_tv (_,_,tv1) (_,_,tv2) = tv1 `compare` tv2
 
+    defaultable_tyvar :: TcTyVar -> Bool
     defaultable_tyvar tv
         = let b1 = isTyConableTyVar tv  -- Note [Avoiding spurious errors]
               b2 = not (tv `elemVarSet` bad_tvs)
-          in b1 && b2
+          in b1 && (b2 || extended_defaults) -- Note [Multi-parameter defaults]
 
+    defaultable_classes :: [Class] -> Bool
     defaultable_classes clss
         | extended_defaults = any (isInteractiveClass ovl_strings) clss
         | otherwise         = all is_std_class clss && (any (isNumClass ovl_strings) clss)
@@ -2125,4 +2128,28 @@ that g isn't polymorphic enough; but then we get another one when
 dealing with the (Num a) context arising from f's definition;
 we try to unify a with Int (to default it), but find that it's
 already been unified with the rigid variable from g's type sig.
+
+Note [Multi-parameter defaults]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+With -XExtendedDefaultRules, we default only based on single-variable
+constraints, but do not exclude from defaulting any type variables which also
+appear in multi-variable constraints. This means that the following will
+default properly:
+
+   default (Integer, Double)
+
+   class A b (c :: Symbol) where
+      a :: b -> Proxy c
+
+   instance A Integer c where a _ = Proxy
+
+   main = print (a 5 :: Proxy "5")
+
+Note that if we change the above instance ("instance A Integer") to
+"instance A Double", we get an error:
+
+   No instance for (A Integer "5")
+
+This is because the first defaulted type (Integer) has successfully satisfied
+its single-parameter constraints (in this case Num).
 -}

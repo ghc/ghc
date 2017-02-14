@@ -154,6 +154,9 @@ Compiler
   allocation and a potential space leak when deriving ``Functor`` for
   a recursive type.
 
+- The :ghc-flag:`-XExtendedDefaultRules` extension now defaults multi-parameter
+  typeclasses. See :ghc-ticket:`12923`.
+
 GHCi
 ~~~~
 
