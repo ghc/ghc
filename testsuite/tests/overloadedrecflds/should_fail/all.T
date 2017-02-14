@@ -21,4 +21,5 @@ test('overloadedlabelsfail01', normal, compile_fail, [''])
 test('T11103', normal, compile_fail, [''])
 test('T11167_ambiguous_fixity', [], multimod_compile_fail,
      ['T11167_ambiguous_fixity', ''])
+test('T13132_duplicaterecflds', normal, compile_fail, [''])
 test('NoParent', normal, compile_fail, [''])

@@ -1160,7 +1160,7 @@ mk_hs_op_ty :: (LHsType Name -> LHsType Name -> HsType Name)
             -> RnM (HsType Name)
 mk_hs_op_ty mk1 op1 fix1 ty1
             mk2 op2 fix2 ty21 ty22 loc2
-  | nofix_error     = do { precParseErr (op1,fix1) (op2,fix2)
+  | nofix_error     = do { precParseErr (NormalOp op1,fix1) (NormalOp op2,fix2)
                          ; return (mk1 ty1 (L loc2 (mk2 ty21 ty22))) }
   | associate_right = return (mk1 ty1 (L loc2 (mk2 ty21 ty22)))
   | otherwise       = do { -- Rearrange to ((ty1 `op1` ty21) `op2` ty22)
@@ -1194,7 +1194,7 @@ mkOpAppRn e1@(L _ (OpApp e11 op1 fix1 e12)) op2 fix2 e2
 --      (- neg_arg) `op` e2
 mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
   | nofix_error
-  = do precParseErr (negateName,negateFixity) (get_op op2,fix2)
+  = do precParseErr (NegateOp,negateFixity) (get_op op2,fix2)
        return (OpApp e1 op2 fix2 e2)
 
   | associate_right
@@ -1208,7 +1208,7 @@ mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
 --      e1 `op` - neg_arg
 mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp _ _))     -- NegApp can occur on the right
   | not associate_right                 -- We *want* right association
-  = do precParseErr (get_op op1, fix1) (negateName, negateFixity)
+  = do precParseErr (get_op op1, fix1) (NegateOp, negateFixity)
        return (OpApp e1 op1 fix1 e2)
   where
     (_, associate_right) = compareFixity fix1 negateFixity
@@ -1222,12 +1222,26 @@ mkOpAppRn e1 op fix e2                  -- Default case, no rearrangment
     return (OpApp e1 op fix e2)
 
 ----------------------------
-get_op :: LHsExpr Name -> Name
+
+-- | Name of an operator in an operator application or section
+data OpName = NormalOp Name         -- ^ A normal identifier
+            | NegateOp              -- ^ Prefix negation
+            | UnboundOp UnboundVar  -- ^ An unbound indentifier
+            | RecFldOp (AmbiguousFieldOcc Name)
+              -- ^ A (possibly ambiguous) record field occurrence
+
+instance Outputable OpName where
+  ppr (NormalOp n)   = ppr n
+  ppr NegateOp       = ppr negateName
+  ppr (UnboundOp uv) = ppr uv
+  ppr (RecFldOp fld) = ppr fld
+
+get_op :: LHsExpr Name -> OpName
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
-get_op (L _ (HsVar (L _ n)))   = n
-get_op (L _ (HsUnboundVar uv)) = mkUnboundName (unboundVarOcc uv)
-get_op (L _ (HsRecFld (Unambiguous _ n))) = n
+get_op (L _ (HsVar (L _ n)))   = NormalOp n
+get_op (L _ (HsUnboundVar uv)) = UnboundOp uv
+get_op (L _ (HsRecFld fld))    = RecFldOp fld
 get_op other                   = pprPanic "get_op" (ppr other)
 
 -- Parser left-associates everything, but
@@ -1289,7 +1303,8 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
         ; let (nofix_error, associate_right) = compareFixity fix1 fix2
 
         ; if nofix_error then do
-                { precParseErr (unLoc op1,fix1) (unLoc op2,fix2)
+                { precParseErr (NormalOp (unLoc op1),fix1)
+                               (NormalOp (unLoc op2),fix2)
                 ; return (ConPatIn op2 (InfixCon p1 p2)) }
 
           else if associate_right then do
@@ -1338,8 +1353,8 @@ checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
                   (op1_dir == InfixR && op_dir == InfixR && right ||
                    op1_dir == InfixL && op_dir == InfixL && not right))
 
-        info  = (op,        op_fix)
-        info1 = (unLoc op1, op1_fix)
+        info  = (NormalOp op,          op_fix)
+        info1 = (NormalOp (unLoc op1), op1_fix)
         (infol, infor) = if right then (info, info1) else (info1, info)
     unless inf_ok (precParseErr infol infor)
 
@@ -1354,23 +1369,33 @@ checkSectionPrec :: FixityDirection -> HsExpr RdrName
         -> LHsExpr Name -> LHsExpr Name -> RnM ()
 checkSectionPrec direction section op arg
   = case unLoc arg of
-        OpApp _ op fix _ -> go_for_it (get_op op) fix
-        NegApp _ _       -> go_for_it negateName  negateFixity
-        _                -> return ()
+        OpApp _ op' fix _ -> go_for_it (get_op op') fix
+        NegApp _ _        -> go_for_it NegateOp     negateFixity
+        _                 -> return ()
   where
     op_name = get_op op
     go_for_it arg_op arg_fix@(Fixity _ arg_prec assoc) = do
-          op_fix@(Fixity _ op_prec _) <- lookupFixityRn op_name
+          op_fix@(Fixity _ op_prec _) <- lookupFixityOp op_name
           unless (op_prec < arg_prec
                   || (op_prec == arg_prec && direction == assoc))
-                 (sectionPrecErr (op_name, op_fix)
+                 (sectionPrecErr (get_op op, op_fix)
                                  (arg_op, arg_fix) section)
+
+-- | Look up the fixity for an operator name.  Be careful to use
+-- 'lookupFieldFixityRn' for (possibly ambiguous) record fields
+-- (see Trac #13132).
+lookupFixityOp :: OpName -> RnM Fixity
+lookupFixityOp (NormalOp n)  = lookupFixityRn n
+lookupFixityOp NegateOp      = lookupFixityRn negateName
+lookupFixityOp (UnboundOp u) = lookupFixityRn (mkUnboundName (unboundVarOcc u))
+lookupFixityOp (RecFldOp f)  = lookupFieldFixityRn f
+
 
 -- Precedence-related error messages
 
-precParseErr :: (Name, Fixity) -> (Name, Fixity) -> RnM ()
+precParseErr :: (OpName,Fixity) -> (OpName,Fixity) -> RnM ()
 precParseErr op1@(n1,_) op2@(n2,_)
-  | isUnboundName n1 || isUnboundName n2
+  | is_unbound n1 || is_unbound n2
   = return ()     -- Avoid error cascade
   | otherwise
   = addErr $ hang (text "Precedence parsing error")
@@ -1378,9 +1403,9 @@ precParseErr op1@(n1,_) op2@(n2,_)
                ppr_opfix op2,
                text "in the same infix expression"])
 
-sectionPrecErr :: (Name, Fixity) -> (Name, Fixity) -> HsExpr RdrName -> RnM ()
+sectionPrecErr :: (OpName,Fixity) -> (OpName,Fixity) -> HsExpr RdrName -> RnM ()
 sectionPrecErr op@(n1,_) arg_op@(n2,_) section
-  | isUnboundName n1 || isUnboundName n2
+  | is_unbound n1 || is_unbound n2
   = return ()     -- Avoid error cascade
   | otherwise
   = addErr $ vcat [text "The operator" <+> ppr_opfix op <+> ptext (sLit "of a section"),
@@ -1388,11 +1413,16 @@ sectionPrecErr op@(n1,_) arg_op@(n2,_) section
                       nest 2 (text "namely" <+> ppr_opfix arg_op)]),
          nest 4 (text "in the section:" <+> quotes (ppr section))]
 
-ppr_opfix :: (Name, Fixity) -> SDoc
+is_unbound :: OpName -> Bool
+is_unbound UnboundOp{} = True
+is_unbound _           = False
+
+ppr_opfix :: (OpName, Fixity) -> SDoc
 ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
    where
-     pp_op | op == negateName = text "prefix `-'"
-           | otherwise        = quotes (ppr op)
+     pp_op | NegateOp <- op = text "prefix `-'"
+           | otherwise      = quotes (ppr op)
+
 
 {- *****************************************************
 *                                                      *
