@@ -102,24 +102,6 @@ endif
 $1_$2_PKGDATA_DEP = $1/$2/package-data.mk
 endif
 
-# We don't bother splitting the bootstrap packages (built with stage 0)
-ifeq "$$($1_$2_SplitObjs)" ""
-ifeq "$$(SplitObjs) $3" "YES 1"
-$1_$2_SplitObjs = YES
-else
-$1_$2_SplitObjs = NO
-endif
-endif
-# Disable split sections when building with stage0, it won't be supported yet
-# and it's probably not very relevant anyway (smaller stage1 ghc?).
-ifeq "$$($1_$2_SplitSections)" ""
-ifeq "$3" "1"
-$1_$2_SplitSections = $(SplitSections)
-else
-$1_$2_SplitSections = NO
-endif
-endif
-
 $(call hs-sources,$1,$2)
 $(call c-sources,$1,$2)
 $(call includes-sources,$1,$2)
