@@ -516,7 +516,9 @@ warnMissingAT :: Name -> TcM ()
 warnMissingAT name
   = do { warn <- woptM Opt_WarnMissingMethods
        ; traceTc "warn" (ppr name <+> ppr warn)
-       ; warnTc (Reason Opt_WarnMissingMethods) warn  -- Warn only if -Wmissing-methods
+       ; hsc_src <- fmap tcg_src getGblEnv
+       -- Warn only if -Wmissing-methods AND not a signature
+       ; warnTc (Reason Opt_WarnMissingMethods) (warn && hsc_src /= HsigFile)
                 (text "No explicit" <+> text "associated type"
                     <+> text "or default declaration for     "
                     <+> quotes (ppr name)) }
