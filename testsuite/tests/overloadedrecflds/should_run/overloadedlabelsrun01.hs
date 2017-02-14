@@ -11,10 +11,10 @@
 import GHC.OverloadedLabels
 
 instance IsLabel "true" Bool where
-  fromLabel _ = True
+  fromLabel = True
 
 instance IsLabel "false" Bool where
-  fromLabel _ = False
+  fromLabel = False
 
 a :: IsLabel "true" t => t
 a = #true

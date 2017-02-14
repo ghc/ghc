@@ -18,7 +18,7 @@ module TcSMonad (
     runTcSEqualities,
     nestTcS, nestImplicTcS, setEvBindsTcS,
 
-    runTcPluginTcS, addUsedGREs, deferTcSForAllEq,
+    runTcPluginTcS, addUsedGRE, addUsedGREs, deferTcSForAllEq,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -44,6 +44,7 @@ module TcSMonad (
     getTcEvBindsVar, getTcLevel,
     getTcEvBindsAndTCVs, getTcEvBindsMap,
     tcLookupClass,
+    tcLookupId,
 
     -- Inerts
     InertSet(..), InertCans(..),
@@ -92,6 +93,7 @@ module TcSMonad (
     -- MetaTyVars
     newFlexiTcSTy, instFlexi, instFlexiX,
     cloneMetaTyVar, demoteUnfilledFmv,
+    tcInstType,
 
     TcLevel, isTouchableMetaTyVarTcS,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
@@ -125,7 +127,7 @@ import FamInstEnv
 import qualified TcRnMonad as TcM
 import qualified TcMType as TcM
 import qualified TcEnv as TcM
-       ( checkWellStaged, topIdLvl, tcGetDefaultTys, tcLookupClass )
+       ( checkWellStaged, topIdLvl, tcGetDefaultTys, tcLookupClass, tcLookupId )
 import PrelNames( heqTyConKey, eqTyConKey )
 import Kind
 import TcType
@@ -2649,11 +2651,18 @@ getLclEnv = wrapTcS $ TcM.getLclEnv
 tcLookupClass :: Name -> TcS Class
 tcLookupClass c = wrapTcS $ TcM.tcLookupClass c
 
+tcLookupId :: Name -> TcS Id
+tcLookupId n = wrapTcS $ TcM.tcLookupId n
+
 -- Setting names as used (used in the deriving of Coercible evidence)
 -- Too hackish to expose it to TcS? In that case somehow extract the used
 -- constructors from the result of solveInteract
 addUsedGREs :: [GlobalRdrElt] -> TcS ()
 addUsedGREs gres = wrapTcS  $ TcM.addUsedGREs gres
+
+addUsedGRE :: Bool -> GlobalRdrElt -> TcS ()
+addUsedGRE warn_if_deprec gre = wrapTcS $ TcM.addUsedGRE warn_if_deprec gre
+
 
 -- Various smaller utilities [TODO, maybe will be absorbed in the instance matcher]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2842,6 +2851,14 @@ instFlexiHelper subst tv
              kind = substTyUnchecked subst (tyVarKind tv)
              ty'  = mkTyVarTy (mkTcTyVar name kind details)
        ; return (extendTvSubst subst tv ty') }
+
+tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
+                   -- ^ How to instantiate the type variables
+           -> Id   -- ^ Type to instantiate
+           -> TcS ([(Name, TcTyVar)], TcThetaType, TcType) -- ^ Result
+                -- (type vars, preds (incl equalities), rho)
+tcInstType inst_tyvars id = wrapTcS (TcM.tcInstType inst_tyvars id)
+
 
 
 -- Creating and setting evidence variables and CtFlavors

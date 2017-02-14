@@ -46,7 +46,8 @@ module RdrName (
         GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv,
         lookupGlobalRdrEnv, extendGlobalRdrEnv, greOccName, shadowNames,
         pprGlobalRdrEnv, globalRdrEnvElts,
-        lookupGRE_RdrName, lookupGRE_Name, lookupGRE_Field_Name, getGRE_NameQualifier_maybes,
+        lookupGRE_RdrName, lookupGRE_Name, lookupGRE_FieldLabel,
+        getGRE_NameQualifier_maybes,
         transformGREs, pickGREs, pickGREsModExp,
 
         -- * GlobalRdrElts
@@ -791,20 +792,31 @@ lookupGRE_RdrName rdr_name env
     Just gres -> pickGREs rdr_name gres
 
 lookupGRE_Name :: GlobalRdrEnv -> Name -> Maybe GlobalRdrElt
+-- ^ Look for precisely this 'Name' in the environment.  This tests
+-- whether it is in scope, ignoring anything else that might be in
+-- scope with the same 'OccName'.
 lookupGRE_Name env name
-  = case [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name)
+  = lookupGRE_Name_OccName env name (nameOccName name)
+
+lookupGRE_FieldLabel :: GlobalRdrEnv -> FieldLabel -> Maybe GlobalRdrElt
+-- ^ Look for a particular record field selector in the environment, where the
+-- selector name and field label may be different: the GlobalRdrEnv is keyed on
+-- the label.  See Note [Parents for record fields] for why this happens.
+lookupGRE_FieldLabel env fl
+  = lookupGRE_Name_OccName env (flSelector fl) (mkVarOccFS (flLabel fl))
+
+lookupGRE_Name_OccName :: GlobalRdrEnv -> Name -> OccName -> Maybe GlobalRdrElt
+-- ^ Look for precisely this 'Name' in the environment, but with an 'OccName'
+-- that might differ from that of the 'Name'.  See 'lookupGRE_FieldLabel' and
+-- Note [Parents for record fields].
+lookupGRE_Name_OccName env name occ
+  = case [ gre | gre <- lookupGlobalRdrEnv env occ
                , gre_name gre == name ] of
       []    -> Nothing
       [gre] -> Just gre
-      gres  -> pprPanic "lookupGRE_Name" (ppr name $$ ppr gres)
+      gres  -> pprPanic "lookupGRE_Name_OccName"
+                        (ppr name $$ ppr occ $$ ppr gres)
                -- See INVARIANT 1 on GlobalRdrEnv
-
-lookupGRE_Field_Name :: GlobalRdrEnv -> Name -> FastString -> [GlobalRdrElt]
--- Used when looking up record fields, where the selector name and
--- field label are different: the GlobalRdrEnv is keyed on the label
-lookupGRE_Field_Name env sel_name lbl
-  = [ gre | gre <- lookupGlobalRdrEnv env (mkVarOccFS lbl),
-            gre_name gre == sel_name ]
 
 
 getGRE_NameQualifier_maybes :: GlobalRdrEnv -> Name -> [Maybe [ModuleName]]
