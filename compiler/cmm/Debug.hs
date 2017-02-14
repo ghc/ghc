@@ -393,7 +393,7 @@ See also: Note [Unwinding information in the NCG] in AsmCodeGen.
 -}
 
 -- | A label associated with an 'UnwindTable'
-data UnwindPoint = UnwindPoint !Label !UnwindTable
+data UnwindPoint = UnwindPoint !CLabel !UnwindTable
 
 instance Outputable UnwindPoint where
   ppr (UnwindPoint lbl uws) =

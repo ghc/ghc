@@ -182,7 +182,7 @@ data Instr
 
         -- unwinding information
         -- See Note [Unwinding information in the NCG].
-        | UNWIND BlockId UnwindTable
+        | UNWIND CLabel UnwindTable
 
         -- specify current stack offset for benefit of subsequent passes.
         -- This carries a BlockId so it can be used in unwinding information.
