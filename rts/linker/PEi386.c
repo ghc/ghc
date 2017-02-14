@@ -107,9 +107,15 @@ void initLinker_PEi386()
      * These two libraries cause problems when added to the static link,
      * but are necessary for resolving symbols in GHCi, hence we load
      * them manually here.
+     *
+     * Most of these are included by base, but GCC always includes them
+     * So lets make sure we always have them too.
      */
     addDLL(WSTR("msvcrt"));
     addDLL(WSTR("kernel32"));
+    addDLL(WSTR("advapi32"));
+    addDLL(WSTR("shell32"));
+    addDLL(WSTR("user32"));
     addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 }

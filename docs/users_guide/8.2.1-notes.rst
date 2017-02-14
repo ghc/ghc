@@ -263,6 +263,9 @@ Runtime system
   Enabling external tools to collect and analyze the event log data while the
   application is still running.
 
+- advapi32, shell32 and user32 are now automatically loaded in GHCi. libGCC is also
+  loaded when a depencency requires it. See :ghc-ticket:`13189`.
+
 Build system
 ~~~~~~~~~~~~
 
