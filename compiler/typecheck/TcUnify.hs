@@ -367,7 +367,7 @@ matchExpectedTyConApp :: TyCon                -- T :: forall kv1 ... kvm. k1 -> 
 -- Postcondition: (T k1 k2 k3 a b c) is well-kinded
 
 matchExpectedTyConApp tc orig_ty
-  = go orig_ty
+  = ASSERT(tc /= funTyCon) go orig_ty
   where
     go ty
        | Just ty' <- coreView ty
