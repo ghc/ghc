@@ -770,17 +770,22 @@ dumpCensus( Census *census )
     traceHeapProfSampleBegin(era);
 
 #ifdef PROFILING
+    /* change typecast to uint64_t to remove
+     * print formatting warning. See #12636 */
     if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_LDV) {
-        fprintf(hp_file, "VOID\t%lu\n",
-                (unsigned long)(census->void_total) * sizeof(W_));
-        fprintf(hp_file, "LAG\t%lu\n",
-                (unsigned long)(census->not_used - census->void_total) * sizeof(W_));
-        fprintf(hp_file, "USE\t%lu\n",
-                (unsigned long)(census->used - census->drag_total) * sizeof(W_));
-        fprintf(hp_file, "INHERENT_USE\t%lu\n",
-                (unsigned long)(census->prim) * sizeof(W_));
-        fprintf(hp_file, "DRAG\t%lu\n",
-                (unsigned long)(census->drag_total) * sizeof(W_));
+        fprintf(hp_file, "VOID\t%" FMT_Word64 "\n",
+                (uint64_t)(census->void_total *
+                                     sizeof(W_)));
+        fprintf(hp_file, "LAG\t%" FMT_Word64 "\n",
+                (uint64_t)((census->not_used - census->void_total) *
+                                     sizeof(W_)));
+        fprintf(hp_file, "USE\t%" FMT_Word64 "\n",
+                (uint64_t)((census->used - census->drag_total) *
+                                     sizeof(W_)));
+        fprintf(hp_file, "INHERENT_USE\t%" FMT_Word64 "\n",
+                (uint64_t)(census->prim * sizeof(W_)));
+        fprintf(hp_file, "DRAG\t%" FMT_Word64 "\n",
+                (uint64_t)(census->drag_total * sizeof(W_)));
         printSample(false, census->time);
         return;
     }
