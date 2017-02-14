@@ -64,7 +64,7 @@ import LoadIface
 import ToIface
 import FlagChecker
 
-import Desugar ( mkUsageInfo, mkUsedNames, mkDependencies )
+import DsUsage ( mkUsageInfo, mkUsedNames, mkDependencies )
 import Id
 import Annotations
 import CoreSyn

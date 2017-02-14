@@ -298,6 +298,7 @@ Library
         DsGRHSs
         DsListComp
         DsMonad
+        DsUsage
         DsUtils
         Match
         MatchCon
