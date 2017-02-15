@@ -273,7 +273,7 @@ b) The top-level binding is marked NoCafRefs.  This really happens
       $fApplicativeSTM [NoCafRefs] = D:Alternative sat ...blah...
 
    So, gruesomely, we must set the NoCafRefs flag on the sat bindings,
-   *and* substutite the modified 'sat' into the old RHS.
+   *and* substitute the modified 'sat' into the old RHS.
 
    It should be the case that 'sat' is itself [NoCafRefs] (a value, no
    cafs) else the original top-level binding would not itself have been

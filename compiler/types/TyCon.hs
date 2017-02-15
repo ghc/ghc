@@ -1732,7 +1732,7 @@ isInjectiveTyCon tc@(TcTyCon {})               _
 isGenerativeTyCon :: TyCon -> Role -> Bool
 isGenerativeTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ }) Nominal = True
 isGenerativeTyCon (FamilyTyCon {}) _ = False
-  -- in all other cases, injectivity implies generativitiy
+  -- in all other cases, injectivity implies generativity
 isGenerativeTyCon tc               r = isInjectiveTyCon tc r
 
 -- | Is this an 'AlgTyConRhs' of a 'TyCon' that is generative and injective

@@ -2153,7 +2153,7 @@ commonly used commands.
     If omitted, ⟨n⟩ and ⟨m⟩ default to the first or last available
     completion candidate respectively. If there are less candidates than
     requested via the range argument, ⟨n⟩ and ⟨m⟩ are implicitly capped
-    to the number of available completition candidates.
+    to the number of available completion candidates.
 
     The output of :ghci-cmd:`:complete` begins with a header line containing
     three space-delimited fields:

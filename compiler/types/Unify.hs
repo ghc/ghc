@@ -504,7 +504,7 @@ To make it idempotent we don't want to get just
 We also want to substitute inside f's kind, to get
    [ k -> *
    , g -> H k (f:*) ]
-If we don't do this, we may apply the substitition to something,
+If we don't do this, we may apply the substitution to something,
 and get an ill-formed type, i.e. one where typeKind will fail.
 This happened, for example, in Trac #9106.
 

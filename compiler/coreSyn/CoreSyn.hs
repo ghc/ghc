@@ -1076,7 +1076,7 @@ has two major consequences
       instance Eq T where ....
    The instance (Eq T) is incorprated as part of T's fingerprint.
 
-   In constrast, orphans are all fingerprinted together in the
+   In contrast, orphans are all fingerprinted together in the
    mi_orph_hash field of the ModIface.
 
    See MkIface.addFingerprints.

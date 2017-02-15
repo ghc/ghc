@@ -1959,7 +1959,7 @@ mkGADTVars tmpl_tvs dc_tvs subst
 
     choose :: [TyVar]           -- accumulator of univ tvs, reversed
            -> [EqSpec]          -- accumulator of GADT equalities, reversed
-           -> TCvSubst          -- template substutition
+           -> TCvSubst          -- template substitution
            -> TCvSubst          -- res. substitution
            -> [TyVar]           -- template tvs (the univ tvs passed in)
            -> ( [TyVar]         -- the univ_tvs

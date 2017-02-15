@@ -212,7 +212,7 @@ example.
 
 So we arrange to put these particular class constraints in the wl_eqs.
 
-  NB: since we do not currently apply the substition to the
+  NB: since we do not currently apply the substitution to the
   inert_solved_dicts, the knot-tying still seems a bit fragile.
   But this makes it better.
 -}
@@ -795,7 +795,7 @@ Theorem [Stability under extension]
                 a not in s, OR
                 the path from the top of s to a includes at least one non-newtype
 
-   then the extended substition T = S+(a -fw-> t)
+   then the extended substitution T = S+(a -fw-> t)
    is an inert generalised substitution.
 
 Conditions (T1-T3) are established by the canonicaliser

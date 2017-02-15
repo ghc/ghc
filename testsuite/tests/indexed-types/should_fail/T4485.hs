@@ -48,7 +48,7 @@ data FooBar = FooBar
 
 instance {-# OVERLAPPING #-} EmbedAsChild (IdentityT IO) FooBar where
   asChild b = asChild $ (genElement "foo")
-  -- asChild :: FooBar -> XMLGenT (XMLGenT (IdentityT IO) [Child (IdentitiyT IO)])
+  -- asChild :: FooBar -> XMLGenT (XMLGenT (IdentityT IO) [Child (IdentityT IO)])
 
 {-     ---------- Deriving the constraints ----------
  asChild :: EmbedAsChild m c => c -> XMLGenT m [Child m]

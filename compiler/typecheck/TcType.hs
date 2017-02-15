@@ -1479,7 +1479,7 @@ tcRepSplitTyConApp_maybe _                          = Nothing
 --    currently don't even enough information to fully determine its RuntimeRep
 --    variables. For instance, @FunTy (a :: k) Int@.
 --
--- By constrast 'tcRepSplitTyConApp_maybe' panics in the second case.
+-- By contrast 'tcRepSplitTyConApp_maybe' panics in the second case.
 --
 -- The behavior here is needed during canonicalization; see Note [FunTy and
 -- decomposing tycon applications] in TcCanonical for details.
