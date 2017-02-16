@@ -148,7 +148,7 @@ tcInferRho expr = addErrCtxt (exprCtxt expr) (tcInferRhoNC expr)
 
 tcInferRhoNC expr
   = do { (expr', sigma) <- tcInferSigmaNC expr
-       ; (wrap, rho) <- topInstantiate (exprCtOrigin (unLoc expr)) sigma
+       ; (wrap, rho) <- topInstantiate (lexprCtOrigin expr) sigma
        ; return (mkLHsWrap wrap expr', rho) }
 
 
@@ -364,7 +364,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        ; (arg1', arg1_ty) <- tcInferSigma arg1
 
        ; let doc   = text "The first argument of ($) takes"
-             orig1 = exprCtOrigin (unLoc arg1)
+             orig1 = lexprCtOrigin arg1
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
            matchActualFunTys doc orig1 (Just arg1) 1 arg1_ty
 
@@ -429,13 +429,18 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
 tcExpr expr@(SectionR op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
-       ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty) <-
-           matchActualFunTys (mk_op_msg op) SectionOrigin (Just op) 2 op_ty
+       ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
+                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just op) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
                                  (mkFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op arg2 arg2_ty 2
        ; return ( mkHsWrap wrap_res $
                   SectionR (mkLHsWrap wrap_fun op') arg2' ) }
+  where
+    fn_orig = lexprCtOrigin op
+    -- It's important to use the origin of 'op', so that call-stacks
+    -- come out right; they are driven by the OccurrenceOf CtOrigin
+    -- See Trac #13285
 
 tcExpr expr@(SectionL arg1 op) res_ty
   = do { (op', op_ty) <- tcInferFun op
@@ -444,13 +449,18 @@ tcExpr expr@(SectionL arg1 op) res_ty
                          | otherwise                            = 2
 
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
-           <- matchActualFunTys (mk_op_msg op) SectionOrigin (Just op)
+           <- matchActualFunTys (mk_op_msg op) fn_orig (Just op)
                                 n_reqd_args op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
                                  (mkFunTys arg_tys op_res_ty) res_ty
        ; arg1' <- tcArg op arg1 arg1_ty 1
        ; return ( mkHsWrap wrap_res $
                   SectionL arg1' (mkLHsWrap wrap_fn op') ) }
+  where
+    fn_orig = lexprCtOrigin op
+    -- It's important to use the origin of 'op', so that call-stacks
+    -- come out right; they are driven by the OccurrenceOf CtOrigin
+    -- See Trac #13285
 
 tcExpr expr@(ExplicitTuple tup_args boxity) res_ty
   | all tupArgPresent tup_args
@@ -1152,7 +1162,7 @@ tcApp m_herald orig_fun orig_args res_ty
     go fun args
       = do {   -- Type-check the function
            ; (fun1, fun_sigma) <- tcInferFun fun
-           ; let orig = exprCtOrigin (unLoc fun)
+           ; let orig = lexprCtOrigin fun
 
            ; (wrap_fun, args1, actual_res_ty)
                <- tcArgs fun fun_sigma orig args

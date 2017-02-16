@@ -378,7 +378,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
         ; (expr',expr'_inferred) <- tcInferSigma expr
 
          -- expression must be a function
-        ; let expr_orig = exprCtOrigin (unLoc expr)
+        ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
         ; (expr_wrap1, [inf_arg_ty], inf_res_ty)
             <- matchActualFunTys herald expr_orig (Just expr) 1 expr'_inferred

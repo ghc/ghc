@@ -2107,7 +2107,7 @@ tcRnExpr hsc_env mode rdr_expr
         -- it might have a rank-2 type (e.g. :t runST)
     uniq <- newUnique ;
     let { fresh_it  = itName uniq (getLoc rdr_expr)
-        ; orig = exprCtOrigin (unLoc rn_expr) } ;
+        ; orig = lexprCtOrigin rn_expr } ;
     (tclvl, lie, res_ty)
           <- pushLevelAndCaptureConstraints $
              do { (_tc_expr, expr_ty) <- tcInferSigma rn_expr

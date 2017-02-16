@@ -94,7 +94,7 @@ module TcRnTypes(
         ctLocTypeOrKind_maybe,
         ctLocDepth, bumpCtLocDepth,
         setCtLocOrigin, setCtLocEnv, setCtLocSpan,
-        CtOrigin(..), exprCtOrigin, matchesCtOrigin, grhssCtOrigin,
+        CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
         ErrorThing(..), mkErrorThing, errorThingNumArgs_maybe,
         TypeOrKind(..), isTypeLevel, isKindLevel,
         pprCtOrigin, pprCtLoc,
@@ -3097,6 +3097,9 @@ ctoHerald :: SDoc
 ctoHerald = text "arising from"
 
 -- | Extract a suitable CtOrigin from a HsExpr
+lexprCtOrigin :: LHsExpr Name -> CtOrigin
+lexprCtOrigin (L _ e) = exprCtOrigin e
+
 exprCtOrigin :: HsExpr Name -> CtOrigin
 exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
@@ -3108,12 +3111,12 @@ exprCtOrigin (HsOverLit lit)    = LiteralOrigin lit
 exprCtOrigin (HsLit {})         = Shouldn'tHappenOrigin "concrete literal"
 exprCtOrigin (HsLam matches)    = matchesCtOrigin matches
 exprCtOrigin (HsLamCase ms)     = matchesCtOrigin ms
-exprCtOrigin (HsApp (L _ e1) _) = exprCtOrigin e1
-exprCtOrigin (HsAppType (L _ e1) _) = exprCtOrigin e1
-exprCtOrigin (HsAppTypeOut {})      = panic "exprCtOrigin HsAppTypeOut"
-exprCtOrigin (OpApp _ (L _ op) _ _) = exprCtOrigin op
-exprCtOrigin (NegApp (L _ e) _) = exprCtOrigin e
-exprCtOrigin (HsPar (L _ e))    = exprCtOrigin e
+exprCtOrigin (HsApp e1 _)       = lexprCtOrigin e1
+exprCtOrigin (HsAppType e1 _)   = lexprCtOrigin e1
+exprCtOrigin (HsAppTypeOut {})  = panic "exprCtOrigin HsAppTypeOut"
+exprCtOrigin (OpApp _ op _ _)   = lexprCtOrigin op
+exprCtOrigin (NegApp e _)       = lexprCtOrigin e
+exprCtOrigin (HsPar e)          = lexprCtOrigin e
 exprCtOrigin (SectionL _ _)     = SectionOrigin
 exprCtOrigin (SectionR _ _)     = SectionOrigin
 exprCtOrigin (ExplicitTuple {}) = Shouldn'tHappenOrigin "explicit tuple"
@@ -3122,7 +3125,7 @@ exprCtOrigin (HsCase _ matches) = matchesCtOrigin matches
 exprCtOrigin (HsIf (Just syn) _ _ _) = exprCtOrigin (syn_expr syn)
 exprCtOrigin (HsIf {})          = Shouldn'tHappenOrigin "if expression"
 exprCtOrigin (HsMultiIf _ rhs)  = lGRHSCtOrigin rhs
-exprCtOrigin (HsLet _ (L _ e))  = exprCtOrigin e
+exprCtOrigin (HsLet _ e)        = lexprCtOrigin e
 exprCtOrigin (HsDo _ _ _)       = DoOrigin
 exprCtOrigin (ExplicitList {})  = Shouldn'tHappenOrigin "list"
 exprCtOrigin (ExplicitPArr {})  = Shouldn'tHappenOrigin "parallel array"
@@ -3132,8 +3135,8 @@ exprCtOrigin (ExprWithTySig {}) = ExprSigOrigin
 exprCtOrigin (ExprWithTySigOut {}) = panic "exprCtOrigin ExprWithTySigOut"
 exprCtOrigin (ArithSeq {})      = Shouldn'tHappenOrigin "arithmetic sequence"
 exprCtOrigin (PArrSeq {})       = Shouldn'tHappenOrigin "parallel array sequence"
-exprCtOrigin (HsSCC _ _ (L _ e))= exprCtOrigin e
-exprCtOrigin (HsCoreAnn _ _ (L _ e)) = exprCtOrigin e
+exprCtOrigin (HsSCC _ _ e)      = lexprCtOrigin e
+exprCtOrigin (HsCoreAnn _ _ e)  = lexprCtOrigin e
 exprCtOrigin (HsBracket {})     = Shouldn'tHappenOrigin "TH bracket"
 exprCtOrigin (HsRnBracketOut {})= Shouldn'tHappenOrigin "HsRnBracketOut"
 exprCtOrigin (HsTcBracketOut {})= panic "exprCtOrigin HsTcBracketOut"
@@ -3142,9 +3145,9 @@ exprCtOrigin (HsProc {})        = Shouldn'tHappenOrigin "proc"
 exprCtOrigin (HsStatic {})      = Shouldn'tHappenOrigin "static expression"
 exprCtOrigin (HsArrApp {})      = panic "exprCtOrigin HsArrApp"
 exprCtOrigin (HsArrForm {})     = panic "exprCtOrigin HsArrForm"
-exprCtOrigin (HsTick _ (L _ e)) = exprCtOrigin e
-exprCtOrigin (HsBinTick _ _ (L _ e)) = exprCtOrigin e
-exprCtOrigin (HsTickPragma _ _ _ (L _ e)) = exprCtOrigin e
+exprCtOrigin (HsTick _ e)       = lexprCtOrigin e
+exprCtOrigin (HsBinTick _ _ e)  = lexprCtOrigin e
+exprCtOrigin (HsTickPragma _ _ _ e) = lexprCtOrigin e
 exprCtOrigin EWildPat           = panic "exprCtOrigin EWildPat"
 exprCtOrigin (EAsPat {})        = panic "exprCtOrigin EAsPat"
 exprCtOrigin (EViewPat {})      = panic "exprCtOrigin EViewPat"
