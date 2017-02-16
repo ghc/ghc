@@ -1867,17 +1867,17 @@ occAnalApp env (Var fun, args, ticks)
        -- This is the *whole point* of the isRhsEnv predicate
        -- See Note [Arguments of let-bound constructors]
 
-    n_val_args = valArgCount args + length (takeWhile isOneShotInfo (occ_one_shots env))
-        -- See Note [Sources of one-shot information], bullet point A'
-
+    n_val_args = valArgCount args
     n_args     = length args
     fun_uds    = mkOneOcc env fun (n_val_args > 0) n_args
     is_exp     = isExpandableApp fun n_val_args
         -- See Note [CONLIKE pragma] in BasicTypes
         -- The definition of is_exp should match that in Simplify.prepareRhs
 
-    one_shots  = argsOneShots (idStrictness fun) n_val_args
-        -- See Note [Sources of one-shot information]
+    one_shots  = argsOneShots (idStrictness fun) guaranteed_val_args
+    guaranteed_val_args = n_val_args + length (takeWhile isOneShotInfo
+                                                         (occ_one_shots env))
+        -- See Note [Sources of one-shot information], bullet point A']
 
 occAnalApp env (fun, args, ticks)
   = (markAllNonTailCalled (fun_uds +++ args_uds),
@@ -1909,32 +1909,38 @@ A:  Saturated applications:  eg   f e1 .. en
     f's strictness signature into e1 .. en, but /only/ if n is enough to
     saturate the strictness signature. A strictness signature like
 
-    f :: C1(C1(L))LS
+          f :: C1(C1(L))LS
 
     means that *if f is applied to three arguments* then it will guarantee to
     call its first argument at most once, and to call the result of that at
     most once. But if f has fewer than three arguments, all bets are off; e.g.
 
-    map (f (\x y. expensive) e2) xs
+          map (f (\x y. expensive) e2) xs
 
     Here the \x y abstraction may be called many times (once for each element of
     xs) so we should not mark x and y as one-shot. But if it was
 
-    map (f (\x y. expensive) 3 2) xs
+          map (f (\x y. expensive) 3 2) xs
 
     then the first argument of f will be called at most once.
 
+    The one-shot info, derived from f's strictness signature, is
+    computed by 'argsOneShots', called in occAnalApp.
+
 A': Non-obviously saturated applications: eg    build (f (\x y -> expensive))
+    where f is as above.
 
     In this case, f is only manifestly applied to one argument, so it does not
     look saturated. So by the previous point, we should not use its strictness
     signature to learn about the one-shotness of \x y. But in this case we can:
-
-    build is fully applied, so we may use its strictness signature. From that
-    we learn that build calls its argument with two arguments *at most once*.
+    build is fully applied, so we may use its strictness signature; and from
+    that we learn that build calls its argument with two arguments *at most once*.
 
     So there is really only one call to f, and it will have three arguments. In
     that sense, f is saturated, and we may proceed as described above.
+
+    Hence the computation of 'guaranteed_val_args' in occAnalApp, using
+    '(occ_one_shots env)'.  See also Trac #13227, comment:9
 
 B:  Let-bindings:  eg   let f = \c. let ... in \n -> blah
                         in (build f, build f)
