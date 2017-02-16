@@ -672,6 +672,8 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $2="$$2 -fno-stack-protector"
     fi
 
+    $3="$$3 -fuse-ld=gold"
+
     rm -f conftest.c conftest.o
     AC_MSG_RESULT([done])
 ])
