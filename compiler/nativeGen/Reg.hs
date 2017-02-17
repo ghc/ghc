@@ -90,11 +90,11 @@ instance Uniquable VirtualReg where
 instance Outputable VirtualReg where
         ppr reg
          = case reg of
-                VirtualRegI  u  -> text "%vI_"  <> pprUnique u
-                VirtualRegHi u  -> text "%vHi_" <> pprUnique u
-                VirtualRegF  u  -> text "%vF_"  <> pprUnique u
-                VirtualRegD  u  -> text "%vD_"  <> pprUnique u
-                VirtualRegSSE u -> text "%vSSE_" <> pprUnique u
+                VirtualRegI  u  -> text "%vI_"   <> pprUniqueAlways u
+                VirtualRegHi u  -> text "%vHi_"  <> pprUniqueAlways u
+                VirtualRegF  u  -> text "%vF_"   <> pprUniqueAlways u
+                VirtualRegD  u  -> text "%vD_"   <> pprUniqueAlways u
+                VirtualRegSSE u -> text "%vSSE_" <> pprUniqueAlways u
 
 
 renameVirtualReg :: Unique -> VirtualReg -> VirtualReg

@@ -41,7 +41,7 @@ import PprCmm()
 import CLabel
 import Hoopl
 
-import Unique           ( Uniquable(..), pprUnique )
+import Unique           ( Uniquable(..), pprUniqueAlways )
 import Outputable
 import Platform
 import FastString
@@ -148,11 +148,11 @@ pprReg reg
  = case reg of
         RegVirtual vr
          -> case vr of
-                VirtualRegI   u -> text "%vI_"  <> pprUnique u
-                VirtualRegHi  u -> text "%vHi_" <> pprUnique u
-                VirtualRegF   u -> text "%vF_"  <> pprUnique u
-                VirtualRegD   u -> text "%vD_"  <> pprUnique u
-                VirtualRegSSE u -> text "%vSSE_" <> pprUnique u
+                VirtualRegI   u -> text "%vI_"   <> pprUniqueAlways u
+                VirtualRegHi  u -> text "%vHi_"  <> pprUniqueAlways u
+                VirtualRegF   u -> text "%vF_"   <> pprUniqueAlways u
+                VirtualRegD   u -> text "%vD_"   <> pprUniqueAlways u
+                VirtualRegSSE u -> text "%vSSE_" <> pprUniqueAlways u
 
         RegReal rr
          -> case rr of

@@ -24,7 +24,7 @@ import Hoopl
 
 import CLabel
 
-import Unique                ( pprUnique, Uniquable(..) )
+import Unique                ( pprUniqueAlways, Uniquable(..) )
 import Platform
 import FastString
 import Outputable
@@ -172,11 +172,11 @@ pprReg r
   = case r of
       RegReal    (RealRegSingle i) -> ppr_reg_no i
       RegReal    (RealRegPair{})   -> panic "PPC.pprReg: no reg pairs on this arch"
-      RegVirtual (VirtualRegI  u)  -> text "%vI_" <> pprUnique u
-      RegVirtual (VirtualRegHi u)  -> text "%vHi_" <> pprUnique u
-      RegVirtual (VirtualRegF  u)  -> text "%vF_" <> pprUnique u
-      RegVirtual (VirtualRegD  u)  -> text "%vD_" <> pprUnique u
-      RegVirtual (VirtualRegSSE  u) -> text "%vSSE_" <> pprUnique u
+      RegVirtual (VirtualRegI  u)  -> text "%vI_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegHi u)  -> text "%vHi_"  <> pprUniqueAlways u
+      RegVirtual (VirtualRegF  u)  -> text "%vF_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegD  u)  -> text "%vD_"   <> pprUniqueAlways u
+      RegVirtual (VirtualRegSSE u) -> text "%vSSE_" <> pprUniqueAlways u
   where
     ppr_reg_no :: Int -> SDoc
     ppr_reg_no i =

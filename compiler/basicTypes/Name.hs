@@ -560,7 +560,7 @@ pprExternal sty uniq mod occ is_wired is_builtin
 
 pprInternal :: PprStyle -> Unique -> OccName -> SDoc
 pprInternal sty uniq occ
-  | codeStyle sty  = pprUnique uniq
+  | codeStyle sty  = pprUniqueAlways uniq
   | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ),
                                                        pprUnique uniq])
   | dumpStyle sty  = ppr_occ_name occ <> ppr_underscore_unique uniq
@@ -571,7 +571,7 @@ pprInternal sty uniq occ
 -- Like Internal, except that we only omit the unique in Iface style
 pprSystem :: PprStyle -> Unique -> OccName -> SDoc
 pprSystem sty uniq occ
-  | codeStyle sty  = pprUnique uniq
+  | codeStyle sty  = pprUniqueAlways uniq
   | debugStyle sty = ppr_occ_name occ <> ppr_underscore_unique uniq
                      <> braces (pprNameSpaceBrief (occNameSpace occ))
   | otherwise      = ppr_occ_name occ <> ppr_underscore_unique uniq
@@ -594,14 +594,20 @@ pprModulePrefix sty mod occ = sdocWithDynFlags $ \dflags ->
                           <> ppr (moduleName mod) <> dot          -- scope either
       NameUnqual       -> empty                   -- In scope unqualified
 
+pprUnique :: Unique -> SDoc
+-- Print a unique unless we are suppressing them
+pprUnique uniq
+  = sdocWithDynFlags $ \dflags ->
+    ppUnless (gopt Opt_SuppressUniques dflags) $
+    pprUniqueAlways uniq
+
 ppr_underscore_unique :: Unique -> SDoc
 -- Print an underscore separating the name from its unique
 -- But suppress it if we aren't printing the uniques anyway
 ppr_underscore_unique uniq
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_SuppressUniques dflags
-    then empty
-    else char '_' <> pprUnique uniq
+    ppUnless (gopt Opt_SuppressUniques dflags) $
+    char '_' <> pprUniqueAlways uniq
 
 ppr_occ_name :: OccName -> SDoc
 ppr_occ_name occ = ftext (occNameFS occ)

@@ -3,7 +3,7 @@
 {Bag(Located (HsBind Var)): 
 [
  ({ <no location info> }
-  (VarBind {Var: (main:DumpTypecheckedAst.$tcPeano{v rHa} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
+  (VarBind {Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }
@@ -27,7 +27,7 @@
             (11015472196725198936)))))) 
        ({ <no location info> }
         (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
      ({ <no location info> }
       (HsPar 
        ({ <no location info> }
@@ -41,7 +41,7 @@
             (NoSourceText) "Peano"))))))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v rFM} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
+  (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }
@@ -65,7 +65,7 @@
             (4722402035995040741)))))) 
        ({ <no location info> }
         (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
      ({ <no location info> }
       (HsPar 
        ({ <no location info> }
@@ -79,7 +79,7 @@
             (NoSourceText) "'Zero"))))))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: (main:DumpTypecheckedAst.$tc'Succ{v rH3} [lidx] :: ghc-prim:GHC.Types.TyCon{tc 61Z})} 
+  (VarBind {Var: (main:DumpTypecheckedAst.$tc'Succ{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }
@@ -103,7 +103,7 @@
             (1296291977643060110)))))) 
        ({ <no location info> }
         (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})}))))) 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
      ({ <no location info> }
       (HsPar 
        ({ <no location info> }
@@ -117,7 +117,7 @@
             (NoSourceText) "'Succ"))))))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: (main:DumpTypecheckedAst.$trModule{v rHO} [lidx] :: ghc-prim:GHC.Types.Module{tc 625})} 
+  (VarBind {Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }
@@ -153,8 +153,8 @@
    [] 
    [] 
    [
-    (ABE {Var: (main:DumpTypecheckedAst.main{v rqD} [lid] :: ghc-prim:GHC.Types.IO{tc 31Q}
-                                                ())} {Var: (main{v aHS} [lid] :: ghc-prim:GHC.Types.IO{tc 31Q} ())} 
+    (ABE {Var: (main:DumpTypecheckedAst.main{v} [lid] :: ghc-prim:GHC.Types.IO{tc}
+                                            ())} {Var: (main{v} [lid] :: ghc-prim:GHC.Types.IO{tc} ())} 
      (WpHole) 
      (SpecPrags 
       []))] 
@@ -163,14 +163,14 @@
    [
     ({ DumpTypecheckedAst.hs:11:1-23 }
      (FunBind 
-      ({ DumpTypecheckedAst.hs:11:1-4 }{Var: (main{v aHS} [lid] :: ghc-prim:GHC.Types.IO{tc 31Q} ())}) 
+      ({ DumpTypecheckedAst.hs:11:1-4 }{Var: (main{v} [lid] :: ghc-prim:GHC.Types.IO{tc} ())}) 
       (MG 
        ({ DumpTypecheckedAst.hs:11:1-23 }
         [
          ({ DumpTypecheckedAst.hs:11:1-23 }
           (Match 
            (FunRhs 
-            ({ DumpTypecheckedAst.hs:11:1-4 }{Name: main:DumpTypecheckedAst.main{v rqD}}) 
+            ({ DumpTypecheckedAst.hs:11:1-4 }{Name: main:DumpTypecheckedAst.main{v}}) 
             (Prefix)) 
            [] 
            (Nothing) 
@@ -183,8 +183,8 @@
                 (HsApp 
                  ({ DumpTypecheckedAst.hs:11:8-15 }
                   (HsVar 
-                   ({ <no location info> }{Var: (base:System.IO.putStrLn{v r1J} [gid] :: base:GHC.Base.String{tc r1h}
-                                         -> ghc-prim:GHC.Types.IO{tc 31Q} ())}))) 
+                   ({ <no location info> }{Var: (base:System.IO.putStrLn{v} [gid] :: base:GHC.Base.String{tc}
+                                     -> ghc-prim:GHC.Types.IO{tc} ())}))) 
                  ({ DumpTypecheckedAst.hs:11:17-23 }
                   (HsLit 
                    (HsString 

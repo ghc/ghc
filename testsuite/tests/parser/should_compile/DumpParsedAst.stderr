@@ -85,7 +85,7 @@
                    ({ DumpParsedAst.hs:8:13 }
                     (HsAppInfix 
                      ({ DumpParsedAst.hs:8:13 }
-                      (Exact {Name: ghc-prim:GHC.Types.:{(w) d 66}})))),
+                      (Exact {Name: ghc-prim:GHC.Types.:{(w) d}})))),
                    ({ DumpParsedAst.hs:8:15-16 }
                     (HsAppPrefix 
                      ({ DumpParsedAst.hs:8:15-16 }

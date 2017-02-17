@@ -26,7 +26,7 @@ module Unique (
         -- ** Constructors, destructors and operations on 'Unique's
         hasKey,
 
-        pprUnique,
+        pprUniqueAlways,
 
         mkUniqueGrimily,                -- Used in UniqSupply only!
         getKey,                         -- Used in Var, UniqFM, Name only!
@@ -280,11 +280,16 @@ finish_show 't' u _pp_u | u < 26
     [chr (ord 'a' + u)]
 finish_show tag _ pp_u = tag : pp_u
 
-pprUnique :: Unique -> SDoc
-pprUnique u = text (showUnique u)
+pprUniqueAlways :: Unique -> SDoc
+-- The "always" means regardless of -dsuppress-uniques
+-- It replaces the old pprUnique to remind callers that
+-- they should consider whether they want to consult
+-- Opt_SuppressUniques
+pprUniqueAlways u
+  = text (showUnique u)
 
 instance Outputable Unique where
-    ppr = pprUnique
+    ppr = pprUniqueAlways
 
 instance Show Unique where
     show uniq = showUnique uniq

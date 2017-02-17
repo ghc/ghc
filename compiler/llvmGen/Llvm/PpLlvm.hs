@@ -196,7 +196,7 @@ ppLlvmBlock (LlvmBlock blockId stmts) =
 
 -- | Print out an LLVM block label.
 ppLlvmBlockLabel :: LlvmBlockId -> SDoc
-ppLlvmBlockLabel id = pprUnique id <> colon
+ppLlvmBlockLabel id = pprUniqueAlways id <> colon
 
 
 -- | Print out an LLVM statement.
