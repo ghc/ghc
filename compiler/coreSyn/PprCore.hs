@@ -148,8 +148,9 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
-ppr_expr _       (Var name)    = ppWhen (isJoinId name) (text "jump") <+>
-                                   ppr name
+ppr_expr add_par (Var name)
+ | isJoinId name               = add_par ((text "jump") <+> ppr name)
+ | otherwise                   = ppr name
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
