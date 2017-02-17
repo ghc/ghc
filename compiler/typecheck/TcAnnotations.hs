@@ -42,7 +42,8 @@ tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do
                   , text "See https://ghc.haskell.org/trac/ghc/ticket/10826" ]
 
 annProvenanceToTarget :: Module -> AnnProvenance Name -> AnnTarget Name
-annProvenanceToTarget _   (ValueAnnProvenance (L _ name)) = NamedTarget name
+annProvenanceToTarget _   (ValueAnnProvenance (L _ name))
+  = NamedTarget $ unEmb name
 annProvenanceToTarget _   (TypeAnnProvenance (L _ name))  = NamedTarget name
 annProvenanceToTarget mod ModuleAnnProvenance             = ModuleTarget mod
 

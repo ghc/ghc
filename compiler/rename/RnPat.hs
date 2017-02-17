@@ -426,9 +426,9 @@ rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _ _ _)
                 -- The Report says that n+k patterns must be in Integral
 
 rnPatAndThen mk (AsPat rdr pat)
-  = do { new_name <- newPatLName mk rdr
+  = do { new_name <- newPatLName mk $ unLEmb rdr
        ; pat' <- rnLPatAndThen mk pat
-       ; return (AsPat new_name pat') }
+       ; return (AsPat (reLEmb rdr (unLoc new_name)) pat') }
 
 rnPatAndThen mk p@(ViewPat expr pat _ty)
   = do { liftCps $ do { vp_flag <- xoptM LangExt.ViewPatterns
@@ -589,13 +589,13 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                               = L loc (FieldOcc (L ll lbl) _)
                                           , hsRecFieldArg = arg
                                           , hsRecPun      = pun }))
-      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent doc lbl
+      = do { sel <- setSrcSpan loc $ lookupRecFieldOcc parent doc (unEmb lbl)
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
-                               -- Discard any module qualifier (#11662)
-                             ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L loc (mk_arg loc arg_rdr)) }
-                     else return arg
+                   then do { checkErr pun_ok (badPun (L loc $ unEmb lbl))
+                             -- Discard any module qualifier (#11662)
+                           ; let arg_rdr = mkRdrUnqual (rdrNameOcc $ unEmb lbl)
+                           ; return (L loc (mk_arg loc arg_rdr)) }
+                   else return arg
            ; return (L l (HsRecField { hsRecFieldLbl
                                          = L loc (FieldOcc (L ll lbl) sel)
                                      , hsRecFieldArg = arg'
@@ -640,7 +640,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
 
            ; addUsedGREs dot_dot_gres
            ; return [ L loc (HsRecField
-                        { hsRecFieldLbl = L loc (FieldOcc (L loc arg_rdr) sel)
+                        { hsRecFieldLbl
+                                 = L loc (FieldOcc (L loc $ EName arg_rdr) sel)
                         , hsRecFieldArg = L loc (mk_arg loc arg_rdr)
                         , hsRecPun      = False })
                     | fl <- dot_dot_fields
@@ -724,17 +725,20 @@ rnHsRecUpdFields flds
                       -- Defer renaming of overloaded fields to the typechecker
                       -- See Note [Disambiguating record fields] in TcExpr
                       if overload_ok
-                          then do { mb <- lookupGlobalOccRn_overloaded overload_ok lbl
+                          then do { mb <- lookupGlobalOccRn_overloaded
+                                                    overload_ok (unEmb lbl)
                                   ; case mb of
-                                      Nothing -> do { addErr (unknownSubordinateErr doc lbl)
-                                                    ; return (Right []) }
+                                      Nothing -> do
+                                        { addErr (unknownSubordinateErr doc
+                                                  (unEmb lbl))
+                                        ; return (Right []) }
                                       Just r  -> return r }
-                          else fmap Left $ lookupGlobalOccRn lbl
+                          else fmap Left $ lookupGlobalOccRn $ unEmb lbl
            ; arg' <- if pun
-                     then do { checkErr pun_ok (badPun (L loc lbl))
-                               -- Discard any module qualifier (#11662)
-                             ; let arg_rdr = mkRdrUnqual (rdrNameOcc lbl)
-                             ; return (L loc (HsVar (L loc arg_rdr))) }
+                 then do { checkErr pun_ok (badPun (L loc $ unEmb lbl))
+                           -- Discard any module qualifier (#11662)
+                         ; let arg_rdr = mkRdrUnqual (rdrNameOcc $ unEmb lbl)
+                         ; return (L loc (HsVar (L loc (reEmb lbl arg_rdr)))) }
                      else return arg
            ; (arg'', fvs) <- rnLExpr arg'
 
@@ -766,10 +770,11 @@ getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
 getFieldLbls flds
-  = map (unLoc . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+  = map (unLocEmb . rdrNameFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 getFieldUpdLbls :: [LHsRecUpdField id] -> [RdrName]
-getFieldUpdLbls flds = map (rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
+getFieldUpdLbls flds
+  = map (unEmb . rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) flds
 
 needFlagDotDot :: HsRecFieldContext -> SDoc
 needFlagDotDot ctxt = vcat [text "Illegal `..' in record" <+> pprRFC ctxt,
@@ -832,7 +837,7 @@ rnOverLit origLit
         ; (SyntaxExpr { syn_expr = from_thing_name }, fvs)
             <- lookupSyntaxName std_name
         ; let rebindable = case from_thing_name of
-                                HsVar (L _ v) -> v /= std_name
+                                HsVar (L _ v) -> unEmb v /= std_name
                                 _             -> panic "rnOverLit"
         ; return (lit { ol_witness = from_thing_name
                       , ol_rebindable = rebindable

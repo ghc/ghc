@@ -35,7 +35,6 @@
 ((Test11321.hs:16:24-34,AnnTilde), [Test11321.hs:16:26]),
 ((Test11321.hs:16:28-30,AnnCloseP), [Test11321.hs:16:30]),
 ((Test11321.hs:16:28-30,AnnOpenP), [Test11321.hs:16:28]),
-((Test11321.hs:16:28-30,AnnVal), [Test11321.hs:16:29]),
 ((Test11321.hs:17:11-18,AnnCloseP), [Test11321.hs:17:18]),
 ((Test11321.hs:17:11-18,AnnOpenP), [Test11321.hs:17:11]),
 ((Test11321.hs:17:20-27,AnnCloseP), [Test11321.hs:17:27]),

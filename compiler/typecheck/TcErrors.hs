@@ -30,6 +30,7 @@ import DataCon
 import TcEvidence
 import HsExpr  ( UnboundVar(..) )
 import HsBinds ( PatSynBind(..) )
+import HsEmbellished
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan )
@@ -2347,7 +2348,7 @@ ctxtFixes has_ambig_tvs pred implics
 discardProvCtxtGivens :: CtOrigin -> [UserGiven] -> [UserGiven]
 discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
   | ProvCtxtOrigin (PSB {psb_id = L _ name}) <- orig
-  = filterOut (discard name) givens
+  = filterOut (discard $ unEmb name) givens
   | otherwise
   = givens
   where

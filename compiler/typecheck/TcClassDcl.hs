@@ -135,8 +135,10 @@ tcClassSigs clas sigs def_methods
        ; traceTc "tcClassSigs 2" (ppr clas)
        ; return op_info }
   where
-    vanilla_sigs = [L loc (nm,ty) | L loc (ClassOpSig False nm ty) <- sigs]
-    gen_sigs     = [L loc (nm,ty) | L loc (ClassOpSig True  nm ty) <- sigs]
+    vanilla_sigs = [L loc (map unLEmb nm,ty)
+                      | L loc (ClassOpSig False nm ty) <- sigs]
+    gen_sigs     = [L loc (map unLEmb nm,ty)
+                      | L loc (ClassOpSig True  nm ty) <- sigs]
     dm_bind_names :: [Name]     -- These ones have a value binding in the class decl
     dm_bind_names = [op | L _ (FunBind {fun_id = L _ op}) <- bagToList def_methods]
 
@@ -346,7 +348,7 @@ mkHsSigFun sigs = lookupNameEnv env
     env = mkHsSigEnv get_classop_sig sigs
 
     get_classop_sig :: LSig Name -> Maybe ([Located Name], LHsSigType Name)
-    get_classop_sig  (L _ (ClassOpSig _ ns hs_ty)) = Just (ns, hs_ty)
+    get_classop_sig  (L _ (ClassOpSig _ ns hs_ty)) = Just (map unLEmb ns,hs_ty)
     get_classop_sig  _                             = Nothing
 
 ---------------------------
@@ -372,7 +374,7 @@ findMinimalDef :: [LSig Name] -> Maybe ClassMinimalDef
 findMinimalDef = firstJusts . map toMinimalDef
   where
     toMinimalDef :: LSig Name -> Maybe ClassMinimalDef
-    toMinimalDef (L _ (MinimalSig _ (L _ bf))) = Just (fmap unLoc bf)
+    toMinimalDef (L _ (MinimalSig _ (L _ bf))) = Just (fmap unLocEmb bf)
     toMinimalDef _                             = Nothing
 
 {-

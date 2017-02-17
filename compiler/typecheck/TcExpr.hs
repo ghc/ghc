@@ -163,7 +163,7 @@ NB: The res_ty is always deeply skolemised.
 -}
 
 tcExpr :: HsExpr Name -> ExpRhoType -> TcM (HsExpr TcId)
-tcExpr (HsVar (L _ name)) res_ty = tcCheckId name res_ty
+tcExpr (HsVar (L _ name)) res_ty = tcCheckId (unEmb name) res_ty
 tcExpr (HsUnboundVar uv)  res_ty = tcUnboundId uv res_ty
 
 tcExpr e@(HsApp {})     res_ty = tcApp1 e res_ty
@@ -207,7 +207,7 @@ tcExpr e@(HsIPVar x) res_ty
        ; let ip_name = mkStrLitTy (hsIPNameFS x)
        ; ipClass <- tcLookupClass ipClassName
        ; ip_var <- emitWantedEvVar origin (mkClassPred ipClass [ip_name, ip_ty])
-       ; tcWrapResult e (fromDict ipClass ip_name ip_ty (HsVar (noLoc ip_var)))
+       ; tcWrapResult e (fromDict ipClass ip_name ip_ty (HsVar (noEmb ip_var)))
                       ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
@@ -225,7 +225,8 @@ tcExpr e@(HsOverLabel mb_fromLabel l) res_ty
                          ; let pred = mkClassPred isLabelClass [lbl, alpha]
                          ; loc <- getSrcSpanM
                          ; var <- emitWantedEvVar origin pred
-                         ; tcWrapResult e (fromDict pred (HsVar (L loc var)))
+                         ; tcWrapResult e (fromDict pred
+                                           (HsVar (L loc $ EName var)))
                                         alpha res_ty } }
   where
   -- Coerces a dictionary for `IsLabel "x" t` into `t`,
@@ -235,7 +236,7 @@ tcExpr e@(HsOverLabel mb_fromLabel l) res_ty
   lbl = mkStrLitTy l
 
   applyFromLabel loc fromLabel =
-    L loc (HsVar (L loc fromLabel)) `HsAppType`
+    L loc (HsVar (L loc $ EName fromLabel)) `HsAppType`
       mkEmptyWildCardBndrs (L loc (HsTyLit (HsStrTy NoSourceText l)))
 
 tcExpr (HsLam match) res_ty
@@ -346,20 +347,20 @@ See also Note [seqId magic] in MkId
 
 tcExpr expr@(OpApp arg1 op fix arg2) res_ty
   | (L loc (HsVar (L lv op_name))) <- op
-  , op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
+  , unEmb op_name `hasKey` seqIdKey           -- Note [Typing rule for seq]
   = do { arg1_ty <- newFlexiTyVarTy liftedTypeKind
        ; let arg2_exp_ty = res_ty
        ; arg1' <- tcArg op arg1 arg1_ty 1
        ; arg2' <- addErrCtxt (funAppCtxt op arg2 2) $
                   tc_poly_expr_nc arg2 arg2_exp_ty
        ; arg2_ty <- readExpType arg2_exp_ty
-       ; op_id <- tcLookupId op_name
+       ; op_id <- tcLookupId $ unEmb op_name
        ; let op' = L loc (HsWrap (mkWpTyApps [arg1_ty, arg2_ty])
-                                 (HsVar (L lv op_id)))
+                                 (HsVar (L lv $ reEmb op_name op_id)))
        ; return $ OpApp arg1' op' fix arg2' }
 
   | (L loc (HsVar (L lv op_name))) <- op
-  , op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
+  , unEmb op_name `hasKey` dollarIdKey        -- Note [Typing rule for ($)]
   = do { traceTc "Application rule" (ppr op)
        ; (arg1', arg1_ty) <- tcInferSigma arg1
 
@@ -390,12 +391,12 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        ; wrap_res <- tcSubTypeHR orig1 (Just expr) op_res_ty res_ty
                        -- op_res -> res
 
-       ; op_id  <- tcLookupId op_name
+       ; op_id  <- tcLookupId $ unEmb op_name
        ; res_ty <- readExpType res_ty
        ; let op' = L loc (HsWrap (mkWpTyApps [ getRuntimeRep "tcExpr ($)" res_ty
                                              , arg2_sigma
                                              , res_ty])
-                                 (HsVar (L lv op_id)))
+                                 (HsVar (L lv $ reEmb op_name op_id)))
              -- arg1' :: arg1_ty
              -- wrap_arg1 :: arg1_ty "->" (arg2_sigma -> op_res_ty)
              -- wrap_res :: op_res_ty "->" res_ty
@@ -819,7 +820,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
         -- After this we know that rbinds is unambiguous
         ; rbinds <- disambiguateRecordBinds record_expr record_rho rbnds res_ty
         ; let upd_flds = map (unLoc . hsRecFieldLbl . unLoc) rbinds
-              upd_fld_occs = map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc) upd_flds
+              upd_fld_occs = map (occNameFS . rdrNameOcc
+                                  . unEmb . rdrNameAmbiguousFieldOcc) upd_flds
               sel_ids      = map selectorAmbiguousFieldOcc upd_flds
         -- STEP 0
         -- Check that the field names are really field names
@@ -1143,14 +1145,14 @@ tcApp m_herald orig_fun orig_args res_ty
     go (L _ (HsAppType e t)) args = go e  (Right t:args)
 
     go (L loc (HsVar (L _ fun))) args
-      | fun `hasKey` tagToEnumKey
+      | unEmb fun `hasKey` tagToEnumKey
       , count isLeft args == 1
-      = do { (wrap, expr, args) <- tcTagToEnum loc fun args res_ty
+      = do { (wrap, expr, args) <- tcTagToEnum loc (unEmb fun) args res_ty
            ; return (wrap, expr, args) }
 
-      | fun `hasKey` seqIdKey
+      | unEmb fun `hasKey` seqIdKey
       , count isLeft args == 2
-      = do { (wrap, expr, args) <- tcSeq loc fun args res_ty
+      = do { (wrap, expr, args) <- tcSeq loc (unEmb fun) args res_ty
            ; return (wrap, expr, args) }
 
     go (L loc (HsRecFld (Ambiguous lbl _))) args@(Left (L _ arg) : _)
@@ -1191,7 +1193,7 @@ mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
 tcInferFun :: LHsExpr Name -> TcM (LHsExpr TcId, TcSigmaType)
 -- Infer type of a function
 tcInferFun (L loc (HsVar (L _ name)))
-  = do { (fun, ty) <- setSrcSpan loc (tcInferId name)
+  = do { (fun, ty) <- setSrcSpan loc (tcInferId $ unEmb name)
                -- Don't wrap a context around a plain Id
        ; return (L loc fun, ty) }
 
@@ -1309,7 +1311,7 @@ tcSyntaxOpGen :: CtOrigin
               -> TcM (a, SyntaxExpr TcId)
 tcSyntaxOpGen orig (SyntaxExpr { syn_expr = HsVar (L _ op) })
               arg_tys res_ty thing_inside
-  = do { (expr, sigma) <- tcInferId op
+  = do { (expr, sigma) <- tcInferId $ unEmb op
        ; (result, expr_wrap, arg_wraps, res_wrap)
            <- tcSynArgA orig sigma arg_tys res_ty $
               thing_inside
@@ -1580,14 +1582,15 @@ tcCheckId :: Name -> ExpRhoType -> TcM (HsExpr TcId)
 tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
-       ; addFunResCtxt False (HsVar (noLoc name)) actual_res_ty res_ty $
+       ; addFunResCtxt False (HsVar (noEmb name)) actual_res_ty res_ty $
          tcWrapResultO (OccurrenceOf name)  expr actual_res_ty res_ty }
 
 tcCheckRecSelId :: AmbiguousFieldOcc Name -> ExpRhoType -> TcM (HsExpr TcId)
 tcCheckRecSelId f@(Unambiguous (L _ lbl) _) res_ty
   = do { (expr, actual_res_ty) <- tcInferRecSelId f
        ; addFunResCtxt False (HsRecFld f) actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOfRecSel lbl) expr actual_res_ty res_ty }
+         tcWrapResultO (OccurrenceOfRecSel $ unEmb lbl) expr
+                       actual_res_ty res_ty }
 tcCheckRecSelId (Ambiguous lbl _) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
@@ -1597,7 +1600,7 @@ tcCheckRecSelId (Ambiguous lbl _) res_ty
 ------------------------
 tcInferRecSelId :: AmbiguousFieldOcc Name -> TcM (HsExpr TcId, TcRhoType)
 tcInferRecSelId (Unambiguous (L _ lbl) sel)
-  = do { (expr', ty) <- tc_infer_id lbl sel
+  = do { (expr', ty) <- tc_infer_id (unEmb lbl) sel
        ; return (expr', ty) }
 tcInferRecSelId (Ambiguous lbl _)
   = ambiguousSelector lbl
@@ -1629,7 +1632,7 @@ tc_infer_assert assert_name
   = do { assert_error_id <- tcLookupId assertErrorName
        ; (wrap, id_rho) <- topInstantiate (OccurrenceOf assert_name)
                                           (idType assert_error_id)
-       ; return (mkHsWrap wrap (HsVar (noLoc assert_error_id)), id_rho)
+       ; return (mkHsWrap wrap (HsVar (noEmb assert_error_id)), id_rho)
        }
 
 tc_infer_id :: RdrName -> Name -> TcM (HsExpr TcId, TcSigmaType)
@@ -1655,7 +1658,7 @@ tc_infer_id lbl id_name
              _ -> failWithTc $
                   ppr thing <+> text "used where a value identifier was expected" }
   where
-    return_id id = return (HsVar (noLoc id), idType id)
+    return_id id = return (HsVar (noEmb id), idType id)
 
     return_data_con con
        -- For data constructors, must perform the stupid-theta check
@@ -1703,7 +1706,7 @@ tcUnboundId unbound res_ty
                                               , ctev_loc  = loc}
                            , cc_hole = ExprHole unbound }
       ; emitInsoluble can
-      ; tcWrapResultO (UnboundOccurrenceOf occ) (HsVar (noLoc ev)) ty res_ty }
+      ; tcWrapResultO (UnboundOccurrenceOf occ) (HsVar (noEmb ev)) ty res_ty }
 
 
 {-
@@ -1785,7 +1788,7 @@ tcSeq loc fun_name args res_ty
         ; arg1' <- tcMonoExpr arg1 (mkCheckExpType arg1_ty)
         ; arg2' <- tcMonoExpr arg2 arg2_exp_ty
         ; res_ty <- readExpType res_ty  -- by now, it's surely filled in
-        ; let fun'    = L loc (HsWrap ty_args (HsVar (L loc fun)))
+        ; let fun'    = L loc (HsWrap ty_args (HsVar (L loc $ EName fun)))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
         ; return (idHsWrapper, fun', [Left arg1', Left arg2']) }
 
@@ -1827,7 +1830,7 @@ tcTagToEnum loc fun_name args res_ty
                  (mk_error ty' doc2)
 
        ; arg' <- tcMonoExpr arg (mkCheckExpType intPrimTy)
-       ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar (L loc fun)))
+       ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar (L loc $ EName fun)))
              rep_ty = mkTyConApp rep_tc rep_args
 
        ; return (mkWpCastR (mkTcSymCo coi), fun', [Left arg']) }
@@ -1905,7 +1908,7 @@ checkCrossStageLifting id (Brack _ (TcPending ps_var lie_var))
         ; lift <- if isStringTy id_ty then
                      do { sid <- tcLookupId THNames.liftStringName
                                      -- See Note [Lifting strings]
-                        ; return (HsVar (noLoc sid)) }
+                        ; return (HsVar (noEmb sid)) }
                   else
                      setConstraintVar lie_var   $
                           -- Put the 'lift' constraint into the right LIE
@@ -2069,26 +2072,26 @@ See also Note [HsRecField and HsRecUpdField] in HsPat.
 -- Given a RdrName that refers to multiple record fields, and the type
 -- of its argument, try to determine the name of the selector that is
 -- meant.
-disambiguateSelector :: Located RdrName -> Type -> TcM Name
+disambiguateSelector :: LEmbellished RdrName -> Type -> TcM Name
 disambiguateSelector lr@(L _ rdr) parent_type
  = do { fam_inst_envs <- tcGetFamInstEnvs
       ; case tyConOf fam_inst_envs parent_type of
           Nothing -> ambiguousSelector lr
           Just p  ->
-            do { xs <- lookupParents rdr
+            do { xs <- lookupParents $ unEmb rdr
                ; let parent = RecSelData p
                ; case lookup parent xs of
                    Just gre -> do { addUsedGRE True gre
                                   ; return (gre_name gre) }
-                   Nothing  -> failWithTc (fieldNotInType parent rdr) } }
+                   Nothing  -> failWithTc (fieldNotInType parent $ unEmb rdr) }}
 
 -- This field name really is ambiguous, so add a suitable "ambiguous
 -- occurrence" error, then give up.
-ambiguousSelector :: Located RdrName -> TcM a
+ambiguousSelector :: LEmbellished RdrName -> TcM a
 ambiguousSelector (L _ rdr)
   = do { env <- getGlobalRdrEnv
-       ; let gres = lookupGRE_RdrName rdr env
-       ; setErrCtxt [] $ addNameClashErrRn rdr gres
+       ; let gres = lookupGRE_RdrName (unEmb rdr) env
+       ; setErrCtxt [] $ addNameClashErrRn (unEmb rdr) gres
        ; failM }
 
 -- Disambiguate the fields in a record update.
@@ -2123,7 +2126,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                                 , [(RecSelParent, GlobalRdrElt)])]
     getUpdFieldsParents
       = fmap (zip rbnds) $ mapM
-          (lookupParents . unLoc . hsRecUpdFieldRdr . unLoc)
+          (lookupParents . unLocEmb . hsRecUpdFieldRdr . unLoc)
           rbnds
 
     -- Given a the lists of possible parents for each field,
@@ -2172,7 +2175,7 @@ disambiguateRecordBinds record_expr record_rho rbnds res_ty
                       -- The field doesn't belong to this parent, so report
                       -- an error but keep going through all the fields
           Nothing  -> do { addErrTc (fieldNotInType p
-                                      (unLoc (hsRecUpdFieldRdr (unLoc upd))))
+                                      (unLocEmb (hsRecUpdFieldRdr (unLoc upd))))
                          ; lookupSelector (upd, gre_name (snd (head xs))) }
 
     -- Given a (field update, selector name) pair, look up the
@@ -2311,7 +2314,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
       = do { addErrTc (badFieldCon con_like field_lbl)
            ; return Nothing }
   where
-        field_lbl = occNameFS $ rdrNameOcc (unLoc lbl)
+        field_lbl = occNameFS $ rdrNameOcc (unLocEmb lbl)
 
 
 checkMissingFields ::  ConLike -> HsRecordBinds Name -> TcM ()
@@ -2469,7 +2472,8 @@ badFieldsUpd rbinds data_cons
     membership :: [(FieldLabelString, [Bool])]
     membership = sortMembership $
         map (\fld -> (fld, map (Set.member fld) fieldLabelSets)) $
-          map (occNameFS . rdrNameOcc . rdrNameAmbiguousFieldOcc . unLoc . hsRecFieldLbl . unLoc) rbinds
+          map (occNameFS . rdrNameOcc . unEmb . rdrNameAmbiguousFieldOcc
+               . unLoc . hsRecFieldLbl . unLoc) rbinds
 
     fieldLabelSets :: [Set.Set FieldLabelString]
     fieldLabelSets = map (Set.fromList . map flLabel . conLikeFieldLabels) data_cons

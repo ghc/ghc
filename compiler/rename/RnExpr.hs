@@ -78,14 +78,14 @@ rnLExpr = wrapLocFstM rnExpr
 
 rnExpr :: HsExpr RdrName -> RnM (HsExpr Name, FreeVars)
 
-finishHsVar :: Located Name -> RnM (HsExpr Name, FreeVars)
+finishHsVar :: LEmbellished Name -> RnM (HsExpr Name, FreeVars)
 -- Separated from rnExpr because it's also used
 -- when renaming infix expressions
 finishHsVar (L l name)
  = do { this_mod <- getModule
-      ; when (nameIsLocalOrFrom this_mod name) $
-        checkThLocalName name
-      ; return (HsVar (L l name), unitFV name) }
+      ; when (nameIsLocalOrFrom this_mod $ unEmb name) $
+        checkThLocalName $ unEmb name
+      ; return (HsVar (L l name), unitFV $ unEmb name) }
 
 rnUnboundVar :: RdrName -> RnM (HsExpr Name, FreeVars)
 rnUnboundVar v
@@ -101,20 +101,20 @@ rnUnboundVar v
 
         else -- Fail immediately (qualified name)
              do { n <- reportUnboundName v
-                ; return (HsVar (noLoc n), emptyFVs) } }
+                ; return (HsVar (noEmb n), emptyFVs) } }
 
 rnExpr (HsVar (L l v))
   = do { opt_DuplicateRecordFields <- xoptM LangExt.DuplicateRecordFields
-       ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields v
+       ; mb_name <- lookupOccRn_overloaded opt_DuplicateRecordFields $ unEmb v
        ; case mb_name of {
-           Nothing -> rnUnboundVar v ;
+           Nothing -> rnUnboundVar $ unEmb v ;
            Just (Left name)
               | name == nilDataConName -- Treat [] as an ExplicitList, so that
                                        -- OverloadedLists works correctly
               -> rnExpr (ExplicitList placeHolderType Nothing [])
 
               | otherwise
-              -> finishHsVar (L l name) ;
+              -> finishHsVar (L l (reEmb v name)) ;
             Just (Right [f@(FieldOcc (L _ fn) s)]) ->
                       return (HsRecFld (ambiguousFieldOcc (FieldOcc (L l fn) s))
                              , unitFV (selectorFieldOcc f)) ;
@@ -170,7 +170,7 @@ rnExpr (OpApp e1 op  _ e2)
         -- more, so I've removed the test.  Adding HsPars in TcGenDeriv
         -- should prevent bad things happening.
         ; fixity <- case op' of
-              L _ (HsVar (L _ n)) -> lookupFixityRn n
+              L _ (HsVar (L _ n)) -> lookupFixityRn $ unEmb n
               L _ (HsRecFld f)    -> lookupFieldFixityRn f
               _ -> return (Fixity NoSourceText minPrecedence InfixL)
                    -- c.f. lookupFixity for unbound
@@ -289,7 +289,7 @@ rnExpr (RecordCon { rcon_con_name = con_id
                            , rcon_con_expr = noPostTcExpr, rcon_con_like = PlaceHolder }
                 , fvs `plusFV` plusFVs fvss `addOneFV` con_name) }
   where
-    mk_hs_var l n = HsVar (L l n)
+    mk_hs_var l n = HsVar (L l $ EName n)
     rn_field (L l fld) = do { (arg', fvs) <- rnLExpr (hsRecFieldArg fld)
                             ; return (L l (fld { hsRecFieldArg = arg' }), fvs) }
 
@@ -481,7 +481,7 @@ rnCmd (HsCmdArrForm op _ (Just _) [arg1, arg2])
        ; (arg1',fv_arg1) <- rnCmdTop arg1
        ; (arg2',fv_arg2) <- rnCmdTop arg2
         -- Deal with fixity
-       ; fixity <- lookupFixityRn op_name
+       ; fixity <- lookupFixityRn $ unEmb op_name
        ; final_e <- mkOpFormRn arg1' op' fixity arg2'
        ; return (final_e, fv_arg1 `plusFV` fv_op `plusFV` fv_arg2) }
 
@@ -972,12 +972,12 @@ lookupStmtNamePoly ctxt name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if rebindable_on
          then do { fm <- lookupOccRn (nameRdrName name)
-                 ; return (HsVar (noLoc fm), unitFV fm) }
+                 ; return (HsVar (noEmb fm), unitFV fm) }
          else not_rebindable }
   | otherwise
   = not_rebindable
   where
-    not_rebindable = return (HsVar (noLoc name), emptyFVs)
+    not_rebindable = return (HsVar (noEmb name), emptyFVs)
 
 -- | Is this a context where we respect RebindableSyntax?
 -- but ListComp/PArrComp are never rebindable
@@ -1820,7 +1820,7 @@ isReturnApp monad_names (L _ e) = case e of
  where
   is_var f (L _ (HsPar e)) = is_var f e
   is_var f (L _ (HsAppType e _)) = is_var f e
-  is_var f (L _ (HsVar (L _ r))) = f r
+  is_var f (L _ (HsVar (L _ r))) = f $ unEmb r
        -- TODO: I don't know how to get this right for rebindable syntax
   is_var _ _ = False
 

@@ -259,7 +259,7 @@ boundValues mod group =
                _other -> error "boundValues"
       tys = [ n | ns <- map (fst . hsLTyClDeclBinders)
                             (hs_tyclds group >>= group_tyclds)
-                , n <- map found ns ]
+                , n <- map (found . unLEmb) ns ]
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
                                       ForeignImport n _ _ _ -> [found n]
@@ -283,7 +283,7 @@ boundThings modname lbinding =
     VarBind { var_id = id } -> [FoundThing modname (getOccString id) (startOfLocated lbinding)]
     AbsBinds { }    -> [] -- nothing interesting in a type abstraction
     AbsBindsSig { } -> []
-    PatSynBind PSB{ psb_id = id } -> [thing id]
+    PatSynBind PSB{ psb_id = id } -> [thing $ unLEmb id]
   where thing = foundOfLName modname
         patThings lpat tl =
           let loc = startOfLocated lpat
@@ -292,7 +292,7 @@ boundThings modname lbinding =
                WildPat _ -> tl
                VarPat (L _ name) -> lid name : tl
                LazyPat p -> patThings p tl
-               AsPat id p -> patThings p (thing id : tl)
+               AsPat id p -> patThings p (thing (unLEmb id) : tl)
                ParPat p -> patThings p tl
                BangPat p -> patThings p tl
                ListPat ps _ _ -> foldr patThings tl ps

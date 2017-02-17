@@ -30,13 +30,13 @@ traverse a =
   where
     showVar :: Maybe (HsExpr Id) -> Traverse ()
     showVar (Just (HsVar (L _ v))) =
-      modify $ \(loc, ids) -> (loc, (varName v, loc) : ids)
+      modify $ \(loc, ids) -> (loc, (varName $ unEmb v, loc) : ids)
     showVar _ =
       return ()
 
     showTyVar :: Maybe (HsType Name) -> Traverse ()
     showTyVar (Just (HsTyVar _ (L _ v))) =
-      modify $ \(loc, ids) -> (loc, (v, loc) : ids)
+      modify $ \(loc, ids) -> (loc, (unEmb v, loc) : ids)
     showTyVar _ =
       return ()
 

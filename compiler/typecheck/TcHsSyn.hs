@@ -92,7 +92,7 @@ hsPatType (VarPat (L _ var))          = idType var
 hsPatType (BangPat pat)               = hsLPatType pat
 hsPatType (LazyPat pat)               = hsLPatType pat
 hsPatType (LitPat lit)                = hsLitType lit
-hsPatType (AsPat var _)               = idType (unLoc var)
+hsPatType (AsPat var _)               = idType (unLocEmb var)
 hsPatType (ViewPat _ _ ty)            = ty
 hsPatType (ListPat _ ty Nothing)      = mkListTy ty
 hsPatType (ListPat _ _ (Just (ty,_))) = ty
@@ -522,12 +522,12 @@ zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
                                     , psb_args = details
                                     , psb_def = lpat
                                     , psb_dir = dir }))
-  = do { id' <- zonkIdBndr env id
+  = do { id' <- zonkIdBndr env $ unEmb id
        ; details' <- zonkPatSynDetails env details
        ; (env1, lpat') <- zonkPat env lpat
        ; (_env2, dir') <- zonkPatSynDir env1 dir
        ; return $ PatSynBind $
-                  bind { psb_id = L loc id'
+                  bind { psb_id = L loc (reEmb id id')
                        , psb_args = details'
                        , psb_def = lpat'
                        , psb_dir = dir' } }
@@ -615,8 +615,8 @@ zonkLExprs env exprs = mapM (zonkLExpr env) exprs
 zonkLExpr  env expr  = wrapLocM (zonkExpr env) expr
 
 zonkExpr env (HsVar (L l id))
-  = ASSERT2( isNothing (isDataConId_maybe id), ppr id )
-    return (HsVar (L l (zonkIdOcc env id)))
+  = ASSERT2( isNothing (isDataConId_maybe $ unEmb id), ppr id )
+    return (HsVar (L l (reEmb id (zonkIdOcc env $ unEmb id))))
 
 zonkExpr _ e@(HsConLikeOut {}) = return e
 
@@ -1204,9 +1204,9 @@ zonk_pat env (BangPat pat)
         ; return (env',  BangPat pat') }
 
 zonk_pat env (AsPat (L loc v) pat)
-  = do  { v' <- zonkIdBndr env v
+  = do  { v' <- zonkIdBndr env (unEmb v)
         ; (env', pat') <- zonkPat (extendIdZonkEnv1 env v') pat
-        ; return (env', AsPat (L loc v') pat') }
+        ; return (env', AsPat (L loc (reEmb v v')) pat') }
 
 zonk_pat env (ViewPat expr pat ty)
   = do  { expr' <- zonkLExpr env expr
@@ -1389,13 +1389,13 @@ zonkVects env = mapM (wrapLocM (zonkVect env))
 
 zonkVect :: ZonkEnv -> VectDecl TcId -> TcM (VectDecl Id)
 zonkVect env (HsVect s v e)
-  = do { v' <- wrapLocM (zonkIdBndr env) v
+  = do { v' <- wrapLocM (zonkIdBndr env) (unLEmb v)
        ; e' <- zonkLExpr env e
-       ; return $ HsVect s v' e'
+       ; return $ HsVect s (reLEmb v (unLoc v')) e'
        }
 zonkVect env (HsNoVect s v)
-  = do { v' <- wrapLocM (zonkIdBndr env) v
-       ; return $ HsNoVect s v'
+  = do { v' <- wrapLocM (zonkIdBndr env) (unLEmb v)
+       ; return $ HsNoVect s (reLEmb v (unLoc v'))
        }
 zonkVect _env (HsVectTypeOut s t rt)
   = return $ HsVectTypeOut s t rt

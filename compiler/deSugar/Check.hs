@@ -568,7 +568,7 @@ translatePat fam_insts pat = case pat of
      -- Note [Translating As Patterns]
     ps <- translatePat fam_insts (unLoc p)
     let [e] = map vaToPmExpr (coercePatVec ps)
-        g   = PmGrd [PmVar (unLoc lid)] e
+        g   = PmGrd [PmVar (unLocEmb lid)] e
     return (ps ++ [g])
 
   SigPatOut p _ty -> translatePat fam_insts (unLoc p)
@@ -1042,7 +1042,7 @@ mkPmId ty = getUniqueM >>= \unique ->
 mkPmId2Forms :: Type -> DsM (Pattern, LHsExpr Id)
 mkPmId2Forms ty = do
   x <- mkPmId ty
-  return (PmVar x, noLoc (HsVar (noLoc x)))
+  return (PmVar x, noLoc (HsVar (noEmb x)))
 
 -- ----------------------------------------------------------------------------
 -- * Converting between Value Abstractions, Patterns and PmExpr

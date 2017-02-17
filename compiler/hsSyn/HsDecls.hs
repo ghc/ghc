@@ -100,6 +100,7 @@ import Coercion
 import ForeignCall
 import PlaceHolder ( PostTc,PostRn,PlaceHolder(..),DataId, OutputableBndrId )
 import NameSet
+import HsEmbellished
 
 -- others:
 import InstEnv
@@ -1131,7 +1132,7 @@ type LConDecl name = Located (ConDecl name)
 -- | data Constructor Declaration
 data ConDecl name
   = ConDeclGADT
-      { con_names   :: [Located name]
+      { con_names   :: [LEmbellished name]
       , con_type    :: LHsSigType name
         -- ^ The type after the ‘::’
       , con_doc     :: Maybe LHsDocString
@@ -1139,7 +1140,7 @@ data ConDecl name
       }
 
   | ConDeclH98
-      { con_name    :: Located name
+      { con_name    :: LEmbellished name
 
       , con_qvars     :: Maybe (LHsQTyVars name)
         -- User-written forall (if any), and its implicit
@@ -1163,7 +1164,7 @@ deriving instance (DataId name) => Data (ConDecl name)
 type HsConDeclDetails name
    = HsConDetails (LBangType name) (Located [LConDeclField name])
 
-getConNames :: ConDecl name -> [Located name]
+getConNames :: ConDecl name -> [LEmbellished name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
 getConNames ConDeclGADT {con_names = names} = names
 
@@ -1865,7 +1866,7 @@ type LVectDecl name = Located (VectDecl name)
 data VectDecl name
   = HsVect
       SourceText   -- Note [Pragma source text] in BasicTypes
-      (Located name)
+      (LEmbellished name)
       (LHsExpr name)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --           'ApiAnnotation.AnnEqual','ApiAnnotation.AnnClose'
@@ -1873,7 +1874,7 @@ data VectDecl name
         -- For details on above see note [Api annotations] in ApiAnnotation
   | HsNoVect
       SourceText   -- Note [Pragma source text] in BasicTypes
-      (Located name)
+      (LEmbellished name)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --                                    'ApiAnnotation.AnnClose'
 
@@ -1881,8 +1882,8 @@ data VectDecl name
   | HsVectTypeIn                -- pre type-checking
       SourceText                -- Note [Pragma source text] in BasicTypes
       Bool                      -- 'TRUE' => SCALAR declaration
-      (Located name)
-      (Maybe (Located name))    -- 'Nothing' => no right-hand side
+      (LEmbellished name)
+      (Maybe (LEmbellished name))    -- 'Nothing' => no right-hand side
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --           'ApiAnnotation.AnnType','ApiAnnotation.AnnClose',
         --           'ApiAnnotation.AnnEqual'
@@ -1894,7 +1895,7 @@ data VectDecl name
       (Maybe TyCon)             -- 'Nothing' => no right-hand side
   | HsVectClassIn               -- pre type-checking
       SourceText                -- Note [Pragma source text] in BasicTypes
-      (Located name)
+      (LEmbellished name)
         -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
         --           'ApiAnnotation.AnnClass','ApiAnnotation.AnnClose',
 
@@ -1908,11 +1909,11 @@ data VectDecl name
 deriving instance (DataId name) => Data (VectDecl name)
 
 lvectDeclName :: NamedThing name => LVectDecl name -> Name
-lvectDeclName (L _ (HsVect _       (L _ name) _))    = getName name
-lvectDeclName (L _ (HsNoVect _     (L _ name)))      = getName name
-lvectDeclName (L _ (HsVectTypeIn _  _ (L _ name) _)) = getName name
+lvectDeclName (L _ (HsVect _       (L _ name) _))    = getName $ unEmb name
+lvectDeclName (L _ (HsNoVect _     (L _ name)))      = getName $ unEmb name
+lvectDeclName (L _ (HsVectTypeIn _  _ (L _ name) _)) = getName $ unEmb name
 lvectDeclName (L _ (HsVectTypeOut  _ tycon _))       = getName tycon
-lvectDeclName (L _ (HsVectClassIn _ (L _ name)))     = getName name
+lvectDeclName (L _ (HsVectClassIn _ (L _ name)))     = getName $ unEmb name
 lvectDeclName (L _ (HsVectClassOut cls))             = getName cls
 lvectDeclName (L _ (HsVectInstIn _))
   = panic "HsDecls.lvectDeclName: HsVectInstIn"
@@ -2009,7 +2010,7 @@ data WarnDecls name = Warnings { wd_src :: SourceText
 type LWarnDecl name = Located (WarnDecl name)
 
 -- | Warning pragma Declaration
-data WarnDecl name = Warning [Located name] WarningTxt
+data WarnDecl name = Warning [LEmbellished name] WarningTxt
   deriving Data
 
 instance OutputableBndr name => Outputable (WarnDecls name) where
@@ -2050,7 +2051,7 @@ instance (OutputableBndrId name) => Outputable (AnnDecl name) where
       = hsep [text "{-#", pprAnnProvenance provenance, pprExpr (unLoc expr), text "#-}"]
 
 -- | Annotation Provenance
-data AnnProvenance name = ValueAnnProvenance (Located name)
+data AnnProvenance name = ValueAnnProvenance (LEmbellished name)
                         | TypeAnnProvenance (Located name)
                         | ModuleAnnProvenance
   deriving (Data, Functor)
@@ -2058,7 +2059,7 @@ deriving instance Foldable    AnnProvenance
 deriving instance Traversable AnnProvenance
 
 annProvenanceName_maybe :: AnnProvenance name -> Maybe name
-annProvenanceName_maybe (ValueAnnProvenance (L _ name)) = Just name
+annProvenanceName_maybe (ValueAnnProvenance (L _ name)) = Just $ unEmb name
 annProvenanceName_maybe (TypeAnnProvenance (L _ name))  = Just name
 annProvenanceName_maybe ModuleAnnProvenance       = Nothing
 
@@ -2084,7 +2085,7 @@ type LRoleAnnotDecl name = Located (RoleAnnotDecl name)
 -- top-level declarations
 -- | Role Annotation Declaration
 data RoleAnnotDecl name
-  = RoleAnnotDecl (Located name)         -- type constructor
+  = RoleAnnotDecl (LEmbellished name)         -- type constructor
                   [Located (Maybe Role)] -- optional annotations
       -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnType',
       --           'ApiAnnotation.AnnRole'
@@ -2101,4 +2102,4 @@ instance OutputableBndr name => Outputable (RoleAnnotDecl name) where
       pp_role (Just r) = ppr r
 
 roleAnnotDeclName :: RoleAnnotDecl name -> name
-roleAnnotDeclName (RoleAnnotDecl (L _ name) _) = name
+roleAnnotDeclName (RoleAnnotDecl (L _ name) _) = unEmb name

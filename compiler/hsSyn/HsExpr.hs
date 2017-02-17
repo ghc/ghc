@@ -41,6 +41,7 @@ import Util
 import Outputable
 import FastString
 import Type
+import HsEmbellished
 
 -- libraries:
 import Data.Data hiding (Fixity(..))
@@ -125,7 +126,7 @@ noSyntaxExpr = SyntaxExpr { syn_expr      = HsLit (HsString NoSourceText
 -- | Make a 'SyntaxExpr Name' (the "rn" is because this is used in the
 -- renamer), missing its HsWrappers.
 mkRnSyntaxExpr :: Name -> SyntaxExpr Name
-mkRnSyntaxExpr name = SyntaxExpr { syn_expr      = HsVar $ noLoc name
+mkRnSyntaxExpr name = SyntaxExpr { syn_expr      = HsVar $ noLoc $ EName name
                                  , syn_arg_wraps = []
                                  , syn_res_wrap  = WpHole }
   -- don't care about filling in syn_arg_wraps because we're clearly
@@ -274,7 +275,7 @@ information to use is the GlobalRdrEnv itself.
 
 -- | A Haskell expression.
 data HsExpr id
-  = HsVar     (Located id)   -- ^ Variable
+  = HsVar     (LEmbellished id)   -- ^ Variable
 
                              -- See Note [Located RdrNames]
 
@@ -667,12 +668,13 @@ data HsExpr id
   -- These constructors only appear temporarily in the parser.
   -- The renamer translates them into the Right Thing.
 
+  -- AZ: TODO: Needs to be embellished too, for backquotes
   | EWildPat                 -- wildcard
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | EAsPat      (Located id) -- as pattern
+  | EAsPat      (LEmbellished id) -- as pattern
                 (LHsExpr id)
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
@@ -2242,7 +2244,7 @@ data HsBracket id = ExpBr (LHsExpr id)   -- [|  expr  |]
                   | DecBrL [LHsDecl id]  -- [d| decls |]; result of parser
                   | DecBrG (HsGroup id)  -- [d| decls |]; result of renamer
                   | TypBr (LHsType id)   -- [t| type  |]
-                  | VarBr Bool id        -- True: 'x, False: ''T
+                  | VarBr Bool (LEmbellished id) -- True: 'x, False: ''T
                                          -- (The Bool flag is used only in pprHsBracket)
                   | TExpBr (LHsExpr id)  -- [||  expr  ||]
 deriving instance (DataId id) => Data (HsBracket id)
@@ -2261,9 +2263,9 @@ pprHsBracket (PatBr p)   = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBrG gp) = thBrackets (char 'd') (ppr gp)
 pprHsBracket (DecBrL ds) = thBrackets (char 'd') (vcat (map ppr ds))
 pprHsBracket (TypBr t)   = thBrackets (char 't') (ppr t)
-pprHsBracket (VarBr True n)
+pprHsBracket (VarBr True (L _ n))
   = char '\'' <> pprPrefixOcc n
-pprHsBracket (VarBr False n)
+pprHsBracket (VarBr False (L _ n))
   = text "''" <> pprPrefixOcc n
 pprHsBracket (TExpBr e)  = thTyBrackets (ppr e)
 

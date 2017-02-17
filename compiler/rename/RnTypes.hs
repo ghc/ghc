@@ -465,8 +465,8 @@ rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
                 , fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env (HsTyVar ip (L loc rdr_name))
-  = do { name <- rnTyVar env rdr_name
-       ; return (HsTyVar ip (L loc name), unitFV name) }
+  = do { name <- rnTyVar env $ unEmb rdr_name
+       ; return (HsTyVar ip (L loc (reEmb rdr_name name)), unitFV name) }
 
 rnHsTyKi env ty@(HsOpTy ty1 l_op ty2)
   = setSrcSpan (getLoc l_op) $
@@ -563,7 +563,7 @@ rnHsTyKi env overall_ty@(HsAppsTy tys)
          let (non_syms, syms) = splitHsAppsTy tys
 
              -- Step 2: rename the pieces
-       ; (syms1, fvs1)      <- mapFvRn (rnHsTyOp env overall_ty) syms
+       ; (syms1, fvs1)      <- mapFvRn (rnHsTyOp env overall_ty . unLEmb) syms
        ; (non_syms1, fvs2)  <- (mapFvRn . mapFvRn) (rnLHsTyKi env) non_syms
 
              -- Step 3: deal with *. See Note [Dealing with *]
@@ -586,7 +586,8 @@ rnHsTyKi env overall_ty@(HsAppsTy tys)
                    (non_syms1 : non_syms2 : non_syms) (L loc star : ops)
       | star `hasKey` starKindTyConKey || star `hasKey` unicodeStarKindTyConKey
       = deal_with_star acc1 acc2
-                       ((non_syms1 ++ L loc (HsTyVar NotPromoted (L loc star))
+                       ((non_syms1
+                            ++ L loc (HsTyVar NotPromoted (L loc $ EName star))
                             : non_syms2) : non_syms)
                        ops
     deal_with_star acc1 acc2 (non_syms1 : non_syms) (op1 : ops)
@@ -1104,7 +1105,7 @@ rnField fl_env env (L l (ConDeclField names ty haddock_doc))
     lookupField :: FieldOcc RdrName -> FieldOcc Name
     lookupField (FieldOcc (L lr rdr) _) = FieldOcc (L lr rdr) (flSelector fl)
       where
-        lbl = occNameFS $ rdrNameOcc rdr
+        lbl = occNameFS $ rdrNameOcc $ unEmb rdr
         fl  = expectJust "rnField" $ lookupFsEnv fl_env lbl
 
 {-
@@ -1239,7 +1240,7 @@ instance Outputable OpName where
 get_op :: LHsExpr Name -> OpName
 -- An unbound name could be either HsVar or HsUnboundVar
 -- See RnExpr.rnUnboundVar
-get_op (L _ (HsVar (L _ n)))   = NormalOp n
+get_op (L _ (HsVar (L _ n)))   = NormalOp $ unEmb n
 get_op (L _ (HsUnboundVar uv)) = UnboundOp uv
 get_op (L _ (HsRecFld fld))    = RecFldOp fld
 get_op other                   = pprPanic "get_op" (ppr other)
@@ -1643,7 +1644,7 @@ extract_lkind = extract_lty KindLevel
 extract_lty :: TypeOrKind -> LHsType RdrName -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_lty t_or_k (L _ ty) acc
   = case ty of
-      HsTyVar _  ltv            -> extract_tv t_or_k ltv acc
+      HsTyVar _  ltv            -> extract_tv t_or_k (unLEmb ltv) acc
       HsBangTy _ ty             -> extract_lty t_or_k ty acc
       HsRecTy flds              -> foldrM (extract_lty t_or_k
                                            . cd_fld_type . unLoc) acc
@@ -1687,7 +1688,7 @@ extract_apps t_or_k tys acc = foldrM (extract_app t_or_k) acc tys
 
 extract_app :: TypeOrKind -> LHsAppType RdrName -> FreeKiTyVars
             -> RnM FreeKiTyVars
-extract_app t_or_k (L _ (HsAppInfix tv))  acc = extract_tv t_or_k tv acc
+extract_app t_or_k (L _ (HsAppInfix tv)) acc = extract_tv t_or_k (unLEmb tv) acc
 extract_app t_or_k (L _ (HsAppPrefix ty)) acc = extract_lty t_or_k ty acc
 
 extract_hs_tv_bndrs :: [LHsTyVarBndr RdrName] -> FreeKiTyVars

@@ -94,7 +94,7 @@ newMethodFromName origin name inst_ty
        ; wrap <- ASSERT( not (isForAllTy ty) && isSingleton theta )
                  instCall origin [inst_ty] theta
 
-       ; return (mkHsWrap wrap (HsVar (noLoc id))) }
+       ; return (mkHsWrap wrap (HsVar (noEmb id))) }
 
 {-
 ************************************************************************
@@ -530,7 +530,7 @@ newNonTrivialOverloadedLit orig
                , ol_rebindable = rebindable }) res_ty
   = do  { hs_lit <- mkOverLit val
         ; let lit_ty = hsLitType hs_lit
-        ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
+        ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr $ unEmb meth_name)
                                       [synKnownType lit_ty] res_ty $
                       \_ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
@@ -593,7 +593,7 @@ tcSyntaxName :: CtOrigin
 -- See Note [CmdSyntaxTable] in HsExpr
 
 tcSyntaxName orig ty (std_nm, HsVar (L _ user_nm))
-  | std_nm == user_nm
+  | std_nm == unEmb user_nm
   = do rhs <- newMethodFromName orig std_nm ty
        return (std_nm, rhs)
 

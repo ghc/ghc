@@ -9,7 +9,9 @@
 module RnEnv (
         newTopSrcBinder,
         lookupLocatedTopBndrRn, lookupTopBndrRn,
+        lookupLEmbellishedTopBndrRn,
         lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
+        lookupLEmbellishedOccRn,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
         lookupLocalOccThLvl_maybe,
         lookupTypeOccRn, lookupKindOccRn,
@@ -19,6 +21,7 @@ module RnEnv (
         addNameClashErrRn,
 
         HsSigCtxt(..), lookupLocalTcNames, lookupSigOccRn,
+        lookupLESigOccRn,
         lookupSigCtxtOccRn,
 
         lookupFixityRn, lookupFixityRn_help,
@@ -248,6 +251,13 @@ lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
                          Just n' -> return n'
                          Nothing -> do traceRn "lookupTopBndrRn fail" (ppr n)
                                        unboundName WL_LocalTop n
+
+lookupLEmbellishedTopBndrRn :: LEmbellished RdrName -> RnM (LEmbellished Name)
+lookupLEmbellishedTopBndrRn = wrapLocM lookup
+  where
+    lookup en = do
+      n <- lookupTopBndrRn (unEmb en)
+      return (reEmb en n)
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
@@ -668,6 +678,13 @@ getLookupOccRn
 mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
+lookupLEmbellishedOccRn :: LEmbellished RdrName -> RnM (LEmbellished Name)
+lookupLEmbellishedOccRn = wrapLocM lookup
+  where
+    lookup emb = do
+      n <- lookupOccRn (unEmb emb)
+      return (reEmb emb n)
+
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
 
@@ -921,7 +938,7 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                                ; let
                                    fld_occ :: FieldOcc Name
                                    fld_occ
-                                     = FieldOcc (noLoc rdr_name) (gre_name gre)
+                                     = FieldOcc (noEmb rdr_name) (gre_name gre)
                                ; return (Just (Right [fld_occ])) }
                       | otherwise
                          -> do { addUsedGRE True gre
@@ -931,7 +948,7 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
                             -- until we know which is meant
                          -> return
                              (Just (Right
-                                     (map (FieldOcc (noLoc rdr_name) . gre_name)
+                                     (map (FieldOcc (noEmb rdr_name) . gre_name)
                                            gres)))
                 gres     -> do { addNameClashErrRn rdr_name gres
                                ; return (Just (Left (gre_name (head gres)))) } }
@@ -1224,6 +1241,13 @@ instance Outputable HsSigCtxt where
     ppr (HsBootCtxt ns) = text "HsBootCtxt" <+> ppr ns
     ppr (RoleAnnotCtxt ns) = text "RoleAnnotCtxt" <+> ppr ns
 
+lookupLESigOccRn :: HsSigCtxt
+                 -> Sig RdrName
+                 -> LEmbellished RdrName -> RnM (LEmbellished Name)
+lookupLESigOccRn ctxt sig le = do
+  L _ n <- lookupSigOccRn ctxt sig (unLEmb le)
+  return (reLEmb le n )
+
 lookupSigOccRn :: HsSigCtxt
                -> Sig RdrName
                -> Located RdrName -> RnM (Located Name)
@@ -1496,8 +1520,8 @@ lookupTyFixityRn (L _ n) = lookupFixityRn n
 -- multiple possible selectors with different fixities, generate an error.
 lookupFieldFixityRn :: AmbiguousFieldOcc Name -> RnM Fixity
 lookupFieldFixityRn (Unambiguous (L _ rdr) n)
-  = lookupFixityRn' n (rdrNameOcc rdr)
-lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr
+  = lookupFixityRn' n (rdrNameOcc $ unEmb rdr)
+lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity $ unEmb rdr
   where
     get_ambiguous_fixity :: RdrName -> RnM Fixity
     get_ambiguous_fixity rdr_name = do
@@ -1636,10 +1660,10 @@ lookupSyntaxNames :: [Name]                          -- Standard names
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
-             return (map (HsVar . noLoc) std_names, emptyFVs)
+             return (map (HsVar . noEmb) std_names, emptyFVs)
         else
           do { usr_names <- mapM (lookupOccRn . mkRdrUnqual . nameOccName) std_names
-             ; return (map (HsVar . noLoc) usr_names, mkFVs usr_names) } }
+             ; return (map (HsVar . noEmb) usr_names, mkFVs usr_names) } }
 
 {-
 *********************************************************

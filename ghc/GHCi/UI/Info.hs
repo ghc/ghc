@@ -321,7 +321,7 @@ processAllTypeCheckedModule tcm = do
         return $ fmap (\expr -> (mid, getLoc e, CoreUtils.exprType expr)) mbe
       where
         mid :: Maybe Id
-        mid | HsVar (L _ i) <- unwrapVar (unLoc e) = Just i
+        mid | HsVar (L _ i) <- unwrapVar (unLoc e) = Just $ unEmb i
             | otherwise                            = Nothing
 
         unwrapVar (HsWrap _ var) = var

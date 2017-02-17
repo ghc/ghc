@@ -773,7 +773,7 @@ gen_Ix_binds loc tycon = do
 
     enum_index dflags
       = mk_easy_FunBind loc unsafeIndex_RDR
-                [noLoc (AsPat (noLoc c_RDR)
+                [noLoc (AsPat (noEmb c_RDR)
                            (nlTuplePat [a_Pat, nlWildPat] Boxed)),
                                 d_Pat] (
            untag_Expr dflags tycon [(a_RDR, ah_RDR)] (
@@ -1314,7 +1314,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataTyCon :: DerivStuff
     genDataTyCon        --  $dT
       = DerivHsBind (mkHsVarBind loc data_type_name rhs,
-                     L loc (TypeSig [L loc data_type_name] sig_ty))
+                     L loc (TypeSig [L loc (EName data_type_name)] sig_ty))
 
     sig_ty = mkLHsSigWcType (nlHsTyVar dataType_RDR)
     rhs    = nlHsVar mkDataType_RDR
@@ -1324,7 +1324,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
     genDataDataCon :: DataCon -> RdrName -> DerivStuff
     genDataDataCon dc constr_name       --  $cT1 etc
       = DerivHsBind (mkHsVarBind loc constr_name rhs,
-                     L loc (TypeSig [L loc constr_name] sig_ty))
+                     L loc (TypeSig [L loc (EName constr_name)] sig_ty))
       where
         sig_ty   = mkLHsSigWcType (nlHsTyVar constr_RDR)
         rhs      = nlHsApps mkConstr_RDR constr_args
@@ -1753,7 +1753,7 @@ genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind RdrName, LSig RdrName)
 genAuxBindSpec dflags loc (DerivCon2Tag tycon)
   = (mk_FunBind loc rdr_name eqns,
-     L loc (TypeSig [L loc rdr_name] sig_ty))
+     L loc (TypeSig [L loc (EName rdr_name)] sig_ty))
   where
     rdr_name = con2tag_RDR dflags tycon
 
@@ -1779,7 +1779,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
   = (mk_FunBind loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
-     L loc (TypeSig [L loc rdr_name] sig_ty))
+     L loc (TypeSig [L loc (EName rdr_name)] sig_ty))
   where
     sig_ty = mkLHsSigWcType $ L loc $
              HsCoreTy $ mkSpecForAllTys (tyConTyVars tycon) $
@@ -1789,7 +1789,7 @@ genAuxBindSpec dflags loc (DerivTag2Con tycon)
 
 genAuxBindSpec dflags loc (DerivMaxTag tycon)
   = (mkHsVarBind loc rdr_name rhs,
-     L loc (TypeSig [L loc rdr_name] sig_ty))
+     L loc (TypeSig [L loc (EName rdr_name)] sig_ty))
   where
     rdr_name = maxtag_RDR dflags tycon
     sig_ty = mkLHsSigWcType (L loc (HsCoreTy intTy))

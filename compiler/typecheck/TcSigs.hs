@@ -206,7 +206,8 @@ tcTySig (L loc (PatSynSig names sig_ty))
 tcTySig _ = return []
 
 
-tcUserTypeSig :: SrcSpan -> LHsSigWcType Name -> Maybe Name -> TcM TcIdSigInfo
+tcUserTypeSig :: SrcSpan -> LHsSigWcType Name -> Maybe (Embellished Name)
+              -> TcM TcIdSigInfo
 -- A function or expression type signature
 -- Returns a fully quantified type signature; even the wildcards
 -- are quantified with ordinary skolems that should be instantiated
@@ -222,24 +223,24 @@ tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId (unEmb name) sigma_ty
                      , sig_ctxt  = ctxt_T
                      , sig_loc   = loc } }
                        -- Location of the <type> in   f :: <type>
 
   -- Partial sig with wildcards
   | otherwise
-  = return (PartialSig { psig_name = name, psig_hs_ty = hs_sig_ty
+  = return (PartialSig { psig_name = unEmb name, psig_hs_ty = hs_sig_ty
                        , sig_ctxt = ctxt_F, sig_loc = loc })
   where
     name   = case mb_name of
                Just n  -> n
-               Nothing -> mkUnboundName (mkVarOcc "<expression>")
+               Nothing -> EName $ mkUnboundName (mkVarOcc "<expression>")
     ctxt_F = case mb_name of
-               Just n  -> FunSigCtxt n False
+               Just n  -> FunSigCtxt (unEmb n) False
                Nothing -> ExprSigCtxt
     ctxt_T = case mb_name of
-               Just n  -> FunSigCtxt n True
+               Just n  -> FunSigCtxt (unEmb n) True
                Nothing -> ExprSigCtxt
 
 
@@ -342,7 +343,7 @@ for example, in hs-boot file, we may need to think what to do...
 (eg don't have any implicitly-bound variables).
 -}
 
-tcPatSynSig :: Name -> LHsSigType Name -> TcM TcPatSynInfo
+tcPatSynSig :: Embellished Name -> LHsSigType Name -> TcM TcPatSynInfo
 tcPatSynSig name sig_ty
   | HsIB { hsib_vars = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
@@ -399,7 +400,7 @@ tcPatSynSig name sig_ty
               , text "ex_tvs" <+> ppr_tvs ex_tvs
               , text "prov" <+> ppr prov
               , text "body_ty" <+> ppr body_ty ]
-       ; return (TPSI { patsig_name = name
+       ; return (TPSI { patsig_name = unEmb name
                       , patsig_implicit_bndrs = mkTyVarBinders Inferred kvs ++
                                                 mkTyVarBinders Specified implicit_tvs
                       , patsig_univ_bndrs     = univ_tvs
@@ -408,7 +409,7 @@ tcPatSynSig name sig_ty
                       , patsig_prov           = prov
                       , patsig_body_ty        = body_ty }) }
   where
-    ctxt = PatSynCtxt name
+    ctxt = PatSynCtxt $ unEmb name
 
     build_patsyn_type kvs imp univ req ex prov body
       = mkInvForAllTys kvs $
@@ -503,15 +504,18 @@ mkPragEnv sigs binds
     prs = mapMaybe get_sig sigs
 
     get_sig :: LSig Name -> Maybe (Name, LSig Name)
-    get_sig (L l (SpecSig lnm@(L _ nm) ty inl)) = Just (nm, L l $ SpecSig   lnm ty (add_arity nm inl))
-    get_sig (L l (InlineSig lnm@(L _ nm) inl))  = Just (nm, L l $ InlineSig lnm    (add_arity nm inl))
-    get_sig (L l (SCCFunSig st lnm@(L _ nm) str))  = Just (nm, L l $ SCCFunSig st lnm str)
+    get_sig (L l (SpecSig lnm@(L _ nm) ty inl))
+                  = Just (unEmb nm, L l $ SpecSig   lnm ty (add_arity nm inl))
+    get_sig (L l (InlineSig lnm@(L _ nm) inl))
+                  = Just (unEmb nm, L l $ InlineSig lnm    (add_arity nm inl))
+    get_sig (L l (SCCFunSig st lnm@(L _ nm) str))
+                  = Just (unEmb nm, L l $ SCCFunSig st lnm str)
     get_sig _                                   = Nothing
 
     add_arity n inl_prag   -- Adjust inl_sat field to match visible arity of function
       | Inline <- inl_inline inl_prag
         -- add arity only for real INLINE pragmas, not INLINABLE
-      = case lookupNameEnv ar_env n of
+      = case lookupNameEnv ar_env (unEmb n) of
           Just ar -> inl_prag { inl_sat = Just ar }
           Nothing -> WARN( True, text "mkPragEnv no arity" <+> ppr n )
                      -- There really should be a binding for every INLINE pragma
@@ -746,9 +750,9 @@ tcImpPrags prags
             return []
          else do
             { pss <- mapAndRecoverM (wrapLocM tcImpSpec)
-                     [L loc (name,prag)
+                     [L loc (unEmb name,prag)
                                | (L loc prag@(SpecSig (L _ name) _ _)) <- prags
-                               , not (nameIsLocalOrFrom this_mod name) ]
+                               , not (nameIsLocalOrFrom this_mod $ unEmb name)]
             ; return $ concatMap (\(L l ps) -> map (L l) ps) pss } }
   where
     -- Ignore SPECIALISE pragmas for imported things

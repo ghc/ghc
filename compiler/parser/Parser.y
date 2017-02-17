@@ -552,12 +552,12 @@ TH_QQUASIQUOTE  { L _ (ITqQuasiQuote _) }
 
 -----------------------------------------------------------------------------
 -- Identifiers; one of the entry points
-identifier :: { Located RdrName }
+identifier :: { Located (Embellished RdrName) }
         : qvar                          { $1 }
         | qcon                          { $1 }
         | qvarop                        { $1 }
         | qconop                        { $1 }
-    | '(' '->' ')'      {% ams (sLL $1 $> $ getRdrName funTyCon)
+    | '(' '->' ')'      {% ams (sLL $1 $> $ EName $ getRdrName funTyCon)
                                [mj AnnOpenP $1,mu AnnRarrow $2,mj AnnCloseP $3] }
 
 -----------------------------------------------------------------------------
@@ -793,7 +793,7 @@ export  :: { OrdList (LIE RdrName) }
                                           >>= \ie -> amsu (sLL $1 $> ie) (fst $ unLoc $2) }
         |  'module' modid            {% amsu (sLL $1 $> (IEModuleContents $2))
                                              [mj AnnModule $1] }
-        |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar (sLL $1 $> (IEPattern $2))))
+        |  'pattern' qcon            {% amsu (sLL $1 $> (IEVar (sLL $1 $> (IEPattern $ unLEmb $2))))
                                              [mj AnnPattern $1] }
 
 export_subspec :: { Located ([AddAnn],ImpExpSubSpec) }
@@ -827,12 +827,12 @@ qcname_ext_w_wildcard :: { Located ([AddAnn], Located ImpExpQcSpec) }
         |  '..'                     { sL1 $1 ([mj AnnDotdot $1], sL1 $1 ImpExpQcWildcard)  }
 
 qcname_ext :: { Located ImpExpQcSpec }
-        :  qcname                   { sL1 $1 (ImpExpQcName $1) }
-        |  'type' oqtycon           {% do { n <- mkTypeImpExp $2
+        :  qcname                   { sL1 $1 (ImpExpQcName (unLEmb $1)) }
+        |  'type' oqtycon           {% do { n <- mkTypeImpExp (unLEmb $2)
                                           ; ams (sLL $1 $> (ImpExpQcType n))
                                                 [mj AnnType $1] } }
 
-qcname  :: { Located RdrName }  -- Variable or type constructor
+qcname  :: { Located (Embellished RdrName) }  -- Variable or type constructor
         :  qvar                 { $1 } -- Things which look like functions
                                        -- Note: This includes record selectors but
                                        -- also (-.->), see #11432
@@ -935,7 +935,7 @@ infix   :: { Located FixityDirection }
         | 'infixl'                              { sL1 $1 InfixL  }
         | 'infixr'                              { sL1 $1 InfixR }
 
-ops     :: { Located (OrdList (Located RdrName)) }
+ops     :: { Located (OrdList (Located (Embellished RdrName))) }
         : ops ',' op       {% addAnnotation (oll $ unLoc $1) AnnComma (gl $2) >>
                               return (sLL $1 $> ((unLoc $1) `appOL` unitOL $3))}
         | op               { sL1 $1 (unitOL $1) }
@@ -1352,7 +1352,7 @@ pattern_synonym_decl :: { LHsDecl RdrName }
                        (as ++ ((mj AnnPattern $1:mu AnnLarrow $3:(fst $ unLoc $5))) )
                    }}
 
-pattern_synonym_lhs :: { (Located RdrName, HsPatSynDetails (Located RdrName), [AddAnn]) }
+pattern_synonym_lhs :: { (Located (Embellished RdrName), HsPatSynDetails (Located RdrName), [AddAnn]) }
         : con vars0 { ($1, PrefixPatSyn $2, []) }
         | varid conop varid { ($2, InfixPatSyn $1 $3, []) }
         | con '{' cvars1 '}' { ($1, RecordPatSyn $3, [moc $2, mcc $4] ) }
@@ -1656,9 +1656,9 @@ fspec :: { Located ([AddAnn]
                     ,(Located StringLiteral, Located RdrName, LHsSigType RdrName)) }
        : STRING var '::' sigtypedoc     { sLL $1 $> ([mu AnnDcolon $3]
                                              ,(L (getLoc $1)
-                                                    (getStringLiteral $1), $2, mkLHsSigType $4)) }
+                                                    (getStringLiteral $1), unLEmb $2, mkLHsSigType $4)) }
        |        var '::' sigtypedoc     { sLL $1 $> ([mu AnnDcolon $2]
-                                             ,(noLoc (StringLiteral NoSourceText nilFS), $1, mkLHsSigType $3)) }
+                                             ,(noLoc (StringLiteral NoSourceText nilFS), unLEmb $1, mkLHsSigType $3)) }
          -- if the entity string is missing, it defaults to the empty string;
          -- the meaning of an empty entity string depends on the calling
          -- convention
@@ -1674,7 +1674,7 @@ opt_asig :: { ([AddAnn],Maybe (LHsType RdrName)) }
         : {- empty -}                   { ([],Nothing) }
         | '::' atype                    { ([mu AnnDcolon $1],Just $2) }
 
-opt_tyconsig :: { ([AddAnn], Maybe (Located RdrName)) }
+opt_tyconsig :: { ([AddAnn], Maybe (Located (Embellished RdrName))) }
              : {- empty -}              { ([], Nothing) }
              | '::' gtycon              { ([mu AnnDcolon $1], Just $2) }
 
@@ -1685,7 +1685,7 @@ sigtypedoc :: { LHsType RdrName }
         : ctypedoc                         { $1 }
 
 
-sig_vars :: { Located [Located RdrName] }    -- Returned in reversed order
+sig_vars :: { Located [Located (Embellished RdrName)] }    -- Returned in reversed order
          : sig_vars ',' var           {% addAnnotation (gl $ head $ unLoc $1)
                                                        AnnComma (gl $2)
                                          >> return (sLL $1 $> ($3 : unLoc $1)) }
@@ -1846,8 +1846,8 @@ tyapp :: { LHsAppType RdrName }
                                                [mj AnnSimpleQuote $1] }
 
 atype :: { LHsType RdrName }
-        : ntgtycon                       { sL1 $1 (HsTyVar NotPromoted $1) }      -- Not including unit tuples
-        | tyvar                          { sL1 $1 (HsTyVar NotPromoted $1) }      -- (See Note [Unit tuples])
+        : ntgtycon                       { sL1 $1 (HsTyVar NotPromoted $1) }        -- Not including unit tuples
+        | tyvar                          { sL1 $1 (HsTyVar NotPromoted (lEmb $1)) } -- (See Note [Unit tuples])
         | strict_mark atype              {% ams (sLL $1 $> (HsBangTy (snd $ unLoc $1) $2))
                                                 (fst $ unLoc $1) }  -- Constructor sigs only
         | '{' fielddecls '}'             {% amms (checkRecordSyntax
@@ -1877,10 +1877,10 @@ atype :: { LHsType RdrName }
         | '$(' exp ')'                {% ams (sLL $1 $> $ mkHsSpliceTy HasParens $2)
                                              [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_SPLICE                {%ams (sLL $1 $> $ mkHsSpliceTy NoParens $ sL1 $1 $ HsVar $
-                                             (sL1 $1 (mkUnqual varName (getTH_ID_SPLICE $1))))
+                                             (sL1 $1 (EName $ mkUnqual varName (getTH_ID_SPLICE $1))))
                                              [mj AnnThIdSplice $1] }
                                       -- see Note [Promotion] for the followings
-        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar Promoted $2) [mj AnnSimpleQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE qcon_nowiredlist {% ams (sLL $1 $> $ HsTyVar Promoted $2) [mj AnnSimpleQuote $1] }
         | SIMPLEQUOTE  '(' ctype ',' comma_types1 ')'
                              {% addAnnotation (gl $3) AnnComma (gl $4) >>
                                 ams (sLL $1 $> $ HsExplicitTupleTy [] ($3 : $5))
@@ -1889,7 +1889,7 @@ atype :: { LHsType RdrName }
                                                             placeHolderKind $3)
                                                        [mj AnnSimpleQuote $1,mos $2,mcs $4] }
         | SIMPLEQUOTE var                       {% ams (sLL $1 $> $ HsTyVar Promoted $2)
-                                                       [mj AnnSimpleQuote $1,mj AnnName $2] }
+                                                       [mj AnnSimpleQuote $1] }
 
         -- Two or more [ty, ty, ty] must be a promoted list type, just as
         -- if you had written '[ty, ty, ty]
@@ -2089,7 +2089,7 @@ forall :: { Located ([AddAnn], Maybe [LHsTyVarBndr RdrName]) }
         : 'forall' tv_bndrs '.'       { sLL $1 $> ([mu AnnForall $1,mj AnnDot $3], Just $2) }
         | {- empty -}                 { noLoc ([], Nothing) }
 
-constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
+constr_stuff :: { Located (LEmbellished RdrName, HsConDeclDetails RdrName) }
     -- See Note [Parsing data constructors is hard] in RdrHsSyn
         : btype_no_ops                         {% do { c <- splitCon $1
                                                      ; return $ sLL $1 $> c } }
@@ -2181,7 +2181,7 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl RdrName }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2) };
+        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 $ EName bang_RDR))) $2) };
                                         pat <- checkPattern empty e;
                                         _ <- ams (sLL $1 $> ())
                                                (fst $ unLoc $3);
@@ -2517,10 +2517,10 @@ aexp2   :: { LHsExpr RdrName }
         -- Template Haskell Extension
         | splice_exp            { $1 }
 
-        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket (VarBr True  (unLoc $2))) [mj AnnSimpleQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
-        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
+        | SIMPLEQUOTE  qvar     {% ams (sLL $1 $> $ HsBracket (VarBr True  $2)       ) [mj AnnSimpleQuote $1] }
+        | SIMPLEQUOTE  qcon     {% ams (sLL $1 $> $ HsBracket (VarBr True  $2)       ) [mj AnnSimpleQuote $1] }
+        | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (lEmb $2))) [mj AnnThTyQuote $1] }
+        | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False $2)) [mj AnnThTyQuote $1] }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2))
@@ -2540,13 +2540,13 @@ aexp2   :: { LHsExpr RdrName }
 
 splice_exp :: { LHsExpr RdrName }
         : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE NoParens
-                                        (sL1 $1 $ HsVar (sL1 $1 (mkUnqual varName
+                                        (sL1 $1 $ HsVar (sL1 $1 (EName $ mkUnqual varName
                                                            (getTH_ID_SPLICE $1)))))
                                        [mj AnnThIdSplice $1] }
         | '$(' exp ')'          {% ams (sLL $1 $> $ mkHsSpliceE HasParens $2)
                                        [mj AnnOpenPE $1,mj AnnCloseP $3] }
         | TH_ID_TY_SPLICE       {% ams (sL1 $1 $ mkHsSpliceTE NoParens
-                                        (sL1 $1 $ HsVar (sL1 $1 (mkUnqual varName
+                                        (sL1 $1 $ HsVar (sL1 $1 (EName $ mkUnqual varName
                                                         (getTH_ID_TY_SPLICE $1)))))
                                        [mj AnnThIdTySplice $1] }
         | '$$(' exp ')'         {% ams (sLL $1 $> $ mkHsSpliceTE HasParens $2)
@@ -2821,7 +2821,7 @@ gdpat   :: { LGRHS RdrName (LHsExpr RdrName) }
 pat     :: { LPat RdrName }
 pat     :  exp          {% checkPattern empty $1 }
         | '!' aexp      {% amms (checkPattern empty (sLL $1 $> (SectionR
-                                                     (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)))
+                                                     (sL1 $1 (HsVar (sL1 $1 $ EName bang_RDR))) $2)))
                                 [mj AnnBang $1] }
 
 bindpat :: { LPat RdrName }
@@ -2829,14 +2829,14 @@ bindpat :  exp            {% checkPattern
                                 (text "Possibly caused by a missing 'do'?") $1 }
         | '!' aexp        {% amms (checkPattern
                                      (text "Possibly caused by a missing 'do'?")
-                                     (sLL $1 $> (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)))
+                                     (sLL $1 $> (SectionR (sL1 $1 (HsVar (sL1 $1 $ EName bang_RDR))) $2)))
                                   [mj AnnBang $1] }
 
 apat   :: { LPat RdrName }
 apat    : aexp                  {% checkPattern empty $1 }
         | '!' aexp              {% amms (checkPattern empty
                                             (sLL $1 $> (SectionR
-                                                (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)))
+                                                (sL1 $1 (HsVar (sL1 $1 $ EName bang_RDR))) $2)))
                                         [mj AnnBang $1] }
 
 apats  :: { [LPat RdrName] }
@@ -2948,31 +2948,31 @@ overloaded_label :: { Located FastString }
 -----------------------------------------------------------------------------
 -- Warnings and deprecations
 
-name_boolformula_opt :: { LBooleanFormula (Located RdrName) }
+name_boolformula_opt :: { LBooleanFormula (LEmbellished RdrName) }
         : name_boolformula          { $1 }
         | {- empty -}               { noLoc mkTrue }
 
-name_boolformula :: { LBooleanFormula (Located RdrName) }
+name_boolformula :: { LBooleanFormula (LEmbellished RdrName) }
         : name_boolformula_and                      { $1 }
         | name_boolformula_and '|' name_boolformula
                            {% aa $1 (AnnVbar, $2)
                               >> return (sLL $1 $> (Or [$1,$3])) }
 
-name_boolformula_and :: { LBooleanFormula (Located RdrName) }
+name_boolformula_and :: { LBooleanFormula (LEmbellished RdrName) }
         : name_boolformula_atom                             { $1 }
         | name_boolformula_atom ',' name_boolformula_and
                   {% aa $1 (AnnComma,$2) >> return (sLL $1 $> (And [$1,$3])) }
 
-name_boolformula_atom :: { LBooleanFormula (Located RdrName) }
+name_boolformula_atom :: { LBooleanFormula (LEmbellished RdrName) }
         : '(' name_boolformula ')'  {% ams (sLL $1 $> (Parens $2)) [mop $1,mcp $3] }
         | name_var                  { sL1 $1 (Var $1) }
 
-namelist :: { Located [Located RdrName] }
+namelist :: { Located [Located (Embellished RdrName)] }
 namelist : name_var              { sL1 $1 [$1] }
          | name_var ',' namelist {% addAnnotation (gl $1) AnnComma (gl $2) >>
                                     return (sLL $1 $> ($1 : unLoc $3)) }
 
-name_var :: { Located RdrName }
+name_var :: { Located (Embellished RdrName) }
 name_var : var { $1 }
          | con { $1 }
 
@@ -2981,28 +2981,28 @@ name_var : var { $1 }
 -- There are two different productions here as lifted list constructors
 -- are parsed differently.
 
-qcon_nowiredlist :: { Located RdrName }
+qcon_nowiredlist :: { Located (Embellished RdrName) }
         : gen_qcon                     { $1 }
-        | sysdcon_nolist               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
+        | sysdcon_nolist               { sL1 $1 $ EName $ nameRdrName (dataConName (unLoc $1)) }
 
-qcon :: { Located RdrName }
+qcon :: { Located (Embellished RdrName) }
   : gen_qcon              { $1}
-  | sysdcon               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
+  | sysdcon               { sL1 $1 $ EParens $ sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
 
-gen_qcon :: { Located RdrName }
-  : qconid                { $1 }
-  | '(' qconsym ')'       {% ams (sLL $1 $> (unLoc $2))
-                                   [mop $1,mj AnnVal $2,mcp $3] }
+gen_qcon :: { Located (Embellished RdrName) }
+  : qconid                { sL1 $1 (EName $ unLoc $1) }
+  | '(' qconsym ')'       {% ams (sLL $1 $> (EParens $2))
+                                   [mop $1,mcp $3] }
 
 -- The case of '[:' ':]' is part of the production `parr'
 
-con     :: { Located RdrName }
-        : conid                 { $1 }
-        | '(' consym ')'        {% ams (sLL $1 $> (unLoc $2))
-                                       [mop $1,mj AnnVal $2,mcp $3] }
-        | sysdcon               { sL1 $1 $ nameRdrName (dataConName (unLoc $1)) }
+con     :: { Located (Embellished RdrName) }
+        : conid                 { sL1 $1 (EName (unLoc $1)) }
+        | '(' consym ')'        {% ams (sLL $1 $> (EParens $2))
+                                       [mop $1,mcp $3] }
+        | sysdcon               { sL1 $1 $ EName $ nameRdrName (dataConName (unLoc $1)) }
 
-con_list :: { Located [Located RdrName] }
+con_list :: { Located [Located (Embellished RdrName)] }
 con_list : con                  { sL1 $1 [$1] }
          | con ',' con_list     {% addAnnotation (gl $1) AnnComma (gl $2) >>
                                    return (sLL $1 $> ($1 : unLoc $3)) }
@@ -3019,16 +3019,16 @@ sysdcon :: { Located DataCon }
         : sysdcon_nolist                 { $1 }
         | '[' ']'               {% ams (sLL $1 $> nilDataCon) [mos $1,mcs $2] }
 
-conop :: { Located RdrName }
-        : consym                { $1 }
-        | '`' conid '`'         {% ams (sLL $1 $> (unLoc $2))
-                                       [mj AnnBackquote $1,mj AnnVal $2
+conop :: { Located (Embellished RdrName) }
+        : consym                { sL1 $1 (EName (unLoc $1)) }
+        | '`' conid '`'         {% ams (sLL $1 $> (EBackquotes $2))
+                                       [mj AnnBackquote $1
                                        ,mj AnnBackquote $3] }
 
-qconop :: { Located RdrName }
-        : qconsym               { $1 }
-        | '`' qconid '`'        {% ams (sLL $1 $> (unLoc $2))
-                                       [mj AnnBackquote $1,mj AnnVal $2
+qconop :: { Located (Embellished RdrName) }
+        : qconsym               { sL1 $1 $ (EName $ unLoc $1) }
+        | '`' qconid '`'        {% ams (sLL $1 $> (EBackquotes $2))
+                                       [mj AnnBackquote $1
                                        ,mj AnnBackquote $3] }
 
 ----------------------------------------------------------------------------
@@ -3037,47 +3037,47 @@ qconop :: { Located RdrName }
 
 -- See Note [Unit tuples] in HsTypes for the distinction
 -- between gtycon and ntgtycon
-gtycon :: { Located RdrName }  -- A "general" qualified tycon, including unit tuples
+gtycon :: { Located (Embellished RdrName) }  -- A "general" qualified tycon, including unit tuples
         : ntgtycon                     { $1 }
-        | '(' ')'                      {% ams (sLL $1 $> $ getRdrName unitTyCon)
+        | '(' ')'                      {% ams (sLL $1 $> $ EName $ getRdrName unitTyCon)
                                               [mop $1,mcp $2] }
-        | '(#' '#)'                    {% ams (sLL $1 $> $ getRdrName unboxedUnitTyCon)
+        | '(#' '#)'                    {% ams (sLL $1 $> $ EName $ getRdrName unboxedUnitTyCon)
                                               [mo $1,mc $2] }
 
-ntgtycon :: { Located RdrName }  -- A "general" qualified tycon, excluding unit tuples
+ntgtycon :: { Located (Embellished RdrName) }  -- A "general" qualified tycon, excluding unit tuples
         : oqtycon               { $1 }
-        | '(' commas ')'        {% ams (sLL $1 $> $ getRdrName (tupleTyCon Boxed
+        | '(' commas ')'        {% ams (sLL $1 $> $ EName $ getRdrName (tupleTyCon Boxed
                                                         (snd $2 + 1)))
                                        (mop $1:mcp $3:(mcommas (fst $2))) }
-        | '(#' commas '#)'      {% ams (sLL $1 $> $ getRdrName (tupleTyCon Unboxed
+        | '(#' commas '#)'      {% ams (sLL $1 $> $ EName $ getRdrName (tupleTyCon Unboxed
                                                         (snd $2 + 1)))
                                        (mo $1:mc $3:(mcommas (fst $2))) }
-        | '(' '->' ')'          {% ams (sLL $1 $> $ getRdrName funTyCon)
+        | '(' '->' ')'          {% ams (sLL $1 $> $ EName $ getRdrName funTyCon)
                                        [mop $1,mu AnnRarrow $2,mcp $3] }
-        | '[' ']'               {% ams (sLL $1 $> $ listTyCon_RDR) [mos $1,mcs $2] }
-        | '[:' ':]'             {% ams (sLL $1 $> $ parrTyCon_RDR) [mo $1,mc $2] }
-        | '(' '~#' ')'          {% ams (sLL $1 $> $ getRdrName eqPrimTyCon)
+        | '[' ']'               {% ams (sLL $1 $> $ EName $ listTyCon_RDR) [mos $1,mcs $2] }
+        | '[:' ':]'             {% ams (sLL $1 $> $ EName $ parrTyCon_RDR) [mo $1,mc $2] }
+        | '(' '~#' ')'          {% ams (sLL $1 $> $ EName $ getRdrName eqPrimTyCon)
                                         [mop $1,mj AnnTildehsh $2,mcp $3] }
 
-oqtycon :: { Located RdrName }  -- An "ordinary" qualified tycon;
+oqtycon :: { Located (Embellished RdrName) }  -- An "ordinary" qualified tycon;
                                 -- These can appear in export lists
-        : qtycon                        { $1 }
-        | '(' qtyconsym ')'             {% ams (sLL $1 $> (unLoc $2))
-                                               [mop $1,mj AnnVal $2,mcp $3] }
-        | '(' '~' ')'                   {% ams (sLL $1 $> $ eqTyCon_RDR)
-                                               [mop $1,mj AnnVal $2,mcp $3] }
+        : qtycon                        { sL1 $1 (EName $ unLoc  $1) }
+        | '(' qtyconsym ')'             {% ams (sLL $1 $> (EParens $2))
+                                               [mop $1,mcp $3] }
+        | '(' '~' ')'                   {% ams (sLL $1 $> $ EParens (sL1 $1 eqTyCon_RDR))
+                                               [mop $1,mcp $3] }
 
-oqtycon_no_varcon :: { Located RdrName }  -- Type constructor which cannot be mistaken
+oqtycon_no_varcon :: { Located (Embellished RdrName) }  -- Type constructor which cannot be mistaken
                                           -- for variable constructor in export lists
                                           -- see Note [Type constructors in export list]
-        :  qtycon            { $1 }
+        :  qtycon            { sL1 $1 (EName $ unLoc $1) }
         | '(' QCONSYM ')'    {% let name = sL1 $2 $! mkQual tcClsName (getQCONSYM $2)
-                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+                                in ams (sLL $1 $> (EParens name)) [mop $1,mcp $3] }
         | '(' CONSYM ')'     {% let name = sL1 $2 $! mkUnqual tcClsName (getCONSYM $2)
-                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
+                                in ams (sLL $1 $> (EParens name)) [mop $1,mcp $3] }
         | '(' ':' ')'        {% let name = sL1 $2 $! consDataCon_RDR
-                                in ams (sLL $1 $> (unLoc name)) [mop $1,mj AnnVal name,mcp $3] }
-        | '(' '~' ')'        {% ams (sLL $1 $> $ eqTyCon_RDR) [mop $1,mj AnnTilde $2,mcp $3] }
+                                in ams (sLL $1 $> (EParens name)) [mop $1,mcp $3] }
+        | '(' '~' ')'        {% ams (sLL $1 $> $ EParens (sL1 $2 eqTyCon_RDR)) [mop $1,mcp $3] }
 
 {- Note [Type constructors in export list]
 ~~~~~~~~~~~~~~~~~~~~~
@@ -3099,10 +3099,10 @@ until after renaming when we resolve the proper namespace for each exported
 child.
 -}
 
-qtyconop :: { Located RdrName } -- Qualified or unqualified
-        : qtyconsym                     { $1 }
-        | '`' qtycon '`'                {% ams (sLL $1 $> (unLoc $2))
-                                               [mj AnnBackquote $1,mj AnnVal $2
+qtyconop :: { Located (Embellished RdrName) } -- Qualified or unqualified
+        : qtyconsym                     { sL1 $1 $ EName (unLoc $1) }
+        | '`' qtycon '`'                {% ams (sLL $1 $> (EBackquotes $2))
+                                               [mj AnnBackquote $1
                                                ,mj AnnBackquote $3] }
 
 qtycon :: { Located RdrName }   -- Qualified or unqualified
@@ -3110,8 +3110,8 @@ qtycon :: { Located RdrName }   -- Qualified or unqualified
         | tycon             { $1 }
 
 qtycondoc :: { LHsType RdrName } -- Qualified or unqualified
-        : qtycon            { sL1 $1                     (HsTyVar NotPromoted $1)      }
-        | qtycon docprev    { sLL $1 $> (HsDocTy (sL1 $1 (HsTyVar NotPromoted $1)) $2) }
+        : qtycon            { sL1 $1                     (HsTyVar NotPromoted (lEmb $1))      }
+        | qtycon docprev    { sLL $1 $> (HsDocTy (sL1 $1 (HsTyVar NotPromoted (lEmb $1))) $2) }
 
 tycon   :: { Located RdrName }  -- Unqualified
         : CONID                   { sL1 $1 $! mkUnqual tcClsName (getCONID $1) }
@@ -3133,14 +3133,14 @@ tyconsym :: { Located RdrName }
 -----------------------------------------------------------------------------
 -- Operators
 
-op      :: { Located RdrName }   -- used in infix decls
+op      :: { Located (Embellished RdrName) }   -- used in infix decls
         : varop                 { $1 }
         | conop                 { $1 }
 
-varop   :: { Located RdrName }
-        : varsym                { $1 }
-        | '`' varid '`'         {% ams (sLL $1 $> (unLoc $2))
-                                       [mj AnnBackquote $1,mj AnnVal $2
+varop   :: { Located (Embellished RdrName) }
+        : varsym                { sL1 $1 (EName $ unLoc $1) }
+        | '`' varid '`'         {% ams (sLL $1 $> (EBackquotes $2))
+                                       [mj AnnBackquote $1
                                        ,mj AnnBackquote $3] }
 
 qop     :: { LHsExpr RdrName }   -- used in sections
@@ -3154,16 +3154,16 @@ qopm    :: { LHsExpr RdrName }   -- used in sections
         : qvaropm               { sL1 $1 $ HsVar $1 }
         | qconop                { sL1 $1 $ HsVar $1 }
 
-qvarop :: { Located RdrName }
-        : qvarsym               { $1 }
-        | '`' qvarid '`'        {% ams (sLL $1 $> (unLoc $2))
-                                       [mj AnnBackquote $1,mj AnnVal $2
+qvarop :: { Located (Embellished RdrName) }
+        : qvarsym               { sL1 $1 $ EName (unLoc $1) }
+        | '`' qvarid '`'        {% ams (sLL $1 $> (EBackquotes $2))
+                                       [mj AnnBackquote $1
                                        ,mj AnnBackquote $3] }
 
-qvaropm :: { Located RdrName }
-        : qvarsym_no_minus      { $1 }
-        | '`' qvarid '`'        {% ams (sLL $1 $> (unLoc $2))
-                                       [mj AnnBackquote $1,mj AnnVal $2
+qvaropm :: { Located (Embellished RdrName) }
+        : qvarsym_no_minus      { sL1 $1 $ EName (unLoc $1) }
+        | '`' qvarid '`'        {% ams (sLL $1 $> (EBackquotes $2))
+                                       [mj AnnBackquote $1
                                        ,mj AnnBackquote $3] }
 
 -----------------------------------------------------------------------------
@@ -3172,9 +3172,9 @@ qvaropm :: { Located RdrName }
 tyvar   :: { Located RdrName }
 tyvar   : tyvarid               { $1 }
 
-tyvarop :: { Located RdrName }
-tyvarop : '`' tyvarid '`'       {% ams (sLL $1 $> (unLoc $2))
-                                       [mj AnnBackquote $1,mj AnnVal $2
+tyvarop :: { Located (Embellished RdrName) }
+tyvarop : '`' tyvarid '`'       {% ams (sLL $1 $> (EBackquotes $2))
+                                       [mj AnnBackquote $1
                                        ,mj AnnBackquote $3] }
         | '.'                   {% parseErrorSDoc (getLoc $1)
                                       (vcat [text "Illegal symbol '.' in type",
@@ -3192,21 +3192,21 @@ tyvarid :: { Located RdrName }
 -----------------------------------------------------------------------------
 -- Variables
 
-var     :: { Located RdrName }
-        : varid                 { $1 }
-        | '(' varsym ')'        {% ams (sLL $1 $> (unLoc $2))
-                                       [mop $1,mj AnnVal $2,mcp $3] }
+var     :: { Located (Embellished RdrName) }
+        : varid                 { sL1 $1 (EName $ unLoc $1) }
+        | '(' varsym ')'        {% ams (sLL $1 $> (EParens $2))
+                                       [mop $1,mcp $3] }
 
  -- Lexing type applications depends subtly on what characters can possibly
  -- end a qvar. Currently (June 2015), only $idchars and ")" can end a qvar.
  -- If you're changing this, please see Note [Lexing type applications] in
  -- Lexer.x.
-qvar    :: { Located RdrName }
-        : qvarid                { $1 }
-        | '(' varsym ')'        {% ams (sLL $1 $> (unLoc $2))
-                                       [mop $1,mj AnnVal $2,mcp $3] }
-        | '(' qvarsym1 ')'      {% ams (sLL $1 $> (unLoc $2))
-                                       [mop $1,mj AnnVal $2,mcp $3] }
+qvar    :: { Located (Embellished RdrName) }
+        : qvarid                { sL1 $1 (EName (unLoc $1)) }
+        | '(' varsym ')'        {% ams (sLL $1 $> (EParens $2))
+                                       [mop $1,mcp $3] }
+        | '(' qvarsym1 ')'      {% ams (sLL $1 $> (EParens $2))
+                                       [mop $1,mcp $3] }
 -- We've inlined qvarsym here so that the decision about
 -- whether it's a qvar or a var can be postponed until
 -- *after* we see the close paren.

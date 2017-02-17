@@ -1609,7 +1609,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; main_expr
                 <- addErrCtxt mainCtxt    $
-                   tcMonoExpr (L loc (HsVar (L loc main_name)))
+                   tcMonoExpr (L loc (HsVar (L loc $ EName main_name)))
                                             (mkCheckExpType $
                                              mkTyConApp ioTyCon [res_ty])
 

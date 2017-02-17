@@ -86,6 +86,7 @@ import BasicTypes
 import SrcLoc
 import Outputable
 import FastString
+import HsEmbellished
 import Maybes( isJust )
 
 import Data.Data hiding ( Fixity, Prefix, Infix )
@@ -434,7 +435,7 @@ data HsType name
 
   | HsTyVar             Promoted -- whether explicitly promoted, for the pretty
                                  -- printer
-                        (Located name)
+                        (LEmbellished name)
                   -- Type variable, type constructor, or data constructor
                   -- see Note [Promotions (HsTyVar)]
                   -- See Note [Located RdrNames] in HsExpr
@@ -605,7 +606,7 @@ type LHsAppType name = Located (HsAppType name)
 
 -- | Haskell Application Type
 data HsAppType name
-  = HsAppInfix (Located name)       -- either a symbol or an id in backticks
+  = HsAppInfix (LEmbellished name)  -- either a symbol or an id in backticks
   | HsAppPrefix (LHsType name)      -- anything else, including things like (+)
 deriving instance (DataId name) => Data (HsAppType name)
 
@@ -884,9 +885,10 @@ hsLTyVarLocNames qtvs = map hsLTyVarLocName (hsQTvExplicit qtvs)
 -- | Convert a LHsTyVarBndr to an equivalent LHsType.
 hsLTyVarBndrToType :: LHsTyVarBndr name -> LHsType name
 hsLTyVarBndrToType = fmap cvt
-  where cvt (UserTyVar n) = HsTyVar NotPromoted n
+  where cvt (UserTyVar n) = HsTyVar NotPromoted (lEmb n)
         cvt (KindedTyVar (L name_loc n) kind)
-          = HsKindSig (L name_loc (HsTyVar NotPromoted (L name_loc n))) kind
+          = HsKindSig (L name_loc (HsTyVar NotPromoted (L name_loc $ EName n)))
+                                                        kind
 
 -- | Convert a LHsTyVarBndrs to a list of types.
 -- Works on *type* variable only, no kind vars.
@@ -953,7 +955,7 @@ splitHsFunType (L _ (HsFunTy x y))
 splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
   = go t1 [t2]
   where  -- Look for (->) t1 t2, possibly with parenthesisation
-    go (L _ (HsTyVar _ (L _ fn))) tys | fn == funTyConName
+    go (L _ (HsTyVar _ (L _ fn))) tys | unEmb fn == funTyConName
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
                                  = (t1:args, res)
@@ -983,7 +985,7 @@ getAppsTyHead_maybe tys = case splitHsAppsTy tys of
 -- element of @non_syms@ followed by the first element of @syms@ followed by
 -- the next element of @non_syms@, etc. It is guaranteed that the non_syms list
 -- has one more element than the syms list.
-splitHsAppsTy :: [LHsAppType name] -> ([[LHsType name]], [Located name])
+splitHsAppsTy :: [LHsAppType name] -> ([[LHsType name]], [LEmbellished name])
 splitHsAppsTy = go [] [] []
   where
     go acc acc_non acc_sym [] = (reverse (reverse acc : acc_non), reverse acc_sym)
@@ -999,7 +1001,7 @@ splitHsAppsTy = go [] [] []
 hsTyGetAppHead_maybe :: LHsType name -> Maybe (Located name, [LHsType name])
 hsTyGetAppHead_maybe = go []
   where
-    go tys (L _ (HsTyVar _ ln))          = Just (ln, tys)
+    go tys (L _ (HsTyVar _ ln))          = Just (unLEmb ln, tys)
     go tys (L _ (HsAppsTy apps))
       | Just (head, args, _) <- getAppsTyHead_maybe apps
                                          = go (args ++ tys) head
@@ -1081,7 +1083,7 @@ type LFieldOcc name = Located (FieldOcc name)
 -- Represents an *occurrence* of an unambiguous field.  We store
 -- both the 'RdrName' the user originally wrote, and after the
 -- renamer, the selector function.
-data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: Located RdrName
+data FieldOcc name = FieldOcc { rdrNameFieldOcc  :: LEmbellished RdrName
                                  -- ^ See Note [Located RdrNames] in HsExpr
                               , selectorFieldOcc :: PostRn name name
                               }
@@ -1092,7 +1094,7 @@ deriving instance (Data name, Data (PostRn name name)) => Data (FieldOcc name)
 instance Outputable (FieldOcc name) where
   ppr = ppr . rdrNameFieldOcc
 
-mkFieldOcc :: Located RdrName -> FieldOcc RdrName
+mkFieldOcc :: LEmbellished RdrName -> FieldOcc RdrName
 mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 
 
@@ -1109,8 +1111,8 @@ mkFieldOcc rdr = FieldOcc rdr PlaceHolder
 -- Note [Disambiguating record fields] in TcExpr.
 -- See Note [Located RdrNames] in HsExpr
 data AmbiguousFieldOcc name
-  = Unambiguous (Located RdrName) (PostRn name name)
-  | Ambiguous   (Located RdrName) (PostTc name name)
+  = Unambiguous (LEmbellished RdrName) (PostRn name name)
+  | Ambiguous   (LEmbellished RdrName) (PostTc name name)
 deriving instance ( Data name
                   , Data (PostRn name name)
                   , Data (PostTc name name))
@@ -1124,9 +1126,9 @@ instance OutputableBndr (AmbiguousFieldOcc name) where
   pprPrefixOcc = pprPrefixOcc . rdrNameAmbiguousFieldOcc
 
 mkAmbiguousFieldOcc :: Located RdrName -> AmbiguousFieldOcc RdrName
-mkAmbiguousFieldOcc rdr = Unambiguous rdr PlaceHolder
+mkAmbiguousFieldOcc rdr = Unambiguous (lEmb rdr) PlaceHolder
 
-rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> RdrName
+rdrNameAmbiguousFieldOcc :: AmbiguousFieldOcc name -> Embellished RdrName
 rdrNameAmbiguousFieldOcc (Unambiguous (L _ rdr) _) = rdr
 rdrNameAmbiguousFieldOcc (Ambiguous   (L _ rdr) _) = rdr
 

@@ -429,7 +429,7 @@ tc_infer_lhs_type mode (L span ty)
 -- | Infer the kind of a type and desugar. This is the "up" type-checker,
 -- as described in Note [Bidirectional type checking]
 tc_infer_hs_type :: TcTyMode -> HsType Name -> TcM (TcType, TcKind)
-tc_infer_hs_type mode (HsTyVar _ (L _ tv)) = tcTyVar mode tv
+tc_infer_hs_type mode (HsTyVar _ (L _ tv)) = tcTyVar mode $ unEmb tv
 tc_infer_hs_type mode (HsAppTy ty1 ty2)
   = do { let (fun_ty, arg_tys) = splitHsAppTys ty1 [ty2]
        ; (fun_ty', fun_kind) <- tc_infer_lhs_type mode fun_ty

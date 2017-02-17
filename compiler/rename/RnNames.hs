@@ -577,7 +577,7 @@ getLocalNonValBinders fixity_env
           --    type sigs in case of a hs-boot file only
         ; is_boot <- tcIsHsBootOrSig
         ; let val_bndrs | is_boot   = hs_boot_sig_bndrs
-                        | otherwise = for_hs_bndrs
+                        | otherwise = map lEmb for_hs_bndrs
         ; val_avails <- mapM new_simple val_bndrs
 
         ; let avails    = concat nti_availss ++ val_avails
@@ -607,15 +607,16 @@ getLocalNonValBinders fixity_env
 
       -- the SrcSpan attached to the input should be the span of the
       -- declaration, not just the name
-    new_simple :: Located RdrName -> RnM AvailInfo
-    new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
+    new_simple :: LEmbellished RdrName -> RnM AvailInfo
+    new_simple rdr_name = do{ nm <- newTopSrcBinder $ unLEmb rdr_name
                             ; return (avail nm) }
 
     new_tc :: Bool -> LTyClDecl RdrName
            -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_tc overload_ok tc_decl -- NOT for type/data instances
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
-             ; names@(main_name : sub_names) <- mapM newTopSrcBinder bndrs
+             ; names@(main_name : sub_names)
+                                     <- mapM (newTopSrcBinder . unLEmb) bndrs
              ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
              ; let fld_env = case unLoc tc_decl of
                      DataDecl { tcdDataDefn = d } -> mk_fld_env d names flds'
@@ -631,12 +632,12 @@ getLocalNonValBinders fixity_env
       where
         find_con_flds (L _ (ConDeclH98 { con_name    = L _ rdr
                                        , con_details = RecCon cdflds }))
-            = [( find_con_name rdr
+            = [( find_con_name $ unEmb rdr
                , concatMap find_con_decl_flds (unLoc cdflds) )]
         find_con_flds (L _ (ConDeclGADT
                               { con_names = rdrs
                               , con_type = (HsIB { hsib_body = res_ty})}))
-            = map (\ (L _ rdr) -> ( find_con_name rdr
+            = map (\ (L _ rdr) -> ( find_con_name $ unEmb rdr
                                   , concatMap find_con_decl_flds cdflds))
                   rdrs
             where
@@ -657,7 +658,7 @@ getLocalNonValBinders fixity_env
         find_con_decl_fld  (L _ (FieldOcc (L _ rdr) _))
           = expectJust "getLocalNonValBinders/find_con_decl_fld" $
               find (\ fl -> flLabel fl == lbl) flds
-          where lbl = occNameFS (rdrNameOcc rdr)
+          where lbl = occNameFS (rdrNameOcc $ unEmb rdr)
 
     new_assoc :: Bool -> LInstDecl RdrName
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
@@ -683,7 +684,7 @@ getLocalNonValBinders fixity_env
     new_di overload_ok mb_cls ti_decl
         = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
              ; let (bndrs, flds) = hsDataFamInstBinders ti_decl
-             ; sub_names <- mapM newTopSrcBinder bndrs
+             ; sub_names <- mapM (newTopSrcBinder . unLEmb) bndrs
              ; flds' <- mapM (newRecordSelector overload_ok sub_names) flds
              ; let avail    = AvailTC (unLoc main_name) sub_names flds'
                                   -- main_name is not bound here!
@@ -697,19 +698,19 @@ getLocalNonValBinders fixity_env
 newRecordSelector :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
-  = do { selName <- newTopSrcBinder $ L loc $ field
+  = do { selName <- newTopSrcBinder $ L loc $ unEmb field
        ; return $ qualFieldLbl { flSelector = selName } }
   where
-    fieldOccName = occNameFS $ rdrNameOcc fld
+    fieldOccName = occNameFS $ rdrNameOcc $ unEmb fld
     qualFieldLbl = mkFieldLabelOccs fieldOccName (nameOccName dc) overload_ok
-    field | isExact fld = fld
+    field | isExact $ unEmb fld = fld
               -- use an Exact RdrName as is to preserve the bindings
               -- of an already renamer-resolved field and its use
               -- sites. This is needed to correctly support record
               -- selectors in Template Haskell. See Note [Binders in
               -- Template Haskell] in Convert.hs and Note [Looking up
               -- Exact RdrNames] in RnEnv.hs.
-          | otherwise   = mkRdrUnqual (flSelector qualFieldLbl)
+          | otherwise   = EName $ mkRdrUnqual (flSelector qualFieldLbl)
 
 {-
 Note [Looking up family names in family instances]
@@ -1618,8 +1619,9 @@ packageImportErr
 --      data T = :% Int Int
 -- from interface files, which always print in prefix form
 
-checkConName :: RdrName -> TcRn ()
-checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
+checkConName :: Embellished RdrName -> TcRn ()
+checkConName name
+  = checkErr (isRdrDataCon $ unEmb name) (badDataCon $ unEmb name)
 
 badDataCon :: RdrName -> SDoc
 badDataCon name

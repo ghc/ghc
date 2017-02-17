@@ -775,7 +775,7 @@ getRdrNamesInScope = withSession $ \hsc_env -> do
 parseName :: GhcMonad m => String -> m [Name]
 parseName str = withSession $ \hsc_env -> liftIO $
    do { lrdr_name <- hscParseIdentifier hsc_env str
-      ; hscTcRnLookupRdrName hsc_env lrdr_name }
+      ; hscTcRnLookupRdrName hsc_env $ unLEmb lrdr_name }
 
 -- | Returns @True@ if passed string is a statement.
 isStmt :: DynFlags -> String -> Bool
@@ -890,7 +890,8 @@ dynCompileExpr expr = do
   parsed_expr <- parseExpr expr
   -- > Data.Dynamic.toDyn expr
   let loc = getLoc parsed_expr
-      to_dyn_expr = mkHsApp (L loc . HsVar . L loc $ getRdrName toDynName)
+      to_dyn_expr = mkHsApp (L loc . HsVar . L loc $ EName
+                                                        $ getRdrName toDynName)
                             parsed_expr
   hval <- compileParsedExpr to_dyn_expr
   return (unsafeCoerce# hval :: Dynamic)

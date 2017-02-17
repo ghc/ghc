@@ -293,7 +293,7 @@ mkSpliceDecl lexpr@(L loc expr)
   = SpliceD (SpliceDecl (L loc (mkUntypedSplice NoParens lexpr)) ImplicitSplice)
 
 mkRoleAnnotDecl :: SrcSpan
-                -> Located RdrName                   -- type being annotated
+                -> LEmbellished RdrName              -- type being annotated
                 -> [Located (Maybe FastString)]      -- roles
                 -> P (LRoleAnnotDecl RdrName)
 mkRoleAnnotDecl loc tycon roles
@@ -463,7 +463,7 @@ So the plan is:
 -}
 
 splitCon :: LHsType RdrName
-      -> P (Located RdrName, HsConDeclDetails RdrName)
+      -> P (LEmbellished RdrName, HsConDeclDetails RdrName)
 -- See Note [Parsing data constructors is hard]
 -- This gets given a "type" that should look like
 --      C Int Bool
@@ -474,34 +474,37 @@ splitCon ty
  where
    -- This is used somewhere where HsAppsTy is not used
    split (L _ (HsAppTy t u)) ts       = split t (u : ts)
-   split (L l (HsTyVar _ (L _ tc)))  ts = do data_con <- tyConToDataCon l tc
-                                             return (data_con, mk_rest ts)
+   split (L l (HsTyVar _ (L _ tc)))  ts
+     = do data_con <- tyConToDataCon l tc
+          return (data_con, mk_rest ts)
    split (L l (HsTupleTy HsBoxedOrConstraintTuple ts)) []
-      = return (L l (getRdrName (tupleDataCon Boxed (length ts))), PrefixCon ts)
+      = return (L l (EName $ getRdrName (tupleDataCon Boxed (length ts)))
+               , PrefixCon ts)
    split (L l _) _ = parseErrorSDoc l (text "Cannot parse data constructor in a data/newtype declaration:" <+> ppr ty)
 
    mk_rest [L l (HsRecTy flds)] = RecCon (L l flds)
    mk_rest ts                   = PrefixCon ts
 
-tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
+tyConToDataCon :: SrcSpan -> Embellished RdrName -> P (LEmbellished RdrName)
 -- See Note [Parsing data constructors is hard]
 -- Data constructor RHSs are parsed as types
 tyConToDataCon loc tc
   | isTcOcc occ
   , isLexCon (occNameFS occ)
-  = return (L loc (setRdrNameSpace tc srcDataName))
+  -- = return (L loc (setRdrNameSpace tc srcDataName))
+  = return (L loc $ fmap (\n -> setRdrNameSpace n srcDataName) tc)
 
   | otherwise
   = parseErrorSDoc loc (msg $$ extra)
   where
-    occ = rdrNameOcc tc
+    occ = rdrNameOcc $ unEmb tc
 
     msg = text "Not a data constructor:" <+> quotes (ppr tc)
-    extra | tc == forall_tv_RDR
+    extra | unEmb tc == forall_tv_RDR
           = text "Perhaps you intended to use ExistentialQuantification"
           | otherwise = empty
 
-mkPatSynMatchGroup :: Located RdrName
+mkPatSynMatchGroup :: LEmbellished RdrName
                    -> Located (OrdList (LHsDecl RdrName))
                    -> P (MatchGroup RdrName (LHsExpr RdrName))
 mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
@@ -510,7 +513,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; return $ mkMatchGroup FromSource matches }
   where
     fromDecl (L loc decl@(ValD (PatBind pat@(L _ (ConPatIn ln@(L _ name) details)) rhs _ _ _))) =
-        do { unless (name == patsyn_name) $
+        do { unless (name == unEmb patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
                PrefixCon pats ->
@@ -542,7 +545,7 @@ recordPatSynErr loc pat =
     text "record syntax not supported for pattern synonym declarations:" $$
     ppr pat
 
-mkConDeclH98 :: Located RdrName -> Maybe [LHsTyVarBndr RdrName]
+mkConDeclH98 :: LEmbellished RdrName -> Maybe [LHsTyVarBndr RdrName]
                 -> LHsContext RdrName -> HsConDeclDetails RdrName
                 -> ConDecl RdrName
 
@@ -555,7 +558,7 @@ mkConDeclH98 name mb_forall cxt details
                , con_details  = details
                , con_doc      = Nothing }
 
-mkGadtDecl :: [Located RdrName]
+mkGadtDecl :: [LEmbellished RdrName]
            -> LHsSigType RdrName     -- Always a HsForAllTy
            -> ConDecl RdrName
 mkGadtDecl names ty = ConDeclGADT { con_names = names
@@ -691,9 +694,9 @@ checkTyVars pp_what equals_or_where tc tparms
         -- Check that the name space is correct!
     chk (L l (HsKindSig
             (L _ (HsAppsTy [L _ (HsAppPrefix (L lv (HsTyVar _ (L _ tv))))])) k))
-        | isRdrTyVar tv    = return (L l (KindedTyVar (L lv tv) k))
+        | isRdrTyVar $ unEmb tv = return (L l (KindedTyVar (L lv $ unEmb tv) k))
     chk (L l (HsTyVar _ (L ltv tv)))
-        | isRdrTyVar tv    = return (L l (UserTyVar (L ltv tv)))
+        | isRdrTyVar $ unEmb tv = return (L l (UserTyVar (L ltv $ unEmb tv)))
     chk t@(L loc _)
         = Left (loc,
                 vcat [ text "Unexpected type" <+> quotes (ppr t)
@@ -743,7 +746,7 @@ checkTyClHdr is_cls ty
     goL (L l ty) acc ann fix = go l ty acc ann fix
 
     go l (HsTyVar _ (L _ tc)) acc ann fix
-      | isRdrTc tc               = return (L l tc, acc, fix, ann)
+      | isRdrTc $ unEmb tc       = return (L l $ unEmb tc, acc, fix, ann)
     go _ (HsOpTy t1 ltc@(L _ tc) t2) acc ann _fix
       | isRdrTc tc               = return (ltc, t1:t2:acc, Infix, ann)
     go l (HsParTy ty)    acc ann fix = goL ty acc (ann ++ mkParensApiAnn l) fix
@@ -753,9 +756,9 @@ checkTyClHdr is_cls ty
       = goL head (args ++ acc) ann fixity
 
     go _ (HsAppsTy [L _ (HsAppInfix (L loc star))]) [] ann fix
-      | occNameFS (rdrNameOcc star) == fsLit "*"
+      | occNameFS (rdrNameOcc $ unEmb star) == fsLit "*"
       = return (L loc (nameRdrName starKindTyConName), [], fix, ann)
-      | occNameFS (rdrNameOcc star) == fsLit "★"
+      | occNameFS (rdrNameOcc $ unEmb star) == fsLit "★"
       = return (L loc (nameRdrName unicodeStarKindTyConName), [], fix, ann)
 
     go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann fix
@@ -806,7 +809,8 @@ checkLPat msg e@(L l _) = checkPat msg l e []
 checkPat :: SDoc -> SrcSpan -> LHsExpr RdrName -> [LPat RdrName]
          -> P (LPat RdrName)
 checkPat _ loc (L l (HsVar (L _ c))) args
-  | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
+  | isRdrDataCon $ unEmb c
+    = return (L loc (ConPatIn (L l $ unEmb c) (PrefixCon args)))
 checkPat msg loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
                         -- non-bang-pattern parse of (C ! e)
@@ -827,9 +831,9 @@ checkAPat msg loc e0 = do
  pState <- getPState
  let opts = options pState
  case e0 of
-   EWildPat -> return (WildPat placeHolderType)
-   HsVar x  -> return (VarPat x)
-   HsLit l  -> return (LitPat l)
+   EWildPat       -> return (WildPat placeHolderType)
+   HsVar (L l x)  -> return (VarPat (L l $ unEmb x))
+   HsLit l        -> return (LitPat l)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
@@ -839,7 +843,7 @@ checkAPat msg loc e0 = do
                         -> return (mkNPat (L l pos_lit) (Just noSyntaxExpr))
 
    SectionR (L lb (HsVar (L _ bang))) e    -- (! x)
-        | bang == bang_RDR
+        | unEmb bang == bang_RDR
         -> do { bang_on <- extension bangPatEnabled
               ; if bang_on then do { e' <- checkLPat msg e
                                    ; addAnnotation loc AnnBang lb
@@ -857,14 +861,17 @@ checkAPat msg loc e0 = do
    -- n+k patterns
    OpApp (L nloc (HsVar (L _ n))) (L _ (HsVar (L _ plus))) _
          (L lloc (HsOverLit lit@(OverLit {ol_val = HsIntegral {}})))
-                      | extopt LangExt.NPlusKPatterns opts && (plus == plus_RDR)
-                      -> return (mkNPlusKPat (L nloc n) (L lloc lit))
+                      | extopt LangExt.NPlusKPatterns opts &&
+                          (unEmb plus == plus_RDR)
+                      -> return (mkNPlusKPat (L nloc $ unEmb n) (L lloc lit))
 
    OpApp l op _fix r  -> do l <- checkLPat msg l
                             r <- checkLPat msg r
                             case op of
-                               L cl (HsVar (L _ c)) | isDataOcc (rdrNameOcc c)
-                                      -> return (ConPatIn (L cl c) (InfixCon l r))
+                               L cl (HsVar (L _ c))
+                                 | isDataOcc (rdrNameOcc $ unEmb c)
+                                      -> return (ConPatIn (L cl $ unEmb c)
+                                                          (InfixCon l r))
                                _ -> patFail msg loc e0
 
    HsPar e            -> checkLPat msg e >>= (return . ParPat)
@@ -893,7 +900,7 @@ checkAPat msg loc e0 = do
 placeHolderPunRhs :: LHsExpr RdrName
 -- The RHS of a punned record field will be filled in by the renamer
 -- It's better not to make it an error, in case we want to print it when debugging
-placeHolderPunRhs = noLoc (HsVar (noLoc pun_RDR))
+placeHolderPunRhs = noLoc (HsVar (noEmb pun_RDR))
 
 plus_RDR, bang_RDR, pun_RDR :: RdrName
 plus_RDR = mkUnqual varName (fsLit "+") -- Hack
@@ -974,11 +981,11 @@ checkPatBind msg lhs (L _ (_,grhss))
         ; return ([],PatBind lhs grhss placeHolderType placeHolderNames
                     ([],[])) }
 
-checkValSigLhs :: LHsExpr RdrName -> P (Located RdrName)
-checkValSigLhs (L _ (HsVar lrdr@(L _ v)))
-  | isUnqual v
-  , not (isDataOcc (rdrNameOcc v))
-  = return lrdr
+checkValSigLhs :: LHsExpr RdrName -> P (LEmbellished RdrName)
+checkValSigLhs (L _ (HsVar (L l v)))
+  | isUnqual $ unEmb v
+  , not (isDataOcc (rdrNameOcc $ unEmb v))
+  = return (L l v)
 
 checkValSigLhs lhs@(L l _)
   = parseErrorSDoc l ((text "Invalid type signature:" <+>
@@ -997,7 +1004,7 @@ checkValSigLhs lhs@(L l _)
     -- A common error is to forget the ForeignFunctionInterface flag
     -- so check for that, and suggest.  cf Trac #3805
     -- Sadly 'foreign import' still barfs 'parse error' because 'import' is a keyword
-    looks_like s (L _ (HsVar (L _ v))) = v == s
+    looks_like s (L _ (HsVar (L _ v))) = unEmb v == s
     looks_like s (L _ (HsApp lhs _))   = looks_like s lhs
     looks_like _ _                     = False
 
@@ -1033,7 +1040,7 @@ checkDoAndIfThenElse guardExpr semiThen thenExpr semiElse elseExpr
 splitBang :: LHsExpr RdrName -> Maybe (LHsExpr RdrName, [LHsExpr RdrName])
 -- Splits (f ! g a b) into (f, [(! g), a, b])
 splitBang (L _ (OpApp l_arg bang@(L _ (HsVar (L _ op))) _ r_arg))
-  | op == bang_RDR = Just (l_arg, L l' (SectionR bang arg1) : argns)
+  | unEmb op == bang_RDR = Just (l_arg, L l' (SectionR bang arg1) : argns)
   where
     l' = combineLocs bang arg1
     (arg1,argns) = split_bang r_arg []
@@ -1058,7 +1065,8 @@ isFunLhs :: LHsExpr RdrName
 isFunLhs e = go e [] []
  where
    go (L loc (HsVar (L _ f))) es ann
-        | not (isRdrDataCon f)       = return (Just (L loc f, Prefix, es, ann))
+        | not (isRdrDataCon $ unEmb f)
+                    = return (Just (L loc (unEmb f), Prefix, es, ann))
    go (L _ (HsApp f e)) es       ann = go f (e:es) ann
    go (L l (HsPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
 
@@ -1079,10 +1087,10 @@ isFunLhs e = go e [] []
         | Just (e',es') <- splitBang e
         = do { bang_on <- extension bangPatEnabled
              ; if bang_on then go e' (es' ++ es) ann
-               else return (Just (L loc' op, Infix, (l:r:es), ann)) }
+               else return (Just (L loc' (unEmb op), Infix, (l:r:es), ann)) }
                 -- No bangs; behave just like the next case
-        | not (isRdrDataCon op)         -- We have found the function!
-        = return (Just (L loc' op, Infix, (l:r:es), ann))
+        | not (isRdrDataCon $ unEmb op)         -- We have found the function!
+        = return (Just (L loc' (unEmb op), Infix, (l:r:es), ann))
         | otherwise                     -- Infix data con; keep going
         = do { mb_l <- go l es ann
              ; case mb_l of
@@ -1132,7 +1140,7 @@ splitTildeApps (t : rest) = do
                     ty))))
           = addAnnotation l AnnTilde tilde_loc >>
             return
-              [L tilde_loc (HsAppInfix (L tilde_loc eqTyCon_RDR)),
+              [L tilde_loc (HsAppInfix (L tilde_loc $ EName eqTyCon_RDR)),
                L l (HsAppPrefix ty)]
                -- NOTE: no annotation is attached to an HsAppPrefix, so the
                --       surrounding SrcSpan is not critical
@@ -1260,8 +1268,8 @@ mkRecConstrOrUpdate
         -> P (HsExpr RdrName)
 
 mkRecConstrOrUpdate (L l (HsVar (L _ c))) _ (fs,dd)
-  | isRdrDataCon c
-  = return (mkRdrRecordCon (L l c) (mk_rec_fields fs dd))
+  | isRdrDataCon $ unEmb c
+  = return (mkRdrRecordCon (L l $ unEmb c) (mk_rec_fields fs dd))
 mkRecConstrOrUpdate exp@(L l _) _ (fs,dd)
   | dd        = parseErrorSDoc l (text "You cannot use `..' in a record update")
   | otherwise = return (mkRdrRecordUpd exp (map (fmap mk_rec_upd_field) fs))

@@ -27,6 +27,7 @@ module HsSyn (
         module HsUtils,
         module HsDoc,
         module PlaceHolder,
+        module HsEmbellished,
         Fixity,
 
         HsModule(..)
@@ -39,6 +40,7 @@ import HsExpr
 import HsImpExp
 import HsLit
 import PlaceHolder
+import HsEmbellished
 import HsPat
 import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )

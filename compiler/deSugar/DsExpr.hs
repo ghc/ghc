@@ -254,7 +254,7 @@ dsLExprNoLP (L loc e)
 dsExpr :: HsExpr Id -> DsM CoreExpr
 dsExpr (HsPar e)              = dsLExpr e
 dsExpr (ExprWithTySigOut e _) = dsLExpr e
-dsExpr (HsVar (L _ var))      = return (varToCoreExpr var)
+dsExpr (HsVar (L _ var))      = return (varToCoreExpr $ unEmb var)
                                 -- See Note [Desugaring vars]
 dsExpr (HsUnboundVar {})      = panic "dsExpr: HsUnboundVar" -- Typechecker eliminates them
 dsExpr (HsConLikeOut con)     = return (dsConLike con)

@@ -430,7 +430,7 @@ tidy1 v (VarPat (L _ var))
         -- = case v of { p -> let x=v in mr[] }
 tidy1 v (AsPat (L _ var) pat)
   = do  { (wrap, pat') <- tidy1 v (unLoc pat)
-        ; return (wrapBind var v . wrap, pat') }
+        ; return (wrapBind (unEmb var) v . wrap, pat') }
 
 {- now, here we handle lazy patterns:
     tidy1 v ~p bs = (v, v1 = case v of p -> v1 :

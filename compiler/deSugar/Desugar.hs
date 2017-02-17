@@ -547,10 +547,10 @@ dsVect :: LVectDecl Id -> DsM CoreVect
 dsVect (L loc (HsVect _ (L _ v) rhs))
   = putSrcSpanDs loc $
     do { rhs' <- dsLExpr rhs
-       ; return $ Vect v rhs'
+       ; return $ Vect (unEmb v) rhs'
        }
 dsVect (L _loc (HsNoVect _ (L _ v)))
-  = return $ NoVect v
+  = return $ NoVect $ unEmb v
 dsVect (L _loc (HsVectTypeOut isScalar tycon rhs_tycon))
   = return $ VectType isScalar tycon' rhs_tycon
   where

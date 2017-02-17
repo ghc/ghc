@@ -1187,7 +1187,7 @@ collectl (L _ pat) bndrs
     go (WildPat _)                = bndrs
     go (LazyPat pat)              = collectl pat bndrs
     go (BangPat pat)              = collectl pat bndrs
-    go (AsPat (L _ a) pat)        = a : collectl pat bndrs
+    go (AsPat (L _ a) pat)        = unEmb a : collectl pat bndrs
     go (ParPat  pat)              = collectl pat bndrs
 
     go (ListPat pats _ _)         = foldr collectl bndrs pats

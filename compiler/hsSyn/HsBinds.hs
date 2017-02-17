@@ -24,6 +24,7 @@ import {-# SOURCE #-} HsPat  ( LPat )
 
 import PlaceHolder ( PostTc,PostRn,DataId,OutputableBndrId )
 import HsTypes
+import HsEmbellished
 import PprCore ()
 import CoreSyn
 import TcEvidence
@@ -292,7 +293,7 @@ data ABExport id
 
 -- | Pattern Synonym binding
 data PatSynBind idL idR
-  = PSB { psb_id   :: Located idL,             -- ^ Name of the pattern synonym
+  = PSB { psb_id   :: LEmbellished idL,        -- ^ Name of the pattern synonym
           psb_fvs  :: PostRn idR NameSet,      -- ^ See Note [Bind free vars]
           psb_args :: HsPatSynDetails (Located idR), -- ^ Formal parameter names
           psb_def  :: LPat idR,                      -- ^ Right-hand side
@@ -739,7 +740,7 @@ data Sig name
 
       -- For details on above see note [Api annotations] in ApiAnnotation
     TypeSig
-       [Located name]        -- LHS of the signature; e.g.  f,g,h :: blah
+       [LEmbellished name]   -- LHS of the signature; e.g.  f,g,h :: blah
        (LHsSigWcType name)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
@@ -751,7 +752,7 @@ data Sig name
       --           'ApiAnnotation.AnnDot','ApiAnnotation.AnnDarrow'
 
       -- For details on above see note [Api annotations] in ApiAnnotation
-  | PatSynSig [Located name] (LHsSigType name)
+  | PatSynSig [LEmbellished name] (LHsSigType name)
       -- P :: forall a b. Req => Prov => ty
 
       -- | A signature for a class method
@@ -764,7 +765,7 @@ data Sig name
       --
       --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDefault',
       --           'ApiAnnotation.AnnDcolon'
-  | ClassOpSig Bool [Located name] (LHsSigType name)
+  | ClassOpSig Bool [LEmbellished name] (LHsSigType name)
 
         -- | A type signature in generated code, notably the code
         -- generated for record selectors.  We simply record
@@ -795,7 +796,7 @@ data Sig name
         --       'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | InlineSig   (Located name)  -- Function name
+  | InlineSig   (LEmbellished name)  -- Function name
                 InlinePragma    -- Never defaultInlinePragma
 
         -- | A specialisation pragma
@@ -810,7 +811,7 @@ data Sig name
         --      'ApiAnnotation.AnnDcolon'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | SpecSig     (Located name)     -- Specialise a function or datatype  ...
+  | SpecSig     (LEmbellished name) -- Specialise a function or datatype  ...
                 [LHsSigType name]  -- ... to these types
                 InlinePragma       -- The pragma on SPECIALISE_INLINE form.
                                    -- If it's just defaultInlinePragma, then we said
@@ -839,7 +840,7 @@ data Sig name
         --      'ApiAnnotation.AnnClose'
 
         -- For details on above see note [Api annotations] in ApiAnnotation
-  | MinimalSig SourceText (LBooleanFormula (Located name))
+  | MinimalSig SourceText (LBooleanFormula (LEmbellished name))
                -- Note [Pragma source text] in BasicTypes
 
         -- | A "set cost centre" pragma for declarations
@@ -851,9 +852,11 @@ data Sig name
         -- > {-# SCC funName "cost_centre_name" #-}
 
   | SCCFunSig  SourceText      -- Note [Pragma source text] in BasicTypes
-               (Located name)  -- Function name
+               (LEmbellished name) -- Function name
                (Maybe StringLiteral)
-  | CompleteMatchSig SourceText (Located [Located name]) (Maybe (Located name))
+  | CompleteMatchSig SourceText
+                     (Located [LEmbellished name])
+                     (Maybe (LEmbellished name))
 
 deriving instance (DataId name) => Data (Sig name)
 
@@ -861,7 +864,7 @@ deriving instance (DataId name) => Data (Sig name)
 type LFixitySig name = Located (FixitySig name)
 
 -- | Fixity Signature
-data FixitySig name = FixitySig [Located name] Fixity
+data FixitySig name = FixitySig [LEmbellished name] Fixity
   deriving Data
 
 -- | Type checker Specialisation Pragmas

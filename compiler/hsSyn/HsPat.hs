@@ -45,6 +45,7 @@ import HsBinds
 import HsLit
 import PlaceHolder
 import HsTypes
+import HsEmbellished
 import TcEvidence
 import BasicTypes
 -- others:
@@ -88,7 +89,7 @@ data Pat id
 
     -- For details on above see note [Api annotations] in ApiAnnotation
 
-  | AsPat       (Located id) (LPat id)  -- ^ As pattern
+  | AsPat       (LEmbellished id) (LPat id)  -- ^ As pattern
     -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
     -- For details on above see note [Api annotations] in ApiAnnotation
@@ -391,7 +392,7 @@ hsRecFieldSel = fmap selectorFieldOcc . hsRecFieldLbl
 hsRecFieldId :: HsRecField Id arg -> Located Id
 hsRecFieldId = hsRecFieldSel
 
-hsRecUpdFieldRdr :: HsRecUpdField id -> Located RdrName
+hsRecUpdFieldRdr :: HsRecUpdField id -> LEmbellished RdrName
 hsRecUpdFieldRdr = fmap rdrNameAmbiguousFieldOcc . hsRecFieldLbl
 
 hsRecUpdFieldId :: HsRecField' (AmbiguousFieldOcc Id) arg -> Located Id

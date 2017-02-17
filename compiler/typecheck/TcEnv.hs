@@ -575,13 +575,13 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
 
     get_fi_cons :: DataFamInstDecl Name -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } })
-      = map unLoc $ concatMap (getConNames . unLoc) cons
+      = map unLocEmb $ concatMap (getConNames . unLoc) cons
 
 
 tcAddPatSynPlaceholders :: [PatSynBind Name Name] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
-  = tcExtendKindEnv2 [ (name, APromotionErr PatSynPE)
+  = tcExtendKindEnv2 [ (unEmb name, APromotionErr PatSynPE)
                      | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
 
@@ -593,8 +593,8 @@ getTypeSigNames sigs
     get_type_sig :: LSig Name -> NameSet -> NameSet
     get_type_sig sig ns =
       case sig of
-        L _ (TypeSig names _) -> extendNameSetList ns (map unLoc names)
-        L _ (PatSynSig names _) -> extendNameSetList ns (map unLoc names)
+        L _ (TypeSig names _) -> extendNameSetList ns (map unLocEmb names)
+        L _ (PatSynSig names _) -> extendNameSetList ns (map unLocEmb names)
         _ -> ns
 
 

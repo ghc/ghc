@@ -284,12 +284,12 @@ rnSrcFixityDecls bndr_set fix_decls
            return [ L loc (FixitySig name fixity)
                   | name <- names ]
 
-    lookup_one :: Located RdrName -> RnM [Located Name]
+    lookup_one :: LEmbellished RdrName -> RnM [LEmbellished Name]
     lookup_one (L name_loc rdr_name)
       = setSrcSpan name_loc $
                     -- this lookup will fail if the definition isn't local
-        do names <- lookupLocalTcNames sig_ctxt what rdr_name
-           return [ L name_loc name | (_, name) <- names ]
+        do names <- lookupLocalTcNames sig_ctxt what $ unEmb rdr_name
+           return [ L name_loc (reEmb rdr_name name) | (_, name) <- names ]
     what = text "fixity signature"
 
 {-
@@ -325,14 +325,14 @@ rnSrcWarnDecls bndr_set decls'
 
    rn_deprec (Warning rdr_names txt)
        -- ensures that the names are defined locally
-     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLoc)
+     = do { names <- concatMapM (lookupLocalTcNames sig_ctxt what . unLocEmb)
                                 rdr_names
           ; return [(rdrNameOcc rdr, txt) | (rdr, _) <- names] }
 
    what = text "deprecation"
 
-   warn_rdr_dups = findDupRdrNames $ concatMap (\(L _ (Warning ns _)) -> ns)
-                                               decls
+   warn_rdr_dups = findDupRdrNames
+                      $ concatMap (\(L _ (Warning ns _)) -> map unLEmb ns) decls
 
 findDupRdrNames :: [Located RdrName] -> [[Located RdrName]]
 findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
@@ -607,7 +607,7 @@ checkCanonicalInstances cls poly_ty mbinds = do
     isAliasMG MG {mg_alts = L _ [L _ (Match { m_pats = [], m_grhss = grhss })]}
         | GRHSs [L _ (GRHS [] body)] lbinds <- grhss
         , L _ EmptyLocalBinds <- lbinds
-        , L _ (HsVar (L _ rhsName)) <- body  = Just rhsName
+        , L _ (HsVar (L _ rhsName)) <- body  = Just $ unEmb rhsName
     isAliasMG _ = Nothing
 
     -- got "lhs = rhs" but expected something different
@@ -1051,7 +1051,7 @@ validRuleLhs foralls lhs
     check (OpApp e1 op _ e2)              = checkl op `mplus` checkl_e e1 `mplus` checkl_e e2
     check (HsApp e1 e2)                   = checkl e1 `mplus` checkl_e e2
     check (HsAppType e _)                 = checkl e
-    check (HsVar (L _ v)) | v `notElem` foralls = Nothing
+    check (HsVar (L _ v)) | unEmb v `notElem` foralls = Nothing
     check other                           = Just other  -- Failure
 
         -- Check an argument
@@ -1102,9 +1102,9 @@ rnHsVectDecl :: VectDecl RdrName -> RnM (VectDecl Name, FreeVars)
 -- FIXME: For the moment, the right-hand side is restricted to be a variable as we cannot properly
 --        typecheck a complex right-hand side without invoking 'vectType' from the vectoriser.
 rnHsVectDecl (HsVect s var rhs@(L _ (HsVar _)))
-  = do { var' <- lookupLocatedOccRn var
+  = do { var' <- lookupLEmbellishedOccRn var
        ; (rhs', fv_rhs) <- rnLExpr rhs
-       ; return (HsVect s var' rhs', fv_rhs `addOneFV` unLoc var')
+       ; return (HsVect s var' rhs', fv_rhs `addOneFV` unLocEmb var')
        }
 rnHsVectDecl (HsVect _ _var _rhs)
   = failWith $ vcat
@@ -1112,24 +1112,26 @@ rnHsVectDecl (HsVect _ _var _rhs)
                , text "must be an identifier"
                ]
 rnHsVectDecl (HsNoVect s var)
-  = do { var' <- lookupLocatedTopBndrRn var           -- only applies to local (not imported) names
-       ; return (HsNoVect s var', unitFV (unLoc var'))
+  = do { var' <- lookupLEmbellishedTopBndrRn var
+                 -- only applies to local (not imported) names
+       ; return (HsNoVect s var', unitFV (unLocEmb var'))
        }
 rnHsVectDecl (HsVectTypeIn s isScalar tycon Nothing)
-  = do { tycon' <- lookupLocatedOccRn tycon
-       ; return (HsVectTypeIn s isScalar tycon' Nothing, unitFV (unLoc tycon'))
+  = do { tycon' <- lookupLEmbellishedOccRn tycon
+       ; return (HsVectTypeIn s isScalar tycon' Nothing
+                , unitFV (unLocEmb tycon'))
        }
 rnHsVectDecl (HsVectTypeIn s isScalar tycon (Just rhs_tycon))
-  = do { tycon'     <- lookupLocatedOccRn tycon
-       ; rhs_tycon' <- lookupLocatedOccRn rhs_tycon
+  = do { tycon'     <- lookupLEmbellishedOccRn tycon
+       ; rhs_tycon' <- lookupLEmbellishedOccRn rhs_tycon
        ; return ( HsVectTypeIn s isScalar tycon' (Just rhs_tycon')
-                , mkFVs [unLoc tycon', unLoc rhs_tycon'])
+                , mkFVs [unLocEmb tycon', unLocEmb rhs_tycon'])
        }
 rnHsVectDecl (HsVectTypeOut _ _ _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectTypeOut'"
 rnHsVectDecl (HsVectClassIn s cls)
-  = do { cls' <- lookupLocatedOccRn cls
-       ; return (HsVectClassIn s cls', unitFV (unLoc cls'))
+  = do { cls' <- lookupLEmbellishedOccRn cls
+       ; return (HsVectClassIn s cls', unitFV (unLocEmb cls'))
        }
 rnHsVectDecl (HsVectClassOut _)
   = panic "RnSource.rnHsVectDecl: Unexpected 'HsVectClassOut'"
@@ -1514,8 +1516,8 @@ rnRoleAnnots tc_names role_annots
               -- decls defined in this group (see #10263)
              tycon' <- lookupSigCtxtOccRn (RoleAnnotCtxt tc_names)
                                           (text "role annotation")
-                                          tycon
-           ; return $ RoleAnnotDecl tycon' roles }
+                                          (unLEmb tycon)
+           ; return $ RoleAnnotDecl (reLEmb tycon (unLoc tycon')) roles }
 
 dupRoleAnnotErr :: [LRoleAnnotDecl RdrName] -> RnM ()
 dupRoleAnnotErr [] = panic "dupRoleAnnotErr"
@@ -1701,7 +1703,8 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
 
         -- Check the signatures
         -- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
-        ; let sig_rdr_names_w_locs = [op | L _ (ClassOpSig False ops _) <- sigs
+        ; let sig_rdr_names_w_locs = [unLEmb op
+                                         | L _ (ClassOpSig False ops _) <- sigs
                                          , op <- ops]
         ; checkDupRdrNames sig_rdr_names_w_locs
                 -- Typechecker is responsible for checking that we only
@@ -2014,8 +2017,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
                            , con_cxt = mcxt, con_details = details
                            , con_doc = mb_doc })
   = do  { _ <- addLocM checkConName name
-        ; new_name     <- lookupLocatedTopBndrRn name
-        ; let doc = ConDeclCtx [new_name]
+        ; new_name     <- lookupLEmbellishedTopBndrRn name
+        ; let doc = ConDeclCtx [unLEmb new_name]
         ; mb_doc'      <- rnMbLHsDoc mb_doc
         ; (kvs, qtvs') <- get_con_qtvs (hsConDeclArgTys details)
 
@@ -2025,7 +2028,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
                              Nothing   -> return (Nothing,emptyFVs)
                              Just lcxt -> do { (lctx',fvs) <- rnContext doc lcxt
                                              ; return (Just lctx',fvs) }
-        ; (new_details, fvs2) <- rnConDeclDetails (unLoc new_name) doc details
+        ; (new_details, fvs2)
+                            <- rnConDeclDetails (unLocEmb new_name) doc details
         ; let (new_details',fvs3) = (new_details,emptyFVs)
         ; traceRn "rnConDecl" (ppr name <+> vcat
              [ text "free_kvs:" <+> ppr kvs
@@ -2055,8 +2059,8 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
 rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
                             , con_doc = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
-        ; new_names    <- mapM lookupLocatedTopBndrRn names
-        ; let doc = ConDeclCtx new_names
+        ; new_names    <- mapM lookupLEmbellishedTopBndrRn names
+        ; let doc = ConDeclCtx $ map unLEmb new_names
         ; mb_doc'      <- rnMbLHsDoc mb_doc
 
         ; (ty', fvs) <- rnHsSigType doc ty
@@ -2115,16 +2119,16 @@ extendPatSynEnv val_decls local_fix_env thing = do {
       | L bind_loc (PatSynBind (PSB { psb_id = L _ n
                                     , psb_args = RecordPatSyn as })) <- bind
       = do
-          bnd_name <- newTopSrcBinder (L bind_loc n)
-          let rnames = map recordPatSynSelectorId as
-              mkFieldOcc :: Located RdrName -> LFieldOcc RdrName
+          bnd_name <- newTopSrcBinder (L bind_loc $ unEmb n)
+          let rnames = map (lEmb . recordPatSynSelectorId) as
+              mkFieldOcc :: LEmbellished RdrName -> LFieldOcc RdrName
               mkFieldOcc (L l name) = L l (FieldOcc (L l name) PlaceHolder)
               field_occs =  map mkFieldOcc rnames
           flds     <- mapM (newRecordSelector False [bnd_name]) field_occs
           return ((bnd_name, flds): names)
       | L bind_loc (PatSynBind (PSB { psb_id = L _ n})) <- bind
       = do
-        bnd_name <- newTopSrcBinder (L bind_loc n)
+        bnd_name <- newTopSrcBinder (L bind_loc $ unEmb n)
         return ((bnd_name, []): names)
       | otherwise
       = return names

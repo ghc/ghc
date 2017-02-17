@@ -508,7 +508,7 @@ addBinTickLHsExpr boxLabel (L pos e0)
 -- in the addTickLHsExpr family of functions.)
 
 addTickHsExpr :: HsExpr Id -> TM (HsExpr Id)
-addTickHsExpr e@(HsVar (L _ id)) = do freeVar id; return e
+addTickHsExpr e@(HsVar (L _ id)) = do freeVar $ unEmb id; return e
 addTickHsExpr (HsUnboundVar {})  = panic "addTickHsExpr.HsUnboundVar"
 addTickHsExpr e@(HsConLikeOut con)
   | Just id <- conLikeWrapId_maybe con = do freeVar id; return e

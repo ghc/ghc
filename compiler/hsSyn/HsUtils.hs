@@ -120,6 +120,7 @@ import Util
 import Bag
 import Outputable
 import Constants
+import HsEmbellished
 
 import Data.Either
 import Data.Function
@@ -196,7 +197,7 @@ mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
 nlHsTyApp :: name -> [Type] -> LHsExpr name
-nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
+nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar (noEmb fun_id)))
 
 nlHsTyApps :: name -> [Type] -> [LHsExpr name] -> LHsExpr name
 nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
@@ -315,7 +316,7 @@ mkRecStmt stmts  = emptyRecStmt { recS_stmts = stmts }
 --- A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
 mkHsOpApp :: LHsExpr id -> id -> LHsExpr id -> HsExpr id
-mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar (noLoc op)))
+mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar (noEmb op)))
                            (error "mkOpApp:fixity") e2
 
 unqualSplice :: RdrName
@@ -368,7 +369,7 @@ userHsTyVarBndrs loc bndrs = [ L loc (UserTyVar (L loc v)) | v <- bndrs ]
 -}
 
 nlHsVar :: id -> LHsExpr id
-nlHsVar n = noLoc (HsVar (noLoc n))
+nlHsVar n = noLoc (HsVar (noEmb n))
 
 -- NB: Only for LHsExpr **Id**
 nlHsDataCon :: DataCon -> LHsExpr Id
@@ -405,7 +406,7 @@ nlHsApps :: id -> [LHsExpr id] -> LHsExpr id
 nlHsApps f xs = foldl nlHsApp (nlHsVar f) xs
 
 nlHsVarApps :: id -> [id] -> LHsExpr id
-nlHsVarApps f xs = noLoc (foldl mk (HsVar (noLoc f)) (map (HsVar . noLoc) xs))
+nlHsVarApps f xs = noLoc (foldl mk (HsVar (noEmb f)) (map (HsVar . noEmb) xs))
                  where
                    mk f a = HsApp (noLoc f) (noLoc a)
 
@@ -472,7 +473,7 @@ nlHsFunTy :: LHsType name -> LHsType name -> LHsType name
 nlHsParTy :: LHsType name                 -> LHsType name
 
 nlHsAppTy f t           = noLoc (HsAppTy f t)
-nlHsTyVar x             = noLoc (HsTyVar NotPromoted (noLoc x))
+nlHsTyVar x             = noLoc (HsTyVar NotPromoted (noEmb x))
 nlHsFunTy a b           = noLoc (HsFunTy a b)
 nlHsParTy t             = noLoc (HsParTy t)
 
@@ -722,7 +723,7 @@ mkVarBind :: id -> LHsExpr id -> LHsBind id
 mkVarBind var rhs = L (getLoc rhs) $
                     VarBind { var_id = var, var_rhs = rhs, var_inline = False }
 
-mkPatSynBind :: Located RdrName -> HsPatSynDetails (Located RdrName)
+mkPatSynBind :: LEmbellished RdrName -> HsPatSynDetails (Located RdrName)
              -> LPat RdrName -> HsPatSynDir RdrName -> HsBind RdrName
 mkPatSynBind name details lpat dir = PatSynBind psb
   where
@@ -891,7 +892,7 @@ collect_bind _ (AbsBinds { abs_exports = dbinds }) acc = map abe_poly dbinds ++ 
 collect_bind _ (AbsBindsSig { abs_sig_export = poly }) acc = poly : acc
 collect_bind omitPatSyn (PatSynBind (PSB { psb_id = L _ ps })) acc
   | omitPatSyn                  = acc
-  | otherwise                   = ps : acc
+  | otherwise                   = unEmb ps : acc
 
 collectMethodBinders :: LHsBindsLR RdrName idR -> [Located RdrName]
 -- Used exclusively for the bindings of an instance decl which are all FunBinds
@@ -940,7 +941,7 @@ collect_lpat (L _ pat) bndrs
     go (WildPat _)                = bndrs
     go (LazyPat pat)              = collect_lpat pat bndrs
     go (BangPat pat)              = collect_lpat pat bndrs
-    go (AsPat (L _ a) pat)        = a : collect_lpat pat bndrs
+    go (AsPat (L _ a) pat)        = unEmb a : collect_lpat pat bndrs
     go (ViewPat _ pat _)          = collect_lpat pat bndrs
     go (ParPat  pat)              = collect_lpat pat bndrs
 
@@ -1007,11 +1008,13 @@ hsTyClForeignBinders tycl_decls foreign_decls
          `mappend`
          foldMap (foldMap hsLInstDeclBinders . group_instds) tycl_decls)
   where
-    getSelectorNames :: ([Located Name], [LFieldOcc Name]) -> [Name]
-    getSelectorNames (ns, fs) = map unLoc ns ++ map (selectorFieldOcc.unLoc) fs
+    getSelectorNames :: ([LEmbellished Name], [LFieldOcc Name]) -> [Name]
+    getSelectorNames (ns, fs)
+      = map unLocEmb ns ++ map (selectorFieldOcc.unLoc) fs
 
 -------------------
-hsLTyClDeclBinders :: Located (TyClDecl name) -> ([Located name], [LFieldOcc name])
+hsLTyClDeclBinders :: Located (TyClDecl name)
+                   -> ([LEmbellished name], [LFieldOcc name])
 -- ^ Returns all the /binding/ names of the decl.  The first one is
 
 -- guaranteed to be the name of the decl. The first component
@@ -1023,16 +1026,19 @@ hsLTyClDeclBinders :: Located (TyClDecl name) -> ([Located name], [LFieldOcc nam
 -- See Note [SrcSpan for binders]
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
-  = ([L loc name], [])
-hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = ([L loc name], [])
+  = ([L loc $ EName name], [])
+hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name }))
+  = ([L loc (EName name)], [])
 hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))
-  = (L loc cls_name :
-     [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
-     [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
+  = (L loc (EName cls_name) :
+     [ L fam_loc (EName fam_name) |
+                 L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
+     [ L mem_loc (EName mem_name) | L mem_loc (ClassOpSig False ns _) <- sigs
+                          , L _ mem_name <- (map unLEmb ns) ]
     , [])
 hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
-  = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
+  = (\ (xs, ys) -> (L loc (EName name) : xs, ys)) $ hsDataDefnBinders defn
 
 -------------------
 hsForeignDeclsBinders :: [LForeignDecl name] -> [Located name]
@@ -1062,7 +1068,7 @@ getPatSynBinds binds
           , L _ (PatSynBind psb) <- bagToList lbinds ]
 
 -------------------
-hsLInstDeclBinders :: LInstDecl name -> ([Located name], [LFieldOcc name])
+hsLInstDeclBinders :: LInstDecl name -> ([LEmbellished name], [LFieldOcc name])
 hsLInstDeclBinders (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = dfis } }))
   = foldMap (hsDataFamInstBinders . unLoc) dfis
 hsLInstDeclBinders (L _ (DataFamInstD { dfid_inst = fi }))
@@ -1071,26 +1077,27 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataFamInstBinders :: DataFamInstDecl name -> ([Located name], [LFieldOcc name])
+hsDataFamInstBinders :: DataFamInstDecl name
+                     -> ([LEmbellished name], [LFieldOcc name])
 hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 
 -------------------
 -- the SrcLoc returned are for the whole declarations, not just the names
-hsDataDefnBinders :: HsDataDefn name -> ([Located name], [LFieldOcc name])
+hsDataDefnBinders :: HsDataDefn name -> ([LEmbellished name], [LFieldOcc name])
 hsDataDefnBinders (HsDataDefn { dd_cons = cons })
   = hsConDeclsBinders cons
   -- See Note [Binders in family instances]
 
 -------------------
-hsConDeclsBinders :: [LConDecl name] -> ([Located name], [LFieldOcc name])
+hsConDeclsBinders :: [LConDecl name] -> ([LEmbellished name], [LFieldOcc name])
   -- See hsLTyClDeclBinders for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
 hsConDeclsBinders cons = go id cons
   where go :: ([LFieldOcc name] -> [LFieldOcc name])
-           -> [LConDecl name] -> ([Located name], [LFieldOcc name])
+           -> [LConDecl name] -> ([LEmbellished name], [LFieldOcc name])
         go _ [] = ([], [])
         go remSeen (r:rs) =
           -- don't re-mangle the location of field names, because we don't
@@ -1112,7 +1119,8 @@ hsConDeclsBinders cons = go id cons
                             where (ns, fs) = go remSeen rs
                where
                  (_tvs, _cxt, tau) = splitLHsSigmaTy res_ty
-                 record_gadt flds = (map (L loc . unLoc) names ++ ns, r' ++ fs)
+                 record_gadt flds = (map (L loc . unLoc) names ++ ns
+                                    , r' ++ fs)
                    where r' = remSeen (concatMap (cd_fld_names . unLoc) flds)
                          remSeen' = foldr (.) remSeen
                                         [deleteBy ((==) `on`

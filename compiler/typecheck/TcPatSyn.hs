@@ -78,7 +78,8 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
                tcPat PatSyn lpat exp_ty $
                mapM tcLookupId arg_names
 
-       ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
+       ; let named_taus = (unEmb name, pat_ty)
+                             : map (\arg -> (getName arg, varType arg)) args
 
        ; (qtvs, req_dicts, ev_binds) <- simplifyInfer tclvl NoRestrictions []
                                                       named_taus wanted
@@ -119,8 +120,9 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; tcCheckPatSynPat lpat
 
        ; (arg_tys, pat_ty) <- case tcSplitFunTysN decl_arity sig_body_ty of
-                                 Right stuff  -> return stuff
-                                 Left missing -> wrongNumberOfParmsErr name decl_arity missing
+                                Right stuff  -> return stuff
+                                Left missing -> wrongNumberOfParmsErr
+                                                 (unEmb name) decl_arity missing
 
        -- Complain about:  pattern P :: () => forall x. x -> P x
        -- The existential 'x' should not appear in the result type
@@ -168,7 +170,8 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
-       ; let skol_info = SigSkol (PatSynCtxt name) (mkPhiTy req_theta pat_ty)
+       ; let skol_info = SigSkol (PatSynCtxt $ unEmb name)
+                                 (mkPhiTy req_theta pat_ty)
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
                          -- See TcRnTypes Note [Skolem info for pattern synonyms]
@@ -266,7 +269,7 @@ collectPatSynArgInfo details =
                                          , recordPatSynSelectorId = L _ selId })
       = (patVar, selId)
 
-addPatSynCtxt :: Located Name -> TcM a -> TcM a
+addPatSynCtxt :: LEmbellished Name -> TcM a -> TcM a
 addPatSynCtxt (L loc name) thing_inside
   = setSrcSpan loc $
     addErrCtxt (text "In the declaration for pattern synonym"
@@ -282,7 +285,7 @@ wrongNumberOfParmsErr name decl_arity missing
 
 -------------------------
 -- Shared by both tcInferPatSyn and tcCheckPatSyn
-tc_patsyn_finish :: Located Name  -- ^ PatSyn Name
+tc_patsyn_finish :: LEmbellished Name -- ^ PatSyn Name
                  -> HsPatSynDir Name  -- ^ PatSyn type (Uni/Bidir/ExplicitBidir)
                  -> Bool              -- ^ Whether infix
                  -> LPat Id           -- ^ Pattern of the PatSyn
@@ -324,14 +327,14 @@ tc_patsyn_finish lname dir is_infix lpat'
            ppr pat_ty
 
        -- Make the 'matcher'
-       ; (matcher_id, matcher_bind) <- tcPatSynMatcher lname lpat'
+       ; (matcher_id, matcher_bind) <- tcPatSynMatcher (unLEmb lname) lpat'
                                          (binderVars univ_tvs, req_theta, req_ev_binds, req_dicts)
                                          (binderVars ex_tvs, ex_tys, prov_theta, prov_dicts)
                                          (args, arg_tys)
                                          pat_ty
 
        -- Make the 'builder'
-       ; builder_id <- mkPatSynBuilderId dir lname
+       ; builder_id <- mkPatSynBuilderId dir (unLEmb lname)
                                          univ_tvs req_theta
                                          ex_tvs   prov_theta
                                          arg_tys pat_ty
@@ -344,7 +347,7 @@ tc_patsyn_finish lname dir is_infix lpat'
 
 
        -- Make the PatSyn itself
-       ; let patSyn = mkPatSyn (unLoc lname) is_infix
+       ; let patSyn = mkPatSyn (unLocEmb lname) is_infix
                         (univ_tvs, req_theta)
                         (ex_tvs, prov_theta)
                         arg_tys
@@ -521,7 +524,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
          , text "RHS pattern:" <+> ppr lpat ]
 
   | Right match_group <- mb_match_group  -- Bidirectional
-  = do { patsyn <- tcLookupPatSyn name
+  = do { patsyn <- tcLookupPatSyn $ unEmb name
        ; traceTc "tcPatSynBuilderBind {" $ ppr patsyn
        ; let Just (builder_id, need_dummy_arg) = patSynBuilder patsyn
                    -- Bidirectional, so patSynBuilder returns Just
@@ -535,7 +538,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
                             , bind_fvs    = placeHolderNamesTc
                             , fun_tick    = [] }
 
-             sig = completeSigFromId (PatSynCtxt name) builder_id
+             sig = completeSigFromId (PatSynCtxt $ unEmb name) builder_id
 
        ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
@@ -553,7 +556,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
     mk_mg body = mkMatchGroup Generated [builder_match]
              where
                builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
-               builder_match = mkMatch (FunRhs (L loc name) Prefix)
+               builder_match = mkMatch (FunRhs (L loc $ unEmb name) Prefix)
                                        builder_args body
                                        (noLoc EmptyLocalBinds)
 
@@ -608,10 +611,10 @@ tcPatToExpr args pat = go pat
 
     -- Make a prefix con for prefix and infix patterns for simplicity
     mkPrefixConExpr :: Located Name -> [LPat Name] -> Either MsgDoc (HsExpr Name)
-    mkPrefixConExpr lcon@(L loc _) pats
+    mkPrefixConExpr (L loc n) pats
       = do { exprs <- mapM go pats
            ; return (foldl (\x y -> HsApp (L loc x) y)
-                           (HsVar lcon) exprs) }
+                           (HsVar (L loc (EName n))) exprs) }
 
     mkRecordConExpr :: Located Name -> HsRecFields Name (LPat Name)
                     -> Either MsgDoc (HsExpr Name)
@@ -634,7 +637,7 @@ tcPatToExpr args pat = go pat
 
     go1 (VarPat (L l var))
         | var `elemNameSet` lhsVars
-        = return $ HsVar (L l var)
+        = return $ HsVar (L l $ EName var)
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat pat)                = fmap HsPar $ go pat

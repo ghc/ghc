@@ -235,7 +235,7 @@ tcCompleteSigs sigs =
            addErrCtxt (text "In" <+> ppr c) $
             case mtc of
               Nothing -> infer_complete_match
-              Just tc -> check_complete_match tc
+              Just tc -> check_complete_match $ unLEmb tc
         where
 
           checkCLTypes acc = foldM checkCLType (acc, []) (unLoc lns)
@@ -259,10 +259,10 @@ tcCompleteSigs sigs =
 
 
       -- See note [Typechecking Complete Matches]
-      checkCLType :: (CompleteSigType, [ConLike]) -> Located Name
+      checkCLType :: (CompleteSigType, [ConLike]) -> LEmbellished Name
                   -> TcM (CompleteSigType, [ConLike])
       checkCLType (cst, cs) n = do
-        cl <- addLocM tcLookupConLike n
+        cl <- addLocM tcLookupConLike $ unLEmb n
         let   (_,_,_,_,_,_, res_ty) = conLikeFullSig cl
               res_ty_con = fst <$> splitTyConApp_maybe res_ty
         case (cst, res_ty_con) of
@@ -315,8 +315,8 @@ tcHsBootSigs binds sigs
       where
         f (L _ name)
           = do { sigma_ty <- solveEqualities $
-                             tcHsSigWcType (FunSigCtxt name False) hs_ty
-               ; return (mkVanillaGlobal name sigma_ty) }
+                             tcHsSigWcType (FunSigCtxt (unEmb name) False) hs_ty
+               ; return (mkVanillaGlobal (unEmb name) sigma_ty) }
         -- Notice that we make GlobalIds, not LocalIds
     tc_boot_sig s = pprPanic "tcHsBootSigs/tc_boot_sig" (ppr s)
 
@@ -527,7 +527,7 @@ tc_single _top_lvl sig_fn _prag_fn
        }
   where
     tc_pat_syn_decl :: TcM (LHsBinds TcId, TcGblEnv)
-    tc_pat_syn_decl = case sig_fn name of
+    tc_pat_syn_decl = case sig_fn $ unEmb name of
         Nothing                 -> tcInferPatSynDecl psb
         Just (TcPatSynSig tpsi) -> tcCheckPatSynDecl psb tpsi
         Just                 _  -> panic "tc_single"
@@ -1139,34 +1139,35 @@ tcVect :: VectDecl Name -> TcM (VectDecl TcId)
 --   from the vectoriser here.
 tcVect (HsVect s name rhs)
   = addErrCtxt (vectCtxt name) $
-    do { var <- wrapLocM tcLookupId name
+    do { var <- wrapLocM tcLookupId $ unLEmb name
        ; let L rhs_loc (HsVar (L lv rhs_var_name)) = rhs
-       ; rhs_id <- tcLookupId rhs_var_name
-       ; return $ HsVect s var (L rhs_loc (HsVar (L lv rhs_id)))
+       ; rhs_id <- tcLookupId $ unEmb rhs_var_name
+       ; return $ HsVect s (reLEmb name (unLoc var))
+                          (L rhs_loc (HsVar (L lv (reEmb rhs_var_name rhs_id))))
        }
 
 tcVect (HsNoVect s name)
-  = addErrCtxt (vectCtxt name) $
-    do { var <- wrapLocM tcLookupId name
-       ; return $ HsNoVect s var
+  = addErrCtxt (vectCtxt $ unLEmb name) $
+    do { var <- wrapLocM tcLookupId $ unLEmb name
+       ; return $ HsNoVect s (reLEmb name (unLoc var))
        }
 tcVect (HsVectTypeIn _ isScalar lname rhs_name)
   = addErrCtxt (vectCtxt lname) $
-    do { tycon <- tcLookupLocatedTyCon lname
+    do { tycon <- tcLookupLocatedTyCon $ unLEmb lname
        ; checkTc (   not isScalar             -- either    we have a non-SCALAR declaration
                  || isJust rhs_name           -- or        we explicitly provide a vectorised type
                  || tyConArity tycon == 0     -- otherwise the type constructor must be nullary
                  )
                  scalarTyConMustBeNullary
 
-       ; rhs_tycon <- fmapMaybeM (tcLookupTyCon . unLoc) rhs_name
+       ; rhs_tycon <- fmapMaybeM (tcLookupTyCon . unLocEmb) rhs_name
        ; return $ HsVectTypeOut isScalar tycon rhs_tycon
        }
 tcVect (HsVectTypeOut _ _ _)
   = panic "TcBinds.tcVect: Unexpected 'HsVectTypeOut'"
 tcVect (HsVectClassIn _ lname)
   = addErrCtxt (vectCtxt lname) $
-    do { cls <- tcLookupLocatedClass lname
+    do { cls <- tcLookupLocatedClass $ unLEmb lname
        ; return $ HsVectClassOut cls
        }
 tcVect (HsVectClassOut _)

@@ -112,7 +112,7 @@ rnBracket e br_body
 
 rn_bracket :: ThStage -> HsBracket RdrName -> RnM (HsBracket Name, FreeVars)
 rn_bracket outer_stage br@(VarBr flg rdr_name)
-  = do { name <- lookupOccRn rdr_name
+  = do { name <- lookupOccRn $ unLocEmb rdr_name
        ; this_mod <- getModule
 
        ; when (flg && nameIsLocalOrFrom this_mod name) $
@@ -133,7 +133,7 @@ rn_bracket outer_stage br@(VarBr flg rdr_name)
                                              (quotedNameStageErr br) }
                         }
                     }
-       ; return (VarBr flg name, unitFV name) }
+       ; return (VarBr flg (reLEmb rdr_name name), unitFV name) }
 
 rn_bracket _ (ExpBr e) = do { (e', fvs) <- rnLExpr e
                             ; return (ExpBr e', fvs) }
@@ -344,11 +344,11 @@ mkQuasiQuoteExpr :: UntypedSpliceFlavour -> Name -> SrcSpan -> FastString -> LHs
 -- which is what we must run in a quasi-quote
 mkQuasiQuoteExpr flavour quoter q_span quote
   = L q_span $ HsApp (L q_span $
-                      HsApp (L q_span (HsVar (L q_span quote_selector)))
+                      HsApp (L q_span (HsVar (L q_span $ EName quote_selector)))
                             quoterExpr)
                      quoteExpr
   where
-    quoterExpr = L q_span $! HsVar $! (L q_span quoter)
+    quoterExpr = L q_span $! HsVar $! (L q_span $ EName quoter)
     quoteExpr  = L q_span $! HsLit $! HsString NoSourceText quote
     quote_selector = case flavour of
                        UntypedExpSplice  -> quoteExpName

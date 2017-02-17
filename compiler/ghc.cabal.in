@@ -310,6 +310,7 @@ Library
         HsImpExp
         HsLit
         PlaceHolder
+        HsEmbellished
         HsPat
         HsSyn
         HsTypes

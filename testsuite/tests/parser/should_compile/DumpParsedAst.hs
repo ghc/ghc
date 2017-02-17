@@ -9,3 +9,7 @@ type family Length (as :: [k]) :: Peano where
   Length '[]      = Zero
 
 main = putStrLn "hello"
+
+foo = 5 `mod` 2
+
+bar = (+) 3 4

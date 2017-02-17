@@ -475,7 +475,7 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
                            Just ksig -> tcLHsKind ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
-        ; let inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
+        ; let inner_prs = [ (unLocEmb con, APromotionErr RecDataConPE)
                           | L _ con' <- cons, con <- getConNames con' ]
         ; return (mkTcTyConPair tycon : inner_prs) }
 
@@ -573,7 +573,7 @@ kcTyClDecl (ClassDecl { tcdLName = L _ name
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM kc_sig)     sigs }
   where
-    kc_sig (ClassOpSig _ nms op_ty) = kcHsSigType nms op_ty
+    kc_sig (ClassOpSig _ nms op_ty) = kcHsSigType (map unLEmb nms) op_ty
     kc_sig _                        = return ()
 
 kcTyClDecl (FamDecl (FamilyDecl { fdLName  = L _ fam_tc_name
@@ -594,7 +594,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
          -- the 'False' says that the existentials don't have a CUSK, as the
          -- concept doesn't really apply here. We just need to bring the variables
          -- into scope.
-    do { _ <- kcHsTyVarBndrs (unLoc name) False False False False
+    do { _ <- kcHsTyVarBndrs (unLocEmb name) False False False False
                              ((fromMaybe emptyLHsQTvs ex_tvs)) $
               do { _ <- tcHsContext (fromMaybe (noLoc []) ex_ctxt)
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
@@ -606,7 +606,7 @@ kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
 kcConDecl (ConDeclGADT { con_names = names
                        , con_type = ty })
   = addErrCtxt (dataConCtxtName names) $
-      do { _ <- tcGadtSigType (ppr names) (unLoc $ head names) ty
+      do { _ <- tcGadtSigType (ppr names) (unLocEmb $ head names) ty
          ; return () }
 
 
@@ -1161,7 +1161,7 @@ kcDataDefn fam_name (HsIB { hsib_body = pats })
             Just k  -> do { k' <- tcLHsKind k
                           ; unifyKind (Just hs_ty_pats) res_k k' } }
   where
-    hs_ty_pats = mkHsAppTys (noLoc $ HsTyVar NotPromoted (noLoc fam_name)) pats
+    hs_ty_pats = mkHsAppTys (noLoc $ HsTyVar NotPromoted (noEmb fam_name)) pats
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -1469,7 +1469,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
               do { traceTc "tcConDecl" (ppr name <+> text "tvs:" <+> ppr hs_tvs)
                  ; ctxt <- tcHsContext (fromMaybe (noLoc []) hs_ctxt)
                  ; btys <- tcConArgs hs_details
-                 ; field_lbls <- lookupConstructorFields (unLoc name)
+                 ; field_lbls <- lookupConstructorFields (unLocEmb name)
                  ; let (arg_tys, stricts) = unzip btys
                        bound_vars  = allBoundVariabless ctxt `unionVarSet`
                                      allBoundVariabless arg_tys
@@ -1509,10 +1509,10 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
            ex_tvs = mkTyVarBinders Inferred qkvs ++
                     mkTyVarBinders Specified user_qtvs
            buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixH98 name hs_details
-             ; rep_nm   <- newTyConRepName name
+             { is_infix <- tcConIsInfixH98 (unEmb name) hs_details
+             ; rep_nm   <- newTyConRepName $ unEmb name
 
-             ; buildDataCon fam_envs name is_infix rep_nm
+             ; buildDataCon fam_envs (unEmb name) is_infix rep_nm
                             stricts Nothing field_lbls
                             (mkDataConUnivTyVarBinders tmpl_bndrs)
                             ex_tvs
@@ -1531,7 +1531,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
   = addErrCtxt (dataConCtxtName names) $
     do { traceTc "tcConDecl 1" (ppr names)
        ; (user_tvs, ctxt, stricts, field_lbls, arg_tys, res_ty,hs_details)
-           <- tcGadtSigType (ppr names) (unLoc $ head names) ty
+           <- tcGadtSigType (ppr names) (unLocEmb $ head names) ty
 
        ; vars <- zonkTcTypeAndSplitDepVars (mkSpecForAllTys user_tvs $
                                             mkFunTys ctxt $
@@ -1561,10 +1561,10 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
        ; traceTc "tcConDecl 2" (ppr names $$ ppr field_lbls)
        ; let
            buildOneDataCon (L _ name) = do
-             { is_infix <- tcConIsInfixGADT name hs_details
-             ; rep_nm   <- newTyConRepName name
+             { is_infix <- tcConIsInfixGADT (unEmb name) hs_details
+             ; rep_nm   <- newTyConRepName $ unEmb name
 
-             ; buildDataCon fam_envs name is_infix
+             ; buildDataCon fam_envs (unEmb name) is_infix
                             rep_nm
                             stricts Nothing field_lbls
                             univ_bndrs ex_bndrs eq_preds
@@ -2910,7 +2910,7 @@ fieldTypeMisMatch field_name con1 con2
   = sep [text "Constructors" <+> ppr con1 <+> text "and" <+> ppr con2,
          text "give different types for field", quotes (ppr field_name)]
 
-dataConCtxtName :: [Located Name] -> SDoc
+dataConCtxtName :: [LEmbellished Name] -> SDoc
 dataConCtxtName [con]
    = text "In the definition of data constructor" <+> quotes (ppr con)
 dataConCtxtName con

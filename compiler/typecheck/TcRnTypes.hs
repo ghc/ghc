@@ -3105,10 +3105,11 @@ lexprCtOrigin :: LHsExpr Name -> CtOrigin
 lexprCtOrigin (L _ e) = exprCtOrigin e
 
 exprCtOrigin :: HsExpr Name -> CtOrigin
-exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
+exprCtOrigin (HsVar (L _ name)) = OccurrenceOf (unEmb name)
 exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
 exprCtOrigin (HsConLikeOut {})  = panic "exprCtOrigin HsConLikeOut"
-exprCtOrigin (HsRecFld f)       = OccurrenceOfRecSel (rdrNameAmbiguousFieldOcc f)
+exprCtOrigin (HsRecFld f)       = OccurrenceOfRecSel
+                                           (unEmb $ rdrNameAmbiguousFieldOcc f)
 exprCtOrigin (HsOverLabel _ l)  = OverLabelOrigin l
 exprCtOrigin (HsIPVar ip)       = IPOccOrigin ip
 exprCtOrigin (HsOverLit lit)    = LiteralOrigin lit

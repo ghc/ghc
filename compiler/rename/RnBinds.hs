@@ -409,14 +409,15 @@ rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
 rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
   = do { addLocM checkConName rdrname
-       ; name <- lookupLocatedTopBndrRn rdrname   -- Should be in scope already
-       ; return (PatSynBind psb{ psb_id = name }) }
+       ; L _ name <- lookupLocatedTopBndrRn $ unLEmb rdrname
+                    -- Should be in scope already
+       ; return (PatSynBind psb{ psb_id = reLEmb rdrname name }) }
 
   | otherwise  -- Pattern synonym, not at top level
   = do { addErr localPatternSynonymErr  -- Complain, but make up a fake
                                         -- name so that we can carry on
-       ; name <- applyNameMaker name_maker rdrname
-       ; return (PatSynBind psb{ psb_id = name }) }
+       ; L _ name <- applyNameMaker name_maker $ unLEmb rdrname
+       ; return (PatSynBind psb{ psb_id = reLEmb rdrname name }) }
   where
     localPatternSynonymErr :: SDoc
     localPatternSynonymErr
@@ -565,11 +566,11 @@ mkSigTvFn sigs = \n -> lookupNameEnv env n `orElse` []
     get_scoped_tvs :: LSig Name -> Maybe ([Located Name], [Name])
     -- Returns (binders, scoped tvs for those binders)
     get_scoped_tvs (L _ (ClassOpSig _ names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
+      = Just (map unLEmb names, hsScopedTvs sig_ty)
     get_scoped_tvs (L _ (TypeSig names sig_ty))
-      = Just (names, hsWcScopedTvs sig_ty)
+      = Just (map unLEmb names, hsWcScopedTvs sig_ty)
     get_scoped_tvs (L _ (PatSynSig names sig_ty))
-      = Just (names, hsScopedTvs sig_ty)
+      = Just (map unLEmb names, hsScopedTvs sig_ty)
     get_scoped_tvs _ = Nothing
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
@@ -587,19 +588,19 @@ makeMiniFixityEnv decls = foldlM add_one_sig emptyFsEnv decls
      foldlM add_one env [ (loc,name_loc,name,fixity)
                         | L name_loc name <- names ]
 
-   add_one env (loc, name_loc, name,fixity) = do
+   add_one env (loc, name_loc, name, fixity) = do
      { -- this fixity decl is a duplicate iff
        -- the ReaderName's OccName's FastString is already in the env
        -- (we only need to check the local fix_env because
        --  definitions of non-local will be caught elsewhere)
-       let { fs = occNameFS (rdrNameOcc name)
+       let { fs = occNameFS (rdrNameOcc $ unEmb name)
            ; fix_item = L loc fixity };
 
        case lookupFsEnv env fs of
          Nothing -> return $ extendFsEnv env fs fix_item
          Just (L loc' _) -> do
            { setSrcSpan loc $
-             addErrAt name_loc (dupFixityDecl loc' name)
+             addErrAt name_loc (dupFixityDecl loc' (unEmb name))
            ; return env}
      }
 
@@ -625,7 +626,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
        -- invariant: no free vars here when it's a FunBind
   = do  { pattern_synonym_ok <- xoptM LangExt.PatternSynonyms
         ; unless pattern_synonym_ok (addErr patternSynonymErr)
-        ; let sig_tvs = sig_fn name
+        ; let sig_tvs = sig_fn $ unEmb name
 
         ; ((pat', details'), fvs1) <- bindSigTyVarsFV sig_tvs $
                                       rnPat PatSyn pat $ \pat' ->
@@ -662,10 +663,10 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             Unidirectional -> return (Unidirectional, emptyFVs)
             ImplicitBidirectional -> return (ImplicitBidirectional, emptyFVs)
             ExplicitBidirectional mg ->
-                do { (mg', fvs) <- bindSigTyVarsFV sig_tvs $
-                                   rnMatchGroup (FunRhs (L l name) Prefix)
-                                                rnLExpr mg
-                   ; return (ExplicitBidirectional mg', fvs) }
+              do { (mg', fvs) <- bindSigTyVarsFV sig_tvs $
+                                 rnMatchGroup (FunRhs (L l $ unEmb name) Prefix)
+                                              rnLExpr mg
+                 ; return (ExplicitBidirectional mg', fvs) }
 
         ; mod <- getModule
         ; let fvs = fvs1 `plusFV` fvs2
@@ -684,7 +685,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                                  _ -> []
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
-          return (bind', name : selector_names , fvs1)
+          return (bind', unEmb name : selector_names , fvs1)
           -- Why fvs1?  See Note [Pattern synonym builders don't yield dependencies]
       }
   where
@@ -888,7 +889,7 @@ renameSig _ (IdSig x)
   = return (IdSig x, emptyFVs)    -- Actually this never occurs
 
 renameSig ctxt sig@(TypeSig vs ty)
-  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
+  = do  { new_vs <- mapM (lookupLESigOccRn ctxt sig) vs
         ; let doc = TypeSigCtx (ppr_sig_bndrs vs)
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
         ; return (TypeSig new_vs new_ty, fvs) }
@@ -897,7 +898,7 @@ renameSig ctxt sig@(ClassOpSig is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $
           addErr (defaultSigErr sig)
-        ; new_v <- mapM (lookupSigOccRn ctxt sig) vs
+        ; new_v <- mapM (lookupLESigOccRn ctxt sig) vs
         ; (new_ty, fvs) <- rnHsSigType ty_ctxt ty
         ; return (ClassOpSig is_deflt new_v new_ty, fvs) }
   where
@@ -915,8 +916,8 @@ renameSig _ (SpecInstSig src ty)
 -- then the SPECIALISE pragma is ambiguous, unlike all other signatures
 renameSig ctxt sig@(SpecSig v tys inl)
   = do  { new_v <- case ctxt of
-                     TopSigCtxt {} -> lookupLocatedOccRn v
-                     _             -> lookupSigOccRn ctxt sig v
+                     TopSigCtxt {} -> lookupLEmbellishedOccRn v
+                     _             -> lookupLESigOccRn ctxt sig v
         ; (new_ty, fvs) <- foldM do_one ([],emptyFVs) tys
         ; return (SpecSig new_v new_ty inl, fvs) }
   where
@@ -927,19 +928,19 @@ renameSig ctxt sig@(SpecSig v tys inl)
            ; return ( new_ty:tys, fvs_ty `plusFV` fvs) }
 
 renameSig ctxt sig@(InlineSig v s)
-  = do  { new_v <- lookupSigOccRn ctxt sig v
+  = do  { new_v <- lookupLESigOccRn ctxt sig v
         ; return (InlineSig new_v s, emptyFVs) }
 
 renameSig ctxt sig@(FixSig (FixitySig vs f))
-  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
+  = do  { new_vs <- mapM (lookupLESigOccRn ctxt sig) vs
         ; return (FixSig (FixitySig new_vs f), emptyFVs) }
 
 renameSig ctxt sig@(MinimalSig s (L l bf))
-  = do new_bf <- traverse (lookupSigOccRn ctxt sig) bf
+  = do new_bf <- traverse (lookupLESigOccRn ctxt sig) bf
        return (MinimalSig s (L l new_bf), emptyFVs)
 
 renameSig ctxt sig@(PatSynSig vs ty)
-  = do  { new_vs <- mapM (lookupSigOccRn ctxt sig) vs
+  = do  { new_vs <- mapM (lookupLESigOccRn ctxt sig) vs
         ; (ty', fvs) <- rnHsSigType ty_ctxt ty
         ; return (PatSynSig new_vs ty', fvs) }
   where
@@ -947,17 +948,17 @@ renameSig ctxt sig@(PatSynSig vs ty)
                           <+> ppr_sig_bndrs vs)
 
 renameSig ctxt sig@(SCCFunSig st v s)
-  = do  { new_v <- lookupSigOccRn ctxt sig v
+  = do  { new_v <- lookupLESigOccRn ctxt sig v
         ; return (SCCFunSig st new_v s, emptyFVs) }
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
 renameSig _ctxt (CompleteMatchSig s (L l bf) mty)
-  = do new_bf <- traverse lookupLocatedOccRn bf
-       new_mty  <- traverse lookupLocatedOccRn mty
+  = do new_bf  <- traverse lookupLEmbellishedOccRn bf
+       new_mty <- traverse lookupLEmbellishedOccRn mty
        return (CompleteMatchSig s (L l new_bf) new_mty, emptyFVs)
 
-ppr_sig_bndrs :: [Located RdrName] -> SDoc
+ppr_sig_bndrs :: [LEmbellished RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)
 
 okHsSig :: HsSigCtxt -> LSig a -> Bool
@@ -1014,12 +1015,12 @@ findDupSigs :: [LSig RdrName] -> [[(Located RdrName, Sig RdrName)]]
 findDupSigs sigs
   = findDupsEq matching_sig (concatMap (expand_sig . unLoc) sigs)
   where
-    expand_sig sig@(FixSig (FixitySig ns _)) = zip ns (repeat sig)
-    expand_sig sig@(InlineSig n _)           = [(n,sig)]
-    expand_sig sig@(TypeSig ns _)            = [(n,sig) | n <- ns]
-    expand_sig sig@(ClassOpSig _ ns _)       = [(n,sig) | n <- ns]
-    expand_sig sig@(PatSynSig ns  _ )        = [(n,sig) | n <- ns]
-    expand_sig sig@(SCCFunSig _ n _)         = [(n,sig)]
+    expand_sig sig@(FixSig (FixitySig ns _)) = zip (map unLEmb ns) (repeat sig)
+    expand_sig sig@(InlineSig n _)           = [(unLEmb n,sig)]
+    expand_sig sig@(TypeSig ns _)            = [(unLEmb n,sig) | n <- ns]
+    expand_sig sig@(ClassOpSig _ ns _)       = [(unLEmb n,sig) | n <- ns]
+    expand_sig sig@(PatSynSig ns  _ )        = [(unLEmb n,sig) | n <- ns]
+    expand_sig sig@(SCCFunSig _ n _)         = [(unLEmb n,sig)]
     expand_sig _ = []
 
     matching_sig (L _ n1,sig1) (L _ n2,sig2)       = n1 == n2 && mtch sig1 sig2
