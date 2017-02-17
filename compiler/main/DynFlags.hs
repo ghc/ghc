@@ -545,6 +545,7 @@ data GeneralFlag
    -- Except for uniques, as some simplifier phases introduce new
    -- variables that have otherwise identical names.
    | Opt_SuppressUniques
+   | Opt_SuppressTicks     -- Replaces Opt_PprShowTicks
 
    -- temporary flags
    | Opt_AutoLinkPackages
@@ -2829,6 +2830,7 @@ dynamic_flags_deps = [
                   setGeneralFlag Opt_SuppressModulePrefixes
                   setGeneralFlag Opt_SuppressTypeApplications
                   setGeneralFlag Opt_SuppressIdInfo
+                  setGeneralFlag Opt_SuppressTicks
                   setGeneralFlag Opt_SuppressTypeSignatures)
 
         ------ Debugging ----------------------------------------------------
@@ -3586,7 +3588,9 @@ dFlagsDeps = [
 -- See Note [Supporting CLI completion]
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
-  flagSpec "ppr-ticks"                  Opt_PprShowTicks,
+  depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
+     (\turn_on -> useInstead "suppress-ticks" (not turn_on)),
+  flagSpec "suppress-ticks"             Opt_SuppressTicks,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
   flagSpec "suppress-unfoldings"        Opt_SuppressUnfoldings,
@@ -3677,7 +3681,7 @@ fFlagsDeps = [
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
-    (useInstead "enable-rewrite-rules"),
+   (useInstead "enable-rewrite-rules"),
   flagSpec "shared-implib"                    Opt_SharedImplib,
   flagSpec "spec-constr"                      Opt_SpecConstr,
   flagSpec "specialise"                       Opt_Specialise,

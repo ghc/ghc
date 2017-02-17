@@ -274,9 +274,9 @@ ppr_expr add_par (Let bind expr)
 
 ppr_expr add_par (Tick tickish expr)
   = sdocWithDynFlags $ \dflags ->
-  if gopt Opt_PprShowTicks dflags
-  then add_par (sep [ppr tickish, pprCoreExpr expr])
-  else ppr_expr add_par expr
+  if gopt Opt_SuppressTicks dflags
+  then ppr_expr add_par expr
+  else add_par (sep [ppr tickish, pprCoreExpr expr])
 
 pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs)

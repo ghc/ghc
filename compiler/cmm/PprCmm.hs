@@ -186,15 +186,14 @@ pprNode node = pp_node <+> pp_debug
       -- label:
       CmmEntry id tscope -> ppr id <> colon <+>
          (sdocWithDynFlags $ \dflags ->
-           ppWhen (gopt Opt_PprShowTicks dflags) (text "//" <+> ppr tscope))
+           ppUnless (gopt Opt_SuppressTicks dflags) (text "//" <+> ppr tscope))
 
       -- // text
       CmmComment s -> text "//" <+> ftext s
 
       -- //tick bla<...>
-      CmmTick t -> if gopt Opt_PprShowTicks dflags
-                   then text "//tick" <+> ppr t
-                   else empty
+      CmmTick t -> ppUnless (gopt Opt_SuppressTicks dflags) $
+                   text "//tick" <+> ppr t
 
       -- unwind reg = expr;
       CmmUnwind regs ->
