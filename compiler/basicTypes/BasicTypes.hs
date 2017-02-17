@@ -1144,7 +1144,7 @@ data RuleMatchInfo = ConLike                    -- See Note [CONLIKE pragma]
 data InlinePragma            -- Note [InlinePragma]
   = InlinePragma
       { inl_src    :: SourceText -- Note [Pragma source text]
-      , inl_inline :: InlineSpec
+      , inl_inline :: InlineSpec -- See Note [inl_inline and inl_act]
 
       , inl_sat    :: Maybe Arity    -- Just n <=> Inline only when applied to n
                                      --            explicit (non-type, non-dictionary) args
@@ -1154,6 +1154,7 @@ data InlinePragma            -- Note [InlinePragma]
                                      --   the Unfolding, and don't look at inl_sat further
 
       , inl_act    :: Activation     -- Says during which phases inlining is allowed
+                                     -- See Note [inl_inline and inl_act]
 
       , inl_rule   :: RuleMatchInfo  -- Should the function be treated like a constructor?
     } deriving( Eq, Data )
@@ -1168,9 +1169,8 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   deriving( Eq, Data, Show )
         -- Show needed for Lexer.x
 
-{-
-Note [InlinePragma]
-~~~~~~~~~~~~~~~~~~~
+{- Note [InlinePragma]
+~~~~~~~~~~~~~~~~~~~~~~
 This data type mirrors what you can write in an INLINE or NOINLINE pragma in
 the source program.
 
@@ -1185,6 +1185,23 @@ if an Id has defaultInlinePragma it means the user didn't specify anything.
 If inl_inline = Inline or Inlineable, then the Id should have an InlineRule unfolding.
 
 If you want to know where InlinePragmas take effect: Look in DsBinds.makeCorePair
+
+Note [inl_inline and inl_act]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* inl_inline says what the user wrote: did she say INLINE, NOINLINE,
+  INLINABLE, or nothing at all
+
+* inl_act says in what phases the unfolding is active or inactive
+  E.g  If you write INLINE[1]    then inl_act will be set to ActiveAfter 1
+       If you write NOINLINE[1]  then inl_act will be set to ActiveBefore 1
+       If you write NOINLINE[~1] then inl_act will be set to ActiveAfter 1
+  So note that inl_act does not say what pragma you wrote: it just
+  expresses its consequences
+
+* inl_act just says when the unfolding is active; it doesn't say what
+  to inline.  If you say INLINE f, then f's inl_act will be AlwaysActive,
+  but in addition f will get a "stable unfolding" with UnfoldingGuidance
+  that tells the inliner to be pretty eager about it.
 
 Note [CONLIKE pragma]
 ~~~~~~~~~~~~~~~~~~~~~
