@@ -977,8 +977,7 @@ lvlBind env (AnnNonRec bndr rhs)
     rhs_fvs    = freeVarsOf rhs
     bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
-    dest_lvl   = destLevel env bind_fvs (isFunction rhs) is_bot
-                                        is_unfloatable_join
+    dest_lvl   = destLevel env bind_fvs (isFunction rhs) is_bot is_join
     mb_bot_str = exprBotStrictness_maybe (deAnnotate rhs)
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
@@ -986,8 +985,8 @@ lvlBind env (AnnNonRec bndr rhs)
     n_extra    = count isId abs_vars
 
     mb_join_arity = isJoinId_maybe bndr
-    is_unfloatable_join = case mb_join_arity of Just ar -> ar > 0
-                                                Nothing -> False
+    is_join = isJust mb_join_arity
+
       -- See Note [When to ruin a join point]
     need_zap = dest_lvl `ltLvl` joinCeilingLevel env
     zapped_join | need_zap  = Nothing    -- Zap the join point
@@ -1066,15 +1065,11 @@ lvlBind env (AnnRec pairs)
                `delDVarSetList`
                 bndrs
 
-    dest_lvl = destLevel env bind_fvs (all isFunction rhss) False
-                         has_unfloatable_join
+    dest_lvl = destLevel env bind_fvs (all isFunction rhss) False is_join
     abs_vars = abstractVars dest_lvl env bind_fvs
 
     mb_join_arities = map isJoinId_maybe bndrs
-    has_unfloatable_join
-      = any (\mb_ar -> case mb_ar of Just ar -> ar > 0
-                                     Nothing -> False) mb_join_arities
-
+    is_join = any isJust mb_join_arities
     need_zap = dest_lvl `ltLvl` joinCeilingLevel env
     zap_join mb_join_arity | need_zap  = Nothing
                            | otherwise = mb_join_arity
@@ -1244,6 +1239,14 @@ destLevel :: LevelEnv -> DVarSet
           -> Bool   -- True <=> is join point (or can be floated anyway)
           -> Level
 destLevel env fvs is_function is_bot is_join
+  | isTopLvl max_fv_level  -- Float even joins if they get to top level
+  = tOP_LEVEL
+
+  | is_join
+  = if max_fv_level `ltLvl` join_ceiling
+    then join_ceiling
+    else max_fv_level
+
   | is_bot              -- Send bottoming bindings to the top
   = tOP_LEVEL           -- regardless; see Note [Bottoming floats]
                         -- Esp Bottoming floats (1)
@@ -1255,19 +1258,12 @@ destLevel env fvs is_function is_bot is_join
   = tOP_LEVEL   -- Send functions to top level; see
                 -- the comments with isFunction
 
-  | is_join
-  , hits_ceiling
-  = join_ceiling
-
   | otherwise = max_fv_level
   where
     max_fv_level = maxFvLevel isId env fvs -- Max over Ids only; the tyvars
                                            -- will be abstracted
-
     join_ceiling = joinCeilingLevel env
-    hits_ceiling = max_fv_level `ltLvl` join_ceiling &&
-                   not (isTopLvl max_fv_level)
-                     -- Note [When to ruin a join point]
+
 
 isFunction :: CoreExprWithFVs -> Bool
 -- The idea here is that we want to float *functions* to
