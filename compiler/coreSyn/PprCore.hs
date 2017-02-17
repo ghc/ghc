@@ -113,15 +113,23 @@ ppr_bind ann (Rec binds)           = vcat (map pp binds)
 
 ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
-  = ann expr $$ pprBndr LetBind val_bdr $$
-    hang (ppr val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs) <+> equals) 2
-         (pprCoreExpr rhs)
+  = ann expr $$ pprBndr LetBind val_bdr $$ pp_bind
   where
-    (bndrs, body)          = collectBinders expr
-    (lhs_bndrs, rhs_bndrs) = splitAt (pprLamsOnLhs val_bdr) bndrs
-    rhs                    = mkLams rhs_bndrs body
-                      -- Returns ([], expr) unless it's a join point, in which
-                      -- case we want the args before the =
+    pp_bind = case bndrIsJoin_maybe val_bdr of
+                Nothing -> pp_normal_bind
+                Just ar -> pp_join_bind ar
+
+    pp_normal_bind = hang (ppr val_bdr) 2 (equals <+> pprCoreExpr expr)
+
+      -- For a join point of join arity n, we want to print j = \x1 ... xn -> e
+      -- as "j x1 ... xn = e" to differentiate when a join point returns a
+      -- lambda (the first rendering looks like a nullary join point returning
+      -- an n-argument function).
+    pp_join_bind join_arity
+      = hang (ppr val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs))
+           2 (equals <+> pprCoreExpr rhs)
+      where
+        (lhs_bndrs, rhs) = collectNBinders join_arity expr
 
 pprParendExpr expr = ppr_expr parens expr
 pprCoreExpr   expr = ppr_expr noParens expr
@@ -249,17 +257,20 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
      pprCoreExpr expr)
 -}
 
+
 -- General case (recursive case, too)
 ppr_expr add_par (Let bind expr)
   = add_par $
-    sep [hang (keyword <+> char '{') 2 (ppr_bind noAnn bind <+> text "} in"),
+    sep [hang (keyword bind <+> char '{') 2 (ppr_bind noAnn bind <+> text "} in"),
          pprCoreExpr expr]
   where
-    keyword = case bind of
-                NonRec b _    -> pprNonRecBndrKeyword b
-                Rec ((b,_):_) -> pprRecBndrKeyword    b
-                Rec []        -> text "let" -- This *shouldn't* happen, but
-                                            -- let's be tolerant here
+    keyword (NonRec b _)
+     | isJust (bndrIsJoin_maybe b) = text "join"
+     | otherwise                   = text "let"
+    keyword (Rec pairs)
+     | ((b,_):_) <- pairs
+     , isJust (bndrIsJoin_maybe b) = text "joinrec"
+     | otherwise                   = text "letrec"
 
 ppr_expr add_par (Tick tickish expr)
   = sdocWithDynFlags $ \dflags ->
@@ -330,11 +341,7 @@ instance OutputableBndr Var where
   pprBndr = pprCoreBinder
   pprInfixOcc  = pprInfixName  . varName
   pprPrefixOcc = pprPrefixName . varName
-  pprNonRecBndrKeyword bndr | isJoinId bndr = text "join"
-                            | otherwise     = text "let"
-  pprRecBndrKeyword    bndr | isJoinId bndr = text "joinrec"
-                            | otherwise     = text "letrec"
-  pprLamsOnLhs bndr = isJoinId_maybe bndr `orElse` 0
+  bndrIsJoin_maybe = isJoinId_maybe
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder

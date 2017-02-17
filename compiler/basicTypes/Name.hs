@@ -524,7 +524,6 @@ instance OutputableBndr Name where
     pprInfixOcc  = pprInfixName
     pprPrefixOcc = pprPrefixName
 
-
 pprName :: Name -> SDoc
 pprName (Name {n_sort = sort, n_uniq = u, n_occ = occ})
   = getPprStyle $ \ sty ->

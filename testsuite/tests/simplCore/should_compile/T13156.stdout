@@ -1,4 +1,4 @@
-    case GHC.List.reverse @ a x of sat { __DEFAULT ->
-    case \ (@ a1) ->
-           case g x of {
-    case r @ GHC.Types.Any of { __DEFAULT -> r @ a }
+      case GHC.List.reverse @ a x of sat { __DEFAULT ->
+      case \ (@ a1) ->
+             case g x of {
+      case r @ GHC.Types.Any of { __DEFAULT -> r @ a }

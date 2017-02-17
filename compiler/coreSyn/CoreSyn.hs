@@ -1724,9 +1724,7 @@ instance (OutputableBndr Var, Outputable b) =>
   pprBndr _ b = ppr b   -- Simple
   pprInfixOcc  b = ppr b
   pprPrefixOcc b = ppr b
-  pprNonRecBndrKeyword (TB b _) = pprNonRecBndrKeyword b
-  pprRecBndrKeyword    (TB b _) = pprRecBndrKeyword    b
-  pprLamsOnLhs         (TB b _) = pprLamsOnLhs         b
+  bndrIsJoin_maybe (TB b _) = isJoinId_maybe b
 
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v

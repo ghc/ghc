@@ -44,8 +44,8 @@ T7116.$trModule :: GHC.Types.Module
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 30}]
-T7116.$trModule =
-  GHC.Types.Module T7116.$trModule3 T7116.$trModule1
+T7116.$trModule
+  = GHC.Types.Module T7116.$trModule3 T7116.$trModule1
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 dr :: Double -> Double
@@ -60,9 +60,9 @@ dr :: Double -> Double
                  case x of { GHC.Types.D# x1 ->
                  GHC.Types.D# (GHC.Prim.+## x1 x1)
                  }}]
-dr =
-  \ (x :: Double) ->
-    case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
+dr
+  = \ (x :: Double) ->
+      case x of { GHC.Types.D# x1 -> GHC.Types.D# (GHC.Prim.+## x1 x1) }
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 dl :: Double -> Double
@@ -75,9 +75,9 @@ dl :: Double -> Double
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=False)
          Tmpl= \ (x [Occ=Once!] :: Double) ->
                  case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }}]
-dl =
-  \ (x :: Double) ->
-    case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }
+dl
+  = \ (x :: Double) ->
+      case x of { GHC.Types.D# y -> GHC.Types.D# (GHC.Prim.+## y y) }
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 fr :: Float -> Float
@@ -92,11 +92,11 @@ fr :: Float -> Float
                  case x of { GHC.Types.F# x1 ->
                  GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
                  }}]
-fr =
-  \ (x :: Float) ->
-    case x of { GHC.Types.F# x1 ->
-    GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
-    }
+fr
+  = \ (x :: Float) ->
+      case x of { GHC.Types.F# x1 ->
+      GHC.Types.F# (GHC.Prim.plusFloat# x1 x1)
+      }
 
 -- RHS size: {terms: 8, types: 3, coercions: 0, joins: 0/0}
 fl :: Float -> Float
@@ -111,11 +111,11 @@ fl :: Float -> Float
                  case x of { GHC.Types.F# y ->
                  GHC.Types.F# (GHC.Prim.plusFloat# y y)
                  }}]
-fl =
-  \ (x :: Float) ->
-    case x of { GHC.Types.F# y ->
-    GHC.Types.F# (GHC.Prim.plusFloat# y y)
-    }
+fl
+  = \ (x :: Float) ->
+      case x of { GHC.Types.F# y ->
+      GHC.Types.F# (GHC.Prim.plusFloat# y y)
+      }
 
 
 
