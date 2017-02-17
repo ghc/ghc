@@ -766,9 +766,9 @@ pprStgExpr (StgLetNoEscape bind expr)
 
 pprStgExpr (StgTick tickish expr)
   = sdocWithDynFlags $ \dflags ->
-    if gopt Opt_PprShowTicks dflags
-    then sep [ ppr tickish, pprStgExpr expr ]
-    else pprStgExpr expr
+    if gopt Opt_SuppressTicks dflags
+    then pprStgExpr expr
+    else sep [ ppr tickish, pprStgExpr expr ]
 
 
 pprStgExpr (StgCase expr bndr alt_type alts)
