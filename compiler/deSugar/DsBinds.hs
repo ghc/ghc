@@ -193,7 +193,7 @@ dsHsBind dflags
        ; let rhs = core_wrap $
                    mkLams tyvars $ mkLams dicts $
                    mkCoreLets ds_binds $
-                   Let core_bind $
+                   mkLet core_bind $
                    Var local
        ; (spec_binds, rules) <- dsSpecs rhs prags
 
@@ -242,7 +242,7 @@ dsHsBind dflags
         ; ds_binds <- dsTcEvBinds_s ev_binds
         ; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
                              mkCoreLets ds_binds $
-                             Let core_bind $
+                             mkLet core_bind $
                              tup_expr
 
         ; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)

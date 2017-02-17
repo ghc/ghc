@@ -20,7 +20,7 @@ module CoreSyn (
                OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar,
 
         -- ** 'Expr' construction
-        mkLets, mkLams,
+        mkLet, mkLets, mkLams,
         mkApps, mkTyApps, mkCoApps, mkVarApps, mkTyArg,
 
         mkIntLit, mkIntLitInt,
@@ -1848,8 +1848,13 @@ mkLets        :: [Bind b] -> Expr b -> Expr b
 mkLams        :: [b] -> Expr b -> Expr b
 
 mkLams binders body = foldr Lam body binders
-mkLets binds body   = foldr Let body binds
+mkLets binds body   = foldr mkLet body binds
 
+mkLet :: Bind b -> Expr b -> Expr b
+-- The desugarer sometimes generates an empty Rec group
+-- which Lint rejects, so we kill it off right away
+mkLet (Rec []) body = body
+mkLet bind     body = Let bind body
 
 -- | Create a binding group where a type variable is bound to a type. Per "CoreSyn#type_let",
 -- this can only be used to bind something in a non-recursive @let@ expression
