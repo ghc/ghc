@@ -392,8 +392,9 @@ cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 
 cseCase :: CSEnv -> InExpr -> InId -> InType -> [InAlt] -> OutExpr
 cseCase env scrut bndr ty alts
-  = Case scrut1 bndr3 ty (map cse_alt alts)
+  = Case scrut1 bndr3 ty' (map cse_alt alts)
   where
+    ty' = substTy (csEnvSubst env) ty
     scrut1 = tryForCSE False env scrut
 
     bndr1 = zapIdOccInfo bndr
