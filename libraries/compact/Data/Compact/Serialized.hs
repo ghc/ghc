@@ -14,9 +14,6 @@
 -- Stability   :  unstable
 -- Portability :  non-portable (GHC Extensions)
 --
--- This module provides a data structure, called a Compact, for
--- holding fully evaluated data in a consecutive block of memory.
---
 -- This module contains support for serializing a Compact for network
 -- transmission and on-disk storage.
 --
@@ -45,7 +42,7 @@ import Control.DeepSeq(NFData, force)
 
 import Data.Compact.Internal
 
--- |A serialized version of the 'Compact' metadata (each block with
+-- | A serialized version of the 'Compact' metadata (each block with
 -- address and size and the address of the root). This structure is
 -- meant to be sent alongside the actual 'Compact' data. It can be
 -- sent out of band in advance if the data is to be sent over RDMA
@@ -57,7 +54,6 @@ data SerializedCompact a = SerializedCompact
 
 addrIsNull :: Addr# -> Bool
 addrIsNull addr = isTrue# (nullAddr# `eqAddr#` addr)
-
 
 compactGetFirstBlock :: Compact# -> IO (Ptr a, Word)
 compactGetFirstBlock buffer =
@@ -85,10 +81,11 @@ mkBlockList buffer = compactGetFirstBlock buffer >>= go
 -- before func had a chance to copy everything into its own
 -- buffers/sockets/whatever
 
--- |Serialize the 'Compact', and call the provided function with
+-- | Serialize the 'Compact', and call the provided function with
 -- with the 'Compact' serialized representation. The resulting
 -- action will be executed synchronously before this function
 -- completes.
+--
 {-# NOINLINE withSerializedCompact #-}
 withSerializedCompact :: NFData c => Compact a ->
                          (SerializedCompact a -> IO c) -> IO c
@@ -115,7 +112,7 @@ fixupPointers firstBlock rootAddr s =
         (# root #) -> case mkCompact buffer root s' of
           (# s'', c #) -> (# s'', Just c #)
 
--- |Deserialize a 'SerializedCompact' into a in-memory 'Compact'. The
+-- | Deserialize a 'SerializedCompact' into a in-memory 'Compact'. The
 -- provided function will be called with the address and size of each
 -- newly allocated block in succession, and should fill the memory
 -- from the external source (eg. by reading from a socket or from disk)
@@ -191,6 +188,9 @@ sanityCheckByteStrings (SerializedCompact scl _) bsl = go scl bsl
     go ((_, size):scs) (bs:bss) =
       fromIntegral size == ByteString.length bs && go scs bss
 
+-- | Convenience function for importing a compact region that is represented
+-- by a list of strict 'ByteString's.
+--
 importCompactByteStrings :: SerializedCompact a -> [ByteString.ByteString] ->
                             IO (Maybe (Compact a))
 importCompactByteStrings serialized stringList =

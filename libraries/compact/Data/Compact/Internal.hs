@@ -13,11 +13,9 @@
 -- Stability   :  unstable
 -- Portability :  non-portable (GHC Extensions)
 --
--- This module provides a data structure, called a Compact, for
--- holding fully evaluated data in a consecutive block of memory.
---
--- This is a private implementation detail of the package and should
--- not be imported directly.
+-- This module provides some internal functions and representation for dealing
+-- with compact regions, which may be of interest if you need higher
+-- performance.
 --
 -- /Since: 1.0.0/
 
@@ -50,13 +48,20 @@ import GHC.Types
 -- separate copy of the data.
 --
 -- The cost of compaction is similar to the cost of GC for the same
--- data, but it is perfomed only once.  However, retainining internal
--- sharing during the compaction process is very costly, so it is
--- optional; there are two ways to create a 'Compact': 'compact' and
--- 'compactWithSharing'.
+-- data, but it is perfomed only once.  However, because
+-- "Data.Compact.compact" does not stop-the-world, retaining internal
+-- sharing during the compaction process is very costly. The user
+-- can choose wether to 'compact' or 'compactWithSharing'.
 --
--- Data can be added to an existing 'Compact' with 'compactAdd' or
--- 'compactAddWithSharing'.
+-- When you have a @'Compact' a@, you can get a pointer to the actual object
+-- in the region using "Data.Compact.getCompact".  The 'Compact' type
+-- serves as handle on the region itself; you can use this handle
+-- to add data to a specific 'Compact' with 'compactAdd' or
+-- 'compactAddWithSharing' (giving you a new handle which corresponds
+-- to the same compact region, but points to the newly added object
+-- in the region).  At the moment, due to technical reasons,
+-- it's not possible to get the @'Compact' a@ if you only have an @a@,
+-- so make sure you hold on to the handle as necessary.
 --
 -- Data in a compact doesn't ever move, so compacting data is also a
 -- way to pin arbitrary data structures in memory.
@@ -70,8 +75,8 @@ import GHC.Types
 --   address (the address might be stored in a C data structure, for
 --   example), so we can't make a copy of it to store in the 'Compact'.
 --
--- * Mutable objects also cannot be compacted, because subsequent
---   mutation would destroy the property that a compact is
+-- * Objects with mutable pointer fields also cannot be compacted,
+--   because subsequent mutation would destroy the property that a compact is
 --   self-contained.
 --
 -- If compaction encounters any of the above, a 'CompactionFailed'
@@ -83,6 +88,10 @@ data Compact a = Compact Compact# a (MVar ())
     -- The MVar here is to enforce mutual exclusion among writers.
     -- Note: the MVar protects the Compact# only, not the pure value 'a'
 
+-- | Make a new 'Compact' object, given a pointer to the true
+-- underlying region.  You must uphold the invariant that @a@ lives
+-- in the compact region.
+--
 mkCompact
   :: Compact# -> a -> State# RealWorld -> (# State# RealWorld, Compact a #)
 mkCompact compact# a s =
@@ -91,6 +100,11 @@ mkCompact compact# a s =
  where
   unIO (IO a) = a
 
+-- | Transfer @a@ into a new compact region, with a preallocated size,
+-- possibly preserving sharing or not.  If you know how big the data
+-- structure in question is, you can save time by picking an appropriate
+-- block size for the compact region.
+--
 compactSized :: NFData a => Int -> Bool -> a -> IO (Compact a)
 compactSized (I# size) share a = IO $ \s0 ->
   case compactNew# (int2Word# size) s0 of { (# s1, compact# #) ->
