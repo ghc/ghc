@@ -1,6 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE CPP, NoImplicitPrelude, BangPatterns, StandaloneDeriving,
-             MagicHash, UnboxedTuples, PolyKinds #-}
+             MagicHash, UnboxedTuples #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 #include "MachDeps.h"

@@ -56,14 +56,14 @@
     imported from `Control.Applicative`. It is likely to be added to the
     `Prelude` in the future. (#13191)
 
-  * A new module exposing GHC's new type-indexed type representation
-    mechanism, `Type.Reflection`, is now provided.
+  * A new module, `Type.Reflection`, exposing GHC's new type-indexed type
+    representation mechanism is now provided.
 
   * `Data.Dynamic` now exports the `Dyn` data constructor, enabled by the new
     type-indexed type representation mechanism.
 
-  * `Data.Type.Equality` now provides a kind heterogeneous type equality type,
-    `(:~~:)`.
+  * `Data.Type.Equality` now provides a kind heterogeneous type equality
+    evidence type, `(:~~:)`.
 
 ## 4.9.0.0  *May 2016*
 

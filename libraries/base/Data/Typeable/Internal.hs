@@ -77,7 +77,7 @@ import GHC.Base
 import qualified GHC.Arr as A
 import GHC.Types ( TYPE )
 import Data.Type.Equality
-import GHC.List ( splitAt, foldl )
+import GHC.List ( splitAt, foldl' )
 import GHC.Word
 import GHC.Show
 import GHC.TypeLits ( KnownSymbol, symbolVal' )
@@ -209,7 +209,7 @@ instance Ord (TypeRep a) where
 
 -- | A non-indexed type representation.
 data SomeTypeRep where
-    SomeTypeRep :: forall k (a :: k). TypeRep a -> SomeTypeRep
+    SomeTypeRep :: forall k (a :: k). !(TypeRep a) -> SomeTypeRep
 
 instance Eq SomeTypeRep where
   SomeTypeRep a == SomeTypeRep b =
@@ -308,7 +308,7 @@ typeRepTyCon (TrFun _ _ _)    = error "typeRepTyCon: FunTy" -- TODO
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)
 eqTypeRep a b
-  | typeRepFingerprint a == typeRepFingerprint b = Just (unsafeCoerce# HRefl)
+  | typeRepFingerprint a == typeRepFingerprint b = Just (unsafeCoerce HRefl)
   | otherwise                                    = Nothing
 
 
@@ -349,7 +349,7 @@ instantiateKindRep vars = go
             applyTy (SomeTypeRep acc) ty
               | SomeTypeRep ty' <- go ty
               = SomeTypeRep $ mkTrApp (unsafeCoerce acc) (unsafeCoerce ty')
-        in foldl applyTy tycon_app ty_args
+        in foldl' applyTy tycon_app ty_args
     go (KindRepVar var)
       = vars A.! var
     go (KindRepApp f a)
@@ -517,7 +517,7 @@ splitApps = go []
     go xs (TrApp _ f x)    = go (SomeTypeRep x : xs) f
     go [] (TrFun _ a b)    = (funTyCon, [SomeTypeRep a, SomeTypeRep b])
     go _  (TrFun _ _ _)    =
-        error "Data.Typeable.Internal.splitApps: Impossible"
+        errorWithoutStackTrace "Data.Typeable.Internal.splitApps: Impossible"
 
 funTyCon :: TyCon
 funTyCon = typeRepTyCon (typeRep @(->))

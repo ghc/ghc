@@ -29,9 +29,7 @@ data Serialized = Serialized TypeRep [Word8]
 
 -- | Put a Typeable value that we are able to actually turn into bytes into a 'Serialized' value ready for deserialization later
 toSerialized :: forall a. Typeable a => (a -> [Word8]) -> a -> Serialized
-toSerialized serialize what = Serialized rep (serialize what)
-  where
-    rep = typeOf what
+toSerialized serialize what = Serialized (typeOf what) (serialize what)
 
 -- | If the 'Serialized' value contains something of the given type, then use the specified deserializer to return @Just@ that.
 -- Otherwise return @Nothing@.
