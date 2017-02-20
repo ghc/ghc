@@ -152,10 +152,23 @@ instance Binary Literal where
     put_ bh (MachChar aa)     = do putByte bh 0; put_ bh aa
     put_ bh (MachStr ab)      = do putByte bh 1; put_ bh ab
     put_ bh (MachNullAddr)    = do putByte bh 2
-    put_ bh (MachInt ad)      = do putByte bh 3; put_ bh ad
-    put_ bh (MachInt64 ae)    = do putByte bh 4; put_ bh ae
-    put_ bh (MachWord af)     = do putByte bh 5; put_ bh af
-    put_ bh (MachWord64 ag)   = do putByte bh 6; put_ bh ag
+
+    -- The target int/word sizes should at least fit within 64 bits,
+    -- so let's not use the (truly awful) Binary Integer instance
+    -- if we can avoid it.
+    put_ bh (MachInt ad)      = ASSERT2( inInt64Range ad, integer ad )
+                                do putByte bh 3
+                                   put_ bh (fromInteger ad :: Int64)
+    put_ bh (MachInt64 ae)    = ASSERT2( inInt64Range ae, integer ae )
+                                do putByte bh 4
+                                   put_ bh (fromInteger ae :: Int64)
+    put_ bh (MachWord af)     = ASSERT2( inWord64Range af, integer af )
+                                do putByte bh 5
+                                   put_ bh (fromInteger af :: Word64)
+    put_ bh (MachWord64 ag)   = ASSERT2( inWord64Range ag, integer ag )
+                                do putByte bh 6
+                                   put_ bh (fromInteger ag :: Word64)
+
     put_ bh (MachFloat ah)    = do putByte bh 7; put_ bh ah
     put_ bh (MachDouble ai)   = do putByte bh 8; put_ bh ai
     put_ bh (MachLabel aj mb fod)
@@ -177,16 +190,16 @@ instance Binary Literal where
                     return (MachNullAddr)
               3 -> do
                     ad <- get bh
-                    return (MachInt ad)
+                    return (MachInt (toInteger (ad :: Int64)))
               4 -> do
                     ae <- get bh
-                    return (MachInt64 ae)
+                    return (MachInt64 (toInteger (ae :: Int64)))
               5 -> do
                     af <- get bh
-                    return (MachWord af)
+                    return (MachWord (toInteger (af :: Word64)))
               6 -> do
                     ag <- get bh
-                    return (MachWord64 ag)
+                    return (MachWord64 (toInteger (ag :: Word64)))
               7 -> do
                     ah <- get bh
                     return (MachFloat ah)
