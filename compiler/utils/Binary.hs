@@ -101,6 +101,7 @@ data BinHandle
   = BinMem {                     -- binary data stored in an unboxed array
      bh_usr :: UserData,         -- sigh, need parameterized modules :-)
      _off_r :: !FastMutInt,      -- the current offset
+                                 -- Invariant: _off_r <= _sz_r
      _sz_r  :: !FastMutInt,      -- size of the array (cached)
      _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
     }
@@ -174,7 +175,7 @@ tellBin (BinMem _ r _ _) = do ix <- readFastMutInt r; return (BinPtr ix)
 seekBin :: BinHandle -> Bin a -> IO ()
 seekBin h@(BinMem _ ix_r sz_r _) (BinPtr p) = do
   sz <- readFastMutInt sz_r
-  if (p >= sz)
+  if (p > sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
@@ -183,7 +184,7 @@ seekBy h@(BinMem _ ix_r sz_r _) off = do
   sz <- readFastMutInt sz_r
   ix <- readFastMutInt ix_r
   let ix' = ix + off
-  if (ix' >= sz)
+  if (ix' > sz)
         then do expandBin h ix'; writeFastMutInt ix_r ix'
         else writeFastMutInt ix_r ix'
 
@@ -219,7 +220,8 @@ readBinMem filename = do
   writeFastMutInt sz_r filesize
   return (BinMem noUserData ix_r sz_r arr_r)
 
--- expand the size of the array to include a specified offset
+-- expand the size of the array to strictly include a specified offset
+-- (i.e., not at EOF, so we can write at least one byte there)
 expandBin :: BinHandle -> Int -> IO ()
 expandBin (BinMem _ _ sz_r arr_r) off = do
    sz <- readFastMutInt sz_r
