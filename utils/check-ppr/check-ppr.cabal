@@ -25,8 +25,7 @@ Executable check-ppr
     Build-Depends: base       >= 4   && < 5,
                    bytestring,
                    containers,
-                   -- Cabal      >= 1.25 && <1.27,
-                   Cabal      >= 1.24 && <1.27,
+                   Cabal      >= 2.0 && < 2.1,
                    directory,
                    filepath,
                    ghc
