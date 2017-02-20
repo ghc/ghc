@@ -612,7 +612,7 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
-           (wordsize(64), 53592736, 7)])
+           (wordsize(64), 58648600, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -645,6 +645,7 @@ test('T5837',
              # 2017-02-07 53592736  amd64/Linux Simon's earlier decrease appears
              #                      to be environmentally-dependent.
              #                      Also bumped acceptance threshold to 7%.
+             # 2017-02-20 58648600  amd64/Linux Type-indexed Typeable
       ],
       compile, ['-freduction-depth=50'])
 
@@ -902,8 +903,9 @@ test('T10547',
      [ compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 31041520, 20),
           # initial:    39165544
-          # 25/11/2106: 31041520 Linux   Around the time of refactoring the constraint solver;
+          # 2016-11-25: 31041520 Linux   Around the time of refactoring the constraint solver;
           #                              but I think that only pushed it over the edge
+          # 2017-02-20: 38681216 Linux   Type-indexed Typeable
           ]),
      ],
      compile_fail,
