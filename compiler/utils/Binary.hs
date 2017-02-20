@@ -207,7 +207,7 @@ readBinMem filename = do
   h <- openBinaryFile filename ReadMode
   filesize' <- hFileSize h
   let filesize = fromIntegral filesize'
-  arr <- mallocForeignPtrBytes (filesize*2)
+  arr <- mallocForeignPtrBytes filesize
   count <- withForeignPtr arr $ \p -> hGetBuf h p filesize
   when (count /= filesize) $
        error ("Binary.readBinMem: only read " ++ show count ++ " bytes")
