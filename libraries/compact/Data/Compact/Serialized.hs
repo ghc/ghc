@@ -38,7 +38,6 @@ import Data.ByteString.Internal(toForeignPtr)
 import Data.IORef(newIORef, readIORef, writeIORef)
 import Foreign.ForeignPtr(withForeignPtr)
 import Foreign.Marshal.Utils(copyBytes)
-import Control.DeepSeq(NFData, force)
 
 import Data.Compact.Internal
 
@@ -82,23 +81,23 @@ mkBlockList buffer = compactGetFirstBlock buffer >>= go
 -- buffers/sockets/whatever
 
 -- | Serialize the 'Compact', and call the provided function with
--- with the 'Compact' serialized representation. The resulting
--- action will be executed synchronously before this function
--- completes.
+-- with the 'Compact' serialized representation.  It is not safe
+-- to return the pointer from the action and use it after
+-- the action completes: all uses must be inside this bracket,
+-- since we cannot guarantee that the compact region will stay
+-- live from the 'Ptr' object.  For example, it would be
+-- unsound to use 'unsafeInterleaveIO' to lazily construct
+-- a lazy bytestring from the 'Ptr'.
 --
 {-# NOINLINE withSerializedCompact #-}
-withSerializedCompact :: NFData c => Compact a ->
+withSerializedCompact :: Compact a ->
                          (SerializedCompact a -> IO c) -> IO c
 withSerializedCompact (Compact buffer root lock) func = withMVar lock $ \_ -> do
   rootPtr <- IO (\s -> case anyToAddr# root s of
                     (# s', rootAddr #) -> (# s', Ptr rootAddr #) )
   blockList <- mkBlockList buffer
   let serialized = SerializedCompact blockList rootPtr
-  -- we must be strict, to avoid smart uses of ByteStrict.Lazy that
-  -- return a thunk instead of a ByteString (but the thunk references
-  -- the Ptr, not the Compact#, so it will point to garbage if GC
-  -- happens)
-  !r <- fmap force $ func serialized
+  r <- func serialized
   IO (\s -> case touch# buffer s of
          s' -> (# s', r #) )
 

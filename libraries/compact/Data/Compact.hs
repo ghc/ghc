@@ -33,9 +33,8 @@
 --  binary serialization), this can lead to substantial speed ups.
 --
 -- For example, suppose you have a function @loadBigStruct :: IO BigStruct@,
--- which loads a large data structure from the file system.  First,
--- ensure that @BigStruct@ is immutable by defining an 'NFData' instance
--- for it.  Then, you can "compact" the structure with the following code:
+-- which loads a large data structure from the file system.  You can "compact"
+-- the structure with the following code:
 --
 -- @
 --      do r <- 'compact' =<< loadBigStruct
@@ -79,7 +78,6 @@ module Data.Compact (
   ) where
 
 import Control.Concurrent
-import Control.DeepSeq (NFData)
 import GHC.Prim
 import GHC.Types
 
@@ -101,12 +99,11 @@ getCompact (Compact _ obj _) = obj
 -- not terminate if the structure contains cycles (use 'compactWithSharing'
 -- instead).
 --
--- The NFData constraint is just to ensure that the object contains no
--- functions, 'compact' does not actually use it.  If your object
--- contains any functions, then 'compact' will fail. (and your
--- 'NFData' instance is lying).
+-- The object in question must not contain any functions or mutable data; if it
+-- does, 'compact' will raise an exception.  In the future, we may add a type
+-- class which will help statically check if this is the case or not.
 --
-compact :: NFData a => a -> IO (Compact a)
+compact :: a -> IO (Compact a)
 compact = Internal.compactSized 31268 False
 
 -- | Compact a value, retaining any internal sharing and
@@ -116,12 +113,11 @@ compact = Internal.compactSized 31268 False
 -- by maintaining a hash table mapping uncompacted objects to
 -- compacted objects.
 --
--- The 'NFData' constraint is just to ensure that the object contains no
--- functions, `compact` does not actually use it.  If your object
--- contains any functions, then 'compactWithSharing' will fail. (and
--- your 'NFData' instance is lying).
+-- The object in question must not contain any functions or mutable data; if it
+-- does, 'compact' will raise an exception.  In the future, we may add a type
+-- class which will help statically check if this is the case or not.
 --
-compactWithSharing :: NFData a => a -> IO (Compact a)
+compactWithSharing :: a -> IO (Compact a)
 compactWithSharing = Internal.compactSized 31268 True
 
 -- | Add a value to an existing 'Compact'.  This will help you avoid
@@ -129,19 +125,19 @@ compactWithSharing = Internal.compactSized 31268 True
 -- but remember that after compaction this value will only be deallocated
 -- with the entire compact region.
 --
--- Behaves exactly like 'compact' with respect to sharing and the 'NFData'
--- constraint.
+-- Behaves exactly like 'compact' with respect to sharing and what data
+-- it accepts.
 --
-compactAdd :: NFData a => Compact b -> a -> IO (Compact a)
+compactAdd :: Compact b -> a -> IO (Compact a)
 compactAdd (Compact compact# _ lock) a = withMVar lock $ \_ -> IO $ \s ->
   case compactAdd# compact# a s of { (# s1, pk #) ->
   (# s1, Compact compact# pk lock #) }
 
--- | Add a value to an existing 'Compact', like 'compactAdd', but
--- behaving exactly like 'compactWithSharing' with respect to
--- sharing and the 'NFData' constraint.
+-- | Add a value to an existing 'Compact', like 'compactAdd',
+-- but behaving exactly like 'compactWithSharing' with respect to sharing and
+-- what data it accepts.
 --
-compactAddWithSharing :: NFData a => Compact b -> a -> IO (Compact a)
+compactAddWithSharing :: Compact b -> a -> IO (Compact a)
 compactAddWithSharing (Compact compact# _ lock) a =
   withMVar lock $ \_ -> IO $ \s ->
     case compactAddWithSharing# compact# a s of { (# s1, pk #) ->

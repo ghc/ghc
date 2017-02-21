@@ -7,7 +7,6 @@ import System.Mem
 import Data.IORef
 import Data.ByteString (ByteString, packCStringLen)
 import Foreign.Ptr
-import Control.DeepSeq
 
 import Data.Compact
 import Data.Compact.Internal
@@ -22,7 +21,7 @@ assertEquals expected actual =
   else assertFail $ "expected " ++ (show expected)
        ++ ", got " ++ (show actual)
 
-serialize :: NFData a => a -> IO (SerializedCompact a, [ByteString])
+serialize :: a -> IO (SerializedCompact a, [ByteString])
 serialize val = do
   cnf <- compactSized 4096 True val
 

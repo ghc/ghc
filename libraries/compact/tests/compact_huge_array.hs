@@ -8,7 +8,6 @@ import Control.Monad.ST
 import Data.Array
 import Data.Array.ST
 import qualified Data.Array.Unboxed as U
-import Control.DeepSeq
 
 import Data.Compact
 import Data.Compact.Internal
@@ -28,9 +27,6 @@ arrTest = do
   forM_ [1..10] $ \j -> do
     writeArray arr j (fromIntegral $ 2*j + 1)
   return arr
-
-instance NFData (U.UArray i e) where
-  rnf x = seq x ()
 
 -- test :: (Word -> a -> IO (Maybe (Compact a))) -> IO ()
 test func = do

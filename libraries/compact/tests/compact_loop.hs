@@ -1,7 +1,6 @@
 module Main where
 
 import Control.Exception
-import Control.DeepSeq
 import System.Mem
 import Text.Show
 
@@ -28,10 +27,6 @@ instance Show Tree where
   showsPrec _ Nil = showString "Nil"
   showsPrec _ (Node _ l r) = showString "(Node " . shows l .
                              showString " " . shows r . showString ")"
-
-instance NFData Tree where
-  rnf Nil = ()
-  rnf (Node p l r) = p `seq` rnf l `seq` rnf r `seq` ()
 
 {-# NOINLINE test #-}
 test x = do

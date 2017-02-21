@@ -26,7 +26,6 @@ module Data.Compact.Internal
   ) where
 
 import Control.Concurrent.MVar
-import Control.DeepSeq
 import GHC.Prim
 import GHC.Types
 
@@ -105,7 +104,7 @@ mkCompact compact# a s =
 -- structure in question is, you can save time by picking an appropriate
 -- block size for the compact region.
 --
-compactSized :: NFData a => Int -> Bool -> a -> IO (Compact a)
+compactSized :: Int -> Bool -> a -> IO (Compact a)
 compactSized (I# size) share a = IO $ \s0 ->
   case compactNew# (int2Word# size) s0 of { (# s1, compact# #) ->
   case compactAddPrim compact# a s1 of { (# s2, pk #) ->
