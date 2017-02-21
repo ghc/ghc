@@ -901,7 +901,7 @@ test('T10370',
 
 test('T10547',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 31041520, 20),
+          [(wordsize(64), 37681360, 20),
           # initial:    39165544
           # 2016-11-25: 31041520 Linux   Around the time of refactoring the constraint solver;
           #                              but I think that only pushed it over the edge
