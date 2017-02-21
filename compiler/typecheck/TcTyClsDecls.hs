@@ -147,6 +147,8 @@ tcTyClGroup (TyClGroup { group_tyclds = tyclds
   = do { let role_annots = mkRoleAnnotEnv roles
 
            -- Step 1: Typecheck the type/class declarations
+       ; traceTc "-------- tcTyClGroup ------------" empty
+       ; traceTc "Decls for" (ppr (map (tcdName . unLoc) tyclds))
        ; tyclss <- tcTyClDecls tyclds role_annots
 
            -- Step 1.5: Make sure we don't have any type synonym cycles
