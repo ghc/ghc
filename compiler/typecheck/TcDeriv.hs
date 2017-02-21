@@ -1177,7 +1177,7 @@ mkNewTypeEqn dflags overlap_mode tvs
           case mtheta of
            Just theta -> return $ GivenTheta $ DS
                { ds_loc = loc
-               , ds_name = dfun_name, ds_tvs = dfun_tvs
+               , ds_name = dfun_name, ds_tvs = tvs
                , ds_cls = cls, ds_tys = inst_tys
                , ds_tc = rep_tycon
                , ds_theta = theta
@@ -1185,7 +1185,7 @@ mkNewTypeEqn dflags overlap_mode tvs
                , ds_mechanism = mechanism }
            Nothing -> return $ InferTheta $ DS
                { ds_loc = loc
-               , ds_name = dfun_name, ds_tvs = dfun_tvs
+               , ds_name = dfun_name, ds_tvs = tvs
                , ds_cls = cls, ds_tys = inst_tys
                , ds_tc = rep_tycon
                , ds_theta = all_thetas
@@ -1258,7 +1258,6 @@ mkNewTypeEqn dflags overlap_mode tvs
         -- See Note [Newtype deriving superclasses] above
         sc_preds   :: [PredOrigin]
         cls_tyvars = classTyVars cls
-        dfun_tvs   = tyCoVarsOfTypesWellScoped inst_tys
         inst_ty    = mkTyConApp tycon tc_args
         inst_tys   = cls_tys ++ [inst_ty]
         sc_preds   = map (mkPredOrigin DerivOrigin TypeLevel) $
@@ -1278,7 +1277,7 @@ mkNewTypeEqn dflags overlap_mode tvs
           = [ mkPredOrigin (DerivOriginCoerce meth t1 t2) TypeLevel
                            (mkReprPrimEqPred t1 t2)
             | meth <- meths
-            , let (Pair t1 t2) = mkCoerceClassMethEqn cls dfun_tvs
+            , let (Pair t1 t2) = mkCoerceClassMethEqn cls tvs
                                          inst_tys rep_inst_ty meth ]
 
         all_thetas :: [ThetaOrigin]
