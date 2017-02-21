@@ -2078,7 +2078,7 @@ checkValidTyCl tc
       = do { traceTc "Aborted validity for tycon" (ppr tc)
            ; return fake_tc }
     fake_tc | isFamilyTyCon tc || isTypeSynonymTyCon tc
-            = makeTyConAbstract tc
+            = makeRecoveryTyCon tc
             | otherwise
             = tc
 
@@ -2087,7 +2087,7 @@ checkValidTyCl tc
 We recover from a validity error in a type or class, which allows us
 to report multiple validity errors. In the failure case we return a
 TyCon of the right kind, but with no interesting behaviour
-(makeTyConAbstract). Why?  Suppose we have
+(makeRecoveryTyCon). Why?  Suppose we have
    type T a = Fun
 where Fun is a type family of arity 1.  The RHS is invalid, but we
 want to go on checking validity of subsequent type declarations.

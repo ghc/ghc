@@ -99,7 +99,7 @@ module TyCon(
 
         -- ** Manipulating TyCons
         expandSynTyCon_maybe,
-        makeTyConAbstract,
+        makeRecoveryTyCon,
         newTyConCo, newTyConCo_maybe,
         pprPromotionQuote, mkTyConKind,
 
@@ -1116,42 +1116,49 @@ so the coercion tycon CoT must have
 
 Note [TcTyCon]
 ~~~~~~~~~~~~~~
-When checking a type/class declaration (in module TcTyClsDecls), we come
-upon knowledge of the eventual tycon in bits and pieces. First, we use
-getInitialKinds to look over the user-provided kind signature of a tycon
-(including, for example, the number of parameters written to the tycon)
-to get an initial shape of the tycon's kind. Then, using these initial
-kinds, we kind-check the body of the tycon (class methods, data constructors,
-etc.), filling in the metavariables in the tycon's initial kind.
-We then generalize to get the tycon's final, fixed kind. Finally, once
-this has happened for all tycons in a mutually recursive group, we
-can desugar the lot.
+TcTyCons are used for tow distinct purposes
 
-For convenience, we store partially-known tycons in TcTyCons, which
-might store meta-variables. These TcTyCons are stored in the local
-environment in TcTyClsDecls, until the real full TyCons can be created
-during desugaring. A desugared program should never have a TcTyCon.
+1.  When recovering from a type error in a type declaration,
+    we want to put the erroneous TyCon in the environment in a
+    way that won't lead to more errors.  We use a TcTyCon for this;
+    see makeRecoveryTyCon.
 
-A challenging piece in all of this is that we end up taking three separate
-passes over every declaration: one in getInitialKind (this pass look only
-at the head, not the body), one in kcTyClDecls (to kind-check the body),
-and a final one in tcTyClDecls (to desugar). In the latter two passes,
-we need to connect the user-written type variables in an LHsQTyVars
-with the variables in the tycon's inferred kind. Because the tycon might
-not have a CUSK, this matching up is, in general, quite hard to do.
-(Look through the git history between Dec 2015 and Apr 2016 for
-TcHsType.splitTelescopeTvs!) Instead of trying, we just store the list
-of type variables to bring into scope in the later passes when we create
-a TcTyCon in getInitialKinds. Much easier this way! These tyvars are
-brought into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
+2.  When checking a type/class declaration (in module TcTyClsDecls), we come
+    upon knowledge of the eventual tycon in bits and pieces. First, we use
+    getInitialKinds to look over the user-provided kind signature of a tycon
+    (including, for example, the number of parameters written to the tycon)
+    to get an initial shape of the tycon's kind. Then, using these initial
+    kinds, we kind-check the body of the tycon (class methods, data constructors,
+    etc.), filling in the metavariables in the tycon's initial kind.
+    We then generalize to get the tycon's final, fixed kind. Finally, once
+    this has happened for all tycons in a mutually recursive group, we
+    can desugar the lot.
 
-It is important that the scoped type variables not be zonked, as some
-scoped type variables come into existence as SigTvs. If we zonk, the
-Unique will change and the user-written occurrences won't match up with
-what we expect.
+    For convenience, we store partially-known tycons in TcTyCons, which
+    might store meta-variables. These TcTyCons are stored in the local
+    environment in TcTyClsDecls, until the real full TyCons can be created
+    during desugaring. A desugared program should never have a TcTyCon.
 
-In a TcTyCon, everything is zonked (except the scoped vars) after
-the kind-checking pass.
+    A challenging piece in all of this is that we end up taking three separate
+    passes over every declaration: one in getInitialKind (this pass look only
+    at the head, not the body), one in kcTyClDecls (to kind-check the body),
+    and a final one in tcTyClDecls (to desugar). In the latter two passes,
+    we need to connect the user-written type variables in an LHsQTyVars
+    with the variables in the tycon's inferred kind. Because the tycon might
+    not have a CUSK, this matching up is, in general, quite hard to do.
+    (Look through the git history between Dec 2015 and Apr 2016 for
+    TcHsType.splitTelescopeTvs!) Instead of trying, we just store the list
+    of type variables to bring into scope in the later passes when we create
+    a TcTyCon in getInitialKinds. Much easier this way! These tyvars are
+    brought into scope in kcTyClTyVars and tcTyClTyVars, both in TcHsType.
+
+    It is important that the scoped type variables not be zonked, as some
+    scoped type variables come into existence as SigTvs. If we zonk, the
+    Unique will change and the user-written occurrences won't match up with
+    what we expect.
+
+    In a TcTyCon, everything is zonked (except the scoped vars) after
+    the kind-checking pass.
 
 ************************************************************************
 *                                                                      *
@@ -1644,10 +1651,10 @@ isSkolemAbstractTyCon :: TyCon -> Bool
 isSkolemAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon SkolemAbstract }) = True
 isSkolemAbstractTyCon _ = False
 
--- | Make an fake, abstract 'TyCon' from an existing one.
+-- | Make an fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors
-makeTyConAbstract :: TyCon -> TyCon
-makeTyConAbstract tc
+makeRecoveryTyCon :: TyCon -> TyCon
+makeRecoveryTyCon tc
   = mkTcTyCon (tyConName tc)
               (tyConBinders tc) (tyConResKind tc)
               (mightBeUnsaturatedTyCon tc) [{- no scoped vars -}]
@@ -1722,8 +1729,9 @@ isInjectiveTyCon (FamilyTyCon { famTcInj = Injective inj }) _   = and inj
 isInjectiveTyCon (FamilyTyCon {})              _                = False
 isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True
-isInjectiveTyCon tc@(TcTyCon {})               _
-  = pprPanic "isInjectiveTyCon sees a TcTyCon" (ppr tc)
+isInjectiveTyCon (TcTyCon {})                  _                = True
+  -- Reply True for TcTyCon to minimise knock on type errors
+  -- See Note [TcTyCon] item (1)
 
 -- | 'isGenerativeTyCon' is true of 'TyCon's for which this property holds
 -- (where X is the role passed in):
@@ -1860,10 +1868,10 @@ isFamFreeTyCon _                                          = True
 -- type synonym, because you should probably have expanded it first
 -- But regardless, it's not decomposable
 mightBeUnsaturatedTyCon :: TyCon -> Bool
-mightBeUnsaturatedTyCon (SynonymTyCon {}) = False
+mightBeUnsaturatedTyCon (SynonymTyCon {})                  = False
 mightBeUnsaturatedTyCon (FamilyTyCon  { famTcFlav = flav}) = isDataFamFlav flav
 mightBeUnsaturatedTyCon (TcTyCon { tyConUnsat = unsat })   = unsat
-mightBeUnsaturatedTyCon _other            = True
+mightBeUnsaturatedTyCon _other                             = True
 
 -- | Is this an algebraic 'TyCon' declared with the GADT syntax?
 isGadtSyntaxTyCon :: TyCon -> Bool
@@ -2042,8 +2050,7 @@ isImplicitTyCon (AlgTyCon { algTcRhs = rhs, tyConName = name })
   | otherwise                        = False
 isImplicitTyCon (FamilyTyCon { famTcParent = parent }) = isJust parent
 isImplicitTyCon (SynonymTyCon {})    = False
-isImplicitTyCon tc@(TcTyCon {})
-  = pprPanic "isImplicitTyCon sees a TcTyCon" (ppr tc)
+isImplicitTyCon (TcTyCon {})         = False
 
 tyConCType_maybe :: TyCon -> Maybe CType
 tyConCType_maybe tc@(AlgTyCon {}) = tyConCType tc
@@ -2065,8 +2072,8 @@ isTcLevPoly AlgTyCon{}           = False
 isTcLevPoly SynonymTyCon{}       = True
 isTcLevPoly FamilyTyCon{}        = True
 isTcLevPoly PrimTyCon{}          = False
+isTcLevPoly TcTyCon{}            = False
 isTcLevPoly tc@PromotedDataCon{} = pprPanic "isTcLevPoly datacon" (ppr tc)
-isTcLevPoly tc@TcTyCon{}         = pprPanic "isTcLevPoly TcTyCon" (ppr tc)
 
 {-
 -----------------------------------------------
@@ -2195,7 +2202,7 @@ tyConRoles tc
     ; FamilyTyCon {}                      -> const_role Nominal
     ; PrimTyCon { tcRoles = roles }       -> roles
     ; PromotedDataCon { tcRoles = roles } -> roles
-    ; TcTyCon {} -> pprPanic "tyConRoles sees a TcTyCon" (ppr tc)
+    ; TcTyCon {}                          -> const_role Nominal
     }
   where
     const_role r = replicate (tyConArity tc) r
