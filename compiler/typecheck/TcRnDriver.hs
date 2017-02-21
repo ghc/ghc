@@ -46,6 +46,7 @@ import IfaceEnv( externaliseName )
 import TcHsType
 import TcMatches
 import Inst( deeplyInstantiate )
+import TcUnify( checkConstraints )
 import RnTypes
 import RnExpr
 import MkId
@@ -1604,14 +1605,16 @@ check_main dflags tcg_env explicit_mod_hdr
              Just main_name -> do
 
         { traceTc "checkMain found" (ppr main_mod <+> ppr main_fn)
-        ; let loc = srcLocSpan (getSrcLoc main_name)
+        ; let loc       = srcLocSpan (getSrcLoc main_name)
         ; ioTyCon <- tcLookupTyCon ioTyConName
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
-        ; main_expr
-                <- addErrCtxt mainCtxt    $
-                   tcMonoExpr (L loc (HsVar (L loc main_name)))
-                                            (mkCheckExpType $
-                                             mkTyConApp ioTyCon [res_ty])
+        ; let io_ty = mkTyConApp ioTyCon [res_ty]
+              skol_info = SigSkol (FunSigCtxt main_name False) io_ty
+        ; (ev_binds, main_expr)
+               <- checkConstraints skol_info [] [] $
+                  addErrCtxt mainCtxt    $
+                  tcMonoExpr (L loc (HsVar (L loc main_name)))
+                             (mkCheckExpType io_ty)
 
                 -- See Note [Root-main Id]
                 -- Construct the binding
@@ -1623,7 +1626,8 @@ check_main dflags tcg_env explicit_mod_hdr
               ; root_main_id = Id.mkExportedVanillaId root_main_name
                                                       (mkTyConApp ioTyCon [res_ty])
               ; co  = mkWpTyApps [res_ty]
-              ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
+              ; rhs = mkHsDictLet ev_binds $
+                      nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
               ; main_bind = mkVarBind root_main_id rhs }
 
         ; return (tcg_env { tcg_main  = Just main_name,
