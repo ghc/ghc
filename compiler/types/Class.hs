@@ -100,7 +100,7 @@ type DefMethInfo = Maybe (Name, DefMethSpec Type)
    -- Just ($gm, GenericDM ty)   A generic default method, name $gm, type ty
    --                              The generic dm type is *not* quantified
    --                              over the class variables; ie has the
-   --                              class vaiables free
+   --                              class variables free
 
 data ClassATItem
   = ATI TyCon         -- See Note [Associated type tyvar names]
