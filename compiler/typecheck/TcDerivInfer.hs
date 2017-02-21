@@ -246,7 +246,7 @@ inferConstraintsDAC cls tvs inst_tys
   = do { let gen_dms = [ (sel_id, dm_ty)
                        | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls ]
 
-       ; (theta_origins, _lvl) <- pushTcLevelM (mapM do_one_meth gen_dms)
+       ; theta_origins <- pushTcLevelM_ (mapM do_one_meth gen_dms)
             -- Yuk: the pushTcLevel is to match the one wrapping the call
             --      to mk_wanteds in simplifyDeriv.  If we omit this, the
             --      unification variables will wrongly be untouchable.
@@ -268,8 +268,8 @@ inferConstraintsDAC cls tvs inst_tys
                  gen_dm_ty' = substTyWith cls_tvs inst_tys gen_dm_ty
                  (dm_tvs, dm_theta, dm_tau) = tcSplitNestedSigmaTys gen_dm_ty'
 
-           ; ((subst, _meta_tvs), _lvl) <- pushTcLevelM $
-                                           newMetaTyVarsX empty_subst dm_tvs
+           ; (subst, _meta_tvs) <- pushTcLevelM_ $
+                                   newMetaTyVarsX empty_subst dm_tvs
                 -- Yuk: the pushTcLevel is to match the one in mk_wanteds
                 --      simplifyDeriv.  If we don't, the unification variables
                 --      will bogusly be untouchable.
