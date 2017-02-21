@@ -368,9 +368,11 @@ simplLazyBind :: SimplEnv
               -> InExpr -> SimplEnv     -- The RHS and its environment
               -> SimplM SimplEnv
 -- Precondition: rhs obeys the let/app invariant
+-- NOT used for JoinIds
 simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
-  = -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
-    do  { let   rhs_env     = rhs_se `setInScope` env
+  = ASSERT2( not (isJoinId bndr), ppr bndr )
+    -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$ ppr rhs $$ ppr (seIdSubst rhs_se)) $
+    do  { let   rhs_env     = rhs_se `setInScopeAndZapFloats` env
                 (tvs, body) = case collectTyAndValBinders rhs of
                                 (tvs, [], body)
                                   | surely_not_lam body -> (tvs, body)
@@ -392,10 +394,10 @@ simplLazyBind env top_lvl is_rec bndr bndr1 rhs rhs_se
 
         -- Simplify the RHS
         ; let   rhs_cont = mkRhsStop (substTy body_env (exprType body))
-        ; (body_env0, body0) <- simplExprF (zapJoinFloats body_env)
-                                           body rhs_cont
+        ; (body_env0, body0) <- simplExprF body_env body rhs_cont
         ; let body1     = wrapJoinFloats body_env0 body0
               body_env1 = body_env0 `restoreJoinFloats` body_env
+
         -- ANF-ise a constructor or PAP rhs
         ; (body_env2, body2) <- prepareRhs top_lvl body_env1 bndr1 body1
 
@@ -429,10 +431,10 @@ simplJoinBind :: SimplEnv
 simplJoinBind env is_rec cont bndr bndr1 rhs rhs_se
   = -- pprTrace "simplLazyBind" ((ppr bndr <+> ppr bndr1) $$
     --                           ppr rhs $$ ppr (seIdSubst rhs_se)) $
-    do  { let   rhs_env     = rhs_se `setInScope` env
+    do  { let rhs_env = rhs_se `setInScopeAndZapFloats` env
 
         -- Simplify the RHS
-        ; rhs' <- simplJoinRhs rhs_env cont bndr rhs
+        ; rhs' <- simplJoinRhs rhs_env bndr rhs cont
         ; completeBind env NotTopLevel is_rec (Just cont) bndr bndr1 rhs' }
 
 {-
@@ -1048,20 +1050,17 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
 --   \x1 .. xn -> e => \x1 .. xn -> E[e]
 -- Note that we need the arity of the join point, since e may be a lambda
 -- (though this is unlikely). See Note [Case-of-case and join points].
-simplJoinRhs :: SimplEnv -> SimplCont -> InId -> InExpr
+simplJoinRhs :: SimplEnv -> InId -> InExpr -> SimplCont
              -> SimplM OutExpr
-simplJoinRhs env cont bndr expr
+simplJoinRhs env bndr expr cont
   | Just arity <- isJoinId_maybe bndr
-  = simpl_join_lams arity
+  =  do { let (join_bndrs, join_body) = collectNBinders arity expr
+        ; (env', join_bndrs') <- simplLamBndrs env join_bndrs
+        ; join_body' <- simplExprC env' join_body cont
+        ; return $ mkLams join_bndrs' join_body' }
+
   | otherwise
   = pprPanic "simplJoinRhs" (ppr bndr)
-  where
-    simpl_join_lams arity
-      = do { (env', join_bndrs') <- simplLamBndrs env join_bndrs
-           ; join_body' <- simplExprC env' join_body cont
-           ; return $ mkLams join_bndrs' join_body' }
-      where
-        (join_bndrs, join_body) = collectNBinders arity expr
 
 ---------------------------------
 simplType :: SimplEnv -> InType -> SimplM OutType
@@ -1262,11 +1261,15 @@ rebuild env expr cont
 
       ApplyToTy  { sc_arg_ty = ty, sc_cont = cont}
         -> rebuild env (App expr (Type ty)) cont
+
       ApplyToVal { sc_arg = arg, sc_env = se, sc_dup = dup_flag, sc_cont = cont}
         -- See Note [Avoid redundant simplification]
-        | isSimplified dup_flag     -> rebuild env (App expr arg) cont
-        | otherwise                 -> do { arg' <- simplExpr (se `setInScope` env) arg
-                                          ; rebuild env (App expr arg') cont }
+        | isSimplified dup_flag
+        -> rebuild env (App expr arg) cont
+
+        | otherwise
+        -> do { arg' <- simplExpr (se `setInScopeAndZapFloats` env) arg
+              ; rebuild env (App expr arg') cont }
 
 
 {-
@@ -1327,7 +1330,7 @@ simplArg env dup_flag arg_env arg
   | isSimplified dup_flag
   = return (dup_flag, arg_env, arg)
   | otherwise
-  = do { arg' <- simplExpr (arg_env `setInScope` env) arg
+  = do { arg' <- simplExpr (arg_env `setInScopeAndZapFloats` env) arg
        ; return (Simplified, zapSubstEnv arg_env, arg') }
 
 {-
@@ -1443,7 +1446,7 @@ simplNonRecE :: SimplEnv
         --   (/\a. e) (Type ty)   and   (let a = Type ty in e)
 simplNonRecE env bndr (Type ty_arg, rhs_se) (bndrs, body) cont
   = ASSERT( isTyVar bndr )
-    do  { ty_arg' <- simplType (rhs_se `setInScope` env) ty_arg
+    do  { ty_arg' <- simplType (rhs_se `setInScopeAndZapFloats` env) ty_arg
         ; simplLam (extendTvSubst env bndr ty_arg') bndrs body cont }
 
 simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
@@ -1521,20 +1524,23 @@ simplRecE env pairs body cont
         ; env2 <- simplRecBind env1 NotTopLevel (Just cont) pairs
         ; simplExprF env2 body cont }
 
--- | Perform the conversion of a value binding to a join point if it's marked
--- as 'AlwaysTailCalled'. If it's already a join point, return it as is.
--- Otherwise return 'Nothing'.
-matchOrConvertToJoinPoint :: InBndr -> InExpr -> Maybe (JoinId, InExpr)
+-- | Returns Just (bndr,rhs) if the binding is a join point:
+-- If it's a JoinId, just return it
+-- If it's not yet a JoinId but is always tail-called,
+--    make it into a JoinId and return it.
+matchOrConvertToJoinPoint :: InBndr -> InExpr -> Maybe (InBndr, InExpr)
 matchOrConvertToJoinPoint bndr rhs
   | not (isId bndr)
   = Nothing
+
   | isJoinId bndr
   = -- No point in keeping tailCallInfo around; very fragile
-    Just (zapIdTailCallInfo bndr, rhs)
+    Just (bndr, rhs)
+
   | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
   , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  = Just (zapIdTailCallInfo (bndr `asJoinId` join_arity),
-          mkLams bndrs body)
+  = Just (bndr `asJoinId` join_arity, mkLams bndrs body)
+
   | otherwise
   = Nothing
 
@@ -1680,7 +1686,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         -- There is no benefit (unlike in a let-binding), and we'd
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
-  = do  { arg' <- simplExprC (arg_se `setInScope` env) arg
+  = do  { arg' <- simplExprC (arg_se `setInScopeAndZapFloats` env) arg
                              (mkLazyArgStop (funArgTy fun_ty) cci)
         ; rebuildCall env (addValArgTo info' arg') cont }
   where
@@ -2735,7 +2741,7 @@ mkDupableCont env (Select { sc_bndr = case_bndr, sc_alts = alts
                 -- a join point if it's too big to duplicate.
                 -- And this is important: see Note [Fusing case continuations]
 
-        ; let alt_env = se `setInScope` env'
+        ; let alt_env = se `setInScopeAndZapFloats` env'
 
         ; (alt_env', case_bndr') <- simplBinder alt_env case_bndr
         ; alts' <- mapM (simplAlt alt_env' Nothing [] case_bndr' dup_cont) alts
@@ -3111,7 +3117,7 @@ simplUnfolding env top_lvl cont_mb id unf
         | isStableSource src
         -> do { expr' <- if isJoinId id
                             then let Just cont = cont_mb
-                                 in simplJoinRhs rule_env cont id expr
+                                 in simplJoinRhs rule_env id expr cont
                             else simplExpr rule_env expr
               ; case guide of
                   UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things

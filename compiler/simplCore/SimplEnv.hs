@@ -15,7 +15,8 @@ module SimplEnv (
         mkSimplEnv, extendIdSubst,
         SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
         zapSubstEnv, setSubstEnv,
-        getInScope, setInScope, setInScopeSet, modifyInScope, addNewInScopeIds,
+        getInScope, setInScopeAndZapFloats,
+        setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
 
         -- * Substitution results
@@ -290,18 +291,18 @@ getInScope env = seInScope env
 setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
 setInScopeSet env in_scope = env {seInScope = in_scope}
 
-setInScope :: SimplEnv -> SimplEnv -> SimplEnv
+setInScopeAndZapFloats :: SimplEnv -> SimplEnv -> SimplEnv
 -- Set the in-scope set, and *zap* the floats
-setInScope env env_with_scope
-  = env { seInScope = seInScope env_with_scope,
-          seFloats = emptyFloats,
+setInScopeAndZapFloats env env_with_scope
+  = env { seInScope    = seInScope env_with_scope,
+          seFloats     = emptyFloats,
           seJoinFloats = emptyJoinFloats }
 
 setFloats :: SimplEnv -> SimplEnv -> SimplEnv
 -- Set the in-scope set *and* the floats
 setFloats env env_with_floats
-  = env { seInScope = seInScope env_with_floats,
-          seFloats = seFloats  env_with_floats,
+  = env { seInScope    = seInScope env_with_floats,
+          seFloats     = seFloats  env_with_floats,
           seJoinFloats = seJoinFloats env_with_floats }
 
 restoreJoinFloats :: SimplEnv -> SimplEnv -> SimplEnv
