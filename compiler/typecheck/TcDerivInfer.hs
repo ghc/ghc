@@ -34,7 +34,7 @@ import Type
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor)
-import Unify ( {- tcMatchTy, -} tcUnifyTy)
+import Unify (tcUnifyTy)
 import Util
 import Var
 import VarEnv
@@ -592,7 +592,7 @@ simplifyDeriv pred tvs thetas
 
              -- Create the implications we need to solve. For stock and newtype
              -- deriving, these implication constraints will be simple class
-             -- constriants like (C a, Ord b).
+             -- constraints like (C a, Ord b).
              -- But with DeriveAnyClass, we make an implication constraint.
              -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
              mk_wanteds :: ThetaOrigin -> TcM WantedConstraints
@@ -716,8 +716,8 @@ To see why, consider this example of DeriveAnyClass:
     default baz :: (Ord a, Show a) => a -> a -> Bool
     baz x y = compare x y == EQ
 
-Because 'bar' and 'baz' have default signatures, generates a top-level
-definition for thse generic default methods
+Because 'bar' and 'baz' have default signatures, this generates a top-level
+definition for these generic default methods
 
   $gdm_bar :: forall a. Foo a
            => forall c. (Show a, Ix c)
@@ -737,14 +737,15 @@ GHC were typechecking the binding
    bar = $gdm bar
 it would
    * skolemise the expected type of bar
-   * instaniate the type of $dm_bar with meta-type varibles
+   * instantiate the type of $dm_bar with meta-type varibles
    * build an implication constraint
 
 [STEP DAC BUILD]
 So that's what we do.  We build the constraint (call it C1)
 
    forall b. Ix b => (Show (Maybe s), Ix cc,
-                      Maybe s -> b -> String ~ Maybe s -> cc -> String)
+                      Maybe s -> b -> String
+                          ~ Maybe s -> cc -> String)
 
 The 'cc' is a unification variable that comes from instantiating
 $dm_bar's type.  The equality constraint comes from marrying up
