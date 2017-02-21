@@ -34,7 +34,7 @@ import Type
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor)
-import Unify (tcMatchTy, tcUnifyTy)
+import Unify ( {- tcMatchTy, -} tcUnifyTy)
 import Util
 import Var
 import VarEnv
@@ -65,7 +65,8 @@ inferConstraints :: [TyVar] -> Class -> [TcType] -> TcType
 -- Generate a sufficiently large set of constraints that typechecking the
 -- generated method definitions should succeed.   This set will be simplified
 -- before being used in the instance declaration
-inferConstraints tvs main_cls cls_tys inst_ty rep_tc rep_tc_args
+inferConstraints tvs main_cls cls_tys inst_ty
+                 rep_tc rep_tc_args
                  mechanism thing
   | is_generic && not is_anyclass     -- Generic constraints are easy
   = thing [mkThetaOriginFromPreds []] tvs inst_tys
@@ -244,66 +245,43 @@ typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
 inferConstraintsDAC :: Class -> [TyVar] -> [TcType]
                     -> ([ThetaOrigin] -> [TyVar] -> [TcType] -> TcM a)
                     -> TcM a
-inferConstraintsDAC cls tvs inst_tys thing =
-  let theta_origins
-        = [ mkThetaOrigin DerivOrigin TypeLevel dm_tvs vanilla_theta' dm_theta'
-          | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls
-          , let vanilla_ty = thdOf3 $ tcSplitMethodTy (varType sel_id)
-                -- See Note [Splitting nested sigma types] in TcTyClsDecls
-                (_,      vanilla_theta, vanilla_tau)
-                  = tcSplitNestedSigmaTys vanilla_ty
-                (dm_tvs, dm_theta,      dm_tau)
-                  = tcSplitNestedSigmaTys dm_ty
+inferConstraintsDAC cls tvs inst_tys thing
+  = do { let gen_dms = [ (sel_id, dm_ty)
+                       | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls ]
 
-                -- The class will start out like:
-                --
-                --   class Foo a where
-                --     bar :: a -> String
-                --     default :: Show a => a -> String
-                --
-                -- If we are anyclass-deriving an instance for, say,
-                -- data Wibble, then we want to collect a (Show Wibble)
-                -- constraint, not a (Show a) constraint! So we must first
-                -- substitute the instantiated types into the default type
-                -- signature (e.g., a |-> Wibble).
-                in_scope  = mkInScopeSet $ tyCoVarsOfTypes
-                                         $ mkTyVarTys dm_tvs ++ inst_tys
-                tv_env    = zipVarEnv (classTyVars cls) inst_tys
-                subst     = mkTvSubst in_scope tv_env
-                dm_theta' = substTheta subst dm_theta
-                dm_tau'   = substTy subst dm_tau
+       ; (theta_origins, _lvl) <- pushTcLevelM (mapM do_one_meth gen_dms)
+            -- Yuk: the pushTcLevel is to match the one wrapping the call
+            --      to mk_wanteds in simplifyDeriv.  If we omit this, the
+            --      unification variables will wrongly be untouchable.
 
-                -- The next obstacle to overcome is the fact that the default
-                -- and non-default type signatures scope over different sets of
-                -- type variables. That is, this imagine that this is the
-                -- class you were anyclass-deriving:
-                --
-                --   class Baz f where
-                --     quux         :: forall a. Eq a => f a -> f a -> Bool
-                --     default quux :: forall b. (Eq b, Show b)
-                --                  => f b -> f b -> Bool
-                --
-                -- We need a way to treat `a` and `b` as the same when
-                -- typechecking a derived Baz instance. So to wrap
-                -- up inferConstraintsDAC, we match up the non-default type
-                -- type signature with the default one, and apply the resulting
-                -- substitution to the non-default type signature.
-                mb_dm_subst = tcMatchTy vanilla_tau dm_tau'
-                -- We can be assured that we'll always get a substitution here
-                -- (i.e., that the type signatures always match up), since we
-                -- checked for this property earlier in checkValidClass.
-                -- See Note [Default method type signatures must align]
-                -- in TcTyClsDecls.
-                dm_subst = fromMaybe
-                  (pprPanic "inferConstraintsDAC" $
-                    vcat [ text "vanilla_tau" <+> ppr vanilla_tau
-                         , text "dm_tau'"     <+> ppr dm_tau' ])
-                  mb_dm_subst
-                vanilla_theta' = substTheta dm_subst vanilla_theta ]
-  in thing theta_origins tvs inst_tys
+       ; thing theta_origins tvs inst_tys }
+  where
+    cls_tvs = classTyVars cls
+    empty_subst = mkEmptyTCvSubst (mkInScopeSet (mkVarSet tvs))
 
-{-
-Note [Inferring the instance context]
+    do_one_meth :: (Id, Type) -> TcM ThetaOrigin
+      -- (Id,Type) are the selector Id and the generic default method type
+      -- NB: the latter is /not/ quantified over the class variables
+      -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
+    do_one_meth (sel_id, gen_dm_ty)
+      = do { let (sel_tvs, _cls_pred, meth_ty) = tcSplitMethodTy (varType sel_id)
+                 meth_ty' = substTyWith sel_tvs inst_tys meth_ty
+                 (meth_tvs, meth_theta, meth_tau) = tcSplitNestedSigmaTys meth_ty'
+
+                 gen_dm_ty' = substTyWith cls_tvs inst_tys gen_dm_ty
+                 (dm_tvs, dm_theta, dm_tau) = tcSplitNestedSigmaTys gen_dm_ty'
+
+           ; ((subst, _meta_tvs), _lvl) <- pushTcLevelM $
+                                           newMetaTyVarsX empty_subst dm_tvs
+                -- Yuk: the pushTcLevel is to match the one in mk_wanteds
+                --      simplifyDeriv.  If we don't, the unification variables
+                --      will bogusly be untouchable.
+           ; let dm_theta' = substTheta subst dm_theta
+                 tau_eq    = mkPrimEqPred meth_tau (substTy subst dm_tau)
+           ; return (mkThetaOrigin DerivOrigin TypeLevel
+                                   meth_tvs meth_theta (tau_eq:dm_theta')) }
+
+{- Note [Inferring the instance context]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There are two sorts of 'deriving':
 
@@ -397,6 +375,7 @@ Similarly consider:
 Here there *is* no argument field, but we must nevertheless generate
 a context for the Data instances:
         instance Typeable a => Data (T a) where ...
+
 
 ************************************************************************
 *                                                                      *
@@ -615,37 +594,39 @@ simplifyDeriv pred tvs thetas
                = newWanted o (Just t_or_k) (substTyUnchecked skol_subst wanted)
 
              -- Create the implications we need to solve. For stock and newtype
-             -- deriving, these implication constraints will all be of the form
-             --
-             --   forall . () => <wanted_cts>
-             --
-             -- But with DeriveAnyClass, there might be given constraints as
-             -- well.
-             -- See Note [Gathering and simplifying constraints for
-             --           DeriveAnyClass]
-             mk_implics :: ThetaOrigin -> TcM (Bag Implication)
-             mk_implics (ThetaOrigin { to_tvs = local_tvs
-                                     , to_givens = givens
-                                     , to_wanted_origins = wanteds }) = do
-               ((given_evs, wanted_cts), tclvl) <- pushTcLevelM $ do
-                 given_cts  <- mapM mk_given_ev  givens
-                 wanted_cts <- mapM mk_wanted_ct wanteds
-                 pure (given_cts, wanted_cts)
-               (implic, _) <- buildImplicationFor tclvl skol_info local_tvs
-                                given_evs (mkSimpleWC wanted_cts)
-               pure implic
+             -- deriving, these implication constraints will be simple class
+             -- constriants like (C a, Ord b).
+             -- But with DeriveAnyClass, we make an implication constraint.
+             -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
+             mk_wanteds :: ThetaOrigin -> TcM WantedConstraints
+             mk_wanteds (ThetaOrigin { to_tvs            = local_skols
+                                     , to_givens         = givens
+                                     , to_wanted_origins = wanteds })
+               | null local_skols, null givens
+               = do { wanted_cts <- mapM mk_wanted_ct wanteds
+                    ; return (mkSimpleWC wanted_cts) }
+               | otherwise
+               = do { given_evs <- mapM mk_given_ev givens
+                    ; (wanted_cts, tclvl) <- pushTcLevelM $
+                                             mapM mk_wanted_ct wanteds
+                    ; (implic, _) <- buildImplicationFor tclvl skol_info local_skols
+                                                   given_evs (mkSimpleWC wanted_cts)
+                    ; pure (mkImplicWC implic) }
 
+       -- See [STEP DAC BUILD]
        -- Generate the implication constraints constraints to solve with the
        -- skolemized variables
-       ; (implics, tclvl) <- pushTcLevelM $ mapM mk_implics thetas
+       ; (wanteds, tclvl) <- pushTcLevelM $ mapM mk_wanteds thetas
 
        ; traceTc "simplifyDeriv inputs" $
-         vcat [ pprTyVars tvs $$ ppr thetas $$ ppr implics, doc ]
+         vcat [ pprTyVars tvs $$ ppr thetas $$ ppr wanteds, doc ]
+
+       -- See [STEP DAC SOLVE]
        -- Simplify the constraints
        ; solved_implics <- runTcSDeriveds $ solveWantedsAndDrop
-                                          $ mkImplicWC
-                                          $ unionManyBags implics
+                                          $ unionsWC wanteds
 
+       -- See [STEP DAC HOIST]
        -- Split the resulting constraints into bad and good constraints,
        -- building an @unsolved :: WantedConstraints@ representing all
        -- the constraints we can't just shunt to the predicates.
@@ -680,6 +661,7 @@ simplifyDeriv pred tvs thetas
              subst_skol = zipTvSubst tvs_skols $ mkTyVarTys tvs
                           -- The reverse substitution (sigh)
 
+       -- See [STEP DAC RESIDUAL]
        ; min_theta_vars <- mapM newEvVar min_theta
        ; (leftover_implic, _) <- buildImplicationFor tclvl skol_info tvs_skols
                                    min_theta_vars solved_implics
@@ -726,59 +708,75 @@ at the data constructors of the data type for which we are deriving an
 instance. But DeriveAnyClass doesn't need to know about a data type's
 definition at all!
 
-To see why, picture this example example of DeriveAnyClass:
-
-  data Maybe a = ... deriving Foo
+To see why, consider this example of DeriveAnyClass:
 
   class Foo a where
-    bar :: Ix b => a -> b -> String
-    default bar :: (Show a, Ix b) => a -> b -> String
-    bar x _ = show x
+    bar :: forall b. Ix b => a -> b -> String
+    default bar :: (Show a, Ix c) => a -> c -> String
+    bar x y = show x ++ show (range (y,y))
 
     baz :: Eq a => a -> a -> Bool
     default baz :: (Ord a, Show a) => a -> a -> Bool
     baz x y = compare x y == EQ
 
+Because 'bar' and 'baz' have default signatures, generates a top-level
+definition for thse generic default methods
+
+  $gdm_bar :: forall a. Foo a
+           => forall c. (Show a, Ix c)
+           => a -> c -> String
+  $gdm_bar x y = show x ++ show (range (y,y))
+
+(and similarly for baz).  Now consider a 'deriving' clause
+  data Maybe s = ... deriving Foo
+
 This derives an instance of the form:
-
-  instance ??? => Foo (Maybe a)
-
-Because bar and baz have default signatures, GHC fills them in under the hood:
-
-  instance ??? => Foo (Maybe a) where
+  instance (CX) => Foo (Maybe s) where
     bar = $gdm_bar
     baz = $gdm_baz
 
-  $gdm_bar :: Show a => a -> String
-  $gdm_bar = show
+Now it is GHC's job to fill in a suitable instance context (CX).  If
+GHC were typechecking the binding
+   bar = $gdm bar
+it would
+   * skolemise the expected type of bar
+   * instaniate the type of $dm_bar with meta-type varibles
+   * build an implication constraint
 
-  $gdm_baz :: (Ord a, Show a) => a -> a -> Bool
-  $gdm_baz x y = compare x y == EQ
+[STEP DAC BUILD]
+So that's what we do.  We build the constraint (call it C1)
 
-Now it is GHC's job to fill in a suitable ??? (the instance context). It does
-so by simplifying two sets of constraints: the constraints from the default
-type signatures (the wanted constraints), and the constraints from the
-non-default type signatures (the given constraints, which can be used to
-help further simplify the wanted constraints):
+   forall b. Ix b => (Show (Maybe s), Ix cc,
+                      Maybe s -> b -> String ~ Maybe s -> cc -> String)
 
-  bar: (Givens: [Ix b],         Wanteds: [Show (Maybe a), Ix b])
-  baz: (Givens: [Eq (Maybe a)], Wanteds: [Ord (Maybe a), Show (Maybe a)])
+The 'cc' is a unification variable that comes from instantiating
+$dm_bar's type.  The equality constraint comes from marrying up
+the instantiated type of $dm_bar with the specified type of bar.
+Notice that the type variables from the instance, 's' in this case,
+are global to this constraint.
 
-These are just implication constraints. We can combine them into a single
-constraint:
+Similarly for 'baz', givng the constraint C2
 
-     (forall b. Ix b         => (Show (Maybe a), Ix b))
-  /\
-     (forall  . Eq (Maybe a) => (Ord (Maybe a), Show (Maybe a)))
+   forall. Eq (Maybe s) => (Ord a, Show a,
+                            Maybe s -> Maybe s -> Bool
+                                ~ Maybe s -> Maybe s -> Bool)
 
-After simplification, you get:
+In this case baz has no local quantification, so the implication
+constraint has no local skolems and there are no unificaiton
+variables.
 
-     (forall b. Ix b         => Show a)
-  /\
-     (forall  . Eq (Maybe a) => (Ord a, Show a))
+[STEP DAC SOLVE]
+We can combine these two implication constraints into a single
+constraint (C1, C2), and simplify, unifying cc:=b, to get:
 
-Now we need to hoist these constraints out of the implications to become our
-candidate for ???. That is done by approximateWC, which will return:
+   forall b. Ix b => Show a
+   /\
+   forall. Eq (Maybe s) => (Ord a, Show a)
+
+[STEP DAC HOIST]
+Let's call that (C1', C2').  Now we need to hoist the unsolved
+constraints out of the implications to become our candidate for
+(CX). That is done by approximateWC, which will return:
 
   (Show a, Ord a, Show a)
 
@@ -786,7 +784,17 @@ Now we can use mkMinimalBySCs to remove superclasses and duplicates, giving
 
   (Show a, Ord a)
 
-And that's what GHC uses for ???.
+And that's what GHC uses for CX.
+
+[STEP DAC RESIDUAL]
+In this case we have solved all the leftover constraints, but what if
+we don't?  Simple!  We just form the final residual constraint
+
+   forall s. CX => (C1',C2')
+
+and simplify that. In simple cases it'll succeed easily, because CX
+literally contains the constraints in C1', C2', but if there is anything
+more complicated it will be reported in a civilised way.
 
 Note [Error reporting for deriving clauses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
