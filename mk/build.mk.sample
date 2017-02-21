@@ -79,6 +79,13 @@ endif
 # working on stage 2 and want to freeze stage 1 and the libraries for
 # a while.
 
+# Enable these if you would like DWARF debugging symbols for your libraries.
+# This is necessary, for instance, to get DWARF stack traces out of programs
+# built by the produced compiler. You must also pass --enable-dwarf-unwind to
+# `configure` to enable the runtime system's builtin unwinding support.
+#GhcLibHcOpts += -g3
+#GhcRtsHcOpts += -g3
+
 # Build the "extra" packages (see ./packages). This enables more tests. See:
 # https://ghc.haskell.org/trac/ghc/wiki/Building/RunningTests/Running#AdditionalPackages
 #BUILD_EXTRA_PKGS=YES
