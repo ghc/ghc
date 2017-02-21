@@ -1236,11 +1236,42 @@ validDerivPred tv_set pred
 ************************************************************************
 -}
 
+{- Note [Instances and constraint synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Currently, we don't allow instances for constraint synonyms at all.
+Consider these (Trac #13267):
+  type C1 a = Show (a -> Bool)
+  instance C1 Int where    -- I1
+    show _ = "ur"
+
+This elicits "show is not a (visible) method of class C1", which isn't
+a great message. But it comes from the renamer, so it's hard to improve.
+
+This needs a bit more care:
+  type C2 a = (Show a, Show Int)
+  instance C2 Int           -- I2
+
+If we use (splitTyConApp_maybe tau) in checkValidInstance to decompose
+the instance head, we'll expand the synonym on fly, and it'll look like
+  instance (%,%) (Show Int, Show Int)
+and we /really/ don't want that.  So we carefully do /not/ expand
+synonyms, by matching on TyConApp directly.
+-}
+
 checkValidInstance :: UserTypeCtxt -> LHsSigType Name -> Type
                    -> TcM ([TyVar], ThetaType, Class, [Type])
 checkValidInstance ctxt hs_type ty
-  | Just (clas,inst_tys) <- getClassPredTys_maybe tau
-  , inst_tys `lengthIs` classArity clas
+  | not is_tc_app
+  = failWithTc (text "Instance head is not headed by a class")
+
+  | isNothing mb_cls
+  = failWithTc (vcat [ text "Illegal instance for a" <+> text (tyConFlavour tc)
+                     , text "A class instance must be for a class" ])
+
+  | not arity_ok
+  = failWithTc (text "Arity mis-match in instance head")
+
+  | otherwise
   = do  { setSrcSpan head_loc (checkValidInstHead ctxt clas inst_tys)
         ; traceTc "checkValidInstance {" (ppr ty)
         ; checkValidTheta ctxt theta
@@ -1269,11 +1300,13 @@ checkValidInstance ctxt hs_type ty
         ; traceTc "End checkValidInstance }" empty
 
         ; return (tvs, theta, clas, inst_tys) }
-
-  | otherwise
-  = failWithTc (text "Malformed instance head:" <+> ppr tau)
   where
-    (tvs, theta, tau) = tcSplitSigmaTy ty
+    (tvs, theta, tau)    = tcSplitSigmaTy ty
+    is_tc_app            = case tau of { TyConApp {} -> True; _ -> False }
+    TyConApp tc inst_tys = tau   -- See Note [Instances and constraint synonyms]
+    mb_cls               = tyConClass_maybe tc
+    Just clas            = mb_cls
+    arity_ok             = inst_tys `lengthIs` classArity clas
 
         -- The location of the "head" of the instance
     head_loc = getLoc (getLHsInstDeclHead hs_type)
