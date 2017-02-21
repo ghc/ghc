@@ -346,6 +346,16 @@ containers
 
 -  Version number XXXXX (was 0.5.4.0)
 
+compact
+~~~~~~~
+
+The ``compact`` library provides an experimental API for placing immutable
+data structures into a contiguous memory region.  Data in these regions
+is not traced during garbage collection and can be serialized to disk or
+over the network.
+
+- Version number 1.0.0.0 (newly added)
+
 deepseq
 ~~~~~~~
 
