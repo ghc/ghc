@@ -1,0 +1,6 @@
+
+T13300.hs:5:3: error:
+    • Data constructor ‘WI’ returns type ‘Int’
+        instead of an instance of its parent type ‘W’
+    • In the definition of data constructor ‘WI’
+      In the data type declaration for ‘W’
