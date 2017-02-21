@@ -450,6 +450,11 @@ test('T9203',
 test('T9339',
      [stats_num_field('bytes allocated',
                       [ (wordsize(32),    40046844, 5)
+                      # is this number correct? Seems very high.
+
+                      , (platform('x86_64-unknown-mingw32'), 47088, 7)
+                      # 2017-02-19                           47088 (x64/Windows) - Unknown
+
                       , (wordsize(64),       50728, 5) ]),
                       # w/o fusing last: 320005080
                       # 2014-07-22:       80050760

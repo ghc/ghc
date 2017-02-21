@@ -5,7 +5,10 @@
 test('haddock.base',
      [unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 25592972912, 5)
+          [(platform('x86_64-unknown-mingw32'), 24286343184, 5)
+            # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
+
+          ,(wordsize(64), 25592972912, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
             # 2012-09-20:  5829972376 (amd64/Linux)
             # 2012-10-08:  5902601224 (amd64/Linux)

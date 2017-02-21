@@ -25,6 +25,11 @@ test('join005', normal, compile, [''])
 test('join006', normal, compile, [''])
 
 test('join007',
-  [stats_num_field('bytes allocated', [(wordsize(64), 50944, 5)])],
+  [stats_num_field('bytes allocated',
+      [(platform('x86_64-unknown-mingw32'), 47368, 5),
+       # 2017-02-19                         47368 (x64/Windows) - Unknown
+
+       (wordsize(64), 50944, 5)])],
+       # Initial 50944
   compile_and_run,
   [''])

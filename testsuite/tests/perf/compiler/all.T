@@ -612,6 +612,9 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
+           (platform('x86_64-unknown-mingw32'), 59161648, 7),
+             # 2017-02-19                        59161648 (x64/Windows) - Unknown
+
            (wordsize(64), 58648600, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
@@ -901,7 +904,10 @@ test('T10370',
 
 test('T10547',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 37681360, 20),
+          [(platform('x86_64-unknown-mingw32'), 37485128, 20),
+          # 2017-02-19                         37485128 (x64/Windows) - Unknown
+
+           (wordsize(64), 37681360, 20),
           # initial:    39165544
           # 2016-11-25: 31041520 Linux   Around the time of refactoring the constraint solver;
           #                              but I think that only pushed it over the edge
@@ -940,8 +946,9 @@ test('T12425',
 test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 77949232, 5),
-          # initial:      77949232
+          [(platform('x86_64-unknown-mingw32'), 89180624, 5),
+          # initial:      89180624
+          # 2017-02-19                          89180624 (x64/Windows) - Unknown
            (wordsize(64), 86525344, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
