@@ -1010,16 +1010,18 @@ mk_data_eqn overlap_mode tvs cls cls_tys tycon tc_args rep_tc rep_tc_args
        dfun_name            <- newDFunName' cls tycon
        case mtheta of
         Nothing -> -- Infer context
-          inferConstraints tvs cls cls_tys inst_ty rep_tc rep_tc_args mechanism
-            $ \inferred_constraints tvs' inst_tys' ->
-            return $ InferTheta $ DS
+          do { (inferred_constraints, tvs', inst_tys')
+                 <- inferConstraints tvs cls cls_tys inst_ty
+                                     rep_tc rep_tc_args mechanism
+             ; return $ InferTheta $ DS
                    { ds_loc = loc
                    , ds_name = dfun_name, ds_tvs = tvs'
                    , ds_cls = cls, ds_tys = inst_tys'
                    , ds_tc = rep_tc
                    , ds_theta = inferred_constraints
                    , ds_overlap = overlap_mode
-                   , ds_mechanism = mechanism }
+                   , ds_mechanism = mechanism } }
+
         Just theta -> do -- Specified context
             return $ GivenTheta $ DS
                    { ds_loc = loc
