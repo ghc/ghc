@@ -1002,6 +1002,7 @@ e_i   :: exp_ty_i
 <*>_i :: t_(i-1) -> exp_ty_i -> t_i
 join :: tn -> res_ty
 -}
+
 tcApplicativeStmts
   :: HsStmtContext Name
   -> [(SyntaxExpr Name, ApplicativeArg Name Name)]
@@ -1023,8 +1024,9 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       ; let (ops, args) = unzip pairs
       ; ops' <- goOps fun_ty (zip3 ops (ts ++ [rhs_ty]) exp_tys)
 
-      ; (args', thing) <- goArgs (zip3 args pat_tys exp_tys) $
-                             thing_inside body_ty
+      ; lie_var <- getConstraintVar  -- See Note [ApplicativeDo and constraints]
+      ; (args', thing) <- goArgs (zip3 args pat_tys exp_tys)
+                                 lie_var (thing_inside body_ty)
       ; return (zip ops' args', body_ty, thing) }
   where
     goOps _ [] = return []
@@ -1037,41 +1039,70 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArgs
-      :: [(ApplicativeArg Name Name, Type, Type)]
-      -> TcM t
-      -> TcM ([ApplicativeArg TcId TcId], t)
+    goArgs :: [(ApplicativeArg Name Name, Type, Type)]
+           -> TcRef WantedConstraints  -- See Note [ApplicativeDo and constraints]
+           -> TcM t
+           -> TcM ([ApplicativeArg TcId TcId], t)
 
-    goArgs [] thing_inside
-      = do { thing <- thing_inside
+    goArgs [] lie_var thing_inside
+      = do { thing <- setConstraintVar lie_var thing_inside
            ; return ([],thing)
            }
-    goArgs ((ApplicativeArgOne pat rhs, pat_ty, exp_ty) : rest) thing_inside
-      = do { let stmt :: ExprStmt Name
-                 stmt = mkBindStmt pat rhs
-           ; setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
-             addErrCtxt (pprStmtInCtxt ctxt stmt) $
-               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
-                  ; (pat',(pairs, thing)) <-
-                      tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
-                      popErrCtxt $
-                      goArgs rest thing_inside
-                  ; return (ApplicativeArgOne pat' rhs' : pairs, thing) } }
+    goArgs ((ApplicativeArgOne pat rhs, pat_ty, exp_ty) : rest)
+           lie_var thing_inside
+      = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
+        addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
+        setConstraintVar lie_var                               $
+        do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
+           ; (pat',(pairs, thing)) <-
+               tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+               popErrCtxt $  -- Undoes the enclosing addErrCtxt
+               goArgs rest lie_var thing_inside
+           ; return (ApplicativeArgOne pat' rhs' : pairs, thing) }
 
     goArgs ((ApplicativeArgMany stmts ret pat, pat_ty, exp_ty) : rest)
-            thing_inside
+            lie_var thing_inside
       = do { (stmts', (ret',pat',rest',thing))  <-
+                setConstraintVar lie_var                                  $
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
                   { L _ ret' <- tcMonoExprNC (noLoc ret) res_ty
                   ; (pat',(rest', thing)) <-
                       tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
-                        goArgs rest thing_inside
+                        goArgs rest lie_var thing_inside
                   ; return (ret', pat', rest', thing)
                   }
            ; return (ApplicativeArgMany stmts' ret' pat' : rest', thing) }
 
-{-
+{- Note [ApplicativeDo and constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+An applicative-do is supposed to take place in parallel, so
+constraints bound in one arm can't possibly be available in aother
+(Trac #13242).  Our current rule is this (more details and discussion
+on the ticket). Consider
+
+   ...stmts...
+   ApplicativeStmts [arg1, arg2, ... argN]
+   ...more stmts...
+
+where argi :: ApplicativeArg. Each 'argi' itself contains one or more Stmts.
+Now, we say that:
+
+* Constraints required by the argi can be solved from
+  constraint bound by ...stmts...
+
+* Constraints and existentials bound by the argi are not available
+  to solve constraints required either by argj (where i /= j),
+  or by ...more stmts....
+
+* Within the stmts of each 'argi' individually, however, constraints bound
+  by earlier stmts can be used to solve later ones.
+
+To achieve this, we just reset the "LIE var" (in which new required
+constraints are collected) to the outer context just before doing each arg,
+and the thing_inside.
+
+
 ************************************************************************
 *                                                                      *
 \subsection{Errors and contexts}
