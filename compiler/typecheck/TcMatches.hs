@@ -1024,10 +1024,17 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       ; let (ops, args) = unzip pairs
       ; ops' <- goOps fun_ty (zip3 ops (ts ++ [rhs_ty]) exp_tys)
 
-      ; lie_var <- getConstraintVar  -- See Note [ApplicativeDo and constraints]
-      ; (args', thing) <- goArgs (zip3 args pat_tys exp_tys)
-                                 lie_var (thing_inside body_ty)
-      ; return (zip ops' args', body_ty, thing) }
+      -- Typecheck each ApplicativeArg separately
+      -- See Note [ApplicativeDo and constraints]
+      ; args' <- mapM goArg (zip3 args pat_tys exp_tys)
+
+      -- Bring into scope all the things bound by the args,
+      -- and typecheck the thign_inside
+      -- See Note [ApplicativeDo and constraints]
+      ; res <- tcExtendIdEnv (concatMap get_arg_bndrs args') $
+               thing_inside body_ty
+
+      ; return (zip ops' args', body_ty, res) }
   where
     goOps _ [] = return []
     goOps t_left ((op,t_i,exp_ty) : ops)
@@ -1039,40 +1046,32 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArgs :: [(ApplicativeArg Name Name, Type, Type)]
-           -> TcRef WantedConstraints  -- See Note [ApplicativeDo and constraints]
-           -> TcM t
-           -> TcM ([ApplicativeArg TcId TcId], t)
+    goArg :: (ApplicativeArg Name Name, Type, Type)
+          -> TcM (ApplicativeArg TcId TcId)
 
-    goArgs [] lie_var thing_inside
-      = do { thing <- setConstraintVar lie_var thing_inside
-           ; return ([],thing)
-           }
-    goArgs ((ApplicativeArgOne pat rhs, pat_ty, exp_ty) : rest)
-           lie_var thing_inside
+    goArg (ApplicativeArgOne pat rhs, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
         addErrCtxt (pprStmtInCtxt ctxt (mkBindStmt pat rhs))   $
-        setConstraintVar lie_var                               $
         do { rhs' <- tcMonoExprNC rhs (mkCheckExpType exp_ty)
-           ; (pat',(pairs, thing)) <-
-               tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
-               popErrCtxt $  -- Undoes the enclosing addErrCtxt
-               goArgs rest lie_var thing_inside
-           ; return (ApplicativeArgOne pat' rhs' : pairs, thing) }
+           ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+                          return ()
+           ; return (ApplicativeArgOne pat' rhs') }
 
-    goArgs ((ApplicativeArgMany stmts ret pat, pat_ty, exp_ty) : rest)
-            lie_var thing_inside
-      = do { (stmts', (ret',pat',rest',thing))  <-
-                setConstraintVar lie_var                                  $
+    goArg (ApplicativeArgMany stmts ret pat, pat_ty, exp_ty)
+      = do { (stmts', (ret',pat')) <-
                 tcStmtsAndThen ctxt tcDoStmt stmts (mkCheckExpType exp_ty) $
                 \res_ty  -> do
                   { L _ ret' <- tcMonoExprNC (noLoc ret) res_ty
-                  ; (pat',(rest', thing)) <-
-                      tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
-                        goArgs rest lie_var thing_inside
-                  ; return (ret', pat', rest', thing)
+                  ; (pat', _) <- tcPat (StmtCtxt ctxt) pat (mkCheckExpType pat_ty) $
+                                 return ()
+                  ; return (ret', pat')
                   }
-           ; return (ApplicativeArgMany stmts' ret' pat' : rest', thing) }
+           ; return (ApplicativeArgMany stmts' ret' pat') }
+
+    get_arg_bndrs :: ApplicativeArg TcId TcId -> [Id]
+    get_arg_bndrs (ApplicativeArgOne pat _)    = collectPatBinders pat
+    get_arg_bndrs (ApplicativeArgMany _ _ pat) = collectPatBinders pat
+
 
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1098,10 +1097,8 @@ Now, we say that:
 * Within the stmts of each 'argi' individually, however, constraints bound
   by earlier stmts can be used to solve later ones.
 
-To achieve this, we just reset the "LIE var" (in which new required
-constraints are collected) to the outer context just before doing each arg,
-and the thing_inside.
-
+To achieve this, we just typecheck each 'argi' separately, bring all
+the variables they bind into scope, and typecheck the thing_inside.
 
 ************************************************************************
 *                                                                      *
