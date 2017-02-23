@@ -105,6 +105,10 @@ class TestCoercion f where
 instance TestCoercion ((Eq.:~:) a) where
   testCoercion Eq.Refl Eq.Refl = Just Coercion
 
+-- | @since 4.10.0.0
+instance TestCoercion ((Eq.:~~:) a) where
+  testCoercion Eq.HRefl Eq.HRefl = Just Coercion
+
 -- | @since 4.7.0.0
 instance TestCoercion (Coercion a) where
   testCoercion Coercion Coercion = Just Coercion

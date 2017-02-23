@@ -1210,6 +1210,11 @@ deriving instance (Data t) => Data (Proxy t)
 -- | @since 4.7.0.0
 deriving instance (a ~ b, Data a) => Data (a :~: b)
 
+-- | @since 4.10.0.0
+deriving instance (Typeable i, Typeable j, Typeable a, Typeable b,
+                    (a :: i) ~~ (b :: j))
+    => Data (a :~~: b)
+
 -- | @since 4.7.0.0
 deriving instance (Coercible a b, Data a, Data b) => Data (Coercion a b)
 
