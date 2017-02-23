@@ -1,0 +1,17 @@
+{-# LANGUAGE DuplicateRecordFields #-}
+unit p where
+    signature A where
+        data A = A { foo :: Int }
+        data B = B { foo :: Bool }
+    module P where
+        import A
+        x :: A -> Int
+        x = foo
+unit q where
+    module A where
+        data A = A { foo :: Int }
+        data B = B { foo :: Bool }
+unit r where
+    dependency p[A=q:A]
+    module R where
+        import P

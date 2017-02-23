@@ -83,7 +83,7 @@ mkNameShape :: ModuleName -> [AvailInfo] -> NameShape
 mkNameShape mod_name as =
     NameShape mod_name as $ mkOccEnv $ do
         a <- as
-        n <- availName a : availNames a
+        n <- availName a : availNamesWithSelectors a
         return (occName n, n)
 
 -- | Given an existing 'NameShape', merge it with a list of 'AvailInfo's
