@@ -45,7 +45,7 @@ libraries/array              -           -                               -
 libraries/binary             -           -                               https://github.com/kolmodin/binary.git
 libraries/bytestring         -           -                               https://github.com/haskell/bytestring.git
 libraries/Cabal              -           -                               https://github.com/haskell/cabal.git
-libraries/compact            -           -                               -
+libraries/ghc-compact        -           -                               -
 libraries/containers         -           -                               https://github.com/haskell/containers.git
 libraries/deepseq            -           -                               ssh://git@github.com/haskell/deepseq.git
 libraries/directory          -           -                               ssh://git@github.com/haskell/directory.git

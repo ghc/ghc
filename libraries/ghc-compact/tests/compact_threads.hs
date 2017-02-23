@@ -1,7 +1,6 @@
 import Control.Concurrent
 import Control.Monad
-import Data.Compact
-import Data.Compact.Internal
+import GHC.Compact
 import qualified Data.Map as Map
 import Data.Maybe
 import System.Environment

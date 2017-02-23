@@ -9,8 +9,7 @@ import Data.Array
 import Data.Array.ST
 import qualified Data.Array.Unboxed as U
 
-import Data.Compact
-import Data.Compact.Internal
+import GHC.Compact
 
 assertFail :: String -> IO ()
 assertFail msg = throwIO $ AssertionFailed msg

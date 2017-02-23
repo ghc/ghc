@@ -1,6 +1,5 @@
 import qualified Data.ByteString.Char8 as B
-import Data.Compact
-import Data.Compact.Internal
+import GHC.Compact
 import qualified Data.Map as Map
 
 main = do

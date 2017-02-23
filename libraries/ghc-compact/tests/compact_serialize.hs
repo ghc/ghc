@@ -8,9 +8,8 @@ import Data.IORef
 import Data.ByteString (ByteString, packCStringLen)
 import Foreign.Ptr
 
-import Data.Compact
-import Data.Compact.Internal
-import Data.Compact.Serialized
+import GHC.Compact
+import GHC.Compact.Serialized
 
 assertFail :: String -> IO ()
 assertFail msg = throwIO $ AssertionFailed msg

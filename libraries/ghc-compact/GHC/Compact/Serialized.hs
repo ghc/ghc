@@ -5,7 +5,7 @@
 
 -----------------------------------------------------------------------------
 -- |
--- Module      :  Data.Compact.Serialized
+-- Module      :  GHC.Compact.Serialized
 -- Copyright   :  (c) The University of Glasgow 2001-2009
 --                (c) Giovanni Campagna <gcampagn@cs.stanford.edu> 2015
 -- License     :  BSD-style (see the file LICENSE)
@@ -19,7 +19,7 @@
 --
 -- /Since: 1.0.0/
 
-module Data.Compact.Serialized(
+module GHC.Compact.Serialized(
   SerializedCompact(..),
   withSerializedCompact,
   importCompact,
@@ -39,7 +39,7 @@ import Data.IORef(newIORef, readIORef, writeIORef)
 import Foreign.ForeignPtr(withForeignPtr)
 import Foreign.Marshal.Utils(copyBytes)
 
-import Data.Compact.Internal
+import GHC.Compact
 
 -- | A serialized version of the 'Compact' metadata (each block with
 -- address and size and the address of the root). This structure is

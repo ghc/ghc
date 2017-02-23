@@ -1,5 +1,5 @@
 import Control.Exception
-import Data.Compact
+import GHC.Compact
 
 data HiddenFunction = HiddenFunction (Int -> Int)
 

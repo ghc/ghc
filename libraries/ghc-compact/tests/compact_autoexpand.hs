@@ -3,8 +3,7 @@ module Main where
 import Control.Exception
 import System.Mem
 
-import Data.Compact
-import Data.Compact.Internal
+import GHC.Compact
 
 assertFail :: String -> IO ()
 assertFail msg = throwIO $ AssertionFailed msg

@@ -1,6 +1,6 @@
 import Control.Concurrent
 import Control.Exception
-import Data.Compact
+import GHC.Compact
 
 data HiddenMVar = HiddenMVar (MVar ())
 

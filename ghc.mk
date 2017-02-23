@@ -463,7 +463,7 @@ PACKAGES_STAGE1 += ghc-boot
 PACKAGES_STAGE1 += template-haskell
 PACKAGES_STAGE1 += hoopl
 PACKAGES_STAGE1 += transformers
-PACKAGES_STAGE1 += compact
+PACKAGES_STAGE1 += ghc-compact
 
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
