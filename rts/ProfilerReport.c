@@ -90,21 +90,6 @@ fprintHeader( FILE *prof_file, uint32_t max_label_len, uint32_t max_module_len,
 static CostCentre *sorted_cc_list;
 
 static void
-aggregateCCCosts( CostCentreStack *ccs )
-{
-    IndexTable *i;
-
-    ccs->cc->mem_alloc += ccs->mem_alloc;
-    ccs->cc->time_ticks += ccs->time_ticks;
-
-    for (i = ccs->indexTable; i != 0; i = i->next) {
-        if (!i->back_edge) {
-            aggregateCCCosts(i->ccs);
-        }
-    }
-}
-
-static void
 insertCCInSortedList( CostCentre *new_cc )
 {
     CostCentre **prev, *cc;
@@ -130,7 +115,6 @@ reportPerCCCosts( FILE *prof_file, ProfilerTotals totals )
     CostCentre *cc, *next;
     uint32_t max_label_len, max_module_len, max_src_len;
 
-    aggregateCCCosts(CCS_MAIN);
     sorted_cc_list = NULL;
 
     max_label_len  = 11; // no shorter than the "COST CENTRE" header

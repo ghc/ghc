@@ -166,7 +166,7 @@ data DoCostCentres
     | CostCentresSummary
     | CostCentresVerbose
     | CostCentresAll
-    | CostCentresXML
+    | CostCentresJSON
     deriving (Show)
 
 -- | @since 4.8.0.0
@@ -175,13 +175,13 @@ instance Enum DoCostCentres where
     fromEnum CostCentresSummary = #{const COST_CENTRES_SUMMARY}
     fromEnum CostCentresVerbose = #{const COST_CENTRES_VERBOSE}
     fromEnum CostCentresAll     = #{const COST_CENTRES_ALL}
-    fromEnum CostCentresXML     = #{const COST_CENTRES_XML}
+    fromEnum CostCentresJSON    = #{const COST_CENTRES_JSON}
 
     toEnum #{const COST_CENTRES_NONE}    = CostCentresNone
     toEnum #{const COST_CENTRES_SUMMARY} = CostCentresSummary
     toEnum #{const COST_CENTRES_VERBOSE} = CostCentresVerbose
     toEnum #{const COST_CENTRES_ALL}     = CostCentresAll
-    toEnum #{const COST_CENTRES_XML}     = CostCentresXML
+    toEnum #{const COST_CENTRES_JSON}    = CostCentresJSON
     toEnum e = errorWithoutStackTrace ("invalid enum for DoCostCentres: " ++ show e)
 
 -- | Parameters pertaining to the cost-center profiler.

@@ -410,6 +410,11 @@ enclosed between ``+RTS ... -RTS`` as usual):
     The :rts-flag:`-pa` option produces the most detailed report containing all
     cost centres in addition to the actual time and allocation data.
 
+.. rts-flag:: -pj
+
+    The :rts-flag:`-pj` option produces a time/allocation profile report in JSON
+    format written into the file :file:`<program>.prof`.
+
 .. rts-flag:: -V <secs>
 
     Sets the interval that the RTS clock ticks at, which is also the

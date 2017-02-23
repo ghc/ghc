@@ -304,6 +304,7 @@ usage_text[] = {
 "  -P       More detailed Time/Allocation profile",
 "  -Pa      Give information about *all* cost centres",
 "",
+"  -Pj      Output cost-center profile in JSON format",
 "  -h<break-down> Heap residency profile (hp2ps) (output file <program>.hp)",
 "     break-down: c = cost centre stack (default)",
 "                 m = module",
@@ -1059,13 +1060,14 @@ error = true;
                       error = true;
                     }
                     break;
+                  case 'j':
+                      RtsFlags.CcFlags.doCostCentres = COST_CENTRES_JSON;
+                      break;
                   case '\0':
                       if (rts_argv[arg][1] == 'P') {
-                          RtsFlags.CcFlags.doCostCentres =
-                              COST_CENTRES_VERBOSE;
+                          RtsFlags.CcFlags.doCostCentres = COST_CENTRES_VERBOSE;
                       } else {
-                          RtsFlags.CcFlags.doCostCentres =
-                              COST_CENTRES_SUMMARY;
+                          RtsFlags.CcFlags.doCostCentres = COST_CENTRES_SUMMARY;
                       }
                       break;
                   default:

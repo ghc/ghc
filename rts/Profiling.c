@@ -118,6 +118,7 @@ static  CostCentreStack * isInIndexTable  ( IndexTable *, CostCentre * );
 static  IndexTable *      addToIndexTable ( IndexTable *, CostCentreStack *,
                                             CostCentre *, unsigned int );
 static  void              ccsSetSelected  ( CostCentreStack *ccs );
+static  void              aggregateCCCosts( CostCentreStack *ccs );
 
 static  void              initTimeProfiling    ( void );
 static  void              initProfilingLogFile ( void );
@@ -694,10 +695,16 @@ reportCCSProfiling( void )
     if (RtsFlags.CcFlags.doCostCentres == 0) return;
 
     ProfilerTotals totals = countTickss(CCS_MAIN);
+    aggregateCCCosts(CCS_MAIN);
     inheritCosts(CCS_MAIN);
     CostCentreStack *stack = pruneCCSTree(CCS_MAIN);
     sortCCSTree(stack);
-    writeCCSReport(prof_file, stack, totals);
+
+    if (RtsFlags.CcFlags.doCostCentres == COST_CENTRES_JSON) {
+        writeCCSReportJson(prof_file, stack, totals);
+    } else {
+        writeCCSReport(prof_file, stack, totals);
+    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -750,6 +757,21 @@ inheritCosts(CostCentreStack *ccs)
         }
 
     return;
+}
+
+static void
+aggregateCCCosts( CostCentreStack *ccs )
+{
+    IndexTable *i;
+
+    ccs->cc->mem_alloc += ccs->mem_alloc;
+    ccs->cc->time_ticks += ccs->time_ticks;
+
+    for (i = ccs->indexTable; i != 0; i = i->next) {
+        if (!i->back_edge) {
+            aggregateCCCosts(i->ccs);
+        }
+    }
 }
 
 //

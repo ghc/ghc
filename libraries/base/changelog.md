@@ -1,6 +1,6 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## next *TBA*
+## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 
   * `Data.Type.Bool.Not` given a type family dependency (#12057).
@@ -64,6 +64,10 @@
 
   * `Data.Type.Equality` now provides a kind heterogeneous type equality
     evidence type, `(:~~:)`.
+
+  * The `CostCentresXML` constructor of `GHC.RTS.Flags.DoCostCentres` has been
+    replaced by `CostCentresJSON` due to the new JSON export format supported by
+    the cost centre profiler.
 
 ## 4.9.0.0  *May 2016*
 
