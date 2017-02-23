@@ -2959,9 +2959,13 @@ name_boolformula :: { LBooleanFormula (Located RdrName) }
                               >> return (sLL $1 $> (Or [$1,$3])) }
 
 name_boolformula_and :: { LBooleanFormula (Located RdrName) }
-        : name_boolformula_atom                             { $1 }
-        | name_boolformula_atom ',' name_boolformula_and
-                  {% aa $1 (AnnComma,$2) >> return (sLL $1 $> (And [$1,$3])) }
+        : name_boolformula_and_list
+                  { sLL (head $1) (last $1) (And ($1)) }
+
+name_boolformula_and_list :: { [LBooleanFormula (Located RdrName)] }
+        : name_boolformula_atom                               { [$1] }
+        | name_boolformula_atom ',' name_boolformula_and_list
+            {% aa $1 (AnnComma, $2) >> return ($1 : $3) }
 
 name_boolformula_atom :: { LBooleanFormula (Located RdrName) }
         : '(' name_boolformula ')'  {% ams (sLL $1 $> (Parens $2)) [mop $1,mcp $3] }
