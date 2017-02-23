@@ -1,0 +1,8 @@
+unit p where
+    signature A where
+        newtype F a = F { mkF :: a }
+unit q where
+    module A where
+        newtype F a = F { mkF :: a }
+unit r where
+    dependency p[A=q:A]

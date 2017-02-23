@@ -509,11 +509,9 @@ rnIfaceTyConParent (IfDataInstance n tc args)
 rnIfaceTyConParent IfNoParent = pure IfNoParent
 
 rnIfaceConDecls :: Rename IfaceConDecls
-rnIfaceConDecls (IfDataTyCon ds b fs)
+rnIfaceConDecls (IfDataTyCon ds)
     = IfDataTyCon <$> mapM rnIfaceConDecl ds
-                  <*> return b
-                  <*> return fs
-rnIfaceConDecls (IfNewTyCon d b fs) = IfNewTyCon <$> rnIfaceConDecl d <*> return b <*> return fs
+rnIfaceConDecls (IfNewTyCon d) = IfNewTyCon <$> rnIfaceConDecl d
 rnIfaceConDecls (IfAbstractTyCon b) = pure (IfAbstractTyCon b)
 
 rnIfaceConDecl :: Rename IfaceConDecl
@@ -524,10 +522,7 @@ rnIfaceConDecl d = do
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
     con_ctxt <- mapM rnIfaceType (ifConCtxt d)
     con_arg_tys <- mapM rnIfaceType (ifConArgTys d)
-    -- TODO: It seems like we really should rename the field labels, but this
-    -- breaks due to tcIfaceDataCons projecting back to the field's OccName and
-    -- then looking up it up in the name cache. See #12699.
-    --con_fields <- mapM rnIfaceGlobal (ifConFields d)
+    con_fields <- mapM rnFieldLabel (ifConFields d)
     let rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
         rnIfaceBang bang = pure bang
     con_stricts <- mapM rnIfaceBang (ifConStricts d)
@@ -536,7 +531,7 @@ rnIfaceConDecl d = do
              , ifConEqSpec = con_eq_spec
              , ifConCtxt = con_ctxt
              , ifConArgTys = con_arg_tys
-             --, ifConFields = con_fields -- See TODO above
+             , ifConFields = con_fields
              , ifConStricts = con_stricts
              }
 

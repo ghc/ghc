@@ -805,21 +805,19 @@ tcIfaceDataCons :: Name -> TyCon -> [TyConBinder] -> IfaceConDecls -> IfL AlgTyC
 tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
   = case if_cons of
         IfAbstractTyCon dis -> return (AbstractTyCon dis)
-        IfDataTyCon cons _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
-                                    ; data_cons  <- mapM (tc_con_decl field_lbls) cons
-                                    ; return (mkDataTyConRhs data_cons) }
-        IfNewTyCon  con  _ _ -> do  { field_lbls <- mapM (traverse lookupIfaceTop) (ifaceConDeclFields if_cons)
-                                    ; data_con  <- tc_con_decl field_lbls con
-                                    ; mkNewTyConRhs tycon_name tycon data_con }
+        IfDataTyCon cons -> do  { data_cons  <- mapM tc_con_decl cons
+                                ; return (mkDataTyConRhs data_cons) }
+        IfNewTyCon  con  -> do  { data_con  <- tc_con_decl con
+                                ; mkNewTyConRhs tycon_name tycon data_con }
   where
     univ_tv_bndrs :: [TyVarBinder]
     univ_tv_bndrs = mkDataConUnivTyVarBinders tc_tybinders
 
-    tc_con_decl field_lbls (IfCon { ifConInfix = is_infix,
+    tc_con_decl (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_bndrs,
                          ifConName = dc_name,
                          ifConCtxt = ctxt, ifConEqSpec = spec,
-                         ifConArgTys = args, ifConFields = my_lbls,
+                         ifConArgTys = args, ifConFields = lbl_names,
                          ifConStricts = if_stricts,
                          ifConSrcStricts = if_src_stricts})
      = -- Universally-quantified tyvars are shared with
@@ -840,16 +838,6 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
                 ; return (eq_spec, theta, arg_tys, stricts) }
-
-        -- Look up the field labels for this constructor; note that
-        -- they should be in the same order as my_lbls!
-        ; let lbl_names = map find_lbl my_lbls
-              find_lbl x = case find (\ fl -> flSelector fl == x) field_lbls of
-                             Just fl -> fl
-                             Nothing -> pprPanic "TcIface.find_lbl" not_found
-                where
-                  not_found = text "missing:" <+> ppr (occName x)
-                           $$ text "known labels:" <+> ppr field_lbls
 
         -- Remember, tycon is the representation tycon
         ; let orig_res_ty = mkFamilyTyConApp tycon

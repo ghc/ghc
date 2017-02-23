@@ -27,7 +27,6 @@ module IfaceSyn (
 
         -- Misc
         ifaceDeclImplicitBndrs, visibleIfConDecls,
-        ifaceConDeclFields,
         ifaceDeclFingerprints,
 
         -- Free Names
@@ -70,7 +69,6 @@ import Lexeme (isLexSym)
 
 import Control.Monad
 import System.IO.Unsafe
-import Data.List (find)
 import Data.Maybe (isJust)
 
 infixl 3 &&&
@@ -209,15 +207,15 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars   :: [IfaceTvBndr]
                                      -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
-  = IfAbstractTyCon HowAbstract                   -- c.f TyCon.AbstractTyCon
-  | IfDataTyCon [IfaceConDecl] Bool [FieldLabelString] -- Data type decls
-  | IfNewTyCon  IfaceConDecl   Bool [FieldLabelString] -- Newtype decls
+  = IfAbstractTyCon HowAbstract     -- c.f TyCon.AbstractTyCon
+  | IfDataTyCon [IfaceConDecl] -- Data type decls
+  | IfNewTyCon  IfaceConDecl   -- Newtype decls
 
 -- For IfDataTyCon and IfNewTyCon we store:
 --  * the data constructor(s);
---  * a boolean indicating whether DuplicateRecordFields was enabled
---    at the definition site; and
---  * a list of field labels.
+-- The field labels are stored individually in the IfaceConDecl
+-- (there is some redundancy here, because a field label may occur
+-- in multiple IfaceConDecls and represent the same field label)
 
 data IfaceConDecl
   = IfCon {
@@ -235,7 +233,7 @@ data IfaceConDecl
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
         ifConArgTys  :: [IfaceType],        -- Arg types
-        ifConFields  :: [IfaceTopBndr],     -- ...ditto... (field labels)
+        ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
           -- or 1-1 corresp with arg tys
@@ -370,18 +368,8 @@ See [http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoid
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
 visibleIfConDecls (IfAbstractTyCon {}) = []
-visibleIfConDecls (IfDataTyCon cs _ _) = cs
-visibleIfConDecls (IfNewTyCon c   _ _) = [c]
-
-ifaceConDeclFields :: IfaceConDecls -> [FieldLbl OccName]
-ifaceConDeclFields x = case x of
-    IfAbstractTyCon {}              -> []
-    IfDataTyCon cons is_over labels -> map (help cons  is_over) labels
-    IfNewTyCon  con  is_over labels -> map (help [con] is_over) labels
-  where
-    help (dc:_) is_over lbl =
-        mkFieldLabelOccs lbl (occName $ ifConName dc) is_over
-    help [] _ _ = error "ifaceConDeclFields: data type has no constructors!"
+visibleIfConDecls (IfDataTyCon cs) = cs
+visibleIfConDecls (IfNewTyCon c) = [c]
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
@@ -398,8 +386,8 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
   = case cons of
       IfAbstractTyCon {}  -> []
-      IfNewTyCon  cd  _ _ -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
-      IfDataTyCon cds _ _ -> concatMap ifaceConDeclImplicitBndrs cds
+      IfNewTyCon  cd  -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
+      IfDataTyCon cds -> concatMap ifaceConDeclImplicitBndrs cds
 
 ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt
                                    , ifName = cls_tc_name
@@ -430,7 +418,8 @@ ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt
 ifaceDeclImplicitBndrs _ = []
 
 ifaceConDeclImplicitBndrs :: IfaceConDecl -> [OccName]
-ifaceConDeclImplicitBndrs (IfCon { ifConWrapper = has_wrapper, ifConName = con_name })
+ifaceConDeclImplicitBndrs (IfCon {
+        ifConWrapper = has_wrapper, ifConName = con_name })
   = [occName con_name, work_occ] ++ wrap_occs
   where
     con_occ = occName con_name
@@ -716,12 +705,11 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     add_bars []     = Outputable.empty
     add_bars (c:cs) = sep ((equals <+> c) : map (vbar <+>) cs)
 
-    ok_con dc = showSub ss dc || any (showSub ss) (ifConFields dc)
+    ok_con dc = showSub ss dc || any (showSub ss . flSelector) (ifConFields dc)
 
     show_con dc
-      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style fls tycon binders parent dc
+      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style tycon binders parent dc
       | otherwise = Nothing
-    fls = ifaceConDeclFields condecls
 
     pp_nd = case condecls of
               IfAbstractTyCon how ->
@@ -942,12 +930,11 @@ isVanillaIfaceConDecl (IfCon { ifConExTvs  = ex_tvs
   = (null ex_tvs) && (null eq_spec) && (null ctxt)
 
 pprIfaceConDecl :: ShowSub -> Bool
-                -> [FieldLbl OccName]
                 -> IfaceTopBndr
                 -> [IfaceTyConBinder]
                 -> IfaceTyConParent
                 -> IfaceConDecl -> SDoc
-pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
+pprIfaceConDecl ss gadt_style tycon tc_binders parent
         (IfCon { ifConName = name, ifConInfix = is_infix,
                  ifConExTvs = ex_tvs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
@@ -995,18 +982,15 @@ pprIfaceConDecl ss gadt_style fls tycon tc_binders parent
     pp_field_args = braces $ sep $ punctuate comma $ ppr_trim $
                     zipWith maybe_show_label fields tys_w_strs
 
-    maybe_show_label :: IfaceTopBndr -> (IfaceBang, IfaceType) -> Maybe SDoc
-    maybe_show_label sel bty
+    maybe_show_label :: FieldLabel -> (IfaceBang, IfaceType) -> Maybe SDoc
+    maybe_show_label lbl bty
       | showSub ss sel =
-          Just (pprPrefixIfDeclBndr how_much lbl <+> dcolon <+> pprBangTy bty)
+          Just (pprPrefixIfDeclBndr how_much occ <+> dcolon <+> pprBangTy bty)
       | otherwise      =
           Nothing
       where
-        -- IfaceConDecl contains the name of the selector function, so
-        -- we have to look up the field label (in case
-        -- DuplicateRecordFields was used for the definition)
-        lbl = maybe (occName sel) (mkVarOccFS . flLabel)
-              $ find (\ fl -> flSelector fl == occName sel) fls
+        sel = flSelector lbl
+        occ = mkVarOccFS (flLabel lbl)
 
     mk_user_con_res_ty :: IfaceEqSpec -> ([IfaceTvBndr], SDoc)
     -- See Note [Result type of a data family GADT]
@@ -1327,8 +1311,8 @@ freeNamesDM (Just (GenericDM ty)) = freeNamesIfType ty
 freeNamesDM _                     = emptyNameSet
 
 freeNamesIfConDecls :: IfaceConDecls -> NameSet
-freeNamesIfConDecls (IfDataTyCon c _ _) = fnList freeNamesIfConDecl c
-freeNamesIfConDecls (IfNewTyCon  c _ _) = freeNamesIfConDecl c
+freeNamesIfConDecls (IfDataTyCon c) = fnList freeNamesIfConDecl c
+freeNamesIfConDecls (IfNewTyCon  c) = freeNamesIfConDecl c
 freeNamesIfConDecls _                   = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
@@ -1336,6 +1320,7 @@ freeNamesIfConDecl c
   = freeNamesIfTyVarBndrs (ifConExTvs c) &&&
     freeNamesIfContext (ifConCtxt c) &&&
     fnList freeNamesIfType (ifConArgTys c) &&&
+    mkNameSet (map flSelector (ifConFields c)) &&&
     fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
 
 freeNamesIfKind :: IfaceType -> NameSet
@@ -1733,14 +1718,14 @@ instance Binary IfaceAxBranch where
 
 instance Binary IfaceConDecls where
     put_ bh (IfAbstractTyCon d)   = putByte bh 0 >> put_ bh d
-    put_ bh (IfDataTyCon cs b fs) = putByte bh 1 >> put_ bh cs >> put_ bh b >> put_ bh fs
-    put_ bh (IfNewTyCon c b fs)   = putByte bh 2 >> put_ bh c >> put_ bh b >> put_ bh fs
+    put_ bh (IfDataTyCon cs) = putByte bh 1 >> put_ bh cs
+    put_ bh (IfNewTyCon c)   = putByte bh 2 >> put_ bh c
     get bh = do
         h <- getByte bh
         case h of
             0 -> liftM IfAbstractTyCon $ get bh
-            1 -> liftM3 IfDataTyCon (get bh) (get bh) (get bh)
-            2 -> liftM3 IfNewTyCon (get bh) (get bh) (get bh)
+            1 -> liftM IfDataTyCon (get bh)
+            2 -> liftM IfNewTyCon (get bh)
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
 
 instance Binary IfaceConDecl where
@@ -1753,7 +1738,7 @@ instance Binary IfaceConDecl where
         put_ bh a6
         put_ bh a7
         put_ bh (length a8)
-        mapM_ (putIfaceTopBndr bh) a8
+        mapM_ (put_ bh) a8
         put_ bh a9
         put_ bh a10
     get bh = do
@@ -1765,7 +1750,7 @@ instance Binary IfaceConDecl where
         a6 <- get bh
         a7 <- get bh
         n_fields <- get bh
-        a8 <- replicateM n_fields (getIfaceTopBndr bh)
+        a8 <- replicateM n_fields (get bh)
         a9 <- get bh
         a10 <- get bh
         return (IfCon a1 a2 a3 a4 a5 a6 a7 a8 a9 a10)
