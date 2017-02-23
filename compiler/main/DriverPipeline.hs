@@ -601,6 +601,10 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                             src_suffix = suffix',
                             output_spec = output }
 
+         when (isBackpackishSuffix suffix') $
+           throwGhcExceptionIO (UsageError
+                       ("use --backpack to process " ++ input_fn))
+
          -- We want to catch cases of "you can't get there from here" before
          -- we start the pipeline, because otherwise it will just run off the
          -- end.

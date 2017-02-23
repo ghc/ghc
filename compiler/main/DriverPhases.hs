@@ -18,6 +18,7 @@ module DriverPhases (
 
    isHaskellishSuffix,
    isHaskellSrcSuffix,
+   isBackpackishSuffix,
    isObjectSuffix,
    isCishSuffix,
    isDynLibSuffix,
@@ -291,7 +292,7 @@ phaseInputExt Cmm                 = "cmmcpp"
 phaseInputExt MergeStub           = "o"
 phaseInputExt StopLn              = "o"
 
-haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
+haskellish_src_suffixes, backpackish_suffixes, haskellish_suffixes, cish_suffixes,
     haskellish_user_src_suffixes, haskellish_sig_suffixes
  :: [String]
 -- When a file with an extension in the haskellish_src_suffixes group is
@@ -306,6 +307,7 @@ cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S", "ll", "
 haskellish_user_src_suffixes =
   haskellish_sig_suffixes ++ [ "hs", "lhs", "hs-boot", "lhs-boot" ]
 haskellish_sig_suffixes      = [ "hsig", "lhsig" ]
+backpackish_suffixes         = [ "bkp" ]
 
 objish_suffixes :: Platform -> [String]
 -- Use the appropriate suffix for the system on which
@@ -320,10 +322,11 @@ dynlib_suffixes platform = case platformOS platform of
   OSDarwin  -> ["dylib", "so"]
   _         -> ["so"]
 
-isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix,
+isHaskellishSuffix, isBackpackishSuffix, isHaskellSrcSuffix, isCishSuffix,
     isHaskellUserSrcSuffix, isHaskellSigSuffix
  :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
+isBackpackishSuffix    s = s `elem` backpackish_suffixes
 isHaskellSigSuffix     s = s `elem` haskellish_sig_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
@@ -334,7 +337,9 @@ isObjectSuffix platform s = s `elem` objish_suffixes platform
 isDynLibSuffix platform s = s `elem` dynlib_suffixes platform
 
 isSourceSuffix :: String -> Bool
-isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
+isSourceSuffix suff  = isHaskellishSuffix suff
+                    || isCishSuffix suff
+                    || isBackpackishSuffix suff
 
 -- | When we are given files (modified by -x arguments) we need
 -- to determine if they are Haskellish or not to figure out
