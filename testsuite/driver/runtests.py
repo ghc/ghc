@@ -11,7 +11,6 @@ import sys
 import os
 import string
 import getopt
-import platform
 import shutil
 import tempfile
 import time
@@ -24,8 +23,6 @@ import re
 #   says "Aborted" and we fail with exit code 134.
 # So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
-
-PYTHON3 = sys.version_info >= (3, 0)
 
 from testutil import *
 from testglobals import *
@@ -119,29 +116,6 @@ for opt,arg in opts:
             sys.exit(1)
         config.verbose = int(arg)
 
-
-if config.use_threads == 1:
-    # Trac #1558 says threads don't work in python 2.4.4, but do
-    # in 2.5.2. Probably >= 2.5 is sufficient, but let's be
-    # conservative here.
-    # Some versions of python have things like '1c1' for some of
-    # these components (see trac #3091), but int() chokes on the
-    # 'c1', so we drop it.
-    (maj, min, pat) = platform.python_version_tuple()
-    # We wrap maj, min, and pat in str() to work around a bug in python
-    # 2.6.1
-    maj = int(re.sub('[^0-9].*', '', str(maj)))
-    min = int(re.sub('[^0-9].*', '', str(min)))
-    pat = int(re.sub('[^0-9].*', '', str(pat)))
-    if (maj, min) < (2, 6):
-        print("Python < 2.6 is not supported")
-        sys.exit(1)
-    # We also need to disable threads for python 2.7.2, because of
-    # this bug: http://bugs.python.org/issue13817
-    elif (maj, min, pat) == (2, 7, 2):
-        print("Warning: Ignoring request to use threads as python version is 2.7.2")
-        print("See http://bugs.python.org/issue13817 for details.")
-        config.use_threads = 0
 
 config.cygwin = False
 config.msys = False
@@ -267,12 +241,8 @@ t.start_time = time.localtime()
 print('Beginning test run at', time.strftime("%c %Z",t.start_time))
 
 sys.stdout.flush()
-if PYTHON3:
-    # in Python 3, we output text, which cannot be unbuffered
-    sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w")
-else:
-    # set stdout to unbuffered (is this the best way to do it?)
-    sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w", 0)
+# we output text, which cannot be unbuffered
+sys.stdout = os.fdopen(sys.__stdout__.fileno(), "w")
 
 if config.local:
     tempdir = ''
@@ -301,12 +271,8 @@ for file in t_files:
     if_verbose(2, '====> Scanning %s' % file)
     newTestDir(tempdir, os.path.dirname(file))
     try:
-        if PYTHON3:
-            with io.open(file, encoding='utf8') as f:
-                src = f.read()
-        else:
-            with open(file) as f:
-                src = f.read()
+        with io.open(file, encoding='utf8') as f:
+            src = f.read()
 
         exec(src)
     except Exception as e:
