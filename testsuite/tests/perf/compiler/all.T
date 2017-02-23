@@ -316,29 +316,30 @@ test('T3064',
             # 2014-12-22: 122836340 (Windows) Death to silent superclasses
             # 2016-04-06: 153261024 (x86/Linux) probably wildcard refactor
 
-           (wordsize(64), 287460128, 5)]),
-            # (amd64/Linux) (28/06/2011):  73259544
-            # (amd64/Linux) (07/02/2013): 224798696
-            # (amd64/Linux) (02/08/2013): 236404384, increase from roles
-            # (amd64/Linux) (11/09/2013): 290165632, increase from AMP warnings
-            # (amd64/Linux) (22/11/2013): 308300448, GND via Coercible and counters for constraints solving
-            # (amd64/Linux) (02/12/2013): 329795912, Coercible refactor
-            # (amd64/Linux) (11/02/2014): 308422280, optimize Coercions in simpleOptExpr
-            # (amd64/Linux) (23/05/2014): 324022680, unknown cause
+           (wordsize(64), 306222424, 5)]),
+            # (amd64/Linux) (2011-06-28):  73259544
+            # (amd64/Linux) (2013-02-07): 224798696
+            # (amd64/Linux) (2013-08-02): 236404384, increase from roles
+            # (amd64/Linux) (2013-09-11): 290165632, increase from AMP warnings
+            # (amd64/Linux) (2013-11-22): 308300448, GND via Coercible and counters for constraints solving
+            # (amd64/Linux) (2013-12-02): 329795912, Coercible refactor
+            # (amd64/Linux) (2014-02-11): 308422280, optimize Coercions in simpleOptExpr
+            # (amd64/Linux) (2014-05-23): 324022680, unknown cause
             # (amd64/Linux) (2014-07-17): 332702112, general round of updates
             # (amd64/Linux) (2014-08-29): 313638592, w/w for INLINABLE things
-            # (amd64/Linux) (09/09/2014): 407416464, AMP changes (larger interfaces, more loading)
-            # (amd64/Linux) (14/09/2014): 385145080, BPP changes (more NoImplicitPrelude in base)
-            # (amd64/Linux) (10/12/2014): 363103840, improvements in constraint solver
-            # (Mac)         (18/12/2014): 350418600, improvements to flattener
-            # (amd64/Linux) (22/12/2014): 243670824, Ha! Death to superclass constraints, makes
+            # (amd64/Linux) (2014-09-09): 407416464, AMP changes (larger interfaces, more loading)
+            # (amd64/Linux) (2014-09-14): 385145080, BPP changes (more NoImplicitPrelude in base)
+            # (amd64/Linux) (2014-12-10): 363103840, improvements in constraint solver
+            # (Mac)         (2014-12-18): 350418600, improvements to flattener
+            # (amd64/Linux) (2014-12-22): 243670824, Ha! Death to superclass constraints, makes
             #                                        much less code for Monad instances
-            # (amd64/Linux) (01/12/2015): 264952256, Regression due to Simon's wildcard refactor
+            # (amd64/Linux) (2015-12-01): 264952256, Regression due to Simon's wildcard refactor
             #                                        Tracked as #11151.
-            # (amd64/Linux) (11/12/2015): 304344936, Regression due to TypeInType
+            # (amd64/Linux) (2015-12-11): 304344936, Regression due to TypeInType
             #                                        Tracked as #11196
-            # (amd64/Linux) (15/4/2016): 287460128   Improvement due to using coercionKind instead
+            # (amd64/Linux) (2016-04-15): 287460128  Improvement due to using coercionKind instead
             #                                        of zonkTcType (Trac #11882)
+            # (amd64/Darwin) (2017-01-23): 306222424 Presumably creep from recent changes (Typeable?)
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -507,32 +508,33 @@ test('T5321Fun',
              # 2012-10-08: 344416344 x86/Linux
              #  (increase due to new codegen)
              # 2014-09-03: 299656164     (specialisation and inlining)
-             # 10/12/2014: 206406188     #  Improvements in constraint solver
+             # 2014-12-10: 206406188     #  Improvements in constraint solver
              # 2016-04-06: 279922360 x86/Linux
-            (wordsize(64), 498135752, 5)])
+            (wordsize(64), 524706256, 5)])
              # prev:       585521080
-             # 29/08/2012: 713385808     #  (increase due to new codegen)
-             # 15/05/2013: 628341952     #  (reason for decrease unknown)
-             # 24/06/2013: 694019152     #  (reason for re-increase unknown)
-             # 12/05/2014: 614409344     #  (specialisation and inlining changes)
-             # 10/09/2014: 601629032     #  post-AMP-cleanup
-             # 06/11/2014: 541287000     #  Simon's flat-skol changes to the constraint solver
-             # 10/12/2014: 408110888     #  Improvements in constraint solver
-             # 16/12/2014: 429921312     #  Flattener parameterized over roles
-             # 10/08/2015: 509921312
+             # 2012-08-29: 713385808     #  (increase due to new codegen)
+             # 2013-05-15: 628341952     #  (reason for decrease unknown)
+             # 2013-06-24: 694019152     #  (reason for re-increase unknown)
+             # 2014-05-12: 614409344     #  (specialisation and inlining changes)
+             # 2014-09-10: 601629032     #  post-AMP-cleanup
+             # 2014-11-06: 541287000     #  Simon's flat-skol changes to the constraint solver
+             # 2014-12-10: 408110888     #  Improvements in constraint solver
+             # 2014-12-16: 429921312     #  Flattener parameterized over roles
+             # 2015-08-10: 509921312
              #  (undefined now takes an implicit parameter and GHC -O0 does
              #  not recognize that the application is bottom)
-             # 11/12/2015: 565883176     #  TypeInType (see #11196)
-             # 06/01/2017: 497356688     #  Small coercion optimisations
+             # 2015-12-11: 565883176     #  TypeInType (see #11196)
+             # 2017-01-06: 497356688     #  Small coercion optimisations
                                          #  The actual decrease was only 2%; earlier
                                          #    commits had drifted down
-             # 22/01/2017: 525895608     #  Allow top-level string literals in Core. I'm not
+             # 2017-01-22: 525895608     #  Allow top-level string literals in Core. I'm not
                                          #    convinced that this patch is
                                          #    responsible for all of this
                                          #    change, however. Namely I am
                                          #    quite skeptical of the downward
                                          #    "drift" reported above
-             # 31/01/2017: 498135752     #  Join points (#12988)
+             # 2017-01-31: 498135752     #  Join points (#12988)
+             # 2017-02-23: 524706256     #  Type-indexed Typeable? (on Darwin)
       ],
       compile,[''])
 
@@ -992,6 +994,7 @@ test('T12707',
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
           # 2017-02-11: 1310037632  Check local family instances vs imports
+          # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
           ]),
      ],
      compile,
