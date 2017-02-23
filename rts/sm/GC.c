@@ -742,6 +742,17 @@ GarbageCollect (uint32_t collect_gen,
          require (F+1)*need. We leave (F+2)*need in order to reduce
          repeated deallocation and reallocation. */
       need = (RtsFlags.GcFlags.oldGenFactor + 2) * need;
+      /* But with a large nursery, the above estimate might exceed
+       * maxHeapSize.  A large resident set size might make the OS
+       * kill this process, or swap unnecessarily.  Therefore we
+       * ensure that our estimate does not exceed maxHeapSize.
+       */
+      if (RtsFlags.GcFlags.maxHeapSize != 0) {
+          W_ max = BLOCKS_TO_MBLOCKS(RtsFlags.GcFlags.maxHeapSize);
+          if (need > max) {
+              need = max;
+          }
+      }
       if (got > need) {
           returnMemoryToOS(got - need);
       }
@@ -1524,7 +1535,8 @@ resize_generations (void)
 
         // minimum size for generation zero
         min_alloc = stg_max((RtsFlags.GcFlags.pcFreeHeap * max) / 200,
-                            RtsFlags.GcFlags.minAllocAreaSize);
+                            RtsFlags.GcFlags.minAllocAreaSize
+                            * (W_)n_capabilities);
 
         // Auto-enable compaction when the residency reaches a
         // certain percentage of the maximum heap size (default: 30%).
