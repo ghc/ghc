@@ -312,7 +312,19 @@ linkCmdLineLibs' hsc_env pls =
                            , libraryPaths = lib_paths}) = hsc_dflags hsc_env
 
       -- (c) Link libraries from the command-line
-      let minus_ls = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
+      let minus_ls_1 = [ lib | Option ('-':'l':lib) <- cmdline_ld_inputs ]
+
+      -- On Windows we want to add libpthread by default just as GCC would.
+      -- However because we don't know the actual name of pthread's dll we
+      -- need to defer this to the locateLib call so we can't initialize it
+      -- inside of the rts. Instead we do it here to be able to find the
+      -- import library for pthreads. See Trac #13210.
+      let platform = targetPlatform dflags
+          os       = platformOS platform
+          minus_ls = case os of
+                       OSMinGW32 -> "pthread" : minus_ls_1
+                       _         -> minus_ls_1
+
       libspecs <- mapM (locateLib hsc_env False lib_paths) minus_ls
 
       -- (d) Link .o files from the command-line
