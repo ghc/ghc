@@ -86,6 +86,9 @@ static bool verifyCOFFHeader(
     COFF_header *hdr,
     pathchar *filename);
 
+static bool checkIfDllLoaded(
+    HINSTANCE instance);
+
 /* Add ld symbol for PE image base. */
 #if defined(__GNUC__)
 #define __ImageBase __MINGW_LSYMBOL(_image_base__)
@@ -104,20 +107,19 @@ void initLinker_PEi386()
     }
 
 #if defined(mingw32_HOST_OS)
-    /*
-     * These two libraries cause problems when added to the static link,
-     * but are necessary for resolving symbols in GHCi, hence we load
-     * them manually here.
-     *
-     * Most of these are included by base, but GCC always includes them
-     * So lets make sure we always have them too.
-     */
+    addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
+   /*
+    * Most of these are included by base, but GCC always includes them
+    * So lets make sure we always have them too.
+    *
+    * In most cases they would have been loaded by the
+    * addDLLHandle above.
+    */
     addDLL(WSTR("msvcrt"));
     addDLL(WSTR("kernel32"));
     addDLL(WSTR("advapi32"));
     addDLL(WSTR("shell32"));
     addDLL(WSTR("user32"));
-    addDLLHandle(WSTR("*.exe"), GetModuleHandle(NULL));
 #endif
 }
 
@@ -129,12 +131,61 @@ static IndirectAddr* indirects = NULL;
 
 /* Adds a DLL instance to the list of DLLs in which to search for symbols. */
 static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
+
+    /* At this point, we actually know what was loaded.
+       So bail out if it's already been loaded.  */
+    if (checkIfDllLoaded(instance))
+    {
+        return;
+    }
+
     OpenedDLL* o_dll;
-    o_dll = stgMallocBytes( sizeof(OpenedDLL), "addDLLHandle" );
+    o_dll           = stgMallocBytes( sizeof(OpenedDLL), "addDLLHandle" );
     o_dll->name     = dll_name ? pathdup(dll_name) : NULL;
     o_dll->instance = instance;
     o_dll->next     = opened_dlls;
     opened_dlls     = o_dll;
+
+    /* Now discover the dependencies of dll_name that were
+       just loaded in our process space. The reason is we have access to them
+       without the user having to explicitly specify them.  */
+    PIMAGE_NT_HEADERS header =
+        (PIMAGE_NT_HEADERS)((BYTE *)instance +
+         ((PIMAGE_DOS_HEADER)instance)->e_lfanew);
+    PIMAGE_IMPORT_DESCRIPTOR imports =
+        (PIMAGE_IMPORT_DESCRIPTOR)((BYTE *)instance + header->
+        OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+
+    /* Ignore these compatibility shims.  */
+    const pathchar* ms_dll = WSTR("api-ms-win-");
+    const int len = wcslen(ms_dll);
+
+    do {
+        pathchar* module = mkPath((char*)(BYTE *)instance + imports->Name);
+        HINSTANCE module_instance = GetModuleHandleW(module);
+        if (0 != wcsncmp(module, ms_dll, len)
+            && module_instance
+            && !checkIfDllLoaded(module_instance))
+        {
+            IF_DEBUG(linker, debugBelch("Loading dependency %" PATH_FMT " -> %" PATH_FMT ".\n", dll_name, module));
+            /* Now recursively load dependencies too.  */
+            addDLLHandle(module, module_instance);
+        }
+        stgFree(module);
+        imports++;
+    } while (imports->Name);
+}
+
+static bool checkIfDllLoaded(HINSTANCE instance)
+{
+    for (OpenedDLL* o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
+        if (o_dll->instance == instance)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 void freePreloadObjectFile_PEi386(ObjectCode *oc)
@@ -157,19 +208,12 @@ addDLL_PEi386( pathchar *dll_name )
    /* ------------------- Win32 DLL loader ------------------- */
 
    pathchar*  buf;
-   OpenedDLL* o_dll;
    HINSTANCE  instance;
 
    IF_DEBUG(linker, debugBelch("addDLL; dll_name = `%" PATH_FMT "'\n", dll_name));
 
-   /* See if we've already got it, and ignore if so. */
-   for (o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
-      if (0 == pathcmp(o_dll->name, dll_name))
-         return NULL;
-   }
-
-   /* The file name has no suffix (yet) so that we can try
-      both foo.dll and foo.drv
+    /* The file name has no suffix (yet) so that we can try
+       both foo.dll and foo.drv
 
       The documentation for LoadLibrary says:
         If no file name extension is specified in the lpFileName
@@ -178,60 +222,59 @@ addDLL_PEi386( pathchar *dll_name )
         point character (.) to indicate that the module name has no
         extension. */
 
-   size_t bufsize = pathlen(dll_name) + 10;
-   buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
+    size_t bufsize = pathlen(dll_name) + 10;
+    buf = stgMallocBytes(bufsize * sizeof(wchar_t), "addDLL");
 
-   /* These are ordered by probability of success and order we'd like them */
-   const wchar_t *formats[] = { L"%ls.DLL", L"%ls.DRV", L"lib%ls.DLL", L"%ls" };
-   const DWORD flags[]      = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
+    /* These are ordered by probability of success and order we'd like them.  */
+    const wchar_t *formats[] = { L"%ls.DLL", L"%ls.DRV", L"lib%ls.DLL", L"%ls" };
+    const DWORD flags[] = { LOAD_LIBRARY_SEARCH_USER_DIRS | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, 0 };
 
-   int cFormat, cFlag;
-   int flags_start = 1; // Assume we don't support the new API
+    int cFormat, cFlag;
+    int flags_start = 1; /* Assume we don't support the new API.  */
 
-   /* Detect if newer API are available, if not, skip the first flags entry */
-   if (GetProcAddress((HMODULE)LoadLibraryW(L"Kernel32.DLL"), "AddDllDirectory")) {
-       flags_start = 0;
-   }
+    /* Detect if newer API are available, if not, skip the first flags entry.  */
+    if (GetProcAddress((HMODULE)LoadLibraryW(L"Kernel32.DLL"), "AddDllDirectory")) {
+        flags_start = 0;
+    }
 
-   /* Iterate through the possible flags and formats */
-   for (cFlag = flags_start; cFlag < 2; cFlag++)
-   {
-       for (cFormat = 0; cFormat < 4; cFormat++)
-       {
-           snwprintf(buf, bufsize, formats[cFormat], dll_name);
-           instance = LoadLibraryExW(buf, NULL, flags[cFlag]);
-           if (instance == NULL)
-           {
-               if (GetLastError() != ERROR_MOD_NOT_FOUND)
-               {
-                   goto error;
-               }
-           }
-           else
-           {
-               break; // We're done. DLL has been loaded.
-           }
-       }
-   }
+    /* Iterate through the possible flags and formats.  */
+    for (cFlag = flags_start; cFlag < 2; cFlag++)
+    {
+        for (cFormat = 0; cFormat < 4; cFormat++)
+        {
+            snwprintf(buf, bufsize, formats[cFormat], dll_name);
+            instance = LoadLibraryExW(buf, NULL, flags[cFlag]);
+            if (instance == NULL)
+            {
+                if (GetLastError() != ERROR_MOD_NOT_FOUND)
+                {
+                    goto error;
+                }
+            }
+            else
+            {
+                break; /* We're done. DLL has been loaded.  */
+            }
+        }
+    }
 
-   // Check if we managed to load the DLL
-   if (instance == NULL) {
-       goto error;
-   }
+    /* Check if we managed to load the DLL.  */
+    if (instance == NULL) {
+        goto error;
+    }
 
-   stgFree(buf);
+    addDLLHandle(buf, instance);
+    stgFree(buf);
 
-   addDLLHandle(dll_name, instance);
-
-   return NULL;
+    return NULL;
 
 error:
-   stgFree(buf);
+    stgFree(buf);
 
-   char* errormsg = malloc(sizeof(char) * 80);
-   snprintf(errormsg, 80, "addDLL: %" PATH_FMT " or dependencies not loaded. (Win32 error %lu)", dll_name, GetLastError());
-   /* LoadLibrary failed; return a ptr to the error msg. */
-   return errormsg;
+    char* errormsg = malloc(sizeof(char) * 80);
+    snprintf(errormsg, 80, "addDLL: %" PATH_FMT " or dependencies not loaded. (Win32 error %lu)", dll_name, GetLastError());
+    /* LoadLibrary failed; return a ptr to the error msg. */
+    return errormsg;
 }
 
 pathchar* findSystemLibrary_PEi386( pathchar* dll_name )
