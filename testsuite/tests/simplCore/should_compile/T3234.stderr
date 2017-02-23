@@ -10,7 +10,7 @@
 
 
 ==================== Grand total simplifier statistics ====================
-Total ticks:     54
+Total ticks:     55
 
 15 PreInlineUnconditionally
   1 n
@@ -40,7 +40,7 @@ Total ticks:     54
   1 fold/build
   1 unpack
   1 unpack-list
-4 LetFloatFromLet 4
+5 LetFloatFromLet 5
 25 BetaReduction
   1 a
   1 c

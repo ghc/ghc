@@ -240,3 +240,7 @@ test('str-rules',
      run_command,
      ['$MAKE -s --no-print-directory str-rules'])
 test('T13170', only_ways(['optasm']), compile, ['-dcore-lint'])
+test('T13317',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T13317'])

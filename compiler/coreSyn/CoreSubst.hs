@@ -1378,7 +1378,7 @@ However e might not *look* as if
 
 Note [exprIsConApp_maybe on literal strings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-See #9400.
+See #9400 and #13317.
 
 Conceptually, a string literal "abc" is just ('a':'b':'c':[]), but in Core
 they are represented as unpackCString# "abc"# by MkCore.mkStringExprFS, or
@@ -1393,6 +1393,13 @@ Just (':', [Char], ['a', unpackCString# "bc"]).
 We need to be careful about UTF8 strings here. ""# contains a ByteString, so
 we must parse it back into a FastString to split off the first character.
 That way we can treat unpackCString# and unpackCStringUtf8# in the same way.
+
+We must also be caeful about
+   lvl = "foo"#
+   ...(unpackCString# lvl)...
+to ensure that we see through the let-binding for 'lvl'.  Hence the
+(exprIsLiteral_maybe .. arg) in the guard before the call to
+dealWithStringLiteral.
 
 Note [Push coercions in exprIsConApp_maybe]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1460,9 +1467,11 @@ exprIsConApp_maybe (in_scope, id_unf) expr
         , let in_scope' = extendInScopeSetSet in_scope (exprFreeVars rhs)
         = go (Left in_scope') rhs cont
 
-        | (fun `hasKey` unpackCStringIdKey)
-         || (fun `hasKey` unpackCStringUtf8IdKey)
-        , [Lit (MachStr str)] <- args
+        -- See Note [exprIsConApp_maybe on literal strings]
+        | (fun `hasKey` unpackCStringIdKey) ||
+          (fun `hasKey` unpackCStringUtf8IdKey)
+        , [arg]              <- args
+        , Just (MachStr str) <- exprIsLiteral_maybe (in_scope, id_unf) arg
         = dealWithStringLiteral fun str co
         where
           unfolding = id_unf fun
