@@ -67,12 +67,24 @@ import System.Environment.ExecutablePath
 
 #ifdef mingw32_HOST_OS
 
--- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
+{-
+Note [Ignore hs_init argv]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ignore the arguments to hs_init on Windows for the sake of Unicode compat
+
+Instead on Windows we get the list of arguments from getCommandLineW and
+filter out arguments which the RTS would not have passed along.
+
+This is done to ensure we get the arguments in proper Unicode Encoding which
+the RTS at this moment does not seem provide. The filtering has to match the
+one done by the RTS to avoid inconsistencies like #13287.
+-}
 
 getWin32ProgArgv_certainly :: IO [String]
 getWin32ProgArgv_certainly = do
         mb_argv <- getWin32ProgArgv
         case mb_argv of
+          -- see Note [Ignore hs_init argv]
           Nothing   -> fmap dropRTSArgs getFullArgs
           Just argv -> return argv
 
@@ -106,8 +118,10 @@ foreign import ccall unsafe "getWin32ProgArgv"
 foreign import ccall unsafe "setWin32ProgArgv"
   c_setWin32ProgArgv :: CInt -> Ptr CWString -> IO ()
 
+-- See Note [Ignore hs_init argv]
 dropRTSArgs :: [String] -> [String]
 dropRTSArgs []             = []
+dropRTSArgs rest@("--":_)  = rest
 dropRTSArgs ("+RTS":rest)  = dropRTSArgs (dropWhile (/= "-RTS") rest)
 dropRTSArgs ("--RTS":rest) = rest
 dropRTSArgs ("-RTS":rest)  = dropRTSArgs rest

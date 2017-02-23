@@ -512,6 +512,13 @@ static void errorRtsOptsDisabled(const char *s)
 
      - rtsConfig   (global) contains the supplied RtsConfig
 
+  On Windows getArgs ignores argv and instead takes the arguments directly
+  from the WinAPI and removes any which would have been parsed by the RTS.
+
+  If the handling of which arguments are passed to the Haskell side changes
+  these changes have to be synchronized with getArgs in base. See #13287 and
+  Note [Ignore hs_init argv] in System.Environment.
+
   -------------------------------------------------------------------------- */
 
 void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
@@ -566,7 +573,7 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
 
     // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
     //   argv[0] must be PGM argument -- leave in argv
-
+    //
     for (mode = PGM; arg < total_arg; arg++) {
         // The '--RTS' argument disables all future +RTS ... -RTS processing.
         if (strequal("--RTS", argv[arg])) {
