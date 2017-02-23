@@ -91,13 +91,10 @@ import qualified System.Win32.Types as Win32
 #else
 import qualified System.Win32.Info as Win32
 #endif
-import Control.Exception (finally)
-import Foreign.Ptr (FunPtr, castPtrToFunPtr)
 import System.Win32.Types (DWORD, LPTSTR, HANDLE)
 import System.Win32.Types (failIfNull, failIf, iNVALID_HANDLE_VALUE)
 import System.Win32.File (createFile,closeHandle, gENERIC_READ, fILE_SHARE_READ, oPEN_EXISTING, fILE_ATTRIBUTE_NORMAL, fILE_FLAG_BACKUP_SEMANTICS )
 import System.Win32.DLL (loadLibrary, getProcAddress)
-import Data.Bits((.|.))
 #endif
 
 import System.Process
@@ -131,9 +128,9 @@ On Unix:
 On Windows:
   - ghc never has a shell wrapper.
   - we can find the location of the ghc binary, which is
-        $topdir/bin/<something>.exe
+        $topdir/<foo>/<something>.exe
     where <something> may be "ghc", "ghc-stage2", or similar
-  - we strip off the "bin/<something>.exe" to leave $topdir.
+  - we strip off the "<foo>/<something>.exe" to leave $topdir.
 
 from topdir we can find package.conf, ghc-asm, etc.
 
@@ -1463,7 +1460,7 @@ traceCmd dflags phase_name cmd_line action
 
 getBaseDir :: IO (Maybe String)
 #if defined(mingw32_HOST_OS)
--- Assuming we are running ghc, accessed by path  $(stuff)/bin/ghc.exe,
+-- Assuming we are running ghc, accessed by path  $(stuff)/<foo>/ghc.exe,
 -- return the path $(stuff)/lib.
 getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
   where
@@ -1471,9 +1468,14 @@ getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
         ret <- c_GetModuleFileName nullPtr buf size
         case ret of
           0 -> return Nothing
-          _ | ret < size -> do path <- peekCWString buf
-                               real <- getFinalPath path -- try to resolve symlinks paths
-                               return $ (Just . rootDir . sanitize . maybe path id) real
+          _ | ret < size -> do
+                path <- peekCWString buf
+                real <- getFinalPath path -- try to resolve symlinks paths
+                let libdir = (rootDir . sanitize . maybe path id) real
+                exists <- doesDirectoryExist libdir
+                if exists
+                   then return $ Just libdir
+                   else fail path
             | otherwise  -> try_size (size * 2)
 
     -- getFinalPath returns paths in full raw form.
@@ -1492,11 +1494,11 @@ getBaseDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
                                          "ghc-stage3.exe"] ->
                     case splitFileName $ takeDirectory d of
                     -- ghc is in $topdir/bin/ghc.exe
-                    (d', bin) | lower bin == "bin" -> takeDirectory d' </> "lib"
-                    _ -> fail
-                _ -> fail
-        where fail = panic ("can't decompose ghc.exe path: " ++ show s)
-              lower = map toLower
+                    (d', _) -> takeDirectory d' </> "lib"
+                _ -> fail s
+
+    fail s = panic ("can't decompose ghc.exe path: " ++ show s)
+    lower = map toLower
 
 foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32

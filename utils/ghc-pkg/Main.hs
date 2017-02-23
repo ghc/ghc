@@ -62,9 +62,7 @@ import qualified Data.ByteString.Char8 as BS
 -- mingw32 needs these for getExecDir
 import Foreign
 import Foreign.C
-#endif
-
-#ifdef mingw32_HOST_OS
+import System.Directory ( canonicalizePath )
 import GHC.ConsoleHandler
 #else
 import System.Posix hiding (fdToHandle)
@@ -1947,7 +1945,15 @@ unDosifyPath :: FilePath -> FilePath
 unDosifyPath xs = subst '\\' '/' xs
 
 getLibDir :: IO (Maybe String)
-getLibDir = fmap (fmap (</> "lib")) $ getExecDir "/bin/ghc-pkg.exe"
+getLibDir = do base   <- getExecDir "/ghc-pkg.exe"
+               case base of
+                 Nothing    -> return Nothing
+                 Just base' -> do
+                    libdir <- canonicalizePath $ base' </> "../lib"
+                    exists <- doesDirectoryExist libdir
+                    if exists
+                       then return $ Just libdir
+                       else return Nothing
 
 -- (getExecDir cmd) returns the directory in which the current
 --                  executable, which should be called 'cmd', is running
