@@ -11,6 +11,7 @@
 
 #include "ghcautoconf.h"
 #include "LinkerInternals.h"
+#include <stdbool.h>
 
 #ifdef LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
@@ -21,6 +22,7 @@
 typedef struct _RtsSymbolVal {
     const SymbolName* lbl;
     SymbolAddr* addr;
+    bool weak;
 } RtsSymbolVal;
 
 extern RtsSymbolVal rtsSyms[];
