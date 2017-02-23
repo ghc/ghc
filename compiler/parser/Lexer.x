@@ -71,6 +71,7 @@ module Lexer (
    addWarning,
    lexTokenStream,
    addAnnotation,AddAnn,addAnnsAt,mkParensApiAnn,
+   commentToAnnotation,
    moveAnnotations
   ) where
 
