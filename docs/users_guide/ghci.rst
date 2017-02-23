@@ -2045,6 +2045,10 @@ commonly used commands.
     available, or otherwise the module will be compiled to byte-code.
     Using the ``*`` prefix forces the module to be loaded as byte-code.
 
+    ⟨module⟩ may be a file path. A "``~``" symbol at the beginning of
+    ⟨module⟩  will be replaced by the contents of the environment variable
+    :envvar:`HOME`.
+
 .. ghci-cmd:: :all-types
 
     List all types collected for expressions and (local) bindings
