@@ -1346,7 +1346,8 @@ scTopBind env body_usage (Rec prs)
   , not force_spec
   , not (all (couldBeSmallEnoughToInline (sc_dflags env) threshold) rhss)
                 -- No specialisation
-  = do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
+  = -- pprTrace "scTopBind: nospec" (ppr bndrs) $
+    do  { (rhs_usgs, rhss')   <- mapAndUnzipM (scExpr env) rhss
         ; return (body_usage `combineUsage` combineUsages rhs_usgs, Rec (bndrs `zip` rhss')) }
 
   | otherwise   -- Do specialisation
@@ -1469,7 +1470,10 @@ specRec top_lvl env body_usg rhs_infos
     -- Loop, specialising, until you get no new specialisations
     go seed_calls usg_so_far spec_infos
       | isEmptyVarEnv seed_calls
-      = return (usg_so_far, spec_infos)
+      = -- pprTrace "specRec" (vcat [ ppr (map ri_fn rhs_infos)
+        --                         , ppr seed_calls
+        --                         , ppr body_usg ]) $
+        return (usg_so_far, spec_infos)
       | otherwise
       = do  { specs_w_usg <- zipWithM (specialise env seed_calls) rhs_infos spec_infos
             ; let (extra_usg_s, new_spec_infos) = unzip specs_w_usg
@@ -1499,11 +1503,13 @@ specialise env bind_calls (RI { ri_fn = fn, ri_lam_bndrs = arg_bndrs
                spec_info@(SI specs spec_count mb_unspec)
   | isBottomingId fn      -- Note [Do not specialise diverging functions]
                           -- and do not generate specialisation seeds from its RHS
-  = return (nullUsage, spec_info)
+  = -- pprTrace "specialise bot" (ppr fn) $
+    return (nullUsage, spec_info)
 
   | isNeverActive (idInlineActivation fn) -- See Note [Transfer activation]
     || null arg_bndrs                     -- Only specialise functions
-  = case mb_unspec of    -- Behave as if there was a single, boring call
+  = -- pprTrace "specialise inactive" (ppr fn) $
+    case mb_unspec of    -- Behave as if there was a single, boring call
       Just rhs_usg -> return (rhs_usg, SI specs spec_count Nothing)
                          -- See Note [spec_usg includes rhs_usg]
       Nothing      -> return (nullUsage, spec_info)
