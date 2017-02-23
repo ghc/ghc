@@ -51,6 +51,7 @@ import Util
 
 import qualified GHC.LanguageExtensions as LangExt
 
+import Panic
 import Data.List
 import System.Exit
 import Control.Monad
@@ -63,8 +64,8 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 
 -- | Entry point to compile a Backpack file.
-doBackpack :: FilePath -> Ghc ()
-doBackpack src_filename = do
+doBackpack :: [FilePath] -> Ghc ()
+doBackpack [src_filename] = do
     -- Apply options from file to dflags
     dflags0 <- getDynFlags
     let dflags1 = dflags0
@@ -96,6 +97,8 @@ doBackpack src_filename = do
                                     then compileExe lunit
                                     else compileUnit cid []
                             else typecheckUnit cid insts
+doBackpack _ =
+    throwGhcException (CmdLineError "--backpack can only process a single file")
 
 computeUnitId :: LHsUnit HsComponentId -> (ComponentId, [(ModuleName, Module)])
 computeUnitId (L _ unit) = (cid, [ (r, mkHoleModule r) | r <- reqs ])

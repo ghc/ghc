@@ -162,7 +162,7 @@ main' postLoadMode dflags0 args flagWarnings = do
                DoInteractive   -> (CompManager, HscInterpreted, LinkInMemory)
                DoEval _        -> (CompManager, HscInterpreted, LinkInMemory)
                DoMake          -> (CompManager, dflt_target,    LinkBinary)
-               DoBackpack _    -> (CompManager, dflt_target,    LinkBinary)
+               DoBackpack      -> (CompManager, dflt_target,    LinkBinary)
                DoMkDependHS    -> (MkDepend,    dflt_target,    LinkBinary)
                DoAbiHash       -> (OneShot,     dflt_target,    LinkBinary)
                _               -> (OneShot,     dflt_target,    LinkBinary)
@@ -253,7 +253,7 @@ main' postLoadMode dflags0 args flagWarnings = do
        DoAbiHash              -> abiHash (map fst srcs)
        ShowPackages           -> liftIO $ showPackages dflags6
        DoFrontend f           -> doFrontend f srcs
-       DoBackpack b           -> doBackpack b
+       DoBackpack             -> doBackpack (map fst srcs)
 
   liftIO $ dumpFinalStats dflags6
 
@@ -455,7 +455,7 @@ data PostLoadMode
   | StopBefore Phase        -- ghc -E | -C | -S
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
-  | DoBackpack String       -- ghc --backpack foo.bkp
+  | DoBackpack              -- ghc --backpack foo.bkp
   | DoInteractive           -- ghc --interactive
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   | DoAbiHash               -- ghc --abi-hash
@@ -482,8 +482,8 @@ doEvalMode str = mkPostLoadMode (DoEval [str])
 doFrontendMode :: String -> Mode
 doFrontendMode str = mkPostLoadMode (DoFrontend (mkModuleName str))
 
-doBackpackMode :: String -> Mode
-doBackpackMode str = mkPostLoadMode (DoBackpack str)
+doBackpackMode :: Mode
+doBackpackMode = mkPostLoadMode DoBackpack
 
 mkPostLoadMode :: PostLoadMode -> Mode
 mkPostLoadMode = Right . Right
@@ -614,7 +614,7 @@ mode_flags =
   , defFlag "C"            (PassFlag (setMode (stopBeforeMode HCc)))
   , defFlag "S"            (PassFlag (setMode (stopBeforeMode (As False))))
   , defFlag "-make"        (PassFlag (setMode doMakeMode))
-  , defFlag "-backpack"    (SepArg   (\s -> setMode (doBackpackMode s) "-backpack"))
+  , defFlag "-backpack"    (PassFlag (setMode doBackpackMode))
   , defFlag "-interactive" (PassFlag (setMode doInteractiveMode))
   , defFlag "-abi-hash"    (PassFlag (setMode doAbiHashMode))
   , defFlag "e"            (SepArg   (\s -> setMode (doEvalMode s) "-e"))
