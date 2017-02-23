@@ -836,7 +836,7 @@ of ``-W(no-)*``.
     Will raise two warnings because ``Zero`` and ``Succ`` are not
     written as ``'Zero`` and ``'Succ``.
 
-    This warning is is enabled by default in :ghc-flag:`-Wall` mode.
+    This warning is enabled by default in :ghc-flag:`-Wall` mode.
 
 .. ghc-flag:: -Wunused-binds
 

@@ -823,7 +823,7 @@ The list @mut_once_list@ is also adjusted if it is safe to remove @r@ from
 
 \subsubsection{(3) Scavenging CAFs}
 
-When a dynamically loaded CAF is entered, it it first put to the list 
+When a dynamically loaded CAF is entered, it is first put to the list 
 @caf_list@ and then overwritten with a static indirection object.
 The evaluation result of the CAF is stored in a dynamic object in the heap
 and the static indirection object stores a pointer to the dynamic object.

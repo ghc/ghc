@@ -2800,7 +2800,7 @@ clean_pragma prag = canon_ws (map toLower (unprefix prag))
 
 -- | Encapsulated call to addAnnotation, requiring only the SrcSpan of
 --   the AST construct the annotation belongs to; together with the
---   AnnKeywordId, this is is the key of the annotation map
+--   AnnKeywordId, this is the key of the annotation map.
 --
 --   This type is useful for places in the parser where it is not yet
 --   known what SrcSpan an annotation should be added to.  The most

@@ -693,7 +693,7 @@ cgConApp con stg_args
                                      -- con args are always non-void,
                                      -- see Note [Post-unarisation invariants] in UnariseStg
                 -- The first "con" says that the name bound to this
-                -- closure is is "con", which is a bit of a fudge, but
+                -- closure is "con", which is a bit of a fudge, but
                 -- it only affects profiling (hence the False)
 
         ; emit =<< fcode_init

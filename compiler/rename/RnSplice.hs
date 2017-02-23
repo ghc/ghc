@@ -195,7 +195,7 @@ illegalUntypedBracket =
 quotedNameStageErr :: HsBracket RdrName -> SDoc
 quotedNameStageErr br
   = sep [ text "Stage error: the non-top-level quoted name" <+> ppr br
-        , text "must be used at the same stage at which is is bound" ]
+        , text "must be used at the same stage at which it is bound" ]
 
 
 {-

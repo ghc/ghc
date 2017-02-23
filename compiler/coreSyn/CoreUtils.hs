@@ -2118,7 +2118,7 @@ tryEtaReduce bndrs body
 {-
 Note [Eta reduction of an eval'd function]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In Haskell is is not true that    f = \x. f x
+In Haskell it is not true that    f = \x. f x
 because f might be bottom, and 'seq' can distinguish them.
 
 But it *is* true that   f = f `seq` \x. f x

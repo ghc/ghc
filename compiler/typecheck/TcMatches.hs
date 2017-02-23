@@ -1029,7 +1029,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       ; args' <- mapM goArg (zip3 args pat_tys exp_tys)
 
       -- Bring into scope all the things bound by the args,
-      -- and typecheck the thign_inside
+      -- and typecheck the thing_inside
       -- See Note [ApplicativeDo and constraints]
       ; res <- tcExtendIdEnv (concatMap get_arg_bndrs args') $
                thing_inside body_ty
@@ -1076,7 +1076,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
 {- Note [ApplicativeDo and constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 An applicative-do is supposed to take place in parallel, so
-constraints bound in one arm can't possibly be available in aother
+constraints bound in one arm can't possibly be available in another
 (Trac #13242).  Our current rule is this (more details and discussion
 on the ticket). Consider
 

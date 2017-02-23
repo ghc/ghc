@@ -482,7 +482,7 @@ check_target:
 #endif
 
     case ThreadMigrating:
-        // if is is ThreadMigrating and tso->cap is ours, then it
+        // if it is ThreadMigrating and tso->cap is ours, then it
         // *must* be migrating *to* this capability.  If it were
         // migrating away from the capability, then tso->cap would
         // point to the destination.

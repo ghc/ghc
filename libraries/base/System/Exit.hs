@@ -43,7 +43,7 @@ import GHC.IO.Exception
 -- A program that fails in any other way is treated as if it had
 -- called 'exitFailure'.
 -- A program that terminates successfully without calling 'exitWith'
--- explicitly is treated as it it had called 'exitWith' 'ExitSuccess'.
+-- explicitly is treated as if it had called 'exitWith' 'ExitSuccess'.
 --
 -- As an 'ExitCode' is not an 'IOError', 'exitWith' bypasses
 -- the error handling in the 'IO' monad and cannot be intercepted by

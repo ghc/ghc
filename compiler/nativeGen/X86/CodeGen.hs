@@ -2594,7 +2594,7 @@ outOfLineCmmOp mop res args
   where
         -- Assume we can call these functions directly, and that they're not in a dynamic library.
         -- TODO: Why is this ok? Under linux this code will be in libm.so
-        --       Is is because they're really implemented as a primitive instruction by the assembler??  -- BL 2009/12/31
+        --       Is it because they're really implemented as a primitive instruction by the assembler??  -- BL 2009/12/31
         lbl = mkForeignLabel fn Nothing ForeignLabelInThisPackage IsFunction
 
         fn = case mop of

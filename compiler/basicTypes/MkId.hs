@@ -1141,7 +1141,7 @@ unsafeCoerceId
 ------------------------------------------------
 nullAddrId :: Id
 -- nullAddr# :: Addr#
--- The reason is is here is because we don't provide
+-- The reason it is here is because we don't provide
 -- a way to write this literal in Haskell.
 nullAddrId = pcMiscPrelId nullAddrName addrPrimTy info
   where

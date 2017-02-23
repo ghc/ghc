@@ -1361,7 +1361,7 @@ AND
         it is bound to a cheap expression
 
 then we should not inline it (unless there is some other reason,
-e.g. is is the sole occurrence).  That is what is happening at
+e.g. it is the sole occurrence).  That is what is happening at
 the use of 'lone_variable' in 'interesting_call'.
 
 Why?  At least in the case-scrutinee situation, turning

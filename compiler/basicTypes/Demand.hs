@@ -859,7 +859,7 @@ be unleashed. See also [Aggregated demand for cardinality].
 Note [Replicating polymorphic demands]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Some demands can be considered as polymorphic. Generally, it is
-applicable to such beasts as tops, bottoms as well as Head-Used adn
+applicable to such beasts as tops, bottoms as well as Head-Used and
 Head-stricts demands. For instance,
 
 S ~ S(L, ..., L)

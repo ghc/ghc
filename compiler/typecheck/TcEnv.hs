@@ -992,7 +992,7 @@ Consider
   x = 3
   data T = MkT $(foo x)
 
-where 'foo' is is imported from somewhere.
+where 'foo' is imported from somewhere.
 
 This is really a staging error, because we can't run code involving 'x'.
 But in fact the type checker processes types first, so 'x' won't even be

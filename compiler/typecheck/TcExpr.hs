@@ -338,7 +338,7 @@ tuple.  The trouble is that this might accept a partially-applied
 only going to work when it's fully applied, so it turns into
     case x of _ -> (# p,q #)
 
-So it seems more uniform to treat 'seq' as it it was a language
+So it seems more uniform to treat 'seq' as if it was a language
 construct.
 
 See also Note [seqId magic] in MkId
