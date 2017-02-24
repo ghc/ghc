@@ -853,6 +853,13 @@ data Sig name
   | SCCFunSig  SourceText      -- Note [Pragma source text] in BasicTypes
                (Located name)  -- Function name
                (Maybe (Located StringLiteral))
+       -- | A complete match pragma
+       --
+       -- > {-# COMPLETE C, D [:: T] #-}
+       --
+       -- Used to inform the pattern match checker about additional
+       -- complete matchings which, for example, arise from pattern
+       -- synonym definitions.
   | CompleteMatchSig SourceText (Located [Located name]) (Maybe (Located name))
 
 deriving instance (DataId name) => Data (Sig name)
