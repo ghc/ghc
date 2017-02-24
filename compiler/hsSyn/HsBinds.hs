@@ -852,7 +852,7 @@ data Sig name
 
   | SCCFunSig  SourceText      -- Note [Pragma source text] in BasicTypes
                (Located name)  -- Function name
-               (Maybe StringLiteral)
+               (Maybe (Located StringLiteral))
   | CompleteMatchSig SourceText (Located [Located name]) (Maybe (Located name))
 
 deriving instance (DataId name) => Data (Sig name)

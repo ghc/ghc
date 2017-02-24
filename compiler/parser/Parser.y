@@ -2275,7 +2275,7 @@ sigdecl :: { LHsDecl RdrName }
         | '{-# SCC' qvar STRING '#-}'
           {% do { scc <- getSCC $3
                 ; let str_lit = StringLiteral (getSTRINGs $3) scc
-                ; ams (sLL $1 $> (SigD (SCCFunSig (getSCC_PRAGs $1) $2 (Just str_lit))))
+                ; ams (sLL $1 $> (SigD (SCCFunSig (getSCC_PRAGs $1) $2 (Just ( sL1 $3 str_lit)))))
                       [mo $1, mc $4] } }
 
         | '{-# SPECIALISE' activation qvar '::' sigtypes1 '#-}'

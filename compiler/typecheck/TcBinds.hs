@@ -727,7 +727,7 @@ funBindTicks loc fun_id mod sigs
       -- by the renamer
   , let cc_str
           | Just cc_str <- mb_cc_str
-          = sl_fs cc_str
+          = sl_fs $ unLoc cc_str
           | otherwise
           = getOccFS (Var.varName fun_id)
         cc_name = moduleNameFS (moduleName mod) `appendFS` consFS '.' cc_str
