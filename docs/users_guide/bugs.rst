@@ -213,8 +213,8 @@ Numbers, basic types, and built-in classes
     -  Whenever you give a function, instance or class a ``Num t``
         constraint, also give it ``Show t`` and ``Eq t`` constraints.
 
-``Bits`` superclasses
-    The ``Bits`` class does not have a ``Num`` superclasses. It
+``Bits`` superclass
+    The ``Bits`` class does not have a ``Num`` superclass. It
     therefore does not have default methods for the ``bit``, ``testBit``
     and ``popCount`` methods.
 
@@ -238,6 +238,11 @@ Numbers, basic types, and built-in classes
     ``readsPrec`` that is defined in terms of ``readPrec``. GHC adds these two
     extra methods simply because ``ReadPrec`` is more efficient than ``ReadS``
     (the type on which ``readsPrec`` is based).
+
+``Monad`` superclass
+    The ``Monad`` class has an ``Applicative`` superclass. You cannot write
+    ``Monad`` instances that work for GHC and also for a Haskell 2010
+    implementation that does not define ``Applicative``.
 
 Extra instances
     The following extra instances are defined: ::
