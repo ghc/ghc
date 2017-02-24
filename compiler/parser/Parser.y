@@ -667,7 +667,7 @@ signature :: { Located (HsModule RdrName) }
                 ams (L loc (HsModule (Just $3) $5 (fst $ snd $7)
                               (snd $ snd $7) $4 $1)
                     )
-                    ([mj AnnModule $2, mj AnnWhere $6] ++ fst $7) }
+                    ([mj AnnSignature $2, mj AnnWhere $6] ++ fst $7) }
 
 module :: { Located (HsModule RdrName) }
        : maybedocheader 'module' modid maybemodwarning maybeexports 'where' body

@@ -262,6 +262,7 @@ data AnnKeywordId
     | AnnSafe
     | AnnSemi -- ^ ';'
     | AnnSimpleQuote -- ^ '''
+    | AnnSignature
     | AnnStatic -- ^ 'static'
     | AnnStock
     | AnnThen
