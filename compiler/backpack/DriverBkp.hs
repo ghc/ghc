@@ -183,6 +183,8 @@ withBkpSession cid insts deps session_type do_this = do
         outputFile  = if session_type == ExeSession
                         then outputFile dflags
                         else Nothing,
+        -- Clear the import path so we don't accidentally grab anything
+        importPaths = [],
         -- Synthesized the flags
         packageFlags = packageFlags dflags ++ map (\(uid0, rn) ->
           let uid = unwireUnitId dflags (improveUnitId (getPackageConfigMap dflags) $ renameHoleUnitId dflags (listToUFM insts) uid0)
