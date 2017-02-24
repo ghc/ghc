@@ -10,7 +10,7 @@ The @TyCon@ datatype
 
 module TyCon(
         -- * Main TyCon data types
-        TyCon, AlgTyConRhs(..), HowAbstract(..), visibleDataCons,
+        TyCon, AlgTyConRhs(..), visibleDataCons,
         AlgTyConFlav(..), isNoParent,
         FamTyConFlav(..), Role(..), Injectivity(..),
         RuntimeRepInfo(..),
@@ -56,7 +56,6 @@ module TyCon(
         isDataSumTyCon_maybe,
         isEnumerationTyCon,
         isNewTyCon, isAbstractTyCon,
-        isSkolemAbstractTyCon,
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
@@ -71,6 +70,7 @@ module TyCon(
 
         -- ** Extracting information out of TyCons
         tyConName,
+        tyConSkolem,
         tyConKind,
         tyConUnique,
         tyConTyVars,
@@ -739,7 +739,6 @@ data AlgTyConRhs
     -- it's represented by a pointer.  Used when we export a data type
     -- abstractly into an .hi file.
   = AbstractTyCon
-      HowAbstract
 
     -- | Information about those 'TyCon's derived from a @data@
     -- declaration. This includes data types with no constructors at
@@ -796,72 +795,6 @@ data AlgTyConRhs
                              -- Watch out!  If any newtypes become transparent
                              -- again check Trac #1072.
     }
-
--- | An 'AbstractTyCon' represents some matchable type constructor (i.e., valid
--- in instance heads), for which we do not know the implementation.  We refer to
--- these as "abstract data".
---
--- At the moment, there are two flavors of abstract data, corresponding
--- to whether or not the abstract data declaration occurred in an hs-boot
--- file or an hsig file.
---
-data HowAbstract
-  -- | Nominally distinct abstract data arises from abstract data
-  -- declarations in an hs-boot file.
-  --
-  -- Abstract data of this form is guaranteed to be nominally distinct
-  -- from all other declarations in the system; e.g., if I have
-  -- a @data T@ and @data S@ in an hs-boot file, it is safe to
-  -- assume that they will never equal each other.  This is something
-  -- of an implementation accident: it is a lot easier to assume that
-  -- @data T@ in @A.hs-boot@ indicates there will be @data T = ...@
-  -- in @A.hs@, than to permit the possibility that @A.hs@ reexports
-  -- it from somewhere else.
-  = DistinctNominalAbstract
-
-  -- Note [Skolem abstract data]
-  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  -- Skolem abstract data arises from abstract data declarations
-  -- in an hsig file.
-  --
-  -- The best analogy is to interpret the abstract types in Backpack
-  -- unit as elaborating to universally quantified type variables;
-  -- e.g.,
-  --
-  --    unit p where
-  --        signature H where
-  --            data T
-  --            data S
-  --        module M where
-  --            import H
-  --            f :: (T ~ S) => a -> b
-  --            f x = x
-  --
-  -- elaborates as (with some fake structural types):
-  --
-  --    p :: forall t s. { f :: forall a b. t ~ s => a -> b }
-  --    p = { f = \x -> x } -- ill-typed
-  --
-  -- It is clear that inside p, t ~ s is not provable (and
-  -- if we tried to write a function to cast t to s, that
-  -- would not work), but if we call p @Int @Int, clearly Int ~ Int
-  -- is provable.  The skolem variables are all distinct from
-  -- one another, but we can't make assumptions like "f is
-  -- inaccessible", because the skolem variables will get
-  -- instantiated eventually!
-  --
-  -- Skolem abstract data still has the constraint that there
-  -- are no type family applications, to keep this data matchable.
-  | SkolemAbstract
-
-instance Binary HowAbstract where
-    put_ bh DistinctNominalAbstract          = putByte bh 0
-    put_ bh SkolemAbstract                   = putByte bh 1
-
-    get bh = do { h <- getByte bh
-                ; case h of
-                    0 -> return DistinctNominalAbstract
-                    _ -> return SkolemAbstract }
 
 -- | Some promoted datacons signify extra info relevant to GHC. For example,
 -- the @IntRep@ constructor of @RuntimeRep@ corresponds to the 'IntRep'
@@ -1642,14 +1575,8 @@ isFunTyCon _             = False
 
 -- | Test if the 'TyCon' is algebraic but abstract (invisible data constructors)
 isAbstractTyCon :: TyCon -> Bool
-isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon {} }) = True
+isAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon }) = True
 isAbstractTyCon _ = False
-
--- | Test if the 'TyCon' is totally abstract; i.e., it is not even certain
--- to be nominally distinct.
-isSkolemAbstractTyCon :: TyCon -> Bool
-isSkolemAbstractTyCon (AlgTyCon { algTcRhs = AbstractTyCon SkolemAbstract }) = True
-isSkolemAbstractTyCon _ = False
 
 -- | Make an fake, recovery 'TyCon' from an existing one.
 -- Used when recovering from errors
@@ -2454,3 +2381,53 @@ checkRecTc (RC bound rec_nts) tc
       Nothing             -> Just (RC bound (extendNameEnv rec_nts tc_name 1))
   where
     tc_name = tyConName tc
+
+-- | Returns whether or not this 'TyCon' is definite, or a hole
+-- that may be filled in at some later point.  See Note [Skolem abstract data]
+tyConSkolem :: TyCon -> Bool
+tyConSkolem = isHoleName . tyConName
+
+-- Note [Skolem abstract data]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Skolem abstract data arises from data declarations in an hsig file.
+--
+-- The best analogy is to interpret the types declared in signature files as
+-- elaborating to universally quantified type variables; e.g.,
+--
+--    unit p where
+--        signature H where
+--            data T
+--            data S
+--        module M where
+--            import H
+--            f :: (T ~ S) => a -> b
+--            f x = x
+--
+-- elaborates as (with some fake structural types):
+--
+--    p :: forall t s. { f :: forall a b. t ~ s => a -> b }
+--    p = { f = \x -> x } -- ill-typed
+--
+-- It is clear that inside p, t ~ s is not provable (and
+-- if we tried to write a function to cast t to s, that
+-- would not work), but if we call p @Int @Int, clearly Int ~ Int
+-- is provable.  The skolem variables are all distinct from
+-- one another, but we can't make assumptions like "f is
+-- inaccessible", because the skolem variables will get
+-- instantiated eventually!
+--
+-- Skolem abstractness can apply to "non-abstract" data as well):
+--
+--    unit p where
+--        signature H1 where
+--            data T = MkT
+--        signature H2 where
+--            data T = MkT
+--        module M where
+--            import qualified H1
+--            import qualified H2
+--            f :: (H1.T ~ H2.T) => a -> b
+--            f x = x
+--
+-- This is why the test is on the original name of the TyCon,
+-- not whether it is abstract or not.

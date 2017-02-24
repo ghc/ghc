@@ -207,7 +207,7 @@ typecheckIface iface
 
 -- | Returns true if an 'IfaceDecl' is for @data T@ (an abstract data type)
 isAbstractIfaceDecl :: IfaceDecl -> Bool
-isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon _ } = True
+isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon } = True
 isAbstractIfaceDecl IfaceClass{ ifCtxt = [], ifSigs = [], ifATs = [] } = True
 isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceAbstractClosedSynFamilyTyCon } = True
 isAbstractIfaceDecl _ = False
@@ -804,7 +804,7 @@ tc_ax_branch prev_branches
 tcIfaceDataCons :: Name -> TyCon -> [TyConBinder] -> IfaceConDecls -> IfL AlgTyConRhs
 tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
   = case if_cons of
-        IfAbstractTyCon dis -> return (AbstractTyCon dis)
+        IfAbstractTyCon  -> return AbstractTyCon
         IfDataTyCon cons -> do  { data_cons  <- mapM tc_con_decl cons
                                 ; return (mkDataTyConRhs data_cons) }
         IfNewTyCon  con  -> do  { data_con  <- tc_con_decl con

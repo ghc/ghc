@@ -15,7 +15,7 @@ bkpfail23.bkp:14:9: error:
       and its hsig file
       Main module: type F a = ()
       Hsig file:  type role F phantom
-                  {- skolem -} data F a
+                  data F a
       Illegal parameterized type synonym in implementation of abstract data.
       (Try eta reducing your type synonym so that it is nullary.)
     • while checking that h:H implements signature H in p[H=h:H]

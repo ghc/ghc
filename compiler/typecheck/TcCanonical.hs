@@ -979,8 +979,8 @@ canTyConApp ev eq_rel tc1 tys1 tc2 tys2
                  ; stopWith ev "Decomposed TyConApp" }
          else canEqFailure ev eq_rel ty1 ty2 }
 
-  -- See Note [Skolem abstract data] (at SkolemAbstract)
-  | isSkolemAbstractTyCon tc1 || isSkolemAbstractTyCon tc2
+  -- See Note [Skolem abstract data] (at tyConSkolem)
+  | tyConSkolem tc1 || tyConSkolem tc2
   = do { traceTcS "canTyConApp: skolem abstract" (ppr tc1 $$ ppr tc2)
        ; continueWith (CIrredEvCan { cc_ev = ev }) }
 

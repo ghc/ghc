@@ -4,6 +4,6 @@ T9204.hs:6:1: error:
     and its hs-boot file
     Main module: type role D phantom
                  data D a
-    Boot file:   {- abstract -} data D a
+    Boot file:   data D a
     The roles do not match.
     Roles on abstract types default to ‘representational’ in boot files.

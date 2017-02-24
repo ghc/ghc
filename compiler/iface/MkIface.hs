@@ -1626,7 +1626,7 @@ tyConToIfaceDecl env tycon
     ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
     ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon [ifaceConDecl con]
     ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls (AbstractTyCon distinct)         = IfAbstractTyCon distinct
+    ifaceConDecls AbstractTyCon                    = IfAbstractTyCon
         -- The AbstractTyCon case happens when a TyCon has been trimmed
         -- during tidying.
         -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver

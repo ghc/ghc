@@ -965,13 +965,10 @@ tcDataDefn roles_info
     -- In hs-boot, a 'data' declaration with no constructors
     -- indicates an nominally distinct abstract data type.
     mk_tc_rhs HsBootFile _ []
-      = return (AbstractTyCon DistinctNominalAbstract)
+      = return AbstractTyCon
 
-    -- In hsig, a 'data' declaration indicates a skolem
-    -- abstract data type. See 'HowAbstract' and Note
-    -- [Skolem abstract data] for more commentary.
-    mk_tc_rhs HsigFile _ []
-      = return (AbstractTyCon SkolemAbstract)
+    mk_tc_rhs HsigFile _ [] -- ditto
+      = return AbstractTyCon
 
     mk_tc_rhs _ tycon data_cons
       = case new_or_data of

@@ -999,7 +999,7 @@ checkBootTyCon is_boot tc1 tc2
     check (roles1 == roles2) roles_msg `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
 
-  -- A skolem abstract TyCon can be implemented using a type synonym, but ONLY
+  -- An abstract TyCon can be implemented using a type synonym, but ONLY
   -- if the type synonym is nullary and has no type family applications.
   -- This arises from two properties of skolem abstract data:
   --
@@ -1011,7 +1011,8 @@ checkBootTyCon is_boot tc1 tc2
   --
   -- See also 'HowAbstract' and Note [Skolem abstract data].
   --
-  | isSkolemAbstractTyCon tc1
+  | isAbstractTyCon tc1
+  , not is_boot -- don't support for hs-boot yet
   , Just (tvs, ty) <- synTyConDefn_maybe tc2
   , Just (tc2', args) <- tcSplitTyConApp_maybe ty
   = check (null (tcTyFamInsts ty))
@@ -1117,7 +1118,7 @@ checkBootTyCon is_boot tc1 tc2
                 (text "Roles on abstract types default to" <+>
                  quotes (text "representational") <+> text "in boot files.")
 
-    eqAlgRhs _ (AbstractTyCon _) _rhs2
+    eqAlgRhs _ AbstractTyCon _rhs2
       = checkSuccess -- rhs2 is guaranteed to be injective, since it's an AlgTyCon
     eqAlgRhs _  tc1@DataTyCon{} tc2@DataTyCon{} =
         checkListBy eqCon (data_cons tc1) (data_cons tc2) (text "constructors")

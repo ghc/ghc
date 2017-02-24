@@ -512,7 +512,7 @@ rnIfaceConDecls :: Rename IfaceConDecls
 rnIfaceConDecls (IfDataTyCon ds)
     = IfDataTyCon <$> mapM rnIfaceConDecl ds
 rnIfaceConDecls (IfNewTyCon d) = IfNewTyCon <$> rnIfaceConDecl d
-rnIfaceConDecls (IfAbstractTyCon b) = pure (IfAbstractTyCon b)
+rnIfaceConDecls IfAbstractTyCon = pure IfAbstractTyCon
 
 rnIfaceConDecl :: Rename IfaceConDecl
 rnIfaceConDecl d = do

@@ -62,7 +62,7 @@ import Fingerprint
 import Binary
 import BooleanFormula ( BooleanFormula, pprBooleanFormula, isTrue )
 import Var( TyVarBndr(..) )
-import TyCon ( Role (..), Injectivity(..), HowAbstract(..) )
+import TyCon ( Role (..), Injectivity(..) )
 import Util( filterOut, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
@@ -207,7 +207,7 @@ data IfaceAxBranch = IfaceAxBranch { ifaxbTyVars   :: [IfaceTvBndr]
                                      -- See Note [Storing compatibility] in CoAxiom
 
 data IfaceConDecls
-  = IfAbstractTyCon HowAbstract     -- c.f TyCon.AbstractTyCon
+  = IfAbstractTyCon     -- c.f TyCon.AbstractTyCon
   | IfDataTyCon [IfaceConDecl] -- Data type decls
   | IfNewTyCon  IfaceConDecl   -- Newtype decls
 
@@ -367,9 +367,9 @@ See [http://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/RecompilationAvoid
 -}
 
 visibleIfConDecls :: IfaceConDecls -> [IfaceConDecl]
-visibleIfConDecls (IfAbstractTyCon {}) = []
+visibleIfConDecls IfAbstractTyCon  = []
 visibleIfConDecls (IfDataTyCon cs) = cs
-visibleIfConDecls (IfNewTyCon c) = [c]
+visibleIfConDecls (IfNewTyCon c)   = [c]
 
 ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 --  *Excludes* the 'main' name, but *includes* the implicitly-bound names
@@ -385,7 +385,7 @@ ifaceDeclImplicitBndrs :: IfaceDecl -> [OccName]
 
 ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
   = case cons of
-      IfAbstractTyCon {}  -> []
+      IfAbstractTyCon -> []
       IfNewTyCon  cd  -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
       IfDataTyCon cds -> concatMap ifaceConDeclImplicitBndrs cds
 
@@ -712,10 +712,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
       | otherwise = Nothing
 
     pp_nd = case condecls of
-              IfAbstractTyCon how ->
-                case how of
-                  DistinctNominalAbstract           -> text "{- abstract -} data"
-                  SkolemAbstract                    -> text "{- skolem -} data"
+              IfAbstractTyCon{} -> text "data"
               IfDataTyCon{}     -> text "data"
               IfNewTyCon{}      -> text "newtype"
 
@@ -1717,13 +1714,13 @@ instance Binary IfaceAxBranch where
         return (IfaceAxBranch a1 a2 a3 a4 a5 a6)
 
 instance Binary IfaceConDecls where
-    put_ bh (IfAbstractTyCon d)   = putByte bh 0 >> put_ bh d
+    put_ bh IfAbstractTyCon  = putByte bh 0
     put_ bh (IfDataTyCon cs) = putByte bh 1 >> put_ bh cs
     put_ bh (IfNewTyCon c)   = putByte bh 2 >> put_ bh c
     get bh = do
         h <- getByte bh
         case h of
-            0 -> liftM IfAbstractTyCon $ get bh
+            0 -> return IfAbstractTyCon
             1 -> liftM IfDataTyCon (get bh)
             2 -> liftM IfNewTyCon (get bh)
             _ -> error "Binary(IfaceConDecls).get: Invalid IfaceConDecls"
