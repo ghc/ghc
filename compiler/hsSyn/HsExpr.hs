@@ -852,6 +852,7 @@ ppr_expr (OpApp e1 op _ e2)
     should_print_infix (HsRecFld f)    = Just (pprInfixOcc f)
     should_print_infix (HsUnboundVar h@TrueExprHole{})
                                        = Just (pprInfixOcc (unboundVarOcc h))
+    should_print_infix EWildPat        = Just (text "`_`")
     should_print_infix (HsWrap _ e)    = should_print_infix e
     should_print_infix _               = Nothing
 

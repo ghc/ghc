@@ -201,3 +201,7 @@ ppr048:
 .PHONY: T13199
 T13199:
 	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" T13199.hs
+
+.PHONY: T13050p
+T13050p:
+	$(CHECK_PPR) "`'$(TEST_HC)' $(TEST_HC_OPTS) --print-libdir | tr -d '\r'`" T13050p.hs
