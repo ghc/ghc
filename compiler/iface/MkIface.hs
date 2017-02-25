@@ -1574,7 +1574,7 @@ tyConToIfaceDecl env tycon
                   ifCType   = tyConCType tycon,
                   ifRoles   = tyConRoles tycon,
                   ifCtxt    = tidyToIfaceContext tc_env1 (tyConStupidTheta tycon),
-                  ifCons    = ifaceConDecls (algTyConRhs tycon) (algTcFields tycon),
+                  ifCons    = ifaceConDecls (algTyConRhs tycon),
                   ifGadtSyntax = isGadtSyntaxTyCon tycon,
                   ifParent  = parent })
 
@@ -1623,11 +1623,11 @@ tyConToIfaceDecl env tycon
 
 
 
-    ifaceConDecls (NewTyCon { data_con = con })    flds = IfNewTyCon  (ifaceConDecl con)
-    ifaceConDecls (DataTyCon { data_cons = cons }) flds = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls (TupleTyCon { data_con = con })  _    = IfDataTyCon [ifaceConDecl con]
-    ifaceConDecls (SumTyCon { data_cons = cons })  flds = IfDataTyCon (map ifaceConDecl cons)
-    ifaceConDecls (AbstractTyCon distinct)         _    = IfAbstractTyCon distinct
+    ifaceConDecls (NewTyCon { data_con = con })    = IfNewTyCon  (ifaceConDecl con)
+    ifaceConDecls (DataTyCon { data_cons = cons }) = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls (TupleTyCon { data_con = con })  = IfDataTyCon [ifaceConDecl con]
+    ifaceConDecls (SumTyCon { data_cons = cons })  = IfDataTyCon (map ifaceConDecl cons)
+    ifaceConDecls (AbstractTyCon distinct)         = IfAbstractTyCon distinct
         -- The AbstractTyCon case happens when a TyCon has been trimmed
         -- during tidying.
         -- Furthermore, tyThingToIfaceDecl is also used in TcRnDriver
@@ -1665,10 +1665,6 @@ tyConToIfaceDecl env tycon
 
           (con_env2, ex_bndrs') = tidyTyVarBinders con_env1 ex_bndrs
           to_eq_spec (tv,ty) = (tidyTyVar con_env2 tv, tidyToIfaceType con_env2 ty)
-
-    ifaceOverloaded flds = case dFsEnvElts flds of
-                             fl:_ -> flIsOverloaded fl
-                             []   -> False
 
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
