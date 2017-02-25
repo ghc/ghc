@@ -15,8 +15,7 @@ def T9579_run_test(binName, expExitCode):
     """
 
     test(fmt('T9579_{binName}'),
-         [extra_clean([ fmt('tmp_T9579_{binName}/Main.hi'),
-                        fmt('tmp_T9579_{binName}/Main.o') ])],
+         [extra_files(['OutOfHeap.hs', 'StackOverflow.hs'])],
           run_command,
           [fmt(testCommandTemplate)])
 
