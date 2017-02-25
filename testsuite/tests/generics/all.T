@@ -19,11 +19,12 @@ test('GenCannotDoRep1_8', normal, compile_fail, [''])
 
 test('GFullyStrict', normal, compile_and_run, [''])
 
-test('T5462Yes1', outputdir('out_T5462Yes1')
+test('T5462Yes1', [extra_files(['GEnum/', 'GEq/', 'GFunctor/']),
+                   outputdir('out_T5462Yes1')]
     , multimod_compile_and_run, ['T5462Yes1', '-iGEq -iGEnum -iGFunctor'])
-test('T5462Yes2', outputdir('out_T5462Yes2')
+test('T5462Yes2', [extra_files(['GFunctor/']), outputdir('out_T5462Yes2')]
     , multimod_compile_and_run, ['T5462Yes2', '-iGFunctor'])
-test('T5462No1', outputdir('out_T5462No1')
+test('T5462No1', [extra_files(['GFunctor/']), outputdir('out_T5462No1')]
     , multimod_compile_fail, ['T5462No1', '-iGFunctor'])
 
 test('T5884', [], multimod_compile, ['T5884Other', '-v0'])

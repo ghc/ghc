@@ -86,7 +86,9 @@ test('testwsdeque', [unless(in_tree_compiler(), skip),
 test('T3236', [c_src, only_ways(['normal','threaded1']), exit_code(1)], compile_and_run, [''])
 
 test('stack001', extra_run_opts('+RTS -K32m -RTS'), compile_and_run, [''])
-test('stack002', extra_run_opts('+RTS -K32m -k4m -RTS'), compile_and_run, [''])
+test('stack002', [extra_files(['stack001.hs']),
+                  extra_run_opts('+RTS -K32m -k4m -RTS')],
+     compile_and_run, [''])
 
 # run this test with very small stack chunks to exercise the stack
 # overflow/underflow machinery.
@@ -178,13 +180,17 @@ def checkDynAsm(actual_file, normaliser):
 # These should have extra_clean() arguments, but I need
 # to somehow extract out the name of DLLs to do that
 
-test('T5435_v_asm', when(arch('powerpc64') or arch('powerpc64le'),
-     expect_broken(11259)),
+test('T5435_v_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
+                     when(arch('powerpc64') or arch('powerpc64le'),
+                          expect_broken(11259))],
      run_command, ['$MAKE -s --no-print-directory T5435_v_asm'])
-test('T5435_v_gcc', when(arch('powerpc64') or arch('powerpc64le'),
-     expect_broken(11259)),
+test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
+                     when(arch('powerpc64') or arch('powerpc64le'),
+                          expect_broken(11259))],
      run_command, ['$MAKE -s --no-print-directory T5435_v_gcc'])
-test('T5435_dyn_asm', check_stdout(checkDynAsm), run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
+test('T5435_dyn_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
+                       check_stdout(checkDynAsm)],
+     run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
 test('T5435_dyn_gcc', normal , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
