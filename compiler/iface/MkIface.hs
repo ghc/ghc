@@ -100,7 +100,6 @@ import BasicTypes       hiding ( SuccessFlag(..) )
 import Unique
 import Util             hiding ( eqListBy )
 import FastString
-import FastStringEnv
 import Maybes
 import Binary
 import Fingerprint
