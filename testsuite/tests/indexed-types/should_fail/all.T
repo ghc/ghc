@@ -80,7 +80,7 @@ test('Overlap11', normal, compile_fail, [''])
 test('Overlap15', normal, compile_fail, [''])
 test('T7194', normal, compile_fail, [''])
 test('T7354', normal, compile_fail, [''])
-test('T7354a', [], run_command, ['$MAKE -s --no-print-directory T7354a'])
+test('T7354a', [extra_files(['T7354b.hs'])], run_command, ['$MAKE -s --no-print-directory T7354a'])
 test('T7536', normal, compile_fail, [''])
 
 test('T7729', normal, compile_fail, [''])

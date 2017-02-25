@@ -1,1 +1,1 @@
-test('rename.prog004', [], multimod_compile, ['C', '-v0'])
+test('rename.prog004', [extra_files(['A.hs', 'B.hs', 'C.hs'])], multimod_compile, ['C', '-v0'])

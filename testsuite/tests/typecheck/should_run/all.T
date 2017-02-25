@@ -39,7 +39,7 @@ test('tcrun022', omit_ways(['ghci']), compile_and_run, ['-O'])
 test('tcrun023', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
      compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
-test('tcrun025', [], multimod_compile_and_run, ['tcrun025', ''])
+test('tcrun025', [extra_files(['TcRun025_B.hs'])], multimod_compile_and_run, ['tcrun025', ''])
 test('tcrun026', normal, compile_and_run, [''])
 test('tcrun027', normal, compile_and_run, [''])
 test('tcrun028', normal, compile_and_run, [''])
@@ -53,7 +53,7 @@ test('tcrun035', normal, compile_and_run, [''])
 test('tcrun036', normal, compile_and_run, [''])
 test('tcrun037', normal, compile_and_run, [''])
 
-test('tcrun038', [], multimod_compile_and_run, ['tcrun038', ''])
+test('tcrun038', [extra_files(['TcRun038_B.hs'])], multimod_compile_and_run, ['tcrun038', ''])
 
 test('tcrun039', normal, compile_and_run, [''])
 test('tcrun040', normal, compile_and_run, [''])

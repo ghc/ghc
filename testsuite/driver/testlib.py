@@ -23,7 +23,7 @@ import subprocess
 
 from testglobals import *
 from testutil import *
-from extra_files import extra_src_files
+extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 if config.use_threads:
     import threading

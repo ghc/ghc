@@ -13,49 +13,58 @@ def normalise_duplicate_errmsg( msg ):
 #--------------------------------------
 
 test('T11223_simple_link',
-     [when(ghc_dynamic(), skip)],
+     [extra_files(['foo.c', 'foo.hs']),
+      when(ghc_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_simple_link'])
 
 test('T11223_simple_link_lib',
-     [when(ghc_dynamic(), skip)],
+     [extra_files(['foo.c', 'foo.hs']),
+      when(ghc_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_simple_link_lib'])
 
 # I'm ignoring the output since for this particular invocation normalise_errmsg
 # isn't being called and I can't figure out why not.
 test('T11223_simple_duplicate',
-     [when(ghc_dynamic(), skip), ignore_stderr, ignore_stdout, exit_code(2), normalise_errmsg_fun(normalise_duplicate_errmsg)],
+     [extra_files(['bar.c', 'foo.c', 'foo.hs']),
+      when(ghc_dynamic(), skip), ignore_stderr, ignore_stdout, exit_code(2), normalise_errmsg_fun(normalise_duplicate_errmsg)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_simple_duplicate'])
 
 test('T11223_simple_duplicate_lib',
-     [when(ghc_dynamic(), skip), normalise_errmsg_fun(normalise_duplicate_errmsg)],
+     [extra_files(['bar.c', 'foo.c', 'foo.hs']),
+      when(ghc_dynamic(), skip), normalise_errmsg_fun(normalise_duplicate_errmsg)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_simple_duplicate_lib'])
 
 test('T11223_simple_unused_duplicate_lib',
-     [when(ghc_dynamic(), skip)],
+     [extra_files(['bar.c', 'foo.c', 'foo.hs']),
+      when(ghc_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_simple_unused_duplicate_lib'])
 
 test('T11223_link_order_a_b_succeed',
-     [when(ghc_dynamic(), skip)],
+     [extra_files(['bar.c', 'foo.c', 'foo2.hs']),
+      when(ghc_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_link_order_a_b_succeed'])
 
 test('T11223_link_order_b_a_succeed',
-     [when(ghc_dynamic(), skip)],
+     [extra_files(['bar.c', 'foo.c', 'foo2.hs']),
+      when(ghc_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_link_order_b_a_succeed'])
 
 test('T11223_link_order_a_b_2_fail',
-     [when(ghc_dynamic(), skip), normalise_errmsg_fun(normalise_duplicate_errmsg)],
+     [extra_files(['bar.c', 'foo.c', 'foo3.hs']),
+      when(ghc_dynamic(), skip), normalise_errmsg_fun(normalise_duplicate_errmsg)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_link_order_a_b_2_fail'])
 
 test('T11223_link_order_b_a_2_succeed',
-     [when(ghc_dynamic(), skip)],
+     [extra_files(['bar.c', 'foo.c', 'foo3.hs']),
+      when(ghc_dynamic(), skip)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_link_order_b_a_2_succeed'])
 
@@ -63,31 +72,37 @@ test('T11223_link_order_b_a_2_succeed',
 # See Note [weak-symbols-support] in Linker.c
 
 test('T11223_weak_only_link_fail',
-     [when(ghc_dynamic(), skip), expect_broken(11817)],
+     [extra_files(['power.c', 'power.hs']),
+      when(ghc_dynamic(), skip), expect_broken(11817)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_weak_only_link_fail'])
 
 test('T11223_weak_only_link_succeed',
-     [when(ghc_dynamic(), skip), expect_broken(11817)],
+     [extra_files(['power3.hs', 'power_slow.c']),
+      when(ghc_dynamic(), skip), expect_broken(11817)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_weak_only_link_succeed'])
 
 test('T11223_weak_both_link_order_a_b_succeed',
-     [when(ghc_dynamic(), skip), expect_broken(11817)],
+     [extra_files(['power.c', 'power3.hs', 'power_slow.c']),
+      when(ghc_dynamic(), skip), expect_broken(11817)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_weak_both_link_order_a_b_succeed'])
 
 test('T11223_weak_both_link_order_b_a_succeed',
-     [when(ghc_dynamic(), skip), expect_broken(11817)],
+     [extra_files(['power.c', 'power3.hs', 'power_slow.c']),
+      when(ghc_dynamic(), skip), expect_broken(11817)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_weak_both_link_order_b_a_succeed'])
 
 test('T11223_weak_single_link_order_a_b_succeed',
-     [when(ghc_dynamic(), skip), expect_broken(11817)],
+     [extra_files(['power.c', 'power3.hs', 'power_slow.c']),
+      when(ghc_dynamic(), skip), expect_broken(11817)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_weak_single_link_order_a_b_succeed'])
 
 test('T11223_weak_single_link_order_b_a_succeed',
-     [when(ghc_dynamic(), skip), expect_broken(11817)],
+     [extra_files(['power.c', 'power3.hs', 'power_slow.c']),
+      when(ghc_dynamic(), skip), expect_broken(11817)],
      run_command,
      ['$MAKE -s --no-print-directory t_11223_weak_single_link_order_b_a_succeed'])

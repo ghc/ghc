@@ -1,5 +1,6 @@
 test('barton-mangler-bug',
-     [when(fast(), skip),
+     [extra_files(['Basic.hs', 'Expected.hs', 'Main.hs', 'Physical.hs', 'Plot.lhs', 'PlotExample.lhs', 'TypesettingTricks.hs']),
+      when(fast(), skip),
       extra_clean(['Basic.hi',             'Basic.o',
                    'Expected.hi',          'Expected.o',
                    'Main.hi',              'Main.o',

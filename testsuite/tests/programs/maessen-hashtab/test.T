@@ -1,6 +1,7 @@
 
 test('maessen_hashtab',
-     [reqlib('QuickCheck'),
+     [extra_files(['Data/', 'HashTest.hs']),
+      reqlib('QuickCheck'),
       extra_clean(['HashTest.hi', 'HashTest.o',
                    'Data/HashTab.hi', 'Data/HashTab.o']),
       when(fast(), skip),

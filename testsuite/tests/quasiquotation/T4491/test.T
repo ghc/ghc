@@ -1,5 +1,6 @@
 test('T4491',
-     [
+     [extra_files(['A.hs']),
+      
       req_interp,
       # We'd need to jump through some hoops to run this test the
       # other ways, due to the TH use, so for now we only run it

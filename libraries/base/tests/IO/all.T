@@ -88,7 +88,7 @@ test('hDuplicateTo001', [], compile_and_run, [''])
 test('countReaders001', [], compile_and_run, [''])
 
 test('concio001', normal, run_command, ['$MAKE -s --no-print-directory test.concio001'])
-test('concio001.thr', normal, run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
+test('concio001.thr', extra_files(['concio001.hs']), run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
 
 test('concio002', reqlib('process'), compile_and_run, [''])
 
@@ -112,7 +112,7 @@ test('encoding001', [], compile_and_run, [''])
 
 test('encoding002', normal, compile_and_run, [''])
 test('encoding003', normal, compile_and_run, [''])
-test('encoding004', normal, compile_and_run, [''])
+test('encoding004', extra_files(['encoded-data/']), compile_and_run, [''])
 test('encoding005', normal, compile_and_run, [''])
 
 test('environment001', [], run_command,

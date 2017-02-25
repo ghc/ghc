@@ -10,6 +10,7 @@ else:
 # hence -O0:
 
 test('concprog002',
-     [only_ways(['threaded2', 'threaded2_hT']), extra_ways(ways), exit_code(1),
+     [extra_files(['Event.hs', 'Scheduler.hs', 'Server.hs', 'Thread.hs']),
+      only_ways(['threaded2', 'threaded2_hT']), extra_ways(ways), exit_code(1),
       when(fast(), skip), reqlib('random')],
      multimod_compile_and_run, ['Server', '-O0'])

@@ -3,7 +3,8 @@
 # detect outliers, as described in Note [residency]. See #9556.
 
 test('haddock.base',
-     [unless(in_tree_compiler(), skip), req_haddock
+     [extra_files(['../../../../libraries/base/dist-install/haddock.t']),
+      unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(platform('x86_64-unknown-mingw32'), 24286343184, 5)
             # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
@@ -58,7 +59,8 @@ test('haddock.base',
      ['haddock.t'])
 
 test('haddock.Cabal',
-     [unless(in_tree_compiler(), skip), req_haddock
+     [extra_files(['../../../../libraries/Cabal/Cabal/dist-install/haddock.t']),
+      unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 18865432648, 5)
             # 2012-08-14:  3255435248 (amd64/Linux)
@@ -124,7 +126,8 @@ test('haddock.Cabal',
      ['haddock.t'])
 
 test('haddock.compiler',
-     [unless(in_tree_compiler(), skip), req_haddock
+     [extra_files(['../../../../compiler/stage2/haddock.t']),
+      unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
           [(wordsize(64), 62070477608, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)

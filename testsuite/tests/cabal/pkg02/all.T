@@ -3,4 +3,4 @@
 # separate packages are allowed).  Now it is a straightforward test
 # for shadowing: the local Foreign module shadows the base package
 # one.
-test('pkg02', [], multimod_compile, ['A', '-v0'])
+test('pkg02', [extra_files(['A.hs', 'Foreign.hs'])], multimod_compile, ['A', '-v0'])

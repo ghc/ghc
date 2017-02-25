@@ -1,1 +1,1 @@
-test('GShow1', [], multimod_compile_and_run, ['Main', ''])
+test('GShow1', [extra_files(['GShow.hs', 'Main.hs'])], multimod_compile_and_run, ['Main', ''])

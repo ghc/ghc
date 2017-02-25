@@ -1,6 +1,7 @@
 
 test('dynamicToo004',
-     [expect_broken(7665),
+     [extra_files(['Setup.hs', 'pkg1/', 'pkg1dyn/', 'pkg2/', 'prog.hs']),
+      expect_broken(7665),
       unless(have_vanilla(), skip),
       unless(have_dynamic(), skip)],
      run_command,

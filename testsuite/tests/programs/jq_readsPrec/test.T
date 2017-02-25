@@ -1,3 +1,4 @@
 
-test('jq_readsPrec', [when(fast(), skip)], multimod_compile_and_run,
+test('jq_readsPrec', [extra_files(['Main.hs']),
+                      when(fast(), skip)], multimod_compile_and_run,
      ['Main', ''])

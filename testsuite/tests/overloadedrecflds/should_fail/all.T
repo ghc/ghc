@@ -1,19 +1,19 @@
 test('overloadedrecfldsfail01', normal, compile_fail, [''])
 test('overloadedrecfldsfail02', normal, compile_fail, [''])
 test('overloadedrecfldsfail03', normal, compile_fail, [''])
-test('overloadedrecfldsfail04', [], multimod_compile_fail,
+test('overloadedrecfldsfail04', [extra_files(['OverloadedRecFldsFail04_A.hs'])], multimod_compile_fail,
      ['overloadedrecfldsfail04', ''])
 test('overloadedrecfldsfail05', normal, compile_fail, [''])
-test('overloadedrecfldsfail06', [], multimod_compile_fail,
+test('overloadedrecfldsfail06', [extra_files(['OverloadedRecFldsFail06_A.hs'])], multimod_compile_fail,
      ['overloadedrecfldsfail06', ''])
 test('overloadedrecfldsfail07', normal, compile_fail, [''])
 test('overloadedrecfldsfail08', normal, compile_fail, [''])
 test('overloadedrecfldsfail09', normal, compile_fail, [''])
-test('overloadedrecfldsfail10', [], multimod_compile_fail,
+test('overloadedrecfldsfail10', [extra_files(['OverloadedRecFldsFail10_A.hs', 'OverloadedRecFldsFail10_B.hs', 'OverloadedRecFldsFail10_C.hs'])], multimod_compile_fail,
      ['overloadedrecfldsfail10', ''])
-test('overloadedrecfldsfail11', [], multimod_compile_fail,
+test('overloadedrecfldsfail11', [extra_files(['OverloadedRecFldsFail11_A.hs'])], multimod_compile_fail,
      ['overloadedrecfldsfail11', ''])
-test('overloadedrecfldsfail12', [], multimod_compile_fail,
+test('overloadedrecfldsfail12', [extra_files(['OverloadedRecFldsFail12_A.hs'])], multimod_compile_fail,
      ['overloadedrecfldsfail12', ''])
 test('overloadedrecfldsfail13', normal, compile_fail, [''])
 test('overloadedrecfldsfail14', normal, compile_fail, [''])

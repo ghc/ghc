@@ -10,5 +10,6 @@
 def set_opts( name, opts ):
   opts.expect = 'fail'
 
-test('okeefe_neural', [when(fast(), skip), set_opts], multimod_compile_and_run,
+test('okeefe_neural', [extra_files(['Main.hs']),
+                       when(fast(), skip), set_opts], multimod_compile_and_run,
      ['Main', '+RTS -M64m -RTS'])

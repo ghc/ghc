@@ -1,5 +1,6 @@
 test('T8602',
-     [extra_clean(['t8602.sh']),
+     [extra_files(['A.hs']),
+      extra_clean(['t8602.sh']),
       # Windows runs the preprocessor using runInteractiveProcess and can't
       # properly run the generated shell script as a result, since it can't
       # recognize e.g. a shebang or anything.

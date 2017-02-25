@@ -52,8 +52,8 @@ test('T9367',
      [req_interp, when(fast() or config.os != 'mingw32', skip)],
      run_command,
      ['$MAKE -s --no-print-directory T9367'])
-test('ghci025', normal, ghci_script, ['ghci025.script'])
-test('ghci026', normal, ghci_script, ['ghci026.script'])
+test('ghci025', extra_files(['Ghci025B.hs', 'Ghci025C.hs', 'Ghci025D.hs']), ghci_script, ['ghci025.script'])
+test('ghci026', extra_files(['../prog002']), ghci_script, ['ghci026.script'])
 
 test('ghci027', [], ghci_script, ['ghci027.script'])
 test('ghci028', normal, ghci_script, ['ghci028.script'])
@@ -66,7 +66,7 @@ test('ghci034', normal, ghci_script, ['ghci034.script'])
 test('ghci035', normal, ghci_script, ['ghci035.script'])
 test('ghci036', normal, ghci_script, ['ghci036.script'])
 test('ghci037', req_interp, run_command, ['$MAKE -s --no-print-directory ghci037'])
-test('ghci038', normal, ghci_script, ['ghci038.script'])
+test('ghci038', extra_files(['../shell.hs']), ghci_script, ['ghci038.script'])
 test('ghci039', normal, ghci_script, ['ghci039.script'])
 test('ghci040', normal, ghci_script, ['ghci040.script'])
 test('ghci041', normal, ghci_script, ['ghci041.script'])
@@ -124,7 +124,7 @@ test('T5557', combined_output, ghci_script, ['T5557.script'])
 test('T5566', normal, ghci_script, ['T5566.script'])
 test('GhciKinds', normal, ghci_script, ['GhciKinds.script'])
 test('T5564', normal, ghci_script, ['T5564.script'])
-test('Defer02', normal, ghci_script, ['Defer02.script'])
+test('Defer02', extra_files(['../../typecheck/should_run/Defer01.hs']), ghci_script, ['Defer02.script'])
 test('T5820', normal, ghci_script, ['T5820.script'])
 test('T5836', normal, ghci_script, ['T5836.script'])
 test('T5979',
@@ -139,11 +139,13 @@ test('T6027ghci', normal, ghci_script, ['T6027ghci.script'])
 
 test('T6007', normal, ghci_script, ['T6007.script'])
 test('T6091', normal, ghci_script, ['T6091.script'])
-test('T6106', [pre_cmd('$MAKE -s --no-print-directory T6106_prep')],
+test('T6106', [extra_files(['../shell.hs']),
+               pre_cmd('$MAKE -s --no-print-directory T6106_prep')],
      ghci_script, ['T6106.script'])
 test('T6105', normal, ghci_script, ['T6105.script'])
 test('T7117', normal, ghci_script, ['T7117.script'])
-test('ghci058', [cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
+test('ghci058', [extra_files(['../shell.hs']),
+                 cmd_prefix('ghciWayFlags=' + config.ghci_way_flags)],
      ghci_script, ['ghci058.script'])
 test('T7587', normal, ghci_script, ['T7587.script'])
 test('T7688', normal, ghci_script, ['T7688.script'])
@@ -164,7 +166,7 @@ test('T8113', normal, ghci_script, ['T8113.script'])
 test('T8172', when(opsys('mingw32'), normalise_drive_letter),
      ghci_script, ['T8172.script'])
 test('T8215', normal, ghci_script, ['T8215.script'])
-test('T8353', normal, ghci_script, ['T8353.script'])
+test('T8353', extra_files(['Defer03.hs']), ghci_script, ['T8353.script'])
 test('T8357', normal, ghci_script, ['T8357.script'])
 test('T8383', normal, ghci_script, ['T8383.script'])
 test('T8469', normal, ghci_script, ['T8469.script'])
@@ -187,7 +189,7 @@ test('T9181', normal, ghci_script, ['T9181.script'])
 test('T9086b', normal, ghci_script, ['T9086b.script'])
 test('T9140', combined_output, ghci_script, ['T9140.script'])
 test('T9658', normal, ghci_script, ['T9658.script'])
-test('T9293', normal, ghci_script, ['T9293.script'])
+test('T9293', extra_files(['ghci057.hs']), ghci_script, ['T9293.script'])
 test('T9762',
  [ unless(have_dynamic(),skip)
  , pre_cmd('$MAKE -s --no-print-directory T9762_prep')

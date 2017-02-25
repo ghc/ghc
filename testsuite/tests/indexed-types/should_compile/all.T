@@ -27,8 +27,8 @@ test('RelaxedExamples', normal, compile, [''])
 test('NonLinearLHS', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
-test('ind2', [], multimod_compile, ['ind2', '-v0'])
-test('impexp', [], multimod_compile, ['Imp', '-w -no-hs-main -c'])
+test('ind2', [extra_files(['Ind2_help.hs'])], multimod_compile, ['ind2', '-v0'])
+test('impexp', [extra_files(['Exp.hs', 'Imp.hs'])], multimod_compile, ['Imp', '-w -no-hs-main -c'])
 
 test('ATLoop', [], multimod_compile, ['ATLoop.hs', '-v0'])
 

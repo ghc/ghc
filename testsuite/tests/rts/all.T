@@ -78,7 +78,8 @@ test('T2783', [ omit_ways(['ghci']), exit_code(1) ], compile_and_run, [''])
 
 # Test the work-stealing deque implementation.  We run this test in
 # both threaded1 (-threaded -debug) and threaded2 (-threaded) ways.
-test('testwsdeque', [unless(in_tree_compiler(), skip),
+test('testwsdeque', [extra_files(['../../../rts/WSDeque.h']),
+                     unless(in_tree_compiler(), skip),
                     req_smp, # needs atomic 'cas'
                     c_src, only_ways(['threaded1', 'threaded2'])],
                     compile_and_run, [''])
@@ -112,7 +113,8 @@ test('rtsflags002', [ only_ways(['normal']) ], compile_and_run, ['-with-rtsopts=
 
 # Test to see if linker scripts link properly to real ELF files
 test('T2615',
-     [ when(opsys('mingw32'), skip),
+     [extra_files(['libfoo_T2615.c', 'libfoo_script_T2615.so']),
+       when(opsys('mingw32'), skip),
        # OS X doesn't seem to support linker scripts
        when(opsys('darwin'), skip),
        # Solaris' linker does not support GNUish linker scripts
@@ -147,7 +149,8 @@ def config_T5250(name, opts):
     if not (config.arch in ['i386','x86_64']):
         opts.skip = 1;
 
-test('T5250', [ config_T5250,
+test('T5250', [extra_files(['spalign.c']),
+                config_T5250,
                 # stack ptr is not 16-byte aligned on 32-bit Windows
                 when(platform('i386-unknown-mingw32'), expect_fail),
                 when(platform('i386-unknown-linux'),
@@ -191,7 +194,7 @@ test('T5435_v_gcc', [extra_files(['T5435.hs', 'T5435_gcc.c']),
 test('T5435_dyn_asm', [extra_files(['T5435.hs', 'T5435_asm.c']),
                        check_stdout(checkDynAsm)],
      run_command, ['$MAKE -s --no-print-directory T5435_dyn_asm'])
-test('T5435_dyn_gcc', normal , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
+test('T5435_dyn_gcc', extra_files(['T5435.hs', 'T5435_gcc.c']) , run_command, ['$MAKE -s --no-print-directory T5435_dyn_gcc'])
 
 test('T5993', extra_run_opts('+RTS -k8 -RTS'), compile_and_run, [''])
 
@@ -211,7 +214,8 @@ test('T7160', normal, compile_and_run, [''])
 test('T7040', [omit_ways(['ghci'])], compile_and_run, ['T7040_c.c'])
 
 test('T7040_ghci',
-     [only_ways(['ghci']),
+     [extra_files(['T7040_c.h']),
+      only_ways(['ghci']),
       pre_cmd('$MAKE -s --no-print-directory T7040_ghci_setup')],
      compile_and_run, ['T7040_ghci_c.o'])
 
@@ -240,7 +244,8 @@ test('T7919', [when(fast(), skip), omit_ways(prof_ways)], compile_and_run,
 test('T8035', normal, compile_and_run, [''])
 
 test('linker_unload',
-     [when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
+     [extra_files(['LinkerUnload.hs', 'Test.hs']),
+      when(arch('powerpc64') or arch('powerpc64le'), expect_broken(11259))],
      run_command, ['$MAKE -s --no-print-directory linker_unload'])
 
 test('T8209', [ req_smp, only_ways(threaded_ways), ignore_stdout ],
@@ -288,13 +293,16 @@ test('overflow1', [ exit_code(251) ], compile_and_run, [''])
 test('overflow2', [ exit_code(251) ], compile_and_run, [''])
 test('overflow3', [ exit_code(251) ], compile_and_run, [''])
 
-test('linker_error1', [ignore_stderr], run_command,
+test('linker_error1', [extra_files(['linker_error.c']),
+                       ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory linker_error1'])
 
-test('linker_error2', [ignore_stderr], run_command,
+test('linker_error2', [extra_files(['linker_error.c']),
+                       ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory linker_error2'])
 
-test('linker_error3', [ignore_stderr], run_command,
+test('linker_error3', [extra_files(['linker_error.c']),
+                       ignore_stderr], run_command,
      ['$MAKE -s --no-print-directory linker_error3'])
 
 def grep_stderr(pattern):

@@ -1,2 +1,3 @@
 
-test('rittri', [when(fast(), skip)], multimod_compile_and_run, ['Main', ''])
+test('rittri', [extra_files(['Main.hs']),
+                when(fast(), skip)], multimod_compile_and_run, ['Main', ''])

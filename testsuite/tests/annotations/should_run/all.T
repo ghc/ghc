@@ -7,7 +7,8 @@ setTestOpts(when(fast(), skip))
 # now, just disable the profiling and dynamic ways, and use
 # config.ghc_th_way_flags.
 test('annrun01',
-     [pre_cmd('$MAKE -s --no-print-directory config'),
+     [extra_files(['Annrun01_Help.hs']),
+      pre_cmd('$MAKE -s --no-print-directory config'),
       omit_ways(['dyn'] + prof_ways)],
      multimod_compile_and_run,
      ['annrun01', '-package ghc ' + config.ghc_th_way_flags])

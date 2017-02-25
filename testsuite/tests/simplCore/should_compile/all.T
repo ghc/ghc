@@ -19,7 +19,7 @@ test('simpl016', normal, compile, ['-dsuppress-uniques'])
 test('simpl017', normal, compile_fail, [''])
 test('simpl018', normal, compile, [''])
 test('simpl019', normal, compile, [''])
-test('simpl020', [], multimod_compile, ['simpl020', '-v0'])
+test('simpl020', [extra_files(['Simpl020_A.hs'])], multimod_compile, ['simpl020', '-v0'])
 
 test('simpl-T1370', normal, compile, [''])
 test('T2520', normal, compile, [''])
@@ -118,7 +118,7 @@ test('T5342', normal, compile, [''])   # Lint error with -prof
 test('T5359a', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5359b', normal, compile, [''])  # Lint error with -O (OccurAnal)
 test('T5458', normal, compile, [''])
-test('simpl021', [], run_command, ['$MAKE -s --no-print-directory simpl021'])
+test('simpl021', [extra_files(['Simpl021A.hs', 'Simpl021B.hs'])], run_command, ['$MAKE -s --no-print-directory simpl021'])
 test('T5327', normal, run_command, ['$MAKE -s --no-print-directory T5327'])
 test('T5615', normal, run_command, ['$MAKE -s --no-print-directory T5615'])
 test('T5623', normal, run_command, ['$MAKE -s --no-print-directory T5623'])
@@ -146,7 +146,8 @@ test('T5550', omit_ways(prof_ways), compile, [''])
 test('T7865', normal, run_command, ['$MAKE -s --no-print-directory T7865'])
 test('T7785', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T7702', 
-     [pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702 TOP={top}'),
+     [extra_files(['T7702plugin']),
+      pre_cmd('$MAKE -s --no-print-directory -C T7702plugin package.T7702 TOP={top}'),
       clean_cmd('$MAKE -s --no-print-directory -C T7702plugin clean.T7702'), 
       # we say 18mb peak allocated +/- 70% because other compiler flags have 
       # a large effect on allocation which is hard to separate from the 

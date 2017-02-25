@@ -1,5 +1,6 @@
 test('qq005',
-     [when(fast(), skip),
+     [extra_files(['Expr.hs', 'Main.hs']),
+      when(fast(), skip),
       reqlib('parsec'),
       # We'd need to jump through some hoops to run this test the
       # profiling ways, due to the TH use, so for now we just

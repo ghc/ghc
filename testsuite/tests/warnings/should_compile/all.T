@@ -14,7 +14,7 @@ test('PluralS', normal, compile, [''])
 # T12574 Test that suggest current flag over deprecated
 test('T12574',normal, compile, ['-fwarn-missing-local-signatures'])
 
-test('DeprU', [], multimod_compile, ['DeprU', '-Wall'])
+test('DeprU', [extra_files(['DeprM.hs'])], multimod_compile, ['DeprU', '-Wall'])
 
 test('Werror01', normal, compile, [''])
 test('Werror02', normal, compile, [''])

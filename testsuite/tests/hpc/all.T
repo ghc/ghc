@@ -1,4 +1,5 @@
-test('T10138', ignore_stdout, run_command,
+test('T10138', [extra_files(['.keepme.hpc.T10138/']),
+                ignore_stdout], run_command,
      # Using --hpcdir with an absolute path should work (exit code 0).
      ['{hpc} report T10138.keepme.tix --hpcdir="`pwd`/.keepme.hpc.T10138"'])
 

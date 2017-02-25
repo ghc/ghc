@@ -70,7 +70,8 @@ test('T3245', [when(doing_ghci(), extra_hc_opts('-fobject-code'))],
 # a bug in hGetBufNonBlocking in 6.13 that triggered this.
 #
 test('lazy-bs-alloc',
-     [stats_num_field('peak_megabytes_allocated', (2, 1)),
+     [extra_files(['../../numeric/should_run/arith011.stdout']),
+      stats_num_field('peak_megabytes_allocated', (2, 1)),
                                  # expected value: 2 (amd64/Linux)
       stats_num_field('bytes allocated',
           [(wordsize(64), 421792, 5),

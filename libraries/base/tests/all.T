@@ -79,9 +79,12 @@ test('dynamic004',      omit_ways(['normal', 'threaded1', 'ghci']), compile_and_
 test('dynamic005',      normal, compile_and_run, [''])
 
 enum_setups = [when(fast(), skip)]
-test('enum01',          enum_setups, compile_and_run, [''])
-test('enum02',          enum_setups, compile_and_run, [''])
-test('enum03',          enum_setups, compile_and_run, [''])
+test('enum01',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
+                         enum_setups], compile_and_run, [''])
+test('enum02',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
+                         enum_setups], compile_and_run, [''])
+test('enum03',          [extra_files(['enum_processor.bat', 'enum_processor.py']),
+                         enum_setups], compile_and_run, [''])
 test('enum04',          normal, compile_and_run, [''])
 
 test('exceptionsrun001',        normal, compile_and_run, [''])
@@ -92,10 +95,12 @@ test('list002', when(fast(), skip), compile_and_run, [''])
 test('list003', when(fast(), skip), compile_and_run, [''])
 test('isSuffixOf', normal, compile_and_run, [''])
 
-test('memo001', [extra_run_opts('+RTS -A10k -RTS')], multimod_compile_and_run,
+test('memo001', [extra_files(['Memo1.lhs']),
+                 extra_run_opts('+RTS -A10k -RTS')], multimod_compile_and_run,
      ['memo001', ''])
 
-test('memo002', [extra_run_opts('20')], multimod_compile_and_run,
+test('memo002', [extra_files(['Memo2.lhs']),
+                 extra_run_opts('20')], multimod_compile_and_run,
      ['memo002', ''])
 
 test('stableptr001',

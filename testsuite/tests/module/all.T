@@ -129,9 +129,9 @@ test('mod98', normal, compile_fail, [''])
 test('mod99', normal, compile, [''])
 test('mod100', normal, compile, [''])
 
-test('mod101', [], multimod_compile_fail, ['mod101', '-v0'])
+test('mod101', [extra_files(['Mod101_AuxA.hs', 'Mod101_AuxB.hs'])], multimod_compile_fail, ['mod101', '-v0'])
 
-test('mod102', [], multimod_compile_fail, ['mod102', '-v0'])
+test('mod102', [extra_files(['Mod102_AuxA.hs', 'Mod102_AuxB.hs'])], multimod_compile_fail, ['mod102', '-v0'])
 
 test('mod103', normal, compile, [''])
 test('mod104', normal, compile, [''])
@@ -144,67 +144,67 @@ test('mod110', normal, compile_fail, [''])
 test('mod111', normal, compile, [''])
 test('mod112', normal, compile, [''])
 test('mod113', normal, compile, [''])
-test('mod114', [], multimod_compile_fail, ['mod114', '-v0'])
+test('mod114', [extra_files(['Mod114_Help.hs'])], multimod_compile_fail, ['mod114', '-v0'])
 
-test('mod115', [], multimod_compile, ['mod115', '-v0'])
+test('mod115', [extra_files(['Mod115_A.hs', 'Mod115_B.hs'])], multimod_compile, ['mod115', '-v0'])
 
 test('mod116', normal, compile_fail, [''])
-test('mod117', [], multimod_compile, ['mod117', '-v0'])
+test('mod117', [extra_files(['Mod117_A.hs', 'Mod117_B.hs'])], multimod_compile, ['mod117', '-v0'])
 
-test('mod118', [], multimod_compile, ['mod118', '-v0'])
+test('mod118', [extra_files(['Mod118_A.hs', 'Mod118_B.hs'])], multimod_compile, ['mod118', '-v0'])
 
-test('mod119', [], multimod_compile, ['mod119', '-v0'])
+test('mod119', [extra_files(['Mod119_A.hs', 'Mod119_B.hs'])], multimod_compile, ['mod119', '-v0'])
 
-test('mod120', [], multimod_compile_fail, ['mod120', '-v0'])
+test('mod120', [extra_files(['Mod120_A.hs'])], multimod_compile_fail, ['mod120', '-v0'])
 
-test('mod121', [], multimod_compile_fail, ['mod121', '-v0'])
+test('mod121', [extra_files(['Mod121_A.hs'])], multimod_compile_fail, ['mod121', '-v0'])
 
-test('mod122', [], multimod_compile_fail, ['mod122', '-v0'])
+test('mod122', [extra_files(['Mod122_A.hs'])], multimod_compile_fail, ['mod122', '-v0'])
 
-test('mod123', [], multimod_compile_fail, ['mod123', '-v0'])
+test('mod123', [extra_files(['Mod123_A.hs'])], multimod_compile_fail, ['mod123', '-v0'])
 
-test('mod124', [], multimod_compile_fail, ['mod124', '-v0'])
+test('mod124', [extra_files(['Mod124_A.hs'])], multimod_compile_fail, ['mod124', '-v0'])
 
-test('mod125', [], multimod_compile_fail, ['mod125', '-v0'])
+test('mod125', [extra_files(['Mod125_A.hs'])], multimod_compile_fail, ['mod125', '-v0'])
 
-test('mod126', [], multimod_compile_fail, ['mod126', '-v0'])
+test('mod126', [extra_files(['Mod126_A.hs'])], multimod_compile_fail, ['mod126', '-v0'])
 
-test('mod127', [], multimod_compile_fail, ['mod127', '-v0'])
+test('mod127', [extra_files(['Mod127_A.hs'])], multimod_compile_fail, ['mod127', '-v0'])
 
-test('mod128', [], multimod_compile, ['mod128', '-v0'])
+test('mod128', [extra_files(['Mod128_A.hs'])], multimod_compile, ['mod128', '-v0'])
 
 test('mod129', normal, compile, [''])
 test('mod130', normal, compile_fail, [''])
-test('mod131', [], multimod_compile_fail, ['mod131', '-v0'])
+test('mod131', [extra_files(['Mod131_A.hs', 'Mod131_B.hs'])], multimod_compile_fail, ['mod131', '-v0'])
 
-test('mod132', [], multimod_compile_fail, ['mod132', '-v0'])
+test('mod132', [extra_files(['Mod132_A.hs', 'Mod132_B.hs'])], multimod_compile_fail, ['mod132', '-v0'])
 
 test('mod133', reqlib('mtl'), compile, [''])
 test('mod134', normal, compile_fail, [''])
 test('mod135', normal, compile_fail, [''])
-test('mod136', [], multimod_compile_fail, ['mod136', '-v0'])
+test('mod136', [extra_files(['Mod136_A.hs'])], multimod_compile_fail, ['mod136', '-v0'])
 
-test('mod137', [], multimod_compile, ['mod137', '-v0'])
+test('mod137', [extra_files(['Mod137_A.hs'])], multimod_compile, ['mod137', '-v0'])
 
-test('mod138', [], multimod_compile_fail, ['mod138', '-v0'])
+test('mod138', [extra_files(['Mod138_A.hs'])], multimod_compile_fail, ['mod138', '-v0'])
 
-test('mod139', [], multimod_compile, ['mod139', '-v0'])
+test('mod139', [extra_files(['Mod139_A.hs', 'Mod139_B.hs'])], multimod_compile, ['mod139', '-v0'])
 
-test('mod140', [], multimod_compile, ['mod140', '-v0'])
+test('mod140', [extra_files(['Mod140_A.hs'])], multimod_compile, ['mod140', '-v0'])
 
-test('mod141', [], multimod_compile, ['mod141', '-v0'])
+test('mod141', [extra_files(['Mod141_A.hs'])], multimod_compile, ['mod141', '-v0'])
 
-test('mod142', [], multimod_compile_fail, ['mod142', '-v0'])
+test('mod142', [extra_files(['Mod142_A.hs'])], multimod_compile_fail, ['mod142', '-v0'])
 
-test('mod143', [], multimod_compile_fail, ['mod143', '-v0'])
+test('mod143', [extra_files(['Mod143_A.hs'])], multimod_compile_fail, ['mod143', '-v0'])
 
-test('mod144', [], run_command, ['$MAKE -s --no-print-directory mod144'])
+test('mod144', [extra_files(['Mod144_A.hs'])], run_command, ['$MAKE -s --no-print-directory mod144'])
 
-test('mod145', [], multimod_compile_fail, ['mod145', '-v0'])
+test('mod145', [extra_files(['Mod145_A.hs'])], multimod_compile_fail, ['mod145', '-v0'])
 
-test('mod146', [], run_command, ['$MAKE -s --no-print-directory mod146'])
+test('mod146', [extra_files(['Mod145_A.hs'])], run_command, ['$MAKE -s --no-print-directory mod146'])
 
-test('mod147', [], multimod_compile_fail, ['mod147', '-v0'])
+test('mod147', [extra_files(['Mod147_A.hs'])], multimod_compile_fail, ['mod147', '-v0'])
 
 test('mod148', normal, compile, [''])
 test('mod149', normal, compile, [''])
@@ -215,53 +215,53 @@ test('mod153', normal, compile_fail, [''])
 test('mod154', normal, compile, [''])
 test('mod155', normal, compile_fail, [''])
 test('mod156', normal, compile, [''])
-test('mod157', [], multimod_compile, ['mod157', '-v0'])
+test('mod157', [extra_files(['Mod157_A.hs', 'Mod157_B.hs', 'Mod157_C.hs', 'Mod157_D.hs'])], multimod_compile, ['mod157', '-v0'])
 
-test('mod158', [], run_command, ['$MAKE -s --no-print-directory mod158'])
+test('mod158', [extra_files(['Mod157_A.hs', 'Mod157_B.hs', 'Mod157_C.hs', 'Mod157_D.hs'])], run_command, ['$MAKE -s --no-print-directory mod158'])
 
-test('mod159', [], multimod_compile, ['mod159', '-v0'])
+test('mod159', [extra_files(['Mod159_A.hs', 'Mod159_B.hs', 'Mod159_C.hs', 'Mod159_D.hs'])], multimod_compile, ['mod159', '-v0'])
 
-test('mod160', [], run_command, ['$MAKE -s --no-print-directory mod160'])
+test('mod160', [extra_files(['Mod159_A.hs', 'Mod159_B.hs', 'Mod159_C.hs', 'Mod159_D.hs'])], run_command, ['$MAKE -s --no-print-directory mod160'])
 
 test('mod161', normal, compile_fail, [''])
-test('mod162', [], multimod_compile, ['mod162', '-v0'])
+test('mod162', [extra_files(['Mod162_A.hs'])], multimod_compile, ['mod162', '-v0'])
 
-test('mod163', [], multimod_compile, ['mod163', '-v0'])
+test('mod163', [extra_files(['Mod163_A.hs'])], multimod_compile, ['mod163', '-v0'])
 
-test('mod164', [], multimod_compile_fail, ['mod164', '-v0'])
+test('mod164', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], multimod_compile_fail, ['mod164', '-v0'])
 
-test('mod165', [], run_command, ['$MAKE -s --no-print-directory mod165'])
+test('mod165', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], run_command, ['$MAKE -s --no-print-directory mod165'])
 
-test('mod166', [], run_command,
+test('mod166', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], run_command,
      ['$MAKE -s --no-print-directory mod166 MAKELEVEL='])
 
-test('mod167', [], run_command,
+test('mod167', [extra_files(['Mod164_A.hs', 'Mod164_B.hs'])], run_command,
      ['$MAKE -s --no-print-directory mod167 MAKELEVEL='])
 
 test('mod168', normal, compile, [''])
 test('mod169', normal, compile, [''])
-test('mod170', [], multimod_compile, ['mod170', '-v0'])
+test('mod170', [extra_files(['Mod170_A.hs'])], multimod_compile, ['mod170', '-v0'])
 
 
-test('mod171', [], multimod_compile, ['mod171', '-v0 -Wall'])
+test('mod171', [extra_files(['Mod171_A.hs', 'Mod171_B.hs'])], multimod_compile, ['mod171', '-v0 -Wall'])
 
 
-test('mod172', [], multimod_compile, ['mod172', '-v0'])
+test('mod172', [extra_files(['Mod172_B.hs', 'Mod172_C.hs'])], multimod_compile, ['mod172', '-v0'])
 
 
-test('mod173', [], multimod_compile, ['mod173', '-v0'])
+test('mod173', [extra_files(['Mod173_Aux.hs'])], multimod_compile, ['mod173', '-v0'])
 
 # mod174 has been deleted
 # mod175 is a sub-directory
 
 test('mod176', normal, compile, ['-fwarn-unused-imports'])
 test('mod177', normal, compile, ['-fwarn-unused-imports'])
-test('mod178', [], multimod_compile_fail, ['mod178', '-v0'])
+test('mod178', [extra_files(['Mod178_2.hs'])], multimod_compile_fail, ['mod178', '-v0'])
 
-test('mod179', [], multimod_compile, ['mod179', '-v0'])
+test('mod179', [extra_files(['Mod179_A.hs'])], multimod_compile, ['mod179', '-v0'])
 
 
-test('mod180', [], multimod_compile_fail, ['mod180', '-v0'])
+test('mod180', [extra_files(['Mod180_A.hs', 'Mod180_B.hs'])], multimod_compile_fail, ['mod180', '-v0'])
 
 test('T1148', normal, compile, [''])
 test('T1074', reqlib('mtl'), compile, [''])

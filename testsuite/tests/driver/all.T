@@ -1,73 +1,73 @@
-test('driver011', [], run_command, ['$MAKE -s --no-print-directory test011'])
+test('driver011', [extra_files(['A011.hs'])], run_command, ['$MAKE -s --no-print-directory test011'])
 
-test('driver012', [], run_command, ['$MAKE -s --no-print-directory test012'])
+test('driver012', [extra_files(['A012.hs'])], run_command, ['$MAKE -s --no-print-directory test012'])
 
-test('driver013', [], run_command, ['$MAKE -s --no-print-directory test013'])
+test('driver013', [extra_files(['A013.hs'])], run_command, ['$MAKE -s --no-print-directory test013'])
 
-test('driver014', [], run_command, ['$MAKE -s --no-print-directory test014'])
+test('driver014', [extra_files(['A014.hs'])], run_command, ['$MAKE -s --no-print-directory test014'])
 
-test('driver015', [], run_command, ['$MAKE -s --no-print-directory test015'])
+test('driver015', [extra_files(['A015.hs'])], run_command, ['$MAKE -s --no-print-directory test015'])
 
-test('driver016', [], run_command, ['$MAKE -s --no-print-directory test016'])
+test('driver016', [extra_files(['F016.hs'])], run_command, ['$MAKE -s --no-print-directory test016'])
 
-test('driver017', [], run_command, ['$MAKE -s --no-print-directory test017'])
+test('driver017', [extra_files(['F017.hs'])], run_command, ['$MAKE -s --no-print-directory test017'])
 
-test('driver018', [], run_command, ['$MAKE -s --no-print-directory test018'])
+test('driver018', [extra_files(['F018.hs'])], run_command, ['$MAKE -s --no-print-directory test018'])
 
-test('driver018a', [], run_command, ['$MAKE -s --no-print-directory test018a'])
+test('driver018a', [extra_files(['F018a.hs'])], run_command, ['$MAKE -s --no-print-directory test018a'])
 
-test('driver019', [], run_command, ['$MAKE -s --no-print-directory test019'])
+test('driver019', [extra_files(['F019.hs'])], run_command, ['$MAKE -s --no-print-directory test019'])
 
-test('driver021', [], run_command, ['$MAKE -s --no-print-directory test021'])
+test('driver021', [extra_files(['B021/'])], run_command, ['$MAKE -s --no-print-directory test021'])
 
-test('driver022', [], run_command, ['$MAKE -s --no-print-directory test022'])
+test('driver022', [extra_files(['B022/'])], run_command, ['$MAKE -s --no-print-directory test022'])
 
-test('driver023', [], run_command, ['$MAKE -s --no-print-directory test023'])
+test('driver023', [extra_files(['B023/'])], run_command, ['$MAKE -s --no-print-directory test023'])
 
-test('driver024', [], run_command, ['$MAKE -s --no-print-directory test024'])
+test('driver024', [extra_files(['B024/'])], run_command, ['$MAKE -s --no-print-directory test024'])
 
 test('driver024a', [], run_command, ['$MAKE -s --no-print-directory test024a'])
 
-test('driver025', [], run_command, ['$MAKE -s --no-print-directory test025'])
+test('driver025', [extra_files(['B025/'])], run_command, ['$MAKE -s --no-print-directory test025'])
 
-test('driver026', [], run_command, ['$MAKE -s --no-print-directory test026'])
+test('driver026', [extra_files(['d026/'])], run_command, ['$MAKE -s --no-print-directory test026'])
 
-test('driver027', [], run_command, ['$MAKE -s --no-print-directory test027'])
+test('driver027', [extra_files(['B027/'])], run_command, ['$MAKE -s --no-print-directory test027'])
 
-test('driver028', [], run_command, ['$MAKE -s --no-print-directory test028'])
+test('driver028', [extra_files(['B028/'])], run_command, ['$MAKE -s --no-print-directory test028'])
 
-test('driver031', [], run_command, ['$MAKE -s --no-print-directory test031'])
+test('driver031', [extra_files(['A031.hs'])], run_command, ['$MAKE -s --no-print-directory test031'])
 
-test('driver032', [], run_command, ['$MAKE -s --no-print-directory test032'])
+test('driver032', [extra_files(['A032.hs'])], run_command, ['$MAKE -s --no-print-directory test032'])
 
-test('driver033', [], run_command, ['$MAKE -s --no-print-directory test033'])
+test('driver033', [extra_files(['A033.hs'])], run_command, ['$MAKE -s --no-print-directory test033'])
 
-test('driver034', [], run_command, ['$MAKE -s --no-print-directory test034'])
+test('driver034', [extra_files(['F034.hs'])], run_command, ['$MAKE -s --no-print-directory test034'])
 
-test('driver035', [], run_command, ['$MAKE -s --no-print-directory test035'])
+test('driver035', [extra_files(['F035.hs'])], run_command, ['$MAKE -s --no-print-directory test035'])
 
-test('driver041', [], run_command, ['$MAKE -s --no-print-directory test041'])
+test('driver041', [extra_files(['B041/'])], run_command, ['$MAKE -s --no-print-directory test041'])
 
-test('driver042', [], run_command, ['$MAKE -s --no-print-directory test042'])
+test('driver042', [extra_files(['B042/'])], run_command, ['$MAKE -s --no-print-directory test042'])
 
-test('driver042stub', [], run_command,
+test('driver042stub', [extra_files(['B042stub/'])], run_command,
      ['$MAKE -s --no-print-directory test042stub'])
 
-test('driver043', [], run_command, ['$MAKE -s --no-print-directory test043'])
+test('driver043', [extra_files(['B043/'])], run_command, ['$MAKE -s --no-print-directory test043'])
 
-test('driver044', [], run_command, ['$MAKE -s --no-print-directory test044'])
+test('driver044', [extra_files(['B044/'])], run_command, ['$MAKE -s --no-print-directory test044'])
 
-test('driver045', [], run_command, ['$MAKE -s --no-print-directory test045'])
+test('driver045', [extra_files(['B045/'])], run_command, ['$MAKE -s --no-print-directory test045'])
 
-test('driver051', [], run_command, ['$MAKE -s --no-print-directory test051'])
+test('driver051', [extra_files(['d051_1/', 'd051_2/'])], run_command, ['$MAKE -s --no-print-directory test051'])
 
-test('driver052', [], run_command, ['$MAKE -s --no-print-directory test052'])
+test('driver052', [extra_files(['d052_1/', 'd052_2/'])], run_command, ['$MAKE -s --no-print-directory test052'])
 
-test('driver053', [], run_command, ['$MAKE -s --no-print-directory test053'])
+test('driver053', [extra_files(['d053_1/', 'd053_2/'])], run_command, ['$MAKE -s --no-print-directory test053'])
 
-test('driver061a', [], run_command, ['$MAKE -s --no-print-directory test061a'])
+test('driver061a', [extra_files(['A061a.hs'])], run_command, ['$MAKE -s --no-print-directory test061a'])
 
-test('driver061b', [], run_command, ['$MAKE -s --no-print-directory test061b'])
+test('driver061b', [extra_files(['A061b.hs'])], run_command, ['$MAKE -s --no-print-directory test061b'])
 
 
 test('driver062a', [], run_command, ['$MAKE -s --no-print-directory test062a'])
@@ -76,27 +76,27 @@ test('driver062c', [], run_command, ['$MAKE -s --no-print-directory test062c'])
 test('driver062d', [], run_command, ['$MAKE -s --no-print-directory test062d'])
 test('driver062e', [], run_command, ['$MAKE -s --no-print-directory test062e'])
 
-test('driver063', [], run_command, ['$MAKE -s --no-print-directory test063'])
+test('driver063', [extra_files(['D063.hs'])], run_command, ['$MAKE -s --no-print-directory test063'])
 
-test('driver064', [], run_command, ['$MAKE -s --no-print-directory test064'])
+test('driver064', [extra_files(['A064.hs'])], run_command, ['$MAKE -s --no-print-directory test064'])
 
-test('driver065', [], run_command, ['$MAKE -s --no-print-directory test065'])
+test('driver065', [extra_files(['A065.hs'])], run_command, ['$MAKE -s --no-print-directory test065'])
 
-test('driver066', [], run_command, ['$MAKE -s --no-print-directory test066'])
+test('driver066', [extra_files(['A066.hs'])], run_command, ['$MAKE -s --no-print-directory test066'])
 
-test('driver067', [], run_command, ['$MAKE -s --no-print-directory test067'])
+test('driver067', [extra_files(['A067.hs'])], run_command, ['$MAKE -s --no-print-directory test067'])
 
-test('driver070', [], run_command, ['$MAKE -s --no-print-directory test070'])
+test('driver070', [extra_files(['A070.hs'])], run_command, ['$MAKE -s --no-print-directory test070'])
 
-test('driver071', [], run_command, ['$MAKE -s --no-print-directory test071'])
+test('driver071', [extra_files(['A071.hs'])], run_command, ['$MAKE -s --no-print-directory test071'])
 
 test('driver081a', [], run_command, ['$MAKE -s --no-print-directory test081a'])
 
 test('driver081b', [], run_command, ['$MAKE -s --no-print-directory test081b'])
 
-test('driver100', [], run_command, ['$MAKE -s --no-print-directory test100'])
+test('driver100', [extra_files(['overlap/'])], run_command, ['$MAKE -s --no-print-directory test100'])
 
-test('driver200', [], run_command, ['$MAKE -s --no-print-directory test200'])
+test('driver200', [extra_files(['A200.hs', 'B200/', 'D200.hs'])], run_command, ['$MAKE -s --no-print-directory test200'])
 
 test('T2566',
      normalise_fun(normalise_errmsg),
@@ -116,7 +116,8 @@ if config.os == 'mingw32':
 else:
      only_windows = skip
 
-test('shared001', [only_windows], run_command,
+test('shared001', [extra_files(['Shared001.hs']),
+                   only_windows], run_command,
      ['$MAKE -s --no-print-directory shared001'])
 
 if config.os == 'darwin':
@@ -124,7 +125,8 @@ if config.os == 'darwin':
 else:
   only_darwin = skip
 
-test('static001', [only_darwin, expect_broken(8127)], run_command,
+test('static001', [extra_files(['Static001.hs']),
+                   only_darwin, expect_broken(8127)], run_command,
      ['$MAKE -s --no-print-directory static001'])
 
 test('dynHelloWorld',
@@ -141,7 +143,7 @@ test('T5313',
 test('T2464', normal, compile, [''])
 test('T3674', [], run_command, ['$MAKE -s --no-print-directory T3674'])
 
-test('rtsopts001', [], run_command,
+test('rtsopts001', [extra_files(['rtsOpts.hs'])], run_command,
      ['$MAKE -s --no-print-directory rtsopts001'])
 test('rtsopts002', normal, run_command,
                 ['$MAKE -s --no-print-directory rtsopts002'])
@@ -205,10 +207,10 @@ test('T8101b', expect_broken(10600), multimod_compile,
 # Should not panic when compiling cmm file together with -outputdir.
 test('T9050', cmm_src, compile, ['-outputdir=.'])
 
-test('write_interface_oneshot', [], run_command,
+test('write_interface_oneshot', [extra_files(['A011.hs'])], run_command,
      ['$MAKE -s --no-print-directory write_interface_oneshot'])
 
-test('write_interface_make', [], run_command,
+test('write_interface_make', [extra_files(['A011.hs'])], run_command,
      ['$MAKE -s --no-print-directory write_interface_make'])
 
 test('T9776', normal, compile_fail, ['-frule-check'])

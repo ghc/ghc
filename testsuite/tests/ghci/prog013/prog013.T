@@ -1,2 +1,2 @@
-test('prog013', normal, ghci_script, ['prog013.script'])
+test('prog013', extra_files(['Bad.hs', 'Good.hs']), ghci_script, ['prog013.script'])
 

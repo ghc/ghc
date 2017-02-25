@@ -12,5 +12,6 @@
 # multiple cores, which is why it is only running the 'threaded2' way
 # right now. --SDM 1/4/2010
 
-test('concprog001', [when(fast(), skip), only_ways(['threaded2'])],
+test('concprog001', [extra_files(['Arithmetic.hs', 'Converter.hs', 'Mult.hs', 'Stream.hs', 'Thread.hs', 'Trit.hs', 'Utilities.hs']),
+                     when(fast(), skip), only_ways(['threaded2'])],
      multimod_compile_and_run, ['Mult', ''])

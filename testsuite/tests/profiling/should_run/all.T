@@ -1,7 +1,8 @@
 # Test for #1227, #1418
 
 test('heapprof002',
-     [pre_cmd('cp heapprof001.hs heapprof002.hs'), extra_ways(['normal_h']),
+     [extra_files(['heapprof001.hs']),
+      pre_cmd('cp heapprof001.hs heapprof002.hs'), extra_ways(['normal_h']),
       extra_run_opts('7')],
      compile_and_run, [''])
 
