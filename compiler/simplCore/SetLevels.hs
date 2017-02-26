@@ -561,9 +561,15 @@ lvlMFE env strict_ctxt ann_expr
   =     -- Don't float it out
     lvlExpr env ann_expr
 
-  | float_is_new_lam || need_join || exprIsTopLevelBindable expr expr_ty
+  |  float_is_new_lam || need_join || exprIsTopLevelBindable expr expr_ty
+  || exprOkForSpeculation expr && not (isTopLvl dest_lvl)
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
+         -- or is okay for speculation (we'll now evaluate it earlier).
+         -- In the last case we _must not_ wrap, because it could violate
+         -- the let/app invariant (Trac #13338).
+         -- But we can't float an unboxed thing to top level; so don't float
+         -- it all, as in lvlBind. (See "Don't break let/app" below.)
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive join_arity_maybe ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 join_arity_maybe
@@ -578,6 +584,7 @@ lvlMFE env strict_ctxt ann_expr
   | escapes_value_lam
   , not (exprIsCheap expr)  -- Boxing/unboxing isn't worth
                             -- it for cheap expressions
+  , not (exprOkForSpeculation expr && isTopLvl dest_lvl) -- Don't break let/app
   , Just (tc, _) <- splitTyConApp_maybe expr_ty
   , Just dc <- boxingDataCon_maybe tc
   , let dc_res_ty = dataConOrigResTy dc  -- No free type variables
