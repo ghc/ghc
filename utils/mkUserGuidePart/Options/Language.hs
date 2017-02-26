@@ -484,6 +484,13 @@ languageOptions =
          , flagReverse = "-XNoOverlappingInstances"
          , flagSince = "6.8.1"
          }
+  , flag { flagName = "-XOverloadedLabels"
+         , flagDescription =
+           "Enable :ref:`overloaded labels <overloaded-labels>`."
+         , flagType = DynamicFlag
+         , flagReverse = "-XNoOverloadedLabels"
+         , flagSince = "8.0.1"
+         }
   , flag { flagName = "-XOverloadedLists"
          , flagDescription =
            "Enable :ref:`overloaded lists <overloaded-lists>`."
