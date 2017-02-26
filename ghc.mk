@@ -1073,6 +1073,17 @@ endif
 
 BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 
+# Note [Persist CrossCompiling in binary distributions]
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# The build system uses the CrossCompiling variable to decide whether or not we
+# should build various packages that must be built using the compiler.
+# Consequently, it is important that we persist its value in the binary
+# distribution so we know during `make install` not to go looking for files that
+# would have been built for these packages. Failing to do this causes #13325.
+#
+# See Note [No stage2 packages when CrossCompiling or Stage1Only].
+
 unix-binary-dist-prep:
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
@@ -1083,6 +1094,8 @@ unix-binary-dist-prep:
 	echo "BUILD_MAN          = $(BUILD_MAN)"          >> $(BIN_DIST_MK)
 	echo "override ghc-cabal_INPLACE = utils/ghc-cabal/dist-install/build/tmp/ghc-cabal-bindist" >> $(BIN_DIST_MK)
 	echo "UseSystemLibFFI    = $(UseSystemLibFFI)"    >> $(BIN_DIST_MK)
+# See Note [Persist CrossCompiling in binary distributions]
+	echo "CrossCompiling     = $(CrossCompiling)"     >> $(BIN_DIST_MK)
 	cd $(BIN_DIST_PREP_DIR) && autoreconf
 	$(call removeFiles,$(BIN_DIST_PREP_TAR))
 # h means "follow symlinks", e.g. if aclocal.m4 is a symlink to a source
@@ -1483,6 +1496,11 @@ endif
 #    run on the host platform at all; it is built to run on $(TARGETPLATFORM)"
 #    [5]. Therefore in this case we also have to exclude the stage2 packages
 #    from the build.
+#
+# Because we omit certain packages from the build when CrossCompiling=YES,
+# it is important that we remember the value of CrossCompiling in binary
+# distributions that we produce. See Note [Persist CrossCompiling in binary
+# distributions].
 #
 #  [1] find utils -name ghc.mk | xargs grep -l 'build-prog.*,2'
 #
