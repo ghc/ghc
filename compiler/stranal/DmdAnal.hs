@@ -111,7 +111,7 @@ dmdTransformThunkDmd e
 
 -- Do not process absent demands
 -- Otherwise act like in a normal demand analysis
--- See |-* relation in the companion paper
+-- See ↦* relation in the Cardinality Analysis paper
 dmdAnalStar :: AnalEnv
             -> Demand   -- This one takes a *Demand*
             -> CoreExpr -> (BothDmdArg, CoreExpr)
