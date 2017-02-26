@@ -244,3 +244,4 @@ test('T13317',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13317'])
+test('T13340', expect_broken(13340), run_command, ['$MAKE -s --no-print-directory T13340'])

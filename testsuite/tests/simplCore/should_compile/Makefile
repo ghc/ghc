@@ -195,3 +195,9 @@ T13025:
 str-rules:
 	$(RM) -f str-rules.hi str-rules.o
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O str-rules.hs -ddump-simpl | grep -o '"@@@[^"].*"#' | sort
+
+# We expect there to be precisely one use of +# in the simplified Core as f and
+# g should have been collapsed into one defininition by CSE.
+.PHONY: T13340
+T13340:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13340.hs -ddump-simpl -dsuppress-all | grep '\+#' | wc -l
