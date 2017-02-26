@@ -2522,21 +2522,22 @@ aexp2   :: { LHsExpr RdrName }
         | TH_TY_QUOTE tyvar     {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | TH_TY_QUOTE gtycon    {% ams (sLL $1 $> $ HsBracket (VarBr False (unLoc $2))) [mj AnnThTyQuote $1,mj AnnName $2] }
         | '[|' exp '|]'       {% ams (sLL $1 $> $ HsBracket (ExpBr $2))
-                                      (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
+                                      (if (hasE $1) then [mj AnnOpenE $1, mu AnnCloseQ $3]
+                                                    else [mu AnnOpenEQ $1,mu AnnCloseQ $3]) }
         | '[||' exp '||]'     {% ams (sLL $1 $> $ HsBracket (TExpBr $2))
                                       (if (hasE $1) then [mj AnnOpenE $1,mc $3] else [mo $1,mc $3]) }
-        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mc $3] }
+        | '[t|' ctype '|]'    {% ams (sLL $1 $> $ HsBracket (TypBr $2)) [mo $1,mu AnnCloseQ $3] }
         | '[p|' infixexp '|]' {% checkPattern empty $2 >>= \p ->
                                       ams (sLL $1 $> $ HsBracket (PatBr p))
-                                          [mo $1,mc $3] }
+                                          [mo $1,mu AnnCloseQ $3] }
         | '[d|' cvtopbody '|]' {% ams (sLL $1 $> $ HsBracket (DecBrL (snd $2)))
-                                      (mo $1:mc $3:fst $2) }
+                                      (mo $1:mu AnnCloseQ $3:fst $2) }
         | quasiquote          { sL1 $1 (HsSpliceE (unLoc $1)) }
 
         -- arrow notation extension
         | '(|' aexp2 cmdargs '|)'  {% ams (sLL $1 $> $ HsArrForm $2
                                                            Nothing (reverse $3))
-                                          [mo $1,mc $4] }
+                                          [mu AnnOpenB $1,mu AnnCloseB $4] }
 
 splice_exp :: { LHsExpr RdrName }
         : TH_ID_SPLICE          {% ams (sL1 $1 $ mkHsSpliceE NoParens
@@ -3457,7 +3458,6 @@ isUnicode (L _ (ITdarrow         iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITdcolon         iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITlarrow         iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITrarrow         iu)) = iu == UnicodeSyntax
-isUnicode (L _ (ITrarrow         iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITlarrowtail     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITrarrowtail     iu)) = iu == UnicodeSyntax
 isUnicode (L _ (ITLarrowtail     iu)) = iu == UnicodeSyntax
@@ -3469,9 +3469,9 @@ isUnicode (L _ (ITcloseQuote     iu)) = iu == UnicodeSyntax
 isUnicode _                           = False
 
 hasE :: Located Token -> Bool
-hasE (L _ (ITopenExpQuote HasE _))  = True
-hasE (L _ (ITopenTExpQuote HasE)) = True
-hasE _                            = False
+hasE (L _ (ITopenExpQuote HasE _)) = True
+hasE (L _ (ITopenTExpQuote HasE))  = True
+hasE _                             = False
 
 getSCC :: Located Token -> P FastString
 getSCC lt = do let s = getSTRING lt

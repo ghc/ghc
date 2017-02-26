@@ -556,8 +556,8 @@ data HsExpr id
   -- MetaHaskell Extensions
 
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen',
-  --         'ApiAnnotation.AnnOpen','ApiAnnotation.AnnClose',
-  --         'ApiAnnotation.AnnClose'
+  --         'ApiAnnotation.AnnOpenE','ApiAnnotation.AnnOpenEQ',
+  --         'ApiAnnotation.AnnClose','ApiAnnotation.AnnCloseQ'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsBracket    (HsBracket id)
@@ -620,8 +620,8 @@ data HsExpr id
         Bool             -- True => right-to-left (f -< arg)
                          -- False => left-to-right (arg >- f)
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(|'@,
-  --         'ApiAnnotation.AnnClose' @'|)'@
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpenB' @'(|'@,
+  --         'ApiAnnotation.AnnCloseB' @'|)'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsArrForm            -- Command formation,  (| e cmd1 .. cmdn |)
@@ -1160,8 +1160,8 @@ data HsCmd id
         Bool             -- True => right-to-left (f -< arg)
                          -- False => left-to-right (arg >- f)
 
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'(|'@,
-  --         'ApiAnnotation.AnnClose' @'|)'@
+  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpenB' @'(|'@,
+  --         'ApiAnnotation.AnnCloseB' @'|)'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
   | HsCmdArrForm         -- Command formation,  (| e cmd1 .. cmdn |)

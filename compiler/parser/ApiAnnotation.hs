@@ -201,7 +201,11 @@ data AnnKeywordId
     | AnnCase -- ^ case or lambda case
     | AnnClass
     | AnnClose -- ^  '\#)' or '\#-}'  etc
+    | AnnCloseB -- ^ '|)'
+    | AnnCloseBU -- ^ '|)', unicode variant
     | AnnCloseC -- ^ '}'
+    | AnnCloseQ  -- ^ '|]'
+    | AnnCloseQU -- ^ '|]', unicode variant
     | AnnCloseP -- ^ ')'
     | AnnCloseS -- ^ ']'
     | AnnColon
@@ -244,12 +248,16 @@ data AnnKeywordId
     | AnnNewtype
     | AnnName -- ^ where a name loses its location in the AST, this carries it
     | AnnOf
-    | AnnOpen   -- ^ '(\#' or '{-\# LANGUAGE' etc
+    | AnnOpen    -- ^ '(\#' or '{-\# LANGUAGE' etc
+    | AnnOpenB   -- ^ '(|'
+    | AnnOpenBU  -- ^ '(|', unicode variant
     | AnnOpenC   -- ^ '{'
     | AnnOpenE   -- ^ '[e|' or '[e||'
+    | AnnOpenEQ  -- ^ '[|'
+    | AnnOpenEQU -- ^ '[|', unicode variant
     | AnnOpenP   -- ^ '('
-    | AnnOpenPE   -- ^ '$('
-    | AnnOpenPTE   -- ^ '$$('
+    | AnnOpenPE  -- ^ '$('
+    | AnnOpenPTE -- ^ '$$('
     | AnnOpenS   -- ^ '['
     | AnnPackageName
     | AnnPattern
@@ -336,6 +344,10 @@ unicodeAnn Annlarrowtail = AnnlarrowtailU
 unicodeAnn Annrarrowtail = AnnrarrowtailU
 unicodeAnn AnnLarrowtail = AnnLarrowtailU
 unicodeAnn AnnRarrowtail = AnnRarrowtailU
+unicodeAnn AnnOpenB      = AnnOpenBU
+unicodeAnn AnnCloseB     = AnnCloseBU
+unicodeAnn AnnOpenEQ     = AnnOpenEQU
+unicodeAnn AnnCloseQ     = AnnCloseQU
 unicodeAnn ann           = ann
 
 
