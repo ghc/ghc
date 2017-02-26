@@ -566,12 +566,12 @@ lvlMFE env strict_ctxt ann_expr
          -- or if we are wrapping it in one or more value lambdas
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive join_arity_maybe ann_expr
                   -- Treat the expr just like a right-hand side
-       ; var <- newLvlVar expr1 join_arity_maybe
+       ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
        ; return (Let (NonRec (TB var2 (FloatMe dest_lvl)) expr1)
                      (mkVarApps (Var var2) abs_vars)) }
 
-  -- OK, so the float has an unlifted type
+  -- OK, so the float has an unlifted type (not top-level bindable)
   --     and no new value lambdas (float_is_new_lam is False)
   -- Try for the boxing strategy
   -- See Note [Floating MFEs of unlifted type]
@@ -588,7 +588,7 @@ lvlMFE env strict_ctxt ann_expr
                          Case expr1 (stayPut l1r ubx_bndr) dc_res_ty
                              [(DEFAULT, [], mkConApp dc [Var ubx_bndr])]
 
-       ; var <- newLvlVar float_rhs Nothing
+       ; var <- newLvlVar float_rhs Nothing is_mk_static
        ; let l1u      = incMinorLvlFrom env
              use_expr = Case (mkVarApps (Var var) abs_vars)
                              (stayPut l1u bx_bndr) expr_ty
@@ -626,9 +626,12 @@ lvlMFE env strict_ctxt ann_expr
     join_arity_maybe | need_join = Just (length abs_vars)
                      | otherwise = Nothing
 
+    is_mk_static = isJust (collectMakeStaticArgs expr)
+        -- Yuk: See Note [Grand plan for static forms] in main/StaticPtrTable
+
         -- A decision to float entails let-binding this thing, and we only do
         -- that if we'll escape a value lambda, or will go to the top level.
-    float_me = saves_work || saves_alloc
+    float_me = saves_work || saves_alloc || is_mk_static
 
     -- We can save work if we can move a redex outside a value lambda
     -- But if float_is_new_lam is True, then the redex is wrapped in a
@@ -1499,8 +1502,9 @@ newPolyBndrs dest_lvl
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> Maybe JoinArity     -- Its join arity, if it is a join point
+          -> Bool                -- True <=> the RHS looks like (makeStatic ...)
           -> LvlM Id
-newLvlVar lvld_rhs join_arity_maybe
+newLvlVar lvld_rhs join_arity_maybe is_mk_static
   = do { uniq <- getUniqueM
        ; return (add_join_info (mk_id uniq rhs_ty))
        }
@@ -1511,8 +1515,7 @@ newLvlVar lvld_rhs join_arity_maybe
 
     mk_id uniq rhs_ty
       -- See Note [Grand plan for static forms] in StaticPtrTable.
-      | isJust $ collectMakeStaticArgs $ snd $
-        collectTyBinders de_tagged_rhs
+      | is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
