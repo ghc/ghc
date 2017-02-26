@@ -191,9 +191,9 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes
        ; let tidy_env = tidyFreeTyCoVars env0 free_tvs
              free_tvs = tyCoVarsOfWCList wanted
 
-       ; traceTc "reportUnsolved (after zonking and tidying):" $
-         vcat [ pprTyVars free_tvs
-              , ppr wanted ]
+       ; traceTc "reportUnsolved (after zonking):" $
+         vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
+              , text "Wanted:" <+> ppr wanted ]
 
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
        ; let err_ctxt = CEC { cec_encl  = []
@@ -335,8 +335,8 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
                      -- certainly be un-satisfied constraints
 
   | otherwise
-  = do { reportWanteds ctxt' tc_lvl wanted
-       ; traceTc "reportImplic" (ppr implic)
+  = do { traceTc "reportImplic" (ppr implic')
+       ; reportWanteds ctxt' tc_lvl wanted
        ; when (cec_warn_redundant ctxt) $
          warnRedundantConstraints ctxt' tcl_env info' dead_givens }
   where
