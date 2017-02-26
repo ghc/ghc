@@ -47,7 +47,8 @@ test('T2762',
      [# peak_megabytes_allocated is 2 with 7.0.2.
       # Was 57 with 6.12.3.
       # 2016-08-31:     3 (allocation area size bumped to 1MB)
-      stats_num_field('peak_megabytes_allocated', (3, 0)),
+      # 2017-02-26:     2 (it's not entirely clear)
+      stats_num_field('peak_megabytes_allocated', (2, 0)),
       only_ways(['normal']),
       extra_clean(['T2762A.hi', 'T2762A.o'])],
      compile_and_run, ['-O'])
