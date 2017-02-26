@@ -504,13 +504,11 @@ for example).
 
     There's one other gotcha to bear in mind when using external
     libraries: if the library contains a ``main()`` function, then this
-    will be linked in preference to GHC's own ``main()`` function (eg.
-    ``libf2c`` and ``libl`` have their own ``main()``\ s). This is
-    because GHC's ``main()`` comes from the ``HSrts`` library, which is
-    normally included *after* all the other libraries on the linker's
-    command line. To force GHC's ``main()`` to be used in preference to
-    any other ``main()``\ s from external libraries, just add the option
-    ``-lHSrts`` before any other libraries on the command line.
+    will be a link conflict with GHC's own ``main()`` function (eg.
+    ``libf2c`` and ``libl`` have their own ``main()``\ s).
+    
+    You can use a extern main function if you initiallize the RTS manually
+    and pass ``-no-hs-main``. See also :ref:`using-own-main`.
 
 .. ghc-flag:: -c
 
