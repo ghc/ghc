@@ -1,6 +1,16 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TupleSections #-}
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 -----------------------------------------------------------------------------
 -- |
@@ -43,6 +53,12 @@ module GHC.PackageDb (
        BinaryStringRep(..),
        DbUnitIdModuleRep(..),
        emptyInstalledPackageInfo,
+       PackageDbLock,
+       lockPackageDb,
+       unlockPackageDb,
+       DbMode(..),
+       DbOpenMode(..),
+       isDbOpenReadMode,
        readPackageDbForGhc,
        readPackageDbForGhcPkg,
        writePackageDb
@@ -53,6 +69,8 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BS.Char8
 import qualified Data.ByteString.Lazy as BS.Lazy
 import qualified Data.ByteString.Lazy.Internal as BS.Lazy (defaultChunkSize)
+import qualified Data.Foldable as F
+import qualified Data.Traversable as F
 import Data.Binary as Bin
 import Data.Binary.Put as Bin
 import Data.Binary.Get as Bin
@@ -62,6 +80,9 @@ import System.FilePath
 import System.IO
 import System.IO.Error
 import GHC.IO.Exception (IOErrorType(InappropriateType))
+#if MIN_VERSION_base(4,10,0)
+import GHC.IO.Handle.Lock
+#endif
 import System.Directory
 
 
@@ -185,12 +206,96 @@ emptyInstalledPackageInfo =
        trusted            = False
   }
 
+-- | Represents a lock of a package db.
+newtype PackageDbLock = PackageDbLock
+#if MIN_VERSION_base(4,10,0)
+  Handle
+#else
+  ()  -- no locking primitives available in base < 4.10
+#endif
+
+-- | Acquire an exclusive lock related to package DB under given location.
+lockPackageDb :: FilePath -> IO PackageDbLock
+
+-- | Release the lock related to package DB.
+unlockPackageDb :: PackageDbLock -> IO ()
+
+#if MIN_VERSION_base(4,10,0)
+
+-- | Acquire a lock of given type related to package DB under given location.
+lockPackageDbWith :: LockMode -> FilePath -> IO PackageDbLock
+lockPackageDbWith mode file = do
+  -- We are trying to open the lock file and then lock it. Thus the lock file
+  -- needs to either exist or we need to be able to create it. Ideally we
+  -- would not assume that the lock file always exists in advance. When we are
+  -- dealing with a package DB where we have write access then if the lock
+  -- file does not exist then we can create it by opening the file in
+  -- read/write mode. On the other hand if we are dealing with a package DB
+  -- where we do not have write access (e.g. a global DB) then we can only
+  -- open in read mode, and the lock file had better exist already or we're in
+  -- trouble. So for global read-only DBs on platforms where we must lock the
+  -- DB for reading then we will require that the installer/packaging has
+  -- included the lock file.
+  --
+  -- Thus the logic here is to first try opening in read-only mode (to handle
+  -- global read-only DBs) and if the file does not exist then try opening in
+  -- read/write mode to create the lock file. If either succeed then lock the
+  -- file. IO exceptions (other than the first open attempt failing due to the
+  -- file not existing) simply propagate.
+  catchJust
+    (\e -> if isDoesNotExistError e then Just () else Nothing)
+    (lockFileOpenIn ReadMode)
+    (const $ lockFileOpenIn ReadWriteMode)
+  where
+    lock = file <.> "lock"
+
+    lockFileOpenIn io_mode = bracketOnError
+      (openBinaryFile lock io_mode)
+      hClose
+      -- If file locking support is not available, ignore the error and proceed
+      -- normally. Without it the only thing we lose on non-Windows platforms is
+      -- the ability to safely issue concurrent updates to the same package db.
+      $ \hnd -> do hLock hnd mode `catch` \FileLockingNotSupported -> return ()
+                   return $ PackageDbLock hnd
+
+lockPackageDb = lockPackageDbWith ExclusiveLock
+unlockPackageDb (PackageDbLock hnd) = hClose hnd
+
+-- MIN_VERSION_base(4,10,0)
+#else
+
+lockPackageDb _file = return $ PackageDbLock ()
+unlockPackageDb _lock = return ()
+
+-- MIN_VERSION_base(4,10,0)
+#endif
+
+-- | Mode to open a package db in.
+data DbMode = DbReadOnly | DbReadWrite
+
+-- | 'DbOpenMode' holds a value of type @t@ but only in 'DbReadWrite' mode.  So
+-- it is like 'Maybe' but with a type argument for the mode to enforce that the
+-- mode is used consistently.
+data DbOpenMode (mode :: DbMode) t where
+  DbOpenReadOnly  ::      DbOpenMode 'DbReadOnly t
+  DbOpenReadWrite :: t -> DbOpenMode 'DbReadWrite t
+
+deriving instance Functor (DbOpenMode mode)
+deriving instance F.Foldable (DbOpenMode mode)
+deriving instance F.Traversable (DbOpenMode mode)
+
+isDbOpenReadMode :: DbOpenMode mode t -> Bool
+isDbOpenReadMode = \case
+  DbOpenReadOnly    -> True
+  DbOpenReadWrite{} -> False
+
 -- | Read the part of the package DB that GHC is interested in.
 --
 readPackageDbForGhc :: RepInstalledPackageInfo a b c d e f g =>
                        FilePath -> IO [InstalledPackageInfo a b c d e f g]
 readPackageDbForGhc file =
-    decodeFromFile file getDbForGhc
+  decodeFromFile file DbOpenReadOnly getDbForGhc >>= \case
+    (pkgs, DbOpenReadOnly) -> return pkgs
   where
     getDbForGhc = do
       _version    <- getHeader
@@ -205,9 +310,14 @@ readPackageDbForGhc file =
 -- is not defined in this package. This is because ghc-pkg uses Cabal types
 -- (and Binary instances for these) which this package does not depend on.
 --
-readPackageDbForGhcPkg :: Binary pkgs => FilePath -> IO pkgs
-readPackageDbForGhcPkg file =
-    decodeFromFile file getDbForGhcPkg
+-- If we open the package db in read only mode, we get its contents. Otherwise
+-- we additionally receive a PackageDbLock that represents a lock on the
+-- database, so that we can safely update it later.
+--
+readPackageDbForGhcPkg :: Binary pkgs => FilePath -> DbOpenMode mode t ->
+                          IO (pkgs, DbOpenMode mode PackageDbLock)
+readPackageDbForGhcPkg file mode =
+    decodeFromFile file mode getDbForGhcPkg
   where
     getDbForGhcPkg = do
       _version    <- getHeader
@@ -221,9 +331,10 @@ readPackageDbForGhcPkg file =
 -- | Write the whole of the package DB, both parts.
 --
 writePackageDb :: (Binary pkgs, RepInstalledPackageInfo a b c d e f g) =>
-                  FilePath -> [InstalledPackageInfo a b c d e f g] -> pkgs -> IO ()
+                  FilePath -> [InstalledPackageInfo a b c d e f g] ->
+                  pkgs -> IO ()
 writePackageDb file ghcPkgs ghcPkgPart =
-    writeFileAtomic file (runPut putDbForGhcPkg)
+  writeFileAtomic file (runPut putDbForGhcPkg)
   where
     putDbForGhcPkg = do
         putHeader
@@ -279,11 +390,28 @@ headerMagic = BS.Char8.pack "\0ghcpkg\0"
 
 -- | Feed a 'Get' decoder with data chunks from a file.
 --
-decodeFromFile :: FilePath -> Get a -> IO a
-decodeFromFile file decoder =
-    withBinaryFile file ReadMode $ \hnd ->
-      feed hnd (runGetIncremental decoder)
+decodeFromFile :: FilePath -> DbOpenMode mode t -> Get pkgs ->
+                  IO (pkgs, DbOpenMode mode PackageDbLock)
+decodeFromFile file mode decoder = case mode of
+  DbOpenReadOnly -> do
+  -- When we open the package db in read only mode, there is no need to acquire
+  -- shared lock on non-Windows platform because we update the database with an
+  -- atomic rename, so readers will always see the database in a consistent
+  -- state.
+#if MIN_VERSION_base(4,10,0) && defined(mingw32_HOST_OS)
+    bracket (lockPackageDbWith SharedLock file) unlockPackageDb $ \_ -> do
+#endif
+      (, DbOpenReadOnly) <$> decodeFileContents
+  DbOpenReadWrite{} -> do
+    -- When we open the package db in read/write mode, acquire an exclusive lock
+    -- on the database and return it so we can keep it for the duration of the
+    -- update.
+    bracketOnError (lockPackageDb file) unlockPackageDb $ \lock -> do
+      (, DbOpenReadWrite lock) <$> decodeFileContents
   where
+    decodeFileContents = withBinaryFile file ReadMode $ \hnd ->
+      feed hnd (runGetIncremental decoder)
+
     feed hnd (Partial k)  = do chunk <- BS.hGet hnd BS.Lazy.defaultChunkSize
                                if BS.null chunk
                                  then feed hnd (k Nothing)

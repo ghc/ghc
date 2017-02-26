@@ -18,13 +18,13 @@
 module GHC.IO.Handle.FD ( 
   stdin, stdout, stderr,
   openFile, openBinaryFile, openFileBlocking,
-  mkHandleFromFD, fdToHandle, fdToHandle',
-  isEOF
+  mkHandleFromFD, fdToHandle, fdToHandle', handleToFd
  ) where
 
 import GHC.Base
 import GHC.Show
 import Data.Maybe
+import Data.Typeable
 import Foreign.C.Types
 import GHC.MVar
 import GHC.IO
@@ -32,7 +32,6 @@ import GHC.IO.Encoding
 import GHC.IO.Device as IODevice
 import GHC.IO.Exception
 import GHC.IO.IOMode
-import GHC.IO.Handle
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
 import qualified GHC.IO.FD as FD
@@ -103,15 +102,6 @@ setBinaryMode _ = return ()
 foreign import ccall unsafe "__hscore_setmode"
   setmode :: CInt -> Bool -> IO CInt
 #endif
-
--- ---------------------------------------------------------------------------
--- isEOF
-
--- | The computation 'isEOF' is identical to 'hIsEOF',
--- except that it works only on 'stdin'.
-
-isEOF :: IO Bool
-isEOF = hIsEOF stdin
 
 -- ---------------------------------------------------------------------------
 -- Opening and Closing Files
@@ -199,7 +189,7 @@ openFile' filepath iomode binary non_blocking = do
 
 
 -- ---------------------------------------------------------------------------
--- Converting file descriptors to Handles
+-- Converting file descriptors from/to Handles
 
 mkHandleFromFD
    :: FD.FD
@@ -282,6 +272,21 @@ fdToHandle fdint = do
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
    mkHandleFromFD fd fd_type fd_str iomode False{-non-block-} 
                   Nothing -- bin mode
+
+-- | Turn an existing Handle into a file descriptor. This function throws an
+-- IOError if the Handle does not reference a file descriptor.
+handleToFd :: Handle -> IO FD.FD
+handleToFd h = case h of
+  FileHandle _ mv -> do
+    Handle__{haDevice = dev} <- readMVar mv
+    case cast dev of
+      Just fd -> return fd
+      Nothing -> throwErr "not a file descriptor"
+  DuplexHandle{} -> throwErr "not a file handle"
+  where
+    throwErr msg = ioException $ IOError (Just h)
+      InappropriateType "handleToFd" msg Nothing Nothing
+
 
 -- ---------------------------------------------------------------------------
 -- Are files opened by default in text or binary mode, if the user doesn't

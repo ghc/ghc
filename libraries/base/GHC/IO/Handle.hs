@@ -26,11 +26,13 @@ module GHC.IO.Handle (
 
    mkFileHandle, mkDuplexHandle,
 
-   hFileSize, hSetFileSize, hIsEOF, hLookAhead,
+   hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead,
    hSetBuffering, hSetBinaryMode, hSetEncoding, hGetEncoding,
    hFlush, hFlushAll, hDuplicate, hDuplicateTo,
 
    hClose, hClose_help,
+
+   LockMode(..), hLock, hTryLock,
 
    HandlePosition, HandlePosn(..), hGetPosn, hSetPosn,
    SeekMode(..), hSeek, hTell,
@@ -54,6 +56,8 @@ import GHC.IO.Encoding
 import GHC.IO.Buffer
 import GHC.IO.BufferedIO ( BufferedIO )
 import GHC.IO.Device as IODevice
+import GHC.IO.Handle.FD
+import GHC.IO.Handle.Lock
 import GHC.IO.Handle.Types
 import GHC.IO.Handle.Internals
 import GHC.IO.Handle.Text
@@ -160,6 +164,15 @@ hIsEOF handle = wantReadableHandle_ "hIsEOF" handle $ \Handle__{..} -> do
      then return True
      else do writeIORef haByteBuffer bbuf'
              return False
+
+-- ---------------------------------------------------------------------------
+-- isEOF
+
+-- | The computation 'isEOF' is identical to 'hIsEOF',
+-- except that it works only on 'stdin'.
+
+isEOF :: IO Bool
+isEOF = hIsEOF stdin
 
 -- ---------------------------------------------------------------------------
 -- Looking ahead

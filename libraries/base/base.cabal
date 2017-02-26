@@ -244,6 +244,7 @@ Library
         GHC.IO.Handle
         GHC.IO.Handle.FD
         GHC.IO.Handle.Internals
+        GHC.IO.Handle.Lock
         GHC.IO.Handle.Text
         GHC.IO.Handle.Types
         GHC.IO.IOMode
