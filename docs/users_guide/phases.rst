@@ -507,7 +507,7 @@ for example).
     will be a link conflict with GHC's own ``main()`` function (eg.
     ``libf2c`` and ``libl`` have their own ``main()``\ s).
     
-    You can use a extern main function if you initiallize the RTS manually
+    You can use an external main function if you initialize the RTS manually
     and pass ``-no-hs-main``. See also :ref:`using-own-main`.
 
 .. ghc-flag:: -c
