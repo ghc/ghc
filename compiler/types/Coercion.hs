@@ -108,7 +108,6 @@ module Coercion (
 
 import TyCoRep
 import Type
-import Kind
 import TyCon
 import CoAxiom
 import Var
@@ -116,14 +115,12 @@ import VarEnv
 import Name hiding ( varName )
 import Util
 import BasicTypes
-import FastString
 import Outputable
 import Unique
 import Pair
 import SrcLoc
 import PrelNames
 import TysPrim          ( eqPhantPrimTyCon )
-import {-# SOURCE #-} TysWiredIn ( constraintKind )
 import ListSetOps
 import Maybes
 import UniqFM
@@ -404,45 +401,14 @@ mkHeteroCoercionType Nominal          = mkHeteroPrimEqPred
 mkHeteroCoercionType Representational = mkHeteroReprPrimEqPred
 mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
 
-constraintIsLifted :: CoAxiomRule
-constraintIsLifted =
-    CoAxiomRule { coaxrName = mkFastString "constraintIsLifted"
-                , coaxrAsmpRoles = []
-                , coaxrRole = Nominal
-                , coaxrProves =
-                      const $ Just $ Pair constraintKind liftedTypeKind
-                }
-
 -- | Given a coercion @co1 :: (a :: TYPE r1) ~ (b :: TYPE r2)@,
 -- produce a coercion @rep_co :: r1 ~ r2@.
 mkRuntimeRepCo :: Coercion -> Coercion
 mkRuntimeRepCo co
-    -- This is currently a bit tricky since we can see types of kind Constraint
-    -- in addition to the usual things of kind (TYPE rep). We first map
-    -- Constraint-kinded types to (TYPE 'LiftedRep).
-    -- FIXME: this is terrible
-  | isConstraintKind a && isConstraintKind b
-  = mkNthCo 0 $ constraintToLifted
-  $ mkSymCo $ constraintToLifted $ mkSymCo kind_co
-
-  | isConstraintKind a
-  = WARN( True, text "mkRuntimeRepCo" )
-    mkNthCo 0
-  $ mkSymCo $ constraintToLifted $ mkSymCo kind_co
-
-  | isConstraintKind b
-  = WARN( True, text "mkRuntimeRepCo" )
-    mkNthCo 0 $ constraintToLifted kind_co
-
-  | otherwise
   = mkNthCo 0 kind_co
   where
-    -- the right side of a coercion from Constraint to TYPE 'LiftedRep
-    constraintToLifted = (`mkTransCo` mkAxiomRuleCo constraintIsLifted [])
-
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
                            -- (up to silliness with Constraint)
-    Pair a b = coercionKind kind_co  -- Pair of (TYPE r1, TYPE r2)
 
 -- | Tests if this coercion is obviously reflexive. Guaranteed to work
 -- very quickly. Sometimes a coercion can be reflexive, but not obviously
