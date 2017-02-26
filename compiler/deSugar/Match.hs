@@ -45,7 +45,8 @@ import Maybes
 import Util
 import Name
 import Outputable
-import BasicTypes ( isGenerated )
+import BasicTypes ( isGenerated, fl_value )
+import FastString
 import Unique
 import UniqDFM
 
@@ -215,6 +216,7 @@ match vars@(v:_) ty eqns    -- Eqns *can* be empty
             PgLit {}  -> matchLiterals   vars ty (subGroupOrd [(l,e) | (PgLit l, e) <- eqns])
             PgAny     -> matchVariables  vars ty (dropGroup eqns)
             PgN {}    -> matchNPats      vars ty (dropGroup eqns)
+            PgOverS {}-> matchNPats      vars ty (dropGroup eqns)
             PgNpK {}  -> matchNPlusKPats vars ty (dropGroup eqns)
             PgBang    -> matchBangs      vars ty (dropGroup eqns)
             PgCo {}   -> matchCoercion   vars ty (dropGroup eqns)
@@ -847,8 +849,10 @@ data PatGroup
   | PgCon DataCon       -- Constructor patterns (incl list, tuple)
   | PgSyn PatSyn [Type] -- See Note [Pattern synonym groups]
   | PgLit Literal       -- Literal patterns
-  | PgN   Literal       -- Overloaded literals
-  | PgNpK Literal       -- n+k patterns
+  | PgN   Rational      -- Overloaded numeric literals;
+                        -- see Note [Don't use Literal for PgN]
+  | PgOverS FastString  -- Overloaded string literals
+  | PgNpK Integer       -- n+k patterns
   | PgBang              -- Bang patterns
   | PgCo Type           -- Coercion patterns; the type is the type
                         --      of the pattern *inside*
@@ -856,6 +860,26 @@ data PatGroup
                         -- the LHsExpr is the expression e
            Type         -- the Type is the type of p (equivalently, the result type of e)
   | PgOverloadedList
+
+{- Note [Don't use Literal for PgN]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Previously we had, as PatGroup constructors
+
+  | ...
+  | PgN   Literal       -- Overloaded literals
+  | PgNpK Literal       -- n+k patterns
+  | ...
+
+But Literal is really supposed to represent an *unboxed* literal, like Int#.
+We were sticking the literal from, say, an overloaded numeric literal pattern
+into a MachInt constructor. This didn't really make sense; and we now have
+the invariant that value in a MachInt must be in the range of the target
+machine's Int# type, and an overloaded literal could meaningfully be larger.
+
+Solution: For pattern grouping purposes, just store the literal directly in
+the PgN constructor as a Rational if numeric, and add a PgOverStr constructor
+for overloaded strings.
+-}
 
 groupEquations :: DynFlags -> [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- If the result is of form [g1, g2, g3],
@@ -937,6 +961,7 @@ sameGroup (PgSyn p1 t1) (PgSyn p2 t2) = p1==p2 && eqTypes t1 t2
                                                 -- eqTypes: See Note [Pattern synonym groups]
 sameGroup (PgLit _)     (PgLit _)     = True    -- One case expression
 sameGroup (PgN l1)      (PgN l2)      = l1==l2  -- Order is significant
+sameGroup (PgOverS s1)  (PgOverS s2)  = s1==s2
 sameGroup (PgNpK l1)    (PgNpK l2)    = l1==l2  -- See Note [Grouping overloaded literal patterns]
 sameGroup (PgCo t1)     (PgCo t2)     = t1 `eqType` t2
         -- CoPats are in the same goup only if the type of the
@@ -1066,8 +1091,18 @@ patGroup _ (ConPatOut { pat_con = L _ con
  | PatSynCon psyn <- con                = PgSyn psyn tys
 patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
-patGroup _ (NPat (L _ olit) mb_neg _ _) = PgN   (hsOverLitKey olit (isJust mb_neg))
-patGroup _ (NPlusKPat _ (L _ olit) _ _ _ _)= PgNpK (hsOverLitKey olit False)
+patGroup _ (NPat (L _ OverLit {ol_val=oval}) mb_neg _ _) =
+  case (oval, isJust mb_neg) of
+   (HsIntegral _ i, False) -> PgN (fromInteger i)
+   (HsIntegral _ i, True ) -> PgN (-fromInteger i)
+   (HsFractional r, False) -> PgN (fl_value r)
+   (HsFractional r, True ) -> PgN (-fl_value r)
+   (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
+                          PgOverS s
+patGroup _ (NPlusKPat _ (L _ OverLit {ol_val=oval}) _ _ _ _) =
+  case oval of
+   HsIntegral _ i -> PgNpK i
+   _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))
 patGroup _ (ListPat _ _ (Just _))       = PgOverloadedList
