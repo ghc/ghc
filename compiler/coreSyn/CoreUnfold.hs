@@ -534,6 +534,11 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
               pairs
 
     size_up (Case e _ _ alts)
+        | null alts
+        = size_up e    -- case e of {} never returns, so take size of scrutinee
+
+    size_up (Case e _ _ alts)
+        -- Now alts is non-empty
         | Just v <- is_top_arg e -- We are scrutinising an argument variable
         = let
             alt_sizes = map size_up_alt alts
@@ -558,8 +563,8 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
 
             alts_size tot_size _ = tot_size
           in
-          alts_size (foldr addAltSize sizeZero alt_sizes)
-                    (foldr maxSize    sizeZero alt_sizes)
+          alts_size (foldr1 addAltSize alt_sizes)  -- alts is non-empty
+                    (foldr1 maxSize    alt_sizes)
                 -- Good to inline if an arg is scrutinised, because
                 -- that may eliminate allocation in the caller
                 -- And it eliminates the case itself
@@ -763,6 +768,7 @@ funSize dflags top_args fun n_val_args voids
     res_discount | idArity fun > n_val_args = ufFunAppDiscount dflags
                  | otherwise                = 0
         -- If the function is partially applied, show a result discount
+-- XXX maybe behave like ConSize for eval'd varaible
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args
@@ -773,6 +779,8 @@ conSize dc n_val_args
 
 -- See Note [Constructor size and result discount]
   | otherwise = SizeIs 10 emptyBag (10 * (1 + n_val_args))
+
+-- XXX still looks to large to me
 
 {-
 Note [Constructor size and result discount]
