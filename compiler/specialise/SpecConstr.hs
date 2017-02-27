@@ -41,7 +41,8 @@ import VarEnv
 import VarSet
 import Name
 import BasicTypes
-import DynFlags         ( DynFlags(..), hasPprDebug )
+import DynFlags         ( DynFlags(..), GeneralFlag( Opt_SpecConstrKeen )
+                        , gopt, hasPprDebug )
 import Maybes           ( orElse, catMaybes, isJust, isNothing )
 import Demand
 import GHC.Serialized   ( deserializeWithData )
@@ -447,7 +448,6 @@ breaks an invariant.
 
 Note [Forcing specialisation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 With stream fusion and in other similar cases, we want to fully
 specialise some (but not necessarily all!) loops regardless of their
 size and the number of specialisations.
@@ -754,6 +754,39 @@ into a work-free value again, thus
    a'_shr = (a1, x_af7)
 but that's more work, so until its shown to be important I'm going to
 leave it for now.
+
+Note [Making SpecConstr keener]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this, in (perf/should_run/T9339)
+   last (filter odd [1..1000])
+
+After optimisation, including SpecConstr, we get:
+   f :: Int# -> Int -> Int
+   f x y = case case remInt# x 2# of
+             __DEFAULT -> case x of
+                            __DEFAULT -> f (+# wild_Xp 1#) (I# x)
+                            1000000# -> ...
+             0# -> case x of
+                     __DEFAULT -> f (+# wild_Xp 1#) y
+                    1000000#   -> y
+
+Not good!  We build an (I# x) box every time around the loop.
+SpecConstr (as described in the paper) does not specialise f, despite
+the call (f ... (I# x)) because 'y' is not scrutinied in the body.
+But it is much better to specialise f for the case where the argument
+is of form (I# x); then we build the box only when returning y, which
+is on the cold path.
+
+Another exmaple:
+
+   f x = ...(g x)....
+
+Here 'x' is not scrutinised in f's body; but if we did specialise 'f'
+then the call (g x) might allow 'g' to be specialised in turn.
+
+So sc_keen controls whether or not we take account of whether argument is
+scrutinised in the body.  True <=> ignore that, and speicalise whenever
+the function is applied to a data constructor.
 -}
 
 data ScEnv = SCE { sc_dflags    :: DynFlags,
@@ -764,6 +797,11 @@ data ScEnv = SCE { sc_dflags    :: DynFlags,
 
                    sc_recursive :: Int,         -- Max # of specialisations over recursive type.
                                                 -- Stops ForceSpecConstr from diverging.
+
+                   sc_keen     :: Bool,         -- Specialise on arguments that are known
+                                                -- constructors, even if they are not
+                                                -- scrutinised in the body.  See
+                                                -- Note [Making SpecConstr keener]
 
                    sc_force     :: Bool,        -- Force specialisation?
                                                 -- See Note [Forcing specialisation]
@@ -807,6 +845,7 @@ initScEnv dflags this_mod anns
           sc_size        = specConstrThreshold dflags,
           sc_count       = specConstrCount     dflags,
           sc_recursive   = specConstrRecursive dflags,
+          sc_keen        = gopt Opt_SpecConstrKeen dflags,
           sc_force       = False,
           sc_subst       = emptySubst,
           sc_how_bound   = emptyVarEnv,
@@ -1976,11 +2015,12 @@ argToPat env in_scope val_env arg arg_occ
                   mkConApp dc (ty_args ++ args')) }
   where
     mb_scrut dc = case arg_occ of
-                    ScrutOcc bs
-                           | Just occs <- lookupUFM bs dc
-                                          -> Just (occs)  -- See Note [Reboxing]
-                    _other | sc_force env -> Just (repeat UnkOcc)
-                           | otherwise    -> Nothing
+                    ScrutOcc bs | Just occs <- lookupUFM bs dc
+                                -> Just (occs)  -- See Note [Reboxing]
+                    _other      | sc_force env || sc_keen env
+                                -> Just (repeat UnkOcc)
+                                | otherwise
+                                -> Nothing
 
   -- Check if the argument is a variable that
   --    (a) is used in an interesting way in the function body
@@ -1989,6 +2029,9 @@ argToPat env in_scope val_env arg arg_occ
 argToPat env in_scope val_env (Var v) arg_occ
   | sc_force env || case arg_occ of { UnkOcc -> False; _other -> True }, -- (a)
     is_value,                                                            -- (b)
+       -- Ignoring sc_keen here to avoid gratuitously incurring Note [Reboxing]
+       -- So sc_keen focused just on f (I# x), where we have freshly-allocated
+       -- box that we can eliminate in the caller
     not (ignoreType env (varType v))
   = return (True, Var v)
   where

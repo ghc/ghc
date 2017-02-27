@@ -522,7 +522,7 @@ list.
 
     Turn on call-pattern specialisation; see `Call-pattern specialisation for
     Haskell programs
-    <http://research.microsoft.com/en-us/um/people/simonpj/papers/spec-constr/index.htm>`__.
+    <https://www.microsoft.com/en-us/research/publication/system-f-with-type-equality-coercions-2/>`__.
 
     This optimisation specializes recursive functions according to their
     argument "shapes". This is best explained by example so consider: ::
@@ -579,6 +579,16 @@ list.
     In particular, after inlining this will expose ``f`` to the loop
     body directly, allowing heavy specialisation over the recursive
     cases.
+
+.. ghc-flag:: -fspec-constr-keen
+
+    :default: off
+
+    If this flag is on, call-patten specialision will specialise a call
+    ``(f (Just x))`` with an explicit constructor agument, even if the argument
+    is not scrutinised in the body of the function. This is sometimes
+    beneficial; e.g. the argument might be given to some other function
+    that can itself be specialised.
 
 .. ghc-flag:: -fspec-constr-count=<n>
 

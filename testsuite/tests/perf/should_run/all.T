@@ -462,7 +462,9 @@ test('T9339',
                       # 2016-08-17:          50728 Join points (#12988)
       only_ways(['normal'])],
      compile_and_run,
-     ['-O2'])
+     ['-O2 -fspec-constr-keen'])
+     # For the -fspec-constr-keen see Note [Making SpecConstr keener] in SpecConstr
+
 
 test('T8472',
      [stats_num_field('bytes allocated',
