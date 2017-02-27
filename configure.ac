@@ -946,6 +946,31 @@ AC_TRY_LINK_FUNC(printf\$LDBLStub,
             [Define to 1 if we have printf$LDBLStub (Apple Mac OS >= 10.4, PPC).])
     ])
 
+dnl Some platforms (e.g. Android's Bionic) have pthreads support available
+dnl without linking against libpthread. Check whether -lpthread is necessary
+dnl to use pthreads.
+dnl
+dnl Note that it is important that this happens before we AC_CHECK_LIB(thread)
+AC_MSG_CHECKING(whether -lpthread is needed for pthreads)
+AC_CHECK_FUNC(pthread_create,
+    [
+        AC_MSG_RESULT(no)
+        need_lpthread=0
+    ],
+    [
+        AC_CHECK_LIB(pthread, pthread_create,
+            [
+                AC_MSG_RESULT(yes)
+                need_lpthread=1
+            ],
+            [
+                AC_MSG_RESULT([no pthreads support found.])
+                need_lpthread=0
+            ])
+    ])
+AC_DEFINE_UNQUOTED([NEED_PTHREAD_LIB], [$need_lpthread],
+    [Define 1 if we need to link code using pthreads with -lpthread])
+
 dnl ** pthread_setname_np is a recent addition to glibc, and OS X has
 dnl    a different single-argument version.
 AC_CHECK_LIB(pthread, pthread_setname_np)
