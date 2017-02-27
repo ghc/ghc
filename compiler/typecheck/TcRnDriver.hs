@@ -1000,78 +1000,26 @@ checkBootTyCon is_boot tc1 tc2
     checkRoles roles1 roles2 `andThenCheck`
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
 
-  -- An abstract TyCon can be implemented using a type synonym, but ONLY
-  -- if the type synonym is nullary and has no type family applications.
-  -- This arises from two properties of skolem abstract data:
-  --
-  --    For any T (with some number of paramaters),
-  --
-  --    1. T is a valid type (it is "curryable"), and
-  --
-  --    2. T is valid in an instance head (no type families).
-  --
-  -- See also 'HowAbstract' and Note [Skolem abstract data].
-  --
-  | isAbstractTyCon tc1
-  , not is_boot -- don't support for hs-boot yet
+  -- This allows abstract 'data T a' to be implemented using 'type T = ...'
+  -- See Note [Synonyms implement abstract data]
+  | not is_boot -- don't support for hs-boot yet
+  , isAbstractTyCon tc1
   , Just (tvs, ty) <- synTyConDefn_maybe tc2
   , Just (tc2', args) <- tcSplitTyConApp_maybe ty
-  = check (null (tcTyFamInsts ty))
-          (text "Illegal type family application in implementation of abstract data.")
-            `andThenCheck`
-    check (null tvs)
-          (text "Illegal parameterized type synonym in implementation of abstract data." $$
-           text "(Try eta reducing your type synonym so that it is nullary.)")
-            `andThenCheck`
-    -- Don't report roles errors unless the type synonym is nullary
-    checkUnless (not (null tvs)) $
-        ASSERT( null roles2 )
-        -- If we have something like:
-        --
-        --  signature H where
-        --      data T a
-        --  module H where
-        --      data K a b = ...
-        --      type T = K Int
-        --
-        -- we need to drop the first role of K when comparing!
-        checkRoles roles1 (drop (length args) (tyConRoles tc2'))
+  = checkSynAbsData tvs ty tc2' args
 
-  -- Note [Constraint synonym implements abstract class]
-  -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-  -- This clause allows an abstract class to be implemented with a constraint
-  -- synonym. For instance, consider a signature requiring an abstract class,
-  --
-  --     signature ASig where
-  --         class K a
-  --
-  -- Since K has no methods (i.e. is abstract), the module implementing this
-  -- signature may want to implement it using a constraint synonym of another
-  -- class,
-  --
-  --     module AnImpl where
-  --         class SomeClass a where ...
-  --         type K a = SomeClass a
-  --
-  -- This was originally requested in #12679.  For now, we only allow this
-  -- in hsig files (@not is_boot@).
-
-  | not is_boot
+  -- This allows abstract 'class C a' to be implemented using 'type C = ...'
+  -- This was originally requested in #12679.
+  -- See Note [Synonyms implement abstract data]
+  | not is_boot -- don't support for hs-boot yet
   , Just c1 <- tyConClass_maybe tc1
   , let (_, _clas_fds1, sc_theta1, _, ats1, op_stuff1)
           = classExtraBigSig c1
   -- Is it abstract?
   , null sc_theta1 && null op_stuff1 && null ats1
   , Just (tvs, ty) <- synTyConDefn_maybe tc2
-  = -- The synonym may or may not be eta-expanded, so we need to
-    -- massage it into the correct form before checking if roles
-    -- match.
-    if length tvs == length roles1
-        then checkRoles roles1 roles2
-        else case tcSplitTyConApp_maybe ty of
-                Just (tc2', args) ->
-                    checkRoles roles1 (drop (length args) (tyConRoles tc2') ++ roles2)
-                Nothing -> Just roles_msg
+  , Just (tc2', args) <- tcSplitTyConApp_maybe ty
+  = checkSynAbsData tvs ty tc2' args
     -- TODO: We really should check if the fundeps are satisfied, but
     -- there is not an obvious way to do this for a constraint synonym.
     -- So for now, let it all through (it won't cause segfaults, anyway).
@@ -1131,10 +1079,11 @@ checkBootTyCon is_boot tc1 tc2
 
     -- Note [Role subtyping]
     -- ~~~~~~~~~~~~~~~~~~~~~
-    -- In the current formulation of roles, role subtyping is only OK if
-    -- the "abstract" TyCon was not injective.  Among the most notable
-    -- examples of non-injective TyCons are abstract data, which can be
-    -- implemented via newtypes (which are not injective).  The key example is
+    -- In the current formulation of roles, role subtyping is only OK if the
+    -- "abstract" TyCon was not representationally injective.  Among the most
+    -- notable examples of non representationally injective TyCons are abstract
+    -- data, which can be implemented via newtypes (which are not
+    -- representationally injective).  The key example is
     -- in this example from #13140:
     --
     --      -- In an hsig file
@@ -1147,9 +1096,9 @@ checkBootTyCon is_boot tc1 tc2
     --
     -- We must NOT allow foo to typecheck, because if we instantiate
     -- T with a concrete data type with a phantom role would cause
-    -- Coercible (T a) (T b) to be provable.  Fortunately, if T
-    -- is not injective, we cannot make the inference that a ~N b
-    -- if T a ~R T b.
+    -- Coercible (T a) (T b) to be provable.  Fortunately, if T is not
+    -- representationally injective, we cannot make the inference that a ~N b if
+    -- T a ~R T b.
     --
     -- Unconditional role subtyping would be possible if we setup
     -- an extra set of roles saying when we can project out coercions
@@ -1179,9 +1128,61 @@ checkBootTyCon is_boot tc1 tc2
     -- (i.e., a user could explicitly ask for one behavior or another) but
     -- the current role system isn't expressive enough to do this.
     -- Having explict proj-roles would solve this problem.
+
     rolesSubtypeOf [] [] = True
+    -- NB: this relation is the OPPOSITE of the subroling relation
     rolesSubtypeOf (x:xs) (y:ys) = x >= y && rolesSubtypeOf xs ys
     rolesSubtypeOf _ _ = False
+
+    -- Note [Synonyms implement abstract data]
+    -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    -- An abstract data type or class can be implemented using a type synonym,
+    -- but ONLY if the type synonym is nullary and has no type family
+    -- applications.  This arises from two properties of skolem abstract data:
+    --
+    --    For any T (with some number of paramaters),
+    --
+    --    1. T is a valid type (it is "curryable"), and
+    --
+    --    2. T is valid in an instance head (no type families).
+    --
+    -- See also 'HowAbstract' and Note [Skolem abstract data].
+
+    -- | Given @type T tvs = ty@, where @ty@ decomposes into @tc2' args@,
+    -- check that this synonym is an acceptable implementation of @tc1@.
+    -- See Note [Synonyms implement abstract data]
+    checkSynAbsData :: [TyVar] -> Type -> TyCon -> [Type] -> Maybe SDoc
+    checkSynAbsData tvs ty tc2' args =
+        check (null (tcTyFamInsts ty))
+              (text "Illegal type family application in implementation of abstract data.")
+                `andThenCheck`
+        check (null tvs)
+              (text "Illegal parameterized type synonym in implementation of abstract data." $$
+               text "(Try eta reducing your type synonym so that it is nullary.)")
+                `andThenCheck`
+        -- Don't report roles errors unless the type synonym is nullary
+        checkUnless (not (null tvs)) $
+            ASSERT( null roles2 )
+            -- If we have something like:
+            --
+            --  signature H where
+            --      data T a
+            --  module H where
+            --      data K a b = ...
+            --      type T = K Int
+            --
+            -- we need to drop the first role of K when comparing!
+            checkRoles roles1 (drop (length args) (tyConRoles tc2'))
+{-
+        -- Hypothetically, if we were allow to non-nullary type synonyms, here
+        -- is how you would check the roles
+        if length tvs == length roles1
+            then checkRoles roles1 roles2
+            else case tcSplitTyConApp_maybe ty of
+                    Just (tc2', args) ->
+                        checkRoles roles1 (drop (length args) (tyConRoles tc2') ++ roles2)
+                    Nothing -> Just roles_msg
+-}
 
     eqAlgRhs _ AbstractTyCon _rhs2
       = checkSuccess -- rhs2 is guaranteed to be injective, since it's an AlgTyCon
