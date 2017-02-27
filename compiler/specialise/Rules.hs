@@ -31,7 +31,6 @@ module Rules (
 import CoreSyn          -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
-import OccurAnal        ( occurAnalyseExpr )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
                         , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,
@@ -172,7 +171,7 @@ mkRule :: Module -> Bool -> Bool -> RuleName -> Activation
 mkRule this_mod is_auto is_local name act fn bndrs args rhs
   = Rule { ru_name = name, ru_fn = fn, ru_act = act,
            ru_bndrs = bndrs, ru_args = args,
-           ru_rhs = occurAnalyseExpr rhs,
+           ru_rhs = rhs,
            ru_rough = roughTopNames args,
            ru_origin = this_mod,
            ru_orphan = orph,
@@ -508,8 +507,7 @@ matchRule dflags rule_env _is_active fn args _rough_args
 -- Built-in rules can't be switched off, it seems
   = case match_fn dflags rule_env fn args of
         Nothing   -> Nothing
-        Just expr -> Just (occurAnalyseExpr expr)
-        -- We could do this when putting things into the rulebase, I guess
+        Just expr -> Just expr
 
 matchRule _ in_scope is_active _ args rough_args
           (Rule { ru_name = rule_name, ru_act = act, ru_rough = tpl_tops
@@ -522,8 +520,7 @@ matchRule _ in_scope is_active _ args rough_args
         Just (bind_wrapper, tpl_vals) -> Just (bind_wrapper $
                                                rule_fn `mkApps` tpl_vals)
   where
-    rule_fn = occurAnalyseExpr (mkLams tpl_vars rhs)
-        -- We could do this when putting things into the rulebase, I guess
+    rule_fn = mkLams tpl_vars rhs
 
 ---------------------------------------
 matchN  :: InScopeEnv

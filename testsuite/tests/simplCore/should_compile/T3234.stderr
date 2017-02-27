@@ -12,12 +12,15 @@
 ==================== Grand total simplifier statistics ====================
 Total ticks:     55
 
-15 PreInlineUnconditionally
+18 PreInlineUnconditionally
+  1 c
   1 n
   1 g
   1 a
   1 xs
   1 ys
+  1 c
+  1 n
   1 k
   1 z
   1 g
@@ -28,11 +31,7 @@ Total ticks:     55
   1 lvl
   1 lvl
   1 lvl
-4 PostInlineUnconditionally
-  1 c
-  1 n
-  1 c
-  1 c
+1 PostInlineUnconditionally 1 c
 1 UnfoldingDone 1 GHC.Base.build
 5 RuleFired
   1 ++
@@ -67,6 +66,6 @@ Total ticks:     55
   1 c
   1 n
   1 a
-11 SimplifierDone 11
+10 SimplifierDone 10
 
 

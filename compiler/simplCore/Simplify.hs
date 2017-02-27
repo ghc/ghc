@@ -15,6 +15,7 @@ import SimplMonad
 import Type hiding      ( substTy, substTyVar, extendTvSubst, extendCvSubst )
 import SimplEnv
 import SimplUtils
+import OccurAnal        ( occurAnalyseExpr )
 import FamInstEnv       ( FamInstEnv )
 import Literal          ( litIsLifted ) --, mkMachInt ) -- temporalily commented out. See #8326
 import Id
@@ -1809,9 +1810,13 @@ tryRules env rules fn args call_cont
                 ; let cont' = pushSimplifiedArgs env
                                                  (drop (ruleArity rule) args)
                                                  call_cont
-                      -- (ruleArity rule) says how many args the rule consumed
+                              -- (ruleArity rule) says how
+                              -- many args the rule consumed
+
+                      occ_anald_rhs = occurAnalyseExpr rule_rhs
+                          -- See Note [Occurence-analyse after rule firing]
                 ; dump dflags rule rule_rhs
-                ; return (Just (rule_rhs, cont')) }}}
+                ; return (Just (occ_anald_rhs, cont')) }}}
   where
     dump dflags rule rule_rhs
       | dopt Opt_D_dump_rule_rewrites dflags
@@ -1842,7 +1847,64 @@ tryRules env rules fn args call_cont
       = liftIO . dumpSDoc dflags alwaysQualify flag "" $
                    sep [text hdr, nest 4 details]
 
-{-
+{- Note [Occurence-analyse after rule firing]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+After firing a rule, we occurrence-analyse the instantiated RHS before
+simplifying it.  Usually this doesn't make much difference, but it can
+be huge.  Here's an example (simplCore/should_compile/T7785)
+
+  map f (map f (map f xs)
+
+= -- Use build/fold form of map, twice
+  map f (build (\cn. foldr (mapFB c f) n
+                           (build (\cn. foldr (mapFB c f) n xs))))
+
+= -- Apply fold/build rule
+  map f (build (\cn. (\cn. foldr (mapFB c f) n xs) (mapFB c f) n))
+
+= -- Beta-reduce
+  -- Alas we have no occurrence-analysed, so we don't know
+  -- that c is used exactly once
+  map f (build (\cn. let c1 = mapFB c f in
+                     foldr (mapFB c1 f) n xs))
+
+= -- Use mapFB rule:   mapFB (mapFB c f) g = mapFB c (f.g)
+  -- We can do this becuase (mapFB c n) is a PAP and hence expandable
+  map f (build (\cn. let c1 = mapFB c n in
+                     foldr (mapFB c (f.f)) n x))
+
+This is not too bad.  But now do the same with the outer map, and
+we get another use of mapFB, and t can interact with /both/ remaining
+mapFB calls in the above expression.  This is stupid because actually
+that 'c1' binding is dead.  The outer map introduces another c2. If
+there is a deep stack of maps we get lots of dead bindings, and lots
+of redundant work as we repeatedly simplify the result of firing rules.
+
+The easy thing to do is simply to occurrence analyse the result of
+the rule firing.  Note that this occ-anals not only the RHS of the
+rule, but also the function arguments, which by now are OutExprs.
+E.g.
+      RULE f (g x) = x+1
+
+Call   f (g BIG)  -->   (\x. x+1) BIG
+
+The rule binders are lambda-bound and applied to the OutExpr arguments
+(here BIG) which lack all internal occurrence info.
+
+Is this inefficient?  Not really: we are about to walk over the result
+of the rule firing to simplify it, so occurrence analysis is at most
+a constant factor.
+
+Possible improvement: occ-anal the rules when putting them in the
+database; and in the simplifier just occ-anal the OutExpr arguments.
+But that's more complicated and the rule RHS is usually tiny; so I'm
+just doing the simple thing.
+
+Historical note: previously we did occ-anal the rules in Rule.hs,
+but failed to occ-anal the OutExpr arguments, which led to the
+nasty performance problem described above.
+
+
 Note [Optimising tagToEnum#]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we have an enumeration data type:
