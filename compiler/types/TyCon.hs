@@ -1652,7 +1652,7 @@ isInjectiveTyCon (AlgTyCon {algTcRhs = rhs})   Representational
 isInjectiveTyCon (SynonymTyCon {})             _                = False
 isInjectiveTyCon (FamilyTyCon { famTcFlav = DataFamilyTyCon _ })
                                                Nominal          = True
-isInjectiveTyCon (FamilyTyCon { famTcInj = Injective inj }) _   = and inj
+isInjectiveTyCon (FamilyTyCon { famTcInj = Injective inj }) Nominal = and inj
 isInjectiveTyCon (FamilyTyCon {})              _                = False
 isInjectiveTyCon (PrimTyCon {})                _                = True
 isInjectiveTyCon (PromotedDataCon {})          _                = True
