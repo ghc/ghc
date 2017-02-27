@@ -66,7 +66,6 @@ import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
 import CoreUtils        ( exprType, exprIsHNF
                         , exprOkForSpeculation
-                        , exprIsTopLevelBindable
                         , isExprLevPoly
                         , collectMakeStaticArgs
                         )
@@ -561,7 +560,7 @@ lvlMFE env strict_ctxt ann_expr
   =     -- Don't float it out
     lvlExpr env ann_expr
 
-  |  float_is_new_lam || need_join || exprIsTopLevelBindable expr expr_ty
+  |  float_is_new_lam || need_join || not (isUnliftedType expr_ty)
   || expr_ok_for_spec && not (isTopLvl dest_lvl)
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
