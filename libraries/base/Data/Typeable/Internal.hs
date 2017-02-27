@@ -40,7 +40,7 @@ module Data.Typeable.Internal (
 
     -- * Module
     Module,  -- Abstract
-    moduleName, modulePackage,
+    moduleName, modulePackage, rnfModule,
 
     -- * TyCon
     TyCon,   -- Abstract

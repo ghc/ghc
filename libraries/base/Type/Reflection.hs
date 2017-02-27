@@ -61,6 +61,10 @@ module Type.Reflection
     , I.tyConModule
     , I.tyConName
     , I.rnfTyCon
+
+      -- * Module names
+    , I.Module
+    , I.moduleName, I.modulePackage, I.rnfModule
     ) where
 
 import qualified Data.Typeable.Internal as I
