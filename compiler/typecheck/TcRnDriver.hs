@@ -1094,6 +1094,8 @@ checkBootTyCon is_boot tc1 tc2
         injInfo2 = familyTyConInjectivityInfo tc2
     in
     -- check equality of roles, family flavours and injectivity annotations
+    -- (NB: Type family roles are always nominal. But the check is
+    -- harmless enough.)
     checkRoles roles1 roles2 `andThenCheck`
     check (eqFamFlav fam_flav1 fam_flav2)
         (ifPprDebug $
@@ -1123,9 +1125,60 @@ checkBootTyCon is_boot tc1 tc2
                         text "Hsig file:" <+> ppr roles1
 
     checkRoles r1 r2
-      | is_boot   = check (r1 == r2) roles_msg
+      | is_boot || isInjectiveTyCon tc1 Representational -- See Note [Role subtyping]
+      = check (r1 == r2) roles_msg
       | otherwise = check (r2 `rolesSubtypeOf` r1) roles_subtype_msg
 
+    -- Note [Role subtyping]
+    -- ~~~~~~~~~~~~~~~~~~~~~
+    -- In the current formulation of roles, role subtyping is only OK if
+    -- the "abstract" TyCon was not injective.  Among the most notable
+    -- examples of non-injective TyCons are abstract data, which can be
+    -- implemented via newtypes (which are not injective).  The key example is
+    -- in this example from #13140:
+    --
+    --      -- In an hsig file
+    --      data T a -- abstract!
+    --      type role T nominal
+    --
+    --      -- Elsewhere
+    --      foo :: Coercible (T a) (T b) => a -> b
+    --      foo x = x
+    --
+    -- We must NOT allow foo to typecheck, because if we instantiate
+    -- T with a concrete data type with a phantom role would cause
+    -- Coercible (T a) (T b) to be provable.  Fortunately, if T
+    -- is not injective, we cannot make the inference that a ~N b
+    -- if T a ~R T b.
+    --
+    -- Unconditional role subtyping would be possible if we setup
+    -- an extra set of roles saying when we can project out coercions
+    -- (we call these proj-roles); then it would NOT be valid to instantiate T
+    -- with a data type at phantom since the proj-role subtyping check
+    -- would fail.  See #13140 for more details.
+    --
+    -- One consequence of this is we get no role subtyping for non-abstract
+    -- data types in signatures. Suppose you have:
+    --
+    --      signature A where
+    --          type role T nominal
+    --          data T a = MkT
+    --
+    -- If you write this, we'll treat T as injective, and make inferences
+    -- like T a ~R T b ==> a ~N b (mkNthCo).  But if we can
+    -- subsequently replace T with one at phantom role, we would then be able to
+    -- infer things like T Int ~R T Bool which is bad news.
+    --
+    -- We could allow role subtyping here if we didn't treat *any* data types
+    -- defined in signatures as injective.  But this would be a bit surprising,
+    -- replacing a data type in a module with one in a signature could cause
+    -- your code to stop typechecking (whereas if you made the type abstract,
+    -- it is more understandable that the type checker knows less).
+    --
+    -- It would have been best if this was purely a question of defaults
+    -- (i.e., a user could explicitly ask for one behavior or another) but
+    -- the current role system isn't expressive enough to do this.
+    -- Having explict proj-roles would solve this problem.
     rolesSubtypeOf [] [] = True
     rolesSubtypeOf (x:xs) (y:ys) = x >= y && rolesSubtypeOf xs ys
     rolesSubtypeOf _ _ = False
