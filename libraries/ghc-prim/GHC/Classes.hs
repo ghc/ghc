@@ -58,6 +58,7 @@ import GHC.Magic ()
 import GHC.IntWord64
 import GHC.Prim
 import GHC.Tuple
+import GHC.CString (unpackCString#)
 import GHC.Types
 
 #include "MachDeps.h"
@@ -170,6 +171,15 @@ instance (Eq a) => Eq [a] where
     []     == []     = True
     (x:xs) == (y:ys) = x == y && xs == ys
     _xs    == _ys    = False
+
+deriving instance Eq Module
+
+instance Eq TrName where
+    TrNameS a == TrNameS b = isTrue# (a `eqAddr#` b)
+    a == b = toString a == toString b
+      where
+        toString (TrNameS s) = unpackCString# s
+        toString (TrNameD s) = s
 
 deriving instance Eq Bool
 deriving instance Eq Ordering
