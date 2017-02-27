@@ -432,7 +432,7 @@ doCorePass CoreLiberateCase          = {-# SCC "LiberateCase" #-}
                                        doPassD liberateCase
 
 doCorePass CoreDoFloatInwards        = {-# SCC "FloatInwards" #-}
-                                       doPassD floatInwards
+                                       floatInwards
 
 doCorePass (CoreDoFloatOutwards f)   = {-# SCC "FloatOutwards" #-}
                                        doPassDUM (floatOutwards f)

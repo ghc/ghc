@@ -53,6 +53,7 @@ module CoreFVs (
         CoreBindWithFVs,        -- = AnnBind Id FVAnn
         CoreAltWithFVs,         -- = AnnAlt Id FVAnn
         freeVars,               -- CoreExpr -> CoreExprWithFVs
+        freeVarsBind,           -- CoreBind -> DVarSet -> (DVarSet, CoreBindWithFVs)
         freeVarsOf,             -- CoreExprWithFVs -> DIdSet
         freeVarsOfType,         -- CoreExprWithFVs -> TyCoVarSet
         freeVarsOfAnn, freeVarsOfTypeAnn,
@@ -701,6 +702,29 @@ stableUnfoldingFVs unf
 ************************************************************************
 -}
 
+freeVarsBind :: CoreBind
+             -> DVarSet                     -- Free vars of scope of binding
+             -> (CoreBindWithFVs, DVarSet)  -- Return free vars of binding + scope
+freeVarsBind (NonRec binder rhs) body_fvs
+  = ( AnnNonRec binder rhs2
+    , freeVarsOf rhs2 `unionFVs` body_fvs2
+                      `unionFVs` fvDVarSet (bndrRuleAndUnfoldingFVs binder) )
+    where
+      rhs2      = freeVars rhs
+      body_fvs2 = binder `delBinderFV` body_fvs
+
+freeVarsBind (Rec binds) body_fvs
+  = ( AnnRec (binders `zip` rhss2)
+    , delBindersFV binders all_fvs )
+  where
+    (binders, rhss) = unzip binds
+    rhss2        = map freeVars rhss
+    rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
+    binders_fvs  = fvDVarSet $ mapUnionFV idRuleAndUnfoldingFVs binders
+    all_fvs      = rhs_body_fvs `unionFVs` binders_fvs
+            -- The "delBinderFV" happens after adding the idSpecVars,
+            -- since the latter may add some of the binders as fvs
+
 freeVars :: CoreExpr -> CoreExprWithFVs
 -- ^ Annotate a 'CoreExpr' with its (non-global) free type and value variables at every tree node
 freeVars = go
@@ -761,37 +785,14 @@ freeVars = go
                               where
                                  rhs2 = go rhs
 
-    go (Let (NonRec binder rhs) body)
-      = ( FVAnn { fva_fvs    = freeVarsOf rhs2
-                               `unionFVs` body_fvs
-                               `unionFVs` fvDVarSet
-                                            (bndrRuleAndUnfoldingFVs binder)
-                               -- Remember any rules; cf rhs_fvs above
+    go (Let bind body)
+      = ( FVAnn { fva_fvs    = bind_fvs
                 , fva_ty_fvs = freeVarsOfType body2
                 , fva_ty     = exprTypeFV body2 }
-        , AnnLet (AnnNonRec binder rhs2) body2 )
+        , AnnLet bind2 body2 )
       where
-        rhs2     = go rhs
-        body2    = go body
-        body_fvs = binder `delBinderFV` freeVarsOf body2
-
-    go (Let (Rec binds) body)
-      = ( FVAnn { fva_fvs    = delBindersFV binders all_fvs
-                , fva_ty_fvs = freeVarsOfType body2
-                , fva_ty     = exprTypeFV body2 }
-        , AnnLet (AnnRec (binders `zip` rhss2)) body2 )
-      where
-        (binders, rhss) = unzip binds
-
-        rhss2        = map go rhss
-        rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
-        binders_fvs  = fvDVarSet $ mapUnionFV idRuleAndUnfoldingFVs binders
-        all_fvs      = rhs_body_fvs `unionFVs` binders_fvs
-            -- The "delBinderFV" happens after adding the idSpecVars,
-            -- since the latter may add some of the binders as fvs
-
-        body2    = go body
-        body_fvs = freeVarsOf body2
+        (bind2, bind_fvs) = freeVarsBind bind (freeVarsOf body2)
+        body2             = go body
 
     go (Cast expr co)
       = ( FVAnn (freeVarsOf expr2 `unionFVs` cfvs) (tyCoVarsOfTypeDSet to_ty) to_ty

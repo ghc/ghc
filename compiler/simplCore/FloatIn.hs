@@ -20,17 +20,19 @@ module FloatIn ( floatInwards ) where
 
 import CoreSyn
 import MkCore
+import HscTypes         ( ModGuts(..) )
 import CoreUtils        ( exprIsDupable, exprIsExpandable,
                           exprOkForSideEffects, mkTicks )
 import CoreFVs
-import Id               ( isJoinId, isJoinId_maybe, isOneShotBndr, idType )
+import CoreMonad        ( CoreM )
+import Id               ( isOneShotBndr, idType )
 import Var
 import Type             ( isUnliftedType )
 import VarSet
 import Util
 import DynFlags
 import Outputable
-import Data.List( mapAccumL )
+import Data.List        ( mapAccumL )
 import BasicTypes       ( RecFlag(..), isRec )
 
 {-
@@ -38,13 +40,16 @@ Top-level interface function, @floatInwards@.  Note that we do not
 actually float any bindings downwards from the top-level.
 -}
 
-floatInwards :: DynFlags -> CoreProgram -> CoreProgram
-floatInwards dflags = map fi_top_bind
+floatInwards :: ModGuts -> CoreM ModGuts
+floatInwards pgm@(ModGuts { mg_binds = binds })
+  = do { dflags <- getDynFlags
+       ; return (pgm { mg_binds = map (fi_top_bind dflags) binds }) }
   where
-    fi_top_bind (NonRec binder rhs)
+    fi_top_bind dflags (NonRec binder rhs)
       = NonRec binder (fiExpr dflags [] (freeVars rhs))
-    fi_top_bind (Rec pairs)
+    fi_top_bind dflags (Rec pairs)
       = Rec [ (b, fiExpr dflags [] (freeVars rhs)) | (b, rhs) <- pairs ]
+
 
 {-
 ************************************************************************
@@ -196,7 +201,6 @@ unlifted function arguments to be ok-for-speculation.
 
 Note [Join points]
 ~~~~~~~~~~~~~~~~~~
-
 Generally, we don't need to worry about join points - there are places we're
 not allowed to float them, but since they can't have occurrences in those
 places, we're not tempted.
@@ -334,77 +338,13 @@ idRuleAndUnfoldingVars of x.  No need for type variables, hence not using
 idFreeVars.
 -}
 
-fiExpr dflags to_drop (_,AnnLet (AnnNonRec id rhs) body)
-  = fiExpr dflags new_to_drop body
+fiExpr dflags to_drop (_,AnnLet bind body)
+  = fiExpr dflags (after ++ new_float : before) body
+           -- to_drop is in reverse dependency order
   where
-    body_fvs = freeVarsOf body `delDVarSet` id
-    rhs_fvs  = freeVarsOf rhs
-
-    rule_fvs = idRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
-    extra_fvs | noFloatIntoRhs (isJoinId id) NonRecursive rhs
-              = rule_fvs `unionDVarSet` freeVarsOf rhs
-              | otherwise
-              = rule_fvs
-        -- See Note [extra_fvs (1): avoid floating into RHS]
-        -- No point in floating in only to float straight out again
-        -- We *can't* float into ok-for-speculation unlifted RHSs
-        -- But do float into join points
-
-    [shared_binds, extra_binds, rhs_binds, body_binds]
-        = sepBindsByDropPoint dflags False
-            [extra_fvs, rhs_fvs, body_fvs]
-            (freeVarsOfType rhs `unionDVarSet` freeVarsOfType body)
-            to_drop
-
-    new_to_drop = body_binds ++                         -- the bindings used only in the body
-                  [FB (unitDVarSet id) rhs_fvs'
-                      (FloatLet (NonRec id rhs'))] ++   -- the new binding itself
-                  extra_binds ++                        -- bindings from extra_fvs
-                  shared_binds                          -- the bindings used both in rhs and body
-
-        -- Push rhs_binds into the right hand side of the binding
-    rhs'     = fiRhs dflags rhs_binds id rhs
-    rhs_fvs' = rhs_fvs `unionDVarSet` floatedBindsFVs rhs_binds `unionDVarSet` rule_fvs
-                        -- Don't forget the rule_fvs; the binding mentions them!
-
-fiExpr dflags to_drop (_,AnnLet (AnnRec bindings) body)
-  = fiExpr dflags new_to_drop body
-  where
-    (ids, rhss) = unzip bindings
-    rhss_fvs = map freeVarsOf rhss
-    body_fvs = freeVarsOf body
-
-        -- See Note [extra_fvs (1,2)]
-    rule_fvs = mapUnionDVarSet idRuleAndUnfoldingVarsDSet ids
-    extra_fvs = rule_fvs `unionDVarSet`
-                unionDVarSets [ freeVarsOf rhs | (bndr, rhs) <- bindings
-                              , noFloatIntoRhs (isJoinId bndr) Recursive rhs ]
-
-    (shared_binds:extra_binds:body_binds:rhss_binds)
-        = sepBindsByDropPoint dflags False
-            (extra_fvs:body_fvs:rhss_fvs)
-            (freeVarsOfType body `unionDVarSet` mapUnionDVarSet freeVarsOfType rhss)
-            to_drop
-
-    new_to_drop = body_binds ++         -- the bindings used only in the body
-                  [FB (mkDVarSet ids) rhs_fvs'
-                      (FloatLet (Rec (fi_bind rhss_binds bindings)))] ++
-                                        -- The new binding itself
-                  extra_binds ++        -- Note [extra_fvs (1,2)]
-                  shared_binds          -- Used in more than one place
-
-    rhs_fvs' = unionDVarSets rhss_fvs `unionDVarSet`
-               unionDVarSets (map floatedBindsFVs rhss_binds) `unionDVarSet`
-               rule_fvs         -- Don't forget the rule variables!
-
-    -- Push rhs_binds into the right hand side of the binding
-    fi_bind :: [FloatInBinds]       -- one per "drop pt" conjured w/ fvs_of_rhss
-            -> [(Id, CoreExprWithFVs)]
-            -> [(Id, CoreExpr)]
-
-    fi_bind to_drops pairs
-      = [ (binder, fiRhs dflags to_drop binder rhs)
-        | ((binder, rhs), to_drop) <- zipEqual "fi_bind" pairs to_drops ]
+    (before, new_float, after) = fiBind dflags to_drop bind body_fvs body_ty_fvs
+    body_fvs    = freeVarsOf body
+    body_ty_fvs = freeVarsOfType body
 
 {-
 For @Case@, the possible ``drop points'' for the \tr{to_drop}
@@ -471,6 +411,84 @@ fiExpr dflags to_drop (_, AnnCase scrut case_bndr ty alts)
 
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr dflags to_drop rhs)
 
+------------------
+fiBind :: DynFlags
+       -> FloatInBinds      -- Binds we're trying to drop
+                            -- as far "inwards" as possible
+       -> CoreBindWithFVs   -- Input binding
+       -> DVarSet           -- Free in scope of binding
+       -> DVarSet           -- Free in type of body of binding
+       -> ( FloatInBinds    -- Land these before
+          , FloatInBind     -- The binding itself
+          , FloatInBinds)   -- Land these after
+
+fiBind dflags to_drop (AnnNonRec id rhs) body_fvs body_ty_fvs
+  = ( extra_binds ++ shared_binds          -- Land these before
+                                           -- See Note [extra_fvs (1,2)]
+    , FB (unitDVarSet id) rhs_fvs'         -- The new binding itself
+          (FloatLet (NonRec id rhs'))
+    , body_binds )                         -- Land these after
+
+  where
+    body_fvs2 = body_fvs `delDVarSet` id
+    rhs_fvs   = freeVarsOf rhs
+
+    rule_fvs = idRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
+    extra_fvs | noFloatIntoRhs (isJoinId id) NonRecursive rhs
+              = rule_fvs `unionDVarSet` freeVarsOf rhs
+              | otherwise
+              = rule_fvs
+        -- See Note [extra_fvs (1): avoid floating into RHS]
+        -- No point in floating in only to float straight out again
+        -- We *can't* float into ok-for-speculation unlifted RHSs
+        -- But do float into join points
+
+    [shared_binds, extra_binds, rhs_binds, body_binds]
+        = sepBindsByDropPoint dflags False
+            [extra_fvs, rhs_fvs, body_fvs2]
+            (freeVarsOfType rhs `unionDVarSet` body_ty_fvs)
+            to_drop
+
+        -- Push rhs_binds into the right hand side of the binding
+    rhs'     = fiRhs dflags rhs_binds id rhs
+    rhs_fvs' = rhs_fvs `unionDVarSet` floatedBindsFVs rhs_binds `unionDVarSet` rule_fvs
+                        -- Don't forget the rule_fvs; the binding mentions them!
+
+fiBind dflags to_drop (AnnRec bindings) body_fvs body_ty_fvs
+  = ( extra_binds ++ shared_binds
+    , FB (mkDVarSet ids) rhs_fvs'
+         (FloatLet (Rec (fi_bind rhss_binds bindings)))
+    , body_binds )
+  where
+    (ids, rhss) = unzip bindings
+    rhss_fvs = map freeVarsOf rhss
+
+        -- See Note [extra_fvs (1,2)]
+    rule_fvs = mapUnionDVarSet idRuleAndUnfoldingVarsDSet ids
+    extra_fvs = rule_fvs `unionDVarSet`
+                unionDVarSets [ freeVarsOf rhs | (bndr, rhs) <- bindings
+                              , noFloatIntoRhs (isJoinId bndr) Recursive rhs ]
+
+    (shared_binds:extra_binds:body_binds:rhss_binds)
+        = sepBindsByDropPoint dflags False
+            (extra_fvs:body_fvs:rhss_fvs)
+            (body_ty_fvs `unionDVarSet` mapUnionDVarSet freeVarsOfType rhss)
+            to_drop
+
+    rhs_fvs' = unionDVarSets rhss_fvs `unionDVarSet`
+               unionDVarSets (map floatedBindsFVs rhss_binds) `unionDVarSet`
+               rule_fvs         -- Don't forget the rule variables!
+
+    -- Push rhs_binds into the right hand side of the binding
+    fi_bind :: [FloatInBinds]       -- one per "drop pt" conjured w/ fvs_of_rhss
+            -> [(Id, CoreExprWithFVs)]
+            -> [(Id, CoreExpr)]
+
+    fi_bind to_drops pairs
+      = [ (binder, fiRhs dflags to_drop binder rhs)
+        | ((binder, rhs), to_drop) <- zipEqual "fi_bind" pairs to_drops ]
+
+------------------
 fiRhs :: DynFlags -> FloatInBinds -> CoreBndr -> CoreExprWithFVs -> CoreExpr
 fiRhs dflags to_drop bndr rhs
   | Just join_arity <- isJoinId_maybe bndr
@@ -479,6 +497,7 @@ fiRhs dflags to_drop bndr rhs
   | otherwise
   = fiExpr dflags to_drop rhs
 
+------------------
 okToFloatInside :: [Var] -> Bool
 okToFloatInside bndrs = all ok bndrs
   where
