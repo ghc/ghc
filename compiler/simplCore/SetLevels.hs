@@ -64,7 +64,7 @@ module SetLevels (
 
 import CoreSyn
 import CoreMonad        ( FloatOutSwitches(..) )
-import CoreUtils        ( exprType, exprIsCheap, exprIsHNF
+import CoreUtils        ( exprType, exprIsHNF
                         , exprOkForSpeculation
                         , exprIsTopLevelBindable
                         , isExprLevPoly
@@ -561,9 +561,12 @@ lvlMFE env strict_ctxt ann_expr
   =     -- Don't float it out
     lvlExpr env ann_expr
 
-  | float_is_new_lam || need_join || exprIsTopLevelBindable expr expr_ty
+  |  float_is_new_lam || need_join || exprIsTopLevelBindable expr expr_ty
+  || expr_ok_for_spec && not (isTopLvl dest_lvl)
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
+         -- or is okay for speculation (we'll now evaluate it earlier).
+         -- But in the last case, we can't float an unlifted thing to top level
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive join_arity_maybe ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
@@ -576,8 +579,8 @@ lvlMFE env strict_ctxt ann_expr
   -- Try for the boxing strategy
   -- See Note [Floating MFEs of unlifted type]
   | escapes_value_lam
-  , not (exprIsCheap expr)  -- Boxing/unboxing isn't worth
-                            -- it for cheap expressions
+  , not expr_ok_for_spec -- Boxing/unboxing isn't worth it for cheap expressions
+                         -- See Note [Test cheapness with exprOkForSpeculation]
   , Just (tc, _) <- splitTyConApp_maybe expr_ty
   , Just dc <- boxingDataCon_maybe tc
   , let dc_res_ty = dataConOrigResTy dc  -- No free type variables
@@ -608,6 +611,7 @@ lvlMFE env strict_ctxt ann_expr
     mb_bot_str   = exprBotStrictness_maybe expr
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
+    expr_ok_for_spec = exprOkForSpeculation expr
     dest_lvl     = destLevel env fvs is_function is_bot need_join
     abs_vars     = abstractVars dest_lvl env fvs
 
@@ -718,6 +722,15 @@ float a boxed version
 and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
 
+However if the expression to be floated (f x) is okay for speculation,
+just float it without any boxing/unboxing. We'll evaluate it earlier,
+but that's okay because the expression is okay for speculation. Simpler
+and cheaper than boxing and unboxing. The only potential snag is that
+we can't float an unlifted binding to top-level (unless it is an unboxed
+string literal). In this case, we just don't float the expression at all.
+No great loss since, by assumption, it is cheap to compute anyways. See
+Note [Test cheapness with exprOkForSpeculation].
+
 Being able to float unboxed expressions is sometimes important; see
 Trac #12603.  I'm not sure how /often/ it is important, but it's
 not hard to achieve.
@@ -736,6 +749,21 @@ wrapping in a function.  In our example
 It works fine, but it's 50% slower (based on some crude benchmarking).
 I suppose we could do it for types not covered by boxingDataCon_maybe,
 but it's more code and I'll wait to see if anyone wants it.
+
+Note [Test cheapness with exprOkForSpeculation]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't want to float very cheap expressions by boxing and unboxing.
+But we use exprOkForSpeculation for the test, not exprIsCheap.
+Why?  Because it's important /not/ to transform
+     f (a /# 3)
+to
+     f (case bx of I# a -> a /# 3)
+and float bx = I# (a /# 3), because the application of f no
+longer obeys the let/app invariant.  But (a /# 3) is ok-for-spec
+due to a special hack that says division operators can't fail
+when the denominator is definitely no-zero.  And yet that
+same expression says False to exprIsCheap.  Simplest way to
+guarantee the let/app invariant is to use the same function!
 
 Note [Bottoming floats]
 ~~~~~~~~~~~~~~~~~~~~~~~
