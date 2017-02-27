@@ -2045,12 +2045,12 @@ pprQuals quals = interpp'SP quals
 -- | Haskell Splice
 data HsSplice id
    = HsTypedSplice       --  $$z  or $$(f 4)
-        HasParens        -- Whether $$( ) variant found, for pretty printing
+        SpliceDecoration -- Whether $$( ) variant found, for pretty printing
         id               -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
    | HsUntypedSplice     --  $z  or $(f 4)
-        HasParens        -- Whether $( ) variant found, for pretty printing
+        SpliceDecoration -- Whether $( ) variant found, for pretty printing
         id               -- A unique name to identify this splice point
         (LHsExpr id)     -- See Note [Pending Splices]
 
@@ -2070,13 +2070,17 @@ data HsSplice id
   deriving Typeable
 deriving instance (DataId id) => Data (HsSplice id)
 
-data HasParens = HasParens
-               | NoParens
-               deriving (Data, Eq, Show)
+-- | A splice can appear with various decorations wrapped around it. This data
+-- type captures explicitly how it was originally written, for use in the pretty
+-- printer.
+data SpliceDecoration
+  = HasParens -- ^ $( splice ) or $$( splice )
+  | HasDollar -- ^ $splice or $$splice
+  | NoParens  -- ^ bare splice
+  deriving (Data, Eq, Show)
 
-instance Outputable HasParens where
-  ppr HasParens = text "HasParens"
-  ppr NoParens  = text "NoParens"
+instance Outputable SpliceDecoration where
+  ppr x = text $ show x
 
 
 isTypedSplice :: HsSplice id -> Bool
@@ -2218,12 +2222,16 @@ ppr_splice_decl e = pprSplice e
 pprSplice :: (OutputableBndrId id) => HsSplice id -> SDoc
 pprSplice (HsTypedSplice HasParens  n e)
   = ppr_splice (text "$$(") n e (text ")")
-pprSplice (HsTypedSplice NoParens n e)
+pprSplice (HsTypedSplice HasDollar n e)
   = ppr_splice (text "$$") n e empty
+pprSplice (HsTypedSplice NoParens n e)
+  = ppr_splice empty n e empty
 pprSplice (HsUntypedSplice HasParens  n e)
   = ppr_splice (text "$(") n e (text ")")
-pprSplice (HsUntypedSplice NoParens n e)
+pprSplice (HsUntypedSplice HasDollar n e)
   = ppr_splice (text "$")  n e empty
+pprSplice (HsUntypedSplice NoParens n e)
+  = ppr_splice empty  n e empty
 pprSplice (HsQuasiQuote n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ thing)         = ppr thing
 

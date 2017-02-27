@@ -62,3 +62,5 @@ class (kparam ~ 'KProxy) => SEq (kparam :: KProxy k) where
   infix 4 %:/=
 
 $(singEqInstances basicTypes)
+$singEqInstances basicTypes
+singEqInstances basicTypes

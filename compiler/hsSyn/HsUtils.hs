@@ -321,16 +321,16 @@ mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar (noLoc op)))
 unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 
-mkUntypedSplice :: HasParens -> LHsExpr RdrName -> HsSplice RdrName
+mkUntypedSplice :: SpliceDecoration -> LHsExpr RdrName -> HsSplice RdrName
 mkUntypedSplice hasParen e = HsUntypedSplice hasParen unqualSplice e
 
-mkHsSpliceE :: HasParens -> LHsExpr RdrName -> HsExpr RdrName
+mkHsSpliceE :: SpliceDecoration -> LHsExpr RdrName -> HsExpr RdrName
 mkHsSpliceE hasParen e = HsSpliceE (mkUntypedSplice hasParen e)
 
-mkHsSpliceTE :: HasParens -> LHsExpr RdrName -> HsExpr RdrName
+mkHsSpliceTE :: SpliceDecoration -> LHsExpr RdrName -> HsExpr RdrName
 mkHsSpliceTE hasParen e = HsSpliceE (HsTypedSplice hasParen unqualSplice e)
 
-mkHsSpliceTy :: HasParens -> LHsExpr RdrName -> HsType RdrName
+mkHsSpliceTy :: SpliceDecoration -> LHsExpr RdrName -> HsType RdrName
 mkHsSpliceTy hasParen e
   = HsSpliceTy (HsUntypedSplice hasParen unqualSplice e) placeHolderKind
 
