@@ -611,6 +611,7 @@ lvlMFE env strict_ctxt ann_expr
     mb_bot_str   = exprBotStrictness_maybe expr
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
+    expr_ok_for_spec = exprOkForSpeculation expr
     dest_lvl     = destLevel env fvs is_function is_bot need_join
     abs_vars     = abstractVars dest_lvl env fvs
 
@@ -645,8 +646,6 @@ lvlMFE env strict_ctxt ann_expr
     saves_alloc =  isTopLvl dest_lvl
                 && floatConsts env
                 && (not strict_ctxt || is_bot || exprIsHNF expr)
-
-    expr_ok_for_spec = exprOkForSpeculation expr
 
 isBottomThunk :: Maybe (Arity, s) -> Bool
 -- See Note [Bottoming floats] (2)
@@ -719,6 +718,15 @@ float a boxed version
    y = case f x of r -> I# r
 and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
+
+However if the expression to be floated (f x) is okay for speculation,
+just float it without any boxing/unboxing. We'll evaluate it earlier,
+but that's okay because the expression is okay for speculation. Simpler
+and cheaper than boxing and unboxing. The only potential snag is that
+we can't float an unlifted binding to top-level (unless it is an unboxed
+string literal). In this case, we just don't float the expression at all.
+No great loss since, by assumption, it is cheap to compute anyways. See
+Note [Test cheapness with exprOkForSpeculation].
 
 Being able to float unboxed expressions is sometimes important; see
 Trac #12603.  I'm not sure how /often/ it is important, but it's
