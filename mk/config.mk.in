@@ -103,10 +103,13 @@ GhcProfiled=NO
 # WITH_TERMINFO can be used to disable terminfo support throughout the compiler
 # and its tools. This is handy in the case of cross-compilation, where we may
 # not have an ncurses build for the target.
-ifeq "$(Windows_Target)" "NO"
-WITH_TERMINFO=YES
-else
+ifeq "$(TargetOS_CPP)" "ios"
+# iOS has no terminfo support
 WITH_TERMINFO=NO
+else ifeq "$(Windows_Target)" "YES"
+WITH_TERMINFO=NO
+else
+WITH_TERMINFO=YES
 endif
 
 ifeq "$(findstring $(TargetOS_CPP),linux freebsd dragonfly openbsd netbsd solaris2 kfreebsdgnu haiku linux-android)" ""
