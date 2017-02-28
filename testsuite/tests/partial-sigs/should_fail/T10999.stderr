@@ -21,8 +21,7 @@ T10999.hs:8:28: error:
       Relevant bindings include g :: [b0] (bound at T10999.hs:8:1)
       Probable fix: use a type annotation to specify what ‘b0’ should be.
       These potential instances exist:
-        instance Ord a => Ord (Set.Set a)
-          -- Defined in ‘containers-0.5.7.1:Data.Set.Base’
+        instance Ord a => Ord (Set.Set a) -- Defined in ‘Data.Set.Internal’
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord Integer
           -- Defined in ‘integer-gmp-1.0.0.1:GHC.Integer.Type’
