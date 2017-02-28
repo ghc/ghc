@@ -42,7 +42,6 @@ import Foreign.C.Error
 import Foreign.C.Types
 import Foreign.Marshal.Alloc
 import Foreign.Marshal.Utils
-import GHC.IO.Exception
 import GHC.IO.FD
 import GHC.IO.Handle.FD
 import GHC.Ptr
