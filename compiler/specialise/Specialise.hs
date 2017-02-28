@@ -1153,8 +1153,8 @@ specCalls :: Maybe Module      -- Just this_mod  =>  specialising imported fn
 
 specCalls mb_mod env rules_for_me calls_for_me fn rhs
         -- The first case is the interesting one
-  |  rhs_tyvars `lengthIs`     n_tyvars -- Rhs of fn's defn has right number of big lambdas
-  && rhs_ids    `lengthAtLeast` n_dicts -- and enough dict args
+  |  rhs_tyvars `lengthIs`      n_tyvars -- Rhs of fn's defn has right number of big lambdas
+  && rhs_bndrs1 `lengthAtLeast` n_dicts -- and enough dict args
   && notNull calls_for_me               -- And there are some calls to specialise
   && not (isNeverActive (idInlineActivation fn))
         -- Don't specialise NOINLINE things
@@ -1178,7 +1178,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
     return ([], [], emptyUDs)
   where
     _trace_doc = sep [ ppr rhs_tyvars, ppr n_tyvars
-                     , ppr rhs_ids, ppr n_dicts
+                     , ppr rhs_bndrs, ppr n_dicts
                      , ppr (idInlineActivation fn) ]
 
     fn_type                 = idType fn
@@ -1194,11 +1194,12 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
-    (rhs_tyvars, rhs_ids, rhs_body) = collectTyAndValBinders rhs
-
-    rhs_dict_ids = take n_dicts rhs_ids
-    body         = mkLams (drop n_dicts rhs_ids) rhs_body
-                -- Glue back on the non-dict lambdas
+    (rhs_bndrs, rhs_body)      = CoreSubst.collectBindersPushingCo rhs
+                                 -- See Note [Account for casts in binding]
+    (rhs_tyvars, rhs_bndrs1)   = span isTyVar rhs_bndrs
+    (rhs_dict_ids, rhs_bndrs2) = splitAt n_dicts rhs_bndrs1
+    body                       = mkLams rhs_bndrs2 rhs_body
+                                 -- Glue back on the non-dict lambdas
 
     already_covered :: DynFlags -> [CoreExpr] -> Bool
     already_covered dflags args      -- Note [Specialisations already covered]
@@ -1350,7 +1351,23 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
 
            ; return (Just ((spec_f_w_arity, spec_rhs), final_uds, spec_env_rule)) } }
 
-{- Note [Evidence foralls]
+{- Note [Account for casts in binding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   f :: Eq a => a -> IO ()
+   {-# INLINABLE f
+       StableUnf = (/\a \(d:Eq a) (x:a). blah) |> g
+     #-}
+   f = ...
+
+In f's stable unfolding we have done some modest simplification which
+has pushed the cast to the outside.  (I wonder if this is the Right
+Thing, but it's what happens now; see SimplUtils Note [Casts and
+lambdas].)  Now that stable unfolding must be specialised, so we want
+to push the cast back inside. It would be terrible if the cast
+defeated specialisation!  Hence the use of collectBindersPushingCo.
+
+Note [Evidence foralls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose (Trac #12212) that we are specialising
    f :: forall a b. (Num a, F a ~ F b) => blah

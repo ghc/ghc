@@ -48,7 +48,7 @@ module Coercion (
         mapStepResult, unwrapNewTypeStepper,
         topNormaliseNewType_maybe, topNormaliseTypeX,
 
-        decomposeCo, getCoVar_maybe,
+        decomposeCo, decomposeFunCo, getCoVar_maybe,
         splitTyConAppCo_maybe,
         splitAppCo_maybe,
         splitFunCo_maybe,
@@ -293,7 +293,19 @@ ppr_co_ax_branch ppr_rhs
         Destructing coercions
 %*                                                                      *
 %************************************************************************
+
+Note [Function coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Remember that
+  (->) :: forall r1 r2. TYPE r1 -> TYPE r2 -> TYPE LiftedRep
+
+Hence
+  FunCo r co1 co2 :: (s1->t1) ~r (s2->t2)
+is short for
+  TyConAppCo (->) co_rep1 co_rep2 co1 co2
+where co_rep1, co_rep2 are the coercions on the representations.
 -}
+
 
 -- | This breaks a 'Coercion' with type @T A B C ~ T D E F@ into
 -- a list of 'Coercion's of kinds @A ~ D@, @B ~ E@ and @E ~ F@. Hence:
@@ -303,6 +315,16 @@ decomposeCo :: Arity -> Coercion -> [Coercion]
 decomposeCo arity co
   = [mkNthCo n co | n <- [0..(arity-1)] ]
            -- Remember, Nth is zero-indexed
+
+decomposeFunCo :: Coercion -> (Coercion, Coercion)
+-- Expects co :: (s1 -> t1) ~ (s2 -> t2)
+-- Returns (co1 :: s1~s2, co2 :: t1~t2)
+-- See Note [Function coercions] for the "2" and "3"
+decomposeFunCo co = ASSERT2( all_ok, ppr co )
+                    (mkNthCo 2 co, mkNthCo 3 co)
+  where
+    Pair s1t1 s2t2 = coercionKind co
+    all_ok = isFunTy s1t1 && isFunTy s2t2
 
 -- | Attempts to obtain the type variable underlying a 'Coercion'
 getCoVar_maybe :: Coercion -> Maybe CoVar
@@ -554,7 +576,7 @@ mkNomReflCo = mkReflCo Nominal
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
   | tc `hasKey` funTyConKey
-  , [_rep1, _rep2, co1, co2] <- cos
+  , [_rep1, _rep2, co1, co2] <- cos   -- See Note [Function coercions]
   = -- (a :: TYPE ra) -> (b :: TYPE rb)  ~  (c :: TYPE rc) -> (d :: TYPE rd)
     -- rep1 :: ra  ~  rc        rep2 :: rb  ~  rd
     -- co1  :: a   ~  c         co2  :: b   ~  d
@@ -882,14 +904,26 @@ mkNthCo n (Refl r ty)
 mkNthCo 0 (ForAllCo _ kind_co _) = kind_co
   -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
   -- then (nth 0 co :: k1 ~ k2)
-mkNthCo n (TyConAppCo _ _ arg_cos) = arg_cos `getNth` n
+
 mkNthCo n co@(FunCo _ arg res)
+  -- See Note [Function coercions]
+  -- If FunCo _ arg_co res_co ::   (s1:TYPE sk1 -> s2:TYPE sk2)
+  --                             ~ (t1:TYPE tk1 -> t2:TYPE tk2)
+  -- Then we want to behave as if co was
+  --    TyConAppCo argk_co resk_co arg_co res_co
+  -- where
+  --    argk_co :: sk1 ~ tk1  =  mkNthCo 0 (mkKindCo arg_co)
+  --    resk_co :: sk2 ~ tk2  =  mkNthCo 0 (mkKindCo res_co)
+  --                             i.e. mkRuntimeRepCo
   = case n of
       0 -> mkRuntimeRepCo arg
       1 -> mkRuntimeRepCo res
       2 -> arg
       3 -> res
       _ -> pprPanic "mkNthCo(FunCo)" (ppr n $$ ppr co)
+
+mkNthCo n (TyConAppCo _ _ arg_cos) = arg_cos `getNth` n
+
 mkNthCo n co = NthCo n co
 
 mkLRCo :: LeftOrRight -> Coercion -> Coercion
@@ -937,8 +971,10 @@ mkKindCo co
        -- generally, calling coercionKind during coercion creation is a bad idea,
        -- as it can lead to exponential behavior. But, we don't have nested mkKindCos,
        -- so it's OK here.
-  , typeKind ty1 `eqType` typeKind ty2
-  = Refl Nominal (typeKind ty1)
+  , let tk1 = typeKind ty1
+        tk2 = typeKind ty2
+  , tk1 `eqType` tk2
+  = Refl Nominal tk1
   | otherwise
   = KindCo co
 

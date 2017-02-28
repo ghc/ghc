@@ -34,7 +34,7 @@ module CoreSubst (
         -- ** Simple expression optimiser
         simpleOptPgm, simpleOptExpr, simpleOptExprWith,
         exprIsConApp_maybe, exprIsLiteral_maybe, exprIsLambda_maybe,
-        pushCoArg, pushCoValArg, pushCoTyArg
+        pushCoArg, pushCoValArg, pushCoTyArg, collectBindersPushingCo
     ) where
 
 #include "HsVersions.h"
@@ -1614,7 +1614,7 @@ exprIsLambda_maybe _ _e
 
 Here we implement the "push rules" from FC papers:
 
-* The push-argument ules, where we can move a coercion past an argument.
+* The push-argument rules, where we can move a coercion past an argument.
   We have
       (fun |> co) arg
   and we want to transform it to
@@ -1687,7 +1687,7 @@ pushCoValArg co
   = Just (mkRepReflCo arg, mkRepReflCo res)
 
   | isFunTy tyL
-  , [_, _, co1, co2] <- decomposeCo 4 co
+  , (co1, co2) <- decomposeFunCo co
               -- If   co  :: (tyL1 -> tyL2) ~ (tyR1 -> tyR2)
               -- then co1 :: tyL1 ~ tyR1
               --      co2 :: tyL2 ~ tyR2
@@ -1711,7 +1711,7 @@ pushCoercionIntoLambda in_scope x e co
     , Pair s1s2 t1t2 <- coercionKind co
     , Just (_s1,_s2) <- splitFunTy_maybe s1s2
     , Just (t1,_t2) <- splitFunTy_maybe t1t2
-    = let [_rep1, _rep2, co1, co2] = decomposeCo 4 co
+    = let (co1, co2) = decomposeFunCo co
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
           x' = x `setIdType` t1
@@ -1784,3 +1784,57 @@ pushCoDataCon dc dc_args co
 
   where
     Pair from_ty to_ty = coercionKind co
+
+collectBindersPushingCo :: CoreExpr -> ([Var], CoreExpr)
+-- Collect lambda binders, pushing coercions inside if possible
+-- E.g.   (\x.e) |> g         g :: <Int> -> blah
+--        = (\x. e |> Nth 1 g)
+--
+-- That is,
+--
+-- collectBindersPushingCo ((\x.e) |> g) === ([x], e |> Nth 1 g)
+collectBindersPushingCo e
+  = go [] e
+  where
+    -- Peel off lambdas until we hit a cast.
+    go :: [Var] -> CoreExpr -> ([Var], CoreExpr)
+    -- The accumulator is in reverse order
+    go bs (Lam b e)   = go (b:bs) e
+    go bs (Cast e co) = go_c bs e co
+    go bs e           = (reverse bs, e)
+
+    -- We are in a cast; peel off casts until we hit a lambda.
+    go_c :: [Var] -> CoreExpr -> Coercion -> ([Var], CoreExpr)
+    -- (go_c bs e c) is same as (go bs e (e |> c))
+    go_c bs (Cast e co1) co2 = go_c bs e (co1 `mkTransCo` co2)
+    go_c bs (Lam b e)    co  = go_lam bs b e co
+    go_c bs e            co  = (reverse bs, mkCast e co)
+
+    -- We are in a lambda under a cast; peel off lambdas and build a
+    -- new coercion for the body.
+    go_lam :: [Var] -> Var -> CoreExpr -> Coercion -> ([Var], CoreExpr)
+    -- (go_lam bs b e c) is same as (go_c bs (\b.e) c)
+    go_lam bs b e co
+      | isTyVar b
+      , let Pair tyL tyR = coercionKind co
+      , ASSERT( isForAllTy tyL )
+        isForAllTy tyR
+      , isReflCo (mkNthCo 0 co)  -- See Note [collectBindersPushingCo]
+      = go_c (b:bs) e (mkInstCo co (mkNomReflCo (mkTyVarTy b)))
+
+      | isId b
+      , let Pair tyL tyR = coercionKind co
+      , ASSERT( isFunTy tyL) isFunTy tyR
+      , (co_arg, co_res) <- decomposeFunCo co
+      , isReflCo co_arg  -- See Note [collectBindersPushingCo]
+      = go_c (b:bs) e co_res
+
+      | otherwise = (reverse bs, mkCast (Lam b e) co)
+
+{- Note [collectBindersPushingCo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We just look for coercions of form
+   <type> -> blah
+(and similarly for foralls) to keep this function simple.  We could do
+more elaborate stuff, but it'd involve substitution etc.
+-}

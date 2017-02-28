@@ -843,7 +843,7 @@ unify_ty (CoercionTy co1) (CoercionTy co2) kco
              -> do { b <- tvBindFlagL cv
                    ; if b == BindMe
                        then do { checkRnEnvRCo co2
-                               ; let [_, _, co_l, co_r] = decomposeCo 4 kco
+                               ; let (co_l, co_r) = decomposeFunCo kco
                                   -- cv :: t1 ~ t2
                                   -- co2 :: s1 ~ s2
                                   -- co_l :: t1 ~ s1
