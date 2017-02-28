@@ -8,6 +8,7 @@ HADDOCK_DOCS       = NO
 BUILD_SPHINX_HTML  = NO
 BUILD_SPHINX_PDF   = NO
 BUILD_MAN          = NO
+WITH_TERMINFO      = NO
 
 INTEGER_LIBRARY      = integer-simple
 Stage1Only           = YES

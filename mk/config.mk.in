@@ -100,6 +100,15 @@ GhcDynamic=NO
 # GhcProfiled=YES means compile a profiled stage-2 compiler
 GhcProfiled=NO
 
+# WITH_TERMINFO can be used to disable terminfo support throughout the compiler
+# and its tools. This is handy in the case of cross-compilation, where we may
+# not have an ncurses build for the target.
+ifeq "$(Windows_Target)" "NO"
+WITH_TERMINFO=YES
+else
+WITH_TERMINFO=NO
+endif
+
 ifeq "$(findstring $(TargetOS_CPP),linux freebsd dragonfly openbsd netbsd solaris2 kfreebsdgnu haiku linux-android)" ""
 TargetElf = NO
 else

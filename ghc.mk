@@ -431,9 +431,7 @@ else # CLEANING
 # compiler already has installed (or up-to-date enough).
 
 PACKAGES_STAGE0 = binary Cabal/Cabal hpc ghc-boot-th ghc-boot hoopl transformers template-haskell ghci
-ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
-endif
 
 PACKAGES_STAGE1 += ghc-prim
 PACKAGES_STAGE1 += $(INTEGER_LIBRARY)
@@ -469,7 +467,7 @@ ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
 endif
 
-ifeq "$(Windows_Target)" "NO"
+ifeq "$(WITH_TERMINFO)" "YES"
 PACKAGES_STAGE1 += terminfo
 endif
 PACKAGES_STAGE1 += haskeline

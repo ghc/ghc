@@ -57,6 +57,10 @@ utils/ghc-pkg_dist_INSTALL = YES
 utils/ghc-pkg_dist_INSTALL_SHELL_WRAPPER_NAME = ghc-pkg-$(ProjectVersion)
 endif
 
+ifeq "$(WITH_TERMINFO)" "NO"
+utils/ghc-pkg_dist-install_CONFIGURE_OPTS += -f-terminfo
+endif
+
 $(eval $(call build-prog,utils/ghc-pkg,dist,0))
 
 $(ghc-pkg_INPLACE) : | $(INPLACE_PACKAGE_CONF)/.

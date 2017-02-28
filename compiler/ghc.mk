@@ -361,6 +361,10 @@ compiler_CONFIGURE_OPTS += --ghc-option=-DNOSMP
 compiler_CONFIGURE_OPTS += --ghc-option=-optc-DNOSMP
 endif
 
+ifeq "$(WITH_TERMINFO)" "NO"
+compiler_stage2_CONFIGURE_OPTS += --flags=-terminfo
+endif
+
 # Careful optimisation of the parser: we don't want to throw everything
 # at it, because that takes too long and doesn't buy much, but we do want
 # to inline certain key external functions, so we instruct GHC not to

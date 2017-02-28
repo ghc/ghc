@@ -15,6 +15,11 @@ Category: Development
 build-type: Simple
 cabal-version: >=1.10
 
+Flag terminfo
+    Description: Build GHC with terminfo support on non-Windows platforms.
+    Default: True
+    Manual: False
+
 Executable ghc-pkg
     Default-Language: Haskell2010
     Main-Is: Main.hs
@@ -30,8 +35,10 @@ Executable ghc-pkg
                    binary,
                    ghc-boot,
                    bytestring
+    if !os(windows) && flag(terminfo)
+        Build-Depends: terminfo
+        Cpp-Options: -DWITH_TERMINFO
     if !os(windows)
-        Build-Depends: unix,
-                       terminfo
+        Build-Depends: unix
     if os(windows)
         c-sources: CRT_noglob.c
