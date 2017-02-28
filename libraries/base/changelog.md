@@ -69,6 +69,10 @@
     replaced by `CostCentresJSON` due to the new JSON export format supported by
     the cost centre profiler.
 
+  * The `ErrorCall` pattern synonym has been given a `COMPLETE` pragma so that
+    functions which solely match again `ErrorCall` do not produce
+    non-exhaustive pattern-match warnings (#8779)
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0

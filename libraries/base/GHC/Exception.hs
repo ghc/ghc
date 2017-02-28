@@ -176,6 +176,8 @@ pattern ErrorCall :: String -> ErrorCall
 pattern ErrorCall err <- ErrorCallWithLocation err _ where
   ErrorCall err = ErrorCallWithLocation err ""
 
+{-# COMPLETE ErrorCall #-}
+
 -- | @since 4.0.0.0
 instance Exception ErrorCall
 

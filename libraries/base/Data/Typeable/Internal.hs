@@ -290,6 +290,9 @@ pattern Con con <- TrTyCon _ con _
 pattern Con' :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a
 pattern Con' con ks <- TrTyCon _ con ks
 
+{-# COMPLETE Fun, App, Con  #-}
+{-# COMPLETE Fun, App, Con' #-}
+
 ----------------- Observation ---------------------
 
 -- | Observe the type constructor of a quantified type representation.
