@@ -730,9 +730,13 @@ and []          =  True
 and (x:xs)      =  x && and xs
 {-# NOINLINE [1] and #-}
 
+andFB :: Bool -> Bool -> Bool
+andFB x r = x && r
+{-# NOINLINE [0] andFB #-}
+
 {-# RULES
-"and/build"     forall (g::forall b.(Bool->b->b)->b->b) .
-                and (build g) = g (&&) True
+"and"     [~1] forall xs. and xs = foldr andFB True xs
+"andList"  [1]            foldr andFB True = and
  #-}
 #endif
 
@@ -747,9 +751,13 @@ or []           =  False
 or (x:xs)       =  x || or xs
 {-# NOINLINE [1] or #-}
 
+orFB :: Bool -> Bool -> Bool
+orFB x r = x || r
+{-# NOINLINE [0] orFB #-}
+
 {-# RULES
-"or/build"      forall (g::forall b.(Bool->b->b)->b->b) .
-                or (build g) = g (||) False
+"or"     [~1] forall xs. or xs = foldr orFB False xs
+"orList"  [1]            foldr orFB False = or
  #-}
 #endif
 
@@ -764,12 +772,15 @@ any p                   =  or . map p
 #else
 any _ []        = False
 any p (x:xs)    = p x || any p xs
-
 {-# NOINLINE [1] any #-}
 
+anyFB :: (t -> Bool) -> t -> Bool -> Bool
+anyFB p x r = p x || r
+{-# NOINLINE [0] anyFB #-}
+
 {-# RULES
-"any/build"     forall p (g::forall b.(a->b->b)->b->b) .
-                any p (build g) = g ((||) . p) False
+"any"     [~1] forall p xs. any p xs = foldr (anyFB p) False xs
+"anyList"  [1] forall p.    foldr (anyFB p) False = any p
  #-}
 #endif
 
@@ -783,12 +794,15 @@ all p                   =  and . map p
 #else
 all _ []        =  True
 all p (x:xs)    =  p x && all p xs
-
 {-# NOINLINE [1] all #-}
 
+allFB :: (t -> Bool) -> t -> Bool -> Bool
+allFB p x r = p x && r
+{-# NOINLINE [0] allFB #-}
+
 {-# RULES
-"all/build"     forall p (g::forall b.(a->b->b)->b->b) .
-                all p (build g) = g ((&&) . p) True
+"all"     [~1] forall p xs. all p xs = foldr (allFB p) True xs
+"allList"  [1] forall p.    foldr (allFB p) True = all p
  #-}
 #endif
 
@@ -803,9 +817,14 @@ elem x                  =  any (== x)
 elem _ []       = False
 elem x (y:ys)   = x==y || elem x ys
 {-# NOINLINE [1] elem #-}
+
+elemFB :: Eq a => a -> a -> Bool -> Bool
+elemFB x y r = (x == y) || r
+{-# NOINLINE [0] elemFB #-}
+
 {-# RULES
-"elem/build"    forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
-   . elem x (build g) = g (\ y r -> (x == y) || r) False
+"elem"     [~1] forall x xs. elem x xs = foldr (elemFB x) False xs
+"elemList"  [1] forall x.    foldr (elemFB x) False = elem x
  #-}
 #endif
 
@@ -817,9 +836,14 @@ notElem x               =  all (/= x)
 notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 {-# NOINLINE [1] notElem #-}
+
+notElemFB :: Eq a => a -> a -> Bool -> Bool
+notElemFB x y r = (x /= y) && r
+{-# NOINLINE [0] notElemFB #-}
+
 {-# RULES
-"notElem/build" forall x (g :: forall b . Eq a => (a -> b -> b) -> b -> b)
-   . notElem x (build g) = g (\ y r -> (x /= y) && r) True
+"notElem"     [~1] forall x xs. notElem x xs = foldr (notElemFB x) False xs
+"notElemList"  [1] forall x.    foldr (notElemFB x) True = notElem x
  #-}
 #endif
 
