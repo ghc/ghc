@@ -228,32 +228,39 @@ CostCentre *mkCostCentre (char *label, char *module, char *srcloc)
 static void
 initProfilingLogFile(void)
 {
-    char *prog;
+    // Figure out output file name stem.
+    char const *stem;
+    if (RtsFlags.CcFlags.outputFileNameStem) {
+        stem = RtsFlags.CcFlags.outputFileNameStem;
+    } else {
+        char *prog;
 
-    prog = arenaAlloc(prof_arena, strlen(prog_name) + 1);
-    strcpy(prog, prog_name);
+        prog = arenaAlloc(prof_arena, strlen(prog_name) + 1);
+        strcpy(prog, prog_name);
 #ifdef mingw32_HOST_OS
-    // on Windows, drop the .exe suffix if there is one
-    {
-        char *suff;
-        suff = strrchr(prog,'.');
-        if (suff != NULL && !strcmp(suff,".exe")) {
-            *suff = '\0';
+        // on Windows, drop the .exe suffix if there is one
+        {
+            char *suff;
+            suff = strrchr(prog,'.');
+            if (suff != NULL && !strcmp(suff,".exe")) {
+                *suff = '\0';
+            }
         }
-    }
 #endif
+        stem = prog;
+    }
 
     if (RtsFlags.CcFlags.doCostCentres == 0 && !doingRetainerProfiling())
     {
-        /* No need for the <prog>.prof file */
+        /* No need for the <stem>.prof file */
         prof_filename = NULL;
         prof_file = NULL;
     }
     else
     {
         /* Initialise the log file name */
-        prof_filename = arenaAlloc(prof_arena, strlen(prog) + 6);
-        sprintf(prof_filename, "%s.prof", prog);
+        prof_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
+        sprintf(prof_filename, "%s.prof", stem);
 
         /* open the log file */
         if ((prof_file = fopen(prof_filename, "w")) == NULL) {
@@ -269,13 +276,13 @@ initProfilingLogFile(void)
 
     if (RtsFlags.ProfFlags.doHeapProfile) {
         /* Initialise the log file name */
-        hp_filename = arenaAlloc(prof_arena, strlen(prog) + 6);
-        sprintf(hp_filename, "%s.hp", prog);
+        hp_filename = arenaAlloc(prof_arena, strlen(stem) + 6);
+        sprintf(hp_filename, "%s.hp", stem);
 
         /* open the log file */
         if ((hp_file = fopen(hp_filename, "w")) == NULL) {
             debugBelch("Can't open profiling report file %s\n",
-                    hp_filename);
+                       hp_filename);
             RtsFlags.ProfFlags.doHeapProfile = 0;
         }
     }

@@ -402,7 +402,8 @@ enclosed between ``+RTS ... -RTS`` as usual):
        single: time profile
 
     The :rts-flag:`-p` option produces a standard *time profile* report. It is
-    written into the file :file:`program.prof`.
+    written into the file :file:`<stem>.prof`; the stem is taken to be the program
+    name by default, but can be overridden by the :rts-flag:`-po` flag.
 
     The :rts-flag:`-P` option produces a more detailed report containing the
     actual time and allocation data as well. (Not used much.)
@@ -414,6 +415,16 @@ enclosed between ``+RTS ... -RTS`` as usual):
 
     The :rts-flag:`-pj` option produces a time/allocation profile report in JSON
     format written into the file :file:`<program>.prof`.
+
+.. rts-flag:: -po ⟨stem⟩
+
+    The :rts-flag:`-po` option overrides the stem used to form the output file
+    paths for the cost-center profiler (see :rts-flag:`-p` and :rts-flag:`-pj`
+    flags above) and heap profiler (see :rts-flag:`-h`).
+
+    For instance, running a program with ``+RTS -h -p -pohello-world`` would
+    produce a heap profile named :file:`hello-world.hp` and a cost-center
+    profile named :file:`hello-world.prof`.
 
 .. rts-flag:: -V <secs>
 
