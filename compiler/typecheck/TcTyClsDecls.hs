@@ -763,10 +763,15 @@ tcTyClDecl1 _parent roles_info
                ; sig_stuff <- tcClassSigs class_name sigs meths
                ; at_stuff <- tcClassATs class_name clas ats at_defs
                ; mindef <- tcClassMinimalDef class_name sigs sig_stuff
-               ; clas <- buildClass
-                            class_name binders roles ctxt'
-                            fds' at_stuff
-                            sig_stuff mindef
+               -- TODO: Allow us to distinguish between abstract class,
+               -- and concrete class with no methods (maybe by
+               -- specifying a trailing where or not
+               ; is_boot <- tcIsHsBootOrSig
+               ; let body | is_boot, null ctxt', null at_stuff, null sig_stuff
+                          = Nothing
+                          | otherwise
+                          = Just (ctxt', at_stuff, sig_stuff, mindef)
+               ; clas <- buildClass class_name binders roles fds' body
                ; traceTc "tcClassDecl" (ppr fundeps $$ ppr binders $$
                                         ppr fds')
                ; return clas }

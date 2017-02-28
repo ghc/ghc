@@ -15,6 +15,7 @@ module IfaceSyn (
         IfaceIdInfo(..), IfaceIdDetails(..), IfaceUnfolding(..),
         IfaceInfoItem(..), IfaceRule(..), IfaceAnnotation(..), IfaceAnnTarget,
         IfaceClsInst(..), IfaceFamInst(..), IfaceTickish(..),
+        IfaceClassBody(..),
         IfaceBang(..),
         IfaceSrcBang(..), SrcUnpackedness(..), SrcStrictness(..),
         IfaceAxBranch(..),
@@ -138,14 +139,11 @@ data IfaceDecl
                    ifFamFlav :: IfaceFamTyConFlav,
                    ifFamInj  :: Injectivity }      -- injectivity information
 
-  | IfaceClass { ifCtxt    :: IfaceContext,             -- Superclasses
-                 ifName    :: IfaceTopBndr,             -- Name of the class TyCon
+  | IfaceClass { ifName    :: IfaceTopBndr,             -- Name of the class TyCon
                  ifRoles   :: [Role],                   -- Roles
                  ifBinders :: [IfaceTyConBinder],
-                 ifFDs     :: [FunDep IfLclName],      -- Functional dependencies
-                 ifATs     :: [IfaceAT],                -- Associated type families
-                 ifSigs    :: [IfaceClassOp],           -- Method signatures
-                 ifMinDef  :: BooleanFormula IfLclName  -- Minimal complete definition
+                 ifFDs     :: [FunDep IfLclName],       -- Functional dependencies
+                 ifBody    :: IfaceClassBody            -- Methods, superclasses, ATs
     }
 
   | IfaceAxiom { ifName       :: IfaceTopBndr,        -- Axiom name
@@ -168,6 +166,17 @@ data IfaceDecl
                   ifPatTy         :: IfaceType,
                   ifFieldLabels   :: [FieldLabel] }
 
+-- See also 'ClassBody'
+data IfaceClassBody
+  -- Abstract classes don't specify their body; they only occur in @hs-boot@ and
+  -- @hsig@ files.
+  = IfAbstractClass
+  | IfConcreteClass {
+     ifClassCtxt :: IfaceContext,             -- Super classes
+     ifATs       :: [IfaceAT],                -- Associated type families
+     ifSigs      :: [IfaceClassOp],           -- Method signatures
+     ifMinDef    :: BooleanFormula IfLclName  -- Minimal complete definition
+    }
 
 data IfaceTyConParent
   = IfNoParent
@@ -389,10 +398,15 @@ ifaceDeclImplicitBndrs (IfaceData {ifName = tc_name, ifCons = cons })
       IfNewTyCon  cd  -> mkNewTyCoOcc (occName tc_name) : ifaceConDeclImplicitBndrs cd
       IfDataTyCon cds -> concatMap ifaceConDeclImplicitBndrs cds
 
-ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt
-                                   , ifName = cls_tc_name
-                                   , ifSigs = sigs
-                                   , ifATs = ats })
+ifaceDeclImplicitBndrs (IfaceClass { ifBody = IfAbstractClass })
+  = []
+
+ifaceDeclImplicitBndrs (IfaceClass { ifName = cls_tc_name
+                                   , ifBody = IfConcreteClass {
+                                        ifClassCtxt = sc_ctxt,
+                                        ifSigs      = sigs,
+                                        ifATs       = ats
+                                     }})
   = --   (possibly) newtype coercion
     co_occs ++
     --    data constructor (DataCon namespace)
@@ -413,7 +427,7 @@ ifaceDeclImplicitBndrs (IfaceClass { ifCtxt = sc_ctxt
             | otherwise  = []
     dcww_occ = mkDataConWorkerOcc dc_occ
     dc_occ = mkClassDataConOcc cls_tc_occ
-    is_newtype = n_sigs + n_ctxt == 1 -- Sigh
+    is_newtype = n_sigs + n_ctxt == 1 -- Sigh (keep this synced with buildClass)
 
 ifaceDeclImplicitBndrs _ = []
 
@@ -663,6 +677,13 @@ isIfaceDataInstance :: IfaceTyConParent -> Bool
 isIfaceDataInstance IfNoParent = False
 isIfaceDataInstance _          = True
 
+pprClassRoles :: ShowSub -> IfaceTopBndr -> [IfaceTyConBinder] -> [Role] -> SDoc
+pprClassRoles ss clas binders roles =
+    pprRoles (== Nominal)
+             (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
+             binders
+             roles
+
 pprIfaceDecl :: ShowSub -> IfaceDecl -> SDoc
 -- NB: pprIfaceDecl is also used for pretty-printing TyThings in GHCi
 --     See Note [Pretty-printing TyThings] in PprTyThing
@@ -718,17 +739,26 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
 
     pp_extra = vcat [pprCType ctype]
 
-
-pprIfaceDecl ss (IfaceClass { ifATs = ats, ifSigs = sigs
-                            , ifCtxt   = context, ifName  = clas
+pprIfaceDecl ss (IfaceClass { ifName  = clas
                             , ifRoles = roles
-                            , ifFDs    = fds, ifMinDef = minDef
-                            , ifBinders = binders })
-  = vcat [ pprRoles
-             (== Nominal)
-             (pprPrefixIfDeclBndr (ss_how_much ss) (occName clas))
-             binders
-             roles
+                            , ifFDs    = fds
+                            , ifBinders = binders
+                            , ifBody = IfAbstractClass })
+  = vcat [ pprClassRoles ss clas binders roles
+         , text "class" <+> pprIfaceDeclHead [] ss clas binders Nothing
+                                <+> pprFundeps fds ]
+
+pprIfaceDecl ss (IfaceClass { ifName  = clas
+                            , ifRoles = roles
+                            , ifFDs    = fds
+                            , ifBinders = binders
+                            , ifBody = IfConcreteClass {
+                                ifATs = ats,
+                                ifSigs = sigs,
+                                ifClassCtxt = context,
+                                ifMinDef = minDef
+                              }})
+  = vcat [ pprClassRoles ss clas binders roles
          , text "class" <+> pprIfaceDeclHead context ss clas binders Nothing
                                 <+> pprFundeps fds <+> pp_where
          , nest 2 (vcat [ vcat asocs, vcat dsigs
@@ -1246,11 +1276,13 @@ freeNamesIfDecl d@IfaceFamily{} =
   freeNamesIfFamFlav (ifFamFlav d) &&&
   freeNamesIfTyVarBndrs (ifBinders d) &&&
   freeNamesIfKind (ifResKind d)
-freeNamesIfDecl d@IfaceClass{} =
-  freeNamesIfContext (ifCtxt d) &&&
+freeNamesIfDecl d@IfaceClass{ ifBody = IfAbstractClass } =
+  freeNamesIfTyVarBndrs (ifBinders d)
+freeNamesIfDecl d@IfaceClass{ ifBody = d'@IfConcreteClass{} } =
   freeNamesIfTyVarBndrs (ifBinders d) &&&
-  fnList freeNamesIfAT     (ifATs d) &&&
-  fnList freeNamesIfClsSig (ifSigs d)
+  freeNamesIfContext (ifClassCtxt d') &&&
+  fnList freeNamesIfAT     (ifATs d') &&&
+  fnList freeNamesIfClsSig (ifSigs d')
 freeNamesIfDecl d@IfaceAxiom{} =
   freeNamesIfTc (ifTyCon d) &&&
   fnList freeNamesIfAxBranch (ifAxBranches d)
@@ -1566,7 +1598,18 @@ instance Binary IfaceDecl where
         put_ bh a5
         put_ bh a6
 
-    put_ bh (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8) = do
+    -- NB: Written in a funny way to avoid an interface change
+    put_ bh (IfaceClass {
+                ifName    = a2,
+                ifRoles   = a3,
+                ifBinders = a4,
+                ifFDs     = a5,
+                ifBody = IfConcreteClass {
+                    ifClassCtxt = a1,
+                    ifATs  = a6,
+                    ifSigs = a7,
+                    ifMinDef  = a8
+                }}) = do
         putByte bh 5
         put_ bh a1
         putIfaceTopBndr bh a2
@@ -1597,6 +1640,18 @@ instance Binary IfaceDecl where
         put_ bh a9
         put_ bh a10
         put_ bh a11
+
+    put_ bh (IfaceClass {
+                ifName    = a1,
+                ifRoles   = a2,
+                ifBinders = a3,
+                ifFDs     = a4,
+                ifBody = IfAbstractClass }) = do
+        putByte bh 8
+        putIfaceTopBndr bh a1
+        put_ bh a2
+        put_ bh a3
+        put_ bh a4
 
     get bh = do
         h <- getByte bh
@@ -1638,7 +1693,17 @@ instance Binary IfaceDecl where
                     a6 <- get bh
                     a7 <- get bh
                     a8 <- get bh
-                    return (IfaceClass a1 a2 a3 a4 a5 a6 a7 a8)
+                    return (IfaceClass {
+                        ifName    = a2,
+                        ifRoles   = a3,
+                        ifBinders = a4,
+                        ifFDs     = a5,
+                        ifBody = IfConcreteClass {
+                            ifClassCtxt = a1,
+                            ifATs  = a6,
+                            ifSigs = a7,
+                            ifMinDef  = a8
+                        }})
             6 -> do a1 <- getIfaceTopBndr bh
                     a2 <- get bh
                     a3 <- get bh
@@ -1656,6 +1721,16 @@ instance Binary IfaceDecl where
                     a10 <- get bh
                     a11 <- get bh
                     return (IfacePatSyn a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11)
+            8 -> do a1 <- getIfaceTopBndr bh
+                    a2 <- get bh
+                    a3 <- get bh
+                    a4 <- get bh
+                    return (IfaceClass {
+                        ifName    = a1,
+                        ifRoles   = a2,
+                        ifBinders = a3,
+                        ifFDs     = a4,
+                        ifBody = IfAbstractClass })
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
 
 instance Binary IfaceFamTyConFlav where

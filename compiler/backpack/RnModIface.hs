@@ -451,15 +451,11 @@ rnIfaceDecl d@IfaceFamily{} = do
                      }
 rnIfaceDecl d@IfaceClass{} = do
             name <- rnIfaceGlobal (ifName d)
-            ctxt <- mapM rnIfaceType (ifCtxt d)
             binders <- mapM rnIfaceTyConBinder (ifBinders d)
-            ats <- mapM rnIfaceAT (ifATs d)
-            sigs <- mapM rnIfaceClassOp (ifSigs d)
-            return d { ifName = name
-                     , ifCtxt = ctxt
+            body <- rnIfaceClassBody (ifBody d)
+            return d { ifName    = name
                      , ifBinders = binders
-                     , ifATs = ats
-                     , ifSigs = sigs
+                     , ifBody    = body
                      }
 rnIfaceDecl d@IfaceAxiom{} = do
             name <- rnIfaceNeverExported (ifName d)
@@ -490,6 +486,14 @@ rnIfaceDecl d@IfacePatSyn{} =  do
                      , ifPatArgs = pat_args
                      , ifPatTy = pat_ty
                      }
+
+rnIfaceClassBody :: Rename IfaceClassBody
+rnIfaceClassBody IfAbstractClass = return IfAbstractClass
+rnIfaceClassBody d@IfConcreteClass{} = do
+    ctxt <- mapM rnIfaceType (ifClassCtxt d)
+    ats <- mapM rnIfaceAT (ifATs d)
+    sigs <- mapM rnIfaceClassOp (ifSigs d)
+    return d { ifClassCtxt = ctxt, ifATs = ats, ifSigs = sigs }
 
 rnIfaceFamTyConFlav :: Rename IfaceFamTyConFlav
 rnIfaceFamTyConFlav (IfaceClosedSynFamilyTyCon (Just (n, axs)))

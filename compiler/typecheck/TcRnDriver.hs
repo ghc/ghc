@@ -981,11 +981,7 @@ checkBootTyCon is_boot tc1 tc2
           -- Checks kind of class
     check (eqListBy eqFD clas_fds1 clas_fds2)
           (text "The functional dependencies do not match") `andThenCheck`
-    checkUnless (null sc_theta1 && null op_stuff1 && null ats1) $
-                     -- Above tests for an "abstract" class.
-                     -- This is duplicated in 'isAbstractIfaceDecl'
-                     -- and also below near
-                     -- Note [Constraint synonym implements abstract class]
+    checkUnless (isAbstractTyCon tc1) $
     check (eqListBy (eqTypeX env) sc_theta1 sc_theta2)
           (text "The class constraints do not match") `andThenCheck`
     checkListBy eqSig op_stuff1 op_stuff2 (text "methods") `andThenCheck`
@@ -1001,26 +997,15 @@ checkBootTyCon is_boot tc1 tc2
     check (eqTypeX env syn_rhs1 syn_rhs2) empty   -- nothing interesting to say
 
   -- This allows abstract 'data T a' to be implemented using 'type T = ...'
+  -- and abstract 'class K a' to be implement using 'type K = ...'
   -- See Note [Synonyms implement abstract data]
   | not is_boot -- don't support for hs-boot yet
   , isAbstractTyCon tc1
   , Just (tvs, ty) <- synTyConDefn_maybe tc2
   , Just (tc2', args) <- tcSplitTyConApp_maybe ty
   = checkSynAbsData tvs ty tc2' args
-
-  -- This allows abstract 'class C a' to be implemented using 'type C = ...'
-  -- This was originally requested in #12679.
-  -- See Note [Synonyms implement abstract data]
-  | not is_boot -- don't support for hs-boot yet
-  , Just c1 <- tyConClass_maybe tc1
-  , let (_, _clas_fds1, sc_theta1, _, ats1, op_stuff1)
-          = classExtraBigSig c1
-  -- Is it abstract?
-  , null sc_theta1 && null op_stuff1 && null ats1
-  , Just (tvs, ty) <- synTyConDefn_maybe tc2
-  , Just (tc2', args) <- tcSplitTyConApp_maybe ty
-  = checkSynAbsData tvs ty tc2' args
-    -- TODO: We really should check if the fundeps are satisfied, but
+    -- TODO: When it's a synonym implementing a class, we really
+    -- should check if the fundeps are satisfied, but
     -- there is not an obvious way to do this for a constraint synonym.
     -- So for now, let it all through (it won't cause segfaults, anyway).
     -- Tracked at #12704.

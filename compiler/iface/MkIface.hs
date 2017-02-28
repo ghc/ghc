@@ -931,7 +931,7 @@ declExtras fix_fn ann_fn rule_env inst_env fi_env decl
                          map ifDFun         (lookupOccEnvL inst_env n))
                         (ann_fn n)
                         (map (id_extras . occName . ifConName) (visibleIfConDecls cons))
-      IfaceClass{ifSigs=sigs, ifATs=ats} ->
+      IfaceClass{ifBody = IfConcreteClass { ifSigs=sigs, ifATs=ats }} ->
                      IfaceClassExtras (fix_fn n)
                         (map ifDFun $ (concatMap at_extras ats)
                                     ++ lookupOccEnvL inst_env n)
@@ -1668,18 +1668,24 @@ tyConToIfaceDecl env tycon
 classToIfaceDecl :: TidyEnv -> Class -> (TidyEnv, IfaceDecl)
 classToIfaceDecl env clas
   = ( env1
-    , IfaceClass { ifCtxt   = tidyToIfaceContext env1 sc_theta,
-                   ifName   = getName tycon,
+    , IfaceClass { ifName   = getName tycon,
                    ifRoles  = tyConRoles (classTyCon clas),
                    ifBinders = toIfaceTyVarBinders tc_binders,
-                   ifFDs    = map toIfaceFD clas_fds,
-                   ifATs    = map toIfaceAT clas_ats,
-                   ifSigs   = map toIfaceClassOp op_stuff,
-                   ifMinDef = fmap getOccFS (classMinimalDef clas) })
+                   ifBody   = body,
+                   ifFDs    = map toIfaceFD clas_fds })
   where
     (_, clas_fds, sc_theta, _, clas_ats, op_stuff)
       = classExtraBigSig clas
     tycon = classTyCon clas
+
+    body | isAbstractTyCon tycon = IfAbstractClass
+         | otherwise
+         = IfConcreteClass {
+                ifClassCtxt   = tidyToIfaceContext env1 sc_theta,
+                ifATs    = map toIfaceAT clas_ats,
+                ifSigs   = map toIfaceClassOp op_stuff,
+                ifMinDef = fmap getOccFS (classMinimalDef clas)
+            }
 
     (env1, tc_binders) = tidyTyConBinders env (tyConBinders tycon)
 

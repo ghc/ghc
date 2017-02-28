@@ -298,15 +298,28 @@ type TcMethInfo     -- A temporary intermediate, to communicate
 
 buildClass :: Name  -- Name of the class/tycon (they have the same Name)
            -> [TyConBinder]                -- Of the tycon
-           -> [Role] -> ThetaType
+           -> [Role]
            -> [FunDep TyVar]               -- Functional dependencies
-           -> [ClassATItem]                -- Associated types
-           -> [TcMethInfo]                 -- Method info
-           -> ClassMinimalDef              -- Minimal complete definition
+           -- Super classes, associated types, method info, minimal complete def.
+           -- This is Nothing if the class is abstract.
+           -> Maybe (ThetaType, [ClassATItem], [TcMethInfo], ClassMinimalDef)
            -> TcRnIf m n Class
 
-buildClass tycon_name binders roles sc_theta
-           fds at_items sig_stuff mindef
+buildClass tycon_name binders roles fds Nothing
+  = fixM  $ \ rec_clas ->       -- Only name generation inside loop
+    do  { traceIf (text "buildClass")
+
+        ; tc_rep_name  <- newTyConRepName tycon_name
+        ; let univ_bndrs = mkDataConUnivTyVarBinders binders
+              univ_tvs   = binderVars univ_bndrs
+              tycon = mkClassTyCon tycon_name binders roles
+                                   AbstractTyCon rec_clas tc_rep_name
+              result = mkAbstractClass tycon_name univ_tvs fds tycon
+        ; traceIf (text "buildClass" <+> ppr tycon)
+        ; return result }
+
+buildClass tycon_name binders roles fds
+           (Just (sc_theta, at_items, sig_stuff, mindef))
   = fixM  $ \ rec_clas ->       -- Only name generation inside loop
     do  { traceIf (text "buildClass")
 
@@ -365,12 +378,14 @@ buildClass tycon_name binders roles sc_theta
                                    (mkTyConApp rec_tycon (mkTyVarTys univ_tvs))
                                    rec_tycon
 
-        ; rhs <- if use_newtype
-                 then mkNewTyConRhs tycon_name rec_tycon dict_con
-                 else if isCTupleTyConName tycon_name
-                 then return (TupleTyCon { data_con = dict_con
-                                         , tup_sort = ConstraintTuple })
-                 else return (mkDataTyConRhs [dict_con])
+        ; rhs <- case () of
+                  _ | use_newtype
+                    -> mkNewTyConRhs tycon_name rec_tycon dict_con
+                    | isCTupleTyConName tycon_name
+                    -> return (TupleTyCon { data_con = dict_con
+                                          , tup_sort = ConstraintTuple })
+                    | otherwise
+                    -> return (mkDataTyConRhs [dict_con])
 
         ; let { tycon = mkClassTyCon tycon_name binders roles
                                      rhs rec_clas tc_rep_name

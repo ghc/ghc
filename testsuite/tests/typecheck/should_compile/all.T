@@ -343,6 +343,7 @@ test('Tc267', [extra_files(['Tc267a.hs', 'Tc267b.hs', 'Tc267a.hs-boot', 'Tc267b.
 test('tc268', normal, compile, [''])
 test('tc269', normal, compile, [''])
 test('tc270', normal, compile, [''])
+test('Tc271', [extra_files(['Tc271a.hs', 'Tc271.hs', 'Tc271.hs-boot'])], run_command, ['$MAKE -s --no-print-directory Tc271'])
 
 test('GivenOverlapping', normal, compile, [''])
 test('GivenTypeSynonym', normal, compile, [''])

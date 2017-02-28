@@ -14,7 +14,7 @@ module Class (
 
         FunDep, pprFundeps, pprFunDep,
 
-        mkClass, classTyVars, classArity,
+        mkClass, mkAbstractClass, classTyVars, classArity,
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
         classAllSelIds, classSCSelId, classMinimalDef, classHasFds,
@@ -34,7 +34,7 @@ import SrcLoc
 import PrelNames    ( eqTyConKey, coercibleTyConKey, typeableClassKey,
                       heqTyConKey )
 import Outputable
-import BooleanFormula (BooleanFormula)
+import BooleanFormula (BooleanFormula, mkTrue)
 
 import qualified Data.Data as Data
 
@@ -62,21 +62,8 @@ data Class
 
         classFunDeps :: [FunDep TyVar],  -- The functional dependencies
 
-        -- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
-        -- We need value-level selectors for both the dictionary
-        -- superclasses and the equality superclasses
-        classSCTheta :: [PredType],     -- Immediate superclasses,
-        classSCSels  :: [Id],           -- Selector functions to extract the
-                                        --   superclasses from a
-                                        --   dictionary of this class
-        -- Associated types
-        classATStuff :: [ClassATItem],  -- Associated type families
+        classBody :: ClassBody -- Superclasses, ATs, methods
 
-        -- Class operations (methods, not superclasses)
-        classOpStuff :: [ClassOpItem],  -- Ordered by tag
-
-        -- Minimal complete definition
-        classMinimalDef :: ClassMinimalDef
      }
 
 --  | e.g.
@@ -109,6 +96,31 @@ data ClassATItem
                       -- Note [Associated type defaults]
 
 type ClassMinimalDef = BooleanFormula Name -- Required methods
+
+data ClassBody
+  = AbstractClass
+  | ConcreteClass {
+        -- Superclasses: eg: (F a ~ b, F b ~ G a, Eq a, Show b)
+        -- We need value-level selectors for both the dictionary
+        -- superclasses and the equality superclasses
+        classSCThetaStuff :: [PredType],     -- Immediate superclasses,
+        classSCSels  :: [Id],           -- Selector functions to extract the
+                                        --   superclasses from a
+                                        --   dictionary of this class
+        -- Associated types
+        classATStuff :: [ClassATItem],  -- Associated type families
+
+        -- Class operations (methods, not superclasses)
+        classOpStuff :: [ClassOpItem],  -- Ordered by tag
+
+        -- Minimal complete definition
+        classMinimalDefStuff :: ClassMinimalDef
+    }
+    -- TODO: maybe super classes should be allowed in abstract class definitions
+
+classMinimalDef :: Class -> ClassMinimalDef
+classMinimalDef Class{ classBody = ConcreteClass{ classMinimalDefStuff = d } } = d
+classMinimalDef _ = mkTrue -- TODO: make sure this is the right direction
 
 {-
 Note [Associated type defaults]
@@ -164,11 +176,28 @@ mkClass cls_name tyvars fds super_classes superdict_sels at_stuff
                 -- But it takes a module loop to assert it here
             classTyVars  = tyvars,
             classFunDeps = fds,
-            classSCTheta = super_classes,
-            classSCSels  = superdict_sels,
-            classATStuff = at_stuff,
-            classOpStuff = op_stuff,
-            classMinimalDef = mindef,
+            classBody = ConcreteClass {
+                    classSCThetaStuff = super_classes,
+                    classSCSels  = superdict_sels,
+                    classATStuff = at_stuff,
+                    classOpStuff = op_stuff,
+                    classMinimalDefStuff = mindef
+                },
+            classTyCon   = tycon }
+
+mkAbstractClass :: Name -> [TyVar]
+        -> [FunDep TyVar]
+        -> TyCon
+        -> Class
+
+mkAbstractClass cls_name tyvars fds tycon
+  = Class { classKey     = nameUnique cls_name,
+            className    = cls_name,
+                -- NB:  tyConName tycon = cls_name,
+                -- But it takes a module loop to assert it here
+            classTyVars  = tyvars,
+            classFunDeps = fds,
+            classBody = AbstractClass,
             classTyCon   = tycon }
 
 {-
@@ -206,30 +235,43 @@ classArity clas = length (classTyVars clas)
 
 classAllSelIds :: Class -> [Id]
 -- Both superclass-dictionary and method selectors
-classAllSelIds c@(Class {classSCSels = sc_sels})
+classAllSelIds c@(Class { classBody = ConcreteClass { classSCSels = sc_sels }})
   = sc_sels ++ classMethods c
+classAllSelIds c = ASSERT( null (classMethods c) ) []
 
 classSCSelId :: Class -> Int -> Id
 -- Get the n'th superclass selector Id
 -- where n is 0-indexed, and counts
 --    *all* superclasses including equalities
-classSCSelId (Class { classSCSels = sc_sels }) n
+classSCSelId (Class { classBody = ConcreteClass { classSCSels = sc_sels } }) n
   = ASSERT( n >= 0 && n < length sc_sels )
     sc_sels !! n
+classSCSelId c n = pprPanic "classSCSelId" (ppr c <+> ppr n)
 
 classMethods :: Class -> [Id]
-classMethods (Class {classOpStuff = op_stuff})
+classMethods (Class { classBody = ConcreteClass { classOpStuff = op_stuff } })
   = [op_sel | (op_sel, _) <- op_stuff]
+classMethods _ = []
 
 classOpItems :: Class -> [ClassOpItem]
-classOpItems = classOpStuff
+classOpItems (Class { classBody = ConcreteClass { classOpStuff = op_stuff }})
+  = op_stuff
+classOpItems _ = []
 
 classATs :: Class -> [TyCon]
-classATs (Class { classATStuff = at_stuff })
+classATs (Class { classBody = ConcreteClass { classATStuff = at_stuff } })
   = [tc | ATI tc _ <- at_stuff]
+classATs _ = []
 
 classATItems :: Class -> [ClassATItem]
-classATItems = classATStuff
+classATItems (Class { classBody = ConcreteClass { classATStuff = at_stuff }})
+  = at_stuff
+classATItems _ = []
+
+classSCTheta :: Class -> [PredType]
+classSCTheta (Class { classBody = ConcreteClass { classSCThetaStuff = theta_stuff }})
+  = theta_stuff
+classSCTheta _ = []
 
 classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
 classTvsFds c = (classTyVars c, classFunDeps c)
@@ -238,14 +280,26 @@ classHasFds :: Class -> Bool
 classHasFds (Class { classFunDeps = fds }) = not (null fds)
 
 classBigSig :: Class -> ([TyVar], [PredType], [Id], [ClassOpItem])
-classBigSig (Class {classTyVars = tyvars, classSCTheta = sc_theta,
-                    classSCSels = sc_sels, classOpStuff = op_stuff})
+classBigSig (Class {classTyVars = tyvars,
+                    classBody = AbstractClass})
+  = (tyvars, [], [], [])
+classBigSig (Class {classTyVars = tyvars,
+                    classBody = ConcreteClass {
+                        classSCThetaStuff = sc_theta,
+                        classSCSels = sc_sels,
+                        classOpStuff = op_stuff
+                    }})
   = (tyvars, sc_theta, sc_sels, op_stuff)
 
 classExtraBigSig :: Class -> ([TyVar], [FunDep TyVar], [PredType], [Id], [ClassATItem], [ClassOpItem])
 classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
-                         classSCTheta = sc_theta, classSCSels = sc_sels,
-                         classATStuff = ats, classOpStuff = op_stuff})
+                         classBody = AbstractClass})
+  = (tyvars, fundeps, [], [], [], [])
+classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
+                         classBody = ConcreteClass {
+                             classSCThetaStuff = sc_theta, classSCSels = sc_sels,
+                             classATStuff = ats, classOpStuff = op_stuff
+                         }})
   = (tyvars, fundeps, sc_theta, sc_sels, ats, op_stuff)
 
 -- | If a class is "naturally coherent", then we needn't worry at all, in any

@@ -208,7 +208,7 @@ typecheckIface iface
 -- | Returns true if an 'IfaceDecl' is for @data T@ (an abstract data type)
 isAbstractIfaceDecl :: IfaceDecl -> Bool
 isAbstractIfaceDecl IfaceData{ ifCons = IfAbstractTyCon } = True
-isAbstractIfaceDecl IfaceClass{ ifCtxt = [], ifSigs = [], ifATs = [] } = True
+isAbstractIfaceDecl IfaceClass{ ifBody = IfAbstractClass } = True
 isAbstractIfaceDecl IfaceFamily{ ifFamFlav = IfaceAbstractClosedSynFamilyTyCon } = True
 isAbstractIfaceDecl _ = False
 
@@ -223,21 +223,22 @@ ifMaybeRoles _ = Nothing
 -- later.)
 mergeIfaceDecl :: IfaceDecl -> IfaceDecl -> IfaceDecl
 mergeIfaceDecl d1 d2
-    -- TODO: need to merge roles
     | isAbstractIfaceDecl d1 = d2 `withRolesFrom` d1
     | isAbstractIfaceDecl d2 = d1 `withRolesFrom` d2
-    | IfaceClass{ ifSigs = ops1, ifMinDef = bf1 } <- d1
-    , IfaceClass{ ifSigs = ops2, ifMinDef = bf2 } <- d2
+    | IfaceClass{ ifBody = IfConcreteClass { ifSigs = ops1, ifMinDef = bf1 } } <- d1
+    , IfaceClass{ ifBody = IfConcreteClass { ifSigs = ops2, ifMinDef = bf2 } } <- d2
     = let ops = nameEnvElts $
                   plusNameEnv_C mergeIfaceClassOp
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops1 ])
                     (mkNameEnv [ (n, op) | op@(IfaceClassOp n _ _) <- ops2 ])
-      in d1 { ifSigs   = ops
-            , ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
-            } `withRolesFrom` d2
+      in d1 { ifBody = (ifBody d1) {
+                ifSigs  = ops,
+                ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
+                }
+            }
     -- It doesn't matter; we'll check for consistency later when
     -- we merge, see 'mergeSignatures'
-    | otherwise              = d1 `withRolesFrom` d2
+    | otherwise              = d1
 
 withRolesFrom :: IfaceDecl -> IfaceDecl -> IfaceDecl
 d1 `withRolesFrom` d2
@@ -677,15 +678,27 @@ tc_iface_decl parent _ (IfaceFamily {ifName = tc_name,
          = pprPanic "tc_iface_decl"
                     (text "IfaceBuiltInSynFamTyCon in interface file")
 
-tc_iface_decl _parent ignore_prags
-            (IfaceClass {ifCtxt = rdr_ctxt, ifName = tc_name,
+tc_iface_decl _parent _ignore_prags
+            (IfaceClass {ifName = tc_name,
                          ifRoles = roles,
                          ifBinders = binders,
                          ifFDs = rdr_fds,
-                         ifATs = rdr_ats, ifSigs = rdr_sigs,
-                         ifMinDef = mindef_occ })
--- ToDo: in hs-boot files we should really treat abstract classes specially,
---       as we do abstract tycons
+                         ifBody = IfAbstractClass})
+  = bindIfaceTyConBinders binders $ \ binders' -> do
+    { fds  <- mapM tc_fd rdr_fds
+    ; cls  <- buildClass tc_name binders' roles fds Nothing
+    ; return (ATyCon (classTyCon cls)) }
+
+tc_iface_decl _parent ignore_prags
+            (IfaceClass {ifName = tc_name,
+                         ifRoles = roles,
+                         ifBinders = binders,
+                         ifFDs = rdr_fds,
+                         ifBody = IfConcreteClass {
+                             ifClassCtxt = rdr_ctxt,
+                             ifATs = rdr_ats, ifSigs = rdr_sigs,
+                             ifMinDef = mindef_occ
+                         }})
   = bindIfaceTyConBinders binders $ \ binders' -> do
     { traceIf (text "tc-iface-class1" <+> ppr tc_name)
     ; ctxt <- mapM tc_sc rdr_ctxt
@@ -697,7 +710,7 @@ tc_iface_decl _parent ignore_prags
     ; cls  <- fixM $ \ cls -> do
               { ats  <- mapM (tc_at cls) rdr_ats
               ; traceIf (text "tc-iface-class4" <+> ppr tc_name)
-              ; buildClass tc_name binders' roles ctxt fds ats sigs mindef }
+              ; buildClass tc_name binders' roles fds (Just (ctxt, ats, sigs, mindef)) }
     ; return (ATyCon (classTyCon cls)) }
   where
    tc_sc pred = forkM (mk_sc_doc pred) (tcIfaceType pred)
@@ -746,10 +759,6 @@ tc_iface_decl _parent ignore_prags
    mk_at_doc tc = text "Associated type" <+> ppr tc
    mk_op_doc op_name op_ty = text "Class op" <+> sep [ppr op_name, ppr op_ty]
 
-   tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
-                           ; tvs2' <- mapM tcIfaceTyVar tvs2
-                           ; return (tvs1', tvs2') }
-
 tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
                               , ifAxBranches = branches, ifRole = role })
   = do { tc_tycon    <- tcIfaceTyCon tc
@@ -793,6 +802,11 @@ tc_iface_decl _ _ (IfacePatSyn{ ifName = name
      tc_pr :: (IfExtName, Bool) -> IfL (Id, Bool)
      tc_pr (nm, b) = do { id <- forkM (ppr nm) (tcIfaceExtId nm)
                         ; return (id, b) }
+
+tc_fd :: FunDep IfLclName -> IfL (FunDep TyVar)
+tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
+                        ; tvs2' <- mapM tcIfaceTyVar tvs2
+                        ; return (tvs1', tvs2') }
 
 tc_ax_branches :: [IfaceAxBranch] -> IfL [CoAxBranch]
 tc_ax_branches if_branches = foldlM tc_ax_branch [] if_branches
