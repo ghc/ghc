@@ -68,10 +68,6 @@ rts_AUTO_APPLY_CMM = rts/dist/build/AutoApply.cmm
 $(rts_AUTO_APPLY_CMM): $$(genapply_INPLACE)
 	"$(genapply_INPLACE)" >$@
 
-rts/dist/build/sm/Evac_thr.c : rts/sm/Evac.c | $$(dir $$@)/.
-	cp $< $@
-rts/dist/build/sm/Scav_thr.c : rts/sm/Scav.c | $$(dir $$@)/.
-	cp $< $@
 
 rts_H_FILES := $(wildcard rts/*.h rts/*/*.h)
 
@@ -157,9 +153,6 @@ endif
 rts_dist_$1_CC_OPTS += -DDYNAMIC
 endif
 
-ifneq "$$(findstring thr, $1)" ""
-rts_$1_EXTRA_C_SRCS  =  rts/dist/build/sm/Evac_thr.c rts/dist/build/sm/Scav_thr.c
-endif
 
 $(call distdir-way-opts,rts,dist,$1,1) # 1 because the rts is built with stage1
 $(call c-suffix-rules,rts,dist,$1,YES)
@@ -452,12 +445,8 @@ endif
 
 # -O3 helps unroll some loops (especially in copy() with a constant argument).
 rts/sm/Evac_CC_OPTS += -funroll-loops
-rts/dist/build/sm/Evac_thr_HC_OPTS += -optc-funroll-loops
+rts/sm/Evac_thr_HC_OPTS += -optc-funroll-loops
 
-# These files are just copies of sm/Evac.c and sm/Scav.c respectively,
-# but compiled with -DPARALLEL_GC.
-rts/dist/build/sm/Evac_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
-rts/dist/build/sm/Scav_thr_CC_OPTS += -DPARALLEL_GC -Irts/sm
 
 #-----------------------------------------------------------------------------
 # Use system provided libffi
