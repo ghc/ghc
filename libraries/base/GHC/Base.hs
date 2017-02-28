@@ -904,16 +904,23 @@ augment g xs = g (:) xs
         -- Only activate this from phase 1, because that's
         -- when we disable the rule that expands (++) into foldr
 
+"foldr/nil"    forall k z.             foldr k z []             = z
+"foldr/single" forall k z x.           foldr k z [x]            = k x z
+"foldr/short2" forall k z x1 x2.       foldr k z [x1,x2]        = k x1 (k x2 z)
+"foldr/short3" forall k z x1 x2 x3.    foldr k z [x1,x2,x3]     = k x1 (k x2 (k x3 z))
+"foldr/short4" forall k z x1 x2 x3 x4. foldr k z [x1,x2,x3,x4]  = k x1 (k x2 (k x3 (k x4 z)))
+
+-- "foldr/cons" forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
 -- The foldr/cons rule looks nice, but it can give disastrously
 -- bloated code when commpiling
 --      array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
 -- i.e. when there are very very long literal lists
--- So I've disabled it for now. We could have special cases
--- for short lists, I suppose.
--- "foldr/cons" forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
-
-"foldr/single"  forall k z x. foldr k z [x] = k x z
-"foldr/nil"     forall k z.   foldr k z []  = z
+-- So we disabled it, but have special cases for short lists up
+-- to a completely arbitrary limit of 4.
+--
+-- Note that static lists that are explicitly entered as such in the source,
+-- the compiler desugars them to build (if they are short), and then normal
+-- foldr/build rule fires, see note [Desugaring explicit lists] in DsExpr
 
 "foldr/cons/build" forall k z x (g::forall b. (a->b->b) -> b -> b) .
                            foldr k z (x:build g) = k x (g k z)
