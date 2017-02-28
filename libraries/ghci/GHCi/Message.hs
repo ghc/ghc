@@ -85,6 +85,9 @@ data Message a where
   -- Interpreter -------------------------------------------
 
   -- | Create a set of BCO objects, and return HValueRefs to them
+  -- Note: Each ByteString contains a Binary-encoded [ResolvedBCO], not
+  -- a ResolvedBCO. The list is to allow us to serialise the ResolvedBCOs
+  -- in parallel. See @createBCOs@ in compiler/ghci/GHCi.hsc.
   CreateBCOs :: [LB.ByteString] -> Message [HValueRef]
 
   -- | Release 'HValueRef's
