@@ -617,7 +617,7 @@ test('T5837',
            (platform('x86_64-unknown-mingw32'), 59161648, 7),
              # 2017-02-19                        59161648 (x64/Windows) - Unknown
 
-           (wordsize(64), 58648600, 7)])
+           (wordsize(64), 54151864, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
              # 2012-10-02 81879216
              # 2012-09-20 87254264 amd64/Linux
@@ -651,6 +651,7 @@ test('T5837',
              #                      to be environmentally-dependent.
              #                      Also bumped acceptance threshold to 7%.
              # 2017-02-20 58648600  amd64/Linux Type-indexed Typeable
+             # 2017-02-28 54151864  amd64/Linux Likely drift due to recent simplifier improvements
       ],
       compile, ['-freduction-depth=50'])
 
@@ -885,6 +886,7 @@ test('T10370',
           # 2016-10-20    38221184   Allow top-level string literals.
           #                          See the comment 16 on #8472.
           # 2017-02-17    51126304   Type-indexed Typeawble
+          # 2017-02-27    43455848   Likely drift from recent simplifier improvements
            (wordsize(32), 11371496, 15),
           # 2015-10-22    11371496
           ]),
