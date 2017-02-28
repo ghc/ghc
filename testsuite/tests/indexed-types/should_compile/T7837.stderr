@@ -1,6 +1,5 @@
 Rule fired: Class op signum
 Rule fired: Class op abs
+Rule fired: Class op HEq_sc
 Rule fired: normalize/Double
-Rule fired: Class op HEq_sc
-Rule fired: Class op HEq_sc
 Rule fired: Class op HEq_sc

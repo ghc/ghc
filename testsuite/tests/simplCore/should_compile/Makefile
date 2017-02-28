@@ -7,13 +7,17 @@ T3990:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T3990.hs | grep 'test_case'
         # Grep output should show an unpacked constructor
 
+T8848:
+	$(RM) -f T8848.o T8848.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-rule-firings T8848.hs | grep 'SPEC map2'
+        # Should fire twice
+
 T9509:
 	$(RM) -f T9509*.o T9509*.hi
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9509a.hs
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9509.hs -funfolding-use-threshold=20 \
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T9509.hs  \
               -ddump-rule-rewrites | grep SPEC
-        # Grep output should show a SPEC rule firing
-        # The unfolding use threshold is to prevent foo inlining before it is specialised
+        # Grep output should show a SPEC rule firing, twice
 
 T13317:
 	$(RM) -f T13317.o T13317.hi
@@ -135,6 +139,7 @@ T4138:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T4138_A.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c T4138.hs -ddump-simpl > T4138.simpl
 	grep -c 'F#' T4138.simpl
+        # We expect to see this
 
 T7165:
 	$(RM) -f T7165.hi T7165a.hi T7165a.o T7165.o

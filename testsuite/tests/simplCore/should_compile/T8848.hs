@@ -18,10 +18,15 @@ instance A.Applicative (Shape r)=> A.Applicative (Shape (S r)) where
 instance Fun.Functor (Shape Z) where
 instance (Fun.Functor (Shape r)) => Fun.Functor (Shape (S r)) where
 
-map2 :: (A.Applicative (Shape r))=> (a->b ->c) -> (Shape r a) -> (Shape r b) -> (Shape r c )
-map2 = \f l r -> A.pure f A.<*>  l  A.<*> r
+map2 :: (A.Applicative (Shape r))=> (a->b ->c) -> (Shape r a) -> (Shape r b) -> [Shape r c]
+-- Artifically made recursive so that it won't inline,
+-- se we can see if the speicalisation happens
+map2 = \f l r -> (A.pure f A.<*>  l  A.<*> r) : map2 f l r
 
-{-# SPECIALIZE map2 :: (a->b->c)-> (Shape (S (S Z)) a )-> Shape (S (S Z)) b -> Shape (S (S Z)) c #-}
+{-# SPECIALIZE map2 :: (a->b->c)
+                    -> (Shape (S (S Z)) a )
+                    -> Shape (S (S Z)) b
+                    -> [Shape (S (S Z)) c] #-}
 
-map3 :: (a->b->c)-> (Shape (S (S Z)) a )-> Shape (S (S Z)) b -> Shape (S (S Z)) c 
+map3 :: (a->b->c)-> (Shape (S (S Z)) a )-> Shape (S (S Z)) b -> [Shape (S (S Z)) c]
 map3 x y z = map2 x y z

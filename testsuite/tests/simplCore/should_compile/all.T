@@ -180,7 +180,9 @@ test('T8832',
      run_command,
      ['$MAKE -s --no-print-directory T8832 T8832_WORDSIZE_OPTS=' +
       ('-DT8832_WORDSIZE_64' if wordsize(64) else '')])
-test('T8848', only_ways(['optasm']), compile, ['-ddump-rule-firings -dsuppress-uniques'])
+test('T8848', normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T8848'])
 test('T8848a', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T8331', only_ways(['optasm']), compile, ['-ddump-rules'])
 test('T6056', only_ways(['optasm']), multimod_compile, ['T6056', '-v0 -ddump-rule-firings'])
@@ -192,7 +194,7 @@ test('T10176', only_ways(['optasm']), compile, [''])
 test('T10180', only_ways(['optasm']), compile, [''])
 test('T10602', only_ways(['optasm']), multimod_compile, ['T10602','-v0'])
 test('T10627', only_ways(['optasm']), compile, [''])
-test('T10181', [expect_broken(10181), only_ways(['optasm'])], compile, [''])
+test('T10181', [only_ways(['optasm'])], compile, [''])
 test('T10083',
      normal,
      run_command,

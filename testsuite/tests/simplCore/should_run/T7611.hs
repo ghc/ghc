@@ -4,6 +4,7 @@ import GHC.Exts
 
 newtype Age = Age Int
 
+{-# NOINLINE myMap #-}
 myMap f [] = []
 myMap f (x:xs) = f x : myMap f xs
 

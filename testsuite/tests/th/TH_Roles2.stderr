@@ -16,8 +16,8 @@ TH_Roles2.$tcT
       TH_Roles2.$trModule
       (GHC.Types.TrNameS "T"#)
       1
-      krep_a4im
-krep_a4im [InlPrag=[~]]
+      krep_a40L
+krep_a40L [InlPrag=[~]]
   = GHC.Types.KindRepFun
       (GHC.Types.KindRepVar 0)
       (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)

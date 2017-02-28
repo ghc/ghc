@@ -15,9 +15,13 @@ import System.IO.Unsafe ( unsafePerformIO )
 -- Dont inline till last, to give the rule a chance
 sndSnd (a,(b,c)) = (a,c)
 
+{-# NOINLINE [2] myFst #-}
+-- Dont inline till last, to give the rule a chance
+myFst (a,b) = a
+
 trace x y = unsafePerformIO (hPutStr stderr x >> hPutStr stderr "\n" >> return y)
 
-{-# RULES "foo" forall v .  fst (sndSnd v) = trace "Yes" (fst v) #-}
+{-# RULES "foo" forall v .  myFst (sndSnd v) = trace "Yes" (fst v) #-}
 
 main :: IO ()
-main = print (fst (sndSnd (True, (False,True))))
+main = print (myFst (sndSnd (True, (False,True))))

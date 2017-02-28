@@ -129,7 +129,7 @@ test('haddock.compiler',
      [extra_files(['../../../../compiler/stage2/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 62070477608, 10)
+          [(wordsize(64), 55777283352, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -146,6 +146,7 @@ test('haddock.compiler',
             # 2016-06-21: 55314944264 (amd64/Linux) D2350: Make checkFamInstConsistency less expensive
             # 2016-11-29: 60911147344 (amd64/Linux) unknown cause
             # 2017-02-11: 62070477608 (amd64/Linux) OccurAnal / One-Shot  (#13227) (and others)
+            # 2017-02-25: 55777283352 (amd64/Linux) Early inline patch
 
           ,(platform('i386-unknown-mingw32'),   902576468, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)

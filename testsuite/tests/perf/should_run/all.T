@@ -89,6 +89,8 @@ test('lazy-bs-alloc',
             # 2014-01-22: 411500 (x86/Linux)
             # 2014-01-28: Widen 1->2% (x86/Windows was at 425212)
             # 2016-04-06: 429760 (x86/Linux) no idea what happened
+            # 2017-02-14: 421448 Early inline patch
+
       only_ways(['normal']),
       extra_run_opts('arith011.stdout'),
       ignore_stdout,

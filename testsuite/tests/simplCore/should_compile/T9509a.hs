@@ -6,5 +6,5 @@ foo :: Ord a => a -> IO a
 {-# INLINABLE foo #-}
 foo x = newIORef x >>= readIORef >>= \y ->
         case compare x y of
-           LT ->  return x ;
-           _  -> return y
+           LT ->  return x
+           _  ->  foo x   -- Recursive so it won't inline

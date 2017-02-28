@@ -132,6 +132,7 @@ getCoreToDo dflags
     rules_on      = gopt Opt_EnableRewriteRules           dflags
     eta_expand_on = gopt Opt_DoLambdaEtaExpansion         dflags
     ww_on         = gopt Opt_WorkerWrapper                dflags
+    vectorise_on  = gopt Opt_Vectorise                    dflags
     static_ptrs   = xopt LangExt.StaticPointers           dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
@@ -160,12 +161,12 @@ getCoreToDo dflags
           --  We need to eliminate these common sub expressions before their definitions
           --  are inlined in phase 2. The CSE introduces lots of  v1 = v2 bindings,
           --  so we also run simpl_gently to inline them.
-      ++  (if gopt Opt_Vectorise dflags && phase == 3
+      ++  (if vectorise_on && phase == 3
             then [CoreCSE, simpl_gently]
             else [])
 
     vectorisation
-      = runWhen (gopt Opt_Vectorise dflags) $
+      = runWhen vectorise_on $
           CoreDoPasses [ simpl_gently, CoreDoVectorisation ]
 
                 -- By default, we have 2 phases before phase 0.
@@ -188,7 +189,8 @@ getCoreToDo dflags
                        (base_mode { sm_phase = InitialPhase
                                   , sm_names = ["Gentle"]
                                   , sm_rules = rules_on   -- Note [RULEs enabled in SimplGently]
-                                  , sm_inline = False
+                                  , sm_inline = not vectorise_on
+                                              -- See Note [Inline in InitialPhase]
                                   , sm_case_case = False })
                           -- Don't do case-of-case transformations.
                           -- This makes full laziness work better
@@ -381,7 +383,35 @@ addPluginPasses builtin_passes
     query_plug todos (_, plug, options) = installCoreToDos plug options todos
 #endif
 
-{-
+{- Note [Inline in InitialPhase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In GHC 8 and earlier we did not inline anything in the InitialPhase. But that is
+confusing for users because when they say INLINE they expect the function to inline
+right away.
+
+So now we do inlining immediately, even in the InitialPhase, assuming that the
+Id's Activation allows it.
+
+This is a surprisingly big deal. Compiler performance improved a lot
+when I made this change:
+
+   perf/compiler/T5837.run            T5837 [stat too good] (normal)
+   perf/compiler/parsing001.run       parsing001 [stat too good] (normal)
+   perf/compiler/T12234.run           T12234 [stat too good] (optasm)
+   perf/compiler/T9020.run            T9020 [stat too good] (optasm)
+   perf/compiler/T3064.run            T3064 [stat too good] (normal)
+   perf/compiler/T9961.run            T9961 [stat too good] (normal)
+   perf/compiler/T13056.run           T13056 [stat too good] (optasm)
+   perf/compiler/T9872d.run           T9872d [stat too good] (normal)
+   perf/compiler/T783.run             T783 [stat too good] (normal)
+   perf/compiler/T12227.run           T12227 [stat too good] (normal)
+   perf/should_run/lazy-bs-alloc.run  lazy-bs-alloc [stat too good] (normal)
+   perf/compiler/T1969.run            T1969 [stat too good] (normal)
+   perf/compiler/T9872a.run           T9872a [stat too good] (normal)
+   perf/compiler/T9872c.run           T9872c [stat too good] (normal)
+   perf/compiler/T9872b.run           T9872b [stat too good] (normal)
+   perf/compiler/T9872d.run           T9872d [stat too good] (normal)
+
 Note [RULEs enabled in SimplGently]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 RULES are enabled when doing "gentle" simplification.  Two reasons:

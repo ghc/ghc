@@ -1,8 +1,20 @@
 {-# LANGUAGE TypeFamilies, ConstraintKinds #-}
 
 module Foo( shared, foo, bar) where
+-- module Foo where
 
 import GHC.Exts
+
+{-
+foo :: [Int] -> [Int]
+foo = let f = map negate
+      in   f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
+           f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
+           f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
+           f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
+           f . f . f . f . f . f . f . f . f . f . f . f . f
+
+-}
 
 type family Domain (f :: * -> *) a :: Constraint
 
@@ -22,7 +34,7 @@ shared = let
   f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
   f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
   f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.  f.
-  f
+  f . f . f . f . f . f . f . f . f . f . f . f . f
 
 foo xs = shared $ 0:xs
 bar xs = 0:shared xs

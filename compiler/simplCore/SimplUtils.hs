@@ -721,7 +721,8 @@ updModeForRules current_mode
 
 {- Note [Simplifying rules]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When simplifying a rule, refrain from any inlining or applying of other RULES.
+When simplifying a rule LHS, refrain from /any/ inlining or applying
+of other RULES.
 
 Doing anything to the LHS is plain confusing, because it means that what the
 rule matches is not what the user wrote. c.f. Trac #10595, and #10528.
@@ -868,11 +869,17 @@ continuation.
 -}
 
 activeUnfolding :: SimplEnv -> Id -> Bool
-activeUnfolding env
-  | not (sm_inline mode) = active_unfolding_minimal
-  | otherwise            = case sm_phase mode of
-                             InitialPhase -> active_unfolding_gentle
-                             Phase n      -> active_unfolding n
+activeUnfolding env id
+  | isCompulsoryUnfolding (realIdUnfolding id)
+  = True   -- Even sm_inline can't override compulsory unfoldings
+  | otherwise
+  = isActive (sm_phase mode) (idInlineActivation id)
+  && sm_inline mode
+      -- `or` isStableUnfolding (realIdUnfolding id)
+      -- Inline things when
+      --  (a) they are active
+      --  (b) sm_inline says so, except that for stable unfoldings
+      --                         (ie pragmas) we inline anyway
   where
     mode = getMode env
 
@@ -891,34 +898,12 @@ getUnfoldingInRuleMatch env
     id_unf id | unf_is_active id = idUnfolding id
               | otherwise        = NoUnfolding
     unf_is_active id
-     | not (sm_rules mode) = active_unfolding_minimal id
+     | not (sm_rules mode) = -- active_unfolding_minimal id
+                             isStableUnfolding (realIdUnfolding id)
+        -- Do we even need to test this?  I think this InScopeEnv
+        -- is only consulted if activeRule returns True, which
+        -- never happens if sm_rules is False
      | otherwise           = isActive (sm_phase mode) (idInlineActivation id)
-
-active_unfolding_minimal :: Id -> Bool
--- Compuslory unfoldings only
--- Ignore SimplGently, because we want to inline regardless;
--- the Id has no top-level binding at all
---
--- NB: we used to have a second exception, for data con wrappers.
--- On the grounds that we use gentle mode for rule LHSs, and
--- they match better when data con wrappers are inlined.
--- But that only really applies to the trivial wrappers (like (:)),
--- and they are now constructed as Compulsory unfoldings (in MkId)
--- so they'll happen anyway.
-active_unfolding_minimal id = isCompulsoryUnfolding (realIdUnfolding id)
-
-active_unfolding :: PhaseNum -> Id -> Bool
-active_unfolding n id = isActiveIn n (idInlineActivation id)
-
-active_unfolding_gentle :: Id -> Bool
--- Anything that is early-active
--- See Note [Gentle mode]
-active_unfolding_gentle id
-  =  isInlinePragma prag
-  && isEarlyActive (inlinePragmaActivation prag)
-       -- NB: wrappers are not early-active
-  where
-    prag = idInlinePragma id
 
 ----------------------
 activeRule :: SimplEnv -> Activation -> Bool
@@ -1027,10 +1012,11 @@ Example
    ...fInt...fInt...fInt...
 
 Here f occurs just once, in the RHS of fInt. But if we inline it there
-we'll lose the opportunity to inline at each of fInt's call sites.
-The INLINE pragma will only inline when the application is saturated
-for exactly this reason; and we don't want PreInlineUnconditionally
-to second-guess it.  A live example is Trac #3736.
+it might make fInt look big, and we'll lose the opportunity to inline f
+at each of fInt's call sites.  The INLINE pragma will only inline when
+the application is saturated for exactly this reason; and we don't
+want PreInlineUnconditionally to second-guess it.  A live example is
+Trac #3736.
     c.f. Note [Stable unfoldings and postInlineUnconditionally]
 
 Note [Top-level bottoming Ids]
