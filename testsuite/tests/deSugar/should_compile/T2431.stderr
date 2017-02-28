@@ -4,7 +4,7 @@ Result size of Tidy Core
   = {terms: 83, types: 49, coercions: 1, joins: 0/0}
 
 -- RHS size: {terms: 2, types: 4, coercions: 1, joins: 0/0}
-T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
+T2431.$WRefl [InlPrag=INLINE[2]] :: forall a. a :~: a
 [GblId[DataConWrapper],
  Caf=NoCafRefs,
  Str=m,
@@ -13,9 +13,9 @@ T2431.$WRefl [InlPrag=INLINE] :: forall a. a :~: a
          Guidance=ALWAYS_IF(arity=0,unsat_ok=True,boring_ok=False)
          Tmpl= \ (@ a) ->
                  T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))}]
-T2431.$WRefl =
-  \ (@ a) ->
-    T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))
+T2431.$WRefl
+  = \ (@ a) ->
+      T2431.Refl @ a @ a @~ (<a>_N :: (a :: *) GHC.Prim.~# (a :: *))
 
 -- RHS size: {terms: 4, types: 8, coercions: 0, joins: 0/0}
 absurd :: forall a. (Int :~: Bool) -> a
@@ -85,14 +85,14 @@ $tc:~:2 = GHC.Types.TrNameS $tc:~:1
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T2431.$tc:~: :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
-T2431.$tc:~: =
-  GHC.Types.TyCon
-    4608886815921030019##
-    6030312177285011233##
-    T2431.$trModule
-    $tc:~:2
-    0#
-    krep4
+T2431.$tc:~:
+  = GHC.Types.TyCon
+      4608886815921030019##
+      6030312177285011233##
+      T2431.$trModule
+      $tc:~:2
+      0#
+      krep4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 krep5 :: GHC.Types.KindRep
@@ -107,9 +107,9 @@ krep6 = GHC.Types.KindRepVar 0#
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
 krep7 :: [GHC.Types.KindRep]
 [GblId, Caf=NoCafRefs]
-krep7 =
-  GHC.Types.:
-    @ GHC.Types.KindRep krep6 (GHC.Types.[] @ GHC.Types.KindRep)
+krep7
+  = GHC.Types.:
+      @ GHC.Types.KindRep krep6 (GHC.Types.[] @ GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 krep8 :: [GHC.Types.KindRep]
@@ -134,14 +134,14 @@ $tc'Refl2 = GHC.Types.TrNameS $tc'Refl1
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T2431.$tc'Refl :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
-T2431.$tc'Refl =
-  GHC.Types.TyCon
-    2478588351447975921##
-    2684375695874497811##
-    T2431.$trModule
-    $tc'Refl2
-    1#
-    krep9
+T2431.$tc'Refl
+  = GHC.Types.TyCon
+      2478588351447975921##
+      2684375695874497811##
+      T2431.$trModule
+      $tc'Refl2
+      1#
+      krep9
 
 
 

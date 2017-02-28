@@ -518,7 +518,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setArityInfo`         wrap_arity
                              -- It's important to specify the arity, so that partial
                              -- applications are treated as values
-                         `setInlinePragInfo`    alwaysInlinePragma
+                         `setInlinePragInfo`    wrap_prag
                          `setUnfoldingInfo`     wrap_unf
                          `setStrictnessInfo`    wrap_sig
                              -- We need to get the CAF info right here because TidyPgm
@@ -527,9 +527,14 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                          `setNeverLevPoly`      wrap_ty
 
              wrap_sig = mkClosedStrictSig wrap_arg_dmds (dataConCPR data_con)
+
              wrap_arg_dmds = map mk_dmd arg_ibangs
              mk_dmd str | isBanged str = evalDmd
                         | otherwise           = topDmd
+
+             wrap_prag = alwaysInlinePragma `setInlinePragmaActivation`
+                         ActiveAfter NoSourceText 2
+                         -- See Note [Activation for data constructor wrappers]
 
              -- The wrapper will usually be inlined (see wrap_unf), so its
              -- strictness and CPR info is usually irrelevant. But this is
@@ -620,7 +625,20 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
            ; expr <- mk_rep_app prs (mkVarApps con_app rep_ids)
            ; return (unbox_fn expr) }
 
-{-
+{- Note [Activation for data constructor wrappers]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Activation on a data constructor wrapper allows it to inline in
+Phase 2 and later (1, 0).  But not in the InitialPhase.  That gives
+rewrite rules a chance to fire (in the InitialPhase) if they mention
+a data constructor on the left
+   RULE "foo"  f (K a b) = ...
+Since the LHS of rules are simplified with InitialPhase, we won't
+inline the wrapper on the LHS either.
+
+People have asked for this before, but now that even the InitialPhase
+does some inlining, it has become important.
+
+
 Note [Bangs on imported data constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
