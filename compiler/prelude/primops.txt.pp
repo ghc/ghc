@@ -1965,7 +1965,7 @@ primop  CatchOp "catch#" GenPrimOp
        -> State# RealWorld
        -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd] topRes }
                  -- See Note [Strictness for mask/unmask/catch]

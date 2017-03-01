@@ -308,7 +308,7 @@ forkOS action0
                         MaskedInterruptible -> action0
                         MaskedUninterruptible -> uninterruptibleMask_ action0
 
-            action_plus = catchException action1 childHandler
+            action_plus = catch action1 childHandler
 
         entry <- newStablePtr (myThreadId >>= putMVar mv >> action_plus)
         err <- forkOS_createThread entry

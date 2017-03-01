@@ -708,7 +708,7 @@ lazyApply1Dmd, lazyApply2Dmd, strictApply1Dmd, catchArgDmd :: Demand
 strictApply1Dmd = JD { sd = Str VanStr (SCall HeadStr)
                      , ud = Use Many (UCall One Used) }
 
--- First argument of catch#:
+-- First argument of catchRetry# and catchSTM#:
 --    uses its arg once, applies it once
 --    and catches exceptions (the ExnStr) part
 catchArgDmd = JD { sd = Str ExnStr (SCall HeadStr)

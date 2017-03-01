@@ -1,0 +1,3 @@
+T13330: Successful exception
+CallStack (from HasCallStack):
+  error, called at T13330.hs:5:16 in main:Main
