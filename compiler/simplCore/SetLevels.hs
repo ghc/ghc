@@ -184,10 +184,9 @@ the worker at all.
 Note [Join ceiling]
 ~~~~~~~~~~~~~~~~~~~
 Join points can't float very far; too far, and they can't remain join points
-(though see Note [When to ruin a join point]). So, suppose we have:
+So, suppose we have:
 
-  f x =
-    (joinrec j y = ... x ... in jump j x) + 1
+  f x = (joinrec j y = ... x ... in jump j x) + 1
 
 One may be tempted to float j out to the top of f's RHS, but then the jump
 would not be a tail call. Thus we keep track of a level called the *join
@@ -552,7 +551,8 @@ lvlMFE env strict_ctxt e@(_, AnnCase {})
 lvlMFE env strict_ctxt ann_expr
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
-  || isTopLvl dest_lvl && need_join -- Can't put join point at top level
+  || anyDVarSet isJoinId fvs   -- If there is a free join, don't float
+                               -- See Note [Free join points]
   || isExprLevPoly expr
          -- We can't let-bind levity polymorphic expressions
          -- See Note [Levity polymorphism invariants] in CoreSyn
@@ -561,13 +561,14 @@ lvlMFE env strict_ctxt ann_expr
   =     -- Don't float it out
     lvlExpr env ann_expr
 
-  |  float_is_new_lam || need_join || exprIsTopLevelBindable expr expr_ty
+  |  float_is_new_lam || exprIsTopLevelBindable expr expr_ty
   || expr_ok_for_spec && not (isTopLvl dest_lvl)
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
          -- or is okay for speculation (we'll now evaluate it earlier).
          -- But in the last case, we can't float an unlifted thing to top level
-  = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive join_arity_maybe ann_expr
+  = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
+                              join_arity_maybe ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
@@ -612,7 +613,7 @@ lvlMFE env strict_ctxt ann_expr
                            -- See Note [Bottoming floats]
                            -- esp Bottoming floats (2)
     expr_ok_for_spec = exprOkForSpeculation expr
-    dest_lvl     = destLevel env fvs is_function is_bot need_join
+    dest_lvl     = destLevel env fvs is_function is_bot False
     abs_vars     = abstractVars dest_lvl env fvs
 
     -- float_is_new_lam: the floated thing will be a new value lambda
@@ -625,10 +626,7 @@ lvlMFE env strict_ctxt ann_expr
 
     (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
 
-        -- Note [Join points and MFEs]
-    need_join = any (\v -> isId v && remainsJoinId env v) (dVarSetElems fvs)
-    join_arity_maybe | need_join = Just (length abs_vars)
-                     | otherwise = Nothing
+    join_arity_maybe = Nothing
 
     is_mk_static = isJust (collectMakeStaticArgs expr)
         -- Yuk: See Note [Grand plan for static forms] in main/StaticPtrTable
@@ -710,6 +708,50 @@ It's controlled by a flag (floatConsts), because doing this too
 early loses opportunities for RULES which (needless to say) are
 important in some nofib programs (gcd is an example).  [SPJ note:
 I think this is obselete; the flag seems always on.]
+
+Note [Floating join point bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Mostly we only float a join point if it can /stay/ a join point.  But
+there is one exception: if it can go to the top level (Trac #13286).
+Consider
+  f x = joinrec j y n = <...j y' n'...>
+        in jump j x 0
+
+Here we may just as well produce
+  j y n = <....j y' n'...>
+  f x = j x 0
+
+and now there is a chance that 'f' will be inlined at its call sites.
+It shouldn't make a lot of difference, but thes tests
+  perf/should_run/MethSharing
+  simplCore/should_compile/spec-inline
+and one nofib program, all improve if you do float to top, because
+of the resulting inlining of f.  So ok, let's do it.
+
+Note [Free join points]
+~~~~~~~~~~~~~~~~~~~~~~~
+We never float a MFE that has a free join-point variable.  You mght think
+this can never occur.  After all, consider
+     join j x = ...
+     in ....(jump j x)....
+How might we ever want to float that (jump j x)?
+  * If it would escape a value lambda, thus
+        join j x = ... in (\y. ...(jump j x)... )
+    then 'j' isn't a valid join point in the first place.
+
+But consider
+     join j x = .... in
+     joinrec j2 y =  ...(jump j x)...(a+b)....
+
+Since j2 is recursive, it /is/ worth floating (a+b) out of the joinrec.
+But it is emphatically /not/ good to float the (jump j x) out:
+ (a) 'j' will stop being a join point
+ (b) In any case, jumping to 'j' must be an exit of the j2 loop, so no
+     work would be saved by floating it out of the \y.
+
+Even if we floated 'j' to top level, (b) would still hold.
+
+Bottom line: never float a MFE that has a free JoinId.
 
 Note [Floating MFEs of unlifted type]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -830,43 +872,6 @@ by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
 Doesn't change any other allocation at all.
 
 We will make a separate decision for the scrutinees and alternatives.
-
-Note [Join points and MFEs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When we create an MFE float, if it has a free join variable, the new binding
-must be a join point:
-
-  let join j x = ...
-  in case a of A -> ...
-               B -> j 3
-
-  =>
-
-  let join j x = ...
-      join k = j 3 -- only valid because k is a join point
-  in case a of A -> ...
-               B -> k
-
-Normally we're very circumspect about floating join points, but in this case
-it's definitely safe because we can only be floating it as far as another join
-binding. In other words, one might worry about a situation like:
-
-  let join j x = ...
-  in case a of A -> ...
-               B -> f (j 3)
-
-  =>
-
-  let join j x = ...
-  in case a of A -> ...
-               B -> f (let join k = j 3 in k)
-
-Here we have created the MFE float k, and are contemplating floating it up to
-j. This would indeed be an invalid operation on a join point like k. However,
-this example is ill-typed to begin with, since this time the call to j is not a
-tail call. In summary, the very occurrence of the join variable in the MFE is
-proof that we can float the MFE as far as that binding.
 -}
 
 annotateBotStr :: Id -> Arity -> Maybe (Arity, StrictSig) -> Id
@@ -989,18 +994,16 @@ lvlBind env (AnnNonRec bndr rhs)
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
          rhs' <- lvlRhs (setCtxtLvl env dest_lvl) NonRecursive
-                        zapped_join rhs
-       ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl
-                                         need_zap [bndr]
+                        mb_join_arity rhs
+       ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
 
   | otherwise
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
          rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
-                             zapped_join rhs
-       ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars
-                                         need_zap [bndr]
+                             mb_join_arity rhs
+       ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
 
@@ -1014,14 +1017,8 @@ lvlBind env (AnnNonRec bndr rhs)
                            -- esp Bottoming floats (2)
     is_bot     = isBottomThunk mb_bot_str
     n_extra    = count isId abs_vars
-
     mb_join_arity = isJoinId_maybe bndr
-    is_join = isJust mb_join_arity
-
-      -- See Note [When to ruin a join point]
-    need_zap = dest_lvl `ltLvl` joinCeilingLevel env
-    zapped_join | need_zap  = Nothing    -- Zap the join point
-                | otherwise = mb_join_arity
+    is_join       = isJust mb_join_arity
 
 lvlBind env (AnnRec pairs)
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
@@ -1033,11 +1030,10 @@ lvlBind env (AnnRec pairs)
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
   | null abs_vars
-  = do { (new_env, new_bndrs) <- cloneLetVars Recursive env dest_lvl
-                                              need_zap bndrs
+  = do { (new_env, new_bndrs) <- cloneLetVars Recursive env dest_lvl bndrs
        ; let env_rhs = setCtxtLvl new_env dest_lvl
        ; new_rhss <- zipWithM (lvlRhs env_rhs Recursive)
-                              (map zap_join mb_join_arities) rhss
+                              mb_join_arities rhss
        ; return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
                 , new_env) }
 
@@ -1058,17 +1054,14 @@ lvlBind env (AnnRec pairs)
     let (rhs_env, abs_vars_w_lvls) = lvlLamBndrs env dest_lvl abs_vars
         rhs_lvl = le_ctxt_lvl rhs_env
 
-    (rhs_env', [new_bndr]) <- cloneLetVars Recursive rhs_env rhs_lvl
-                                           need_zap [bndr]
+    (rhs_env', [new_bndr]) <- cloneLetVars Recursive rhs_env rhs_lvl [bndr]
     let
         (lam_bndrs, rhs_body)   = collectAnnBndrs rhs
         (body_env1, lam_bndrs1) = substBndrsSL NonRecursive rhs_env' lam_bndrs
         (body_env2, lam_bndrs2) = lvlLamBndrs body_env1 rhs_lvl lam_bndrs1
         mb_join_arity           = isJoinId_maybe bndr
-    new_rhs_body <- lvlRhs body_env2 Recursive
-                           (zap_join mb_join_arity) rhs_body
-    (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars
-                                            need_zap [bndr]
+    new_rhs_body <- lvlRhs body_env2 Recursive mb_join_arity rhs_body
+    (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
                  , mkLams abs_vars_w_lvls $
                    mkLams lam_bndrs2 $
@@ -1078,10 +1071,9 @@ lvlBind env (AnnRec pairs)
            , poly_env)
 
   | otherwise  -- Non-null abs_vars
-  = do { (new_env, new_bndrs) <- newPolyBndrs dest_lvl env abs_vars
-                                              need_zap bndrs
+  = do { (new_env, new_bndrs) <- newPolyBndrs dest_lvl env abs_vars bndrs
        ; new_rhss <- zipWithM (lvlFloatRhs abs_vars dest_lvl new_env Recursive)
-                              (map zap_join mb_join_arities) rhss
+                              mb_join_arities rhss
        ; return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
                 , new_env) }
 
@@ -1096,14 +1088,13 @@ lvlBind env (AnnRec pairs)
                `delDVarSetList`
                 bndrs
 
-    dest_lvl = destLevel env bind_fvs (all isFunction rhss) False is_join
+    dest_lvl = destLevel env bind_fvs (all isFunction rhss) False any_joins
     abs_vars = abstractVars dest_lvl env bind_fvs
 
     mb_join_arities = map isJoinId_maybe bndrs
-    is_join = any isJust mb_join_arities
-    need_zap = dest_lvl `ltLvl` joinCeilingLevel env
-    zap_join mb_join_arity | need_zap  = Nothing
-                           | otherwise = mb_join_arity
+    any_joins = isJust (head mb_join_arities)
+                -- bndrs is always non-empty and if one is a join they all are
+                -- Both are checked by Lint
 
 lvlRhs :: LevelEnv
        -> RecFlag
@@ -1118,24 +1109,6 @@ profitableFloat env dest_lvl
   =  (dest_lvl `ltMajLvl` le_ctxt_lvl env)  -- Escapes a value lambda
   || isTopLvl dest_lvl                      -- Going all the way to top level
 
-
-{-
-Note [When to ruin a join point]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Generally, we protect join points zealously. However, there are two situations
-in which it can pay to promote a join point to a function:
-
-1. If the join point has no value arguments, then floating it outward will make
-   it a *thunk*, not a function, so we might get increased sharing.
-2. If we float the join point all the way to the top level, it still won't be
-   allocated, so the cost is much less.
-
-Refusing to lose a join point in either of these cases can be disastrous---for
-instance, allocation in imaginary/x2n1 *triples* because $w$s^ becomes too big
-to inline, which prevents Float In from making a particular binding strictly
-demanded.
--}
 
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
@@ -1256,6 +1229,7 @@ lvlBndrs :: LevelEnv -> Level -> [CoreBndr] -> (LevelEnv, [LevelledBndr])
 -- all or none.  We never separate binders.
 lvlBndrs env@(LE { le_lvl_env = lvl_env }) new_lvl bndrs
   = ( env { le_ctxt_lvl = new_lvl
+          , le_join_ceil = new_lvl
           , le_lvl_env  = addLvls new_lvl lvl_env bndrs }
     , map (stayPut new_lvl) bndrs)
 
@@ -1267,16 +1241,19 @@ stayPut new_lvl bndr = TB bndr (StayPut new_lvl)
 destLevel :: LevelEnv -> DVarSet
           -> Bool   -- True <=> is function
           -> Bool   -- True <=> is bottom
-          -> Bool   -- True <=> is join point (or can be floated anyway)
+          -> Bool   -- True <=> is a join point
           -> Level
+-- INVARIANT: if is_join=True then result >= join_ceiling
 destLevel env fvs is_function is_bot is_join
-  | isTopLvl max_fv_level  -- Float even joins if they get to top level
+  | isTopLvl max_fv_id_level  -- Float even joins if they get to top level
+                              -- See Note [Floating join point bindings]
   = tOP_LEVEL
 
-  | is_join
-  = if max_fv_level `ltLvl` join_ceiling
+  | is_join  -- Never float a join point past the join ceiling
+             -- See Note [Join points] in FloatOut
+  = if max_fv_id_level `ltLvl` join_ceiling
     then join_ceiling
-    else max_fv_level
+    else max_fv_id_level
 
   | is_bot              -- Send bottoming bindings to the top
   = tOP_LEVEL           -- regardless; see Note [Bottoming floats]
@@ -1289,12 +1266,11 @@ destLevel env fvs is_function is_bot is_join
   = tOP_LEVEL   -- Send functions to top level; see
                 -- the comments with isFunction
 
-  | otherwise = max_fv_level
+  | otherwise = max_fv_id_level
   where
-    max_fv_level = maxFvLevel isId env fvs -- Max over Ids only; the tyvars
-                                           -- will be abstracted
+    max_fv_id_level = maxFvLevel isId env fvs -- Max over Ids only; the tyvars
+                                              -- will be abstracted
     join_ceiling = joinCeilingLevel env
-
 
 isFunction :: CoreExprWithFVs -> Bool
 -- The idea here is that we want to float *functions* to
@@ -1337,32 +1313,46 @@ data LevelEnv
        , le_ctxt_lvl :: Level           -- The current level
        , le_lvl_env  :: VarEnv Level    -- Domain is *post-cloned* TyVars and Ids
        , le_join_ceil:: Level           -- Highest level to which joins float
+                                        -- Invariant: always >= le_ctxt_lvl
+
+       -- See Note [le_subst and le_env]
        , le_subst    :: Subst           -- Domain is pre-cloned TyVars and Ids
                                         -- The Id -> CoreExpr in the Subst is ignored
                                         -- (since we want to substitute a LevelledExpr for
                                         -- an Id via le_env) but we do use the Co/TyVar substs
        , le_env      :: IdEnv ([OutVar], LevelledExpr)  -- Domain is pre-cloned Ids
     }
-        -- We clone let- and case-bound variables so that they are still
-        -- distinct when floated out; hence the le_subst/le_env.
-        -- (see point 3 of the module overview comment).
-        -- We also use these envs when making a variable polymorphic
-        -- because we want to float it out past a big lambda.
-        --
-        -- The le_subst and le_env always implement the same mapping, but the
-        -- le_subst maps to CoreExpr and the le_env to LevelledExpr
-        -- Since the range is always a variable or type application,
-        -- there is never any difference between the two, but sadly
-        -- the types differ.  The le_subst is used when substituting in
-        -- a variable's IdInfo; the le_env when we find a Var.
-        --
-        -- In addition the le_env records a list of tyvars free in the
-        -- type application, just so we don't have to call freeVars on
-        -- the type application repeatedly.
-        --
-        -- The domain of the both envs is *pre-cloned* Ids, though
-        --
-        -- The domain of the le_lvl_env is the *post-cloned* Ids
+
+{- Note [le_subst and le_env]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We clone let- and case-bound variables so that they are still distinct
+when floated out; hence the le_subst/le_env.  (see point 3 of the
+module overview comment).  We also use these envs when making a
+variable polymorphic because we want to float it out past a big
+lambda.
+
+The le_subst and le_env always implement the same mapping,
+     in_x :->  out_x a b
+where out_x is an OutVar, and a,b are its arguments (when
+we perform abstraction at the same time as floating).
+
+  le_subst maps to CoreExpr
+  le_env   maps to LevelledExpr
+
+Since the range is always a variable or application, there is never
+any difference between the two, but sadly the types differ.  The
+le_subst is used when substituting in a variable's IdInfo; the le_env
+when we find a Var.
+
+In addition the le_env records a [OutVar] of variables free in the
+OutExpr/LevelledExpr, just so we don't have to call freeVars
+repeatedly.  This list is always non-empty, and the first element is
+out_x
+
+The domain of the both envs is *pre-cloned* Ids, though
+
+The domain of the le_lvl_env is the *post-cloned* Ids
+-}
 
 initialEnv :: FloatOutSwitches -> LevelEnv
 initialEnv float_lams
@@ -1392,7 +1382,7 @@ floatTopLvlOnly :: LevelEnv -> Bool
 floatTopLvlOnly le = floatToTopLevelOnly (le_switches le)
 
 setCtxtLvl :: LevelEnv -> Level -> LevelEnv
-setCtxtLvl env lvl = env { le_ctxt_lvl = lvl }
+setCtxtLvl env lvl = env { le_ctxt_lvl = lvl, le_join_ceil = lvl }
 
 incMinorLvlFrom :: LevelEnv -> Level
 incMinorLvlFrom env = incMinorLvl (le_ctxt_lvl env)
@@ -1441,13 +1431,6 @@ lookupVar le v = case lookupVarEnv (le_env le) v of
 joinCeilingLevel :: LevelEnv -> Level
 joinCeilingLevel = le_join_ceil
 
-remainsJoinId :: LevelEnv -> Id -> Bool
-remainsJoinId le v = case lookupVarEnv (le_env le) v of
-                         Just (v':_, _) -> isJoinId v'
-                         Nothing        -> isJoinId v
-                         Just ([], e)   -> pprPanic "remainsJoinId" $
-                                             ppr v $$ ppr e
-
 abstractVars :: Level -> LevelEnv -> DVarSet -> [OutVar]
         -- Find the variables in fvs, free vars of the target expression,
         -- whose level is greater than the destination level
@@ -1495,13 +1478,13 @@ type LvlM result = UniqSM result
 initLvl :: UniqSupply -> UniqSM a -> a
 initLvl = initUs_
 
-newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> Bool -> [InId]
+newPolyBndrs :: Level -> LevelEnv -> [OutVar] -> [InId]
              -> LvlM (LevelEnv, [OutId])
 -- The envt is extended to bind the new bndrs to dest_lvl, but
 -- the le_ctxt_lvl is unaffected
 newPolyBndrs dest_lvl
              env@(LE { le_lvl_env = lvl_env, le_subst = subst, le_env = id_env })
-             abs_vars zapping_joins bndrs
+             abs_vars bndrs
  = ASSERT( all (not . isCoVar) bndrs )   -- What would we add to the CoSubst in this case. No easy answer.
    do { uniqs <- getUniquesM
       ; let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
@@ -1515,18 +1498,22 @@ newPolyBndrs dest_lvl
     add_id    env (v, v') = extendVarEnv env v ((v':abs_vars), mkVarApps (Var v') abs_vars)
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
-                             maybe_transfer_join_info bndr $
+                             transfer_join_info bndr $
                              mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
-                             maybe_transfer_join_info bndr new_bndr
-                               | not zapping_joins
-                               , Just join_arity <- isJoinId_maybe bndr
-                               = new_bndr `asJoinId`
-                                   join_arity + length abs_vars
-                               | otherwise
-                               = new_bndr
+
+    -- If we are floating a join point to top level, it stops being
+    -- a join point.  Otherwise it continues to be a join point,
+    -- but we may need to adjust its arity
+    dest_is_top = isTopLvl dest_lvl
+    transfer_join_info bndr new_bndr
+      | Just join_arity <- isJoinId_maybe bndr
+      , not dest_is_top
+      = new_bndr `asJoinId` join_arity + length abs_vars
+      | otherwise
+      = new_bndr
 
 newLvlVar :: LevelledExpr        -- The RHS of the new binding
           -> Maybe JoinArity     -- Its join arity, if it is a join point
@@ -1554,14 +1541,15 @@ cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env
                new_lvl vs
   = do { us <- getUniqueSupplyM
        ; let (subst', vs') = cloneBndrs subst us vs
-             env' = env { le_ctxt_lvl = new_lvl
-                        , le_lvl_env  = addLvls new_lvl lvl_env vs'
-                        , le_subst    = subst'
-                        , le_env      = foldl add_id id_env (vs `zip` vs') }
+             env' = env { le_ctxt_lvl  = new_lvl
+                        , le_join_ceil = new_lvl
+                        , le_lvl_env   = addLvls new_lvl lvl_env vs'
+                        , le_subst     = subst'
+                        , le_env       = foldl add_id id_env (vs `zip` vs') }
 
        ; return (env', vs') }
 
-cloneLetVars :: RecFlag -> LevelEnv -> Level -> Bool -> [InVar]
+cloneLetVars :: RecFlag -> LevelEnv -> Level -> [InVar]
              -> LvlM (LevelEnv, [OutVar])
 -- See Note [Need for cloning during float-out]
 -- Works for Ids bound by let(rec)
@@ -1569,9 +1557,9 @@ cloneLetVars :: RecFlag -> LevelEnv -> Level -> Bool -> [InVar]
 -- but cloneVars doesn't affect the le_ctxt_lvl of the incoming env
 cloneLetVars is_rec
           env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })
-          dest_lvl zapping_joins vs
+          dest_lvl vs
   = do { us <- getUniqueSupplyM
-       ; let vs1  = map (zap_demand_info . maybe_zap_join) vs
+       ; let vs1  = map zap vs
                       -- See Note [Zapping the demand info]
              (subst', vs2) = case is_rec of
                                NonRecursive -> cloneBndrs      subst us vs1
@@ -1583,18 +1571,17 @@ cloneLetVars is_rec
 
        ; return (env', vs2) }
   where
-    maybe_zap_join v | isId v, zapping_joins = zapJoinId v
-                     | otherwise             = v
+    zap :: Var -> Var
+    zap v | isId v    = zap_join (zapIdDemandInfo v)
+          | otherwise = v
+
+    zap_join | isTopLvl dest_lvl = zapJoinId
+             | otherwise         = \v -> v
 
 add_id :: IdEnv ([Var], LevelledExpr) -> (Var, Var) -> IdEnv ([Var], LevelledExpr)
 add_id id_env (v, v1)
   | isTyVar v = delVarEnv    id_env v
   | otherwise = extendVarEnv id_env v ([v1], ASSERT(not (isCoVar v1)) Var v1)
-
-zap_demand_info :: Var -> Var
-zap_demand_info v
-  | isId v    = zapIdDemandInfo v
-  | otherwise = v
 
 {-
 Note [Zapping the demand info]
