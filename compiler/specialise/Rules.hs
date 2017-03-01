@@ -864,7 +864,7 @@ match_alts _ _ _ _
 ------------------------------------------
 okToFloat :: RnEnv2 -> VarSet -> Bool
 okToFloat rn_env bind_fvs
-  = varSetAll not_captured bind_fvs
+  = allVarSet not_captured bind_fvs
   where
     not_captured fv = not (inRnEnvR rn_env fv)
 

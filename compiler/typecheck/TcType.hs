@@ -911,7 +911,7 @@ anyRewritableTyVar ignore_cos pred ty
 
     go_co bound co
       | ignore_cos = False
-      | otherwise  = varSetAny (go_tv bound) (tyCoVarsOfCo co)
+      | otherwise  = anyVarSet (go_tv bound) (tyCoVarsOfCo co)
       -- We don't have an equivalent of anyRewritableTyVar for coercions
       -- (at least not yet) so take the free vars and test them
 

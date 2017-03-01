@@ -17,7 +17,7 @@ module VarSet (
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
         minusVarSet, filterVarSet,
-        varSetAny, varSetAll,
+        anyVarSet, allVarSet,
         transCloVarSet, fixVarSet,
         lookupVarSet, lookupVarSetByName,
         sizeVarSet, seqVarSet,
@@ -35,7 +35,7 @@ module VarSet (
         intersectDVarSet, intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet, foldDVarSet, filterDVarSet,
-        dVarSetMinusVarSet,
+        dVarSetMinusVarSet, anyDVarSet, allDVarSet,
         transCloDVarSet,
         sizeDVarSet, seqDVarSet,
         partitionDVarSet,
@@ -50,7 +50,7 @@ import Name     ( Name )
 import UniqSet
 import UniqDSet
 import UniqFM( disjointUFM, pluralUFM, pprUFM )
-import UniqDFM( disjointUDFM, udfmToUfm )
+import UniqDFM( disjointUDFM, udfmToUfm, anyUDFM, allUDFM )
 import Outputable (SDoc)
 
 -- | A non-deterministic Variable Set
@@ -139,11 +139,11 @@ intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
 disjointVarSet   s1 s2 = disjointUFM s1 s2
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 
-varSetAny :: (Var -> Bool) -> VarSet -> Bool
-varSetAny = uniqSetAny
+anyVarSet :: (Var -> Bool) -> VarSet -> Bool
+anyVarSet = uniqSetAny
 
-varSetAll :: (Var -> Bool) -> VarSet -> Bool
-varSetAll = uniqSetAll
+allVarSet :: (Var -> Bool) -> VarSet -> Bool
+allVarSet = uniqSetAll
 
 -- There used to exist mapVarSet, see Note [Unsound mapUniqSet] in UniqSet for
 -- why it got removed.
@@ -281,6 +281,12 @@ dVarSetMinusVarSet = uniqDSetMinusUniqSet
 
 foldDVarSet :: (Var -> a -> a) -> a -> DVarSet -> a
 foldDVarSet = foldUniqDSet
+
+anyDVarSet :: (Var -> Bool) -> DVarSet -> Bool
+anyDVarSet = anyUDFM
+
+allDVarSet :: (Var -> Bool) -> DVarSet -> Bool
+allDVarSet = allUDFM
 
 filterDVarSet :: (Var -> Bool) -> DVarSet -> DVarSet
 filterDVarSet = filterUniqDSet
