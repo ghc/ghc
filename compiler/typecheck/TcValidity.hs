@@ -658,7 +658,7 @@ applying the instance decl would show up two uses of ?x.  Trac #8912.
 -}
 
 checkValidTheta :: UserTypeCtxt -> ThetaType -> TcM ()
--- Assumes arguemt is fully zonked
+-- Assumes argument is fully zonked
 checkValidTheta ctxt theta
   = do { env <- tcInitOpenTidyEnv (tyCoVarsOfTypesList theta)
        ; addErrCtxtM (checkThetaCtxt ctxt theta) $
