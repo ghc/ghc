@@ -3245,7 +3245,7 @@ substitute the RULES and add them back onto the binders; this is done
 cases where he really, really wanted a RULE for a recursive function
 to apply in that function's own right-hand side.
 
-See Note [Loop breaking and RULES] in OccAnal.
+See Note [Forming Rec groups] in OccurAnal
 -}
 
 addBndrRules :: SimplEnv -> InBndr -> OutBndr -> SimplM (SimplEnv, OutBndr)
