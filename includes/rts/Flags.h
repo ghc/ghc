@@ -119,7 +119,7 @@ typedef struct _COST_CENTRE_FLAGS {
 
     int	    profilerTicks;   /* derived */
     int	    msecsPerTick;    /* derived */
-    char const *oututFileNameStem;
+    char const *outputFileNameStem;
 } COST_CENTRE_FLAGS;
 
 /* See Note [Synchronization of flags and base APIs] */

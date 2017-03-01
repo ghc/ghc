@@ -18,6 +18,7 @@
 #include "Arena.h"
 #include "RetainerProfile.h"
 #include "ProfilerReport.h"
+#include "ProfilerReportJson.h"
 #include "Printer.h"
 #include "Capability.h"
 
