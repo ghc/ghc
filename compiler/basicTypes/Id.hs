@@ -5,7 +5,7 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 -}
 
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE ImplicitParams, CPP #-}
 
 -- |
 -- #name_types#
@@ -127,8 +127,7 @@ import Var( Id, CoVar, DictId, JoinId,
             InId,  InVar,
             OutId, OutVar,
             idInfo, idDetails, setIdDetails, globaliseId, varType,
-            isId, isLocalId, isGlobalId, isExportedId,
-            isJoinId, isJoinId_maybe )
+            isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
 
 import Type
@@ -477,6 +476,24 @@ isDataConId_maybe id = case Var.idDetails id of
                          DataConWorkId con -> Just con
                          DataConWrapId con -> Just con
                          _                 -> Nothing
+
+isJoinId :: Var -> Bool
+-- It is convenient in SetLevels.lvlMFE to apply isJoinId
+-- to the free vars of an expression, so it's convenient
+-- if it returns False for type variables
+isJoinId id
+  | isId id = case Var.idDetails id of
+                JoinId {} -> True
+                _         -> False
+  | otherwise = False
+
+isJoinId_maybe :: Var -> Maybe JoinArity
+isJoinId_maybe id
+ | isId id  = ASSERT2( isId id, ppr id )
+              case Var.idDetails id of
+                JoinId arity -> Just arity
+                _            -> Nothing
+ | otherwise = Nothing
 
 idDataCon :: Id -> DataCon
 -- ^ Get from either the worker or the wrapper 'Id' to the 'DataCon'. Currently used only in the desugarer.

@@ -11,10 +11,11 @@ module CSE (cseProgram, cseOneExpr) where
 #include "HsVersions.h"
 
 import CoreSubst
-import Var              ( Var, isJoinId )
+import Var              ( Var )
 import VarEnv           ( elemInScopeSet )
 import Id               ( Id, idType, idInlineActivation, isDeadBinder
-                        , zapIdOccInfo, zapIdUsageInfo, idInlinePragma )
+                        , zapIdOccInfo, zapIdUsageInfo, idInlinePragma
+                        , isJoinId )
 import CoreUtils        ( mkAltExpr, eqExpr
                         , exprIsLiteralString
                         , stripTicksE, stripTicksT, mkTicks )

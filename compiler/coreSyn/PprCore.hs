@@ -338,11 +338,19 @@ Furthermore, a dead case-binder is completely ignored, while otherwise, dead
 binders are printed as "_".
 -}
 
+-- THese instances are sadly orphans
+
 instance OutputableBndr Var where
   pprBndr = pprCoreBinder
   pprInfixOcc  = pprInfixName  . varName
   pprPrefixOcc = pprPrefixName . varName
   bndrIsJoin_maybe = isJoinId_maybe
+
+instance Outputable b => OutputableBndr (TaggedBndr b) where
+  pprBndr _    b = ppr b   -- Simple
+  pprInfixOcc  b = ppr b
+  pprPrefixOcc b = ppr b
+  bndrIsJoin_maybe (TB b _) = isJoinId_maybe b
 
 pprCoreBinder :: BindingSite -> Var -> SDoc
 pprCoreBinder LetBind binder

@@ -25,7 +25,7 @@ import CoreUtils        ( exprIsDupable, exprIsExpandable,
                           exprOkForSideEffects, mkTicks )
 import CoreFVs
 import CoreMonad        ( CoreM )
-import Id               ( isOneShotBndr, idType )
+import Id               ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import Var
 import Type             ( isUnliftedType )
 import VarSet

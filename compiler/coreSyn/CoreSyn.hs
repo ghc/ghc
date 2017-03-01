@@ -1717,15 +1717,6 @@ type TaggedAlt  t = Alt  (TaggedBndr t)
 instance Outputable b => Outputable (TaggedBndr b) where
   ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
 
--- OutputableBndr Var is declared separately in PprCore; using a FlexibleContext
--- to avoid circularity
-instance (OutputableBndr Var, Outputable b) =>
-    OutputableBndr (TaggedBndr b) where
-  pprBndr _ b = ppr b   -- Simple
-  pprInfixOcc  b = ppr b
-  pprPrefixOcc b = ppr b
-  bndrIsJoin_maybe (TB b _) = isJoinId_maybe b
-
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
 deTagExpr (Lit l)                   = Lit l
