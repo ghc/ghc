@@ -18,6 +18,7 @@ module Class (
         classKey, className, classATs, classATItems, classTyCon, classMethods,
         classOpItems, classBigSig, classExtraBigSig, classTvsFds, classSCTheta,
         classAllSelIds, classSCSelId, classMinimalDef, classHasFds,
+        isAbstractClass,
         naturallyCoherentClass
     ) where
 
@@ -301,6 +302,10 @@ classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
                              classATStuff = ats, classOpStuff = op_stuff
                          }})
   = (tyvars, fundeps, sc_theta, sc_sels, ats, op_stuff)
+
+isAbstractClass :: Class -> Bool
+isAbstractClass Class{ classBody = AbstractClass } = True
+isAbstractClass _ = False
 
 -- | If a class is "naturally coherent", then we needn't worry at all, in any
 -- way, about overlapping/incoherent instances. Just solve the thing!

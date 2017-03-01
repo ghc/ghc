@@ -520,6 +520,10 @@ doClsInstErrorChecks inst_info
          -- In hs-boot files there should be no bindings
       ; failIfTc (is_boot && not no_binds) badBootDeclErr
 
+         -- If not in an hs-boot file, abstract classes cannot have
+         -- instances declared
+      ; failIfTc (not is_boot && isAbstractClass clas) abstractClassInstErr
+
          -- Handwritten instances of any rejected
          -- class is always forbidden
          -- #12837
@@ -535,11 +539,15 @@ doClsInstErrorChecks inst_info
     binds    = iBinds inst_info
     no_binds = isEmptyLHsBinds (ib_binds binds) && null (ib_pragmas binds)
     clas_nm  = is_cls_nm ispec
+    clas     = is_cls ispec
 
     gen_inst_err = hang (text ("Generic instances can only be "
                             ++ "derived in Safe Haskell.") $+$
                          text "Replace the following instance:")
                       2 (pprInstanceHdr ispec)
+
+    abstractClassInstErr =
+        text "Cannot define instance for abstract class" <+> quotes (ppr clas_nm)
 
     -- Report an error or a warning for certain class instances.
     -- If we are working on an .hs-boot file, we just report a warning,
