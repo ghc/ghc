@@ -114,7 +114,7 @@ import BasicTypes
 import DynFlags
 import Outputable
 import Util
-import UniqFM
+import UniqSet
 import SrcLoc     ( RealSrcSpan, containsSpan )
 import Binary
 
@@ -1038,7 +1038,7 @@ chooseOrphanAnchor local_names
   | isEmptyNameSet local_names = IsOrphan
   | otherwise                  = NotOrphan (minimum occs)
   where
-    occs = map nameOccName $ nonDetEltsUFM local_names
+    occs = map nameOccName $ nonDetEltsUniqSet local_names
     -- It's OK to use nonDetEltsUFM here, see comments above
 
 instance Binary IsOrphan where

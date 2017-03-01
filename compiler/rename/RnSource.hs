@@ -51,7 +51,7 @@ import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs
                         , stronglyConnCompFromEdgedVerticesUniq )
-import UniqFM
+import UniqSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1348,7 +1348,7 @@ depAnalTyClDecls :: GlobalRdrEnv
 depAnalTyClDecls rdr_env ds_w_fvs
   = stronglyConnCompFromEdgedVerticesUniq edges
   where
-    edges = [ (d, tcdName (unLoc d), map (getParent rdr_env) (nonDetEltsUFM fvs))
+    edges = [ (d, tcdName (unLoc d), map (getParent rdr_env) (nonDetEltsUniqSet fvs))
             | (d, fvs) <- ds_w_fvs ]
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic
@@ -1357,7 +1357,7 @@ depAnalTyClDecls rdr_env ds_w_fvs
 
 toParents :: GlobalRdrEnv -> NameSet -> NameSet
 toParents rdr_env ns
-  = nonDetFoldUFM add emptyNameSet ns
+  = nonDetFoldUniqSet add emptyNameSet ns
   -- It's OK to use nonDetFoldUFM because we immediately forget the
   -- ordering by creating a set
   where

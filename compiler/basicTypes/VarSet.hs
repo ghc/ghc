@@ -11,7 +11,7 @@ module VarSet (
 
         -- ** Manipulating these sets
         emptyVarSet, unitVarSet, mkVarSet,
-        extendVarSet, extendVarSetList, extendVarSet_C,
+        extendVarSet, extendVarSetList,
         elemVarSet, subVarSet,
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
@@ -19,7 +19,7 @@ module VarSet (
         minusVarSet, filterVarSet,
         anyVarSet, allVarSet,
         transCloVarSet, fixVarSet,
-        lookupVarSet, lookupVarSetByName,
+        lookupVarSet_Directly, lookupVarSet, lookupVarSetByName,
         sizeVarSet, seqVarSet,
         elemVarSetByKey, partitionVarSet,
         pluralVarSet, pprVarSet,
@@ -91,13 +91,13 @@ delVarSetList   :: VarSet -> [Var] -> VarSet
 minusVarSet     :: VarSet -> VarSet -> VarSet
 isEmptyVarSet   :: VarSet -> Bool
 mkVarSet        :: [Var] -> VarSet
+lookupVarSet_Directly :: VarSet -> Unique -> Maybe Var
 lookupVarSet    :: VarSet -> Var -> Maybe Var
                         -- Returns the set element, which may be
                         -- (==) to the argument, but not the same as
 lookupVarSetByName :: VarSet -> Name -> Maybe Var
 sizeVarSet      :: VarSet -> Int
 filterVarSet    :: (Var -> Bool) -> VarSet -> VarSet
-extendVarSet_C  :: (Var->Var->Var) -> VarSet -> Var -> VarSet
 
 delVarSetByKey  :: VarSet -> Unique -> VarSet
 elemVarSetByKey :: Unique -> VarSet -> Bool
@@ -123,11 +123,11 @@ delVarSet       = delOneFromUniqSet
 delVarSetList   = delListFromUniqSet
 isEmptyVarSet   = isEmptyUniqSet
 mkVarSet        = mkUniqSet
+lookupVarSet_Directly = lookupUniqSet_Directly
 lookupVarSet    = lookupUniqSet
 lookupVarSetByName = lookupUniqSet
 sizeVarSet      = sizeUniqSet
 filterVarSet    = filterUniqSet
-extendVarSet_C  = addOneToUniqSet_C
 delVarSetByKey  = delOneFromUniqSet_Directly
 elemVarSetByKey = elemUniqSet_Directly
 partitionVarSet = partitionUniqSet
@@ -136,7 +136,7 @@ mapUnionVarSet get_set xs = foldr (unionVarSet . get_set) emptyVarSet xs
 
 -- See comments with type signatures
 intersectsVarSet s1 s2 = not (s1 `disjointVarSet` s2)
-disjointVarSet   s1 s2 = disjointUFM s1 s2
+disjointVarSet   s1 s2 = disjointUFM (getUniqSet s1) (getUniqSet s2)
 subVarSet        s1 s2 = isEmptyVarSet (s1 `minusVarSet` s2)
 
 anyVarSet :: (Var -> Bool) -> VarSet -> Bool
@@ -190,7 +190,7 @@ seqVarSet s = sizeVarSet s `seq` ()
 -- | Determines the pluralisation suffix appropriate for the length of a set
 -- in the same way that plural from Outputable does for lists.
 pluralVarSet :: VarSet -> SDoc
-pluralVarSet = pluralUFM
+pluralVarSet = pluralUFM . getUniqSet
 
 -- | Pretty-print a non-deterministic set.
 -- The order of variables is non-deterministic and for pretty-printing that
@@ -207,7 +207,7 @@ pprVarSet :: VarSet          -- ^ The things to be pretty printed
                              -- elements
           -> SDoc            -- ^ 'SDoc' where the things have been pretty
                              -- printed
-pprVarSet = pprUFM
+pprVarSet = pprUFM . getUniqSet
 
 -- Deterministic VarSet
 -- See Note [Deterministic UniqFM] in UniqDFM for explanation why we need
@@ -311,7 +311,7 @@ extendDVarSetList = addListToUniqDSet
 
 -- | Convert a DVarSet to a VarSet by forgeting the order of insertion
 dVarSetToVarSet :: DVarSet -> VarSet
-dVarSetToVarSet = udfmToUfm
+dVarSetToVarSet = unsafeUFMToUniqSet . udfmToUfm
 
 -- | transCloVarSet for DVarSet
 transCloDVarSet :: (DVarSet -> DVarSet)

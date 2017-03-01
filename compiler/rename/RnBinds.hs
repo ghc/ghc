@@ -48,7 +48,7 @@ import Bag
 import Util
 import Outputable
 import FastString
-import UniqFM
+import UniqSet
 import Maybes           ( orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
@@ -528,8 +528,8 @@ depAnalBinds binds_w_dus
   = (map get_binds sccs, map get_du sccs)
   where
     sccs = depAnal (\(_, defs, _) -> defs)
-                   (\(_, _, uses) -> nonDetEltsUFM uses)
-                   -- It's OK to use nonDetEltsUFM here as explained in
+                   (\(_, _, uses) -> nonDetEltsUniqSet uses)
+                   -- It's OK to use nonDetEltsUniqSet here as explained in
                    -- Note [depAnal determinism] in NameEnv.
                    (bagToList binds_w_dus)
 

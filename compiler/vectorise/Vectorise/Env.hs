@@ -31,6 +31,7 @@ import Name
 import NameEnv
 import FastString
 import UniqDFM
+import UniqSet
 
 
 import Data.Maybe
@@ -210,7 +211,7 @@ modVectInfo env mg_ids mg_tyCons vectDecls info
     , vectInfoTyCon          = mk_env tyCons   (global_tycons   env)
     , vectInfoDataCon        = mk_env dataCons (global_datacons env)
     , vectInfoParallelVars   = (global_parallel_vars   env `minusDVarSet`  vectInfoParallelVars   info)
-                               `udfmIntersectUFM` (mkVarSet ids)
+                               `udfmIntersectUFM` (getUniqSet $ mkVarSet ids)
     , vectInfoParallelTyCons =  global_parallel_tycons env `minusNameSet` vectInfoParallelTyCons info
     }
   where

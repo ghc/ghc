@@ -66,7 +66,8 @@ import CoreSyn
 import Id
 import IdInfo
 import NameSet
-import UniqFM
+import UniqSet
+import Unique (Uniquable (..))
 import Literal ( literalType )
 import Name
 import VarSet
@@ -476,7 +477,8 @@ idRuleRhsVars is_active id
                   , ru_rhs = rhs, ru_act = act })
       | is_active act
             -- See Note [Finding rule RHS free vars] in OccAnal.hs
-      = delFromUFM fvs fn        -- Note [Rule free var hack]
+      = delOneFromUniqSet_Directly fvs (getUnique fn)
+            -- Note [Rule free var hack]
       where
         fvs = fvVarSet $ filterFV isLocalVar $ addBndrs bndrs (expr_fvs rhs)
     get_fvs _ = noFVs

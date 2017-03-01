@@ -48,7 +48,7 @@ import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
-import UniqFM
+import UniqSet
 import Var         ( TyVarBndr(..), mkTyVar )
 import ErrUtils
 import DynFlags
@@ -1899,8 +1899,8 @@ checkValidInferredKinds orig_kvs out_of_scope extra
 
   where
     (env1, _) = tidyTyCoVarBndrs emptyTidyEnv orig_kvs
-    (env, _)  = tidyTyCoVarBndrs env1         (nonDetEltsUFM out_of_scope)
-      -- It's OK to use nonDetEltsUFM here because it's only used for
+    (env, _)  = tidyTyCoVarBndrs env1         (nonDetEltsUniqSet out_of_scope)
+      -- It's OK to use nonDetEltsUniqSet here because it's only used for
       -- generating the error message
 
 {-

@@ -46,7 +46,6 @@ import TcEnv
 
 import TyCon
 import Name
-import VarEnv
 import Util
 import VarSet
 import BasicTypes       ( Boxity(..) )
@@ -307,12 +306,12 @@ mapTermTypeM f = foldTermM TermFoldM {
 termTyCoVars :: Term -> TyCoVarSet
 termTyCoVars = foldTerm TermFold {
             fTerm       = \ty _ _ tt   ->
-                          tyCoVarsOfType ty `plusVarEnv` concatVarEnv tt,
+                          tyCoVarsOfType ty `unionVarSet` concatVarEnv tt,
             fSuspension = \_ ty _ _ -> tyCoVarsOfType ty,
-            fPrim       = \ _ _ -> emptyVarEnv,
-            fNewtypeWrap= \ty _ t -> tyCoVarsOfType ty `plusVarEnv` t,
-            fRefWrap    = \ty t -> tyCoVarsOfType ty `plusVarEnv` t}
-    where concatVarEnv = foldr plusVarEnv emptyVarEnv
+            fPrim       = \ _ _ -> emptyVarSet,
+            fNewtypeWrap= \ty _ t -> tyCoVarsOfType ty `unionVarSet` t,
+            fRefWrap    = \ty t -> tyCoVarsOfType ty `unionVarSet` t}
+    where concatVarEnv = foldr unionVarSet emptyVarSet
 
 ----------------------------------
 -- Pretty printing of terms

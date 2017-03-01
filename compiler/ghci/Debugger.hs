@@ -27,7 +27,7 @@ import IfaceEnv( newInteractiveBinder )
 import Name
 import Var hiding ( varName )
 import VarSet
-import UniqFM
+import UniqSet
 import Type
 import GHC
 import Outputable
@@ -100,11 +100,11 @@ pprintClosureCommand bindThings force str = do
          my_tvs       = termTyCoVars t
          tvs          = env_tvs `minusVarSet` my_tvs
          tyvarOccName = nameOccName . tyVarName
-         tidyEnv      = (initTidyOccEnv (map tyvarOccName (nonDetEltsUFM tvs))
-           -- It's OK to use nonDetEltsUFM here because initTidyOccEnv
+         tidyEnv      = (initTidyOccEnv (map tyvarOccName (nonDetEltsUniqSet tvs))
+           -- It's OK to use nonDetEltsUniqSet here because initTidyOccEnv
            -- forgets the ordering immediately by creating an env
-                        , env_tvs `intersectVarSet` my_tvs)
-     return$ mapTermType (snd . tidyOpenType tidyEnv) t
+                        , getUniqSet $ env_tvs `intersectVarSet` my_tvs)
+     return $ mapTermType (snd . tidyOpenType tidyEnv) t
 
 -- | Give names, and bind in the interactive environment, to all the suspensions
 --   included (inductively) in a term

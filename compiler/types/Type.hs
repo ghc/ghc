@@ -215,7 +215,7 @@ import TyCoRep
 import Var
 import VarEnv
 import VarSet
-import NameEnv
+import UniqSet
 
 import Class
 import TyCon
@@ -2365,51 +2365,51 @@ resultIsLevPoly = isTypeLevPoly . snd . splitPiTys
 -- | All type constructors occurring in the type; looking through type
 --   synonyms, but not newtypes.
 --  When it finds a Class, it returns the class TyCon.
-tyConsOfType :: Type -> NameEnv TyCon
+tyConsOfType :: Type -> UniqSet TyCon
 tyConsOfType ty
   = go ty
   where
-     go :: Type -> NameEnv TyCon  -- The NameEnv does duplicate elim
+     go :: Type -> UniqSet TyCon  -- The UniqSet does duplicate elim
      go ty | Just ty' <- coreView ty = go ty'
-     go (TyVarTy {})                = emptyNameEnv
-     go (LitTy {})                  = emptyNameEnv
-     go (TyConApp tc tys)           = go_tc tc `plusNameEnv` go_s tys
-     go (AppTy a b)                 = go a `plusNameEnv` go b
-     go (FunTy a b)                 = go a `plusNameEnv` go b `plusNameEnv` go_tc funTyCon
-     go (ForAllTy (TvBndr tv _) ty) = go ty `plusNameEnv` go (tyVarKind tv)
-     go (CastTy ty co)              = go ty `plusNameEnv` go_co co
+     go (TyVarTy {})                = emptyUniqSet
+     go (LitTy {})                  = emptyUniqSet
+     go (TyConApp tc tys)           = go_tc tc `unionUniqSets` go_s tys
+     go (AppTy a b)                 = go a `unionUniqSets` go b
+     go (FunTy a b)                 = go a `unionUniqSets` go b `unionUniqSets` go_tc funTyCon
+     go (ForAllTy (TvBndr tv _) ty) = go ty `unionUniqSets` go (tyVarKind tv)
+     go (CastTy ty co)              = go ty `unionUniqSets` go_co co
      go (CoercionTy co)             = go_co co
 
      go_co (Refl _ ty)             = go ty
-     go_co (TyConAppCo _ tc args)  = go_tc tc `plusNameEnv` go_cos args
-     go_co (AppCo co arg)          = go_co co `plusNameEnv` go_co arg
-     go_co (ForAllCo _ kind_co co) = go_co kind_co `plusNameEnv` go_co co
-     go_co (FunCo _ co1 co2)       = go_co co1 `plusNameEnv` go_co co2
-     go_co (CoVarCo {})            = emptyNameEnv
-     go_co (AxiomInstCo ax _ args) = go_ax ax `plusNameEnv` go_cos args
-     go_co (UnivCo p _ t1 t2)      = go_prov p `plusNameEnv` go t1 `plusNameEnv` go t2
+     go_co (TyConAppCo _ tc args)  = go_tc tc `unionUniqSets` go_cos args
+     go_co (AppCo co arg)          = go_co co `unionUniqSets` go_co arg
+     go_co (ForAllCo _ kind_co co) = go_co kind_co `unionUniqSets` go_co co
+     go_co (FunCo _ co1 co2)       = go_co co1 `unionUniqSets` go_co co2
+     go_co (AxiomInstCo ax _ args) = go_ax ax `unionUniqSets` go_cos args
+     go_co (UnivCo p _ t1 t2)      = go_prov p `unionUniqSets` go t1 `unionUniqSets` go t2
+     go_co (CoVarCo {})            = emptyUniqSet
      go_co (SymCo co)              = go_co co
-     go_co (TransCo co1 co2)       = go_co co1 `plusNameEnv` go_co co2
+     go_co (TransCo co1 co2)       = go_co co1 `unionUniqSets` go_co co2
      go_co (NthCo _ co)            = go_co co
      go_co (LRCo _ co)             = go_co co
-     go_co (InstCo co arg)         = go_co co `plusNameEnv` go_co arg
-     go_co (CoherenceCo co1 co2)   = go_co co1 `plusNameEnv` go_co co2
+     go_co (InstCo co arg)         = go_co co `unionUniqSets` go_co arg
+     go_co (CoherenceCo co1 co2)   = go_co co1 `unionUniqSets` go_co co2
      go_co (KindCo co)             = go_co co
      go_co (SubCo co)              = go_co co
      go_co (AxiomRuleCo _ cs)      = go_cos cs
 
-     go_prov UnsafeCoerceProv    = emptyNameEnv
+     go_prov UnsafeCoerceProv    = emptyUniqSet
      go_prov (PhantomProv co)    = go_co co
      go_prov (ProofIrrelProv co) = go_co co
-     go_prov (PluginProv _)      = emptyNameEnv
-     go_prov (HoleProv _)        = emptyNameEnv
+     go_prov (PluginProv _)      = emptyUniqSet
+     go_prov (HoleProv _)        = emptyUniqSet
         -- this last case can happen from the tyConsOfType used from
         -- checkTauTvUpdate
 
-     go_s tys     = foldr (plusNameEnv . go)     emptyNameEnv tys
-     go_cos cos   = foldr (plusNameEnv . go_co)  emptyNameEnv cos
+     go_s tys     = foldr (unionUniqSets . go)     emptyUniqSet tys
+     go_cos cos   = foldr (unionUniqSets . go_co)  emptyUniqSet cos
 
-     go_tc tc = unitNameEnv (tyConName tc) tc
+     go_tc tc = unitUniqSet tc
      go_ax ax = go_tc $ coAxiomTyCon ax
 
 -- | Find the result 'Kind' of a type synonym,

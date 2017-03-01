@@ -167,6 +167,7 @@ import Pair
 import UniqSupply
 import Util
 import UniqFM
+import UniqSet
 
 -- libraries
 import qualified Data.Data as Data hiding ( TyCon )
@@ -1535,8 +1536,8 @@ coVarsOfCos cos = mapUnionVarSet coVarsOfCo cos
 -- | Add the kind variables free in the kinds of the tyvars in the given set.
 -- Returns a non-deterministic set.
 closeOverKinds :: TyVarSet -> TyVarSet
-closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUFM
-  -- It's OK to use nonDetEltsUFM here because we immediately forget
+closeOverKinds = fvVarSet . closeOverKindsFV . nonDetEltsUniqSet
+  -- It's OK to use nonDetEltsUniqSet here because we immediately forget
   -- about the ordering by returning a set.
 
 -- | Given a list of tyvars returns a deterministic FV computation that
@@ -2107,7 +2108,7 @@ checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
     -- It's OK to use nonDetKeysUFM here, because we only use this list to
     -- remove some elements from a set
   needInScope = (tyCoVarsOfTypes tys `unionVarSet` tyCoVarsOfCos cos)
-                  `delListFromUFM_Directly` substDomain
+                  `delListFromUniqSet_Directly` substDomain
   tysCosFVsInScope = needInScope `varSetInScope` in_scope
 
 

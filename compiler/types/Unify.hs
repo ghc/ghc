@@ -39,6 +39,7 @@ import Util
 import Pair
 import Outputable
 import UniqFM
+import UniqSet
 
 import Control.Monad
 #if __GLASGOW_HASKELL__ > 710
@@ -537,8 +538,8 @@ niFixTCvSubst tenv = f tenv
                                                  setTyVarKind rtv $
                                                  substTy subst $
                                                  tyVarKind rtv)
-                                         | rtv <- nonDetEltsUFM range_tvs
-                                         -- It's OK to use nonDetEltsUFM here
+                                         | rtv <- nonDetEltsUniqSet range_tvs
+                                         -- It's OK to use nonDetEltsUniqSet here
                                          -- because we forget the order
                                          -- immediatedly by putting it in VarEnv
                                          , not (in_domain rtv) ]
@@ -549,7 +550,7 @@ niSubstTvSet :: TvSubstEnv -> TyCoVarSet -> TyCoVarSet
 -- remembering that the substitution isn't necessarily idempotent
 -- This is used in the occurs check, before extending the substitution
 niSubstTvSet tsubst tvs
-  = nonDetFoldUFM (unionVarSet . get) emptyVarSet tvs
+  = nonDetFoldUniqSet (unionVarSet . get) emptyVarSet tvs
   -- It's OK to nonDetFoldUFM here because we immediately forget the
   -- ordering by creating a set.
   where
@@ -1095,10 +1096,10 @@ umRnBndr2 v1 v2 thing = UM $ \env state ->
   let rn_env' = rnBndr2 (um_rn_env env) v1 v2 in
   unUM thing (env { um_rn_env = rn_env' }) state
 
-checkRnEnv :: (RnEnv2 -> VarSet) -> VarSet -> UM ()
+checkRnEnv :: (RnEnv2 -> VarEnv Var) -> VarSet -> UM ()
 checkRnEnv get_set varset = UM $ \env state ->
   let env_vars = get_set (um_rn_env env) in
-  if isEmptyVarSet env_vars || varset `disjointVarSet` env_vars
+  if isEmptyVarEnv env_vars || (getUniqSet varset `disjointVarEnv` env_vars)
      -- NB: That isEmptyVarSet is a critical optimization; it
      -- means we don't have to calculate the free vars of
      -- the type, often saving quite a bit of allocation.

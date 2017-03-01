@@ -44,7 +44,7 @@ import Unify         ( tcMatchTyKi )
 import Util
 import Var
 import VarSet
-import UniqFM
+import UniqSet
 import BasicTypes    ( IntWithInf, intGtLimit )
 import ErrUtils      ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
@@ -689,8 +689,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
 
            -- promoteTyVar ignores coercion variables
        ; outer_tclvl <- TcM.getTcLevel
-       ; mapM_ (promoteTyVar outer_tclvl) (nonDetEltsUFM promote_tkvs)
-           -- It's OK to use nonDetEltsUFM here because promoteTyVar is
+       ; mapM_ (promoteTyVar outer_tclvl) (nonDetEltsUniqSet promote_tkvs)
+           -- It's OK to use nonDetEltsUniqSet here because promoteTyVar is
            -- commutative
 
            -- Emit an implication constraint for the
@@ -1436,7 +1436,7 @@ neededEvVars (ev_binds, tcvs) initial_seeds
 
    also_needs :: VarSet -> VarSet
    also_needs needs
-     = nonDetFoldUFM add emptyVarSet needs
+     = nonDetFoldUniqSet add emptyVarSet needs
      -- It's OK to use nonDetFoldUFM here because we immediately forget
      -- about the ordering by creating a set
      where

@@ -35,6 +35,7 @@ import TysPrim          ( realWorldStatePrimTy )
 import ErrUtils         ( dumpIfSet_dyn )
 import Name             ( getName, stableNameCmp )
 import Data.Function    ( on )
+import UniqSet
 
 {-
 ************************************************************************
@@ -717,7 +718,7 @@ unitDmdType :: DmdEnv -> DmdType
 unitDmdType dmd_env = DmdType dmd_env [] topRes
 
 coercionDmdEnv :: Coercion -> DmdEnv
-coercionDmdEnv co = mapVarEnv (const topDmd) (coVarsOfCo co)
+coercionDmdEnv co = mapVarEnv (const topDmd) (getUniqSet $ coVarsOfCo co)
                     -- The VarSet from coVarsOfCo is really a VarEnv Var
 
 addVarDmd :: DmdType -> Var -> Demand -> DmdType

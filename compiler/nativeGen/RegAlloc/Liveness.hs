@@ -40,7 +40,7 @@ import Instruction
 
 import BlockId
 import Hoopl
-import Cmm hiding (RegSet)
+import Cmm hiding (RegSet, emptyRegSet)
 import PprCmm()
 
 import Digraph
@@ -65,6 +65,9 @@ type RegMap a = UniqFM a
 
 emptyRegMap :: UniqFM a
 emptyRegMap = emptyUFM
+
+emptyRegSet :: RegSet
+emptyRegSet = emptyUniqSet
 
 type BlockMap a = LabelMap a
 
@@ -220,7 +223,8 @@ instance Outputable instr
          where  pprRegs :: SDoc -> RegSet -> SDoc
                 pprRegs name regs
                  | isEmptyUniqSet regs  = empty
-                 | otherwise            = name <> (pprUFM regs (hcat . punctuate space . map ppr))
+                 | otherwise            = name <>
+                     (pprUFM (getUniqSet regs) (hcat . punctuate space . map ppr))
 
 instance Outputable LiveInfo where
     ppr (LiveInfo mb_static entryIds liveVRegsOnEntry liveSlotsOnEntry)
@@ -573,7 +577,7 @@ patchEraseLive patchF cmm
          = let
                 patchRegSet set = mkUniqSet $ map patchF $ nonDetEltsUFM set
                   -- See Note [Unique Determinism and code generation]
-                blockMap'       = mapMap patchRegSet blockMap
+                blockMap'       = mapMap (patchRegSet . getUniqSet) blockMap
 
                 info'           = LiveInfo static id (Just blockMap') mLiveSlots
            in   CmmProc info' label live $ map patchSCC sccs
@@ -629,9 +633,9 @@ patchRegsLiveInstr patchF li
                 (patchRegsOfInstr instr patchF)
                 (Just live
                         { -- WARNING: have to go via lists here because patchF changes the uniq in the Reg
-                          liveBorn      = mkUniqSet $ map patchF $ nonDetEltsUFM $ liveBorn live
-                        , liveDieRead   = mkUniqSet $ map patchF $ nonDetEltsUFM $ liveDieRead live
-                        , liveDieWrite  = mkUniqSet $ map patchF $ nonDetEltsUFM $ liveDieWrite live })
+                          liveBorn      = mapUniqSet patchF $ liveBorn live
+                        , liveDieRead   = mapUniqSet patchF $ liveDieRead live
+                        , liveDieWrite  = mapUniqSet patchF $ liveDieWrite live })
                           -- See Note [Unique Determinism and code generation]
 
 
@@ -758,7 +762,7 @@ checkIsReverseDependent sccs'
          = let  dests           = slurpJumpDestsOfBlock block
                 blocksSeen'     = unionUniqSets blocksSeen $ mkUniqSet [blockId block]
                 badDests        = dests `minusUniqSet` blocksSeen'
-           in   case nonDetEltsUFM badDests of
+           in   case nonDetEltsUniqSet badDests of
                  -- See Note [Unique Determinism and code generation]
                  []             -> go blocksSeen' sccs
                  bad : _        -> Just bad
@@ -767,7 +771,7 @@ checkIsReverseDependent sccs'
          = let  dests           = unionManyUniqSets $ map slurpJumpDestsOfBlock blocks
                 blocksSeen'     = unionUniqSets blocksSeen $ mkUniqSet $ map blockId blocks
                 badDests        = dests `minusUniqSet` blocksSeen'
-           in   case nonDetEltsUFM badDests of
+           in   case nonDetEltsUniqSet badDests of
                  -- See Note [Unique Determinism and code generation]
                  []             -> go blocksSeen' sccs
                  bad : _        -> Just bad
@@ -861,7 +865,7 @@ livenessSCCs platform blockmap done
                 = a' == b'
               where a' = map f $ mapToList a
                     b' = map f $ mapToList b
-                    f (key,elt) = (key, nonDetEltsUFM elt)
+                    f (key,elt) = (key, nonDetEltsUniqSet elt)
                     -- See Note [Unique Determinism and code generation]
 
 
@@ -989,7 +993,7 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             targetLiveRegs target
                   = case mapLookup target blockmap of
                                 Just ra -> ra
-                                Nothing -> emptyRegMap
+                                Nothing -> emptyRegSet
 
             live_from_branch = unionManyUniqSets (map targetLiveRegs targets)
 
@@ -998,8 +1002,8 @@ liveness1 platform liveregs blockmap (LiveInstr instr _)
             -- registers that are live only in the branch targets should
             -- be listed as dying here.
             live_branch_only = live_from_branch `minusUniqSet` liveregs
-            r_dying_br  = nonDetEltsUFM (mkUniqSet r_dying `unionUniqSets`
-                                        live_branch_only)
+            r_dying_br  = nonDetEltsUniqSet (mkUniqSet r_dying `unionUniqSets`
+                                             live_branch_only)
                           -- See Note [Unique Determinism and code generation]
 
 

@@ -104,7 +104,7 @@ import Maybes
 import Binary
 import Fingerprint
 import Exception
-import UniqFM
+import UniqSet
 import UniqDFM
 import Packages
 
@@ -453,7 +453,7 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                         -- filtering must be on the semantic module!
                         -- See Note [Identity versus semantic module]
                         . filter ((== semantic_mod) . name_module)
-                        . nonDetEltsUFM
+                        . nonDetEltsUniqSet
                    -- It's OK to use nonDetEltsUFM as localOccs is only
                    -- used to construct the edges and
                    -- stronglyConnCompFromEdgedVertices is deterministic

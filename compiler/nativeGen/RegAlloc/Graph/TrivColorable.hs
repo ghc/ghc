@@ -13,7 +13,7 @@ import Reg
 
 import GraphBase
 
-import UniqFM
+import UniqSet
 import Platform
 import Panic
 
@@ -56,10 +56,10 @@ accSqueeze
         :: Int
         -> Int
         -> (reg -> Int)
-        -> UniqFM reg
+        -> UniqSet reg
         -> Int
 
-accSqueeze count maxCount squeeze ufm = acc count (nonDetEltsUFM ufm)
+accSqueeze count maxCount squeeze us = acc count (nonDetEltsUniqSet us)
   -- See Note [Unique Determinism and code generation]
   where acc count [] = count
         acc count _ | count >= maxCount = count

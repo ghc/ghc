@@ -111,7 +111,7 @@ regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
            (  text "It looks like the register allocator is stuck in an infinite loop."
            $$ text "max cycles  = " <> int maxSpinCount
            $$ text "regsFree    = " <> (hcat $ punctuate space $ map ppr
-                                             $ nonDetEltsUFM $ unionManyUniqSets
+                                             $ nonDetEltsUniqSet $ unionManyUniqSets
                                              $ nonDetEltsUFM regsFree)
               -- This is non-deterministic but we do not
               -- currently support deterministic code-generation.
@@ -316,15 +316,15 @@ graphAddConflictSet
 
 graphAddConflictSet set graph
  = let  virtuals        = mkUniqSet
-                        [ vr | RegVirtual vr <- nonDetEltsUFM set ]
+                        [ vr | RegVirtual vr <- nonDetEltsUniqSet set ]
 
         graph1  = Color.addConflicts virtuals classOfVirtualReg graph
 
         graph2  = foldr (\(r1, r2) -> Color.addExclusion r1 classOfVirtualReg r2)
                         graph1
                         [ (vr, rr)
-                                | RegVirtual vr <- nonDetEltsUFM set
-                                , RegReal    rr <- nonDetEltsUFM set]
+                                | RegVirtual vr <- nonDetEltsUniqSet set
+                                , RegReal    rr <- nonDetEltsUniqSet set]
                           -- See Note [Unique Determinism and code generation]
 
    in   graph2
@@ -419,11 +419,11 @@ seqNode node
         =     seqVirtualReg     (Color.nodeId node)
         `seq` seqRegClass       (Color.nodeClass node)
         `seq` seqMaybeRealReg   (Color.nodeColor node)
-        `seq` (seqVirtualRegList (nonDetEltsUFM (Color.nodeConflicts node)))
-        `seq` (seqRealRegList    (nonDetEltsUFM (Color.nodeExclusions node)))
+        `seq` (seqVirtualRegList (nonDetEltsUniqSet (Color.nodeConflicts node)))
+        `seq` (seqRealRegList    (nonDetEltsUniqSet (Color.nodeExclusions node)))
         `seq` (seqRealRegList (Color.nodePreference node))
-        `seq` (seqVirtualRegList (nonDetEltsUFM (Color.nodeCoalesce node)))
-              -- It's OK to use nonDetEltsUFM for seq
+        `seq` (seqVirtualRegList (nonDetEltsUniqSet (Color.nodeCoalesce node)))
+              -- It's OK to use nonDetEltsUniqSet for seq
 
 seqVirtualReg :: VirtualReg -> ()
 seqVirtualReg reg = reg `seq` ()

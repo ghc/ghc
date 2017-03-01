@@ -89,7 +89,7 @@ worst   :: (RegClass    -> UniqSet Reg)
 worst regsOfClass regAlias neighbors classN classC
  = let  regAliasS regs  = unionManyUniqSets
                         $ map regAlias
-                        $ nonDetEltsUFM regs
+                        $ nonDetEltsUniqSet regs
                         -- This is non-deterministic but we do not
                         -- currently support deterministic code-generation.
                         -- See Note [Unique Determinism and code generation]
@@ -126,7 +126,7 @@ bound regsOfClass regAlias classN classesC
 
         regsC_aliases
                 = unionManyUniqSets
-                $ map (regAliasS . regsOfClass) classesC
+                $ map (regAliasS . getUniqSet . regsOfClass) classesC
 
         overlap = intersectUniqSets (regsOfClass classN) regsC_aliases
 
@@ -155,5 +155,5 @@ powersetL       = map concat . mapM (\x -> [[],[x]])
 
 -- | powersetLS (list of sets)
 powersetLS :: Uniquable a => UniqSet a -> [UniqSet a]
-powersetLS s    = map mkUniqSet $ powersetL $ nonDetEltsUFM s
+powersetLS s    = map mkUniqSet $ powersetL $ nonDetEltsUniqSet s
   -- See Note [Unique Determinism and code generation]

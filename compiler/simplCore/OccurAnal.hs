@@ -40,6 +40,7 @@ import Digraph          ( SCC(..), Node
                         , stronglyConnCompFromEdgedVerticesUniqR )
 import Unique
 import UniqFM
+import UniqSet
 import Util
 import Outputable
 import Data.List
@@ -88,7 +89,8 @@ occurAnalysePgm this_mod active_rule imp_rules vects vectVars binds
 
     -- Note [Preventing loops due to imported functions rules]
     imp_rule_edges = foldr (plusVarEnv_C unionVarSet) emptyVarEnv
-                            [ mapVarEnv (const maps_to) (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
+                            [ mapVarEnv (const maps_to) $
+                                getUniqSet (exprFreeIds arg `delVarSetList` ru_bndrs imp_rule)
                             | imp_rule <- imp_rules
                             , not (isBuiltinRule imp_rule)  -- See Note [Plugin rules]
                             , let maps_to = exprFreeIds (ru_rhs imp_rule)
@@ -1221,8 +1223,8 @@ makeNode :: OccEnv -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
 makeNode env imp_rule_edges bndr_set (bndr, rhs)
-  = (details, varUnique bndr, nonDetKeysUFM node_fvs)
-    -- It's OK to use nonDetKeysUFM here as stronglyConnCompFromEdgedVerticesR
+  = (details, varUnique bndr, nonDetKeysUniqSet node_fvs)
+    -- It's OK to use nonDetKeysUniqSet here as stronglyConnCompFromEdgedVerticesR
     -- is still deterministic with edges in nondeterministic order as
     -- explained in Note [Deterministic SCC] in Digraph.
   where
@@ -1297,8 +1299,8 @@ mkLoopBreakerNodes lvl bndr_set body_uds details_s
                             [ (nd_bndr nd, nd_uds nd, nd_rhs_bndrs nd)
                             | nd <- details_s ]
     mk_lb_node nd@(ND { nd_bndr = bndr, nd_rhs = rhs, nd_inl = inl_fvs }) bndr'
-      = (nd', varUnique bndr, nonDetKeysUFM lb_deps)
-              -- It's OK to use nonDetKeysUFM here as
+      = (nd', varUnique bndr, nonDetKeysUniqSet lb_deps)
+              -- It's OK to use nonDetKeysUniqSet here as
               -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
               -- in nondeterministic order as explained in
               -- Note [Deterministic SCC] in Digraph.
@@ -2196,7 +2198,7 @@ extendFvs env s
     extras :: VarSet    -- env(s)
     extras = nonDetFoldUFM unionVarSet emptyVarSet $
       -- It's OK to use nonDetFoldUFM here because unionVarSet commutes
-             intersectUFM_C (\x _ -> x) env s
+             intersectUFM_C (\x _ -> x) env (getUniqSet s)
 
 {-
 ************************************************************************
@@ -2435,7 +2437,7 @@ mkOneOcc env id int_cxt arity
                        , occ_one_br  = True
                        , occ_int_cxt = int_cxt
                        , occ_tail    = AlwaysTailCalled arity }
-  | id `elemVarEnv` occ_gbl_scrut env
+  | id `elemVarSet` occ_gbl_scrut env
   = singleton noOccInfo
 
   | otherwise
@@ -2451,7 +2453,7 @@ addOneOcc ud id info
     plus_zapped old new = doZapping ud id old `addOccInfo` new
 
 addManyOccsSet :: UsageDetails -> VarSet -> UsageDetails
-addManyOccsSet usage id_set = nonDetFoldUFM addManyOccs usage id_set
+addManyOccsSet usage id_set = nonDetFoldUniqSet addManyOccs usage id_set
   -- It's OK to use nonDetFoldUFM here because addManyOccs commutes
 
 -- Add several occurrences, assumed not to be tail calls
@@ -2500,7 +2502,7 @@ v `usedIn` ud = isExportedId v || v `elemVarEnv` ud_env ud
 
 udFreeVars :: VarSet -> UsageDetails -> VarSet
 -- Find the subset of bndrs that are mentioned in uds
-udFreeVars bndrs ud = intersectUFM_C (\b _ -> b) bndrs (ud_env ud)
+udFreeVars bndrs ud = restrictUniqSetToUFM bndrs (ud_env ud)
 
 -------------------
 -- Auxiliary functions for UsageDetails implementation

@@ -35,7 +35,6 @@ module NameSet (
 
 import Name
 import UniqSet
-import UniqFM
 import Data.List (sortBy)
 
 {-
@@ -96,8 +95,8 @@ nameSetAll = uniqSetAll
 -- See Note [Deterministic UniqFM] to learn about nondeterminism
 nameSetElemsStable :: NameSet -> [Name]
 nameSetElemsStable ns =
-  sortBy stableNameCmp $ nonDetEltsUFM ns
-  -- It's OK to use nonDetEltsUFM here because we immediately sort
+  sortBy stableNameCmp $ nonDetEltsUniqSet ns
+  -- It's OK to use nonDetEltsUniqSet here because we immediately sort
   -- with stableNameCmp
 
 {-

@@ -43,6 +43,7 @@ import ConLike
 import DataCon
 import Name
 import NameEnv
+import NameSet hiding (unitFV)
 import RdrName ( mkVarUnqual )
 import Id
 import IdInfo
@@ -180,7 +181,7 @@ checkNameIsAcyclic n m = SynCycleM $ \s ->
 -- can give better error messages.
 checkSynCycles :: UnitId -> [TyCon] -> [LTyClDecl Name] -> TcM ()
 checkSynCycles this_uid tcs tyclds = do
-    case runSynCycleM (mapM_ (go emptyNameEnv []) tcs) emptyNameEnv of
+    case runSynCycleM (mapM_ (go emptyNameSet []) tcs) emptyNameSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc err
         Right _  -> return ()
   where

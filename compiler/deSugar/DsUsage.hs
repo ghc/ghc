@@ -15,7 +15,7 @@ import NameSet
 import Module
 import Outputable
 import Util
-import UniqFM
+import UniqSet
 import UniqDFM
 import ListSetOps
 import Fingerprint
@@ -108,7 +108,7 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
     -- ent_map groups together all the things imported and used
     -- from a particular module
     ent_map :: ModuleEnv [OccName]
-    ent_map  = nonDetFoldUFM add_mv emptyModuleEnv used_names
+    ent_map  = nonDetFoldUniqSet add_mv emptyModuleEnv used_names
      -- nonDetFoldUFM is OK here. If you follow the logic, we sort by OccName
      -- in ent_hashs
      where

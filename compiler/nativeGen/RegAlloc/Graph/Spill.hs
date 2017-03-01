@@ -61,9 +61,9 @@ regSpill platform code slotsFree regs
         | otherwise
         = do
                 -- Allocate a slot for each of the spilled regs.
-                let slots       = take (sizeUniqSet regs) $ nonDetEltsUFM slotsFree
+                let slots       = take (sizeUniqSet regs) $ nonDetEltsUniqSet slotsFree
                 let regSlotMap  = listToUFM
-                                $ zip (nonDetEltsUFM regs) slots
+                                $ zip (nonDetEltsUniqSet regs) slots
                     -- This is non-deterministic but we do not
                     -- currently support deterministic code-generation.
                     -- See Note [Unique Determinism and code generation]
@@ -141,7 +141,7 @@ regSpill_top platform regSlotMap cmm
                 moreSlotsLive   = IntSet.fromList
                                 $ catMaybes
                                 $ map (lookupUFM regSlotMap)
-                                $ nonDetEltsUFM regsLive
+                                $ nonDetEltsUniqSet regsLive
                     -- See Note [Unique Determinism and code generation]
 
                 slotMap'

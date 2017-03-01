@@ -115,7 +115,7 @@ import FastString
 import SrcLoc
 import Bag
 import Pair
-import UniqFM
+import UniqSet
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
@@ -1280,8 +1280,8 @@ zonkTyCoVar tv | isTcTyVar tv = zonkTcTyVar tv
 
 zonkTyCoVarsAndFV :: TyCoVarSet -> TcM TyCoVarSet
 zonkTyCoVarsAndFV tycovars =
-  tyCoVarsOfTypes <$> mapM zonkTyCoVar (nonDetEltsUFM tycovars)
-  -- It's OK to use nonDetEltsUFM here because we immediately forget about
+  tyCoVarsOfTypes <$> mapM zonkTyCoVar (nonDetEltsUniqSet tycovars)
+  -- It's OK to use nonDetEltsUniqSet here because we immediately forget about
   -- the ordering by turning it into a nondeterministic set and the order
   -- of zonking doesn't matter for determinism.
 

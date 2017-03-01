@@ -77,6 +77,7 @@ import FieldLabel
 import Outputable
 import Unique
 import UniqFM
+import UniqSet
 import Util
 import NameEnv
 
@@ -346,7 +347,7 @@ instance Outputable LocalRdrEnv where
     = hang (text "LocalRdrEnv {")
          2 (vcat [ text "env =" <+> pprOccEnv ppr_elt env
                  , text "in_scope ="
-                    <+> pprUFM ns (braces . pprWithCommas ppr)
+                    <+> pprUFM (getUniqSet ns) (braces . pprWithCommas ppr)
                  ] <+> char '}')
     where
       ppr_elt name = parens (ppr (getUnique (nameOccName name))) <+> ppr name

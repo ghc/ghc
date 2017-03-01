@@ -70,7 +70,7 @@ minusUniqDSet :: UniqDSet a -> UniqDSet a -> UniqDSet a
 minusUniqDSet = minusUDFM
 
 uniqDSetMinusUniqSet :: UniqDSet a -> UniqSet a -> UniqDSet a
-uniqDSetMinusUniqSet = udfmMinusUFM
+uniqDSetMinusUniqSet xs ys = udfmMinusUFM xs (getUniqSet ys)
 
 intersectUniqDSets :: UniqDSet a -> UniqDSet a -> UniqDSet a
 intersectUniqDSets = intersectUDFM

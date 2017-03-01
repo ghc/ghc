@@ -79,7 +79,6 @@ import FastString
 import Module
 import Binary
 import UniqSet
-import UniqFM
 import Unique( mkAlphaTyVarUnique )
 
 import qualified Data.Data as Data
@@ -1202,7 +1201,7 @@ isLegacyPromotableDataCon dc
   =  null (dataConEqSpec dc)  -- no GADTs
   && null (dataConTheta dc)   -- no context
   && not (isFamInstTyCon (dataConTyCon dc))   -- no data instance constructors
-  && allUFM isLegacyPromotableTyCon (tyConsOfType (dataConUserType dc))
+  && uniqSetAll isLegacyPromotableTyCon (tyConsOfType (dataConUserType dc))
 
 -- | Was this tycon promotable before GHC 8.0? That is, is it promotable
 -- without -XTypeInType

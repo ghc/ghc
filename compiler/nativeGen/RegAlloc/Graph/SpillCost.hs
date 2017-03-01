@@ -108,7 +108,7 @@ slurpSpillCostInfo platform cmm
         countLIs rsLiveEntry (LiveInstr instr (Just live) : lis)
          = do
                 -- Increment the lifetime counts for regs live on entry to this instr.
-                mapM_ incLifetime $ nonDetEltsUFM rsLiveEntry
+                mapM_ incLifetime $ nonDetEltsUniqSet rsLiveEntry
                     -- This is non-deterministic but we do not
                     -- currently support deterministic code-generation.
                     -- See Note [Unique Determinism and code generation]
@@ -140,7 +140,7 @@ slurpSpillCostInfo platform cmm
 -- | Take all the virtual registers from this set.
 takeVirtuals :: UniqSet Reg -> UniqSet VirtualReg
 takeVirtuals set = mkUniqSet
-  [ vr | RegVirtual vr <- nonDetEltsUFM set ]
+  [ vr | RegVirtual vr <- nonDetEltsUniqSet set ]
   -- See Note [Unique Determinism and code generation]
 
 
@@ -260,7 +260,7 @@ nodeDegree classOfVirtualReg graph reg
         , virtConflicts
            <- length
            $ filter (\r -> classOfVirtualReg r == classOfVirtualReg reg)
-           $ nonDetEltsUFM
+           $ nonDetEltsUniqSet
            -- See Note [Unique Determinism and code generation]
            $ nodeConflicts node
 

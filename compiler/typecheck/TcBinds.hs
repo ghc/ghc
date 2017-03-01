@@ -61,6 +61,7 @@ import PrelNames( ipClassName )
 import TcValidity (checkValidType)
 import Unique (getUnique)
 import UniqFM
+import UniqSet
 import qualified GHC.LanguageExtensions as LangExt
 import ConLike
 
@@ -546,7 +547,7 @@ type BKey = Int -- Just number off the bindings
 mkEdges :: TcSigFun -> LHsBinds Name -> [Node BKey (LHsBind Name)]
 -- See Note [Polymorphic recursion] in HsBinds.
 mkEdges sig_fn binds
-  = [ (bind, key, [key | n <- nonDetEltsUFM (bind_fvs (unLoc bind)),
+  = [ (bind, key, [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
                          Just key <- [lookupNameEnv key_map n], no_sig n ])
     | (bind, key) <- keyd_binds
     ]

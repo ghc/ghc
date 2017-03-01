@@ -59,7 +59,7 @@ addNode k node graph
  = let
         -- add back conflict edges from other nodes to this one
         map_conflict =
-          nonDetFoldUFM
+          nonDetFoldUniqSet
             -- It's OK to use nonDetFoldUFM here because the
             -- operation is commutative
             (adjustUFM_C (\n -> n { nodeConflicts =
@@ -69,7 +69,7 @@ addNode k node graph
 
         -- add back coalesce edges from other nodes to this one
         map_coalesce =
-          nonDetFoldUFM
+          nonDetFoldUniqSet
             -- It's OK to use nonDetFoldUFM here because the
             -- operation is commutative
             (adjustUFM_C (\n -> n { nodeCoalesce =
@@ -89,11 +89,11 @@ delNode k graph
         | Just node     <- lookupNode graph k
         = let   -- delete conflict edges from other nodes to this one.
                 graph1  = foldl' (\g k1 -> let Just g' = delConflict k1 k g in g') graph
-                        $ nonDetEltsUFM (nodeConflicts node)
+                        $ nonDetEltsUniqSet (nodeConflicts node)
 
                 -- delete coalesce edge from other nodes to this one.
                 graph2  = foldl' (\g k1 -> let Just g' = delCoalesce k1 k g in g') graph1
-                        $ nonDetEltsUFM (nodeCoalesce node)
+                        $ nonDetEltsUniqSet (nodeCoalesce node)
                         -- See Note [Unique Determinism and code generation]
 
                 -- delete the node
@@ -182,7 +182,7 @@ addConflicts
 addConflicts conflicts getClass
 
         -- just a single node, but no conflicts, create the node anyway.
-        | (u : [])      <- nonDetEltsUFM conflicts
+        | (u : [])      <- nonDetEltsUniqSet conflicts
         = graphMapModify
         $ adjustWithDefaultUFM
                 id
@@ -191,8 +191,8 @@ addConflicts conflicts getClass
 
         | otherwise
         = graphMapModify
-        $ (\fm -> foldl' (\g u  -> addConflictSet1 u getClass conflicts g) fm
-                $ nonDetEltsUFM conflicts)
+        $ \fm -> foldl' (\g u  -> addConflictSet1 u getClass conflicts g) fm
+                $ nonDetEltsUniqSet conflicts
                 -- See Note [Unique Determinism and code generation]
 
 
@@ -318,7 +318,7 @@ coalesceGraph' aggressive triv graph kkPairsAcc
         --
         cList   = [ (nodeId node1, k2)
                         | node1 <- cNodes
-                        , k2    <- nonDetEltsUFM $ nodeCoalesce node1 ]
+                        , k2    <- nonDetEltsUniqSet $ nodeCoalesce node1 ]
                         -- See Note [Unique Determinism and code generation]
 
         -- do the coalescing, returning the new graph and a list of pairs of keys
@@ -472,7 +472,7 @@ freezeNode k
                 else node       -- panic "GraphOps.freezeNode: edge to freeze wasn't in the coalesce set"
                                 -- If the edge isn't actually in the coelesce set then just ignore it.
 
-        fm2     = nonDetFoldUFM (adjustUFM_C (freezeEdge k)) fm1
+        fm2     = nonDetFoldUniqSet (adjustUFM_C (freezeEdge k)) fm1
                     -- It's OK to use nonDetFoldUFM here because the operation
                     -- is commutative
                         $ nodeCoalesce node
@@ -568,7 +568,7 @@ validateGraph doc isColored graph
         , not $ isEmptyUniqSet badEdges
         = pprPanic "GraphOps.validateGraph"
                 (  text "Graph has edges that point to non-existent nodes"
-                $$ text "  bad edges: " <> pprUFM badEdges (vcat . map ppr)
+                $$ text "  bad edges: " <> pprUFM (getUniqSet badEdges) (vcat . map ppr)
                 $$ doc )
 
         -- Check that no conflicting nodes have the same color
@@ -609,7 +609,7 @@ checkNode
 checkNode graph node
         | Just color            <- nodeColor node
         , Just neighbors        <- sequence $ map (lookupNode graph)
-                                $  nonDetEltsUFM $ nodeConflicts node
+                                $  nonDetEltsUniqSet $ nodeConflicts node
             -- See Note [Unique Determinism and code generation]
 
         , neighbourColors       <- catMaybes $ map nodeColor neighbors

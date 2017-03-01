@@ -51,6 +51,7 @@ import ListSetOps( assocMaybe )
 import Data.List
 import Util
 import UniqDFM
+import UniqSet
 
 data DsCmdEnv = DsCmdEnv {
         arr_id, compose_id, first_id, app_id, choice_id, loop_id :: CoreExpr
@@ -375,7 +376,7 @@ dsCmd ids local_vars stack_ty res_ty
               res_ty
               core_make_arg
               core_arrow,
-            exprFreeIdsDSet core_arg `udfmIntersectUFM` local_vars)
+            exprFreeIdsDSet core_arg `udfmIntersectUFM` (getUniqSet local_vars))
 
 -- D, xs |- fun :: a t1 t2
 -- D, xs |- arg :: t1
@@ -404,7 +405,7 @@ dsCmd ids local_vars stack_ty res_ty
               core_make_pair
               (do_app ids arg_ty res_ty),
             (exprsFreeIdsDSet [core_arrow, core_arg])
-              `udfmIntersectUFM` local_vars)
+              `udfmIntersectUFM` getUniqSet local_vars)
 
 -- D; ys |-a cmd : (t,stk) --> t'
 -- D, xs |-  exp :: t
@@ -437,7 +438,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdApp cmd arg) env_ids = do
                       core_map
                       core_cmd,
             free_vars `unionDVarSet`
-              (exprFreeIdsDSet core_arg `udfmIntersectUFM` local_vars))
+              (exprFreeIdsDSet core_arg `udfmIntersectUFM` getUniqSet local_vars))
 
 -- D; ys |-a cmd : stk t'
 -- -----------------------------------------------
@@ -474,7 +475,7 @@ dsCmd ids local_vars stack_ty res_ty
     -- match the old environment and stack against the input
     select_code <- matchEnvStack env_ids stack_id param_code
     return (do_premap ids in_ty in_ty' res_ty select_code core_body,
-            free_vars `udfmMinusUFM` pat_vars)
+            free_vars `udfmMinusUFM` getUniqSet pat_vars)
 
 dsCmd ids local_vars stack_ty res_ty (HsCmdPar cmd) env_ids
   = dsLCmd ids local_vars stack_ty res_ty cmd env_ids
@@ -506,7 +507,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdIf mb_fun cond then_cmd else_cmd)
         then_ty = envStackType then_ids stack_ty
         else_ty = envStackType else_ids stack_ty
         sum_ty = mkTyConApp either_con [then_ty, else_ty]
-        fvs_cond = exprFreeIdsDSet core_cond `udfmIntersectUFM` local_vars
+        fvs_cond = exprFreeIdsDSet core_cond `udfmIntersectUFM` getUniqSet local_vars
 
         core_left  = mk_left_expr  then_ty else_ty (buildEnvStack then_ids stack_id)
         core_right = mk_right_expr then_ty else_ty (buildEnvStack else_ids stack_id)
@@ -602,7 +603,7 @@ dsCmd ids local_vars stack_ty res_ty
 
     core_matches <- matchEnvStack env_ids stack_id core_body
     return (do_premap ids in_ty sum_ty res_ty core_matches core_choices,
-            exprFreeIdsDSet core_body `udfmIntersectUFM` local_vars)
+            exprFreeIdsDSet core_body `udfmIntersectUFM` getUniqSet local_vars)
 
 -- D; ys |-a cmd : stk --> t
 -- ----------------------------------
@@ -627,7 +628,7 @@ dsCmd ids local_vars stack_ty res_ty (HsCmdLet lbinds@(L _ binds) body) env_ids 
                         res_ty
                         core_map
                         core_body,
-        exprFreeIdsDSet core_binds `udfmIntersectUFM` local_vars)
+        exprFreeIdsDSet core_binds `udfmIntersectUFM` getUniqSet local_vars)
 
 -- D; xs |-a ss : t
 -- ----------------------------------
@@ -879,7 +880,7 @@ dsCmdStmt ids local_vars out_ids (BindStmt pat cmd _ _ _) env_ids = do
                 do_compose ids before_c_ty after_c_ty out_ty
                         (do_first ids in_ty1 pat_ty in_ty2 core_cmd) $
                 do_arr ids after_c_ty out_ty proj_expr,
-              fv_cmd `unionDVarSet` (mkDVarSet out_ids `udfmMinusUFM` pat_vars))
+              fv_cmd `unionDVarSet` (mkDVarSet out_ids `udfmMinusUFM` getUniqSet pat_vars))
 
 -- D; xs' |-a do { ss } : t
 -- --------------------------------------
@@ -896,7 +897,7 @@ dsCmdStmt ids local_vars out_ids (LetStmt binds) env_ids = do
                         (mkBigCoreVarTupTy env_ids)
                         (mkBigCoreVarTupTy out_ids)
                         core_map,
-            exprFreeIdsDSet core_binds `udfmIntersectUFM` local_vars)
+            exprFreeIdsDSet core_binds `udfmIntersectUFM` getUniqSet local_vars)
 
 -- D; ys  |-a do { ss; returnA -< ((xs1), (ys2)) } : ...
 -- D; xs' |-a do { ss' } : t
@@ -1015,7 +1016,7 @@ dsRecCmd ids local_vars stmts later_ids later_rets rec_ids rec_rets = do
 
     rec_id <- newSysLocalDs rec_ty
     let
-        env1_id_set = fv_stmts `udfmMinusUFM` rec_id_set
+        env1_id_set = fv_stmts `udfmMinusUFM` getUniqSet rec_id_set
         env1_ids = dVarSetElems env1_id_set
         env1_ty = mkBigCoreVarTupTy env1_ids
         in_pair_ty = mkCorePairTy env1_ty rec_ty

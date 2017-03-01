@@ -309,7 +309,7 @@ selectColor colors graph u
         Just nsConflicts
                         = sequence
                         $ map (lookupNode graph)
-                        $ nonDetEltsUFM
+                        $ nonDetEltsUniqSet
                         $ nodeConflicts node
                         -- See Note [Unique Determinism and code generation]
 
@@ -356,7 +356,7 @@ selectColor colors graph u
 
                 -- it wasn't a preference, but it was still ok
                 | not $ isEmptyUniqSet colors_ok
-                , c : _         <- nonDetEltsUFM colors_ok
+                , c : _         <- nonDetEltsUniqSet colors_ok
                 -- See Note [Unique Determinism and code generation]
                 = Just c
 

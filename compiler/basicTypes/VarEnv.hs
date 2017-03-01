@@ -9,7 +9,7 @@ module VarEnv (
 
         -- ** Manipulating these environments
         emptyVarEnv, unitVarEnv, mkVarEnv, mkVarEnv_Directly,
-        elemVarEnv,
+        elemVarEnv, disjointVarEnv,
         extendVarEnv, extendVarEnv_C, extendVarEnv_Acc, extendVarEnv_Directly,
         extendVarEnvList,
         plusVarEnv, plusVarEnv_C, plusVarEnv_CD, plusMaybeVarEnv_C,
@@ -76,6 +76,7 @@ module VarEnv (
 import OccName
 import Var
 import VarSet
+import UniqSet
 import UniqFM
 import UniqDFM
 import Unique
@@ -94,17 +95,11 @@ import Outputable
 -- | A set of variables that are in scope at some point
 -- "Secrets of the Glasgow Haskell Compiler inliner" Section 3.2 provides
 -- the motivation for this abstraction.
-data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
-        -- The (VarEnv Var) is just a VarSet.  But we write it like
-        -- this to remind ourselves that you can look up a Var in
-        -- the InScopeSet. Typically the InScopeSet contains the
+data InScopeSet = InScope VarSet {-# UNPACK #-} !Int
+        -- We store a VarSet here, but we use this for lookups rather than
+        -- just membership tests. Typically the InScopeSet contains the
         -- canonical version of the variable (e.g. with an informative
         -- unfolding), so this lookup is useful.
-        --
-        -- INVARIANT: the VarEnv maps (the Unique of) a variable to
-        --            a variable with the same Unique.  (This was not
-        --            the case in the past, when we had a grevious hack
-        --            mapping var1 to var2.
         --
         -- The Int is a kind of hash-value used by uniqAway
         -- For example, it might be the size of the set
@@ -112,8 +107,9 @@ data InScopeSet = InScope (VarEnv Var) {-# UNPACK #-} !Int
 
 instance Outputable InScopeSet where
   ppr (InScope s _) =
-    text "InScope" <+> braces (fsep (map (ppr . Var.varName) (nonDetEltsUFM s)))
-                      -- It's OK to use nonDetEltsUFM here because it's
+    text "InScope" <+>
+    braces (fsep (map (ppr . Var.varName) (nonDetEltsUniqSet s)))
+                      -- It's OK to use nonDetEltsUniqSet here because it's
                       -- only for pretty printing
                       -- In-scope sets get big, and with -dppr-debug
                       -- the output is overwhelming
@@ -121,42 +117,43 @@ instance Outputable InScopeSet where
 emptyInScopeSet :: InScopeSet
 emptyInScopeSet = InScope emptyVarSet 1
 
-getInScopeVars ::  InScopeSet -> VarEnv Var
+getInScopeVars ::  InScopeSet -> VarSet
 getInScopeVars (InScope vs _) = vs
 
-mkInScopeSet :: VarEnv Var -> InScopeSet
+mkInScopeSet :: VarSet -> InScopeSet
 mkInScopeSet in_scope = InScope in_scope 1
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
-extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n + 1)
+extendInScopeSet (InScope in_scope n) v
+   = InScope (extendVarSet in_scope v) (n + 1)
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
-   = InScope (foldl (\s v -> extendVarEnv s v v) in_scope vs)
+   = InScope (foldl (\s v -> extendVarSet s v) in_scope vs)
                     (n + length vs)
 
-extendInScopeSetSet :: InScopeSet -> VarEnv Var -> InScopeSet
+extendInScopeSetSet :: InScopeSet -> VarSet -> InScopeSet
 extendInScopeSetSet (InScope in_scope n) vs
-   = InScope (in_scope `plusVarEnv` vs) (n + sizeUFM vs)
+   = InScope (in_scope `unionVarSet` vs) (n + sizeUniqSet vs)
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
-delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
+delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarSet` v) n
 
 elemInScopeSet :: Var -> InScopeSet -> Bool
-elemInScopeSet v (InScope in_scope _) = v `elemVarEnv` in_scope
+elemInScopeSet v (InScope in_scope _) = v `elemVarSet` in_scope
 
 -- | Look up a variable the 'InScopeSet'.  This lets you map from
 -- the variable's identity (unique) to its full value.
 lookupInScope :: InScopeSet -> Var -> Maybe Var
-lookupInScope (InScope in_scope _) v  = lookupVarEnv in_scope v
+lookupInScope (InScope in_scope _) v  = lookupVarSet in_scope v
 
 lookupInScope_Directly :: InScopeSet -> Unique -> Maybe Var
 lookupInScope_Directly (InScope in_scope _) uniq
-  = lookupVarEnv_Directly in_scope uniq
+  = lookupVarSet_Directly in_scope uniq
 
 unionInScope :: InScopeSet -> InScopeSet -> InScopeSet
 unionInScope (InScope s1 _) (InScope s2 n2)
-  = InScope (s1 `plusVarEnv` s2) n2
+  = InScope (s1 `unionVarSet` s2) n2
 
 varSetInScope :: VarSet -> InScopeSet -> Bool
 varSetInScope vars (InScope s1 _) = vars `subVarSet` s1
@@ -240,9 +237,9 @@ mkRnEnv2 vars = RV2     { envL     = emptyVarEnv
                         , envR     = emptyVarEnv
                         , in_scope = vars }
 
-addRnInScopeSet :: RnEnv2 -> VarEnv Var -> RnEnv2
+addRnInScopeSet :: RnEnv2 -> VarSet -> RnEnv2
 addRnInScopeSet env vs
-  | isEmptyVarEnv vs = env
+  | isEmptyVarSet vs = env
   | otherwise        = env { in_scope = extendInScopeSetSet (in_scope env) vs }
 
 rnInScope :: Var -> RnEnv2 -> Bool
@@ -462,9 +459,11 @@ lookupVarEnv_NF   :: VarEnv a -> Var -> a
 lookupWithDefaultVarEnv :: VarEnv a -> a -> Var -> a
 elemVarEnv        :: Var -> VarEnv a -> Bool
 elemVarEnvByKey   :: Unique -> VarEnv a -> Bool
+disjointVarEnv    :: VarEnv a -> VarEnv a -> Bool
 
 elemVarEnv       = elemUFM
 elemVarEnvByKey  = elemUFM_Directly
+disjointVarEnv   = disjointUFM
 alterVarEnv      = alterUFM
 extendVarEnv     = addToUFM
 extendVarEnv_C   = addToUFM_C

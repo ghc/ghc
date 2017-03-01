@@ -985,7 +985,7 @@ is_cishCC JavaScriptCallConv = False
 --
 pprTempAndExternDecls :: [CmmBlock] -> (SDoc{-temps-}, SDoc{-externs-})
 pprTempAndExternDecls stmts
-  = (pprUFM temps (vcat . map pprTempDecl),
+  = (pprUFM (getUniqSet temps) (vcat . map pprTempDecl),
      vcat (map (pprExternDecl False{-ToDo-}) (Map.keys lbls)))
   where (temps, lbls) = runTE (mapM_ te_BB stmts)
 

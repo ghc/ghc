@@ -169,6 +169,7 @@ import Data.List ( foldl', partition )
 
 #ifdef DEBUG
 import Digraph
+import UniqSet
 #endif
 
 {-
@@ -2422,7 +2423,7 @@ checkForCyclicBinds ev_binds_map
     is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)
 
     edges :: [(EvBind, EvVar, [EvVar])]
-    edges = [ (bind, bndr, nonDetEltsUFM (evVarsOfTerm rhs))
+    edges = [ (bind, bndr, nonDetEltsUniqSet (evVarsOfTerm rhs))
             | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs}) <- bagToList ev_binds ]
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic even

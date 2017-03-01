@@ -233,7 +233,7 @@ plusUFMList = foldl' plusUFM emptyUFM
 minusUFM :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 minusUFM (UFM x) (UFM y) = UFM (M.difference x y)
 
-intersectUFM :: UniqFM elt -> UniqFM elt -> UniqFM elt
+intersectUFM :: UniqFM elt1 -> UniqFM elt2 -> UniqFM elt1
 intersectUFM (UFM x) (UFM y) = UFM (M.intersection x y)
 
 intersectUFM_C

@@ -447,7 +447,7 @@ getGlobalPtr llvmLbl = do
 -- will be generated anymore!
 generateExternDecls :: LlvmM ([LMGlobal], [LlvmType])
 generateExternDecls = do
-  delayed <- fmap nonDetEltsUFM $ getEnv envAliases
+  delayed <- fmap nonDetEltsUniqSet $ getEnv envAliases
   -- This is non-deterministic but we do not
   -- currently support deterministic code-generation.
   -- See Note [Unique Determinism and code generation]
