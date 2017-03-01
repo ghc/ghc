@@ -294,11 +294,14 @@ cseProgram binds = snd (mapAccumL (cseBind True) emptyCSEnv binds)
 
 cseBind :: Bool -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind toplevel env (NonRec b e)
-  = (env2, NonRec b2 e1)
+  = (env2, NonRec b2 e2)
   where
     e1         = tryForCSE toplevel env e
     (env1, b1) = addBinder env b
     (env2, b2) = addBinding env1 b b1 e1
+    e2  -- See Note [Take care with literal strings]
+      | toplevel && exprIsLiteralString e = e
+      | otherwise                         = e1
 
 cseBind _ env (Rec [(in_id, rhs)])
   | noCSE in_id
@@ -402,9 +405,7 @@ the original RHS unmodified. This produces:
 -}
 
 tryForCSE :: Bool -> CSEnv -> InExpr -> OutExpr
-tryForCSE toplevel env expr
-  | toplevel && exprIsLiteralString expr = expr
-      -- See Note [Take care with literal strings]
+tryForCSE _toplevel env expr
   | Just e <- lookupCSEnv env expr'' = mkTicks ticks e
   | otherwise                        = expr'
     -- The varToCoreExpr is needed if we have

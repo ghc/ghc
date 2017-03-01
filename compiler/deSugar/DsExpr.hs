@@ -979,7 +979,7 @@ handle_failure :: LPat Id -> MatchResult -> SyntaxExpr Id -> DsM CoreExpr
 handle_failure pat match fail_op
   | matchCanFail match
   = do { dflags <- getDynFlags
-       ; fail_msg <- mkStringExpr (mk_fail_msg dflags pat)
+       ; fail_msg <- mkStringExprAtTopLevel (mk_fail_msg dflags pat)
        ; fail_expr <- dsSyntaxExpr fail_op [fail_msg]
        ; extractMatchResult match fail_expr }
   | otherwise

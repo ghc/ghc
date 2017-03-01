@@ -75,6 +75,19 @@ fun2
            }
        })
 
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+T7360.$tcFoo1 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m5]
+T7360.$tcFoo1 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7360.$trModule2 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T7360.$trModule2 = "T7360"#
+
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule4 :: GHC.Prim.Addr#
 [GblId,
@@ -91,14 +104,6 @@ T7360.$trModule3 :: GHC.Types.TrName
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
 T7360.$trModule3 = GHC.Types.TrNameS T7360.$trModule4
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$trModule2 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$trModule2 = "T7360"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$trModule1 :: GHC.Types.TrName
@@ -119,10 +124,29 @@ T7360.$trModule :: GHC.Types.Module
 T7360.$trModule
   = GHC.Types.Module T7360.$trModule3 T7360.$trModule1
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo1 [InlPrag=[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m5]
-T7360.$tcFoo1 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo12 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T7360.$tc'Foo12 = "'Foo3"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo9 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T7360.$tc'Foo9 = "'Foo2"#
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+T7360.$tc'Foo6 :: GHC.Prim.Addr#
+[GblId,
+ Caf=NoCafRefs,
+ Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
+         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
+T7360.$tc'Foo6 = "'Foo1"#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo3 :: GHC.Prim.Addr#
@@ -164,14 +188,6 @@ T7360.$tc'Foo4
   = GHC.Types.KindRepTyConApp
       T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
 
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo6 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo6 = "'Foo1"#
-
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo5 :: GHC.Types.TrName
 [GblId,
@@ -203,14 +219,6 @@ T7360.$tc'Foo7 [InlPrag=[~]] :: GHC.Types.KindRep
 T7360.$tc'Foo7
   = GHC.Types.KindRepTyConApp
       T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo9 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo9 = "'Foo2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo8 :: GHC.Types.TrName
@@ -255,14 +263,6 @@ krep1
 T7360.$tc'Foo10 [InlPrag=[~]] :: GHC.Types.KindRep
 [GblId, Str=m4]
 T7360.$tc'Foo10 = GHC.Types.KindRepFun krep krep1
-
--- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo12 :: GHC.Prim.Addr#
-[GblId,
- Caf=NoCafRefs,
- Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
-         WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo12 = "'Foo3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo11 :: GHC.Types.TrName

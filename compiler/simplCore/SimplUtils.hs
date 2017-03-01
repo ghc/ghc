@@ -1030,6 +1030,12 @@ Note [Do not inline CoVars unconditionally]
 Coercion variables appear inside coercions, and the RHS of a let-binding
 is a term (not a coercion) so we can't necessarily inline the latter in
 the former.
+
+Note [Do not inline string literals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We float out string literals and then common them up. So we must ensure
+that preInlineUnconditionally doesn't undo the work of FloatOut by inlining
+them right back.
 -}
 
 preInlineUnconditionally :: DynFlags -> SimplEnv -> TopLevelFlag -> InId -> InExpr -> Bool
@@ -1055,6 +1061,8 @@ preInlineUnconditionally dflags env top_lvl bndr rhs
              -- See Note [pre/postInlineUnconditionally in gentle mode]
     act = idInlineActivation bndr
     try_once in_lam int_cxt     -- There's one textual occurrence
+        -- See Note [Do not inline string literals]
+        | exprIsLiteralString rhs = False
         | not in_lam = isNotTopLevel top_lvl || early_phase
         | otherwise  = int_cxt && canInlineInLam rhs
 

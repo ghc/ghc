@@ -252,7 +252,7 @@ test('TH_Roles2', normalise_version('array', 'base', 'deepseq', 'ghc-prim',
                                     'ghc-boot', 'ghc-boot-th',
                                     'integer-gmp', 'pretty', 'template-haskell',
                                     'binary', 'bytestring', 'containers'
-                                    ), compile, ['-v0 -ddump-tc'])
+                                    ), compile, ['-v0 -ddump-tc -dsuppress-uniques'])
 test('TH_Roles3', normal, compile, ['-v0 -dsuppress-uniques'])
 test('TH_Roles4', normal, compile, ['-v0'])
 

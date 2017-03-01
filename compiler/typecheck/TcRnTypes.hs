@@ -381,6 +381,9 @@ data DsGblEnv
         , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
         , ds_complete_matches :: CompleteMatchMap
            -- Additional complete pattern matches
+        , ds_top_binds :: Maybe (IORef [CoreBind])
+          -- extra top-level bindings added by the desugarer, e.g. string literals and callstacks
+          -- see Note [Adding Top-Level Bindings in the Desugarer]
         }
 
 type CompleteMatchMap = UniqFM [CompleteMatch]
@@ -390,6 +393,47 @@ mkCompleteMatchMap cms = foldl' insertMatch emptyUFM cms
   where
     insertMatch :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
     insertMatch ufm c@(CompleteMatch _ t) = addToUFM_C (++) ufm t [c]
+
+-- Note [Adding Top-Level Bindings in the Desugarer]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-- Inlining can cause wasteful duplication of constant values like
+-- String literals or CallStacks. For example, if we have a function
+-- that adds a common prefix to an error message
+--
+--   myError msg = error ("some header: " ++ msg)
+--
+-- each time GHC inlines myError we will get a duplicate copy of the
+-- "some header: " literal, which can lead to a sizeable increase in
+-- binary size.
+--
+-- But why is this not already solved by FloatOut (which does indeed
+-- float such constants to the top)? The issue is that by the time
+-- FloatOut runs, myError has already been assigned a StableUnfolding
+-- that captures the string. FloatOut won't rewrite the unfolding
+-- because GHC promises to inline exactly the code the user wrote. Thus,
+-- even though we *have* floated the constant out, we are still forced
+-- to duplicate it when myError is inlined into another module, ugh!
+--
+-- Rather than changing FloatOut, we give the desugarer the ability to
+-- add new top-level bindings (stored in the new ds_top_binds field of
+-- the DsGblEnv), and pre-emptively float string literals before the
+-- unfoldings are produced.
+--
+-- We call the desugarer in two contexts: compiling an entire module, and
+-- compiling and individual expression (e.g. for ghci). In the context of
+-- an individual expression it makes no sense to add top-level bindings,
+-- so the ds_top_binds field is a Maybe.
+--
+-- The function DsUtils.bindExprAtTopLevel takes care of determining
+-- whether we can actually create a new binding, and returns a Var if
+-- able, and the original Expr otherwise.
+--
+-- The function DsMonad.withTopBinds initializes the ds_top_binds field
+-- to a fresh IORef for the duration of the wrapped action, and returns
+-- a pair of the action's result and any added top-level binders. But it
+-- only does so if we're compiling with optimizations, otherwise we don't
+-- gain anything by pre-emptively floating things and just slow down GHC.
+-- (see T1969 for an extreme example)
 
 instance ContainsModule DsGblEnv where
     extractModule = ds_mod

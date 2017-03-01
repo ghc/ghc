@@ -127,6 +127,7 @@ deSugar hsc_env
         ; (msgs, mb_res)
             <- initDs hsc_env mod rdr_env type_env
                       fam_inst_env complete_matches $
+                            withTopBinds $
                        do { ds_ev_binds <- dsEvBinds ev_binds
                           ; core_prs <- dsTopLHsBinds binds_cvr
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
@@ -143,15 +144,15 @@ deSugar hsc_env
 
         ; case mb_res of {
            Nothing -> return (msgs, Nothing) ;
-           Just (ds_ev_binds, all_prs, all_rules, vects0, ds_fords) ->
+           Just ((ds_ev_binds, all_prs, all_rules, vects0, ds_fords), ds_top_binds) ->
 
      do {       -- Add export flags to bindings
           keep_alive <- readIORef keep_var
         ; let (rules_for_locals, rules_for_imps) = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target export_set keep_alive
                                                  rules_for_locals (fromOL all_prs)
-
-              final_pgm = combineEvBinds ds_ev_binds final_prs
+              final_binds = ds_ev_binds ++ ds_top_binds
+              final_pgm = combineEvBinds final_binds final_prs
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
         -- When compiling PrelFloat, which defines data Float = F# Float#
         -- we want F# to be in scope in the foreign marshalling code!

@@ -1,4 +1,4 @@
-*** Exception (reporting due to +RTS -xc): (THUNK_STATIC), stack trace: 
+*** Exception (reporting due to +RTS -xc): (THUNK_2_0), stack trace: 
   Main.g,
   called from Main.f,
   called from Main.main,

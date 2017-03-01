@@ -41,6 +41,7 @@ import PrelNames
 import TyCon
 import TcEvidence
 import TcType
+import TcRnMonad
 import Type
 import Coercion
 import TysWiredIn ( typeNatKind, typeSymbolKind )
@@ -61,7 +62,6 @@ import BasicTypes
 import DynFlags
 import FastString
 import Util
-import MonadUtils
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Monad
 
@@ -1151,7 +1151,7 @@ dsEvTerm (EvId v)           = return (Var v)
 dsEvTerm (EvCallStack cs)   = dsEvCallStack cs
 dsEvTerm (EvTypeable ty ev) = dsEvTypeable ty ev
 dsEvTerm (EvLit (EvNum n))  = mkNaturalExpr n
-dsEvTerm (EvLit (EvStr s))  = mkStringExprFS s
+dsEvTerm (EvLit (EvStr s))  = mkStringExprFSAtTopLevel s
 
 dsEvTerm (EvCast tm co)
   = do { tm' <- dsEvTerm tm
@@ -1174,14 +1174,15 @@ dsEvTerm (EvSelector sel_id tys tms)
   = do { tms' <- mapM dsEvTerm tms
        ; return $ Var sel_id `mkTyApps` tys `mkApps` tms' }
 
-dsEvTerm (EvDelayedError ty msg) = return $ dsEvDelayedError ty msg
+dsEvTerm (EvDelayedError ty msg) = dsEvDelayedError ty msg
 
-dsEvDelayedError :: Type -> FastString -> CoreExpr
+dsEvDelayedError :: Type -> FastString -> DsM CoreExpr
 dsEvDelayedError ty msg
-  = Var errorId `mkTyApps` [getRuntimeRep "dsEvTerm" ty, ty] `mkApps` [litMsg]
+  = do { litMsg <- bindExprAtTopLevel (Lit (MachStr (fastStringToByteString msg)))
+       ; return $ Var errorId `mkTyApps` [getRuntimeRep "dsEvTerm" ty, ty]
+                              `mkApps`   [litMsg] }
   where
     errorId = tYPE_ERROR_ID
-    litMsg  = Lit (MachStr (fastStringToByteString msg))
 
 {-**********************************************************************
 *                                                                      *
@@ -1321,11 +1322,11 @@ dsEvCallStack cs = do
   df            <- getDynFlags
   m             <- getModule
   srcLocDataCon <- dsLookupDataCon srcLocDataConName
-  let mkSrcLoc l =
+  let mkSrcLoc l = bindExprAtTopLevel =<<
         liftM (mkCoreConApps srcLocDataCon)
-              (sequence [ mkStringExprFS (unitIdFS $ moduleUnitId m)
-                        , mkStringExprFS (moduleNameFS $ moduleName m)
-                        , mkStringExprFS (srcSpanFile l)
+              (sequence [ mkStringExprFSAtTopLevel (unitIdFS $ moduleUnitId m)
+                        , mkStringExprFSAtTopLevel (moduleNameFS $ moduleName m)
+                        , mkStringExprFSAtTopLevel (srcSpanFile l)
                         , return $ mkIntExprInt df (srcSpanStartLine l)
                         , return $ mkIntExprInt df (srcSpanStartCol l)
                         , return $ mkIntExprInt df (srcSpanEndLine l)
@@ -1339,7 +1340,7 @@ dsEvCallStack cs = do
         mkCoreApps (Var pushCSVar) [mkCoreTup [name, loc], rest]
 
   let mkPush name loc tm = do
-        nameExpr <- mkStringExprFS name
+        nameExpr <- mkStringExprFSAtTopLevel name
         locExpr <- mkSrcLoc loc
         case tm of
           EvCallStack EvCsEmpty -> return (pushCS nameExpr locExpr emptyCS)
@@ -1350,6 +1351,7 @@ dsEvCallStack cs = do
                   -- See Note [Overview of implicit CallStacks]
                   let ip_co = unwrapIP (exprType tmExpr)
                   return (pushCS nameExpr locExpr (mkCastDs tmExpr ip_co))
+
   case cs of
     EvCsPushCall name loc tm -> mkPush (occNameFS $ getOccName name) loc tm
     EvCsEmpty -> return emptyCS
