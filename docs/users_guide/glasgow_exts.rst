@@ -966,6 +966,42 @@ the optimal solution, provided as an option:
     times when there are very large ``do`` expressions (over 100
     statements).  The default ``ApplicativeDo`` algorithm is ``O(n^2)``.
 
+
+.. _applicative-do-existential:
+
+Existential patterns and GADTs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Note that when the pattern in a statement matches a constructor with
+existential type variables and/or constraints, the transformation that
+``ApplicativeDo`` performs may mean that the pattern does not scope
+over the statements that follow it.  This is because the rearrangement
+happens before the expression is typechecked.  For example, this
+program does not typecheck::
+
+    {-# LANGUAGE RankNTypes, GADTs, ApplicativeDo #-}
+
+    data T where A :: forall a . Eq a => a -> T
+
+    test = do
+      A x <- undefined
+      _ <- return True
+      return (x == x)
+
+The reason is that the ``Eq`` constraint that would be brought into
+scope from the pattern match ``A x`` is not available when
+typechecking the expression ``x == x``, because ``ApplicativeDo`` has
+rearranged the expression to look like this::
+
+    test =
+      (\x _ -> x == x)
+        <$> do A x <- undefined; return x
+        <*> return True
+
+Turning off ``ApplicativeDo`` lets the program typecheck.  This is
+something to bear in mind when using ``ApplicativeDo`` in combination
+with :ref:`existential-quantification` or :ref:`gadt`.
+
 .. _applicative-do-pitfall:
 
 Things to watch out for
