@@ -235,19 +235,64 @@ mergeIfaceDecl d1 d2
                 ifSigs  = ops,
                 ifMinDef = BF.mkOr [noLoc bf1, noLoc bf2]
                 }
-            }
+            } `withRolesFrom` d2
     -- It doesn't matter; we'll check for consistency later when
     -- we merge, see 'mergeSignatures'
-    | otherwise              = d1
+    | otherwise              = d1 `withRolesFrom` d2
+
+-- Note [Role merging]
+-- ~~~~~~~~~~~~~~~~~~~
+-- First, why might it be necessary to do a non-trivial role
+-- merge?  It may rescue a merge that might otherwise fail:
+--
+--      signature A where
+--          type role T nominal representational
+--          data T a b
+--
+--      signature A where
+--          type role T representational nominal
+--          data T a b
+--
+-- A module that defines T as representational in both arguments
+-- would successfully fill both signatures, so it would be better
+-- if if we merged the roles of these types in some nontrivial
+-- way.
+--
+-- However, we have to be very careful about how we go about
+-- doing this, because role subtyping is *conditional* on
+-- the supertype being NOT representationally injective, e.g.,
+-- if we have instead:
+--
+--      signature A where
+--          type role T nominal representational
+--          data T a b = T a b
+--
+--      signature A where
+--          type role T representational nominal
+--          data T a b = T a b
+--
+-- Should we merge the definitions of T so that the roles are R/R (or N/N)?
+-- Absolutely not: neither resulting type is a subtype of the original
+-- types (see Note [Role subtyping]), because data is not representationally
+-- injective.
+--
+-- Thus, merging only occurs when BOTH TyCons in question are
+-- representationally injective.  If they're not, no merge.
 
 withRolesFrom :: IfaceDecl -> IfaceDecl -> IfaceDecl
 d1 `withRolesFrom` d2
     | Just roles1 <- ifMaybeRoles d1
     , Just roles2 <- ifMaybeRoles d2
+    , not (isRepInjectiveIfaceDecl d1 || isRepInjectiveIfaceDecl d2)
     = d1 { ifRoles = mergeRoles roles1 roles2 }
     | otherwise = d1
   where
     mergeRoles roles1 roles2 = zipWith max roles1 roles2
+
+isRepInjectiveIfaceDecl :: IfaceDecl -> Bool
+isRepInjectiveIfaceDecl IfaceData{ ifCons = IfDataTyCon _ } = True
+isRepInjectiveIfaceDecl IfaceFamily{ ifFamFlav = IfaceDataFamilyTyCon } = True
+isRepInjectiveIfaceDecl _ = False
 
 mergeIfaceClassOp :: IfaceClassOp -> IfaceClassOp -> IfaceClassOp
 mergeIfaceClassOp op1@(IfaceClassOp _ _ (Just _)) _ = op1
