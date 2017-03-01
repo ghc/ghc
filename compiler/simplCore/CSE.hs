@@ -24,7 +24,7 @@ import CoreSyn
 import Outputable
 import BasicTypes       ( isAlwaysActive, isAnyInlinePragma )
 import TrieMap
-import Util             ( compareLength, filterOut )
+import Util             ( filterOut )
 import Data.List        ( mapAccumL )
 
 {-
