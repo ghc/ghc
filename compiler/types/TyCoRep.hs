@@ -61,7 +61,7 @@ module TyCoRep (
         pprTyVar, pprTyVars,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-        TyPrec(..), maybeParen, pprTcAppCo, pprTcAppTy,
+        TyPrec(..), maybeParen, pprTcAppCo,
         pprPrefixApp, pprArrowChain,
         pprDataCons, ppSuggestExplicitKinds,
 
@@ -137,12 +137,14 @@ import {-# SOURCE #-} DataCon( dataConFullSig
                              , DataCon, filterEqSpec )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
                           , tyCoVarsOfTypesWellScoped
+                          , tyCoVarsOfTypeWellScoped
                           , coreView, typeKind )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
 import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
-import {-# SOURCE #-} ToIface
+import {-# SOURCE #-} ToIface( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
+                             , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercion )
 
 -- friends:
 import IfaceType
@@ -2460,7 +2462,14 @@ pprParendKind = pprParendType
 tidyToIfaceType :: Type -> IfaceType
 -- It's vital to tidy before converting to an IfaceType
 -- or nested binders will become indistinguishable!
-tidyToIfaceType = toIfaceType . tidyTopType
+--
+-- Also for the free type variables, tell toIfaceTypeX to
+-- leave them as IfaceFreeTyVar.  This is super-important
+-- for debug printing.
+tidyToIfaceType ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env ty)
+  where
+    env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
+    free_tcvs = tyCoVarsOfTypeWellScoped ty
 
 ------------
 pprClassPred :: Class -> [Type] -> SDoc
@@ -2483,7 +2492,7 @@ instance Outputable TyLit where
 ------------------
 
 pprSigmaType :: Type -> SDoc
-pprSigmaType = (pprIfaceSigmaType ShowForAllWhen) . tidyToIfaceType
+pprSigmaType = pprIfaceSigmaType ShowForAllWhen . tidyToIfaceType
 
 pprForAll :: [TyVarBinder] -> SDoc
 pprForAll tvs = pprIfaceForAll (map toIfaceForAllBndr tvs)
@@ -2578,12 +2587,10 @@ pprDataConWithArgs dc = sep [forAllDoc, thetaDoc, ppr dc <+> argsDoc]
 
 
 pprTypeApp :: TyCon -> [Type] -> SDoc
-pprTypeApp = pprTcAppTy TopPrec
-
-pprTcAppTy :: TyPrec -> TyCon -> [Type] -> SDoc
-pprTcAppTy p tc tys
+pprTypeApp tc tys
+  = pprIfaceTypeApp TopPrec (toIfaceTyCon tc)
+                            (toIfaceTcArgs tc tys)
     -- TODO: toIfaceTcArgs seems rather wasteful here
-  = pprIfaceTypeApp p (toIfaceTyCon tc) (toIfaceTcArgs tc tys)
 
 pprTcAppCo :: TyPrec -> (TyPrec -> Coercion -> SDoc)
            -> TyCon -> [Coercion] -> SDoc
@@ -2649,16 +2656,16 @@ getHelpfulOccName tyvar = occ1
   where
     name = tyVarName tyvar
     occ  = getOccName name
-    -- System Names are for unification variables;
+    -- A TcTyVar with a System Name is probably a unification variable;
     -- when we tidy them we give them a trailing "0" (or 1 etc)
     -- so that they don't take precedence for the un-modified name
     -- Plus, indicating a unification variable in this way is a
     -- helpful clue for users
     occ1 | isSystemName name
-         = if isTyVar tyvar
-           then mkTyVarOcc (occNameString occ ++ "0")
-           else mkVarOcc   (occNameString occ ++ "0")
-         | otherwise         = occ
+         , isTcTyVar tyvar
+         = mkTyVarOcc (occNameString occ ++ "0")
+         | otherwise
+         = occ
 
 tidyTyVarBinder :: TidyEnv -> TyVarBndr TyVar vis
                 -> (TidyEnv, TyVarBndr TyVar vis)
@@ -2820,7 +2827,7 @@ tidyCos env = map (tidyCo env)
 --     recursion across a hi-boot file, we don't get the CPR property
 --     and these functions allocate a tremendous amount of rubbish.
 --     It's not critical (because typeSize is really only used in
---     debug mode, but I tripped over and example (T5642) in which
+--     debug mode, but I tripped over an example (T5642) in which
 --     typeSize was one of the biggest single allocators in all of GHC.
 --     And it's easy to fix, so I did.
 

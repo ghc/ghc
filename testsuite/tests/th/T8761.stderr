@@ -81,14 +81,14 @@ T8761.hs:(71,1)-(105,39): Splicing declarations
         pattern Pur :: forall a. (Num a, Eq a) => a -> [a]
         pattern Pur x <- [x, 1]
         pattern Purp ::
-                 forall a b. (Num a, Eq a) => Show b => a -> b -> ([a], UnivProv b)
+                  forall a b. (Num a, Eq a) => Show b => a -> b -> ([a], UnivProv b)
         pattern Purp x y <- ([x, 1], MkUnivProv y)
         pattern Pure ::
                   forall a. (Num a, Eq a) => forall b. a -> b -> ([a], Ex)
         pattern Pure x y <- ([x, 1], MkEx y)
         pattern Purep ::
                   forall a.
-                         (Num a, Eq a) => forall b. Show b => a -> b -> ([a], ExProv)
+                  (Num a, Eq a) => forall b. Show b => a -> b -> ([a], ExProv)
         pattern Purep x y <- ([x, 1], MkExProv y)
         pattern Pep :: () => forall a. Show a => a -> ExProv
         pattern Pep x <- MkExProv x
@@ -116,44 +116,43 @@ T8761.hs:(71,1)-(105,39): Splicing declarations
     pattern Pure x y <- ([x, 1], MkEx y)
     pattern Purep ::
               forall a.
-                     (Num a, Eq a) => forall b. Show b => a -> b -> ([a], ExProv)
+              (Num a, Eq a) => forall b. Show b => a -> b -> ([a], ExProv)
     pattern Purep x y <- ([x, 1], MkExProv y)
     pattern Pep :: () => forall a. Show a => a -> ExProv
     pattern Pep x <- MkExProv x
     pattern Pup :: forall a. () => Show a => a -> UnivProv a
     pattern Pup x <- MkUnivProv x
     pattern Puep ::
-               forall a. () => forall b. Show b => a -> b -> (ExProv, a)
+              forall a. () => forall b. Show b => a -> b -> (ExProv, a)
     pattern Puep x y <- (MkExProv y, x)
 pattern T8761.P :: GHC.Types.Bool
-pattern T8761.Pe :: () => forall (a0_0 :: *) . a0_0 -> T8761.Ex
-pattern T8761.Pu :: forall (a0_0 :: *) . a0_0 -> a0_0
-pattern T8761.Pue :: forall (a0_0 :: *) . () => forall (b0_1 :: *) .
-                                                a0_0 -> b0_1 -> (a0_0, T8761.Ex)
-pattern T8761.Pur :: forall (a0_0 :: *) . (GHC.Num.Num a0_0,
-                                           GHC.Classes.Eq a0_0) =>
-                     a0_0 -> [a0_0]
-pattern T8761.Purp :: forall (a0_0 :: *) (b0_1 :: *) . (GHC.Num.Num a0_0,
-                                                        GHC.Classes.Eq a0_0) =>
-                      GHC.Show.Show b0_1 => a0_0 -> b0_1 -> ([a0_0], T8761.UnivProv b0_1)
-pattern T8761.Pure :: forall (a0_0 :: *) . (GHC.Num.Num a0_0,
-                                            GHC.Classes.Eq a0_0) =>
-                      forall (b0_1 :: *) . a0_0 -> b0_1 -> ([a0_0], T8761.Ex)
-pattern T8761.Purep :: forall (a0_0 :: *) . (GHC.Num.Num a0_0,
-                                             GHC.Classes.Eq a0_0) =>
-                       forall (b0_1 :: *) . GHC.Show.Show b0_1 =>
-                       a0_0 -> b0_1 -> ([a0_0], T8761.ExProv)
-pattern T8761.Pep :: () => forall (a0_0 :: *) . GHC.Show.Show a0_0 =>
-                           a0_0 -> T8761.ExProv
-pattern T8761.Pup :: forall (a0_0 :: *) . () => GHC.Show.Show a0_0 =>
-                                                a0_0 -> T8761.UnivProv a0_0
-pattern T8761.Puep :: forall (a0_0 :: *) . () => forall (b0_1 :: *) . GHC.Show.Show b0_1 =>
-                                                 a0_0 -> b0_1 -> (T8761.ExProv, a0_0)
+pattern T8761.Pe :: () => forall (a_0 :: *) . a_0 -> T8761.Ex
+pattern T8761.Pu :: forall (a_0 :: *) . a_0 -> a_0
+pattern T8761.Pue :: forall (a_0 :: *) . () => forall (b_1 :: *) .
+                                               a_0 -> b_1 -> (a_0, T8761.Ex)
+pattern T8761.Pur :: forall (a_0 :: *) . (GHC.Num.Num a_0,
+                                          GHC.Classes.Eq a_0) =>
+                     a_0 -> [a_0]
+pattern T8761.Purp :: forall (a_0 :: *) (b_1 :: *) . (GHC.Num.Num a_0,
+                                                      GHC.Classes.Eq a_0) =>
+                      GHC.Show.Show b_1 => a_0 -> b_1 -> ([a_0], T8761.UnivProv b_1)
+pattern T8761.Pure :: forall (a_0 :: *) . (GHC.Num.Num a_0,
+                                           GHC.Classes.Eq a_0) =>
+                      forall (b_1 :: *) . a_0 -> b_1 -> ([a_0], T8761.Ex)
+pattern T8761.Purep :: forall (a_0 :: *) . (GHC.Num.Num a_0,
+                                            GHC.Classes.Eq a_0) =>
+                       forall (b_1 :: *) . GHC.Show.Show b_1 =>
+                       a_0 -> b_1 -> ([a_0], T8761.ExProv)
+pattern T8761.Pep :: () => forall (a_0 :: *) . GHC.Show.Show a_0 =>
+                           a_0 -> T8761.ExProv
+pattern T8761.Pup :: forall (a_0 :: *) . () => GHC.Show.Show a_0 =>
+                                               a_0 -> T8761.UnivProv a_0
+pattern T8761.Puep :: forall (a_0 :: *) . () => forall (b_1 :: *) . GHC.Show.Show b_1 =>
+                                                a_0 -> b_1 -> (T8761.ExProv, a_0)
 T8761.hs:(108,1)-(117,25): Splicing declarations
     do infos <- mapM
                   reify
-                  ['P, 'Pe, 'Pu, 'Pue, 'Pur, 'Purp, 'Pure, 'Purep, 'Pep, 'Pup,
-                   'Puep]
+                  ['P, 'Pe, 'Pu, 'Pue, 'Pur, 'Purp, 'Pure, 'Purep, 'Pep, 'Pup, 'Puep]
        mapM_ (runIO . hPutStrLn stderr . pprint) infos
        [d| theAnswerIs = 42 |]
   ======>

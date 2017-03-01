@@ -22,5 +22,5 @@ partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
 coreView :: Type -> Maybe Type
 
 tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-
+tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])

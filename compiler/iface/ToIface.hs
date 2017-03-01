@@ -11,7 +11,7 @@ module ToIface
     , toIfaceTyVarBinders
     , toIfaceTyVar
       -- * Types
-    , toIfaceType
+    , toIfaceType, toIfaceTypeX
     , toIfaceKind
     , toIfaceTcArgs
     , toIfaceTyCon
@@ -64,6 +64,7 @@ import FastString
 import Util
 import Var
 import VarEnv
+import VarSet
 import TyCoRep
 import Demand ( isTopSig )
 
@@ -105,44 +106,51 @@ toIfaceKind = toIfaceType
 
 ---------------------
 toIfaceType :: Type -> IfaceType
--- Synonyms are retained in the interface type
-toIfaceType (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in IfaceType
-  | isTcTyVar tv            = IfaceTcTyVar tv
-  | otherwise               = IfaceTyVar (toIfaceTyVar tv)
-toIfaceType (AppTy t1 t2)   = IfaceAppTy (toIfaceType t1) (toIfaceType t2)
-toIfaceType (LitTy n)       = IfaceLitTy (toIfaceTyLit n)
-toIfaceType (ForAllTy b t)  = IfaceForAllTy (toIfaceForAllBndr b) (toIfaceType t)
-toIfaceType (FunTy t1 t2)
-  | isPredTy t1             = IfaceDFunTy (toIfaceType t1) (toIfaceType t2)
-  | otherwise               = IfaceFunTy  (toIfaceType t1) (toIfaceType t2)
-toIfaceType (CastTy ty co)  = IfaceCastTy (toIfaceType ty) (toIfaceCoercion co)
-toIfaceType (CoercionTy co) = IfaceCoercionTy (toIfaceCoercion co)
+toIfaceType = toIfaceTypeX emptyVarSet
 
-toIfaceType (TyConApp tc tys)
+toIfaceTypeX :: VarSet -> Type -> IfaceType
+-- (toIfaceTypeX free ty)
+--    translates the tyvars in 'free' as IfaceFreeTyVars
+--
+-- Synonyms are retained in the interface type
+toIfaceTypeX fr (TyVarTy tv)   -- See Note [TcTyVars in IfaceType] in IfaceType
+  | tv `elemVarSet` fr         = IfaceFreeTyVar tv
+  | otherwise                  = IfaceTyVar (toIfaceTyVar tv)
+toIfaceTypeX fr (AppTy t1 t2)  = IfaceAppTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX _  (LitTy n)      = IfaceLitTy (toIfaceTyLit n)
+toIfaceTypeX fr (ForAllTy b t) = IfaceForAllTy (toIfaceForAllBndr b)
+                                               (toIfaceTypeX (fr `delVarSet` binderVar b) t)
+toIfaceTypeX fr (FunTy t1 t2)
+  | isPredTy t1                 = IfaceDFunTy (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+  | otherwise                   = IfaceFunTy  (toIfaceTypeX fr t1) (toIfaceTypeX fr t2)
+toIfaceTypeX fr (CastTy ty co)  = IfaceCastTy (toIfaceTypeX fr ty) (toIfaceCoercionX fr co)
+toIfaceTypeX fr (CoercionTy co) = IfaceCoercionTy (toIfaceCoercionX fr co)
+
+toIfaceTypeX fr (TyConApp tc tys)
     -- tuples
   | Just sort <- tyConTuple_maybe tc
   , n_tys == arity
-  = IfaceTupleTy sort IsNotPromoted (toIfaceTcArgs tc tys)
+  = IfaceTupleTy sort IsNotPromoted (toIfaceTcArgsX fr tc tys)
 
   | Just dc <- isPromotedDataCon_maybe tc
   , isTupleDataCon dc
   , n_tys == 2*arity
-  = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgs tc (drop arity tys))
+  = IfaceTupleTy BoxedTuple IsPromoted (toIfaceTcArgsX fr tc (drop arity tys))
 
     -- type equalities: see Note [Equality predicates in IfaceType]
   | tyConName tc == eqTyConName
   = let info = IfaceTyConInfo IsNotPromoted (IfaceEqualityTyCon True)
-    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgs tc tys)
+    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
 
   | tc `elem` [ eqPrimTyCon, eqReprPrimTyCon, heqTyCon ]
   , [k1, k2, _t1, _t2] <- tys
   = let homogeneous = k1 `eqType` k2
         info = IfaceTyConInfo IsNotPromoted (IfaceEqualityTyCon homogeneous)
-    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgs tc tys)
+    in IfaceTyConApp (IfaceTyCon (tyConName tc) info) (toIfaceTcArgsX fr tc tys)
 
     -- other applications
   | otherwise
-  = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTcArgs tc tys)
+  = IfaceTyConApp (toIfaceTyCon tc) (toIfaceTcArgsX fr tc tys)
   where
     arity = tyConArity tc
     n_tys = length tys
@@ -200,50 +208,63 @@ toIfaceTyLit (StrTyLit x) = IfaceStrTyLit x
 
 ----------------
 toIfaceCoercion :: Coercion -> IfaceCoercion
-toIfaceCoercion (Refl r ty)         = IfaceReflCo r (toIfaceType ty)
-toIfaceCoercion co@(TyConAppCo r tc cos)
-  | tc `hasKey` funTyConKey
-  , [_,_,_,_] <- cos                = pprPanic "toIfaceCoercion" (ppr co)
-  | otherwise                       = IfaceTyConAppCo r (toIfaceTyCon tc)
-                                                        (map toIfaceCoercion cos)
-toIfaceCoercion (AppCo co1 co2)     = IfaceAppCo  (toIfaceCoercion co1)
-                                                  (toIfaceCoercion co2)
-toIfaceCoercion (ForAllCo tv k co)  = IfaceForAllCo (toIfaceTvBndr tv)
-                                                    (toIfaceCoercion k)
-                                                    (toIfaceCoercion co)
-toIfaceCoercion (FunCo r co1 co2)   = IfaceFunCo r (toIfaceCoercion co1)
-                                                   (toIfaceCoercion co2)
-toIfaceCoercion (CoVarCo cv)        = IfaceCoVarCo  (toIfaceCoVar cv)
-toIfaceCoercion (AxiomInstCo con ind cos)
-                                    = IfaceAxiomInstCo (coAxiomName con) ind
-                                                       (map toIfaceCoercion cos)
-toIfaceCoercion (UnivCo p r t1 t2)  = IfaceUnivCo (toIfaceUnivCoProv p) r
-                                                  (toIfaceType t1)
-                                                  (toIfaceType t2)
-toIfaceCoercion (SymCo co)          = IfaceSymCo (toIfaceCoercion co)
-toIfaceCoercion (TransCo co1 co2)   = IfaceTransCo (toIfaceCoercion co1)
-                                                   (toIfaceCoercion co2)
-toIfaceCoercion (NthCo d co)        = IfaceNthCo d (toIfaceCoercion co)
-toIfaceCoercion (LRCo lr co)        = IfaceLRCo lr (toIfaceCoercion co)
-toIfaceCoercion (InstCo co arg)     = IfaceInstCo (toIfaceCoercion co)
-                                                  (toIfaceCoercion arg)
-toIfaceCoercion (CoherenceCo c1 c2) = IfaceCoherenceCo (toIfaceCoercion c1)
-                                                       (toIfaceCoercion c2)
-toIfaceCoercion (KindCo c)          = IfaceKindCo (toIfaceCoercion c)
-toIfaceCoercion (SubCo co)          = IfaceSubCo (toIfaceCoercion co)
-toIfaceCoercion (AxiomRuleCo co cs) = IfaceAxiomRuleCo (coaxrName co)
-                                          (map toIfaceCoercion cs)
+toIfaceCoercion = toIfaceCoercionX emptyVarSet
 
-toIfaceUnivCoProv :: UnivCoProvenance -> IfaceUnivCoProv
-toIfaceUnivCoProv UnsafeCoerceProv    = IfaceUnsafeCoerceProv
-toIfaceUnivCoProv (PhantomProv co)    = IfacePhantomProv (toIfaceCoercion co)
-toIfaceUnivCoProv (ProofIrrelProv co) = IfaceProofIrrelProv (toIfaceCoercion co)
-toIfaceUnivCoProv (PluginProv str)    = IfacePluginProv str
-toIfaceUnivCoProv (HoleProv h)        = IfaceHoleProv (chUnique h)
+toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion
+-- (toIfaceCoercionX free ty)
+--    translates the tyvars in 'free' as IfaceFreeTyVars
+toIfaceCoercionX fr co
+  = go co
+  where
+    go (Refl r ty)          = IfaceReflCo r (toIfaceType ty)
+    go (CoVarCo cv)         = IfaceCoVarCo  (toIfaceCoVar cv)
+    go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
+    go (SymCo co)           = IfaceSymCo (go co)
+    go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
+    go (NthCo d co)         = IfaceNthCo d (go co)
+    go (LRCo lr co)         = IfaceLRCo lr (go co)
+    go (InstCo co arg)      = IfaceInstCo (go co) (go arg)
+    go (CoherenceCo c1 c2)  = IfaceCoherenceCo (go c1) (go c2)
+    go (KindCo c)           = IfaceKindCo (go c)
+    go (SubCo co)           = IfaceSubCo (go co)
+    go (AxiomRuleCo co cs)  = IfaceAxiomRuleCo (coaxrName co) (map go cs)
+    go (AxiomInstCo c i cs) = IfaceAxiomInstCo (coAxiomName c) i (map go cs)
+    go (UnivCo p r t1 t2)   = IfaceUnivCo (go_prov p) r
+                                          (toIfaceTypeX fr t1)
+                                          (toIfaceTypeX fr t2)
+    go (TyConAppCo r tc cos)
+      | tc `hasKey` funTyConKey
+      , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
+      | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
+    go (FunCo r co1 co2)   = IfaceFunCo r (toIfaceCoercion co1)
+                                          (toIfaceCoercion co2)
+
+    go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
+                                          (toIfaceCoercionX fr' k)
+                                          (toIfaceCoercionX fr' co)
+                          where
+                            fr' = fr `delVarSet` tv
+
+    go_prov :: UnivCoProvenance -> IfaceUnivCoProv
+    go_prov UnsafeCoerceProv    = IfaceUnsafeCoerceProv
+    go_prov (PhantomProv co)    = IfacePhantomProv (go co)
+    go_prov (ProofIrrelProv co) = IfaceProofIrrelProv (go co)
+    go_prov (PluginProv str)    = IfacePluginProv str
+    go_prov (HoleProv h)        = IfaceHoleProv (chUnique h)
 
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceTcArgs
+toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
+
+toIfaceTcArgsX :: VarSet -> TyCon -> [Type] -> IfaceTcArgs
 -- See Note [Suppressing invisible arguments]
-toIfaceTcArgs tc ty_args
+-- We produce a result list of args describing visiblity
+-- The awkward case is
+--    T :: forall k. * -> k
+-- And consider
+--    T (forall j. blah) * blib
+-- Is 'blib' visible?  It depends on the visibility flag on j,
+-- so we have to substitute for k.  Annoying!
+toIfaceTcArgsX fr tc ty_args
   = go (mkEmptyTCvSubst in_scope) (tyConKind tc) ty_args
   where
     in_scope = mkInScopeSet (tyCoVarsOfTypes ty_args)
@@ -256,16 +277,16 @@ toIfaceTcArgs tc ty_args
       | isVisibleArgFlag vis = ITC_Vis   t' ts'
       | otherwise            = ITC_Invis t' ts'
       where
-        t'  = toIfaceType t
+        t'  = toIfaceTypeX fr t
         ts' = go (extendTvSubst env tv t) res ts
 
     go env (FunTy _ res) (t:ts) -- No type-class args in tycon apps
-      = ITC_Vis (toIfaceType t) (go env res ts)
+      = ITC_Vis (toIfaceTypeX fr t) (go env res ts)
 
     go env (TyVarTy tv) ts
       | Just ki <- lookupTyVar env tv = go env ki ts
     go env kind (t:ts) = WARN( True, ppr tc $$ ppr (tyConKind tc) $$ ppr ty_args )
-                         ITC_Vis (toIfaceType t) (go env kind ts) -- Ill-kinded
+                         ITC_Vis (toIfaceTypeX fr t) (go env kind ts) -- Ill-kinded
 
 tidyToIfaceType :: TidyEnv -> Type -> IfaceType
 tidyToIfaceType env ty = toIfaceType (tidyType env ty)

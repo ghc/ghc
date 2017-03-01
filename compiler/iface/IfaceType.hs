@@ -110,15 +110,15 @@ data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
 type IfaceKind     = IfaceType
 
 data IfaceType     -- A kind of universal type, used for types and kinds
-  = IfaceTcTyVar  TyVar                   -- See Note [TcTyVars in IfaceType]
-  | IfaceTyVar    IfLclName               -- Type/coercion variable only, not tycon
-  | IfaceLitTy    IfaceTyLit
-  | IfaceAppTy    IfaceType IfaceType
-  | IfaceFunTy    IfaceType IfaceType
-  | IfaceDFunTy   IfaceType IfaceType
-  | IfaceForAllTy IfaceForAllBndr IfaceType
-  | IfaceTyConApp IfaceTyCon IfaceTcArgs  -- Not necessarily saturated
-                                          -- Includes newtypes, synonyms, tuples
+  = IfaceFreeTyVar TyVar                 -- See Note [Free tyvars in IfaceType]
+  | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
+  | IfaceLitTy     IfaceTyLit
+  | IfaceAppTy     IfaceType IfaceType
+  | IfaceFunTy     IfaceType IfaceType
+  | IfaceDFunTy    IfaceType IfaceType
+  | IfaceForAllTy  IfaceForAllBndr IfaceType
+  | IfaceTyConApp  IfaceTyCon IfaceTcArgs  -- Not necessarily saturated
+                                           -- Includes newtypes, synonyms, tuples
   | IfaceCastTy     IfaceType IfaceCoercion
   | IfaceCoercionTy IfaceCoercion
 
@@ -186,7 +186,7 @@ data IfaceTyConSort = IfaceNormalTyCon          -- ^ a regular tycon
                       -- details.
                     deriving (Eq)
 
-{- Note [TcTyVars in IfaceType]
+{- Note [Free tyvars in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Nowadays (since Nov 16, 2016) we pretty-print a Type by converting to an
 IfaceType and pretty printing that.  This eliminates a lot of
@@ -198,11 +198,11 @@ when using -ddump-tc-trace) we print a lot of /open/ types.  These
 types are full of TcTyVars, and it's absolutely crucial to print them
 in their full glory, with their unique, TcTyVarDetails etc.
 
-So we simply embed a TcTyVar in IfaceType with the IfaceTcTyVar constructor.
+So we simply embed a TyVar in IfaceType with the IfaceFreeTyVar constructor.
 Note that:
 
-* We never expect to serialise an IfaceTcTyVar into an interface file, nor
-  to deserialise one.  IfaceTcTyVar is used only in the "convert to IfaceType
+* We never expect to serialise an IfaceFreeTyVar into an interface file, nor
+  to deserialise one.  IfaceFreeTyVar is used only in the "convert to IfaceType
   and then pretty-print" pipeline.
 
 
@@ -345,7 +345,7 @@ ifTypeIsVarFree :: IfaceType -> Bool
 ifTypeIsVarFree ty = go ty
   where
     go (IfaceTyVar {})         = False
-    go (IfaceTcTyVar {})       = False
+    go (IfaceFreeTyVar {})     = False
     go (IfaceAppTy fun arg)    = go fun && go arg
     go (IfaceFunTy arg res)    = go arg && go res
     go (IfaceDFunTy arg res)   = go arg && go res
@@ -375,7 +375,7 @@ substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
 substIfaceType env ty
   = go ty
   where
-    go (IfaceTcTyVar tv)      = IfaceTcTyVar tv
+    go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t1 t2)    = IfaceAppTy  (go t1) (go t2)
     go (IfaceFunTy  t1 t2)    = IfaceFunTy  (go t1) (go t2)
@@ -473,7 +473,7 @@ extendIfRnEnv2 IRV2 { ifenvL = lenv
 
 -- See Note [No kind check in ifaces]
 eqIfaceType :: IfRnEnv2 -> IfaceType -> IfaceType -> Bool
-eqIfaceType _ (IfaceTcTyVar tv1) (IfaceTcTyVar tv2)
+eqIfaceType _ (IfaceFreeTyVar tv1) (IfaceFreeTyVar tv2)
     = tv1 == tv2   -- Should not happen
 eqIfaceType env (IfaceTyVar tv1) (IfaceTyVar tv2) =
     case (rnIfOccL env tv1, rnIfOccR env tv2) of
@@ -667,7 +667,7 @@ pprIfaceType       = eliminateRuntimeRep (ppr_ty TopPrec)
 pprParendIfaceType = eliminateRuntimeRep (ppr_ty TyConPrec)
 
 ppr_ty :: TyPrec -> IfaceType -> SDoc
-ppr_ty _         (IfaceTcTyVar tyvar)   = ppr tyvar  -- This is the main reson for IfaceTcTyVar!
+ppr_ty _         (IfaceFreeTyVar tyvar) = ppr tyvar  -- This is the main reson for IfaceFreeTyVar!
 ppr_ty _         (IfaceTyVar tyvar)     = ppr tyvar  -- See Note [TcTyVars in IfaceType]
 ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty _         (IfaceTupleTy i p tys) = pprTuple i p tys
@@ -1322,8 +1322,8 @@ pprIfaceContext [pred] = ppr_ty TyOpPrec pred
 pprIfaceContext preds  = parens (fsep (punctuate comma (map ppr preds)))
 
 instance Binary IfaceType where
-    put_ _ (IfaceTcTyVar tv)
-       = pprPanic "Can't serialise IfaceTcTyVar" (ppr tv)
+    put_ _ (IfaceFreeTyVar tv)
+       = pprPanic "Can't serialise IfaceFreeTyVar" (ppr tv)
 
     put_ bh (IfaceForAllTy aa ab) = do
             putByte bh 0

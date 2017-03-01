@@ -1181,7 +1181,7 @@ tcIfaceType :: IfaceType -> IfL Type
 tcIfaceType = go
   where
     go (IfaceTyVar n)         = TyVarTy <$> tcIfaceTyVar n
-    go (IfaceTcTyVar n)       = pprPanic "tcIfaceType:IfaceTcTyVar" (ppr n)
+    go (IfaceFreeTyVar n)     = pprPanic "tcIfaceType:IfaceFreeTyVar" (ppr n)
     go (IfaceAppTy t1 t2)     = AppTy <$> go t1 <*> go t2
     go (IfaceLitTy l)         = LitTy <$> tcIfaceTyLit l
     go (IfaceFunTy t1 t2)     = FunTy <$> go t1 <*> go t2

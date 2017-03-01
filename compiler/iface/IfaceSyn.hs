@@ -1329,7 +1329,7 @@ freeNamesIfTcArgs (ITC_Invis k ks) = freeNamesIfKind k &&& freeNamesIfTcArgs ks
 freeNamesIfTcArgs ITC_Nil          = emptyNameSet
 
 freeNamesIfType :: IfaceType -> NameSet
-freeNamesIfType (IfaceTcTyVar _)      = emptyNameSet
+freeNamesIfType (IfaceFreeTyVar _)    = emptyNameSet
 freeNamesIfType (IfaceTyVar _)        = emptyNameSet
 freeNamesIfType (IfaceAppTy s t)      = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfTcArgs ts

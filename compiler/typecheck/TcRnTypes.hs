@@ -1765,8 +1765,9 @@ tyCoFVsOfWC (WC { wc_simple = simple, wc_impl = implic, wc_insol = insol })
 tyCoFVsOfImplic :: Implication -> FV
 -- Only called on *zonked* things, hence no need to worry about flatten-skolems
 tyCoFVsOfImplic (Implic { ic_skols = skols
-                         , ic_given = givens, ic_wanted = wanted })
-  = FV.delFVs (mkVarSet skols)
+                        , ic_given = givens
+                        , ic_wanted = wanted })
+  = FV.delFVs (mkVarSet skols `unionVarSet` mkVarSet givens)
       (tyCoFVsOfWC wanted `unionFV` tyCoFVsOfTypes (map evVarPred givens))
 
 tyCoFVsOfBag :: (a -> FV) -> Bag a -> FV
