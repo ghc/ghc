@@ -238,23 +238,23 @@ T7360.$tc'Foo2
       T7360.$tc'Foo7
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-krep :: GHC.Types.KindRep
+$krep :: GHC.Types.KindRep
 [GblId, Str=m1]
-krep
+$krep
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-krep1 :: GHC.Types.KindRep
+$krep1 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs, Str=m1]
-krep1
+$krep1
   = GHC.Types.KindRepTyConApp
       T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo10 [InlPrag=[~]] :: GHC.Types.KindRep
 [GblId, Str=m4]
-T7360.$tc'Foo10 = GHC.Types.KindRepFun krep krep1
+T7360.$tc'Foo10 = GHC.Types.KindRepFun $krep $krep1
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo12 :: GHC.Prim.Addr#

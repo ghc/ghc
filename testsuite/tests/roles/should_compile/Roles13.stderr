@@ -11,10 +11,10 @@ convert1 = \ (ds :: Wrap Age) -> ds
 -- RHS size: {terms: 1, types: 0, coercions: 5, joins: 0/0}
 convert :: Wrap Age -> Int
 [GblId, Arity=1, Caf=NoCafRefs]
-convert =
-  convert1
-  `cast` (<Wrap Age>_R -> Roles13.N:Wrap[0] Roles13.N:Age[0]
-          :: ((Wrap Age -> Wrap Age) :: *) ~R# ((Wrap Age -> Int) :: *))
+convert
+  = convert1
+    `cast` (<Wrap Age>_R -> Roles13.N:Wrap[0] Roles13.N:Age[0]
+            :: ((Wrap Age -> Wrap Age) :: *) ~R# ((Wrap Age -> Int) :: *))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $trModule1 :: GHC.Prim.Addr#
@@ -42,9 +42,9 @@ Roles13.$trModule :: GHC.Types.Module
 Roles13.$trModule = GHC.Types.Module $trModule2 $trModule4
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-krep :: GHC.Types.KindRep
+$krep :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+$krep = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tcAge1 :: GHC.Prim.Addr#
@@ -59,33 +59,33 @@ $tcAge2 = GHC.Types.TrNameS $tcAge1
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Roles13.$tcAge :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
-Roles13.$tcAge =
-  GHC.Types.TyCon
-    3456257068627873222##
-    14056710845110756026##
-    Roles13.$trModule
-    $tcAge2
-    0#
-    krep
+Roles13.$tcAge
+  = GHC.Types.TyCon
+      3456257068627873222##
+      14056710845110756026##
+      Roles13.$trModule
+      $tcAge2
+      0#
+      $krep
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-krep1 :: GHC.Types.KindRep
+$krep1 :: GHC.Types.KindRep
 [GblId]
-krep1 =
-  GHC.Types.KindRepTyConApp
-    GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
+$krep1
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-krep2 :: GHC.Types.KindRep
+$krep2 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep2 =
-  GHC.Types.KindRepTyConApp
-    Roles13.$tcAge (GHC.Types.[] @ GHC.Types.KindRep)
+$krep2
+  = GHC.Types.KindRepTyConApp
+      Roles13.$tcAge (GHC.Types.[] @ GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-krep3 :: GHC.Types.KindRep
+$krep3 :: GHC.Types.KindRep
 [GblId]
-krep3 = GHC.Types.KindRepFun krep1 krep2
+$krep3 = GHC.Types.KindRepFun $krep1 $krep2
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tc'MkAge1 :: GHC.Prim.Addr#
@@ -100,29 +100,29 @@ $tc'MkAge2 = GHC.Types.TrNameS $tc'MkAge1
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Roles13.$tc'MkAge :: GHC.Types.TyCon
 [GblId]
-Roles13.$tc'MkAge =
-  GHC.Types.TyCon
-    18264039750958872441##
-    1870189534242358050##
-    Roles13.$trModule
-    $tc'MkAge2
-    0#
-    krep3
+Roles13.$tc'MkAge
+  = GHC.Types.TyCon
+      18264039750958872441##
+      1870189534242358050##
+      Roles13.$trModule
+      $tc'MkAge2
+      0#
+      $krep3
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-krep4 :: GHC.Types.KindRep
+$krep4 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep4 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+$krep4 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-krep5 :: GHC.Types.KindRep
+$krep5 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep5 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+$krep5 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-krep6 :: GHC.Types.KindRep
+$krep6 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep6 = GHC.Types.KindRepFun krep4 krep5
+$krep6 = GHC.Types.KindRepFun $krep4 $krep5
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tcWrap1 :: GHC.Prim.Addr#
@@ -137,41 +137,41 @@ $tcWrap2 = GHC.Types.TrNameS $tcWrap1
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Roles13.$tcWrap :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
-Roles13.$tcWrap =
-  GHC.Types.TyCon
-    13773534096961634492##
-    15591525585626702988##
-    Roles13.$trModule
-    $tcWrap2
-    0#
-    krep6
+Roles13.$tcWrap
+  = GHC.Types.TyCon
+      13773534096961634492##
+      15591525585626702988##
+      Roles13.$trModule
+      $tcWrap2
+      0#
+      $krep6
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-krep7 :: GHC.Types.KindRep
+$krep7 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep7 = GHC.Types.KindRepVar 0#
+$krep7 = GHC.Types.KindRepVar 0#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-krep8 :: GHC.Types.KindRep
+$krep8 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep8 = GHC.Types.KindRepVar 0#
+$krep8 = GHC.Types.KindRepVar 0#
 
 -- RHS size: {terms: 3, types: 2, coercions: 0, joins: 0/0}
-krep9 :: [GHC.Types.KindRep]
+$krep9 :: [GHC.Types.KindRep]
 [GblId, Caf=NoCafRefs]
-krep9 =
-  GHC.Types.:
-    @ GHC.Types.KindRep krep8 (GHC.Types.[] @ GHC.Types.KindRep)
+$krep9
+  = GHC.Types.:
+      @ GHC.Types.KindRep $krep8 (GHC.Types.[] @ GHC.Types.KindRep)
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-krep10 :: GHC.Types.KindRep
+$krep10 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep10 = GHC.Types.KindRepTyConApp Roles13.$tcWrap krep9
+$krep10 = GHC.Types.KindRepTyConApp Roles13.$tcWrap $krep9
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-krep11 :: GHC.Types.KindRep
+$krep11 :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs]
-krep11 = GHC.Types.KindRepFun krep7 krep10
+$krep11 = GHC.Types.KindRepFun $krep7 $krep10
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 $tc'MkWrap1 :: GHC.Prim.Addr#
@@ -186,14 +186,14 @@ $tc'MkWrap2 = GHC.Types.TrNameS $tc'MkWrap1
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 Roles13.$tc'MkWrap :: GHC.Types.TyCon
 [GblId, Caf=NoCafRefs]
-Roles13.$tc'MkWrap =
-  GHC.Types.TyCon
-    15580677875333883466##
-    808508687714473149##
-    Roles13.$trModule
-    $tc'MkWrap2
-    1#
-    krep11
+Roles13.$tc'MkWrap
+  = GHC.Types.TyCon
+      15580677875333883466##
+      808508687714473149##
+      Roles13.$trModule
+      $tc'MkWrap2
+      1#
+      $krep11
 
 
 

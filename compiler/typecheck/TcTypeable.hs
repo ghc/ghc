@@ -379,7 +379,7 @@ mkTyConRepBinds stuff@(Stuff {..}) todo (TypeableTyCon {..})
   = do -- Place a NOINLINE pragma on KindReps since they tend to be quite large
        -- and bloat interface files.
        kind_rep_id <- (`setInlinePragma` neverInlinePragma)
-                      <$> newSysLocalId (fsLit "krep") (mkTyConTy kindRepTyCon)
+                      <$> newSysLocalId (fsLit "$krep") (mkTyConTy kindRepTyCon)
        kind_rep <- mkTyConKindRep stuff tycon tycon_kind
 
        tycon_rep_rhs <- mkTyConRepTyConRHS stuff todo tycon kind_rep_id

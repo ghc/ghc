@@ -50,10 +50,10 @@
           (0)))))) 
      ({ <no location info> }
       (HsVar 
-       ({ <no location info> }{Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+       ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }
@@ -111,10 +111,10 @@
           (0)))))) 
      ({ <no location info> }
       (HsVar 
-       ({ <no location info> }{Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+       ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }
@@ -182,10 +182,10 @@
           (0)))))) 
      ({ <no location info> }
       (HsVar 
-       ({ <no location info> }{Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+       ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: (krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
    ({ <no location info> }
     (HsApp 
      ({ <no location info> }

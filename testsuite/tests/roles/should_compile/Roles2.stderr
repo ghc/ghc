@@ -18,8 +18,8 @@ Roles2.$tcT2
       Roles2.$trModule
       (GHC.Types.TrNameS "T2"#)
       0
-      krep
-krep [InlPrag=[~]]
+      $krep
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepFun
       (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
       (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
@@ -30,8 +30,8 @@ Roles2.$tc'K2
       Roles2.$trModule
       (GHC.Types.TrNameS "'K2"#)
       1
-      krep
-krep [InlPrag=[~]]
+      $krep
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepFun
       (GHC.Types.KindRepTyConApp
          GHC.Ptr.$tcFunPtr ((:) (GHC.Types.KindRepVar 0) []))
@@ -44,8 +44,8 @@ Roles2.$tcT1
       Roles2.$trModule
       (GHC.Types.TrNameS "T1"#)
       0
-      krep
-krep [InlPrag=[~]]
+      $krep
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepFun
       (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
       (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
@@ -56,8 +56,8 @@ Roles2.$tc'K1
       Roles2.$trModule
       (GHC.Types.TrNameS "'K1"#)
       1
-      krep
-krep [InlPrag=[~]]
+      $krep
+$krep [InlPrag=[~]]
   = GHC.Types.KindRepFun
       (GHC.Types.KindRepTyConApp
          GHC.Types.$tcIO ((:) (GHC.Types.KindRepVar 0) []))
