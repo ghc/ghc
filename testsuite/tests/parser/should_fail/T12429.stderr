@@ -1,0 +1,7 @@
+
+testsuite/tests/parser/should_fail/T12429.hs:2:29: error:
+    parse error on input ‘Y’
+    Perhaps you intended to use PatternSynonyms
+  |
+2 |   import Data.Text (pattern Y)
+  |                             ^

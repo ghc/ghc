@@ -2394,8 +2394,12 @@ srcParseErr options buf len
               $$ ppWhen (token == "=")
                         (text "Perhaps you need a 'let' in a 'do' block?"
                          $$ text "e.g. 'let x = 5' instead of 'x = 5'")
+              $$ ppWhen (not ps_enabled && pattern == "pattern") -- #12429
+                        (text "Perhaps you intended to use PatternSynonyms")
   where token = lexemeToString (offsetBytes (-len) buf) len
+        pattern = lexemeToString (offsetBytes (-len - 8) buf) 7
         th_enabled = extopt LangExt.TemplateHaskell options
+        ps_enabled = extopt LangExt.PatternSynonyms options
 
 -- Report a parse failure, giving the span of the previous token as
 -- the location of the error.  This is the entry point for errors
