@@ -549,8 +549,33 @@ readPackageConfig dflags conf_file = do
   where
     readDirStylePackageConfig conf_dir = do
       let filename = conf_dir </> "package.cache"
-      debugTraceMsg dflags 2 (text "Using binary package database:" <+> text filename)
-      readPackageDbForGhc filename
+      cache_exists <- doesFileExist filename
+      if cache_exists
+        then do
+          debugTraceMsg dflags 2 $ text "Using binary package database:"
+                                    <+> text filename
+          readPackageDbForGhc filename
+        else do
+          -- If there is no package.cache file, we check if the database is not
+          -- empty by inspecting if the directory contains any .conf file. If it
+          -- does, something is wrong and we fail. Otherwise we assume that the
+          -- database is empty.
+          debugTraceMsg dflags 2 $ text "There is no package.cache in"
+                               <+> text conf_dir
+                                <> text ", checking if the database is empty"
+          db_empty <- all (not . isSuffixOf ".conf")
+                   <$> getDirectoryContents conf_dir
+          if db_empty
+            then do
+              debugTraceMsg dflags 3 $ text "There are no .conf files in"
+                                   <+> text conf_dir <> text ", treating"
+                                   <+> text "package database as empty"
+              return []
+            else do
+              throwGhcExceptionIO $ InstallationError $
+                "there is no package.cache in " ++ conf_dir ++
+                " even though package database is not empty"
+
 
     -- Single-file style package dbs have been deprecated for some time, but
     -- it turns out that Cabal was using them in one place. So this is a

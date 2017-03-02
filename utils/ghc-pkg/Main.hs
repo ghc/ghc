@@ -807,7 +807,10 @@ readParseDatabase :: forall mode t. Verbosity
 readParseDatabase verbosity mb_user_conf mode use_cache path
   -- the user database (only) is allowed to be non-existent
   | Just (user_conf,False) <- mb_user_conf, path == user_conf
-  = mkPackageDB [] =<< F.mapM (const $ GhcPkg.lockPackageDb path) mode
+  = do lock <- F.forM mode $ \_ -> do
+         createDirectoryIfMissing True path
+         GhcPkg.lockPackageDb cache
+       mkPackageDB [] lock
   | otherwise
   = do e <- tryIO $ getDirectoryContents path
        case e of
@@ -828,17 +831,17 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
          Right fs
            | not use_cache -> ignore_cache (const $ return ())
            | otherwise -> do
-              let cache = path </> cachefilename
               tdir     <- getModificationTime path
               e_tcache <- tryIO $ getModificationTime cache
               case e_tcache of
                 Left ex -> do
                   whenReportCacheErrors $
                     if isDoesNotExistError ex
-                      then do
-                        warn ("WARNING: cache does not exist: " ++ cache)
-                        warn ("ghc will fail to read this package db. " ++
-                              recacheAdvice)
+                      then
+                        when (verbosity >= Verbose) $ do
+                            warn ("WARNING: cache does not exist: " ++ cache)
+                            warn ("ghc will fail to read this package db. " ++
+                                  recacheAdvice)
                       else do
                         warn ("WARNING: cache cannot be read: " ++ show ex)
                         warn "ghc will fail to read this package db."
@@ -876,7 +879,7 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
                      -- If we're opening for modification, we need to acquire a
                      -- lock even if we don't open the cache now, because we are
                      -- going to modify it later.
-                     lock <- F.mapM (const $ GhcPkg.lockPackageDb path) mode
+                     lock <- F.mapM (const $ GhcPkg.lockPackageDb cache) mode
                      let confs = filter (".conf" `isSuffixOf`) fs
                          doFile f = do checkTime f
                                        parseSingletonPackageConf verbosity f
@@ -888,6 +891,8 @@ readParseDatabase verbosity mb_user_conf mode use_cache path
                  whenReportCacheErrors = when $ verbosity > Normal
                    || verbosity >= Normal && GhcPkg.isDbOpenReadMode mode
   where
+    cache = path </> cachefilename
+
     recacheAdvice
       | Just (user_conf, True) <- mb_user_conf, path == user_conf
       = "Use 'ghc-pkg recache --user' to fix."
@@ -1012,7 +1017,9 @@ tryReadParseOldFileStyleDatabase verbosity mb_user_conf
               locationAbsolute = path_abs
             }
          else do
-           lock <- F.mapM (const $ GhcPkg.lockPackageDb path_dir) mode
+           lock <- F.forM mode $ \_ -> do
+             createDirectoryIfMissing True path_dir
+             GhcPkg.lockPackageDb $ path_dir </> cachefilename
            return $ Just PackageDB {
                location         = path,
                locationAbsolute = path_abs,
