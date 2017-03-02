@@ -986,6 +986,7 @@ test('T12234',
           # 2017-02-05:   74374440  (Probably OccAnal fixes)
           # 2017-02-17:   86525344  (Type-indexed Typeable)
           # 2017-02-25:   80245640  (Early inline patch)
+          # 2017-03-01:   84750072  (Unclear. Possibly catch# signature change.)
           ]),
      ],
      compile,
