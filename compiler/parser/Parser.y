@@ -3181,11 +3181,7 @@ tyvarop :: { Located RdrName }
 tyvarop : '`' tyvarid '`'       {% ams (sLL $1 $> (unLoc $2))
                                        [mj AnnBackquote $1,mj AnnVal $2
                                        ,mj AnnBackquote $3] }
-        | '.'                   {% parseErrorSDoc (getLoc $1)
-                                      (vcat [text "Illegal symbol '.' in type",
-                                             text "Perhaps you intended to use RankNTypes or a similar language",
-                                             text "extension to enable explicit-forall syntax: forall <tvs>. <type>"])
-                                }
+        | '.'                   {% hintExplicitForall' (getLoc $1) }
 
 tyvarid :: { Located RdrName }
         : VARID            { sL1 $1 $! mkUnqual tvName (getVARID $1) }
@@ -3584,6 +3580,22 @@ hintExplicitForall span = do
       , text "Perhaps you intended to use RankNTypes or a similar language"
       , text "extension to enable explicit-forall syntax: \x2200 <tvs>. <type>"
       ]
+
+-- Hint about explicit-forall, assuming UnicodeSyntax is off
+hintExplicitForall' :: SrcSpan -> P (GenLocated SrcSpan RdrName)
+hintExplicitForall' span = do
+    forall    <- extension explicitForallEnabled
+    let illegalDot = "Illegal symbol '.' in type"
+    if forall
+      then parseErrorSDoc span $ vcat
+        [ text illegalDot
+        , text "Perhaps you meant to write 'forall <tvs>. <type>'?"
+        ]
+      else parseErrorSDoc span $ vcat
+        [ text illegalDot
+        , text "Perhaps you intended to use RankNTypes or a similar language"
+        , text "extension to enable explicit-forall syntax: forall <tvs>. <type>"
+        ]
 
 {-
 %************************************************************************
