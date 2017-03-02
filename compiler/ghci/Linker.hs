@@ -1364,7 +1364,9 @@ locateLib hsc_env is_hs dirs lib
 
      obj_file     = lib <.> "o"
      dyn_obj_file = lib <.> "dyn_o"
-     arch_file = "lib" ++ lib ++ lib_tag <.> "a"
+     arch_files = [ "lib" ++ lib ++ lib_tag <.> "a"
+                  , lib <.> "a" -- native code has no lib_tag
+                  ]
      lib_tag = if is_hs && loading_profiled_hs_libs then "_p" else ""
 
      loading_profiled_hs_libs = interpreterProfiled dflags
@@ -1385,9 +1387,10 @@ locateLib hsc_env is_hs dirs lib
 
      findObject    = liftM (fmap Object)  $ findFile dirs obj_file
      findDynObject = liftM (fmap Object)  $ findFile dirs dyn_obj_file
-     findArchive   = let local  = liftM (fmap Archive) $ findFile dirs arch_file
-                         linked = liftM (fmap Archive) $ searchForLibUsingGcc dflags arch_file dirs
-                     in liftM2 (<|>) local linked
+     findArchive   = let local  name = liftM (fmap Archive) $ findFile dirs name
+                         linked name = liftM (fmap Archive) $ searchForLibUsingGcc dflags name dirs
+                         check name = apply [local name, linked name]
+                     in  apply (map check arch_files)
      findHSDll     = liftM (fmap DLLPath) $ findFile dirs hs_dyn_lib_file
      findDll       = liftM (fmap DLLPath) $ findFile dirs dyn_lib_file
      findSysDll    = fmap (fmap $ DLL . dropExtension . takeFileName) $ findSystemLibrary hsc_env so_name
