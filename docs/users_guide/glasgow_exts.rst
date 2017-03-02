@@ -2843,7 +2843,7 @@ also sets :ghc-flag:`-XGADTSyntax` and :ghc-flag:`-XMonoLocalBinds`.
    binding site. The easiest way to ensure that a variable a rigid type
    is to give it a type signature. For more precise details see `Simple
    unification-based type inference for
-   GADTs <http://research.microsoft.com/%7Esimonpj/papers/gadt>`__. The
+   GADTs <http://research.microsoft.com/%7Esimonpj/papers/gadt/>`__. The
    criteria implemented by GHC are given in the Appendix.
 
 .. _record-system-extensions:
