@@ -1815,14 +1815,27 @@ linkBinary' staticLink dflags o_files dep_packages = do
               in ["-L" ++ l] ++ ["-Xlinker", "-rpath", "-Xlinker", libpath]
          | otherwise = ["-L" ++ l]
 
-    let dead_strip = if osSubsectionsViaSymbols (platformOS platform)
-                      then ["-Wl,-dead_strip"]
-                      else []
+    let
+      dead_strip
+        | gopt Opt_WholeArchiveHsLibs dflags = []
+        | otherwise = if osSubsectionsViaSymbols (platformOS platform)
+                        then ["-Wl,-dead_strip"]
+                        else []
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
 
     extraLinkObj <- mkExtraObjToLinkIntoBinary dflags
     noteLinkObjs <- mkNoteObjsToLinkIntoBinary dflags dep_packages
+
+    let
+      (pre_hs_libs, post_hs_libs)
+        | gopt Opt_WholeArchiveHsLibs dflags
+        = if platformOS platform == OSDarwin
+            then (["-Wl,-all_load"], [])
+              -- OS X does not have a flag to turn off -all_load
+            else (["-Wl,--whole-archive"], ["-Wl,--no-whole-archive"])
+        | otherwise
+        = ([],[])
 
     pkg_link_opts <- do
         (package_hs_libs, extra_libs, other_flags) <- getPackageLinkOpts dflags dep_packages
@@ -1832,7 +1845,9 @@ linkBinary' staticLink dflags o_files dep_packages = do
                                  -- HS packages, because libtool doesn't accept other options.
                                  -- In the case of iOS these need to be added by hand to the
                                  -- final link in Xcode.
-            else other_flags ++ dead_strip ++ package_hs_libs ++ extra_libs
+            else other_flags ++ dead_strip
+                  ++ pre_hs_libs ++ package_hs_libs ++ post_hs_libs
+                  ++ extra_libs
                  -- -Wl,-u,<sym> contained in other_flags
                  -- needs to be put before -l<package>,
                  -- otherwise Solaris linker fails linking
@@ -1934,7 +1949,8 @@ linkBinary' staticLink dflags o_files dep_packages = do
                           then ["-Wl,-read_only_relocs,suppress"]
                           else [])
 
-                      ++ (if sLdIsGnuLd mySettings
+                      ++ (if sLdIsGnuLd mySettings &&
+                             not (gopt Opt_WholeArchiveHsLibs dflags)
                           then ["-Wl,--gc-sections"]
                           else [])
 

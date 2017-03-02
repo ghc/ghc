@@ -515,6 +515,7 @@ data GeneralFlag
    | Opt_ExternalInterpreter
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
+   | Opt_WholeArchiveHsLibs
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -3705,7 +3706,8 @@ fFlagsDeps = [
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
-  flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints
+  flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
+  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
