@@ -872,7 +872,7 @@ def do_test(name, way, func, args, files):
 # if found and instead have the testsuite decide on what to do
 # with the output.
 def override_options(pre_cmd):
-    if config.verbose >= 4 and bool(re.match('\$make', pre_cmd, re.I)):
+    if config.verbose >= 5 and bool(re.match('\$make', pre_cmd, re.I)):
         return pre_cmd.replace('-s'      , '') \
                       .replace('--silent', '') \
                       .replace('--quiet' , '')
