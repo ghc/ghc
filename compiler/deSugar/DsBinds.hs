@@ -837,13 +837,15 @@ decomposeRuleLhs :: [Var] -> CoreExpr -> Either SDoc ([Var], Id, [CoreExpr])
 -- The 'bndrs' are the quantified binders of the rules, but decomposeRuleLhs
 -- may add some extra dictionary binders (see Note [Free dictionaries])
 --
--- Returns Nothing if the LHS isn't of the expected shape
+-- Returns an error message if the LHS isn't of the expected shape
 -- Note [Decomposing the left-hand side of a RULE]
 decomposeRuleLhs orig_bndrs orig_lhs
   | not (null unbound)    -- Check for things unbound on LHS
                           -- See Note [Unused spec binders]
   = Left (vcat (map dead_msg unbound))
-
+  | Var funId <- fun2
+  , Just con <- isDataConId_maybe funId
+  = Left (constructor_msg con) -- See Note [No RULES on datacons]
   | Just (fn_id, args) <- decompose fun2 args2
   , let extra_bndrs = mk_extra_bndrs fn_id args
   = -- pprTrace "decmposeRuleLhs" (vcat [ text "orig_bndrs:" <+> ppr orig_bndrs
@@ -898,6 +900,11 @@ decomposeRuleLhs orig_bndrs orig_lhs
     | isTyVar bndr                      = text "type variable" <+> quotes (ppr bndr)
     | Just pred <- evVarPred_maybe bndr = text "constraint" <+> quotes (ppr pred)
     | otherwise                         = text "variable" <+> quotes (ppr bndr)
+
+   constructor_msg con = vcat
+     [ text "A constructor," <+> ppr con <>
+         text ", appears as outermost match in RULE lhs."
+     , text "This rule will be ignored." ]
 
    drop_dicts :: CoreExpr -> CoreExpr
    drop_dicts e
@@ -1086,6 +1093,22 @@ not bound on the LHS!  But it's a silly specialisation anyway, because
 the constraint is unused.  We could bind 'd' to (error "unused")
 but it seems better to reject the program because it's almost certainly
 a mistake.  That's what the isDeadBinder call detects.
+
+Note [No RULES on datacons]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Previously, `RULES` like
+
+    "JustNothing" forall x . Just x = Nothing
+
+were allowed. Simon Peyton Jones says this seems to have been a
+mistake, that such rules have never been supported intentionally,
+and that he doesn't know if they can break in horrible ways.
+Furthermore, Ben Gamari and Reid Barton are considering trying to
+detect the presence of "static data" that the simplifier doesn't
+need to traverse at all. Such rules do not play well with that.
+So for now, we ban them altogether as requested by #13290. See also #7398.
+
 
 ************************************************************************
 *                                                                      *

@@ -68,7 +68,6 @@ test('T10830', extra_run_opts('+RTS -K100k -RTS'), compile_and_run, [''])
 test('T11172', normal, compile_and_run, [''])
 test('T11731', normal, compile_and_run, ['-fspec-constr'])
 test('T7611', normal, compile_and_run, [''])
-test('T12689', normal, compile_and_run, [''])
 test('T12689broken', expect_broken(12689), compile_and_run, [''])
 test('T12689a', normal, compile_and_run, [''])
 

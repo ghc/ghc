@@ -157,6 +157,16 @@ Compiler
 - The :ghc-flag:`-XExtendedDefaultRules` extension now defaults multi-parameter
   typeclasses. See :ghc-ticket:`12923`.
 
+- GHC now ignores ``RULES`` for data constructors (:ghc-ticket:`13290`).
+  Previously, it accepted::
+
+    "NotAllowed" forall x. Just x = e
+
+  That rule will no longer take effect, and a warning will be issued. ``RULES``
+  may still mention data constructors, but not in the outermost position::
+
+    "StillWorks" forall x. f (Just x) = e
+
 GHCi
 ~~~~
 

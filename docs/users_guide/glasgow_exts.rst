@@ -13268,9 +13268,11 @@ From a syntactic point of view:
 
        "wrong1"   forall e1 e2.  case True of { True -> e1; False -> e2 } = e1
        "wrong2"   forall f.      f True = True
+       "wrong3"   forall x.      Just x = Nothing
 
    In ``"wrong1"``, the LHS is not an application; in ``"wrong2"``, the
-   LHS has a pattern variable in the head.
+   LHS has a pattern variable in the head. In ``"wrong3"``, the LHS consists
+   of a *constructor*, rather than a *variable*, applied to an argument.
 
 -  A rule does not need to be in the same module as (any of) the
    variables it mentions, though of course they need to be in scope.
