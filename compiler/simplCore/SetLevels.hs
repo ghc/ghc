@@ -562,11 +562,8 @@ lvlMFE env strict_ctxt ann_expr
     lvlExpr env ann_expr
 
   |  float_is_new_lam || exprIsTopLevelBindable expr expr_ty
-  || expr_ok_for_spec && not (isTopLvl dest_lvl)
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
-         -- or is okay for speculation (we'll now evaluate it earlier).
-         -- But in the last case, we can't float an unlifted thing to top level
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
                               join_arity_maybe ann_expr
                   -- Treat the expr just like a right-hand side
@@ -764,15 +761,6 @@ float a boxed version
 and replace the original (f x) with
    case (case y of I# r -> r) of r -> blah
 
-However if the expression to be floated (f x) is okay for speculation,
-just float it without any boxing/unboxing. We'll evaluate it earlier,
-but that's okay because the expression is okay for speculation. Simpler
-and cheaper than boxing and unboxing. The only potential snag is that
-we can't float an unlifted binding to top-level (unless it is an unboxed
-string literal). In this case, we just don't float the expression at all.
-No great loss since, by assumption, it is cheap to compute anyways. See
-Note [Test cheapness with exprOkForSpeculation].
-
 Being able to float unboxed expressions is sometimes important; see
 Trac #12603.  I'm not sure how /often/ it is important, but it's
 not hard to achieve.
@@ -806,6 +794,18 @@ due to a special hack that says division operators can't fail
 when the denominator is definitely no-zero.  And yet that
 same expression says False to exprIsCheap.  Simplest way to
 guarantee the let/app invariant is to use the same function!
+
+If an expression is okay for speculation, we could also float it out
+*without* boxing and unboxing, since evaluating it early is okay.
+However, it turned out to usually be better not to float such expressions,
+since they tend to be extremely cheap things like (x +# 1#). Even the
+cost of spilling the let-bound variable to the stack across a call may
+exceed the cost of recomputing such an expression. (And we can't float
+unlifted bindings to top-level.)
+
+We could try to do something smarter here, and float out expensive yet
+okay-for-speculation things, such as division by non-zero constants.
+But I suspect it's a narrow target.
 
 Note [Bottoming floats]
 ~~~~~~~~~~~~~~~~~~~~~~~
