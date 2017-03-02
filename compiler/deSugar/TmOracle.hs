@@ -32,7 +32,7 @@ import TcHsSyn
 import MonadUtils
 import Util
 
-import qualified Data.Map as Map
+import NameEnv
 
 {-
 %************************************************************************
@@ -43,7 +43,7 @@ import qualified Data.Map as Map
 -}
 
 -- | The type of substitutions.
-type PmVarEnv = Map.Map Name PmExpr
+type PmVarEnv = NameEnv PmExpr
 
 -- | The environment of the oracle contains
 --     1. A Bool (are there any constraints we cannot handle? (PmExprOther)).
@@ -80,7 +80,7 @@ varIn x e = case e of
 
 -- | Flatten the DAG (Could be improved in terms of performance.).
 flattenPmVarEnv :: PmVarEnv -> PmVarEnv
-flattenPmVarEnv env = Map.map (exprDeepLookup env) env
+flattenPmVarEnv env = mapNameEnv (exprDeepLookup env) env
 
 -- | The state of the term oracle (includes complex constraints that cannot
 -- progress unless we get more information).
@@ -88,7 +88,7 @@ type TmState = ([ComplexEq], TmOracleEnv)
 
 -- | Initial state of the oracle.
 initialTmState :: TmState
-initialTmState = ([], (False, Map.empty))
+initialTmState = ([], (False, emptyNameEnv))
 
 -- | Solve a complex equality (top-level).
 solveOneEq :: TmState -> ComplexEq -> Maybe TmState
@@ -140,7 +140,7 @@ extendSubstAndSolve x e (standby, (unhandled, env))
     -- had some progress. Careful about performance:
     -- See Note [Representation of Term Equalities] in deSugar/Check.hs
     (changed, unchanged) = partitionWith (substComplexEq x e) standby
-    new_incr_state       = (unchanged, (unhandled, Map.insert x e env))
+    new_incr_state       = (unchanged, (unhandled, extendNameEnv env x e))
 
 -- | When we know that a variable is fresh, we do not actually have to
 -- check whether anything changes, we know that nothing does. Hence,
@@ -149,7 +149,7 @@ extendSubstAndSolve x e (standby, (unhandled, env))
 extendSubst :: Id -> PmExpr -> TmState -> TmState
 extendSubst y e (standby, (unhandled, env))
   | isNotPmExprOther simpl_e
-  = (standby, (unhandled, Map.insert x simpl_e env))
+  = (standby, (unhandled, extendNameEnv env x simpl_e))
   | otherwise = (standby, (True, env))
   where
     x = idName y
@@ -219,7 +219,7 @@ applySubstComplexEq env (e1,e2) = (exprDeepLookup env e1, exprDeepLookup env e2)
 -- | Apply an (un-flattened) substitution to a variable.
 varDeepLookup :: PmVarEnv -> Name -> PmExpr
 varDeepLookup env x
-  | Just e <- Map.lookup x env = exprDeepLookup env e -- go deeper
+  | Just e <- lookupNameEnv env x = exprDeepLookup env e -- go deeper
   | otherwise                  = PmExprVar x          -- terminal
 {-# INLINE varDeepLookup #-}
 

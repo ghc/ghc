@@ -96,6 +96,7 @@ import Data.Function
 import Data.IORef ( IORef, modifyIORef, newIORef, readIORef, writeIORef )
 import Data.List ( find, group, intercalate, intersperse, isPrefixOf, nub,
                    partition, sort, sortBy )
+import qualified Data.Set as S
 import Data.Maybe
 import qualified Data.Map as M
 import Data.Time.LocalTime ( getZonedTime )
@@ -2042,15 +2043,15 @@ isSafeModule m = do
     -- print info to user...
     liftIO $ putStrLn $ "Trust type is (Module: " ++ trust ++ ", Package: " ++ pkg ++ ")"
     liftIO $ putStrLn $ "Package Trust: " ++ (if packageTrustOn dflags then "On" else "Off")
-    when (not $ null good)
+    when (not $ S.null good)
          (liftIO $ putStrLn $ "Trusted package dependencies (trusted): " ++
-                        (intercalate ", " $ map (showPpr dflags) good))
-    case msafe && null bad of
+                        (intercalate ", " $ map (showPpr dflags) (S.toList good)))
+    case msafe && S.null bad of
         True -> liftIO $ putStrLn $ mname ++ " is trusted!"
         False -> do
             when (not $ null bad)
                  (liftIO $ putStrLn $ "Trusted package dependencies (untrusted): "
-                            ++ (intercalate ", " $ map (showPpr dflags) bad))
+                            ++ (intercalate ", " $ map (showPpr dflags) (S.toList bad)))
             liftIO $ putStrLn $ mname ++ " is NOT trusted!"
 
   where
@@ -2060,8 +2061,8 @@ isSafeModule m = do
         | thisPackage dflags == moduleUnitId md = True
         | otherwise = trusted $ getPackageDetails dflags (moduleUnitId md)
 
-    tallyPkgs dflags deps | not (packageTrustOn dflags) = ([], [])
-                          | otherwise = partition part deps
+    tallyPkgs dflags deps | not (packageTrustOn dflags) = (S.empty, S.empty)
+                          | otherwise = S.partition part deps
         where part pkg = trusted $ getInstalledPackageDetails dflags pkg
 
 -----------------------------------------------------------------------------

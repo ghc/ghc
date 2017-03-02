@@ -8,7 +8,7 @@
 {-# LANGUAGE CPP #-}
 
 module ListSetOps (
-        unionLists, minusList, insertList,
+        unionLists, minusList,
 
         -- Association lists
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
@@ -41,10 +41,6 @@ getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
 ************************************************************************
 -}
 
-insertList :: Eq a => a -> [a] -> [a]
--- Assumes the arg list contains no dups; guarantees the result has no dups
-insertList x xs | isIn "insert" x xs = xs
-                | otherwise          = x : xs
 
 unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
 -- Assumes that the arguments contain no duplicates

@@ -55,8 +55,10 @@ import Data.Map         ( Map )
 import qualified Data.Map as Map
 import Data.Ord         ( comparing )
 import Data.List        ( partition, (\\), find, sortBy )
+import qualified Data.Set as S
 -- import qualified Data.Set as Set
 import System.FilePath  ((</>))
+
 import System.IO
 
 {-
@@ -397,15 +399,15 @@ calculateAvails dflags iface mod_safe' want_boot =
           imp_orphs      = orphans,
           imp_finsts     = finsts,
           imp_dep_mods   = mkModDeps dependent_mods,
-          imp_dep_pkgs   = map fst $ dependent_pkgs,
+          imp_dep_pkgs   = S.fromList . map fst $ dependent_pkgs,
           -- Add in the imported modules trusted package
           -- requirements. ONLY do this though if we import the
           -- module as a safe import.
           -- See Note [Tracking Trust Transitively]
           -- and Note [Trust Transitive Property]
           imp_trust_pkgs = if mod_safe'
-                               then map fst $ filter snd dependent_pkgs
-                               else [],
+                               then S.fromList . map fst $ filter snd dependent_pkgs
+                               else S.empty,
           -- Do we require our own pkg to be trusted?
           -- See Note [Trust Own Package]
           imp_trust_own_pkg = pkg_trust_req
