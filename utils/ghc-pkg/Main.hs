@@ -41,6 +41,7 @@ import Distribution.Package hiding (installedUnitId)
 import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
+import Distribution.Types.UnqualComponentName
 import Distribution.Simple.Utils (fromUTF8, toUTF8, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
@@ -1243,8 +1244,17 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.componentId        = installedComponentId pkg,
        GhcPkg.instantiatedWith   = instantiatedWith pkg,
        GhcPkg.sourcePackageId    = sourcePackageId pkg,
-       GhcPkg.packageName        = packageName pkg,
+       GhcPkg.packageName        =
+        case sourcePackageName pkg of
+            Nothing -> packageName pkg
+            Just pn -> pn,
        GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
+       GhcPkg.mungedPackageName  =
+         case sourcePackageName pkg of
+            Nothing -> Nothing
+            Just _  -> Just (packageName pkg),
+       GhcPkg.libName            =
+         fmap (mkPackageName . unUnqualComponentName) (sourceLibName pkg),
        GhcPkg.depends            = depends pkg,
        GhcPkg.abiDepends         = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),
        GhcPkg.abiHash            = unAbiHash (abiHash pkg),
@@ -1268,7 +1278,8 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.exposed            = exposed pkg,
        GhcPkg.trusted            = trusted pkg
     }
-  where convertExposed (ExposedModule n reexport) = (n, reexport)
+  where
+    convertExposed (ExposedModule n reexport) = (n, reexport)
 
 instance GhcPkg.BinaryStringRep ComponentId where
   fromStringRep = mkComponentId . fromStringRep

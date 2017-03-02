@@ -308,6 +308,8 @@ buildUnit session cid insts lunit = do
             packageName = compat_pn,
             packageVersion = makeVersion [0],
             unitId = toInstalledUnitId (thisPackage dflags),
+            mungedPackageName = Nothing,
+            libName = Nothing,
             componentId = cid,
             instantiatedWith = insts,
             -- Slight inefficiency here haha

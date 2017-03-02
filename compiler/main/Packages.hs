@@ -97,6 +97,7 @@ import qualified Data.Semigroup as Semigroup
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
+import Data.Version
 
 -- ---------------------------------------------------------------------------
 -- The Package state
@@ -1857,9 +1858,15 @@ missingDependencyMsg (Just parent)
 -- -----------------------------------------------------------------------------
 
 componentIdString :: DynFlags -> ComponentId -> Maybe String
-componentIdString dflags cid =
-    fmap sourcePackageIdString (lookupInstalledPackage dflags
-        (componentIdToInstalledUnitId cid))
+componentIdString dflags cid = do
+    conf <- lookupInstalledPackage dflags (componentIdToInstalledUnitId cid)
+    return $
+        case libName conf of
+            Nothing -> sourcePackageIdString conf
+            Just (PackageName libname) ->
+                packageNameString conf
+                    ++ "-" ++ showVersion (packageVersion conf)
+                    ++ ":" ++ unpackFS libname
 
 displayInstalledUnitId :: DynFlags -> InstalledUnitId -> Maybe String
 displayInstalledUnitId dflags uid =

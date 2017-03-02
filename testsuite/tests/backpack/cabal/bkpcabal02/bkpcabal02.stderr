@@ -6,5 +6,5 @@ q/H.hsig:2:1: error:
       Hsig file:  x :: Bool
       The two types are different
     • while merging the signatures from:
-        • z-bkpcabal01-z-p-0.1.0.0[H=<H>]:H
+        • bkpcabal01-0.1.0.0:p[H=<H>]:H
         • ...and the local signature for H
