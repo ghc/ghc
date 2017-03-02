@@ -1,0 +1,6 @@
+
+T13349.hs:5:1: error:
+    • Orphan COMPLETE pragmas not supported
+      A COMPLETE pragma must mention at least one data constructor
+      or pattern synonym defined in the same module.
+    • In {-# COMPLETE False #-}

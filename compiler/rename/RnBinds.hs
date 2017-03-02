@@ -952,10 +952,44 @@ renameSig ctxt sig@(SCCFunSig st v s)
 
 -- COMPLETE Sigs can refer to imported IDs which is why we use
 -- lookupLocatedOccRn rather than lookupSigOccRn
-renameSig _ctxt (CompleteMatchSig s (L l bf) mty)
+renameSig _ctxt sig@(CompleteMatchSig s (L l bf) mty)
   = do new_bf <- traverse lookupLocatedOccRn bf
        new_mty  <- traverse lookupLocatedOccRn mty
+
+       this_mod <- fmap tcg_mod getGblEnv
+       unless (any (nameIsLocalOrFrom this_mod . unLoc) new_bf) $ do
+         -- Why 'any'? See Note [Orphan COMPLETE pragmas]
+         addErrCtxt (text "In" <+> ppr sig) $ failWithTc orphanError
+
        return (CompleteMatchSig s (L l new_bf) new_mty, emptyFVs)
+  where
+    orphanError :: SDoc
+    orphanError =
+      text "Orphan COMPLETE pragmas not supported" $$
+      text "A COMPLETE pragma must mention at least one data constructor" $$
+      text "or pattern synonym defined in the same module."
+
+{-
+Note [Orphan COMPLETE pragmas]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We define a COMPLETE pragma to be a non-orphan if it includes at least
+one conlike defined in the current module. Why is this sufficient?
+Well if you have a pattern match
+
+  case expr of
+    P1 -> ...
+    P2 -> ...
+    P3 -> ...
+
+any COMPLETE pragma which mentions a conlike other than P1, P2 or P3
+will not be of any use in verifying that the pattern match is
+exhaustive. So as we have certainly read the interface files that
+define P1, P2 and P3, we will have loaded all non-orphan COMPLETE
+pragmas that could be relevant to this pattern match.
+
+For now we simply disallow orphan COMPLETE pragmas, as the added
+complexity of supporting them properly doesn't seem worthwhile.
+-}
 
 ppr_sig_bndrs :: [Located RdrName] -> SDoc
 ppr_sig_bndrs bs = quotes (pprWithCommas ppr bs)

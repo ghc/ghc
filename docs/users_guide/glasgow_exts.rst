@@ -13128,11 +13128,14 @@ and ``RightChoice`` is total. ::
 definition matches on all the constructors specified in the pragma then the
 compiler will produce no warning.
 
-``COMPLETE`` pragmas can contain any data constructors or pattern synonyms
-which are in scope. Once defined, they are automatically imported and exported
-from modules. ``COMPLETE`` pragmas should be thought of as asserting a universal
-truth about a set of patterns and as a result, should not be used to silence
-context specific incomplete match warnings.
+``COMPLETE`` pragmas can contain any data constructors or pattern
+synonyms which are in scope, but must mention at least one data
+constructor or pattern synonym defined in the same module.
+``COMPLETE`` pragmas may only appear at the top level of a module.
+Once defined, they are automatically imported and exported from
+modules. ``COMPLETE`` pragmas should be thought of as asserting a
+universal truth about a set of patterns and as a result, should not be
+used to silence context specific incomplete match warnings.
 
 When specifing a ``COMPLETE`` pragma, the result types of all patterns must
 be consistent with each other. This is a sanity check as it would be impossible
