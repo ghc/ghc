@@ -39,7 +39,7 @@ module GHC.Show
 
         -- Show support code
         shows, showChar, showString, showMultiLineString,
-        showParen, showList__, showSpace,
+        showParen, showList__, showCommaSpace, showSpace,
         showLitChar, showLitString, protectEsc,
         intToDigit, showSignedInt,
         appPrec, appPrec1,
@@ -344,6 +344,8 @@ showParen b p   =  if b then showChar '(' . p . showChar ')' else p
 showSpace :: ShowS
 showSpace = {-showChar ' '-} \ xs -> ' ' : xs
 
+showCommaSpace :: ShowS
+showCommaSpace = showString ", "
 -- Code specific for characters
 
 -- | Convert a character to a string using only printable characters,

@@ -1125,6 +1125,7 @@ gen_Show_binds get_fixity loc tycon
     -----------------------------------------------------------------------
     data_cons = tyConDataCons tycon
     shows_prec = mk_FunBind loc showsPrec_RDR (map pats_etc data_cons)
+    comma_space = nlHsVar showCommaSpace_RDR
 
     pats_etc data_con
       | nullary_con =  -- skip the showParen junk...
@@ -1174,7 +1175,7 @@ gen_Show_binds get_fixity loc tycon
                 -- Assumption for record syntax: no of fields == no of
                 -- labelled fields (and in same order)
              show_record_args = concat $
-                                intersperse [mk_showString_app ", "] $
+                                intersperse [comma_space] $
                                 [ [show_label lbl, arg]
                                 | (lbl,arg) <- zipEqual "gen_Show_binds"
                                                         labels show_args ]
