@@ -28,8 +28,9 @@ T8832:
 	'$(TEST_HC)' $(TEST_HC_OPTS) $(T8832_WORDSIZE_OPTS) -O -c -ddump-simpl T8832.hs | grep '^[a-zA-Z0-9]\+ ='
 
 T12603:
-	$(RM) -f T8832.o T8832.hi
-	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T12603.hs | grep 'wf1'
+	$(RM) -f T12603.o T12603.hi
+	'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl -dsuppress-uniques T12603.hs | grep 'GHC.Real'
+         # Horribly delicate; looking for a top-level shared call to 2^8
 
 T11155:
 	$(RM) -f T11155.o T11155.hi
@@ -129,7 +130,7 @@ T13155:
 
 T13156:
 	$(RM) -f T13156.hi T13156.o
-	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13156.hs -O -ddump-prep -dsuppress-uniques | grep "case"
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c T13156.hs -O -ddump-prep -dsuppress-uniques | grep "case.*Any"
         # There should be a single 'case r @ GHC.Types.Any'
 
 .PHONY: T4138
