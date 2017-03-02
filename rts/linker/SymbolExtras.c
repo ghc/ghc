@@ -103,7 +103,7 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 
 
 #ifndef arm_HOST_ARCH
-SymbolExtra* makeSymbolExtra( ObjectCode* oc,
+SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
                               unsigned long symbolNumber,
                               unsigned long target )
 {
@@ -169,18 +169,16 @@ SymbolExtra* makeSymbolExtra( ObjectCode* oc,
 */
 
 /* Produce a jump island for ARM/Thumb interworking */
-SymbolExtra* makeArmSymbolExtra( ObjectCode* oc,
+SymbolExtra* makeArmSymbolExtra( ObjectCode const* oc,
                                  unsigned long symbolNumber,
                                  unsigned long target,
-                                 int fromThumb,
-                                 int toThumb )
+                                 bool fromThumb,
+                                 bool toThumb )
 {
-  SymbolExtra *extra;
-
   ASSERT( symbolNumber >= oc->first_symbol_extra
         && symbolNumber - oc->first_symbol_extra < oc->n_symbol_extras);
 
-  extra = &oc->symbol_extras[symbolNumber - oc->first_symbol_extra];
+  SymbolExtra *extra = &oc->symbol_extras[symbolNumber - oc->first_symbol_extra];
 
   // Make sure instruction mode bit is set properly
   if (toThumb)

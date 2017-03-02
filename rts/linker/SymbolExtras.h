@@ -11,13 +11,13 @@
 int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first );
 
 #ifdef arm_HOST_ARCH
-SymbolExtra* makeArmSymbolExtra( ObjectCode* oc,
+SymbolExtra* makeArmSymbolExtra( ObjectCode const* oc,
                                  unsigned long symbolNumber,
                                  unsigned long target,
-                                 int fromThumb,
-                                 int toThumb );
+                                 bool fromThumb,
+                                 bool toThumb );
 #else
-SymbolExtra* makeSymbolExtra( ObjectCode* oc,
+SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
                               unsigned long symbolNumber,
                               unsigned long target );
 
