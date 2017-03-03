@@ -1565,9 +1565,7 @@ instance Binary IfaceDecl where
     put_ bh (IfaceId name ty details idinfo) = do
         putByte bh 0
         putIfaceTopBndr bh name
-        put_ bh ty
-        put_ bh details
-        put_ bh idinfo
+        lazyPut bh (ty, details, idinfo)
 
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
@@ -1657,9 +1655,7 @@ instance Binary IfaceDecl where
         h <- getByte bh
         case h of
             0 -> do name    <- get bh
-                    ty      <- get bh
-                    details <- get bh
-                    idinfo  <- get bh
+                    ~(ty, details, idinfo) <- lazyGet bh
                     return (IfaceId name ty details idinfo)
             1 -> error "Binary.get(TyClDecl): ForeignType"
             2 -> do a1  <- getIfaceTopBndr bh
