@@ -18,3 +18,4 @@ main = do
     print $ absD (-1 / 0)
     print $ absF (1 / 0)
     print $ absD (1 / 0)
+    print $ absD $ sqrt (-1)
