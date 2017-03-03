@@ -977,7 +977,7 @@ test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-unknown-mingw32'), 89180624, 5),
-          # initial:      89180624
+          # initial:      83032768
           # 2017-02-19                          89180624 (x64/Windows) - Unknown
            (wordsize(64), 80245640, 5),
           # initial:      72958288
@@ -985,8 +985,7 @@ test('T12234',
           # 2017-02-01:   80882208  (Use superclass instances when solving)
           # 2017-02-05:   74374440  (Probably OccAnal fixes)
           # 2017-02-17:   86525344  (Type-indexed Typeable)
-          # 2017-02-25:   80245640  (Early inline patch)
-          # 2017-03-01:   84750072  (Unclear. Possibly catch# signature change.)
+          # 2017-02-25:   83032768  (Early inline patch)
           ]),
      ],
      compile,
