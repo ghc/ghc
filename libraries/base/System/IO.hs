@@ -426,7 +426,7 @@ fixIO k = do
 -- | The function creates a temporary file in ReadWrite mode.
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
 --
--- The file is creates with permissions such that only the current
+-- The file is created with permissions such that only the current
 -- user can read\/write it.
 --
 -- With some exceptions (see below), the file will be created securely
