@@ -951,7 +951,7 @@ flatten_one (CastTy ty g)
 flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 
 -- | "Flatten" a coercion. Really, just flatten the types that it coerces
--- between and then use transitivity.
+-- between and then use transitivity. See Note [Flattening coercions]
 flatten_co :: Coercion -> FlatM (Coercion, Coercion)
 flatten_co co
   = do { let (Pair ty1 ty2, role) = coercionKindRole co
@@ -980,6 +980,31 @@ flatten_ty_con_app tc tys
        ; return (mkTyConApp tc xis, mkTyConAppCo role tc cos) }
 
 {-
+Note [Flattening coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Because a flattened type has a flattened kind, we also must "flatten"
+coercions as we walk through a type. Otherwise, the "from" type of
+the coercion might not match the (now flattened) kind of the type
+that it's casting. flatten_co does the work, taking a coercion of
+type (ty1 ~ ty2) and flattening it to have type (fty1 ~ fty2),
+where flatten(ty1) = fty1 and flatten(ty2) = fty2.
+
+In other words:
+
+  If  r1 is a role
+      co :: s ~r1 t
+      flatten_co co = (fco, kco)
+      r2 is the role in the FlatM
+
+  then
+      fco :: fs ~r1 ft
+      fs, ft are flattened types
+      kco :: (fs ~r1 ft) ~r2 (s ~r1 t)
+
+The second return value of flatten_co is always a ProofIrrelCo. As
+such, it doesn't contain any information the caller doesn't have and
+might not be necessary in whatever comes next.
+
 Note [Flattening synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Not expanding synonyms aggressively improves error messages, and
