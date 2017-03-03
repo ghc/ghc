@@ -13,7 +13,7 @@
 /* Platform specific headers */
 #if defined(OBJFORMAT_PEi386)
 #  include "linker/PEi386.h"
-#elif defined(darwin_HOST_OS)
+#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  include "linker/MachO.h"
 #  include <regex.h>
 #  include <mach/machine.h>
@@ -29,7 +29,7 @@
 
 #define DEBUG_LOG(...) IF_DEBUG(linker, debugBelch("loadArchive: " __VA_ARGS__))
 
-#if defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 /* Read 4 bytes and convert to host byte order */
 static uint32_t read4Bytes(const char buf[static 4])
 {
@@ -51,6 +51,9 @@ static StgBool loadFatArchive(char tmp[static 20], FILE* f, pathchar* path)
 #elif defined(powerpc64_HOST_ARCH)
     const uint32_t mycputype = CPU_TYPE_POWERPC64;
     const uint32_t mycpusubtype = CPU_SUBTYPE_POWERPC_ALL;
+#elif defined(aarch64_HOST_ARCH)
+    const uint32_t mycputype = CPU_TYPE_ARM64;
+    const uint32_t mycpusubtype = CPU_SUBTYPE_ARM64_ALL;
 #else
 #error Unknown Darwin architecture
 #endif
@@ -149,7 +152,7 @@ static StgBool checkFatArchive(char magic[static 20], FILE* f, pathchar* path)
 {
     StgBool success;
     success = false;
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
     /* Not a standard archive, look for a fat archive magic number: */
     if (read4Bytes(magic) == FAT_MAGIC)
         success = loadFatArchive(magic, f, path);
@@ -341,7 +344,7 @@ static HsInt loadArchive_ (pathchar *path)
             }
         }
 
-#if defined(darwin_HOST_OS)
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
         if (strncmp(fileName, "!<arch>\n", 8) == 0) {
             DEBUG_LOG("found the start of another archive, breaking\n");
             break;
@@ -500,7 +503,7 @@ static HsInt loadArchive_ (pathchar *path)
             //       cannot currently allocate blocks large enough.
             image = allocateImageAndTrampolines(path, fileName, f, memberSize,
                                                 isThin);
-#elif defined(darwin_HOST_OS)
+#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
             if (RTS_LINKER_USE_MMAP)
                 image = mmapForLinker(memberSize, MAP_ANONYMOUS, -1, 0);
             else {
