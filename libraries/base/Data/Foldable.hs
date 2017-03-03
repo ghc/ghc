@@ -551,16 +551,20 @@ all p = getAll #. foldMap (All #. p)
 
 -- | The largest element of a non-empty structure with respect to the
 -- given comparison function.
+
+-- See Note [maximumBy/minimumBy space usage]
 maximumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
-maximumBy cmp = foldr1 max'
+maximumBy cmp = foldl1 max'
   where max' x y = case cmp x y of
                         GT -> x
                         _  -> y
 
 -- | The least element of a non-empty structure with respect to the
 -- given comparison function.
+
+-- See Note [maximumBy/minimumBy space usage]
 minimumBy :: Foldable t => (a -> a -> Ordering) -> t a -> a
-minimumBy cmp = foldr1 min'
+minimumBy cmp = foldl1 min'
   where min' x y = case cmp x y of
                         GT -> y
                         _  -> x
@@ -574,3 +578,25 @@ notElem x = not . elem x
 -- 'Nothing' if there is no such element.
 find :: Foldable t => (a -> Bool) -> t a -> Maybe a
 find p = getFirst . foldMap (\ x -> First (if p x then Just x else Nothing))
+
+{-
+Note [maximumBy/minimumBy space usage]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When the type signatures of maximumBy and minimumBy were generalized to work
+over any Foldable instance (instead of just lists), they were defined using
+foldr1. This was problematic for space usage, as the semantics of maximumBy
+and minimumBy essentially require that they examine every element of the
+data structure. Using foldr1 to examine every element results in space usage
+proportional to the size of the data structure. For the common case of lists,
+this could be particularly bad (see Trac #10830).
+
+For the common case of lists, switching the implementations of maximumBy and
+minimumBy to foldl1 solves the issue, as GHC's strictness analysis can then
+make these functions only use O(1) stack space. It is perhaps not the optimal
+way to fix this problem, as there are other conceivable data structures
+(besides lists) which might benefit from specialized implementations for
+maximumBy and minimumBy (see
+https://ghc.haskell.org/trac/ghc/ticket/10830#comment:26 for a further
+discussion). But using foldl1 is at least always better than using foldr1, so
+GHC has chosen to adopt that approach for now.
+-}

@@ -73,6 +73,10 @@
     functions which solely match again `ErrorCall` do not produce
     non-exhaustive pattern-match warnings (#8779)
 
+  * Change the implementations of `maximumBy` and `minimumBy` from
+    `Data.Foldable` to use `fold11` instead of `foldr1`. This makes them run
+    in constant space when applied to lists. (#10830)
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0
