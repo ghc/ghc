@@ -674,6 +674,7 @@ instance Binary KindRep where
     put_ bh (KindRepFun a b) = putByte bh 3 >> put_ bh a >> put_ bh b
     put_ bh (KindRepTYPE r) = putByte bh 4 >> put_ bh r
     put_ bh (KindRepTypeLit sort r) = putByte bh 5 >> put_ bh sort >> put_ bh r
+    put_ _  _ = fail "Binary.putKindRep: impossible"
 
     get bh = do
         tag <- getByte bh

@@ -15,7 +15,7 @@ module TcIface (
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
-        tcIfaceVectInfo, tcIfaceAnnotations, tcIfaceCompleteSigs,
+        tcIfaceVectInfo, tcIfaceAnnotations,
         tcIfaceExpr,    -- Desired by HERMIT (Trac #7683)
         tcIfaceGlobal
  ) where
@@ -1096,7 +1096,9 @@ tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteSigs = mapM tcIfaceCompleteSig
 
 tcIfaceCompleteSig :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
+tcIfaceCompleteSig cm@(IfaceCompleteMatch ms t) =
+  forkM (text "COMPLETE" <+> ppr cm) $
+    CompleteMatch <$> mapM tcIfaceConLike ms <*> tcIfaceTyConByName t
 
 {-
 ************************************************************************
@@ -1757,6 +1759,14 @@ tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
                          ; case thing of
                                 AConLike (RealDataCon dc) -> return dc
                                 _       -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
+
+tcIfaceConLike :: Name -> IfL ConLike
+tcIfaceConLike name =
+    do { thing <- tcIfaceGlobal name
+       ; case thing of
+        AConLike cl -> return cl
+        _           -> pprPanic "tcIfaceExtCL" (ppr name$$ ppr thing) }
+
 
 tcIfaceExtId :: Name -> IfL Id
 tcIfaceExtId name = do { thing <- tcIfaceGlobal name
