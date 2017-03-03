@@ -50,7 +50,7 @@
           (0)))))) 
      ({ <no location info> }
       (HsVar 
-       ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+       ({ <no location info> }{Var: (ghc-prim:GHC.Types.krep$*{v} [gid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
@@ -167,17 +167,6 @@
      ({ <no location info> }
       (HsVar 
        ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
-   (False))),
- ({ <no location info> }
-  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
-   ({ <no location info> }
-    (HsApp 
-     ({ <no location info> }
-      (HsConLikeOut 
-       ({abstract:ConLike}))) 
-     ({ <no location info> }
-      (HsConLikeOut 
-       ({abstract:ConLike}))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 

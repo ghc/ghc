@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 117, types: 54, coercions: 0, joins: 0/0}
+  = {terms: 114, types: 53, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[2]] :: Int -> Foo
@@ -126,27 +126,22 @@ $krep
   = GHC.Types.KindRepTyConApp
       GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
 
--- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo1 [InlPrag=[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m5]
-T7360.$tcFoo1 = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
-
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo3 :: GHC.Prim.Addr#
+T7360.$tcFoo2 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 20 0}]
-T7360.$tcFoo3 = "Foo"#
+T7360.$tcFoo2 = "Foo"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tcFoo2 :: GHC.Types.TrName
+T7360.$tcFoo1 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.$tcFoo2 = GHC.Types.TrNameS T7360.$tcFoo3
+T7360.$tcFoo1 = GHC.Types.TrNameS T7360.$tcFoo2
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo :: GHC.Types.TyCon
@@ -160,9 +155,9 @@ T7360.$tcFoo
       1581370841583180512##
       13291578023368289311##
       T7360.$trModule
-      T7360.$tcFoo2
-      0#
       T7360.$tcFoo1
+      0#
+      GHC.Types.krep$*
 
 -- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
 T7360.$tc'Foo4 [InlPrag=[~]] :: GHC.Types.KindRep

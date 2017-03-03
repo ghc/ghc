@@ -244,6 +244,11 @@ basicKnownKeyNames
         typeSymbolTypeRepName, typeNatTypeRepName,
         trGhcPrimModuleName,
 
+        -- KindReps for common cases
+        starKindRepName,
+        starArrStarKindRepName,
+        starArrStarArrStarKindRepName,
+
         -- Dynamic
         toDynName,
 
@@ -1267,6 +1272,12 @@ typeSymbolTypeRepName = varQual tYPEABLE_INTERNAL (fsLit "typeSymbolTypeRep") ty
 -- this is the Typeable 'Module' for GHC.Prim (which has no code, so we place in GHC.Types)
 -- See Note [Grand plan for Typeable] in TcTypeable.
 trGhcPrimModuleName   = varQual gHC_TYPES         (fsLit "tr$ModuleGHCPrim")  trGhcPrimModuleKey
+
+-- Typeable KindReps for some common cases
+starKindRepName, starArrStarKindRepName, starArrStarArrStarKindRepName :: Name
+starKindRepName        = varQual gHC_TYPES         (fsLit "krep$*")         starKindRepKey
+starArrStarKindRepName = varQual gHC_TYPES         (fsLit "krep$*Arr*")     starArrStarKindRepKey
+starArrStarArrStarKindRepName = varQual gHC_TYPES  (fsLit "krep$*->*->*")   starArrStarArrStarKindRepKey
 
 -- Custom type errors
 errorMessageTypeErrorFamName
@@ -2326,6 +2337,12 @@ trTYPE'PtrRepLiftedKey = mkPreludeMiscIdUnique 511
 trRuntimeRepKey        = mkPreludeMiscIdUnique 512
 tr'PtrRepLiftedKey     = mkPreludeMiscIdUnique 513
 
+-- KindReps for common cases
+starKindRepKey, starArrStarKindRepKey, starArrStarArrStarKindRepKey :: Unique
+starKindRepKey        = mkPreludeMiscIdUnique 520
+starArrStarKindRepKey = mkPreludeMiscIdUnique 521
+starArrStarArrStarKindRepKey = mkPreludeMiscIdUnique 522
+
 -- Dynamic
 toDynIdKey :: Unique
 toDynIdKey            = mkPreludeMiscIdUnique 550
@@ -2350,14 +2367,14 @@ emptyCallStackKey = mkPreludeMiscIdUnique 558
 pushCallStackKey  = mkPreludeMiscIdUnique 559
 
 fromStaticPtrClassOpKey :: Unique
-fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 519
+fromStaticPtrClassOpKey = mkPreludeMiscIdUnique 560
 
 makeStaticKey :: Unique
-makeStaticKey = mkPreludeMiscIdUnique 520
+makeStaticKey = mkPreludeMiscIdUnique 561
 
 -- Natural
 naturalFromIntegerIdKey :: Unique
-naturalFromIntegerIdKey = mkPreludeMiscIdUnique 521
+naturalFromIntegerIdKey = mkPreludeMiscIdUnique 562
 
 {-
 ************************************************************************

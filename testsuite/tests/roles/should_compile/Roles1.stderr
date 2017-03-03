@@ -64,7 +64,7 @@ Roles1.$tcT5
       Roles1.$trModule
       (GHC.Types.TrNameS "T5"#)
       0
-      $krep
+      GHC.Types.krep$*Arr*
 Roles1.$tc'K5
   = GHC.Types.TyCon
       5548842497263642061##
@@ -112,7 +112,7 @@ Roles1.$tcT2
       Roles1.$trModule
       (GHC.Types.TrNameS "T2"#)
       0
-      $krep
+      GHC.Types.krep$*Arr*
 Roles1.$tc'K2
   = GHC.Types.TyCon
       11054915488163123841##
@@ -128,7 +128,7 @@ Roles1.$tcT1
       Roles1.$trModule
       (GHC.Types.TrNameS "T1"#)
       0
-      $krep
+      GHC.Types.krep$*Arr*
 Roles1.$tc'K1
   = GHC.Types.TyCon
       1265606750138351672##
@@ -143,15 +143,16 @@ $krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
 $krep [InlPrag=[~]] = GHC.Types.KindRepVar 2
 $krep [InlPrag=[~]] = GHC.Types.KindRepApp $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun $krep GHC.Types.krep$*Arr*
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep GHC.Types.krep$*
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$*Arr* GHC.Types.krep$*Arr*
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       Roles1.$tcT7 ((:) $krep ((:) $krep ((:) $krep [])))
@@ -161,7 +162,6 @@ $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT4 ((:) $krep ((:) $krep []))
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT3 ((:) $krep ((:) $krep []))
-$krep [InlPrag=[~]] = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp Roles1.$tcT5 ((:) $krep [])
 $krep [InlPrag=[~]]

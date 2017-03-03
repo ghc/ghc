@@ -25,7 +25,7 @@ Roles4.$tcC3
       Roles4.$trModule
       (GHC.Types.TrNameS "C3"#)
       0
-      $krep
+      GHC.Types.krep$*Arr*
 Roles4.$tc'C:C3
   = GHC.Types.TyCon
       3133378316178104365##
@@ -41,7 +41,7 @@ Roles4.$tcC1
       Roles4.$trModule
       (GHC.Types.TrNameS "C1"#)
       0
-      $krep
+      GHC.Types.krep$*Arr*
 Roles4.$tc'C:C1
   = GHC.Types.TyCon
       3870707671502302648##
@@ -55,8 +55,6 @@ $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tc[] ((:) $krep [])
 $krep [InlPrag=[~]]
