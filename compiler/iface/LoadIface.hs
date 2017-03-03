@@ -33,7 +33,8 @@ module LoadIface (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}   TcIface( tcIfaceDecl, tcIfaceRules, tcIfaceInst,
-                                 tcIfaceFamInst, tcIfaceVectInfo, tcIfaceAnnotations )
+                                 tcIfaceFamInst, tcIfaceVectInfo,
+                                 tcIfaceAnnotations, tcIfaceCompleteSigs )
 
 import DynFlags
 import IfaceSyn
@@ -462,6 +463,7 @@ loadInterface doc_str mod from
         ; new_eps_rules     <- tcIfaceRules ignore_prags (mi_rules iface)
         ; new_eps_anns      <- tcIfaceAnnotations (mi_anns iface)
         ; new_eps_vect_info <- tcIfaceVectInfo mod (mkNameEnv new_eps_decls) (mi_vect_info iface)
+        ; new_eps_complete_sigs <- tcIfaceCompleteSigs (mi_complete_sigs iface)
 
         ; let { final_iface = iface {
                                 mi_decls     = panic "No mi_decls in PIT",
@@ -480,6 +482,10 @@ loadInterface doc_str mod from
                   eps_PTE          = addDeclsToPTE   (eps_PTE eps) new_eps_decls,
                   eps_rule_base    = extendRuleBaseList (eps_rule_base eps)
                                                         new_eps_rules,
+                  eps_complete_matches
+                                   = extendCompleteMatchMap
+                                         (eps_complete_matches eps)
+                                         new_eps_complete_sigs,
                   eps_inst_env     = extendInstEnvList (eps_inst_env eps)
                                                        new_eps_insts,
                   eps_fam_inst_env = extendFamInstEnvList (eps_fam_inst_env eps)
@@ -910,18 +916,19 @@ readIface wanted_mod file_path
 initExternalPackageState :: ExternalPackageState
 initExternalPackageState
   = EPS {
-      eps_is_boot      = emptyUFM,
-      eps_PIT          = emptyPackageIfaceTable,
-      eps_free_holes   = emptyInstalledModuleEnv,
-      eps_PTE          = emptyTypeEnv,
-      eps_inst_env     = emptyInstEnv,
-      eps_fam_inst_env = emptyFamInstEnv,
-      eps_rule_base    = mkRuleBase builtinRules,
+      eps_is_boot          = emptyUFM,
+      eps_PIT              = emptyPackageIfaceTable,
+      eps_free_holes       = emptyInstalledModuleEnv,
+      eps_PTE              = emptyTypeEnv,
+      eps_inst_env         = emptyInstEnv,
+      eps_fam_inst_env     = emptyFamInstEnv,
+      eps_rule_base        = mkRuleBase builtinRules,
         -- Initialise the EPS rule pool with the built-in rules
       eps_mod_fam_inst_env
-                       = emptyModuleEnv,
-      eps_vect_info    = noVectInfo,
-      eps_ann_env      = emptyAnnEnv,
+                           = emptyModuleEnv,
+      eps_vect_info        = noVectInfo,
+      eps_complete_matches = emptyUFM,
+      eps_ann_env          = emptyAnnEnv,
       eps_stats = EpsStats { n_ifaces_in = 0, n_decls_in = 0, n_decls_out = 0
                            , n_insts_in = 0, n_insts_out = 0
                            , n_rules_in = length builtinRules, n_rules_out = 0 }

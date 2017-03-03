@@ -245,12 +245,18 @@ tcCompleteSigs sigs =
             (res, cls) <- checkCLTypes AcceptAny
             case res of
               AcceptAny -> failWithTc ambiguousError
-              Fixed _ tc  -> return $ CompleteMatch cls tc
+              Fixed _ tc  -> return $ mkMatch cls tc
 
           check_complete_match tc_name = do
             ty_con <- tcLookupLocatedTyCon tc_name
             (_, cls) <- checkCLTypes (Fixed Nothing ty_con)
-            return $ CompleteMatch cls ty_con
+            return $ mkMatch cls ty_con
+
+          mkMatch :: [ConLike] -> TyCon -> CompleteMatch
+          mkMatch cls ty_con = CompleteMatch {
+            completeMatchConLikes = map conLikeName cls,
+            completeMatchTyCon = tyConName ty_con
+            }
       doOne _ = return Nothing
 
       ambiguousError :: SDoc
