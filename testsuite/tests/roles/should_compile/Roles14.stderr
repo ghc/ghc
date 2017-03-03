@@ -20,10 +20,6 @@ Roles12.$tcC2
       (GHC.Types.TrNameS "C2"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint [])
 Roles12.$tc'C:C2
   = GHC.Types.TyCon
       7087988437584478859##
@@ -32,12 +28,13 @@ Roles12.$tc'C:C2
       (GHC.Types.TrNameS "'C:C2"#)
       1
       $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepVar 0) (GHC.Types.KindRepVar 0))
-      (GHC.Types.KindRepTyConApp
-         Roles12.$tcC2 ((:) (GHC.Types.KindRepVar 0) []))
+  = GHC.Types.KindRepTyConApp Roles12.$tcC2 ((:) $krep [])
 Roles12.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles12"#)

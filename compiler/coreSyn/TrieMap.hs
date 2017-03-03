@@ -10,13 +10,22 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 module TrieMap(
+   -- * Maps over Core expressions
    CoreMap, emptyCoreMap, extendCoreMap, lookupCoreMap, foldCoreMap,
+   -- * Maps over 'Type's
    TypeMap, emptyTypeMap, extendTypeMap, lookupTypeMap, foldTypeMap,
    LooseTypeMap,
+   -- ** With explicit scoping
+   CmEnv, lookupCME, extendTypeMapWithScope, lookupTypeMapWithScope,
+   mkDeBruijnContext,
+   -- * Maps over 'Maybe' values
    MaybeMap,
+   -- * Maps over 'List' values
    ListMap,
-   TrieMap(..), insertTM, deleteTM,
+   -- * Maps over 'Literal's
    LiteralMap,
+   -- * 'TrieMap' class
+   TrieMap(..), insertTM, deleteTM,
    lkDFreeVar, xtDFreeVar,
    lkDNamed, xtDNamed,
    (>.>), (|>), (|>>),
@@ -978,6 +987,21 @@ lookupTypeMap cm t = lookupTM t cm
 extendTypeMap :: TypeMap a -> Type -> a -> TypeMap a
 extendTypeMap m t v = alterTM t (const (Just v)) m
 
+lookupTypeMapWithScope :: TypeMap a -> CmEnv -> Type -> Maybe a
+lookupTypeMapWithScope m cm t = lkTT (D cm t) m
+
+-- | Extend a 'TypeMap' with a type in the given context.
+-- @extendTypeMapWithScope m (mkDeBruijnContext [a,b,c]) t v@ is equivalent to
+-- @extendTypeMap m (forall a b c. t) v@, but allows reuse of the context over
+-- multiple insertions.
+extendTypeMapWithScope :: TypeMap a -> CmEnv -> Type -> a -> TypeMap a
+extendTypeMapWithScope m cm t v = xtTT (D cm t) (const (Just v)) m
+
+-- | Construct a deBruijn environment with the given variables in scope.
+-- e.g. @mkDeBruijnEnv [a,b,c]@ constructs a context @forall a b c.@
+mkDeBruijnContext :: [Var] -> CmEnv
+mkDeBruijnContext = extendCMEs emptyCME
+
 -- | A 'LooseTypeMap' doesn't do a kind-check. Thus, when lookup up (t |> g),
 -- you'll find entries inserted under (t), even if (g) is non-reflexive.
 newtype LooseTypeMap a
@@ -1002,7 +1026,7 @@ instance TrieMap LooseTypeMap where
 type BoundVar = Int  -- Bound variables are deBruijn numbered
 type BoundVarMap a = IntMap.IntMap a
 
-data CmEnv = CME { cme_next :: BoundVar
+data CmEnv = CME { cme_next :: !BoundVar
                  , cme_env  :: VarEnv BoundVar }
 
 emptyCME :: CmEnv

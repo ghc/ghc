@@ -53,17 +53,6 @@
        ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
    (False))),
  ({ <no location info> }
-  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
-   ({ <no location info> }
-    (HsApp 
-     ({ <no location info> }
-      (HsConLikeOut 
-       ({abstract:ConLike}))) 
-     ({ <no location info> }
-      (HsConLikeOut 
-       ({abstract:ConLike}))))) 
-   (False))),
- ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Zero{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
    ({ <no location info> }
     (HsApp 
@@ -112,27 +101,6 @@
      ({ <no location info> }
       (HsVar 
        ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
-   (False))),
- ({ <no location info> }
-  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
-   ({ <no location info> }
-    (HsApp 
-     ({ <no location info> }
-      (HsApp 
-       ({ <no location info> }
-        (HsConLikeOut 
-         ({abstract:ConLike}))) 
-       ({ <no location info> }
-        (HsVar 
-         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
-     ({ <no location info> }
-      (HsWrap 
-       (WpTyApp 
-        (TyConApp 
-         ({abstract:TyCon}) 
-         [])) 
-       (HsConLikeOut 
-        ({abstract:ConLike})))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$tc'Succ{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})} 
@@ -194,45 +162,43 @@
         (HsConLikeOut 
          ({abstract:ConLike}))) 
        ({ <no location info> }
-        (HsPar 
-         ({ <no location info> }
-          (HsApp 
-           ({ <no location info> }
-            (HsApp 
-             ({ <no location info> }
-              (HsConLikeOut 
-               ({abstract:ConLike}))) 
-             ({ <no location info> }
-              (HsVar 
-               ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
-           ({ <no location info> }
-            (HsWrap 
-             (WpTyApp 
-              (TyConApp 
-               ({abstract:TyCon}) 
-               [])) 
-             (HsConLikeOut 
-              ({abstract:ConLike})))))))))) 
+        (HsVar 
+         ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
      ({ <no location info> }
-      (HsPar 
+      (HsVar 
+       ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsConLikeOut 
+       ({abstract:ConLike}))) 
+     ({ <no location info> }
+      (HsConLikeOut 
+       ({abstract:ConLike}))))) 
+   (False))),
+ ({ <no location info> }
+  (VarBind {Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})} 
+   ({ <no location info> }
+    (HsApp 
+     ({ <no location info> }
+      (HsApp 
        ({ <no location info> }
-        (HsApp 
-         ({ <no location info> }
-          (HsApp 
-           ({ <no location info> }
-            (HsConLikeOut 
-             ({abstract:ConLike}))) 
-           ({ <no location info> }
-            (HsVar 
-             ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
-         ({ <no location info> }
-          (HsWrap 
-           (WpTyApp 
-            (TyConApp 
-             ({abstract:TyCon}) 
-             [])) 
-           (HsConLikeOut 
-            ({abstract:ConLike})))))))))) 
+        (HsConLikeOut 
+         ({abstract:ConLike}))) 
+       ({ <no location info> }
+        (HsVar 
+         ({ <no location info> }{Var: (main:DumpTypecheckedAst.$tcPeano{v} [lidx] :: ghc-prim:GHC.Types.TyCon{tc})}))))) 
+     ({ <no location info> }
+      (HsWrap 
+       (WpTyApp 
+        (TyConApp 
+         ({abstract:TyCon}) 
+         [])) 
+       (HsConLikeOut 
+        ({abstract:ConLike})))))) 
    (False))),
  ({ <no location info> }
   (VarBind {Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})} 

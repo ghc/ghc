@@ -41,12 +41,6 @@ Roles3.$tcC4
       (GHC.Types.TrNameS "C4"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-         (GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []))
 Roles3.$tcC3
   = GHC.Types.TyCon
       5076086601454991970##
@@ -55,12 +49,6 @@ Roles3.$tcC3
       (GHC.Types.TrNameS "C3"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-         (GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []))
 Roles3.$tcC2
   = GHC.Types.TyCon
       7902873224172523979##
@@ -69,12 +57,6 @@ Roles3.$tcC2
       (GHC.Types.TrNameS "C2"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-         (GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []))
 Roles3.$tc'C:C2
   = GHC.Types.TyCon
       11218882737915989529##
@@ -83,19 +65,6 @@ Roles3.$tc'C:C2
       (GHC.Types.TrNameS "'C:C2"#)
       2
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepTyConApp
-            Data.Type.Equality.$tc~
-            ((:)
-               (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-               ((:) (GHC.Types.KindRepVar 0) ((:) (GHC.Types.KindRepVar 1) []))))
-         (GHC.Types.KindRepFun
-            (GHC.Types.KindRepVar 0) (GHC.Types.KindRepVar 1)))
-      (GHC.Types.KindRepTyConApp
-         Roles3.$tcC2
-         ((:) (GHC.Types.KindRepVar 0) ((:) (GHC.Types.KindRepVar 1) [])))
 Roles3.$tcC1
   = GHC.Types.TyCon
       11013585501375994163##
@@ -104,10 +73,6 @@ Roles3.$tcC1
       (GHC.Types.TrNameS "C1"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint [])
 Roles3.$tc'C:C1
   = GHC.Types.TyCon
       4508088879886988796##
@@ -116,12 +81,23 @@ Roles3.$tc'C:C1
       (GHC.Types.TrNameS "'C:C1"#)
       1
       $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
 $krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepVar 0) (GHC.Types.KindRepVar 0))
-      (GHC.Types.KindRepTyConApp
-         Roles3.$tcC1 ((:) (GHC.Types.KindRepVar 0) []))
+  = GHC.Types.KindRepTyConApp
+      Data.Type.Equality.$tc~ ((:) $krep ((:) $krep ((:) $krep [])))
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp Roles3.$tcC2 ((:) $krep ((:) $krep []))
+$krep [InlPrag=[~]] = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp Roles3.$tcC1 ((:) $krep [])
 Roles3.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "Roles3"#)

@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 125, types: 58, coercions: 0, joins: 0/0}
+  = {terms: 117, types: 54, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
 T7360.$WFoo3 [InlPrag=INLINE[2]] :: Int -> Foo
@@ -119,6 +119,13 @@ T7360.$trModule :: GHC.Types.Module
 T7360.$trModule
   = GHC.Types.Module T7360.$trModule3 T7360.$trModule1
 
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m1]
+$krep
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
+
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
 T7360.$tcFoo1 [InlPrag=[~]] :: GHC.Types.KindRep
 [GblId, Caf=NoCafRefs, Str=m5]
@@ -197,29 +204,22 @@ T7360.$tc'Foo1
       0#
       T7360.$tc'Foo4
 
--- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-T7360.$tc'Foo7 [InlPrag=[~]] :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1]
-T7360.$tc'Foo7
-  = GHC.Types.KindRepTyConApp
-      T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
-
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo9 :: GHC.Prim.Addr#
+T7360.$tc'Foo8 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo9 = "'Foo2"#
+T7360.$tc'Foo8 = "'Foo2"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo8 :: GHC.Types.TrName
+T7360.$tc'Foo7 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.$tc'Foo8 = GHC.Types.TrNameS T7360.$tc'Foo9
+T7360.$tc'Foo7 = GHC.Types.TrNameS T7360.$tc'Foo8
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo2 :: GHC.Types.TyCon
@@ -233,49 +233,36 @@ T7360.$tc'Foo2
       17325079864060690428##
       2969742457748208427##
       T7360.$trModule
-      T7360.$tc'Foo8
-      0#
       T7360.$tc'Foo7
-
--- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep :: GHC.Types.KindRep
-[GblId, Str=m1]
-$krep
-  = GHC.Types.KindRepTyConApp
-      GHC.Types.$tcInt (GHC.Types.[] @ GHC.Types.KindRep)
-
--- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
-$krep1 :: GHC.Types.KindRep
-[GblId, Caf=NoCafRefs, Str=m1]
-$krep1
-  = GHC.Types.KindRepTyConApp
-      T7360.$tcFoo (GHC.Types.[] @ GHC.Types.KindRep)
+      0#
+      T7360.$tc'Foo4
 
 -- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo10 [InlPrag=[~]] :: GHC.Types.KindRep
-[GblId, Str=m4]
-T7360.$tc'Foo10 = GHC.Types.KindRepFun $krep $krep1
+T7360.$tc'Foo9 [InlPrag=[~]] :: GHC.Types.KindRep
+[GblId, Caf=NoCafRefs, Str=m4]
+T7360.$tc'Foo9 = GHC.Types.KindRepFun $krep T7360.$tc'Foo4
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo12 :: GHC.Prim.Addr#
+T7360.$tc'Foo11 :: GHC.Prim.Addr#
 [GblId,
  Caf=NoCafRefs,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 30 0}]
-T7360.$tc'Foo12 = "'Foo3"#
+T7360.$tc'Foo11 = "'Foo3"#
 
 -- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
-T7360.$tc'Foo11 :: GHC.Types.TrName
+T7360.$tc'Foo10 :: GHC.Types.TrName
 [GblId,
  Caf=NoCafRefs,
  Str=m1,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 20}]
-T7360.$tc'Foo11 = GHC.Types.TrNameS T7360.$tc'Foo12
+T7360.$tc'Foo10 = GHC.Types.TrNameS T7360.$tc'Foo11
 
 -- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
 T7360.$tc'Foo3 :: GHC.Types.TyCon
 [GblId,
+ Caf=NoCafRefs,
  Str=m,
  Unf=Unf{Src=<vanilla>, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True, Guidance=IF_ARGS [] 10 70}]
@@ -284,9 +271,9 @@ T7360.$tc'Foo3
       3674231676522181654##
       2694749919371021431##
       T7360.$trModule
-      T7360.$tc'Foo11
-      0#
       T7360.$tc'Foo10
+      0#
+      T7360.$tc'Foo9
 
 
 

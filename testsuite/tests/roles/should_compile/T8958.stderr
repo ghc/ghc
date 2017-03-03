@@ -28,12 +28,6 @@ T8958.$tcMap
       (GHC.Types.TrNameS "Map"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepFun
-         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-         (GHC.Types.KindRepTYPE GHC.Types.LiftedRep))
 T8958.$tc'MkMap
   = GHC.Types.TyCon
       2942839876828444488##
@@ -42,24 +36,6 @@ T8958.$tc'MkMap
       (GHC.Types.TrNameS "'MkMap"#)
       2
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTyConApp
-         GHC.Types.$tc[]
-         ((:) @ GHC.Types.KindRep
-            (GHC.Types.KindRepTyConApp
-               GHC.Tuple.$tc(,)
-               ((:) @ GHC.Types.KindRep
-                  (GHC.Types.KindRepVar 0)
-                  ((:) @ GHC.Types.KindRep
-                     (GHC.Types.KindRepVar 1) [] @ GHC.Types.KindRep)))
-            [] @ GHC.Types.KindRep))
-      (GHC.Types.KindRepTyConApp
-         T8958.$tcMap
-         ((:) @ GHC.Types.KindRep
-            (GHC.Types.KindRepVar 0)
-            ((:) @ GHC.Types.KindRep
-               (GHC.Types.KindRepVar 1) [] @ GHC.Types.KindRep)))
 T8958.$tcRepresentational
   = GHC.Types.TyCon
       12809567151893673426##
@@ -68,11 +44,6 @@ T8958.$tcRepresentational
       (GHC.Types.TrNameS "Representational"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepTyConApp
-         GHC.Types.$tcConstraint [] @ GHC.Types.KindRep)
 T8958.$tc'C:Representational
   = GHC.Types.TyCon
       2358772282532242424##
@@ -81,11 +52,6 @@ T8958.$tc'C:Representational
       (GHC.Types.TrNameS "'C:Representational"#)
       1
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepTyConApp
-      T8958.$tcRepresentational
-      ((:) @ GHC.Types.KindRep
-         (GHC.Types.KindRepVar 0) [] @ GHC.Types.KindRep)
 T8958.$tcNominal
   = GHC.Types.TyCon
       12224997609886144634##
@@ -94,11 +60,6 @@ T8958.$tcNominal
       (GHC.Types.TrNameS "Nominal"#)
       0
       $krep
-$krep [InlPrag=[~]]
-  = GHC.Types.KindRepFun
-      (GHC.Types.KindRepTYPE GHC.Types.LiftedRep)
-      (GHC.Types.KindRepTyConApp
-         GHC.Types.$tcConstraint [] @ GHC.Types.KindRep)
 T8958.$tc'C:Nominal
   = GHC.Types.TyCon
       10562260635335201742##
@@ -107,11 +68,34 @@ T8958.$tc'C:Nominal
       (GHC.Types.TrNameS "'C:Nominal"#)
       1
       $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Tuple.$tc(,)
+      ((:) @ GHC.Types.KindRep
+         $krep ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep))
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcMap
+      ((:) @ GHC.Types.KindRep
+         $krep ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep))
+$krep [InlPrag=[~]] = GHC.Types.KindRepTYPE GHC.Types.LiftedRep
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      GHC.Types.$tc[]
+      ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
+$krep [InlPrag=[~]]
+  = GHC.Types.KindRepTyConApp
+      T8958.$tcRepresentational
+      ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
 $krep [InlPrag=[~]]
   = GHC.Types.KindRepTyConApp
       T8958.$tcNominal
-      ((:) @ GHC.Types.KindRep
-         (GHC.Types.KindRepVar 0) [] @ GHC.Types.KindRep)
+      ((:) @ GHC.Types.KindRep $krep [] @ GHC.Types.KindRep)
 T8958.$trModule
   = GHC.Types.Module
       (GHC.Types.TrNameS "main"#) (GHC.Types.TrNameS "T8958"#)
