@@ -66,6 +66,8 @@ test('T4029',
             # 2016-09-01: 71 (amd64/Linux)           Restore w/w limit (#11565)
             # 2017-02-12: 80 (amd64/Linux)           Type-indexed Typeable
             # 2017-02-20: 76 (amd64/Linux)           Better reading of iface files
+            # 2017-03-03: 65 (amd64/Linux)           Share Typeable KindReps or more
+            #                                        lazy interface file reading
       stats_num_field('max_bytes_used',
           [(wordsize(64), 22016200, 5)]),
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
@@ -80,6 +82,8 @@ test('T4029',
             # 2017-02-07: 22770352 (amd64/Linux)     It is unclear
             # 2017-02-12: 24151096 (amd64/Linux)     Type-indexed Typeable
             # 2017-02-20: 22016200 (amd64/Linux)     Better reading of iface files
+            # 2017-03-03: 19172360 (amd64/Linux)     Share Typeable KindReps or more
+            #                                        lazy interface file reading
       extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,
