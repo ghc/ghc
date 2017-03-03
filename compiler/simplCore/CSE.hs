@@ -217,8 +217,10 @@ Consider
 
 Here 'foo' has a stable unfolding, but its (optimised) RHS is trivial.
 (Turns out that this actually happens for the enumFromTo method of
-the Integer instance of Enum in GHC.Enum.)  Then we obviously do NOT
-want to extend the substitution with (foo->x)!   See similar
+the Integer instance of Enum in GHC.Enum.)  Suppose moreover that foo's
+stable unfolding originates from an INLINE or INLINEABLE pragma on foo.
+Then we obviously do NOT want to extend the substitution with (foo->x),
+because we promised to inline foo as what the user wrote.  See similar
 SimplUtils Note [Stable unfoldings and postInlineUnconditionally].
 
 Nor do we want to change the reverse mapping. Suppose we have
@@ -231,6 +233,11 @@ There could conceivably be merit in rewriting the RHS of bar:
    bar = foo
 but now bar's inlining behaviour will change, and importing
 modules might see that.  So it seems dodgy and we don't do it.
+
+Stable unfoldings are also created during worker/wrapper when we decide
+that a function's definition is so small that it should always inline.
+In this case we still want to do CSE (#13340). Hence the use of
+isAnyInlinePragma rather than isStableUnfolding.
 
 Note [Corner case for case expressions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -367,7 +374,6 @@ noCSE :: InId -> Bool
 noCSE id = not (isAlwaysActive (idInlineActivation id))
              -- See Note [CSE for INLINE and NOINLINE]
          || isAnyInlinePragma (idInlinePragma id)
-             --isStableUnfolding (idUnfolding id)
              -- See Note [CSE for stable unfoldings]
          || isJoinId id
              -- See Note [CSE for join points?]
