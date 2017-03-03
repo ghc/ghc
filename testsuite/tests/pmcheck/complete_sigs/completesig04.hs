@@ -1,3 +1,5 @@
 module TyMismatch where
 
-{-# COMPLETE Just, Left #-}
+data E = L | R
+
+{-# COMPLETE Just, L #-}
