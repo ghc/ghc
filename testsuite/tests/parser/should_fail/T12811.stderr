@@ -1,7 +1,4 @@
 
-testsuite/tests/parser/should_fail/T12811.hs:4:15: error:
+T12811.hs:4:15: error:
     Illegal symbol '.' in type
     Perhaps you meant to write 'forall <tvs>. <type>'?
-  |
-4 | foo :: foral a. a -> a
-  |               ^
