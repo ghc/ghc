@@ -249,3 +249,4 @@ test('T13317',
      ['$MAKE -s --no-print-directory T13317'])
 test('T13340', normal, run_command, ['$MAKE -s --no-print-directory T13340'])
 test('T13338', only_ways(['optasm']), compile, ['-dcore-lint'])
+test('T13367', normal, run_command, ['$MAKE -s --no-print-directory T13367'])

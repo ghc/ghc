@@ -19,11 +19,11 @@ import Id               ( Id, idType, idInlineActivation, isDeadBinder
 import CoreUtils        ( mkAltExpr, eqExpr
                         , exprIsLiteralString
                         , stripTicksE, stripTicksT, mkTicks )
-import Literal          ( litIsTrivial )
 import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
-import BasicTypes       ( isAlwaysActive, isAnyInlinePragma )
+import BasicTypes       ( TopLevelFlag(..), isTopLevel
+                        , isAlwaysActive, isAnyInlinePragma )
 import TrieMap
 import Util             ( filterOut )
 import Data.List        ( mapAccumL )
@@ -68,14 +68,14 @@ Note [CSE for bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~
 Let-bindings have two cases, implemented by addBinding.
 
-* SUBSTITUTE: applies when the RHS is a variable or literal
+* SUBSTITUTE: applies when the RHS is a variable
 
      let x = y in ...(h x)....
 
   Here we want to extend the /substitution/ with x -> y, so that the
   (h x) in the body might CSE with an enclosing (let v = h y in ...).
   NB: the substitution maps InIds, so we extend the substitution with
-      a biding for the original InId 'x'
+      a binding for the original InId 'x'
 
   How can we have a variable on the RHS? Doesn't the simplifier inline them?
 
@@ -89,7 +89,7 @@ Let-bindings have two cases, implemented by addBinding.
       Here we CSE y1's rhs to 'x1', and then we must add (y1->x1) to
       the substitution so that we can CSE the binding for y2.
 
-    - Second, we use cseRHS for case expression scrutinees too;
+    - Second, we use addBinding for case expression scrutinees too;
       see Note [CSE for case expressions]
 
 * EXTEND THE REVERSE MAPPING: applies in all other cases
@@ -151,7 +151,7 @@ For example:
   (Notice this is exactly backwards to what the simplifier does, which
   is to try to replaces uses of 'a' with uses of 'wild1'.)
 
-  This is the main reason that cseRHs is called with a trivial rhs.
+  This is the main reason that addBinding is called with a trivial rhs.
 
 * Non-trivial scrutinee
      case (f x) of y { pat -> ...let y = f x in ... }
@@ -297,15 +297,14 @@ the program; it's a kind of synthetic key for recursive bindings.
 -}
 
 cseProgram :: CoreProgram -> CoreProgram
-cseProgram binds = snd (mapAccumL (cseBind True) emptyCSEnv binds)
+cseProgram binds = snd (mapAccumL (cseBind TopLevel) emptyCSEnv binds)
 
-cseBind :: Bool -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
+cseBind :: TopLevelFlag -> CSEnv -> CoreBind -> (CSEnv, CoreBind)
 cseBind toplevel env (NonRec b e)
-  = (env2, NonRec b2 e1)
+  = (env2, NonRec b2 e2)
   where
-    e1         = tryForCSE toplevel env e
-    (env1, b1) = addBinder env b
-    (env2, b2) = addBinding env1 b b1 e1
+    (env1, b1)       = addBinder env b
+    (env2, (b2, e2)) = cse_bind toplevel env1 (b,e) b1
 
 cseBind _ env (Rec [(in_id, rhs)])
   | noCSE in_id
@@ -330,15 +329,22 @@ cseBind _ env (Rec [(in_id, rhs)])
 cseBind toplevel env (Rec pairs)
   = (env2, Rec pairs')
   where
-    (bndrs, rhss)  = unzip pairs
-    (env1, bndrs1) = addRecBinders env bndrs
-    rhss1          = map (tryForCSE toplevel env1) rhss
-                     -- Process rhss in extended env1
-    (env2, pairs') = foldl do_one (env1, []) (zip3 bndrs bndrs1 rhss1)
-    do_one (env, pairs) (b, b1, e1)
-         = (env1, (b2, e1) : pairs)
-       where
-         (env1, b2) = addBinding env b b1 e1
+    (env1, bndrs1) = addRecBinders env (map fst pairs)
+    (env2, pairs') = mapAccumL do_one env1 (zip pairs bndrs1)
+
+    do_one env (pr, b1) = cse_bind toplevel env pr b1
+
+cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, OutExpr))
+cse_bind toplevel env (in_id, in_rhs) out_id
+  | isTopLevel toplevel, exprIsLiteralString in_rhs
+      -- See Note [Take care with literal strings]
+  = (env', (out_id, in_rhs))
+
+  | otherwise
+  = (env', (out_id', out_rhs))
+  where
+    out_rhs         = tryForCSE env in_rhs
+    (env', out_id') = addBinding env in_id out_id out_rhs
 
 addBinding :: CSEnv                      -- Includes InId->OutId cloning
            -> InId
@@ -367,7 +373,6 @@ addBinding env in_id out_id rhs'
     -- See Note [CSE for bindings]
     use_subst = case rhs' of
                    Var {} -> True
-                   Lit l  -> litIsTrivial l
                    _      -> False
 
 noCSE :: InId -> Bool
@@ -379,10 +384,8 @@ noCSE id = not (isAlwaysActive (idInlineActivation id))
              -- See Note [CSE for join points?]
 
 
-{-
-Note [Take care with literal strings]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [Take care with literal strings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this example:
 
   x = "foo"#
@@ -405,12 +408,18 @@ the original RHS unmodified. This produces:
   x = "foo"#
   y = "foo"#
   ...x...x...x...x....
+
+Now 'y' will be discarded as dead code, and we are done.
+
+The net effect is that for the y-binding we want to
+  - Use SUBSTITUTE, by extending the substitution with  y :-> x
+  - but leave the original binding for y undisturbed
+
+This is done by cse_bind.  I got it wrong the first time (Trac #13367).
 -}
 
-tryForCSE :: Bool -> CSEnv -> InExpr -> OutExpr
-tryForCSE toplevel env expr
-  | toplevel && exprIsLiteralString expr = expr
-      -- See Note [Take care with literal strings]
+tryForCSE :: CSEnv -> InExpr -> OutExpr
+tryForCSE env expr
   | Just e <- lookupCSEnv env expr'' = mkTicks ticks e
   | otherwise                        = expr'
     -- The varToCoreExpr is needed if we have
@@ -434,12 +443,12 @@ cseExpr env (Type t)              = Type (substTy (csEnvSubst env) t)
 cseExpr env (Coercion c)          = Coercion (substCo (csEnvSubst env) c)
 cseExpr _   (Lit lit)             = Lit lit
 cseExpr env (Var v)               = lookupSubst env v
-cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE False env a)
+cseExpr env (App f a)             = App (cseExpr env f) (tryForCSE env a)
 cseExpr env (Tick t e)            = Tick t (cseExpr env e)
 cseExpr env (Cast e co)           = Cast (cseExpr env e) (substCo (csEnvSubst env) co)
 cseExpr env (Lam b e)             = let (env', b') = addBinder env b
                                     in Lam b' (cseExpr env' e)
-cseExpr env (Let bind e)          = let (env', bind') = cseBind False env bind
+cseExpr env (Let bind e)          = let (env', bind') = cseBind NotTopLevel env bind
                                     in Let bind' (cseExpr env' e)
 cseExpr env (Case e bndr ty alts) = cseCase env e bndr ty alts
 
@@ -449,7 +458,7 @@ cseCase env scrut bndr ty alts
     combineAlts alt_env (map cse_alt alts)
   where
     ty' = substTy (csEnvSubst env) ty
-    scrut1 = tryForCSE False env scrut
+    scrut1 = tryForCSE env scrut
 
     bndr1 = zapIdOccInfo bndr
       -- Zapping the OccInfo is needed because the extendCSEnv
@@ -472,14 +481,14 @@ cseCase env scrut bndr ty alts
                 --      case x of { True -> ....True.... }
                 -- Don't replace True by x!
                 -- Hence the 'null args', which also deal with literals and DEFAULT
-        = (DataAlt con, args', tryForCSE False new_env rhs)
+        = (DataAlt con, args', tryForCSE new_env rhs)
         where
           (env', args') = addBinders alt_env args
           new_env       = extendCSEnv env' con_expr con_target
           con_expr      = mkAltExpr (DataAlt con) args' arg_tys
 
     cse_alt (con, args, rhs)
-        = (con, args', tryForCSE False env' rhs)
+        = (con, args', tryForCSE env' rhs)
         where
           (env', args') = addBinders alt_env args
 
