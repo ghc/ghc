@@ -434,8 +434,19 @@ fi
 # Despite its similarity in name to TargetPlatform, TargetPlatformFull is used
 # in calls to subproject configure scripts and thus must be set to the autoconf
 # triple, not the normalized GHC triple that TargetPlatform is set to.
-# It may be better to just do away with the GHC triples all together.
-TargetPlatformFull="${target}"
+#
+# We use the non-canonicalized triple, target_alias, here since the subproject
+# configure scripts will use this triple to construct the names of the toolchain
+# executables. If we instead passed down the triple produced by
+# AC_CANONICAL_TARGET then it may look for the target toolchain under the wrong
+# name (this is a known problem in the case of the Android NDK, which has
+# slightly odd triples).
+#
+# It may be better to just do away with the GHC triples all together. This would
+# all be taken care of for us if we configured the subprojects using
+# AC_CONFIG_DIR, but unfortunately Cabal needs to be the one to do the
+# configuration.
+TargetPlatformFull="${target_alias}"
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
