@@ -1020,12 +1020,13 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1310037632, 5),
+          [(wordsize(64), 1231809592, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
           # 2017-02-11: 1310037632  Check local family instances vs imports
           # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
+          # 2017-03-02: 1231809592  Drift from recent simplifier improvements
           ]),
      ],
      compile,
