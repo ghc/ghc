@@ -1357,13 +1357,13 @@ nodeScore old_bndr new_bndr bind_rhs lb_deps
   = mk_score 5       -- Note [Constructor applications]
 
   | isStableUnfolding id_unfolding
-  , canUnfold id_unfolding
+  , can_unfold
   = mk_score 3
 
   | isOneOcc (idOccInfo new_bndr)
   = mk_score 2  -- Likely to be inlined
 
-  | canUnfold id_unfolding  -- The Id has some kind of unfolding
+  | can_unfold  -- The Id has some kind of unfolding
   = mk_score 1
 
   | otherwise
@@ -1386,6 +1386,7 @@ nodeScore old_bndr new_bndr bind_rhs lb_deps
                     -> size
                  _  -> cheapExprSize rhs
 
+    can_unfold   = canUnfold id_unfolding
     id_unfolding = realIdUnfolding old_bndr
        -- realIdUnfolding: Ignore loop-breaker-ness here because
        -- that is what we are setting!
