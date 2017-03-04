@@ -5,6 +5,7 @@ GhcStage2HcOpts    = -O -dcore-lint
 GhcLibHcOpts       = -O -dcore-lint
 BUILD_PROF_LIBS    = NO
 SplitObjs          = NO
+SplitSections      = NO
 HADDOCK_DOCS       = YES
 BUILD_SPHINX_HTML  = YES
 BUILD_SPHINX_PDF   = NO
