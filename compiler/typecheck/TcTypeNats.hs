@@ -27,6 +27,7 @@ import Name       ( Name, BuiltInSyntax(..) )
 import TysWiredIn
 import TysPrim    ( mkTemplateAnonTyConBinders )
 import PrelNames  ( gHC_TYPELITS
+                  , gHC_TYPENATS
                   , typeNatAddTyFamNameKey
                   , typeNatMulTyFamNameKey
                   , typeNatExpTyFamNameKey
@@ -67,7 +68,7 @@ typeNatAddTyCon = mkTypeNatFunTyCon2 name
     , sfInteractInert = interactInertAdd
     }
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "+")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "+")
             typeNatAddTyFamNameKey typeNatAddTyCon
 
 typeNatSubTyCon :: TyCon
@@ -78,7 +79,7 @@ typeNatSubTyCon = mkTypeNatFunTyCon2 name
     , sfInteractInert = interactInertSub
     }
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "-")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "-")
             typeNatSubTyFamNameKey typeNatSubTyCon
 
 typeNatMulTyCon :: TyCon
@@ -89,7 +90,7 @@ typeNatMulTyCon = mkTypeNatFunTyCon2 name
     , sfInteractInert = interactInertMul
     }
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "*")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "*")
             typeNatMulTyFamNameKey typeNatMulTyCon
 
 typeNatExpTyCon :: TyCon
@@ -100,7 +101,7 @@ typeNatExpTyCon = mkTypeNatFunTyCon2 name
     , sfInteractInert = interactInertExp
     }
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "^")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "^")
                 typeNatExpTyFamNameKey typeNatExpTyCon
 
 typeNatLeqTyCon :: TyCon
@@ -114,7 +115,7 @@ typeNatLeqTyCon =
     NotInjective
 
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "<=?")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "<=?")
                 typeNatLeqTyFamNameKey typeNatLeqTyCon
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamLeq
@@ -133,7 +134,7 @@ typeNatCmpTyCon =
     NotInjective
 
   where
-  name = mkWiredInTyConName UserSyntax gHC_TYPELITS (fsLit "CmpNat")
+  name = mkWiredInTyConName UserSyntax gHC_TYPENATS (fsLit "CmpNat")
                 typeNatCmpTyFamNameKey typeNatCmpTyCon
   ops = BuiltInSynFamily
     { sfMatchFam      = matchFamCmpNat

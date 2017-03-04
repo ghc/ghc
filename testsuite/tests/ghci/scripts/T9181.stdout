@@ -1,23 +1,6 @@
-type family (GHC.TypeLits.*) (a :: GHC.Types.Nat)
-                             (b :: GHC.Types.Nat)
-            :: GHC.Types.Nat
-type family (GHC.TypeLits.+) (a :: GHC.Types.Nat)
-                             (b :: GHC.Types.Nat)
-            :: GHC.Types.Nat
-type family (GHC.TypeLits.-) (a :: GHC.Types.Nat)
-                             (b :: GHC.Types.Nat)
-            :: GHC.Types.Nat
-type (GHC.TypeLits.<=) (x :: GHC.Types.Nat) (y :: GHC.Types.Nat) =
-  (x GHC.TypeLits.<=? y) ~ 'True :: Constraint
-type family (GHC.TypeLits.<=?) (a :: GHC.Types.Nat)
-                               (b :: GHC.Types.Nat)
-            :: Bool
 type family GHC.TypeLits.AppendSymbol (a :: GHC.Types.Symbol)
                                       (b :: GHC.Types.Symbol)
             :: GHC.Types.Symbol
-type family GHC.TypeLits.CmpNat (a :: GHC.Types.Nat)
-                                (b :: GHC.Types.Nat)
-            :: Ordering
 type family GHC.TypeLits.CmpSymbol (a :: GHC.Types.Symbol)
                                    (b :: GHC.Types.Symbol)
             :: Ordering
@@ -36,9 +19,6 @@ data GHC.TypeLits.SomeSymbol where
                              (Data.Proxy.Proxy n) -> GHC.TypeLits.SomeSymbol
 type family GHC.TypeLits.TypeError (a :: GHC.TypeLits.ErrorMessage)
             :: b
-type family (GHC.TypeLits.^) (a :: GHC.Types.Nat)
-                             (b :: GHC.Types.Nat)
-            :: GHC.Types.Nat
 GHC.TypeLits.natVal ::
   GHC.TypeNats.KnownNat n => proxy n -> Integer
 GHC.TypeLits.natVal' ::
@@ -53,6 +33,23 @@ GHC.TypeLits.symbolVal ::
   GHC.TypeLits.KnownSymbol n => proxy n -> String
 GHC.TypeLits.symbolVal' ::
   GHC.TypeLits.KnownSymbol n => GHC.Prim.Proxy# n -> String
+type family (GHC.TypeNats.*) (a :: GHC.Types.Nat)
+                             (b :: GHC.Types.Nat)
+            :: GHC.Types.Nat
+type family (GHC.TypeNats.+) (a :: GHC.Types.Nat)
+                             (b :: GHC.Types.Nat)
+            :: GHC.Types.Nat
+type family (GHC.TypeNats.-) (a :: GHC.Types.Nat)
+                             (b :: GHC.Types.Nat)
+            :: GHC.Types.Nat
+type (GHC.TypeNats.<=) (x :: GHC.Types.Nat) (y :: GHC.Types.Nat) =
+  (x GHC.TypeNats.<=? y) ~ 'True :: Constraint
+type family (GHC.TypeNats.<=?) (a :: GHC.Types.Nat)
+                               (b :: GHC.Types.Nat)
+            :: Bool
+type family GHC.TypeNats.CmpNat (a :: GHC.Types.Nat)
+                                (b :: GHC.Types.Nat)
+            :: Ordering
 class GHC.TypeNats.KnownNat (n :: GHC.Types.Nat) where
   GHC.TypeNats.natSing :: GHC.TypeNats.SNat n
   {-# MINIMAL natSing #-}
@@ -61,6 +58,9 @@ data GHC.TypeNats.SomeNat where
   GHC.TypeNats.SomeNat :: GHC.TypeNats.KnownNat n =>
                           (Data.Proxy.Proxy n) -> GHC.TypeNats.SomeNat
 data GHC.Types.Symbol
+type family (GHC.TypeNats.^) (a :: GHC.Types.Nat)
+                             (b :: GHC.Types.Nat)
+            :: GHC.Types.Nat
 GHC.TypeNats.sameNat ::
   (GHC.TypeNats.KnownNat a, GHC.TypeNats.KnownNat b) =>
   Data.Proxy.Proxy a

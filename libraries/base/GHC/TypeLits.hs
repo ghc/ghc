@@ -34,9 +34,9 @@ module GHC.TypeLits
 
 
     -- * Functions on type literals
-  , type (<=), type (<=?), type (+), type (*), type (^), type (-)
+  , type (N.<=), type (N.<=?), type (N.+), type (N.*), type (N.^), type (N.-)
   , AppendSymbol
-  , CmpNat, CmpSymbol
+  , N.CmpNat, CmpSymbol
 
   -- * User-defined type errors
   , TypeError
@@ -129,43 +129,10 @@ type instance a == b = EqSymbol a b
 
 --------------------------------------------------------------------------------
 
-infix  4 <=?, <=
-infixl 6 +, -
-infixl 7 *
-infixr 8 ^
-
--- | Comparison of type-level naturals, as a constraint.
-type x <= y = (x <=? y) ~ 'True
-
 -- | Comparison of type-level symbols, as a function.
 --
 -- @since 4.7.0.0
 type family CmpSymbol (m :: Symbol) (n :: Symbol) :: Ordering
-
--- | Comparison of type-level naturals, as a function.
---
--- @since 4.7.0.0
-type family CmpNat    (m :: Nat)    (n :: Nat)    :: Ordering
-
-{- | Comparison of type-level naturals, as a function.
-NOTE: The functionality for this function should be subsumed
-by 'CmpNat', so this might go away in the future.
-Please let us know, if you encounter discrepancies between the two. -}
-type family (m :: Nat) <=? (n :: Nat) :: Bool
-
--- | Addition of type-level naturals.
-type family (m :: Nat) + (n :: Nat) :: Nat
-
--- | Multiplication of type-level naturals.
-type family (m :: Nat) * (n :: Nat) :: Nat
-
--- | Exponentiation of type-level naturals.
-type family (m :: Nat) ^ (n :: Nat) :: Nat
-
--- | Subtraction of type-level naturals.
---
--- @since 4.7.0.0
-type family (m :: Nat) - (n :: Nat) :: Nat
 
 -- | Concatenation of type-level symbols.
 --
