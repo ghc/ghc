@@ -69,7 +69,7 @@ test('T4029',
             # 2017-03-03: 65 (amd64/Linux)           Share Typeable KindReps or more
             #                                        lazy interface file reading
       stats_num_field('max_bytes_used',
-          [(wordsize(64), 22016200, 5)]),
+          [(wordsize(64), 19172360, 5)]),
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
             # 2016-04-21: 25542832 (amd64/Linux)
             # 2016-05-23: 25247216 (amd64/Linux)     Use -G1
