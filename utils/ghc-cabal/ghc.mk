@@ -54,7 +54,6 @@ $(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. b
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
-	       -DHAVE_containers_050 \
 	       -DBOOTSTRAPPING \
 	       -optP-include -optPutils/ghc-cabal/cabal_macros_boot.h \
 	       -odir  bootstrapping \
