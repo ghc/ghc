@@ -44,10 +44,10 @@ before_install:
  - git submodule --quiet update --recursive # Now we can be quiet again.
 
 script:
- # try "quickest" flavor
- - echo 'SRC_HC_OPTS        = -O0 -H64m' >> mk/validate.mk
- - echo 'GhcStage1HcOpts    = -O'        >> mk/validate.mk
- - echo 'GhcStage2HcOpts    = -O0'       >> mk/validate.mk
+ # # try "quickest" flavor
+ # - echo 'SRC_HC_OPTS        = -O0 -H64m' >> mk/validate.mk
+ # - echo 'GhcStage1HcOpts    = -O'        >> mk/validate.mk
+ # - echo 'GhcStage2HcOpts    = -O0'       >> mk/validate.mk
  # split sections cost time
  - echo 'SplitSections      = NO'        >> mk/validate.mk
  # do  not build docs
