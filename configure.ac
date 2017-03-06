@@ -442,7 +442,7 @@ fi
 # name (this is a known problem in the case of the Android NDK, which has
 # slightly odd triples).
 #
-# It may be better to just do away with the GHC triples all together. This would
+# It may be better to just do away with the GHC triples altogether. This would
 # all be taken care of for us if we configured the subprojects using
 # AC_CONFIG_DIR, but unfortunately Cabal needs to be the one to do the
 # configuration.

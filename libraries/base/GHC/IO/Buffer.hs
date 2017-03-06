@@ -173,7 +173,7 @@ charSize = 4
 --
 -- The "live" elements of the buffer are those between the 'bufL' and
 -- 'bufR' offsets.  In an empty buffer, 'bufL' is equal to 'bufR', but
--- they might not be zero: for exmaple, the buffer might correspond to
+-- they might not be zero: for example, the buffer might correspond to
 -- a memory-mapped file and in which case 'bufL' will point to the
 -- next location to be written, which is not necessarily the beginning
 -- of the file.

@@ -1104,7 +1104,7 @@ lvlBind env (AnnRec pairs)
                 -- Both are checked by Lint
     is_fun   = all isFunction rhss
     is_bot   = False  -- It's odd to have an unconditionally divergent
-                      -- funtion in a Rec, and we don't much care what
+                      -- function in a Rec, and we don't much care what
                       -- happens to it.  False is simple!
 
     do_rhs env (bndr,rhs) = lvlFloatRhs abs_vars dest_lvl env Recursive

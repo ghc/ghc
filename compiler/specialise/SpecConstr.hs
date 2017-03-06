@@ -777,7 +777,7 @@ But it is much better to specialise f for the case where the argument
 is of form (I# x); then we build the box only when returning y, which
 is on the cold path.
 
-Another exmaple:
+Another example:
 
    f x = ...(g x)....
 

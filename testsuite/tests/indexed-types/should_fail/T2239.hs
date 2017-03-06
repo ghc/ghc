@@ -51,7 +51,7 @@ complexFD = id :: (forall b. MyEq b Bool => b->b)
 complexTF = id :: (forall b. b~Bool => b->b)
                -> (forall c. c~Bool => c->c)
 
-{- For exmaple, here is how the subsumption check works for complexTF
+{- For example, here is how the subsumption check works for complexTF
    when type-checking the expression
       (id :: (forall b. b~Bool => b->b) -> (forall c. c~Bool => c->c))
 

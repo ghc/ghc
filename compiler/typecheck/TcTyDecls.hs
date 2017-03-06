@@ -243,7 +243,7 @@ one approach is to instantiate all of C's superclasses, transitively.
 We can only do so if that set is finite.
 
 This potential loop occurs only through superclasses.  This, for
-exmaple, is fine
+example, is fine
   class C a where
     op :: C b => a -> b -> b
 even though C's full definition uses C.

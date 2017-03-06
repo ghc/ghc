@@ -1,6 +1,6 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
--- Exmaples from Doaitse Swierestra and Brandon Moore
+-- Examples from Doaitse Swierstra and Brandon Moore
 -- GHC users mailing list, April 07, title "Release plans"
 
 -- This one should fail, but Hugs passes it

@@ -687,7 +687,7 @@ readConstr dt str =
 
 ------------------------------------------------------------------------------
 --
---      Convenience funtions: algebraic data types
+--      Convenience functions: algebraic data types
 --
 ------------------------------------------------------------------------------
 
