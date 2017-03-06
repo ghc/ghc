@@ -13,4 +13,4 @@ f x = let x = "foo"#
               _       -> False
       )
 -- This case-expression should simplify
--- yeilding a KnownBranch simplifier tick
+-- yielding a KnownBranch simplifier tick

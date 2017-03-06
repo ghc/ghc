@@ -63,7 +63,7 @@ Moreover, we want to make it CONLIKE, so that:
   E.g. the eqString rule in PrelRules
    eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
-* exprIsConApp_maybe will see the string when we ahve
+* exprIsConApp_maybe will see the string when we have
      let x = unpackCString# "foo"#
      ...(case x of algs)...
 

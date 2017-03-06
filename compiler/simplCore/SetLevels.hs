@@ -799,7 +799,7 @@ to
 and float bx = I# (a /# 3), because the application of f no
 longer obeys the let/app invariant.  But (a /# 3) is ok-for-spec
 due to a special hack that says division operators can't fail
-when the denominator is definitely no-zero.  And yet that
+when the denominator is definitely non-zero.  And yet that
 same expression says False to exprIsCheap.  Simplest way to
 guarantee the let/app invariant is to use the same function!
 

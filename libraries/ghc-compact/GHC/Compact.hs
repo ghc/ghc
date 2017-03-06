@@ -30,7 +30,7 @@
 --  dump the memory to disk and/or send it over the network.
 --  For applications that are not bandwidth bound (GHC's heap
 --  representation can be as much of a x4 expansion over a
---  binary serialization), this can lead to substantial speed ups.
+--  binary serialization), this can lead to substantial speedups.
 --
 -- For example, suppose you have a function @loadBigStruct :: IO BigStruct@,
 -- which loads a large data structure from the file system.  You can "compact"
@@ -106,7 +106,7 @@ import GHC.Types
 -- data, but it is perfomed only once.  However, because
 -- "Data.Compact.compact" does not stop-the-world, retaining internal
 -- sharing during the compaction process is very costly. The user
--- can choose wether to 'compact' or 'compactWithSharing'.
+-- can choose whether to 'compact' or 'compactWithSharing'.
 --
 -- When you have a @'Compact' a@, you can get a pointer to the actual object
 -- in the region using "Data.Compact.getCompact".  The 'Compact' type

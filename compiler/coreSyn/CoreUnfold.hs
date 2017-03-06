@@ -768,7 +768,7 @@ funSize dflags top_args fun n_val_args voids
     res_discount | idArity fun > n_val_args = ufFunAppDiscount dflags
                  | otherwise                = 0
         -- If the function is partially applied, show a result discount
--- XXX maybe behave like ConSize for eval'd varaible
+-- XXX maybe behave like ConSize for eval'd variable
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args

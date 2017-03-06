@@ -1869,7 +1869,7 @@ be huge.  Here's an example (simplCore/should_compile/T7785)
                      foldr (mapFB c1 f) n xs))
 
 = -- Use mapFB rule:   mapFB (mapFB c f) g = mapFB c (f.g)
-  -- We can do this becuase (mapFB c n) is a PAP and hence expandable
+  -- We can do this because (mapFB c n) is a PAP and hence expandable
   map f (build (\cn. let c1 = mapFB c n in
                      foldr (mapFB c (f.f)) n x))
 

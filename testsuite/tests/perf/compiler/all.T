@@ -909,7 +909,7 @@ test('T10370',
           #     were identical, so I think it's just GC noise.
           # 2016-10-20    38221184   Allow top-level string literals.
           #                          See the comment 16 on #8472.
-          # 2017-02-17    51126304   Type-indexed Typeawble
+          # 2017-02-17    51126304   Type-indexed Typeable
           # 2017-02-27    43455848   Likely drift from recent simplifier improvements
           # 2017-02-25    41291976   Early inline patch
 
@@ -922,7 +922,7 @@ test('T10370',
           # 2016-04-14    101 final demand analyzer run
           # 2016-08-08    121 see above
           # 2017-01-18    146 Allow top-level string literals in Core
-          # 2017-02-17    187 Type-indexed Typeawble
+          # 2017-02-17    187 Type-indexed Typeable
           # 2017-02-25    154 Early inline patch
            (wordsize(32),  39, 15),
           # 2015-10-22     39
