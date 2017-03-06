@@ -1924,13 +1924,25 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Int#
 
--- not really the right type, but we don't know about pairs here.  The
--- correct type is
+-- Note [Why not an unboxed tuple in atomicModifyMutVar#?]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
---   MutVar# s a -> (a -> (a,b)) -> State# s -> (# State# s, b #)
+-- Looking at the type of atomicModifyMutVar#, one might wonder why
+-- it doesn't return an unboxed tuple. e.g.,
 --
+--   MutVar# s a -> (a -> (# a, b #)) -> State# s -> (# State# s, b #)
+--
+-- The reason is that atomicModifyMutVar# relies on laziness for its atomicity.
+-- Given a MutVar# containing x, atomicModifyMutVar# merely replaces the
+-- its contents with a thunk of the form (fst (f x)). This can be done using an
+-- atomic compare-and-swap as it is merely replacing a pointer.
+
 primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
    MutVar# s a -> (a -> b) -> State# s -> (# State# s, c #)
+   { Modify the contents of a {\tt MutVar\#}. Note that this isn't strictly
+     speaking the correct type for this function, it should really be
+     {\tt MutVar# s a -> (a -> (a,b)) -> State# s -> (# State# s, b #)}, however
+     we don't know about pairs here. }
    with
    out_of_line = True
    has_side_effects = True
