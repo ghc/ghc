@@ -345,8 +345,10 @@ linkCmdLineLibs' hsc_env pls =
       if null cmdline_lib_specs then return pls
                                 else do
 
-      -- Add directories to library search paths
-      let all_paths = let paths = framework_paths
+      -- Add directories to library search paths, this only has an effect
+      -- on Windows. On Unix OSes this function is a NOP.
+      let all_paths = let paths = takeDirectory (fst $ sPgm_c $ settings dflags)
+                                : framework_paths
                                ++ lib_paths
                                ++ [ takeDirectory dll | DLLPath dll <- libspecs ]
                       in nub $ map normalise paths
