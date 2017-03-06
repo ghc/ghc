@@ -917,11 +917,17 @@ to ``hs-boot`` files, but with some slight changes:
   relation ``phantom < representational < nominal``: for example,
   an abstract type with a nominal type parameter can be implemented
   using a concrete type with a representational type parameter.
+  Merging respects this subtyping relation (e.g., ``nominal``
+  merged with ``representational`` is ``representational``.)
   Roles in signatures default to ``nominal``, which gives maximum
   flexibility on the implementor's side.  You should only need to
   give an explicit role annotation if a client of the signature
   would like to coerce the abstract type in a type parameter (in which case you
-  should specify ``representational`` explicitly.)
+  should specify ``representational`` explicitly.)  Unlike
+  regular data types, we do *not* assume that abstract
+  data types are representationally injective: if we have
+  ``Coercible (T a) (T b)``, and ``T`` has role ``nominal``,
+  this does not imply that ``a ~ b``.
 
 - A class declarations can either be abstract or concrete.  An
   abstract class is one with no superclasses or class methods::
@@ -989,6 +995,8 @@ to ``hs-boot`` files, but with some slight changes:
   same orphans.
 
 Known limitations:
+
+- Pattern synonyms are not supported.
 
 - Algebraic data types specified in a signature cannot be implemented using
   pattern synonyms.  See :ghc-ticket:`12717`
