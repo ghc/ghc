@@ -1097,11 +1097,12 @@ allCompleteMatches cl tys = do
             [(FromBuiltin, map RealDataCon (tyConDataCons (dataConTyCon dc)))]
            PatSynCon _    -> []
 
-
-  from_pragma <- map ((FromComplete,) . completeMatch) <$>
-                  case splitTyConApp_maybe (conLikeResTy cl tys) of
-                    Just (tc, _) -> dsGetCompleteMatches tc
-                    Nothing -> return []
+  pragmas <- case splitTyConApp_maybe (conLikeResTy cl tys) of
+              Just (tc, _) -> dsGetCompleteMatches tc
+              Nothing -> return []
+  let fams cm = fmap (FromComplete,) $
+                mapM dsLookupConLike (completeMatchConLikes cm)
+  from_pragma <- mapM fams pragmas
 
   let final_groups = fam ++ from_pragma
   tracePmD "allCompleteMatches" (ppr final_groups)

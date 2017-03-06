@@ -23,7 +23,8 @@ module DsMonad (
         newUnique,
         UniqSupply, newUniqueSupply,
         getGhcModeDs, dsGetFamInstEnvs,
-        dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon, dsLookupDataCon,
+        dsLookupGlobal, dsLookupGlobalId, dsDPHBuiltin, dsLookupTyCon,
+        dsLookupDataCon, dsLookupConLike,
 
         PArrBuiltin(..),
         dsLookupDPHRdrEnv, dsLookupDPHRdrEnv_maybe,
@@ -67,6 +68,7 @@ import RdrName
 import HscTypes
 import Bag
 import DataCon
+import ConLike
 import TyCon
 import PmExpr
 import Id
@@ -543,6 +545,10 @@ dsLookupDataCon :: Name -> DsM DataCon
 dsLookupDataCon name
   = tyThingDataCon <$> dsLookupGlobal name
 
+dsLookupConLike :: Name -> DsM ConLike
+dsLookupConLike name
+  = tyThingConLike <$> dsLookupGlobal name
+
 -- |Lookup a name exported by 'Data.Array.Parallel.Prim' or 'Data.Array.Parallel.Prim'.
 --  Panic if there isn't one, or if it is defined multiple times.
 dsLookupDPHRdrEnv :: OccName -> DsM Name
@@ -619,8 +625,12 @@ dsGetMetaEnv = do { env <- getLclEnv; return (dsl_meta env) }
 -- | The @COMPLETE@ pragams provided by the user for a given `TyCon`.
 dsGetCompleteMatches :: TyCon -> DsM [CompleteMatch]
 dsGetCompleteMatches tc = do
+  eps <- getEps
   env <- getGblEnv
-  return $ (lookupWithDefaultUFM (ds_complete_matches env) [] tc)
+  let lookup_completes ufm = lookupWithDefaultUFM ufm [] tc
+      eps_matches_list = lookup_completes $ eps_complete_matches eps
+      env_matches_list = lookup_completes $ ds_complete_matches env
+  return $ eps_matches_list ++ env_matches_list
 
 dsLookupMetaEnv :: Name -> DsM (Maybe DsMetaVal)
 dsLookupMetaEnv name = do { env <- getLclEnv; return (lookupNameEnv (dsl_meta env) name) }
