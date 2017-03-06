@@ -327,7 +327,14 @@ instance Monoid a => Monoid (Maybe a) where
   m `mappend` Nothing = m
   Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
 
--- | @since 2.01
+-- | For tuples, the 'Monoid' constraint on @a@ determines
+-- how the first values merge.
+-- For example, 'String's concatenate:
+--
+-- > ("hello ", (+15)) <*> ("world!", 2002)
+-- > ("hello world!",2017)
+--
+-- @since 2.01
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u `mappend` v, f x)
