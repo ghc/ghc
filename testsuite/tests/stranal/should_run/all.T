@@ -14,3 +14,4 @@ test('T11076', normal, multimod_compile_and_run, ['T11076.hs', 'T11076_prim.cmm'
 test('T11555a', normal, compile_and_run, [''])
 test('T12368', exit_code(1), compile_and_run, [''])
 test('T12368a', exit_code(1), compile_and_run, [''])
+test('T13380', [expect_broken(13380), exit_code(1)], compile_and_run, [''])
