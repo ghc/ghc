@@ -973,6 +973,7 @@ mapFB c f = \x ys -> c (f x) ys
 "map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
 "mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
 "mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
+"mapFB/id"  forall c.           mapFB c (\x -> x)       = c
   #-}
 
 -- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost

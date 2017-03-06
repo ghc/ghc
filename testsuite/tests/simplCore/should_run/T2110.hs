@@ -5,6 +5,8 @@ import Unsafe.Coerce
 
 newtype Age = Age Int
 
+foo :: [Int] -> [Int]
+foo = map id
 fooAge :: [Int] -> [Age]
 fooAge = map Age
 fooCoerce :: [Int] -> [Age]
@@ -19,6 +21,7 @@ same x y = case reallyUnsafePtrEquality# (unsafeCoerce x) y of
 
 main = do
     let l = [1,2,3]
+    same (foo l) l
     same (fooAge l) l
     same (fooCoerce l) l
     same (fooUnsafeCoerce l) l
