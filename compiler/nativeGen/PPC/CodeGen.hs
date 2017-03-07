@@ -1525,6 +1525,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_F32_Exp   -> (fsLit "exp", True)
                     MO_F32_Log   -> (fsLit "log", True)
                     MO_F32_Sqrt  -> (fsLit "sqrt", True)
+                    MO_F32_Fabs  -> unsupported
 
                     MO_F32_Sin   -> (fsLit "sin", True)
                     MO_F32_Cos   -> (fsLit "cos", True)
@@ -1542,6 +1543,7 @@ genCCall' dflags gcp target dest_regs args
                     MO_F64_Exp   -> (fsLit "exp", False)
                     MO_F64_Log   -> (fsLit "log", False)
                     MO_F64_Sqrt  -> (fsLit "sqrt", False)
+                    MO_F64_Fabs  -> unsupported
 
                     MO_F64_Sin   -> (fsLit "sin", False)
                     MO_F64_Cos   -> (fsLit "cos", False)

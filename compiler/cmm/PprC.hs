@@ -754,6 +754,7 @@ pprCallishMachOp_for_C mop
         MO_F64_Log      -> text "log"
         MO_F64_Exp      -> text "exp"
         MO_F64_Sqrt     -> text "sqrt"
+        MO_F64_Fabs     -> unsupported
         MO_F32_Pwr      -> text "powf"
         MO_F32_Sin      -> text "sinf"
         MO_F32_Cos      -> text "cosf"
@@ -767,6 +768,7 @@ pprCallishMachOp_for_C mop
         MO_F32_Log      -> text "logf"
         MO_F32_Exp      -> text "expf"
         MO_F32_Sqrt     -> text "sqrtf"
+        MO_F32_Fabs     -> unsupported
         MO_WriteBarrier -> text "write_barrier"
         MO_Memcpy _     -> text "memcpy"
         MO_Memset _     -> text "memset"

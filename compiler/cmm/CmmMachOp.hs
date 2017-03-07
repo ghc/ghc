@@ -528,6 +528,7 @@ data CallishMachOp
   | MO_F64_Atan
   | MO_F64_Log
   | MO_F64_Exp
+  | MO_F64_Fabs
   | MO_F64_Sqrt
   | MO_F32_Pwr
   | MO_F32_Sin
@@ -541,6 +542,7 @@ data CallishMachOp
   | MO_F32_Atan
   | MO_F32_Log
   | MO_F32_Exp
+  | MO_F32_Fabs
   | MO_F32_Sqrt
 
   | MO_UF_Conv Width

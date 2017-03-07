@@ -2043,17 +2043,24 @@ genCCall dflags is32Bit (PrimTarget (MO_Cmpxchg width)) [dst] [addr, old, new] =
 genCCall _ is32Bit target dest_regs args = do
   dflags <- getDynFlags
   let platform = targetPlatform dflags
+      sse2     = isSse2Enabled dflags
   case (target, dest_regs) of
     -- void return type prim op
     (PrimTarget op, []) ->
         outOfLineCmmOp op Nothing args
     -- we only cope with a single result for foreign calls
     (PrimTarget op, [r])
-      | not is32Bit -> outOfLineCmmOp op (Just r) args
+      | sse2 -> case op of
+          MO_F32_Fabs -> case args of
+            [x] -> sse2FabsCode W32 x
+            _ -> panic "genCCall: Wrong number of arguments for fabs"
+          MO_F64_Fabs -> case args of
+            [x] -> sse2FabsCode W64 x
+            _ -> panic "genCCall: Wrong number of arguments for fabs"
+          _other_op -> outOfLineCmmOp op (Just r) args
       | otherwise -> do
         l1 <- getNewLabelNat
         l2 <- getNewLabelNat
-        sse2 <- sse2Enabled
         if sse2
           then
             outOfLineCmmOp op (Just r) args
@@ -2081,6 +2088,23 @@ genCCall _ is32Bit target dest_regs args = do
         actuallyInlineFloatOp _ _ args
               = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
                       ++ show (length args) ++ ")"
+
+        sse2FabsCode :: Width -> CmmExpr -> NatM InstrBlock
+        sse2FabsCode w x = do
+          let fmt = floatFormat w
+          x_code <- getAnyReg x
+          let
+            const | FF32 <- fmt = CmmInt 0x7fffffff W32
+                  | otherwise   = CmmInt 0x7fffffffffffffff W64
+          Amode amode amode_code <- memConstant (widthInBytes w) const
+          tmp <- getNewRegNat fmt
+          let
+            code dst = x_code dst `appOL` amode_code `appOL` toOL [
+                MOV fmt (OpAddr amode) (OpReg tmp),
+                AND fmt (OpReg tmp) (OpReg dst)
+                ]
+
+          return $ code (getRegisterReg platform True (CmmLocal r))
 
     (PrimTarget (MO_S_QuotRem  width), _) -> divOp1 platform True  width dest_regs args
     (PrimTarget (MO_U_QuotRem  width), _) -> divOp1 platform False width dest_regs args
@@ -2599,6 +2623,7 @@ outOfLineCmmOp mop res args
 
         fn = case mop of
               MO_F32_Sqrt  -> fsLit "sqrtf"
+              MO_F32_Fabs  -> unsupported
               MO_F32_Sin   -> fsLit "sinf"
               MO_F32_Cos   -> fsLit "cosf"
               MO_F32_Tan   -> fsLit "tanf"
@@ -2615,6 +2640,7 @@ outOfLineCmmOp mop res args
               MO_F32_Pwr   -> fsLit "powf"
 
               MO_F64_Sqrt  -> fsLit "sqrt"
+              MO_F64_Fabs  -> unsupported
               MO_F64_Sin   -> fsLit "sin"
               MO_F64_Cos   -> fsLit "cos"
               MO_F64_Tan   -> fsLit "tan"
@@ -3050,8 +3076,16 @@ sse2NegCode w x = do
   x_code <- getAnyReg x
   -- This is how gcc does it, so it can't be that bad:
   let
-    const | FF32 <- fmt = CmmInt 0x80000000 W32
-          | otherwise   = CmmInt 0x8000000000000000 W64
+    const = case fmt of
+      FF32 -> CmmInt 0x80000000 W32
+      FF64 -> CmmInt 0x8000000000000000 W64
+      x@II8  -> wrongFmt x
+      x@II16 -> wrongFmt x
+      x@II32 -> wrongFmt x
+      x@II64 -> wrongFmt x
+      x@FF80 -> wrongFmt x
+      where
+        wrongFmt x = panic $ "sse2NegCode: " ++ show x
   Amode amode amode_code <- memConstant (widthInBytes w) const
   tmp <- getNewRegNat fmt
   let

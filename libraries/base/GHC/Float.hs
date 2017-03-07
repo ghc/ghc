@@ -245,9 +245,7 @@ instance  Num Float  where
     (-)         x y     =  minusFloat x y
     negate      x       =  negateFloat x
     (*)         x y     =  timesFloat x y
-    abs x    | x == 0    = 0 -- handles (-0.0)
-             | x >  0    = x
-             | otherwise = negateFloat x
+    abs         x       =  fabsFloat x
     signum x | x > 0     = 1
              | x < 0     = negateFloat 1
              | otherwise = x -- handles 0.0, (-0.0), and NaN
@@ -427,9 +425,7 @@ instance  Num Double  where
     (-)         x y     =  minusDouble x y
     negate      x       =  negateDouble x
     (*)         x y     =  timesDouble x y
-    abs x    | x == 0    = 0 -- handles (-0.0)
-             | x >  0    = x
-             | otherwise = negateDouble x
+    abs         x       =  fabsDouble x
     signum x | x > 0     = 1
              | x < 0     = negateDouble 1
              | otherwise = x -- handles 0.0, (-0.0), and NaN
@@ -1087,13 +1083,14 @@ geFloat     (F# x) (F# y) = isTrue# (geFloat# x y)
 ltFloat     (F# x) (F# y) = isTrue# (ltFloat# x y)
 leFloat     (F# x) (F# y) = isTrue# (leFloat# x y)
 
-expFloat, logFloat, sqrtFloat :: Float -> Float
+expFloat, logFloat, sqrtFloat, fabsFloat :: Float -> Float
 sinFloat, cosFloat, tanFloat  :: Float -> Float
 asinFloat, acosFloat, atanFloat  :: Float -> Float
 sinhFloat, coshFloat, tanhFloat  :: Float -> Float
 expFloat    (F# x) = F# (expFloat# x)
 logFloat    (F# x) = F# (logFloat# x)
 sqrtFloat   (F# x) = F# (sqrtFloat# x)
+fabsFloat   (F# x) = F# (fabsFloat# x)
 sinFloat    (F# x) = F# (sinFloat# x)
 cosFloat    (F# x) = F# (cosFloat# x)
 tanFloat    (F# x) = F# (tanFloat# x)
@@ -1131,13 +1128,14 @@ double2Float (D# x) = F# (double2Float# x)
 float2Double :: Float -> Double
 float2Double (F# x) = D# (float2Double# x)
 
-expDouble, logDouble, sqrtDouble :: Double -> Double
+expDouble, logDouble, sqrtDouble, fabsDouble :: Double -> Double
 sinDouble, cosDouble, tanDouble  :: Double -> Double
 asinDouble, acosDouble, atanDouble  :: Double -> Double
 sinhDouble, coshDouble, tanhDouble  :: Double -> Double
 expDouble    (D# x) = D# (expDouble# x)
 logDouble    (D# x) = D# (logDouble# x)
 sqrtDouble   (D# x) = D# (sqrtDouble# x)
+fabsDouble   (D# x) = D# (fabsDouble# x)
 sinDouble    (D# x) = D# (sinDouble# x)
 cosDouble    (D# x) = D# (cosDouble# x)
 tanDouble    (D# x) = D# (tanDouble# x)

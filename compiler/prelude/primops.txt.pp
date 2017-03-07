@@ -531,6 +531,8 @@ primop   DoubleDivOp   "/##"   Dyadic
 
 primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
 
+primop   DoubleFabsOp  "fabsDouble#"    Monadic   Double# -> Double#
+
 primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
    {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
@@ -656,6 +658,8 @@ primop   FloatDivOp   "divideFloat#"      Dyadic
    with can_fail = True
 
 primop   FloatNegOp   "negateFloat#"      Monadic    Float# -> Float#
+
+primop   FloatFabsOp  "fabsFloat#"        Monadic    Float# -> Float#
 
 primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
    {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
