@@ -186,10 +186,10 @@ newtype Flag = Flag Word16
  , flagOneshot = EV_ONESHOT
  }
 
-#if SIZEOF_KEV_FILTER == 4 /*kevent.filter: uint32_t or uint16_t. */
-newtype Filter = Filter Word32
+#if SIZEOF_KEV_FILTER == 4 /*kevent.filter: int32_t or int16_t. */
+newtype Filter = Filter Int32
 #else
-newtype Filter = Filter Word16
+newtype Filter = Filter Int16
 #endif
     deriving (Bits, FiniteBits, Eq, Num, Show, Storable)
 
