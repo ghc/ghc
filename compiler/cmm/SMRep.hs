@@ -50,6 +50,7 @@ module SMRep (
 #include "../HsVersions.h"
 #include "../includes/MachDeps.h"
 
+import BasicTypes( ConTagZ )
 import DynFlags
 import Outputable
 import Platform
@@ -185,14 +186,13 @@ type IsStatic = Bool
 -- rtsClosureType below.
 
 data ClosureTypeInfo
-  = Constr        ConstrTag ConstrDescription
+  = Constr        ConTagZ ConstrDescription
   | Fun           FunArity ArgDescr
   | Thunk
   | ThunkSelector SelectorOffset
   | BlackHole
   | IndStatic
 
-type ConstrTag         = Int
 type ConstrDescription = [Word8] -- result of dataConIdentity
 type FunArity          = Int
 type SelectorOffset    = Int

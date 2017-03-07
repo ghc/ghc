@@ -74,6 +74,7 @@ import Module
 import Id
 import VarEnv
 import OrdList
+import BasicTypes( ConTagZ )
 import Unique
 import UniqSupply
 import FastString

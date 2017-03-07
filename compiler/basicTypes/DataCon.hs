@@ -28,8 +28,9 @@ module DataCon (
 
         -- ** Type deconstruction
         dataConRepType, dataConSig, dataConInstSig, dataConFullSig,
-        dataConName, dataConIdentity, dataConTag, dataConTyCon,
-        dataConOrigTyCon, dataConUserType,
+        dataConName, dataConIdentity, dataConTag, dataConTagZ,
+        dataConTyCon, dataConOrigTyCon,
+        dataConUserType,
         dataConUnivTyVars, dataConUnivTyVarBinders,
         dataConExTyVars, dataConExTyVarBinders,
         dataConAllTyVars,
@@ -860,6 +861,9 @@ dataConName = dcName
 -- | The tag used for ordering 'DataCon's
 dataConTag :: DataCon -> ConTag
 dataConTag  = dcTag
+
+dataConTagZ :: DataCon -> ConTagZ
+dataConTagZ con = dataConTag con - fIRST_TAG
 
 -- | The type constructor that we are building via this data constructor
 dataConTyCon :: DataCon -> TyCon
