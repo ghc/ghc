@@ -318,9 +318,11 @@ displayLintResults dflags pass warns errs binds
   | not (isEmptyBag warns)
   , not (hasNoDebugOutput dflags)
   , showLintWarnings pass
-  = log_action dflags dflags NoReason Err.SevDump noSrcSpan
+  -- If the Core linter encounters an error, output to stderr instead of
+  -- stdout (#13342)
+  = log_action dflags dflags NoReason Err.SevInfo noSrcSpan
         (defaultDumpStyle dflags)
-        (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag warns)
+        (lint_banner "warnings" (ppr pass) $$ Err.pprMessageBag (mapBag ($$ blankLine) warns))
 
   | otherwise = return ()
   where
