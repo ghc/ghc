@@ -182,7 +182,7 @@ catch (IO io) handler = IO $ catch# io handler'
 -- | Catch any 'Exception' type in the 'IO' monad.
 --
 -- Note that this function is /strict/ in the action. That is,
--- @catchException undefined b == _|_@. See #exceptions_and_strictness# for
+-- @catchAny undefined b == _|_@. See #exceptions_and_strictness# for
 -- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
 catchAny !(IO io) handler = IO $ catch# io handler'
