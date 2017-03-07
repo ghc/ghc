@@ -27,6 +27,7 @@ import Vectorise.Builtins
 import Vectorise.Env
 
 import CoreSyn
+import TcRnMonad
 import DsMonad
 import HscTypes hiding ( MonadThings(..) )
 import DynFlags
@@ -44,6 +45,7 @@ import ErrUtils
 import Outputable
 import Module
 
+import Control.Monad (join)
 
 -- |Run a vectorisation computation.
 --
@@ -55,18 +57,14 @@ initV :: HscEnv
 initV hsc_env guts info thing_inside
   = do { dumpIfVtTrace "Incoming VectInfo" (ppr info)
 
-       ; let type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
-       ; (_, Just res) <- initDs hsc_env (mg_module guts)
-                                         (mg_rdr_env guts) type_env
-                                         (mg_fam_inst_env guts) [] go
-
-       ; case res of
+       ; (_, res) <- initDsWithModGuts hsc_env guts go
+       ; case join res of
            Nothing
              -> dumpIfVtTrace "Vectorisation FAILED!" empty
            Just (info', _)
              -> dumpIfVtTrace "Outgoing VectInfo" (ppr info')
 
-       ; return res
+       ; return $ join res
        }
   where
     dflags = hsc_dflags hsc_env
@@ -124,7 +122,6 @@ initV hsc_env guts info thing_inside
                | otherwise                       = pprPanic invalidInstance (ppr i)
 
     invalidInstance = "Invalid DPH instance (overlapping in head constructor)"
-
 
 -- Builtins -------------------------------------------------------------------
 

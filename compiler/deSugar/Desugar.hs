@@ -20,7 +20,7 @@ import DynFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
-import TcRnMonad ( finalSafeMode, fixSafeInstances )
+import TcRnMonad  ( finalSafeMode, fixSafeInstances )
 import TcRnDriver ( runTcInteractive )
 import Id
 import Name
@@ -124,9 +124,7 @@ deSugar hsc_env
                               then addTicksToBinds hsc_env mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, Nothing)
-        ; (msgs, mb_res)
-            <- initDs hsc_env mod rdr_env type_env
-                      fam_inst_env complete_matches $
+        ; (msgs, mb_res) <- initDs hsc_env tcg_env $
                        do { ds_ev_binds <- dsEvBinds ev_binds
                           ; core_prs <- dsTopLHsBinds binds_cvr
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs

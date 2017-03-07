@@ -10,7 +10,7 @@ Functions for working with the typechecker environment (setters, getters...).
 
 module TcRnMonad(
   -- * Initalisation
-  initTc, initTcInteractive, initTcForLookup, initTcRnIf,
+  initTc, initTcWithGbl, initTcInteractive, initTcForLookup, initTcRnIf,
 
   -- * Simple accessors
   discardResult,
@@ -200,15 +200,12 @@ initTc :: HscEnv
                 -- (error messages should have been printed already)
 
 initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
- = do { errs_var     <- newIORef (emptyBag, emptyBag) ;
-        tvs_var      <- newIORef emptyVarSet ;
-        keep_var     <- newIORef emptyNameSet ;
+ = do { keep_var     <- newIORef emptyNameSet ;
         used_gre_var <- newIORef [] ;
         th_var       <- newIORef False ;
         th_splice_var<- newIORef False ;
         th_locs_var  <- newIORef Set.empty ;
         infer_var    <- newIORef (True, emptyBag) ;
-        lie_var      <- newIORef emptyWC ;
         dfun_n_var   <- newIORef emptyOccSet ;
         type_env_var <- case hsc_type_env_var hsc_env of {
                            Just (_mod, te_var) -> return te_var ;
@@ -301,7 +298,23 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcg_static_wc      = static_wc_var,
                 tcg_complete_matches = []
              } ;
-             lcl_env = TcLclEnv {
+        } ;
+
+        -- OK, here's the business end!
+        initTcWithGbl hsc_env gbl_env loc do_this
+    }
+
+-- | Run a 'TcM' action in the context of an existing 'GblEnv'.
+initTcWithGbl :: HscEnv
+              -> TcGblEnv
+              -> RealSrcSpan
+              -> TcM r
+              -> IO (Messages, Maybe r)
+initTcWithGbl hsc_env gbl_env loc do_this
+ = do { tvs_var      <- newIORef emptyVarSet
+      ; lie_var      <- newIORef emptyWC
+      ; errs_var     <- newIORef (emptyBag, emptyBag)
+      ; let lcl_env = TcLclEnv {
                 tcl_errs       = errs_var,
                 tcl_loc        = loc,     -- Should be over-ridden very soon!
                 tcl_ctxt       = [],
@@ -315,31 +328,29 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
-             } ;
-        } ;
+                }
 
-        -- OK, here's the business end!
-        maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
+      ; maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
                      do { r <- tryM do_this
                         ; case r of
                           Right res -> return (Just res)
-                          Left _    -> return Nothing } ;
+                          Left _    -> return Nothing }
 
         -- Check for unsolved constraints
-        lie <- readIORef lie_var ;
-        if isEmptyWC lie
+      ; lie <- readIORef (tcl_lie lcl_env)
+      ; if isEmptyWC lie
            then return ()
-           else pprPanic "initTc: unsolved constraints" (ppr lie) ;
+           else pprPanic "initTc: unsolved constraints" (ppr lie)
 
         -- Collect any error messages
-        msgs <- readIORef errs_var ;
+      ; msgs <- readIORef (tcl_errs lcl_env)
 
-        let { final_res | errorsFound dflags msgs = Nothing
-                        | otherwise               = maybe_res } ;
+      ; let { final_res | errorsFound dflags msgs = Nothing
+                        | otherwise               = maybe_res }
 
-        return (msgs, final_res)
-    }
-
+      ; return (msgs, final_res)
+      }
+  where dflags = hsc_dflags hsc_env
 
 initTcInteractive :: HscEnv -> TcM a -> IO (Messages, Maybe a)
 -- Initialise the type checker monad for use in GHCi

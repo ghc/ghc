@@ -6,12 +6,12 @@
 @DsMonad@: monadery used in desugaring
 -}
 
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleInstances, FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}  -- instance MonadThings is necessarily an orphan
 
 module DsMonad (
         DsM, mapM, mapAndUnzipM,
-        initDs, initDsTc, initTcDsForSolver, fixDs,
+        initDs, initDsTc, initTcDsForSolver, initDsWithModGuts, fixDs,
         foldlM, foldrM, whenGOptM, unsetGOptM, unsetWOptM, xoptM,
         Applicative(..),(<$>),
 
@@ -63,7 +63,6 @@ import TcMType ( checkForLevPolyX, formatLevPolyErr )
 import LoadIface
 import Finder
 import PrelNames
-import RnNames
 import RdrName
 import HscTypes
 import Bag
@@ -153,55 +152,76 @@ type DsWarning = (SrcSpan, SDoc)
         -- and we'll do the print_unqual stuff later on to turn it
         -- into a Doc.
 
-initDs :: HscEnv
-       -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
-       -> [CompleteMatch]
-       -> DsM a
-       -> IO (Messages, Maybe a)
--- Print errors and warnings, if any arise
-
-initDs hsc_env mod rdr_env type_env fam_inst_env complete_matches thing_inside
-  = do  { msg_var <- newIORef (emptyBag, emptyBag)
-        ; let all_matches = (hptCompleteSigs hsc_env) ++ complete_matches
-        ; pm_iter_var      <- newIORef 0
-        ; let dflags                   = hsc_dflags hsc_env
-              (ds_gbl_env, ds_lcl_env) = mkDsEnvs dflags mod rdr_env type_env
-                                                  fam_inst_env msg_var
-                                                  pm_iter_var all_matches
-
-        ; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env
-                          $ initDPH
-                          $ tryM thing_inside     -- Catch exceptions (= errors during desugaring)
-
-        -- Display any errors and warnings
-        -- Note: if -Werror is used, we don't signal an error here.
-        ; msgs <- readIORef msg_var
-
-        ; let final_res | errorsFound dflags msgs = Nothing
-                        | otherwise = case either_res of
-                                        Right res -> Just res
-                                        Left exn  -> pprPanic "initDs" (text (show exn))
-                -- The (Left exn) case happens when the thing_inside throws
-                -- a UserError exception.  Then it should have put an error
-                -- message in msg_var, so we just discard the exception
-
-        ; return (msgs, final_res)
-        }
+-- | Run a 'DsM' action inside the 'TcM' monad.
 initDsTc :: DsM a -> TcM a
 initDsTc thing_inside
-  = do  { this_mod <- getModule
-        ; tcg_env  <- getGblEnv
-        ; msg_var  <- getErrsVar
-        ; dflags   <- getDynFlags
-        ; pm_iter_var      <- liftIO $ newIORef 0
-        ; let type_env = tcg_type_env tcg_env
-              rdr_env  = tcg_rdr_env tcg_env
-              fam_inst_env = tcg_fam_inst_env tcg_env
-              complete_matches = tcg_complete_matches tcg_env
-              ds_envs  = mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
-                                  msg_var pm_iter_var complete_matches
-        ; setEnvs ds_envs thing_inside
-        }
+  = do { tcg_env  <- getGblEnv
+       ; msg_var  <- getErrsVar
+       ; hsc_env  <- getTopEnv
+       ; envs     <- mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
+       ; setEnvs envs $ initDPH thing_inside
+       }
+
+-- | Run a 'DsM' action inside the 'IO' monad.
+initDs :: HscEnv -> TcGblEnv -> DsM a -> IO (Messages, Maybe a)
+initDs hsc_env tcg_env thing_inside
+  = do { msg_var <- newIORef emptyMessages
+       ; envs <- mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
+       ; runDs hsc_env envs thing_inside
+       }
+
+-- | Build a set of desugarer environments derived from a 'TcGblEnv'.
+mkDsEnvsFromTcGbl :: MonadIO m
+                  => HscEnv -> IORef Messages -> TcGblEnv
+                  -> m (DsGblEnv, DsLclEnv)
+mkDsEnvsFromTcGbl hsc_env msg_var tcg_env
+  = do { pm_iter_var <- liftIO $ newIORef 0
+       ; let dflags   = hsc_dflags hsc_env
+             this_mod = tcg_mod tcg_env
+             type_env = tcg_type_env tcg_env
+             rdr_env  = tcg_rdr_env tcg_env
+             fam_inst_env = tcg_fam_inst_env tcg_env
+             complete_matches = hptCompleteSigs hsc_env
+                                ++ tcg_complete_matches tcg_env
+       ; return $ mkDsEnvs dflags this_mod rdr_env type_env fam_inst_env
+                           msg_var pm_iter_var complete_matches
+       }
+
+runDs :: HscEnv -> (DsGblEnv, DsLclEnv) -> DsM a -> IO (Messages, Maybe a)
+runDs hsc_env (ds_gbl, ds_lcl) thing_inside
+  = do { res    <- initTcRnIf 'd' hsc_env ds_gbl ds_lcl
+                              (initDPH $ tryM thing_inside)
+       ; msgs   <- readIORef (ds_msgs ds_gbl)
+       ; let final_res
+               | errorsFound dflags msgs = Nothing
+               | Right r <- res          = Just r
+               | otherwise               = panic "initDs"
+       ; return (msgs, final_res)
+       }
+  where dflags = hsc_dflags hsc_env
+
+-- | Run a 'DsM' action in the context of an existing 'ModGuts'
+initDsWithModGuts :: HscEnv -> ModGuts -> DsM a -> IO (Messages, Maybe a)
+initDsWithModGuts hsc_env guts thing_inside
+  = do { pm_iter_var <- newIORef 0
+       ; msg_var <- newIORef emptyMessages
+       ; let dflags   = hsc_dflags hsc_env
+             type_env = typeEnvFromEntities ids (mg_tcs guts) (mg_fam_insts guts)
+             rdr_env  = mg_rdr_env guts
+             fam_inst_env = mg_fam_inst_env guts
+             this_mod = mg_module guts
+             complete_matches = hptCompleteSigs hsc_env
+                                ++ mg_complete_sigs guts
+
+             bindsToIds (NonRec v _)   = [v]
+             bindsToIds (Rec    binds) = map fst binds
+             ids = concatMap bindsToIds (mg_binds guts)
+
+             envs  = mkDsEnvs dflags this_mod rdr_env type_env
+                              fam_inst_env msg_var pm_iter_var
+                              complete_matches
+       ; runDs hsc_env envs thing_inside
+       }
 
 initTcDsForSolver :: TcM a -> DsM (Messages, Maybe a)
 -- Spin up a TcM context so that we can run the constraint solver
@@ -229,7 +249,8 @@ initTcDsForSolver thing_inside
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> FamInstEnv
          -> IORef Messages -> IORef Int -> [CompleteMatch]
          -> (DsGblEnv, DsLclEnv)
-mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar complete_matches
+mkDsEnvs dflags mod rdr_env type_env fam_inst_env msg_var pmvar
+         complete_matches
   = let if_genv = IfGblEnv { if_doc       = text "mkDsEnvs",
                              if_rec_types = Just (mod, return type_env) }
         if_lenv = mkIfLclEnv mod (text "GHC error in desugarer lookup in" <+> ppr mod)
