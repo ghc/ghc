@@ -1249,7 +1249,8 @@ hscWriteIface dflags iface no_change mod_summary = do
 
 -- | Compile to hard-code.
 hscGenHardCode :: HscEnv -> CgGuts -> ModSummary -> FilePath
-               -> IO (FilePath, Maybe FilePath) -- ^ @Just f@ <=> _stub.c is f
+               -> IO (FilePath, Maybe FilePath, [(ForeignSrcLang, FilePath)])
+               -- ^ @Just f@ <=> _stub.c is f
 hscGenHardCode hsc_env cgguts mod_summary output_filename = do
         let CgGuts{ -- This is the last use of the ModGuts in a compilation.
                     -- From now on, we just use the bits we need.
@@ -1257,6 +1258,7 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                     cg_binds    = core_binds,
                     cg_tycons   = tycons,
                     cg_foreign  = foreign_stubs0,
+                    cg_foreign_files = foreign_files,
                     cg_dep_pkgs = dependencies,
                     cg_hpc_info = hpc_info } = cgguts
             dflags = hsc_dflags hsc_env
@@ -1303,11 +1305,11 @@ hscGenHardCode hsc_env cgguts mod_summary output_filename = do
                             return a
                 rawcmms1 = Stream.mapM dump rawcmms0
 
-            (output_filename, (_stub_h_exists, stub_c_exists))
+            (output_filename, (_stub_h_exists, stub_c_exists), foreign_fps)
                 <- {-# SCC "codeOutput" #-}
                   codeOutput dflags this_mod output_filename location
-                  foreign_stubs dependencies rawcmms1
-            return (output_filename, stub_c_exists)
+                  foreign_stubs foreign_files dependencies rawcmms1
+            return (output_filename, stub_c_exists, foreign_fps)
 
 
 hscInteractive :: HscEnv
@@ -1358,7 +1360,8 @@ hscCompileCmmFile hsc_env filename output_filename = runHsc hsc_env $ do
             -- lest we reproduce #11784.
             mod_name = mkModuleName $ "Cmm$" ++ FilePath.takeFileName filename
             cmm_mod = mkModule (thisPackage dflags) mod_name
-        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] rawCmms
+        _ <- codeOutput dflags cmm_mod output_filename no_loc NoStubs [] []
+             rawCmms
         return ()
   where
     no_loc = ModLocation{ ml_hs_file  = Just filename,

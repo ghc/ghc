@@ -97,7 +97,7 @@ deSugar hsc_env
                             tcg_imp_specs    = imp_specs,
                             tcg_dependent_files = dependent_files,
                             tcg_ev_binds     = ev_binds,
-                            tcg_th_cstubs    = th_cstubs_var,
+                            tcg_th_foreign_files = th_foreign_files_var,
                             tcg_fords        = fords,
                             tcg_rules        = rules,
                             tcg_vects        = vects,
@@ -180,8 +180,7 @@ deSugar hsc_env
         -- past desugaring. See Note [Identity versus semantic module].
         ; MASSERT( id_mod == mod )
 
-        ; cstubs <- readIORef th_cstubs_var
-        ; let ds_fords' = foldl' appendStubC ds_fords (map text cstubs)
+        ; foreign_files <- readIORef th_foreign_files_var
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
@@ -203,7 +202,8 @@ deSugar hsc_env
                 mg_patsyns      = patsyns,
                 mg_rules        = ds_rules_for_imps,
                 mg_binds        = ds_binds,
-                mg_foreign      = ds_fords',
+                mg_foreign      = ds_fords,
+                mg_foreign_files = foreign_files,
                 mg_hpc_info     = ds_hpc_info,
                 mg_modBreaks    = modBreaks,
                 mg_vect_decls   = ds_vects,

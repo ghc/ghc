@@ -54,6 +54,7 @@ module TcRnTypes(
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
+        ForeignSrcLang(..),
 
         -- Arrows
         ArrowCtxt(..),
@@ -471,7 +472,6 @@ data FrontendResult
 --        since that will actually say the specific interface you
 --        want to track (and recompile if it changes)
 
-
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
 -- It is this structure that is handed on to the desugarer
@@ -603,8 +603,8 @@ data TcGblEnv
         tcg_th_topdecls :: TcRef [LHsDecl RdrName],
         -- ^ Top-level declarations from addTopDecls
 
-        tcg_th_cstubs :: TcRef [String],
-        -- ^ C stubs from addCStub
+        tcg_th_foreign_files :: TcRef [(ForeignSrcLang, String)],
+        -- ^ Foreign files emitted from TH.
 
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls

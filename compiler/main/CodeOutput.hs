@@ -36,6 +36,7 @@ import Control.Exception
 import System.Directory
 import System.FilePath
 import System.IO
+import Control.Monad (forM)
 
 {-
 ************************************************************************
@@ -50,12 +51,16 @@ codeOutput :: DynFlags
            -> FilePath
            -> ModLocation
            -> ForeignStubs
+           -> [(ForeignSrcLang, String)]
+           -- ^ additional files to be compiled with with the C compiler
            -> [InstalledUnitId]
            -> Stream IO RawCmmGroup ()                       -- Compiled C--
            -> IO (FilePath,
-                  (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}))
+                  (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
+                  [(ForeignSrcLang, FilePath)]{-foreign_fps-})
 
-codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
+codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
+  cmm_stream
   =
     do  {
         -- Lint each CmmGroup as it goes past
@@ -82,6 +87,10 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
                 }
 
         ; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
+        ; foreign_fps <- forM foreign_files $ \(lang, file_contents) -> do
+            { fp <- outputForeignFile dflags lang file_contents;
+            ; return (lang, fp);
+            }
         ; case hscTarget dflags of {
              HscAsm         -> outputAsm dflags this_mod location filenm
                                          linted_cmm_stream;
@@ -90,7 +99,7 @@ codeOutput dflags this_mod filenm location foreign_stubs pkg_deps cmm_stream
              HscInterpreted -> panic "codeOutput: HscInterpreted";
              HscNothing     -> panic "codeOutput: HscNothing"
           }
-        ; return (filenm, stubs_exist)
+        ; return (filenm, stubs_exist, foreign_fps)
         }
 
 doOutput :: String -> (Handle -> IO a) -> IO a
@@ -258,3 +267,15 @@ outputForeignStubs_help _fname ""      _header _footer = return False
 outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
+
+outputForeignFile :: DynFlags -> ForeignSrcLang -> String -> IO FilePath
+outputForeignFile dflags lang file_contents
+ = do
+   extension <- case lang of
+     LangC -> return "c"
+     LangCxx -> return "cpp"
+     LangObjc -> return "m"
+     LangObjcxx -> return "mm"
+   fp <- newTempName dflags extension
+   writeFile fp file_contents
+   return fp

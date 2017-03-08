@@ -32,6 +32,7 @@ Library
 
     exposed-modules:
             GHC.LanguageExtensions.Type
+            GHC.ForeignSrcLang.Type
             GHC.Lexeme
 
     build-depends: base       >= 4.7 && < 4.11
