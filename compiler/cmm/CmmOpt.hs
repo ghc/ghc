@@ -284,48 +284,68 @@ cmmMachOpFoldM dflags cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
     maybe_comparison _ _ _ = Nothing
 
 -- We can often do something with constants of 0 and 1 ...
+-- See Note [Comparison operators]
 
 cmmMachOpFoldM dflags mop [x, y@(CmmLit (CmmInt 0 _))]
   = case mop of
-        MO_Add   _ -> Just x
-        MO_Sub   _ -> Just x
-        MO_Mul   _ -> Just y
-        MO_And   _ -> Just y
-        MO_Or    _ -> Just x
-        MO_Xor   _ -> Just x
-        MO_Shl   _ -> Just x
-        MO_S_Shr _ -> Just x
+        -- Arithmetic
+        MO_Add   _ -> Just x   -- x + 0 = x
+        MO_Sub   _ -> Just x   -- x - 0 = x
+        MO_Mul   _ -> Just y   -- x * 0 = 0
+
+        -- Logical operations
+        MO_And   _ -> Just y   -- x &     0 = 0
+        MO_Or    _ -> Just x   -- x |     0 = x
+        MO_Xor   _ -> Just x   -- x `xor` 0 = x
+
+        -- Shifts
+        MO_Shl   _ -> Just x   -- x << 0 = x
+        MO_S_Shr _ -> Just x   -- ditto shift-right
         MO_U_Shr _ -> Just x
-        MO_Ne    _ | isComparisonExpr x -> Just x
-        MO_Eq    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  _ | isComparisonExpr x -> Just x
-        MO_S_Gt  _ | isComparisonExpr x -> Just x
-        MO_U_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_S_Lt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_U_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_S_Ge  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_U_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
+
+        -- Comparisons; these ones are trickier
+        -- See Note [Comparison operators]
+        MO_Ne    _ | isComparisonExpr x -> Just x                -- (x > y) != 0  =  x > y
+        MO_Eq    _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x > y) == 0  =  x <= y
+        MO_U_Gt  _ | isComparisonExpr x -> Just x                -- (x > y) > 0   =  x > y
+        MO_S_Gt  _ | isComparisonExpr x -> Just x                -- ditto
+        MO_U_Lt  _ | isComparisonExpr x -> Just zero             -- (x > y) < 0  =  0
+        MO_S_Lt  _ | isComparisonExpr x -> Just zero
+        MO_U_Ge  _ | isComparisonExpr x -> Just one              -- (x > y) >= 0  =  1
+        MO_S_Ge  _ | isComparisonExpr x -> Just one
+
+        MO_U_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x > y) <= 0  =  x <= y
         MO_S_Le  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
         _ -> Nothing
+  where
+    zero = CmmLit (CmmInt 0 (wordWidth dflags))
+    one  = CmmLit (CmmInt 1 (wordWidth dflags))
 
 cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt 1 rep))]
   = case mop of
+        -- Arithmetic: x*1 = x, etc
         MO_Mul    _ -> Just x
         MO_S_Quot _ -> Just x
         MO_U_Quot _ -> Just x
         MO_S_Rem  _ -> Just $ CmmLit (CmmInt 0 rep)
         MO_U_Rem  _ -> Just $ CmmLit (CmmInt 0 rep)
-        MO_Ne    _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_Eq    _ | isComparisonExpr x -> Just x
-        MO_U_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_S_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'
-        MO_U_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_S_Gt  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 0 (wordWidth dflags))
-        MO_U_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_S_Le  _ | isComparisonExpr x -> Just $ CmmLit (CmmInt 1 (wordWidth dflags))
-        MO_U_Ge  _ | isComparisonExpr x -> Just x
+
+        -- Comparisons; trickier
+        -- See Note [Comparison operators]
+        MO_Ne    _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x>y) != 1  =  x<=y
+        MO_Eq    _ | isComparisonExpr x -> Just x                -- (x>y) == 1  =  x>y
+        MO_U_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- (x>y) < 1   =  x<=y
+        MO_S_Lt  _ | Just x' <- maybeInvertCmmExpr x -> Just x'  -- ditto
+        MO_U_Gt  _ | isComparisonExpr x -> Just zero             -- (x>y) > 1   = 0
+        MO_S_Gt  _ | isComparisonExpr x -> Just zero
+        MO_U_Le  _ | isComparisonExpr x -> Just one              -- (x>y) <= 1  = 1
+        MO_S_Le  _ | isComparisonExpr x -> Just one
+        MO_U_Ge  _ | isComparisonExpr x -> Just x                -- (x>y) >= 1  = x>y
         MO_S_Ge  _ | isComparisonExpr x -> Just x
         _ -> Nothing
+  where
+    zero = CmmLit (CmmInt 0 (wordWidth dflags))
+    one  = CmmLit (CmmInt 1 (wordWidth dflags))
 
 -- Now look for multiplication/division by powers of 2 (integers).
 
@@ -375,6 +395,17 @@ cmmMachOpFoldM dflags mop [x, (CmmLit (CmmInt n _))]
 -- Anything else is just too hard.
 
 cmmMachOpFoldM _ _ _ = Nothing
+
+{- Note [Comparison operators]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+   CmmCondBranch ((x>#y) == 1) t f
+we really want to convert to
+   CmmCondBranch (x>#y) t f
+
+That's what the constant-folding operations on comparison operators do above.
+-}
+
 
 -- -----------------------------------------------------------------------------
 -- Utils

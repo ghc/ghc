@@ -405,7 +405,7 @@ isLFReEntrant _                = False
 lfClosureType :: LambdaFormInfo -> ClosureTypeInfo
 lfClosureType (LFReEntrant _ _ arity _ argd) = Fun arity argd
 lfClosureType (LFCon con)                    = Constr (dataConTagZ con)
-                                                    (dataConIdentity con)
+                                                      (dataConIdentity con)
 lfClosureType (LFThunk _ _ _ is_sel _)       = thunkClosureType is_sel
 lfClosureType _                              = panic "lfClosureType"
 
