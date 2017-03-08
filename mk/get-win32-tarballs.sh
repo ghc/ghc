@@ -35,6 +35,16 @@ download_file() {
         fi
     fi
 
+    if test "$sigs" = "1"
+    then
+        echo "Downloading ${description} (signature) to ${dest_dir}..."
+        local curl_cmd="curl -L ${file_url}.sig -o ${dest_file}.sig --create-dirs -# ${extra_curl_opts}"
+        $curl_cmd || {
+                rm -f "${dest_file}.sig"
+                fail "ERROR: Download failed."
+            }
+    fi
+
     if test "$verify" = "1"
     then
         echo "${file_md5} *${dest_file}" | md5sum --quiet -c - ||
@@ -43,7 +53,14 @@ download_file() {
 }
 
 download_mingw() {
-    local mingw_url="$1"
+    if test "$mingw_arch" = "sources"
+    then
+        local mingw_url=`echo "$1" | sed -e 's/-any\.pkg\.tar\.xz/\.src\.tar\.gz/' \
+                                         -e 's/-sources-/-/' \
+                                         -e 's/-libwinpthread-git-/-winpthreads-git-/' `
+    else
+        local mingw_url="$1"
+    fi
     local file_md5sum_x86="$2"
     local file_md5sum_x64="$3"
 
@@ -74,7 +91,7 @@ download_tarballs() {
     local package_prefix="mingw-w64"
     local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}-${mingw_arch}"
 
-    download_mingw "${format_url}-crt-git-5.0.0.4745.d2384c2-1-any.pkg.tar.xz"           "03c9e74ce17702b0f13db8cb2c7ca8ca" "035f08a61ced0b81bb6c09974f7be897"
+    download_mingw "${format_url}-crt-git-5.0.0.4795.e3d96cb1-1-any.pkg.tar.xz"          "534bb4756482f3271308576cdadfe5dc" "3780a25a6f20eef9b143f47f4b615e39"
     download_mingw "${format_url}-winpthreads-git-5.0.0.4741.2c8939a-1-any.pkg.tar.xz"   "155845f8c897f0c70adee83cfa9ec30c" "ba417ad9fb7cd3ee56e713b2b070adb9"
     download_mingw "${format_url}-headers-git-5.0.0.4747.0f8f626-1-any.pkg.tar.xz"       "b724d1aaae73c329022ad22374481817" "e8065928b81c9b379286515913eccd68"
     download_mingw "${format_url}-libwinpthread-git-5.0.0.4741.2c8939a-1-any.pkg.tar.xz" "65b18b67eef3c3d5e5707577dfa8f831" "c280f60a4b80ed6722ce4d9b4f6c550e"
@@ -130,6 +147,7 @@ case $1 in
     download)
         download=1
         verify=1
+        sigs=0
         ;;
     fetch)
         download=1
@@ -157,6 +175,7 @@ case $2 in
         download_x86_64
         ;;
     mirror)
+        sigs=1
         download_i386
         download_x86_64
         verify=0
