@@ -1566,6 +1566,7 @@ instance Binary IfaceDecl where
         putByte bh 0
         putIfaceTopBndr bh name
         lazyPut bh (ty, details, idinfo)
+        -- See Note [Lazy deserialization of IfaceId]
 
     put_ bh (IfaceData a1 a2 a3 a4 a5 a6 a7 a8 a9) = do
         putByte bh 2
@@ -1656,6 +1657,7 @@ instance Binary IfaceDecl where
         case h of
             0 -> do name    <- get bh
                     ~(ty, details, idinfo) <- lazyGet bh
+                    -- See Note [Lazy deserialization of IfaceId]
                     return (IfaceId name ty details idinfo)
             1 -> error "Binary.get(TyClDecl): ForeignType"
             2 -> do a1  <- getIfaceTopBndr bh
@@ -1728,6 +1730,31 @@ instance Binary IfaceDecl where
                         ifFDs     = a4,
                         ifBody = IfAbstractClass })
             _ -> panic (unwords ["Unknown IfaceDecl tag:", show h])
+
+{- Note [Lazy deserialization of IfaceId]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The use of lazyPut and lazyGet in the IfaceId Binary instance is
+purely for performance reasons, to avoid deserializing details about
+identifiers that will never be used. It's not involved in tying the
+knot in the type checker. It saved ~1% of the total build time of GHC.
+
+When we read an interface file, we extend the PTE, a mapping of Names
+to TyThings, with the declarations we have read. The extension of the
+PTE is strict in the Names, but not in the TyThings themselves.
+LoadIface.loadDecl calculates the list of (Name, TyThing) bindings to
+add to the PTE. For an IfaceId, there's just one binding to add; and
+the ty, details, and idinfo fields of an IfaceId are used only in the
+TyThing. So by reading those fields lazily we may be able to save the
+work of ever having to deserialize them (into IfaceType, etc.).
+
+For IfaceData and IfaceClass, loadDecl creates extra implicit bindings
+(the constructors and field selectors of the data declaration, or the
+methods of the class), whose Names depend on more than just the Name
+of the type constructor or class itself. So deserializing them lazily
+would be more involved. Similar comments apply to the other
+constructors of IfaceDecl with the additional point that they probably
+represent a small proportion of all declarations.
+-}
 
 instance Binary IfaceFamTyConFlav where
     put_ bh IfaceDataFamilyTyCon              = putByte bh 0
