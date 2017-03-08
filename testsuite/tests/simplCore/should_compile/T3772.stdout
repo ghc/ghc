@@ -1,7 +1,7 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 44, types: 19, coercions: 0, joins: 0/0}
+  = {terms: 43, types: 18, coercions: 0, joins: 0/0}
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T3772.$trModule4 :: GHC.Prim.Addr#
@@ -59,14 +59,14 @@ $wxs
       }
 end Rec }
 
--- RHS size: {terms: 11, types: 3, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 10, types: 2, coercions: 0, joins: 0/0}
 T3772.$wfoo [InlPrag=NOINLINE] :: GHC.Prim.Int# -> ()
 [GblId, Arity=1, Caf=NoCafRefs, Str=<S,U>]
 T3772.$wfoo
   = \ (ww :: GHC.Prim.Int#) ->
-      case GHC.Prim.tagToEnum# @ Bool (GHC.Prim.<# 0# ww) of {
-        False -> GHC.Tuple.();
-        True -> $wxs ww
+      case GHC.Prim.<# 0# ww of {
+        __DEFAULT -> GHC.Tuple.();
+        1# -> $wxs ww
       }
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
