@@ -1642,6 +1642,8 @@ ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
 -- ^ Compares 'AltCon's within a single list of alternatives
+-- DEFAULT comes out smallest, so that sorting by AltCon
+-- puts alternatives in the order required by #case_invariants#
 cmpAltCon DEFAULT      DEFAULT     = EQ
 cmpAltCon DEFAULT      _           = LT
 
