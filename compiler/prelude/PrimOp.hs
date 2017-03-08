@@ -22,7 +22,7 @@ module PrimOp (
         primOpOkForSpeculation, primOpOkForSideEffects,
         primOpIsCheap, primOpFixity,
 
-        getPrimOpResultInfo,  PrimOpResultInfo(..),
+        getPrimOpResultInfo,  isComparisonPrimOp, PrimOpResultInfo(..),
 
         PrimCall(..)
     ) where
@@ -551,6 +551,11 @@ primOpOcc op = case primOpInfo op of
                Monadic   occ _     -> occ
                Compare   occ _     -> occ
                GenPrimOp occ _ _ _ -> occ
+
+isComparisonPrimOp :: PrimOp -> Bool
+isComparisonPrimOp op = case primOpInfo op of
+                          Compare {} -> True
+                          _          -> False
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)

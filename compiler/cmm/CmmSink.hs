@@ -378,6 +378,8 @@ dropAssignments dflags should_drop state assigs
 
 -- -----------------------------------------------------------------------------
 -- Try to inline assignments into a node.
+-- This also does constant folding for primpops, since
+-- inlining opens up opportunities for doing so.
 
 tryToInline
    :: DynFlags
@@ -432,14 +434,39 @@ tryToInline dflags live node assigs = go usages node [] assigs
         occurs_once = not l_live && l_usages == Just 1
         occurs_none = not l_live && l_usages == Nothing
 
-        inl_node = mapExpDeep inline node
-                   -- mapExpDeep is where the inlining actually takes place!
-           where inline (CmmReg    (CmmLocal l'))     | l == l' = rhs
-                 inline (CmmRegOff (CmmLocal l') off) | l == l'
+        inl_node = case mapExpDeep inl_exp node of
+                     -- See Note [Improving conditionals]
+                     CmmCondBranch (CmmMachOp (MO_Ne w) args)
+                                   ti fi l
+                           -> CmmCondBranch (cmmMachOpFold dflags (MO_Eq w) args)
+                                            fi ti l
+                     node' -> node'
+
+        inl_exp :: CmmExpr -> CmmExpr
+        -- inl_exp is where the inlining actually takes place!
+        inl_exp (CmmReg    (CmmLocal l'))     | l == l' = rhs
+        inl_exp (CmmRegOff (CmmLocal l') off) | l == l'
                     = cmmOffset dflags rhs off
                     -- re-constant fold after inlining
-                 inline (CmmMachOp op args) = cmmMachOpFold dflags op args
-                 inline other = other
+        inl_exp (CmmMachOp op args) = cmmMachOpFold dflags op args
+        inl_exp other = other
+
+{- Note [Improving conditionals]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given
+  CmmCondBranch ((a >## b) != 1) t f
+where a,b, are Floats, the constant folder /cannot/ turn it into
+  CmmCondBranch (a <=## b) t f
+because comparison on floats are not invertible
+(see CmmMachOp.maybeInvertComparison).
+
+What we want instead is simply to reverse the true/false branches thus
+  CmmCondBranch ((a >## b) != 1) t f
+-->
+  CmmCondBranch (a >## b) f t
+
+And we do that right here in tryToInline, just as we do cmmMachOpFold.
+-}
 
 -- Note [dependent assignments]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
