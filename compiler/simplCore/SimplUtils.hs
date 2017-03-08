@@ -53,7 +53,7 @@ import Demand
 import SimplMonad
 import Type     hiding( substTy )
 import Coercion hiding( substCo )
-import DataCon          ( dataConWorkId )
+import DataCon          ( dataConWorkId, isNullaryRepDataCon )
 import VarEnv
 import VarSet
 import BasicTypes
@@ -62,7 +62,7 @@ import MonadUtils
 import Outputable
 import Pair
 import PrelRules
-import Literal
+import FastString       ( fsLit )
 
 import Control.Monad    ( when )
 import Data.List        ( sortBy )
@@ -1779,8 +1779,12 @@ prepareAlts scrut case_bndr' alts
 
 mkCase tries these things
 
-1.  Merge Nested Cases
+* Note [Nerge nested cases]
+* Note [Elimiante identity case]
+* Note [Scrutinee constant folding]
 
+Note [Merge Nested Cases]
+~~~~~~~~~~~~~~~~~~~~~~~~~
        case e of b {             ==>   case e of b {
          p1 -> rhs1                      p1 -> rhs1
          ...                             ...
@@ -1792,21 +1796,21 @@ mkCase tries these things
                      _  -> rhsd
        }
 
-    which merges two cases in one case when -- the default alternative of
-    the outer case scrutises the same variable as the outer case. This
-    transformation is called Case Merging.  It avoids that the same
-    variable is scrutinised multiple times.
+which merges two cases in one case when -- the default alternative of
+the outer case scrutises the same variable as the outer case. This
+transformation is called Case Merging.  It avoids that the same
+variable is scrutinised multiple times.
 
-2.  Eliminate Identity Case
-
+Note [Eliminate Identity Case]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         case e of               ===> e
                 True  -> True;
                 False -> False
 
-    and similar friends.
+and similar friends.
 
-3.  Scrutinee Constant Folding
-
+Note [Scrutinee Constant Folding]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
      case x op# k# of _ {  ===> case x of _ {
         a1# -> e1                  (a1# inv_op# k#) -> e1
         a2# -> e2                  (a2# inv_op# k#) -> e2
@@ -1815,32 +1819,66 @@ mkCase tries these things
 
      where (x op# k#) inv_op# k# == x
 
-    And similarly for commuted arguments and for some unary operations.
+And similarly for commuted arguments and for some unary operations.
 
-    The purpose of this transformation is not only to avoid an arithmetic
-    operation at runtime but to allow other transformations to apply in cascade.
+The purpose of this transformation is not only to avoid an arithmetic
+operation at runtime but to allow other transformations to apply in cascade.
 
-    Example with the "Merge Nested Cases" optimization (from #12877):
+Example with the "Merge Nested Cases" optimization (from #12877):
 
-          main = case t of t0
-             0##     -> ...
-             DEFAULT -> case t0 `minusWord#` 1## of t1
-                0##    -> ...
-                DEFAUT -> case t1 `minusWord#` 1## of t2
-                   0##     -> ...
-                   DEFAULT -> case t2 `minusWord#` 1## of _
-                      0##     -> ...
-                      DEFAULT -> ...
+      main = case t of t0
+         0##     -> ...
+         DEFAULT -> case t0 `minusWord#` 1## of t1
+            0##    -> ...
+            DEFAUT -> case t1 `minusWord#` 1## of t2
+               0##     -> ...
+               DEFAULT -> case t2 `minusWord#` 1## of _
+                  0##     -> ...
+                  DEFAULT -> ...
 
-      becomes:
+  becomes:
 
-          main = case t of _
-          0##     -> ...
-          1##     -> ...
-          2##     -> ...
-          3##     -> ...
-          DEFAULT -> ...
+      main = case t of _
+      0##     -> ...
+      1##     -> ...
+      2##     -> ...
+      3##     -> ...
+      DEFAULT -> ...
 
+There are some wrinkles
+
+* Do not apply caseRules if there is just a single DEFAULT alternative
+     case e +# 3# of b { DEFAULT -> rhs }
+  If we applied the transformation here we would (stupidly) get
+     case a of b' { DEFAULT -> let b = e +# 3# in rhs }
+  and now the process may repeat, because that let will really
+  be a case.
+
+* The type of the scrutinee might change.  E.g.
+        case tagToEnum (x :: Int#) of (b::Bool)
+          False -> e1
+          True -> e2
+  ==>
+        case x of (b'::Int#)
+          DEFAULT -> e1
+          1#      -> e2
+
+* The case binder may be used in the right hand sides, so we need
+  to make a local binding for it, if it is alive.  e.g.
+         case e +# 10# of b
+           DEFAULT -> blah...b...
+           44#     -> blah2...b...
+  ===>
+         case e of b'
+           DEFAULT -> let b = b' +# 10# in blah...b...
+           34#     -> let b = 44# in blah2...b...
+
+  Note that in the non-DEFAULT cases we know what to bind 'b' to,
+  whereas in the DEFAULT case we must reconstruct the original value.
+  But NB: we use b'; we do not duplicate 'e'.
+
+* In dataToTag we might need to make up some fake binders;
+  see Note [caseRules for dataToTag] in PrelRules
 -}
 
 mkCase, mkCase1, mkCase2, mkCase3
@@ -1941,9 +1979,18 @@ mkCase1 dflags scrut bndr alts_ty alts = mkCase2 dflags scrut bndr alts_ty alts
 --------------------------------------------------
 
 mkCase2 dflags scrut bndr alts_ty alts
-  | gopt Opt_CaseFolding dflags
-  , Just (scrut',f) <- caseRules dflags scrut
-  = mkCase3 dflags scrut' bndr alts_ty (new_alts f)
+  | -- See Note [Scrutinee Constant Folding]
+    case alts of  -- Not if there is just a DEFAULT alterantive
+      [(DEFAULT,_,_)] -> False
+      _               -> True
+  , gopt Opt_CaseFolding dflags
+  , Just (scrut', tx_con, mk_orig) <- caseRules dflags scrut
+  = do { bndr' <- newId (fsLit "lwild") (exprType scrut')
+       ; alts' <- mapM  (tx_alt tx_con mk_orig bndr') alts
+       ; mkCase3 dflags scrut' bndr' alts_ty $
+         add_default (re_sort alts')
+       }
+
   | otherwise
   = mkCase3 dflags scrut bndr alts_ty alts
   where
@@ -1959,19 +2006,41 @@ mkCase2 dflags scrut bndr alts_ty alts
     --                                      10      -> let y = 20      in e1
     --                                      DEFAULT -> let y = y' + 10 in e2
     --
-    wrap_rhs l rhs
-      | isDeadBinder bndr = rhs
-      | otherwise         = Let (NonRec bndr l) rhs
+    -- This wrapping is done in tx_alt; we use mk_orig, returned by caseRules,
+    -- to construct an expression equivalent to the original one, for use
+    -- in the DEFAULT case
 
-    -- We need to re-sort the alternatives to preserve the #case_invariants#
-    new_alts f = sortBy cmpAlt (map (mapAlt f) alts)
+    tx_alt tx_con mk_orig new_bndr (con, bs, rhs)
+      | DataAlt dc <- con', not (isNullaryRepDataCon dc)
+      = -- For non-nullary data cons we must invent some fake binders
+        -- See Note [caseRules for dataToTag] in PrelRules
+        do { us <- getUniquesM
+           ; let (ex_tvs, arg_ids) = dataConRepInstPat us dc
+                                         (tyConAppArgs (idType new_bndr))
+           ; return (con', ex_tvs ++ arg_ids, rhs') }
+      | otherwise
+      = return (con', [], rhs')
+      where
+        con' = tx_con con
 
-    mapAlt f alt@(c,bs,e) = case c of
-      DEFAULT          -> (c, bs, wrap_rhs scrut e)
-      LitAlt l
-        | isLitValue l -> (LitAlt (mapLitValue dflags f l),
-                           bs, wrap_rhs (Lit l) e)
-      _ -> pprPanic "Unexpected alternative (mkCase2)" (ppr alt)
+        rhs' | isDeadBinder bndr = rhs
+             | otherwise         = bindNonRec bndr orig_val rhs
+
+        orig_val = case con of
+                      DEFAULT    -> mk_orig new_bndr
+                      LitAlt l   -> Lit l
+                      DataAlt dc -> mkConApp2 dc (tyConAppArgs (idType bndr)) bs
+
+
+    re_sort :: [CoreAlt] -> [CoreAlt]  -- Re-sort the alternatives to
+    re_sort alts = sortBy cmpAlt alts  -- preserve the #case_invariants#
+
+    add_default :: [CoreAlt] -> [CoreAlt]
+    -- TagToEnum may change a boolean True/False set of alternatives
+    -- to LitAlt 0#/1# alterantives.  But literal alternatives always
+    -- have a DEFAULT (I think).  So add it.
+    add_default ((LitAlt {}, bs, rhs) : alts) = (DEFAULT, bs, rhs) : alts
+    add_default alts                          = alts
 
 --------------------------------------------------
 --      Catch-all
