@@ -1972,7 +1972,7 @@ section "Exceptions"
 -- The outer case just decides whether to mask exceptions, but we don't want
 -- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
 --
--- For catch, we must be extra careful; see
+-- For catch, catchSTM, and catchRetry, we must be extra careful; see
 -- Note [Exceptions and strictness] in Demand
 
 primop  CatchOp "catch#" GenPrimOp
@@ -2010,6 +2010,13 @@ primop  RaiseOp "raise#" GenPrimOp
 --     f x y | x>0       = raiseIO blah
 --           | y>0       = return 1
 --           | otherwise = return 2
+--
+-- TODO Check that the above notes on @f@ are valid. The function successfully
+-- produces an IO exception when compiled without optimization. If we analyze
+-- it as strict in @y@, won't we change that behavior under optimization?
+-- I thought the rule was that it was okay to replace one valid imprecise
+-- exception with another, but not to replace a precise exception with
+-- an imprecise one (dfeuer, 2017-03-05).
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
@@ -2099,7 +2106,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd ] topRes }
                  -- See Note [Strictness for mask/unmask/catch]

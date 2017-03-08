@@ -124,10 +124,11 @@ mkJointDmds ss as = zipWithEqual "mkJointDmds" mkJointDmd ss as
 
 Note [Exceptions and strictness]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Exceptions need rather careful treatment, especially because of 'catch'.
-See Trac #10712.
+Exceptions need rather careful treatment, especially because of 'catch'
+('catch#'), 'catchSTM' ('catchSTM#'), and 'orElse' ('catchRetry#').
+See Trac #11555, #10712 and #13330, and for some more background, #11222.
 
-There are two main pieces.
+There are three main pieces.
 
 * The Termination type includes ThrowsExn, meaning "under the given
   demand this expression either diverges or throws an exception".
@@ -139,31 +140,77 @@ There are two main pieces.
   result of the argument.  If the ExnStr flag is ExnStr, we squash
   ThrowsExn to topRes.  (This is done in postProcessDmdResult.)
 
-Here is the kay example
+Here is the key example
 
-    catch# (\s -> throwIO exn s) blah
+    catchRetry# (\s -> retry# s) blah
 
-We analyse the argument (\s -> raiseIO# exn s) with demand
+We analyse the argument (\s -> retry# s) with demand
     Str ExnStr (SCall HeadStr)
 i.e. with the ExnStr flag set.
   - First we analyse the argument with the "clean-demand" (SCall
     HeadStr), getting a DmdResult of ThrowsExn from the saturated
-    application of raiseIO#.
+    application of retry#.
   - Then we apply the post-processing for the shell, squashing the
     ThrowsExn to topRes.
 
 This also applies uniformly to free variables.  Consider
 
-    let r = \st -> raiseIO# blah st
-    in catch# (\s -> ...(r s')..) handler st
+    let r = \st -> retry# st
+    in catchRetry# (\s -> ...(r s')..) handler st
 
-If we give the first argument of catch a strict signature, we'll get
-a demand 'C(S)' for 'r'; that is, 'r' is definitely called with one
-argument, which indeed it is.  But when we post-process the free-var
-demands on catch#'s argument (in postProcessDmdEnv), we'll give 'r'
-a demand of (Str ExnStr (SCall HeadStr)); and if we feed that into r's
-RHS (which would be reasonable) we'll squash the exception just as if
-we'd inlined 'r'.
+If we give the first argument of catch a strict signature, we'll get a demand
+'C(S)' for 'r'; that is, 'r' is definitely called with one argument, which
+indeed it is.  But when we post-process the free-var demands on catchRetry#'s
+argument (in postProcessDmdEnv), we'll give 'r' a demand of (Str ExnStr (SCall
+HeadStr)); and if we feed that into r's RHS (which would be reasonable) we'll
+squash the retry just as if we'd inlined 'r'.
+
+* We don't try to get clever about 'catch#' and 'catchSTM#' at the moment. We
+previously (#11222) tried to take advantage of the fact that 'catch#' calls its
+first argument eagerly. See especially commit
+9915b6564403a6d17651e9969e9ea5d7d7e78e7f. We analyzed that first argument with
+a strict demand, and then performed a post-processing step at the end to change
+ThrowsExn to TopRes.  The trouble, I believe, is that to use this approach
+correctly, we'd need somewhat different information about that argument.
+Diverges, ThrowsExn (i.e., diverges or throws an exception), and Dunno are the
+wrong split here.  In order to evaluate part of the argument speculatively,
+we'd need to know that it *does not throw an exception*. That is, that it
+either diverges or succeeds. But we don't currently have a way to talk about
+that. Abstractly and approximately,
+
+catch# m f s = case ORACLE m s of
+  DivergesOrSucceeds -> m s
+  Fails exc -> f exc s
+
+where the magical ORACLE determines whether or not (m s) throws an exception
+when run, and if so which one. If we want, we can safely consider (catch# m f s)
+strict in anything that both branches are strict in (by performing demand
+analysis for 'catch#' in the same way we do for case). We could also safely
+consider it strict in anything demanded by (m s) that is guaranteed not to
+throw an exception under that demand, but I don't know if we have the means
+to express that.
+
+My mind keeps turning to this model (not as an actual change to the type, but
+as a way to think about what's going on in the analysis):
+
+newtype IO a = IO {unIO :: State# s -> (# s, (# SomeException | a #) #)}
+instance Monad IO where
+  return a = IO $ \s -> (# s, (# | a #) #)
+  IO m >>= f = IO $ \s -> case m s of
+    (# s', (# e | #) #) -> (# s', e #)
+    (# s', (# | a #) #) -> unIO (f a) s
+raiseIO# e s = (# s, (# e | #) #)
+catch# m f s = case m s of
+  (# s', (# e | #) #) -> f e s'
+  res -> res
+
+Thinking about it this way seems likely to be productive for analyzing IO
+exception behavior, but imprecise exceptions and asynchronous exceptions remain
+quite slippery beasts. Can we incorporate them? I think we can. We can imagine
+applying 'seq#' to evaluate @m s@, determining whether it throws an imprecise
+or asynchronous exception or whether it succeeds or throws an IO exception.
+This confines the peculiarities to 'seq#', which is indeed rather essentially
+peculiar.
 -}
 
 -- Vanilla strictness domain
