@@ -506,13 +506,20 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        ; binder_ty <- applySubstTy (idType binder)
        ; ensureEqTys binder_ty ty (mkRhsMsg binder (text "RHS") ty)
 
+       -- Check that it's not levity-polymorphic
+       -- Do this first, because otherwise isUnliftedType panics
+       -- Annoyingly, this duplicates the test in lintIdBdr,
+       -- because for non-rec lets we call lintSingleBinding first
+       ; checkL (isJoinId binder || not (isTypeLevPoly binder_ty))
+                (badBndrTyMsg binder (text "levity-polymorphic"))
+
         -- Check the let/app invariant
         -- See Note [CoreSyn let/app invariant] in CoreSyn
-       ; checkL (not (isUnliftedType binder_ty)
-            || isJoinId binder
-            || (isNonRec rec_flag && exprOkForSpeculation rhs)
-            || exprIsLiteralString rhs)
-           (mkRhsPrimMsg binder rhs)
+       ; checkL ( isJoinId binder
+               || not (isUnliftedType binder_ty)
+               || (isNonRec rec_flag && exprOkForSpeculation rhs)
+               || exprIsLiteralString rhs)
+           (badBndrTyMsg binder (text "unlifted"))
 
         -- Check that if the binder is top-level or recursive, it's not
         -- demanded. Primitive string literals are exempt as there is no
@@ -1208,7 +1215,7 @@ lintIdBndr top_lvl bind_site id linterF
 
        ; (ty, k) <- lintInTy (idType id)
           -- See Note [Levity polymorphism invariants] in CoreSyn
-       ; lintL (not (isKindLevPoly k))
+       ; lintL (isJoinId id || not (isKindLevPoly k))
            (text "Levity-polymorphic binder:" <+>
                  (ppr id <+> dcolon <+> parens (ppr ty <+> dcolon <+> ppr k)))
 
@@ -2263,12 +2270,10 @@ mkLetAppMsg e
   = hang (text "This argument does not satisfy the let/app invariant:")
        2 (ppr e)
 
-mkRhsPrimMsg :: Id -> CoreExpr -> MsgDoc
-mkRhsPrimMsg binder _rhs
-  = vcat [hsep [text "The type of this binder is primitive:",
-                     ppr binder],
-              hsep [text "Binder's type:", ppr (idType binder)]
-             ]
+badBndrTyMsg :: Id -> SDoc -> MsgDoc
+badBndrTyMsg binder what
+  = vcat [ text "The type of this binder is" <+> what <> colon <+> ppr binder
+         , text "Binder's type:" <+> ppr (idType binder) ]
 
 mkStrictMsg :: Id -> MsgDoc
 mkStrictMsg binder

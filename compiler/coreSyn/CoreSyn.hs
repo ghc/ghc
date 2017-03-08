@@ -444,7 +444,10 @@ Note [Levity polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The levity-polymorphism invariants are these:
 
-* The type of a term-binder must not be levity-polymorphic
+* The type of a term-binder must not be levity-polymorphic,
+  unless it is a let(rec)-bound join point
+     (see Note [Invariants on join points])
+
 * The type of the argument of an App must not be levity-polymorphic.
 
 A type (t::TYPE r) is "levity polymorphic" if 'r' has any free variables.
@@ -570,11 +573,24 @@ Join points must follow these invariants:
   1. All occurrences must be tail calls. Each of these tail calls must pass the
      same number of arguments, counting both types and values; we call this the
      "join arity" (to distinguish from regular arity, which only counts values).
+
   2. For join arity n, the right-hand side must begin with at least n lambdas.
+
   3. If the binding is recursive, then all other bindings in the recursive group
      must also be join points.
+
   4. The binding's type must not be polymorphic in its return type (as defined
      in Note [The polymorphism rule of join points]).
+
+However, join points have simpler invariants in other ways
+
+  5. A join point can have an unboxed type without the RHS being
+     ok-for-speculation (i.e. drop the let/app invariant)
+     e.g.  let j :: Int# = factorial x in ...
+
+  6. A join point can have a levity-polymorphic RHS
+     e.g.  let j :: r :: TYPE l = fail void# in ...
+     This happened in an intermediate program Trac #13394
 
 Examples:
 
