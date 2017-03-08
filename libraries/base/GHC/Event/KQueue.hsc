@@ -28,6 +28,7 @@ available = False
 
 import Data.Bits (Bits(..), FiniteBits(..))
 import Data.Word (Word16, Word32)
+import Data.Int  (Int16)
 import Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
                         eNOTSUP, getErrno, throwErrno)
 import Foreign.C.Types
