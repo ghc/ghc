@@ -16,6 +16,7 @@ module Documentation.Haddock (
   -- * Interface
   Interface(..),
   InstalledInterface(..),
+  toInstalledIface,
   createInterfaces,
   processModules,
 
