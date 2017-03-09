@@ -109,7 +109,7 @@ import Control.Exception.Base as Exception
 
 import GHC.Conc hiding (threadWaitRead, threadWaitWrite,
                         threadWaitReadSTM, threadWaitWriteSTM)
-import GHC.IO           ( unsafeUnmask, catchException )
+import GHC.IO           ( unsafeUnmask, catch )
 import GHC.IORef        ( newIORef, readIORef, writeIORef )
 import GHC.Base
 
@@ -381,7 +381,7 @@ runInUnboundThread action = do
       mv <- newEmptyMVar
       mask $ \restore -> do
         tid <- forkIO $ Exception.try (restore action) >>= putMVar mv
-        let wait = takeMVar mv `catchException` \(e :: SomeException) ->
+        let wait = takeMVar mv `catch` \(e :: SomeException) ->
                      Exception.throwTo tid e >> wait
         wait >>= unsafeResult
     else action

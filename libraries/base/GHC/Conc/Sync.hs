@@ -280,8 +280,6 @@ forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s ->
    case (fork# action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
-  -- We must use 'catch' rather than 'catchException' because the action
-  -- could be bottom. #13330
   action_plus = catch action childHandler
 
 -- | Like 'forkIO', but the child thread is passed a function that can
@@ -330,8 +328,6 @@ forkOn :: Int -> IO () -> IO ThreadId
 forkOn (I# cpu) action = IO $ \ s ->
    case (forkOn# cpu action_plus s) of (# s1, tid #) -> (# s1, ThreadId tid #)
  where
-  -- We must use 'catch' rather than 'catchException' because the action
-  -- could be bottom. #13330
   action_plus = catch action childHandler
 
 -- | Like 'forkIOWithUnmask', but the child thread is pinned to the
@@ -401,10 +397,6 @@ foreign import ccall "&enabled_capabilities" enabled_capabilities :: Ptr CInt
 
 childHandler :: SomeException -> IO ()
 childHandler err = catch (real_handler err) childHandler
-  -- We must use catch here rather than catchException. If the
-  -- raised exception throws an (imprecise) exception, then real_handler err
-  -- will do so as well. If we use catchException here, then we could miss
-  -- that exception.
 
 real_handler :: SomeException -> IO ()
 real_handler se

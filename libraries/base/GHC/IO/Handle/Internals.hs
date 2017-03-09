@@ -157,13 +157,12 @@ withHandle__' fun h m act =
    h'  <- do_operation fun h act m
    checkHandleInvariants h'
    putMVar m h'
-   return ()
 
 do_operation :: String -> Handle -> (Handle__ -> IO a) -> MVar Handle__ -> IO a
 do_operation fun h act m = do
   h_ <- takeMVar m
   checkHandleInvariants h_
-  act h_ `catchException` handler h_
+  act h_ `catch` handler h_
   where
     handler h_ e = do
       putMVar m h_
@@ -748,7 +747,7 @@ hClose_help handle_ =
 
 
 trymaybe :: IO () -> IO (Maybe SomeException)
-trymaybe io = (do io; return Nothing) `catchException` \e -> return (Just e)
+trymaybe io = (do io; return Nothing) `catch` \e -> return (Just e)
 
 hClose_handle_ :: Handle__ -> IO (Handle__, Maybe SomeException)
 hClose_handle_ h_@Handle__{..} = do

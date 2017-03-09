@@ -154,14 +154,14 @@ runIOFastExit main = catch main topHandlerFastExit
 -- are used to export Haskell functions with non-IO types.
 --
 runNonIO :: a -> IO a
-runNonIO a = catch (a `seq` return a) topHandler
+runNonIO a = catch (evaluate a) topHandler
 
 topHandler :: SomeException -> IO a
 topHandler err = catch (real_handler safeExit err) topHandler
 
 topHandlerFastExit :: SomeException -> IO a
 topHandlerFastExit err =
-  catchException (real_handler fastExit err) topHandlerFastExit
+  catch (real_handler fastExit err) topHandlerFastExit
 
 -- Make sure we handle errors while reporting the error!
 -- (e.g. evaluating the string passed to 'error' might generate

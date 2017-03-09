@@ -138,7 +138,7 @@ addFilePathToIOError fun fp ioe
 -- be using 'openBinaryFile'.
 openFile :: FilePath -> IOMode -> IO Handle
 openFile fp im = 
-  catchException
+  catch
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE True)
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
@@ -150,7 +150,7 @@ openFile fp im =
 -- @since 4.4.0.0
 openFileBlocking :: FilePath -> IOMode -> IO Handle
 openFileBlocking fp im =
-  catchException
+  catch
     (openFile' fp im dEFAULT_OPEN_IN_BINARY_MODE False)
     (\e -> ioError (addFilePathToIOError "openFile" fp e))
 
@@ -165,7 +165,7 @@ openFileBlocking fp im =
 
 openBinaryFile :: FilePath -> IOMode -> IO Handle
 openBinaryFile fp m =
-  catchException
+  catch
     (openFile' fp m True True)
     (\e -> ioError (addFilePathToIOError "openBinaryFile" fp e))
 

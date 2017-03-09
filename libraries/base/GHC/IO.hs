@@ -128,12 +128,8 @@ have to work around that in the definition of catch below).
 -}
 
 -- | Catch an exception in the 'IO' monad.
---
--- Note that this function is /strict/ in the action. That is,
--- @catchException undefined b == _|_@. See #exceptions_and_strictness#
--- for details.
 catchException :: Exception e => IO a -> (e -> IO a) -> IO a
-catchException !io handler = catch io handler
+catchException io handler = catch io handler
 
 -- | This is the simplest of the exception-catching functions.  It
 -- takes a single argument, runs it, and if an exception is raised
@@ -180,19 +176,12 @@ catch (IO io) handler = IO $ catch# io handler'
 
 
 -- | Catch any 'Exception' type in the 'IO' monad.
---
--- Note that this function is /strict/ in the action. That is,
--- @catchAny undefined b == _|_@. See #exceptions_and_strictness# for
--- details.
 catchAny :: IO a -> (forall e . Exception e => e -> IO a) -> IO a
-catchAny !(IO io) handler = IO $ catch# io handler'
+catchAny (IO io) handler = IO $ catch# io handler'
     where handler' (SomeException e) = unIO (handler e)
 
--- Using catchException here means that if `m` throws an
--- 'IOError' /as an imprecise exception/, we will not catch
--- it. No one should really be doing that anyway.
 mplusIO :: IO a -> IO a -> IO a
-mplusIO m n = m `catchException` \ (_ :: IOError) -> n
+mplusIO m n = m `catch` \ (_ :: IOError) -> n
 
 -- | A variant of 'throw' that can only be used within the 'IO' monad.
 --
@@ -282,8 +271,8 @@ getMaskingState  = IO $ \s ->
                              _  -> MaskedInterruptible #)
 
 onException :: IO a -> IO b -> IO a
-onException io what = io `catchException` \e -> do _ <- what
-                                                   throwIO (e :: SomeException)
+onException io what = io `catch` \e -> do _ <- what
+                                          throwIO (e :: SomeException)
 
 -- | Executes an IO computation with asynchronous
 -- exceptions /masked/.  That is, any thread which attempts to raise
@@ -437,12 +426,4 @@ examples:
 > test2 = GHC.IO.catchException (error "uh oh") (\(_ :: SomeException) -> putStrLn "it failed")
 
 While @test1@ will print "it failed", @test2@ will print "uh oh".
-
-When using 'catchException', exceptions thrown while evaluating the
-action-to-be-executed will not be caught; only exceptions thrown during
-execution of the action will be handled by the exception handler.
-
-Since this strictness is a small optimization and may lead to surprising
-results, all of the @catch@ and @handle@ variants offered by "Control.Exception"
-use 'catch' rather than 'catchException'.
 -}
