@@ -964,10 +964,12 @@ mapFB c f = \x ys -> c (f x) ys
 -- (along with build's unfolding) else we'd get an infinite loop
 -- in the rules.  Hence the activation control below.
 --
--- The "mapFB" rule optimises compositions of map.
---
 -- This same pattern is followed by many other functions:
 -- e.g. append, filter, iterate, repeat, etc.
+--
+-- The "mapFB" rule optimises compositions of map and
+-- the "mapFB/id" rule get rids of 'map id' calls.
+-- (Any similarity to the Functor laws for [] is expected.)
 
 {-# RULES
 "map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
