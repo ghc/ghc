@@ -784,7 +784,7 @@ package `text` we find
   packConstr :: Constr
   packConstr = mkConstr textDataType "pack" [] Prefix
 
-Here `packConstr` isn't a real data constructor, it's an ordiary
+Here `packConstr` isn't a real data constructor, it's an ordinary
 function.  Two complications
 
 * In such a case, we must take care to build the Name using

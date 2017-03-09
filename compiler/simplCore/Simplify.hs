@@ -1814,7 +1814,7 @@ tryRules env rules fn args call_cont
                               -- many args the rule consumed
 
                       occ_anald_rhs = occurAnalyseExpr rule_rhs
-                          -- See Note [Occurence-analyse after rule firing]
+                          -- See Note [Occurrence-analyse after rule firing]
                 ; dump dflags rule rule_rhs
                 ; return (Just (occ_anald_rhs, cont')) }}}
   where
@@ -1847,7 +1847,7 @@ tryRules env rules fn args call_cont
       = liftIO . dumpSDoc dflags alwaysQualify flag "" $
                    sep [text hdr, nest 4 details]
 
-{- Note [Occurence-analyse after rule firing]
+{- Note [Occurrence-analyse after rule firing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 After firing a rule, we occurrence-analyse the instantiated RHS before
 simplifying it.  Usually this doesn't make much difference, but it can

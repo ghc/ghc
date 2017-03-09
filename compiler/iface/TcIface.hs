@@ -255,7 +255,7 @@ mergeIfaceDecl d1 d2
 --
 -- A module that defines T as representational in both arguments
 -- would successfully fill both signatures, so it would be better
--- if if we merged the roles of these types in some nontrivial
+-- if we merged the roles of these types in some nontrivial
 -- way.
 --
 -- However, we have to be very careful about how we go about

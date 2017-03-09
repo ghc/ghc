@@ -125,7 +125,7 @@ There are many wrinkles:
   reduce the number of bindings we need to produce, we generate their KindReps
   once in GHC.Types. These are referred to as "built-in" KindReps below.
 
-* Even though KindReps aren't inlined this scheme still has more of an effect on
+* Even though KindReps aren't inlined, this scheme still has more of an effect on
   compilation time than I'd like. This is especially true in the case of
   families of type constructors (e.g. tuples and unboxed sums). The problem is
   particularly bad in the case of sums, since each arity-N tycon brings with it

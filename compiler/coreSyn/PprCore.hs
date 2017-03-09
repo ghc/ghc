@@ -338,7 +338,7 @@ Furthermore, a dead case-binder is completely ignored, while otherwise, dead
 binders are printed as "_".
 -}
 
--- THese instances are sadly orphans
+-- These instances are sadly orphans
 
 instance OutputableBndr Var where
   pprBndr = pprCoreBinder
