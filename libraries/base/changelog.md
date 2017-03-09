@@ -79,7 +79,7 @@
 
   * `mkFunTy`, `mkAppTy`, and `mkTyConApp` from `Data.Typeable` no longer exist.
     This functionality is superceded by the interfaces provided by
-    `Data.Reflection`.
+    `Type.Reflection`.
 
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is
     replaced by `Type.Reflection.Unsafe.mkTyCon`.
