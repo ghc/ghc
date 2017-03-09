@@ -55,8 +55,8 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
-      ghc-boot == 8.1,
-      ghc == 8.1,
+      ghc-boot == 8.3,
+      ghc == 8.3,
       bytestring,
       transformers
 
