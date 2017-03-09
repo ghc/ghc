@@ -446,7 +446,13 @@ fi
 # all be taken care of for us if we configured the subprojects using
 # AC_CONFIG_DIR, but unfortunately Cabal needs to be the one to do the
 # configuration.
-TargetPlatformFull="${target_alias}"
+if test -z "${target_alias}"
+then
+  # --target wasn't given; use result from AC_CANONICAL_TARGET
+  TargetPlatformFull="${target}"
+else
+  TargetPlatformFull="${target_alias}"
+fi
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)
