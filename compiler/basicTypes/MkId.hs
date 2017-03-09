@@ -657,6 +657,18 @@ the interface file.
 The HsImplBangs passed are in 1-1 correspondence with the
 dataConOrigArgTys of the DataCon.
 
+Note [Data con wrappers and unlifted types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   data T = MkT !Int#
+
+We certainly do not want to make a wrapper
+   $WMkT x = case x of y { DEFAULT -> MkT y }
+
+For a start, it's still to generate a no-op.  But worse, since wrappers
+are currently injected at TidyCore, we don't even optimise it away!
+So the stupid case expression stays there.  This actually happened for
+the Integer data type (see Trac #1600 comment:66)!
 -}
 
 -------------------------
@@ -673,7 +685,7 @@ dataConSrcToImplBang
    -> HsImplBang
 
 dataConSrcToImplBang dflags fam_envs arg_ty
-              (HsSrcBang ann unpk NoSrcStrict)
+                     (HsSrcBang ann unpk NoSrcStrict)
   | xopt LangExt.StrictData dflags -- StrictData => strict field
   = dataConSrcToImplBang dflags fam_envs arg_ty
                   (HsSrcBang ann unpk SrcStrict)
@@ -684,7 +696,11 @@ dataConSrcToImplBang _ _ _ (HsSrcBang _ _ SrcLazy)
   = HsLazy
 
 dataConSrcToImplBang dflags fam_envs arg_ty
-    (HsSrcBang _ unpk_prag SrcStrict)
+                     (HsSrcBang _ unpk_prag SrcStrict)
+  | isUnliftedType arg_ty
+  = HsLazy  -- For !Int#, say, use HsLazy
+            -- See Note [Data con wrappers and unlifted types]
+
   | not (gopt Opt_OmitInterfacePragmas dflags) -- Don't unpack if -fomit-iface-pragmas
           -- Don't unpack if we aren't optimising; rather arbitrarily,
           -- we use -fomit-iface-pragmas as the indication
