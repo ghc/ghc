@@ -50,7 +50,7 @@ Library
 
     build-depends:
         base        >= 4.8 && < 4.11,
-        ghc-boot-th == 8.1,
+        ghc-boot-th == 8.2.*,
         pretty      == 1.1.*
 
     -- We need to set the unit ID to template-haskell (without a
