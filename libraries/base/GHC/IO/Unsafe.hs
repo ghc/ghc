@@ -130,14 +130,11 @@ unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
 -- a readMVar, but it seems wrong for unsafeInterleaveIO to sometimes
 -- share and sometimes not (plus it probably breaks the noDuplicate).
 -- So now, we do not inline unsafeDupableInterleaveIO.
-
-{-# NOINLINE unsafeDupableInterleaveIO #-}
+{-# INLINE unsafeDupableInterleaveIO #-}
 unsafeDupableInterleaveIO :: IO a -> IO a
 unsafeDupableInterleaveIO (IO m)
-  = IO ( \ s -> let
-                   r = case m s of (# _, res #) -> res
-                in
-                (# s, r #))
+  = IO ( \ s ->
+       (# s, runRW# (\s2 -> case m s2 of (# _, res #) -> res) #))
 
 {-|
 Ensures that the suspensions under evaluation by the current thread
