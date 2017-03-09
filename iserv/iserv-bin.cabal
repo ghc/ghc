@@ -24,7 +24,7 @@ Executable iserv
                    bytestring >= 0.10 && < 0.11,
                    containers >= 0.5 && < 0.6,
                    deepseq    >= 1.4 && < 1.5,
-                   ghci       == 8.3
+                   ghci       == 8.1
 
     if os(windows)
         Cpp-Options: -DWINDOWS
