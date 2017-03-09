@@ -65,13 +65,15 @@ module Data.Typeable
 
       -- * Type representations
     , TypeRep
-    , typeRepTyCon
     , rnfTypeRep
     , showsTypeRep
     , mkFunTy
 
       -- * Observing type representations
     , funResultTy
+    , splitTyConApp
+    , typeRepArgs
+    , typeRepTyCon
     , I.typeRepFingerprint
 
       -- * Type constructors
@@ -81,6 +83,7 @@ module Data.Typeable
     , I.tyConModule
     , I.tyConName
     , I.rnfTyCon
+    , I.tyConFingerprint
 
       -- * For backwards compatibility
     , typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7
@@ -149,10 +152,6 @@ gcast2 :: forall c t t' a b. (Typeable t, Typeable t')
        => c (t a b) -> Maybe (c (t' a b))
 gcast2 x = fmap (\Refl -> x) (eqT :: Maybe (t :~: t'))
 
--- | Observe the type constructor of a quantified type representation.
-typeRepTyCon :: TypeRep -> TyCon
-typeRepTyCon = I.typeRepXTyCon
-
 -- | Applies a type to a function type. Returns: @Just u@ if the first argument
 -- represents a function of type @t -> u@ and the second argument represents a
 -- function of type @t@. Otherwise, returns @Nothing@.
@@ -173,9 +172,20 @@ mkFunTy (I.SomeTypeRep arg) (I.SomeTypeRep res)
   | otherwise
   = error $ "mkFunTy: Attempted to construct function type from non-lifted "++
             "type: arg="++show arg++", res="++show res
-  where liftedTy = I.typeRep :: I.TypeRep *
-  -- TODO: We should be able to support this but the kind of (->) must be
-  -- generalized
+  where liftedTy = I.typeRep :: I.TypeRep Type
+
+-- | Splits a type constructor application. Note that if the type constructor is
+-- polymorphic, this will not return the kinds that were used.
+splitTyConApp :: TypeRep -> (TyCon, [TypeRep])
+splitTyConApp (I.SomeTypeRep x) = I.splitApps x
+
+-- | Observe the argument types of a type representation
+typeRepArgs :: TypeRep -> [TypeRep]
+typeRepArgs ty = case splitTyConApp ty of (_, args) -> args
+
+-- | Observe the type constructor of a quantified type representation.
+typeRepTyCon :: TypeRep -> TyCon
+typeRepTyCon = I.typeRepXTyCon
 
 -- | Force a 'TypeRep' to normal form.
 rnfTypeRep :: TypeRep -> ()

@@ -45,6 +45,7 @@ module Type.Reflection
     , I.rnfTypeRep
     , I.eqTypeRep
     , I.typeRepKind
+    , I.splitApps
 
       -- ** Quantified
       --
@@ -61,6 +62,7 @@ module Type.Reflection
     , I.tyConModule
     , I.tyConName
     , I.rnfTyCon
+    , I.tyConFingerprint
 
       -- * Module names
     , I.Module
