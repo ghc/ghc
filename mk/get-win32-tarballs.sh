@@ -34,10 +34,11 @@ download_file() {
         fi
     fi
 
-    if test "$sigs" = "1"
+    local sig_file="${dest_file}.sig"
+    if test "$sigs" = "1" -a ! -f "$sig_file"
     then
         echo "Downloading ${description} (signature) to ${dest_dir}..."
-        local curl_cmd="curl -L ${file_url}.sig -o ${dest_file}.sig --create-dirs -# ${extra_curl_opts}"
+        local curl_cmd="curl -L ${file_url}.sig -o ${sig_file} --create-dirs -# ${extra_curl_opts}"
         $curl_cmd || {
                 rm -f "${dest_file}.sig"
                 fail "ERROR: Download failed."
@@ -46,7 +47,7 @@ download_file() {
 
     if test "$verify" = "1"
     then
-        grep "${dest_file}" mk/win32-tarballs.md5sum | md5sum --quiet -c - ||
+        grep "${dest_file}$" mk/win32-tarballs.md5sum | md5sum --quiet -c - ||
             fail "ERROR: ${description} appears to be corrupted, please delete it and try again."
     fi
 }
@@ -74,8 +75,8 @@ download_mingw() {
 }
 
 download_tarballs() {
-    local mingw_base_url="http://repo.msys2.org/mingw"
-    #local mingw_base_url="https://downloads.haskell.org/~ghc/mingw"
+    #local mingw_base_url="http://repo.msys2.org/mingw"
+    local mingw_base_url="https://downloads.haskell.org/~ghc/mingw"
     local package_prefix="mingw-w64"
     local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}-${mingw_arch}"
 
@@ -85,13 +86,21 @@ download_tarballs() {
     download_mingw "${format_url}-libwinpthread-git-5.0.0.4741.2c8939a-1-any.pkg.tar.xz"
     download_mingw "${format_url}-zlib-1.2.8-9-any.pkg.tar.xz"
     download_mingw "${format_url}-isl-0.17.1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"
     download_mingw "${format_url}-mpfr-3.1.4.p3-4-any.pkg.tar.xz"
     download_mingw "${format_url}-gmp-6.1.1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-gcc-libs-6.2.0-2-any.pkg.tar.xz"
     download_mingw "${format_url}-binutils-2.27-2-any.pkg.tar.xz"
     download_mingw "${format_url}-libidn-1.32-3-any.pkg.tar.xz"
     download_mingw "${format_url}-gcc-6.2.0-2-any.pkg.tar.xz"
+
+    # Upstream is unfortunately quite inconsistent in naming
+    if test "$mingw_arch" != "sources"; then
+        download_mingw "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"
+        download_mingw "${format_url}-gcc-libs-6.2.0-2-any.pkg.tar.xz"
+    else
+        local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}"
+        download_mingw "${format_url}-i686-mpc-1.0.3-2.src.tar.gz"
+        download_mingw "${format_url}-x86_64-mpc-1.0.3-2.src.tar.gz"
+    fi
 
     download_file "https://github.com/ghc/ghc-tarballs/blob/master/perl/ghc-perl-1.tar.gz?raw=true" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions" "--insecure"
 
