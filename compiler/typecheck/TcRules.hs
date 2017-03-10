@@ -18,11 +18,11 @@ import TcType
 import TcHsType
 import TcExpr
 import TcEnv
-import TcEvidence
 import TcUnify( buildImplicationFor )
+import TcEvidence( mkTcCoVarCo )
 import Type
 import Id
-import Var              ( EvVar )
+import Var( EvVar )
 import Name
 import BasicTypes       ( RuleName )
 import SrcLoc
@@ -84,23 +84,24 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                   , ppr lhs_wanted
                                   , ppr rhs_wanted ])
        ; let all_lhs_wanted = bndr_wanted `andWC` lhs_wanted
-       ; lhs_evs <- simplifyRule (snd $ unLoc name)
-                                 all_lhs_wanted
-                                 rhs_wanted
+       ; (lhs_evs, residual_lhs_wanted) <- simplifyRule (snd $ unLoc name)
+                                              all_lhs_wanted
+                                              rhs_wanted
 
-        -- Now figure out what to quantify over
-        -- c.f. TcSimplify.simplifyInfer
-        -- We quantify over any tyvars free in *either* the rule
-        --  *or* the bound variables.  The latter is important.  Consider
-        --      ss (x,(y,z)) = (x,z)
-        --      RULE:  forall v. fst (ss v) = fst v
-        -- The type of the rhs of the rule is just a, but v::(a,(b,c))
-        --
-        -- We also need to get the completely-uconstrained tyvars of
-        -- the LHS, lest they otherwise get defaulted to Any; but we do that
-        -- during zonking (see TcHsSyn.zonkRule)
+       -- SimplfyRule Plan, step 4
+       -- Now figure out what to quantify over
+       -- c.f. TcSimplify.simplifyInfer
+       -- We quantify over any tyvars free in *either* the rule
+       --  *or* the bound variables.  The latter is important.  Consider
+       --      ss (x,(y,z)) = (x,z)
+       --      RULE:  forall v. fst (ss v) = fst v
+       -- The type of the rhs of the rule is just a, but v::(a,(b,c))
+       --
+       -- We also need to get the completely-uconstrained tyvars of
+       -- the LHS, lest they otherwise get defaulted to Any; but we do that
+       -- during zonking (see TcHsSyn.zonkRule)
 
-       ; let tpl_ids     = lhs_evs ++ id_bndrs
+       ; let tpl_ids = lhs_evs ++ id_bndrs
        ; forall_tkvs <- zonkTcTypesAndSplitDepVars $
                         rule_ty : map idType tpl_ids
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
@@ -113,19 +114,16 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                                 , vcat [ ppr id <+> dcolon <+> ppr (idType id) | id <- tpl_ids ]
                   ])
 
-           -- Simplify the RHS constraints
-       ; let skol_info = RuleSkol (snd $ unLoc name)
+       -- SimplfyRule Plan, step 5
+       -- Simplify the LHS and RHS constraints:
+       -- For the LHS constraints we must solve the remaining constraints
+       -- (a) so that we report insoluble ones
+       -- (b) so that we bind any soluble ones
+       ; let skol_info = RuleSkol (snd (unLoc name))
+       ; (lhs_implic, lhs_binds) <- buildImplicationFor topTcLevel skol_info qtkvs
+                                         lhs_evs residual_lhs_wanted
        ; (rhs_implic, rhs_binds) <- buildImplicationFor topTcLevel skol_info qtkvs
                                          lhs_evs rhs_wanted
-
-           -- For the LHS constraints we must solve the remaining constraints
-           -- (a) so that we report insoluble ones
-           -- (b) so that we bind any soluble ones
-       ; (lhs_implic, lhs_binds) <- buildImplicationFor topTcLevel skol_info qtkvs
-                                         lhs_evs
-                                         (all_lhs_wanted { wc_simple = emptyBag })
-                                           -- simplifyRule consumed all simple
-                                           -- constraints
 
        ; emitImplications (lhs_implic `unionBags` rhs_implic)
        ; return (HsRule name act
@@ -166,8 +164,8 @@ ruleCtxt name = text "When checking the transformation rule" <+>
 *                                                                                 *
 ***********************************************************************************
 
-Note [Simplifying RULE constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [The SimplifyRule Plan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Example.  Consider the following left-hand side of a rule
         f (x == y) (y > z) = ...
 If we typecheck this expression we get constraints
@@ -218,21 +216,23 @@ resulting from skolemising the argument type of g.  So we
 revert to SimplCheck when going under an implication.
 
 
------------------------- So the plan is this -----------------------
+--------- So the SimplifyRule Plan is this -----------------------
 
 * Step 0: typecheck the LHS and RHS to get constraints from each
 
 * Step 1: Simplify the LHS and RHS constraints all together in one bag
           We do this to discover all unification equalities
 
-* Step 2: Zonk the ORIGINAL (unsimplified) lhs constraints, to take
-          advantage of those unifications, and partition them into the
-          ones we will quantify over, and the others
+* Step 2: Zonk the ORIGINAL (unsimplified) LHS constraints, to take
+          advantage of those unifications
+
+* Setp 3: Partition the LHS constraints into the ones we will
+          quantify over, and the others.
           See Note [RULE quantification over equalities]
 
-* Step 3: Decide on the type variables to quantify over
+* Step 4: Decide on the type variables to quantify over
 
-* Step 4: Simplify the LHS and RHS constraints separately, using the
+* Step 5: Simplify the LHS and RHS constraints separately, using the
           quantified constraints as givens
 
 Note [Solve order for RULES]
@@ -301,8 +301,9 @@ terrible, so we avoid the problem by cloning the constraints.
 simplifyRule :: RuleName
              -> WantedConstraints       -- Constraints from LHS
              -> WantedConstraints       -- Constraints from RHS
-             -> TcM [EvVar]             -- LHS evidence variables,
--- See Note [Simplifying RULE constraints] in TcRule
+             -> TcM ( [EvVar]               -- Quantify over these LHS vars
+                    , WantedConstraints)    -- Residual un-quantified LHS constraints
+-- See Note [The SimplifyRule Plan]
 -- NB: This consumes all simple constraints on the LHS, but not
 -- any LHS implication constraints.
 simplifyRule name lhs_wanted rhs_wanted
@@ -310,55 +311,55 @@ simplifyRule name lhs_wanted rhs_wanted
                  -- variables: runTcS runs with topTcLevel
        ; lhs_clone <- cloneWC lhs_wanted
        ; rhs_clone <- cloneWC rhs_wanted
+
+       -- Note [The SimplifyRule Plan] step 1
+       -- First solve the LHS and *then* solve the RHS
+       -- Crucially, this performs unifications
+       -- See Note [Solve order for RULES]
+       -- See Note [Simplify cloned constraints]
        ; insoluble <- runTcSDeriveds $
-             do { -- First solve the LHS and *then* solve the RHS
-                  -- See Note [Solve order for RULES]
-                  -- See Note [Simplify cloned constraints]
-                  lhs_resid <- solveWanteds lhs_clone
+             do { lhs_resid <- solveWanteds lhs_clone
                 ; rhs_resid <- solveWanteds rhs_clone
                 ; return ( insolubleWC lhs_resid ||
                            insolubleWC rhs_resid ) }
 
-
+       -- Note [The SimplifyRule Plan] step 2
        ; zonked_lhs_simples <- zonkSimples (wc_simple lhs_wanted)
-       ; ev_ids <- mapMaybeM (quantify_ct insoluble) $
-                             bagToList zonked_lhs_simples
+
+       -- Note [The SimplifyRule Plan] step 3
+       ; let (quant_cts, no_quant_cts) = partitionBag (quantify_ct insoluble)
+                                                      zonked_lhs_simples
+
+       ; quant_evs <- mapM mk_quant_ev (bagToList quant_cts)
 
        ; traceTc "simplifyRule" $
          vcat [ text "LHS of rule" <+> doubleQuotes (ftext name)
-              , text "lhs_wantd" <+> ppr lhs_wanted
-              , text "rhs_wantd" <+> ppr rhs_wanted
+              , text "lhs_wanted" <+> ppr lhs_wanted
+              , text "rhs_wanted" <+> ppr rhs_wanted
               , text "zonked_lhs_simples" <+> ppr zonked_lhs_simples
-              , text "ev_ids"     <+> ppr ev_ids
+              , text "quant_cts" <+> ppr quant_cts
+              , text "no_quant_cts" <+> ppr no_quant_cts
               ]
 
-       ; return ev_ids }
+       ; return (quant_evs, lhs_wanted { wc_simple = no_quant_cts }) }
 
   where
-    quantify_ct insol -- Note [RULE quantification over equalities]
-      | insol     = quantify_insol
-      | otherwise = quantify_normal
+    quantify_ct :: Bool -> Ct -> Bool
+    quantify_ct insol ct
+      | EqPred _ t1 t2 <- classifyPredType (ctPred ct)
+      = not (insol || t1 `tcEqType` t2)
+        -- Note [RULE quantification over equalities]
 
-    quantify_insol ct
-      | isEqPred (ctPred ct)
-      = return Nothing
       | otherwise
-      = return $ Just $ ctEvId $ ctEvidence ct
+      = True
 
-    quantify_normal (ctEvidence -> CtWanted { ctev_dest = dest
-                                            , ctev_pred = pred })
-      = case dest of  -- See Note [Quantifying over coercion holes]
-          HoleDest hole
-            | EqPred NomEq t1 t2 <- classifyPredType pred
-            , t1 `tcEqType` t2
-            -> do { -- These are trivial. Don't quantify. But do fill in
-                    -- the hole.
-                  ; fillCoercionHole hole (mkTcNomReflCo t1)
-                  ; return Nothing }
-
-            | otherwise
-            -> do { ev_id <- newEvVar pred
-                  ; fillCoercionHole hole (mkTcCoVarCo ev_id)
-                  ; return (Just ev_id) }
-          EvVarDest evar -> return (Just evar)
-    quantify_normal ct = pprPanic "simplifyRule.quantify_normal" (ppr ct)
+    mk_quant_ev :: Ct -> TcM EvVar
+    mk_quant_ev ct
+      | CtWanted { ctev_dest = dest, ctev_pred = pred } <- ctEvidence ct
+      = case dest of
+          EvVarDest ev_id -> return ev_id
+          HoleDest hole   -> -- See Note [Quantifying over coercion holes]
+                             do { ev_id <- newEvVar pred
+                                ; fillCoercionHole hole (mkTcCoVarCo ev_id)
+                                ; return ev_id }
+    mk_quant_ev ct = pprPanic "mk_quant_ev" (ppr ct)
