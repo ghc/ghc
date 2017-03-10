@@ -49,7 +49,6 @@ import Id
 import IdInfo
 import VarEnv
 import VarSet
-import NameSet  ( NameSet, unitNameSet, extendNameSet, elemNameSet )
 import Coercion ( ltRole )
 import BasicTypes
 import SrcLoc
