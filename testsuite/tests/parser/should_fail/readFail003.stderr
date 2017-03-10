@@ -1,7 +1,7 @@
 
 readFail003.hs:4:27: error:
     • Occurs check: cannot construct the infinite type:
-        a2 ~ (a2, [a1], [a])
+        a ~ (a, [a1], [a2])
     • In the expression: a
       In a pattern binding:
         ~(a, b, c)
@@ -11,6 +11,6 @@ readFail003.hs:4:27: error:
           where
               nullity = null
     • Relevant bindings include
-        a :: a2 (bound at readFail003.hs:4:3)
+        a :: a (bound at readFail003.hs:4:3)
         b :: [a1] (bound at readFail003.hs:4:5)
-        c :: [a] (bound at readFail003.hs:4:7)
+        c :: [a2] (bound at readFail003.hs:4:7)

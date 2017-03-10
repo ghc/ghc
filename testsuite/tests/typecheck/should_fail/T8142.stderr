@@ -8,7 +8,7 @@ T8142.hs:6:18: error:
     • In the ambiguity check for the inferred type for ‘h’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
       When checking the inferred type
-        h :: forall (g :: * -> *) a. Nu ((,) a) -> Nu g
+        h :: forall a (g :: * -> *). Nu ((,) a) -> Nu g
       In an equation for ‘tracer’:
           tracer
             = h

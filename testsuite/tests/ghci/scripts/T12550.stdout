@@ -1,16 +1,16 @@
-f :: forall {b} {a :: * -> *}. C a => a b
-f :: forall {b} {a :: * -> *}. C a => a b
-f :: forall {b} {a :: * -> *}. C a => a b
-f :: forall {b} {a :: * -> *}. C a => a b
-f :: forall {b} {a :: * -> *}. C a => a b
-f :: forall {b} {a :: * -> *}. C a => a b
-f ∷ ∀ {b} {a ∷ ★ → ★}. C a ⇒ a b
-f ∷ ∀ {b} {a ∷ ★ → ★}. C a ⇒ a b
-f ∷ ∀ {b} {a ∷ ★ → ★}. C a ⇒ a b
-f ∷ ∀ {b} {a ∷ ★ → ★}. C a ⇒ a b
-f ∷ ∀ {b} {a ∷ ★ → ★}. C a ⇒ a b
-f ∷ ∀ {b} {a ∷ ★ → ★}. C a ⇒ a b
-fmap ∷ ∀ {f ∷ ★ → ★} {b} {a}. Functor f ⇒ (a → b) → f a → f b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f :: forall {a :: * -> *} {b}. C a => a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+f ∷ ∀ {a ∷ ★ → ★} {b}. C a ⇒ a b
+fmap ∷ ∀ {f ∷ ★ → ★} {a} {b}. Functor f ⇒ (a → b) → f a → f b
 class Functor (f ∷ ★ → ★) where
   fmap ∷ ∀ a b. (a → b) → f a → f b
   ...
@@ -62,6 +62,6 @@ class Datatype (d ∷ k) where
                  t d f a → [Char]
   ...
   	-- Defined in ‘GHC.Generics’
-(:*:) ∷ ∀ {g ∷ ★ → ★} {p} {f ∷ ★ → ★}. f p → g p → (:*:) f g p
+(:*:) ∷ ∀ {f ∷ ★ → ★} {p} {g ∷ ★ → ★}. f p → g p → (:*:) f g p
 Rep ∷ ★ → ★ → ★
 M1 ∷ ∀ k. ★ → Meta → (k → ★) → k → ★

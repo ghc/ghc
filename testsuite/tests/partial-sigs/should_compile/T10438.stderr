@@ -22,5 +22,5 @@ T10438.hs:7:22: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include
         r :: p2 (bound at T10438.hs:6:11)
         g :: p2 -> p2 (bound at T10438.hs:6:9)
-        f :: p1 (bound at T10438.hs:5:5)
-        foo :: p1 -> p -> p (bound at T10438.hs:5:1)
+        f :: p (bound at T10438.hs:5:5)
+        foo :: p -> p1 -> p1 (bound at T10438.hs:5:1)

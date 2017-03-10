@@ -808,17 +808,14 @@ decideQuantification
   :: InferMode
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [PredType]            -- All annotated constraints from signatures
-  -> [PredType]            -- Candidate theta
+  -> [PredType]            -- Candidate theta; already zonked
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
 decideQuantification infer_mode name_taus psig_theta candidates
-  = do { gbl_tvs <- tcGetGlobalTyCoVars
-       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
-                        -- psig_theta: see Note [Quantification and partial signatures]
-       ; ovl_strings <- xoptM LangExt.OverloadedStrings
-       ; let DV {dv_kvs = zkvs, dv_tvs = ztvs} = splitDepVarsOfTypes zonked_taus
-             (gbl_cand, quant_cand)  -- gbl_cand   = do not quantify me
+  = do { ovl_strings <- xoptM LangExt.OverloadedStrings
+       ; gbl_tvs     <- tcGetGlobalTyCoVars
+       ; let (gbl_cand, quant_cand)    -- gbl_cand   = do not quantify me
                 = case infer_mode of   -- quant_cand = try to quantify me
                     ApplyMR         -> (candidates, [])
                     NoRestrictions  -> ([], candidates)
@@ -834,8 +831,20 @@ decideQuantification infer_mode name_taus psig_theta candidates
              constrained_tvs = tyCoVarsOfTypes gbl_cand
              mono_tvs        = growThetaTyVars eq_constraints $
                                gbl_tvs `unionVarSet` constrained_tvs
-             tau_tvs_plus    = growThetaTyVarsDSet quant_cand ztvs
-             dvs_plus        = DV { dv_kvs = zkvs, dv_tvs = tau_tvs_plus }
+
+       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
+                        -- psig_theta: see Note [Quantification and partial signatures]
+
+       ; let -- The candidate tyvars are the ones free in
+             -- either quant_cand or zonked_taus.
+             DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
+                = candidateQTyVarsOfTypes (quant_cand ++ zonked_taus)
+
+               -- Now keep only the ones reachable
+               -- (via growThetaTyVars) from zonked_taus.
+             grown_tvs = growThetaTyVars quant_cand (tyCoVarsOfTypes zonked_taus)
+             pick      = filterDVarSet (`elemVarSet` grown_tvs)
+             dvs_plus  = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; qtvs <- quantifyZonkedTyVars mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
@@ -855,7 +864,7 @@ decideQuantification infer_mode name_taus psig_theta candidates
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
        ; let mr_bites | ApplyMR <- infer_mode
-                      = constrained_tvs `intersectsVarSet` tcDepVarSet dvs_plus
+                      = constrained_tvs `intersectsVarSet` grown_tvs
                       | otherwise
                       = False
        ; warnTc (Reason Opt_WarnMonomorphism) (warn_mono && mr_bites) $
@@ -871,7 +880,8 @@ decideQuantification infer_mode name_taus psig_theta candidates
                  , text "quant_cand:"   <+> ppr quant_cand
                  , text "gbl_tvs:"      <+> ppr gbl_tvs
                  , text "mono_tvs:"     <+> ppr mono_tvs
-                 , text "tau_tvs_plus:" <+> ppr tau_tvs_plus
+                 , text "cand_tvs"      <+> ppr cand_tvs
+                 , text "grown_tvs:"    <+> ppr grown_tvs
                  , text "qtvs:"         <+> ppr qtvs
                  , text "min_theta:"    <+> ppr min_theta ])
        ; return (qtvs, min_theta) }
@@ -900,32 +910,6 @@ growThetaTyVars theta tvs
        | otherwise                          = tvs
        where
          pred_tvs = tyCoVarsOfType pred
-
-------------------
-growThetaTyVarsDSet :: ThetaType -> DTyCoVarSet -> DTyVarSet
--- See Note [Growing the tau-tvs using constraints]
--- NB: only returns tyvars, never covars
--- It takes a deterministic set of TyCoVars and returns a deterministic set
--- of TyVars.
--- The implementation mirrors growThetaTyVars, the only difference is that
--- it avoids unionDVarSet and uses more efficient extendDVarSetList.
-growThetaTyVarsDSet theta tvs
-  | null theta = tvs_only
-  | otherwise  = filterDVarSet isTyVar $
-                 transCloDVarSet mk_next seed_tvs
-  where
-    tvs_only = filterDVarSet isTyVar tvs
-    seed_tvs = tvs `extendDVarSetList` tyCoVarsOfTypesList ips
-    (ips, non_ips) = partition isIPPred theta
-                         -- See Note [Inheriting implicit parameters] in TcType
-
-    mk_next :: DVarSet -> DVarSet -- Maps current set to newly-grown ones
-    mk_next so_far = foldr (grow_one so_far) emptyDVarSet non_ips
-    grow_one so_far pred tvs
-       | any (`elemDVarSet` so_far) pred_tvs = tvs `extendDVarSetList` pred_tvs
-       | otherwise                           = tvs
-       where
-         pred_tvs = tyCoVarsOfTypeList pred
 
 {- Note [Quantification and partial signatures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

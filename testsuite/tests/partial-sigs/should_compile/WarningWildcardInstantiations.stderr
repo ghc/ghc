@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  bar :: forall w t. t -> (t -> w) -> w
+  bar :: forall t w. t -> (t -> w) -> w
   foo :: forall a. (Show a, Enum a) => a -> String
 TYPE CONSTRUCTORS
 COERCION AXIOMS
