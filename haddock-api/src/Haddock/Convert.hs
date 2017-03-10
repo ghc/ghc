@@ -114,7 +114,8 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
         hs_rhs     = synifyType WithinType rhs
     in TyFamEqn { tfe_tycon = name
                 , tfe_pats  = HsIB { hsib_body = typats
-                                   , hsib_vars = map tyVarName tkvs }
+                                   , hsib_vars = map tyVarName tkvs
+                                   , hsib_closed = True }
                 , tfe_fixity = Prefix
                 , tfe_rhs   = hs_rhs }
 
@@ -300,7 +301,7 @@ synifyDataCon use_gadt_syntax dc =
           (False,True) -> case linear_tys of
                            [a,b] -> return $ InfixCon a b
                            _ -> Left "synifyDataCon: infix with non-2 args?"
-  gadt_ty = HsIB [] (synifyType WithinType res_ty)
+  gadt_ty = HsIB [] (synifyType WithinType res_ty) False
  -- finally we get synifyDataCon's result!
  in hs_arg_tys >>=
       \hat ->
