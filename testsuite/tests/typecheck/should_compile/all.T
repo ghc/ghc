@@ -543,3 +543,4 @@ test('T11525', [unless(have_dynamic(), expect_broken(10301))], multi_compile,
 test('T12923', normal, compile, [''])
 test('T12924', normal, compile, [''])
 test('T12926', normal, compile, [''])
+test('T13381', normal, compile_fail, [''])
