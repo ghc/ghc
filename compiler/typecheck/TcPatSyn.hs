@@ -168,7 +168,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
               ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
               ; return (ex_tvs', prov_dicts, args') }
 
-       ; let skol_info = SigSkol (PatSynCtxt name) (mkPhiTy req_theta pat_ty)
+       ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
                          -- The type here is a bit bogus, but we do not print
                          -- the type for PatSynCtxt, so it doesn't matter
                          -- See TcRnTypes Note [Skolem info for pattern synonyms]
@@ -176,10 +176,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
 
        -- Solve the constraints now, because we are about to make a PatSyn,
        -- which should not contain unification variables and the like (Trac #10997)
-       ; empty_binds <- simplifyTop (mkImplicWC implics)
-
-       -- Since all the inputs are implications the returned bindings will be empty
-       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
+       ; simplifyTopImplic implics
 
        -- ToDo: in the bidirectional case, check that the ex_tvs' are all distinct
        -- Otherwise we may get a type error when typechecking the builder,
