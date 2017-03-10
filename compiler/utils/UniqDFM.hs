@@ -143,34 +143,40 @@ unitUDFM :: Uniquable key => key -> elt -> UniqDFM elt
 unitUDFM k v = UDFM (M.singleton (getKey $ getUnique k) (TaggedVal v 0)) 1
 
 addToUDFM :: Uniquable key => UniqDFM elt -> key -> elt  -> UniqDFM elt
-addToUDFM (UDFM m i) k v =
-  UDFM (M.insert (getKey $ getUnique k) (TaggedVal v i) m) (i + 1)
+addToUDFM m k v = addToUDFM_Directly m (getUnique k) v
 
 addToUDFM_Directly :: UniqDFM elt -> Unique -> elt -> UniqDFM elt
-addToUDFM_Directly (UDFM m i) u v =
-  UDFM (M.insert (getKey u) (TaggedVal v i) m) (i + 1)
+addToUDFM_Directly (UDFM m i) u v
+  = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+  where
+    tf (TaggedVal new_v _) (TaggedVal _ old_i) = TaggedVal new_v old_i
+      -- Keep the old tag, but insert the new value
+      -- This means that udfmToList typically returns elements
+      -- in the order of insertion, rather than the reverse
 
 addToUDFM_Directly_C
-  :: (elt -> elt -> elt) -> UniqDFM elt -> Unique -> elt -> UniqDFM elt
-addToUDFM_Directly_C f (UDFM m i) u v =
-  UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
-  where
-  tf (TaggedVal a j) (TaggedVal b _) = TaggedVal (f a b) j
-
-addListToUDFM :: Uniquable key => UniqDFM elt -> [(key,elt)] -> UniqDFM elt
-addListToUDFM = foldl (\m (k, v) -> addToUDFM m k v)
+  :: (elt -> elt -> elt)   -- old -> new -> result
+  -> UniqDFM elt
+  -> Unique -> elt
+  -> UniqDFM elt
+addToUDFM_Directly_C f (UDFM m i) u v
+  = UDFM (M.insertWith tf (getKey u) (TaggedVal v i) m) (i + 1)
+    where
+      tf (TaggedVal new_v _) (TaggedVal old_v old_i)
+         = TaggedVal (f old_v new_v) old_i
+          -- Flip the arguments, because M.insertWith uses  (new->old->result)
+          --                         but f            needs (old->new->result)
+          -- Like addToUDFM_Directly, keep the old tag
 
 addToUDFM_C
   :: Uniquable key => (elt -> elt -> elt) -- old -> new -> result
   -> UniqDFM elt -- old
   -> key -> elt -- new
   -> UniqDFM elt -- result
-addToUDFM_C f (UDFM m i) k v =
-  UDFM (M.insertWith tf (getKey $ getUnique k) (TaggedVal v i) m) (i + 1)
-  where
-  tf (TaggedVal a j) (TaggedVal b _) = TaggedVal (f b a) j
-                                       -- Flip the arguments, just like
-                                       -- addToUFM_C does.
+addToUDFM_C f m k v = addToUDFM_Directly_C f m (getUnique k) v
+
+addListToUDFM :: Uniquable key => UniqDFM elt -> [(key,elt)] -> UniqDFM elt
+addListToUDFM = foldl (\m (k, v) -> addToUDFM m k v)
 
 addListToUDFM_Directly :: UniqDFM elt -> [(Unique,elt)] -> UniqDFM elt
 addListToUDFM_Directly = foldl (\m (k, v) -> addToUDFM_Directly m k v)

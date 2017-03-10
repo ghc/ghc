@@ -18,11 +18,11 @@ T11192.hs:7:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
     • Relevant bindings include fails :: a (bound at T11192.hs:6:1)
 
 T11192.hs:13:14: warning: [-Wpartial-type-signatures (in -Wdefault)]
-    • Found type wildcard ‘_’ standing for ‘p1 -> p -> p’
-      Where: ‘p1’ is a rigid type variable bound by
-               the inferred type of go :: p1 -> p -> p at T11192.hs:14:8-17
-             ‘p’ is a rigid type variable bound by
-               the inferred type of go :: p1 -> p -> p at T11192.hs:14:8-17
+    • Found type wildcard ‘_’ standing for ‘p -> p1 -> p1’
+      Where: ‘p’ is a rigid type variable bound by
+               the inferred type of go :: p -> p1 -> p1 at T11192.hs:14:8-17
+             ‘p1’ is a rigid type variable bound by
+               the inferred type of go :: p -> p1 -> p1 at T11192.hs:14:8-17
     • In the type signature: go :: _
       In the expression:
         let

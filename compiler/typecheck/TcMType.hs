@@ -900,7 +900,7 @@ interface file. One such example is inferred type signatures. They also affect
 the results of optimizations, for example worker-wrapper. This means that to
 get deterministic builds quantifyTyVars needs to be deterministic.
 
-To achieve this TcDepVars is backed by deterministic sets which allows them
+To achieve this CandidatesQTvs is backed by deterministic sets which allows them
 to be later converted to a list in a deterministic order.
 
 For more information about deterministic sets see
@@ -908,8 +908,8 @@ Note [Deterministic UniqFM] in UniqDFM.
 -}
 
 quantifyTyVars, quantifyZonkedTyVars
-  :: TcTyCoVarSet   -- global tvs
-  -> TcDepVars      -- See Note [Dependent type variables] in TcType
+  :: TcTyCoVarSet     -- global tvs
+  -> CandidatesQTvs   -- See Note [Dependent type variables] in TcType
   -> TcM [TcTyVar]
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
@@ -1264,15 +1264,15 @@ zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 zonkTcTypeAndFV ty
   = tyCoVarsOfTypeDSet <$> zonkTcTypeInKnot ty
 
--- | Zonk a type and call 'splitDepVarsOfType' on it.
+-- | Zonk a type and call 'candidateQTyVarsOfType' on it.
 -- Works within the knot.
-zonkTcTypeAndSplitDepVars :: TcType -> TcM TcDepVars
+zonkTcTypeAndSplitDepVars :: TcType -> TcM CandidatesQTvs
 zonkTcTypeAndSplitDepVars ty
-  = splitDepVarsOfType <$> zonkTcTypeInKnot ty
+  = candidateQTyVarsOfType <$> zonkTcTypeInKnot ty
 
-zonkTcTypesAndSplitDepVars :: [TcType] -> TcM TcDepVars
+zonkTcTypesAndSplitDepVars :: [TcType] -> TcM CandidatesQTvs
 zonkTcTypesAndSplitDepVars tys
-  = splitDepVarsOfTypes <$> mapM zonkTcTypeInKnot tys
+  = candidateQTyVarsOfTypes <$> mapM zonkTcTypeInKnot tys
 
 zonkTyCoVar :: TyCoVar -> TcM TcType
 -- Works on TyVars and TcTyVars

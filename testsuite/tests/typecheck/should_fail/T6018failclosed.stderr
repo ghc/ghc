@@ -28,7 +28,7 @@ T6018failclosed.hs:25:5: error:
       cannot be inferred from the right-hand side.
       Use -fprint-explicit-kinds to see the kind arguments
       In the type family equation:
-        forall k1 k2 (c :: k1) (b :: k2).
+        forall k1 k2 (b :: k2) (c :: k1).
           JClosed Int b c = Char -- Defined at T6018failclosed.hs:25:5
     • In the equations for closed type family ‘JClosed’
       In the type family declaration for ‘JClosed’
@@ -90,7 +90,7 @@ T6018failclosed.hs:66:5: error:
       Kind variable ‘k’ cannot be inferred from the right-hand side.
       Use -fprint-explicit-kinds to see the kind arguments
       In the type family equation:
-        forall k (b :: k) (a :: k).
+        forall k (a :: k) (b :: k).
           Gc a b = Int -- Defined at T6018failclosed.hs:66:5
     • In the equations for closed type family ‘Gc’
       In the type family declaration for ‘Gc’

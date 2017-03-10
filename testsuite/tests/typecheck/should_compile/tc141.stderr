@@ -7,7 +7,7 @@ tc141.hs:11:12: error:
       In a pattern binding: (p :: a, q :: a) = x
 
 tc141.hs:11:31: error:
-    • Couldn't match expected type ‘a2’ with actual type ‘a1’
+    • Couldn't match expected type ‘a2’ with actual type ‘a’
         because type variable ‘a2’ would escape its scope
       This (rigid, skolem) type variable is bound by
         an expression type signature:
@@ -17,10 +17,10 @@ tc141.hs:11:31: error:
       In the expression: (q :: a, p)
       In the expression: let (p :: a, q :: a) = x in (q :: a, p)
     • Relevant bindings include
-        p :: a1 (bound at tc141.hs:11:12)
-        q :: a1 (bound at tc141.hs:11:17)
-        x :: (a1, a1) (bound at tc141.hs:11:3)
-        f :: (a1, a1) -> (a, a1) (bound at tc141.hs:11:1)
+        p :: a (bound at tc141.hs:11:12)
+        q :: a (bound at tc141.hs:11:17)
+        x :: (a, a) (bound at tc141.hs:11:3)
+        f :: (a, a) -> (a1, a) (bound at tc141.hs:11:1)
 
 tc141.hs:13:13: error:
     • You cannot bind scoped type variable ‘a’
@@ -51,4 +51,4 @@ tc141.hs:15:18: error:
     • Relevant bindings include
         v :: a2 (bound at tc141.hs:15:14)
         b :: p (bound at tc141.hs:13:5)
-        g :: a1 -> p -> a (bound at tc141.hs:13:1)
+        g :: a -> p -> a1 (bound at tc141.hs:13:1)

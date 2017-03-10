@@ -2,7 +2,7 @@ TYPE SIGNATURES
   Node :: forall s a chain. s -> a -> chain -> Q s a chain
   Z :: forall a. a -> Z a
   foo ::
-    forall chain s b.
+    forall s b chain.
     Zork s (Z [Char]) b =>
     Q s (Z [Char]) chain -> ST s ()
   huh ::

@@ -6,8 +6,8 @@ pattern Pu :: p -> p 	-- Defined at <interactive>:18:1
 pattern Pue :: a -> a1 -> (a, Ex) 	-- Defined at <interactive>:19:1
 pattern Pur :: (Num a, Eq a) => a -> [a]
   	-- Defined at <interactive>:20:1
-pattern Purp :: (Num a1, Eq a1) => Show a => a1
-                                             -> a -> ([a1], UnivProv a)
+pattern Purp :: (Num a, Eq a) => Show a1 => a
+                                            -> a1 -> ([a], UnivProv a1)
   	-- Defined at <interactive>:21:1
 pattern Pure :: (Num a, Eq a) => a -> a1 -> ([a], Ex)
   	-- Defined at <interactive>:22:1
@@ -31,8 +31,8 @@ pattern Pue :: forall {a}. () => forall {a1}. a -> a1 -> (a, Ex)
   	-- Defined at <interactive>:19:1
 pattern Pur :: forall {a}. (Num a, Eq a) => a -> [a]
   	-- Defined at <interactive>:20:1
-pattern Purp :: forall {a} {a1}. (Num a1, Eq a1) => Show a => a1
-                                                              -> a -> ([a1], UnivProv a)
+pattern Purp :: forall {a} {a1}. (Num a, Eq a) => Show a1 => a
+                                                             -> a1 -> ([a], UnivProv a1)
   	-- Defined at <interactive>:21:1
 pattern Pure :: forall {a}. (Num a, Eq a) => forall {a1}. a
                                                           -> a1 -> ([a], Ex)
