@@ -701,7 +701,6 @@ cgConApp con stg_args
         ; emitReturn [idInfoToAmode idinfo] }
 
 cgIdApp :: Id -> [StgArg] -> FCode ReturnKind
-cgIdApp fun_id [] | isVoidTy (idType fun_id) = emitReturn []
 cgIdApp fun_id args = do
     dflags         <- getDynFlags
     fun_info       <- getCgIdInfo fun_id
@@ -719,9 +718,11 @@ cgIdApp fun_id args = do
         v_args      = length $ filter (isVoidTy . stgArgType) args
         node_points dflags = nodeMustPointToIt dflags lf_info
     case getCallMethod dflags fun_name cg_fun_id lf_info n_args v_args (cg_loc fun_info) self_loop_info of
-
             -- A value in WHNF, so we can just return it.
-        ReturnIt -> emitReturn [fun] -- ToDo: does ReturnIt guarantee tagged?
+        ReturnIt
+          | isVoidTy (idType fun_id) -> emitReturn []
+          | otherwise                -> emitReturn [fun]
+          -- ToDo: does ReturnIt guarantee tagged?
 
         EnterIt -> ASSERT( null args )  -- Discarding arguments
                    emitEnter fun
