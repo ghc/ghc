@@ -577,7 +577,8 @@ renameImplicit :: (in_thing -> RnM out_thing)
 renameImplicit rn_thing (HsIB { hsib_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsIB { hsib_body = thing'
-                      , hsib_vars = PlaceHolder }) }
+                      , hsib_vars = PlaceHolder
+                      , hsib_closed = PlaceHolder }) }
 
 renameWc :: (in_thing -> RnM out_thing)
          -> HsWildCardBndrs Name in_thing
