@@ -1661,7 +1661,7 @@ check_main dflags tcg_env explicit_mod_hdr
         ; ioTyCon <- tcLookupTyCon ioTyConName
         ; res_ty <- newFlexiTyVarTy liftedTypeKind
         ; let io_ty = mkTyConApp ioTyCon [res_ty]
-              skol_info = SigSkol (FunSigCtxt main_name False) io_ty
+              skol_info = SigSkol (FunSigCtxt main_name False) io_ty []
         ; (ev_binds, main_expr)
                <- checkConstraints skol_info [] [] $
                   addErrCtxt mainCtxt    $

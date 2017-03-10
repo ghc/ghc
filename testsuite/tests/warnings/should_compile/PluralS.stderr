@@ -17,9 +17,11 @@ PluralS.hs:17:24: warning: [-Wtype-defaults (in -Wall)]
 PluralS.hs:23:1: warning: [-Wredundant-constraints]
     • Redundant constraint: Num a
     • In the type signature for:
-           redundantNum :: (Num a, Num a) => a
+           redundantNum :: forall a. (Num a, Num a) => a
 
 PluralS.hs:26:1: warning: [-Wredundant-constraints]
     • Redundant constraints: (Show a, Num a, Eq a, Eq a)
     • In the type signature for:
-           redundantMultiple :: (Num a, Show a, Num a, Eq a, Eq a) => a
+           redundantMultiple :: forall a.
+                                (Num a, Show a, Num a, Eq a, Eq a) =>
+                                a

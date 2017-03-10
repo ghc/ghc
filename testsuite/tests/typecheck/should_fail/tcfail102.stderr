@@ -6,7 +6,7 @@ tcfail102.hs:9:15: error:
     • Could not deduce (Integral (Ratio a)) arising from a use of ‘p’
       from the context: Integral a
         bound by the type signature for:
-                   f :: Integral a => P (Ratio a) -> P (Ratio a)
+                   f :: forall a. Integral a => P (Ratio a) -> P (Ratio a)
         at tcfail102.hs:8:1-45
     • In the ‘p’ field of a record
       In the expression: x {p = p x}

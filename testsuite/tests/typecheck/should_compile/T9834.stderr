@@ -30,9 +30,7 @@ T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
         at T9834.hs:22:11-74
       ‘a1’ is a rigid type variable bound by
         a type expected by the context:
-          forall (q :: * -> *) a1.
-          Applicative q =>
-          Comp p q a1 -> Comp p q a1
+          forall (q :: * -> *). Applicative q => Nat (Comp p q) (Comp p q)
         at T9834.hs:23:10-19
       Expected type: Comp p q a1 -> Comp p q a1
         Actual type: Comp p q a -> Comp p q a

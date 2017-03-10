@@ -3,7 +3,7 @@ T1897a.hs:9:1: error:
     • Could not deduce (Wob a0 b)
       from the context: Wob a b
         bound by the inferred type for ‘foo’:
-                   Wob a b => b -> [b]
+                   forall a b. Wob a b => b -> [b]
         at T1897a.hs:9:1-24
       The type variable ‘a0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘foo’

@@ -16,7 +16,7 @@ overloadedlabelsfail01.hs:14:5: error:
         arising from the overloaded label ‘#y’
       from the context: IsLabel "x" t
         bound by the type signature for:
-                   c :: IsLabel "x" t => t
+                   c :: forall t. IsLabel "x" t => t
         at overloadedlabelsfail01.hs:13:1-23
     • In the expression: #y
       In an equation for ‘c’: c = #y

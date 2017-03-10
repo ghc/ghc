@@ -6,7 +6,7 @@ bkpfail44.bkp:10:15: error:
     • Could not deduce: a ~ b
       from the context: Coercible (T a) (T b)
         bound by the type signature for:
-                   f :: Coercible (T a) (T b) => a -> b
+                   f :: forall a b. Coercible (T a) (T b) => a -> b
         at bkpfail44.bkp:9:9-44
       ‘a’ is a rigid type variable bound by
         the type signature for:

@@ -2841,9 +2841,14 @@ pushErrCtxtSameOrigin err loc@(CtLoc { ctl_env = lcl })
 --   a) type variables are skolemised
 --   b) an implication constraint is generated
 data SkolemInfo
-  = SigSkol UserTypeCtxt        -- A skolem that is created by instantiating
-            TcType              -- a programmer-supplied type signature
-                                -- Location of the binding site is on the TyVar
+  = SigSkol -- A skolem that is created by instantiating
+            -- a programmer-supplied type signature
+            -- Location of the binding site is on the TyVar
+            -- See Note [SigSkol SkolemInfo]
+       UserTypeCtxt        -- What sort of signature
+       TcType              -- Original type signature (before skolemisation)
+       [(Name,TcTyVar)]    -- Maps the original name of the skolemised tyvar
+                           -- to its instantiated version
 
   | ClsSkol Class       -- Bound at a class decl
 
@@ -2898,9 +2903,9 @@ termEvidenceAllowed _                    = True
 
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
-pprSkolInfo (SigSkol ctxt ty) = pprSigSkolInfo ctxt ty
+pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
-                                <+> pprWithCommas ppr ips
+                                 <+> pprWithCommas ppr ips
 pprSkolInfo (ClsSkol cls)     = text "the class declaration for" <+> quotes (ppr cls)
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
 pprSkolInfo InstSkol          = text "the instance declaration"
@@ -2923,6 +2928,7 @@ pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
 pprSkolInfo UnkSkol = WARN( True, text "pprSkolInfo: UnkSkol" ) text "UnkSkol"
 
 pprSigSkolInfo :: UserTypeCtxt -> TcType -> SDoc
+-- The type is already tidied
 pprSigSkolInfo ctxt ty
   = case ctxt of
        FunSigCtxt f _ -> vcat [ text "the type signature for:"
@@ -2948,12 +2954,37 @@ pprPatSkolInfo (PatSynCon ps)
 {- Note [Skolem info for pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 For pattern synonym SkolemInfo we have
-   SigSkol (PatSynCtxt p) ty
+   SigSkol (PatSynCtxt p) ty _
 but the type 'ty' is not very helpful.  The full pattern-synonym type
-is has the provided and required pieces, which it is inconvenient to
+has the provided and required pieces, which it is inconvenient to
 record and display here. So we simply don't display the type at all,
 contenting outselves with just the name of the pattern synonym, which
 is fine.  We could do more, but it doesn't seem worth it.
+
+Note [SigSkol SkolemInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we (deeply) skolemise a type
+   f :: forall a. a -> forall b. b -> a
+Then we'll instantiate [a :-> a', b :-> b'], and with the instantiated
+      a' -> b' -> a.
+But when, in an error message, we report that "b is a rigid type
+variable bound by the type signature for f", we want to show the foralls
+in the right place.  So we proceed as follows:
+
+* In SigSkol we record
+    - the original signature forall a. a -> forall b. b -> a
+    - the instantiation mapping [a :-> a', b :-> b']
+
+* Then when tidying in TcMType.tidySkolemInfo, we first tidy a' to
+  whatever it tidies to, say a''; and then we walk over the type
+  replacing the binder a by the tidied version a'', to give
+       forall a''. a'' -> forall b''. b'' -> a''
+  We need to do this under function arrows, to match what deeplySkolemise
+  does.
+
+* Typically a'' will have a nice pretty name like "a", but the point is
+  that the foral-bound variables of the signature we report line up with
+  the instantiated skolems lying  around in other types.
 
 
 ************************************************************************

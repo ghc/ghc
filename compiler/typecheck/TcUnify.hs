@@ -719,15 +719,13 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
       = -- See Note [Co/contra-variance of subsumption checking]
-        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig ctxt act_res exp_res
-           ; arg_wrap
-               <- tc_sub_tc_type eq_orig (GivenOrigin
-                                          (SigSkol GenSigCtxt exp_arg))
-                                 ctxt exp_arg act_arg
+        do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
+           ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
            ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where
+        given_orig = GivenOrigin (SigSkol GenSigCtxt exp_arg [])
         doc = text "When checking that" <+> quotes (ppr ty_actual) <+>
               text "is more polymorphic than" <+> quotes (ppr ty_expected)
 
@@ -1040,14 +1038,14 @@ tcSkolemise ctxt expected_ty thing_inside
    -- We expect expected_ty to be a forall-type
    -- If not, the call is a no-op
   = do  { traceTc "tcSkolemise" Outputable.empty
-        ; (wrap, tvs', given, rho') <- deeplySkolemise expected_ty
+        ; (wrap, tv_prs, given, rho') <- deeplySkolemise expected_ty
 
         ; lvl <- getTcLevel
         ; when debugIsOn $
               traceTc "tcSkolemise" $ vcat [
                 ppr lvl,
                 text "expected_ty" <+> ppr expected_ty,
-                text "inst tyvars" <+> ppr tvs',
+                text "inst tyvars" <+> ppr tv_prs,
                 text "given"       <+> ppr given,
                 text "inst type"   <+> ppr rho' ]
 
@@ -1064,9 +1062,8 @@ tcSkolemise ctxt expected_ty thing_inside
         -- TcTyVars, all this is handled automatically with no need for
         -- extra faffing around
 
-        -- Use the *instantiated* type in the SkolemInfo
-        -- so that the names of displayed type variables line up
-        ; let skol_info = SigSkol ctxt (mkFunTys (map varType given) rho')
+        ; let tvs' = map snd tv_prs
+              skol_info = SigSkol ctxt expected_ty tv_prs
 
         ; (ev_binds, result) <- checkConstraints skol_info tvs' given $
                                 thing_inside tvs' rho'

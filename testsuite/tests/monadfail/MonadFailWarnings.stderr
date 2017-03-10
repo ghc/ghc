@@ -5,12 +5,12 @@ MonadFailWarnings.hs:19:5: warning: [-Wmissing-monadfail-instances (in -Wcompat)
         (this will become an error in a future GHC release)
       from the context: Monad m
         bound by the type signature for:
-                   general :: Monad m => m a
+                   general :: forall (m :: * -> *) a. Monad m => m a
         at MonadFailWarnings.hs:17:1-25
       Possible fix:
         add (MonadFail m) to the context of
           the type signature for:
-            general :: Monad m => m a
+            general :: forall (m :: * -> *) a. Monad m => m a
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
         do Just x <- undefined

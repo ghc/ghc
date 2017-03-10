@@ -5,12 +5,12 @@ MonadFailErrors.hs:16:5: error:
         with the failable pattern ‘Just x’
       from the context: Monad m
         bound by the type signature for:
-                   general :: Monad m => m a
+                   general :: forall (m :: * -> *) a. Monad m => m a
         at MonadFailErrors.hs:14:1-25
       Possible fix:
         add (MonadFail m) to the context of
           the type signature for:
-            general :: Monad m => m a
+            general :: forall (m :: * -> *) a. Monad m => m a
     • In a stmt of a 'do' block: Just x <- undefined
       In the expression:
         do Just x <- undefined
