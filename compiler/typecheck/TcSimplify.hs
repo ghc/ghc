@@ -5,7 +5,7 @@ module TcSimplify(
        growThetaTyVars,
        simplifyAmbiguityCheck,
        simplifyDefault,
-       simplifyTop, captureTopConstraints,
+       simplifyTop, simplifyTopImplic, captureTopConstraints,
        simplifyInteractive, solveEqualities,
        simplifyWantedsTcM,
        tcCheckSatisfiability,
@@ -80,6 +80,15 @@ captureTopConstraints thing_inside
            Left {}   -> do { _ <- reportUnsolved lie; failM } }
                 -- This call to reportUnsolved is the reason
                 -- this function is here instead of TcRnMonad
+
+simplifyTopImplic :: Bag Implication -> TcM ()
+simplifyTopImplic implics
+  = do { empty_binds <- simplifyTop (mkImplicWC implics)
+
+       -- Since all the inputs are implications the returned bindings will be empty
+       ; MASSERT2( isEmptyBag empty_binds, ppr empty_binds )
+
+       ; return () }
 
 simplifyTop :: WantedConstraints -> TcM (Bag EvBind)
 -- Simplify top-level constraints
@@ -729,7 +738,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
               , text "psig_theta =" <+> ppr psig_theta
               , text "bound_theta =" <+> ppr bound_theta
               , text "full_theta =" <+> ppr full_theta
-              , text "qtvs =" <+> ppr qtvs
+              , text "all_qtvs =" <+> ppr all_qtvs
               , text "implic =" <+> ppr implic ]
 
        ; return ( qtvs, full_theta_vars, TcEvBinds ev_binds_var ) }
@@ -869,6 +878,7 @@ decideQuantification infer_mode name_taus psig_theta candidates
            (vcat [ text "infer_mode:"   <+> ppr infer_mode
                  , text "gbl_cand:"     <+> ppr gbl_cand
                  , text "quant_cand:"   <+> ppr quant_cand
+                 , text "zonked_taus:" <+> ppr zonked_taus
                  , text "gbl_tvs:"      <+> ppr gbl_tvs
                  , text "mono_tvs:"     <+> ppr mono_tvs
                  , text "tau_tvs_plus:" <+> ppr tau_tvs_plus

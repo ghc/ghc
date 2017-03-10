@@ -666,7 +666,7 @@ simplifyDeriv pred tvs thetas
        -- See Note [Error reporting for deriving clauses]
        -- See also Note [Exotic derived instance contexts], which are caught
        -- in this line of code.
-       ; _ <- simplifyTop $ mkImplicWC leftover_implic
+       ; simplifyTopImplic leftover_implic
 
        ; return (substTheta subst_skol min_theta) }
 
