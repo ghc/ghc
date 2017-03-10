@@ -203,13 +203,10 @@ We hope that one of the two measure kick in:
      in CoreArity.
 
 The oneShot annotations used in this module are correct, as we only use them in
-argumets to foldr, where we know how the arguments are called.
--}
+arguments to foldr, where we know how the arguments are called.
 
-{-
 Note [Inline FB functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-
 After fusion rules successfully fire, we are usually left with one or more calls
 to list-producing functions abstracted over cons and nil. Here we call them
 FB functions because their names usually end with 'FB'. It's a good idea to
