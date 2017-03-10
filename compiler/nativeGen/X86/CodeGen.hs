@@ -2623,7 +2623,7 @@ outOfLineCmmOp mop res args
 
         fn = case mop of
               MO_F32_Sqrt  -> fsLit "sqrtf"
-              MO_F32_Fabs  -> unsupported
+              MO_F32_Fabs  -> fsLit "fabsf"
               MO_F32_Sin   -> fsLit "sinf"
               MO_F32_Cos   -> fsLit "cosf"
               MO_F32_Tan   -> fsLit "tanf"
@@ -2640,7 +2640,7 @@ outOfLineCmmOp mop res args
               MO_F32_Pwr   -> fsLit "powf"
 
               MO_F64_Sqrt  -> fsLit "sqrt"
-              MO_F64_Fabs  -> unsupported
+              MO_F64_Fabs  -> fsLit "fabs"
               MO_F64_Sin   -> fsLit "sin"
               MO_F64_Cos   -> fsLit "cos"
               MO_F64_Tan   -> fsLit "tan"
