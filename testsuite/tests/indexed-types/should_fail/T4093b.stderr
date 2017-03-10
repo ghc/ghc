@@ -4,7 +4,8 @@ T4093b.hs:31:13: error:
       from the context: (EitherCO e (A C O n) (A O O n) ~ A e O n,
                          EitherCO x (A C C n) (A C O n) ~ A C x n)
         bound by the type signature for:
-                   blockToNodeList :: (EitherCO e (A C O n) (A O O n) ~ A e O n,
+                   blockToNodeList :: forall (n :: * -> * -> *) e x.
+                                      (EitherCO e (A C O n) (A O O n) ~ A e O n,
                                        EitherCO x (A C C n) (A C O n) ~ A C x n) =>
                                       Block n e x -> A e x n
         at T4093b.hs:(19,1)-(22,26)

@@ -4,7 +4,9 @@ T3208b.hs:15:15: error:
         arising from a use of ‘apply’
       from the context: (OTerm a ~ STerm a, OBJECT a, SUBST a)
         bound by the type signature for:
-                   fce' :: (OTerm a ~ STerm a, OBJECT a, SUBST a) => a -> c
+                   fce' :: forall a c.
+                           (OTerm a ~ STerm a, OBJECT a, SUBST a) =>
+                           a -> c
         at T3208b.hs:14:1-56
       The type variable ‘o0’ is ambiguous
     • In the first argument of ‘fce’, namely ‘(apply f)’

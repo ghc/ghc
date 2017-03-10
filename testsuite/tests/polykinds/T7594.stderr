@@ -4,7 +4,7 @@ T7594.hs:35:12: error:
         ‘b’ is untouchable
           inside the constraints: (:&:) c0 Real a
           bound by a type expected by the context:
-                     (:&:) c0 Real a => a -> b
+                     forall a. (:&:) c0 Real a => a -> b
           at T7594.hs:35:8-19
       ‘b’ is a rigid type variable bound by
         the inferred type of bar2 :: b at T7594.hs:35:1-19

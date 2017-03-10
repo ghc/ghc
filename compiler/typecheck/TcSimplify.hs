@@ -1407,7 +1407,7 @@ setImplicationStatus implic@(Implic { ic_binds  = ev_binds_var
      = Left ic
 
 warnRedundantGivens :: SkolemInfo -> Bool
-warnRedundantGivens (SigSkol ctxt _)
+warnRedundantGivens (SigSkol ctxt _ _)
   = case ctxt of
        FunSigCtxt _ warn_redundant -> warn_redundant
        ExprSigCtxt                 -> True

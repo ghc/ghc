@@ -4,7 +4,7 @@ tcfail198.hs:6:36: error:
         because type variable ‘a1’ would escape its scope
       This (rigid, skolem) type variable is bound by
         an expression type signature:
-          a1
+          forall a1. a1
         at tcfail198.hs:6:41
     • In the expression: x :: a
       In the second argument of ‘(++)’, namely ‘[x :: a]’

@@ -9,7 +9,7 @@ T7848.hs:10:9: error:
         because type variable ‘a’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
-          (&) :: a
+          (&) :: forall a. a
         at T7848.hs:10:9-35
     • In the SPECIALISE pragma {-# SPECIALIZE (&) :: a #-}
       In an equation for ‘x’:

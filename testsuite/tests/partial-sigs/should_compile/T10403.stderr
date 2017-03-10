@@ -53,7 +53,7 @@ T10403.hs:28:8: warning: [-Wdeferred-type-errors (in -Wdefault)]
         because type variable ‘t’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
-          app2 :: H (B t)
+          app2 :: forall t. H (B t)
         at T10403.hs:27:1-15
       Expected type: H (B t)
         Actual type: H f0

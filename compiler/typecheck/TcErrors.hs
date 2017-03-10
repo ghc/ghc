@@ -2329,7 +2329,7 @@ ctxtFixes has_ambig_tvs pred implics
   , isTyVarClassPred pred
   , (skol:skols) <- usefulContext implics pred
   , let what | null skols
-             , SigSkol (PatSynCtxt {}) _ <- skol
+             , SigSkol (PatSynCtxt {}) _ _ <- skol
              = text "\"required\""
              | otherwise
              = empty
@@ -2351,8 +2351,8 @@ discardProvCtxtGivens orig givens  -- See Note [discardProvCtxtGivens]
   | otherwise
   = givens
   where
-    discard n (Implic { ic_info = SigSkol (PatSynCtxt n') _ }) = n == n'
-    discard _ _                                                = False
+    discard n (Implic { ic_info = SigSkol (PatSynCtxt n') _ _ }) = n == n'
+    discard _ _                                                  = False
 
 usefulContext :: [Implication] -> PredType -> [SkolemInfo]
 -- usefulContext picks out the implications whose context
@@ -2375,8 +2375,8 @@ usefulContext implics pred
       | implausible_info (ic_info ic) = True
       | otherwise                     = False
 
-    implausible_info (SigSkol (InfSigCtxt {}) _) = True
-    implausible_info _                           = False
+    implausible_info (SigSkol (InfSigCtxt {}) _ _) = True
+    implausible_info _                             = False
     -- Do not suggest adding constraints to an *inferred* type signature
 
 {- Note [Report candidate instances]
@@ -2600,13 +2600,10 @@ mkAmbigMsg prepend_msg ct
 pprSkol :: [Implication] -> TcTyVar -> SDoc
 pprSkol implics tv
   = case skol_info of
-      UnkSkol         -> quotes (ppr tv) <+> text "is an unknown type variable"
-      SigSkol ctxt ty -> ppr_rigid (pprSigSkolInfo ctxt
-                                      (mkSpecForAllTys skol_tvs ty))
-      _               -> ppr_rigid (pprSkolInfo skol_info)
+      UnkSkol -> quotes (ppr tv) <+> text "is an unknown type variable"
+      _       -> ppr_rigid (pprSkolInfo skol_info)
   where
-    Implic { ic_skols = skol_tvs, ic_info = skol_info }
-       = getSkolemInfo implics tv
+    Implic { ic_info = skol_info } = getSkolemInfo implics tv
     ppr_rigid pp_info
        = hang (quotes (ppr tv) <+> text "is a rigid type variable bound by")
             2 (sep [ pp_info

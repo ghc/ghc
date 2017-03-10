@@ -687,13 +687,13 @@ tcPolyCheck prag_fn
                             , fun_matches = matches }))
   = setSrcSpan sig_loc $
     do { traceTc "tcPolyCheck" (ppr poly_id $$ ppr sig_loc)
-       ; (tv_prs, theta, tau) <- tcInstType (tcInstSigTyVars sig_loc) poly_id
+       ; (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
                 -- See Note [Instantiate sig with fresh variables]
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
        ; ev_vars   <- newEvVars theta
        ; let mono_id   = mkLocalId mono_name tau
-             skol_info = SigSkol ctxt (mkPhiTy theta tau)
+             skol_info = SigSkol ctxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
 
        ; (ev_binds, (co_fn, matches'))

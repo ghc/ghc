@@ -54,7 +54,7 @@ import Class( Class )
 import MkId( mkDictFunId )
 import Id
 import Name
-import Var      ( EvVar, mkTyVar, TyVarBndr(..) )
+import Var      ( EvVar, mkTyVar, tyVarName, TyVarBndr(..) )
 import DataCon
 import TyCon
 import VarEnv
@@ -129,31 +129,37 @@ ToDo: this eta-abstraction plays fast and loose with termination,
       fix this
 -}
 
-deeplySkolemise
-  :: TcSigmaType
-  -> TcM ( HsWrapper
-         , [TyVar]     -- all skolemised variables
-         , [EvVar]     -- all "given"s
-         , TcRhoType)
+deeplySkolemise :: TcSigmaType
+                -> TcM ( HsWrapper
+                       , [(Name,TyVar)]     -- All skolemised variables
+                       , [EvVar]            -- All "given"s
+                       , TcRhoType )
 
 deeplySkolemise ty
-  | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-  = do { ids1 <- newSysLocalIds (fsLit "dk") arg_tys
-       ; (subst, tvs1) <- tcInstSkolTyVars tvs
-       ; ev_vars1 <- newEvVars (substThetaUnchecked subst theta)
-       ; (wrap, tvs2, ev_vars2, rho) <-
-           deeplySkolemise (substTyAddInScope subst ty')
-       ; return ( mkWpLams ids1
-                   <.> mkWpTyLams tvs1
-                   <.> mkWpLams ev_vars1
-                   <.> wrap
-                   <.> mkWpEvVarApps ids1
-                , tvs1     ++ tvs2
-                , ev_vars1 ++ ev_vars2
-                , mkFunTys arg_tys rho ) }
+  = go init_subst ty
+  where
+    init_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ty))
 
-  | otherwise
-  = return (idHsWrapper, [], [], ty)
+    go subst ty
+      | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
+      = do { let arg_tys' = substTys subst arg_tys
+           ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
+           ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
+           ; ev_vars1       <- newEvVars (substTheta subst' theta)
+           ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
+           ; let tv_prs1 = map tyVarName tvs `zip` tvs1
+           ; return ( mkWpLams ids1
+                      <.> mkWpTyLams tvs1
+                      <.> mkWpLams ev_vars1
+                      <.> wrap
+                      <.> mkWpEvVarApps ids1
+                    , tv_prs1  ++ tvs_prs2
+                    , ev_vars1 ++ ev_vars2
+                    , mkFunTys arg_tys' rho ) }
+
+      | otherwise
+      = return (idHsWrapper, [], [], substTy subst ty)
+        -- substTy is a quick no-op on an empty substitution
 
 -- | Instantiate all outer type variables
 -- and any context. Never looks through arrows.

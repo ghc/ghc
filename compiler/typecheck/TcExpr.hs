@@ -1490,9 +1490,9 @@ in the other order, the extra signature in f2 is reqd.
 tcExprSig :: LHsExpr Name -> TcIdSigInfo -> TcM (LHsExpr TcId, TcType)
 tcExprSig expr (CompleteSig { sig_bndr = poly_id, sig_loc = loc })
   = setSrcSpan loc $   -- Sets the location for the implication constraint
-    do { (tv_prs, theta, tau) <- tcInstType (tcInstSigTyVars loc) poly_id
+    do { (tv_prs, theta, tau) <- tcInstType tcInstSkolTyVars poly_id
        ; given <- newEvVars theta
-       ; let skol_info = SigSkol ExprSigCtxt (mkPhiTy theta tau)
+       ; let skol_info = SigSkol ExprSigCtxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
        ; (ev_binds, expr') <- checkConstraints skol_info skol_tvs given $
                               tcExtendTyVarEnv2 tv_prs $

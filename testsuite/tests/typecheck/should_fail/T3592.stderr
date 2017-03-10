@@ -4,7 +4,7 @@ T3592.hs:8:5: error:
       Possible fix:
         add (Show a) to the context of
           the type signature for:
-            f :: T a -> String
+            f :: forall a. T a -> String
     • In the expression: show
       In an equation for ‘f’: f = show
 
@@ -13,6 +13,6 @@ T3592.hs:11:7: error:
       Possible fix:
         add (Show a) to the context of
           the type signature for:
-            g :: T a -> String
+            g :: forall a. T a -> String
     • In the expression: show x
       In an equation for ‘g’: g x = show x

@@ -4,6 +4,6 @@ tcfail171.hs:9:10: error:
       Possible fix:
         add (PrintfArg a) to the context of
           the type signature for:
-            phex :: a -> b
+            phex :: forall a b. a -> b
     • In the expression: printf "0x%x" x
       In an equation for ‘phex’: phex x = printf "0x%x" x

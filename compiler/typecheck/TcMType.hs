@@ -57,8 +57,8 @@ module TcMType (
   newMetaSigTyVars, newMetaSigTyVarX,
   newSigTyVar, newWildCardX,
   tcInstType,
-  tcInstSkolTyVars, tcInstSuperSkolTyVarsX,
-  tcInstSigTyVars,
+  tcInstSkolTyVars,tcInstSkolTyVarsX,
+  tcInstSuperSkolTyVarsX,
   tcSkolDFunType, tcSuperSkolTyVars,
 
   instSkolTyCoVars, freshenTyVarBndrs, freshenCoVarBndrsX,
@@ -108,6 +108,7 @@ import VarSet
 import TysWiredIn
 import TysPrim
 import VarEnv
+import NameEnv
 import PrelNames
 import Util
 import Outputable
@@ -478,7 +479,10 @@ tcSuperSkolTyVar subst tv
 -- skolems are non-overlappable; see Note [Overlap and deriving]
 -- for an example where this matters.
 tcInstSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
-tcInstSkolTyVars = tcInstSkolTyVars' False emptyTCvSubst
+tcInstSkolTyVars = tcInstSkolTyVarsX emptyTCvSubst
+
+tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcM (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsX = tcInstSkolTyVars' False
 
 tcInstSuperSkolTyVars :: [TyVar] -> TcM (TCvSubst, [TcTyVar])
 tcInstSuperSkolTyVars = tcInstSuperSkolTyVarsX emptyTCvSubst
@@ -502,12 +506,6 @@ mkTcSkolTyVar lvl loc overlappable
   where
     details = SkolemTv (pushTcLevel lvl) overlappable
               -- NB: skolems bump the level
-
-tcInstSigTyVars :: SrcSpan -> [TyVar]
-                -> TcM (TCvSubst, [TcTyVar])
-tcInstSigTyVars loc tvs
-  = do { lvl <- getTcLevel
-       ; instSkolTyCoVars (mkTcSkolTyVar lvl loc False) tvs }
 
 ------------------
 freshenTyVarBndrs :: [TyVar] -> TcRnIf gbl lcl (TCvSubst, [TyVar])
@@ -1417,8 +1415,8 @@ zonkCtEvidence ctev@(CtDerived { ctev_pred = pred })
        ; return (ctev { ctev_pred = pred' }) }
 
 zonkSkolemInfo :: SkolemInfo -> TcM SkolemInfo
-zonkSkolemInfo (SigSkol cx ty)  = do { ty' <- zonkTcType ty
-                                     ; return (SigSkol cx ty') }
+zonkSkolemInfo (SigSkol cx ty tv_prs)  = do { ty' <- zonkTcType ty
+                                            ; return (SigSkol cx ty' tv_prs) }
 zonkSkolemInfo (InferSkol ntys) = do { ntys' <- mapM do_one ntys
                                      ; return (InferSkol ntys') }
   where
@@ -1606,11 +1604,39 @@ tidyEvVar env var = setVarType var (tidyType env (varType var))
 
 ----------------
 tidySkolemInfo :: TidyEnv -> SkolemInfo -> SkolemInfo
-tidySkolemInfo env (DerivSkol ty)       = DerivSkol (tidyType env ty)
-tidySkolemInfo env (SigSkol cx ty)      = SigSkol cx (tidyType env ty)
-tidySkolemInfo env (InferSkol ids)      = InferSkol (mapSnd (tidyType env) ids)
-tidySkolemInfo env (UnifyForAllSkol ty) = UnifyForAllSkol (tidyType env ty)
-tidySkolemInfo _   info                 = info
+tidySkolemInfo env (DerivSkol ty)         = DerivSkol (tidyType env ty)
+tidySkolemInfo env (SigSkol cx ty tv_prs) = tidySigSkol env cx ty tv_prs
+tidySkolemInfo env (InferSkol ids)        = InferSkol (mapSnd (tidyType env) ids)
+tidySkolemInfo env (UnifyForAllSkol ty)   = UnifyForAllSkol (tidyType env ty)
+tidySkolemInfo _   info                   = info
+
+tidySigSkol :: TidyEnv -> UserTypeCtxt
+            -> TcType -> [(Name,TcTyVar)] -> SkolemInfo
+-- We need to take special care when tidying SigSkol
+-- See Note [SigSkol SkolemInfo] in TcRnTypes
+tidySigSkol env cx ty tv_prs
+  = SigSkol cx (tidy_ty env ty) tv_prs'
+  where
+    tv_prs' = mapSnd (tidyTyVarOcc env) tv_prs
+    inst_env = mkNameEnv tv_prs'
+
+    tidy_ty env (ForAllTy (TvBndr tv vis) ty)
+      = ForAllTy (TvBndr tv' vis) (tidy_ty env' ty)
+      where
+        (env', tv') = tidy_tv_bndr env tv
+
+    tidy_ty env (FunTy arg res)
+      = FunTy (tidyType env arg) (tidy_ty env res)
+
+    tidy_ty env ty = tidyType env ty
+
+    tidy_tv_bndr :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
+    tidy_tv_bndr env@(occ_env, subst) tv
+      | Just tv' <- lookupNameEnv inst_env (tyVarName tv)
+      = ((occ_env, extendVarEnv subst tv tv'), tv')
+
+      | otherwise
+      = tidyTyCoVarBndr env tv
 
 -------------------------------------------------------------------------
 {-
