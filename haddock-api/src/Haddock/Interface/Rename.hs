@@ -179,7 +179,7 @@ renameLSigType :: LHsSigType Name -> RnM (LHsSigType DocName)
 renameLSigType = renameImplicit renameLType
 
 renameLSigWcType :: LHsSigWcType Name -> RnM (LHsSigWcType DocName)
-renameLSigWcType = renameImplicit (renameWc renameLType)
+renameLSigWcType = renameWc (renameImplicit renameLType)
 
 renameLKind :: LHsKind Name -> RnM (LHsKind DocName)
 renameLKind = renameLType
@@ -219,7 +219,7 @@ renameType t = case t of
     ltype'    <- renameLType ltype
     return (HsQualTy { hst_ctxt = lcontext', hst_body = ltype' })
 
-  HsTyVar (L l n) -> return . HsTyVar . L l =<< rename n
+  HsTyVar ip (L l n) -> return . HsTyVar ip . L l =<< rename n
   HsBangTy b ltype -> return . HsBangTy b =<< renameLType ltype
 
   HsAppTy a b -> do
@@ -238,6 +238,7 @@ renameType t = case t of
   HsEqTy ty1 ty2 -> liftM2 HsEqTy (renameLType ty1) (renameLType ty2)
 
   HsTupleTy b ts -> return . HsTupleTy b =<< mapM renameLType ts
+  HsSumTy ts -> HsSumTy <$> mapM renameLType ts
 
   HsOpTy a (L loc op) b -> do
     op' <- rename op
@@ -261,7 +262,7 @@ renameType t = case t of
 
   HsRecTy a               -> HsRecTy <$> mapM renameConDeclFieldField a
   HsCoreTy a              -> pure (HsCoreTy a)
-  HsExplicitListTy  a b   -> HsExplicitListTy  a <$> mapM renameLType b
+  HsExplicitListTy i a b  -> HsExplicitListTy i a <$> mapM renameLType b
   HsExplicitTupleTy a b   -> HsExplicitTupleTy a <$> mapM renameLType b
   HsSpliceTy _ _          -> error "renameType: HsSpliceTy"
   HsWildCardTy a          -> HsWildCardTy <$> renameWildCardInfo a
@@ -328,6 +329,9 @@ renameDecl decl = case decl of
   InstD d -> do
     d' <- renameInstD d
     return (InstD d')
+  DerivD d -> do
+    d' <- renameDerivD d
+    return (DerivD d')
   _ -> error "renameDecl"
 
 renameLThing :: (a Name -> RnM (a DocName)) -> Located (a Name) -> RnM (Located (a DocName))
@@ -340,19 +344,19 @@ renameTyClD d = case d of
     decl' <- renameFamilyDecl decl
     return (FamDecl { tcdFam = decl' })
 
-  SynDecl { tcdLName = lname, tcdTyVars = tyvars, tcdRhs = rhs, tcdFVs = _fvs } -> do
+  SynDecl { tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdRhs = rhs, tcdFVs = _fvs } -> do
     lname'    <- renameL lname
     tyvars'   <- renameLHsQTyVars tyvars
     rhs'     <- renameLType rhs
-    return (SynDecl { tcdLName = lname', tcdTyVars = tyvars', tcdRhs = rhs', tcdFVs = placeHolderNames })
+    return (SynDecl { tcdLName = lname', tcdTyVars = tyvars', tcdFixity = fixity, tcdRhs = rhs', tcdFVs = placeHolderNames })
 
-  DataDecl { tcdLName = lname, tcdTyVars = tyvars, tcdDataDefn = defn, tcdFVs = _fvs } -> do
+  DataDecl { tcdLName = lname, tcdTyVars = tyvars, tcdFixity = fixity, tcdDataDefn = defn, tcdFVs = _fvs } -> do
     lname'    <- renameL lname
     tyvars'   <- renameLHsQTyVars tyvars
     defn'     <- renameDataDefn defn
-    return (DataDecl { tcdLName = lname', tcdTyVars = tyvars', tcdDataDefn = defn', tcdDataCusk = PlaceHolder, tcdFVs = placeHolderNames })
+    return (DataDecl { tcdLName = lname', tcdTyVars = tyvars', tcdFixity = fixity, tcdDataDefn = defn', tcdDataCusk = PlaceHolder, tcdFVs = placeHolderNames })
 
-  ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars
+  ClassDecl { tcdCtxt = lcontext, tcdLName = lname, tcdTyVars = ltyvars, tcdFixity = fixity
             , tcdFDs = lfundeps, tcdSigs = lsigs, tcdATs = ats, tcdATDefs = at_defs } -> do
     lcontext' <- renameLContext lcontext
     lname'    <- renameL lname
@@ -363,6 +367,7 @@ renameTyClD d = case d of
     at_defs'  <- mapM renameLTyFamDefltEqn at_defs
     -- we don't need the default methods or the already collected doc entities
     return (ClassDecl { tcdCtxt = lcontext', tcdLName = lname', tcdTyVars = ltyvars'
+                      , tcdFixity = fixity
                       , tcdFDs = lfundeps', tcdSigs = lsigs', tcdMeths= emptyBag
                       , tcdATs = ats', tcdATDefs = at_defs', tcdDocs = [], tcdFVs = placeHolderNames })
 
@@ -376,7 +381,9 @@ renameTyClD d = case d of
 
 renameFamilyDecl :: FamilyDecl Name -> RnM (FamilyDecl DocName)
 renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
-                             , fdTyVars = ltyvars, fdResultSig = result
+                             , fdTyVars = ltyvars
+                             , fdFixity = fixity
+                             , fdResultSig = result
                              , fdInjectivityAnn = injectivity }) = do
     info'        <- renameFamilyInfo info
     lname'       <- renameL lname
@@ -384,7 +391,9 @@ renameFamilyDecl (FamilyDecl { fdInfo = info, fdLName = lname
     result'      <- renameFamilyResultSig result
     injectivity' <- renameMaybeInjectivityAnn injectivity
     return (FamilyDecl { fdInfo = info', fdLName = lname'
-                       , fdTyVars = ltyvars', fdResultSig = result'
+                       , fdTyVars = ltyvars'
+                       , fdFixity = fixity
+                       , fdResultSig = result'
                        , fdInjectivityAnn = injectivity' })
 
 
@@ -412,7 +421,8 @@ renameDataDefn (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext, dd_cType = cType
     cons'     <- mapM (mapM renameCon) cons
     -- I don't think we need the derivings, so we return Nothing
     return (HsDataDefn { dd_ND = nd, dd_ctxt = lcontext', dd_cType = cType
-                       , dd_kindSig = k', dd_cons = cons', dd_derivs = Nothing })
+                       , dd_kindSig = k', dd_cons = cons'
+                       , dd_derivs = noLoc [] })
 
 renameCon :: ConDecl Name -> RnM (ConDecl DocName)
 renameCon decl@(ConDeclH98 { con_name = lname, con_qvars = ltyvars
@@ -467,10 +477,10 @@ renameSig sig = case sig of
     lnames' <- mapM renameL lnames
     ltype' <- renameLSigType sig_ty
     return (ClassOpSig is_default lnames' ltype')
-  PatSynSig lname sig_ty -> do
-    lname' <- renameL lname
+  PatSynSig lnames sig_ty -> do
+    lnames' <- mapM renameL lnames
     sig_ty' <- renameLSigType sig_ty
-    return $ PatSynSig lname' sig_ty'
+    return $ PatSynSig lnames' sig_ty'
   FixSig (FixitySig lnames fixity) -> do
     lnames' <- mapM renameL lnames
     return $ FixSig (FixitySig lnames' fixity)
@@ -503,6 +513,15 @@ renameInstD (DataFamInstD { dfid_inst = d }) = do
   d' <- renameDataFamInstD d
   return (DataFamInstD { dfid_inst = d' })
 
+renameDerivD :: DerivDecl Name -> RnM (DerivDecl DocName)
+renameDerivD (DerivDecl { deriv_type = ty
+                        , deriv_strategy = strat
+                        , deriv_overlap_mode = omode }) = do
+  ty' <- renameLSigType ty
+  return (DerivDecl { deriv_type = ty'
+                    , deriv_strategy = strat
+                    , deriv_overlap_mode = omode })
+
 renameClsInstD :: ClsInstDecl Name -> RnM (ClsInstDecl DocName)
 renameClsInstD (ClsInstDecl { cid_overlap_mode = omode
                             , cid_poly_ty =ltype, cid_tyfam_insts = lATs
@@ -523,30 +542,33 @@ renameTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
                                , tfid_fvs = placeHolderNames }) }
 
 renameLTyFamInstEqn :: LTyFamInstEqn Name -> RnM (LTyFamInstEqn DocName)
-renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_rhs = rhs }))
+renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_fixity = fixity, tfe_rhs = rhs }))
   = do { tc' <- renameL tc
        ; pats' <- renameImplicit (mapM renameLType) pats
        ; rhs' <- renameLType rhs
        ; return (L loc (TyFamEqn { tfe_tycon = tc'
                                  , tfe_pats = pats'
+                                 , tfe_fixity = fixity
                                  , tfe_rhs = rhs' })) }
 
 renameLTyFamDefltEqn :: LTyFamDefltEqn Name -> RnM (LTyFamDefltEqn DocName)
-renameLTyFamDefltEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = tvs, tfe_rhs = rhs }))
+renameLTyFamDefltEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = tvs, tfe_fixity = fixity, tfe_rhs = rhs }))
   = do { tc'  <- renameL tc
        ; tvs' <- renameLHsQTyVars tvs
        ; rhs' <- renameLType rhs
        ; return (L loc (TyFamEqn { tfe_tycon = tc'
                                  , tfe_pats = tvs'
+                                 , tfe_fixity = fixity
                                  , tfe_rhs = rhs' })) }
 
 renameDataFamInstD :: DataFamInstDecl Name -> RnM (DataFamInstDecl DocName)
-renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats, dfid_defn = defn })
+renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats, dfid_fixity = fixity, dfid_defn = defn })
   = do { tc' <- renameL tc
        ; pats' <- renameImplicit (mapM renameLType) pats
        ; defn' <- renameDataDefn defn
        ; return (DataFamInstDecl { dfid_tycon = tc'
                                  , dfid_pats = pats'
+                                 , dfid_fixity = fixity
                                  , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
 
 renameImplicit :: (in_thing -> RnM out_thing)
@@ -563,7 +585,7 @@ renameWc :: (in_thing -> RnM out_thing)
 renameWc rn_thing (HsWC { hswc_body = thing })
   = do { thing' <- rn_thing thing
        ; return (HsWC { hswc_body = thing'
-                      , hswc_wcs = PlaceHolder, hswc_ctx = Nothing }) }
+                      , hswc_wcs = PlaceHolder }) }
 
 renameDocInstance :: DocInstance Name -> RnM (DocInstance DocName)
 renameDocInstance (inst, idoc, L l n) = do

@@ -34,7 +34,7 @@ import qualified Data.Map as Map
 import           Data.Maybe
 import           Text.XHtml hiding     ( name, title, p, quote )
 
-import GHC
+import GHC hiding (LexicalFixity(..))
 import GHC.Exts
 import Name
 import BooleanFormula
@@ -44,17 +44,18 @@ ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
        -> DocForDecl DocName -> [DocInstance DocName] -> [(DocName, Fixity)]
        -> [(DocName, DocForDecl DocName)] -> Splice -> Unicode -> Qualification -> Html
 ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances fixities subdocs splice unicode qual = case decl of
-  TyClD (FamDecl d)         -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
-  TyClD d@(DataDecl {})     -> ppDataDecl summ links instances fixities subdocs loc mbDoc d splice unicode qual
-  TyClD d@(SynDecl {})      -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
-  TyClD d@(ClassDecl {})    -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
-  SigD (TypeSig lnames lty) -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
+  TyClD (FamDecl d)            -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
+  TyClD d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d splice unicode qual
+  TyClD d@(SynDecl {})         -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
+  TyClD d@(ClassDecl {})       -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
+  SigD (TypeSig lnames lty)    -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
                                          (hsSigWcType lty) fixities splice unicode qual
-  SigD (PatSynSig lname ty) -> ppLPatSig summ links loc (mbDoc, fnArgsDoc) lname
+  SigD (PatSynSig lnames ty)   -> ppLPatSig summ links loc (mbDoc, fnArgsDoc) lnames
                                          ty fixities splice unicode qual
-  ForD d                         -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
-  InstD _                        -> noHtml
-  _                              -> error "declaration not supported by ppDecl"
+  ForD d                       -> ppFor summ links loc (mbDoc, fnArgsDoc) d fixities splice unicode qual
+  InstD _                      -> noHtml
+  DerivD _                     -> noHtml
+  _                            -> error "declaration not supported by ppDecl"
 
 
 ppLFunSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
@@ -74,21 +75,19 @@ ppFunSig summary links loc doc docnames typ fixities splice unicode qual =
     pp_typ = ppLType unicode qual typ
 
 ppLPatSig :: Bool -> LinksInfo -> SrcSpan -> DocForDecl DocName ->
-             Located DocName -> LHsSigType DocName ->
+             [Located DocName] -> LHsSigType DocName ->
              [(DocName, Fixity)] ->
              Splice -> Unicode -> Qualification -> Html
-ppLPatSig summary links loc (doc, _argDocs) (L _ name) typ fixities splice unicode qual
+ppLPatSig summary links loc (doc, _argDocs) docnames typ fixities splice unicode qual
   | summary = pref1
-  | otherwise = topDeclElem links loc splice [name] (pref1 <+> ppFixities fixities qual)
+  | otherwise = topDeclElem links loc splice (map unLoc docnames) (pref1 <+> ppFixities fixities qual)
                 +++ docSection Nothing qual doc
   where
     pref1 = hsep [ keyword "pattern"
-                 , ppBinder summary occname
+                 , hsep $ punctuate comma $ map (ppBinder summary . getOccName) docnames
                  , dcolon unicode
                  , ppLType unicode qual (hsSigType typ)
                  ]
-
-    occname = nameOccName . getName $ name
 
 ppSigLike :: Bool -> LinksInfo -> SrcSpan -> Html -> DocForDecl DocName ->
              [DocName] -> [(DocName, Fixity)] -> (HsType DocName, Html) ->
@@ -645,10 +644,8 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
 ppInstanceSigs links splice unicode qual sigs = do
     TypeSig lnames typ <- sigs
     let names = map unLoc lnames
-        L loc rtyp = get_type typ
+        L loc rtyp = hsSigWcType typ
     return $ ppSimpleSig links splice unicode qual loc names rtyp
-    where
-      get_type = hswc_body . hsib_body
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
@@ -916,6 +913,9 @@ tupleParens HsUnboxedTuple = ubxParenList
 tupleParens _              = parenList
 
 
+sumParens :: [Html] -> Html
+sumParens = ubxSumList
+
 --------------------------------------------------------------------------------
 -- * Rendering of HsType
 --------------------------------------------------------------------------------
@@ -984,19 +984,20 @@ ppr_mono_ty ctxt_prec (HsQualTy ctxt ty) unicode qual
     ppLContext ctxt unicode qual <+> ppr_mono_lty pREC_TOP ty unicode qual
 
 -- UnicodeSyntax alternatives
-ppr_mono_ty _ (HsTyVar (L _ name)) True _
+ppr_mono_ty _ (HsTyVar _ (L _ name)) True _
   | getOccString (getName name) == "*"    = toHtml "★"
   | getOccString (getName name) == "(->)" = toHtml "(→)"
 
 ppr_mono_ty _         (HsBangTy b ty)     u q = ppBang b +++ ppLParendType u q ty
-ppr_mono_ty _         (HsTyVar (L _ name)) _ q = ppDocName q Prefix True name
+ppr_mono_ty _         (HsTyVar _ (L _ name)) _ q = ppDocName q Prefix True name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   u q = ppr_fun_ty ctxt_prec ty1 ty2 u q
 ppr_mono_ty _         (HsTupleTy con tys) u q = tupleParens con (map (ppLType u q) tys)
+ppr_mono_ty _         (HsSumTy tys) u q = sumParens (map (ppLType u q) tys)
 ppr_mono_ty _         (HsKindSig ty kind) u q =
     parens (ppr_mono_lty pREC_TOP ty u q <+> dcolon u <+> ppLKind u q kind)
 ppr_mono_ty _         (HsListTy ty)       u q = brackets (ppr_mono_lty pREC_TOP ty u q)
 ppr_mono_ty _         (HsPArrTy ty)       u q = pabrackets (ppr_mono_lty pREC_TOP ty u q)
-ppr_mono_ty ctxt_prec (HsIParamTy n ty)   u q =
+ppr_mono_ty ctxt_prec (HsIParamTy (L _ n) ty) u q =
     maybeParen ctxt_prec pREC_CTX $ ppIPName n <+> dcolon u <+> ppr_mono_lty pREC_TOP ty u q
 ppr_mono_ty _         (HsSpliceTy {})     _ _ = error "ppr_mono_ty HsSpliceTy"
 ppr_mono_ty _         (HsRecTy {})        _ _ = toHtml "{..}"
@@ -1004,7 +1005,8 @@ ppr_mono_ty _         (HsRecTy {})        _ _ = toHtml "{..}"
        -- placeholder in the signature, which is followed by the field
        -- declarations.
 ppr_mono_ty _         (HsCoreTy {})       _ _ = error "ppr_mono_ty HsCoreTy"
-ppr_mono_ty _         (HsExplicitListTy _ tys) u q = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitListTy Promoted _ tys) u q = promoQuote $ brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
+ppr_mono_ty _         (HsExplicitListTy NotPromoted _ tys) u q = brackets $ hsep $ punctuate comma $ map (ppLType u q) tys
 ppr_mono_ty _         (HsExplicitTupleTy _ tys) u q = promoQuote $ parenList $ map (ppLType u q) tys
 ppr_mono_ty _         (HsAppsTy {})       _ _ = error "ppr_mono_ty HsAppsTy"
 

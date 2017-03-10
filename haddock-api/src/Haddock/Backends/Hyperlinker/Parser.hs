@@ -31,11 +31,19 @@ chunk str@(c:_)
 chunk str
     | "--" `isPrefixOf` str = chunk' $ spanToNewline str
     | "{-" `isPrefixOf` str = chunk' $ chunkComment 0 str
-    | otherwise = case lex str of
+    | otherwise = case lex' str of
         (tok:_) -> chunk' tok
         [] -> [str]
   where
     chunk' (c, rest) = c:(chunk rest)
+
+-- | A bit better lexer then the default, i.e. handles DataKinds quotes
+lex' :: ReadS String
+lex' ('\'' : '\'' : rest)              = [("''", rest)]
+lex' str@('\'' : '\\' : _ : '\'' : _)  = lex str
+lex' str@('\'' : _ : '\'' : _)         = lex str
+lex' ('\'' : rest)                     = [("'", rest)]
+lex' str                               = lex str
 
 -- | Split input to "first line" string and the rest of it.
 --
@@ -124,6 +132,8 @@ classify str
     | "--" `isPrefixOf` str = TkComment
     | "{-#" `isPrefixOf` str = TkPragma
     | "{-" `isPrefixOf` str = TkComment
+classify "''" = TkSpecial
+classify "'"  = TkSpecial
 classify str@(c:_)
     | isSpace c = TkSpace
     | isDigit c = TkNumber

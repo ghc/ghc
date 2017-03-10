@@ -72,7 +72,7 @@ types =
     everything (<|>) ty
   where
     ty term = case cast term of
-        (Just (GHC.L sspan (GHC.HsTyVar name))) ->
+        (Just (GHC.L sspan (GHC.HsTyVar _ name))) ->
             pure (sspan, RtkType (GHC.unLoc name))
         _ -> empty
 
@@ -118,7 +118,7 @@ decls (group, _, _, _) = concatMap ($ group)
   where
     typ (GHC.L _ t) = case t of
         GHC.DataDecl { tcdLName = name } -> pure . decl $ name
-        GHC.SynDecl name _ _ _ -> pure . decl $ name
+        GHC.SynDecl name _ _ _ _ -> pure . decl $ name
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
     fun term = case cast term of
@@ -152,11 +152,11 @@ imports src@(_, imps, _, _) =
     everything (<|>) ie src ++ mapMaybe (imp . GHC.unLoc) imps
   where
     ie term = case cast term of
-        (Just (GHC.IEVar v)) -> pure $ var v
-        (Just (GHC.IEThingAbs t)) -> pure $ typ t
-        (Just (GHC.IEThingAll t)) -> pure $ typ t
+        (Just (GHC.IEVar v)) -> pure $ var $ GHC.ieLWrappedName v
+        (Just (GHC.IEThingAbs t)) -> pure $ typ $ GHC.ieLWrappedName t
+        (Just (GHC.IEThingAll t)) -> pure $ typ $ GHC.ieLWrappedName t
         (Just (GHC.IEThingWith t _ vs _fls)) ->
-          [typ t] ++ map var vs
+          [typ $ GHC.ieLWrappedName t] ++ map (var . GHC.ieLWrappedName) vs
         _ -> empty
     typ (GHC.L sspan name) = (sspan, RtkType name)
     var (GHC.L sspan name) = (sspan, RtkVar name)

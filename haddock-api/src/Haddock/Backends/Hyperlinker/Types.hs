@@ -12,16 +12,19 @@ data Token = Token
     , tkValue :: String
     , tkSpan :: Span
     }
+    deriving (Show)
 
 data Position = Position
     { posRow :: !Int
     , posCol :: !Int
     }
+    deriving (Show)
 
 data Span = Span
     { spStart :: Position
     , spEnd :: Position
     }
+    deriving (Show)
 
 data TokenType
     = TkIdentifier

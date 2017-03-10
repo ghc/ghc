@@ -37,7 +37,7 @@ library
       Haskell2010
 
   build-depends:
-      base >= 4.3 && < 4.10
+      base >= 4.3 && < 4.11
     , bytestring
     , filepath
     , directory

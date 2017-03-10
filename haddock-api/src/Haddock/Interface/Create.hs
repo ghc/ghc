@@ -47,7 +47,7 @@ import Bag
 import RdrName
 import TcRnTypes
 import FastString (concatFS)
-import BasicTypes ( StringLiteral(..) )
+import BasicTypes ( StringLiteral(..), SourceText(..) )
 import qualified Outputable as O
 import HsDecls ( getConDetails )
 
@@ -163,7 +163,7 @@ mkAliasMap dflags mRenamedSource =
     Just (_,impDecls,_,_) ->
       M.fromList $
       mapMaybe (\(SrcLoc.L _ impDecl) -> do
-        alias <- ideclAs impDecl
+        SrcLoc.L _ alias <- ideclAs impDecl
         return $
           (lookupModuleDyn dflags
              (fmap Module.fsToUnitId $
@@ -305,16 +305,16 @@ mkMaps dflags gre instances decls =
       where loc = case d of
               TyFamInstD _ -> l -- The CoAx's loc is the whole line, but only for TFs
               _ -> getInstLoc d
+    names l (DerivD {}) = maybeToList (M.lookup l instanceMap) -- See note [2].
     names _ decl = getMainDeclBinder decl
 
 -- Note [2]:
 ------------
--- We relate ClsInsts to InstDecls using the SrcSpans buried inside them.
--- That should work for normal user-written instances (from looking at GHC
--- sources). We can assume that commented instances are user-written.
--- This lets us relate Names (from ClsInsts) to comments (associated
--- with InstDecls).
-
+-- We relate ClsInsts to InstDecls and DerivDecls using the SrcSpans buried
+-- inside them. That should work for normal user-written instances (from
+-- looking at GHC sources). We can assume that commented instances are
+-- user-written. This lets us relate Names (from ClsInsts) to comments
+-- (associated with InstDecls and DerivDecls).
 
 --------------------------------------------------------------------------------
 -- Declarations
@@ -338,7 +338,7 @@ subordinates instMap decl = case decl of
                    , name <- getMainDeclBinder d, not (isValD d)
                    ]
     dataSubs :: HsDataDefn Name -> [(Name, [HsDocString], Map Int HsDocString)]
-    dataSubs dd = constrs ++ fields
+    dataSubs dd = constrs ++ fields ++ derivs
       where
         cons = map unL $ (dd_cons dd)
         constrs = [ (unL cname, maybeToList $ fmap unL $ con_doc c, M.empty)
@@ -347,6 +347,11 @@ subordinates instMap decl = case decl of
                   | RecCon flds <- map getConDetails cons
                   , L _ (ConDeclField ns _ doc) <- (unLoc flds)
                   , L _ n <- ns ]
+        derivs  = [ (instName, [unL doc], M.empty)
+                  | HsIB { hsib_body = L l (HsDocTy _ doc) }
+                      <- concatMap (unLoc . deriv_clause_tys . unLoc) $
+                           unLoc $ dd_derivs dd
+                  , Just instName <- [M.lookup l instMap] ]
 
 -- | Extract function argument docs from inside types.
 typeDocs :: HsDecl Name -> Map Int HsDocString
@@ -394,12 +399,12 @@ mkFixMap group_ = M.fromList [ (n,f)
 -- | Take all declarations except pragmas, infix decls, rules from an 'HsGroup'.
 ungroup :: HsGroup Name -> [LHsDecl Name]
 ungroup group_ =
-  mkDecls (tyClGroupConcat . hs_tyclds) TyClD  group_ ++
+  mkDecls (tyClGroupTyClDecls . hs_tyclds) TyClD  group_ ++
   mkDecls hs_derivds             DerivD group_ ++
   mkDecls hs_defds               DefD   group_ ++
   mkDecls hs_fords               ForD   group_ ++
   mkDecls hs_docs                DocD   group_ ++
-  mkDecls hs_instds              InstD  group_ ++
+  mkDecls (tyClGroupInstDecls . hs_tyclds) InstD  group_ ++
   mkDecls (typesigs . hs_valds)  SigD   group_ ++
   mkDecls (valbinds . hs_valds)  ValD   group_
   where
@@ -433,8 +438,9 @@ filterDecls :: [(LHsDecl a, doc)] -> [(LHsDecl a, doc)]
 filterDecls = filter (isHandled . unL . fst)
   where
     isHandled (ForD (ForeignImport {})) = True
-    isHandled (TyClD {}) = True
-    isHandled (InstD {}) = True
+    isHandled (TyClD {})  = True
+    isHandled (InstD {})  = True
+    isHandled (DerivD {}) = True
     isHandled (SigD d) = isUserLSig (reL d)
     isHandled (ValD _) = True
     -- we keep doc declarations to be able to get at named docs
@@ -504,10 +510,10 @@ mkExportItems
     Nothing -> fullModuleContents dflags warnings gre maps fixMap splices decls
     Just exports -> liftM concat $ mapM lookupExport exports
   where
-    lookupExport (IEVar (L _ x))         = declWith x
-    lookupExport (IEThingAbs (L _ t))    = declWith t
-    lookupExport (IEThingAll (L _ t))    = declWith t
-    lookupExport (IEThingWith (L _ t) _ _ _) = declWith t
+    lookupExport (IEVar (L _ x))         = declWith $ ieWrappedName x
+    lookupExport (IEThingAbs (L _ t))    = declWith $ ieWrappedName t
+    lookupExport (IEThingAll (L _ t))    = declWith $ ieWrappedName t
+    lookupExport (IEThingWith (L _ t) _ _ _) = declWith $ ieWrappedName t
     lookupExport (IEModuleContents (L _ m)) =
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
@@ -562,7 +568,7 @@ mkExportItems
 
                   L loc (TyClD cl@ClassDecl{}) -> do
                     mdef <- liftGhcToErrMsgGhc $ minimalDef t
-                    let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . noLoc . fmap noLoc) mdef
+                    let sig = maybeToList $ fmap (noLoc . MinimalSig NoSourceText . noLoc . fmap noLoc) mdef
                     return [ mkExportDecl t
                       (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_ ]
 
@@ -756,11 +762,13 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
       | otherwise = return Nothing
     mkExportItem decl@(L l (InstD d))
       | Just name <- M.lookup (getInstLoc d) instMap =
-        let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
-        return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
+        expInst decl l name
+    mkExportItem decl@(L l (DerivD {}))
+      | Just name <- M.lookup l instMap =
+        expInst decl l name
     mkExportItem (L l (TyClD cl@ClassDecl{ tcdLName = L _ name, tcdSigs = sigs })) = do
       mdef <- liftGhcToErrMsgGhc $ minimalDef name
-      let sig = maybeToList $ fmap (noLoc . MinimalSig mempty . noLoc . fmap noLoc) mdef
+      let sig = maybeToList $ fmap (noLoc . MinimalSig NoSourceText . noLoc . fmap noLoc) mdef
       expDecl (L l (TyClD cl { tcdSigs = sig ++ sigs })) l name
     mkExportItem decl@(L l d)
       | name:_ <- getMainDeclBinder d = expDecl decl l name
@@ -771,6 +779,10 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
 
     expDecl decl l name = return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
       where (doc, subs) = lookupDocs name warnings docMap argMap subMap
+
+    expInst decl l name =
+        let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
+        return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
 
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
@@ -834,7 +846,7 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
   data_ty
     -- ResTyGADT _ ty <- con_res con = ty
     | ConDeclGADT{} <- con = hsib_body $ con_type con
-    | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar (noLoc t))) tvs
+    | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar NotPromoted (noLoc t))) tvs
 
 -- | Keep export items with docs.
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]

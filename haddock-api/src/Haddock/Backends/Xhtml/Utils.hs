@@ -20,7 +20,7 @@ module Haddock.Backends.Xhtml.Utils (
   (<+>), (<=>), char,
   keyword, punctuate,
 
-  braces, brackets, pabrackets, parens, parenList, ubxParenList,
+  braces, brackets, pabrackets, parens, parenList, ubxParenList, ubxSumList,
   arrow, comma, dcolon, dot, darrow, equals, forallSymbol, quote, promoQuote,
 
   hsep, vcat,
@@ -75,8 +75,7 @@ spliceURL' maybe_file maybe_mod maybe_name maybe_loc = run
       case span_ of
       RealSrcSpan span__ ->
         show $ srcSpanStartLine span__
-      UnhelpfulSpan _ ->
-        error "spliceURL UnhelpfulSpan"
+      UnhelpfulSpan _ -> ""
 
   run "" = ""
   run ('%':'M':rest) = mdl  ++ run rest
@@ -176,6 +175,10 @@ parenList = parens . hsep . punctuate comma
 
 ubxParenList :: [Html] -> Html
 ubxParenList = ubxparens . hsep . punctuate comma
+
+
+ubxSumList :: [Html]  -> Html
+ubxSumList = ubxparens . hsep . punctuate (toHtml " | ")
 
 
 ubxparens :: Html -> Html

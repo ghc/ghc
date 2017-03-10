@@ -26,7 +26,7 @@ import Text.XHtml hiding ( name, title, p, quote )
 import qualified Data.Map as M
 import qualified Data.List as List
 
-import GHC
+import GHC hiding (LexicalFixity(..))
 import Name
 import RdrName
 import FastString (unpackFS)

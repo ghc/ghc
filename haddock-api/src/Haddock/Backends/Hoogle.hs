@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Backends.Hoogle
@@ -15,7 +16,7 @@ module Haddock.Backends.Hoogle (
     ppHoogle
   ) where
 
-import BasicTypes (OverlapFlag(..), OverlapMode(..))
+import BasicTypes (OverlapFlag(..), OverlapMode(..), SourceText(..))
 import InstEnv (ClsInst(..))
 import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
@@ -84,7 +85,8 @@ dropHsDocTy = f
         f (HsDocTy a _) = f $ unL a
         f x = x
 
-outHsType :: OutputableBndr a => DynFlags -> HsType a -> String
+outHsType :: (OutputableBndrId a)
+          => DynFlags -> HsType a -> String
 outHsType dflags = out dflags . dropHsDocTy
 
 
@@ -180,6 +182,7 @@ ppClass dflags decl subdocs = (out dflags decl{tcdSigs=[]} ++ ppTyFams) :  ppMet
         tyFamEqnToSyn tfe = SynDecl
             { tcdLName = tfe_tycon tfe
             , tcdTyVars = tfe_pats tfe
+            , tcdFixity = tfe_fixity tfe
             , tcdRhs = tfe_rhs tfe
             , tcdFVs = emptyNameSet
             }
@@ -194,7 +197,7 @@ ppInstance dflags x =
     -- safety information to a state where the Outputable instance
     -- produces no output which means no overlap and unsafe (or [safe]
     -- is generated).
-    cls = x { is_flag = OverlapFlag { overlapMode = NoOverlap mempty
+    cls = x { is_flag = OverlapFlag { overlapMode = NoOverlap NoSourceText
                                     , isSafeOverlap = False } }
 
 ppSynonym :: DynFlags -> TyClDecl Name -> [String]
@@ -202,7 +205,7 @@ ppSynonym dflags x = [out dflags x]
 
 ppData :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
 ppData dflags decl@(DataDecl { tcdDataDefn = defn }) subdocs
-    = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=Nothing }} :
+    = showData decl{ tcdDataDefn = defn { dd_cons=[],dd_derivs=noLoc [] }} :
       concatMap (ppCtor dflags decl subdocs . unL) (dd_cons defn)
     where
 
@@ -242,7 +245,7 @@ ppCtor dflags dat subdocs con@ConDeclH98 {}
         -- docs for con_names on why it is a list to begin with.
         name = commaSeparate dflags . map unL $ getConNames con
 
-        resType = apps $ map (reL . HsTyVar . reL) $
+        resType = apps $ map (reL . HsTyVar NotPromoted . reL) $
                         (tcdName dat) : [hsTyVarName v | L _ v@(UserTyVar _) <- hsQTvExplicit $ tyClDeclTyVars dat]
 
 ppCtor dflags _dat subdocs con@ConDeclGADT {}

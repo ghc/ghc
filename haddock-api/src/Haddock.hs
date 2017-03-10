@@ -68,7 +68,6 @@ import System.Directory (doesDirectoryExist)
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
-import StaticFlags (discardStaticFlags)
 import Packages
 import Panic (handleGhcException)
 import Module
@@ -410,18 +409,9 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
     parseGhcFlags dynflags = do
       -- TODO: handle warnings?
 
-      -- NOTA BENE: We _MUST_ discard any static flags here, because we cannot
-      -- rely on Haddock to parse them, as it only parses the DynFlags. Yet if
-      -- we pass any, Haddock will fail. Since StaticFlags are global to the
-      -- GHC invocation, there's also no way to reparse/save them to set them
-      -- again properly.
-      --
-      -- This is a bit of a hack until we get rid of the rest of the remaining
-      -- StaticFlags. See GHC issue #8276.
-      let flags' = discardStaticFlags flags
-      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags')
+      (dynflags', rest, _) <- parseDynamicFlags dynflags (map noLoc flags)
       if not (null rest)
-        then throwE ("Couldn't parse GHC options: " ++ unwords flags')
+        then throwE ("Couldn't parse GHC options: " ++ unwords flags)
         else return dynflags'
 
 -------------------------------------------------------------------------------
@@ -576,7 +566,15 @@ getExecDir = try_size 2048 -- plenty, PATH_MAX is 512 under Win32.
           _ | ret < size -> fmap (Just . dropFileName) $ peekCWString buf
             | otherwise  -> try_size (size * 2)
 
-foreign import stdcall unsafe "windows.h GetModuleFileNameW"
+# if defined(i386_HOST_ARCH)
+#  define WINDOWS_CCONV stdcall
+# elif defined(x86_64_HOST_ARCH)
+#  define WINDOWS_CCONV ccall
+# else
+#  error Unknown mingw32 arch
+# endif
+
+foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
   c_GetModuleFileName :: Ptr () -> CWString -> Word32 -> IO Word32
 #else
 getExecDir = return Nothing

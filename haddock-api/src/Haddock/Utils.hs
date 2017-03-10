@@ -128,7 +128,7 @@ mkMeta x = emptyMetaDoc { _doc = x }
 mkEmptySigWcType :: LHsType Name -> LHsSigWcType Name
 -- Dubious, because the implicit binders are empty even
 -- though the type might have free varaiables
-mkEmptySigWcType ty = mkEmptyImplicitBndrs (mkEmptyWildCardBndrs ty)
+mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs ty)
 
 addClassContext :: Name -> LHsQTyVars Name -> LSig Name -> LSig Name
 -- Add the class context to a class-op signature
@@ -150,7 +150,7 @@ addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
 lHsQTyVarsToTypes :: LHsQTyVars Name -> [LHsType Name]
 lHsQTyVarsToTypes tvs
-  = [ noLoc (HsTyVar (noLoc (hsLTyVarName tv)))
+  = [ noLoc (HsTyVar NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
 
 --------------------------------------------------------------------------------

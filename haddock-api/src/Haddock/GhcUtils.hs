@@ -104,7 +104,7 @@ sigName (L _ sig) = sigNameNoLoc sig
 sigNameNoLoc :: Sig name -> [name]
 sigNameNoLoc (TypeSig      ns _)       = map unLoc ns
 sigNameNoLoc (ClassOpSig _ ns _)       = map unLoc ns
-sigNameNoLoc (PatSynSig    n _)        = [unLoc n]
+sigNameNoLoc (PatSynSig    ns _)       = map unLoc ns
 sigNameNoLoc (SpecSig      n _ _)      = [unLoc n]
 sigNameNoLoc (InlineSig    n _)        = [unLoc n]
 sigNameNoLoc (FixSig (FixitySig ns _)) = map unLoc ns
