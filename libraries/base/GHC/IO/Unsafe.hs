@@ -108,33 +108,17 @@ unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> a
 When passed a value of type @IO a@, the 'IO' will only be performed
 when the value of the @a@ is demanded.  This is used to implement lazy
 file reading, see 'System.IO.hGetContents'.
+
+@ unsafeInterleaveIO m === pure (unsafePerformIO m) @
 -}
 {-# INLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
+unsafeInterleaveIO m = pure (unsafePerformIO m)
 
--- We used to believe that INLINE on unsafeInterleaveIO was safe,
--- because the state from this IO thread is passed explicitly to the
--- interleaved IO, so it cannot be floated out and shared.
---
--- HOWEVER, if the compiler figures out that r is used strictly here,
--- then it will eliminate the thunk and the side effects in m will no
--- longer be shared in the way the programmer was probably expecting,
--- but can be performed many times.  In #5943, this broke our
--- definition of fixIO, which contains
---
---    ans <- unsafeInterleaveIO (takeMVar m)
---
--- after inlining, we lose the sharing of the takeMVar, so the second
--- time 'ans' was demanded we got a deadlock.  We could fix this with
--- a readMVar, but it seems wrong for unsafeInterleaveIO to sometimes
--- share and sometimes not (plus it probably breaks the noDuplicate).
--- So now, we do not inline unsafeDupableInterleaveIO.
+-- | @ unsafeDupableInterleaveIO m = pure (unsafeDupablePerformIO m) @
 {-# INLINE unsafeDupableInterleaveIO #-}
 unsafeDupableInterleaveIO :: IO a -> IO a
-unsafeDupableInterleaveIO (IO m)
-  = IO ( \ s ->
-       (# s, runRW# (\s2 -> case m s2 of (# _, res #) -> res) #))
+unsafeDupableInterleaveIO m = pure (unsafeDupablePerformIO m)
 
 {-|
 Ensures that the suspensions under evaluation by the current thread
