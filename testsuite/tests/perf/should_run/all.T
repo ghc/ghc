@@ -22,7 +22,9 @@ test('T12791',
 
 test('T10359',
      [stats_num_field('bytes allocated',
-          [(wordsize(64), 499512, 5),
+          [(wordsize(64), 450920, 5),
+           # previously   499512    (amd64/Linux)
+           # 2017-03-10   450920    (amd64/Linux)  Don't generate wrapper for !Int#
            (wordsize(32), 351508, 5)]),
       only_ways(['normal'])
       ],
