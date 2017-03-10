@@ -631,6 +631,8 @@ pprInstr (SUB_CC format src dst)
 pprInstr (AND II64 src@(OpImm (ImmInteger mask)) dst)
   | 0 <= mask && mask < 0xffffffff
     = pprInstr (AND II32 src dst)
+pprInstr (AND FF32 src dst) = pprOpOp (sLit "andps") FF32 src dst
+pprInstr (AND FF64 src dst) = pprOpOp (sLit "andpd") FF64 src dst
 pprInstr (AND format src dst) = pprFormatOpOp (sLit "and") format src dst
 pprInstr (OR  format src dst) = pprFormatOpOp (sLit "or")  format src dst
 

@@ -106,7 +106,7 @@ instance (ArrowZero a, ArrowPlus a) => Alternative (WrappedArrow a b) where
 newtype ZipList a = ZipList { getZipList :: [a] }
                   deriving ( Show, Eq, Ord, Read, Functor
                            , Foldable, Generic, Generic1)
--- See Data.Traversable for Traversabel instance due to import loops
+-- See Data.Traversable for Traversable instance due to import loops
 
 -- | @since 2.01
 instance Applicative ZipList where

@@ -8,10 +8,11 @@ Pattern-matching literal patterns
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
 
-module MatchLit ( dsLit, dsOverLit, hsLitKey
+module MatchLit ( dsLit, dsOverLit, dsOverLit', hsLitKey
                 , tidyLitPat, tidyNPat
                 , matchLiterals, matchNPlusKPats, matchNPats
-                , warnAboutIdentities, warnAboutEmptyEnumerations
+                , warnAboutIdentities, warnAboutOverflowedLiterals
+                , warnAboutEmptyEnumerations
                 ) where
 
 #include "HsVersions.h"

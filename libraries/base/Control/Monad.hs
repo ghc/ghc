@@ -117,7 +117,7 @@ f >=> g     = \x -> f x >>= g
 forever     :: (Applicative f) => f a -> f b
 {-# INLINE forever #-}
 forever a   = let a' = a *> a' in a'
--- Use explicit sharing here, as it is prevents a space leak regardless of
+-- Use explicit sharing here, as it prevents a space leak regardless of
 -- optimizations.
 
 -- -----------------------------------------------------------------------------

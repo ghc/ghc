@@ -45,6 +45,7 @@ module Data.Typeable.Internal (
     -- * TyCon
     TyCon,   -- Abstract
     tyConPackage, tyConModule, tyConName, tyConKindArgs, tyConKindRep,
+    tyConFingerprint,
     KindRep(.., KindRepTypeLit), TypeLitSort(..),
     rnfTyCon,
 
@@ -58,6 +59,7 @@ module Data.Typeable.Internal (
     rnfTypeRep,
     eqTypeRep,
     typeRepKind,
+    splitApps,
 
     -- * SomeTypeRep
     SomeTypeRep(..),

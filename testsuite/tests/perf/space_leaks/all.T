@@ -69,7 +69,7 @@ test('T4029',
             # 2017-03-03: 65 (amd64/Linux)           Share Typeable KindReps or more
             #                                        lazy interface file reading
       stats_num_field('max_bytes_used',
-          [(wordsize(64), 19172360, 5)]),
+          [(wordsize(64), 20476360, 5)]),
             # 2016-02-26: 24071720 (amd64/Linux)     INITIAL
             # 2016-04-21: 25542832 (amd64/Linux)
             # 2016-05-23: 25247216 (amd64/Linux)     Use -G1
@@ -84,6 +84,7 @@ test('T4029',
             # 2017-02-20: 22016200 (amd64/Linux)     Better reading of iface files
             # 2017-03-03: 19172360 (amd64/Linux)     Share Typeable KindReps or more
             #                                        lazy interface file reading
+            # 2017-03-07: 20476360 (amd64/Linux)     It's not entirely clear
       extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,

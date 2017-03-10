@@ -322,6 +322,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                               , mg_complete_sigs = complete_sigs
                               , mg_deps      = deps
                               , mg_foreign   = foreign_stubs
+                              , mg_foreign_files = foreign_files
                               , mg_hpc_info  = hpc_info
                               , mg_modBreaks = modBreaks
                               })
@@ -427,6 +428,7 @@ tidyProgram hsc_env  (ModGuts { mg_module    = mod
                            cg_tycons   = alg_tycons,
                            cg_binds    = all_tidy_binds,
                            cg_foreign  = add_spt_init_code foreign_stubs,
+                           cg_foreign_files = foreign_files,
                            cg_dep_pkgs = map fst $ dep_pkgs deps,
                            cg_hpc_info = hpc_info,
                            cg_modBreaks = modBreaks,

@@ -829,6 +829,9 @@ checkAPat msg loc e0 = do
  case e0 of
    EWildPat -> return (WildPat placeHolderType)
    HsVar x  -> return (VarPat x)
+   HsLit (HsStringPrim _ _) -- (#13260)
+       -> parseErrorSDoc loc (text "Illegal unboxed string literal in pattern:" $$ ppr e0)
+
    HsLit l  -> return (LitPat l)
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)

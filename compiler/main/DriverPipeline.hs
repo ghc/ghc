@@ -86,7 +86,7 @@ preprocess :: HscEnv
 preprocess hsc_env (filename, mb_phase) =
   ASSERT2(isJust mb_phase || isHaskellSrcFilename filename, text filename)
   runPipeline anyHsc hsc_env (filename, fmap RealPhase mb_phase)
-        Nothing Temporary Nothing{-no ModLocation-} Nothing{-no stub-}
+        Nothing Temporary Nothing{-no ModLocation-} []{-no foreign objects-}
 
 -- ---------------------------------------------------------------------------
 
@@ -177,7 +177,7 @@ compileOne' m_tc_result mHscMessage
                               (Just basename)
                               Persistent
                               (Just location)
-                              Nothing
+                              []
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
             return hmi0 { hm_linkable = Just linkable }
@@ -212,7 +212,7 @@ compileOne' m_tc_result mHscMessage
                               (Just basename)
                               Persistent
                               (Just location)
-                              Nothing
+                              []
                   -- The object filename comes from the ModLocation
             o_time <- getModificationUTCTime object_filename
             let linkable = LM o_time this_mod [DotO object_filename]
@@ -269,21 +269,34 @@ compileOne' m_tc_result mHscMessage
                                              _ -> False
 
 -----------------------------------------------------------------------------
--- stub .h and .c files (for foreign export support)
+-- stub .h and .c files (for foreign export support), and cc files.
 
 -- The _stub.c file is derived from the haskell source file, possibly taking
 -- into account the -stubdir option.
 --
 -- The object file created by compiling the _stub.c file is put into a
 -- temporary file, which will be later combined with the main .o file
--- (see the MergeStubs phase).
+-- (see the MergeForeigns phase).
+--
+-- Moreover, we also let the user emit arbitrary C/C++/ObjC/ObjC++ files
+-- from TH, that are then compiled and linked to the module. This is
+-- useful to implement facilities such as inline-c.
 
-compileStub :: HscEnv -> FilePath -> IO FilePath
-compileStub hsc_env stub_c = do
-        (_, stub_o) <- runPipeline StopLn hsc_env (stub_c,Nothing)  Nothing
-                                   Temporary Nothing{-no ModLocation-} Nothing
+compileForeign :: HscEnv -> ForeignSrcLang -> FilePath -> IO FilePath
+compileForeign hsc_env lang stub_c = do
+        let phase = case lang of
+              LangC -> Cc
+              LangCxx -> Ccxx
+              LangObjc -> Cobjc
+              LangObjcxx -> Cobjcxx
+        (_, stub_o) <- runPipeline StopLn hsc_env
+                       (stub_c, Just (RealPhase phase))
+                       Nothing Temporary Nothing{-no ModLocation-} []
 
         return stub_o
+
+compileStub :: HscEnv -> FilePath -> IO FilePath
+compileStub hsc_env stub_c = compileForeign hsc_env LangC stub_c
 
 compileEmptyStub :: DynFlags -> HscEnv -> FilePath -> ModLocation -> ModuleName -> IO ()
 compileEmptyStub dflags hsc_env basename location mod_name = do
@@ -302,7 +315,7 @@ compileEmptyStub dflags hsc_env basename location mod_name = do
                   (Just basename)
                   Persistent
                   (Just location)
-                  Nothing
+                  []
   return ()
 
 -- ---------------------------------------------------------------------------
@@ -530,7 +543,7 @@ compileFile hsc_env stop_phase (src, mb_phase) = do
 
    ( _, out_file) <- runPipeline stop_phase' hsc_env
                             (src, fmap RealPhase mb_phase) Nothing output
-                            Nothing{-no ModLocation-} Nothing
+                            Nothing{-no ModLocation-} []
    return out_file
 
 
@@ -566,10 +579,10 @@ runPipeline
   -> Maybe FilePath             -- ^ original basename (if different from ^^^)
   -> PipelineOutput             -- ^ Output filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
-  -> Maybe FilePath             -- ^ stub object, if we have one
+  -> [FilePath]                 -- ^ foreign objects
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
 runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
-             mb_basename output maybe_loc maybe_stub_o
+             mb_basename output maybe_loc foreign_os
 
     = do let
              dflags0 = hsc_dflags hsc_env0
@@ -622,7 +635,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
          r <- runPipeline' start_phase hsc_env env input_fn
-                           maybe_loc maybe_stub_o
+                           maybe_loc foreign_os
 
          -- If we are compiling a Haskell module, and doing
          -- -dynamic-too, but couldn't do the -dynamic-too fast
@@ -636,7 +649,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                let dflags' = dynamicTooMkDynamicDynFlags dflags
                hsc_env' <- newHscEnv dflags'
                _ <- runPipeline' start_phase hsc_env' env input_fn
-                                 maybe_loc maybe_stub_o
+                                 maybe_loc foreign_os
                return ()
          return r
 
@@ -646,13 +659,13 @@ runPipeline'
   -> PipeEnv
   -> FilePath                   -- ^ Input filename
   -> Maybe ModLocation          -- ^ A ModLocation, if this is a Haskell module
-  -> Maybe FilePath             -- ^ stub object, if we have one
+  -> [FilePath]                 -- ^ foreign objects, if we have one
   -> IO (DynFlags, FilePath)    -- ^ (final flags, output filename)
 runPipeline' start_phase hsc_env env input_fn
-             maybe_loc maybe_stub_o
+             maybe_loc foreign_os
   = do
   -- Execute the pipeline...
-  let state = PipeState{ hsc_env, maybe_loc, maybe_stub_o = maybe_stub_o }
+  let state = PipeState{ hsc_env, maybe_loc, foreign_os = foreign_os }
 
   evalP (pipeLoop start_phase input_fn) env state
 
@@ -769,7 +782,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
           keep_bc    = gopt Opt_KeepLlvmFiles dflags
 
           myPhaseInputExt HCc       = hcsuf
-          myPhaseInputExt MergeStub = osuf
+          myPhaseInputExt MergeForeign = osuf
           myPhaseInputExt StopLn    = osuf
           myPhaseInputExt other     = phaseInputExt other
 
@@ -1049,12 +1062,12 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub) <- liftIO $ hscGenHardCode hsc_env' cgguts mod_summary output_fn
-                    case mStub of
-                        Nothing -> return ()
-                        Just stub_c ->
-                            do stub_o <- liftIO $ compileStub hsc_env' stub_c
-                               setStubO stub_o
+                    (outputFilename, mStub, foreign_files) <- liftIO $
+                      hscGenHardCode hsc_env' cgguts mod_summary output_fn
+                    stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
+                    foreign_os <- liftIO $
+                      mapM (uncurry (compileForeign hsc_env')) foreign_files
+                    setForeignOs (maybe [] return stub_o ++ foreign_os)
 
                     return (RealPhase next_phase, outputFilename)
 
@@ -1263,7 +1276,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
         let cmdline_include_paths = includePaths dflags
         let pic_c_flags = picCCOpts dflags
 
-        next_phase <- maybeMergeStub
+        next_phase <- maybeMergeForeign
         output_fn <- phaseOutputFilename next_phase
 
         -- we create directories for the object file, because it
@@ -1310,7 +1323,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
 -- of assembly files)
 runPhase (RealPhase SplitAs) _input_fn dflags
   = do
-        -- we'll handle the stub_o file in this phase, so don't MergeStub,
+        -- we'll handle the stub_o file in this phase, so don't MergeForeign,
         -- just jump straight to StopLn afterwards.
         let next_phase = StopLn
         output_fn <- phaseOutputFilename next_phase
@@ -1366,7 +1379,8 @@ runPhase (RealPhase SplitAs) _input_fn dflags
         liftIO $ mapM_ assemble_file [1..n]
 
         -- Note [pipeline-split-init]
-        -- If we have a stub file, it may contain constructor
+        -- If we have a stub file -- which will be part of foreign_os --
+        --  it may contain constructor
         -- functions for initialisation of this module.  We can't
         -- simply leave the stub as a separate object file, because it
         -- will never be linked in: nothing refers to it.  We need to
@@ -1377,16 +1391,18 @@ runPhase (RealPhase SplitAs) _input_fn dflags
         -- To that end, we make a DANGEROUS ASSUMPTION here: the data
         -- that needs to be initialised is all in the FIRST split
         -- object.  See Note [codegen-split-init].
+        --
+        -- We also merge in all the foreign objects since we're at it.
 
-        PipeState{maybe_stub_o} <- getPipeState
-        case maybe_stub_o of
-            Nothing     -> return ()
-            Just stub_o -> liftIO $ do
-                     tmp_split_1 <- newTempName dflags osuf
-                     let split_1 = split_obj 1
-                     copyFile split_1 tmp_split_1
-                     removeFile split_1
-                     joinObjectFiles dflags [tmp_split_1, stub_o] split_1
+        PipeState{foreign_os} <- getPipeState
+        if null foreign_os
+          then return ()
+          else liftIO $ do
+             tmp_split_1 <- newTempName dflags osuf
+             let split_1 = split_obj 1
+             copyFile split_1 tmp_split_1
+             removeFile split_1
+             joinObjectFiles dflags (tmp_split_1 : foreign_os) split_1
 
         -- join them into a single .o file
         liftIO $ joinObjectFiles dflags (map split_obj [1..n]) output_fn
@@ -1524,27 +1540,26 @@ runPhase (RealPhase LlvmMangle) input_fn dflags
 -----------------------------------------------------------------------------
 -- merge in stub objects
 
-runPhase (RealPhase MergeStub) input_fn dflags
+runPhase (RealPhase MergeForeign) input_fn dflags
  = do
-     PipeState{maybe_stub_o} <- getPipeState
+     PipeState{foreign_os} <- getPipeState
      output_fn <- phaseOutputFilename StopLn
      liftIO $ createDirectoryIfMissing True (takeDirectory output_fn)
-     case maybe_stub_o of
-       Nothing ->
-         panic "runPhase(MergeStub): no stub"
-       Just stub_o -> do
-         liftIO $ joinObjectFiles dflags [input_fn, stub_o] output_fn
+     if null foreign_os
+       then panic "runPhase(MergeForeign): no foreign objects"
+       else do
+         liftIO $ joinObjectFiles dflags (input_fn : foreign_os) output_fn
          return (RealPhase StopLn, output_fn)
 
 -- warning suppression
 runPhase (RealPhase other) _input_fn _dflags =
    panic ("runPhase: don't know how to run phase " ++ show other)
 
-maybeMergeStub :: CompPipeline Phase
-maybeMergeStub
+maybeMergeForeign :: CompPipeline Phase
+maybeMergeForeign
  = do
-     PipeState{maybe_stub_o} <- getPipeState
-     if isJust maybe_stub_o then return MergeStub else return StopLn
+     PipeState{foreign_os} <- getPipeState
+     if null foreign_os then return StopLn else return MergeForeign
 
 getLocation :: HscSource -> ModuleName -> CompPipeline ModLocation
 getLocation src_flavour mod_name = do

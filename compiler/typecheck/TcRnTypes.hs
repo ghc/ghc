@@ -47,12 +47,14 @@ module TcRnTypes(
 
         -- Desugaring types
         DsM, DsLclEnv(..), DsGblEnv(..), PArrBuiltin(..),
-        DsMetaEnv, DsMetaVal(..), CompleteMatchMap, mkCompleteMatchMap,
+        DsMetaEnv, DsMetaVal(..), CompleteMatchMap,
+        mkCompleteMatchMap, extendCompleteMatchMap,
 
         -- Template Haskell
         ThStage(..), SpliceType(..), PendingStuff(..),
         topStage, topAnnStage, topSpliceStage,
         ThLevel, impLevel, outerLevel, thLevel,
+        ForeignSrcLang(..),
 
         -- Arrows
         ArrowCtxt(..),
@@ -174,7 +176,6 @@ import FastString
 import qualified GHC.LanguageExtensions as LangExt
 import Fingerprint
 import Util
-import UniqFM ( emptyUFM, addToUFM_C, UniqFM )
 
 import Control.Monad (ap, liftM, msum)
 #if __GLASGOW_HASKELL__ > 710
@@ -188,8 +189,6 @@ import Data.Dynamic  ( Dynamic )
 import Data.Typeable ( TypeRep )
 import GHCi.Message
 import GHCi.RemoteTypes
-
-import Data.List (foldl')
 
 import qualified Language.Haskell.TH as TH
 
@@ -384,14 +383,6 @@ data DsGblEnv
            -- Additional complete pattern matches
         }
 
-type CompleteMatchMap = UniqFM [CompleteMatch]
-
-mkCompleteMatchMap :: [CompleteMatch] -> CompleteMatchMap
-mkCompleteMatchMap cms = foldl' insertMatch emptyUFM cms
-  where
-    insertMatch :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
-    insertMatch ufm c@(CompleteMatch _ t) = addToUFM_C (++) ufm t [c]
-
 instance ContainsModule DsGblEnv where
     extractModule = ds_mod
 
@@ -480,7 +471,6 @@ data FrontendResult
 --      - For recompilation avoidance, you want the identity module,
 --        since that will actually say the specific interface you
 --        want to track (and recompile if it changes)
-
 
 -- | 'TcGblEnv' describes the top-level of the module at the
 -- point at which the typechecker is finished work.
@@ -613,8 +603,8 @@ data TcGblEnv
         tcg_th_topdecls :: TcRef [LHsDecl RdrName],
         -- ^ Top-level declarations from addTopDecls
 
-        tcg_th_cstubs :: TcRef [String],
-        -- ^ C stubs from addCStub
+        tcg_th_foreign_files :: TcRef [(ForeignSrcLang, String)],
+        -- ^ Foreign files emitted from TH.
 
         tcg_th_topnames :: TcRef NameSet,
         -- ^ Exact names bound in top-level declarations in tcg_th_topdecls

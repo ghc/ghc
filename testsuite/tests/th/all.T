@@ -71,11 +71,6 @@ def error_has(pattern):
     # the following fails only if both the command fails and the pattern is found
     return('bash -o pipefail -c \'! (! "$@" {swap12}) | grep {pattern} {swap12} &> /dev/null\' --'.format(**locals()))
 
-test('TH_addCStub1', normal, compile_and_run, ['-v0'])
-test('TH_addCStub2'
-     , [compile_cmd_prefix(error_has('TH_addCStub2.hs:13:'))]
-     , compile_fail, ['-v0'])
-
 test('TH_reifyMkName', normal, compile, ['-v0'])
 
 test('TH_reifyInstances', normal, compile, ['-v0'])
@@ -252,7 +247,7 @@ test('TH_Roles2', normalise_version('array', 'base', 'deepseq', 'ghc-prim',
                                     'ghc-boot', 'ghc-boot-th',
                                     'integer-gmp', 'pretty', 'template-haskell',
                                     'binary', 'bytestring', 'containers'
-                                    ), compile, ['-v0 -ddump-tc'])
+                                    ), compile, ['-v0 -ddump-tc -dsuppress-uniques'])
 test('TH_Roles3', normal, compile, ['-v0 -dsuppress-uniques'])
 test('TH_Roles4', normal, compile, ['-v0'])
 
@@ -385,3 +380,4 @@ test('T13018', normal, compile, ['-v0'])
 test('T13123', normal, compile, ['-v0'])
 test('T13098', normal, compile, ['-v0'])
 test('T11046', normal, multimod_compile, ['T11046','-v0'])
+test('T13366', normal, compile_and_run, ['-lstdc++ -v0'])

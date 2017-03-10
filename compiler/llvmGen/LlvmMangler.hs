@@ -47,11 +47,20 @@ type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies.
 rewriteLine :: DynFlags -> [Rewrite] -> B.ByteString -> B.ByteString
-rewriteLine dflags rewrites l =
+rewriteLine dflags rewrites l
+  -- We disable .subsections_via_symbols on darwin and ios, as the llvm code
+  -- gen uses prefix data for the info table.  This however does not prevent
+  -- llvm from generating .subsections_via_symbols, which in turn with
+  -- -dead_strip, strips the info tables, and therefore breaks ghc.
+  | isSubsectionsViaSymbols l =
+    (B.pack "## no .subsection_via_symbols for ghc. We need our info tables!")
+  | otherwise =
     case firstJust $ map (\rewrite -> rewrite dflags rest) rewrites of
       Nothing        -> l
       Just rewritten -> B.concat $ [symbol, B.pack "\t", rewritten]
   where
+    isSubsectionsViaSymbols = B.isPrefixOf (B.pack ".subsections_via_symbols")
+
     (symbol, rest) = splitLine l
 
     firstJust :: [Maybe a] -> Maybe a

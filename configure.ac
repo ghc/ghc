@@ -13,7 +13,7 @@ dnl
 # see what flags are available. (Better yet, read the documentation!)
 #
 
-AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.1], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
+AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.3], [glasgow-haskell-bugs@haskell.org], [ghc-AC_PACKAGE_VERSION])
 
 # Set this to YES for a released version, otherwise NO
 : ${RELEASE=NO}
@@ -442,11 +442,17 @@ fi
 # name (this is a known problem in the case of the Android NDK, which has
 # slightly odd triples).
 #
-# It may be better to just do away with the GHC triples all together. This would
+# It may be better to just do away with the GHC triples altogether. This would
 # all be taken care of for us if we configured the subprojects using
 # AC_CONFIG_DIR, but unfortunately Cabal needs to be the one to do the
 # configuration.
-TargetPlatformFull="${target_alias}"
+if test -z "${target_alias}"
+then
+  # --target wasn't given; use result from AC_CANONICAL_TARGET
+  TargetPlatformFull="${target}"
+else
+  TargetPlatformFull="${target_alias}"
+fi
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
 AC_SUBST(TargetPlatformFull)

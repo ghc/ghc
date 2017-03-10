@@ -531,6 +531,8 @@ primop   DoubleDivOp   "/##"   Dyadic
 
 primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
 
+primop   DoubleFabsOp  "fabsDouble#"    Monadic   Double# -> Double#
+
 primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
    {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
     Results are undefined if the truncation if truncation yields
@@ -656,6 +658,8 @@ primop   FloatDivOp   "divideFloat#"      Dyadic
    with can_fail = True
 
 primop   FloatNegOp   "negateFloat#"      Monadic    Float# -> Float#
+
+primop   FloatFabsOp  "fabsFloat#"        Monadic    Float# -> Float#
 
 primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
    {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
@@ -1924,13 +1928,25 @@ primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Int#
 
--- not really the right type, but we don't know about pairs here.  The
--- correct type is
+-- Note [Why not an unboxed tuple in atomicModifyMutVar#?]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
---   MutVar# s a -> (a -> (a,b)) -> State# s -> (# State# s, b #)
+-- Looking at the type of atomicModifyMutVar#, one might wonder why
+-- it doesn't return an unboxed tuple. e.g.,
 --
+--   MutVar# s a -> (a -> (# a, b #)) -> State# s -> (# State# s, b #)
+--
+-- The reason is that atomicModifyMutVar# relies on laziness for its atomicity.
+-- Given a MutVar# containing x, atomicModifyMutVar# merely replaces the
+-- its contents with a thunk of the form (fst (f x)). This can be done using an
+-- atomic compare-and-swap as it is merely replacing a pointer.
+
 primop  AtomicModifyMutVarOp "atomicModifyMutVar#" GenPrimOp
    MutVar# s a -> (a -> b) -> State# s -> (# State# s, c #)
+   { Modify the contents of a {\tt MutVar\#}. Note that this isn't strictly
+     speaking the correct type for this function, it should really be
+     {\tt MutVar# s a -> (a -> (a,b)) -> State# s -> (# State# s, b #)}, however
+     we don't know about pairs here. }
    with
    out_of_line = True
    has_side_effects = True
@@ -1956,7 +1972,7 @@ section "Exceptions"
 -- The outer case just decides whether to mask exceptions, but we don't want
 -- thereby to hide the strictness in 'ma'!  Hence the use of strictApply1Dmd.
 --
--- For catch, we must be extra careful; see
+-- For catch, catchSTM, and catchRetry, we must be extra careful; see
 -- Note [Exceptions and strictness] in Demand
 
 primop  CatchOp "catch#" GenPrimOp
@@ -1989,16 +2005,21 @@ primop  RaiseOp "raise#" GenPrimOp
 -- must be *precise* - we don't want the strictness analyser turning
 -- one kind of bottom into another, as it is allowed to do in pure code.
 --
--- But we *do* want to know that it returns bottom after
--- being applied to two arguments, so that this function is strict in y
---     f x y | x>0       = raiseIO blah
---           | y>0       = return 1
---           | otherwise = return 2
+-- We currently produce topRes, which is much too conservative (interfering
+-- with dead code elimination, unfortunately), but nothing else we currently
+-- have on tap is actually correct.
+--
+-- TODO Check that the above notes on @f@ are valid. The function successfully
+-- produces an IO exception when compiled without optimization. If we analyze
+-- it as strict in @y@, won't we change that behavior under optimization?
+-- I thought the rule was that it was okay to replace one valid imprecise
+-- exception with another, but not to replace a precise exception with
+-- an imprecise one (dfeuer, 2017-03-05).
 
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] topRes }
    out_of_line = True
    has_side_effects = True
 
@@ -2083,7 +2104,7 @@ primop  CatchSTMOp "catchSTM#" GenPrimOp
    -> (b -> State# RealWorld -> (# State# RealWorld, a #) )
    -> (State# RealWorld -> (# State# RealWorld, a #) )
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [ catchArgDmd
+   strictness  = { \ _arity -> mkClosedStrictSig [ lazyApply1Dmd
                                                  , lazyApply2Dmd
                                                  , topDmd ] topRes }
                  -- See Note [Strictness for mask/unmask/catch]

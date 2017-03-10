@@ -214,7 +214,7 @@ Consider a function whose most general type is
         f :: forall a b. Ord a => [a] -> b -> b
 
 There is really no point in making a version of g at Int/Int and another
-at Int/Bool, because it's only instancing the type variable "a" which
+at Int/Bool, because it's only instantiating the type variable "a" which
 buys us any efficiency. Since g is completely polymorphic in b there
 ain't much point in making separate versions of g for the different
 b types.

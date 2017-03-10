@@ -15,7 +15,7 @@ module TcIface (
         typecheckIfacesForMerging,
         typecheckIfaceForInstantiate,
         tcIfaceDecl, tcIfaceInst, tcIfaceFamInst, tcIfaceRules,
-        tcIfaceVectInfo, tcIfaceAnnotations,
+        tcIfaceVectInfo, tcIfaceAnnotations, tcIfaceCompleteSigs,
         tcIfaceExpr,    -- Desired by HERMIT (Trac #7683)
         tcIfaceGlobal
  ) where
@@ -255,7 +255,7 @@ mergeIfaceDecl d1 d2
 --
 -- A module that defines T as representational in both arguments
 -- would successfully fill both signatures, so it would be better
--- if if we merged the roles of these types in some nontrivial
+-- if we merged the roles of these types in some nontrivial
 -- way.
 --
 -- However, we have to be very careful about how we go about
@@ -1096,9 +1096,7 @@ tcIfaceCompleteSigs :: [IfaceCompleteMatch] -> IfL [CompleteMatch]
 tcIfaceCompleteSigs = mapM tcIfaceCompleteSig
 
 tcIfaceCompleteSig :: IfaceCompleteMatch -> IfL CompleteMatch
-tcIfaceCompleteSig cm@(IfaceCompleteMatch ms t) =
-  forkM (text "COMPLETE" <+> ppr cm) $
-    CompleteMatch <$> mapM tcIfaceConLike ms <*> tcIfaceTyConByName t
+tcIfaceCompleteSig (IfaceCompleteMatch ms t) = return (CompleteMatch ms t)
 
 {-
 ************************************************************************
@@ -1759,14 +1757,6 @@ tcIfaceDataCon name = do { thing <- tcIfaceGlobal name
                          ; case thing of
                                 AConLike (RealDataCon dc) -> return dc
                                 _       -> pprPanic "tcIfaceExtDC" (ppr name$$ ppr thing) }
-
-tcIfaceConLike :: Name -> IfL ConLike
-tcIfaceConLike name =
-    do { thing <- tcIfaceGlobal name
-       ; case thing of
-        AConLike cl -> return cl
-        _           -> pprPanic "tcIfaceExtCL" (ppr name$$ ppr thing) }
-
 
 tcIfaceExtId :: Name -> IfL Id
 tcIfaceExtId name = do { thing <- tcIfaceGlobal name

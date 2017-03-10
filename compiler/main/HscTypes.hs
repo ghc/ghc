@@ -23,6 +23,7 @@ module HscTypes (
         ModDetails(..), emptyModDetails,
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
         ImportedMods, ImportedModsVal(..), SptEntry(..),
+        ForeignSrcLang(..),
 
         ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
@@ -47,6 +48,7 @@ module HscTypes (
         lookupIfaceByModule, emptyModIface, lookupHptByModule,
 
         PackageInstEnv, PackageFamInstEnv, PackageRuleBase,
+        PackageCompleteMatchMap,
 
         mkSOName, mkHsSOName, soExt,
 
@@ -81,7 +83,7 @@ module HscTypes (
 
         -- * TyThings and type environments
         TyThing(..),  tyThingAvailInfo,
-        tyThingTyCon, tyThingDataCon,
+        tyThingTyCon, tyThingDataCon, tyThingConLike,
         tyThingId, tyThingCoAxiom, tyThingParent_maybe, tyThingsTyCoVars,
         implicitTyThings, implicitTyConThings, implicitClassThings,
         isImplicitTyThing,
@@ -134,7 +136,8 @@ module HscTypes (
         handleFlagWarnings, printOrThrowWarnings,
 
         -- * COMPLETE signature
-        CompleteMatch(..)
+        CompleteMatch(..), CompleteMatchMap,
+        mkCompleteMatchMap, extendCompleteMatchMap
     ) where
 
 #include "HsVersions.h"
@@ -143,6 +146,7 @@ import ByteCodeTypes
 import InteractiveEvalTypes ( Resume )
 import GHCi.Message         ( Pipe )
 import GHCi.RemoteTypes
+import GHC.ForeignSrcLang
 
 import UniqFM
 import HsSyn
@@ -1222,6 +1226,8 @@ data ModGuts
                                          -- See Note [Overall plumbing for rules] in Rules.hs
         mg_binds     :: !CoreProgram,    -- ^ Bindings for this module
         mg_foreign   :: !ForeignStubs,   -- ^ Foreign exports declared in this module
+        mg_foreign_files :: ![(ForeignSrcLang, String)],
+        -- ^ Files to be compiled with the C compiler
         mg_warns     :: !Warnings,       -- ^ Warnings declared in the module
         mg_anns      :: [Annotation],    -- ^ Annotations declared in this module
         mg_complete_sigs :: [CompleteMatch], -- ^ Complete Matches
@@ -1281,6 +1287,7 @@ data CgGuts
                 -- as part of the code-gen of tycons
 
         cg_foreign   :: !ForeignStubs,   -- ^ Foreign export stubs
+        cg_foreign_files :: ![(ForeignSrcLang, String)],
         cg_dep_pkgs  :: ![InstalledUnitId], -- ^ Dependent packages, used to
                                             -- generate #includes for C code gen
         cg_hpc_info  :: !HpcInfo,           -- ^ Program coverage tick box information
@@ -2089,6 +2096,12 @@ tyThingDataCon :: TyThing -> DataCon
 tyThingDataCon (AConLike (RealDataCon dc)) = dc
 tyThingDataCon other                       = pprPanic "tyThingDataCon" (ppr other)
 
+-- | Get the 'ConLike' from a 'TyThing' if it is a data constructor thing.
+-- Panics otherwise
+tyThingConLike :: TyThing -> ConLike
+tyThingConLike (AConLike dc) = dc
+tyThingConLike other         = pprPanic "tyThingConLike" (ppr other)
+
 -- | Get the 'Id' from a 'TyThing' if it is a id *or* data constructor thing. Panics otherwise
 tyThingId :: TyThing -> Id
 tyThingId (AnId id)                   = id
@@ -2427,12 +2440,13 @@ instance Binary Usage where
 ************************************************************************
 -}
 
-type PackageTypeEnv    = TypeEnv
-type PackageRuleBase   = RuleBase
-type PackageInstEnv    = InstEnv
-type PackageFamInstEnv = FamInstEnv
-type PackageVectInfo   = VectInfo
-type PackageAnnEnv     = AnnEnv
+type PackageTypeEnv          = TypeEnv
+type PackageRuleBase         = RuleBase
+type PackageInstEnv          = InstEnv
+type PackageFamInstEnv       = FamInstEnv
+type PackageVectInfo         = VectInfo
+type PackageAnnEnv           = AnnEnv
+type PackageCompleteMatchMap = CompleteMatchMap
 
 -- | Information about other packages that we have slurped in by reading
 -- their interface files
@@ -2496,6 +2510,9 @@ data ExternalPackageState
                                                -- from all the external-package modules
         eps_ann_env      :: !PackageAnnEnv,    -- ^ The total 'AnnEnv' accumulated
                                                -- from all the external-package modules
+        eps_complete_matches :: !PackageCompleteMatchMap,
+                                  -- ^ The total 'CompleteMatchMap' accumulated
+                                  -- from all the external-package modules
 
         eps_mod_fam_inst_env :: !(ModuleEnv FamInstEnv), -- ^ The family instances accumulated from external
                                                          -- packages, keyed off the module that declared them
@@ -3008,11 +3025,78 @@ byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
 
 -- | A list of conlikes which represents a complete pattern match.
 -- These arise from @COMPLETE@ signatures.
+
+-- See Note [Implementation of COMPLETE signatures]
 data CompleteMatch = CompleteMatch {
-                          completeMatch :: [ConLike]
-                          , completeMatchType :: TyCon
+                            completeMatchConLikes :: [Name]
+                            -- ^ The ConLikes that form a covering family
+                            -- (e.g. Nothing, Just)
+                          , completeMatchTyCon :: Name
+                            -- ^ The TyCon that they cover (e.g. Maybe)
                           }
 
 instance Outputable CompleteMatch where
   ppr (CompleteMatch cl ty) = text "CompleteMatch:" <+> ppr cl
-                                                   <+>  dcolon <+> ppr ty
+                                                    <+> dcolon <+> ppr ty
+
+-- | A map keyed by the 'completeMatchTyCon'.
+
+-- See Note [Implementation of COMPLETE signatures]
+type CompleteMatchMap = UniqFM [CompleteMatch]
+
+mkCompleteMatchMap :: [CompleteMatch] -> CompleteMatchMap
+mkCompleteMatchMap = extendCompleteMatchMap emptyUFM
+
+extendCompleteMatchMap :: CompleteMatchMap -> [CompleteMatch]
+                       -> CompleteMatchMap
+extendCompleteMatchMap = foldl' insertMatch
+  where
+    insertMatch :: CompleteMatchMap -> CompleteMatch -> CompleteMatchMap
+    insertMatch ufm c@(CompleteMatch _ t) = addToUFM_C (++) ufm t [c]
+
+{-
+Note [Implementation of COMPLETE signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A COMPLETE signature represents a set of conlikes (i.e., constructors or
+pattern synonyms) such that if they are all pattern-matched against in a
+function, it gives rise to a total function. An example is:
+
+  newtype Boolean = Boolean Int
+  pattern F, T :: Boolean
+  pattern F = Boolean 0
+  pattern T = Boolean 1
+  {-# COMPLETE F, T #-}
+
+  -- This is a total function
+  booleanToInt :: Boolean -> Int
+  booleanToInt F = 0
+  booleanToInt T = 1
+
+COMPLETE sets are represented internally in GHC with the CompleteMatch data
+type. For example, {-# COMPLETE F, T #-} would be represented as:
+
+  CompleteMatch { complateMatchConLikes = [F, T]
+                , completeMatchTyCon    = Boolean }
+
+Note that GHC was able to infer the completeMatchTyCon (Boolean), but for the
+cases in which it's ambiguous, you can also explicitly specify it in the source
+language by writing this:
+
+  {-# COMPLETE F, T :: Boolean #-}
+
+For efficiency purposes, GHC collects all of the CompleteMatches that it knows
+about into a CompleteMatchMap, which is a map that is keyed by the
+completeMatchTyCon. In other words, you could have a multiple COMPLETE sets
+for the same TyCon:
+
+  {-# COMPLETE F, T1 :: Boolean #-}
+  {-# COMPLETE F, T2 :: Boolean #-}
+
+And looking up the values in the CompleteMatchMap associated with Boolean
+would give you [CompleteMatch [F, T1] Boolean, CompleteMatch [F, T2] Boolean].
+dsGetCompleteMatches in DsMeta accomplishes this lookup.
+
+Also see Note [Typechecking Complete Matches] in TcBinds for a more detailed
+explanation for how GHC ensures that all the conlikes in a COMPLETE set are
+consistent.
+-}

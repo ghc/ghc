@@ -272,16 +272,22 @@ setLevels float_lams binds us
 
 lvlTopBind :: LevelEnv -> Bind Id -> LvlM (LevelledBind, LevelEnv)
 lvlTopBind env (NonRec bndr rhs)
-  = do { rhs' <- lvlRhs env NonRecursive Nothing -- Not a join point
-                        (freeVars rhs)
+  = do { rhs' <- lvl_top env NonRecursive bndr rhs
        ; let (env', [bndr']) = substAndLvlBndrs NonRecursive env tOP_LEVEL [bndr]
        ; return (NonRec bndr' rhs', env') }
 
 lvlTopBind env (Rec pairs)
-  = do let (bndrs,rhss) = unzip pairs
-           (env', bndrs') = substAndLvlBndrs Recursive env tOP_LEVEL bndrs
-       rhss' <- mapM (lvlRhs env' Recursive Nothing . freeVars) rhss
-       return (Rec (bndrs' `zip` rhss'), env')
+  = do { let (env', bndrs') = substAndLvlBndrs Recursive env tOP_LEVEL
+                                               (map fst pairs)
+       ; rhss' <- mapM (\(b,r) -> lvl_top env' Recursive b r) pairs
+       ; return (Rec (bndrs' `zip` rhss'), env') }
+
+lvl_top :: LevelEnv -> RecFlag -> Id -> CoreExpr -> LvlM LevelledExpr
+lvl_top env is_rec bndr rhs
+  = lvlRhs env is_rec
+           (isBottomingId bndr)
+           Nothing  -- Not a join point
+           (freeVars rhs)
 
 {-
 ************************************************************************
@@ -565,7 +571,9 @@ lvlMFE env strict_ctxt ann_expr
          -- No wrapping needed if the type is lifted, or is a literal string
          -- or if we are wrapping it in one or more value lambdas
   = do { expr1 <- lvlFloatRhs abs_vars dest_lvl rhs_env NonRecursive
-                              join_arity_maybe ann_expr
+                              (isJust mb_bot_str)
+                              join_arity_maybe
+                              ann_expr
                   -- Treat the expr just like a right-hand side
        ; var <- newLvlVar expr1 join_arity_maybe is_mk_static
        ; let var2 = annotateBotStr var float_n_lams mb_bot_str
@@ -791,7 +799,7 @@ to
 and float bx = I# (a /# 3), because the application of f no
 longer obeys the let/app invariant.  But (a /# 3) is ok-for-spec
 due to a special hack that says division operators can't fail
-when the denominator is definitely no-zero.  And yet that
+when the denominator is definitely non-zero.  And yet that
 same expression says False to exprIsCheap.  Simplest way to
 guarantee the let/app invariant is to use the same function!
 
@@ -815,22 +823,36 @@ we'd like to float the call to error, to get
         lvl = error "urk"
         f = \x. g lvl
 
-* Bottoming floats (1): Furthermore, we want to float a bottoming
-  expression even if it has free variables:
+But, as ever, we need to be careful:
+
+(1) We want to float a bottoming
+    expression even if it has free variables:
         f = \x. g (let v = h x in error ("urk" ++ v))
-  Then we'd like to abstract over 'x' can float the whole arg of g:
+    Then we'd like to abstract over 'x' can float the whole arg of g:
         lvl = \x. let v = h x in error ("urk" ++ v)
         f = \x. g (lvl x)
-  To achieve this we pass is_bot to destLevel
+    To achieve this we pass is_bot to destLevel
 
-* Bottoming floats (2): we do not do this for functions that return
-  bottom.  Instead we treat the /body/ of such a function specially,
-  via point (1).  For example:
+(2) We do not do this for lambdas that return
+    bottom.  Instead we treat the /body/ of such a function specially,
+    via point (1).  For example:
         f = \x. ....(\y z. if x then error y else error z)....
-  ===>
+    ===>
         lvl = \x z y. if b then error y else error z
         f = \x. ...(\y z. lvl x z y)...
-  (There is no guarantee that we'll choose the perfect argument order.)
+    (There is no guarantee that we'll choose the perfect argument order.)
+
+(3) If we have a /binding/ that returns bottom, we want to float it to top
+    level, even if it has free vars (point (1)), and even it has lambdas.
+    Example:
+       ... let { v = \y. error (show x ++ show y) } in ...
+    We want to abstract over x and float the whole thing to top:
+       lvl = \xy. errror (show x ++ show y)
+       ...let {v = lvl x} in ...
+
+    Then of course we don't want to separately float the body (error ...)
+    as /another/ MFE, so we tell lvlFloatRhs not to do that, via the is_bot
+    argument.
 
 See Maessen's paper 1999 "Bottom extraction: factoring error handling out
 of functional programs" (unpublished I think).
@@ -985,7 +1007,7 @@ lvlBind env (AnnNonRec bndr rhs)
           -- aren't expensive either
 
   = -- No float
-    do { rhs' <- lvlRhs env NonRecursive mb_join_arity rhs
+    do { rhs' <- lvlRhs env NonRecursive is_bot mb_join_arity rhs
        ; let  bind_lvl        = incMinorLvl (le_ctxt_lvl env)
               (env', [bndr']) = substAndLvlBndrs NonRecursive env bind_lvl [bndr]
        ; return (NonRec bndr' rhs', env') }
@@ -993,8 +1015,8 @@ lvlBind env (AnnNonRec bndr rhs)
   -- Otherwise we are going to float
   | null abs_vars
   = do {  -- No type abstraction; clone existing binder
-         rhs' <- lvlRhs (setCtxtLvl env dest_lvl) NonRecursive
-                        mb_join_arity rhs
+         rhs' <- lvlFloatRhs [] dest_lvl env NonRecursive
+                             is_bot mb_join_arity rhs
        ; (env', [bndr']) <- cloneLetVars NonRecursive env dest_lvl [bndr]
        ; let bndr2 = annotateBotStr bndr' 0 mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
@@ -1002,7 +1024,7 @@ lvlBind env (AnnNonRec bndr rhs)
   | otherwise
   = do {  -- Yes, type abstraction; create a new binder, extend substitution, etc
          rhs' <- lvlFloatRhs abs_vars dest_lvl env NonRecursive
-                             mb_join_arity rhs
+                             is_bot mb_join_arity rhs
        ; (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
        ; let bndr2 = annotateBotStr bndr' n_extra mb_bot_str
        ; return (NonRec (TB bndr2 (FloatMe dest_lvl)) rhs', env') }
@@ -1012,10 +1034,11 @@ lvlBind env (AnnNonRec bndr rhs)
     bind_fvs   = rhs_fvs `unionDVarSet` dIdFreeVars bndr
     abs_vars   = abstractVars dest_lvl env bind_fvs
     dest_lvl   = destLevel env bind_fvs (isFunction rhs) is_bot is_join
+
     mb_bot_str = exprBotStrictness_maybe (deAnnotate rhs)
-                           -- See Note [Bottoming floats]
-                           -- esp Bottoming floats (2)
-    is_bot     = isBottomThunk mb_bot_str
+    is_bot     = isJust mb_bot_str
+        -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
+
     n_extra    = count isId abs_vars
     mb_join_arity = isJoinId_maybe bndr
     is_join       = isJust mb_join_arity
@@ -1024,16 +1047,15 @@ lvlBind env (AnnRec pairs)
   |  floatTopLvlOnly env && not (isTopLvl dest_lvl)
          -- Only floating to the top level is allowed.
   || not (profitableFloat env dest_lvl)
-  = do { let bind_lvl = incMinorLvl (le_ctxt_lvl env)
+  = do { let bind_lvl       = incMinorLvl (le_ctxt_lvl env)
              (env', bndrs') = substAndLvlBndrs Recursive env bind_lvl bndrs
-       ; rhss' <- zipWithM (lvlRhs env' Recursive) mb_join_arities rhss
+             lvl_rhs (b,r)  = lvlRhs env' Recursive is_bot (isJoinId_maybe b) r
+       ; rhss' <- mapM lvl_rhs pairs
        ; return (Rec (bndrs' `zip` rhss'), env') }
 
   | null abs_vars
   = do { (new_env, new_bndrs) <- cloneLetVars Recursive env dest_lvl bndrs
-       ; let env_rhs = setCtxtLvl new_env dest_lvl
-       ; new_rhss <- zipWithM (lvlRhs env_rhs Recursive)
-                              mb_join_arities rhss
+       ; new_rhss <- mapM (do_rhs new_env) pairs
        ; return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
                 , new_env) }
 
@@ -1059,8 +1081,7 @@ lvlBind env (AnnRec pairs)
         (lam_bndrs, rhs_body)   = collectAnnBndrs rhs
         (body_env1, lam_bndrs1) = substBndrsSL NonRecursive rhs_env' lam_bndrs
         (body_env2, lam_bndrs2) = lvlLamBndrs body_env1 rhs_lvl lam_bndrs1
-        mb_join_arity           = isJoinId_maybe bndr
-    new_rhs_body <- lvlRhs body_env2 Recursive mb_join_arity rhs_body
+    new_rhs_body <- lvlRhs body_env2 Recursive is_bot (get_join bndr) rhs_body
     (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
     return (Rec [(TB poly_bndr (FloatMe dest_lvl)
                  , mkLams abs_vars_w_lvls $
@@ -1072,13 +1093,27 @@ lvlBind env (AnnRec pairs)
 
   | otherwise  -- Non-null abs_vars
   = do { (new_env, new_bndrs) <- newPolyBndrs dest_lvl env abs_vars bndrs
-       ; new_rhss <- zipWithM (lvlFloatRhs abs_vars dest_lvl new_env Recursive)
-                              mb_join_arities rhss
+       ; new_rhss <- mapM (do_rhs new_env) pairs
        ; return ( Rec ([TB b (FloatMe dest_lvl) | b <- new_bndrs] `zip` new_rhss)
                 , new_env) }
 
   where
     (bndrs,rhss) = unzip pairs
+    is_join  = isJoinId (head bndrs)
+                -- bndrs is always non-empty and if one is a join they all are
+                -- Both are checked by Lint
+    is_fun   = all isFunction rhss
+    is_bot   = False  -- It's odd to have an unconditionally divergent
+                      -- function in a Rec, and we don't much care what
+                      -- happens to it.  False is simple!
+
+    do_rhs env (bndr,rhs) = lvlFloatRhs abs_vars dest_lvl env Recursive
+                                        is_bot (get_join bndr)
+                                        rhs
+
+    get_join bndr | need_zap  = Nothing
+                  | otherwise = isJoinId_maybe bndr
+    need_zap = dest_lvl `ltLvl` joinCeilingLevel env
 
         -- Finding the free vars of the binding group is annoying
     bind_fvs = ((unionDVarSets [ freeVarsOf rhs | (_, rhs) <- pairs])
@@ -1088,21 +1123,8 @@ lvlBind env (AnnRec pairs)
                `delDVarSetList`
                 bndrs
 
-    dest_lvl = destLevel env bind_fvs (all isFunction rhss) False any_joins
+    dest_lvl = destLevel env bind_fvs is_fun is_bot is_join
     abs_vars = abstractVars dest_lvl env bind_fvs
-
-    mb_join_arities = map isJoinId_maybe bndrs
-    any_joins = isJust (head mb_join_arities)
-                -- bndrs is always non-empty and if one is a join they all are
-                -- Both are checked by Lint
-
-lvlRhs :: LevelEnv
-       -> RecFlag
-       -> Maybe JoinArity
-       -> CoreExprWithFVs
-       -> LvlM LevelledExpr
-lvlRhs env rec_flag mb_join_arity expr
-  = lvlFloatRhs [] (le_ctxt_lvl env) env rec_flag mb_join_arity expr
 
 profitableFloat :: LevelEnv -> Level -> Bool
 profitableFloat env dest_lvl
@@ -1113,11 +1135,25 @@ profitableFloat env dest_lvl
 ----------------------------------------------------
 -- Three help functions for the type-abstraction case
 
+lvlRhs :: LevelEnv
+       -> RecFlag
+       -> Bool               -- Is this a bottoming function
+       -> Maybe JoinArity
+       -> CoreExprWithFVs
+       -> LvlM LevelledExpr
+lvlRhs env rec_flag is_bot mb_join_arity expr
+  = lvlFloatRhs [] (le_ctxt_lvl env) env
+                rec_flag is_bot mb_join_arity expr
+
 lvlFloatRhs :: [OutVar] -> Level -> LevelEnv -> RecFlag
-            -> Maybe JoinArity -> CoreExprWithFVs
+            -> Bool   -- Binding is for a bottoming function
+            -> Maybe JoinArity
+            -> CoreExprWithFVs
             -> LvlM (Expr LevelledBndr)
-lvlFloatRhs abs_vars dest_lvl env rec mb_join_arity rhs
-  = do { body' <- if any isId bndrs  -- See Note [Floating from a RHS]
+-- Ignores the le_ctxt_lvl in env; treats dest_lvl as the baseline
+lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
+  = do { body' <- if not is_bot  -- See Note [Floating from a RHS]
+                     && any isId bndrs
                   then lvlMFE  body_env True body
                   else lvlExpr body_env      body
        ; return (mkLams bndrs' body') }
@@ -1159,15 +1195,26 @@ to float out the error sub-expression in
               True  -> error ("blah" ++ show x)
               False -> ...
 
-But we must be careful!  If we had
-  f = \x -> factorial 20
-we /would/ want to float that (factorial 20) out!  Functions are treated
-differently: see the use of isFunction in the calls to destLevel. If
-there are only type lambdas, then destLevel will say "go to top, and
-abstract over the free tyvars" and we don't want that here.
+But we must be careful:
 
-Conclusion: use lvlMFE if there are any value lambdas, lvlExpr
-otherwise.  A little subtle, and I got it wrong to start with.
+* If we had
+    f = \x -> factorial 20
+  we /would/ want to float that (factorial 20) out!  Functions are treated
+  differently: see the use of isFunction in the calls to destLevel. If
+  there are only type lambdas, then destLevel will say "go to top, and
+  abstract over the free tyvars" and we don't want that here.
+
+* But if we had
+    f = \x -> error (...x....)
+  we would NOT want to float the bottoming expression out to give
+    lvl = \x -> error (...x...)
+    f = \x -> lvl x
+
+Conclusion: use lvlMFE if there are
+  * any value lambdas in the original function, and
+  * this is not a bottoming function (the is_bot argument)
+Use lvlExpr otherwise.  A little subtle, and I got it wrong at least twice
+(e.g. Trac #13369).
 -}
 
 {-
@@ -1380,9 +1427,6 @@ floatOverSat le = floatOutOverSatApps (le_switches le)
 
 floatTopLvlOnly :: LevelEnv -> Bool
 floatTopLvlOnly le = floatToTopLevelOnly (le_switches le)
-
-setCtxtLvl :: LevelEnv -> Level -> LevelEnv
-setCtxtLvl env lvl = env { le_ctxt_lvl = lvl, le_join_ceil = lvl }
 
 incMinorLvlFrom :: LevelEnv -> Level
 incMinorLvlFrom env = incMinorLvl (le_ctxt_lvl env)

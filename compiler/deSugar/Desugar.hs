@@ -20,7 +20,7 @@ import DynFlags
 import HscTypes
 import HsSyn
 import TcRnTypes
-import TcRnMonad ( finalSafeMode, fixSafeInstances )
+import TcRnMonad  ( finalSafeMode, fixSafeInstances )
 import TcRnDriver ( runTcInteractive )
 import Id
 import Name
@@ -97,7 +97,7 @@ deSugar hsc_env
                             tcg_imp_specs    = imp_specs,
                             tcg_dependent_files = dependent_files,
                             tcg_ev_binds     = ev_binds,
-                            tcg_th_cstubs    = th_cstubs_var,
+                            tcg_th_foreign_files = th_foreign_files_var,
                             tcg_fords        = fords,
                             tcg_rules        = rules,
                             tcg_vects        = vects,
@@ -124,9 +124,7 @@ deSugar hsc_env
                               then addTicksToBinds hsc_env mod mod_loc
                                        export_set (typeEnvTyCons type_env) binds
                               else return (binds, hpcInfo, Nothing)
-        ; (msgs, mb_res)
-            <- initDs hsc_env mod rdr_env type_env
-                      fam_inst_env complete_matches $
+        ; (msgs, mb_res) <- initDs hsc_env tcg_env $
                        do { ds_ev_binds <- dsEvBinds ev_binds
                           ; core_prs <- dsTopLHsBinds binds_cvr
                           ; (spec_prs, spec_rules) <- dsImpSpecs imp_specs
@@ -182,8 +180,7 @@ deSugar hsc_env
         -- past desugaring. See Note [Identity versus semantic module].
         ; MASSERT( id_mod == mod )
 
-        ; cstubs <- readIORef th_cstubs_var
-        ; let ds_fords' = foldl' appendStubC ds_fords (map text cstubs)
+        ; foreign_files <- readIORef th_foreign_files_var
 
         ; let mod_guts = ModGuts {
                 mg_module       = mod,
@@ -205,7 +202,8 @@ deSugar hsc_env
                 mg_patsyns      = patsyns,
                 mg_rules        = ds_rules_for_imps,
                 mg_binds        = ds_binds,
-                mg_foreign      = ds_fords',
+                mg_foreign      = ds_fords,
+                mg_foreign_files = foreign_files,
                 mg_hpc_info     = ds_hpc_info,
                 mg_modBreaks    = modBreaks,
                 mg_vect_decls   = ds_vects,
@@ -525,7 +523,7 @@ by 'competesWith'
 Class methods have a built-in RULE to select the method from the dictionary,
 so you can't change the phase on this.  That makes id very dubious to
 match on class methods in RULE lhs's.   See Trac #10595.   I'm not happy
-about this. For exmaple in Control.Arrow we have
+about this. For example in Control.Arrow we have
 
 {-# RULES "compose/arr"   forall f g .
                           (arr f) . (arr g) = arr (f . g) #-}

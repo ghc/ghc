@@ -1,30 +1,27 @@
 
 ==================== Tidy Core ====================
 Result size of Tidy Core
-  = {terms: 73, types: 50, coercions: 0, joins: 0/0}
+  = {terms: 71, types: 44, coercions: 0, joins: 0/0}
 
 Rec {
--- RHS size: {terms: 3, types: 4, coercions: 0, joins: 0/0}
-T13143.$wf [InlPrag=NOINLINE] :: forall a. GHC.Prim.Void# -> a
-[GblId, Arity=1, Str=<B,A>b]
-T13143.$wf = \ (@ a) _ [Occ=Dead] -> lvl @ a
-
--- RHS size: {terms: 3, types: 3, coercions: 0, joins: 0/0}
-lvl :: forall a. a
-[GblId, Str=b]
-lvl = \ (@ a) -> T13143.$wf @ a GHC.Prim.void#
+-- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
+T13143.$wf [InlPrag=NOINLINE, Occ=LoopBreaker]
+  :: forall a. GHC.Prim.Void# -> a
+[GblId, Arity=1, Caf=NoCafRefs, Str=<B,A>b]
+T13143.$wf = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
 end Rec }
 
--- RHS size: {terms: 3, types: 4, coercions: 0, joins: 0/0}
+-- RHS size: {terms: 4, types: 4, coercions: 0, joins: 0/0}
 f [InlPrag=INLINE[0]] :: forall a. Int -> a
 [GblId,
  Arity=1,
+ Caf=NoCafRefs,
  Str=<B,A>b,
  Unf=Unf{Src=InlineStable, TopLvl=True, Value=True, ConLike=True,
          WorkFree=True, Expandable=True,
          Guidance=ALWAYS_IF(arity=1,unsat_ok=True,boring_ok=True)
          Tmpl= \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#}]
-f = \ (@ a) _ [Occ=Dead] -> lvl @ a
+f = \ (@ a) _ [Occ=Dead] -> T13143.$wf @ a GHC.Prim.void#
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
 T13143.$trModule4 :: GHC.Prim.Addr#
@@ -71,9 +68,9 @@ T13143.$trModule
   = GHC.Types.Module T13143.$trModule3 T13143.$trModule1
 
 -- RHS size: {terms: 2, types: 1, coercions: 0, joins: 0/0}
-lvl1 :: Int
+lvl :: Int
 [GblId, Str=b]
-lvl1 = T13143.$wf @ Int GHC.Prim.void#
+lvl = T13143.$wf @ Int GHC.Prim.void#
 
 Rec {
 -- RHS size: {terms: 28, types: 7, coercions: 0, joins: 0/0}
@@ -91,7 +88,7 @@ T13143.$wg
         True ->
           case w1 of {
             False -> T13143.$wg GHC.Types.True GHC.Types.True ww;
-            True -> case lvl1 of wild2 { }
+            True -> case lvl of wild2 { }
           }
       }
 end Rec }

@@ -27,7 +27,7 @@ module Text.Printf(
 --
 -- | This 'printf' can be extended to format types
 -- other than those provided for by default. This
--- is done by instancing 'PrintfArg' and providing
+-- is done by instantiating 'PrintfArg' and providing
 -- a 'formatArg' for the type. It is possible to
 -- provide a 'parseFormat' to process type-specific
 -- modifiers, but the default instance is usually

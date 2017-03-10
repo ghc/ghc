@@ -5104,8 +5104,8 @@ this case ``a``).  More precisely, a constraint in a class method signature is r
 
      class C a where
        op3 :: Eq a => a -> a    -- Rejected: constrains class variable only
-       op4 :: D b => a -> b     -- Accepted: constrains a locally-quantified varible `b`
-       op5 :: D (a,b) => a -> b -- Accepted: constrains a locally-quantified varible `b`
+       op4 :: D b => a -> b     -- Accepted: constrains a locally-quantified variable `b`
+       op5 :: D (a,b) => a -> b -- Accepted: constrains a locally-quantified variable `b`
 
 
 GHC lifts this restriction with language extension
@@ -8866,7 +8866,7 @@ is ambiguous if and only if ``((undefined :: ty) :: ty)`` would fail to
 typecheck. We use a very similar test for *inferred* types, to ensure
 that they too are unambiguous.
 
-*Switching off the ambiguity check.* Even if a function is has an
+*Switching off the ambiguity check.* Even if a function has an
 ambiguous type according the "guiding principle", it is possible that
 the function is callable. For example: ::
 

@@ -844,6 +844,12 @@ callishPrimOpSupported dflags op
       WordMul2Op     | ncg && x86ish
                          || llvm      -> Left (MO_U_Mul2     (wordWidth dflags))
                      | otherwise      -> Right genericWordMul2Op
+      FloatFabsOp    | (ncg && x86ish)
+                         || llvm      -> Left MO_F32_Fabs
+                     | otherwise      -> Right $ genericFabsOp W32
+      DoubleFabsOp   | (ncg && x86ish)
+                         || llvm      -> Left MO_F64_Fabs
+                     | otherwise      -> Right $ genericFabsOp W64
 
       _ -> pprPanic "emitPrimOp: can't translate PrimOp " (ppr op)
  where
@@ -1063,6 +1069,34 @@ genericWordMul2Op [res_h, res_l] [arg_x, arg_y]
                         topHalf (CmmReg xlyh),
                         topHalf (CmmReg r)])]
 genericWordMul2Op _ _ = panic "genericWordMul2Op"
+
+-- This replicates what we had in libraries/base/GHC/Float.hs:
+--
+--    abs x    | x == 0    = 0 -- handles (-0.0)
+--             | x >  0    = x
+--             | otherwise = negateFloat x
+genericFabsOp :: Width -> GenericOp
+genericFabsOp w [res_r] [aa]
+ = do dflags <- getDynFlags
+      let zero   = CmmLit (CmmFloat 0 w)
+
+          eq x y = CmmMachOp (MO_F_Eq w) [x, y]
+          gt x y = CmmMachOp (MO_F_Gt w) [x, y]
+
+          neg x  = CmmMachOp (MO_F_Neg w) [x]
+
+          g1 = catAGraphs [mkAssign (CmmLocal res_r) zero]
+          g2 = catAGraphs [mkAssign (CmmLocal res_r) aa]
+
+      res_t <- CmmLocal <$> newTemp (cmmExprType dflags aa)
+      let g3 = catAGraphs [mkAssign res_t aa,
+                           mkAssign (CmmLocal res_r) (neg (CmmReg res_t))]
+
+      g4 <- mkCmmIfThenElse (gt aa zero) g2 g3
+
+      emit =<< mkCmmIfThenElse (eq aa zero) g1 g4
+
+genericFabsOp _ _ _ = panic "genericFabsOp"
 
 -- These PrimOps are NOPs in Cmm
 

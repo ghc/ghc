@@ -737,7 +737,7 @@ GHC were typechecking the binding
    bar = $gdm bar
 it would
    * skolemise the expected type of bar
-   * instantiate the type of $dm_bar with meta-type varibles
+   * instantiate the type of $dm_bar with meta-type variables
    * build an implication constraint
 
 [STEP DAC BUILD]

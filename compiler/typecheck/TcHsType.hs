@@ -320,7 +320,7 @@ tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
 
 ---------------------------
 -- | Should we generalise the kind of this type signature?
--- We *should* generalise if the type is mentions no scoped type variables
+-- We *should* generalise if the type mentions no scoped type variables
 -- or if NoMonoLocalBinds is set. Otherwise, nope.
 decideKindGeneralisationPlan :: Type -> TcM Bool
 decideKindGeneralisationPlan ty

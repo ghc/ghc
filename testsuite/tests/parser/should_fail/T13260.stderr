@@ -1,0 +1,4 @@
+
+T13260.hs:6:5: error:
+    Illegal unboxed string literal in pattern:
+    "a"#

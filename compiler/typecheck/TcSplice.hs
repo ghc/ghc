@@ -909,16 +909,9 @@ instance TH.Quasi TcM where
           hang (text "The binder" <+> quotes (ppr name) <+> ptext (sLit "is not a NameU."))
              2 (text "Probable cause: you used mkName instead of newName to generate a binding.")
 
-  qAddCStub str = do
-      l <- getSrcSpanM
-      r <- case l of
-             UnhelpfulSpan _ -> pprPanic "qAddCStub: Unhelpful location" (ppr l)
-             RealSrcSpan s -> return s
-      let filename  = unpackFS (srcSpanFile r)
-          linePragma = "#line " ++ show (srcSpanStartLine r)
-                                ++ " " ++ show filename
-      th_cstubs_var <- fmap tcg_th_cstubs getGblEnv
-      updTcRef th_cstubs_var ([linePragma, str] ++)
+  qAddForeignFile lang str = do
+    var <- fmap tcg_th_foreign_files getGblEnv
+    updTcRef var ((lang, str) :)
 
   qAddModFinalizer fin = do
       r <- liftIO $ mkRemoteRef fin
@@ -1111,7 +1104,7 @@ handleTHMessage msg = case msg of
     hsc_env <- env_top <$> getEnv
     wrapTHResult $ liftIO (mkFinalizedHValue hsc_env r) >>= addModFinalizerRef
   AddTopDecls decs -> wrapTHResult $ TH.qAddTopDecls decs
-  AddCStub str -> wrapTHResult $ TH.qAddCStub str
+  AddForeignFile lang str -> wrapTHResult $ TH.qAddForeignFile lang str
   IsExtEnabled ext -> wrapTHResult $ TH.qIsExtEnabled ext
   ExtsEnabled -> wrapTHResult $ TH.qExtsEnabled
   _ -> panic ("handleTHMessage: unexpected message " ++ show msg)

@@ -1176,7 +1176,7 @@ class Generic1 (f :: k -> *) where
 -- * In @MetaCons n f s@, @n@ is the constructor's name, @f@ is its fixity,
 --   and @s@ is @'True@ if the constructor contains record selectors.
 --
--- * In @MetaSel mn su ss ds@, if the field is uses record syntax, then @mn@ is
+-- * In @MetaSel mn su ss ds@, if the field uses record syntax, then @mn@ is
 --   'Just' the record name. Otherwise, @mn@ is 'Nothing'. @su@ and @ss@ are
 --   the field's unpackedness and strictness annotations, and @ds@ is the
 --   strictness that GHC infers for the field.

@@ -327,7 +327,14 @@ instance Monoid a => Monoid (Maybe a) where
   m `mappend` Nothing = m
   Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
 
--- | @since 2.01
+-- | For tuples, the 'Monoid' constraint on @a@ determines
+-- how the first values merge.
+-- For example, 'String's concatenate:
+--
+-- > ("hello ", (+15)) <*> ("world!", 2002)
+-- > ("hello world!",2017)
+--
+-- @since 2.01
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
     (u, f) <*> (v, x) = (u `mappend` v, f x)
@@ -957,15 +964,18 @@ mapFB c f = \x ys -> c (f x) ys
 -- (along with build's unfolding) else we'd get an infinite loop
 -- in the rules.  Hence the activation control below.
 --
--- The "mapFB" rule optimises compositions of map.
---
 -- This same pattern is followed by many other functions:
 -- e.g. append, filter, iterate, repeat, etc.
+--
+-- The "mapFB" rule optimises compositions of map and
+-- the "mapFB/id" rule get rids of 'map id' calls.
+-- (Any similarity to the Functor laws for [] is expected.)
 
 {-# RULES
 "map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
 "mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
 "mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g)
+"mapFB/id"  forall c.           mapFB c (\x -> x)       = c
   #-}
 
 -- See Breitner, Eisenberg, Peyton Jones, and Weirich, "Safe Zero-cost

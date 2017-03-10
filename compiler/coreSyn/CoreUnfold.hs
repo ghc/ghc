@@ -657,8 +657,8 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     -- Cost to allocate binding with given binder
     size_up_alloc bndr
       |  isTyVar bndr                 -- Doesn't exist at runtime
-      || isUnliftedType (idType bndr) -- Doesn't live in heap
       || isJoinId bndr                -- Not allocated at all
+      || isUnliftedType (idType bndr) -- Doesn't live in heap
       = 0
       | otherwise
       = 10
@@ -768,7 +768,7 @@ funSize dflags top_args fun n_val_args voids
     res_discount | idArity fun > n_val_args = ufFunAppDiscount dflags
                  | otherwise                = 0
         -- If the function is partially applied, show a result discount
--- XXX maybe behave like ConSize for eval'd varaible
+-- XXX maybe behave like ConSize for eval'd variable
 
 conSize :: DataCon -> Int -> ExprSize
 conSize dc n_val_args

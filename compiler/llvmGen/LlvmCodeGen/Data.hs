@@ -16,6 +16,7 @@ import BlockId
 import CLabel
 import Cmm
 import DynFlags
+import Platform
 
 import FastString
 import Outputable
@@ -46,8 +47,11 @@ genLlvmData (sec, Statics lbl xs) = do
         struct         = Just $ LMStaticStruc static tyAlias
         link           = if (externallyVisibleCLabel lbl)
                             then ExternallyVisible else Internal
+        align          = case sec of
+                            Section CString _ -> Just 1
+                            _                 -> Nothing
         const          = if isSecConstant sec then Constant else Global
-        varDef         = LMGlobalVar label tyAlias link lmsec Nothing const
+        varDef         = LMGlobalVar label tyAlias link lmsec align const
         globDef        = LMGlobal varDef struct
 
     return ([globDef], [tyAlias])
@@ -65,15 +69,17 @@ isSecConstant (Section t _) = case t of
     (OtherSection _)        -> False
 
 -- | Format the section type part of a Cmm Section
-llvmSectionType :: SectionType -> FastString
-llvmSectionType t = case t of
+llvmSectionType :: Platform -> SectionType -> FastString
+llvmSectionType p t = case t of
     Text                    -> fsLit ".text"
     ReadOnlyData            -> fsLit ".rodata"
     RelocatableReadOnlyData -> fsLit ".data.rel.ro"
     ReadOnlyData16          -> fsLit ".rodata.cst16"
     Data                    -> fsLit ".data"
     UninitialisedData       -> fsLit ".bss"
-    CString                 -> fsLit ".cstring"
+    CString                 -> case platformOS p of
+                                 OSMinGW32 -> fsLit ".rdata"
+                                 _         -> fsLit ".rodata.str"
     (OtherSection _)        -> panic "llvmSectionType: unknown section type"
 
 -- | Format a Cmm Section into a LLVM section name
@@ -81,11 +87,12 @@ llvmSection :: Section -> LlvmM LMSection
 llvmSection (Section t suffix) = do
   dflags <- getDynFlags
   let splitSect = gopt Opt_SplitSections dflags
+      platform  = targetPlatform dflags
   if not splitSect
   then return Nothing
   else do
     lmsuffix <- strCLabel_llvm suffix
-    return (Just (concatFS [llvmSectionType t, fsLit ".", lmsuffix]))
+    return (Just (concatFS [llvmSectionType platform t, fsLit ".", lmsuffix]))
 
 -- ----------------------------------------------------------------------------
 -- * Generate static data

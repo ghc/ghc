@@ -12,6 +12,7 @@ Alexander Vershilov     <alexander.vershilov@gmail.com>     <alexander.vershilov
 Alexey Rodriguez        <mrchebas@gmail.com>
 Alexey Rodriguez        <mrchebas@gmail.com>                mrchebas@gmail.com <unknown>
 Alex Biehl              <alex.biehl@gmail.com>
+Alex Biehl              <alex.biehl@gmail.com>              <alexbiehl@gmail.com>
 Andrew Farmer           <anfarmer@fb.com>                   <anfarmer@ku.edu>
 Andrew Farmer           <anfarmer@fb.com>                   <afarmer@ittc.ku.edu>
 Andrew Pimlott          <andrew.pimlott.ctr@metnet.navy.mil> andrew.pimlott.ctr@metnet.navy.mil <unknown>
@@ -97,6 +98,7 @@ Duncan Coutts           <duncan@well-typed.com>             <duncan.coutts@worc.
 Duncan Coutts           <duncan@well-typed.com>             <duncan@community.haskell.org>
 Duncan Coutts           <duncan@well-typed.com>             <duncan@haskell.org>
 Edward Z. Yang          <ezyang@cs.stanford.edu>            <ezyang@mit.edu>
+Eric Seidel             <eric@seidel.io>                    <gridaphobe@gmail.com>
 Erik de Castro Lopo     <erik.decastrolopo@ambiata.com>     <erikd@mega-nerd.com>
 Evan Hauck              <khyperia@live.com>
 Fumiaki Kinoshita       <fumiexcel@gmail.com>
@@ -147,6 +149,7 @@ Jost Berthold           <jb.diku@gmail.com>                 berthold@mathematik.
 Juan J. Quintela        <quintela@fi.udc.es>                quintela <unknown>
 Judah Jacobson          <judah.jacobson@gmail.com>          judah.jacobson@gmail.com <unknown>
 Julian Seward           <jseward@acm.org>                   sewardj <unknown>
+Julie Moronuki          <jdog74@gmail.com>
 Karel Gardas            <karel.gardas@centrum.cz>           <karel.gardas@centrumcz>
 Karel Gardas            <karel.gardas@centrum.cz>           <kgardas@objectsecurity.com>
 Keith Wansbrough        <keith.wansbrough@cl.cam.ac.uk>     keithw <unknown>
@@ -202,8 +205,9 @@ Pepe Iborra             <mnislaih@gmail.com>                pepe <unknown>
 Pepe Iborra             <mnislaih@gmail.com>                pepeiborra@gmail.com <unknown>
 Peter Jonsson           <t-peterj@microsoft.com>            t-peterj@microsoft.com <unknown>
 Peter Trommler          <ptrommler@acm.org>                 <ptrommler@scm.org>
-Peter Wortmann          <scpmw@leeds.ac.uk>                 <peter@grayson-heights-pc028-118.student-halls.leeds.ac.uk>
-Peter Wortmann          <scpmw@leeds.ac.uk>                 scpmw@leeds.ac.uk <unknown>
+Peter Wortmann          <Peter.Wortmann@googlemail.com>     <scpmw@leeds.ac.uk>
+Peter Wortmann          <Peter.Wortmann@googlemail.com>     <peter@grayson-heights-pc028-118.student-halls.leeds.ac.uk>
+Peter Wortmann          <Peter.Wortmann@googlemail.com>     scpmw@leeds.ac.uk <unknown>
 Ralf Laemmel            <softlang@uni-koblenz.de>           ralf <unknown> # https://ghc.haskell.org/trac/ghc/wiki/TeamGHC
 Ravi Nanavati           <ravi@bluespec.com>                 # Commit 70c044.
 Reuben Thomas           <rrt@sc3d.org>                      rrt <unknown>
@@ -224,6 +228,7 @@ Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox at gentoo.or
 Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox@community.haskell.org>
 Sergei Trofimovich      <slyfox@gentoo.org>                 <slyfox@inbox.ru>
 Shae Matijs Erisson     <shae@ScannedInAvian.com>           shae@ScannedInAvian.com <unknown>
+Siddhanathan Shanmugam  <siddhanathan@gmail.com>            <siddhanathan+social@gmail.com>
 Siddharth Bhat          <siddu.druid@gmail.com>
 Sigbjorn Finne          <sof@galois.com>                    sof <unknown>
 Sigbjorn Finne          <sof@galois.com>                    sof@galois.com <unknown>

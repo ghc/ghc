@@ -52,7 +52,7 @@ Each functional dependency with one variable in the RHS is responsible
 for generating a single equality. For instance:
      class C a b | a -> b
 The constraints ([Wanted] C Int Bool) and [Wanted] C Int alpha
-will generate the folloing FunDepEqn
+will generate the following FunDepEqn
      FDEqn { fd_qtvs = []
            , fd_eqs  = [Pair Bool alpha]
            , fd_pred1 = C Int Bool

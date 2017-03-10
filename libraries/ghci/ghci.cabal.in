@@ -75,6 +75,7 @@ library
         deepseq          == 1.4.*,
         filepath         == 1.4.*,
         ghc-boot         == @ProjectVersionMunged@,
+        ghc-boot-th      == @ProjectVersionMunged@,
         template-haskell == 2.12.*,
         transformers     == 0.5.*
 

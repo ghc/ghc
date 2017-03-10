@@ -27,7 +27,9 @@ available = False
 #else
 
 import Data.Bits (Bits(..), FiniteBits(..))
+import qualified Data.Int as I
 import Data.Word (Word16, Word32)
+import Data.Int  (Int16)
 import Foreign.C.Error (throwErrnoIfMinus1, eINTR, eINVAL,
                         eNOTSUP, getErrno, throwErrno)
 import Foreign.C.Types
@@ -186,10 +188,10 @@ newtype Flag = Flag Word16
  , flagOneshot = EV_ONESHOT
  }
 
-#if SIZEOF_KEV_FILTER == 4 /*kevent.filter: uint32_t or uint16_t. */
-newtype Filter = Filter Word32
+#if SIZEOF_KEV_FILTER == 4 /*kevent.filter: int32_t or int16_t. */
+newtype Filter = Filter I.Int32
 #else
-newtype Filter = Filter Word16
+newtype Filter = Filter I.Int16
 #endif
     deriving (Bits, FiniteBits, Eq, Num, Show, Storable)
 
