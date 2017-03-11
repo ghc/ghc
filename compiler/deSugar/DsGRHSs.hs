@@ -47,17 +47,17 @@ necessary.  The type argument gives the type of the @ei@.
 dsGuarded :: GRHSs Id (LHsExpr Id) -> Type -> DsM CoreExpr
 
 dsGuarded grhss rhs_ty = do
-    match_result <- dsGRHSs PatBindRhs [] grhss rhs_ty
+    match_result <- dsGRHSs PatBindRhs grhss rhs_ty
     error_expr <- mkErrorAppDs nON_EXHAUSTIVE_GUARDS_ERROR_ID rhs_ty empty
     extractMatchResult match_result error_expr
 
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
-dsGRHSs :: HsMatchContext Name -> [Pat Id]      -- These are to build a MatchContext from
+dsGRHSs :: HsMatchContext Name
         -> GRHSs Id (LHsExpr Id)                -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
-dsGRHSs hs_ctx _ (GRHSs grhss binds) rhs_ty
+dsGRHSs hs_ctx (GRHSs grhss binds) rhs_ty
   = ASSERT( notNull grhss )
     do { match_results <- mapM (dsGRHS hs_ctx rhs_ty) grhss
        ; let match_result1 = foldr1 combineMatchResults match_results

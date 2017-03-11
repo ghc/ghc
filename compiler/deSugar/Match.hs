@@ -755,7 +755,7 @@ matchWrapper ctxt mb_scr (MG { mg_alts = L _ matches
            ; tm_cs <- genCaseTmCs2 mb_scr upats vars
            ; match_result <- addDictsDs dicts $ -- See Note [Type and Term Equality Propagation]
                              addTmCsDs tm_cs  $ -- See Note [Type and Term Equality Propagation]
-                             dsGRHSs ctxt upats grhss rhs_ty
+                             dsGRHSs ctxt grhss rhs_ty
            ; return (EqnInfo { eqn_pats = upats, eqn_rhs  = match_result}) }
 
     handleWarnings = if isGenerated origin
