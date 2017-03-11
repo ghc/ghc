@@ -167,6 +167,16 @@ Compiler
 
     "StillWorks" forall x. f (Just x) = e
 
+- Type synonyms can no longer appear in the class position of an instance.
+  This means something like this is no longer allowed: ::
+
+    type ReadShow a = (Read a, Show a)
+    instance Read Foo
+    instance Show Foo
+    instance ReadShow Foo -- illegal
+
+  See :ghc-ticket:`13267`.
+
 GHCi
 ~~~~
 
