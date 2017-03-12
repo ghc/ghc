@@ -39,7 +39,6 @@ import Coercion ( eqCoercion )
 import TcType ( toTcTypeBag )
 import TyCon( isNewTyCon )
 import TysWiredIn
-import ListSetOps
 import SrcLoc
 import Maybes
 import Util
@@ -52,6 +51,7 @@ import UniqDFM
 
 import Control.Monad( when, unless )
 import qualified Data.Map as Map
+import Data.List (groupBy)
 
 {-
 ************************************************************************
@@ -887,7 +887,7 @@ groupEquations :: DynFlags -> [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- (b) none of the gi are empty
 -- The ordering of equations is unchanged
 groupEquations dflags eqns
-  = runs same_gp [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
+  = groupBy same_gp [(patGroup dflags (firstPat eqn), eqn) | eqn <- eqns]
   where
     same_gp :: (PatGroup,EquationInfo) -> (PatGroup,EquationInfo) -> Bool
     (pg1,_) `same_gp` (pg2,_) = pg1 `sameGroup` pg2

@@ -14,7 +14,7 @@ module ListSetOps (
         Assoc, assoc, assocMaybe, assocUsing, assocDefault, assocDefaultUsing,
 
         -- Duplicate handling
-        hasNoDups, runs, removeDups, findDupsEq,
+        hasNoDups, removeDups, findDupsEq,
         equivClasses,
 
         -- Indexing
@@ -111,26 +111,9 @@ equivClasses :: (a -> a -> Ordering) -- Comparison
 
 equivClasses _         []  = []
 equivClasses _   stuff@[_] = [stuff]
-equivClasses cmp items     = runs eq (sortBy cmp items)
+equivClasses cmp items     = groupBy eq (sortBy cmp items)
   where
     eq a b = case cmp a b of { EQ -> True; _ -> False }
-
-{-
-The first cases in @equivClasses@ above are just to cut to the point
-more quickly...
-
-@runs@ groups a list into a list of lists, each sublist being a run of
-identical elements of the input list. It is passed a predicate @p@ which
-tells when two elements are equal.
--}
-
-runs :: (a -> a -> Bool) -- Equality
-     -> [a]
-     -> [[a]]
-
-runs _ []     = []
-runs p (x:xs) = case (span (p x) xs) of
-                (first, rest) -> (x:first) : (runs p rest)
 
 removeDups :: (a -> a -> Ordering) -- Comparison function
            -> [a]

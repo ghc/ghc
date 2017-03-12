@@ -76,7 +76,6 @@ import UniqFM       ( UniqFM, mapUFM, filterUFM )
 import MonadUtils
 import NameCache
 import SrcLoc
-import ListSetOps       ( runs )
 import Data.List
 import Data.Ord
 import Data.Dynamic
@@ -348,7 +347,7 @@ pprTickCounts counts
   where
     groups :: [[(Tick,Int)]]    -- Each group shares a comon tag
                                 -- toList returns common tags adjacent
-    groups = runs same_tag (Map.toList counts)
+    groups = groupBy same_tag (Map.toList counts)
     same_tag (tick1,_) (tick2,_) = tickToTag tick1 == tickToTag tick2
 
 pprTickGroup :: [(Tick, Int)] -> SDoc

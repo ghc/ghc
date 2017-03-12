@@ -22,7 +22,6 @@ import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
 import Util
-import ListSetOps ( runs )
 import Id
 import NameEnv
 import FieldLabel ( flSelector )
@@ -30,6 +29,7 @@ import SrcLoc
 import DynFlags
 import Outputable
 import Control.Monad(liftM)
+import Data.List (groupBy)
 
 {-
 We are confronted with the first column of patterns in a set of
@@ -153,8 +153,8 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
 
         -- Divide into sub-groups; see Note [Record patterns]
         ; let groups :: [[(ConArgPats, EquationInfo)]]
-              groups = runs compatible_pats [ (pat_args (firstPat eqn), eqn)
-                                            | eqn <- eqn1:eqns ]
+              groups = groupBy compatible_pats [ (pat_args (firstPat eqn), eqn)
+                                               | eqn <- eqn1:eqns ]
 
         ; match_results <- mapM (match_group arg_vars) groups
 
@@ -245,7 +245,7 @@ Now consider:
 In the first we must test y first; in the second we must test x
 first.  So we must divide even the equations for a single constructor
 T into sub-goups, based on whether they match the same field in the
-same order.  That's what the (runs compatible_pats) grouping.
+same order.  That's what the (groupBy compatible_pats) grouping.
 
 All non-record patterns are "compatible" in this sense, because the
 positional patterns (T a b) and (a `T` b) all match the arguments
