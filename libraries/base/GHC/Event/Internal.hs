@@ -99,7 +99,7 @@ elSupremum OneShot OneShot = OneShot
 elSupremum _       _       = MultiShot
 {-# INLINE elSupremum #-}
 
--- | @mappend@ == @elSupremum@
+-- | @mappend@ takes the longer of two lifetimes.
 --
 -- @since 4.8.0.0
 instance Monoid Lifetime where
