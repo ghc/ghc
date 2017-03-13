@@ -59,7 +59,7 @@ test('T4018',
 
 test('T4029',
      [stats_num_field('peak_megabytes_allocated',
-          [(wordsize(64), 76, 10)]),
+          [(wordsize(64), 65, 10)]),
             # 2016-02-26: 66 (amd64/Linux)           INITIAL
             # 2016-05-23: 82 (amd64/Linux)           Use -G1
             # 2016-07-13: 92 (amd64/Linux)           Changes to tidyType
