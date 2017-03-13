@@ -78,6 +78,9 @@ data Interface = Interface
     -- | The module behind this interface.
     ifaceMod             :: !Module
 
+    -- | Is this a signature?
+  , ifaceIsSig           :: !Bool
+
     -- | Original file name of the module.
   , ifaceOrigFilename    :: !FilePath
 
@@ -155,6 +158,9 @@ data InstalledInterface = InstalledInterface
     -- | The module represented by this interface.
     instMod            :: Module
 
+    -- | Is this a signature?
+  , instIsSig          :: Bool
+
     -- | Textual information about the module.
   , instInfo           :: HaddockModInfo Name
 
@@ -184,6 +190,7 @@ data InstalledInterface = InstalledInterface
 toInstalledIface :: Interface -> InstalledInterface
 toInstalledIface interface = InstalledInterface
   { instMod            = ifaceMod            interface
+  , instIsSig          = ifaceIsSig          interface
   , instInfo           = ifaceInfo           interface
   , instDocMap         = ifaceDocMap         interface
   , instArgMap         = ifaceArgMap         interface
