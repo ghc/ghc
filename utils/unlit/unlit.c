@@ -296,6 +296,9 @@ static void unlit(char *file, FILE *istream, FILE *ostream)
 	    }
 	}
 #endif
+	if (this == SHEBANG) {
+	    myputc('\n', ostream);
+	}
     } while(this!=ENDFILE);
 
     if (defnsread==0)
