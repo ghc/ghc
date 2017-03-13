@@ -132,6 +132,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   return $! Interface {
     ifaceMod             = mdl
+  , ifaceIsSig           = Module.isHoleModule sem_mdl
   , ifaceOrigFilename    = msHsFilePath ms
   , ifaceInfo            = info
   , ifaceDoc             = Documentation mbDoc modWarn
