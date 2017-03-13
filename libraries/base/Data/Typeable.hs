@@ -45,7 +45,6 @@ module Data.Typeable
       Typeable
     , typeOf
     , typeRep
-    , I.withTypeable
 
       -- * Propositional equality
     , (:~:)(Refl)
@@ -74,7 +73,7 @@ module Data.Typeable
     , splitTyConApp
     , typeRepArgs
     , typeRepTyCon
-    , I.typeRepFingerprint
+    , typeRepFingerprint
 
       -- * Type constructors
     , I.TyCon          -- abstract, instance of: Eq, Show, Typeable
@@ -97,6 +96,7 @@ import Data.Type.Equality
 
 import Data.Maybe
 import Data.Proxy
+import GHC.Fingerprint.Type
 import GHC.Show
 import GHC.Base
 
@@ -115,7 +115,7 @@ typeRep :: forall proxy a. Typeable a => proxy a -> TypeRep
 typeRep = I.typeRepX
 
 -- | Show a type representation
-showsTypeRep :: I.SomeTypeRep -> ShowS
+showsTypeRep :: TypeRep -> ShowS
 showsTypeRep = shows
 
 -- | The type-safe cast operation
@@ -186,6 +186,13 @@ typeRepArgs ty = case splitTyConApp ty of (_, args) -> args
 -- | Observe the type constructor of a quantified type representation.
 typeRepTyCon :: TypeRep -> TyCon
 typeRepTyCon = I.typeRepXTyCon
+
+-- | Takes a value of type @a@ and returns a concrete representation
+-- of that type.
+--
+-- @since 4.7.0.0
+typeRepFingerprint :: TypeRep -> Fingerprint
+typeRepFingerprint = I.typeRepXFingerprint
 
 -- | Force a 'TypeRep' to normal form.
 rnfTypeRep :: TypeRep -> ()
