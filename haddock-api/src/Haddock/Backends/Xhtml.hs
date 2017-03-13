@@ -256,13 +256,20 @@ ppHtmlContents dflags odir doctitle _maybe_package
   themes mathjax_url maybe_index_url
   maybe_source_url maybe_wiki_url ifaces showPkgs prologue debug qual = do
   let tree = mkModuleTree dflags showPkgs
-         [(instMod iface, toInstalledDescription iface) | iface <- ifaces]
+         [(instMod iface, toInstalledDescription iface)
+         | iface <- ifaces
+         , not (instIsSig iface)]
+      sig_tree = mkModuleTree dflags showPkgs
+         [(instMod iface, toInstalledDescription iface)
+         | iface <- ifaces
+         , instIsSig iface]
       html =
         headHtml doctitle Nothing themes mathjax_url +++
         bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
             ppPrologue qual doctitle prologue,
+            ppSignatureTree qual sig_tree,
             ppModuleTree qual tree
           ]
   createDirectoryIfMissing True odir
@@ -278,7 +285,13 @@ ppPrologue qual title (Just doc) =
   divDescription << (h1 << title +++ docElement thediv (rdrDocToHtml qual doc))
 
 
+ppSignatureTree :: Qualification -> [ModuleTree] -> Html
+ppSignatureTree qual ts =
+  divModuleList << (sectionName << "Signatures" +++ mkNodeList qual [] "n" ts)
+
+
 ppModuleTree :: Qualification -> [ModuleTree] -> Html
+ppModuleTree _ [] = mempty
 ppModuleTree qual ts =
   divModuleList << (sectionName << "Modules" +++ mkNodeList qual [] "n" ts)
 
@@ -345,6 +358,8 @@ flatModuleTree ifaces =
 ppHtmlContentsFrame :: FilePath -> String -> Themes -> Maybe String
   -> [InstalledInterface] -> Bool -> IO ()
 ppHtmlContentsFrame odir doctitle themes maybe_mathjax_url ifaces debug = do
+  -- TODO: Arguably should split up signatures and modules here too...
+  -- but who uses frames?  Fix this if someone complains. -- ezyang
   let mods = flatModuleTree ifaces
       html =
         headHtml doctitle Nothing themes maybe_mathjax_url +++
