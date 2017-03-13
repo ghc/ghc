@@ -317,8 +317,8 @@ instance Monoid Ordering where
 -- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
 -- turned into a monoid simply by adjoining an element @e@ not in @S@
 -- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\" Since
--- there is no \"Semigroup\" typeclass providing just 'mappend', we
--- use 'Monoid' instead.
+-- there used to be no \"Semigroup\" typeclass providing just 'mappend',
+-- we use 'Monoid' instead.
 --
 -- @since 2.01
 instance Monoid a => Monoid (Maybe a) where
