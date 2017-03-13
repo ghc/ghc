@@ -746,10 +746,12 @@ test('T9675',
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 731171072, 10)
+          [(wordsize(64), 656137960, 10)
           # 2014-10-13    544489040
           # 2015-10-28    608284152  emit Typeable at definition site
           # 2017-02-17    731171072  Type-indexed Typeable
+          # 2017-03-13    656137960  Put join ceiling underneath lambdas?
+
           ,(wordsize(32), 279480696, 10)
           # 2015-07-11    279480696  (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
