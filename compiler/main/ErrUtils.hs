@@ -378,11 +378,15 @@ pprLocErrMsg (ErrMsg { errMsgSpan      = s
     mkLocMessage sev s (formatErrDoc dflags doc)
 
 sortMsgBag :: Maybe DynFlags -> Bag ErrMsg -> [ErrMsg]
-sortMsgBag dflags = sortBy (maybeFlip $ comparing errMsgSpan) . bagToList
+sortMsgBag dflags = maybeLimit . sortBy (maybeFlip cmp) . bagToList
   where maybeFlip :: (a -> a -> b) -> (a -> a -> b)
         maybeFlip
           | fromMaybe False (fmap reverseErrors dflags) = flip
           | otherwise                                   = id
+        cmp = comparing errMsgSpan
+        maybeLimit = case join (fmap maxErrors dflags) of
+          Nothing        -> id
+          Just err_limit -> take err_limit
 
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val

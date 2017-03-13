@@ -90,6 +90,19 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-helpful-errors"
          }
+  , flag { flagName = "-freverse-errors"
+         , flagDescription =
+           "Display errors in GHC/GHCi sorted by reverse order of "++
+           "source code line numbers."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-reverse-errors"
+         }
+  , flag { flagName = "-fmax-errors"
+         , flagDescription =
+           "Limit the number of errors displayed in GHC/GHCi."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-max-errors"
+         }
   , flag { flagName = "-Wdeprecated-flags"
          , flagDescription =
            "warn about uses of commandline flags that are deprecated"

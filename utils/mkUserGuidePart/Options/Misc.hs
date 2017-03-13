@@ -29,13 +29,6 @@ miscOptions =
            "the main thread, rather than a forked thread."
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-freverse-errors"
-         , flagDescription =
-           "Display errors in GHC/GHCi sorted by reverse order of "++
-           "source code line numbers."
-         , flagType = DynamicFlag
-         , flagReverse = "-fno-reverse-errors"
-         }
   , flag { flagName = "-flocal-ghci-history"
          , flagDescription =
            "Use current directory for the GHCi command history "++
