@@ -186,14 +186,13 @@ dsHsBind dflags
     addDictsDs (toTcTypeBag (listToBag dicts)) $
          -- addDictsDs: push type constraints deeper for pattern match check
     do { (_, bind_prs) <- dsLHsBinds binds
-       ; let core_bind = Rec bind_prs
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; core_wrap <- dsHsWrapper wrap -- Usually the identity
 
        ; let rhs = core_wrap $
                    mkLams tyvars $ mkLams dicts $
                    mkCoreLets ds_binds $
-                   mkLet core_bind $
+                   mkLetRec bind_prs $
                    Var local
        ; (spec_binds, rules) <- dsSpecs rhs prags
 

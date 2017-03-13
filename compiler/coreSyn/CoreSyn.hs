@@ -20,7 +20,7 @@ module CoreSyn (
                OutBndr, OutVar, OutCoercion, OutTyVar, OutCoVar,
 
         -- ** 'Expr' construction
-        mkLet, mkLets, mkLams,
+        mkLet, mkLets, mkLetNonRec, mkLetRec, mkLams,
         mkApps, mkTyApps, mkCoApps, mkVarApps, mkTyArg,
 
         mkIntLit, mkIntLitInt,
@@ -1862,6 +1862,16 @@ mkLet :: Bind b -> Expr b -> Expr b
 -- which Lint rejects, so we kill it off right away
 mkLet (Rec []) body = body
 mkLet bind     body = Let bind body
+
+-- | @mkLetNonRec bndr rhs body@ wraps @body@ in a @let@ binding @bndr@.
+mkLetNonRec :: b -> Expr b -> Expr b -> Expr b
+mkLetNonRec b rhs body = Let (NonRec b rhs) body
+
+-- | @mkLetRec binds body@ wraps @body@ in a @let rec@ with the given set of
+-- @binds@ if binds is non-empty.
+mkLetRec :: [(b, Expr b)] -> Expr b -> Expr b
+mkLetRec [] body = body
+mkLetRec bs body = Let (Rec bs) body
 
 -- | Create a binding group where a type variable is bound to a type. Per "CoreSyn#type_let",
 -- this can only be used to bind something in a non-recursive @let@ expression
