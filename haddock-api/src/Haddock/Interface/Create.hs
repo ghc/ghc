@@ -551,7 +551,11 @@ mkExportItems
     lookupExport (IEThingAll (L _ t))    = declWith $ ieWrappedName t
     lookupExport (IEThingWith (L _ t) _ _ _) = declWith $ ieWrappedName t
     lookupExport (IEModuleContents (L _ m)) =
-      -- Pass in identity module, so we can look it up in index correctly
+      -- TODO: We could get more accurate reporting here if IEModuleContents
+      -- also recorded the actual names that are exported here.  We CAN
+      -- compute this info using @gre@ but 'moduleExports does not seem to
+      -- do so.
+      -- NB: Pass in identity module, so we can look it up in index correctly
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
       return . ExportGroup lev "" $ processDocString dflags gre docStr
