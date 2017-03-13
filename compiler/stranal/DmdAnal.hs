@@ -344,10 +344,14 @@ dmdAnalAlt env dmd case_bndr (con,bndrs,rhs)
 {- Note [IO hack in the demand analyser]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There's a hack here for I/O operations.  Consider
-     case foo x s of { (# s, r #) -> y }
-Is this strict in 'y'?  Normally yes, but what if 'foo' is an I/O
-operation that simply terminates the program (not in an erroneous way)?
-In that case we should not evaluate 'y' before the call to 'foo'.
+
+     case foo x s of { (# s', r #) -> y }
+
+Is this strict in 'y'? Often not! If foo x s performs some observable action
+(including raising an exception with raiseIO#, modifying a mutable variable, or
+even ending the program normally), then we must not force 'y' (which may fail
+to terminate) until we have performed foo x s.
+
 Hackish solution: spot the IO-like situation and add a virtual branch,
 as if we had
      case foo x s of
