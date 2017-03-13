@@ -63,9 +63,9 @@ module Data.Typeable.Internal (
 
     -- * SomeTypeRep
     SomeTypeRep(..),
-    typeRepX,
-    typeRepXTyCon,
-    typeRepXFingerprint,
+    someTypeRep,
+    someTypeRepTyCon,
+    someTypeRepFingerprint,
     rnfSomeTypeRep,
 
     -- * Construction
@@ -250,7 +250,7 @@ mkTrCon :: forall k (a :: k). TyCon -> [SomeTypeRep] -> TypeRep a
 mkTrCon tc kind_vars = TrTyCon fpr tc kind_vars
   where
     fpr_tc  = tyConFingerprint tc
-    fpr_kvs = map typeRepXFingerprint kind_vars
+    fpr_kvs = map someTypeRepFingerprint kind_vars
     fpr     = fingerprintFingerprints (fpr_tc:fpr_kvs)
 
 -- | Construct a representation for a type application.
@@ -298,8 +298,8 @@ pattern Con' con ks <- TrTyCon _ con ks
 ----------------- Observation ---------------------
 
 -- | Observe the type constructor of a quantified type representation.
-typeRepXTyCon :: SomeTypeRep -> TyCon
-typeRepXTyCon (SomeTypeRep t) = typeRepTyCon t
+someTypeRepTyCon :: SomeTypeRep -> TyCon
+someTypeRepTyCon (SomeTypeRep t) = typeRepTyCon t
 
 -- | Observe the type constructor of a type representation
 typeRepTyCon :: TypeRep a -> TyCon
@@ -470,12 +470,12 @@ typeOf _ = typeRep
 -- of that type.
 --
 -- @since 4.7.0.0
-typeRepX :: forall proxy a. Typeable a => proxy a -> SomeTypeRep
-typeRepX _ = SomeTypeRep (typeRep :: TypeRep a)
+someTypeRep :: forall proxy a. Typeable a => proxy a -> SomeTypeRep
+someTypeRep _ = SomeTypeRep (typeRep :: TypeRep a)
 {-# INLINE typeRep #-}
 
-typeRepXFingerprint :: SomeTypeRep -> Fingerprint
-typeRepXFingerprint (SomeTypeRep t) = typeRepFingerprint t
+someTypeRepFingerprint :: SomeTypeRep -> Fingerprint
+someTypeRepFingerprint (SomeTypeRep t) = typeRepFingerprint t
 
 ----------------- Showing TypeReps --------------------
 
