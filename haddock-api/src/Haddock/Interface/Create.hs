@@ -92,6 +92,7 @@ createInterface tm flags modMap instIfaceMap = do
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
+  -- Process the top-level module header documentation.
   (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
 
   let declsWithDocs = topDecls group_
@@ -114,6 +115,8 @@ createInterface tm flags modMap instIfaceMap = do
 
   let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
 
+  -- The MAIN functionality: compute the export items which will
+  -- each be the actual documentation of this module.
   exportItems <- mkExportItems modMap mdl sem_mdl allWarnings gre exportedNames decls
                    maps fixMap splices exports instIfaceMap dflags
 
@@ -352,6 +355,8 @@ mkMaps dflags gre instances decls =
 
 
 -- | Get all subordinate declarations inside a declaration, and their docs.
+-- A subordinate declaration is something like the associate type or data
+-- family of a type class.
 subordinates :: InstMap -> HsDecl Name -> [(Name, [HsDocString], Map Int HsDocString)]
 subordinates instMap decl = case decl of
   InstD (ClsInstD d) -> do
