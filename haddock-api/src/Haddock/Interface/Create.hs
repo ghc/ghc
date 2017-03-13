@@ -36,7 +36,6 @@ import Control.Arrow (second)
 import Control.DeepSeq
 import Control.Monad
 import Data.Function (on)
-import qualified Data.Foldable as F
 
 import qualified Packages
 import qualified Module
@@ -50,7 +49,7 @@ import TcRnTypes
 import FastString (concatFS)
 import BasicTypes ( StringLiteral(..), SourceText(..) )
 import qualified Outputable as O
-import HsDecls ( gadtDeclDetails,getConDetails )
+import HsDecls ( getConDetails )
 
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
@@ -63,6 +62,7 @@ createInterface tm flags modMap instIfaceMap = do
       L _ hsm        = parsedSource tm
       !safety        = modInfoSafe mi
       mdl            = ms_mod ms
+      sem_mdl        = tcg_semantic_mod (fst (tm_internals_ tm))
       dflags         = ms_hspp_opts ms
       !instances     = modInfoInstances mi
       !fam_instances = md_fam_insts md
@@ -89,8 +89,9 @@ createInterface tm flags modMap instIfaceMap = do
   let declsWithDocs = topDecls group_
       fixMap = mkFixMap group_
       (decls, _) = unzip declsWithDocs
-      localInsts = filter (nameIsLocalOrFrom mdl) $  map getName instances
-                                                  ++ map getName fam_instances
+      localInsts = filter (nameIsLocalOrFrom sem_mdl)
+                        $  map getName instances
+                        ++ map getName fam_instances
       -- Locations of all TH splices
       splices = [ l | L l (SpliceD _) <- hsmodDecls hsm ]
 
@@ -105,7 +106,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
 
-  exportItems <- mkExportItems modMap mdl allWarnings gre exportedNames decls
+  exportItems <- mkExportItems modMap mdl sem_mdl allWarnings gre exportedNames decls
                    maps fixMap splices exports instIfaceMap dflags
 
   let !visibleNames = mkVisibleNames maps exportItems opts
@@ -157,6 +158,10 @@ createInterface tm flags modMap instIfaceMap = do
   , ifaceTokenizedSrc    = tokenizedSrc
   }
 
+-- | Given all of the @import M as N@ declarations in a package,
+-- create a mapping from the module identity of M, to an alias N
+-- (if there are multiple aliases, we pick the last one.)  This
+-- will go in 'ifaceModuleAliases'.
 mkAliasMap :: DynFlags -> Maybe RenamedSource -> M.Map Module ModuleName
 mkAliasMap dflags mRenamedSource =
   case mRenamedSource of
@@ -167,13 +172,28 @@ mkAliasMap dflags mRenamedSource =
         SrcLoc.L _ alias <- ideclAs impDecl
         return $
           (lookupModuleDyn dflags
+             -- TODO: This is supremely dodgy, because in general the
+             -- UnitId isn't going to look anything like the package
+             -- qualifier (even with old versions of GHC, the
+             -- IPID would be p-0.1, but a package qualifier never
+             -- has a version number it.  (Is it possible that in
+             -- Haddock-land, the UnitIds never have version numbers?
+             -- I, ezyang, have not quite understand Haddock's package
+             -- identifier model.)
+             --
+             -- Additionally, this is simulating some logic GHC already
+             -- has for deciding how to qualify names when it outputs
+             -- them to the user.  We should reuse that information;
+             -- or at least reuse the renamed imports, which know what
+             -- they import!
              (fmap Module.fsToUnitId $
               fmap sl_fs $ ideclPkgQual impDecl)
              (case ideclName impDecl of SrcLoc.L _ name -> name),
            alias))
         impDecls
 
--- similar to GHC.lookupModule
+-- Similar to GHC.lookupModule
+-- ezyang: Not really...
 lookupModuleDyn ::
   DynFlags -> Maybe UnitId -> ModuleName -> Module
 lookupModuleDyn _ (Just pkgId) mdlName =
@@ -493,6 +513,7 @@ collectDocs = go Nothing []
 mkExportItems
   :: IfaceMap
   -> Module             -- this module
+  -> Module             -- semantic module
   -> WarningMap
   -> GlobalRdrEnv
   -> [Name]             -- exported names (orig)
@@ -505,7 +526,7 @@ mkExportItems
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
 mkExportItems
-  modMap thisMod warnings gre exportedNames decls
+  modMap thisMod semMod warnings gre exportedNames decls
   maps@(docMap, argMap, subMap, declMap, instMap) fixMap splices optExports instIfaceMap dflags =
   case optExports of
     Nothing -> fullModuleContents dflags warnings gre maps fixMap splices decls
@@ -516,6 +537,7 @@ mkExportItems
     lookupExport (IEThingAll (L _ t))    = declWith $ ieWrappedName t
     lookupExport (IEThingWith (L _ t) _ _ _) = declWith $ ieWrappedName t
     lookupExport (IEModuleContents (L _ m)) =
+      -- Pass in identity module, so we can look it up in index correctly
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
     lookupExport (IEGroup lev docStr)  = return $
       return . ExportGroup lev "" $ processDocString dflags gre docStr
@@ -583,6 +605,8 @@ mkExportItems
             Just decl ->
               -- We try to get the subs and docs
               -- from the installed .haddock file for that package.
+              -- TODO: This needs to be more sophisticated to deal
+              -- with signature inheritance
               case M.lookup (nameModule t) instIfaceMap of
                 Nothing -> do
                    liftErrMsg $ tell
@@ -598,8 +622,7 @@ mkExportItems
     mkExportDecl :: Name -> LHsDecl Name -> (DocForDecl Name, [(Name, DocForDecl Name)]) -> ExportItem Name
     mkExportDecl name decl (doc, subs) = decl'
       where
-        decl' = ExportDecl (restrictTo sub_names (extractDecl name mdl decl)) doc subs' [] fixities False
-        mdl = nameModule name
+        decl' = ExportDecl (restrictTo sub_names (extractDecl name decl)) doc subs' [] fixities False
         subs' = filter (isExported . fst) subs
         sub_names = map fst subs'
         fixities = [ (n, f) | n <- name:sub_names, Just f <- [M.lookup n fixMap] ]
@@ -610,14 +633,20 @@ mkExportItems
 
     findDecl :: Name -> ([LHsDecl Name], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl n
-      | m == thisMod, Just ds <- M.lookup n declMap =
+      | m == semMod, Just ds <- M.lookup n declMap =
           (ds, lookupDocs n warnings docMap argMap subMap)
-      | Just iface <- M.lookup m modMap, Just ds <- M.lookup n (ifaceDeclMap iface) =
+      | Just iface <- M.lookup (semToIdMod (moduleUnitId thisMod) m) modMap, Just ds <- M.lookup n (ifaceDeclMap iface) =
           (ds, lookupDocs n warnings (ifaceDocMap iface) (ifaceArgMap iface) (ifaceSubMap iface))
       | otherwise = ([], (noDocForDecl, []))
       where
         m = nameModule n
 
+-- | Given a 'Module' from a 'Name', convert it into a 'Module' that
+-- we can actually find in the 'IfaceMap'.
+semToIdMod :: UnitId -> Module -> Module
+semToIdMod this_uid m
+    | Module.isHoleModule m = mkModule this_uid (moduleName m)
+    | otherwise      = m
 
 hiDecl :: DynFlags -> Name -> ErrMsgGhc (Maybe (LHsDecl Name))
 hiDecl dflags t = do
@@ -680,7 +709,7 @@ lookupDocs n warnings docMap argMap subMap =
 --    only return those that are.
 -- 3) B is visible and all its exports are in scope, in which case we return
 --    a single 'ExportModule' item.
-moduleExports :: Module           -- ^ Module A
+moduleExports :: Module           -- ^ Module A (identity, NOT semantic)
               -> ModuleName       -- ^ The real name of B, the exported module
               -> DynFlags         -- ^ The flags used when typechecking A
               -> WarningMap
@@ -694,8 +723,11 @@ moduleExports :: Module           -- ^ Module A
               -> [SrcSpan]        -- ^ Locations of all TH splices
               -> ErrMsgGhc [ExportItem Name] -- ^ Resulting export items
 moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfaceMap maps fixMap splices
-  | m == thisMod = fullModuleContents dflags warnings gre maps fixMap splices decls
+  | expMod == moduleName thisMod
+  = fullModuleContents dflags warnings gre maps fixMap splices decls
   | otherwise =
+    -- NB: we constructed the identity module when looking up in
+    -- the IfaceMap.
     case M.lookup m ifaceMap of
       Just iface
         | OptHide `elem` ifaceOptions iface -> return (ifaceExportItems iface)
@@ -711,7 +743,7 @@ moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfa
                     "documentation for exported module: " ++ pretty dflags expMod]
             return []
   where
-    m = mkModule unitId expMod
+    m = mkModule unitId expMod -- Identity module!
     unitId = moduleUnitId thisMod
 
 
@@ -790,8 +822,8 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble
 -- together a type signature for it...).
-extractDecl :: Name -> Module -> LHsDecl Name -> LHsDecl Name
-extractDecl name mdl decl
+extractDecl :: Name -> LHsDecl Name -> LHsDecl Name
+extractDecl name decl
   | name `elem` getMainDeclBinder (unLoc decl) = decl
   | otherwise  =
     case unLoc decl of
@@ -805,11 +837,11 @@ extractDecl name mdl decl
           _ -> error "internal: extractDecl (ClassDecl)"
       TyClD d@DataDecl {} ->
         let (n, tyvar_tys) = (tcdName d, lHsQTyVarsToTypes (tyClDeclTyVars d))
-        in SigD <$> extractRecSel name mdl n tyvar_tys (dd_cons (tcdDataDefn d))
+        in SigD <$> extractRecSel name n tyvar_tys (dd_cons (tcdDataDefn d))
       InstD (DataFamInstD DataFamInstDecl { dfid_tycon = L _ n
                                           , dfid_pats = HsIB { hsib_body = tys }
                                           , dfid_defn = defn }) ->
-        SigD <$> extractRecSel name mdl n tys (dd_cons defn)
+        SigD <$> extractRecSel name n tys (dd_cons defn)
       InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
         let matches = [ d | L _ d <- insts
                           -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
@@ -819,19 +851,19 @@ extractDecl name mdl decl
                           , selectorFieldOcc n == name
                       ]
         in case matches of
-          [d0] -> extractDecl name mdl (noLoc . InstD $ DataFamInstD d0)
+          [d0] -> extractDecl name (noLoc . InstD $ DataFamInstD d0)
           _ -> error "internal: extractDecl (ClsInstD)"
       _ -> error "internal: extractDecl"
 
-extractRecSel :: Name -> Module -> Name -> [LHsType Name] -> [LConDecl Name]
+extractRecSel :: Name -> Name -> [LHsType Name] -> [LConDecl Name]
               -> LSig Name
-extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
+extractRecSel _ _ _ [] = error "extractRecSel: selector not found"
 
-extractRecSel nm mdl t tvs (L _ con : rest) =
+extractRecSel nm t tvs (L _ con : rest) =
   case getConDetails con of
     RecCon (L _ fields) | ((l,L _ (ConDeclField _nn ty _)) : _) <- matching_fields fields ->
       L l (TypeSig [noLoc nm] (mkEmptySigWcType (noLoc (HsFunTy data_ty (getBangType ty)))))
-    _ -> extractRecSel nm mdl t tvs rest
+    _ -> extractRecSel nm t tvs rest
  where
   matching_fields :: [LConDeclField Name] -> [(SrcSpan, LConDeclField Name)]
   matching_fields flds = [ (l,f) | f@(L _ (ConDeclField ns _ _)) <- flds
