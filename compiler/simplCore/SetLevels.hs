@@ -1167,7 +1167,8 @@ lvlFloatRhs abs_vars dest_lvl env rec is_bot mb_join_arity rhs
     (body_env, bndrs') | Just _ <- mb_join_arity
                       = lvlJoinBndrs env1 dest_lvl rec all_bndrs
                       | otherwise
-                      = lvlLamBndrs (placeJoinCeiling env1) dest_lvl all_bndrs
+                      = case lvlLamBndrs env1 dest_lvl all_bndrs of
+                          (env2, bndrs') -> (placeJoinCeiling env2, bndrs')
         -- The important thing here is that we call lvlLamBndrs on
         -- all these binders at once (abs_vars and bndrs), so they
         -- all get the same major level.  Otherwise we create stupid
