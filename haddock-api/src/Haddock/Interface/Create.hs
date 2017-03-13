@@ -11,6 +11,10 @@
 -- Maintainer  :  haddock@projects.haskell.org
 -- Stability   :  experimental
 -- Portability :  portable
+--
+-- This module provides a single function 'createInterface',
+-- which creates a Haddock 'Interface' from the typechecking
+-- results 'TypecheckedModule' from GHC.
 -----------------------------------------------------------------------------
 module Haddock.Interface.Create (createInterface) where
 
@@ -54,7 +58,11 @@ import HsDecls ( getConDetails )
 -- | Use a 'TypecheckedModule' to produce an 'Interface'.
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the 'IfaceMap'.
-createInterface :: TypecheckedModule -> [Flag] -> IfaceMap -> InstIfaceMap -> ErrMsgGhc Interface
+createInterface :: TypecheckedModule
+                -> [Flag]       -- Boolean flags
+                -> IfaceMap     -- Locally processed modules
+                -> InstIfaceMap -- External, already installed interfaces
+                -> ErrMsgGhc Interface
 createInterface tm flags modMap instIfaceMap = do
 
   let ms             = pm_mod_summary . tm_parsed_module $ tm
@@ -518,7 +526,7 @@ mkExportItems
   -> WarningMap
   -> GlobalRdrEnv
   -> [Name]             -- exported names (orig)
-  -> [LHsDecl Name]
+  -> [LHsDecl Name]     -- renamed source declarations
   -> Maps
   -> FixMap
   -> [SrcSpan]          -- splice locations
@@ -716,7 +724,7 @@ moduleExports :: Module           -- ^ Module A (identity, NOT semantic)
               -> WarningMap
               -> GlobalRdrEnv     -- ^ The renaming environment used for A
               -> [Name]           -- ^ All the exports of A
-              -> [LHsDecl Name]   -- ^ All the declarations in A
+              -> [LHsDecl Name]   -- ^ All the renamed declarations in A
               -> IfaceMap         -- ^ Already created interfaces
               -> InstIfaceMap     -- ^ Interfaces in other packages
               -> Maps
@@ -765,8 +773,17 @@ moduleExports thisMod expMod dflags warnings gre _exports decls ifaceMap instIfa
 -- (For more information, see Trac #69)
 
 
-fullModuleContents :: DynFlags -> WarningMap -> GlobalRdrEnv -> Maps -> FixMap -> [SrcSpan]
-                   -> [LHsDecl Name] -> ErrMsgGhc [ExportItem Name]
+-- | Simplified variant of 'mkExportItems', where we can assume that
+-- every locally defined declaration is exported; thus, we just
+-- zip through the renamed declarations.
+fullModuleContents :: DynFlags
+                   -> WarningMap
+                   -> GlobalRdrEnv      -- ^ The renaming environment
+                   -> Maps
+                   -> FixMap
+                   -> [SrcSpan]         -- ^ Locations of all TH splices
+                   -> [LHsDecl Name]    -- ^ All the renamed declarations
+                   -> ErrMsgGhc [ExportItem Name]
 fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap) fixMap splices decls =
   liftM catMaybes $ mapM mkExportItem (expandSig decls)
   where
