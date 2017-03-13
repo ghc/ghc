@@ -52,7 +52,9 @@ module Type.Reflection
       -- "Data.Typeable" exports a variant of this interface (named differently
       -- for backwards compatibility).
     , I.SomeTypeRep(..)
+    , I.typeRepX
     , I.typeRepXTyCon
+    , I.typeRepXFingerprint
     , I.rnfSomeTypeRep
 
       -- * Type constructors
