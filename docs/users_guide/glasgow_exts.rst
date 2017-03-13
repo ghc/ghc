@@ -12771,6 +12771,29 @@ position for the duration of the splice and are limited to the splice.
 Note that because Template Haskell splices abstract syntax, the file
 positions are not automatically advanced.
 
+.. _column-pragma:
+
+``COLUMN`` pragma
+---------------
+
+.. index::
+   single: COLUMN; pragma
+   single: pragma; COLUMN
+
+This is the analogue of the ``LINE`` pragma and is likewise intended for
+use in automatically generated Haskell code. It lets you specify the
+column number of the original code; for example
+
+::
+
+    foo = do
+      {-# COLUMN 42 #-}pure ()
+      pure ()
+
+This adjusts all column numbers immediately after the pragma to start
+at 42.  The presence of this pragma only affects the quality of the
+diagnostics and does not change the syntax of the code itself.
+
 .. _rules:
 
 ``RULES`` pragma
