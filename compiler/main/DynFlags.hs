@@ -935,7 +935,10 @@ data DynFlags = DynFlags {
   maxInlineMemsetInsns  :: Int,
 
   -- | Reverse the order of error messages in GHC/GHCi
-  reverseErrors :: Bool,
+  reverseErrors         :: Bool,
+
+  -- | Limit the maximum number of errors to show
+  maxErrors             :: Maybe Int,
 
   -- | Unique supply configuration for testing build determinism
   initialUnique         :: Int,
@@ -1684,7 +1687,8 @@ defaultDynFlags mySettings =
         initialUnique = 0,
         uniqueIncrement = 1,
 
-        reverseErrors = False
+        reverseErrors = False,
+        maxErrors     = Nothing
       }
 
 defaultWays :: Settings -> [Way]
@@ -2798,6 +2802,10 @@ dynamic_flags_deps = [
              "Use -fno-force-recomp instead"
   , make_dep_flag defGhcFlag "no-recomp"
         (NoArg $ setGeneralFlag Opt_ForceRecomp) "Use -fforce-recomp instead"
+  , make_ord_flag defFlag "fmax-errors"
+      (intSuffix (\n d -> d { maxErrors = Just (max 1 n) }))
+  , make_ord_flag defFlag "fno-max-errors"
+      (noArg (\d -> d { maxErrors = Nothing }))
   , make_ord_flag defFlag "freverse-errors"
         (noArg (\d -> d {reverseErrors = True} ))
   , make_ord_flag defFlag "fno-reverse-errors"
