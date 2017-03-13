@@ -495,7 +495,33 @@ mergeSignatures
     -- Note [Blank hsigs for all requirements]
     hsc_env <- getTopEnv
     dflags  <- getDynFlags
+
+    -- Copy over some things from the original TcGblEnv that
+    -- we want to preserve
+    updGblEnv (\env -> env {
+        -- Renamed imports/declarations are often used
+        -- by programs that use the GHC API, e.g., Haddock.
+        -- These won't get filled by the merging process (since
+        -- we don't actually rename the parsed module again) so
+        -- we need to take them directly from the previous
+        -- typechecking.
+        --
+        -- NB: the export declarations aren't in their final
+        -- form yet.  We'll fill those in when we reprocess
+        -- the export declarations.
+        tcg_rn_imports = tcg_rn_imports orig_tcg_env,
+        tcg_rn_decls   = tcg_rn_decls   orig_tcg_env,
+        -- Annotations
+        tcg_ann_env    = tcg_ann_env    orig_tcg_env,
+        -- Documentation header
+        tcg_doc_hdr    = tcg_doc_hdr orig_tcg_env
+        -- tcg_dus?
+        -- tcg_th_used           = tcg_th_used orig_tcg_env,
+        -- tcg_th_splice_used    = tcg_th_splice_used orig_tcg_env
+        -- tcg_th_top_level_locs = tcg_th_top_level_locs orig_tcg_env
+       }) $ do
     tcg_env <- getGblEnv
+
     let outer_mod = tcg_mod tcg_env
         inner_mod = tcg_semantic_mod tcg_env
         mod_name = moduleName (tcg_mod tcg_env)
@@ -608,6 +634,7 @@ mergeSignatures
     (mb_lies, _) <- exports_from_avail mb_exports rdr_env
                         (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
 
+    {- -- NB: This is commented out, because warns above is disabled.
     -- If you tried to explicitly export an identifier that has a warning
     -- attached to it, that's probably a mistake.  Warn about it.
     case mb_lies of
@@ -620,8 +647,13 @@ mergeSignatures
                     text "Exported identifier" <+> quotes (ppr n) <+> text "will cause warnings if used.",
                     parens (text "To suppress this warning, remove" <+> quotes (ppr n) <+> text "from the export list of this signature.")
                     ]
+    -}
 
     failIfErrsM
+
+    -- Save the exports
+    setGblEnv tcg_env { tcg_rn_exports = mb_lies } $ do
+    tcg_env <- getGblEnv
 
     -- STEP 4: Rename the interfaces
     ext_ifaces <- forM thinned_ifaces $ \((IndefModule iuid _), ireq_iface) ->
