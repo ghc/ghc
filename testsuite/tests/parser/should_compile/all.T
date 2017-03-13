@@ -91,6 +91,7 @@ test('mc16', normal, compile, [''])
 test('EmptyDecls', normal, compile, [''])
 test('ParserLambdaCase', [], compile, [''])
 
+test('ColumnPragma', normal, compile, [''])
 test('T5243', [], multimod_compile, ['T5243', ''])
 test('T7118', normal, compile, [''])
 test('T7776', normal, compile, [''])

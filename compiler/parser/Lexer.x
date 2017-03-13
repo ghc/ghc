@@ -318,6 +318,10 @@ $tab          { warnTab }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
 
+-- Haskell-style column pragmas, of the form
+--    {-# COLUMN <column> #-}
+<column_prag> @decimal $whitechar* "#-}" { setColumn }
+
 <0,option_prags> {
   "{-#" $whitechar* $pragmachar+
         $whitechar+ $pragmachar+ / { known_pragma twoWordPrags }
@@ -1388,6 +1392,17 @@ setLine code span buf len = do
         -- subtract one: the line number refers to the *following* line
   _ <- popLexState
   pushLexState code
+  lexToken
+
+setColumn :: Action
+setColumn span buf len = do
+  let column =
+        case reads (lexemeToString buf len) of
+          [(column, _)] -> column
+          _ -> error "setColumn: expected integer" -- shouldn't happen
+  setSrcLoc (mkRealSrcLoc (srcSpanFile span) (srcSpanEndLine span)
+                          (fromIntegral (column :: Integer)))
+  _ <- popLexState
   lexToken
 
 setFile :: Int -> Action
@@ -2751,7 +2766,8 @@ oneWordPrags = Map.fromList [
      ("overlapping", strtoken (\s -> IToverlapping_prag (SourceText s))),
      ("incoherent", strtoken (\s -> ITincoherent_prag (SourceText s))),
      ("ctype", strtoken (\s -> ITctype (SourceText s))),
-     ("complete", strtoken (\s -> ITcomplete_prag (SourceText s)))
+     ("complete", strtoken (\s -> ITcomplete_prag (SourceText s))),
+     ("column", begin column_prag)
      ]
 
 twoWordPrags = Map.fromList([
