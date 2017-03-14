@@ -1066,7 +1066,8 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
 
        -- Typecheck RHS
        ; let pats = HsIB { hsib_vars = imp_vars ++ map hsLTyVarName exp_vars
-                         , hsib_body = map hsLTyVarBndrToType exp_vars }
+                         , hsib_body = map hsLTyVarBndrToType exp_vars
+                         , hsib_closed = False } -- this field is ignored, anyway
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
           -- are different.

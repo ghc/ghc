@@ -110,7 +110,7 @@ rn_hs_sig_wc_type no_implicit_if_forall ctxt
        ; rnImplicitBndrs no_implicit_if_forall tv_rdrs hs_ty $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_wcs = wcs, hswc_body = ib_ty' }
-             ib_ty'  = HsIB { hsib_vars = vars, hsib_body = hs_ty' }
+             ib_ty'  = mk_implicit_bndrs vars hs_ty' fvs1
        ; (res, fvs2) <- thing_inside sig_ty'
        ; return (res, fvs1 `plusFV` fvs2) } }
 
@@ -247,8 +247,7 @@ rnHsSigType ctx (HsIB { hsib_body = hs_ty })
   = do { vars <- extractFilteredRdrTyVars hs_ty
        ; rnImplicitBndrs True vars hs_ty $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
-       ; return (HsIB { hsib_vars = vars
-                      , hsib_body = body' }, fvs) } }
+       ; return ( mk_implicit_bndrs vars body' fvs, fvs ) } }
 
 rnImplicitBndrs :: Bool    -- True <=> no implicit quantification
                            --          if type is headed by a forall
@@ -291,6 +290,15 @@ rnLHsInstType doc_str inst_ty
   = do { addErrAt (getLoc (hsSigType inst_ty)) $
          text "Malformed instance:" <+> ppr inst_ty
        ; rnHsSigType (GenericCtx doc_str) inst_ty }
+
+mk_implicit_bndrs :: [Name]      -- implicitly bound
+                  -> a           -- payload
+                  -> FreeVars    -- FreeVars of payload
+                  -> HsImplicitBndrs Name a
+mk_implicit_bndrs vars body fvs
+  = HsIB { hsib_vars = vars
+         , hsib_body = body
+         , hsib_closed = nameSetAll (not . isTyVarName) (vars `delFVs` fvs) }
 
 
 {- ******************************************************

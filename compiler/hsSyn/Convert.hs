@@ -513,7 +513,7 @@ cvtConstr (ForallC tvs ctxt con)
                   let hs_ty  = mkHsForAllTy tvs noSrcSpan tvs' rho_ty
                       rho_ty = mkHsQualTy ctxt noSrcSpan (L loc ctxt')
                                                          (hsib_body conT)
-                  in con' { con_type = HsIB PlaceHolder hs_ty }
+                  in con' { con_type = mkHsImplicitBndrs hs_ty }
                 ConDeclH98  {} ->
                   let qvars = case (tvs, con_qvars con') of
                         ([], Nothing) -> Nothing

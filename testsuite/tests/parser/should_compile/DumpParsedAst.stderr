@@ -92,7 +92,8 @@
                       (HsTyVar 
                        (NotPromoted) 
                        ({ DumpParsedAst.hs:8:15-16 }
-                        (Unqual {OccName: as}))))))]))))]) 
+                        (Unqual {OccName: as}))))))]))))] 
+             (PlaceHolder)) 
             (Prefix) 
             ({ DumpParsedAst.hs:8:21-36 }
              (HsAppsTy 
@@ -136,7 +137,8 @@
                (HsExplicitListTy 
                 (Promoted) 
                 (PlaceHolder) 
-                []))]) 
+                []))] 
+             (PlaceHolder)) 
             (Prefix) 
             ({ DumpParsedAst.hs:9:21-24 }
              (HsAppsTy 
