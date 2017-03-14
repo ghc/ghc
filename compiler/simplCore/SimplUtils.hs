@@ -1821,21 +1821,21 @@ mkCase1 _dflags scrut case_bndr _ alts@((_,_,rhs1) : _)      -- Identity case
     ticks = concatMap (stripTicksT tickishFloatable . thdOf3) (tail alts)
     identity_alt (con, args, rhs) = check_eq rhs con args
 
-    check_eq (Cast rhs co) con        args
+    check_eq (Cast rhs co) con args        -- See Note [RHS casts]
       = not (any (`elemVarSet` tyCoVarsOfCo co) args) && check_eq rhs con args
-        -- See Note [RHS casts]
-    check_eq (Lit lit)  (LitAlt lit') _    = lit == lit'
+    check_eq (Tick t e) alt args
+      = tickishFloatable t && check_eq e alt args
+
+    check_eq (Lit lit) (LitAlt lit') _     = lit == lit'
     check_eq (Var v) _ _  | v == case_bndr = True
-    check_eq (Var v)    (DataAlt con) []   = v == dataConWorkId con
+    check_eq (Var v)   (DataAlt con) args
+      | null arg_tys, null args            = v == dataConWorkId con
                                              -- Optimisation only
-    check_eq (Tick t e) alt           args = tickishFloatable t &&
-                                             check_eq e alt args
     check_eq rhs        (DataAlt con) args = cheapEqExpr' tickishFloatable rhs $
-                                             mkConApp con (arg_tys ++
-                                                           varsToCoreExprs args)
+                                             mkConApp2 con arg_tys args
     check_eq _          _             _    = False
 
-    arg_tys = map Type (tyConAppArgs (idType case_bndr))
+    arg_tys = tyConAppArgs (idType case_bndr)
 
         -- Note [RHS casts]
         -- ~~~~~~~~~~~~~~~~
