@@ -16,10 +16,10 @@ class C a where
     type D a b
 
 instance C Int where
-    type D Int b = String
+    type D Int () = String
 
 instance C () where
-    type D () a = Bool
+    type D () () = Bool
 
 type family E a where
     E ()  = Bool

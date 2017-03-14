@@ -1416,7 +1416,7 @@ With this class decl, if we have an instance decl
   instance C ty1 ty2 where ...
 then the type instance must look like
      type T ty1 v ty2 = ...
-with exactly 'ty1' for 'a', 'ty2' for 'b', and a variable for 'x'.
+with exactly 'ty1' for 'a', 'ty2' for 'b', and some type 'v' for 'x'.
 For example:
 
   instance C [p] Int
@@ -1443,20 +1443,40 @@ Note that
   on the LHS to establish the repeated pattern.  So to keep it simple
   we just require equality.
 
-* We also check that any non-class-tyvars are instantiated with
-  distinct tyvars.  That rules out
+* For variables in associated type families that are not bound by the class
+  itself, we do _not_ check if they are over-specific. In other words,
+  it's perfectly acceptable to have an instance like this:
+
     instance C [p] Int where
-      type T [p] Bool Int = p  -- Note Bool
-      type T [p] Char Int = p  -- Note Char
+      type T [p] (Maybe x) Int = x
 
-  and
-     instance C [p] Int where
-      type T [p] p Int = p     -- Note repeated 'p' on LHS
-  It's consistent to do this because we don't allow this kind of
-  instantiation for the class-tyvar arguments of the family.
+  While the first and third arguments to T are required to be exactly [p] and
+  Int, respectively, since they are bound by C, the second argument is allowed
+  to be more specific than just a type variable. Furthermore, it is permissible
+  to define multiple equations for T that differ only in the non-class-bound
+  argument:
 
-  Overall, we can have exactly one type instance for each
-  associated type.  If you wantmore, use an auxiliary family.
+    instance C [p] Int where
+      type T [p] (Maybe x)    Int = x
+      type T [p] (Either x y) Int = x -> y
+
+  We once considered requiring that non-class-bound variables in associated
+  type family instances be instantiated with distinct type variables. However,
+  that requirement proved too restrictive in practice, as there were examples
+  of extremely simple associated type family instances that this check would
+  reject, and fixing them required tiresome boilerplate in the form of
+  auxiliary type families. For instance, you would have to define the above
+  example as:
+
+    instance C [p] Int where
+      type T [p] x Int = CAux x
+
+    type family CAux x where
+      CAux (Maybe x)    = x
+      CAux (Either x y) = x -> y
+
+  We decided that this restriction wasn't buying us much, so we opted not
+  to pursue that design (see also GHC Trac #13398).
 
 Implementation
   * Form the mini-envt from the class type variables a,b
@@ -1466,7 +1486,8 @@ Implementation
     (it shares tyvars with the class C)
 
   * Apply the mini-evnt to them, and check that the result is
-    consistent with the instance types [p] y Int
+    consistent with the instance types [p] y Int. (where y can be any type, as
+    it is not scoped over the class type variables.
 
 We make all the instance type variables scope over the
 type instances, of course, which picks up non-obvious kinds.  Eg
@@ -1516,13 +1537,10 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc _at_tvs at_tys
 
        -- Check type args first (more comprehensible)
        ; checkTc (all check_arg type_shapes)   pp_wrong_at_arg
-       ; checkTc (check_poly_args type_shapes) pp_wrong_at_tyvars
 
        -- And now kind args
        ; checkTc (all check_arg kind_shapes)
                  (pp_wrong_at_arg $$ ppSuggestExplicitKinds)
-       ; checkTc (check_poly_args kind_shapes)
-                 (pp_wrong_at_tyvars $$ ppSuggestExplicitKinds)
 
        ; traceTc "cfi" (vcat [ ppr inst_tvs
                              , ppr arg_shapes
@@ -1538,19 +1556,9 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc _at_tvs at_tys
     check_arg (Just exp_ty, at_ty) = exp_ty `tcEqType` at_ty
     check_arg (Nothing,     _    ) = True -- Arg position does not correspond
                                           -- to a class variable
-    check_poly_args :: [(Maybe Type,Type)] -> Bool
-    check_poly_args arg_shapes
-      = allDistinctTyVars (mkVarSet inst_tvs)
-                          [ at_ty | (Nothing, at_ty) <- arg_shapes ]
 
     pp_wrong_at_arg
       = vcat [ text "Type indexes must match class instance head"
-             , pp_exp_act ]
-
-    pp_wrong_at_tyvars
-      = vcat [ text "Polymorphic type indexes of associated type" <+> quotes (ppr fam_tc)
-             , nest 2 $ vcat [ text "(i.e. ones independent of the class type variables)"
-                             , text "must be distinct type variables" ]
              , pp_exp_act ]
 
     pp_exp_act

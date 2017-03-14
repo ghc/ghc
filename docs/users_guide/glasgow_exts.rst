@@ -7092,38 +7092,20 @@ keyword in the family instance: ::
       ...
 
 The data or type family instance for an assocated type must follow
-the following two rules:
+the rule that the type indexes corresponding to class parameters must have
+precisely the same as type given in the instance head. For example: ::
 
--  The type indexes corresponding to class parameters must have
-   precisely the same as type given in the instance head.
-   For example: ::
+    class Collects ce where
+      type Elem ce :: *
 
-       class Collects ce where
-         type Elem ce :: *
+    instance Eq (Elem [e]) => Collects [e] where
+      -- Choose one of the following alternatives:
+      type Elem [e] = e       -- OK
+      type Elem [x] = x       -- BAD; '[x]' is differnet to '[e]' from head
+      type Elem x   = x       -- BAD; 'x' is different to '[e]'
+      type Elem [Maybe x] = x -- BAD: '[Maybe x]' is different to '[e]'
 
-       instance Eq (Elem [e]) => Collects [e] where
-         -- Choose one of the following alternatives:
-         type Elem [e] = e       -- OK
-         type Elem [x] = x       -- BAD; '[x]' is differnet to '[e]' from head
-         type Elem x   = x       -- BAD; 'x' is different to '[e]'
-         type Elem [Maybe x] = x -- BAD: '[Maybe x]' is different to '[e]'
-
--  The type indexes of the type family that do *not* correspond to
-   class parameters must be distinct type variables, not mentioned
-   in the instance head.  For example: ::
-
-       class C b x where
-          type F a b c :: *
-
-       instance C [v] [w] where
-         -- Choose one of the following alternatives:
-         type C a [v] c = a->c  -- OK; a,c are tyvars
-         type C x [v] y = y->x  -- OK; x,y are tyvars
-         type C x [v] x = x     -- BAD: x is repeated
-         type C x [v] w = x     -- BAD: w is mentioned in instance head
-
-The effect of these two rules is that the type-family instance
-completely covers the cases covered by the instance head.
+Note the following points:
 
 -  An instance for an associated family can only appear as part of an
    instance declarations of the class in which the family was declared,
@@ -7138,9 +7120,9 @@ completely covers the cases covered by the instance head.
    inhabited; i.e., only diverging expressions, such as ``undefined``,
    can assume the type.
 
--  A historical note.  In the past (but no longer), GHC allowed you to
-   write *multiple* type or data family instances for a single
-   associated type.  For example: ::
+-  Although it is unusual, there (currently) can be *multiple* instances
+   for an associated family in a single instance declaration. For
+   example, this is legitimate: ::
 
        instance GMapKey Flob where
          data GMap Flob [v] = G1 v
@@ -7149,23 +7131,9 @@ completely covers the cases covered by the instance head.
 
    Here we give two data instance declarations, one in which the last
    parameter is ``[v]``, and one for which it is ``Int``. Since you
-   cannot give any *subsequent* instances for ``(GMap Flob ...)``,
-   this facility was not very useful, except perhaps when the free
-   indexed parameter has a fixed number of alternatives
-   (e.g. ``Bool``). But in that case it is better to define an auxiliary
-   closed type function like this: ::
-
-       class C a where
-         type F a (b :: Bool) :: *
-
-       instance C Int where
-         type F Int b = FInt b
-
-       type family FInt a b where
-         FInt True  = Char
-         FInt False = Bool
-
-    Here the auxiliary type function is ``FInt``.
+   cannot give any *subsequent* instances for ``(GMap Flob ...)``, this
+   facility is most useful when the free indexed parameter is of a kind
+   with a finite number of alternatives (unlike ``*``).
 
 .. _assoc-decl-defs:
 
