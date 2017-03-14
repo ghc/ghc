@@ -180,7 +180,7 @@ coreExprToBCOs hsc_env this_mod expr
   where dflags = hsc_dflags hsc_env
 
 -- The regular freeVars function gives more information than is useful to
--- us here. simpleFreeVars does the impedence matching.
+-- us here. simpleFreeVars does the impedance matching.
 simpleFreeVars :: CoreExpr -> AnnExpr Id DVarSet
 simpleFreeVars = go . freeVars
   where

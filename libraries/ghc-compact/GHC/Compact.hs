@@ -103,7 +103,7 @@ import GHC.Types
 -- separate copy of the data.
 --
 -- The cost of compaction is similar to the cost of GC for the same
--- data, but it is perfomed only once.  However, because
+-- data, but it is performed only once.  However, because
 -- "Data.Compact.compact" does not stop-the-world, retaining internal
 -- sharing during the compaction process is very costly. The user
 -- can choose whether to 'compact' or 'compactWithSharing'.

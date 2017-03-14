@@ -830,7 +830,7 @@ mkExport prag_fn qtvs theta
         ; spec_prags <- tcSpecPrags poly_id prag_sigs
                 -- tcPrags requires a zonked poly_id
 
-        -- See Note [Impedence matching]
+        -- See Note [Impedance matching]
         -- NB: we have already done checkValidType, including an ambiguity check,
         --     on the type; either when we checked the sig or in mkInferredPolyId
         ; let poly_ty     = idType poly_id
@@ -842,7 +842,7 @@ mkExport prag_fn qtvs theta
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
                                            -- an ambiguouse type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
-                  else addErrCtxtM (mk_impedence_match_msg mono_info sel_poly_ty poly_ty) $
+                  else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubType_NC sig_ctxt sel_poly_ty poly_ty
 
         ; warn_missing_sigs <- woptM Opt_WarnMissingLocalSignatures
@@ -868,7 +868,7 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig_inst mono_ty
 
   | otherwise  -- Either no type sig or partial type sig
   = checkNoErrs $  -- The checkNoErrs ensures that if the type is ambiguous
-                   -- we don't carry on to the impedence matching, and generate
+                   -- we don't carry on to the impedance matching, and generate
                    -- a duplicate ambiguity error.  There is a similar
                    -- checkNoErrs for complete type signatures too.
     do { fam_envs <- tcGetFamInstEnvs
@@ -965,11 +965,11 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
     mk_ctuple preds  = do { tc <- tcLookupTyCon (cTupleTyConName (length preds))
                           ; return (mkTyConApp tc preds) }
 
-mk_impedence_match_msg :: MonoBindInfo
+mk_impedance_match_msg :: MonoBindInfo
                        -> TcType -> TcType
                        -> TidyEnv -> TcM (TidyEnv, SDoc)
 -- This is a rare but rather awkward error messages
-mk_impedence_match_msg (MBI { mbi_poly_name = name, mbi_sig = mb_sig })
+mk_impedance_match_msg (MBI { mbi_poly_name = name, mbi_sig = mb_sig })
                        inf_ty sig_ty tidy_env
  = do { (tidy_env1, inf_ty) <- zonkTidyTcType tidy_env  inf_ty
       ; (tidy_env2, sig_ty) <- zonkTidyTcType tidy_env1 sig_ty
@@ -1076,7 +1076,7 @@ Examples that might fail:
  - an inferred type that includes unboxed tuples
 
 
-Note [Impedence matching]
+Note [Impedance matching]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    f 0 x = x

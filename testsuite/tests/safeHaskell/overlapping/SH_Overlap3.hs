@@ -2,7 +2,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 
 -- | Same as SH_Overlap1, but module where overlap occurs (SH_Overlap3) is
--- marked `Unsafe`. Compilation should succeed (symetry with inferring safety).
+-- marked `Unsafe`. Compilation should succeed (symmetry with inferring safety).
 module SH_Overlap3 where
 
 import SH_Overlap3_A

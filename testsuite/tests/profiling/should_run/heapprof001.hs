@@ -169,7 +169,7 @@ split p = split' p []
 spri (Ast x : Lex c : s) = opri c
 spri s = 0
 
--- does any symbol appear in both consequent and antecedant of clause
+-- does any symbol appear in both consequent and antecedent of clause
 tautclause (c,a) = [x | x <- c, x `elem` a] /= []
 
 -- form unique clausal axioms excluding tautologies

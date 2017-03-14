@@ -450,7 +450,7 @@ typeIsTypeable (CoercionTy{})       = panic "typeIsTypeable(Coercion)"
 type KindRepEnv = TypeMap (Id, Maybe (LHsExpr Id))
 
 -- | A monad within which we will generate 'KindRep's. Here we keep an
--- environments containing 'KindRep's which we've already generated so we can
+-- environment containing 'KindRep's which we've already generated so we can
 -- re-use them opportunistically.
 newtype KindRepM a = KindRepM { unKindRepM :: StateT KindRepEnv TcRn a }
                    deriving (Functor, Applicative, Monad)

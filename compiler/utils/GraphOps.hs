@@ -279,7 +279,7 @@ addPreference (u, c) color
 
 
 -- | Do aggressive coalescing on this graph.
---      returns the new graph and the list of pairs of nodes that got coaleced together.
+--      returns the new graph and the list of pairs of nodes that got coalesced together.
 --      for each pair, the resulting node will have the least key and be second in the pair.
 --
 coalesceGraph

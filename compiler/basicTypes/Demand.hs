@@ -1229,7 +1229,7 @@ diverge, and we do not anything being passed to b.
 
 Note [Asymmetry of 'both' for DmdType and DmdResult]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-'both' for DmdTypes is *assymetrical*, because there is only one
+'both' for DmdTypes is *asymmetrical*, because there is only one
 result!  For example, given (e1 e2), we get a DmdType dt1 for e1, use
 its arg demand to analyse e2 giving dt2, and then do (dt1 `bothType` dt2).
 Similarly with

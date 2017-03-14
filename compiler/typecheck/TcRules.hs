@@ -285,7 +285,7 @@ These don't have a name, so we can't quantify over them directly.
 Instead, because we really do want to quantify here, invent a new
 EvVar for the coercion, fill the hole with the invented EvVar, and
 then quantify over the EvVar. Not too tricky -- just some
-impedence matching, really.
+impedance matching, really.
 
 Note [Simplify cloned constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

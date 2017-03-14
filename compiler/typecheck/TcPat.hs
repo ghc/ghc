@@ -243,7 +243,7 @@ subsumption, not equality, check against the context type.  e.g.
 
 Since 'blah' returns a value of type T, its payload is a polymorphic
 function of type (forall a. a->a).  And that's enough to bind the
-less-polymorphic function 'f', but we need some impedence matching
+less-polymorphic function 'f', but we need some impedance matching
 to witness the instantiation.
 
 
