@@ -39,7 +39,7 @@ test('T1969',
              # 2013-11-13 17 (x86/Windows, 64bit machine)
              # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 30 (x86/Linux, 64bit machine)
-           (wordsize(64), 83, 20)]),
+           (wordsize(64), 66, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -54,6 +54,7 @@ test('T1969',
              # 2016-10-20 68, (amd64/Linux) allow top-level string literals
              #                See the comment 16 on #8472.
              # 2017-02-17 83  (amd64/Linux) Type-indexed Typeable
+             # 2017-03-14 66  (amd64/Windows) Perhaps Typeable optimizations
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -624,8 +625,9 @@ test('T5837',
              # 2014-12-08: 115905208  Constraint solver perf improvements (esp kick-out)
              # 2016-04-06: 24199320  (x86/Linux, 64-bit machine) TypeInType
 
-           (platform('x86_64-unknown-mingw32'), 59161648, 7),
-             # 2017-02-19                        59161648 (x64/Windows) - Unknown
+           (platform('x86_64-unknown-mingw32'), 53787192, 7),
+             # 2017-02-19                       59161648 (x64/Windows) - Unknown
+             # 2017-03-14                       53787192 (x64/Windows) - Unknown
 
            (wordsize(64), 52625920, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
@@ -981,9 +983,10 @@ test('T12425',
 test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 89180624, 5),
+          [(platform('x86_64-unknown-mingw32'), 79820152, 5),
           # initial:      83032768
-          # 2017-02-19                          89180624 (x64/Windows) - Unknown
+          # 2017-02-19    89180624 (x64/Windows) - Unknown
+          # 2017-03-14    79820152 (x64/Windows) - Probably Early inline patch
            (wordsize(64), 80245640, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
