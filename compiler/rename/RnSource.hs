@@ -777,7 +777,8 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
 
        ; return (tycon',
                  HsIB { hsib_body = pats'
-                      , hsib_vars = all_ibs },
+                      , hsib_vars = all_ibs
+                      , hsib_closed = True },
                  payload',
                  all_fvs) }
              -- type instance => use, hence addOneFV

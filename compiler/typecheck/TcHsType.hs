@@ -5,7 +5,7 @@
 \section[TcMonoType]{Typechecking user-specified @MonoTypes@}
 -}
 
-{-# LANGUAGE CPP, TupleSections, MultiWayIf #-}
+{-# LANGUAGE CPP, TupleSections, MultiWayIf, RankNTypes #-}
 
 module TcHsType (
         -- Type signatures
@@ -53,7 +53,7 @@ import TcMType
 import TcValidity
 import TcUnify
 import TcIface
-import TcSimplify ( solveEqualities )
+import TcSimplify ( solveEqualities, solveSomeEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
 import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
@@ -190,8 +190,7 @@ tcClassSigType :: [Located Name] -> LHsSigType Name -> TcM Type
 -- the recursive class declaration "knot"
 tcClassSigType names sig_ty
   = addSigCtxt (funsSigCtxt names) (hsSigType sig_ty) $
-    do { ty <- tc_hs_sig_type sig_ty liftedTypeKind
-       ; kindGeneralizeType ty }
+    tc_hs_sig_type_and_gen sig_ty liftedTypeKind
 
 tcHsSigType :: UserTypeCtxt -> LHsSigType Name -> TcM Type
 -- Does validity checking
@@ -204,22 +203,37 @@ tcHsSigType ctxt sig_ty
               -- The kind is checked by checkValidType, and isn't necessarily
               -- of kind * in a Template Haskell quote eg [t| Maybe |]
 
-       ; ty <- tc_hs_sig_type sig_ty kind
-
           -- Generalise here: see Note [Kind generalisation]
-       ; do_kind_gen <- decideKindGeneralisationPlan ty
+       ; do_kind_gen <- decideKindGeneralisationPlan sig_ty
        ; ty <- if do_kind_gen
-               then kindGeneralizeType ty
-               else zonkTcType ty
+               then tc_hs_sig_type_and_gen sig_ty kind
+               else tc_hs_sig_type         sig_ty kind >>= zonkTcType
 
        ; checkValidType ctxt ty
        ; return ty }
 
+-- kind-checks/desugars an 'LHsSigType' and then kind-generalizes.
+-- This will never emit constraints, as it uses solveEqualities interally.
+-- No validity checking, but it does zonk en route to generalization
+tc_hs_sig_type_and_gen :: LHsSigType Name -> Kind -> TcM Type
+tc_hs_sig_type_and_gen sig_ty kind
+  = do { ty <- tc_hs_sig_type_x solveEqualities sig_ty kind
+       ; kindGeneralizeType ty }
+
 tc_hs_sig_type :: LHsSigType Name -> Kind -> TcM Type
--- Does not do validity checking or zonking
-tc_hs_sig_type (HsIB { hsib_body = hs_ty
-                     , hsib_vars = sig_vars }) kind
-  = do { (tkvs, ty) <- solveEqualities $
+-- May emit constraints; uses solveSomeEqualities internally.
+-- No zonking or validity checking
+tc_hs_sig_type = tc_hs_sig_type_x solveSomeEqualities
+
+-- Version of tc_hs_sig_type parameterized over how it should solve
+-- equalities
+tc_hs_sig_type_x :: (forall a. TcM a -> TcM a)  -- solveSomeEqualities
+                                                -- or solveEqualities
+                 -> LHsSigType Name -> Kind
+                 -> TcM Type
+tc_hs_sig_type_x solve (HsIB { hsib_body = hs_ty
+                             , hsib_vars = sig_vars }) kind
+  = do { (tkvs, ty) <- solve $
                        tcImplicitTKBndrsType sig_vars $
                        tc_lhs_type typeLevelMode hs_ty kind
        ; return (mkSpecForAllTys tkvs ty) }
@@ -237,8 +251,7 @@ tcHsDeriv hs_ty
                     -- can be no covars in an outer scope
        ; ty <- checkNoErrs $
                  -- avoid redundant error report with "illegal deriving", below
-               tc_hs_sig_type hs_ty cls_kind
-       ; ty <- kindGeneralizeType ty  -- also zonks
+               tc_hs_sig_type_and_gen hs_ty cls_kind
        ; cls_kind <- zonkTcType cls_kind
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
@@ -252,8 +265,7 @@ tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt
 -- Like tcHsSigType, but for a class instance declaration
 tcHsClsInstType user_ctxt hs_inst_ty
   = setSrcSpan (getLoc (hsSigType hs_inst_ty)) $
-    do { inst_ty <- tc_hs_sig_type hs_inst_ty constraintKind
-       ; inst_ty <- kindGeneralizeType inst_ty
+    do { inst_ty <- tc_hs_sig_type_and_gen hs_inst_ty constraintKind
        ; checkValidInstance user_ctxt hs_inst_ty inst_ty }
 
 -- Used for 'VECTORISE [SCALAR] instance' declarations
@@ -276,7 +288,9 @@ tcHsVectInst ty
 tcHsTypeApp :: LHsWcType Name -> Kind -> TcM Type
 tcHsTypeApp wc_ty kind
   | HsWC { hswc_wcs = sig_wcs, hswc_body = hs_ty } <- wc_ty
-  = do { ty <- solveEqualities $
+    -- use solveSomeEqualities b/c we are in an expression
+    -- See Note [solveEqualities vs solveSomeEqualities] in TcSimplify
+  = do { ty <- solveSomeEqualities $
                tcWildCardBindersX newWildTyVar sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        ; ty <- zonkTcType ty
@@ -290,8 +304,8 @@ tcHsTypeApp wc_ty kind
 ************************************************************************
 *                                                                      *
             The main kind checker: no validity checks here
-%*                                                                      *
-%************************************************************************
+*                                                                      *
+************************************************************************
 
         First a couple of simple wrappers for kcHsType
 -}
@@ -320,18 +334,14 @@ tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
 
 ---------------------------
 -- | Should we generalise the kind of this type signature?
--- We *should* generalise if the type mentions no scoped type variables
+-- We *should* generalise if the type is closed
 -- or if NoMonoLocalBinds is set. Otherwise, nope.
-decideKindGeneralisationPlan :: Type -> TcM Bool
-decideKindGeneralisationPlan ty
+decideKindGeneralisationPlan :: LHsSigType Name -> TcM Bool
+decideKindGeneralisationPlan sig_ty@(HsIB { hsib_closed = closed })
   = do { mono_locals <- xoptM LangExt.MonoLocalBinds
-       ; in_scope <- getInLocalScope
-       ; let fvs        = tyCoVarsOfTypeList ty
-             should_gen = not mono_locals || all (not . in_scope . getName) fvs
+       ; let should_gen = not mono_locals || closed
        ; traceTc "decideKindGeneralisationPlan"
-           (vcat [ text "type:" <+> ppr ty
-                 , text "ftvs:" <+> ppr fvs
-                 , text "should gen?" <+> ppr should_gen ])
+           (ppr sig_ty $$ text "should gen?" <+> ppr should_gen)
        ; return should_gen }
 
 {-
@@ -1771,12 +1781,15 @@ the term:
   * We instantiate the explicit and implicit foralls with SigTvs
   * We instantiate the wildcards with meta tyvars
 
-We /do/ call solveEqualities, and then zonk to propage the result of
-solveEqualities, mainly so that functions like matchExpectedFunTys will
+We /do/ call solveSomeEqualities, and then zonk to propagate the result of
+solveSomeEqualities, mainly so that functions like matchExpectedFunTys will
 be able to decompose the type, and hence higher-rank signatures will
 work. Ugh!  For example
    f :: (forall a. a->a) -> _
    f x = (x True, x 'c')
+
+Because we are not generalizing, etc., solveSomeEqualities is appropriate.
+See also Note [solveEqualities vs solveSomeEqualities] in TcSimplify.
 
 -}
 
@@ -1795,7 +1808,7 @@ tcHsPartialSigType ctxt sig_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (wcs, wcx, explicit_tvs, theta, tau))
             <- -- See Note [Solving equalities in partial type signatures]
-               solveEqualities $
+               solveSomeEqualities $
                tcWildCardBindersX newWildTyVar sig_wcs        $ \ wcs ->
                tcImplicitTKBndrsX new_implicit_tv implicit_hs_tvs $
                tcExplicitTKBndrsX newSigTyVar explicit_hs_tvs $ \ explicit_tvs ->
@@ -1857,7 +1870,7 @@ tcHsPatSigType ctxt sig_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (wcs, sig_ty))
             <- -- See Note [Solving equalities in partial type signatures]
-               solveEqualities $
+               solveSomeEqualities $
                tcWildCardBindersX newWildTyVar    sig_wcs  $ \ wcs ->
                tcImplicitTKBndrsX new_implicit_tv sig_vars $
                do { sig_ty <- tcHsOpenType hs_ty

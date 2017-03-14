@@ -290,6 +290,9 @@ isEmptyLHsQTvs _                = False
 data HsImplicitBndrs name thing   -- See Note [HsType binders]
   = HsIB { hsib_vars :: PostRn name [Name] -- Implicitly-bound kind & type vars
          , hsib_body :: thing              -- Main payload (type or list of types)
+         , hsib_closed :: PostRn name Bool -- Taking the hsib_vars into account,
+                                           -- is the payload closed? Used in
+                                           -- TcHsType.decideKindGeneralisationPlan
     }
 
 -- | Haskell Wildcard Binders
@@ -306,7 +309,7 @@ data HsWildCardBndrs name thing
                 -- it's still there in the hsc_body.
     }
 
-deriving instance (Data name, Data thing, Data (PostRn name [Name]))
+deriving instance (Data name, Data thing, Data (PostRn name [Name]), Data (PostRn name Bool))
   => Data (HsImplicitBndrs name thing)
 
 deriving instance (Data name, Data thing, Data (PostRn name [Name]))
@@ -357,8 +360,9 @@ the explicitly forall'd tyvar 'a' is bound by the HsForAllTy
 -}
 
 mkHsImplicitBndrs :: thing -> HsImplicitBndrs RdrName thing
-mkHsImplicitBndrs x = HsIB { hsib_body = x
-                           , hsib_vars = PlaceHolder }
+mkHsImplicitBndrs x = HsIB { hsib_body   = x
+                           , hsib_vars   = PlaceHolder
+                           , hsib_closed = PlaceHolder }
 
 mkHsWildCardBndrs :: thing -> HsWildCardBndrs RdrName thing
 mkHsWildCardBndrs x = HsWC { hswc_body = x
@@ -367,8 +371,9 @@ mkHsWildCardBndrs x = HsWC { hswc_body = x
 -- Add empty binders.  This is a bit suspicious; what if
 -- the wrapped thing had free type variables?
 mkEmptyImplicitBndrs :: thing -> HsImplicitBndrs Name thing
-mkEmptyImplicitBndrs x = HsIB { hsib_body = x
-                              , hsib_vars = [] }
+mkEmptyImplicitBndrs x = HsIB { hsib_body   = x
+                              , hsib_vars   = []
+                              , hsib_closed = False }
 
 mkEmptyWildCardBndrs :: thing -> HsWildCardBndrs Name thing
 mkEmptyWildCardBndrs x = HsWC { hswc_body = x

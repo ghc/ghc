@@ -118,7 +118,8 @@
                   ({ DumpRenamedAst.hs:8:15-16 }
                    (HsTyVar 
                     (NotPromoted) 
-                    ({ DumpRenamedAst.hs:8:15-16 }{Name: as{tv}})))))))]) 
+                    ({ DumpRenamedAst.hs:8:15-16 }{Name: as{tv}})))))))] 
+             (True)) 
             (Prefix) 
             ({ DumpRenamedAst.hs:8:21-36 }
              (HsAppTy 
@@ -148,7 +149,8 @@
                (HsExplicitListTy 
                 (Promoted) 
                 (PlaceHolder) 
-                []))]) 
+                []))] 
+             (True)) 
             (Prefix) 
             ({ DumpRenamedAst.hs:9:21-24 }
              (HsTyVar 
