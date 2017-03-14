@@ -71,6 +71,7 @@ createInterface tm flags modMap instIfaceMap = do
       !safety        = modInfoSafe mi
       mdl            = ms_mod ms
       sem_mdl        = tcg_semantic_mod (fst (tm_internals_ tm))
+      is_sig         = ms_hsc_src ms == HsigFile
       dflags         = ms_hspp_opts ms
       !instances     = modInfoInstances mi
       !fam_instances = md_fam_insts md
@@ -117,7 +118,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   -- The MAIN functionality: compute the export items which will
   -- each be the actual documentation of this module.
-  exportItems <- mkExportItems modMap mdl sem_mdl allWarnings gre exportedNames decls
+  exportItems <- mkExportItems is_sig modMap mdl sem_mdl allWarnings gre exportedNames decls
                    maps fixMap splices exports instIfaceMap dflags
 
   let !visibleNames = mkVisibleNames maps exportItems opts
@@ -143,7 +144,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   return $! Interface {
     ifaceMod             = mdl
-  , ifaceIsSig           = Module.isHoleModule sem_mdl
+  , ifaceIsSig           = is_sig
   , ifaceOrigFilename    = msHsFilePath ms
   , ifaceInfo            = info
   , ifaceDoc             = Documentation mbDoc modWarn
@@ -525,7 +526,8 @@ collectDocs = go Nothing []
 -- We create the export items even if the module is hidden, since they
 -- might be useful when creating the export items for other modules.
 mkExportItems
-  :: IfaceMap
+  :: Bool               -- is it a signature
+  -> IfaceMap
   -> Module             -- this module
   -> Module             -- semantic module
   -> WarningMap
@@ -540,7 +542,7 @@ mkExportItems
   -> DynFlags
   -> ErrMsgGhc [ExportItem Name]
 mkExportItems
-  modMap thisMod semMod warnings gre exportedNames decls
+  is_sig modMap thisMod semMod warnings gre exportedNames decls
   maps@(docMap, argMap, subMap, declMap, instMap) fixMap splices optExports instIfaceMap dflags =
   case optExports of
     Nothing -> fullModuleContents dflags warnings gre maps fixMap splices decls
@@ -569,8 +571,9 @@ mkExportItems
         Just doc -> return . ExportDoc $ processDocStringParas dflags gre doc
 
     declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
-    declWith t =
-      case findDecl t of
+    declWith t = do
+      r <- findDecl t
+      case r of
         ([L l (ValD _)], (doc, _)) -> do
           -- Top-level binding without type signature
           export <- hiValExportItem dflags t l doc (l `elem` splices) $ M.lookup t fixMap
@@ -649,13 +652,32 @@ mkExportItems
     isExported = (`elem` exportedNames)
 
 
-    findDecl :: Name -> ([LHsDecl Name], (DocForDecl Name, [(Name, DocForDecl Name)]))
+    findDecl :: Name -> ErrMsgGhc ([LHsDecl Name], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl n
-      | m == semMod, Just ds <- M.lookup n declMap =
-          (ds, lookupDocs n warnings docMap argMap subMap)
-      | Just iface <- M.lookup (semToIdMod (moduleUnitId thisMod) m) modMap, Just ds <- M.lookup n (ifaceDeclMap iface) =
-          (ds, lookupDocs n warnings (ifaceDocMap iface) (ifaceArgMap iface) (ifaceSubMap iface))
-      | otherwise = ([], (noDocForDecl, []))
+      | m == semMod =
+          case M.lookup n declMap of
+            Just ds -> return (ds, lookupDocs n warnings docMap argMap subMap)
+            Nothing
+              | is_sig -> do
+                -- OK, so it wasn't in the local declaration map.  It could
+                -- have been inherited from a signature.  Reconstitute it
+                -- from the type.
+                mb_r <- hiDecl dflags n
+                case mb_r of
+                    Nothing -> return ([], (noDocForDecl, []))
+                    -- TODO: If we try harder, we might be able to find
+                    -- a Haddock!  Look in the Haddocks for each thing in
+                    -- requirementContext (pkgState)
+                    Just decl -> return ([decl], (noDocForDecl, []))
+              | otherwise ->
+                return ([], (noDocForDecl, []))
+      | Just iface <- M.lookup (semToIdMod (moduleUnitId thisMod) m) modMap
+      , Just ds <- M.lookup n (ifaceDeclMap iface) =
+          return (ds, lookupDocs n warnings
+                            (ifaceDocMap iface)
+                            (ifaceArgMap iface)
+                            (ifaceSubMap iface))
+      | otherwise = return ([], (noDocForDecl, []))
       where
         m = nameModule n
 
