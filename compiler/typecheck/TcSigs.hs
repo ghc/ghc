@@ -470,7 +470,7 @@ the signature types for f and g, we'll end up unifying 'a' and 'b'
 So we instantiate f and g's signature with SigTv skolems
 (newMetaSigTyVars) that can unify with each other.  If too much
 unification takes place, we'll find out when we do the final
-impedence-matching check in TcBinds.mkExport
+impedance-matching check in TcBinds.mkExport
 
 See Note [Signature skolems] in TcType
 

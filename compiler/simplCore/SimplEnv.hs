@@ -790,7 +790,7 @@ the letrec.
 {-
 ************************************************************************
 *                                                                      *
-                Impedence matching to type substitution
+                Impedance matching to type substitution
 *                                                                      *
 ************************************************************************
 -}

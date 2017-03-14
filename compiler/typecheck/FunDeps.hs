@@ -212,7 +212,7 @@ improveFromInstEnv inst_env mk_loc pred
                                 -- because there often are none!
     , let trimmed_tcs = trimRoughMatchTcs cls_tvs fd rough_tcs
                 -- Trim the rough_tcs based on the head of the fundep.
-                -- Remember that instanceCantMatch treats both argumnents
+                -- Remember that instanceCantMatch treats both arguments
                 -- symmetrically, so it's ok to trim the rough_tcs,
                 -- rather than trimming each inst_tcs in turn
     , ispec <- instances

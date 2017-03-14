@@ -60,7 +60,7 @@ data RegAllocStats statics instr
           -- | Partially colored graph.
         , raGraph       :: Color.Graph VirtualReg RegClass RealReg
 
-          -- | The regs that were coaleced.
+          -- | The regs that were coalesced.
         , raCoalesced   :: UniqFM VirtualReg
 
           -- | Spiller stats.
@@ -84,7 +84,7 @@ data RegAllocStats statics instr
           -- | Coalesced and colored graph.
         , raGraphColored  :: Color.Graph VirtualReg RegClass RealReg
 
-          -- | Regs that were coaleced.
+          -- | Regs that were coalesced.
         , raCoalesced     :: UniqFM VirtualReg
 
           -- | Code with coalescings applied.

@@ -974,14 +974,14 @@ The rules for map work like this.
 
 * The "mapFB" rule optimises compositions of map
 
-* The "mapFB/id" rule get rids of 'map id' calls.
+* The "mapFB/id" rule gets rid of 'map id' calls.
   You might think that (mapFB c id) will turn into c simply
   when mapFB is inlined; but before that happens the "mapList"
   rule turns
      (foldr (mapFB (:) id) [] a
   back into
      map id
-  Which is not very cleveer.
+  Which is not very clever.
 
 * Any similarity to the Functor laws for [] is expected.
 -}

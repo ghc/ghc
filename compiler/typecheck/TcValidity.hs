@@ -118,7 +118,7 @@ and fail.
 
 So in fact we use this as our *definition* of ambiguity.  We use a
 very similar test for *inferred* types, to ensure that they are
-unambiguous. See Note [Impedence matching] in TcBinds.
+unambiguous. See Note [Impedance matching] in TcBinds.
 
 This test is very conveniently implemented by calling
     tcSubType <type> <type>

@@ -954,7 +954,7 @@ mentions the same name with different kinds, but it *is* well-kinded, noting
 that `(tv1:k2) |> sym kind_co` has kind k1.
 
 This all really would work storing just a Name in the ForAllCo. But we can't
-add Names to, e.g., VarSets, and there generally is just an impedence mismatch
+add Names to, e.g., VarSets, and there generally is just an impedance mismatch
 in a bunch of places. So we use tv1. When we need tv2, we can use
 setTyVarKind.
 

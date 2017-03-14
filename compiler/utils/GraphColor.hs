@@ -45,7 +45,7 @@ colorGraph
 
         -> ( Graph k cls color          -- the colored graph.
            , UniqSet k                  -- the set of nodes that we couldn't find a color for.
-           , UniqFM  k )                -- map of regs (r1 -> r2) that were coaleced
+           , UniqFM  k )                -- map of regs (r1 -> r2) that were coalesced
                                         --       r1 should be replaced by r2 in the source
 
 colorGraph iterative spinCount colors triv spill graph0
