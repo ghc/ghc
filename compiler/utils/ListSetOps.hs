@@ -27,6 +27,7 @@ import Outputable
 import Util
 
 import Data.List
+import qualified Data.Set as S
 
 getNth :: Outputable a => [a] -> Int -> a
 getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
@@ -48,9 +49,32 @@ unionLists xs ys
   = WARN(length xs > 100 || length ys > 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
-minusList :: (Eq a) => [a] -> [a] -> [a]
--- Everything in the first list that is not in the second list:
-minusList xs ys = [ x | x <- xs, isn'tIn "minusList" x ys]
+-- | Calculate the set difference of two lists. This is
+-- /O((m + n) log n)/, where we subtract a list of /n/ elements
+-- from a list of /m/ elements.
+--
+-- Extremely short cases are handled specially:
+-- When /m/ or /n/ is 0, this takes /O(1)/ time. When /m/ is 1,
+-- it takes /O(n)/ time.
+minusList :: Ord a => [a] -> [a] -> [a]
+-- There's no point building a set to perform just one lookup, so we handle
+-- extremely short lists specially. It might actually be better to use
+-- an O(m*n) algorithm when m is a little longer (perhaps up to 4 or even 5).
+-- The tipping point will be somewhere in the area of where /m/ and /log n/
+-- become comparable, but we probably don't want to work too hard on this.
+minusList [] _ = []
+minusList xs@[x] ys
+  | x `elem` ys = []
+  | otherwise = xs
+-- Using an empty set or a singleton would also be silly, so let's not.
+minusList xs [] = xs
+minusList xs [y] = filter (/= y) xs
+-- When each list has at least two elements, we build a set from the
+-- second argument, allowing us to filter the first argument fairly
+-- efficiently.
+minusList xs ys = filter (`S.notMember` yss) xs
+  where
+    yss = S.fromList ys
 
 {-
 ************************************************************************
