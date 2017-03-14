@@ -130,11 +130,9 @@ __attribute__((noreturn)) int run (char *exePath,
                        &pi) ) {
         die("Unable to start %s (error code: %lu)\n", exePath, GetLastError());
     }
-    /* Disable handling of console events in the parent by dropping its
-     * connection to the console. This has the (minor) downside of not being
-     * able to subsequently emit any error messages to the console.
-     */
-    FreeConsole();
+
+    /* Synchronize input and wait for target to be ready.  */
+    WaitForInputIdle(pi.hProcess, INFINITE);
 
     switch (WaitForSingleObject(pi.hProcess, INFINITE) ) {
     case WAIT_OBJECT_0:
