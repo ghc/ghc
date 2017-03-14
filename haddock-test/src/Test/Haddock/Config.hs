@@ -237,7 +237,7 @@ baseDependencies ghcPath = do
             exitFailure
         (ifArg:_) -> pure ifArg
     ifaces pkgIndex name = do
-        pkg <- join $ snd <$> lookupPackageName pkgIndex (PackageName name)
+        pkg <- join $ snd <$> lookupPackageName pkgIndex (mkPackageName name)
         iface <$> haddockInterfaces pkg <*> haddockHTMLs pkg
     iface file html = "--read-interface=" ++ html ++ "," ++ file
 
