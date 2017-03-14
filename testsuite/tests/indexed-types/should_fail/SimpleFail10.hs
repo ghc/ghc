@@ -8,7 +8,6 @@ class C8 a where
 instance C8 Int where
   data S8 Int a = S8Int a
 
--- Extra argument is not a variable;
--- this is now not allowed
+-- Extra argument is not a variable; this is fine
 instance C8 Bool where
   data S8 Bool Char = S8Bool

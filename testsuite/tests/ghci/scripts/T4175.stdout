@@ -9,8 +9,8 @@ type instance A (B a) b = () 	-- Defined at T4175.hs:10:15
 class C a where
   type family D a b :: *
   	-- Defined at T4175.hs:16:5
-type instance D () a = Bool 	-- Defined at T4175.hs:22:10
-type instance D Int b = String 	-- Defined at T4175.hs:19:10
+type instance D () () = Bool 	-- Defined at T4175.hs:22:10
+type instance D Int () = String 	-- Defined at T4175.hs:19:10
 type family E a :: *
   where
       E () = Bool
@@ -25,7 +25,8 @@ instance Read () -- Defined in ‘GHC.Read’
 instance Eq () -- Defined in ‘GHC.Classes’
 instance Ord () -- Defined in ‘GHC.Classes’
 instance Show () -- Defined in ‘GHC.Show’
-type instance D () a = Bool 	-- Defined at T4175.hs:22:10
+type instance D () () = Bool 	-- Defined at T4175.hs:22:10
+type instance D Int () = String 	-- Defined at T4175.hs:19:10
 data instance B () = MkB 	-- Defined at T4175.hs:13:15
 data Maybe a = Nothing | Just a 	-- Defined in ‘GHC.Base’
 instance Traversable Maybe -- Defined in ‘Data.Traversable’
@@ -50,7 +51,7 @@ instance Read Int -- Defined in ‘GHC.Read’
 instance Eq Int -- Defined in ‘GHC.Classes’
 instance Ord Int -- Defined in ‘GHC.Classes’
 instance Show Int -- Defined in ‘GHC.Show’
-type instance D Int b = String 	-- Defined at T4175.hs:19:10
+type instance D Int () = String 	-- Defined at T4175.hs:19:10
 type instance A Int Int = () 	-- Defined at T4175.hs:8:15
 class Z a 	-- Defined at T4175.hs:28:1
 instance F (Z a) -- Defined at T4175.hs:31:10
