@@ -465,6 +465,7 @@ compiler_stage2_dll0_MODULES = \
 	DriverPhases \
 	DynFlags \
 	Encoding \
+	EnumSet \
 	ErrUtils \
 	Exception \
 	FamInstEnv \

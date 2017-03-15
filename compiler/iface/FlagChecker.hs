@@ -16,7 +16,7 @@ import Fingerprint
 import BinFingerprint
 -- import Outputable
 
-import qualified Data.IntSet as IntSet
+import qualified EnumSet
 import System.FilePath (normalise)
 
 -- | Produce a fingerprint of a @DynFlags@ value. We only base
@@ -39,7 +39,7 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
 
         -- *all* the extension flags and the language
         lang = (fmap fromEnum language,
-                IntSet.toList $ extensionFlags)
+                map fromEnum $ EnumSet.toList extensionFlags)
 
         -- -I, -D and -U flags affect CPP
         cpp = (map normalise includePaths, opt_P dflags ++ picPOpts dflags)

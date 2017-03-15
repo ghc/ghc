@@ -210,8 +210,8 @@ import System.IO.Error
 import Text.ParserCombinators.ReadP hiding (char)
 import Text.ParserCombinators.ReadP as R
 
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import EnumSet (EnumSet)
+import qualified EnumSet
 
 import GHC.Foreign (withCString, peekCString)
 import qualified GHC.LanguageExtensions as LangExt
@@ -836,10 +836,10 @@ data DynFlags = DynFlags {
   generatedDumps        :: IORef (Set FilePath),
 
   -- hsc dynamic flags
-  dumpFlags             :: IntSet,
-  generalFlags          :: IntSet,
-  warningFlags          :: IntSet,
-  fatalWarningFlags     :: IntSet,
+  dumpFlags             :: EnumSet DumpFlag,
+  generalFlags          :: EnumSet GeneralFlag,
+  warningFlags          :: EnumSet WarningFlag,
+  fatalWarningFlags     :: EnumSet WarningFlag,
   -- Don't change this without updating extensionFlags:
   language              :: Maybe Language,
   -- | Safe Haskell mode
@@ -863,7 +863,7 @@ data DynFlags = DynFlags {
   --     flattenExtensionFlags language extensions
   -- LangExt.Extension is defined in libraries/ghc-boot so that it can be used
   -- by template-haskell
-  extensionFlags        :: IntSet,
+  extensionFlags        :: EnumSet LangExt.Extension,
 
   -- Unfolding control
   -- See Note [Discounts and thresholds] in CoreUnfold
@@ -1614,10 +1614,10 @@ defaultDynFlags mySettings =
         filesToNotIntermediateClean = panic "defaultDynFlags: No filesToNotIntermediateClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
-        dumpFlags = IntSet.empty,
-        generalFlags = IntSet.fromList (map fromEnum (defaultFlags mySettings)),
-        warningFlags = IntSet.fromList (map fromEnum standardWarnings),
-        fatalWarningFlags = IntSet.empty,
+        dumpFlags = EnumSet.empty,
+        generalFlags = EnumSet.fromList (defaultFlags mySettings),
+        warningFlags = EnumSet.fromList standardWarnings,
+        fatalWarningFlags = EnumSet.empty,
         ghciScripts = [],
         language = Nothing,
         safeHaskell = Sf_None,
@@ -1861,11 +1861,11 @@ instance Outputable a => Outputable (OnOff a) where
 
 -- OnOffs accumulate in reverse order, so we use foldr in order to
 -- process them in the right order
-flattenExtensionFlags :: Maybe Language -> [OnOff LangExt.Extension] -> IntSet
+flattenExtensionFlags :: Maybe Language -> [OnOff LangExt.Extension] -> EnumSet LangExt.Extension
 flattenExtensionFlags ml = foldr f defaultExtensionFlags
-    where f (On f)  flags = IntSet.insert (fromEnum f) flags
-          f (Off f) flags = IntSet.delete (fromEnum f) flags
-          defaultExtensionFlags = IntSet.fromList (map fromEnum (languageExtensions ml))
+    where f (On f)  flags = EnumSet.insert f flags
+          f (Off f) flags = EnumSet.delete f flags
+          defaultExtensionFlags = EnumSet.fromList (languageExtensions ml)
 
 languageExtensions :: Maybe Language -> [LangExt.Extension]
 
@@ -1920,7 +1920,7 @@ hasNoOptCoercion = gopt Opt_G_NoOptCoercion
 
 -- | Test whether a 'DumpFlag' is set
 dopt :: DumpFlag -> DynFlags -> Bool
-dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
+dopt f dflags = (f `EnumSet.member` dumpFlags dflags)
              || (verbosity dflags >= 4 && enableIfVerbose f)
     where enableIfVerbose Opt_D_dump_tc_trace               = False
           enableIfVerbose Opt_D_dump_rn_trace               = False
@@ -1954,55 +1954,53 @@ dopt f dflags = (fromEnum f `IntSet.member` dumpFlags dflags)
 
 -- | Set a 'DumpFlag'
 dopt_set :: DynFlags -> DumpFlag -> DynFlags
-dopt_set dfs f = dfs{ dumpFlags = IntSet.insert (fromEnum f) (dumpFlags dfs) }
+dopt_set dfs f = dfs{ dumpFlags = EnumSet.insert f (dumpFlags dfs) }
 
 -- | Unset a 'DumpFlag'
 dopt_unset :: DynFlags -> DumpFlag -> DynFlags
-dopt_unset dfs f = dfs{ dumpFlags = IntSet.delete (fromEnum f) (dumpFlags dfs) }
+dopt_unset dfs f = dfs{ dumpFlags = EnumSet.delete f (dumpFlags dfs) }
 
 -- | Test whether a 'GeneralFlag' is set
 gopt :: GeneralFlag -> DynFlags -> Bool
-gopt f dflags  = fromEnum f `IntSet.member` generalFlags dflags
+gopt f dflags  = f `EnumSet.member` generalFlags dflags
 
 -- | Set a 'GeneralFlag'
 gopt_set :: DynFlags -> GeneralFlag -> DynFlags
-gopt_set dfs f = dfs{ generalFlags = IntSet.insert (fromEnum f) (generalFlags dfs) }
+gopt_set dfs f = dfs{ generalFlags = EnumSet.insert f (generalFlags dfs) }
 
 -- | Unset a 'GeneralFlag'
 gopt_unset :: DynFlags -> GeneralFlag -> DynFlags
-gopt_unset dfs f = dfs{ generalFlags = IntSet.delete (fromEnum f) (generalFlags dfs) }
+gopt_unset dfs f = dfs{ generalFlags = EnumSet.delete f (generalFlags dfs) }
 
 -- | Test whether a 'WarningFlag' is set
 wopt :: WarningFlag -> DynFlags -> Bool
-wopt f dflags  = fromEnum f `IntSet.member` warningFlags dflags
+wopt f dflags  = f `EnumSet.member` warningFlags dflags
 
 -- | Set a 'WarningFlag'
 wopt_set :: DynFlags -> WarningFlag -> DynFlags
-wopt_set dfs f = dfs{ warningFlags = IntSet.insert (fromEnum f) (warningFlags dfs) }
+wopt_set dfs f = dfs{ warningFlags = EnumSet.insert f (warningFlags dfs) }
 
 -- | Unset a 'WarningFlag'
 wopt_unset :: DynFlags -> WarningFlag -> DynFlags
-wopt_unset dfs f = dfs{ warningFlags = IntSet.delete (fromEnum f) (warningFlags dfs) }
+wopt_unset dfs f = dfs{ warningFlags = EnumSet.delete f (warningFlags dfs) }
 
 -- | Test whether a 'WarningFlag' is set as fatal
 wopt_fatal :: WarningFlag -> DynFlags -> Bool
-wopt_fatal f dflags = fromEnum f `IntSet.member` fatalWarningFlags dflags
+wopt_fatal f dflags = f `EnumSet.member` fatalWarningFlags dflags
 
 -- | Mark a 'WarningFlag' as fatal (do not set the flag)
 wopt_set_fatal :: DynFlags -> WarningFlag -> DynFlags
 wopt_set_fatal dfs f
-    = dfs { fatalWarningFlags =
-              IntSet.insert (fromEnum f) (fatalWarningFlags dfs) }
+    = dfs { fatalWarningFlags = EnumSet.insert f (fatalWarningFlags dfs) }
 
 -- | Mark a 'WarningFlag' as not fatal
 wopt_unset_fatal :: DynFlags -> WarningFlag -> DynFlags
 wopt_unset_fatal dfs f
-    = dfs { fatalWarningFlags =
-              IntSet.delete (fromEnum f) (fatalWarningFlags dfs) }
+    = dfs { fatalWarningFlags = EnumSet.delete f (fatalWarningFlags dfs) }
 
 -- | Test whether a 'LangExt.Extension' is set
 xopt :: LangExt.Extension -> DynFlags -> Bool
-xopt f dflags = fromEnum f `IntSet.member` extensionFlags dflags
+xopt f dflags = f `EnumSet.member` extensionFlags dflags
 
 -- | Set a 'LangExt.Extension'
 xopt_set :: DynFlags -> LangExt.Extension -> DynFlags
@@ -3063,10 +3061,10 @@ dynamic_flags_deps = [
                           -- Opt_WarnIsError is still needed to pass -Werror
                           -- to CPP; see runCpp in SysTools
   , make_dep_flag defFlag "Wnot"    (NoArg (upd (\d ->
-                                              d {warningFlags = IntSet.empty})))
+                                              d {warningFlags = EnumSet.empty})))
                                              "Use -w or -Wno-everything instead"
   , make_ord_flag defFlag "w"       (NoArg (upd (\d ->
-                                              d {warningFlags = IntSet.empty})))
+                                              d {warningFlags = EnumSet.empty})))
 
      -- New-style uniform warning sets
      --
@@ -3074,7 +3072,7 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "Weverything"    (NoArg (mapM_
                                            setWarningFlag minusWeverythingOpts))
   , make_ord_flag defFlag "Wno-everything"
-                           (NoArg (upd (\d -> d {warningFlags = IntSet.empty})))
+                           (NoArg (upd (\d -> d {warningFlags = EnumSet.empty})))
 
   , make_ord_flag defFlag "Wall"           (NoArg (mapM_
                                                   setWarningFlag minusWallOpts))

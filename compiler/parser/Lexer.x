@@ -86,8 +86,8 @@ import Data.List
 import Data.Maybe
 import Data.Word
 
-import Data.IntSet (IntSet)
-import qualified Data.IntSet as IntSet
+import EnumSet (EnumSet)
+import qualified EnumSet
 
 -- ghc-boot
 import qualified GHC.LanguageExtensions as LangExt
@@ -1798,16 +1798,16 @@ data ParseResult a
 
 -- | Test whether a 'WarningFlag' is set
 warnopt :: WarningFlag -> ParserFlags -> Bool
-warnopt f options = fromEnum f `IntSet.member` pWarningFlags options
+warnopt f options = f `EnumSet.member` pWarningFlags options
 
 -- | Test whether a 'LangExt.Extension' is set
 extopt :: LangExt.Extension -> ParserFlags -> Bool
-extopt f options = fromEnum f `IntSet.member` pExtensionFlags options
+extopt f options = f `EnumSet.member` pExtensionFlags options
 
 -- | The subset of the 'DynFlags' used by the parser
 data ParserFlags = ParserFlags {
-    pWarningFlags   :: IntSet
-  , pExtensionFlags :: IntSet
+    pWarningFlags   :: EnumSet WarningFlag
+  , pExtensionFlags :: EnumSet LangExt.Extension
   , pThisPackage    :: UnitId      -- ^ key of package currently being compiled
   , pExtsBitmap     :: !ExtsBitmap -- ^ bitmap of permitted extensions
   }

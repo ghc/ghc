@@ -103,6 +103,7 @@ import Maybes( MaybeErr(..) )
 import DynFlags
 import Panic
 import Lexeme
+import qualified EnumSet
 
 import qualified Language.Haskell.TH as TH
 -- THSyntax gives access to internal functions and data types
@@ -111,7 +112,6 @@ import qualified Language.Haskell.TH.Syntax as TH
 -- Because GHC.Desugar might not be in the base library of the bootstrapping compiler
 import GHC.Desugar      ( AnnotationWrapper(..) )
 
-import qualified Data.IntSet as IntSet
 import Control.Exception
 import Data.Binary
 import Data.Binary.Get
@@ -931,9 +931,8 @@ instance TH.Quasi TcM where
 
   qIsExtEnabled = xoptM
 
-  qExtsEnabled = do
-    dflags <- hsc_dflags <$> getTopEnv
-    return $ map toEnum $ IntSet.elems $ extensionFlags dflags
+  qExtsEnabled =
+    EnumSet.toList . extensionFlags . hsc_dflags <$> getTopEnv
 
 -- | Adds a mod finalizer reference to the local environment.
 addModFinalizerRef :: ForeignRef (TH.Q ()) -> TcM ()
