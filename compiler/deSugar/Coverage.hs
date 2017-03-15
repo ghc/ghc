@@ -111,7 +111,7 @@ addTicksToBinds hsc_env mod mod_loc exports tyCons binds
      modBreaks <- mkModBreaks hsc_env mod tickCount entries
 
      when (dopt Opt_D_dump_ticked dflags) $
-         log_action dflags dflags NoReason SevDump noSrcSpan
+         putLogMsg dflags NoReason SevDump noSrcSpan
              (defaultDumpStyle dflags) (pprLHsBinds binds1)
 
      return (binds1, HpcInfo tickCount hashNo, Just modBreaks)

@@ -973,7 +973,7 @@ parUpsweep n_jobs mHscMessage old_hpt stable_mods cleanup sccs = do
             print_loop [] = read_msgs
             print_loop (x:xs) = case x of
                 Just (reason,severity,srcSpan,style,msg) -> do
-                    log_action dflags dflags reason severity srcSpan style msg
+                    putLogMsg dflags reason severity srcSpan style msg
                     print_loop xs
                 -- Exit the loop once we encounter the end marker.
                 Nothing -> return ()

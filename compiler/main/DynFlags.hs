@@ -64,6 +64,9 @@ module DynFlags (
 
         thisPackage, thisComponentId, thisUnitIdInsts,
 
+        -- ** Log output
+        putLogMsg,
+
         -- ** Safe Haskell
         SafeHaskellMode(..),
         safeHaskellOn, safeImportsOn, safeLanguageOn, safeInferOn,
@@ -2406,6 +2409,10 @@ setLogAction dflags = do
               })
          mlogger
 
+-- | Write an error or warning to the 'LogOutput'.
+putLogMsg :: DynFlags -> WarnReason -> Severity -> SrcSpan -> PprStyle
+          -> MsgDoc -> IO ()
+putLogMsg dflags = log_action dflags dflags
 
 updateWays :: DynFlags -> DynFlags
 updateWays dflags

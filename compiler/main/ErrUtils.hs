@@ -46,7 +46,7 @@ module ErrUtils (
         putMsg, printInfoForUser, printOutputForUser,
         logInfo, logOutput,
         errorMsg, warningMsg,
-        fatalErrorMsg, fatalErrorMsg', fatalErrorMsg'',
+        fatalErrorMsg, fatalErrorMsg'',
         compilationProgressMsg,
         showPass, withTiming,
         debugTraceMsg,
@@ -347,7 +347,7 @@ errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
 printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_ [ let style = mkErrStyle dflags unqual
-                in log_action dflags dflags reason sev s style (formatErrDoc dflags doc)
+                in putLogMsg dflags reason sev s style (formatErrDoc dflags doc)
               | ErrMsg { errMsgSpan      = s,
                          errMsgDoc       = doc,
                          errMsgSeverity  = sev,
@@ -408,8 +408,7 @@ doIfSet_dyn dflags flag action | gopt flag dflags = action
 dumpIfSet :: DynFlags -> Bool -> String -> SDoc -> IO ()
 dumpIfSet dflags flag hdr doc
   | not flag   = return ()
-  | otherwise  = log_action dflags
-                            dflags
+  | otherwise  = putLogMsg  dflags
                             NoReason
                             SevDump
                             noSrcSpan
@@ -490,7 +489,7 @@ dumpSDoc dflags print_unqual flag hdr doc
               let (doc', severity)
                     | null hdr  = (doc, SevOutput)
                     | otherwise = (mkDumpDoc hdr doc, SevDump)
-              log_action dflags dflags NoReason severity noSrcSpan dump_style doc'
+              putLogMsg dflags NoReason severity noSrcSpan dump_style doc'
 
 
 -- | Choose where to put a dump file based on DynFlags
@@ -547,18 +546,15 @@ ifVerbose dflags val act
 
 errorMsg :: DynFlags -> MsgDoc -> IO ()
 errorMsg dflags msg
-   = log_action dflags dflags NoReason SevError noSrcSpan (defaultErrStyle dflags) msg
+   = putLogMsg dflags NoReason SevError noSrcSpan (defaultErrStyle dflags) msg
 
 warningMsg :: DynFlags -> MsgDoc -> IO ()
 warningMsg dflags msg
-   = log_action dflags dflags NoReason SevWarning noSrcSpan (defaultErrStyle dflags) msg
+   = putLogMsg dflags NoReason SevWarning noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg :: DynFlags -> MsgDoc -> IO ()
-fatalErrorMsg dflags msg = fatalErrorMsg' (log_action dflags) dflags msg
-
-fatalErrorMsg' :: LogAction -> DynFlags -> MsgDoc -> IO ()
-fatalErrorMsg' la dflags msg =
-    la dflags NoReason SevFatal noSrcSpan (defaultErrStyle dflags) msg
+fatalErrorMsg dflags msg =
+    putLogMsg dflags NoReason SevFatal noSrcSpan (defaultErrStyle dflags) msg
 
 fatalErrorMsg'' :: FatalMessager -> String -> IO ()
 fatalErrorMsg'' fm msg = fm msg
@@ -642,12 +638,12 @@ printOutputForUser dflags print_unqual msg
 
 logInfo :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 logInfo dflags sty msg
-  = log_action dflags dflags NoReason SevInfo noSrcSpan sty msg
+  = putLogMsg dflags NoReason SevInfo noSrcSpan sty msg
 
 logOutput :: DynFlags -> PprStyle -> MsgDoc -> IO ()
 -- ^ Like 'logInfo' but with 'SevOutput' rather then 'SevInfo'
 logOutput dflags sty msg
-  = log_action dflags dflags NoReason SevOutput noSrcSpan sty msg
+  = putLogMsg dflags NoReason SevOutput noSrcSpan sty msg
 
 prettyPrintGhcErrors :: ExceptionMonad m => DynFlags -> m a -> m a
 prettyPrintGhcErrors dflags

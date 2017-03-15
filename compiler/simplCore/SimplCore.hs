@@ -519,7 +519,7 @@ ruleCheckPass current_phase pat guts =
     { rb <- getRuleBase
     ; dflags <- getDynFlags
     ; vis_orphs <- getVisibleOrphanMods
-    ; liftIO $ log_action dflags dflags NoReason Err.SevDump noSrcSpan
+    ; liftIO $ putLogMsg dflags NoReason Err.SevDump noSrcSpan
                    (defaultDumpStyle dflags)
                    (ruleCheckProgram current_phase pat
                       (RuleEnv rb vis_orphs) (mg_binds guts))
