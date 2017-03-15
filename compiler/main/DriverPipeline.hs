@@ -1642,7 +1642,7 @@ mkExtraObj dflags extn xs
 mkExtraObjToLinkIntoBinary :: DynFlags -> IO FilePath
 mkExtraObjToLinkIntoBinary dflags = do
    when (gopt Opt_NoHsMain dflags && haveRtsOptsFlags dflags) $ do
-      log_action dflags dflags NoReason SevInfo noSrcSpan
+      putLogMsg dflags NoReason SevInfo noSrcSpan
           (defaultUserStyle dflags)
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -no-hs-main." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
@@ -2057,7 +2057,7 @@ linkDynLibCheck :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkDynLibCheck dflags o_files dep_packages
  = do
     when (haveRtsOptsFlags dflags) $ do
-      log_action dflags dflags NoReason SevInfo noSrcSpan
+      putLogMsg dflags NoReason SevInfo noSrcSpan
           (defaultUserStyle dflags)
           (text "Warning: -rtsopts and -with-rtsopts have no effect with -shared." $$
            text "    Call hs_init_ghc() from your main() function to set these options.")
