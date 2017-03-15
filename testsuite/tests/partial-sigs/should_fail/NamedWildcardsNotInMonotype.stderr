@@ -3,7 +3,7 @@ NamedWildcardsNotInMonotype.hs:5:1: error:
     • Could not deduce (Eq w0)
       from the context: (Show a, Eq w, Eq a)
         bound by the inferred type for ‘foo’:
-                   (Show a, Eq w, Eq a) => a -> a -> String
+                   forall w a. (Show a, Eq w, Eq a) => a -> a -> String
         at NamedWildcardsNotInMonotype.hs:5:1-33
       The type variable ‘w0’ is ambiguous
     • In the ambiguity check for the inferred type for ‘foo’

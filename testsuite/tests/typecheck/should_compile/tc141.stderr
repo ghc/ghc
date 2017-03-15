@@ -11,7 +11,7 @@ tc141.hs:11:31: error:
         because type variable ‘a2’ would escape its scope
       This (rigid, skolem) type variable is bound by
         an expression type signature:
-          a2
+          forall a2. a2
         at tc141.hs:11:34
     • In the expression: q :: a
       In the expression: (q :: a, p)
@@ -39,7 +39,7 @@ tc141.hs:15:18: error:
         because type variable ‘a2’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
-          v :: a2
+          v :: forall a2. a2
         at tc141.hs:14:14-19
     • In the expression: b
       In an equation for ‘v’: v = b
