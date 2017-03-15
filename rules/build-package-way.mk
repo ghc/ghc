@@ -143,9 +143,6 @@ endif
 endif
 
 # Build the GHCi library
-ifeq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
-$1_$2_GHCI_LIB = $$($1_$2_dyn_LIB)
-else
 ifeq "$3" "v"
 $1_$2_GHCI_LIB = $1/$2/build/HS$$($1_$2_COMPONENT_ID).$$($3_osuf)
 ifeq "$$($1_$2_BUILD_GHCI_LIB)" "YES"
@@ -164,7 +161,6 @@ $(call all-target,$1_$2,$$($1_$2_GHCI_LIB))
 endif
 endif # "$$($1_$2_BUILD_GHCI_LIB)" "YES"
 endif # "$3" "v"
-endif # "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 
 $(call profEnd, build-package-way($1,$2,$3))
 endef # build-package-way

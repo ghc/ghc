@@ -32,10 +32,12 @@ endif
 $1_$2_CONFIGURE_OPTS += --disable-library-for-ghci
 ifeq "$$(filter v,$$($1_$2_WAYS))" "v"
 $1_$2_CONFIGURE_OPTS += --enable-library-vanilla
+# Build the GHCi lib even if GHCi is dynamic (and therefore won't use
+# these by default), because they will be used by
+#  (a) ghci -fexternal-interpreter
+#  (b) statically-linked binaries that use the GHC package
 ifeq "$$(GhcWithInterpreter)" "YES"
-ifneq "$$(DYNAMIC_GHC_PROGRAMS)" "YES"
 $1_$2_CONFIGURE_OPTS += --enable-library-for-ghci
-endif
 endif
 else
 $1_$2_CONFIGURE_OPTS += --disable-library-vanilla
