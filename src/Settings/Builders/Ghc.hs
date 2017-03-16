@@ -28,7 +28,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                    return $ concatMap (words . strip) buildInfo
                else return []
     mconcat [ arg "-no-auto-link-packages"
-            , nonHsMainPackage pkg ? arg "-no-hs-main"
+            ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
+            , not (nonHsMainPackage pkg) ? arg "-rtsopts"
             , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
             , append [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
 
@@ -74,8 +75,7 @@ commonGhcArgs = do
             , append $ map ("-optP" ++) cppArgs
             , arg "-odir"    , arg path
             , arg "-hidir"   , arg path
-            , arg "-stubdir" , arg path
-            , (not . nonHsMainPackage) <$> getPackage ? arg "-rtsopts" ]
+            , arg "-stubdir" , arg path ]
 
 -- TODO: Do '-ticky' in all debug ways?
 wayGhcArgs :: Args
