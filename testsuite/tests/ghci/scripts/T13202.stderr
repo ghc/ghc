@@ -1,0 +1,8 @@
+
+<interactive>:6:22: error:
+    • Cannot apply expression of type ‘TypeRep a0’
+      to a visible type argument ‘(Maybe Int#)’
+    • In the first argument of ‘typeRepKind’, namely
+        ‘(typeRep @(Maybe Int#))’
+      In the expression: typeRepKind (typeRep @(Maybe Int#))
+      In an equation for ‘x’: x = typeRepKind (typeRep @(Maybe Int#))
