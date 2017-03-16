@@ -117,7 +117,7 @@ executable hadrian
                        , ScopedTypeVariables
     build-depends:       base >= 4.8 && < 5
                        , ansi-terminal        == 0.6.*
-                       , Cabal                == 1.25.*
+                       , Cabal                == 2.0.0.0
                        , containers           == 0.5.*
                        , directory            == 1.2.*
                        , extra                >= 1.4.7
