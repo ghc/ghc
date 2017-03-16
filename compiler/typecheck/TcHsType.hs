@@ -53,7 +53,7 @@ import TcMType
 import TcValidity
 import TcUnify
 import TcIface
-import TcSimplify ( solveEqualities, solveSomeEqualities )
+import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
 import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
@@ -221,14 +221,13 @@ tc_hs_sig_type_and_gen sig_ty kind
        ; kindGeneralizeType ty }
 
 tc_hs_sig_type :: LHsSigType Name -> Kind -> TcM Type
--- May emit constraints; uses solveSomeEqualities internally.
+-- May emit constraints
 -- No zonking or validity checking
-tc_hs_sig_type = tc_hs_sig_type_x solveSomeEqualities
+tc_hs_sig_type = tc_hs_sig_type_x id
 
 -- Version of tc_hs_sig_type parameterized over how it should solve
 -- equalities
-tc_hs_sig_type_x :: (forall a. TcM a -> TcM a)  -- solveSomeEqualities
-                                                -- or solveEqualities
+tc_hs_sig_type_x :: (forall a. TcM a -> TcM a)  -- id or solveEqualities
                  -> LHsSigType Name -> Kind
                  -> TcM Type
 tc_hs_sig_type_x solve (HsIB { hsib_body = hs_ty
@@ -288,10 +287,7 @@ tcHsVectInst ty
 tcHsTypeApp :: LHsWcType Name -> Kind -> TcM Type
 tcHsTypeApp wc_ty kind
   | HsWC { hswc_wcs = sig_wcs, hswc_body = hs_ty } <- wc_ty
-    -- use solveSomeEqualities b/c we are in an expression
-    -- See Note [solveEqualities vs solveSomeEqualities] in TcSimplify
-  = do { ty <- solveSomeEqualities $
-               tcWildCardBindersX newWildTyVar sig_wcs $ \ _ ->
+  = do { ty <- tcWildCardBindersX newWildTyVar sig_wcs $ \ _ ->
                tcCheckLHsType hs_ty kind
        ; ty <- zonkTcType ty
        ; checkValidType TypeAppCtxt ty
@@ -1772,25 +1768,6 @@ It isn't essential for correctness.
 *                                                                      *
 ************************************************************************
 
-
-Note [Solving equalities in partial type signatures]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We treat a partial type signature as a "shape constraint" to impose on
-the term:
-  * We make no attempt to kind-generalise it
-  * We instantiate the explicit and implicit foralls with SigTvs
-  * We instantiate the wildcards with meta tyvars
-
-We /do/ call solveSomeEqualities, and then zonk to propagate the result of
-solveSomeEqualities, mainly so that functions like matchExpectedFunTys will
-be able to decompose the type, and hence higher-rank signatures will
-work. Ugh!  For example
-   f :: (forall a. a->a) -> _
-   f x = (x True, x 'c')
-
-Because we are not generalizing, etc., solveSomeEqualities is appropriate.
-See also Note [solveEqualities vs solveSomeEqualities] in TcSimplify.
-
 -}
 
 tcHsPartialSigType
@@ -1807,9 +1784,7 @@ tcHsPartialSigType ctxt sig_ty
   , (explicit_hs_tvs, L _ hs_ctxt, hs_tau) <- splitLHsSigmaTy hs_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (wcs, wcx, explicit_tvs, theta, tau))
-            <- -- See Note [Solving equalities in partial type signatures]
-               solveSomeEqualities $
-               tcWildCardBindersX newWildTyVar sig_wcs        $ \ wcs ->
+            <- tcWildCardBindersX newWildTyVar sig_wcs        $ \ wcs ->
                tcImplicitTKBndrsX new_implicit_tv implicit_hs_tvs $
                tcExplicitTKBndrsX newSigTyVar explicit_hs_tvs $ \ explicit_tvs ->
                do {   -- Instantiate the type-class context; but if there
@@ -1869,9 +1844,7 @@ tcHsPatSigType ctxt sig_ty
   , HsIB { hsib_vars = sig_vars, hsib_body = hs_ty } <- ib_ty
   = addSigCtxt ctxt hs_ty $
     do { (implicit_tvs, (wcs, sig_ty))
-            <- -- See Note [Solving equalities in partial type signatures]
-               solveSomeEqualities $
-               tcWildCardBindersX newWildTyVar    sig_wcs  $ \ wcs ->
+            <- tcWildCardBindersX newWildTyVar    sig_wcs  $ \ wcs ->
                tcImplicitTKBndrsX new_implicit_tv sig_vars $
                do { sig_ty <- tcHsOpenType hs_ty
                   ; return ((wcs, sig_ty), allBoundVariables sig_ty) }

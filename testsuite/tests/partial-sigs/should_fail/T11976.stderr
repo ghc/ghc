@@ -5,10 +5,3 @@ T11976.hs:7:20: error:
     • In an expression type signature: Lens _ _ _
       In the expression: undefined :: Lens _ _ _
       In an equation for ‘foo’: foo = undefined :: Lens _ _ _
-
-T11976.hs:7:20: error:
-    • Expecting one fewer arguments to ‘Lens w0 w1’
-      Expected kind ‘k0 -> *’, but ‘Lens w0 w1’ has kind ‘*’
-    • In the type ‘Lens _ _ _’
-      In an expression type signature: Lens _ _ _
-      In the expression: undefined :: Lens _ _ _
