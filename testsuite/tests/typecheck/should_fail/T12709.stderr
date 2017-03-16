@@ -1,0 +1,24 @@
+
+T12709.hs:27:13: error:
+    A levity-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep
+    In the type of expression: 1
+
+T12709.hs:27:17: error:
+    A levity-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep
+    In the type of expression: 2
+
+T12709.hs:27:21: error:
+    A levity-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep
+    In the type of expression: 3
+
+T12709.hs:27:25: error:
+    A levity-polymorphic type is not allowed here:
+      Type: a
+      Kind: TYPE rep
+    In the type of expression: 4

@@ -1136,8 +1136,10 @@ dsHsWrapper (WpFun c1 c2 t1 doc)
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
                                          arg     = w1 (Var x)
-                                   ; dsNoLevPolyExpr arg doc
-                                   ; return (\e -> (Lam x (w2 (app e arg)))) }
+                                   ; (_, ok) <- askNoErrsDs $ dsNoLevPolyExpr arg doc
+                                   ; if ok
+                                     then return (\e -> (Lam x (w2 (app e arg))))
+                                     else return id }  -- this return is irrelevant
 dsHsWrapper (WpCast co)       = ASSERT(coercionRole co == Representational)
                                 return $ \e -> mkCastDs e co
 dsHsWrapper (WpEvApp tm)      = do { core_tm <- dsEvTerm tm
