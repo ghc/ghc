@@ -21,7 +21,7 @@ module MkCore (
 
         -- * Constructing small tuples
         mkCoreVarTup, mkCoreVarTupTy, mkCoreTup, mkCoreUbxTup,
-        mkCoreTupBoxity,
+        mkCoreTupBoxity, unitExpr,
 
         -- * Constructing big tuples
         mkBigCoreVarTup, mkBigCoreVarTup1,
@@ -396,6 +396,9 @@ mkBigCoreTup = mkChunkified mkCoreTup
 mkBigCoreTupTy :: [Type] -> Type
 mkBigCoreTupTy = mkChunkified mkBoxedTupleTy
 
+-- | The unit expression
+unitExpr :: CoreExpr
+unitExpr = Var unitDataConId
 
 {-
 ************************************************************************

@@ -49,13 +49,13 @@ module DsMonad (
         CanItFail(..), orFail,
 
         -- Levity polymorphism
-        dsNoLevPoly, dsNoLevPolyExpr
+        dsNoLevPoly, dsNoLevPolyExpr, dsWhenNoErrs
     ) where
 
 import TcRnMonad
 import FamInstEnv
 import CoreSyn
-import MkCore    ( mkCoreTup )
+import MkCore    ( unitExpr )
 import CoreUtils ( exprType, isExprLevPoly )
 import HsSyn
 import TcIface
@@ -444,7 +444,7 @@ errDs err
 errDsCoreExpr :: SDoc -> DsM CoreExpr
 errDsCoreExpr err
   = do { errDs err
-       ; return $ mkCoreTup [] }
+       ; return unitExpr }
 
 failWithDs :: SDoc -> DsM a
 failWithDs err
@@ -569,6 +569,20 @@ dsNoLevPolyExpr :: CoreExpr -> SDoc -> DsM ()
 dsNoLevPolyExpr e doc
   | isExprLevPoly e = errDs (formatLevPolyErr (exprType e) $$ doc)
   | otherwise       = return ()
+
+-- | Runs the thing_inside. If there are no errors, then returns the expr
+-- given. Otherwise, returns unitExpr. This is useful for doing a bunch
+-- of levity polymorphism checks and then avoiding making a core App.
+-- (If we make a core App on a levity polymorphic argument, detecting how
+-- to handle the let/app invariant might call isUnliftedType, which panics
+-- on a levity polymorphic type.)
+-- See #12709 for an example of why this machinery is necessary.
+dsWhenNoErrs :: DsM a -> (a -> CoreExpr) -> DsM CoreExpr
+dsWhenNoErrs thing_inside mk_expr
+  = do { (result, no_errs) <- askNoErrsDs thing_inside
+       ; return $ if no_errs
+                  then mk_expr result
+                  else unitExpr }
 
 --------------------------------------------------------------------------
 --                  Data Parallel Haskell

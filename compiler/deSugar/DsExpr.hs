@@ -292,7 +292,9 @@ dsExpr (HsLamCase matches)
        ; return $ Lam discrim_var matching_code }
 
 dsExpr e@(HsApp fun arg)
-  = mkCoreAppDs (text "HsApp" <+> ppr e) <$> dsLExpr fun <*> dsLExprNoLP arg
+  = do { fun' <- dsLExpr fun
+       ; dsWhenNoErrs (dsLExprNoLP arg)
+                      (\arg' -> mkCoreAppDs (text "HsApp" <+> ppr e) fun' arg') }
 
 dsExpr (HsAppTypeOut e _)
     -- ignore type arguments here; they're in the wrappers instead at this point
@@ -340,10 +342,14 @@ will sort it out.
 
 dsExpr e@(OpApp e1 op _ e2)
   = -- for the type of y, we need the type of op's 2nd argument
-    mkCoreAppsDs (text "opapp" <+> ppr e) <$> dsLExpr op <*> mapM dsLExprNoLP [e1, e2]
+    do { op' <- dsLExpr op
+       ; dsWhenNoErrs (mapM dsLExprNoLP [e1, e2])
+                      (\exprs' -> mkCoreAppsDs (text "opapp" <+> ppr e) op' exprs') }
 
 dsExpr (SectionL expr op)       -- Desugar (e !) to ((!) e)
-  = mkCoreAppDs (text "sectionl" <+> ppr expr) <$> dsLExpr op <*> dsLExprNoLP expr
+  = do { op' <- dsLExpr op
+       ; dsWhenNoErrs (dsLExprNoLP expr)
+                      (\expr' -> mkCoreAppDs (text "sectionl" <+> ppr expr) op' expr') }
 
 -- dsLExpr (SectionR op expr)   -- \ x -> op x expr
 dsExpr e@(SectionR op expr) = do
@@ -352,10 +358,10 @@ dsExpr e@(SectionR op expr) = do
     let (x_ty:y_ty:_, _) = splitFunTys (exprType core_op)
         -- See comment with SectionL
     y_core <- dsLExpr expr
-    x_id <- newSysLocalDsNoLP x_ty
-    y_id <- newSysLocalDsNoLP y_ty
-    return (bindNonRec y_id y_core $
-            Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e) core_op [Var x_id, Var y_id]))
+    dsWhenNoErrs (mapM newSysLocalDsNoLP [x_ty, y_ty])
+                 (\[x_id, y_id] -> bindNonRec y_id y_core $
+                                   Lam x_id (mkCoreAppsDs (text "sectionr" <+> ppr e)
+                                                          core_op [Var x_id, Var y_id]))
 
 dsExpr (ExplicitTuple tup_args boxity)
   = do { let go (lam_vars, args) (L _ (Missing ty))
@@ -765,8 +771,8 @@ dsSyntaxExpr (SyntaxExpr { syn_expr      = expr
        ; core_arg_wraps <- mapM dsHsWrapper arg_wraps
        ; core_res_wrap  <- dsHsWrapper res_wrap
        ; let wrapped_args = zipWith ($) core_arg_wraps arg_exprs
-       ; zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_doc n | n <- [1..] ]
-       ; return (core_res_wrap (mkApps fun wrapped_args)) }
+       ; dsWhenNoErrs (zipWithM_ dsNoLevPolyExpr wrapped_args [ mk_doc n | n <- [1..] ])
+                      (\_ -> core_res_wrap (mkApps fun wrapped_args)) }
   where
     mk_doc n = text "In the" <+> speakNth n <+> text "argument of" <+> quotes (ppr expr)
 
