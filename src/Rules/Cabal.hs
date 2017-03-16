@@ -23,7 +23,7 @@ cabalRules = do
         let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
         constraints <- forM (sort pkgs) $ \pkg -> do
             need [pkgCabalFile pkg]
-            pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
+            pd <- liftIO . readGenericPackageDescription silent $ pkgCabalFile pkg
             let identifier          = package . packageDescription $ pd
                 version             = display . pkgVersion $ identifier
             return $ unPackageName (DP.pkgName identifier) ++ " == " ++ version
@@ -37,7 +37,7 @@ cabalRules = do
             if not exists then return $ pkgNameString pkg
             else do
                 need [pkgCabalFile pkg]
-                pd <- liftIO . readPackageDescription silent $ pkgCabalFile pkg
+                pd <- liftIO . readGenericPackageDescription silent $ pkgCabalFile pkg
                 let depsLib  = collectDeps $ condLibrary pd
                     depsExes = map (collectDeps . Just . snd) $ condExecutables pd
                     deps     = concat $ depsLib : depsExes
