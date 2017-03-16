@@ -1,14 +1,13 @@
 {-# LANGUAGE OverloadedStrings, LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
-    array, base, binary, bytestring, cabal, checkApiAnnotations, compact,
-    compareSizes, compiler, containers, deepseq, deriveConstants, directory,
-    dllSplit, filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh,
-    ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline,
-    hsc2hs, hoopl, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iservBin,
-    libffi, mkUserGuidePart, parallel, pretty, primitive, process, rts, runGhc,
-    stm, templateHaskell, terminfo, time, touchy, transformers, unlit, unix,
-    win32, xhtml,
+    array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes,
+    compiler, containers, deepseq, deriveConstants, directory, dllSplit, filepath,
+    genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci,
+    ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps,
+    hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart,
+    parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
+    terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
 
     defaultKnownPackages, builderProvenance, programName, nonCabalContext,
     nonHsMainPackage
@@ -26,10 +25,10 @@ import Stage
 -- be overridden in @hadrian/src/UserSettings.hs@.
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
-    [ array, base, binary, bytestring, cabal, checkApiAnnotations, compact
-    , compareSizes, compiler, containers, deepseq, deriveConstants, directory
-    , dllSplit, filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh
-    , ghcCabal, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs
+    [ array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes
+    , compiler, containers, deepseq, deriveConstants, directory, dllSplit
+    , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal
+    , ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs
     , hoopl, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi
     , mkUserGuidePart, parallel, pretty, primitive, process, rts, runGhc, stm
     , templateHaskell, terminfo, time, touchy, transformers, unlit, unix, win32
@@ -42,7 +41,6 @@ binary              = library  "binary"
 bytestring          = library  "bytestring"
 cabal               = library  "Cabal"        `setPath` "libraries/Cabal/Cabal"
 checkApiAnnotations = utility  "check-api-annotations"
-compact             = library  "compact"
 compareSizes        = utility  "compareSizes" `setPath` "utils/compare_sizes"
 compiler            = topLevel "ghc"          `setPath` "compiler"
 containers          = library  "containers"
@@ -57,6 +55,7 @@ ghc                 = topLevel "ghc-bin"      `setPath` "ghc"   `setType` Progra
 ghcBoot             = library  "ghc-boot"
 ghcBootTh           = library  "ghc-boot-th"
 ghcCabal            = utility  "ghc-cabal"
+ghcCompact          = library  "ghc-compact"
 ghci                = library  "ghci"
 ghcPkg              = utility  "ghc-pkg"
 ghcPrim             = library  "ghc-prim"

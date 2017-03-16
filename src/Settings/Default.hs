@@ -120,13 +120,13 @@ stage1Packages = do
             , append $ [ array
                        , base
                        , bytestring
-                       , compact
                        , containers
                        , deepseq
                        , directory
                        , filepath
                        , ghc
                        , ghcCabal
+                       , ghcCompact
                        , ghci
                        , ghcPrim
                        , haskeline
