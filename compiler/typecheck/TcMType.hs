@@ -998,31 +998,38 @@ zonkQuantifiedTyVar :: Bool     -- True  <=> this is a kind var and -XNoPolyKind
 
 zonkQuantifiedTyVar default_kind tv
   = case tcTyVarDetails tv of
-      SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
-                        ; return $ Just (setTyVarKind tv kind) }
+      SkolemTv {} -> zonk_kind_and_return
         -- It might be a skolem type variable,
         -- for example from a user type signature
 
-      MetaTv { mtv_ref = ref }
+      MetaTv { mtv_ref = ref, mtv_info = info }
         -> do { when debugIsOn (check_empty ref)
-              ; zonk_meta_tv tv }
+              ; zonk_meta_tv info tv }
 
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
   where
-    zonk_meta_tv :: TcTyVar -> TcM (Maybe TcTyVar)
-    zonk_meta_tv tv
-      | isRuntimeRepVar tv   -- Never quantify over a RuntimeRep var
+    zonk_kind_and_return = do { kind <- zonkTcType (tyVarKind tv)
+                              ; return $ Just (setTyVarKind tv kind) }
+
+    zonk_meta_tv :: MetaInfo -> TcTyVar -> TcM (Maybe TcTyVar)
+    zonk_meta_tv info tv
+      | isRuntimeRepVar tv && not_sig_tv  -- Never quantify over a RuntimeRep var
       = do { writeMetaTyVar tv liftedRepTy
            ; return Nothing }
 
-      | default_kind         -- -XNoPolyKinds and this is a kind var
+      | default_kind && not_sig_tv        -- -XNoPolyKinds and this is a kind var
       = do { _ <- default_kind_var tv
            ; return Nothing }
 
       | otherwise
       = do { tv' <- skolemiseUnboundMetaTyVar tv
            ; return (Just tv') }
+      where
+        -- do not default SigTvs. This would violate the invariants on SigTvs
+        not_sig_tv = case info of SigTv -> False
+                                  _     -> True
+
 
     default_kind_var :: TyVar -> TcM Type
        -- defaultKindVar is used exclusively with -XNoPolyKinds
