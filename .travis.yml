@@ -28,12 +28,18 @@ install:
     - export PATH
     - env
 
+    # Fetch GHC sources into ./ghc
+    - git --version
+    - git config --global url."git://github.com/ghc/packages-".insteadOf git://github.com/ghc/packages/
+    - git clone --depth 1 --recursive git://github.com/ghc/ghc
+    # --shallow-submodules is not supported on travis standard git 1.8 (linux), but it is supported
+    # on Travis Mac OS X machines. But it does not work with github mirrors because it cannot
+    # find commits.
+
     # Install all Hadrian and GHC build dependencies
     - cabal update
     - cabal install alex happy ansi-terminal mtl shake quickcheck
 
-    # Fetch GHC sources into ./ghc
-    - git clone --recursive git://git.haskell.org/ghc.git --quiet
 
     # Travis has already cloned Hadrian into ./ and we need to move it
     # to ./ghc/hadrian -- one way to do it is to move the .git directory
