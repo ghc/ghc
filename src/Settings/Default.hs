@@ -127,7 +127,6 @@ stage1Packages = do
                        , ghc
                        , ghcCabal
                        , ghcCompact
-                       , ghci
                        , ghcPrim
                        , haskeline
                        , hpcBin
