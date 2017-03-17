@@ -399,7 +399,7 @@ they can give rise to improvement.  Example (Trac #10100):
     instance Add Zero b b
     instance Add a b ab => Add (Succ a) b (Succ ab)
 The context (Add a b ab) for the instance is clearly unused in terms
-of evidence, since the dictionary has no feilds.  But it is still
+of evidence, since the dictionary has no fields.  But it is still
 needed!  With the context, a wanted constraint
    Add (Succ Zero) beta (Succ Zero)
 we will reduce to (Add Zero beta Zero), and thence we get beta := Zero.
