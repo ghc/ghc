@@ -10,9 +10,10 @@
 
 -- | Arity and eta expansion
 module CoreArity (
-        manifestArity, exprArity, typeArity, exprBotStrictness_maybe,
+        manifestArity, joinRhsArity, exprArity, typeArity,
         exprEtaExpandArity, findRhsArity, CheapFun, etaExpand,
-        etaExpandToJoinPoint, etaExpandToJoinPointRule
+        etaExpandToJoinPoint, etaExpandToJoinPointRule,
+        exprBotStrictness_maybe
     ) where
 
 #include "HsVersions.h"
@@ -76,6 +77,14 @@ manifestArity (Lam v e) | isId v        = 1 + manifestArity e
 manifestArity (Tick t e) | not (tickishIsCode t) =  manifestArity e
 manifestArity (Cast e _)                = manifestArity e
 manifestArity _                         = 0
+
+joinRhsArity :: CoreExpr -> JoinArity
+-- Join points are supposed to have manifestly-visible
+-- lambdas at the top: no ticks, no casts, nothing
+-- Moreover, type lambdas count in JoinArity
+joinRhsArity (Lam _ e) = 1 + joinRhsArity e
+joinRhsArity _         = 0
+
 
 ---------------
 exprArity :: CoreExpr -> Arity

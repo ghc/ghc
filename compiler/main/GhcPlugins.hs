@@ -41,7 +41,8 @@ import DataCon
 import CoreUtils
 import MkCore
 import CoreFVs
-import CoreSubst
+import CoreSubst hiding( substTyVarBndr, substCoVarBndr, extendCvSubst )
+       -- These names are also exported by Type
 
 -- Core "extras"
 import Rules

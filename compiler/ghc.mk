@@ -452,6 +452,7 @@ compiler_stage2_dll0_MODULES = \
 	CoreArity \
 	CoreFVs \
 	CoreSubst \
+	CoreOpt \
 	CoreSyn \
 	CoreTidy \
 	CoreUnfold \

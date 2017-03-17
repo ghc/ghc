@@ -21,6 +21,7 @@ import VarSet
 import VarEnv
 import CoreSyn
 import Rules
+import CoreOpt          ( collectBindersPushingCo )
 import CoreUtils        ( exprIsTrivial, applyTypeToArgs, mkCast )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, idFreeVars, exprsFreeIdsList )
 import CoreArity        ( etaExpandToJoinPointRule )
@@ -1194,7 +1195,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
         -- Figure out whether the function has an INLINE pragma
         -- See Note [Inline specialisations]
 
-    (rhs_bndrs, rhs_body)      = CoreSubst.collectBindersPushingCo rhs
+    (rhs_bndrs, rhs_body)      = collectBindersPushingCo rhs
                                  -- See Note [Account for casts in binding]
     (rhs_tyvars, rhs_bndrs1)   = span isTyVar rhs_bndrs
     (rhs_dict_ids, rhs_bndrs2) = splitAt n_dicts rhs_bndrs1

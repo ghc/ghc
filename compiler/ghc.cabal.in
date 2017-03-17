@@ -277,6 +277,7 @@ Library
         CoreLint
         CorePrep
         CoreSubst
+        CoreOpt
         CoreSyn
         TrieMap
         CoreTidy
