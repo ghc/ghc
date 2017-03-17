@@ -249,7 +249,7 @@ occurrences of 'wild-id' (with wildCardKey).  The easy
 way to do that is to start of with a representative
 Id in the in-scope set
 
-There can be be *occurrences* of wild-id.  For example,
+There can be *occurrences* of wild-id.  For example,
 MkCore.mkCoreApp transforms
    e (a /# b)   -->   case (a /# b) of wild { DEFAULT -> e wild }
 This is ok provided 'wild' isn't free in 'e', and that's the delicate

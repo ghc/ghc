@@ -718,7 +718,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
      To do this, we extend the *caller's* stack frame by 2 words and shift
      the output registers used for argument passing (%o0 - %o5, we are a *leaf*
      procedure because of the tail-jump) by 2 positions. This makes room in
-     %o0 and %o1 for the additinal arguments, namely  hptr and a dummy (used
+     %o0 and %o1 for the additional arguments, namely  hptr and a dummy (used
      for destination addr of jump on SPARC, return address on x86, ...). This
      shouldn't cause any problems for a C-like caller: alloca is implemented
      similarly, and local variables should be accessed via %fp, not %sp. In a

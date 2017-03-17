@@ -222,7 +222,7 @@ pdataReprTyCon ty
 --
 pdataReprTyConExact :: TyCon -> VM TyCon
 pdataReprTyConExact tycon
-  = do {   -- look up the representation tycon; if there is a match at all, it will be be exact
+  = do {   -- look up the representation tycon; if there is a match at all, it will be exact
        ;   -- (i.e.,' _tys' will be distinct type variables)
        ; (ptycon, _tys) <- pdataReprTyCon (tycon `mkTyConApp` mkTyVarTys (tyConTyVars tycon))
        ; return ptycon
@@ -235,7 +235,7 @@ pdataReprTyConExact tycon
 --
 pdatasReprTyConExact :: TyCon -> VM TyCon
 pdatasReprTyConExact tycon
-  = do {   -- look up the representation tycon; if there is a match at all, it will be be exact
+  = do {   -- look up the representation tycon; if there is a match at all, it will be exact
        ; (FamInstMatch { fim_instance = ptycon }) <- pdatasReprTyCon (tycon `mkTyConApp` mkTyVarTys (tyConTyVars tycon))
        ; return $ dataFamInstRepTyCon ptycon
        }

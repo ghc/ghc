@@ -860,7 +860,7 @@ constructor has the same type as the last type parameter:
 
 Only E1's argument is an occurrence of a universally quantified type variable
 that is syntactically equivalent to the last type parameter, so only E1's
-argument will be be folded over in a derived Foldable instance.
+argument will be folded over in a derived Foldable instance.
 
 See Trac #10447 for the original discussion on this feature. Also see
 https://ghc.haskell.org/trac/ghc/wiki/Commentary/Compiler/DeriveFunctor

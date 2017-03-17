@@ -1188,7 +1188,7 @@ simple_out_bind_pair env in_bndr mb_out_bndr out_rhs
 
 {- Note [Exported Ids and trivial RHSs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We obviously do no want to unconditinally inline an Id that is exported.
+We obviously do not want to unconditionally inline an Id that is exported.
 In SimplUtils, Note [Top level and postInlineUnconditionally], we
 explain why we don't inline /any/ top-level things unconditionally, even
 trivial ones.  But we do here!  Why?  In the simple optimiser
@@ -1197,7 +1197,7 @@ trivial ones.  But we do here!  Why?  In the simple optimiser
   * We do no call-site inlining
 
 Those differences obviate the reasons for not inlining a trivial rhs,
-and increase the benefit for doing so.  So we unconditaionlly inline trivial
+and increase the benefit for doing so.  So we unconditionally inline trivial
 rhss here.
 -}
 

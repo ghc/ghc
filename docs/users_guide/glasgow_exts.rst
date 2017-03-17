@@ -6309,7 +6309,7 @@ Overloaded lists
     ``IsList`` class).
 
 GHC supports *overloading of the list notation*. Let us recap the
-notation for constructing lists. In Haskell, the list notation can be be
+notation for constructing lists. In Haskell, the list notation can be
 used in the following seven ways:
 
 ::
