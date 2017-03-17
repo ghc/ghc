@@ -1,5 +1,5 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, StandaloneDeriving, ScopedTypeVariables #-}
 {-# OPTIONS_HADDOCK hide #-}
 
 -----------------------------------------------------------------------------
@@ -42,6 +42,8 @@ module GHC.Read
   )
  where
 
+#include "MachDeps.h"
+
 import qualified Text.ParserCombinators.ReadP as P
 
 import Text.ParserCombinators.ReadP
@@ -66,6 +68,7 @@ import GHC.Float
 import GHC.Show
 import GHC.Base
 import GHC.Arr
+import GHC.Word
 
 
 -- | @'readParen' 'True' p@ parses what @p@ parses, but surrounded with
@@ -518,6 +521,26 @@ instance Read Int where
 
 -- | @since 4.5.0.0
 instance Read Word where
+    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
+
+-- | @since 2.01
+instance Read Word8 where
+    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
+
+-- | @since 2.01
+instance Read Word16 where
+    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
+
+-- | @since 2.01
+instance Read Word32 where
+#if WORD_SIZE_IN_BITS < 33
+    readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
+#else
+    readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
+#endif
+
+-- | @since 2.01
+instance Read Word64 where
     readsPrec p s = [(fromInteger x, r) | (x, r) <- readsPrec p s]
 
 -- | @since 2.01
