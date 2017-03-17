@@ -171,8 +171,8 @@ ppFixities fs qual = foldr1 (+++) (map ppFix uniq_fs) +++ rightEdge
 
 
 -- | Pretty-print type variables.
-ppTyVars :: [LHsTyVarBndr DocName] -> [Html]
-ppTyVars tvs = map (ppTyName . getName . hsLTyVarName) tvs
+ppTyVars :: Unicode -> Qualification -> [LHsTyVarBndr DocName] -> [Html]
+ppTyVars unicode qual tvs = map (ppHsTyVarBndr unicode qual . unLoc) tvs
 
 tyvarNames :: LHsQTyVars DocName -> [Name]
 tyvarNames = map (getName . hsLTyVarName) . hsQTvExplicit
@@ -199,7 +199,7 @@ ppTySyn summary links fixities loc doc (SynDecl { tcdLName = L _ name, tcdTyVars
                    splice unicode qual
   where
     hdr  = hsep ([keyword "type", ppBinder summary occ]
-                 ++ ppTyVars (hsQTvExplicit ltyvars))
+                 ++ ppTyVars unicode qual (hsQTvExplicit ltyvars))
     full = hdr <+> equals <+> ppLType unicode qual ltype
     occ  = nameOccName . getName $ name
     fixs
@@ -353,20 +353,20 @@ ppAssocType summ links doc (L loc decl) fixities splice unicode qual =
 -- | Print a type family and its variables
 ppFamDeclBinderWithVars :: Bool -> Unicode -> Qualification -> FamilyDecl DocName -> Html
 ppFamDeclBinderWithVars summ unicode qual (FamilyDecl { fdLName = lname, fdTyVars = tvs }) =
-  ppAppDocNameTyVarBndrs summ unicode qual (unLoc lname) (map unLoc $ hsq_explicit tvs)
+  ppAppDocNameTyVarBndrs summ unicode qual (unLoc lname) (hsq_explicit tvs)
 
 -- | Print a newtype / data binder and its variables
-ppDataBinderWithVars :: Bool -> TyClDecl DocName -> Html
-ppDataBinderWithVars summ decl =
-  ppAppDocNameNames summ (tcdName decl) (tyvarNames $ tcdTyVars decl)
+ppDataBinderWithVars :: Bool -> Unicode -> Qualification -> TyClDecl DocName -> Html
+ppDataBinderWithVars summ unicode qual decl =
+  ppAppDocNameTyVarBndrs summ unicode qual (tcdName decl) (hsQTvExplicit $ tcdTyVars decl)
 
 --------------------------------------------------------------------------------
 -- * Type applications
 --------------------------------------------------------------------------------
 
-ppAppDocNameTyVarBndrs :: Bool -> Unicode -> Qualification -> DocName -> [HsTyVarBndr DocName] -> Html
+ppAppDocNameTyVarBndrs :: Bool -> Unicode -> Qualification -> DocName -> [LHsTyVarBndr DocName] -> Html
 ppAppDocNameTyVarBndrs summ unicode qual n vs =
-    ppTypeApp n [] vs ppDN (ppHsTyVarBndr unicode qual)
+    ppTypeApp n [] vs ppDN (ppHsTyVarBndr unicode qual . unLoc)
   where
     ppDN notation = ppBinderFixity notation summ . nameOccName . getName
     ppBinderFixity Infix = ppBinderInfix
@@ -378,15 +378,6 @@ ppAppNameTypes :: DocName -> [HsType DocName] -> [HsType DocName]
 ppAppNameTypes n ks ts unicode qual =
     ppTypeApp n ks ts (\p -> ppDocName qual p True) (ppParendType unicode qual)
 
-
--- | Print an application of a 'DocName' and a list of 'Names'
-ppAppDocNameNames :: Bool -> DocName -> [Name] -> Html
-ppAppDocNameNames summ n ns =
-    ppTypeApp n [] ns ppDN ppTyName
-  where
-    ppDN notation = ppBinderFixity notation summ . nameOccName . getName
-    ppBinderFixity Infix = ppBinderInfix
-    ppBinderFixity _ = ppBinder
 
 -- | General printing of type applications
 ppTypeApp :: DocName -> [a] -> [a] -> (Notation -> DocName -> Html) -> (a -> Html) -> Html
@@ -445,7 +436,7 @@ ppClassHdr :: Bool -> Located [LHsType DocName] -> DocName
 ppClassHdr summ lctxt n tvs fds unicode qual =
   keyword "class"
   <+> (if not . null . unLoc $ lctxt then ppLContext lctxt unicode qual else noHtml)
-  <+> ppAppDocNameNames summ n (tyvarNames tvs)
+  <+> ppAppDocNameTyVarBndrs summ unicode qual n (hsQTvExplicit tvs)
   <+> ppFds fds unicode qual
 
 
@@ -890,7 +881,7 @@ ppDataHeader summary decl@(DataDecl { tcdDataDefn =
     -- context
     ppLContext ctxt unicode qual <+>
     -- T a b c ..., or a :+: b
-    ppDataBinderWithVars summary decl
+    ppDataBinderWithVars summary unicode qual decl
     <+> case ks of
       Nothing -> mempty
       Just (L _ x) -> dcolon unicode <+> ppKind unicode qual x
@@ -967,8 +958,8 @@ ppLKind unicode qual y = ppKind unicode qual (unLoc y)
 ppKind :: Unicode -> Qualification -> HsKind DocName -> Html
 ppKind unicode qual ki = ppr_mono_ty pREC_TOP ki unicode qual
 
-ppForAllPart :: [LHsTyVarBndr DocName] -> Unicode -> Html
-ppForAllPart tvs unicode = hsep (forallSymbol unicode : ppTyVars tvs) +++ dot
+ppForAllPart :: Unicode -> Qualification -> [LHsTyVarBndr DocName] -> Html
+ppForAllPart unicode qual tvs = hsep (forallSymbol unicode : ppTyVars unicode qual tvs) +++ dot
 
 ppr_mono_lty :: Int -> LHsType DocName -> Unicode -> Qualification -> Html
 ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
@@ -977,7 +968,7 @@ ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 ppr_mono_ty :: Int -> HsType DocName -> Unicode -> Qualification -> Html
 ppr_mono_ty ctxt_prec (HsForAllTy tvs ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
-    ppForAllPart tvs unicode <+> ppr_mono_lty pREC_TOP ty unicode qual
+    ppForAllPart unicode qual tvs <+> ppr_mono_lty pREC_TOP ty unicode qual
 
 ppr_mono_ty ctxt_prec (HsQualTy ctxt ty) unicode qual
   = maybeParen ctxt_prec pREC_FUN $
