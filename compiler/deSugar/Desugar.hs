@@ -29,8 +29,8 @@ import InstEnv
 import Class
 import Avail
 import CoreSyn
-import CoreFVs( exprsSomeFreeVarsList )
-import CoreSubst
+import CoreFVs     ( exprsSomeFreeVarsList )
+import CoreOpt     ( simpleOptPgm, simpleOptExpr )
 import PprCore
 import DsMonad
 import DsExpr

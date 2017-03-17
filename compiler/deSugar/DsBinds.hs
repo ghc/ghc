@@ -28,7 +28,7 @@ import DsUtils
 import HsSyn            -- lots of things
 import CoreSyn          -- lots of things
 import Literal          ( Literal(MachStr) )
-import CoreSubst
+import CoreOpt          ( simpleOptExpr )
 import OccurAnal        ( occurAnalyseExpr )
 import MkCore
 import CoreUtils

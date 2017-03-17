@@ -31,6 +31,7 @@ module Rules (
 import CoreSyn          -- All of it
 import Module           ( Module, ModuleSet, elemModuleSet )
 import CoreSubst
+import CoreOpt          ( exprIsLambda_maybe )
 import CoreFVs          ( exprFreeVars, exprsFreeVars, bindFreeVars
                         , rulesFreeVarsDSet, exprsOrphNames, exprFreeVarsList )
 import CoreUtils        ( exprType, eqExpr, mkTick, mkTicks,

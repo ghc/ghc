@@ -31,7 +31,7 @@ import CoreSyn
 import MkCore
 import Id
 import Literal
-import CoreSubst   ( exprIsLiteral_maybe )
+import CoreOpt     ( exprIsLiteral_maybe )
 import PrimOp      ( PrimOp(..), tagToEnumKey )
 import TysWiredIn
 import TysPrim

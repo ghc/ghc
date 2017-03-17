@@ -35,7 +35,8 @@ import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
 import CoreArity
-import CoreSubst        ( pushCoTyArg, pushCoValArg )
+import CoreOpt          ( pushCoTyArg, pushCoValArg
+                        , joinPointBinding_maybe, joinPointBindings_maybe )
 --import PrimOp           ( tagToEnumKey ) -- temporalily commented out. See #8326
 import Rules            ( mkRuleInfo, lookupRule, getRules )
 --import TysPrim          ( intPrimTy ) -- temporalily commented out. See #8326
@@ -1456,7 +1457,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
            -> simplExprF (rhs_se `setFloats` env) rhs
                          (StrictBind bndr bndrs body env cont)
 
-           | Just (bndr', rhs') <- matchOrConvertToJoinPoint bndr rhs
+           | Just (bndr', rhs') <- joinPointBinding_maybe bndr rhs
            -> do { let cont_dup_res_ty = resultTypeOfDupableCont (getMode env)
                                            [bndr'] cont
                  ; (env1, bndr1) <- simplNonRecJoinBndr env
@@ -1492,7 +1493,7 @@ simplRecE :: SimplEnv
 -- simplRecE is used for
 --  * non-top-level recursive lets in expressions
 simplRecE env pairs body cont
-  | Just pairs' <- matchOrConvertToJoinPoints pairs
+  | Just pairs' <- joinPointBindings_maybe pairs
   = do  { let bndrs' = map fst pairs'
               cont_dup_res_ty = resultTypeOfDupableCont (getMode env)
                                                         bndrs' cont
@@ -1519,29 +1520,6 @@ simplRecE env pairs body cont
         ; env2 <- simplRecBind env1 NotTopLevel (Just cont) pairs
         ; simplExprF env2 body cont }
 
--- | Returns Just (bndr,rhs) if the binding is a join point:
--- If it's a JoinId, just return it
--- If it's not yet a JoinId but is always tail-called,
---    make it into a JoinId and return it.
-matchOrConvertToJoinPoint :: InBndr -> InExpr -> Maybe (InBndr, InExpr)
-matchOrConvertToJoinPoint bndr rhs
-  | not (isId bndr)
-  = Nothing
-
-  | isJoinId bndr
-  = -- No point in keeping tailCallInfo around; very fragile
-    Just (bndr, rhs)
-
-  | AlwaysTailCalled join_arity <- tailCallInfo (idOccInfo bndr)
-  , (bndrs, body) <- etaExpandToJoinPoint join_arity rhs
-  = Just (bndr `asJoinId` join_arity, mkLams bndrs body)
-
-  | otherwise
-  = Nothing
-
-matchOrConvertToJoinPoints :: [(InBndr, InExpr)] -> Maybe [(InBndr, InExpr)]
-matchOrConvertToJoinPoints bndrs
-  = mapM (uncurry matchOrConvertToJoinPoint) bndrs
 
 {-
 ************************************************************************

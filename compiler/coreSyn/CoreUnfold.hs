@@ -46,7 +46,7 @@ import DynFlags
 import CoreSyn
 import PprCore          ()      -- Instances
 import OccurAnal        ( occurAnalyseExpr )
-import CoreSubst hiding( substTy )
+import CoreOpt
 import CoreArity       ( manifestArity )
 import CoreUtils
 import Id
