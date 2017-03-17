@@ -678,11 +678,8 @@ list.
 
     :default: on
 
-    Switch on the strictness analyser. There is a very
-    old paper about GHC's strictness analyser, `Measuring the
-    effectiveness of a simple strictness
-    analyser <http://research.microsoft.com/en-us/um/people/simonpj/papers/simple-strictnes-analyser.ps.gz>`__,
-    but the current one is quite a bit different.
+    Switch on the strictness analyser. The
+    implementation is described in the paper `Theory and Practice of Demand Analysis in Haskell`<https://www.microsoft.com/en-us/research/wp-content/uploads/2017/03/demand-jfp-draft.pdf>`__.
 
     The strictness analyser figures out when arguments and variables in
     a function can be treated 'strictly' (that is they are always
