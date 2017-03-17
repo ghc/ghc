@@ -580,7 +580,9 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
            _ -> return ()
 
        ; mapM_ (lintCoreRule binder binder_ty) (idCoreRules binder)
-       ; lintIdUnfolding binder binder_ty (idUnfolding binder) }
+
+       ; addLoc (UnfoldingOf binder) $
+         lintIdUnfolding binder binder_ty (idUnfolding binder) }
 
         -- We should check the unfolding, if any, but this is tricky because
         -- the unfolding is a SimplifiableCoreExpr. Give up for now.
@@ -609,7 +611,7 @@ lintRhs bndr rhs
            ; return $ mkLamType var' body_ty }
 
     lint_join_lams n tot True _other
-      = failWithL $ mkBadJoinArityMsg bndr tot (tot-n)
+      = failWithL $ mkBadJoinArityMsg bndr tot (tot-n) rhs
     lint_join_lams _ _ False rhs
       = markAllJoinsBad $ lintCoreExpr rhs
           -- Future join point, not yet eta-expanded
@@ -1938,6 +1940,7 @@ instance HasDynFlags LintM where
 data LintLocInfo
   = RhsOf Id            -- The variable bound
   | LambdaBodyOf Id     -- The lambda-binder
+  | UnfoldingOf Id      -- Unfolding of a binder
   | BodyOfLetRec [Id]   -- One of the binders
   | CaseAlt CoreAlt     -- Case alternative
   | CasePat CoreAlt     -- The *pattern* of the case alternative
@@ -2124,6 +2127,9 @@ dumpLoc (RhsOf v)
 
 dumpLoc (LambdaBodyOf b)
   = (getSrcLoc b, brackets (text "in body of lambda with binder" <+> pp_binder b))
+
+dumpLoc (UnfoldingOf b)
+  = (getSrcLoc b, brackets (text "in the unfolding of" <+> pp_binder b))
 
 dumpLoc (BodyOfLetRec [])
   = (noSrcLoc, brackets (text "In body of a letrec with no binders"))
@@ -2351,12 +2357,14 @@ mkInvalidJoinPointMsg var ty
   = hang (text "Join point has invalid type:")
         2 (ppr var <+> dcolon <+> ppr ty)
 
-mkBadJoinArityMsg :: Var -> Int -> Int -> SDoc
-mkBadJoinArityMsg var ar nlams
+mkBadJoinArityMsg :: Var -> Int -> Int -> CoreExpr -> SDoc
+mkBadJoinArityMsg var ar nlams rhs
   = vcat [ text "Join point has too few lambdas",
            text "Join var:" <+> ppr var,
            text "Join arity:" <+> ppr ar,
-           text "Number of lambdas:" <+> ppr nlams ]
+           text "Number of lambdas:" <+> ppr nlams,
+           text "Rhs = " <+> ppr rhs
+           ]
 
 invalidJoinOcc :: Var -> SDoc
 invalidJoinOcc var
