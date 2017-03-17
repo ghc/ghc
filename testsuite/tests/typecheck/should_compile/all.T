@@ -388,6 +388,8 @@ test('holes2', normal, compile, ['-fdefer-type-errors'])
 test('holes3', normal, compile_fail, [''])
 test('hole_constraints', normal, compile, ['-fdefer-type-errors'])
 test('hole_constraints_nested', normal, compile, ['-fdefer-type-errors'])
+test('valid_substitutions', [extra_files(['ValidSubs.hs'])],
+    multimod_compile, ['valid_substitutions','-fdefer-type-errors'])
 test('T7408', normal, compile, [''])
 test('UnboxStrictPrimitiveFields', normal, compile, [''])
 test('T7541', normal, compile, [''])

@@ -707,6 +707,8 @@ data DynFlags = DynFlags {
 
   maxRelevantBinds      :: Maybe Int,   -- ^ Maximum number of bindings from the type envt
                                         --   to show in type error messages
+  maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions
+                                        --   to show in type error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -1526,6 +1528,7 @@ defaultDynFlags mySettings =
         maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
         maxRelevantBinds        = Just 6,
+        maxValidSubstitutions   = Just 6,
         maxUncoveredPatterns    = 4,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
@@ -3120,6 +3123,10 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { maxRelevantBinds = Just n }))
   , make_ord_flag defFlag "fno-max-relevant-binds"
       (noArg (\d -> d { maxRelevantBinds = Nothing }))
+  , make_ord_flag defFlag "fmax-valid-substitutions"
+      (intSuffix (\n d -> d { maxValidSubstitutions = Just n }))
+  , make_ord_flag defFlag "fno-max-valid-substitutions"
+      (noArg (\d -> d { maxValidSubstitutions = Nothing }))
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
