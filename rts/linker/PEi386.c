@@ -1357,9 +1357,11 @@ ocResolve_PEi386 ( ObjectCode* oc )
          sym = (COFF_symbol*)
                myindex ( sizeof_COFF_symbol,
                          symtab, reltab_j->SymbolTableIndex );
+#if defined(x86_64_HOST_ARCH)
          uint64_t symIndex = ((uint64_t)myindex(sizeof_COFF_symbol, symtab,
                                                 reltab_j->SymbolTableIndex)
                                         - (uint64_t)symtab) / sizeof_COFF_symbol;
+#endif
 
          IF_DEBUG(linker,
                   debugBelch(
