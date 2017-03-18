@@ -219,10 +219,6 @@ CostCentre *mkCostCentre (char *label, char *module, char *srcloc)
     cc->label = label;
     cc->module = module;
     cc->srcloc = srcloc;
-    cc->is_caf = 0;
-    cc->mem_alloc = 0;
-    cc->time_ticks = 0;
-    cc->link = NULL;
     return cc;
 }
 
@@ -373,7 +369,7 @@ void enterFunCCS (StgRegTable *reg, CostCentreStack *ccsfn)
     }
 
     // common case 2: the function stack is empty, or just CAF
-    if (ccsfn->cc->is_caf) {
+    if (ccsfn->prevStack == CCS_MAIN) {
         return;
     }
 
