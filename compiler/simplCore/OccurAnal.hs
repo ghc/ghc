@@ -732,8 +732,8 @@ It's not clear that this comes up often, however. TODO: Measure how often and
 add this analysis if necessary.
 
 ------------------------------------------------------------
-Note [Adjusting for lambdas]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Adjusting right-hand sides]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There's a bit of a dance we need to do after analysing a lambda expression or
 a right-hand side. In particular, we need to
 
