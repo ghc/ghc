@@ -83,6 +83,7 @@ import Control.Monad
 import Data.IORef
 import Data.List
 import qualified Data.List as List
+import Data.Foldable (toList)
 import Data.Maybe
 import Data.Ord ( comparing )
 import Data.Time
@@ -1352,6 +1353,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
             target = if prevailing_target /= local_target
                         && (not (isObjectTarget prevailing_target)
                             || not (isObjectTarget local_target))
+                        && not (prevailing_target == HscNothing)
                         then prevailing_target
                         else local_target
 
@@ -1605,7 +1607,8 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
   where
     -- stronglyConnCompG flips the original order, so if we reverse
     -- the summaries we get a stable topological sort.
-    (graph, lookup_node) = moduleGraphNodes drop_hs_boot_nodes (reverse summaries)
+    (graph, lookup_node) =
+      moduleGraphNodes drop_hs_boot_nodes (reverse summaries)
 
     initial_graph = case mb_root_mod of
         Nothing -> graph
@@ -1614,8 +1617,11 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
             -- the specified module.  We do this by building a graph with
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
-            let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
-                     | otherwise = throwGhcException (ProgramError "module does not exist")
+            let root | Just node <- lookup_node HsSrcFile root_mod
+                     , graph `hasVertexG` node
+                     = node
+                     | otherwise
+                     = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
 
 type SummaryNode = (ModSummary, Int, [Int])
@@ -1754,7 +1760,16 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        rootSummariesOk <- reportImportErrors rootSummaries
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
-       summs <- loop (concatMap calcDeps rootSummariesOk) root_map
+       new_map <- loop (concatMap calcDeps rootSummariesOk) root_map
+       -- if we have been passed -fno-code, we enable code generation
+       -- for dependencies of modules that have -XTemplateHaskell,
+       -- otherwise those modules will fail to compile. #8025
+       let summs = concat $ nodeMapElts $
+             if hscTarget dflags == HscNothing
+             then enableCodeGenForTH
+               (defaultObjectTarget (targetPlatform flags))
+               new_map
+             else new_map
        return summs
      where
         calcDeps = msDeps
@@ -1802,16 +1817,16 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO [Either ErrMsg ModSummary]
+             -> IO (NodeMap [Either ErrMsg ModSummary])
                         -- The result includes the worklist, except
                         -- for those mentioned in the visited set
-        loop [] done      = return (concat (nodeMapElts done))
+        loop [] done = return done
         loop ((wanted_mod, is_boot) : ss) done
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
                 loop ss done
             else
-                do { multiRootsErr dflags (rights summs); return [] }
+                do { multiRootsErr dflags (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
                                        is_boot wanted_mod True
@@ -1819,10 +1834,48 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                case mb_s of
                    Nothing -> loop ss done
                    Just (Left e) -> loop ss (Map.insert key [Left e] done)
-                   Just (Right s)-> loop (calcDeps s ++ ss)
-                                         (Map.insert key [Right s] done)
+                   Just (Right s)-> do
+                     new_map <-
+                       loop (calcDeps s) (Map.insert key [Right s] done)
+                     loop ss new_map
           where
             key = (unLoc wanted_mod, is_boot)
+
+-- | Update the hscTarget of every ModSummary that is dependend on
+-- by a module that needs template haskell
+enableCodeGenForTH :: HscTarget
+  -> NodeMap [Either ErrMsg ModSummary]
+  -> NodeMap [Either ErrMsg ModSummary]
+enableCodeGenForTH target nodemap =
+  fmap (fmap (fmap enable_code_gen)) nodemap
+  where
+    enable_code_gen ms | ModSummary
+                         {ms_mod = ms_mod
+                         , ms_hsc_src = HsSrcFile
+                         , ms_hspp_opts = dynflags@DynFlags
+                           {hscTarget = HscNothing}
+                         } <- ms
+                       , ms_mod `Set.member` needs_codegen_set
+                       = ms {ms_hspp_opts = dynflags {hscTarget = target}}
+                       | otherwise = ms
+    needs_codegen_set = transitive_deps_set Set.empty th_modSums
+    th_modSums = [ms
+                 | mss <- Map.elems nodemap
+                 , Right ms <- mss
+                 , xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+                 ]
+    transitive_deps_set marked_mods modSums = foldl' go marked_mods modSums
+    go marked_mods ms
+      | Set.member (ms_mod ms) marked_mods
+      = marked_mods
+      | otherwise
+      = let deps = [dep_ms
+                   | (L _ mn, NotBoot) <- msDeps ms
+                   , dep_ms <- toList (Map.lookup (mn, NotBoot) nodemap)
+                     >>= toList >>= toList]
+            new_marked_mods =
+              marked_mods `Set.union` Set.fromList (fmap ms_mod deps)
+        in transitive_deps_set new_marked_mods deps
 
 mkRootMap :: [ModSummary] -> NodeMap [Either ErrMsg ModSummary]
 mkRootMap summaries = Map.insertListWith (flip (++))
