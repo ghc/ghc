@@ -10564,6 +10564,7 @@ Syntax
 
 .. ghc-flag:: -XTemplateHaskell
 
+    :since: 6.0. Typed splices introduced in GHC 7.8.1.
     :implies: :ghc-flag:`-XTemplateHaskellQuotes`
 
     Enable Template Haskell's splice and quotation syntax.
