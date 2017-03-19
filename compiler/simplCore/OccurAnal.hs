@@ -2606,7 +2606,8 @@ tagNonRecBinder lvl usage binder
  = let
      occ     = lookupDetails usage binder
      will_be_join = decideJoinPointHood lvl usage [binder]
-     occ'    | will_be_join = occ -- must already be marked AlwaysTailCalled
+     occ'    | will_be_join = -- must already be marked AlwaysTailCalled
+                              ASSERT(isAlwaysTailCalled occ) occ
              | otherwise    = markNonTailCalled occ
      binder' = setBinderOcc occ' binder
      usage'  = usage `delDetails` binder
