@@ -806,16 +806,26 @@ data DynFlags = DynFlags {
   --  Package flags
   extraPkgConfs         :: [PkgConfRef] -> [PkgConfRef],
         -- ^ The @-package-db@ flags given on the command line, in the order
-        -- they appeared.
+        -- they appeared.  In *reverse* order that they're specified
+        -- on the command line.  This is intended to be applied with the
+        -- list of "initial" package databases derived from @GHC_PACKAGE_PATH@;
+        -- see 'getPackageConfRefs'; this is a function because 'extraPkgConfs'
+        -- maybe configured to filter out certain flags from *either* the
+        -- user command line, or the base command; see for example
+        -- 'removeUserPkgConf'.
 
   ignorePackageFlags    :: [IgnorePackageFlag],
-        -- ^ The @-ignore-package@ flags from the command line
+        -- ^ The @-ignore-package@ flags from the command line.
+        -- In *reverse* order that they're specified on the command line.
   packageFlags          :: [PackageFlag],
-        -- ^ The @-package@ and @-hide-package@ flags from the command-line
+        -- ^ The @-package@ and @-hide-package@ flags from the command-line.
+        -- In *reverse* order that they're specified on the command line.
   pluginPackageFlags    :: [PackageFlag],
-        -- ^ The @-plugin-package-id@ flags from command line
+        -- ^ The @-plugin-package-id@ flags from command line.
+        -- In *reverse* order that they're specified on the command line.
   trustFlags            :: [TrustFlag],
-        -- ^ The @-trust@ and @-distrust@ flags
+        -- ^ The @-trust@ and @-distrust@ flags.
+        -- In *reverse* order that they're specified on the command line.
   packageEnv            :: Maybe FilePath,
         -- ^ Filepath to the package environment file (if overriding default)
 
