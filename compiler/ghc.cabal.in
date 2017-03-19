@@ -508,6 +508,7 @@ Library
         UniqDFM
         UniqDSet
         UniqFM
+        UniqMap
         UniqSet
         Util
         Vectorise.Builtins.Base
