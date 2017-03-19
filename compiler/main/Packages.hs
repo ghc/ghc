@@ -680,22 +680,23 @@ mungePackagePaths top_dir pkgroot pkg =
 
 applyTrustFlag
    :: DynFlags
+   -> PackagePrecedenceIndex
    -> UnusablePackages
    -> [PackageConfig]
    -> TrustFlag
    -> IO [PackageConfig]
-applyTrustFlag dflags unusable pkgs flag =
+applyTrustFlag dflags prec_map unusable pkgs flag =
   case flag of
     -- we trust all matching packages. Maybe should only trust first one?
     -- and leave others the same or set them untrusted
     TrustPackage str ->
-       case selectPackages (PackageArg str) pkgs unusable of
+       case selectPackages prec_map (PackageArg str) pkgs unusable of
          Left ps       -> trustFlagErr dflags flag ps
          Right (ps,qs) -> return (map trust ps ++ qs)
           where trust p = p {trusted=True}
 
     DistrustPackage str ->
-       case selectPackages (PackageArg str) pkgs unusable of
+       case selectPackages prec_map (PackageArg str) pkgs unusable of
          Left ps       -> trustFlagErr dflags flag ps
          Right (ps,qs) -> return (map distrust ps ++ qs)
           where distrust p = p {trusted=False}
@@ -707,6 +708,7 @@ isIndefinite dflags = not (unitIdIsDefinite (thisPackage dflags))
 
 applyPackageFlag
    :: DynFlags
+   -> PackagePrecedenceIndex
    -> PackageConfigMap
    -> UnusablePackages
    -> Bool -- if False, if you expose a package, it implicitly hides
@@ -716,10 +718,10 @@ applyPackageFlag
    -> PackageFlag               -- flag to apply
    -> IO VisibilityMap        -- Now exposed
 
-applyPackageFlag dflags pkg_db unusable no_hide_others pkgs vm flag =
+applyPackageFlag dflags prec_map pkg_db unusable no_hide_others pkgs vm flag =
   case flag of
     ExposePackage _ arg (ModRenaming b rns) ->
-       case findPackages pkg_db arg pkgs unusable of
+       case findPackages prec_map pkg_db arg pkgs unusable of
          Left ps         -> packageFlagErr dflags flag ps
          Right (p:_) -> return vm'
           where
@@ -784,7 +786,7 @@ applyPackageFlag dflags pkg_db unusable no_hide_others pkgs vm flag =
          _ -> panic "applyPackageFlag"
 
     HidePackage str ->
-       case findPackages pkg_db (PackageArg str) pkgs unusable of
+       case findPackages prec_map pkg_db (PackageArg str) pkgs unusable of
          Left ps  -> packageFlagErr dflags flag ps
          Right ps -> return vm'
           where vm' = foldl' (flip Map.delete) vm (map packageConfigId ps)
@@ -792,16 +794,17 @@ applyPackageFlag dflags pkg_db unusable no_hide_others pkgs vm flag =
 -- | Like 'selectPackages', but doesn't return a list of unmatched
 -- packages.  Furthermore, any packages it returns are *renamed*
 -- if the 'UnitArg' has a renaming associated with it.
-findPackages :: PackageConfigMap -> PackageArg -> [PackageConfig]
+findPackages :: PackagePrecedenceIndex
+             -> PackageConfigMap -> PackageArg -> [PackageConfig]
              -> UnusablePackages
              -> Either [(PackageConfig, UnusablePackageReason)]
                 [PackageConfig]
-findPackages pkg_db arg pkgs unusable
+findPackages prec_map pkg_db arg pkgs unusable
   = let ps = mapMaybe (finder arg) pkgs
     in if null ps
         then Left (mapMaybe (\(x,y) -> finder arg x >>= \x' -> return (x',y))
                             (Map.elems unusable))
-        else Right (sortByVersion (reverse ps))
+        else Right (sortByPreference prec_map ps)
   where
     finder (PackageArg str) p
       = if str == sourcePackageIdString p || str == packageNameString p
@@ -815,18 +818,16 @@ findPackages pkg_db arg pkgs unusable
                             Just indef -> renamePackage pkg_db (indefUnitIdInsts indef) p)
               else Nothing
 
-selectPackages :: PackageArg -> [PackageConfig]
+selectPackages :: PackagePrecedenceIndex -> PackageArg -> [PackageConfig]
                -> UnusablePackages
                -> Either [(PackageConfig, UnusablePackageReason)]
                   ([PackageConfig], [PackageConfig])
-selectPackages arg pkgs unusable
+selectPackages prec_map arg pkgs unusable
   = let matches = matching arg
         (ps,rest) = partition matches pkgs
     in if null ps
         then Left (filter (matches.fst) (Map.elems unusable))
-        -- NB: packages from later package databases are LATER
-        -- in the list.  We want to prefer the latest package.
-        else Right (sortByVersion (reverse ps), rest)
+        else Right (sortByPreference prec_map ps, rest)
 
 -- | Rename a 'PackageConfig' according to some module instantiation.
 renamePackage :: PackageConfigMap -> [(ModuleName, Module)]
@@ -857,8 +858,38 @@ matching (PackageArg str) = matchingStr str
 matching (UnitIdArg (DefiniteUnitId (DefUnitId uid)))  = matchingId uid
 matching (UnitIdArg _)  = \_ -> False -- TODO: warn in this case
 
-sortByVersion :: [PackageConfig] -> [PackageConfig]
-sortByVersion = sortBy (flip (comparing packageVersion))
+-- | This sorts a list of packages, putting "preferred" packages first.
+-- See 'compareByPreference' for the semantics of "preference".
+sortByPreference :: PackagePrecedenceIndex -> [PackageConfig] -> [PackageConfig]
+sortByPreference prec_map = sortBy (flip (compareByPreference prec_map))
+
+-- | Returns 'GT' if @pkg@ should be preferred over @pkg'@ when picking
+-- which should be "active".  Here is the order of preference:
+--
+--      1. First, prefer the latest version
+--      2. If the versions are the same, prefer the package that
+--      came in the latest package database.
+--
+-- Pursuant to #12518, we could change this policy to, for example, remove
+-- the version preference, meaning that we would always prefer the packages
+-- in alter package database.
+--
+compareByPreference
+    :: PackagePrecedenceIndex
+    -> PackageConfig
+    -> PackageConfig
+    -> Ordering
+compareByPreference prec_map pkg pkg' =
+    case comparing packageVersion pkg pkg' of
+        GT -> GT
+        EQ | Just prec  <- Map.lookup (unitId pkg)  prec_map
+           , Just prec' <- Map.lookup (unitId pkg') prec_map
+           -- Prefer the package from the later DB flag (i.e., higher
+           -- precedence)
+           -> compare prec prec'
+           | otherwise
+           -> EQ
+        LT -> LT
 
 comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
@@ -920,13 +951,14 @@ type WiredPackagesMap = Map WiredUnitId WiredUnitId
 
 findWiredInPackages
    :: DynFlags
+   -> PackagePrecedenceIndex
    -> [PackageConfig]           -- database
    -> VisibilityMap             -- info on what packages are visible
                                 -- for wired in selection
    -> IO ([PackageConfig],  -- package database updated for wired in
           WiredPackagesMap) -- map from unit id to wired identity
 
-findWiredInPackages dflags pkgs vis_map = do
+findWiredInPackages dflags prec_map pkgs vis_map = do
   --
   -- Now we must find our wired-in packages, and rename them to
   -- their canonical names (eg. base-1.0 ==> base).
@@ -962,8 +994,8 @@ findWiredInPackages dflags pkgs vis_map = do
            case all_exposed_ps of
             [] -> case all_ps of
                        []   -> notfound
-                       many -> pick (head (sortByVersion many))
-            many -> pick (head (sortByVersion many))
+                       many -> pick (head (sortByPreference prec_map many))
+            many -> pick (head (sortByPreference prec_map many))
           where
                 notfound = do
                           debugTraceMsg dflags 2 $
@@ -1188,22 +1220,29 @@ ignorePackages flags pkgs = Map.fromList (concatMap doit flags)
 -- Merging databases
 --
 
+-- | For each package, a mapping from uid -> i indicates that this
+-- package was brought into GHC by the ith @-package-db@ flag on
+-- the command line.  We use this mapping to make sure we prefer
+-- packages that were defined later on the command line, if there
+-- is an ambiguity.
+type PackagePrecedenceIndex = Map InstalledUnitId Int
+
 -- | Given a list of databases, merge them together, where
 -- packages with the same unit id in later databases override
 -- earlier ones.  This does NOT check if the resulting database
 -- makes sense (that's done by 'validateDatabase').
 mergeDatabases :: DynFlags -> [(FilePath, [PackageConfig])]
-               -> IO InstalledPackageIndex
-mergeDatabases dflags = foldM merge Map.empty
+               -> IO (InstalledPackageIndex, PackagePrecedenceIndex)
+mergeDatabases dflags = foldM merge (Map.empty, Map.empty) . zip [1..]
   where
-    merge pkg_map (db_path, db) = do
+    merge (pkg_map, prec_map) (i, (db_path, db)) = do
       debugTraceMsg dflags 2 $
           text "loading package database" <+> text db_path
       forM_ (Set.toList override_set) $ \pkg ->
           debugTraceMsg dflags 2 $
               text "package" <+> ppr pkg <+>
               text "overrides a previously defined package"
-      return pkg_map'
+      return (pkg_map', prec_map')
      where
       db_map = mk_pkg_map db
       mk_pkg_map = Map.fromList . map (\p -> (unitId p, p))
@@ -1219,6 +1258,9 @@ mergeDatabases dflags = foldM merge Map.empty
       -- first argument preferred)
       pkg_map' :: InstalledPackageIndex
       pkg_map' = Map.union db_map pkg_map
+
+      prec_map' :: PackagePrecedenceIndex
+      prec_map' = Map.union (Map.map (const i) db_map) prec_map
 
 -- | Validates a database, removing unusable packages from it
 -- (this includes removing packages that the user has explicitly
@@ -1281,7 +1323,9 @@ validateDatabase dflags pkg_map1 =
 
 mkPackageState
     :: DynFlags
-    -> [(FilePath, [PackageConfig])]     -- initial databases
+    -- initial databases, in the order they were specified on
+    -- the command line (later databases shadow earlier ones)
+    -> [(FilePath, [PackageConfig])]
     -> [PreloadUnitId]              -- preloaded packages
     -> IO (PackageState,
            [PreloadUnitId])         -- new packages to preload
@@ -1304,7 +1348,9 @@ mkPackageState dflags dbs preload0 = do
        a) Merge all the databases together.
           If an input database defines unit ID that is already in
           the unified database, that package SHADOWS the existing
-          package in the current unified database.
+          package in the current unified database.  Note that
+          order is important: packages defined later in the list of
+          command line arguments shadow those defined earlier.
 
        b) Remove all packages with missing dependencies, or
           mutually recursive dependencies.
@@ -1341,12 +1387,15 @@ mkPackageState dflags dbs preload0 = do
           we build a mapping saying what every in scope module name points to.
 -}
 
+  -- This, and the other reverse's that you will see, are due to the face that
+  -- packageFlags, pluginPackageFlags, etc. are all specified in *reverse* order
+  -- than they are on the command line.
   let other_flags = reverse (packageFlags dflags)
   debugTraceMsg dflags 2 $
       text "package flags" <+> ppr other_flags
 
   -- Merge databases together, without checking validity
-  pkg_map1 <- mergeDatabases dflags dbs
+  (pkg_map1, prec_map) <- mergeDatabases dflags dbs
 
   -- Now that we've merged everything together, prune out unusable
   -- packages.
@@ -1357,7 +1406,7 @@ mkPackageState dflags dbs preload0 = do
 
   -- Apply trust flags (these flags apply regardless of whether
   -- or not packages are visible or not)
-  pkgs1 <- foldM (applyTrustFlag dflags unusable)
+  pkgs1 <- foldM (applyTrustFlag dflags prec_map unusable)
                  (Map.elems pkg_map2) (reverse (trustFlags dflags))
   let prelim_pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs1
 
@@ -1367,7 +1416,7 @@ mkPackageState dflags dbs preload0 = do
   -- or is empty if we have -hide-all-packages
   --
   let preferLater pkg pkg' =
-        case comparing packageVersion pkg pkg' of
+        case compareByPreference prec_map pkg pkg' of
             GT -> pkg
             _  -> pkg'
       calcInitial m pkg = addToUDFM_C preferLater m (fsPackageName pkg) pkg
@@ -1396,7 +1445,7 @@ mkPackageState dflags dbs preload0 = do
   -- -hide-package).  This needs to know about the unusable packages, since if a
   -- user tries to enable an unusable package, we should let them know.
   --
-  vis_map2 <- foldM (applyPackageFlag dflags prelim_pkg_db unusable
+  vis_map2 <- foldM (applyPackageFlag dflags prec_map prelim_pkg_db unusable
                         (gopt Opt_HideAllPackages dflags) pkgs1)
                             vis_map1 other_flags
 
@@ -1405,7 +1454,7 @@ mkPackageState dflags dbs preload0 = do
   -- it modifies the unit ids of wired in packages, but when we process
   -- package arguments we need to key against the old versions.
   --
-  (pkgs2, wired_map) <- findWiredInPackages dflags pkgs1 vis_map2
+  (pkgs2, wired_map) <- findWiredInPackages dflags prec_map pkgs1 vis_map2
   let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs2
 
   -- Update the visibility map, so we treat wired packages as visible.
@@ -1424,7 +1473,7 @@ mkPackageState dflags dbs preload0 = do
                         -- won't work.
                         | otherwise = vis_map2
                 plugin_vis_map2
-                    <- foldM (applyPackageFlag dflags prelim_pkg_db unusable
+                    <- foldM (applyPackageFlag dflags prec_map prelim_pkg_db unusable
                                 (gopt Opt_HideAllPluginPackages dflags) pkgs1)
                              plugin_vis_map1
                              (reverse (pluginPackageFlags dflags))
