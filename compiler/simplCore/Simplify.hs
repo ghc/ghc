@@ -438,15 +438,11 @@ prepareRhs mode top_lvl occ _ rhs0
         -- On the other hand, for scoping ticks we need to be able to
         -- copy them on the floats, which in turn is only allowed if
         -- we can obtain non-counting ticks.
-        | (not (tickishCounts t) || tickishCanSplit t)
+        | not (tickishCounts t) || tickishCanSplit t
         = do { (is_exp, floats, rhs') <- go n_val_args rhs
-             ; let tickIt (id, expr)
                        -- we have to take care not to tick top-level literal
                        -- strings. See Note [CoreSyn top-level string literals].
-                     | isTopLevel top_lvl && exprIsLiteralString expr
-                     = (id, expr)
-                     | otherwise
-                     = (id, mkTick (mkNoCount t) expr)
+             ; let tickIt (id, expr) = (id, mkTick (mkNoCount t) expr)
                    floats' = mapLetFloats floats tickIt
              ; return (is_exp, floats', Tick t rhs') }
 
