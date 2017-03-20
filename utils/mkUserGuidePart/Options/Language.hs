@@ -169,13 +169,6 @@ languageOptions =
          , flagReverse = "-XNoDeriveGeneric"
          , flagSince = "7.2.1"
          }
-  , flag { flagName = "-XDeriveGeneric"
-         , flagDescription =
-           "Enable :ref:`deriving for the Generic class <deriving-typeable>`."
-         , flagType = DynamicFlag
-         , flagReverse = "-XNoDeriveGeneric"
-         , flagSince = "7.2.1"
-         }
   , flag { flagName = "-XDeriveLift"
          , flagDescription =
            "Enable :ref:`deriving for the Lift class <deriving-lift>`"
