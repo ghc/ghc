@@ -1163,6 +1163,9 @@ void freeObjectCode (ObjectCode *oc)
                     break;
                 }
             }
+            if (oc->sections[i].info) {
+                stgFree(oc->sections[i].info);
+            }
         }
         stgFree(oc->sections);
     }
@@ -1731,6 +1734,9 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
 
    s->mapped_start = mapped_start; /* start of mmap() block */
    s->mapped_size  = mapped_size;  /* size of mmap() block */
+
+   s->info = (SectionFormatInfo*)stgCallocBytes(1, sizeof(SectionFormatInfo),
+                                            "addSection(SectionFormatInfo)");
 
    IF_DEBUG(linker,
             debugBelch("addSection: %p-%p (size %" FMT_Word "), kind %d\n",
