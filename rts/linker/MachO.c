@@ -2,6 +2,14 @@
 
 #if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 
+#if defined(ios_HOST_OS)
+#if !RTS_LINKER_USE_MMAP
+#error "ios must use mmap and mprotect!"
+#endif
+/* for roundUpToPage */
+#include "sm/OSMem.h"
+#endif
+
 #include "RtsUtils.h"
 #include "GetEnv.h"
 #include "LinkerInternals.h"
@@ -29,6 +37,10 @@
 #  include <mach-o/x86_64/reloc.h>
 #endif
 
+#if defined(aarch64_HOST_ARCH)
+#  include <mach-o/arm64/reloc.h>
+#endif
+
 /*
   Support for MachO linking on Darwin/MacOS X
   by Wolfgang Thaller (wolfgang.thaller@gmx.net)
@@ -38,6 +50,47 @@
   *) implement ocVerifyImage_MachO
   *) add still more sanity checks.
 */
+#if defined(aarch64_HOST_ARCH)
+/* aarch64 linker by moritz angermann <moritz@lichtzwerge.de> */
+
+/* often times we need to extend some value of certain number of bits
+ * int an int64_t for e.g. relative offsets.
+ */
+int64_t sign_extend(uint64_t val, uint8_t bits);
+/* Helper functions to check some instruction properties */
+bool is_vector_op(uint32_t *p);
+bool is_load_store(uint32_t *p);
+
+/* aarch64 relocations may contain an addend alreay in the position
+ * where we want to write the address offset to. Thus decoding as well
+ * as encoding is needed.
+ */
+bool fits_bits(size_t bits, int64_t value);
+int64_t decode_addend(ObjectCode * oc, Section * section,
+                      MachORelocationInfo * ri);
+void encode_addend(ObjectCode * oc, Section * section,
+                   MachORelocationInfo * ri, int64_t addend);
+
+/* finding and making stubs. We don't need to care about the symbol they
+ * represent. As long as two stubs point to the same address, they are identical
+ */
+bool find_stub(Section * section, void ** addr);
+bool make_stub(Section * section, void ** addr);
+void free_stubs(Section * section);
+
+/* Global Offset Table logic */
+bool is_got_load(MachORelocationInfo * ri);
+bool need_got_slot(MachONList * symbol);
+bool make_got(ObjectCode * oc);
+void free_got(ObjectCode * oc);
+#endif /* aarch64_HOST_ARCH */
+
+#if defined(ios_HOST_OS)
+/* on iOS we need to ensure we only have r+w or r+x pages hence we need to mmap
+ * pages r+w and r+x mprotect them later on.
+ */
+bool ocMprotect_MachO( ObjectCode *oc );
+#endif /* ios_HOST_OS */
 
 /*
  * Initialize some common data in the object code so we don't have to
@@ -108,6 +161,12 @@ ocDeinit_MachO(ObjectCode * oc) {
     if(oc->info->n_macho_symbols > 0) {
         stgFree(oc->info->macho_symbols);
     }
+#if defined(aarch64_HOST_ARCH)
+    free_got(oc);
+    for(int i = 0; i < oc->n_sections; i++) {
+        free_stubs(&oc->sections[i]);
+    }
+#endif
     stgFree(oc->info);
 }
 
@@ -158,7 +217,7 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
     return ocAllocateSymbolExtras(oc,0,0);
 }
 
-#elif defined(x86_64_HOST_ARCH)
+#elif defined(x86_64_HOST_ARCH) || defined(aarch64_HOST_ARCH)
 
 int
 ocAllocateSymbolExtras_MachO(ObjectCode* oc)
@@ -282,12 +341,426 @@ resolveImports(
     return 1;
 }
 
+#if defined(aarch64_HOST_ARCH)
+/* aarch64 linker by moritz angermann <moritz@lichtzwerge.de> */
+
+int64_t
+sign_extend(uint64_t val, uint8_t bits) {
+    return (int64_t)(val << (64-bits)) >> (64-bits);
+}
+
+bool
+is_vector_op(uint32_t *p) {
+    return (*p & 0x04800000) == 0x04800000;
+}
+
+bool
+is_load_store(uint32_t *p) {
+    return (*p & 0x3B000000) == 0x39000000;
+}
+
+int64_t
+decode_addend(ObjectCode * oc, Section * section, MachORelocationInfo * ri) {
+
+    /* the instruction. It is 32bit wide */
+    uint32_t * p = (uint32_t*)((uint8_t*)section->start + ri->r_address);
+
+    checkProddableBlock(oc, (void*)p, 1 << ri->r_length);
+
+    switch(ri->r_type) {
+        case ARM64_RELOC_UNSIGNED:
+        case ARM64_RELOC_SUBTRACTOR: {
+            switch (ri->r_length) {
+                case 0: return sign_extend(*(uint8_t*)p,  8 * (1 << ri->r_length));
+                case 1: return sign_extend(*(uint16_t*)p, 8 * (1 << ri->r_length));
+                case 2: return sign_extend(*(uint32_t*)p, 8 * (1 << ri->r_length));
+                case 3: return sign_extend(*(uint64_t*)p, 8 * (1 << ri->r_length));
+                default:
+                    barf("Unsupported r_length (%d) for SUBTRACTOR relocation",
+                         ri->r_length);
+            }
+        }
+        case ARM64_RELOC_BRANCH26:
+            /* take the lower 26 bits and shift them by 2. The last two are
+             * implicilty 0 (as the instructions must be aligned!) and sign
+             * extend to 64 bits.
+             */
+            return sign_extend( (*p & 0x03FFFFFF) << 2, 28 );
+        case ARM64_RELOC_PAGE21:
+        case ARM64_RELOC_GOT_LOAD_PAGE21:
+            /* take the instruction bits masked with 0x6 (0110), and push them
+             * down. into the last two bits, and mask in the
+             *
+             * the 21 bits are encoded as follows in the instruction
+             *
+             * -**- ---* **** **** **** **** ***-- ----
+             *  ^^
+             *  ''-- these are the low two bits.
+             */
+            return sign_extend(   (*p & 0x60000000) >> 29
+                               | ((*p & 0x01FFFFE0) >> 3) << 12, 33);
+        case ARM64_RELOC_PAGEOFF12:
+        case ARM64_RELOC_GOT_LOAD_PAGEOFF12: {
+            /* the 12 bits for the page offset are encoded from bit 11 onwards
+             *
+             * ---- ---- --** **** **** **-- ---- ----
+             */
+            int64_t a = (*p & 0x003FFC00) >> 10;
+            int shift = 0;
+            if (is_load_store(p)) {
+                shift = (*p >> 30) & 0x3;
+                if(0 == shift && is_vector_op(p)) {
+                    shift = 4;
+                }
+            }
+            return a << shift;
+        }
+    }
+    barf("unsupported relocation type: %d\n", ri->r_type);
+}
+
+inline bool
+fits_bits(size_t bits, int64_t value) {
+    if(bits == 64) return true;
+    if(bits > 64) barf("fits_bits with %d bits and an 64bit integer!", bits);
+    return  0 == (value >> bits)   // All bits off: 0
+        || -1 == (value >> bits);  // All bits on: -1
+}
+
+void
+encode_addend(ObjectCode * oc, Section * section,
+              MachORelocationInfo * ri, int64_t addend) {
+    uint32_t * p = (uint32_t*)((uint8_t*)section->start + ri->r_address);
+
+    checkProddableBlock(oc, (void*)p, 1 << ri->r_length);
+
+    switch (ri->r_type) {
+        case ARM64_RELOC_UNSIGNED:
+        case ARM64_RELOC_SUBTRACTOR: {
+            if(!fits_bits(8 << ri->r_length, addend))
+                barf("Relocation out of range for UNSIGNED/SUBTRACTOR");
+            switch (ri->r_length) {
+                case 0: *(uint8_t*)p  = (uint8_t)addend; break;
+                case 1: *(uint16_t*)p = (uint16_t)addend; break;
+                case 2: *(uint32_t*)p = (uint32_t)addend; break;
+                case 3: *(uint64_t*)p = (uint64_t)addend; break;
+                default:
+                    barf("Unsupported r_length (%d) for SUBTRACTOR relocation",
+                         ri->r_length);
+            }
+            return;
+        }
+        case ARM64_RELOC_BRANCH26: {
+            /* We can only store 26 bits in the instruction, due to alignment we
+             * do not need the last two bits of the value. If the value >> 2
+             * still exceeds 26bits, we won't be able to reach it.
+             */
+            if(!fits_bits(26, addend >> 2))
+                barf("Relocation target for BRACH26 out of range.");
+            *p = (*p & 0xFC000000) | ((uint32_t)(addend >> 2) & 0x03FFFFFF);
+            return;
+        }
+        case ARM64_RELOC_PAGE21:
+        case ARM64_RELOC_GOT_LOAD_PAGE21: {
+            /* We store 21bits, in bits 6 to 24, and bits 30 and 31.
+             * The encoded value describes a multiple of 4k pages, and together
+             * with the PAGEOFF12 relocation allows to address a relative range
+             * of +-4GB.
+             */
+            if(!fits_bits(21, addend >> 12))
+                barf("Relocation target for PAGE21 out of range.");
+            *p = (*p & 0x9F00001F) | (uint32_t)((addend << 17) & 0x60000000)
+                                   | (uint32_t)((addend >> 9)  & 0x00FFFFE0);
+            return;
+        }
+        case ARM64_RELOC_PAGEOFF12:
+        case ARM64_RELOC_GOT_LOAD_PAGEOFF12: {
+            /* Store an offset into a page (4k). Depending on the instruction
+             * the bits are stored at slightly different positions.
+             */
+            if(!fits_bits(12, addend))
+                barf("Relocation target for PAGEOFF12 out or range.");
+
+            int shift = 0;
+            if(is_load_store(p)) {
+                shift = (*p >> 30) & 0x3;
+                if(0 == shift && is_vector_op(p)) {
+                    shift = 4;
+                }
+            }
+            *p = (*p & 0xFFC003FF)
+               | ((uint32_t)(addend >> shift << 10) & 0x003FFC00);
+            return;
+        }
+    }
+    barf("unsupported relocation type: %d\n", ri->r_type);
+}
+
+bool
+is_got_load(struct relocation_info * ri) {
+    return ri->r_type == ARM64_RELOC_GOT_LOAD_PAGE21
+    ||  ri->r_type == ARM64_RELOC_GOT_LOAD_PAGEOFF12;
+}
+
+/* This is very similar to makeSymbolExtra
+ * However, as we load sections into different
+ * pages, that may be further appart than
+ * branching allows, we'll use some extra
+ * space at the end of each section allocated
+ * for stubs.
+ */
+bool
+find_stub(Section * section, void ** addr) {
+
+    for(Stub * s = section->info->stubs; s != NULL; s = s->next) {
+        if(s->target == *addr) {
+            *addr = s->addr;
+            return EXIT_SUCCESS;
+        }
+    }
+    return EXIT_FAILURE;
+}
+
+bool
+make_stub(Section * section, void ** addr) {
+
+    Stub * s = stgCallocBytes(1, sizeof(Stub), "make_stub(Stub)");
+    s->target = *addr;
+    s->addr = (uint8_t*)section->info->stub_offset
+            + ((8+8)*section->info->nstubs) + 8;
+    s->next = NULL;
+
+     /* target address */
+    *(uint64_t*)((uint8_t*)s->addr - 8) = (uint64_t)s->target;
+    /* ldr x16, - (8 bytes) */
+    *(uint32_t*)(s->addr)               = (uint32_t)0x58ffffd0;
+    /* br x16 */
+    *(uint32_t*)((uint8_t*)s->addr + 4) = (uint32_t)0xd61f0200;
+
+    if(section->info->nstubs == 0) {
+        /* no stubs yet, let's just create this one */
+        section->info->stubs = s;
+    } else {
+        Stub * tail = section->info->stubs;
+        while(tail->next != NULL) tail = tail->next;
+        tail->next = s;
+    }
+    section->info->nstubs += 1;
+    *addr = s->addr;
+    return EXIT_SUCCESS;
+}
+void
+free_stubs(Section * section) {
+    if(section->info->nstubs == 0)
+        return;
+    Stub * last = section->info->stubs;
+    while(last->next != NULL) {
+        Stub * t = last;
+        last = last->next;
+        stgFree(t);
+    }
+    section->info->stubs = NULL;
+    section->info->nstubs = 0;
+}
+
+/*
+ * Check if we need a global offset table slot for a
+ * given symbol
+ */
+bool
+need_got_slot(MachONList * symbol) {
+    return (symbol->n_type & N_EXT)             /* is an external symbol      */
+        && (N_UNDF == (symbol->n_type & N_TYPE) /* and is undefined           */
+            || NO_SECT != symbol->n_sect);      /*     or is defined in a
+                                                 *        different section   */
+}
+
+bool
+make_got(ObjectCode * oc) {
+    size_t got_slots = 0;
+
+    for(size_t i=0; i < oc->info->n_macho_symbols; i++)
+        if(need_got_slot(oc->info->macho_symbols[i].nlist))
+            got_slots += 1;
+
+    if(got_slots > 0) {
+        oc->info->got_size =  got_slots * sizeof(void*);
+        oc->info->got_start = mmap(NULL, oc->info->got_size,
+                                   PROT_READ | PROT_WRITE,
+                                   MAP_ANON | MAP_PRIVATE,
+                                   -1, 0);
+        if( oc->info->got_start == MAP_FAILED ) {
+            barf("MAP_FAILED. errno=%d", errno );
+            return EXIT_FAILURE;
+        }
+        /* update got_addr */
+        size_t slot = 0;
+        for(size_t i=0; i < oc->info->n_macho_symbols; i++)
+            if(need_got_slot(oc->info->macho_symbols[i].nlist))
+                oc->info->macho_symbols[i].got_addr
+                    = ((uint8_t*)oc->info->got_start)
+                    + (slot++ * sizeof(void *));
+    }
+    return EXIT_SUCCESS;
+}
+
+void
+free_got(ObjectCode * oc) {
+    munmap(oc->info->got_start, oc->info->got_size);
+    oc->info->got_start = NULL;
+    oc->info->got_size = 0;
+}
+
+static int
+relocateSection_aarch64(ObjectCode * oc, Section * section)
+{
+    if(section->size == 0)
+        return 1;
+    /* at this point, we have:
+     *
+     * - loaded the sections (potentially into non-continuous memory),
+     *   (in ocGetNames_MachO)
+     * - registered exported sybmols
+     *   (in ocGetNames_MachO)
+     * - and fixed the nlist[i].n_value for common storage symbols (N_UNDF,
+     *   N_EXT and n_value != 0) so that they point into the common storage.
+     *   (in ocGetNames_MachO)
+     * - All oc->symbols however should now point at the right place.
+     */
+
+    /* we need to care about the explicity addend */
+    int64_t explicit_addend = 0;
+    size_t  nreloc = section->info->macho_section->nreloc;
+
+    for(size_t i = 0; i < nreloc; i++) {
+        MachORelocationInfo * ri = &section->info->relocation_info[i];
+        switch (ri->r_type) {
+            case ARM64_RELOC_UNSIGNED: {
+                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
+                int64_t addend = decode_addend(oc, section, ri);
+                uint64_t value = 0;
+                if(symbol->nlist->n_type & N_EXT) {
+                    /* external symbols should be able to be
+                     * looked up via the lookupSymbol_ function.
+                     * Either through the global symbol hashmap
+                     * or asking the system, if not found
+                     * in the symbol hashmap
+                     */
+                    value = (uint64_t)lookupSymbol_((char*)symbol->name);
+                    if(!value)
+                        barf("Could not lookup symbol: %s!", symbol->name);
+                } else {
+                    value = (uint64_t)symbol->addr;    // address of the symbol.
+                }
+                encode_addend(oc, section, ri, value + addend);
+                break;
+            }
+            case ARM64_RELOC_SUBTRACTOR:
+            {
+                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
+                // subtractor and unsigned are called in tandem:
+                // first  pc <- pc - symbol address (SUBTRACTOR)
+                // second pc <- pc + symbol address (UNSIGNED)
+                // to achieve pc <- pc + target - base.
+                //
+                // the current implementation uses absolute addresses,
+                // which is simpler than trying to do this section
+                // relative, but could more easily lead to overflow.
+                //
+                if(!(i+1 < nreloc)
+                   || !(section->info->relocation_info[i+1].r_type
+                          == ARM64_RELOC_UNSIGNED))
+                    barf("SUBTRACTOR relocation *must* be followed by UNSIGNED relocation.");
+
+                int64_t addend = decode_addend(oc, section, ri);
+                int64_t value = (uint64_t)symbol->addr;
+                encode_addend(oc, section, ri, addend - value);
+                break;
+            }
+            case ARM64_RELOC_BRANCH26: {
+                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
+
+                // pre-existing addend
+                int64_t addend = decode_addend(oc, section, ri);
+                // address of the branch (b/bl) instruction.
+                uint64_t pc = (uint64_t)section->start + ri->r_address;
+                uint64_t value = 0;
+                if(symbol->nlist->n_type & N_EXT) {
+                    value = (uint64_t)lookupSymbol_((char*)symbol->name);
+                    if(!value)
+                        barf("Could not lookup symbol: %s!", symbol->name);
+                } else {
+                    value = (uint64_t)symbol->addr;    // address of the symbol.
+                }
+                if((value - pc + addend) >> (2 + 26)) {
+                    /* we need a stub */
+                    /* check if we already have that stub */
+                    if(find_stub(section, (void**)&value)) {
+                        /* did not find it. Crete a new stub. */
+                        if(make_stub(section, (void**)&value)) {
+                            barf("could not find or make stub");
+                        }
+                    }
+                }
+                encode_addend(oc, section, ri, value - pc + addend);
+                break;
+            }
+            case ARM64_RELOC_PAGE21:
+            case ARM64_RELOC_GOT_LOAD_PAGE21: {
+                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
+                int64_t addend = decode_addend(oc, section, ri);
+                if(!(explicit_addend == 0 || addend == 0))
+                    barf("explicit_addend and addend can't be set at the same time.");
+                uint64_t pc = (uint64_t)section->start + ri->r_address;
+                uint64_t value = (uint64_t)(is_got_load(ri) ? symbol->got_addr : symbol->addr);
+                encode_addend(oc, section, ri, ((value + addend + explicit_addend) & (-4096)) - (pc & (-4096)));
+
+                // reset, just in case.
+                explicit_addend = 0;
+                break;
+            }
+            case ARM64_RELOC_PAGEOFF12:
+            case ARM64_RELOC_GOT_LOAD_PAGEOFF12: {
+                MachOSymbol* symbol = &oc->info->macho_symbols[ri->r_symbolnum];
+                int64_t addend = decode_addend(oc, section, ri);
+                if(!(explicit_addend == 0 || addend == 0))
+                    barf("explicit_addend and addend can't be set at the same time.");
+                uint64_t value = (uint64_t)(is_got_load(ri) ? symbol->got_addr : symbol->addr);
+                encode_addend(oc, section, ri, 0xFFF & (value + addend + explicit_addend));
+
+                // reset, just in case.
+                explicit_addend = 0;
+                break;
+            }
+            case ARM64_RELOC_ADDEND: {
+                explicit_addend = sign_extend(ri->r_symbolnum, 24);
+                if(!(i+1 < nreloc)
+                   || !(section->info->relocation_info[i+1].r_type == ARM64_RELOC_PAGE21
+                        || section->info->relocation_info[i+1].r_type == ARM64_RELOC_PAGEOFF12))
+                    barf("ADDEND relocation *must* be followed by PAGE or PAGEOFF relocation");
+                break;
+            }
+            default: {
+                barf("Relocation of type: %d not (yet) supported!\n", ri->r_type);
+            }
+        }
+    }
+    return 1;
+}
+
+#else /* non aarch64_HOST_ARCH branch -- aarch64 doesn't use relocateAddress */
+
+/*
+ * Try to find the final loaded address for some addres.
+ * Look through all sections, locating the section that
+ * contains the address and compute the absolue address.
+ */
 static unsigned long
 relocateAddress(
-    ObjectCode* oc,
-    int nSections,
-    MachOSection* sections,
-    unsigned long address)
+                ObjectCode* oc,
+                int nSections,
+                MachOSection* sections,
+                unsigned long address)
 {
     int i;
     IF_DEBUG(linker, debugBelch("relocateAddress: start\n"));
@@ -298,7 +771,7 @@ relocateAddress(
             && address < sections[i].addr + sections[i].size)
         {
             return (unsigned long)oc->image
-                    + sections[i].offset + address - sections[i].addr;
+            + sections[i].offset + address - sections[i].addr;
         }
     }
     barf("Invalid Mach-O file:"
@@ -306,6 +779,9 @@ relocateAddress(
     return 0;
 }
 
+#endif /* aarch64_HOST_ARCH */
+
+#ifndef aarch64_HOST_ARCH
 static int
 relocateSection(
     ObjectCode* oc,
@@ -867,6 +1343,26 @@ relocateSection(
     IF_DEBUG(linker, debugBelch("relocateSection: done\n"));
     return 1;
 }
+#endif /* aarch64_HOST_ARCH */
+
+/* Note [mmap r+w+x]
+ * ~~~~~~~~~~~~~~~~~
+ *
+ * iOS does not permit to mmap r+w+x, hence wo only mmap r+w, and later change
+ * to r+x via mprotect.  While this could would be nice to have for all hosts
+ * and not just for iOS, it entail that the rest of the linker code supports
+ * that, this includes:
+ *
+ * - mmap and mprotect need to be available.
+ * - text and data sections need to be mapped into different pages. Ideally
+ *   the text and data sections would be aggregated, to prevent using a single
+ *   page for every section, however tiny.
+ * - the relocation code for each object file format / architecture, needs to
+ *   respect the (now) non-contiguousness of the sections.
+ * - with sections being mapped potentially far apart from each other, it must
+ *   be made sure that the pages are reachable within the architectures
+ *   addressability for relative or absolute access.
+ */
 
 int
 ocGetNames_MachO(ObjectCode* oc)
@@ -900,20 +1396,7 @@ ocGetNames_MachO(ObjectCode* oc)
             continue;
         }
 
-        if((oc->info->macho_sections[i].flags & SECTION_TYPE) == S_ZEROFILL) {
-            char * zeroFillArea;
-            if (RTS_LINKER_USE_MMAP) {
-                zeroFillArea = mmapForLinker(oc->info->macho_sections[i].size, MAP_ANONYMOUS,
-                                            -1, 0);
-                if (zeroFillArea == NULL) return 0;
-                memset(zeroFillArea, 0, oc->info->macho_sections[i].size);
-            }
-            else {
-                zeroFillArea = stgCallocBytes(1,oc->info->macho_sections[i].size,
-                                      "ocGetNames_MachO(common symbols)");
-            }
-            oc->info->macho_sections[i].offset = zeroFillArea - oc->image;
-        }
+        // XXX, use SECTION_TYPE attributes, instead of relying on the name?
 
         SectionKind kind = SECTIONKIND_OTHER;
 
@@ -928,14 +1411,146 @@ ocGetNames_MachO(ObjectCode* oc)
             kind = SECTIONKIND_RWDATA;
         }
 
-        addSection(&secArray[i], kind, SECTION_NOMEM,
-                   (void *)(oc->image + oc->info->macho_sections[i].offset),
-                   oc->info->macho_sections[i].size,
-                   0, 0, 0);
+        switch(section->flags & SECTION_TYPE) {
+#if defined(ios_HOST_OS)
+            case S_ZEROFILL:
+            case S_GB_ZEROFILL: {
+                // See Note [mmap r+w+x]
+                void * mem = mmap(NULL, section->size,
+                                  PROT_READ | PROT_WRITE,
+                                  MAP_ANON | MAP_PRIVATE,
+                                  -1, 0);
+                if( mem == MAP_FAILED ) {
+                    barf("failed to mmap allocate memory for zerofill section %d of size %d. errno = %d", i, section->size, errno);
+                }
+                addSection(&secArray[i], kind, SECTION_MMAP, mem, section->size,
+                           0, mem, roundUpToPage(section->size));
+                addProddableBlock(oc, mem, (int)section->size);
 
-        addProddableBlock(oc,
-                          (void *) (oc->image + oc->info->macho_sections[i].offset),
-                                        oc->info->macho_sections[i].size);
+                secArray[i].info->nstubs = 0;
+                secArray[i].info->stub_offset = NULL;
+                secArray[i].info->stub_size = 0;
+                secArray[i].info->stubs = NULL;
+
+                secArray[i].info->macho_section = section;
+                secArray[i].info->relocation_info
+                  = (MachORelocationInfo*)(oc->image + section->reloff);
+                break;
+            }
+            default: {
+                // The secion should have a non-zero offset. As the offset is
+                // relativ to the image, and must be somewhere after the header.
+                if(section->offset == 0) barf("section with zero offset!");
+                /* on iOS, we must allocate the code in r+x sections and
+                 * the data in r+w sections, as the system does not allow
+                 * for r+w+x, we must allocate each section in a new page
+                 * range.
+                 *
+                 * copy the sections's memory to some page-aligned place via
+                 * mmap and memcpy. This will later allow us to selectively
+                 * use mprotect on pages with data (r+w) and pages text (r+x).
+                 * We initially start with r+w, so that we can modify the
+                 * pages during relocations, prior to setting it r+x.
+                 */
+
+                /* We also need space for stubs. As pages can be assigned
+                 * randomly in the addressable space, we need to keep the
+                 * stubs close to the section.  The strategy we are going
+                 * to use is to allocate them right after the section. And
+                 * we are going to be generous and allocare a stub slot
+                 * for each relocation to keep it simple.
+                 */
+                size_t n_ext_sec_sym = section->nreloc; /* number of relocations
+                                                         * for this section. Should
+                                                         * be a good upper bound
+                                                         */
+                size_t stub_space = /* eight bytes for the 64 bit address,
+                                     * and another eight bytes for the two
+                                     * instructions (ldr, br) for each relocation.
+                                     */ 16 * n_ext_sec_sym;
+                // See Note [mmap r+w+x]
+                void * mem = mmap(NULL, section->size+stub_space,
+                                  PROT_READ | PROT_WRITE,
+                                  MAP_ANON | MAP_PRIVATE,
+                                  -1, 0);
+                if( mem == MAP_FAILED ) {
+                    barf("failed to mmap allocate memory to load section %d. errno = %d", i, errno );
+                }
+                memcpy( mem, oc->image + section->offset, section->size);
+
+                addSection(&secArray[i], kind, SECTION_MMAP,
+                           mem, section->size,
+                           0, mem, roundUpToPage(section->size+stub_space));
+                addProddableBlock(oc, mem, (int)section->size);
+
+                secArray[i].info->nstubs = 0;
+                secArray[i].info->stub_offset = ((uint8_t*)mem) + section->size;
+                secArray[i].info->stub_size = stub_space;
+                secArray[i].info->stubs = NULL;
+
+                secArray[i].info->macho_section = section;
+                secArray[i].info->relocation_info
+                  = (MachORelocationInfo*)(oc->image + section->reloff);
+                break;
+            }
+
+#else /* any other host */
+            case S_ZEROFILL:
+            case S_GB_ZEROFILL: {
+                char * zeroFillArea;
+                if (RTS_LINKER_USE_MMAP) {
+                    zeroFillArea = mmapForLinker(section->size, MAP_ANONYMOUS,
+                                                 -1, 0);
+                    if (zeroFillArea == NULL) return 0;
+                    memset(zeroFillArea, 0, section->size);
+                }
+                else {
+                    zeroFillArea = stgCallocBytes(1,section->size,
+                                                  "ocGetNames_MachO(common symbols)");
+                }
+                section->offset = zeroFillArea - oc->image;
+
+                addSection(&secArray[i], kind, SECTION_NOMEM,
+                           (void *)(oc->image + section->offset),
+                           section->size,
+                           0, 0, 0);
+
+                addProddableBlock(oc,
+                                  (void *) (oc->image + section->offset),
+                                  section->size);
+
+                secArray[i].info->nstubs = 0;
+                secArray[i].info->stub_offset = NULL;
+                secArray[i].info->stub_size = 0;
+                secArray[i].info->stubs = NULL;
+
+                secArray[i].info->macho_section = section;
+                secArray[i].info->relocation_info
+                = (MachORelocationInfo*)(oc->image + section->reloff);
+            }
+            default: {
+                // just set the pointer to the loaded image.
+                addSection(&secArray[i], kind, SECTION_NOMEM,
+                           (void *)(oc->image + section->offset),
+                           section->size,
+                           0, 0, 0);
+
+                addProddableBlock(oc,
+                                  (void *) (oc->image + section->offset),
+                                  section->size);
+
+                secArray[i].info->nstubs = 0;
+                secArray[i].info->stub_offset = NULL;
+                secArray[i].info->stub_size = 0;
+                secArray[i].info->stubs = NULL;
+
+                secArray[i].info->macho_section = section;
+                secArray[i].info->relocation_info
+                = (MachORelocationInfo*)(oc->image + section->reloff);
+            }
+#endif
+        }
+
     }
     /* now, as all sections have been loaded, we can resolve the absolute
      * address of symbols defined in those sections.
@@ -1063,10 +1678,50 @@ ocGetNames_MachO(ObjectCode* oc)
             }
         }
     }
+#if defined(aarch64_HOST_ARCH)
+    /* Setup the global offset table
+     * This is for symbols that are external, and not defined here.
+     * So that we can load their address indirectly.
+     *
+     * We will get GOT request for any symbol that is
+     * - EXT and UNDF
+     * - EXT and not in the same section.
+     *
+     * As sections are not necessarily continuous and can live
+     * anywhere in the addressable space. This obviously makes
+     * sense.  However it took me a while to figure this out.
+     */
+    make_got(oc);
 
+    /* at this point, macho_symbols, should know the addresses for
+     * all symbols defined by this object code.
+     * - those that are defined in sections.
+     * - those that are undefined, but have a value (common storage).
+     */
+#endif
     IF_DEBUG(linker, debugBelch("ocGetNames_MachO: done\n"));
     return 1;
 }
+
+#if defined(ios_HOST_OS)
+bool
+ocMprotect_MachO( ObjectCode *oc ) {
+    for(int i=0; i < oc->n_sections; i++) {
+        Section * section = &oc->sections[i];
+        if(section->size == 0) continue;
+        if(   (section->info->macho_section->flags & SECTION_ATTRIBUTES_USR)
+           == S_ATTR_PURE_INSTRUCTIONS) {
+            if( 0 != mprotect(section->start,
+                              section->size + section->info->stub_size,
+                              PROT_READ | PROT_EXEC) ) {
+                barf("mprotect failed! errno = %d", errno);
+                return false;
+            }
+        }
+    }
+    return true;
+}
+#endif
 
 int
 ocResolve_MachO(ObjectCode* oc)
@@ -1109,16 +1764,55 @@ ocResolve_MachO(ObjectCode* oc)
             }
         }
     }
+#if defined(aarch64_HOST_ARCH)
+    /* fill the GOT table */
+    for(size_t i = 0; i < oc->info->n_macho_symbols; i++) {
+        MachOSymbol * symbol = &oc->info->macho_symbols[i];
+        if(need_got_slot(symbol->nlist)) {
+            if(N_UNDF == (symbol->nlist->n_type & N_TYPE)) {
+                /* an undefined symbol. So we need to ensure we
+                 * have the address.
+                 */
+                if(NULL == symbol->addr) {
+                    symbol->addr = lookupSymbol_((char*)symbol->name);
+                    if(NULL == symbol->addr)
+                        barf("Failed to lookup symbol: %s", symbol->name);
+                } else {
+                    // we already have the address.
+                }
+            } /* else it was defined in the same object,
+               * just a different section. We should have
+               * the address as well already
+               */
+            if(NULL == symbol->addr) {
+                barf("Something went wrong!");
+            }
+            if(NULL == symbol->got_addr) {
+                barf("Not good either!");
+            }
+            *(uint64_t*)symbol->got_addr = (uint64_t)symbol->addr;
+        }
+    }
+#endif
 
     for(int i = 0; i < oc->n_sections; i++)
     {
         IF_DEBUG(linker, debugBelch("ocResolve_MachO: relocating section %d\n", i));
 
+#if defined aarch64_HOST_ARCH
+        if (!relocateSection_aarch64(oc, &oc->sections[i]))
+            return 0;
+#else
         if (!relocateSection(oc,oc->image,oc->info->symCmd,oc->info->nlist,
                              oc->info->segCmd->nsects,oc->info->macho_sections,
                              &oc->info->macho_sections[i]))
             return 0;
+#endif
     }
+#if defined(ios_HOST_OS)
+    if(!ocMprotect_MachO ( oc ))
+        return 0;
+#endif
 
 #if defined (powerpc_HOST_ARCH)
     ocFlushInstructionCache( oc );
