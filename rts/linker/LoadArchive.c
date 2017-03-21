@@ -538,6 +538,9 @@ static HsInt loadArchive_ (pathchar *path)
 
             oc = mkOc(path, image, memberSize, false, archiveMemberName
                      , misalignment);
+#ifdef OBJFORMAT_MACHO
+            ocInit_MachO( oc );
+#endif
 
             stgFree(archiveMemberName);
 

@@ -1,6 +1,6 @@
 #include "Rts.h"
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 
 #include "RtsUtils.h"
 #include "GetEnv.h"
@@ -17,7 +17,7 @@
 #include <mach-o/nlist.h>
 #include <mach-o/reloc.h>
 
-#if defined(HAVE_SYS_MMAN_H)
+#if defined(HAVE_SYS_MMAN_H) && RTS_LINKER_USE_MMAP
 #  include <sys/mman.h>
 #endif
 
@@ -46,6 +46,77 @@
 #define nlist nlist_64
 #endif
 
+/*
+ * Initialize some common data in the object code so we don't have to
+ * continuously look up the addresses.
+ */
+void
+ocInit_MachO(ObjectCode * oc)
+{
+    oc->info = (ObjectCodeFormatInfo*)stgCallocBytes(
+                1, sizeof(ObjectCodeFormatInfo),
+                "ocInit_MachO(ObjectCodeFormatInfo)");
+    oc->info->header  = (MachOHeader *) oc->image;
+    oc->info->symCmd  = NULL;
+    oc->info->segCmd  = NULL;
+    oc->info->dsymCmd = NULL;
+
+    MachOLoadCommand *lc = (MachOLoadCommand*)(oc->image + sizeof(MachOHeader));
+    for(size_t i = 0; i < oc->info->header->ncmds; i++) {
+        if (lc->cmd == LC_SEGMENT || lc->cmd == LC_SEGMENT_64) {
+            oc->info->segCmd = (MachOSegmentCommand*) lc;
+        }
+        else if (lc->cmd == LC_SYMTAB) {
+            oc->info->symCmd = (MachOSymtabCommand*) lc;
+        }
+        else if (lc->cmd == LC_DYSYMTAB) {
+            oc->info->dsymCmd = (MachODsymtabCommand*) lc;
+        }
+        lc = (MachOLoadCommand *) ( ((char*)lc) + lc->cmdsize );
+    }
+    if (NULL == oc->info->segCmd) {
+        barf("ocGetNames_MachO: no segment load command");
+    }
+
+    oc->info->macho_sections = (MachOSection*) (oc->info->segCmd+1);
+    oc->n_sections = oc->info->segCmd->nsects;
+
+    oc->info->nlist = oc->info->symCmd == NULL
+              ? NULL
+              : (MachONList *)(oc->image + oc->info->symCmd->symoff);
+    oc->info->names = oc->image + oc->info->symCmd->stroff;
+
+    /* If we have symbols, allocate and fill the macho_symbols
+     * This will make relocation easier.
+     */
+    oc->info->n_macho_symbols = 0;
+    oc->info->macho_symbols = NULL;
+
+    if(NULL != oc->info->nlist) {
+        oc->info->n_macho_symbols = oc->info->symCmd->nsyms;
+        oc->info->macho_symbols = (MachOSymbol*)stgCallocBytes(
+                                    oc->info->symCmd->nsyms,
+                                    sizeof(MachOSymbol),
+                                    "ocInit_MachO(MachOSymbol)");
+        for(uint32_t i = 0; i < oc->info->symCmd->nsyms; i++) {
+            oc->info->macho_symbols[i].name  = oc->info->names
+                                             + oc->info->nlist[i].n_un.n_strx;
+            oc->info->macho_symbols[i].nlist = &oc->info->nlist[i];
+             /* we don't have an address for this symbol yet; this will be
+              * populated during ocGetNames_MachO. hence addr = NULL
+              */
+            oc->info->macho_symbols[i].addr  = NULL;
+        }
+    }
+}
+
+void
+ocDeinit_MachO(ObjectCode * oc) {
+    if(oc->info->n_macho_symbols > 0) {
+        stgFree(oc->info->macho_symbols);
+    }
+    stgFree(oc->info);
+}
 static int
 resolveImports(
     ObjectCode* oc,
@@ -55,6 +126,7 @@ resolveImports(
     unsigned long *indirectSyms,
     struct nlist *nlist);
 
+#if NEED_SYMBOL_EXTRAS
 #if defined(powerpc_HOST_ARCH)
 int
 ocAllocateSymbolExtras_MachO(ObjectCode* oc)
@@ -144,6 +216,7 @@ ocAllocateSymbolExtras_MachO(ObjectCode* oc)
 #else
 #error Unknown MachO architecture
 #endif /* HOST_ARCH */
+#endif /* NEED_SYMBOL_EXTRAS */
 
 int
 ocVerifyImage_MachO(ObjectCode * oc)
@@ -153,7 +226,7 @@ ocVerifyImage_MachO(ObjectCode * oc)
 
     IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: start\n"));
 
-#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH
+#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH || aarch64_HOST_ARCH
     if(header->magic != MH_MAGIC_64) {
         errorBelch("Could not load image %s: bad magic!\n"
                    "  Expected %08x (64bit), got %08x%s\n",
@@ -1241,4 +1314,4 @@ machoGetMisalignment( FILE * f )
     return misalignment ? (16 - misalignment) : 0;
 }
 
-#endif /* darwin_HOST_OS */
+#endif /* darwin_HOST_OS, ios_HOST_OS */

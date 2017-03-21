@@ -1186,6 +1186,10 @@ void freeObjectCode (ObjectCode *oc)
     }
 #endif
 
+#if defined(OBJECTFORMAT_MACHO)
+    ocDeinit_MachO(oc);
+#endif
+
     stgFree(oc->fileName);
     stgFree(oc->archiveMemberName);
 
@@ -1388,6 +1392,11 @@ preloadObjectFile (pathchar *path)
 #endif /* RTS_LINKER_USE_MMAP */
 
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
+
+#ifdef OBJFORMAT_MACHO
+   if (ocVerifyImage_MachO( oc ))
+       ocInit_MachO( oc );
+#endif
 
    return oc;
 }
