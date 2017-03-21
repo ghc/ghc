@@ -1308,9 +1308,26 @@ preloadObjectFile (pathchar *path)
       return NULL;
    }
 
+   /* iOS does not permit to mmap with r+w+x, however while the comment for
+    * this function says this is not the final resting place, for some
+    * architectures / hosts (at least mach-o non-iOS -- see ocGetNames_MachO)
+    * the image mmaped here in fact ends up being the final resting place for
+    * the sections. And hence we need to leave r+w+x here for other hosts
+    * until all hosts have been made aware of the initial image being r+w only.
+    *
+    * See also the misalignment logic for darwin below.
+    */
+#if defined(ios_HOST_OS)
+   image = mmap(NULL, fileSize, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
+#else
    image = mmap(NULL, fileSize, PROT_READ|PROT_WRITE|PROT_EXEC,
                 MAP_PRIVATE, fd, 0);
-       // not 32-bit yet, we'll remap later
+#endif
+
+   if (image == MAP_FAILED) {
+       errorBelch("mmap: failed. errno = %d", errno);
+   }
+   // not 32-bit yet, we'll remap later
    close(fd);
 
 #else /* !RTS_LINKER_USE_MMAP */
