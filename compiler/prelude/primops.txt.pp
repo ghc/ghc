@@ -1910,20 +1910,34 @@ primop  NewMutVarOp "newMutVar#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
+-- Note [Why MutVar# ops can't fail]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- We don't label readMutVar# or writeMutVar# as can_fail.
+-- This may seem a bit peculiar, because they surely *could*
+-- fail spectacularly if passed a pointer to unallocated memory.
+-- But MutVar#s are always correct by construction; we never
+-- test if a pointer is valid before using it with these operations.
+-- So we never have to worry about floating the pointer reference
+-- outside a validity test. At the moment, has_side_effects blocks
+-- up the relevant optimizations anyway, but we hope to draw finer
+-- distinctions soon, which should improve matters for readMutVar#
+-- at least.
+
 primop  ReadMutVarOp "readMutVar#" GenPrimOp
    MutVar# s a -> State# s -> (# State# s, a #)
    {Read contents of {\tt MutVar\#}. Result is not yet evaluated.}
    with
+   -- See Note [Why MutVar# ops can't fail]
    has_side_effects = True
-   can_fail         = True
 
 primop  WriteMutVarOp "writeMutVar#"  GenPrimOp
    MutVar# s a -> a -> State# s -> State# s
    {Write contents of {\tt MutVar\#}.}
    with
+   -- See Note [Why MutVar# ops can't fail]
    has_side_effects = True
    code_size = { primOpCodeSizeForeignCall } -- for the write barrier
-   can_fail         = True
 
 primop  SameMutVarOp "sameMutVar#" GenPrimOp
    MutVar# s a -> MutVar# s a -> Int#
