@@ -21,6 +21,7 @@
 module Control.Monad.ST.Unsafe (
         -- * Unsafe operations
         unsafeInterleaveST,
+        unsafeDupableInterleaveST,
         unsafeIOToST,
         unsafeSTToIO
     ) where
