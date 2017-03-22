@@ -875,7 +875,7 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64),  974530192, 5),
+        [(wordsize(64),  924299320, 5),
          # 2015-08-04    999826288     initial value
          # 2016-04-14   1066246248     Final demand analyzer run
          # 2016-06-18    984268712     shuffling around of Data.Functor.Identity
@@ -886,6 +886,7 @@ test('T9233',
          # 2017-02-01    894486272     Join points
          # 2017-02-07    884436192     Another improvement to SetLevels
          # 2017-02-17    974530192     Type-indexed Typeable
+         # 2017-03-21    924299320     It's unclear
 
          (wordsize(32),  515672240, 5)   # Put in your value here if you hit this
          # 2016-04-06    515672240     (x86/Linux) initial value
@@ -968,11 +969,12 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 142256192, 5),
-          # initial:    125831400
-          # 2017-01-18: 133380960  Allow top-level string literals in Core
-          # 2017-02-17: 153611448  Type-indexed Typeable
-          # 2017-03-03: 142256192  Share Typeable KindReps
+          [(wordsize(64), 134334800, 5),
+          # initial:      125831400
+          # 2017-01-18:   133380960  Allow top-level string literals in Core
+          # 2017-02-17:   153611448  Type-indexed Typeable
+          # 2017-03-03:   142256192  Share Typeable KindReps
+          # 2017-03-21:   134334800  Unclear
           ]),
      ],
      compile,
@@ -999,12 +1001,13 @@ test('T12234',
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 98390488, 5),
+          [(wordsize(64), 93249744, 5),
           # 2017-01-05   90595208  initial
           # 2017-01-19   95269000  Allow top-level string literals in Core
           # 2017-02-05   88806416  Probably OccAnal fixes
           # 2017-02-17   103890200 Type-indexed Typeable
           # 2017-02-25   98390488  Early inline patch
+          # 2017-03-21   93249744  It's unclear
           ]),
      ],
      compile,
