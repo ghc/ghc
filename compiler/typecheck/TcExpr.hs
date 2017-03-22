@@ -573,8 +573,9 @@ tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
            -- Just like Note [Case branches must never infer a non-tau type]
            -- in TcMatches (See #10619)
 
-       ; b1' <- tcMonoExpr b1 res_ty
-       ; b2' <- tcMonoExpr b2 res_ty
+       ; (u1,b1') <- tcCollectingUsage $ tcMonoExpr b1 res_ty
+       ; (u2,b2') <- tcCollectingUsage $ tcMonoExpr b2 res_ty
+       ; tcEmitBindingUsage (supUE u1 u2)
        ; return (HsIf Nothing pred' b1' b2') }
 
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty

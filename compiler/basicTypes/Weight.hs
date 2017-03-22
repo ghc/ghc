@@ -50,6 +50,14 @@ subweight Zero  Zero  = True
 subweight One   One   = True
 subweight _     _     = False
 
+-- | @sup w1 w2@ returns the smallest weight larger than or equal to both @w1@
+-- and @w2@.
+sup :: Rig -> Rig -> Rig
+sup Zero  Zero  = Zero
+sup One   One   = One
+sup Omega Omega = Omega
+sup _     _     = Omega
+
 
 --
 -- * Utilities
@@ -104,6 +112,10 @@ addUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
 scaleUE :: Rig -> UsageEnv -> UsageEnv
 scaleUE w (UsageEnv e) = UsageEnv $
   mapNameEnv (w*) e
+
+supUE :: UsageEnv -> UsageEnv -> UsageEnv
+supUE (UsageEnv e1) (UsageEnv e2) = UsageEnv $
+  plusNameEnv_CD sup e1 Zero e2 Zero
 
 -- TODO: arnaud: both delete function: unify argument order with existing similar functions.
 -- | @deleteUEAsserting w x env@ deletes the binding to @x@ in @env@ under one

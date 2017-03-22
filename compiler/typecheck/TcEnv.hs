@@ -576,9 +576,9 @@ tcExtendLocalTypeEnv lcl_env@(TcLclEnv { tcl_env = lcl_type_env }) tc_ty_things
         --
         -- Nor must we generalise g over any kind variables free in r's kind
 
--- | |tcCollectingUsage thing_inside| runs |thing_inside| and returns the usage
+-- | @tcCollectingUsage thing_inside@ runs @thing_inside@ and returns the usage
 -- information which was collected as part of the execution of
--- |thing_inside|. Careful: |tcCollectingUsage thing_inside| itself does not
+-- @thing_inside@. Careful: @tcCollectingUsage thing_inside@ itself does not
 -- report any usage information, it's up to the programmer to incorporate the
 -- returned usage information into the larger context appropriately.
 tcCollectingUsage :: TcM a -> TcM (UsageEnv,a)

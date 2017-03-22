@@ -207,7 +207,12 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
   = do { (Weighted _ rhs_ty):pat_tys <- tauifyMultipleMatches matches ((Weighted One rhs_ty):pat_tys) -- return type has implicitly weight 1, it doesn't matter all that much in this case since it isn't used and is eliminated immediately.
             -- See Note [Case branches must never infer a non-tau type]
 
-       ; matches' <- mapM (tcMatch ctxt pat_tys rhs_ty) matches
+       ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
+       ; let (usages,matches') = unzip umatches
+       ; tcEmitBindingUsage $
+           case usages of -- Interesting that empty cases must be special-cased
+             [] -> zeroUE
+             _  -> foldr1 supUE usages
        ; pat_tys  <- mapM (mapM readExpType) pat_tys
        ; rhs_ty   <- readExpType rhs_ty
        ; return (MG { mg_alts = L l matches'
