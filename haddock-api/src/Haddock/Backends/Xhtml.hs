@@ -485,19 +485,26 @@ ppHtmlModule odir doctitle themes
       mdl_str_annot = mdl_str ++ if ifaceIsSig iface
                                     then " (signature)"
                                     else ""
+      mdl_str_linked = mdl_str +++
+                       " (signature" +++
+                       sup << ("[" +++ anchor ! [href signatureDocURL] << "?" +++ "]" ) +++
+                       ")"
       real_qual = makeModuleQual qual aliases mdl
       html =
         headHtml mdl_str_annot (Just $ "mini_" ++ moduleHtmlFile mdl) themes maybe_mathjax_url +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
-            divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str_annot)),
+            divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str_linked)),
             ifaceToHtml maybe_source_url maybe_wiki_url iface unicode real_qual
           ]
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
   ppHtmlModuleMiniSynopsis odir doctitle themes maybe_mathjax_url iface unicode real_qual debug
+
+signatureDocURL :: String
+signatureDocURL = "https://wiki.haskell.org/Module_signature"
 
 ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
   -> Maybe String -> Interface -> Bool -> Qualification -> Bool -> IO ()
