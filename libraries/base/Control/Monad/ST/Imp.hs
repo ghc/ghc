@@ -29,10 +29,12 @@ module Control.Monad.ST.Imp (
 
         -- * Unsafe operations
         unsafeInterleaveST,
+        unsafeDupableInterleaveST,
         unsafeIOToST,
         unsafeSTToIO
     ) where
 
-import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
+import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST
+                        , unsafeDupableInterleaveST )
 import GHC.Base         ( RealWorld )
 import GHC.IO           ( stToIO, unsafeIOToST, unsafeSTToIO )

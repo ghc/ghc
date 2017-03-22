@@ -2344,7 +2344,7 @@ primop  IsCurrentThreadBoundOp "isCurrentThreadBound#" GenPrimOp
    has_side_effects = True
 
 primop  NoDuplicateOp "noDuplicate#" GenPrimOp
-   State# RealWorld -> State# RealWorld
+   State# s -> State# s
    with
    out_of_line = True
    has_side_effects = True

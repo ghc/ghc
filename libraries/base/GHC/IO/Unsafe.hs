@@ -104,7 +104,7 @@ unsafeDupablePerformIO  :: IO a -> a
 unsafeDupablePerformIO (IO m) = case runRW# m of (# _, a #) -> a
 
 {-|
-'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
+'unsafeInterleaveIO' allows an 'IO' computation to be deferred lazily.
 When passed a value of type @IO a@, the 'IO' will only be performed
 when the value of the @a@ is demanded.  This is used to implement lazy
 file reading, see 'System.IO.hGetContents'.
@@ -113,6 +113,9 @@ file reading, see 'System.IO.hGetContents'.
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
 
+-- Note [unsafeDupableInterleaveIO should not be inlined]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
 -- We used to believe that INLINE on unsafeInterleaveIO was safe,
 -- because the state from this IO thread is passed explicitly to the
 -- interleaved IO, so it cannot be floated out and shared.
@@ -131,7 +134,18 @@ unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
 -- share and sometimes not (plus it probably breaks the noDuplicate).
 -- So now, we do not inline unsafeDupableInterleaveIO.
 
+{-|
+'unsafeDupableInterleaveIO' allows an 'IO' computation to be deferred lazily.
+When passed a value of type @IO a@, the 'IO' will only be performed
+when the value of the @a@ is demanded.
+
+The computation may be performed multiple times by different threads,
+possibly at the same time. To ensure that the computation is performed
+only once, use 'unsafeInterleaveIO' instead.
+-}
+
 {-# NOINLINE unsafeDupableInterleaveIO #-}
+-- See Note [unsafeDupableInterleaveIO should not be inlined]
 unsafeDupableInterleaveIO :: IO a -> IO a
 unsafeDupableInterleaveIO (IO m)
   = IO ( \ s -> let

@@ -84,22 +84,31 @@ failIO s = IO (raiseIO# (toException (userError s)))
 -- ---------------------------------------------------------------------------
 -- Coercions between IO and ST
 
--- | A monad transformer embedding strict state transformers in the 'IO'
--- monad.  The 'RealWorld' parameter indicates that the internal state
+-- | Embed a strict state transformer in an 'IO'
+-- action.  The 'RealWorld' parameter indicates that the internal state
 -- used by the 'ST' computation is a special one supplied by the 'IO'
 -- monad, and thus distinct from those used by invocations of 'runST'.
 stToIO        :: ST RealWorld a -> IO a
 stToIO (ST m) = IO m
 
+-- | Convert an 'IO' action into an 'ST' action. The type of the result
+-- is constrained to use a 'RealWorld' state, and therefore the result cannot
+-- be passed to 'runST'.
 ioToST        :: IO a -> ST RealWorld a
 ioToST (IO m) = (ST m)
 
--- This relies on IO and ST having the same representation modulo the
--- constraint on the type of the state
---
+-- | Convert an 'IO' action to an 'ST' action.
+-- This relies on 'IO' and 'ST' having the same representation modulo the
+-- constraint on the type of the state.
 unsafeIOToST        :: IO a -> ST s a
 unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
 
+-- | Convert an 'ST' action to an 'IO' action.
+-- This relies on 'IO' and 'ST' having the same representation modulo the
+-- constraint on the type of the state.
+--
+-- For an example demonstrating why this is unsafe, see
+-- https://mail.haskell.org/pipermail/haskell-cafe/2009-April/060719.html
 unsafeSTToIO :: ST s a -> IO a
 unsafeSTToIO (ST m) = IO (unsafeCoerce# m)
 
