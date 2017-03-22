@@ -88,6 +88,11 @@ pre, code, kbd, samp, tt, .src {
   font-size: 182%; /* 24pt */
 }
 
+#module-header .caption sup {
+  font-size: 70%;
+  font-weight: normal;
+}
+
 .info  {
   font-size: 85%; /* 11pt */
 }
