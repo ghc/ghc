@@ -482,13 +482,16 @@ ppHtmlModule odir doctitle themes
       mdl = ifaceMod iface
       aliases = ifaceModuleAliases iface
       mdl_str = moduleString mdl
+      mdl_str_annot = mdl_str ++ if ifaceIsSig iface
+                                    then " (signature)"
+                                    else ""
       real_qual = makeModuleQual qual aliases mdl
       html =
-        headHtml mdl_str (Just $ "mini_" ++ moduleHtmlFile mdl) themes maybe_mathjax_url +++
+        headHtml mdl_str_annot (Just $ "mini_" ++ moduleHtmlFile mdl) themes maybe_mathjax_url +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
-            divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str)),
+            divModuleHeader << (moduleInfo iface +++ (sectionName << mdl_str_annot)),
             ifaceToHtml maybe_source_url maybe_wiki_url iface unicode real_qual
           ]
 
