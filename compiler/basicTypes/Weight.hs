@@ -15,6 +15,10 @@ import Outputable
 import Name
 import NameEnv
 
+--
+-- * Core properties of weights
+--
+
 data Rig = Zero | One | Omega
   deriving (Eq,Ord,Data)
 
@@ -36,17 +40,20 @@ instance Outputable Rig where
   ppr Omega = fromString "ω"
 
 
--- | |subweight w1 w2| check whether a value of weight |w1| is allowed where a
--- value of weight |w2| is expected. This is a partial order.
+-- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
+-- value of weight @w2@ is expected. This is a partial order.
 subweight :: Rig -> Rig -> Bool
+subweight _     Omega = True
 subweight Zero  Zero  = True
 -- It is no mistake: 'Zero' is not a subweight of 'One': a value which must be
 -- used zero times cannot be used one time.
-subweight Zero  Omega = True
 subweight One   One   = True
-subweight One   Omega = True
-subweight Omega Omega = True
 subweight _     _     = False
+
+
+--
+-- * Utilities
+--
 
 -- | A shorthand for data with an attached 'Rig' element (the weight).
 data Weighted a = Weighted {weightedWeight :: Rig, weightedThing :: a}
@@ -61,6 +68,10 @@ instance Outputable a => Outputable (Weighted a) where
 weightedSet :: Weighted a -> b -> Weighted b
 weightedSet x b = fmap (\_->b) x
 
+
+--
+-- * Usage environments
+--
 
 -- | Like in the mathematical presentation, we have a context on which the
 -- semi-ring of weights acts (that is, 'UsageEnv' is a 'Rig'-module). Unlike the
@@ -95,10 +106,10 @@ scaleUE w (UsageEnv e) = UsageEnv $
   mapNameEnv (w*) e
 
 -- TODO: arnaud: both delete function: unify argument order with existing similar functions.
--- | |deleteUEAsserting w x env| deletes the binding to |x| in |env| under one
--- condition: if |x| is bound to |w'| in |env|, then |w'| must be a subweight of
--- |w|, if |x| is not bound in |env| then |Zero| must be a subweight of |W|. If
--- the condition is not met, then |Nothing| is returned.
+-- | @deleteUEAsserting w x env@ deletes the binding to @x@ in @env@ under one
+-- condition: if @x@ is bound to @w'@ in @env@, then @w'@ must be a subweight of
+-- @w@, if @x@ is not bound in @env@ then 'Zero' must be a subweight of @W@. If
+-- the condition is not met, then @Nothing@ is returned.
 deleteUEAsserting :: Rig -> Name -> UsageEnv -> Maybe UsageEnv
 deleteUEAsserting w x (UsageEnv e) | Just w' <- lookupNameEnv e x = do
   guard (subweight w' w)
