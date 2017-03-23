@@ -455,11 +455,11 @@ cmpStringPrefix ptr1 ptr2 len =
     return (r == 0)
 
 hashStr :: Ptr Word8 -> Int -> Int
-hashStr (Ptr a#) (I# len#) = loop 0# a# .&. (hASH_TBL_SIZE - 1)
+hashStr (Ptr a#) (I# len#) = loop 0# a#
   where
     !end = plusAddr# a# len# 
 
-    loop h op | isTrue# (eqAddr# op end) = I# h
+    loop h op | isTrue# (eqAddr# op end) = I# h .&. (hASH_TBL_SIZE - 1)
               | otherwise = loop h' (plusAddr# op 1#)
             where 
                 !c  = ord# (indexCharOffAddr# op 0#)
