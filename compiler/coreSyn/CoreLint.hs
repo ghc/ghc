@@ -1636,7 +1636,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
               (checkTypes ty1 ty2)
        ; return (k1, k2, ty1, ty2, r) }
    where
-     report s = hang (text $ "Unsafe coercion between " ++ s)
+     report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1
                              , text "  To:" <+> ppr ty2])
      isUnBoxed :: PrimRep -> Bool
@@ -1644,10 +1644,20 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
        -- see #9122 for discussion of these checks
      checkTypes t1 t2
-       = do { checkWarnL (reps1 `equalLength` reps2)
-                         (report "values with different # of reps")
-            ; zipWithM_ validateCoercion reps1 reps2 }
+       = do { checkWarnL lev_poly1
+                         (report "left-hand type is levity-polymorphic")
+            ; checkWarnL lev_poly2
+                         (report "right-hand type is levity-polymorphic")
+            ; when (not (lev_poly1 || lev_poly2)) $
+              do { checkWarnL (reps1 `equalLength` reps2)
+                              (report "between values with different # of reps")
+                 ; zipWithM_ validateCoercion reps1 reps2 }}
        where
+         lev_poly1 = isTypeLevPoly t1
+         lev_poly2 = isTypeLevPoly t2
+
+         -- don't look at these unless lev_poly1/2 are False
+         -- Otherwise, we get #13458
          reps1 = typePrimRep t1
          reps2 = typePrimRep t2
 
@@ -1655,15 +1665,15 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
      validateCoercion rep1 rep2
        = do { dflags <- getDynFlags
             ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
-                         (report "unboxed and boxed value")
+                         (report "between unboxed and boxed value")
             ; checkWarnL (TyCon.primRepSizeW dflags rep1
                            == TyCon.primRepSizeW dflags rep2)
-                         (report "unboxed values of different size")
+                         (report "between unboxed values of different size")
             ; let fl = liftM2 (==) (TyCon.primRepIsFloat rep1)
                                    (TyCon.primRepIsFloat rep2)
             ; case fl of
-                Nothing    -> addWarnL (report "vector types")
-                Just False -> addWarnL (report "float and integral values")
+                Nothing    -> addWarnL (report "between vector types")
+                Just False -> addWarnL (report "between float and integral values")
                 _          -> return ()
             }
 
