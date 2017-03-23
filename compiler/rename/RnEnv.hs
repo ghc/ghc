@@ -1843,7 +1843,7 @@ unknownNameSuggestions_ :: WhereLooking -> DynFlags
                        -> RdrName -> SDoc
 unknownNameSuggestions_ where_look dflags global_env local_env imports tried_rdr_name =
     similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions dflags imports tried_rdr_name
+    importSuggestions imports tried_rdr_name
 
 
 similarNameSuggestions :: WhereLooking -> DynFlags
@@ -1964,8 +1964,8 @@ similarNameSuggestions where_look dflags global_env
         | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: DynFlags -> ImportAvails -> RdrName -> SDoc
-importSuggestions _dflags imports rdr_name
+importSuggestions :: ImportAvails -> RdrName -> SDoc
+importSuggestions imports rdr_name
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
   , Just name <- mod_name
