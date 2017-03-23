@@ -459,7 +459,11 @@ hashStr (Ptr a#) (I# len#) = loop 0# a#
   where
     !end = plusAddr# a# len# 
 
-    loop h op | isTrue# (eqAddr# op end) = I# h .&. (hASH_TBL_SIZE - 1)
+    loop h op | isTrue# (eqAddr# op end) = I# (word2Int#
+                                                (and#
+                                                  (int2Word# h)
+                                                  (minusWord#
+                                                    hASH_TBL_SIZE## 1##)))
               | otherwise = loop h' (plusAddr# op 1#)
             where 
                 !c  = ord# (indexCharOffAddr# op 0#)
