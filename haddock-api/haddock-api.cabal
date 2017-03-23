@@ -48,7 +48,7 @@ library
     , xhtml >= 3000.2 && < 3000.3
     , Cabal >= 1.10
     , ghc-boot
-    , ghc >= 8.0 && < 8.2
+    , ghc >= 8.3 && < 8.4
 
     , ghc-paths
     , haddock-library == 1.4.*
