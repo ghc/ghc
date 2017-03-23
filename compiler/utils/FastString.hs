@@ -102,6 +102,7 @@ import FastFunctions
 import Panic
 import Util
 
+import Data.Bits ((.&.))
 import Control.DeepSeq
 import Control.Monad
 import Data.ByteString (ByteString)
@@ -129,8 +130,8 @@ import GHC.Conc.Sync    (sharedCAF)
 
 import GHC.Base         ( unpackCString# )
 
-#define hASH_TBL_SIZE          4091
-#define hASH_TBL_SIZE_UNBOXED  4091#
+#define hASH_TBL_SIZE          4096
+#define hASH_TBL_SIZE_UNBOXED  4096#
 
 
 fastStringToByteString :: FastString -> ByteString
@@ -453,16 +454,16 @@ cmpStringPrefix ptr1 ptr2 len =
  do r <- memcmp ptr1 ptr2 len
     return (r == 0)
 
+hashStr :: Ptr Word8 -> Int -> Int
+hashStr (Ptr a#) (I# len#) = loop 0# a# .&. (hASH_TBL_SIZE - 1)
+  where
+    !end = plusAddr# a# len# 
 
-hashStr  :: Ptr Word8 -> Int -> Int
- -- use the Addr to produce a hash value between 0 & m (inclusive)
-hashStr (Ptr a#) (I# len#) = loop 0# 0#
-   where
-    loop h n | isTrue# (n ==# len#) = I# h
-             | otherwise  = loop h2 (n +# 1#)
-          where !c = ord# (indexCharOffAddr# a# n)
-                !h2 = (c +# (h *# 128#)) `remInt#`
-                      hASH_TBL_SIZE#
+    loop h op | isTrue# (eqAddr# op end) = I# h
+              | otherwise = loop h' (plusAddr# op 1#)
+            where 
+                !c  = ord# (indexCharOffAddr# op 0#)
+                !h' = h *# 31# +# c
 
 -- -----------------------------------------------------------------------------
 -- Operations
