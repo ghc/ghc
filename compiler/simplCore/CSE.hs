@@ -154,7 +154,7 @@ For example:
   This is the main reason that addBinding is called with a trivial rhs.
 
 * Non-trivial scrutinee
-     case (f x) of y { pat -> ...let y = f x in ... }
+     case (f x) of y { pat -> ...let z = f x in ... }
 
   By using addBinding we'll add (f x :-> y) to the cs_map, and
   thereby CSE the inner (f x) to y.
@@ -334,6 +334,11 @@ cseBind toplevel env (Rec pairs)
 
     do_one env (pr, b1) = cse_bind toplevel env pr b1
 
+-- | Given a binding of @in_id@ to @in_rhs@, and a fresh name to refer
+-- to @in_id@ (@out_id@, created from addBinder or addRecBinders),
+-- first try to CSE @in_rhs@, and then add the resulting (possibly CSE'd)
+-- binding to the 'CSEnv', so that we attempt to CSE any expressions
+-- which are equal to @out_rhs@.
 cse_bind :: TopLevelFlag -> CSEnv -> (InId, InExpr) -> OutId -> (CSEnv, (OutId, OutExpr))
 cse_bind toplevel env (in_id, in_rhs) out_id
   | isTopLevel toplevel, exprIsLiteralString in_rhs
@@ -474,9 +479,11 @@ cseCase env scrut bndr ty alts
     arg_tys :: [OutType]
     arg_tys = tyConAppArgs (idType bndr3)
 
+    -- Given case x of { K y z -> ...K y z... }
+    -- CSE K y z into x...
     cse_alt (DataAlt con, args, rhs)
         | not (null args)
-                -- Don't try CSE if there are no args; it just increases the number
+                -- ... but don't try CSE if there are no args; it just increases the number
                 -- of live vars.  E.g.
                 --      case x of { True -> ....True.... }
                 -- Don't replace True by x!
@@ -508,7 +515,7 @@ combineAlts _ alts = alts  -- Default case
 {- Note [Combine case alternatives]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 combineAlts is just a more heavyweight version of the use of
-combineIdentialAlts in SimplUtils.prepareAlts.  The basic idea is
+combineIdenticalAlts in SimplUtils.prepareAlts.  The basic idea is
 to transform
 
     DEFAULT -> e1
@@ -581,6 +588,9 @@ lookupSubst (CS { cs_subst = sub}) x = lookupIdSubst (text "CSE.lookupSubst") su
 extendCSSubst :: CSEnv -> Id  -> CoreExpr -> CSEnv
 extendCSSubst cse x rhs = cse { cs_subst = extendSubst (cs_subst cse) x rhs }
 
+-- | Add clones to the substitution to deal with shadowing.  See
+-- Note [Shadowing] for more details.  You should call this whenever
+-- you go under a binder.
 addBinder :: CSEnv -> Var -> (CSEnv, Var)
 addBinder cse v = (cse { cs_subst = sub' }, v')
                 where
