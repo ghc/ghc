@@ -36,7 +36,6 @@ endif
 
 utils/haddock_dist_MODULES += Paths_haddock
 
-utils/haddock_dist_DATA_FILES += html/frames.html
 utils/haddock_dist_DATA_FILES += html/haddock-util.js
 utils/haddock_dist_DATA_FILES += html/Classic.theme/haskell_icon.gif
 utils/haddock_dist_DATA_FILES += html/Classic.theme/minus.gif

@@ -501,7 +501,7 @@ Special characters
 ~~~~~~~~~~~~~~~~~~
 
 The following characters have special meanings in documentation
-comments: ``\\``, ``/``, ``'``, ``\```, ``"``, ``@``, ``<``. To insert a
+comments: ``\\``, ``/``, ``'``, ``\```, ``"``, ``@``, ``<``, ``$``. To insert a
 literal occurrence of one of these special characters, precede it with a
 backslash (``\\``).
 
@@ -798,6 +798,21 @@ like this: ::
 If the output format supports it, the image will be rendered inside the
 documentation. The image description is used as relpacement text and/or
 image title.
+
+Mathematics / LaTeX
+~~~~~~~~~~~~~~~~~~~
+
+Haddock supports LaTeX syntax for rendering mathematical notation. The
+delimiters are ``\[...\]`` for displayed mathematics and ``\(...\)``
+for in-line mathematics. An example looks like this: ::
+
+  \[
+  f(a) = \frac{1}{2\pi i}\oint_\gamma \frac{f(z)}{z-a}\,\mathrm{d}z
+  \]
+
+If the output format supports it, the mathematics will be rendered
+inside the documentation. For example, the HTML backend will display
+the mathematics via `MathJax <https://www.mathjax.org>`__.
 
 Anchors
 ~~~~~~~

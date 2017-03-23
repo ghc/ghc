@@ -1,5 +1,5 @@
 name:                 haddock-api
-version:              2.17.2
+version:              2.17.3
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -19,7 +19,6 @@ data-dir:
   resources
 data-files:
   html/solarized.css
-  html/frames.html
   html/haddock-util.js
   html/highlight.js
   html/Classic.theme/haskell_icon.gif

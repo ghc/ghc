@@ -877,13 +877,21 @@ extractDecl name decl
   | otherwise  =
     case unLoc decl of
       TyClD d@ClassDecl {} ->
-        let matches = [ sig | sig <- tcdSigs d, name `elem` sigName sig,
-                        isTypeLSig sig ] -- TODO: document fixity
+        let matches = [ lsig
+                      | lsig <- tcdSigs d
+                      , ClassOpSig False _ _ <- pure $ unLoc lsig
+                        -- Note: exclude `default` declarations (see #505)
+                      , name `elem` sigName lsig
+                      ]
+            -- TODO: document fixity
         in case matches of
           [s0] -> let (n, tyvar_names) = (tcdName d, tyClDeclTyVars d)
                       L pos sig = addClassContext n tyvar_names s0
                   in L pos (SigD sig)
-          _ -> error "internal: extractDecl (ClassDecl)"
+          _ -> O.pprPanic "extractDecl" (O.text "Ambiguous decl for" O.<+> O.ppr name O.<+> O.text "in class:"
+                                         O.$$ O.nest 4 (O.ppr d)
+                                         O.$$ O.text "Matches:"
+                                         O.$$ O.nest 4 (O.ppr matches))
       TyClD d@DataDecl {} ->
         let (n, tyvar_tys) = (tcdName d, lHsQTyVarsToTypes (tyClDeclTyVars d))
         in SigD <$> extractRecSel name n tyvar_tys (dd_cons (tcdDataDefn d))
@@ -918,7 +926,7 @@ extractRecSel nm t tvs (L _ con : rest) =
   matching_fields flds = [ (l,f) | f@(L _ (ConDeclField ns _ _)) <- flds
                                  , L l n <- ns, selectorFieldOcc n == nm ]
   data_ty
-    -- | ResTyGADT _ ty <- con_res con = ty
+    -- ResTyGADT _ ty <- con_res con = ty
     | ConDeclGADT{} <- con = hsib_body $ con_type con
     | otherwise = foldl' (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar NotPromoted (noLoc t))) tvs
 

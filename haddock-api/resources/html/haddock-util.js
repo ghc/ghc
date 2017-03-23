@@ -248,33 +248,6 @@ function addMenuItem(html) {
   }
 }
 
-function adjustForFrames() {
-  var bodyCls;
-
-  if (parent.location.href == window.location.href) {
-    // not in frames, so add Frames button
-    addMenuItem("<a href='#' onclick='reframe();return true;'>Frames</a>");
-    bodyCls = "no-frame";
-  }
-  else {
-    bodyCls = "in-frame";
-  }
-  addClass(document.body, bodyCls);
-}
-
-function reframe() {
-  setCookie("haddock-reframe", document.URL);
-  window.location = "frames.html";
-}
-
-function postReframe() {
-  var s = getCookie("haddock-reframe");
-  if (s) {
-    parent.window.main.location = s;
-    clearCookie("haddock-reframe");
-  }
-}
-
 function styles() {
   var i, a, es = document.getElementsByTagName("link"), rs = [];
   for (i = 0; a = es[i]; i++) {
@@ -337,7 +310,6 @@ function styleMenu(show) {
 
 function pageLoad() {
   addStyleMenu();
-  adjustForFrames();
   resetStyle();
   restoreCollapsed();
 }

@@ -100,7 +100,7 @@ The following options are available:
 
     ``module.html``; ``mini_module.html``
         An HTML page for each module, and a "mini" page for each used
-        when viewing in frames.
+        when viewing their synopsis.
 
     ``index.html``
         The top level page of the documentation: lists the modules
@@ -111,17 +111,13 @@ The following options are available:
         The alphabetic index, possibly split into multiple pages if big
         enough.
 
-    ``frames.html``
-        The top level document when viewing in frames.
-
     ``some.css``; ``etc...``
         Files needed for the themes used. Specify your themes using the
         :option:`--theme` option.
 
     ``haddock-util.js``
         Some JavaScript utilities used to implement some of the dynamic
-        features like collapsible sections, and switching to frames
-        view.
+        features like collapsible sections.
 
 .. option:: --latex
 

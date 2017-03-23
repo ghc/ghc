@@ -35,8 +35,8 @@ import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
 import Control.Monad         ( when, unless )
-import Data.Char             ( toUpper )
-import Data.List             ( sortBy, groupBy, intercalate, isPrefixOf )
+import Data.Char             ( toUpper, isSpace )
+import Data.List             ( sortBy, intercalate, isPrefixOf, intersperse )
 import Data.Maybe
 import System.FilePath hiding ( (</>) )
 import System.Directory
@@ -105,7 +105,8 @@ copyHtmlBits odir libdir themes = do
     copyCssFile f = copyFile f (combine odir (takeFileName f))
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
-  mapM_ copyLibFile [ jsFile, framesFile ]
+  copyLibFile jsFile
+  return ()
 
 
 headHtml :: String -> Maybe String -> Themes -> Maybe String -> Html
@@ -201,8 +202,7 @@ moduleInfo iface =
         field info >>= \a -> return (th << fieldName <-> td << a)
 
       entries :: [HtmlTable]
-      entries = mapMaybe doOneEntry [
-          ("Copyright",hmi_copyright),
+      entries = maybeToList copyrightsTable ++ mapMaybe doOneEntry [
           ("License",hmi_license),
           ("Maintainer",hmi_maintainer),
           ("Stability",hmi_stability),
@@ -215,6 +215,14 @@ moduleInfo iface =
             Nothing -> Nothing
             Just Haskell98 -> Just "Haskell98"
             Just Haskell2010 -> Just "Haskell2010"
+
+          multilineRow :: String -> [String] -> HtmlTable
+          multilineRow title xs = (th ! [valign "top"]) << title <-> td << (toLines xs)
+            where toLines = mconcat . intersperse br . map toHtml
+
+          copyrightsTable :: Maybe HtmlTable
+          copyrightsTable = fmap (multilineRow "Copyright" . split) (hmi_copyright info)
+            where split = map (trim . filter (/= ',')) . lines
 
           extsForm
             | OptShowExtensions `elem` ifaceOptions iface =
@@ -275,9 +283,6 @@ ppHtmlContents dflags odir doctitle _maybe_package
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, contentsHtmlFile]) (renderToString debug html)
 
-  -- XXX: think of a better place for this?
-  ppHtmlContentsFrame odir doctitle themes mathjax_url ifaces debug
-
 
 ppPrologue :: Qualification -> String -> Maybe (MDoc GHC.RdrName) -> Html
 ppPrologue _ _ Nothing = noHtml
@@ -333,41 +338,6 @@ mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
 
     subtree = mkNodeList qual (s:ss) p ts ! collapseSection p True ""
 
-
--- | Turn a module tree into a flat list of full module names.  E.g.,
--- @
---  A
---  +-B
---  +-C
--- @
--- becomes
--- @["A", "A.B", "A.B.C"]@
-flatModuleTree :: [InstalledInterface] -> [Html]
-flatModuleTree ifaces =
-    map (uncurry ppModule' . head)
-            . groupBy ((==) `on` fst)
-            . sortBy (comparing fst)
-            $ mods
-  where
-    mods = [ (moduleString mdl, mdl) | mdl <- map instMod ifaces ]
-    ppModule' txt mdl =
-      anchor ! [href (moduleHtmlFile mdl), target mainFrameName]
-        << toHtml txt
-
-
-ppHtmlContentsFrame :: FilePath -> String -> Themes -> Maybe String
-  -> [InstalledInterface] -> Bool -> IO ()
-ppHtmlContentsFrame odir doctitle themes maybe_mathjax_url ifaces debug = do
-  -- TODO: Arguably should split up signatures and modules here too...
-  -- but who uses frames?  Fix this if someone complains. -- ezyang
-  let mods = flatModuleTree ifaces
-      html =
-        headHtml doctitle Nothing themes maybe_mathjax_url +++
-        miniBody << divModuleList <<
-          (sectionName << "Modules" +++
-           ulist << [ li ! [theclass "module"] << m | m <- mods ])
-  createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, frameIndexHtmlFile]) (renderToString debug html)
 
 
 --------------------------------------------------------------------------------
@@ -709,6 +679,9 @@ processDecl :: Bool -> Html -> Maybe Html
 processDecl True = Just
 processDecl False = Just . divTopDecl
 
+trim :: String -> String
+trim = f . f
+  where f = reverse . dropWhile isSpace
 
 processDeclOneLiner :: Bool -> Html -> Maybe Html
 processDeclOneLiner True = Just

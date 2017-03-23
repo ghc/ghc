@@ -42,7 +42,7 @@ import           Data.Tuple
 
 import           Documentation.Haddock.Types (Version)
 
-data ParserState = ParserState {
+newtype ParserState = ParserState {
   parserStateSince :: Maybe Version
 } deriving (Eq, Show)
 
