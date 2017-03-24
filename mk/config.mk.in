@@ -789,9 +789,9 @@ STRIP_CMD      = strip
 endif
 PATCH_CMD      = @PatchCmd@
 TAR_CMD        = @TarCmd@
-BZIP2_CMD      = bzip2
-GZIP_CMD       = gzip
-XZ_CMD         = xz
+BZIP2_CMD      = @Bzip2Cmd@
+GZIP_CMD       = @GzipCmd@
+XZ_CMD         = @XzCmd@
 
 # xz is default compression
 TAR_COMP      ?= xz
