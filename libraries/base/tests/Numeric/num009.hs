@@ -1,4 +1,8 @@
 -- trac #2059
+--
+-- Note that this test fails miserably when compiled to use X87 floating point.
+-- For instance, in the case of (sin 1e20) the X86 FSIN instruction doesn't even
+-- get the sign right on my machine.
 
 module Main(main) where
 
@@ -20,7 +24,7 @@ test :: (RealFloat a, Floating a, RealFloat b, Floating b, Show b)
 test s f g x = do let y = realToFrac (f (realToFrac x))
                       z = g x
                   unless (y == z) $ do
-                      putStrLn (s ++ ' ':show x)
+                      putStrLn ("uh oh! " ++ s ++ ' ':show x)
                       print y
                       print z
                       print $ decodeFloat y
