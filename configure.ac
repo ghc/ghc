@@ -702,6 +702,11 @@ dnl ** check for tar
 dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gnutar gtar tar,tar)
 
+dnl ** check for compressors
+AC_PATH_PROGS(Bzip2Cmd,bzip2, bzip2)
+AC_PATH_PROGS(GzipCmd,gzip, gzip)
+AC_PATH_PROGS(XzCmd,pxz xz, xz)
+
 dnl ** check for patch
 dnl if GNU patch is named gpatch, look for it first
 AC_PATH_PROGS(PatchCmd,gpatch patch, patch)
