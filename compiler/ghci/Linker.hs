@@ -573,7 +573,7 @@ failNonStd dflags srcspan = dieWith dflags srcspan $
   text "Cannot load" <+> compWay <+>
      text "objects when GHC is built" <+> ghciWay $$
   text "To fix this, either:" $$
-  text "  (1) Use -fexternal-interprter, or" $$
+  text "  (1) Use -fexternal-interpreter, or" $$
   text "  (2) Build the program twice: once" <+>
                        ghciWay <> text ", and then" $$
   text "      with" <+> compWay <+>
