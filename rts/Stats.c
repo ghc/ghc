@@ -757,35 +757,43 @@ stat_exit (void)
         }
 
         if (RtsFlags.GcFlags.giveStats == ONELINE_GC_STATS) {
-      char *fmt1, *fmt2;
-      if (RtsFlags.MiscFlags.machineReadable) {
-          fmt1 = " [(\"bytes allocated\", \"%llu\")\n";
-          fmt2 = " ,(\"num_GCs\", \"%d\")\n"
-                 " ,(\"average_bytes_used\", \"%ld\")\n"
-                 " ,(\"max_bytes_used\", \"%ld\")\n"
-                 " ,(\"num_byte_usage_samples\", \"%ld\")\n"
-                 " ,(\"peak_megabytes_allocated\", \"%lu\")\n"
-                 " ,(\"init_cpu_seconds\", \"%.3f\")\n"
-                 " ,(\"init_wall_seconds\", \"%.3f\")\n"
-                 " ,(\"mutator_cpu_seconds\", \"%.3f\")\n"
-                 " ,(\"mutator_wall_seconds\", \"%.3f\")\n"
-                 " ,(\"GC_cpu_seconds\", \"%.3f\")\n"
-                 " ,(\"GC_wall_seconds\", \"%.3f\")\n"
-                 " ]\n";
-      }
-      else {
-          fmt1 = "<<ghc: %llu bytes, ";
-          fmt2 = "%d GCs, %ld/%ld avg/max bytes residency (%ld samples), %luM in use, %.3f INIT (%.3f elapsed), %.3f MUT (%.3f elapsed), %.3f GC (%.3f elapsed) :ghc>>\n";
-      }
+          char *fmt;
+          if (RtsFlags.MiscFlags.machineReadable) {
+            fmt =
+                " [(\"bytes allocated\", \"%" FMT_Word64 "\")\n"
+                " ,(\"num_GCs\", \"%" FMT_Word32 "\")\n"
+                " ,(\"average_bytes_used\", \"%" FMT_Word64 "\")\n"
+                " ,(\"max_bytes_used\", \"%" FMT_Word64 "\")\n"
+                " ,(\"num_byte_usage_samples\", \"%" FMT_Word32 "\")\n"
+                " ,(\"peak_megabytes_allocated\", \"%" FMT_Word64 "\")\n"
+                " ,(\"init_cpu_seconds\", \"%.3f\")\n"
+                " ,(\"init_wall_seconds\", \"%.3f\")\n"
+                " ,(\"mutator_cpu_seconds\", \"%.3f\")\n"
+                " ,(\"mutator_wall_seconds\", \"%.3f\")\n"
+                " ,(\"GC_cpu_seconds\", \"%.3f\")\n"
+                " ,(\"GC_wall_seconds\", \"%.3f\")\n"
+                " ]\n";
+          }
+          else {
+            fmt =
+                "<<ghc: %" FMT_Word64 " bytes, "
+                "%" FMT_Word32 " GCs, "
+                "%" FMT_Word64 "/%" FMT_Word64 " avg/max bytes residency (%" FMT_Word32 " samples), "
+                "%" FMT_Word64 "M in use, "
+                "%.3f INIT (%.3f elapsed), "
+                "%.3f MUT (%.3f elapsed), "
+                "%.3f GC (%.3f elapsed) :ghc>>\n";
+          }
           /* print the long long separately to avoid bugginess on mingwin (2001-07-02, mingw-0.5) */
-          statsPrintf(fmt1, stats.allocated_bytes);
-          statsPrintf(fmt2,
+          statsPrintf(fmt,
+                    stats.allocated_bytes,
                     stats.gcs,
-                    stats.major_gcs == 0 ? 0 :
-                        stats.cumulative_live_bytes/stats.major_gcs,
+                     (uint64_t)
+                      (stats.major_gcs == 0 ? 0 :
+                       stats.cumulative_live_bytes/stats.major_gcs),
                     stats.max_live_bytes,
                     stats.major_gcs,
-                    (unsigned long)(peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
+                    (uint64_t) (peak_mblocks_allocated * MBLOCK_SIZE / (1024L * 1024L)),
                     TimeToSecondsDbl(init_cpu), TimeToSecondsDbl(init_elapsed),
                     TimeToSecondsDbl(mut_cpu), TimeToSecondsDbl(mut_elapsed),
                     TimeToSecondsDbl(gc_cpu), TimeToSecondsDbl(gc_elapsed));
