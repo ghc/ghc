@@ -35,3 +35,4 @@ test('T10667', [ when((arch('powerpc64') or arch('powerpc64le')),
      compile, ['-g'])
 test('T12115', normal, compile, [''])
 test('T12355', normal, compile, [''])
+test('T13233', expect_broken(13233), compile, [''])
