@@ -528,6 +528,7 @@ compiler_stage2_dll0_MODULES = \
 	PipelineMonad \
 	Platform \
 	PlatformConstants \
+	PprColour \
 	PprCore \
 	PrelNames \
 	PrelRules \

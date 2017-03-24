@@ -501,6 +501,7 @@ Library
         Outputable
         Pair
         Panic
+        PprColour
         Pretty
         State
         Stream

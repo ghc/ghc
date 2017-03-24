@@ -42,7 +42,6 @@ module DynFlags (
         DynFlags(..),
         FlagSpec(..),
         HasDynFlags(..), ContainsDynFlags(..),
-        OverridingBool(..), overrideWith,
         RtsOptsEnabled(..),
         HscTarget(..), isObjectTarget, defaultObjectTarget,
         targetRetainsAllBindings,
@@ -58,6 +57,7 @@ module DynFlags (
         dynFlagDependencies,
         tablesNextToCode, mkTablesNextToCode,
         makeDynFlagsConsistent,
+        shouldUseColor,
 
         Way(..), mkBuildTag, wayRTSOnly, addWay', updateWays,
         wayGeneralFlags, wayUnsetGeneralFlags,
@@ -170,6 +170,7 @@ import Config
 import CmdLineParser
 import Constants
 import Panic
+import qualified PprColour as Col
 import Util
 import Maybes
 import MonadUtils
@@ -207,7 +208,7 @@ import qualified Data.Set as Set
 import Data.Word
 import System.FilePath
 import System.Directory
-import System.Environment (getEnv)
+import System.Environment (getEnv, lookupEnv)
 import System.IO
 import System.IO.Error
 import Text.ParserCombinators.ReadP hiding (char)
@@ -911,6 +912,7 @@ data DynFlags = DynFlags {
   useUnicode            :: Bool,
   useColor              :: OverridingBool,
   canUseColor           :: Bool,
+  colScheme             :: Col.Scheme,
 
   -- | what kind of {-# SCC #-} to add automatically
   profAuto              :: ProfAuto,
@@ -1291,16 +1293,8 @@ data DynLibLoader
 data RtsOptsEnabled = RtsOptsNone | RtsOptsSafeOnly | RtsOptsAll
   deriving (Show)
 
-data OverridingBool
-  = Auto
-  | Always
-  | Never
-  deriving Show
-
-overrideWith :: Bool -> OverridingBool -> Bool
-overrideWith b Auto   = b
-overrideWith _ Always = True
-overrideWith _ Never  = False
+shouldUseColor :: DynFlags -> Bool
+shouldUseColor dflags = overrideWith (canUseColor dflags) (useColor dflags)
 
 -----------------------------------------------------------------------------
 -- Ways
@@ -1505,6 +1499,13 @@ initDynFlags dflags = do
                              return (str == str'))
                          `catchIOError` \_ -> return False
  canUseColor <- stderrSupportsAnsiColors
+ maybeGhcColorsEnv  <- lookupEnv "GHC_COLORS"
+ maybeGhcColoursEnv <- lookupEnv "GHC_COLOURS"
+ let adjustCols (Just env) = Col.parseScheme env
+     adjustCols Nothing    = id
+ let (useColor', colScheme') =
+       (adjustCols maybeGhcColoursEnv . adjustCols maybeGhcColorsEnv)
+       (useColor dflags, colScheme dflags)
  return dflags{
         canGenerateDynamicToo = refCanGenerateDynamicToo,
         nextTempSuffix = refNextTempSuffix,
@@ -1514,7 +1515,9 @@ initDynFlags dflags = do
         generatedDumps = refGeneratedDumps,
         nextWrapperNum = wrapperNum,
         useUnicode    = canUseUnicode,
+        useColor      = useColor',
         canUseColor   = canUseColor,
+        colScheme     = colScheme',
         rtldInfo      = refRtldInfo,
         rtccInfo      = refRtccInfo
         }
@@ -1680,6 +1683,7 @@ defaultDynFlags mySettings =
         useUnicode = False,
         useColor = Auto,
         canUseColor = False,
+        colScheme = Col.defaultScheme,
         profAuto = NoProfAuto,
         interactivePrint = Nothing,
         nextWrapperNum = panic "defaultDynFlags: No nextWrapperNum",

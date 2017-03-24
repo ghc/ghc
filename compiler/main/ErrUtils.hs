@@ -60,6 +60,7 @@ import Bag
 import Exception
 import Outputable
 import Panic
+import qualified PprColour as Col
 import SrcLoc
 import DynFlags
 import FastString (unpackFS)
@@ -73,7 +74,6 @@ import Data.List
 import qualified Data.Set as Set
 import Data.IORef
 import Data.Maybe       ( fromMaybe )
-import Data.Monoid      ( mappend )
 import Data.Ord
 import Data.Time
 import Control.Monad
@@ -199,14 +199,22 @@ mkLocMessageAnn ann severity locn msg
       let locn' = if gopt Opt_ErrorSpans dflags
                   then ppr locn
                   else ppr (srcSpanStart locn)
+
+          sevColour = getSeverityColour severity (colScheme dflags)
+
+          -- Add optional information
+          optAnn = case ann of
+            Nothing -> text ""
+            Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
+
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
           prefix = locn' <> colon <+>
                    coloured sevColour sevText <> optAnn
-      in bold (hang prefix 4 msg)
-  where
-    sevColour = colBold `mappend` getSeverityColour severity
 
+      in coloured (Col.sMessage (colScheme dflags)) (hang prefix 4 msg)
+
+  where
     sevText =
       case severity of
         SevWarning -> text "warning:"
@@ -214,16 +222,11 @@ mkLocMessageAnn ann severity locn msg
         SevFatal   -> text "fatal:"
         _          -> empty
 
-    -- Add optional information
-    optAnn = case ann of
-      Nothing -> text ""
-      Just i  -> text " [" <> coloured sevColour (text i) <> text "]"
-
-getSeverityColour :: Severity -> PprColour
-getSeverityColour SevWarning = colMagentaFg
-getSeverityColour SevError   = colRedFg
-getSeverityColour SevFatal   = colRedFg
-getSeverityColour _          = mempty
+getSeverityColour :: Severity -> Col.Scheme -> Col.PprColour
+getSeverityColour SevWarning = Col.sWarning
+getSeverityColour SevError   = Col.sError
+getSeverityColour SevFatal   = Col.sFatal
+getSeverityColour _          = const mempty
 
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
@@ -255,10 +258,6 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
     fix '\0' = '\xfffd'
     fix c    = c
 
-    sevColour = colBold `mappend` getSeverityColour severity
-
-    marginColour = colBold `mappend` colBlueFg
-
     row = srcSpanStartLine span
     rowStr = show row
     multiline = row /= srcSpanEndLine span
@@ -267,6 +266,10 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
 
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
+      sdocWithDynFlags $ \ dflags ->
+      let sevColour = getSeverityColour severity (colScheme dflags)
+          marginColour = Col.sMargin (colScheme dflags)
+      in
       coloured marginColour (text marginSpace) <>
       text ("\n") <>
       coloured marginColour (text marginRow) <>
