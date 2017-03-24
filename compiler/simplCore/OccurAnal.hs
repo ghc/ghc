@@ -892,7 +892,6 @@ occAnalRec lvl (CyclicSCC details_s) (body_uds, binds)
   | otherwise   -- At this point we always build a single Rec
   = -- pprTrace "occAnalRec" (vcat
     --  [ text "weak_fvs" <+> ppr weak_fvs
-    --  , text "tagged details" <+> ppr tagged_details_s
     --  , text "lb nodes" <+> ppr loop_breaker_nodes])
     (final_uds, Rec pairs : binds)
 
@@ -1204,6 +1203,7 @@ instance Outputable Details where
                   , text "inl =" <+> ppr (nd_inl nd)
                   , text "weak =" <+> ppr (nd_weak nd)
                   , text "rule =" <+> ppr (nd_active_rule_fvs nd)
+                  , text "score =" <+> ppr (nd_score nd)
              ])
 
 -- The NodeScore is compared lexicographically;
