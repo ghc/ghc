@@ -39,4 +39,6 @@ enumFromToS lo hi = Stream next lo
 test :: Int -> Int -> Int
 test lo hi = sumS (filterS even (enumFromToS lo hi))
 
+-- Note that this overflows on 32-bit machines and therefore we have two stdout
+-- files
 main = print $ test 1 10000000
