@@ -85,13 +85,14 @@ test('lazy-bs-alloc',
             # 2015-12-15: 444720 (amd64/Linux, D1616)
             # 2015-12-17: 444720 (widen 3->5%, Windows is at 462688)
             # 2017-01-30: 421792 (amd64/Linux, strangely Type-indexed Typeable)
-           (wordsize(32), 429760, 2)]),
+           (wordsize(32), 410040, 5)]),
             # 2013-02-10: 421296 (x86/Windows)
             # 2013-02-10: 414180 (x86/OSX)
             # 2014-01-22: 411500 (x86/Linux)
             # 2014-01-28: Widen 1->2% (x86/Windows was at 425212)
             # 2016-04-06: 429760 (x86/Linux) no idea what happened
             # 2017-02-14: 421448 Early inline patch
+            # 2017-03-24: 410040 It's not entirely clear, widen threshold to match 64-bit case
 
       only_ways(['normal']),
       extra_run_opts('arith011.stdout'),
@@ -115,12 +116,13 @@ test('T876',
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
               # 2016-11-11:   58128 (x86_64/Linux), it's not clear
 
-           (wordsize(32), 53156, 5) ]),
+           (wordsize(32), 50408, 5) ]),
               # some date:  663712  (Windows, 64-bit machine)
               # 2014-04-04:  56820  (Windows, 64-bit machine)
               # 2014-06-29:  53024  (x86_64/Linux)
               # 2014-12-01:  56796  (Windows)
               # 2015-07-11:  53156  (x86_64/Linux)
+              # 2017-03-24:  50408  (x86/Linux, 64-bit machine)
 
       only_ways(['normal']),
       extra_run_opts('10000')
@@ -162,12 +164,13 @@ test('MethSharing',
                     # expected value: 1 (amd64/Linux)
                     # 2016-08-31:     2 (allocation area size bumped to 1MB)
       stats_num_field('bytes allocated',
-                      [(wordsize(32), 360940756, 5),
+                      [(wordsize(32), 240071008, 5),
                     # expected value: 2685858140 (x86/OS X)
-                          # expected: 360940756 (x86/Linux)
+                    # expected:       360940756 (x86/Linux)
+                    # 2017-03-24:     240071008 (x86/Linux, 64-bit machine)
                        (wordsize(64), 480098192, 5)]),
-                          # expected:   640067672 (amd64/Linux)
-                          # 2017-01-31: 480098192 work/wrap noinline things
+                    # expected:   640067672 (amd64/Linux)
+                    # 2017-01-31: 480098192 work/wrap noinline things
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -204,8 +207,9 @@ test('T4978',
 
 test('T5205',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 47088, 5),
+                      [(wordsize(32), 49460, 5),
                     # expected value: 47088 (x86/Darwin)
+                    # 2017-03-24:     49460 (x86/Linux, 64-bit machine)
 
                        (platform('x86_64-unknown-mingw32'), 52264, 5),
                     # 2016-12-14: 52264 (Separate out Windows results)
@@ -224,9 +228,10 @@ test('T5205',
 
 test('T5549',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 4096606332, 5),
+                      [(wordsize(32), 2896607976, 5),
                     # expected value: 3362958676 (Windows)
                     # 2014-12-01:     4096606332 (Windows) integer-gmp2
+                    # 2017-03-24:     2896607976 (x86/Linux, 64-bit machine)
 
                        (wordsize(64), 5793140200, 5)]),
                     # expected value: 6725846120 (amd64/Linux)
@@ -297,9 +302,10 @@ test('T5536',
 
 test('T7257',
      [stats_num_field('bytes allocated',
-                      [(wordsize(32), 989850664, 10),
+                      [(wordsize(32), 869850704, 10),
                         # expected value: 1246287228 (i386/Linux)
                         # 2016-04-06: 989850664 (i386/Linux) no idea what happened
+                        # 2017-03-25: 869850704 (x86/Linux, 64-bit machine) probably sizeExpr fix
                        (wordsize(64), 1414893248, 5)]),
                         # 2012-09-21: 1774893760 (amd64/Linux)
                         # 2015-11-03: 1654893248 (amd64/Linux)
@@ -338,9 +344,10 @@ test('T7436',
            #             127000 (amd64/Linux)
            # 2013-02-07:  60360 (amd64/Linux)
            # 2015-04-03: Widen 1->4% (amd64/Windows was doing better)
-           (wordsize(32), 58434, 1)]),
+           (wordsize(32), 42772, 1)]),
             # 2013-02-10: 58032 (x86/Windows)
             # 2013-02-10: 58836 (x86/OSX)
+            # 2017-03-24: 42772 (x86/Linux, 64-bit machine) no idea why
       only_ways(['normal'])
       ],
      compile_and_run,
@@ -440,9 +447,11 @@ test('InlineCloneArrayAlloc',
 
 test('T9203',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32), 84345136 , 5)
+                      [ (wordsize(32), 77969268, 5)
                       # was
                       # 2016-04-06     84345136 (i386/Debian) not sure
+                      # 2017-03-24     77969268 (x86/Linux, 64-bit machine) probably join points
+
                       , (wordsize(64), 84620888, 5) ]),
                       # was            95747304
                       # 2019-09-10     94547280 post-AMP cleanup
@@ -454,8 +463,9 @@ test('T9203',
 
 test('T9339',
      [stats_num_field('bytes allocated',
-                      [ (wordsize(32),    40046844, 5)
+                      [ (wordsize(32),    46904, 5)
                       # is this number correct? Seems very high.
+                      # 2017-03-24:       46904 (x86/Linux, 64-bit machine) who knows
 
                       , (platform('x86_64-unknown-mingw32'), 47088, 7)
                       # 2017-02-19                           47088 (x64/Windows) - Unknown
