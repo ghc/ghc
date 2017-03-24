@@ -61,7 +61,7 @@ depAnal :: (node -> [Name])      -- Defs
         -> (node -> [Name])      -- Uses
         -> [node]
         -> [SCC node]
--- Peform dependency analysis on a group of definitions,
+-- Perform dependency analysis on a group of definitions,
 -- where each definition may define more than one Name
 --
 -- The get_defs and get_uses functions are called only once per node

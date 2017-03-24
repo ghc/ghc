@@ -2238,7 +2238,7 @@ inlined.
 
 Historical note: we use to do the "case binder swap" in the Simplifier
 so there were additional complications if the scrutinee was a variable.
-Now the binder-swap stuff is done in the occurrence analyer; see
+Now the binder-swap stuff is done in the occurrence analyser; see
 OccurAnal Note [Binder swap].
 
 Note [knownCon occ info]

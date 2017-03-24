@@ -1081,7 +1081,7 @@ Note [Body kind of a HsForAllTy]
 The body of a forall is usually a type, but in principle
 there's no reason to prohibit *unlifted* types.
 In fact, GHC can itself construct a function with an
-unboxed tuple inside a for-all (via CPR analyis; see
+unboxed tuple inside a for-all (via CPR analysis; see
 typecheck/should_compile/tc170).
 
 Moreover in instance heads we get forall-types with

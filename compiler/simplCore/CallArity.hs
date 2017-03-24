@@ -16,7 +16,6 @@ import CoreSyn
 import Id
 import CoreArity ( typeArity )
 import CoreUtils ( exprIsCheap, exprIsTrivial )
---import Outputable
 import UnVarGraph
 import Demand
 
@@ -26,7 +25,7 @@ import Control.Arrow ( first, second )
 {-
 %************************************************************************
 %*                                                                      *
-              Call Arity Analyis
+              Call Arity Analysis
 %*                                                                      *
 %************************************************************************
 
@@ -76,7 +75,7 @@ correct.
 What we want to know from an expression
 ---------------------------------------
 
-In order to obtain that information for variables, we analyize expression and
+In order to obtain that information for variables, we analyze expression and
 obtain bits of information:
 
  I.  The arity analysis:
@@ -95,7 +94,7 @@ For efficiency reasons, we gather this information only for a set of
 The two analysis are not completely independent, as a higher arity can improve
 the information about what variables are being called once or multiple times.
 
-Note [Analysis I: The arity analyis]
+Note [Analysis I: The arity analysis]
 ------------------------------------
 
 The arity analysis is quite straight forward: The information about an
@@ -104,7 +103,7 @@ expression is an
 where absent variables are bound to Nothing and otherwise to a lower bound to
 their arity.
 
-When we analyize an expression, we analyize it with a given context arity.
+When we analyze an expression, we analyze it with a given context arity.
 Lambdas decrease and applications increase the incoming arity. Analysizing a
 variable will put that arity in the environment. In lets or cases all the
 results from the various subexpressions are lubed, which takes the point-wise
@@ -687,7 +686,7 @@ trimArity v a = minimum [a, max_arity_by_type, max_arity_by_strsig]
 ---------------------------------------
 
 -- Result type for the two analyses.
--- See Note [Analysis I: The arity analyis]
+-- See Note [Analysis I: The arity analysis]
 -- and Note [Analysis II: The Co-Called analysis]
 type CallArityRes = (UnVarGraph, VarEnv Arity)
 

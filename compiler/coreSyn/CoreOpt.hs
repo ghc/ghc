@@ -143,7 +143,7 @@ simpleOptPgm dflags this_mod binds rules vects
     rules' = substRulesForImportedIds final_subst rules
     vects' = substVects final_subst vects
              -- We never unconditionally inline into rules,
-             -- hence pasing just a substitution
+             -- hence paying just a substitution
 
     do_one (env, binds') bind
       = case simple_opt_bind env bind of
@@ -686,9 +686,9 @@ Moreover, since g is going to be inlined anyway, there is no benefit
 from making it a join point.
 
 If it is recursive, and uselessly marked INLINE, this will stop us
-making it a join point, which is a annoying.  But occasionally
+making it a join point, which is annoying.  But occasionally
 (notably in class methods; see Note [Instances and loop breakers] in
-TcInstDcls) we mark recurive things as INLINE but the recursion
+TcInstDcls) we mark recursive things as INLINE but the recursion
 unravels; so ignoring INLINE pragmas on recursive things isn't good
 either.
 
@@ -755,7 +755,7 @@ data ConCont = CC [CoreExpr] Coercion
 
 -- | Returns @Just (dc, [t1..tk], [x1..xn])@ if the argument expression is
 -- a *saturated* constructor application of the form @dc t1..tk x1 .. xn@,
--- where t1..tk are the *universally-qantified* type args of 'dc'
+-- where t1..tk are the *universally-quantified* type args of 'dc'
 exprIsConApp_maybe :: InScopeEnv -> CoreExpr -> Maybe (DataCon, [Type], [CoreExpr])
 exprIsConApp_maybe (in_scope, id_unf) expr
   = go (Left in_scope) expr (CC [] (mkRepReflCo (exprType expr)))
@@ -961,7 +961,7 @@ Here we implement the "push rules" from FC papers:
        (K e1 .. en) |> co
   and we want to tranform to
        (K e1' .. en')
-  by pushing the coercion into the oarguments
+  by pushing the coercion into the arguments
 -}
 
 pushCoArgs :: Coercion -> [CoreArg] -> Maybe ([CoreArg], Coercion)
@@ -1081,7 +1081,7 @@ pushCoDataCon dc dc_args co
         --      (C x y) `cast` (g :: T a ~ S [a]),
         -- where S is a type function.  In fact, exprIsConApp
         -- will probably not be called in such circumstances,
-        -- but there't nothing wrong with it
+        -- but there's nothing wrong with it
 
   = let
         tc_arity       = tyConArity to_tc

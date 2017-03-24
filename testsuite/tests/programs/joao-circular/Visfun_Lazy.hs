@@ -926,7 +926,7 @@ afmt_txt string =
 allf fs =
  case fs of { ( [] ) -> "" ; ( (:) f fs2 ) -> ((txtstr f 0 "\n\n")++(best fs2)) }
 assign_InfType n exptype fid env =
- let { (desttype) = (gettype n fid env) } in (if ((coersibleTypes desttype exptype)==(C_Errortype_1 )) then (C_E_T_NC_1 desttype exptype) else (C_NoTypeError_1 ))
+ let { (desttype) = (gettype n fid env) } in (if ((coercibleTypes desttype exptype)==(C_Errortype_1 )) then (C_E_T_NC_1 desttype exptype) else (C_NoTypeError_1 ))
 asts i =
  (if (i==0) then "" else (if (i==1) then "*" else ((":"++(repeatCHAR '*' (fromIntegral (i-2))))++"*>")) )
 beside_fmt l r =
@@ -945,7 +945,7 @@ choose_ab_beside_fmts avail fa fb f =
  (if avail then (beside_fmts f fa fb) else (above_fmts fa fb))
 choose_ab_error_beside avail fa fb f =
  (if avail then (error_beside fa fb) else (above_fmts fa fb))
-coersibleTypes t1 t2 =
+coercibleTypes t1 t2 =
  (if (t1==t2) then t1 else case t1 of { (C_Realtype_1 ) -> case t2 of { (C_Inttype_1 ) -> t1 ; _ -> (C_Errortype_1 ) } ; _ -> (C_Errortype_1 ) } )
 cons_height pph acth avail =
  (if (acth==0) then (if (pph>0) then 1 else 0) else (acth+(if avail then 0 else 1) ))
@@ -1034,7 +1034,7 @@ indent_fmt i f =
 indent_fmts f i fs =
  case f of { (C_F_1 pw _) -> (map_indent_fmt i (dropWhileFormatsNotFit (pw-i) fs)) }
 infType op t1 t2 =
- case op of { 1 -> (coersibleTypes t1 t2) ; 2 -> (if (t1==t2) then (C_Booltype_1 ) else (C_Errortype_1 )) ; _ -> (C_Errortype_1 ) }
+ case op of { 1 -> (coercibleTypes t1 t2) ; 2 -> (if (t1==t2) then (C_Booltype_1 ) else (C_Errortype_1 )) ; _ -> (C_Errortype_1 ) }
 initLst_Str l =
  case l of { ( [] ) -> ([] ) ; ( (:) x ( [] ) ) -> ([] ) ; ( (:) x ls ) -> ((:) x (initLst_Str ls)) }
 isaritmexp t =
