@@ -18,6 +18,7 @@ module HsDumpAst (
 import Data.Data hiding (Fixity)
 import Data.List
 import Bag
+import BasicTypes
 import FastString
 import NameSet
 import Name
@@ -46,7 +47,7 @@ showAstData b = showAstData' 0
     showAstData' n =
       generic
               `ext1Q` list
-              `extQ` string `extQ` fastString `extQ` srcSpan
+              `extQ` string `extQ` fastString `extQ` srcSpan `extQ` lit
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
@@ -75,6 +76,19 @@ showAstData b = showAstData' 0
             list l     = indent n ++ "["
                                 ++ intercalate "," (map (showAstData' (n+1)) l)
                                 ++ "]"
+
+            -- Eliminate word-size dependence
+            lit :: HsLit -> String
+            lit (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
+            lit (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
+            lit (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
+            lit (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
+            lit l                  = generic l
+
+            numericLit :: String -> Integer -> SourceText -> String
+            numericLit tag x s = indent n ++ unwords [ "{" ++ tag
+                                                     , generic x
+                                                     , generic s ++ "}" ]
 
             name :: Name -> String
             name       = ("{Name: "++) . (++"}") . showSDocDebug_ . ppr

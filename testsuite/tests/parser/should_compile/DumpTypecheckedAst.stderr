@@ -21,14 +21,14 @@
                  ({abstract:ConLike}))) 
                ({ <no location info> }
                 (HsLit 
-                 (HsWordPrim 
-                  (NoSourceText) 
-                  (14073232900889011755)))))) 
+                 {HsWord{64}Prim 
+                 (14073232900889011755) 
+                 (NoSourceText)})))) 
              ({ <no location info> }
               (HsLit 
-               (HsWordPrim 
-                (NoSourceText) 
-                (2739668351064589274)))))) 
+               {HsWord{64}Prim 
+               (2739668351064589274) 
+               (NoSourceText)})))) 
            ({ <no location info> }
             (HsVar 
              ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
@@ -45,9 +45,9 @@
                 (NoSourceText) "Peano"))))))))) 
        ({ <no location info> }
         (HsLit 
-         (HsIntPrim 
-          (SourceText "0") 
-          (0)))))) 
+         {HsInt{64}Prim 
+         (0) 
+         (SourceText "0")})))) 
      ({ <no location info> }
       (HsVar 
        ({ <no location info> }{Var: (ghc-prim:GHC.Types.krep$*{v} [gid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
@@ -71,14 +71,14 @@
                  ({abstract:ConLike}))) 
                ({ <no location info> }
                 (HsLit 
-                 (HsWordPrim 
-                  (NoSourceText) 
-                  (13760111476013868540)))))) 
+                 {HsWord{64}Prim 
+                 (13760111476013868540) 
+                 (NoSourceText)})))) 
              ({ <no location info> }
               (HsLit 
-               (HsWordPrim 
-                (NoSourceText) 
-                (12314848029315386153)))))) 
+               {HsWord{64}Prim 
+               (12314848029315386153) 
+               (NoSourceText)})))) 
            ({ <no location info> }
             (HsVar 
              ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
@@ -95,9 +95,9 @@
                 (NoSourceText) "'Zero"))))))))) 
        ({ <no location info> }
         (HsLit 
-         (HsIntPrim 
-          (SourceText "0") 
-          (0)))))) 
+         {HsInt{64}Prim 
+         (0) 
+         (SourceText "0")})))) 
      ({ <no location info> }
       (HsVar 
        ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
@@ -121,14 +121,14 @@
                  ({abstract:ConLike}))) 
                ({ <no location info> }
                 (HsLit 
-                 (HsWordPrim 
-                  (NoSourceText) 
-                  (1143980031331647856)))))) 
+                 {HsWord{64}Prim 
+                 (1143980031331647856) 
+                 (NoSourceText)})))) 
              ({ <no location info> }
               (HsLit 
-               (HsWordPrim 
-                (NoSourceText) 
-                (14802086722010293686)))))) 
+               {HsWord{64}Prim 
+               (14802086722010293686) 
+               (NoSourceText)})))) 
            ({ <no location info> }
             (HsVar 
              ({ <no location info> }{Var: (main:DumpTypecheckedAst.$trModule{v} [lidx] :: ghc-prim:GHC.Types.Module{tc})}))))) 
@@ -145,9 +145,9 @@
                 (NoSourceText) "'Succ"))))))))) 
        ({ <no location info> }
         (HsLit 
-         (HsIntPrim 
-          (SourceText "0") 
-          (0)))))) 
+         {HsInt{64}Prim 
+         (0) 
+         (SourceText "0")})))) 
      ({ <no location info> }
       (HsVar 
        ({ <no location info> }{Var: ($krep{v} [lid] :: ghc-prim:GHC.Types.KindRep{tc})}))))) 
