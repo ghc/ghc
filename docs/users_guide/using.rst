@@ -638,7 +638,7 @@ messages and in GHCi:
         (>>) :: ∀ (m :: * → *) a b. Monad m ⇒ m a → m b → m b
 
 .. _pretty-printing-types:
-    
+
 .. ghc-flag:: -fprint-explicit-foralls
 
     Using :ghc-flag:`-fprint-explicit-foralls` makes
@@ -795,10 +795,23 @@ messages and in GHCi:
 
     Causes GHC to display error messages with colors.  To do this, the
     terminal must have support for ANSI color codes, or else garbled text will
-    appear.  The default value is `auto`, which means GHC will make an attempt
-    to detect whether terminal supports colors and choose accordingly.  (Note:
-    the detection mechanism is not yet implemented, so colors are off by
-    default on all platforms.)
+    appear.  The default value is ``auto``, which means GHC will make an
+    attempt to detect whether terminal supports colors and choose accordingly.
+
+    The precise color scheme is controlled by the environment variable
+    ``GHC_COLORS`` (or ``GHC_COLOURS``).  This can be set to colon-separated
+    list of ``key=value`` pairs.  These are the default settings:
+
+    .. code-block:: none
+
+        message=1:warning=1;35:error=1;31:fatal=1;31:margin=1;34
+
+    Each value is expected to be a `Select Graphic Rendition (SGR) substring
+    <https://en.wikipedia.org/wiki/ANSI_escape_code#graphics>`_.
+
+    The environment variable can also be set to the magical values ``never``
+    or ``always``, which is equivalent to setting the corresponding
+    ``-fdiagnostics-color`` flag but has lower precedence.
 
 .. ghc-flag:: -f[no-]diagnostics-show-caret
 

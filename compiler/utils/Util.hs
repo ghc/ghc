@@ -129,6 +129,10 @@ module Util (
         HasCallStack,
         HasDebugCallStack,
         prettyCurrentCallStack,
+
+        -- * Utils for flags
+        OverridingBool(..),
+        overrideWith,
     ) where
 
 #include "HsVersions.h"
@@ -1354,3 +1358,14 @@ prettyCurrentCallStack = GHC.Stack.showCallStack ?callStack
 prettyCurrentCallStack :: HasCallStack => String
 prettyCurrentCallStack = "Call stack unavailable"
 #endif
+
+data OverridingBool
+  = Auto
+  | Always
+  | Never
+  deriving Show
+
+overrideWith :: Bool -> OverridingBool -> Bool
+overrideWith b Auto   = b
+overrideWith _ Always = True
+overrideWith _ Never  = False

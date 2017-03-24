@@ -64,7 +64,7 @@ import SrcLoc
 import qualified Lexer
 
 import StringBuffer
-import Outputable hiding ( printForUser, printForUserPartWay, bold )
+import Outputable hiding ( printForUser, printForUserPartWay )
 
 -- Other random utilities
 import BasicTypes hiding ( isTopLevel )

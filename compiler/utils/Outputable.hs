@@ -38,9 +38,7 @@ module Outputable (
         speakNth, speakN, speakNOf, plural, isOrAre, doOrDoes,
         unicodeSyntax,
 
-        coloured, bold, keyword, PprColour, colReset, colBold, colBlackFg,
-        colRedFg, colGreenFg, colYellowFg, colBlueFg, colMagentaFg, colCyanFg,
-        colWhiteFg, colBinder, colCoerc, colDataCon, colType,
+        coloured, keyword,
 
         -- * Converting 'SDoc' into strings and outputing it
         printSDoc, printSDocLn, printForUser, printForUserPartWay,
@@ -89,8 +87,7 @@ module Outputable (
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
                                   targetPlatform, pprUserLength, pprCols,
                                   useUnicode, useUnicodeSyntax,
-                                  useColor, canUseColor, overrideWith,
-                                  unsafeGlobalDynFlags )
+                                  shouldUseColor, unsafeGlobalDynFlags )
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 
@@ -99,6 +96,7 @@ import FastString
 import qualified Pretty
 import Util
 import Platform
+import qualified PprColour as Col
 import Pretty           ( Doc, Mode(..) )
 import Panic
 import GHC.Serialized
@@ -113,7 +111,6 @@ import Data.Int
 import qualified Data.IntMap as IM
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Monoid (Monoid, mappend, mempty)
 import Data.String
 import Data.Word
 import System.IO        ( Handle )
@@ -318,7 +315,7 @@ newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
 
 data SDocContext = SDC
   { sdocStyle      :: !PprStyle
-  , sdocLastColour :: !PprColour
+  , sdocLastColour :: !Col.PprColour
     -- ^ The most recently used colour.  This allows nesting colours.
   , sdocDynFlags   :: !DynFlags
   }
@@ -329,7 +326,7 @@ instance IsString SDoc where
 initSDocContext :: DynFlags -> PprStyle -> SDocContext
 initSDocContext dflags sty = SDC
   { sdocStyle = sty
-  , sdocLastColour = colReset
+  , sdocLastColour = Col.colReset
   , sdocDynFlags = dflags
   }
 
@@ -438,7 +435,8 @@ printSDoc :: Mode -> DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
 printSDoc mode dflags handle sty doc =
   Pretty.printDoc_ mode cols handle (runSDoc doc ctx)
     `finally`
-      Pretty.printDoc_ mode cols handle (runSDoc (coloured colReset empty) ctx)
+      Pretty.printDoc_ mode cols handle
+        (runSDoc (coloured Col.colReset empty) ctx)
   where
     cols = pprCols dflags
     ctx = initSDocContext dflags sty
@@ -721,81 +719,26 @@ ppWhen False _   = empty
 ppUnless True  _   = empty
 ppUnless False doc = doc
 
--- | A colour\/style for use with 'coloured'.
-newtype PprColour = PprColour String
-
--- | Allow colours to be combined (e.g. bold + red);
---   In case of conflict, right side takes precedence.
-instance Monoid PprColour where
-  mempty = PprColour mempty
-  PprColour s1 `mappend` PprColour s2 = PprColour (s1 `mappend` s2)
-
--- Colours
-
-colReset :: PprColour
-colReset = PprColour "\27[0m"
-
-colBold :: PprColour
-colBold = PprColour "\27[;1m"
-
-colBlackFg :: PprColour
-colBlackFg = PprColour "\27[30m"
-
-colRedFg :: PprColour
-colRedFg = PprColour "\27[31m"
-
-colGreenFg :: PprColour
-colGreenFg = PprColour "\27[32m"
-
-colYellowFg :: PprColour
-colYellowFg = PprColour "\27[33m"
-
-colBlueFg :: PprColour
-colBlueFg = PprColour "\27[34m"
-
-colMagentaFg :: PprColour
-colMagentaFg = PprColour "\27[35m"
-
-colCyanFg :: PprColour
-colCyanFg = PprColour "\27[36m"
-
-colWhiteFg :: PprColour
-colWhiteFg = PprColour "\27[37m"
-
-colBinder :: PprColour
-colBinder = colGreenFg
-
-colCoerc :: PprColour
-colCoerc = colBlueFg
-
-colDataCon :: PprColour
-colDataCon = colRedFg
-
-colType :: PprColour
-colType = colBlueFg
-
 -- | Apply the given colour\/style for the argument.
 --
 -- Only takes effect if colours are enabled.
-coloured :: PprColour -> SDoc -> SDoc
-coloured col@(PprColour c) sdoc =
+coloured :: Col.PprColour -> SDoc -> SDoc
+coloured col@(Col.PprColour c) sdoc =
   sdocWithDynFlags $ \dflags ->
-    if overrideWith (canUseColor dflags) (useColor dflags)
-    then SDoc $ \ctx@SDC{ sdocLastColour = PprColour lc } ->
+    if shouldUseColor dflags
+    then SDoc $ \ctx@SDC{ sdocLastColour = Col.PprColour lc } ->
          case ctx of
            SDC{ sdocStyle = PprUser _ _ Coloured } ->
              let ctx' = ctx{ sdocLastColour = col } in
-             Pretty.zeroWidthText c
+             Pretty.zeroWidthText (cReset ++ c)
                Pretty.<> runSDoc sdoc ctx'
-               Pretty.<> Pretty.zeroWidthText lc
+               Pretty.<> Pretty.zeroWidthText (cReset ++ lc)
            _ -> runSDoc sdoc ctx
     else sdoc
-
-bold :: SDoc -> SDoc
-bold = coloured colBold
+  where Col.PprColour cReset = Col.colReset
 
 keyword :: SDoc -> SDoc
-keyword = bold
+keyword = coloured Col.colBold
 
 {-
 ************************************************************************
