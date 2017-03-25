@@ -148,7 +148,7 @@ test('PopCnt', omit_ways(['ghci']), multi_compile_and_run,
                  ['PopCnt', [('PopCnt_cmm.cmm', '')], ''])
 test('T12059', normal, compile_and_run, [''])
 test('T12433', normal, compile_and_run, [''])
-test('T12622', normal, multimod_compile_and_run, ['T12622', '-O'])
+test('T12622', expect_broken_for(13481, ['ghci']), multimod_compile_and_run, ['T12622', '-O'])
 test('T12757', normal, compile_and_run, [''])
 test('T12855', normal, compile_and_run, [''])
 test('T9577', [ unless(arch('x86_64') or arch('i386'),skip),
