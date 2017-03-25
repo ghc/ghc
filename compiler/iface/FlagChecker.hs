@@ -57,9 +57,15 @@ fingerprintDynFlags dflags@DynFlags{..} this_mod nameio =
                  then 0
                  else optLevel
 
-    in -- pprTrace "flags" (ppr (mainis, safeHs, lang, cpp, paths, prof, opt)) $
-       computeFingerprint nameio (mainis, safeHs, lang, cpp, paths, prof, opt)
+        -- -fhpc, see https://ghc.haskell.org/trac/ghc/ticket/11798
+        -- hpcDir is output-only, so we should recompile if it changes
+        hpc = if gopt Opt_Hpc dflags then Just hpcDir else Nothing
 
+        -- Nesting just to avoid ever more Binary tuple instances
+        flags = (mainis, safeHs, lang, cpp, paths, (prof, opt, hpc))
+
+    in -- pprTrace "flags" (ppr flags) $
+       computeFingerprint nameio flags
 
 {- Note [path flags and recompilation]
 
