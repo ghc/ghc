@@ -235,7 +235,7 @@ test('T13025',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13025'])
-test('T13143', normal, compile, ['-O -ddump-simpl -dsuppress-uniques'])
+test('T13143', only_ways(['optasm']), compile, ['-O -ddump-simpl -dsuppress-uniques'])
 test('T13156', normal, run_command, ['$MAKE -s --no-print-directory T13156'])
 test('T11444', normal, compile, [''])
 test('str-rules',
