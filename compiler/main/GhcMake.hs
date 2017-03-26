@@ -1767,7 +1767,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        let summs = concat $ nodeMapElts $
              if hscTarget dflags == HscNothing
              then enableCodeGenForTH
-               (defaultObjectTarget (targetPlatform flags))
+               (defaultObjectTarget (targetPlatform dflags))
                new_map
              else new_map
        return summs
