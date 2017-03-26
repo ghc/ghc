@@ -60,13 +60,19 @@ genLlvmData (sec, Statics lbl xs) = do
 llvmSectionType :: Platform -> SectionType -> FastString
 llvmSectionType p t = case t of
     Text                    -> fsLit ".text"
-    ReadOnlyData            -> fsLit ".rodata"
-    RelocatableReadOnlyData -> fsLit ".data.rel.ro"
-    ReadOnlyData16          -> fsLit ".rodata.cst16"
+    ReadOnlyData            -> case platformOS p of
+                                 OSMinGW32 -> fsLit ".rdata"
+                                 _         -> fsLit ".rodata"
+    RelocatableReadOnlyData -> case platformOS p of
+                                 OSMinGW32 -> fsLit ".rdata$rel.ro"
+                                 _         -> fsLit ".data.rel.ro"
+    ReadOnlyData16          -> case platformOS p of
+                                 OSMinGW32 -> fsLit ".rdata$cst16"
+                                 _         -> fsLit ".rodata.cst16"
     Data                    -> fsLit ".data"
     UninitialisedData       -> fsLit ".bss"
     CString                 -> case platformOS p of
-                                 OSMinGW32 -> fsLit ".rdata"
+                                 OSMinGW32 -> fsLit ".rdata$str"
                                  _         -> fsLit ".rodata.str"
     (OtherSection _)        -> panic "llvmSectionType: unknown section type"
 
@@ -80,7 +86,11 @@ llvmSection (Section t suffix) = do
   then return Nothing
   else do
     lmsuffix <- strCLabel_llvm suffix
-    return (Just (concatFS [llvmSectionType platform t, fsLit ".", lmsuffix]))
+    let result sep = Just (concatFS [llvmSectionType platform t
+                                    , fsLit sep, lmsuffix])
+    case platformOS platform of
+      OSMinGW32 -> return (result "$")
+      _         -> return (result ".")
 
 -- ----------------------------------------------------------------------------
 -- * Generate static data

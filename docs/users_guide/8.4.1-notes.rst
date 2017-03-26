@@ -76,6 +76,9 @@ Now we generate ::
 
       _ == _ = error ...
 
+- `-fsplit-sections` is now supported on x86_64 Windows and is on by default.
+  See :ghc-ticket:`12913`.
+
 - Configure on Windows now supports ``--enable-distro-toolchain`` which can be
   used to build a GHC using compilers on your ``PATH`` instead of using the
   bundled bindist. See :ghc-ticket:`13792`
