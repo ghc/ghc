@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+# Set up a cabal sandbox with wreq-0.5.0.0 ready to build.
+# I had to do modify the environment as follows to get this to work:
+# * sudo apt install libz-dev
+# * ensure inplace/bin and the cabal executable are on the path, and ensure `which haddock` is
+#   in inplace/bin
+
+# We:
+# * unpack wreq
+# * initialize a sandbox
+# * pull some dependencies from github. This is required because they don't have hackage
+#   releases that support ghc head
+# * install dependencies and configure with ghc-stage2
+
+cabal unpack wreq
+cd wreq-0.5.0.0
+git clone https://github.com/ekmett/lens
+cd lens
+# this lets one re-run the script
+git fetch
+git checkout dbfc09
+cd ..
+git clone https://github.com/ekmett/comonad
+cd comonad
+# this lets one re-run the script
+git fetch
+git checkout 9c5f117
+cd ..
+cabal sandbox init
+cabal sandbox add-source lens
+cabal sandbox add-source comonad
+cabal install --only-dependencies --with-ghc ghc-stage2 --allow-newer
+cabal configure --with-ghc ghc-stage2
+mkdir results
+cd ..
