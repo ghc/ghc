@@ -176,13 +176,22 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
         export_hash | depend_on_exports = Just (mi_exp_hash iface)
                     | otherwise         = Nothing
 
+        by_is_safe (ImportedByUser imv) = imv_is_safe imv
+        by_is_safe _ = False
         (is_direct_import, imp_safe)
             = case lookupModuleEnv direct_imports mod of
-                Just (imv : _xs) -> (True, imv_is_safe imv)
-                Just _           -> pprPanic "mkUsage: empty direct import" Outputable.empty
-                Nothing          -> (False, safeImplicitImpsReq dflags)
-                -- Nothing case is for implicit imports like 'System.IO' when 'putStrLn'
-                -- is used in the source code. We require them to be safe in Safe Haskell
+                -- ezyang: I'm not sure if any is the correct
+                -- metric here. If safety was guaranteed to be uniform
+                -- across all imports, why did the old code only look
+                -- at the first import?
+                Just bys -> (True, any by_is_safe bys)
+                Just _   -> pprPanic "mkUsage: empty direct import" Outputable.empty
+                Nothing  -> (False, safeImplicitImpsReq dflags)
+                -- Nothing case is for references to entities which were
+                -- not directly imported (NB: the "implicit" Prelude import
+                -- counts as directly imported!  An entity is not directly
+                -- imported if, e.g., we got a reference to it from a
+                -- reexport of another module.)
 
         used_occs = lookupModuleEnv ent_map mod `orElse` []
 

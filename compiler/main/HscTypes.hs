@@ -22,7 +22,7 @@ module HscTypes (
         -- * Information about modules
         ModDetails(..), emptyModDetails,
         ModGuts(..), CgGuts(..), ForeignStubs(..), appendStubC,
-        ImportedMods, ImportedModsVal(..), SptEntry(..),
+        ImportedMods, ImportedBy(..), importedByUser, ImportedModsVal(..), SptEntry(..),
         ForeignSrcLang(..),
 
         ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
@@ -1185,7 +1185,20 @@ emptyModDetails
 
 -- | Records the modules directly imported by a module for extracting e.g.
 -- usage information, and also to give better error message
-type ImportedMods = ModuleEnv [ImportedModsVal]
+type ImportedMods = ModuleEnv [ImportedBy]
+
+-- | If a module was "imported" by the user, we associate it with
+-- more detailed usage information 'ImportedModsVal'; a module
+-- imported by the system only gets used for usage information.
+data ImportedBy
+    = ImportedByUser ImportedModsVal
+    | ImportedBySystem
+
+importedByUser :: [ImportedBy] -> [ImportedModsVal]
+importedByUser (ImportedByUser imv : bys) = imv : importedByUser bys
+importedByUser (ImportedBySystem   : bys) =       importedByUser bys
+importedByUser [] = []
+
 data ImportedModsVal
  = ImportedModsVal {
         imv_name :: ModuleName,          -- ^ The name the module is imported with

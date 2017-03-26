@@ -206,7 +206,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
 
     imported_modules = [ imv_name imv
-                       | xs <- moduleEnvElts $ imp_mods imports, imv <- xs ]
+                       | xs <- moduleEnvElts $ imp_mods imports
+                       , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ExportAccum ie_names occs exports)

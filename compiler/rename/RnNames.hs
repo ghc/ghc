@@ -297,9 +297,7 @@ rnImportDecl this_mod
             , imv_all_exports = potential_gres
             , imv_qualified   = qual_only
             }
-    let imports
-          = (calculateAvails dflags iface mod_safe' want_boot)
-                { imp_mods = unitModuleEnv (mi_module iface) [imv] }
+        imports = calculateAvails dflags iface mod_safe' want_boot (ImportedByUser imv)
 
     -- Complain if we import a deprecated module
     whenWOptM Opt_WarnWarningsDeprecations (
@@ -320,8 +318,9 @@ calculateAvails :: DynFlags
                 -> ModIface
                 -> IsSafeImport
                 -> IsBootInterface
+                -> ImportedBy
                 -> ImportAvails
-calculateAvails dflags iface mod_safe' want_boot =
+calculateAvails dflags iface mod_safe' want_boot imported_by =
   let imp_mod    = mi_module iface
       imp_sem_mod= mi_semantic_module iface
       orph_iface = mi_orphan iface
@@ -395,7 +394,7 @@ calculateAvails dflags iface mod_safe' want_boot =
             ([], (ipkg, False) : dep_pkgs deps, False)
 
   in ImportAvails {
-          imp_mods       = emptyModuleEnv, -- this gets filled in later
+          imp_mods       = unitModuleEnv (mi_module iface) [imported_by],
           imp_orphs      = orphans,
           imp_finsts     = finsts,
           imp_dep_mods   = mkModDeps dependent_mods,

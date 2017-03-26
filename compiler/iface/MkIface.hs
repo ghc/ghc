@@ -163,7 +163,6 @@ mkIfaceTc :: HscEnv
           -> IO (ModIface, Bool)
 mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
   tc_result@TcGblEnv{ tcg_mod = this_mod,
-                      tcg_semantic_mod = semantic_mod,
                       tcg_src = hsc_src,
                       tcg_imports = imports,
                       tcg_rdr_env = rdr_env,
@@ -180,7 +179,14 @@ mkIfaceTc hsc_env maybe_old_fingerprint safe_mode mod_details
           let hpc_info = emptyHpcInfo other_hpc_info
           used_th <- readIORef tc_splice_used
           dep_files <- (readIORef dependent_files)
-          usages <- mkUsageInfo hsc_env semantic_mod (imp_mods imports) used_names dep_files merged
+          -- Do NOT use semantic module here; this_mod in mkUsageInfo
+          -- is used solely to decide if we should record a dependency
+          -- or not.  When we instantiate a signature, the semantic
+          -- module is something we want to record dependencies for,
+          -- but if you pass that in here, we'll decide it's the local
+          -- module and does not need to be recorded as a dependency.
+          -- See Note [Identity versus semantic module]
+          usages <- mkUsageInfo hsc_env this_mod (imp_mods imports) used_names dep_files merged
           mkIface_ hsc_env maybe_old_fingerprint
                    this_mod hsc_src
                    used_th deps rdr_env
