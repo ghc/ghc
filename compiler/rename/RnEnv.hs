@@ -2047,7 +2047,7 @@ importSuggestions _dflags imports rdr_name
   -- or, if this is an unqualified name, are not qualified imports
   interesting_imports = [ (mod, imp)
     | (mod, mod_imports) <- moduleEnvToList (imp_mods imports)
-    , Just imp <- return $ pick mod_imports
+    , Just imp <- return $ pick (importedByUser mod_imports)
     ]
 
   -- We want to keep only one for each original module; preferably one with an
