@@ -813,10 +813,10 @@ test('T9872b',
           # 2016-09-15:   4069522928    Fix #12422
           # 2017-02-14    3730686224    Early inlining: 5% improvement
 
-           (wordsize(32), 1740903516, 5)
+           (wordsize(32), 1894037608, 5)
           # was           1700000000
           # 2016-04-06    2422750696    x86/Linux
-          # 2017-03-24    1740903516    x86/Linux, 64-bit machine
+          # 2017-03-24    1894037608    x86/Linux, 64-bit machine
           ]),
       ],
      compile_fail,
