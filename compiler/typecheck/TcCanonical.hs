@@ -595,8 +595,8 @@ can_eq_nc'
 
 -- Expand synonyms first; see Note [Type synonyms and canonicalization]
 can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just ty1' <- coreView ty1 = can_eq_nc flat ev eq_rel ty1' ps_ty1 ty2  ps_ty2
-  | Just ty2' <- coreView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+  | Just ty1' <- tcView ty1 = can_eq_nc flat ev eq_rel ty1' ps_ty1 ty2  ps_ty2
+  | Just ty2' <- tcView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
 -- need to check for reflexivity in the ReprEq case.
 -- See Note [Eager reflexivity check]
@@ -1866,8 +1866,8 @@ unifyWanted loc Phantom ty1 ty2
 unifyWanted loc role orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
   where
-    go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
-    go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
+    go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
     go (FunTy s1 t1) (FunTy s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
@@ -1917,8 +1917,8 @@ unify_derived _   Phantom _        _        = return ()
 unify_derived loc role    orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
   where
-    go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
-    go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
+    go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
     go (FunTy s1 t1) (FunTy s2 t2)
       = do { unify_derived loc role s1 s2

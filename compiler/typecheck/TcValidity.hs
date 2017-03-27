@@ -518,7 +518,7 @@ check_syn_tc_app env ctxt rank ty tc tys
                 mapM_ check_arg tys
 
           else  -- In the liberal case (only for closed syns), expand then check
-          case coreView ty of
+          case tcView ty of
              Just ty' -> check_type env ctxt rank ty'
              Nothing  -> pprPanic "check_tau_type" (ppr ty)  }
 
@@ -717,7 +717,7 @@ check_pred_help :: Bool    -- True <=> under a type synonym
                 -> DynFlags -> UserTypeCtxt
                 -> PredType -> TcM ()
 check_pred_help under_syn env dflags ctxt pred
-  | Just pred' <- coreView pred  -- Switch on under_syn when going under a
+  | Just pred' <- tcView pred  -- Switch on under_syn when going under a
                                  -- synonym (Trac #9838, yuk)
   = check_pred_help True env dflags ctxt pred'
   | otherwise
@@ -1921,7 +1921,7 @@ checkValidInferredKinds orig_kvs out_of_scope extra
 
 -- Free variables of a type, retaining repetitions, and expanding synonyms
 fvType :: Type -> [TyCoVar]
-fvType ty | Just exp_ty <- coreView ty = fvType exp_ty
+fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
 fvType (TyVarTy tv)          = [tv]
 fvType (TyConApp _ tys)      = fvTypes tys
 fvType (LitTy {})            = []
@@ -1964,7 +1964,7 @@ fvProv (HoleProv h)        = pprPanic "fvProv falls into a hole" (ppr h)
 
 sizeType :: Type -> Int
 -- Size of a type: the number of variables and constructors
-sizeType ty | Just exp_ty <- coreView ty = sizeType exp_ty
+sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
 sizeType (TyVarTy {})      = 1
 sizeType (TyConApp _ tys)  = sizeTypes tys + 1
 sizeType (LitTy {})        = 1

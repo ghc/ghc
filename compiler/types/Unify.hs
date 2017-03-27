@@ -778,8 +778,9 @@ unify_ty :: Type -> Type  -- Types to be unified and a co
 -- Respects newtypes, PredTypes
 
 unify_ty ty1 ty2 kco
-  | Just ty1' <- coreView ty1 = unify_ty ty1' ty2 kco
-  | Just ty2' <- coreView ty2 = unify_ty ty1 ty2' kco
+    -- TODO: More commentary needed here
+  | Just ty1' <- tcView ty1   = unify_ty ty1' ty2 kco
+  | Just ty2' <- tcView ty2   = unify_ty ty1 ty2' kco
   | CastTy ty1' co <- ty1     = unify_ty ty1' ty2 (co `mkTransCo` kco)
   | CastTy ty2' co <- ty2     = unify_ty ty1 ty2' (kco `mkTransCo` mkSymCo co)
 
@@ -791,9 +792,9 @@ unify_ty ty1 (TyVarTy tv2) kco
          else surelyApart }  -- non-tv on left; tv on right: can't match.
 
 unify_ty ty1 ty2 _kco
-  | Just (tc1, tys1) <- splitTyConApp_maybe ty1
-  , Just (tc2, tys2) <- splitTyConApp_maybe ty2
-  = if tc1 == tc2 || (isStarKind ty1 && isStarKind ty2)
+  | Just (tc1, tys1) <- tcSplitTyConApp_maybe ty1
+  , Just (tc2, tys2) <- tcSplitTyConApp_maybe ty2
+  = if tc1 == tc2 || (tcIsStarKind ty1 && tcIsStarKind ty2)
     then if isInjectiveTyCon tc1 Nominal
          then unify_tys tys1 tys2
          else do { let inj | isTypeFamilyTyCon tc1
@@ -1210,7 +1211,7 @@ ty_co_match :: MatchEnv   -- ^ ambient helpful info
             -> Coercion   -- ^ :: kind of R type of substed ty ~N R kind of co
             -> Maybe LiftCoEnv
 ty_co_match menv subst ty co lkco rkco
-  | Just ty' <- coreViewOneStarKind ty = ty_co_match menv subst ty' co lkco rkco
+  | Just ty' <- coreView ty = ty_co_match menv subst ty' co lkco rkco
 
   -- handle Refl case:
   | tyCoVarsOfType ty `isNotInDomainOf` subst

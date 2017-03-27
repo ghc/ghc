@@ -728,7 +728,7 @@ tc_infer_hs_type_ek mode ty ek
 tupKindSort_maybe :: TcKind -> Maybe TupleSort
 tupKindSort_maybe k
   | Just (k', _) <- splitCastTy_maybe k = tupKindSort_maybe k'
-  | Just k'      <- coreView k          = tupKindSort_maybe k'
+  | Just k'      <- tcView k            = tupKindSort_maybe k'
   | isConstraintKind k = Just ConstraintTuple
   | isLiftedTypeKind k = Just BoxedTuple
   | otherwise          = Nothing

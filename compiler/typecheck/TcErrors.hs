@@ -2143,7 +2143,7 @@ expandSynonymsToMatch ty1 ty2 = (ty1_ret, ty2_ret)
     --
     -- `tyExpansions (M T10)` returns [Maybe T10] (T10 is not expanded)
     tyExpansions :: Type -> [Type]
-    tyExpansions = unfoldr (\t -> (\x -> (x, x)) `fmap` coreView t)
+    tyExpansions = unfoldr (\t -> (\x -> (x, x)) `fmap` tcView t)
 
     -- | Drop the type pairs until types in a pair look alike (i.e. the outer
     -- constructors are the same).
