@@ -1,0 +1,5 @@
+
+<interactive>:1:1: error:
+    • Cannot apply expression of type ‘t1’
+      to a visible type argument ‘[]’
+    • In the expression: out_of_scope @[]
