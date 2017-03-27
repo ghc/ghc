@@ -12780,7 +12780,7 @@ positions are not automatically advanced.
 .. _column-pragma:
 
 ``COLUMN`` pragma
----------------
+-----------------
 
 .. index::
    single: COLUMN; pragma
