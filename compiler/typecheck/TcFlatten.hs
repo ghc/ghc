@@ -722,7 +722,7 @@ yields a better error message anyway.)
 flatten :: FlattenMode -> CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
 flatten mode ev ty
-  = do { traceTcS "flatten {" (ppr ty)
+  = do { traceTcS "flatten {" (ppr mode <+> ppr ty)
        ; (ty', co) <- runFlatten mode ev (flatten_one ty)
        ; traceTcS "flatten }" (ppr ty')
        ; return (ty', co) }

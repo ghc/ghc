@@ -1026,7 +1026,9 @@ zonkQuantifiedTyVar default_kind tv
       = do { tv' <- skolemiseUnboundMetaTyVar tv
            ; return (Just tv') }
       where
-        -- do not default SigTvs. This would violate the invariants on SigTvs
+        -- Do not default SigTvs. Doing so would violate the invariants
+        -- on SigTvs; see Note [Signature skolems] in TcType.
+        -- Trac #13343 is an example
         not_sig_tv = case info of SigTv -> False
                                   _     -> True
 

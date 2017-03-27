@@ -439,21 +439,31 @@ why Var.hs shouldn't actually have the definition, but it "belongs" here.
 
 Note [Signature skolems]
 ~~~~~~~~~~~~~~~~~~~~~~~~
+A SigTv is a specialised variant of TauTv, with the following invarints:
+
+    * A SigTv can be unified only with a TyVar,
+      not with any other type
+
+    * Its MetaDetails, if filled in, will always be another SigTv
+      or a SkolemTv
+
+SigTvs are only distinguished to improve error messages.
 Consider this
 
   f :: forall a. [a] -> Int
   f (x::b : xs) = 3
 
 Here 'b' is a lexically scoped type variable, but it turns out to be
-the same as the skolem 'a'.  So we have a special kind of skolem
-constant, SigTv, which can unify with other SigTvs. They are used
-*only* for pattern type signatures.
+the same as the skolem 'a'.  So we make them both SigTvs, which can unify
+with each other.
 
 Similarly consider
   data T (a:k1) = MkT (S a)
   data S (b:k2) = MkS (T b)
 When doing kind inference on {S,T} we don't want *skolems* for k1,k2,
 because they end up unifying; we want those SigTvs again.
+
+SigTvs are used *only* for pattern type signatures.
 
 Note [TyVars and TcTyVars during type checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -514,10 +524,7 @@ data MetaInfo
 
    | SigTv         -- A variant of TauTv, except that it should not be
                    -- unified with a type, only with a type variable
-                   -- SigTvs are only distinguished to improve error messages
-                   --      see Note [Signature skolems]
-                   --      The MetaDetails, if filled in, will
-                   --      always be another SigTv or a SkolemTv
+                   -- See Note [Signature skolems]
 
    | FlatMetaTv    -- A flatten meta-tyvar
                    -- It is a meta-tyvar, but it is always untouchable, with level 0
