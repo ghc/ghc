@@ -149,13 +149,14 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
            pushLevelAndCaptureConstraints            $
            tcExtendTyVarEnv univ_tvs                 $
            tcPat PatSyn lpat (mkCheckExpType pat_ty) $
-           do { let new_tv | isUnidirectional dir = newMetaTyVarX
-                           | otherwise            = newMetaSigTyVarX
+           do { let new_tv = case dir of
+                               ImplicitBidirectional -> newMetaSigTyVarX
+                               _                     -> newMetaTyVarX
+                    -- new_tv: see the "Existential type variables"
+                    -- part of Note [Checking against a pattern signature]
                     in_scope    = mkInScopeSet (mkVarSet univ_tvs)
                     empty_subst = mkEmptyTCvSubst in_scope
               ; (subst, ex_tvs') <- mapAccumLM new_tv empty_subst ex_tvs
-                    -- See the "Existential type variables" part of
-                    -- Note [Checking against a pattern signature]
               ; traceTc "tcpatsyn1" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs])
               ; traceTc "tcpatsyn2" (vcat [ ppr v <+> dcolon <+> ppr (tyVarKind v) | v <- ex_tvs'])
               ; let prov_theta' = substTheta subst prov_theta
@@ -240,12 +241,20 @@ unify x := [a] during type checking, and then use the instantiating type
                                               dl = $dfunEqList d
                                           in k [a] dl ys
 
-This "concealing" story works for /uni-directional/ pattern synonyms,
-but obviously not for bidirectional ones.  So in the bidirectional case
-we use SigTv, rather than a generic TauTv, meta-tyvar so that.  And
-we should really check that those SigTvs don't get unified with each
-other.
+This "concealing" story works for /uni-directional/ pattern synonyms.
+It also works for /explicitly-bidirectional/ pattern synonyms, where
+the constructor direction is typecheked entirely separately.
 
+But for /implicitly-bidirecitonal/ ones like
+  pattern P x = MkS x
+we are trying to typecheck both directions at once.  So for this we
+use SigTv, rather than a generic TauTv.  But it's not quite done:
+ - We should really check that those SigTvs don't get unified
+   with each other.
+ - Trac #13441 is rejected if you use an implicitly-bidirectional
+   pattern.
+Maybe it'd be better to treat it like an explicitly-bidirectional
+pattern?
 -}
 
 collectPatSynArgInfo :: HsPatSynDetails (Located Name) -> ([Name], [Name], Bool)
@@ -519,7 +528,6 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
 
   | Right match_group <- mb_match_group  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn name
-       ; traceTc "tcPatSynBuilderBind {" $ ppr patsyn
        ; let Just (builder_id, need_dummy_arg) = patSynBuilder patsyn
                    -- Bidirectional, so patSynBuilder returns Just
 
@@ -534,6 +542,8 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
 
              sig = completeSigFromId (PatSynCtxt name) builder_id
 
+       ; traceTc "tcPatSynBuilderBind {" $
+         ppr patsyn $$ ppr builder_id <+> dcolon <+> ppr (idType builder_id)
        ; (builder_binds, _) <- tcPolyCheck emptyPragEnv sig (noLoc bind)
        ; traceTc "tcPatSynBuilderBind }" $ ppr builder_binds
        ; return builder_binds }
