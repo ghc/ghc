@@ -308,6 +308,25 @@ data ReportErrCtxt
                                     -- See Note [Suppressing error messages]
       }
 
+instance Outputable ReportErrCtxt where
+  ppr (CEC { cec_binds              = bvar
+           , cec_errors_as_warns    = ew
+           , cec_defer_type_errors  = dte
+           , cec_expr_holes         = eh
+           , cec_type_holes         = th
+           , cec_out_of_scope_holes = osh
+           , cec_warn_redundant     = wr
+           , cec_suppress           = sup })
+    = text "CEC" <+> braces (vcat
+         [ text "cec_binds"              <+> equals <+> ppr bvar
+         , text "cec_errors_as_warns"    <+> equals <+> ppr ew
+         , text "cec_defer_type_errors"  <+> equals <+> ppr dte
+         , text "cec_expr_holes"         <+> equals <+> ppr eh
+         , text "cec_type_holes"         <+> equals <+> ppr th
+         , text "cec_out_of_scope_holes" <+> equals <+> ppr osh
+         , text "cec_warn_redundant"     <+> equals <+> ppr wr
+         , text "cec_suppress"           <+> equals <+> ppr sup ])
+
 {-
 Note [Suppressing error messages]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -411,13 +430,14 @@ This only matters in instance declarations..
 reportWanteds :: ReportErrCtxt -> TcLevel -> WantedConstraints -> TcM ()
 reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   = do { traceTc "reportWanteds" (vcat [ text "Simples =" <+> ppr simples
+                                       , text "Insols =" <+> ppr insols
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)])
        ; let tidy_cts = bagToList (mapBag (tidyCt env) (insols `unionBags` simples))
 
          -- First deal with things that are utterly wrong
          -- Like Int ~ Bool (incl nullary TyCons)
          -- or  Int ~ t a   (AppTy on one side)
-         -- These ones are not suppressed by the incoming context
+         -- These /ones/ are not suppressed by the incoming context
        ; let ctxt_for_insols = ctxt { cec_suppress = False }
        ; (ctxt1, cts1) <- tryReporters ctxt_for_insols report1 tidy_cts
 
@@ -448,7 +468,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", is_user_type_error,
                                                   True, mkUserTypeErrorReporter)
-              , ("insoluble1",   is_given_eq,     True, mkGivenErrorReporter)
+              , given_eq_spec
               , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
               , ("skolem eq1",   very_wrong,      True, mkSkolReporter)
               , ("skolem eq2",   skolem_eq,       True, mkSkolReporter)
@@ -490,12 +510,6 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     non_tv_eq _ (EqPred NomEq ty1 _) = not (isTyVarTy ty1)
     non_tv_eq _ _                    = False
 
---    rigid_nom_eq _ pred = isRigidEqPred tc_lvl pred
---
---    rigid_nom_tv_eq _ pred
---      | EqPred _ ty1 _ <- pred = isRigidEqPred tc_lvl pred && isTyVarTy ty1
---      | otherwise              = False
-
     is_out_of_scope ct _ = isOutOfScopeCt ct
     is_hole         ct _ = isHoleCt ct
 
@@ -513,6 +527,22 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     is_irred _ (IrredPred {}) = True
     is_irred _ _              = False
 
+    given_eq_spec = case find_gadt_match (cec_encl ctxt) of
+       Just imp -> ("insoluble1a", is_given_eq, True,  mkGivenErrorReporter imp)
+       Nothing  -> ("insoluble1b", is_given_eq, False, ignoreErrorReporter)
+                  -- False means don't suppress subsequent errors
+                  -- Reason: we don't report all given errors
+                  --         (see mkGivenErrorReporter), and we should only suppress
+                  --         subsequent errors if we actually report this one!
+                  --         Trac #13446 is an example
+
+    find_gadt_match [] = Nothing
+    find_gadt_match (implic : implics)
+      | PatSkol {} <- ic_info implic
+      , not (ic_no_eqs implic)
+      = Just implic
+      | otherwise
+      = find_gadt_match implics
 
 ---------------
 isSkolemTy :: TcLevel -> Type -> Bool
@@ -580,10 +610,9 @@ mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
                             Nothing  -> pprPanic "mkUserTypeError" (ppr ct)
 
 
-mkGivenErrorReporter :: Reporter
+mkGivenErrorReporter :: Implication -> Reporter
 -- See Note [Given errors]
-mkGivenErrorReporter ctxt cts
-  | Just implic <- find_gadt_match (cec_encl ctxt)
+mkGivenErrorReporter implic ctxt cts
   = do { (ctxt, binds_msg, ct) <- relevantBindings True ctxt ct
        ; dflags <- getDynFlags
        ; let ct' = setCtLoc ct (setCtLocEnv (ctLoc ct) (ic_env implic))
@@ -600,22 +629,17 @@ mkGivenErrorReporter ctxt cts
 
        ; traceTc "mkGivenErrorRporter" (ppr ct)
        ; maybeReportError ctxt err }
-
-  | otherwise   -- Discard Given errors that don't come from
-                -- a pattern match; maybe we should warn instead?
-  = do { traceTc "mkGivenErrorRporter no" (ppr ct $$ ppr (cec_encl ctxt))
-       ; return () }
   where
     (ct : _ )  = cts    -- Never empty
     (ty1, ty2) = getEqPredTys (ctPred ct)
 
-    find_gadt_match [] = Nothing
-    find_gadt_match (implic : implics)
-      | PatSkol {} <- ic_info implic
-      , not (ic_no_eqs implic)
-      = Just implic
-      | otherwise
-      = find_gadt_match implics
+ignoreErrorReporter :: Reporter
+-- Discard Given errors that don't come from
+-- a pattern match; maybe we should warn instead?ignoreErrorReporter ctxt cts
+ignoreErrorReporter ctxt cts
+  = do { traceTc "mkGivenErrorRporter no" (ppr cts $$ ppr (cec_encl ctxt))
+       ; return () }
+
 
 {- Note [Given errors]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1442,7 +1466,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
   || isSigTyVar tv1 && not (isTyVarTy ty2)
-  || ctEqRel ct == ReprEq && not (isTyVarUnderDatatype tv1 ty2)
+  || ctEqRel ct == ReprEq && not insoluble_occurs_check
      -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
         [ important $ misMatchOrCND ctxt ct oriented ty1 ty2
@@ -1454,7 +1478,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
   -- generalised it).  So presumably it is an *untouchable*
   -- meta tyvar or a SigTv, else it'd have been unified
   | OC_Occurs <- occ_check_expand
-  , ctEqRel ct == NomEq || isTyVarUnderDatatype tv1 ty2
+  , insoluble_occurs_check
          -- See Note [Occurs check error] in TcCanonical
   = do { let occCheckMsg = important $ addArising (ctOrigin ct) $
                            hang (text "Occurs check: cannot construct the infinite" <+> what <> colon)
@@ -1547,7 +1571,8 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
         -- Not an occurs check, because F is a type function.
   where
     ty1 = mkTyVarTy tv1
-    occ_check_expand = occCheckForErrors dflags tv1 ty2
+    occ_check_expand       = occCheckForErrors dflags tv1 ty2
+    insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2
 
     what = case ctLocTypeOrKind_maybe (ctLoc ct) of
       Just KindLevel -> text "kind"

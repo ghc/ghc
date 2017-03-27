@@ -1,0 +1,10 @@
+
+T13446.hs:34:17: error:
+    • Couldn't match expected type ‘Dict (JReference (JComparable a))’
+                  with actual type ‘Char’
+    • In the first argument of ‘Sub’, namely ‘'a'’
+      In the expression: Sub 'a'
+      In an equation for ‘lifting’: lifting = Sub 'a'
+    • Relevant bindings include
+        lifting :: JReference a :- JReference (JComparable a)
+          (bound at T13446.hs:34:3)

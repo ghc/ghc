@@ -2,15 +2,8 @@
 T12427a.hs:17:29: error:
     • Couldn't match expected type ‘p’
                   with actual type ‘(forall b. [b] -> [b]) -> Int’
-        ‘p’ is untouchable
-          inside the constraints: ()
-          bound by a pattern with constructor:
-                     T1 :: forall a. a -> ((forall b. [b] -> [b]) -> Int) -> T,
-                   in a case alternative
-          at T12427a.hs:17:19-24
       ‘p’ is a rigid type variable bound by
         the inferred type of h11 :: T -> p at T12427a.hs:17:1-29
-      Possible fix: add a type signature for ‘h11’
     • In the expression: v
       In a case alternative: T1 _ v -> v
       In the expression: case y of { T1 _ v -> v }
@@ -18,16 +11,8 @@ T12427a.hs:17:29: error:
         h11 :: T -> p (bound at T12427a.hs:17:1)
 
 T12427a.hs:28:6: error:
-    • Couldn't match expected type ‘p’
-                  with actual type ‘(forall b. [b] -> [b]) -> Int’
-        ‘p’ is untouchable
-          inside the constraints: ()
-          bound by a pattern with constructor:
-                     T1 :: forall a. a -> ((forall b. [b] -> [b]) -> Int) -> T,
-                   in a pattern binding
-          at T12427a.hs:28:1-7
-      ‘p’ is a rigid type variable bound by
-        the inferred type of x1 :: p at T12427a.hs:28:1-19
-      Possible fix: add a type signature for ‘x1’
+    • Cannot instantiate unification variable ‘p0’
+      with a type involving foralls: (forall b. [b] -> [b]) -> Int
+        GHC doesn't yet support impredicative polymorphism
     • In the pattern: T1 _ x1
       In a pattern binding: T1 _ x1 = undefined

@@ -78,7 +78,7 @@ module TcType (
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
-  isPredTy, isTyVarClassPred, isTyVarExposed, isTyVarUnderDatatype,
+  isPredTy, isTyVarClassPred, isTyVarExposed, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
   isRigidEqPred, isRigidTy,
 
@@ -2126,26 +2126,35 @@ isTyVarExposed _  (FunTy {})      = False
 isTyVarExposed tv (CastTy ty _)   = isTyVarExposed tv ty
 isTyVarExposed _  (CoercionTy {}) = False
 
--- | Does the given tyvar appear under a type generative w.r.t.
--- representational equality? See Note [Occurs check error] in
+-- | Is the equality
+--        a ~r ...a....
+-- definitely insoluble or not?
+--      a ~r Maybe a      -- Definitely insoluble
+--      a ~N ...(F a)...  -- Not definitely insoluble
+--                        -- Perhaps (F a) reduces to Int
+--      a ~R ...(N a)...  -- Not definitely insoluble
+--                        -- Perhaps newtype N a = MkN Int
+-- See Note [Occurs check error] in
 -- TcCanonical for the motivation for this function.
-isTyVarUnderDatatype :: TcTyVar -> TcType -> Bool
-isTyVarUnderDatatype tv = go False
+isInsolubleOccursCheck :: EqRel -> TcTyVar -> TcType -> Bool
+isInsolubleOccursCheck eq_rel tv ty
+  = go ty
   where
-    go under_dt ty | Just ty' <- coreView ty = go under_dt ty'
-    go under_dt (TyVarTy tv') = under_dt && (tv == tv')
-    go under_dt (TyConApp tc tys) = let under_dt' = under_dt ||
-                                                    isGenerativeTyCon tc
-                                                      Representational
-                                    in any (go under_dt') tys
-    go _        (LitTy {}) = False
-    go _        (FunTy arg res) = go True arg || go True res
-    go under_dt (AppTy fun arg) = go under_dt fun || go under_dt arg
-    go under_dt (ForAllTy (TvBndr tv' _) inner_ty)
+    go ty | Just ty' <- coreView ty = go ty'
+    go (TyVarTy tv') = tv == tv' || go (tyVarKind tv')
+    go (LitTy {})    = False
+    go (AppTy t1 t2) = go t1 || go t2
+    go (FunTy t1 t2) = go t1 || go t2
+    go (ForAllTy (TvBndr tv' _) inner_ty)
       | tv' == tv = False
-      | otherwise = go under_dt inner_ty
-    go under_dt (CastTy ty _)   = go under_dt ty
-    go _        (CoercionTy {}) = False
+      | otherwise = go (tyVarKind tv') || go inner_ty
+    go (CastTy ty _)  = go ty   -- ToDo: what about the coercion
+    go (CoercionTy _) = False   -- ToDo: what about the coercion
+    go (TyConApp tc tys)
+      | isGenerativeTyCon tc role = any go tys
+      | otherwise                 = False
+
+    role = eqRelRole eq_rel
 
 isRigidTy :: TcType -> Bool
 isRigidTy ty
