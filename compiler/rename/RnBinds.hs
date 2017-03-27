@@ -635,13 +635,13 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
             case details of
                PrefixPatSyn vars ->
                    do { checkDupRdrNames vars
-                      ; names <- mapM lookupVar vars
+                      ; names <- mapM lookupPatSynBndr vars
                       ; return ( (pat', PrefixPatSyn names)
                                , mkFVs (map unLoc names)) }
                InfixPatSyn var1 var2 ->
                    do { checkDupRdrNames [var1, var2]
-                      ; name1 <- lookupVar var1
-                      ; name2 <- lookupVar var2
+                      ; name1 <- lookupPatSynBndr var1
+                      ; name2 <- lookupPatSynBndr var2
                       -- ; checkPrecMatch -- TODO
                       ; return ( (pat', InfixPatSyn name1 name2)
                                , mkFVs (map unLoc [name1, name2])) }
@@ -651,7 +651,7 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                               (RecordPatSynField { recordPatSynSelectorId = visible
                                                  , recordPatSynPatVar = hidden })
                               = do { visible' <- lookupLocatedTopBndrRn visible
-                                   ; hidden'  <- lookupVar hidden
+                                   ; hidden'  <- lookupPatSynBndr hidden
                                    ; return $ RecordPatSynField { recordPatSynSelectorId = visible'
                                                                 , recordPatSynPatVar = hidden' } }
                       ; names <- mapM rnRecordPatSynField  vars
@@ -688,7 +688,8 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
           -- Why fvs1?  See Note [Pattern synonym builders don't yield dependencies]
       }
   where
-    lookupVar = wrapLocM lookupOccRn
+    -- See Note [Renaming pattern synonym variables]
+    lookupPatSynBndr = wrapLocM lookupLocalOccRn
 
     patternSynonymErr :: SDoc
     patternSynonymErr
@@ -696,6 +697,36 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
            2 (text "Use -XPatternSynonyms to enable this extension")
 
 {-
+Note [Renaming pattern synonym variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We rename pattern synonym declaractions backwards to normal to reuse
+the logic already implemented for renaming patterns.
+
+We first rename the RHS of a declaration which brings into
+scope the variables bound by the pattern (as they would be
+in normal function definitions). We then lookup the variables
+which we want to bind in this local environment.
+
+It is crucial that we then only lookup in the *local* environment which
+only contains the variables brought into scope by the pattern and nothing
+else. Amazingly no-one encountered this bug for 3 GHC versions but
+it was possible to define a pattern synonym which referenced global
+identifiers and worked correctly.
+
+```
+x = 5
+
+pattern P :: Int -> ()
+pattern P x <- _
+
+f (P x) = x
+
+> f () = 5
+```
+
+See #13470 for the original report.
+
 Note [Pattern synonym builders don't yield dependencies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When renaming a pattern synonym that has an explicit builder,
