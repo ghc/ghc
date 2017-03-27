@@ -318,12 +318,12 @@ char *cstring_from_section_name(
 || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
 || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 #  define OBJFORMAT_ELF
-typedef struct _ObjectCodeFormatInfo { void* placeholder;} ObjectCodeFormatInfo;
-typedef struct _SectionFormatInfo { void* placeholder; } SectionFormatInfo;
+struct _SectionFormatInfo { void* placeholder; };
+struct _ObjectCodeFormatInfo { void* placeholder; };
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
-typedef struct _ObjectCodeFormatInfo { void* placeholder;} ObjectCodeFormatInfo;
-typedef struct _SectionFormatInfo { void* placeholder; } SectionFormatInfo;
+struct _SectionFormatInfo { void* placeholder; };
+struct _ObjectCodeFormatInfo { void* placeholder; };
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"
