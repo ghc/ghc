@@ -584,8 +584,8 @@ list.
 
     :default: off
 
-    If this flag is on, call-patten specialision will specialise a call
-    ``(f (Just x))`` with an explicit constructor agument, even if the argument
+    If this flag is on, call-pattern specialisation will specialise a call
+    ``(f (Just x))`` with an explicit constructor argument, even if the argument
     is not scrutinised in the body of the function. This is sometimes
     beneficial; e.g. the argument might be given to some other function
     that can itself be specialised.
