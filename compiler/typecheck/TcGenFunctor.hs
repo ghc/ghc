@@ -352,7 +352,7 @@ functorLikeTraverse var (FT { ft_triv = caseTrivial,     ft_var = caseVar
        -> Type
        -> (a, Bool)   -- (result of type a, does type contain var)
 
-    go co ty | Just ty' <- coreView ty = go co ty'
+    go co ty | Just ty' <- tcView ty = go co ty'
     go co (TyVarTy    v) | v == var = (if co then caseCoVar else caseVar,True)
     go co (FunTy x y)  | isPredTy x = go co y
                        | xc || yc   = (caseFun xr yr,True)

@@ -122,7 +122,7 @@ normaliseFfiType' env ty0 = go initRecTc ty0
   where
     go :: RecTcChecker -> Type -> TcM (Coercion, Type, Bag GlobalRdrElt)
     go rec_nts ty
-      | Just ty' <- coreView ty     -- Expand synonyms
+      | Just ty' <- tcView ty     -- Expand synonyms
       = go rec_nts ty'
 
       | Just (tc, tys) <- splitTyConApp_maybe ty

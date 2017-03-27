@@ -15,12 +15,13 @@ module Kind (
 
         classifiesTypeWithValues,
         isStarKind, isStarKindSynonymTyCon,
+        tcIsStarKind,
         isKindLevPoly
        ) where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} Type    ( typeKind, coreViewOneStarKind
+import {-# SOURCE #-} Type    ( typeKind, coreView, tcView
                               , splitTyConApp_maybe )
 import {-# SOURCE #-} DataCon ( DataCon )
 
@@ -98,7 +99,7 @@ isKindLevPoly k = ASSERT2( isStarKind k || _is_type, ppr k )
                       -- the isStarKind check is necessary b/c of Constraint
                   go k
   where
-    go ty | Just ty' <- coreViewOneStarKind ty = go ty'
+    go ty | Just ty' <- coreView ty = go ty'
     go TyVarTy{}         = True
     go AppTy{}           = True  -- it can't be a TyConApp
     go (TyConApp tc tys) = isFamilyTyCon tc || any go tys
@@ -137,13 +138,21 @@ okArrowResultKind = classifiesTypeWithValues
 -- like *, #, TYPE Lifted, TYPE v, Constraint.
 classifiesTypeWithValues :: Kind -> Bool
 -- ^ True of any sub-kind of OpenTypeKind
-classifiesTypeWithValues t | Just t' <- coreViewOneStarKind t = classifiesTypeWithValues t'
+classifiesTypeWithValues t | Just t' <- coreView t = classifiesTypeWithValues t'
 classifiesTypeWithValues (TyConApp tc [_]) = tc `hasKey` tYPETyConKey
 classifiesTypeWithValues _ = False
 
 -- | Is this kind equivalent to *?
+tcIsStarKind :: Kind -> Bool
+tcIsStarKind k | Just k' <- tcView k = isStarKind k'
+tcIsStarKind (TyConApp tc [TyConApp ptr_rep []])
+  =  tc      `hasKey` tYPETyConKey
+  && ptr_rep `hasKey` liftedRepDataConKey
+tcIsStarKind _ = False
+
+-- | Is this kind equivalent to *?
 isStarKind :: Kind -> Bool
-isStarKind k | Just k' <- coreViewOneStarKind k = isStarKind k'
+isStarKind k | Just k' <- coreView k = isStarKind k'
 isStarKind (TyConApp tc [TyConApp ptr_rep []])
   =  tc      `hasKey` tYPETyConKey
   && ptr_rep `hasKey` liftedRepDataConKey

@@ -138,7 +138,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
            ; return (result, idHsWrapper) }
 
     go acc_arg_tys n ty
-      | Just ty' <- coreView ty = go acc_arg_tys n ty'
+      | Just ty' <- tcView ty = go acc_arg_tys n ty'
 
     go acc_arg_tys n (FunTy arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
@@ -269,7 +269,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
         (tvs, theta, _) = tcSplitSigmaTy ty
 
     go n acc_args ty
-      | Just ty' <- coreView ty = go n acc_args ty'
+      | Just ty' <- tcView ty = go n acc_args ty'
 
     go n acc_args (FunTy arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
@@ -370,7 +370,7 @@ matchExpectedTyConApp tc orig_ty
   = ASSERT(tc /= funTyCon) go orig_ty
   where
     go ty
-       | Just ty' <- coreView ty
+       | Just ty' <- tcView ty
        = go ty'
 
     go ty@(TyConApp tycon args)
@@ -415,7 +415,7 @@ matchExpectedAppTy orig_ty
   = go orig_ty
   where
     go ty
-      | Just ty' <- coreView ty = go ty'
+      | Just ty' <- tcView ty = go ty'
 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
       = return (mkTcNomReflCo orig_ty, (fun_ty, arg_ty))
@@ -695,8 +695,8 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
               , text "ty_expected =" <+> ppr ty_expected ]
        ; go ty_actual ty_expected }
   where
-    go ty_a ty_e | Just ty_a' <- coreView ty_a = go ty_a' ty_e
-                 | Just ty_e' <- coreView ty_e = go ty_a  ty_e'
+    go ty_a ty_e | Just ty_a' <- tcView ty_a = go ty_a' ty_e
+                 | Just ty_e' <- tcView ty_e = go ty_a  ty_e'
 
     go (TyVarTy tv_a) ty_e
       = do { lookup_res <- lookupTcTyVar tv_a
@@ -1273,8 +1273,8 @@ uType origin t_or_k orig_ty1 orig_ty2
         -- we'll end up saying "can't match Foo with Bool"
         -- rather than "can't match "Int with Bool".  See Trac #4535.
     go ty1 ty2
-      | Just ty1' <- coreView ty1 = go ty1' ty2
-      | Just ty2' <- coreView ty2 = go ty1  ty2'
+      | Just ty1' <- tcView ty1 = go ty1' ty2
+      | Just ty2' <- tcView ty2 = go ty1  ty2'
 
     go (CastTy t1 co1) t2
       = do { co_tys <- go t1 t2
@@ -1768,7 +1768,7 @@ matchExpectedFunKind :: Arity           -- ^ # of args remaining, only for error
                                   -- ^ co :: old_kind ~ arg -> res
 matchExpectedFunKind num_args_remaining ty = go
   where
-    go k | Just k' <- coreView k = go k'
+    go k | Just k' <- tcView k = go k'
 
     go k@(TyVarTy kvar)
       | isTcTyVar kvar, isMetaTyVar kvar
@@ -2040,8 +2040,8 @@ occCheckExpand tv ty
     go env ty@(TyConApp tc tys)
       = case mapM (go env) tys of
           Just tys' -> return (mkTyConApp tc tys')
-          Nothing | Just ty' <- coreView ty -> go env ty'
-                  | otherwise               -> Nothing
+          Nothing | Just ty' <- tcView ty -> go env ty'
+                  | otherwise             -> Nothing
                       -- Failing that, try to expand a synonym
 
     go env (CastTy ty co) =  do { ty' <- go env ty

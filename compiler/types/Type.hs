@@ -31,6 +31,7 @@ module Type (
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
         splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
+        tcRepSplitTyConApp_maybe, tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
 
@@ -148,7 +149,7 @@ module Type (
         seqType, seqTypes,
 
         -- * Other views onto Types
-        coreView, coreViewOneStarKind,
+        coreView, tcView,
 
         tyConsOfType,
 
@@ -305,6 +306,18 @@ import Control.Arrow    ( first, second )
                 Type representation
 *                                                                      *
 ************************************************************************
+
+Note [coreView vs tcView]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+So far as the typechecker is concerned, 'Constraint' and 'TYPE LiftedRep' are distinct kinds.
+
+But in Core these two are treated as identical.
+
+We implement this by making 'coreView' convert 'Constraint' to 'TYPE LiftedRep' on the fly.
+The function tcView (used in the type checker) does not do this.
+
+See also Trac #11715, which tracks removing this inconsistency.
+
 -}
 
 {-# INLINE coreView #-}
@@ -312,6 +325,7 @@ coreView :: Type -> Maybe Type
 -- ^ This function Strips off the /top layer only/ of a type synonym
 -- application (if any) its underlying representation type.
 -- Returns Nothing if there is nothing to look through.
+-- This function considers 'Constraint' to be a synonym of @TYPE LiftedRep@.
 --
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
@@ -323,17 +337,27 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc t
                -- Its important to use mkAppTys, rather than (foldl AppTy),
                -- because the function part might well return a
                -- partially-applied type constructor; indeed, usually will!
+coreView (TyConApp tc [])
+  | isStarKindSynonymTyCon tc
+  = Just liftedTypeKind
+
 coreView _ = Nothing
 
--- | Like 'coreView', but it also "expands" @Constraint@ to become
--- @TYPE LiftedRep@.
-{-# INLINE coreViewOneStarKind #-}
-coreViewOneStarKind :: Type -> Maybe Type
-coreViewOneStarKind ty
-  | Just ty' <- coreView ty   = Just ty'
-  | TyConApp tc [] <- ty
-  , isStarKindSynonymTyCon tc = Just liftedTypeKind
-  | otherwise                 = Nothing
+-- | Gives the typechecker view of a type. This unwraps synonyms but
+-- leaves 'Constraint' alone. c.f. coreView, which turns Constraint into
+-- TYPE LiftedRep. Returns Nothing if no unwrapping happens.
+-- See also Note [coreView vs tcView] in Type.
+{-# INLINE tcView #-}
+tcView :: Type -> Maybe Type
+tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- expandSynTyCon_maybe tc tys
+  = Just (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
+               -- The free vars of 'rhs' should all be bound by 'tenv', so it's
+               -- ok to use 'substTy' here.
+               -- See also Note [The substitution invariant] in TyCoRep.
+               -- Its important to use mkAppTys, rather than (foldl AppTy),
+               -- because the function part might well return a
+               -- partially-applied type constructor; indeed, usually will!
+tcView _ = Nothing
 
 -----------------------------------------------
 expandTypeSynonyms :: Type -> Type
@@ -702,6 +726,33 @@ tcRepSplitAppTy_maybe (TyConApp tc tys)
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
 tcRepSplitAppTy_maybe _other = Nothing
+
+-- | Split a type constructor application into its type constructor and
+-- applied types. Note that this may fail in the case of a 'FunTy' with an
+-- argument of unknown kind 'FunTy' (e.g. @FunTy (a :: k) Int@. since the kind
+-- of @a@ isn't of the form @TYPE rep@). Consequently, you may need to zonk your
+-- type before using this function.
+--
+-- If you only need the 'TyCon', consider using 'tcTyConAppTyCon_maybe'.
+tcSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcSplitTyConApp_maybe ty | Just ty' <- tcView ty = tcSplitTyConApp_maybe ty'
+tcSplitTyConApp_maybe ty                         = tcRepSplitTyConApp_maybe ty
+
+-- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
+tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
+-- Defined here to avoid module loops between Unify and TcType.
+tcRepSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
+tcRepSplitTyConApp_maybe (FunTy arg res)
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTyCon, [arg_rep, res_rep, arg, res])
+
+  | otherwise
+  = pprPanic "tcRepSplitTyConApp_maybe" (ppr arg $$ ppr res)
+tcRepSplitTyConApp_maybe _                          = Nothing
+
+
 -------------
 splitAppTy :: Type -> (Type, Type)
 -- ^ Attempts to take a type application apart, as in 'splitAppTy_maybe',
@@ -1995,7 +2046,7 @@ getRuntimeRepFromKind_maybe :: HasDebugCallStack
                             => Type -> Maybe Type
 getRuntimeRepFromKind_maybe = go
   where
-    go k | Just k' <- coreViewOneStarKind k = go k'
+    go k | Just k' <- coreView k = go k'
     go k
       | Just (_tc, [arg]) <- splitTyConApp_maybe k
       = ASSERT2( _tc `hasKey` tYPETyConKey, ppr k )
@@ -2240,8 +2291,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
     -- and whether either contains a cast.
     go :: RnEnv2 -> Type -> Type -> TypeOrdering
     go env t1 t2
-      | Just t1' <- coreViewOneStarKind t1 = go env t1' t2
-      | Just t2' <- coreViewOneStarKind t2 = go env t1 t2'
+      | Just t1' <- coreView t1 = go env t1' t2
+      | Just t2' <- coreView t2 = go env t1 t2'
 
     go env (TyVarTy tv1)       (TyVarTy tv2)
       = liftOrdering $ rnOccL env tv1 `nonDetCmpVar` rnOccR env tv2

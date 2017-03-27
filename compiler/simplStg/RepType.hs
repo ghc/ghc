@@ -335,7 +335,7 @@ tyConPrimRep1 tc = case tyConPrimRep tc of
 -- of values of types of this kind.
 kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
-  | Just ki' <- coreViewOneStarKind ki
+  | Just ki' <- coreView ki
   = kindPrimRep doc ki'
 kindPrimRep doc (TyConApp typ [runtime_rep])
   = ASSERT( typ `hasKey` tYPETyConKey )

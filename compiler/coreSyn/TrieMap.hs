@@ -786,7 +786,9 @@ xtC (D env co) f (CoercionMapX m)
 -- but it is strictly internal to this module.  If you are including a 'TypeMap'
 -- inside another 'TrieMap', this is the type you want. Note that this
 -- lookup does not do a kind-check. Thus, all keys in this map must have
--- the same kind.
+-- the same kind. Also note that this map respects the distinction between
+-- @Type@ and @Constraint@, despite the fact that they are equivalent type
+-- synonyms in Core.
 type TypeMapG = GenMap TypeMapX
 
 -- | @TypeMapX a@ is the base map from @DeBruijn Type@ to @a@, but without the
@@ -801,13 +803,20 @@ data TypeMapX a
        }
     -- Note that there is no tyconapp case; see Note [Equality on AppTys] in Type
 
--- | squeeze out any synonyms, convert Constraint to *, and change TyConApps
--- to nested AppTys. Why the last one? See Note [Equality on AppTys] in Type
+-- | Squeeze out any synonyms, and change TyConApps to nested AppTys. Why the
+-- last one? See Note [Equality on AppTys] in Type
+--
+-- Note, however, that we keep Constraint and Type apart here, despite the fact
+-- that they are both synonyms of TYPE 'LiftedRep (see #11715).
 trieMapView :: Type -> Maybe Type
-trieMapView ty | Just ty' <- coreViewOneStarKind ty = Just ty'
 trieMapView ty
-  | Just (tc, tys@(_:_)) <- splitTyConApp_maybe ty
+  -- First check for TyConApps that need to be expanded to
+  -- AppTy chains.
+  | Just (tc, tys@(_:_)) <- tcSplitTyConApp_maybe ty
   = Just $ foldl AppTy (TyConApp tc []) tys
+
+  -- Then resolve any remaining nullary synonyms.
+  | Just ty' <- tcView ty = Just ty'
 trieMapView _ = Nothing
 
 instance TrieMap TypeMapX where
@@ -820,8 +829,8 @@ instance TrieMap TypeMapX where
 
 instance Eq (DeBruijn Type) where
   env_t@(D env t) == env_t'@(D env' t')
-    | Just new_t  <- coreViewOneStarKind t  = D env new_t == env_t'
-    | Just new_t' <- coreViewOneStarKind t' = env_t       == D env' new_t'
+    | Just new_t  <- tcView t  = D env new_t == env_t'
+    | Just new_t' <- tcView t' = env_t       == D env' new_t'
     | otherwise
     = case (t, t') of
         (CastTy t1 _, _)  -> D env t1 == D env t'
