@@ -441,7 +441,8 @@ fixIO k = do
 openTempFile :: FilePath   -- ^ Directory in which to create the file
              -> String     -- ^ File name template. If the template is \"foo.ext\" then
                            -- the created file will be \"fooXXX.ext\" where XXX is some
-                           -- random number.
+                           -- random number. Note that this should not contain any path
+                           -- separator characters.
              -> IO (FilePath, Handle)
 openTempFile tmp_dir template
     = openTempFile' "openTempFile" tmp_dir template False 0o600
@@ -465,7 +466,10 @@ openBinaryTempFileWithDefaultPermissions tmp_dir template
 
 openTempFile' :: String -> FilePath -> String -> Bool -> CMode
               -> IO (FilePath, Handle)
-openTempFile' loc tmp_dir template binary mode = findTempName
+openTempFile' loc tmp_dir template binary mode
+    | pathSeparator `elem` template
+    = fail $ "openTempFile': Template string must not contain path separator characters: "++template
+    | otherwise = findTempName
   where
     -- We split off the last extension, so we can use .foo.ext files
     -- for temporary files (hidden on Unix OSes). Unfortunately we're
