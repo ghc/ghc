@@ -21,6 +21,9 @@
 typedef void SymbolAddr;
 typedef char SymbolName;
 
+typedef struct _SectionFormatInfo SectionFormatInfo;
+typedef struct _ObjectCodeFormatInfo ObjectCodeFormatInfo;
+
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
     OBJECT_LOADED,
@@ -63,6 +66,9 @@ typedef
       StgWord mapped_offset;      /* offset from the image of mapped_start */
       void* mapped_start;         /* start of mmap() block */
       StgWord mapped_size;        /* size of mmap() block */
+
+      /* A customizable type to augment the Section type. */
+       SectionFormatInfo* info;
    }
    Section;
 
@@ -86,7 +92,10 @@ typedef struct ForeignExportStablePtr_ {
 } ForeignExportStablePtr;
 
 #if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
+/* ios currently uses adjacent got tables, and no symbol extras */
+#if !defined(ios_HOST_OS)
 #define NEED_SYMBOL_EXTRAS 1
+#endif /* ios_HOST_OS */
 #endif
 
 /* Jump Islands are sniplets of machine code required for relative
@@ -132,6 +141,10 @@ typedef struct _ObjectCode {
 
     /* ptr to mem containing the object file image */
     char*      image;
+
+    /* A customizable type, that formats can use to augment ObjectCode */
+    ObjectCodeFormatInfo *info;
+
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
 
@@ -299,12 +312,23 @@ char *cstring_from_section_name(
 #endif
 
 /* Which object file format are we targetting? */
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
+|| defined(linux_android_HOST_OS) \
+|| defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \
+|| defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
+|| defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 #  define OBJFORMAT_ELF
+typedef struct _ObjectCodeFormatInfo { void* placeholder;} ObjectCodeFormatInfo;
+typedef struct _SectionFormatInfo { void* placeholder; } SectionFormatInfo;
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
-#elif defined(darwin_HOST_OS)
+typedef struct _ObjectCodeFormatInfo { void* placeholder;} ObjectCodeFormatInfo;
+typedef struct _SectionFormatInfo { void* placeholder; } SectionFormatInfo;
+#elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
+#  include "linker/MachOTypes.h"
+#else
+#error "Unknown OBJECT_FORMAT for HOST_OS"
 #endif
 
 /* In order to simplify control flow a bit, some references to mmap-related
