@@ -212,28 +212,28 @@ tcHsSigType ctxt sig_ty
        ; checkValidType ctxt ty
        ; return ty }
 
--- kind-checks/desugars an 'LHsSigType' and then kind-generalizes.
+tc_hs_sig_type_and_gen :: LHsSigType Name -> Kind -> TcM Type
+-- Kind-checks/desugars an 'LHsSigType',
+--   solve equalities,
+--   and then kind-generalizes.
 -- This will never emit constraints, as it uses solveEqualities interally.
 -- No validity checking, but it does zonk en route to generalization
-tc_hs_sig_type_and_gen :: LHsSigType Name -> Kind -> TcM Type
-tc_hs_sig_type_and_gen sig_ty kind
-  = do { ty <- tc_hs_sig_type_x solveEqualities sig_ty kind
+tc_hs_sig_type_and_gen hs_ty kind
+  = do { ty <- solveEqualities $
+               tc_hs_sig_type hs_ty kind
+         -- NB the call to solveEqualities, which unifies all those
+         --    kind variables floating about, immediately prior to
+         --    kind generalisation
        ; kindGeneralizeType ty }
 
 tc_hs_sig_type :: LHsSigType Name -> Kind -> TcM Type
--- May emit constraints
+-- Kind-check/desugar a 'LHsSigType', but does not solve
+-- the equalities that arise from doing so; instead it may
+-- emit kind-equality constraints into the monad
 -- No zonking or validity checking
-tc_hs_sig_type = tc_hs_sig_type_x id
-
--- Version of tc_hs_sig_type parameterized over how it should solve
--- equalities
-tc_hs_sig_type_x :: (forall a. TcM a -> TcM a)  -- id or solveEqualities
-                 -> LHsSigType Name -> Kind
-                 -> TcM Type
-tc_hs_sig_type_x solve (HsIB { hsib_body = hs_ty
-                             , hsib_vars = sig_vars }) kind
-  = do { (tkvs, ty) <- solve $
-                       tcImplicitTKBndrsType sig_vars $
+tc_hs_sig_type (HsIB { hsib_vars = sig_vars
+                     , hsib_body = hs_ty }) kind
+  = do { (tkvs, ty) <- tcImplicitTKBndrsType sig_vars $
                        tc_lhs_type typeLevelMode hs_ty kind
        ; return (mkSpecForAllTys tkvs ty) }
 
@@ -332,6 +332,7 @@ tcLHsType ty = addTypeCtxt ty (tc_infer_lhs_type typeLevelMode ty)
 -- | Should we generalise the kind of this type signature?
 -- We *should* generalise if the type is closed
 -- or if NoMonoLocalBinds is set. Otherwise, nope.
+-- See Note [Kind generalisation plan]
 decideKindGeneralisationPlan :: LHsSigType Name -> TcM Bool
 decideKindGeneralisationPlan sig_ty@(HsIB { hsib_closed = closed })
   = do { mono_locals <- xoptM LangExt.MonoLocalBinds
@@ -340,7 +341,34 @@ decideKindGeneralisationPlan sig_ty@(HsIB { hsib_closed = closed })
            (ppr sig_ty $$ text "should gen?" <+> ppr should_gen)
        ; return should_gen }
 
-{-
+{- Note [Kind generalisation plan]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When should we do kind-generalisation for user-written type signature?
+Answer: we use the same rule as for value bindings:
+
+ * We always kind-generalise if the type signature is closed
+ * Additionally, we attempt to generalise if we have NoMonoLocalBinds
+
+Trac #13337 shows the problem if we kind-generalise an open type (i.e.
+one that mentions in-scope tpe variable
+  foo :: forall k (a :: k) proxy. (Typeable k, Typeable a)
+      => proxy a -> String
+  foo _ = case eqT :: Maybe (k :~: Type) of
+            Nothing   -> ...
+            Just Refl -> case eqT :: Maybe (a :~: Int) of ...
+
+In the expression type sig on the last line, we have (a :: k)
+but (Int :: Type).  Since (:~:) is kind-homogeneous, this requires
+k ~ *, which is true in the Refl branch of the outer case.
+
+That equality will be solved if we allow it to float out to the
+implication constraint for the Refl match, bnot not if we aggressively
+attempt to solve all equalities the moment they occur; that is, when
+checking (Maybe (a :~: Int)).   (NB: solveEqualities fails unless it
+solves all the kind equalities, which is the right thing at top level.)
+
+So here the right thing is simply not to do kind generalisation!
+
 ************************************************************************
 *                                                                      *
       Type-checking modes
