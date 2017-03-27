@@ -1908,8 +1908,7 @@ metaTyVarUpdateOK :: DynFlags
                   -> TcType              -- ty :: k2
                   -> Maybe TcType        -- possibly-expanded ty
 -- (metaTyFVarUpdateOK tv ty)
--- We are about to update the meta-tyvar tv with ty, in
--- our on-the-flyh unifier
+-- We are about to update the meta-tyvar tv with ty
 -- Check (a) that tv doesn't occur in ty (occurs check)
 --       (b) that ty does not have any foralls
 --           (in the impredicative case), or type functions
