@@ -1369,13 +1369,8 @@ simplLam env (bndr:bndrs) body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont }
 simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
                                            , sc_cont = cont })
   = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env' (zap_unfolding bndr) (arg, arg_se) (bndrs, body) cont }
+        ; simplNonRecE env (zap_unfolding bndr) (arg, arg_se) (bndrs, body) cont }
   where
-    env' | Coercion co <- arg
-         = extendCvSubst env bndr co
-         | otherwise
-         = env
-
     zap_unfolding bndr  -- See Note [Zap unfolding when beta-reducing]
       | isId bndr, isStableUnfolding (realIdUnfolding bndr)
       = setIdUnfolding bndr NoUnfolding
