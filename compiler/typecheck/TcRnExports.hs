@@ -164,6 +164,9 @@ exports_from_avail :: Maybe (Located [LIE RdrName])
                          -- Nothing => no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails
+                         -- Imported modules; this is used to test if a
+                         -- 'module Foo' export is valid (it's not valid
+                         -- if we didn't import Foo!)
                    -> Module
                    -> RnM (Maybe [LIE Name], [AvailInfo])
 
