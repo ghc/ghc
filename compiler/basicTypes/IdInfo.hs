@@ -29,7 +29,7 @@ module IdInfo (
         -- ** Zapping various forms of Info
         zapLamInfo, zapFragileInfo,
         zapDemandInfo, zapUsageInfo, zapUsageEnvInfo, zapUsedOnceInfo,
-        zapTailCallInfo,
+        zapTailCallInfo, zapCallArityInfo,
 
         -- ** The ArityInfo type
         ArityInfo,
@@ -552,6 +552,9 @@ zapTailCallInfo info
           | otherwise              -> Nothing
         where
           safe_occ = occ { occ_tail = NoTailCallInfo }
+
+zapCallArityInfo :: IdInfo -> IdInfo
+zapCallArityInfo info = setCallArityInfo info 0
 
 {-
 ************************************************************************

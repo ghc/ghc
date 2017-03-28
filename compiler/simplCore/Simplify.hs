@@ -803,7 +803,12 @@ completeBind env top_lvl is_rec mb_cont old_bndr new_bndr new_rhs
                   | otherwise
                   = info2
 
-            final_id = new_bndr `setIdInfo` info3
+              -- Zap call arity info. We have used it by now (via
+              -- `tryEtaExpandRhs`), and the simplifier can invalidate this
+              -- information, leading to broken code later (e.g. #13479)
+            info4 = zapCallArityInfo info3
+
+            final_id = new_bndr `setIdInfo` info4
 
       ; -- pprTrace "Binding" (ppr final_id <+> ppr new_unfolding) $
         return (addNonRec env final_id final_rhs) } }
