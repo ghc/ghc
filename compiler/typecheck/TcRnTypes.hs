@@ -531,7 +531,31 @@ data TcGblEnv
         tcg_imports :: ImportAvails,
           -- ^ Information about what was imported from where, including
           -- things bound in this module. Also store Safe Haskell info
-          -- here about transative trusted packaage requirements.
+          -- here about transitive trusted package requirements.
+          --
+          -- There are not many uses of this field, so you can grep for
+          -- all them.
+          --
+          -- The ImportAvails records information about the following
+          -- things:
+          --
+          --    1. All of the modules you directly imported (tcRnImports)
+          --    2. The orphans (only!) of all imported modules in a GHCi
+          --       session (runTcInteractive)
+          --    3. The module that instantiated a signature
+          --    4. Each of the signatures that merged in
+          --
+          -- It is used in the following ways:
+          --    - imp_orphs is used to determine what orphan modules should be
+          --      visible in the context (tcVisibleOrphanMods)
+          --    - imp_finsts is used to determine what family instances should
+          --      be visible (tcExtendLocalFamInstEnv)
+          --    - To resolve the meaning of the export list of a module
+          --      (tcRnExports)
+          --    - imp_mods is used to compute usage info (mkIfaceTc, deSugar)
+          --    - imp_trust_own_pkg is used for Safe Haskell in interfaces
+          --      (mkIfaceTc, as well as in HscMain)
+          --    - To create the Dependencies field in interface (mkDependencies)
 
         tcg_dus       :: DefUses,   -- ^ What is defined in this module and what is used.
         tcg_used_gres :: TcRef [GlobalRdrElt],  -- ^ Records occurrences of imported entities
