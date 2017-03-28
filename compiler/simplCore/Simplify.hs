@@ -1001,16 +1001,21 @@ simplExprF1 env (Lit lit)      cont = rebuild env (Lit lit) cont
 simplExprF1 env (Tick t expr)  cont = simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = simplCoercionF env co cont
-simplExprF1 env (Type ty)      cont = ASSERT( contIsRhsOrArg cont )
-                                      rebuild env (Type (substTy env ty)) cont
+simplExprF1 env (Type ty)      cont
+  = ASSERT( contIsRhsOrArg cont )
+    do { ty' <- simplType env ty
+       ; rebuild env (Type ty') cont }
 
 simplExprF1 env (App fun arg) cont
-  = simplExprF env fun $
-    case arg of
-      Type ty -> ApplyToTy  { sc_arg_ty  = substTy env ty
-                            , sc_hole_ty = substTy env (exprType fun)
-                            , sc_cont    = cont }
-      _       -> ApplyToVal { sc_arg = arg, sc_env = env
+  = case arg of
+      Type ty -> do { arg' <- simplType env ty
+                    ; hole' <- simplType env (exprType fun)
+                    ; simplExprF env fun $
+                      ApplyToTy { sc_arg_ty  = arg'
+                                , sc_hole_ty = hole'
+                                , sc_cont    = cont } }
+      _       -> simplExprF env fun $
+                 ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_dup = NoDup, sc_cont = cont }
 
 simplExprF1 env expr@(Lam {}) cont
@@ -2217,7 +2222,10 @@ reallyRebuildCase env scrut case_bndr alts cont
 
         ; dflags <- getDynFlags
         ; let alts_ty' = contResultType dup_cont
-        ; case_expr <- mkCase dflags scrut' case_bndr' alts_ty' alts'
+        -- The seqType below is needed to avoid a space leak (#13426)
+        -- but I don't know why.
+        ; case_expr <- seqType alts_ty' `seq`
+                       mkCase dflags scrut' case_bndr' alts_ty' alts'
 
         -- Notice that rebuild gets the in-scope set from env', not alt_env
         -- (which in any case is only build in simplAlts)
