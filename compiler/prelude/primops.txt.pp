@@ -200,7 +200,7 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
    {Return non-zero if there is any possibility that the upper word of a
     signed integer multiply might contain useful information.  Return
     zero only if you are completely sure that no overflow can occur.
-    On a 32-bit platform, the recommmended implementation is to do a
+    On a 32-bit platform, the recommended implementation is to do a
     32 x 32 -> 64 signed multiply, and subtract result[63:32] from
     (result[31] >>signed 31).  If this is zero, meaning that the
     upper word is merely a sign extension of the lower one, no

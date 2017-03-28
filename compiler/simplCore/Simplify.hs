@@ -485,7 +485,7 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
 {-
 {- No, no, no!  Do not try preInlineUnconditionally in completeNonRecX
    Doing so risks exponential behaviour, because new_rhs has been simplified once already
-   In the cases described by the folowing commment, postInlineUnconditionally will
+   In the cases described by the following comment, postInlineUnconditionally will
    catch many of the relevant cases.
         -- This happens; for example, the case_bndr during case of
         -- known constructor:  case (a,b) of x { (p,q) -> ... }

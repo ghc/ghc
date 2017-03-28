@@ -375,7 +375,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
        IF_DEBUG(linker,debugBelch( "Is big-endian\n" ));
    } else {
-       errorBelch("%s: unknown endiannness", oc->fileName);
+       errorBelch("%s: unknown endianness", oc->fileName);
        return 0;
    }
 

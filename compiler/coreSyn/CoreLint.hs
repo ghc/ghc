@@ -2198,7 +2198,7 @@ mkScrutMsg var var_ty scrut_ty subst
 
 mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> MsgDoc
 mkNonDefltMsg e
-  = hang (text "Case expression with DEFAULT not at the beginnning") 4 (ppr e)
+  = hang (text "Case expression with DEFAULT not at the beginning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
   = hang (text "Case expression with badly-ordered alternatives") 4 (ppr e)
 

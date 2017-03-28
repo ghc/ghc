@@ -920,7 +920,7 @@ runCommands' eh sourceErrorHandler gCmd = gmask $ \unmask -> do
 -- A result of Nothing means there was no more input to process.
 -- Otherwise the result is Just b where b is True if the command succeeded;
 -- this is relevant only to ghc -e, which will exit with status 1
--- if the commmand was unsuccessful. GHCi will continue in either case.
+-- if the command was unsuccessful. GHCi will continue in either case.
 runOneCommand :: (SomeException -> GHCi Bool) -> InputT GHCi (Maybe String)
             -> InputT GHCi (Maybe Bool)
 runOneCommand eh gCmd = do
