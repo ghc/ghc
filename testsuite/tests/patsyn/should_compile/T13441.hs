@@ -21,9 +21,16 @@ type family Replicate (n :: Nat) (x :: a) = (r :: [a]) where
 
 type Vec n a = FList Identity (Replicate n a)
 
+-- Using explicitly-bidirectional pattern
 pattern (:>) :: forall n a. n ~ Length (Replicate n a)
              => forall m. n ~ Succ m
              => a -> Vec m a -> Vec n a
 pattern x :> xs <- Identity x :@ xs
   where
     x :> xs = Identity x :@ xs
+
+-- Using implicitly-bidirectional pattern
+pattern (:>>) :: forall n a. n ~ Length (Replicate n a)
+             => forall m. n ~ Succ m
+             => a -> Vec m a -> Vec n a
+pattern x :>> xs = Identity x :@ xs
