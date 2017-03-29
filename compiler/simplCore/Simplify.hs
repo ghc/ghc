@@ -51,6 +51,7 @@ import FastString
 import Pair
 import Util
 import ErrUtils
+import Module          ( moduleName, pprModuleName )
 
 {-
 The guts of the simplifier is in this module, but the driver loop for
@@ -1784,7 +1785,7 @@ tryRules env rules fn args call_cont
              do { nodump dflags  -- This ensures that an empty file is written
                 ; return Nothing } ;  -- No rule matches
            Just (rule, rule_rhs) ->
-             do { checkedTick (RuleFired (ru_name rule))
+             do { checkedTick (RuleFired (ruleName rule))
                 ; let cont' = pushSimplifiedArgs env
                                                  (drop (ruleArity rule) args)
                                                  call_cont
@@ -1796,17 +1797,23 @@ tryRules env rules fn args call_cont
                 ; dump dflags rule rule_rhs
                 ; return (Just (occ_anald_rhs, cont')) }}}
   where
+    printRuleModule rule =
+      parens
+        (maybe (text "BUILTIN") (pprModuleName . moduleName) (ruleModule rule))
+
     dump dflags rule rule_rhs
       | dopt Opt_D_dump_rule_rewrites dflags
       = log_rule dflags Opt_D_dump_rule_rewrites "Rule fired" $ vcat
-          [ text "Rule:" <+> ftext (ru_name rule)
+          [ text "Rule:" <+> ftext (ruleName rule)
+          , text "Module:" <+>  printRuleModule rule
           , text "Before:" <+> hang (ppr fn) 2 (sep (map ppr args))
           , text "After: " <+> pprCoreExpr rule_rhs
           , text "Cont:  " <+> ppr call_cont ]
 
       | dopt Opt_D_dump_rule_firings dflags
       = log_rule dflags Opt_D_dump_rule_firings "Rule fired:" $
-          ftext (ru_name rule)
+          ftext (ruleName rule)
+            <+> printRuleModule rule
 
       | otherwise
       = return ()

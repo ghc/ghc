@@ -263,7 +263,7 @@ pprRulesForUser :: DynFlags -> [CoreRule] -> SDoc
 pprRulesForUser dflags rules
   = withPprStyle (defaultUserStyle dflags) $
     pprRules $
-    sortBy (comparing ru_name) $
+    sortBy (comparing ruleName) $
     tidyRules emptyTidyEnv rules
 
 {-
@@ -420,7 +420,7 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
   | debugIsOn = let pp_rule rule = sdocWithPprDebug $ \dbg -> if dbg
                         then ppr rule
-                        else doubleQuotes (ftext (ru_name rule))
+                        else doubleQuotes (ftext (ruleName rule))
                 in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
                          (vcat [ sdocWithPprDebug $ \dbg -> if dbg
                                    then text "Expression to match:" <+> ppr fn
