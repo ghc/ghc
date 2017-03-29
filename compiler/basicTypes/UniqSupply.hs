@@ -77,7 +77,7 @@ takeUniqFromSupply :: UniqSupply -> (Unique, UniqSupply)
 -- ^ Obtain the 'Unique' from this particular 'UniqSupply', and a new supply
 
 mkSplitUniqSupply c
-  = case ord c `shiftL` UNIQUE_BITS of
+  = case ord c `shiftL` uNIQUE_BITS of
      mask -> let
         -- here comes THE MAGIC:
 

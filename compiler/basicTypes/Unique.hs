@@ -22,6 +22,7 @@ Haskell).
 module Unique (
         -- * Main data types
         Unique, Uniquable(..),
+        uNIQUE_BITS,
 
         -- ** Constructors, destructors and operations on 'Unique's
         hasKey,
@@ -98,6 +99,10 @@ Fast comparison is everything on @Uniques@:
 -- These are sometimes also referred to as \"keys\" in comments in GHC.
 newtype Unique = MkUnique Int
 
+{-# INLINE uNIQUE_BITS #-}
+uNIQUE_BITS :: Int
+uNIQUE_BITS = finiteBitSize (0 :: Int) - UNIQUE_TAG_BITS
+
 {-
 Now come the functions which construct uniques from their pieces, and vice versa.
 The stuff about unique *supplies* is handled further down this module.
@@ -132,7 +137,7 @@ newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 -- | How many bits are devoted to the unique index (as opposed to the class
 -- character).
 uniqueMask :: Int
-uniqueMask = (1 `shiftL` UNIQUE_BITS) - 1
+uniqueMask = (1 `shiftL` uNIQUE_BITS) - 1
 
 -- pop the Char in the top 8 bits of the Unique(Supply)
 
@@ -146,14 +151,14 @@ mkUnique :: Char -> Int -> Unique       -- Builds a unique from pieces
 mkUnique c i
   = MkUnique (tag .|. bits)
   where
-    tag  = ord c `shiftL` UNIQUE_BITS
+    tag  = ord c `shiftL` uNIQUE_BITS
     bits = i .&. uniqueMask
 
 unpkUnique (MkUnique u)
   = let
         -- as long as the Char may have its eighth bit set, we
         -- really do need the logical right-shift here!
-        tag = chr (u `shiftR` UNIQUE_BITS)
+        tag = chr (u `shiftR` uNIQUE_BITS)
         i   = u .&. uniqueMask
     in
     (tag, i)
