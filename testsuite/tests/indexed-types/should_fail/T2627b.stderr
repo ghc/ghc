@@ -1,13 +1,9 @@
 
 T2627b.hs:20:24: error:
-    • Couldn't match type ‘b0’ with ‘Dual (Dual b0)’
+    • Occurs check: cannot construct the infinite type:
+        b0 ~ Dual (Dual b0)
         arising from a use of ‘conn’
-        ‘b0’ is untouchable
-          inside the constraints: b ~ W e f
-          bound by a pattern with constructor:
-                     Wr :: forall e f. e -> Comm f -> Comm (W e f),
-                   in an equation for ‘conn’
-          at T2627b.hs:20:14-19
+      The type variable ‘b0’ is ambiguous
     • In the expression: conn undefined undefined
       In an equation for ‘conn’:
           conn (Rd k) (Wr a r) = conn undefined undefined
