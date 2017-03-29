@@ -210,7 +210,9 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
        ; umatches <- mapM (tcCollectingUsage . tcMatch ctxt pat_tys rhs_ty) matches
        ; let (usages,matches') = unzip umatches
        ; tcEmitBindingUsage $
-           case usages of -- Interesting that empty cases must be special-cased
+           case usages of -- Interestingly the empty cases must be
+                          -- special-cased: @zeroUE@ is not the identity of
+                          -- @supUE@.
              [] -> zeroUE
              _  -> foldr1 supUE usages
        ; pat_tys  <- mapM (mapM readExpType) pat_tys
