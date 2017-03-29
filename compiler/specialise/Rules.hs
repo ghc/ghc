@@ -555,12 +555,16 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
         | isId tmpl_var
         = case lookupVarEnv id_subst tmpl_var of
              Just e -> (rs, e)
-             _      -> unbound tmpl_var
+             Nothing | Just refl_co <- isReflCoVar_maybe tmpl_var
+                     , let co_expr = Coercion refl_co
+                     -> (rs { rs_id_subst = extendVarEnv id_subst tmpl_var co_expr }, co_expr)
+                     | otherwise
+                     -> unbound tmpl_var
         | otherwise
         = case lookupVarEnv tv_subst tmpl_var of
              Just ty -> (rs, Type ty)
              Nothing -> (rs { rs_tv_subst = extendVarEnv tv_subst tmpl_var fake_ty }, Type fake_ty)
-             -- See Note [Unbound template type variables]
+                        -- See Note [Unbound RULE binders]
         where
           fake_ty = anyTypeOfKind kind
           cv_subst = to_co_env id_subst
@@ -584,10 +588,14 @@ matchN (in_scope, id_unf) rule_name tmpl_vars tmpl_es target_es
                        , text "LHS args:" <+> ppr tmpl_es
                        , text "Actual args:" <+> ppr target_es ]
 
-{- Note [Unbound template type variables]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Type synonyms with phantom args can give rise to unbound template type
-variables.  Consider this (Trac #10689, simplCore/should_compile/T10689):
+{- Note [Unbound RULE binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It can be the case that the binder in a rule is not actually
+bound on the LHS:
+
+* Type variables.  Type synonyms with phantom args can give rise to
+  unbound template type variables.  Consider this (Trac #10689,
+  simplCore/should_compile/T10689):
 
     type Foo a b = b
 
@@ -597,12 +605,31 @@ variables.  Consider this (Trac #10689, simplCore/should_compile/T10689):
     {-# RULES "foo" forall (x :: Foo a Char). f x = True #-}
     finkle = f 'c'
 
-The rule looks like
-   foall (a::*) (d::Eq Char) (x :: Foo a Char).
+  The rule looks like
+    forall (a::*) (d::Eq Char) (x :: Foo a Char).
          f (Foo a Char) d x = True
 
-Matching the rule won't bind 'a', and legitimately so.  We fudge by
-pretending that 'a' is bound to (Any :: *).
+  Matching the rule won't bind 'a', and legitimately so.  We fudge by
+  pretending that 'a' is bound to (Any :: *).
+
+* Coercion variables.  On the LHS of a RULE for a local binder
+  we might have
+    RULE forall (c :: a~b). f (x |> c) = e
+  Now, if that binding is inlined, so that a=b=Int, we'd get
+    RULE forall (c :: Int~Int). f (x |> c) = e
+  and now when we simpilfy the LHS (Simplify.simplRule) we
+  optCoercion will turn that 'c' into Refl:
+    RULE forall (c :: Int~Int). f (x |> <Int>) = e
+  and then perhaps drop it altogether.  Now 'c' is unbound.
+
+  It's tricky to be sure this never happens, so instead I
+  say it's OK to have an unbound coercion binder in a RULE
+  provided its type is (c :: t~t).  Then, when the RULE
+  fires we can substitute <t> for c.
+
+  This actually happened (in a RULE for a local function)
+  in Trac #13410, and also in test T10602.
+
 
 Note [Template binders]
 ~~~~~~~~~~~~~~~~~~~~~~~
