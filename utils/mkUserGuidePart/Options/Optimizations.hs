@@ -183,6 +183,13 @@ optimizationsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-fno-max-relevant-bindings"
          }
+  , flag { flagName = "-fmax-valid-substitutions=⟨n⟩"
+         , flagDescription =
+           "*default: 6.* Set the maximum number of valid substitutions for"++
+           "typed holes to display in type error messages."
+         , flagType = DynamicFlag
+         , flagReverse = "-fno-max-valid-substitutions"
+         }
   , flag { flagName = "-fmax-uncovered-patterns=⟨n⟩"
          , flagDescription =
            "*default: 4.* Set the maximum number of patterns to display in "++

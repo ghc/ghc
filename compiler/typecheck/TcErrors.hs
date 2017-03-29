@@ -32,7 +32,8 @@ import HsExpr  ( UnboundVar(..) )
 import HsBinds ( PatSynBind(..) )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
-               , mkRdrUnqual, isLocalGRE, greSrcSpan )
+               , mkRdrUnqual, isLocalGRE, greSrcSpan, pprNameProvenance
+               , GlobalRdrElt (..), globalRdrEnvElts )
 import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey )
 import Id
 import Var
@@ -42,8 +43,10 @@ import NameSet
 import Bag
 import ErrUtils         ( ErrMsg, errDoc, pprLocErrMsg )
 import BasicTypes
-import ConLike          ( ConLike(..) )
+import ConLike          ( ConLike(..), conLikeWrapId_maybe )
 import Util
+import HscTypes (HscEnv, lookupTypeHscEnv, TypeEnv, lookupTypeEnv )
+import NameEnv (lookupNameEnv)
 import FastString
 import Outputable
 import SrcLoc
@@ -219,12 +222,16 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes
 data Report
   = Report { report_important :: [SDoc]
            , report_relevant_bindings :: [SDoc]
+           , report_valid_substitutions :: [SDoc]
            }
 
 instance Outputable Report where   -- Debugging only
-  ppr (Report { report_important = imp, report_relevant_bindings = rel })
+  ppr (Report { report_important = imp
+              , report_relevant_bindings = rel
+              , report_valid_substitutions = val })
     = vcat [ text "important:" <+> vcat imp
-           , text "relevant:"  <+> vcat rel ]
+           , text "relevant:"  <+> vcat rel
+           , text "valid:"  <+> vcat val ]
 
 {- Note [Error report]
 The idea is that error msgs are divided into three parts: the main msg, the
@@ -241,12 +248,13 @@ multiple places so they have to be in the Report.
 
 #if __GLASGOW_HASKELL__ > 710
 instance Semigroup Report where
-    Report a1 b1 <> Report a2 b2 = Report (a1 ++ a2) (b1 ++ b2)
+    Report a1 b1 c1 <> Report a2 b2 c2 = Report (a1 ++ a2) (b1 ++ b2) (c1 ++ c2)
 #endif
 
 instance Monoid Report where
-    mempty = Report [] []
-    mappend (Report a1 b1) (Report a2 b2) = Report (a1 ++ a2) (b1 ++ b2)
+    mempty = Report [] [] []
+    mappend (Report a1 b1 c1) (Report a2 b2 c2)
+      = Report (a1 ++ a2) (b1 ++ b2) (c1 ++ c2)
 
 -- | Put a doc into the important msgs block.
 important :: SDoc -> Report
@@ -255,6 +263,10 @@ important doc = mempty { report_important = [doc] }
 -- | Put a doc into the relevant bindings block.
 relevant_bindings :: SDoc -> Report
 relevant_bindings doc = mempty { report_relevant_bindings = [doc] }
+
+-- | Put a doc into the valid substitutions block.
+valid_substitutions :: SDoc -> Report
+valid_substitutions docs = mempty { report_valid_substitutions = [docs] }
 
 data TypeErrorChoice   -- What to do for type errors found by the type checker
   = TypeError     -- A type error aborts compilation with an error message
@@ -865,10 +877,10 @@ mkErrorMsgFromCt ctxt ct report
   = mkErrorReport ctxt (ctLocEnv (ctLoc ct)) report
 
 mkErrorReport :: ReportErrCtxt -> TcLclEnv -> Report -> TcM ErrMsg
-mkErrorReport ctxt tcl_env (Report important relevant_bindings)
+mkErrorReport ctxt tcl_env (Report important relevant_bindings valid_subs)
   = do { context <- mkErrInfo (cec_tidy ctxt) (tcl_ctxt tcl_env)
        ; mkErrDocAt (RealSrcSpan (tcl_loc tcl_env))
-            (errDoc important [context] relevant_bindings)
+            (errDoc important [context] (relevant_bindings ++ valid_subs))
        }
 
 type UserGiven = Implication
@@ -1051,9 +1063,11 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
                   = givenConstraintsMsg ctxt
                | otherwise = empty
 
+       ; sub_msg <-  validSubstitutions ct
        ; mkErrorMsgFromCt ctxt ct $
             important hole_msg `mappend`
-            relevant_bindings (binds_msg $$ constraints_msg) }
+            relevant_bindings (binds_msg $$ constraints_msg) `mappend`
+            valid_substitutions sub_msg}
 
   where
     occ     = holeOcc hole
@@ -1100,6 +1114,98 @@ mkHoleError ctxt ct@(CHoleCan { cc_hole = hole })
 mkHoleError _ ct = pprPanic "mkHoleError" (ppr ct)
 
 
+-- See Note [Valid substitutions include ...]
+validSubstitutions :: Ct -> TcM SDoc
+validSubstitutions ct | isExprHoleCt ct =
+  do { top_env <- getTopEnv
+     ; rdr_env <- getGlobalRdrEnv
+     ; gbl_env <- tcg_type_env <$> getGblEnv
+     ; lcl_env <- getLclTypeEnv
+     ; dflags <- getDynFlags
+     ; (discards, substitutions) <-
+        go (gbl_env, lcl_env, top_env) (maxValidSubstitutions dflags)
+         $ localsFirst $ globalRdrEnvElts rdr_env
+     ; return $ ppUnless (null substitutions) $
+                 hang (text "Valid substitutions include")
+                  2 (vcat (map (ppr_sub rdr_env) substitutions)
+                    $$ ppWhen discards subsDiscardMsg) }
+  where
+    hole_ty :: TcPredType
+    hole_ty = ctEvPred (ctEvidence ct)
+
+    hole_env = ctLocEnv $ ctEvLoc $ ctEvidence ct
+
+    localsFirst :: [GlobalRdrElt] -> [GlobalRdrElt]
+    localsFirst elts = lcl ++ gbl
+      where (lcl, gbl) = partition gre_lcl elts
+
+    getBndrOcc :: TcIdBinder -> OccName
+    getBndrOcc (TcIdBndr id _) = occName $ getName id
+    getBndrOcc (TcIdBndr_ExpType name _ _) = occName $ getName name
+
+    relBindSet =  mkOccSet $ map getBndrOcc $ tcl_bndrs hole_env
+
+    shouldBeSkipped :: GlobalRdrElt -> Bool
+    shouldBeSkipped el = (occName $ gre_name el) `elemOccSet` relBindSet
+
+    ppr_sub :: GlobalRdrEnv -> Id -> SDoc
+    ppr_sub rdr_env id = case lookupGRE_Name rdr_env (idName id) of
+        Just elt -> sep [ idAndTy, nest 2 (parens $ pprNameProvenance elt)]
+        _ -> idAndTy
+      where name = idName id
+            ty = varType id
+            idAndTy = (pprPrefixOcc name <+> dcolon <+> pprType ty)
+
+    tyToId :: TyThing -> Maybe Id
+    tyToId (AnId i) = Just i
+    tyToId (AConLike c) = conLikeWrapId_maybe c
+    tyToId _ = Nothing
+
+    tcTyToId :: TcTyThing -> Maybe Id
+    tcTyToId (AGlobal id) = tyToId id
+    tcTyToId (ATcId id _) = Just id
+    tcTyToId _ = Nothing
+
+    substituteable :: Id -> Bool
+    substituteable = tcEqType hole_ty . varType
+
+    lookupTopId :: HscEnv -> Name -> IO (Maybe Id)
+    lookupTopId env name =
+        maybe Nothing tyToId <$> lookupTypeHscEnv env name
+
+    lookupGblId :: TypeEnv -> Name -> Maybe Id
+    lookupGblId env name = maybe Nothing tyToId $ lookupTypeEnv env name
+
+    lookupLclId :: TcTypeEnv -> Name -> Maybe Id
+    lookupLclId env name = maybe Nothing tcTyToId $ lookupNameEnv env name
+
+    go ::  (TypeEnv, TcTypeEnv, HscEnv) -> Maybe Int -> [GlobalRdrElt]
+       -> TcM (Bool, [Id])
+    go = go_ []
+
+    go_ ::  [Id] -> (TypeEnv, TcTypeEnv, HscEnv) -> Maybe Int -> [GlobalRdrElt]
+         -> TcM (Bool, [Id])
+    go_ subs _ _ [] = return (False, reverse subs)
+    go_ subs _ (Just 0) _ = return (True, reverse subs)
+    go_ subs envs@(gbl,lcl,top) maxleft (el:elts) =
+       if shouldBeSkipped el then discard_it
+         else do { maybeId <- liftIO lookupId
+                 ; case maybeId of
+                     Just id | substituteable id ->
+                       go_ (id:subs) envs ((\n -> n - 1) <$> maxleft) elts
+                     _ -> discard_it }
+      where name = gre_name el
+            discard_it = go_ subs envs maxleft elts
+            getTopId = lookupTopId top name
+            gbl_id = lookupGblId gbl name
+            lcl_id = lookupLclId lcl name
+            lookupId = if (isJust lcl_id) then return lcl_id
+                       else if (isJust gbl_id) then return gbl_id else getTopId
+
+
+validSubstitutions _ = return empty
+
+
 -- See Note [Constraints include ...]
 givenConstraintsMsg :: ReportErrCtxt -> SDoc
 givenConstraintsMsg ctxt =
@@ -1139,6 +1245,45 @@ mkIPErr ctxt cts
     (ct1:_) = cts
 
 {-
+Note [Valid substitutions include ...]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+`validSubstitutions` returns the "Valid substitutions include ..." message.
+For example, look at the following definitions in a file called test.hs:
+
+    ps :: String -> IO ()
+    ps = putStrLn
+
+    ps2 :: a -> IO ()
+    ps2 _ = putStrLn "hello, world"
+
+    main :: IO ()
+    main = _ "hello, world"
+
+The hole in `main` would generate the message:
+
+    Valid substitutions include
+      ps :: String -> IO () ((defined at test.hs:2:1)
+      putStrLn :: String -> IO ()
+        (imported from ‘Prelude’ at test.hs:1:1
+         (and originally defined in ‘System.IO’))
+      putStr :: String -> IO ()
+        (imported from ‘Prelude’ at test.hs:1:1
+         (and originally defined in ‘System.IO’))
+
+Valid substitutions are found by checking names in scope.
+
+Currently the implementation only looks at exact type matches, as given by
+`tcEqType`, so we DO NOT report `ps2` as a valid substitution in the example,
+even though it fits in the hole. To determine that `ps2` fits in the hole,
+we would need to check ids for subsumption, i.e. that the type of the hole is
+a subtype of the id. This can be done using `tcSubType` from `TcUnify` and
+`tcCheckSatisfiability` in `TcSimplify`.  Unfortunately, `TcSimplify` uses
+`TcErrors` to report errors found during constraint checking, so checking for
+subsumption in holes would involve shuffling some code around in `TcSimplify`,
+to make a non-error reporting constraint satisfiability checker which could
+then be used for checking whether a given id satisfies the constraints imposed
+by the hole.
+
 Note [Constraints include ...]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 'givenConstraintsMsg' returns the "Constraints include ..." message enabled by
@@ -2786,6 +2931,11 @@ relevantBindings want_filtering ctxt ct
 discardMsg :: SDoc
 discardMsg = text "(Some bindings suppressed;" <+>
              text "use -fmax-relevant-binds=N or -fno-max-relevant-binds)"
+
+subsDiscardMsg :: SDoc
+subsDiscardMsg =
+    text "(Some substitutions suppressed;" <+>
+    text "use -fmax-valid-substitutions=N or -fno-max-valid-substitutions)"
 
 -----------------------
 warnDefaulting :: [Ct] -> Type -> TcM ()

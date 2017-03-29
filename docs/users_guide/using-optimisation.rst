@@ -395,6 +395,16 @@ list.
     they may be numerous), but ``-fno-max-relevant-bindings`` includes
     them too.
 
+.. ghc-flag:: -fmax-valid-substitutions=<n>
+              -fno-max-valid-substitutions
+
+    :default: 6
+
+    The type checker sometimes displays a list of valid substitutions
+    for typed holes in error messages, but only up to some maximum number,
+    set by this flag. Turning it off with
+    ``-fno-max-valid-substitutions`` gives an unlimited number.
+
 .. ghc-flag:: -fmax-uncovered-patterns=<n>
 
     :default: 4
