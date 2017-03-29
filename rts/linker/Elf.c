@@ -1,6 +1,10 @@
 #include "Rts.h"
 
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
+|| defined(linux_android_HOST_OS) \
+|| defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \
+|| defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
+|| defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 
 #include "RtsUtils.h"
 #include "RtsSymbolInfo.h"
@@ -613,13 +617,13 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
         /* .rodata-style section */
         return SECTIONKIND_CODE_OR_RODATA;
     }
-#ifndef openbsd_HOST_OS
+#ifdef SHT_INIT_ARRAY
     if (hdr->sh_type == SHT_INIT_ARRAY
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
        /* .init_array section */
         return SECTIONKIND_INIT_ARRAY;
     }
-#endif /* not OpenBSD */
+#endif /* not SHT_INIT_ARRAY */
     if (hdr->sh_type == SHT_NOBITS
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
         /* .bss-style section */

@@ -1895,7 +1895,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
     let thread_opts
          | WayThreaded `elem` ways dflags =
             let os = platformOS (targetPlatform dflags)
-            in if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD,
+            in if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD, OSAndroid,
                              OSNetBSD, OSHaiku, OSQNXNTO, OSiOS, OSDarwin]
                then []
                else ["-lpthread"]
