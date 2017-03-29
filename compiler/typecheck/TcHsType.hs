@@ -1913,7 +1913,7 @@ tcPatSig in_pat_bind sig res_ty
         -- and not already in scope. These are the ones
         -- that should be brought into scope
 
-        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0 -- TODO: arnaud: distributes the weight of the type to the component. Correct for now as the weight of the component is always 1, but should actually be a multiplication, using the join of (multiplicative, writer) monadic structure of Weighted
+        ; let sig_wcs = map (\(x,y)-> (x,weightedSet res_ty y)) sig_wcs0 -- TODO: arnaud: distributes the weight of the type to the component. Correct for now as the weight of the component is always 1, but should actually be a multiplication, using the join of (multiplicative, writer) monadic structure of Weighted. -- The previous comment may not be accurate as we are seemingly typechecking types. I seem to have assumed we were checking patterns.
         ; let sig_tvs_weighted = map (weightedSet res_ty) sig_tvs -- TODO: arnaud: see previous
         ; if null sig_tvs then do {
                 -- Just do the subsumption check and return
