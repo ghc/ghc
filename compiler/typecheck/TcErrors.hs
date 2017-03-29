@@ -1474,22 +1474,21 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
         , report
         ]
 
-  -- So tv is a meta tyvar (or started that way before we
-  -- generalised it).  So presumably it is an *untouchable*
-  -- meta tyvar or a SigTv, else it'd have been unified
   | OC_Occurs <- occ_check_expand
-  , insoluble_occurs_check
-         -- See Note [Occurs check error] in TcCanonical
-  = do { let occCheckMsg = important $ addArising (ctOrigin ct) $
-                           hang (text "Occurs check: cannot construct the infinite" <+> what <> colon)
+    -- We report an "occurs check" even for  a ~ F t a, where F is a type
+    -- function; it's not insouble (because in principle F could reduce)
+    -- but we have certainly been unable to solve it
+    -- See Note [Occurs check error] in TcCanonical
+  = do { let main_msg = addArising (ctOrigin ct) $
+                        hang (text "Occurs check: cannot construct the infinite" <+> what <> colon)
                               2 (sep [ppr ty1, char '~', ppr ty2])
+
              extra2 = important $ mkEqInfoMsg ct ty1 ty2
 
-             interesting_tyvars
-               = filter (not . noFreeVarsOfType . tyVarKind) $
-                 filter isTyVar $
-                 fvVarList $
-                 tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
+             interesting_tyvars = filter (not . noFreeVarsOfType . tyVarKind) $
+                                  filter isTyVar $
+                                  fvVarList $
+                                  tyCoFVsOfType ty1 `unionFV` tyCoFVsOfType ty2
              extra3 = relevant_bindings $
                       ppWhen (not (null interesting_tyvars)) $
                       hang (text "Type variable kinds:") 2 $
@@ -1497,7 +1496,8 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
                                 interesting_tyvars)
 
              tyvar_binding tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
-       ; mkErrorMsgFromCt ctxt ct $ mconcat [occCheckMsg, extra2, extra3, report] }
+       ; mkErrorMsgFromCt ctxt ct $
+         mconcat [important main_msg, extra2, extra3, report] }
 
   | OC_Bad <- occ_check_expand
   = do { let msg = vcat [ text "Cannot instantiate unification variable"
@@ -1546,6 +1546,9 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
        ; mkErrorMsgFromCt ctxt ct (mconcat [msg, tv_extra, report]) }
 
   -- Nastiest case: attempt to unify an untouchable variable
+  -- So tv is a meta tyvar (or started that way before we
+  -- generalised it).  So presumably it is an *untouchable*
+  -- meta tyvar or a SigTv, else it'd have been unified
   -- See Note [Error messages for untouchables]
   | (implic:_) <- cec_encl ctxt   -- Get the innermost context
   , Implic { ic_env = env, ic_given = given
