@@ -2713,7 +2713,7 @@ primop   AddrToAnyOp "addrToAny#" GenPrimOp
 
 primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, Addr# #)
-   { Retrive the address of any Haskell value. This is
+   { Retrieve the address of any Haskell value. This is
      essentially an {\texttt unsafeCoerce\#}, but if implemented as such
      the core lint pass complains and fails to compile.
      As a primop, it is opaque to core/stg, and only appears

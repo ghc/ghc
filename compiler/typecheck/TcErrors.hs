@@ -1621,7 +1621,7 @@ mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
 
   | OC_Occurs <- occ_check_expand
     -- We report an "occurs check" even for  a ~ F t a, where F is a type
-    -- function; it's not insouble (because in principle F could reduce)
+    -- function; it's not insoluble (because in principle F could reduce)
     -- but we have certainly been unable to solve it
     -- See Note [Occurs check error] in TcCanonical
   = do { let main_msg = addArising (ctOrigin ct) $

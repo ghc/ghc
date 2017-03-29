@@ -662,7 +662,7 @@ is collected here, in @matchWrapper@.  This function takes as
 arguments:
 \begin{itemize}
 \item
-Typchecked @Matches@ (of a function definition, or a case or lambda
+Typechecked @Matches@ (of a function definition, or a case or lambda
 expression)---the main input;
 \item
 An error message to be inserted into any (runtime) pattern-matching
