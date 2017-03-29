@@ -353,9 +353,20 @@ tc_pat penv (LazyPat pat) pat_ty thing_inside
         ; return (LazyPat pat', res) }
 
 tc_pat _ (WildPat _) pat_ty thing_inside
-  = do  { res <- thing_inside
+  = checkLinearity $
+    do  { res <- thing_inside
         ; pat_ty <- expTypeToType (weightedThing pat_ty)
         ; return (WildPat pat_ty, res) }
+    where
+      checkLinearity tc_wildcard =
+        if subweight Zero (weightedWeight pat_ty) then
+          tc_wildcard
+        else do
+          addErrTc $ text "Wildcard patterns of weight " <+>
+                     quotes (ppr $ weightedWeight pat_ty) <+>
+                     text "are not allowed"
+          tc_wildcard
+
 
 tc_pat penv (AsPat (L nm_loc name) pat) pat_ty thing_inside
   = do  { (wrap, bndr_id) <- setSrcSpan nm_loc (tcPatBndr penv name pat_ty)
