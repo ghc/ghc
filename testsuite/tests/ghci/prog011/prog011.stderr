@@ -1,2 +1,2 @@
 
-prog011.hx:14:22: Empty 'do' block
+prog011.hx:14:22: error: Empty 'do' block

@@ -1856,7 +1856,8 @@ unknownNameSuggestions_ :: WhereLooking -> DynFlags
                        -> RdrName -> SDoc
 unknownNameSuggestions_ where_look dflags global_env local_env imports tried_rdr_name =
     similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions where_look imports tried_rdr_name
+    importSuggestions where_look  imports tried_rdr_name $$
+    extensionSuggestions tried_rdr_name
 
 
 similarNameSuggestions :: WhereLooking -> DynFlags
@@ -2086,6 +2087,13 @@ importSuggestions where_look imports rdr_name
   -- explicit import list
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
+
+extensionSuggestions :: RdrName -> SDoc
+extensionSuggestions rdrName
+  | rdrName == mkUnqual varName (fsLit "mdo") ||
+    rdrName == mkUnqual varName (fsLit "rec")
+      = text "Perhaps you meant to use RecursiveDo"
+  | otherwise = Outputable.empty
 
 {-
 ************************************************************************

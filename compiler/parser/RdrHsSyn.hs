@@ -805,8 +805,10 @@ checkLPat msg e@(L l _) = checkPat msg l e []
 
 checkPat :: SDoc -> SrcSpan -> LHsExpr RdrName -> [LPat RdrName]
          -> P (LPat RdrName)
-checkPat _ loc (L l (HsVar (L _ c))) args
+checkPat _ loc (L l e@(HsVar (L _ c))) args
   | isRdrDataCon c = return (L loc (ConPatIn (L l c) (PrefixCon args)))
+  | not (null args) && patIsRec c =
+      patFail (text "Perhaps you intended to use RecursiveDo") l e
 checkPat msg loc e args     -- OK to let this happen even if bang-patterns
                         -- are not enabled, because there is no valid
                         -- non-bang-pattern parse of (C ! e)
@@ -912,6 +914,9 @@ patFail :: SDoc -> SrcSpan -> HsExpr RdrName -> P a
 patFail msg loc e = parseErrorSDoc loc err
     where err = text "Parse error in pattern:" <+> ppr e
              $$ msg
+
+patIsRec :: RdrName -> Bool
+patIsRec e = e == mkUnqual varName (fsLit "rec")
 
 
 ---------------------------------------------------------------------------

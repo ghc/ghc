@@ -2405,14 +2405,18 @@ srcParseErr options buf len
               $$ ppWhen (not th_enabled && token == "$") -- #7396
                         (text "Perhaps you intended to use TemplateHaskell")
               $$ ppWhen (token == "<-")
-                        (text "Perhaps this statement should be within a 'do' block?")
+                        (if mdoInLast100
+                           then text "Perhaps you intended to use RecursiveDo"
+                           else text "Perhaps this statement should be within a 'do' block?")
               $$ ppWhen (token == "=")
                         (text "Perhaps you need a 'let' in a 'do' block?"
                          $$ text "e.g. 'let x = 5' instead of 'x = 5'")
-              $$ ppWhen (not ps_enabled && pattern == "pattern") -- #12429
+              $$ ppWhen (not ps_enabled && pattern == "pattern ") -- #12429
                         (text "Perhaps you intended to use PatternSynonyms")
   where token = lexemeToString (offsetBytes (-len) buf) len
-        pattern = lexemeToString (offsetBytes (-len - 8) buf) 7
+        pattern = decodePrevNChars 8 buf
+        last100 = decodePrevNChars 100 buf
+        mdoInLast100 = "mdo" `isInfixOf` last100
         th_enabled = extopt LangExt.TemplateHaskell options
         ps_enabled = extopt LangExt.PatternSynonyms options
 
