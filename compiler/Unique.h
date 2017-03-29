@@ -1,3 +1,5 @@
-#include "../includes/MachDeps.h"
-
-#define UNIQUE_BITS (WORD_SIZE_IN_BITS - 8)
+/* unique has the following structure:
+ * HsInt unique =
+ *    (unique_tag << (sizeof (HsInt) - UNIQUE_TAG_BITS)) | unique_number
+ */
+#define UNIQUE_TAG_BITS 8
