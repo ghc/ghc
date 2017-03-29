@@ -1423,16 +1423,14 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
        ; rhs_ty <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
-                                 mkBadJoinPointRuleMsg fun join_arity rule
+                                mkBadJoinPointRuleMsg fun join_arity rule
                                -- See Note [Rules for join points]
                              ; lintCoreExpr rhs }
                      _ -> markAllJoinsBad $ lintCoreExpr rhs
        ; ensureEqTys lhs_ty rhs_ty $
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
                             , text "rhs type:" <+> ppr rhs_ty ])
-       ; let bad_bndrs = filterOut (`elemVarSet` exprsFreeVars args) $
-                         filter (`elemVarSet` exprFreeVars rhs) $
-                         bndrs
+       ; let bad_bndrs = filter is_bad_bndr bndrs
 
        ; checkL (null bad_bndrs)
                 (rule_doc <+> text "unbound" <+> ppr bad_bndrs)
@@ -1440,6 +1438,16 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
     }
   where
     rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
+
+    lhs_fvs = exprsFreeVars args
+    rhs_fvs = exprFreeVars rhs
+
+    is_bad_bndr :: Var -> Bool
+    -- See Note [Unbound RULE binders] in Rules
+    is_bad_bndr bndr = not (bndr `elemVarSet` lhs_fvs)
+                    && bndr `elemVarSet` rhs_fvs
+                    && isNothing (isReflCoVar_maybe bndr)
+
 
 {- Note [Linting rules]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1460,7 +1468,7 @@ this check will nail it.
 NB (Trac #11643): it's possible that a variable listed in the
 binders becomes not-mentioned on both LHS and RHS.  Here's a silly
 example:
-   RULE forall x y. f (g x y) = g (x+1 (y-1)
+   RULE forall x y. f (g x y) = g (x+1) (y-1)
 And suppose worker/wrapper decides that 'x' is Absent.  Then
 we'll end up with
    RULE forall x y. f ($gw y) = $gw (x+1)

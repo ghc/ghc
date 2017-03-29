@@ -220,13 +220,24 @@ opt_co4 env sym rep r (CoVarCo cv)
   | Just co <- lookupCoVar (lcTCvSubst env) cv
   = opt_co4_wrap (zapLiftingContext env) sym rep r co
 
-  | Just cv1 <- lookupInScope (lcInScopeSet env) cv
-  = ASSERT( isCoVar cv1 ) wrapRole rep r $ wrapSym sym (CoVarCo cv1)
-                -- cv1 might have a substituted kind!
+  | ty1 `eqType` ty2   -- See Note [Optimise CoVarCo to Refl]
+  = Refl (chooseRole rep r) ty1
 
-  | otherwise = WARN( True, text "opt_co: not in scope:" <+> ppr cv $$ ppr env)
-                ASSERT( isCoVar cv )
-                wrapRole rep r $ wrapSym sym (CoVarCo cv)
+  | otherwise
+  = ASSERT( isCoVar cv1 )
+    wrapRole rep r $ wrapSym sym $
+    CoVarCo cv1
+
+  where
+    Pair ty1 ty2 = coVarTypes cv1
+
+    cv1 = case lookupInScope (lcInScopeSet env) cv of
+             Just cv1 -> cv1
+             Nothing  -> WARN( True, text "opt_co: not in scope:"
+                                     <+> ppr cv $$ ppr env)
+                         cv
+          -- cv1 might have a substituted kind!
+
 
 opt_co4 env sym rep r (AxiomInstCo con ind cos)
     -- Do *not* push sym inside top-level axioms
@@ -334,6 +345,15 @@ opt_co4 env sym rep r (AxiomRuleCo co cs)
     wrapRole rep r $
     wrapSym sym $
     AxiomRuleCo co (zipWith (opt_co2 env False) (coaxrAsmpRoles co) cs)
+
+{- Note [Optimise CoVarCo to Refl]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have (c :: t~t) we can optimise it to Refl. That increases the
+chances of floating the Refl upwards; e.g. Maybe c --> Refl (Maybe t)
+
+We do so here in optCoercion, not in mkCoVarCo; see Note [mkCoVarCo]
+in Coercion.
+-}
 
 -------------
 -- | Optimize a phantom coercion. The input coercion may not necessarily
