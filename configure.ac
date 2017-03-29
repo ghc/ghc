@@ -1081,7 +1081,7 @@ dnl ** Use MMAP in the runtime linker?
 dnl --------------------------------------------------------------
 
 case ${TargetOS} in
-    linux|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
+    linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
         RtsLinkerUseMmap=1
         ;;
     darwin|ios)
