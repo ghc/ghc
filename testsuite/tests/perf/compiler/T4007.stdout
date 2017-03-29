@@ -1,8 +1,8 @@
-Rule fired: Class op >>
-Rule fired: Class op return
-Rule fired: unpack
-Rule fired: Class op foldr
-Rule fired: fold/build
-Rule fired: <#
-Rule fired: tagToEnum#
-Rule fired: unpack-list
+Rule fired: Class op >> (BUILTIN)
+Rule fired: Class op return (BUILTIN)
+Rule fired: unpack (GHC.Base)
+Rule fired: Class op foldr (BUILTIN)
+Rule fired: fold/build (GHC.Base)
+Rule fired: <# (BUILTIN)
+Rule fired: tagToEnum# (BUILTIN)
+Rule fired: unpack-list (GHC.Base)
