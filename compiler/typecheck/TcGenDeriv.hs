@@ -31,7 +31,7 @@ module TcGenDeriv (
         mkCoerceClassMethEqn,
         genAuxBinds,
         ordOpTbl, boxConTbl, litConTbl,
-        mkRdrFunBind, error_Expr
+        mkRdrFunBind, mkRdrFunBindEC, mkRdrFunBindSE, error_Expr
     ) where
 
 #include "HsVersions.h"
@@ -190,14 +190,9 @@ gen_Eq_binds loc tycon = do
     aux_binds | no_tag_match_cons = emptyBag
               | otherwise         = unitBag $ DerivAuxBind $ DerivCon2Tag tycon
 
-    method_binds dflags = listToBag
-      [ eq_bind dflags
-      , ne_bind
-      ]
-    eq_bind dflags = mk_FunBind loc eq_RDR (map pats_etc pat_match_cons
+    method_binds dflags = unitBag (eq_bind dflags)
+    eq_bind dflags = mkFunBindSE 2 loc eq_RDR (map pats_etc pat_match_cons
                                             ++ fall_through_eqn dflags)
-    ne_bind = mk_easy_FunBind loc ne_RDR [a_Pat, b_Pat] (
-                        nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
 
     ------------------------------------------------------------------
     pats_etc data_con
@@ -341,7 +336,7 @@ gen_Ord_binds :: SrcSpan -> TyCon -> TcM (LHsBinds RdrName, BagDerivStuff)
 gen_Ord_binds loc tycon = do
     dflags <- getDynFlags
     return $ if null tycon_data_cons -- No data-cons => invoke bale-out case
-      then ( unitBag $ mk_FunBind loc compare_RDR []
+      then ( unitBag $ mkFunBindSE 2 loc compare_RDR []
            , emptyBag)
       else ( unitBag (mkOrdOp dflags OrdCompare) `unionBags` other_ops dflags
            , aux_binds)
@@ -1124,7 +1119,7 @@ gen_Show_binds get_fixity loc tycon
                   (nlHsApp (nlHsVar showList___RDR) (nlHsPar (nlHsApp (nlHsVar showsPrec_RDR) (nlHsIntLit 0))))
     -----------------------------------------------------------------------
     data_cons = tyConDataCons tycon
-    shows_prec = mk_FunBind loc showsPrec_RDR (map pats_etc data_cons)
+    shows_prec = mkFunBindSE 1 loc showsPrec_RDR (map pats_etc data_cons)
     comma_space = nlHsVar showCommaSpace_RDR
 
     pats_etc data_con
@@ -1345,11 +1340,11 @@ gen_data dflags data_type_name constr_names loc rep_tc
                | otherwise = prefix_RDR
 
         ------------ gfoldl
-    gfoldl_bind = mk_HRFunBind 2 loc gfoldl_RDR (map gfoldl_eqn data_cons)
+    gfoldl_bind = mkFunBindSE 3 loc gfoldl_RDR (map gfoldl_eqn data_cons)
 
     gfoldl_eqn con
-      = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed],
-                       foldl mk_k_app (nlHsVar z_RDR `nlHsApp` nlHsVar con_name) as_needed)
+      = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
+                   foldl mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1357,10 +1352,10 @@ gen_data dflags data_type_name constr_names loc rep_tc
                      mk_k_app e v = nlHsPar (nlHsOpApp e k_RDR (nlHsVar v))
 
         ------------ gunfold
-    gunfold_bind = mk_HRFunBind 2 loc
+    gunfold_bind = mk_easy_FunBind loc
                      gunfold_RDR
-                     [([k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat],
-                       gunfold_rhs)]
+                     [k_Pat, z_Pat, if one_constr then nlWildPat else c_Pat]
+                     gunfold_rhs
 
     gunfold_rhs
         | one_constr = mk_unfold_rhs (head data_cons)   -- No need for case
@@ -1369,7 +1364,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gunfold_alt dc = mkHsCaseAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
     mk_unfold_rhs dc = foldr nlHsApp
-                           (nlHsVar z_RDR `nlHsApp` nlHsVar (getRdrName dc))
+                           (z_Expr `nlHsApp` nlHsVar (getRdrName dc))
                            (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
 
     mk_unfold_pat dc    -- Last one is a wild-pat, to avoid
@@ -1381,7 +1376,8 @@ gen_data dflags data_type_name constr_names loc rep_tc
         tag = dataConTag dc
 
         ------------ toConstr
-    toCon_bind = mk_FunBind loc toConstr_RDR (zipWith to_con_eqn data_cons constr_names)
+    toCon_bind = mkFunBindSE 1 loc toConstr_RDR
+                     (zipWith to_con_eqn data_cons constr_names)
     to_con_eqn dc con_name = ([nlWildConPat dc], nlHsVar con_name)
 
         ------------ dataTypeOf
@@ -1523,10 +1519,13 @@ gen_Lift_binds loc tycon
                      , emptyBag)
   | otherwise = (unitBag lift_bind, emptyBag)
   where
+    -- We may want to make mkFunBindSE's error message generation general
+    -- enough to avoid needing to duplicate its logic here. On the other
+    -- hand, it may not be worth the trouble.
     errorMsg_Expr = nlHsVar error_RDR `nlHsApp` nlHsLit
         (mkHsString $ "Can't lift value of empty datatype " ++ tycon_str)
 
-    lift_bind = mk_FunBind loc lift_RDR (map pats_etc data_cons)
+    lift_bind = mkFunBindSE 1 loc lift_RDR (map pats_etc data_cons)
     data_cons = tyConDataCons tycon
     tycon_str = occNameString . nameOccName . tyConName $ tycon
 
@@ -1656,19 +1655,18 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
        return ( listToBag $ map mk_bind (classMethods cls)
               , listToBag $ map DerivFamInst atf_insts )
   where
-    coerce_RDR = getRdrName coerceId
-
     mk_bind :: Id -> LHsBind RdrName
     mk_bind meth_id
       = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch
-                                         (FunRhs (L loc meth_RDR) Prefix)
-                                         [] rhs_expr]
+                                          (FunRhs (L loc meth_RDR) Prefix)
+                                          [] rhs_expr]
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
 
         meth_RDR = getRdrName meth_id
 
-        rhs_expr = nlHsVar coerce_RDR `nlHsAppType` from_ty
+        rhs_expr = nlHsVar (getRdrName coerceId)
+                                      `nlHsAppType` from_ty
                                       `nlHsAppType` to_ty
                                       `nlHsApp`     nlHsVar meth_RDR
 
@@ -1753,7 +1751,7 @@ fiddling around.
 genAuxBindSpec :: DynFlags -> SrcSpan -> AuxBindSpec
                   -> (LHsBind RdrName, LSig RdrName)
 genAuxBindSpec dflags loc (DerivCon2Tag tycon)
-  = (mk_FunBind loc rdr_name eqns,
+  = (mkFunBindSE 0 loc rdr_name eqns,
      L loc (TypeSig [L loc rdr_name] sig_ty))
   where
     rdr_name = con2tag_RDR dflags tycon
@@ -1777,7 +1775,7 @@ genAuxBindSpec dflags loc (DerivCon2Tag tycon)
                                     (toInteger ((dataConTag con) - fIRST_TAG))))
 
 genAuxBindSpec dflags loc (DerivTag2Con tycon)
-  = (mk_FunBind loc rdr_name
+  = (mkFunBindSE 0 loc rdr_name
         [([nlConVarPat intDataCon_RDR [a_RDR]],
            nlHsApp (nlHsVar tagToEnum_RDR) a_Expr)],
      L loc (TypeSig [L loc rdr_name] sig_ty))
@@ -1841,34 +1839,60 @@ mkParentType tc
 ************************************************************************
 -}
 
-mk_FunBind :: SrcSpan -> RdrName
-           -> [([LPat RdrName], LHsExpr RdrName)]
-           -> LHsBind RdrName
-mk_FunBind = mk_HRFunBind 0   -- by using mk_FunBind and not mk_HRFunBind,
-                              -- the caller says that the Void case needs no
-                              -- patterns
-
--- | This variant of 'mk_FunBind' puts an 'Arity' number of wildcards before
--- the "=" in the empty-data-decl case. This is necessary if the function
--- has a higher-rank type, like foldl. (See deriving/should_compile/T4302)
-mk_HRFunBind :: Arity -> SrcSpan -> RdrName
+-- | Make a function binding. If no equations are given, produce a function
+-- with the given arity that produces a stock error.
+mkFunBindSE :: Arity -> SrcSpan -> RdrName
              -> [([LPat RdrName], LHsExpr RdrName)]
              -> LHsBind RdrName
-mk_HRFunBind arity loc fun pats_and_exprs
-  = mkHRRdrFunBind arity (L loc fun) matches
+mkFunBindSE arity loc fun pats_and_exprs
+  = mkRdrFunBindSE arity (L loc fun) matches
   where
     matches = [mkMatch (FunRhs (L loc fun) Prefix) p e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
-mkRdrFunBind = mkHRRdrFunBind 0
+mkRdrFunBind fun@(L loc _fun_rdr) matches
+  = L loc (mkFunBind fun matches)
 
-mkHRRdrFunBind :: Arity -> Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
-mkHRRdrFunBind arity fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
+-- | Produces a function binding. When no equations are given, it generates
+-- a binding of the given arity and an empty case expression
+-- for the last argument that it passes to the given function to produce
+-- the right-hand side.
+mkRdrFunBindEC :: Arity
+               -> (LHsExpr RdrName -> LHsExpr RdrName)
+               -> Located RdrName
+               -> [LMatch RdrName (LHsExpr RdrName)]
+               -> LHsBind RdrName
+mkRdrFunBindEC arity catch_all
+                 fun@(L loc _fun_rdr) matches = L loc (mkFunBind fun matches')
  where
    -- Catch-all eqn looks like
-   --     fmap = error "Void fmap"
+   --     fmap _ z = case z of {}
+   -- or
+   --     traverse _ z = pure (case z of)
+   -- or
+   --     foldMap _ z = mempty
+   -- It's needed if there no data cons at all,
+   -- which can happen with -XEmptyDataDecls
+   -- See Trac #4302
+   matches' = if null matches
+              then [mkMatch (FunRhs fun Prefix)
+                            (replicate (arity - 1) nlWildPat ++ [z_Pat])
+                            (catch_all $ nlHsCase z_Expr [])
+                            (noLoc emptyLocalBinds)]
+              else matches
+
+-- | Produces a function binding. When there are no equations, it generates
+-- a binding with the given arity that produces an error based on the name of
+-- the type of the last argument.
+mkRdrFunBindSE :: Arity -> Located RdrName ->
+                    [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
+mkRdrFunBindSE arity
+                 fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
+ where
+   -- Catch-all eqn looks like
+   --     compare _ _ = error "Void compare"
    -- It's needed if there no data cons at all,
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
@@ -1878,6 +1902,7 @@ mkHRRdrFunBind arity fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches'
                             (error_Expr str) (noLoc emptyLocalBinds)]
               else matches
    str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
+
 
 box ::         String           -- The class involved
             -> TyCon            -- The tycon involved
@@ -2079,11 +2104,12 @@ as_RDRs         = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) ..
 bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-a_Expr, b_Expr, c_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
+a_Expr, b_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
     true_Expr :: LHsExpr RdrName
 a_Expr          = nlHsVar a_RDR
 b_Expr          = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
+z_Expr          = nlHsVar z_RDR
 ltTag_Expr      = nlHsVar ltTag_RDR
 eqTag_Expr      = nlHsVar eqTag_RDR
 gtTag_Expr      = nlHsVar gtTag_RDR

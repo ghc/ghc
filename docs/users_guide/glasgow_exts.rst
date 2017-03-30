@@ -3776,6 +3776,29 @@ fail to compile:
 
    would not compile successfully due to the way in which ``b`` is constrained.
 
+When the last type parameter has a phantom role (see :ref:`roles`), the derived
+``Functor`` instance will not be produced using the usual algorithm. Instead,
+the entire value will be coerced. ::
+
+    data Phantom a = Z | S (Phantom a) deriving Functor
+
+will produce the following instance: ::
+
+    instance Functor Phantom where
+      fmap _ = coerce
+
+When a type has no constructors, the derived ``Functor`` instance will
+simply force the (bottom) value of the argument using
+:ghc-flag:`-XEmptyCase`. ::
+
+    data V a deriving Functor
+    type role V nominal
+
+will produce
+
+    instance Functor V where
+      fmap _ z = case z of
+
 .. _deriving-foldable:
 
 Deriving ``Foldable`` instances
@@ -3799,7 +3822,30 @@ of ``fmap``. In addition, :ghc-flag:`-XDeriveFoldable` filters out all
 constructor arguments on the RHS expression whose types do not mention the last
 type parameter, since those arguments do not need to be folded over.
 
-Here are the differences between the generated code in each extension:
+When the type parameter has a phantom role (see :ref:`roles`),
+:ghc-flag:`-XDeriveFoldable` derives a trivial instance. For example, this
+declaration: ::
+
+    data Phantom a = Z | S (Phantom a)
+
+will generate the following instance. ::
+
+    instance Foldable Phantom where
+      foldMap _ _ = mempty
+
+Similarly, when the type has no constructors, :ghc-flag:`-XDeriveFoldable` will
+derive a trivial instance: ::
+
+    data V a deriving Foldable
+    type role V nominal
+
+will generate the following. ::
+
+    instance Foldable V where
+      foldMap _ _ = mempty
+
+Here are the differences between the generated code for ``Functor`` and
+``Foldable``:
 
 #. When a bare type variable ``a`` is encountered, :ghc-flag:`-XDeriveFunctor` would
    generate ``f a`` for an ``fmap`` definition. :ghc-flag:`-XDeriveFoldable` would
@@ -3882,7 +3928,31 @@ The algorithm for :ghc-flag:`-XDeriveTraversable` is adapted from the
 instead of ``fmap``. In addition, :ghc-flag:`-XDeriveTraversable` filters out
 all constructor arguments on the RHS expression whose types do not mention the
 last type parameter, since those arguments do not produce any effects in a
-traversal. Here are the differences between the generated code in each
+traversal.
+
+When the type parameter has a phantom role (see :ref:`roles`),
+:ghc-flag:`-XDeriveTraversable` coerces its argument. For example, this
+declaration::
+
+    data Phantom a = Z | S (Phantom a) deriving Traversable
+
+will generate the following instance::
+
+    instance Traversable Phantom where
+      traverse _ z = pure (coerce z)
+
+When the type has no constructors, :ghc-flag:`-XDeriveTraversable` will
+derive the laziest instance it can. ::
+
+    data V a deriving Traversable
+    type role V nominal
+
+will generate the following, using :ghc-flag:`-XEmptyCase`: ::
+
+    instance Traversable V where
+      traverse _ z = pure (case z of)
+
+Here are the differences between the generated code in each
 extension:
 
 #. When a bare type variable ``a`` is encountered, both :ghc-flag:`-XDeriveFunctor` and
