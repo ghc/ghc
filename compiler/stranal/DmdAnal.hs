@@ -17,6 +17,7 @@ import DynFlags
 import WwLib            ( findTypeShape, deepSplitProductType_maybe )
 import Demand   -- All of it
 import CoreSyn
+import CoreSeq          ( seqBinds )
 import Outputable
 import VarEnv
 import BasicTypes
@@ -52,7 +53,8 @@ dmdAnalProgram dflags fam_envs binds
         dumpIfSet_dyn dflags Opt_D_dump_str_signatures
                       "Strictness signatures" $
             dumpStrSig binds_plus_dmds ;
-        return binds_plus_dmds
+        -- See Note [Stamp out space leaks in demand analysis]
+        seqBinds binds_plus_dmds `seq` return binds_plus_dmds
     }
   where
     do_prog :: CoreProgram -> CoreProgram
@@ -78,6 +80,24 @@ dmdAnalTopBind sigs (Rec pairs)
     (sigs', _, pairs')  = dmdFix TopLevel sigs pairs
                 -- We get two iterations automatically
                 -- c.f. the NonRec case above
+
+{- Note [Stamp out space leaks in demand analysis]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The demand analysis pass outputs a new copy of the Core program in
+which binders have been annotated with demand and strictness
+information. It's tiresome to ensure that this information is fully
+evaluated everywhere that we produce it, so we just run a single
+seqBinds over the output before returning it, to ensure that there are
+no references holding on to the input Core program.
+
+This is particularly important when we are doing late demand analysis,
+since we don't do a seqBinds at any point thereafter. Hence code
+generation would hold on to an extra copy of the Core program, via
+unforced thunks in demand or strictness information; and it is the
+most memory-intensive part of the compilation process, so this added
+seqBinds makes a big difference in peak memory usage.
+-}
+
 
 {-
 ************************************************************************

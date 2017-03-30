@@ -332,7 +332,7 @@ bothStr (SProd _) (SCall _)    = HyperStr
 -- utility functions to deal with memory leaks
 seqStrDmd :: StrDmd -> ()
 seqStrDmd (SProd ds)   = seqStrDmdList ds
-seqStrDmd (SCall s)     = s `seq` ()
+seqStrDmd (SCall s)    = seqStrDmd s
 seqStrDmd _            = ()
 
 seqStrDmdList :: [ArgStr] -> ()
