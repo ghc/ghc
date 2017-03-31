@@ -1646,11 +1646,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
        -- see #9122 for discussion of these checks
      checkTypes t1 t2
-       = do { checkWarnL lev_poly1
-                         (report "left-hand type is levity-polymorphic")
-            ; checkWarnL lev_poly2
-                         (report "right-hand type is levity-polymorphic")
-            ; when (not (lev_poly1 || lev_poly2)) $
+       = do { when (not (lev_poly1 || lev_poly2)) $
               do { checkWarnL (reps1 `equalLength` reps2)
                               (report "between values with different # of reps")
                  ; zipWithM_ validateCoercion reps1 reps2 }}
