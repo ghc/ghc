@@ -5,6 +5,14 @@
 Here is how you can build GHC, from source, on Windows. We assume that `git` and `stack` are
 installed (see [prerequisites](https://github.com/snowleopard/hadrian/blob/master/doc/windows.md#prerequisites)).
 
+Note that `git` should be configured to check out Unix-style line endings. The default behaviour of `git` on Windows is to check out Windows-style line endings which can cause issues during the build. This can be changed using the following command:
+
+    git config --global core.autocrlf false
+    
+If you would like to restore the default behaviour later run:
+
+    git config --global core.autocrlf true
+
 ```sh
 # Get GHC and Hadrian sources
 git clone --recursive git://git.haskell.org/ghc.git
