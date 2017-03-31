@@ -39,7 +39,7 @@ test('T1969',
              # 2013-11-13 17 (x86/Windows, 64bit machine)
              # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 30 (x86/Linux, 64bit machine)
-           (wordsize(64), 66, 20)]),
+           (wordsize(64), 61, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -55,6 +55,7 @@ test('T1969',
              #                See the comment 16 on #8472.
              # 2017-02-17 83  (amd64/Linux) Type-indexed Typeable
              # 2017-03-14 66  (amd64/Windows) Perhaps Typeable optimizations
+             # 2017-03-31 61  (amd64/Linux) Fix memory leak in simplifier
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -71,7 +72,7 @@ test('T1969',
              # 2016-04-06 9093608 (x86/Linux, 64bit machine)
              # 2017-03-24 9261052 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 19924328, 15)]),
+           (wordsize(64), 16679176, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -85,6 +86,7 @@ test('T1969',
              # 2016-10-12 17285216 (amd64/Linux) it's not entirely clear why
              # 2017-02-01 19924328 (amd64/Linux) Join points (#12988)
              # 2017-02-14 16393848 Early inline patch
+             # 2017-03-31 16679176 Fix memory leak in simplifier
 
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
@@ -326,7 +328,7 @@ test('T3064',
             # 2016-04-06: 153261024 (x86/Linux) probably wildcard refactor
             # 2017-03-24: 134044092 (x86/Linux, 64-bit machine) Update
 
-           (wordsize(64), 259815560, 5)]),
+           (wordsize(64), 265950920, 5)]),
             # (amd64/Linux) (2011-06-28):  73259544
             # (amd64/Linux) (2013-02-07): 224798696
             # (amd64/Linux) (2013-08-02): 236404384, increase from roles
@@ -351,6 +353,7 @@ test('T3064',
             #                                        of zonkTcType (Trac #11882)
             # (amd64/Darwin) (2017-01-23): 306222424 Presumably creep from recent changes (Typeable?)
             # (amd64/Linux) (2017-02-14): 259815560  Early inline patch: 9% improvement
+            # (amd64/Linux) (2017-03-31): 265950920  Fix memory leak in simplifier
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -435,7 +438,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1065147968, 5)]),
+           (wordsize(64), 1037482512, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -449,6 +452,7 @@ test('T5631',
         # 2016-11-10:     1077429456 (amd64/Linux) Stop -dno-debug-output suppressing -ddump-tc-trace
         # 2017-02-17:     1517484488 (amd64/Linux) Type-indexed Typeable
         # 2017-03-03:     1065147968 (amd64/Linux) Share Typeable KindReps
+        # 2017-03-31:     1037482512 (amd64/Linux) Fix memory leak in simplifier
        only_ways(['normal'])
       ],
      compile,
@@ -715,7 +719,7 @@ test('T9020',
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
-           (wordsize(64), 500707080, 10)])
+           (wordsize(64), 493596312, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -727,6 +731,7 @@ test('T9020',
            # 2017-02-03:  764866144 Join points
            # 2017-02-14:  500707080 Early inline patch; 35% decrease!
            #                        Program size collapses in first simplification
+           # 2017-03-31:  493596312 Fix memory leak in simplifier
       ],
       compile,[''])
 
@@ -898,7 +903,7 @@ test('T9961',
 test('T9233',
     [ only_ways(['normal']),
       compiler_stats_num_field('bytes allocated',
-        [(wordsize(64),  974530192, 5),
+        [(wordsize(64),  924299320, 5),
          # 2015-08-04    999826288     initial value
          # 2016-04-14   1066246248     Final demand analyzer run
          # 2016-06-18    984268712     shuffling around of Data.Functor.Identity
@@ -909,6 +914,7 @@ test('T9233',
          # 2017-02-01    894486272     Join points
          # 2017-02-07    884436192     Another improvement to SetLevels
          # 2017-02-17    974530192     Type-indexed Typeable
+         # 2017-03-21    924299320     It's unclear
 
          (wordsize(32),  460112888, 5)
          # 2016-04-06    515672240     (x86/Linux) initial value
@@ -994,11 +1000,12 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 142256192, 5),
-          # initial:    125831400
-          # 2017-01-18: 133380960  Allow top-level string literals in Core
-          # 2017-02-17: 153611448  Type-indexed Typeable
-          # 2017-03-03: 142256192  Share Typeable KindReps
+          [(wordsize(64), 134334800, 5),
+          # initial:      125831400
+          # 2017-01-18:   133380960  Allow top-level string literals in Core
+          # 2017-02-17:   153611448  Type-indexed Typeable
+          # 2017-03-03:   142256192  Share Typeable KindReps
+          # 2017-03-21:   134334800  Unclear
           ]),
      ],
      compile,
@@ -1007,10 +1014,9 @@ test('T12425',
 test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 79820152, 5),
+          [(platform('x86_64-unknown-mingw32'), 89180624, 5),
           # initial:      83032768
-          # 2017-02-19    89180624 (x64/Windows) - Unknown
-          # 2017-03-14    79820152 (x64/Windows) - Probably Early inline patch
+          # 2017-02-19                          89180624 (x64/Windows) - Unknown
            (wordsize(64), 80245640, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
@@ -1026,12 +1032,13 @@ test('T12234',
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 98390488, 5),
+          [(wordsize(64), 93249744, 5),
           # 2017-01-05   90595208  initial
           # 2017-01-19   95269000  Allow top-level string literals in Core
           # 2017-02-05   88806416  Probably OccAnal fixes
           # 2017-02-17   103890200 Type-indexed Typeable
           # 2017-02-25   98390488  Early inline patch
+          # 2017-03-21   93249744  It's unclear
           ]),
      ],
      compile,
