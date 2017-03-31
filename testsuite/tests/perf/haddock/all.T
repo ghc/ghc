@@ -157,12 +157,13 @@ test('haddock.compiler',
             # 2014-12-01:                       104140852 (x86/Windows, sudden shrinkage!)
             # 2014-12-10:                       217933548 increased again
 
-          ,(wordsize(32), 118738876, 5)])
+          ,(wordsize(32), 137383060, 5)])
             # 2012-08-14: 13471797488 (x86/OSX)
             # 2014-01-22: 14581475024 (x86/Linux - new haddock)
             # 2014-06-29: 15110426000 (x86/Linux)
             # 2016-04-06: 16222702892 (x86/Linux)
             # 2017-03-24: 118738876   (x86/Linux)
+            # 2017-03-31: 137383060   (x86/Linux)
       ],
      stats,
      ['haddock.t'])
