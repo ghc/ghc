@@ -2251,7 +2251,10 @@ reallyRebuildCase env scrut case_bndr alts cont
 
         ; dflags <- getDynFlags
         ; let alts_ty' = contResultType dup_cont
-        ; case_expr <- mkCase dflags scrut' case_bndr' alts_ty' alts'
+        -- The seqType below is needed to avoid a space leak (#13426)
+        -- but I don't know why.
+        ; case_expr <- seqType alts_ty' `seq`
+                       mkCase dflags scrut' case_bndr' alts_ty' alts'
 
         -- Notice that rebuild gets the in-scope set from env', not alt_env
         -- (which in any case is only build in simplAlts)
