@@ -738,7 +738,7 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 38776008, 15),
+          [(wordsize(64), 29871032, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
@@ -746,7 +746,8 @@ test('T9675',
           # 2015-06-21    28056344   switch to `+RTS -G1`, tighten bound to 15%
           # 2015-10-28    23776640   emit Typeable at definition site
           # 2015-12-11    30837312   TypeInType (see #11196)
-          # 2016-04-14    38776008   Final demand analyzer run
+          # 2016-03-14    38776008   Final demand analyzer run
+          # 2016-04-01    29871032   Fix leaks in demand analysis
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
