@@ -110,7 +110,7 @@ module GHC.Conc
         , setUncaughtExceptionHandler
         , getUncaughtExceptionHandler
 
-        , reportError, reportStackOverflow
+        , reportError, reportStackOverflow, reportHeapOverflow
         ) where
 
 import GHC.Conc.IO

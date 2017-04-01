@@ -1,3 +1,0 @@
-T1791: Heap exhausted;
-T1791: Current maximum heap size is 8388608 bytes (8 MB).
-T1791: Use `+RTS -M<size>' to increase it.
