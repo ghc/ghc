@@ -473,7 +473,7 @@ run_thread:
         break;
 
     default:
-        barf("schedule: invalid what_next field");
+        barf("schedule: invalid prev_what_next=%u field", prev_what_next);
     }
 
     cap->in_haskell = false;
