@@ -131,13 +131,11 @@ stgFree(void* p)
 }
 
 /* -----------------------------------------------------------------------------
-   Stack overflow
-
-   Not sure if this belongs here.
+   Stack/heap overflow
    -------------------------------------------------------------------------- */
 
 void
-stackOverflow(StgTSO* tso)
+reportStackOverflow(StgTSO* tso)
 {
     rtsConfig.stackOverflowHook(tso->tot_stack_size * sizeof(W_));
 
@@ -147,16 +145,11 @@ stackOverflow(StgTSO* tso)
 }
 
 void
-heapOverflow(void)
+reportHeapOverflow(void)
 {
-    if (!heap_overflow)
-    {
-        /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-        rtsConfig.outOfHeapHook(0/*unknown request size*/,
-                                (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
-
-        heap_overflow = true;
-    }
+    /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+    rtsConfig.outOfHeapHook(0/*unknown request size*/,
+                            (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 }
 
 /* -----------------------------------------------------------------------------
@@ -351,4 +344,3 @@ void checkFPUStack(void)
     }
 #endif
 }
-
