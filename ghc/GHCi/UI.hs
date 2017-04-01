@@ -2593,13 +2593,6 @@ setOptions wds =
       -- then, dynamic flags
       when (not (null minus_opts)) $ newDynFlags False minus_opts
 
-packageFlagsChanged :: DynFlags -> DynFlags -> Bool
-packageFlagsChanged idflags1 idflags0 =
-    packageFlags idflags1 /= packageFlags idflags0 ||
-    ignorePackageFlags idflags1 /= ignorePackageFlags idflags0 ||
-    pluginPackageFlags idflags1 /= pluginPackageFlags idflags0 ||
-    trustFlags idflags1 /= trustFlags idflags0
-
 newDynFlags :: Bool -> [String] -> GHCi ()
 newDynFlags interactive_only minus_opts = do
       let lopts = map noLoc minus_opts

@@ -500,10 +500,26 @@ getPackageConfRefs dflags = do
          | otherwise
          -> map PkgConfFile (splitSearchPath path)
 
-  return $ reverse (extraPkgConfs dflags base_conf_refs)
-  -- later packages shadow earlier ones.  extraPkgConfs
-  -- is in the opposite order to the flags on the
-  -- command line.
+  -- Apply the package DB-related flags from the command line to get the
+  -- final list of package DBs.
+  --
+  -- Notes on ordering:
+  --  * The list of flags is reversed (later ones first)
+  --  * We work with the package DB list in "left shadows right" order
+  --  * and finally reverse it at the end, to get "right shadows left"
+  --
+  return $ reverse (foldr doFlag base_conf_refs (packageDBFlags dflags))
+ where
+  doFlag (PackageDB p) dbs = p : dbs
+  doFlag NoUserPackageDB dbs = filter isNotUser dbs
+  doFlag NoGlobalPackageDB dbs = filter isNotGlobal dbs
+  doFlag ClearPackageDBs _ = []
+
+  isNotUser UserPkgConf = False
+  isNotUser _ = True
+
+  isNotGlobal GlobalPkgConf = False
+  isNotGlobal _ = True
 
 resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
 resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
