@@ -9,7 +9,6 @@ Derived class instances:
   
   instance GHC.Show.Show (DrvEmptyData.Void a) where
     GHC.Show.showsPrec _ = GHC.Err.error "Void showsPrec"
-    GHC.Show.showList = GHC.Show.showList__ (GHC.Show.showsPrec 0)
   
   instance GHC.Classes.Ord (DrvEmptyData.Void a) where
     GHC.Classes.compare _ _ = GHC.Err.error "Void compare"

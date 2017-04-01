@@ -1112,12 +1112,8 @@ Example
 gen_Show_binds :: (Name -> Fixity) -> SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 
 gen_Show_binds get_fixity loc tycon
-  = (listToBag [shows_prec, show_list], emptyBag)
+  = (unitBag shows_prec, emptyBag)
   where
-    -----------------------------------------------------------------------
-    show_list = mkHsVarBind loc showList_RDR
-                  (nlHsApp (nlHsVar showList___RDR) (nlHsPar (nlHsApp (nlHsVar showsPrec_RDR) (nlHsIntLit 0))))
-    -----------------------------------------------------------------------
     data_cons = tyConDataCons tycon
     shows_prec = mkFunBindSE 1 loc showsPrec_RDR (map pats_etc data_cons)
     comma_space = nlHsVar showCommaSpace_RDR
