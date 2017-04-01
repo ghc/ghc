@@ -126,7 +126,7 @@ headHtml docTitle miniPage themes mathjax_url =
     ]
   where
     setSynopsis = maybe "" (\p -> "setSynopsis(\"" ++ p ++ "\");") miniPage
-    mjUrl = maybe "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
+    mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
 
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
