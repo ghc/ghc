@@ -5151,7 +5151,7 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_Hpc
           warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
       in loop dflags' warn
- | hscTarget dflags == HscAsm &&
+ | hscTarget dflags `elem` [HscAsm, HscLlvm] &&
    platformUnregisterised (targetPlatform dflags)
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"
