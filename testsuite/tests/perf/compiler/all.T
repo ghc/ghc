@@ -1014,9 +1014,10 @@ test('T12425',
 test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 89180624, 5),
+          [(platform('x86_64-unknown-mingw32'), 79889200, 5),
           # initial:      83032768
-          # 2017-02-19                          89180624 (x64/Windows) - Unknown
+          # 2017-02-19    89180624 (x64/Windows) - Unknown
+          # 2017-02-25    79889200 (x64/Windows) - Early inline patch
            (wordsize(64), 80245640, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)
