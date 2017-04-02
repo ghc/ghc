@@ -31,6 +31,6 @@ OutOfHeapHook (W_ request_size, W_ heap_size) /* both sizes in bytes */
 
         }
     } else {
-        errorBelch("Out of memory.\n");
+        errorBelch("Out of memory\n");
     }
 }

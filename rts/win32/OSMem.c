@@ -74,7 +74,7 @@ allocNew(uint32_t n) {
         rec=0;
         if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
 
-            errorBelch("Out of memory");
+            errorBelch("Out of memory\n");
             stg_exit(EXIT_HEAPOVERFLOW);
         } else {
             sysErrorBelch(
