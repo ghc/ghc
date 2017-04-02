@@ -526,3 +526,11 @@ test('T13218',
      only_ways(['normal'])],
     compile_and_run,
     ['-O'])
+
+test('DeriveNull',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 152083704, 5) ]),
+                    # 2017-04-02     152083704 w/o derived null
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O'])
