@@ -4,4 +4,5 @@ import Control.Monad
 createDirectory "test"
 createDirectory "test/test1"
 :cd test
-unless ("test1" `elem` getDirectoryContents ".") $ putStrLn "Uh oh."
+fs <- getDirectoryContents "."
+unless ("test1" `elem` fs) $ putStrLn "Uh oh."
