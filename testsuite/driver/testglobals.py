@@ -138,6 +138,7 @@ class TestRun:
 
        self.missing_libs = []
        self.framework_failures = []
+       self.framework_warnings = []
 
        self.unexpected_passes = []
        self.unexpected_failures = []

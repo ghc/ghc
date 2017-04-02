@@ -324,7 +324,7 @@ def _stats_num_field( name, opts, field, expecteds ):
             if b:
                 opts.stats_range_fields[field] = (expected, dev)
                 return
-        framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+        framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
     else:
         (expected, dev) = expecteds
@@ -347,7 +347,7 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
             opts.compiler_stats_range_fields[field] = (expected, dev)
             return
 
-    framework_fail(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+    framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
 # -----
 
@@ -892,6 +892,13 @@ def framework_fail(name, way, reason):
     full_name = name + '(' + way + ')'
     if_verbose(1, '*** framework failure for %s %s ' % (full_name, reason))
     t.framework_failures.append((directory, name, way, reason))
+
+def framework_warn(name, way, reason):
+    opts = getTestOpts()
+    directory = re.sub('^\\.[/\\\\]', '', opts.testdir)
+    full_name = name + '(' + way + ')'
+    if_verbose(1, '*** framework warning for %s %s ' % (full_name, reason))
+    t.framework_warnings.append((directory, name, way, reason))
 
 def badResult(result):
     try:
@@ -1990,6 +1997,8 @@ def summary(t, file, short=False):
                + '\n'
                + repr(len(t.framework_failures)).rjust(8)
                + ' caused framework failures\n'
+               + repr(len(t.framework_warnings)).rjust(8)
+               + ' caused framework warnings\n'
                + repr(len(t.unexpected_passes)).rjust(8)
                + ' unexpected passes\n'
                + repr(len(t.unexpected_failures)).rjust(8)
@@ -2013,6 +2022,10 @@ def summary(t, file, short=False):
     if t.framework_failures:
         file.write('Framework failures:\n')
         printTestInfosSummary(file, t.framework_failures)
+
+    if t.framework_warnings:
+        file.write('Framework warnings:\n')
+        printTestInfosSummary(file, t.framework_warnings)
 
     if stopping():
         file.write('WARNING: Testsuite run was terminated early\n')
