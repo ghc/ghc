@@ -836,7 +836,8 @@ uIntHash_RDR    = varQual_RDR gHC_GENERICS (fsLit "uInt#")
 uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
 
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
-    foldMap_RDR, traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
+    foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
+    mappend_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
 replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
 pure_RDR                = nameRdrName pureAName
@@ -844,6 +845,8 @@ ap_RDR                  = nameRdrName apAName
 liftA2_RDR              = varQual_RDR gHC_BASE (fsLit "liftA2")
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
+null_RDR                = varQual_RDR dATA_FOLDABLE       (fsLit "null")
+all_RDR                 = varQual_RDR dATA_FOLDABLE       (fsLit "all")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
 mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")

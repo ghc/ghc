@@ -34,6 +34,7 @@ import Util
 import Var
 import VarSet
 import MkId (coerceId)
+import TysWiredIn (true_RDR, false_RDR)
 
 import Data.Maybe (catMaybes, isJust)
 
@@ -176,7 +177,7 @@ gen_Functor_binds loc tycon
                  , ft_bad_app = panic "in other argument in ft_fmap"
                  , ft_co_var = panic "contravariant in ft_fmap" }
 
-    -- See Note [deriving <$]
+    -- See Note [Deriving <$]
     replace_name = L loc replace_RDR
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
@@ -225,11 +226,11 @@ gen_Functor_binds loc tycon
     match_for_con ctxt = mkSimpleConMatch ctxt $
         \con_name xs -> return $ nlHsApps con_name xs  -- Con x1 x2 ..
 
--- See Note [deriving <$]
+-- See Note [Deriving <$]
 data Replacer = Immediate {replace :: LHsExpr RdrName}
               | Nested {replace :: LHsExpr RdrName}
 
-{- Note [deriving <$]
+{- Note [Deriving <$]
    ~~~~~~~~~~~~~~~~~~
 
 We derive the definition of <$. Allowing this to take the default definition
@@ -596,6 +597,46 @@ derived Foldable instance for GADT is:
 
 See Note [DeriveFoldable with ExistentialQuantification].
 
+Note [Deriving null]
+~~~~~~~~~~~~~~~~~~~~
+
+In some cases, deriving the definition of 'null' can produce much better
+results than the default definition. For example, with
+
+  data SnocList a = Nil | Snoc (SnocList a) a
+
+the default definition of 'null' would walk the entire spine of a
+nonempty snoc-list before concluding that it is not null. But looking at
+the Snoc constructor, we can immediately see that it contains an 'a', and
+so 'null' can return False immediately if it matches on Snoc. When we
+derive 'null', we keep track of things that cannot be null. The interesting
+case is type application. Given
+
+  data Wrap a = Wrap (Foo (Bar a))
+
+we use
+
+  null (Wrap fba) = all null fba
+
+but if we see
+
+  data Wrap a = Wrap (Foo a)
+
+we can just use
+
+  null (Wrap fa) = null fa
+
+Indeed, we allow this to happen even for tuples:
+
+  data Wrap a = Wrap (Foo (a, Int))
+
+produces
+
+  null (Wrap fa) = null fa
+
+As explained in Note [Deriving <$], giving tuples special performance treatment
+could surprise users if they switch to other types, but Ryan Scott seems to
+think it's okay to do it for now.
 -}
 
 gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
@@ -618,7 +659,7 @@ gen_Foldable_binds loc tycon
   = (unitBag foldMap_bind, emptyBag)
 
   | otherwise
-  = (listToBag [foldr_bind, foldMap_bind], emptyBag)
+  = (listToBag [foldr_bind, foldMap_bind, null_bind], emptyBag)
   where
     data_cons = tyConDataCons tycon
 
@@ -641,6 +682,29 @@ gen_Foldable_binds loc tycon
       = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
         parts = sequence $ foldDataConArgs ft_foldMap con
+
+    -- Given a list of NullM results, produce Nothing if any of
+    -- them is NotNull, and otherwise produce a list of Maybes
+    -- with Justs representing unknowns and Nothings representing
+    -- things that are definitely null.
+    convert :: [NullM a] -> Maybe [Maybe a]
+    convert = traverse go where
+      go IsNull = Just Nothing
+      go NotNull = Nothing
+      go (NullM a) = Just (Just a)
+
+    null_name = L loc null_RDR
+    null_match_ctxt = FunRhs null_name Prefix
+    null_bind = mkRdrFunBind null_name null_eqns
+    null_eqns = map null_eqn data_cons
+    null_eqn con
+      = flip evalState bs_RDRs $ do
+          parts <- sequence $ foldDataConArgs ft_null con
+          case convert parts of
+            Nothing -> return $
+              mkMatch null_match_ctxt [nlParPat (nlWildConPat con)]
+                false_Expr (noLoc emptyLocalBinds)
+            Just cp -> match_null [] con cp
 
     -- Yields 'Just' an expression if we're folding over a type that mentions
     -- the last type parameter of the datatype. Otherwise, yields 'Nothing'.
@@ -707,6 +771,59 @@ gen_Foldable_binds loc tycon
         mkFoldMap :: [LHsExpr RdrName] -> LHsExpr RdrName
         mkFoldMap [] = mempty_Expr
         mkFoldMap xs = foldr1 (\x y -> nlHsApps mappend_RDR [x,y]) xs
+
+    -- See Note [FFoldType and functorLikeTraverse]
+    -- Yields NullM an expression if we're folding over an expression
+    -- that may or may not be null. Yields IsNull if it's certainly
+    -- null, and yields NotNull if it's certainly not null.
+    -- See Note [Deriving null]
+    ft_null :: FFoldType (State [RdrName] (NullM (LHsExpr RdrName)))
+    ft_null
+      = FT { ft_triv = return IsNull
+             -- null = \_ -> True
+           , ft_var  = return NotNull
+             -- null = \_ -> False
+           , ft_tup  = \t g -> do
+               gg  <- sequence g
+               case convert gg of
+                 Nothing -> pure NotNull
+                 Just ggg ->
+                   NullM <$> (mkSimpleLam $ mkSimpleTupleCase match_null t ggg)
+             -- null = \x -> case x of (..,)
+           , ft_ty_app = \_ g -> flip fmap g $ \nestedResult ->
+                              case nestedResult of
+                                -- If e definitely contains the parameter,
+                                -- then we can test if (G e) contains it by
+                                -- simply checking if (G e) is null
+                                NotNull -> NullM null_Expr
+                                -- This case is unreachable--it will actually be
+                                -- caught by ft_triv
+                                IsNull -> IsNull
+                                -- The general case uses (all null),
+                                -- (all (all null)), etc.
+                                NullM nestedTest -> NullM $
+                                                    nlHsApp all_Expr nestedTest
+             -- null fa = null fa, or null fa = all null fa, or null fa = True
+           , ft_forall = \_ g -> g
+           , ft_co_var = panic "contravariant in ft_null"
+           , ft_fun = panic "function in ft_null"
+           , ft_bad_app = panic "in other argument in ft_null" }
+
+    match_null :: [LPat RdrName]
+                  -> DataCon
+                  -> [Maybe (LHsExpr RdrName)]
+                  -> State [RdrName] (LMatch RdrName (LHsExpr RdrName))
+    match_null = mkSimpleConMatch2 CaseAlt $ \_ xs -> return (mkNull xs)
+      where
+        -- v1 && v2 && ..
+        mkNull :: [LHsExpr RdrName] -> LHsExpr RdrName
+        mkNull [] = true_Expr
+        mkNull xs = foldr1 (\x y -> nlHsApps and_RDR [x,y]) xs
+
+data NullM a =
+    IsNull   -- Definitely null
+  | NotNull  -- Definitely not null
+  | NullM a  -- Unknown
 
 {-
 ************************************************************************
@@ -821,7 +938,8 @@ gen_Traversable_binds loc tycon
 -----------------------------------------------------------------------
 
 f_Expr, z_Expr, fmap_Expr, replace_Expr, mempty_Expr, foldMap_Expr,
-    traverse_Expr, coerce_Expr, pure_Expr :: LHsExpr RdrName
+    traverse_Expr, coerce_Expr, pure_Expr, true_Expr, false_Expr,
+    all_Expr, null_Expr :: LHsExpr RdrName
 f_Expr        = nlHsVar f_RDR
 z_Expr        = nlHsVar z_RDR
 fmap_Expr     = nlHsVar fmap_RDR
@@ -831,6 +949,10 @@ foldMap_Expr  = nlHsVar foldMap_RDR
 traverse_Expr = nlHsVar traverse_RDR
 coerce_Expr   = nlHsVar (getRdrName coerceId)
 pure_Expr     = nlHsVar pure_RDR
+true_Expr     = nlHsVar true_RDR
+false_Expr    = nlHsVar false_RDR
+all_Expr      = nlHsVar all_RDR
+null_Expr     = nlHsVar null_RDR
 
 f_RDR, z_RDR :: RdrName
 f_RDR = mkVarUnqual (fsLit "f")

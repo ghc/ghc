@@ -3816,11 +3816,12 @@ would generate the following instance::
       foldr f z (Ex a1 a2 a3 a4) = f a1 (foldr f z a3)
       foldMap f (Ex a1 a2 a3 a4) = mappend (f a1) (foldMap f a3)
 
-The algorithm for :ghc-flag:`-XDeriveFoldable` is adapted from the :ghc-flag:`-XDeriveFunctor`
-algorithm, but it generates definitions for ``foldMap`` and ``foldr`` instead
-of ``fmap``. In addition, :ghc-flag:`-XDeriveFoldable` filters out all
-constructor arguments on the RHS expression whose types do not mention the last
-type parameter, since those arguments do not need to be folded over.
+The algorithm for :ghc-flag:`-XDeriveFoldable` is adapted from the
+:ghc-flag:`-XDeriveFunctor` algorithm, but it generates definitions for
+``foldMap``, ``foldr``, and ``null`` instead of ``fmap``. In addition,
+:ghc-flag:`-XDeriveFoldable` filters out all constructor arguments on the RHS
+expression whose types do not mention the last type parameter, since those
+arguments do not need to be folded over.
 
 When the type parameter has a phantom role (see :ref:`roles`),
 :ghc-flag:`-XDeriveFoldable` derives a trivial instance. For example, this
@@ -3847,20 +3848,44 @@ will generate the following. ::
 Here are the differences between the generated code for ``Functor`` and
 ``Foldable``:
 
-#. When a bare type variable ``a`` is encountered, :ghc-flag:`-XDeriveFunctor` would
-   generate ``f a`` for an ``fmap`` definition. :ghc-flag:`-XDeriveFoldable` would
-   generate ``f a z`` for ``foldr``, and ``f a`` for ``foldMap``.
+#. When a bare type variable ``a`` is encountered, :ghc-flag:`-XDeriveFunctor`
+would generate ``f a`` for an ``fmap`` definition. :ghc-flag:`-XDeriveFoldable`
+would generate ``f a z`` for ``foldr``, ``f a`` for ``foldMap``, and ``False``
+for ``null``.
 
 #. When a type that is not syntactically equivalent to ``a``, but which does
    contain ``a``, is encountered, :ghc-flag:`-XDeriveFunctor` recursively calls
    ``fmap`` on it. Similarly, :ghc-flag:`-XDeriveFoldable` would recursively call
-   ``foldr`` and ``foldMap``.
+   ``foldr`` and ``foldMap``. Depending on the context, ``null`` may recursively
+   call ``null`` or ``all null``. For example, given ::
+
+       data F a = F (P a)
+       data G a = G (P (a, Int))
+       data H a = H (P (Q a))
+
+   ``Foldable`` deriving will produce ::
+
+       null (F x) = null x
+       null (G x) = null x
+       null (H x) = all null x
 
 #. :ghc-flag:`-XDeriveFunctor` puts everything back together again at the end by
    invoking the constructor. :ghc-flag:`-XDeriveFoldable`, however, builds up a value
    of some type. For ``foldr``, this is accomplished by chaining applications
    of ``f`` and recursive ``foldr`` calls on the state value ``z``. For
-   ``foldMap``, this happens by combining all values with ``mappend``.
+   ``foldMap``, this happens by combining all values with ``mappend``. For ``null``,
+   the values are usually combined with ``&&``. However, if any of the values is
+   known to be ``False``, all the rest will be dropped. For example, ::
+
+       data SnocList a = Nil | Snoc (SnocList a) a
+
+   will not produce ::
+
+       null (Snoc xs _) = null xs && False
+
+   (which would walk the whole list), but rather ::
+
+       null (Snoc _ _) = False
 
 There are some other differences regarding what data types can have derived
 ``Foldable`` instances:
