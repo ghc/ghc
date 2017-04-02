@@ -441,6 +441,7 @@ compiler_stage2_dll0_MODULES = \
 	BinFingerprint \
 	BooleanFormula \
 	BufWrite \
+	ByteCodeTypes \
 	Class \
 	CmdLineParser \
 	CmmType \
@@ -493,12 +494,13 @@ compiler_stage2_dll0_MODULES = \
 	HsUtils \
 	HscTypes \
 	IOEnv \
-  NameCache \
+	NameCache \
 	Id \
 	IdInfo \
 	IfaceSyn \
 	IfaceType \
-	Json 		\
+	InteractiveEvalTypes \
+	Json \
 	ToIface \
 	InstEnv \
 	Kind \
@@ -563,9 +565,7 @@ compiler_stage2_dll0_MODULES = \
 ifeq "$(GhcWithInterpreter)" "YES"
 # These files are reacheable from DynFlags
 # only by GHCi-enabled code (see #9552)
-compiler_stage2_dll0_MODULES += \
-	ByteCodeTypes \
-	InteractiveEvalTypes
+compiler_stage2_dll0_MODULES += # none
 endif
 
 compiler_stage2_dll0_HS_OBJS = \
