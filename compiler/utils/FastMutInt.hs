@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, BangPatterns, MagicHash, UnboxedTuples #-}
+{-# LANGUAGE BangPatterns, MagicHash, UnboxedTuples #-}
 {-# OPTIONS_GHC -O #-}
 -- We always optimise this, otherwise performance of a non-optimised
 -- compiler is severely affected
@@ -15,12 +15,7 @@ module FastMutInt(
         readFastMutPtr, writeFastMutPtr
   ) where
 
-
-#include "../includes/MachDeps.h"
-#ifndef SIZEOF_HSINT
-#define SIZEOF_HSINT  INT_SIZE_IN_BYTES
-#endif
-
+import Data.Bits
 import GHC.Base
 import GHC.Ptr
 
@@ -37,7 +32,7 @@ data FastMutInt = FastMutInt (MutableByteArray# RealWorld)
 newFastMutInt = IO $ \s ->
   case newByteArray# size s of { (# s, arr #) ->
   (# s, FastMutInt arr #) }
-  where !(I# size) = SIZEOF_HSINT
+  where !(I# size) = finiteBitSize (0 :: Int)
 
 readFastMutInt (FastMutInt arr) = IO $ \s ->
   case readIntArray# arr 0# s of { (# s, i #) ->
@@ -52,7 +47,8 @@ data FastMutPtr = FastMutPtr (MutableByteArray# RealWorld)
 newFastMutPtr = IO $ \s ->
   case newByteArray# size s of { (# s, arr #) ->
   (# s, FastMutPtr arr #) }
-  where !(I# size) = SIZEOF_VOID_P
+  -- GHC assumes 'sizeof (Int) == sizeof (Ptr a)'
+  where !(I# size) = finiteBitSize (0 :: Int)
 
 readFastMutPtr (FastMutPtr arr) = IO $ \s ->
   case readAddrArray# arr 0# s of { (# s, i #) ->

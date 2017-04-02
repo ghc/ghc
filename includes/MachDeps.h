@@ -3,7 +3,7 @@
  * (c) The University of Glasgow 2002
  *
  * Definitions that characterise machine specific properties of basic
- * types (C & Haskell).
+ * types (C & Haskell) of a target platform.
  *
  * NB: Keep in sync with HsFFI.h and StgTypes.h.
  * NB: THIS FILE IS INCLUDED IN HASKELL SOURCE!
@@ -15,6 +15,31 @@
 
 #ifndef MACHDEPS_H
 #define MACHDEPS_H
+
+/* Don't allow stage1 (cross-)compiler embed assumptions about target
+ * platform. When ghc-stage1 is being built by ghc-stage0 is should not
+ * refer to target defines. A few past examples:
+ *  - https://ghc.haskell.org/trac/ghc/ticket/13491
+ *  - https://phabricator.haskell.org/D3122
+ *  - https://phabricator.haskell.org/D3405
+ *
+ * In those cases code change assumed target defines like SIZEOF_HSINT
+ * are applied to host platform, not target platform.
+ *
+ * So what should be used instead in STAGE=1?
+ *
+ * To get host's equivalent of SIZEOF_HSINT you can use Bits instances:
+ *    Data.Bits.finiteBitSize (0 :: Int)
+ *
+ * To get target's values it is preferred to use runtime target
+ * configuration from 'targetPlatform :: DynFlags -> Platform'
+ * record. A few wrappers are already defined and used throughout GHC:
+ *    wORD_SIZE :: DynFlags -> Int
+ *    wORD_SIZE dflags = pc_WORD_SIZE (sPlatformConstants (settings dflags))
+ *
+ * Hence we hide these macros from -DSTAGE=1
+ */
+#if !defined(STAGE) || STAGE >= 2
 
 /* Sizes of C types come from here... */
 #include "ghcautoconf.h"
@@ -95,5 +120,7 @@
 #endif
 
 #define TAG_MASK ((1 << TAG_BITS) - 1)
+
+#endif /* !defined(STAGE) || STAGE >= 2 */
 
 #endif /* MACHDEPS_H */
