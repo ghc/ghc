@@ -111,6 +111,7 @@ test('T876',
           [(platform('x86_64-unknown-mingw32'), 66928, 5),
               # 2015-04-03: 71904 (amd64/Windows, unknown cause)
               # 2016-11-27: 66928 (amd64/Windows, unknown cause)
+
            (wordsize(64), 58128, 5),
               # 2013-02-14: 1263712 (x86_64/Linux)
               # 2014-02-10:   63216 (x86_64/Linux), call arity analysis
@@ -344,10 +345,11 @@ test('T7436',
            #             127000 (amd64/Linux)
            # 2013-02-07:  60360 (amd64/Linux)
            # 2015-04-03: Widen 1->4% (amd64/Windows was doing better)
-           (wordsize(32), 42772, 1)]),
-            # 2013-02-10: 58032 (x86/Windows)
-            # 2013-02-10: 58836 (x86/OSX)
-            # 2017-03-24: 42772 (x86/Linux, 64-bit machine) no idea why
+           (wordsize(32), 42772, 4)]),
+           # 2013-02-10: 58032 (x86/Windows)
+           # 2013-02-10: 58836 (x86/OSX)
+           # 2017-03-24: 42772 (x86/Linux, 64-bit machine) no idea why
+           # 2017-04-02: Widen 1->4% (i386/Windows was doing better)
       only_ways(['normal'])
       ],
      compile_and_run,
