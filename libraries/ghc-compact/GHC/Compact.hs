@@ -130,9 +130,9 @@ import GHC.Types
 --   address (the address might be stored in a C data structure, for
 --   example), so we can't make a copy of it to store in the 'Compact'.
 --
--- * Objects with mutable pointer fields also cannot be compacted,
---   because subsequent mutation would destroy the property that a compact is
---   self-contained.
+-- * Objects with mutable pointer fields (e.g. 'Data.IORef.IORef',
+--   'GHC.Array.MutableArray') also cannot be compacted, because subsequent
+--   mutation would destroy the property that a compact is self-contained.
 --
 -- If compaction encounters any of the above, a 'CompactionFailed'
 -- exception will be thrown by the compaction operation.
@@ -186,9 +186,10 @@ getCompact (Compact _ obj _) = obj
 -- not terminate if the structure contains cycles (use 'compactWithSharing'
 -- instead).
 --
--- The object in question must not contain any functions or mutable data; if it
--- does, 'compact' will raise an exception.  In the future, we may add a type
--- class which will help statically check if this is the case or not.
+-- The object in question must not contain any functions or data with mutable
+-- pointers; if it does, 'compact' will raise an exception. In the future, we
+-- may add a type class which will help statically check if this is the case or
+-- not.
 --
 compact :: a -> IO (Compact a)
 compact = compactSized 31268 False
@@ -200,9 +201,10 @@ compact = compactSized 31268 False
 -- by maintaining a hash table mapping uncompacted objects to
 -- compacted objects.
 --
--- The object in question must not contain any functions or mutable data; if it
--- does, 'compact' will raise an exception.  In the future, we may add a type
--- class which will help statically check if this is the case or not.
+-- The object in question must not contain any functions or data with mutable
+-- pointers; if it does, 'compact' will raise an exception. In the future, we
+-- may add a type class which will help statically check if this is the case or
+-- not.
 --
 compactWithSharing :: a -> IO (Compact a)
 compactWithSharing = compactSized 31268 True
