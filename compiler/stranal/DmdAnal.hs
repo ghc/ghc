@@ -90,6 +90,9 @@ evaluated everywhere that we produce it, so we just run a single
 seqBinds over the output before returning it, to ensure that there are
 no references holding on to the input Core program.
 
+This makes a ~30% reduction in peak memory usage when compiling
+DynFlags (cf Trac #9675 and #13426).
+
 This is particularly important when we are doing late demand analysis,
 since we don't do a seqBinds at any point thereafter. Hence code
 generation would hold on to an extra copy of the Core program, via
