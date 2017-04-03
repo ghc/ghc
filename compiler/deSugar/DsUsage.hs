@@ -185,7 +185,6 @@ mk_mod_usage_info pit hsc_env this_mod direct_imports used_names
                 -- across all imports, why did the old code only look
                 -- at the first import?
                 Just bys -> (True, any by_is_safe bys)
-                Just _   -> pprPanic "mkUsage: empty direct import" Outputable.empty
                 Nothing  -> (False, safeImplicitImpsReq dflags)
                 -- Nothing case is for references to entities which were
                 -- not directly imported (NB: the "implicit" Prelude import
