@@ -147,7 +147,7 @@
 // to force gnu90-style 'external inline' semantics.
 #if defined(FORCE_GNU_INLINE)
 // disable auto-detection since HAVE_GNU_INLINE has been defined externally
-#elif __GNUC_GNU_INLINE__ && __GNUC__ == 4 && __GNUC_MINOR__ == 2
+#elif defined(__GNUC_GNU_INLINE__) && __GNUC__ == 4 && __GNUC_MINOR__ == 2
 // GCC 4.2.x didn't properly support C99 inline semantics (GCC 4.3 was the first
 // release to properly support C99 inline semantics), and therefore warned when
 // using 'extern inline' while in C99 mode unless `__attributes__((gnu_inline))`
@@ -155,14 +155,14 @@
 # define FORCE_GNU_INLINE 1
 #endif
 
-#if FORCE_GNU_INLINE
+#ifdef FORCE_GNU_INLINE
 // Force compiler into gnu90 semantics
 # if defined(KEEP_INLINES)
 #  define EXTERN_INLINE inline __attribute__((gnu_inline))
 # else
 #  define EXTERN_INLINE extern inline __attribute__((gnu_inline))
 # endif
-#elif __GNUC_GNU_INLINE__
+#elif defined(__GNUC_GNU_INLINE__)
 // we're currently in gnu90 inline mode by default and
 // __attribute__((gnu_inline)) may not be supported, so better leave it off
 # if defined(KEEP_INLINES)

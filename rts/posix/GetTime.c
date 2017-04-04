@@ -190,7 +190,7 @@ void getUnixEpochTime(StgWord64 *sec, StgWord32 *nsec)
 W_
 getPageFaults(void)
 {
-#if !defined(HAVE_GETRUSAGE) || haiku_HOST_OS
+#if !defined(HAVE_GETRUSAGE) || defined(haiku_HOST_OS)
     return 0;
 #else
     struct rusage t;
