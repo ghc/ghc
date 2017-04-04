@@ -8,8 +8,8 @@ SRC_HC_OPTS     += -Wall
 # isn't supported yet (https://ghc.haskell.org/trac/ghc/wiki/Design/Warnings).
 #
 # See Note [Stage number in build variables] in mk/config.mk.in.
-SRC_HC_OPTS_STAGE1 += $(WERROR)
-SRC_HC_OPTS_STAGE2 += $(WERROR)
+SRC_HC_OPTS_STAGE1 += $(WERROR) -Wcpp-undef
+SRC_HC_OPTS_STAGE2 += $(WERROR) -Wcpp-undef
 
 
 ifneq "$(GccIsClang)" "YES"

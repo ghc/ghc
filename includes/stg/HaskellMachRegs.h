@@ -32,14 +32,34 @@
 
 #define MACHREGS_NO_REGS 0
 
-#define MACHREGS_i386     i386_TARGET_ARCH
-#define MACHREGS_x86_64   x86_64_TARGET_ARCH
-#define MACHREGS_powerpc  (powerpc_TARGET_ARCH || powerpc64_TARGET_ARCH \
-                || powerpc64le_TARGET_ARCH || rs6000_TARGET_ARCH)
-#define MACHREGS_sparc    sparc_TARGET_ARCH
-#define MACHREGS_arm      arm_TARGET_ARCH
-#define MACHREGS_aarch64  aarch64_TARGET_ARCH
-#define MACHREGS_darwin   darwin_TARGET_OS
+#ifdef i386_TARGET_ARCH
+#define MACHREGS_i386     1
+#endif
+
+#ifdef x86_64_TARGET_ARCH
+#define MACHREGS_x86_64   1
+#endif
+
+#if defined(powerpc_TARGET_ARCH) || defined(powerpc64_TARGET_ARCH) \
+            || defined(powerpc64le_TARGET_ARCH) || defined(rs6000_TARGET_ARCH)
+#define MACHREGS_powerpc  1
+#endif
+
+#ifdef sparc_TARGET_ARCH
+#define MACHREGS_sparc    1
+#endif
+
+#ifdef arm_TARGET_ARCH
+#define MACHREGS_arm      1
+#endif
+
+#ifdef aarch64_TARGET_ARCH
+#define MACHREGS_aarch64  1
+#endif
+
+#ifdef darwin_TARGET_OS
+#define MACHREGS_darwin   1
+#endif
 
 #endif
 

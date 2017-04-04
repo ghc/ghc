@@ -13,7 +13,7 @@
 
 #pragma once
 
-#if arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
+#if defined(arm_HOST_ARCH) && defined(arm_HOST_ARCH_PRE_ARMv6)
 void arm_atomic_spin_lock(void);
 void arm_atomic_spin_unlock(void);
 #endif
@@ -186,14 +186,15 @@ EXTERN_INLINE void
 write_barrier(void) {
 #if defined(NOSMP)
     return;
-#elif i386_HOST_ARCH || x86_64_HOST_ARCH
+#elif defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+    || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("lwsync" : : : "memory");
-#elif sparc_HOST_ARCH
+#elif defined(sparc_HOST_ARCH)
     /* Sparc in TSO mode does not require store/store barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif (arm_HOST_ARCH) || aarch64_HOST_ARCH
+#elif defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb  st" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
@@ -204,17 +205,18 @@ EXTERN_INLINE void
 store_load_barrier(void) {
 #if defined(NOSMP)
     return;
-#elif i386_HOST_ARCH
+#elif defined(i386_HOST_ARCH)
     __asm__ __volatile__ ("lock; addl $0,0(%%esp)" : : : "memory");
-#elif x86_64_HOST_ARCH
+#elif defined(x86_64_HOST_ARCH)
     __asm__ __volatile__ ("lock; addq $0,0(%%rsp)" : : : "memory");
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+    || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("sync" : : : "memory");
-#elif sparc_HOST_ARCH
+#elif defined(sparc_HOST_ARCH)
     __asm__ __volatile__ ("membar #StoreLoad" : : : "memory");
-#elif arm_HOST_ARCH
+#elif defined(arm_HOST_ARCH)
     __asm__ __volatile__ ("dmb" : : : "memory");
-#elif aarch64_HOST_ARCH
+#elif defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb sy" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
@@ -225,18 +227,19 @@ EXTERN_INLINE void
 load_load_barrier(void) {
 #if defined(NOSMP)
     return;
-#elif i386_HOST_ARCH
+#elif defined(i386_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");
-#elif x86_64_HOST_ARCH
+#elif defined(x86_64_HOST_ARCH)
     __asm__ __volatile__ ("" : : : "memory");
-#elif powerpc_HOST_ARCH || powerpc64_HOST_ARCH || powerpc64le_HOST_ARCH
+#elif defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+    || defined(powerpc64le_HOST_ARCH)
     __asm__ __volatile__ ("lwsync" : : : "memory");
-#elif sparc_HOST_ARCH
+#elif defined(sparc_HOST_ARCH)
     /* Sparc in TSO mode does not require load/load barriers. */
     __asm__ __volatile__ ("" : : : "memory");
-#elif arm_HOST_ARCH
+#elif defined(arm_HOST_ARCH)
     __asm__ __volatile__ ("dmb" : : : "memory");
-#elif aarch64_HOST_ARCH
+#elif defined(aarch64_HOST_ARCH)
     __asm__ __volatile__ ("dmb sy" : : : "memory");
 #else
 #error memory barriers unimplemented on this architecture
