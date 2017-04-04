@@ -336,11 +336,14 @@ initTcWithGbl hsc_env gbl_env loc do_this
                           Right res -> return (Just res)
                           Left _    -> return Nothing }
 
-        -- Check for unsolved constraints
+      -- Check for unsolved constraints
+      -- If we succeed (maybe_res = Just r), there should be
+      -- no unsolved constraints.  But if we exit via an
+      -- exception (maybe_res = Nothing), we may have skipped
+      -- solving, so don't panic then (Trac #13466)
       ; lie <- readIORef (tcl_lie lcl_env)
-      ; if isEmptyWC lie
-           then return ()
-           else pprPanic "initTc: unsolved constraints" (ppr lie)
+      ; when (isJust maybe_res && not (isEmptyWC lie)) $
+        pprPanic "initTc: unsolved constraints" (ppr lie)
 
         -- Collect any error messages
       ; msgs <- readIORef (tcl_errs lcl_env)

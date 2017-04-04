@@ -139,7 +139,7 @@ Note [generating code for top-level string literal bindings]
 Here is a summary on how the byte code generator deals with top-level string
 literals:
 
-1. Top-level string literal bindings are spearted from the rest of the module.
+1. Top-level string literal bindings are separated from the rest of the module.
 
 2. The strings are allocated via iservCmd, in allocateTopStrings
 

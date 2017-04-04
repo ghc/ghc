@@ -17,6 +17,7 @@ import TcFlatten
 import TcUnify( canSolveByUnification )
 import VarSet
 import Type
+import Kind( isConstraintKind )
 import InstEnv( DFunInstType, lookupInstEnv, instanceDFunId )
 import CoAxiom( sfInteractTop, sfInteractInert )
 
@@ -31,7 +32,7 @@ import PrelNames ( knownNatClassName, knownSymbolClassName,
                    hasFieldClassName,
                    heqTyConKey, ipClassKey )
 import TysWiredIn ( typeNatKind, typeSymbolKind, heqDataCon,
-                    coercibleDataCon )
+                    coercibleDataCon, constraintKindTyCon )
 import TysPrim    ( eqPrimTyCon, eqReprPrimTyCon )
 import Id( idType, isNaughtyRecordSelector )
 import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
@@ -2405,6 +2406,7 @@ matchTypeable clas [k,t]  -- clas = Typeable
   -- Now cases that do work
   | k `eqType` typeNatKind                 = doTyLit knownNatClassName         t
   | k `eqType` typeSymbolKind              = doTyLit knownSymbolClassName      t
+  | isConstraintKind t                     = doTyConApp clas t constraintKindTyCon []
   | Just (arg,ret) <- splitFunTy_maybe t   = doFunTy    clas t arg ret
   | Just (tc, ks) <- splitTyConApp_maybe t -- See Note [Typeable (T a b c)]
   , onlyNamedBndrsApplied tc ks            = doTyConApp clas t tc ks

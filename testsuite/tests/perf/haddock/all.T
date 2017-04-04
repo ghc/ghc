@@ -40,21 +40,22 @@ test('haddock.base',
             # 2017-02-17: 38425793776 (x86_64/Linux) - Generalize kind of (->)
             # 2017-02-12: 25592972912 (x86_64/Linux) - Type-indexed Typeable
 
-          ,(platform('i386-unknown-mingw32'), 4434804940, 5)
+          ,(platform('i386-unknown-mingw32'), 2885173512, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
             # 2013-11-13:                     3097751052 (x86/Windows, 64bit machine)
             # 2014-04-04:                     3548581572 (x86/Windows, 64bit machine)
             # 2014-12-01:                     4202377432 (x86/Windows, 64bit machine)
             # 2015-01-20:                     4434804940 (x86/Windows, 64bit machine)
+            # 2017-04-02:                     2885173512 update
 
-          ,(wordsize(32), 3623926468, 5)])
+          ,(wordsize(32), 3819657568, 5)])
             # 2012-08-14: 3046487920 (x86/OSX)
             # 2012-10-30: 2955470952 (x86/Windows)
             # 2013-02-10: 3146596848 (x86/OSX)
             # 2014-02-22: 3554624600 (x86/Linux - new haddock)
             # 2014-06-29: 3799130400 (x86/Linux)
             # 2016-04-06: 5509757068 (x86/Linux)
-            # 2017-03-24: 3623926468 (x86/Linux)
+            # 2017-03-24: 3819657568 (x86/Linux)
       ],
      stats,
      ['haddock.t'])
@@ -150,19 +151,20 @@ test('haddock.compiler',
             # 2017-02-11: 62070477608 (amd64/Linux) OccurAnal / One-Shot  (#13227) (and others)
             # 2017-02-25: 55777283352 (amd64/Linux) Early inline patch
 
-          ,(platform('i386-unknown-mingw32'),   902576468, 10)
+          ,(platform('i386-unknown-mingw32'),   367546388, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
             # 2013-02-10:                     14925262356 (x86/Windows)
             # 2013-11-13:                     14328363592 (x86/Windows, 64bit machine)
             # 2014-12-01:                       104140852 (x86/Windows, sudden shrinkage!)
             # 2014-12-10:                       217933548 increased again
+            # 2017-04-02:                       367546388 update
 
-          ,(wordsize(32), 3872262112, 5)])
+          ,(wordsize(32), 118738876, 5)])
             # 2012-08-14: 13471797488 (x86/OSX)
             # 2014-01-22: 14581475024 (x86/Linux - new haddock)
             # 2014-06-29: 15110426000 (x86/Linux)
             # 2016-04-06: 16222702892 (x86/Linux)
-            # 2017-03-24: 3872262112  (x86/Linux)
+            # 2017-03-24: 118738876   (x86/Linux)
       ],
      stats,
      ['haddock.t'])

@@ -1,6 +1,10 @@
 #include "Rts.h"
 
-#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) || defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
+#if defined(linux_HOST_OS) || defined(solaris2_HOST_OS) \
+|| defined(linux_android_HOST_OS) \
+|| defined(freebsd_HOST_OS) || defined(kfreebsdgnu_HOST_OS) \
+|| defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
+|| defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 
 #include "RtsUtils.h"
 #include "RtsSymbolInfo.h"
@@ -375,7 +379,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
    if (ehdr->e_ident[EI_DATA] == ELFDATA2MSB) {
        IF_DEBUG(linker,debugBelch( "Is big-endian\n" ));
    } else {
-       errorBelch("%s: unknown endiannness", oc->fileName);
+       errorBelch("%s: unknown endianness", oc->fileName);
        return 0;
    }
 
@@ -613,13 +617,13 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
         /* .rodata-style section */
         return SECTIONKIND_CODE_OR_RODATA;
     }
-#ifndef openbsd_HOST_OS
+#ifdef SHT_INIT_ARRAY
     if (hdr->sh_type == SHT_INIT_ARRAY
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
        /* .init_array section */
         return SECTIONKIND_INIT_ARRAY;
     }
-#endif /* not OpenBSD */
+#endif /* not SHT_INIT_ARRAY */
     if (hdr->sh_type == SHT_NOBITS
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
         /* .bss-style section */
@@ -1441,7 +1445,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             break;
 #        endif
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
       case R_X86_64_64:
           *(Elf64_Xword *)P = value;
           break;
@@ -1669,7 +1673,7 @@ int ocRunInit_ELF( ObjectCode *oc )
  * PowerPC & X86_64 ELF specifics
  */
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
 
 int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 {

@@ -177,8 +177,9 @@ real_handler exit se = do
 
       Just UserInterrupt -> exitInterrupted
 
-      Just HeapOverflow -> exit 251
-           -- the RTS has already emitted a message to stderr
+      Just HeapOverflow -> do
+           reportHeapOverflow
+           exit 251
 
       _ -> case fromException se of
            -- only the main thread gets ExitException exceptions

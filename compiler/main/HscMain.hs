@@ -940,7 +940,8 @@ checkSafeImports dflags tcg_env
   where
     impInfo  = tcg_imports tcg_env     -- ImportAvails
     imports  = imp_mods impInfo        -- ImportedMods
-    imports' = moduleEnvToList imports -- (Module, [ImportedModsVal])
+    imports1 = moduleEnvToList imports -- (Module, [ImportedBy])
+    imports' = map (fmap importedByUser) imports1 -- (Module, [ImportedModsVal])
     pkgReqs  = imp_trust_pkgs impInfo  -- [UnitId]
 
     condense :: (Module, [ImportedModsVal]) -> Hsc (Module, SrcSpan, IsSafeImport)

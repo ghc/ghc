@@ -164,6 +164,9 @@ exports_from_avail :: Maybe (Located [LIE RdrName])
                          -- Nothing => no explicit export list
                    -> GlobalRdrEnv
                    -> ImportAvails
+                         -- Imported modules; this is used to test if a
+                         -- 'module Foo' export is valid (it's not valid
+                         -- if we didn't import Foo!)
                    -> Module
                    -> RnM (Maybe [LIE Name], [AvailInfo])
 
@@ -206,7 +209,8 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
 
     imported_modules = [ imv_name imv
-                       | xs <- moduleEnvElts $ imp_mods imports, imv <- xs ]
+                       | xs <- moduleEnvElts $ imp_mods imports
+                       , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ExportAccum ie_names occs exports)

@@ -30,7 +30,7 @@ typedef struct scattered_relocation_info MachOScatteredRelocationInfo;
 /* Dealing with nlist symbol entries can become
  * painful.  We'll have our own Symbol struct that
  * mirrors the symbol from the nlist and can carry
- * some more infomration (like addr).
+ * some more information (like addr).
  */
 typedef struct _MachOSymbol {
     SymbolName * name;  /* the name of the symbol. */
@@ -101,7 +101,7 @@ typedef struct _ObjectCodeFormatInfo {
  *
  * These are very similar to the SymbolExtras
  * below.  However the SymbolExtras are allocated
- * per ObejctCode and not per Section.
+ * per ObjectCode and not per Section.
  *
  * TODO: Merge SymbolExtras and Stubs.
  */

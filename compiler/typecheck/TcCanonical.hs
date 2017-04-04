@@ -595,8 +595,8 @@ can_eq_nc'
 
 -- Expand synonyms first; see Note [Type synonyms and canonicalization]
 can_eq_nc' flat _rdr_env _envs ev eq_rel ty1 ps_ty1 ty2 ps_ty2
-  | Just ty1' <- coreView ty1 = can_eq_nc flat ev eq_rel ty1' ps_ty1 ty2  ps_ty2
-  | Just ty2' <- coreView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
+  | Just ty1' <- tcView ty1 = can_eq_nc flat ev eq_rel ty1' ps_ty1 ty2  ps_ty2
+  | Just ty2' <- tcView ty2 = can_eq_nc flat ev eq_rel ty1  ps_ty1 ty2' ps_ty2
 
 -- need to check for reflexivity in the ReprEq case.
 -- See Note [Eager reflexivity check]
@@ -1439,11 +1439,12 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
     CTyEqCan { cc_ev = new_new_ev, cc_tyvar = tv1
              , cc_rhs = xi2'', cc_eq_rel = eq_rel }
 
-  | otherwise  -- Occurs check error (or a forall)
-  = do { traceTcS "canEqTyVar2 occurs check error" (ppr tv1 $$ ppr xi2)
+  | otherwise  -- For some reason (occurs check, or forall) we can't unify
+               -- We must not use it for further rewriting!
+  = do { traceTcS "canEqTyVar2 can't unify" (ppr tv1 $$ ppr xi2)
        ; rewriteEqEvidence ev swapped xi1 xi2 co1 co2
          `andWhenContinue` \ new_ev ->
-         if eq_rel == NomEq || isTyVarUnderDatatype tv1 xi2
+         if isInsolubleOccursCheck eq_rel tv1 xi2
          then do { emitInsoluble (mkNonCanonical new_ev)
              -- If we have a ~ [a], it is not canonical, and in particular
              -- we don't want to rewrite existing inerts with it, otherwise
@@ -1456,7 +1457,7 @@ canEqTyVar2 dflags ev eq_rel swapped tv1 xi2
              -- We might learn that b is the newtype Id.
              -- But, the occurs-check certainly prevents the equality from being
              -- canonical, and we might loop if we were to use it in rewriting.
-         else do { traceTcS "Occurs-check in representational equality"
+         else do { traceTcS "Possibly-soluble occurs check"
                            (ppr xi1 $$ ppr xi2)
                  ; continueWith (CIrredEvCan { cc_ev = new_ev }) } }
   where
@@ -1865,8 +1866,8 @@ unifyWanted loc Phantom ty1 ty2
 unifyWanted loc role orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
   where
-    go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
-    go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
+    go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
     go (FunTy s1 t1) (FunTy s2 t2)
       = do { co_s <- unifyWanted loc role s1 s2
@@ -1916,8 +1917,8 @@ unify_derived _   Phantom _        _        = return ()
 unify_derived loc role    orig_ty1 orig_ty2
   = go orig_ty1 orig_ty2
   where
-    go ty1 ty2 | Just ty1' <- coreView ty1 = go ty1' ty2
-    go ty1 ty2 | Just ty2' <- coreView ty2 = go ty1 ty2'
+    go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
+    go ty1 ty2 | Just ty2' <- tcView ty2 = go ty1 ty2'
 
     go (FunTy s1 t1) (FunTy s2 t2)
       = do { unify_derived loc role s1 s2

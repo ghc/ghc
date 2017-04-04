@@ -22,7 +22,7 @@
 /* HACK: On Mac OS X 10.4 (at least), time.h doesn't declare ctime_r with
  *       _POSIX_C_SOURCE. If this is the case, we declare it ourselves.
  */
-#if HAVE_CTIME_R && !HAVE_DECL_CTIME_R
+#if defined(HAVE_CTIME_R) && !HAVE_DECL_CTIME_R
 extern char *ctime_r(const time_t *, char *);
 #endif
 
@@ -131,13 +131,11 @@ stgFree(void* p)
 }
 
 /* -----------------------------------------------------------------------------
-   Stack overflow
-
-   Not sure if this belongs here.
+   Stack/heap overflow
    -------------------------------------------------------------------------- */
 
 void
-stackOverflow(StgTSO* tso)
+reportStackOverflow(StgTSO* tso)
 {
     rtsConfig.stackOverflowHook(tso->tot_stack_size * sizeof(W_));
 
@@ -147,16 +145,11 @@ stackOverflow(StgTSO* tso)
 }
 
 void
-heapOverflow(void)
+reportHeapOverflow(void)
 {
-    if (!heap_overflow)
-    {
-        /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-        rtsConfig.outOfHeapHook(0/*unknown request size*/,
-                                (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
-
-        heap_overflow = true;
-    }
+    /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
+    rtsConfig.outOfHeapHook(0/*unknown request size*/,
+                            (W_)RtsFlags.GcFlags.maxHeapSize * BLOCK_SIZE);
 }
 
 /* -----------------------------------------------------------------------------
@@ -171,7 +164,7 @@ time_str(void)
 
     if (now == 0) {
         time(&now);
-#if HAVE_CTIME_R
+#if defined(HAVE_CTIME_R)
         ctime_r(&now, nowstr);
 #else
         strcpy(nowstr, ctime(&now));
@@ -351,4 +344,3 @@ void checkFPUStack(void)
     }
 #endif
 }
-

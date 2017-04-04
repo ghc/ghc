@@ -176,8 +176,8 @@ compactAllocateBlockInternal(Capability            *cap,
         n_blocks >= HS_INT32_MAX)   // avoid overflow when
                                     // calling allocGroup() below
     {
-        heapOverflow();
-        // heapOverflow() doesn't exit (see #2592), but we aren't
+        reportHeapOverflow();
+        // reportHeapOverflow() doesn't exit (see #2592), but we aren't
         // in a position to do a clean shutdown here: we
         // either have to allocate the memory or exit now.
         // Allocating the memory would be bad, because the user
@@ -1170,7 +1170,7 @@ compactFixupPointers(StgCompactNFData *str,
     dbl_link_onto(bd, &g0->compact_objects);
     RELEASE_SM_LOCK;
 
-#if DEBUG
+#ifdef DEBUG
     if (root)
         verify_consistency_loop(str);
 #endif

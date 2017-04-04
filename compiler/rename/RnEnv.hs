@@ -11,7 +11,7 @@ module RnEnv (
         lookupLocatedTopBndrRn, lookupTopBndrRn,
         lookupLocatedOccRn, lookupOccRn, lookupOccRn_maybe,
         lookupLocalOccRn_maybe, lookupInfoOccRn,
-        lookupLocalOccThLvl_maybe,
+        lookupLocalOccThLvl_maybe, lookupLocalOccRn,
         lookupTypeOccRn, lookupKindOccRn,
         lookupGlobalOccRn, lookupGlobalOccRn_maybe,
         lookupOccRn_overloaded, lookupGlobalOccRn_overloaded, lookupExactOcc,
@@ -690,6 +690,15 @@ lookupOccRn rdr_name
        ; case mb_name of
            Just name -> return name
            Nothing   -> reportUnboundName rdr_name }
+
+-- Only used in one place, to rename pattern synonym binders.
+-- See Note [Renaming pattern synonym variables] in RnBinds
+lookupLocalOccRn :: RdrName -> RnM Name
+lookupLocalOccRn rdr_name
+  = do { mb_name <- lookupLocalOccRn_maybe rdr_name
+       ; case mb_name of
+           Just name -> return name
+           Nothing   -> unboundName WL_LocalOnly rdr_name }
 
 lookupKindOccRn :: RdrName -> RnM Name
 -- Looking up a name occurring in a kind
@@ -1795,6 +1804,10 @@ checkShadowedOccs (global_env,local_env) get_loc_occ ns
 data WhereLooking = WL_Any        -- Any binding
                   | WL_Global     -- Any top-level binding (local or imported)
                   | WL_LocalTop   -- Any top-level binding in this module
+                  | WL_LocalOnly
+                        -- Only local bindings
+                        -- (pattern synonyms declaractions,
+                        -- see Note [Renaming pattern synonym variables])
 
 reportUnboundName :: RdrName -> RnM Name
 reportUnboundName rdr = unboundName WL_Any rdr
@@ -1843,7 +1856,8 @@ unknownNameSuggestions_ :: WhereLooking -> DynFlags
                        -> RdrName -> SDoc
 unknownNameSuggestions_ where_look dflags global_env local_env imports tried_rdr_name =
     similarNameSuggestions where_look dflags global_env local_env tried_rdr_name $$
-    importSuggestions dflags imports tried_rdr_name
+    importSuggestions where_look  imports tried_rdr_name $$
+    extensionSuggestions tried_rdr_name
 
 
 similarNameSuggestions :: WhereLooking -> DynFlags
@@ -1890,7 +1904,9 @@ similarNameSuggestions where_look dflags global_env
         -- This heuristic avoids things like
         --      Not in scope 'f'; perhaps you meant '+' (from Prelude)
 
-    local_ok = case where_look of { WL_Any -> True; _ -> False }
+    local_ok = case where_look of { WL_Any -> True
+                                  ; WL_LocalOnly -> True
+                                  ; _ -> False }
     local_possibilities :: LocalRdrEnv -> [(RdrName, SrcSpan)]
     local_possibilities env
       | tried_is_qual = []
@@ -1902,8 +1918,9 @@ similarNameSuggestions where_look dflags global_env
 
     gre_ok :: GlobalRdrElt -> Bool
     gre_ok = case where_look of
-                   WL_LocalTop -> isLocalGRE
-                   _           -> \_ -> True
+                   WL_LocalTop  -> isLocalGRE
+                   WL_LocalOnly -> const False
+                   _            -> const True
 
     global_possibilities :: GlobalRdrEnv -> [(RdrName, (RdrName, HowInScope))]
     global_possibilities global_env
@@ -1964,8 +1981,9 @@ similarNameSuggestions where_look dflags global_env
         | i <- is, let ispec = is_decl i, is_qual ispec ]
 
 -- | Generate helpful suggestions if a qualified name Mod.foo is not in scope.
-importSuggestions :: DynFlags -> ImportAvails -> RdrName -> SDoc
-importSuggestions _dflags imports rdr_name
+importSuggestions :: WhereLooking -> ImportAvails -> RdrName -> SDoc
+importSuggestions where_look imports rdr_name
+  | WL_LocalOnly <- where_look                 = Outputable.empty
   | not (isQual rdr_name || isUnqual rdr_name) = Outputable.empty
   | null interesting_imports
   , Just name <- mod_name
@@ -2047,7 +2065,7 @@ importSuggestions _dflags imports rdr_name
   -- or, if this is an unqualified name, are not qualified imports
   interesting_imports = [ (mod, imp)
     | (mod, mod_imports) <- moduleEnvToList (imp_mods imports)
-    , Just imp <- return $ pick mod_imports
+    , Just imp <- return $ pick (importedByUser mod_imports)
     ]
 
   -- We want to keep only one for each original module; preferably one with an
@@ -2069,6 +2087,13 @@ importSuggestions _dflags imports rdr_name
   -- explicit import list
   (helpful_imports_hiding, helpful_imports_non_hiding)
     = partition (imv_is_hiding . snd) helpful_imports
+
+extensionSuggestions :: RdrName -> SDoc
+extensionSuggestions rdrName
+  | rdrName == mkUnqual varName (fsLit "mdo") ||
+    rdrName == mkUnqual varName (fsLit "rec")
+      = text "Perhaps you meant to use RecursiveDo"
+  | otherwise = Outputable.empty
 
 {-
 ************************************************************************

@@ -1,0 +1,67 @@
+
+==================== Derived instances ====================
+Derived class instances:
+  instance GHC.Read.Read (DrvEmptyData.Void a) where
+    GHC.Read.readPrec
+      = GHC.Read.parens Text.ParserCombinators.ReadPrec.pfail
+    GHC.Read.readList = GHC.Read.readListDefault
+    GHC.Read.readListPrec = GHC.Read.readListPrecDefault
+  
+  instance GHC.Show.Show (DrvEmptyData.Void a) where
+    GHC.Show.showsPrec _ = GHC.Err.error "Void showsPrec"
+  
+  instance GHC.Classes.Ord (DrvEmptyData.Void a) where
+    GHC.Classes.compare _ _ = GHC.Err.error "Void compare"
+  
+  instance GHC.Classes.Eq (DrvEmptyData.Void a) where
+    (GHC.Classes.==) _ _ = GHC.Err.error "Void =="
+  
+  instance Data.Data.Data a =>
+           Data.Data.Data (DrvEmptyData.Void a) where
+    Data.Data.gfoldl _ _ _ = GHC.Err.error "Void gfoldl"
+    Data.Data.gunfold k z c = case Data.Data.constrIndex c of
+    Data.Data.toConstr _ = GHC.Err.error "Void toConstr"
+    Data.Data.dataTypeOf _ = DrvEmptyData.$tVoid
+    Data.Data.dataCast1 f = Data.Typeable.gcast1 f
+  
+  instance GHC.Base.Functor DrvEmptyData.Void where
+    GHC.Base.fmap _ z = case z of
+    (GHC.Base.<$) _ z = case z of
+  
+  instance Data.Foldable.Foldable DrvEmptyData.Void where
+    Data.Foldable.foldMap _ z = GHC.Base.mempty
+  
+  instance Data.Traversable.Traversable DrvEmptyData.Void where
+    Data.Traversable.traverse _ z = GHC.Base.pure (case z of)
+  
+  instance GHC.Generics.Generic (DrvEmptyData.Void a) where
+    GHC.Generics.from x
+      = GHC.Generics.M1 (case x of { x -> case x of })
+    GHC.Generics.to (GHC.Generics.M1 x) = case x of { x -> case x of }
+  
+  instance GHC.Generics.Generic1 DrvEmptyData.Void where
+    GHC.Generics.from1 x
+      = GHC.Generics.M1 (case x of { x -> case x of })
+    GHC.Generics.to1 (GHC.Generics.M1 x) = case x of { x -> case x of }
+  
+  instance Language.Haskell.TH.Syntax.Lift
+             (DrvEmptyData.Void a) where
+    Language.Haskell.TH.Syntax.lift _
+      = GHC.Err.error "Can't lift value of empty datatype Void"
+  
+  DrvEmptyData.$tVoid :: Data.Data.DataType
+  DrvEmptyData.$tVoid = Data.Data.mkDataType "Void" []
+
+Derived type family instances:
+  type GHC.Generics.Rep (DrvEmptyData.Void a) = GHC.Generics.D1
+                                                  ('GHC.Generics.MetaData
+                                                     "Void" "DrvEmptyData" "main" 'GHC.Types.False)
+                                                  GHC.Generics.V1
+  type GHC.Generics.Rep1 DrvEmptyData.Void = GHC.Generics.D1
+                                               ('GHC.Generics.MetaData
+                                                  "Void" "DrvEmptyData" "main" 'GHC.Types.False)
+                                               GHC.Generics.V1
+
+
+
+==================== Filling in method body ====================

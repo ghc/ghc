@@ -91,7 +91,7 @@ module GHC.Conc.Sync
         , setUncaughtExceptionHandler
         , getUncaughtExceptionHandler
 
-        , reportError, reportStackOverflow
+        , reportError, reportStackOverflow, reportHeapOverflow
 
         , sharedCAF
         ) where
@@ -883,7 +883,7 @@ sharedCAF a get_or_set =
 reportStackOverflow :: IO ()
 reportStackOverflow = do
      ThreadId tid <- myThreadId
-     callStackOverflowHook tid
+     c_reportStackOverflow tid
 
 reportError :: SomeException -> IO ()
 reportError ex = do
@@ -892,8 +892,11 @@ reportError ex = do
 
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.
-foreign import ccall unsafe "stackOverflow"
-        callStackOverflowHook :: ThreadId# -> IO ()
+foreign import ccall unsafe "reportStackOverflow"
+        c_reportStackOverflow :: ThreadId# -> IO ()
+
+foreign import ccall unsafe "reportHeapOverflow"
+        reportHeapOverflow :: IO ()
 
 {-# NOINLINE uncaughtExceptionHandler #-}
 uncaughtExceptionHandler :: IORef (SomeException -> IO ())

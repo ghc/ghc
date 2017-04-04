@@ -241,8 +241,8 @@ AC_SUBST(SOLARIS_BROKEN_SHLD)
 
 dnl ** Do an unregisterised build?
 dnl --------------------------------------------------------------
-case "$HostArch" in
-    i386|x86_64|powerpc|powerpc64|powerpc64le|arm)
+case "$TargetArch" in
+    i386|x86_64|powerpc|powerpc64|powerpc64le|arm|aarch64)
         UnregisterisedDefault=NO
         ;;
     *)
@@ -1081,7 +1081,7 @@ dnl ** Use MMAP in the runtime linker?
 dnl --------------------------------------------------------------
 
 case ${TargetOS} in
-    linux|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
+    linux|linux-android|freebsd|dragonfly|netbsd|openbsd|kfreebsdgnu|gnu|solaris2)
         RtsLinkerUseMmap=1
         ;;
     darwin|ios)

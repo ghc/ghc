@@ -200,7 +200,7 @@ primop   IntMulMayOfloOp  "mulIntMayOflo#"
    {Return non-zero if there is any possibility that the upper word of a
     signed integer multiply might contain useful information.  Return
     zero only if you are completely sure that no overflow can occur.
-    On a 32-bit platform, the recommmended implementation is to do a
+    On a 32-bit platform, the recommended implementation is to do a
     32 x 32 -> 64 signed multiply, and subtract result[63:32] from
     (result[31] >>signed 31).  If this is zero, meaning that the
     upper word is merely a sign extension of the lower one, no
@@ -2019,9 +2019,11 @@ primop  RaiseOp "raise#" GenPrimOp
 -- must be *precise* - we don't want the strictness analyser turning
 -- one kind of bottom into another, as it is allowed to do in pure code.
 --
--- We currently produce topRes, which is much too conservative (interfering
--- with dead code elimination, unfortunately), but nothing else we currently
--- have on tap is actually correct.
+-- But we *do* want to know that it returns bottom after
+-- being applied to two arguments, so that this function is strict in y
+--     f x y | x>0       = raiseIO blah
+--           | y>0       = return 1
+--           | otherwise = return 2
 --
 -- TODO Check that the above notes on @f@ are valid. The function successfully
 -- produces an IO exception when compiled without optimization. If we analyze
@@ -2033,7 +2035,7 @@ primop  RaiseOp "raise#" GenPrimOp
 primop  RaiseIOOp "raiseIO#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, b #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] topRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd, topDmd] exnRes }
    out_of_line = True
    has_side_effects = True
 
@@ -2713,7 +2715,7 @@ primop   AddrToAnyOp "addrToAny#" GenPrimOp
 
 primop   AnyToAddrOp "anyToAddr#" GenPrimOp
    a -> State# RealWorld -> (# State# RealWorld, Addr# #)
-   { Retrive the address of any Haskell value. This is
+   { Retrieve the address of any Haskell value. This is
      essentially an {\texttt unsafeCoerce\#}, but if implemented as such
      the core lint pass complains and fails to compile.
      As a primop, it is opaque to core/stg, and only appears

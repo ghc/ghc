@@ -252,7 +252,15 @@ compileOne' m_tc_result mHscMessage
        -- imports a _stub.h file that we created here.
        current_dir = takeDirectory basename
        old_paths   = includePaths dflags1
-       dflags      = dflags1 { includePaths = current_dir : old_paths }
+       prevailing_dflags = hsc_dflags hsc_env0
+       dflags =
+          dflags1 { includePaths = current_dir : old_paths
+                  , log_action = log_action prevailing_dflags
+                  , log_finaliser = log_finaliser prevailing_dflags }
+                  -- use the prevailing log_action / log_finaliser,
+                  -- not the one cached in the summary.  This is so
+                  -- that we can change the log_action without having
+                  -- to re-summarize all the source files.
        hsc_env     = hsc_env0 {hsc_dflags = dflags}
 
        -- Figure out what lang we're generating
@@ -1895,7 +1903,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
     let thread_opts
          | WayThreaded `elem` ways dflags =
             let os = platformOS (targetPlatform dflags)
-            in if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD,
+            in if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD, OSAndroid,
                              OSNetBSD, OSHaiku, OSQNXNTO, OSiOS, OSDarwin]
                then []
                else ["-lpthread"]

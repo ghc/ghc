@@ -235,7 +235,7 @@ mkTemplateTyVarsFrom :: Int -> [Kind] -> [TyVar]
 -- b  with unique (mkAlphaTyVarUnique n+1)
 -- ... etc
 -- Typically called as
---   mkTemplateTyVarsFrom (legth kv_bndrs) kinds
+--   mkTemplateTyVarsFrom (length kv_bndrs) kinds
 -- where kv_bndrs are the kind-level binders of a TyCon
 mkTemplateTyVarsFrom n kinds
   = [ mkTyVar name kind

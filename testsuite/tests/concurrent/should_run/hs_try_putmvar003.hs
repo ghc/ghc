@@ -10,6 +10,7 @@ import GHC.Conc
 import GHC.MVar (MVar(..))
 import GHC.Prim
 import System.Environment
+import System.Exit
 
 -- Measure C to Haskell callback throughput under a workload with
 -- several dimensions:
@@ -29,6 +30,8 @@ import System.Environment
 -- hs_try_putmvar() is 9x faster with these parameters.
 
 main = do
+   when (not rtsSupportsBoundThreads) $
+     die "This test requires -threaded"
    args <- getArgs
    case args of
      ["1",x,y,z] -> experiment False (read x) (read y) (read z)

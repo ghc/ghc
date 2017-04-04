@@ -1425,16 +1425,14 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
        ; rhs_ty <- case isJoinId_maybe fun of
                      Just join_arity
                        -> do { checkL (args `lengthIs` join_arity) $
-                                 mkBadJoinPointRuleMsg fun join_arity rule
+                                mkBadJoinPointRuleMsg fun join_arity rule
                                -- See Note [Rules for join points]
                              ; lintCoreExpr rhs }
                      _ -> markAllJoinsBad $ lintCoreExpr rhs
        ; ensureEqTys lhs_ty rhs_ty $
          (rule_doc <+> vcat [ text "lhs type:" <+> ppr lhs_ty
                             , text "rhs type:" <+> ppr rhs_ty ])
-       ; let bad_bndrs = filterOut (`elemVarSet` exprsFreeVars args) $
-                         filter (`elemVarSet` exprFreeVars rhs) $
-                         bndrs
+       ; let bad_bndrs = filter is_bad_bndr bndrs
 
        ; checkL (null bad_bndrs)
                 (rule_doc <+> text "unbound" <+> ppr bad_bndrs)
@@ -1442,6 +1440,16 @@ lintCoreRule fun fun_ty rule@(Rule { ru_name = name, ru_bndrs = bndrs
     }
   where
     rule_doc = text "Rule" <+> doubleQuotes (ftext name) <> colon
+
+    lhs_fvs = exprsFreeVars args
+    rhs_fvs = exprFreeVars rhs
+
+    is_bad_bndr :: Var -> Bool
+    -- See Note [Unbound RULE binders] in Rules
+    is_bad_bndr bndr = not (bndr `elemVarSet` lhs_fvs)
+                    && bndr `elemVarSet` rhs_fvs
+                    && isNothing (isReflCoVar_maybe bndr)
+
 
 {- Note [Linting rules]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1462,7 +1470,7 @@ this check will nail it.
 NB (Trac #11643): it's possible that a variable listed in the
 binders becomes not-mentioned on both LHS and RHS.  Here's a silly
 example:
-   RULE forall x y. f (g x y) = g (x+1 (y-1)
+   RULE forall x y. f (g x y) = g (x+1) (y-1)
 And suppose worker/wrapper decides that 'x' is Absent.  Then
 we'll end up with
    RULE forall x y. f ($gw y) = $gw (x+1)
@@ -1630,7 +1638,7 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
               (checkTypes ty1 ty2)
        ; return (k1, k2, ty1, ty2, r) }
    where
-     report s = hang (text $ "Unsafe coercion between " ++ s)
+     report s = hang (text $ "Unsafe coercion: " ++ s)
                      2 (vcat [ text "From:" <+> ppr ty1
                              , text "  To:" <+> ppr ty2])
      isUnBoxed :: PrimRep -> Bool
@@ -1638,10 +1646,16 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
 
        -- see #9122 for discussion of these checks
      checkTypes t1 t2
-       = do { checkWarnL (reps1 `equalLength` reps2)
-                         (report "values with different # of reps")
-            ; zipWithM_ validateCoercion reps1 reps2 }
+       = do { when (not (lev_poly1 || lev_poly2)) $
+              do { checkWarnL (reps1 `equalLength` reps2)
+                              (report "between values with different # of reps")
+                 ; zipWithM_ validateCoercion reps1 reps2 }}
        where
+         lev_poly1 = isTypeLevPoly t1
+         lev_poly2 = isTypeLevPoly t2
+
+         -- don't look at these unless lev_poly1/2 are False
+         -- Otherwise, we get #13458
          reps1 = typePrimRep t1
          reps2 = typePrimRep t2
 
@@ -1649,15 +1663,15 @@ lintCoercion co@(UnivCo prov r ty1 ty2)
      validateCoercion rep1 rep2
        = do { dflags <- getDynFlags
             ; checkWarnL (isUnBoxed rep1 == isUnBoxed rep2)
-                         (report "unboxed and boxed value")
+                         (report "between unboxed and boxed value")
             ; checkWarnL (TyCon.primRepSizeW dflags rep1
                            == TyCon.primRepSizeW dflags rep2)
-                         (report "unboxed values of different size")
+                         (report "between unboxed values of different size")
             ; let fl = liftM2 (==) (TyCon.primRepIsFloat rep1)
                                    (TyCon.primRepIsFloat rep2)
             ; case fl of
-                Nothing    -> addWarnL (report "vector types")
-                Just False -> addWarnL (report "float and integral values")
+                Nothing    -> addWarnL (report "between vector types")
+                Just False -> addWarnL (report "between float and integral values")
                 _          -> return ()
             }
 
@@ -2188,7 +2202,7 @@ mkScrutMsg var var_ty scrut_ty subst
 
 mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> MsgDoc
 mkNonDefltMsg e
-  = hang (text "Case expression with DEFAULT not at the beginnning") 4 (ppr e)
+  = hang (text "Case expression with DEFAULT not at the beginning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
   = hang (text "Case expression with badly-ordered alternatives") 4 (ppr e)
 

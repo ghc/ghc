@@ -39,7 +39,7 @@ test('T1969',
              # 2013-11-13 17 (x86/Windows, 64bit machine)
              # 2015-07-11 21 (x86/Linux, 64bit machine) use +RTS -G1
              # 2016-04-06 30 (x86/Linux, 64bit machine)
-           (wordsize(64), 83, 20)]),
+           (wordsize(64), 61, 20)]),
              #            28 (amd64/Linux)
              #            34 (amd64/Linux)
              # 2012-09-20 23 (amd64/Linux)
@@ -54,6 +54,7 @@ test('T1969',
              # 2016-10-20 68, (amd64/Linux) allow top-level string literals
              #                See the comment 16 on #8472.
              # 2017-02-17 83  (amd64/Linux) Type-indexed Typeable
+             # 2017-03-31 61  (amd64/Linux) Fix memory leak in simplifier
       compiler_stats_num_field('max_bytes_used',
           [(platform('i386-unknown-mingw32'), 5719436, 20),
                                  # 2010-05-17 5717704 (x86/Windows)
@@ -70,7 +71,7 @@ test('T1969',
              # 2016-04-06 9093608 (x86/Linux, 64bit machine)
              # 2017-03-24 9261052 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 19924328, 15)]),
+           (wordsize(64), 16679176, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -84,6 +85,7 @@ test('T1969',
              # 2016-10-12 17285216 (amd64/Linux) it's not entirely clear why
              # 2017-02-01 19924328 (amd64/Linux) Join points (#12988)
              # 2017-02-14 16393848 Early inline patch
+             # 2017-03-31 16679176 Fix memory leak in simplifier
 
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
@@ -325,7 +327,7 @@ test('T3064',
             # 2016-04-06: 153261024 (x86/Linux) probably wildcard refactor
             # 2017-03-24: 134044092 (x86/Linux, 64-bit machine) Update
 
-           (wordsize(64), 259815560, 5)]),
+           (wordsize(64), 265950920, 5)]),
             # (amd64/Linux) (2011-06-28):  73259544
             # (amd64/Linux) (2013-02-07): 224798696
             # (amd64/Linux) (2013-08-02): 236404384, increase from roles
@@ -350,6 +352,7 @@ test('T3064',
             #                                        of zonkTcType (Trac #11882)
             # (amd64/Darwin) (2017-01-23): 306222424 Presumably creep from recent changes (Typeable?)
             # (amd64/Linux) (2017-02-14): 259815560  Early inline patch: 9% improvement
+            # (amd64/Linux) (2017-03-31): 265950920  Fix memory leak in simplifier
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -434,7 +437,7 @@ test('T5631',
         # 2014-04-04:     346389856 (x86 Windows, 64 bit machine)
         # 2014-12-01:     390199244 (Windows laptop)
         # 2016-04-06:     570137436 (amd64/Linux) many reasons
-           (wordsize(64), 1065147968, 5)]),
+           (wordsize(64), 1037482512, 5)]),
         # expected value: 774595008 (amd64/Linux):
         # expected value: 735486328 (amd64/Linux) 2012/12/12:
         # expected value: 690742040 (amd64/Linux) Call Arity improvements
@@ -448,6 +451,7 @@ test('T5631',
         # 2016-11-10:     1077429456 (amd64/Linux) Stop -dno-debug-output suppressing -ddump-tc-trace
         # 2017-02-17:     1517484488 (amd64/Linux) Type-indexed Typeable
         # 2017-03-03:     1065147968 (amd64/Linux) Share Typeable KindReps
+        # 2017-03-31:     1037482512 (amd64/Linux) Fix memory leak in simplifier
        only_ways(['normal'])
       ],
      compile,
@@ -713,7 +717,7 @@ test('T9020',
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
-           (wordsize(64), 500707080, 10)])
+           (wordsize(64), 493596312, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -725,13 +729,14 @@ test('T9020',
            # 2017-02-03:  764866144 Join points
            # 2017-02-14:  500707080 Early inline patch; 35% decrease!
            #                        Program size collapses in first simplification
+           # 2017-03-31:  493596312 Fix memory leak in simplifier
       ],
       compile,[''])
 
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 38776008, 15),
+          [(wordsize(64), 29871032, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
@@ -739,7 +744,8 @@ test('T9675',
           # 2015-06-21    28056344   switch to `+RTS -G1`, tighten bound to 15%
           # 2015-10-28    23776640   emit Typeable at definition site
           # 2015-12-11    30837312   TypeInType (see #11196)
-          # 2016-04-14    38776008   Final demand analyzer run
+          # 2016-03-14    38776008   Final demand analyzer run
+          # 2016-04-01    29871032   Fix leaks in demand analysis
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
@@ -813,10 +819,10 @@ test('T9872b',
           # 2016-09-15:   4069522928    Fix #12422
           # 2017-02-14    3730686224    Early inlining: 5% improvement
 
-           (wordsize(32), 1740903516, 5)
+           (wordsize(32), 1894037608, 5)
           # was           1700000000
           # 2016-04-06    2422750696    x86/Linux
-          # 2017-03-24    1740903516    x86/Linux, 64-bit machine
+          # 2017-03-24    1894037608    x86/Linux, 64-bit machine
           ]),
       ],
      compile_fail,
@@ -1007,9 +1013,10 @@ test('T12425',
 test('T12234',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-unknown-mingw32'), 89180624, 5),
+          [(platform('x86_64-unknown-mingw32'), 79889200, 5),
           # initial:      83032768
-          # 2017-02-19                          89180624 (x64/Windows) - Unknown
+          # 2017-02-19    89180624 (x64/Windows) - Unknown
+          # 2017-02-25    79889200 (x64/Windows) - Early inline patch
            (wordsize(64), 80245640, 5),
           # initial:      72958288
           # 2016-01-17:   76848856  (x86-64, Linux. drift?)

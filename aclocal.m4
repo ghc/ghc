@@ -227,7 +227,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkVendor() {
         case [$]1 in
-        dec|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld)
+        dec|none|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld)
             ;;
         *)
             echo "Unknown vendor [$]1"
@@ -874,12 +874,14 @@ FP_CHECK_ALIGNMENT([$1])
 # checking for *no* leading underscore first. Sigh.  --SDM
 #
 # Similarly on OpenBSD, but this test doesn't help. -- dons
+#
 AC_DEFUN([FP_LEADING_UNDERSCORE],
 [AC_CHECK_LIB([elf], [nlist], [LIBS="-lelf $LIBS"])
 AC_CACHE_CHECK([leading underscore in symbol names], [fptools_cv_leading_underscore], [
 # Hack!: nlist() under Digital UNIX insist on there being an _,
 # but symbol table listings shows none. What is going on here?!?
-case $HostPlatform in
+case $TargetPlatform in
+*linux-android*) fptools_cv_leading_underscore=no;;
 *openbsd*) # x86 openbsd is ELF from 3.4 >, meaning no leading uscore
   case $build in
     i386-*2\.@<:@0-9@:>@ | i386-*3\.@<:@0-3@:>@ ) fptools_cv_leading_underscore=yes ;;

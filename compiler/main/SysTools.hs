@@ -31,7 +31,7 @@ module SysTools (
 
         linkDynLib,
 
-        askCc,
+        askLd,
 
         touch,                  -- String -> String -> IO ()
         copy,
@@ -480,11 +480,12 @@ runCc dflags args =   do
 isContainedIn :: String -> String -> Bool
 xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 
-askCc :: DynFlags -> [Option] -> IO String
-askCc dflags args = do
-  let (p,args0) = pgm_c dflags
-      args1 = map Option (getOpts dflags opt_c)
-      args2 = args0 ++ args1 ++ args
+-- | Run the linker with some arguments and return the output
+askLd :: DynFlags -> [Option] -> IO String
+askLd dflags args = do
+  let (p,args0) = pgm_l dflags
+      args1     = map Option (getOpts dflags opt_l)
+      args2     = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
   runSomethingWith dflags "gcc" p args2 $ \real_args ->
     readCreateProcessWithExitCode' (proc p real_args){ env = mb_env }

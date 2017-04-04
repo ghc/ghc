@@ -622,11 +622,10 @@ forall_tv_RDR, dot_tv_RDR :: RdrName
 forall_tv_RDR = mkUnqual tvName (fsLit "forall")
 dot_tv_RDR    = mkUnqual tvName (fsLit ".")
 
-eq_RDR, ge_RDR, ne_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
+eq_RDR, ge_RDR, le_RDR, lt_RDR, gt_RDR, compare_RDR,
     ltTag_RDR, eqTag_RDR, gtTag_RDR :: RdrName
 eq_RDR                  = nameRdrName eqName
 ge_RDR                  = nameRdrName geName
-ne_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "/=")
 le_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<=")
 lt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit "<")
 gt_RDR                  = varQual_RDR  gHC_CLASSES (fsLit ">")
@@ -755,10 +754,8 @@ reset_RDR               = varQual_RDR  rEAD_PREC (fsLit "reset")
 prec_RDR                = varQual_RDR  rEAD_PREC (fsLit "prec")
 pfail_RDR               = varQual_RDR  rEAD_PREC (fsLit "pfail")
 
-showList_RDR, showList___RDR, showsPrec_RDR, shows_RDR, showString_RDR,
+showsPrec_RDR, shows_RDR, showString_RDR,
     showSpace_RDR, showCommaSpace_RDR, showParen_RDR :: RdrName
-showList_RDR            = varQual_RDR gHC_SHOW (fsLit "showList")
-showList___RDR          = varQual_RDR gHC_SHOW (fsLit "showList__")
 showsPrec_RDR           = varQual_RDR gHC_SHOW (fsLit "showsPrec")
 shows_RDR               = varQual_RDR gHC_SHOW (fsLit "shows")
 showString_RDR          = varQual_RDR gHC_SHOW (fsLit "showString")
@@ -839,7 +836,8 @@ uIntHash_RDR    = varQual_RDR gHC_GENERICS (fsLit "uInt#")
 uWordHash_RDR   = varQual_RDR gHC_GENERICS (fsLit "uWord#")
 
 fmap_RDR, replace_RDR, pure_RDR, ap_RDR, liftA2_RDR, foldable_foldr_RDR,
-    foldMap_RDR, traverse_RDR, mempty_RDR, mappend_RDR :: RdrName
+    foldMap_RDR, null_RDR, all_RDR, traverse_RDR, mempty_RDR,
+    mappend_RDR :: RdrName
 fmap_RDR                = varQual_RDR gHC_BASE (fsLit "fmap")
 replace_RDR             = varQual_RDR gHC_BASE (fsLit "<$")
 pure_RDR                = nameRdrName pureAName
@@ -847,6 +845,8 @@ ap_RDR                  = nameRdrName apAName
 liftA2_RDR              = varQual_RDR gHC_BASE (fsLit "liftA2")
 foldable_foldr_RDR      = varQual_RDR dATA_FOLDABLE       (fsLit "foldr")
 foldMap_RDR             = varQual_RDR dATA_FOLDABLE       (fsLit "foldMap")
+null_RDR                = varQual_RDR dATA_FOLDABLE       (fsLit "null")
+all_RDR                 = varQual_RDR dATA_FOLDABLE       (fsLit "all")
 traverse_RDR            = varQual_RDR dATA_TRAVERSABLE    (fsLit "traverse")
 mempty_RDR              = varQual_RDR gHC_BASE            (fsLit "mempty")
 mappend_RDR             = varQual_RDR gHC_BASE            (fsLit "mappend")

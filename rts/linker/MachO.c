@@ -248,7 +248,8 @@ ocVerifyImage_MachO(ObjectCode * oc)
 
     IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: start\n"));
 
-#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH || aarch64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+    || defined(aarch64_HOST_ARCH)
     if(header->magic != MH_MAGIC_64) {
         errorBelch("Could not load image %s: bad magic!\n"
                    "  Expected %08x (64bit), got %08x%s\n",
@@ -281,7 +282,7 @@ resolveImports(
 
     IF_DEBUG(linker, debugBelch("resolveImports: start\n"));
 
-#if i386_HOST_ARCH
+#if defined(i386_HOST_ARCH)
     int isJumpTable = 0;
 
     if (strcmp(sect->sectname,"__jump_table") == 0) {
@@ -319,7 +320,7 @@ resolveImports(
         }
         ASSERT(addr);
 
-#if i386_HOST_ARCH
+#if defined(i386_HOST_ARCH)
         if (isJumpTable) {
             checkProddableBlock(oc,oc->image + sect->offset + i*itemSize, 5);
 
@@ -618,7 +619,7 @@ relocateSection_aarch64(ObjectCode * oc, Section * section)
         return 1;
     /* at this point, we have:
      *
-     * - loaded the sections (potentially into non-continuous memory),
+     * - loaded the sections (potentially into non-contiguous memory),
      *   (in ocGetNames_MachO)
      * - registered exported sybmols
      *   (in ocGetNames_MachO)
@@ -628,7 +629,7 @@ relocateSection_aarch64(ObjectCode * oc, Section * section)
      * - All oc->symbols however should now point at the right place.
      */
 
-    /* we need to care about the explicity addend */
+    /* we need to care about the explicit addend */
     int64_t explicit_addend = 0;
     size_t  nreloc = section->info->macho_section->nreloc;
 
@@ -986,7 +987,7 @@ relocateSection(
                 thing -= value;
                 break;
             default:
-                barf("unkown relocation");
+                barf("unknown relocation");
         }
 
         switch(reloc->r_length)
@@ -1687,7 +1688,7 @@ ocGetNames_MachO(ObjectCode* oc)
      * - EXT and UNDF
      * - EXT and not in the same section.
      *
-     * As sections are not necessarily continuous and can live
+     * As sections are not necessarily contiguous and can live
      * anywhere in the addressable space. This obviously makes
      * sense.  However it took me a while to figure this out.
      */
@@ -1922,7 +1923,8 @@ machoGetMisalignment( FILE * f )
     }
     fseek(f, -sizeof(header), SEEK_CUR);
 
-#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH || aarch64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+    || defined(aarch64_HOST_ARCH)
     if(header.magic != MH_MAGIC_64) {
         barf("Bad magic. Expected: %08x, got: %08x.",
              MH_MAGIC_64, header.magic);

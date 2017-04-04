@@ -1422,7 +1422,7 @@ searchForLibUsingGcc :: DynFlags -> String -> [FilePath] -> IO (Maybe FilePath)
 searchForLibUsingGcc dflags so dirs = do
    -- GCC does not seem to extend the library search path (using -L) when using
    -- --print-file-name. So instead pass it a new base location.
-   str <- askCc dflags (map (FileOption "-B") dirs
+   str <- askLd dflags (map (FileOption "-B") dirs
                           ++ [Option "--print-file-name", Option so])
    let file = case lines str of
                 []  -> ""

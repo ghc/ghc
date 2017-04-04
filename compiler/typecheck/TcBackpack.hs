@@ -555,37 +555,99 @@ mergeSignatures
         --
         gen_subst (nsubst,oks,ifaces) (imod@(IndefModule iuid _), ireq_iface) = do
             let insts = indefUnitIdInsts iuid
+                isFromSignaturePackage =
+                    let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
+                        pkg = getInstalledPackageDetails dflags inst_uid
+                    in null (exposedModules pkg)
+            -- 3(a). Rename the exports according to how the dependency
+            -- was instantiated.  The resulting export list will be accurate
+            -- except for exports *from the signature itself* (which may
+            -- be subsequently updated by exports from other signatures in
+            -- the merge.
             as1 <- tcRnModExports insts ireq_iface
-            let inst_uid = fst (splitUnitIdInsts (IndefiniteUnitId iuid))
-                pkg = getInstalledPackageDetails dflags inst_uid
-                -- Setup the import spec correctly, so that when we apply
-                -- IEModuleContents we pick up EVERYTHING
-                ispec = ImpSpec
-                            ImpDeclSpec{
-                                is_mod  = mod_name,
-                                is_as   = mod_name,
-                                is_qual = False,
-                                is_dloc = loc
-                            } ImpAll
-                rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
+            -- 3(b). Thin the interface if it comes from a signature package.
             (thinned_iface, as2) <- case mb_exports of
                     Just (L loc _)
-                      | null (exposedModules pkg) -> setSrcSpan loc $ do
-                        -- Suppress missing errors; we'll pick em up
-                        -- when we test exports on the final thing
-                        (msgs, mb_r) <- tryTc $
+                      -- Check if the package containing this signature is
+                      -- a signature package (i.e., does not expose any
+                      -- modules.)  If so, we can thin it.
+                      | isFromSignaturePackage
+                      -> setSrcSpan loc $ do
+                        -- Suppress missing errors; they might be used to refer
+                        -- to entities from other signatures we are merging in.
+                        -- If an identifier truly doesn't exist in any of the
+                        -- signatures that are merged in, we will discover this
+                        -- when we run exports_from_avail on the final merged
+                        -- export list.
+                        (msgs, mb_r) <- tryTc $ do
+                            -- Suppose that we have written in a signature:
+                            --  signature A ( module A ) where {- empty -}
+                            -- If I am also inheriting a signature from a
+                            -- signature package, does 'module A' scope over
+                            -- all of its exports?
+                            --
+                            -- There are two possible interpretations:
+                            --
+                            --  1. For non self-reexports, a module reexport
+                            --  is interpreted only in terms of the local
+                            --  signature module, and not any of the inherited
+                            --  ones.  The reason for this is because after
+                            --  typechecking, module exports are completely
+                            --  erased from the interface of a file, so we
+                            --  have no way of "interpreting" a module reexport.
+                            --  Thus, it's only useful for the local signature
+                            --  module (where we have a useful GlobalRdrEnv.)
+                            --
+                            --  2. On the other hand, a common idiom when
+                            --  you want to "export everything, plus a reexport"
+                            --  in modules is to say module A ( module A, reex ).
+                            --  This applies to signature modules too; and in
+                            --  particular, you probably still want the entities
+                            --  from the inherited signatures to be preserved
+                            --  too.
+                            --
+                            -- We think it's worth making a special case for
+                            -- self reexports to make use case (2) work.  To
+                            -- do this, we take the exports of the inherited
+                            -- signature @as1@, and bundle them into a
+                            -- GlobalRdrEnv where we treat them as having come
+                            -- from the import @import A@.  Thus, we will
+                            -- pick them up if they are referenced explicitly
+                            -- (@foo@) or even if we do a module reexport
+                            -- (@module A@).
+                            let ispec = ImpSpec ImpDeclSpec{
+                                            -- NB: This needs to be mod name
+                                            -- of the local signature, not
+                                            -- the (original) module name of
+                                            -- the inherited signature,
+                                            -- because we need module
+                                            -- LocalSig (from the local
+                                            -- export list) to match it!
+                                            is_mod  = mod_name,
+                                            is_as   = mod_name,
+                                            is_qual = False,
+                                            is_dloc = loc
+                                          } ImpAll
+                                rdr_env = mkGlobalRdrEnv (gresFromAvails (Just ispec) as1)
                             setGblEnv tcg_env {
                                 tcg_rdr_env = rdr_env
                             } $ exports_from_avail mb_exports rdr_env
-                                    (tcg_imports tcg_env) (tcg_semantic_mod tcg_env)
+                                    -- NB: tcg_imports is also empty!
+                                    emptyImportAvails
+                                    (tcg_semantic_mod tcg_env)
                         case mb_r of
                             Just (_, as2) -> return (thinModIface as2 ireq_iface, as2)
                             Nothing -> addMessages msgs >> failM
+                    -- We can't think signatures from non signature packages
                     _ -> return (ireq_iface, as1)
-            let oks' | null (exposedModules pkg)
+            -- 3(c). Only identifiers from signature packages are "ok" to
+            -- import (that is, they are safe from a PVP perspective.)
+            -- (NB: This code is actually dead right now.)
+            let oks' | isFromSignaturePackage
                      = extendOccSetList oks (exportOccs as2)
                      | otherwise
                      = oks
+            -- 3(d). Extend the name substitution (performing shaping)
             mb_r <- extend_ns nsubst as2
             case mb_r of
                 Left err -> failWithTc err
@@ -768,8 +830,8 @@ mergeSignatures
             -- in the listing.  We don't want it because a module is NOT
             -- supposed to include itself in its dep_orphs/dep_finsts.  See #13214
             iface' = iface { mi_orphan = False, mi_finsts = False }
-            avails = plusImportAvails (tcg_imports tcg_env)
-                                      (calculateAvails dflags iface' False False)
+            avails = plusImportAvails (tcg_imports tcg_env) $
+                        calculateAvails dflags iface' False False ImportedBySystem
         return tcg_env {
             tcg_inst_env = inst_env,
             tcg_insts    = insts,
@@ -856,7 +918,7 @@ checkImplements impl_mod req_mod@(IndefModule uid mod_name) =
 
     dflags <- getDynFlags
     let avails = calculateAvails dflags
-                    impl_iface False{- safe -} False{- boot -}
+                    impl_iface False{- safe -} False{- boot -} ImportedBySystem
         fix_env = mkNameEnv [ (gre_name rdr_elt, FixItem occ f)
                             | (occ, f) <- mi_fixities impl_iface
                             , rdr_elt <- lookupGlobalRdrEnv impl_gr occ ]

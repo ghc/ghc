@@ -24,7 +24,7 @@ module DynFlags (
         WarningFlag(..), WarnReason(..),
         Language(..),
         PlatformConstants(..),
-        FatalMessager, LogAction, FlushOut(..), FlushErr(..),
+        FatalMessager, LogAction, LogFinaliser, FlushOut(..), FlushErr(..),
         ProfAuto(..),
         glasgowExtsFlags,
         warningGroups, warningHierarchies,
@@ -48,8 +48,9 @@ module DynFlags (
         GhcMode(..), isOneShot,
         GhcLink(..), isNoLink,
         PackageFlag(..), PackageArg(..), ModRenaming(..),
+        packageFlagsChanged,
         IgnorePackageFlag(..), TrustFlag(..),
-        PkgConfRef(..),
+        PackageDBFlag(..), PkgConfRef(..),
         Option(..), showOpt,
         DynLibLoader(..),
         fFlags, fLangFlags, xFlags,
@@ -708,6 +709,8 @@ data DynFlags = DynFlags {
 
   maxRelevantBinds      :: Maybe Int,   -- ^ Maximum number of bindings from the type envt
                                         --   to show in type error messages
+  maxValidSubstitutions :: Maybe Int,   -- ^ Maximum number of substitutions
+                                        --   to show in type error messages
   maxUncoveredPatterns  :: Int,         -- ^ Maximum number of unmatched patterns to show
                                         --   in non-exhaustiveness warnings
   simplTickFactor       :: Int,         -- ^ Multiplier for simplifier ticks
@@ -804,15 +807,12 @@ data DynFlags = DynFlags {
   depSuffixes           :: [String],
 
   --  Package flags
-  extraPkgConfs         :: [PkgConfRef] -> [PkgConfRef],
-        -- ^ The @-package-db@ flags given on the command line, in the order
-        -- they appeared.  In *reverse* order that they're specified
-        -- on the command line.  This is intended to be applied with the
-        -- list of "initial" package databases derived from @GHC_PACKAGE_PATH@;
-        -- see 'getPackageConfRefs'; this is a function because 'extraPkgConfs'
-        -- maybe configured to filter out certain flags from *either* the
-        -- user command line, or the base command; see for example
-        -- 'removeUserPkgConf'.
+  packageDBFlags        :: [PackageDBFlag],
+        -- ^ The @-package-db@ flags given on the command line, In
+        -- *reverse* order that they're specified on the command line.
+        -- This is intended to be applied with the list of "initial"
+        -- package databases derived from @GHC_PACKAGE_PATH@; see
+        -- 'getPackageConfRefs'.
 
   ignorePackageFlags    :: [IgnorePackageFlag],
         -- ^ The @-ignore-package@ flags from the command line.
@@ -1254,9 +1254,28 @@ data TrustFlag
 data PackageFlag
   = ExposePackage   String PackageArg ModRenaming -- ^ @-package@, @-package-id@
   | HidePackage     String -- ^ @-hide-package@
+  deriving (Eq) -- NB: equality instance is used by packageFlagsChanged
+
+data PackageDBFlag
+  = PackageDB PkgConfRef
+  | NoUserPackageDB
+  | NoGlobalPackageDB
+  | ClearPackageDBs
   deriving (Eq)
--- NB: equality instance is used by InteractiveUI to test if
--- package flags have changed.
+
+packageFlagsChanged :: DynFlags -> DynFlags -> Bool
+packageFlagsChanged idflags1 idflags0 =
+  packageFlags idflags1 /= packageFlags idflags0 ||
+  ignorePackageFlags idflags1 /= ignorePackageFlags idflags0 ||
+  pluginPackageFlags idflags1 /= pluginPackageFlags idflags0 ||
+  trustFlags idflags1 /= trustFlags idflags0 ||
+  packageDBFlags idflags1 /= packageDBFlags idflags0 ||
+  packageGFlags idflags1 /= packageGFlags idflags0
+ where
+   packageGFlags dflags = map (`gopt` dflags)
+     [ Opt_HideAllPackages
+     , Opt_HideAllPluginPackages
+     , Opt_AutoLinkPackages ]
 
 instance Outputable PackageFlag where
     ppr (ExposePackage n arg rn) = text n <> braces (ppr arg <+> ppr rn)
@@ -1539,6 +1558,7 @@ defaultDynFlags mySettings =
         maxPmCheckIterations    = 2000000,
         ruleCheck               = Nothing,
         maxRelevantBinds        = Just 6,
+        maxValidSubstitutions   = Just 6,
         maxUncoveredPatterns    = 4,
         simplTickFactor         = 100,
         specConstrThreshold     = Just 2000,
@@ -1604,7 +1624,7 @@ defaultDynFlags mySettings =
 
         hpcDir                  = ".hpc",
 
-        extraPkgConfs           = id,
+        packageDBFlags          = [],
         packageFlags            = [],
         pluginPackageFlags      = [],
         ignorePackageFlags      = [],
@@ -3134,6 +3154,10 @@ dynamic_flags_deps = [
       (intSuffix (\n d -> d { maxRelevantBinds = Just n }))
   , make_ord_flag defFlag "fno-max-relevant-binds"
       (noArg (\d -> d { maxRelevantBinds = Nothing }))
+  , make_ord_flag defFlag "fmax-valid-substitutions"
+      (intSuffix (\n d -> d { maxValidSubstitutions = Just n }))
+  , make_ord_flag defFlag "fno-max-valid-substitutions"
+      (noArg (\d -> d { maxValidSubstitutions = Nothing }))
   , make_ord_flag defFlag "fmax-uncovered-patterns"
       (intSuffix (\n d -> d { maxUncoveredPatterns = n }))
   , make_ord_flag defFlag "fsimplifier-phases"
@@ -4531,24 +4555,23 @@ data PkgConfRef
   = GlobalPkgConf
   | UserPkgConf
   | PkgConfFile FilePath
+  deriving Eq
 
 addPkgConfRef :: PkgConfRef -> DynP ()
-addPkgConfRef p = upd $ \s -> s { extraPkgConfs = (p:) . extraPkgConfs s }
+addPkgConfRef p = upd $ \s ->
+  s { packageDBFlags = PackageDB p : packageDBFlags s }
 
 removeUserPkgConf :: DynP ()
-removeUserPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotUser . extraPkgConfs s }
-  where
-    isNotUser UserPkgConf = False
-    isNotUser _ = True
+removeUserPkgConf = upd $ \s ->
+  s { packageDBFlags = NoUserPackageDB : packageDBFlags s }
 
 removeGlobalPkgConf :: DynP ()
-removeGlobalPkgConf = upd $ \s -> s { extraPkgConfs = filter isNotGlobal . extraPkgConfs s }
-  where
-    isNotGlobal GlobalPkgConf = False
-    isNotGlobal _ = True
+removeGlobalPkgConf = upd $ \s ->
+ s { packageDBFlags = NoGlobalPackageDB : packageDBFlags s }
 
 clearPkgConf :: DynP ()
-clearPkgConf = upd $ \s -> s { extraPkgConfs = const [] }
+clearPkgConf = upd $ \s ->
+  s { packageDBFlags = ClearPackageDBs : packageDBFlags s }
 
 parsePackageFlag :: String                 -- the flag
                  -> ReadP PackageArg       -- type of argument
@@ -5144,7 +5167,7 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_Hpc
           warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
       in loop dflags' warn
- | hscTarget dflags == HscAsm &&
+ | hscTarget dflags `elem` [HscAsm, HscLlvm] &&
    platformUnregisterised (targetPlatform dflags)
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"

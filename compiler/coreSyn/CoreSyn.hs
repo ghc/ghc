@@ -4,6 +4,7 @@
 -}
 
 {-# LANGUAGE CPP, DeriveDataTypeable, FlexibleContexts #-}
+{-# LANGUAGE NamedFieldPuns #-}
 
 -- | CoreSyn holds all the main data types for use by for the Glasgow Haskell Compiler midsection
 module CoreSyn (
@@ -89,7 +90,7 @@ module CoreSyn (
 
         -- ** Operations on 'CoreRule's
         ruleArity, ruleName, ruleIdName, ruleActivation,
-        setRuleIdName,
+        setRuleIdName, ruleModule,
         isBuiltinRule, isLocalRule, isAutoRule,
 
         -- * Core vectorisation declarations data type
@@ -1245,6 +1246,10 @@ ruleArity (Rule {ru_args = args})      = length args
 
 ruleName :: CoreRule -> RuleName
 ruleName = ru_name
+
+ruleModule :: CoreRule -> Maybe Module
+ruleModule Rule { ru_origin } = Just ru_origin
+ruleModule BuiltinRule {} = Nothing
 
 ruleActivation :: CoreRule -> Activation
 ruleActivation (BuiltinRule { })       = AlwaysActive

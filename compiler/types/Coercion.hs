@@ -59,6 +59,7 @@ module Coercion (
         pickLR,
 
         isReflCo, isReflCo_maybe, isReflexiveCo, isReflexiveCo_maybe,
+        isReflCoVar_maybe,
 
         -- ** Coercion variables
         mkCoVar, isCoVar, coVarName, setCoVarName, setCoVarUnique,
@@ -372,10 +373,10 @@ splitForAllCo_maybe _                     = Nothing
 -------------------------------------------------------
 -- and some coercion kind stuff
 
-coVarTypes :: CoVar -> (Type,Type)
+coVarTypes :: CoVar -> Pair Type
 coVarTypes cv
   | (_, _, ty1, ty2, _) <- coVarKindsTypesRole cv
-  = (ty1, ty2)
+  = Pair ty1 ty2
 
 coVarKindsTypesRole :: CoVar -> (Kind,Kind,Type,Type,Role)
 coVarKindsTypesRole cv
@@ -425,12 +426,21 @@ mkHeteroCoercionType Phantom          = panic "mkHeteroCoercionType"
 
 -- | Given a coercion @co1 :: (a :: TYPE r1) ~ (b :: TYPE r2)@,
 -- produce a coercion @rep_co :: r1 ~ r2@.
-mkRuntimeRepCo :: Coercion -> Coercion
+mkRuntimeRepCo :: HasDebugCallStack => Coercion -> Coercion
 mkRuntimeRepCo co
   = mkNthCo 0 kind_co
   where
     kind_co = mkKindCo co  -- kind_co :: TYPE r1 ~ TYPE r2
                            -- (up to silliness with Constraint)
+
+isReflCoVar_maybe :: CoVar -> Maybe Coercion
+-- If cv :: t~t then isReflCoVar_maybe cv = Just (Refl t)
+isReflCoVar_maybe cv
+  | Pair ty1 ty2 <- coVarTypes cv
+  , ty1 `eqType` ty2
+  = Just (Refl (coVarRole cv) ty1)
+  | otherwise
+  = Nothing
 
 -- | Tests if this coercion is obviously reflexive. Guaranteed to work
 -- very quickly. Sometimes a coercion can be reflexive, but not obviously
@@ -739,14 +749,19 @@ mkHomoForAllCos_NoRefl tvs orig_co = foldr go orig_co tvs
 
 mkCoVarCo :: CoVar -> Coercion
 -- cv :: s ~# t
-mkCoVarCo cv
-  | ty1 `eqType` ty2 = Refl (coVarRole cv) ty1
-  | otherwise        = CoVarCo cv
-  where
-    (ty1, ty2) = coVarTypes cv
+-- See Note [mkCoVarCo]
+mkCoVarCo cv = CoVarCo cv
 
 mkCoVarCos :: [CoVar] -> [Coercion]
 mkCoVarCos = map mkCoVarCo
+
+{- Note [mkCoVarCo]
+~~~~~~~~~~~~~~~~~~~
+In the past, mkCoVarCo optimised (c :: t~t) to (Refl t).  That is
+valid (although see Note [Unbound RULE binders] in Rules), but
+it's a relatively expensive test and perhaps better done in
+optCoercion.  Not a big deal either way.
+-}
 
 -- | Extract a covar, if possible. This check is dirty. Be ashamed
 -- of yourself. (It's dirty because it cares about the structure of
@@ -1515,7 +1530,7 @@ liftCoSubstWith r tvs cos ty
 -- that coerces between @lc_left(ty)@ and @lc_right(ty)@, where
 -- @lc_left@ is a substitution mapping type variables to the left-hand
 -- types of the mapped coercions in @lc@, and similar for @lc_right@.
-liftCoSubst :: Role -> LiftingContext -> Type -> Coercion
+liftCoSubst :: HasDebugCallStack => Role -> LiftingContext -> Type -> Coercion
 liftCoSubst r lc@(LC subst env) ty
   | isEmptyVarEnv env = Refl r (substTy subst ty)
   | otherwise         = ty_co_subst lc r ty
@@ -1800,7 +1815,7 @@ coercionKind co = go co
             -- need to, see #11735
         mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2'
     go (FunCo _ co1 co2)    = mkFunTy <$> go co1 <*> go co2
-    go (CoVarCo cv)         = toPair $ coVarTypes cv
+    go (CoVarCo cv)         = coVarTypes cv
     go (AxiomInstCo ax ind cos)
       | CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                    , cab_lhs = lhs, cab_rhs = rhs } <- coAxiomNthBranch ax ind
@@ -1882,7 +1897,7 @@ coercionKindRole = go
         (mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2', r)
     go (FunCo r co1 co2)
       = (mkFunTy <$> coercionKind co1 <*> coercionKind co2, r)
-    go (CoVarCo cv) = (toPair $ coVarTypes cv, coVarRole cv)
+    go (CoVarCo cv) = (coVarTypes cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
     go (UnivCo _ r ty1 ty2)  = (Pair ty1 ty2, r)
     go (SymCo co) = first swap $ go co

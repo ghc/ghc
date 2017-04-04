@@ -345,7 +345,7 @@ mkBindsRep gk tycon =
 
         -- Recurse over the sum first
         from_alts, to_alts :: [Alt]
-        (from_alts, to_alts) = mkSum gk_ (1 :: US) tycon datacons
+        (from_alts, to_alts) = mkSum gk_ (1 :: US) datacons
           where gk_ = case gk of
                   Gen0 -> Gen0_
                   Gen1 -> ASSERT(length tyvars >= 1)
@@ -693,24 +693,19 @@ mkBoxTy uAddr uChar uDouble uFloat uInt uWord rec0 k ty
 
 mkSum :: GenericKind_ -- Generic or Generic1?
       -> US          -- Base for generating unique names
-      -> TyCon       -- The type constructor
       -> [DataCon]   -- The data constructors
       -> ([Alt],     -- Alternatives for the T->Trep "from" function
           [Alt])     -- Alternatives for the Trep->T "to" function
 
 -- Datatype without any constructors
-mkSum _ _ tycon [] = ([from_alt], [to_alt])
+mkSum _ _ [] = ([from_alt], [to_alt])
   where
-    from_alt = (nlWildPat, makeError errMsgFrom)
-    to_alt   = (nlWildPat, makeError errMsgTo)
+    from_alt = (x_Pat, nlHsCase x_Expr [])
+    to_alt   = (x_Pat, nlHsCase x_Expr [])
                -- These M1s are meta-information for the datatype
-    makeError s = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString s))
-    tyConStr   = occNameString (nameOccName (tyConName tycon))
-    errMsgFrom = "No generic representation for empty datatype " ++ tyConStr
-    errMsgTo   = "No values for empty datatype " ++ tyConStr
 
 -- Datatype with at least one constructor
-mkSum gk_ us _ datacons =
+mkSum gk_ us datacons =
   -- switch the payload of gk_ to be datacon-centric instead of tycon-centric
  unzip [ mk1Sum (gk2gkDC gk_ d) us i (length datacons) d
            | (d,i) <- zip datacons [1..] ]

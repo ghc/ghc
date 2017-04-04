@@ -6,7 +6,7 @@
 
 #include "BeginPrivate.h"
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
 
 int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first );
 

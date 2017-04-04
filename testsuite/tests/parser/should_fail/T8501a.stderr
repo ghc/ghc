@@ -1,0 +1,4 @@
+
+T8501a.hs:5:3: error:
+    Parse error in pattern: rec
+    Perhaps you intended to use RecursiveDo

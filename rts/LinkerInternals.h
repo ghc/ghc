@@ -91,7 +91,8 @@ typedef struct ForeignExportStablePtr_ {
     struct ForeignExportStablePtr_ *next;
 } ForeignExportStablePtr;
 
-#if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) \
+    || defined(arm_HOST_ARCH)
 /* ios currently uses adjacent got tables, and no symbol extras */
 #if !defined(ios_HOST_OS)
 #define NEED_SYMBOL_EXTRAS 1
@@ -102,17 +103,17 @@ typedef struct ForeignExportStablePtr_ {
  * address relocations on the PowerPC, x86_64 and ARM.
  */
 typedef struct {
-#ifdef powerpc_HOST_ARCH
+#if defined(powerpc_HOST_ARCH)
     struct {
         short lis_r12, hi_addr;
         short ori_r12_r12, lo_addr;
         long mtctr_r12;
         long bctr;
     } jumpIsland;
-#elif x86_64_HOST_ARCH
+#elif defined(x86_64_HOST_ARCH)
     uint64_t    addr;
     uint8_t     jumpIsland[6];
-#elif arm_HOST_ARCH
+#elif defined(arm_HOST_ARCH)
     uint8_t     jumpIsland[16];
 #endif
 } SymbolExtra;
@@ -174,7 +175,7 @@ typedef struct _ObjectCode {
     unsigned int pltIndex;
 #endif
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
     SymbolExtra    *symbol_extras;
     unsigned long   first_symbol_extra;
     unsigned long   n_symbol_extras;
@@ -283,7 +284,7 @@ ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                   int misalignment
                   );
 
-#if defined (mingw32_HOST_OS)
+#if defined(mingw32_HOST_OS)
 /* We use myindex to calculate array addresses, rather than
    simply doing the normal subscript thing.  That's because
    some of the above structs have sizes which are not
@@ -318,12 +319,12 @@ char *cstring_from_section_name(
 || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
 || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 #  define OBJFORMAT_ELF
-typedef struct _ObjectCodeFormatInfo { void* placeholder;} ObjectCodeFormatInfo;
-typedef struct _SectionFormatInfo { void* placeholder; } SectionFormatInfo;
+struct _SectionFormatInfo { void* placeholder; };
+struct _ObjectCodeFormatInfo { void* placeholder; };
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
-typedef struct _ObjectCodeFormatInfo { void* placeholder;} ObjectCodeFormatInfo;
-typedef struct _SectionFormatInfo { void* placeholder; } SectionFormatInfo;
+struct _SectionFormatInfo { void* placeholder; };
+struct _ObjectCodeFormatInfo { void* placeholder; };
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"

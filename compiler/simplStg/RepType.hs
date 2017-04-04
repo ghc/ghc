@@ -335,17 +335,13 @@ tyConPrimRep1 tc = case tyConPrimRep tc of
 -- of values of types of this kind.
 kindPrimRep :: HasDebugCallStack => SDoc -> Kind -> [PrimRep]
 kindPrimRep doc ki
-  | Just ki' <- coreViewOneStarKind ki
+  | Just ki' <- coreView ki
   = kindPrimRep doc ki'
 kindPrimRep doc (TyConApp typ [runtime_rep])
   = ASSERT( typ `hasKey` tYPETyConKey )
     runtimeRepPrimRep doc runtime_rep
 kindPrimRep doc ki
   = pprPanic "kindPrimRep" (ppr ki $$ doc)
-
-  -- TODO (RAE): Remove:
-  -- WARN( True, text "kindPrimRep defaulting to LiftedRep on" <+> ppr ki $$ doc )
-  -- [LiftedRep]  -- this can happen legitimately for, e.g., Any
 
 -- | Take a type of kind RuntimeRep and extract the list of 'PrimRep' that
 -- it encodes.

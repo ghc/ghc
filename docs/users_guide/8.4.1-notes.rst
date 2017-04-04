@@ -1,0 +1,84 @@
+.. _release-8-4-1:
+
+Release notes for version 8.4.1
+===============================
+
+The significant changes to the various parts of the compiler are listed in the
+following sections. There have also been numerous bug fixes and performance
+improvements over the 8.2.1 release.
+
+
+Highlights
+----------
+
+The highlights, since the 8.2.1 release, are:
+
+-  Many, many bug fixes.
+
+Full details
+------------
+
+Language
+~~~~~~~~
+
+Compiler
+~~~~~~~~
+
+- Derived ``Functor``, ``Foldable``, and ``Traversable`` instances are now
+  optimized when their last type parameters have phantom roles.
+  Specifically, ::
+
+    fmap _ = coerce
+    traverse _ x = pure (coerce x)
+    foldMap _ _ = mempty
+
+  These definitions of ``foldMap`` and ``traverse`` are lazier than the ones we
+  would otherwise derive, as they may produce results without inspecting their
+  arguments at all.
+
+  See also :ref:`deriving-functor`, :ref:`deriving-foldable`, and
+  :ref:`deriving-traversable`.
+
+- Derived ``Functor``, ``Foldable``, ``Traversable``, ``Generic``, and
+  ``Generic1`` instances now have better, and generally better-documented,
+  behaviors for types with no constructors. In particular, ::
+
+      fmap _ x = case x of
+      foldMap _ _ = mempty
+      traverse _ x = pure (case x of)
+      to x = case x of
+      to1 x = case x of
+      from x = case x of
+      from1 x = case x of
+
+  The new behavior generally leads to more useful error messages than the
+  old did, and lazier semantics for ``foldMap`` and ``traverse``.
+
+- Derived ``Foldable`` instances now derive custom definitions for ``null``
+  instead of using the default one. This leads to asymptotically better
+  performance for recursive types not shaped like cons-lists, and allows ``null``
+  to terminate for more (but not all) infinitely large structures.
+
+- Derived instances for types with no constructors now have appropriate
+  arities: they take all their arguments before producing errors. This may not
+  be terribly important in practice, but it seems like the right thing to do.
+  Previously, we generated ::
+
+      (==) = error ...
+
+Now we generate ::
+
+      _ == _ = error ...
+
+- Lots of other bugs. See `Trac
+   <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
+   for a complete list.
+
+Runtime system
+~~~~~~~~~~~~~~
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+
+``ghc`` library
+~~~~~~~~~~~~~~~

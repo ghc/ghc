@@ -395,6 +395,16 @@ list.
     they may be numerous), but ``-fno-max-relevant-bindings`` includes
     them too.
 
+.. ghc-flag:: -fmax-valid-substitutions=<n>
+              -fno-max-valid-substitutions
+
+    :default: 6
+
+    The type checker sometimes displays a list of valid substitutions
+    for typed holes in error messages, but only up to some maximum number,
+    set by this flag. Turning it off with
+    ``-fno-max-valid-substitutions`` gives an unlimited number.
+
 .. ghc-flag:: -fmax-uncovered-patterns=<n>
 
     :default: 4
@@ -584,8 +594,8 @@ list.
 
     :default: off
 
-    If this flag is on, call-patten specialision will specialise a call
-    ``(f (Just x))`` with an explicit constructor agument, even if the argument
+    If this flag is on, call-pattern specialisation will specialise a call
+    ``(f (Just x))`` with an explicit constructor argument, even if the argument
     is not scrutinised in the body of the function. This is sometimes
     beneficial; e.g. the argument might be given to some other function
     that can itself be specialised.

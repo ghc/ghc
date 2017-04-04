@@ -471,10 +471,11 @@ initPackages dflags0 = do
         Nothing -> readPackageConfigs dflags
         Just db -> return $ map (\(p, pkgs)
                                     -> (p, setBatchPackageFlags dflags pkgs)) db
-  (pkg_state, preload)
+  (pkg_state, preload, insts)
         <- mkPackageState dflags pkg_db []
   return (dflags{ pkgDatabase = Just pkg_db,
-                  pkgState = pkg_state },
+                  pkgState = pkg_state,
+                  thisUnitIdInsts_ = insts },
           preload)
 
 -- -----------------------------------------------------------------------------
@@ -500,10 +501,26 @@ getPackageConfRefs dflags = do
          | otherwise
          -> map PkgConfFile (splitSearchPath path)
 
-  return $ reverse (extraPkgConfs dflags base_conf_refs)
-  -- later packages shadow earlier ones.  extraPkgConfs
-  -- is in the opposite order to the flags on the
-  -- command line.
+  -- Apply the package DB-related flags from the command line to get the
+  -- final list of package DBs.
+  --
+  -- Notes on ordering:
+  --  * The list of flags is reversed (later ones first)
+  --  * We work with the package DB list in "left shadows right" order
+  --  * and finally reverse it at the end, to get "right shadows left"
+  --
+  return $ reverse (foldr doFlag base_conf_refs (packageDBFlags dflags))
+ where
+  doFlag (PackageDB p) dbs = p : dbs
+  doFlag NoUserPackageDB dbs = filter isNotUser dbs
+  doFlag NoGlobalPackageDB dbs = filter isNotGlobal dbs
+  doFlag ClearPackageDBs _ = []
+
+  isNotUser UserPkgConf = False
+  isNotUser _ = True
+
+  isNotGlobal GlobalPkgConf = False
+  isNotGlobal _ = True
 
 resolvePackageConfig :: DynFlags -> PkgConfRef -> IO (Maybe FilePath)
 resolvePackageConfig dflags GlobalPkgConf = return $ Just (systemPackageConfig dflags)
@@ -1053,24 +1070,35 @@ findWiredInPackages dflags prec_map pkgs vis_map = do
                   = pkg
                 upd_deps pkg = pkg {
                       -- temporary harmless DefUnitId invariant violation
-                      depends = map (unDefUnitId . upd_wired_in . DefUnitId) (depends pkg),
+                      depends = map (unDefUnitId . upd_wired_in wiredInMap . DefUnitId) (depends pkg),
                       exposedModules
-                        = map (\(k,v) -> (k, fmap upd_wired_in_mod v))
+                        = map (\(k,v) -> (k, fmap (upd_wired_in_mod wiredInMap) v))
                               (exposedModules pkg)
                     }
-                upd_wired_in_mod (Module uid m) = Module (upd_wired_in_uid uid) m
-                upd_wired_in_uid (DefiniteUnitId def_uid) =
-                    DefiniteUnitId (upd_wired_in def_uid)
-                upd_wired_in_uid (IndefiniteUnitId indef_uid) =
-                    IndefiniteUnitId $ newIndefUnitId
-                        (indefUnitIdComponentId indef_uid)
-                        (map (\(x,y) -> (x,upd_wired_in_mod y)) (indefUnitIdInsts indef_uid))
-                upd_wired_in key
-                    | Just key' <- Map.lookup key wiredInMap = key'
-                    | otherwise = key
 
 
   return (updateWiredInDependencies pkgs, wiredInMap)
+
+-- Helper functions for rewiring Module and UnitId.  These
+-- rewrite UnitIds of modules in wired-in packages to the form known to the
+-- compiler. For instance, base-4.9.0.0 will be rewritten to just base, to match
+-- what appears in PrelNames.
+
+upd_wired_in_mod :: WiredPackagesMap -> Module -> Module
+upd_wired_in_mod wiredInMap (Module uid m) = Module (upd_wired_in_uid wiredInMap uid) m
+
+upd_wired_in_uid :: WiredPackagesMap -> UnitId -> UnitId
+upd_wired_in_uid wiredInMap (DefiniteUnitId def_uid) =
+    DefiniteUnitId (upd_wired_in wiredInMap def_uid)
+upd_wired_in_uid wiredInMap (IndefiniteUnitId indef_uid) =
+    IndefiniteUnitId $ newIndefUnitId
+        (indefUnitIdComponentId indef_uid)
+        (map (\(x,y) -> (x,upd_wired_in_mod wiredInMap y)) (indefUnitIdInsts indef_uid))
+
+upd_wired_in :: WiredPackagesMap -> DefUnitId -> DefUnitId
+upd_wired_in wiredInMap key
+    | Just key' <- Map.lookup key wiredInMap = key'
+    | otherwise = key
 
 updateVisibilityMap :: WiredPackagesMap -> VisibilityMap -> VisibilityMap
 updateVisibilityMap wiredInMap vis_map = foldl' f vis_map (Map.toList wiredInMap)
@@ -1328,12 +1356,10 @@ mkPackageState
     -> [(FilePath, [PackageConfig])]
     -> [PreloadUnitId]              -- preloaded packages
     -> IO (PackageState,
-           [PreloadUnitId])         -- new packages to preload
+           [PreloadUnitId],         -- new packages to preload
+           Maybe [(ModuleName, Module)])
 
 mkPackageState dflags dbs preload0 = do
-  -- Compute the unit id
-  let this_package = thisPackage dflags
-
 {-
    Plan.
 
@@ -1525,7 +1551,10 @@ mkPackageState dflags dbs preload0 = do
       -- but in any case remove the current package from the set of
       -- preloaded packages so that base/rts does not end up in the
       -- set up preloaded package when we are just building it
-      preload3 = nub $ filter (/= this_package)
+      -- (NB: since this is only relevant for base/rts it doesn't matter
+      -- that thisUnitIdInsts_ is not wired yet)
+      --
+      preload3 = nub $ filter (/= thisPackage dflags)
                      $ (basicLinkedPackages ++ preload2)
 
   -- Close the preload packages with their dependencies
@@ -1548,7 +1577,8 @@ mkPackageState dflags dbs preload0 = do
     unwireMap = Map.fromList [ (v,k) | (k,v) <- Map.toList wired_map ],
     requirementContext = req_ctx
     }
-  return (pstate, new_dep_preload)
+  let new_insts = fmap (map (fmap (upd_wired_in_mod wired_map))) (thisUnitIdInsts_ dflags)
+  return (pstate, new_dep_preload, new_insts)
 
 -- | Given a wired-in 'UnitId', "unwire" it into the 'UnitId'
 -- that it was recorded as in the package database.

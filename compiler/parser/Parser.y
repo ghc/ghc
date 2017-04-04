@@ -1362,8 +1362,8 @@ vars0 :: { [Located RdrName] }
         | varid vars0                 { $1 : $2 }
 
 cvars1 :: { [RecordPatSynField (Located RdrName)] }
-       : varid                        { [RecordPatSynField $1 $1] }
-       | varid ',' cvars1             {% addAnnotation (getLoc $1) AnnComma (getLoc $2) >>
+       : var                          { [RecordPatSynField $1 $1] }
+       | var ',' cvars1               {% addAnnotation (getLoc $1) AnnComma (getLoc $2) >>
                                          return ((RecordPatSynField $1 $1) : $3 )}
 
 where_decls :: { Located ([AddAnn]
