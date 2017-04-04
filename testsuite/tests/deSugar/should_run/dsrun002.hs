@@ -1,4 +1,4 @@
-{- Tests let-expressions in do-statments -}
+{- Tests let-expressions in do-statements -}
 
 module Main( main ) where
 

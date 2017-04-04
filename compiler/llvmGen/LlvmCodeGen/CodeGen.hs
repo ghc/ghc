@@ -62,7 +62,7 @@ genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
 --
 
 -- | Generate code for a list of blocks that make up a complete
--- procedure. The first block in the list is exepected to be the entry
+-- procedure. The first block in the list is expected to be the entry
 -- point and will get the prologue.
 basicBlocksCodeGen :: LiveGlobalRegs -> [CmmBlock]
                       -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])

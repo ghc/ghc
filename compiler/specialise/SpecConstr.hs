@@ -1749,7 +1749,7 @@ the passed-in RuleInfo, unless there are no calls at all to the function.
 The caller can, indeed must, assume this.  He should not combine in rhs_usg
 himself, or he'll get rhs_usg twice -- and that can lead to an exponential
 blowup of duplicates in the CallEnv.  This is what gave rise to the massive
-performace loss in Trac #8852.
+performance loss in Trac #8852.
 
 Note [Specialise original body]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

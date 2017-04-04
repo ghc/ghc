@@ -1612,7 +1612,7 @@ type GuardLStmt id = LStmt id (LHsExpr id)
 -- | Guard Statement
 type GuardStmt  id = Stmt  id (LHsExpr id)
 
--- | Ghci Located Statemnt
+-- | Ghci Located Statement
 type GhciLStmt  id = LStmt id (LHsExpr id)
 
 -- | Ghci Statement

@@ -150,7 +150,7 @@ pprExp i (LamCaseE ms) = parensIf (i > noPrec)
 pprExp _ (TupE es) = parens (commaSep es)
 pprExp _ (UnboxedTupE es) = hashParens (commaSep es)
 pprExp _ (UnboxedSumE e alt arity) = unboxedSumBars (ppr e) alt arity
--- Nesting in Cond is to avoid potential problems in do statments
+-- Nesting in Cond is to avoid potential problems in do statements
 pprExp i (CondE guard true false)
  = parensIf (i > noPrec) $ sep [text "if"   <+> ppr guard,
                        nest 1 $ text "then" <+> ppr true,

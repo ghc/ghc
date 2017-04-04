@@ -309,7 +309,7 @@ splitEithers (e : es) = case e of
     where (xs,ys) = splitEithers es
 
 chkAppend :: [a] -> [a] -> [a]
--- Checks for the second arguemnt being empty
+-- Checks for the second argument being empty
 -- Used in situations where that situation is common
 chkAppend xs ys
   | null ys   = xs

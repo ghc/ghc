@@ -2012,7 +2012,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
                        ; when (isUnitTy $ it_ty) failM
                        ; return stuff },
 
-                        -- Plan B; a naked bind statment
+                        -- Plan B; a naked bind statement
                     tcGhciStmts [bind_stmt],
 
                         -- Plan C; check that the let-binding is typeable all by itself.
