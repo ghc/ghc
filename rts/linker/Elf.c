@@ -1445,7 +1445,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
             break;
 #        endif
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
       case R_X86_64_64:
           *(Elf64_Xword *)P = value;
           break;
@@ -1673,7 +1673,7 @@ int ocRunInit_ELF( ObjectCode *oc )
  * PowerPC & X86_64 ELF specifics
  */
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
 
 int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 {

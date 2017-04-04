@@ -1174,7 +1174,7 @@ void freeObjectCode (ObjectCode *oc)
 
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
-#if NEED_SYMBOL_EXTRAS && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
+#if defined(NEED_SYMBOL_EXTRAS) && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
     if (RTS_LINKER_USE_MMAP) {
         if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
             m32_free(oc->symbol_extras,
@@ -1244,7 +1244,7 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->sections          = NULL;
    oc->proddables        = NULL;
    oc->stable_ptrs       = NULL;
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
    oc->symbol_extras     = NULL;
 #endif
    oc->imageMapped       = mapped;
@@ -1467,7 +1467,7 @@ HsInt loadOc (ObjectCode* oc)
        return r;
    }
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
 #  if defined(OBJFORMAT_MACHO)
    r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) {

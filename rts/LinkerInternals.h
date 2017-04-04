@@ -175,7 +175,7 @@ typedef struct _ObjectCode {
     unsigned int pltIndex;
 #endif
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
     SymbolExtra    *symbol_extras;
     unsigned long   first_symbol_extra;
     unsigned long   n_symbol_extras;

@@ -11,7 +11,7 @@
 
 #include "LinkerInternals.h"
 
-#if NEED_SYMBOL_EXTRAS
+#if defined(NEED_SYMBOL_EXTRAS)
 #if !defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS)
 
 #include "RtsUtils.h"
