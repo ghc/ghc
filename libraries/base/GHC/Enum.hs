@@ -435,12 +435,12 @@ instance  Enum Int  where
     fromEnum x = x
 
     {-# INLINE enumFrom #-}
-    enumFrom (I# x) = eftInt x maxInt#
-        where !(I# maxInt#) = maxInt
+    enumFrom x = eftInt x maxInt
+--        where !(I# maxInt#) = maxInt
         -- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
-    enumFromTo (I# x) (I# y) = eftInt x y
+    enumFromTo x y = eftInt x y
 
     {-# INLINE enumFromThen #-}
     enumFromThen (I# x1) (I# x2) = efdInt x1 x2
@@ -467,24 +467,25 @@ instance  Enum Int  where
 -}
 
 {-# NOINLINE [1] eftInt #-}
-eftInt :: Int# -> Int# -> [Int]
+eftInt :: Int -> Int -> [Int]
 -- [x1..x2]
-eftInt x0 y | isTrue# (x0 ># y) = []
-            | otherwise         = go x0
-               where
-                 go x = I# x : if isTrue# (x ==# y)
-                               then []
-                               else go (x +# 1#)
+eftInt (I# x0) (I# y)
+   | isTrue# (x0 ># y) = []
+   | otherwise         = go x0
+   where
+     go x = I# x : if isTrue# (x ==# y)
+                   then []
+                   else go (x +# 1#)
 
 {-# INLINE [0] eftIntFB #-} -- See Note [Inline FB functions] in GHC.List
-eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
-eftIntFB c n x0 y | isTrue# (x0 ># y) = n
-                  | otherwise         = go x0
-                 where
-                   go x = I# x `c` if isTrue# (x ==# y)
-                                   then n
-                                   else go (x +# 1#)
-                        -- Watch out for y=maxBound; hence ==, not >
+eftIntFB :: (Int -> r -> r) -> r -> Int -> Int -> r
+eftIntFB c n (I# x0) (I# y)
+   | isTrue# (x0 ># y) = n
+   | otherwise         = go x0
+   where
+     go x = I# x `c` if isTrue# (x ==# y)
+                     then n  -- Watch out for y=maxBound; hence ==, not >
+                     else go (x +# 1#)
         -- Be very careful not to have more than one "c"
         -- so that when eftInfFB is inlined we can inline
         -- whatever is bound to "c"
