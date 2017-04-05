@@ -39,6 +39,7 @@ import DynFlags
 import qualified Data.Traversable as T
 
 import Bag
+import Data.Functor.Compose
 import Data.IORef
 import NameShape
 import IfaceEnv
@@ -525,7 +526,7 @@ rnIfaceConDecl d = do
     let rnIfConEqSpec (n,t) = (,) n <$> rnIfaceType t
     con_eq_spec <- mapM rnIfConEqSpec (ifConEqSpec d)
     con_ctxt <- mapM rnIfaceType (ifConCtxt d)
-    con_arg_tys <- mapM rnIfaceType (ifConArgTys d)
+    con_arg_tys <- mapM rnIfaceType (Compose $ ifConArgTys d)
     con_fields <- mapM rnFieldLabel (ifConFields d)
     let rnIfaceBang (IfUnpackCo co) = IfUnpackCo <$> rnIfaceCo co
         rnIfaceBang bang = pure bang
@@ -534,7 +535,7 @@ rnIfaceConDecl d = do
              , ifConExTvs = con_ex_tvs
              , ifConEqSpec = con_eq_spec
              , ifConCtxt = con_ctxt
-             , ifConArgTys = con_arg_tys
+             , ifConArgTys = getCompose con_arg_tys
              , ifConFields = con_fields
              , ifConStricts = con_stricts
              }

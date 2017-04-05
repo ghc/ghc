@@ -43,6 +43,7 @@ import Avail
 import Outputable
 import Bag
 import BasicTypes       ( DerivStrategy, RuleName, pprRuleName )
+import Weight
 import FastString
 import SrcLoc
 import DynFlags
@@ -56,6 +57,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Control.Arrow ( first )
+import Data.Functor.Compose ( Compose(..) )
 import Data.List ( sortBy, mapAccumL )
 import Data.Maybe ( isJust )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
@@ -2018,7 +2020,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
         ; new_name     <- lookupLocatedTopBndrRn name
         ; let doc = ConDeclCtx [new_name]
         ; mb_doc'      <- rnMbLHsDoc mb_doc
-        ; (kvs, qtvs') <- get_con_qtvs (hsConDeclArgTys details)
+        ; (kvs, qtvs') <- get_con_qtvs (map weightedThing $ hsConDeclArgTys details)
 
         ; bindHsQTyVars doc (Just $ inHsDocContext doc) Nothing kvs qtvs' $
           \new_tyvars _ -> do
@@ -2070,15 +2072,15 @@ rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
 rnConDeclDetails
    :: Name
    -> HsDocContext
-   -> HsConDetails (LHsType RdrName) (Located [LConDeclField RdrName])
-   -> RnM (HsConDetails (LHsType Name) (Located [LConDeclField Name]), FreeVars)
+   -> HsConDetails (Weighted (LHsType RdrName)) (Located [LConDeclField RdrName])
+   -> RnM (HsConDetails (Weighted (LHsType Name)) (Located [LConDeclField Name]), FreeVars)
 rnConDeclDetails _ doc (PrefixCon tys)
-  = do { (new_tys, fvs) <- rnLHsTypes doc tys
+  = do { (Compose new_tys, fvs) <- rnLHsTypes doc (Compose tys)
        ; return (PrefixCon new_tys, fvs) }
 
 rnConDeclDetails _ doc (InfixCon ty1 ty2)
-  = do { (new_ty1, fvs1) <- rnLHsType doc ty1
-       ; (new_ty2, fvs2) <- rnLHsType doc ty2
+  = do { (new_ty1, fvs1) <- rnLHsTypes doc ty1
+       ; (new_ty2, fvs2) <- rnLHsTypes doc ty2
        ; return (InfixCon new_ty1 new_ty2, fvs1 `plusFV` fvs2) }
 
 rnConDeclDetails con doc (RecCon (L l fields))

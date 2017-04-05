@@ -82,6 +82,7 @@ import DataCon( HsSrcBang(..), HsImplBang(..),
                 SrcStrictness(..), SrcUnpackedness(..) )
 import TysPrim( funTyConName )
 import Type
+import Weight
 import HsDoc
 import BasicTypes
 import SrcLoc
@@ -785,10 +786,10 @@ updateGadtResult
   :: (Monad m)
      => (SDoc -> m ())
      -> SDoc
-     -> HsConDetails (LHsType Name) (Located [LConDeclField Name])
+     -> HsConDetails (Weighted (LHsType Name)) (Located [LConDeclField Name])
                      -- ^ Original details
      -> LHsType Name -- ^ Original result type
-     -> m (HsConDetails (LHsType Name) (Located [LConDeclField Name]),
+     -> m (HsConDetails (Weighted (LHsType Name)) (Located [LConDeclField Name]),
            LHsType Name)
 updateGadtResult failWith doc details ty
   = do { let (arg_tys, res_ty) = splitHsFunType ty
@@ -950,15 +951,13 @@ mkHsAppTys = foldl mkHsAppTy
 -- Also deals with (->) t1 t2; that is why it only works on LHsType Name
 --   (see Trac #9096)
 
--- TODO: arnaud: first step: ignore weight annotations (seems to be used mostly
--- for gadt syntax).
-splitHsFunType :: LHsType Name -> ([LHsType Name], LHsType Name)
+splitHsFunType :: LHsType Name -> ([Weighted (LHsType Name)], LHsType Name)
 splitHsFunType (L _ (HsParTy ty))
   = splitHsFunType ty
 
-splitHsFunType (L _ (HsFunTy x _weight y))
+splitHsFunType (L _ (HsFunTy x weight y))
   | (args, res) <- splitHsFunType y
-  = (x:args, res)
+  = ((Weighted weight x):args, res)
 
 splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
   = go t1 [t2]
@@ -966,7 +965,7 @@ splitHsFunType orig_ty@(L _ (HsAppTy t1 t2))
     go (L _ (HsTyVar _ (L _ fn))) tys | fn == (funTyConName Omega) -- TODO: arnaud harder but should be done for all arity
                                  , [t1,t2] <- tys
                                  , (args, res) <- splitHsFunType t2
-                                 = (t1:args, res)
+                                 = ((unrestricted t1):args, res) -- TODO: arnaud: when we pattern-match on arity (see above), then replace this unrestricted
     go (L _ (HsAppTy t1 t2)) tys = go t1 (t2:tys)
     go (L _ (HsParTy ty))    tys = go ty tys
     go _                     _   = ([], orig_ty)  -- Failure to match

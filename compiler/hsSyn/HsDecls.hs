@@ -94,6 +94,7 @@ import HsBinds
 import HsTypes
 import HsDoc
 import TyCon
+import Weight
 import Name
 import BasicTypes
 import Coercion
@@ -1161,7 +1162,7 @@ deriving instance (DataId name) => Data (ConDecl name)
 
 -- | Haskell data Constructor Declaration Details
 type HsConDeclDetails name
-   = HsConDetails (LBangType name) (Located [LConDeclField name])
+   = HsConDetails (Weighted (LBangType name)) (Located [LConDeclField name])
 
 getConNames :: ConDecl name -> [Located name]
 getConNames ConDeclH98  {con_name  = name}  = [name]
@@ -1189,10 +1190,16 @@ gadtDeclDetails HsIB {hsib_body = lbody_ty} = (details,res_ty,cxt,tvs)
                   -> (RecCon (L l flds), res_ty')
           _other  -> (PrefixCon [], tau)
 
-hsConDeclArgTys :: HsConDeclDetails name -> [LBangType name]
+hsConDeclArgTys :: HsConDeclDetails name -> [Weighted (LBangType name)]
 hsConDeclArgTys (PrefixCon tys)    = tys
 hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
-hsConDeclArgTys (RecCon flds)      = map (cd_fld_type . unLoc) (unLoc flds)
+hsConDeclArgTys (RecCon flds)      = map (linear . cd_fld_type . unLoc) (unLoc flds)
+  -- Remark: with the record syntax, constructors have all their argument
+  -- linear, despite the fact that projections do not make sense on linear
+  -- constructors. The design here is that the record projection themselves are
+  -- typed to take an unrestricted argument (that is the record itself is
+  -- unrestricted). By the transfer property, projections are then correct in
+  -- that all the non-projected fields have multiplicity ω, and can be dropped.
 
 pp_data_defn :: (OutputableBndrId name)
                   => (HsContext name -> SDoc)   -- Printing the header
@@ -1242,9 +1249,11 @@ pprConDecl (ConDeclH98 { con_name = L _ con
                        , con_doc = doc })
   = sep [ppr_mbDoc doc, pprHsForAll tvs cxt,         ppr_details details]
   where
-    ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
+    -- In ppr_details: let's not print the multiplicities (they are always 1, by
+    -- definition) as they do not appear in an actual declaration.
+    ppr_details (InfixCon t1 t2) = hsep [ppr (weightedThing t1), pprInfixOcc con, ppr (weightedThing t2)]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprParendHsType . unLoc) tys)
+                                   : map (pprParendHsType . unLoc) (map weightedThing tys))
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     tvs = case mtvs of

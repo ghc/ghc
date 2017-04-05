@@ -50,6 +50,7 @@ import Outputable
 import qualified GHC.LanguageExtensions as LangExt
 import Control.Arrow  ( second )
 import ListSetOps ( getNth )
+import Data.Functor.Compose ( Compose(..) )
 
 {-
 ************************************************************************
@@ -745,7 +746,7 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
           -- Add the stupid theta
         ; setSrcSpan con_span $ addDataConStupidTheta data_con ctxt_res_tys
 
-        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ arg_tys
+        ; let all_arg_tys = eqSpecPreds eq_spec ++ theta ++ (map weightedThing arg_tys)
         ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX
                                (zipTvSubst univ_tvs ctxt_res_tys) ex_tvs
@@ -755,8 +756,9 @@ tcDataConPat penv (L con_span con_name) data_con pat_ty_weighted arg_pats thing_
               -- pat_ty' is type of the actual constructor application
               -- pat_ty' /= pat_ty iff coi /= IdCo
 
-              arg_tys' = substTys tenv arg_tys
-              arg_tys_weighted = map (weightedSet pat_ty_weighted) arg_tys' -- TODO: arnaud: when constructor arguments have a weight, multiply weight rather than distribute it.
+              arg_tys' = getCompose $ substTys tenv (Compose arg_tys)
+              pat_weight = weightedWeight pat_ty_weighted
+              arg_tys_weighted = map (scaleWeighted pat_weight) arg_tys'
 
         ; traceTc "tcConPat" (vcat [ ppr con_name
                                    , pprTyVars univ_tvs
@@ -825,12 +827,13 @@ tcPatSynPat penv (L con_span _) pat_syn pat_ty arg_pats thing_inside
 
         ; (subst, univ_tvs') <- newMetaTyVars univ_tvs
 
-        ; let all_arg_tys = ty : prov_theta ++ arg_tys
+        ; let all_arg_tys = ty : prov_theta ++ (map weightedThing arg_tys)
         ; checkExistentials ex_tvs all_arg_tys penv
         ; (tenv, ex_tvs') <- tcInstSuperSkolTyVarsX subst ex_tvs
         ; let ty'         = substTy tenv ty
-              arg_tys'    = substTys tenv arg_tys
-              arg_tys_weighted = map (weightedSet pat_ty) arg_tys' -- TODO: arnaud: when constructor arguments have a weight, multiply weight rather than distribute it.
+              arg_tys'    = getCompose $ substTys tenv (Compose arg_tys)
+              pat_weight  = weightedWeight pat_ty
+              arg_tys_weighted = map (scaleWeighted pat_weight) arg_tys'
               prov_theta' = substTheta tenv prov_theta
               req_theta'  = substTheta tenv req_theta
 

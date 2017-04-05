@@ -7,6 +7,7 @@ import Unique ( Uniquable )
 import Outputable ( Outputable, OutputableBndr )
 import BasicTypes (Arity)
 import {-# SOURCE #-} TyCoRep ( Type, ThetaType )
+import Weight
 
 data DataCon
 data DataConRep
@@ -23,7 +24,7 @@ dataConFieldLabels :: DataCon -> [FieldLabel]
 dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Type], Type)
+               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Weighted Type], Type)
 
 instance Eq DataCon
 instance Uniquable DataCon

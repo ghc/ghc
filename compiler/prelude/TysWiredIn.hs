@@ -152,6 +152,7 @@ import NameEnv          ( NameEnv, mkNameEnv, lookupNameEnv )
 import NameSet          ( NameSet, mkNameSet, elemNameSet )
 import BasicTypes       ( Arity, Boxity(..), TupleSort(..), ConTagZ,
                           SourceText(..) )
+import Weight
 import ForeignCall
 import SrcLoc           ( noSrcSpan )
 import Unique
@@ -526,7 +527,8 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
                 (mkTyVarBinders Specified ex_tyvars)
                 []      -- No equality spec
                 []      -- No theta
-                arg_tys (mkTyConApp tycon (mkTyVarTys tyvars))
+                (map unrestricted arg_tys) -- TODO: arnaud: is unrestricted correct?
+                (mkTyConApp tycon (mkTyVarTys tyvars))
                 rri
                 tycon
                 []      -- No stupid theta

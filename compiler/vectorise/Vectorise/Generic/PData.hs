@@ -19,6 +19,7 @@ import BuildTyCl
 import DataCon
 import TyCon
 import Type
+import Weight
 import FamInst
 import FamInstEnv
 import TcMType
@@ -86,7 +87,7 @@ buildPDataDataCon orig_name vect_tc repr_tc repr
                             []                     -- no existentials
                             []                     -- no eq spec
                             []                     -- no context
-                            comp_tys
+                            (map unrestricted comp_tys) -- TODO: Arnaud: I don't know what PData is yet, quite possibly wrong
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
   where
@@ -130,7 +131,7 @@ buildPDatasDataCon orig_name vect_tc repr_tc repr
                             []                     -- no existentials
                             []                     -- no eq spec
                             []                     -- no context
-                            comp_tys
+                            (map unrestricted comp_tys) -- TODO: arnaud: I don't know what PData is yet, quite possibly wrong
                             (mkFamilyTyConApp repr_tc (mkTyVarTys tvs))
                             repr_tc
   where

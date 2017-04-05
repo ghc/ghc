@@ -43,6 +43,7 @@ import NameEnv
 import NameSet
 import TcType
 import TyCon
+import Weight
 import TysWiredIn
 import CoreSyn
 import MkCore
@@ -1069,7 +1070,7 @@ repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
 repLKind :: LHsKind Name -> DsM (Core TH.Kind)
 repLKind ki
   = do { let (kis, ki') = splitHsFunType ki
-       ; kis_rep <- mapM repLKind kis
+       ; kis_rep <- mapM repLKind (map weightedThing kis)
        ; ki'_rep <- repNonArrowLKind ki'
        ; kcon <- repKArrow
        ; let f k1 k2 = repKApp kcon k1 >>= flip repKApp k2
@@ -2195,11 +2196,11 @@ repConstr :: HsConDeclDetails Name
           -> [Core TH.Name]
           -> DsM (Core TH.ConQ)
 repConstr (PrefixCon ps) Nothing [con]
-    = do arg_tys  <- repList bangTypeQTyConName repBangTy ps
+    = do arg_tys  <- repList bangTypeQTyConName repBangTy (map weightedThing ps)
          rep2 normalCName [unC con, unC arg_tys]
 
 repConstr (PrefixCon ps) (Just (L _ res_ty)) cons
-    = do arg_tys     <- repList bangTypeQTyConName repBangTy ps
+    = do arg_tys     <- repList bangTypeQTyConName repBangTy (map weightedThing ps)
          res_ty' <- repTy res_ty
          rep2 gadtCName [ unC (nonEmptyCoreList cons), unC arg_tys, unC res_ty']
 
@@ -2222,8 +2223,8 @@ repConstr (RecCon (L _ ips)) resTy cons
                           ; rep2 varBangTypeName [v,ty] }
 
 repConstr (InfixCon st1 st2) Nothing [con]
-    = do arg1 <- repBangTy st1
-         arg2 <- repBangTy st2
+    = do arg1 <- repBangTy (weightedThing st1)
+         arg2 <- repBangTy (weightedThing st2)
          rep2 infixCName [unC arg1, unC con, unC arg2]
 
 repConstr (InfixCon {}) (Just _) _ =

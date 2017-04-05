@@ -873,8 +873,12 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         -- Take apart a representative constructor
         ; let con1 = ASSERT( not (null relevant_cons) ) head relevant_cons
-              (con1_tvs, _, _, _prov_theta, req_theta, con1_arg_tys, _)
+              (con1_tvs, _, _, _prov_theta, req_theta, weighted_con1_arg_tys, _)
                  = conLikeFullSig con1
+              con1_arg_tys = map weightedThing weighted_con1_arg_tys
+                -- Remark: we can safely drop the weight of field because it's
+                -- always 1, this way we don't need to handle it in the rest of
+                -- the function
               con1_flds   = map flLabel $ conLikeFieldLabels con1
               con1_tv_tys = mkTyVarTys con1_tvs
               con1_res_ty = case mtycon of
@@ -1972,7 +1976,7 @@ getFixedTyVars upd_fld_occs univ_tvs cons
                                      ++ prov_theta
                                      ++ req_theta
                             flds = conLikeFieldLabels con
-                            fixed_tvs = exactTyCoVarsOfTypes fixed_tys
+                            fixed_tvs = exactTyCoVarsOfTypes (map weightedThing fixed_tys)
                                     -- fixed_tys: See Note [Type of a record update]
                                         `unionVarSet` tyCoVarsOfTypes theta
                                     -- Universally-quantified tyvars that

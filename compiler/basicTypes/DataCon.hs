@@ -352,7 +352,7 @@ data DataCon
                 -- the wrapper Id, because that makes it harder to use the wrap-id
                 -- to rebuild values after record selection or in generics.
 
-        dcOrigArgTys :: [Type],         -- Original argument types
+        dcOrigArgTys :: [Weighted Type],-- Original argument types
                                         -- (before unboxing and flattening of strict fields)
         dcOrigResTy :: Type,            -- Original result type, as seen by the user
                 -- NB: for a data instance, the original user result type may
@@ -755,7 +755,7 @@ mkDataCon :: Name
                             -- (These last two must be Named and Inferred/Specified)
           -> [EqSpec]       -- ^ GADT equalities
           -> ThetaType      -- ^ Theta-type occuring before the arguments proper
-          -> [Type]         -- ^ Original argument types
+          -> [Weighted Type]-- ^ Original argument types
           -> Type           -- ^ Original result type
           -> RuntimeRepInfo -- ^ See comments on 'TyCon.RuntimeRepInfo'
           -> TyCon          -- ^ Representation type constructor
@@ -816,7 +816,7 @@ mkDataCon name declared_infix prom_info
     prom_tv_bndrs = [ mkNamedTyConBinder vis tv
                     | TvBndr tv vis <- filterEqSpec eq_spec univ_tvs ++ ex_tvs ]
 
-    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ orig_arg_tys)
+    prom_arg_bndrs = mkCleanAnonTyConBinders prom_tv_bndrs (theta ++ map weightedThing orig_arg_tys)
     prom_res_kind  = orig_res_ty
     promoted       = mkPromotedDataCon con name prom_info
                                        (prom_tv_bndrs ++ prom_arg_bndrs)
@@ -982,7 +982,7 @@ dataConFieldType con label = case dataConFieldType_maybe con label of
 dataConFieldType_maybe :: DataCon -> FieldLabelString
                        -> Maybe (FieldLabel, Type)
 dataConFieldType_maybe con label
-  = find ((== label) . flLabel . fst) (dcFields con `zip` dcOrigArgTys con)
+  = find ((== label) . flLabel . fst) (dcFields con `zip` (weightedThing <$> dcOrigArgTys con))
 
 -- | Strictness/unpack annotations, from user; or, for imported
 -- DataCons, from the interface file
@@ -1037,10 +1037,10 @@ dataConBoxer _ = Nothing
 -- 2) All the 'ThetaType's relating to the 'DataCon' (coercion, dictionary, implicit
 --    parameter - whatever)
 --
--- 3) The type arguments to the constructor
+-- 3) The type arguments to the constructor with linearity annotations
 --
 -- 4) The /original/ result type of the 'DataCon'
-dataConSig :: DataCon -> ([TyVar], ThetaType, [Type], Type)
+dataConSig :: DataCon -> ([TyVar], ThetaType, [Weighted Type], Type)
 dataConSig con@(MkData {dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
   = (dataConAllTyVars con, dataConTheta con, arg_tys, res_ty)
 
@@ -1057,7 +1057,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
                univ_tys
   = ( ex_tvs'
     , substTheta subst (eqSpecPreds eq_spec ++ theta)
-    , substTys   subst arg_tys)
+    , substTys   subst (map weightedThing arg_tys))
   where
     univ_subst = zipTvSubst (binderVars univ_tvs) univ_tys
     (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst $
@@ -1075,11 +1075,12 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
 -- 4) The result of 'dataConDictTheta'
 --
 -- 5) The original argument types to the 'DataCon' (i.e. before
---    any change of the representation of the type)
+--    any change of the representation of the type) with linearity
+--    annotations
 --
 -- 6) The original result type of the 'DataCon'
 dataConFullSig :: DataCon
-               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Type], Type)
+               -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Weighted Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs,
                         dcEqSpec = eq_spec, dcOtherTheta = theta,
                         dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
@@ -1112,8 +1113,8 @@ dataConUserType (MkData { dcUnivTyVars = univ_tvs,
                           dcOrigResTy = res_ty })
   = mkForAllTys (filterEqSpec eq_spec univ_tvs) $
     mkForAllTys ex_tvs $
-    mkFunTys (map unrestricted theta) $ -- TODO: arnaud: and following line: when constructor types are handled properly, this unrestricted should disapear.
-    mkFunTys (map unrestricted arg_tys) $
+    mkFunTys (map unrestricted theta) $ -- TODO: arnaud: what is theta in constructors? Does it need linearity information?
+    mkFunTys arg_tys $
     res_ty
 
 -- | Finds the instantiated types of the arguments required to construct a 'DataCon' representation
@@ -1146,14 +1147,14 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcExTyVars = ex_tvs}) inst_tys
   = ASSERT2( length tyvars == length inst_tys
           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-    map (substTyWith tyvars inst_tys) arg_tys
+    map (substTyWith tyvars inst_tys) (map weightedThing arg_tys)
   where
     tyvars = binderVars (univ_tvs ++ ex_tvs)
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
 dataConOrigArgTys :: DataCon -> [Type]
-dataConOrigArgTys dc = dcOrigArgTys dc
+dataConOrigArgTys dc = map weightedThing $ dcOrigArgTys dc
 
 -- | Returns the arg types of the worker, including *all*
 -- evidence, after any flattening has been done and without substituting for
@@ -1164,7 +1165,7 @@ dataConRepArgTys (MkData { dcRep = rep
                          , dcOtherTheta = theta
                          , dcOrigArgTys = orig_arg_tys })
   = case rep of
-      NoDataConRep -> ASSERT( null eq_spec ) theta ++ orig_arg_tys
+      NoDataConRep -> ASSERT( null eq_spec ) theta ++ (map weightedThing orig_arg_tys)
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached

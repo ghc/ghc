@@ -36,6 +36,7 @@ import BasicTypes
 import TyCoRep (Type, ThetaType)
 import Var
 import Type (mkTyConApp)
+import Weight
 
 import qualified Data.Data as Data
 
@@ -164,7 +165,7 @@ conLikeResTy (PatSynCon ps)    tys = patSynInstResTy ps tys
 -- 7) The original result type
 conLikeFullSig :: ConLike
                -> ([TyVar], [TyVar], [EqSpec]
-                  , ThetaType, ThetaType, [Type], Type)
+                  , ThetaType, ThetaType, [Weighted Type], Type)
 conLikeFullSig (RealDataCon con) =
   let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty) = dataConFullSig con
   -- Required theta is empty as normal data cons require no additional

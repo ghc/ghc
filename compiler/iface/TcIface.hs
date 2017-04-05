@@ -908,7 +908,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
-                ; arg_tys <- mapM tcIfaceType args
+                ; arg_tys <- mapM (traverse tcIfaceType) args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM

@@ -58,6 +58,7 @@ import PrelNames
 import Name
 import BasicTypes
 import Type
+import Weight
 import PatSyn
 import Outputable
 import FastString
@@ -315,7 +316,7 @@ patSynToIfaceDecl ps
                 , ifPatExBndrs    = map toIfaceForAllBndr ex_bndrs'
                 , ifPatProvCtxt   = tidyToIfaceContext env2 prov_theta
                 , ifPatReqCtxt    = tidyToIfaceContext env2 req_theta
-                , ifPatArgs       = map (tidyToIfaceType env2) args
+                , ifPatArgs       = map (tidyToIfaceType env2 . weightedThing) args
                 , ifPatTy         = tidyToIfaceType env2 rhs_ty
                 , ifFieldLabels   = (patSynFieldLabels ps)
                 }

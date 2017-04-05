@@ -416,7 +416,7 @@ mkDataConWorkId wkr_name data_con
                   `setInlinePragInfo`     alwaysInlinePragma
                   `setUnfoldingInfo`      newtype_unf
                   `setLevityInfoWithType` nt_wrap_ty
-    id_arg1      = mkTemplateLocal 1 (head nt_arg_tys)
+    id_arg1      = mkTemplateLocal 1 (weightedThing $ head nt_arg_tys)
     newtype_unf  = ASSERT2( isVanillaDataCon data_con &&
                             isSingleton nt_arg_tys, ppr data_con  )
                               -- Note [Newtype datacons]
@@ -559,8 +559,9 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
                      , dcr_bangs   = arg_ibangs }) }
 
   where
-    (univ_tvs, ex_tvs, eq_spec, theta, orig_arg_tys, _orig_res_ty)
+    (univ_tvs, ex_tvs, eq_spec, theta, weighted_orig_arg_tys, _orig_res_ty)
       = dataConFullSig data_con
+    orig_arg_tys = map weightedThing weighted_orig_arg_tys -- TODO: arnaud: I fully expect this to be incorrect
     res_ty_args  = substTyVars (mkTvSubstPrs (map eqSpecPair eq_spec)) univ_tvs
 
     tycon        = dataConTyCon data_con       -- The representation TyCon (not family)

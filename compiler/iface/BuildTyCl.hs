@@ -31,6 +31,7 @@ import TyCon
 import Type
 import Id
 import TcType
+import Weight
 
 import SrcLoc( SrcSpan, noSrcSpan )
 import DynFlags
@@ -112,7 +113,7 @@ buildDataCon :: FamInstEnvs
            -> [EqSpec]                 -- Equality spec
            -> ThetaType                -- Does not include the "stupid theta"
                                        -- or the GADT equalities
-           -> [Type] -> Type           -- Argument and result types
+           -> [Weighted Type] -> Type  -- Argument and result types
            -> TyCon                    -- Rep tycon
            -> TcRnIf m n DataCon
 -- A wrapper for DataCon.mkDataCon that
@@ -131,7 +132,7 @@ buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs fie
         ; traceIf (text "buildDataCon 1" <+> ppr src_name)
         ; us <- newUniqueSupply
         ; dflags <- getDynFlags
-        ; let stupid_ctxt = mkDataConStupidTheta rep_tycon arg_tys univ_tvs
+        ; let stupid_ctxt = mkDataConStupidTheta rep_tycon (map weightedThing arg_tys) univ_tvs
               data_con = mkDataCon src_name declared_infix prom_info
                                    src_bangs field_lbls
                                    univ_tvs ex_tvs eq_spec ctxt
@@ -374,7 +375,7 @@ buildClass tycon_name binders roles fds
                                    [{- no existentials -}]
                                    [{- No GADT equalities -}]
                                    [{- No theta -}]
-                                   arg_tys
+                                   (map unrestricted arg_tys) -- type classes are unrestricted
                                    (mkTyConApp rec_tycon (mkTyVarTys univ_tvs))
                                    rec_tycon
 

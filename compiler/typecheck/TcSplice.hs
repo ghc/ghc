@@ -1453,7 +1453,7 @@ reifyDataCon isGadtDataCon tys dc
              eq_spec_tvs = mkVarSet (map eqSpecTyVar g_eq_spec)
              g_unsbst_univ_tvs = filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
 
-       ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
+       ; r_arg_tys <- reifyTypes (if isGadtDataCon then (map weightedThing g_arg_tys) else arg_tys)
 
        ; main_con <-
            if | not (null fields) && not isGadtDataCon ->
@@ -1691,11 +1691,11 @@ reifyTyLit :: TyCoRep.TyLit -> TcM TH.TyLit
 reifyTyLit (NumTyLit n) = return (TH.NumTyLit n)
 reifyTyLit (StrTyLit s) = return (TH.StrTyLit (unpackFS s))
 
-reifyTypes :: [Type] -> TcM [TH.Type]
+reifyTypes :: (Traversable t) => t Type -> TcM (t TH.Type)
 reifyTypes = mapM reifyType
 
 reifyPatSynType
-  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type) -> TcM TH.Type
+  :: ([TyVar], ThetaType, [TyVar], ThetaType, [Weighted Type], Type) -> TcM TH.Type
 -- reifies a pattern synonym's type and returns its *complete* type
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
@@ -1704,7 +1704,7 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
        ; req'        <- reifyCxt req
        ; exTyVars'   <- reifyTyVars exTyVars Nothing
        ; prov'       <- reifyCxt prov
-       ; tau'        <- reifyType (mkFunTys (map unrestricted argTys) resTy) -- arnaud: TODO: incorrect unrestricted. Fix Template Haskell.
+       ; tau'        <- reifyType (mkFunTys argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
                 $ TH.ForallT exTyVars' prov' tau' }
 

@@ -11,6 +11,7 @@ import OccName
 import Class
 import Type
 import TyCon
+import Weight
 import DataCon
 import DynFlags
 import BasicTypes( DefMethSpec(..) )
@@ -202,7 +203,8 @@ vectDataCon dc
                     []                             -- no existential tvs for now
                     []                             -- no equalities for now
                     []                             -- no context for now
-                    arg_tys                        -- argument types
+                    (map unrestricted arg_tys)     -- argument types
+                    -- TODO: arnaud: almost certainly wrong
                     ret_ty                         -- return type
                     tycon'                         -- representation tycon
        }

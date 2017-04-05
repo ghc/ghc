@@ -366,11 +366,11 @@ patSynExTyVars ps = binderVars (psExTyVars ps)
 patSynExTyVarBinders :: PatSyn -> [TyVarBinder]
 patSynExTyVarBinders = psExTyVars
 
-patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
+patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Weighted Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
                     , psArgs = arg_tys, psOrigResTy = res_ty })
-  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, arg_tys, res_ty)
+  = (binderVars univ_tvs, req, binderVars ex_tvs, prov, (map unrestricted arg_tys), res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
 patSynMatcher = psMatcher

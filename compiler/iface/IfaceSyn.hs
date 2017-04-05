@@ -56,6 +56,7 @@ import Literal
 import ForeignCall
 import Annotations( AnnPayload, AnnTarget )
 import BasicTypes
+import Weight
 import Outputable
 import Module
 import SrcLoc
@@ -241,7 +242,7 @@ data IfaceConDecl
         ifConExTvs   :: [IfaceForAllBndr],  -- Existential tyvars (w/ visibility)
         ifConEqSpec  :: IfaceEqSpec,        -- Equality constraints
         ifConCtxt    :: IfaceContext,       -- Non-stupid context
-        ifConArgTys  :: [IfaceType],        -- Arg types
+        ifConArgTys  :: [Weighted IfaceType],-- Arg types
         ifConFields  :: [FieldLabel],  -- ...ditto... (field labels)
         ifConStricts :: [IfaceBang],
           -- Empty (meaning all lazy),
@@ -977,7 +978,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
   where
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
-    tys_w_strs = zip stricts arg_tys
+    tys_w_strs = zip stricts (map weightedThing arg_tys) -- TODO: arnaud: don't drop linearity when printing
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     (univ_tvs, pp_res_ty) = mk_user_con_res_ty eq_spec
@@ -1352,7 +1353,7 @@ freeNamesIfConDecl (IfCon { ifConExTvs   = ex_tvs, ifConCtxt = ctxt
                           , ifConStricts = bangs })
   = freeNamesIfTyVarBndrs ex_tvs &&&
     freeNamesIfContext ctxt &&&
-    fnList freeNamesIfType arg_tys &&&
+    fnList freeNamesIfType (map weightedThing arg_tys) &&&
     mkNameSet (map flSelector flds) &&&
     fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
     fnList freeNamesIfBang bangs

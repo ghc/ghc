@@ -8,6 +8,7 @@
 module Weight where
   -- TODO: arnaud list of exports
 
+import Binary
 import Control.Monad
 import Data.Data
 import Data.String
@@ -39,6 +40,19 @@ instance Outputable Rig where
   ppr One = fromString "1"
   ppr Omega = fromString "ω"
 
+instance Binary Rig where
+  put_ bh Zero = putByte bh 0
+  put_ bh One = putByte bh 1
+  put_ bh Omega = putByte bh 2
+
+  get bh = do
+    h <- getByte bh
+    case h of
+      0 -> return Zero
+      1 -> return One
+      2 -> return Omega
+      _ -> fail "Invalid binary data for multiplicity found"
+
 
 -- | @subweight w1 w2@ check whether a value of weight @w1@ is allowed where a
 -- value of weight @w2@ is expected. This is a partial order.
@@ -68,13 +82,25 @@ data Weighted a = Weighted {weightedWeight :: Rig, weightedThing :: a}
   deriving (Functor,Foldable,Traversable,Data)
 
 unrestricted = Weighted Omega
+linear = Weighted One
 staticOnly = Weighted Zero
 
 instance Outputable a => Outputable (Weighted a) where
    ppr (Weighted cnt t) = ppr cnt <> ppr t
 
+instance Binary a => Binary (Weighted a) where
+  put_ bh (Weighted r x) = put_ bh r >> put_ bh x
+  get bh = do
+    r <- get bh
+    x <- get bh
+    return $ Weighted r x
+
 weightedSet :: Weighted a -> b -> Weighted b
 weightedSet x b = fmap (\_->b) x
+
+scaleWeighted :: Rig -> Weighted a -> Weighted a
+scaleWeighted w x =
+  x { weightedWeight = w * weightedWeight x }
 
 
 --

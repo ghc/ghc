@@ -87,6 +87,7 @@ import DynFlags
 import FastString
 import Control.Monad
 import Data.List
+import Data.Foldable    ( toList )
 import Data.Function    ( on )
 import ListSetOps       ( minusList )
 import Constants        ( mAX_TUPLE_SIZE )
@@ -2084,10 +2085,9 @@ addFvRn :: FreeVars -> RnM (thing, FreeVars) -> RnM (thing, FreeVars)
 addFvRn fvs1 thing_inside = do { (res, fvs2) <- thing_inside
                                ; return (res, fvs1 `plusFV` fvs2) }
 
-mapFvRn :: (a -> RnM (b, FreeVars)) -> [a] -> RnM ([b], FreeVars)
+mapFvRn :: (Traversable t ) => (a -> RnM (b, FreeVars)) -> t a -> RnM (t b, FreeVars)
 mapFvRn f xs = do stuff <- mapM f xs
-                  case unzip stuff of
-                      (ys, fvs_s) -> return (ys, plusFVs fvs_s)
+                  return (fmap fst stuff, plusFVs . map snd $ toList stuff)
 
 mapMaybeFvRn :: (a -> RnM (b, FreeVars)) -> Maybe a -> RnM (Maybe b, FreeVars)
 mapMaybeFvRn _ Nothing = return (Nothing, emptyFVs)

@@ -70,6 +70,7 @@ import Annotations
 import CoreSyn
 import Class
 import TyCon
+import Weight
 import CoAxiom
 import ConLike
 import DataCon
@@ -1645,7 +1646,7 @@ tyConToIfaceDecl env tycon
                     ifConExTvs   = map toIfaceForAllBndr ex_bndrs',
                     ifConEqSpec  = map (to_eq_spec . eqSpecPair) eq_spec,
                     ifConCtxt    = tidyToIfaceContext con_env2 theta,
-                    ifConArgTys  = map (tidyToIfaceType con_env2) arg_tys,
+                    ifConArgTys  = map (fmap (tidyToIfaceType con_env2)) arg_tys,
                     ifConFields  = dataConFieldLabels data_con,
                     ifConStricts = map (toIfaceBang con_env2)
                                        (dataConImplBangs data_con),

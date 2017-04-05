@@ -51,6 +51,7 @@ import FieldLabel
 import Util
 import BasicTypes       ( compareFixity, funTyFixity, negateFixity,
                           Fixity(..), FixityDirection(..), LexicalFixity(..) )
+import Weight
 import Outputable
 import FastString
 import Maybes
@@ -425,7 +426,7 @@ isRnKindLevel _                                 = False
 rnLHsType  :: HsDocContext -> LHsType RdrName -> RnM (LHsType Name, FreeVars)
 rnLHsType ctxt ty = rnLHsTyKi (mkTyKiEnv ctxt TypeLevel RnTypeBody) ty
 
-rnLHsTypes :: HsDocContext -> [LHsType RdrName] -> RnM ([LHsType Name], FreeVars)
+rnLHsTypes :: (Traversable t) => HsDocContext -> t (LHsType RdrName) -> RnM (t (LHsType Name), FreeVars)
 rnLHsTypes doc tys = mapFvRn (rnLHsType doc) tys
 
 rnHsType  :: HsDocContext -> HsType RdrName -> RnM (HsType Name, FreeVars)
@@ -1625,7 +1626,7 @@ extractDataDefnKindVars (HsDataDefn { dd_ctxt = ctxt, dd_kindSig = ksig
                             , con_cxt = ctxt, con_details = details }) acc
       = extract_hs_tv_bndrs (maybe [] hsQTvExplicit qvs) acc =<<
         extract_mlctxt ctxt =<<
-        extract_ltys TypeLevel (hsConDeclArgTys details) emptyFKTV
+        extract_ltys TypeLevel (map weightedThing $ hsConDeclArgTys details) emptyFKTV
 
 extract_mlctxt :: Maybe (LHsContext RdrName) -> FreeKiTyVars -> RnM FreeKiTyVars
 extract_mlctxt Nothing     acc = return acc
