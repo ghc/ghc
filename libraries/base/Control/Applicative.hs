@@ -59,7 +59,7 @@ import Data.Functor.Const (Const(..))
 
 import GHC.Base
 import GHC.Generics
-import GHC.List (repeat, zipWith)
+import GHC.List (repeat, zipWith, drop)
 import GHC.Read (Read)
 import GHC.Show (Show)
 
@@ -120,6 +120,11 @@ newtype ZipList a = ZipList { getZipList :: [a] }
 instance Applicative ZipList where
     pure x = ZipList (repeat x)
     liftA2 f (ZipList xs) (ZipList ys) = ZipList (zipWith f xs ys)
+
+-- | @since 4.11.0.0
+instance Alternative ZipList where
+   empty = ZipList []
+   ZipList xs <|> ZipList ys = ZipList (xs ++ drop (length xs) ys)
 
 -- extra functions
 
