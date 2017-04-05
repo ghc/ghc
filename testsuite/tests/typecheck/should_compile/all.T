@@ -547,4 +547,5 @@ test('T13381', normal, compile_fail, [''])
 test('T13337', normal, compile, [''])
 test('T13343', normal, compile, [''])
 test('T13474', normal, compile, [''])
-test('T13526', normal, compile, [''])
+test('T13509', normal, compile, [''])
+

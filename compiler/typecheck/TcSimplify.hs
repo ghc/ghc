@@ -49,7 +49,7 @@ import BasicTypes    ( IntWithInf, intGtLimit )
 import ErrUtils      ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad ( when, unless )
+import Control.Monad
 import Data.List     ( partition )
 
 {-
@@ -626,47 +626,22 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        --      to less polymorphic types, see Note [Default while Inferring]
 
        ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
-       ; quant_pred_candidates   -- Fully zonked
-           <- if insolubleWC wanted_transformed_incl_derivs
-              then return []   -- See Note [Quantification with errors]
-                               -- NB: must include derived errors in this test,
-                               --     hence "incl_derivs"
+             quant_pred_candidates   -- Fully zonked
+                 | insolubleWC wanted_transformed_incl_derivs
+                 = []   -- See Note [Quantification with errors]
+                        -- NB: must include derived errors in this test,
+                        --     hence "incl_derivs"
 
-              else do { let quant_cand = approximateWC False wanted_transformed
-                            meta_tvs   = filter isMetaTyVar $
-                                         tyCoVarsOfCtsList quant_cand
-
-                      ; gbl_tvs <- tcGetGlobalTyCoVars
-                            -- Miminise quant_cand.  We are not interested in any evidence
-                            -- produced, because we are going to simplify wanted_transformed
-                            -- again later. All we want here are the predicates over which to
-                            -- quantify.
-                            --
-                            -- If any meta-tyvar unifications take place (unlikely),
-                            -- we'll pick that up later.
-
-                      -- See Note [Promote _and_ default when inferring]
-                      ; let def_tyvar tv
-                              = when (not $ tv `elemVarSet` gbl_tvs) $
-                                defaultTyVar tv
-                      ; mapM_ def_tyvar meta_tvs
-                      ; mapM_ (promoteTyVar rhs_tclvl) meta_tvs
-
-                      ; clone_wanteds <- mapM cloneWanted (bagToList quant_cand)
-                      ; WC { wc_simple = simples }
-                           <- setTcLevel rhs_tclvl $
-                              simplifyWantedsTcM clone_wanteds
-                              -- Discard evidence; result is zonked
-
-                      ; return [ ctEvPred ev | ct <- bagToList simples
-                                             , let ev = ctEvidence ct ] }
+                 | otherwise
+                 = ctsPreds (approximateWC False wanted_transformed)
 
        -- NB: quant_pred_candidates is already fully zonked
 
        -- Decide what type variables and constraints to quantify
        -- NB: bound_theta are constraints we want to quantify over,
        --     /apart from/ the psig_theta, which we always quantify over
-       ; (qtvs, bound_theta) <- decideQuantification infer_mode name_taus psig_theta
+       ; (qtvs, bound_theta) <- decideQuantification infer_mode rhs_tclvl
+                                                     name_taus psig_theta
                                                      quant_pred_candidates
 
          -- Promote any type variables that are free in the inferred type
@@ -753,6 +728,10 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                          Nothing -> add_psig_tvs qtvs      tvs
                          Just tv -> add_psig_tvs (tv:qtvs) tvs } }
 
+ctsPreds :: Cts -> [PredType]
+ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
+                             , let ev = ctEvidence ct ]
+
 {- Note [Add signature contexts as givens]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this (Trac #11016):
@@ -789,115 +768,205 @@ Note [Deciding quantification]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If the monomorphism restriction does not apply, then we quantify as follows:
 
-  * Take the global tyvars, and "grow" them using the equality constraints
-    E.g.  if x:alpha is in the environment, and alpha ~ [beta] (which can
+* Step 1. Take the global tyvars, and "grow" them using the equality
+  constraints
+     E.g.  if x:alpha is in the environment, and alpha ~ [beta] (which can
           happen because alpha is untouchable here) then do not quantify over
           beta, because alpha fixes beta, and beta is effectively free in
           the environment too
-    These are the mono_tvs
 
-  * Take the free vars of the tau-type (zonked_tau_tvs) and "grow" them
-    using all the constraints.  These are tau_tvs_plus
+  We also account for the monomorphism restriction; if it applies,
+  add the free vars of all the constraints.
 
-  * Use quantifyTyVars to quantify over (tau_tvs_plus - mono_tvs), being
+  Result is mono_tvs; we will not quantify over these.
+
+* Step 2. Default any non-mono tyvars (i.e ones that are definitely
+  not going to become further constrained), and re-simplify the
+  candidate constraints.
+
+  Motivation for re-simplification (Trac #7857): imagine we have a
+  constraint (C (a->b)), where 'a :: TYPE l1' and 'b :: TYPE l2' are
+  not free in the envt, and instance forall (a::*) (b::*). (C a) => C
+  (a -> b) The instance doesnt' match while l1,l2 are polymorphic, but
+  it will match when we default them to LiftedRep.
+
+  This is all very tiresome.
+
+* Step 3: decide which variables to quantify over, as follows:
+
+  - Take the free vars of the tau-type (zonked_tau_tvs) and "grow"
+    them using all the constraints.  These are tau_tvs_plus
+
+  - Use quantifyTyVars to quantify over (tau_tvs_plus - mono_tvs), being
     careful to close over kinds, and to skolemise the quantified tyvars.
     (This actually unifies each quantifies meta-tyvar with a fresh skolem.)
-    Result is qtvs.
 
-  * Filter the constraints using pickQuantifiablePreds and the qtvs.
-    We have to zonk the constraints first, so they "see" the freshly
-    created skolems.
+ Result is qtvs.
 
-If the MR does apply, mono_tvs includes all the constrained tyvars --
-including all covars -- and the quantified constraints are empty/insoluble.
+* Step 4: Filter the constraints using pickQuantifiablePreds and the
+  qtvs. We have to zonk the constraints first, so they "see" the
+  freshly created skolems.
 
 -}
 
 decideQuantification
   :: InferMode
+  -> TcLevel
   -> [(Name, TcTauType)]   -- Variables to be generalised
   -> [PredType]            -- All annotated constraints from signatures
   -> [PredType]            -- Candidate theta; already zonked
   -> TcM ( [TcTyVar]       -- Quantify over these (skolems)
          , [PredType] )    -- and this context (fully zonked)
 -- See Note [Deciding quantification]
-decideQuantification infer_mode name_taus psig_theta candidates
-  = do { ovl_strings <- xoptM LangExt.OverloadedStrings
-       ; gbl_tvs     <- tcGetGlobalTyCoVars
-       ; let (gbl_cand, quant_cand)    -- gbl_cand   = do not quantify me
-                = case infer_mode of   -- quant_cand = try to quantify me
-                    ApplyMR         -> (candidates, [])
-                    NoRestrictions  -> ([], candidates)
-                    EagerDefaulting -> partition is_interactive_ct candidates
-                      where
-                        is_interactive_ct ct
-                          | Just (cls, _) <- getClassPredTys_maybe ct
-                          = isInteractiveClass ovl_strings cls
-                          | otherwise
-                          = False
+decideQuantification infer_mode rhs_tclvl name_taus psig_theta candidates
+  = do { -- Step 1: find the mono_tvs
+         (mono_tvs, candidates) <- decideMonoTyVars infer_mode candidates name_taus
 
-             eq_constraints  = filter isEqPred quant_cand
-             constrained_tvs = tyCoVarsOfTypes gbl_cand
-             mono_tvs        = growThetaTyVars eq_constraints $
-                               gbl_tvs `unionVarSet` constrained_tvs
+       -- Step 2: default any non-mono tyvars, and re-simplify
+       ; candidates <- defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 
-       ; zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ taus)
-                        -- psig_theta: see Note [Quantification and partial signatures]
+       -- Step 3: decide which kind/type variables to quantify over
+       ; qtvs <- decideQuantifiedTyVars mono_tvs candidates
+                                        psig_theta name_taus
+
+       -- Step 4: choose which of the remaining candidate
+       --         predicates to actually quantify over
+       -- NB: decideQuantifiedTyVars turned some meta tyvars
+       -- into quantified skolems, so we have to zonk again
+       ; candidates <- TcM.zonkTcTypes candidates
+       ; let theta = pickQuantifiablePreds (mkVarSet qtvs) $
+                     mkMinimalBySCs $  -- See Note [Minimize by Superclasses]
+                     candidates
+
+       ; traceTc "decideQuantification"
+           (vcat [ text "infer_mode:"   <+> ppr infer_mode
+                 , text "candidates:"   <+> ppr candidates
+                 , text "mono_tvs:"     <+> ppr mono_tvs
+                 , text "qtvs:"         <+> ppr qtvs
+                 , text "theta:"        <+> ppr theta ])
+       ; return (qtvs, theta) }
+
+------------------
+decideMonoTyVars :: InferMode -> [PredType]
+                 -> [(Name,TcType)]
+                 -> TcM (TcTyCoVarSet, [PredType])
+-- Decide which tyvars cannot be generalised:
+--   (a) Free in the environment
+--   (b) Mentioned in a constraint we can't generalise
+--   (c) Connected by an equality to (a) or (b)
+-- Also return the reduced set of constraint we can generalise
+decideMonoTyVars infer_mode candidates name_taus
+  = do { (no_quant, yes_quant) <- pick infer_mode candidates
+
+       ; gbl_tvs <- tcGetGlobalTyCoVars
+       ; let eq_constraints        = filter isEqPred candidates
+             constrained_tvs       = tyCoVarsOfTypes no_quant
+             mono_tvs              = growThetaTyVars eq_constraints $
+                                     gbl_tvs `unionVarSet` constrained_tvs
+
+           -- Warn about the monomorphism restriction
+       ; warn_mono <- woptM Opt_WarnMonomorphism
+       ; when (case infer_mode of { ApplyMR -> warn_mono; _ -> False}) $
+         do { taus <- mapM (TcM.zonkTcType . snd) name_taus
+            ; warnTc (Reason Opt_WarnMonomorphism)
+                     (constrained_tvs `intersectsVarSet` tyCoVarsOfTypes taus)
+                     mr_msg }
+
+       ; return (mono_tvs, yes_quant) }
+  where
+    pick :: InferMode -> [PredType] -> TcM ([PredType], [PredType])
+    -- Split the candidates into ones we definitely
+    -- won't quantify, and ones that we might
+    pick NoRestrictions  cand = return ([], cand)
+    pick ApplyMR         cand = return (cand, [])
+    pick EagerDefaulting cand = do { os <- xoptM LangExt.OverloadedStrings
+                                   ; return (partition (is_int_ct os) cand) }
+
+    is_int_ct ovl_strings pred
+      | Just (cls, _) <- getClassPredTys_maybe pred
+      = isInteractiveClass ovl_strings cls
+      | otherwise
+      = False
+
+    pp_bndrs = pprWithCommas (quotes . ppr . fst) name_taus
+    mr_msg = hang (text "The Monomorphism Restriction applies to the binding"
+                   <> plural name_taus <+> text "for" <+> pp_bndrs)
+                2 (text "Consider giving a type signature for"
+                   <+> if isSingleton name_taus then pp_bndrs
+                                                else text "these binders")
+
+-------------------
+defaultTyVarsAndSimplify :: TcLevel
+                         -> TyCoVarSet
+                         -> [PredType]          -- Assumed zonked
+                         -> TcM [PredType]      -- Guaranteed Zonked
+-- Default any tyvar free in the constraints,
+-- and re-simplify in case the defaulting allows futher simplification
+defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
+  | null candidates  -- Common shortcut
+  = return []
+  | otherwise
+  = do { let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
+                = candidateQTyVarsOfTypes candidates
+       ; poly_kinds  <- xoptM LangExt.PolyKinds
+       ; default_kvs <- mapM (default_one poly_kinds True)
+                             (dVarSetElems cand_kvs)
+       ; default_tvs <- mapM (default_one poly_kinds False)
+                             (dVarSetElems (cand_tvs `minusDVarSet` cand_kvs))
+       ; if (not (or default_kvs || or default_tvs))
+         then return candidates
+         else do { candidates' <- simplify_cand candidates
+                 ; traceTc "Simplified after defaulting" $
+                      vcat [ text "Before:" <+> ppr candidates
+                           , text "After:"  <+> ppr candidates' ]
+                 ; return candidates' } }
+  where
+    default_one poly_kinds is_kind_var tv
+      | not (isMetaTyVar tv)
+      = return False
+      | tv `elemVarSet` mono_tvs
+      = return False
+      | otherwise
+      = defaultTyVar (not poly_kinds && is_kind_var) tv
+
+    simplify_cand candidates
+      = do { clone_wanteds <- newWanteds DefaultOrigin candidates
+           ; WC { wc_simple = simples } <- setTcLevel rhs_tclvl $
+                                           simplifyWantedsTcM clone_wanteds
+              -- Discard evidence; simples is fully zonked
+
+           ; traceTc "Minimise theta" (ppr candidates $$ ppr simples)
+           ; return (ctsPreds simples) }
+
+------------------
+decideQuantifiedTyVars
+   :: TyCoVarSet
+   -> [PredType]   -- Candidates predicates (zonked)
+   -> [PredType] -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
+   -> TcM [TyVar]
+-- Fix what tyvars we are going to quantify over, and quantify them
+decideQuantifiedTyVars mono_tvs candidates psig_theta name_taus
+  = do { zonked_taus <- mapM TcM.zonkTcType (psig_theta ++ map snd name_taus)
+         -- Why psig_theta? see Note [Quantification and partial signatures]
 
        ; let -- The candidate tyvars are the ones free in
              -- either quant_cand or zonked_taus.
              DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
-                = candidateQTyVarsOfTypes (quant_cand ++ zonked_taus)
+                = candidateQTyVarsOfTypes (candidates ++ zonked_taus)
 
-               -- Now keep only the ones reachable
-               -- (via growThetaTyVars) from zonked_taus.
-             grown_tvs = growThetaTyVars quant_cand (tyCoVarsOfTypes zonked_taus)
+             -- Now keep only the ones reachable
+             -- (via growThetaTyVars) from zonked_taus.
+             tau_tvs   = tyCoVarsOfTypes zonked_taus
+             grown_tvs = growThetaTyVars candidates tau_tvs
              pick      = filterDVarSet (`elemVarSet` grown_tvs)
              dvs_plus  = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
-       ; qtvs <- quantifyZonkedTyVars mono_tvs dvs_plus
+       ; quantifyZonkedTyVars mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
           -- that quantifyTyVars uses the separation between kvs and tvs
           -- only for defaulting, and we don't want (ever) to default a tv
           -- to *. So, don't grow the kvs.
-
-       ; quant_cand <- TcM.zonkTcTypes quant_cand
-                 -- quantifyTyVars turned some meta tyvars into
-                 -- quantified skolems, so we have to zonk again
-
-       ; let qtv_set   = mkVarSet qtvs
-             theta     = pickQuantifiablePreds qtv_set quant_cand
-             min_theta = mkMinimalBySCs theta
-               -- See Note [Minimize by Superclasses]
-
-           -- Warn about the monomorphism restriction
-       ; warn_mono <- woptM Opt_WarnMonomorphism
-       ; let mr_bites | ApplyMR <- infer_mode
-                      = constrained_tvs `intersectsVarSet` grown_tvs
-                      | otherwise
-                      = False
-       ; warnTc (Reason Opt_WarnMonomorphism) (warn_mono && mr_bites) $
-         hang (text "The Monomorphism Restriction applies to the binding"
-               <> plural bndrs <+> text "for" <+> pp_bndrs)
-             2 (text "Consider giving a type signature for"
-                <+> if isSingleton bndrs then pp_bndrs
-                                         else text "these binders")
-
-       ; traceTc "decideQuantification"
-           (vcat [ text "infer_mode:"   <+> ppr infer_mode
-                 , text "gbl_cand:"     <+> ppr gbl_cand
-                 , text "quant_cand:"   <+> ppr quant_cand
-                 , text "zonked_taus:" <+> ppr zonked_taus
-                 , text "gbl_tvs:"      <+> ppr gbl_tvs
-                 , text "mono_tvs:"     <+> ppr mono_tvs
-                 , text "cand_tvs"      <+> ppr cand_tvs
-                 , text "grown_tvs:"    <+> ppr grown_tvs
-                 , text "qtvs:"         <+> ppr qtvs
-                 , text "min_theta:"    <+> ppr min_theta ])
-       ; return (qtvs, min_theta) }
-  where
-    pp_bndrs = pprWithCommas (quotes . ppr) bndrs
-    (bndrs, taus) = unzip name_taus
+       }
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyVarSet
@@ -1602,17 +1671,6 @@ promoteTyVarTcS tclvl tv
        ; unifyTyVar tv (mkTyVarTy rhs_tv) }
   | otherwise
   = return ()
-
--- | If the tyvar is a RuntimeRep var, set it to LiftedRep.
-defaultTyVar :: TcTyVar -> TcM ()
--- Precondition: MetaTyVars only
--- See Note [DefaultTyVar]
-defaultTyVar the_tv
-  | isRuntimeRepVar the_tv
-  = do { traceTc "defaultTyVar RuntimeRep" (ppr the_tv)
-       ; writeMetaTyVar the_tv liftedRepTy }
-
-  | otherwise = return ()    -- The common case
 
 -- | Like 'defaultTyVar', but in the TcS monad.
 defaultTyVarTcS :: TcTyVar -> TcS Bool

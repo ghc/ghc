@@ -73,7 +73,7 @@ module TcMType (
   zonkTyCoVarsAndFV, zonkTcTypeAndFV,
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
-  zonkQuantifiedTyVar,
+  zonkQuantifiedTyVar, defaultTyVar,
   quantifyTyVars, quantifyZonkedTyVars,
   zonkTcTyCoVarBndr, zonkTcTyVarBinder,
   zonkTcType, zonkTcTypes, zonkCo,
@@ -960,12 +960,12 @@ quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
            -- mentioned in the kinds of the nondep_tvs'
            -- now refer to the dep_kvs'
 
-       ; traceTc "quantifyTyVars"
+       ; traceTc "quantifyZonkedTyVars"
            (vcat [ text "globals:" <+> ppr gbl_tvs
-                 , text "nondep:" <+> ppr nondep_tvs
-                 , text "dep:" <+> ppr dep_kvs
-                 , text "dep_kvs'" <+> ppr dep_kvs'
-                 , text "nondep_tvs'" <+> ppr nondep_tvs' ])
+                 , text "nondep:"  <+> pprTyVars nondep_tvs
+                 , text "dep:"     <+> pprTyVars dep_kvs
+                 , text "dep_kvs'" <+> pprTyVars dep_kvs'
+                 , text "nondep_tvs'" <+> pprTyVars nondep_tvs' ])
 
        ; return (dep_kvs' ++ nondep_tvs') }
   where
@@ -998,65 +998,58 @@ zonkQuantifiedTyVar :: Bool     -- True  <=> this is a kind var and -XNoPolyKind
 
 zonkQuantifiedTyVar default_kind tv
   = case tcTyVarDetails tv of
-      SkolemTv {} -> zonk_kind_and_return
+      SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
+                        ; return $ Just (setTyVarKind tv kind) }
         -- It might be a skolem type variable,
         -- for example from a user type signature
 
-      MetaTv { mtv_ref = ref, mtv_info = info }
-        -> do { when debugIsOn (check_empty ref)
-              ; zonk_meta_tv info tv }
+      MetaTv {}
+        -> do { mb_tv <- defaultTyVar default_kind tv
+              ; case mb_tv of
+                  True  -> return Nothing
+                  False -> do { tv' <- skolemiseUnboundMetaTyVar tv
+                              ; return (Just tv') } }
 
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
+defaultTyVar :: Bool      -- True <=> please default this kind variable to *
+             -> TcTyVar   -- Always an unbound meta tyvar
+             -> TcM Bool  -- True <=> defaulted away altogether
+
+defaultTyVar default_kind tv
+  | isRuntimeRepVar tv && not_sig_tv  -- We never quantify over a RuntimeRep var
+  = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
+       ; writeMetaTyVar tv liftedRepTy
+       ; return True }
+
+  | default_kind && not_sig_tv        -- -XNoPolyKinds and this is a kind var
+  = do { default_kind_var tv          -- so default it to * if possible
+       ; return True }
+
+  | otherwise
+  = return False
+
   where
-    zonk_kind_and_return = do { kind <- zonkTcType (tyVarKind tv)
-                              ; return $ Just (setTyVarKind tv kind) }
+    -- Do not default SigTvs. Doing so would violate the invariants
+    -- on SigTvs; see Note [Signature skolems] in TcType.
+    -- Trac #13343 is an example
+    not_sig_tv = not (isSigTyVar tv)
 
-    zonk_meta_tv :: MetaInfo -> TcTyVar -> TcM (Maybe TcTyVar)
-    zonk_meta_tv info tv
-      | isRuntimeRepVar tv && not_sig_tv  -- Never quantify over a RuntimeRep var
-      = do { writeMetaTyVar tv liftedRepTy
-           ; return Nothing }
-
-      | default_kind && not_sig_tv        -- -XNoPolyKinds and this is a kind var
-      = do { _ <- default_kind_var tv
-           ; return Nothing }
-
-      | otherwise
-      = do { tv' <- skolemiseUnboundMetaTyVar tv
-           ; return (Just tv') }
-      where
-        -- Do not default SigTvs. Doing so would violate the invariants
-        -- on SigTvs; see Note [Signature skolems] in TcType.
-        -- Trac #13343 is an example
-        not_sig_tv = case info of SigTv -> False
-                                  _     -> True
-
-
-    default_kind_var :: TyVar -> TcM Type
+    default_kind_var :: TyVar -> TcM ()
        -- defaultKindVar is used exclusively with -XNoPolyKinds
        -- See Note [Defaulting with -XNoPolyKinds]
        -- It takes an (unconstrained) meta tyvar and defaults it.
        -- Works only on vars of type *; for other kinds, it issues an error.
     default_kind_var kv
       | isStarKind (tyVarKind kv)
-      = do { writeMetaTyVar kv liftedTypeKind
-           ; return liftedTypeKind }
+      = do { traceTc "Defaulting a kind var to *" (ppr kv)
+           ; writeMetaTyVar kv liftedTypeKind }
       | otherwise
-      = do { addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
-                          , text "of kind:" <+> ppr (tyVarKind kv')
-                          , text "Perhaps enable PolyKinds or add a kind signature" ])
-           ; return (mkTyVarTy kv) }
+      = addErr (vcat [ text "Cannot default kind variable" <+> quotes (ppr kv')
+                     , text "of kind:" <+> ppr (tyVarKind kv')
+                     , text "Perhaps enable PolyKinds or add a kind signature" ])
       where
         (_, kv') = tidyOpenTyCoVar emptyTidyEnv kv
-
-    check_empty ref       -- [Sept 04] Check for non-empty.
-      = when debugIsOn $  -- See note [Silly Type Synonym]
-        do { cts <- readMutVar ref
-           ; case cts of
-               Flexi       -> return ()
-               Indirect ty -> WARN( True, ppr tv $$ ppr ty )
-                              return () }
 
 skolemiseRuntimeUnk :: TcTyVar -> TcM TyVar
 skolemiseRuntimeUnk tv
@@ -1074,7 +1067,8 @@ skolemise_tv :: TcTyVar -> TcTyVarDetails -> TcM TyVar
 --   See Note [Zonking to Skolem]
 skolemise_tv tv details
   = ASSERT2( isMetaTyVar tv, ppr tv )
-    do  { span <- getSrcSpanM    -- Get the location from "here"
+    do  { when debugIsOn (check_empty tv)
+        ; span <- getSrcSpanM    -- Get the location from "here"
                                  -- ie where we are generalising
         ; kind <- zonkTcType (tyVarKind tv)
         ; let uniq        = getUnique tv
@@ -1088,6 +1082,15 @@ skolemise_tv tv details
         ; traceTc "Skolemising" (ppr tv <+> text ":=" <+> ppr final_tv)
         ; writeMetaTyVar tv (mkTyVarTy final_tv)
         ; return final_tv }
+
+  where
+    check_empty tv       -- [Sept 04] Check for non-empty.
+      = when debugIsOn $  -- See note [Silly Type Synonym]
+        do { cts <- readMetaTyVar tv
+           ; case cts of
+               Flexi       -> return ()
+               Indirect ty -> WARN( True, ppr tv $$ ppr ty )
+                              return () }
 
 {- Note [Defaulting with -XNoPolyKinds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
