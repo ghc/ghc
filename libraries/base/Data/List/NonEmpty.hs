@@ -180,6 +180,8 @@ unfold :: (a -> (b, Maybe a)) -> a -> NonEmpty b
 unfold f a = case f a of
   (b, Nothing) -> b :| []
   (b, Just c)  -> b <| unfold f c
+{-# DEPRECATED unfold "Use unfoldr" #-}
+-- Deprecated in 8.2.1, remove in 8.4
 
 -- | 'nonEmpty' efficiently turns a normal list into a 'NonEmpty' stream,
 -- producing 'Nothing' if the input is empty.
