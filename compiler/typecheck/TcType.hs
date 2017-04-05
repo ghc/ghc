@@ -1284,7 +1284,7 @@ mkSigmaTy bndrs theta tau = mkForAllTys bndrs (mkPhiTy theta tau)
 -- | Make a sigma ty where all type variables are 'Inferred'. That is,
 -- they cannot be used with visible type application.
 mkInfSigmaTy :: [TyVar] -> [PredType] -> Type -> Type
-mkInfSigmaTy tyvars ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) ty
+mkInfSigmaTy tyvars theta ty = mkSigmaTy (mkTyVarBinders Inferred tyvars) theta ty
 
 -- | Make a sigma ty where all type variables are "specified". That is,
 -- they can be used with visible type application
@@ -1889,7 +1889,7 @@ pickCapturedPreds
   -> TcThetaType        -- Proposed constraints to quantify
   -> TcThetaType        -- A subset that we can actually quantify
 -- A simpler version of pickQuantifiablePreds, used to winnow down
--- the inferred constrains of a group of bindings, into those for
+-- the inferred constraints of a group of bindings, into those for
 -- one particular identifier
 pickCapturedPreds qtvs theta
   = filter captured theta

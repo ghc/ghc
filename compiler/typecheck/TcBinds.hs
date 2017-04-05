@@ -840,7 +840,7 @@ mkExport prag_fn qtvs theta
 
         ; wrap <- if sel_poly_ty `eqType` poly_ty  -- NB: eqType ignores visibility
                   then return idHsWrapper  -- Fast path; also avoids complaint when we infer
-                                           -- an ambiguouse type and have AllowAmbiguousType
+                                           -- an ambiguous type and have AllowAmbiguousType
                                            -- e..g infer  x :: forall a. F a -> Int
                   else addErrCtxtM (mk_impedance_match_msg mono_info sel_poly_ty poly_ty) $
                        tcSubType_NC sig_ctxt sel_poly_ty poly_ty
