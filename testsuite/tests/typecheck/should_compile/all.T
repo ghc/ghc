@@ -552,3 +552,5 @@ test('T13458', normal, compile, [''])
 test('T13490', normal, compile, [''])
 test('T13474', normal, compile, [''])
 test('T13524', expect_broken(13524), compile, [''])
+test('T13509', normal, compile, [''])
+
