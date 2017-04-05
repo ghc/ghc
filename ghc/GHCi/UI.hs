@@ -379,7 +379,7 @@ findEditor :: IO String
 findEditor = do
   getEnv "EDITOR"
     `catchIO` \_ -> do
-#ifdef mingw32_HOST_OS
+#if mingw32_HOST_OS
         win <- System.Win32.getWindowsDirectory
         return (win </> "notepad.exe")
 #else

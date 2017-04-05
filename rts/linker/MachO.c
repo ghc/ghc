@@ -248,8 +248,7 @@ ocVerifyImage_MachO(ObjectCode * oc)
 
     IF_DEBUG(linker, debugBelch("ocVerifyImage_MachO: start\n"));
 
-#if defined(x86_64_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-    || defined(aarch64_HOST_ARCH)
+#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH || aarch64_HOST_ARCH
     if(header->magic != MH_MAGIC_64) {
         errorBelch("Could not load image %s: bad magic!\n"
                    "  Expected %08x (64bit), got %08x%s\n",
@@ -282,7 +281,7 @@ resolveImports(
 
     IF_DEBUG(linker, debugBelch("resolveImports: start\n"));
 
-#if defined(i386_HOST_ARCH)
+#if i386_HOST_ARCH
     int isJumpTable = 0;
 
     if (strcmp(sect->sectname,"__jump_table") == 0) {
@@ -320,7 +319,7 @@ resolveImports(
         }
         ASSERT(addr);
 
-#if defined(i386_HOST_ARCH)
+#if i386_HOST_ARCH
         if (isJumpTable) {
             checkProddableBlock(oc,oc->image + sect->offset + i*itemSize, 5);
 
@@ -1923,8 +1922,7 @@ machoGetMisalignment( FILE * f )
     }
     fseek(f, -sizeof(header), SEEK_CUR);
 
-#if defined(x86_64_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-    || defined(aarch64_HOST_ARCH)
+#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH || aarch64_HOST_ARCH
     if(header.magic != MH_MAGIC_64) {
         barf("Bad magic. Expected: %08x, got: %08x.",
              MH_MAGIC_64, header.magic);

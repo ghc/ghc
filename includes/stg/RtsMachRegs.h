@@ -39,34 +39,14 @@
 
 #define MACHREGS_NO_REGS 0
 
-#ifdef i386_HOST_ARCH
-#define MACHREGS_i386     1
-#endif
-
-#ifdef x86_64_HOST_ARCH
-#define MACHREGS_x86_64   1
-#endif
-
-#if defined(powerpc_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
-        || defined(powerpc64le_HOST_ARCH) || defined(rs6000_HOST_ARCH)
-#define MACHREGS_powerpc  1
-#endif
-
-#ifdef sparc_HOST_ARCH
-#define MACHREGS_sparc    1
-#endif
-
-#ifdef arm_HOST_ARCH
-#define MACHREGS_arm      1
-#endif
-
-#ifdef aarch64_HOST_ARCH
-#define MACHREGS_aarch64  1
-#endif
-
-#ifdef darwin_HOST_OS
-#define MACHREGS_darwin   1
-#endif
+#define MACHREGS_i386     i386_HOST_ARCH
+#define MACHREGS_x86_64   x86_64_HOST_ARCH
+#define MACHREGS_powerpc  (powerpc_HOST_ARCH || powerpc64_HOST_ARCH \
+        || powerpc64le_HOST_ARCH || rs6000_HOST_ARCH)
+#define MACHREGS_sparc    sparc_HOST_ARCH
+#define MACHREGS_arm      arm_HOST_ARCH
+#define MACHREGS_aarch64  aarch64_HOST_ARCH
+#define MACHREGS_darwin   darwin_HOST_OS
 
 #endif
 

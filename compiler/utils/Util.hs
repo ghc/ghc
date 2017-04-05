@@ -1345,7 +1345,7 @@ type HasCallStack = (() :: Constraint)
 #endif
 
 -- | A call stack constraint, but only when 'isDebugOn'.
-#ifdef DEBUG
+#if DEBUG
 type HasDebugCallStack = HasCallStack
 #else
 type HasDebugCallStack = (() :: Constraint)

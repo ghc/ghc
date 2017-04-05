@@ -1170,7 +1170,7 @@ compactFixupPointers(StgCompactNFData *str,
     dbl_link_onto(bd, &g0->compact_objects);
     RELEASE_SM_LOCK;
 
-#ifdef DEBUG
+#if DEBUG
     if (root)
         verify_consistency_loop(str);
 #endif

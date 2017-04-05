@@ -826,7 +826,7 @@ loop:
  * Debugging: why is a thread blocked
  * ------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if DEBUG
 void
 printThreadBlockage(StgTSO *tso)
 {

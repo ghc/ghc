@@ -561,7 +561,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
          r = [stg_sel_1 z]   (max (HS + 1) MIN_UPD_SIZE)
     */
 
-#if defined(MIN_UPD_SIZE) && MIN_UPD_SIZE > 1
+#if MIN_UPD_SIZE > 1
 #define THUNK_1_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
 #define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),WDS(MIN_UPD_SIZE-1))
 #else
@@ -569,7 +569,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
 #define TICK_ALLOC_THUNK_1() TICK_ALLOC_UP_THK(WDS(1),0)
 #endif
 
-#if defined(MIN_UPD_SIZE) && MIN_UPD_SIZE > 2
+#if MIN_UPD_SIZE > 2
 #define THUNK_2_SIZE (SIZEOF_StgThunkHeader + WDS(MIN_UPD_SIZE))
 #define TICK_ALLOC_THUNK_2() TICK_ALLOC_UP_THK(WDS(2),WDS(MIN_UPD_SIZE-2))
 #else

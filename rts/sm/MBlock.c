@@ -657,7 +657,7 @@ initMBlocks(void)
 #ifdef USE_LARGE_ADDRESS_SPACE
     {
         W_ size;
-#ifdef aarch64_HOST_ARCH
+#if aarch64_HOST_ARCH
         size = (W_)1 << 38; // 1/4 TByte
 #else
         size = (W_)1 << 40; // 1 TByte

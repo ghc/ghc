@@ -22,7 +22,7 @@
 /* HACK: On Mac OS X 10.4 (at least), time.h doesn't declare ctime_r with
  *       _POSIX_C_SOURCE. If this is the case, we declare it ourselves.
  */
-#if defined(HAVE_CTIME_R) && !HAVE_DECL_CTIME_R
+#if HAVE_CTIME_R && !HAVE_DECL_CTIME_R
 extern char *ctime_r(const time_t *, char *);
 #endif
 
@@ -164,7 +164,7 @@ time_str(void)
 
     if (now == 0) {
         time(&now);
-#if defined(HAVE_CTIME_R)
+#if HAVE_CTIME_R
         ctime_r(&now, nowstr);
 #else
         strcpy(nowstr, ctime(&now));

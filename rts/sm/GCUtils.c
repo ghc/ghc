@@ -346,7 +346,7 @@ alloc_todo_block (gen_workspace *ws, uint32_t size)
  * Debugging
  * -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if DEBUG
 void
 printMutableList(bdescr *bd)
 {

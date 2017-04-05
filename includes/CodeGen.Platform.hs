@@ -1,7 +1,6 @@
 
 import CmmExpr
-#if !(defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
-    || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc))
+#if !(MACHREGS_i386 || MACHREGS_x86_64 || MACHREGS_sparc || MACHREGS_powerpc)
 import Panic
 #endif
 import Reg
@@ -9,9 +8,9 @@ import Reg
 #include "ghcautoconf.h"
 #include "stg/MachRegs.h"
 
-#if defined(MACHREGS_i386) || defined(MACHREGS_x86_64)
+#if MACHREGS_i386 || MACHREGS_x86_64
 
-# if defined(MACHREGS_i386)
+# if MACHREGS_i386
 #  define eax 0
 #  define ebx 1
 #  define ecx 2
@@ -22,7 +21,7 @@ import Reg
 #  define esp 7
 # endif
 
-# if defined(MACHREGS_x86_64)
+# if MACHREGS_x86_64
 #  define rax   0
 #  define rbx   1
 #  define rcx   2
@@ -104,8 +103,7 @@ import Reg
 -- I'm not sure if these are the correct numberings.
 -- Normally, the register names are just stringified as part of the REG() macro
 
-#elif defined(MACHREGS_powerpc) || defined(MACHREGS_arm) \
-    || defined(MACHREGS_aarch64)
+#elif MACHREGS_powerpc || MACHREGS_arm || MACHREGS_aarch64
 
 # define r0 0
 # define r1 1
@@ -140,10 +138,9 @@ import Reg
 # define r30 30
 # define r31 31
 
--- See note above. These aren't actually used for anything except satisfying
--- the compiler for globalRegMaybe so I'm unsure if they're the correct
--- numberings, should they ever be attempted to be used in the NCG.
-#if defined(MACHREGS_aarch64) || defined(MACHREGS_arm)
+-- See note above. These aren't actually used for anything except satisfying the compiler for globalRegMaybe
+-- so I'm unsure if they're the correct numberings, should they ever be attempted to be used in the NCG.
+#if MACHREGS_aarch64 || MACHREGS_arm
 # define s0 32
 # define s1 33
 # define s2 34
@@ -211,7 +208,7 @@ import Reg
 # define d31 63
 #endif
 
-# if defined(MACHREGS_darwin)
+# if MACHREGS_darwin
 #  define f0  32
 #  define f1  33
 #  define f2  34
@@ -279,7 +276,7 @@ import Reg
 #  define fr31 63
 # endif
 
-#elif defined(MACHREGS_sparc)
+#elif MACHREGS_sparc
 
 # define g0  0
 # define g1  1
@@ -634,9 +631,7 @@ haveRegBase = False
 -- in a real machine register, otherwise returns @'Just' reg@, where
 -- reg is the machine register it is stored in.
 globalRegMaybe :: GlobalReg -> Maybe RealReg
-#if defined(MACHREGS_i386) || defined(MACHREGS_x86_64) \
-    || defined(MACHREGS_sparc) || defined(MACHREGS_powerpc) \
-    || defined(MACHREGS_arm) || defined(MACHREGS_aarch64)
+#if MACHREGS_i386 || MACHREGS_x86_64 || MACHREGS_sparc || MACHREGS_powerpc || MACHREGS_arm || MACHREGS_aarch64
 # ifdef REG_Base
 globalRegMaybe BaseReg                  = Just (RealRegSingle REG_Base)
 # endif
@@ -690,7 +685,7 @@ globalRegMaybe (FloatReg 6)             = Just (RealRegSingle REG_F6)
 # endif
 # ifdef REG_D1
 globalRegMaybe (DoubleReg 1)            =
-#  if defined(MACHREGS_sparc)
+#  if MACHREGS_sparc
                                           Just (RealRegPair REG_D1 (REG_D1 + 1))
 #  else
                                           Just (RealRegSingle REG_D1)
@@ -698,7 +693,7 @@ globalRegMaybe (DoubleReg 1)            =
 # endif
 # ifdef REG_D2
 globalRegMaybe (DoubleReg 2)            =
-#  if defined(MACHREGS_sparc)
+#  if MACHREGS_sparc
                                           Just (RealRegPair REG_D2 (REG_D2 + 1))
 #  else
                                           Just (RealRegSingle REG_D2)
@@ -706,7 +701,7 @@ globalRegMaybe (DoubleReg 2)            =
 # endif
 # ifdef REG_D3
 globalRegMaybe (DoubleReg 3)            =
-#  if defined(MACHREGS_sparc)
+#  if MACHREGS_sparc
                                           Just (RealRegPair REG_D3 (REG_D3 + 1))
 #  else
                                           Just (RealRegSingle REG_D3)
@@ -714,7 +709,7 @@ globalRegMaybe (DoubleReg 3)            =
 # endif
 # ifdef REG_D4
 globalRegMaybe (DoubleReg 4)            =
-#  if defined(MACHREGS_sparc)
+#  if MACHREGS_sparc
                                           Just (RealRegPair REG_D4 (REG_D4 + 1))
 #  else
                                           Just (RealRegSingle REG_D4)
@@ -722,7 +717,7 @@ globalRegMaybe (DoubleReg 4)            =
 # endif
 # ifdef REG_D5
 globalRegMaybe (DoubleReg 5)            =
-#  if defined(MACHREGS_sparc)
+#  if MACHREGS_sparc
                                           Just (RealRegPair REG_D5 (REG_D5 + 1))
 #  else
                                           Just (RealRegSingle REG_D5)
@@ -730,7 +725,7 @@ globalRegMaybe (DoubleReg 5)            =
 # endif
 # ifdef REG_D6
 globalRegMaybe (DoubleReg 6)            =
-#  if defined(MACHREGS_sparc)
+#  if MACHREGS_sparc
                                           Just (RealRegPair REG_D6 (REG_D6 + 1))
 #  else
                                           Just (RealRegSingle REG_D6)
@@ -756,7 +751,7 @@ globalRegMaybe (XmmReg 5)               = Just (RealRegSingle REG_XMM5)
 globalRegMaybe (XmmReg 6)               = Just (RealRegSingle REG_XMM6)
 #  endif
 # endif
-# if defined MAX_REAL_YMM_REG && MAX_REAL_YMM_REG != 0
+# if MAX_REAL_YMM_REG != 0
 #  ifdef REG_YMM1
 globalRegMaybe (YmmReg 1)               = Just (RealRegSingle REG_YMM1)
 #  endif
@@ -776,7 +771,7 @@ globalRegMaybe (YmmReg 5)               = Just (RealRegSingle REG_YMM5)
 globalRegMaybe (YmmReg 6)               = Just (RealRegSingle REG_YMM6)
 #  endif
 # endif
-# if defined MAX_REAL_ZMM_REG && MAX_REAL_ZMM_REG != 0
+# if MAX_REAL_ZMM_REG != 0
 #  ifdef REG_ZMM1
 globalRegMaybe (ZmmReg 1)               = Just (RealRegSingle REG_ZMM1)
 #  endif
@@ -824,7 +819,7 @@ globalRegMaybe CurrentNursery           = Just (RealRegSingle REG_CurrentNursery
 globalRegMaybe MachSp                   = Just (RealRegSingle REG_MachSp)
 # endif
 globalRegMaybe _                        = Nothing
-#elif defined MACHREGS_NO_REGS
+#elif MACHREGS_NO_REGS
 globalRegMaybe _ = Nothing
 #else
 globalRegMaybe = panic "globalRegMaybe not defined for this platform"
@@ -832,14 +827,14 @@ globalRegMaybe = panic "globalRegMaybe not defined for this platform"
 
 freeReg :: RegNo -> Bool
 
-#if defined(MACHREGS_i386) || defined(MACHREGS_x86_64)
+#if MACHREGS_i386 || MACHREGS_x86_64
 
-# if defined(MACHREGS_i386)
+# if MACHREGS_i386
 freeReg esp = False -- %esp is the C stack pointer
 freeReg esi = False -- Note [esi/edi not allocatable]
 freeReg edi = False
 # endif
-# if defined(MACHREGS_x86_64)
+# if MACHREGS_x86_64
 freeReg rsp = False  --        %rsp is the C stack pointer
 # endif
 
@@ -880,14 +875,14 @@ freeRegBase REG_HpLim = False
 -- their liveness accurately.
 freeRegBase _ = True
 
-#elif defined(MACHREGS_powerpc)
+#elif MACHREGS_powerpc
 
 freeReg 0 = False -- Used by code setting the back chain pointer
                   -- in stack reallocations on Linux
                   -- r0 is not usable in all insns so also reserved
                   -- on Darwin.
 freeReg 1 = False -- The Stack Pointer
-# if !defined(MACHREGS_darwin)
+# if !MACHREGS_darwin
 -- most non-darwin powerpc OSes use r2 as a TOC pointer or something like that
 freeReg 2 = False
 freeReg 13 = False -- reserved for system thread ID on 64 bit
@@ -988,7 +983,7 @@ freeReg REG_HpLim = False
 # endif
 freeReg _ = True
 
-#elif defined(MACHREGS_sparc)
+#elif MACHREGS_sparc
 
 -- SPARC regs used by the OS / ABI
 -- %g0(r0) is always zero

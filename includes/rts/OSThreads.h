@@ -17,7 +17,7 @@
 
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
-#ifdef CMINUSMINUS
+#if CMINUSMINUS
 
 #define OS_ACQUIRE_LOCK(mutex) foreign "C" pthread_mutex_lock(mutex)
 #define OS_RELEASE_LOCK(mutex) foreign "C" pthread_mutex_unlock(mutex)
@@ -76,7 +76,7 @@ EXTERN_INLINE int TRY_ACQUIRE_LOCK(pthread_mutex_t *mutex)
 
 # elif defined(HAVE_WINDOWS_H)
 
-#ifdef CMINUSMINUS
+#if CMINUSMINUS
 
 /* We jump through a hoop here to get a CCall EnterCriticalSection
    and LeaveCriticalSection, as that's what C-- wants. */

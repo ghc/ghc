@@ -65,7 +65,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#ifdef HAVE_SYS_TIMERFD_H
+#if HAVE_SYS_TIMERFD_H
 #include <sys/timerfd.h>
 #define USE_TIMERFD_FOR_ITIMER 1
 #else
@@ -101,7 +101,7 @@ static void *itimer_thread_func(void *_handle_tick)
     uint64_t nticks;
     int timerfd = -1;
 
-#if defined(USE_TIMERFD_FOR_ITIMER) && USE_TIMERFD_FOR_ITIMER
+#if USE_TIMERFD_FOR_ITIMER
     struct itimerspec it;
     it.it_value.tv_sec  = TimeToSeconds(itimer_interval);
     it.it_value.tv_nsec = TimeToNS(itimer_interval) % 1000000000;
@@ -169,7 +169,7 @@ initTicker (Time interval, TickProc handle_tick)
      * to the thread we create so we can later join to it if requested
      */
     if (! pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick)) {
-#ifdef HAVE_PTHREAD_SETNAME_NP
+#if HAVE_PTHREAD_SETNAME_NP
         pthread_setname_np(thread, "ghc_ticker");
 #endif
     } else {

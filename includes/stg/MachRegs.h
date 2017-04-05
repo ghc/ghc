@@ -82,7 +82,7 @@
    Leaving SpLim out of the picture.
    -------------------------------------------------------------------------- */
 
-#ifdef MACHREGS_i386
+#if MACHREGS_i386
 
 #define REG(x) __asm__("%" #x)
 
@@ -156,7 +156,7 @@
 
   --------------------------------------------------------------------------- */
 
-#elif defined(MACHREGS_x86_64)
+#elif MACHREGS_x86_64
 
 #define REG(x) __asm__("%" #x)
 
@@ -303,7 +303,7 @@ the stack. See Note [Overlapping global registers] for implications.
    We can do the Whole Business with callee-save registers only!
    -------------------------------------------------------------------------- */
 
-#elif defined(MACHREGS_powerpc)
+#elif MACHREGS_powerpc
 
 #define REG(x) __asm__(#x)
 
@@ -316,7 +316,7 @@ the stack. See Note [Overlapping global registers] for implications.
 #define REG_R7          r20
 #define REG_R8          r21
 
-#ifdef MACHREGS_darwin
+#if MACHREGS_darwin
 
 #define REG_F1          f14
 #define REG_F2          f15
@@ -442,7 +442,7 @@ the stack. See Note [Overlapping global registers] for implications.
 
    -------------------------------------------------------------------------- */
 
-#elif defined(MACHREGS_sparc)
+#elif MACHREGS_sparc
 
 #define REG(x) __asm__("%" #x)
 
@@ -521,7 +521,7 @@ the stack. See Note [Overlapping global registers] for implications.
    d16-d31/q8-q15        Argument / result/ scratch registers
    ----------------------------------------------------------------------------- */
 
-#elif defined(MACHREGS_arm)
+#elif MACHREGS_arm
 
 #define REG(x) __asm__(#x)
 
@@ -578,7 +578,7 @@ the stack. See Note [Overlapping global registers] for implications.
 
    ----------------------------------------------------------------------------- */
 
-#elif defined(MACHREGS_aarch64)
+#elif MACHREGS_aarch64
 
 #define REG(x) __asm__(#x)
 

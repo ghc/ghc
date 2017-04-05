@@ -91,8 +91,7 @@ typedef struct ForeignExportStablePtr_ {
     struct ForeignExportStablePtr_ *next;
 } ForeignExportStablePtr;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) \
-    || defined(arm_HOST_ARCH)
+#if powerpc_HOST_ARCH || x86_64_HOST_ARCH || arm_HOST_ARCH
 /* ios currently uses adjacent got tables, and no symbol extras */
 #if !defined(ios_HOST_OS)
 #define NEED_SYMBOL_EXTRAS 1
@@ -103,17 +102,17 @@ typedef struct ForeignExportStablePtr_ {
  * address relocations on the PowerPC, x86_64 and ARM.
  */
 typedef struct {
-#if defined(powerpc_HOST_ARCH)
+#ifdef powerpc_HOST_ARCH
     struct {
         short lis_r12, hi_addr;
         short ori_r12_r12, lo_addr;
         long mtctr_r12;
         long bctr;
     } jumpIsland;
-#elif defined(x86_64_HOST_ARCH)
+#elif x86_64_HOST_ARCH
     uint64_t    addr;
     uint8_t     jumpIsland[6];
-#elif defined(arm_HOST_ARCH)
+#elif arm_HOST_ARCH
     uint8_t     jumpIsland[16];
 #endif
 } SymbolExtra;
@@ -284,7 +283,7 @@ ObjectCode* mkOc( pathchar *path, char *image, int imageSize,
                   int misalignment
                   );
 
-#if defined(mingw32_HOST_OS)
+#if defined (mingw32_HOST_OS)
 /* We use myindex to calculate array addresses, rather than
    simply doing the normal subscript thing.  That's because
    some of the above structs have sizes which are not
