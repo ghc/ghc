@@ -100,7 +100,7 @@
 #elif HAVE_STDINT_H
 # include <stdint.h>
 #endif
-#if HAVE_CLOCK_GETTIME
+#ifdef HAVE_CLOCK_GETTIME
 # ifdef _POSIX_MONOTONIC_CLOCK
 #  define CLOCK_ID CLOCK_MONOTONIC
 # else
