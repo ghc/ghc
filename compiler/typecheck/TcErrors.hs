@@ -599,7 +599,8 @@ mkHoleReporter ctxt
 mkUserTypeErrorReporter :: Reporter
 mkUserTypeErrorReporter ctxt
   = mapM_ $ \ct -> do { err <- mkUserTypeError ctxt ct
-                      ; maybeReportError ctxt err }
+                      ; maybeReportError ctxt err
+                      ; addDeferredBinding ctxt err ct }
 
 mkUserTypeError :: ReportErrCtxt -> Ct -> TcM ErrMsg
 mkUserTypeError ctxt ct = mkErrorMsgFromCt ctxt ct
