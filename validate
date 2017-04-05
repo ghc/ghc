@@ -176,7 +176,7 @@ if [ $testsuite_only -eq 0 ]; then
 thisdir=`pwd`
 
 if [ $no_clean -eq 0 ]; then
-    $make maintainer-clean NO_CLEAN_GMP=YES
+    $make maintainer-clean
 
     INSTDIR="$thisdir/inst"
 
