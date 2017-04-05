@@ -211,3 +211,4 @@ test('T13191',
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
+test('T13525', expect_broken(13525), compile_and_run, [''])
