@@ -1822,25 +1822,30 @@ isDroppableDerivedLoc loc
       HoleOrigin {}    -> False
       KindEqOrigin {}  -> False
       GivenOrigin {}   -> False
-      FunDepOrigin1 {} -> False
+
+      -- See Note [Dropping derived constraints
+      -- For fundeps, drop wanted/warnted interactions
       FunDepOrigin2 {} -> False
-      _                -> True
+      FunDepOrigin1 _ loc1 _ loc2
+        | isGivenLoc loc1 || isGivenLoc loc2 -> False
+        | otherwise                          -> True
+      _ -> True
 
 arisesFromGivens :: Ct -> Bool
 arisesFromGivens ct
   = case ctEvidence ct of
-      CtGiven {} -> True
-      CtWanted {} -> False
-      CtDerived { ctev_loc = loc } -> from_given loc
-  where
-   from_given :: CtLoc -> Bool
-   from_given loc = from_given_origin (ctLocOrigin loc)
+      CtGiven {}                   -> True
+      CtWanted {}                  -> False
+      CtDerived { ctev_loc = loc } -> isGivenLoc loc
 
-   from_given_origin :: CtOrigin -> Bool
-   from_given_origin (GivenOrigin {})          = True
-   from_given_origin (FunDepOrigin1 _ l1 _ l2) = from_given l1 && from_given l2
-   from_given_origin (FunDepOrigin2 _ o1 _ _)  = from_given_origin o1
-   from_given_origin _                         = False
+isGivenLoc :: CtLoc -> Bool
+isGivenLoc loc = isGivenOrigin (ctLocOrigin loc)
+
+isGivenOrigin :: CtOrigin -> Bool
+isGivenOrigin (GivenOrigin {})          = True
+isGivenOrigin (FunDepOrigin1 _ l1 _ l2) = isGivenLoc l1 && isGivenLoc l2
+isGivenOrigin (FunDepOrigin2 _ o1 _ _)  = isGivenOrigin o1
+isGivenOrigin _                         = False
 
 {- Note [Dropping derived constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1856,19 +1861,19 @@ see dropDerivedWC.  For example
 
 But (tiresomely) we do keep *some* Derived insolubles:
 
- * Insoluble kind equalities (e.g. [D] * ~ (* -> *)) may arise from
-   a type equality a ~ Int#, say.  In future they'll be Wanted, not Derived,
-   but at the moment they are Derived.
-
- * Insoluble derived equalities (e.g. [D] Int ~ Bool) may arise from
-   functional dependency interactions, either between Givens or
-   Wanteds.  It seems sensible to retain these:
-   - For Givens they reflect unreachable code
-   - For Wanteds it is arguably better to get a fundep error than
-     a no-instance error (Trac #9612)
-
  * Type holes are derived constraints because they have no evidence
    and we want to keep them so we get the error report
+
+ * Insoluble derived equalities (e.g. [D] Int ~ Bool) may arise from
+   functional dependency interactions:
+      - Given or Wanted interacting with an instance declaration (FunDepOrigin2)
+      - Given/Given interactions (FunDepOrigin1); this reflects unreachable code
+      - Given/Wanted interactions (FunDepOrigin1); see Trac #9612
+
+   But for Wanted/Wanted interactions we do /not/ want to report an
+   error (Trac #13506).  Consider [W] C Int Int, [W] C Int Bool, with
+   a fundep on class C.  We don't want to report an insoluble Int~Bool;
+   c.f. "wanteds do not rewrite wanteds".
 
 Moreover, we keep *all* derived insolubles under some circumstances:
 
@@ -1876,7 +1881,7 @@ Moreover, we keep *all* derived insolubles under some circumstances:
     generalise.  Example: [W] a ~ Int, [W] a ~ Bool
     We get [D] Int ~ Bool, and indeed the constraints are insoluble,
     and we want simplifyInfer to see that, even though we don't
-    ultimately want to generate an (inexplicable) error message from
+    ultimately want to generate an (inexplicable) error message from it
 
 To distinguish these cases we use the CtOrigin.
 
