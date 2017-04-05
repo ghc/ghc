@@ -84,6 +84,9 @@
   * `mkTyCon3` is no longer exported by `Data.Typeable`. This function is
     replaced by `Type.Reflection.Unsafe.mkTyCon`.
 
+  * `Data.List.NonEmpty.unfold` has been deprecated in favor of `unfoldr`,
+    which is functionally equivalent.
+
 ## 4.9.0.0  *May 2016*
 
   * Bundled with GHC 8.0
