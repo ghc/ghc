@@ -1891,16 +1891,18 @@ predTypeEqRel ty
 -- (that is, doesn't depend on Uniques).
 toposortTyVars :: [TyVar] -> [TyVar]
 toposortTyVars tvs = reverse $
-                     [ tv | (tv, _, _) <- topologicalSortG $
+                     [ node_payload node | node <- topologicalSortG $
                                           graphFromEdgedVerticesOrd nodes ]
   where
     var_ids :: VarEnv Int
     var_ids = mkVarEnv (zip tvs [1..])
 
-    nodes = [ ( tv
-              , lookupVarEnv_NF var_ids tv
-              , mapMaybe (lookupVarEnv var_ids)
-                         (tyCoVarsOfTypeList (tyVarKind tv)) )
+    nodes :: [ Node Int TyVar ]
+    nodes = [ DigraphNode
+                tv
+                (lookupVarEnv_NF var_ids tv)
+                (mapMaybe (lookupVarEnv var_ids)
+                         (tyCoVarsOfTypeList (tyVarKind tv)))
             | tv <- tvs ]
 
 -- | Extract a well-scoped list of variables from a deterministic set of

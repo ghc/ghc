@@ -803,12 +803,12 @@ evVarsOfTerms = mapUnionVarSet evVarsOfTerm
 sccEvBinds :: Bag EvBind -> [SCC EvBind]
 sccEvBinds bs = stronglyConnCompFromEdgedVerticesUniq edges
   where
-    edges :: [(EvBind, EvVar, [EvVar])]
+    edges :: [ Node EvVar EvBind ]
     edges = foldrBag ((:) . mk_node) [] bs
 
-    mk_node :: EvBind -> (EvBind, EvVar, [EvVar])
+    mk_node :: EvBind -> Node EvVar EvBind
     mk_node b@(EvBind { eb_lhs = var, eb_rhs = term })
-      = (b, var, nonDetEltsUniqSet (evVarsOfTerm term `unionVarSet`
+      = DigraphNode b var (nonDetEltsUniqSet (evVarsOfTerm term `unionVarSet`
                                 coVarsOfType (varType var)))
       -- It's OK to use nonDetEltsUniqSet here as stronglyConnCompFromEdgedVertices
       -- is still deterministic even if the edges are in nondeterministic order

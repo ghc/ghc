@@ -98,7 +98,8 @@ type TyConGroup = ([TyCon], UniqSet TyCon)
 tyConGroups :: [TyCon] -> [TyConGroup]
 tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVerticesUniq edges)
   where
-    edges = [((tc, ds), tc, nonDetEltsUniqSet ds) | tc <- tcs
+    edges :: [ Node TyCon (TyCon, UniqSet TyCon) ]
+    edges = [DigraphNode (tc, ds) tc (nonDetEltsUniqSet ds) | tc <- tcs
                                 , let ds = tyConsOfTyCon tc]
             -- It's OK to use nonDetEltsUniqSet here as
             -- stronglyConnCompFromEdgedVertices is still deterministic even

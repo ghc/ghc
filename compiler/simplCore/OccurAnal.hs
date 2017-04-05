@@ -11,7 +11,7 @@ The occurrence analyser re-typechecks a core expression, returning a new
 core expression with (hopefully) improved usage information.
 -}
 
-{-# LANGUAGE CPP, BangPatterns, MultiWayIf #-}
+{-# LANGUAGE CPP, BangPatterns, MultiWayIf, ViewPatterns  #-}
 
 module OccurAnal (
         occurAnalysePgm, occurAnalyseExpr, occurAnalyseExpr_NoBinderSwap
@@ -35,7 +35,7 @@ import VarSet
 import VarEnv
 import Var
 import Demand           ( argOneShots, argsOneShots )
-import Digraph          ( SCC(..), Node
+import Digraph          ( SCC(..), Node(..)
                         , stronglyConnCompFromEdgedVerticesUniq
                         , stronglyConnCompFromEdgedVerticesUniqR )
 import Unique
@@ -978,7 +978,7 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
     (map mk_loop_breaker chosen_nodes ++ binds)
   where
     (chosen_nodes, unchosen) = chooseLoopBreaker approximate_lb
-                                                 (nd_score (fstOf3 node))
+                                                 (nd_score (node_payload node))
                                                  [node] [] nodes
 
     approximate_lb = depth >= 2
@@ -988,14 +988,15 @@ reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
         -- and approximate, returning to d=0
 
 mk_loop_breaker :: LetrecNode -> Binding
-mk_loop_breaker (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
+mk_loop_breaker (node_payload -> ND { nd_bndr = bndr, nd_rhs = rhs})
   = (bndr `setIdOccInfo` strongLoopBreaker { occ_tail = tail_info }, rhs)
   where
     tail_info = tailCallInfo (idOccInfo bndr)
 
 mk_non_loop_breaker :: VarSet -> LetrecNode -> Binding
 -- See Note [Weak loop breakers]
-mk_non_loop_breaker weak_fvs (ND { nd_bndr = bndr, nd_rhs = rhs}, _, _)
+mk_non_loop_breaker weak_fvs (node_payload -> ND { nd_bndr = bndr
+                                                 , nd_rhs = rhs})
   | bndr `elemVarSet` weak_fvs = (setIdOccInfo bndr occ', rhs)
   | otherwise                  = (bndr, rhs)
   where
@@ -1029,7 +1030,7 @@ chooseLoopBreaker approx_lb loop_sc loop_nodes acc (node : nodes)
   | otherwise              -- Worse score so don't pick it
   = chooseLoopBreaker approx_lb loop_sc loop_nodes (node : acc) nodes
   where
-    sc = nd_score (fstOf3 node)
+    sc = nd_score (node_payload node)
 
 {-
 Note [Complexity of loop breaking]
@@ -1223,7 +1224,7 @@ makeNode :: OccEnv -> ImpRuleEdges -> VarSet
          -> (Var, CoreExpr) -> LetrecNode
 -- See Note [Recursive bindings: the grand plan]
 makeNode env imp_rule_edges bndr_set (bndr, rhs)
-  = (details, varUnique bndr, nonDetKeysUniqSet node_fvs)
+  = DigraphNode details (varUnique bndr) (nonDetKeysUniqSet node_fvs)
     -- It's OK to use nonDetKeysUniqSet here as stronglyConnCompFromEdgedVerticesR
     -- is still deterministic with edges in nondeterministic order as
     -- explained in Note [Deterministic SCC] in Digraph.
@@ -1296,10 +1297,12 @@ mkLoopBreakerNodes lvl bndr_set body_uds details_s
   = (final_uds, zipWith mk_lb_node details_s bndrs')
   where
     (final_uds, bndrs') = tagRecBinders lvl body_uds
-                            [ (nd_bndr nd, nd_uds nd, nd_rhs_bndrs nd)
+                            [ ((nd_bndr nd)
+                               ,(nd_uds nd)
+                               ,(nd_rhs_bndrs nd))
                             | nd <- details_s ]
     mk_lb_node nd@(ND { nd_bndr = bndr, nd_rhs = rhs, nd_inl = inl_fvs }) bndr'
-      = (nd', varUnique bndr, nonDetKeysUniqSet lb_deps)
+      = DigraphNode nd' (varUnique bndr) (nonDetKeysUniqSet lb_deps)
               -- It's OK to use nonDetKeysUniqSet here as
               -- stronglyConnCompFromEdgedVerticesR is still deterministic with edges
               -- in nondeterministic order as explained in

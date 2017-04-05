@@ -2422,8 +2422,8 @@ checkForCyclicBinds ev_binds_map
     coercion_cycles = [c | c <- cycles, any is_co_bind c]
     is_co_bind (EvBind { eb_lhs = b }) = isEqPred (varType b)
 
-    edges :: [(EvBind, EvVar, [EvVar])]
-    edges = [ (bind, bndr, nonDetEltsUniqSet (evVarsOfTerm rhs))
+    edges :: [ Node EvVar EvBind ]
+    edges = [ DigraphNode bind bndr (nonDetEltsUniqSet (evVarsOfTerm rhs))
             | bind@(EvBind { eb_lhs = bndr, eb_rhs = rhs}) <- bagToList ev_binds ]
             -- It's OK to use nonDetEltsUFM here as
             -- stronglyConnCompFromEdgedVertices is still deterministic even

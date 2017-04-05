@@ -677,28 +677,27 @@ natCmmTopToLive proc@(CmmProc info lbl live (ListGraph blocks@(first : _)))
 -- exactly what we do. (#7574)
 --
 sccBlocks
-        :: Instruction instr
+        :: forall instr . Instruction instr
         => [NatBasicBlock instr]
         -> [BlockId]
         -> [SCC (NatBasicBlock instr)]
 
-sccBlocks blocks entries = map (fmap get_node) sccs
+sccBlocks blocks entries = map (fmap node_payload) sccs
   where
-        -- nodes :: [(NatBasicBlock instr, Unique, [Unique])]
-        nodes = [ (block, id, getOutEdges instrs)
+        nodes :: [ Node BlockId (NatBasicBlock instr) ]
+        nodes = [ DigraphNode block id (getOutEdges instrs)
                 | block@(BasicBlock id instrs) <- blocks ]
 
         g1 = graphFromEdgedVerticesUniq nodes
 
         reachable :: LabelSet
-        reachable = setFromList [ id | (_,id,_) <- reachablesG g1 roots ]
+        reachable = setFromList [ node_key node | node <- reachablesG g1 roots ]
 
-        g2 = graphFromEdgedVerticesUniq [ node | node@(_,id,_) <- nodes
-                                               , id `setMember` reachable ]
+        g2 = graphFromEdgedVerticesUniq [ node | node <- nodes
+                                               , node_key node
+                                                  `setMember` reachable ]
 
         sccs = stronglyConnCompG g2
-
-        get_node (n, _, _) = n
 
         getOutEdges :: Instruction instr => [instr] -> [BlockId]
         getOutEdges instrs = concat $ map jumpDestsOfInstr instrs
@@ -709,7 +708,8 @@ sccBlocks blocks entries = map (fmap get_node) sccs
         -- node: (NatBasicBlock, BlockId, [BlockId]).  This takes
         -- advantage of the fact that Digraph only looks at the key,
         -- even though it asks for the whole triple.
-        roots = [(panic "sccBlocks",b,panic "sccBlocks") | b <- entries ]
+        roots = [DigraphNode (panic "sccBlocks") b (panic "sccBlocks")
+                | b <- entries ]
 
 
 

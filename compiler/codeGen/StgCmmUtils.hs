@@ -399,8 +399,8 @@ emitMultiAssign regs rhss   = do
 unscramble :: DynFlags -> [Vrtx] -> FCode ()
 unscramble dflags vertices = mapM_ do_component components
   where
-        edges :: [ (Vrtx, Key, [Key]) ]
-        edges = [ (vertex, key1, edges_from stmt1)
+        edges :: [ Node Key Vrtx ]
+        edges = [ DigraphNode vertex key1 (edges_from stmt1)
                 | vertex@(key1, stmt1) <- vertices ]
 
         edges_from :: Stmt -> [Key]

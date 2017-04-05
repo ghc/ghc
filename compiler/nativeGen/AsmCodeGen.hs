@@ -848,9 +848,7 @@ sequenceBlocks infos (entry:blocks) =
 sccBlocks
         :: Instruction instr
         => [NatBasicBlock instr]
-        -> [SCC ( NatBasicBlock instr
-                , BlockId
-                , [BlockId])]
+        -> [SCC (Node BlockId (NatBasicBlock instr))]
 
 sccBlocks blocks = stronglyConnCompFromEdgedVerticesUniqR (map mkNode blocks)
 
@@ -867,10 +865,10 @@ getOutEdges instrs
 
 mkNode :: (Instruction t)
        => GenBasicBlock t
-       -> (GenBasicBlock t, BlockId, [BlockId])
-mkNode block@(BasicBlock id instrs) = (block, id, getOutEdges instrs)
+       -> Node BlockId (GenBasicBlock t)
+mkNode block@(BasicBlock id instrs) = DigraphNode block id (getOutEdges instrs)
 
-seqBlocks :: LabelMap i -> [(GenBasicBlock t1, BlockId, [BlockId])]
+seqBlocks :: LabelMap i -> [Node BlockId (GenBasicBlock t1)]
                         -> [GenBasicBlock t1]
 seqBlocks infos blocks = placeNext pullable0 todo0
   where
@@ -879,8 +877,8 @@ seqBlocks infos blocks = placeNext pullable0 todo0
     --           reason not to;
     --           may include blocks that have already been placed, but then
     --           these are not in pullable
-    pullable0 = listToUFM [ (i,(b,n)) | (b,i,n) <- blocks ]
-    todo0     = [i | (_,i,_) <- blocks ]
+    pullable0 = listToUFM [ (i,(b,n)) | DigraphNode b i n <- blocks ]
+    todo0     = map node_key blocks
 
     placeNext _ [] = []
     placeNext pullable (i:rest)

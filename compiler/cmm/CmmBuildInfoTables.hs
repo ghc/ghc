@@ -278,7 +278,8 @@ mkTopCAFInfo localCAFs = foldl addToTop Map.empty g
           in foldl (\env l -> Map.insert l (flatten env cafset) env) env lbls
 
         g = stronglyConnCompFromEdgedVerticesOrd
-              [ ((l,cafs), l, Set.elems cafs) | (cafs, Just l) <- localCAFs ]
+              [ DigraphNode (l,cafs) l (Set.elems cafs)
+              | (cafs, Just l) <- localCAFs ]
 
 flatten :: Map CLabel CAFSet -> CAFSet -> CAFSet
 flatten env cafset = foldSet (lookup env) Set.empty cafset

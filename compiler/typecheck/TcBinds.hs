@@ -552,8 +552,8 @@ type BKey = Int -- Just number off the bindings
 mkEdges :: TcSigFun -> LHsBinds Name -> [Node BKey (LHsBind Name)]
 -- See Note [Polymorphic recursion] in HsBinds.
 mkEdges sig_fn binds
-  = [ (bind, key, [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
-                         Just key <- [lookupNameEnv key_map n], no_sig n ])
+  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
+                         Just key <- [lookupNameEnv key_map n], no_sig n ]
     | (bind, key) <- keyd_binds
     ]
     -- It's OK to use nonDetEltsUFM here as stronglyConnCompFromEdgedVertices

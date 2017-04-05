@@ -445,8 +445,8 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
         where extras = declExtras fix_fn ann_fn non_orph_rules non_orph_insts
                                   non_orph_fis decl
 
-       edges :: [(IfaceDeclABI, Unique, [Unique])]
-       edges = [ (abi, getUnique (getOccName decl), out)
+       edges :: [ Node Unique IfaceDeclABI ]
+       edges = [ DigraphNode abi (getUnique (getOccName decl)) out
                | decl <- new_decls
                , let abi = declABI decl
                , let out = localOccs $ freeNamesDeclABI abi

@@ -1570,7 +1570,7 @@ typecheckLoop dflags hsc_env mods = do
 
 reachableBackwards :: ModuleName -> [ModSummary] -> [ModSummary]
 reachableBackwards mod summaries
-  = [ ms | (ms,_,_) <- reachableG (transposeG graph) root ]
+  = [ node_payload node | node <- reachableG (transposeG graph) root ]
   where -- the rest just sets up the graph:
         (graph, lookup_node) = moduleGraphNodes False summaries
         root  = expectJust "reachableBackwards" (lookup_node HsBootFile mod)
@@ -1618,13 +1618,13 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
                      | otherwise = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
 
-type SummaryNode = (ModSummary, Int, [Int])
+type SummaryNode = Node Int ModSummary
 
 summaryNodeKey :: SummaryNode -> Int
-summaryNodeKey (_, k, _) = k
+summaryNodeKey = node_key
 
 summaryNodeSummary :: SummaryNode -> ModSummary
-summaryNodeSummary (s, _, _) = s
+summaryNodeSummary = node_payload
 
 moduleGraphNodes :: Bool -> [ModSummary]
   -> (Graph SummaryNode, HscSource -> ModuleName -> Maybe SummaryNode)
@@ -1642,11 +1642,12 @@ moduleGraphNodes drop_hs_boot_nodes summaries =
     node_map :: NodeMap SummaryNode
     node_map = Map.fromList [ ((moduleName (ms_mod s),
                                 hscSourceToIsBoot (ms_hsc_src s)), node)
-                            | node@(s, _, _) <- nodes ]
+                            | node <- nodes
+                            , let s = summaryNodeSummary node ]
 
     -- We use integers as the keys for the SCC algorithm
     nodes :: [SummaryNode]
-    nodes = [ (s, key, out_keys)
+    nodes = [ DigraphNode s key out_keys
             | (s, key) <- numbered_summaries
              -- Drop the hi-boot ones if told to do so
             , not (isBootSummary s && drop_hs_boot_nodes)
@@ -2212,7 +2213,7 @@ cyclicModuleErr mss
                          , nest 2 (show_path path) ]
   where
     graph :: [Node NodeKey ModSummary]
-    graph = [(ms, msKey ms, get_deps ms) | ms <- mss]
+    graph = [ DigraphNode ms (msKey ms) (get_deps ms) | ms <- mss]
 
     get_deps :: ModSummary -> [NodeKey]
     get_deps ms = ([ (unLoc m, IsBoot)  | m <- ms_home_srcimps ms ] ++
