@@ -193,8 +193,6 @@ GhcWithNativeCodeGen := $(strip\
     $(if $(filter YESYESNO,\
 		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
 
-HaveLibDL = @HaveLibDL@
-
 # ArchSupportsSMP should be set iff there is support for that arch in
 # includes/stg/SMP.h
 ifeq "$(TargetArch_CPP)" "arm"
