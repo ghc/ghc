@@ -1816,15 +1816,15 @@ dropDerivedInsols insols = filterBag keep insols
       | otherwise      = True
 
 isDroppableDerivedLoc :: CtLoc -> Bool
--- Note [Dropping derived constraints]
+-- See Note [Dropping derived constraints]
 isDroppableDerivedLoc loc
   = case ctLocOrigin loc of
       HoleOrigin {}    -> False
       KindEqOrigin {}  -> False
       GivenOrigin {}   -> False
 
-      -- See Note [Dropping derived constraints
-      -- For fundeps, drop wanted/warnted interactions
+      -- See Note [Dropping derived constraints]
+      -- For fundeps, drop wanted/wanted interactions
       FunDepOrigin2 {} -> False
       FunDepOrigin1 _ loc1 _ loc2
         | isGivenLoc loc1 || isGivenLoc loc2 -> False
@@ -1861,8 +1861,8 @@ see dropDerivedWC.  For example
 
 But (tiresomely) we do keep *some* Derived insolubles:
 
- * Type holes are derived constraints because they have no evidence
-   and we want to keep them so we get the error report
+ * Type holes are derived constraints, because they have no evidence
+   and we want to keep them, so we get the error report
 
  * Insoluble derived equalities (e.g. [D] Int ~ Bool) may arise from
    functional dependency interactions:
@@ -2182,7 +2182,7 @@ trulyInsoluble :: Ct -> Bool
 --   a) type holes, arising from PartialTypeSignatures,
 --   b) "true" expression holes arising from TypedHoles
 --
--- A "expression hole" or "type hole" constraint isn't really an error
+-- An "expression hole" or "type hole" constraint isn't really an error
 -- at all; it's a report saying "_ :: Int" here.  But an out-of-scope
 -- variable masquerading as expression holes IS treated as truly
 -- insoluble, so that it trumps other errors during error reporting.

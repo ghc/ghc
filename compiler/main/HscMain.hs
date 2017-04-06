@@ -344,7 +344,7 @@ hscParse' mod_summary
             -- that the parser gave us,
             --   - eliminate files beginning with '<'.  gcc likes to use
             --     pseudo-filenames like "<built-in>" and "<command-line>"
-            --   - normalise them (elimiante differences between ./f and f)
+            --   - normalise them (eliminate differences between ./f and f)
             --   - filter out the preprocessed source file
             --   - filter out anything beginning with tmpdir
             --   - remove duplicates

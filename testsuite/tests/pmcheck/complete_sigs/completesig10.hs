@@ -20,7 +20,7 @@ m2 :: T -> ()
 m2 B = ()
 m2 D = ()
 
--- Redudant incomplete overlap
+-- Redundant incomplete overlap
 m3 :: T -> ()
 m3 B = ()
 m3 C = ()

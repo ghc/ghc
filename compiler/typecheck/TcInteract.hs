@@ -1077,7 +1077,7 @@ f2 :: (?x :: Int, ?x :: Char) => Int
 f2 = ?x
 
 Both of these are actually wrong:  when we try to use either one,
-we'll get two incompatible wnated constraints (?x :: Int, ?x :: Char),
+we'll get two incompatible wanted constraints (?x :: Int, ?x :: Char),
 which would lead to an error.
 
 I can think of two ways to fix this:

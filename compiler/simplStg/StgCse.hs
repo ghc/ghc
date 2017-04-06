@@ -392,7 +392,7 @@ mkStgLet stgLet (Just binds) body = stgLet binds body
 {-
 Note [Trivial case scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We wnat to be able to handle nested reconstruction of constructors as in
+We want to be able to handle nested reconstruction of constructors as in
 
     nested :: Either Int (Either Int a) -> Either Bool (Either Bool a)
     nested (Right (Right v)) = Right (Right v)

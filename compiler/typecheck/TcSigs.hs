@@ -754,7 +754,7 @@ tcImpPrags prags
     -- Ignore SPECIALISE pragmas for imported things
     -- when we aren't specialising, or when we aren't generating
     -- code.  The latter happens when Haddocking the base library;
-    -- we don't wnat complaints about lack of INLINABLE pragmas
+    -- we don't want complaints about lack of INLINABLE pragmas
     not_specialising dflags
       | not (gopt Opt_Specialise dflags) = True
       | otherwise = case hscTarget dflags of

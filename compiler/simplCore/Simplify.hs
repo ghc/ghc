@@ -2408,7 +2408,7 @@ then we'd like to transform
 Nota Bene: we used to have a built-in rule for 'seq' that dropped
 casts, so that
     case (x |> co) of { _ -> blah }
-dropped the cast; in order to imporove the chances of trySeqRules
+dropped the cast; in order to improve the chances of trySeqRules
 firing.  But that works in the /opposite/ direction to Note [Improving
 seq] so there's a danger of flip/flopping.  Better to make trySeqRules
 insensitive to the cast, which is now is.

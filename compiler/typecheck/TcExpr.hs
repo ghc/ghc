@@ -1538,7 +1538,7 @@ tcExprSig expr sig@(PartialSig { psig_name = name, sig_loc = loc })
              my_sigma       = mkForAllTys binders (mkPhiTy  my_theta tau)
        ; wrap <- if inferred_sigma `eqType` my_sigma -- NB: eqType ignores vis.
                  then return idHsWrapper  -- Fast path; also avoids complaint when we infer
-                                          -- an ambiguouse type and have AllowAmbiguousType
+                                          -- an ambiguous type and have AllowAmbiguousType
                                           -- e..g infer  x :: forall a. F a -> Int
                  else tcSubType_NC ExprSigCtxt inferred_sigma my_sigma
 

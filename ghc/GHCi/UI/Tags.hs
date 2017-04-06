@@ -143,12 +143,12 @@ writeTagsSafely file str = do
         else writeFile file str
 
 collateAndWriteTags :: TagsKind -> FilePath -> [TagInfo] -> IO (Either IOError ())
--- ctags style with the Ex exresion being just the line number, Vim et al
+-- ctags style with the Ex expression being just the line number, Vim et al
 collateAndWriteTags CTagsWithLineNumbers file tagInfos = do
   let tags = unlines $ sort $ map showCTag tagInfos
   tryIO (writeTagsSafely file tags)
 
--- ctags style with the Ex exresion being a regex searching the line, Vim et al
+-- ctags style with the Ex expression being a regex searching the line, Vim et al
 collateAndWriteTags CTagsWithRegExes file tagInfos = do -- ctags style, Vim et al
   tagInfoGroups <- makeTagGroupsWithSrcInfo tagInfos
   let tags = unlines $ sort $ map showCTag $concat tagInfoGroups

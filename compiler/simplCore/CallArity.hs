@@ -409,7 +409,7 @@ Call Arity considers everything that is not cheap (`exprIsCheap`) as a thunk.
 Note [Call Arity and Join Points]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The Call Arity analysis does not care about joint points, and treats them just
+The Call Arity analysis does not care about join points, and treats them just
 like normal functions. This is ok.
 
 The analysis *could* make use of the fact that join points are always evaluated
@@ -420,7 +420,7 @@ This *might* be more efficient (for example, join points would not have to be
 considered interesting variables), but it would also add redundant code. So for
 now we do not do that.
 
-The simplifier never eta-expands join points (it insteads pushes extra arguments from
+The simplifier never eta-expands join points (it instead pushes extra arguments from
 an eta-expanded context into the join point’s RHS), so the call arity
 annotation on join points is not actually used. As it would be equally valid
 (though less efficient) to eta-expand join points, this is the simplifier's

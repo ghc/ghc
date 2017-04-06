@@ -8,7 +8,7 @@ unId False (Just (Id x)) = (Just x)
 unId False Nothing = Nothing
 {-# NOINLINE unId #-}
 
-val n = trace "evalued once, as it should" (Just (Id n))
+val n = trace "evaluated once, as it should" (Just (Id n))
 {-# NOINLINE val #-}
 
 foo b n = unId b (val n)

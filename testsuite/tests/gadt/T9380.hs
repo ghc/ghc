@@ -63,6 +63,6 @@ test2 =
       V1a{} -> putStrLn "test2 - O_o"
 
 main = do
-  test0 -- no ouput at all
+  test0 -- no output at all
   test1 -- A
   test2 -- O_o

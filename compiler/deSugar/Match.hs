@@ -159,7 +159,7 @@ corresponds roughly to @matchVarCon@.
 
 Note [Match Ids]
 ~~~~~~~~~~~~~~~~
-Most of the matching fuctions take an Id or [Id] as argument.  This Id
+Most of the matching functions take an Id or [Id] as argument.  This Id
 is the scrutinee(s) of the match. The desugared expression may
 sometimes use that Id in a local binding or as a case binder.  So it
 should not have an External name; Lint rejects non-top-level binders

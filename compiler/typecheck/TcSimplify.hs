@@ -787,7 +787,7 @@ If the monomorphism restriction does not apply, then we quantify as follows:
   Motivation for re-simplification (Trac #7857): imagine we have a
   constraint (C (a->b)), where 'a :: TYPE l1' and 'b :: TYPE l2' are
   not free in the envt, and instance forall (a::*) (b::*). (C a) => C
-  (a -> b) The instance doesnt' match while l1,l2 are polymorphic, but
+  (a -> b) The instance doesn't match while l1,l2 are polymorphic, but
   it will match when we default them to LiftedRep.
 
   This is all very tiresome.
@@ -901,7 +901,7 @@ defaultTyVarsAndSimplify :: TcLevel
                          -> [PredType]          -- Assumed zonked
                          -> TcM [PredType]      -- Guaranteed Zonked
 -- Default any tyvar free in the constraints,
--- and re-simplify in case the defaulting allows futher simplification
+-- and re-simplify in case the defaulting allows further simplification
 defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
   | null candidates  -- Common shortcut
   = return []
