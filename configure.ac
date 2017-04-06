@@ -425,12 +425,6 @@ with a cross-compiler.  To cross-compile GHC itself, set TARGET: stage
 GHC.
 ])
 fi
-if test "$CrossCompiling" = "YES"
-then
-  CrossCompilePrefix="${target}-"
-else
-  CrossCompilePrefix=""
-fi
 # Despite its similarity in name to TargetPlatform, TargetPlatformFull is used
 # in calls to subproject configure scripts and thus must be set to the autoconf
 # triple, not the normalized GHC triple that TargetPlatform is set to.
@@ -446,12 +440,21 @@ fi
 # all be taken care of for us if we configured the subprojects using
 # AC_CONFIG_DIR, but unfortunately Cabal needs to be the one to do the
 # configuration.
+#
+# We also use non-canonicalized triple when install stage1 crosscompiler
 if test -z "${target_alias}"
 then
   # --target wasn't given; use result from AC_CANONICAL_TARGET
   TargetPlatformFull="${target}"
 else
   TargetPlatformFull="${target_alias}"
+fi
+if test "$CrossCompiling" = "YES"
+then
+  # Use value passed by user from --target=
+  CrossCompilePrefix="${TargetPlatformFull}-"
+else
+  CrossCompilePrefix=""
 fi
 AC_SUBST(CrossCompiling)
 AC_SUBST(CrossCompilePrefix)
