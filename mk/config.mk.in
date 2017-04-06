@@ -530,11 +530,7 @@ SUPPORTS_THIS_UNIT_ID = @SUPPORTS_THIS_UNIT_ID@
 # needs to know which gcc you're using in order to perform its tests.
 
 GccVersion            = @GccVersion@
-ifeq "$(phase)" "0"
-CrossCompilePrefix    =
-else
 CrossCompilePrefix    = @CrossCompilePrefix@
-endif
 # TargetPlatformFull retains the string passed to configure so we have it in
 # the necessary format to pass to libffi's configure.
 TargetPlatformFull    = @TargetPlatformFull@
