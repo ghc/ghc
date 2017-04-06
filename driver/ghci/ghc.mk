@@ -16,16 +16,16 @@ ifneq "$(Windows_Host)" "YES"
 install: install_driver_ghci
 
 .PHONY: install_driver_ghci
-install_driver_ghci: WRAPPER=$(DESTDIR)$(bindir)/ghci-$(ProjectVersion)
+install_driver_ghci: WRAPPER=$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghci-$(ProjectVersion)
 install_driver_ghci:
 	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
 	$(call removeFiles,                                "$(WRAPPER)")
 	$(CREATE_SCRIPT)                                   "$(WRAPPER)"
 	echo '#!$(SHELL)'                               >> "$(WRAPPER)"
-	echo 'exec "$(bindir)/ghc-$(ProjectVersion)" --interactive "$$@"' >> "$(WRAPPER)"
+	echo 'exec "$(bindir)/$(CrossCompilePrefix)ghc-$(ProjectVersion)" --interactive "$$@"' >> "$(WRAPPER)"
 	$(EXECUTABLE_FILE)                                 "$(WRAPPER)"
-	$(call removeFiles,"$(DESTDIR)$(bindir)/ghci")
-	$(LN_S) ghci-$(ProjectVersion) "$(DESTDIR)$(bindir)/ghci"
+	$(call removeFiles,"$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghci")
+	$(LN_S) $(CrossCompilePrefix)ghci-$(ProjectVersion) "$(DESTDIR)$(bindir)/$(CrossCompilePrefix)ghci"
 
 else # Windows_Host...
 
