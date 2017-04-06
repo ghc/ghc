@@ -62,14 +62,15 @@ test('T1969',
                                  # 2013-02-10 5030080 (x86/Windows)
                                  # 2013-11-13 7295012 (x86/Windows, 64bit machine)
                                  # 2014-04-24 5719436 (x86/Windows, 64bit machine)
-           (wordsize(32), 9261052, 1),
+           (wordsize(32), 9418680, 1),
              #            6707308 (x86/OS X)
              # 2009-12-31 6149572 (x86/Linux)
              # 2014-01-22 6429864 (x86/Linux)
              # 2014-06-29 5949188 (x86/Linux)
-             # 2015-07-11 6241108 (x86/Linux, 64bit machine) use +RTS -G1
-             # 2016-04-06 9093608 (x86/Linux, 64bit machine)
+             # 2015-07-11 6241108 (x86/Linux, 64-bit machine) use +RTS -G1
+             # 2016-04-06 9093608 (x86/Linux, 64-bit machine)
              # 2017-03-24 9261052 (x86/Linux, 64-bit machine)
+             # 2017-04-06 9418680 (x86/Linux, 64-bit machine)
 
            (wordsize(64), 16679176, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
@@ -293,12 +294,13 @@ test('T4801',
 
 test('T3064',
      [compiler_stats_num_field('peak_megabytes_allocated',# Note [residency]
-          [(wordsize(32), 28, 20),
+          [(wordsize(32), 36, 20),
             # expected value: 14 (x86/Linux 28-06-2012):
             # 2013-11-13:     18 (x86/Windows, 64bit machine)
             # 2014-01-22:     23 (x86/Linux)
             # 2014-12-22:     23 (x86/Linux) death to silent superclasses
             # 2015-07-11:     28 (x86/Linux, 64-bit machine) use +RTS -G1
+            # 2017-04-06:     36 (x86/Linux, 64-bit machine) it's unclear
 
            (wordsize(64), 66, 20)]),
             # (amd64/Linux):            18
