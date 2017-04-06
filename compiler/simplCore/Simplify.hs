@@ -974,7 +974,7 @@ might do the same again.
 
 simplExpr :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 simplExpr env (Type ty)
-  = do { ty' <- simplType env ty
+  = do { ty' <- simplType env ty  -- See Note [Avoiding space leaks in OutType]
        ; return (Type ty') }
 
 simplExpr env expr
@@ -1031,14 +1031,24 @@ simplExprF1 env (Tick t expr)  cont = simplTick env t expr cont
 simplExprF1 env (Cast body co) cont = simplCast env body co cont
 simplExprF1 env (Coercion co)  cont = simplCoercionF env co cont
 
-
 simplExprF1 env (App fun arg) cont
-  = simplExprF env fun $
-    case arg of
-      Type ty -> ApplyToTy  { sc_arg_ty  = substTy env ty
-                            , sc_hole_ty = substTy env (exprType fun)
-                            , sc_cont    = cont }
-      _       -> ApplyToVal { sc_arg = arg, sc_env = env
+  = case arg of
+      Type ty -> do { -- The argument type will (almost) certainly be used
+                      -- in the output program, so just force it now.
+                      -- See Note [Avoiding space leaks in OutType]
+                      arg' <- simplType env ty
+
+                      -- But use substTy, not simplType, to avoid forcing
+                      -- the hole type; it will likely not be needed.
+                      -- See Note [The hole type in ApplyToTy]
+                    ; let hole' = substTy env (exprType fun)
+
+                    ; simplExprF env fun $
+                      ApplyToTy { sc_arg_ty  = arg'
+                                , sc_hole_ty = hole'
+                                , sc_cont    = cont } }
+      _       -> simplExprF env fun $
+                 ApplyToVal { sc_arg = arg, sc_env = env
                             , sc_dup = NoDup, sc_cont = cont }
 
 simplExprF1 env expr@(Lam {}) cont
@@ -1080,6 +1090,50 @@ simplExprF1 env (Let (NonRec bndr rhs) body) cont
   | otherwise
   = simplNonRecE env bndr (rhs, env) ([], body) cont
 
+{- Note [Avoiding space leaks in OutType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Since the simplifier is run for multiple iterations, we need to ensure
+that any thunks in the output of one simplifier iteration are forced
+by the evaluation of the next simplifier iteration. Otherwise we may
+retain multiple copies of the Core program and leak a terrible amount
+of memory (as in #13426).
+
+The simplifier is naturally strict in the entire "Expr part" of the
+input Core program, because any expression may contain binders, which
+we must find in order to extend the SimplEnv accordingly. But types
+do not contain binders and so it is tempting to write things like
+
+    simplExpr env (Type ty) = return (Type (substTy env ty))   -- Bad!
+
+This is Bad because the result includes a thunk (substTy env ty) which
+retains a reference to the whole simplifier environment; and the next
+simplifier iteration will not force this thunk either, because the
+line above is not strict in ty.
+
+So instead our strategy is for the simplifier to fully evaluate
+OutTypes when it emits them into the output Core program, for example
+
+    simplExpr env (Type ty) = do { ty' <- simplType env ty     -- Good
+                                 ; return (Type ty') }
+
+where the only difference from above is that simplType calls seqType
+on the result of substTy.
+
+However, SimplCont can also contain OutTypes and it's not necessarily
+a good idea to force types on the way in to SimplCont, because they
+may end up not being used and forcing them could be a lot of wasted
+work. T5631 is a good example of this.
+
+- For ApplyToTy's sc_arg_ty, we force the type on the way in because
+  the type will almost certainly appear as a type argument in the
+  output program.
+
+- For the hole types in Stop and ApplyToTy, we force the type when we
+  emit it into the output program, after obtaining it from
+  contResultType. (The hole type in ApplyToTy is only directly used
+  to form the result type in a new Stop continuation.)
+-}
+
 ---------------------------------
 -- Simplify a join point, adding the context.
 -- Context goes *inside* the lambdas. IOW, if the join point has arity n, we do:
@@ -1101,6 +1155,7 @@ simplJoinRhs env bndr expr cont
 ---------------------------------
 simplType :: SimplEnv -> InType -> SimplM OutType
         -- Kept monadic just so we can do the seqType
+        -- See Note [Avoiding space leaks in OutType]
 simplType env ty
   = -- pprTrace "simplType" (ppr ty $$ ppr (seTvSubst env)) $
     seqType new_ty `seq` return new_ty
@@ -1659,8 +1714,11 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
   -- the continuation, leaving just the bottoming expression.  But the
   -- type might not be right, so we may have to add a coerce.
   | not (contIsTrivial cont)     -- Only do this if there is a non-trivial
-  = return (env, castBottomExpr res cont_ty)  -- continuation to discard, else we do it
-  where                                       -- again and again!
+                                 -- continuation to discard, else we do it
+                                 -- again and again!
+  = seqType cont_ty `seq`        -- See Note [Avoiding space leaks in OutType]
+    return (env, castBottomExpr res cont_ty)
+  where
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
@@ -2251,8 +2309,7 @@ reallyRebuildCase env scrut case_bndr alts cont
 
         ; dflags <- getDynFlags
         ; let alts_ty' = contResultType dup_cont
-        -- The seqType below is needed to avoid a space leak (#13426)
-        -- but I don't know why.
+        -- See Note [Avoiding space leaks in OutType]
         ; case_expr <- seqType alts_ty' `seq`
                        mkCase dflags scrut' case_bndr' alts_ty' alts'
 
@@ -2637,7 +2694,9 @@ missingAlt :: SimplEnv -> Id -> [InAlt] -> SimplCont -> SimplM (SimplEnv, OutExp
                 -- inaccessible.  So we simply put an error case here instead.
 missingAlt env case_bndr _ cont
   = WARN( True, text "missingAlt" <+> ppr case_bndr )
-    return (env, mkImpossibleExpr (contResultType cont))
+    -- See Note [Avoiding space leaks in OutType]
+    let cont_ty = contResultType cont
+    in seqType cont_ty `seq` return (env, mkImpossibleExpr cont_ty)
 
 {-
 ************************************************************************
