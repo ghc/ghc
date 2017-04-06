@@ -607,6 +607,12 @@ tcExpr (HsProc pat cmd) res_ty
 
 -- Typechecks the static form and wraps it with a call to 'fromStaticPtr'.
 -- See Note [Grand plan for static forms] in StaticPtrTable for an overview.
+-- To type check
+--      (static e) :: p a
+-- we want to check (e :: a),
+-- and wrap (static e) in a call to
+--    fromStaticPtr :: IsStatic p => StaticPtr a -> p a
+
 tcExpr (HsStatic fvs expr) res_ty
   = do  { res_ty          <- expTypeToType res_ty
         ; (co, (p_ty, expr_ty)) <- matchExpectedAppTy res_ty
@@ -615,6 +621,7 @@ tcExpr (HsStatic fvs expr) res_ty
                              2 (ppr expr)
                        ) $
             tcPolyExprNC expr expr_ty
+
         -- Check that the free variables of the static form are closed.
         -- It's OK to use nonDetEltsUniqSet here as the only side effects of
         -- checkClosedInStaticForm are error messages.
@@ -628,6 +635,7 @@ tcExpr (HsStatic fvs expr) res_ty
         ; _ <- emitWantedEvVar StaticOrigin $
                   mkTyConApp (classTyCon typeableClass)
                              [liftedTypeKind, expr_ty]
+
         -- Insert the constraints of the static form in a global list for later
         -- validation.
         ; emitStaticConstraints lie
