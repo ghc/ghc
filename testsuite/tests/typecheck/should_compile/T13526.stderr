@@ -1,0 +1,7 @@
+
+T13526.hs:21:8: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
+    • The constraint ‘C (Maybe a)’ matches an instance declaration
+      instance C a => C (Maybe a) -- Defined at T13526.hs:14:10
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • In the type signature: bar :: C (Maybe a) => a -> Maybe a

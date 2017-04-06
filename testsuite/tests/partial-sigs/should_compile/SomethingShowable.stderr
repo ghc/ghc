@@ -7,7 +7,9 @@ Dependent packages: [base-4.10.0.0, ghc-prim-0.5.0.0,
                      integer-gmp-1.0.0.1]
 
 SomethingShowable.hs:5:1: warning: [-Wsimplifiable-class-constraints (in -Wdefault)]
-    The constraint ‘Show Bool’ matches an instance declaration
-    instance Show Bool -- Defined in ‘GHC.Show’
-    This makes type inference for inner bindings fragile;
-      either use MonoLocalBinds, or simplify it using the instance
+    • The constraint ‘Show Bool’ matches an instance declaration
+      instance Show Bool -- Defined in ‘GHC.Show’
+      This makes type inference for inner bindings fragile;
+        either use MonoLocalBinds, or simplify it using the instance
+    • When checking the inferred type
+        somethingShowable :: Show Bool => Bool -> String
