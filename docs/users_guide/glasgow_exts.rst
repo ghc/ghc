@@ -12453,8 +12453,8 @@ Certain pragmas are *file-header pragmas*:
 
 .. _language-pragma:
 
-LANGUAGE pragma
----------------
+``LANGUAGE`` pragma
+-------------------
 
 .. index::
    single: LANGUAGE; pragma
@@ -12491,7 +12491,7 @@ are not supported.
 
 .. index::
    single: OPTIONS_GHC
-   single: pragma; ``OPTIONS_GHC``
+   single: pragma; OPTIONS_GHC
 
 The ``OPTIONS_GHC`` pragma is used to specify additional options that
 are given to the compiler when compiling this source file. See
@@ -12566,8 +12566,8 @@ You can suppress the warnings with the flag
 
 .. _minimal-pragma:
 
-MINIMAL pragma
---------------
+``MINIMAL`` pragma
+------------------
 
 .. index::
    single: MINIMAL
@@ -12611,19 +12611,19 @@ This warning can be turned off with the flag
 
 .. _inline-noinline-pragma:
 
-INLINE and NOINLINE pragmas
----------------------------
+``INLINE`` and ``NOINLINE`` pragmas
+-----------------------------------
 
 These pragmas control the inlining of function definitions.
 
 .. _inline-pragma:
 
-INLINE pragma
-~~~~~~~~~~~~~
+``INLINE`` pragma
+~~~~~~~~~~~~~~~~~
 
 .. index::
    single: INLINE
-   single: pragma; ``INLINE``
+   single: pragma; INLINE
 
 GHC (with :ghc-flag:`-O`, as always) tries to inline (or "unfold")
 functions/values that are "small enough," thus avoiding the call
@@ -12689,7 +12689,7 @@ has a number of other effects:
 -  It is useful for GHC to optimise the definition of an INLINE function
    ``f`` just like any other non-INLINE function, in case the
    non-inlined version of ``f`` is ultimately called. But we don't want
-   to inline the *optimised* version of ``f``; a major reason for INLINE
+   to inline the *optimised* version of ``f``; a major reason for ``INLINE``
    pragmas is to expose functions in ``f``\'s RHS that have rewrite
    rules, and it's no good if those functions have been optimised away.
 
@@ -12707,11 +12707,11 @@ GHC ensures that inlining cannot go on forever: every mutually-recursive
 group is cut by one or more *loop breakers* that is never inlined (see
 `Secrets of the GHC inliner, JFP 12(4) July
 2002 <http://research.microsoft.com/%7Esimonpj/Papers/inlining/index.htm>`__).
-GHC tries not to select a function with an INLINE pragma as a loop
+GHC tries not to select a function with an ``INLINE`` pragma as a loop
 breaker, but when there is no choice even an INLINE function can be
-selected, in which case the INLINE pragma is ignored. For example, for a
+selected, in which case the ``INLINE`` pragma is ignored. For example, for a
 self-recursive function, the loop breaker can only be the function
-itself, so an INLINE pragma is always ignored.
+itself, so an ``INLINE`` pragma is always ignored.
 
 Syntactically, an ``INLINE`` pragma for a function can be put anywhere
 its type signature could be put.
@@ -12728,8 +12728,8 @@ See also the ``NOINLINE`` (:ref:`noinline-pragma`) and ``INLINABLE``
 
 .. _inlinable-pragma:
 
-INLINABLE pragma
-~~~~~~~~~~~~~~~~
+``INLINABLE`` pragma
+~~~~~~~~~~~~~~~~~~~~
 
 An ``{-# INLINABLE f #-}`` pragma on a function ``f`` has the following
 behaviour:
@@ -12766,8 +12766,8 @@ The alternative spelling ``INLINEABLE`` is also accepted by GHC.
 
 .. _noinline-pragma:
 
-NOINLINE pragma
-~~~~~~~~~~~~~~~
+``NOINLINE`` pragma
+~~~~~~~~~~~~~~~~~~~
 
 .. index::
    single: NOINLINE
@@ -12783,13 +12783,13 @@ used if you want your code to be portable).
 
 .. _conlike-pragma:
 
-CONLIKE modifier
-~~~~~~~~~~~~~~~~
+``CONLIKE`` modifier
+~~~~~~~~~~~~~~~~~~~~
 
 .. index::
    single: CONLIKE
 
-An INLINE or NOINLINE pragma may have a CONLIKE modifier, which affects
+An ``INLINE`` or ``NOINLINE`` pragma may have a ``CONLIKE`` modifier, which affects
 matching in RULEs (only). See :ref:`conlike`.
 
 .. _phase-control:
@@ -12797,12 +12797,12 @@ matching in RULEs (only). See :ref:`conlike`.
 Phase control
 ~~~~~~~~~~~~~
 
-Sometimes you want to control exactly when in GHC's pipeline the INLINE
+Sometimes you want to control exactly when in GHC's pipeline the ``INLINE``
 pragma is switched on. Inlining happens only during runs of the
 *simplifier*. Each run of the simplifier has a different *phase number*;
 the phase number decreases towards zero. If you use
 ``-dverbose-core2core`` you'll see the sequence of phase numbers for
-successive runs of the simplifier. In an INLINE pragma you can
+successive runs of the simplifier. In an ``INLINE`` pragma you can
 optionally specify a phase number, thus:
 
 -  "``INLINE[k] f``" means: do not inline ``f`` until phase ``k``, but
@@ -12835,10 +12835,10 @@ By "Maybe" we mean that the usual heuristic inlining rules apply (if the
 function body is small, or it is applied to interesting-looking
 arguments etc). Another way to understand the semantics is this:
 
--  For both INLINE and NOINLINE, the phase number says when inlining is
+-  For both ``INLINE`` and ``NOINLINE``, the phase number says when inlining is
    allowed at all.
 
--  The INLINE pragma has the additional effect of making the function
+-  The ``INLINE`` pragma has the additional effect of making the function
    body look small, so that when inlining is allowed it is very likely
    to happen.
 
@@ -12972,7 +12972,7 @@ specialise it as follows:
    specialisation is done too early, the optimisation rules might fail
    to fire.
 
--  The type in a SPECIALIZE pragma can be any type that is less
+-  The type in a ``SPECIALIZE`` pragma can be any type that is less
    polymorphic than the type of the original function. In concrete
    terms, if the original function is ``f`` then the pragma
 
@@ -13343,7 +13343,7 @@ From a syntactic point of view:
    semicolons (which may be generated by the layout rule).
 
 -  The layout rule applies in a pragma. Currently no new indentation
-   level is set, so if you put several rules in single RULES pragma and
+   level is set, so if you put several rules in single ``RULES`` pragma and
    wish to use layout to separate them, you must lay out the starting in
    the same column as the enclosing definitions. ::
 
@@ -13415,7 +13415,7 @@ From a syntactic point of view:
    extension :ghc-flag:`-XScopedTypeVariables` is automatically enabled; see
    :ref:`scoped-type-variables`.
 
--  Like other pragmas, RULE pragmas are always checked for scope errors,
+-  Like other pragmas, ``RULE`` pragmas are always checked for scope errors,
    and are typechecked. Typechecking means that the LHS and RHS of a
    rule are typechecked, and must have the same type. However, rules are
    only *enabled* if the :ghc-flag:`-fenable-rewrite-rules` flag is on (see
@@ -13508,16 +13508,16 @@ Now ``g`` is inlined into ``h``, but ``f``\'s RULE has no chance to fire.
 If instead GHC had first inlined ``g`` into ``h`` then there would have
 been a better chance that ``f``\'s RULE might fire.
 
-The way to get predictable behaviour is to use a NOINLINE pragma, or an
-INLINE[⟨phase⟩] pragma, on ``f``, to ensure that it is not inlined until
+The way to get predictable behaviour is to use a ``NOINLINE`` pragma, or an
+``INLINE[⟨phase⟩]`` pragma, on ``f``, to ensure that it is not inlined until
 its RULEs have had a chance to fire. The warning flag
 :ghc-flag:`-Winline-rule-shadowing` (see :ref:`options-sanity`) warns about
 this situation.
 
 .. _conlike:
 
-How rules interact with CONLIKE pragmas
----------------------------------------
+How rules interact with ``CONLIKE`` pragmas
+-------------------------------------------
 
 GHC is very cautious about duplicating work. For example, consider ::
 
@@ -13532,7 +13532,7 @@ would be duplicated if the rule fired.
 Sometimes, however, this approach is over-cautious, and we *do* want the
 rule to fire, even though doing so would duplicate redex. There is no
 way that GHC can work out when this is a good idea, so we provide the
-CONLIKE pragma to declare it, thus: ::
+``CONLIKE`` pragma to declare it, thus: ::
 
     {-# INLINE CONLIKE [1] f #-}
     f x = blah
@@ -13542,7 +13542,7 @@ an application of ``f`` to one argument (in general, the number of arguments
 to the left of the ``=`` sign) should be considered cheap enough to
 duplicate, if such a duplication would make rule fire. (The name
 "CONLIKE" is short for "constructor-like", because constructors
-certainly have such a property.) The CONLIKE pragma is a modifier to
+certainly have such a property.) The ``CONLIKE`` pragma is a modifier to
 INLINE/NOINLINE because it really only makes sense to match ``f`` on the
 LHS of a rule if you are sure that ``f`` is not going to be inlined
 before the rule has a chance to fire.
