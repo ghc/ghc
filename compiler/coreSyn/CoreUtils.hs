@@ -1279,7 +1279,7 @@ it's applied only to dictionaries.
 --    exprOkForSpeculation implies exprOkForSideEffects
 --
 -- See Note [PrimOp can_fail and has_side_effects] in PrimOp
--- and Note [Implementation: how can_fail/has_side_effects affect transformations]
+-- and Note [Transformations affected by can_fail and has_side_effects]
 --
 -- As an example of the considerations in this test, consider:
 --
