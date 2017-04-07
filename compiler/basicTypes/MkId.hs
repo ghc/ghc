@@ -1173,7 +1173,6 @@ seqId = pcMiscPrelId seqName ty info
   where
     info = noCafIdInfo `setInlinePragInfo` inline_prag
                        `setUnfoldingInfo`  mkCompulsoryUnfolding rhs
-                       `setRuleInfo`       mkRuleInfo [seq_cast_rule]
                        `setNeverLevPoly`   ty
 
     inline_prag
@@ -1189,28 +1188,6 @@ seqId = pcMiscPrelId seqName ty info
 
     [x,y] = mkTemplateLocals [alphaTy, betaTy]
     rhs = mkLams [alphaTyVar,betaTyVar,x,y] (Case (Var x) x betaTy [(DEFAULT, [], Var y)])
-
-    -- See Note [Built-in RULES for seq]
-    -- NB: ru_nargs = 3, not 4, to match the code in
-    --     Simplify.rebuildCase which tries to apply this rule
-    seq_cast_rule = BuiltinRule { ru_name  = fsLit "seq of cast"
-                                , ru_fn    = seqName
-                                , ru_nargs = 3
-                                , ru_try   = match_seq_of_cast }
-
-match_seq_of_cast :: RuleFun
-    -- See Note [Built-in RULES for seq]
-match_seq_of_cast _ _ _ [Type _, Type res_ty, Cast scrut co]
-  = Just (fun `App` scrut)
-  where
-    fun      = Lam x $ Lam y $
-               Case (Var x) x res_ty [(DEFAULT,[],Var y)]
-               -- Generate a Case directly, not a call to seq, which
-               -- might be ill-kinded if res_ty is unboxed
-    [x,y]    = mkTemplateLocals [scrut_ty, res_ty]
-    scrut_ty = pFst (coercionKind co)
-
-match_seq_of_cast _ _ _ _ = Nothing
 
 ------------------------------------------------
 lazyId :: Id    -- See Note [lazyId magic]
@@ -1356,7 +1333,7 @@ enough support that you can do this using a rewrite rule:
 
 You write that rule.  When GHC sees a case expression that discards
 its result, it mentally transforms it to a call to 'seq' and looks for
-a RULE.  (This is done in Simplify.rebuildCase.)  As usual, the
+a RULE.  (This is done in Simplify.trySeqRules.)  As usual, the
 correctness of the rule is up to you.
 
 VERY IMPORTANT: to make this work, we give the RULE an arity of 1, not 2.
@@ -1370,21 +1347,6 @@ with rule arity 2, then two bad things would happen:
 
   - The code in Simplify.rebuildCase would need to actually supply
     the value argument, which turns out to be awkward.
-
-Note [Built-in RULES for seq]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We also have the following built-in rule for seq
-
-  seq (x `cast` co) y = seq x y
-
-This eliminates unnecessary casts and also allows other seq rules to
-match more often.  Notably,
-
-   seq (f x `cast` co) y  -->  seq (f x) y
-
-and now a user-defined rule for seq (see Note [User-defined RULES for seq])
-may fire.
-
 
 Note [lazyId magic]
 ~~~~~~~~~~~~~~~~~~~
