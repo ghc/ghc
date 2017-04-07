@@ -106,7 +106,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                         rule_ty : map idType tpl_ids
        ; gbls  <- tcGetGlobalTyCoVars -- Even though top level, there might be top-level
                                       -- monomorphic bindings from the MR; test tc111
-       ; qtkvs <- quantifyZonkedTyVars gbls forall_tkvs
+       ; qtkvs <- quantifyTyVars gbls forall_tkvs
        ; traceTc "tcRule" (vcat [ pprFullRuleName name
                                 , ppr forall_tkvs
                                 , ppr qtkvs

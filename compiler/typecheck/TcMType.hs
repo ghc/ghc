@@ -74,7 +74,7 @@ module TcMType (
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
   zonkQuantifiedTyVar, defaultTyVar,
-  quantifyTyVars, quantifyZonkedTyVars,
+  quantifyTyVars,
   zonkTcTyCoVarBndr, zonkTcTyVarBinder,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
@@ -907,24 +907,17 @@ For more information about deterministic sets see
 Note [Deterministic UniqFM] in UniqDFM.
 -}
 
-quantifyTyVars, quantifyZonkedTyVars
-  :: TcTyCoVarSet     -- global tvs
+quantifyTyVars
+  :: TcTyCoVarSet     -- Global tvs; already zonked
   -> CandidatesQTvs   -- See Note [Dependent type variables] in TcType
+                      -- Already zonked
   -> TcM [TcTyVar]
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
 
--- The zonked variant assumes everything is already zonked.
-
-quantifyTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { dep_tkvs    <- zonkTyCoVarsAndFVDSet dep_tkvs
-       ; nondep_tkvs <- zonkTyCoVarsAndFVDSet nondep_tkvs
-       ; gbl_tvs     <- zonkTyCoVarsAndFV gbl_tvs
-       ; quantifyZonkedTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs }) }
-
-quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { traceTc "quantifyZonkedTyVars" (vcat [ppr dvs, ppr gbl_tvs])
+quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
+  = do { traceTc "quantifyTyVars" (vcat [ppr dvs, ppr gbl_tvs])
        ; let all_cvs = filterVarSet isCoVar $ dVarSetToVarSet dep_tkvs
              dep_kvs = dVarSetElemsWellScoped $
                        dep_tkvs `dVarSetMinusVarSet` gbl_tvs
@@ -960,7 +953,7 @@ quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
            -- mentioned in the kinds of the nondep_tvs'
            -- now refer to the dep_kvs'
 
-       ; traceTc "quantifyZonkedTyVars"
+       ; traceTc "quantifyTyVars"
            (vcat [ text "globals:" <+> ppr gbl_tvs
                  , text "nondep:"  <+> pprTyVars nondep_tvs
                  , text "dep:"     <+> pprTyVars dep_kvs
@@ -1300,13 +1293,6 @@ zonkTyCoVarsAndFV tycovars =
 zonkTyCoVarsAndFVList :: [TyCoVar] -> TcM [TyCoVar]
 zonkTyCoVarsAndFVList tycovars =
   tyCoVarsOfTypesList <$> mapM zonkTyCoVar tycovars
-
--- Takes a deterministic set of TyCoVars, zonks them and returns a
--- deterministic set of their free variables.
--- See Note [quantifyTyVars determinism].
-zonkTyCoVarsAndFVDSet :: DTyCoVarSet -> TcM DTyCoVarSet
-zonkTyCoVarsAndFVDSet tycovars =
-  tyCoVarsOfTypesDSet <$> mapM zonkTyCoVar (dVarSetElems tycovars)
 
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars

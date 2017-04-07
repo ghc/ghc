@@ -609,8 +609,13 @@ kcConDecl (ConDeclGADT { con_names = names
                        , con_type = ty })
   = addErrCtxt (dataConCtxtName names) $
       do { _ <- tcGadtSigType (ppr names) (unLoc $ head names) ty
+                -- Even though the data constructor's type is closed, we
+                -- still call tcGadtSigType, becuase that influences the
+                -- inferred kind of the /type/ constructor.  Example:
+                --    data T f a where
+                --      MkT :: f a -> T f a
+                -- If we 
          ; return () }
-
 
 {-
 Note [Recursion and promoting data constructors]
@@ -1297,7 +1302,7 @@ tcFamTyPats fam_shape@(name,_,_,_) mb_clsinfo pats kind_checker thing_inside
             -- replace a meta kind var with (Any *)
             -- Very like kindGeneralize
        ; vars  <- zonkTcTypesAndSplitDepVars typats
-       ; qtkvs <- quantifyZonkedTyVars emptyVarSet vars
+       ; qtkvs <- quantifyTyVars emptyVarSet vars
 
        ; MASSERT( isEmptyVarSet $ coVarsOfTypes typats )
            -- This should be the case, because otherwise the solveEqualities
@@ -1463,10 +1468,17 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                       , con_details = hs_details })
   = addErrCtxt (dataConCtxtName [name]) $
     do { traceTc "tcConDecl 1" (ppr name)
+
+       -- Get hold of the existential type variables
+       -- e.g. data T a = forall (b::k) f. MkT a (f b)
+       -- Here tmpl_bndrs = {a}
+       --          hs_kvs = {k}
+       --          hs_tvs = {f,b}
        ; let (hs_kvs, hs_tvs) = case hs_qvars of
                Nothing -> ([], [])
                Just (HsQTvs { hsq_implicit = kvs, hsq_explicit = tvs })
                        -> (kvs, tvs)
+
        ; (imp_tvs, (exp_tvs, ctxt, arg_tys, field_lbls, stricts))
            <- solveEqualities $
               tcImplicitTKBndrs hs_kvs $
@@ -1480,8 +1492,9 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                                      allBoundVariabless arg_tys
                  ; return ((exp_tvs, ctxt, arg_tys, field_lbls, stricts), bound_vars)
                  }
+
+         -- exp_tvs have explicit, user-written binding sites
          -- imp_tvs are user-written kind variables, without an explicit binding site
-         -- exp_tvs have binding sites
          -- the kvs below are those kind variables entirely unmentioned by the user
          --   and discovered only by generalization
 
@@ -1498,7 +1511,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                  -- we're doing this to get the right behavior around removing
                  -- any vars bound in exp_binders.
 
-       ; kvs <- quantifyZonkedTyVars (mkVarSet (binderVars tmpl_bndrs)) vars
+       ; kvs <- quantifyTyVars (mkVarSet (binderVars tmpl_bndrs)) vars
 
              -- Zonk to Types
        ; (ze, qkvs)      <- zonkTyBndrsX emptyZonkEnv kvs
@@ -1542,7 +1555,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                                             mkFunTys ctxt $
                                             mkFunTys arg_tys $
                                             res_ty)
-       ; tkvs <- quantifyZonkedTyVars emptyVarSet vars
+       ; tkvs <- quantifyTyVars emptyVarSet vars
 
              -- Zonk to Types
        ; (ze, qtkvs) <- zonkTyBndrsX emptyZonkEnv (tkvs ++ user_tvs)

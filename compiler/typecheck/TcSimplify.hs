@@ -581,7 +581,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
-       ; qtkvs <- quantifyZonkedTyVars gbl_tvs dep_vars
+       ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds) }
 
@@ -961,7 +961,7 @@ decideQuantifiedTyVars mono_tvs candidates psig_theta name_taus
              pick      = filterDVarSet (`elemVarSet` grown_tvs)
              dvs_plus  = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
-       ; quantifyZonkedTyVars mono_tvs dvs_plus
+       ; quantifyTyVars mono_tvs dvs_plus
           -- We don't grow the kvs, as there's no real need to. Recall
           -- that quantifyTyVars uses the separation between kvs and tvs
           -- only for defaulting, and we don't want (ever) to default a tv
