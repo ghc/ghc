@@ -137,8 +137,8 @@ import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUnivTyVarBinders, dataConExTyVarBinders
                              , DataCon, filterEqSpec )
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
-                          , tyCoVarsOfTypesWellScoped
                           , tyCoVarsOfTypeWellScoped
+                          , tyCoVarsOfTypesWellScoped
                           , coreView, typeKind )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
@@ -2445,7 +2445,7 @@ pprType       = pprPrecType TopPrec
 pprParendType = pprPrecType TyConPrec
 
 pprPrecType :: TyPrec -> Type -> SDoc
-pprPrecType prec ty = pprPrecIfaceType prec (tidyToIfaceType ty)
+pprPrecType prec ty = getPprStyle $ \sty -> pprPrecIfaceType prec (tidyToIfaceTypeSty ty sty)
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
@@ -2453,6 +2453,12 @@ pprTyLit = pprIfaceTyLit . toIfaceTyLit
 pprKind, pprParendKind :: Kind -> SDoc
 pprKind       = pprType
 pprParendKind = pprParendType
+
+tidyToIfaceTypeSty :: Type -> PprStyle -> IfaceType
+tidyToIfaceTypeSty ty sty
+  | userStyle sty = tidyToIfaceType ty
+  | otherwise     = toIfaceTypeX (tyCoVarsOfType ty) ty
+     -- in latter case, don't tidy, as we'll be printing uniques.
 
 tidyToIfaceType :: Type -> IfaceType
 -- It's vital to tidy before converting to an IfaceType
