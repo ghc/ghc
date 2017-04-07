@@ -1160,18 +1160,46 @@ newTyConInstRhs tycon tys
                            ~~~~~~
 A casted type has its *kind* casted into something new.
 
-Note [Weird typing rule for ForAllTy]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [No reflexive casts in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+As far as possible, we would like to maintain the following property:
 
-Here is the (truncated) typing rule for the dependent ForAllTy:
+  (*) If (t1 `eqType` t2), then t1 and t2 are treated identically within GHC.
 
-inner : kind
-------------------------------------
-ForAllTy (Named tv vis) inner : kind
+The (*) property is very useful, because we have a tendency to compare two
+types to see if they're equal, and then arbitrarily choose one. We don't
+want this arbitrary choice to then matter later on. Maintaining (*) means
+that every function that looks at a structure of a type must think about
+casts. In places where we directly pattern-match, this consideration is
+forced by consideration of the CastTy constructor.
 
-Note that neither the inner type nor for ForAllTy itself have to have
-kind *! But, it means that we should push any kind casts through the
-ForAllTy. The only trouble is avoiding capture.
+But, when we call a splitXXX function, it's easy to ignore the possibility
+of casts. In particular, splitTyConApp is used extensively, and we don't
+want it to fail on (T a b c |> co). Happily, if we have
+  (T a b c |> co) `eqType` (T d e f)
+then co must be reflexive. Why? eqType checks that the kinds are equal, as
+well as checking that (a `eqType` d), (b `eqType` e), and (c `eqType` f).
+By the kind check, we know that (T a b c |> co) and (T d e f) have the same
+kind. So the only way that co could be non-reflexive is for (T a b c) to have
+a different kind than (T d e f). But because T's kind is closed (all tycon kinds
+are closed), the only way for this to happen is that one of the arguments has
+to differ, leading to a contradiction. Thus, co is reflexive.
+
+Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
+about outermost casts to uphold (*).
+
+Unforunately, that's not the end of the story. Consider comparing
+  (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> sym co)
+These two types have the same kind (Type), but the left type is a TyConApp
+while the right type is not. To handle this case, we will have to implement
+some variant of the dreaded KPush algorithm (c.f. CoreOpt.pushCoDataCon).
+This stone is left unturned for now, meaning that we don't yet uphold (*).
+
+The other place where (*) will be hard to guarantee is in splitAppTy, because
+I (Richard E) can't think of a way to push coercions into AppTys. The good
+news here is that splitAppTy is not used all that much, and so all clients of
+that function can simply be told to use splitCastTy as well, in order to
+uphold (*). This, too, is left undone, for now.
 
 -}
 
@@ -1180,23 +1208,10 @@ splitCastTy_maybe ty | Just ty' <- coreView ty = splitCastTy_maybe ty'
 splitCastTy_maybe (CastTy ty co)               = Just (ty, co)
 splitCastTy_maybe _                            = Nothing
 
--- | Make a 'CastTy'. The Coercion must be nominal. This function looks
--- at the entire structure of the type and coercion in an attempt to
--- maintain representation invariance (that is, any two types that are `eqType`
--- look the same). Be very wary of calling this in a loop.
+-- | Make a 'CastTy'. The Coercion must be nominal. Checks the
+-- Coercion for reflexivity, dropping it if it's reflexive.
+-- See Note [No reflexive casts in types]
 mkCastTy :: Type -> Coercion -> Type
--- Running example:
---   T :: forall k1. k1 -> forall k2. k2 -> Bool -> Maybe k1 -> *
---   co :: * ~R X    (maybe X is a newtype around *)
---   ty = T Nat 3 Symbol "foo" True (Just 2)
---
--- We wish to "push" the cast down as far as possible. See also
--- Note [Pushing down casts] in TyCoRep. Here is where we end
--- up:
---
---   (T Nat 3 Symbol |> <Symbol> -> <Bool> -> <Maybe Nat> -> co)
---      "foo" True (Just 2)
---
 mkCastTy ty co | isReflexiveCo co = ty
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something
@@ -1205,69 +1220,7 @@ mkCastTy ty co | isReflexiveCo co = ty
 -- in test dependent/should_compile/dynamic-paper.
 
 mkCastTy (CastTy ty co1) co2 = mkCastTy ty (co1 `mkTransCo` co2)
-
-mkCastTy outer_ty@(ForAllTy (TvBndr tv vis) inner_ty) co
-  = ForAllTy (TvBndr tv' vis) (substTy subst inner_ty `mkCastTy` co)
-  where
-    -- See Note [Weird typing rule for ForAllTy]
-    -- have to make sure that pushing the co in doesn't capture the bound var
-    fvs = tyCoVarsOfCo co `unionVarSet` tyCoVarsOfType outer_ty
-    empty_subst = mkEmptyTCvSubst (mkInScopeSet fvs)
-    (subst, tv') = substTyVarBndr empty_subst tv
-
-mkCastTy ty co = -- NB: don't check if the coercion "from" type matches here;
-                 -- there may be unzonked variables about
-                 let result = split_apps [] ty co in
-                 ASSERT2( CastTy ty co `eqType` result
-                        , ppr ty <+> dcolon <+> ppr (typeKind ty) $$
-                          ppr co <+> dcolon <+> ppr (coercionKind co) $$
-                          ppr (CastTy ty co) <+> dcolon <+> ppr (typeKind (CastTy ty co)) $$
-                          ppr result <+> dcolon <+> ppr (typeKind result) )
-                 result
-  where
-    -- split_apps breaks apart any type applications, so we can see how far down
-    -- to push the cast
-    split_apps args (AppTy t1 t2) co
-      = split_apps (t2:args) t1 co
-    split_apps args (TyConApp tc tc_args) co
-      | mightBeUnsaturatedTyCon tc
-      = affix_co (tyConTyBinders tc) (mkTyConTy tc) (tc_args `chkAppend` args) co
-      | otherwise -- not decomposable... but it may still be oversaturated
-      = let (non_decomp_args, decomp_args) = splitAt (tyConArity tc) tc_args
-            saturated_tc = mkTyConApp tc non_decomp_args
-        in
-        affix_co (fst $ splitPiTys $ typeKind saturated_tc)
-                 saturated_tc (decomp_args `chkAppend` args) co
-
-    split_apps args (FunTy arg res) co
-      | rep_arg <- getRuntimeRep "mkCastTy.split_apps" arg
-      , rep_res <- getRuntimeRep "mkCastTy.split_apps" res
-      = affix_co (tyConTyBinders funTyCon) (mkTyConTy funTyCon)
-                 (rep_arg : rep_res : arg : res : args) co
-    split_apps args ty co
-      = affix_co (fst $ splitPiTys $ typeKind ty)
-                 ty args co
-
-    -- Having broken everything apart, this figures out the point at which there
-    -- are no more dependent quantifications, and puts the cast there
-    affix_co _ ty [] co
-      = no_double_casts ty co
-    affix_co bndrs ty args co
-      -- if kind contains any dependent quantifications, we can't push.
-      -- apply arguments until it doesn't
-      = let (no_dep_bndrs, some_dep_bndrs) = spanEnd isAnonTyBinder bndrs
-            (some_dep_args, rest_args) = splitAtList some_dep_bndrs args
-            dep_subst = zipTyBinderSubst some_dep_bndrs some_dep_args
-            used_no_dep_bndrs = takeList rest_args no_dep_bndrs
-            rest_arg_tys = substTys dep_subst (map tyBinderType used_no_dep_bndrs)
-            co' = mkFunCos Nominal
-                           (map (mkReflCo Nominal) rest_arg_tys)
-                           co
-        in
-        ((ty `mkAppTys` some_dep_args) `no_double_casts` co') `mkAppTys` rest_args
-
-    no_double_casts (CastTy ty co1) co2 = CastTy ty (co1 `mkTransCo` co2)
-    no_double_casts ty              co  = CastTy ty co
+mkCastTy ty co = CastTy ty co
 
 tyConTyBinders :: TyCon -> [TyBinder]
 -- Return the tyConBinders in TyBinder form
