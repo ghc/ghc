@@ -13,6 +13,7 @@ then discover that they aren't needed in the chosen branch.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# OPTIONS_GHC -fprof-auto #-}
 
 module FloatIn ( floatInwards ) where
 
@@ -21,18 +22,19 @@ module FloatIn ( floatInwards ) where
 import CoreSyn
 import MkCore
 import HscTypes         ( ModGuts(..) )
-import CoreUtils        ( exprIsDupable, exprIsExpandable,
-                          exprOkForSideEffects, mkTicks )
+import CoreUtils        ( exprIsDupable, exprIsHNF
+                        , exprOkForSideEffects, mkTicks
+                        , exprType )
 import CoreFVs
 import CoreMonad        ( CoreM )
 import Id               ( isOneShotBndr, idType, isJoinId, isJoinId_maybe )
 import Var
-import Type             ( isUnliftedType )
+import Type
 import VarSet
 import Util
 import DynFlags
 import Outputable
-import Data.List        ( mapAccumL )
+-- import Data.List        ( mapAccumL )
 import BasicTypes       ( RecFlag(..), isRec )
 
 {-
@@ -151,7 +153,6 @@ fiExpr dflags to_drop (_, AnnCast expr (co_ann, co))
     [drop_here, e_drop, co_drop]
       = sepBindsByDropPoint dflags False
           [freeVarsOf expr, freeVarsOfAnn co_ann]
-          (freeVarsOfType expr `unionDVarSet` freeVarsOfTypeAnn co_ann)
           to_drop
 
 {-
@@ -166,28 +167,39 @@ fiExpr dflags to_drop ann_expr@(_,AnnApp {})
            (zipWith (fiExpr dflags) arg_drops ann_args)
   where
     (ann_fun, ann_args, ticks) = collectAnnArgsTicks tickishFloatable ann_expr
-    (extra_fvs0, fun_fvs)
-      | (_, AnnVar _) <- ann_fun = (freeVarsOf ann_fun, emptyDVarSet)
+    fun_ty  = exprType (deAnnotate ann_fun)
+    fun_fvs = freeVarsOf ann_fun
+    arg_fvs = map freeVarsOf ann_args
+
+    (drop_here : extra_drop : fun_drop : arg_drops)
+       = sepBindsByDropPoint dflags False
+                             (extra_fvs : fun_fvs : arg_fvs)
+                             to_drop
+         -- Shortcut behaviour: if to_drop is empty,
+         -- sepBindsByDropPoint returns a suitable bunch of empty
+         -- lists without evaluating extra_fvs, and hence without
+         -- peering into each argument
+
+    (_, extra_fvs) = foldl add_arg (fun_ty, extra_fvs0) ann_args
+    extra_fvs0 = case ann_fun of
+                   (_, AnnVar _) -> fun_fvs
+                   _             -> emptyDVarSet
           -- Don't float the binding for f into f x y z; see Note [Join points]
           -- for why we *can't* do it when f is a join point. (If f isn't a
           -- join point, floating it in isn't especially harmful but it's
           -- useless since the simplifier will immediately float it back out.)
-      | otherwise                = (emptyDVarSet, freeVarsOf ann_fun)
-    (extra_fvs, arg_fvs) = mapAccumL mk_arg_fvs extra_fvs0 ann_args
 
-    mk_arg_fvs :: FreeVarSet -> CoreExprWithFVs -> (FreeVarSet, FreeVarSet)
-    mk_arg_fvs extra_fvs ann_arg
-      | noFloatIntoRhs False NonRecursive ann_arg
-      = (extra_fvs `unionDVarSet` freeVarsOf ann_arg, emptyDVarSet)
+    add_arg :: (Type,FreeVarSet) -> CoreExprWithFVs -> (Type,FreeVarSet)
+    add_arg (fun_ty, extra_fvs) (_, AnnType ty)
+      = (piResultTy fun_ty ty, extra_fvs)
+
+    add_arg (fun_ty, extra_fvs) (arg_fvs, arg)
+      | noFloatIntoArg arg arg_ty
+      = (res_ty, extra_fvs `unionDVarSet` arg_fvs)
       | otherwise
-      = (extra_fvs, freeVarsOf ann_arg)
-
-    drop_here : extra_drop : fun_drop : arg_drops
-      = sepBindsByDropPoint dflags False
-          (extra_fvs : fun_fvs : arg_fvs)
-          (freeVarsOfType ann_fun `unionDVarSet`
-           mapUnionDVarSet freeVarsOfType ann_args)
-          to_drop
+      = (res_ty, extra_fvs)
+      where
+       (arg_ty, res_ty) = splitFunTy fun_ty
 
 {-
 Note [Do not destroy the let/app invariant]
@@ -260,6 +272,27 @@ it's non-recursive, so we float only into non-recursive join points.)
 
 Urk! if all are tyvars, and we don't float in, we may miss an
       opportunity to float inside a nested case branch
+
+
+Note [Floating coercions]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We could, in principle, have a coercion binding like
+   case f x of co { DEFAULT -> e1 e2 }
+It's not common to have a function that returns a coercion, but nothing
+in Core prohibits it.  If so, 'co' might be mentioned in e1 or e2
+/only in a type/.  E.g. suppose e1 was
+  let (x :: Int |> co) = blah in blah2
+
+
+But, with coercions appearing in types, there is a complication: we
+might be floating in a "strict let" -- that is, a case. Case expressions
+mention their return type. We absolutely can't float a coercion binding
+inward to the point that the type of the expression it's about to wrap
+mentions the coercion. So we include the union of the sets of free variables
+of the types of all the drop points involved. If any of the floaters
+bind a coercion variable mentioned in any of the types, that binder must
+be dropped right away.
+
 -}
 
 fiExpr dflags to_drop lam@(_, AnnLam _ _)
@@ -342,9 +375,8 @@ fiExpr dflags to_drop (_,AnnLet bind body)
   = fiExpr dflags (after ++ new_float : before) body
            -- to_drop is in reverse dependency order
   where
-    (before, new_float, after) = fiBind dflags to_drop bind body_fvs body_ty_fvs
+    (before, new_float, after) = fiBind dflags to_drop bind body_fvs
     body_fvs    = freeVarsOf body
-    body_ty_fvs = freeVarsOfType body
 
 {-
 For @Case@, the possible ``drop points'' for the \tr{to_drop}
@@ -369,15 +401,14 @@ fiExpr dflags to_drop (_, AnnCase scrut case_bndr _ [(con,alt_bndrs,rhs)])
   where
     case_float = FB (mkDVarSet (case_bndr : alt_bndrs)) scrut_fvs
                     (FloatCase scrut' case_bndr con alt_bndrs)
-    scrut' = fiExpr dflags scrut_binds scrut
+    scrut'     = fiExpr dflags scrut_binds scrut
+    rhs_fvs    = freeVarsOf rhs `delDVarSetList` (case_bndr : alt_bndrs)
+    scrut_fvs  = freeVarsOf scrut
+
     [shared_binds, scrut_binds, rhs_binds]
        = sepBindsByDropPoint dflags False
            [scrut_fvs, rhs_fvs]
-           (freeVarsOfType scrut `unionDVarSet` rhs_ty_fvs)
            to_drop
-    rhs_fvs    = freeVarsOf rhs `delDVarSetList` (case_bndr : alt_bndrs)
-    rhs_ty_fvs = freeVarsOfType rhs `delDVarSetList` (case_bndr : alt_bndrs)
-    scrut_fvs  = freeVarsOf scrut
 
 fiExpr dflags to_drop (_, AnnCase scrut case_bndr ty alts)
   = wrapFloats drop_here1 $
@@ -389,25 +420,19 @@ fiExpr dflags to_drop (_, AnnCase scrut case_bndr ty alts)
     [drop_here1, scrut_drops, alts_drops]
        = sepBindsByDropPoint dflags False
            [scrut_fvs, all_alts_fvs]
-           (freeVarsOfType scrut `unionDVarSet` all_alts_ty_fvs)
            to_drop
 
         -- Float into the alts with the is_case flag set
     (drop_here2 : alts_drops_s)
-      = sepBindsByDropPoint dflags True alts_fvs all_alts_ty_fvs
-                            alts_drops
+      = sepBindsByDropPoint dflags True alts_fvs alts_drops
 
-    scrut_fvs       = freeVarsOf scrut
-    alts_fvs        = map alt_fvs alts
-    all_alts_fvs    = unionDVarSets alts_fvs
-    alts_ty_fvs     = map alt_ty_fvs alts
-    all_alts_ty_fvs = unionDVarSets alts_ty_fvs
+    scrut_fvs    = freeVarsOf scrut
+    alts_fvs     = map alt_fvs alts
+    all_alts_fvs = unionDVarSets alts_fvs
     alt_fvs (_con, args, rhs)
-      = foldl delDVarSet (freeVarsOf rhs)     (case_bndr:args)
-    alt_ty_fvs (_con, args, rhs)
-      = foldl delDVarSet (freeVarsOfType rhs) (case_bndr:args)
-                                -- Delete case_bndr and args from free vars of rhs
-                                -- to get free vars of alt
+      = foldl delDVarSet (freeVarsOf rhs) (case_bndr:args)
+           -- Delete case_bndr and args from free vars of rhs
+           -- to get free vars of alt
 
     fi_alt to_drop (con, args, rhs) = (con, args, fiExpr dflags to_drop rhs)
 
@@ -417,12 +442,11 @@ fiBind :: DynFlags
                             -- as far "inwards" as possible
        -> CoreBindWithFVs   -- Input binding
        -> DVarSet           -- Free in scope of binding
-       -> DVarSet           -- Free in type of body of binding
        -> ( FloatInBinds    -- Land these before
           , FloatInBind     -- The binding itself
           , FloatInBinds)   -- Land these after
 
-fiBind dflags to_drop (AnnNonRec id rhs) body_fvs body_ty_fvs
+fiBind dflags to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
   = ( extra_binds ++ shared_binds          -- Land these before
                                            -- See Note [extra_fvs (1,2)]
     , FB (unitDVarSet id) rhs_fvs'         -- The new binding itself
@@ -431,11 +455,10 @@ fiBind dflags to_drop (AnnNonRec id rhs) body_fvs body_ty_fvs
 
   where
     body_fvs2 = body_fvs `delDVarSet` id
-    rhs_fvs   = freeVarsOf rhs
 
     rule_fvs = idRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
-    extra_fvs | noFloatIntoRhs (isJoinId id) NonRecursive rhs
-              = rule_fvs `unionDVarSet` freeVarsOf rhs
+    extra_fvs | noFloatIntoRhs NonRecursive id rhs
+              = rule_fvs `unionDVarSet` rhs_fvs
               | otherwise
               = rule_fvs
         -- See Note [extra_fvs (1): avoid floating into RHS]
@@ -446,15 +469,14 @@ fiBind dflags to_drop (AnnNonRec id rhs) body_fvs body_ty_fvs
     [shared_binds, extra_binds, rhs_binds, body_binds]
         = sepBindsByDropPoint dflags False
             [extra_fvs, rhs_fvs, body_fvs2]
-            (freeVarsOfType rhs `unionDVarSet` body_ty_fvs)
             to_drop
 
         -- Push rhs_binds into the right hand side of the binding
-    rhs'     = fiRhs dflags rhs_binds id rhs
+    rhs'     = fiRhs dflags rhs_binds id ann_rhs
     rhs_fvs' = rhs_fvs `unionDVarSet` floatedBindsFVs rhs_binds `unionDVarSet` rule_fvs
                         -- Don't forget the rule_fvs; the binding mentions them!
 
-fiBind dflags to_drop (AnnRec bindings) body_fvs body_ty_fvs
+fiBind dflags to_drop (AnnRec bindings) body_fvs
   = ( extra_binds ++ shared_binds
     , FB (mkDVarSet ids) rhs_fvs'
          (FloatLet (Rec (fi_bind rhss_binds bindings)))
@@ -466,13 +488,12 @@ fiBind dflags to_drop (AnnRec bindings) body_fvs body_ty_fvs
         -- See Note [extra_fvs (1,2)]
     rule_fvs = mapUnionDVarSet idRuleAndUnfoldingVarsDSet ids
     extra_fvs = rule_fvs `unionDVarSet`
-                unionDVarSets [ freeVarsOf rhs | (bndr, rhs) <- bindings
-                              , noFloatIntoRhs (isJoinId bndr) Recursive rhs ]
+                unionDVarSets [ rhs_fvs | (bndr, (rhs_fvs, rhs)) <- bindings
+                              , noFloatIntoRhs Recursive bndr rhs ]
 
     (shared_binds:extra_binds:body_binds:rhss_binds)
         = sepBindsByDropPoint dflags False
             (extra_fvs:body_fvs:rhss_fvs)
-            (body_ty_fvs `unionDVarSet` mapUnionDVarSet freeVarsOfType rhss)
             to_drop
 
     rhs_fvs' = unionDVarSets rhss_fvs `unionDVarSet`
@@ -504,37 +525,54 @@ okToFloatInside bndrs = all ok bndrs
     ok b = not (isId b) || isOneShotBndr b
     -- Push the floats inside there are no non-one-shot value binders
 
-noFloatIntoRhs :: Bool -> RecFlag -> CoreExprWithFVs -> Bool
+noFloatIntoRhs :: RecFlag -> Id -> CoreExprWithFVs' -> Bool
 -- ^ True if it's a bad idea to float bindings into this RHS
 -- Preconditio:  rhs :: rhs_ty
-noFloatIntoRhs is_join is_rec rhs@(_, rhs')
-  |  is_join
-  =  isRec is_rec -- Joins are one-shot iff non-recursive
-  |  otherwise
-  =  isUnliftedType rhs_ty
-       -- See Note [Do not destroy the let/app invariant]
-  || noFloatIntoExpr rhs'
-  where
-    rhs_ty = exprTypeFV rhs
+noFloatIntoRhs is_rec bndr rhs
+  | isJoinId bndr
+  = isRec is_rec -- Joins are one-shot iff non-recursive
 
-noFloatIntoExpr :: CoreExprWithFVs' -> Bool
-noFloatIntoExpr (AnnLam bndr e)
-   = not (okToFloatInside (bndr:bndrs))
-     -- NB: Must line up with fiExpr (AnnLam...); see Trac #7088
-   where
-     (bndrs, _) = collectAnnBndrs e
-        -- IMPORTANT: don't say 'True' for a RHS with a one-shot lambda at the top.
-        -- This makes a big difference for things like
-        --      f x# = let x = I# x#
-        --             in let j = \() -> ...x...
-        --                in if <condition> then normal-path else j ()
-        -- If x is used only in the error case join point, j, we must float the
-        -- boxing constructor into it, else we box it every time which is very bad
-        -- news indeed.
+  | isUnliftedType (idType bndr)
+  = True   -- See Note [Do not destroy the let/app invariant]
 
-noFloatIntoExpr rhs = exprIsExpandable (deAnnotate' rhs)
-       -- We'd just float right back out again...
-       -- Should match the test in SimplEnv.doFloatFromRhs
+   | AnnLam bndr e <- rhs
+   , (bndrs, _) <- collectAnnBndrs e
+   =  not (okToFloatInside (bndr:bndrs))  -- (a)
+   || any isId (bndr:bndrs)            -- (b)
+      -- Do not float in if (a) any non-one-shot value lambdas
+      --                 or (b) all type lambdas
+      -- In both cases we'll float straight back out again
+      -- NB: Must line up with fiExpr (AnnLam...); see Trac #7088
+
+      -- (a) is imoprtant: we must float into a one-shot lambda group
+      -- (which includes join points). This makes a big difference
+      -- for things like
+      --      f x# = let x = I# x#
+      --             in let j = \() -> ...x...
+      --                in if <condition> then normal-path else j ()
+      -- If x is used only in the error case join point, j, we must float the
+      -- boxing constructor into it, else we box it every time which is very bad
+      -- news indeed.
+
+  | otherwise
+  = exprIsHNF (deAnnotate' rhs)
+    -- Do not float into a HNF; We'd just float right back out again...
+
+noFloatIntoArg :: CoreExprWithFVs' -> Type -> Bool
+noFloatIntoArg expr expr_ty
+  | isUnliftedType expr_ty
+  = True
+     -- See Note [Do not destroy the let/app invariant]
+
+  | otherwise
+  = exprIsHNF (deAnnotate' expr)
+    -- Consider:  case (a /## b) of r -> Just (D# r)
+    -- We do not want to float that primop into the arg of the Just,
+    -- else we create a thunk where none existed before.  (Before I
+    -- had this test nofib 'simple' allocated more becuase of this.)
+    -- Also, when I floated in more aggressively many ghci.debugger
+    -- tests got less informative ouput, perhaps again because there
+    -- were more thunks.
 
 {-
 ************************************************************************
@@ -556,27 +594,20 @@ in it goes.  If a binding is used inside {\em multiple} drop points,
 then it has to go in a you-must-drop-it-above-all-these-drop-points
 point.
 
-But, with coercions appearing in types, there is a complication: we
-might be floating in a "strict let" -- that is, a case. Case expressions
-mention their return type. We absolutely can't float a coercion binding
-inward to the point that the type of the expression it's about to wrap
-mentions the coercion. So we include the union of the sets of free variables
-of the types of all the drop points involved. If any of the floaters
-bind a coercion variable mentioned in any of the types, that binder must
-be dropped right away.
-
 We have to maintain the order on these drop-point-related lists.
 -}
 
+-- pprFIB :: FloatInBinds -> SDoc
+-- pprFIB fibs = text "FIB:" <+> ppr [b | FB _ _ b <- fibs]
+
 sepBindsByDropPoint
     :: DynFlags
-    -> Bool             -- True <=> is case expression
-    -> [FreeVarSet]         -- One set of FVs per drop point
-    -> FreeVarSet           -- Vars free in all the types of the drop points
-    -> FloatInBinds         -- Candidate floaters
+    -> Bool                -- True <=> is case expression
+    -> [FreeVarSet]        -- One set of FVs per drop point
+    -> FloatInBinds        -- Candidate floaters
     -> [FloatInBinds]      -- FIRST one is bindings which must not be floated
-                            -- inside any drop point; the rest correspond
-                            -- one-to-one with the input list of FV sets
+                           -- inside any drop point; the rest correspond
+                           -- one-to-one with the input list of FV sets
 
 -- Every input floater is returned somewhere in the result;
 -- none are dropped, not even ones which don't seem to be
@@ -586,10 +617,11 @@ sepBindsByDropPoint
 
 type DropBox = (FreeVarSet, FloatInBinds)
 
-sepBindsByDropPoint _ _is_case drop_pts _ty_fvs []
-  = [] : [[] | _ <- drop_pts]   -- cut to the chase scene; it happens
+sepBindsByDropPoint dflags is_case drop_pts floaters
+  | null floaters  -- Shortcut common case
+  = [] : [[] | _ <- drop_pts]
 
-sepBindsByDropPoint dflags is_case drop_pts ty_fvs floaters
+  | otherwise
   = go floaters (map (\fvs -> (fvs, [])) (emptyDVarSet : drop_pts))
   where
     go :: FloatInBinds -> [DropBox] -> [FloatInBinds]
@@ -606,9 +638,8 @@ sepBindsByDropPoint dflags is_case drop_pts ty_fvs floaters
 
           (used_here : used_in_flags) = [ fvs `intersectsDVarSet` bndrs
                                         | (fvs, _) <- drop_boxes]
-          used_in_ty = ty_fvs `intersectsDVarSet` bndrs
 
-          drop_here = used_here || not can_push || used_in_ty
+          drop_here = used_here || not can_push
 
                 -- For case expressions we duplicate the binding if it is
                 -- reasonably small, and if it is not used in all the RHSs
