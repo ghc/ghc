@@ -962,6 +962,12 @@ endif
 
 INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 
+ifeq "$(CrossCompiling)" "YES"
+# when installing ghc-stage2 we can't run target's
+# 'ghc-pkg' and 'ghc-stage2' but those are needed for registration.
+INSTALLED_GHC_REAL=$(TOP)/inplace/bin/ghc-stage1
+INSTALLED_GHC_PKG_REAL=$(TOP)/$(ghc-pkg_DIST_BINARY)
+else # CrossCompiling
 # Install packages in the right order, so that ghc-pkg doesn't complain.
 # Also, install ghc-pkg first.
 ifeq "$(Windows_Host)" "NO"
@@ -971,6 +977,7 @@ else
 INSTALLED_GHC_REAL=$(DESTDIR)$(bindir)/ghc.exe
 INSTALLED_GHC_PKG_REAL=$(DESTDIR)$(bindir)/ghc-pkg.exe
 endif
+endif # CrossCompiling
 
 # Set the INSTALL_DISTDIR_p for each package; compiler is special
 $(foreach p,$(filter-out compiler,$(INSTALL_PACKAGES)),\
