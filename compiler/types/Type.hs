@@ -1222,10 +1222,6 @@ mkCastTy ty co | isReflexiveCo co = ty
 mkCastTy (CastTy ty co1) co2 = mkCastTy ty (co1 `mkTransCo` co2)
 mkCastTy ty co = CastTy ty co
 
-tyConTyBinders :: TyCon -> [TyBinder]
--- Return the tyConBinders in TyBinder form
-tyConTyBinders tycon = tyConBindersTyBinders (tyConBinders tycon)
-
 tyConBindersTyBinders :: [TyConBinder] -> [TyBinder]
 -- Return the tyConBinders in TyBinder form
 tyConBindersTyBinders = map to_tyb
@@ -1528,13 +1524,6 @@ caseBinder :: TyBinder           -- ^ binder to scrutinize
            -> a
 caseBinder (Named v) f _ = f v
 caseBinder (Anon t)  _ d = d t
-
--- | Create a TCvSubst combining the binders and types provided.
--- NB: It is specifically OK if the lists are of different lengths.
--- Barely used
-zipTyBinderSubst :: [TyBinder] -> [Type] -> TCvSubst
-zipTyBinderSubst bndrs tys
-  = mkTvSubstPrs [ (tv, ty) | (Named (TvBndr tv _), ty) <- zip bndrs tys ]
 
 -- | Manufacture a new 'TyConBinder' from a 'TyBinder'. Anonymous
 -- 'TyBinder's are still assigned names as 'TyConBinder's, so we need
