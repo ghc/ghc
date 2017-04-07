@@ -1763,11 +1763,9 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules })
   = do {  -- We've accumulated a simplified call in <fun,rev_args>
           -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
           -- See also Note [Rules for recursive functions]
-        ; let env' = zapSubstEnv env  -- See Note [zapSubstEnv];
-                                      -- and NB that 'rev_args' are all fully simplified
-        ; mb_rule <- tryRules env' rules fun (reverse rev_args) cont
+          mb_rule <- tryRules env rules fun (reverse rev_args) cont
         ; case mb_rule of {
-             Just (rule_rhs, cont') -> simplExprF env' rule_rhs cont'
+             Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
 
                  -- Rules don't match
            ; Nothing -> rebuild env (argInfoExpr fun rev_args) cont      -- No rules
@@ -1829,9 +1827,9 @@ all this at once is TOO HARD!
 -}
 
 tryRules :: SimplEnv -> [CoreRule]
-         -> Id -> [ArgSpec] -> SimplCont
-         -> SimplM (Maybe (CoreExpr, SimplCont))
--- The SimplEnv already has zapSubstEnv applied to it
+         -> Id -> [ArgSpec]
+         -> SimplCont
+         -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
 
 tryRules env rules fn args call_cont
   | null rules
@@ -1866,7 +1864,7 @@ tryRules env rules fn args call_cont
                 ; return Nothing } ;  -- No rule matches
            Just (rule, rule_rhs) ->
              do { checkedTick (RuleFired (ruleName rule))
-                ; let cont' = pushSimplifiedArgs env
+                ; let cont' = pushSimplifiedArgs zapped_env
                                                  (drop (ruleArity rule) args)
                                                  call_cont
                               -- (ruleArity rule) says how
@@ -1875,8 +1873,12 @@ tryRules env rules fn args call_cont
                       occ_anald_rhs = occurAnalyseExpr rule_rhs
                           -- See Note [Occurrence-analyse after rule firing]
                 ; dump dflags rule rule_rhs
-                ; return (Just (occ_anald_rhs, cont')) }}}
+                ; return (Just (zapped_env, occ_anald_rhs, cont')) }}}
+                     -- The occ_anald_rhs and cont' are all Out things
+                     -- hence zapping the environment
   where
+    zapped_env = zapSubstEnv env  -- See Note [zapSubstEnv]
+
     printRuleModule rule =
       parens
         (maybe (text "BUILTIN") (pprModuleName . moduleName) (ruleModule rule))
@@ -1912,7 +1914,48 @@ tryRules env rules fn args call_cont
       = liftIO . dumpSDoc dflags alwaysQualify flag "" $
                    sep [text hdr, nest 4 details]
 
-{- Note [Occurrence-analyse after rule firing]
+trySeqRules :: SimplEnv
+            -> OutExpr -> InExpr   -- Scrutinee and RHS
+            -> SimplCont
+            -> SimplM (Maybe (SimplEnv, CoreExpr, SimplCont))
+-- See Note [User-defined RULES for seq]
+trySeqRules in_env scrut rhs cont
+  = do { rule_base <- getSimplRules
+       ; tryRules in_env (getRules rule_base seqId) seqId out_args rule_cont }
+  where
+    no_cast_scrut = drop_casts scrut
+    scrut_ty  = exprType no_cast_scrut
+    seq_id_ty = idType seqId
+    rhs_ty    = substTy in_env (exprType rhs)
+    out_args  = [ TyArg { as_arg_ty  = scrut_ty
+                        , as_hole_ty = seq_id_ty }
+                , TyArg { as_arg_ty  = rhs_ty
+                       , as_hole_ty  = piResultTy seq_id_ty scrut_ty }
+                , ValArg no_cast_scrut]
+    rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
+                           , sc_env = in_env, sc_cont = cont }
+    -- Lazily evaluated, so we don't do most of this
+
+    drop_casts (Cast e _) = drop_casts e
+    drop_casts e          = e
+
+{- Note [User-defined RULES for seq]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Given
+   case (scrut |> co) of _ -> rhs
+look for rules that match the expression
+   seq @t1 @t2 scrut
+where scrut :: t1
+      rhs   :: t2
+
+If you find a match, rewrite it, and apply to 'rhs'.
+
+Notice that we can simply drop casts on the fly here, which
+makes it more likely that a rule will match.
+
+See Note [User-defined RULES for seq] in MkId.
+
+Note [Occurrence-analyse after rule firing]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 After firing a rule, we occurrence-analyse the instantiated RHS before
 simplifying it.  Usually this doesn't make much difference, but it can
@@ -2261,28 +2304,14 @@ rebuildCase env scrut case_bndr alts@[(_, bndrs, rhs)] cont
   --     b) a rule for seq applies
   -- See Note [User-defined RULES for seq] in MkId
   | is_plain_seq
-  = do { let scrut_ty = exprType scrut
-             rhs_ty   = substTy env (exprType rhs)
-             out_args = [ TyArg { as_arg_ty  = scrut_ty
-                                , as_hole_ty = seq_id_ty }
-                        , TyArg { as_arg_ty  = rhs_ty
-                                , as_hole_ty = piResultTy seq_id_ty scrut_ty }
-                        , ValArg scrut]
-             rule_cont = ApplyToVal { sc_dup = NoDup, sc_arg = rhs
-                                    , sc_env = env, sc_cont = cont }
-             env' = zapSubstEnv env
-             -- Lazily evaluated, so we don't do most of this
-
-       ; rule_base <- getSimplRules
-       ; mb_rule <- tryRules env' (getRules rule_base seqId) seqId out_args rule_cont
+  = do { mb_rule <- trySeqRules env scrut rhs cont
        ; case mb_rule of
-           Just (rule_rhs, cont') -> simplExprF env' rule_rhs cont'
-           Nothing                -> reallyRebuildCase env scrut case_bndr alts cont }
+           Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
+           Nothing                      -> reallyRebuildCase env scrut case_bndr alts cont }
   where
     is_unlifted        = isUnliftedType (idType case_bndr)
     all_dead_bndrs     = all isDeadBinder bndrs       -- bndrs are [InId]
     is_plain_seq       = all_dead_bndrs && isDeadBinder case_bndr -- Evaluation *only* for effect
-    seq_id_ty          = idType seqId
 
     scrut_is_demanded_var :: CoreExpr -> Bool
             -- See Note [Eliminating redundant seqs]
@@ -2356,37 +2385,33 @@ Consider
         type family F :: * -> *
         type instance F Int = Int
 
-        ... case e of x { DEFAULT -> rhs } ...
-
-where x::F Int.  Then we'd like to rewrite (F Int) to Int, getting
-
-        case e `cast` co of x'::Int
+We'd like to transform
+        case e of (x :: F Int) { DEFAULT -> rhs }
+===>
+        case e `cast` co of (x'::Int)
            I# x# -> let x = x' `cast` sym co
                     in rhs
 
-so that 'rhs' can take advantage of the form of x'.
+so that 'rhs' can take advantage of the form of x'.  Notice that Note
+[Case of cast] (in OccurAnal) may then apply to the result.
 
-Notice that Note [Case of cast] (in OccurAnal) may then apply to the result.
+We'd also like to eliminate empty types (Trac #13468). So if
 
-Nota Bene: We only do the [Improving seq] transformation if the
-case binder 'x' is actually used in the rhs; that is, if the case
-is *not* a *pure* seq.
-  a) There is no point in adding the cast to a pure seq.
-  b) There is a good reason not to: doing so would interfere
-     with seq rules (Note [Built-in RULES for seq] in MkId).
-     In particular, this [Improving seq] thing *adds* a cast
-     while [Built-in RULES for seq] *removes* one, so they
-     just flip-flop.
+    data Void
+    type instance F Bool = Void
 
-You might worry about
-   case v of x { __DEFAULT ->
-      ... case (v `cast` co) of y { I# -> ... }}
-This is a pure seq (since x is unused), so [Improving seq] won't happen.
-But it's ok: the simplifier will replace 'v' by 'x' in the rhs to get
-   case v of x { __DEFAULT ->
-      ... case (x `cast` co) of y { I# -> ... }}
-Now the outer case is not a pure seq, so [Improving seq] will happen,
-and then the inner case will disappear.
+then we'd like to transform
+        case (x :: F Bool) of { _ -> error "urk" }
+===>
+        case (x |> co) of (x' :: Void) of {}
+
+Nota Bene: we used to have a built-in rule for 'seq' that dropped
+casts, so that
+    case (x |> co) of { _ -> blah }
+dropped the cast; in order to imporove the chances of trySeqRules
+firing.  But that works in the /opposite/ direction to Note [Improving
+seq] so there's a danger of flip/flopping.  Better to make trySeqRules
+insensitive to the cast, which is now is.
 
 The need for [Improving seq] showed up in Roman's experiments.  Example:
   foo :: F Int -> Int -> Int
@@ -2439,8 +2464,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
            -> SimplM (SimplEnv, OutExpr, OutId)
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
-  | not (isDeadBinder case_bndr) -- Not a pure seq!  See Note [Improving seq]
-  , Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
+  | Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
   = do { case_bndr2 <- newId (fsLit "nt") ty2
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co)
               env2 = extendIdSubst env case_bndr rhs
