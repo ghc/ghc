@@ -223,6 +223,8 @@ OccName.  We use OccName.isSymOcc to detect that case, which isn't
 terribly efficient, but there seems to be no better way.
 -}
 
+-- Can be made to not be exposed
+-- Only used unwrapped in rnAnnProvenance
 lookupTopBndrRn :: RdrName -> RnM Name
 lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
                        case nopt of
@@ -261,6 +263,8 @@ lookupTopBndrRn_maybe rdr_name
   = do  { loc <- getSrcSpanM
         ; n <- newGlobalBinder rdr_mod rdr_occ loc
         ; return (Just n)}
+
+-- MP: This looks dodgy, why not just make sure the calls are inserted..
 
   | otherwise
   = do  {  -- Check for operators in type or class declarations
@@ -388,6 +392,8 @@ lookupInstDeclBndr cls what rdr
   where
     doc = what <+> text "of class" <+> quotes (ppr cls)
 
+-- MP: This looks good enough
+
 
 -----------------------------------------------
 lookupFamInstName :: Maybe Name -> Located RdrName -> RnM (Located Name)
@@ -445,6 +451,8 @@ lookupRecFieldOcc parent doc rdr_name
            Right n  -> return n }
 
   | otherwise
+  -- This use of Global is right as we are looking up a selector which
+  -- can only be defined at the top level.
   = lookupGlobalOccRn rdr_name
 
 lookupSubBndrOcc :: Bool
@@ -834,6 +842,8 @@ lookupGlobalOccRn_maybe rdr_name
 lookupGlobalOccRn :: RdrName -> RnM Name
 -- lookupGlobalOccRn is like lookupOccRn, except that it looks in the global
 -- environment.  Adds an error message if the RdrName is not in scope.
+-- You usually want to use "lookupOccRn" which also looks in the local
+-- environment.
 lookupGlobalOccRn rdr_name
   = do { mb_name <- lookupGlobalOccRn_maybe rdr_name
        ; case mb_name of
