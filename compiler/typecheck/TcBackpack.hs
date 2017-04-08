@@ -45,7 +45,7 @@ import HscTypes
 import Outputable
 import Type
 import FastString
-import RnEnv
+import RnFixity ( lookupFixityRn )
 import Maybes
 import TcEnv
 import Var

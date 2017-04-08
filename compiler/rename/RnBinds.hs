@@ -34,6 +34,10 @@ import RnTypes
 import RnPat
 import RnNames
 import RnEnv
+import RnFixity
+import RnUtils          ( HsDocContext(..), mapFvRn, extendTyVarEnvFVRn
+                        , checkDupRdrNames, warnUnusedLocalBinds
+                        , checkDupAndShadowedNames, bindLocalNamesFV )
 import DynFlags
 import Module
 import Name

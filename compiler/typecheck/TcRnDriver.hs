@@ -49,6 +49,8 @@ import Inst( deeplyInstantiate )
 import TcUnify( checkConstraints )
 import RnTypes
 import RnExpr
+import RnUtils ( HsDocContext(..) )
+import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )

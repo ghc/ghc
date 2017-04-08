@@ -24,6 +24,8 @@ import DynFlags
 import HsSyn
 import TcEnv
 import RnEnv
+import RnFixity
+import RnUtils          ( warnUnusedTopBinds, mkFieldEnv )
 import LoadIface        ( loadSrcInterface )
 import TcRnMonad
 import PrelNames

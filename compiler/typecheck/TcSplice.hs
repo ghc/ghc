@@ -57,6 +57,8 @@ import HscTypes
 import Convert
 import RnExpr
 import RnEnv
+import RnUtils ( HsDocContext(..) )
+import RnFixity ( lookupFixityRn_help )
 import RnTypes
 import TcHsSyn
 import TcSimplify

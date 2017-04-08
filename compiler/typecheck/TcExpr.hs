@@ -32,8 +32,8 @@ import TcSigs           ( tcUserTypeSig, tcInstSig )
 import TcSimplify       ( simplifyInfer, InferMode(..) )
 import FamInst          ( tcGetFamInstEnvs, tcLookupDataFamInst )
 import FamInstEnv       ( FamInstEnvs )
-import RnEnv            ( addUsedGRE, addNameClashErrRn
-                        , unknownSubordinateErr )
+import RnEnv            ( addUsedGRE )
+import RnUtils          ( addNameClashErrRn, unknownSubordinateErr )
 import TcEnv
 import TcArrows
 import TcMatches

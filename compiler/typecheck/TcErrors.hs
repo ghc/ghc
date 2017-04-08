@@ -14,7 +14,7 @@ import TcRnMonad
 import TcMType
 import TcUnify( occCheckForErrors, OccCheckResult(..) )
 import TcType
-import RnEnv( unknownNameSuggestions )
+import RnUnbound ( unknownNameSuggestions )
 import Type
 import TyCoRep
 import Kind

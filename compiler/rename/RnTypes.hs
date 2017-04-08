@@ -38,6 +38,12 @@ import DynFlags
 import HsSyn
 import RnHsDoc          ( rnLHsDoc, rnMbLHsDoc )
 import RnEnv
+import RnUnbound        ( perhapsForallMsg )
+import RnUtils          ( HsDocContext(..), withHsDocContext, mapFvRn
+                        , pprHsDocContext, bindLocalNamesFV, dupNamesErr
+                        , newLocalBndrRn, checkShadowedRdrNames )
+import RnFixity         ( lookupFieldFixityRn, lookupFixityRn
+                        , lookupTyFixityRn )
 import TcRnMonad
 import RdrName
 import PrelNames

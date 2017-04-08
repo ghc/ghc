@@ -32,6 +32,7 @@ import TcMType
 import RnNames( extendGlobalRdrEnvRn )
 import RnBinds
 import RnEnv
+import RnUtils    ( bindLocalNamesFV )
 import RnSource   ( addTcgDUs )
 import Avail
 

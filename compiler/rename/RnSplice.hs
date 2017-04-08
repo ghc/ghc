@@ -18,6 +18,8 @@ import TcRnMonad
 import Kind
 
 import RnEnv
+import RnUtils          ( HsDocContext(..), newLocalBndrRn )
+import RnUnbound        ( isUnboundName )
 import RnSource         ( rnSrcDecls, findSplice )
 import RnPat            ( rnPat )
 import BasicTypes       ( TopLevelFlag, isTopLevel, SourceText(..) )

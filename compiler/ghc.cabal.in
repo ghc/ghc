@@ -388,6 +388,9 @@ Library
         RnSource
         RnSplice
         RnTypes
+        RnFixity
+        RnUtils
+        RnUnbound
         CoreMonad
         CSE
         FloatIn

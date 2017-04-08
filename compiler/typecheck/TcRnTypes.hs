@@ -128,7 +128,11 @@ module TcRnTypes(
         -- Misc other types
         TcId, TcIdSet,
         Hole(..), holeOcc,
-        NameShape(..)
+        NameShape(..),
+
+        -- Role annotations
+        RoleAnnotEnv, emptyRoleAnnotEnv, mkRoleAnnotEnv,
+        lookupRoleAnnot, getRoleAnnots,
 
   ) where
 
@@ -176,6 +180,7 @@ import FastString
 import qualified GHC.LanguageExtensions as LangExt
 import Fingerprint
 import Util
+import PrelNames ( isUnboundName )
 
 import Control.Monad (ap, liftM, msum)
 #if __GLASGOW_HASKELL__ > 710
@@ -187,6 +192,7 @@ import qualified Data.Set as S
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
 import Data.Typeable ( TypeRep )
+import Data.Maybe    ( mapMaybe )
 import GHCi.Message
 import GHCi.RemoteTypes
 
@@ -3422,3 +3428,31 @@ data TcPluginResult
     -- and the evidence for them is recorded.
     -- The second field contains new work, that should be processed by
     -- the constraint solver.
+
+{- *********************************************************************
+*                                                                      *
+                        Role annotations
+*                                                                      *
+********************************************************************* -}
+
+type RoleAnnotEnv = NameEnv (LRoleAnnotDecl Name)
+
+mkRoleAnnotEnv :: [LRoleAnnotDecl Name] -> RoleAnnotEnv
+mkRoleAnnotEnv role_annot_decls
+ = mkNameEnv [ (name, ra_decl)
+             | ra_decl <- role_annot_decls
+             , let name = roleAnnotDeclName (unLoc ra_decl)
+             , not (isUnboundName name) ]
+       -- Some of the role annots will be unbound;
+       -- we don't wish to include these
+
+emptyRoleAnnotEnv :: RoleAnnotEnv
+emptyRoleAnnotEnv = emptyNameEnv
+
+lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl Name)
+lookupRoleAnnot = lookupNameEnv
+
+getRoleAnnots :: [Name] -> RoleAnnotEnv -> ([LRoleAnnotDecl Name], RoleAnnotEnv)
+getRoleAnnots bndrs role_env
+  = ( mapMaybe (lookupRoleAnnot role_env) bndrs
+    , delListFromNameEnv role_env bndrs )

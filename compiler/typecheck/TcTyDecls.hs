@@ -29,7 +29,6 @@ module TcTyDecls(
 import TcRnMonad
 import TcEnv
 import TcBinds( tcRecSelBinds )
-import RnEnv( RoleAnnotEnv, lookupRoleAnnot )
 import TyCoRep( Type(..), Coercion(..), UnivCoProvenance(..) )
 import TcType
 import TysWiredIn( unitTy )

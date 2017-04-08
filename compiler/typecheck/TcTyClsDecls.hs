@@ -37,8 +37,7 @@ import TcHsType
 import TcMType
 import TysWiredIn ( unitTy )
 import TcType
-import RnEnv( RoleAnnotEnv, mkRoleAnnotEnv, lookupRoleAnnot
-            , lookupConstructorFields )
+import RnEnv( lookupConstructorFields )
 import FamInst
 import FamInstEnv
 import Coercion

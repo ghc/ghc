@@ -26,6 +26,12 @@ import HsSyn
 import TcRnMonad
 import Module           ( getModule )
 import RnEnv
+import RnFixity
+import RnUtils          ( HsDocContext(..), bindLocalNamesFV, checkDupNames
+                        , bindLocalNames
+                        , mapMaybeFvRn, mapFvRn
+                        , warnUnusedLocalBinds )
+import RnUnbound        ( reportUnboundName )
 import RnSplice         ( rnBracket, rnSpliceExpr, checkThLocalName )
 import RnTypes
 import RnPat

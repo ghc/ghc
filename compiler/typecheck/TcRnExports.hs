@@ -12,6 +12,8 @@ import TcMType
 import TcType
 import RnNames
 import RnEnv
+import RnUnbound ( reportUnboundName, mkUnboundNameRdr )
+import RnUtils   ( addNameClashErrRn )
 import ErrUtils
 import Id
 import IdInfo

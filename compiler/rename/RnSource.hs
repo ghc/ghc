@@ -21,6 +21,11 @@ import RdrName
 import RnTypes
 import RnBinds
 import RnEnv
+import RnUtils          ( HsDocContext(..), mapFvRn, bindLocalNames
+                        , checkDupRdrNames, inHsDocContext, bindLocalNamesFV
+                        , checkShadowedRdrNames, warnUnusedTypePatterns
+                        , extendTyVarEnvFVRn, newLocalBndrsRn )
+import RnUnbound        ( mkUnboundName )
 import RnNames
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcAnnotations    ( annCtxt )

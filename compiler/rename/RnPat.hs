@@ -44,6 +44,11 @@ import HsSyn
 import TcRnMonad
 import TcHsSyn             ( hsOverLitName )
 import RnEnv
+import RnFixity
+import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
+                           , warnUnusedMatches, newLocalBndrRn
+                           , checkDupAndShadowedNames, checkTupSize
+                           , unknownSubordinateErr )
 import RnTypes
 import PrelNames
 import TyCon               ( tyConName )
