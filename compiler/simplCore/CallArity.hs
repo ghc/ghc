@@ -405,6 +405,26 @@ In practice, there are thunks that do a just little work, such as
 pattern-matching on a variable, and the benefits of eta-expansion likely
 oughtweigh the cost of doing that repeatedly. Therefore, this implementation of
 Call Arity considers everything that is not cheap (`exprIsCheap`) as a thunk.
+
+Note [Call Arity and Join Points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Call Arity analysis does not care about joint points, and treats them just
+like normal functions. This is ok.
+
+The analysis *could* make use of the fact that join points are always evaluated
+in the same context as the join-binding they are defined in and are always
+one-shot, and handle join points separately, as suggested in
+https://ghc.haskell.org/trac/ghc/ticket/13479#comment:10.
+This *might* be more efficient (for example, join points would not have to be
+considered interesting variables), but it would also add redundant code. So for
+now we do not do that.
+
+The simplifier never eta-expands join points (it insteads pushes extra arguments from
+an eta-expanded context into the join point’s RHS), so the call arity
+annotation on join points is not actually used. As it would be equally valid
+(though less efficient) to eta-expand join points, this is the simplifier's
+choice, and hence Call Arity sets the call arity for join points as well.
 -}
 
 -- Main entry point
@@ -627,7 +647,9 @@ callArityBind boring_vars ae_body int b@(Rec binds)
                           | safe_arity == 0 = ae_rhs -- If it is not a function, its body is evaluated only once
                           | otherwise       = calledMultipleTimes ae_rhs
 
-              in (True, (i `setIdCallArity` trimmed_arity, Just (called_once, new_arity, ae_rhs'), rhs'))
+                  i' = i `setIdCallArity` trimmed_arity
+
+              in (True, (i', Just (called_once, new_arity, ae_rhs'), rhs'))
           where
             -- See Note [Taking boring variables into account]
             (new_arity, called_once) | i `elemVarSet` boring_vars = (0, False)
