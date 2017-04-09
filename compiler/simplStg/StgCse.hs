@@ -127,21 +127,20 @@ data CseEnv = CseEnv
         -- ^ The main component of the environment is the trie that maps
         --   data constructor applications (with their `OutId` arguments)
         --   to an in-scope name that can be used instead.
-    , ce_renaming     :: IdEnv OutId
-        -- ^ CSE is simple to implement (and reason about) when there is no
-        --   shadowing. Unfortunately, we have to cope with shadowing
-        --   (see Note [Shadowing]). So we morally do a separate renaming pass
-        --   before CSE, and practically do both passes in one traversal of the tree.
-        --   It still causes less confusion to keep the renaming substitution
-        --   and the substitutions due to CSE separate.
+        --   This name is always either a let-bound variable or a case binder.
     , ce_subst     :: IdEnv OutId
-        -- ^ This substitution contains CSE-specific entries. The domain are
-        --   OutIds, so ce_renaming has to be applied first.
-        --   It has an entry x ↦ y when a let-binding `let x = Con y` is
-        --   removed because `let y = Con z` is in scope.
+        -- ^ This substitution is applied to the code as we traverse it.
+        --   Entries have one of two reasons:
         --
-        --   Both substitutions are applied to data constructor arguments
-        --   before these are looked up in the conAppMap.
+        --   * The input might have shadowing (see Note [Shadowing]), so we have
+        --     to rename some binders as we traverse the tree.
+        --   * If we remove `let x = Con z` because  `let y = Con z` is in scope,
+        --     we note this here as x ↦ y.
+    , ce_bndrMap     :: IdEnv OutId
+        --   If we come across a case expression case x as b of … with a trivial
+        --   binder, we add b ↦ x to this.
+        --   This map is *only* used when looking something up in the ce_conAppMap.
+        --   See Note [Trivial case scrutinee]
     , ce_in_scope  :: InScopeSet
         -- ^ The third component is an in-scope set, to rename away any
         --   shadowing binders
@@ -153,33 +152,36 @@ Note [CseEnv Example]
 The following tables shows how the CseEnvironment changes as code is traversed,
 as well as the changes to that code.
 
-  InExpr                                    OutExpr
-     conAppMap                   renaming   subst          in_scope
-  ──────────────────────────────────────────────────────────────────────
-  -- empty                       {}         {}             {}
-  case … as a of {Con x y ->                case … as a of {Con x y ->
-  -- Con x y ↦ a                 {}         {}             {a,x,y}
-  let b = Con x y                           (removed)
-  -- Con x y ↦ a                 {}         b↦a            {a,x,y,b}
-  let c = Bar a                             let c = Bar a
-  -- Con x y ↦ a, Bar a ↦ c      {}         b↦a            {a,x,y,b,c}
-  let c = some expression                   let c' = some expression
-  -- Con x y ↦ a, Bar a ↦ c      c↦c'       b↦a            {a,x,y,b,c,c'}
-  let d = Bar b                             (removed)
-  -- Con x y ↦ a, Bar a ↦ c      c↦c'       b↦a, d↦c       {a,x,y,b,c,c',d}
-  (a, b, c d)                               (a, a, c' c)
+  InExpr                         OutExpr
+     conAppMap                   subst          in_scope
+  ───────────────────────────────────────────────────────────
+  -- empty                       {}             {}
+  case … as a of {Con x y ->     case … as a of {Con x y ->
+  -- Con x y ↦ a                 {}             {a,x,y}
+  let b = Con x y                (removed)
+  -- Con x y ↦ a                 b↦a            {a,x,y,b}
+  let c = Bar a                  let c = Bar a
+  -- Con x y ↦ a, Bar a ↦ c      b↦a            {a,x,y,b,c}
+  let c = some expression        let c' = some expression
+  -- Con x y ↦ a, Bar a ↦ c      b↦a, c↦c',     {a,x,y,b,c,c'}
+  let d = Bar b                  (removed)
+  -- Con x y ↦ a, Bar a ↦ c      b↦a, c↦c', d↦c {a,x,y,b,c,c',d}
+  (a, b, c d)                    (a, a, c' c)
 -}
 
 initEnv :: InScopeSet -> CseEnv
 initEnv in_scope = CseEnv
     { ce_conAppMap = emptyTM
-    , ce_renaming  = emptyVarEnv
     , ce_subst     = emptyVarEnv
+    , ce_bndrMap   = emptyVarEnv
     , ce_in_scope  = in_scope
     }
 
 envLookup :: DataCon -> [OutStgArg] -> CseEnv -> Maybe OutId
-envLookup dataCon args env = lookupTM (dataCon, args) (ce_conAppMap env)
+envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
+  where args' = map go args -- See Note [Trivial case scrutinee]
+        go (StgVarArg v  ) = StgVarArg (fromMaybe v $ lookupVarEnv (ce_bndrMap env) v)
+        go (StgLitArg lit) = StgLitArg lit
 
 addDataCon :: OutId -> DataCon -> [OutStgArg] -> CseEnv -> CseEnv
 -- do not bother with nullary data constructors, they are static anyways
@@ -196,6 +198,10 @@ addSubst :: OutId -> OutId -> CseEnv -> CseEnv
 addSubst from to env
     = env { ce_subst = extendVarEnv (ce_subst env) from to }
 
+addTrivCaseBndr :: OutId -> OutId -> CseEnv -> CseEnv
+addTrivCaseBndr from to env
+    = env { ce_bndrMap = extendVarEnv (ce_bndrMap env) from to }
+
 substArgs :: CseEnv -> [InStgArg] -> [OutStgArg]
 substArgs env = map (substArg env)
 
@@ -207,10 +213,7 @@ substVars :: CseEnv -> [InId] -> [OutId]
 substVars env = map (substVar env)
 
 substVar :: CseEnv -> InId -> OutId
-substVar env id0 = id2
-  where
-    id1 = fromMaybe id0 $ lookupVarEnv (ce_renaming env) id0
-    id2 = fromMaybe id1 $ lookupVarEnv (ce_subst env)    id1
+substVar env id = fromMaybe id $ lookupVarEnv (ce_subst env) id
 
 -- Functions to enter binders
 
@@ -227,7 +230,7 @@ substBndr env old_id
     new_id = uniqAway (ce_in_scope env) old_id
     no_change = new_id == old_id
     env' = env { ce_in_scope = ce_in_scope env `extendInScopeSet` new_id }
-    new_env | no_change = env' { ce_renaming = extendVarEnv (ce_subst env) old_id new_id }
+    new_env | no_change = env' { ce_subst = extendVarEnv (ce_subst env) old_id new_id }
             | otherwise = env'
 
 substBndrs :: CseEnv -> [InVar] -> (CseEnv, [OutVar])
@@ -294,10 +297,10 @@ stgCseExpr env (StgCase scrut bndr ty alts)
   where
     scrut' = stgCseExpr env scrut
     (env1, bndr') = substBndr env bndr
-    cse_bndr | StgApp trivial_scrut [] <- scrut' = trivial_scrut
+    env2 | StgApp trivial_scrut [] <- scrut' = addTrivCaseBndr bndr trivial_scrut env1
                  -- See Note [Trivial case scrutinee]
-             | otherwise                         = bndr'
-    alts' = map (stgCseAlt env1 cse_bndr) alts
+         | otherwise                         = env1
+    alts' = map (stgCseAlt env2 bndr') alts
 
 
 -- A constructor application.
@@ -389,26 +392,25 @@ mkStgLet stgLet (Just binds) body = stgLet binds body
 {-
 Note [Trivial case scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we find
-
-    case x as b of { Con a -> … }
-
-we really want to replace uses of Con a in the body with x, and not just b, in
-order to handle nested reconstruction of constructors as in
+We wnat to be able to handle nested reconstruction of constructors as in
 
     nested :: Either Int (Either Int a) -> Either Bool (Either Bool a)
-    nested (Right (Right x)) = Right (Right x)
+    nested (Right (Right v)) = Right (Right v)
     nested _ = Left True
 
-Therefore, we add
-    Con a ↦ x
-to the ConAppMap respectively.
-Compare Note [CSE for case expressions] in CSE.hs, which does the same for Core CSE.
+So if we come across
 
-If we find
-    case foo x as b of { Con a -> … }
-we use
-    Con a ↦ b
+    case x of r1
+      Right a -> case a of r2
+              Right b -> let v = Right b
+                         in Right v
+
+we first replace v with r2. Next we want to replace Right r2 with r1. But the
+ce_conAppMap contains Right a!
+
+Therefore, we add r1 ↦ x to ce_bndrMap when analysing the outer case, and use
+this subsitution before looking Right r2 up in ce_conAppMap, and everything
+works out.
 
 Note [Free variables of an StgClosure]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
