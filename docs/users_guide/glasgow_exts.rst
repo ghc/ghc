@@ -12007,7 +12007,7 @@ Replace the "Translation" there with the following one.  Given
     Replace any binding ``p = e``, where ``p`` is not a variable, with
     ``v = e; x1 = case v of p -> x1; ...; xn = case v of p -> xn``, where
     ``v`` is fresh and ``x1``.. ``xn`` are the bound variables of ``p``.
-    Again if ``e`` is a variable, you can optimised his by not introducing a
+    Again if ``e`` is a variable, this can be optimised by not introducing a
     fresh variable.
 
 The result will be a (possibly) recursive set of bindings, binding
@@ -12017,7 +12017,7 @@ non-recursive using ``fix``, but we do not do so in Core, and it only
 obfuscates matters, so we do not do so here.)
 
 The translation is carefully crafted to make bang patterns meaningful
-for reursive and polymorphic bindings as well as straightforward
+for recursive and polymorphic bindings as well as straightforward
 non-recursive bindings.
 
 Here are some examples of how this translation works. The first
