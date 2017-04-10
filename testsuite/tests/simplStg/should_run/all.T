@@ -11,3 +11,12 @@ setTestOpts(f)
 
 test('T9291', normal, compile_and_run, [''])
 test('T13536', normal, compile_and_run, [''])
+
+test('T13536a',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 86664, 5) ]),
+                    # 2017-04-10     86664 -- 25769889696 if broken
+     only_ways(['optasm'])],
+    compile_and_run,
+    [''])
+
