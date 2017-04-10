@@ -31,7 +31,7 @@
 -- Since GHC 8.2, GHC has supported type-indexed type representations.
 -- "Data.Typeable" provides type representations which are qualified over this
 -- index, providing an interface very similar to the "Typeable" notion seen in
--- previous releases. For the type-indexed interface, see "Data.Reflection".
+-- previous releases. For the type-indexed interface, see "Type.Reflection".
 --
 -- Since GHC 7.8, 'Typeable' is poly-kinded. The changes required for this might
 -- break some old programs involving 'Typeable'. More details on this, including
