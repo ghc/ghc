@@ -100,7 +100,13 @@ writeChan (Chan _ writeVar) val = do
 -- completes and before modifyMVar_ installs the new value, it will set the
 -- Chan's write end to a filled hole.
 
--- |Read the next value from the 'Chan'.
+-- |Read the next value from the 'Chan'. Blocks when the channel is empty. Since
+-- the read end of a channel is an 'MVar', this operation inherits fairness
+-- guarantees of 'MVar's (e.g. threads blocked in this operation are woken up in
+-- FIFO order).
+--
+-- Throws 'BlockedIndefinitelyOnMVar' when the channel is empty and no other
+-- thread holds a reference to the channel.
 readChan :: Chan a -> IO a
 readChan (Chan readVar _) = do
   modifyMVarMasked readVar $ \read_end -> do -- Note [modifyMVarMasked]
