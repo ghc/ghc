@@ -52,6 +52,7 @@ test('T2762',
       # 2016-08-31:     3 (allocation area size bumped to 1MB)
       # 2017-02-22:     2 (refactor fiBind)
       only_ways(['normal']),
+      extra_run_opts('+RTS -G1 -RTS' ),
       extra_clean(['T2762A.hi', 'T2762A.o'])],
      compile_and_run, ['-O'])
 
