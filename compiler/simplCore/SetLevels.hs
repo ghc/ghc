@@ -84,7 +84,7 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, isStrictDmd, splitStrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( isUnliftedType, Type, mkLamTypes, splitTyConApp_maybe )
+import Type             ( Type, mkLamTypes, splitTyConApp_maybe )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -1001,10 +1001,10 @@ lvlBind env (AnnNonRec bndr rhs)
   || isCoVar bndr   -- Difficult to fix up CoVar occurrences (see extendPolyLvlEnv)
                     -- so we will ignore this case for now
   || not (profitableFloat env dest_lvl)
-  || (isTopLvl dest_lvl && isUnliftedType (idType bndr))
-          -- We can't float an unlifted binding to top level, so we don't
-          -- float it at all.  It's a bit brutal, but unlifted bindings
-          -- aren't expensive either
+  || (isTopLvl dest_lvl && not (exprIsTopLevelBindable deann_rhs (idType bndr)))
+          -- We can't float an unlifted binding to top level (except
+          -- literal strings), so we don't float it at all.  It's a
+          -- bit brutal, but unlifted bindings aren't expensive either
 
   = -- No float
     do { rhs' <- lvlRhs env NonRecursive is_bot mb_join_arity rhs
@@ -1035,7 +1035,8 @@ lvlBind env (AnnNonRec bndr rhs)
     abs_vars   = abstractVars dest_lvl env bind_fvs
     dest_lvl   = destLevel env bind_fvs (isFunction rhs) is_bot is_join
 
-    mb_bot_str = exprBotStrictness_maybe (deAnnotate rhs)
+    deann_rhs  = deAnnotate rhs
+    mb_bot_str = exprBotStrictness_maybe deann_rhs
     is_bot     = isJust mb_bot_str
         -- NB: not isBottomThunk!  See Note [Bottoming floats] point (3)
 
