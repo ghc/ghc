@@ -19,6 +19,7 @@
 module Haddock.Interface.Create (createInterface) where
 
 import Documentation.Haddock.Doc (metaDocAppend)
+import Documentation.Haddock.Utf8 as Utf8
 import Haddock.Types
 import Haddock.Options
 import Haddock.GhcUtils
@@ -29,6 +30,7 @@ import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Ast as Hyperlinker
 import Haddock.Backends.Hyperlinker.Parser as Hyperlinker
 
+import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import Data.Map (Map)
 import Data.List
@@ -38,6 +40,7 @@ import Data.Ord
 import Control.Applicative
 import Control.Arrow (second)
 import Control.DeepSeq
+import Control.Exception (evaluate)
 import Control.Monad
 import Data.Function (on)
 
@@ -976,10 +979,11 @@ mkMaybeTokenizedSrc flags tm
     summary = pm_mod_summary . tm_parsed_module $ tm
 
 mkTokenizedSrc :: ModSummary -> RenamedSource -> IO [RichToken]
-mkTokenizedSrc ms src =
-    Hyperlinker.enrich src . Hyperlinker.parse <$> rawSrc
-  where
-    rawSrc = readFile $ msHsFilePath ms
+mkTokenizedSrc ms src = do
+  -- make sure to read the whole file at once otherwise
+  -- we run out of file descriptors (see #495)
+  rawSrc <- BS.readFile (msHsFilePath ms) >>= evaluate
+  return $ Hyperlinker.enrich src (Hyperlinker.parse (decodeUtf8 rawSrc))
 
 -- | Find a stand-alone documentation comment by its name.
 findNamedDoc :: String -> [HsDecl Name] -> ErrMsgM (Maybe HsDocString)

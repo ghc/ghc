@@ -34,6 +34,7 @@ library
     Documentation.Haddock.Parser.Monad
     Documentation.Haddock.Types
     Documentation.Haddock.Doc
+    Documentation.Haddock.Utf8
 
   other-modules:
     Data.Attoparsec
@@ -48,7 +49,6 @@ library
     Data.Attoparsec.Internal.Types
     Data.Attoparsec.Number
     Documentation.Haddock.Parser.Util
-    Documentation.Haddock.Utf8
 
 test-suite spec
   type:             exitcode-stdio-1.0
