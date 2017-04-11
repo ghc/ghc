@@ -1,7 +1,7 @@
 #ifndef MachOTypes_h
 #define MachOTypes_h
 
-#if defined(darwin_HOST_OS) || defined(ios_HOST_OS)
+#if defined(OBJFORMAT_MACHO)
 
 #include "ghcplatform.h"
 
@@ -129,5 +129,5 @@ typedef struct _SectionFormatInfo {
     MachORelocationInfo * relocation_info;
 } SectionFormatInfo;
 
-#endif /* darwin_HOST_OS || ios_HOST_OS */
+#endif /* OBJECTFORMAT_MACHO */
 #endif /* MachOTypes_h */
