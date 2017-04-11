@@ -39,7 +39,7 @@ import Data.Monoid
 import Data.Ord
 import Control.Applicative
 import Control.Arrow (second)
-import Control.DeepSeq
+import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Control.Monad
 import Data.Function (on)
