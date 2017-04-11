@@ -1,3 +1,4 @@
-packages: ./haddock-api
+packages: ./
+          ./haddock-api
           ./haddock-library
           ./haddock-test
