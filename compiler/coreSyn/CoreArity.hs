@@ -484,6 +484,10 @@ data ArityType = ATop [OneShotInfo] | ABot Arity
      -- There is always an explicit lambda
      -- to justify the [OneShot], or the Arity
 
+instance Outputable ArityType where
+  ppr (ATop os) = text "ATop" <> parens (ppr (length os))
+  ppr (ABot n)  = text "ABot" <> parens (ppr n)
+
 vanillaArityType :: ArityType
 vanillaArityType = ATop []      -- Totally uninformative
 
