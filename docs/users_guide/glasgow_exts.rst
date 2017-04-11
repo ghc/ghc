@@ -5241,7 +5241,7 @@ you can specify a default method that uses that generic implementation: ::
 We reuse the keyword ``default`` to signal that a signature applies to
 the default method only; when defining instances of the ``Enum`` class,
 the original type ``[a]`` of ``enum`` still applies. When giving an
-empty instance, however, the default implementation ``map to genum`` is
+empty instance, however, the default implementation ``(map to genum)`` is
 filled-in, and type-checked with the type
 ``(Generic a, GEnum (Rep a)) => [a]``.
 
@@ -13970,7 +13970,7 @@ exposed to the user: ::
     class Serialize a where
       put :: a -> [Bin]
 
-      default put :: (Generic a, GSerialize (Rep a)) => a -> [Bit]
+      default put :: (Generic a, GSerialize (Rep a)) => a -> [Bin]
       put = gput . from
 
 Here we use a `default signature <#class-default-signatures>`__ to
