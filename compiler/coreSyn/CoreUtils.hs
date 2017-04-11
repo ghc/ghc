@@ -25,7 +25,7 @@ module CoreUtils (
         exprType, coreAltType, coreAltsType, isExprLevPoly,
         exprIsDupable, exprIsTrivial, getIdFromTrivialExpr, exprIsBottom,
         getIdFromTrivialExpr_maybe,
-        exprIsCheap, exprIsExpandable, exprIsOk, CheapAppFun,
+        exprIsCheap, exprIsExpandable, exprIsCheapX, CheapAppFun,
         exprIsHNF, exprOkForSpeculation, exprOkForSideEffects, exprIsWorkFree,
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
@@ -1095,31 +1095,43 @@ duplicate the (a +# b) primop, which we should not do lightly.
 (It's quite hard to trigger this bug, but T13155 does so for GHC 8.0.)
 
 
-Note [Arguments in exprIsOk]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What predicate should we apply to the argument of an application?  We
-used to say "exprIsTrivial arg" due to concerns about duplicating
-nested constructor applications, but see #4978.  The principle here is
+Note [Arguments and let-bindings exprIsCheapX]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+What predicate should we apply to the argument of an application, or the
+RHS of a let-binding?
+
+We used to say "exprIsTrivial arg" due to concerns about duplicating
+nested constructor applications, but see #4978.  So now we just recursively
+use exprIsCheapX.
+
+We definitely want to treat let and app the same.  The principle here is
 that
-   let x = a +# b in c *# x
+   let x = blah in f x
 should behave equivalently to
-   c *# (a +# b)
-Since lets with cheap RHSs are accepted, so should paps with cheap arguments
+   f blah
+
+This in turn means that the 'letrec g' does not prevent eta expansion
+in this (which it previously was):
+    f = \x. let v = case x of
+                      True -> letrec g = \w. blah
+                              in g
+                      False -> \x. x
+            in \w. v True
 -}
 
 --------------------
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap = exprIsOk isCheapApp
+exprIsCheap = exprIsCheapX isCheapApp
 
 exprIsExpandable :: CoreExpr -> Bool -- See Note [exprIsExpandable]
-exprIsExpandable = exprIsOk isExpandableApp
+exprIsExpandable = exprIsCheapX isExpandableApp
 
 exprIsWorkFree :: CoreExpr -> Bool   -- See Note [exprIsWorkFree]
-exprIsWorkFree = exprIsOk isWorkFreeApp
+exprIsWorkFree = exprIsCheapX isWorkFreeApp
 
 --------------------
-exprIsOk :: CheapAppFun -> CoreExpr -> Bool
-exprIsOk ok_app e
+exprIsCheapX :: CheapAppFun -> CoreExpr -> Bool
+exprIsCheapX ok_app e
   = ok e
   where
     ok e = go 0 e
@@ -1138,11 +1150,11 @@ exprIsOk ok_app e
                     | otherwise       = go n e
     go n (App f e)  | isRuntimeArg e  = go (n+1) f && ok e
                     | otherwise       = go n f
-    go _ (Let {})                     = False
+    go n (Let (NonRec _ r) e)         = go n e && ok r
+    go n (Let (Rec prs) e)            = go n e && all (ok . snd) prs
 
       -- Case: see Note [Case expressions are work-free]
-      -- App:  see Note [Arguments in exprIsOk]
-      -- Let:  the old exprIsCheap worked through lets
+      -- App, Let: see Note [Arguments and let-bindings exprIsCheapX]
 
 
 -------------------------------------
@@ -1157,7 +1169,7 @@ type CheapAppFun = Id -> Arity -> Bool
 
   -- NB: isCheapApp and isExpandableApp are called from outside
   --     this module, so don't be tempted to move the notRedex
-  --     stuff into the call site in exprIsOk, and remove it
+  --     stuff into the call site in exprIsCheapX, and remove it
   --     from the CheapAppFun implementations
 
 
