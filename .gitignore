@@ -1,4 +1,5 @@
 /dist/
+/dist-newstyle/
 /haddock-api/dist/
 /haddock-library/dist/
 /haddock-test/dist/
