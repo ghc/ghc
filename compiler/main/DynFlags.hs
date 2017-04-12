@@ -5176,15 +5176,6 @@ makeDynFlagsConsistent dflags
       = let dflags' = dflags { hscTarget = HscLlvm }
             warn = "No native code generator, so using LLVM"
         in loop dflags' warn
- | hscTarget dflags == HscLlvm &&
-   not ((arch == ArchX86_64) && (os == OSLinux || os == OSDarwin || os == OSFreeBSD)) &&
-   not ((isARM arch) && (os == OSLinux)) &&
-   (gopt Opt_PIC dflags || WayDyn `elem` ways dflags)
-    = if cGhcWithNativeCodeGen == "YES"
-      then let dflags' = dflags { hscTarget = HscAsm }
-               warn = "Using native code generator rather than LLVM, as LLVM is incompatible with -fPIC and -dynamic on this platform"
-           in loop dflags' warn
-      else throwGhcException $ CmdLineError "Can't use -fPIC or -dynamic on this platform"
  | os == OSDarwin &&
    arch == ArchX86_64 &&
    not (gopt Opt_PIC dflags)

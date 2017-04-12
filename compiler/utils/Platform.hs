@@ -16,7 +16,6 @@ module Platform (
         osMachOTarget,
         osSubsectionsViaSymbols,
         platformUsesFrameworks,
-        platformBinariesAreStaticLibs,
 )
 
 where
@@ -148,6 +147,7 @@ osElfTarget OSUnknown   = False
 -- | This predicate tells us whether the OS support Mach-O shared libraries.
 osMachOTarget :: OS -> Bool
 osMachOTarget OSDarwin = True
+osMachOTarget OSiOS    = True
 osMachOTarget _ = False
 
 osUsesFrameworks :: OS -> Bool
@@ -158,15 +158,8 @@ osUsesFrameworks _        = False
 platformUsesFrameworks :: Platform -> Bool
 platformUsesFrameworks = osUsesFrameworks . platformOS
 
-osBinariesAreStaticLibs :: OS -> Bool
-osBinariesAreStaticLibs OSiOS = True
-osBinariesAreStaticLibs _     = False
-
 osSubsectionsViaSymbols :: OS -> Bool
 osSubsectionsViaSymbols OSDarwin = True
 osSubsectionsViaSymbols OSiOS    = True
 osSubsectionsViaSymbols _        = False
-
-platformBinariesAreStaticLibs :: Platform -> Bool
-platformBinariesAreStaticLibs = osBinariesAreStaticLibs . platformOS
 
