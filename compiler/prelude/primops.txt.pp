@@ -2830,8 +2830,9 @@ pseudoop   "unsafeCoerce#"
 
          * Casting {\tt Any} back to the real type
 
-         * Casting an unboxed type to another unboxed type of the same size
-           (but not coercions between floating-point and integral types)
+         * Casting an unboxed type to another unboxed type of the same size.
+           (Casting between floating-point and integral types does not work.
+           See the {\tt GHC.Float} module for functions to do work.)
 
          * Casting between two types that have the same runtime representation.  One case is when
            the two types differ only in "phantom" type parameters, for example
