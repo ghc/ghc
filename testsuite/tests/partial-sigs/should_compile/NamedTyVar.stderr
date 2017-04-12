@@ -1,5 +1,5 @@
 TYPE SIGNATURES
-  foo :: forall a b. (a, b) -> (a, b)
+  foo :: forall b a. (a, b) -> (a, b)
 TYPE CONSTRUCTORS
 COERCION AXIOMS
 Dependent modules: []

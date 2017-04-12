@@ -1404,7 +1404,7 @@ data TcIdSigInst
   = TISI { sig_inst_sig :: TcIdSigInfo
 
          , sig_inst_skols :: [(Name, TcTyVar)]
-               -- Instantiated type and kind variables SKOLEMS
+               -- Instantiated type and kind variables, SigTvs
                -- The Name is the Name that the renamer chose;
                --   but the TcTyVar may come from instantiating
                --   the type and hence have a different unique.
@@ -1454,7 +1454,7 @@ Moreover the kind of a wildcard in sig_inst_wcs may mention
 the universally-quantified tyvars sig_inst_skols
 e.g.   f :: t a -> t _
 Here we get
-   sig_inst_skole = [k:*, (t::k ->*), (a::k)]
+   sig_inst_skols = [k:*, (t::k ->*), (a::k)]
    sig_inst_tau   = t a -> t _22
    sig_inst_wcs   = [ _22::k ]
 -}
