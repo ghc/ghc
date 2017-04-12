@@ -1596,7 +1596,7 @@ kindGeneralize kind_or_type
   = do { kvs <- zonkTcTypeAndFV kind_or_type
        ; let dvs = DV { dv_kvs = kvs, dv_tvs = emptyDVarSet }
        ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
-       ; quantifyZonkedTyVars gbl_tvs dvs }
+       ; quantifyTyVars gbl_tvs dvs }
 
 {-
 Note [Kind generalisation]

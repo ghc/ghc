@@ -581,7 +581,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
-       ; qtkvs <- quantifyZonkedTyVars gbl_tvs dep_vars
+       ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
        ; return (qtkvs, [], emptyTcEvBinds) }
 
@@ -948,7 +948,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
              grown_tvs = growThetaTyVars candidates (tyCoVarsOfTypes seed_tys)
 
        -- Now we have to classify them into kind variables and type variables
-       -- (sigh) just for the benefit of -XNoPolyKinds; see quantifyZonkedTyVars
+       -- (sigh) just for the benefit of -XNoPolyKinds; see quantifyTyVars
        --
        -- Keep the psig_tys first, so that candidateQTyVarsOfTypes produces
        -- them in that order, so that the final qtvs quantifies in the same
@@ -960,7 +960,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
              dvs_plus = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; mono_tvs <- TcM.zonkTyCoVarsAndFV mono_tvs
-       ; quantifyZonkedTyVars mono_tvs dvs_plus }
+       ; quantifyTyVars mono_tvs dvs_plus }
 
 ------------------
 growThetaTyVars :: ThetaType -> TyCoVarSet -> TyVarSet

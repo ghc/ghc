@@ -74,7 +74,7 @@ module TcMType (
   zonkTyCoVarsAndFVList,
   zonkTcTypeAndSplitDepVars, zonkTcTypesAndSplitDepVars,
   zonkQuantifiedTyVar, defaultTyVar,
-  quantifyTyVars, quantifyZonkedTyVars,
+  quantifyTyVars,
   zonkTcTyCoVarBndr, zonkTcTyVarBinder,
   zonkTcType, zonkTcTypes, zonkCo,
   zonkTyCoVarKind, zonkTcTypeMapper,
@@ -907,24 +907,17 @@ For more information about deterministic sets see
 Note [Deterministic UniqFM] in UniqDFM.
 -}
 
-quantifyTyVars, quantifyZonkedTyVars
-  :: TcTyCoVarSet     -- global tvs
+quantifyTyVars
+  :: TcTyCoVarSet     -- Global tvs; already zonked
   -> CandidatesQTvs   -- See Note [Dependent type variables] in TcType
+                      -- Already zonked
   -> TcM [TcTyVar]
 -- See Note [quantifyTyVars]
 -- Can be given a mixture of TcTyVars and TyVars, in the case of
 --   associated type declarations. Also accepts covars, but *never* returns any.
 
--- The zonked variant assumes everything is already zonked.
-
-quantifyTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { dep_tkvs    <- zonkTyCoVarsAndFVDSet dep_tkvs
-       ; nondep_tkvs <- zonkTyCoVarsAndFVDSet nondep_tkvs
-       ; gbl_tvs     <- zonkTyCoVarsAndFV gbl_tvs
-       ; quantifyZonkedTyVars gbl_tvs (DV { dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs }) }
-
-quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
-  = do { traceTc "quantifyZonkedTyVars" (vcat [ppr dvs, ppr gbl_tvs])
+quantifyTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
+  = do { traceTc "quantifyTyVars" (vcat [ppr dvs, ppr gbl_tvs])
        ; let all_cvs = filterVarSet isCoVar $ dVarSetToVarSet dep_tkvs
              dep_kvs = dVarSetElemsWellScoped $
                        dep_tkvs `dVarSetMinusVarSet` gbl_tvs
@@ -960,7 +953,7 @@ quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
            -- mentioned in the kinds of the nondep_tvs'
            -- now refer to the dep_kvs'
 
-       ; traceTc "quantifyZonkedTyVars"
+       ; traceTc "quantifyTyVars"
            (vcat [ text "globals:" <+> ppr gbl_tvs
                  , text "nondep:"  <+> pprTyVars nondep_tvs
                  , text "dep:"     <+> pprTyVars dep_kvs
@@ -969,19 +962,24 @@ quantifyZonkedTyVars gbl_tvs dvs@(DV{ dv_kvs = dep_tkvs, dv_tvs = nondep_tkvs })
 
        ; return (dep_kvs' ++ nondep_tvs') }
   where
+    -- zonk_quant returns a tyvar if it should be quantified over;
+    -- otherwise, it returns Nothing. The latter case happens for
+    --    * Kind variables, with -XNoPolyKinds: don't quantify over these
+    --    * RuntimeRep variables: we never quantify over these
     zonk_quant default_kind tkv
-      | isTcTyVar tkv = zonkQuantifiedTyVar default_kind tkv
-      | otherwise     = return $ Just tkv
-      -- For associated types, we have the class variables
-      -- in scope, and they are TyVars not TcTyVars
+      | not (isTcTyVar tkv)
+      = return (Just tkv)  -- For associated types, we have the class variables
+                           -- in scope, and they are TyVars not TcTyVars
+      | otherwise
+      = do { deflt_done <- defaultTyVar default_kind tkv
+           ; case deflt_done of
+               True  -> return Nothing
+               False -> do { tv <- zonkQuantifiedTyVar tkv
+                           ; return (Just tv) } }
 
-zonkQuantifiedTyVar :: Bool     -- True  <=> this is a kind var and -XNoPolyKinds
-                                -- False <=> not a kind var or -XPolyKinds
-                    -> TcTyVar
-                    -> TcM (Maybe TcTyVar)
+zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- The quantified type variables often include meta type variables
--- we want to freeze them into ordinary type variables, and
--- default their kind (e.g. from TYPE v to TYPE Lifted)
+-- we want to freeze them into ordinary type variables
 -- The meta tyvar is updated to point to the new skolem TyVar.  Now any
 -- bound occurrences of the original type variable will get zonked to
 -- the immutable version.
@@ -990,33 +988,26 @@ zonkQuantifiedTyVar :: Bool     -- True  <=> this is a kind var and -XNoPolyKind
 --
 -- This function is called on both kind and type variables,
 -- but kind variables *only* if PolyKinds is on.
---
--- This returns a tyvar if it should be quantified over;
--- otherwise, it returns Nothing. The latter case happens for
---    * Kind variables, with -XNoPolyKinds: don't quantify over these
---    * RuntimeRep variables: we never quantify over these
 
-zonkQuantifiedTyVar default_kind tv
+zonkQuantifiedTyVar tv
   = case tcTyVarDetails tv of
       SkolemTv {} -> do { kind <- zonkTcType (tyVarKind tv)
-                        ; return $ Just (setTyVarKind tv kind) }
+                        ; return (setTyVarKind tv kind) }
         -- It might be a skolem type variable,
         -- for example from a user type signature
 
-      MetaTv {}
-        -> do { mb_tv <- defaultTyVar default_kind tv
-              ; case mb_tv of
-                  True  -> return Nothing
-                  False -> do { tv' <- skolemiseUnboundMetaTyVar tv
-                              ; return (Just tv') } }
+      MetaTv {} -> skolemiseUnboundMetaTyVar tv
 
       _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
 
 defaultTyVar :: Bool      -- True <=> please default this kind variable to *
-             -> TcTyVar   -- Always an unbound meta tyvar
+             -> TcTyVar   -- If it's a MetaTyVar then it is unbound
              -> TcM Bool  -- True <=> defaulted away altogether
 
 defaultTyVar default_kind tv
+  | not (isMetaTyVar tv)
+  = return False
+
   | isRuntimeRepVar tv && not_sig_tv  -- We never quantify over a RuntimeRep var
   = do { traceTc "Defaulting a RuntimeRep var to LiftedRep" (ppr tv)
        ; writeMetaTyVar tv liftedRepTy
@@ -1300,13 +1291,6 @@ zonkTyCoVarsAndFV tycovars =
 zonkTyCoVarsAndFVList :: [TyCoVar] -> TcM [TyCoVar]
 zonkTyCoVarsAndFVList tycovars =
   tyCoVarsOfTypesList <$> mapM zonkTyCoVar tycovars
-
--- Takes a deterministic set of TyCoVars, zonks them and returns a
--- deterministic set of their free variables.
--- See Note [quantifyTyVars determinism].
-zonkTyCoVarsAndFVDSet :: DTyCoVarSet -> TcM DTyCoVarSet
-zonkTyCoVarsAndFVDSet tycovars =
-  tyCoVarsOfTypesDSet <$> mapM zonkTyCoVar (dVarSetElems tycovars)
 
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
 zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
