@@ -53,9 +53,8 @@ ghc_stage2_MORE_HC_OPTS += -debug
 ghc_stage3_MORE_HC_OPTS += -debug
 endif
 
-ifeq "$(GhcDynamic)" "YES"
-ghc_stage2_MORE_HC_OPTS += -dynamic
-ghc_stage3_MORE_HC_OPTS += -dynamic
+ifneq "$(GhcDynamic)" ""
+$(error GhcDynamic is no longer supported, use DYNAMIC_GHC_PROGRAMS instead)
 endif
 
 ifeq "$(GhcThreaded)" "YES"

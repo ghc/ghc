@@ -95,7 +95,6 @@ endif
 #   The stage number refers to the compiler stage the options are passed to.
 
 GhcDebugged=NO
-GhcDynamic=NO
 
 # GhcProfiled=YES means compile a profiled stage-2 compiler
 GhcProfiled=NO
