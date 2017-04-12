@@ -1666,7 +1666,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ pkg_lib_path_opts
                  ++ pkg_link_opts
                 ))
-        OSDarwin -> do
+        _ | os `elem` [OSDarwin, OSiOS] -> do
             -------------------------------------------------------------------
             -- Making a darwin dylib
             -------------------------------------------------------------------
@@ -1726,7 +1726,6 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_link_opts
                  ++ map Option pkg_framework_opts
               )
-        OSiOS -> throwGhcExceptionIO (ProgramError "dynamic libraries are not supported on iOS target")
         _ -> do
             -------------------------------------------------------------------
             -- Making a DSO

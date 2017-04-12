@@ -378,7 +378,7 @@ link' dflags batch_attempt_linking hpt
         let
             staticLink = case ghcLink dflags of
                           LinkStaticLib -> True
-                          _ -> platformBinariesAreStaticLibs (targetPlatform dflags)
+                          _ -> False
 
             home_mod_infos = eltsHpt hpt
 
@@ -1950,13 +1950,6 @@ linkBinary' staticLink dflags o_files dep_packages = do
                                ArchARM64  -> True
                                _ -> False
                           then ["-Wl,-no_compact_unwind"]
-                          else [])
-
-                      -- '-no_pie'
-                      -- iOS uses 'dynamic-no-pic', so we must pass this to ld to suppress a warning; see #7722
-                      ++ (if platformOS platform == OSiOS &&
-                             not staticLink
-                          then ["-Wl,-no_pie"]
                           else [])
 
                       -- '-Wl,-read_only_relocs,suppress'
