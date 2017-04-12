@@ -3520,9 +3520,9 @@ deprecatedForExtension lang turn_on
       flag | turn_on   = lang
            | otherwise = "No" ++ lang
 
-useInstead :: String -> TurnOnFlag -> String
-useInstead flag turn_on
-  = "Use -f" ++ no ++ flag ++ " instead"
+useInstead :: String -> String -> TurnOnFlag -> String
+useInstead prefix flag turn_on
+  = "Use " ++ prefix ++ no ++ flag ++ " instead"
   where
     no = if turn_on then "" else "no-"
 
@@ -3642,7 +3642,7 @@ dFlagsDeps = [
 -- Please keep the list of flags below sorted alphabetically
   flagSpec "ppr-case-as-let"            Opt_PprCaseAsLet,
   depFlagSpec' "ppr-ticks"              Opt_PprShowTicks
-     (\turn_on -> useInstead "suppress-ticks" (not turn_on)),
+     (\turn_on -> useInstead "-d" "suppress-ticks" (not turn_on)),
   flagSpec "suppress-ticks"             Opt_SuppressTicks,
   flagSpec "suppress-coercions"         Opt_SuppressCoercions,
   flagSpec "suppress-idinfo"            Opt_SuppressIdInfo,
@@ -3734,7 +3734,7 @@ fFlagsDeps = [
   flagSpec "regs-graph"                       Opt_RegsGraph,
   flagSpec "regs-iterative"                   Opt_RegsIterative,
   depFlagSpec' "rewrite-rules"                Opt_EnableRewriteRules
-   (useInstead "enable-rewrite-rules"),
+   (useInstead "-f" "enable-rewrite-rules"),
   flagSpec "shared-implib"                    Opt_SharedImplib,
   flagSpec "spec-constr"                      Opt_SpecConstr,
   flagSpec "spec-constr-keen"                 Opt_SpecConstrKeen,
