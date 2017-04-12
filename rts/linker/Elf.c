@@ -188,99 +188,6 @@
 #endif
 
 
-/*
- * Functions to allocate entries in dynamic sections.  Currently we simply
- * preallocate a large number, and we don't check if a entry for the given
- * target already exists (a linear search is too slow).  Ideally these
- * entries would be associated with symbols.
- */
-
-/* These sizes sufficient to load HSbase + HShaskell98 + a few modules */
-#define GOT_SIZE            0x20000
-#define FUNCTION_TABLE_SIZE 0x10000
-#define PLT_SIZE            0x08000
-
-#ifdef ELF_NEED_GOT
-static Elf_Addr got[GOT_SIZE];
-static unsigned int gotIndex;
-static Elf_Addr gp_val = (Elf_Addr)got;
-
-static Elf_Addr
-allocateGOTEntry(Elf_Addr target)
-{
-   Elf_Addr *entry;
-
-   if (gotIndex >= GOT_SIZE)
-      barf("Global offset table overflow");
-
-   entry = &got[gotIndex++];
-   *entry = target;
-   return (Elf_Addr)entry;
-}
-#endif
-
-#ifdef ELF_FUNCTION_DESC
-typedef struct {
-   Elf_Addr ip;
-   Elf_Addr gp;
-} FunctionDesc;
-
-static FunctionDesc functionTable[FUNCTION_TABLE_SIZE];
-static unsigned int functionTableIndex;
-
-static Elf_Addr
-allocateFunctionDesc(Elf_Addr target)
-{
-   FunctionDesc *entry;
-
-   if (functionTableIndex >= FUNCTION_TABLE_SIZE)
-      barf("Function table overflow");
-
-   entry = &functionTable[functionTableIndex++];
-   entry->ip = target;
-   entry->gp = (Elf_Addr)gp_val;
-   return (Elf_Addr)entry;
-}
-
-static Elf_Addr
-copyFunctionDesc(Elf_Addr target)
-{
-   FunctionDesc *olddesc = (FunctionDesc *)target;
-   FunctionDesc *newdesc;
-
-   newdesc = (FunctionDesc *)allocateFunctionDesc(olddesc->ip);
-   newdesc->gp = olddesc->gp;
-   return (Elf_Addr)newdesc;
-}
-#endif
-
-#ifdef ELF_NEED_PLT
-
-typedef struct {
-   unsigned char code[sizeof(plt_code)];
-} PLTEntry;
-
-static Elf_Addr
-allocatePLTEntry(Elf_Addr target, ObjectCode *oc)
-{
-   PLTEntry *plt = (PLTEntry *)oc->plt;
-   PLTEntry *entry;
-
-   if (oc->pltIndex >= PLT_SIZE)
-      barf("Procedure table overflow");
-
-   entry = &plt[oc->pltIndex++];
-   memcpy(entry->code, plt_code, sizeof(entry->code));
-   PLT_RELOC(entry->code, target);
-   return (Elf_Addr)entry;
-}
-
-static unsigned int
-PLTSize(void)
-{
-   return (PLT_SIZE * sizeof(PLTEntry));
-}
-#endif
 
 /*
 
@@ -1324,25 +1231,11 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
             S = (Elf_Addr)oc->sections[secno].start
                 + stab[ELF_R_SYM(info)].st_value;
-#ifdef ELF_FUNCTION_DESC
-            /* Make a function descriptor for this function */
-            if (S && ELF_ST_TYPE(sym.st_info) == STT_FUNC) {
-               S = allocateFunctionDesc(S + A);
-               A = 0;
-            }
-#endif
          } else {
             /* No, so look up the name in our global table. */
             symbol = strtab + sym.st_name;
             S_tmp = lookupSymbol_( symbol );
             S = (Elf_Addr)S_tmp;
-
-#ifdef ELF_FUNCTION_DESC
-            /* If a function, already a function descriptor - we would
-               have to copy it to add an offset. */
-            if (S && (ELF_ST_TYPE(sym.st_info) == STT_FUNC) && (A != 0))
-               errorBelch("%s: function %s with addend %p", oc->fileName, symbol, (void *)A);
-#endif
          }
          if (!S) {
            errorBelch("%s: unknown symbol `%s'", oc->fileName, symbol);
