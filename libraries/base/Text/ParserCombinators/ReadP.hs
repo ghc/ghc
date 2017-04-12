@@ -286,7 +286,7 @@ string this = do s <- look; scan this s
 
 munch :: (Char -> Bool) -> ReadP String
 -- ^ Parses the first zero or more characters satisfying the predicate.
---   Always succeds, exactly once having consumed all the characters
+--   Always succeeds, exactly once having consumed all the characters
 --   Hence NOT the same as (many (satisfy p))
 munch p =
   do s <- look
