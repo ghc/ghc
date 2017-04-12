@@ -478,7 +478,7 @@ lookupExportChild parent rdr_name
   | otherwise = do
   gre_env <- getGlobalRdrEnv
 
-  let original_gres = lookupGRE_RdrName rdr_name gre_env
+  let original_gres = lookupGlobalRdrEnv gre_env (rdrNameOcc rdr_name)
   -- Disambiguate the lookup based on the parent information.
   -- The remaining GREs are things that we *could* export here, note that
   -- this includes things which have `NoParent`. Those are sorted in
