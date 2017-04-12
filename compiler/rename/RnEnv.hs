@@ -28,14 +28,13 @@ module RnEnv (
         lookupSyntaxName, lookupSyntaxName', lookupSyntaxNames,
         lookupIfThenElse,
         lookupGreAvailRn,
-        getLookupOccRn,mkUnboundName, mkUnboundNameRdr, isUnboundName,
+        mkUnboundName, mkUnboundNameRdr, isUnboundName,
         addUsedGRE, addUsedGREs, addUsedDataCons,
 
         newLocalBndrRn, newLocalBndrsRn,
         bindLocalNames, bindLocalNamesFV,
         MiniFixityEnv,
         addLocalFixities,
-        bindLocatedLocalsFV, bindLocatedLocalsRn,
         extendTyVarEnvFVRn,
 
         -- Role annotations
@@ -45,7 +44,7 @@ module RnEnv (
         checkDupRdrNames, checkShadowedRdrNames,
         checkDupNames, checkDupAndShadowedNames, dupNamesErr,
         checkTupSize,
-        addFvRn, mapFvRn, mapMaybeFvRn, mapFvRnCPS,
+        addFvRn, mapFvRn, mapMaybeFvRn,
         warnUnusedMatches, warnUnusedTypePatterns,
         warnUnusedTopBinds, warnUnusedLocalBinds,
         mkFieldEnv,
@@ -203,7 +202,7 @@ newTopSrcBinder (L loc rdr_name)
         ; newGlobalBinder rdr_mod rdr_occ loc }
 
   | otherwise
-  = do  { unless (not (isQual rdr_name))
+  = do  { when (isQual rdr_name)
                  (addErrAt loc (badQualBndrErr rdr_name))
                 -- Binders should not be qualified; if they are, and with a different
                 -- module name, we we get a confusing "M.T is not in scope" error later
@@ -660,11 +659,6 @@ we'll miss the fact that the qualified import is redundant.
 --------------------------------------------------
 -}
 
-getLookupOccRn :: RnM (Name -> Maybe Name)
-getLookupOccRn
-  = do local_env <- getLocalRdrEnv
-       return (lookupLocalRdrOcc local_env . nameOccName)
-
 mkUnboundNameRdr :: RdrName -> Name
 mkUnboundNameRdr rdr = mkUnboundName (rdrNameOcc rdr)
 
@@ -950,55 +944,86 @@ lookupGlobalOccRn_overloaded overload_ok rdr_name
 --      Lookup in the Global RdrEnv of the module
 --------------------------------------------------
 
+data GreLookupResult = NameNotFound
+                     | OneNameMatch GlobalRdrElt
+                     | MultipleNames [GlobalRdrElt]
+
 lookupGreRn_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
 -- Look up the RdrName in the GlobalRdrEnv
 --   Exactly one binding: records it as "used", return (Just gre)
 --   No bindings:         return Nothing
 --   Many bindings:       report "ambiguous", return an arbitrary (Just gre)
--- (This API is a bit strange; lookupGRERn2_maybe is simpler.
---  But it works and I don't want to fiddle too much.)
 -- Uses addUsedRdrName to record use and deprecations
 lookupGreRn_maybe rdr_name
-  = do  { env <- getGlobalRdrEnv
-        ; case lookupGRE_RdrName rdr_name env of
-            []    -> return Nothing
-            [gre] -> do { addUsedGRE True gre
-                        ; return (Just gre) }
-            gres  -> do { addNameClashErrRn rdr_name gres
-                        ; traceRn "lookupGreRn:name clash"
-                            (ppr rdr_name $$ ppr gres $$ ppr env)
-                        ; return (Just (head gres)) } }
+  = do
+      res <- lookupGreRn_helper rdr_name
+      case res of
+        OneNameMatch gre ->  return $ Just gre
+        MultipleNames gres -> do
+          addNameClashErrRn rdr_name gres
+          return $ Just (head gres)
+        _ -> return Nothing
 
-lookupGreRn2_maybe :: RdrName -> RnM (Maybe GlobalRdrElt)
--- Look up the RdrName in the GlobalRdrEnv
---   Exactly one binding: record it as "used",   return (Just gre)
---   No bindings:         report "not in scope", return Nothing
---   Many bindings:       report "ambiguous",    return Nothing
--- Uses addUsedRdrName to record use and deprecations
-lookupGreRn2_maybe rdr_name
+{-
+
+Note [ Unbound vs Ambiguous Names ]
+
+lookupGreRn_maybe deals with failures in two different ways. If a name
+is unbound then we return a `Nothing` but if the name is ambiguous
+then we raise an error and return a dummy name.
+
+The reason for this is that when we call `lookupGreRn_maybe` we are
+speculatively looking for whatever we are looking up. If we don't find it,
+then we might have been looking for the wrong thing and can keep trying.
+On the other hand, if we find a clash then there is no way to recover as
+we found the thing we were looking for but can no longer resolve which
+the correct one is.
+
+One example of this is in `lookupTypeOccRn` which first looks in the type
+constructor namespace before looking in the data constructor namespace to
+deal with `DataKinds`.
+
+There is however, as always, one exception to this scheme. If we find
+an ambiguous occurence of a record selector and DuplicateRecordFields
+is enabled then we defer the selection until the typechecker.
+
+-}
+
+
+
+
+-- Internal Function
+lookupGreRn_helper :: RdrName -> RnM GreLookupResult
+lookupGreRn_helper rdr_name
   = do  { env <- getGlobalRdrEnv
         ; case lookupGRE_RdrName rdr_name env of
-            []    -> do { _ <- unboundName WL_Global rdr_name
-                        ; return Nothing }
+            []    -> return NameNotFound
             [gre] -> do { addUsedGRE True gre
-                        ; return (Just gre) }
-            gres  -> do { addNameClashErrRn rdr_name gres
-                        ; traceRn "lookupGreRn_maybe:name clash"
-                            (ppr rdr_name $$ ppr gres $$ ppr env)
-                        ; return Nothing } }
+                        ; return (OneNameMatch gre) }
+            gres  -> return (MultipleNames gres) }
 
 lookupGreAvailRn :: RdrName -> RnM (Name, AvailInfo)
 -- Used in export lists
 -- If not found or ambiguous, add error message, and fake with UnboundName
 -- Uses addUsedRdrName to record use and deprecations
 lookupGreAvailRn rdr_name
-  = do  { mb_gre <- lookupGreRn2_maybe rdr_name
-        ; case mb_gre of {
-            Just gre -> return (gre_name gre, availFromGRE gre) ;
-            Nothing  ->
-    do  { traceRn "lookupGreAvailRn" (ppr rdr_name)
-        ; let name = mkUnboundNameRdr rdr_name
-        ; return (name, avail name) } } }
+  = do
+      mb_gre <- lookupGreRn_helper rdr_name
+      case mb_gre of
+        NameNotFound ->
+          do
+            traceRn "lookupGreAvailRn" (ppr rdr_name)
+            name <- unboundName WL_Global rdr_name
+            return (name, avail name)
+        MultipleNames gres ->
+          do
+            addNameClashErrRn rdr_name gres
+            let unbound_name = mkUnboundNameRdr rdr_name
+            return (unbound_name, avail unbound_name)
+                        -- Returning an unbound name here prevents an error
+                        -- cascade
+        OneNameMatch gre -> return (gre_name gre, availFromGRE gre)
+
 
 {-
 *********************************************************
@@ -1674,18 +1699,6 @@ newLocalBndrRn (L loc rdr_name)
 newLocalBndrsRn :: [Located RdrName] -> RnM [Name]
 newLocalBndrsRn = mapM newLocalBndrRn
 
----------------------
-bindLocatedLocalsRn :: [Located RdrName]
-                    -> ([Name] -> RnM a)
-                    -> RnM a
-bindLocatedLocalsRn rdr_names_w_loc enclosed_scope
-  = do { checkDupRdrNames rdr_names_w_loc
-       ; checkShadowedRdrNames rdr_names_w_loc
-
-        -- Make fresh Names and extend the environment
-       ; names <- newLocalBndrsRn rdr_names_w_loc
-       ; bindLocalNames names (enclosed_scope names) }
-
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope
   = do { lcl_env <- getLclEnv
@@ -1701,17 +1714,6 @@ bindLocalNamesFV :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV names enclosed_scope
   = do  { (result, fvs) <- bindLocalNames names enclosed_scope
         ; return (result, delFVs names fvs) }
-
-
--------------------------------------
-        -- binLocalsFVRn is the same as bindLocalsRn
-        -- except that it deals with free vars
-bindLocatedLocalsFV :: [Located RdrName]
-                    -> ([Name] -> RnM (a,FreeVars)) -> RnM (a, FreeVars)
-bindLocatedLocalsFV rdr_names enclosed_scope
-  = bindLocatedLocalsRn rdr_names       $ \ names ->
-    do (thing, fvs) <- enclosed_scope names
-       return (thing, delFVs names fvs)
 
 -------------------------------------
 
@@ -2116,17 +2118,6 @@ mapFvRn f xs = do stuff <- mapM f xs
 mapMaybeFvRn :: (a -> RnM (b, FreeVars)) -> Maybe a -> RnM (Maybe b, FreeVars)
 mapMaybeFvRn _ Nothing = return (Nothing, emptyFVs)
 mapMaybeFvRn f (Just x) = do { (y, fvs) <- f x; return (Just y, fvs) }
-
--- because some of the rename functions are CPSed:
--- maps the function across the list from left to right;
--- collects all the free vars into one set
-mapFvRnCPS :: (a  -> (b   -> RnM c) -> RnM c)
-           -> [a] -> ([b] -> RnM c) -> RnM c
-
-mapFvRnCPS _ []     cont = cont []
-mapFvRnCPS f (x:xs) cont = f x             $ \ x' ->
-                           mapFvRnCPS f xs $ \ xs' ->
-                           cont (x':xs')
 
 {-
 ************************************************************************
