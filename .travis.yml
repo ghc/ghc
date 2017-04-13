@@ -14,10 +14,10 @@ before_install:
  - cabal update
  - cd haddock-library
  - cabal install --only-dependencies --enable-tests
- - cabal install doctest
+# - cabal install doctest
  # --ghc-options=-Werror
  - cabal configure --enable-tests && cabal build && cabal test
- - doctest -isrc -i$(echo vendor/attoparsec-*) -optP-include -optPdist/build/autogen/cabal_macros.h src/Documentation/Haddock/Parser.hs
+# - doctest -isrc -i$(echo vendor/attoparsec-*) -optP-include -optPdist/build/autogen/cabal_macros.h src/Documentation/Haddock/Parser.hs
  - cabal install
  - cd ..
  - (cd haddock-api/ && cabal install --only-dependencies --enable-tests && cabal configure --enable-tests && cabal build && cabal test && cabal install)
