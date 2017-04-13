@@ -260,9 +260,7 @@ lookupTopBndrRn_maybe rdr_name
         -- This deals with the case of derived bindings, where
         -- we don't bother to call newTopSrcBinder first
         -- We assume there is no "parent" name
-  = do  { loc <- getSrcSpanM
-        ; n <- newGlobalBinder rdr_mod rdr_occ loc
-        ; return (Just n)}
+  = do  { Just <$> lookupOrig rdr_mod rdr_occ }
 
 -- MP: This looks dodgy, why not just make sure the calls are inserted..
 
