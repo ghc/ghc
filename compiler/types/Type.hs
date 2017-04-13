@@ -1662,6 +1662,7 @@ isPredTy ty = go ty []
        --
        -- 1. There is actually a kind error.  Example in which this showed up:
        --    polykinds/T11399
+       --
        -- 2. A type constructor application appears to be oversaturated. An
        --    example of this occurred in GHC Trac #13187:
        --
@@ -1669,11 +1670,14 @@ isPredTy ty = go ty []
        --      type Const a b = b
        --      f :: Const Int (,) Bool Char -> Char
        --
-       --    This code is actually fine, since Const is polymorphic in its
-       --    return kind. It does show that isPredTy could possibly report a
-       --    false negative if a constraint is similarly oversaturated, but
+       --    We call isPredTy (Const k1 k2 Int (,) Bool Char
+       --    where k1,k2 are unification variables that have been
+       --    unified to *, and (*->*->*) resp, /but not zonked/.
+       --    This shows that isPredTy can report a false negative
+       --    if a constraint is similarly oversaturated, but
        --    it's hard to do better than isPredTy currently does without
-       --    zonking, so we punt on such cases for now.
+       --    zonking, so we punt on such cases for now.  This only happens
+       --    during debug-printing, so it doesn't matter.
 
 isClassPred, isEqPred, isNomEqPred, isIPPred :: PredType -> Bool
 isClassPred ty = case tyConAppTyCon_maybe ty of
