@@ -72,6 +72,8 @@ linters = [
                  message='`#if defined(x)` is preferred to `#ifdef x`'),
     RegexpLinter(br'#if\s+defined\s+',
                  message='`#if defined(x)` is preferred to `#if defined x`'),
+    RegexpLinter(br'#ifndef\s+',
+                 message='`#if !defined(x)` is preferred to `#ifndef x`'),
 ]
 
 if __name__ == '__main__':
