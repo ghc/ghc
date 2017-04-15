@@ -17,3 +17,6 @@ cabal.sandbox.config
 
 # the user settings
 /UserSettings.hs
+
+# Mostly temp file by emacs
+*~

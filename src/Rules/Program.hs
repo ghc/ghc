@@ -12,6 +12,7 @@ import Oracles.ModuleFiles
 import Oracles.PackageData
 import Rules.Wrappers.Ghc
 import Rules.Wrappers.GhcPkg
+import Rules.Wrappers.Runhaskell
 import Settings
 import Settings.Path
 import Target
@@ -25,6 +26,7 @@ type Wrapper = FilePath -> Expr String
 wrappers :: [(Context, Wrapper)]
 wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 ghc   , ghcWrapper   )
+           , (vanillaContext Stage1 runGhc, runhaskellWrapper)
            , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper) ]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
