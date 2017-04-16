@@ -76,7 +76,7 @@ stgMallocBytes (size_t n, char *msg)
       if (n == 0) return NULL;
 
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      rtsConfig.mallocFailHook((W_) n, msg); /*msg*/
+      rtsConfig.mallocFailHook((W_) n, msg);
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     IF_DEBUG(sanity, memset(space, 0xbb, n));
@@ -90,7 +90,7 @@ stgReallocBytes (void *p, size_t n, char *msg)
 
     if ((space = realloc(p, n)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      rtsConfig.mallocFailHook((W_) n, msg); /*msg*/
+      rtsConfig.mallocFailHook((W_) n, msg);
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
@@ -103,7 +103,7 @@ stgCallocBytes (size_t n, size_t m, char *msg)
 
     if ((space = calloc(n, m)) == NULL) {
       /* don't fflush(stdout); WORKAROUND bug in Linux glibc */
-      rtsConfig.mallocFailHook((W_) n*m, msg); /*msg*/
+      rtsConfig.mallocFailHook((W_) n*m, msg);
       stg_exit(EXIT_INTERNAL_ERROR);
     }
     return space;
