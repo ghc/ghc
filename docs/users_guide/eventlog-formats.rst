@@ -38,11 +38,13 @@ A single fixed-width event emitted during program start-up describing the sample
       * ``SAMPLE_TYPE_MODULE`` (output from ``-hm``)
       * ``SAMPLE_TYPE_TYPE_DESCR`` (output from ``-hy``)
       * ``SAMPLE_TYPE_BIOGRAPHY`` (output from ``-hb``)
-   * ``String``: Cost centre filter
-   * ``String``: Closure description filter
-   * ``String``: Retainer filter
    * ``String``: Module filter
+   * ``String``: Closure description filter
    * ``String``: Type description filter
+   * ``String``: Cost centre filter
+   * ``String``: Cost centre stack filter
+   * ``String``: Retainer filter
+   * ``String``: Biography filter
 
 Cost center definitions
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -81,9 +83,8 @@ Cost-center break-down
 
 A variable-length packet encoding a heap profile sample broken down by,
  * cost-center (``-hc``)
- * retainer (``-hr``)
 
- * ``EVENT_HEAP_PROF_SAMPLE``
+ * ``EVENT_HEAP_PROF_SAMPLE_COST_CENTRE``
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``Word8``: stack depth
@@ -98,22 +99,7 @@ A variable-length event encoding a heap sample broken down by,
  * closure description (``-hd``)
  * module (``-hm``)
 
- * ``EVENT_HEAP_PROF_SAMPLE``
+ * ``EVENT_HEAP_PROF_SAMPLE_STRING``
    * ``Word8``: Profile ID
-   * The event shall contain packed pairs of,
-     * ``String``: type description
-     * ``Word64``: heap residency in bytes
-
-
-Biography break-down
-^^^^^^^^^^^^^^^^^^^^
-
-A fixed-length event encoding a biography heap sample.
-
- * ``EVENT_HEAP_PROF_SAMPLE``
-   * ``Word8``: Profile ID
-   * ``Word64``: Void
-   * ``Word64``: Lag
-   * ``Word64``: Use
-   * ``Word64``: Inherent use
-   * ``Word64``: Drag
+   * ``Word64``: heap residency in bytes
+   * ``String``: type or closure description, or module name
