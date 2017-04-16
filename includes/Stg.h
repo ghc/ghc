@@ -493,20 +493,6 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 #endif /* SIZEOF_HSWORD == 4 */
 
 /* -----------------------------------------------------------------------------
-   Split markers
-   -------------------------------------------------------------------------- */
-
-#if defined(USE_SPLIT_MARKERS)
-#if defined(LEADING_UNDERSCORE)
-#define __STG_SPLIT_MARKER __asm__("\n___stg_split_marker:");
-#else
-#define __STG_SPLIT_MARKER __asm__("\n__stg_split_marker:");
-#endif
-#else
-#define __STG_SPLIT_MARKER /* nothing */
-#endif
-
-/* -----------------------------------------------------------------------------
    Integer multiply with overflow
    -------------------------------------------------------------------------- */
 

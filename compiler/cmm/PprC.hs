@@ -62,17 +62,13 @@ import Data.Array.ST
 -- --------------------------------------------------------------------------
 -- Top level
 
-pprCs :: DynFlags -> [RawCmmGroup] -> SDoc
-pprCs dflags cmms
- = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
- where
-   split_marker
-     | gopt Opt_SplitObjs dflags = text "__STG_SPLIT_MARKER"
-     | otherwise                 = empty
+pprCs :: [RawCmmGroup] -> SDoc
+pprCs cmms
+ = pprCode CStyle (vcat $ map pprC cmms)
 
 writeCs :: DynFlags -> Handle -> [RawCmmGroup] -> IO ()
 writeCs dflags handle cmms
-  = printForC dflags handle (pprCs dflags cmms)
+  = printForC dflags handle (pprCs cmms)
 
 -- --------------------------------------------------------------------------
 -- Now do some real work

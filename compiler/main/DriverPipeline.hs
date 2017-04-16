@@ -1148,10 +1148,6 @@ runPhase (RealPhase cc_phase) input_fn dflags
                                  (cmdlineFrameworkPaths ++ pkgFrameworkPaths)
             else return []
 
-        let split_objs = gopt Opt_SplitObjs dflags
-            split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
-                      | otherwise         = [ ]
-
         let cc_opt | optLevel dflags >= 2 = [ "-O2" ]
                    | optLevel dflags >= 1 = [ "-O" ]
                    | otherwise            = []
@@ -1230,7 +1226,6 @@ runPhase (RealPhase cc_phase) input_fn dflags
                        ++ cc_opt
                        ++ [ "-include", ghcVersionH ]
                        ++ framework_paths
-                       ++ split_opt
                        ++ include_paths
                        ++ pkg_extra_cc_opts
                        ))
