@@ -130,7 +130,9 @@ ocInit_MachO(ObjectCode * oc)
     oc->info->nlist = oc->info->symCmd == NULL
               ? NULL
               : (MachONList *)(oc->image + oc->info->symCmd->symoff);
-    oc->info->names = oc->image + oc->info->symCmd->stroff;
+    oc->info->names = oc->info->symCmd == NULL
+              ? NULL
+              : (oc->image + oc->info->symCmd->stroff);
 
     /* If we have symbols, allocate and fill the macho_symbols
      * This will make relocation easier.

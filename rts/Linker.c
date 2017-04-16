@@ -1215,6 +1215,8 @@ mkOc( pathchar *path, char *image, int imageSize,
    IF_DEBUG(linker, debugBelch("mkOc: start\n"));
    oc = stgMallocBytes(sizeof(ObjectCode), "mkOc(oc)");
 
+   oc->info = NULL;
+
 #  if defined(OBJFORMAT_ELF)
    oc->formatName = "ELF";
 #  elif defined(OBJFORMAT_PEi386)
