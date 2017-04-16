@@ -2702,7 +2702,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "split-objs"
       (NoArg (if can_split
                 then setGeneralFlag Opt_SplitObjs
-                else addWarn "ignoring -fsplit-objs"))
+                else addWarn "ignoring -split-objs"))
 
   , make_ord_flag defGhcFlag "split-sections"
       (noArgM (\dflags -> do
