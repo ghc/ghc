@@ -37,7 +37,7 @@ exclude_patterns = ['.build', "*.gen.rst"]
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = "Glasgow Haskell Compiler <release> User's Guide"
+html_title = "Glasgow Haskell Compiler %s User's Guide" % release
 html_short_title = "GHC %s User's Guide" % release
 html_theme_path = ['.']
 html_theme = 'ghc-theme'
