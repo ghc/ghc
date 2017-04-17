@@ -178,25 +178,3 @@ INFO_TABLE_RET(stg_forceIO, RET_SMALL, P_ info_ptr)
 {
     ENTER(ret);
 }
-
-/* -----------------------------------------------------------------------------
-   Special STG entry points for module registration.
-   -------------------------------------------------------------------------- */
-
-stg_init_finish /* no args: explicit stack layout */
-{
-  jump StgReturn [];
-}
-
-/* On entry to stg_init:
- *    init_stack[0] = &stg_init_ret;
- *    init_stack[1] = __stginit_Something;
- */
-stg_init /* no args: explicit stack layout */
-{
-  W_ next;
-  Sp = W_[BaseReg + OFFSET_StgRegTable_rSp];
-  next = W_[Sp];
-  Sp_adj(1);
-  jump next [];
-}

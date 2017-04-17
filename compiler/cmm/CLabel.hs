@@ -47,8 +47,6 @@ module CLabel (
         mkAsmTempEndLabel,
         mkAsmTempDieLabel,
 
-        mkPlainModuleInitLabel,
-
         mkSplitMarkerLabel,
         mkDirty_MUT_VAR_Label,
         mkUpdInfoLabel,
@@ -205,9 +203,6 @@ data CLabel
   | StringLitLabel
         {-# UNPACK #-} !Unique
 
-  | PlainModuleInitLabel        -- without the version & way info
-        Module
-
   | CC_Label  CostCentre
   | CCS_Label CostCentreStack
 
@@ -273,8 +268,6 @@ instance Ord CLabel where
     compare b1 b2
   compare (StringLitLabel u1) (StringLitLabel u2) =
     nonDetCmpUnique u1 u2
-  compare (PlainModuleInitLabel a1) (PlainModuleInitLabel a2) =
-    compare a1 a2
   compare (CC_Label a1) (CC_Label a2) =
     compare a1 a2
   compare (CCS_Label a1) (CCS_Label a2) =
@@ -309,8 +302,6 @@ instance Ord CLabel where
   compare _ AsmTempDerivedLabel{} = GT
   compare StringLitLabel{} _ = LT
   compare _ StringLitLabel{} = GT
-  compare PlainModuleInitLabel{} _ = LT
-  compare _ PlainModuleInitLabel{} = GT
   compare CC_Label{} _ = LT
   compare _ CC_Label{} = GT
   compare CCS_Label{} _ = LT
@@ -652,8 +643,6 @@ mkAsmTempDerivedLabel = AsmTempDerivedLabel
 
 mkAsmTempEndLabel :: CLabel -> CLabel
 mkAsmTempEndLabel l = mkAsmTempDerivedLabel l (fsLit "_end")
-mkPlainModuleInitLabel :: Module -> CLabel
-mkPlainModuleInitLabel mod      = PlainModuleInitLabel mod
 
 -- | Construct a label for a DWARF Debug Information Entity (DIE)
 -- describing another symbol.
@@ -738,7 +727,6 @@ needsCDecl (LargeSRTLabel _)            = False
 needsCDecl (LargeBitmapLabel _)         = False
 needsCDecl (IdLabel _ _ _)              = True
 needsCDecl (CaseLabel _ _)              = True
-needsCDecl (PlainModuleInitLabel _)     = True
 
 needsCDecl (StringLitLabel _)           = False
 needsCDecl (AsmTempLabel _)             = False
@@ -872,7 +860,6 @@ externallyVisibleCLabel (CaseLabel _ _)         = False
 externallyVisibleCLabel (StringLitLabel _)      = False
 externallyVisibleCLabel (AsmTempLabel _)        = False
 externallyVisibleCLabel (AsmTempDerivedLabel _ _)= False
-externallyVisibleCLabel (PlainModuleInitLabel _)= True
 externallyVisibleCLabel (RtsLabel _)            = True
 externallyVisibleCLabel (CmmLabel _ _ _)        = True
 externallyVisibleCLabel (ForeignLabel{})        = True
@@ -930,7 +917,6 @@ labelType (RtsLabel (RtsApInfoTable _ _))       = DataLabel
 labelType (RtsLabel (RtsApFast _))              = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)          = DataLabel
 labelType (CaseLabel _ _)                       = CodeLabel
-labelType (PlainModuleInitLabel _)              = CodeLabel
 labelType (SRTLabel _)                          = DataLabel
 labelType (LargeSRTLabel _)                     = DataLabel
 labelType (LargeBitmapLabel _)                  = DataLabel
@@ -995,8 +981,6 @@ labelDynamic dflags this_mod lbl =
             -- so we claim that all foreign imports come from dynamic
             -- libraries
             True
-
-   PlainModuleInitLabel m -> (WayDyn `elem` ways dflags) && this_pkg /= (moduleUnitId m)
 
    HpcTicksLabel m        -> (WayDyn `elem` ways dflags) && this_mod /= m
 
@@ -1225,9 +1209,6 @@ pprCLbl (IdLabel name _cafs flavor) = ppr name <> ppIdFlavor flavor
 
 pprCLbl (CC_Label cc)           = ppr cc
 pprCLbl (CCS_Label ccs)         = ppr ccs
-
-pprCLbl (PlainModuleInitLabel mod)
-   = text "__stginit_" <> ppr mod
 
 pprCLbl (HpcTicksLabel mod)
   = text "_hpc_tickboxes_"  <> ppr mod <> ptext (sLit "_hpc")

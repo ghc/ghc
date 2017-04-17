@@ -301,17 +301,6 @@ startupHaskell(int argc, char *argv[], void (*init_root)(void) STG_UNUSED)
     hs_init(&argc, &argv);
 }
 
-
-/* -----------------------------------------------------------------------------
-   hs_add_root: backwards compatibility.  (see #3252)
-   -------------------------------------------------------------------------- */
-
-void
-hs_add_root(void (*init_root)(void) STG_UNUSED)
-{
-    /* nothing */
-}
-
 /* ----------------------------------------------------------------------------
  * Shutting down the RTS
  *

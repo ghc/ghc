@@ -6,12 +6,9 @@
 #include <windows.h>
 #endif
 
-void __stginit_Test(void);
-
 int main(int argc, char *argv[])
 {
     hs_init(&argc,&argv);
-    hs_add_root(__stginit_Test);
     f(500000);
 #if mingw32_HOST_OS
     Sleep(100);
