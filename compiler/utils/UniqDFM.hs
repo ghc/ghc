@@ -294,7 +294,7 @@ intersectUDFM (UDFM x i) (UDFM y _j) = UDFM (M.intersection x y) i
   -- M.intersection is left biased, that means the result will only have
   -- a subset of elements from the left set, so `i` is a good upper bound.
 
-udfmIntersectUFM :: UniqDFM elt -> UniqFM elt -> UniqDFM elt
+udfmIntersectUFM :: UniqDFM elt1 -> UniqFM elt2 -> UniqDFM elt1
 udfmIntersectUFM (UDFM x i) y = UDFM (M.intersection x (ufmToIntMap y)) i
   -- M.intersection is left biased, that means the result will only have
   -- a subset of elements from the left set, so `i` is a good upper bound.

@@ -956,7 +956,7 @@ decideQuantifiedTyVars mono_tvs name_taus psigs candidates
        ; let DV {dv_kvs = cand_kvs, dv_tvs = cand_tvs}
                       = candidateQTyVarsOfTypes $
                         psig_tys ++ candidates ++ tau_tys
-             pick     = filterDVarSet (`elemVarSet` grown_tvs)
+             pick     = (`dVarSetIntersectVarSet` grown_tvs)
              dvs_plus = DV { dv_kvs = pick cand_kvs, dv_tvs = pick cand_tvs }
 
        ; mono_tvs <- TcM.zonkTyCoVarsAndFV mono_tvs

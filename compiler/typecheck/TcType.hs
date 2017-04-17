@@ -1092,7 +1092,7 @@ split_dvs bound dvs ty
 
     kill_bound free
       | isEmptyVarSet bound = free
-      | otherwise           = filterDVarSet (not . (`elemVarSet` bound)) free
+      | otherwise           = free `dVarSetMinusVarSet` bound
 
 -- | Like 'splitDepVarsOfType', but over a list of types
 candidateQTyVarsOfTypes :: [Type] -> CandidatesQTvs

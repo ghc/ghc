@@ -32,7 +32,8 @@ module VarSet (
         extendDVarSet, extendDVarSetList,
         elemDVarSet, dVarSetElems, subDVarSet,
         unionDVarSet, unionDVarSets, mapUnionDVarSet,
-        intersectDVarSet, intersectsDVarSet, disjointDVarSet,
+        intersectDVarSet, dVarSetIntersectVarSet,
+        intersectsDVarSet, disjointDVarSet,
         isEmptyDVarSet, delDVarSet, delDVarSetList,
         minusDVarSet, foldDVarSet, filterDVarSet,
         dVarSetMinusVarSet, anyDVarSet, allDVarSet,
@@ -258,6 +259,9 @@ mapUnionDVarSet get_set xs = foldr (unionDVarSet . get_set) emptyDVarSet xs
 
 intersectDVarSet :: DVarSet -> DVarSet -> DVarSet
 intersectDVarSet = intersectUniqDSets
+
+dVarSetIntersectVarSet :: DVarSet -> VarSet -> DVarSet
+dVarSetIntersectVarSet = uniqDSetIntersectUniqSet
 
 -- | True if empty intersection
 disjointDVarSet :: DVarSet -> DVarSet -> Bool
