@@ -58,6 +58,7 @@ import Control.Monad
 import System.Environment
 import System.Exit
 import Text.Printf
+import GHC.Fingerprint (getFileHash)
 
 import Data.Binary
 import qualified Data.ByteString as BS
@@ -182,7 +183,7 @@ fwdLoadCall verbose _ remote msg = do
           reply =<< BS.readFile path
           loopLoad
         Have path remoteHash -> do
-          localHash <- sha256sum path
+          localHash <- getFileHash path
           reply =<< if localHash == remoteHash
                     then return Nothing
                     else Just <$> BS.readFile path

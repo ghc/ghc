@@ -3,29 +3,19 @@
 module Remote.Message
   ( SlaveMessage(..)
   , SlaveMsg(..)
-  , sha256sum
   , putSlaveMessage
   , getSlaveMessage )
 where
 
+import GHC.Fingerprint (Fingerprint)
 import Data.Binary
-import Data.ByteString as BS (ByteString, readFile)
-
-import Crypto.Hash
-
-type Sha256Hash = String
-
-sha256 :: ByteString -> Digest SHA256
-sha256 = hash
-
-sha256sum :: FilePath -> IO Sha256Hash
-sha256sum path = (show . sha256) <$> BS.readFile path
+import Data.ByteString (ByteString)
 
 -- | A @SlaveMessage a@ is message from the iserv process on the
 -- target, requesting something from the Proxy of with result type @a@.
 data SlaveMessage a where
   -- sends either a new file, or nothing if the file is acceptable.
-  Have     :: FilePath -> Sha256Hash -> SlaveMessage (Maybe ByteString)
+  Have     :: FilePath -> Fingerprint -> SlaveMessage (Maybe ByteString)
   Missing  :: FilePath -> SlaveMessage ByteString
   Done     :: SlaveMessage ()
 

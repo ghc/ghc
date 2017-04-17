@@ -19,6 +19,7 @@ import GHCi.Message (Pipe(..), Msg(..), Message(..), readPipe, writePipe)
 import Foreign.C.String
 
 import Data.Binary
+import GHC.Fingerprint (getFileHash)
 
 import qualified Data.ByteString as BS
 
@@ -59,16 +60,16 @@ startSlave' verbose base_path port = do
 --
 -- If we however already have the requested file we need to make
 -- sure that this file is the same one ghc sees. Hence we
--- calculate the sha256sum of the file and send it back to the
+-- calculate the Fingerprint of the file and send it back to the
 -- host for comparison. The proxy will then send back either @Nothing@
--- indicating that the file on the host has the same sha256sum, or
+-- indicating that the file on the host has the same Fingerprint, or
 -- Maybe ByteString containing the payload to replace the existing
 -- file with.
 handleLoad :: Pipe -> FilePath -> FilePath -> IO ()
 handleLoad pipe path localPath = do
   exists <- doesFileExist localPath
   if exists
-    then sha256sum localPath >>= \hash -> proxyCall (Have path hash) >>= \case
+    then getFileHash localPath >>= \hash -> proxyCall (Have path hash) >>= \case
       Nothing -> return ()
       Just bs -> BS.writeFile localPath bs
     else do
