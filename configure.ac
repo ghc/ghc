@@ -1237,9 +1237,11 @@ echo "\
    Unregisterised            : $Unregisterised
    hs-cpp       : $HaskellCPPCmd
    hs-cpp-flags : $HaskellCPPArgs
+   ar           : $ArCmd
    ld           : $LdCmd
    nm           : $NmCmd
    objdump      : $ObjdumpCmd
+   ranlib       : $RanlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd
