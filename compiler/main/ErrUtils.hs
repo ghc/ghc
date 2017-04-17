@@ -64,7 +64,7 @@ import qualified PprColour as Col
 import SrcLoc
 import DynFlags
 import FastString (unpackFS)
-import StringBuffer (hGetStringBuffer, len, lexemeToString)
+import StringBuffer (atLine, hGetStringBuffer, len, lexemeToString)
 import Json
 
 import System.Directory
@@ -231,27 +231,26 @@ getSeverityColour _          = const mempty
 getCaretDiagnostic :: Severity -> SrcSpan -> IO MsgDoc
 getCaretDiagnostic _ (UnhelpfulSpan _) = pure empty
 getCaretDiagnostic severity (RealSrcSpan span) = do
-  caretDiagnostic <$> getSrcLine (srcSpanFile span) (row - 1)
+  caretDiagnostic <$> getSrcLine (srcSpanFile span) row
 
   where
-
-    getSrcLine fn i = do
-      (getLine i <$> readFile' (unpackFS fn))
-        `catchIOError` \ _ ->
+    getSrcLine fn i =
+      getLine i (unpackFS fn)
+        `catchIOError` \_ ->
           pure Nothing
 
-    getLine i contents =
-      case drop i (lines contents) of
-        srcLine : _ -> Just srcLine
-        [] -> Nothing
-
-    readFile' fn = do
+    getLine i fn = do
       -- StringBuffer has advantages over readFile:
       -- (a) no lazy IO, otherwise IO exceptions may occur in pure code
       -- (b) always UTF-8, rather than some system-dependent encoding
       --     (Haskell source code must be UTF-8 anyway)
-      buf <- hGetStringBuffer fn
-      pure (fix <$> lexemeToString buf (len buf))
+      content <- hGetStringBuffer fn
+      case atLine i content of
+        Just at_line -> pure $
+          case lines (fix <$> lexemeToString at_line (len at_line)) of
+            srcLine : _ -> Just srcLine
+            _           -> Nothing
+        _ -> pure Nothing
 
     -- allow user to visibly see that their code is incorrectly encoded
     -- (StringBuffer.nextChar uses \0 to represent undecodable characters)
