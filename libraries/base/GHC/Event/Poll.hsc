@@ -35,7 +35,7 @@ import GHC.Base
 import GHC.Conc.Sync (withMVar)
 import GHC.Enum (maxBound)
 import GHC.Num (Num(..))
-import GHC.Real (ceiling, fromIntegral)
+import GHC.Real (fromIntegral, div)
 import GHC.Show (Show)
 import System.Posix.Types (Fd(..))
 
@@ -143,7 +143,9 @@ poll p mtout f = do
 
 fromTimeout :: E.Timeout -> Int
 fromTimeout E.Forever     = -1
-fromTimeout (E.Timeout s) = ceiling $ 1000 * s
+fromTimeout (E.Timeout s) = fromIntegral $ s `divRoundUp` 1000000
+  where
+    divRoundUp num denom = (num + denom - 1) `div` denom
 
 data PollFd = PollFd {
       pfdFd      :: {-# UNPACK #-} !Fd

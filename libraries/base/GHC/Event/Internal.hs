@@ -33,6 +33,7 @@ import Data.OldList (foldl', filter, intercalate, null)
 import Foreign.C.Error (eINTR, getErrno, throwErrno)
 import System.Posix.Types (Fd)
 import GHC.Base
+import GHC.Word (Word64)
 import GHC.Num (Num(..))
 import GHC.Show (Show(..))
 
@@ -133,8 +134,8 @@ elEvent :: EventLifetime -> Event
 elEvent (EL x) = Event (x .&. 0x7)
 {-# INLINE elEvent #-}
 
--- | A type alias for timeouts, specified in seconds.
-data Timeout = Timeout {-# UNPACK #-} !Double
+-- | A type alias for timeouts, specified in nanoseconds.
+data Timeout = Timeout {-# UNPACK #-} !Word64
              | Forever
                deriving (Show)
 

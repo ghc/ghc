@@ -89,7 +89,7 @@ module GHC.Event.PSQ
     ) where
 
 import GHC.Base hiding (empty)
-import GHC.Float () -- for Show Double instance
+import GHC.Word (Word64)
 import GHC.Num (Num(..))
 import GHC.Show (Show(showsPrec))
 import GHC.Event.Unique (Unique)
@@ -104,7 +104,7 @@ data Elem a = E
 ------------------------------------------------------------------------
 -- | A mapping from keys @k@ to priorites @p@.
 
-type Prio = Double
+type Prio = Word64
 type Key = Unique
 
 data PSQ a = Void
