@@ -3141,7 +3141,6 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "ffrontend-opt" (hasArg addFrontendPluginOption)
 
         ------ Optimisation flags ------------------------------------------
-  , make_ord_flag defGhcFlag "O"      (noArgM (setOptLevel 1))
   , make_dep_flag defGhcFlag "Onot"   (noArgM $ setOptLevel 0 )
                                                             "Use -O0 instead"
   , make_ord_flag defGhcFlag "Odph"   (noArgM setDPHOpt)
