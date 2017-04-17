@@ -3525,8 +3525,7 @@ listAround pan do_highlight = do
           prefixed = zipWith ($) highlighted bs_line_nos
           output   = BS.intercalate (BS.pack "\n") prefixed
 
-      utf8Decoded <- liftIO $ BS.useAsCStringLen output
-                        $ \(p,n) -> utf8DecodeString (castPtr p) n
+      let utf8Decoded = utf8DecodeByteString output
       liftIO $ putStrLn utf8Decoded
   where
         file  = GHC.srcSpanFile pan

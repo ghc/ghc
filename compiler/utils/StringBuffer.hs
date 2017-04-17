@@ -288,9 +288,7 @@ lexemeToString :: StringBuffer
                -> String
 lexemeToString _ 0 = ""
 lexemeToString (StringBuffer buf _ cur) bytes =
-  inlinePerformIO $
-    withForeignPtr buf $ \ptr ->
-      utf8DecodeString (ptr `plusPtr` cur) bytes
+  utf8DecodeStringLazy buf cur bytes
 
 lexemeToFastString :: StringBuffer
                    -> Int               -- ^ @n@, the number of bytes
