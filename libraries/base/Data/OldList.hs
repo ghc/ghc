@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
-{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables, MagicHash #-}
+{-# LANGUAGE CPP, NoImplicitPrelude, ScopedTypeVariables,
+             MagicHash, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -854,12 +855,14 @@ sortBy cmp = mergeAll . sequences
 
     ascending a as (b:bs)
       | a `cmp` b /= GT = ascending b (\ys -> as (a:ys)) bs
-    ascending a as bs   = as [a]: sequences bs
+    ascending a as bs   = let !x = as [a]
+                          in x : sequences bs
 
     mergeAll [x] = x
     mergeAll xs  = mergeAll (mergePairs xs)
 
-    mergePairs (a:b:xs) = merge a b: mergePairs xs
+    mergePairs (a:b:xs) = let !x = merge a b
+                          in x : mergePairs xs
     mergePairs xs       = xs
 
     merge as@(a:as') bs@(b:bs')
