@@ -1114,7 +1114,9 @@ AC_SUBST([LdHasFilelist])
 # ----------
 # Sets fp_prog_ar to a path to ar. Exits if no ar can be found
 AC_DEFUN([FP_PROG_AR],
-[AC_PATH_PROG([fp_prog_ar], [ar])
+[if test -z "$fp_prog_ar"; then
+  AC_PATH_PROG([fp_prog_ar], [ar])
+fi
 if test -z "$fp_prog_ar"; then
   AC_MSG_ERROR([cannot find ar in your PATH, no idea how to make a library])
 fi
