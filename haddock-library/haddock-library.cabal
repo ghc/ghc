@@ -14,7 +14,7 @@ homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
 build-type:           Simple
-cabal-version:        >= 1.10
+cabal-version:        >= 2.0
 stability:            experimental
 
 library
@@ -78,6 +78,9 @@ test-suite spec
     , hspec
     , QuickCheck == 2.*
 
+  build-tool-depends:
+    hspec-discover:hspec-discover
+    
 source-repository head
   type:     git
   subdir:   haddock-library

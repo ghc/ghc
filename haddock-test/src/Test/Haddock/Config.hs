@@ -165,11 +165,18 @@ loadConfig ccfg dcfg flags files = do
     cfgEnv <- (:) ("haddock_datadir", dcfgResDir dcfg) <$> getEnvironment
 
     systemHaddockPath <- List.lookup "HADDOCK_PATH" <$> getEnvironment
-    cfgHaddockPath <- case flagsHaddockPath flags <|> systemHaddockPath of
+    haddockOnPath <- findExecutable "haddock"
+
+    let haddock_path = msum [ flagsHaddockPath flags
+                            , systemHaddockPath
+                            , haddockOnPath
+                            ]
+
+    cfgHaddockPath <- case haddock_path of
         Just path -> pure path
-        Nothing -> do
-            hPutStrLn stderr $ "Haddock executable not specified"
-            exitFailure
+        Nothing   -> do
+          hPutStrLn stderr "Haddock executable not found"
+          exitFailure
 
     ghcPath <- init <$> rawSystemStdout normal cfgHaddockPath
         ["--print-ghc-path"]
@@ -195,7 +202,7 @@ loadConfig ccfg dcfg flags files = do
     let cfgAccept = FlagAccept `elem` flags
 
     let cfgCheckConfig = ccfg
-    let cfgDirConfig = dcfg
+    let cfgDirConfig   = dcfg
 
     return $ Config { .. }
 

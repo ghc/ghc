@@ -12,9 +12,10 @@ bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-cabal-version:        >= 1.10
+cabal-version:        >= 2.0
 stability:            experimental
-
+tested-with:          GHC==8.2.*, GHC==8.3
+                      
 extra-source-files:
   CHANGES
   README.md
@@ -130,32 +131,40 @@ test-suite driver-test
 
 test-suite html-test
   type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   html-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
+  -- This tells cabal that this test depends on the executable
+  -- component 'haddock' from this very same package, as well
+  -- as adding the build-folder where the `haddock`
+  -- executable can be found in front of $PATH
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     html-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
 
 test-suite hypsrc-test
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   hypsrc-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
-  ghc-options:      -Wall -fwarn-tabs
+  type:               exitcode-stdio-1.0
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     hypsrc-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
+  ghc-options:        -Wall -fwarn-tabs
 
 test-suite latex-test
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   latex-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
+  type:               exitcode-stdio-1.0
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     latex-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
 
 test-suite hoogle-test
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   hoogle-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
+  type:               exitcode-stdio-1.0
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     hoogle-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
 
 source-repository head
   type:     git

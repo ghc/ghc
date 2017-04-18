@@ -426,15 +426,22 @@ getHaddockLibDir flags =
 #ifdef IN_GHC_TREE
       getInTreeDir
 #else
-      d <- getDataDir -- provided by Cabal
-      doesDirectoryExist d >>= \exists -> case exists of
-        True -> return d
-        False -> do
-          -- If directory does not exist then we are probably invoking from
-          -- ./dist/build/haddock/haddock so we use ./resources as a fallback.
-          doesDirectoryExist "resources" >>= \exists_ -> case exists_ of
-            True -> return "resources"
-            False -> die ("Haddock's resource directory (" ++ d ++ ") does not exist!\n")
+      -- if data directory does not exist we are probably
+      -- invoking from either ./haddock-api or ./
+      let res_dirs = [ getDataDir -- provided by Cabal
+                     , pure "resources"
+                     , pure "haddock-api/resources"
+                     ]
+
+          check get_path = do
+            p <- get_path
+            exists <- doesDirectoryExist p
+            pure $ if exists then Just p else Nothing
+
+      dirs <- mapM check res_dirs  
+      case [p | Just p <- dirs] of
+        (p : _) -> return p 
+        _       -> die "Haddock's resource directory does not exist!\n"
 #endif
     fs -> return (last fs)
 
