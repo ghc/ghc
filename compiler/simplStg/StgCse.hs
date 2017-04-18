@@ -293,7 +293,7 @@ stgCseExpr env (StgTick tick body)
     = let body' = stgCseExpr env body
       in StgTick tick body'
 stgCseExpr env (StgCase scrut bndr ty alts)
-    = StgCase scrut' bndr' ty alts'
+    = mkStgCase scrut' bndr' ty alts'
   where
     scrut' = stgCseExpr env scrut
     (env1, bndr') = substBndr env bndr
@@ -381,6 +381,17 @@ stgCseRhs env bndr (StgRhsClosure ccs info occs upd args body)
       in (Just (substVar env bndr, StgRhsClosure ccs info occs' upd args' body'), env)
   where occs' = substVars env occs
 
+
+mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr
+mkStgCase scrut bndr ty alts | all isBndr alts = scrut
+                             | otherwise       = StgCase scrut bndr ty alts
+
+  where
+    -- see Note [All alternatives are the binder]
+    isBndr (_, _, StgApp f []) = f == bndr
+    isBndr _                   = False
+
+
 -- Utilities
 
 -- | This function short-cuts let-bindings that are now obsolete
@@ -390,6 +401,24 @@ mkStgLet stgLet (Just binds) body = stgLet binds body
 
 
 {-
+Note [All alternatives are the binder]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When all alternatives simply refer to the case binder, then we do not have
+to bother with the case expression at all (#13588). CoreSTG does this as well,
+but sometimes, types get into the way:
+
+    newtype T = MkT Int
+    f :: (Int, Int) -> (T, Int)
+    f (x, y) = (MkT x, y)
+
+Core cannot just turn this into
+
+    f p = p
+
+as this would not be well-typed. But to STG, where MkT is no longer in the way,
+we can.
+
 Note [Trivial case scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We want to be able to handle nested reconstruction of constructors as in

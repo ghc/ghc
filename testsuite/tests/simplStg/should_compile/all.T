@@ -19,4 +19,4 @@ def checkStgString(needle):
 
 
 
-test('T13588', [ checkStgString('case'), expect_broken(13588) ] , compile, ['-ddump-stg'])
+test('T13588', [ checkStgString('case') ] , compile, ['-ddump-stg'])
