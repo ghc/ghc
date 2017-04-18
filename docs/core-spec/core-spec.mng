@@ -473,14 +473,9 @@ analogously to \texttt{CoreLint.lhs}.
 Nevertheless, these rules are included in this document to help the reader
 understand System FC.
 
-\subsection{The context $[[S]]$}
-We use a context $[[S]]$ to keep track of the values of variables in a (mutually)
-recursive group. Its definition is as follows:
-\[
-[[S]] \quad ::= \quad [[ empty ]] \ |\ [[S]], [[ [n |-> e] ]]
-\]
-The presence of the context $[[S]]$ is solely to deal with recursion. If your
-use of FC does not require modeling recursion, you will not need to track $[[S]]$.
+Also note that this semantics implements call-by-name, not call-by-need. So
+while it describes the operational meaning of a term, it does not describe what
+subexpressions are shared, and when.
 
 \subsection{Operational semantics rules}
 
@@ -489,13 +484,6 @@ use of FC does not require modeling recursion, you will not need to track $[[S]]
 \subsection{Notes}
 
 \begin{itemize}
-\item The \ottdrulename{S\_LetRec} rules
-implement recursion. \ottdrulename{S\_LetRec} adds to the context $[[S]]$ bindings
-for all of the mutually recursive equations. Then, after perhaps many steps,
-when the body of the $[[let]]\ [[rec]]$ contains no variables that are bound
-in the $[[let]]\ [[rec]]$, the context is popped in \ottdrulename{S\_LetRecReturn}.
-The other \ottdrulename{S\_LetRecXXX}
-rules are there to prevent reduction from getting stuck.
 \item In the $[[case]]$ rules, a constructor $[[K]]$ is written taking three
 lists of arguments: two lists of types and a list of terms. The types passed
 in are the universally and, respectively, existentially quantified type variables
