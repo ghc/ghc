@@ -360,7 +360,7 @@ pprDebugCLabel lbl
                                 <+> ppr src
                                 <+> ppr funOrData)
 
-        _               -> ppr lbl <> (parens $ text "other CLabel)")
+        _               -> ppr lbl <> (parens $ text "other CLabel")
 
 
 data IdLabelInfo
@@ -416,7 +416,7 @@ data RtsLabelInfo
 --      Determines the suffix appended to the name when a CLabel.CmmLabel
 --      is pretty printed.
 data CmmLabelInfo
-  = CmmInfo                     -- ^ misc rts info tabless,     suffix _info
+  = CmmInfo                     -- ^ misc rts info tables,      suffix _info
   | CmmEntry                    -- ^ misc rts entry points,     suffix _entry
   | CmmRetInfo                  -- ^ misc rts ret info tables,  suffix _info
   | CmmRet                      -- ^ misc rts return points,    suffix _ret
