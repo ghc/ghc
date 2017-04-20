@@ -62,7 +62,7 @@ else:
 if (config.have_profiling and ghc_with_threaded_rts == 1):
     config.run_ways.append('profthreaded')
 
-if (ghc_with_llvm == 1):
+if (ghc_with_llvm == 1 and not config.unregisterised):
     config.compile_ways.append('optllvm')
     config.run_ways.append('optllvm')
 
