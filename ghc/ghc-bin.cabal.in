@@ -32,7 +32,7 @@ Executable ghc
                    array      >= 0.1 && < 0.6,
                    bytestring >= 0.9 && < 0.11,
                    directory  >= 1   && < 1.4,
-                   process    >= 1   && < 1.5,
+                   process    >= 1   && < 1.7,
                    filepath   >= 1   && < 1.5,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc        == @ProjectVersionMunged@

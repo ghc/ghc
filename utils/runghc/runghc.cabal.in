@@ -28,7 +28,7 @@ Executable runghc
 
     Build-Depends: base       >= 3   && < 5,
                    directory  >= 1   && < 1.4,
-                   process    >= 1   && < 1.5,
+                   process    >= 1   && < 1.7,
                    filepath
 
     if !os(windows)
