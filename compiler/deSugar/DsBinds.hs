@@ -536,6 +536,7 @@ thought!
 
 Note [Desugar Strict binds]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+See https://ghc.haskell.org/trac/ghc/wiki/StrictPragma
 
 Desugaring strict variable bindings looks as follows (core below ==>)
 

@@ -1651,12 +1651,9 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
     restricted (VarBind { var_id = v })                  = no_sig v
     restricted (FunBind { fun_id = v, fun_matches = m }) = restricted_match m
                                                            && no_sig (unLoc v)
-    restricted (PatSynBind {}) = panic "isRestrictedGroup/unrestricted PatSynBind"
-    restricted (AbsBinds {}) = panic "isRestrictedGroup/unrestricted AbsBinds"
-    restricted (AbsBindsSig {}) = panic "isRestrictedGroup/unrestricted AbsBindsSig"
+    restricted b = pprPanic "isRestrictedGroup/unrestricted" (ppr b)
 
-    restricted_match (MG { mg_alts = L _ (L _ (Match _ [] _ _) : _ )}) = True
-    restricted_match _                                                 = False
+    restricted_match mg = matchGroupArity mg == 0
         -- No args => like a pattern binding
         -- Some args => a function binding
 
