@@ -26,6 +26,9 @@
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
+#if defined(dragonfly_HOST_OS)
+#include <sys/tls.h>
+#endif
 
 /* on x86_64 we have a problem with relocating symbol references in
  * code that was compiled without -fPIC.  By default, the small memory

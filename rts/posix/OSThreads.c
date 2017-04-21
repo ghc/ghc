@@ -9,9 +9,9 @@
 
 #include "PosixSource.h"
 
-#if defined(freebsd_HOST_OS)
-/* Inclusion of system headers usually requires __BSD_VISIBLE on FreeBSD,
- * because of some specific types, like u_char, u_int, etc. */
+#if defined(freebsd_HOST_OS) || defined(dragonfly_HOST_OS)
+/* Inclusion of system headers usually requires __BSD_VISIBLE on FreeBSD and
+ * DragonflyBSD, because of some specific types, like u_char, u_int, etc. */
 #define __BSD_VISIBLE   1
 #endif
 #if defined(darwin_HOST_OS)
