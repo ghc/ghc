@@ -260,6 +260,10 @@ ifeq "$(findstring show,$(MAKECMDGOALS))" "show"
 NO_INCLUDE_DEPS = YES
 # We want package-data.mk for show
 endif
+ifeq "$(findstring echo,$(MAKECMDGOALS))" "echo"
+NO_INCLUDE_DEPS = YES
+# We want package-data.mk for show
+endif
 
 # -----------------------------------------------------------------------------
 # Ways

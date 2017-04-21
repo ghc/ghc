@@ -795,7 +795,7 @@ else ifeq "$(TAR_COMP)" "gzip"
 TAR_COMP_CMD  = $(GZIP_CMD)
 TAR_COMP_EXT  = gz
 else ifeq "$(TAR_COMP)" "xz"
-TAR_COMP_CMD  = $(XZ_CMD)
+TAR_COMP_CMD  = $(XZ_CMD) --threads=0
 TAR_COMP_EXT  = xz
 else
 $(error $$(TAR_COMP) set to unknown value "$(TAR_COMP)" (supported: "bzip2", "gzip", "xz"))

@@ -173,6 +173,10 @@ $(filter clean_%, $(MAKECMDGOALS)) : clean_% :
 bootstrapping-files show echo:
 	$(MAKE) --no-print-directory -f ghc.mk $@
 
+.PHONY: echo!
+echo!:
+	@$(MAKE) --no-print-directory -f ghc.mk echo NO_INCLUDE_PKGDATA=YES
+
 .PHONY: show!
 show!:
 	$(MAKE) --no-print-directory -f ghc.mk show NO_INCLUDE_PKGDATA=YES
