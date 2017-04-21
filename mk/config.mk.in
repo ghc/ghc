@@ -415,6 +415,7 @@ GhcRtsWithLibdw=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64),@UseLibdw@,
 #
 ################################################################################
 
+BINDIST               = NO
 BIN_DIST_NAME         = ghc-$(ProjectVersion)
 BIN_DIST_PREP_DIR     = bindistprep/$(BIN_DIST_NAME)
 BIN_DIST_PREP_TAR     = bindistprep/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar

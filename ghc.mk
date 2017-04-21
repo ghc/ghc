@@ -962,7 +962,7 @@ endif
 
 INSTALLED_PACKAGE_CONF=$(DESTDIR)$(topdir)/package.conf.d
 
-ifeq "$(CrossCompiling)" "YES"
+ifeq "$(BINDIST) $(CrossCompiling)" "NO YES"
 # when installing ghc-stage2 we can't run target's
 # 'ghc-pkg' and 'ghc-stage2' but those are needed for registration.
 INSTALLED_GHC_REAL=$(TOP)/inplace/bin/ghc-stage1
