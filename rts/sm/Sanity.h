@@ -8,7 +8,7 @@
 
 #pragma once
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 #include "BeginPrivate.h"
 

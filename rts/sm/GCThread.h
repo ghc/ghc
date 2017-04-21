@@ -119,7 +119,7 @@ typedef struct gen_workspace_ {
 typedef struct gc_thread_ {
     Capability *cap;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     OSThreadId id;                 // The OS thread that this struct belongs to
     SpinLock   gc_spin;
     SpinLock   mut_spin;

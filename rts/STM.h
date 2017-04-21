@@ -32,7 +32,7 @@
 
 #pragma once
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 //#define STM_CG_LOCK
 #define STM_FG_LOCKS
 #else

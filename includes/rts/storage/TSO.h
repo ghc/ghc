@@ -173,13 +173,13 @@ typedef struct StgTSO_ {
      */
     StgWord32  tot_stack_size;
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
     /* TICKY-specific stuff would go here. */
 #endif
-#ifdef PROFILING
+#if defined(PROFILING)
     StgTSOProfInfo prof;
 #endif
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     StgWord32 saved_winerror;
 #endif
 

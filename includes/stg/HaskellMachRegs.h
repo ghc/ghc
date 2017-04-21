@@ -24,7 +24,7 @@
  * the stack, and components of an unboxed tuple will be returned on
  * the stack rather than in registers.
  */
-#ifdef NO_REGS
+#if defined(NO_REGS)
 
 #define MACHREGS_NO_REGS 1
 
@@ -32,11 +32,11 @@
 
 #define MACHREGS_NO_REGS 0
 
-#ifdef i386_TARGET_ARCH
+#if defined(i386_TARGET_ARCH)
 #define MACHREGS_i386     1
 #endif
 
-#ifdef x86_64_TARGET_ARCH
+#if defined(x86_64_TARGET_ARCH)
 #define MACHREGS_x86_64   1
 #endif
 
@@ -45,19 +45,19 @@
 #define MACHREGS_powerpc  1
 #endif
 
-#ifdef sparc_TARGET_ARCH
+#if defined(sparc_TARGET_ARCH)
 #define MACHREGS_sparc    1
 #endif
 
-#ifdef arm_TARGET_ARCH
+#if defined(arm_TARGET_ARCH)
 #define MACHREGS_arm      1
 #endif
 
-#ifdef aarch64_TARGET_ARCH
+#if defined(aarch64_TARGET_ARCH)
 #define MACHREGS_aarch64  1
 #endif
 
-#ifdef darwin_TARGET_OS
+#if defined(darwin_TARGET_OS)
 #define MACHREGS_darwin   1
 #endif
 

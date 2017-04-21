@@ -483,7 +483,7 @@ plusParent p1 p2@(FldParent _ _) = hasParent p2 p1
 plusParent _ _                   = NoParent
 
 hasParent :: Parent -> Parent -> Parent
-#ifdef DEBUG
+#if defined(DEBUG)
 hasParent p NoParent = p
 hasParent p p'
   | p /= p' = pprPanic "hasParent" (ppr p <+> ppr p')  -- Parents should agree

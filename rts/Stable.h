@@ -43,7 +43,7 @@ void    updateStableTables    ( bool full );
 void    stableLock            ( void );
 void    stableUnlock          ( void );
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 // needed by Schedule.c:forkProcess()
 extern Mutex stable_mutex;
 #endif

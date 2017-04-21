@@ -79,7 +79,7 @@ tail []                 =  errorEmptyList "tail"
 
 -- | Extract the last element of a list, which must be finite and non-empty.
 last                    :: [a] -> a
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 last [x]                =  x
 last (_:xs)             =  last xs
 last []                 =  errorEmptyList "last"
@@ -98,7 +98,7 @@ lastError = errorEmptyList "last"
 -- | Return all the elements of a list except the last one.
 -- The list must be non-empty.
 init                    :: [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 init [x]                =  []
 init (x:xs)             =  x : init xs
 init []                 =  errorEmptyList "init"
@@ -550,7 +550,7 @@ dropWhile p xs@(x:xs')
 -- It is an instance of the more general 'Data.List.genericTake',
 -- in which @n@ may be of any integral type.
 take                   :: Int -> [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 take n _      | n <= 0 =  []
 take _ []              =  []
 take n (x:xs)          =  x : take (n-1) xs
@@ -617,7 +617,7 @@ takeFB c n x xs
 -- It is an instance of the more general 'Data.List.genericDrop',
 -- in which @n@ may be of any integral type.
 drop                   :: Int -> [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 drop n xs     | n <= 0 =  xs
 drop _ []              =  []
 drop n (_:xs)          =  drop (n-1) xs
@@ -652,7 +652,7 @@ drop n ls
 -- in which @n@ may be of any integral type.
 splitAt                :: Int -> [a] -> ([a],[a])
 
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 splitAt n xs           =  (take n xs, drop n xs)
 #else
 splitAt n ls
@@ -694,7 +694,7 @@ span p xs@(x:xs')
 -- 'break' @p@ is equivalent to @'span' ('not' . p)@.
 
 break                   :: (a -> Bool) -> [a] -> ([a],[a])
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 break p                 =  span (not . p)
 #else
 -- HBC version (stolen)
@@ -707,7 +707,7 @@ break p xs@(x:xs')
 -- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
 -- @xs@ must be finite.
 reverse                 :: [a] -> [a]
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 reverse                 =  foldl (flip (:)) []
 #else
 reverse l =  rev l []
@@ -720,7 +720,7 @@ reverse l =  rev l []
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value at a finite index of a finite or infinite list.
 and                     :: [Bool] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 and                     =  foldr (&&) True
 #else
 and []          =  True
@@ -737,7 +737,7 @@ and (x:xs)      =  x && and xs
 -- 'False', the list must be finite; 'True', however, results from a 'True'
 -- value at a finite index of a finite or infinite list.
 or                      :: [Bool] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 or                      =  foldr (||) False
 #else
 or []           =  False
@@ -756,7 +756,7 @@ or (x:xs)       =  x || or xs
 -- value for the predicate applied to an element at a finite index of a finite or infinite list.
 any                     :: (a -> Bool) -> [a] -> Bool
 
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 any p                   =  or . map p
 #else
 any _ []        = False
@@ -775,7 +775,7 @@ any p (x:xs)    = p x || any p xs
 -- 'True', the list must be finite; 'False', however, results from a 'False'
 -- value for the predicate applied to an element at a finite index of a finite or infinite list.
 all                     :: (a -> Bool) -> [a] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 all p                   =  and . map p
 #else
 all _ []        =  True
@@ -794,7 +794,7 @@ all p (x:xs)    =  p x && all p xs
 -- 'False', the list must be finite; 'True', however, results from an element
 -- equal to @x@ found at a finite index of a finite or infinite list.
 elem                    :: (Eq a) => a -> [a] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 elem x                  =  any (== x)
 #else
 elem _ []       = False
@@ -808,7 +808,7 @@ elem x (y:ys)   = x==y || elem x ys
 
 -- | 'notElem' is the negation of 'elem'.
 notElem                 :: (Eq a) => a -> [a] -> Bool
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 notElem x               =  all (/= x)
 #else
 notElem _ []    =  True
@@ -855,7 +855,7 @@ concat = foldr (++) []
 -- It is an instance of the more general 'Data.List.genericIndex',
 -- which takes an index of any integral type.
 (!!)                    :: [a] -> Int -> a
-#ifdef USE_REPORT_PRELUDE
+#if defined(USE_REPORT_PRELUDE)
 xs     !! n | n < 0 =  errorWithoutStackTrace "Prelude.!!: negative index"
 []     !! _         =  errorWithoutStackTrace "Prelude.!!: index too large"
 (x:_)  !! 0         =  x

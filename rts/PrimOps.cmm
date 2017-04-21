@@ -25,7 +25,7 @@
 #include "MachDeps.h"
 #include "SMPClosureOps.h"
 
-#ifdef __PIC__
+#if defined(__PIC__)
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
@@ -36,7 +36,7 @@ import CLOSURE ghczmprim_GHCziTypes_False_closure;
 #if defined(USE_MINIINTERPRETER) || !defined(mingw32_HOST_OS)
 import CLOSURE sm_mutex;
 #endif
-#ifdef PROFILING
+#if defined(PROFILING)
 import CLOSURE CCS_MAIN;
 #endif
 
@@ -605,7 +605,7 @@ stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
   retry:
     x = StgMutVar_var(mv);
     StgThunk_payload(z,1) = x;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, x, y);
     if (h != x) { goto retry; }
 #else
@@ -714,7 +714,7 @@ stg_finalizzeWeakzh ( gcptr w )
     list = StgWeak_cfinalizers(w);
 
     // kill it
-#ifdef PROFILING
+#if defined(PROFILING)
     // @LDV profiling
     // A weak pointer is inherently used, so we do not need to call
     // LDV_recordDead_FILL_SLOP_DYNAMIC():
@@ -2072,7 +2072,7 @@ write_nptrs:
 
 stg_waitReadzh ( W_ fd )
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("waitRead# on threaded RTS") never returns;
 #else
 
@@ -2088,7 +2088,7 @@ stg_waitReadzh ( W_ fd )
 
 stg_waitWritezh ( W_ fd )
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("waitWrite# on threaded RTS") never returns;
 #else
 
@@ -2106,21 +2106,21 @@ stg_waitWritezh ( W_ fd )
 STRING(stg_delayzh_malloc_str, "stg_delayzh")
 stg_delayzh ( W_ us_delay )
 {
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     W_ ares;
     CInt reqID;
 #else
     W_ t, prev, target;
 #endif
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("delay# on threaded RTS") never returns;
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDelay::I16;
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = ccall stgMallocBytes(SIZEOF_StgAsyncIOResult,
@@ -2168,14 +2168,14 @@ while:
 }
 
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 STRING(stg_asyncReadzh_malloc_str, "stg_asyncReadzh")
 stg_asyncReadzh ( W_ fd, W_ is_sock, W_ len, W_ buf )
 {
     W_ ares;
     CInt reqID;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("asyncRead# on threaded RTS") never returns;
 #else
 
@@ -2201,7 +2201,7 @@ stg_asyncWritezh ( W_ fd, W_ is_sock, W_ len, W_ buf )
     W_ ares;
     CInt reqID;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("asyncWrite# on threaded RTS") never returns;
 #else
 
@@ -2227,7 +2227,7 @@ stg_asyncDoProczh ( W_ proc, W_ param )
     W_ ares;
     CInt reqID;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     ccall barf("asyncDoProc# on threaded RTS") never returns;
 #else
 
@@ -2356,7 +2356,7 @@ stg_traceCcszh ( P_ obj, P_ ret )
 {
     W_ ccs;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     ccs = StgHeader_ccs(UNTAG(obj));
     ccall fprintCCS_stderr(ccs "ptr");
 #endif
@@ -2368,7 +2368,7 @@ stg_getSparkzh ()
 {
     W_ spark;
 
-#ifndef THREADED_RTS
+#if !defined(THREADED_RTS)
     return (0,ghczmprim_GHCziTypes_False_closure);
 #else
     ("ptr" spark) = ccall findSpark(MyCapability() "ptr");
@@ -2382,7 +2382,7 @@ stg_getSparkzh ()
 
 stg_clearCCSzh (P_ arg)
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     CCCS = CCS_MAIN;
 #endif
     jump stg_ap_v_fast(arg);
@@ -2391,7 +2391,7 @@ stg_clearCCSzh (P_ arg)
 stg_numSparkszh ()
 {
     W_ n;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     (n) = ccall dequeElements(Capability_sparks(MyCapability()));
 #else
     n = 0;

@@ -51,14 +51,14 @@ typedef struct {
 
 typedef struct {
     const StgInfoTable* info;
-#ifdef PROFILING
+#if defined(PROFILING)
     StgProfHeader         prof;
 #endif
 } StgHeader;
 
 typedef struct {
     const StgInfoTable* info;
-#ifdef PROFILING
+#if defined(PROFILING)
     StgProfHeader         prof;
 #endif
     StgSMPThunkHeader     smp;

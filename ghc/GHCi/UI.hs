@@ -122,7 +122,7 @@ import Text.Read.Lex (isSymbolChar)
 
 import Unsafe.Coerce
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import System.Posix hiding ( getEnv )
 #else
 import qualified System.Win32
@@ -379,7 +379,7 @@ findEditor :: IO String
 findEditor = do
   getEnv "EDITOR"
     `catchIO` \_ -> do
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
         win <- System.Win32.getWindowsDirectory
         return (win </> "notepad.exe")
 #else
@@ -669,7 +669,7 @@ checkFileAndDirPerms file = do
     d -> d
 
 checkPerms :: FilePath -> IO Bool
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 checkPerms _ = return True
 #else
 checkPerms file =
@@ -720,7 +720,7 @@ formatCurrentTime format =
 
 getUserName :: IO String
 getUserName = do
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   getEnv "USERNAME"
     `catchIO` \e -> do
       putStrLn $ show e

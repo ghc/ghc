@@ -33,7 +33,7 @@ import Foreign
 import Foreign.C
 import System.IO.Error (mkIOError)
 import Control.Exception.Base (bracket_, throwIO)
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Control.Exception.Base (bracket)
 #endif
 -- import GHC.IO
@@ -41,7 +41,7 @@ import GHC.IO.Exception
 import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 import Control.Monad
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import GHC.Environment
 import GHC.Windows
 #else
@@ -50,7 +50,7 @@ import System.Posix.Internals (withFilePath)
 
 import System.Environment.ExecutablePath
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
 # elif defined(x86_64_HOST_ARCH)
@@ -65,7 +65,7 @@ import System.Environment.ExecutablePath
 -- ---------------------------------------------------------------------------
 -- getArgs, getProgName, getEnv
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 
 {-
 Note [Ignore hs_init argv]
@@ -133,7 +133,7 @@ dropRTSArgs (arg:rest)     = arg : dropRTSArgs rest
 -- line arguments (not including the program name).
 getArgs :: IO [String]
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 getArgs =  fmap tail getWin32ProgArgv_certainly
 #else
 getArgs =
@@ -160,7 +160,7 @@ between platforms: on Windows, for example, a program invoked as foo
 is probably really @FOO.EXE@, and that is what 'getProgName' will return.
 -}
 getProgName :: IO String
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 -- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
 getProgName = fmap (basename . head) getWin32ProgArgv_certainly
 #else
@@ -188,7 +188,7 @@ basename f = go f f
 
   isPathSeparator :: Char -> Bool
   isPathSeparator '/'  = True
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   isPathSeparator '\\' = True
 #endif
   isPathSeparator _    = False
@@ -206,7 +206,7 @@ basename f = go f f
 getEnv :: String -> IO String
 getEnv name = lookupEnv name >>= maybe handleError return
   where
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     handleError = do
         err <- c_GetLastError
         if err == eRROR_ENVVAR_NOT_FOUND
@@ -230,7 +230,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h GetLastError"
 --
 -- @since 4.6.0.0
 lookupEnv :: String -> IO (Maybe String)
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 lookupEnv name = withCWString name $ \s -> try_size s 256
   where
     try_size s size = allocaArray (fromIntegral size) $ \p_value -> do
@@ -295,7 +295,7 @@ setEnv key_ value_
     value = takeWhile (/= '\NUL') value_
 
 setEnv_ :: String -> String -> IO ()
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 setEnv_ key value = withCWString key $ \k -> withCWString value $ \v -> do
   success <- c_SetEnvironmentVariable k v
   unless success (throwGetLastError "setEnv")
@@ -329,7 +329,7 @@ foreign import ccall unsafe "putenv" c_putenv :: CString -> IO CInt
 --
 -- @since 4.7.0.0
 unsetEnv :: String -> IO ()
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 unsetEnv key = withCWString key $ \k -> do
   success <- c_SetEnvironmentVariable k nullPtr
   unless success $ do
@@ -340,7 +340,7 @@ unsetEnv key = withCWString key $ \k -> do
       throwGetLastError "unsetEnv"
 #else
 
-#ifdef HAVE_UNSETENV
+#if defined(HAVE_UNSETENV)
 unsetEnv key = withFilePath key (throwErrnoIf_ (/= 0) "unsetEnv" . c_unsetenv)
 foreign import ccall unsafe "__hsbase_unsetenv" c_unsetenv :: CString -> IO CInt
 #else
@@ -372,7 +372,7 @@ withProgName nm act = do
 
 withArgv :: [String] -> IO a -> IO a
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 -- We have to reflect the updated arguments in the RTS-side variables as
 -- well, because the RTS still consults them for error messages and the like.
 -- If we don't do this then ghc-e005 fails.
@@ -406,7 +406,7 @@ foreign import ccall unsafe "setProgArgv"
 -- the @key@ is the whole entry and the @value@ is the empty string.
 getEnvironment :: IO [(String, String)]
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 getEnvironment = bracket c_GetEnvironmentStrings c_FreeEnvironmentStrings $ \pBlock ->
     if pBlock == nullPtr then return []
      else go pBlock

@@ -47,7 +47,7 @@ module GHCi
   ) where
 
 import GHCi.Message
-#ifdef GHCI
+#if defined(GHCI)
 import GHCi.Run
 #endif
 import GHCi.RemoteTypes
@@ -83,7 +83,7 @@ import GHC.Stack (CostCentre,CostCentreStack)
 import System.Exit
 import Data.Maybe
 import GHC.IO.Handle.Types (Handle)
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Foreign.C
 import GHC.IO.Handle.FD (fdToHandle)
 #if !MIN_VERSION_process(1,4,2)
@@ -162,7 +162,7 @@ Other Notes on Remote GHCi
   * Note [Remote Template Haskell] in libraries/ghci/GHCi/TH.hs
 -}
 
-#ifndef GHCI
+#if !defined(GHCI)
 needExtInt :: IO a
 needExtInt = throwIO
   (InstallationError "this operation requires -fexternal-interpreter")
@@ -180,7 +180,7 @@ iservCmd hsc_env@HscEnv{..} msg
        uninterruptibleMask_ $ do -- Note [uninterruptibleMask_]
          iservCall iserv msg
  | otherwise = -- Just run it directly
-#ifdef GHCI
+#if defined(GHCI)
    run msg
 #else
    needExtInt
@@ -385,7 +385,7 @@ lookupSymbol hsc_env@HscEnv{..} str
                writeIORef iservLookupSymbolCache $! addToUFM cache str p
                return (Just p)
  | otherwise =
-#ifdef GHCI
+#if defined(GHCI)
    fmap fromRemotePtr <$> run (LookupSymbol (unpackFS str))
 #else
    needExtInt
@@ -525,7 +525,7 @@ stopIServ HscEnv{..} =
 
 runWithPipes :: (CreateProcess -> IO ProcessHandle)
              -> FilePath -> [String] -> IO (ProcessHandle, Handle, Handle)
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall "io.h _close"
    c__close :: CInt -> IO CInt
 
@@ -652,7 +652,7 @@ wormholeRef dflags _r
   | gopt Opt_ExternalInterpreter dflags
   = throwIO (InstallationError
       "this operation requires -fno-external-interpreter")
-#ifdef GHCI
+#if defined(GHCI)
   | otherwise
   = localRef _r
 #else

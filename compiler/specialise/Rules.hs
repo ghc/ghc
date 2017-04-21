@@ -843,7 +843,7 @@ match_co renv subst co1 co2
       _ -> Nothing
 match_co _ _ _co1 _co2
     -- Currently just deals with CoVarCo, TyConAppCo and Refl
-#ifdef DEBUG
+#if defined(DEBUG)
   = pprTrace "match_co: needs more cases" (ppr _co1 $$ ppr _co2) Nothing
 #else
   = Nothing

@@ -102,7 +102,7 @@ int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
 }
 
 
-#ifndef arm_HOST_ARCH
+#if !defined(arm_HOST_ARCH)
 SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
                               unsigned long symbolNumber,
                               unsigned long target )
@@ -114,7 +114,7 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 
     extra = &oc->symbol_extras[symbolNumber - oc->first_symbol_extra];
 
-#ifdef powerpc_HOST_ARCH
+#if defined(powerpc_HOST_ARCH)
     // lis r12, hi16(target)
     extra->jumpIsland.lis_r12     = 0x3d80;
     extra->jumpIsland.hi_addr     = target >> 16;
@@ -129,7 +129,7 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
     // bctr
     extra->jumpIsland.bctr        = 0x4e800420;
 #endif /* powerpc_HOST_ARCH */
-#ifdef x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     // jmp *-14(%rip)
     static uint8_t jmp[] = { 0xFF, 0x25, 0xF2, 0xFF, 0xFF, 0xFF };
     extra->addr = target;
@@ -140,7 +140,7 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 }
 #endif
 
-#ifdef arm_HOST_ARCH
+#if defined(arm_HOST_ARCH)
 /*
   Note [The ARM/Thumb Story]
   ~~~~~~~~~~~~~~~~~~~~~~~~~~

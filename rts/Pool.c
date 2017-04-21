@@ -28,7 +28,7 @@ struct Pool_ {
     /* how many things are currently allocated? (sum of lengths of available and
      * taken lists) */
     uint32_t current_size;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     /* signaled when a thing is released */
     Condition cond;
 #endif
@@ -37,7 +37,7 @@ struct Pool_ {
 
     PoolEntry *available;
     PoolEntry *taken;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     /* protects entire data structure */
     Mutex mutex;
 #endif
@@ -53,7 +53,7 @@ Pool *poolInit(uint32_t max_size, uint32_t desired_size,
     pool->free_fn = free_fn;
     pool->available = NULL;
     pool->taken = NULL;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&pool->mutex);
     initCondition(&pool->cond);
 #endif
@@ -65,7 +65,7 @@ int poolFree(Pool *pool) {
         return 1;
 
     poolSetMaxSize(pool, 0);
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeCondition(&pool->cond);
     closeMutex(&pool->mutex);
 #endif
@@ -145,7 +145,7 @@ void *poolTake(Pool *pool) {
     while (ent == NULL) {
         ent = poolTryTake_(pool);
         if (!ent) {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
             waitCondition(&pool->cond, &pool->mutex);
 #else
             barf("Tried to take from an empty pool");
@@ -171,7 +171,7 @@ void poolRelease(Pool *pool, void *thing) {
             } else {
                 ent->next = pool->available;
                 pool->available = ent;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
                 signalCondition(&pool->cond);
 #endif
             }

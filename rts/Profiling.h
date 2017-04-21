@@ -13,7 +13,7 @@
 #include "BeginPrivate.h"
 #include "Rts.h"
 
-#ifdef PROFILING
+#if defined(PROFILING)
 #define PROFILING_ONLY(s) s
 #else
 #define PROFILING_ONLY(s) doNothing()
@@ -35,7 +35,7 @@ typedef struct {
     unsigned int total_prof_ticks;
 } ProfilerTotals;
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 void reportCCSProfiling ( void );
 
@@ -45,7 +45,7 @@ void fprintCCS_stderr (CostCentreStack *ccs, StgClosure *exception, StgTSO *tso)
 bool ignoreCCS (CostCentreStack const *ccs);
 bool ignoreCC (CostCentre const *cc);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void debugCCS( CostCentreStack *ccs );
 #endif
 

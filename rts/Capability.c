@@ -306,7 +306,7 @@ initCapability (Capability *cap, uint32_t i)
     cap->pinned_object_block = NULL;
     cap->pinned_object_blocks = NULL;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #else
     cap->r.rCCCS = NULL;
@@ -368,7 +368,7 @@ void initCapabilities (void)
 
 #if defined(THREADED_RTS)
 
-#ifndef REG_Base
+#if !defined(REG_Base)
     // We can't support multiple CPUs if BaseReg is not a register
     if (RtsFlags.ParFlags.nCapabilities > 1) {
         errorBelch("warning: multiple CPUs not supported in this build, reverting to 1");
@@ -575,7 +575,7 @@ releaseCapability_ (Capability* cap,
         }
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_IDLE;
 #endif
     last_free_capability[cap->node] = cap;
@@ -806,7 +806,7 @@ void waitForCapability (Capability **pCap, Task *task)
         cap = waitForReturnCapability(task);
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #endif
 
@@ -898,7 +898,7 @@ yieldCapability (Capability** pCap, Task *task, bool gcAllowed)
     debugTrace(DEBUG_sched, "resuming capability %d", cap->no);
     ASSERT(cap->running_task == task);
 
-#ifdef PROFILING
+#if defined(PROFILING)
     cap->r.rCCCS = CCS_SYSTEM;
 #endif
 

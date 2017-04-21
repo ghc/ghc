@@ -441,7 +441,7 @@ void setExecutable (void *p, W_ len, bool exec)
     }
 }
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 static void* heap_base = NULL;
 

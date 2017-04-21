@@ -35,7 +35,7 @@
 #  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #endif
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #  define RTS_RET(f)      RTS_INFO(f##_info)
 #  define RTS_ENTRY(f)    RTS_INFO(f##_info)
 #  define RTS_FUN(f)      RTS_FUN_INFO(f##_info)
@@ -318,7 +318,7 @@ RTS_RET(stg_block_takemvar);
 RTS_RET(stg_block_readmvar);
 RTS_FUN_DECL(stg_block_putmvar);
 RTS_RET(stg_block_putmvar);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_block_async);
 RTS_RET(stg_block_async);
 RTS_FUN_DECL(stg_block_async_void);
@@ -395,7 +395,7 @@ RTS_FUN_DECL(stg_tryReadMVarzh);
 RTS_FUN_DECL(stg_waitReadzh);
 RTS_FUN_DECL(stg_waitWritezh);
 RTS_FUN_DECL(stg_delayzh);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 RTS_FUN_DECL(stg_asyncReadzh);
 RTS_FUN_DECL(stg_asyncWritezh);
 RTS_FUN_DECL(stg_asyncDoProczh);

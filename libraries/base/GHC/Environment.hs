@@ -9,7 +9,7 @@ import Foreign.C
 import GHC.Base
 import GHC.Real ( fromIntegral )
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import GHC.IO (finally)
 import GHC.Windows
 
@@ -30,7 +30,7 @@ import qualified GHC.Foreign as GHC
 -- command line arguments, starting with the program name, and
 -- including those normally eaten by the RTS (+RTS ... -RTS).
 getFullArgs :: IO [String]
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 -- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
 getFullArgs = do
     p_arg_string <- c_GetCommandLine

@@ -71,7 +71,7 @@ uint32_t n_nurseries;
  */
 volatile StgWord next_nursery[MAX_NUMA_NODES];
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 /*
  * Storage manager mutex:  protects all the above state from
  * simultaneous access by two STG threads.
@@ -113,7 +113,7 @@ initGeneration (generation *gen, int g)
     gen->mark = 0;
     gen->compact = 0;
     gen->bitmap = NULL;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initSpinLock(&gen->sync);
 #endif
     gen->threads = END_TSO_QUEUE;
@@ -195,9 +195,9 @@ initStorage (void)
 
   exec_block = NULL;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
   initSpinLock(&gc_alloc_block_sync);
-#ifdef PROF_SPIN
+#if defined(PROF_SPIN)
   whitehole_spin = 0;
 #endif
 #endif
@@ -381,7 +381,7 @@ lockCAF (StgRegTable *reg, StgIndStatic *caf)
 
     orig_info = caf->header.info;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     const StgInfoTable *cur_info;
 
     if (orig_info == &stg_IND_STATIC_info ||
@@ -452,7 +452,7 @@ newCAF(StgRegTable *reg, StgIndStatic *caf)
                              regTableToCapability(reg), oldest_gen->no);
         }
 
-#ifdef DEBUG
+#if defined(DEBUG)
         // In the DEBUG rts, we keep track of live CAFs by chaining them
         // onto a list debug_caf_list.  This is so that we can tell if we
         // ever enter a GC'd CAF, and emit a suitable barf().
@@ -642,7 +642,7 @@ resetNurseries (void)
     }
     assignNurseriesToCapabilities(0, n_capabilities);
 
-#ifdef DEBUG
+#if defined(DEBUG)
     bdescr *bd;
     for (n = 0; n < n_nurseries; n++) {
         for (bd = nurseries[n].blocks; bd; bd = bd->link) {
@@ -1515,7 +1515,7 @@ void freeExec (void *addr)
 
 #endif /* switch(HOST_OS) */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 // handy function for use in gdb, because Bdescr() is inlined.
 extern bdescr *_bdescr (StgPtr p);

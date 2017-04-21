@@ -54,7 +54,7 @@ import RnFixity ( lookupFixityRn )
 import MkId
 import TidyPgm    ( globaliseAndTidyId )
 import TysWiredIn ( unitTy, mkListTy )
-#ifdef GHCI
+#if defined(GHCI)
 import DynamicLoading ( loadPlugins )
 import Plugins ( tcPlugin )
 #endif
@@ -2622,7 +2622,7 @@ withTcPlugins hsc_env m =
        return (solve s, stop s)
 
 loadTcPlugins :: HscEnv -> IO [TcPlugin]
-#ifndef GHCI
+#if !defined(GHCI)
 loadTcPlugins _ = return []
 #else
 loadTcPlugins hsc_env =

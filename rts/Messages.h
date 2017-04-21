@@ -13,7 +13,7 @@
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg);
 StgTSO * blackHoleOwner (StgClosure *bh);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 void executeMessage (Capability *cap, Message *m);
 void sendMessage    (Capability *from_cap, Capability *to_cap, Message *msg);
 #endif

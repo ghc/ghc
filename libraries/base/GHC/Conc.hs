@@ -86,7 +86,7 @@ module GHC.Conc
 
         -- * Miscellaneous
         , withMVar
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
         , asyncRead
         , asyncWrite
         , asyncDoProc
@@ -95,14 +95,14 @@ module GHC.Conc
         , asyncWriteBA
 #endif
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
         , Signal, HandlerFun, setHandler, runHandlers
 #endif
 
         , ensureIOManagerIsRunning
         , ioManagerCapabilitiesChanged
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
         , ConsoleEvent(..)
         , win32ConsoleHandler
         , toWin32ConsoleEvent
@@ -116,6 +116,6 @@ module GHC.Conc
 import GHC.Conc.IO
 import GHC.Conc.Sync
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import GHC.Conc.Signal
 #endif

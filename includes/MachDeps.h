@@ -100,7 +100,7 @@
 #define SIZEOF_WORD64           SIZEOF_UINT64_T
 #define ALIGNMENT_WORD64        ALIGNMENT_UINT64_T
 
-#ifndef WORD_SIZE_IN_BITS
+#if !defined(WORD_SIZE_IN_BITS)
 #if SIZEOF_HSWORD == 4
 #define WORD_SIZE_IN_BITS       32
 #define WORD_SIZE_IN_BITS_FLOAT 32.0
@@ -110,7 +110,7 @@
 #endif
 #endif
 
-#ifndef TAG_BITS
+#if !defined(TAG_BITS)
 #if SIZEOF_HSWORD == 4
 #define TAG_BITS                2
 #else

@@ -11,7 +11,7 @@
 
 #include <windows.h>
 
-#ifdef HAVE_TIME_H
+#if defined(HAVE_TIME_H)
 # include <time.h>
 #endif
 

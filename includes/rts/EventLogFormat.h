@@ -230,7 +230,7 @@
 #define CAPSET_TYPE_OSPROCESS   2  /* caps belong to the same OS process */
 #define CAPSET_TYPE_CLOCKDOMAIN 3  /* caps share a local clock/time      */
 
-#ifndef EVENTLOG_CONSTANTS_ONLY
+#if !defined(EVENTLOG_CONSTANTS_ONLY)
 
 typedef StgWord16 EventTypeNum;
 typedef StgWord64 EventTimestamp; /* in nanoseconds */

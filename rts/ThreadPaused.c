@@ -240,7 +240,7 @@ threadPaused(Capability *cap, StgTSO *tso)
             bh = ((StgUpdateFrame *)frame)->updatee;
             bh_info = bh->header.info;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         retry:
 #endif
             // Note [suspend duplicate work]
@@ -311,7 +311,7 @@ threadPaused(Capability *cap, StgTSO *tso)
 
             // an EAGER_BLACKHOLE or CAF_BLACKHOLE gets turned into a
             // BLACKHOLE here.
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
             // first we turn it into a WHITEHOLE to claim it, and if
             // successful we write our TSO and then the BLACKHOLE info pointer.
             cur_bh_info = (const StgInfoTable *)

@@ -11,7 +11,7 @@
 
 #include <stdio.h>
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "BeginPrivate.h"
 
@@ -41,16 +41,16 @@
 #define RETAINER_SCHEME_CCS
 // #define RETAINER_SCHEME_CC
 
-#ifdef RETAINER_SCHEME_INFO
+#if defined(RETAINER_SCHEME_INFO)
 struct _StgInfoTable;
 typedef struct _StgInfoTable *retainer;
 #endif
 
-#ifdef RETAINER_SCHEME_CCS
+#if defined(RETAINER_SCHEME_CCS)
 typedef CostCentreStack *retainer;
 #endif
 
-#ifdef RETAINER_SCHEME_CC
+#if defined(RETAINER_SCHEME_CC)
 typedef CostCentre *retainer;
 #endif
 
@@ -83,7 +83,7 @@ typedef struct _RetainerSet {
     that in the first approach, we do not free the memory allocated for
     retainer sets; we just invalidate all retainer sets.
  */
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
 // In thise case, FIRST_APPROACH must be turned on because the memory pool
 // for retainer sets is freed each time.
 #define FIRST_APPROACH
@@ -159,7 +159,7 @@ isMember(retainer r, RetainerSet *rs)
 // Finds or creates a retainer set augmented with a new retainer.
 RetainerSet *addElement(retainer, RetainerSet *);
 
-#ifdef SECOND_APPROACH
+#if defined(SECOND_APPROACH)
 // Prints a single retainer set.
 void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
 #endif
@@ -168,7 +168,7 @@ void printRetainerSetShort(FILE *, RetainerSet *, uint32_t);
 // store the sum of all costs and the number of all retainer sets.
 void outputRetainerSet(FILE *, uint32_t *, uint32_t *);
 
-#ifdef SECOND_APPROACH
+#if defined(SECOND_APPROACH)
 // Print all retainer sets at the exit of the program.
 void outputAllRetainerSet(FILE *);
 #endif

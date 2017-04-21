@@ -46,7 +46,7 @@
     sources are being processed. This is only the case when 
     using Win32 DLLs. ]
 */
-#ifdef COMPILING_RTS
+#if defined(COMPILING_RTS)
 #define DLL_IMPORT DLLIMPORT
 #define DLL_IMPORT_RTS
 #define DLL_IMPORT_DATA_VAR(x) x
@@ -65,7 +65,7 @@
 #endif
 
 
-#ifdef COMPILING_STDLIB
+#if defined(COMPILING_STDLIB)
 #define DLL_IMPORT_STDLIB
 #else
 #define DLL_IMPORT_STDLIB DLLIMPORT

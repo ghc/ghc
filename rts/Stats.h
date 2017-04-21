@@ -32,10 +32,10 @@ void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct, W_ live,
                        W_ copied, W_ slop, uint32_t gen, uint32_t n_gc_threads,
                        W_ par_max_copied);
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void      stat_startRP(void);
 void      stat_endRP(uint32_t,
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
                             uint32_t, int,
 #endif
                             double);

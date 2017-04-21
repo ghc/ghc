@@ -257,7 +257,7 @@ stackCheck regstatus args args_in_regs fun_info_label (prof_sp, norm_sp) =
           char '}'
        | otherwise = empty
   in
-  vcat [ text "#ifdef PROFILING",
+  vcat [ text "#if defined(PROFILING)",
          cmp_sp prof_sp,
          text "#else",
          cmp_sp norm_sp,
@@ -392,7 +392,7 @@ genMkPAP regstatus macro jump live ticker disamb
 
         shuffle_extra_args = (doc, (shuffle_prof_stack, shuffle_norm_stack))
           where
-           doc = vcat [ text "#ifdef PROFILING",
+           doc = vcat [ text "#if defined(PROFILING)",
                         shuffle_prof_doc,
                         text "#else",
                         shuffle_norm_doc,

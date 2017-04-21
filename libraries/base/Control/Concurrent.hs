@@ -117,7 +117,7 @@ import System.Posix.Types ( Fd )
 import Foreign.StablePtr
 import Foreign.C.Types
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Foreign.C
 import System.IO
 import Data.Functor ( void )
@@ -401,7 +401,7 @@ unsafeResult = either Exception.throwIO return
 -- 'GHC.Conc.closeFdWith'.
 threadWaitRead :: Fd -> IO ()
 threadWaitRead fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   -- we have no IO manager implementing threadWaitRead on Windows.
   -- fdReady does the right thing, but we have to call it in a
   -- separate thread, otherwise threadWaitRead won't be interruptible,
@@ -426,7 +426,7 @@ threadWaitRead fd
 -- 'GHC.Conc.closeFdWith'.
 threadWaitWrite :: Fd -> IO ()
 threadWaitWrite fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   | threaded  = withThread (waitFd fd 1)
   | otherwise = errorWithoutStackTrace "threadWaitWrite requires -threaded on Windows"
 #else
@@ -441,7 +441,7 @@ threadWaitWrite fd
 -- @since 4.7.0.0
 threadWaitReadSTM :: Fd -> IO (STM (), IO ())
 threadWaitReadSTM fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
                   mask_ $ void $ forkIO $ do result <- try (waitFd fd 0)
                                              atomically (writeTVar v $ Just result)
@@ -465,7 +465,7 @@ threadWaitReadSTM fd
 -- @since 4.7.0.0
 threadWaitWriteSTM :: Fd -> IO (STM (), IO ())
 threadWaitWriteSTM fd
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   | threaded = do v <- newTVarIO Nothing
                   mask_ $ void $ forkIO $ do result <- try (waitFd fd 1)
                                              atomically (writeTVar v $ Just result)
@@ -481,7 +481,7 @@ threadWaitWriteSTM fd
   = GHC.Conc.threadWaitWriteSTM fd
 #endif
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 
 withThread :: IO a -> IO a

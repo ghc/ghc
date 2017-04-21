@@ -150,7 +150,7 @@ osThreadIsAlive(OSThreadId id)
     return (exit_code == STILL_ACTIVE);
 }
 
-#ifdef USE_CRITICAL_SECTIONS
+#if defined(USE_CRITICAL_SECTIONS)
 void
 initMutex (Mutex* pMut)
 {
@@ -195,7 +195,7 @@ getThreadLocalVar (ThreadLocalKey *key)
 {
     void *r;
     r = TlsGetValue(*key);
-#ifdef DEBUG
+#if defined(DEBUG)
     // r is allowed to be NULL - it can mean that either there was an
     // error or the stored value is in fact NULL.
     if (GetLastError() != NO_ERROR) {
@@ -257,7 +257,7 @@ forkOS_createThread ( HsStablePtr entry )
 typedef DWORD(WINAPI *GetItemCountProc)(WORD);
 typedef DWORD(WINAPI *GetGroupCountProc)(void);
 typedef BOOL(WINAPI *SetThreadGroupAffinityProc)(HANDLE, const GROUP_AFFINITY*, PGROUP_AFFINITY);
-#ifndef ALL_PROCESSOR_GROUPS
+#if !defined(ALL_PROCESSOR_GROUPS)
 #define ALL_PROCESSOR_GROUPS 0xffff
 #endif
 #endif

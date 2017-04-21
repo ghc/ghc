@@ -17,17 +17,17 @@
 #include "hooks/Hooks.h"
 #include "Capability.h"
 
-#ifdef HAVE_CTYPE_H
+#if defined(HAVE_CTYPE_H)
 #include <ctype.h>
 #endif
 
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
 
@@ -97,15 +97,15 @@ static StgWord64 decodeSize (
 
 static void bad_option (const char *s);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void read_debug_flags(const char *arg);
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 static bool read_heap_profiling_flag(const char *arg);
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
 static void read_trace_flags(const char *arg);
 #endif
 
@@ -153,7 +153,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.GcFlags.compactThreshold   = 30.0;
     RtsFlags.GcFlags.sweep              = false;
     RtsFlags.GcFlags.idleGCDelayTime    = USToTime(300000); // 300ms
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     RtsFlags.GcFlags.doIdleGC           = true;
 #else
     RtsFlags.GcFlags.doIdleGC           = false;
@@ -189,7 +189,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.doHeapProfile      = false;
     RtsFlags.ProfFlags. heapProfileInterval = USToTime(100000); // 100ms
 
-#ifdef PROFILING
+#if defined(PROFILING)
     RtsFlags.ProfFlags.includeTSOs        = false;
     RtsFlags.ProfFlags.showCCSOnException = false;
     RtsFlags.ProfFlags.maxRetainerSetSize = 8;
@@ -203,7 +203,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.bioSelector        = NULL;
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
     RtsFlags.TraceFlags.tracing       = TRACE_NONE;
     RtsFlags.TraceFlags.timestamp     = false;
     RtsFlags.TraceFlags.scheduler     = false;
@@ -213,7 +213,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.TraceFlags.user          = false;
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // When profiling we want a lot more ticks
     RtsFlags.MiscFlags.tickInterval     = USToTime(1000);  // 1ms
 #else
@@ -225,7 +225,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.MiscFlags.machineReadable = false;
     RtsFlags.MiscFlags.linkerMemBase    = 0;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     RtsFlags.ParFlags.nCapabilities     = 1;
     RtsFlags.ParFlags.migrate           = true;
     RtsFlags.ParFlags.parGcEnabled      = 1;
@@ -241,7 +241,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.maxLocalSparks    = 4096;
 #endif /* THREADED_RTS */
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
     RtsFlags.TickyFlags.showTickyStats   = false;
     RtsFlags.TickyFlags.tickyFile        = NULL;
 #endif
@@ -333,10 +333,10 @@ usage_text[] = {
 "  -xc      Show current cost centre stack on raising an exception",
 #endif /* PROFILING */
 
-#ifdef TRACING
+#if defined(TRACING)
 "",
 "  -l[flags]  Log events in binary format to the file <program>.eventlog",
-#  ifdef DEBUG
+#  if defined(DEBUG)
 "  -v[flags]  Log events to stderr",
 #  endif
 "             where [flags] can contain:",
@@ -346,7 +346,7 @@ usage_text[] = {
 "                f    par spark events (full detail)",
 "                u    user events (emitted from Haskell code)",
 "                a    all event classes above",
-#  ifdef DEBUG
+#  if defined(DEBUG)
 "                t    add time stamps (only useful with -v)",
 #  endif
 "               -x    disable an event class, for any flag above",
@@ -369,7 +369,7 @@ usage_text[] = {
 "  -V<secs>  Master tick interval in seconds (0 == disable timer).",
 "            This sets the resolution for -C and the heap profile timer -i,",
 "            and is the frequence of time profile samples.",
-#ifdef PROFILING
+#if defined(PROFILING)
 "            Default: 0.001 sec.",
 #else
 "            Default: 0.01 sec.",
@@ -618,7 +618,7 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
     if (RtsFlags.GcFlags.statsFile != NULL) {
         initStatsFile (RtsFlags.GcFlags.statsFile);
     }
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
     if (RtsFlags.TickyFlags.tickyFile != NULL) {
         initStatsFile (RtsFlags.TickyFlags.tickyFile);
     }
@@ -703,7 +703,7 @@ static void procRtsOpts (int rts_argc0,
                  x*, which allows for more options.
               */
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
 # define TICKY_BUILD_ONLY(x) x
 #else
 # define TICKY_BUILD_ONLY(x) \
@@ -712,7 +712,7 @@ errorBelch("the flag %s requires the program to be built with -ticky", \
 error = true;
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 # define PROFILING_BUILD_ONLY(x)   x
 #else
 # define PROFILING_BUILD_ONLY(x) \
@@ -721,7 +721,7 @@ errorBelch("the flag %s requires the program to be built with -prof", \
 error = true;
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
 # define TRACING_BUILD_ONLY(x)   x
 #else
 # define TRACING_BUILD_ONLY(x) \
@@ -730,7 +730,7 @@ errorBelch("the flag %s requires the program to be built with -eventlog or -debu
 error = true;
 #endif
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 # define THREADED_BUILD_ONLY(x)      x
 #else
 # define THREADED_BUILD_ONLY(x) \
@@ -739,7 +739,7 @@ errorBelch("the flag %s requires the program to be built with -threaded", \
 error = true;
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
 # define DEBUG_BUILD_ONLY(x) x
 #else
 # define DEBUG_BUILD_ONLY(x) \
@@ -1637,7 +1637,7 @@ decodeSize(const char *flag, uint32_t offset, StgWord64 min, StgWord64 max)
     return val;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void read_debug_flags(const char* arg)
 {
     // Already parsed "-D"
@@ -1702,7 +1702,7 @@ static void read_debug_flags(const char* arg)
 }
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 // Parse a "-h" flag, returning whether the parse resulted in an error.
 static bool read_heap_profiling_flag(const char *arg)
 {

@@ -10,7 +10,7 @@
 
 #include "BeginPrivate.h"
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 /* Lock closure, equivalent to ccall lockClosure but the condition is inlined.
  * Arguments are swapped for uniformity with unlockClosure. */

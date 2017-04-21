@@ -11,7 +11,7 @@
 #define THROWTO_SUCCESS   0
 #define THROWTO_BLOCKED   1
 
-#ifndef CMINUSMINUS
+#if !defined(CMINUSMINUS)
 
 #include "BeginPrivate.h"
 

@@ -245,7 +245,7 @@ typedef struct _RTS_FLAGS {
     PAR_FLAGS	      ParFlags;
 } RTS_FLAGS;
 
-#ifdef COMPILING_RTS_MAIN
+#if defined(COMPILING_RTS_MAIN)
 extern DLLIMPORT RTS_FLAGS RtsFlags;
 #elif IN_STG_CODE
 /* Hack because the C code generator can't generate '&label'. */

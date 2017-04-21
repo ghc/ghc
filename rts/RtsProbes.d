@@ -6,7 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef __APPLE__ && __MACH__
+#if defined(__APPLE__) && __MACH__
 # if MAC_OS_X_VERSION_MIN_REQUIRED >= MAC_OS_X_VERSION_10_9
 #  define USE_INTTYPES_H_FOR_RTS_PROBES_D
 # endif

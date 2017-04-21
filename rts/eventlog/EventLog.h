@@ -14,7 +14,7 @@
 
 #include "BeginPrivate.h"
 
-#ifdef TRACING
+#if defined(TRACING)
 
 /*
  * Descriptions of EventTags for events.
@@ -141,7 +141,7 @@ void postHeapProfSampleString(StgWord8 profile_id,
                               const char *label,
                               StgWord64 residency);
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void postHeapProfCostCentre(StgWord32 ccID,
                             const char *label,
                             const char *module,

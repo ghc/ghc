@@ -2636,7 +2636,7 @@ dynamic_flags_deps = [
   , make_ord_flag defGhcFlag "static"         (NoArg removeWayDyn)
   , make_ord_flag defGhcFlag "dynamic"        (NoArg (addWay WayDyn))
   , make_ord_flag defGhcFlag "rdynamic" $ noArg $
-#ifdef linux_HOST_OS
+#if defined(linux_HOST_OS)
                               addOptl "-rdynamic"
 #elif defined (mingw32_HOST_OS)
                               addOptl "-Wl,--export-all-symbols"
@@ -4884,7 +4884,7 @@ addIncludePath p =
 addFrameworkPath p =
   upd (\s -> s{frameworkPaths = frameworkPaths s ++ splitPathList p})
 
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS)
 split_marker :: Char
 split_marker = ':'   -- not configurable (ToDo)
 #endif
@@ -4896,7 +4896,7 @@ splitPathList s = filter notNull (splitUp s)
                 -- cause confusion when they are translated into -I options
                 -- for passing to gcc.
   where
-#ifndef mingw32_TARGET_OS
+#if !defined(mingw32_TARGET_OS)
     splitUp xs = split split_marker xs
 #else
      -- Windows: 'hybrid' support for DOS-style paths in directory lists.

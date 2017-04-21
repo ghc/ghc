@@ -57,7 +57,7 @@ module Data.Bits (
 
 #include "MachDeps.h"
 
-#ifdef MIN_VERSION_integer_gmp
+#if defined(MIN_VERSION_integer_gmp)
 # define HAVE_INTEGER_GMP1 MIN_VERSION_integer_gmp(1,0,0)
 #endif
 

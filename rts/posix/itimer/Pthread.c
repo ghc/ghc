@@ -44,18 +44,18 @@
 #include "posix/Clock.h"
 
 /* As recommended in the autoconf manual */
-# ifdef TIME_WITH_SYS_TIME
+# if defined(TIME_WITH_SYS_TIME)
 #  include <sys/time.h>
 #  include <time.h>
 # else
-#  ifdef HAVE_SYS_TIME_H
+#  if defined(HAVE_SYS_TIME_H)
 #   include <sys/time.h>
 #  else
 #   include <time.h>
 #  endif
 # endif
 
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 # include <signal.h>
 #endif
 
@@ -65,7 +65,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 
-#ifdef HAVE_SYS_TIMERFD_H
+#if defined(HAVE_SYS_TIMERFD_H)
 #include <sys/timerfd.h>
 #define USE_TIMERFD_FOR_ITIMER 1
 #else
@@ -76,7 +76,7 @@
  * TFD_CLOEXEC has been added in Linux 2.6.26.
  * If it is not available, we use fcntl(F_SETFD).
  */
-#ifndef TFD_CLOEXEC
+#if !defined(TFD_CLOEXEC)
 #define TFD_CLOEXEC 0
 #endif
 
@@ -169,7 +169,7 @@ initTicker (Time interval, TickProc handle_tick)
      * to the thread we create so we can later join to it if requested
      */
     if (! pthread_create(&thread, NULL, itimer_thread_func, (void*)handle_tick)) {
-#ifdef HAVE_PTHREAD_SETNAME_NP
+#if defined(HAVE_PTHREAD_SETNAME_NP)
         pthread_setname_np(thread, "ghc_ticker");
 #endif
     } else {

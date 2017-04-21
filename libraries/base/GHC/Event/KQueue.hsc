@@ -56,7 +56,7 @@ import Data.Int (Int64)
 -- Handle brokenness on some BSD variants, notably OS X up to at least
 -- 10.6.  If NOTE_EOF isn't available, we have no way to receive a
 -- notification from the kernel when we reach EOF on a plain file.
-#ifndef NOTE_EOF
+#if !defined(NOTE_EOF)
 # define NOTE_EOF 0
 #endif
 
@@ -132,7 +132,7 @@ data Event = KEvent {
     , filter :: {-# UNPACK #-} !Filter
     , flags  :: {-# UNPACK #-} !Flag
     , fflags :: {-# UNPACK #-} !FFlag
-#ifdef netbsd_HOST_OS
+#if defined(netbsd_HOST_OS)
     , data_  :: {-# UNPACK #-} !Int64
 #else
     , data_  :: {-# UNPACK #-} !CIntPtr

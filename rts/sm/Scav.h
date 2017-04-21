@@ -18,7 +18,7 @@
 void    scavenge_loop (void);
 void    scavenge_capability_mut_lists (Capability *cap);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 void    scavenge_loop1 (void);
 void    scavenge_capability_mut_Lists1 (Capability *cap);
 #endif

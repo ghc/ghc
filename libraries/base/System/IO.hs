@@ -224,7 +224,7 @@ import Control.Exception.Base
 import Data.Bits
 import Data.Maybe
 import Foreign.C.Error
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import Foreign.C.String
 #endif
 import Foreign.C.Types
@@ -546,7 +546,7 @@ openNewFile filepath binary mode = do
       errno <- getErrno
       case errno of
         _ | errno == eEXIST -> return FileExists
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
         -- If c_open throws EACCES on windows, it could mean that filepath is a
         -- directory. In this case, we want to return FileExists so that the
         -- enclosing openTempFile can try again instead of failing outright.
@@ -565,13 +565,13 @@ openNewFile filepath binary mode = do
         _ -> return (OpenNewError errno)
     else return (NewFileCreated fd)
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall "file_exists" c_fileExists :: CString -> IO Bool
 #endif
 
 -- XXX Should use filepath library
 pathSeparator :: Char
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 pathSeparator = '\\'
 #else
 pathSeparator = '/'

@@ -285,7 +285,7 @@ stg_compactAddWithSharingzh (P_ compact, P_ p)
     call stg_compactAddWorkerzh(compact, p, pp);
     ccall freeHashTable(StgCompactNFData_hash(compact), NULL);
     StgCompactNFData_hash(compact) = NULL;
-#ifdef DEBUG
+#if defined(DEBUG)
     ccall verifyCompact(compact);
 #endif
     return (P_[pp]);
@@ -305,7 +305,7 @@ stg_compactAddzh (P_ compact, P_ p)
     W_ pp; // See Note [compactAddWorker result]
     pp = compact + SIZEOF_StgHeader + OFFSET_StgCompactNFData_result;
     call stg_compactAddWorkerzh(compact, p, pp);
-#ifdef DEBUG
+#if defined(DEBUG)
     ccall verifyCompact(compact);
 #endif
     return (P_[pp]);

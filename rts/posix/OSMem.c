@@ -15,25 +15,25 @@
 #include "sm/OSMem.h"
 #include "sm/HeapAlloc.h"
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
-#ifdef HAVE_SYS_MMAN_H
+#if defined(HAVE_SYS_MMAN_H)
 #include <sys/mman.h>
 #endif
-#ifdef HAVE_STRING_H
+#if defined(HAVE_STRING_H)
 #include <string.h>
 #endif
-#ifdef HAVE_FCNTL_H
+#if defined(HAVE_FCNTL_H)
 #include <fcntl.h>
 #endif
-#ifdef HAVE_NUMA_H
+#if defined(HAVE_NUMA_H)
 #include <numa.h>
 #endif
-#ifdef HAVE_NUMAIF_H
+#if defined(HAVE_NUMAIF_H)
 #include <numaif.h>
 #endif
 
@@ -114,7 +114,7 @@ my_mmap (void *addr, W_ size, int operation)
 {
     void *ret;
 
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS)
     // Without MAP_FIXED, Apple's mmap ignores addr.
     // With MAP_FIXED, it overwrites already mapped regions, whic
     // mmap(0, ... MAP_FIXED ...) is worst of all: It unmaps the program text
@@ -160,7 +160,7 @@ my_mmap (void *addr, W_ size, int operation)
 # if defined(MAP_NORESERVE)
         flags = MAP_NORESERVE;
 # else
-#  ifdef USE_LARGE_ADDRESS_SPACE
+#  if defined(USE_LARGE_ADDRESS_SPACE)
 #   error USE_LARGE_ADDRESS_SPACE needs MAP_NORESERVE
 #  endif
         errorBelch("my_mmap(,,MEM_RESERVE) not supported on this platform");
@@ -170,7 +170,7 @@ my_mmap (void *addr, W_ size, int operation)
     else
         flags = 0;
 
-#ifdef hpux_HOST_OS
+#if defined(hpux_HOST_OS)
     ret = mmap(addr, size, prot, flags | MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 #elif defined(linux_HOST_OS)
     ret = mmap(addr, size, prot, flags | MAP_ANON | MAP_PRIVATE, -1, 0);
@@ -414,7 +414,7 @@ void setExecutable (void *p, W_ len, bool exec)
     }
 }
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 static void *
 osTryReserveHeapMemory (W_ len, void *hint)
@@ -533,13 +533,13 @@ void osDecommitMemory(void *at, W_ size)
     // We only do this in DEBUG because it forces the OS to remove
     // all MMU entries for this page range, and there is no reason
     // to do so unless there is memory pressure
-#ifdef DEBUG
+#if defined(DEBUG)
     r = mprotect(at, size, PROT_NONE);
     if(r < 0)
         sysErrorBelch("unable to make released memory unaccessible");
 #endif
 
-#ifdef MADV_FREE
+#if defined(MADV_FREE)
     // Try MADV_FREE first, FreeBSD has both and MADV_DONTNEED
     // just swaps memory out. Linux >= 4.5 has both DONTNEED and FREE; either
     // will work as they both allow the system to free anonymous pages.

@@ -13,11 +13,11 @@
 #include "GetTime.h"
 #include "Clock.h"
 
-#if HAVE_SYS_RESOURCE_H
+#if defined(HAVE_SYS_RESOURCE_H)
 # include <sys/resource.h>
 #endif
 
-#ifdef HAVE_SYS_TIMES_H
+#if defined(HAVE_SYS_TIMES_H)
 # include <sys/times.h>
 #endif
 

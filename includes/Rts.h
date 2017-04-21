@@ -12,7 +12,7 @@
 
 #pragma once
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 extern "C" {
 #endif
 
@@ -23,7 +23,7 @@ extern "C" {
 #include <windows.h>
 #endif
 
-#ifndef IN_STG_CODE
+#if !defined(IN_STG_CODE)
 #define IN_STG_CODE 0
 #endif
 #include "Stg.h"
@@ -32,7 +32,7 @@ extern "C" {
 #include "RtsAPI.h"
 
 // Turn off inlining when debugging - it obfuscates things
-#ifdef DEBUG
+#if defined(DEBUG)
 # undef  STATIC_INLINE
 # define STATIC_INLINE static
 #endif
@@ -69,13 +69,13 @@ extern "C" {
 #endif
 
 /* Fix for mingw stat problem (done here so it's early enough) */
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 #define __MSVCRT__ 1
 #endif
 
 /* Needed to get the macro version of errno on some OSs, and also to
    get prototypes for the _r versions of C library functions. */
-#ifndef _REENTRANT
+#if !defined(_REENTRANT)
 #define _REENTRANT 1
 #endif
 
@@ -109,7 +109,7 @@ void _assertFail(const char *filename, unsigned int linenum)
         else                                    \
             barf(msg, ##__VA_ARGS__)
 
-#ifndef DEBUG
+#if !defined(DEBUG)
 #define ASSERT(predicate) /* nothing */
 #define ASSERTM(predicate,msg,...) /* nothing */
 #else
@@ -125,7 +125,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 
 #define doNothing() do { } while (0)
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define USED_IF_DEBUG
 #define USED_IF_NOT_DEBUG STG_UNUSED
 #else
@@ -133,7 +133,7 @@ void _assertFail(const char *filename, unsigned int linenum)
 #define USED_IF_NOT_DEBUG
 #endif
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 #define USED_IF_THREADS
 #define USED_IF_NOT_THREADS STG_UNUSED
 #else
@@ -211,7 +211,7 @@ DLL_IMPORT_RTS extern char **prog_argv; /* so we can get at these from Haskell *
 DLL_IMPORT_RTS extern int    prog_argc;
 DLL_IMPORT_RTS extern char  *prog_name;
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 // We need these two from Haskell too
 void getWin32ProgArgv(int *argc, wchar_t **argv[]);
 void setWin32ProgArgv(int argc, wchar_t *argv[]);
@@ -222,7 +222,7 @@ void reportHeapOverflow(void);
 
 void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 int stg_sig_install (int, int, void *);
 #endif
 
@@ -251,7 +251,7 @@ int rts_isDynamic(void);
    Miscellaneous garbage
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define TICK_VAR(arity) \
   extern StgInt SLOW_CALLS_##arity; \
   extern StgInt RIGHT_ARITY_##arity; \
@@ -269,7 +269,7 @@ TICK_VAR(2)
 
 #define IF_RTSFLAGS(c,s)  if (RtsFlags.c) { s; } doNothing()
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #if IN_STG_CODE
 #define IF_DEBUG(c,s)  if (RtsFlags[0].DebugFlags.c) { s; } doNothing()
 #else
@@ -279,13 +279,13 @@ TICK_VAR(2)
 #define IF_DEBUG(c,s)  doNothing()
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define DEBUG_ONLY(s) s
 #else
 #define DEBUG_ONLY(s) doNothing()
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define DEBUG_IS_ON   1
 #else
 #define DEBUG_IS_ON   0
@@ -309,6 +309,6 @@ TICK_VAR(2)
 
 /* -------------------------------------------------------------------------- */
 
-#ifdef __cplusplus
+#if defined(__cplusplus)
 }
 #endif

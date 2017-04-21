@@ -13,7 +13,7 @@
 #include "Proftimer.h"
 #include "Capability.h"
 
-#ifdef PROFILING
+#if defined(PROFILING)
 static bool do_prof_ticks = false;       // enable profiling ticks
 #endif
 
@@ -28,7 +28,7 @@ bool performHeapProfile;
 void
 stopProfTimer( void )
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     do_prof_ticks = false;
 #endif
 }
@@ -36,7 +36,7 @@ stopProfTimer( void )
 void
 startProfTimer( void )
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     do_prof_ticks = true;
 #endif
 }
@@ -71,7 +71,7 @@ uint32_t total_ticks = 0;
 void
 handleProfTick(void)
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     total_ticks++;
     if (do_prof_ticks) {
         uint32_t n;

@@ -1,6 +1,6 @@
 #include "Rts.h"
 
-#ifdef HAVE_WINDOWS_H
+#if defined(HAVE_WINDOWS_H)
 #include <windows.h>
 #endif
 

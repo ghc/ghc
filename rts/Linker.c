@@ -39,7 +39,7 @@
 // get protos for is*()
 #include <ctype.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
 
@@ -49,7 +49,7 @@
 #include <stdio.h>
 #include <assert.h>
 
-#ifdef HAVE_SYS_STAT_H
+#if defined(HAVE_SYS_STAT_H)
 #include <sys/stat.h>
 #endif
 
@@ -170,7 +170,7 @@ ObjectCode *objects = NULL;     /* initially empty */
    to be actually freed via checkUnload() */
 ObjectCode *unloaded_objects = NULL; /* initially empty */
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 /* This protects all the Linker's global state except unloaded_objects */
 Mutex linker_mutex;
 /*
@@ -395,7 +395,7 @@ static int linker_init_done = 0 ;
 static void *dl_prog_handle;
 static regex_t re_invalid;
 static regex_t re_realso;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex dl_mutex; // mutex to protect dlopen/dlerror critical section
 #endif
 #endif
@@ -516,7 +516,7 @@ exitLinker( void ) {
    if (linker_init_done == 1) {
       regfree(&re_invalid);
       regfree(&re_realso);
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
       closeMutex(&dl_mutex);
 #endif
    }
@@ -524,7 +524,7 @@ exitLinker( void ) {
    if (linker_init_done == 1) {
        freeHashTable(symhash, free);
    }
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
    closeMutex(&linker_mutex);
 #endif
 }
@@ -879,7 +879,7 @@ SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
             return NULL;
         }
 
-#ifdef PROFILING
+#if defined(PROFILING)
         // collect any new cost centres & CCSs
         // that were defined during runInit
         initProfiling2();
@@ -936,7 +936,7 @@ StgStablePtr foreignExportStablePtr (StgPtr p)
  * Debugging aid: look in GHCi's object symbol tables for symbols
  * within DELTA bytes of the specified address, and show their names.
  */
-#ifdef DEBUG
+#if defined(DEBUG)
 void ghci_enquire ( SymbolAddr* addr );
 
 void ghci_enquire(SymbolAddr* addr)
@@ -1395,7 +1395,7 @@ preloadObjectFile (pathchar *path)
 
    oc = mkOc(path, image, fileSize, true, NULL, misalignment);
 
-#ifdef OBJFORMAT_MACHO
+#if defined(OBJFORMAT_MACHO)
    if (ocVerifyImage_MachO( oc ))
        ocInit_MachO( oc );
 #endif
@@ -1594,7 +1594,7 @@ static HsInt resolveObjs_ (void)
         }
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // collect any new cost centres & CCSs that were defined during runInit
     initProfiling2();
 #endif

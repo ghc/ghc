@@ -72,7 +72,7 @@ INFO_TABLE_RET(stg_stop_thread, STOP_FRAME,
        need to identify the platform stack pointer and return address values for
        the StgRun's caller.
      */
-#ifdef x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     // offset of 8 in MachSp value due to return address
     unwind MachSp = MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE + 8,
            UnwindReturnReg = W_[MachSp + RESERVED_C_STACK_BYTES + STG_RUN_STACK_FRAME_SIZE];

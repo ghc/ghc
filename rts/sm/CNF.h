@@ -29,7 +29,7 @@ StgWord           compactContains(StgCompactNFData *str,
                                   StgPtr            what);
 StgWord           countCompactBlocks(bdescr *outer);
 
-#ifdef DEBUG
+#if defined(DEBUG)
 StgWord           countAllocdCompactBlocks(bdescr *outer);
 #endif
 

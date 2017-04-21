@@ -38,7 +38,7 @@ roundUpToPage (size_t x)
 }
 
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 /*
   If "large address space" is enabled, we allocate memory in two

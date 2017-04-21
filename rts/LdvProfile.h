@@ -9,7 +9,7 @@
 
 #pragma once
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "ProfHeap.h"
 

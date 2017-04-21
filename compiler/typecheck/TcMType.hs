@@ -263,7 +263,7 @@ newCoercionHole
 fillCoercionHole :: CoercionHole -> Coercion -> TcM ()
 fillCoercionHole (CoercionHole u ref) co
   = do {
-#ifdef DEBUG
+#if defined(DEBUG)
        ; cts <- readTcRef ref
        ; whenIsJust cts $ \old_co ->
          pprPanic "Filling a filled coercion hole" (ppr u $$ ppr co $$ ppr old_co)

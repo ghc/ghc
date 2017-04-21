@@ -25,7 +25,7 @@
 #include "Threads.h"
 
 #include <string.h>     /* for memcpy */
-#ifdef HAVE_ERRNO_H
+#if defined(HAVE_ERRNO_H)
 #include <errno.h>
 #endif
 
@@ -83,7 +83,7 @@
 #define SAVE_STACK_POINTERS                     \
     cap->r.rCurrentTSO->stackobj->sp = Sp;
 
-#ifdef PROFILING
+#if defined(PROFILING)
 #define LOAD_THREAD_STATE()                     \
     LOAD_STACK_POINTERS                         \
     cap->r.rCCCS = cap->r.rCurrentTSO->prof.cccs;
@@ -92,7 +92,7 @@
     LOAD_STACK_POINTERS
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 #define SAVE_THREAD_STATE()                     \
     SAVE_STACK_POINTERS                         \
     cap->r.rCurrentTSO->prof.cccs = cap->r.rCCCS;
@@ -131,7 +131,7 @@ allocate_NONUPD (Capability *cap, int n_words)
 int rts_stop_next_breakpoint = 0;
 int rts_stop_on_exception = 0;
 
-#ifdef INTERP_STATS
+#if defined(INTERP_STATS)
 
 /* Hacky stats, for tuning the interpreter ... */
 int it_unknown_entries[N_CLOSURE_TYPES];
@@ -214,7 +214,7 @@ void interp_shutdown ( void )
 
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 //
 // Build a zero-argument PAP with the current CCS
@@ -287,7 +287,7 @@ interpretBCO (Capability* cap)
              debugBelch(
              "\n---------------------------------------------------------------\n");
              debugBelch("Entering the interpreter, Sp = %p\n", Sp);
-#ifdef PROFILING
+#if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
              debugBelch("\n");
 #endif
@@ -356,7 +356,7 @@ eval_obj:
              "\n---------------------------------------------------------------\n");
              debugBelch("Evaluating: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
-#ifdef PROFILING
+#if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
              debugBelch("\n");
 #endif
@@ -394,7 +394,7 @@ eval_obj:
     case FUN_1_1:
     case FUN_0_2:
     case FUN_STATIC:
-#ifdef PROFILING
+#if defined(PROFILING)
         if (cap->r.rCCCS != obj->header.prof.ccs) {
             tagged_obj =
                 newEmptyPAP(cap, tagged_obj, get_fun_itbl(obj)->f.arity);
@@ -403,7 +403,7 @@ eval_obj:
         break;
 
     case PAP:
-#ifdef PROFILING
+#if defined(PROFILING)
         if (cap->r.rCCCS != obj->header.prof.ccs) {
             tagged_obj = copyPAP(cap, (StgPAP *)obj);
         }
@@ -412,7 +412,7 @@ eval_obj:
 
     case BCO:
         ASSERT(((StgBCO *)obj)->arity > 0);
-#ifdef PROFILING
+#if defined(PROFILING)
         if (cap->r.rCCCS != obj->header.prof.ccs) {
             tagged_obj = newEmptyPAP(cap, tagged_obj, ((StgBCO *)obj)->arity);
         }
@@ -435,7 +435,7 @@ eval_obj:
             RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
         }
 
-#ifdef PROFILING
+#if defined(PROFILING)
         // restore the CCCS after evaluating the AP
         Sp -= 2;
         Sp[1] = (W_)cap->r.rCCCS;
@@ -464,7 +464,7 @@ eval_obj:
     }
 
     default:
-#ifdef INTERP_STATS
+#if defined(INTERP_STATS)
     {
         int j;
 
@@ -480,7 +480,7 @@ eval_obj:
                  debugBelch("evaluating unknown closure -- yielding to sched\n");
                  printObj(obj);
             );
-#ifdef PROFILING
+#if defined(PROFILING)
         // restore the CCCS after evaluating the closure
         Sp -= 2;
         Sp[1] = (W_)cap->r.rCCCS;
@@ -505,7 +505,7 @@ do_return:
              "\n---------------------------------------------------------------\n");
              debugBelch("Returning: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
-#ifdef PROFILING
+#if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
              debugBelch("\n");
 #endif
@@ -652,7 +652,7 @@ do_return_unboxed:
              "\n---------------------------------------------------------------\n");
              debugBelch("Returning: "); printObj(obj);
              debugBelch("Sp = %p\n", Sp);
-#ifdef PROFILING
+#if defined(PROFILING)
              fprintCCS(stderr, cap->r.rCCCS);
              debugBelch("\n");
 #endif
@@ -744,7 +744,7 @@ do_apply:
                 }
                 obj = UNTAG_CLOSURE(pap->fun);
 
-#ifdef PROFILING
+#if defined(PROFILING)
                 enterFunCCS(&cap->r, pap->header.prof.ccs);
 #endif
                 goto run_BCO_fun;
@@ -755,7 +755,7 @@ do_apply:
                     Sp[i] = (W_)pap->payload[i];
                 }
                 obj = UNTAG_CLOSURE(pap->fun);
-#ifdef PROFILING
+#if defined(PROFILING)
                 enterFunCCS(&cap->r, pap->header.prof.ccs);
 #endif
                 goto run_BCO_fun;
@@ -936,13 +936,13 @@ run_BCO:
         register StgWord16* instrs    = (StgWord16*)(bco->instrs->payload);
         register StgWord*  literals   = (StgWord*)(&bco->literals->payload[0]);
         register StgPtr*   ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
-#ifdef DEBUG
+#if defined(DEBUG)
         int bcoSize;
         bcoSize = bco->instrs->bytes / sizeof(StgWord16);
 #endif
         IF_DEBUG(interpreter,debugBelch("bcoSize = %d\n", bcoSize));
 
-#ifdef INTERP_STATS
+#if defined(INTERP_STATS)
         it_lastopc = 0; /* no opcode */
 #endif
 
@@ -969,7 +969,7 @@ run_BCO:
 
         INTERP_TICK(it_insns);
 
-#ifdef INTERP_STATS
+#if defined(INTERP_STATS)
         ASSERT( (int)instrs[bciPtr] >= 0 && (int)instrs[bciPtr] < 27 );
         it_ofreq[ (int)instrs[bciPtr] ] ++;
         it_oofreq[ it_lastopc ][ (int)instrs[bciPtr] ] ++;
@@ -987,7 +987,7 @@ run_BCO:
         case bci_BRK_FUN:
         {
             int arg1_brk_array, arg2_array_index, arg3_module_uniq;
-#ifdef PROFILING
+#if defined(PROFILING)
             int arg4_cc;
 #endif
             StgArrBytes *breakPoints;
@@ -1005,7 +1005,7 @@ run_BCO:
             arg1_brk_array      = BCO_GET_LARGE_ARG;
             arg2_array_index    = BCO_NEXT;
             arg3_module_uniq    = BCO_GET_LARGE_ARG;
-#ifdef PROFILING
+#if defined(PROFILING)
             arg4_cc             = BCO_GET_LARGE_ARG;
 #else
             BCO_GET_LARGE_ARG;
@@ -1017,7 +1017,7 @@ run_BCO:
             returning_from_break =
                 cap->r.rCurrentTSO->flags & TSO_STOPPED_ON_BREAKPOINT;
 
-#ifdef PROFILING
+#if defined(PROFILING)
             cap->r.rCCCS = pushCostCentre(cap->r.rCCCS,
                                           (CostCentre*)BCO_LIT(arg4_cc));
 #endif
@@ -1158,7 +1158,7 @@ run_BCO:
             Sp -= 2;
             Sp[1] = BCO_PTR(o_bco);
             Sp[0] = (W_)&stg_ctoi_R1p_info;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1171,7 +1171,7 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_R1unpt_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1184,7 +1184,7 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_R1n_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1197,7 +1197,7 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_F1_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1210,7 +1210,7 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_D1_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1223,7 +1223,7 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_L1_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1236,7 +1236,7 @@ run_BCO:
             Sp[-2] = (W_)&stg_ctoi_V_info;
             Sp[-1] = BCO_PTR(o_bco);
             Sp -= 2;
-#ifdef PROFILING
+#if defined(PROFILING)
             Sp -= 2;
             Sp[1] = (W_)cap->r.rCCCS;
             Sp[0] = (W_)&stg_restore_cccs_info;
@@ -1369,7 +1369,7 @@ run_BCO:
 
             // The function should be a BCO
             if (get_itbl(pap->fun)->type != BCO) {
-#ifdef DEBUG
+#if defined(DEBUG)
                 printClosure(pap->fun);
 #endif
                 barf("bci_MKPAP");

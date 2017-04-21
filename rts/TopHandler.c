@@ -2,7 +2,7 @@
 #include "Stable.h"
 #include "TopHandler.h"
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex m; // Protects the operations on topHandlerPtr,
                 // which aren't atomic
 #endif
@@ -47,7 +47,7 @@ StgTSO *getTopHandlerThread(void) {
 }
 
 void initTopHandler(void) {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&m);
 #endif
     topHandlerPtr = NULL;
@@ -56,7 +56,7 @@ void initTopHandler(void) {
 void exitTopHandler(void) {
     freeStablePtr(topHandlerPtr);
     topHandlerPtr = NULL;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeMutex(&m);
 #endif
 }

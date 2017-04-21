@@ -29,7 +29,7 @@ PRELUDE_CLOSURE(ghczmprim_GHCziTypes_False_closure);
 PRELUDE_CLOSURE(base_GHCziPack_unpackCString_closure);
 PRELUDE_CLOSURE(base_GHCziWeak_runFinalizzerBatch_closure);
 
-#ifdef IN_STG_CODE
+#if defined(IN_STG_CODE)
 extern W_ ZCMain_main_closure[];
 #else
 extern StgClosure ZCMain_main_closure;

@@ -15,7 +15,7 @@
 #include "posix/Clock.h"
 #include "posix/Signals.h"
 
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 # include <signal.h>
 #endif
 

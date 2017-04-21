@@ -27,7 +27,7 @@ import GHC.Enum
 import GHC.Show
 import {-# SOURCE #-} GHC.Exception( divZeroException, overflowException, ratioZeroDenomException )
 
-#ifdef OPTIMISE_INTEGER_GCD_LCM
+#if defined(OPTIMISE_INTEGER_GCD_LCM)
 # if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals
 # else
@@ -636,7 +636,7 @@ lcm _ 0         =  0
 lcm 0 _         =  0
 lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 
-#ifdef OPTIMISE_INTEGER_GCD_LCM
+#if defined(OPTIMISE_INTEGER_GCD_LCM)
 {-# RULES
 "gcd/Int->Int->Int"             gcd = gcdInt'
 "gcd/Integer->Integer->Integer" gcd = gcdInteger

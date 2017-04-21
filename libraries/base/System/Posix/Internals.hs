@@ -43,7 +43,7 @@ import GHC.IO
 import GHC.IO.IOMode
 import GHC.IO.Exception
 import GHC.IO.Device
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import {-# SOURCE #-} GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 #endif
@@ -157,7 +157,7 @@ fdGetMode fd = do
 
     return mode
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 withFilePath :: FilePath -> (CWString -> IO a) -> IO a
 withFilePath = withCWString
 
@@ -545,7 +545,7 @@ s_isfifo cm = c_s_isfifo cm /= 0
 
 foreign import ccall unsafe "HsBase.h __hscore_sizeof_stat" sizeof_stat :: Int
 foreign import ccall unsafe "HsBase.h __hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "HsBase.h __hscore_st_size" st_size :: Ptr CStat -> IO Int64
 #else
 foreign import ccall unsafe "HsBase.h __hscore_st_size" st_size :: Ptr CStat -> IO COff

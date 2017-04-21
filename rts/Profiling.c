@@ -6,7 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -24,7 +24,7 @@
 
 #include <string.h>
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #include "Trace.h"
 #endif
 
@@ -55,7 +55,7 @@ FILE *hp_file;
 CostCentre      *CC_LIST  = NULL;
 CostCentreStack *CCS_LIST = NULL;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex ccs_mutex;
 #endif
 
@@ -141,7 +141,7 @@ void initProfiling (void)
         }
     }
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&ccs_mutex);
 #endif
 
@@ -238,7 +238,7 @@ initProfilingLogFile(void)
 
         prog = arenaAlloc(prof_arena, strlen(prog_name) + 1);
         strcpy(prog, prog_name);
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
         // on Windows, drop the .exe suffix if there is one
         {
             char *suff;
@@ -456,7 +456,7 @@ ccsSetSelected (CostCentreStack *ccs)
    Cost-centre stack manipulation
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 CostCentreStack * _pushCostCentre ( CostCentreStack *ccs, CostCentre *cc );
 CostCentreStack *
 pushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
@@ -473,7 +473,7 @@ pushCostCentre ( CostCentreStack *ccs, CostCentre *cc )
 
 /* Append ccs1 to ccs2 (ignoring any CAF cost centre at the root of ccs1 */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 CostCentreStack *_appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 );
 CostCentreStack *
 appendCCS ( CostCentreStack *ccs1, CostCentreStack *ccs2 )
@@ -981,7 +981,7 @@ done:
     return;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void
 debugCCS( CostCentreStack *ccs )
 {

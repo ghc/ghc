@@ -12,7 +12,7 @@
 #include "LinkerInternals.h"
 #include <stdbool.h>
 
-#ifdef LEADING_UNDERSCORE
+#if defined(LEADING_UNDERSCORE)
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
 #else
 #define MAYBE_LEADING_UNDERSCORE_STR(s) (s)

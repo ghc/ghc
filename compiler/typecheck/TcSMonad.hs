@@ -167,7 +167,7 @@ import MonadUtils
 import Data.IORef
 import Data.List ( foldl', partition )
 
-#ifdef DEBUG
+#if defined(DEBUG)
 import Digraph
 import UniqSet
 #endif
@@ -2397,14 +2397,14 @@ runTcSWithEvBinds ev_binds_var tcs
        ; when (count > 0) $
          csTraceTcM $ return (text "Constraint solver steps =" <+> int count)
 
-#ifdef DEBUG
+#if defined(DEBUG)
        ; ev_binds <- TcM.getTcEvBindsMap ev_binds_var
        ; checkForCyclicBinds ev_binds
 #endif
 
        ; return res }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 checkForCyclicBinds :: EvBindMap -> TcM ()
 checkForCyclicBinds ev_binds_map
   | null cycles
@@ -2456,7 +2456,7 @@ nestImplicTcS ref inner_tclvl (TcS thing_inside)
        ; res <- TcM.setTcLevel inner_tclvl $
                 thing_inside nest_env
 
-#ifdef DEBUG
+#if defined(DEBUG)
        -- Perform a check that the thing_inside did not cause cycles
        ; ev_binds <- TcM.getTcEvBindsMap ref
        ; checkForCyclicBinds ev_binds

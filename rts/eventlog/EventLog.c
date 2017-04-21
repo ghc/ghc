@@ -9,7 +9,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#ifdef TRACING
+#if defined(TRACING)
 
 #include "Trace.h"
 #include "Capability.h"
@@ -19,10 +19,10 @@
 
 #include <string.h>
 #include <stdio.h>
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -44,7 +44,7 @@ typedef struct _EventsBuf {
 EventsBuf *capEventBuf; // one EventsBuf for each Capability
 
 EventsBuf eventBuf; // an EventsBuf not associated with any Capability
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 Mutex eventBufMutex; // protected by this mutex
 #endif
 
@@ -287,7 +287,7 @@ initEventLogging(const EventLogWriter *ev_writer)
      * Use a single buffer to store the header with event types, then flush
      * the buffer so all buffers are empty for writing events.
      */
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     // XXX n_capabilities hasn't been initislised yet
     n_caps = RtsFlags.ParFlags.nCapabilities;
 #else
@@ -493,7 +493,7 @@ initEventLogging(const EventLogWriter *ev_writer)
         postBlockMarker(&capEventBuf[c]);
     }
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&eventBufMutex);
 #endif
 }
@@ -1211,7 +1211,7 @@ void postHeapProfSampleString(StgWord8 profile_id,
     RELEASE_LOCK(&eventBufMutex);
 }
 
-#ifdef PROFILING
+#if defined(PROFILING)
 void postHeapProfCostCentre(StgWord32 ccID,
                             const char *label,
                             const char *module,

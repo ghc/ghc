@@ -112,7 +112,7 @@ createThread(Capability *cap, W_ size)
 
     tso->trec = NO_TREC;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     tso->prof.cccs = CCS_MAIN;
 #endif
 
@@ -263,7 +263,7 @@ tryWakeupThread (Capability *cap, StgTSO *tso)
 {
     traceEventThreadWakeup (cap, tso, tso->cap->no);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     if (tso->cap != cap)
     {
         MessageWakeup *msg;
@@ -826,7 +826,7 @@ loop:
  * Debugging: why is a thread blocked
  * ------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 void
 printThreadBlockage(StgTSO *tso)
 {

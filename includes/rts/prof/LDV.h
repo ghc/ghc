@@ -13,7 +13,7 @@
 
 #pragma once
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 /* retrieves the LDV word from closure c */
 #define LDVW(c)                 (((StgClosure *)(c))->header.prof.hp.ldvw)
@@ -28,7 +28,7 @@
  * to zero.
  */
 
-#ifdef CMINUSMINUS
+#if defined(CMINUSMINUS)
 
 #else
 

@@ -9,7 +9,7 @@
 
 #pragma once
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "RetainerSet.h"
 
@@ -41,7 +41,7 @@ retainerSetOf( const StgClosure *c )
 }
 
 // Used by Storage.c:memInventory()
-#ifdef DEBUG
+#if defined(DEBUG)
 extern W_ retainerStackBlocks ( void );
 #endif
 

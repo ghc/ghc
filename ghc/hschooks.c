@@ -18,7 +18,7 @@ in instead of the defaults.
 #include <string.h>
 #include <stdbool.h>
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 

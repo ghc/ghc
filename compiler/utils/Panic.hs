@@ -38,7 +38,7 @@ import Debug.Trace        ( trace )
 import System.IO.Unsafe
 import System.Environment
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import System.Posix.Signals as S
 #endif
 

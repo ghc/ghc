@@ -183,7 +183,7 @@ mkNop        :: CmmAGraph
 mkNop         = nilOL
 
 mkComment    :: FastString -> CmmAGraph
-#ifdef DEBUG
+#if defined(DEBUG)
 -- SDM: generating all those comments takes time, this saved about 4% for me
 mkComment fs  = mkMiddle $ CmmComment fs
 #else

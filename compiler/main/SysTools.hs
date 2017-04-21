@@ -81,7 +81,7 @@ import Data.List
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import qualified System.Posix.Internals
 #else /* Must be Win32 */
 import Foreign
@@ -102,7 +102,7 @@ import Control.Concurrent
 import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
 # elif defined(x86_64_HOST_ARCH)
@@ -1539,7 +1539,7 @@ foreign import WINDOWS_CCONV unsafe "dynamic"
 getBaseDir = return Nothing
 #endif
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
 #else
 getProcessID :: IO Int

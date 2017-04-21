@@ -255,7 +255,7 @@ check_target:
                   (unsigned long)msg->source->id,
                   (unsigned long)msg->target->id);
 
-#ifdef DEBUG
+#if defined(DEBUG)
     traceThreadStatus(DEBUG_sched, target);
 #endif
 
@@ -435,7 +435,7 @@ check_target:
         }
 
     case BlockedOnCCall_Interruptible:
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     {
         Task *task = NULL;
         // walk suspended_ccalls to find the correct worker thread
@@ -463,7 +463,7 @@ check_target:
         blockedThrowTo(cap,target,msg);
         return THROWTO_BLOCKED;
 
-#ifndef THREADEDED_RTS
+#if !defined(THREADEDED_RTS)
     case BlockedOnRead:
     case BlockedOnWrite:
     case BlockedOnDelay:
@@ -505,7 +505,7 @@ throwToSendMsg (Capability *cap STG_UNUSED,
                 MessageThrowTo *msg USED_IF_THREADS)
 
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     debugTraceCap(DEBUG_sched, cap, "throwTo: sending a throwto message to cap %lu", (unsigned long)target_cap->no);
 
     sendMessage(cap, target_cap, (Message*)msg);

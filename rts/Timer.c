@@ -65,7 +65,7 @@ handle_tick(int unused STG_UNUSED)
       if (ticks_to_gc == 0) {
           if (RtsFlags.GcFlags.doIdleGC) {
               recent_activity = ACTIVITY_INACTIVE;
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
               wakeUpRts();
               // The scheduler will call stopTimer() when it has done
               // the GC.
@@ -76,7 +76,7 @@ handle_tick(int unused STG_UNUSED)
               // but only if we're not profiling (e.g. passed -h or -p RTS
               // flags). If we are profiling we need to keep the timer active
               // so that samples continue to be collected.
-#ifdef PROFILING
+#if defined(PROFILING)
               if (!(RtsFlags.ProfFlags.doHeapProfile
                     || RtsFlags.CcFlags.doCostCentres)) {
                   stopTimer();

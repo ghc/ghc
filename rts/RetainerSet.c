@@ -7,7 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 #include "PosixSource.h"
 #include "Rts.h"
@@ -78,7 +78,7 @@ initializeAllRetainerSet(void)
 void
 refreshAllRetainerSet(void)
 {
-#ifdef FIRST_APPROACH
+#if defined(FIRST_APPROACH)
     int i;
 
     // first approach: completely refresh
@@ -145,7 +145,7 @@ addElement(retainer r, RetainerSet *rs)
     RetainerSet *nrs;   // New Retainer Set
     StgWord hk;         // Hash Key
 
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
     // debugBelch("addElement(%p, %p) = ", r, rs);
 #endif
 
@@ -185,7 +185,7 @@ addElement(retainer r, RetainerSet *rs)
             if (rs->element[i] != nrs->element[i + 1]) break;
         if (i < rs->num) continue;
 
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
         // debugBelch("%p\n", nrs);
 #endif
         // The set we are seeking already exists!
@@ -208,7 +208,7 @@ addElement(retainer r, RetainerSet *rs)
 
     hashTable[hash(hk)] = nrs;
 
-#ifdef DEBUG_RETAINER
+#if defined(DEBUG_RETAINER)
     // debugBelch("%p\n", nrs);
 #endif
     return nrs;
@@ -245,7 +245,7 @@ printRetainer(FILE *f, retainer cc)
  *  printRetainerSetShort() should always display the same output for
  *  a given retainer set regardless of the time of invocation.
  * -------------------------------------------------------------------------- */
-#ifdef SECOND_APPROACH
+#if defined(SECOND_APPROACH)
 #if defined(RETAINER_SCHEME_INFO)
 // Retainer scheme 1: retainer = info table
 void
@@ -411,7 +411,7 @@ printRetainerSetShort(FILE *f, retainerSet *rs, uint32_t max_length)
  * of the run, so the user can find out for a given retainer set ID
  * the full contents of that set.
  * -------------------------------------------------------------------------- */
-#ifdef SECOND_APPROACH
+#if defined(SECOND_APPROACH)
 void
 outputAllRetainerSet(FILE *prof_file)
 {

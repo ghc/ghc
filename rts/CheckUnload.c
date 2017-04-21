@@ -246,7 +246,7 @@ static void searchHeapBlocks (HashTable *addrs, bdescr *bd)
     }
 }
 
-#ifdef PROFILING
+#if defined(PROFILING)
 //
 // Do not unload the object if the CCS tree refers to a CCS or CC which
 // originates in the object.
@@ -324,7 +324,7 @@ void checkUnload (StgClosure *static_objects)
       }
   }
 
-#ifdef PROFILING
+#if defined(PROFILING)
   /* Traverse the cost centre tree, calling checkAddress on each CCS/CC */
   searchCostCentres(addrs, CCS_MAIN);
 

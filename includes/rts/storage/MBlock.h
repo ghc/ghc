@@ -26,7 +26,7 @@ extern void freeAllMBlocks(void);
 extern void *getFirstMBlock(void **state);
 extern void *getNextMBlock(void **state, void *mblock);
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 // needed for HEAP_ALLOCED below
 extern SpinLock gc_alloc_block_sync;
 #endif

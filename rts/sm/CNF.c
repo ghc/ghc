@@ -26,10 +26,10 @@
 
 #include <string.h>
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#ifdef HAVE_LIMITS_H
+#if defined(HAVE_LIMITS_H)
 #include <limits.h>
 #endif
 
@@ -227,7 +227,7 @@ compactAllocateBlockInternal(Capability            *cap,
         break;
 
     default:
-#ifdef DEBUG
+#if defined(DEBUG)
         ASSERT(!"code should not be reached");
 #else
         RTS_UNREACHABLE;
@@ -319,7 +319,7 @@ countCompactBlocks(bdescr *outer)
     return count;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 // Like countCompactBlocks, but adjusts the size so each mblock is assumed to
 // only contain BLOCKS_PER_MBLOCK blocks.  Used in memInventory().
 StgWord
@@ -639,7 +639,7 @@ StgWord shouldCompact (StgCompactNFData *str, StgClosure *p)
    Sanity-checking a compact
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 STATIC_INLINE void
 check_object_in_compact (StgCompactNFData *str, StgClosure *p)
 {
@@ -788,7 +788,7 @@ any_needs_fixup(StgCompactNFDataBlock *block)
     return false;
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 static void
 spew_failing_pointer(StgWord *fixup_table, uint32_t count, StgWord address)
 {
@@ -857,7 +857,7 @@ find_pointer(StgWord *fixup_table, uint32_t count, StgClosure *q)
  fail:
     // We should never get here
 
-#ifdef DEBUG
+#if defined(DEBUG)
     spew_failing_pointer(fixup_table, count, address);
 #endif
     return NULL;
@@ -1171,7 +1171,7 @@ compactFixupPointers(StgCompactNFData *str,
     dbl_link_onto(bd, &g0->compact_objects);
     RELEASE_SM_LOCK;
 
-#ifdef DEBUG
+#if defined(DEBUG)
     if (root)
         verify_consistency_loop(str);
 #endif

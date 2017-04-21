@@ -1400,7 +1400,7 @@ checkModUsage _this_pkg UsageFile{ usg_file_path = file,
  where
    recomp = RecompBecause (file ++ " changed")
    handle =
-#ifdef DEBUG
+#if defined(DEBUG)
        \e -> pprTrace "UsageFile" (text (show e)) $ return recomp
 #else
        \_ -> return recomp -- if we can't find the file, just recompile, don't fail

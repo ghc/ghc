@@ -272,7 +272,7 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
         }
         break;
     case STG_SIG_HAN:
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
         // handler is stored in an MVar in the threaded RTS
         console_handler = STG_SIG_HAN;
 #else

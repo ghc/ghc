@@ -35,7 +35,7 @@ extern W_ top_ct[];
    same declarations for both extern decls (which are included everywhere)
    and initializations (which only happen once) 
    TICKY_C is defined only in rts/Ticky.c */
-#ifdef TICKY_C
+#if defined(TICKY_C)
 #define INIT(ializer) = ializer
 #define EXTERN
 #else
@@ -197,8 +197,8 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
 
    Note that these macros must be defined whether
    TICKY_TICKY is defined or not. */
-  
-#ifndef CMINUSMINUS
+
+#if !defined(CMINUSMINUS)
 #define TICK_BUMP_BY(ctr,n) ctr = (StgInt) ctr + n
 #define TICK_BUMP(ctr)      TICK_BUMP_BY(ctr,1)
 

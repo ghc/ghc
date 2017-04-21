@@ -113,7 +113,7 @@
 
 // If SHAKE is defined then validation will sometimes spuriously fail.  They help test
 // unusual code paths if genuine contention is rare
-#ifdef SHAKE
+#if defined(SHAKE)
 static int shake_ctr = 0;
 static int shake_lim = 1;
 

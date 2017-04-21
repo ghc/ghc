@@ -986,7 +986,7 @@ which will eliminate the expression entirely.
 However, it's certainly possible and reasonable for this to occur in
 hand-written C-- code. Consider something like:
 
-    #ifndef SOME_CONDITIONAL
+    #if !defined(SOME_CONDITIONAL)
     #define CHECK_THING(x) 1
     #else
     #define CHECK_THING(x) some_operation((x))

@@ -115,7 +115,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
         const StgInfoTable *new_info;
         new_info = (const StgInfoTable *)cas((StgPtr)&src->header.info, (W_)info, MK_FORWARDING_PTR(to));
         if (new_info != info) {
-#ifdef PROFILING
+#if defined(PROFILING)
             // We copied this object at the same time as another
             // thread.  We'll evacuate the object again and the copy
             // we just made will be discarded at the next GC, but we
@@ -136,7 +136,7 @@ copy_tag(StgClosure **p, const StgInfoTable *info,
     *p = TAG_CLOSURE(tag,(StgClosure*)to);
 #endif
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
     // the profiler can guess the position of the next object later.
     // This is safe only if we are sure that no other thread evacuates
@@ -171,7 +171,7 @@ copy_tag_nolock(StgClosure **p, const StgInfoTable *info,
 //      __builtin_prefetch(to + size + 2, 1);
 //  }
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
     // the profiler can guess the position of the next object later.
     SET_EVACUAEE_FOR_LDV(from, size);
@@ -195,7 +195,7 @@ copyPart(StgClosure **p, StgClosure *src, uint32_t size_to_reserve,
 spin:
         info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
         if (info == (W_)&stg_WHITEHOLE_info) {
-#ifdef PROF_SPIN
+#if defined(PROF_SPIN)
             whitehole_spin++;
 #endif
             goto spin;
@@ -221,7 +221,7 @@ spin:
     src->header.info = (const StgInfoTable*)MK_FORWARDING_PTR(to);
     *p = (StgClosure *)to;
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // We store the size of the just evacuated object in the LDV word so that
     // the profiler can guess the position of the next object later.
     SET_EVACUAEE_FOR_LDV(from, size_to_reserve);
@@ -344,7 +344,7 @@ evacuate_static_object (StgClosure **link_field, StgClosure *q)
     // See Note [STATIC_LINK fields] for how the link field bits work
     if ((((StgWord)(link)&STATIC_BITS) | prev_static_flag) != 3) {
         StgWord new_list_head = (StgWord)q | static_flag;
-#ifndef THREADED_RTS
+#if !defined(THREADED_RTS)
         *link_field = gct->static_objects;
         gct->static_objects = (StgClosure *)new_list_head;
 #else
@@ -707,7 +707,7 @@ loop:
   case THUNK_1_1:
   case THUNK_2_0:
   case THUNK_0_2:
-#ifdef NO_PROMOTE_THUNKS
+#if defined(NO_PROMOTE_THUNKS)
 #error bitrotted
 #endif
     copy(p,info,q,sizeofW(StgThunk)+2,gen_no);
@@ -1067,7 +1067,7 @@ selector_loop:
               // Select the right field from the constructor
               val = selectee->payload[field];
 
-#ifdef PROFILING
+#if defined(PROFILING)
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
               if (era > 0) {

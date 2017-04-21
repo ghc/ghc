@@ -16,7 +16,7 @@
 #include "PosixSource.h"
 #include "Rts.h"
 
-#ifdef DEBUG                                                   /* whole file */
+#if defined(DEBUG)                                                   /* whole file */
 
 #include "RtsUtils.h"
 #include "sm/Storage.h"
@@ -808,7 +808,7 @@ findMemoryLeak (void)
         markBlocks(capabilities[i]->pinned_object_block);
     }
 
-#ifdef PROFILING
+#if defined(PROFILING)
   // TODO:
   // if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
   //    markRetainerBlocks();
@@ -913,7 +913,7 @@ memInventory (bool show)
   }
 
   retainer_blocks = 0;
-#ifdef PROFILING
+#if defined(PROFILING)
   if (RtsFlags.ProfFlags.doHeapProfile == HEAP_BY_RETAINER) {
       retainer_blocks = retainerStackBlocks();
   }

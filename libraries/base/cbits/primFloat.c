@@ -109,7 +109,7 @@ union stg_ieee754_dbl
  */
 
 /* In case you don't support IEEE, you'll just get dummy defs.. */
-#ifdef IEEE_FLOATING_POINT
+#if defined(IEEE_FLOATING_POINT)
 
 HsInt
 isDoubleFinite(HsDouble d)

@@ -271,7 +271,7 @@ unpack !buf !r !w acc0
               -- Here, we are rather careful to only put an *evaluated* character
               -- in the output string. Due to pointer tagging, this allows the consumer
               -- to avoid ping-ponging between the actual consumer code and the thunk code
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
               -- reverse-order decoding of UTF-16
               c2 <- peekElemOff pbuf i
               if (c2 < 0xdc00 || c2 > 0xdffff)

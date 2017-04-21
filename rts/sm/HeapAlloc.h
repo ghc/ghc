@@ -48,7 +48,7 @@
    the 4GB block in question.
    -------------------------------------------------------------------------- */
 
-#ifdef USE_LARGE_ADDRESS_SPACE
+#if defined(USE_LARGE_ADDRESS_SPACE)
 
 struct mblock_address_range {
     W_ begin, end;

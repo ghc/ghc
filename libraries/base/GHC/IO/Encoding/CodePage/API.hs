@@ -157,7 +157,7 @@ newCP rec fn cp = do
 
 utf16_native_encode' :: EncodeBuffer
 utf16_native_decode' :: DecodeBuffer
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN)
 utf16_native_encode' = utf16be_encode
 utf16_native_decode' = utf16be_decode
 #else
@@ -204,7 +204,7 @@ utf16_native_decode ibuf obuf = do
 
 cpDecode :: Word32 -> Int -> DecodeBuffer
 cpDecode cp max_char_size = \ibuf obuf -> do
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
     let mbuf = obuf
 #else
     -- FIXME: share the buffer between runs, even if the buffer is not the perfect size
@@ -215,7 +215,7 @@ cpDecode cp max_char_size = \ibuf obuf -> do
     debugIO $ "cpDecode " ++ summaryBuffer ibuf ++ " " ++ summaryBuffer mbuf
     (why1, ibuf', mbuf') <- cpRecode try' is_valid_prefix max_char_size 1 0 1 ibuf mbuf
     debugIO $ "cpRecode (cpDecode) = " ++ show why1 ++ " " ++ summaryBuffer ibuf' ++ " " ++ summaryBuffer mbuf'
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
     return (why1, ibuf', mbuf')
 #else
     -- Convert as much UTF-16 as possible to UTF-32. Note that it's impossible for this to fail
@@ -265,7 +265,7 @@ cpDecode cp max_char_size = \ibuf obuf -> do
 
 cpEncode :: Word32 -> Int -> EncodeBuffer
 cpEncode cp _max_char_size = \ibuf obuf -> do
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
     let mbuf' = ibuf
 #else
     -- FIXME: share the buffer between runs, even though that means we can't size the buffer as we want.
@@ -281,7 +281,7 @@ cpEncode cp _max_char_size = \ibuf obuf -> do
     debugIO $ "\ncpEncode " ++ summaryBuffer mbuf' ++ " " ++ summaryBuffer obuf
     (why2, target_utf16_count, mbuf', obuf) <- saner (cpRecode try' is_valid_prefix 2 1 1 0) (mbuf' { bufState = ReadBuffer }) obuf
     debugIO $ "cpRecode (cpEncode) = " ++ show why2 ++ " " ++ summaryBuffer mbuf' ++ " " ++ summaryBuffer obuf
-#ifdef CHARBUF_UTF16
+#if defined(CHARBUF_UTF16)
     return (why2, mbuf', obuf)
 #else
     case why2 of

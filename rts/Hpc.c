@@ -14,15 +14,15 @@
 #include <string.h>
 #include <assert.h>
 
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
 
-#ifdef HAVE_SYS_STAT_H
+#if defined(HAVE_SYS_STAT_H)
 #include <sys/stat.h>
 #endif
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
 
@@ -216,7 +216,7 @@ startupHpc(void)
     /* Make sure the directory is present;
      * conditional code for mkdir lifted from lndir.c
      */
-#ifdef WIN32
+#if defined(WIN32)
     mkdir(hpc_tixdir);
 #else
     mkdir(hpc_tixdir,0777);

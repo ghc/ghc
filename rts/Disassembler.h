@@ -8,7 +8,7 @@
 
 #pragma once
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 RTS_PRIVATE int  disInstr   ( StgBCO *bco, int pc );
 RTS_PRIVATE void disassemble( StgBCO *bco );

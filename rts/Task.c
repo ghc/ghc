@@ -334,7 +334,7 @@ boundTaskExiting (Task *task)
 }
 
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 #define TASK_ID(t) (t)->id
 #else
 #define TASK_ID(t) (t)
@@ -501,7 +501,7 @@ void rts_setInCallCapability (
     Task *task = getTask();
     task->preferred_capability = preferred_capability;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     if (affinity) {
         if (RtsFlags.ParFlags.setAffinity) {
             setThreadAffinity(preferred_capability, n_capabilities);
@@ -513,7 +513,7 @@ void rts_setInCallCapability (
 void rts_pinThreadToNumaNode (
     int node USED_IF_THREADS)
 {
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     if (RtsFlags.GcFlags.numa) {
         Task *task = getTask();
         task->node = capNoToNumaNode(node);
@@ -524,7 +524,7 @@ void rts_pinThreadToNumaNode (
 #endif
 }
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 void printAllTasks(void);
 

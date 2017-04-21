@@ -82,7 +82,7 @@ struct _IndirectAddr {
 } IndirectAddr;
 
 /* See Note [mingw-w64 name decoration scheme] */
-#ifndef x86_64_HOST_ARCH
+#if !defined(x86_64_HOST_ARCH)
 #define STRIP_LEADING_UNDERSCORE 1
 #else
 #define STRIP_LEADING_UNDERSCORE 0

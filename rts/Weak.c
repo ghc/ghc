@@ -103,7 +103,7 @@ scheduleFinalizers(Capability *cap, StgWeak *list)
 
         runCFinalizers((StgCFinalizerList *)w->cfinalizers);
 
-#ifdef PROFILING
+#if defined(PROFILING)
         // A weak pointer is inherently used, so we do not need to call
         // LDV_recordDead().
         //

@@ -168,7 +168,7 @@ import qualified Data.Set as Set
 
 import Data.Time
 
-#ifdef DEBUG
+#if defined(DEBUG)
 import {-# SOURCE #-} Outputable ( warnPprTrace, text )
 #endif
 
@@ -192,42 +192,42 @@ the flags are off.
 -}
 
 ghciSupported :: Bool
-#ifdef GHCI
+#if defined(GHCI)
 ghciSupported = True
 #else
 ghciSupported = False
 #endif
 
 debugIsOn :: Bool
-#ifdef DEBUG
+#if defined(DEBUG)
 debugIsOn = True
 #else
 debugIsOn = False
 #endif
 
 ncgDebugIsOn :: Bool
-#ifdef NCG_DEBUG
+#if defined(NCG_DEBUG)
 ncgDebugIsOn = True
 #else
 ncgDebugIsOn = False
 #endif
 
 ghciTablesNextToCode :: Bool
-#ifdef GHCI_TABLES_NEXT_TO_CODE
+#if defined(GHCI_TABLES_NEXT_TO_CODE)
 ghciTablesNextToCode = True
 #else
 ghciTablesNextToCode = False
 #endif
 
 isWindowsHost :: Bool
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 isWindowsHost = True
 #else
 isWindowsHost = False
 #endif
 
 isDarwinHost :: Bool
-#ifdef darwin_HOST_OS
+#if defined(darwin_HOST_OS)
 isDarwinHost = True
 #else
 isDarwinHost = False
@@ -326,7 +326,7 @@ zipWithEqual    :: String -> (a->b->c) -> [a]->[b]->[c]
 zipWith3Equal   :: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
 zipWith4Equal   :: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
-#ifndef DEBUG
+#if !defined(DEBUG)
 zipEqual      _ = zip
 zipWithEqual  _ = zipWith
 zipWith3Equal _ = zipWith3
@@ -544,7 +544,7 @@ notNull [] = False
 notNull _  = True
 
 only :: [a] -> a
-#ifdef DEBUG
+#if defined(DEBUG)
 only [a] = a
 #else
 only (a:_) = a
@@ -1345,7 +1345,7 @@ type HasCallStack = (() :: Constraint)
 #endif
 
 -- | A call stack constraint, but only when 'isDebugOn'.
-#ifdef DEBUG
+#if defined(DEBUG)
 type HasDebugCallStack = HasCallStack
 #else
 type HasDebugCallStack = (() :: Constraint)

@@ -88,7 +88,7 @@ adjustorCode:
     
         /* set up stack frame */
     LOAD    r12, FRAMESIZE_OFF(r2)
-#ifdef powerpc64_HOST_ARCH
+#if defined(powerpc64_HOST_ARCH)
     stdux   r1, r1, r12
 #else   
     stwux   r1, r1, r12
@@ -162,7 +162,7 @@ L2:
 #define FRAMESIZE_OFF   (HEADER_BYTES + 2*WS)
 #define ARGWORDS_OFF    (HEADER_BYTES + 3*WS)
 
-#ifdef LEADING_UNDERSCORE
+#if defined(LEADING_UNDERSCORE)
     .globl _adjustorCode
 _adjustorCode:
 #else

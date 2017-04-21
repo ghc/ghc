@@ -188,7 +188,7 @@ createAdjustor (int cconv,
 #include <string.h>
 #endif
 
-#ifdef LEADING_UNDERSCORE
+#if defined(LEADING_UNDERSCORE)
 #define UNDERSCORE "_"
 #else 
 #define UNDERSCORE ""
@@ -1057,7 +1057,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
         AdjustorStub *adjustorStub;
         int sz = 0, extra_sz, total_sz;
 
-#ifdef FUNDESCS
+#if defined(FUNDESCS)
         adjustorStub = stgMallocBytes(sizeof(AdjustorStub), "createAdjustor");
 #else
         adjustorStub = allocateExec(sizeof(AdjustorStub),&code);
@@ -1066,7 +1066,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
             
         adjustorStub->code = (void*) &adjustorCode;
 
-#ifdef FUNDESCS
+#if defined(FUNDESCS)
             // function descriptors are a cool idea.
             // We don't need to generate any code at runtime.
         adjustorStub->toc = adjustorStub;

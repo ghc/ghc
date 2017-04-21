@@ -19,7 +19,7 @@
 #include <string.h>
 #include <errno.h>
 
-#ifdef HAVE_WINDOWS_H
+#if defined(HAVE_WINDOWS_H)
 #include <windows.h>
 #endif
 
@@ -175,7 +175,7 @@ rtsFatalInternalErrorFn(const char *s, va_list ap)
      fflush(stderr);
   }
 
-#ifdef TRACING
+#if defined(TRACING)
   if (RtsFlags.TraceFlags.tracing == TRACE_EVENTLOG) endEventLogging();
 #endif
 

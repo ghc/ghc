@@ -43,7 +43,7 @@ import qualified GHC.IO.Device
 import GHC.IO.Device (SeekMode(..), IODeviceType(..))
 import GHC.Conc.IO
 import GHC.IO.Exception
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 import GHC.Windows
 #endif
 
@@ -53,7 +53,7 @@ import qualified System.Posix.Internals
 import System.Posix.Internals hiding (FD, setEcho, getEcho)
 import System.Posix.Types
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 # if defined(i386_HOST_ARCH)
 #  define WINDOWS_CCONV stdcall
 # elif defined(x86_64_HOST_ARCH)
@@ -71,7 +71,7 @@ c_DEBUG_DUMP = False
 
 data FD = FD {
   fdFD :: {-# UNPACK #-} !CInt,
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
   -- On Windows, a socket file descriptor needs to be read and written
   -- using different functions (send/recv).
   fdIsSocket_ :: {-# UNPACK #-} !Int
@@ -83,7 +83,7 @@ data FD = FD {
 #endif
  }
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 fdIsSocket :: FD -> Bool
 fdIsSocket fd = fdIsSocket_ fd /= 0
 #endif
@@ -167,7 +167,7 @@ openFile filepath iomode non_blocking =
                   ReadWriteMode -> rw_flags
                   AppendMode    -> append_flags
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
       binary_flags = o_BINARY
 #else
       binary_flags = 0
@@ -259,12 +259,12 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
 
         _other_type -> return ()
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
     when (not is_socket) $ setmode fd True >> return ()
 #endif
 
     return (FD{ fdFD = fd,
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
                 fdIsNonBlocking = fromEnum is_nonblock
 #else
                 fdIsSocket_ = fromEnum is_socket
@@ -273,7 +273,7 @@ mkFD fd iomode mb_stat is_socket is_nonblock = do
             fd_type)
 
 getUniqueFileInfo :: CInt -> CDev -> CIno -> IO (Word64, Word64)
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 getUniqueFileInfo _ dev ino = return (fromIntegral dev, fromIntegral ino)
 #else
 getUniqueFileInfo fd _ _ = do
@@ -283,7 +283,7 @@ getUniqueFileInfo fd _ _ = do
       liftM2 (,) (peek devptr) (peek inoptr)
 #endif
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "__hscore_setmode"
   setmode :: CInt -> Bool -> IO CInt
 #endif
@@ -293,7 +293,7 @@ foreign import ccall unsafe "__hscore_setmode"
 
 stdFD :: CInt -> FD
 stdFD fd = FD { fdFD = fd,
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
                 fdIsSocket_ = 0
 #else
                 fdIsNonBlocking = 0
@@ -315,7 +315,7 @@ close :: FD -> IO ()
 close fd =
   do let closer realFd =
            throwErrnoIfMinus1Retry_ "GHC.IO.FD.close" $
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
            if fdIsSocket fd then
              c_closesocket (fromIntegral realFd)
            else
@@ -333,7 +333,7 @@ release :: FD -> IO ()
 release fd = do _ <- unlockFile (fdFD fd)
                 return ()
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import WINDOWS_CCONV unsafe "HsBase.h closesocket"
    c_closesocket :: CInt -> IO CInt
 #endif
@@ -465,7 +465,7 @@ fdWriteNonBlocking fd ptr bytes = do
 
 -- Low level routines for reading/writing to (raw)buffers:
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 
 {-
 NOTE [nonblock]:
@@ -647,7 +647,7 @@ foreign import ccall unsafe "rtsSupportsBoundThreads" threaded :: Bool
 -- -----------------------------------------------------------------------------
 -- utils
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 throwErrnoIfMinus1RetryOnBlock  :: String -> IO CSsize -> IO CSsize -> IO CSsize
 throwErrnoIfMinus1RetryOnBlock loc f on_block  =
   do
@@ -672,7 +672,7 @@ foreign import ccall unsafe "lockFile"
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
 
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 foreign import ccall unsafe "get_unique_file_info"
   c_getUniqueFileInfo :: CInt -> Ptr Word64 -> Ptr Word64 -> IO ()
 #endif

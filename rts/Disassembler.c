@@ -8,7 +8,7 @@
  * $Date: 2004/09/03 15:28:19 $
  * ---------------------------------------------------------------------------*/
 
-#ifdef DEBUG
+#if defined(DEBUG)
 
 #include "PosixSource.h"
 #include "Rts.h"

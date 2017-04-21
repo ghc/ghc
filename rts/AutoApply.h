@@ -40,7 +40,7 @@
 // arguments to an existing PAP, we must construct the CCS for the new PAP as if
 // we had entered the existing PAP from the current CCS.  Otherwise, we lose any
 // stack information in the existing PAP.  See #5654, and the test T5654b-O0.
-#ifdef PROFILING
+#if defined(PROFILING)
 #define ENTER_FUN_CCS_NEW_PAP(pap) \
   ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(pap) "ptr");
 #else

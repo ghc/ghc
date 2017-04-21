@@ -158,7 +158,7 @@ newtype Event = Event CShort
 
 -- We have to duplicate the whole enum like this in order for the
 -- hsc2hs cross-compilation mode to work
-#ifdef POLLRDHUP
+#if defined(POLLRDHUP)
 #{enum Event, Event
  , pollIn    = POLLIN
  , pollOut   = POLLOUT

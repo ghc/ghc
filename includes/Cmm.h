@@ -120,13 +120,13 @@
         name : bits8[] str;                     \
   }                                             \
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define RET_LBL(f) f##_info
 #else
 #define RET_LBL(f) f##_ret
 #endif
 
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 #define ENTRY_LBL(f) f##_info
 #else
 #define ENTRY_LBL(f) f##_entry
@@ -204,7 +204,7 @@
    Assertions and Debuggery
    -------------------------------------------------------------------------- */
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define ASSERT(predicate)                       \
         if (predicate) {                        \
             /*null*/;                           \
@@ -215,7 +215,7 @@
 #define ASSERT(p) /* nothing */
 #endif
 
-#ifdef DEBUG
+#if defined(DEBUG)
 #define DEBUG_ONLY(s) s
 #else
 #define DEBUG_ONLY(s) /* nothing */
@@ -230,7 +230,7 @@
  *
  * Note the syntax is slightly different to the C version of this macro.
  */
-#ifdef DEBUG
+#if defined(DEBUG)
 #define IF_DEBUG(c,s)  if (RtsFlags_DebugFlags_##c(RtsFlags) != 0::CBool) { s; }
 #else
 #define IF_DEBUG(c,s)  /* nothing */
@@ -256,7 +256,7 @@
    Indirections can contain tagged pointers, so their tag is checked.
    -------------------------------------------------------------------------- */
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 // When profiling, we cannot shortcut ENTER() by checking the tag,
 // because LDV profiling relies on entering closures to mark them as
@@ -589,7 +589,7 @@
  * depending on TABLES_NEXT_TO_CODE.  So we define field access
  * macros which use the appropriate version here:
  */
-#ifdef TABLES_NEXT_TO_CODE
+#if defined(TABLES_NEXT_TO_CODE)
 /*
  * when TABLES_NEXT_TO_CODE, slow_apply is stored as an offset
  * instead of the normal pointer.
@@ -623,7 +623,7 @@
 #define OVERWRITING_CLOSURE_OFS(c,n) /* nothing */
 #endif
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 #define prim_write_barrier prim %write_barrier()
 #else
 #define prim_write_barrier /* nothing */
@@ -633,7 +633,7 @@
    Ticky macros
    -------------------------------------------------------------------------- */
 
-#ifdef TICKY_TICKY
+#if defined(TICKY_TICKY)
 #define TICK_BUMP_BY(ctr,n) CLong[ctr] = CLong[ctr] + n
 #else
 #define TICK_BUMP_BY(ctr,n) /* nothing */

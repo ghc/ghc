@@ -2,7 +2,7 @@
 
 -- | Dynamically lookup up values from modules and loading them.
 module DynamicLoading (
-#ifdef GHCI
+#if defined(GHCI)
         -- * Loading plugins
         loadPlugins,
         loadFrontendPlugin,
@@ -24,7 +24,7 @@ module DynamicLoading (
 #endif
     ) where
 
-#ifdef GHCI
+#if defined(GHCI)
 import Linker           ( linkModule, getHValue )
 import GHCi             ( wormhole )
 import SrcLoc           ( noSrcSpan )
@@ -66,7 +66,7 @@ import Data.List        ( intercalate )
 
 #endif
 
-#ifdef GHCI
+#if defined(GHCI)
 
 loadPlugins :: HscEnv -> IO [(ModuleName, Plugin, [CommandLineOption])]
 loadPlugins hsc_env

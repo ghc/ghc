@@ -15,7 +15,7 @@
 #include "Schedule.h"
 #include "RtsFlags.h"
 
-#ifdef HAVE_TIME_H
+#if defined(HAVE_TIME_H)
 #include <time.h>
 #endif
 
@@ -26,11 +26,11 @@
 extern char *ctime_r(const time_t *, char *);
 #endif
 
-#ifdef HAVE_FCNTL_H
+#if defined(HAVE_FCNTL_H)
 #include <fcntl.h>
 #endif
 
-#ifdef HAVE_GETTIMEOFDAY
+#if defined(HAVE_GETTIMEOFDAY)
 #include <sys/time.h>
 #endif
 
@@ -39,7 +39,7 @@ extern char *ctime_r(const time_t *, char *);
 #include <stdarg.h>
 #include <stdio.h>
 
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 #include <signal.h>
 #endif
 
@@ -253,7 +253,7 @@ showStgWord64(StgWord64 x, char *s, bool with_commas)
 
 
 // Can be used as a breakpoint to set on every heap check failure.
-#ifdef DEBUG
+#if defined(DEBUG)
 void
 heapCheckFail( void )
 {
@@ -313,7 +313,7 @@ void printRtsInfo(void) {
 // profiled or not.  GHCi uses it (see #2197).
 int rts_isProfiled(void)
 {
-#ifdef PROFILING
+#if defined(PROFILING)
     return 1;
 #else
     return 0;
@@ -324,7 +324,7 @@ int rts_isProfiled(void)
 // dynamically-linked or not.
 int rts_isDynamic(void)
 {
-#ifdef DYNAMIC
+#if defined(DYNAMIC)
     return 1;
 #else
     return 0;
@@ -334,7 +334,7 @@ int rts_isDynamic(void)
 // Used for detecting a non-empty FPU stack on x86 (see #4914)
 void checkFPUStack(void)
 {
-#ifdef i386_HOST_ARCH
+#if defined(i386_HOST_ARCH)
     static unsigned char buf[108];
     asm("FSAVE %0":"=m" (buf));
 

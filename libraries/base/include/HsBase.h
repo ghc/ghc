@@ -99,8 +99,8 @@
 #elif HAVE_STDINT_H
 # include <stdint.h>
 #endif
-#ifdef HAVE_CLOCK_GETTIME
-# ifdef _POSIX_MONOTONIC_CLOCK
+#if defined(HAVE_CLOCK_GETTIME)
+# if defined(_POSIX_MONOTONIC_CLOCK)
 #  define CLOCK_ID CLOCK_MONOTONIC
 # else
 #  define CLOCK_ID CLOCK_REALTIME
@@ -162,7 +162,7 @@ extern int fdReady(int fd, int write, int msecs, int isSock);
    when compiling to native code.
    -------------------------------------------------------------------------- */
 
-#ifndef INLINE
+#if !defined(INLINE)
 # if defined(_MSC_VER)
 #  define INLINE extern __inline
 # else
@@ -192,7 +192,7 @@ __hscore_o_binary(void)
 INLINE int
 __hscore_o_rdonly(void)
 {
-#ifdef O_RDONLY
+#if defined(O_RDONLY)
   return O_RDONLY;
 #else
   return 0;
@@ -202,7 +202,7 @@ __hscore_o_rdonly(void)
 INLINE int
 __hscore_o_wronly( void )
 {
-#ifdef O_WRONLY
+#if defined(O_WRONLY)
   return O_WRONLY;
 #else
   return 0;
@@ -212,7 +212,7 @@ __hscore_o_wronly( void )
 INLINE int
 __hscore_o_rdwr( void )
 {
-#ifdef O_RDWR
+#if defined(O_RDWR)
   return O_RDWR;
 #else
   return 0;
@@ -222,7 +222,7 @@ __hscore_o_rdwr( void )
 INLINE int
 __hscore_o_append( void )
 {
-#ifdef O_APPEND
+#if defined(O_APPEND)
   return O_APPEND;
 #else
   return 0;
@@ -232,7 +232,7 @@ __hscore_o_append( void )
 INLINE int
 __hscore_o_creat( void )
 {
-#ifdef O_CREAT
+#if defined(O_CREAT)
   return O_CREAT;
 #else
   return 0;
@@ -242,7 +242,7 @@ __hscore_o_creat( void )
 INLINE int
 __hscore_o_excl( void )
 {
-#ifdef O_EXCL
+#if defined(O_EXCL)
   return O_EXCL;
 #else
   return 0;
@@ -252,7 +252,7 @@ __hscore_o_excl( void )
 INLINE int
 __hscore_o_trunc( void )
 {
-#ifdef O_TRUNC
+#if defined(O_TRUNC)
   return O_TRUNC;
 #else
   return 0;
@@ -262,7 +262,7 @@ __hscore_o_trunc( void )
 INLINE int
 __hscore_o_noctty( void )
 {
-#ifdef O_NOCTTY
+#if defined(O_NOCTTY)
   return O_NOCTTY;
 #else
   return 0;
@@ -272,7 +272,7 @@ __hscore_o_noctty( void )
 INLINE int
 __hscore_o_nonblock( void )
 {
-#ifdef O_NONBLOCK
+#if defined(O_NONBLOCK)
   return O_NONBLOCK;
 #else
   return 0;
@@ -374,7 +374,7 @@ __hscore_ptr_c_cc( struct termios* ts )
 INLINE HsInt
 __hscore_sizeof_termios( void )
 {
-#ifndef _WIN32
+#if !defined(_WIN32)
   return sizeof(struct termios);
 #else
   return 0;
@@ -393,7 +393,7 @@ __hscore_sizeof_sigset_t( void )
 INLINE int
 __hscore_echo( void )
 {
-#ifdef ECHO
+#if defined(ECHO)
   return ECHO;
 #else
   return 0;
@@ -404,7 +404,7 @@ __hscore_echo( void )
 INLINE int
 __hscore_tcsanow( void )
 {
-#ifdef TCSANOW
+#if defined(TCSANOW)
   return TCSANOW;
 #else
   return 0;
@@ -415,7 +415,7 @@ __hscore_tcsanow( void )
 INLINE int
 __hscore_icanon( void )
 {
-#ifdef ICANON
+#if defined(ICANON)
   return ICANON;
 #else
   return 0;
@@ -424,7 +424,7 @@ __hscore_icanon( void )
 
 INLINE int __hscore_vmin( void )
 {
-#ifdef VMIN
+#if defined(VMIN)
   return VMIN;
 #else
   return 0;
@@ -433,7 +433,7 @@ INLINE int __hscore_vmin( void )
 
 INLINE int __hscore_vtime( void )
 {
-#ifdef VTIME
+#if defined(VTIME)
   return VTIME;
 #else
   return 0;
@@ -442,7 +442,7 @@ INLINE int __hscore_vtime( void )
 
 INLINE int __hscore_sigttou( void )
 {
-#ifdef SIGTTOU
+#if defined(SIGTTOU)
   return SIGTTOU;
 #else
   return 0;
@@ -451,7 +451,7 @@ INLINE int __hscore_sigttou( void )
 
 INLINE int __hscore_sig_block( void )
 {
-#ifdef SIG_BLOCK
+#if defined(SIG_BLOCK)
   return SIG_BLOCK;
 #else
   return 0;
@@ -460,14 +460,14 @@ INLINE int __hscore_sig_block( void )
 
 INLINE int __hscore_sig_setmask( void )
 {
-#ifdef SIG_SETMASK
+#if defined(SIG_SETMASK)
   return SIG_SETMASK;
 #else
   return 0;
 #endif
 }
 
-#ifndef _WIN32
+#if !defined(_WIN32)
 INLINE size_t __hscore_sizeof_siginfo_t (void)
 {
     return sizeof(siginfo_t);
@@ -477,7 +477,7 @@ INLINE size_t __hscore_sizeof_siginfo_t (void)
 INLINE int
 __hscore_f_getfl( void )
 {
-#ifdef F_GETFL
+#if defined(F_GETFL)
   return F_GETFL;
 #else
   return 0;
@@ -487,7 +487,7 @@ __hscore_f_getfl( void )
 INLINE int
 __hscore_f_setfl( void )
 {
-#ifdef F_SETFL
+#if defined(F_SETFL)
   return F_SETFL;
 #else
   return 0;
@@ -497,7 +497,7 @@ __hscore_f_setfl( void )
 INLINE int
 __hscore_f_setfd( void )
 {
-#ifdef F_SETFD
+#if defined(F_SETFD)
   return F_SETFD;
 #else
   return 0;
@@ -507,7 +507,7 @@ __hscore_f_setfd( void )
 INLINE long
 __hscore_fd_cloexec( void )
 {
-#ifdef FD_CLOEXEC
+#if defined(FD_CLOEXEC)
   return FD_CLOEXEC;
 #else
   return 0;
@@ -518,7 +518,7 @@ __hscore_fd_cloexec( void )
 extern void* __hscore_get_saved_termios(int fd);
 extern void __hscore_set_saved_termios(int fd, void* ts);
 
-#ifdef _WIN32
+#if defined(_WIN32)
 INLINE int __hscore_open(wchar_t *file, int how, mode_t mode) {
 	if ((how & O_WRONLY) || (how & O_RDWR) || (how & O_APPEND))
 	  return _wsopen(file,how | _O_NOINHERIT,_SH_DENYNO,mode);

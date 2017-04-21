@@ -281,7 +281,7 @@ static bool memory_read(Dwfl *dwfl STG_UNUSED, Dwarf_Addr addr,
 
 static bool set_initial_registers(Dwfl_Thread *thread, void *arg);
 
-#ifdef x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
     Dwarf_Word regs[17];

@@ -40,7 +40,7 @@
  * IN_STG_CODE is not defined, and the register variables will not be
  * active.
  */
-#ifndef IN_STG_CODE
+#if !defined(IN_STG_CODE)
 # define IN_STG_CODE 1
 
 // Turn on C99 for .hc code.  This gives us the INFINITY and NAN
@@ -154,7 +154,7 @@
 # define FORCE_GNU_INLINE 1
 #endif
 
-#ifdef FORCE_GNU_INLINE
+#if defined(FORCE_GNU_INLINE)
 // Force compiler into gnu90 semantics
 # if defined(KEEP_INLINES)
 #  define EXTERN_INLINE inline __attribute__((gnu_inline))
@@ -524,7 +524,7 @@ INLINE_HEADER StgInt64 PK_Int64(W_ p_src[])
 
 #if SIZEOF_VOID_P == 4
 
-#ifdef WORDS_BIGENDIAN
+#if defined(WORDS_BIGENDIAN)
 #define RTS_CARRY_IDX__ 0
 #define RTS_REM_IDX__  1
 #else

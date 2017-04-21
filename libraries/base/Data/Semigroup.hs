@@ -85,7 +85,7 @@ import           Data.Monoid         (Alt (..))
 import qualified Data.Monoid         as Monoid
 import           Data.Ord            (Down(..))
 import           Data.Void
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 import           GHC.Event           (Event, Lifetime)
 #endif
 import           GHC.Generics
@@ -725,7 +725,7 @@ instance Semigroup (Proxy s) where
 instance Semigroup a => Semigroup (IO a) where
     (<>) = liftA2 (<>)
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 -- | @since 4.10.0.0
 instance Semigroup Event where
     (<>) = mappend

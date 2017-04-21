@@ -18,7 +18,7 @@
 #include "Stable.h"
 #include "Libdw.h"
 
-#ifdef alpha_HOST_ARCH
+#if defined(alpha_HOST_ARCH)
 # if defined(linux_HOST_OS)
 #  include <asm/fpu.h>
 # else
@@ -26,23 +26,23 @@
 # endif
 #endif
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 # include <unistd.h>
 #endif
 
-#ifdef HAVE_SIGNAL_H
+#if defined(HAVE_SIGNAL_H)
 # include <signal.h>
 #endif
 
-#ifdef HAVE_ERRNO_H
+#if defined(HAVE_ERRNO_H)
 # include <errno.h>
 #endif
 
-#ifdef HAVE_EVENTFD_H
+#if defined(HAVE_EVENTFD_H)
 # include <sys/eventfd.h>
 #endif
 
-#ifdef HAVE_TERMIOS_H
+#if defined(HAVE_TERMIOS_H)
 #include <termios.h>
 #endif
 
@@ -70,7 +70,7 @@ static uint32_t n_haskell_handlers = 0;
 static sigset_t userSignals;
 static sigset_t savedSignals;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 static Mutex sig_mutex; // protects signal_handlers, nHandlers
 #endif
 
@@ -82,7 +82,7 @@ void
 initUserSignals(void)
 {
     sigemptyset(&userSignals);
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     initMutex(&sig_mutex);
 #endif
 }
@@ -95,7 +95,7 @@ freeSignalHandlers(void) {
         nHandlers = 0;
         n_haskell_handlers = 0;
     }
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
     closeMutex(&sig_mutex);
 #endif
 }
@@ -637,7 +637,7 @@ install_vtalrm_handler(int sig, TickProc handle_tick)
 
     sigemptyset(&action.sa_mask);
 
-#ifdef SA_RESTART
+#if defined(SA_RESTART)
     // specify SA_RESTART.  One consequence if we don't do this is
     // that readline gets confused by the -threaded RTS.  It seems
     // that if a SIGALRM handler is installed without SA_RESTART,
@@ -706,7 +706,7 @@ initDefaultHandlers(void)
     }
 #endif
 
-#ifdef alpha_HOST_ARCH
+#if defined(alpha_HOST_ARCH)
     ieee_set_fp_control(0);
 #endif
 

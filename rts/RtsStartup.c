@@ -53,10 +53,10 @@
 #include "posix/TTY.h"
 #endif
 
-#ifdef HAVE_UNISTD_H
+#if defined(HAVE_UNISTD_H)
 #include <unistd.h>
 #endif
-#ifdef HAVE_LOCALE_H
+#if defined(HAVE_LOCALE_H)
 #include <locale.h>
 #endif
 
@@ -111,7 +111,7 @@ void _fpreset(void)
     x86_init_fpu();
 }
 
-#ifdef __GNUC__
+#if defined(__GNUC__)
 void __attribute__((alias("_fpreset"))) fpreset(void);
 #else
 void fpreset(void) {
@@ -186,7 +186,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
         setFullProgArgv(*argc,*argv);
         setupRtsFlags(argc, *argv, rts_config);
 
-#ifdef DEBUG
+#if defined(DEBUG)
         /* load debugging symbols for current binary */
         DEBUG_LoadSymbols((*argv)[0]);
 #endif /* DEBUG */
@@ -196,7 +196,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     initStats1();
 
     /* initTracing must be after setupRtsFlags() */
-#ifdef TRACING
+#if defined(TRACING)
     initTracing();
 #endif
 
@@ -243,7 +243,7 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     getStablePtr((StgPtr)runSparks_closure);
     getStablePtr((StgPtr)ensureIOManagerIsRunning_closure);
     getStablePtr((StgPtr)ioManagerCapabilitiesChanged_closure);
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
     getStablePtr((StgPtr)blockedOnBadFD_closure);
     getStablePtr((StgPtr)runHandlersPtr_closure);
 #endif
@@ -431,14 +431,14 @@ hs_exit_(bool wait_foreign)
     endProfiling();
     freeProfiling();
 
-#ifdef PROFILING
+#if defined(PROFILING)
     // Originally, this was in report_ccs_profiling().  Now, retainer
     // profiling might tack some extra stuff on to the end of this file
     // during endProfiling().
     if (prof_file != NULL) fclose(prof_file);
 #endif
 
-#ifdef TRACING
+#if defined(TRACING)
     endTracing();
     freeTracing();
 #endif
@@ -515,7 +515,7 @@ shutdownHaskellAndExit(int n, int fastExit)
     stg_exit(n);
 }
 
-#ifndef mingw32_HOST_OS
+#if !defined(mingw32_HOST_OS)
 static void exitBySignal(int sig) GNUC3_ATTRIBUTE(__noreturn__);
 
 void

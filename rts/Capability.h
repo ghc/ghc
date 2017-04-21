@@ -387,7 +387,7 @@ typedef struct PutMVar_ {
     struct PutMVar_ *link;
 } PutMVar;
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 INLINE_HEADER bool emptyInbox(Capability *cap);
 
@@ -464,7 +464,7 @@ contextSwitchCapability (Capability *cap)
     cap->context_switch = 1;
 }
 
-#ifdef THREADED_RTS
+#if defined(THREADED_RTS)
 
 INLINE_HEADER bool emptyInbox(Capability *cap)
 {

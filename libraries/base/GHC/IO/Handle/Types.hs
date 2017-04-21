@@ -46,7 +46,7 @@ import GHC.Read
 import GHC.Word
 import GHC.IO.Device
 import Data.Typeable
-#ifdef DEBUG
+#if defined(DEBUG)
 import Control.Monad
 #endif
 
@@ -179,7 +179,7 @@ isReadWriteHandleType _                 = False
 --   * In a wriite Handle, the Char buffer is always empty (we encode when writing)
 --
 checkHandleInvariants :: Handle__ -> IO ()
-#ifdef DEBUG
+#if defined(DEBUG)
 checkHandleInvariants h_ = do
  bbuf <- readIORef (haByteBuffer h_)
  checkBuffer bbuf
@@ -367,7 +367,7 @@ data NewlineMode
 -- | The native newline representation for the current platform: 'LF'
 -- on Unix systems, 'CRLF' on Windows.
 nativeNewline :: Newline
-#ifdef mingw32_HOST_OS
+#if defined(mingw32_HOST_OS)
 nativeNewline = CRLF
 #else
 nativeNewline = LF

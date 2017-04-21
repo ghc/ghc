@@ -235,7 +235,7 @@ stg_PAP_apply /* no args => explicit stack */
   // profiling
   TICK_ENT_PAP();
   LDV_ENTER(pap);
-#ifdef PROFILING
+#if defined(PROFILING)
   ccall enterFunCCS(BaseReg "ptr", StgHeader_ccs(pap) "ptr");
 #endif
 
@@ -271,7 +271,7 @@ for:
   // Off we go!
   TICK_ENT_VIA_NODE();
 
-#ifdef NO_ARG_REGS
+#if defined(NO_ARG_REGS)
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
@@ -349,7 +349,7 @@ for:
   // Off we go!
   TICK_ENT_VIA_NODE();
 
-#ifdef NO_ARG_REGS
+#if defined(NO_ARG_REGS)
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;
@@ -419,7 +419,7 @@ for:
   // Off we go!
   TICK_ENT_VIA_NODE();
 
-#ifdef NO_ARG_REGS
+#if defined(NO_ARG_REGS)
   jump %GET_ENTRY(UNTAG(R1)) [R1];
 #else
       W_ info;

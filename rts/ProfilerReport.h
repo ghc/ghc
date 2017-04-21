@@ -15,7 +15,7 @@
 
 #include "BeginPrivate.h"
 
-#ifdef PROFILING
+#if defined(PROFILING)
 
 void writeCCSReport( FILE *prof_file, CostCentreStack const *ccs,
                      ProfilerTotals totals );

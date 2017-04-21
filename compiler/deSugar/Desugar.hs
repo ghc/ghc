@@ -156,7 +156,7 @@ deSugar hsc_env
         -- You might think it doesn't matter, but the simplifier brings all top-level
         -- things into the in-scope set before simplifying; so we get no unfolding for F#!
 
-#ifdef DEBUG
+#if defined(DEBUG)
           -- Debug only as pre-simple-optimisation program may be really big
         ; endPassIO hsc_env print_unqual CoreDesugar final_pgm rules_for_imps
 #endif

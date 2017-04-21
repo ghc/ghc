@@ -22,7 +22,7 @@
 #define CALL_LAST 0
 
 // this should be in <excpt.h>, but it's been removed from MinGW distributions
-#ifndef EH_UNWINDING
+#if !defined(EH_UNWINDING)
 #define EH_UNWINDING   0x02
 #endif /* EH_UNWINDING */
 
