@@ -9,11 +9,13 @@
 #include "HsBase.h"
 #if !defined(_WIN32)
 #include <poll.h>
+#include <sys/time.h>
 #endif
 
 /*
  * inputReady(fd) checks to see whether input is available on the file
- * descriptor 'fd'.  Input meaning 'can I safely read at least a
+ * descriptor 'fd' within 'msecs' milliseconds (or indefinitely if 'msecs' is
+ * negative). "Input is available" is defined as 'can I safely read at least a
  * *character* from this file object without blocking?'
  */
 int
@@ -21,23 +23,41 @@ fdReady(int fd, int write, int msecs, int isSock)
 {
 
 #if !defined(_WIN32)
-
-    // We only handle msecs == 0 on non-Windows, because this is the
-    // only case we need.  Non-zero waiting is handled by the IO manager.
-    if (msecs != 0) {
-        fprintf(stderr, "fdReady: msecs != 0, this shouldn't happen");
-        abort();
-    }
-
     struct pollfd fds[1];
+
+    // if we need to track the then record the current time in case we are
+    // interrupted.
+    struct timeval tv0;
+    if (msecs > 0) {
+        if (gettimeofday(&tv0, NULL) != 0) {
+            fprintf(stderr, "fdReady: gettimeofday failed: %s\n",
+                    strerror(errno));
+            abort();
+        }
+    }
 
     fds[0].fd = fd;
     fds[0].events = write ? POLLOUT : POLLIN;
     fds[0].revents = 0;
 
     int res;
-    while ((res = poll(fds, 1, 0)) < 0) {
-        if (errno != EINTR) {
+    while ((res = poll(fds, 1, msecs)) < 0) {
+        if (errno == EINTR) {
+            if (msecs > 0) {
+                struct timeval tv;
+                if (gettimeofday(&tv, NULL) != 0) {
+                    fprintf(stderr, "fdReady: gettimeofday failed: %s\n",
+                            strerror(errno));
+                    abort();
+                }
+
+                int elapsed = 1000 * (tv.tv_sec - tv0.tv_sec)
+                            + (tv.tv_usec - tv0.tv_usec) / 1000;
+                msecs -= elapsed;
+                if (msecs <= 0) return 0;
+                tv0 = tv;
+            }
+        } else {
             return (-1);
         }
     }
