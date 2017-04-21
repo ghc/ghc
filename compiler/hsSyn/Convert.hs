@@ -140,7 +140,7 @@ cvtDec :: TH.Dec -> CvtM (Maybe (LHsDecl RdrName))
 cvtDec (TH.ValD pat body ds)
   | TH.VarP s <- pat
   = do  { s' <- vNameL s
-        ; cl' <- cvtClause (FunRhs s' Prefix) (Clause [] body ds)
+        ; cl' <- cvtClause (FunRhs s' Prefix NoSrcStrict) (Clause [] body ds)
         ; returnJustL $ Hs.ValD $ mkFunBind s' [cl'] }
 
   | otherwise
@@ -159,7 +159,7 @@ cvtDec (TH.FunD nm cls)
                  <+> text "has no equations")
   | otherwise
   = do  { nm' <- vNameL nm
-        ; cls' <- mapM (cvtClause (FunRhs nm' Prefix)) cls
+        ; cls' <- mapM (cvtClause (FunRhs nm' Prefix NoSrcStrict)) cls
         ; returnJustL $ Hs.ValD $ mkFunBind nm' cls' }
 
 cvtDec (TH.SigD nm typ)
@@ -375,7 +375,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir _ Unidir          = return Unidirectional
     cvtDir _ ImplBidir       = return ImplicitBidirectional
     cvtDir n (ExplBidir cls) =
-      do { ms <- mapM (cvtClause (FunRhs n Prefix)) cls
+      do { ms <- mapM (cvtClause (FunRhs n Prefix NoSrcStrict)) cls
          ; return $ ExplicitBidirectional $ mkMatchGroup FromSource ms }
 
 cvtDec (TH.PatSynSigD nm ty)

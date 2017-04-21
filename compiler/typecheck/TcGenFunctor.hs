@@ -137,7 +137,7 @@ gen_Functor_binds loc tycon
     fmap_eqns = [mkSimpleMatch fmap_match_ctxt
                                [nlWildPat]
                                coerce_Expr]
-    fmap_match_ctxt = FunRhs fmap_name Prefix
+    fmap_match_ctxt = FunRhs fmap_name Prefix NoSrcStrict
 
 gen_Functor_binds loc tycon
   = (listToBag [fmap_bind, replace_bind], emptyBag)
@@ -147,7 +147,7 @@ gen_Functor_binds loc tycon
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     fmap_bind = mkRdrFunBindEC 2 id fmap_name fmap_eqns
-    fmap_match_ctxt = FunRhs fmap_name Prefix
+    fmap_match_ctxt = FunRhs fmap_name Prefix NoSrcStrict
 
     fmap_eqn con = flip evalState bs_RDRs $
                      match_for_con fmap_match_ctxt [f_Pat] con =<< parts
@@ -182,7 +182,7 @@ gen_Functor_binds loc tycon
 
     -- See Note [EmptyDataDecls with Functor, Foldable, and Traversable]
     replace_bind = mkRdrFunBindEC 2 id replace_name replace_eqns
-    replace_match_ctxt = FunRhs replace_name Prefix
+    replace_match_ctxt = FunRhs replace_name Prefix NoSrcStrict
 
     replace_eqn con = flip evalState bs_RDRs $
         match_for_con replace_match_ctxt [z_Pat] con =<< parts
@@ -651,7 +651,7 @@ gen_Foldable_binds loc tycon
     foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
                                   [nlWildPat, nlWildPat]
                                   mempty_Expr]
-    foldMap_match_ctxt = FunRhs foldMap_name Prefix
+    foldMap_match_ctxt = FunRhs foldMap_name Prefix NoSrcStrict
 
 gen_Foldable_binds loc tycon
   | null data_cons  -- There's no real point producing anything but
@@ -694,7 +694,7 @@ gen_Foldable_binds loc tycon
       go (NullM a) = Just (Just a)
 
     null_name = L loc null_RDR
-    null_match_ctxt = FunRhs null_name Prefix
+    null_match_ctxt = FunRhs null_name Prefix NoSrcStrict
     null_bind = mkRdrFunBind null_name null_eqns
     null_eqns = map null_eqn data_cons
     null_eqn con
@@ -878,7 +878,7 @@ gen_Traversable_binds loc tycon
         [mkSimpleMatch traverse_match_ctxt
                        [nlWildPat, z_Pat]
                        (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
-    traverse_match_ctxt = FunRhs traverse_name Prefix
+    traverse_match_ctxt = FunRhs traverse_name Prefix NoSrcStrict
 
 gen_Traversable_binds loc tycon
   = (unitBag traverse_bind, emptyBag)

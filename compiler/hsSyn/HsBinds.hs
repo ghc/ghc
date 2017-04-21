@@ -138,6 +138,7 @@ data HsBindLR idL idR
     --
     -- FunBind is used for both functions     @f x = e@
     -- and variables                          @f = \x -> e@
+    -- and strict variables                   @!x = x + 1@
     --
     -- Reason 1: Special case for type inference: see 'TcBinds.tcMonoBinds'.
     --
@@ -147,6 +148,9 @@ data HsBindLR idL idR
     -- But note that the form                 @f :: a->a = ...@
     -- parses as a pattern binding, just like
     --                                        @(f :: a -> a) = ... @
+    --
+    -- Strict binders have their strictness recorded in the 'SrcStrictness' of their
+    -- 'MatchContext'.
     --
     --  'ApiAnnotation.AnnKeywordId's
     --

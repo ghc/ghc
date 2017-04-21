@@ -1509,7 +1509,7 @@ makeG_d.
 gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Lift_binds loc tycon
   | null data_cons = (unitBag (L loc $ mkFunBind (L loc lift_RDR)
-                       [mkMatch (FunRhs (L loc lift_RDR) Prefix)
+                       [mkMatch (FunRhs (L loc lift_RDR) Prefix NoSrcStrict)
                                         [nlWildPat] errorMsg_Expr
                                         (noLoc emptyLocalBinds)])
                      , emptyBag)
@@ -1654,7 +1654,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
     mk_bind :: Id -> LHsBind RdrName
     mk_bind meth_id
       = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch
-                                          (FunRhs (L loc meth_RDR) Prefix)
+                                          (FunRhs (L loc meth_RDR) Prefix NoSrcStrict)
                                           [] rhs_expr]
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
@@ -1843,7 +1843,7 @@ mkFunBindSE :: Arity -> SrcSpan -> RdrName
 mkFunBindSE arity loc fun pats_and_exprs
   = mkRdrFunBindSE arity (L loc fun) matches
   where
-    matches = [mkMatch (FunRhs (L loc fun) Prefix) p e
+    matches = [mkMatch (FunRhs (L loc fun) Prefix NoSrcStrict) p e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
@@ -1873,7 +1873,7 @@ mkRdrFunBindEC arity catch_all
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
-              then [mkMatch (FunRhs fun Prefix)
+              then [mkMatch (FunRhs fun Prefix NoSrcStrict)
                             (replicate (arity - 1) nlWildPat ++ [z_Pat])
                             (catch_all $ nlHsCase z_Expr [])
                             (noLoc emptyLocalBinds)]
@@ -1893,7 +1893,7 @@ mkRdrFunBindSE arity
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
-              then [mkMatch (FunRhs fun Prefix)
+              then [mkMatch (FunRhs fun Prefix NoSrcStrict)
                             (replicate arity nlWildPat)
                             (error_Expr str) (noLoc emptyLocalBinds)]
               else matches

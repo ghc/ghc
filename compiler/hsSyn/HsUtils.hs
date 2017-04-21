@@ -745,7 +745,7 @@ mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
                 -> LHsExpr RdrName -> LHsBind RdrName
 mk_easy_FunBind loc fun pats expr
   = L loc $ mkFunBind (L loc fun)
-              [mkMatch (FunRhs (L loc fun) Prefix) pats expr
+              [mkMatch (FunRhs (L loc fun) Prefix NoSrcStrict) pats expr
                        (noLoc emptyLocalBinds)]
 
 ------------

@@ -2181,19 +2181,21 @@ docdecld :: { LDocDecl }
 decl_no_th :: { LHsDecl RdrName }
         : sigdecl               { $1 }
 
-        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2) };
-                                        pat <- checkPattern empty e;
-                                        _ <- ams (sLL $1 $> ())
-                                               (fst $ unLoc $3);
-                                        return $ sLL $1 $> $ ValD $
-                                            PatBind pat (snd $ unLoc $3)
-                                                    placeHolderType
-                                                    placeHolderNames
-                                                    ([],[]) } }
+        | '!' aexp rhs          {% do { let { e = sLL $1 $2 (SectionR (sL1 $1 (HsVar (sL1 $1 bang_RDR))) $2)
+                                            ; l = comb2 $1 $> };
+                                        (ann, r) <- checkValDef empty SrcStrict e Nothing $3 ;
+                                        case r of {
+                                          (FunBind n _ _ _ _) ->
+                                                ams (L l ()) [mj AnnFunId n] >> return () ;
+                                          (PatBind (L lh _lhs) _rhs _ _ _) ->
+                                                ams (L lh ()) [] >> return () } ;
+
+                                        _ <- ams (L l ()) (ann ++ fst (unLoc $3)) ;
+                                        return $! (sL l $ ValD r) } }
                                 -- Turn it all into an expression so that
                                 -- checkPattern can check that bangs are enabled
 
-        | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty $1 (snd $2) $3;
+        | infixexp_top opt_sig rhs  {% do { (ann,r) <- checkValDef empty NoSrcStrict $1 (snd $2) $3;
                                         let { l = comb2 $1 $> };
                                         case r of {
                                           (FunBind n _ _ _ _) ->

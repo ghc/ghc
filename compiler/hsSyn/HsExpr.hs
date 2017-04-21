@@ -1451,8 +1451,8 @@ Example infix function definition requiring individual API Annotations
 
 isInfixMatch :: Match id body -> Bool
 isInfixMatch match = case m_ctxt match of
-  FunRhs _ Infix -> True
-  _              -> False
+  FunRhs _ Infix _ -> True
+  _                -> False
 
 isEmptyMatchGroup :: MatchGroup id body -> Bool
 isEmptyMatchGroup (MG { mg_alts = ms }) = null $ unLoc ms
@@ -1531,7 +1531,7 @@ pprMatch match
     ctxt = m_ctxt match
     (herald, other_pats)
         = case ctxt of
-            FunRhs (L _ fun) fixity
+            FunRhs (L _ fun) fixity _
                 | fixity == Prefix -> (pprPrefixOcc fun, m_pats match)
                         -- f x y z = e
                         -- Not pprBndr; the AbsBinds will
@@ -2332,7 +2332,9 @@ pp_dotdot = text " .. "
 --
 -- Context of a Match
 data HsMatchContext id
-  = FunRhs (Located id) LexicalFixity -- ^Function binding for f, fixity
+  = FunRhs (Located id) LexicalFixity SrcStrictness
+                                -- ^Function binding for f, fixity, and whether
+                                -- the pattern was banged
   | LambdaExpr                  -- ^Patterns of a lambda
   | CaseAlt                     -- ^Patterns and guards on a case alternative
   | IfAlt                       -- ^Guards of a multi-way if alternative
@@ -2353,7 +2355,7 @@ data HsMatchContext id
 deriving instance (DataIdPost id) => Data (HsMatchContext id)
 
 instance OutputableBndr id => Outputable (HsMatchContext id) where
-  ppr (FunRhs (L _ id) fix) = text "FunRhs" <+> ppr id <+> ppr fix
+  ppr (FunRhs (L _ id) fix str) = text "FunRhs" <+> ppr id <+> ppr fix <+> ppr str
   ppr LambdaExpr            = text "LambdaExpr"
   ppr CaseAlt               = text "CaseAlt"
   ppr IfAlt                 = text "IfAlt"
@@ -2438,7 +2440,7 @@ pprMatchContext ctxt
 
 pprMatchContextNoun :: (Outputable (NameOrRdrName id),Outputable id)
                     => HsMatchContext id -> SDoc
-pprMatchContextNoun (FunRhs (L _ fun) _) = text "equation for"
+pprMatchContextNoun (FunRhs (L _ fun) _ _) = text "equation for"
                                       <+> quotes (ppr fun)
 pprMatchContextNoun CaseAlt         = text "case alternative"
 pprMatchContextNoun IfAlt           = text "multi-way if alternative"
@@ -2498,7 +2500,7 @@ instance (Outputable id, Outputable (NameOrRdrName id))
 -- Used to generate the string for a *runtime* error message
 matchContextErrString :: Outputable id
                       => HsMatchContext id -> SDoc
-matchContextErrString (FunRhs (L _ fun) _) = text "function" <+> ppr fun
+matchContextErrString (FunRhs (L _ fun) _ _) = text "function" <+> ppr fun
 matchContextErrString CaseAlt              = text "case"
 matchContextErrString IfAlt                = text "multi-way if"
 matchContextErrString PatBindRhs           = text "pattern binding"

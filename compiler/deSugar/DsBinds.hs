@@ -142,7 +142,7 @@ dsHsBind dflags
          (FunBind { fun_id = L _ fun, fun_matches = matches
                   , fun_co_fn = co_fn, fun_tick = tick })
  = do   { (args, body) <- matchWrapper
-                           (FunRhs (noLoc $ idName fun) Prefix)
+                           (FunRhs (noLoc $ idName fun) Prefix NoSrcStrict)
                            Nothing matches
         ; core_wrap <- dsHsWrapper co_fn
         ; let body' = mkOptTickBox tick body
@@ -333,7 +333,7 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
     addDictsDs (toTcTypeBag (listToBag dicts)) $
              -- addDictsDs: push type constraints deeper for pattern match check
     do { (args, body) <- matchWrapper
-                           (FunRhs (noLoc $ idName global) Prefix)
+                           (FunRhs (noLoc $ idName global) Prefix NoSrcStrict)
                            Nothing matches
        ; core_wrap <- dsHsWrapper co_fn
        ; let body'   = mkOptTickBox tick body

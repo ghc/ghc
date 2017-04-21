@@ -864,10 +864,10 @@ mkOneRecordSelector all_cons idDetails fl
     --    where cons_w_field = [C2,C7]
     sel_bind = mkTopFunBind Generated sel_lname alts
       where
-        alts | is_naughty = [mkSimpleMatch (FunRhs sel_lname Prefix)
+        alts | is_naughty = [mkSimpleMatch (FunRhs sel_lname Prefix NoSrcStrict)
                                            [] unit_rhs]
              | otherwise =  map mk_match cons_w_field ++ deflt
-    mk_match con = mkSimpleMatch (FunRhs sel_lname Prefix)
+    mk_match con = mkSimpleMatch (FunRhs sel_lname Prefix NoSrcStrict)
                                  [L loc (mk_sel_pat con)]
                                  (L loc (HsVar (L loc field_var)))
     mk_sel_pat con = ConPatIn (L loc (getName con)) (RecCon rec_fields)

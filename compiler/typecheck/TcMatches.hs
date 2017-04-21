@@ -98,7 +98,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
-    match_ctxt = MC { mc_what = FunRhs fn Prefix, mc_body = tcBody }
+    match_ctxt = MC { mc_what = FunRhs fn Prefix NoSrcStrict, mc_body = tcBody }
 
 {-
 @tcMatchesCase@ doesn't do the argument-count check because the
