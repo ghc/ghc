@@ -69,11 +69,14 @@ linters = [
     RegexpLinter(br'ASSERT\s+\(',
                  message='CPP macros should not have a space between the macro name and their argument list'),
     RegexpLinter(br'#ifdef\s+',
-                 message='`#if defined(x)` is preferred to `#ifdef x`'),
+                 message='`#if defined(x)` is preferred to `#ifdef x`',
+                 severity='warning'),
     RegexpLinter(br'#if\s+defined\s+',
-                 message='`#if defined(x)` is preferred to `#if defined x`'),
+                 message='`#if defined(x)` is preferred to `#if defined x`',
+                 severity='warning'),
     RegexpLinter(br'#ifndef\s+',
-                 message='`#if !defined(x)` is preferred to `#ifndef x`'),
+                 message='`#if !defined(x)` is preferred to `#ifndef x`',
+                 severity='warning'),
 ]
 
 if __name__ == '__main__':
