@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Run this ad-hoc haddock benchmark of wreq
+# One should run boot-wreq-bench first to set up the sandbox. See notes in that
+# file for configuring the environment
+
+cd wreq
+rm -r results
+
+pushd ~/utils/haddock
+git checkout e91b57c
+make
+popd
+cd wreq
+(time cabal haddock --haddock-options=-o results/patched &> results/patched.stderr) &> results/patched.time
+pushd ~/utils/haddock
+git checkout 07272c7
+make
+popd
+(time cabal haddock --haddock-options=-o results/unpatched &> results/unpatched.stderr) &> results/unpatched.time
+
+echo "Differences between patched and unpatched haddock output:"
+diff results/patched results/unpatched
+
+echo "time output from patched cabal haddock:"
+echo < results/patched.time
+
+echo "time output from unpatched cabal haddock:"
+echo < results/unpatched.time
