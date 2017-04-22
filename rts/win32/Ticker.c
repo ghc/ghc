@@ -73,6 +73,7 @@ stopTicker(void)
 void
 exitTicker (bool wait)
 {
+    stopTicker();
     if (timer_queue != NULL) {
         DeleteTimerQueueEx(timer_queue, wait ? INVALID_HANDLE_VALUE : NULL);
         timer_queue = NULL;
