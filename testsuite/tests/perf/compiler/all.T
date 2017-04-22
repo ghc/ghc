@@ -105,7 +105,7 @@ test('T1969',
              # 2015-07-11 288699104 (x86/Linux, 64-bit machine) use +RTS -G1
              # 2016-04-06 344730660 (x86/Linux, 64-bit machine)
              # 2017-03-24 324586096 (x86/Linux, 64-bit machine)
-           (wordsize(64), 695354904, 5)]),
+           (wordsize(64), 659863176, 5)]),
              # 2009-11-17 434845560 (amd64/Linux)
              # 2009-12-08 459776680 (amd64/Linux)
              # 2010-05-17 519377728 (amd64/Linux)
@@ -128,6 +128,7 @@ test('T1969',
              # 2015-10-28 756138176 (x86_64/Linux) inst-decl defaults go via typechecker (#12220)
              # 2017-02-17 831733376 (x86_64/Linux) Type-indexed Typeable
              # 2017-02-25 695354904 (x86_64/Linux) Early inlining patch
+             # 2017-04-21 659863176 (x86_64/Linux) Unknown
       only_ways(['normal']),
 
       extra_hc_opts('-dcore-lint -static'),
@@ -644,7 +645,8 @@ test('T5837',
              # 2017-03-24: 27028956  (x86/Linux, 64-bit machine)
 
            (platform('x86_64-unknown-mingw32'), 59161648, 7),
-             # 2017-02-19                        59161648 (x64/Windows) - Unknown
+             # 2017-02-19                       59161648 (x64/Windows) - Unknown
+             # 2017-04-21                       54985248 (x64/Windows) - Unknown
 
            (wordsize(64), 52625920, 7)])
              # sample: 3926235424 (amd64/Linux, 15/2/2012)
@@ -1054,6 +1056,7 @@ test('T13056',
          # 2017-01-31    546800240 Join points (#12988)
          # 2017-02-07    524611224 new SetLevels
          # 2017-02-14    440548592 Early inline patch: 16% improvement
+         # 2017-04-21    417860736 Unknown
          ]),
      ],
      compile,
