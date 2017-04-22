@@ -1570,7 +1570,7 @@ Tuple sections
 
     Allow the use of tuple section syntax
 
-The :ghc-flag:`-XTupleSections` flag enables Python-style partially applied
+The :ghc-flag:`-XTupleSections` flag enables partially applied
 tuple constructors. For example, the following program ::
 
       (, True)
