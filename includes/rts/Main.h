@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSMAIN_H
-#define RTSMAIN_H
+#pragma once
 
 /* -----------------------------------------------------------------------------
  * The entry point for Haskell programs that use a Haskell main function
@@ -17,5 +16,3 @@ int hs_main (int argc, char *argv[],     // program args
              StgClosure *main_closure,   // closure for Main.main
              RtsConfig rts_config)       // RTS configuration
    GNUC3_ATTRIBUTE(__noreturn__);
-
-#endif /* RTSMAIN_H */

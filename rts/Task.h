@@ -9,8 +9,7 @@
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef TASK_H
-#define TASK_H
+#pragma once
 
 #include "GetTime.h"
 
@@ -347,5 +346,3 @@ serialisableTaskId (Task *task)
 }
 
 #include "EndPrivate.h"
-
-#endif /* TASK_H */

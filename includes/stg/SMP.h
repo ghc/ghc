@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef SMP_H
-#define SMP_H
+#pragma once
 
 #if arm_HOST_ARCH && defined(arm_HOST_ARCH_PRE_ARMv6)
 void arm_atomic_spin_lock(void);
@@ -299,5 +298,3 @@ atomic_dec(StgVolatilePtr p)
 #define VOLATILE_LOAD(p) ((StgWord)*((StgWord*)(p)))
 
 #endif /* !THREADED_RTS */
-
-#endif /* SMP_H */

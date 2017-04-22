@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef __HSBASE_H__
-#define __HSBASE_H__
+#pragma once
 
 #include "HsBaseConfig.h"
 
@@ -554,6 +553,3 @@ INLINE intptr_t  __hscore_to_intptr   (void *p)     { return (intptr_t)p; }
 
 void errorBelch2(const char*s, char *t);
 void debugBelch2(const char*s, char *t);
-
-#endif /* __HSBASE_H__ */
-

@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef WEAK_H
-#define WEAK_H
+#pragma once
 
 #include "Capability.h"
 
@@ -22,6 +21,3 @@ void scheduleFinalizers(Capability *cap, StgWeak *w);
 void markWeakList(void);
 
 #include "EndPrivate.h"
-
-#endif /* WEAK_H */
-

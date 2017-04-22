@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef TICKYCOUNTERS_H
-#define TICKYCOUNTERS_H
+#pragma once
 
 /* These should probably be automatically generated in order to
    keep them consistent with the macros that use them (which are
@@ -215,6 +214,3 @@ EXTERN StgInt RET_UNBOXED_TUP_hst[TICKY_BIN_COUNT] INIT({0});
 #define TICK_ALLOC_SE_THK(g,s)
 
 #endif
-
-
-#endif /* TICKYCOUNTERS_H */

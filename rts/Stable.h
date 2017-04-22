@@ -12,8 +12,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STABLE_H
-#define STABLE_H
+#pragma once
 
 #include "sm/GC.h" // for evac_fn below
 
@@ -50,5 +49,3 @@ extern Mutex stable_mutex;
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* STABLE_H */

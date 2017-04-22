@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef LINKERINTERNALS_H
-#define LINKERINTERNALS_H
+#pragma once
 
 #include "Rts.h"
 #include "Hash.h"
@@ -342,4 +341,3 @@ struct _ObjectCodeFormatInfo { void* placeholder; };
 #endif
 
 #include "EndPrivate.h"
-#endif /* LINKERINTERNALS_H */

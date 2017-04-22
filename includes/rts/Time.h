@@ -9,8 +9,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef RTSTIME_H
-#define RTSTIME_H
+#pragma once
 
 // For most time values in the RTS we use a fixed resolution of nanoseconds,
 // normalising the time we get from platform-dependent APIs to this
@@ -39,5 +38,3 @@ INLINE_HEADER Time fsecondsToTime (double t)
 {
     return (Time)(t * TIME_RESOLUTION);
 }
-
-#endif // RTSTIME_H

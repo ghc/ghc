@@ -6,6 +6,8 @@
  *
  * --------------------------------------------------------------------------*/
 
+#pragma once
+
 #include "BeginPrivate.h"
 
 uint32_t messageBlackHole(Capability *cap, MessageBlackHole *msg);

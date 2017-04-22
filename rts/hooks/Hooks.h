@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_HOOKS_H
-#define RTS_HOOKS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -25,5 +24,3 @@ extern void MallocFailHook (W_ request_size /* in bytes */, const char *msg);
 extern void FlagDefaultsHook (void);
 
 #include "EndPrivate.h"
-
-#endif /* RTS_HOOKS_H */

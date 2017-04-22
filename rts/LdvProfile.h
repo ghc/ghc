@@ -7,8 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef LDVPROFILE_H
-#define LDVPROFILE_H
+#pragma once
 
 #ifdef PROFILING
 
@@ -37,5 +36,3 @@ RTS_PRIVATE void LdvCensusKillAll ( void );
     LDVW((c)) = (size)
 
 #endif /* PROFILING */
-
-#endif /* LDVPROFILE_H */

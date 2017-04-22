@@ -1,5 +1,4 @@
-#ifndef MAIN_H
-#define MAIN_H
+#pragma once
 
 #include "ghcconfig.h"
 #include <stdio.h>
@@ -71,5 +70,3 @@ extern char *auxfile;
 
 extern FILE *hpfp;
 extern FILE *psfp;
-
-#endif /* MAIN_H */

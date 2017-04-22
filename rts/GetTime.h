@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef GETTIME_H
-#define GETTIME_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -26,5 +25,3 @@ void  getUnixEpochTime      (StgWord64 *sec, StgWord32 *nsec);
 W_    getPageFaults         (void);
 
 #include "EndPrivate.h"
-
-#endif /* GETTIME_H */

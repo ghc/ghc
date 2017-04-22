@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_GC_H
-#define SM_GC_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -62,5 +61,3 @@ void releaseGCThreads (Capability *cap, bool idle_cap[]);
 #define WORK_UNIT_WORDS 128
 
 #include "EndPrivate.h"
-
-#endif /* SM_GC_H */

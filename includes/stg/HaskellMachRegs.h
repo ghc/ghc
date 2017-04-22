@@ -12,8 +12,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef HASKELLMACHREGS_H
-#define HASKELLMACHREGS_H
+#pragma once
 
 /*
  * Defining NO_REGS causes no global registers to be used.  NO_REGS is
@@ -45,5 +44,3 @@
 #endif
 
 #include "MachRegs.h"
-
-#endif /* HASKELLMACHREGS_H */

@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef AUTOAPPLY_H
-#define AUTOAPPLY_H
+#pragma once
 
 // Build a new PAP: function is in R1
 // ret addr and m arguments taking up n words are on the stack.
@@ -98,6 +97,3 @@
 #else
 #define jump_SAVE_CCCS(target,...) jump (target) [__VA_ARGS__]
 #endif
-
-#endif /* APPLY_H */
-

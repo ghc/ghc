@@ -17,8 +17,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_CONSTANTS_H
-#define RTS_CONSTANTS_H
+#pragma once
 
 /* -----------------------------------------------------------------------------
    Minimum closure sizes
@@ -314,5 +313,3 @@
  * we can have static arrays of this size in the RTS for speed.
  */
 #define MAX_NUMA_NODES 16
-
-#endif /* RTS_CONSTANTS_H */

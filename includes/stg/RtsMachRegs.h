@@ -12,8 +12,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSMACHREGS_H
-#define RTSMACHREGS_H
+#pragma once
 
 #ifdef UnregisterisedCompiler
 #ifndef NO_REGS
@@ -51,5 +50,3 @@
 #endif
 
 #include "MachRegs.h"
-
-#endif /* RTSMACHREGS_H */

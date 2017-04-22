@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef EVENTLOG_WRITER_H
-#define EVENTLOG_WRITER_H
+#pragma once
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -36,5 +35,3 @@ typedef struct {
  * a file `program.eventlog`.
  */
 extern const EventLogWriter FileEventLogWriter;
-
-#endif /* EVENTLOG_WRITER_H */

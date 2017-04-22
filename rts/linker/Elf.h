@@ -1,5 +1,4 @@
-#ifndef LINKER_ELF_H
-#define LINKER_ELF_H
+#pragma once
 
 #include "Rts.h"
 #include "LinkerInternals.h"
@@ -13,5 +12,3 @@ int ocRunInit_ELF        ( ObjectCode* oc );
 int ocAllocateSymbolExtras_ELF( ObjectCode *oc );
 
 #include "EndPrivate.h"
-
-#endif /* LINKER_ELF_H */

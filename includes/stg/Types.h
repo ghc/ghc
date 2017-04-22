@@ -18,8 +18,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STGTYPES_H
-#define STGTYPES_H
+#pragma once
 
 #if defined(mingw32_HOST_OS)
 /* Inform mingw we want the ISO rather than Windows printf format specifiers. */
@@ -182,5 +181,3 @@ typedef StgWord8*          StgByteArray;
 
 typedef void  *(*(*StgFunPtr)(void))(void);
 typedef StgFunPtr StgFun(void);
-
-#endif /* STGTYPES_H */

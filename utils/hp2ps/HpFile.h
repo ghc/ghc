@@ -1,5 +1,4 @@
-#ifndef HP_FILE_H
-#define HP_FILE_H
+#pragma once
 
 typedef enum {
         /* These tokens are found in ".hp" files */ 
@@ -71,5 +70,3 @@ extern char *datestring;
  
 extern char *sampleunitstring;
 extern char *valueunitstring;
-
-#endif /* HP_FILE_H */

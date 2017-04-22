@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef REGS_H
-#define REGS_H
+#pragma once
 
 /*
  * The STG machine has a collection of "registers", each one of which
@@ -527,5 +526,3 @@ GLOBAL_REG_DECL(bdescr *,HpAlloc,REG_HpAlloc)
 #define stg_gc_fun                (FunReg->stgGCFun)
 
 #endif /* IN_STG_CODE */
-
-#endif /* REGS_H */

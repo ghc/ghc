@@ -9,8 +9,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef RTSAPI_H
-#define RTSAPI_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -445,5 +444,3 @@ extern StgWord base_GHCziTopHandler_runNonIO_closure[];
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* RTSAPI_H */

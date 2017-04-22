@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PROFILER_REPORT_H
-#define PROFILER_REPORT_H
+#pragma once
 
 #include <stdio.h>
 
@@ -24,5 +23,3 @@ void writeCCSReport( FILE *prof_file, CostCentreStack const *ccs,
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PROFILER_REPORT_H */

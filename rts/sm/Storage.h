@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_STORAGE_H
-#define SM_STORAGE_H
+#pragma once
 
 #include "Capability.h"
 
@@ -197,5 +196,3 @@ extern StgIndStatic * debug_caf_list;
 extern StgIndStatic * revertible_caf_list;
 
 #include "EndPrivate.h"
-
-#endif /* SM_STORAGE_H */

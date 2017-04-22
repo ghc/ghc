@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_CNF_H
-#define SM_CNF_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -81,5 +80,3 @@ extern void insertCompactHash (Capability *cap,
 extern void verifyCompact (StgCompactNFData *str);
 
 #include "EndPrivate.h"
-
-#endif // SM_COMPACT_H

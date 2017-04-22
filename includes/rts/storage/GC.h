@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_GC_H
-#define RTS_STORAGE_GC_H
+#pragma once
 
 #include <stddef.h>
 #include "rts/OSThreads.h"
@@ -241,5 +240,3 @@ INLINE_HEADER void initBdescr(bdescr *bd, generation *gen, generation *dest)
     bd->gen_no  = gen->no;
     bd->dest_no = dest->no;
 }
-
-#endif /* RTS_STORAGE_GC_H */

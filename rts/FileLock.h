@@ -6,10 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef POSIX_FILELOCK_H
-#define POSIX_FILELOCK_H
+#pragma once
 
 RTS_PRIVATE void initFileLocking(void);
 RTS_PRIVATE void freeFileLocking(void);
-
-#endif /* POSIX_FILELOCK_H */

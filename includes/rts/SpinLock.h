@@ -19,9 +19,8 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_SPINLOCK_H
-#define RTS_SPINLOCK_H
- 
+#pragma once
+
 #if defined(THREADED_RTS)
 
 #if defined(PROF_SPIN)
@@ -112,6 +111,3 @@ INLINE_HEADER void initSpinLock(void * p STG_UNUSED)
 { /* nothing */ }
 
 #endif /* THREADED_RTS */
-
-#endif /* RTS_SPINLOCK_H */
-

@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_PROF_LDV_H
-#define RTS_PROF_LDV_H
+#pragma once
 
 #ifdef PROFILING
 
@@ -43,5 +42,3 @@
 #define LDV_RECORD_CREATE(c)   /* nothing */
 
 #endif /* PROFILING */
-
-#endif /* STGLDVPROF_H */

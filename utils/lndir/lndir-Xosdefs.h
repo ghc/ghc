@@ -23,8 +23,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _XOSDEFS_H_
-#define _XOSDEFS_H_
+#pragma once
 
 /*
  * X_NOT_STDC_ENV means does not have ANSI C header files.  Lack of this
@@ -95,5 +94,3 @@
 #define X_NOT_STDC_ENV
 #endif
 #endif
-
-#endif /* _XOSDEFS_H_ */

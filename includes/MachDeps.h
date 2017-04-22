@@ -13,8 +13,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef MACHDEPS_H
-#define MACHDEPS_H
+#pragma once
 
 /* Don't allow stage1 (cross-)compiler embed assumptions about target
  * platform. When ghc-stage1 is being built by ghc-stage0 is should not
@@ -122,5 +121,3 @@
 #define TAG_MASK ((1 << TAG_BITS) - 1)
 
 #endif /* !defined(STAGE) || STAGE >= 2 */
-
-#endif /* MACHDEPS_H */

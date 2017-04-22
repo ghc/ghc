@@ -11,12 +11,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_FILELOCK_H
-#define RTS_FILELOCK_H
+#pragma once
 
 #include "Stg.h"
 
 int  lockFile(int fd, StgWord64 dev, StgWord64 ino, int for_writing);
 int  unlockFile(int fd);
-
-#endif /* RTS_FILELOCK_H */

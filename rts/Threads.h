@@ -6,8 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef THREADS_H
-#define THREADS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -51,5 +50,3 @@ void printThreadQueue (StgTSO *t);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* THREADS_H */

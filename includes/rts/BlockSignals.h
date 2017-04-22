@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_BLOCKSIGNALS_H
-#define RTS_BLOCKSIGNALS_H
+#pragma once
 
 /* Used by runProcess() in the process package
  */
@@ -33,5 +32,3 @@ void blockUserSignals(void);
  * The inverse of blockUserSignals(); re-enable the deliver of console events.
  */
 void unblockUserSignals(void);
-
-#endif /* RTS_BLOCKSIGNALS_H */

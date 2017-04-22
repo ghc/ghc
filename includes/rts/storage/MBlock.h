@@ -9,8 +9,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_MBLOCK_H
-#define RTS_STORAGE_MBLOCK_H
+#pragma once
 
 extern W_ peak_mblocks_allocated;
 extern W_ mblocks_allocated;
@@ -31,5 +30,3 @@ extern void *getNextMBlock(void **state, void *mblock);
 // needed for HEAP_ALLOCED below
 extern SpinLock gc_alloc_block_sync;
 #endif
-
-#endif /* RTS_STORAGE_MBLOCK_H */

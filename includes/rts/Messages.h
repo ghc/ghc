@@ -14,8 +14,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_MESSAGES_H
-#define RTS_MESSAGES_H
+#pragma once
 
 #include <stdarg.h>
 
@@ -102,5 +101,3 @@ extern RtsMsgFunction rtsFatalInternalErrorFn;
 extern RtsMsgFunction rtsDebugMsgFn;
 extern RtsMsgFunction rtsErrorMsgFn;
 extern RtsMsgFunction rtsSysErrorMsgFn;
-
-#endif /* RTS_MESSAGES_H */

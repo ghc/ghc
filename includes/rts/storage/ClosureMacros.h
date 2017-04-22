@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_CLOSUREMACROS_H
-#define RTS_STORAGE_CLOSUREMACROS_H
+#pragma once
 
 /* -----------------------------------------------------------------------------
    Info tables are slammed up against the entry code, and the label
@@ -596,5 +595,3 @@ EXTERN_INLINE void overwritingClosureOfs (StgClosure *p, uint32_t offset)
     for (i = offset; i < size; i++)
         ((StgWord *)p)[i] = 0;
 }
-
-#endif /* RTS_STORAGE_CLOSUREMACROS_H */

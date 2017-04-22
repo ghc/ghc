@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef BLOCK_ALLOC_H
-#define BLOCK_ALLOC_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -31,5 +30,3 @@ extern W_ n_alloc_blocks;   // currently allocated blocks
 extern W_ hw_alloc_blocks;  // high-water allocated blocks
 
 #include "EndPrivate.h"
-
-#endif /* BLOCK_ALLOC_H */

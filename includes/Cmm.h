@@ -25,8 +25,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef CMM_H
-#define CMM_H
+#pragma once
 
 /*
  * In files that are included into both C and C-- (and perhaps
@@ -942,5 +941,3 @@
     }                                                          \
                                                                \
     return (dst);
-
-#endif /* CMM_H */

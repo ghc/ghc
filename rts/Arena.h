@@ -4,8 +4,7 @@
    Arena allocation interface.
    -------------------------------------------------------------------------- */
 
-#ifndef ARENA_H
-#define ARENA_H
+#pragma once
 
 // Abstract type of arenas
 typedef struct _Arena Arena;
@@ -21,5 +20,3 @@ RTS_PRIVATE void arenaFree  ( Arena * );
 
 // For internal use only:
 RTS_PRIVATE unsigned long arenaBlocks( void );
-
-#endif /* ARENA_H */

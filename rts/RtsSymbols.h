@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_SYMBOLS_H
-#define RTS_SYMBOLS_H
+#pragma once
 
 #include "ghcautoconf.h"
 #include "LinkerInternals.h"
@@ -26,5 +25,3 @@ typedef struct _RtsSymbolVal {
 } RtsSymbolVal;
 
 extern RtsSymbolVal rtsSyms[];
-
-#endif /* RTS_SYMBOLS_H */

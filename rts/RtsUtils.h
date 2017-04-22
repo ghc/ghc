@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSUTILS_H
-#define RTSUTILS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -46,5 +45,3 @@ void printRtsInfo(void);
 void checkFPUStack(void);
 
 #include "EndPrivate.h"
-
-#endif /* RTSUTILS_H */

@@ -12,8 +12,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_THREADS_H
-#define RTS_THREADS_H
+#pragma once
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -75,5 +74,3 @@ extern Capability MainCapability;
 // current value at the moment).
 //
 extern void setNumCapabilities (uint32_t new_);
-
-#endif /* RTS_THREADS_H */

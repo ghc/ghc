@@ -11,9 +11,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_SWEEP_H
-#define SM_SWEEP_H
+#pragma once
 
 RTS_PRIVATE void sweep(generation *gen);
-
-#endif /* SM_SWEEP_H */

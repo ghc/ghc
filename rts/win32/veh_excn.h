@@ -6,8 +6,7 @@
 *
 * ---------------------------------------------------------------------------*/
 
-#ifndef WIN32_VEH_EXCN_H
-#define WIN32_VEH_EXCN_H
+#pragma once
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,6 +67,3 @@ long WINAPI __hs_exception_handler( struct _EXCEPTION_POINTERS *exception_data )
 // prototypes to the functions doing the registration and unregistration of the VEH handlers
 void __register_hs_exception_handler( void );
 void __unregister_hs_exception_handler( void );
-
-#endif /* WIN32_VEH_EXCN_H */
-

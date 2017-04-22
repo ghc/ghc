@@ -7,8 +7,7 @@
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef SCHEDULE_H
-#define SCHEDULE_H
+#pragma once
 
 #include "rts/OSThreads.h"
 #include "Capability.h"
@@ -246,5 +245,3 @@ emptyThreadQueues(Capability *cap)
 #endif /* !IN_STG_CODE */
 
 #include "EndPrivate.h"
-
-#endif /* SCHEDULE_H */

@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_GCTHREAD_H
-#define SM_GCTHREAD_H
+#pragma once
 
 #include "WSDeque.h"
 #include "GetTime.h" // for Ticks
@@ -208,5 +207,3 @@ extern ThreadLocalKey gctKey;
 #endif
 
 #include "EndPrivate.h"
-
-#endif // SM_GCTHREAD_H

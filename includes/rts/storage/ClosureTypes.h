@@ -7,8 +7,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_CLOSURETYPES_H
-#define RTS_STORAGE_CLOSURETYPES_H
+#pragma once
 
 /* 
  * WARNING WARNING WARNING
@@ -83,5 +82,3 @@
 #define SMALL_MUT_ARR_PTRS_FROZEN     62
 #define COMPACT_NFDATA                63
 #define N_CLOSURE_TYPES               64
-
-#endif /* RTS_STORAGE_CLOSURETYPES_H */

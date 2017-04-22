@@ -6,9 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef THREADPAUSED_H
-#define THREADPAUSED_H
+#pragma once
 
 RTS_PRIVATE void threadPaused ( Capability *cap, StgTSO * );
-
-#endif /* THREADPAUSED_H */

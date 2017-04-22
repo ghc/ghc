@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PROFHEAP_H
-#define PROFHEAP_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -22,5 +21,3 @@ bool doingRetainerProfiling(void);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PROFHEAP_H */

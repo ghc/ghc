@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef __STGDLL_H__
-#define __STGDLL_H__ 1
+#pragma once
 
 #if defined(COMPILING_WINDOWS_DLL)
 #  if defined(x86_64_HOST_ARCH)
@@ -71,5 +70,3 @@
 #else
 #define DLL_IMPORT_STDLIB DLLIMPORT
 #endif
-
-#endif /* __STGDLL_H__ */

@@ -7,8 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RETAINERPROFILE_H
-#define RETAINERPROFILE_H
+#pragma once
 
 #ifdef PROFILING
 
@@ -49,5 +48,3 @@ extern W_ retainerStackBlocks ( void );
 #include "EndPrivate.h"
 
 #endif /* PROFILING */
-
-#endif /* RETAINERPROFILE_H */

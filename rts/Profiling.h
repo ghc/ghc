@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PROFILING_H
-#define PROFILING_H
+#pragma once
 
 #include <stdio.h>
 
@@ -53,5 +52,3 @@ void debugCCS( CostCentreStack *ccs );
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PROFILING_H */

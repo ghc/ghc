@@ -23,8 +23,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STG_H
-#define STG_H
+#pragma once
 
 #if !(__STDC_VERSION__ >= 199901L)
 # error __STDC_VERSION__ does not advertise C99 or later
@@ -567,5 +566,3 @@ typedef union {
   c;                                            \
 })
 #endif
-
-#endif /* STG_H */

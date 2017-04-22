@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PRINTER_H
-#define PRINTER_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -34,6 +33,3 @@ extern const char *what_next_strs[];
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* PRINTER_H */
-

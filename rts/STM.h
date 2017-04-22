@@ -30,8 +30,7 @@
 
 */
 
-#ifndef STM_H
-#define STM_H
+#pragma once
 
 #ifdef THREADED_RTS
 //#define STM_CG_LOCK
@@ -218,6 +217,3 @@ void stmWriteTVar(Capability *cap,
 /*----------------------------------------------------------------------*/
 
 #include "EndPrivate.h"
-
-#endif /* STM_H */
-

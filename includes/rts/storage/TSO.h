@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_TSO_H
-#define RTS_STORAGE_TSO_H
+#pragma once
 
 /*
  * PROFILING info in a TSO
@@ -260,5 +259,3 @@ void dirty_STACK (Capability *cap, StgStack *stack);
 
 /* this is the NIL ptr for a TSO queue (e.g. runnable queue) */
 #define END_TSO_QUEUE  ((StgTSO *)(void*)&stg_END_TSO_QUEUE_closure)
-
-#endif /* RTS_STORAGE_TSO_H */

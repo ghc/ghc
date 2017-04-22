@@ -1,5 +1,4 @@
-#ifndef MachOTypes_h
-#define MachOTypes_h
+#pragma once
 
 #if defined(OBJFORMAT_MACHO)
 
@@ -130,4 +129,3 @@ typedef struct _SectionFormatInfo {
 } SectionFormatInfo;
 
 #endif /* OBJECTFORMAT_MACHO */
-#endif /* MachOTypes_h */

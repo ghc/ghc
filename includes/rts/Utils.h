@@ -10,10 +10,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_UTILS_H
-#define RTS_UTILS_H
+#pragma once
 
 /* Alternate to raise(3) for threaded rts, for BSD-based OSes */
 int genericRaise(int sig);
-
-#endif /* RTS_UTILS_H */

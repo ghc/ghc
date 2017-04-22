@@ -18,8 +18,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef CAPABILITY_H
-#define CAPABILITY_H
+#pragma once
 
 #include "sm/GC.h" // for evac_fn
 #include "Task.h"
@@ -476,5 +475,3 @@ INLINE_HEADER bool emptyInbox(Capability *cap)
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* CAPABILITY_H */

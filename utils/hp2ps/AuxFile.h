@@ -1,7 +1,4 @@
-#ifndef AUX_FILE_H
-#define AUX_FILE_H
+#pragma once
 
 void PutAuxFile PROTO((FILE *));
 void GetAuxFile PROTO((FILE *));
-
-#endif /* AUX_FILE_H */

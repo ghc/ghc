@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_OSMEM_H
-#define SM_OSMEM_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -88,5 +87,3 @@ void osReleaseHeapMemory(void);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* SM_OSMEM_H */

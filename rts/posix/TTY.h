@@ -6,9 +6,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef POSIX_TTY_H
-#define POSIX_TTY_H
+#pragma once
 
 RTS_PRIVATE void resetTerminalSettings (void);
-
-#endif /* POSIX_TTY_H */

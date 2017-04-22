@@ -1,5 +1,4 @@
-#ifndef LINKER_PE_I386_H
-#define LINKER_PE_I386_H
+#pragma once
 
 #include "Rts.h"
 #include "LinkerInternals.h"
@@ -107,5 +106,3 @@ See #9218
 
 
 #include "EndPrivate.h"
-
-#endif /* LINKER_PE_I386_H */

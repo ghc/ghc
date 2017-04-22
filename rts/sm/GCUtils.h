@@ -11,8 +11,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef SM_GCUTILS_H
-#define SM_GCUTILS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -76,5 +75,3 @@ recordMutableGen_GC (StgClosure *p, uint32_t gen_no)
 }
 
 #include "EndPrivate.h"
-
-#endif /* SM_GCUTILS_H */

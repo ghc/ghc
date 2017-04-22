@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef POSIX_CLOCK_H
-#define POSIX_CLOCK_H
+#pragma once
 
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
@@ -31,5 +30,3 @@
 # include <mach/mach.h>
 # include <mach/mach_time.h>
 #endif
-
-#endif /* POSIX_CLOCK_H */

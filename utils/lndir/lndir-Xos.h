@@ -21,8 +21,7 @@
  * in a "signficant" number of source files.
  */
 
-#ifndef _XOS_H_
-#define _XOS_H_
+#pragma once
 
 #include "lndir-Xosdefs.h"
 
@@ -148,5 +147,3 @@ struct timezone {
 #ifdef ISC
 #include <sys/bsdtypes.h>
 #endif
-
-#endif /* _XOS_H_ */

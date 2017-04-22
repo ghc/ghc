@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_HEAP_ALLOC_H
-#define SM_HEAP_ALLOC_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -223,5 +222,3 @@ StgBool HEAP_ALLOCED_GC(void *p)
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* SM_HEAP_ALLOC_H */

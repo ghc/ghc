@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SANITY_H
-#define SANITY_H
+#pragma once
 
 #ifdef DEBUG
 
@@ -42,5 +41,3 @@ void checkBQ (StgTSO *bqe, StgClosure *closure);
 #include "EndPrivate.h"
 
 #endif /* DEBUG */
- 
-#endif /* SANITY_H */

@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef GETENV_H
-#define GETENV_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -19,5 +18,3 @@ void freeProgEnvv (int envc, char *envv[]);
 /* calls to getProgEnvv must have a corresponding freeProgEnvv */
 
 #include "EndPrivate.h"
-
-#endif /* GETENV_H */

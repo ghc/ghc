@@ -1,5 +1,4 @@
-#ifndef DEFINES_H
-#define DEFINES_H
+#pragma once
 
 /* 
  * Things that can be altered.
@@ -57,5 +56,3 @@ extern int _twenty_;
 #define VERSION			"0.25"		/* as of 95/03/21	 */
 
 #define max(x,y) ((x) > (y) ? (x) : (y))	/* not everyone has this */
-
-#endif /* DEFINES_H */

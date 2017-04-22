@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_FUNTYPES_H
-#define RTS_STORAGE_FUNTYPES_H
+#pragma once
 
 /* generic - function comes with a small bitmap */
 #define ARG_GEN      0   
@@ -53,5 +52,3 @@
 #define ARG_PPPPPP   26
 #define ARG_PPPPPPP  27
 #define ARG_PPPPPPPP 28
-
-#endif /* RTS_STORAGE_FUNTYPES_H */

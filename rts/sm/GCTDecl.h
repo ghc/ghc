@@ -9,8 +9,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_GCTDECL_H
-#define SM_GCTDECL_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -143,5 +142,3 @@ extern __thread gc_thread* gct;
 #endif // THREADED_RTS
 
 #include "EndPrivate.h"
-
-#endif // SM_GCTDECL_H

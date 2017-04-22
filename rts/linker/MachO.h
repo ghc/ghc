@@ -1,5 +1,4 @@
-#ifndef LINKER_MACHO_H
-#define LINKER_MACHO_H
+#pragma once
 
 #include "Rts.h"
 
@@ -21,5 +20,3 @@ void machoInitSymbolsWithoutUnderscore( void );
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* LINKER_MACHO_H */

@@ -6,10 +6,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#include "Rts.h"
-
-#ifndef RTS_LIBDW_H
-#define RTS_LIBDW_H
+#pragma once
 
 // Chunk capacity
 // This is rather arbitrary
@@ -92,5 +89,3 @@ Backtrace *libdwGetBacktrace(LibdwSession *session);
 /* Lookup Location information for the given address.
  * Returns 0 if successful, 1 if address could not be found. */
 int libdwLookupLocation(LibdwSession *session, Location *loc, StgPtr pc);
-
-#endif /* RTS_LIBDW_H */

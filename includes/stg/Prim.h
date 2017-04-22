@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef PRIM_H
-#define PRIM_H
+#pragma once
 
 /* libraries/ghc-prim/cbits/atomic.c */
 StgWord hs_atomic_add8(StgWord x, StgWord val);
@@ -81,5 +80,3 @@ StgWord hs_ctz8(StgWord x);
 StgWord hs_ctz16(StgWord x);
 StgWord hs_ctz32(StgWord x);
 StgWord hs_ctz64(StgWord64 x);
-
-#endif /* PRIM_H */

@@ -73,8 +73,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_EVENTLOGFORMAT_H
-#define RTS_EVENTLOGFORMAT_H
+#pragma once
 
 /*
  * Markers for begin/end of the Header.
@@ -245,5 +244,3 @@ typedef StgWord64 EventTaskId;         /* for EVENT_TASK_* */
 typedef StgWord64 EventKernelThreadId; /* for EVENT_TASK_CREATE */
 
 #endif
-
-#endif /* RTS_EVENTLOGFORMAT_H */

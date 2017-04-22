@@ -8,13 +8,10 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef CHECKUNLOAD_H
-#define CHECKUNLOAD_H
+#pragma once
 
 #include "BeginPrivate.h"
 
 void checkUnload (StgClosure *static_objects);
 
 #include "EndPrivate.h"
-
-#endif // CHECKUNLOAD_H

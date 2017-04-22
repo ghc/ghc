@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef TRACE_H
-#define TRACE_H
+#pragma once
 
 #include "rts/EventLogFormat.h"
 #include "Capability.h"
@@ -868,5 +867,3 @@ INLINE_HEADER void traceTaskDelete(Task *task STG_UNUSED)
 }
 
 #include "EndPrivate.h"
-
-#endif /* TRACE_H */

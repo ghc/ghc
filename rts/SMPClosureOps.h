@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_SMPCLOSUREOPS_H
-#define RTS_STORAGE_SMPCLOSUREOPS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -125,5 +124,3 @@ INLINE_HEADER void unlockTSO(StgTSO *tso)
 #endif /* CMINUSMINUS */
 
 #include "EndPrivate.h"
-
-#endif /* RTS_STORAGE_SMPCLOSUREOPS_H */

@@ -1,5 +1,4 @@
-#ifndef __HS_EVENT_H__
-#define __HS_EVENT_H__
+#pragma once
 
 #include "EventConfig.h"
 
@@ -33,7 +32,6 @@ INLINE int __hsevent_kill_thread(pthread_t *tid, int sig)
     return pthread_kill(*tid, sig);
 }
 
-#endif /* __HS_EVENT_H__ */
 /*
  * Local Variables: 
  * c-file-style: "stroustrup" 

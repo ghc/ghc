@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_SCAV_H
-#define SM_SCAV_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -25,6 +24,3 @@ void    scavenge_capability_mut_Lists1 (Capability *cap);
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* SM_SCAV_H */
-

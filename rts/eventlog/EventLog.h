@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef EVENTLOG_H
-#define EVENTLOG_H
+#pragma once
 
 #include "rts/EventLogFormat.h"
 #include "rts/EventLogWriter.h"
@@ -185,5 +184,3 @@ INLINE_HEADER void postThreadLabel(Capability    *cap   STG_UNUSED,
 #endif
 
 #include "EndPrivate.h"
-
-#endif /* TRACING_H */

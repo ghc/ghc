@@ -7,8 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTSFLAGS_H
-#define RTSFLAGS_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -21,5 +20,3 @@ void freeRtsArgs          (void);
 extern RtsConfig rtsConfig;
 
 #include "EndPrivate.h"
-
-#endif /* RTSFLAGS_H */

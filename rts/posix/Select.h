@@ -6,12 +6,9 @@
  *
  * -------------------------------------------------------------------------*/
 
-#ifndef POSIX_SELECT_H
-#define POSIX_SELECT_H
+#pragma once
 
 // An absolute time value in units of 10ms.
 typedef StgWord LowResTime;
 
 RTS_PRIVATE LowResTime getDelayTarget (HsInt us);
-
-#endif /* POSIX_SELECT_H */

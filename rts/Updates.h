@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef UPDATES_H
-#define UPDATES_H
+#pragma once
 
 #ifndef CMINUSMINUS
 #include "BeginPrivate.h"
@@ -89,5 +88,3 @@ INLINE_HEADER void updateWithIndirection (Capability *cap,
 #ifndef CMINUSMINUS
 #include "EndPrivate.h"
 #endif
-
-#endif /* UPDATES_H */

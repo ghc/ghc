@@ -1,5 +1,4 @@
-#ifndef _HS_INTEGER_GMP_H_
-#define _HS_INTEGER_GMP_H_
+#pragma once
 
 /* Whether GMP is embedded into integer-gmp */
 #define GHC_GMP_INTREE     @UseIntreeGmp@
@@ -10,5 +9,3 @@
 #define GHC_GMP_VERSION_PL @GhcGmpVerPl@
 #define GHC_GMP_VERSION \
     (@GhcGmpVerMj@ * 10000 + @GhcGmpVerMi@ * 100 + @GhcGmpVerPl@)
-
-#endif /* _HS_INTEGER_GMP_H_ */

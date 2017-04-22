@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef STATICPTRTABLE_H
-#define STATICPTRTABLE_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -15,5 +14,3 @@
 void exitStaticPtrTable ( void );
 
 #include "EndPrivate.h"
-
-#endif /* STATICPTRTABLE_H */

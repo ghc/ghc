@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_SHOULDCOMPACT_H
-#define SM_SHOULDCOMPACT_H
+#pragma once
 
 #define SHOULDCOMPACT_STATIC 0
 #define SHOULDCOMPACT_IN_CNF 1
@@ -21,6 +20,4 @@
 
 #ifndef CMINUSMINUS
 extern StgWord shouldCompact (StgCompactNFData *str, StgClosure *p);
-#endif
-
 #endif

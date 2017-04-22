@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef STATS_H
-#define STATS_H
+#pragma once
 
 #include "GetTime.h"
 
@@ -65,5 +64,3 @@ Time      stat_getElapsedGCTime(void);
 Time      stat_getElapsedTime(void);
 
 #include "EndPrivate.h"
-
-#endif /* STATS_H */

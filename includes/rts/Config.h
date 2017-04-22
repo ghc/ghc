@@ -13,8 +13,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_CONFIG_H
-#define RTS_CONFIG_H
+#pragma once
 
 #if defined(TICKY_TICKY) && defined(THREADED_RTS)
 #error TICKY_TICKY is incompatible with THREADED_RTS
@@ -47,5 +46,3 @@
 /* Profile spin locks */
 
 #define PROF_SPIN
-
-#endif /* RTS_CONFIG_H */

@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_MARKSTACK_H
-#define SM_MARKSTACK_H
+#pragma once
 
 #include "BeginPrivate.h"
 #include "GCUtils.h"
@@ -68,5 +67,3 @@ mark_stack_empty(void)
 }
 
 #include "EndPrivate.h"
-
-#endif /* SM_MARKSTACK_H */

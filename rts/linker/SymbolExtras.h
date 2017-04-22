@@ -1,5 +1,4 @@
-#ifndef LINKER_SYMBOL_EXTRAS_H
-#define LINKER_SYMBOL_EXTRAS_H
+#pragma once
 
 #include "Rts.h"
 #include "LinkerInternals.h"
@@ -26,5 +25,3 @@ SymbolExtra* makeSymbolExtra( ObjectCode const* oc,
 #endif /* NEED_SYMBOL_EXTRAS */
 
 #include "EndPrivate.h"
-
-#endif /* LINKER_SYMBOL_EXTRAS_H */

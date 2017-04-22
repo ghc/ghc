@@ -7,8 +7,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RETAINERSET_H
-#define RETAINERSET_H
+#pragma once
 
 #include <stdio.h>
 
@@ -194,4 +193,3 @@ void outputAllRetainerSet(FILE *);
 #include "EndPrivate.h"
 
 #endif /* PROFILING */
-#endif /* RETAINERSET_H */

@@ -17,8 +17,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef STGMISCCLOSURES_H
-#define STGMISCCLOSURES_H
+#pragma once
 
 #if IN_STG_CODE
 #  define RTS_RET_INFO(i)   extern W_(i)[]
@@ -532,5 +531,3 @@ void * pushCostCentre (void *ccs, void *cc);
 extern unsigned int n_capabilities;
 
 #endif
-
-#endif /* STGMISCCLOSURES_H */

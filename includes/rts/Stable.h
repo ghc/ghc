@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STABLE_H
-#define RTS_STABLE_H
+#pragma once
 
 EXTERN_INLINE StgPtr deRefStablePtr (StgStablePtr stable_ptr);
 StgStablePtr getStablePtr  (StgPtr p);
@@ -39,5 +38,3 @@ StgPtr deRefStablePtr(StgStablePtr sp)
 {
     return stable_ptr_table[(StgWord)sp].addr;
 }
-
-#endif /* RTS_STABLE_H */

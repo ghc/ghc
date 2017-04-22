@@ -1,6 +1,3 @@
-#ifndef TOP_TWENTY_H
-#define TOP_TWENTY_H
+#pragma once
 
 void TopTwenty PROTO((void));
-
-#endif /* TOP_TWENTY_H */

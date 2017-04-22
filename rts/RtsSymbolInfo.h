@@ -6,12 +6,9 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_SYMBOLINFO_H
-#define RTS_SYMBOLINFO_H
+#pragma once
 
 #include "LinkerInternals.h"
 
 HsBool isSymbolWeak(ObjectCode *owner, void *label);
 void setWeakSymbol(ObjectCode *owner, void *label);
-
-#endif /* RTS_SYMBOLINFO_H */

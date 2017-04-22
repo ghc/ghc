@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef TICKER_H
-#define TICKER_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -19,5 +18,3 @@ void stopTicker  (void);
 void exitTicker  (bool wait);
 
 #include "EndPrivate.h"
-
-#endif /* TICKER_H */

@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_STORAGE_BLOCK_H
-#define RTS_STORAGE_BLOCK_H
+#pragma once
 
 #include "ghcconfig.h"
 
@@ -351,4 +350,3 @@ round_up_to_mblocks(StgWord words)
 }
 
 #endif /* !CMINUSMINUS */
-#endif /* RTS_STORAGE_BLOCK_H */

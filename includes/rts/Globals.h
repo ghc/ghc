@@ -14,8 +14,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_GLOBALS_H
-#define RTS_GLOBALS_H
+#pragma once
 
 #define mkStoreAccessorPrototype(name)                                  \
     StgStablePtr                                                        \
@@ -35,5 +34,3 @@ mkStoreAccessorPrototype(LibHSghcInitLinkerDone)
 mkStoreAccessorPrototype(LibHSghcGlobalDynFlags)
 mkStoreAccessorPrototype(LibHSghcStaticOptions)
 mkStoreAccessorPrototype(LibHSghcStaticOptionsReady)
-
-#endif /* RTS_GLOBALS_H */

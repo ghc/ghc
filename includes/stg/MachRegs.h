@@ -12,8 +12,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef MACHREGS_H
-#define MACHREGS_H
+#pragma once
 
 /* This file is #included into Haskell code in the compiler: #defines
  * only in here please.
@@ -714,5 +713,3 @@ the stack. See Note [Overlapping global registers] for implications.
 #else
 #undef NO_ARG_REGS
 #endif
-
-#endif /* MACHREGS_H */

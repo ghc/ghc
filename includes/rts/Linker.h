@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_LINKER_H
-#define RTS_LINKER_H
+#pragma once
 
 #if defined(mingw32_HOST_OS)
 typedef wchar_t pathchar;
@@ -86,5 +85,3 @@ pathchar* findSystemLibrary(pathchar* dll_name);
 
 /* called by the initialization code for a module, not a user API */
 StgStablePtr foreignExportStablePtr (StgPtr p);
-
-#endif /* RTS_LINKER_H */

@@ -6,8 +6,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef PRELUDE_H
-#define PRELUDE_H
+#pragma once
 
 /* These definitions are required by the RTS .cmm files too, so we
  * need declarations that we can #include into the generated .hc files.
@@ -119,5 +118,3 @@ PRELUDE_INFO(base_GHCziStable_StablePtr_con_info);
 #define FunPtr_con_info           DLL_IMPORT_DATA_REF(base_GHCziPtr_FunPtr_con_info)
 #define StablePtr_static_info     DLL_IMPORT_DATA_REF(base_GHCziStable_StablePtr_static_info)
 #define StablePtr_con_info        DLL_IMPORT_DATA_REF(base_GHCziStable_StablePtr_con_info)
-
-#endif /* PRELUDE_H */

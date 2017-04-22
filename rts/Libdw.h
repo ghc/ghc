@@ -11,8 +11,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef LIBDW_H
-#define LIBDW_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -44,5 +43,3 @@ int libdwForEachFrameOutwards(Backtrace *bt,
 #endif /* USE_LIBDW */
 
 #include "EndPrivate.h"
-
-#endif /* LIBDW_H */

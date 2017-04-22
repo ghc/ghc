@@ -10,8 +10,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_H
-#define RTS_H
+#pragma once
 
 #ifdef __cplusplus
 extern "C" {
@@ -313,5 +312,3 @@ TICK_VAR(2)
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* RTS_H */

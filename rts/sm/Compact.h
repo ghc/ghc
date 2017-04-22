@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef SM_COMPACT_H
-#define SM_COMPACT_H
+#pragma once
 
 #include "BeginPrivate.h"
 
@@ -49,5 +48,3 @@ is_marked(StgPtr p, bdescr *bd)
 void compact (StgClosure *static_objects);
 
 #include "EndPrivate.h"
-
-#endif /* SM_COMPACT_H */

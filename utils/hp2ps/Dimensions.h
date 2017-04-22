@@ -1,5 +1,4 @@
-#ifndef DIMENSIONS_H
-#define DIMENSIONS_H
+#pragma once
 
 extern floatish borderheight; 
 extern floatish borderwidth; 
@@ -18,5 +17,3 @@ extern floatish graphwidth;
 
 void     Dimensions PROTO((void));
 floatish StringSize PROTO((char *));
-
-#endif /* DIMENSIONS_H */

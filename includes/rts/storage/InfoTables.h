@@ -6,8 +6,7 @@
  *
  * -------------------------------------------------------------------------- */
 
-#ifndef RTS_STORAGE_INFOTABLES_H
-#define RTS_STORAGE_INFOTABLES_H
+#pragma once
 
 /* ----------------------------------------------------------------------------
    Relative pointers
@@ -394,5 +393,3 @@ typedef struct StgConInfoTable_ {
 #else
 #define GET_PROF_DESC(info) ((info)->prof.closure_desc)
 #endif
-
-#endif /* RTS_STORAGE_INFOTABLES_H */

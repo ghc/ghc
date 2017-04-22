@@ -11,8 +11,7 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#ifndef RTS_FLAGS_H
-#define RTS_FLAGS_H
+#pragma once
 
 #include <stdio.h>
 #include <stdint.h>
@@ -282,5 +281,3 @@ extern char  **prog_argv;
 */
 extern int      rts_argc;  /* ditto */
 extern char   **rts_argv;
-
-#endif	/* RTS_FLAGS_H */

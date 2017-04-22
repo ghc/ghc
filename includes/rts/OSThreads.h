@@ -12,8 +12,7 @@
  *
  * --------------------------------------------------------------------------*/
 
-#ifndef RTS_OSTHREADS_H
-#define RTS_OSTHREADS_H
+#pragma once
 
 #if defined(HAVE_PTHREAD_H) && !defined(mingw32_HOST_OS)
 
@@ -257,5 +256,3 @@ typedef StgWord64 KernelThreadId;
 KernelThreadId kernelThreadId (void);
 
 #endif /* CMINUSMINUS */
-
-#endif /* RTS_OSTHREADS_H */
