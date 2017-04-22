@@ -127,9 +127,8 @@ lockImpl h ctx mode block = do
     -- We want to lock the whole file without looking up its size to be
     -- consistent with what flock does. According to documentation of LockFileEx
     -- "locking a region that goes beyond the current end-of-file position is
-    -- not an error", however some versions of Windows seem to have issues with
-    -- large regions and set ERROR_INVALID_LOCK_RANGE in such case for
-    -- mysterious reasons. Work around that by setting only low 32 bits.
+    -- not an error", hence we pass maximum value as the number of bytes to
+    -- lock.
     fix $ \retry -> c_LockFileEx wh flags 0 0xffffffff 0xffffffff ovrlpd >>= \case
       True  -> return True
       False -> getLastError >>= \err -> if
