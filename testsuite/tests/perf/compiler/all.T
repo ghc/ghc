@@ -1051,12 +1051,13 @@ test('T13035',
 test('T13056',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-         [(wordsize(64), 440548592, 5),
+         [(wordsize(64), 440548592, 10),
          # 2017-01-06    520166912 initial
          # 2017-01-31    546800240 Join points (#12988)
          # 2017-02-07    524611224 new SetLevels
          # 2017-02-14    440548592 Early inline patch: 16% improvement
-         # 2017-04-21    417860736 Unknown
+         # 2017-04-21    417860736 (darwin)
+         # 2017-04-22    Increase to +/- 10% (Darwin and Linux differ significantly)
          ]),
      ],
      compile,
