@@ -20,9 +20,11 @@ iserv_stage2_p_MORE_HC_OPTS += -debug
 iserv_stage2_dyn_MORE_HC_OPTS += -debug
 endif
 
+ifeq "$(GhcThreaded)" "YES"
 iserv_stage2_MORE_HC_OPTS += -threaded
 iserv_stage2_p_MORE_HC_OPTS += -threaded
 iserv_stage2_dyn_MORE_HC_OPTS += -threaded
+endif
 
 # Add -Wl,--export-dynamic enables GHCi to load dynamic objects that
 # refer to the RTS.  This is harmless if you don't use it (adds a bit
