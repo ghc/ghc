@@ -2,7 +2,7 @@
 T13233.hs:14:11: error:
     Cannot use primitive with levity-polymorphic arguments:
       GHC.Prim.(#,#) :: a -> a -> (# a, a #)
-    Levity polymorphic arguments:
+    Levity-polymorphic arguments:
       a :: TYPE rep
       a :: TYPE rep
 
@@ -10,7 +10,7 @@ T13233.hs:22:16: error:
     Cannot use primitive with levity-polymorphic arguments:
       GHC.Prim.(#,#) :: forall (a :: TYPE rep1) (b :: TYPE rep2).
                         a -> b -> (# a, b #)
-    Levity polymorphic arguments:
+    Levity-polymorphic arguments:
       a :: TYPE rep1
       b :: TYPE rep2
 
@@ -21,4 +21,4 @@ T13233.hs:27:10: error:
                  -> (State# RealWorld -> (# State# RealWorld, c #))
                  -> State# RealWorld
                  -> (# State# RealWorld, Weak# b #)
-    Levity polymorphic arguments: a :: TYPE rep
+    Levity-polymorphic arguments: a :: TYPE rep
