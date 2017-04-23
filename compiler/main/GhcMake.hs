@@ -26,7 +26,8 @@ module GhcMake(
         findExtraSigImports,
         implicitRequirements,
 
-        noModError, cyclicModuleErr
+        noModError, cyclicModuleErr,
+        moduleGraphNodes, SummaryNode
     ) where
 
 #include "HsVersions.h"
