@@ -751,6 +751,8 @@ flattenManyNom ev tys
   flatten ty  ==>   (xi, co)
     where
       xi has no type functions, unless they appear under ForAlls
+         has no skolems that are mapped in the inert set
+         has no filled-in metavariables
       co :: xi ~ ty
 
 Note that it is flatten's job to flatten *every type function it sees*.
@@ -761,12 +763,53 @@ Flattening also:
   * applies the substitution embodied in the inert set
 
 Because flattening zonks and the returned coercion ("co" above) is also
-zonked, it's possible that (co :: xi ~ ty) isn't quite true, as ty (the
-input to the flattener) might not be zonked. After zonking everything,
-(co :: xi ~ ty) will be true, however. It is for this reason that we
+zonked, it's possible that (co :: xi ~ ty) isn't quite true. So, instead,
+we can rely on these facts:
+  (F1) typeKind(xi) succeeds and returns a fully zonked kind
+  (F2) co :: xi ~ zonk(ty)
+Note that the left-hand type of co is *always* precisely xi. The right-hand
+type may or may not be ty, however: if ty has unzonked filled-in metavariables,
+then the right-hand type of co will be the zonked version of ty.
+It is for this reason that we
 occasionally have to explicitly zonk, when (co :: xi ~ ty) is important
-even before we zonk the whole program. (In particular, this is why the
-zonk in flattenTyVar is necessary.)
+even before we zonk the whole program. For example, see the FTRNotFollowed
+case in flattenTyVar.
+
+Why have these invariants on flattening? Really, they're both to ensure
+invariant (F1), which is a Good Thing because we sometimes use typeKind
+during canonicalisation, and we want this kind to be zonked (e.g., see
+TcCanonical.homogeniseRhsKind). Invariant (F2) is needed solely to support
+(F1). It is relied on in one place:
+
+ - The FTRNotFollowed case in flattenTyVar. Here, we have a tyvar
+ that cannot be reduced any further (that is, no equality over the tyvar
+ is in the inert set such that the inert equality can rewrite the constraint
+ at hand, and it is not a filled-in metavariable).
+ But its kind might still not be flat,
+ if it mentions a type family or a variable that can be rewritten. Flattened
+ types have flattened kinds (see below), so we must flatten the kind. Here is
+ an example:
+
+   let kappa be a filled-in metavariable such that kappa := k.
+   [G] co :: k ~ Type
+
+   We are flattening
+     a :: kappa
+   where a is a skolem.
+
+ We end up in the FTRNotFollowed case, but we need to flatten the kind kappa.
+ Flattening kappa yields (Type, kind_co), where kind_co :: Type ~ k. Note that the
+ right-hand type of kind_co is *not* kappa, because (F1) tells us it's zonk(kappa),
+ which is k. Now, we return (a |> sym kind_co). If we are to uphold (F1), then
+ the right-hand type of (sym kind_co) had better be fully zonked. In other words,
+ the left-hand type of kind_co needs to be zonked... which is precisely what (F2)
+ guarantees.
+
+In order to support (F2), we require that ctEvCoercion, when called on a
+zonked CtEvidence, always returns a zonked coercion. See Note [Given in
+ctEvCoercion]. This requirement comes into play in flatten_tyvar2. (I suppose
+we could move the logic from ctEvCoercion to flatten_tyvar2, but it's much
+easier to do in ctEvCoercion.)
 
 Flattening a type also means flattening its kind. In the case of a type
 variable whose kind mentions a type family, this might mean that the result
@@ -876,7 +919,7 @@ flatten_one (AppTy ty1 ty2)
            (NomEq,  _)                -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Nominal)          -> flatten_rhs xi1 co1 NomEq
            (ReprEq, Representational) -> flatten_rhs xi1 co1 ReprEq
-           (ReprEq, Phantom)          ->
+           (ReprEq, Phantom)          -> -- See Note [Phantoms in the flattener]
              do { ty2 <- liftTcS $ zonkTcType ty2
                 ; return ( mkAppTy xi1 ty2
                          , mkAppCo co1 (mkNomReflCo ty2)) } }
@@ -954,8 +997,8 @@ flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 -- between and then use transitivity. See Note [Flattening coercions]
 flatten_co :: Coercion -> FlatM (Coercion, Coercion)
 flatten_co co
-  = do { let (Pair ty1 ty2, role) = coercionKindRole co
-       ; co <- liftTcS $ zonkCo co  -- squeeze out any metavars from the original
+  = do { co <- liftTcS $ zonkCo co  -- see Note [Zonking when flattening a coercion]
+       ; let (Pair ty1 ty2, role) = coercionKindRole co
        ; (co1, co2) <- flattenKinds $
                        do { (_, co1) <- flatten_one ty1
                           ; (_, co2) <- flatten_one ty2
@@ -999,11 +1042,38 @@ In other words:
   then
       fco :: fs ~r1 ft
       fs, ft are flattened types
-      kco :: (fs ~r1 ft) ~r2 (s ~r1 t)
+      kco :: fco ~r2 co
 
 The second return value of flatten_co is always a ProofIrrelCo. As
 such, it doesn't contain any information the caller doesn't have and
 might not be necessary in whatever comes next.
+
+Note that a flattened coercion might have unzonked metavariables or
+type functions in it -- but its *kind* will not. Instead of just flattening
+the kinds and using mkTransCo, we could actually flatten the coercion
+structurally. But doing so seems harder than simply flattening the types.
+
+Note [Zonking when flattening a coercion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The first step in flatten_co (see Note [Flattening coercions]) is to
+zonk the input. This is necessary because we want to ensure the following
+invariants (c.f. the invariants (F1) and (F2) in Note [Flattening])
+  If
+    (co', kco) <- flatten_co co
+  Then
+    (FC1) coercionKind(co') succeeds and produces a fully zonked pair of kinds
+    (FC2) kco :: co' ~ zonk(co)
+We must zonk to ensure (1). This is because fco is built by using mkTransCo
+to build up on the input co. But if the only action that happens during
+flattening ty1 and ty2 is to zonk metavariables, the coercions returned
+(co1 and co2) will be reflexive. The mkTransCo calls will drop the reflexive
+coercions and co' will be the same as co -- with unzonked kinds.
+
+These invariants are necessary to uphold (F1) and (F2) in the CastTy and
+CoercionTy cases.
+
+We zonk right at the beginning to avoid duplicating work when flattening the
+ty1 and ty2.
 
 Note [Flattening synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
