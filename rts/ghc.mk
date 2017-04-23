@@ -39,7 +39,7 @@ $(eval $(call all-target,rts,$(ALL_RTS_LIBS)))
 
 ALL_DIRS = hooks sm eventlog linker
 
-ifeq "$(HostOS_CPP)" "mingw32"
+ifeq "$(TargetOS_CPP)" "mingw32"
 ALL_DIRS += win32
 else
 ALL_DIRS += posix
@@ -92,7 +92,7 @@ rts/dist/libs.depend : $$(ghc-pkg_INPLACE) | $$(dir $$@)/.
 # 	These are made from rts/win32/libHS*.def which contain lists of
 # 	all the symbols in those libraries used by the RTS.
 #
-ifeq "$(HostOS_CPP)" "mingw32" 
+ifeq "$(TargetOS_CPP)" "mingw32"
 
 ALL_RTS_DEF_LIBNAMES 	= base ghc-prim
 ALL_RTS_DEF_LIBS	= \
@@ -116,7 +116,7 @@ endif
 
 ifneq "$(BINDIST)" "YES"
 ifneq "$(UseSystemLibFFI)" "YES"
-ifeq "$(HostOS_CPP)" "mingw32" 
+ifeq "$(TargetOS_CPP)" "mingw32"
 rts/dist/build/$(LIBFFI_DLL): libffi/build/inst/bin/$(LIBFFI_DLL)
 	cp $< $@
 else
@@ -147,7 +147,7 @@ rts_dist_$1_CC_OPTS += -fno-omit-frame-pointer -g -O0
 endif
 
 ifneq "$$(findstring dyn, $1)" ""
-ifeq "$$(HostOS_CPP)" "mingw32" 
+ifeq "$$(TargetOS_CPP)" "mingw32"
 rts_dist_$1_CC_OPTS += -DCOMPILING_WINDOWS_DLL
 endif
 rts_dist_$1_CC_OPTS += -DDYNAMIC
@@ -197,7 +197,7 @@ endif
 
 # Making a shared library for the RTS.
 ifneq "$$(findstring dyn, $1)" ""
-ifeq "$$(HostOS_CPP)" "mingw32" 
+ifeq "$$(TargetOS_CPP)" "mingw32"
 $$(rts_$1_LIB) : $$(rts_$1_OBJS) $$(ALL_RTS_DEF_LIBS) rts/dist/libs.depend rts/dist/build/$$(LIBFFI_DLL)
 	"$$(RM)" $$(RM_OPTS) $$@
 	"$$(rts_dist_HC)" -this-unit-id rts -shared -dynamic -dynload deploy \
