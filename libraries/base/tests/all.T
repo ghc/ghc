@@ -212,4 +212,4 @@ test('T13191',
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
-test('T13525', normal, compile_and_run, [''])
+test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
