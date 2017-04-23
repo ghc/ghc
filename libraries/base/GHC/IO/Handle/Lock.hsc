@@ -47,6 +47,10 @@ import GHC.IO.Handle.FD
 import GHC.Ptr
 import GHC.Windows
 
+#else
+
+import GHC.IO (throwIO)
+
 #endif
 
 import Data.Functor
