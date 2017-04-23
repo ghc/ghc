@@ -203,8 +203,8 @@ compactAllocateBlockInternal(Capability            *cap,
     block = allocGroup(n_blocks);
     switch (operation) {
     case ALLOCATE_NEW:
-        ASSERT (first == NULL);
-        ASSERT (g == g0);
+        ASSERT(first == NULL);
+        ASSERT(g == g0);
         dbl_link_onto(block, &g0->compact_objects);
         g->n_compact_blocks += block->blocks;
         g->n_new_large_words += aligned_size / sizeof(StgWord);
@@ -214,8 +214,8 @@ compactAllocateBlockInternal(Capability            *cap,
         dbl_link_onto(block, &g0->compact_blocks_in_import);
         /* fallthrough */
     case ALLOCATE_IMPORT_APPEND:
-        ASSERT (first == NULL);
-        ASSERT (g == g0);
+        ASSERT(first == NULL);
+        ASSERT(g == g0);
         g->n_compact_blocks_in_import += block->blocks;
         g->n_new_large_words += aligned_size / sizeof(StgWord);
         break;
@@ -307,7 +307,7 @@ countCompactBlocks(bdescr *outer)
         block = (StgCompactNFDataBlock*)(outer->start);
         do {
             inner = Bdescr((P_)block);
-            ASSERT (inner->flags & BF_COMPACT);
+            ASSERT(inner->flags & BF_COMPACT);
 
             count += inner->blocks;
             block = block->next;
@@ -335,7 +335,7 @@ countAllocdCompactBlocks(bdescr *outer)
         block = (StgCompactNFDataBlock*)(outer->start);
         do {
             inner = Bdescr((P_)block);
-            ASSERT (inner->flags & BF_COMPACT);
+            ASSERT(inner->flags & BF_COMPACT);
 
             count += inner->blocks;
             // See BlockAlloc.c:countAllocdBlocks()
@@ -407,13 +407,13 @@ compactAppendBlock (Capability       *cap,
     block->owner = str;
     block->next = NULL;
 
-    ASSERT (str->last->next == NULL);
+    ASSERT(str->last->next == NULL);
     str->last->next = block;
     str->last = block;
 
     bd = Bdescr((P_)block);
     bd->free = (StgPtr)((W_)block + sizeof(StgCompactNFDataBlock));
-    ASSERT (bd->free == (StgPtr)block + sizeofW(StgCompactNFDataBlock));
+    ASSERT(bd->free == (StgPtr)block + sizeofW(StgCompactNFDataBlock));
 
     str->totalW += bd->blocks * BLOCK_SIZE_W;
 
@@ -920,7 +920,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
     bd = Bdescr((P_)block);
     p = bd->start + sizeofW(StgCompactNFDataBlock);
     while (p < bd->free) {
-        ASSERT (LOOKS_LIKE_CLOSURE_PTR(p));
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
         info = get_itbl((StgClosure*)p);
 
         switch (info->type) {
@@ -1163,8 +1163,8 @@ compactFixupPointers(StgCompactNFData *str,
     total_blocks = str->totalW / BLOCK_SIZE_W;
 
     ACQUIRE_SM_LOCK;
-    ASSERT (bd->gen == g0);
-    ASSERT (g0->n_compact_blocks_in_import >= total_blocks);
+    ASSERT(bd->gen == g0);
+    ASSERT(g0->n_compact_blocks_in_import >= total_blocks);
     g0->n_compact_blocks_in_import -= total_blocks;
     g0->n_compact_blocks += total_blocks;
     dbl_link_remove(bd, &g0->compact_blocks_in_import);

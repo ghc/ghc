@@ -484,22 +484,22 @@ checkCompactObjects(bdescr *bd)
         StgCompactNFData *str;
         StgWord totalW;
 
-        ASSERT (bd->flags & BF_COMPACT);
+        ASSERT(bd->flags & BF_COMPACT);
 
         block = (StgCompactNFDataBlock*)bd->start;
         str = block->owner;
-        ASSERT ((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
+        ASSERT((W_)str == (W_)block + sizeof(StgCompactNFDataBlock));
 
         totalW = 0;
         for ( ; block ; block = block->next) {
             last = block;
-            ASSERT (block->owner == str);
+            ASSERT(block->owner == str);
 
             totalW += Bdescr((P_)block)->blocks * BLOCK_SIZE_W;
         }
 
-        ASSERT (str->totalW == totalW);
-        ASSERT (str->last == last);
+        ASSERT(str->totalW == totalW);
+        ASSERT(str->last == last);
     }
 }
 

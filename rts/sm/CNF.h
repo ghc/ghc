@@ -48,14 +48,14 @@ INLINE_HEADER StgCompactNFDataBlock *objectGetCompactBlock (StgClosure *closure)
 
     object_block = Bdescr((StgPtr)closure);
 
-    ASSERT ((object_block->flags & BF_COMPACT) != 0);
+    ASSERT((object_block->flags & BF_COMPACT) != 0);
 
     if (object_block->blocks == 0)
         head_block = object_block->link;
     else
         head_block = object_block;
 
-    ASSERT ((head_block->flags & BF_COMPACT) != 0);
+    ASSERT((head_block->flags & BF_COMPACT) != 0);
 
     return (StgCompactNFDataBlock*)(head_block->start);
 }
