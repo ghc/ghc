@@ -9332,6 +9332,49 @@ and :ghc-flag:`-XGADTs`. You can switch it off again with
 :ghc-flag:`-XNoMonoLocalBinds <-XMonoLocalBinds>` but type inference becomes
 less predicatable if you do so. (Read the papers!)
 
+.. _kind-generalisation:
+
+Kind generalisation
+-------------------
+
+Just as :ghc-flag:`-XMonoLocalBinds` places limitations on when the *type* of a
+*term* is generalised (see :ref:`mono-local-binds`), it also limits when the
+*kind* of a *type signature* is generalised. Here is an example involving
+:ref:`type signatures on instance declarations <instance-sigs>`: ::
+
+    data Proxy a = Proxy
+    newtype Tagged s b = Tagged b
+
+    class C b where
+      c :: forall (s :: k). Tagged s b
+
+    instance C (Proxy a) where
+      c :: forall s. Tagged s (Proxy a)
+      c = Tagged Proxy
+
+With :ghc-flag:`-XMonoLocalBinds` enabled, this ``C (Proxy a)`` instance will
+fail to typecheck. The reason is that the type signature for ``c`` captures
+``a``, an outer-scoped type variable, which means the type signature is not
+closed. Therefore, the inferred kind for ``s`` will *not* be generalised, and
+as a result, it will fail to unify with the kind variable ``k`` which is
+specified in the declaration of ``c``. This can be worked around by specifying
+an explicit kind variable for ``s``, e.g., ::
+
+    instance C (Proxy a) where
+      c :: forall (s :: k). Tagged s (Proxy a)
+      c = Tagged Proxy
+
+or, alternatively: ::
+
+    instance C (Proxy a) where
+      c :: forall k (s :: k). Tagged s (Proxy a)
+      c = Tagged Proxy
+
+This declarations are equivalent using Haskell's implicit "add implicit
+foralls" rules (see :ref:`implicit-quantification`). The implicit foralls rules
+are purely syntactic and are quite separate from the kind generalisation
+described here.
+
 .. _visible-type-application:
 
 Visible type application

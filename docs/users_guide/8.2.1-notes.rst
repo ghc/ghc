@@ -196,6 +196,11 @@ Compiler
   See the section on `associated type family instances <assoc-data-inst>` for
   more information.
 
+- A bug involving the interaction between :ghc-flag:`-XMonoLocalBinds` and
+  :ghc-flag:`-XPolyKinds` has been fixed. This can cause some programs to fail
+  to typecheck in case explicit kind signatures are not provided. See
+  :ref:`kind-generalisation` for an example.
+
 GHCi
 ~~~~
 
