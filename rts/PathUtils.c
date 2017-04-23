@@ -1,9 +1,9 @@
-#include <string.h>
-#include <stddef.h>
-
 #include <Rts.h>
 #include "RtsUtils.h"
 #include "PathUtils.h"
+
+#include <string.h>
+#include <stddef.h>
 
 #include <libgen.h>
 #include <ctype.h>

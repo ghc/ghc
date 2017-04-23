@@ -11,7 +11,6 @@
 #define _GNU_SOURCE
 
 #include "PosixSource.h"
-#include <string.h>
 #include "Rts.h"
 #include "RtsUtils.h"
 
@@ -24,6 +23,8 @@
 #include "BlockAlloc.h"
 #include "Trace.h"
 #include "sm/ShouldCompact.h"
+
+#include <string.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
