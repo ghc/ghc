@@ -6,6 +6,13 @@
 || defined(dragonfly_HOST_OS) || defined(netbsd_HOST_OS) \
 || defined(openbsd_HOST_OS) || defined(gnu_HOST_OS)
 
+// It is essential that this is included before any <elf.h> is included. <elf.h>
+// defines R_XXX relocations, which would interfere with the COMPAT_R_XXX
+// relocations we generate.  E.g. COMPAT_ ## R_ARM_ARM32 would end up as
+// const unsigned COMPAT_3 = 0x03; instead of
+// const unsigned COMPAT_R_ARM_ARM32 = 0x03;
+#include "elf_compat.h"
+
 #include "RtsUtils.h"
 #include "RtsSymbolInfo.h"
 #include "linker/Elf.h"
@@ -14,6 +21,8 @@
 #include "linker/SymbolExtras.h"
 #include "sm/OSMem.h"
 #include "GetEnv.h"
+#include "linker/util.h"
+#include "linker/elf_util.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -81,55 +90,7 @@
 #else
 /* openbsd elf has things in different places, with diff names */
 #  include <elf_abi.h>
-#  include <machine/reloc.h>
-#  define R_386_32    RELOC_32
-#  define R_386_PC32  RELOC_PC32
 #endif
-
-/* If elf.h doesn't define it */
-#  ifndef R_X86_64_PC64
-#    define R_X86_64_PC64 24
-#  endif
-
-/*
- * Workaround for libc implementations (e.g. eglibc) with incomplete
- * relocation lists
- */
-#ifndef R_ARM_THM_CALL
-#  define R_ARM_THM_CALL      10
-#endif
-#ifndef R_ARM_CALL
-#  define R_ARM_CALL      28
-#endif
-#ifndef R_ARM_JUMP24
-#  define R_ARM_JUMP24      29
-#endif
-#ifndef R_ARM_THM_JUMP24
-#  define R_ARM_THM_JUMP24      30
-#endif
-#ifndef R_ARM_TARGET1
-#  define R_ARM_TARGET1      38
-#endif
-#ifndef R_ARM_MOVW_ABS_NC
-#  define R_ARM_MOVW_ABS_NC      43
-#endif
-#ifndef R_ARM_MOVT_ABS
-#  define R_ARM_MOVT_ABS      44
-#endif
-#ifndef R_ARM_THM_MOVW_ABS_NC
-#  define R_ARM_THM_MOVW_ABS_NC   47
-#endif
-#ifndef R_ARM_THM_MOVT_ABS
-#  define R_ARM_THM_MOVT_ABS      48
-#endif
-#ifndef R_ARM_THM_JUMP11
-#  define R_ARM_THM_JUMP11      102
-#endif
-#ifndef R_ARM_THM_JUMP8
-#  define R_ARM_THM_JUMP8      103
-#endif
-
-
 
 /*
 
@@ -164,9 +125,9 @@ static Elf_Word elf_shnum(Elf_Ehdr* ehdr)
 
 static Elf_Word elf_shstrndx(Elf_Ehdr* ehdr)
 {
-   Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
    Elf_Half shstrndx = ehdr->e_shstrndx;
 #if defined(SHN_XINDEX)
+   Elf_Shdr* shdr = (Elf_Shdr*) ((char*)ehdr + ehdr->e_shoff);
    return shstrndx != SHN_XINDEX ? shstrndx : shdr[0].sh_link;
 #else
    // some OSes do not support SHN_XINDEX yet, let's revert to
@@ -742,21 +703,6 @@ end:
    return result;
 }
 
-#if defined(arm_HOST_ARCH)
-// TODO: These likely belong in a library somewhere
-
-// Signed extend a number to a 32-bit int.
-static inline StgInt32 sign_extend32(uint32_t bits, StgWord32 x) {
-    return ((StgInt32) (x << (32 - bits))) >> (32 - bits);
-}
-
-// Does the given signed integer fit into the given bit width?
-static inline StgBool is_int(uint32_t bits, StgInt32 x) {
-    return bits > 32 || (-(1 << (bits-1)) <= x
-                         && x < (1 << (bits-1)));
-}
-#endif
-
 /* Do ELF relocations which lack an explicit addend.  All x86-linux
    and arm-linux relocations appear to be of this form. */
 static int
@@ -886,25 +832,26 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
       switch (reloc_type) {
 #        ifdef i386_HOST_ARCH
-         case R_386_32:   *pP = value;     break;
-         case R_386_PC32: *pP = value - P; break;
+         case COMPAT_R_386_32:   *pP = value;     break;
+         case COMPAT_R_386_PC32: *pP = value - P; break;
 #        endif
 
 #        ifdef arm_HOST_ARCH
-         case R_ARM_ABS32:
-         case R_ARM_TARGET1:  // Specified by Linux ARM ABI to be equivalent to ABS32
+         case COMPAT_R_ARM_ABS32:
+         // Specified by Linux ARM ABI to be equivalent to ABS32
+         case COMPAT_R_ARM_TARGET1:
             *(Elf32_Word *)P += S;
             *(Elf32_Word *)P |= T;
             break;
 
-         case R_ARM_REL32:
+         case COMPAT_R_ARM_REL32:
             *(Elf32_Word *)P += S;
             *(Elf32_Word *)P |= T;
             *(Elf32_Word *)P -= P;
             break;
 
-         case R_ARM_CALL:
-         case R_ARM_JUMP24:
+         case COMPAT_R_ARM_CALL:
+         case COMPAT_R_ARM_JUMP24:
          {
             // N.B. LLVM's LLD linker's relocation implement is a fantastic
             // resource
@@ -923,30 +870,36 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             StgWord32 result = ((S + imm) | T) - P;
 
             const StgBool overflow = !is_int(26, (StgInt32) result);
-
             // Handle overflow and Thumb interworking
-            const StgBool needs_veneer = (is_target_thm && ELF_R_TYPE(info) == R_ARM_JUMP24) || overflow;
+            const StgBool needs_veneer =
+                (is_target_thm && ELF_R_TYPE(info) == COMPAT_R_ARM_JUMP24)
+                || overflow;
+
             if (needs_veneer) {
                // Generate veneer
-               // The +8 below is to undo the PC-bias compensation done by the object producer
-               SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info), S+imm+8, 0, is_target_thm);
+               // The +8 below is to undo the PC-bias compensation done by the
+               // object producer
+               SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info),
+                                                       S+imm+8, 0,
+                                                       is_target_thm);
                // The -8 below is to compensate for PC bias
                result = (StgWord32) ((StgInt32) extra->jumpIsland - P - 8);
                result &= ~1; // Clear thumb indicator bit
                if (!is_int(26, (StgInt32) result)) {
-                  errorBelch("Unable to fixup overflow'd R_ARM_CALL: jump island=%p, reloc=%p\n",
+                  errorBelch("Unable to fixup overflow'd R_ARM_CALL: "
+                             "jump island=%p, reloc=%p\n",
                              (void*) extra->jumpIsland, (void*) P);
                   return 0;
                }
             }
-
             // Update the branch target
             const StgWord32 imm24 = (result & 0x03fffffc) >> 2;
             *word = (*word & ~0x00ffffff)
                   | (imm24 & 0x00ffffff);
 
             // Change the relocated branch into a BLX if necessary
-            const StgBool switch_mode = is_target_thm && (reloc_type == R_ARM_CALL);
+            const StgBool switch_mode =
+                is_target_thm && (reloc_type == COMPAT_R_ARM_CALL);
             if (!needs_veneer && switch_mode) {
                const StgWord32 hBit = (result & 0x2) >> 1;
                // Change instruction to BLX
@@ -956,8 +909,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             break;
          }
 
-         case R_ARM_MOVT_ABS:
-         case R_ARM_MOVW_ABS_NC:
+         case COMPAT_R_ARM_MOVT_ABS:
+         case COMPAT_R_ARM_MOVW_ABS_NC:
          {
             StgWord32 *word = (StgWord32 *)P;
             StgWord32 imm12 = *word & 0xfff;
@@ -965,7 +918,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             StgInt32 offset = imm4 << 12 | imm12;
             StgWord32 result = (S + offset) | T;
 
-            if (reloc_type == R_ARM_MOVT_ABS)
+            if (reloc_type == COMPAT_R_ARM_MOVT_ABS)
                 result = (result & 0xffff0000) >> 16;
 
             StgWord32 result12 = result & 0xfff;
@@ -974,8 +927,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             break;
          }
 
-         case R_ARM_THM_CALL:
-         case R_ARM_THM_JUMP24:
+         case COMPAT_R_ARM_THM_CALL:
+         case COMPAT_R_ARM_THM_JUMP24:
          {
             StgWord16 *upper = (StgWord16 *)P;
             StgWord16 *lower = (StgWord16 *)(P + 2);
@@ -999,15 +952,20 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                imm -= 0x02000000;
 
             offset = ((imm + S) | T) - P;
-            overflow = offset <= (StgWord32)0xff000000 || offset >= (StgWord32)0x01000000;
+            overflow = offset <= (StgWord32)0xff000000
+                    || offset >= (StgWord32)0x01000000;
 
-            if ((!is_target_thm && ELF_R_TYPE(info) == R_ARM_THM_JUMP24) || overflow) {
+            if ((!is_target_thm && ELF_R_TYPE(info) == COMPAT_R_ARM_THM_JUMP24)
+                || overflow) {
                // Generate veneer
-               SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info), S+imm+4, 1, is_target_thm);
+               SymbolExtra *extra = makeArmSymbolExtra(oc, ELF_R_SYM(info),
+                                                       S+imm+4, 1,
+                                                       is_target_thm);
                offset = (StgWord32) &extra->jumpIsland - P - 4;
                sign = offset >> 31;
                to_thm = 1;
-            } else if (!is_target_thm && ELF_R_TYPE(info) == R_ARM_THM_CALL) {
+            } else if (!is_target_thm
+                       && ELF_R_TYPE(info) == COMPAT_R_ARM_THM_CALL) {
                offset &= ~0x3;
                to_thm = 0;
             }
@@ -1026,8 +984,8 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             break;
          }
 
-         case R_ARM_THM_MOVT_ABS:
-         case R_ARM_THM_MOVW_ABS_NC:
+         case COMPAT_R_ARM_THM_MOVT_ABS:
+         case COMPAT_R_ARM_THM_MOVW_ABS_NC:
          {
             StgWord16 *upper = (StgWord16 *)P;
             StgWord16 *lower = (StgWord16 *)(P + 2);
@@ -1038,9 +996,9 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 
             offset = (offset ^ 0x8000) - 0x8000; // Sign extend
             offset += S;
-            if (ELF_R_TYPE(info) == R_ARM_THM_MOVW_ABS_NC)
+            if (ELF_R_TYPE(info) == COMPAT_R_ARM_THM_MOVW_ABS_NC)
                    offset |= T;
-            else if (ELF_R_TYPE(info) == R_ARM_THM_MOVT_ABS)
+            else if (ELF_R_TYPE(info) == COMPAT_R_ARM_THM_MOVT_ABS)
                    offset >>= 16;
 
             *upper = ( (*upper & 0xfbf0)
@@ -1052,13 +1010,14 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             break;
          }
 
-         case R_ARM_THM_JUMP8:
+         case COMPAT_R_ARM_THM_JUMP8:
          {
             StgWord16 *word = (StgWord16 *)P;
             StgWord offset = *word & 0x01fe;
             offset += S - P;
             if (!is_target_thm) {
-               errorBelch("%s: Thumb to ARM transition with JUMP8 relocation not supported\n",
+               errorBelch("%s: Thumb to ARM transition with JUMP8 relocation "
+                          "not supported\n",
                      oc->fileName);
                return 0;
             }
@@ -1068,13 +1027,14 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
             break;
          }
 
-         case R_ARM_THM_JUMP11:
+         case COMPAT_R_ARM_THM_JUMP11:
          {
             StgWord16 *word = (StgWord16 *)P;
             StgWord offset = *word & 0x0ffe;
             offset += S - P;
             if (!is_target_thm) {
-               errorBelch("%s: Thumb to ARM transition with JUMP11 relocation not supported\n",
+               errorBelch("%s: Thumb to ARM transition with JUMP11 relocation "
+                          "not supported\n",
                      oc->fileName);
                return 0;
             }
@@ -1303,11 +1263,11 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #        endif
 
 #if defined(x86_64_HOST_ARCH)
-      case R_X86_64_64:
+      case COMPAT_R_X86_64_64:
           *(Elf64_Xword *)P = value;
           break;
 
-      case R_X86_64_PC32:
+      case COMPAT_R_X86_64_PC32:
       {
 #if defined(ALWAYS_PIC)
           barf("R_X86_64_PC32 relocation, but ALWAYS_PIC.");
@@ -1331,14 +1291,14 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           break;
       }
 
-      case R_X86_64_PC64:
+      case COMPAT_R_X86_64_PC64:
       {
           StgInt64 off = value - P;
           *(Elf64_Word *)P = (Elf64_Word)off;
           break;
       }
 
-      case R_X86_64_32:
+      case COMPAT_R_X86_64_32:
 #if defined(ALWAYS_PIC)
           barf("R_X86_64_32 relocation, but ALWAYS_PIC.");
 #else
@@ -1359,7 +1319,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
           break;
 
-      case R_X86_64_32S:
+      case COMPAT_R_X86_64_32S:
 #if defined(ALWAYS_PIC)
           barf("R_X86_64_32S relocation, but ALWAYS_PIC.");
 #else
@@ -1379,14 +1339,9 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           *(Elf64_Sword *)P = (Elf64_Sword)value;
 #endif
           break;
-/* These two relocations were introduced in glibc 2.23 and binutils 2.26.
-    But in order to use them the system which compiles the bindist for GHC needs
-    to have glibc >= 2.23. So only use them if they're defined. */
-#if defined(R_X86_64_REX_GOTPCRELX) && defined(R_X86_64_GOTPCRELX)
-      case R_X86_64_REX_GOTPCRELX:
-      case R_X86_64_GOTPCRELX:
-#endif
-      case R_X86_64_GOTPCREL:
+      case COMPAT_R_X86_64_REX_GOTPCRELX:
+      case COMPAT_R_X86_64_GOTPCRELX:
+      case COMPAT_R_X86_64_GOTPCREL:
       {
           StgInt64 gotAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)->addr;
           StgInt64 off = gotAddress + A - P;
@@ -1394,7 +1349,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
           break;
       }
 #if defined(dragonfly_HOST_OS)
-      case R_X86_64_GOTTPOFF:
+      case COMPAT_R_X86_64_GOTTPOFF:
       {
 #if defined(ALWAYS_PIC)
           barf("R_X86_64_GOTTPOFF relocation, but ALWAYS_PIC.");
@@ -1413,9 +1368,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       }
 #endif
 
-
-
-      case R_X86_64_PLT32:
+      case COMPAT_R_X86_64_PLT32:
       {
 #if defined(ALWAYS_PIC)
           barf("R_X86_64_PLT32 relocation, but ALWAYS_PIC.");
