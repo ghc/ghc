@@ -1382,6 +1382,7 @@ addInertEq :: Ct -> TcS ()
 addInertEq ct
   = do { traceTcS "addInertEq {" $
          text "Adding new inert equality:" <+> ppr ct
+
        ; ics <- getInertCans
 
        ; ct@(CTyEqCan { cc_tyvar = tv, cc_ev = ev }) <- maybeEmitShadow ics ct

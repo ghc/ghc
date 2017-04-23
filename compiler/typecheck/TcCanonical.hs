@@ -50,85 +50,23 @@ Note [Canonicalization]
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Canonicalization converts a simple constraint to a canonical form. It is
-unary (i.e. treats individual constraints one at a time), does not do
-any zonking, but lives in TcS monad because it needs to create fresh
-variables (for flattening) and consult the inerts (for efficiency).
+unary (i.e. treats individual constraints one at a time).
 
-The execution plan for canonicalization is the following:
+Constraints originating from user-written code come into being as
+CNonCanonicals (except for CHoleCans, arising from holes). We know nothing
+about these constraints. So, first:
 
-  1) Decomposition of equalities happens as necessary until we reach a
-     variable or type family in one side. There is no decomposition step
-     for other forms of constraints.
+     Classify CNonCanoncal constraints, depending on whether they
+     are equalities, class predicates, or other.
 
-  2) If, when we decompose, we discover a variable on the head then we
-     look at inert_eqs from the current inert for a substitution for this
-     variable and contine decomposing. Hence we lazily apply the inert
-     substitution if it is needed.
+Then proceed depending on the shape of the constraint. Generally speaking,
+each constraint gets flattened and then decomposed into one of several forms
+(see type Ct in TcRnTypes).
 
-  3) If no more decomposition is possible, we deeply apply the substitution
-     from the inert_eqs and continue with flattening.
+When an already-canonicalized constraint gets kicked out of the inert set,
+it must be recanonicalized. But we know a bit about its shape from the
+last time through, so we can skip the classification step.
 
-  4) During flattening, we examine whether we have already flattened some
-     function application by looking at all the CTyFunEqs with the same
-     function in the inert set. The reason for deeply applying the inert
-     substitution at step (3) is to maximise our chances of matching an
-     already flattened family application in the inert.
-
-The net result is that a constraint coming out of the canonicalization
-phase cannot be rewritten any further from the inerts (but maybe /it/ can
-rewrite an inert or still interact with an inert in a further phase in the
-simplifier.
-
-Note [Caching for canonicals]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Our plan with pre-canonicalization is to be able to solve a constraint
-really fast from existing bindings in TcEvBinds. So one may think that
-the condition (isCNonCanonical) is not necessary.  However consider
-the following setup:
-
-InertSet = { [W] d1 : Num t }
-WorkList = { [W] d2 : Num t, [W] c : t ~ Int}
-
-Now, we prioritize equalities, but in our concrete example
-(should_run/mc17.hs) the first (d2) constraint is dealt with first,
-because (t ~ Int) is an equality that only later appears in the
-worklist since it is pulled out from a nested implication
-constraint. So, let's examine what happens:
-
-   - We encounter work item (d2 : Num t)
-
-   - Nothing is yet in EvBinds, so we reach the interaction with inerts
-     and set:
-              d2 := d1
-    and we discard d2 from the worklist. The inert set remains unaffected.
-
-   - Now the equation ([W] c : t ~ Int) is encountered and kicks-out
-     (d1 : Num t) from the inerts.  Then that equation gets
-     spontaneously solved, perhaps. We end up with:
-        InertSet : { [G] c : t ~ Int }
-        WorkList : { [W] d1 : Num t}
-
-   - Now we examine (d1), we observe that there is a binding for (Num
-     t) in the evidence binds and we set:
-             d1 := d2
-     and end up in a loop!
-
-Now, the constraints that get kicked out from the inert set are always
-Canonical, so by restricting the use of the pre-canonicalizer to
-NonCanonical constraints we eliminate this danger. Moreover, for
-canonical constraints we already have good caching mechanisms
-(effectively the interaction solver) and we are interested in reducing
-things like superclasses of the same non-canonical constraint being
-generated hence I don't expect us to lose a lot by introducing the
-(isCNonCanonical) restriction.
-
-A similar situation can arise in TcSimplify, at the end of the
-solve_wanteds function, where constraints from the inert set are
-returned as new work -- our substCt ensures however that if they are
-not rewritten by subst, they remain canonical and hence we will not
-attempt to solve them from the EvBinds. If on the other hand they did
-get rewritten and are now non-canonical they will still not match the
-EvBinds, so we are again good.
 -}
 
 -- Top-level canonicalization
@@ -1739,7 +1677,7 @@ may reflect the result of unification alpha := ty, so new_pred might
 not _look_ the same as old_pred, and it's vital to proceed from now on
 using new_pred.
 
-The flattener preserves type synonyms, so they should appear in new_pred
+qThe flattener preserves type synonyms, so they should appear in new_pred
 as well as in old_pred; that is important for good error messages.
  -}
 
