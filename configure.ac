@@ -1242,6 +1242,8 @@ echo "\
    nm           : $NmCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd
+   windres      : $Windres
+   dllwrap      : $DllWrap
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd
