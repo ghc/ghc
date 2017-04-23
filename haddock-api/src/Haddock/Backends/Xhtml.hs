@@ -486,10 +486,13 @@ ppHtmlModule odir doctitle themes
       mdl_str_annot = mdl_str ++ if ifaceIsSig iface
                                     then " (signature)"
                                     else ""
-      mdl_str_linked = mdl_str +++
-                       " (signature" +++
+      mdl_str_linked
+        | ifaceIsSig iface
+        = mdl_str +++ " (signature" +++
                        sup << ("[" +++ anchor ! [href signatureDocURL] << "?" +++ "]" ) +++
                        ")"
+        | otherwise
+        = toHtml mdl_str
       real_qual = makeModuleQual qual aliases mdl
       html =
         headHtml mdl_str_annot (Just $ "mini_" ++ moduleHtmlFile mdl) themes maybe_mathjax_url +++
