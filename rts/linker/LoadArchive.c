@@ -1,6 +1,3 @@
-#include <string.h>
-#include <stddef.h>
-
 #include <Rts.h>
 #include "PathUtils.h"
 
@@ -20,6 +17,8 @@
 #  include <mach-o/fat.h>
 #endif
 
+#include <string.h>
+#include <stddef.h>
 #include <ctype.h>
 
 #define FAIL(...) do {\
