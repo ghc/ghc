@@ -17,13 +17,13 @@
 
 #include <stdlib.h>
 #include <string.h>
-#ifdef HAVE_SYS_STAT_H
+#if defined(HAVE_SYS_STAT_H)
 #include <sys/stat.h>
 #endif
-#ifdef HAVE_SYS_TYPES_H
+#if defined(HAVE_SYS_TYPES_H)
 #include <sys/types.h>
 #endif
-#ifdef HAVE_FCNTL_H
+#if defined(HAVE_FCNTL_H)
 #include <fcntl.h>
 #endif
 #if defined(dragonfly_HOST_OS)
@@ -73,14 +73,7 @@
 #  define ELF_TARGET_386    /* Used inside <elf.h> */
 #elif defined(x86_64_HOST_ARCH)
 #  define ELF_TARGET_X64_64
-#  define ELF_64BIT
 #  define ELF_TARGET_AMD64 /* Used inside <elf.h> on Solaris 11 */
-#elif defined(powerpc64_HOST_ARCH) || defined(powerpc64le_HOST_ARCH)
-#  define ELF_64BIT
-#elif defined(ia64_HOST_ARCH)
-#  define ELF_64BIT
-#elif defined(aarch64_HOST_ARCH)
-#  define ELF_64BIT
 #endif
 
 #if !defined(openbsd_HOST_OS)
@@ -134,60 +127,6 @@
 #endif
 #ifndef R_ARM_THM_JUMP8
 #  define R_ARM_THM_JUMP8      103
-#endif
-
-/*
- * Define a set of types which can be used for both ELF32 and ELF64
- */
-
-#ifdef ELF_64BIT
-#define ELFCLASS    ELFCLASS64
-#define Elf_Addr    Elf64_Addr
-#define Elf_Word    Elf64_Word
-#define Elf_Sword   Elf64_Sword
-#define Elf_Half    Elf64_Half
-#define Elf_Ehdr    Elf64_Ehdr
-#define Elf_Phdr    Elf64_Phdr
-#define Elf_Shdr    Elf64_Shdr
-#define Elf_Sym     Elf64_Sym
-#define Elf_Rel     Elf64_Rel
-#define Elf_Rela    Elf64_Rela
-#ifndef ELF_ST_TYPE
-#define ELF_ST_TYPE ELF64_ST_TYPE
-#endif
-#ifndef ELF_ST_BIND
-#define ELF_ST_BIND ELF64_ST_BIND
-#endif
-#ifndef ELF_R_TYPE
-#define ELF_R_TYPE  ELF64_R_TYPE
-#endif
-#ifndef ELF_R_SYM
-#define ELF_R_SYM   ELF64_R_SYM
-#endif
-#else
-#define ELFCLASS    ELFCLASS32
-#define Elf_Addr    Elf32_Addr
-#define Elf_Word    Elf32_Word
-#define Elf_Sword   Elf32_Sword
-#define Elf_Half    Elf32_Half
-#define Elf_Ehdr    Elf32_Ehdr
-#define Elf_Phdr    Elf32_Phdr
-#define Elf_Shdr    Elf32_Shdr
-#define Elf_Sym     Elf32_Sym
-#define Elf_Rel     Elf32_Rel
-#define Elf_Rela    Elf32_Rela
-#ifndef ELF_ST_TYPE
-#define ELF_ST_TYPE ELF32_ST_TYPE
-#endif
-#ifndef ELF_ST_BIND
-#define ELF_ST_BIND ELF32_ST_BIND
-#endif
-#ifndef ELF_R_TYPE
-#define ELF_R_TYPE  ELF32_R_TYPE
-#endif
-#ifndef ELF_R_SYM
-#define ELF_R_SYM   ELF32_R_SYM
-#endif
 #endif
 
 
@@ -301,25 +240,25 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 
    IF_DEBUG(linker,debugBelch( "Architecture is " ));
    switch (ehdr->e_machine) {
-#ifdef EM_ARM
+#if defined(EM_ARM)
       case EM_ARM:   IF_DEBUG(linker,debugBelch( "arm" )); break;
 #endif
       case EM_386:   IF_DEBUG(linker,debugBelch( "x86" )); break;
-#ifdef EM_SPARC32PLUS
+#if defined(EM_SPARC32PLUS)
       case EM_SPARC32PLUS:
 #endif
       case EM_SPARC: IF_DEBUG(linker,debugBelch( "sparc" )); break;
-#ifdef EM_IA_64
+#if defined(EM_IA_64)
       case EM_IA_64: IF_DEBUG(linker,debugBelch( "ia64" )); break;
 #endif
       case EM_PPC:   IF_DEBUG(linker,debugBelch( "powerpc32" )); break;
-#ifdef EM_PPC64
+#if defined(EM_PPC64)
       case EM_PPC64: IF_DEBUG(linker,debugBelch( "powerpc64" ));
           errorBelch("%s: RTS linker not implemented on PowerPC 64-bit",
                      oc->fileName);
           return 0;
 #endif
-#ifdef EM_X86_64
+#if defined(EM_X86_64)
       case EM_X86_64: IF_DEBUG(linker,debugBelch( "x86_64" )); break;
 #elif defined(EM_AMD64)
       case EM_AMD64: IF_DEBUG(linker,debugBelch( "amd64" )); break;
@@ -527,7 +466,7 @@ static int getSectionKind_ELF( Elf_Shdr *hdr, int *is_bss )
         /* .rodata-style section */
         return SECTIONKIND_CODE_OR_RODATA;
     }
-#ifdef SHT_INIT_ARRAY
+#if defined(SHT_INIT_ARRAY)
     if (hdr->sh_type == SHT_INIT_ARRAY
         && (hdr->sh_flags & SHF_ALLOC) && (hdr->sh_flags & SHF_WRITE)) {
        /* .init_array section */
@@ -733,7 +672,7 @@ ocGetNames_ELF ( ObjectCode* oc )
                isLocal = true;
                isWeak = false;
             } else { /* STB_GLOBAL or STB_WEAK */
-#ifdef ELF_FUNCTION_DESC
+#if defined(ELF_FUNCTION_DESC)
                /* dlsym() and the initialisation table both give us function
                 * descriptors, so to be consistent we store function descriptors
                 * in the symbol table */
@@ -803,7 +742,7 @@ end:
    return result;
 }
 
-#ifdef arm_HOST_ARCH
+#if defined(arm_HOST_ARCH)
 // TODO: These likely belong in a library somewhere
 
 // Signed extend a number to a 32-bit int.
@@ -861,10 +800,10 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
 #endif
       Elf_Addr  S;
       void*     S_tmp;
-#ifdef i386_HOST_ARCH
+#if defined(i386_HOST_ARCH)
       Elf_Addr  value;
 #endif
-#ifdef arm_HOST_ARCH
+#if defined(arm_HOST_ARCH)
       int is_target_thm=0, T=0;
 #endif
 
@@ -901,7 +840,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
          }
          IF_DEBUG(linker,debugBelch( "`%s' resolves to %p\n", symbol, (void*)S ));
 
-#ifdef arm_HOST_ARCH
+#if defined(arm_HOST_ARCH)
           /*
            * 4.5.3 Symbol Values
            *
@@ -941,7 +880,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
                              (void*)P, (void*)S, (void*)A, reloc_type ));
       checkProddableBlock ( oc, pP, sizeof(Elf_Word) );
 
-#ifdef i386_HOST_ARCH
+#if defined(i386_HOST_ARCH)
       value = S + A;
 #endif
 
@@ -1176,7 +1115,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
 #endif
 #if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
-   /* This #ifdef only serves to avoid unused-var warnings. */
+   /* This #if def only serves to avoid unused-var warnings. */
    Elf_Addr targ = (Elf_Addr) oc->sections[target_shndx].start;
 #endif
 
@@ -1194,7 +1133,7 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
    for (j = 0; j < nent; j++) {
 #if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
-      /* This #ifdef only serves to avoid unused-var warnings. */
+      /* This #if def only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
       Elf_Addr  A      = rtab[j].r_addend;
