@@ -924,7 +924,7 @@ ifneq "$(INSTALL_LIBEXECS)" ""
 	done
 # We rename ghc-stage2, so that the right program name is used in error
 # messages etc.
-ifeq "$(Windows_Host)" "NO"
+ifeq "$(Windows_Target)" "NO"
 	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
 endif
 endif
