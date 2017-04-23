@@ -81,21 +81,21 @@ download_tarballs() {
     local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}-${mingw_arch}"
 
     download_mingw "${format_url}-crt-git-5.0.0.4795.e3d96cb1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-winpthreads-git-5.0.0.4741.2c8939a-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-headers-git-5.0.0.4747.0f8f626-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-libwinpthread-git-5.0.0.4741.2c8939a-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-zlib-1.2.8-9-any.pkg.tar.xz"
+    download_mingw "${format_url}-winpthreads-git-5.0.0.4761.02bea78-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-headers-git-5.0.0.4797.31e66d7e-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-libwinpthread-git-5.0.0.4761.02bea78-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-zlib-1.2.11-1-any.pkg.tar.xz"
     download_mingw "${format_url}-isl-0.17.1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-mpfr-3.1.4.p3-4-any.pkg.tar.xz"
-    download_mingw "${format_url}-gmp-6.1.1-1-any.pkg.tar.xz"
-    download_mingw "${format_url}-binutils-2.27-2-any.pkg.tar.xz"
-    download_mingw "${format_url}-libidn-1.32-3-any.pkg.tar.xz"
-    download_mingw "${format_url}-gcc-6.2.0-2-any.pkg.tar.xz"
+    download_mingw "${format_url}-mpfr-3.1.5.p1-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-gmp-6.1.2-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-binutils-2.28-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-libidn-1.33-1-any.pkg.tar.xz"
+    download_mingw "${format_url}-gcc-6.3.0-2-any.pkg.tar.xz"
 
     # Upstream is unfortunately quite inconsistent in naming
     if test "$mingw_arch" != "sources"; then
         download_mingw "${format_url}-mpc-1.0.3-2-any.pkg.tar.xz"
-        download_mingw "${format_url}-gcc-libs-6.2.0-2-any.pkg.tar.xz"
+        download_mingw "${format_url}-gcc-libs-6.3.0-2-any.pkg.tar.xz"
     else
         local format_url="${mingw_base_url}/${mingw_arch}/${package_prefix}"
         download_mingw "${format_url}-i686-mpc-1.0.3-2.src.tar.gz"
