@@ -27,7 +27,7 @@ $1_$2_$3_LIB_FILE = libHS$$($1_$2_COMPONENT_ID)$$($3_libsuf)
 $1_$2_$3_LIB = $1/$2/build/$$($1_$2_$3_LIB_FILE)
 $$($1_$2_COMPONENT_ID)_$2_$3_LIB = $$($1_$2_$3_LIB)
 
-ifeq "$$(HostOS_CPP)" "mingw32"
+ifeq "$$(TargetOS_CPP)" "mingw32"
 ifneq "$$($1_$2_dll0_HS_OBJS)" ""
 $1_$2_$3_LIB0_ROOT = HS$$($1_$2_COMPONENT_ID)-0$$($3_libsuf)
 $1_$2_$3_LIB0_NAME = lib$$($1_$2_$3_LIB0_ROOT)
@@ -75,7 +75,7 @@ $1/$2/dll-split.stamp: $$($1_$2_depfile_haskell) $$$$(dll-split_INPLACE)
 
 # Link a dynamic library
 # On windows we have to supply the extra libs this one links to when building it.
-ifeq "$$(HostOS_CPP)" "mingw32"
+ifeq "$$(TargetOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 ifneq "$$($1_$2_$3_LIB0)" ""
 	$$(call build-dll,$1,$2,$3,-L$1/$2/build -l$$($1_$2_$3_LIB0_ROOT),$$(filter-out $$($1_$2_dll0_HS_OBJS),$$($1_$2_$3_HS_OBJS)) $$($1_$2_$3_NON_HS_OBJS),$$@)
@@ -89,14 +89,14 @@ $$($1_$2_$3_LIB0) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS
 	$$(call build-dll,$1,$2,$3,,$$($1_$2_dll0_HS_OBJS) $$($1_$2_$3_NON_HS_OBJS),$$($1_$2_$3_LIB0))
 endif
 
-else # ifneq "$$(HostOS_CPP)" "mingw32"
+else # ifneq "$$(TargetOS_CPP)" "mingw32"
 $$($1_$2_$3_LIB) : $$($1_$2_$3_ALL_OBJS) $$(ALL_RTS_LIBS) $$($1_$2_$3_DEPS_LIBS)
 	$$(call cmd,$1_$2_HC) $$($1_$2_$3_ALL_HC_OPTS) $$($1_$2_$3_GHC_LD_OPTS) $$($1_$2_$3_ALL_OBJS) \
          -shared -dynamic -dynload deploy \
 	 $$(addprefix -l,$$($1_$2_EXTRA_LIBRARIES)) $$(addprefix -L,$$($1_$2_EXTRA_LIBDIRS)) \
          -no-auto-link-packages \
          -o $$@
-endif # "$$(HostOS_CPP)" "mingw32"
+endif # "$$(TargetOS_CPP)" "mingw32"
 
 else # ifneq "$3" "dyn"
 
@@ -116,7 +116,7 @@ else
 endif
 	$$(call removeFiles,$$@.contents)
 
-ifeq "$$(HostOS_CPP)" "mingw32"
+ifeq "$$(TargetOS_CPP)" "mingw32"
 ifneq "$$($1_$2_$3_LIB0)" ""
 $$($1_$2_$3_LIB) : $$($1_$2_$3_LIB0)
 $$($1_$2_$3_LIB0) :
