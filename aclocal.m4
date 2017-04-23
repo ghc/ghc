@@ -14,7 +14,8 @@ AC_DEFUN([GHC_SELECT_FILE_EXTENSIONS],
         AC_MSG_WARN([I'm assuming you wanted to build for i386-unknown-mingw32])
         exit 1
         ;;
-    *-unknown-mingw32)
+    # examples: i386-unknown-mingw32, i686-w64-mingw32, x86_64-w64-mingw32
+    *-mingw32)
         windows=YES
         $2='.exe'
         $3='.dll'
