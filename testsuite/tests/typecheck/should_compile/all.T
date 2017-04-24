@@ -554,4 +554,4 @@ test('T13474', normal, compile, [''])
 test('T13524', normal, compile, [''])
 test('T13509', normal, compile, [''])
 test('T13526', normal, compile, [''])
-
+test('T13603', normal, compile, [''])
