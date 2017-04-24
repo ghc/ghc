@@ -222,13 +222,23 @@ typedef StgInt    I_;
 typedef StgWord StgWordArray[];
 typedef StgFunPtr       F_;
 
-#define EB_(X)    extern char X[]
-#define IB_(X)    static char X[]
-#define EI_(X)          extern StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
-#define II_(X)          static StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+/* byte arrays (and strings): */
+#define EB_(X)    extern const char X[]
+#define IB_(X)    static const char X[]
+/* static (non-heap) closures (requires alignment for pointer tagging): */
+#define EC_(X)    extern       StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+#define IC_(X)    static       StgWordArray (X) GNU_ATTRIBUTE(aligned (8))
+/* writable data (does not require alignment): */
+#define ERW_(X)   extern       StgWordArray (X)
+#define IRW_(X)   static       StgWordArray (X)
+/* read-only data (does not require alignment): */
+#define ERO_(X)   extern const StgWordArray (X)
+#define IRO_(X)   static const StgWordArray (X)
+/* stg-native functions: */
 #define IF_(f)    static StgFunPtr GNUC3_ATTRIBUTE(used) f(void)
-#define FN_(f)    StgFunPtr f(void)
-#define EF_(f)    StgFunPtr f(void) /* External Cmm functions */
+#define FN_(f)           StgFunPtr f(void)
+#define EF_(f)           StgFunPtr f(void) /* External Cmm functions */
+/* foreign functions: */
 #define EFF_(f)   void f() /* See Note [External function prototypes] */
 
 /* Note [External function prototypes]  See Trac #8965, #11395

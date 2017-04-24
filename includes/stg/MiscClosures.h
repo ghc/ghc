@@ -20,10 +20,10 @@
 #pragma once
 
 #if IN_STG_CODE
-#  define RTS_RET_INFO(i)   extern W_(i)[]
-#  define RTS_FUN_INFO(i)   extern W_(i)[]
-#  define RTS_THUNK_INFO(i) extern W_(i)[]
-#  define RTS_INFO(i)       extern W_(i)[]
+#  define RTS_RET_INFO(i)   extern const W_(i)[]
+#  define RTS_FUN_INFO(i)   extern const W_(i)[]
+#  define RTS_THUNK_INFO(i) extern const W_(i)[]
+#  define RTS_INFO(i)       extern const W_(i)[]
 #  define RTS_CLOSURE(i)    extern W_(i)[]
 #  define RTS_FUN_DECL(f)   extern DLL_IMPORT_RTS StgFunPtr f(void)
 #else
@@ -488,9 +488,9 @@ extern StgWord RTS_VAR(sched_mutex);
 
 // Apply.cmm
 // canned bitmap for each arg type
-extern StgWord stg_arg_bitmaps[];
-extern StgWord stg_ap_stack_entries[];
-extern StgWord stg_stack_save_entries[];
+extern const StgWord stg_arg_bitmaps[];
+extern const StgWord stg_ap_stack_entries[];
+extern const StgWord stg_stack_save_entries[];
 
 // Storage.c
 extern unsigned int RTS_VAR(g0);

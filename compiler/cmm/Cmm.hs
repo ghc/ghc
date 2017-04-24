@@ -9,6 +9,7 @@ module Cmm (
      CmmBlock,
      RawCmmDecl, RawCmmGroup,
      Section(..), SectionType(..), CmmStatics(..), CmmStatic(..),
+     isSecConstant,
 
      -- ** Blocks containing lists
      GenBasicBlock(..), blockId,
@@ -166,6 +167,18 @@ data SectionType
   | CString
   | OtherSection String
   deriving (Show)
+
+-- | Should a data in this section be considered constant
+isSecConstant :: Section -> Bool
+isSecConstant (Section t _) = case t of
+    Text                    -> True
+    ReadOnlyData            -> True
+    RelocatableReadOnlyData -> True
+    ReadOnlyData16          -> True
+    CString                 -> True
+    Data                    -> False
+    UninitialisedData       -> False
+    (OtherSection _)        -> False
 
 data Section = Section SectionType CLabel
 

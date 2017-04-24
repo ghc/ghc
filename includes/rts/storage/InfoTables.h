@@ -265,7 +265,7 @@ typedef struct {
 } StgFunInfoTable;
 
 // canned bitmap for each arg type, indexed by constants in FunTypes.h
-extern StgWord stg_arg_bitmaps[];
+extern const StgWord stg_arg_bitmaps[];
 
 /* -----------------------------------------------------------------------------
    Return info tables

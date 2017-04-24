@@ -56,18 +56,6 @@ genLlvmData (sec, Statics lbl xs) = do
 
     return ([globDef], [tyAlias])
 
--- | Should a data in this section be considered constant
-isSecConstant :: Section -> Bool
-isSecConstant (Section t _) = case t of
-    Text                    -> True
-    ReadOnlyData            -> True
-    RelocatableReadOnlyData -> True
-    ReadOnlyData16          -> True
-    CString                 -> True
-    Data                    -> False
-    UninitialisedData       -> False
-    (OtherSection _)        -> False
-
 -- | Format the section type part of a Cmm Section
 llvmSectionType :: Platform -> SectionType -> FastString
 llvmSectionType p t = case t of

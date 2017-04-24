@@ -133,7 +133,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         --
         return (top_decls ++
                 [CmmProc mapEmpty entry_lbl live blocks,
-                 mkDataLits (Section Data info_lbl) info_lbl
+                 mkRODataLits info_lbl
                     (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
 
   --

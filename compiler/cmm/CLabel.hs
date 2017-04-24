@@ -89,6 +89,8 @@ module CLabel (
         foreignLabelStdcallInfo,
         isBytesLabel,
         isForeignLabel,
+        isSomeRODataLabel,
+        isStaticClosureLabel,
         mkCCLabel, mkCCSLabel,
 
         DynamicLinkerLabelInfo(..),
@@ -574,6 +576,28 @@ isBytesLabel _lbl = False
 isForeignLabel :: CLabel -> Bool
 isForeignLabel (ForeignLabel _ _ _ _) = True
 isForeignLabel _lbl = False
+
+-- | Whether label is a static closure label (can come from haskell or cmm)
+isStaticClosureLabel :: CLabel -> Bool
+-- Closure defined in haskell (.hs)
+isStaticClosureLabel (IdLabel _ _ Closure) = True
+-- Closure defined in cmm
+isStaticClosureLabel (CmmLabel _ _ CmmClosure) = True
+isStaticClosureLabel _lbl = False
+
+-- | Whether label is a .rodata label
+isSomeRODataLabel :: CLabel -> Bool
+-- info table defined in haskell (.hs)
+isSomeRODataLabel (IdLabel _ _ ClosureTable) = True
+isSomeRODataLabel (IdLabel _ _ ConInfoTable) = True
+isSomeRODataLabel (IdLabel _ _ InfoTable) = True
+isSomeRODataLabel (IdLabel _ _ LocalInfoTable) = True
+-- static reference tables defined in haskell (.hs)
+isSomeRODataLabel (IdLabel _ _ SRT) = True
+isSomeRODataLabel (SRTLabel _) = True
+-- info table defined in cmm (.cmm)
+isSomeRODataLabel (CmmLabel _ _ CmmInfo) = True
+isSomeRODataLabel _lbl = False
 
 -- | Get the label size field from a ForeignLabel
 foreignLabelStdcallInfo :: CLabel -> Maybe Int
