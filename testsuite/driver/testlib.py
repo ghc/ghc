@@ -767,7 +767,10 @@ def test_common_work(watcher, name, opts, func, args):
         t.n_tests_skipped += len(set(all_ways) - set(do_ways))
 
         if config.cleanup and do_ways:
-            cleanup()
+            try:
+                cleanup()
+            except Exception as e:
+                framework_fail(name, 'runTest', 'Unhandled exception during cleanup: ' + str(e))
 
         package_conf_cache_file_end_timestamp = get_package_cache_timestamp();
 
@@ -1910,8 +1913,8 @@ if config.msys:
     import time
     def cleanup():
         testdir = getTestOpts().testdir
-        max_attemps = 5
-        retries = max_attemps
+        max_attempts = 5
+        retries = max_attempts
         def on_error(function, path, excinfo):
             # At least one test (T11489) removes the write bit from a file it
             # produces. Windows refuses to delete read-only files with a
@@ -1935,13 +1938,18 @@ if config.msys:
         # with an even more cryptic error.
         #
         # See Trac #13162
+        exception = None
         while retries > 0 and os.path.exists(testdir):
-            time.sleep((max_attemps-retries)*6)
-            shutil.rmtree(testdir, onerror=on_error, ignore_errors=False)
-            retries=-1
+            time.sleep((max_attempts-retries)*6)
+            try:
+                shutil.rmtree(testdir, onerror=on_error, ignore_errors=False)
+            except Exception as e:
+                exception = e
+            retries -= 1
 
         if retries == 0 and os.path.exists(testdir):
-            raise Exception("Unable to remove folder '" + testdir + "'. Unable to start current test.")
+            raise Exception("Unable to remove folder '%s': %s\nUnable to start current test."
+                            % (testdir, exception))
 else:
     def cleanup():
         testdir = getTestOpts().testdir
