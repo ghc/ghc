@@ -907,9 +907,11 @@ endef
 
 install_bins: $(INSTALL_BINS) $(INSTALL_SCRIPTS)
 	$(INSTALL_DIR) "$(DESTDIR)$(bindir)"
+ifneq "$(INSTALL_BINS)" ""
 	for i in $(INSTALL_BINS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
 	done
+endif
 ifneq "$(INSTALL_SCRIPTS)" ""
 	for i in $(INSTALL_SCRIPTS); do \
 		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i "$(DESTDIR)$(bindir)" ;  \
