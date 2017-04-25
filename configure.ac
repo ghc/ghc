@@ -177,9 +177,13 @@ then
 
     if test "$ghc_host_os" = "mingw32"
     then
-        # Canonicalise to <drive>:/path/to/ghc
-        WithGhc=`cygpath -m "${WithGhc}"`
-
+        if test "${OSTYPE}" = "msys"
+        then
+            WithGhc=`echo "${WithGhc}" | sed "s#^/\([a-zA-Z]\)/#\1:/#"`
+        else
+            # Canonicalise to <drive>:/path/to/ghc
+            WithGhc=`cygpath -m "${WithGhc}"`
+        fi
         echo "GHC path canonicalised to: ${WithGhc}"
     fi
 fi
@@ -374,8 +378,6 @@ then
     NM="${mingwbin}nm.exe"
     RANLIB="${mingwbin}ranlib.exe"
     OBJDUMP="${mingwbin}objdump.exe"
-    Windres="${mingwbin}windres.exe"
-    DllWrap="${mingwbin}dllwrap.exe"
     fp_prog_ar="${mingwbin}ar.exe"
 
     # NB. Download the perl binaries if required
@@ -727,6 +729,7 @@ AC_SUBST(HaveDtrace)
 AC_PATH_PROG(HSCOLOUR,HsColour)
 # HsColour is passed to Cabal, so we need a native path
 if test "$HostOS"      = "mingw32" && \
+   test "${OSTYPE}"   != "msys"    && \
    test "${HSCOLOUR}" != ""
 then
     # Canonicalise to <drive>:/path/to/gcc
