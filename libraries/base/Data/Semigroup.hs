@@ -83,6 +83,7 @@ import           Data.Monoid         (All (..), Any (..), Dual (..), Endo (..),
                                       Product (..), Sum (..))
 import           Data.Monoid         (Alt (..))
 import qualified Data.Monoid         as Monoid
+import           Data.Ord            (Down(..))
 import           Data.Void
 #ifndef mingw32_HOST_OS
 import           GHC.Event           (Event, Lifetime)
@@ -237,6 +238,11 @@ instance Semigroup All where
 instance Semigroup Any where
   (<>) = coerce (||)
   stimes = stimesIdempotentMonoid
+
+-- | @since 4.11.0.0
+instance Semigroup a => Semigroup (Down a) where
+  Down a <> Down b = Down (a <> b)
+  stimes n (Down a) = Down (stimes n a)
 
 
 -- | @since 4.9.0.0

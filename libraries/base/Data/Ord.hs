@@ -1,5 +1,6 @@
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -25,6 +26,7 @@ module Data.Ord (
 import GHC.Base
 import GHC.Show
 import GHC.Read
+import GHC.Num
 
 -- | 
 -- > comparing p x y = compare (p x) (p y)
@@ -43,11 +45,29 @@ comparing p x y = compare (p x) (p y)
 -- This is particularly useful when sorting in generalised list comprehensions,
 -- as in: @then sortWith by 'Down' x@
 --
--- Provides 'Show' and 'Read' instances (/since: 4.7.0.0/).
---
 -- @since 4.6.0.0
-newtype Down a = Down a deriving (Eq, Show, Read)
+newtype Down a = Down a
+    deriving
+      ( Eq
+      , Show -- ^ @since 4.7.0.0
+      , Read -- ^ @since 4.7.0.0
+      , Num -- ^ @since 4.11.0.0
+      , Monoid -- ^ @since 4.11.0.0
+      )
 
 -- | @since 4.6.0.0
 instance Ord a => Ord (Down a) where
     compare (Down x) (Down y) = y `compare` x
+
+-- | @since 4.11.0.0
+instance Functor Down where
+    fmap = coerce
+
+-- | @since 4.11.0.0
+instance Applicative Down where
+    pure = Down
+    (<*>) = coerce
+
+-- | @since 4.11.0.0
+instance Monad Down where
+    Down a >>= k = k a
