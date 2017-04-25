@@ -2368,6 +2368,11 @@ primtype Weak# b
 primop  MkWeakOp "mkWeak#" GenPrimOp
    o -> b -> (State# RealWorld -> (# State# RealWorld, c #))
      -> State# RealWorld -> (# State# RealWorld, Weak# b #)
+   { {\tt mkWeak# k v finalizer s} creates a weak reference to value {\tt k},
+     with an associated reference to some value {\tt v}. If {\tt k} is still
+     alive then {\tt v} can be retrieved using {\tt deRefWeak#}. Note that
+     the type of {\tt k} must be represented by a pointer (i.e. of kind {\tt
+     TYPE 'LiftedRep} or {\tt TYPE 'UnliftedRep}). }
    with
    has_side_effects = True
    out_of_line      = True
