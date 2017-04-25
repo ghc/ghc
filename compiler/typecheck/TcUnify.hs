@@ -1161,7 +1161,8 @@ unifyType :: Outputable a => Maybe a   -- ^ If present, has type 'ty1'
           -> TcTauType -> TcTauType -> TcM TcCoercionN
 -- Actual and expected types
 -- Returns a coercion : ty1 ~ ty2
-unifyType thing ty1 ty2 = uType origin TypeLevel ty1 ty2
+unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
+                          uType origin TypeLevel ty1 ty2
   where
     origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                           , uo_thing  = mkErrorThing <$> thing }
@@ -1173,7 +1174,8 @@ noThing :: Maybe (HsExpr Name)
 noThing = Nothing
 
 unifyKind :: Outputable a => Maybe a -> TcKind -> TcKind -> TcM CoercionN
-unifyKind thing ty1 ty2 = uType origin KindLevel ty1 ty2
+unifyKind thing ty1 ty2 = traceTc "ukind" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
+                          uType origin KindLevel ty1 ty2
   where origin = TypeEqOrigin { uo_actual = ty1, uo_expected = ty2
                               , uo_thing  = mkErrorThing <$> thing }
 
