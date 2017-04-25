@@ -502,7 +502,14 @@ AC_SUBST([LdCmd])
 
 dnl ** Which nm to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([NM], [nm], [nm])
+if test "$HostOS" != "mingw32"; then
+    AC_CHECK_TARGET_TOOL([NM], [nm])
+    if test "$NM" = ":"; then
+        AC_MSG_ERROR([cannot find nm in your PATH])
+    fi
+fi
+NmCmd="$NM"
+AC_SUBST([NmCmd])
 
 if test "$TargetOS_CPP" = "darwin"
 then
@@ -529,39 +536,39 @@ then
         esac
 fi
 
-NmCmd="$NM"
-AC_SUBST([NmCmd])
-
 dnl ** Which objdump to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL([OBJDUMP], [objdump], [objdump])
+dnl Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
+case $HostOS_CPP in
+  cygwin32|mingw32)
+    AC_CHECK_TARGET_TOOL([OBJDUMP], [objdump])
+    ;;
+esac
+
 ObjdumpCmd="$OBJDUMP"
 AC_SUBST([ObjdumpCmd])
 
 dnl ** Which ar to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([AR], [ar], [ar])
+if test "$HostOS" != "mingw32"; then
+    AC_CHECK_TARGET_TOOL([AR], [ar])
+    if test "$AR" = ":"; then
+        AC_MSG_ERROR([cannot find ar in your PATH])
+    fi
+fi
 ArCmd="$AR"
 fp_prog_ar="$AR"
 AC_SUBST([ArCmd])
 
 dnl ** Which ranlib to use?
 dnl --------------------------------------------------------------
-FP_ARG_WITH_PATH_GNU_PROG([RANLIB], [ranlib], [ranlib])
+AC_PROG_RANLIB
+if test "$RANLIB" = ":"; then
+    AC_MSG_ERROR([cannot find ranlib in your PATH])
+fi
 RanlibCmd="$RANLIB"
 RANLIB="$RanlibCmd"
 
-
-# Note: we may not have objdump on OS X, and we only need it on Windows (for DLL checks)
-case $HostOS_CPP in
-cygwin32|mingw32)
-    dnl ** Which objdump to use?
-    dnl --------------------------------------------------------------
-    FP_ARG_WITH_PATH_GNU_PROG([OBJDUMP], [objdump], [objdump])
-    ObjdumpCmd="$OBJDUMP"
-    AC_SUBST([ObjdumpCmd])
-    ;;
-esac
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -574,13 +581,13 @@ AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The sup
 
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([LLC], [llc], [llc], [$LlvmVersion])
+FIND_LLVM_PROG([LLC], [llc], [$LlvmVersion])
 LlcCmd="$LLC"
 AC_SUBST([LlcCmd])
 
 dnl ** Which LLVM opt to use?
 dnl --------------------------------------------------------------
-FIND_LLVM_PROG([OPT], [opt], [opt], [$LlvmVersion])
+FIND_LLVM_PROG([OPT], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 

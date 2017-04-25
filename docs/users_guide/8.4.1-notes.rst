@@ -24,6 +24,12 @@ Language
 Compiler
 ~~~~~~~~
 
+- The ``configure`` script now no longer accepts ``--with-TOOL`` flags (e.g.
+  ``--with-nm``, ``--with-ld``, etc.). Instead, these are taken from environment
+  variables, as is typical in ``autoconf`` scripts. For instance,
+  ``./configure --with-nm=/usr/local/bin/nm`` turns into
+  ``./configure NM=/usr/local/bin/nm``.
+
 - Derived ``Functor``, ``Foldable``, and ``Traversable`` instances are now
   optimized when their last type parameters have phantom roles.
   Specifically, ::

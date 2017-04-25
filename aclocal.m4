@@ -710,75 +710,6 @@ AC_DEFUN([FPTOOLS_FLOAT_WORD_ORDER_BIGENDIAN],
 ])
 
 
-# FP_ARG_WITH_PATH_GNU_PROG_GENERAL
-# --------------------
-# Find the specified command on the path or allow a user to set it manually
-# with a --with-<command> option.
-#
-# This is ignored on the mingw32 platform.
-#
-# $1 = the variable to set
-# $2 = the with option name
-# $3 = the command to look for
-# $4 = prepend target to program name? if 'no', use the name unchanged
-# $5 = optional? if 'no', then raise an error if the command isn't found
-#
-AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_GENERAL],
-[
-AC_ARG_WITH($2,
-[AC_HELP_STRING([--with-$2=ARG],
-        [Use ARG as the path to $2 [default=autodetect]])],
-[
-    if test "$HostOS" = "mingw32"
-    then
-        AC_MSG_WARN([Request to use $withval will be ignored])
-    else
-        $1=$withval
-    fi
-
-    # Remember that we set this manually.  Used to override CC_STAGE0
-    # and friends later, if we are not cross-compiling.
-    With_$2=$withval
-],
-[
-    if test "$HostOS" != "mingw32"
-    then
-        if test "$4" = "no" -o "$target_alias" = "" ; then
-            AC_PATH_PROG([$1], [$3])
-        else
-            AC_PATH_PROG([$1], [$target_alias-$3])
-        fi
-        if test "$5" = "no" -a -z "$$1"
-        then
-            AC_MSG_ERROR([cannot find $3 in your PATH])
-        fi
-    fi
-]
-)
-]) # FP_ARG_WITH_PATH_GNU_PROG_GENERAL
-
-
-# FP_ARG_WITH_PATH_GNU_PROG
-# --------------------
-# The usual case: prepend the target, and the program is not optional.
-AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG],
-[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [yes], [no])])
-
-# FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL
-# --------------------
-# Same as FP_ARG_WITH_PATH_GNU_PROG but no error will be thrown if the command
-# isn't found.
-AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL],
-[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [yes], [yes])])
-
-# FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET
-# --------------------
-# Same as FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL but don't prepend the target name
-# (used for LLVM).
-AC_DEFUN([FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET],
-[FP_ARG_WITH_PATH_GNU_PROG_GENERAL([$1], [$2], [$3], [no], [yes])])
-
-
 # FP_PROG_CONTEXT_DIFF
 # --------------------
 # Figure out how to do context diffs. Sets the output variable ContextDiffCmd.
@@ -2048,36 +1979,32 @@ AC_DEFUN([XCODE_VERSION],[
 # are installed with a version suffix (e.g., llc-3.1).
 #
 # $1 = the variable to set
-# $2 = the with option name
-# $3 = the command to look for
-# $4 = the version of the command to look for
+# $2 = the command to look for
+# $3 = the version of the command to look for
 #
 AC_DEFUN([FIND_LLVM_PROG],[
-    # Test for program with version name.
-    FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3-$4])
-    if test -z "$$1"; then
-        # Test for program without version name.
-        FP_ARG_WITH_PATH_GNU_PROG_OPTIONAL_NOTARGET([$1], [$2], [$3])
-        if test -n "$$1"; then
-            AC_MSG_CHECKING([$$1 is version $4])
-            if test `$$1 --version | grep -c "version $4"` -gt 0 ; then
-                AC_MSG_RESULT(yes)
-            else
-                AC_MSG_RESULT(no)
-                $1=""
-            fi
+    # Test for program with and without version name.
+    AC_CHECK_TOOLS([$1], [$2-$3 $2])
+    if test "$$1" != ":"; then
+        AC_MSG_CHECKING([$$1 is version $3])
+        if test `$$1 --version | grep -c "version $3"` -gt 0 ; then
+            AC_MSG_RESULT(yes)
+        else
+            AC_MSG_RESULT(no)
+            $1=""
         fi
     fi
 ])
 
 # FIND_LD
+# ---------
 # Find the version of `ld` to use. This is used in both in the top level
 # configure.ac and in distrib/configure.ac.in.
 #
 # $1 = the variable to set
 #
 AC_DEFUN([FIND_LD],[
-    FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
+    AC_CHECK_TARGET_TOOL([LD], [ld])
     case $target in
         arm*linux*       | \
         aarch64*linux*   )
@@ -2085,7 +2012,7 @@ AC_DEFUN([FIND_LD],[
             # This case should catch at least arm-unknown-linux-gnueabihf,
             # arm-linux-androideabi, arm64-unknown-linux and
             # aarch64-linux-android
-            FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
+            AC_CHECK_TARGET_TOOL([LD_GOLD], [ld.gold])
             $1="$LD_GOLD"
             ;;
         *)
