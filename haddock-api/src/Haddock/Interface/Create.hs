@@ -819,20 +819,30 @@ fullModuleContents :: DynFlags
                    -> [LHsDecl Name]    -- ^ All the renamed declarations
                    -> ErrMsgGhc [ExportItem Name]
 fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap) fixMap splices decls =
-  liftM catMaybes $ mapM mkExportItem (expandSig decls)
+  liftM catMaybes $ mapM mkExportItem (expandSigDecls decls)
   where
     -- A type signature can have multiple names, like:
     --   foo, bar :: Types..
     --
     -- We go through the list of declarations and expand type signatures, so
     -- that every type signature has exactly one name!
-    expandSig :: [LHsDecl name] -> [LHsDecl name]
-    expandSig = foldr f []
+    expandSigDecls :: [LHsDecl name] -> [LHsDecl name]
+    expandSigDecls = concatMap f
       where
-        f :: LHsDecl name -> [LHsDecl name] -> [LHsDecl name]
-        f (L l (SigD (TypeSig    names t)))   xs = foldr (\n acc -> L l (SigD (TypeSig      [n] t)) : acc) xs names
-        f (L l (SigD (ClassOpSig b names t))) xs = foldr (\n acc -> L l (SigD (ClassOpSig b [n] t)) : acc) xs names
-        f x xs = x : xs
+        f (L l (SigD sig))              = [ L l (SigD s) | s <- expandSig sig ]
+
+        -- also expand type signatures for class methods
+        f (L l (TyClD cls@ClassDecl{})) =
+          [ L l (TyClD cls { tcdSigs = concatMap expandLSig (tcdSigs cls) }) ]
+        f x = [x]
+
+    expandLSig :: LSig name -> [LSig name]
+    expandLSig (L l sig) = [ L l s | s <- expandSig sig ]
+
+    expandSig :: Sig name -> [Sig name]
+    expandSig (TypeSig names t)      = [ TypeSig [n] t      | n <- names ]
+    expandSig (ClassOpSig b names t) = [ ClassOpSig b [n] t | n <- names ]
+    expandSig x                      = [x]
 
     mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))
     mkExportItem (L _ (DocD (DocGroup lev docStr))) = do
