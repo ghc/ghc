@@ -85,7 +85,7 @@ module TcRnTypes(
         andWC, unionsWC, mkSimpleWC, mkImplicWC,
         addInsols, getInsolubles, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
-        tyCoVarsOfWCList,
+        tyCoVarsOfWCList, trulyInsoluble,
         isDroppableDerivedLoc, insolubleImplic,
         arisesFromGivens,
 
@@ -2409,7 +2409,11 @@ So a Given has EvVar inside it rather than (as previously) an EvTerm.
 -- EvVarDest.
 data TcEvDest
   = EvVarDest EvVar         -- ^ bind this var to the evidence
+              -- EvVarDest is always used for non-type-equalities
+              -- e.g. class constraints
+
   | HoleDest  CoercionHole  -- ^ fill in this hole with the evidence
+              -- HoleDest is always used for type-equalities
               -- See Note [Coercion holes] in TyCoRep
 
 data CtEvidence
@@ -2456,12 +2460,16 @@ ctEvTerm ev@(CtWanted { ctev_dest = HoleDest _ }) = EvCoercion $ ctEvCoercion ev
 ctEvTerm ev = EvId (ctEvId ev)
 
 ctEvCoercion :: CtEvidence -> Coercion
-ctEvCoercion ev@(CtWanted { ctev_dest = HoleDest hole, ctev_pred = pred })
-  = case getEqPredTys_maybe pred of
-      Just (role, ty1, ty2) -> mkHoleCo hole role ty1 ty2
-      _                     -> pprPanic "ctEvTerm" (ppr ev)
-ctEvCoercion (CtGiven { ctev_evar = ev_id }) = mkTcCoVarCo ev_id
-ctEvCoercion ev = pprPanic "ctEvCoercion" (ppr ev)
+ctEvCoercion (CtGiven { ctev_evar = ev_id })
+  = mkTcCoVarCo ev_id
+ctEvCoercion (CtWanted { ctev_dest = dest, ctev_pred = pred })
+  | HoleDest hole <- dest
+  , Just (role, ty1, ty2) <- getEqPredTys_maybe pred
+  = -- ctEvCoercion is only called on type equalities
+    -- and they always have HoleDests
+    mkHoleCo hole role ty1 ty2
+ctEvCoercion ev
+  = pprPanic "ctEvCoercion" (ppr ev)
 
 ctEvId :: CtEvidence -> TcId
 ctEvId (CtWanted { ctev_dest = EvVarDest ev }) = ev
