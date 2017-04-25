@@ -521,7 +521,7 @@ pprGotDeclaration _ _ OSAIX
                  ]
 
 
--- PPC 64 ELF v1needs a Table Of Contents (TOC) on Linux
+-- PPC 64 ELF v1 needs a Table Of Contents (TOC) on Linux
 pprGotDeclaration _ (ArchPPC_64 ELF_V1) OSLinux
         = text ".section \".toc\",\"aw\""
 -- In ELF v2 we also need to tell the assembler that we want ABI
@@ -814,7 +814,8 @@ initializePicBase_ppc ArchPPC os picReg
             fetchPC (BasicBlock bID insns) =
               BasicBlock bID (PPC.FETCHPC picReg
                               : PPC.ADDIS picReg picReg (PPC.HA gotOffset)
-                              : PPC.ADDI picReg picReg (PPC.LO gotOffset)
+                              : PPC.ADD picReg picReg
+                                        (PPC.RIImm (PPC.LO gotOffset))
                               : PPC.MR PPC.r30 picReg
                               : insns)
 

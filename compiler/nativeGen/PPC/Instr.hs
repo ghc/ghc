@@ -210,40 +210,34 @@ data Instr
     | BCTRL   [Reg]
 
     | ADD     Reg Reg RI            -- dst, src1, src2
+    | ADDO    Reg Reg Reg           -- add and set overflow
     | ADDC    Reg Reg Reg           -- (carrying) dst, src1, src2
-    | ADDE    Reg Reg Reg           -- (extend) dst, src1, src2
-    | ADDI    Reg Reg Imm           -- Add Immediate dst, src1, src2
+    | ADDE    Reg Reg Reg           -- (extended) dst, src1, src2
+    | ADDZE   Reg Reg               -- (to zero extended) dst, src
     | ADDIS   Reg Reg Imm           -- Add Immediate Shifted dst, src1, src2
     | SUBF    Reg Reg Reg           -- dst, src1, src2 ; dst = src2 - src1
-    | SUBFC   Reg Reg Reg           -- (carrying) dst, src1, src2 ; dst = src2 - src1
-    | SUBFE   Reg Reg Reg           -- (extend) dst, src1, src2 ; dst = src2 - src1
-    | MULLD   Reg Reg RI
-    | MULLW   Reg Reg RI
-    | DIVW    Reg Reg Reg
-    | DIVD    Reg Reg Reg
-    | DIVWU   Reg Reg Reg
-    | DIVDU   Reg Reg Reg
-
-    | MULLW_MayOflo Reg Reg Reg
-                                    -- dst = 1 if src1 * src2 overflows
-                                    -- pseudo-instruction; pretty-printed as:
-                                    -- mullwo. dst, src1, src2
+    | SUBFO   Reg Reg Reg           -- subtract from and set overflow
+    | SUBFC   Reg Reg RI            -- (carrying) dst, src1, src2 ;
+                                    -- dst = src2 - src1
+    | SUBFE   Reg Reg Reg           -- (extended) dst, src1, src2 ;
+                                    -- dst = src2 - src1
+    | MULL    Format Reg Reg RI
+    | MULLO   Format Reg Reg Reg    -- multiply and set overflow
+    | MFOV    Format Reg            -- move overflow bit (1|33) to register
+                                    -- pseudo-instruction; pretty printed as
                                     -- mfxer dst
-                                    -- rlwinm dst, dst, 2, 31,31
-    | MULLD_MayOflo Reg Reg Reg
-                                    -- dst = 1 if src1 * src2 overflows
-                                    -- pseudo-instruction; pretty-printed as:
-                                    -- mulldo. dst, src1, src2
-                                    -- mfxer dst
-                                    -- rlwinm dst, dst, 2, 31,31
-
+                                    -- extr[w|d]i dst, dst, 1, [1|33]
+    | MULHU   Format Reg Reg Reg
+    | DIV     Format Bool Reg Reg Reg
     | AND     Reg Reg RI            -- dst, src1, src2
+    | ANDC    Reg Reg Reg           -- AND with complement, dst = src1 & ~ src2
     | OR      Reg Reg RI            -- dst, src1, src2
     | ORIS    Reg Reg Imm           -- OR Immediate Shifted dst, src1, src2
     | XOR     Reg Reg RI            -- dst, src1, src2
     | XORIS   Reg Reg Imm           -- XOR Immediate Shifted dst, src1, src2
 
     | EXTS    Format Reg Reg
+    | CNTLZ   Format Reg Reg
 
     | NEG     Reg Reg
     | NOT     Reg Reg
@@ -253,6 +247,7 @@ data Instr
     | SRA     Format Reg Reg RI            -- shift right arithmetic
 
     | RLWINM  Reg Reg Int Int Int   -- Rotate Left Word Immediate then AND with Mask
+    | CLRLI   Format Reg Reg Int    -- clear left immediate (extended mnemonic)
     | CLRRI   Format Reg Reg Int    -- clear right immediate (extended mnemonic)
 
     | FADD    Format Reg Reg Reg
@@ -275,9 +270,6 @@ data Instr
     | MFLR    Reg               -- move from link register
     | FETCHPC Reg               -- pseudo-instruction:
                                 -- bcl to next insn, mflr reg
-    | FETCHTOC Reg CLabel       -- pseudo-instruction
-                                -- add TOC offset to address in r12
-                                -- print .localentry for label
     | LWSYNC                    -- memory barrier
     | NOP                       -- no operation, PowerPC 64 bit
                                 -- needs this as place holder to
@@ -313,36 +305,37 @@ ppc_regUsageOfInstr platform instr
     BCTRL   params           -> usage (params, callClobberedRegs platform)
 
     ADD     reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
+    ADDO    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     ADDC    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
     ADDE    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    ADDI    reg1 reg2 _      -> usage ([reg2], [reg1])
+    ADDZE   reg1 reg2        -> usage ([reg2], [reg1])
     ADDIS   reg1 reg2 _      -> usage ([reg2], [reg1])
     SUBF    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    SUBFC   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    SUBFO   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    SUBFC   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
     SUBFE   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    MULLD   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
-    MULLW   reg1 reg2 ri     -> usage (reg2 : regRI ri, [reg1])
-    DIVW    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    DIVD    reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    DIVWU   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
-    DIVDU   reg1 reg2 reg3   -> usage ([reg2,reg3], [reg1])
+    MULL    _ reg1 reg2 ri   -> usage (reg2 : regRI ri, [reg1])
+    MULLO   _ reg1 reg2 reg3 -> usage ([reg2,reg3], [reg1])
+    MFOV    _ reg            -> usage ([], [reg])
+    MULHU   _ reg1 reg2 reg3 -> usage ([reg2,reg3], [reg1])
+    DIV     _ _ reg1 reg2 reg3
+                             -> usage ([reg2,reg3], [reg1])
 
-    MULLW_MayOflo reg1 reg2 reg3
-                            -> usage ([reg2,reg3], [reg1])
-    MULLD_MayOflo reg1 reg2 reg3
-                            -> usage ([reg2,reg3], [reg1])
     AND     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
+    ANDC    reg1 reg2 reg3  -> usage ([reg2,reg3], [reg1])
     OR      reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
     ORIS    reg1 reg2 _     -> usage ([reg2], [reg1])
     XOR     reg1 reg2 ri    -> usage (reg2 : regRI ri, [reg1])
     XORIS   reg1 reg2 _     -> usage ([reg2], [reg1])
     EXTS    _  reg1 reg2    -> usage ([reg2], [reg1])
+    CNTLZ   _  reg1 reg2    -> usage ([reg2], [reg1])
     NEG     reg1 reg2       -> usage ([reg2], [reg1])
     NOT     reg1 reg2       -> usage ([reg2], [reg1])
     SL      _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SR      _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     SRA     _ reg1 reg2 ri  -> usage (reg2 : regRI ri, [reg1])
     RLWINM  reg1 reg2 _ _ _ -> usage ([reg2], [reg1])
+    CLRLI   _ reg1 reg2 _   -> usage ([reg2], [reg1])
     CLRRI   _ reg1 reg2 _   -> usage ([reg2], [reg1])
 
     FADD    _ r1 r2 r3      -> usage ([r2,r3], [r1])
@@ -358,7 +351,6 @@ ppc_regUsageOfInstr platform instr
     MFCR    reg             -> usage ([], [reg])
     MFLR    reg             -> usage ([], [reg])
     FETCHPC reg             -> usage ([], [reg])
-    FETCHTOC reg _          -> usage ([], [reg])
     UPDATE_SP _ _           -> usage ([], [sp])
     _                       -> noUsage
   where
@@ -401,29 +393,33 @@ ppc_patchRegsOfInstr instr env
     BL      imm argRegs     -> BL imm argRegs    -- argument regs
     BCTRL   argRegs         -> BCTRL argRegs     -- cannot be remapped
     ADD     reg1 reg2 ri    -> ADD (env reg1) (env reg2) (fixRI ri)
+    ADDO    reg1 reg2 reg3  -> ADDO (env reg1) (env reg2) (env reg3)
     ADDC    reg1 reg2 reg3  -> ADDC (env reg1) (env reg2) (env reg3)
     ADDE    reg1 reg2 reg3  -> ADDE (env reg1) (env reg2) (env reg3)
-    ADDI    reg1 reg2 imm   -> ADDI (env reg1) (env reg2) imm
+    ADDZE   reg1 reg2       -> ADDZE (env reg1) (env reg2)
     ADDIS   reg1 reg2 imm   -> ADDIS (env reg1) (env reg2) imm
     SUBF    reg1 reg2 reg3  -> SUBF (env reg1) (env reg2) (env reg3)
-    SUBFC   reg1 reg2 reg3  -> SUBFC (env reg1) (env reg2) (env reg3)
+    SUBFO   reg1 reg2 reg3  -> SUBFO (env reg1) (env reg2) (env reg3)
+    SUBFC   reg1 reg2 ri    -> SUBFC (env reg1) (env reg2) (fixRI ri)
     SUBFE   reg1 reg2 reg3  -> SUBFE (env reg1) (env reg2) (env reg3)
-    MULLD   reg1 reg2 ri    -> MULLD (env reg1) (env reg2) (fixRI ri)
-    MULLW   reg1 reg2 ri    -> MULLW (env reg1) (env reg2) (fixRI ri)
-    DIVW    reg1 reg2 reg3  -> DIVW (env reg1) (env reg2) (env reg3)
-    DIVD    reg1 reg2 reg3  -> DIVD (env reg1) (env reg2) (env reg3)
-    DIVWU   reg1 reg2 reg3  -> DIVWU (env reg1) (env reg2) (env reg3)
-    DIVDU   reg1 reg2 reg3  -> DIVDU (env reg1) (env reg2) (env reg3)
-    MULLW_MayOflo reg1 reg2 reg3
-                            -> MULLW_MayOflo (env reg1) (env reg2) (env reg3)
-    MULLD_MayOflo reg1 reg2 reg3
-                            -> MULLD_MayOflo (env reg1) (env reg2) (env reg3)
+    MULL    fmt reg1 reg2 ri
+                            -> MULL fmt (env reg1) (env reg2) (fixRI ri)
+    MULLO   fmt reg1 reg2 reg3
+                            -> MULLO fmt (env reg1) (env reg2) (env reg3)
+    MFOV    fmt reg         -> MFOV fmt (env reg)
+    MULHU   fmt reg1 reg2 reg3
+                            -> MULHU fmt (env reg1) (env reg2) (env reg3)
+    DIV     fmt sgn reg1 reg2 reg3
+                            -> DIV fmt sgn (env reg1) (env reg2) (env reg3)
+
     AND     reg1 reg2 ri    -> AND (env reg1) (env reg2) (fixRI ri)
+    ANDC    reg1 reg2 reg3  -> ANDC (env reg1) (env reg2) (env reg3)
     OR      reg1 reg2 ri    -> OR  (env reg1) (env reg2) (fixRI ri)
     ORIS    reg1 reg2 imm   -> ORIS (env reg1) (env reg2) imm
     XOR     reg1 reg2 ri    -> XOR (env reg1) (env reg2) (fixRI ri)
     XORIS   reg1 reg2 imm   -> XORIS (env reg1) (env reg2) imm
     EXTS    fmt reg1 reg2   -> EXTS fmt (env reg1) (env reg2)
+    CNTLZ   fmt reg1 reg2   -> CNTLZ fmt (env reg1) (env reg2)
     NEG     reg1 reg2       -> NEG (env reg1) (env reg2)
     NOT     reg1 reg2       -> NOT (env reg1) (env reg2)
     SL      fmt reg1 reg2 ri
@@ -434,6 +430,7 @@ ppc_patchRegsOfInstr instr env
                             -> SRA fmt (env reg1) (env reg2) (fixRI ri)
     RLWINM  reg1 reg2 sh mb me
                             -> RLWINM (env reg1) (env reg2) sh mb me
+    CLRLI   fmt reg1 reg2 n -> CLRLI fmt (env reg1) (env reg2) n
     CLRRI   fmt reg1 reg2 n -> CLRRI fmt (env reg1) (env reg2) n
     FADD    fmt r1 r2 r3    -> FADD fmt (env r1) (env r2) (env r3)
     FSUB    fmt r1 r2 r3    -> FSUB fmt (env r1) (env r2) (env r3)
@@ -448,7 +445,6 @@ ppc_patchRegsOfInstr instr env
     MFCR    reg             -> MFCR (env reg)
     MFLR    reg             -> MFLR (env reg)
     FETCHPC reg             -> FETCHPC (env reg)
-    FETCHTOC reg lab        -> FETCHTOC (env reg) lab
     _                       -> instr
   where
     fixAddr (AddrRegReg r1 r2) = AddrRegReg (env r1) (env r2)
