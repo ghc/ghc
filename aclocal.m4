@@ -459,55 +459,42 @@ AC_DEFUN([GET_ARM_ISA],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    SettingsCCompilerCommand="$CC"
-    SettingsHaskellCPPCommand="$HaskellCPPCmd"
-    SettingsHaskellCPPFlags="$HaskellCPPArgs"
-    SettingsLdCommand="$LdCmd"
-    SettingsArCommand="$ArCmd"
-    SettingsPerlCommand="$PerlCmd"
-
-    if test -z "$DllWrap"
+    if test "$windows" = YES
     then
+        mingw_bin_prefix=mingw/bin/
+        SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
+        SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
+        SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
+        SettingsPerlCommand='$topdir/../perl/perl.exe'
+        SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
+        SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
+        SettingsTouchCommand='$topdir/bin/touchy.exe'
+    else
+        SettingsCCompilerCommand="$CC"
+        SettingsHaskellCPPCommand="$HaskellCPPCmd"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
+        SettingsLdCommand="$LdCmd"
+        SettingsArCommand="$ArCmd"
+        SettingsPerlCommand="$PerlCmd"
         SettingsDllWrapCommand="/bin/false"
-    else
-        SettingsDllWrapCommand="$DllWrap"
-    fi
-
-    if test -z "$Windres"
-    then
         SettingsWindresCommand="/bin/false"
-    else
-        SettingsWindresCommand="$Windres"
-    fi
-
-    if test -z "$Libtool"
-    then
         SettingsLibtoolCommand="libtool"
-    else
-        SettingsLibtoolCommand="$Libtool"
-    fi
-
-    if test -z "$Touch"
-    then
         SettingsTouchCommand='touch'
-    else
-        SettingsTouchCommand='$Touch'
     fi
-
     if test -z "$LlcCmd"
     then
       SettingsLlcCommand="llc"
     else
       SettingsLlcCommand="$LlcCmd"
     fi
-
     if test -z "$OptCmd"
     then
       SettingsOptCommand="opt"
     else
       SettingsOptCommand="$OptCmd"
     fi
-
     SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
     SettingsCCompilerLinkFlags="$CONF_GCC_LINKER_OPTS_STAGE2"
     SettingsCCompilerSupportsNoPie="$CONF_GCC_SUPPORTS_NO_PIE"
