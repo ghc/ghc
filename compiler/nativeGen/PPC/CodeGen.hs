@@ -359,7 +359,7 @@ iselExpr64 (CmmMachOp (MO_Sub _) [e1,e2]) = do
         r2hi = getHiVRegFromLo r2lo
         code =  code1 `appOL`
                 code2 `appOL`
-                toOL [ SUBFC rlo r2lo r1lo,
+                toOL [ SUBFC rlo r2lo (RIReg r1lo),
                        SUBFE rhi r2hi r1hi ]
    return (ChildCode64 code rlo)
 
@@ -589,42 +589,37 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
 
       MO_Add rep -> trivialCode rep True ADD x y
       MO_Sub rep ->
-        case y of    -- subfi ('substract from' with immediate) doesn't exist
+        case y of
           CmmLit (CmmInt imm immrep) | Just _ <- makeImmediate rep True (-imm)
             -> trivialCode rep True ADD x (CmmLit $ CmmInt (-imm) immrep)
-          _ -> trivialCodeNoImm' (intFormat rep) SUBF y x
+          _ -> case x of
+                 CmmLit (CmmInt imm _)
+                   | Just _ <- makeImmediate rep True imm
+                   -- subfi ('substract from' with immediate) doesn't exist
+                   -> trivialCode rep True SUBFC y x
+                 _ -> trivialCodeNoImm' (intFormat rep) SUBF y x
 
-      MO_Mul rep
-       | arch32    -> trivialCode rep True MULLW x y
-       | otherwise -> trivialCode rep True MULLD x y
+      MO_Mul rep -> shiftMulCode rep True MULL x y
+      MO_S_MulMayOflo rep -> do
+        (src1, code1) <- getSomeReg x
+        (src2, code2) <- getSomeReg y
+        let
+          format = intFormat rep
+          code dst = code1 `appOL` code2
+                       `appOL` toOL [ MULLO format dst src1 src2
+                                    , MFOV  format dst
+                                    ]
+        return (Any format code)
 
-      MO_S_MulMayOflo W32 -> trivialCodeNoImm' II32 MULLW_MayOflo x y
-      MO_S_MulMayOflo W64 -> trivialCodeNoImm' II64 MULLD_MayOflo x y
-
-      MO_S_MulMayOflo _ -> panic "S_MulMayOflo: (II8/16) not implemented"
-      MO_U_MulMayOflo _ -> panic "U_MulMayOflo: not implemented"
-
-      MO_S_Quot rep
-       | arch32     -> trivialCodeNoImm' (intFormat rep) DIVW
+      MO_S_Quot rep -> trivialCodeNoImmSign (intFormat rep) True DIV
                 (extendSExpr dflags rep x) (extendSExpr dflags rep y)
-       | otherwise  -> trivialCodeNoImm' (intFormat rep) DIVD
-                (extendSExpr dflags rep x) (extendSExpr dflags rep y)
-      MO_U_Quot rep
-       | arch32     -> trivialCodeNoImm' (intFormat rep) DIVWU
-                (extendUExpr dflags rep x) (extendUExpr dflags rep y)
-       | otherwise  -> trivialCodeNoImm' (intFormat rep) DIVDU
+      MO_U_Quot rep -> trivialCodeNoImmSign (intFormat rep) False DIV
                 (extendUExpr dflags rep x) (extendUExpr dflags rep y)
 
-      MO_S_Rem rep
-       | arch32    -> remainderCode rep DIVW (extendSExpr dflags rep x)
+      MO_S_Rem rep -> remainderCode rep True (extendSExpr dflags rep x)
                                              (extendSExpr dflags rep y)
-       | otherwise -> remainderCode rep DIVD (extendSExpr dflags rep x)
-                                             (extendSExpr dflags rep y)
-      MO_U_Rem rep
-       | arch32    -> remainderCode rep DIVWU (extendSExpr dflags rep x)
-                                              (extendSExpr dflags rep y)
-       | otherwise -> remainderCode rep DIVDU (extendSExpr dflags rep x)
-                                              (extendSExpr dflags rep y)
+      MO_U_Rem rep -> remainderCode rep False (extendUExpr dflags rep x)
+                                              (extendUExpr dflags rep y)
 
       MO_And rep   -> case y of
         (CmmLit (CmmInt imm _)) | imm == -8 || imm == -4
@@ -639,16 +634,14 @@ getRegister' dflags (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_Or rep    -> trivialCode rep False OR x y
       MO_Xor rep   -> trivialCode rep False XOR x y
 
-      MO_Shl rep   -> shiftCode rep SL x y
-      MO_S_Shr rep -> shiftCode rep SRA (extendSExpr dflags rep x) y
-      MO_U_Shr rep -> shiftCode rep SR (extendUExpr dflags rep x) y
+      MO_Shl rep   -> shiftMulCode rep False SL x y
+      MO_S_Shr rep -> shiftMulCode rep False SRA (extendSExpr dflags rep x) y
+      MO_U_Shr rep -> shiftMulCode rep False SR (extendUExpr dflags rep x) y
       _         -> panic "PPC.CodeGen.getRegister: no match"
 
   where
     triv_float :: Width -> (Format -> Reg -> Reg -> Reg -> Instr) -> NatM Register
     triv_float width instr = trivialCodeNoImm (floatFormat width) instr x y
-
-    arch32 = target32Bit $ targetPlatform dflags
 
 getRegister' _ (CmmLit (CmmInt i rep))
   | Just imm <- makeImmediate rep True i
@@ -1090,22 +1083,370 @@ genCondJump id bool = do
 -- Now the biggest nightmare---calls.  Most of the nastiness is buried in
 -- @get_arg@, which moves the arguments to the correct registers/stack
 -- locations.  Apart from that, the code is easy.
---
--- (If applicable) Do not fill the delay slots here; you will confuse the
--- register allocator.
 
-genCCall :: ForeignTarget            -- function to call
+genCCall :: ForeignTarget      -- function to call
          -> [CmmFormal]        -- where to put the result
          -> [CmmActual]        -- arguments (of mixed type)
          -> NatM InstrBlock
+genCCall (PrimTarget MO_WriteBarrier) _ _
+ = return $ unitOL LWSYNC
+
+genCCall (PrimTarget MO_Touch) _ _
+ = return $ nilOL
+
+genCCall (PrimTarget (MO_Prefetch_Data _)) _ _
+ = return $ nilOL
+
+genCCall (PrimTarget (MO_Clz width)) [dst] [src]
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+          reg_dst = getRegisterReg platform (CmmLocal dst)
+      if target32Bit platform && width == W64
+        then do
+          ChildCode64 code vr_lo <- iselExpr64 src
+          lbl1 <- getBlockIdNat
+          lbl2 <- getBlockIdNat
+          lbl3 <- getBlockIdNat
+          let vr_hi = getHiVRegFromLo vr_lo
+              cntlz = toOL [ CMPL II32 vr_hi (RIImm (ImmInt 0))
+                           , BCC NE lbl2
+                           , BCC ALWAYS lbl1
+
+                           , NEWBLOCK lbl1
+                           , CNTLZ II32 reg_dst vr_lo
+                           , ADD reg_dst reg_dst (RIImm (ImmInt 32))
+                           , BCC ALWAYS lbl3
+
+                           , NEWBLOCK lbl2
+                           , CNTLZ II32 reg_dst vr_hi
+                           , BCC ALWAYS lbl3
+
+                           , NEWBLOCK lbl3
+                           ]
+          return $ code `appOL` cntlz
+        else do
+          let format = if width == W64 then II64 else II32
+          (s_reg, s_code) <- getSomeReg src
+          (pre, reg , post) <-
+            case width of
+              W64 -> return (nilOL, s_reg, nilOL)
+              W32 -> return (nilOL, s_reg, nilOL)
+              W16 -> do
+                reg_tmp <- getNewRegNat format
+                return
+                  ( unitOL $ AND reg_tmp s_reg (RIImm (ImmInt 65535))
+                  , reg_tmp
+                  , unitOL $ ADD reg_dst reg_dst (RIImm (ImmInt (-16)))
+                  )
+              W8  -> do
+                reg_tmp <- getNewRegNat format
+                return
+                  ( unitOL $ AND reg_tmp s_reg (RIImm (ImmInt 255))
+                  , reg_tmp
+                  , unitOL $ ADD reg_dst reg_dst (RIImm (ImmInt (-24)))
+                  )
+              _   -> panic "genCall: Clz wrong format"
+          let cntlz = unitOL (CNTLZ format reg_dst reg)
+          return $ s_code `appOL` pre `appOL` cntlz `appOL` post
+
+genCCall (PrimTarget (MO_Ctz width)) [dst] [src]
+ = do dflags <- getDynFlags
+      let platform = targetPlatform dflags
+          reg_dst = getRegisterReg platform (CmmLocal dst)
+      if target32Bit platform && width == W64
+        then do
+          let format = II32
+          ChildCode64 code vr_lo <- iselExpr64 src
+          lbl1 <- getBlockIdNat
+          lbl2 <- getBlockIdNat
+          lbl3 <- getBlockIdNat
+          x' <- getNewRegNat format
+          x'' <- getNewRegNat format
+          r' <- getNewRegNat format
+          cnttzlo <- cnttz format reg_dst vr_lo
+          let vr_hi = getHiVRegFromLo vr_lo
+              cnttz64 = toOL [ CMPL format vr_lo (RIImm (ImmInt 0))
+                             , BCC NE lbl2
+                             , BCC ALWAYS lbl1
+
+                             , NEWBLOCK lbl1
+                             , ADD x' vr_hi (RIImm (ImmInt (-1)))
+                             , ANDC x'' x' vr_hi
+                             , CNTLZ format r' x''
+                               -- 32 + (32 - clz(x''))
+                             , SUBFC reg_dst r' (RIImm (ImmInt 64))
+                             , BCC ALWAYS lbl3
+
+                             , NEWBLOCK lbl2
+                             ]
+                        `appOL` cnttzlo `appOL`
+                        toOL [ BCC ALWAYS lbl3
+
+                             , NEWBLOCK lbl3
+                             ]
+          return $ code `appOL` cnttz64
+        else do
+          let format = if width == W64 then II64 else II32
+          (s_reg, s_code) <- getSomeReg src
+          (reg_ctz, pre_code) <-
+            case width of
+              W64 -> return (s_reg, nilOL)
+              W32 -> return (s_reg, nilOL)
+              W16 -> do
+                reg_tmp <- getNewRegNat format
+                return (reg_tmp, unitOL $ ORIS reg_tmp s_reg (ImmInt 1))
+              W8  -> do
+                reg_tmp <- getNewRegNat format
+                return (reg_tmp, unitOL $ OR reg_tmp s_reg (RIImm (ImmInt 256)))
+              _   -> panic "genCall: Ctz wrong format"
+          ctz_code <- cnttz format reg_dst reg_ctz
+          return $ s_code `appOL` pre_code `appOL` ctz_code
+        where
+          -- cnttz(x) = sizeof(x) - cntlz(~x & (x - 1))
+          -- see Henry S. Warren, Hacker's Delight, p 107
+          cnttz format dst src = do
+            let format_bits = 8 * formatInBytes format
+            x' <- getNewRegNat format
+            x'' <- getNewRegNat format
+            r' <- getNewRegNat format
+            return $ toOL [ ADD x' src (RIImm (ImmInt (-1)))
+                          , ANDC x'' x' src
+                          , CNTLZ format r' x''
+                          , SUBFC dst r' (RIImm (ImmInt (format_bits)))
+                          ]
+
 genCCall target dest_regs argsAndHints
  = do dflags <- getDynFlags
-      genCCall' dflags (platformToGCP (targetPlatform dflags))
-                target dest_regs argsAndHints
+      let platform = targetPlatform dflags
+      case target of
+        PrimTarget (MO_S_QuotRem  width) -> divOp1 platform True  width
+                                                   dest_regs argsAndHints
+        PrimTarget (MO_U_QuotRem  width) -> divOp1 platform False width
+                                                   dest_regs argsAndHints
+        PrimTarget (MO_U_QuotRem2 width) -> divOp2 platform width dest_regs
+                                                   argsAndHints
+        PrimTarget (MO_U_Mul2 width) -> multOp2 platform width dest_regs
+                                                argsAndHints
+        PrimTarget (MO_Add2 _) -> add2Op platform dest_regs argsAndHints
+        PrimTarget (MO_SubWordC _) -> subcOp platform dest_regs argsAndHints
+        PrimTarget (MO_AddIntC width) -> addSubCOp ADDO platform width
+                                                   dest_regs argsAndHints
+        PrimTarget (MO_SubIntC width) -> addSubCOp SUBFO platform width
+                                                   dest_regs argsAndHints
+        _ -> genCCall' dflags (platformToGCP platform)
+                       target dest_regs argsAndHints
+        where divOp1 platform signed width [res_q, res_r] [arg_x, arg_y]
+                = do let reg_q = getRegisterReg platform (CmmLocal res_q)
+                         reg_r = getRegisterReg platform (CmmLocal res_r)
+                         fmt   = intFormat width
+                     (x_reg, x_code) <- getSomeReg arg_x
+                     (y_reg, y_code) <- getSomeReg arg_y
+                     return $       y_code `appOL` x_code
+                            `appOL` toOL [ DIV fmt signed reg_q x_reg y_reg
+                                         , MULL fmt reg_r reg_q (RIReg y_reg)
+                                         , SUBF reg_r reg_r x_reg
+                                         ]
+
+              divOp1 _ _ _ _ _
+                = panic "genCCall: Wrong number of arguments for divOp1"
+              divOp2 platform width [res_q, res_r]
+                                    [arg_x_high, arg_x_low, arg_y]
+                = do let reg_q = getRegisterReg platform (CmmLocal res_q)
+                         reg_r = getRegisterReg platform (CmmLocal res_r)
+                         fmt   = intFormat width
+                         half  = 4 * (formatInBytes fmt)
+                     (xh_reg, xh_code) <- getSomeReg arg_x_high
+                     (xl_reg, xl_code) <- getSomeReg arg_x_low
+                     (y_reg, y_code) <- getSomeReg arg_y
+                     s <- getNewRegNat fmt
+                     b <- getNewRegNat fmt
+                     v <- getNewRegNat fmt
+                     vn1 <- getNewRegNat fmt
+                     vn0 <- getNewRegNat fmt
+                     un32 <- getNewRegNat fmt
+                     tmp  <- getNewRegNat fmt
+                     un10 <- getNewRegNat fmt
+                     un1 <- getNewRegNat fmt
+                     un0 <- getNewRegNat fmt
+                     q1 <- getNewRegNat fmt
+                     rhat <- getNewRegNat fmt
+                     tmp1 <- getNewRegNat fmt
+                     q0 <- getNewRegNat fmt
+                     un21 <- getNewRegNat fmt
+                     again1 <- getBlockIdNat
+                     no1 <- getBlockIdNat
+                     then1 <- getBlockIdNat
+                     endif1 <- getBlockIdNat
+                     again2 <- getBlockIdNat
+                     no2 <- getBlockIdNat
+                     then2 <- getBlockIdNat
+                     endif2 <- getBlockIdNat
+                     return $ y_code `appOL` xl_code `appOL` xh_code `appOL`
+                              -- see Hacker's Delight p 196 Figure 9-3
+                              toOL [ -- b = 2 ^ (bits_in_word / 2)
+                                     LI b (ImmInt 1)
+                                   , SL fmt b b (RIImm (ImmInt half))
+                                     -- s = clz(y)
+                                   , CNTLZ fmt s y_reg
+                                     -- v = y << s
+                                   , SL fmt v y_reg (RIReg s)
+                                     -- vn1 = upper half of v
+                                   , SR fmt vn1 v (RIImm (ImmInt half))
+                                     -- vn0 = lower half of v
+                                   , CLRLI fmt vn0 v half
+                                     -- un32 = (u1 << s)
+                                     --      | (u0 >> (bits_in_word - s))
+                                   , SL fmt un32 xh_reg (RIReg s)
+                                   , SUBFC tmp s
+                                        (RIImm (ImmInt (8 * formatInBytes fmt)))
+                                   , SR fmt tmp xl_reg (RIReg tmp)
+                                   , OR un32 un32 (RIReg tmp)
+                                     -- un10 = u0 << s
+                                   , SL fmt un10 xl_reg (RIReg s)
+                                     -- un1 = upper half of un10
+                                   , SR fmt un1 un10 (RIImm (ImmInt half))
+                                     -- un0 = lower half of un10
+                                   , CLRLI fmt un0 un10 half
+                                     -- q1 = un32/vn1
+                                   , DIV fmt False q1 un32 vn1
+                                     -- rhat = un32 - q1*vn1
+                                   , MULL fmt tmp q1 (RIReg vn1)
+                                   , SUBF rhat tmp un32
+                                   , BCC ALWAYS again1
+
+                                   , NEWBLOCK again1
+                                     -- if (q1 >= b || q1*vn0 > b*rhat + un1)
+                                   , CMPL fmt q1 (RIReg b)
+                                   , BCC GEU then1
+                                   , BCC ALWAYS no1
+
+                                   , NEWBLOCK no1
+                                   , MULL fmt tmp q1 (RIReg vn0)
+                                   , SL fmt tmp1 rhat (RIImm (ImmInt half))
+                                   , ADD tmp1 tmp1 (RIReg un1)
+                                   , CMPL fmt tmp (RIReg tmp1)
+                                   , BCC LEU endif1
+                                   , BCC ALWAYS then1
+
+                                   , NEWBLOCK then1
+                                     -- q1 = q1 - 1
+                                   , ADD q1 q1 (RIImm (ImmInt (-1)))
+                                     -- rhat = rhat + vn1
+                                   , ADD rhat rhat (RIReg vn1)
+                                     -- if (rhat < b) goto again1
+                                   , CMPL fmt rhat (RIReg b)
+                                   , BCC LTT again1
+                                   , BCC ALWAYS endif1
+
+                                   , NEWBLOCK endif1
+                                     -- un21 = un32*b + un1 - q1*v
+                                   , SL fmt un21 un32 (RIImm (ImmInt half))
+                                   , ADD un21 un21 (RIReg un1)
+                                   , MULL fmt tmp q1 (RIReg v)
+                                   , SUBF un21 tmp un21
+                                     -- compute second quotient digit
+                                     -- q0 = un21/vn1
+                                   , DIV fmt False q0 un21 vn1
+                                     -- rhat = un21- q0*vn1
+                                   , MULL fmt tmp q0 (RIReg vn1)
+                                   , SUBF rhat tmp un21
+                                   , BCC ALWAYS again2
+
+                                   , NEWBLOCK again2
+                                     -- if (q0>b || q0*vn0 > b*rhat + un0)
+                                   , CMPL fmt q0 (RIReg b)
+                                   , BCC GEU then2
+                                   , BCC ALWAYS no2
+
+                                   , NEWBLOCK no2
+                                   , MULL fmt tmp q0 (RIReg vn0)
+                                   , SL fmt tmp1 rhat (RIImm (ImmInt half))
+                                   , ADD tmp1 tmp1 (RIReg un0)
+                                   , CMPL fmt tmp (RIReg tmp1)
+                                   , BCC LEU endif2
+                                   , BCC ALWAYS then2
+
+                                   , NEWBLOCK then2
+                                     -- q0 = q0 - 1
+                                   , ADD q0 q0 (RIImm (ImmInt (-1)))
+                                     -- rhat = rhat + vn1
+                                   , ADD rhat rhat (RIReg vn1)
+                                     -- if (rhat<b) goto again2
+                                   , CMPL fmt rhat (RIReg b)
+                                   , BCC LTT again2
+                                   , BCC ALWAYS endif2
+
+                                   , NEWBLOCK endif2
+                                     -- compute remainder
+                                     -- r = (un21*b + un0 - q0*v) >> s
+                                   , SL fmt reg_r un21 (RIImm (ImmInt half))
+                                   , ADD reg_r reg_r (RIReg un0)
+                                   , MULL fmt tmp q0 (RIReg v)
+                                   , SUBF reg_r tmp reg_r
+                                   , SR fmt reg_r reg_r (RIReg s)
+                                     -- compute quotient
+                                     -- q = q1*b + q0
+                                   , SL fmt reg_q q1 (RIImm (ImmInt half))
+                                   , ADD reg_q reg_q (RIReg q0)
+                                   ]
+              divOp2 _ _ _ _
+                = panic "genCCall: Wrong number of arguments for divOp2"
+              multOp2 platform width [res_h, res_l] [arg_x, arg_y]
+                = do let reg_h = getRegisterReg platform (CmmLocal res_h)
+                         reg_l = getRegisterReg platform (CmmLocal res_l)
+                         fmt = intFormat width
+                     (x_reg, x_code) <- getSomeReg arg_x
+                     (y_reg, y_code) <- getSomeReg arg_y
+                     return $ y_code `appOL` x_code
+                            `appOL` toOL [ MULL fmt reg_l x_reg (RIReg y_reg)
+                                         , MULHU fmt reg_h x_reg y_reg
+                                         ]
+              multOp2 _ _ _ _
+                = panic "genCall: Wrong number of arguments for multOp2"
+              add2Op platform [res_h, res_l] [arg_x, arg_y]
+                = do let reg_h = getRegisterReg platform (CmmLocal res_h)
+                         reg_l = getRegisterReg platform (CmmLocal res_l)
+                     (x_reg, x_code) <- getSomeReg arg_x
+                     (y_reg, y_code) <- getSomeReg arg_y
+                     return $ y_code `appOL` x_code
+                            `appOL` toOL [ LI reg_h (ImmInt 0)
+                                         , ADDC reg_l x_reg y_reg
+                                         , ADDZE reg_h reg_h
+                                         ]
+              add2Op _ _ _
+                = panic "genCCall: Wrong number of arguments/results for add2"
+
+              -- PowerPC subfc sets the carry for rT = ~(rA) + rB + 1,
+              -- which is 0 for borrow and 1 otherwise. We need 1 and 0
+              -- so xor with 1.
+              subcOp platform [res_r, res_c] [arg_x, arg_y]
+                = do let reg_r = getRegisterReg platform (CmmLocal res_r)
+                         reg_c = getRegisterReg platform (CmmLocal res_c)
+                     (x_reg, x_code) <- getSomeReg arg_x
+                     (y_reg, y_code) <- getSomeReg arg_y
+                     return $ y_code `appOL` x_code
+                            `appOL` toOL [ LI reg_c (ImmInt 0)
+                                         , SUBFC reg_r y_reg (RIReg x_reg)
+                                         , ADDZE reg_c reg_c
+                                         , XOR reg_c reg_c (RIImm (ImmInt 1))
+                                         ]
+              subcOp _ _ _
+                = panic "genCCall: Wrong number of arguments/results for subc"
+              addSubCOp instr platform width [res_r, res_c] [arg_x, arg_y]
+                = do let reg_r = getRegisterReg platform (CmmLocal res_r)
+                         reg_c = getRegisterReg platform (CmmLocal res_c)
+                     (x_reg, x_code) <- getSomeReg arg_x
+                     (y_reg, y_code) <- getSomeReg arg_y
+                     return $ y_code `appOL` x_code
+                            `appOL` toOL [ instr reg_r y_reg x_reg,
+                                           -- SUBFO argument order reversed!
+                                           MFOV (intFormat width) reg_c
+                                         ]
+              addSubCOp _ _ _ _ _
+                = panic "genCall: Wrong number of arguments/results for addC"
 
 -- TODO: replace 'Int' by an enum such as 'PPC_64ABI'
 data GenCCallPlatform = GCPLinux | GCPDarwin | GCPLinux64ELF !Int | GCPAIX
-                      deriving Eq
 
 platformToGCP :: Platform -> GenCCallPlatform
 platformToGCP platform = case platformOS platform of
@@ -1174,15 +1515,6 @@ genCCall'
     frame just before ccalling.
 -}
 
-
-genCCall' _ _ (PrimTarget MO_WriteBarrier) _ _
- = return $ unitOL LWSYNC
-
-genCCall' _ _ (PrimTarget MO_Touch) _ _
- = return $ nilOL
-
-genCCall' _ _ (PrimTarget (MO_Prefetch_Data _)) _ _
- = return $ nilOL
 
 genCCall' dflags gcp target dest_regs args
   = ASSERT(not $ any (`elem` [II16]) $ map cmmTypeFormat argReps)
@@ -1767,21 +2099,22 @@ trivialCode rep _ instr x y = do
     let code dst = code1 `appOL` code2 `snocOL` instr dst src1 (RIReg src2)
     return (Any (intFormat rep) code)
 
-shiftCode
+shiftMulCode
         :: Width
+        -> Bool
         -> (Format-> Reg -> Reg -> RI -> Instr)
         -> CmmExpr
         -> CmmExpr
         -> NatM Register
-shiftCode width instr x (CmmLit (CmmInt y _))
-    | Just imm <- makeImmediate width False y
+shiftMulCode width sign instr x (CmmLit (CmmInt y _))
+    | Just imm <- makeImmediate width sign y
     = do
         (src1, code1) <- getSomeReg x
         let format = intFormat width
         let code dst = code1 `snocOL` instr format dst src1 (RIImm imm)
         return (Any format code)
 
-shiftCode width instr x y = do
+shiftMulCode width _ instr x y = do
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let format = intFormat width
@@ -1800,6 +2133,12 @@ trivialCodeNoImm :: Format -> (Format -> Reg -> Reg -> Reg -> Instr)
                  -> CmmExpr -> CmmExpr -> NatM Register
 trivialCodeNoImm format instr x y = trivialCodeNoImm' format (instr format) x y
 
+trivialCodeNoImmSign :: Format -> Bool
+                     -> (Format -> Bool -> Reg -> Reg -> Reg -> Instr)
+                     -> CmmExpr -> CmmExpr -> NatM Register
+trivialCodeNoImmSign  format sgn instr x y
+  = trivialCodeNoImm' format (instr format sgn) x y
+
 
 trivialUCode
         :: Format
@@ -1813,19 +2152,16 @@ trivialUCode rep instr x = do
 
 -- There is no "remainder" instruction on the PPC, so we have to do
 -- it the hard way.
--- The "div" parameter is the division instruction to use (DIVW or DIVWU)
+-- The "sgn" parameter is the signedness for the division instruction
 
-remainderCode :: Width -> (Reg -> Reg -> Reg -> Instr)
-    -> CmmExpr -> CmmExpr -> NatM Register
-remainderCode rep div x y = do
-    dflags <- getDynFlags
-    let mull_instr = if target32Bit $ targetPlatform dflags then MULLW
-                                                            else MULLD
+remainderCode :: Width -> Bool -> CmmExpr -> CmmExpr -> NatM Register
+remainderCode rep sgn x y = do
+    let fmt = intFormat rep
     (src1, code1) <- getSomeReg x
     (src2, code2) <- getSomeReg y
     let code dst = code1 `appOL` code2 `appOL` toOL [
-                div dst src1 src2,
-                mull_instr dst dst (RIReg src2),
+                DIV fmt sgn dst src1 src2,
+                MULL fmt dst dst (RIReg src2),
                 SUBF dst dst src1
             ]
     return (Any (intFormat rep) code)
