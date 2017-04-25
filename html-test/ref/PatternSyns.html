@@ -69,9 +69,9 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >Foo</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > t. t -&gt; <a href="#"
+	    > x. x -&gt; <a href="#"
 	    >FooType</a
-	    > t</li
+	    > x</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >pattern</span
@@ -79,11 +79,11 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >Bar</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > t. t -&gt; <a href="#"
+	    > x. x -&gt; <a href="#"
 	    >FooType</a
 	    > (<a href="#"
 	    >FooType</a
-	    > t)</li
+	    > x)</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >pattern</span
@@ -91,17 +91,19 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >(:&lt;-&gt;)</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > t t1. t -&gt; t1 -&gt; (<a href="#"
+	    > x x1. x -&gt; x1 -&gt; (<a href="#"
 	    >FooType</a
-	    > t, <a href="#"
+	    > x, <a href="#"
 	    >FooType</a
 	    > (<a href="#"
 	    >FooType</a
-	    > t1))</li
+	    > x1))</li
 	  ><li class="src short"
 	  ><span class="keyword"
 	    >data</span
-	    > a <a href="#"
+	    > (a :: <a href="#"
+	    >*</a
+	    >) <a href="#"
 	    >&gt;&lt;</a
 	    > b = <a href="#"
 	    >Empty</a
@@ -113,9 +115,9 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >E</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > k t t1. <a href="#"
+	    > k a (b :: k). <a href="#"
 	    >(&gt;&lt;)</a
-	    > k t t1</li
+	    > k a b</li
 	  ></ul
 	></div
       ><div id="interface"
@@ -157,9 +159,9 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >Foo</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > t. t -&gt; <a href="#"
+	    > x. x -&gt; <a href="#"
 	    >FooType</a
-	    > t <a href="#" class="selflink"
+	    > x <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -179,11 +181,11 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >Bar</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > t. t -&gt; <a href="#"
+	    > x. x -&gt; <a href="#"
 	    >FooType</a
 	    > (<a href="#"
 	    >FooType</a
-	    > t) <a href="#" class="selflink"
+	    > x) <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -203,13 +205,13 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >(:&lt;-&gt;)</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > t t1. t -&gt; t1 -&gt; (<a href="#"
+	    > x x1. x -&gt; x1 -&gt; (<a href="#"
 	    >FooType</a
-	    > t, <a href="#"
+	    > x, <a href="#"
 	    >FooType</a
 	    > (<a href="#"
 	    >FooType</a
-	    > t1)) <a href="#" class="selflink"
+	    > x1)) <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
@@ -225,7 +227,9 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	><p class="src"
 	  ><span class="keyword"
 	    >data</span
-	    > a <a id="t:-62--60-" class="def"
+	    > (a :: <a href="#"
+	    >*</a
+	    >) <a id="t:-62--60-" class="def"
 	    >&gt;&lt;</a
 	    > b <a href="#" class="selflink"
 	    >#</a
@@ -261,9 +265,9 @@ window.onload = function () {pageLoad();setSynopsis(&quot;mini_PatternSyns.html&
 	    >E</a
 	    > :: <span class="keyword"
 	    >forall</span
-	    > k t t1. <a href="#"
+	    > k a (b :: k). <a href="#"
 	    >(&gt;&lt;)</a
-	    > k t t1 <a href="#" class="selflink"
+	    > k a b <a href="#" class="selflink"
 	    >#</a
 	    ></p
 	  ><div class="doc"
