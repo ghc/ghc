@@ -22,6 +22,7 @@ import Haddock.GhcUtils
 import Haddock.Types hiding (Version)
 import Haddock.Utils hiding (out)
 
+import HsBinds (emptyLHsBinds)
 import GHC
 import Outputable
 import NameSet
@@ -157,7 +158,9 @@ pp_sig dflags names (L _ typ)  =
 
 -- note: does not yet output documentation for class methods
 ppClass :: DynFlags -> TyClDecl Name -> [(Name, DocForDecl Name)] -> [String]
-ppClass dflags decl subdocs = (out dflags decl{tcdSigs=[]} ++ ppTyFams) :  ppMethods
+ppClass dflags decl subdocs =
+  (out dflags decl{tcdSigs=[], tcdATs=[], tcdATDefs=[], tcdMeths=emptyLHsBinds}
+    ++ ppTyFams) :  ppMethods
     where
 
         ppMethods = concat . map (ppSig' . unLoc . add_ctxt) $ tcdSigs decl
