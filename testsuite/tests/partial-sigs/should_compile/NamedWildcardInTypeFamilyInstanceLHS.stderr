@@ -2,7 +2,7 @@ TYPE SIGNATURES
 TYPE CONSTRUCTORS
   type family F a :: *
     where
-      [_t] F _t = Int
+        F _t = Int
       axiom NamedWildcardInTypeFamilyInstanceLHS.D:R:F
 COERCION AXIOMS
   axiom NamedWildcardInTypeFamilyInstanceLHS.D:R:F ::

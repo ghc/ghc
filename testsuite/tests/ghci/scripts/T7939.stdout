@@ -15,13 +15,13 @@ type family H (a :: Bool) :: Bool
 H :: Bool -> Bool
 type family J (a :: [k]) :: Bool
   where
-    [k] J k '[] = 'False
-    [k, (h :: k), (t :: [k])] J k (h : t) = 'True
+      J k '[] = 'False
+      J k (h : t) = 'True
   	-- Defined at T7939.hs:17:1
 J :: [k] -> Bool
 type family K (a1 :: [a]) :: Maybe a
   where
-    [a] K a '[] = 'Nothing
-    [a, (h :: a), (t :: [a])] K a (h : t) = 'Just h
+      K a '[] = 'Nothing
+      K a (h : t) = 'Just h
   	-- Defined at T7939.hs:21:1
 K :: [a] -> Maybe a

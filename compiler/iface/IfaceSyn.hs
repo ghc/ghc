@@ -67,6 +67,7 @@ import TyCon ( Role (..), Injectivity(..) )
 import Util( filterOut, filterByList )
 import DataCon (SrcStrictness(..), SrcUnpackedness(..))
 import Lexeme (isLexSym)
+import DynFlags
 
 import Control.Monad
 import System.IO.Unsafe
@@ -554,7 +555,10 @@ pprAxBranch pp_tc (IfaceAxBranch { ifaxbTyVars = tvs
     $+$
     nest 2 maybe_incomps
   where
-    ppr_binders
+    ppr_binders = sdocWithDynFlags $ \dflags ->
+                  ppWhen (gopt Opt_PrintExplicitForalls dflags) ppr_binders'
+
+    ppr_binders'
       | null tvs && null cvs = empty
       | null cvs
       = brackets (pprWithCommas (pprIfaceTvBndr True) tvs)
