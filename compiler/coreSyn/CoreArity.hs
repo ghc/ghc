@@ -839,6 +839,33 @@ simplification but it's not too hard.  The alernative, of relying on
 a subsequent clean-up phase of the Simplifier to de-crapify the result,
 means you can't really use it in CorePrep, which is painful.
 
+Note [Eta expansion for join points]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The no-crap rule is very tiresome to guarantee when
+we have join points. Consider eta-expanding
+   let j :: Int -> Int -> Bool
+       j x = e
+   in b
+
+The simple way is
+  \(y::Int). (let j x = e in b) y
+
+The no-crap way is
+  \(y::Int). let j' :: Int -> Bool
+                 j' x = e y
+             in b[j'/j] y
+where I have written to stress that j's type has
+changed.  Note that (of course!) we have to push the application
+inside the RHS of the join as well as into the body.  AND if j
+has an unfolding we have to push it into there too.  AND j might
+be recursive...
+
+So for now I'm abandonig the no-crap rule in this case. I think
+that for the use in CorePrep it really doesn't matter; and if
+it does, then CoreToStg.myCollectArgs will fall over.
+
+(Moreover, I think that casts can make the no-crap rule fail too.)
+
 Note [Eta expansion and SCCs]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Note that SCCs are not treated specially by etaExpand.  If we have
@@ -912,11 +939,11 @@ etaExpand n orig_expr
           sexpr = foldl App expr'' args
           retick expr = foldr mkTick expr ticks
 
-                                -- Wrapper    Unwrapper
+                                -- Abstraction    Application
 --------------
-data EtaInfo = EtaVar Var       -- /\a. [],   [] a
-                                -- \x.  [],   [] x
-             | EtaCo Coercion   -- [] |> co,  [] |> (sym co)
+data EtaInfo = EtaVar Var       -- /\a. []        [] a
+                                -- \x.  []        [] x
+             | EtaCo Coercion   -- [] |> sym co   [] |> co
 
 instance Outputable EtaInfo where
    ppr (EtaVar v) = text "EtaVar" <+> ppr v
@@ -951,22 +978,21 @@ etaInfoApp subst (Cast e co1) eis
     co' = CoreSubst.substCo subst co1
 
 etaInfoApp subst (Case e b ty alts) eis
-  = Case (subst_expr subst e) b1 (mk_alts_ty (CoreSubst.substTy subst ty) eis) alts'
+  = Case (subst_expr subst e) b1 ty' alts'
   where
     (subst1, b1) = substBndr subst b
     alts' = map subst_alt alts
+    ty'   = etaInfoAppTy (CoreSubst.substTy subst ty) eis
     subst_alt (con, bs, rhs) = (con, bs', etaInfoApp subst2 rhs eis)
               where
                  (subst2,bs') = substBndrs subst1 bs
 
-    mk_alts_ty ty []               = ty
-    mk_alts_ty ty (EtaVar v : eis) = mk_alts_ty (applyTypeToArg ty (varToCoreExpr v)) eis
-    mk_alts_ty _  (EtaCo co : eis) = mk_alts_ty (pSnd (coercionKind co)) eis
-
 etaInfoApp subst (Let b e) eis
+  | not (isJoinBind b)
+    -- See Note [Eta expansion for join points]
   = Let b' (etaInfoApp subst' e eis)
   where
-    (subst', b') = etaInfoAppBind subst b eis
+    (subst', b') = substBindSC subst b
 
 etaInfoApp subst (Tick t e) eis
   = Tick (substTickish subst t) (etaInfoApp subst e eis)
@@ -984,93 +1010,14 @@ etaInfoApp subst e eis
     go e (EtaVar v    : eis) = go (App e (varToCoreExpr v)) eis
     go e (EtaCo co    : eis) = go (Cast e co) eis
 
---------------
--- | Apply the eta info to a local binding. Mostly delegates to
--- `etaInfoAppLocalBndr` and `etaInfoAppRhs`.
-etaInfoAppBind :: Subst -> CoreBind -> [EtaInfo] -> (Subst, CoreBind)
-etaInfoAppBind subst (NonRec bndr rhs) eis
-  = (subst', NonRec bndr' rhs')
-  where
-    bndr_w_new_type = etaInfoAppLocalBndr bndr eis
-    (subst', bndr1) = substBndr subst bndr_w_new_type
-    rhs'            = etaInfoAppRhs subst bndr1 rhs eis
-    bndr'           | isJoinId bndr = bndr1 `setIdArity` manifestArity rhs'
-                                        -- Arity may have changed
-                                        -- (see etaInfoAppRhs example)
-                    | otherwise     = bndr1
-etaInfoAppBind subst (Rec pairs) eis
-  = (subst', Rec (bndrs' `zip` rhss'))
-  where
-    (bndrs, rhss)     = unzip pairs
-    bndrs_w_new_types = map (\bndr -> etaInfoAppLocalBndr bndr eis) bndrs
-    (subst', bndrs1)  = substRecBndrs subst bndrs_w_new_types
-    rhss'             = zipWith process bndrs1 rhss
-    process bndr' rhs = etaInfoAppRhs subst' bndr' rhs eis
-    bndrs'            | isJoinId (head bndrs)
-                      = [ bndr1 `setIdArity` manifestArity rhs'
-                        | (bndr1, rhs') <- bndrs1 `zip` rhss' ]
-                          -- Arities may have changed
-                          -- (see etaInfoAppRhs example)
-                      | otherwise
-                      = bndrs1
 
 --------------
--- | Apply the eta info to a binder's RHS. Only interesting for a join point,
--- where we might have this:
---   join j :: a -> [a] -> [a]
---        j x = \xs -> x : xs in jump j z
--- Eta-expanding produces this:
---   \ys -> (join j :: a -> [a] -> [a]
---                j x = \xs -> x : xs in jump j z) ys
--- Now when we push the application to ys inward (see Note [No crap in
--- eta-expanded code]), it goes to the body of the RHS of the join point (after
--- the lambda x!):
---   \ys -> join j :: a -> [a]
---               j x = x : ys in jump j z
--- Note that the type and arity of j have both changed.
-etaInfoAppRhs :: Subst -> CoreBndr -> CoreExpr -> [EtaInfo] -> CoreExpr
-etaInfoAppRhs subst bndr expr eis
-  | Just arity <- isJoinId_maybe bndr
-  = do_join_point arity
-  | otherwise
-  = subst_expr subst expr
-  where
-    do_join_point arity = mkLams join_bndrs' join_body'
-      where
-        (join_bndrs, join_body) = collectNBinders arity expr
-        (subst', join_bndrs') = substBndrs subst join_bndrs
-        join_body' = etaInfoApp subst' join_body eis
-
-
---------------
--- | Apply the eta info to a local binder. A join point will have the EtaInfos
--- applied to its RHS, so its type may change. See comment on etaInfoAppRhs for
--- an example. See Note [No crap in eta-expanded code] for why all this is
--- necessary.
-etaInfoAppLocalBndr :: CoreBndr -> [EtaInfo] -> CoreBndr
-etaInfoAppLocalBndr bndr orig_eis
-  = case isJoinId_maybe bndr of
-      Just arity -> bndr `setIdType` modifyJoinResTy arity (app orig_eis) ty
-      Nothing    -> bndr
-  where
-    ty = idType bndr
-
-    -- | Apply the given EtaInfos to the result type of the join point.
-    app :: [EtaInfo] -- To apply
-        -> Type      -- Result type of join point
-        -> Type      -- New result type
-    app [] ty
-      = ty
-    app (EtaVar v : eis) ty
-      | isId v    = app eis (funResultTy ty)
-      | otherwise = app eis (piResultTy ty (mkTyVarTy v))
-    app (EtaCo co : eis) ty
-      = ASSERT2(from_ty `eqType` ty, fsep ([text "can't apply", ppr orig_eis,
-                                            text "to", ppr bndr <+> dcolon <+>
-                                                       ppr (idType bndr)]))
-        app eis to_ty
-      where
-        Pair from_ty to_ty = coercionKind co
+etaInfoAppTy :: Type -> [EtaInfo] -> Type
+-- If                    e :: ty
+-- then   etaInfoApp e eis :: etaInfoApp ty eis
+etaInfoAppTy ty []               = ty
+etaInfoAppTy ty (EtaVar v : eis) = etaInfoAppTy (applyTypeToArg ty (varToCoreExpr v)) eis
+etaInfoAppTy _  (EtaCo co : eis) = etaInfoAppTy (pSnd (coercionKind co)) eis
 
 --------------
 mkEtaWW :: Arity -> CoreExpr -> InScopeSet -> Type
@@ -1110,7 +1057,7 @@ mkEtaWW orig_n orig_expr in_scope orig_ty
                 --      eta_expand 1 e T
                 -- We want to get
                 --      coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
-         go n subst ty' (EtaCo co : eis)
+         go n subst ty' (pushCoercion co eis)
 
        | otherwise       -- We have an expression of arity > 0,
                          -- but its type isn't a function, or a binder
