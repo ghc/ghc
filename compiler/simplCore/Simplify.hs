@@ -487,7 +487,6 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
         ; completeBind env2 NotTopLevel NonRecursive Nothing
                        old_bndr new_bndr rhs2 }
 
-{-
 {- No, no, no!  Do not try preInlineUnconditionally in completeNonRecX
    Doing so risks exponential behaviour, because new_rhs has been simplified once already
    In the cases described by the folowing commment, postInlineUnconditionally will
@@ -514,6 +513,36 @@ completeNonRecX top_lvl env is_strict old_bndr new_bndr new_rhs
 -}
 
 ----------------------------------
+{- Note [Avoiding exponential behaviour]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+One way in which we can get exponential behaviour is if we simplify a
+big expression, and the re-simplify it -- and then this happens in a
+deeply-nested way.  So we must be jolly careful about re-simplifying
+an expression.  That is why completeNonRecX does not try
+preInlineUnconditionally.
+
+Example:
+  f BIG, where f has a RULE
+Then
+ * We simplify BIG before trying the rule; but the rule does not fire
+ * We inline f = \x. x True
+ * So if we did preInlineUnconditionally we'd re-simplify (BIG True)
+
+However, if BIG has /not/ already been simplified, we'd /like/ to
+simplify BIG True; maybe good things happen.  That is why
+
+* simplLam has
+    - a case for (isSimplified dup), which goes via simplNonRecX, and
+    - a case for the un-simplified case, which goes via simplNonRecE
+
+* We go to some efforts to avoid unnecessarily simplifying ApplyToVal,
+  in at least two places
+    - In simplCast/addCoerce, where we check for isReflCo
+    - In rebuildCall we avoid simplifying arguments before we have to
+      (see Note [Trying rewrite rules])
+
+Note [prepareRhs]
+~~~~~~~~~~~~~~~~~~~~
 prepareRhs takes a putative RHS, checks whether it's a PAP or
 constructor application and, if so, converts it to ANF, so that the
 resulting thing can be inlined more easily.  Thus
@@ -532,6 +561,7 @@ That's what the 'go' loop in prepareRhs does
 
 prepareRhs :: TopLevelFlag -> SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
+-- See Note [prepareRhs]
 prepareRhs top_lvl env id (Cast rhs co)    -- Note [Float coercions]
   | Pair ty1 _ty2 <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
   , not (isUnliftedType ty1)            -- see Note [Float coercions (unlifted)]
@@ -999,15 +1029,15 @@ simplExprF :: SimplEnv
            -> SimplM (SimplEnv, OutExpr)
 
 simplExprF env e cont
-  = {- pprTrace "simplExprF" (vcat
-      [ ppr e
-      , text "cont =" <+> ppr cont
-      , text "inscope =" <+> ppr (seInScope env)
-      , text "tvsubst =" <+> ppr (seTvSubst env)
-      , text "idsubst =" <+> ppr (seIdSubst env)
-      , text "cvsubst =" <+> ppr (seCvSubst env)
-      {- , ppr (seFloats env) -}
-      ]) $ -}
+  = -- pprTrace "simplExprF" (vcat
+--      [ ppr e
+--      , text "cont =" <+> ppr cont
+--      , text "inscope =" <+> ppr (seInScope env)
+--      , text "tvsubst =" <+> ppr (seTvSubst env)
+--      , text "idsubst =" <+> ppr (seIdSubst env)
+--      , text "cvsubst =" <+> ppr (seCvSubst env)
+--      {- , ppr (seFloats env) -}
+--      ]) $
     simplExprF1 env e cont
 
 simplExprF1 :: SimplEnv -> InExpr -> SimplCont
@@ -1381,24 +1411,29 @@ simplCast env body co0 cont0
          = do { tail' <- addCoerce co' tail
               ; return (cont { sc_arg_ty = arg_ty', sc_cont = tail' }) }
 
-       addCoerce co (ApplyToVal { sc_arg = arg, sc_env = arg_se
+       addCoerce co cont@(ApplyToVal { sc_arg = arg, sc_env = arg_se
                                 , sc_dup = dup, sc_cont = tail })
          | Just (co1, co2) <- pushCoValArg co
          , Pair _ new_ty <- coercionKind co1
          , not (isTypeLevPoly new_ty)  -- without this check, we get a lev-poly arg
                                        -- See Note [Levity polymorphism invariants] in CoreSyn
                                        -- test: typecheck/should_run/EtaExpandLevPoly
-         = do { (dup', arg_se', arg') <- simplArg env dup arg_se arg
+         = do { tail' <- addCoerce co2 tail
+              ; if isReflCo co1
+                then return (cont { sc_cont = tail' })
+                     -- Avoid simplifying if possible;
+                     -- See Note [Avoiding exponential behaviour]
+                else do
+              { (dup', arg_se', arg') <- simplArg env dup arg_se arg
                    -- When we build the ApplyTo we can't mix the OutCoercion
                    -- 'co' with the InExpr 'arg', so we simplify
                    -- to make it all consistent.  It's a bit messy.
                    -- But it isn't a common case.
                    -- Example of use: Trac #995
-              ; tail' <- addCoerce co2 tail
               ; return (ApplyToVal { sc_arg  = mkCast arg' co1
                                    , sc_env  = arg_se'
                                    , sc_dup  = dup'
-                                   , sc_cont = tail' }) }
+                                   , sc_cont = tail' }) } }
 
        addCoerce co cont
          | isReflexiveCo co = return cont
@@ -1451,13 +1486,20 @@ simplLam env (bndr:bndrs) body (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont }
        ; simplLam (extendTvSubst env bndr arg_ty) bndrs body cont }
 
 simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
-                                           , sc_cont = cont })
+                                           , sc_cont = cont, sc_dup = dup })
+  | isSimplified dup  -- Don't re-simplify if we've simplified it once
+                      -- See Note [Avoiding exponential behaviour]
   = do  { tick (BetaReduction bndr)
-        ; simplNonRecE env (zap_unfolding bndr) (arg, arg_se) (bndrs, body) cont }
+        ; env' <- simplNonRecX env zapped_bndr arg
+        ; simplLam env' bndrs body cont }
+
+  | otherwise
+  = do  { tick (BetaReduction bndr)
+        ; simplNonRecE env zapped_bndr (arg, arg_se) (bndrs, body) cont }
   where
-    zap_unfolding bndr  -- See Note [Zap unfolding when beta-reducing]
+    zapped_bndr  -- See Note [Zap unfolding when beta-reducing]
       | isId bndr, isStableUnfolding (realIdUnfolding bndr)
-      = setIdUnfolding bndr NoUnfolding
+                  = setIdUnfolding bndr NoUnfolding
       | otherwise = bndr
 
       -- discard a non-counting tick on a lambda.  This may change the
@@ -1500,7 +1542,8 @@ simplLamBndr env bndr
 
 ------------------
 simplNonRecE :: SimplEnv
-             -> InId                    -- The binder, always an Id for simplNonRecE
+             -> InId                    -- The binder, always an Id
+                                        -- Can be a join point
              -> (InExpr, SimplEnv)      -- Rhs of binding (or arg of lambda)
              -> ([InBndr], InExpr)      -- Body of the let/lambda
                                         --      \xs.e
@@ -1595,7 +1638,7 @@ simplRecE env pairs body cont
         ; env1 <- simplRecBndrs env bndrs
                 -- NB: bndrs' don't have unfoldings or rules
                 -- We add them as we go down
-        ; env2 <- simplRecBind env1 NotTopLevel (Just cont) pairs
+        ; env2 <- simplRecBind env1 NotTopLevel Nothing pairs
         ; simplExprF env2 body cont }
 
 
@@ -1667,18 +1710,17 @@ completeCall env var cont
                unfolding    = activeUnfolding env var
                maybe_inline = callSiteInline dflags var unfolding
                                              lone_variable arg_infos interesting_cont
-        ; case maybe_inline of {
+        ; case maybe_inline of
             Just expr      -- There is an inlining!
               ->  do { checkedTick (UnfoldingDone var)
                      ; dump_inline dflags expr cont
                      ; simplExprF (zapSubstEnv env) expr cont }
 
-            ; Nothing -> do               -- No inlining!
-
-        { rule_base <- getSimplRules
-        ; let info = mkArgInfo var (getRules rule_base var) n_val_args call_cont
-        ; rebuildCall env info cont
-    }}}
+            ; Nothing -> do { rule_base <- getSimplRules
+                            ; let info = mkArgInfo var (getRules rule_base var)
+                                                   n_val_args call_cont
+                            ; rebuildCall env info cont }
+    }
   where
     dump_inline dflags unfolding cont
       | not (dopt Opt_D_dump_inlinings dflags) = return ()
@@ -1696,6 +1738,12 @@ rebuildCall :: SimplEnv
             -> ArgInfo
             -> SimplCont
             -> SimplM (SimplEnv, OutExpr)
+-- We decided not to inline, so
+--    - simplify the arguments
+--    - try rewrite rules
+--    - and rebuild
+
+---------- Bottoming applications --------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) cont
   -- When we run out of strictness args, it means
   -- that the call is definitely bottom; see SimplUtils.mkArgInfo
@@ -1716,11 +1764,32 @@ rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_strs = [] }) con
     res     = argInfoExpr fun rev_args
     cont_ty = contResultType cont
 
+---------- Try rewrite RULES --------------
+-- See Note [Trying rewrite rules]
+rebuildCall env info@(ArgInfo { ai_fun = fun, ai_args = rev_args
+                              , ai_rules = Just (nr_wanted, rules) }) cont
+  | nr_wanted == 0 || no_more_args
+  , let info' = info { ai_rules = Nothing }
+  = -- We've accumulated a simplified call in <fun,rev_args>
+    -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
+    -- See also Note [Rules for recursive functions]
+    do { mb_match <- tryRules env rules fun (reverse rev_args) cont
+       ; case mb_match of
+             Just (env', rhs, cont') -> simplExprF env' rhs cont'
+             Nothing                 -> rebuildCall env info' cont }
+  where
+    no_more_args = case cont of
+                      ApplyToTy  {} -> False
+                      ApplyToVal {} -> False
+                      _             -> True
+
+
+---------- Simplify applications and casts --------------
 rebuildCall env info (CastIt co cont)
   = rebuildCall env (addCastTo info co) cont
 
 rebuildCall env info (ApplyToTy { sc_arg_ty = arg_ty, sc_cont = cont })
-  = rebuildCall env (info `addTyArgTo` arg_ty) cont
+  = rebuildCall env (addTyArgTo info arg_ty) cont
 
 rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
                               , ai_strs = str:strs, ai_discs = disc:discs })
@@ -1749,23 +1818,32 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         | disc > 0   = DiscArgCtxt  -- Be keener here
         | otherwise  = BoringCtxt   -- Nothing interesting
 
-rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args, ai_rules = rules }) cont
-  | null rules
-  = rebuild env (argInfoExpr fun rev_args) cont      -- No rules, common case
+---------- No further useful info, revert to generic rebuild ------------
+rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont
+  = rebuild env (argInfoExpr fun rev_args) cont
 
-  | otherwise
-  = do {  -- We've accumulated a simplified call in <fun,rev_args>
-          -- so try rewrite rules; see Note [RULEs apply to simplified arguments]
-          -- See also Note [Rules for recursive functions]
-          mb_rule <- tryRules env rules fun (reverse rev_args) cont
-        ; case mb_rule of {
-             Just (env', rule_rhs, cont') -> simplExprF env' rule_rhs cont'
+{- Note [Trying rewrite rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider an application (f e1 e2 e3) where the e1,e2,e3 are not yet
+simplified.  We want to simplify enough arguments to allow the rules
+to apply, but it's more efficient to avoid simplifying e2,e3 if e1 alone
+is sufficient.  Example: class ops
+   (+) dNumInt e2 e3
+If we rewrite ((+) dNumInt) to plusInt, we can take advantage of the
+latter's strictness when simplifying e2, e3.  Moreover, suppose we have
+  RULE  f Int = \x. x True
 
-                 -- Rules don't match
-           ; Nothing -> rebuild env (argInfoExpr fun rev_args) cont      -- No rules
-    } }
+Then given (f Int e1) we rewrite to
+   (\x. x True) e1
+without simpifying e1.  Now we can inline x into its unique call site,
+and absorb the True into it all in the same pass.  If we simplified
+e1 first, we couldn't do that; see Note [Avoiding exponential behaviour].
 
-{-
+So we try to apply rules if either
+  (a) no_more_args: we've run out of argument that the rules can "see"
+  (b) nr_wanted: none of the rules wants any more arguments
+
+
 Note [RULES apply to simplified arguments]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 It's very desirable to try RULES once the arguments have been simplified, because
@@ -3248,10 +3326,12 @@ simplLetUnfolding env top_lvl cont_mb id new_rhs unf
     is_top_lvl   = isTopLevel top_lvl
     is_bottoming = isBottomingId id
 
-simplUnfolding :: SimplEnv -> TopLevelFlag -> Maybe SimplCont -> InId
+simplUnfolding :: SimplEnv -> TopLevelFlag
+               -> Maybe SimplCont  -- Just k => a join point with continuation k
+               -> InId
                -> Unfolding -> SimplM Unfolding
 -- Note [Setting the new unfolding]
-simplUnfolding env top_lvl cont_mb id unf
+simplUnfolding env top_lvl mb_cont id unf
   = case unf of
       NoUnfolding -> return unf
       BootUnfolding -> return unf
@@ -3264,10 +3344,9 @@ simplUnfolding env top_lvl cont_mb id unf
 
       CoreUnfolding { uf_tmpl = expr, uf_src = src, uf_guidance = guide }
         | isStableSource src
-        -> do { expr' <- if isJoinId id
-                            then let Just cont = cont_mb
-                                 in simplJoinRhs rule_env id expr cont
-                            else simplExpr rule_env expr
+        -> do { expr' <- case mb_cont of
+                           Just cont -> simplJoinRhs rule_env id expr cont
+                           Nothing   -> simplExpr rule_env expr
               ; case guide of
                   UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok }  -- Happens for INLINE things
                      -> let guide' = UnfWhen { ug_arity = arity, ug_unsat_ok = sat_ok

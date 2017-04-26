@@ -16,18 +16,18 @@ Total ticks:     55
   1 c
   1 n
   1 g
-  1 a
   1 xs
   1 ys
   1 c
   1 n
-  1 k
-  1 z
-  1 g
+  1 a
+  1 a
   1 g
   1 h
   1 n
-  1 a
+  1 k
+  1 z
+  1 g
   1 lvl
   1 lvl
   1 lvl
@@ -47,10 +47,17 @@ Total ticks:     55
   1 a
   1 g
   1 a
-  1 b
-  1 a
   1 xs
   1 ys
+  1 b
+  1 c
+  1 n
+  1 a
+  1 b
+  1 a
+  1 a
+  1 g
+  1 h
   1 b
   1 c
   1 n
@@ -59,13 +66,6 @@ Total ticks:     55
   1 k
   1 z
   1 g
-  1 a
-  1 g
-  1 h
-  1 b
-  1 c
-  1 n
-  1 a
 10 SimplifierDone 10
 
 
