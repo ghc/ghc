@@ -17,7 +17,7 @@ stability:            experimental
 tested-with:          GHC==8.2.*, GHC==8.3
                       
 extra-source-files:
-  CHANGES
+  CHANGES.md
   README.md
   doc/Makefile
   doc/README.md
