@@ -42,7 +42,7 @@ cabalRules = do
                     depsExes = map (collectDeps . Just . snd) $ condExecutables pd
                     deps     = concat $ depsLib : depsExes
                     depNames = [ unPackageName name | Dependency name _ <- deps ]
-                return . unwords $ pkgNameString pkg : sort depNames
+                return . unwords $ pkgNameString pkg : (sort depNames \\ [pkgNameString pkg])
         writeFileChanged out $ unlines pkgDeps
         putSuccess $ "| Successfully computed package dependencies"
 
