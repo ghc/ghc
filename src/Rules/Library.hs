@@ -23,12 +23,8 @@ buildPackageLibrary context@Context {..} = do
     -- TODO: handle dynamic libraries
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
         removeFile a
-        asmObjs <- map (objectPath context) <$> pkgDataList (AsmSrcs path)
-        cObjs   <- cObjects  context
-        cmmObjs <- map (objectPath context) <$> pkgDataList (CmmSrcs path)
-        eObjs   <- extraObjects context
-        hsObjs  <- hsObjects context
-        let noHsObjs = asmObjs ++ cObjs ++ cmmObjs ++ eObjs
+        hsObjs   <- hsObjects    context
+        noHsObjs <- nonHsObjects context
 
         -- This will create split objects if required (we don't track them
         -- explicitly as this would needlessly bloat the Shake database).
@@ -56,9 +52,20 @@ buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     let libPrefix = buildPath context -/- "HS" ++ pkgNameString package
     matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
-        objs <- concatMapM ($ context) [cObjects, hsObjects, extraObjects]
+        objs <- allObjects context
         need objs
         build $ Target context Ld objs [obj]
+
+allObjects :: Context -> Action [FilePath]
+allObjects context = (++) <$> nonHsObjects context <*> hsObjects context
+
+nonHsObjects :: Context -> Action [FilePath]
+nonHsObjects context = do
+    let path = buildPath context
+    cObjs   <- cObjects context
+    cmmObjs <- map (objectPath context) <$> pkgDataList (CmmSrcs path)
+    eObjs   <- extraObjects context
+    return $ cObjs ++ cmmObjs ++ eObjs
 
 cObjects :: Context -> Action [FilePath]
 cObjects context = do

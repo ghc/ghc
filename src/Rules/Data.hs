@@ -102,13 +102,16 @@ packageCmmSources pkg
 -- Prepare a given 'packaga-data.mk' file for parsing by readConfigFile:
 -- 1) Drop lines containing '$'. For example, get rid of
 -- @libraries/Win32_dist-install_CMM_SRCS  := $(addprefix cbits/,$(notdir ...@
--- Reason: we don't need them and we can't parse them.
+-- and replace it with a tracked call to getDirectoryFiles.
 -- 2) Drop path prefixes to individual settings.
 -- For example, @libraries/deepseq/dist-install_VERSION = 1.4.0.0@
 -- is replaced by @VERSION = 1.4.0.0@.
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
 postProcessPackageData :: Context -> FilePath -> Action ()
 postProcessPackageData context@Context {..} file = do
-    top <- topDirectory
+    top     <- topDirectory
+    cmmSrcs <- getDirectoryFiles (pkgPath package) ["cbits/*.cmm"]
     let len = length (pkgPath package) + length (top -/- buildPath context) + 2
-    fixFile file $ unlines . map (drop len) . filter ('$' `notElem`) . lines
+    fixFile file $ unlines
+                 . (++ ["CMM_SRCS = " ++ unwords (map unifyPath cmmSrcs) ])
+                 . map (drop len) . filter ('$' `notElem`) . lines
