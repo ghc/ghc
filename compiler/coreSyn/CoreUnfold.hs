@@ -1472,15 +1472,15 @@ computeDiscount dflags arg_discounts res_discount arg_infos cont_info
       = res_discount   -- Over-saturated
       | otherwise
       = case cont_info of
-                        BoringCtxt  -> 0
-                        CaseCtxt    -> res_discount  -- Presumably a constructor
-                        ValAppCtxt  -> res_discount  -- Presumably a function
-                        _           -> 40 `min` res_discount
+           BoringCtxt  -> 0
+           CaseCtxt    -> res_discount  -- Presumably a constructor
+           ValAppCtxt  -> res_discount  -- Presumably a function
+           _           -> 40 `min` res_discount
                 -- ToDo: this 40 `min` res_discount doesn't seem right
                 --   for DiscArgCtxt it shouldn't matter because the function will
-                --    get the arg discount for any non-triv arg
+                --       get the arg discount for any non-triv arg
                 --   for RuleArgCtxt we do want to be keener to inline; but not only
-                --    constructor results
+                --       constructor results
                 --   for RhsCtxt I suppose that exposing a data con is good in general
                 --   And 40 seems very arbitrary
                 --

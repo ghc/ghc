@@ -479,7 +479,7 @@ subst_opt_id_bndr (SOE { soe_subst = subst, soe_inl = inl }) old_id
     id1    = uniqAway in_scope old_id
     id2    = setIdType id1 (substTy subst (idType old_id))
     new_id = zapFragileIdInfo id2
-             -- Zaps rules, worker-info, unfolding, and fragile OccInfo
+             -- Zaps rules, unfolding, and fragile OccInfo
              -- The unfolding and rules will get added back later, by add_info
 
     new_in_scope = in_scope `extendInScopeSet` new_id
