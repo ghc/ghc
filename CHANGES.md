@@ -1,4 +1,4 @@
-## Changes in version HEAD
+## Changes in version 2.18.0
 
  * Synopsis is working again (#599)
 
