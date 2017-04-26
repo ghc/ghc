@@ -22,11 +22,13 @@
 #endif
 
 #include <string.h>
+#include <ctype.h>
 
 #ifdef DEBUG
 
 #include "Disassembler.h"
 #include "Apply.h"
+#include "Libdw.h"
 
 /* --------------------------------------------------------------------------
  * local function decls
@@ -56,11 +58,31 @@ void printObj( StgClosure *obj )
     printClosure(obj);
 }
 
+static void printFunInfo(StgPtr info)
+{
+#if USE_LIBDW
+    static LibdwSession *session = NULL;
+    static HashTable *ht = NULL;
+    if (session == NULL)
+        session = libdwInit();
+    if (ht == NULL)
+        ht = allocHashTable();
+    Location *l;
+    if (!(l = lookupHashTable(ht, (StgWord)info))) {
+        l = malloc(sizeof(Location));
+        libdwLookupLocation(session, l, info);
+        insertHashTable(ht, (StgWord)info, l);
+    }
+    debugBelch("<%s %d:%d>", l->source_file ? l->source_file : "?", l->lineno, l->colno);
+#endif
+}
+
 STATIC_INLINE void
 printStdObjHdr( const StgClosure *obj, char* tag )
 {
     debugBelch("%s(",tag);
     printPtr((StgPtr)obj->header.info);
+    printFunInfo((StgPtr)obj->header.info);
 #ifdef PROFILING
     debugBelch(", %s", obj->header.prof.ccs->cc->label);
 #endif
@@ -78,7 +100,7 @@ printStdObjPayload( const StgClosure *obj )
         printPtr((StgPtr)obj->payload[i]);
     }
     for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        debugBelch(", %pd#",obj->payload[i+j]);
+        debugBelch(", %p#",obj->payload[i+j]);
     }
     debugBelch(")\n");
 }
@@ -95,7 +117,7 @@ printThunkPayload( StgThunk *obj )
         printPtr((StgPtr)obj->payload[i]);
     }
     for (j = 0; j < info->layout.payload.nptrs; ++j) {
-        debugBelch(", %pd#",obj->payload[i+j]);
+        debugBelch(", %p#",obj->payload[i+j]);
     }
     debugBelch(")\n");
 }
@@ -146,6 +168,7 @@ printClosure( const StgClosure *obj )
     case FUN_STATIC:
         debugBelch("FUN/%d(",(int)itbl_to_fun_itbl(info)->f.arity);
         printPtr((StgPtr)obj->header.info);
+        printFunInfo((StgPtr)obj->header.info);
 #ifdef PROFILING
         debugBelch(", %s", obj->header.prof.ccs->cc->label);
 #endif
@@ -169,14 +192,10 @@ printClosure( const StgClosure *obj )
     case THUNK_1_1: case THUNK_0_2: case THUNK_2_0:
     case THUNK_STATIC:
             /* ToDo: will this work for THUNK_STATIC too? */
-#ifdef PROFILING
-            printThunkObject((StgThunk *)obj,GET_PROF_DESC(info));
-#else
             printThunkObject((StgThunk *)obj,"THUNK");
-#endif
             break;
 
-    case THUNK_SELECTOR:
+    case THUNK_SELECTOR: /* TODO: Print which field we are selecting */
         printStdObjHdr(obj, "THUNK_SELECTOR");
         debugBelch(", %p)\n", ((StgSelector *)obj)->selectee);
         break;
@@ -294,8 +313,10 @@ printClosure( const StgClosure *obj )
         {
             StgWord i;
             debugBelch("ARR_WORDS(\"");
-            for (i=0; i<arr_words_words((StgArrBytes *)obj); i++)
-              debugBelch("%" FMT_Word, (W_)((StgArrBytes *)obj)->payload[i]);
+            for (i=0; i<arr_words_words((StgArrBytes *)obj) * sizeof(StgWord) && i < 30; i++) {
+                char c = ((char*)(((StgArrBytes *)obj)->payload))[i];
+                debugBelch("%c", (iscntrl(c) || isspace(c)) ? '.' : c);
+            }
             debugBelch("\")\n");
             break;
         }
@@ -312,6 +333,10 @@ printClosure( const StgClosure *obj )
         debugBelch("MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
         break;
 
+    case MUT_ARR_PTRS_FROZEN0:
+        debugBelch("MUT_ARR_PTRS_FROZEN0(size=%" FMT_Word ")\n", (W_)((StgMutArrPtrs *)obj)->ptrs);
+        break;
+
     case SMALL_MUT_ARR_PTRS_CLEAN:
         debugBelch("SMALL_MUT_ARR_PTRS_CLEAN(size=%" FMT_Word ")\n",
                    (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
@@ -324,6 +349,11 @@ printClosure( const StgClosure *obj )
 
     case SMALL_MUT_ARR_PTRS_FROZEN:
         debugBelch("SMALL_MUT_ARR_PTRS_FROZEN(size=%" FMT_Word ")\n",
+                   (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
+        break;
+
+    case SMALL_MUT_ARR_PTRS_FROZEN0:
+        debugBelch("SMALL_MUT_ARR_PTRS_FROZEN0(size=%" FMT_Word ")\n",
                    (W_)((StgSmallMutArrPtrs *)obj)->ptrs);
         break;
 
