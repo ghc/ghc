@@ -1236,16 +1236,9 @@ convertPackageInfoToCacheFormat pkg =
        GhcPkg.componentId        = installedComponentId pkg,
        GhcPkg.instantiatedWith   = instantiatedWith pkg,
        GhcPkg.sourcePackageId    = sourcePackageId pkg,
-       GhcPkg.packageName        =
-        case sourcePackageName pkg of
-            Nothing -> packageName pkg
-            Just pn -> pn,
+       GhcPkg.packageName        = packageName pkg,
        GhcPkg.packageVersion     = Version.Version (versionNumbers (packageVersion pkg)) [],
-       GhcPkg.mungedPackageName  =
-         case sourcePackageName pkg of
-            Nothing -> Nothing
-            Just _  -> Just (packageName pkg),
-       GhcPkg.libName            =
+       GhcPkg.sourceLibName      =
          fmap (mkPackageName . unUnqualComponentName) (sourceLibName pkg),
        GhcPkg.depends            = depends pkg,
        GhcPkg.abiDepends         = map (\(AbiDependency k v) -> (k,unAbiHash v)) (abiDepends pkg),

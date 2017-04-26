@@ -1940,7 +1940,7 @@ componentIdString :: DynFlags -> ComponentId -> Maybe String
 componentIdString dflags cid = do
     conf <- lookupInstalledPackage dflags (componentIdToInstalledUnitId cid)
     return $
-        case libName conf of
+        case sourceLibName conf of
             Nothing -> sourcePackageIdString conf
             Just (PackageName libname) ->
                 packageNameString conf

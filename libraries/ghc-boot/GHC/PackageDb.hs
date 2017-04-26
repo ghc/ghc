@@ -98,8 +98,7 @@ data InstalledPackageInfo compid srcpkgid srcpkgname instunitid unitid modulenam
        sourcePackageId    :: srcpkgid,
        packageName        :: srcpkgname,
        packageVersion     :: Version,
-       mungedPackageName  :: Maybe srcpkgname,
-       libName            :: Maybe srcpkgname,
+       sourceLibName      :: Maybe srcpkgname,
        abiHash            :: String,
        depends            :: [instunitid],
        -- | Like 'depends', but each dependency is annotated with the
@@ -184,8 +183,7 @@ emptyInstalledPackageInfo =
        sourcePackageId    = fromStringRep BS.empty,
        packageName        = fromStringRep BS.empty,
        packageVersion     = Version [] [],
-       mungedPackageName  = Nothing,
-       libName            = Nothing,
+       sourceLibName      = Nothing,
        abiHash            = "",
        depends            = [],
        abiDepends         = [],
@@ -444,7 +442,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
   put (InstalledPackageInfo
          unitId componentId instantiatedWith sourcePackageId
          packageName packageVersion
-         mungedPackageName libName
+         sourceLibName
          abiHash depends abiDepends importDirs
          hsLibraries extraLibraries extraGHCiLibraries
          libraryDirs libraryDynDirs
@@ -457,8 +455,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     put (toStringRep sourcePackageId)
     put (toStringRep packageName)
     put packageVersion
-    put (fmap toStringRep mungedPackageName)
-    put (fmap toStringRep libName)
+    put (fmap toStringRep sourceLibName)
     put (toStringRep unitId)
     put (toStringRep componentId)
     put (map (\(mod_name, mod) -> (toStringRep mod_name, toDbModule mod))
@@ -491,8 +488,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
     sourcePackageId    <- get
     packageName        <- get
     packageVersion     <- get
-    mungedPackageName  <- get
-    libName            <- get
+    sourceLibName      <- get
     unitId             <- get
     componentId        <- get
     instantiatedWith   <- get
@@ -525,8 +521,7 @@ instance (RepInstalledPackageInfo a b c d e f g) =>
                 instantiatedWith)
               (fromStringRep sourcePackageId)
               (fromStringRep packageName) packageVersion
-              (fmap fromStringRep mungedPackageName)
-              (fmap fromStringRep libName)
+              (fmap fromStringRep sourceLibName)
               abiHash
               (map fromStringRep depends)
               (map (\(k,v) -> (fromStringRep k, v)) abiDepends)
