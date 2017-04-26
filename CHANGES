@@ -1,3 +1,7 @@
+Changes in version HEAD
+
+ * Synopsis is working again (#599)
+
 Changes in version 2.17.4
 
  * Fix 'internal error: links: UnhelpfulSpan' (#554, #565)
