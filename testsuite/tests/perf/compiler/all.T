@@ -721,7 +721,8 @@ test('T9020',
            # Original:    381360728
            # 2014-07-31:  343005716 (Windows) (general round of updates)
            # 2017-03-24:  249904136 (x86/Linux, 64-bit machine)
-           (wordsize(64), 493596312, 10)])
+
+           (wordsize(64), 423163832, 10)])
            # prev:        795469104
            # 2014-07-17:  728263536 (general round of updates)
            # 2014-09-10:  785871680 post-AMP-cleanup
@@ -734,6 +735,7 @@ test('T9020',
            # 2017-02-14:  500707080 Early inline patch; 35% decrease!
            #                        Program size collapses in first simplification
            # 2017-03-31:  493596312 Fix memory leak in simplifier
+           # 2017-04-28:  423163832  Remove exponential behaviour in simplifier
       ],
       compile,[''])
 
@@ -1003,12 +1005,13 @@ test('T12227',
 test('T12425',
      [ only_ways(['optasm']),
        compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 134334800, 5),
+          [(wordsize(64), 127500136, 5),
           # initial:      125831400
           # 2017-01-18:   133380960  Allow top-level string literals in Core
           # 2017-02-17:   153611448  Type-indexed Typeable
           # 2017-03-03:   142256192  Share Typeable KindReps
           # 2017-03-21:   134334800  Unclear
+          # 2017-04-28:   127500136  Remove exponential behaviour in simplifier
           ]),
      ],
      compile,
@@ -1072,6 +1075,15 @@ test('T12707',
           # 2017-02-11: 1310037632  Check local family instances vs imports
           # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
           # 2017-03-02: 1231809592  Drift from recent simplifier improvements
+          ]),
+     ],
+     compile,
+     [''])
+
+test('T13379',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 411597856, 5),
+          # initial:    411597856
           ]),
      ],
      compile,

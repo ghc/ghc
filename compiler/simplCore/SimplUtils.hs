@@ -19,7 +19,7 @@ module SimplUtils (
         -- The continuation type
         SimplCont(..), DupFlag(..),
         isSimplified,
-        contIsDupable, contResultType, contHoleType, applyContToJoinType,
+        contIsDupable, contResultType, contHoleType,
         contIsTrivial, contArgs,
         countArgs,
         mkBoringStop, mkRhsStop, mkLazyArgStop, contIsRhsOrArg,
@@ -221,9 +221,10 @@ data ArgInfo
   = ArgInfo {
         ai_fun   :: OutId,      -- The function
         ai_args  :: [ArgSpec],  -- ...applied to these args (which are in *reverse* order)
+
         ai_type  :: OutType,    -- Type of (f a1 ... an)
 
-        ai_rules :: [CoreRule], -- Rules for this function
+        ai_rules :: FunRules,   -- Rules for this function
 
         ai_encl :: Bool,        -- Flag saying whether this function
                                 -- or an enclosing one has rules (recursively)
@@ -250,11 +251,13 @@ instance Outputable ArgSpec where
 
 addValArgTo :: ArgInfo -> OutExpr -> ArgInfo
 addValArgTo ai arg = ai { ai_args = ValArg arg : ai_args ai
-                        , ai_type = applyTypeToArg (ai_type ai) arg }
+                        , ai_type = applyTypeToArg (ai_type ai) arg
+                        , ai_rules = decRules (ai_rules ai) }
 
 addTyArgTo :: ArgInfo -> OutType -> ArgInfo
 addTyArgTo ai arg_ty = ai { ai_args = arg_spec : ai_args ai
-                          , ai_type = piResultTy poly_fun_ty arg_ty }
+                          , ai_type = piResultTy poly_fun_ty arg_ty
+                          , ai_rules = decRules (ai_rules ai) }
   where
     poly_fun_ty = ai_type ai
     arg_spec    = TyArg { as_arg_ty = arg_ty, as_hole_ty = poly_fun_ty }
@@ -292,6 +295,20 @@ argInfoExpr fun rev_args
     go (TyArg { as_arg_ty = ty } : as) = go as `App` Type ty
     go (CastBy co                : as) = mkCast (go as) co
 
+
+type FunRules = Maybe (Int, [CoreRule]) -- Remaining rules for this function
+     -- Nothing => No rules
+     -- Just (n, rules) => some rules, requiring at least n more type/value args
+
+decRules :: FunRules -> FunRules
+decRules (Just (n, rules)) = Just (n-1, rules)
+decRules Nothing           = Nothing
+
+mkFunRules :: [CoreRule] -> FunRules
+mkFunRules [] = Nothing
+mkFunRules rs = Just (n_required, rs)
+  where
+    n_required = maximum (map ruleArity rs)
 
 {-
 ************************************************************************
@@ -362,10 +379,6 @@ contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
 contHoleType (Select { sc_dup = d, sc_bndr =  b, sc_env = se })
   = perhapsSubstTy d se (idType b)
 
-applyContToJoinType :: JoinArity -> SimplCont -> OutType -> OutType
-applyContToJoinType ar cont ty
-  = setJoinResTy ar (contResultType cont) ty
-
 -------------------
 countArgs :: SimplCont -> Int
 -- Count all arguments, including types, coercions, and other values
@@ -407,17 +420,19 @@ mkArgInfo :: Id
 mkArgInfo fun rules n_val_args call_cont
   | n_val_args < idArity fun            -- Note [Unsaturated functions]
   = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
-            , ai_rules = rules, ai_encl = False
+            , ai_rules = fun_rules, ai_encl = False
             , ai_strs = vanilla_stricts
             , ai_discs = vanilla_discounts }
   | otherwise
   = ArgInfo { ai_fun = fun, ai_args = [], ai_type = fun_ty
-            , ai_rules = rules
+            , ai_rules = fun_rules
             , ai_encl = interestingArgContext rules call_cont
             , ai_strs  = add_type_str fun_ty arg_stricts
             , ai_discs = arg_discounts }
   where
     fun_ty = idType fun
+
+    fun_rules = mkFunRules rules
 
     vanilla_discounts, arg_discounts :: [Int]
     vanilla_discounts = repeat 0
