@@ -1,5 +1,5 @@
 name:                 haddock-api
-version:              2.17.3
+version:              2.17.4
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -33,28 +33,29 @@ data-files:
   latex/haddock.sty
 
 library
-  default-language:
-      Haskell2010
+  default-language: Haskell2010
 
-  build-depends:
-      base >= 4.3 && < 4.11
-    , bytestring
-    , filepath
-    , directory
-    , containers
-    , transformers
-    , deepseq
-    , array
-    , xhtml >= 3000.2 && < 3000.3
-    , Cabal >= 1.10
-    , ghc-boot
-    , ghc == 8.2.*
+  -- this package typically supports only single major versions
+  build-depends: base            == 4.10.*
+               , Cabal           == 2.0.*
+               , ghc             == 8.2.*
+               , ghc-paths       == 0.1.*
+               , haddock-library >= 1.4.2 && < 1.5
+               , xhtml           == 3000.2.*
 
-    , ghc-paths
-    , haddock-library == 1.4.*
+  -- Versions for the dependencies below are transitively pinned by
+  -- the non-reinstallable `ghc` package and hence need no version
+  -- bounds
+  build-depends: array
+               , bytestring
+               , containers
+               , deepseq
+               , directory
+               , filepath
+               , ghc-boot
+               , transformers
 
-  hs-source-dirs:
-      src
+  hs-source-dirs: src
 
   ghc-options: -funbox-strict-fields -Wall -fwarn-tabs -O2
 
@@ -125,4 +126,5 @@ test-suite spec
 
 source-repository head
   type:     git
+  subdir:   haddock-api
   location: https://github.com/haskell/haddock.git

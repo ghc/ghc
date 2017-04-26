@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.17.3
+version:              2.17.4
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -43,6 +43,7 @@ executable haddock
   hs-source-dirs:       driver
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
 
+  -- haddock typically only supports a single GHC major version
   build-depends:
     base >= 4.3 && < 4.11
   if flag(in-ghc-tree)
@@ -120,7 +121,9 @@ executable haddock
       Haddock.Syb
       Haddock.Convert
   else
-    build-depends:  haddock-api == 2.17.*
+    -- in order for haddock's advertised version number to have proper meaning,
+    -- we pin down to a single haddock-api version.
+    build-depends:  haddock-api == 2.17.4
 
 test-suite driver-test
   type:             exitcode-stdio-1.0
