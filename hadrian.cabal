@@ -66,6 +66,7 @@ executable hadrian
                        , Rules.Test
                        , Rules.Wrappers.Ghc
                        , Rules.Wrappers.GhcPkg
+                       , Rules.Wrappers.RunGhc
                        , Settings
                        , Settings.Builders.Alex
                        , Settings.Builders.Ar

@@ -1,12 +1,12 @@
-module Rules.Wrappers.Runhaskell (runhaskellWrapper) where
+module Rules.Wrappers.RunGhc (runGhcWrapper) where
 
 import Base
 import Expression
 import Oracles.Path
 
-runhaskellWrapper :: FilePath -> Expr String
-runhaskellWrapper program = do
-    lift $ need [sourcePath -/- "Rules/Wrappers/Runhaskell.hs"]
+runGhcWrapper :: FilePath -> Expr String
+runGhcWrapper program = do
+    lift $ need [sourcePath -/- "Rules/Wrappers/RunGhc.hs"]
     top <- getTopDirectory
     return $ unlines
         [ "#!/bin/bash"
