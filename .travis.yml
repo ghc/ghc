@@ -16,6 +16,7 @@ matrix:
               - PATH="/opt/cabal/1.22/bin:$PATH"
 
         - os: osx
+          osx_image: xcode8
           env: MODE="--flavour=quickest --integer-simple"
           before_install:
               - brew update
