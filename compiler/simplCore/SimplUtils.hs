@@ -54,7 +54,6 @@ import SimplMonad
 import Type     hiding( substTy )
 import Coercion hiding( substCo )
 import DataCon          ( dataConWorkId, isNullaryRepDataCon )
-import VarEnv
 import VarSet
 import BasicTypes
 import Util
@@ -96,7 +95,7 @@ Key points:
 -}
 
 data SimplCont
-  = Stop                -- An empty context, or <hole>
+  = Stop                -- Stop[e] = e
         OutType         -- Type of the <hole>
         CallCtxt        -- Tells if there is something interesting about
                         --          the context, and hence the inliner
@@ -107,43 +106,48 @@ data SimplCont
                         -- Never ValAppCxt (use ApplyToVal instead)
                         -- or CaseCtxt (use Select instead)
 
-  | CastIt            -- <hole> `cast` co
+  | CastIt              -- (CastIt co K)[e] = K[ e `cast` co ]
         OutCoercion             -- The coercion simplified
                                 -- Invariant: never an identity coercion
         SimplCont
 
-  | ApplyToVal {        -- <hole> arg
-        sc_dup  :: DupFlag,          -- See Note [DupFlag invariants]
-        sc_arg  :: InExpr,           -- The argument,
-        sc_env  :: StaticEnv,        --     and its static env
-        sc_cont :: SimplCont }
+  | ApplyToVal         -- (ApplyToVal arg K)[e] = K[ e arg ]
+      { sc_dup  :: DupFlag      -- See Note [DupFlag invariants]
+      , sc_arg  :: InExpr       -- The argument,
+      , sc_env  :: StaticEnv    --     and its static env
+      , sc_cont :: SimplCont }
 
-  | ApplyToTy {         -- <hole> ty
-        sc_arg_ty  :: OutType,     -- Argument type
-        sc_hole_ty :: OutType,     -- Type of the function, presumably (forall a. blah)
-                                   -- See Note [The hole type in ApplyToTy]
-        sc_cont    :: SimplCont }
+  | ApplyToTy          -- (ApplyToTy ty K)[e] = K[ e ty ]
+      { sc_arg_ty  :: OutType     -- Argument type
+      , sc_hole_ty :: OutType     -- Type of the function, presumably (forall a. blah)
+                                  -- See Note [The hole type in ApplyToTy]
+      , sc_cont    :: SimplCont }
 
-  | Select {           -- case <hole> of alts
-        sc_dup  :: DupFlag,                 -- See Note [DupFlag invariants]
-        sc_bndr :: InId,                    -- case binder
-        sc_alts :: [InAlt],                 -- Alternatives
-        sc_env  ::  StaticEnv,              --   and their static environment
-        sc_cont :: SimplCont }
+  | Select             -- (Select alts K)[e] = K[ case e of alts ]
+      { sc_dup  :: DupFlag        -- See Note [DupFlag invariants]
+      , sc_bndr :: InId           -- case binder
+      , sc_alts :: [InAlt]        -- Alternatives
+      , sc_env  :: StaticEnv      --   and their static environment
+      , sc_cont :: SimplCont }
 
   -- The two strict forms have no DupFlag, because we never duplicate them
-  | StrictBind                  -- (\x* \xs. e) <hole>
-        InId [InBndr]           -- let x* = <hole> in e
-        InExpr StaticEnv        --      is a special case
-        SimplCont
+  | StrictBind          -- (StrictBind x xs b K)[e] = let x = e in K[\xs.b]
+                        --       or, equivalently,  = K[ (\x xs.b) e ]
+      { sc_dup   :: DupFlag        -- See Note [DupFlag invariants]
+      , sc_bndr  :: InId
+      , sc_bndrs :: [InBndr]
+      , sc_body  :: InExpr
+      , sc_env   :: StaticEnv
+      , sc_cont  :: SimplCont }
 
-  | StrictArg           -- f e1 ..en <hole>
-        ArgInfo         -- Specifies f, e1..en, Whether f has rules, etc
-                        --     plus strictness flags for *further* args
-        CallCtxt        -- Whether *this* argument position is interesting
-        SimplCont
+  | StrictArg           -- (StrictArg (f e1 ..en) K)[e] = K[ f e1 .. en e ]
+      { sc_dup  :: DupFlag     -- Always Simplified or OkToDup
+      , sc_fun  :: ArgInfo     -- Specifies f, e1..en, Whether f has rules, etc
+                               --     plus strictness flags for *further* args
+      , sc_cci  :: CallCtxt    -- Whether *this* argument position is interesting
+      , sc_cont :: SimplCont }
 
-  | TickIt
+  | TickIt              -- (TickIt t K)[e] = K[ tick t e ]
         (Tickish Id)    -- Tick tickish <hole>
         SimplCont
 
@@ -186,8 +190,10 @@ instance Outputable SimplCont where
   ppr (ApplyToVal { sc_arg = arg, sc_dup = dup, sc_cont = cont })
     = (text "ApplyToVal" <+> ppr dup <+> pprParendExpr arg)
                                         $$ ppr cont
-  ppr (StrictBind b _ _ _ cont)       = (text "StrictBind" <+> ppr b) $$ ppr cont
-  ppr (StrictArg ai _ cont)           = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
+  ppr (StrictBind { sc_bndr = b, sc_cont = cont })
+    = (text "StrictBind" <+> ppr b) $$ ppr cont
+  ppr (StrictArg { sc_fun = ai, sc_cont = cont })
+    = (text "StrictArg" <+> ppr (ai_fun ai)) $$ ppr cont
   ppr (Select { sc_dup = dup, sc_bndr = bndr, sc_alts = alts, sc_env = se, sc_cont = cont })
     = (text "Select" <+> ppr dup <+> ppr bndr) $$
        ifPprDebug (nest 2 $ vcat [ppr (seTvSubst se), ppr alts]) $$ ppr cont
@@ -344,6 +350,7 @@ contIsDupable (Stop {})                         = True
 contIsDupable (ApplyToTy  { sc_cont = k })      = contIsDupable k
 contIsDupable (ApplyToVal { sc_dup = OkToDup }) = True -- See Note [DupFlag invariants]
 contIsDupable (Select { sc_dup = OkToDup })     = True -- ...ditto...
+contIsDupable (StrictArg { sc_dup = OkToDup })  = True -- ...ditto...
 contIsDupable (CastIt _ k)                      = contIsDupable k
 contIsDupable _                                 = False
 
@@ -359,8 +366,8 @@ contIsTrivial _                                                 = False
 contResultType :: SimplCont -> OutType
 contResultType (Stop ty _)                  = ty
 contResultType (CastIt _ k)                 = contResultType k
-contResultType (StrictBind _ _ _ _ k)       = contResultType k
-contResultType (StrictArg _ _ k)            = contResultType k
+contResultType (StrictBind { sc_cont = k }) = contResultType k
+contResultType (StrictArg { sc_cont = k })  = contResultType k
 contResultType (Select { sc_cont = k })     = contResultType k
 contResultType (ApplyToTy  { sc_cont = k }) = contResultType k
 contResultType (ApplyToVal { sc_cont = k }) = contResultType k
@@ -370,8 +377,9 @@ contHoleType :: SimplCont -> OutType
 contHoleType (Stop ty _)                      = ty
 contHoleType (TickIt _ k)                     = contHoleType k
 contHoleType (CastIt co _)                    = pFst (coercionKind co)
-contHoleType (StrictBind b _ _ se _)          = substTy se (idType b)
-contHoleType (StrictArg ai _ _)               = funArgTy (ai_type ai)
+contHoleType (StrictBind { sc_bndr = b, sc_dup = dup, sc_env = se })
+  = perhapsSubstTy dup se (idType b)
+contHoleType (StrictArg { sc_fun = ai })      = funArgTy (ai_type ai)
 contHoleType (ApplyToTy  { sc_hole_ty = ty }) = ty  -- See Note [The hole type in ApplyToTy]
 contHoleType (ApplyToVal { sc_arg = e, sc_env = se, sc_dup = dup, sc_cont = k })
   = mkFunTy (perhapsSubstTy dup se (exprType e))
@@ -552,13 +560,12 @@ interestingCallContext cont
         -- motivation to inline. See Note [Cast then apply]
         -- in CoreUnfold
 
-    interesting (StrictArg _ BoringCtxt _)  = RhsCtxt
-    interesting (StrictArg _ cci _)         = cci
-    interesting (StrictBind {})             = BoringCtxt
-    interesting (Stop _ cci)                = cci
-    interesting (TickIt _ k)                = interesting k
-    interesting (ApplyToTy { sc_cont = k }) = interesting k
-    interesting (CastIt _ k)                = interesting k
+    interesting (StrictArg { sc_cci = cci }) = cci
+    interesting (StrictBind {})              = BoringCtxt
+    interesting (Stop _ cci)                 = cci
+    interesting (TickIt _ k)                 = interesting k
+    interesting (ApplyToTy { sc_cont = k })  = interesting k
+    interesting (CastIt _ k)                 = interesting k
         -- If this call is the arg of a strict function, the context
         -- is a bit interesting.  If we inline here, we may get useful
         -- evaluation information to avoid repeated evals: e.g.
@@ -600,14 +607,14 @@ interestingArgContext rules call_cont
   where
     enclosing_fn_has_rules = go call_cont
 
-    go (Select {})         = False
-    go (ApplyToVal {})     = False  -- Shouldn't really happen
-    go (ApplyToTy  {})     = False  -- Ditto
-    go (StrictArg _ cci _) = interesting cci
-    go (StrictBind {})     = False      -- ??
-    go (CastIt _ c)        = go c
-    go (Stop _ cci)        = interesting cci
-    go (TickIt _ c)        = go c
+    go (Select {})                  = False
+    go (ApplyToVal {})              = False  -- Shouldn't really happen
+    go (ApplyToTy  {})              = False  -- Ditto
+    go (StrictArg { sc_cci = cci }) = interesting cci
+    go (StrictBind {})              = False      -- ??
+    go (CastIt _ c)                 = go c
+    go (Stop _ cci)                 = interesting cci
+    go (TickIt _ c)                 = go c
 
     interesting RuleArgCtxt = True
     interesting _           = False
@@ -650,12 +657,10 @@ interestingArg env e = go env 0 e
   where
     -- n is # value args to which the expression is applied
     go env n (Var v)
-       | SimplEnv { seIdSubst = ids, seInScope = in_scope } <- env
-       = case snd <$> lookupVarEnv ids v of
-           Nothing                     -> go_var n (refineFromInScope in_scope v)
-           Just (DoneId v')            -> go_var n (refineFromInScope in_scope v')
-           Just (DoneEx e)             -> go (zapSubstEnv env)             n e
-           Just (ContEx tvs cvs ids e) -> go (setSubstEnv env tvs cvs ids) n e
+       = case substId env v of
+           DoneId v'            -> go_var n v'
+           DoneEx e _           -> go (zapSubstEnv env)             n e
+           ContEx tvs cvs ids e -> go (setSubstEnv env tvs cvs ids) n e
 
     go _   _ (Lit {})          = ValueArg
     go _   _ (Type _)          = TrivArg

@@ -699,7 +699,7 @@ test('T6048',
             # 2014-12-01: 49987836 (x86 Windows)
             # 2016-04-06: 55701280 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 115714216, 10)])
+           (wordsize(64), 90996312, 10)])
              # 2012-09-18  97247032 amd64/Linux
              # 2014-01-16 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 2014-01-18  95960720 amd64/Linux Call Arity improvements
@@ -712,6 +712,7 @@ test('T6048',
              # 2016-03-11 108225624 amd64/Linux unknown reason sadly; likely gradual creep.
              # 2016-11-25  94327392 amd64/Linux Back down again hooray; still not sure why
              # 2017-02-17 115715592 amd64/Linux Type-indexed Typeable
+             # 2017-04-28 90996312 Join point refactoring
       ],
       compile,[''])
 
