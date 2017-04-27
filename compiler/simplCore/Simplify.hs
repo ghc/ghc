@@ -1801,7 +1801,7 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
   | str                 -- Strict argument
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setFloats` env) arg
-               (StrictArg info' cci cont)
+               (StrictArg info' cci_strict cont)
                 -- Note [Shadowing]
 
   | otherwise                           -- Lazy argument
@@ -1810,13 +1810,27 @@ rebuildCall env info@(ArgInfo { ai_encl = encl_rules, ai_type = fun_ty
         -- have to be very careful about bogus strictness through
         -- floating a demanded let.
   = do  { arg' <- simplExprC (arg_se `setInScopeAndZapFloats` env) arg
-                             (mkLazyArgStop (funArgTy fun_ty) cci)
+                             (mkLazyArgStop arg_ty cci_lazy)
         ; rebuildCall env (addValArgTo info' arg') cont }
   where
-    info' = info { ai_strs = strs, ai_discs = discs }
-    cci | encl_rules = RuleArgCtxt
-        | disc > 0   = DiscArgCtxt  -- Be keener here
-        | otherwise  = BoringCtxt   -- Nothing interesting
+    info'  = info { ai_strs = strs, ai_discs = discs }
+    arg_ty = funArgTy fun_ty
+
+    -- Use this for lazy arguments
+    cci_lazy | encl_rules = RuleArgCtxt
+             | disc > 0   = DiscArgCtxt  -- Be keener here
+             | otherwise  = BoringCtxt   -- Nothing interesting
+
+    -- ..and this for strict arguments
+    cci_strict | encl_rules = RuleArgCtxt
+               | disc > 0   = DiscArgCtxt
+               | otherwise  = RhsCtxt
+      -- Why RhsCtxt?  if we see f (g x) (h x), and f is strict, we
+      -- want to be a bit more eager to inline g, because it may
+      -- expose an eval (on x perhaps) that can be eliminated or
+      -- shared. I saw this in nofib 'boyer2', RewriteFuns.onewayunify1
+      -- It's worth an 18% improvement in allocation for this
+      -- particular benchmark; 5% on 'mate' and 1.3% on 'multiplier'
 
 ---------- No further useful info, revert to generic rebuild ------------
 rebuildCall env (ArgInfo { ai_fun = fun, ai_args = rev_args }) cont

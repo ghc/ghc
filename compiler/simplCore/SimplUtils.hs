@@ -551,6 +551,8 @@ interestingCallContext cont
         -- If f has an INLINE prag we need to give it some
         -- motivation to inline. See Note [Cast then apply]
         -- in CoreUnfold
+
+    interesting (StrictArg _ BoringCtxt _)  = RhsCtxt
     interesting (StrictArg _ cci _)         = cci
     interesting (StrictBind {})             = BoringCtxt
     interesting (Stop _ cci)                = cci
