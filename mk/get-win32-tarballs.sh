@@ -112,7 +112,7 @@ download_tarballs() {
         download_mingw "${format_url}-x86_64-mpc-1.0.3-2.src.tar.gz"
     fi
 
-    download_file "https://github.com/ghc/ghc-tarballs/blob/master/perl/ghc-perl-1.tar.gz?raw=true" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions" "--insecure"
+    download_file "https://downloads.haskell.org/~ghc/mingw/ghc-perl-1.tar.gz" "ghc-tarballs/perl/ghc-perl-1.tar.gz" "Windows Perl binary distributions"
 
     if ! test "$missing_files" = "0"
     then
