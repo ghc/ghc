@@ -849,14 +849,7 @@
                                                                \
     dst_p = dst + SIZEOF_StgMutArrPtrs;                        \
     src_p = src + SIZEOF_StgMutArrPtrs + WDS(offset);          \
-  while:                                                       \
-    if (n != 0) {                                              \
-        n = n - 1;                                             \
-        W_[dst_p] = W_[src_p];                                 \
-        dst_p = dst_p + WDS(1);                                \
-        src_p = src_p + WDS(1);                                \
-        goto while;                                            \
-    }                                                          \
+    prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
                                                                \
     return (dst);
 
@@ -931,13 +924,6 @@
                                                                \
     dst_p = dst + SIZEOF_StgSmallMutArrPtrs;                   \
     src_p = src + SIZEOF_StgSmallMutArrPtrs + WDS(offset);     \
-  while:                                                       \
-    if (n != 0) {                                              \
-        n = n - 1;                                             \
-        W_[dst_p] = W_[src_p];                                 \
-        dst_p = dst_p + WDS(1);                                \
-        src_p = src_p + WDS(1);                                \
-        goto while;                                            \
-    }                                                          \
+    prim %memcpy(dst_p, src_p, n * SIZEOF_W, SIZEOF_W);        \
                                                                \
     return (dst);
