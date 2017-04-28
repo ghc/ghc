@@ -1627,6 +1627,7 @@ reifyFamilyInstance :: [Bool] -- True <=> the corresponding tv is poly-kinded
                     -> FamInst -> TcM TH.Dec
 reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                                               , fi_fam = fam
+                                              , fi_tvs = fam_tvs
                                               , fi_tys = lhs
                                               , fi_rhs = rhs })
   = case flavor of
@@ -1641,7 +1642,7 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                                    (TH.TySynEqn annot_th_lhs th_rhs)) }
 
       DataFamilyInst rep_tc ->
-        do { let tvs = tyConTyVars rep_tc
+        do { let rep_tvs = tyConTyVars rep_tc
                  fam' = reifyName fam
 
                    -- eta-expand lhs types, because sometimes data/newtype
@@ -1649,12 +1650,14 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                    -- See Note [Eta reduction for data family axioms]
                    -- in TcInstDcls
                  (_rep_tc, rep_tc_args) = splitTyConApp rhs
-                 etad_tyvars            = dropList rep_tc_args tvs
-                 eta_expanded_lhs = lhs `chkAppend` mkTyVarTys etad_tyvars
-                 dataCons               = tyConDataCons rep_tc
+                 etad_tyvars            = dropList rep_tc_args rep_tvs
+                 etad_tys               = mkTyVarTys etad_tyvars
+                 eta_expanded_tvs = mkTyVarTys fam_tvs `chkAppend` etad_tys
+                 eta_expanded_lhs = lhs `chkAppend` etad_tys
+                 dataCons         = tyConDataCons rep_tc
                  -- see Note [Reifying GADT data constructors]
                  isGadt   = any (not . null . dataConEqSpec) dataCons
-           ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
+           ; cons <- mapM (reifyDataCon isGadt eta_expanded_tvs) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc eta_expanded_lhs
            ; th_tys <- reifyTypes types_only
            ; annot_th_tys <- zipWith3M annotThType is_poly_tvs types_only th_tys
