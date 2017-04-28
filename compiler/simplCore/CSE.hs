@@ -282,7 +282,7 @@ with mutual recursion it's quite hard; but for self-recursive bindings
   Note the \f in the domain of the mapping!
 
 * When we come across the binding for 'g', look up (\g. (\y. ...g...))
-  Bingo we get a hit.  So we can repace the 'g' binding with
+  Bingo we get a hit.  So we can replace the 'g' binding with
      g = f
 
 We can't use cs_map for this, because the key isn't an expression of
@@ -565,7 +565,7 @@ extendCSEnv cse expr triv_expr
 extendCSRecEnv :: CSEnv -> OutId -> OutExpr -> OutExpr -> CSEnv
 -- See Note [CSE for recursive bindings]
 extendCSRecEnv cse bndr expr triv_expr
-  = cse { cs_rec_map = extendCoreMap (cs_map cse) (Lam bndr expr) triv_expr }
+  = cse { cs_rec_map = extendCoreMap (cs_rec_map cse) (Lam bndr expr) triv_expr }
 
 lookupCSRecEnv :: CSEnv -> OutId -> OutExpr -> Maybe OutExpr
 -- See Note [CSE for recursive bindings]
