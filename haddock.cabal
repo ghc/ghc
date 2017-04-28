@@ -47,7 +47,7 @@ executable haddock
   build-depends:
     base >= 4.3 && < 4.11
   if flag(in-ghc-tree)
-    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
+    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.13.1.0, haddock-library/src
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,

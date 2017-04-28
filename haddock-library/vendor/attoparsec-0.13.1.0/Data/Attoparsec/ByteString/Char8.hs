@@ -1,10 +1,13 @@
-{-# LANGUAGE BangPatterns, FlexibleInstances, TypeFamilies,
+{-# LANGUAGE BangPatterns, CPP, FlexibleInstances, TypeFamilies,
     TypeSynonymInstances, GADTs #-}
+#if __GLASGOW_HASKELL__ >= 702
+{-# LANGUAGE Trustworthy #-} -- Imports internal modules
+#endif
 {-# OPTIONS_GHC -fno-warn-orphans -fno-warn-warnings-deprecations #-}
 
 -- |
 -- Module      :  Data.Attoparsec.ByteString.Char8
--- Copyright   :  Bryan O'Sullivan 2007-2014
+-- Copyright   :  Bryan O'Sullivan 2007-2015
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -67,7 +70,7 @@ module Data.Attoparsec.ByteString.Char8
 
     -- * Efficient string handling
     , I.string
-    , stringCI
+    , I.stringCI
     , skipSpace
     , skipWhile
     , I.take
@@ -94,7 +97,6 @@ module Data.Attoparsec.ByteString.Char8
     , decimal
     , hexadecimal
     , signed
-    , Number(..)
 
     -- * Combinators
     , try
@@ -120,16 +122,19 @@ module Data.Attoparsec.ByteString.Char8
     , I.atEnd
     ) where
 
-import Control.Applicative ((*>), (<*), (<$>), (<|>))
+#if !MIN_VERSION_base(4,8,0)
+import Control.Applicative (pure, (*>), (<*), (<$>))
+import Data.Word (Word)
+#endif
+import Control.Applicative ((<|>))
 import Data.Attoparsec.ByteString.FastSet (charClass, memberChar)
 import Data.Attoparsec.ByteString.Internal (Parser)
 import Data.Attoparsec.Combinator
-import Data.Attoparsec.Number (Number(..))
 import Data.Bits (Bits, (.|.), shiftL)
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Int (Int8, Int16, Int32, Int64)
 import Data.String (IsString(..))
-import Data.Word
+import Data.Word (Word8, Word16, Word32, Word64)
 import Prelude hiding (takeWhile)
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.Attoparsec.ByteString.Internal as I
@@ -154,16 +159,6 @@ instance (a ~ B.ByteString) => IsString (Parser a) where
 -- @0xA4@ (which is the Euro symbol in ISO-8859-15, but the generic
 -- currency sign in ISO-8859-1).  Haskell 'Char' values above U+00FF
 -- are truncated, so e.g. U+1D6B7 is truncated to the byte @0xB7@.
-
--- ASCII-specific but fast, oh yes.
-toLower :: Word8 -> Word8
-toLower w | w >= 65 && w <= 90 = w + 32
-          | otherwise          = w
-
--- | Satisfy a literal string, ignoring case.
-stringCI :: B.ByteString -> Parser B.ByteString
-stringCI = I.stringTransform (B8.map toLower)
-{-# INLINE stringCI #-}
 
 -- | Consume input as long as the predicate returns 'True', and return
 -- the consumed input.
@@ -228,7 +223,7 @@ isDigit c = c >= '0' && c <= '9'
 
 -- | A fast digit predicate.
 isDigit_w8 :: Word8 -> Bool
-isDigit_w8 w = w >= 48 && w <= 57
+isDigit_w8 w = w - 48 <= 9
 {-# INLINE isDigit_w8 #-}
 
 -- | Match any character.
@@ -265,7 +260,7 @@ isSpace c = (c == ' ') || ('\t' <= c && c <= '\r')
 
 -- | Fast 'Word8' predicate for matching ASCII space characters.
 isSpace_w8 :: Word8 -> Bool
-isSpace_w8 w = (w == 32) || (9 <= w && w <= 13)
+isSpace_w8 w = w == 32 || w - 9 <= 4
 {-# INLINE isSpace_w8 #-}
 
 
@@ -440,9 +435,8 @@ hexadecimal = B8.foldl' step 0 `fmap` I.takeWhile1 isHexDigit
 
 -- | Parse and decode an unsigned decimal number.
 decimal :: Integral a => Parser a
-decimal = B8.foldl' step 0 `fmap` I.takeWhile1 isDig
-  where isDig w  = w >= 48 && w <= 57
-        step a w = a * 10 + fromIntegral (w - 48)
+decimal = B8.foldl' step 0 `fmap` I.takeWhile1 isDigit_w8
+  where step a w = a * 10 + fromIntegral (w - 48)
 {-# SPECIALISE decimal :: Parser Int #-}
 {-# SPECIALISE decimal :: Parser Int8 #-}
 {-# SPECIALISE decimal :: Parser Int16 #-}
@@ -467,3 +461,4 @@ signed :: Num a => Parser a -> Parser a
 signed p = (negate <$> (char8 '-' *> p))
        <|> (char8 '+' *> p)
        <|> p
+

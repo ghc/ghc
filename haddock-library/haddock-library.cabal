@@ -26,7 +26,7 @@ library
     , transformers >= 0.3.0   && < 0.6
     , deepseq      >= 1.3     && < 1.5
 
-  hs-source-dirs:       src, vendor/attoparsec-0.12.1.1
+  hs-source-dirs:       src, vendor/attoparsec-0.13.1.0
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   exposed-modules:
@@ -57,7 +57,7 @@ test-suite spec
   hs-source-dirs:
       test
     , src
-    , vendor/attoparsec-0.12.1.1
+    , vendor/attoparsec-0.13.1.0
   ghc-options: -Wall
 
   cpp-options:

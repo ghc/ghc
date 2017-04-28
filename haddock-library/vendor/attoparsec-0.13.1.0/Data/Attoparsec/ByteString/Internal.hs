@@ -1,7 +1,8 @@
-{-# LANGUAGE BangPatterns, GADTs, OverloadedStrings, RecordWildCards #-}
+{-# LANGUAGE BangPatterns, CPP, GADTs, OverloadedStrings, RankNTypes,
+    RecordWildCards #-}
 -- |
 -- Module      :  Data.Attoparsec.ByteString.Internal
--- Copyright   :  Bryan O'Sullivan 2007-2014
+-- Copyright   :  Bryan O'Sullivan 2007-2015
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -46,7 +47,7 @@ module Data.Attoparsec.ByteString.Internal
     -- * Efficient string handling
     , skipWhile
     , string
-    , stringTransform
+    , stringCI
     , take
     , scan
     , runScanner
@@ -65,7 +66,10 @@ module Data.Attoparsec.ByteString.Internal
     , atEnd
     ) where
 
-import Control.Applicative ((<|>), (<$>))
+#if !MIN_VERSION_base(4,8,0)
+import Control.Applicative ((<$>))
+#endif
+import Control.Applicative ((<|>))
 import Control.Monad (when)
 import Data.Attoparsec.ByteString.Buffer (Buffer, buffer)
 import Data.Attoparsec.ByteString.FastSet (charClass, memberWord8)
@@ -74,6 +78,7 @@ import Data.Attoparsec.Internal
 import Data.Attoparsec.Internal.Fhthagn (inlinePerformIO)
 import Data.Attoparsec.Internal.Types hiding (Parser, Failure, Success)
 import Data.ByteString (ByteString)
+import Data.List (intercalate)
 import Data.Word (Word8)
 import Foreign.ForeignPtr (withForeignPtr)
 import Foreign.Ptr (castPtr, minusPtr, plusPtr)
@@ -136,22 +141,15 @@ storable = hack undefined
   hack :: Storable b => b -> Parser b
   hack dummy = do
     (fp,o,_) <- B.toForeignPtr `fmap` take (sizeOf dummy)
-    return . B.inlinePerformIO . withForeignPtr fp $ \p ->
+    return . inlinePerformIO . withForeignPtr fp $ \p ->
         peek (castPtr $ p `plusPtr` o)
-
--- | Consume @n@ bytes of input, but succeed only if the predicate
--- returns 'True'.
-takeWith :: Int -> (ByteString -> Bool) -> Parser ByteString
-takeWith n0 p = do
-  let n = max n0 0
-  s <- ensure n
-  if p s
-    then advance n >> return s
-    else fail "takeWith"
 
 -- | Consume exactly @n@ bytes of input.
 take :: Int -> Parser ByteString
-take n = takeWith n (const True)
+take n0 = do
+  let n = max n0 0
+  s <- ensure n
+  advance n >> return s
 {-# INLINE take #-}
 
 -- | @string s@ parses a sequence of bytes that identically match
@@ -170,13 +168,59 @@ take n = takeWith n (const True)
 -- before failing.  In attoparsec, the above parser will /succeed/ on
 -- that input, because the failed first branch will consume nothing.
 string :: ByteString -> Parser ByteString
-string s = takeWith (B.length s) (==s)
+string s = string_ (stringSuspended id) id s
 {-# INLINE string #-}
 
-stringTransform :: (ByteString -> ByteString) -> ByteString
-                -> Parser ByteString
-stringTransform f s = takeWith (B.length s) ((==f s) . f)
-{-# INLINE stringTransform #-}
+-- ASCII-specific but fast, oh yes.
+toLower :: Word8 -> Word8
+toLower w | w >= 65 && w <= 90 = w + 32
+          | otherwise          = w
+
+-- | Satisfy a literal string, ignoring case.
+stringCI :: ByteString -> Parser ByteString
+stringCI s = string_ (stringSuspended lower) lower s
+  where lower = B8.map toLower
+{-# INLINE stringCI #-}
+
+string_ :: (forall r. ByteString -> ByteString -> Buffer -> Pos -> More
+            -> Failure r -> Success ByteString r -> Result r)
+        -> (ByteString -> ByteString)
+        -> ByteString -> Parser ByteString
+string_ suspended f s0 = T.Parser $ \t pos more lose succ ->
+  let n = B.length s
+      s = f s0
+  in if lengthAtLeast pos n t
+     then let t' = substring pos (Pos n) t
+          in if s == f t'
+             then succ t (pos + Pos n) more t'
+             else lose t pos more [] "string"
+     else let t' = Buf.unsafeDrop (fromPos pos) t
+          in if f t' `B.isPrefixOf` s
+             then suspended s (B.drop (B.length t') s) t pos more lose succ
+             else lose t pos more [] "string"
+{-# INLINE string_ #-}
+
+stringSuspended :: (ByteString -> ByteString)
+                -> ByteString -> ByteString -> Buffer -> Pos -> More
+                -> Failure r
+                -> Success ByteString r
+                -> Result r
+stringSuspended f s0 s t pos more lose succ =
+    runParser (demandInput_ >>= go) t pos more lose succ
+  where go s'0   = T.Parser $ \t' pos' more' lose' succ' ->
+          let m  = B.length s
+              s' = f s'0
+              n  = B.length s'
+          in if n >= m
+             then if B.unsafeTake m s' == s
+                  then let o = Pos (B.length s0)
+                       in succ' t' (pos' + o) more'
+                          (substring pos' o t')
+                  else lose' t' pos' more' [] "string"
+             else if s' == B.unsafeTake n s
+                  then stringSuspended f s0 (B.unsafeDrop n s)
+                       t' pos' more' lose' succ'
+                  else lose' t' pos' more' [] "string"
 
 -- | Skip past input for as long as the predicate returns 'True'.
 skipWhile :: (Word8 -> Bool) -> Parser ()
@@ -213,15 +257,24 @@ takeTill p = takeWhile (not . p)
 -- parsers loop until a failure occurs.  Careless use will thus result
 -- in an infinite loop.
 takeWhile :: (Word8 -> Bool) -> Parser ByteString
-takeWhile p = (B.concat . reverse) `fmap` go []
+takeWhile p = do
+    s <- B8.takeWhile p <$> get
+    continue <- inputSpansChunks (B.length s)
+    if continue
+      then takeWhileAcc p [s]
+      else return s
+{-# INLINE takeWhile #-}
+
+takeWhileAcc :: (Word8 -> Bool) -> [ByteString] -> Parser ByteString
+takeWhileAcc p = go
  where
   go acc = do
     s <- B8.takeWhile p <$> get
     continue <- inputSpansChunks (B.length s)
     if continue
       then go (s:acc)
-      else return (s:acc)
-{-# INLINE takeWhile #-}
+      else return $ concatReverse (s:acc)
+{-# INLINE takeWhileAcc #-}
 
 takeRest :: Parser [ByteString]
 takeRest = go []
@@ -285,16 +338,13 @@ scan_ f s0 p = go [] s0
 -- parsers loop until a failure occurs.  Careless use will thus result
 -- in an infinite loop.
 scan :: s -> (s -> Word8 -> Maybe s) -> Parser ByteString
-scan = scan_ $ \_ chunks ->
-  case chunks of
-    [x] -> return x
-    xs  -> return $! B.concat $ reverse xs
+scan = scan_ $ \_ chunks -> return $! concatReverse chunks
 {-# INLINE scan #-}
 
 -- | Like 'scan', but generalized to return the final state of the
 -- scanner.
 runScanner :: s -> (s -> Word8 -> Maybe s) -> Parser (ByteString, s)
-runScanner = scan_ $ \s xs -> return (B.concat (reverse xs), s)
+runScanner = scan_ $ \s xs -> let !sx = concatReverse xs in return (sx, s)
 {-# INLINE runScanner #-}
 
 -- | Consume input as long as the predicate returns 'True', and return
@@ -314,8 +364,9 @@ takeWhile1 p = do
       advance len
       eoc <- endOfChunk
       if eoc
-        then (s<>) `fmap` takeWhile p
+        then takeWhileAcc p [s]
         else return s
+{-# INLINE takeWhile1 #-}
 
 -- | Match any byte in a set.
 --
@@ -416,9 +467,10 @@ parse m s = T.runParser m (buffer s) (Pos 0) Incomplete failK successK
 -- @
 parseOnly :: Parser a -> ByteString -> Either String a
 parseOnly m s = case T.runParser m (buffer s) (Pos 0) Complete failK successK of
-                  Fail _ _ err -> Left err
-                  Done _ a     -> Right a
-                  _            -> error "parseOnly: impossible error!"
+                  Fail _ [] err   -> Left err
+                  Fail _ ctxs err -> Left (intercalate " > " ctxs ++ ": " ++ err)
+                  Done _ a        -> Right a
+                  _               -> error "parseOnly: impossible error!"
 {-# INLINE parseOnly #-}
 
 get :: Parser ByteString
@@ -465,7 +517,6 @@ ensure n = T.Parser $ \t pos more lose succ ->
     then succ t pos more (substring pos (Pos n) t)
     -- The uncommon case is kept out-of-line to reduce code size:
     else ensureSuspended n t pos more lose succ
--- Non-recursive so the bounds check can be inlined:
 {-# INLINE ensure #-}
 
 -- | Return both the result of a parse and the portion of the input
