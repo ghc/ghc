@@ -289,7 +289,7 @@ data Instr
         | CVTSI2SS      Format Operand Reg -- I32/I64 to F32
         | CVTSI2SD      Format Operand Reg -- I32/I64 to F64
 
-        -- use ADD & SUB for arithmetic.  In both cases, operands
+        -- use ADD, SUB, and SQRT for arithmetic.  In both cases, operands
         -- are  Operand Reg.
 
         -- SSE2 floating-point division:
@@ -447,6 +447,7 @@ x86_regUsageOfInstr platform instr
     CVTSI2SS   _ src dst -> mkRU (use_R src []) [dst]
     CVTSI2SD   _ src dst -> mkRU (use_R src []) [dst]
     FDIV _     src dst  -> usageRM src dst
+    SQRT _ src dst      -> mkRU (use_R src []) [dst]
 
     FETCHGOT reg        -> mkRU [] [reg]
     FETCHPC  reg        -> mkRU [] [reg]
@@ -617,6 +618,7 @@ x86_patchRegsOfInstr instr env
     CVTSI2SS fmt src dst -> CVTSI2SS fmt (patchOp src) (env dst)
     CVTSI2SD fmt src dst -> CVTSI2SD fmt (patchOp src) (env dst)
     FDIV fmt src dst     -> FDIV fmt (patchOp src) (patchOp dst)
+    SQRT fmt src dst    -> SQRT fmt (patchOp src) (env dst)
 
     CALL (Left _)  _    -> instr
     CALL (Right reg) p  -> CALL (Right (env reg)) p

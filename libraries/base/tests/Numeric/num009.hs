@@ -17,6 +17,9 @@ main = do let d = [0, pi, pi/2, pi/3, 1e10, 1e20] :: [Double]
           mapM_ (test "cosf" cosf cos) f
           mapM_ (test "tand" tand tan) d
           mapM_ (test "tanf" tanf tan) f
+          -- added to test #13629
+          mapM_ (test "sqrtd" sqrtd sqrt) f
+          mapM_ (test "sqrtf" sqrtf sqrt) f
           putStrLn "Done"
 
 test :: (RealFloat a, Floating a, RealFloat b, Floating b, Show b)
@@ -39,3 +42,5 @@ foreign import ccall "math.h cosf" cosf :: CFloat  -> CFloat
 foreign import ccall "math.h tan"  tand :: CDouble -> CDouble
 foreign import ccall "math.h tanf" tanf :: CFloat  -> CFloat
 
+foreign import ccall "math.h sqrt"  sqrtd :: CDouble -> CDouble
+foreign import ccall "math.h sqrtf" sqrtf :: CFloat  -> CFloat

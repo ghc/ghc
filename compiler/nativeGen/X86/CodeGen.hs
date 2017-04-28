@@ -2057,13 +2057,15 @@ genCCall _ is32Bit target dest_regs args = do
           MO_F64_Fabs -> case args of
             [x] -> sse2FabsCode W64 x
             _ -> panic "genCCall: Wrong number of arguments for fabs"
+
+          MO_F32_Sqrt -> actuallyInlineSSE2Op (\fmt r -> SQRT fmt (OpReg r)) FF32 args
+          MO_F64_Sqrt -> actuallyInlineSSE2Op (\fmt r -> SQRT fmt (OpReg r)) FF64 args
           _other_op -> outOfLineCmmOp op (Just r) args
       | otherwise -> do
         l1 <- getNewLabelNat
         l2 <- getNewLabelNat
         if sse2
-          then
-            outOfLineCmmOp op (Just r) args
+          then outOfLineCmmOp op (Just r) args
           else case op of
               MO_F32_Sqrt -> actuallyInlineFloatOp GSQRT FF32 args
               MO_F64_Sqrt -> actuallyInlineFloatOp GSQRT FF64 args
@@ -2080,13 +2082,16 @@ genCCall _ is32Bit target dest_regs args = do
               _other_op   -> outOfLineCmmOp op (Just r) args
 
        where
-        actuallyInlineFloatOp instr format [x]
+        actuallyInlineFloatOp = actuallyInlineFloatOp' False
+        actuallyInlineSSE2Op = actuallyInlineFloatOp' True
+
+        actuallyInlineFloatOp' usesSSE instr format [x]
               = do res <- trivialUFCode format (instr format) x
                    any <- anyReg res
-                   return (any (getRegisterReg platform False (CmmLocal r)))
+                   return (any (getRegisterReg platform usesSSE (CmmLocal r)))
 
-        actuallyInlineFloatOp _ _ args
-              = panic $ "genCCall.actuallyInlineFloatOp: bad number of arguments! ("
+        actuallyInlineFloatOp' _ _ _ args
+              = panic $ "genCCall.actuallyInlineFloatOp': bad number of arguments! ("
                       ++ show (length args) ++ ")"
 
         sse2FabsCode :: Width -> CmmExpr -> NatM InstrBlock
