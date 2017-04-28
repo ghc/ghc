@@ -215,6 +215,43 @@ defaultBuilderArgs = mconcat
     , makeBuilderArgs
     , tarBuilderArgs ]
 
+-- | Disable some warnings in packages we use
+-- | https://github.com/ghc/ghc/blob/master/mk/warnings.mk#L46
+disableWarningArgsStage0 :: Args
+disableWarningArgsStage0 = stage Stage0 ? builder Ghc ? mconcat
+    [ package transformers ? append [ "-fno-warn-unused-matches", "-fno-warn-unused-imports" ]
+    , package terminfo ? append [ "-fno-warn-unused-imports" ] ]
+
+disableWarningArgsStage1 :: Args
+disableWarningArgsStage1 = notStage0 ? builder Ghc ? mconcat
+    [ package bytestring ? append [ "-Wno-inline-rule-shadowing" ]
+    , package haddock ? append [ "-Wno-unused-imports", "-Wno-deprecations" ]
+    , package directory ? append [ "-Wno-unused-imports" ]
+    , package binary ? append [ "-Wno-deprecations" ]
+    , package haskeline ? append [ "-Wno-deprecations", "-Wno-unused-imports",
+                                 "-Wno-redundant-constraints",
+                                 "-Wno-simplifiable-class-constraints" ]
+    , package pretty ? append [ "-Wno-unused-imports" ]
+    , package primitive ? append [ "-Wno-unused-imports", "-Wno-deprecations" ]
+    , package terminfo ? append [ "-Wno-unused-imports" ]
+    , package xhtml ? append [ "-Wno-unused-imports", "-Wno-tabs" ]
+    , package transformers ? append [ "-Wno-unused-matches", "-Wno-unused-imports",
+                                    "-Wno-redundant-constraints", "-Wno-orphans" ]
+    , package base ? append [ "-Wno-trustworthy-safe" ]
+    , package ghcPrim ? append [ "-Wno-trustworthy-safe" ]
+    , package win32 ? append [ "-Wno-trustworthy-safe" ] ]
+
+-- GhcLibExtraHcOpts += -Wno-deprecated-flags
+-- GhcBootLibExtraHcOpts += -fno-warn-deprecated-flags
+disableWarningArgsLibs :: Args
+disableWarningArgsLibs = do
+  pkg <- getPackage
+  isLibrary pkg ? builder Ghc ? mconcat
+    [ notStage0 ? arg "-Wno-deprecated-flags"
+    , stage Stage0 ? arg "-fno-warn-deprecated-flags"]
+
+-- TODO: Disable warnings for Windows specifics
+
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
@@ -227,4 +264,7 @@ defaultPackageArgs = mconcat
     , haddockPackageArgs
     , integerGmpPackageArgs
     , rtsPackageArgs
-    , runGhcPackageArgs ]
+    , runGhcPackageArgs
+    , disableWarningArgsStage0
+    , disableWarningArgsStage1
+    , disableWarningArgsLibs ]
