@@ -52,17 +52,17 @@ function toggleSection(id)
 {
   var b = toggleShow(document.getElementById("section." + id));
   toggleCollapser(document.getElementById("control." + id), b);
-  rememberCollapsed(id, b);
+  rememberCollapsed(id);
   return b;
 }
 
 var collapsed = {};
-function rememberCollapsed(id, b)
+function rememberCollapsed(id)
 {
-  if(b)
+  if(collapsed[id])
     delete collapsed[id]
   else
-    collapsed[id] = null;
+    collapsed[id] = true;
 
   var sections = [];
   for(var i in collapsed)
