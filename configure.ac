@@ -526,7 +526,7 @@ then
             echo
             echo "Try re-running configure with:"
             echo
-            echo '   ./configure --with-nm=$(xcrun --find nm-classic)'
+            echo '   NM=$(xcrun --find nm-classic) ./configure'
             echo
             exit 1
             ;;
