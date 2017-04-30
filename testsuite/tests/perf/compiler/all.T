@@ -1082,8 +1082,9 @@ test('T12707',
 
 test('T13379',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 411597856, 5),
+          [(wordsize(64), 411597856, 10),
           # initial:    411597856
+          # widen window to 10%, Darwin had 449080520, a 9.1% difference
           ]),
      ],
      compile,
