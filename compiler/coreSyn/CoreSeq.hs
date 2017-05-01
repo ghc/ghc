@@ -28,7 +28,7 @@ megaSeqIdInfo info
 
 -- Omitting this improves runtimes a little, presumably because
 -- some unfoldings are not calculated at all
---    seqUnfolding (unfoldingInfo info)         `seq`
+    seqUnfolding (unfoldingInfo info)           `seq`
 
     seqDemand (demandInfo info)                 `seq`
     seqStrictSig (strictnessInfo info)          `seq`
@@ -101,7 +101,8 @@ seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding { uf_tmpl = e, uf_is_top = top,
                 uf_is_value = b1, uf_is_work_free = b2,
                 uf_expandable = b3, uf_is_conlike = b4,
-                uf_guidance = g})
+                uf_guidance = g, uf_src = src})
+  | isStableSource src
   = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` b3 `seq` b4 `seq` seqGuidance g
 
 seqUnfolding _ = ()
