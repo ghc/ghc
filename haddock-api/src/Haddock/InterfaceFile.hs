@@ -83,7 +83,7 @@ binaryInterfaceMagic = 0xD0Cface
 --
 binaryInterfaceVersion :: Word16
 #if (__GLASGOW_HASKELL__ >= 802) && (__GLASGOW_HASKELL__ < 804)
-binaryInterfaceVersion = 29
+binaryInterfaceVersion = 30
 
 binaryInterfaceVersionCompatibility :: [Word16]
 binaryInterfaceVersionCompatibility = [binaryInterfaceVersion]
@@ -377,6 +377,7 @@ instance Binary InstalledInterface where
     put_ bh modu
     put_ bh is_sig
     put_ bh info
+    lazyPut bh (docMap, argMap)
     put_ bh docMap
     put_ bh argMap
     put_ bh exps
@@ -389,8 +390,7 @@ instance Binary InstalledInterface where
     modu    <- get bh
     is_sig  <- get bh
     info    <- get bh
-    docMap  <- get bh
-    argMap  <- get bh
+    ~(docMap, argMap) <- lazyGet bh
     exps    <- get bh
     visExps <- get bh
     opts    <- get bh
