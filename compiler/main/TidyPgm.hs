@@ -22,6 +22,7 @@ import CoreMonad
 import CorePrep
 import CoreUtils        (rhsIsStatic)
 import CoreStats        (coreBindsStats, CoreStats(..))
+import CoreSeq          (seqBinds)
 import CoreLint
 import Literal
 import Rules
@@ -1134,7 +1135,9 @@ tidyTopBinds hsc_env this_mod unfold_env init_occ_env binds
   = do mkIntegerId <- lookupMkIntegerName dflags hsc_env
        integerSDataCon <- lookupIntegerSDataConName dflags hsc_env
        let cvt_integer = cvtLitInteger dflags mkIntegerId integerSDataCon
-       return $ tidy cvt_integer init_env binds
+           result      = tidy cvt_integer init_env binds
+       seqBinds (snd result) `seq` return result
+       -- This seqBinds avoids a spike in space usage (see #13564)
   where
     dflags = hsc_dflags hsc_env
 
