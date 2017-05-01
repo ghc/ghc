@@ -15,6 +15,7 @@ module CoreTidy (
 #include "HsVersions.h"
 
 import CoreSyn
+import CoreSeq ( seqUnfolding )
 import CoreArity
 import Id
 import IdInfo
@@ -223,9 +224,14 @@ tidyUnfolding tidy_env
               unf@(CoreUnfolding { uf_tmpl = unf_rhs, uf_src = src })
               unf_from_rhs
   | isStableSource src
-  = unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
+  = seqIt $ unf { uf_tmpl = tidyExpr tidy_env unf_rhs }    -- Preserves OccInfo
+    -- This seqIt avoids a space leak: otherwise the uf_is_value,
+    -- uf_is_conlike, ... fields may retain a reference to the
+    -- pre-tidied expression forever (ToIface doesn't look at them)
+
   | otherwise
   = unf_from_rhs
+  where seqIt unf = seqUnfolding unf `seq` unf
 tidyUnfolding _ unf _ = unf     -- NoUnfolding or OtherCon
 
 {-
