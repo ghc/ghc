@@ -378,8 +378,6 @@ instance Binary InstalledInterface where
     put_ bh is_sig
     put_ bh info
     lazyPut bh (docMap, argMap)
-    put_ bh docMap
-    put_ bh argMap
     put_ bh exps
     put_ bh visExps
     put_ bh opts
