@@ -37,7 +37,7 @@ warnAnns :: [LAnnDecl Name] -> TcM [Annotation]
 warnAnns [] = return []
 warnAnns anns@(L loc _ : _)
   = do { setSrcSpan loc $ addWarnTc NoReason $
-             (text "Ignoring Ann annotation" <> plural anns <> comma
+             (text "Ignoring ANN annotation" <> plural anns <> comma
              <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
        ; return [] }
 #else

@@ -1,3 +1,3 @@
 
 T13609.hs:3:1: warning:
-    Ignoring Ann annotation, because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi
+    Ignoring ANN annotation, because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi
