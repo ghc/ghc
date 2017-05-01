@@ -852,10 +852,12 @@ callishPrimOpSupported dflags op
                                || ppc)
                          || llvm      -> Left (MO_U_Mul2     (wordWidth dflags))
                      | otherwise      -> Right genericWordMul2Op
-      FloatFabsOp    | (ncg && x86ish)
+      FloatFabsOp    | (ncg && x86ish
+                               || ppc)
                          || llvm      -> Left MO_F32_Fabs
                      | otherwise      -> Right $ genericFabsOp W32
-      DoubleFabsOp   | (ncg && x86ish)
+      DoubleFabsOp   | (ncg && x86ish
+                               || ppc)
                          || llvm      -> Left MO_F64_Fabs
                      | otherwise      -> Right $ genericFabsOp W64
 
