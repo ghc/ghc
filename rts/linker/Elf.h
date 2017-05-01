@@ -5,6 +5,10 @@
 
 #include "BeginPrivate.h"
 
+#include "ElfTypes.h"
+
+void ocInit_ELF          ( ObjectCode* oc );
+void ocDeinit_ELF        ( ObjectCode* oc );
 int ocVerifyImage_ELF    ( ObjectCode* oc );
 int ocGetNames_ELF       ( ObjectCode* oc );
 int ocResolve_ELF        ( ObjectCode* oc );

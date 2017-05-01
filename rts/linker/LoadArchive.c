@@ -15,6 +15,8 @@
 #  include <regex.h>
 #  include <mach/machine.h>
 #  include <mach-o/fat.h>
+#elif defined(OBJFORMAT_ELF)
+#include "linker/Elf.h"
 #endif
 
 #include <string.h>
@@ -539,6 +541,9 @@ static HsInt loadArchive_ (pathchar *path)
                      , misalignment);
 #if defined(OBJFORMAT_MACHO)
             ocInit_MachO( oc );
+#endif
+#if defined(OBJFORMAT_ELF)
+            ocInit_ELF( oc );
 #endif
 
             stgFree(archiveMemberName);

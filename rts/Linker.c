@@ -748,7 +748,8 @@ addDLL( pathchar *dll_name )
 */
 pathchar* findSystemLibrary(pathchar* dll_name)
 {
-    IF_DEBUG(linker, debugBelch("\nfindSystemLibrary: dll_name = `%" PATH_FMT "'\n", dll_name));
+    IF_DEBUG(linker, debugBelch("\nfindSystemLibrary: dll_name = `%"
+                                PATH_FMT "'\n", dll_name));
 
 #if defined(OBJFORMAT_PEi386)
     return findSystemLibrary_PEi386(dll_name);
@@ -779,7 +780,8 @@ void warnMissingKBLibraryPaths( void )
 */
 HsPtr addLibrarySearchPath(pathchar* dll_path)
 {
-    IF_DEBUG(linker, debugBelch("\naddLibrarySearchPath: dll_path = `%" PATH_FMT "'\n", dll_path));
+    IF_DEBUG(linker, debugBelch("\naddLibrarySearchPath: dll_path = `%"
+                                PATH_FMT "'\n", dll_path));
 
 #if defined(OBJFORMAT_PEi386)
     return addLibrarySearchPath_PEi386(dll_path);
@@ -796,7 +798,8 @@ HsPtr addLibrarySearchPath(pathchar* dll_path)
 */
 HsBool removeLibrarySearchPath(HsPtr dll_path_index)
 {
-    IF_DEBUG(linker, debugBelch("\nremoveLibrarySearchPath: ptr = `%p'\n", dll_path_index));
+    IF_DEBUG(linker, debugBelch("\nremoveLibrarySearchPath: ptr = `%p'\n",
+                                dll_path_index));
 
 #if defined(OBJFORMAT_PEi386)
     return removeLibrarySearchPath_PEi386(dll_path_index);
@@ -813,7 +816,8 @@ HsBool removeLibrarySearchPath(HsPtr dll_path_index)
  */
 HsInt insertSymbol(pathchar* obj_name, SymbolName* key, SymbolAddr* data)
 {
-    return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE, NULL);
+    return ghciInsertSymbolTable(obj_name, symhash, key, data, HS_BOOL_FALSE,
+                                 NULL);
 }
 
 /* -----------------------------------------------------------------------------
@@ -843,11 +847,12 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
 
         /* HACK: On OS X, all symbols are prefixed with an underscore.
                  However, dlsym wants us to omit the leading underscore from the
-                 symbol name -- the dlsym routine puts it back on before searching
-                 for the symbol. For now, we simply strip it off here (and ONLY
-                 here).
+                 symbol name -- the dlsym routine puts it back on before
+                 searching for the symbol. For now, we simply strip it off here
+                 (and ONLY here).
         */
-        IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n", lbl));
+        IF_DEBUG(linker, debugBelch("lookupSymbol: looking up %s with dlsym\n",
+                                    lbl));
         ASSERT(lbl[0] == '_');
         return internal_dlsym(lbl + 1);
 
@@ -866,14 +871,16 @@ SymbolAddr* lookupSymbol_ (SymbolName* lbl)
  * Symbol name only used for diagnostics output.
  */
 SymbolAddr* loadSymbol(SymbolName *lbl, RtsSymbolInfo *pinfo) {
-    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl, pinfo->value));
+    IF_DEBUG(linker, debugBelch("lookupSymbol: value of %s is %p\n", lbl,
+                                pinfo->value));
     ObjectCode* oc = pinfo->owner;
 
     /* Symbol can be found during linking, but hasn't been relocated. Do so now.
         See Note [runtime-linker-phases] */
     if (oc && lbl && oc->status == OBJECT_LOADED) {
         oc->status = OBJECT_NEEDED;
-        IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand loading symbol '%s'\n", lbl));
+        IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand "
+                                    "loading symbol '%s'\n", lbl));
         int r = ocTryLoad(oc);
         if (!r) {
             return NULL;
@@ -894,7 +901,8 @@ SymbolAddr* lookupSymbol( SymbolName* lbl )
     ACQUIRE_LOCK(&linker_mutex);
     SymbolAddr* r = lookupSymbol_(lbl);
     if (!r) {
-        errorBelch("^^ Could not load '%s', dependency unresolved. See top entry above.\n", lbl);
+        errorBelch("^^ Could not load '%s', dependency unresolved. "
+                   "See top entry above.\n", lbl);
         fflush(stderr);
     }
     RELEASE_LOCK(&linker_mutex);
@@ -961,7 +969,8 @@ void ghci_enquire(SymbolAddr* addr)
          else if (   a->value
                   && (char*)addr-DELTA <= (char*)a->value
                   && (char*)a->value <= (char*)addr+DELTA) {
-             debugBelch("%p + %3d  ==  `%s'\n", addr, (int)((char*)a->value - (char*)addr), sym);
+             debugBelch("%p + %3d  ==  `%s'\n", addr,
+                        (int)((char*)a->value - (char*)addr), sym);
          }
       }
    }
@@ -1174,7 +1183,8 @@ void freeObjectCode (ObjectCode *oc)
 
     /* Free symbol_extras.  On x86_64 Windows, symbol_extras are allocated
      * alongside the image, so we don't need to free. */
-#if defined(NEED_SYMBOL_EXTRAS) && (!defined(x86_64_HOST_ARCH) || !defined(mingw32_HOST_OS))
+#if defined(NEED_SYMBOL_EXTRAS) && (!defined(x86_64_HOST_ARCH) \
+                                    || !defined(mingw32_HOST_OS))
     if (RTS_LINKER_USE_MMAP) {
         if (!USE_CONTIGUOUS_MMAP && oc->symbol_extras != NULL) {
             m32_free(oc->symbol_extras,
@@ -1188,6 +1198,9 @@ void freeObjectCode (ObjectCode *oc)
 
 #if defined(OBJECTFORMAT_MACHO)
     ocDeinit_MachO(oc);
+#endif
+#if defined(OBJFORMAT_ELF)
+    ocDeinit_ELF(oc);
 #endif
 
     stgFree(oc->fileName);
@@ -1232,7 +1245,8 @@ mkOc( pathchar *path, char *image, int imageSize,
    oc->fileName = pathdup(path);
 
    if (archiveMemberName) {
-       oc->archiveMemberName = stgMallocBytes( strlen(archiveMemberName)+1, "loadObj" );
+       oc->archiveMemberName = stgMallocBytes( strlen(archiveMemberName)+1,
+                                               "loadObj" );
        strcpy(oc->archiveMemberName, archiveMemberName);
    } else {
        oc->archiveMemberName = NULL;
@@ -1399,7 +1413,10 @@ preloadObjectFile (pathchar *path)
    if (ocVerifyImage_MachO( oc ))
        ocInit_MachO( oc );
 #endif
-
+#if defined(OBJFORMAT_ELF)
+   if(ocVerifyImage_ELF( oc ))
+       ocInit_ELF( oc );
+#endif
    return oc;
 }
 
@@ -1473,13 +1490,15 @@ HsInt loadOc (ObjectCode* oc)
 #  if defined(OBJFORMAT_MACHO)
    r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
+       IF_DEBUG(linker,
+                debugBelch("loadOc: ocAllocateSymbolExtras_MachO failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_ELF)
    r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) {
-       IF_DEBUG(linker, debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
+       IF_DEBUG(linker,
+                debugBelch("loadOc: ocAllocateSymbolExtras_ELF failed\n"));
        return r;
    }
 #  elif defined(OBJFORMAT_PEi386)
@@ -1537,7 +1556,8 @@ int ocTryLoad (ObjectCode* oc) {
     for (x = 0; x < oc->n_symbols; x++) {
         symbol = oc->symbols[x];
         if (   symbol
-            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol, NULL, isSymbolWeak(oc, symbol), oc)) {
+            && !ghciInsertSymbolTable(oc->fileName, symhash, symbol, NULL,
+                                      isSymbolWeak(oc, symbol), oc)) {
             return 0;
         }
     }

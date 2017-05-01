@@ -155,6 +155,160 @@ get_shndx_table(Elf_Ehdr* ehdr)
 #endif
 
 /*
+ * ocInit and ocDeinit
+ */
+
+void
+ocInit_ELF(ObjectCode * oc)
+{
+    oc->info = (ObjectCodeFormatInfo*)stgCallocBytes(
+            1, sizeof(ObjectCodeFormatInfo),
+            "ocInit_Elf(ObjectCodeFormatInfo)");
+    // TODO: fill info
+    oc->info->elfHeader = (Elf_Ehdr *)oc->image;
+    oc->info->programHeader = (Elf_Phdr *) ((uint8_t*)oc->image
+                                            + oc->info->elfHeader->e_phoff);
+    oc->info->sectionHeader = (Elf_Shdr *) ((uint8_t*)oc->image
+                                            + oc->info->elfHeader->e_shoff);
+
+    oc->n_sections = elf_shnum(oc->info->elfHeader);
+
+    /* get the symbol table(s) */
+    for(int i=0; i < oc->n_sections; i++) {
+        if(SHT_REL  == oc->info->sectionHeader[i].sh_type) {
+            ElfRelocationTable *relTab = (ElfRelocationTable *)stgCallocBytes(
+                    1, sizeof(ElfRelocationTable),
+                    "ocInit_Elf(ElfRelocationTable");
+            relTab->index = i;
+
+            relTab->relocations =
+                (Elf_Rel*) ((uint8_t*)oc->info->elfHeader
+                                    + oc->info->sectionHeader[i].sh_offset);
+            relTab->n_relocations = oc->info->sectionHeader[i].sh_size
+                                    / sizeof(Elf_Rel);
+            relTab->targetSectionIndex = oc->info->sectionHeader[i].sh_info;
+
+            relTab->sectionHeader      = &oc->info->sectionHeader[i];
+
+            if(oc->info->relTable == NULL) {
+                oc->info->relTable = relTab;
+            } else {
+                ElfRelocationTable * tail = oc->info->relTable;
+                while(tail->next != NULL) tail = tail->next;
+                tail->next = relTab;
+            }
+
+        } else if(SHT_RELA == oc->info->sectionHeader[i].sh_type) {
+            ElfRelocationATable *relTab = (ElfRelocationATable *)stgCallocBytes(
+                    1, sizeof(ElfRelocationATable),
+                    "ocInit_Elf(ElfRelocationTable");
+            relTab->index = i;
+
+            relTab->relocations =
+                (Elf_Rela*) ((uint8_t*)oc->info->elfHeader
+                                     + oc->info->sectionHeader[i].sh_offset);
+            relTab->n_relocations = oc->info->sectionHeader[i].sh_size
+                                    / sizeof(Elf_Rela);
+            relTab->targetSectionIndex = oc->info->sectionHeader[i].sh_info;
+
+            relTab->sectionHeader      = &oc->info->sectionHeader[i];
+
+            if(oc->info->relaTable == NULL) {
+                oc->info->relaTable = relTab;
+            } else {
+                ElfRelocationATable * tail = oc->info->relaTable;
+                while(tail->next != NULL) tail = tail->next;
+                tail->next = relTab;
+            }
+
+        } else if(SHT_SYMTAB == oc->info->sectionHeader[i].sh_type) {
+
+            ElfSymbolTable *symTab = (ElfSymbolTable *)stgCallocBytes(
+                    1, sizeof(ElfSymbolTable),
+                    "ocInit_Elf(ElfSymbolTable");
+
+            symTab->index = i; /* store the original index, so we can later
+                                * find or assert that we are dealing with the
+                                * correct symbol table */
+
+            Elf_Sym *stab = (Elf_Sym*)((uint8_t*)oc->info->elfHeader
+                                       + oc->info->sectionHeader[i].sh_offset);
+            symTab->n_symbols = oc->info->sectionHeader[i].sh_size
+                                / sizeof(Elf_Sym);
+            symTab->symbols = (ElfSymbol *)stgCallocBytes(
+                    symTab->n_symbols, sizeof(ElfSymbol),
+                    "ocInit_Elf(ElfSymbol)");
+
+            /* get the strings table */
+            size_t lnkIdx = oc->info->sectionHeader[i].sh_link;
+            symTab->names = (char*)(uint8_t*)oc->info->elfHeader
+                            + oc->info->sectionHeader[lnkIdx].sh_offset;
+
+            /* build the ElfSymbols from the symbols */
+            for(size_t j=0; j < symTab->n_symbols; j++) {
+
+                symTab->symbols[j].name = stab[j].st_name == 0
+                                          ? "(noname)"
+                                          : symTab->names + stab[j].st_name;
+                symTab->symbols[j].elf_sym = &stab[j];
+                /* we don't have an address for this symbol yet; this will be
+                 * populated during ocGetNames. hence addr = NULL.
+                 */
+                symTab->symbols[j].addr  = NULL;
+                symTab->symbols[j].got_addr = NULL;
+            }
+
+            /* append the ElfSymbolTable */
+            if(oc->info->symbolTables == NULL) {
+                oc->info->symbolTables = symTab;
+            } else {
+                ElfSymbolTable * tail = oc->info->symbolTables;
+                while(tail->next != NULL) tail = tail->next;
+                tail->next = symTab;
+            }
+        }
+    }
+}
+
+void
+ocDeinit_ELF(ObjectCode * oc)
+{
+    /* free all ElfSymbolTables, and their associated
+     * ElfSymbols
+     */
+    if(oc->info != NULL) {
+        ElfSymbolTable * last = oc->info->symbolTables;
+
+        while(last != NULL) {
+            ElfSymbolTable * t = last;
+            last = last->next;
+            stgFree(t->symbols);
+            stgFree(t);
+        }
+
+        {
+            ElfRelocationTable *last = oc->info->relTable;
+            while (last != NULL) {
+                ElfRelocationTable *t = last;
+                last = last->next;
+                stgFree(t);
+            }
+        }
+
+        {
+            ElfRelocationATable *last = oc->info->relaTable;
+            while (last != NULL) {
+                ElfRelocationATable *t = last;
+                last = last->next;
+                stgFree(t);
+            }
+        }
+
+        stgFree(oc->info);
+    }
+}
+
+/*
  * Generic ELF functions
  */
 
@@ -1074,7 +1228,8 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 #if defined(SHN_XINDEX)
    Elf_Word* shndx_table = get_shndx_table((Elf_Ehdr*)ehdrC);
 #endif
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
+    || defined(x86_64_HOST_ARCH)
    /* This #if def only serves to avoid unused-var warnings. */
    Elf_Addr targ = (Elf_Addr) oc->sections[target_shndx].start;
 #endif
@@ -1092,13 +1247,15 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
    }
 
    for (j = 0; j < nent; j++) {
-#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(DEBUG) || defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
+    || defined(x86_64_HOST_ARCH)
       /* This #if def only serves to avoid unused-var warnings. */
       Elf_Addr  offset = rtab[j].r_offset;
       Elf_Addr  P      = targ + offset;
       Elf_Addr  A      = rtab[j].r_addend;
 #endif
-#if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
+    || defined(x86_64_HOST_ARCH)
       Elf_Addr  value;
 #endif
       Elf_Addr  info   = rtab[j].r_info;
@@ -1153,7 +1310,8 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       checkProddableBlock(oc, (void*)P, sizeof(Elf_Word));
 #endif
 
-#if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
+#if defined(sparc_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
+    || defined(x86_64_HOST_ARCH)
       value = S + A;
 #endif
 
