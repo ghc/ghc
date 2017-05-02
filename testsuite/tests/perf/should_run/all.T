@@ -539,3 +539,11 @@ test('DeriveNull',
     ['-O'])
 
 test('DeriveNullTermination', normal, compile_and_run, [''])
+
+test('T13623',
+    [stats_num_field('bytes allocated',
+                    [ (wordsize(64), 50936, 5) ]),
+                    # 2017-05-02     50936 initial
+     only_ways(['normal'])],
+    compile_and_run,
+    ['-O2'])
