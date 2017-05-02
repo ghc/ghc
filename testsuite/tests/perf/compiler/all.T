@@ -330,7 +330,7 @@ test('T3064',
             # 2016-04-06: 153261024 (x86/Linux) probably wildcard refactor
             # 2017-03-24: 134044092 (x86/Linux, 64-bit machine) Update
 
-           (wordsize(64), 265950920, 5)]),
+           (wordsize(64), 281509496, 5)]),
             # (amd64/Linux) (2011-06-28):  73259544
             # (amd64/Linux) (2013-02-07): 224798696
             # (amd64/Linux) (2013-08-02): 236404384, increase from roles
@@ -356,6 +356,7 @@ test('T3064',
             # (amd64/Darwin) (2017-01-23): 306222424 Presumably creep from recent changes (Typeable?)
             # (amd64/Linux) (2017-02-14): 259815560  Early inline patch: 9% improvement
             # (amd64/Linux) (2017-03-31): 265950920  Fix memory leak in simplifier
+            # (amd64/Linux) (2017-05-01): 281509496  Avoid excessive space usage from unfoldings in CoreTidy
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
