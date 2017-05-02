@@ -26,7 +26,7 @@ module GHC.IO.Unsafe (
   ) where
 
 import GHC.Base
-
+import GHC.MVar
 
 {-|
 This is the \"back door\" into the 'IO' monad, allowing
@@ -111,12 +111,25 @@ file reading, see 'System.IO.hGetContents'.
 -}
 {-# INLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
+unsafeInterleaveIO m = do
+  claimedV <- newEmptyMVar
+  resultV <- newEmptyMVar
+  unsafeDupableInterleaveIO $ do
+    claimSucceeded <- tryPutMVar claimedV ()
+    if claimSucceeded
+      then do
+             -- We were the first ones to claim the computation, so we
+             -- perform it and store the result.
+             res <- m
+             putMVar resultV res
+             pure res
+      else readMVar resultV
+
 
 -- Note [unsafeDupableInterleaveIO should not be inlined]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- We used to believe that INLINE on unsafeInterleaveIO was safe,
+-- We used to believe that INLINE on unsafeDupableInterleaveIO was safe,
 -- because the state from this IO thread is passed explicitly to the
 -- interleaved IO, so it cannot be floated out and shared.
 --
