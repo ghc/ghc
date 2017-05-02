@@ -26,7 +26,7 @@ module GHC.IO.Unsafe (
   ) where
 
 import GHC.Base
-
+import GHC.MVar
 
 {-|
 This is the \"back door\" into the 'IO' monad, allowing
@@ -111,12 +111,83 @@ file reading, see 'System.IO.hGetContents'.
 -}
 {-# INLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
-unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
+-- See Note [Null pointers in unsafeInterleaveIO]
+unsafeInterleaveIO m = do
+  v <- case unclaimed of
+         Box r -> unsafeCoerce# newMVar r
+  unsafeDupableInterleaveIO $ do
+  a <- takeMVar v
+  if isUnclaimed a
+    then do
+      res <- m
+      putMVar v res
+      pure res
+    else a <$ putMVar v a
+
+-- The 'Unclaimed' constructor must not be exported.
+data Unclaimed = Unclaimed
+data Box = Box !Unclaimed
+
+-- We use 'unclaimed' as a "null pointer" in 'unsafeInterleaveIO'.
+-- It must not be exported!
+-- See Note [Null pointers in unsafeInterleaveIO]
+{-# NOINLINE unclaimed #-}
+unclaimed :: Box
+unclaimed = Box Unclaimed
+
+isUnclaimed :: a -> Bool
+isUnclaimed a = case unclaimed of
+  Box r -> isTrue# (unsafeCoerce# reallyUnsafePtrEquality# a r)
+
+-- Note [Null pointers in unsafeInterleaveIO]
+-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+--
+-- Conceptually, we're implementing this:
+--
+-- unsafeInterleaveIO :: IO a -> IO a
+-- unsafeInterleaveIO m = do
+--   v <- newMVar Nothing
+--   unsafeDupableInterleaveIO $ do
+--     r <- takeMVar v
+--     case r of
+--       -- We're the first ones to get the MVar, so we actually
+--       -- do the work.
+--       Nothing -> do
+--         a <- m
+--         putMVar v (Just a)
+--         pure a
+--
+--       -- Someone else has claimed the action, so we use
+--       -- their result and put it back in the MVar.
+--       j@(Just a) -> a <$ putMVar v j
+--
+-- The MVar starts out full, with Nothing in it. When the interleaved
+-- computation is complete, the result will be stored in the MVar in a Just
+-- constructor. The interleaved computation, which may run in multiple
+-- threads, takes the MVar, checks whether it's Nothing or Just, and either
+-- performs the interleaved computation or just puts the Just back.
+--
+-- However, allocating Just constructors is wasteful; we can pretend we're
+-- writing in C and use a distinguished "null pointer" to represent Nothing
+-- instead. We magic up a single, global null pointer and use that every time.
+-- The usual problem with null pointers is that they can't distinguish, among
+-- Nothing, Just Nothing, Just (Just Nothing), etc. Fortunately, we don't have
+-- to worry about that here. The null pointer is private to this module, so
+-- it is impossible for the computation passed to 'unsafeInterleaveIO' to
+-- produce it.
+--
+-- Why do we have to build a box around the distinguished null? I don't
+-- actually know. But without this box, 'reallyUnsafePtrEquality#' does not
+-- seem to detect equality! Note that we rely on the fact that GHC uses
+-- distinct heap locations to represent nullary constructors of distinct
+-- datatypes. If this changes, we can recover the correct behavior by using
+-- 'unsafePerformIO' to allocate something like an 'IORef' and use the
+-- embedded 'MutVar#' as a null pointer.
 
 -- Note [unsafeDupableInterleaveIO should not be inlined]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
--- We used to believe that INLINE on unsafeInterleaveIO was safe,
+-- We used to believe that INLINE on unsafeDupableInterleaveIO was safe,
 -- because the state from this IO thread is passed explicitly to the
 -- interleaved IO, so it cannot be floated out and shared.
 --
