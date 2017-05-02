@@ -1350,8 +1350,8 @@ lintArrow :: SDoc -> LintedKind -> LintedKind -> LintM LintedKind
 -- See Note [GHC Formalism]
 lintArrow what k1 k2   -- Eg lintArrow "type or kind `blah'" k1 k2
                        -- or lintarrow "coercion `blah'" k1 k2
-  = do { unless (okArrowArgKind k1)    (addErrL (msg (text "argument") k1))
-       ; unless (okArrowResultKind k2) (addErrL (msg (text "result")   k2))
+  = do { unless (classifiesTypeWithValues k1) (addErrL (msg (text "argument") k1))
+       ; unless (classifiesTypeWithValues k2) (addErrL (msg (text "result")   k2))
        ; return liftedTypeKind }
   where
     msg ar k

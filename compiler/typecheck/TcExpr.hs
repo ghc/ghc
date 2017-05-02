@@ -211,7 +211,7 @@ tcExpr e@(HsIPVar x) res_ty
                       ip_ty res_ty }
   where
   -- Coerces a dictionary for `IP "x" t` into `t`.
-  fromDict ipClass x ty = HsWrap $ mkWpCastR $
+  fromDict ipClass x ty = mkHsWrap $ mkWpCastR $
                           unwrapIP $ mkClassPred ipClass [x,ty]
   origin = IPOccOrigin x
 
@@ -230,7 +230,7 @@ tcExpr e@(HsOverLabel mb_fromLabel l) res_ty
   where
   -- Coerces a dictionary for `IsLabel "x" t` into `t`,
   -- or `HasField "x" r a into `r -> a`.
-  fromDict pred = HsWrap $ mkWpCastR $ unwrapIP pred
+  fromDict pred = mkHsWrap $ mkWpCastR $ unwrapIP pred
   origin = OverLabelOrigin l
   lbl = mkStrLitTy l
 
@@ -354,8 +354,8 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
                   tc_poly_expr_nc arg2 arg2_exp_ty
        ; arg2_ty <- readExpType arg2_exp_ty
        ; op_id <- tcLookupId op_name
-       ; let op' = L loc (HsWrap (mkWpTyApps [arg1_ty, arg2_ty])
-                                 (HsVar (L lv op_id)))
+       ; let op' = L loc (mkHsWrap (mkWpTyApps [arg1_ty, arg2_ty])
+                                   (HsVar (L lv op_id)))
        ; return $ OpApp arg1' op' fix arg2' }
 
   | (L loc (HsVar (L lv op_name))) <- op
@@ -392,10 +392,10 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
-       ; let op' = L loc (HsWrap (mkWpTyApps [ getRuntimeRep "tcExpr ($)" res_ty
-                                             , arg2_sigma
-                                             , res_ty])
-                                 (HsVar (L lv op_id)))
+       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep "tcExpr ($)" res_ty
+                                               , arg2_sigma
+                                               , res_ty])
+                                   (HsVar (L lv op_id)))
              -- arg1' :: arg1_ty
              -- wrap_arg1 :: arg1_ty "->" (arg2_sigma -> op_res_ty)
              -- wrap_res :: op_res_ty "->" res_ty
@@ -1793,7 +1793,7 @@ tcSeq loc fun_name args res_ty
         ; arg1' <- tcMonoExpr arg1 (mkCheckExpType arg1_ty)
         ; arg2' <- tcMonoExpr arg2 arg2_exp_ty
         ; res_ty <- readExpType res_ty  -- by now, it's surely filled in
-        ; let fun'    = L loc (HsWrap ty_args (HsVar (L loc fun)))
+        ; let fun'    = L loc (mkHsWrap ty_args (HsVar (L loc fun)))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
         ; return (idHsWrapper, fun', [Left arg1', Left arg2']) }
 
@@ -1835,7 +1835,7 @@ tcTagToEnum loc fun_name args res_ty
                  (mk_error ty' doc2)
 
        ; arg' <- tcMonoExpr arg (mkCheckExpType intPrimTy)
-       ; let fun' = L loc (HsWrap (WpTyApp rep_ty) (HsVar (L loc fun)))
+       ; let fun' = L loc (mkHsWrap (WpTyApp rep_ty) (HsVar (L loc fun)))
              rep_ty = mkTyConApp rep_tc rep_args
 
        ; return (mkWpCastR (mkTcSymCo coi), fun', [Left arg']) }

@@ -457,7 +457,8 @@ See #case_invariants#
 
 Note [Levity polymorphism invariants]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The levity-polymorphism invariants are these:
+The levity-polymorphism invariants are these (as per "Levity Polymorphism",
+PLDI '17):
 
 * The type of a term-binder must not be levity-polymorphic,
   unless it is a let(rec)-bound join point
