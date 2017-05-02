@@ -7196,7 +7196,7 @@ precisely the same as type given in the instance head. For example: ::
     instance Eq (Elem [e]) => Collects [e] where
       -- Choose one of the following alternatives:
       type Elem [e] = e       -- OK
-      type Elem [x] = x       -- BAD; '[x]' is differnet to '[e]' from head
+      type Elem [x] = x       -- BAD; '[x]' is different to '[e]' from head
       type Elem x   = x       -- BAD; 'x' is different to '[e]'
       type Elem [Maybe x] = x -- BAD: '[Maybe x]' is different to '[e]'
 
