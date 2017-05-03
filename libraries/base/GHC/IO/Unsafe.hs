@@ -112,18 +112,29 @@ file reading, see 'System.IO.hGetContents'.
 {-# INLINE unsafeInterleaveIO #-}
 unsafeInterleaveIO :: IO a -> IO a
 unsafeInterleaveIO m = do
-  claimedV <- newEmptyMVar
-  resultV <- newEmptyMVar
+  v <- newMVar Nothing
   unsafeDupableInterleaveIO $ do
-    claimSucceeded <- tryPutMVar claimedV ()
-    if claimSucceeded
-      then do
-             -- We were the first ones to claim the computation, so we
-             -- perform it and store the result.
-             res <- m
-             putMVar resultV res
-             pure res
-      else readMVar resultV
+    r <- tryTakeMVar v
+    case r of
+      -- Someone else has taken the MVar. By the time they put
+      -- it back, the action will surely have been performed,
+      -- so we use the result.
+      Nothing -> do
+        res <- readMVar v
+        case res of
+          Nothing -> errorWithoutStackTrace "unsafeInterleaveIO: impossible Nothing"
+          Just a -> pure a
+
+      -- Someone else has performed the action, so we use
+      -- their result and put it back in the MVar.
+      Just j@(Just r) -> r <$ putMVar v j
+
+      -- We're the first ones to get the MVar, so we actually
+      -- do the work.
+      Just Nothing -> do
+        res <- m
+        putMVar v (Just res)
+        pure res
 
 
 -- Note [unsafeDupableInterleaveIO should not be inlined]
