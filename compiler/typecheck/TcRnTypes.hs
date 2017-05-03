@@ -1646,9 +1646,9 @@ of (cc_ev ct), and is fully rewritten wrt the substitution.   Eg for CDictCan,
 This holds by construction; look at the unique place where CDictCan is
 built (in TcCanonical).
 
-In contrast, the type of the evidence *term* (ccev_evtm or ctev_evar/dest) in
+In contrast, the type of the evidence *term* (ctev_dest / ctev_evar) in
 the evidence may *not* be fully zonked; we are careful not to look at it
-during constraint solving.  See Note [Evidence field of CtEvidence]
+during constraint solving. See Note [Evidence field of CtEvidence].
 -}
 
 mkNonCanonical :: CtEvidence -> Ct
@@ -2402,6 +2402,16 @@ For Givens we make new EvVars and bind them immediately. Two main reasons:
     (see evTermCoercion), so the easy thing is to bind it to an Id.
 
 So a Given has EvVar inside it rather than (as previously) an EvTerm.
+
+Note [Given in ctEvCoercion]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When retrieving the evidence from a Given equality, we update the type of the EvVar
+from the ctev_pred field. In Note [Evidence field of CtEvidence], we claim that
+the type of the evidence is never looked at -- but this isn't true in the case of
+a coercion that is used in a type. (See the comments in Note [Flattening] in TcFlatten
+about the FTRNotFollowed case of flattenTyVar.) So, right here where we are retrieving
+the coercion from a Given, we update the type to make sure it's zonked.
+
 -}
 
 -- | A place for type-checking evidence to go after it is generated.
@@ -2418,7 +2428,6 @@ data TcEvDest
 
 data CtEvidence
   = CtGiven    -- Truly given, not depending on subgoals
-               -- NB: Spontaneous unifications belong here
       { ctev_pred :: TcPredType      -- See Note [Ct/evidence invariant]
       , ctev_evar :: EvVar           -- See Note [Evidence field of CtEvidence]
       , ctev_loc  :: CtLoc }
@@ -2459,9 +2468,11 @@ ctEvTerm :: CtEvidence -> EvTerm
 ctEvTerm ev@(CtWanted { ctev_dest = HoleDest _ }) = EvCoercion $ ctEvCoercion ev
 ctEvTerm ev = EvId (ctEvId ev)
 
+-- Always returns a coercion whose type is precisely ctev_pred of the CtEvidence.
+-- See also Note [Given in ctEvCoercion]
 ctEvCoercion :: CtEvidence -> Coercion
-ctEvCoercion (CtGiven { ctev_evar = ev_id })
-  = mkTcCoVarCo ev_id
+ctEvCoercion (CtGiven { ctev_pred = pred_ty, ctev_evar = ev_id })
+  = mkTcCoVarCo (setVarType ev_id pred_ty)  -- See Note [Given in ctEvCoercion]
 ctEvCoercion (CtWanted { ctev_dest = dest, ctev_pred = pred })
   | HoleDest hole <- dest
   , Just (role, ty1, ty2) <- getEqPredTys_maybe pred

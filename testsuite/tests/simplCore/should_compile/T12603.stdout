@@ -1,1 +1,1 @@
-  = case GHC.Real.$wf1 2# 8# of ww4 { __DEFAULT -> GHC.Types.I# ww4 }
+lvl = case GHC.Real.$wf1 2# 8# of v { __DEFAULT -> GHC.Types.I# v }

@@ -13,8 +13,6 @@
 Total ticks:     55
 
 18 PreInlineUnconditionally
-  1 c
-  1 n
   1 g
   1 xs
   1 ys
@@ -28,6 +26,8 @@ Total ticks:     55
   1 k
   1 z
   1 g
+  1 c
+  1 n
   1 lvl
   1 lvl
   1 lvl
@@ -42,9 +42,6 @@ Total ticks:     55
 5 LetFloatFromLet 5
 25 BetaReduction
   1 a
-  1 c
-  1 n
-  1 a
   1 g
   1 a
   1 xs
@@ -66,6 +63,9 @@ Total ticks:     55
   1 k
   1 z
   1 g
+  1 a
+  1 c
+  1 n
 10 SimplifierDone 10
 
 

@@ -11,7 +11,7 @@ module SimplMonad (
         getSimplRules, getFamEnvs,
 
         -- Unique supply
-        MonadUnique(..), newId,
+        MonadUnique(..), newId, newJoinId,
 
         -- Counting
         SimplCount, tick, freeTick, checkedTick,
@@ -19,8 +19,11 @@ module SimplMonad (
         plusSimplCount, isZeroSimplCount
     ) where
 
+import Var              ( Var, isTyVar, mkLocalVar )
+import Name             ( mkSystemVarName )
 import Id               ( Id, mkSysLocalOrCoVar )
-import Type             ( Type )
+import IdInfo           ( IdDetails(..), vanillaIdInfo, setArityInfo )
+import Type             ( Type, mkLamTypes )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
 import UniqSupply
@@ -176,6 +179,19 @@ getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 newId :: FastString -> Type -> SimplM Id
 newId fs ty = do uniq <- getUniqueM
                  return (mkSysLocalOrCoVar fs uniq ty)
+
+newJoinId :: [Var] -> Type -> SimplM Id
+newJoinId bndrs body_ty
+  = do { uniq <- getUniqueM
+       ; let name       = mkSystemVarName uniq (fsLit "$j")
+             join_id_ty = mkLamTypes bndrs body_ty  -- Note [Funky mkLamTypes]
+             arity      = length (filter (not . isTyVar) bndrs)
+             join_arity = length bndrs
+             details    = JoinId join_arity
+             id_info    = vanillaIdInfo `setArityInfo` arity
+--                                        `setOccInfo` strongLoopBreaker
+
+       ; return (mkLocalVar details name join_id_ty id_info) }
 
 {-
 ************************************************************************

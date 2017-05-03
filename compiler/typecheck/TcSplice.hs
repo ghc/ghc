@@ -574,8 +574,8 @@ runAnnotation target expr = do
                 -- and hence ensures the appropriate dictionary is bound by const_binds
               ; wrapper <- instCall AnnOrigin [expr_ty] [mkClassPred data_class [expr_ty]]
               ; let specialised_to_annotation_wrapper_expr
-                      = L loc (HsWrap wrapper
-                                      (HsVar (L loc to_annotation_wrapper_id)))
+                      = L loc (mkHsWrap wrapper
+                                        (HsVar (L loc to_annotation_wrapper_id)))
               ; return (L loc (HsApp specialised_to_annotation_wrapper_expr expr')) }
 
     -- Run the appropriately wrapped expression to get the value of

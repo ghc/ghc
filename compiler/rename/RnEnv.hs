@@ -609,7 +609,7 @@ TH we might use the same TH NameU in two different name spaces.
 eg (Trac #7241):
    $(newName "Foo" >>= \o -> return [DataD [] o [] [RecC o []] [''Show]])
 Here we generate a type constructor and data constructor with the same
-unique, but differnt name spaces.
+unique, but different name spaces.
 
 It'd be nicer to rule this out in extendGlobalRdrEnvRn, but that would
 mean looking up the OccName in every name-space, just in case, and that

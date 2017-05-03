@@ -135,7 +135,7 @@ module TyCoRep (
 import {-# SOURCE #-} DataCon( dataConFullSig
                              , dataConUnivTyVarBinders, dataConExTyVarBinders
                              , DataCon, filterEqSpec )
-import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy
+import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypesWellScoped
                           , tyCoVarsOfTypeWellScoped
                           , coreView, typeKind )
@@ -2186,7 +2186,7 @@ subst_ty subst ty
                                (ForAllTy $! ((TvBndr $! tv') vis)) $!
                                             (subst_ty subst' ty)
     go (LitTy n)         = LitTy $! n
-    go (CastTy ty co)    = (CastTy $! (go ty)) $! (subst_co subst co)
+    go (CastTy ty co)    = (mkCastTy $! (go ty)) $! (subst_co subst co)
     go (CoercionTy co)   = CoercionTy $! (subst_co subst co)
 
 substTyVar :: TCvSubst -> TyVar -> Type

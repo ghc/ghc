@@ -289,8 +289,7 @@ it easier to read debugging output.
 
 Note [Levity polymorphism checking]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-According to the Levity Polymorphism paper
-<http://cs.brynmawr.edu/~rae/papers/2017/levity/levity.pdf>, levity
+According to the "Levity Polymorphism" paper (PLDI '17), levity
 polymorphism is forbidden in precisely two places: in the type of a bound
 term-level argument and in the type of an argument to a function. The paper
 explains it more fully, but briefly: expressions in these contexts need to be

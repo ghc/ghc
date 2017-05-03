@@ -81,7 +81,7 @@ import Var
 import VarSet
 import VarEnv
 import Literal          ( litIsTrivial )
-import Demand           ( StrictSig, isStrictDmd, splitStrictSig, increaseStrictSigArity )
+import Demand           ( StrictSig, Demand, isStrictDmd, splitStrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
 import Type             ( Type, mkLamTypes, splitTyConApp_maybe )
@@ -95,7 +95,7 @@ import FastString
 import UniqDFM
 import FV
 import Data.Maybe
-import Control.Monad    ( zipWithM )
+import MonadUtils       ( mapAccumLM )
 
 {-
 ************************************************************************
@@ -402,7 +402,7 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
         ; return (foldl App lapp' rargs') }
 
   | otherwise
-  = do { args' <- zipWithM (lvlMFE env) stricts args
+  = do { (_, args') <- mapAccumLM lvl_arg stricts args
             -- Take account of argument strictness; see
             -- Note [Floating to the top]
        ; return (foldl App (lookupVar env fn) args') }
@@ -410,12 +410,12 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
     n_val_args = count (isValArg . deAnnotate) args
     arity      = idArity fn
 
-    stricts :: [Bool]   -- True for strict argument
+    stricts :: [Demand]   -- True for strict /value/ arguments
     stricts = case splitStrictSig (idStrictness fn) of
-                (arg_ds, _) | not (arg_ds `lengthExceeds` n_val_args)
-                            -> map isStrictDmd arg_ds ++ repeat False
+                (arg_ds, _) | arg_ds `lengthExceeds` n_val_args
+                            -> []
                             | otherwise
-                            -> repeat False
+                            -> arg_ds
 
     -- Separate out the PAP that we are floating from the extra
     -- arguments, by traversing the spine until we have collected
@@ -427,6 +427,19 @@ lvlApp env orig_expr ((_,AnnVar fn), args)
        | isValArg (deAnnotate a) = left (n-1) f (a:rargs)
        | otherwise               = left n     f (a:rargs)
     left _ _ _                   = panic "SetLevels.lvlExpr.left"
+
+    is_val_arg :: CoreExprWithFVs -> Bool
+    is_val_arg (_, AnnType {}) = False
+    is_val_arg _               = True
+
+    lvl_arg :: [Demand] -> CoreExprWithFVs -> LvlM ([Demand], LevelledExpr)
+    lvl_arg strs arg | (str1 : strs') <- strs
+                     , is_val_arg arg
+                     = do { arg' <- lvlMFE env (isStrictDmd str1) arg
+                          ; return (strs', arg') }
+                     | otherwise
+                     = do { arg' <- lvlMFE env False arg
+                          ; return (strs, arg') }
 
 lvlApp env _ (fun, args)
   =  -- No PAPs that we can float: just carry on with the
@@ -893,7 +906,17 @@ in exchange we build a thunk, which is bad.  This case reduces allocation
 by 7% in spectral/puzzle (a rather strange benchmark) and 1.2% in real/fem.
 Doesn't change any other allocation at all.
 
-We will make a separate decision for the scrutinees and alternatives.
+We will make a separate decision for the scrutinee and alternatives.
+
+However this can have a knock-on effect for fusion: consider
+    \v -> foldr k z (case x of I# y -> build ..y..)
+Perhaps we can float the entire (case x of ...) out of the \v.  Then
+fusion will not happen, but we will get more sharing.  But if we don't
+float the case (as advocated here) we won't float the (build ...y..)
+either, so fusion will happen.  It can be a big effect, esp in some
+artificial benchmarks (e.g. integer, queens), but there is no perfect
+answer.
+
 -}
 
 annotateBotStr :: Id -> Arity -> Maybe (Arity, StrictSig) -> Id

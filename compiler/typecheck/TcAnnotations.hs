@@ -22,8 +22,31 @@ import TcRnMonad
 import SrcLoc
 import Outputable
 
+-- Some platforms don't support the external interpreter, and
+-- compilation on those platforms shouldn't fail just due to
+-- annotations
+#ifndef GHCI
 tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
-tcAnnotations anns = mapM tcAnnotation anns
+tcAnnotations anns = do
+  dflags <- getDynFlags
+  case gopt Opt_ExternalInterpreter dflags of
+    True  -> tcAnnotations' anns
+    False -> warnAnns anns
+warnAnns :: [LAnnDecl Name] -> TcM [Annotation]
+--- No GHCI; emit a warning (not an error) and ignore. cf Trac #4268
+warnAnns [] = return []
+warnAnns anns@(L loc _ : _)
+  = do { setSrcSpan loc $ addWarnTc NoReason $
+             (text "Ignoring ANN annotation" <> plural anns <> comma
+             <+> text "because this is a stage-1 compiler without -fexternal-interpreter or doesn't support GHCi")
+       ; return [] }
+#else
+tcAnnotations :: [LAnnDecl Name] -> TcM [Annotation]
+tcAnnotations = tcAnnotations'
+#endif
+
+tcAnnotations' :: [LAnnDecl Name] -> TcM [Annotation]
+tcAnnotations' anns = mapM tcAnnotation anns
 
 tcAnnotation :: LAnnDecl Name -> TcM Annotation
 tcAnnotation (L loc ann@(HsAnnotation _ provenance expr)) = do

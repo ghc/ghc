@@ -580,7 +580,7 @@ translatePat fam_insts pat = case pat of
     | otherwise -> do
         ps      <- translatePat fam_insts p
         (xp,xe) <- mkPmId2Forms ty
-        let g = mkGuard ps (HsWrap wrapper (unLoc xe))
+        let g = mkGuard ps (mkHsWrap wrapper (unLoc xe))
         return [xp,g]
 
   -- (n + k)  ===>   x (True <- x >= k) (n <- x-k)

@@ -403,7 +403,7 @@ withBinaryFile name mode = bracket (openBinaryFile name mode) hClose
 fixIO :: (a -> IO a) -> IO a
 fixIO k = do
     m <- newEmptyMVar
-    ans <- unsafeInterleaveIO (takeMVar m)
+    ans <- unsafeDupableInterleaveIO (readMVar m)
     result <- k ans
     putMVar m result
     return result
@@ -413,12 +413,18 @@ fixIO k = do
 -- computation a few times before it notices the loop, which is wrong.
 --
 -- NOTE2: the explicit black-holing with an IORef ran into trouble
--- with multiple threads (see #5421), so now we use an MVar.  I'm
--- actually wondering whether we should use readMVar rather than
--- takeMVar, just in case it ends up being executed multiple times,
--- but even then it would have to be masked to protect against async
--- exceptions.  Ugh.  What we really need here is an IVar, or an
--- atomic readMVar, or even STM.  All these seem like overkill.
+-- with multiple threads (see #5421), so now we use an MVar. We used
+-- to use takeMVar with unsafeInterleaveIO. This, however, uses noDuplicate#,
+-- which is not particularly cheap. Better to use readMVar, which can be
+-- performed in multiple threads safely, and to use unsafeDupableInterleaveIO
+-- to avoid the noDuplicate cost.
+--
+-- What we'd ideally want is probably an IVar, but we don't quite have those.
+-- STM TVars look like an option at first, but I don't think they are:
+-- we'd need to be able to write to the variable in an IO context, which can
+-- only be done using 'atomically', and 'atomically' is not allowed within
+-- unsafePerformIO. We can't know if someone will try to use the result
+-- of fixIO with unsafePerformIO!
 --
 -- See also System.IO.Unsafe.unsafeFixIO.
 --

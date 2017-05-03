@@ -196,7 +196,7 @@ mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
 nlHsTyApp :: name -> [Type] -> LHsExpr name
-nlHsTyApp fun_id tys = noLoc (HsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
+nlHsTyApp fun_id tys = noLoc (mkHsWrap (mkWpTyApps tys) (HsVar (noLoc fun_id)))
 
 nlHsTyApps :: name -> [Type] -> [LHsExpr name] -> LHsExpr name
 nlHsTyApps fun_id tys xs = foldl nlHsApp (nlHsTyApp fun_id tys) xs
@@ -654,9 +654,12 @@ typeToLHsType ty
 mkLHsWrap :: HsWrapper -> LHsExpr id -> LHsExpr id
 mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 
+-- Avoid (HsWrap co (HsWrap co' _)).
+-- See Note [Detecting forced eta expansion] in DsExpr
 mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
-                 | otherwise           = HsWrap co_fn e
+mkHsWrap co_fn (HsWrap co_fn' e)       = mkHsWrap (co_fn <.> co_fn') e
+mkHsWrap co_fn e                       = HsWrap co_fn e
 
 mkHsWrapCo :: TcCoercionN   -- A Nominal coercion  a ~N b
            -> HsExpr id -> HsExpr id

@@ -330,7 +330,7 @@ test('T3064',
             # 2016-04-06: 153261024 (x86/Linux) probably wildcard refactor
             # 2017-03-24: 134044092 (x86/Linux, 64-bit machine) Update
 
-           (wordsize(64), 265950920, 5)]),
+           (wordsize(64), 281509496, 5)]),
             # (amd64/Linux) (2011-06-28):  73259544
             # (amd64/Linux) (2013-02-07): 224798696
             # (amd64/Linux) (2013-08-02): 236404384, increase from roles
@@ -356,6 +356,7 @@ test('T3064',
             # (amd64/Darwin) (2017-01-23): 306222424 Presumably creep from recent changes (Typeable?)
             # (amd64/Linux) (2017-02-14): 259815560  Early inline patch: 9% improvement
             # (amd64/Linux) (2017-03-31): 265950920  Fix memory leak in simplifier
+            # (amd64/Linux) (2017-05-01): 281509496  Avoid excessive space usage from unfoldings in CoreTidy
 
 ###################################
 # deactivated for now, as this metric became too volatile recently
@@ -698,7 +699,7 @@ test('T6048',
             # 2014-12-01: 49987836 (x86 Windows)
             # 2016-04-06: 55701280 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 115714216, 10)])
+           (wordsize(64), 90996312, 10)])
              # 2012-09-18  97247032 amd64/Linux
              # 2014-01-16 108578664 amd64/Linux (unknown, likely foldl-via-foldr)
              # 2014-01-18  95960720 amd64/Linux Call Arity improvements
@@ -711,6 +712,7 @@ test('T6048',
              # 2016-03-11 108225624 amd64/Linux unknown reason sadly; likely gradual creep.
              # 2016-11-25  94327392 amd64/Linux Back down again hooray; still not sure why
              # 2017-02-17 115715592 amd64/Linux Type-indexed Typeable
+             # 2017-04-28 90996312 Join point refactoring
       ],
       compile,[''])
 
@@ -742,7 +744,7 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 29871032, 15),
+          [(wordsize(64), 17675240, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
@@ -752,12 +754,13 @@ test('T9675',
           # 2015-12-11    30837312   TypeInType (see #11196)
           # 2016-03-14    38776008   Final demand analyzer run
           # 2016-04-01    29871032   Fix leaks in demand analysis
+          # 2016-04-30    17675240   Fix leaks in tidy unfoldings
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 121, 15),
+          [(wordsize(64), 63, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
@@ -768,6 +771,7 @@ test('T9675',
           # 2015-12-11    113        TypeInType (see #11196)
           # 2016-04-14    144        Final demand analyzer run
           # 2016-07-26    121        Unboxed sums?
+          # 2017-04-30    63         Fix leaks in tidy unfoldings
             (wordsize(32), 56, 15)
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
@@ -933,7 +937,7 @@ test('T9233',
 test('T10370',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 41291976, 15),
+          [(wordsize(64), 31524048, 15),
           # 2015-10-22    19548720
           # 2016-02-24    22823976   Changing Levity to RuntimeRep; not sure why this regresses though, even after some analysis
           # 2016-04-14    28256896   final demand analyzer run
@@ -949,19 +953,21 @@ test('T10370',
           # 2017-02-17    51126304   Type-indexed Typeable
           # 2017-02-27    43455848   Likely drift from recent simplifier improvements
           # 2017-02-25    41291976   Early inline patch
+          # 2017-04-30    31524048   Fix leaks in tidy unfoldings
 
            (wordsize(32), 19276304, 15),
           # 2015-10-22    11371496
           # 2017-03-24    19276304 (x86/Linux, 64-bit machine)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 154, 15),
+          [(wordsize(64), 117, 15),
           # 2015-10-22     76
           # 2016-04-14    101 final demand analyzer run
           # 2016-08-08    121 see above
           # 2017-01-18    146 Allow top-level string literals in Core
           # 2017-02-17    187 Type-indexed Typeable
           # 2017-02-25    154 Early inline patch
+          # 2017-04-30    117 Fix leaks in tidy unfoldings
            (wordsize(32),  69, 15),
           # 2015-10-22     39
           # 2017-03-24     69
@@ -1082,8 +1088,9 @@ test('T12707',
 
 test('T13379',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 411597856, 5),
+          [(wordsize(64), 411597856, 10),
           # initial:    411597856
+          # widen window to 10%, Darwin had 449080520, a 9.1% difference
           ]),
      ],
      compile,

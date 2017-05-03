@@ -26,7 +26,7 @@ which produces this Core:
     bar :: forall a. a -> (Either Int a, Either Bool a)
     bar @a x = (Right @Int @a x, Right @Bool @a x)
 
-where the two components of the tuple are differnt terms, and cannot be
+where the two components of the tuple are different terms, and cannot be
 commoned up (easily). On the STG level we have
 
     bar [x] = let c1 = Right [x]
