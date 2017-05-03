@@ -10,4 +10,5 @@ ghcPrimPackageArgs = package ghcPrim ? mconcat
 
     , builder (Cc CompileC)    ?
       (not <$> flag GccLt44)   ?
+      (not <$> flag GccIsClang) ?
       input "//cbits/atomic.c" ? arg "-Wno-sync-nand" ]

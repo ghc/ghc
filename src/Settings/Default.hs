@@ -65,10 +65,24 @@ defaultArgs = mconcat
     , sourceArgs defaultSourceArgs
     , defaultPackageArgs ]
 
+-- | Default flags about Werror
+-- | mk/warnings.mk
+defaultErrorGhcFlags :: Args
+defaultErrorGhcFlags =
+  mconcat [ notStage0 ? arg "-Werror"
+          , (not <$> flag GccIsClang) ? mconcat [
+                (not <$> flag GccLt46) ? (not <$> windowsHost) ?
+                  arg "-Werror=unused-but-set-variable"
+              , (not <$> flag GccLt44) ? arg "-Wno-error=inline" ]
+          , flag GccIsClang ? arg "-Wno-unknown-pragmas" ]
+
 -- | Default source arguments, e.g. optimisation settings.
 defaultSourceArgs :: SourceArgs
 defaultSourceArgs = SourceArgs
-    { hsDefault  = mconcat [stage0 ? arg "-O", notStage0 ? arg "-O2", arg "-H32m"]
+    { hsDefault  = mconcat [ stage0 ? arg "-O"
+                           , notStage0 ? arg "-O2"
+                           , arg "-H32m"
+                           , defaultErrorGhcFlags ]
     , hsLibrary  = mempty
     , hsCompiler = mempty
     , hsGhc      = mempty }

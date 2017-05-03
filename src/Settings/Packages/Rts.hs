@@ -89,7 +89,9 @@ rtsPackageArgs = package rts ? do
             , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
 
             , inputs ["//Evac_thr.c", "//Scav_thr.c"] ?
-              append [ "-DPARALLEL_GC", "-Irts/sm" ] ]
+              append [ "-DPARALLEL_GC", "-Irts/sm" ]
+
+            , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr" ]
 
         , builder Ghc ? arg "-Irts"
 
