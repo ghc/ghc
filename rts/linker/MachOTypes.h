@@ -38,7 +38,7 @@ typedef struct _MachOSymbol {
     MachONList * nlist; /* the nlist symbol entry */
 } MachOSymbol;
 
-typedef struct _ObjectCodeFormatInfo {
+struct ObjectCodeFormatInfo {
     // while we have the image
     // we can store some pointers
     // into it, so we don't have
@@ -63,7 +63,7 @@ typedef struct _ObjectCodeFormatInfo {
     /* pointer to the global offset table */
     void                 *got_start;
     size_t                got_size;
-} ObjectCodeFormatInfo;
+};
 
 /* When loading sections of the macho
  * into different pages, such that the
@@ -112,7 +112,7 @@ struct _Stub {
 }
 Stub;
 
-typedef struct _SectionFormatInfo {
+struct SectionFormatInfo {
     /*
      * The following fields are relevant for stubs next to sections only.
      */
@@ -126,6 +126,6 @@ typedef struct _SectionFormatInfo {
      */
     MachOSection * macho_section;
     MachORelocationInfo * relocation_info;
-} SectionFormatInfo;
+};
 
 #endif /* OBJECTFORMAT_MACHO */

@@ -1766,7 +1766,7 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
    s->mapped_start = mapped_start; /* start of mmap() block */
    s->mapped_size  = mapped_size;  /* size of mmap() block */
 
-   s->info = (SectionFormatInfo*)stgCallocBytes(1, sizeof(SectionFormatInfo),
+   s->info = (struct SectionFormatInfo*)stgCallocBytes(1, sizeof *s->info,
                                             "addSection(SectionFormatInfo)");
 
    IF_DEBUG(linker,

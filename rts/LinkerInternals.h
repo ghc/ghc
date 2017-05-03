@@ -20,9 +20,6 @@
 typedef void SymbolAddr;
 typedef char SymbolName;
 
-typedef struct _SectionFormatInfo SectionFormatInfo;
-typedef struct _ObjectCodeFormatInfo ObjectCodeFormatInfo;
-
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
     OBJECT_LOADED,
@@ -52,6 +49,18 @@ typedef
         }
    SectionAlloc;
 
+/*
+ * Note [No typedefs for customizable types]
+ * Some pointer-to-struct types are defined opaquely
+ * first, and customized later to architecture/ABI-specific
+ * instantiations. Having the usual
+ *   typedef struct _Foo {...} Foo;
+ * wrappers is hard to get right with older versions of GCC,
+ * so just have a
+ *   struct Foo {...};
+ * and always refer to it with the 'struct' qualifier.
+ */
+
 typedef
    struct _Section {
       void*    start;              /* actual start of section in memory */
@@ -66,8 +75,10 @@ typedef
       void* mapped_start;         /* start of mmap() block */
       StgWord mapped_size;        /* size of mmap() block */
 
-      /* A customizable type to augment the Section type. */
-       SectionFormatInfo* info;
+      /* A customizable type to augment the Section type.
+       * See Note [No typedefs for customizable types]
+       */
+      struct SectionFormatInfo* info;
    }
    Section;
 
@@ -142,8 +153,10 @@ typedef struct _ObjectCode {
     /* ptr to mem containing the object file image */
     char*      image;
 
-    /* A customizable type, that formats can use to augment ObjectCode */
-    ObjectCodeFormatInfo *info;
+    /* A customizable type, that formats can use to augment ObjectCode
+     * See Note [No typedefs for customizable types]
+     */
+    struct ObjectCodeFormatInfo* info;
 
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
@@ -321,8 +334,8 @@ char *cstring_from_section_name(
 #  include "linker/ElfTypes.h"
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
-struct _SectionFormatInfo { void* placeholder; };
-struct _ObjectCodeFormatInfo { void* placeholder; };
+struct SectionFormatInfo { void* placeholder; };
+struct ObjectCodeFormatInfo { void* placeholder; };
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"

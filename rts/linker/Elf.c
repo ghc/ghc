@@ -161,8 +161,8 @@ get_shndx_table(Elf_Ehdr* ehdr)
 void
 ocInit_ELF(ObjectCode * oc)
 {
-    oc->info = (ObjectCodeFormatInfo*)stgCallocBytes(
-            1, sizeof(ObjectCodeFormatInfo),
+    oc->info = (struct ObjectCodeFormatInfo*)stgCallocBytes(
+            1, sizeof *oc->info,
             "ocInit_Elf(ObjectCodeFormatInfo)");
     // TODO: fill info
     oc->info->elfHeader = (Elf_Ehdr *)oc->image;

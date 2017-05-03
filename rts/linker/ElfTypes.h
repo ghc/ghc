@@ -130,7 +130,7 @@ typedef struct _ElfRelocationATable {
  * Header provides Information about the sections.
  *
  */
-typedef struct _ObjectCodeFormatInfo {
+struct ObjectCodeFormatInfo {
     Elf_Ehdr             *elfHeader;
     Elf_Phdr             *programHeader;
     Elf_Shdr             *sectionHeader;
@@ -144,8 +144,7 @@ typedef struct _ObjectCodeFormatInfo {
     /* pointer to the global offset table */
     void *                got_start;
     size_t                got_size;
-
-} ObjectCodeFormatInfo;
+};
 
 typedef
 struct _Stub {
@@ -154,7 +153,7 @@ struct _Stub {
     struct _Stub * next;
 } Stub;
 
-typedef struct _SectionFormatInfo {
+struct SectionFormatInfo {
     /*
      * The following fields are relevant for stubs next to sections only.
      */
@@ -166,6 +165,6 @@ typedef struct _SectionFormatInfo {
     char * name;
 
     Elf_Shdr *sectionHeader;
-} SectionFormatInfo;
+};
 #endif /* OBJECTFORMAT_ELF */
 #endif /* ElfTypes_h */
