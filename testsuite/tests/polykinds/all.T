@@ -140,6 +140,7 @@ test('T11362', normal, compile, ['-dunique-increment=-1'])
   # -dunique-increment=-1 doesn't work inside the file
 test('T11399', normal, compile_fail, [''])
 test('T11611', normal, compile_fail, [''])
+test('T11616', normal, compile, [''])
 test('T11648', normal, compile, [''])
 test('T11648b', normal, compile_fail, [''])
 test('KindVType', normal, compile_fail, [''])
