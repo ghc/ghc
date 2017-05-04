@@ -445,7 +445,7 @@ lookupChildrenExport parent rdr_items =
           let bareName = unLoc n
               lkup v = lookupExportChild parent (setRdrNameSpace bareName v)
 
-          name <-  fmap mconcat . mapM lkup $
+          name <-  tryChildLookupResult $ map lkup $
                     (choosePossibleNamespaces (rdrNameSpace bareName))
 
           -- Default to data constructors for slightly better error
@@ -460,6 +460,17 @@ lookupChildrenExport parent rdr_items =
             FoundFL fls -> return $ Right (L (getLoc n) fls)
             FoundName name -> return $ Left (L (getLoc n) name)
             NameErr err_msg -> reportError err_msg >> failM
+
+tryChildLookupResult :: [RnM ChildLookupResult] -> RnM ChildLookupResult
+tryChildLookupResult [x] = x
+tryChildLookupResult (x:xs) = do
+  res <- x
+  case res of
+    FoundFL {} -> return res
+    FoundName {} -> return res
+    NameErr {}   -> return res
+    _ -> tryChildLookupResult xs
+tryChildLookupResult _ = panic "tryChildLookupResult:empty list"
 
 
 
@@ -580,19 +591,20 @@ data DisambigInfo
 instance Monoid DisambigInfo where
   mempty = NoOccurrence
   -- This is the key line: We prefer disambiguated occurrences to other
-  -- names.
-  UniqueOccurrence _ `mappend` DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
-  DisambiguatedOccurrence g' `mappend` UniqueOccurrence _ = DisambiguatedOccurrence g'
+  -- names. Notice that two disambiguated occurences are not ambiguous as
+  -- there is an internal invariant that a list of `DisambigInfo` arises
+  -- from a list of GREs which all have the same OccName. Thus, if we ever
+  -- have two DisambiguatedOccurences then they must have arisen from the
+  -- same GRE and hence it's safe to discard one.
+  _ `mappend` DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
+  DisambiguatedOccurrence g' `mappend` _ = DisambiguatedOccurrence g'
 
 
   NoOccurrence `mappend` m = m
   m `mappend` NoOccurrence = m
   UniqueOccurrence g `mappend` UniqueOccurrence g' = AmbiguousOccurrence [g, g']
   UniqueOccurrence g `mappend` AmbiguousOccurrence gs = AmbiguousOccurrence (g:gs)
-  DisambiguatedOccurrence g `mappend` DisambiguatedOccurrence g'  = AmbiguousOccurrence [g, g']
-  DisambiguatedOccurrence g `mappend` AmbiguousOccurrence gs = AmbiguousOccurrence (g:gs)
   AmbiguousOccurrence gs `mappend` UniqueOccurrence g' = AmbiguousOccurrence (g':gs)
-  AmbiguousOccurrence gs `mappend` DisambiguatedOccurrence g' = AmbiguousOccurrence (g':gs)
   AmbiguousOccurrence gs `mappend` AmbiguousOccurrence gs' = AmbiguousOccurrence (gs ++ gs')
 
 
