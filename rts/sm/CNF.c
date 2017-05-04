@@ -4,7 +4,7 @@
  *
  * GC support for immutable non-GCed structures, also known as Compact
  * Normal Forms (CNF for short). This provides the RTS support for
- * the 'compact' package and the Data.Compact module.
+ * the 'compact' package and the GHC.Compact module.
  *
  * ---------------------------------------------------------------------------*/
 
@@ -51,7 +51,7 @@
   Structure
   ~~~~~~~~~
 
-  * In Data.Compact.Internal we have
+  * In GHC.Compact we have
     data Compact a = Compact Compact# a
 
   * The Compact# primitive object is operated on by the primitives.

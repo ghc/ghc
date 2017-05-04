@@ -131,7 +131,7 @@ allocationLimitExceeded = toException AllocationLimitExceeded
 
 -- | Compaction found an object that cannot be compacted.  Functions
 -- cannot be compacted, nor can mutable objects or pinned objects.
--- See 'Data.Compact.compact'.
+-- See 'GHC.Compact.compact'.
 --
 -- @since 4.10.0.0
 newtype CompactionFailed = CompactionFailed String
