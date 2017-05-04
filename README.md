@@ -29,7 +29,7 @@ There are two ways to get a source tree:
         $ git clone --recursive git://git.haskell.org/ghc.git
 
   Note: cloning GHC from Github requires a special setup. See [Getting a GHC
-  repository from Github] [7].
+  repository from Github][7].
 
   *See the GHC team's working conventions regarding [how to contribute a patch to GHC](http://ghc.haskell.org/trac/ghc/wiki/WorkingConventions/FixingBugs).* First time contributors are encouraged to get started by just sending a Pull Request.
 
@@ -37,19 +37,19 @@ There are two ways to get a source tree:
 Building & Installing
 =====================
 
-For full information on building GHC, see the [GHC Building Guide] [3].
+For full information on building GHC, see the [GHC Building Guide][3].
 Here follows a summary - if you get into trouble, the Building Guide
 has all the answers.
 
 Before building GHC you may need to install some other tools and
-libraries.  See, [Setting up your system for building GHC] [8].
+libraries.  See, [Setting up your system for building GHC][8].
 
-*NB.* In particular, you need [GHC] [1] installed in order to build GHC,
+*NB.* In particular, you need [GHC][1] installed in order to build GHC,
 because the compiler is itself written in Haskell.  You also need
-[Happy] [4], [Alex] [5], and [Cabal] [9].  For instructions on how
-to port GHC to a new platform, see the [GHC Building Guide] [3].
+[Happy][4], [Alex][5], and [Cabal][9].  For instructions on how
+to port GHC to a new platform, see the [GHC Building Guide][3].
 
-For building library documentation, you'll need [Haddock] [6].  To build
+For building library documentation, you'll need [Haddock][6].  To build
 the compiler documentation, you need [Sphinx](http://www.sphinx-doc.org/)
 and Xelatex (only for PDF output).
 
@@ -71,7 +71,7 @@ almost always a win regardless of how many cores you have. As a simple rule,
 you should have about N+1 jobs, where `N` is the amount of cores you have.)
 
 The `./boot` step is only necessary if this is a tree checked out
-from git.  For source distributions downloaded from [GHC's web site] [1],
+from git.  For source distributions downloaded from [GHC's web site][1],
 this step has already been performed.
 
 These steps give you the default build, which includes everything
@@ -83,12 +83,12 @@ Filing bugs and feature requests
 
 If you've encountered what you believe is a bug in GHC, or you'd like
 to propose a feature request, please let us know! Submit a ticket in
-our [bug tracker] [10] and we'll be sure to look into it. Remember:
+our [bug tracker][10] and we'll be sure to look into it. Remember:
 **Filing a bug is the best way to make sure your issue isn't lost over
 time**, so please feel free.
 
 If you're an active user of GHC, you may also be interested in joining
-the [glasgow-haskell-users] [11] mailing list, where developers and
+the [glasgow-haskell-users][11] mailing list, where developers and
 GHC users discuss various topics and hang out.
 
 Hacking & Developing GHC
@@ -103,7 +103,7 @@ Contributors & Acknowledgements
 ===============================
 
 GHC in its current form wouldn't exist without the hard work of
-[its many contributors] [12]. Over time, it has grown to include the
+[its many contributors][12]. Over time, it has grown to include the
 efforts and research of many institutions, highly talented people, and
 groups from around the world. We'd like to thank them all, and invite
 you to join!
