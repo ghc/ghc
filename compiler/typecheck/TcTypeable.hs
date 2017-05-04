@@ -72,7 +72,7 @@ The overall plan is this:
    Here 0# is the number of arguments expected by the tycon to fully determine
    its kind. kind_rep is a value of type GHC.Types.KindRep, which gives a
    recipe for computing the kind of an instantiation of the tycon (see
-   Note [Representing TyCon kinds] later in this file for details).
+   Note [Representing TyCon kinds: KindRep] later in this file for details).
 
    We define (in TyCon)
 
@@ -640,35 +640,51 @@ word64 dflags n
   | otherwise             = HsWordPrim   NoSourceText (toInteger n)
 
 {-
-Note [Representing TyCon kinds]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [Representing TyCon kinds: KindRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 One of the operations supported by Typeable is typeRepKind,
 
     typeRepKind :: TypeRep (a :: k) -> TypeRep k
 
-Implementing this is a bit tricky. To see why let's consider the TypeRep
-encoding of `Proxy Int` where
+Implementing this is a bit tricky for poly-kinded types like
 
     data Proxy (a :: k) :: Type
+    -- Proxy :: forall k. k -> Type
 
-which looks like,
+The TypeRep encoding of `Proxy Type Int` looks like this:
 
-    $tcProxy :: TyCon
+    $tcProxy :: GHC.Types.TyCon
     $trInt   :: TypeRep Int
     $trType  :: TypeRep Type
 
-    $trProxyType :: TypeRep (Proxy :: Type -> Type)
+    $trProxyType :: TypeRep (Proxy Type :: Type -> Type)
     $trProxyType = TrTyCon $tcProxy
                            [$trType]  -- kind variable instantiation
 
-    $trProxy :: TypeRep (Proxy Int)
+    $trProxy :: TypeRep (Proxy Type Int)
     $trProxy = TrApp $trProxyType $trInt
 
-Note how $trProxyType encodes only the kind variables of the TyCon
-instantiation. To compute the kind (Proxy Int) we need to have a recipe to
-compute the kind of a concrete instantiation of Proxy. We call this recipe a
-KindRep and store it in the TyCon produced for Proxy,
+    $tkProxy :: GHC.Types.KindRep
+    $tkProxy = KindRepFun (KindRepVar 0) (KindRepTyConApp $trType [])
+
+Note how $trProxyType cannot use 'TrApp', because TypeRep cannot represent
+polymorphic types.  So instead
+
+ * $trProxyType uses 'TrTyCon' to apply Proxy to (the representations)
+   of all its kind arguments. We can't represent a tycon that is
+   applied to only some of its kind arguments.
+
+ * In $tcProxy, the GHC.Types.TyCon structure for Proxy, we store a
+   GHC.Types.KindRep, which represents the polymorphic kind of Proxy
+       Proxy :: forall k. k->Type
+
+ * A KindRep is just a recipe that we can instantiate with the
+   argument kinds, using Data.Typeable.Internal.instantiateKindRep.
+
+   Data.Typeable.Internal.typeRepKind uses instantiateKindRep
+
+ * In a KindRep, the kind variables are represented by 0-indexed
+   de Bruijn numbers:
 
     type KindBndr = Int   -- de Bruijn index
 
@@ -676,18 +692,7 @@ KindRep and store it in the TyCon produced for Proxy,
                  | KindRepVar !KindBndr
                  | KindRepApp KindRep KindRep
                  | KindRepFun KindRep KindRep
-
-The KindRep for Proxy would look like,
-
-    $tkProxy :: KindRep
-    $tkProxy = KindRepFun (KindRepVar 0) (KindRepTyConApp $trType [])
-
-
-data Maybe a = Nothing | Just a
-
-'Just :: a -> Maybe a
-
-F :: forall k. k -> forall k'. k' -> Type
+                 ...
 -}
 
 mkList :: Type -> [LHsExpr Id] -> LHsExpr Id

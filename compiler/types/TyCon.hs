@@ -403,6 +403,9 @@ tyConBinderArgFlag (TvBndr _ (NamedTCB vis)) = vis
 tyConBinderArgFlag (TvBndr _ AnonTCB)        = Required
 
 isNamedTyConBinder :: TyConBinder -> Bool
+-- Identifies kind variables
+-- E.g. data T k (a:k) = blah
+-- Here 'k' is a NamedTCB, a variable used in the kind of other binders
 isNamedTyConBinder (TvBndr _ (NamedTCB {})) = True
 isNamedTyConBinder _                        = False
 
@@ -427,7 +430,7 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
 All TyCons have this group of fields
   tyConBinders :: [TyConBinder]
   tyConResKind :: Kind
-  tyConTyVars  :: [TyVra] -- Cached = binderVars tyConBinders
+  tyConTyVars  :: [TyVar] -- Cached = binderVars tyConBinders
   tyConKind    :: Kind    -- Cached = mkTyConKind tyConBinders tyConResKind
   tyConArity   :: Arity   -- Cached = length tyConBinders
 

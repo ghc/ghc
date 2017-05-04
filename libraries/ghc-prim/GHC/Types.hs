@@ -450,7 +450,7 @@ type KindBndr = Int
 #endif
 
 -- | The representation produced by GHC for conjuring up the kind of a
--- 'TypeRep'.
+-- 'TypeRep'.  See Note [Representing TyCon kinds: KindRep] in TcTypeable.
 data KindRep = KindRepTyConApp TyCon [KindRep]
              | KindRepVar !KindBndr
              | KindRepApp KindRep KindRep
