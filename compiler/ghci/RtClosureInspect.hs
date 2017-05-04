@@ -576,11 +576,7 @@ traceTR = liftTcM . traceOptTcRn Opt_D_dump_rtti
 -- recoverM retains the errors in the first action,
 --  whereas recoverTc here does not
 recoverTR :: TR a -> TR a -> TR a
-recoverTR recover thing = do
-  (_,mb_res) <- tryTcErrs thing
-  case mb_res of
-    Nothing  -> recover
-    Just res -> return res
+recoverTR = tryTcDiscardingErrs
 
 trIO :: IO a -> TR a
 trIO = liftTcM . liftIO
@@ -747,7 +743,7 @@ cvObtainTerm hsc_env max_depth force old_ty hval = runTR hsc_env $ do
                         then parens (text "already monomorphic: " <> ppr my_ty)
                         else Ppr.empty)
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
-        (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
+        (_,mb_dc)    <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing -> do -- This can happen for private constructors compiled -O0
                         -- where the .hi descriptor does not export them
@@ -893,7 +889,7 @@ cvReconstructType hsc_env max_depth old_ty hval = runTR_maybe hsc_env $ do
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
         traceTR (text "Constr1" <+> ppr dcname)
-        (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
+        (_,mb_dc)    <- tryTc (tcLookupDataCon dcname)
         case mb_dc of
           Nothing-> do
             forM (elems $ ptrs clos) $ \a -> do

@@ -1951,7 +1951,7 @@ type Plan = TcM PlanResult
 runPlans :: [Plan] -> TcM PlanResult
 runPlans []     = panic "runPlans"
 runPlans [p]    = p
-runPlans (p:ps) = tryTcLIE_ (runPlans ps) p
+runPlans (p:ps) = tryTcDiscardingErrs (runPlans ps) p
 
 -- | Typecheck (and 'lift') a stmt entered by the user in GHCi into the
 -- GHCi 'environment'.
