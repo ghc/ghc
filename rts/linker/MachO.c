@@ -99,9 +99,9 @@ bool ocMprotect_MachO( ObjectCode *oc );
 void
 ocInit_MachO(ObjectCode * oc)
 {
-    oc->info = (ObjectCodeFormatInfo*)stgCallocBytes(
-                1, sizeof(ObjectCodeFormatInfo),
-                "ocInit_MachO(ObjectCodeFormatInfo)");
+    oc->info = (struct ObjectCodeFormatInfo*)stgCallocBytes(
+                1, sizeof(struct ObjectCodeFormatInfo),
+                "ocInit_MachO(struct ObjectCodeFormatInfo)");
     oc->info->header  = (MachOHeader *) oc->image;
     oc->info->symCmd  = NULL;
     oc->info->segCmd  = NULL;
