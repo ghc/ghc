@@ -283,4 +283,5 @@ test('T11970A', [], multimod_compile, ['T11970A','-Wunused-imports'])
 test('T11970B', normal, compile_fail, [''])
 test('MultiExport', normal, compile, [''])
 test('T13528', normal, compile, [''])
+test('T13622', normal, compile, [''])
 
