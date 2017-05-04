@@ -409,7 +409,7 @@ But there are wrinkles
 
   Solution: only float cases into the branches of other cases, and
   not into the arguments of an application, or the RHS of a let. This
-  is somewhat conservative, but it's simple.  And it stil hits the
+  is somewhat conservative, but it's simple.  And it still hits the
   cases like Trac #5658.   This is implemented in sepBindsByJoinPoint;
   if is_case is False we dump all floating cases right here.
 

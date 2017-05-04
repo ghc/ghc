@@ -854,7 +854,7 @@ would like to see is
 
 To achieve this, the function avoidClashesOccEnv can be used to prepare the
 TidyEnv, by “blocking” every name that occurs twice in the map. This way, none
-of the "a"s will get the priviledge of keeping this name, and all of them will
+of the "a"s will get the privilege of keeping this name, and all of them will
 get a suitable number by tidyOccName.
 
 This prepared TidyEnv can then be used with tidyOccName. See tidyTyCoVarBndrs

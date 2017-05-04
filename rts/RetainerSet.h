@@ -106,7 +106,7 @@ RetainerSet *singleton(retainer r);
 
 extern RetainerSet rs_MANY;
 
-// Checks if a given retainer is a memeber of the retainer set.
+// Checks if a given retainer is a member of the retainer set.
 //
 // Note & (maybe) Todo:
 //   This function needs to be declared as an inline function, so it is declared

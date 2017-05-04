@@ -175,10 +175,10 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
        --   '------------'
        --
        -- Why this @<name> and @<name>$def?  As the textual llvm ir
-       -- generator is only handed typeless labes, it often does not
+       -- generator is only handed typeless labels, it often does not
        -- know the type of the label (e.g. function to call), until
        -- the actual call happens.  However, llvm requires symbol
-       -- lookups to be typed.  Therfore we create the actual function
+       -- lookups to be typed.  Therefore we create the actual function
        -- as @<name>$def, and alias a bitcast to i8* as @<name>.
        --   Any subsequent lookup can lookup @<name> as i8* and
        -- bitcast it to the required type once we want to call it.

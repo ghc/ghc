@@ -312,7 +312,7 @@ dmdAnal' env dmd (Let (NonRec id rhs) body)
     env1                 = extendAnalEnv NotTopLevel env id1 (idStrictness id1)
     (body_ty, body')     = dmdAnal env1 dmd body
     (body_ty1, id2)      = annotateBndr env body_ty id1
-    body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleasheable free variables]
+    body_ty2             = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
 
         -- If the actual demand is better than the vanilla call
         -- demand, you might think that we might do better to re-analyse
@@ -332,7 +332,7 @@ dmdAnal' env dmd (Let (Rec pairs) body)
         (env', lazy_fv, pairs') = dmdFix NotTopLevel env dmd pairs
         (body_ty, body')        = dmdAnal env' dmd body
         body_ty1                = deleteFVs body_ty (map fst pairs)
-        body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleasheable free variables]
+        body_ty2                = addLazyFVs body_ty1 lazy_fv -- see Note [Lazy and unleashable free variables]
     in
     body_ty2 `seq`
     (body_ty2,  Let (Rec pairs') body')
@@ -527,7 +527,7 @@ dmdFix top_lvl env let_dmd orig_pairs
     abort :: (AnalEnv, DmdEnv, [(Id,CoreExpr)])
     abort = (env, lazy_fv', zapped_pairs)
       where (lazy_fv, pairs') = step True (zapIdStrictness orig_pairs)
-            -- Note [Lazy and unleasheable free variables]
+            -- Note [Lazy and unleashable free variables]
             non_lazy_fvs = plusVarEnvList $ map (strictSigDmdEnv . idStrictness . fst) pairs'
             lazy_fv'     = lazy_fv `plusVarEnv` mapVarEnv (const topDmd) non_lazy_fvs
             zapped_pairs = zapIdStrictness pairs'
@@ -579,7 +579,7 @@ return the environment and code unchanged! We still need to do one additional
 round, for two reasons:
 
  * To get information on used free variables (both lazy and strict!)
-   (see Note [Lazy and unleasheable free variables])
+   (see Note [Lazy and unleashable free variables])
  * To ensure that all expressions have been traversed at least once, and any left-over
    strictness annotations have been updated.
 
@@ -721,14 +721,14 @@ evalDmd, and think that it was lazy in p.  But for join points we can
 do better!  We know that j's body will (if called at all) be evaluated
 with the demand that consumes the entire join-binding, in this case
 the argument demand from g.  Whizzo!  g evaluates both components of
-its arugment pair, so p will certainly be evaluated if j is called.
+its argument pair, so p will certainly be evaluated if j is called.
 
 For f to be strict in p, we need /all/ paths to evaluate p; in this
 case the C branch does so too, so we are fine.  So, as usual, we need
 to transport demands on free variables to the call site(s).  Compare
-Note [Lazy and unleasheable free variables].
+Note [Lazy and unleashable free variables].
 
-The implementation is easy.  Wwhen analysing a join point, we can
+The implementation is easy.  When analysing a join point, we can
 analyse its body with the demand from the entire join-binding (written
 let_dmd here).
 
@@ -1032,7 +1032,7 @@ strictness.  For example, if you have a function implemented by an
 error stub, but which has RULES, you may want it not to be eliminated
 in favour of error!
 
-Note [Lazy and unleasheable free variables]
+Note [Lazy and unleashable free variables]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We put the strict and once-used FVs in the DmdType of the Id, so
 that at its call sites we unleash demands on its strict fvs.

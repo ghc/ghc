@@ -364,7 +364,7 @@ data Sink (m :: * -> *) a x =
    {
    -- | Function 'put' tries to put a value into the given `Sink`. The intervening 'Trampoline' computations suspend up
    -- to the 'pipe' invocation that has created the argument sink. The result of 'put' indicates whether the operation
-   -- succeded.
+   -- succeeded.
    put :: forall d. (AncestorFunctor a d) => x -> Trampoline d m Bool,
    -- | Function 'canPut' checks if the argument `Sink` accepts values, i.e., whether a 'put' operation would succeed on
    -- the sink.
