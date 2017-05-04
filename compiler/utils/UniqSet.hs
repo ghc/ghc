@@ -128,6 +128,12 @@ mapUniqSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
 -- the invariant.
 
 newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a} deriving Data
+
+-- Two 'UniqSet's are considered equal if they contain the same
+-- uniques.
+instance Eq (UniqSet a) where
+  UniqSet a == UniqSet b = equalKeysUFM a b
+
 getUniqSet :: UniqSet a -> UniqFM a
 getUniqSet = getUniqSet'
 
