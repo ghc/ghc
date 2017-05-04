@@ -837,7 +837,8 @@ doFrontend modname _ = pluginError [modname]
 doFrontend modname srcs = do
     hsc_env <- getSession
     frontend_plugin <- liftIO $ loadFrontendPlugin hsc_env modname
-    frontend frontend_plugin (frontendPluginOpts (hsc_dflags hsc_env)) srcs
+    frontend frontend_plugin
+      (reverse $ frontendPluginOpts (hsc_dflags hsc_env)) srcs
 #endif
 
 -- -----------------------------------------------------------------------------
