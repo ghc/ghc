@@ -250,6 +250,13 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
                      "</style>",
                      "</head>",
                      "<body>",
+                     "<pre>",
+                     concat [
+                         "<span class=\"decl\">",
+                         "<span class=\"nottickedoff\">never executed</span> ",
+                         "<span class=\"tickonlytrue\">always true</span> ",
+                         "<span class=\"tickonlyfalse\">always false</span></span>"],
+                     "</pre>",
                      "<pre>"] ++ addLines content' ++ "\n</pre>\n</body>\n</html>\n";
 
 
