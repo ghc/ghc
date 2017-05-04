@@ -16,7 +16,6 @@ import TyCoRep( Type(..), TyLit(..) )
 import TcEnv
 import TcEvidence ( mkWpTyApps )
 import TcRnMonad
-import TcMType ( zonkTcType )
 import HscTypes ( lookupId )
 import PrelNames
 import TysPrim ( primTyCons )
@@ -209,11 +208,12 @@ mkModIdRHS mod
 *                                                                      *
 ********************************************************************* -}
 
--- | Information we need about a 'TyCon' to generate its representation.
+-- | Information we need about a 'TyCon' to generate its representation. We
+-- carry the 'Id' in order to share it between the generation of the @TyCon@ and
+-- @KindRep@ bindings.
 data TypeableTyCon
     = TypeableTyCon
       { tycon        :: !TyCon
-      , tycon_kind   :: !Kind
       , tycon_rep_id :: !Id
       }
 
@@ -224,7 +224,7 @@ data TypeRepTodo
       , pkg_fingerprint :: !Fingerprint     -- ^ Package name fingerprint
       , mod_fingerprint :: !Fingerprint     -- ^ Module name fingerprint
       , todo_tycons     :: [TypeableTyCon]
-        -- ^ The 'TyCon's in need of bindings and their zonked kinds
+        -- ^ The 'TyCon's in need of bindings kinds
       }
     | ExportedKindRepsTodo [(Kind, Id)]
       -- ^ Build exported 'KindRep' bindings for the given set of kinds.
@@ -232,30 +232,25 @@ data TypeRepTodo
 todoForTyCons :: Module -> Id -> [TyCon] -> TcM TypeRepTodo
 todoForTyCons mod mod_id tycons = do
     trTyConTy <- mkTyConTy <$> tcLookupTyCon trTyConTyConName
-    let mkRepId :: TyConRepName -> Id
-        mkRepId rep_name = mkExportedVanillaId rep_name trTyConTy
+    let mk_rep_id :: TyConRepName -> Id
+        mk_rep_id rep_name = mkExportedVanillaId rep_name trTyConTy
 
-    tycons <- sequence
-              [ do kind <- zonkTcType $ tyConKind tc''
-                   return TypeableTyCon { tycon = tc''
-                                        , tycon_kind = kind
-                                        , tycon_rep_id = mkRepId rep_name
-                                        }
-              | tc     <- tycons
-              , tc'    <- tc : tyConATs tc
-                -- If the tycon itself isn't typeable then we needn't look
-                -- at its promoted datacons as their kinds aren't Typeable
-              , Just _ <- pure $ tyConRepName_maybe tc'
-                -- We need type representations for any associated types
-              , let promoted = map promoteDataCon (tyConDataCons tc')
-              , tc''   <- tc' : promoted
-              , Just rep_name <- pure $ tyConRepName_maybe tc''
-              ]
-    let typeable_tycons = filter is_typeable tycons
-        is_typeable (TypeableTyCon {..}) =
-            --pprTrace "todoForTycons" (ppr tycon $$ ppr bare_kind $$ ppr is_typeable)
-            (typeIsTypeable bare_kind)
-          where bare_kind = dropForAlls tycon_kind
+    let typeable_tycons :: [TypeableTyCon]
+        typeable_tycons =
+            [ TypeableTyCon { tycon = tc''
+                            , tycon_rep_id = mk_rep_id rep_name
+                            }
+            | tc     <- tycons
+            , tc'    <- tc : tyConATs tc
+              -- If the tycon itself isn't typeable then we needn't look
+              -- at its promoted datacons as their kinds aren't Typeable
+            , Just _ <- pure $ tyConRepName_maybe tc'
+              -- We need type representations for any associated types
+            , let promoted = map promoteDataCon (tyConDataCons tc')
+            , tc''   <- tc' : promoted
+            , Just rep_name <- pure $ tyConRepName_maybe tc''
+            , typeIsTypeable $ dropForAlls $ tyConKind tc''
+            ]
     return TypeRepTodo { mod_rep_expr    = nlHsVar mod_id
                        , pkg_fingerprint = pkg_fpr
                        , mod_fingerprint = mod_fpr
@@ -279,7 +274,9 @@ mkTypeRepTodoBinds todos
 
          -- First extend the type environment with all of the bindings
          -- which we are going to produce since we may need to refer to them
-         -- while generating the kind representations of other types.
+         -- while generating kind representations (namely, when we want to
+         -- represent a TyConApp in a kind, we must be able to look up the
+         -- TyCon associated with the applied type constructor).
        ; let produced_bndrs :: [Id]
              produced_bndrs = [ tycon_rep_id
                               | todo@(TypeRepTodo{}) <- todos
@@ -402,9 +399,9 @@ mkTyConRepBinds :: TypeableStuff -> TypeRepTodo
                 -> TypeableTyCon -> KindRepM (LHsBinds Id)
 mkTyConRepBinds stuff@(Stuff {..}) todo (TypeableTyCon {..})
   = do -- Make a KindRep
-       let (bndrs, kind) = splitForAllTyVarBndrs tycon_kind
+       let (bndrs, kind) = splitForAllTyVarBndrs (tyConKind tycon)
        liftTc $ traceTc "mkTyConKindRepBinds"
-                        (ppr tycon $$ ppr tycon_kind $$ ppr kind)
+                        (ppr tycon $$ ppr (tyConKind tycon) $$ ppr kind)
        let ctx = mkDeBruijnContext (map binderVar bndrs)
        kind_rep <- getKindRep stuff ctx kind
 
