@@ -100,8 +100,8 @@ void
 ocInit_MachO(ObjectCode * oc)
 {
     oc->info = (struct ObjectCodeFormatInfo*)stgCallocBytes(
-                1, sizeof(struct ObjectCodeFormatInfo),
-                "ocInit_MachO(struct ObjectCodeFormatInfo)");
+                1, sizeof *oc->info,
+                "ocInit_MachO(ObjectCodeFormatInfo)");
     oc->info->header  = (MachOHeader *) oc->image;
     oc->info->symCmd  = NULL;
     oc->info->segCmd  = NULL;
