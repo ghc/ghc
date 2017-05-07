@@ -112,6 +112,15 @@ struct Capability_ {
     // See [Note allocation accounting] in Storage.c
     W_ total_allocated;
 
+    // See Note [Statistical profiling of heap allocation]
+    int heap_sample_count;
+    void **heap_samples;
+
+    // Black hole instruction pointer profiling
+    // See Note [Statistical profiling of black hole waits]
+    int blackhole_sample_count;
+    void **blackhole_samples;
+
 #if defined(THREADED_RTS)
     // Worker Tasks waiting in the wings.  Singly-linked.
     Task *spare_workers;

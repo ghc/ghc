@@ -30,6 +30,7 @@
 #include "sm/GCThread.h"
 #include "Sparks.h"
 #include "Capability.h"
+#include "StatProfile.h"
 #include "Task.h"
 #include "AwaitEvent.h"
 #if defined(mingw32_HOST_OS)
@@ -400,6 +401,8 @@ run_thread:
     cap->r.rCurrentTSO = t;
 
     startHeapProfTimer();
+
+    statProfileDumpSamples(cap);
 
     // ----------------------------------------------------------------------
     // Run the current thread

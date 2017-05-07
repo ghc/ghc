@@ -13,6 +13,7 @@
 #include "Cmm.h"
 #include "Updates.h"
 #include "SMPClosureOps.h"
+#include "rts/Config.h" /* for STAT_PROFILE */
 
 #if defined(__PIC__)
 import pthread_mutex_unlock;
@@ -79,6 +80,17 @@ import LeaveCriticalSection;
   StgRegTable_rRet(BaseReg) = why;                      \
   R1 = BaseReg;
 
+/*
+ * Note [Statistical profiling of heap allocation]
+ *
+ * Each capability carries with it a buffer where we accumulate IP samples
+ * collected when the heap check fails in stg_gc_noregs. This buffer is
+ * unconditionally flushed to the event log on every Schedule. It is important
+ * that the buffer does not fill up, as this would mean we must drop samples,
+ * skewing the profile.
+ *
+ */
+
 /* Remember that the return address is *removed* when returning to a
  * ThreadRunGHC thread.
  */
@@ -94,6 +106,57 @@ stg_gc_noregs
                 ret = ThreadYielding;
                 goto sched;
         }
+
+#if defined(STAT_PROFILE)
+        /* See Note [Statistical profiling of heap allocation] */
+        CInt n;
+        n = Capability_heap_sample_count(MyCapability());
+        if (n < (STAT_PROFILE_HEAP_SAMPLE_BUFFER_SIZE :: CInt)) {
+            W_ code;
+            code = Sp(0);
+            /* some of the entrypoints below push a new stack frame from
+             * which we must extract the address of interest. */
+            if (code == stg_enter_info) {  /* from __stg_gc_enter_1 */
+                code = W_[Sp(1)];
+                goto out;
+            }
+            if ( code == stg_ret_p_info    /* from stg_gc_unpt_r1 */
+              || code == stg_ret_n_info    /* from stg_gc_unbx_r1 */
+              || code == stg_ret_f_info    /* from stg_gc_f1 */
+              ) {
+                /* for these the address of interest is in the next stack frame.
+                 * the top frame consists of an info pointer and a 1 word field.
+                 */
+                code = %ENTRY_CODE(Sp(2));
+                goto out;
+            }
+            if ( code == stg_ret_d_info    /* from stg_gc_d1 */
+              || code == stg_ret_l_info    /* from stg_gc_l1 */
+              ) {
+                /* for these the address of interest is in the next stack frame
+                 * but the top frame has a 64-bit field (double or int64), so
+                 * we need to treat it appropriately
+                 */
+                code = %ENTRY_CODE(Sp(BYTES_TO_WDS(8) + 1));
+                goto out;
+            }
+            if (code == stg_gc_fun_info) { /* from __stg_gc_fun */
+#ifdef NO_ARG_REGS
+                code = Sp(2);
+#else
+                code = %GET_ENTRY(UNTAG(Sp(2)));
+#endif
+                goto out;
+            }
+            code = %ENTRY_CODE(Sp(0));
+        out:
+            W_ samples;
+            samples = Capability_heap_samples(MyCapability());
+            W_[samples + WDS(TO_W_(n))] = code;
+            Capability_heap_sample_count(MyCapability()) = n + (1::CInt);
+        }
+#endif /* STAT_PROFILE */
+
         if (HpAlloc <= BLOCK_SIZE
             && bdescr_link(CurrentNursery) != NULL) {
             HpAlloc = 0;
@@ -589,6 +652,17 @@ stg_block_putmvar (P_ mvar, P_ val)
 
 stg_block_blackhole (P_ node)
 {
+#if defined(STAT_PROFILE)
+    /* See Note [Statistical profiling of blackhole blocking] */
+    CInt n;
+    n = Capability_blackhole_sample_count(MyCapability());
+    if (n < STAT_PROFILE_BLACKHOLE_SAMPLE_BUFFER_SIZE :: CInt) {
+        W_ samples;
+        samples = Capability_blackhole_samples(MyCapability());
+        W_[samples + WDS(TO_W_(n))] = node;
+        Capability_heap_sample_count(MyCapability()) = n + (1::CInt);
+    }
+#endif
     Sp_adj(-2);
     Sp(1) = node;
     Sp(0) = stg_enter_info;

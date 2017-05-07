@@ -43,6 +43,11 @@
 #define STAT_PROFILE 1
 #endif
 
+#if defined(STAT_PROFILE)
+#define STAT_PROFILE_HEAP_SAMPLE_BUFFER_SIZE 4096
+#define STAT_PROFILE_BLACKHOLE_SAMPLE_BUFFER_SIZE 4096
+#endif
+
 /*
  * Signals - supported on non-PAR versions of the runtime.  See RtsSignals.h.
  */

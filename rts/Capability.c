@@ -26,6 +26,7 @@
 #include "sm/GC.h" // for gcWorkerThread()
 #include "STM.h"
 #include "RtsUtils.h"
+#include "StatProfile.h"
 #include "sm/OSMem.h"
 
 #if !defined(mingw32_HOST_OS)
@@ -310,6 +311,18 @@ initCapability (Capability *cap, uint32_t i)
     cap->r.rCCCS = CCS_SYSTEM;
 #else
     cap->r.rCCCS = NULL;
+#endif
+
+#if defined(STAT_PROFILE)
+    cap->heap_sample_count = 0;
+    cap->heap_samples = stgMallocBytes(sizeof(void *) *
+                                       STAT_PROFILE_HEAP_SAMPLE_BUFFER_SIZE,
+                                       "initCapability");
+    cap->blackhole_sample_count = 0;
+    cap->blackhole_samples =
+        stgMallocBytes(sizeof(void *) *
+                       STAT_PROFILE_BLACKHOLE_SAMPLE_BUFFER_SIZE,
+                       "initCapability");
 #endif
 
     // cap->r.rCurrentTSO is charged for calls to allocate(), so we
@@ -1098,6 +1111,9 @@ shutdownCapability (Capability *cap USED_IF_THREADS,
     // we now have the Capability, its run queue and spare workers
     // list are both empty.
 
+    // Ensure the statistical profiler has no samples waiting to be written
+    statProfileDumpSamples(cap);
+
     // ToDo: we can't drop this mutex, because there might still be
     // threads performing foreign calls that will eventually try to
     // return via resumeThread() and attempt to grab cap->lock.
@@ -1125,6 +1141,10 @@ freeCapability (Capability *cap)
     stgFree(cap->saved_mut_lists);
 #if defined(THREADED_RTS)
     freeSparkPool(cap->sparks);
+#endif
+#if defined(STAT_PROFILE)
+    stgFree(cap->heap_samples);
+    stgFree(cap->blackhole_samples);
 #endif
     traceCapsetRemoveCap(CAPSET_OSPROCESS_DEFAULT, cap->no);
     traceCapsetRemoveCap(CAPSET_CLOCKDOMAIN_DEFAULT, cap->no);
