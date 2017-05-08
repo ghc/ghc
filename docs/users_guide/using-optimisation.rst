@@ -108,8 +108,7 @@ The easiest way to see what ``-O`` (etc.) “really mean” is to run with
 These flags turn on and off individual optimisations. Flags marked as
 on by default are enabled by ``-O``, and as such you shouldn't
 need to set any of them explicitly. A flag ``-fwombat`` can be negated
-by saying ``-fno-wombat``. See :ref:`options-f-compact` for a compact
-list.
+by saying ``-fno-wombat``.
 
 .. ghc-flag:: -fcase-merge
 

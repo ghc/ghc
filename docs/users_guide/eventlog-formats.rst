@@ -32,12 +32,14 @@ A single fixed-width event emitted during program start-up describing the sample
    * ``Word8``: Profile ID
    * ``Word64``: Sampling period in nanoseconds
    * ``Word32``: Sample break-down type. One of,
+
       * ``SAMPLE_TYPE_COST_CENTER`` (output from ``-hc``)
       * ``SAMPLE_TYPE_CLOSURE_DESCR`` (output from ``-hd``)
       * ``SAMPLE_TYPE_RETAINER`` (output from ``-hr``)
       * ``SAMPLE_TYPE_MODULE`` (output from ``-hm``)
       * ``SAMPLE_TYPE_TYPE_DESCR`` (output from ``-hy``)
       * ``SAMPLE_TYPE_BIOGRAPHY`` (output from ``-hb``)
+
    * ``String``: Module filter
    * ``String``: Closure description filter
    * ``String``: Type description filter
@@ -57,6 +59,7 @@ A variable-length packet produced once for each cost centre,
    * ``String``: module
    * ``String``: source location
    * ``Word8``: flags
+
      * bit 0: is the cost-centre a CAF?
 
 

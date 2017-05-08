@@ -76,9 +76,8 @@ Now we generate ::
 
       _ == _ = error ...
 
-- Lots of other bugs. See `Trac
-   <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
-   for a complete list.
+- Lots of other bugs. See `Trac <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
+  for a complete list.
 
 Runtime system
 ~~~~~~~~~~~~~~
