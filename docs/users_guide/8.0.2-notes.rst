@@ -171,7 +171,7 @@ Runtime system
   `MSDN <https://msdn.microsoft.com/en-us/library/ms235384.aspx>`_ . This should now introduce the same
   behavior both compiled and interpreted. (see :ghc-ticket:`12497`).
 
-- Profiles from the cost-center profiler now provide source span information.
+- Profiles from the cost-centre profiler now provide source span information.
   (see :ghc-ticket:`11543`).
 
 - The number of threads used for garbage collection is now configurable
