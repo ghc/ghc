@@ -21,7 +21,6 @@ module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambd
 import {-# SOURCE #-}   TcExpr( tcSyntaxOp, tcInferSigmaNC, tcInferSigma
                               , tcCheckId, tcMonoExpr, tcMonoExprNC, tcPolyExpr )
 
-import BasicTypes ( LexicalFixity(..) )
 import HsSyn
 import TcRnMonad
 import TcEnv
@@ -98,7 +97,7 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
-    match_ctxt = MC { mc_what = FunRhs fn Prefix, mc_body = tcBody }
+    match_ctxt = MC { mc_what = mkPrefixFunRhs fn, mc_body = tcBody }
 
 {-
 @tcMatchesCase@ doesn't do the argument-count check because the

@@ -442,7 +442,7 @@ tcPatSynMatcher (L loc name) lpat
                        , mg_res_ty = res_ty
                        , mg_origin = Generated
                        }
-             match = mkMatch (FunRhs (L loc name) Prefix) []
+             match = mkMatch (mkPrefixFunRhs (L loc name)) []
                              (mkHsLams (rr_tv:res_tv:univ_tvs)
                              req_dicts body')
                              (noLoc EmptyLocalBinds)
@@ -563,7 +563,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
     mk_mg body = mkMatchGroup Generated [builder_match]
              where
                builder_args  = [L loc (VarPat (L loc n)) | L loc n <- args]
-               builder_match = mkMatch (FunRhs (L loc name) Prefix)
+               builder_match = mkMatch (mkPrefixFunRhs (L loc name))
                                        builder_args body
                                        (noLoc EmptyLocalBinds)
 

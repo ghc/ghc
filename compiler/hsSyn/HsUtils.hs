@@ -22,7 +22,7 @@ module HsUtils(
   -- Terms
   mkHsPar, mkHsApp, mkHsAppType, mkHsAppTypeOut, mkHsCaseAlt,
   mkSimpleMatch, unguardedGRHSs, unguardedRHS,
-  mkMatchGroup, mkMatch, mkHsLam, mkHsIf,
+  mkMatchGroup, mkMatch, mkPrefixFunRhs, mkHsLam, mkHsIf,
   mkHsWrap, mkLHsWrap, mkHsWrapCo, mkHsWrapCoR, mkLHsWrapCo,
   mkHsDictLet, mkHsLams,
   mkHsOpApp, mkHsDo, mkHsComp, mkHsWrapPat, mkHsWrapPatCo,
@@ -748,8 +748,12 @@ mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
                 -> LHsExpr RdrName -> LHsBind RdrName
 mk_easy_FunBind loc fun pats expr
   = L loc $ mkFunBind (L loc fun)
-              [mkMatch (FunRhs (L loc fun) Prefix) pats expr
+              [mkMatch (mkPrefixFunRhs (L loc fun)) pats expr
                        (noLoc emptyLocalBinds)]
+
+-- | Make a prefix, non-strict function 'HsMatchContext'
+mkPrefixFunRhs :: Located id -> HsMatchContext id
+mkPrefixFunRhs n = FunRhs n Prefix NoSrcStrict
 
 ------------
 mkMatch :: HsMatchContext (NameOrRdrName id) -> [LPat id] -> LHsExpr id

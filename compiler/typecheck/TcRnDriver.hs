@@ -1973,7 +1973,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
         ; uniq <- newUnique
         ; interPrintName <- getInteractivePrintName
         ; let fresh_it  = itName uniq loc
-              matches   = [mkMatch (FunRhs (L loc fresh_it) Prefix) [] rn_expr
+              matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
               the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }

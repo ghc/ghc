@@ -132,12 +132,41 @@ type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 -- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
+{- Note [Varieties of binding pattern matches]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The distinction between FunBind and PatBind is a bit subtle. FunBind covers
+patterns which resemble function bindings and simple variable bindings.
+
+    f x = e
+    f !x = e
+    f = e
+    !x = e          -- FunRhs has SrcStrict
+    x `f` y = e     -- FunRhs has Infix
+
+The actual patterns and RHSs of a FunBind are encoding in fun_matches.
+The m_ctxt field of Match will be FunRhs and carries two bits of information
+about the match,
+
+  * the mc_strictness field describes whether the match is decorated with a bang
+    (e.g. `!x = e`)
+  * the mc_fixity field describes the fixity of the function binder
+
+By contrast, PatBind represents data constructor patterns, as well as a few
+other interesting cases. Namely,
+
+    Just x = e
+    (x) = e
+    x :: Ty = e
+-}
+
 -- | Haskell Binding with separate Left and Right id's
 data HsBindLR idL idR
-  = -- | Function Binding
+  = -- | Function-like Binding
     --
     -- FunBind is used for both functions     @f x = e@
     -- and variables                          @f = \x -> e@
+    -- and strict variables                   @!x = x + 1@
     --
     -- Reason 1: Special case for type inference: see 'TcBinds.tcMonoBinds'.
     --
@@ -147,6 +176,10 @@ data HsBindLR idL idR
     -- But note that the form                 @f :: a->a = ...@
     -- parses as a pattern binding, just like
     --                                        @(f :: a -> a) = ... @
+    --
+    -- Strict bindings have their strictness recorded in the 'SrcStrictness' of their
+    -- 'MatchContext'. See Note [Varities of binding pattern matches] for
+    -- details about the relationship between FunBind and PatBind.
     --
     --  'ApiAnnotation.AnnKeywordId's
     --
@@ -188,7 +221,10 @@ data HsBindLR idL idR
   -- | Pattern Binding
   --
   -- The pattern is never a simple variable;
-  -- That case is done by FunBind
+  -- That case is done by FunBind.
+  -- See Note [Varities of binding pattern matches] for details about the
+  -- relationship between FunBind and PatBind.
+
   --
   --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang',
   --       'ApiAnnotation.AnnEqual','ApiAnnotation.AnnWhere',
