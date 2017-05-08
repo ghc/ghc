@@ -419,11 +419,11 @@ enclosed between ``+RTS ... -RTS`` as usual):
 .. rts-flag:: -po ⟨stem⟩
 
     The :rts-flag:`-po` option overrides the stem used to form the output file
-    paths for the cost-center profiler (see :rts-flag:`-p` and :rts-flag:`-pj`
+    paths for the cost-centre profiler (see :rts-flag:`-p` and :rts-flag:`-pj`
     flags above) and heap profiler (see :rts-flag:`-h`).
 
     For instance, running a program with ``+RTS -h -p -pohello-world`` would
-    produce a heap profile named :file:`hello-world.hp` and a cost-center
+    produce a heap profile named :file:`hello-world.hp` and a cost-centre
     profile named :file:`hello-world.prof`.
 
 .. rts-flag:: -V <secs>
@@ -490,7 +490,7 @@ tree-like object (which we'll call a "cost-centre stack" here) with the
 following properties,
 
 ``id`` (integral number)
-    The ``id`` of a cost-center listed in the ``cost_centres`` list.
+    The ``id`` of a cost-centre listed in the ``cost_centres`` list.
 ``entries`` (integral number)
     How many times was this cost-centre entered?
 ``ticks`` (integral number)

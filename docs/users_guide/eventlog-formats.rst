@@ -46,24 +46,24 @@ A single fixed-width event emitted during program start-up describing the sample
    * ``String``: Retainer filter
    * ``String``: Biography filter
 
-Cost center definitions
+Cost centre definitions
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-A variable-length packet produced once for each cost center,
+A variable-length packet produced once for each cost centre,
 
  * ``EVENT_HEAP_PROF_COST_CENTRE``
-   * ``Word32``: cost center number
+   * ``Word32``: cost centre number
    * ``String``: label
    * ``String``: module
    * ``String``: source location
    * ``Word8``: flags
-     * bit 0: is the cost-center a CAF?
+     * bit 0: is the cost-centre a CAF?
 
 
 Sample event types
 ~~~~~~~~~~~~~~~~~~
 
-A sample (consisting of a list of break-down classes, e.g. cost centers, and
+A sample (consisting of a list of break-down classes, e.g. cost centres, and
 heap residency sizes), is to be encoded in the body of one or more events.
 
 We mark the beginning of a new sample with an ``EVENT_HEAP_PROF_SAMPLE_BEGIN``
@@ -78,17 +78,17 @@ in length a single sample may need to be split among multiple
 determined by the break-down type.
 
 
-Cost-center break-down
+Cost-centre break-down
 ^^^^^^^^^^^^^^^^^^^^^^
 
 A variable-length packet encoding a heap profile sample broken down by,
- * cost-center (``-hc``)
+ * cost-centre (``-hc``)
 
  * ``EVENT_HEAP_PROF_SAMPLE_COST_CENTRE``
    * ``Word8``: Profile ID
    * ``Word64``: heap residency in bytes
    * ``Word8``: stack depth
-   * ``Word32[]``: cost center stack starting with inner-most (cost center numbers)
+   * ``Word32[]``: cost centre stack starting with inner-most (cost centre numbers)
 
 
 String break-down
