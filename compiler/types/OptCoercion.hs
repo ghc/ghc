@@ -794,7 +794,7 @@ checkAxInstCo _ = Nothing
 
 -----------
 wrapSym :: SymFlag -> Coercion -> Coercion
-wrapSym sym co | sym       = SymCo co
+wrapSym sym co | sym       = mkSymCo co
                | otherwise = co
 
 -- | Conditionally set a role to be representational
