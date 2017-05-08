@@ -1224,7 +1224,7 @@ specCalls mb_mod env rules_for_me calls_for_me fn rhs
               -> SpecM (Maybe ((Id,CoreExpr),     -- Specialised definition
                                UsageDetails,      -- Usage details from specialised body
                                CoreRule))         -- Info for the Id's SpecEnv
-    spec_call _call_info@(CallKey call_ts, (call_ds, _))
+    spec_call (CI { ci_key = CallKey call_ts, ci_args = call_ds })
       = ASSERT( call_ts `lengthIs` n_tyvars  && call_ds `lengthIs` n_dicts )
 
         -- Suppose f's defn is  f = /\ a b c -> \ d1 d2 -> rhs
@@ -1768,8 +1768,6 @@ instance Outputable UsageDetails where
 -- variables (both type variables and dictionaries)
 type DictBind = (CoreBind, VarSet)
 
-type DictExpr = CoreExpr
-
 emptyUDs :: UsageDetails
 emptyUDs = MkUD { ud_binds = emptyBag, ud_calls = emptyDVarEnv }
 
@@ -1778,12 +1776,24 @@ type CallDetails  = DIdEnv CallInfoSet
   -- The order of specialized binds and rules depends on how we linearize
   -- CallDetails, so to get determinism we must use a deterministic set here.
   -- See Note [Deterministic UniqFM] in UniqDFM
-newtype CallKey   = CallKey [Maybe Type]
-  -- Nothing => unconstrained type argument
 
 data CallInfoSet = CIS Id (Bag CallInfo)
   -- The list of types and dictionaries is guaranteed to
   -- match the type of f
+
+data CallInfo
+  = CI { ci_key  :: CallKey     -- Type arguments
+       , ci_args :: [DictExpr]  -- Dictionary arguments
+       , ci_fvs  :: VarSet      -- Free vars of the ci_key and ci_args
+                                -- call (including tyvars)
+                                -- [*not* include the main id itself, of course]
+    }
+
+newtype CallKey   = CallKey [Maybe Type]
+  -- Nothing => unconstrained type argument
+
+type DictExpr = CoreExpr
+
 
 {-
 Note [CallInfoSet determinism]
@@ -1829,7 +1839,7 @@ ciSetToList (CIS _ b) = snd $ foldrBag combine (emptyTM, []) b
   -- This is where we eliminate duplicates, recording the CallKeys we've
   -- already seen in the TrieMap. See Note [CallInfoSet determinism].
   combine :: CallInfo -> (CallKeySet, [CallInfo]) -> (CallKeySet, [CallInfo])
-  combine ci@(CallKey key, _) (set, acc)
+  combine ci@(CI { ci_key = CallKey key }) (set, acc)
     | Just _ <- lookupTM key set = (set, acc)
     | otherwise = (insertTM key () set, ci:acc)
 
@@ -1839,26 +1849,24 @@ type CallKeySet = ListMap (MaybeMap TypeMap) ()
 ciSetFilter :: (CallInfo -> Bool) -> CallInfoSet -> CallInfoSet
 ciSetFilter p (CIS id a) = CIS id (filterBag p a)
 
-type CallInfo = (CallKey, ([DictExpr], VarSet))
-                    -- Range is dict args and the vars of the whole
-                    -- call (including tyvars)
-                    -- [*not* include the main id itself, of course]
-
 instance Outputable CallInfoSet where
   ppr (CIS fn map) = hang (text "CIS" <+> ppr fn)
                         2 (ppr map)
 
 pprCallInfo :: Id -> CallInfo -> SDoc
-pprCallInfo fn (CallKey mb_tys, (_dxs, _))
-  = hang (ppr fn)
-       2 (fsep (map ppr_call_key_ty mb_tys {- ++ map pprParendExpr _dxs -}))
+pprCallInfo fn (CI { ci_key = key })
+  = ppr fn <+> ppr key
 
 ppr_call_key_ty :: Maybe Type -> SDoc
 ppr_call_key_ty Nothing   = char '_'
 ppr_call_key_ty (Just ty) = char '@' <+> pprParendType ty
 
 instance Outputable CallKey where
-  ppr (CallKey ts) = ppr ts
+  ppr (CallKey ts) = brackets (fsep (map ppr_call_key_ty ts))
+
+instance Outputable CallInfo where
+  ppr (CI { ci_key = key, ci_args = args, ci_fvs = fvs })
+    = text "CI" <> braces (hsep [ ppr key, ppr args, ppr fvs ])
 
 unionCalls :: CallDetails -> CallDetails -> CallDetails
 unionCalls c1 c2 = plusDVarEnv_C unionCallInfoSet c1 c2
@@ -1875,14 +1883,16 @@ callDetailsFVs calls =
 
 callInfoFVs :: CallInfoSet -> VarSet
 callInfoFVs (CIS _ call_info) =
-  foldrBag (\(_, (_,fv)) vs -> unionVarSet fv vs) emptyVarSet call_info
+  foldrBag (\(CI { ci_fvs = fv }) vs -> unionVarSet fv vs) emptyVarSet call_info
 
 ------------------------------------------------------------
 singleCall :: Id -> [Maybe Type] -> [DictExpr] -> UsageDetails
 singleCall id tys dicts
   = MkUD {ud_binds = emptyBag,
           ud_calls = unitDVarEnv id $ CIS id $
-                     unitBag (CallKey tys, (dicts, call_fvs)) }
+                     unitBag (CI { ci_key = CallKey tys
+                                 , ci_args = dicts
+                                 , ci_fvs  = call_fvs }) }
   where
     call_fvs = exprsFreeVars dicts `unionVarSet` tys_fvs
     tys_fvs  = tyCoVarsOfTypes (catMaybes tys)
@@ -2146,11 +2156,16 @@ callsForMe fn (MkUD { ud_binds = orig_dbs, ud_calls = orig_calls })
     filter_dfuns | isDFunId fn = filter ok_call
                  | otherwise   = \cs -> cs
 
-    ok_call (_, (_,fvs)) = not (fvs `intersectsVarSet` dep_set)
+    ok_call (CI { ci_fvs = fvs }) = not (fvs `intersectsVarSet` dep_set)
 
 ----------------------
 splitDictBinds :: Bag DictBind -> IdSet -> (Bag DictBind, Bag DictBind, IdSet)
--- Returns (free_dbs, dump_dbs, dump_set)
+-- splitDictBinds dbs bndrs returns
+--   (free_dbs, dump_dbs, dump_set)
+-- where
+--   * dump_dbs depends, transitively on bndrs
+--   * free_dbs does not depend on bndrs
+--   * dump_set = bndrs `union` bndrs(dump_dbs)
 splitDictBinds dbs bndr_set
    = foldlBag split_db (emptyBag, emptyBag, bndr_set) dbs
                 -- Important that it's foldl not foldr;
@@ -2167,11 +2182,11 @@ splitDictBinds dbs bndr_set
 
 ----------------------
 deleteCallsMentioning :: VarSet -> CallDetails -> CallDetails
--- Remove calls *mentioning* bs
+-- Remove calls *mentioning* bs in any way
 deleteCallsMentioning bs calls
   = mapDVarEnv (ciSetFilter keep_call) calls
   where
-    keep_call (_, (_, fvs)) = not (fvs `intersectsVarSet` bs)
+    keep_call (CI { ci_fvs = fvs }) = not (fvs `intersectsVarSet` bs)
 
 deleteCallsFor :: [Id] -> CallDetails -> CallDetails
 -- Remove calls *for* bs
