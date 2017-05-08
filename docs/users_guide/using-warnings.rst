@@ -902,18 +902,20 @@ of ``-W(no-)*``.
        single: binds, unused
 
     Warn if a pattern binding binds no variables at all, unless it is a
-    lone, possibly-banged, wild-card pattern. For example: ::
+    lone wild-card pattern, or a banged pattern. For example: ::
 
         Just _ = rhs3    -- Warning: unused pattern binding
         (_, _) = rhs4    -- Warning: unused pattern binding
         _  = rhs3        -- No warning: lone wild-card pattern
-        !_ = rhs4        -- No warning: banged wild-card pattern; behaves like seq
+        !() = rhs4       -- No warning: banged pattern; behaves like seq
 
+    In general a lazy pattern binding `p = e` is a no-op if `p` does not
+    bind any variables.
     The motivation for allowing lone wild-card patterns is they are not
     very different from ``_v = rhs3``, which elicits no warning; and
     they can be useful to add a type constraint, e.g. ``_ = x::Int``. A
-    lone banged wild-card pattern is useful as an alternative (to
-    ``seq``) way to force evaluation.
+    banged pattern (see :ref:`bang-patterns`) is *not* a no-op, because
+    it forces evaluation, and is useful as an alternative to ``seq``.
 
 .. ghc-flag:: -Wunused-imports
 

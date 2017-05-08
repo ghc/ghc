@@ -27,7 +27,7 @@ test('rn034', normal, compile, [''])
 test('rn035', normal, compile, [''])
 test('rn036', normal, compile, [''])
 test('rn037', normal, compile, [''])
-	
+
 # Missing:
 # test('rn038', normal, compile, [''])
 
@@ -150,3 +150,4 @@ test('T12533', normal, compile, [''])
 test('T12597', normal, compile, [''])
 test('T12548', normal, compile, [''])
 test('T13132', normal, compile, [''])
+test('T13646', normal, compile, [''])
