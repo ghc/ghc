@@ -528,6 +528,7 @@ stg_newMutVarzh ( gcptr init )
 stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
  /* MutVar# s a -> a -> a -> State# s -> (# State#, Int#, Any a #) */
 {
+#if defined(THREADED_RTS)
     gcptr h;
 
     (h) = prim %cmpxchgW(mv + SIZEOF_StgHeader + OFFSET_StgMutVar_var, old, new);
@@ -539,6 +540,20 @@ stg_casMutVarzh ( gcptr mv, gcptr old, gcptr new )
         }
         return (0,new);
     }
+#else
+    gcptr prev_val;
+
+    prev_val = StgMutVar_var(mv);
+    if (prev_val != old) {
+        return (1,prev_val);
+    } else {
+        StgMutVar_var(mv) = new;
+        if (GET_INFO(mv) == stg_MUT_VAR_CLEAN_info) {
+            ccall dirty_MUT_VAR(BaseReg "ptr", mv "ptr");
+        }
+        return (0,new);
+    }
+#endif
 }
 
 stg_atomicModifyMutVarzh ( gcptr mv, gcptr f )
