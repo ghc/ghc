@@ -2371,7 +2371,7 @@ repLiteral lit
   = do lit' <- case lit of
                    HsIntPrim _ i    -> mk_integer i
                    HsWordPrim _ w   -> mk_integer w
-                   HsInt _ i        -> mk_integer i
+                   HsInt i          -> mk_integer (il_value i)
                    HsFloatPrim r    -> mk_rational r
                    HsDoublePrim r   -> mk_rational r
                    HsCharPrim _ c   -> mk_char c
@@ -2383,7 +2383,7 @@ repLiteral lit
   where
     mb_lit_name = case lit of
                  HsInteger _ _ _  -> Just integerLName
-                 HsInt     _ _    -> Just integerLName
+                 HsInt _          -> Just integerLName
                  HsIntPrim _ _    -> Just intPrimLName
                  HsWordPrim _ _   -> Just wordPrimLName
                  HsFloatPrim _    -> Just floatPrimLName
@@ -2397,6 +2397,7 @@ repLiteral lit
 mk_integer :: Integer -> DsM HsLit
 mk_integer  i = do integer_ty <- lookupType integerTyConName
                    return $ HsInteger NoSourceText i integer_ty
+
 mk_rational :: FractionalLit -> DsM HsLit
 mk_rational r = do rat_ty <- lookupType rationalTyConName
                    return $ HsRat r rat_ty
@@ -2414,7 +2415,7 @@ repOverloadedLiteral (OverLit { ol_val = val})
         -- and rationalL is sucked in when any TH stuff is used
 
 mk_lit :: OverLitVal -> DsM HsLit
-mk_lit (HsIntegral _ i)   = mk_integer  i
+mk_lit (HsIntegral i)     = mk_integer  (il_value i)
 mk_lit (HsFractional f)   = mk_rational f
 mk_lit (HsIsString _ s)   = mk_string   s
 

@@ -19,7 +19,8 @@ module HsLit where
 #include "HsVersions.h"
 
 import {-# SOURCE #-} HsExpr( HsExpr, pprExpr )
-import BasicTypes ( FractionalLit(..),SourceText(..),pprWithSourceText )
+import BasicTypes ( IntegralLit(..),FractionalLit(..),negateIntegralLit,
+                    negateFractionalLit,SourceText(..),pprWithSourceText )
 import Type       ( Type )
 import Outputable
 import FastString
@@ -48,7 +49,7 @@ data HsLit
       -- ^ String
   | HsStringPrim    SourceText ByteString
       -- ^ Packed bytes
-  | HsInt           SourceText Integer
+  | HsInt           IntegralLit
       -- ^ Genuinely an Int; arises from
       -- @TcGenDeriv@, and from TRANSLATION
   | HsIntPrim       SourceText Integer
@@ -78,7 +79,7 @@ instance Eq HsLit where
   (HsCharPrim _ x1)   == (HsCharPrim _ x2)   = x1==x2
   (HsString _ x1)     == (HsString _ x2)     = x1==x2
   (HsStringPrim _ x1) == (HsStringPrim _ x2) = x1==x2
-  (HsInt _ x1)        == (HsInt _ x2)        = x1==x2
+  (HsInt x1)          == (HsInt x2)          = x1==x2
   (HsIntPrim _ x1)    == (HsIntPrim _ x2)    = x1==x2
   (HsWordPrim _ x1)   == (HsWordPrim _ x2)   = x1==x2
   (HsInt64Prim _ x1)  == (HsInt64Prim _ x2)  = x1==x2
@@ -102,10 +103,15 @@ deriving instance (DataId id) => Data (HsOverLit id)
 -- the following
 -- | Overloaded Literal Value
 data OverLitVal
-  = HsIntegral   !SourceText !Integer    -- ^ Integer-looking literals;
+  = HsIntegral   !IntegralLit            -- ^ Integer-looking literals;
   | HsFractional !FractionalLit          -- ^ Frac-looking literals
   | HsIsString   !SourceText !FastString -- ^ String-looking literals
   deriving Data
+
+negateOverLitVal :: OverLitVal -> OverLitVal
+negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
+negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
+negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
 overLitType :: HsOverLit a -> PostTc a Type
 overLitType = ol_type
@@ -146,7 +152,7 @@ instance Eq (HsOverLit id) where
   (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
 
 instance Eq OverLitVal where
-  (HsIntegral _ i1)   == (HsIntegral _ i2)   = i1 == i2
+  (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
   (HsFractional f1)   == (HsFractional f2)   = f1 == f2
   (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
   _                   == _                   = False
@@ -155,14 +161,14 @@ instance Ord (HsOverLit id) where
   compare (OverLit {ol_val=val1}) (OverLit {ol_val=val2}) = val1 `compare` val2
 
 instance Ord OverLitVal where
-  compare (HsIntegral _ i1)   (HsIntegral _ i2)   = i1 `compare` i2
-  compare (HsIntegral _ _)    (HsFractional _)    = LT
-  compare (HsIntegral _ _)    (HsIsString _ _)    = LT
+  compare (HsIntegral i1)     (HsIntegral i2)     = i1 `compare` i2
+  compare (HsIntegral _)      (HsFractional _)    = LT
+  compare (HsIntegral _)      (HsIsString _ _)    = LT
   compare (HsFractional f1)   (HsFractional f2)   = f1 `compare` f2
-  compare (HsFractional _)    (HsIntegral _ _)    = GT
+  compare (HsFractional _)    (HsIntegral   _)    = GT
   compare (HsFractional _)    (HsIsString _ _)    = LT
   compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `compare` s2
-  compare (HsIsString _ _)    (HsIntegral _ _)    = GT
+  compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
 
 instance Outputable HsLit where
@@ -170,7 +176,7 @@ instance Outputable HsLit where
     ppr (HsCharPrim st c)   = pp_st_suffix st primCharSuffix (pprPrimChar c)
     ppr (HsString st s)     = pprWithSourceText st (pprHsString s)
     ppr (HsStringPrim st s) = pprWithSourceText st (pprHsBytes s)
-    ppr (HsInt st i)        = pprWithSourceText st (integer i)
+    ppr (HsInt i)           = pprWithSourceText (il_text i) (integer (il_value i))
     ppr (HsInteger st i _)  = pprWithSourceText st (integer i)
     ppr (HsRat f _)         = ppr f
     ppr (HsFloatPrim f)     = ppr f <> primFloatSuffix
@@ -190,7 +196,7 @@ instance (OutputableBndrId id) => Outputable (HsOverLit id) where
         = ppr val <+> (ifPprDebug (parens (pprExpr witness)))
 
 instance Outputable OverLitVal where
-  ppr (HsIntegral st i)  = pprWithSourceText st (integer i)
+  ppr (HsIntegral i)     = pprWithSourceText (il_text i) (integer (il_value i))
   ppr (HsFractional f)   = ppr f
   ppr (HsIsString st s)  = pprWithSourceText st (pprHsString s)
 
@@ -205,7 +211,7 @@ pmPprHsLit (HsChar _ c)       = pprHsChar c
 pmPprHsLit (HsCharPrim _ c)   = pprHsChar c
 pmPprHsLit (HsString st s)    = pprWithSourceText st (pprHsString s)
 pmPprHsLit (HsStringPrim _ s) = pprHsBytes s
-pmPprHsLit (HsInt _ i)        = integer i
+pmPprHsLit (HsInt i)          = integer (il_value i)
 pmPprHsLit (HsIntPrim _ i)    = integer i
 pmPprHsLit (HsWordPrim _ w)   = integer w
 pmPprHsLit (HsInt64Prim _ i)  = integer i

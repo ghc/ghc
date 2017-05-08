@@ -82,17 +82,16 @@ dsLit (HsInt64Prim  _ i) = return (Lit (MachInt64 i))
 dsLit (HsWord64Prim _ w) = return (Lit (MachWord64 w))
 dsLit (HsFloatPrim    f) = return (Lit (MachFloat (fl_value f)))
 dsLit (HsDoublePrim   d) = return (Lit (MachDouble (fl_value d)))
-
 dsLit (HsChar _ c)       = return (mkCharExpr c)
 dsLit (HsString _ str)   = mkStringExprFS str
 dsLit (HsInteger _ i _)  = mkIntegerExpr i
-dsLit (HsInt _ i)        = do dflags <- getDynFlags
-                              return (mkIntExpr dflags i)
+dsLit (HsInt i)          = do dflags <- getDynFlags
+                              return (mkIntExpr dflags (il_value i))
 
-dsLit (HsRat r ty) = do
-   num   <- mkIntegerExpr (numerator (fl_value r))
-   denom <- mkIntegerExpr (denominator (fl_value r))
-   return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
+dsLit (HsRat (FL _ _ val) ty) = do
+  num   <- mkIntegerExpr (numerator val)
+  denom <- mkIntegerExpr (denominator val)
+  return (mkCoreConApps ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty)
         = case tcSplitTyConApp ty of
@@ -243,9 +242,9 @@ getLHsIntegralLit (L _ (HsOverLit over_lit)) = getIntegralLit over_lit
 getLHsIntegralLit _ = Nothing
 
 getIntegralLit :: HsOverLit Id -> Maybe (Integer, Name)
-getIntegralLit (OverLit { ol_val = HsIntegral _ i, ol_type = ty })
+getIntegralLit (OverLit { ol_val = HsIntegral i, ol_type = ty })
   | Just tc <- tyConAppTyCon_maybe ty
-  = Just (i, tyConName tc)
+  = Just (il_value i, tyConName tc)
 getIntegralLit _ = Nothing
 
 {-
@@ -313,8 +312,8 @@ tidyNPat tidy_lit_pat (OverLit val False _ ty) mb_neg _eq outer_ty
 
     mb_int_lit :: Maybe Integer
     mb_int_lit = case (mb_neg, val) of
-                   (Nothing, HsIntegral _ i) -> Just i
-                   (Just _,  HsIntegral _ i) -> Just (-i)
+                   (Nothing, HsIntegral i) -> Just (il_value i)
+                   (Just _,  HsIntegral i) -> Just (-(il_value i))
                    _ -> Nothing
 
     mb_str_lit :: Maybe FastString

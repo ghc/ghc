@@ -44,7 +44,7 @@ import Maybes
 import Util
 import Name
 import Outputable
-import BasicTypes ( isGenerated, fl_value )
+import BasicTypes ( isGenerated, il_value, fl_value )
 import FastString
 import Unique
 import UniqDFM
@@ -1093,15 +1093,15 @@ patGroup _ (WildPat {})                 = PgAny
 patGroup _ (BangPat {})                 = PgBang
 patGroup _ (NPat (L _ OverLit {ol_val=oval}) mb_neg _ _) =
   case (oval, isJust mb_neg) of
-   (HsIntegral _ i, False) -> PgN (fromInteger i)
-   (HsIntegral _ i, True ) -> PgN (-fromInteger i)
+   (HsIntegral   i, False) -> PgN (fromInteger (il_value i))
+   (HsIntegral   i, True ) -> PgN (-fromInteger (il_value i))
    (HsFractional r, False) -> PgN (fl_value r)
    (HsFractional r, True ) -> PgN (-fl_value r)
    (HsIsString _ s, _) -> ASSERT(isNothing mb_neg)
                           PgOverS s
 patGroup _ (NPlusKPat _ (L _ OverLit {ol_val=oval}) _ _ _ _) =
   case oval of
-   HsIntegral _ i -> PgNpK i
+   HsIntegral i -> PgNpK (il_value i)
    _ -> pprPanic "patGroup NPlusKPat" (ppr oval)
 patGroup _ (CoPat _ p _)                = PgCo  (hsPatType p) -- Type of innelexp pattern
 patGroup _ (ViewPat expr p _)           = PgView expr (hsPatType (unLoc p))

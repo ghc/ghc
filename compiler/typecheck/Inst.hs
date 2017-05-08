@@ -34,7 +34,7 @@ module Inst (
 import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
 import {-# SOURCE #-}   TcUnify( unifyType, unifyKind, noThing )
 
-import BasicTypes ( SourceText(..) )
+import BasicTypes ( IntegralLit(..), SourceText(..) )
 import FastString
 import HsSyn
 import TcHsSyn
@@ -549,9 +549,9 @@ newNonTrivialOverloadedLit _ lit _
 
 ------------
 mkOverLit :: OverLitVal -> TcM HsLit
-mkOverLit (HsIntegral src i)
+mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
-        ; return (HsInteger src i integer_ty) }
+        ; return (HsInteger (il_text i) (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName

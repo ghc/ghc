@@ -1007,9 +1007,9 @@ cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
 
 cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
 cvtOverLit (IntegerL i)
-  = do { force i; return $ mkHsIntegral NoSourceText i placeHolderType}
+  = do { force i; return $ mkHsIntegral   (mkIntegralLit i)   placeHolderType}
 cvtOverLit (RationalL r)
-  = do { force r; return $ mkHsFractional (cvtFractionalLit r) placeHolderType}
+  = do { force r; return $ mkHsFractional (mkFractionalLit r) placeHolderType}
 cvtOverLit (StringL s)
   = do { let { s' = mkFastString s }
        ; force s'
@@ -1043,8 +1043,8 @@ allCharLs xs
 cvtLit :: Lit -> CvtM HsLit
 cvtLit (IntPrimL i)    = do { force i; return $ HsIntPrim NoSourceText i }
 cvtLit (WordPrimL w)   = do { force w; return $ HsWordPrim NoSourceText w }
-cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (cvtFractionalLit f) }
-cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (cvtFractionalLit f) }
+cvtLit (FloatPrimL f)  = do { force f; return $ HsFloatPrim (mkFractionalLit f) }
+cvtLit (DoublePrimL f) = do { force f; return $ HsDoublePrim (mkFractionalLit f) }
 cvtLit (CharL c)       = do { force c; return $ HsChar NoSourceText c }
 cvtLit (CharPrimL c)   = do { force c; return $ HsCharPrim NoSourceText c }
 cvtLit (StringL s)     = do { let { s' = mkFastString s }
@@ -1427,9 +1427,6 @@ overloadedLit :: Lit -> Bool
 overloadedLit (IntegerL  _) = True
 overloadedLit (RationalL _) = True
 overloadedLit _             = False
-
-cvtFractionalLit :: Rational -> FractionalLit
-cvtFractionalLit r = FL { fl_text = show (fromRational r :: Double), fl_value = r }
 
 -- Checks that are performed when converting unboxed sum expressions and
 -- patterns alike.

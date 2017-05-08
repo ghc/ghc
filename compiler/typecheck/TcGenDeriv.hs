@@ -607,8 +607,9 @@ gen_Enum_binds loc tycon = do
                                nlHsVarApps intDataCon_RDR [ah_RDR]])
              (illegal_Expr "pred" occ_nm "tried to take `pred' of first tag in enumeration")
              (nlHsApp (nlHsVar (tag2con_RDR dflags tycon))
-                           (nlHsApps plus_RDR [nlHsVarApps intDataCon_RDR [ah_RDR],
-                                           nlHsLit (HsInt NoSourceText (-1))]))
+                      (nlHsApps plus_RDR
+                                [ nlHsVarApps intDataCon_RDR [ah_RDR]
+                                , nlHsLit (HsInt (mkIntegralLit (-1 :: Int)))]))
 
     to_enum dflags
       = mk_easy_FunBind loc toEnum_RDR [a_Pat] $
@@ -1125,7 +1126,7 @@ gen_Show_binds get_fixity loc tycon
       | otherwise   =
          ([a_Pat, con_pat],
           showParen_Expr (genOpApp a_Expr ge_RDR
-                              (nlHsLit (HsInt NoSourceText con_prec_plus_one)))
+                              (nlHsLit (HsInt (mkIntegralLit con_prec_plus_one))))
                          (nlHsPar (nested_compose_Expr show_thingies)))
         where
              data_con_RDR  = getRdrName data_con
@@ -1209,7 +1210,7 @@ mk_showString_app str = nlHsApp (nlHsVar showString_RDR) (nlHsLit (mkHsString st
 -- | showsPrec :: Show a => Int -> a -> ShowS
 mk_showsPrec_app :: Integer -> LHsExpr RdrName -> LHsExpr RdrName
 mk_showsPrec_app p x
-  = nlHsApps showsPrec_RDR [nlHsLit (HsInt NoSourceText p), x]
+  = nlHsApps showsPrec_RDR [nlHsLit (HsInt (mkIntegralLit p)), x]
 
 -- | shows :: Show a => a -> ShowS
 mk_shows_app :: LHsExpr RdrName -> LHsExpr RdrName

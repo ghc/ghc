@@ -50,7 +50,7 @@ testOneFile libdir fileName = do
        = ["HsString [" ++ src ++ "] " ++ show c]
      doHsLit (HsStringPrim (SourceText src) c)
        = ["HsStringPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsInt        (SourceText src) c)
+     doHsLit (HsInt        (IL (SourceText src) _ c))
        = ["HsInt [" ++ src ++ "] " ++ show c]
      doHsLit (HsIntPrim    (SourceText src) c)
        = ["HsIntPrim [" ++ src ++ "] " ++ show c]
@@ -65,7 +65,7 @@ testOneFile libdir fileName = do
      doHsLit _ = []
 
      doOverLit :: OverLitVal -> [String]
-     doOverLit (HsIntegral  (SourceText src) c)
+     doOverLit (HsIntegral  (IL (SourceText src) _ c))
        = ["HsIntegral [" ++ src ++ "] " ++ show c]
      doOverLit (HsIsString  (SourceText src) c)
        = ["HsIsString [" ++ src ++ "] " ++ show c]

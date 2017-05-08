@@ -277,12 +277,12 @@ ds_expr _ (HsWrap co_fn e)
        ; warnAboutIdentities dflags e' wrapped_ty
        ; return wrapped_e }
 
-ds_expr _ (NegApp (L loc (HsOverLit lit@(OverLit { ol_val = HsIntegral src i })))
+ds_expr _ (NegApp (L loc (HsOverLit lit@(OverLit { ol_val = HsIntegral i })))
                   neg_expr)
   = do { expr' <- putSrcSpanDs loc $ do
           { dflags <- getDynFlags
           ; warnAboutOverflowedLiterals dflags
-                                        (lit { ol_val = HsIntegral src (-i) })
+                                        (lit { ol_val = HsIntegral (negateIntegralLit i) })
           ; dsOverLit' dflags lit }
        ; dsSyntaxExpr neg_expr [expr'] }
 

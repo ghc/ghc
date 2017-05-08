@@ -152,8 +152,11 @@ rnExpr (HsLit lit)
        ; return (HsLit lit, emptyFVs) }
 
 rnExpr (HsOverLit lit)
-  = do { (lit', fvs) <- rnOverLit lit
-       ; return (HsOverLit lit', fvs) }
+  = do { ((lit', mb_neg), fvs) <- rnOverLit lit -- See Note [Negative zero]
+       ; case mb_neg of
+              Nothing -> return (HsOverLit lit', fvs)
+              Just neg -> return ( HsApp (noLoc neg) (noLoc (HsOverLit lit'))
+                                 , fvs ) }
 
 rnExpr (HsApp fun arg)
   = do { (fun',fvFun) <- rnLExpr fun

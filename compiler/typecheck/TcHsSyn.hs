@@ -18,7 +18,6 @@ module TcHsSyn (
         -- * Other HsSyn functions
         mkHsDictLet, mkHsApp,
         mkHsAppTy, mkHsCaseAlt,
-        nlHsIntLit,
         shortCutLit, hsOverLitName,
         conLikeResTy,
 
@@ -112,7 +111,7 @@ hsLitType (HsChar _ _)       = charTy
 hsLitType (HsCharPrim _ _)   = charPrimTy
 hsLitType (HsString _ _)     = stringTy
 hsLitType (HsStringPrim _ _) = addrPrimTy
-hsLitType (HsInt _ _)        = intTy
+hsLitType (HsInt _)          = intTy
 hsLitType (HsIntPrim _ _)    = intPrimTy
 hsLitType (HsWordPrim _ _)   = wordPrimTy
 hsLitType (HsInt64Prim _ _)  = int64PrimTy
@@ -125,12 +124,11 @@ hsLitType (HsDoublePrim _)   = doublePrimTy
 -- Overloaded literals. Here mainly because it uses isIntTy etc
 
 shortCutLit :: DynFlags -> OverLitVal -> TcType -> Maybe (HsExpr TcId)
-shortCutLit dflags (HsIntegral src i) ty
-  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt src i))
-  | isWordTy ty && inWordRange dflags i
-                                   = Just (mkLit wordDataCon (HsWordPrim src i))
+shortCutLit dflags (HsIntegral int@(IL src neg i)) ty
+  | isIntTy ty  && inIntRange  dflags i = Just (HsLit (HsInt int))
+  | isWordTy ty && inWordRange dflags i = Just (mkLit wordDataCon (HsWordPrim src i))
   | isIntegerTy ty = Just (HsLit (HsInteger src i ty))
-  | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit i)) ty
+  | otherwise = shortCutLit dflags (HsFractional (integralFractionalLit neg i)) ty
         -- The 'otherwise' case is important
         -- Consider (3 :: Float).  Syntactically it looks like an IntLit,
         -- so we'll call shortCutIntLit, but of course it's a float
