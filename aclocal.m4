@@ -390,6 +390,8 @@ AC_DEFUN([GET_ARM_ISA],
                          defined(__ARM_ARCH_6T2__) || \
                          defined(__ARM_ARCH_6Z__)  || \
                          defined(__ARM_ARCH_6ZK__) || \
+                         defined(__ARM_ARCH_6K__)  || \
+                         defined(__ARM_ARCH_6KZ__) || \
                          defined(__ARM_ARCH_6M__)
                          return 0;
                      #else
@@ -584,18 +586,6 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         ;;
     i386-portbld-freebsd*)
         $2="$$2 -march=i686"
-        ;;
-    i386-apple-darwin)
-        $2="$$2 -m32"
-        $3="$$3 -m32"
-        $4="$$4 -arch i386"
-        $5="$$5 -m32"
-        ;;
-    x86_64-apple-darwin)
-        $2="$$2 -m64"
-        $3="$$3 -m64"
-        $4="$$4 -arch x86_64"
-        $5="$$5 -m64"
         ;;
     x86_64-unknown-solaris2)
         $2="$$2 -m64"
