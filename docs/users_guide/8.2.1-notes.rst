@@ -418,7 +418,8 @@ filepath
 ghc
 ~~~
 
--
+-  Version number 8.2.1
+
 ghc-boot
 ~~~~~~~~
 

@@ -104,6 +104,7 @@ to abort.
     warnings when doing batch compilation.
 
 .. ghc-flag:: -Werror=<wflag>
+    :noindex:
 
     :implies: ``-W<wflag>``
 
@@ -116,6 +117,7 @@ to abort.
     default, but can be useful to negate a :ghc-flag:`-Werror` flag.
 
 .. ghc-flag:: -Wwarn=<wflag>
+    :noindex:
 
     Causes a specific warning to be treated as normal warning, not fatal error.
 
