@@ -15,7 +15,6 @@ module TcGenFunctor (
         gen_Functor_binds, gen_Foldable_binds, gen_Traversable_binds
     ) where
 
-import BasicTypes ( LexicalFixity(..) )
 import Bag
 import DataCon
 import FastString
@@ -130,7 +129,7 @@ gen_Functor_binds loc tycon
     data_cons = tyConDataCons tycon
     fmap_name = L loc fmap_RDR
     fmap_bind = mkRdrFunBind fmap_name fmap_eqns
-    fmap_match_ctxt = FunRhs fmap_name Prefix
+    fmap_match_ctxt = mkPrefixFunRhs fmap_name
 
     fmap_eqn con = flip evalState bs_RDRs $
                      match_for_con fmap_match_ctxt [f_Pat] con =<< parts
@@ -167,7 +166,7 @@ gen_Functor_binds loc tycon
     -- See Note [deriving <$]
     replace_name = L loc replace_RDR
     replace_bind = mkRdrFunBind replace_name replace_eqns
-    replace_match_ctxt = FunRhs replace_name Prefix
+    replace_match_ctxt = mkPrefixFunRhs replace_name
 
     replace_eqn con = flip evalState bs_RDRs $
         match_for_con replace_match_ctxt [z_Pat] con =<< parts

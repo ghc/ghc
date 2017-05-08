@@ -1566,7 +1566,7 @@ mkDefMethBind clas inst_tys sel_id dm_name
                                       , tyConBinderArgFlag tcb /= Inferred ]
               rhs  = foldl mk_vta (nlHsVar dm_name) visible_inst_tys
               bind = noLoc $ mkTopFunBind Generated fn $
-                             [mkSimpleMatch (FunRhs fn Prefix) [] rhs]
+                             [mkSimpleMatch (mkPrefixFunRhs fn) [] rhs]
 
         ; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
                    (vcat [ppr clas <+> ppr inst_tys,

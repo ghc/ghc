@@ -17,7 +17,8 @@
            (Match 
             (FunRhs 
              ({ DumpRenamedAst.hs:11:1-4 }{Name: main:DumpRenamedAst.main{v}}) 
-             (Prefix)) 
+             (Prefix) 
+             (NoSrcStrict)) 
             [] 
             (Nothing) 
             (GRHSs 

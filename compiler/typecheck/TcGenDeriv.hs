@@ -1517,7 +1517,7 @@ makeG_d.
 gen_Lift_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
 gen_Lift_binds loc tycon
   | null data_cons = (unitBag (L loc $ mkFunBind (L loc lift_RDR)
-                       [mkMatch (FunRhs (L loc lift_RDR) Prefix)
+                       [mkMatch (mkPrefixFunRhs (L loc lift_RDR))
                                         [nlWildPat] errorMsg_Expr
                                         (noLoc emptyLocalBinds)])
                      , emptyBag)
@@ -1661,8 +1661,8 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
     mk_bind :: Id -> LHsBind RdrName
     mk_bind meth_id
       = mkRdrFunBind (L loc meth_RDR) [mkSimpleMatch
-                                         (FunRhs (L loc meth_RDR) Prefix)
-                                         [] rhs_expr]
+                                          (mkPrefixFunRhs (L loc meth_RDR))
+                                          [] rhs_expr]
       where
         Pair from_ty to_ty = mkCoerceClassMethEqn cls inst_tvs inst_tys rhs_ty meth_id
 
@@ -1857,7 +1857,7 @@ mk_HRFunBind :: Arity -> SrcSpan -> RdrName
 mk_HRFunBind arity loc fun pats_and_exprs
   = mkHRRdrFunBind arity (L loc fun) matches
   where
-    matches = [mkMatch (FunRhs (L loc fun) Prefix) p e
+    matches = [mkMatch (mkPrefixFunRhs (L loc fun)) p e
                                (noLoc emptyLocalBinds)
               | (p,e) <-pats_and_exprs]
 
@@ -1873,7 +1873,7 @@ mkHRRdrFunBind arity fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches'
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
-              then [mkMatch (FunRhs fun Prefix)
+              then [mkMatch (mkPrefixFunRhs fun)
                             (replicate arity nlWildPat)
                             (error_Expr str) (noLoc emptyLocalBinds)]
               else matches
