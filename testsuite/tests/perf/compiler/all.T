@@ -744,7 +744,7 @@ test('T9020',
 test('T9675',
      [ only_ways(['optasm']),
        compiler_stats_num_field('max_bytes_used', # Note [residency]
-          [(wordsize(64), 25381032, 15),
+          [(wordsize(64), 17675240, 15),
           # 2014-10-13    29596552
           # 2014-10-13    26570896   seq the DmdEnv in seqDmdType as well
           # 2014-10-13    18582472   different machines giving different results..
@@ -755,13 +755,12 @@ test('T9675',
           # 2016-03-14    38776008   Final demand analyzer run
           # 2016-04-01    29871032   Fix leaks in demand analysis
           # 2016-04-30    17675240   Fix leaks in tidy unfoldings
-          # 2017-05-08    25381032   CoreTidy: Don't seq unfoldings
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
           ]),
        compiler_stats_num_field('peak_megabytes_allocated', # Note [residency]
-          [(wordsize(64), 94, 15),
+          [(wordsize(64), 63, 15),
           # 2014-10-13    66
           # 2014-10-13    58         seq the DmdEnv in seqDmdType as well
           # 2014-10-13    49         different machines giving different results...
@@ -773,7 +772,6 @@ test('T9675',
           # 2016-04-14    144        Final demand analyzer run
           # 2016-07-26    121        Unboxed sums?
           # 2017-04-30    63         Fix leaks in tidy unfoldings
-          # 2017-05-08    94         CoreTidy: Don't seq unfoldings
             (wordsize(32), 56, 15)
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
