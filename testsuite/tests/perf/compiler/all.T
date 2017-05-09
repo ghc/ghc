@@ -755,7 +755,7 @@ test('T9675',
           # 2016-03-14    38776008   Final demand analyzer run
           # 2016-04-01    29871032   Fix leaks in demand analysis
           # 2016-04-30    17675240   Fix leaks in tidy unfoldings
-          # 2017-05-08    25381032   Fix negative zero (see #13211)
+          # 2017-05-08    25381032   CoreTidy: Don't seq unfoldings
            (wordsize(32), 18043224, 15)
           # 2015-07-11    15341228   (x86/Linux, 64-bit machine) use +RTS -G1
           # 2016-04-06    18043224   (x86/Linux, 64-bit machine)
@@ -773,7 +773,7 @@ test('T9675',
           # 2016-04-14    144        Final demand analyzer run
           # 2016-07-26    121        Unboxed sums?
           # 2017-04-30    63         Fix leaks in tidy unfoldings
-          # 2017-05-08    94         Fix negative zero (see #13211)
+          # 2017-05-08    94         CoreTidy: Don't seq unfoldings
             (wordsize(32), 56, 15)
           # 2015-07-11    56         (x86/Linux, 64-bit machine) use +RTS -G1
           ]),
