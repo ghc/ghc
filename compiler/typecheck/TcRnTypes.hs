@@ -1493,14 +1493,14 @@ data Ct
   -- Atomic canonical constraints
   = CDictCan {  -- e.g.  Num xi
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
+
       cc_class  :: Class,
-      cc_tyargs :: [Xi],       -- cc_tyargs are function-free, hence Xi
-      cc_pend_sc :: Bool       -- True <=> (a) cc_class has superclasses
-                               --          (b) we have not (yet) added those
-                               --              superclasses as Givens
-           -- NB: cc_pend_sc is used for G/W/D.  For W/D the reason
-           --     we need superclasses is to expose possible improvement
-           --     via fundeps
+      cc_tyargs :: [Xi],   -- cc_tyargs are function-free, hence Xi
+
+      cc_pend_sc :: Bool   -- See Note [The superclass story] in TcCanonical
+                           -- True <=> (a) cc_class has superclasses
+                           --          (b) we have not (yet) added those
+                           --              superclasses as Givens
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
@@ -1578,9 +1578,8 @@ holeOcc :: Hole -> OccName
 holeOcc (ExprHole uv)  = unboundVarOcc uv
 holeOcc (TypeHole occ) = occ
 
-{-
-Note [Hole constraints]
-~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Hole constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 CHoleCan constraints are used for two kinds of holes,
 distinguished by cc_hole:
 
@@ -1775,13 +1774,25 @@ dropDerivedSimples simples = mapMaybeBag dropDerivedCt simples
 dropDerivedCt :: Ct -> Maybe Ct
 dropDerivedCt ct
   = case ctEvFlavour ev of
-      Wanted WOnly -> Just (ct { cc_ev = ev_wd })
-      Wanted _     -> Just ct
+      Wanted WOnly -> Just (ct' { cc_ev = ev_wd })
+      Wanted _     -> Just ct'
       _            -> ASSERT( isDerivedCt ct ) Nothing
                       -- simples are all Wanted or Derived
   where
     ev    = ctEvidence ct
     ev_wd = ev { ctev_nosh = WDeriv }
+    ct'   = setPendingScDict ct -- See Note [Resetting cc_pend_sc]
+
+{- Note [Resetting cc_pend_sc]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we discard Derived constraints, in dropDerivedSimples, we must
+set the cc_pend_sc flag to True, so that if we re-process this
+CDictCan we will re-generate its derived superclasses. Otherwise
+we might miss some fundeps.  Trac #13662 showed this up.
+
+See Note [The superclass story] in TcCanonical.
+-}
+
 
 dropDerivedInsols :: Cts -> Cts
 -- See Note [Dropping derived constraints]
@@ -1975,6 +1986,12 @@ isPendingScDict :: Ct -> Maybe Ct
 isPendingScDict ct@(CDictCan { cc_pend_sc = True })
                   = Just (ct { cc_pend_sc = False })
 isPendingScDict _ = Nothing
+
+setPendingScDict :: Ct -> Ct
+-- Set the cc_pend_sc flag to True
+setPendingScDict ct@(CDictCan { cc_pend_sc = False })
+                    = ct { cc_pend_sc = True }
+setPendingScDict ct = ct
 
 superClassesMightHelp :: Ct -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
