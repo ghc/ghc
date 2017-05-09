@@ -1952,8 +1952,8 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
      -- segment of this list
 
     pat_cons :: CallPat -> Int
-    -- How many data consturorst of literals are in
-    -- the patten.  More data-cons => less general
+    -- How many data constructors of literals are in
+    -- the pattern.  More data-cons => less general
     pat_cons (qs, ps) = foldr ((+) . n_cons) 0 ps
        where
           q_set = mkVarSet qs

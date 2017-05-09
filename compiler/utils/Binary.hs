@@ -336,7 +336,7 @@ getByte :: BinHandle -> IO Word8
 getByte h = getWord8 h
 
 -- -----------------------------------------------------------------------------
--- Primitve Word writes
+-- Primitive Word writes
 
 instance Binary Word8 where
   put_ = putWord8
@@ -355,7 +355,7 @@ instance Binary Word64 where
   get h = getWord64 h
 
 -- -----------------------------------------------------------------------------
--- Primitve Int writes
+-- Primitive Int writes
 
 instance Binary Int8 where
   put_ h w = put_ h (fromIntegral w :: Word8)

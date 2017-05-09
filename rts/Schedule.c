@@ -2835,7 +2835,7 @@ deleteThread_(Capability *cap, StgTSO *tso)
 /* -----------------------------------------------------------------------------
    raiseExceptionHelper
 
-   This function is called by the raise# primitve, just so that we can
+   This function is called by the raise# primitive, just so that we can
    move some of the tricky bits of raising an exception from C-- into
    C.  Who knows, it might be a useful re-useable thing here too.
    -------------------------------------------------------------------------- */

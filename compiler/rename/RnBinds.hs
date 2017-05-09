@@ -518,7 +518,7 @@ because they don't do anything!  But we have two exceptions:
         (b) is sometimes used to give a type sig for,
             or an occurrence of, a variable on the RHS
 
-* A strict patten binding; that is, one with an outermost bang
+* A strict pattern binding; that is, one with an outermost bang
      !Just _ = e
   This can fail, so unlike the lazy variant, it is not a no-op.
   Moreover, Trac #13646 argues that even for single constructor

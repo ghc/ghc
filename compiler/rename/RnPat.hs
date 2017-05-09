@@ -432,7 +432,7 @@ rnPatAndThen mk (NPlusKPat rdr (L l lit) _ _ _ _)
        ; (lit', _) <- liftCpsFV $ rnOverLit lit -- See Note [Negative zero]
                                                 -- We skip negateName as
                                                 -- negative zero doesn't make
-                                                -- sense in n + k pattenrs
+                                                -- sense in n + k patterns
        ; minus <- liftCpsFV $ lookupSyntaxName minusName
        ; ge    <- liftCpsFV $ lookupSyntaxName geName
        ; return (NPlusKPat (L (nameSrcSpan new_name) new_name)

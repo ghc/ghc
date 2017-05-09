@@ -1508,7 +1508,7 @@ foreign import WINDOWS_CCONV unsafe "windows.h GetModuleFileNameW"
 -- is located at. See Trac #11759.
 getFinalPath :: FilePath -> IO (Maybe FilePath)
 getFinalPath name = do
-    dllHwnd <- failIfNull "LoadLibray"     $ loadLibrary "kernel32.dll"
+    dllHwnd <- failIfNull "LoadLibrary"     $ loadLibrary "kernel32.dll"
     -- Note: The API GetFinalPathNameByHandleW is only available starting from Windows Vista.
     -- This means that we can't bind directly to it since it may be missing.
     -- Instead try to find it's address at runtime and if we don't succeed consider the

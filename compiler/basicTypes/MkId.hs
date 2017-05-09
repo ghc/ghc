@@ -1497,7 +1497,7 @@ Also see https://ghc.haskell.org/trac/ghc/wiki/OneShot.
 Note [magicDictId magic]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 The identifier `magicDict` is just a place-holder, which is used to
-implement a primitve that we cannot define in Haskell but we can write
+implement a primitive that we cannot define in Haskell but we can write
 in Core.  It is declared with a place-holder type:
 
     magicDict :: forall a. a
