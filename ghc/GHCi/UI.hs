@@ -1793,7 +1793,7 @@ modulesLoadedMsg ok mods = do
   dflags <- getDynFlags
   unqual <- GHC.getPrintUnqual
   let mod_name mod = do
-        is_interpreted <- GHC.isModuleInterpreted mod
+        is_interpreted <- GHC.moduleIsBootOrNotObjectLinkable mod
         return $ if is_interpreted
                   then ppr (GHC.ms_mod mod)
                   else ppr (GHC.ms_mod mod)

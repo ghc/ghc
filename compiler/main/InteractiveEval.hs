@@ -31,7 +31,7 @@ module InteractiveEval (
         typeKind,
         parseName,
         showModule,
-        isModuleInterpreted,
+        moduleIsBootOrNotObjectLinkable,
         parseExpr, compileParsedExpr,
         compileExpr, dynCompileExpr,
         compileExprRemote, compileParsedExprRemote,
@@ -901,17 +901,17 @@ dynCompileExpr expr = do
 showModule :: GhcMonad m => ModSummary -> m String
 showModule mod_summary =
     withSession $ \hsc_env -> do
-        interpreted <- isModuleInterpreted mod_summary
+        interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
         return (showModMsg dflags (hscTarget dflags) interpreted mod_summary)
 
-isModuleInterpreted :: GhcMonad m => ModSummary -> m Bool
-isModuleInterpreted mod_summary = withSession $ \hsc_env ->
+moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
+moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
   case lookupHpt (hsc_HPT hsc_env) (ms_mod_name mod_summary) of
         Nothing       -> panic "missing linkable"
-        Just mod_info -> return (not obj_linkable)
-                      where
-                         obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
+        Just mod_info -> return $ case hm_linkable mod_info of
+          Nothing       -> True
+          Just linkable -> not (isObjectLinkable linkable)
 
 ----------------------------------------------------------------------------
 -- RTTI primitives

@@ -112,7 +112,7 @@ module GHC (
         moduleIsInterpreted,
         getInfo,
         showModule,
-        isModuleInterpreted,
+        moduleIsBootOrNotObjectLinkable,
 
         -- ** Inspecting types and kinds
         exprType, TcRnExprMode(..),
