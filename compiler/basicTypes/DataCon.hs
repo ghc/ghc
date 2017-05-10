@@ -446,9 +446,9 @@ data DataConRep
 
         , dcr_boxer   :: DataConBoxer
 
-        , dcr_arg_tys :: [Type]  -- Final, representation argument types,
-                                 -- after unboxing and flattening,
-                                 -- and *including* all evidence args
+        , dcr_arg_tys :: [Weighted Type]  -- Final, representation argument types,
+                                          -- after unboxing and flattening,
+                                          -- and *including* all evidence args
 
         , dcr_stricts :: [StrictnessMark]  -- 1-1 with dcr_arg_tys
                 -- See also Note [Data-con worker strictness] in MkId.hs
@@ -809,7 +809,7 @@ mkDataCon name declared_infix prom_info
     rep_arg_tys = dataConRepArgTys con
 
     rep_ty = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $
-             mkFunTys (map unrestricted rep_arg_tys) $ -- TODO: arnaud: that unrestricted is more than a little fishy.
+             mkFunTys rep_arg_tys $
              mkTyConApp rep_tycon (mkTyVarTys (binderVars univ_tvs))
 
       -- See Note [Promoted data constructors] in TyCon
@@ -1057,7 +1057,7 @@ dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
                univ_tys
   = ( ex_tvs'
     , substTheta subst (eqSpecPreds eq_spec ++ theta)
-    , substTys   subst (map weightedThing arg_tys))
+    , substTys   subst (map weightedThing arg_tys)) -- arnaud: TODO: we will eventually want to return linearity annotations. But this function is only used in template Haskell, so not critical for the proof of concept
   where
     univ_subst = zipTvSubst (binderVars univ_tvs) univ_tys
     (subst, ex_tvs') = mapAccumL Type.substTyVarBndr univ_subst $
@@ -1125,13 +1125,13 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                                 -- However, it can have a dcTheta (notably it can be a
                                 -- class dictionary, with superclasses)
                   -> [Type]     -- ^ Instantiated at these types
-                  -> [Type]
+                  -> [Weighted Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyVars = ex_tvs}) inst_tys
  = ASSERT2( length univ_tvs == length inst_tys
           , text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2( null ex_tvs, ppr dc )
-   map (substTyWith (binderVars univ_tvs) inst_tys) (dataConRepArgTys dc)
+   map (fmap (substTyWith (binderVars univ_tvs) inst_tys)) (dataConRepArgTys dc)
 
 -- | Returns just the instantiated /value/ argument types of a 'DataCon',
 -- (excluding dictionary args)
@@ -1159,13 +1159,13 @@ dataConOrigArgTys dc = map weightedThing $ dcOrigArgTys dc
 -- | Returns the arg types of the worker, including *all*
 -- evidence, after any flattening has been done and without substituting for
 -- any type variables
-dataConRepArgTys :: DataCon -> [Type]
+dataConRepArgTys :: DataCon -> [Weighted Type]
 dataConRepArgTys (MkData { dcRep = rep
                          , dcEqSpec = eq_spec
                          , dcOtherTheta = theta
                          , dcOrigArgTys = orig_arg_tys })
   = case rep of
-      NoDataConRep -> ASSERT( null eq_spec ) theta ++ (map weightedThing orig_arg_tys)
+      NoDataConRep -> ASSERT( null eq_spec ) (map unrestricted theta) ++ orig_arg_tys
       DCR { dcr_arg_tys = arg_tys } -> arg_tys
 
 -- | The string @package:module.name@ identifying a constructor, which is attached
@@ -1276,7 +1276,7 @@ splitDataProductType_maybe
         -> Maybe (TyCon,                -- The type constructor
                   [Type],               -- Type args of the tycon
                   DataCon,              -- The data constructor
-                  [Type])               -- Its /representation/ arg types
+                  [Weighted Type])      -- Its /representation/ arg types
 
         -- Rejecting existentials is conservative.  Maybe some things
         -- could be made to work with them, but I'm not going to sweat

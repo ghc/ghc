@@ -73,6 +73,7 @@ import Id
 import IdInfo
 import Type
 import TyCoRep( TyBinder(..) )
+import Weight
 import Coercion
 import TyCon
 import Unique
@@ -1680,7 +1681,8 @@ dataConInstPat fss uniqs con inst_tys
         kind   = Type.substTyUnchecked subst (tyVarKind tv)
 
       -- Make value vars, instantiating types
-    arg_ids = zipWith4 mk_id_var id_uniqs id_fss arg_tys arg_strs
+    arg_ids = zipWith4 mk_id_var id_uniqs id_fss (map weightedThing arg_tys) arg_strs
+      -- Ignore the weights above, as there are Core ignores linearity at the moment.
     mk_id_var uniq fs ty str
       = setCaseBndrEvald str $  -- See Note [Mark evaluated arguments]
         mkLocalIdOrCoVar name (Type.substTy full_subst ty)

@@ -35,6 +35,7 @@ import HscTypes
 import DataCon
 import Type
 import RepType
+import Weight
 import qualified Unify as U
 import Var
 import TcRnMonad
@@ -953,7 +954,7 @@ getDataConArgTys dc con_app_ty
        ; (subst, _) <- instTyVars (univ_tvs ++ ex_tvs)
        ; addConstraint rep_con_app_ty (substTy subst (dataConOrigResTy dc))
               -- See Note [Constructor arg types]
-       ; let con_arg_tys = substTys subst (dataConRepArgTys dc)
+       ; let con_arg_tys = substTys subst (map weightedThing $ dataConRepArgTys dc)
        ; traceTR (text "getDataConArgTys 2" <+> (ppr rep_con_app_ty $$ ppr con_arg_tys $$ ppr subst))
        ; return con_arg_tys }
   where

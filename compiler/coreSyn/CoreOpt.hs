@@ -37,6 +37,7 @@ import DataCon
 import OptCoercion ( optCoercion )
 import Type     hiding ( substTy, extendTvSubst, extendCvSubst, extendTvSubstList
                        , isInScope, substTyVarBndr, cloneTyVarBndr )
+import Weight
 import Coercion hiding ( substCo, substCoVarBndr )
 import TyCon        ( tyConArity )
 import TysWiredIn
@@ -1102,7 +1103,7 @@ pushCoDataCon dc dc_args co
                               (map exprToType ex_args)
 
           -- Cast the value arguments (which include dictionaries)
-        new_val_args = zipWith cast_arg arg_tys val_args
+        new_val_args = zipWith cast_arg (map weightedThing arg_tys) val_args
         cast_arg arg_ty arg = mkCast arg (psi_subst arg_ty)
 
         to_ex_args = map Type to_ex_arg_tys

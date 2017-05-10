@@ -27,6 +27,7 @@ import TysWiredIn       ( tupleDataCon )
 import VarEnv           ( mkInScopeSet )
 import VarSet           ( VarSet )
 import Type
+import Weight
 import RepType          ( isVoidTy )
 import Coercion
 import FamInstEnv
@@ -695,7 +696,7 @@ deepSplitProductType_maybe fam_envs ty
   , Just (tc, tc_args) <- splitTyConApp_maybe ty1
   , Just con <- isDataProductTyCon_maybe tc
   , not (isClassTyCon tc)  -- See Note [Do not unpack class dictionaries]
-  , let arg_tys = dataConInstArgTys con tc_args
+  , let arg_tys = map weightedThing $ dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dspt" arg_tys strict_marks, co)
 deepSplitProductType_maybe _ _ = Nothing
@@ -717,7 +718,7 @@ deepSplitCprType_maybe fam_envs con_tag ty
   , cons `lengthAtLeast` con_tag -- This might not be true if we import the
                                  -- type constructor via a .hs-bool file (#8743)
   , let con = cons `getNth` (con_tag - fIRST_TAG)
-        arg_tys = dataConInstArgTys con tc_args
+        arg_tys = map weightedThing $ dataConInstArgTys con tc_args
         strict_marks = dataConRepStrictness con
   = Just (con, tc_args, zipEqual "dsct" arg_tys strict_marks, co)
 deepSplitCprType_maybe _ _ _ = Nothing
@@ -729,7 +730,7 @@ findTypeShape :: FamInstEnvs -> Type -> TypeShape
 findTypeShape fam_envs ty
   | Just (tc, tc_args)  <- splitTyConApp_maybe ty
   , Just con <- isDataProductTyCon_maybe tc
-  = TsProd (map (findTypeShape fam_envs) $ dataConInstArgTys con tc_args)
+  = TsProd (map (findTypeShape fam_envs) $ map weightedThing $ dataConInstArgTys con tc_args)
 
   | Just (_, res) <- splitFunTy_maybe ty
   = TsFun (findTypeShape fam_envs res)

@@ -30,6 +30,7 @@ import DataCon
 import TyCon
 import CoAxiom
 import Type
+import Weight
 import FamInstEnv
 import Id
 import MkId
@@ -406,7 +407,7 @@ vectDataConWorkers orig_tc vect_tc arr_tc
     arity    = length cons
     [arr_dc] = tyConDataCons arr_tc
 
-    rep_tys  = map dataConRepArgTys $ tyConDataCons vect_tc
+    rep_tys  = map (map weightedThing) $ map dataConRepArgTys $ tyConDataCons vect_tc
 
     mk_data_con con tys pre post
       = do dflags <- getDynFlags

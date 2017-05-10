@@ -252,7 +252,7 @@ lintAlt scrut_ty (DataAlt con, args, rhs) = do
          checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con)
          checkL (length args == dataConRepArity con) (mkAlgAltMsg3 con args)
          when (isVanillaDataCon con) $
-           mapM_ check (zipEqual "lintAlgAlt:stg" arg_tys args)
+           mapM_ check (zipEqual "lintAlgAlt:stg" (map weightedThing arg_tys) args)
          return ()
       _ ->
          addErrL (mkAltMsg1 scrut_ty)

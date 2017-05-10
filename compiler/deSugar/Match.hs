@@ -527,7 +527,7 @@ tidy_bang_pat v l p@(ConPatOut { pat_con = L _ (RealDataCon dc)
   -- Newtypes: push bang inwards (Trac #9844)
   =
     if isNewTyCon (dataConTyCon dc)
-      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l ty args })
+      then tidy1 v (p { pat_args = push_bang_into_newtype_arg l (weightedThing ty) args })
       else tidy1 v p  -- Data types: discard the bang
     where
       (ty:_) = dataConInstArgTys dc arg_tys

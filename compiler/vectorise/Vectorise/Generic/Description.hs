@@ -24,6 +24,7 @@ import CoreSyn
 import DataCon
 import TyCon
 import Type
+import Weight
 import Control.Monad
 import Outputable
 
@@ -151,7 +152,7 @@ tyConRepr tc
                   }
 
     -- Build the representation type for a single data constructor.
-    con_repr con   = liftM (ConRepr con) (prod_repr (dataConRepArgTys con))
+    con_repr con   = liftM (ConRepr con) (prod_repr (map weightedThing $ dataConRepArgTys con))
 
     -- Build the representation type for the fields of a data constructor.
     -- The representation types for each individual field are bundled

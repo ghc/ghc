@@ -49,7 +49,7 @@ vectTyConDecl tycon name'
            -- vectorise method selectors
        ; let opItems      = classOpItems cls
              Just datacon = tyConSingleDataCon_maybe tycon
-             argTys       = dataConRepArgTys datacon                      -- all selector types
+             argTys       = map weightedThing $ dataConRepArgTys datacon  -- all selector types
              opTys        = drop (length argTys - length opItems) argTys  -- only method types
        ; methods' <- sequence [ vectMethod id meth ty | ((id, meth), ty) <- zip opItems opTys]
 
@@ -210,7 +210,7 @@ vectDataCon dc
        }
   where
     name        = dataConName dc
-    rep_arg_tys = dataConRepArgTys dc
+    rep_arg_tys = map weightedThing $ dataConRepArgTys dc
     tycon       = dataConTyCon dc
     (univ_tvs, ex_tvs, eq_spec, theta, _arg_tys, _res_ty) = dataConFullSig dc
     univ_bndrs  = dataConUnivTyVarBinders dc

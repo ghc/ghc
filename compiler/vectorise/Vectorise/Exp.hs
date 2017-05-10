@@ -733,7 +733,7 @@ unVectDict :: Type -> CoreExpr -> VM CoreExpr
 unVectDict ty e
   = do { vTys <- mapM vectType tys
        ; let meths = map (\sel -> Var sel `mkTyApps` vTys `mkApps` [e]) selIds
-       ; scOps <- zipWithM fromVect methTys meths
+       ; scOps <- zipWithM fromVect (map weightedThing methTys) meths
        ; return $ mkCoreConApps dataCon (map Type tys ++ scOps)
        }
   where

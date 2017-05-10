@@ -24,6 +24,7 @@ import UniqFM
 import DataCon
 import TyCon
 import TyCoRep
+import Weight
 import qualified Type
 import PrelNames
 import Digraph
@@ -113,7 +114,7 @@ tyConGroups tcs = map mk_grp (stronglyConnCompFromEdgedVerticesUniq edges)
 -- |Collect the set of TyCons used by the representation of some data type.
 --
 tyConsOfTyCon :: TyCon -> UniqSet TyCon
-tyConsOfTyCon = tyConsOfTypes . concatMap dataConRepArgTys . tyConDataCons
+tyConsOfTyCon = tyConsOfTypes . map weightedThing . concatMap dataConRepArgTys . tyConDataCons
 
 -- |Collect the set of TyCons that occur in these types.
 --
