@@ -220,8 +220,9 @@ load' how_much mHscMessage mod_graph = do
     -- B.hs-boot in the module graph, but no B.hs
     -- The downsweep should have ensured this does not happen
     -- (see msDeps)
-    let all_home_mods = [ms_mod_name s
-                        | s <- mod_graph, not (isBootSummary s)]
+    let all_home_mods =
+          mkUniqSet [ ms_mod_name s
+                    | s <- mod_graph, not (isBootSummary s)]
     -- TODO: Figure out what the correct form of this assert is. It's violated
     -- when you have HsBootMerge nodes in the graph: then you'll have hs-boot
     -- files without corresponding hs files.
@@ -236,7 +237,7 @@ load' how_much mHscMessage mod_graph = do
         checkHowMuch _ = id
 
         checkMod m and_then
-            | m `elem` all_home_mods = and_then
+            | m `elementOfUniqSet` all_home_mods = and_then
             | otherwise = do
                     liftIO $ errorMsg dflags (text "no such module:" <+>
                                      quotes (ppr m))
@@ -656,7 +657,7 @@ unload hsc_env stable_linkables -- Unload everthing *except* 'stable_linkables'
 checkStability
         :: HomePackageTable   -- HPT from last compilation
         -> [SCC ModSummary]   -- current module graph (cyclic)
-        -> [ModuleName]       -- all home modules
+        -> UniqSet ModuleName -- all home modules
         -> ([ModuleName],     -- stableObject
             [ModuleName])     -- stableBCO
 
@@ -669,7 +670,8 @@ checkStability hpt sccs all_home_mods = foldl checkSCC ([],[]) sccs
      where
         scc = flattenSCC scc0
         scc_mods = map ms_mod_name scc
-        home_module m   = m `elem` all_home_mods && m `notElem` scc_mods
+        home_module m =
+          m `elementOfUniqSet` all_home_mods && m `notElem` scc_mods
 
         scc_allimps = nub (filter home_module (concatMap ms_home_allimps scc))
             -- all imports outside the current SCC, but in the home pkg
