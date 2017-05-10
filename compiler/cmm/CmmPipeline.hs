@@ -158,7 +158,8 @@ cpsTop hsc_env proc =
         -- tablesNextToCode is off.  The latter is because we have no
         -- label to put on info tables for basic blocks that are not
         -- the entry point.
-        splitting_proc_points = hscTarget dflags /= HscAsm
+        target = hscTarget dflags
+        splitting_proc_points = not (target == HscAsm || target == HscLlvm)
                              || not (tablesNextToCode dflags)
                              || -- Note [inconsistent-pic-reg]
                                 usingInconsistentPicReg
