@@ -584,6 +584,7 @@ specProgram guts@(ModGuts { mg_module = this_mod
              -- Specialise imported functions
        ; hpt_rules <- getRuleBase
        ; let rule_base = extendRuleBaseList hpt_rules local_rules
+       ; pprTrace "uds" (ppr uds) (return ())
        ; (new_rules, spec_binds) <- specImports dflags this_mod top_env emptyVarSet
                                                 [] rule_base (ud_calls uds)
 
