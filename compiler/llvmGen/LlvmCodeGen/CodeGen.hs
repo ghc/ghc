@@ -126,9 +126,12 @@ stmtToInstrs stmt = case stmt of
     CmmUnsafeForeignCall target res args
         -> genCall target res args
 
-    -- Tail call
+    -- Cmm call
     CmmCall { cml_target = arg,
-              cml_args_regs = live } -> genJump arg live
+              cml_args_regs = live,
+              cml_cont = maybeCont } -> case maybeCont of
+                Nothing -> genJump arg live -- Tail call
+                Just cont -> panic "todo: handle non-tail CmmCall"
 
     _ -> panic "Llvm.CodeGen.stmtToInstrs"
 
