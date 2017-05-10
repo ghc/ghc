@@ -240,9 +240,10 @@ test('T4801',
 #            # 2014-10-13: 48 stricter seqDmdType
 
       compiler_stats_num_field('bytes allocated',
-          [(platform('x86_64-apple-darwin'), 465653312, 10),
+          [(platform('x86_64-apple-darwin'), 417302064, 10),
            # prev:       510938976 (amd64/OS X):
            # 2015-12-11: 465653312 (amd64/OS X) Update, bump tolerance to +/-10%
+           # 2017-03-24: 417302064 (amd64/OS X) Correlated with Linux improvement
 
            (wordsize(32), 199856388, 10),
            # prev:        185669232 (x86/OSX)
