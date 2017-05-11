@@ -109,6 +109,11 @@ typedef struct ForeignExportStablePtr_ {
 #endif /* ios_HOST_OS */
 #endif
 
+/* iOS Simulator however, needs symbol extras for now (#13678) */
+#if defined(ios_HOST_OS) && defined(x86_64_HOST_ARCH)
+#define NEED_SYMBOL_EXTRAS 1
+#endif
+
 /* Jump Islands are sniplets of machine code required for relative
  * address relocations on the PowerPC, x86_64 and ARM.
  */
