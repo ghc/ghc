@@ -667,6 +667,9 @@ tcPatToExpr args pat = go pat
     go1 (ConPatOut{})               = panic "ConPatOut in output of renamer"
     go1 (SigPatOut{})               = panic "SigPatOut in output of renamer"
     go1 (CoPat{})                   = panic "CoPat in output of renamer"
+    go1 (SplicePat (HsSpliced _ (HsSplicedPat pat)))
+                                    = go1 pat
+    go1 (SplicePat (HsSpliced{}))   = panic "Invalid splice variety"
     go1 p = Left (text "pattern" <+> quotes (ppr p) <+> text "is not invertible")
 
 {- Note [Builder for a bidirectional pattern synonym]
@@ -771,7 +774,11 @@ tcCheckPatSynPat = go
     go1   NPat{}              = return ()
     go1   (SigPatIn pat _)    = go pat
     go1   (ViewPat _ pat _)   = go pat
-    go1 p@SplicePat{}         = thInPatSynErr p
+    go1   (SplicePat splice)
+      | HsSpliced mod_finalizers (HsSplicedPat pat) <- splice
+                              = do addModFinalizersWithLclEnv mod_finalizers
+                                   go1 pat
+      | otherwise             = panic "non-pattern from spliced thing"
     go1 p@NPlusKPat{}         = nPlusKPatInPatSynErr p
     go1   ConPatOut{}         = panic "ConPatOut in output of renamer"
     go1   SigPatOut{}         = panic "SigPatOut in output of renamer"
@@ -781,12 +788,6 @@ asPatInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
 asPatInPatSynErr pat
   = failWithTc $
     hang (text "Pattern synonym definition cannot contain as-patterns (@):")
-       2 (ppr pat)
-
-thInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
-thInPatSynErr pat
-  = failWithTc $
-    hang (text "Pattern synonym definition cannot contain Template Haskell:")
        2 (ppr pat)
 
 nPlusKPatInPatSynErr :: (OutputableBndrId name) => Pat name -> TcM a
