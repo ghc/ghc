@@ -50,9 +50,8 @@ $(libffi_STAMP_CONFIGURE): $(TOUCH_DEP)
 	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_CONFIGURE))
 	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_BUILD))
 	$(call removeFiles,$(libffi_STAMP_STATIC_SHARED_INSTALL))
-	$(call removeTrees,$(LIBFFI_DIR) libffi/build)
-	cat libffi-tarballs/libffi*.tar.gz | $(GZIP_CMD) -d | { cd libffi && $(TAR_CMD) -xf - ; }
-	mv libffi/libffi-* libffi/build
+	git clean -x -f -d libffi/build
+	cd libffi/build && ./autogen.sh
 
 # update config.guess/config.sub
 	$(CP) "$(TOP)/config.guess" libffi/build/config.guess
@@ -123,10 +122,10 @@ $(libffi_STATIC_LIB): $(libffi_STAMP_INSTALL)
 	@test -f $@ || { echo "$< exists, but $@ does not."; echo "Suggest removing $<."; exit 1; }
 
 $(libffi_HEADERS): $(libffi_STAMP_INSTALL) | $$(dir $$@)/.
-	cp -f libffi/build/inst/lib/libffi-*/include/$(notdir $@) $@
+	cp -f libffi/build/inst/include/$(notdir $@) $@
 
 $(eval $(call clean-target,libffi,, \
-    libffi/build $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
+    $(wildcard libffi/stamp.ffi.*) libffi/dist-install))
 
 endif
 
