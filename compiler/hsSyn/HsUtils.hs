@@ -965,6 +965,9 @@ collect_lpat (L _ pat) bndrs
 
     go (SigPatIn pat _)           = collect_lpat pat bndrs
     go (SigPatOut pat _)          = collect_lpat pat bndrs
+
+    go (SplicePat (HsSpliced _ (HsSplicedPat pat)))
+                                  = go pat
     go (SplicePat _)              = bndrs
     go (CoPat _ pat _)            = go pat
 
