@@ -1892,22 +1892,19 @@ linkBinary' staticLink dflags o_files dep_packages = do
     -- Here are some libs that need to be linked at the *end* of
     -- the command line, because they contain symbols that are referred to
     -- by the RTS.  We can't therefore use the ordinary way opts for these.
-    let
-        debug_opts | WayDebug `elem` ways dflags = [
+    let debug_opts | WayDebug `elem` ways dflags = [
 #if defined(HAVE_LIBBFD)
                         "-lbfd", "-liberty"
 #endif
                          ]
-                   | otherwise            = []
+                   | otherwise                   = []
 
-    let thread_opts
-         | WayThreaded `elem` ways dflags =
-            let os = platformOS (targetPlatform dflags)
-            in if os `elem` [OSMinGW32, OSFreeBSD, OSOpenBSD, OSAndroid,
-                             OSNetBSD, OSHaiku, OSQNXNTO, OSiOS, OSDarwin]
-               then []
-               else ["-lpthread"]
-         | otherwise               = []
+        thread_opts | WayThreaded `elem` ways dflags = [
+#if NEED_PTHREAD_LIB
+                        "-lpthread"
+#endif
+                        ]
+                    | otherwise                      = []
 
     rc_objs <- maybeCreateManifest dflags output_fn
 
