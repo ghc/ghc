@@ -99,6 +99,9 @@ data Node key payload = DigraphNode {
      --    it's ok to have extra keys in the dependencies that
      --    are not the key of any Node in the graph
 
+instance (Outputable a, Outputable b) => Outputable (Node  a b) where
+  ppr (DigraphNode a b c) = ppr (a, b, c)
+
 emptyGraph :: Graph a
 emptyGraph = Graph (array (1, 0) []) (error "emptyGraph") (const Nothing)
 
