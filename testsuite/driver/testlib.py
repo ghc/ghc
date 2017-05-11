@@ -84,6 +84,8 @@ def setTestOpts( f ):
 #      test('test001', expect_fail, compile, [''])
 #
 # to expect failure for this test.
+#
+# type TestOpt = (name :: String, opts :: Object) -> IO ()
 
 def normal( name, opts ):
     return;
@@ -518,6 +520,12 @@ def normalise_errmsg_fun( *fs ):
 def _normalise_errmsg_fun( name, opts, *fs ):
     opts.extra_errmsg_normaliser =  join_normalisers(opts.extra_errmsg_normaliser, fs)
 
+def normalise_whitespace_fun(f):
+    return lambda name, opts: _normalise_whitespace_fun(name, opts, f)
+
+def _normalise_whitespace_fun(name, opts, f):
+    opts.whitespace_normaliser = f
+
 def normalise_version_( *pkgs ):
     def normalise_version__( str ):
         return re.sub('(' + '|'.join(map(re.escape,pkgs)) + ')-[0-9.]+',
@@ -622,7 +630,7 @@ def runTest(watcher, opts, name, func, args):
         test_common_work(watcher, name, opts, func, args)
 
 # name  :: String
-# setup :: TestOpts -> IO ()
+# setup :: [TestOpt] -> IO ()
 def test(name, setup, func, args):
     global aloneTests
     global parallelTests
@@ -1006,7 +1014,9 @@ def do_compile(name, way, should_fail, top_mod, extra_mods, extra_hc_opts, **kwa
                            join_normalisers(getTestOpts().extra_errmsg_normaliser,
                                             normalise_errmsg),
                            expected_stderr_file, actual_stderr_file,
-                           whitespace_normaliser=normalise_whitespace):
+                           whitespace_normaliser=getattr(getTestOpts(),
+                                                         "whitespace_normaliser",
+                                                         normalise_whitespace)):
         return failBecause('stderr mismatch')
 
     # no problems found, this test passed
