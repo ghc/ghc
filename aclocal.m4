@@ -136,9 +136,13 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     TargetVendor_CPP=`  echo "$TargetVendor"   | sed -e 's/\./_/g' -e 's/-/_/g'`
     TargetOS_CPP=`      echo "$TargetOS"       | sed -e 's/\./_/g' -e 's/-/_/g'`
 
+    # we intend to pass trough --targets to llvm as is.
+    LLVMTarget_CPP=`    echo "$target"`
+
     echo "GHC build  : $BuildPlatform"
     echo "GHC host   : $HostPlatform"
     echo "GHC target : $TargetPlatform"
+    echo "LLVM target: $target"
 
     AC_SUBST(BuildPlatform)
     AC_SUBST(HostPlatform)
@@ -154,6 +158,7 @@ AC_DEFUN([FPTOOLS_SET_PLATFORM_VARS],
     AC_SUBST(HostOS_CPP)
     AC_SUBST(BuildOS_CPP)
     AC_SUBST(TargetOS_CPP)
+    AC_SUBST(LLVMTarget_CPP)
 
     AC_SUBST(HostVendor_CPP)
     AC_SUBST(BuildVendor_CPP)
