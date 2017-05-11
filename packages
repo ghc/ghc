@@ -38,7 +38,7 @@
 # localpath                  tag         remotepath                      upstreamurl
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ghc-tarballs                 windows     ghc-tarballs.git                -
-libffi/build                 -           -                               https://github.com/libffi/libffi.git
+libffi-tarballs              -           -                               -
 utils/hsc2hs                 -           -                               -
 utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git
 libraries/array              -           -                               -

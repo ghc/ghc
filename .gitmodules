@@ -111,12 +111,13 @@
 	path = utils/hsc2hs
 	url = ../hsc2hs.git
 	ignore = none
+[submodule "libffi-tarballs"]
+	path = libffi-tarballs
+	url = ../libffi-tarballs.git
+	ignore = none
 [submodule "gmp-tarballs"]
 	path = libraries/integer-gmp/gmp/gmp-tarballs
 	url = ../gmp-tarballs.git
 [submodule ".arc-linters/arcanist-external-json-linter"]
 	path = .arc-linters/arcanist-external-json-linter
 	url = ../arcanist-external-json-linter.git
-[submodule "libffi/build"]
-	path = libffi/build
-	url = https://github.com/libffi/libffi.git
