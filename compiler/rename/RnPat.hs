@@ -754,13 +754,13 @@ rnHsRecUpdFields flds
 
            ; let fvs' = case sel of
                           Left sel_name -> fvs `addOneFV` sel_name
-                          Right [FieldOcc _ sel_name] -> fvs `addOneFV` sel_name
+                          Right [sel_name] -> fvs `addOneFV` sel_name
                           Right _       -> fvs
                  lbl' = case sel of
                           Left sel_name ->
                                      L loc (Unambiguous (L loc lbl) sel_name)
-                          Right [FieldOcc lbl sel_name] ->
-                                     L loc (Unambiguous lbl sel_name)
+                          Right [sel_name] ->
+                                     L loc (Unambiguous (L loc lbl) sel_name)
                           Right _ -> L loc (Ambiguous   (L loc lbl) PlaceHolder)
 
            ; return (L l (HsRecField { hsRecFieldLbl = lbl'

@@ -121,12 +121,12 @@ rnExpr (HsVar (L l v))
 
               | otherwise
               -> finishHsVar (L l name) ;
-            Just (Right [f@(FieldOcc (L _ fn) s)]) ->
-                      return (HsRecFld (ambiguousFieldOcc (FieldOcc (L l fn) s))
-                             , unitFV (selectorFieldOcc f)) ;
-           Just (Right fs@(_:_:_)) -> return (HsRecFld (Ambiguous (L l v)
-                                                        PlaceHolder)
-                                             , mkFVs (map selectorFieldOcc fs));
+            Just (Right [s]) ->
+              return ( HsRecFld (ambiguousFieldOcc (FieldOcc (L l v) s))
+                     , unitFV s) ;
+           Just (Right fs@(_:_:_)) ->
+              return ( HsRecFld (Ambiguous (L l v) PlaceHolder)
+                     , mkFVs fs);
            Just (Right [])         -> panic "runExpr/HsVar" } }
 
 rnExpr (HsIPVar v)

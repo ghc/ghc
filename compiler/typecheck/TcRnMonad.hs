@@ -78,7 +78,7 @@ module TcRnMonad(
 
   -- * Error message generation (type checker)
   addErrTc, addErrsTc,
-  addErrTcM, mkErrTcM,
+  addErrTcM, mkErrTcM, mkErrTc,
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
@@ -1196,6 +1196,10 @@ mkErrTcM (tidy_env, err_msg)
          loc  <- getSrcSpanM ;
          err_info <- mkErrInfo tidy_env ctxt ;
          mkLongErrAt loc err_msg err_info }
+
+mkErrTc :: MsgDoc -> TcM ErrMsg
+mkErrTc msg = do { env0 <- tcInitTidyEnv
+                 ; mkErrTcM (env0, msg) }
 
 -- The failWith functions add an error message and cause failure
 

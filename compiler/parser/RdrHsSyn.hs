@@ -753,9 +753,9 @@ checkTyClHdr is_cls ty
       = goL head (args ++ acc) ann fixity
 
     go _ (HsAppsTy [L _ (HsAppInfix (L loc star))]) [] ann fix
-      | occNameFS (rdrNameOcc star) == fsLit "*"
+      | isStar star
       = return (L loc (nameRdrName starKindTyConName), [], fix, ann)
-      | occNameFS (rdrNameOcc star) == fsLit "★"
+      | isUniStar star
       = return (L loc (nameRdrName unicodeStarKindTyConName), [], fix, ann)
 
     go l (HsTupleTy HsBoxedOrConstraintTuple ts) [] ann fix
