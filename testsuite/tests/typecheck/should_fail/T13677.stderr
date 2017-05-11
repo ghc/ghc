@@ -1,0 +1,4 @@
+
+T13677.hs:10:8: error:
+    • Expected a constraint, but ‘Dict (Int ~ Int)’ has kind ‘*’
+    • In the type signature: foo :: Dict (Int ~ Int) => Int

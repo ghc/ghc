@@ -979,7 +979,7 @@ pprTyTcApp' ctxt_prec tc tys dflags style
          -> text "(TypeError ...)"
 
        | Just doc <- ppr_equality tc (tcArgsIfaceTypes tys)
-         -> doc
+         -> maybeParen ctxt_prec TyConPrec doc
 
        | otherwise
          -> ppr_iface_tc_app ppr_ty ctxt_prec tc tys_wo_kinds

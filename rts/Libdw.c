@@ -18,6 +18,8 @@
 
 const int max_backtrace_depth = 5000;
 
+static bool set_initial_registers(Dwfl_Thread *thread, void *arg);
+
 static BacktraceChunk *backtraceAllocChunk(BacktraceChunk *next) {
     BacktraceChunk *chunk = stgMallocBytes(sizeof(BacktraceChunk),
                                            "backtraceAllocChunk");
@@ -59,13 +61,12 @@ void backtraceFree(Backtrace *bt) {
 
 struct LibdwSession_ {
     Dwfl *dwfl;
+    Dwfl_Thread_Callbacks thread_cbs;
 
     // The current backtrace we are collecting (if any)
     Backtrace *cur_bt;
     int max_depth;
 };
-
-static const Dwfl_Thread_Callbacks thread_cbs;
 
 void libdwFree(LibdwSession *session) {
     if (session == NULL)
@@ -110,6 +111,7 @@ LibdwSession *libdwInit() {
         sysErrorBelch("dwfl_report_end failed: %s", dwfl_errmsg(dwfl_errno()));
         goto fail;
     }
+
 
     pid_t pid = getpid();
     if (! dwfl_attach_state(session->dwfl, NULL, pid, &thread_cbs, NULL)) {
@@ -243,11 +245,62 @@ static int getBacktraceFrameCb(Dwfl_Frame *frame, void *arg) {
     }
 }
 
+static pid_t next_tso(Dwfl *dwfl, void *arg, void **thread_argp) {
+    /* there is only the current thread */
+    if (*thread_argp != NULL)
+        return 0;
+
+    *thread_argp = tso;
+    return dwfl_pid(dwfl);
+}
+
+int forEachHsThread(LibdwSession *session, int (*do_it)(StgTSO *)) {
+    tso_list *list = NULL;
+    for (int g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (StgTSO *t = generations[g].threads; t != END_TSO_QUEUE; t = t->global_link) {
+            int ret = do_it(t);
+            if (ret) return ret;
+        }
+    }
+    return 0;
+}
+
+/* Collect a backtrace for the thread associated with the given TSO */
+Backtrace *libdwGetThreadBacktrace(LibdwSession *session, StgTSO *tso) {
+    if (session->cur_bt != NULL) {
+        sysErrorBelch("Already collecting backtrace. Uh oh.");
+        return NULL;
+    }
+
+    session->thread_cbs = {
+        .next_thread = dummy_next_thread,
+        .memory_read = memory_read,
+        .set_initial_registers = set_tso_initial_registers,
+    };
+
+    Backtrace *bt = backtraceAlloc();
+    session->cur_bt = bt;
+    session->max_depth = max_backtrace_depth;
+    int ret = dwfl_getthread_frames(session->dwfl, tso, getBacktraceFrameCb, session);
+    if (ret == -1)
+        sysErrorBelch("Failed to get stack frames of current process: %s",
+                      dwfl_errmsg(dwfl_errno()));
+
+    session->cur_bt = NULL;
+    return bt;
+}
+
+/* Collect a backtrace of the current execution stack */
 Backtrace *libdwGetBacktrace(LibdwSession *session) {
     if (session->cur_bt != NULL) {
         sysErrorBelch("Already collecting backtrace. Uh oh.");
         return NULL;
     }
+    session->thread_cbs = {
+        .next_thread = dummy_next_thread,
+        .memory_read = memory_read,
+        .set_initial_registers = set_current_initial_registers,
+    };
 
     Backtrace *bt = backtraceAlloc();
     session->cur_bt = bt;
@@ -264,7 +317,9 @@ Backtrace *libdwGetBacktrace(LibdwSession *session) {
     return bt;
 }
 
-static pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
+/* the libdwfl next_thread callback for when we are collecting a backtrace for
+   the current thread */
+static pid_t dummy_next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
     /* there is only the current thread */
     if (*thread_argp != NULL)
         return 0;
@@ -273,17 +328,24 @@ static pid_t next_thread(Dwfl *dwfl, void *arg, void **thread_argp) {
     return dwfl_pid(dwfl);
 }
 
+/* libdwfl memory_read callback to read from the current process */
 static bool memory_read(Dwfl *dwfl STG_UNUSED, Dwarf_Addr addr,
                         Dwarf_Word *result, void *arg STG_UNUSED) {
     *result = *(Dwarf_Word *) (uintptr_t) addr;
     return true;
 }
 
-static bool set_initial_registers(Dwfl_Thread *thread, void *arg);
-
 #ifdef x86_64_HOST_ARCH
-static bool set_initial_registers(Dwfl_Thread *thread,
-                                  void *arg STG_UNUSED) {
+static bool set_tso_initial_registers(Dwfl_Thread *thread, void *arg) {
+    StgTSO *tso = arg;
+    Dwarf_Word regs[17];
+    regs[6] = tso->stackobj->sp; // rbp
+    regs[16] = tso->stackobj->sp[0]; // rip
+    return dwfl_thread_state_registers(thread, 0, 17, regs);
+}
+
+static bool set_current_initial_registers(Dwfl_Thread *thread,
+                                          void *arg STG_UNUSED) {
     Dwarf_Word regs[17];
     __asm__ ("movq %%rax, 0x00(%0)\n\t"
              "movq %%rdx, 0x08(%0)\n\t"
@@ -309,6 +371,7 @@ static bool set_initial_registers(Dwfl_Thread *thread,
         );
     return dwfl_thread_state_registers(thread, 0, 17, regs);
 }
+
 #elif defined(i386_HOST_ARCH)
 static bool set_initial_registers(Dwfl_Thread *thread,
                                   void *arg STG_UNUSED) {
@@ -333,12 +396,6 @@ static bool set_initial_registers(Dwfl_Thread *thread,
 #else
 #    error "Please implement set_initial_registers() for your arch"
 #endif
-
-static const Dwfl_Thread_Callbacks thread_cbs = {
-    .next_thread = next_thread,
-    .memory_read = memory_read,
-    .set_initial_registers = set_initial_registers,
-};
 
 #else /* !USE_LIBDW */
 
