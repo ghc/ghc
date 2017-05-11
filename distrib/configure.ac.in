@@ -86,7 +86,7 @@ AC_SUBST([OptCmd])
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-FIND_LD([LdCmd])
+FIND_LD([$target],[LdCmd])
 AC_SUBST([LdCmd])
 
 FP_GCC_VERSION

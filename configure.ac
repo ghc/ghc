@@ -497,7 +497,7 @@ FP_SET_CFLAGS_C99([CC],[CONF_CC_OPTS_STAGE2],[CONF_CPP_OPTS_STAGE2])
 
 dnl ** Which ld to use?
 dnl --------------------------------------------------------------
-FIND_LD([LdCmd])
+FIND_LD([$target],[LdCmd])
 AC_SUBST([LdCmd])
 
 dnl ** Which nm to use?

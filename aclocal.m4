@@ -572,6 +572,7 @@ AC_DEFUN([FP_SET_CFLAGS_C99],
 # $5 is the name of the CPP flags variable
 AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
 [
+    FIND_LD([$1],[UseLd])
     AC_MSG_CHECKING([Setting up $2, $3, $4 and $5])
     case $$1 in
     i386-*)
@@ -610,18 +611,14 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         ;;
     arm*linux*)
         # On arm/linux and arm/android, tell gcc to generate Arm
-        # instructions (ie not Thumb) and to link using the gold linker.
-        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
+        # instructions (ie not Thumb).
         $2="$$2 -marm"
-        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $3="$$3 -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
         ;;
 
     aarch64*linux*)
-        # On aarch64/linux and aarch64/android, tell gcc to link using the
-        # gold linker.
-        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
-        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $3="$$3 -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
         ;;
 
@@ -640,6 +637,15 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         $4="$$4 -z wxneeded"
         ;;
 
+    esac
+
+    case $UseLd in
+         *ld.gold)
+         $3="$$3 -fuse-ld=gold"
+         ;;
+         *ld.bfd)
+         $3="$$3 -fuse-ld=bfd"
+         ;;
     esac
 
     # If gcc knows about the stack protector, turn it off.
@@ -1991,11 +1997,12 @@ AC_DEFUN([FIND_LLVM_PROG],[
 # Find the version of `ld` to use. This is used in both in the top level
 # configure.ac and in distrib/configure.ac.in.
 #
-# $1 = the variable to set
+# $1 = the platform
+# $2 = the variable to set
 #
 AC_DEFUN([FIND_LD],[
     AC_CHECK_TARGET_TOOL([LD], [ld])
-    case $target in
+    case $1 in
         arm*linux*       | \
         aarch64*linux*   )
             # Arm and Aarch64 requires use of the binutils ld.gold linker.
@@ -2003,10 +2010,18 @@ AC_DEFUN([FIND_LD],[
             # arm-linux-androideabi, arm64-unknown-linux and
             # aarch64-linux-android
             AC_CHECK_TARGET_TOOL([LD_GOLD], [ld.gold])
-            $1="$LD_GOLD"
+            if test "$LD_GOLD" != ""; then
+                $2="$LD_GOLD"
+            elif test `$LD --version | grep -c "GNU gold"` -gt 0; then
+                AC_MSG_NOTICE([ld is ld.gold])
+                $2="$LD"
+            else
+                AC_MSG_WARN([could not find ld.gold, falling back to $LD])
+                $2="$LD"
+            fi
             ;;
         *)
-            $1="$LD"
+            $2="$LD"
             ;;
     esac
 ])
