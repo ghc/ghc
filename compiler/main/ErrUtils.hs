@@ -261,8 +261,6 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
     rowStr = show row
     multiline = row /= srcSpanEndLine span
 
-    stripNewlines = filter (/= '\n')
-
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
       sdocWithDynFlags $ \ dflags ->
@@ -280,7 +278,13 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
 
       where
 
-        srcLine = stripNewlines srcLineWithNewline
+        fixWhitespace (i, c)
+          | c == '\n' = ""
+            -- show tabs in a device-independent manner #13664
+          | c == '\t' = replicate (8 - i `mod` 8) ' '
+          | otherwise = [c]
+
+        srcLine = concat (map fixWhitespace (zip [0..] srcLineWithNewline))
 
         start = srcSpanStartCol span - 1
         end | multiline = length srcLine
