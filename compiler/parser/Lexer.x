@@ -2524,7 +2524,7 @@ alternativeLayoutRuleToken t
              (_, ALRLayout _ col : _ls, Just expectingOCurly)
               | (thisCol > col) ||
                 (thisCol == col &&
-                 isNonDecreasingIntentation expectingOCurly) ->
+                 isNonDecreasingIndentation expectingOCurly) ->
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
@@ -2668,9 +2668,9 @@ isALRclose ITccurly = True
 isALRclose ITcubxparen = True
 isALRclose _        = False
 
-isNonDecreasingIntentation :: ALRLayout -> Bool
-isNonDecreasingIntentation ALRLayoutDo = True
-isNonDecreasingIntentation _           = False
+isNonDecreasingIndentation :: ALRLayout -> Bool
+isNonDecreasingIndentation ALRLayoutDo = True
+isNonDecreasingIndentation _           = False
 
 containsCommas :: Token -> Bool
 containsCommas IToparen = True

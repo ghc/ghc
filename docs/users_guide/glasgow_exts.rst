@@ -9497,7 +9497,7 @@ Here are the details:
        visible type application.
 
      * Universal variables always come first, in precisely the order they
-       appear in the type delcaration. Universal variables that are
+       appear in the type declaration. Universal variables that are
        constrained by a GADT return type are not included in the data constructor.
 
      * Existential variables come next. Their order is determined by a user-

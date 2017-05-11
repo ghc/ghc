@@ -30,7 +30,7 @@ dropLeadingPathSeparator :: FilePath -> FilePath
 dropLeadingPathSeparator p | isAbsolute p = joinPath (drop 1 (splitPath p))
                            | otherwise    = p
 
--- | Path concatication that prevents a double path separator to appear in the
+-- | Path concatenation that prevents a double path separator to appear in the
 -- final path. "/foo/bar/" <//> "/baz/quux" == "/foo/bar/baz/quux"
 (<//>) :: FilePath -> FilePath -> FilePath
 lhs <//> rhs = dropTrailingPathSeparator lhs </> dropLeadingPathSeparator rhs

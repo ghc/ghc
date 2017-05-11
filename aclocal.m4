@@ -1879,7 +1879,7 @@ AC_DEFUN([GHC_CONVERT_VENDOR],[
 # converts os from gnu to ghc naming, and assigns the result to $target_var
 AC_DEFUN([GHC_CONVERT_OS],[
     case "$1" in
-      # watchos and tvos are ios variant as of May 2017.
+      # watchos and tvos are ios variants as of May 2017.
       ios|watchos|tvos)
         $3="ios"
         ;;

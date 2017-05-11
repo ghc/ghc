@@ -849,7 +849,7 @@ lookupFamInstEnvInjectivityConflicts
                       -- INVARIANT: list contains at least one True value
     ->  FamInstEnvs   -- all type instances seens so far
     ->  FamInst       -- new type instance that we're checking
-    -> [CoAxBranch]   -- conflicting instance delcarations
+    -> [CoAxBranch]   -- conflicting instance declarations
 lookupFamInstEnvInjectivityConflicts injList (pkg_ie, home_ie)
                              fam_inst@(FamInst { fi_axiom = new_axiom })
   -- See Note [Verifying injectivity annotation]. This function implements
