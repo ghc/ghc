@@ -1,2 +1,4 @@
 
-T5745.hs:5:6: Not in scope: type constructor or class ‘T’
+T5745.hs:5:6: error:
+    Not in scope: type constructor or class ‘T’
+    A data constructor of that name is in scope; did you mean DataKinds?

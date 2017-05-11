@@ -1,2 +1,4 @@
 
-tcfail048.hs:3:8: Not in scope: type constructor or class ‘B’
+tcfail048.hs:3:8: error:
+    Not in scope: type constructor or class ‘B’
+    A data constructor of that name is in scope; did you mean DataKinds?

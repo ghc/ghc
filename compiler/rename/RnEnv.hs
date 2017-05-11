@@ -706,16 +706,17 @@ lookup_demoted rdr_name dflags
   | Just demoted_rdr <- demoteRdrName rdr_name
     -- Maybe it's the name of a *data* constructor
   = do { data_kinds <- xoptM LangExt.DataKinds
-       ; mb_demoted_name <- lookupOccRn_maybe demoted_rdr
-       ; case mb_demoted_name of
-           Nothing -> unboundNameX WL_Any rdr_name star_info
-           Just demoted_name
-             | data_kinds ->
-             do { whenWOptM Opt_WarnUntickedPromotedConstructors $
-                  addWarn (Reason Opt_WarnUntickedPromotedConstructors)
-                          (untickedPromConstrWarn demoted_name)
-                ; return demoted_name }
-             | otherwise  -> unboundNameX WL_Any rdr_name suggest_dk }
+       ; if data_kinds
+            then do { mb_demoted_name <- lookupOccRn_maybe demoted_rdr
+                    ; case mb_demoted_name of
+                        Nothing -> unboundNameX WL_Any rdr_name star_info
+                        Just demoted_name ->
+                          do { whenWOptM Opt_WarnUntickedPromotedConstructors $
+                               addWarn
+                                 (Reason Opt_WarnUntickedPromotedConstructors)
+                                 (untickedPromConstrWarn demoted_name)
+                             ; return demoted_name } }
+            else unboundNameX WL_Any rdr_name suggest_dk }
 
   | otherwise
   = reportUnboundName rdr_name
