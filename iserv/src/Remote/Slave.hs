@@ -11,7 +11,9 @@ import Control.Exception
 import Control.Concurrent
 import Control.Monad (when, forever)
 import System.Directory
-import System.FilePath (takeDirectory)
+import System.FilePath (takeDirectory, (</>), dropTrailingPathSeparator,
+                        isAbsolute, joinPath, splitPath)
+import GHCi.ResolvedBCO
 
 import Data.IORef
 import GHCi.Message (Pipe(..), Msg(..), Message(..), readPipe, writePipe)
@@ -22,6 +24,17 @@ import Data.Binary
 import GHC.Fingerprint (getFileHash)
 
 import qualified Data.ByteString as BS
+
+
+dropLeadingPathSeparator :: FilePath -> FilePath
+dropLeadingPathSeparator p | isAbsolute p = joinPath (drop 1 (splitPath p))
+                           | otherwise    = p
+
+-- | Path concatication that prevents a double path separator to appear in the
+-- final path. "/foo/bar/" <//> "/baz/quux" == "/foo/bar/baz/quux"
+(<//>) :: FilePath -> FilePath -> FilePath
+lhs <//> rhs = dropTrailingPathSeparator lhs </> dropLeadingPathSeparator rhs
+infixr 5 <//>
 
 foreign export ccall startSlave :: Bool -> Int -> CString -> IO ()
 
@@ -89,18 +102,24 @@ handleLoad pipe path localPath = do
 hook :: Bool -> String -> Pipe -> Msg -> IO Msg
 hook verbose base_path pipe m = case m of
   Msg (AddLibrarySearchPath p) -> do
-    when verbose $ putStrLn ("Need Path: " ++ base_path ++ p)
-    createDirectoryIfMissing True (base_path ++ p)
-    return $ Msg (AddLibrarySearchPath (base_path ++ p))
+    when verbose $ putStrLn ("Need Path: " ++ (base_path <//> p))
+    createDirectoryIfMissing True (base_path <//> p)
+    return $ Msg (AddLibrarySearchPath (base_path <//> p))
   Msg (LoadObj path) -> do
-    handleLoad pipe path (base_path ++ path)
-    return $ Msg (LoadObj (base_path ++ path))
+    when verbose $ putStrLn ("Need Obj: " ++ (base_path <//> path))
+    handleLoad pipe path (base_path <//> path)
+    return $ Msg (LoadObj (base_path <//> path))
   Msg (LoadArchive path) -> do
-    handleLoad pipe path (base_path ++ path)
-    return $ Msg (LoadArchive (base_path ++ path))
-  -- Msg (LoadDLL path) -> do
-  --   handleLoad ctl_pipe path (base_path ++ path)
-  --   return $ Msg (LoadDLL (base_path ++ path))
+    handleLoad pipe path (base_path <//> path)
+    return $ Msg (LoadArchive (base_path <//> path))
+  -- when loading DLLs (.so, .dylib, .dll, ...) and these are provided
+  -- as relative paths, the intention is to load a pre-existing system library,
+  -- therefore we hook the LoadDLL call only for absolute paths to ship the
+  -- dll from the host to the target.
+  Msg (LoadDLL path) | isAbsolute path -> do
+    when verbose $ putStrLn ("Need DLL: " ++ (base_path <//> path))
+    handleLoad pipe path (base_path <//> path)
+    return $ Msg (LoadDLL (base_path <//> path))
   _other -> return m
 
 --------------------------------------------------------------------------------

@@ -134,5 +134,7 @@ Executable iserv-proxy
                   containers >= 0.5 && < 0.6,
                   deepseq    >= 1.4 && < 1.5,
                   ghci       == 8.3,
+                  directory  >= 1.3 && < 1.4,
                   network    >= 2.6,
+                  filepath   >= 1.4 && < 1.5,
                   iserv-bin
