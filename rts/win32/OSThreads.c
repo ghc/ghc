@@ -251,7 +251,7 @@ forkOS_createThread ( HsStablePtr entry )
                            (unsigned*)&pId) == 0);
 }
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
 /* We still support Windows Vista, so we can't depend on it
    and must manually resolve these. */
 typedef DWORD(WINAPI *GetItemCountProc)(WORD);
@@ -306,7 +306,7 @@ getNumberOfProcessorsGroups (void)
     static uint8_t n_groups = 0;
 
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     if (!n_groups)
     {
         /* We still support Windows Vista. Which means we can't rely
@@ -328,7 +328,7 @@ getNumberOfProcessorsGroups (void)
     return n_groups;
 }
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
 static uint8_t*
 getProcessorsDistribution (void)
 {
@@ -377,7 +377,7 @@ getProcessorsCumulativeSum(void)
         cpuGroupCumulativeCache = malloc(n_groups * sizeof(uint32_t));
         memset(cpuGroupCumulativeCache, 0, n_groups * sizeof(uint32_t));
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
         uint8_t* proc_dist = getProcessorsDistribution();
         uint32_t cum_num_proc = 0;
         for (int i = 0; i < n_groups; i++)
@@ -419,7 +419,7 @@ createProcessorGroupMap (void)
     /* For 32bit Windows and 64bit older than Windows 7, create a default mapping. */
     memset(cpuGroupCache, 0, numProcs * sizeof(uint8_t));
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     uint8_t* proc_dist = getProcessorsDistribution();
 
     int totalProcs = 0;
@@ -443,7 +443,7 @@ getNumberOfProcessors (void)
 {
     static uint32_t nproc = 0;
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     /* We still support Windows Vista. Which means we can't rely
        on the API being available. So we'll have to resolve manually.  */
     HMODULE kernel = GetModuleHandleW(L"kernel32");
@@ -510,7 +510,7 @@ setThreadAffinity (uint32_t n, uint32_t m) // cap N of M
         mask[group] |= 1 << ix;
     }
 
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
     /* We still support Windows Vista. Which means we can't rely
        on the API being available. So we'll have to resolve manually.  */
     HMODULE kernel = GetModuleHandleW(L"kernel32");
@@ -520,7 +520,7 @@ setThreadAffinity (uint32_t n, uint32_t m) // cap N of M
 
     for (i = 0; i < n_groups; i++)
     {
-#if x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH)
         // If we support the new API, use it.
         if (mask[i] > 0 && SetThreadGroupAffinity)
         {
