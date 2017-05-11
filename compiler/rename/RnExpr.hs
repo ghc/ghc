@@ -833,6 +833,10 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _ _)) thing_inside
 
         ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
         ; let getFailFunction
+                -- If the pattern is irrefutible (e.g.: wildcard, tuple,
+                -- ~pat, etc.) we should not need to fail.
+                | isIrrefutableHsPat pat
+                                    = return (noSyntaxExpr, emptyFVs)
                 -- For non-monadic contexts (e.g. guard patterns, list
                 -- comprehensions, etc.) we should not need to fail.
                 -- See Note [Failing pattern matches in Stmts]
