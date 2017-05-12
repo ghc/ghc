@@ -514,9 +514,9 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
                wrongNameBindingErr loc decl
            ; match <- case details of
                PrefixCon pats ->
-                        return $ Match (FunRhs ln Prefix NoSrcStrict) pats Nothing rhs
+                        return $ Match (FunRhs ln Prefix) pats Nothing rhs
                InfixCon pat1 pat2 ->
-                       return $ Match (FunRhs ln Infix NoSrcStrict) [pat1, pat2] Nothing rhs
+                       return $ Match (FunRhs ln Infix) [pat1, pat2] Nothing rhs
                RecCon{} -> recordPatSynErr loc pat
            ; return $ L loc match }
     fromDecl (L loc decl) = extraDeclErr loc decl
@@ -923,27 +923,25 @@ patIsRec e = e == mkUnqual varName (fsLit "rec")
 -- Check Equation Syntax
 
 checkValDef :: SDoc
-            -> SrcStrictness
             -> LHsExpr RdrName
             -> Maybe (LHsType RdrName)
             -> Located (a,GRHSs RdrName (LHsExpr RdrName))
             -> P ([AddAnn],HsBind RdrName)
 
-checkValDef msg _strictness lhs (Just sig) grhss
+checkValDef msg lhs (Just sig) grhss
         -- x :: ty = rhs  parses as a *pattern* binding
   = checkPatBind msg (L (combineLocs lhs sig)
                         (ExprWithTySig lhs (mkLHsSigWcType sig))) grhss
 
-checkValDef msg strictness lhs opt_sig g@(L l (_,grhss))
+checkValDef msg lhs opt_sig g@(L l (_,grhss))
   = do  { mb_fun <- isFunLhs lhs
         ; case mb_fun of
             Just (fun, is_infix, pats, ann) ->
-              checkFunBind msg strictness ann (getLoc lhs)
+              checkFunBind msg ann (getLoc lhs)
                            fun is_infix pats opt_sig (L l grhss)
             Nothing -> checkPatBind msg lhs g }
 
 checkFunBind :: SDoc
-             -> SrcStrictness
              -> [AddAnn]
              -> SrcSpan
              -> Located RdrName
@@ -952,13 +950,13 @@ checkFunBind :: SDoc
              -> Maybe (LHsType RdrName)
              -> Located (GRHSs RdrName (LHsExpr RdrName))
              -> P ([AddAnn],HsBind RdrName)
-checkFunBind msg strictness ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
+checkFunBind msg ann lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
   = do  ps <- checkPatterns msg pats
         let match_span = combineSrcSpans lhs_loc rhs_span
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
         return (ann, makeFunBind fun
-                  [L match_span (Match { m_ctxt = FunRhs fun is_infix strictness
+                  [L match_span (Match { m_ctxt = FunRhs fun is_infix
                                        , m_pats = ps
                                        , m_type = opt_sig
                                        , m_grhss = grhss })])

@@ -244,8 +244,7 @@
           (Match 
            (FunRhs 
             ({ DumpTypecheckedAst.hs:11:1-4 }{Name: main:DumpTypecheckedAst.main{v}}) 
-            (Prefix) 
-            (NoSrcStrict)) 
+            (Prefix)) 
            [] 
            (Nothing) 
            (GRHSs 

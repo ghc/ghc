@@ -1166,8 +1166,8 @@ rnMatch' ctxt rnBody match@(Match { m_ctxt = mf, m_pats = pats
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
         ; let mf' = case (ctxt,mf) of
-                      (FunRhs (L _ funid) _ _,FunRhs (L lf _) _ _)
-                                            -> FunRhs (L lf funid) fixity NoSrcStrict -- TODO: Is this right?
+                      (FunRhs (L _ funid) _,FunRhs (L lf _) _)
+                                            -> FunRhs (L lf funid) fixity
                       _                     -> ctxt
         ; return (Match { m_ctxt = mf', m_pats = pats'
                         , m_type = Nothing, m_grhss = grhss'}, grhss_fvs ) }}

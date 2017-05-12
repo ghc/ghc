@@ -204,8 +204,7 @@
            (FunRhs 
             ({ DumpParsedAst.hs:11:1-4 }
              (Unqual {OccName: main})) 
-            (Prefix) 
-            (NoSrcStrict)) 
+            (Prefix)) 
            [] 
            (Nothing) 
            (GRHSs 
