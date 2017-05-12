@@ -547,9 +547,10 @@ getPrologue :: DynFlags -> [Flag] -> IO (Maybe (MDoc RdrName))
 getPrologue dflags flags =
   case [filename | Flag_Prologue filename <- flags ] of
     [] -> return Nothing
-    [filename] -> withFile filename ReadMode $ \h -> do
+    [filename] -> do
+      h <- openFile filename ReadMode
       hSetEncoding h utf8
-      str <- hGetContents h
+      str <- hGetContents h -- semi-closes the handle
       return . Just $! parseParas dflags str
     _ -> throwE "multiple -p/--prologue options"
 
