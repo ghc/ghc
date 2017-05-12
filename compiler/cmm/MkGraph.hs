@@ -329,6 +329,12 @@ copyIn dflags conv area formals extra_stk
 -- Factoring out the common parts of the copyout functions yielded something
 -- more complicated:
 
+-- Note [llvm non-tail calls]
+-- We cannot explicily store a block address to the stack when using
+-- LLVM. Instead, we just leave space in the frame for the return 
+-- address, which LLVM's assembly code generator will fill in later 
+-- when it sees the CPSCALL pseudo-instruction.
+
 data Transfer = Call | JumpRet | Jump | Ret deriving Eq
 
 copyOutOflow :: DynFlags -> Convention -> Transfer -> Area -> [CmmExpr]
@@ -361,6 +367,7 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
                          -- the return address if making a call
                   case transfer of
                      Call -> 
+                     -- see Note [llvm non-tail calls]
                        if hscTarget dflags == HscLlvm
                          then ([], widthInBytes (wordWidth dflags))
                          else
