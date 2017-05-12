@@ -274,11 +274,12 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , idName pid `elemNameSet` (exports env) ] }
 
+   -- See Note [inline sccs]
    add_inlines env =
      env{ inlines = inlines env `extendVarSetList`
                       [ mid
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
-                      , isAnyInlinePragma (idInlinePragma pid) ] }
+                      , isInlinePragma (idInlinePragma pid) ] }
 
 addTickLHsBind (L pos bind@(AbsBindsSig { abs_sig_bind   = val_bind
                                         , abs_sig_export = poly_id }))
@@ -298,8 +299,9 @@ addTickLHsBind (L pos bind@(AbsBindsSig { abs_sig_bind   = val_bind
     | otherwise
     = env
 
+  -- See Note [inline sccs]
   add_inlines mono_id env
-    | isAnyInlinePragma (idInlinePragma poly_id)
+    | isInlinePragma (idInlinePragma poly_id)
     = env { inlines = inlines env `extendVarSet` mono_id }
     | otherwise
     = env
@@ -310,7 +312,8 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   density <- getDensity
 
   inline_ids <- liftM inlines getEnv
-  let inline   = isAnyInlinePragma (idInlinePragma id)
+  -- See Note [inline sccs]
+  let inline   = isInlinePragma (idInlinePragma id)
                  || id `elemVarSet` inline_ids
 
   -- See Note [inline sccs]
@@ -406,6 +409,11 @@ bindTick density name pos fvs = do
 -- (see #6131)
 --
 -- So for now we do not add any ticks to INLINE functions at all.
+--
+-- We used to use isAnyInlinePragma to figure out whether to avoid adding
+-- ticks for this purpose. However, #12962 indicates that this contradicts
+-- the documentation on profiling (which only mentions INLINE pragmas).
+-- So now we're more careful about what we avoid adding ticks to.
 
 -- -----------------------------------------------------------------------------
 -- Decorate an LHsExpr with ticks
