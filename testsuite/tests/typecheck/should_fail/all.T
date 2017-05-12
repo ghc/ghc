@@ -404,6 +404,8 @@ test('T12035', [], multimod_compile_fail, ['T12035', '-v0'])
 test('T12035j', [extra_files(['T12035.hs', 'T12035a.hs', 'T12035.hs-boot']),
                  req_smp], multimod_compile_fail, ['T12035', '-j2 -v0'])
 test('T12063', [expect_broken(12063)], multimod_compile_fail, ['T12063', '-v0'])
+test('T12083a', normal, compile_fail, [''])
+test('T12083b', normal, compile_fail, [''])
 test('T11974b', normal, compile_fail, [''])
 test('T12151', normal, compile_fail, [''])
 test('T7437', normal, compile_fail, [''])
