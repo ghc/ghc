@@ -360,9 +360,12 @@ copyOutOflow dflags conv transfer area actuals updfr_off extra_stack_stuff
             Young id ->  -- Generate a store instruction for
                          -- the return address if making a call
                   case transfer of
-                     Call ->
-                       ([(CmmLit (CmmBlock id), StackParam init_offset)],
-                       widthInBytes (wordWidth dflags))
+                     Call -> 
+                       if hscTarget dflags == HscLlvm
+                         then ([], widthInBytes (wordWidth dflags))
+                         else
+                           ([(CmmLit (CmmBlock id), StackParam init_offset)],
+                           widthInBytes (wordWidth dflags))
                      JumpRet ->
                        ([],
                        widthInBytes (wordWidth dflags))
