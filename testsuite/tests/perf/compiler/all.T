@@ -1088,3 +1088,14 @@ test('T13379',
      ],
      compile,
      [''])
+
+test('MultiLayerModules',
+     [ compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 12139116496, 10),
+          # initial:    12139116496
+          ]),
+       pre_cmd('./genMultiLayerModules'),
+       extra_files(['genMultiLayerModules']),
+     ],
+     multimod_compile,
+     ['MultiLayerModules', '-v0'])
