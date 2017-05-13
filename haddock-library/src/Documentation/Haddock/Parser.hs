@@ -143,7 +143,7 @@ specialChar = "_/<@\"&'`# "
 -- to ensure that we have already given a chance to more meaningful parsers
 -- before capturing their characers.
 string' :: Parser (DocH mod a)
-string' = DocString . unescape . decodeUtf8 <$> takeWhile1_ (`notElem` specialChar)
+string' = DocString . unescape . decodeUtf8 <$> takeWhile1_ (notInClass specialChar)
   where
     unescape "" = ""
     unescape ('\\':x:xs) = x : unescape xs
@@ -153,7 +153,7 @@ string' = DocString . unescape . decodeUtf8 <$> takeWhile1_ (`notElem` specialCh
 -- This is done to skip over any special characters belonging to other
 -- elements but which were not deemed meaningful at their positions.
 skipSpecialChar :: Parser (DocH mod a)
-skipSpecialChar = DocString . return <$> satisfy (`elem` specialChar)
+skipSpecialChar = DocString . return <$> satisfy (inClass specialChar)
 
 -- | Emphasis parser.
 --
@@ -215,7 +215,7 @@ moduleName = DocModule <$> (char '"' *> modid <* char '"')
       -- accept {small | large | digit | ' } here.  But as we can't
       -- match on unicode characters, this is currently not possible.
       -- Note that we allow ‘#’ to suport anchors.
-      <*> (decodeUtf8 <$> takeWhile (`notElem` (" .&[{}(=*)+]!|@/;,^?\"\n"::String)))
+      <*> (decodeUtf8 <$> takeWhile (notInClass " .&[{}(=*)+]!|@/;,^?\"\n"))
 
 -- | Picture parser, surrounded by \<\< and \>\>. It's possible to specify
 -- a title for the picture.
@@ -338,7 +338,7 @@ definitionList :: BS.ByteString -> Parser (DocH mod Identifier)
 definitionList indent = DocDefList <$> p
   where
     p = do
-      label <- "[" *> (parseStringBS <$> takeWhile1 (`notElem` ("]\n" :: String))) <* ("]" <* optional ":")
+      label <- "[" *> (parseStringBS <$> takeWhile1 (notInClass "]\n")) <* ("]" <* optional ":")
       c <- takeLine
       (cs, items) <- more indent p
       let contents = parseString . dropNLs . unlines $ c : cs
@@ -561,7 +561,7 @@ autoUrl = mkLink <$> url
     url = mappend <$> ("http://" <|> "https://" <|> "ftp://") <*> takeWhile1 (not . isSpace)
     mkLink :: BS.ByteString -> DocH mod a
     mkLink s = case unsnoc s of
-      Just (xs, x) | x `elem` (",.!?" :: String) -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) `docAppend` DocString [x]
+      Just (xs, x) | inClass ",.!?" x -> DocHyperlink (Hyperlink (decodeUtf8 xs) Nothing) `docAppend` DocString [x]
       _ -> DocHyperlink (Hyperlink (decodeUtf8 s) Nothing)
 
 -- | Parses strings between identifier delimiters. Consumes all input that it
@@ -570,8 +570,13 @@ autoUrl = mkLink <$> url
 parseValid :: Parser String
 parseValid = p some
   where
-    idChar = satisfy (`elem` ("_.!#$%&*+/<=>?@\\|-~:^"::String))
-             <|> digit <|> letter_ascii
+    idChar =
+      satisfy (\c -> isAlpha_ascii c
+                     || isDigit c
+                     -- N.B. '-' is placed first otherwise attoparsec thinks
+                     -- it belongs to a character class
+                     || inClass "-_.!#$%&*+/<=>?@\\|~:^" c)
+
     p p' = do
       vs' <- p' $ utf8String "⋆" <|> return <$> idChar
       let vs = concat vs'
@@ -594,4 +599,4 @@ identifier = do
   e <- idDelim
   return $ DocIdentifier (o, vid, e)
   where
-    idDelim = char '\'' <|> char '`'
+    idDelim = satisfy (\c -> c == '\'' || c == '`')

@@ -22,7 +22,7 @@ module Documentation.Haddock.Parser.Util (
 
 import           Control.Applicative
 import           Control.Monad (mfilter)
-import           Documentation.Haddock.Parser.Monad
+import           Documentation.Haddock.Parser.Monad hiding (isHorizontalSpace)
 import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8 as BS
 import           Prelude hiding (takeWhile)
@@ -40,11 +40,14 @@ unsnoc bs
 strip :: String -> String
 strip = (\f -> f . f) $ dropWhile isSpace . reverse
 
+isHorizontalSpace :: Char -> Bool
+isHorizontalSpace = inClass " \t\f\v\r"
+
 skipHorizontalSpace :: Parser ()
-skipHorizontalSpace = skipWhile (`elem` " \t\f\v\r")
+skipHorizontalSpace = skipWhile isHorizontalSpace
 
 takeHorizontalSpace :: Parser BS.ByteString
-takeHorizontalSpace = takeWhile (`elem` " \t\f\v\r")
+takeHorizontalSpace = takeWhile isHorizontalSpace
 
 makeLabeled :: (String -> Maybe String -> a) -> String -> a
 makeLabeled f input = case break isSpace $ removeEscapes $ strip input of
