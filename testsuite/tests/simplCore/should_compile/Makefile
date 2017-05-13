@@ -218,3 +218,10 @@ str-rules:
 .PHONY: T13340
 T13340:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T13340.hs -ddump-simpl -dsuppress-all | grep -c '\+#'
+
+
+# We expect to see all dictionaries specialized away.
+.PHONY: T11272
+T11272:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11272a.hs
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep T11272.hs | { ! grep Ord ;}
