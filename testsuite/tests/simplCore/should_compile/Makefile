@@ -225,3 +225,8 @@ T13340:
 T11272:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O T11272a.hs
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep T11272.hs | { ! grep Ord ;}
+
+# We expect to see a $wfoo worker that doesn't take any dictionaries.
+.PHONY: T12600
+T12600:
+	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-all -dsuppress-uniques -dno-suppress-type-signatures -dppr-cols=200 T12600.hs | grep "wfoo" | head -n 1
