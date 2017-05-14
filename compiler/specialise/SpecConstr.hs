@@ -828,13 +828,8 @@ wantSpecImport dflags unf
      BootUnfolding    -> False
      OtherCon {}      -> False
      DFunUnfolding {} -> True
-     CoreUnfolding { uf_src = src, uf_guidance = _guidance }
-       | gopt Opt_SpecialiseAggressively dflags -> True
-       | isStableSource src -> True
-               -- Specialise even INLINE things; it hasn't inlined yet,
-               -- so perhaps it never will.  Moreover it may have calls
-               -- inside it that we want to specialise
-       | otherwise -> False    -- Stable, not INLINE, hence INLINABLE
+     CoreUnfolding { uf_src = src, uf_guidance = _guidance } -> True
+
 {-
 ************************************************************************
 *                                                                      *
