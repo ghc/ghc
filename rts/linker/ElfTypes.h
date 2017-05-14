@@ -12,15 +12,12 @@
  */
 
 #  define ELF_TARGET_AMD64 /* Used inside <elf.h> on Solaris 11 */
-#if defined(powerpc64_HOST_ARCH) || defined(powerpc64le_HOST_ARCH) \
- || defined(ia64_HOST_ARCH) || defined(aarch64_HOST_ARCH) \
- || defined(x86_64_HOST_ARCH)
+
+/* __LP64__ is a rough proxy if a platform is ELFCLASS64 */
+#if defined(__LP64__) || defined(_LP64)
 #  define ELF_64BIT
-#elif defined(sparc_HOST_ARCH) || defined(i386_HOST_ARCH) \
- || defined(arm_HOST_ARCH)
-#  define ELF_32BIT
 #else
-#  error "Unsupported arch!"
+#  define ELF_32BIT
 #endif
 
 #if defined(ELF_64BIT)
