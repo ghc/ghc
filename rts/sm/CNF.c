@@ -689,14 +689,17 @@ verify_consistency_block (StgCompactNFData *str, StgCompactNFDataBlock *block)
         switch (info->type) {
         case CONSTR_1_0:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[0]));
+            /* fallthrough */
         case CONSTR_0_1:
             p += sizeofW(StgClosure) + 1;
             break;
 
         case CONSTR_2_0:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[1]));
+            /* fallthrough */
         case CONSTR_1_1:
             check_object_in_compact(str, UNTAG_CLOSURE(q->payload[0]));
+            /* fallthrough */
         case CONSTR_0_2:
             p += sizeofW(StgClosure) + 2;
             break;
@@ -928,6 +931,7 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[0]))
                 return false;
+            /* fallthrough */
         case CONSTR_0_1:
             p += sizeofW(StgClosure) + 1;
             break;
@@ -936,10 +940,12 @@ fixup_block(StgCompactNFDataBlock *block, StgWord *fixup_table, uint32_t count)
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[1]))
                 return false;
+            /* fallthrough */
         case CONSTR_1_1:
             if (!fixup_one_pointer(fixup_table, count,
                                    &((StgClosure*)p)->payload[0]))
                 return false;
+            /* fallthrough */
         case CONSTR_0_2:
             p += sizeofW(StgClosure) + 2;
             break;
