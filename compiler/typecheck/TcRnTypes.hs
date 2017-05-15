@@ -35,7 +35,7 @@ module TcRnTypes(
         -- Renamer types
         ErrCtxt, RecFieldEnv,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
-        WhereFrom(..), mkModDeps,
+        WhereFrom(..), mkModDeps, modDepsElts,
 
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
@@ -165,7 +165,7 @@ import Module
 import SrcLoc
 import VarSet
 import ErrUtils
-import UniqDFM
+import UniqFM
 import UniqSupply
 import BasicTypes
 import Bag
@@ -184,6 +184,7 @@ import qualified Control.Monad.Fail as MonadFail
 import Data.Set      ( Set )
 import qualified Data.Set as S
 
+import Data.List ( sort )
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
 import Data.Typeable ( TypeRep )
@@ -1210,7 +1211,7 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_dep_mods :: DModuleNameEnv (ModuleName, IsBootInterface),
+        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
           -- ^ Home-package modules needed by the module being compiled
           --
           -- It doesn't matter whether any of these dependencies
@@ -1252,14 +1253,21 @@ data ImportAvails
       }
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
-          -> DModuleNameEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl add emptyUDFM deps
+          -> ModuleNameEnv (ModuleName, IsBootInterface)
+mkModDeps deps = foldl add emptyUFM deps
                where
-                 add env elt@(m,_) = addToUDFM env m elt
+                 add env elt@(m,_) = addToUFM env m elt
+
+modDepsElts
+  :: ModuleNameEnv (ModuleName, IsBootInterface)
+  -> [(ModuleName, IsBootInterface)]
+modDepsElts = sort . nonDetEltsUFM
+  -- It's OK to use nonDetEltsUFM here because sorting by module names
+  -- restores determinism
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
-                                   imp_dep_mods      = emptyUDFM,
+                                   imp_dep_mods      = emptyUFM,
                                    imp_dep_pkgs      = S.empty,
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
@@ -1282,7 +1290,7 @@ plusImportAvails
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
-                   imp_dep_mods      = plusUDFM_C plus_mod_dep dmods1 dmods2,
+                   imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
                    imp_dep_pkgs      = dpkgs1 `S.union` dpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,

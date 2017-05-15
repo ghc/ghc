@@ -1091,8 +1091,9 @@ test('T13379',
 
 test('MultiLayerModules',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 12139116496, 10),
+          [(wordsize(64), 6956533312, 10),
           # initial:    12139116496
+          # 2017-05-12: 6956533312   Revert "Use a deterministic map for imp_dep_mods"
           ]),
        pre_cmd('./genMultiLayerModules'),
        extra_files(['genMultiLayerModules']),
