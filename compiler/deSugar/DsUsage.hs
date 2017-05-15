@@ -16,7 +16,7 @@ import Module
 import Outputable
 import Util
 import UniqSet
-import UniqFM
+import UniqDFM
 import Fingerprint
 import Maybes
 
@@ -37,7 +37,7 @@ mkDependencies
  = do
       -- Template Haskell used?
       th_used <- readIORef th_var
-      let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
+      let dep_mods = eltsUDFM (delFromUDFM (imp_dep_mods imports)
                                            (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!

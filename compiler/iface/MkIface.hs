@@ -105,6 +105,7 @@ import Binary
 import Fingerprint
 import Exception
 import UniqSet
+import UniqDFM
 import Packages
 
 import Control.Monad
@@ -1219,14 +1220,14 @@ checkVersions hsc_env mod_summary iface
        -- We do this regardless of compilation mode, although in --make mode
        -- all the dependent modules should be in the HPT already, so it's
        -- quite redundant
-       ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
+       ; updateEps_ $ \eps  -> eps { eps_is_boot = udfmToUfm mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
     }}}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
-    mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
+    mod_deps :: DModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
 -- | Check if an hsig file needs recompilation because its
