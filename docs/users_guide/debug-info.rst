@@ -5,13 +5,14 @@ Since the 7.10 release GHC can emit a debugging information to help debugging
 tools understand the code that GHC produces. This debugging information is
 useable by most UNIX debugging tools.
 
-.. warning::
+.. ghc-flag:: -g, -g<n>
 
-   This feature is still in technology preview state. There are known cases
-   where requesting a stack-trace can cause your program to segmentation fault
-   (e.g. :ghc-ticket:`11353`, :ghc-ticket:`11338`, and :ghc-ticket:`11337`).
-   Consequently, we can not recommend that stack trace support be used in
-   production code.
+    :since: 7.10, numeric levels since 8.0
+
+    Emit debug information in object code. Currently only DWARF debug
+    information is supported on x86-64 and i386. Currently debug levels 0
+    through 3 are accepted, with 0 disabling debug information production.
+    Levels 1 through 3 are functionally equivalent.
 
 
 Tutorial
