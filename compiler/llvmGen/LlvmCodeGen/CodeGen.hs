@@ -126,12 +126,18 @@ stmtToInstrs stmt = case stmt of
     CmmUnsafeForeignCall target res args
         -> genCall target res args
 
-    -- Cmm call
+    -- Cmm tail call
     CmmCall { cml_target = arg,
               cml_args_regs = live,
-              cml_cont = maybeCont } -> case maybeCont of
-                Nothing -> genJump arg live -- Tail call
-                Just cont -> panic "todo: handle non-tail CmmCall"
+              cml_cont = Nothing } -> 
+                genNativeCall Nothing arg live
+                
+    -- Cmm non-tail call
+    CmmCall { cml_target = arg,
+              cml_args_regs = live,
+              cml_cont = Just cont,
+              cml_args = argOffset } -> 
+                genNativeCall (Just (cont, argOffset)) arg live
 
     _ -> panic "Llvm.CodeGen.stmtToInstrs"
 
@@ -761,20 +767,24 @@ cmmPrimOpFunctions mop = do
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
 
--- | Tail function calls
-genJump :: CmmExpr -> [GlobalReg] -> LlvmM StmtData
+-- | Native function calls. First arg indicates whether there is a continuation.
+genNativeCall :: Maybe (Label, Int) -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
 
--- Call to known function
-genJump (CmmLit (CmmLabel lbl)) live = do
+-- Native call to a known function
+genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
     (vf, stmts, top) <- getHsFunc live lbl
     (stgRegs, stgStmts) <- funEpilogue live
-    let s1  = Expr $ Call TailCall vf stgRegs llvmStdFunAttrs
-    let s2  = Return Nothing
-    return (stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
-
-
--- Call to unknown function / address
-genJump expr live = do
+    let retTy = getRetTy $ getVarType vf
+    case maybeCont of
+        _ -> do -- native tail call
+            (retV, s1) <- doExpr retTy $ Call TailCall vf stgRegs llvmStdFunAttrs
+            let s2  = Return (Just retV)
+            return (stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
+        
+        -- Just (cont, offset) -> panic "kavon, handle non-tail known calls."
+    
+-- Tail call to unknown function / address. TODO: check if the expr is P64[Sp] to gen a ret.
+genNativeCall _ expr live = do
     fty <- llvmFunTy live
     (vf, stmts, top) <- exprToVar expr
     dflags <- getDynFlags
@@ -783,13 +793,14 @@ genJump expr live = do
          ty | isPointer ty -> LM_Bitcast
          ty | isInt ty     -> LM_Inttoptr
 
-         ty -> panic $ "genJump: Expr is of bad type for function call! ("
+         ty -> panic $ "genNativeCall: Expr is of bad type for function call! ("
                      ++ showSDoc dflags (ppr ty) ++ ")"
 
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
     (stgRegs, stgStmts) <- funEpilogue live
-    let s2 = Expr $ Call TailCall v1 stgRegs llvmStdFunAttrs
-    let s3 = Return Nothing
+    let retTy = getRetTy fty
+    (retV, s2) <- doExpr retTy $ Call TailCall v1 stgRegs llvmStdFunAttrs
+    let s3 = Return (Just retV)
     return (stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
             top)
 

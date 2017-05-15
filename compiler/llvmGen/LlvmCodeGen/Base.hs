@@ -124,7 +124,8 @@ llvmFunSig' live lbl link
   = do let toParams x | isPointer x = (x, [NoAlias, NoCapture])
                       | otherwise   = (x, [])
        dflags <- getDynFlags
-       return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) LMVoid FixedArgs
+       let retTy = LMFloat -- TODO: generate the struct that we will return.
+       return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) retTy FixedArgs
                                  (map (toParams . getVarType) (llvmFunArgs dflags live))
                                  (llvmFunAlign dflags)
 

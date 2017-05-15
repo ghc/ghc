@@ -45,7 +45,7 @@ module Llvm (
         MetaExpr(..), MetaAnnot(..), MetaDecl(..), MetaId(..),
 
         -- ** Operations on the type system.
-        isGlobal, getLitType, getVarType,
+        isGlobal, getLitType, getVarType, getRetTy,
         getLink, getStatType, pVarLift, pVarLower,
         pLift, pLower, isInt, isFloat, isPointer, isVector, llvmWidthInBits,
 
@@ -61,4 +61,3 @@ import Llvm.AbsSyn
 import Llvm.MetaData
 import Llvm.PpLlvm
 import Llvm.Types
-

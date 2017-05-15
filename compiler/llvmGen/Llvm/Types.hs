@@ -267,6 +267,12 @@ getLitType (LMVectorLit ls)  = LMVector (length ls) (getLitType (head ls))
 getLitType (LMNullLit    t) = t
 getLitType (LMUndefLit   t) = t
 
+-- | Return the return type of the given function or function pointer type
+getRetTy :: LlvmType -> LlvmType
+getRetTy (LMFunction(LlvmFunctionDecl{decReturnType = t})) = t
+getRetTy (LMPointer(LMFunction(LlvmFunctionDecl{decReturnType = t}))) = t
+getRetTy _ = panic "getRetTy -- not a function or function pointer!"
+
 -- | Return the 'LlvmType' of the 'LlvmStatic'
 getStatType :: LlvmStatic -> LlvmType
 getStatType (LMStaticLit   l  ) = getLitType l
