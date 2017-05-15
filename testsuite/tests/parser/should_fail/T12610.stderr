@@ -1,0 +1,6 @@
+
+T12610.hs:5:1: warning: [-Wtabs (in -Wdefault)]
+    Tab character found here.
+    Please use spaces instead.
+
+T12610.hs:5:9: parse error on input ‘y’

@@ -1800,10 +1800,14 @@ data LayoutContext
 data ParseResult a
   = POk PState a
   | PFailed
-        SrcSpan         -- The start and end of the text span related to
-                        -- the error.  Might be used in environments which can
-                        -- show this span, e.g. by highlighting it.
-        MsgDoc          -- The error message
+        (DynFlags -> Messages) -- A function that returns warnings that
+                               -- accumulated during parsing, including
+                               -- the warnings related to tabs.
+        SrcSpan                -- The start and end of the text span related
+                               -- to the error.  Might be used in environments
+                               -- which can show this span, e.g. by
+                               -- highlighting it.
+        MsgDoc                 -- The error message
 
 -- | Test whether a 'WarningFlag' is set
 warnopt :: WarningFlag -> ParserFlags -> Bool
@@ -1902,19 +1906,27 @@ thenP :: P a -> (a -> P b) -> P b
 (P m) `thenP` k = P $ \ s ->
         case m s of
                 POk s1 a         -> (unP (k a)) s1
-                PFailed span err -> PFailed span err
+                PFailed warnFn span err -> PFailed warnFn span err
 
 failP :: String -> P a
-failP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
+failP msg =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (last_loc s)) (text msg)
 
 failMsgP :: String -> P a
-failMsgP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
+failMsgP msg =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (last_loc s)) (text msg)
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> String -> P a
-failLocMsgP loc1 loc2 str = P $ \_ -> PFailed (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
+failLocMsgP loc1 loc2 str =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
 
 failSpanMsgP :: SrcSpan -> SDoc -> P a
-failSpanMsgP span msg = P $ \_ -> PFailed span msg
+failSpanMsgP span msg =
+  P $ \s ->
+    PFailed (getMessages s) span msg
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2375,8 +2387,10 @@ popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
-        (_:tl) -> POk s{ context = tl } ()
-        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr o buf len)
+        (_:tl) ->
+          POk s{ context = tl } ()
+        []     ->
+          PFailed (getMessages s) (RealSrcSpan last_loc) (srcParseErr o buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
@@ -2433,9 +2447,9 @@ srcParseErr options buf len
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, options = o, last_len = len,
+srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    PFailed (RealSrcSpan last_loc) (srcParseErr o buf len)
+    PFailed (getMessages s) (RealSrcSpan last_loc) (srcParseErr o buf len)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.

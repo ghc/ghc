@@ -1300,7 +1300,7 @@ getTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts  -> return ts
-    PFailed span err ->
+    PFailed _ span err ->
         do dflags <- getDynFlags
            liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
 
@@ -1313,7 +1313,7 @@ getRichTokenStream mod = do
   let startLoc = mkRealSrcLoc (mkFastString sourceFile) 1 1
   case lexTokenStream source startLoc flags of
     POk _ ts -> return $ addSourceToTokens startLoc source ts
-    PFailed span err ->
+    PFailed _ span err ->
         do dflags <- getDynFlags
            liftIO $ throwIO $ mkSrcErr (unitBag $ mkPlainErrMsg dflags span err)
 
@@ -1481,7 +1481,7 @@ lookupName name =
 parser :: String         -- ^ Haskell module source text (full Unicode is supported)
        -> DynFlags       -- ^ the flags
        -> FilePath       -- ^ the filename (for source locations)
-       -> Either ErrorMessages (WarningMessages, Located (HsModule RdrName))
+       -> (WarningMessages, Either ErrorMessages (Located (HsModule RdrName)))
 
 parser str dflags filename =
    let
@@ -1490,9 +1490,10 @@ parser str dflags filename =
    in
    case unP Parser.parseModule (mkPState dflags buf loc) of
 
-     PFailed span err   ->
-         Left (unitBag (mkPlainErrMsg dflags span err))
+     PFailed warnFn span err   ->
+         let (warns,_) = warnFn dflags in
+         (warns, Left $ unitBag (mkPlainErrMsg dflags span err))
 
      POk pst rdr_module ->
          let (warns,_) = getMessages pst dflags in
-         Right (warns, rdr_module)
+         (warns, Right rdr_module)

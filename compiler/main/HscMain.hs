@@ -328,7 +328,9 @@ hscParse' mod_summary
                  | otherwise = parseModule
 
     case unP parseMod (mkPState dflags buf loc) of
-        PFailed span err ->
+        PFailed warnFn span err -> do
+            logWarningsReportErrors (warnFn dflags)
+            handleWarnings
             liftIO $ throwOneError (mkPlainErrMsg dflags span err)
 
         POk pst rdr_module -> do
@@ -1705,7 +1707,9 @@ hscParseThingWithLocation source linenumber parser str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
-        PFailed span err -> do
+        PFailed warnFn span err -> do
+            logWarningsReportErrors (warnFn dflags)
+            handleWarnings
             let msg = mkPlainErrMsg dflags span err
             throwErrors $ unitBag msg
 

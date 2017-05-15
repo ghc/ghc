@@ -55,7 +55,7 @@ test('T3153', normal, compile_fail, [''])
 test('T3751', normal, compile_fail, [''])
 
 test('position001', normal, compile_fail, [''])
-test('position002', normal, compile_fail, [''])
+test('position002', normal, compile_fail, ['-Wno-tabs'])
 
 test('T1344a', normal, compile_fail, [''])
 test('T1344b', normal, compile_fail, [''])
@@ -101,3 +101,4 @@ test('T13414', literate, compile_fail, [''])
 test('T8501a', normal, compile_fail, [''])
 test('T8501b', normal, compile_fail, [''])
 test('T8501c', normal, compile_fail, [''])
+test('T12610', normal, compile_fail, [''])
