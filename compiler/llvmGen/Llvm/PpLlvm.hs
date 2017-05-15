@@ -232,6 +232,7 @@ ppLlvmExpression expr
         Extract    vec idx          -> ppExtract vec idx
         ExtractV   struct idx       -> ppExtractV struct idx
         Insert     vec elt idx      -> ppInsert vec elt idx
+        InsertV    struct elt idx   -> ppInsertV struct elt idx
         GetElemPtr inb ptr indexes  -> ppGetElementPtr inb ptr indexes
         Load       ptr              -> ppLoad ptr
         ALoad      ord st ptr       -> ppALoad ord st ptr
@@ -463,6 +464,13 @@ ppInsert :: LlvmVar -> LlvmVar -> LlvmVar -> SDoc
 ppInsert vec elt idx =
     text "insertelement"
     <+> ppr (getVarType vec) <+> ppName vec <> comma
+    <+> ppr (getVarType elt) <+> ppName elt <> comma
+    <+> ppr idx
+    
+ppInsertV :: LlvmVar -> LlvmVar -> Int -> SDoc
+ppInsertV struct elt idx =
+    text "insertvalue"
+    <+> ppr (getVarType struct) <+> ppName struct <> comma
     <+> ppr (getVarType elt) <+> ppName elt <> comma
     <+> ppr idx
 

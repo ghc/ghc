@@ -239,6 +239,14 @@ data LlvmExpression
       * index: The index at which to insert the scalar
   -}
   | Insert LlvmVar LlvmVar LlvmVar
+  
+  {- |
+    Insert a scalar element into a structure
+      * val:   The structure
+      * elt:   The scalar to insert
+      * index: The index at which to insert within the structure
+  -}
+  | InsertV LlvmVar LlvmVar Int
 
   {- |
     Allocate amount * sizeof(tp) bytes on the heap
@@ -347,4 +355,3 @@ data LlvmExpression
   | MExpr [MetaAnnot] LlvmExpression
 
   deriving (Eq)
-
