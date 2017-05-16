@@ -467,6 +467,9 @@ data LlvmParamAttr
   -- | This indicates that the pointer parameter can be excised using the
   -- trampoline intrinsics.
   | Nest
+  -- | This indicates that the parameter or return pointer is not null. 
+  -- This attribute may only be applied to pointer typed parameters.
+  | NonNull
   deriving (Eq)
 
 instance Outputable LlvmParamAttr where
@@ -478,6 +481,7 @@ instance Outputable LlvmParamAttr where
   ppr NoAlias   = text "noalias"
   ppr NoCapture = text "nocapture"
   ppr Nest      = text "nest"
+  ppr NonNull   = text "nonnull"
 
 -- | Llvm Function Attributes.
 --
@@ -564,7 +568,7 @@ instance Outputable LlvmFuncAttr where
   ppr OptSize            = text "optsize"
   ppr NoReturn           = text "noreturn"
   ppr NoUnwind           = text "nounwind"
-  ppr ReadNone           = text "readnon"
+  ppr ReadNone           = text "readnone"
   ppr ReadOnly           = text "readonly"
   ppr Ssp                = text "ssp"
   ppr SspReq             = text "ssqreq"
