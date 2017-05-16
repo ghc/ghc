@@ -259,13 +259,14 @@ pprNode node = pp_node <+> pp_debug
             range = brackets $ hsep [integer lo, text "..", integer hi]
               where (lo,hi) = switchTargetsRange ids
 
-      CmmCall tgt k regs out res updfr_off ->
+      CmmCall tgt k regs retRegs out res updfr_off ->
           hcat [ text "call", space
                , pprFun tgt, parens (interpp'SP regs), space
                , returns <+>
                  text "args: " <> ppr out <> comma <+>
                  text "res: " <> ppr res <> comma <+>
-                 text "upd: " <> ppr updfr_off
+                 text "upd: " <> ppr updfr_off <> comma <+>
+                 text "outRegs: " <> interpp'SP retRegs
                , semi ]
           where pprFun f@(CmmLit _) = ppr f
                 pprFun f = parens (ppr f)

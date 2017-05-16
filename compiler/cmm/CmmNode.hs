@@ -121,6 +121,12 @@ data CmmNode e x where
           -- they are all live.  This list should only include
           -- GlobalRegs that are mapped to real machine registers on
           -- the target platform.
+          
+      cml_ret_regs :: [GlobalReg],
+          -- The argument GlobalRegs (Rx, Fx, Dx, Lx) that are returned
+          -- by the call to the cml_cont, if any. This is needed by
+          -- the LLVM code generator when handling the return, as
+          -- we would otherwise have to assume all registers are live.
 
       cml_args :: ByteOff,
           -- Byte offset, from the *old* end of the Area associated with
@@ -498,7 +504,7 @@ mapExpM f (CmmStore addr e)         = (\[addr', e'] -> CmmStore addr' e') `fmap`
 mapExpM _ (CmmBranch _)             = Nothing
 mapExpM f (CmmCondBranch e ti fi l) = (\x -> CmmCondBranch x ti fi l) `fmap` f e
 mapExpM f (CmmSwitch e tbl)         = (\x -> CmmSwitch x tbl)       `fmap` f e
-mapExpM f (CmmCall tgt mb_id r o i s) = (\x -> CmmCall x mb_id r o i s) `fmap` f tgt
+mapExpM f (CmmCall tgt mb_id r rt o i s) = (\x -> CmmCall x mb_id r rt o i s) `fmap` f tgt
 mapExpM f (CmmUnsafeForeignCall tgt fs as)
     = case mapForeignTargetM f tgt of
         Just tgt' -> Just (CmmUnsafeForeignCall tgt' fs (mapListJ f as))

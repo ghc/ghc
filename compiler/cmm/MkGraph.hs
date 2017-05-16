@@ -205,7 +205,7 @@ mkJump          :: DynFlags -> Convention -> CmmExpr
                 -> CmmAGraph
 mkJump dflags conv e actuals updfr_off =
   lastWithArgs dflags Jump Old conv actuals updfr_off $
-    toCall e Nothing updfr_off 0
+    toCall e Nothing [] updfr_off 0
 
 -- | A jump where the caller says what the live GlobalRegs are.  Used
 -- for low-level hand-written Cmm.
@@ -213,7 +213,7 @@ mkRawJump       :: DynFlags -> CmmExpr -> UpdFrameOffset -> [GlobalReg]
                 -> CmmAGraph
 mkRawJump dflags e updfr_off vols =
   lastWithArgs dflags Jump Old NativeNodeCall [] updfr_off $
-    \arg_space _  -> toCall e Nothing updfr_off 0 arg_space vols
+    \arg_space _  -> toCall e Nothing [] updfr_off 0 arg_space vols
 
 
 mkJumpExtra :: DynFlags -> Convention -> CmmExpr -> [CmmExpr]
@@ -221,7 +221,7 @@ mkJumpExtra :: DynFlags -> Convention -> CmmExpr -> [CmmExpr]
                 -> CmmAGraph
 mkJumpExtra dflags conv e actuals updfr_off extra_stack =
   lastWithArgsAndExtraStack dflags Jump Old conv actuals updfr_off extra_stack $
-    toCall e Nothing updfr_off 0
+    toCall e Nothing [] updfr_off 0
 
 mkCbranch       :: CmmExpr -> BlockId -> BlockId -> Maybe Bool -> CmmAGraph
 mkCbranch pred ifso ifnot likely =
@@ -234,7 +234,7 @@ mkReturn        :: DynFlags -> CmmExpr -> [CmmExpr] -> UpdFrameOffset
                 -> CmmAGraph
 mkReturn dflags e actuals updfr_off =
   lastWithArgs dflags Ret  Old NativeReturn actuals updfr_off $
-    toCall e Nothing updfr_off 0
+    toCall e Nothing [] updfr_off 0
 
 mkBranch        :: BlockId -> CmmAGraph
 mkBranch bid     = mkLast (CmmBranch bid)
@@ -244,7 +244,7 @@ mkFinalCall   :: DynFlags
               -> CmmAGraph
 mkFinalCall dflags f _ actuals updfr_off =
   lastWithArgs dflags Call Old NativeDirectCall actuals updfr_off $
-    toCall f Nothing updfr_off 0
+    toCall f Nothing [] updfr_off 0
 
 mkCallReturnsTo :: DynFlags -> CmmExpr -> Convention -> [CmmExpr]
                 -> BlockId
@@ -418,8 +418,8 @@ lastWithArgsAndExtraStack dflags transfer area conv actuals updfr_off
 noExtraStack :: [CmmExpr]
 noExtraStack = []
 
-toCall :: CmmExpr -> Maybe BlockId -> UpdFrameOffset -> ByteOff
+toCall :: CmmExpr -> Maybe BlockId -> [GlobalReg] -> UpdFrameOffset -> ByteOff
        -> ByteOff -> [GlobalReg]
        -> CmmAGraph
-toCall e cont updfr_off res_space arg_space regs =
-  mkLast $ CmmCall e cont regs arg_space res_space updfr_off
+toCall e cont retRegs updfr_off res_space arg_space argRegs =
+  mkLast $ CmmCall e cont argRegs retRegs arg_space res_space updfr_off

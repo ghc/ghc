@@ -367,8 +367,8 @@ replaceLabels env g
        mkCmmCondBranch (exp p) (lookup t) (lookup f) l
      txnode (CmmSwitch e ids) =
        CmmSwitch (exp e) (mapSwitchTargets lookup ids)
-     txnode (CmmCall t k rg a res r) =
-       CmmCall (exp t) (liftM lookup k) rg a res r
+     txnode (CmmCall t k rg rt a res r) =
+       CmmCall (exp t) (liftM lookup k) rg rt a res r
      txnode fc@CmmForeignCall{} =
        fc{ args = map exp (args fc), succ = lookup (succ fc) }
      txnode other = mapExpDeep exp other

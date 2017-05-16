@@ -288,7 +288,7 @@ splitAtProcPoints dflags entry_label callPPs procPoints procMap
            do bid <- liftM mkBlockId getUniqueM
               let b = blockJoin (CmmEntry bid GlobalScope) emptyBlock jump
                   live = ppLiveness pp
-                  jump = CmmCall (CmmLit (CmmLabel l)) Nothing live 0 0 0
+                  jump = CmmCall (CmmLit (CmmLabel l)) Nothing live [] 0 0 0
               return (mapInsert pp bid env, b : bs)
 
          add_jumps
