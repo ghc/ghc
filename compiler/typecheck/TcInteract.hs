@@ -1739,17 +1739,21 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   -- see Note [Type inference for type families with injectivity]
   | isOpenTypeFamilyTyCon fam_tc
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  , let fam_insts = lookupFamInstEnvByTyCon fam_envs fam_tc
   = -- it is possible to have several compatible equations in an open type
     -- family but we only want to derive equalities from one such equation.
-    concatMapM (injImproveEqns injective_args) (take 1 $
-      buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
-                           fi_tvs fi_tys fi_rhs (const Nothing))
+    do { let improvs = buildImprovementData fam_insts
+                           fi_tvs fi_tys fi_rhs (const Nothing)
+
+       ; traceTcS "improve_top_fun_eqs2" (ppr improvs)
+       ; concatMapM (injImproveEqns injective_args) $
+         take 1 improvs }
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
   = concatMapM (injImproveEqns injective_args) $
-      buildImprovementData (fromBranches (co_ax_branches ax))
-                           cab_tvs cab_lhs cab_rhs Just
+    buildImprovementData (fromBranches (co_ax_branches ax))
+                         cab_tvs cab_lhs cab_rhs Just
 
   | otherwise
   = return []
