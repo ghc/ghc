@@ -52,3 +52,5 @@ test('T5442d', [extra_files(['shadow1.pkg', 'shadow2.pkg', 'shadow4.pkg'])], run
 test('shadow', [], run_command, ['$MAKE -s --no-print-directory shadow'])
 
 test('T12485a', [extra_files(['shadow1.pkg', 'shadow2.pkg', 'shadow3.pkg'])], run_command, ['$MAKE -s --no-print-directory T12485a'])
+
+test('T13703', [extra_files(['test13703a.pkg', 'test13703b.pkg'])], run_command, ['$MAKE -s --no-print-directory T13703'])

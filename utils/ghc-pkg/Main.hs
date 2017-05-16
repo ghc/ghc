@@ -42,6 +42,8 @@ import Distribution.Text
 import Distribution.Version
 import Distribution.Backpack
 import Distribution.Types.UnqualComponentName
+import Distribution.Types.MungedPackageName
+import Distribution.Types.MungedPackageId
 import Distribution.Simple.Utils (fromUTF8, toUTF8, writeUTF8File, readUTF8File)
 import qualified Data.Version as Version
 import System.FilePath as FilePath
@@ -509,8 +511,8 @@ parseCheck parser str what =
 -- | Either an exact 'PackageIdentifier', or a glob for all packages
 -- matching 'PackageName'.
 data GlobPackageIdentifier
-    = ExactPackageIdentifier PackageIdentifier
-    | GlobPackageIdentifier  PackageName
+    = ExactPackageIdentifier MungedPackageId
+    | GlobPackageIdentifier  MungedPackageName
 
 displayGlobPkgId :: GlobPackageIdentifier -> String
 displayGlobPkgId (ExactPackageIdentifier pid) = display pid
@@ -1114,7 +1116,7 @@ registerPackage input verbosity my_flags multi_instance
 
   -- report any warnings from the parse phase
   _ <- reportValidateErrors verbosity [] ws
-         (display (sourcePackageId pkg) ++ ": Warning: ") Nothing
+         (display (mungedId pkg) ++ ": Warning: ") Nothing
 
   -- validate the expanded pkg, but register the unexpanded
   pkgroot <- absolutePath (takeDirectory to_modify)
@@ -1135,7 +1137,7 @@ registerPackage input verbosity my_flags multi_instance
      removes = [ RemovePackage p
                | not multi_instance,
                  p <- packages db_to_operate_on,
-                 sourcePackageId p == sourcePackageId pkg,
+                 mungedId p == mungedId pkg,
                  -- Only remove things that were instantiated the same way!
                  instantiatedWith p == instantiatedWith pkg ]
   --
@@ -1357,11 +1359,11 @@ modifyPackage fn pkgarg verbosity my_flags force = do
                             . installedUnitId) new_broken
   --
   let displayQualPkgId pkg
-        | [_] <- filter ((== pkgid) . sourcePackageId)
+        | [_] <- filter ((== pkgid) . mungedId)
                         (allPackagesInStack db_stack)
             = display pkgid
         | otherwise = display pkgid ++ "@" ++ display (installedUnitId pkg)
-        where pkgid = sourcePackageId pkg
+        where pkgid = mungedId pkg
   when (not (null newly_broken)) $
       dieOrForceAll force ("unregistering would break the following packages: "
               ++ unwords (map displayQualPkgId newly_broken))
@@ -1401,14 +1403,14 @@ listPackages verbosity my_flags mPackageName mModuleName = do
             | db <- db_stack_filtered ]
           where sort_pkgs = sortBy cmpPkgIds
                 cmpPkgIds pkg1 pkg2 =
-                   case pkgName p1 `compare` pkgName p2 of
+                   case mungedName p1 `compare` mungedName p2 of
                         LT -> LT
                         GT -> GT
-                        EQ -> case pkgVersion p1 `compare` pkgVersion p2 of
+                        EQ -> case mungedVersion p1 `compare` mungedVersion p2 of
                                 LT -> LT
                                 GT -> GT
                                 EQ -> installedUnitId pkg1 `compare` installedUnitId pkg2
-                   where (p1,p2) = (sourcePackageId pkg1, sourcePackageId pkg2)
+                   where (p1,p2) = (mungedId pkg1, mungedId pkg2)
 
       stack = reverse db_stack_sorted
 
@@ -1430,7 +1432,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                    where doc | verbosity >= Verbose = printf "%s (%s)" pkg (display (installedUnitId p))
                              | otherwise            = pkg
                           where
-                          pkg = display (sourcePackageId p)
+                          pkg = display (mungedId p)
 
       show_simple = simplePackageList my_flags . allPackagesInStack
 
@@ -1461,7 +1463,7 @@ listPackages verbosity my_flags mPackageName mModuleName = do
                                | otherwise
                                = termText pkg
                             where
-                            pkg = display (sourcePackageId p)
+                            pkg = display (mungedId p)
 
     is_tty <- hIsTerminalDevice stdout
     if not is_tty
@@ -1475,9 +1477,9 @@ listPackages verbosity my_flags mPackageName mModuleName = do
 
 simplePackageList :: [Flag] -> [InstalledPackageInfo] -> IO ()
 simplePackageList my_flags pkgs = do
-   let showPkg = if FlagNamesOnly `elem` my_flags then display . pkgName
+   let showPkg = if FlagNamesOnly `elem` my_flags then display . mungedName
                                                   else display
-       strs = map showPkg $ map sourcePackageId pkgs
+       strs = map showPkg $ map mungedId pkgs
    when (not (null pkgs)) $
       hPutStrLn stdout $ concat $ intersperse " " strs
 
@@ -1494,10 +1496,10 @@ showPackageDot verbosity myflags = do
   let quote s = '"':s ++ "\""
   mapM_ putStrLn [ quote from ++ " -> " ++ quote to
                  | p <- all_pkgs,
-                   let from = display (sourcePackageId p),
+                   let from = display (mungedId p),
                    key <- depends p,
                    Just dep <- [PackageIndex.lookupUnitId ipix key],
-                   let to = display (sourcePackageId dep)
+                   let to = display (mungedId dep)
                  ]
   putStrLn "}"
 
@@ -1515,7 +1517,7 @@ latestPackage verbosity my_flags pkgid = do
   ps <- findPackages flag_db_stack (Id pkgid)
   case ps of
     [] -> die "no matches"
-    _  -> show_pkg . maximum . map sourcePackageId $ ps
+    _  -> show_pkg . maximum . map mungedId $ ps
   where
     show_pkg pid = hPutStrLn stdout (display pid)
 
@@ -1578,17 +1580,17 @@ cannotFindPackage pkgarg mdb = die $ "cannot find package " ++ pkg_msg pkgarg
     pkg_msg (IUId ipid)          = display ipid
     pkg_msg (Substring pkgpat _) = "matching " ++ pkgpat
 
-matches :: GlobPackageIdentifier -> PackageIdentifier -> Bool
+matches :: GlobPackageIdentifier -> MungedPackageId -> Bool
 GlobPackageIdentifier pn `matches` pid'
-  = (pn == pkgName pid')
+  = (pn == mungedName pid')
 ExactPackageIdentifier pid `matches` pid'
-  = pkgName pid == pkgName pid' &&
-    (pkgVersion pid == pkgVersion pid' || pkgVersion pid == nullVersion)
+  = mungedName pid == mungedName pid' &&
+    (mungedVersion pid == mungedVersion pid' || mungedVersion pid == nullVersion)
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
-(Id pid)        `matchesPkg` pkg = pid `matches` sourcePackageId pkg
+(Id pid)        `matchesPkg` pkg = pid `matches` mungedId pkg
 (IUId ipid)     `matchesPkg` pkg = ipid == installedUnitId pkg
-(Substring _ m) `matchesPkg` pkg = m (display (sourcePackageId pkg))
+(Substring _ m) `matchesPkg` pkg = m (display (mungedId pkg))
 
 -- -----------------------------------------------------------------------------
 -- Field
@@ -1635,7 +1637,7 @@ checkConsistency verbosity my_flags = do
                     return []
             else do
               when (not simple_output) $ do
-                  reportError ("There are problems in package " ++ display (sourcePackageId p) ++ ":")
+                  reportError ("There are problems in package " ++ display (mungedId p) ++ ":")
                   _ <- reportValidateErrors verbosity es ws "  " Nothing
                   return ()
               return [p]
@@ -1643,8 +1645,8 @@ checkConsistency verbosity my_flags = do
   broken_pkgs <- concat `fmap` mapM checkPackage pkgs
 
   let filterOut pkgs1 pkgs2 = filter not_in pkgs2
-        where not_in p = sourcePackageId p `notElem` all_ps
-              all_ps = map sourcePackageId pkgs1
+        where not_in p = mungedId p `notElem` all_ps
+              all_ps = map mungedId pkgs1
 
   let not_broken_pkgs = filterOut broken_pkgs pkgs
       (_, trans_broken_pkgs) = closure [] not_broken_pkgs
@@ -1656,7 +1658,7 @@ checkConsistency verbosity my_flags = do
       else do
        reportError ("\nThe following packages are broken, either because they have a problem\n"++
                 "listed above, or because they depend on a broken package.")
-       mapM_ (hPutStrLn stderr . display . sourcePackageId) all_broken_pkgs
+       mapM_ (hPutStrLn stderr . display . mungedId) all_broken_pkgs
 
   when (not (null all_broken_pkgs)) $ exitWith (ExitFailure 1)
 
@@ -1750,7 +1752,7 @@ validatePackageConfig pkg verbosity db_stack
                  checkPackageConfig pkg verbosity db_stack
                                     multi_instance update
   ok <- reportValidateErrors verbosity es ws
-          (display (sourcePackageId pkg) ++ ": ") (Just force)
+          (display (mungedId pkg) ++ ": ") (Just force)
   when (not ok) $ exitWith (ExitFailure 1)
 
 checkPackageConfig :: InstalledPackageInfo
@@ -1788,8 +1790,8 @@ checkPackageConfig pkg verbosity db_stack
 -- we check that the package id can be parsed properly here.
 checkPackageId :: InstalledPackageInfo -> Validate ()
 checkPackageId ipi =
-  let str = display (sourcePackageId ipi) in
-  case [ x :: PackageIdentifier | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
+  let str = display (mungedId ipi) in
+  case [ x :: MungedPackageId | (x,ys) <- readP_to_S parse str, all isSpace ys ] of
     [_] -> return ()
     []  -> verror CannotForce ("invalid package identifier: " ++ str)
     _   -> verror CannotForce ("ambiguous package identifier: " ++ str)
@@ -1813,19 +1815,19 @@ checkDuplicates :: PackageDBStack -> InstalledPackageInfo
                 -> Bool -> Bool-> Validate ()
 checkDuplicates db_stack pkg multi_instance update = do
   let
-        pkgid = sourcePackageId pkg
+        pkgid = mungedId pkg
         pkgs  = packages (head db_stack)
   --
   -- Check whether this package id already exists in this DB
   --
   when (not update && not multi_instance
-                   && (pkgid `elem` map sourcePackageId pkgs)) $
+                   && (pkgid `elem` map mungedId pkgs)) $
        verror CannotForce $
           "package " ++ display pkgid ++ " is already installed"
 
   let
         uncasep = map toLower . display
-        dups = filter ((== uncasep pkgid) . uncasep) (map sourcePackageId pkgs)
+        dups = filter ((== uncasep pkgid) . uncasep) (map mungedId pkgs)
 
   when (not update && not multi_instance
                    && not (null dups)) $ verror ForceAll $
