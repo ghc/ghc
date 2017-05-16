@@ -121,12 +121,12 @@ llvmFunSig live lbl link = do
 
 llvmFunSig' :: LiveGlobalRegs -> LMString -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
 llvmFunSig' live lbl link
-  = do let toParams x | isPointer x = (x, [NoAlias, NoCapture])
+  = do let toParams x | isPointer x = (x, [NoAlias, NoCapture]) -- TODO(kavon): add NonNull
                       | otherwise   = (x, [])
        dflags <- getDynFlags
        -- the standard set of argument types passed/returned.
        let stdConvention = map getVarType (llvmFunArgs dflags live)
-       let retTy = LMStructU $ stdConvention -- TODO: introduce a type alias to reduce bytes output
+       let retTy = LMStructU $ stdConvention -- TODO(kavon): introduce a type alias to reduce bytes output
        return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) retTy FixedArgs
                                  (map toParams stdConvention)
                                  (llvmFunAlign dflags)
