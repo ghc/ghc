@@ -287,3 +287,11 @@ ghcpkg07:
 recache_reexport:
 	@rm -rf recache_reexport_db/package.cache
 	'$(GHC_PKG)' --no-user-package-db --global-package-db=recache_reexport_db recache
+
+T13703:
+	@rm -rf T13703.package.conf
+	'$(GHC_PKG)' init T13703.package.conf
+	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf register --force test13703a.pkg 2>/dev/null
+	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf register --force test13703b.pkg 2>/dev/null
+	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-q lib-name
+	'$(GHC_PKG)' --no-user-package-db -f T13703.package.conf field z-p-z-r lib-name
