@@ -24,8 +24,7 @@ module IfaceType (
         ifTyConBinderTyVar, ifTyConBinderName,
 
         -- Equality testing
-        IfRnEnv2, emptyIfRnEnv2, eqIfaceType, eqIfaceTypes,
-        eqIfaceTcArgs, eqIfaceTvBndrs, isIfaceLiftedTypeKind,
+        isIfaceLiftedTypeKind,
 
         -- Conversion from IfaceTcArgs -> [IfaceType]
         tcArgsIfaceTypes,
@@ -44,8 +43,8 @@ module IfaceType (
         suppressIfaceInvisibles,
         stripIfaceInvisVars,
         stripInvisArgs,
-        substIfaceType, substIfaceTyVar, substIfaceTcArgs, mkIfaceTySubst,
-        eqIfaceTvBndr
+
+        mkIfaceTySubst, substIfaceTyVar, substIfaceTcArgs, inDomIfaceTySubst
     ) where
 
 #include "HsVersions.h"
@@ -63,9 +62,9 @@ import Binary
 import Outputable
 import FastString
 import FastStringEnv
-import UniqFM
 import Util
 
+import Data.Maybe( isJust )
 import Data.List (foldl')
 
 {-
@@ -287,9 +286,6 @@ keep the hole's Unique, since that is all we need to print.
 ifaceTyConHasKey :: IfaceTyCon -> Unique -> Bool
 ifaceTyConHasKey tc key = ifaceTyConName tc `hasKey` key
 
-eqIfaceTvBndr :: IfaceTvBndr -> IfaceTvBndr -> Bool
-eqIfaceTvBndr (occ1, _) (occ2, _) = occ1 == occ2
-
 isIfaceLiftedTypeKind :: IfaceKind -> Bool
 isIfaceLiftedTypeKind (IfaceTyConApp tc ITC_Nil)
   = isLiftedTypeKindTyConName (ifaceTyConName tc)
@@ -360,18 +356,24 @@ ifTypeIsVarFree ty = go ty
     go_args (ITC_Vis   arg args) = go arg && go_args args
     go_args (ITC_Invis arg args) = go arg && go_args args
 
-{-
-Substitutions on IfaceType. This is only used during pretty-printing to construct
-the result type of a GADT, and does not deal with binders (eg IfaceForAll), so
-it doesn't need fancy capture stuff.
--}
+{- Note [Substitution on IfaceType]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Substitutions on IfaceType are done only during pretty-printing to
+construct the result type of a GADT, and does not deal with binders
+(eg IfaceForAll), so it doesn't need fancy capture stuff.  -}
 
-type IfaceTySubst = FastStringEnv IfaceType
+type IfaceTySubst = FastStringEnv IfaceType -- Note [Substitution on IfaceType]
 
-mkIfaceTySubst :: [IfaceTvBndr] -> [IfaceType] -> IfaceTySubst
-mkIfaceTySubst tvs tys = mkFsEnv $ zipWithEqual "mkIfaceTySubst" (\(fs,_) ty -> (fs,ty)) tvs tys
+mkIfaceTySubst :: [(IfLclName,IfaceType)] -> IfaceTySubst
+-- See Note [Substitution on IfaceType]
+mkIfaceTySubst eq_spec = mkFsEnv eq_spec
+
+inDomIfaceTySubst :: IfaceTySubst -> IfaceTvBndr -> Bool
+-- See Note [Substitution on IfaceType]
+inDomIfaceTySubst subst (fs, _) = isJust (lookupFsEnv subst fs)
 
 substIfaceType :: IfaceTySubst -> IfaceType -> IfaceType
+-- See Note [Substitution on IfaceType]
 substIfaceType env ty
   = go ty
   where
@@ -426,106 +428,6 @@ substIfaceTyVar env tv
   | Just ty <- lookupFsEnv env tv = ty
   | otherwise                     = IfaceTyVar tv
 
-{-
-************************************************************************
-*                                                                      *
-                Equality over IfaceTypes
-*                                                                      *
-************************************************************************
-
-Note [No kind check in ifaces]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We check iface types for equality only when checking the consistency
-between two user-written signatures. In these cases, there is no possibility
-for a kind mismatch. So we omit the kind check (which would be impossible to
-write, anyway.)
-
--}
-
--- Like an RnEnv2, but mapping from FastString to deBruijn index
--- DeBruijn; see eqTypeX
-type BoundVar = Int
-data IfRnEnv2
-  = IRV2 { ifenvL :: UniqFM BoundVar -- from FastString
-         , ifenvR :: UniqFM BoundVar
-         , ifenv_next :: BoundVar
-         }
-
-emptyIfRnEnv2 :: IfRnEnv2
-emptyIfRnEnv2 = IRV2 { ifenvL = emptyUFM
-                     , ifenvR = emptyUFM
-                     , ifenv_next = 0 }
-
-rnIfOccL :: IfRnEnv2 -> IfLclName -> Maybe BoundVar
-rnIfOccL env = lookupUFM (ifenvL env)
-
-rnIfOccR :: IfRnEnv2 -> IfLclName -> Maybe BoundVar
-rnIfOccR env = lookupUFM (ifenvR env)
-
-extendIfRnEnv2 :: IfRnEnv2 -> IfLclName -> IfLclName -> IfRnEnv2
-extendIfRnEnv2 IRV2 { ifenvL = lenv
-                    , ifenvR = renv
-                    , ifenv_next = n } tv1 tv2
-             = IRV2 { ifenvL = addToUFM lenv tv1 n
-                    , ifenvR = addToUFM renv tv2 n
-                    , ifenv_next = n + 1
-                    }
-
--- See Note [No kind check in ifaces]
-eqIfaceType :: IfRnEnv2 -> IfaceType -> IfaceType -> Bool
-eqIfaceType _ (IfaceFreeTyVar tv1) (IfaceFreeTyVar tv2)
-    = tv1 == tv2   -- Should not happen
-eqIfaceType env (IfaceTyVar tv1) (IfaceTyVar tv2) =
-    case (rnIfOccL env tv1, rnIfOccR env tv2) of
-        (Just v1, Just v2) -> v1 == v2
-        (Nothing, Nothing) -> tv1 == tv2
-        _ -> False
-eqIfaceType _   (IfaceLitTy l1) (IfaceLitTy l2) = l1 == l2
-eqIfaceType env (IfaceAppTy t11 t12) (IfaceAppTy t21 t22)
-    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
-eqIfaceType env (IfaceFunTy t11 t12) (IfaceFunTy t21 t22)
-    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
-eqIfaceType env (IfaceDFunTy t11 t12) (IfaceDFunTy t21 t22)
-    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
-eqIfaceType env (IfaceForAllTy bndr1 t1) (IfaceForAllTy bndr2 t2)
-    = eqIfaceForAllBndr env bndr1 bndr2 (\env' -> eqIfaceType env' t1 t2)
-eqIfaceType env (IfaceTyConApp tc1 tys1) (IfaceTyConApp tc2 tys2)
-    = tc1 == tc2 && eqIfaceTcArgs env tys1 tys2
-eqIfaceType env (IfaceTupleTy s1 tc1 tys1) (IfaceTupleTy s2 tc2 tys2)
-    = s1 == s2 && tc1 == tc2 && eqIfaceTcArgs env tys1 tys2
-eqIfaceType env (IfaceCastTy t1 _) (IfaceCastTy t2 _)
-    = eqIfaceType env t1 t2
-eqIfaceType _   (IfaceCoercionTy {}) (IfaceCoercionTy {})
-    = True
-eqIfaceType _ _ _ = False
-
-eqIfaceTypes :: IfRnEnv2 -> [IfaceType] -> [IfaceType] -> Bool
-eqIfaceTypes env tys1 tys2 = and (zipWith (eqIfaceType env) tys1 tys2)
-
-eqIfaceForAllBndr :: IfRnEnv2 -> IfaceForAllBndr -> IfaceForAllBndr
-                  -> (IfRnEnv2 -> Bool)  -- continuation
-                  -> Bool
-eqIfaceForAllBndr env (TvBndr (tv1, k1) vis1) (TvBndr (tv2, k2) vis2) k
-  = eqIfaceType env k1 k2 && vis1 == vis2 &&
-    k (extendIfRnEnv2 env tv1 tv2)
-
-eqIfaceTcArgs :: IfRnEnv2 -> IfaceTcArgs -> IfaceTcArgs -> Bool
-eqIfaceTcArgs _ ITC_Nil ITC_Nil = True
-eqIfaceTcArgs env (ITC_Vis ty1 tys1) (ITC_Vis ty2 tys2)
-    = eqIfaceType env ty1 ty2 && eqIfaceTcArgs env tys1 tys2
-eqIfaceTcArgs env (ITC_Invis ty1 tys1) (ITC_Invis ty2 tys2)
-    = eqIfaceType env ty1 ty2 && eqIfaceTcArgs env tys1 tys2
-eqIfaceTcArgs _ _ _ = False
-
--- | Similar to 'eqTyVarBndrs', checks that tyvar lists
--- are the same length and have matching kinds; if so, extend the
--- 'IfRnEnv2'.  Returns 'Nothing' if they don't match.
-eqIfaceTvBndrs :: IfRnEnv2 -> [IfaceTvBndr] -> [IfaceTvBndr] -> Maybe IfRnEnv2
-eqIfaceTvBndrs env [] [] = Just env
-eqIfaceTvBndrs env ((tv1, k1):tvs1) ((tv2, k2):tvs2)
-  | eqIfaceType env k1 k2
-  = eqIfaceTvBndrs (extendIfRnEnv2 env tv1 tv2) tvs1 tvs2
-eqIfaceTvBndrs _ _ _ = Nothing
 
 {-
 ************************************************************************

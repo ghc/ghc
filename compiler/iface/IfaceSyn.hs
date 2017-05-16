@@ -71,7 +71,6 @@ import DynFlags
 
 import Control.Monad
 import System.IO.Unsafe
-import Data.Maybe (isJust)
 
 infixl 3 &&&
 
@@ -1031,9 +1030,9 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
       | otherwise
       = (con_univ_tvs, sdocWithDynFlags (ppr_tc_app gadt_subst))
       where
-        gadt_subst = mkFsEnv eq_spec
-        done_univ_tv (tv,_) = isJust (lookupFsEnv gadt_subst tv)
-        con_univ_tvs = filterOut done_univ_tv (map ifTyConBinderTyVar tc_binders)
+        gadt_subst = mkIfaceTySubst eq_spec
+        con_univ_tvs = filterOut (inDomIfaceTySubst gadt_subst) $
+                       map ifTyConBinderTyVar tc_binders
 
     ppr_tc_app gadt_subst dflags
        = pprPrefixIfDeclBndr how_much (occName tycon)
