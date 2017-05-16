@@ -776,12 +776,18 @@ genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
     (stgRegs, stgStmts) <- funEpilogue live
     let retTy = getRetTy $ getVarType vf
     case maybeCont of
-        _ -> do -- native tail call
+        -- tail call to a known fun
+        Nothing -> do 
             (retV, s1) <- doExpr retTy $ Call TailCall vf stgRegs llvmStdFunAttrs
             let s2  = Return (Just retV)
             return (stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
-        
-        -- Just (cont, offset) -> panic "kavon, handle non-tail known calls."
+            
+        -- non-tail call to a known fun
+        Just (cont, offset) -> do 
+            -- TODO add metadata to this StdCall with the offset and label name
+            (retV, s1) <- doExpr retTy $ Call StdCall vf stgRegs llvmStdFunAttrs
+            endStms <- doReturnTo cont retV
+            return (stmts `appOL` stgStmts `snocOL` s1 `appOL` endStms, top)
     
 -- Tail call to unknown function / address. TODO: check if the expr is P64[Sp] to gen a ret.
 genNativeCall _ expr live = do
@@ -803,6 +809,14 @@ genNativeCall _ expr live = do
     let s3 = Return (Just retV)
     return (stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
             top)
+            
+doReturnTo :: Label -> LlvmVar -> LlvmM (OrdList LlvmStatement)
+doReturnTo cont retV = panic "handleReturn"
+    -- TODO: we need to know the [GlobalReg] that are live in the continuation,
+    -- aka, what values did the call return?
+    -- todo: extract vals
+    -- todo store vals into reg allocas
+    -- emit a branch
 
 
 -- | CmmAssign operation
