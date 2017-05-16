@@ -126,7 +126,7 @@ llvmFunSig' live lbl link
        dflags <- getDynFlags
        -- the standard set of argument types passed/returned.
        let stdConvention = map getVarType (llvmFunArgs dflags live)
-       let retTy = LMStructU $ stdConvention
+       let retTy = LMStructU $ stdConvention -- TODO: introduce a type alias to reduce bytes output
        return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) retTy FixedArgs
                                  (map toParams stdConvention)
                                  (llvmFunAlign dflags)
