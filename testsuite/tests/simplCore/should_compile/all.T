@@ -268,3 +268,4 @@ test('T12600',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T12600'])
+test('T13658', normal, compile, ['-dcore-lint'])
