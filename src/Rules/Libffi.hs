@@ -39,7 +39,7 @@ configureEnvironment = do
 
 libffiRules :: Rules ()
 libffiRules = do
-    libffiDependencies &%> \_ -> do
+    (libffiLibrary : libffiDependencies) &%> \_ -> do
         useSystemFfi <- flag UseSystemFfi
         if useSystemFfi
         then do
@@ -57,7 +57,7 @@ libffiRules = do
 
             ways <- interpretInContext libffiContext (getLibraryWays <> getRtsWays)
             forM_ (nubOrd ways) $ \way ->
-                copyFile libffiLibrary =<< rtsLibffiLibrary way
+                copyFileUntracked libffiLibrary =<< rtsLibffiLibrary way
 
             putSuccess $ "| Successfully built custom library 'libffi'"
 

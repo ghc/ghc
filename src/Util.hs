@@ -3,7 +3,7 @@ module Util (
     removeFile, copyDirectory, copyDirectoryContents, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
     makeExecutable, renderProgram, renderLibrary, Match(..), builderEnvironment,
-    needBuilder
+    needBuilder, copyFileUntracked
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -94,9 +94,17 @@ copyFile :: FilePath -> FilePath -> Action ()
 copyFile source target = do
     need [source] -- Guarantee source is built before printing progress info.
     let dir = takeDirectory target
-    unlessM (liftIO $ IO.doesDirectoryExist dir) $ createDirectory dir
+    liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
+
+-- Same as copyFile, but not tracking the source as a build dependency
+copyFileUntracked :: FilePath -> FilePath -> Action ()
+copyFileUntracked source target = do
+    let dir = takeDirectory target
+    liftIO $ IO.createDirectoryIfMissing True dir
+    putProgressInfo $ renderAction "Copy file (Untracked)" source target
+    liftIO $ IO.copyFile source target
 
 -- | Move a file; we cannot track the source, because it is moved.
 moveFile :: FilePath -> FilePath -> Action ()
