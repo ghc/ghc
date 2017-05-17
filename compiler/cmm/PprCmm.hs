@@ -266,7 +266,7 @@ pprNode node = pp_node <+> pp_debug
                  text "args: " <> ppr out <> comma <+>
                  text "res: " <> ppr res <> comma <+>
                  text "upd: " <> ppr updfr_off <> comma <+>
-                 text "outRegs: " <> interpp'SP retRegs
+                 text "outRegs: [" <> interpp'SP retRegs <> text "]"
                , semi ]
           where pprFun f@(CmmLit _) = ppr f
                 pprFun f = parens (ppr f)

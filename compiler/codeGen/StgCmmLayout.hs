@@ -116,12 +116,12 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
             AssignTo res_regs _ -> do
               k <- newBlockId
               let area = Young k
-                  (off, _, copyin) = copyInOflow dflags retConv area res_regs []
-                  copyout = mkCallReturnsTo dflags fun callConv args k off updfr_off
+                  (off, retRegs, copyin) = copyInOflow dflags retConv area res_regs []
+                  copyout = mkCallReturnsTo dflags fun callConv args k retRegs off updfr_off
                                    extra_stack
               tscope <- getTickScope
               emit (copyout <*> mkLabel k tscope <*> copyin)
-              return (ReturnedTo k off)
+              return (ReturnedTo k off retRegs)
       }
 
 

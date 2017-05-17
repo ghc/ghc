@@ -240,7 +240,7 @@ instance Outputable Sequel where
 -- See Note [sharing continuations] below
 data ReturnKind
   = AssignedDirectly
-  | ReturnedTo BlockId ByteOff
+  | ReturnedTo BlockId ByteOff [GlobalReg]
 
 -- Note [sharing continuations]
 --
@@ -882,8 +882,8 @@ mkCall f (callConv, retConv) results actuals updfr_off extra_stack = do
   k      <- newBlockId
   tscp   <- getTickScope
   let area = Young k
-      (off, _, copyin) = copyInOflow dflags retConv area results []
-      copyout = mkCallReturnsTo dflags f callConv actuals k off updfr_off extra_stack
+      (off, gregs, copyin) = copyInOflow dflags retConv area results []
+      copyout = mkCallReturnsTo dflags f callConv actuals k gregs off updfr_off extra_stack
   return $ catAGraphs [copyout, mkLabel k tscp, copyin]
 
 mkCmmCall :: CmmExpr -> [CmmFormal] -> [CmmExpr] -> UpdFrameOffset

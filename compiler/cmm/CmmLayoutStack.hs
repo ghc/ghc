@@ -1065,6 +1065,7 @@ lowerSafeForeignCall dflags block
                                          CmmLoad (CmmReg spReg) (bWord dflags)
                        , cml_cont      = Just succ
                        , cml_args_regs = regs
+                       , cml_ret_regs  = [BaseReg] -- TODO(kavon): make sure this is right
                        , cml_args      = widthInBytes (wordWidth dflags)
                        , cml_ret_args  = ret_args
                        , cml_ret_off   = ret_off }

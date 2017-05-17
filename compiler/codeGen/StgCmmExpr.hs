@@ -692,8 +692,8 @@ maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
 maybeAltHeapCheck (NoGcInAlts,_)  code = code
 maybeAltHeapCheck (GcInAlts regs, AssignedDirectly) code =
   altHeapCheck regs code
-maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off) code =
-  altHeapCheckReturnsTo regs lret off code
+maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off retRegs) code =
+  altHeapCheckReturnsTo regs lret retRegs off code
 
 -----------------------------------------------------------------------------
 --      Tail calls
@@ -923,17 +923,17 @@ emitEnter fun = do
       --
       AssignTo res_regs _ -> do
        { lret <- newBlockId
-       ; let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
+       ; let (off, retRegs, copyin) = copyInOflow dflags NativeReturn (Young lret) res_regs []
        ; lcall <- newBlockId
        ; updfr_off <- getUpdFrameOff
        ; let area = Young lret
-       ; let (outArgs, regs, copyout) = copyOutOflow dflags NativeNodeCall Call area
+       ; let (outArgs, argRegs, copyout) = copyOutOflow dflags NativeNodeCall Call area
                                           [fun] updfr_off []
          -- refer to fun via nodeReg after the copyout, to avoid having
          -- both live simultaneously; this sometimes enables fun to be
          -- inlined in the RHS of the R1 assignment.
        ; let entry = entryCode dflags (closureInfoPtr dflags (CmmReg nodeReg))
-             the_call = toCall entry (Just lret) updfr_off off outArgs regs
+             the_call = toCall entry (Just lret) retRegs updfr_off off outArgs argRegs
        ; tscope <- getTickScope
        ; emit $
            copyout <*>
@@ -942,7 +942,7 @@ emitEnter fun = do
            outOfLine lcall (the_call,tscope) <*>
            mkLabel lret tscope <*>
            copyin
-       ; return (ReturnedTo lret off)
+       ; return (ReturnedTo lret off retRegs)
        }
   }
 

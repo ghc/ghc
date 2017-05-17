@@ -419,19 +419,19 @@ altOrNoEscapeHeapCheck checkYield regs code = do
       Nothing -> genericGC checkYield code
       Just gc -> do
         lret <- newBlockId
-        let (off, _, copyin) = copyInOflow dflags NativeReturn (Young lret) regs []
+        let (off, gregs, copyin) = copyInOflow dflags NativeReturn (Young lret) regs []
         lcont <- newBlockId
         tscope <- getTickScope
         emitOutOfLine lret (copyin <*> mkBranch lcont, tscope)
         emitLabel lcont
-        cannedGCReturnsTo checkYield False gc regs lret off code
+        cannedGCReturnsTo checkYield False gc regs lret gregs off code
 
-altHeapCheckReturnsTo :: [LocalReg] -> Label -> ByteOff -> FCode a -> FCode a
-altHeapCheckReturnsTo regs lret off code
+altHeapCheckReturnsTo :: [LocalReg] -> Label -> [GlobalReg] -> ByteOff -> FCode a -> FCode a
+altHeapCheckReturnsTo regs lret retRegs off code
   = do dflags <- getDynFlags
        case cannedGCEntryPoint dflags regs of
            Nothing -> genericGC False code
-           Just gc -> cannedGCReturnsTo False True gc regs lret off code
+           Just gc -> cannedGCReturnsTo False True gc regs lret retRegs off code
 
 -- noEscapeHeapCheck is implemented identically to altHeapCheck (which
 -- is more efficient), but cannot be optimized away in the non-allocating
@@ -439,10 +439,10 @@ altHeapCheckReturnsTo regs lret off code
 noEscapeHeapCheck :: [LocalReg] -> FCode a -> FCode a
 noEscapeHeapCheck regs code = altOrNoEscapeHeapCheck True regs code
 
-cannedGCReturnsTo :: Bool -> Bool -> CmmExpr -> [LocalReg] -> Label -> ByteOff
+cannedGCReturnsTo :: Bool -> Bool -> CmmExpr -> [LocalReg] -> Label -> [GlobalReg] -> ByteOff
                   -> FCode a
                   -> FCode a
-cannedGCReturnsTo checkYield cont_on_stack gc regs lret off code
+cannedGCReturnsTo checkYield cont_on_stack gc regs lret retRegs off code
   = do dflags <- getDynFlags
        updfr_sz <- getUpdFrameOff
        heapCheck False checkYield (gc_call dflags gc updfr_sz) code
@@ -456,9 +456,9 @@ cannedGCReturnsTo checkYield cont_on_stack gc regs lret off code
       -- NativeReturn convention.
     gc_call dflags label sp
       | cont_on_stack
-      = mkJumpReturnsTo dflags label NativeReturn reg_exprs lret off sp
+      = mkJumpReturnsTo dflags label NativeReturn reg_exprs lret retRegs off sp
       | otherwise
-      = mkCallReturnsTo dflags label NativeReturn reg_exprs lret off sp []
+      = mkCallReturnsTo dflags label NativeReturn reg_exprs lret retRegs off sp []
 
 genericGC :: Bool -> FCode a -> FCode a
 genericGC checkYield code

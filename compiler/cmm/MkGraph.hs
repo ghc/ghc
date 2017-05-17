@@ -248,25 +248,27 @@ mkFinalCall dflags f _ actuals updfr_off =
 
 mkCallReturnsTo :: DynFlags -> CmmExpr -> Convention -> [CmmExpr]
                 -> BlockId
+                -> [GlobalReg]
                 -> ByteOff
                 -> UpdFrameOffset
                 -> [CmmExpr]
                 -> CmmAGraph
-mkCallReturnsTo dflags f callConv actuals ret_lbl ret_off updfr_off extra_stack = do
+mkCallReturnsTo dflags f callConv actuals ret_lbl ret_regs ret_off updfr_off extra_stack = do
   lastWithArgsAndExtraStack dflags Call (Young ret_lbl) callConv actuals
      updfr_off extra_stack $
-       toCall f (Just ret_lbl) updfr_off ret_off
+       toCall f (Just ret_lbl) ret_regs updfr_off ret_off
 
 -- Like mkCallReturnsTo, but does not push the return address (it is assumed to be
 -- already on the stack).
 mkJumpReturnsTo :: DynFlags -> CmmExpr -> Convention -> [CmmExpr]
                 -> BlockId
+                -> [GlobalReg]
                 -> ByteOff
                 -> UpdFrameOffset
                 -> CmmAGraph
-mkJumpReturnsTo dflags f callConv actuals ret_lbl ret_off updfr_off  = do
+mkJumpReturnsTo dflags f callConv actuals ret_lbl ret_regs ret_off updfr_off  = do
   lastWithArgs dflags JumpRet (Young ret_lbl) callConv actuals updfr_off $
-       toCall f (Just ret_lbl) updfr_off ret_off
+       toCall f (Just ret_lbl) ret_regs updfr_off ret_off
 
 mkUnsafeCall  :: ForeignTarget -> [CmmFormal] -> [CmmActual] -> CmmAGraph
 mkUnsafeCall t fs as = mkMiddle $ CmmUnsafeForeignCall t fs as

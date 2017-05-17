@@ -241,7 +241,7 @@ emitForeignCall safety results target args
             <*> mkLabel k tscope
             <*> copyout
            )
-    return (ReturnedTo k off)
+    return (ReturnedTo k off []) -- TODO(kavon) this will need to change once you get to foreign calls
 
 load_target_into_temp :: ForeignTarget -> FCode ForeignTarget
 load_target_into_temp (ForeignTarget expr conv) = do
