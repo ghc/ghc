@@ -1131,8 +1131,8 @@ maybe_fixup_internal_pointers (StgCompactNFDataBlock *block,
     if (!any_needs_fixup(block))
         return root;
 
-    debugBelch("Compact imported at the wrong address, will fix up"
-               " internal pointers\n");
+    IF_DEBUG(gc, debugBelch("Compact imported at the wrong address, "
+                            "will fix up internal pointers\n"));
 
     // I am PROOT!
     proot = &root;
