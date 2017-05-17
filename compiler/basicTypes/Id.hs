@@ -628,8 +628,10 @@ idFunRepArity :: Id -> RepArity
 idFunRepArity x = countFunRepArgs (idArity x) (idType x)
 
 -- | Returns true if an application to n args would diverge
-isBottomingId :: Id -> Bool
-isBottomingId id = isBottomingSig (idStrictness id)
+isBottomingId :: Var -> Bool
+isBottomingId v
+  | isId v    = isBottomingSig (idStrictness v)
+  | otherwise = False
 
 idStrictness :: Id -> StrictSig
 idStrictness id = strictnessInfo (idInfo id)

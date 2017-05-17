@@ -485,7 +485,7 @@ fiBind dflags to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
   where
     body_fvs2 = body_fvs `delDVarSet` id
 
-    rule_fvs = idRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
+    rule_fvs = bndrRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
     extra_fvs | noFloatIntoRhs NonRecursive id rhs
               = rule_fvs `unionDVarSet` rhs_fvs
               | otherwise
@@ -515,7 +515,7 @@ fiBind dflags to_drop (AnnRec bindings) body_fvs
     rhss_fvs = map freeVarsOf rhss
 
         -- See Note [extra_fvs (1,2)]
-    rule_fvs = mapUnionDVarSet idRuleAndUnfoldingVarsDSet ids
+    rule_fvs = mapUnionDVarSet bndrRuleAndUnfoldingVarsDSet ids
     extra_fvs = rule_fvs `unionDVarSet`
                 unionDVarSets [ rhs_fvs | (bndr, (rhs_fvs, rhs)) <- bindings
                               , noFloatIntoRhs Recursive bndr rhs ]
