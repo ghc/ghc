@@ -38,8 +38,9 @@ import Control.Monad.Trans.Writer
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 #endif
-import Data.List ( nub )
+import Data.List ( nub, mapAccumL )
 import Data.Maybe ( catMaybes )
+import Control.Monad ( foldM )
 
 type Atomic = Bool
 type LlvmStatements = OrdList LlvmStatement
@@ -136,8 +137,9 @@ stmtToInstrs stmt = case stmt of
     CmmCall { cml_target = arg,
               cml_args_regs = live,
               cml_cont = Just cont,
-              cml_args = argOffset } -> 
-                genNativeCall (Just (cont, argOffset)) arg live
+              cml_args = argOffset,
+              cml_ret_regs = retRegs } -> 
+                genNativeCall (Just (cont, argOffset, retRegs)) arg live
 
     _ -> panic "Llvm.CodeGen.stmtToInstrs"
 
@@ -767,8 +769,12 @@ cmmPrimOpFunctions mop = do
     MO_AtomicWrite _ -> unsupported
     MO_Cmpxchg _     -> unsupported
 
+
+-- block, arg byte off, return regs (not including Sp, etc)
+type ContInfo = (Label, Int, [GlobalReg]) 
+
 -- | Native function calls. First arg indicates whether there is a continuation.
-genNativeCall :: Maybe (Label, Int) -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
+genNativeCall :: Maybe ContInfo -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
 
 -- Native call to a known function
 genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
@@ -783,10 +789,10 @@ genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
             return (stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
             
         -- non-tail call to a known fun
-        Just (cont, offset) -> do 
+        Just contInfo -> do 
             -- TODO add metadata to this StdCall with the offset and label name
             (retV, s1) <- doExpr retTy $ Call StdCall vf stgRegs llvmStdFunAttrs
-            endStms <- doReturnTo cont retV
+            endStms <- doReturnTo contInfo retV
             return (stmts `appOL` stgStmts `snocOL` s1 `appOL` endStms, top)
     
 -- Tail call to unknown function / address. TODO: check if the expr is P64[Sp] to gen a ret.
@@ -810,13 +816,34 @@ genNativeCall _ expr live = do
     return (stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
             top)
             
-doReturnTo :: Label -> LlvmVar -> LlvmM (OrdList LlvmStatement)
-doReturnTo cont retV = panic "handleReturn"
-    -- TODO: we need to know the [GlobalReg] that are live in the continuation,
-    -- aka, what values did the call return?
-    -- todo: extract vals
-    -- todo store vals into reg allocas
-    -- emit a branch
+            
+doReturnTo :: ContInfo -> LlvmVar -> LlvmM LlvmStatements
+doReturnTo (retl, off, retRegs) llRetV = do
+    -- find the struct fields corresponding to each live register 
+    -- according to the return convention.
+    platform <- getDynFlag targetPlatform
+    let regOrder = activeStgRegs platform
+        live = alwaysLive ++ retRegs
+        liveRegs = filter (\x -> x `elem` live) regOrder
+        withIdx i x = (i+1, (x, i))
+        (_, retConv) = mapAccumL withIdx 0 liveRegs
+        
+        -- for each (GlobalReg, Int), we will add to the stms an extract
+        -- from llRetV followed by a store to the alloca backing the reg
+        extract stms (reg, i) = do
+            regAlloca <- getCmmReg $ CmmGlobal reg
+            let (LMPointer ty) = getVarType regAlloca
+            (newVal, s1) <- doExpr ty $ ExtractV llRetV i
+            let s2 = Store newVal regAlloca
+            return (stms `snocOL` s1 `snocOL` s2)
+    
+    -- extract the regs from the struct and update their allocas
+    updateStms <- foldM extract nilOL retConv
+    
+    -- TODO make a branch instr
+
+    -- TODO combine all the LlvmStatements together and return them.
+    return updateStms
 
 
 -- | CmmAssign operation
