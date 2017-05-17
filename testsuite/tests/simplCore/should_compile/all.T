@@ -260,3 +260,4 @@ test('T13468',
      run_command,
      ['$MAKE -s --no-print-directory T13468'])
 test('T13658', normal, compile, ['-dcore-lint'])
+test('T13708', normal, compile, [''])

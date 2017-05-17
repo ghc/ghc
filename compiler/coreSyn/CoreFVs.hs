@@ -31,7 +31,7 @@ module CoreFVs (
         varTypeTyCoVars,
         varTypeTyCoFVs,
         idUnfoldingVars, idFreeVars, dIdFreeVars,
-        idRuleAndUnfoldingVars, idRuleAndUnfoldingVarsDSet,
+        bndrRuleAndUnfoldingVarsDSet,
         idFVs,
         idRuleVars, idRuleRhsVars, stableUnfoldingVars,
         ruleRhsFreeVars, ruleFreeVars, rulesFreeVars,
@@ -646,22 +646,15 @@ idFVs :: Id -> FV
 -- Type variables, rule variables, and inline variables
 idFVs id = ASSERT( isId id)
            varTypeTyCoFVs id `unionFV`
-           idRuleAndUnfoldingFVs id
+           bndrRuleAndUnfoldingFVs id
 
-bndrRuleAndUnfoldingFVs :: Var -> FV
-bndrRuleAndUnfoldingFVs v | isTyVar v = emptyFV
-                          | otherwise = idRuleAndUnfoldingFVs v
+bndrRuleAndUnfoldingVarsDSet :: Id -> DVarSet
+bndrRuleAndUnfoldingVarsDSet id = fvDVarSet $ bndrRuleAndUnfoldingFVs id
 
-idRuleAndUnfoldingVars :: Id -> VarSet
-idRuleAndUnfoldingVars id = fvVarSet $ idRuleAndUnfoldingFVs id
-
-idRuleAndUnfoldingVarsDSet :: Id -> DVarSet
-idRuleAndUnfoldingVarsDSet id = fvDVarSet $ idRuleAndUnfoldingFVs id
-
-idRuleAndUnfoldingFVs :: Id -> FV
-idRuleAndUnfoldingFVs id = ASSERT( isId id)
-                           idRuleFVs id `unionFV` idUnfoldingFVs id
-
+bndrRuleAndUnfoldingFVs :: Id -> FV
+bndrRuleAndUnfoldingFVs id
+  | isId id   = idRuleFVs id `unionFV` idUnfoldingFVs id
+  | otherwise = emptyFV
 
 idRuleVars ::Id -> VarSet  -- Does *not* include CoreUnfolding vars
 idRuleVars id = fvVarSet $ idRuleFVs id
@@ -710,7 +703,7 @@ freeVarsBind :: CoreBind
 freeVarsBind (NonRec binder rhs) body_fvs
   = ( AnnNonRec binder rhs2
     , freeVarsOf rhs2 `unionFVs` body_fvs2
-                      `unionFVs` fvDVarSet (bndrRuleAndUnfoldingFVs binder) )
+                      `unionFVs` bndrRuleAndUnfoldingVarsDSet binder )
     where
       rhs2      = freeVars rhs
       body_fvs2 = binder `delBinderFV` body_fvs
@@ -722,7 +715,7 @@ freeVarsBind (Rec binds) body_fvs
     (binders, rhss) = unzip binds
     rhss2        = map freeVars rhss
     rhs_body_fvs = foldr (unionFVs . freeVarsOf) body_fvs rhss2
-    binders_fvs  = fvDVarSet $ mapUnionFV idRuleAndUnfoldingFVs binders
+    binders_fvs  = fvDVarSet $ mapUnionFV bndrRuleAndUnfoldingFVs binders
     all_fvs      = rhs_body_fvs `unionFVs` binders_fvs
             -- The "delBinderFV" happens after adding the idSpecVars,
             -- since the latter may add some of the binders as fvs
