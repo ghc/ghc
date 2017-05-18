@@ -1538,7 +1538,7 @@ data Exp
   | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
   | LitE Lit                           -- ^ @{ 5 or \'c\'}@
   | AppE Exp Exp                       -- ^ @{ f x }@
-  | AppTypeE Exp Type                  -- ^ @{ f \@Int }
+  | AppTypeE Exp Type                  -- ^ @{ f \@Int }@
 
   | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
 
