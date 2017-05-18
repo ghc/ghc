@@ -26,7 +26,7 @@ module LlvmCodeGen.Base (
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, tysToParams, llvmFunSection,
+        llvmPtrBits, tysToParams, llvmFunSection, llvmStdConv,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -145,10 +145,11 @@ llvmFunSection dflags lbl
     | gopt Opt_SplitSections dflags = Just (concatFS [fsLit ".text.", lbl])
     | otherwise                     = Nothing
 
--- | A Function's arguments
-llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
-llvmFunArgs dflags live =
-    map (lmGlobalRegArg dflags) (filter isPassed (activeStgRegs platform))
+-- | The full set of Cmm registers passed to a function, in the correct order,
+--   given the live argument registers. This is used for both call and return.
+llvmStdConv :: DynFlags -> LiveGlobalRegs -> [GlobalReg]
+llvmStdConv dflags live = 
+    filter isPassed (activeStgRegs platform)
     where platform = targetPlatform dflags
           isLive r = not (isSSE r) || r `elem` alwaysLive || r `elem` live
           isPassed r = not (isSSE r) || isLive r
@@ -158,6 +159,12 @@ llvmFunArgs dflags live =
           isSSE (YmmReg _)    = True
           isSSE (ZmmReg _)    = True
           isSSE _             = False
+
+-- | A Function's arguments
+llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]
+llvmFunArgs dflags live =
+    map (lmGlobalRegArg dflags) (llvmStdConv dflags live)
+    
 
 -- | Llvm standard fun attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]

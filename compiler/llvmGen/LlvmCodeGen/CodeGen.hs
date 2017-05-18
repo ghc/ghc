@@ -40,7 +40,7 @@ import qualified Data.Semigroup as Semigroup
 #endif
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
-import Control.Monad ( foldM, filterM )
+import Control.Monad ( foldM )
 
 type Atomic = Bool
 type LlvmStatements = OrdList LlvmStatement
@@ -818,29 +818,30 @@ genNativeCall _ expr live = do
             
             
 doReturnTo :: ContInfo -> LlvmVar -> LlvmM LlvmStatements
-doReturnTo (retl, _, retRegs) llRetV = do
-    -- find the struct fields corresponding to each live register 
-    -- according to the return convention.
-    platform <- getDynFlag targetPlatform
-    let regOrder = activeStgRegs platform
-        needsUpdate r = do
-             hasAlloca <- checkStackReg r
-             return (hasAlloca && (r `elem` alwaysLive || r `elem` retRegs))
-    
-    -- liveRegs is ordered by the return convention.
-    liveRegs <- filterM needsUpdate regOrder
+doReturnTo (retl, _, retArgs) llRetV = do
+    dflags <- getDynFlags
+    let 
+        -- TODO(kavon): seems retRegs includes all of the Rx registers
+        -- even if they are not live. LLVM will clean that up but it'd be nice if
+        -- we could avoid emitting those extracts by slimming down the retRegs list.
         
-        -- for each reg, we will add to the stms an extract
-        -- from llRetV, followed by a store to the alloca backing the reg
-    let extract (i, stms) reg = do
-            regAlloca <- getCmmReg $ CmmGlobal reg
-            let (LMPointer ty) = getVarType regAlloca
-            (newVal, s1) <- doExpr ty $ ExtractV llRetV i
-            let s2 = Store newVal regAlloca
-            return (i+1, stms `snocOL` s1 `snocOL` s2)
+        -- retRegs is a subset of allRegs, with the _same relative ordering_
+        retRegs = llvmStdConv dflags retArgs
+        allRegs = activeStgRegs $ targetPlatform dflags
+        
+        extract (z@(_, [], _)) _ = return z -- no more slots needed
+        extract (i, x:xs, stms) reg
+            | x /= reg = -- skip if x doesn't go in this slot
+                return (i+1, x:xs, stms) 
+            | otherwise = do
+                regAlloca <- getCmmReg $ CmmGlobal reg
+                let (LMPointer ty) = getVarType regAlloca
+                (newVal, s1) <- doExpr ty $ ExtractV llRetV i
+                let s2 = Store newVal regAlloca
+                return (i+1, xs, stms `snocOL` s1 `snocOL` s2)
     
-    -- update the allocas that correspond to the regs
-    (_, updateStms) <- foldM extract (0, nilOL) liveRegs
+    -- update the allocas that correspond to the retRegs
+    (_, [], updateStms) <- foldM extract (0, retRegs, nilOL) allRegs
     let br = Branch $ blockIdToLlvm retl
     return (updateStms `snocOL` br)
 
@@ -1753,7 +1754,7 @@ genLit _ CmmHighStackMark
 -- once we're done.
 funPrologue :: LiveGlobalRegs -> [CmmBlock] -> LlvmM StmtData
 funPrologue live cmmBlocks = do
-
+  dflags <- getDynFlags
   trash <- getTrashRegs
   let getAssignedRegs :: CmmNode O O -> [CmmReg]
       getAssignedRegs (CmmAssign reg _)  = [reg]
@@ -1762,10 +1763,14 @@ funPrologue live cmmBlocks = do
       getAssignedRegs (CmmUnsafeForeignCall _ rs _) = map CmmGlobal trash ++ map CmmLocal rs
       getAssignedRegs _                  = []
       getRegsBlock (_, body, _)          = concatMap getAssignedRegs $ blockToList body
-      assignedRegs = nub $ concatMap (getRegsBlock . blockSplit) cmmBlocks
+      
+      -- because we emit non-tail calls, the pinned registers such as the BasePtr is
+      -- returned and we need to use an alloca for it. -kavon
+      conventionRegs = map CmmGlobal $ llvmStdConv dflags live
+      
+      assignedRegs = nub $ concatMap (getRegsBlock . blockSplit) cmmBlocks ++ conventionRegs
       isLive r     = r `elem` alwaysLive || r `elem` live
-
-  dflags <- getDynFlags
+  
   stmtss <- flip mapM assignedRegs $ \reg ->
     case reg of
       CmmLocal (LocalReg un _) -> do
