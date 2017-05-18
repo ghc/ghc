@@ -38,9 +38,9 @@ import Control.Monad.Trans.Writer
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 #endif
-import Data.List ( nub, mapAccumL )
+import Data.List ( nub )
 import Data.Maybe ( catMaybes )
-import Control.Monad ( foldM )
+import Control.Monad ( foldM, filterM )
 
 type Atomic = Bool
 type LlvmStatements = OrdList LlvmStatement
@@ -818,32 +818,31 @@ genNativeCall _ expr live = do
             
             
 doReturnTo :: ContInfo -> LlvmVar -> LlvmM LlvmStatements
-doReturnTo (retl, off, retRegs) llRetV = do
+doReturnTo (retl, _, retRegs) llRetV = do
     -- find the struct fields corresponding to each live register 
     -- according to the return convention.
     platform <- getDynFlag targetPlatform
     let regOrder = activeStgRegs platform
-        live = alwaysLive ++ retRegs
-        liveRegs = filter (\x -> x `elem` live) regOrder
-        withIdx i x = (i+1, (x, i))
-        (_, retConv) = mapAccumL withIdx 0 liveRegs
+        needsUpdate r = do
+             hasAlloca <- checkStackReg r
+             return (hasAlloca && (r `elem` alwaysLive || r `elem` retRegs))
+    
+    -- liveRegs is ordered by the return convention.
+    liveRegs <- filterM needsUpdate regOrder
         
-        -- for each (GlobalReg, Int), we will add to the stms an extract
-        -- from llRetV followed by a store to the alloca backing the reg
-        extract stms (reg, i) = do
+        -- for each reg, we will add to the stms an extract
+        -- from llRetV, followed by a store to the alloca backing the reg
+    let extract (i, stms) reg = do
             regAlloca <- getCmmReg $ CmmGlobal reg
             let (LMPointer ty) = getVarType regAlloca
             (newVal, s1) <- doExpr ty $ ExtractV llRetV i
             let s2 = Store newVal regAlloca
-            return (stms `snocOL` s1 `snocOL` s2)
+            return (i+1, stms `snocOL` s1 `snocOL` s2)
     
-    -- extract the regs from the struct and update their allocas
-    updateStms <- foldM extract nilOL retConv
-    
-    -- TODO make a branch instr
-
-    -- TODO combine all the LlvmStatements together and return them.
-    return updateStms
+    -- update the allocas that correspond to the regs
+    (_, updateStms) <- foldM extract (0, nilOL) liveRegs
+    let br = Branch $ blockIdToLlvm retl
+    return (updateStms `snocOL` br)
 
 
 -- | CmmAssign operation
@@ -1746,7 +1745,12 @@ genLit _ CmmHighStackMark
 -- On the other hand, this is unnecessarily verbose if the register in
 -- question is never written. Therefore we skip it where we can to
 -- save a few lines in the output and hopefully speed compilation up a
--- bit.
+-- bit. 
+--
+-- FIXME(kavon): it seems inefficient to scan the whole function for reg assigns,
+-- we could instead update a map of CmmRegs -> LlvmVars when we see assignments during
+-- translation of a function's blocks, and then prepend the allocas to the entry block
+-- once we're done.
 funPrologue :: LiveGlobalRegs -> [CmmBlock] -> LlvmM StmtData
 funPrologue live cmmBlocks = do
 
