@@ -208,7 +208,7 @@ disasterHandler exit _ =
       errorBelch fmt msg >> exit 1
   where
     msgStr =
-        "encountered an exception while trying to report an exception." ++
+        "encountered an exception while trying to report an exception.\n" ++
         "One possible reason for this is that we failed while trying to " ++
         "encode an error message. Check that your locale is configured " ++
         "properly."
