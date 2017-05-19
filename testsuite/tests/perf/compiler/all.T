@@ -1111,8 +1111,9 @@ test('MultiLayerModules',
 
 test('T13719',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 49907410784, 10),
+          [(wordsize(64), 5296593200, 10),
           # initial:    49907410784
+          # 2017-05-22: 5296593200   Faster checkFamInstConsistency
           ]),
        pre_cmd('./genT13719'),
        extra_files(['genT13719']),
