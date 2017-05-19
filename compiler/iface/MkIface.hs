@@ -476,10 +476,9 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                   extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
                   where n = getOccName d
 
-        -- strongly-connected groups of declarations, in dependency order
+        -- Strongly-connected groups of declarations, in dependency order
        groups :: [SCC IfaceDeclABI]
-       groups =
-           stronglyConnCompFromEdgedVerticesUniq edges
+       groups = stronglyConnCompFromEdgedVerticesUniq edges
 
        global_hash_fn = mkHashFun hsc_env eps
 
