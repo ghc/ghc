@@ -1261,44 +1261,65 @@ fingerprinting the instance, so DFuns are not dependencies.
 -}
 
 freeNamesIfDecl :: IfaceDecl -> NameSet
-freeNamesIfDecl (IfaceId _s t d i) =
-  freeNamesIfType t &&&
-  freeNamesIfIdInfo i &&&
-  freeNamesIfIdDetails d
-freeNamesIfDecl d@IfaceData{} =
-  freeNamesIfTyVarBndrs (ifBinders d) &&&
-  freeNamesIfType (ifResKind d) &&&
-  freeNamesIfaceTyConParent (ifParent d) &&&
-  freeNamesIfContext (ifCtxt d) &&&
-  freeNamesIfConDecls (ifCons d)
-freeNamesIfDecl d@IfaceSynonym{} =
-  freeNamesIfType (ifSynRhs d) &&&
-  freeNamesIfTyVarBndrs (ifBinders d) &&&
-  freeNamesIfKind (ifResKind d)
-freeNamesIfDecl d@IfaceFamily{} =
-  freeNamesIfFamFlav (ifFamFlav d) &&&
-  freeNamesIfTyVarBndrs (ifBinders d) &&&
-  freeNamesIfKind (ifResKind d)
-freeNamesIfDecl d@IfaceClass{ ifBody = IfAbstractClass } =
-  freeNamesIfTyVarBndrs (ifBinders d)
-freeNamesIfDecl d@IfaceClass{ ifBody = d'@IfConcreteClass{} } =
-  freeNamesIfTyVarBndrs (ifBinders d) &&&
-  freeNamesIfContext (ifClassCtxt d') &&&
-  fnList freeNamesIfAT     (ifATs d') &&&
-  fnList freeNamesIfClsSig (ifSigs d')
-freeNamesIfDecl d@IfaceAxiom{} =
-  freeNamesIfTc (ifTyCon d) &&&
-  fnList freeNamesIfAxBranch (ifAxBranches d)
-freeNamesIfDecl d@IfacePatSyn{} =
-  unitNameSet (fst (ifPatMatcher d)) &&&
-  maybe emptyNameSet (unitNameSet . fst) (ifPatBuilder d) &&&
-  freeNamesIfTyVarBndrs (ifPatUnivBndrs d) &&&
-  freeNamesIfTyVarBndrs (ifPatExBndrs d) &&&
-  freeNamesIfContext (ifPatProvCtxt d) &&&
-  freeNamesIfContext (ifPatReqCtxt d) &&&
-  fnList freeNamesIfType (ifPatArgs d) &&&
-  freeNamesIfType (ifPatTy d) &&&
-  mkNameSet (map flSelector (ifFieldLabels d))
+freeNamesIfDecl (IfaceId { ifType = t, ifIdDetails = d, ifIdInfo = i})
+  = freeNamesIfType t &&&
+    freeNamesIfIdInfo i &&&
+    freeNamesIfIdDetails d
+
+freeNamesIfDecl (IfaceData { ifBinders = bndrs, ifResKind = res_k
+                           , ifParent = p, ifCtxt = ctxt, ifCons = cons })
+  = freeNamesIfTyVarBndrs bndrs &&&
+    freeNamesIfType res_k &&&
+    freeNamesIfaceTyConParent p &&&
+    freeNamesIfContext ctxt &&&
+    freeNamesIfConDecls cons
+
+freeNamesIfDecl (IfaceSynonym { ifBinders = bndrs, ifResKind = res_k
+                              , ifSynRhs = rhs })
+  = freeNamesIfTyVarBndrs bndrs &&&
+    freeNamesIfKind res_k &&&
+    freeNamesIfType rhs
+
+freeNamesIfDecl (IfaceFamily { ifBinders = bndrs, ifResKind = res_k
+                             , ifFamFlav = flav })
+  = freeNamesIfTyVarBndrs bndrs &&&
+    freeNamesIfKind res_k &&&
+    freeNamesIfFamFlav flav
+
+freeNamesIfDecl (IfaceClass{ ifBinders = bndrs, ifBody = cls_body })
+  = freeNamesIfTyVarBndrs bndrs &&&
+    freeNamesIfClassBody cls_body
+
+freeNamesIfDecl (IfaceAxiom { ifTyCon = tc, ifAxBranches = branches })
+  = freeNamesIfTc tc &&&
+    fnList freeNamesIfAxBranch branches
+
+freeNamesIfDecl (IfacePatSyn { ifPatMatcher = (matcher, _)
+                             , ifPatBuilder = mb_builder
+                             , ifPatUnivBndrs = univ_bndrs
+                             , ifPatExBndrs = ex_bndrs
+                             , ifPatProvCtxt = prov_ctxt
+                             , ifPatReqCtxt = req_ctxt
+                             , ifPatArgs = args
+                             , ifPatTy = pat_ty
+                             , ifFieldLabels = lbls })
+  = unitNameSet matcher &&&
+    maybe emptyNameSet (unitNameSet . fst) mb_builder &&&
+    freeNamesIfTyVarBndrs univ_bndrs &&&
+    freeNamesIfTyVarBndrs ex_bndrs &&&
+    freeNamesIfContext prov_ctxt &&&
+    freeNamesIfContext req_ctxt &&&
+    fnList freeNamesIfType args &&&
+    freeNamesIfType pat_ty &&&
+    mkNameSet (map flSelector lbls)
+
+freeNamesIfClassBody :: IfaceClassBody -> NameSet
+freeNamesIfClassBody IfAbstractClass
+  = emptyNameSet
+freeNamesIfClassBody (IfConcreteClass{ ifClassCtxt = ctxt, ifATs = ats, ifSigs = sigs })
+  = freeNamesIfContext ctxt  &&&
+    fnList freeNamesIfAT ats &&&
+    fnList freeNamesIfClsSig sigs
 
 freeNamesIfAxBranch :: IfaceAxBranch -> NameSet
 freeNamesIfAxBranch (IfaceAxBranch { ifaxbTyVars   = tyvars
@@ -1348,12 +1369,15 @@ freeNamesIfConDecls (IfNewTyCon  c) = freeNamesIfConDecl c
 freeNamesIfConDecls _                   = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
-freeNamesIfConDecl c
-  = freeNamesIfTyVarBndrs (ifConExTvs c) &&&
-    freeNamesIfContext (ifConCtxt c) &&&
-    fnList freeNamesIfType (ifConArgTys c) &&&
-    mkNameSet (map flSelector (ifConFields c)) &&&
-    fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
+freeNamesIfConDecl (IfCon { ifConExTvs   = ex_tvs, ifConCtxt = ctxt
+                          , ifConArgTys  = arg_tys
+                          , ifConFields  = flds
+                          , ifConEqSpec  = eq_spec })
+  = freeNamesIfTyVarBndrs ex_tvs &&&
+    freeNamesIfContext ctxt &&&
+    fnList freeNamesIfType arg_tys &&&
+    mkNameSet (map flSelector flds) &&&
+    fnList freeNamesIfType (map snd eq_spec) -- equality constraints
 
 freeNamesIfKind :: IfaceType -> NameSet
 freeNamesIfKind = freeNamesIfType
