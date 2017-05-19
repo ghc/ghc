@@ -410,8 +410,8 @@ data DsMetaVal
                         -- Will be dynamically alpha renamed.
                         -- The Id has type THSyntax.Var
 
-   | DsSplice (HsExpr Id) -- These bindings are introduced by
-                          -- the PendingSplices on a HsBracketOut
+   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
+                             -- the PendingSplices on a HsBracketOut
 
 
 {-
@@ -616,22 +616,22 @@ data TcGblEnv
         -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-        tcg_rn_exports :: Maybe [Located (IE Name)],
+        tcg_rn_exports :: Maybe [Located (IE GhcRn)],
                 -- Nothing <=> no explicit export list
                 -- Is always Nothing if we don't want to retain renamed
                 -- exports
 
-        tcg_rn_imports :: [LImportDecl Name],
+        tcg_rn_imports :: [LImportDecl GhcRn],
                 -- Keep the renamed imports regardless.  They are not
                 -- voluminous and are needed if you want to report unused imports
 
-        tcg_rn_decls :: Maybe (HsGroup Name),
+        tcg_rn_decls :: Maybe (HsGroup GhcRn),
           -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
           -- decls.
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
 
-        tcg_th_topdecls :: TcRef [LHsDecl RdrName],
+        tcg_th_topdecls :: TcRef [LHsDecl GhcPs],
         -- ^ Top-level declarations from addTopDecls
 
         tcg_th_foreign_files :: TcRef [(ForeignSrcLang, String)],
@@ -655,10 +655,10 @@ data TcGblEnv
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
         -- For the latter, see Note [The interactive package] in HscTypes
-        tcg_tr_module :: Maybe Id,           -- Id for $trModule :: GHC.Types.Module
+        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Types.Module
                                              -- for which every module has a top-level defn
                                              -- except in GHCi in which case we have Nothing
-        tcg_binds     :: LHsBinds Id,        -- Value bindings in this module
+        tcg_binds     :: LHsBinds GhcTc,     -- Value bindings in this module
         tcg_sigs      :: NameSet,            -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],      -- ...SPECIALISE prags for imported Ids
         tcg_warns     :: Warnings,           -- ...Warnings and deprecations
@@ -666,10 +666,10 @@ data TcGblEnv
         tcg_tcs       :: [TyCon],            -- ...TyCons and Classes
         tcg_insts     :: [ClsInst],          -- ...Instances
         tcg_fam_insts :: [FamInst],          -- ...Family instances
-        tcg_rules     :: [LRuleDecl Id],     -- ...Rules
-        tcg_fords     :: [LForeignDecl Id],  -- ...Foreign import & exports
-        tcg_vects     :: [LVectDecl Id],     -- ...Vectorisation declarations
-        tcg_patsyns   :: [PatSyn],           -- ...Pattern synonyms
+        tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
+        tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
+        tcg_vects     :: [LVectDecl GhcTc],   -- ...Vectorisation declarations
+        tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
 
         tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
@@ -1385,8 +1385,9 @@ data TcIdSigInfo   -- See Note [Complete and partial type signatures]
                    -- wildcards). In this case it doesn't make sense to give
                    -- the polymorphic Id, because we are going to /infer/ its
                    -- type, so we can't make the polymorphic Id ab-initio
-      { psig_name  :: Name               -- Name of the function; used when report wildcards
-      , psig_hs_ty :: LHsSigWcType Name  -- The original partial signature in HsSyn form
+      { psig_name  :: Name   -- Name of the function; used when report wildcards
+      , psig_hs_ty :: LHsSigWcType GhcRn  -- The original partial signature in
+                                          -- HsSyn form
       , sig_ctxt   :: UserTypeCtxt
       , sig_loc    :: SrcSpan            -- Location of the type signature
       }
@@ -3101,19 +3102,19 @@ data CtOrigin
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
   | OverLabelOrigin FastString  -- Occurrence of an overloaded label
 
-  | LiteralOrigin (HsOverLit Name)      -- Occurrence of a literal
+  | LiteralOrigin (HsOverLit GhcRn)     -- Occurrence of a literal
   | NegateOrigin                        -- Occurrence of syntactic negation
 
-  | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
-  | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
+  | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
+  | PArrSeqOrigin  (ArithSeqInfo GhcRn) -- [:x..y:] and [:x,y..z:]
   | SectionOrigin
   | TupleOrigin                        -- (..,..)
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
   | PatOrigin           -- Instantiating a polytyped pattern at a constructor
   | ProvCtxtOrigin      -- The "provided" context of a pattern synonym signature
-        (PatSynBind Name Name) -- Information about the pattern synonym, in particular
-                               -- the name and the right-hand side
+        (PatSynBind GhcRn GhcRn) -- Information about the pattern synonym, in
+                                 -- particular the name and the right-hand side
   | RecordUpdOrigin
   | ViewPatOrigin
 
@@ -3131,11 +3132,11 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
-  | DoPatOrigin (LPat Name) -- Arising from a failable pattern in
-                            -- a do expression
+  | DoPatOrigin (LPat GhcRn) -- Arising from a failable pattern in
+                             -- a do expression
   | MCompOrigin         -- Arising from a monad comprehension
-  | MCompPatOrigin (LPat Name) -- Arising from a failable pattern in a
-                               -- monad comprehension
+  | MCompPatOrigin (LPat GhcRn) -- Arising from a failable pattern in a
+                                -- monad comprehension
   | IfOrigin            -- Arising from an if statement
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
@@ -3154,9 +3155,10 @@ data CtOrigin
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
-  | FailablePattern (LPat TcId) -- A failable pattern in do-notation for the
-                                -- MonadFail Proposal (MFP). Obsolete when
-                                -- actual desugaring to MonadFail.fail is live.
+  | FailablePattern (LPat GhcTcId) -- A failable pattern in do-notation for the
+                                   -- MonadFail Proposal (MFP). Obsolete when
+                                   -- actual desugaring to MonadFail.fail is
+                                   -- live.
   | Shouldn'tHappenOrigin String
                             -- the user should never see this one,
                             -- unless ImpredicativeTypes is on, where all
@@ -3206,10 +3208,10 @@ ctoHerald :: SDoc
 ctoHerald = text "arising from"
 
 -- | Extract a suitable CtOrigin from a HsExpr
-lexprCtOrigin :: LHsExpr Name -> CtOrigin
+lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
 lexprCtOrigin (L _ e) = exprCtOrigin e
 
-exprCtOrigin :: HsExpr Name -> CtOrigin
+exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
 exprCtOrigin (HsConLikeOut {})  = panic "exprCtOrigin HsConLikeOut"
@@ -3264,7 +3266,7 @@ exprCtOrigin (ELazyPat {})      = panic "exprCtOrigin ELazyPat"
 exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 
 -- | Extract a suitable CtOrigin from a MatchGroup
-matchesCtOrigin :: MatchGroup Name (LHsExpr Name) -> CtOrigin
+matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
 matchesCtOrigin (MG { mg_alts = alts })
   | L _ [L _ match] <- alts
   , Match { m_grhss = grhss } <- match
@@ -3274,11 +3276,11 @@ matchesCtOrigin (MG { mg_alts = alts })
   = Shouldn'tHappenOrigin "multi-way match"
 
 -- | Extract a suitable CtOrigin from guarded RHSs
-grhssCtOrigin :: GRHSs Name (LHsExpr Name) -> CtOrigin
+grhssCtOrigin :: GRHSs GhcRn (LHsExpr GhcRn) -> CtOrigin
 grhssCtOrigin (GRHSs { grhssGRHSs = lgrhss }) = lGRHSCtOrigin lgrhss
 
 -- | Extract a suitable CtOrigin from a list of guarded RHSs
-lGRHSCtOrigin :: [LGRHS Name (LHsExpr Name)] -> CtOrigin
+lGRHSCtOrigin :: [LGRHS GhcRn (LHsExpr GhcRn)] -> CtOrigin
 lGRHSCtOrigin [L _ (GRHS _ (L _ e))] = exprCtOrigin e
 lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
@@ -3482,9 +3484,9 @@ data TcPluginResult
 *                                                                      *
 ********************************************************************* -}
 
-type RoleAnnotEnv = NameEnv (LRoleAnnotDecl Name)
+type RoleAnnotEnv = NameEnv (LRoleAnnotDecl GhcRn)
 
-mkRoleAnnotEnv :: [LRoleAnnotDecl Name] -> RoleAnnotEnv
+mkRoleAnnotEnv :: [LRoleAnnotDecl GhcRn] -> RoleAnnotEnv
 mkRoleAnnotEnv role_annot_decls
  = mkNameEnv [ (name, ra_decl)
              | ra_decl <- role_annot_decls
@@ -3496,10 +3498,11 @@ mkRoleAnnotEnv role_annot_decls
 emptyRoleAnnotEnv :: RoleAnnotEnv
 emptyRoleAnnotEnv = emptyNameEnv
 
-lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl Name)
+lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl GhcRn)
 lookupRoleAnnot = lookupNameEnv
 
-getRoleAnnots :: [Name] -> RoleAnnotEnv -> ([LRoleAnnotDecl Name], RoleAnnotEnv)
+getRoleAnnots :: [Name] -> RoleAnnotEnv
+              -> ([LRoleAnnotDecl GhcRn], RoleAnnotEnv)
 getRoleAnnots bndrs role_env
   = ( mapMaybe (lookupRoleAnnot role_env) bndrs
     , delListFromNameEnv role_env bndrs )

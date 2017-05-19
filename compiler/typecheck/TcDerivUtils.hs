@@ -7,6 +7,7 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 -}
 
 {-# LANGUAGE ImplicitParams #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcDerivUtils (
         DerivSpec(..), pprDerivSpec,
@@ -36,7 +37,6 @@ import Module (getModule)
 import Name
 import Outputable
 import PrelNames
-import RdrName
 import SrcLoc
 import TcGenDeriv
 import TcGenFunctor
@@ -108,7 +108,7 @@ instance Outputable theta => Outputable (DerivSpec theta) where
 -- NB: DerivSpecMechanism is purely local to this module
 data DerivSpecMechanism
   = DerivSpecStock   -- "Standard" classes
-      (SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds RdrName, BagDerivStuff))
+      (SrcSpan -> TyCon -> [Type] -> TcM (LHsBinds GhcPs, BagDerivStuff))
 
   | DerivSpecNewtype -- -XGeneralizedNewtypeDeriving
       Type -- ^ The newtype rep type
@@ -240,14 +240,14 @@ hasStockDeriving :: Class
                    -> Maybe (SrcSpan
                              -> TyCon
                              -> [Type]
-                             -> TcM (LHsBinds RdrName, BagDerivStuff))
+                             -> TcM (LHsBinds GhcPs, BagDerivStuff))
 hasStockDeriving clas
   = assocMaybe gen_list (getUnique clas)
   where
     gen_list :: [(Unique, SrcSpan
                           -> TyCon
                           -> [Type]
-                          -> TcM (LHsBinds RdrName, BagDerivStuff))]
+                          -> TcM (LHsBinds GhcPs, BagDerivStuff))]
     gen_list = [ (eqClassKey,          simpleM gen_Eq_binds)
                , (ordClassKey,         simpleM gen_Ord_binds)
                , (enumClassKey,        simpleM gen_Enum_binds)

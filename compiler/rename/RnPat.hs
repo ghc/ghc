@@ -210,7 +210,7 @@ matchNameMaker ctxt = LamMk report_unused
                       ThPatQuote            -> False
                       _                     -> True
 
-rnHsSigCps :: LHsSigWcType RdrName -> CpsRn (LHsSigWcType Name)
+rnHsSigCps :: LHsSigWcType GhcPs -> CpsRn (LHsSigWcType GhcRn)
 rnHsSigCps sig = CpsRn (rnHsSigWcTypeScoped PatCtx sig)
 
 newPatLName :: NameMaker -> Located RdrName -> CpsRn (Located Name)
@@ -302,8 +302,8 @@ There are various entry points to renaming patterns, depending on
 --   * unused and duplicate checking
 --   * no fixities
 rnPats :: HsMatchContext Name -- for error messages
-       -> [LPat RdrName]
-       -> ([LPat Name] -> RnM (a, FreeVars))
+       -> [LPat GhcPs]
+       -> ([LPat GhcRn] -> RnM (a, FreeVars))
        -> RnM (a, FreeVars)
 rnPats ctxt pats thing_inside
   = do  { envs_before <- getRdrEnvs
@@ -329,8 +329,8 @@ rnPats ctxt pats thing_inside
     doc_pat = text "In" <+> pprMatchContext ctxt
 
 rnPat :: HsMatchContext Name -- for error messages
-      -> LPat RdrName
-      -> (LPat Name -> RnM (a, FreeVars))
+      -> LPat GhcPs
+      -> (LPat GhcRn -> RnM (a, FreeVars))
       -> RnM (a, FreeVars)     -- Variables bound by pattern do not
                                -- appear in the result FreeVars
 rnPat ctxt pat thing_inside
@@ -348,8 +348,8 @@ applyNameMaker mk rdr = do { (n, _fvs) <- runCps (newPatLName mk rdr)
 --   * no unused and duplicate checking
 --   * fixities might be coming in
 rnBindPat :: NameMaker
-          -> LPat RdrName
-          -> RnM (LPat Name, FreeVars)
+          -> LPat GhcPs
+          -> RnM (LPat GhcRn, FreeVars)
    -- Returned FreeVars are the free variables of the pattern,
    -- of course excluding variables bound by this pattern
 
@@ -366,17 +366,17 @@ rnBindPat name_maker pat = runCps (rnLPatAndThen name_maker pat)
 -- ----------- Entry point 3: rnLPatAndThen -------------------
 -- General version: parametrized by how you make new names
 
-rnLPatsAndThen :: NameMaker -> [LPat RdrName] -> CpsRn [LPat Name]
+rnLPatsAndThen :: NameMaker -> [LPat GhcPs] -> CpsRn [LPat GhcRn]
 rnLPatsAndThen mk = mapM (rnLPatAndThen mk)
   -- Despite the map, the monad ensures that each pattern binds
   -- variables that may be mentioned in subsequent patterns in the list
 
 --------------------
 -- The workhorse
-rnLPatAndThen :: NameMaker -> LPat RdrName -> CpsRn (LPat Name)
+rnLPatAndThen :: NameMaker -> LPat GhcPs -> CpsRn (LPat GhcRn)
 rnLPatAndThen nm lpat = wrapSrcSpanCps (rnPatAndThen nm) lpat
 
-rnPatAndThen :: NameMaker -> Pat RdrName -> CpsRn (Pat Name)
+rnPatAndThen :: NameMaker -> Pat GhcPs -> CpsRn (Pat GhcRn)
 rnPatAndThen _  (WildPat _)   = return (WildPat placeHolderType)
 rnPatAndThen mk (ParPat pat)  = do { pat' <- rnLPatAndThen mk pat; return (ParPat pat') }
 rnPatAndThen mk (LazyPat pat) = do { pat' <- rnLPatAndThen mk pat; return (LazyPat pat') }
@@ -411,7 +411,7 @@ rnPatAndThen mk (LitPat lit)
          else normal_lit }
   | otherwise = normal_lit
   where
-    normal_lit = do { liftCps (rnLit lit); return (LitPat lit) }
+    normal_lit = do { liftCps (rnLit lit); return (LitPat (convertLit lit)) }
 
 rnPatAndThen _ (NPat (L l lit) mb_neg _eq _)
   = do { (lit', mb_neg') <- liftCpsFV $ rnOverLit lit
@@ -502,9 +502,9 @@ rnPatAndThen _ pat = pprPanic "rnLPatAndThen" (ppr pat)
 
 --------------------
 rnConPatAndThen :: NameMaker
-                -> Located RdrName          -- the constructor
-                -> HsConPatDetails RdrName
-                -> CpsRn (Pat Name)
+                -> Located RdrName    -- the constructor
+                -> HsConPatDetails GhcPs
+                -> CpsRn (Pat GhcRn)
 
 rnConPatAndThen mk con (PrefixCon pats)
   = do  { con' <- lookupConCps con
@@ -526,8 +526,8 @@ rnConPatAndThen mk con (RecCon rpats)
 --------------------
 rnHsRecPatsAndThen :: NameMaker
                    -> Located Name      -- Constructor
-                   -> HsRecFields RdrName (LPat RdrName)
-                   -> CpsRn (HsRecFields Name (LPat Name))
+                   -> HsRecFields GhcPs (LPat GhcPs)
+                   -> CpsRn (HsRecFields GhcRn (LPat GhcRn))
 rnHsRecPatsAndThen mk (L _ con) hs_rec_fields@(HsRecFields { rec_dotdot = dd })
   = do { flds <- liftCpsFV $ rnHsRecFields (HsRecFieldPat con) mkVarPat
                                             hs_rec_fields
@@ -562,8 +562,8 @@ rnHsRecFields
        HsRecFieldContext
     -> (SrcSpan -> RdrName -> arg)
          -- When punning, use this to build a new field
-    -> HsRecFields RdrName (Located arg)
-    -> RnM ([LHsRecField Name (Located arg)], FreeVars)
+    -> HsRecFields GhcPs (Located arg)
+    -> RnM ([LHsRecField GhcRn (Located arg)], FreeVars)
 
 -- This surprisingly complicated pass
 --   a) looks up the field name (possibly using disambiguation)
@@ -597,8 +597,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
             Nothing  -> text "constructor field name"
             Just con -> text "field of constructor" <+> quotes (ppr con)
 
-    rn_fld :: Bool -> Maybe Name -> LHsRecField RdrName (Located arg)
-           -> RnM (LHsRecField Name (Located arg))
+    rn_fld :: Bool -> Maybe Name -> LHsRecField GhcPs (Located arg)
+           -> RnM (LHsRecField GhcRn (Located arg))
     rn_fld pun_ok parent (L l (HsRecField { hsRecFieldLbl
                                               = L loc (FieldOcc (L ll lbl) _)
                                           , hsRecFieldArg = arg
@@ -616,10 +616,10 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
                                      , hsRecPun      = pun })) }
 
     rn_dotdot :: Maybe Int      -- See Note [DotDot fields] in HsPat
-              -> Maybe Name     -- The constructor (Nothing for an
+              -> Maybe Name -- The constructor (Nothing for an
                                 --    out of scope constructor)
-              -> [LHsRecField Name (Located arg)] -- Explicit fields
-              -> RnM [LHsRecField Name (Located arg)]   -- Filled in .. fields
+              -> [LHsRecField GhcRn (Located arg)] -- Explicit fields
+              -> RnM [LHsRecField GhcRn (Located arg)]   -- Filled in .. fields
     rn_dotdot Nothing _mb_con _flds     -- No ".." at all
       = return []
     rn_dotdot (Just {}) Nothing _flds   -- Constructor out of scope
@@ -668,7 +668,8 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
       = do { env <- getGlobalRdrEnv; return (find_tycon env con) }
       | otherwise = return Nothing
 
-    find_tycon :: GlobalRdrEnv -> Name {- DataCon -} -> Maybe Name {- TyCon -}
+    find_tycon :: GlobalRdrEnv -> Name {- DataCon -}
+               -> Maybe Name {- TyCon -}
     -- Return the parent *type constructor* of the data constructor
     -- (that is, the parent of the data constructor),
     -- or 'Nothing' if it is a pattern synonym or not in scope.
@@ -713,8 +714,8 @@ fail.  But there is no need for disambiguation anyway, so we just return Nothing
 -}
 
 rnHsRecUpdFields
-    :: [LHsRecUpdField RdrName]
-    -> RnM ([LHsRecUpdField Name], FreeVars)
+    :: [LHsRecUpdField GhcPs]
+    -> RnM ([LHsRecUpdField GhcRn], FreeVars)
 rnHsRecUpdFields flds
   = do { pun_ok        <- xoptM LangExt.RecordPuns
        ; overload_ok   <- xoptM LangExt.DuplicateRecordFields
@@ -729,7 +730,8 @@ rnHsRecUpdFields flds
   where
     doc = text "constructor field name"
 
-    rn_fld :: Bool -> Bool -> LHsRecUpdField RdrName -> RnM (LHsRecUpdField Name, FreeVars)
+    rn_fld :: Bool -> Bool -> LHsRecUpdField GhcPs
+           -> RnM (LHsRecUpdField GhcRn, FreeVars)
     rn_fld pun_ok overload_ok (L l (HsRecField { hsRecFieldLbl = L loc f
                                                , hsRecFieldArg = arg
                                                , hsRecPun      = pun }))
@@ -775,7 +777,7 @@ rnHsRecUpdFields flds
 
 
 
-getFieldIds :: [LHsRecField Name arg] -> [Name]
+getFieldIds :: [LHsRecField GhcRn arg] -> [Name]
 getFieldIds flds = map (unLoc . hsRecFieldSel . unLoc) flds
 
 getFieldLbls :: [LHsRecField id arg] -> [RdrName]
@@ -824,7 +826,7 @@ that the types and classes they involve
 are made available.
 -}
 
-rnLit :: HsLit -> RnM ()
+rnLit :: HsLit p -> RnM ()
 rnLit (HsChar _ c) = checkErr (inCharRange c) (bogusCharError c)
 rnLit _ = return ()
 
@@ -855,7 +857,7 @@ can apply it explicitly. In this case it stays negative zero.  Trac #13211
 -}
 
 rnOverLit :: HsOverLit t ->
-             RnM ((HsOverLit Name, Maybe (HsExpr Name)), FreeVars)
+             RnM ((HsOverLit GhcRn, Maybe (HsExpr GhcRn)), FreeVars)
 rnOverLit origLit
   = do  { opt_NumDecimals <- xoptM LangExt.NumDecimals
         ; let { lit@(OverLit {ol_val=val})
@@ -895,6 +897,6 @@ bogusCharError :: Char -> SDoc
 bogusCharError c
   = text "character literal out of range: '\\" <> char c  <> char '\''
 
-badViewPat :: Pat RdrName -> SDoc
+badViewPat :: Pat GhcPs -> SDoc
 badViewPat pat = vcat [text "Illegal view pattern: " <+> ppr pat,
                        text "Use ViewPatterns to enable view patterns"]

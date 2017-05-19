@@ -7,6 +7,7 @@ TcRules: Typechecking transformation rules
 -}
 
 {-# LANGUAGE ViewPatterns #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcRules ( tcRules ) where
 
@@ -23,7 +24,6 @@ import TcEvidence( mkTcCoVarCo )
 import Type
 import Id
 import Var( EvVar )
-import Name
 import BasicTypes       ( RuleName )
 import SrcLoc
 import Outputable
@@ -49,15 +49,15 @@ an example (test simplCore/should_compile/rule2.hs) produced by Roman:
 He wanted the rule to typecheck.
 -}
 
-tcRules :: [LRuleDecls Name] -> TcM [LRuleDecls TcId]
+tcRules :: [LRuleDecls GhcRn] -> TcM [LRuleDecls GhcTcId]
 tcRules decls = mapM (wrapLocM tcRuleDecls) decls
 
-tcRuleDecls :: RuleDecls Name -> TcM (RuleDecls TcId)
+tcRuleDecls :: RuleDecls GhcRn -> TcM (RuleDecls GhcTcId)
 tcRuleDecls (HsRules src decls)
    = do { tc_decls <- mapM (wrapLocM tcRule) decls
         ; return (HsRules src tc_decls) }
 
-tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
+tcRule :: RuleDecl GhcRn -> TcM (RuleDecl GhcTcId)
 tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
   = addErrCtxt (ruleCtxt $ snd $ unLoc name)  $
     do { traceTc "---- Rule ------" (pprFullRuleName name)
@@ -131,7 +131,7 @@ tcRule (HsRule name act hs_bndrs lhs fv_lhs rhs fv_rhs)
                     (mkHsDictLet lhs_binds lhs') fv_lhs
                     (mkHsDictLet rhs_binds rhs') fv_rhs) }
 
-tcRuleBndrs :: [LRuleBndr Name] -> TcM [Var]
+tcRuleBndrs :: [LRuleBndr GhcRn] -> TcM [Var]
 tcRuleBndrs []
   = return []
 tcRuleBndrs (L _ (RuleBndr (L _ name)) : rule_bndrs)

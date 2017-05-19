@@ -1,4 +1,5 @@
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module Main where
 
 import Prelude hiding ( mod, id, mapM )
@@ -248,7 +249,7 @@ fileData filename modname (group, _imports, _lie, _doc) = do
     line_map' <- evaluate line_map
     return $ FileData filename (boundValues modname group) line_map'
 
-boundValues :: ModuleName -> HsGroup Name -> [FoundThing]
+boundValues :: ModuleName -> HsGroup GhcRn -> [FoundThing]
 -- ^Finds all the top-level definitions in a module
 boundValues mod group =
   let vals = case hs_valds group of
@@ -275,7 +276,7 @@ startOfLocated lHs = case getLoc lHs of
 foundOfLName :: ModuleName -> Located Name -> FoundThing
 foundOfLName mod id = FoundThing mod (getOccString $ unLoc id) (startOfLocated id)
 
-boundThings :: ModuleName -> LHsBind Name -> [FoundThing]
+boundThings :: ModuleName -> LHsBind GhcRn -> [FoundThing]
 boundThings modname lbinding =
   case unLoc lbinding of
     FunBind { fun_id = id } -> [thing id]

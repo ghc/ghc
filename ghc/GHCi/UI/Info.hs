@@ -308,13 +308,13 @@ processAllTypeCheckedModule tcm = do
     tcs = tm_typechecked_source tcm
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsBind's
-    getTypeLHsBind :: LHsBind Id -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLHsBind :: LHsBind GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsBind (L _spn FunBind{fun_id = pid,fun_matches = MG _ _ _typ _})
         = pure $ Just (Just (unLoc pid),getLoc pid,varType (unLoc pid))
     getTypeLHsBind _ = pure Nothing
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LHsExpr's
-    getTypeLHsExpr :: LHsExpr Id -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLHsExpr :: LHsExpr GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLHsExpr e = do
         hs_env  <- getSession
         (_,mbe) <- liftIO $ deSugarExpr hs_env e
@@ -328,7 +328,7 @@ processAllTypeCheckedModule tcm = do
         unwrapVar e'             = e'
 
     -- | Extract 'Id', 'SrcSpan', and 'Type' for 'LPats's
-    getTypeLPat :: LPat Id -> m (Maybe (Maybe Id,SrcSpan,Type))
+    getTypeLPat :: LPat GhcTc -> m (Maybe (Maybe Id,SrcSpan,Type))
     getTypeLPat (L spn pat) =
         pure (Just (getMaybeId pat,spn,hsPatType pat))
       where

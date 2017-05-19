@@ -7,6 +7,10 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 -}
 
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
+                                      -- in module PlaceHolder
 
 module HsImpExp where
 
@@ -19,6 +23,7 @@ import FieldLabel       ( FieldLbl(..) )
 import Outputable
 import FastString
 import SrcLoc
+import HsExtension
 
 import Data.Data
 
@@ -73,7 +78,7 @@ data ImportDecl name
      --     to location in ideclHiding
 
      -- For details on above see note [Api annotations] in ApiAnnotation
-       deriving Data
+deriving instance (DataId name) => Data (ImportDecl name)
 
 simpleImportDecl :: ModuleName -> ImportDecl name
 simpleImportDecl mn = ImportDecl {
@@ -88,7 +93,7 @@ simpleImportDecl mn = ImportDecl {
       ideclHiding    = Nothing
     }
 
-instance (OutputableBndr name, HasOccName name) => Outputable (ImportDecl name) where
+instance (OutputableBndrId pass) => Outputable (ImportDecl pass) where
     ppr (ImportDecl { ideclSourceSrc = mSrcText, ideclName = mod'
                     , ideclPkgQual = pkg
                     , ideclSource = from, ideclSafe = safe
@@ -160,10 +165,10 @@ type LIE name = Located (IE name)
 
 -- | Imported or exported entity.
 data IE name
-  = IEVar       (LIEWrappedName name)
+  = IEVar       (LIEWrappedName (IdP name))
         -- ^ Imported or Exported Variable
 
-  | IEThingAbs  (LIEWrappedName name)
+  | IEThingAbs  (LIEWrappedName (IdP name))
         -- ^ Imported or exported Thing with Absent list
         --
         -- The thing is a Class/Type (can't tell)
@@ -172,7 +177,7 @@ data IE name
 
         -- For details on above see note [Api annotations] in ApiAnnotation
         -- See Note [Located RdrNames] in HsExpr
-  | IEThingAll  (LIEWrappedName name)
+  | IEThingAll  (LIEWrappedName (IdP name))
         -- ^ Imported or exported Thing with All imported or exported
         --
         -- The thing is a Class/Type and the All refers to methods/constructors
@@ -184,10 +189,10 @@ data IE name
         -- For details on above see note [Api annotations] in ApiAnnotation
         -- See Note [Located RdrNames] in HsExpr
 
-  | IEThingWith (LIEWrappedName name)
+  | IEThingWith (LIEWrappedName (IdP name))
                 IEWildcard
-                [LIEWrappedName name]
-                [Located (FieldLbl name)]
+                [LIEWrappedName (IdP name)]
+                [Located (FieldLbl (IdP name))]
         -- ^ Imported or exported Thing With given imported or exported
         --
         -- The thing is a Class/Type and the imported or exported things are
@@ -209,7 +214,9 @@ data IE name
   | IEGroup             Int HsDocString  -- ^ Doc section heading
   | IEDoc               HsDocString      -- ^ Some documentation
   | IEDocNamed          String           -- ^ Reference to named doc
-  deriving (Eq, Data)
+  -- deriving (Eq, Data)
+deriving instance (Eq name, Eq (IdP name)) => Eq (IE name)
+deriving instance (DataId name)             => Data (IE name)
 
 -- | Imported or Exported Wildcard
 data IEWildcard = NoIEWildcard | IEWildcard Int deriving (Eq, Data)
@@ -231,14 +238,14 @@ gives rise to
 See Note [Representing fields in AvailInfo] in Avail for more details.
 -}
 
-ieName :: IE name -> name
+ieName :: IE pass -> IdP pass
 ieName (IEVar (L _ n))              = ieWrappedName n
 ieName (IEThingAbs  (L _ n))        = ieWrappedName n
 ieName (IEThingWith (L _ n) _ _ _)  = ieWrappedName n
 ieName (IEThingAll  (L _ n))        = ieWrappedName n
 ieName _ = panic "ieName failed pattern match!"
 
-ieNames :: IE a -> [a]
+ieNames :: IE pass -> [IdP pass]
 ieNames (IEVar       (L _ n)   )     = [ieWrappedName n]
 ieNames (IEThingAbs  (L _ n)   )     = [ieWrappedName n]
 ieNames (IEThingAll  (L _ n)   )     = [ieWrappedName n]
@@ -265,7 +272,7 @@ replaceWrappedName (IEType    (L l _)) n = IEType    (L l n)
 replaceLWrappedName :: LIEWrappedName name1 -> name2 -> LIEWrappedName name2
 replaceLWrappedName (L l n) n' = L l (replaceWrappedName n n')
 
-instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
+instance (OutputableBndrId pass) => Outputable (IE pass) where
     ppr (IEVar          var) = ppr (unLoc var)
     ppr (IEThingAbs     thing) = ppr (unLoc thing)
     ppr (IEThingAll     thing) = hcat [ppr (unLoc thing), text "(..)"]
@@ -290,14 +297,12 @@ instance (HasOccName name, OutputableBndr name) => Outputable (IE name) where
 instance (HasOccName name) => HasOccName (IEWrappedName name) where
   occName w = occName (ieWrappedName w)
 
-instance (OutputableBndr name, HasOccName name)
-           => OutputableBndr (IEWrappedName name) where
+instance (OutputableBndr name) => OutputableBndr (IEWrappedName name) where
   pprBndr bs   w = pprBndr bs   (ieWrappedName w)
   pprPrefixOcc w = pprPrefixOcc (ieWrappedName w)
   pprInfixOcc  w = pprInfixOcc  (ieWrappedName w)
 
-instance (HasOccName name, OutputableBndr name)
-            => Outputable (IEWrappedName name) where
+instance (OutputableBndr name) => Outputable (IEWrappedName name) where
   ppr (IEName    n) = pprPrefixOcc (unLoc n)
   ppr (IEPattern n) = text "pattern" <+> pprPrefixOcc (unLoc n)
   ppr (IEType    n) = text "type"    <+> pprPrefixOcc (unLoc n)

@@ -566,7 +566,7 @@ tcExtendIdBndrs bndrs thing_inside
 *                                                                      *
 ********************************************************************* -}
 
-tcAddDataFamConPlaceholders :: [LInstDecl Name] -> TcM a -> TcM a
+tcAddDataFamConPlaceholders :: [LInstDecl GhcRn] -> TcM a -> TcM a
 -- See Note [AFamDataCon: not promoting data family constructors]
 tcAddDataFamConPlaceholders inst_decls thing_inside
   = tcExtendKindEnvList [ (con, APromotionErr FamDataConPE)
@@ -575,30 +575,30 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
       -- Note [AFamDataCon: not promoting data family constructors]
   where
     -- get_cons extracts the *constructor* bindings of the declaration
-    get_cons :: LInstDecl Name -> [Name]
+    get_cons :: LInstDecl GhcRn -> [Name]
     get_cons (L _ (TyFamInstD {}))                     = []
     get_cons (L _ (DataFamInstD { dfid_inst = fid }))  = get_fi_cons fid
     get_cons (L _ (ClsInstD { cid_inst = ClsInstDecl { cid_datafam_insts = fids } }))
       = concatMap (get_fi_cons . unLoc) fids
 
-    get_fi_cons :: DataFamInstDecl Name -> [Name]
+    get_fi_cons :: DataFamInstDecl GhcRn -> [Name]
     get_fi_cons (DataFamInstDecl { dfid_defn = HsDataDefn { dd_cons = cons } })
       = map unLoc $ concatMap (getConNames . unLoc) cons
 
 
-tcAddPatSynPlaceholders :: [PatSynBind Name Name] -> TcM a -> TcM a
+tcAddPatSynPlaceholders :: [PatSynBind GhcRn GhcRn] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
   = tcExtendKindEnvList [ (name, APromotionErr PatSynPE)
                         | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
 
-getTypeSigNames :: [LSig Name] -> NameSet
+getTypeSigNames :: [LSig GhcRn] -> NameSet
 -- Get the names that have a user type sig
 getTypeSigNames sigs
   = foldr get_type_sig emptyNameSet sigs
   where
-    get_type_sig :: LSig Name -> NameSet -> NameSet
+    get_type_sig :: LSig GhcRn -> NameSet -> NameSet
     get_type_sig sig ns =
       case sig of
         L _ (TypeSig names _) -> extendNameSetList ns (map unLoc names)
@@ -659,7 +659,7 @@ lookup of A won't fail.
 ************************************************************************
 -}
 
-tcExtendRules :: [LRuleDecl Id] -> TcM a -> TcM a
+tcExtendRules :: [LRuleDecl GhcTc] -> TcM a -> TcM a
         -- Just pop the new rules into the EPS and envt resp
         -- All the rules come from an interface file, not source
         -- Nevertheless, some may be for this module, if we read
@@ -833,10 +833,10 @@ data InstBindings a
            --          Used only to improve error messages
       }
 
-instance (OutputableBndrId a) => Outputable (InstInfo a) where
+instance (SourceTextX a, OutputableBndrId a) => Outputable (InstInfo a) where
     ppr = pprInstInfoDetails
 
-pprInstInfoDetails :: (OutputableBndrId a) => InstInfo a -> SDoc
+pprInstInfoDetails :: (SourceTextX a, OutputableBndrId a) => InstInfo a -> SDoc
 pprInstInfoDetails info
    = hang (pprInstanceHdr (iSpec info) <+> text "where")
         2 (details (iBinds info))

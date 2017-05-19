@@ -10,6 +10,7 @@ files for imported data types.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcTyDecls(
         RolesInfo,
@@ -177,7 +178,7 @@ checkNameIsAcyclic n m = SynCycleM $ \s ->
 -- checking those TyCons: cycles never go through foreign packages) and
 -- the corresponding @LTyClDecl Name@ for each 'TyCon', so we
 -- can give better error messages.
-checkSynCycles :: UnitId -> [TyCon] -> [LTyClDecl Name] -> TcM ()
+checkSynCycles :: UnitId -> [TyCon] -> [LTyClDecl GhcRn] -> TcM ()
 checkSynCycles this_uid tcs tyclds = do
     case runSynCycleM (mapM_ (go emptyNameSet []) tcs) emptyNameSet of
         Left (loc, err) -> setSrcSpan loc $ failWithTc err
@@ -662,7 +663,7 @@ data RoleInferenceState = RIS { role_env  :: RoleEnv
 type VarPositions = VarEnv Int
 
 -- See [Role inference]
-newtype RoleM a = RM { unRM :: Maybe Name   -- of the tycon
+newtype RoleM a = RM { unRM :: Maybe Name -- of the tycon
                             -> VarPositions
                             -> Int          -- size of VarPositions
                             -> RoleInferenceState
@@ -809,7 +810,7 @@ when typechecking the [d| .. |] quote, and typecheck them later.
 ************************************************************************
 -}
 
-mkRecSelBinds :: [TyCon] -> HsValBinds Name
+mkRecSelBinds :: [TyCon] -> HsValBinds GhcRn
 -- NB We produce *un-typechecked* bindings, rather like 'deriving'
 --    This makes life easier, because the later type checking will add
 --    all necessary type abstractions and applications
@@ -821,14 +822,14 @@ mkRecSelBinds tycons
                                 | tc <- tycons
                                 , fld <- tyConFieldLabels tc ]
 
-mkRecSelBind :: (TyCon, FieldLabel) -> (LSig Name, (RecFlag, LHsBinds Name))
+mkRecSelBind :: (TyCon, FieldLabel) -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
 mkRecSelBind (tycon, fl)
   = mkOneRecordSelector all_cons (RecSelData tycon) fl
   where
     all_cons = map RealDataCon (tyConDataCons tycon)
 
 mkOneRecordSelector :: [ConLike] -> RecSelParent -> FieldLabel
-                    -> (LSig Name, (RecFlag, LHsBinds Name))
+                    -> (LSig GhcRn, (RecFlag, LHsBinds GhcRn))
 mkOneRecordSelector all_cons idDetails fl
   = (L loc (IdSig sel_id), (NonRecursive, unitBag (L loc sel_bind)))
   where
