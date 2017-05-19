@@ -8,6 +8,7 @@ The deriving code for the Generic class
 
 {-# LANGUAGE CPP, ScopedTypeVariables, TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcGenGenerics (canDoGenerics, canDoGenerics1,
                       GenericKind(..),
@@ -65,7 +66,7 @@ For the generic representation we need to generate:
 -}
 
 gen_Generic_binds :: GenericKind -> TyCon -> [Type]
-                 -> TcM (LHsBinds RdrName, FamInst)
+                 -> TcM (LHsBinds GhcPs, FamInst)
 gen_Generic_binds gk tc inst_tys = do
   repTyInsts <- tc_mkRepFamInsts gk tc inst_tys
   return (mkBindsRep gk tc, repTyInsts)
@@ -296,7 +297,7 @@ canDoGenerics1 rep_tc =
 -}
 
 type US = Int   -- Local unique supply, just a plain Int
-type Alt = (LPat RdrName, LHsExpr RdrName)
+type Alt = (LPat GhcPs, LHsExpr GhcPs)
 
 -- GenericKind serves to mark if a datatype derives Generic (Gen0) or
 -- Generic1 (Gen1).
@@ -320,7 +321,7 @@ gk2gkDC Gen1_{} d = Gen1_DC $ last $ dataConUnivTyVars d
 
 
 -- Bindings for the Generic instance
-mkBindsRep :: GenericKind -> TyCon -> LHsBinds RdrName
+mkBindsRep :: GenericKind -> TyCon -> LHsBinds GhcPs
 mkBindsRep gk tycon =
     unitBag (mkRdrFunBind (L loc from01_RDR) [from_eqn])
   `unionBags`
@@ -752,7 +753,7 @@ mk1Sum gk_ us i n datacon = (from_alt, to_alt)
 
 
 -- Generates the L1/R1 sum pattern
-genLR_P :: Int -> Int -> LPat RdrName -> LPat RdrName
+genLR_P :: Int -> Int -> LPat GhcPs -> LPat GhcPs
 genLR_P i n p
   | n == 0       = error "impossible"
   | n == 1       = p
@@ -761,7 +762,7 @@ genLR_P i n p
                      where m = div n 2
 
 -- Generates the L1/R1 sum expression
-genLR_E :: Int -> Int -> LHsExpr RdrName -> LHsExpr RdrName
+genLR_E :: Int -> Int -> LHsExpr GhcPs -> LHsExpr GhcPs
 genLR_E i n e
   | n == 0       = error "impossible"
   | n == 1       = e
@@ -778,8 +779,9 @@ genLR_E i n e
 -- Build a product expression
 mkProd_E :: GenericKind_DC    -- Generic or Generic1?
          -> US                -- Base for unique names
-         -> [(RdrName, Type)] -- List of variables matched on the lhs and their types
-         -> LHsExpr RdrName   -- Resulting product expression
+         -> [(RdrName, Type)]
+                       -- List of variables matched on the lhs and their types
+         -> LHsExpr GhcPs   -- Resulting product expression
 mkProd_E _   _ []     = mkM1_E (nlHsVar u1DataCon_RDR)
 mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
                      -- These M1s are meta-information for the constructor
@@ -787,7 +789,7 @@ mkProd_E gk_ _ varTys = mkM1_E (foldBal prod appVars)
     appVars = map (wrapArg_E gk_) varTys
     prod a b = prodDataCon_RDR `nlHsApps` [a,b]
 
-wrapArg_E :: GenericKind_DC -> (RdrName, Type) -> LHsExpr RdrName
+wrapArg_E :: GenericKind_DC -> (RdrName, Type) -> LHsExpr GhcPs
 wrapArg_E Gen0_DC          (var, ty) = mkM1_E $
                             boxRepRDR ty `nlHsVarApps` [var]
                          -- This M1 is meta-information for the selector
@@ -824,7 +826,7 @@ mkProd_P :: GenericKind       -- Gen0 or Gen1
          -> US                -- Base for unique names
          -> [(RdrName, Type)] -- List of variables to match,
                               --   along with their types
-         -> LPat RdrName      -- Resulting product pattern
+         -> LPat GhcPs      -- Resulting product pattern
 mkProd_P _  _ []     = mkM1_P (nlNullaryConPat u1DataCon_RDR)
 mkProd_P gk _ varTys = mkM1_P (foldBal prod appVars)
                      -- These M1s are meta-information for the constructor
@@ -832,7 +834,7 @@ mkProd_P gk _ varTys = mkM1_P (foldBal prod appVars)
     appVars = unzipWith (wrapArg_P gk) varTys
     prod a b = nlParPat $ prodDataCon_RDR `nlConPat` [a,b]
 
-wrapArg_P :: GenericKind -> RdrName -> Type -> LPat RdrName
+wrapArg_P :: GenericKind -> RdrName -> Type -> LPat GhcPs
 wrapArg_P Gen0 v ty = mkM1_P (nlParPat $ boxRepRDR ty `nlConVarPat` [v])
                    -- This M1 is meta-information for the selector
 wrapArg_P Gen1 v _  = nlParPat $ m1DataCon_RDR `nlConVarPat` [v]
@@ -843,19 +845,19 @@ mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
 x_RDR :: RdrName
 x_RDR = mkVarUnqual (fsLit "x")
 
-x_Expr :: LHsExpr RdrName
+x_Expr :: LHsExpr GhcPs
 x_Expr = nlHsVar x_RDR
 
-x_Pat :: LPat RdrName
+x_Pat :: LPat GhcPs
 x_Pat = nlVarPat x_RDR
 
-mkM1_E :: LHsExpr RdrName -> LHsExpr RdrName
+mkM1_E :: LHsExpr GhcPs -> LHsExpr GhcPs
 mkM1_E e = nlHsVar m1DataCon_RDR `nlHsApp` e
 
-mkM1_P :: LPat RdrName -> LPat RdrName
+mkM1_P :: LPat GhcPs -> LPat GhcPs
 mkM1_P p = nlParPat $ m1DataCon_RDR `nlConPat` [p]
 
-nlHsCompose :: LHsExpr RdrName -> LHsExpr RdrName -> LHsExpr RdrName
+nlHsCompose :: LHsExpr GhcPs -> LHsExpr GhcPs -> LHsExpr GhcPs
 nlHsCompose x y = compose_RDR `nlHsApps` [x, y]
 
 -- | Variant of foldr1 for producing balanced lists

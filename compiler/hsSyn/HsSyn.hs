@@ -27,6 +27,7 @@ module HsSyn (
         module HsUtils,
         module HsDoc,
         module PlaceHolder,
+        module HsExtension,
         Fixity,
 
         HsModule(..)
@@ -39,12 +40,12 @@ import HsExpr
 import HsImpExp
 import HsLit
 import PlaceHolder
+import HsExtension
 import HsPat
 import HsTypes
 import BasicTypes       ( Fixity, WarningTxt )
 import HsUtils
 import HsDoc
-import OccName          ( HasOccName(..) )
 
 -- others:
 import Outputable
@@ -109,8 +110,8 @@ data HsModule name
      -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId name) => Data (HsModule name)
 
-instance (OutputableBndrId name, HasOccName name)
-  => Outputable (HsModule name) where
+instance (SourceTextX pass, OutputableBndrId pass)
+  => Outputable (HsModule pass) where
 
     ppr (HsModule Nothing _ imports decls _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports

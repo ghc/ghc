@@ -94,3 +94,37 @@ Template Haskell
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
+
+- hsSyn Abstract Syntax Tree (AST) is now extensible via the mechanism described in `Trees that Grow <http://www.jucs.org/jucs_23_1/trees_that_grow/jucs_23_01_0042_0062_najd.pdf>`_
+
+  The main change for users of the GHC API is that the AST is no longer indexed
+  by the type used as the identifier, but by a specific index type, ::
+
+      type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
+      type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
+      type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
+      type GhcTcId = GhcTc                -- Old 'TcId' type param
+
+  The simplest way to support the current GHC as well as earlier ones is to define ::
+
+      #if MIN_VERSION_ghc(8,3,0)
+      type ParseI     = GhcPs
+      type RenameI    = GhcRn
+      type TypecheckI = GhcTc
+      #else
+      type ParseI     = RdrName
+      type RenameI    = Name
+      type TypecheckI = Var
+      #endif
+
+  and then replace all hardcoded index types accordingly. For polymorphic types,
+  the constraint ::
+
+      #if MIN_VERSION_ghc(8,3,0)
+      -- |bundle up the constraints required for a trees that grow pass
+      type IsPass pass = (DataId pass, OutputableBndrId pass, SourceTextX pass)
+      else
+      type IsPass pass = (DataId pass, OutputableBndrId pass)
+      #endif
+
+  can be used.

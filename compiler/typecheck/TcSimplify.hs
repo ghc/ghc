@@ -819,7 +819,8 @@ decideMonoTyVars infer_mode name_taus psigs candidates
        ; gbl_tvs <- tcGetGlobalTyCoVars
        ; let eq_constraints  = filter isEqPred candidates
              mono_tvs1       = growThetaTyVars eq_constraints gbl_tvs
-             constrained_tvs = growThetaTyVars eq_constraints (tyCoVarsOfTypes no_quant)
+             constrained_tvs = growThetaTyVars eq_constraints
+                                               (tyCoVarsOfTypes no_quant)
                                `minusVarSet` mono_tvs1
              mono_tvs2       = mono_tvs1 `unionVarSet` constrained_tvs
              -- A type variable is only "constrained" (so that the MR bites)
@@ -866,12 +867,13 @@ decideMonoTyVars infer_mode name_taus psigs candidates
       = False
 
     pp_bndrs = pprWithCommas (quotes . ppr . fst) name_taus
-    mr_msg = hang (sep [ text "The Monomorphism Restriction applies to the binding"
-                         <> plural name_taus
-                       , text "for" <+> pp_bndrs ])
-                2 (hsep [ text "Consider giving"
-                        , text (if isSingleton name_taus then "it" else "them")
-                        , text "a type signature"])
+    mr_msg =
+         hang (sep [ text "The Monomorphism Restriction applies to the binding"
+                     <> plural name_taus
+                   , text "for" <+> pp_bndrs ])
+            2 (hsep [ text "Consider giving"
+                    , text (if isSingleton name_taus then "it" else "them")
+                    , text "a type signature"])
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel

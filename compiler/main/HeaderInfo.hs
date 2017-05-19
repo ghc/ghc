@@ -18,7 +18,6 @@ module HeaderInfo ( getImports
 
 #include "HsVersions.h"
 
-import RdrName
 import HscTypes
 import Parser           ( parseHeader )
 import Lexer
@@ -99,8 +98,8 @@ getImports dflags buf filename source_filename = do
 
 mkPrelImports :: ModuleName
               -> SrcSpan    -- Attribute the "import Prelude" to this location
-              -> Bool -> [LImportDecl RdrName]
-              -> [LImportDecl RdrName]
+              -> Bool -> [LImportDecl GhcPs]
+              -> [LImportDecl GhcPs]
 -- Construct the implicit declaration "import Prelude" (or not)
 --
 -- NB: opt_NoImplicitPrelude is slightly different to import Prelude ();
@@ -119,7 +118,7 @@ mkPrelImports this_mod loc implicit_prelude import_decls
                           <- import_decls
                       , unLoc mod == pRELUDE_NAME ]
 
-      preludeImportDecl :: LImportDecl RdrName
+      preludeImportDecl :: LImportDecl GhcPs
       preludeImportDecl
         = L loc $ ImportDecl { ideclSourceSrc = NoSourceText,
                                ideclName      = L loc pRELUDE_NAME,

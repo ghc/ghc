@@ -18,7 +18,6 @@ import {-# SOURCE #-} Match   ( matchSinglePat )
 import HsSyn
 import MkCore
 import CoreSyn
-import Var
 
 import DsMonad
 import DsUtils
@@ -44,7 +43,7 @@ producing an expression with a runtime error in the corner if
 necessary.  The type argument gives the type of the @ei@.
 -}
 
-dsGuarded :: GRHSs Id (LHsExpr Id) -> Type -> DsM CoreExpr
+dsGuarded :: GRHSs GhcTc (LHsExpr GhcTc) -> Type -> DsM CoreExpr
 
 dsGuarded grhss rhs_ty = do
     match_result <- dsGRHSs PatBindRhs grhss rhs_ty
@@ -54,7 +53,7 @@ dsGuarded grhss rhs_ty = do
 -- In contrast, @dsGRHSs@ produces a @MatchResult@.
 
 dsGRHSs :: HsMatchContext Name
-        -> GRHSs Id (LHsExpr Id)                -- Guarded RHSs
+        -> GRHSs GhcTc (LHsExpr GhcTc)          -- Guarded RHSs
         -> Type                                 -- Type of RHS
         -> DsM MatchResult
 dsGRHSs hs_ctx (GRHSs grhss binds) rhs_ty
@@ -65,7 +64,8 @@ dsGRHSs hs_ctx (GRHSs grhss binds) rhs_ty
                              -- NB: nested dsLet inside matchResult
        ; return match_result2 }
 
-dsGRHS :: HsMatchContext Name -> Type -> LGRHS Id (LHsExpr Id) -> DsM MatchResult
+dsGRHS :: HsMatchContext Name -> Type -> LGRHS GhcTc (LHsExpr GhcTc)
+       -> DsM MatchResult
 dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
   = matchGuards (map unLoc guards) (PatGuard hs_ctx) rhs rhs_ty
 
@@ -77,10 +77,10 @@ dsGRHS hs_ctx rhs_ty (L _ (GRHS guards rhs))
 ************************************************************************
 -}
 
-matchGuards :: [GuardStmt Id]       -- Guard
-            -> HsStmtContext Name   -- Context
-            -> LHsExpr Id           -- RHS
-            -> Type                 -- Type of RHS of guard
+matchGuards :: [GuardStmt GhcTc]     -- Guard
+            -> HsStmtContext Name    -- Context
+            -> LHsExpr GhcTc         -- RHS
+            -> Type                  -- Type of RHS of guard
             -> DsM MatchResult
 
 -- See comments with HsExpr.Stmt re what a BodyStmt means
@@ -126,7 +126,7 @@ matchGuards (RecStmt   {} : _) _ _ _ = panic "matchGuards RecStmt"
 matchGuards (ApplicativeStmt {} : _) _ _ _ =
   panic "matchGuards ApplicativeLastStmt"
 
-isTrueLHsExpr :: LHsExpr Id -> Maybe (CoreExpr -> DsM CoreExpr)
+isTrueLHsExpr :: LHsExpr GhcTc -> Maybe (CoreExpr -> DsM CoreExpr)
 
 -- Returns Just {..} if we're sure that the expression is True
 -- I.e.   * 'True' datacon

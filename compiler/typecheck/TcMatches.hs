@@ -11,6 +11,7 @@ TcMatches: Typecheck some @Matches@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcMatches ( tcMatchesFun, tcGRHS, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
                    TcMatchCtxt(..), TcStmtChecker, TcExprStmtChecker, TcCmdStmtChecker,
@@ -70,9 +71,9 @@ See Note [sig_tau may be polymorphic] in TcPat.
 -}
 
 tcMatchesFun :: Located Name
-             -> MatchGroup Name (LHsExpr Name)
+             -> MatchGroup GhcRn (LHsExpr GhcRn)
              -> ExpRhoType     -- Expected type of function
-             -> TcM (HsWrapper, MatchGroup TcId (LHsExpr TcId))
+             -> TcM (HsWrapper, MatchGroup GhcTcId (LHsExpr GhcTcId))
                                 -- Returns type of body
 tcMatchesFun fn@(L _ fun_name) matches exp_ty
   = do  {  -- Check that they all have the same no of arguments
@@ -104,23 +105,23 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
 parser guarantees that each equation has exactly one argument.
 -}
 
-tcMatchesCase :: (Outputable (body Name)) =>
-                 TcMatchCtxt body                             -- Case context
-              -> TcSigmaType                                  -- Type of scrutinee
-              -> MatchGroup Name (Located (body Name))        -- The case alternatives
-              -> ExpRhoType                                   -- Type of whole case expressions
-              -> TcM (MatchGroup TcId (Located (body TcId)))
-                 -- Translated alternatives
-                 -- wrapper goes from MatchGroup's ty to expected ty
+tcMatchesCase :: (Outputable (body GhcRn)) =>
+                TcMatchCtxt body                        -- Case context
+             -> TcSigmaType                             -- Type of scrutinee
+             -> MatchGroup GhcRn (Located (body GhcRn)) -- The case alternatives
+             -> ExpRhoType                    -- Type of whole case expressions
+             -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
+                -- Translated alternatives
+                -- wrapper goes from MatchGroup's ty to expected ty
 
 tcMatchesCase ctxt scrut_ty matches res_ty
   = tcMatches ctxt [mkCheckExpType scrut_ty] res_ty matches
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
               -> TcMatchCtxt HsExpr
-              -> MatchGroup Name (LHsExpr Name)
+              -> MatchGroup GhcRn (LHsExpr GhcRn)
               -> ExpRhoType   -- deeply skolemised
-              -> TcM (MatchGroup TcId (LHsExpr TcId), HsWrapper)
+              -> TcM (MatchGroup GhcTcId (LHsExpr GhcTcId), HsWrapper)
 tcMatchLambda herald match_ctxt match res_ty
   = matchExpectedFunTys herald n_pats res_ty $ \ pat_tys rhs_ty ->
     tcMatches match_ctxt pat_tys rhs_ty match
@@ -130,8 +131,8 @@ tcMatchLambda herald match_ctxt match res_ty
 
 -- @tcGRHSsPat@ typechecks @[GRHSs]@ that occur in a @PatMonoBind@.
 
-tcGRHSsPat :: GRHSs Name (LHsExpr Name) -> TcRhoType
-           -> TcM (GRHSs TcId (LHsExpr TcId))
+tcGRHSsPat :: GRHSs GhcRn (LHsExpr GhcRn) -> TcRhoType
+           -> TcM (GRHSs GhcTcId (LHsExpr GhcTcId))
 -- Used for pattern bindings
 tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (mkCheckExpType res_ty)
   where
@@ -187,18 +188,18 @@ tauifyMultipleMatches group exp_tys
   -- NB: In the empty-match case, this ensures we fill in the ExpType
 
 -- | Type-check a MatchGroup.
-tcMatches :: (Outputable (body Name)) => TcMatchCtxt body
+tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
           -> [ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
-          -> MatchGroup Name (Located (body Name))
-          -> TcM (MatchGroup TcId (Located (body TcId)))
+          -> MatchGroup GhcRn (Located (body GhcRn))
+          -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
-  = MC { mc_what :: HsMatchContext Name,        -- What kind of thing this is
-         mc_body :: Located (body Name)         -- Type checker for a body of
+  = MC { mc_what :: HsMatchContext Name,  -- What kind of thing this is
+         mc_body :: Located (body GhcRn)         -- Type checker for a body of
                                                 -- an alternative
                  -> ExpRhoType
-                 -> TcM (Located (body TcId)) }
+                 -> TcM (Located (body GhcTcId)) }
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
@@ -214,11 +215,11 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                     , mg_origin = origin }) }
 
 -------------
-tcMatch :: (Outputable (body Name)) => TcMatchCtxt body
+tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
         -> [ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
-        -> LMatch Name (Located (body Name))
-        -> TcM (LMatch TcId (Located (body TcId)))
+        -> LMatch GhcRn (Located (body GhcRn))
+        -> TcM (LMatch GhcTcId (Located (body GhcTcId)))
 
 tcMatch ctxt pat_tys rhs_ty match
   = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
@@ -244,8 +245,8 @@ tcMatch ctxt pat_tys rhs_ty match
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
 -------------
-tcGRHSs :: TcMatchCtxt body -> GRHSs Name (Located (body Name)) -> ExpRhoType
-        -> TcM (GRHSs TcId (Located (body TcId)))
+tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (Located (body GhcRn)) -> ExpRhoType
+        -> TcM (GRHSs GhcTcId (Located (body GhcTcId)))
 
 -- Notice that we pass in the full res_ty, so that we get
 -- good inference from simple things like
@@ -261,8 +262,8 @@ tcGRHSs ctxt (GRHSs grhss (L l binds)) res_ty
         ; return (GRHSs grhss' (L l binds')) }
 
 -------------
-tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS Name (Located (body Name))
-       -> TcM (GRHS TcId (Located (body TcId)))
+tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (Located (body GhcRn))
+       -> TcM (GRHS GhcTcId (Located (body GhcTcId)))
 
 tcGRHS ctxt res_ty (GRHS guards rhs)
   = do  { (guards', rhs')
@@ -281,9 +282,9 @@ tcGRHS ctxt res_ty (GRHS guards rhs)
 -}
 
 tcDoStmts :: HsStmtContext Name
-          -> Located [LStmt Name (LHsExpr Name)]
+          -> Located [LStmt GhcRn (LHsExpr GhcRn)]
           -> ExpRhoType
-          -> TcM (HsExpr TcId)          -- Returns a HsDo
+          -> TcM (HsExpr GhcTcId)          -- Returns a HsDo
 tcDoStmts ListComp (L l stmts) res_ty
   = do  { res_ty <- expTypeToType res_ty
         ; (co, elt_ty) <- matchExpectedListTy res_ty
@@ -317,7 +318,7 @@ tcDoStmts MonadComp (L l stmts) res_ty
 
 tcDoStmts ctxt _ _ = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
-tcBody :: LHsExpr Name -> ExpRhoType -> TcM (LHsExpr TcId)
+tcBody :: LHsExpr GhcRn -> ExpRhoType -> TcM (LHsExpr GhcTcId)
 tcBody body res_ty
   = do  { traceTc "tcBody" (ppr res_ty)
         ; tcMonoExpr body res_ty
@@ -336,27 +337,27 @@ type TcCmdStmtChecker  = TcStmtChecker HsCmd  TcRhoType
 
 type TcStmtChecker body rho_type
   =  forall thing. HsStmtContext Name
-                -> Stmt Name (Located (body Name))
+                -> Stmt GhcRn (Located (body GhcRn))
                 -> rho_type                 -- Result type for comprehension
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
-                -> TcM (Stmt TcId (Located (body TcId)), thing)
+                -> TcM (Stmt GhcTcId (Located (body GhcTcId)), thing)
 
-tcStmts :: (Outputable (body Name)) => HsStmtContext Name
+tcStmts :: (Outputable (body GhcRn)) => HsStmtContext Name
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
-        -> [LStmt Name (Located (body Name))]
+        -> [LStmt GhcRn (Located (body GhcRn))]
         -> rho_type
-        -> TcM [LStmt TcId (Located (body TcId))]
+        -> TcM [LStmt GhcTcId (Located (body GhcTcId))]
 tcStmts ctxt stmt_chk stmts res_ty
   = do { (stmts', _) <- tcStmtsAndThen ctxt stmt_chk stmts res_ty $
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (Outputable (body Name)) => HsStmtContext Name
+tcStmtsAndThen :: (Outputable (body GhcRn)) => HsStmtContext Name
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
-               -> [LStmt Name (Located (body Name))]
+               -> [LStmt GhcRn (Located (body GhcRn))]
                -> rho_type
                -> (rho_type -> TcM thing)
-               -> TcM ([LStmt TcId (Located (body TcId))], thing)
+               -> TcM ([LStmt GhcTcId (Located (body GhcTcId))], thing)
 
 -- Note the higher-rank type.  stmt_chk is applied at different
 -- types in the equations for tcStmts
@@ -457,7 +458,8 @@ tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s _ _ _) elt_ty thing_inside
   = do  { (pairs', thing) <- loop bndr_stmts_s
         ; return (ParStmt pairs' noExpr noSyntaxExpr unitTy, thing) }
   where
-    -- loop :: [([LStmt Name], [Name])] -> TcM ([([LStmt TcId], [TcId])], thing)
+    -- loop :: [([LStmt GhcRn], [GhcRn])]
+    --      -> TcM ([([LStmt GhcTcId], [GhcTcId])], thing)
     loop [] = do { thing <- thing_inside elt_ty
                  ; return ([], thing) }         -- matching in the branches
 
@@ -778,7 +780,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
        --      -> ExpRhoType                            -- inner_res_ty
        --      -> [TcType]                              -- tup_tys
        --      -> [ParStmtBlock Name]
-       --      -> TcM ([([LStmt TcId], [TcId])], thing)
+       --      -> TcM ([([LStmt GhcTcId], [GhcTcId])], thing)
     loop _ inner_res_ty [] [] = do { thing <- thing_inside inner_res_ty
                                    ; return ([], thing) }
                                    -- matching in the branches
@@ -923,10 +925,10 @@ tcDoStmt _ stmt _ _
 -- TcErrors.hs.
 
 tcMonadFailOp :: CtOrigin
-              -> LPat TcId
-              -> SyntaxExpr Name     -- The fail op
+              -> LPat GhcTcId
+              -> SyntaxExpr GhcRn    -- The fail op
               -> TcType              -- Type of the whole do-expression
-              -> TcRn (SyntaxExpr TcId)  -- Typechecked fail op
+              -> TcRn (SyntaxExpr GhcTcId)  -- Typechecked fail op
 -- Get a 'fail' operator expression, to use if the pattern
 -- match fails. If the pattern is irrefutatable, just return
 -- noSyntaxExpr; it won't be used
@@ -950,7 +952,7 @@ tcMonadFailOp orig pat fail_op res_ty
         ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
                              (mkCheckExpType res_ty) $ \_ -> return ()) }
 
-emitMonadFailConstraint :: LPat TcId -> TcType -> TcRn ()
+emitMonadFailConstraint :: LPat GhcTcId -> TcType -> TcRn ()
 emitMonadFailConstraint pat res_ty
   = do { -- We expect res_ty to be of form (monad_ty arg_ty)
          (_co, (monad_ty, _arg_ty)) <- matchExpectedAppTy res_ty
@@ -962,7 +964,7 @@ emitMonadFailConstraint pat res_ty
                          (mkClassPred monadFailClass [monad_ty])
        ; return () }
 
-warnRebindableClash :: LPat TcId -> TcRn ()
+warnRebindableClash :: LPat GhcTcId -> TcRn ()
 warnRebindableClash pattern = addWarnAt
     (Reason Opt_WarnMissingMonadFailInstances)
     (getLoc pattern)
@@ -1004,10 +1006,10 @@ join :: tn -> res_ty
 
 tcApplicativeStmts
   :: HsStmtContext Name
-  -> [(SyntaxExpr Name, ApplicativeArg Name Name)]
+  -> [(SyntaxExpr GhcRn, ApplicativeArg GhcRn GhcRn)]
   -> ExpRhoType                         -- rhs_ty
   -> (TcRhoType -> TcM t)               -- thing_inside
-  -> TcM ([(SyntaxExpr TcId, ApplicativeArg TcId TcId)], Type, t)
+  -> TcM ([(SyntaxExpr GhcTcId, ApplicativeArg GhcTcId GhcTcId)], Type, t)
 
 tcApplicativeStmts ctxt pairs rhs_ty thing_inside
  = do { body_ty <- newFlexiTyVarTy liftedTypeKind
@@ -1045,8 +1047,8 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }
 
-    goArg :: (ApplicativeArg Name Name, Type, Type)
-          -> TcM (ApplicativeArg TcId TcId)
+    goArg :: (ApplicativeArg GhcRn GhcRn, Type, Type)
+          -> TcM (ApplicativeArg GhcTcId GhcTcId)
 
     goArg (ApplicativeArgOne pat rhs, pat_ty, exp_ty)
       = setSrcSpan (combineSrcSpans (getLoc pat) (getLoc rhs)) $
@@ -1067,7 +1069,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
                   }
            ; return (ApplicativeArgMany stmts' ret' pat') }
 
-    get_arg_bndrs :: ApplicativeArg TcId TcId -> [Id]
+    get_arg_bndrs :: ApplicativeArg GhcTcId GhcTcId -> [Id]
     get_arg_bndrs (ApplicativeArgOne pat _)    = collectPatBinders pat
     get_arg_bndrs (ApplicativeArgMany _ _ pat) = collectPatBinders pat
 
@@ -1109,7 +1111,7 @@ the variables they bind into scope, and typecheck the thing_inside.
 number of args are used in each equation.
 -}
 
-checkArgs :: Name -> MatchGroup Name body -> TcM ()
+checkArgs :: Name -> MatchGroup GhcRn body -> TcM ()
 checkArgs _ (MG { mg_alts = L _ [] })
     = return ()
 checkArgs fun (MG { mg_alts = L _ (match1:matches) })
@@ -1124,5 +1126,5 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     n_args1 = args_in_match match1
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]
 
-    args_in_match :: LMatch Name body -> Int
+    args_in_match :: LMatch GhcRn body -> Int
     args_in_match (L _ (Match _ pats _ _)) = length pats

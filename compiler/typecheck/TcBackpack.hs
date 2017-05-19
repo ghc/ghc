@@ -3,6 +3,7 @@
 {-# LANGUAGE NondecreasingIndentation #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 module TcBackpack (
     findExtraSigImports',
     findExtraSigImports,

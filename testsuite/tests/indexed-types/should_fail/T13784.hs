@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, GADTs #-}
-{-# LANGUAGE KindSignatures, MultiParamTypeClasses, TypeFamilies, TypeOperators #-}
+{-# LANGUAGE KindSignatures, MultiParamTypeClasses, TypeFamilies,
+             TypeOperators #-}
 
 module T13784 where
 
@@ -22,7 +23,8 @@ class Divideable a as where
 
 instance Divideable a (a : as) where
     -- type Divide a (a : as) = as
-    -- Conflicting type family instances, seems like OVERLAPS isn't a thing for type families.
+    -- Conflicting type family instances, seems like OVERLAPS isn't a thing for
+    -- type families.
     divide (a :* as) = (a, as)
 
 instance Divideable b as => Divideable b (a : as) where

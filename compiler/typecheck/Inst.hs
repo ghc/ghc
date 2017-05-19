@@ -7,6 +7,7 @@ The @Inst@ type: dictionaries or method instances
 -}
 
 {-# LANGUAGE CPP, MultiWayIf, TupleSections #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Inst (
        deeplySkolemise,
@@ -75,7 +76,7 @@ import Control.Monad( unless )
 ************************************************************************
 -}
 
-newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr TcId)
+newMethodFromName :: CtOrigin -> Name -> TcRhoType -> TcM (HsExpr GhcTcId)
 -- Used when Name is the wired-in name for a wired-in class method,
 -- so the caller knows its type for sure, which should be of form
 --    forall a. C a => <blah>
@@ -500,9 +501,9 @@ cases (the rest are caught in lookupInst).
 
 -}
 
-newOverloadedLit :: HsOverLit Name
+newOverloadedLit :: HsOverLit GhcRn
                  -> ExpRhoType
-                 -> TcM (HsOverLit TcId)
+                 -> TcM (HsOverLit GhcTcId)
 newOverloadedLit
   lit@(OverLit { ol_val = val, ol_rebindable = rebindable }) res_ty
   | not rebindable
@@ -528,9 +529,9 @@ newOverloadedLit
 -- Does not handle things that 'shortCutLit' can handle. See also
 -- newOverloadedLit in TcUnify
 newNonTrivialOverloadedLit :: CtOrigin
-                           -> HsOverLit Name
+                           -> HsOverLit GhcRn
                            -> ExpRhoType
-                           -> TcM (HsOverLit TcId)
+                           -> TcM (HsOverLit GhcTcId)
 newNonTrivialOverloadedLit orig
   lit@(OverLit { ol_val = val, ol_witness = HsVar (L _ meth_name)
                , ol_rebindable = rebindable }) res_ty
@@ -548,16 +549,17 @@ newNonTrivialOverloadedLit _ lit _
   = pprPanic "newNonTrivialOverloadedLit" (ppr lit)
 
 ------------
-mkOverLit :: OverLitVal -> TcM HsLit
+mkOverLit ::(HasDefaultX p, SourceTextX p) => OverLitVal -> TcM (HsLit p)
 mkOverLit (HsIntegral i)
   = do  { integer_ty <- tcMetaTy integerTyConName
-        ; return (HsInteger (il_text i) (il_value i) integer_ty) }
+        ; return (HsInteger (setSourceText $ il_text i)
+                            (il_value i) integer_ty) }
 
 mkOverLit (HsFractional r)
   = do  { rat_ty <- tcMetaTy rationalTyConName
-        ; return (HsRat r rat_ty) }
+        ; return (HsRat def r rat_ty) }
 
-mkOverLit (HsIsString src s) = return (HsString src s)
+mkOverLit (HsIsString src s) = return (HsString (setSourceText src) s)
 
 {-
 ************************************************************************
@@ -592,9 +594,10 @@ just use the expression inline.
 -}
 
 tcSyntaxName :: CtOrigin
-             -> TcType                  -- Type to instantiate it at
-             -> (Name, HsExpr Name)     -- (Standard name, user name)
-             -> TcM (Name, HsExpr TcId) -- (Standard name, suitable expression)
+             -> TcType                 -- ^ Type to instantiate it at
+             -> (Name, HsExpr GhcRn)   -- ^ (Standard name, user name)
+             -> TcM (Name, HsExpr GhcTcId)
+                                       -- ^ (Standard name, suitable expression)
 -- USED ONLY FOR CmdTop (sigh) ***
 -- See Note [CmdSyntaxTable] in HsExpr
 
@@ -621,7 +624,7 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
      expr <- tcPolyExpr (L span user_nm_expr) sigma1
      return (std_nm, unLoc expr)
 
-syntaxNameCtxt :: HsExpr Name -> CtOrigin -> Type -> TidyEnv
+syntaxNameCtxt :: HsExpr GhcRn -> CtOrigin -> Type -> TidyEnv
                -> TcRn (TidyEnv, SDoc)
 syntaxNameCtxt name orig ty tidy_env
   = do { inst_loc <- getCtLocM orig (Just TypeLevel)

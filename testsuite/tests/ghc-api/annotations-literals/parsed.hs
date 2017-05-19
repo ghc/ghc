@@ -41,7 +41,7 @@ testOneFile libdir fileName = do
     where
      gq ast = everything (++) ([] `mkQ` doHsLit `extQ` doOverLit) ast
 
-     doHsLit :: HsLit -> [String]
+     doHsLit :: HsLit GhcPs -> [String]
      doHsLit (HsChar       (SourceText src) c)
        = ["HsChar [" ++ src ++ "] " ++ show c]
      doHsLit (HsCharPrim   (SourceText src) c)
@@ -50,9 +50,9 @@ testOneFile libdir fileName = do
        = ["HsString [" ++ src ++ "] " ++ show c]
      doHsLit (HsStringPrim (SourceText src) c)
        = ["HsStringPrim [" ++ src ++ "] " ++ show c]
-     doHsLit (HsInt        (IL (SourceText src) _ c))
+     doHsLit (HsInt  _     (IL (SourceText src) _ c))
        = ["HsInt [" ++ src ++ "] " ++ show c]
-     doHsLit (HsIntPrim    (SourceText src) c)
+     doHsLit (HsIntPrim (SourceText src) c)
        = ["HsIntPrim [" ++ src ++ "] " ++ show c]
      doHsLit (HsWordPrim   (SourceText src) c)
        = ["HsWordPrim [" ++ src ++ "] " ++ show c]

@@ -26,23 +26,24 @@ module Hooks ( Hooks
              ) where
 
 import DynFlags
-import Name
 import PipelineMonad
 import HscTypes
 import HsDecls
 import HsBinds
 import HsExpr
 import OrdList
-import Id
 import TcRnTypes
 import Bag
 import RdrName
+import Name
+import Id
 import CoreSyn
 import GHCi.RemoteTypes
 import SrcLoc
 import Type
 import System.Process
 import BasicTypes
+import HsExtension
 
 import Data.Maybe
 
@@ -75,17 +76,24 @@ emptyHooks = Hooks
   }
 
 data Hooks = Hooks
-  { dsForeignsHook         :: Maybe ([LForeignDecl Id] -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
-  , tcForeignImportsHook   :: Maybe ([LForeignDecl Name] -> TcM ([Id], [LForeignDecl Id], Bag GlobalRdrElt))
-  , tcForeignExportsHook   :: Maybe ([LForeignDecl Name] -> TcM (LHsBinds TcId, [LForeignDecl TcId], Bag GlobalRdrElt))
+  { dsForeignsHook         :: Maybe ([LForeignDecl GhcTc]
+                           -> DsM (ForeignStubs, OrdList (Id, CoreExpr)))
+  , tcForeignImportsHook   :: Maybe ([LForeignDecl GhcRn]
+                          -> TcM ([Id], [LForeignDecl GhcTc], Bag GlobalRdrElt))
+  , tcForeignExportsHook   :: Maybe ([LForeignDecl GhcRn]
+            -> TcM (LHsBinds GhcTcId, [LForeignDecl GhcTcId], Bag GlobalRdrElt))
   , hscFrontendHook        :: Maybe (ModSummary -> Hsc FrontendResult)
-  , hscCompileCoreExprHook :: Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
+  , hscCompileCoreExprHook ::
+               Maybe (HscEnv -> SrcSpan -> CoreExpr -> IO ForeignHValue)
   , ghcPrimIfaceHook       :: Maybe ModIface
-  , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags -> CompPipeline (PhasePlus, FilePath))
+  , runPhaseHook           :: Maybe (PhasePlus -> FilePath -> DynFlags
+                                         -> CompPipeline (PhasePlus, FilePath))
   , runMetaHook            :: Maybe (MetaHook TcM)
-  , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool -> HomePackageTable -> IO SuccessFlag)
-  , runRnSpliceHook        :: Maybe (HsSplice Name -> RnM (HsSplice Name))
-  , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type -> IO (Maybe HValue))
+  , linkHook               :: Maybe (GhcLink -> DynFlags -> Bool
+                                         -> HomePackageTable -> IO SuccessFlag)
+  , runRnSpliceHook        :: Maybe (HsSplice GhcRn -> RnM (HsSplice GhcRn))
+  , getValueSafelyHook     :: Maybe (HscEnv -> Name -> Type
+                                                          -> IO (Maybe HValue))
   , createIservProcessHook :: Maybe (CreateProcess -> IO ProcessHandle)
   }
 

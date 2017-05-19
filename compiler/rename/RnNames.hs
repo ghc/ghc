@@ -5,6 +5,10 @@
 -}
 
 {-# LANGUAGE CPP, NondecreasingIndentation, MultiWayIf, NamedFieldPuns #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module RnNames (
         rnImports, getLocalNonValBinders, newRecordSelector,
@@ -15,7 +19,8 @@ module RnNames (
         checkConName,
         mkChildEnv,
         findChildren,
-        dodgyMsg
+        dodgyMsg,
+        dodgyMsgInsert
     ) where
 
 #include "HsVersions.h"
@@ -154,8 +159,8 @@ with yes we have gone with no for now.
 -- the return types represent.
 -- Note: Do the non SOURCE ones first, so that we get a helpful warning
 -- for SOURCE ones that are unnecessary
-rnImports :: [LImportDecl RdrName]
-          -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+rnImports :: [LImportDecl GhcPs]
+          -> RnM ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImports imports = do
     tcg_env <- getGblEnv
     -- NB: want an identity module here, because it's OK for a signature
@@ -170,8 +175,8 @@ rnImports imports = do
     return (decls, rdr_env, imp_avails, hpc_usage)
 
   where
-    combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
-            -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+    combine :: [(LImportDecl GhcRn,  GlobalRdrEnv, ImportAvails, AnyHpcUsage)]
+            -> ([LImportDecl GhcRn], GlobalRdrEnv, ImportAvails, AnyHpcUsage)
     combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails, False)
 
     plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
@@ -196,8 +201,8 @@ rnImports imports = do
 --
 --  4. A boolean 'AnyHpcUsage' which is true if the imported module
 --     used HPC.
-rnImportDecl  :: Module -> LImportDecl RdrName
-              -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
+rnImportDecl  :: Module -> LImportDecl GhcPs
+             -> RnM (LImportDecl GhcRn, GlobalRdrEnv, ImportAvails, AnyHpcUsage)
 rnImportDecl this_mod
              (L loc decl@(ImportDecl { ideclName = loc_imp_mod_name, ideclPkgQual = mb_pkg
                                      , ideclSource = want_boot, ideclSafe = mod_safe
@@ -543,7 +548,7 @@ extendGlobalRdrEnvRn avails new_fixities
 *                                                                      *
 ********************************************************************* -}
 
-getLocalNonValBinders :: MiniFixityEnv -> HsGroup RdrName
+getLocalNonValBinders :: MiniFixityEnv -> HsGroup GhcPs
     -> RnM ((TcGblEnv, TcLclEnv), NameSet)
 -- Get all the top-level binders bound the group *except*
 -- for value bindings, which are treated separately
@@ -614,7 +619,7 @@ getLocalNonValBinders fixity_env
     new_simple rdr_name = do{ nm <- newTopSrcBinder rdr_name
                             ; return (avail nm) }
 
-    new_tc :: Bool -> LTyClDecl RdrName
+    new_tc :: Bool -> LTyClDecl GhcPs
            -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_tc overload_ok tc_decl -- NOT for type/data instances
         = do { let (bndrs, flds) = hsLTyClDeclBinders tc_decl
@@ -629,7 +634,8 @@ getLocalNonValBinders fixity_env
     -- Calculate the mapping from constructor names to fields, which
     -- will go in tcg_field_env. It's convenient to do this here where
     -- we are working with a single datatype definition.
-    mk_fld_env :: HsDataDefn RdrName -> [Name] -> [FieldLabel] -> [(Name, [FieldLabel])]
+    mk_fld_env :: HsDataDefn GhcPs -> [Name] -> [FieldLabel]
+               -> [(Name, [FieldLabel])]
     mk_fld_env d names flds = concatMap find_con_flds (dd_cons d)
       where
         find_con_flds (L _ (ConDeclH98 { con_name    = L _ rdr
@@ -662,7 +668,7 @@ getLocalNonValBinders fixity_env
               find (\ fl -> flLabel fl == lbl) flds
           where lbl = occNameFS (rdrNameOcc rdr)
 
-    new_assoc :: Bool -> LInstDecl RdrName
+    new_assoc :: Bool -> LInstDecl GhcPs
               -> RnM ([AvailInfo], [(Name, [FieldLabel])])
     new_assoc _ (L _ (TyFamInstD {})) = return ([], [])
       -- type instances don't bind new names
@@ -681,7 +687,7 @@ getLocalNonValBinders fixity_env
       = return ([], [])    -- Do not crash on ill-formed instances
                            -- Eg   instance !Show Int   Trac #3811c
 
-    new_di :: Bool -> Maybe Name -> DataFamInstDecl RdrName
+    new_di :: Bool -> Maybe Name -> DataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_di overload_ok mb_cls ti_decl
         = do { main_name <- lookupFamInstName mb_cls (dfid_tycon ti_decl)
@@ -693,11 +699,11 @@ getLocalNonValBinders fixity_env
                    fld_env  = mk_fld_env (dfid_defn ti_decl) sub_names flds'
              ; return (avail, fld_env) }
 
-    new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl RdrName
+    new_loc_di :: Bool -> Maybe Name -> LDataFamInstDecl GhcPs
                    -> RnM (AvailInfo, [(Name, [FieldLabel])])
     new_loc_di overload_ok mb_cls (L _ d) = new_di overload_ok mb_cls d
 
-newRecordSelector :: Bool -> [Name] -> LFieldOcc RdrName -> RnM FieldLabel
+newRecordSelector :: Bool -> [Name] -> LFieldOcc GhcPs -> RnM FieldLabel
 newRecordSelector _ [] _ = error "newRecordSelector: datatype has no constructors!"
 newRecordSelector overload_ok (dc:_) (L loc (FieldOcc (L _ fld) _))
   = do { selName <- newTopSrcBinder $ L loc $ field
@@ -780,8 +786,8 @@ although we never look up data constructors.
 filterImports
     :: ModIface
     -> ImpDeclSpec                     -- The span for the entire import decl
-    -> Maybe (Bool, Located [LIE RdrName])    -- Import spec; True => hiding
-    -> RnM (Maybe (Bool, Located [LIE Name]), -- Import spec w/ Names
+    -> Maybe (Bool, Located [LIE GhcPs])    -- Import spec; True => hiding
+    -> RnM (Maybe (Bool, Located [LIE GhcRn]), -- Import spec w/ Names
             [GlobalRdrElt])                   -- Same again, but in GRE form
 filterImports iface decl_spec Nothing
   = return (Nothing, gresFromAvails (Just imp_spec) (mi_exports iface))
@@ -793,7 +799,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
   = do  -- check for errors, convert RdrNames to Names
         items1 <- mapM lookup_lie import_items
 
-        let items2 :: [(LIE Name, AvailInfo)]
+        let items2 :: [(LIE GhcRn, AvailInfo)]
             items2 = concat items1
                 -- NB the AvailInfo may have duplicates, and several items
                 --    for the same parent; e.g N(x) and N(y)
@@ -811,7 +817,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
     all_avails = mi_exports iface
 
         -- See Note [Dealing with imports]
-    imp_occ_env :: OccEnv (Name,        -- the name
+    imp_occ_env :: OccEnv (Name,    -- the name
                            AvailInfo,   -- the export item providing the name
                            Maybe Name)  -- the parent of associated types
     imp_occ_env = mkOccEnv_C combine [ (nameOccName n, (n, a, Nothing))
@@ -837,7 +843,7 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
       where
         mb_success = lookupOccEnv imp_occ_env (rdrNameOcc rdr)
 
-    lookup_lie :: LIE RdrName -> TcRn [(LIE Name, AvailInfo)]
+    lookup_lie :: LIE GhcPs -> TcRn [(LIE GhcRn, AvailInfo)]
     lookup_lie (L loc ieRdr)
         = do (stuff, warns) <- setSrcSpan loc $
                                liftM (fromMaybe ([],[])) $
@@ -873,7 +879,8 @@ filterImports iface decl_spec (Just (want_hiding, L l import_items))
         -- data constructors of an associated family, we need separate
         -- AvailInfos for the data constructors and the family (as they have
         -- different parents).  See Note [Dealing with imports]
-    lookup_ie :: IE RdrName -> IELookupM ([(IE Name, AvailInfo)], [IELookupWarning])
+    lookup_ie :: IE GhcPs
+              -> IELookupM ([(IE GhcRn, AvailInfo)], [IELookupWarning])
     lookup_ie ie = handle_bad_import $ do
       case ie of
         IEVar (L l n) -> do
@@ -1007,7 +1014,7 @@ catIELookupM ms = [ a | Succeeded a <- ms ]
 -}
 
 -- | Given an import\/export spec, construct the appropriate 'GlobalRdrElt's.
-gresFromIE :: ImpDeclSpec -> (LIE Name, AvailInfo) -> [GlobalRdrElt]
+gresFromIE :: ImpDeclSpec -> (LIE GhcRn, AvailInfo) -> [GlobalRdrElt]
 gresFromIE decl_spec (L loc ie, avail)
   = gresFromAvail prov_fn avail
   where
@@ -1081,7 +1088,7 @@ lookupChildren all_kids rdr_items
 *********************************************************
 -}
 
-reportUnusedNames :: Maybe (Located [LIE RdrName])  -- Export list
+reportUnusedNames :: Maybe (Located [LIE GhcPs])  -- Export list
                   -> TcGblEnv -> RnM ()
 reportUnusedNames _export_decls gbl_env
   = do  { traceRn "RUN" (ppr (tcg_dus gbl_env))
@@ -1137,9 +1144,9 @@ specification and implementation notes are here:
 -}
 
 type ImportDeclUsage
-   = ( LImportDecl Name   -- The import declaration
+   = ( LImportDecl GhcRn   -- The import declaration
      , [AvailInfo]        -- What *is* used (normalised)
-     , [Name] )           -- What is imported but *not* used
+     , [Name] )       -- What is imported but *not* used
 
 warnUnusedImportDecls :: TcGblEnv -> RnM ()
 warnUnusedImportDecls gbl_env
@@ -1200,6 +1207,7 @@ warnMissingSignatures gbl_env
                       name  = patSynName p
                       pp_ty = pprPatSynType p
 
+                  add_bind_warn :: Id -> IOEnv (Env TcGblEnv TcLclEnv) ()
                   add_bind_warn id
                     = do { env <- tcInitTidyEnv     -- Why not use emptyTidyEnv?
                          ; let name    = idName id
@@ -1242,7 +1250,7 @@ not normalised).
 
 type ImportMap = Map SrcLoc [AvailInfo]  -- See [The ImportMap]
 
-findImportUsage :: [LImportDecl Name]
+findImportUsage :: [LImportDecl GhcRn]
                 -> [GlobalRdrElt]
                 -> [ImportDeclUsage]
 
@@ -1267,7 +1275,7 @@ findImportUsage imports used_gres
                                  foldr (add_unused . unLoc) emptyNameSet imp_ies
               _other -> emptyNameSet -- No explicit import list => no unused-name list
 
-        add_unused :: IE Name -> NameSet -> NameSet
+        add_unused :: IE GhcRn -> NameSet -> NameSet
         add_unused (IEVar (L _ n))      acc
                                        = add_unused_name (ieWrappedName n) acc
         add_unused (IEThingAbs (L _ n)) acc
@@ -1410,7 +1418,7 @@ printMinimalImports imports_w_usage
       where
         doc = text "Compute minimal imports for" <+> ppr decl
 
-    to_ie :: ModIface -> AvailInfo -> [IE Name]
+    to_ie :: ModIface -> AvailInfo -> [IE GhcRn]
     -- The main trick here is that if we're importing all the constructors
     -- we want to say "T(..)", but if we're importing only a subset we want
     -- to say "T(A,B,C)".  So we have to find out what the module exports.
@@ -1509,7 +1517,7 @@ qualImportItemErr rdr
   = hang (text "Illegal qualified name in import item:")
        2 (ppr rdr)
 
-badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
+badImportItemErrStd :: ModIface -> ImpDeclSpec -> IE GhcPs -> SDoc
 badImportItemErrStd iface decl_spec ie
   = sep [text "Module", quotes (ppr (is_mod decl_spec)), source_import,
          text "does not export", quotes (ppr ie)]
@@ -1517,7 +1525,8 @@ badImportItemErrStd iface decl_spec ie
     source_import | mi_boot iface = text "(hi-boot interface)"
                   | otherwise     = Outputable.empty
 
-badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE RdrName -> SDoc
+badImportItemErrDataCon :: OccName -> ModIface -> ImpDeclSpec -> IE GhcPs
+                        -> SDoc
 badImportItemErrDataCon dataType_occ iface decl_spec ie
   = vcat [ text "In module"
              <+> quotes (ppr (is_mod decl_spec))
@@ -1542,7 +1551,7 @@ badImportItemErrDataCon dataType_occ iface decl_spec ie
                   | otherwise     = Outputable.empty
     parens_sp d = parens (space <> d <> space)  -- T( f,g )
 
-badImportItemErr :: ModIface -> ImpDeclSpec -> IE RdrName -> [AvailInfo] -> SDoc
+badImportItemErr :: ModIface -> ImpDeclSpec -> IE GhcPs -> [AvailInfo] -> SDoc
 badImportItemErr iface decl_spec ie avails
   = case find checkIfDataCon avails of
       Just con -> badImportItemErrDataCon (availOccName con) iface decl_spec ie
@@ -1561,15 +1570,23 @@ illegalImportItemErr :: SDoc
 illegalImportItemErr = text "Illegal import item"
 
 dodgyImportWarn :: RdrName -> SDoc
-dodgyImportWarn item = dodgyMsg (text "import") item
+dodgyImportWarn item
+  = dodgyMsg (text "import") item (dodgyMsgInsert item :: IE GhcPs)
 
-dodgyMsg :: (OutputableBndr n, HasOccName n) => SDoc -> n -> SDoc
-dodgyMsg kind tc
+dodgyMsg :: (Outputable a, Outputable b) => SDoc -> a -> b -> SDoc
+dodgyMsg kind tc ie
   = sep [ text "The" <+> kind <+> ptext (sLit "item")
-                     <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
+                    -- <+> quotes (ppr (IEThingAll (noLoc (IEName $ noLoc tc))))
+                     <+> quotes (ppr ie)
                 <+> text "suggests that",
           quotes (ppr tc) <+> text "has (in-scope) constructors or class methods,",
           text "but it has none" ]
+
+dodgyMsgInsert :: forall p . IdP p -> IE p
+dodgyMsgInsert tc = IEThingAll ii
+  where
+    ii :: LIEWrappedName (IdP p)
+    ii = noLoc (IEName $ noLoc tc)
 
 
 addDupDeclErr :: [GlobalRdrElt] -> TcRn ()
@@ -1594,7 +1611,7 @@ missingImportListWarn :: ModuleName -> SDoc
 missingImportListWarn mod
   = text "The module" <+> quotes (ppr mod) <+> ptext (sLit "does not have an explicit import list")
 
-missingImportListItem :: IE RdrName -> SDoc
+missingImportListItem :: IE GhcPs -> SDoc
 missingImportListItem ie
   = text "The import item" <+> quotes (ppr ie) <+> ptext (sLit "does not have an explicit import list")
 

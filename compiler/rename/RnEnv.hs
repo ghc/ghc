@@ -385,7 +385,8 @@ lookupInstDeclBndr cls what rdr
     doc = what <+> text "of class" <+> quotes (ppr cls)
 
 -----------------------------------------------
-lookupFamInstName :: Maybe Name -> Located RdrName -> RnM (Located Name)
+lookupFamInstName :: Maybe Name -> Located RdrName
+                  -> RnM (Located Name)
 -- Used for TyData and TySynonym family instances only,
 -- See Note [Family instance binders]
 lookupFamInstName (Just cls) tc_rdr  -- Associated type; c.f RnBinds.rnMethodBind
@@ -440,8 +441,8 @@ lookupExactOrOrig rdr_name res k
 -- unambiguous because there is only one field id 'fld' in scope.
 -- But currently it's rejected.
 
-lookupRecFieldOcc :: Maybe Name  -- Nothing    => just look it up as usual
-                                 -- Just tycon => use tycon to disambiguate
+lookupRecFieldOcc :: Maybe Name -- Nothing    => just look it up as usual
+                                      -- Just tycon => use tycon to disambiguate
                   -> SDoc -> RdrName
                   -> RnM Name
 lookupRecFieldOcc parent doc rdr_name
@@ -612,8 +613,8 @@ data ChildLookupResult
                         Name        -- Name of thing we were looking for
                         SDoc        -- How to print the name
                         [Name]      -- List of possible parents
-      | FoundName Parent Name  --  We resolved to a normal name
-      | FoundFL FieldLabel       --  We resolved to a FL
+      | FoundName Parent Name       --  We resolved to a normal name
+      | FoundFL FieldLabel          --  We resolved to a FL
 
 -- | Specialised version of msum for RnM ChildLookupResult
 combineChildLookupResult :: [RnM ChildLookupResult] -> RnM ChildLookupResult
@@ -935,7 +936,8 @@ lookupOccRnX_maybe globalLookup wrapper rdr_name
 lookupOccRn_maybe :: RdrName -> RnM (Maybe Name)
 lookupOccRn_maybe = lookupOccRnX_maybe lookupGlobalOccRn_maybe id
 
-lookupOccRn_overloaded :: Bool -> RdrName -> RnM (Maybe (Either Name [Name]))
+lookupOccRn_overloaded :: Bool -> RdrName
+                       -> RnM (Maybe (Either Name [Name]))
 lookupOccRn_overloaded overload_ok
   = lookupOccRnX_maybe global_lookup Left
       where
@@ -1343,7 +1345,7 @@ instance Outputable HsSigCtxt where
     ppr (RoleAnnotCtxt ns) = text "RoleAnnotCtxt" <+> ppr ns
 
 lookupSigOccRn :: HsSigCtxt
-               -> Sig RdrName
+               -> Sig GhcPs
                -> Located RdrName -> RnM (Located Name)
 lookupSigOccRn ctxt sig = lookupSigCtxtOccRn ctxt (hsSigDoc sig)
 
@@ -1507,10 +1509,10 @@ We treat the original (standard) names as free-vars too, because the type checke
 checks the type of the user thing against the type of the standard thing.
 -}
 
-lookupIfThenElse :: RnM (Maybe (SyntaxExpr Name), FreeVars)
+lookupIfThenElse :: RnM (Maybe (SyntaxExpr GhcRn), FreeVars)
 -- Different to lookupSyntaxName because in the non-rebindable
 -- case we desugar directly rather than calling an existing function
--- Hence the (Maybe (SyntaxExpr Name)) return type
+-- Hence the (Maybe (SyntaxExpr GhcRn)) return type
 lookupIfThenElse
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on
@@ -1529,8 +1531,9 @@ lookupSyntaxName' std_name
             -- Get the similarly named thing from the local environment
            lookupOccRn (mkRdrUnqual (nameOccName std_name)) }
 
-lookupSyntaxName :: Name                                -- The standard name
-                 -> RnM (SyntaxExpr Name, FreeVars)     -- Possibly a non-standard name
+lookupSyntaxName :: Name                             -- The standard name
+                 -> RnM (SyntaxExpr GhcRn, FreeVars) -- Possibly a non-standard
+                                                     -- name
 lookupSyntaxName std_name
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax
        ; if not rebindable_on then
@@ -1540,8 +1543,8 @@ lookupSyntaxName std_name
            do { usr_name <- lookupOccRn (mkRdrUnqual (nameOccName std_name))
               ; return (mkRnSyntaxExpr usr_name, unitFV usr_name) } }
 
-lookupSyntaxNames :: [Name]                          -- Standard names
-                  -> RnM ([HsExpr Name], FreeVars)   -- See comments with HsExpr.ReboundNames
+lookupSyntaxNames :: [Name]                         -- Standard names
+     -> RnM ([HsExpr GhcRn], FreeVars) -- See comments with HsExpr.ReboundNames
    -- this works with CmdTop, which wants HsExprs, not SyntaxExprs
 lookupSyntaxNames std_names
   = do { rebindable_on <- xoptM LangExt.RebindableSyntax

@@ -7,6 +7,7 @@ Handles @deriving@ clauses on @data@ declarations.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcDeriv ( tcDeriving, DerivInfo(..), mkDerivInfos ) where
 
@@ -190,12 +191,12 @@ both of them.  So we gather defs/uses from deriving just like anything else.
 data DerivInfo = DerivInfo { di_rep_tc  :: TyCon
                              -- ^ The data tycon for normal datatypes,
                              -- or the *representation* tycon for data families
-                           , di_clauses :: [LHsDerivingClause Name]
+                           , di_clauses :: [LHsDerivingClause GhcRn]
                            , di_ctxt    :: SDoc -- ^ error context
                            }
 
 -- | Extract `deriving` clauses of proper data type (skips data families)
-mkDerivInfos :: [LTyClDecl Name] -> TcM [DerivInfo]
+mkDerivInfos :: [LTyClDecl GhcRn] -> TcM [DerivInfo]
 mkDerivInfos decls = concatMapM (mk_deriv . unLoc) decls
   where
 
@@ -217,8 +218,8 @@ mkDerivInfos decls = concatMapM (mk_deriv . unLoc) decls
 -}
 
 tcDeriving  :: [DerivInfo]       -- All `deriving` clauses
-            -> [LDerivDecl Name] -- All stand-alone deriving declarations
-            -> TcM (TcGblEnv, Bag (InstInfo Name), HsValBinds Name)
+            -> [LDerivDecl GhcRn] -- All stand-alone deriving declarations
+            -> TcM (TcGblEnv, Bag (InstInfo GhcRn), HsValBinds GhcRn)
 tcDeriving deriv_infos deriv_decls
   = recoverM (do { g <- getGblEnv
                  ; return (g, emptyBag, emptyValBindsOut)}) $
@@ -278,7 +279,7 @@ tcDeriving deriv_infos deriv_decls
         ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ catMaybes maybe_fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) } }
   where
-    ddump_deriving :: Bag (InstInfo Name) -> HsValBinds Name
+    ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
                    -> Bag FamInst             -- ^ Rep type family instances
                    -> SDoc
     ddump_deriving inst_infos extra_binds repFamInsts
@@ -292,8 +293,8 @@ tcDeriving deriv_infos deriv_decls
 
     -- Apply the suspended computations given by genInst calls.
     -- See Note [Staging of tcDeriving]
-    apply_inst_infos :: [ThetaType -> TcM (InstInfo RdrName)]
-                     -> [DerivSpec ThetaType] -> TcM [InstInfo RdrName]
+    apply_inst_infos :: [ThetaType -> TcM (InstInfo GhcPs)]
+                     -> [DerivSpec ThetaType] -> TcM [InstInfo GhcPs]
     apply_inst_infos = zipWithM (\f ds -> f (ds_theta ds))
 
 -- Prints the representable type family instance
@@ -304,9 +305,9 @@ pprRepTy fi@(FamInst { fi_tys = lhs })
   where rhs = famInstRHS fi
 
 renameDeriv :: Bool
-            -> [InstInfo RdrName]
-            -> Bag (LHsBind RdrName, LSig RdrName)
-            -> TcM (Bag (InstInfo Name), HsValBinds Name, DefUses)
+            -> [InstInfo GhcPs]
+            -> Bag (LHsBind GhcPs, LSig GhcPs)
+            -> TcM (Bag (InstInfo GhcRn), HsValBinds GhcRn, DefUses)
 renameDeriv is_boot inst_infos bagBinds
   | is_boot     -- If we are compiling a hs-boot file, don't generate any derived bindings
                 -- The inst-info bindings will all be empty, but it's easier to
@@ -343,7 +344,7 @@ renameDeriv is_boot inst_infos bagBinds
                   dus_aux `plusDU` usesOnly (plusFVs fvs_insts)) } }
 
   where
-    rn_inst_info :: InstInfo RdrName -> TcM (InstInfo Name, FreeVars)
+    rn_inst_info :: InstInfo GhcPs -> TcM (InstInfo GhcRn, FreeVars)
     rn_inst_info
       inst_info@(InstInfo { iSpec = inst
                           , iBinds = InstBindings
@@ -492,7 +493,7 @@ in derived code.
 
 makeDerivSpecs :: Bool
                -> [DerivInfo]
-               -> [LDerivDecl Name]
+               -> [LDerivDecl GhcRn]
                -> TcM [EarlyDerivSpec]
 makeDerivSpecs is_boot deriv_infos deriv_decls
   = do  { eqns1 <- concatMapM (recoverM (return []) . deriveDerivInfo)  deriv_infos
@@ -526,13 +527,13 @@ deriveDerivInfo (DerivInfo { di_rep_tc = rep_tc, di_clauses = clauses
 
                   _ -> (rep_tc, mkTyVarTys tvs)     -- datatype
 
-    deriveForClause :: HsDerivingClause Name -> TcM [EarlyDerivSpec]
+    deriveForClause :: HsDerivingClause GhcRn -> TcM [EarlyDerivSpec]
     deriveForClause (HsDerivingClause { deriv_clause_strategy = dcs
                                       , deriv_clause_tys      = L _ preds })
       = concatMapM (deriveTyData tvs tc tys (fmap unLoc dcs)) preds
 
 ------------------------------------------------------------------
-deriveStandalone :: LDerivDecl Name -> TcM [EarlyDerivSpec]
+deriveStandalone :: LDerivDecl GhcRn -> TcM [EarlyDerivSpec]
 -- Standalone deriving declarations
 --  e.g.   deriving instance Show a => Show (T a)
 -- Rather like tcLocalInstDecl
@@ -596,7 +597,7 @@ warnUselessTypeable
 deriveTyData :: [TyVar] -> TyCon -> [Type]   -- LHS of data or data instance
                                              --   Can be a data instance, hence [Type] args
              -> Maybe DerivStrategy          -- The optional deriving strategy
-             -> LHsSigType Name              -- The deriving predicate
+             -> LHsSigType GhcRn             -- The deriving predicate
              -> TcM [EarlyDerivSpec]
 -- The deriving clause of a data or newtype declaration
 -- I.e. not standalone deriving
@@ -1522,7 +1523,7 @@ the renamer.  What a great hack!
 -- case of instances for indexed families.
 --
 genInst :: DerivSpec theta
-        -> TcM (ThetaType -> TcM (InstInfo RdrName), BagDerivStuff, Maybe Name)
+        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, Maybe Name)
 -- We must use continuation-returning style here to get the order in which we
 -- typecheck family instances and derived instances right.
 -- See Note [Staging of tcDeriving]
@@ -1610,7 +1611,7 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
 
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
               -> TyCon -> [Type] -> [TyVar]
-              -> TcM (LHsBinds RdrName, BagDerivStuff)
+              -> TcM (LHsBinds GhcPs, BagDerivStuff)
 genDerivStuff mechanism loc clas tycon inst_tys tyvars
   = case mechanism of
       -- See Note [Bindings for Generalised Newtype Deriving]
@@ -1761,7 +1762,7 @@ derivable class, and C2 isn't a newtype).
 ************************************************************************
 -}
 
-nonUnaryErr :: LHsSigType Name -> SDoc
+nonUnaryErr :: LHsSigType GhcRn -> SDoc
 nonUnaryErr ct = quotes (ppr ct)
   <+> text "is not a unary constraint, as expected by a deriving clause"
 
@@ -1835,7 +1836,7 @@ derivingHiddenErr tc
   = hang (text "The data constructors of" <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
        2 (text "so you cannot derive an instance for it")
 
-standaloneCtxt :: LHsSigType Name -> SDoc
+standaloneCtxt :: LHsSigType GhcRn -> SDoc
 standaloneCtxt ty = hang (text "In the stand-alone deriving instance for")
                        2 (quotes (ppr ty))
 
