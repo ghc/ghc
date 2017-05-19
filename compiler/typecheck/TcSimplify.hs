@@ -1201,7 +1201,9 @@ solveWanteds :: WantedConstraints -> TcS WantedConstraints
 solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   = do { traceTcS "solveWanteds {" (ppr wc)
 
-       ; wc1 <- solveSimpleWanteds simples
+       ; wc1 <- solveSimpleWanteds (simples `unionBags` insols)
+                -- Why solve 'insols'?  See Note [Rewrite insolubles] in TcSMonad
+
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
        ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
@@ -1213,8 +1215,9 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
        ; dflags <- getDynFlags
        ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
                                 no_new_scs
-                                (WC { wc_simple = simples2, wc_impl = implics2
-                                    , wc_insol  = insols `unionBags` insols1 })
+                                (WC { wc_simple = simples2
+                                    , wc_insol  = insols1
+                                    , wc_impl   = implics2 })
 
        ; bb <- TcS.getTcEvBindsMap
        ; traceTcS "solveWanteds }" $
@@ -1257,25 +1260,30 @@ simpl_loop n limit floated_eqs no_new_deriveds
 
        -- solveSimples may make progress if either float_eqs hold
        ; (unifs1, wc1) <- reportUnifications $
-                          solveSimpleWanteds (floated_eqs `unionBags` simples)
-                               -- Put floated_eqs first so they get solved first
-                               -- NB: the floated_eqs may include /derived/ equalities
-                               --     arising from fundeps inside an implication
+                          solveSimpleWanteds $
+                          floated_eqs `unionBags` simples `unionBags` insols
+            -- Notes:
+            --   - Why solve 'insols'?  See Note [Rewrite insolubles] in TcSMonad
+            --   - Put floated_eqs first so they get solved first
+            --     NB: the floated_eqs may include /derived/ equalities
+            --     arising from fundeps inside an implication
 
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
        ; (no_new_scs, simples2) <- expandSuperClasses simples1
 
        -- We have already tried to solve the nested implications once
        -- Try again only if we have unified some meta-variables
-       -- (which is a bit like adding more givens
+       -- (which is a bit like adding more givens)
        -- See Note [Cutting off simpl_loop]
        ; (floated_eqs2, implics2) <- if unifs1 == 0 && isEmptyBag implics1
                                      then return (emptyBag, implics)
                                      else solveNestedImplications (implics `unionBags` implics1)
 
        ; simpl_loop (n+1) limit floated_eqs2 no_new_scs
-                    (WC { wc_simple = simples2, wc_impl = implics2
-                        , wc_insol  = insols `unionBags` insols1 }) }
+                    (WC { wc_simple = simples2
+                        , wc_insol  = insols1
+                        , wc_impl   = implics2 }) }
+
 
 expandSuperClasses :: Cts -> TcS (Bool, Cts)
 -- If there are any unsolved wanteds, expand one step of

@@ -1499,7 +1499,7 @@ kick_out_rewritable new_fr new_tv ics@(IC { inert_eqs      = tv_eqs
     (dicts_out,  dicts_in)  = partitionDicts   kick_out_ct dictmap
     (irs_out,    irs_in)    = partitionBag     kick_out_ct irreds
     (insols_out, insols_in) = partitionBag     kick_out_ct insols
-      -- Kick out even insolubles: See Note [Kick out insolubles]
+      -- Kick out even insolubles: See Note [Rewrite insolubles]
 
     fr_may_rewrite :: CtFlavourRole -> Bool
     fr_may_rewrite fs = new_fr `eqMayRewriteFR` fs
@@ -1591,14 +1591,29 @@ new equality, to maintain the inert-set invariants.
     take the substitution into account
 
 
-Note [Kick out insolubles]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Rewrite insolubles]
+~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we have an insoluble alpha ~ [alpha], which is insoluble
-because an occurs check.  And then we unify alpha := [Int].
-Then we really want to rewrite the insoluble to [Int] ~ [[Int]].
-Now it can be decomposed.  Otherwise we end up with a "Can't match
-[Int] ~ [[Int]]" which is true, but a bit confusing because the
-outer type constructors match.
+because an occurs check.  And then we unify alpha := [Int].  Then we
+really want to rewrite the insoluble to [Int] ~ [[Int]].  Now it can
+be decomposed.  Otherwise we end up with a "Can't match [Int] ~
+[[Int]]" which is true, but a bit confusing because the outer type
+constructors match.
+
+Similarly, if we have a CHoleCan, we'd like to rewrite it with any
+Givens, to give as informative an error messasge as possible
+(Trac #12468, #11325).
+
+Hence:
+ * In the main simlifier loops in TcSimplify (solveWanteds,
+   simpl_loop), we feed the insolubles in solveSimpleWanteds,
+   so that they get rewritten (albeit not solved).
+
+ * We kick insolubles out of the inert set, if they can be
+   rewritten (see TcSMonad.kick_out_rewritable)
+
+ * We rewrite those insolubles in TcCanonical.
+   See Note [Make sure that insolubles are fully rewritten]
 -}
 
 
@@ -2567,10 +2582,11 @@ emitInsoluble ct
   where
     this_pred = ctPred ct
     add_insol is@(IS { inert_cans = ics@(IC { inert_insols = old_insols }) })
-      | already_there = is
-      | otherwise     = is { inert_cans = ics { inert_insols = old_insols `snocCts` ct } }
+      | drop_it   = is
+      | otherwise = is { inert_cans = ics { inert_insols = old_insols `snocCts` ct } }
       where
-        already_there = not (isWantedCt ct) && anyBag (tcEqType this_pred . ctPred) old_insols
+        drop_it = isDroppableDerivedCt ct &&
+                  anyBag (tcEqType this_pred . ctPred) old_insols
              -- See Note [Do not add duplicate derived insolubles]
 
 newTcRef :: a -> TcS (TcRef a)

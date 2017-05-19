@@ -86,7 +86,7 @@ module TcRnTypes(
         addInsols, getInsolubles, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
         tyCoVarsOfWCList, trulyInsoluble,
-        isDroppableDerivedLoc, insolubleImplic,
+        isDroppableDerivedLoc, isDroppableDerivedCt, insolubleImplic,
         arisesFromGivens,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
@@ -1834,11 +1834,14 @@ See Note [The superclass story] in TcCanonical.
 
 dropDerivedInsols :: Cts -> Cts
 -- See Note [Dropping derived constraints]
-dropDerivedInsols insols = filterBag keep insols
-  where                    -- insols can include Given
-    keep ct
-      | isDerivedCt ct = not (isDroppableDerivedLoc (ctLoc ct))
-      | otherwise      = True
+dropDerivedInsols insols
+  = filterBag (not . isDroppableDerivedCt) insols
+              -- insols can include Given
+
+isDroppableDerivedCt :: Ct -> Bool
+isDroppableDerivedCt ct
+  | isDerivedCt ct = isDroppableDerivedLoc (ctLoc ct)
+  | otherwise      = False
 
 isDroppableDerivedLoc :: CtLoc -> Bool
 -- See Note [Dropping derived constraints]
