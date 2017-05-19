@@ -33,6 +33,7 @@ import Outputable
 import FastString
 import MonadUtils
 import ErrUtils
+import Panic (throwGhcExceptionIO, GhcException (..))
 import BasicTypes          ( IntWithInf, treatZeroAsInf, mkIntWithInf )
 import Control.Monad       ( when, liftM, ap )
 
@@ -211,16 +212,30 @@ tick t = SM (\st_env us sc -> let sc' = doSimplTick (st_flags st_env) t sc
 checkedTick :: Tick -> SimplM ()
 -- Try to take a tick, but fail if too many
 checkedTick t
-  = SM (\st_env us sc -> if st_max_ticks st_env <= mkIntWithInf (simplCountN sc)
-                         then pprPanic "Simplifier ticks exhausted" (msg sc)
-                         else let sc' = doSimplTick (st_flags st_env) t sc
-                              in sc' `seq` return ((), us, sc'))
+  = SM (\st_env us sc ->
+           if st_max_ticks st_env <= mkIntWithInf (simplCountN sc)
+           then throwGhcExceptionIO $
+                  PprProgramError "Simplifier ticks exhausted" (msg sc)
+           else let sc' = doSimplTick (st_flags st_env) t sc
+                in sc' `seq` return ((), us, sc'))
   where
-    msg sc = vcat [ text "When trying" <+> ppr t
-                  , text "To increase the limit, use -fsimpl-tick-factor=N (default 100)"
-                  , text "If you need to do this, let GHC HQ know, and what factor you needed"
-                  , pp_details sc
-                  , pprSimplCount sc ]
+    msg sc = vcat
+      [ text "When trying" <+> ppr t
+      , text "To increase the limit, use -fsimpl-tick-factor=N (default 100)."
+      , space
+      , text "If you need to increase the limit substantially, please file a"
+      , text "bug report and indicate the factor you needed."
+      , space
+      , text "If GHC was unable to complete compilation even"
+               <+> text "with a very large factor"
+      , text "(a thousand or more), please consult the"
+                <+> doubleQuotes (text "Known bugs or infelicities")
+      , text "section in the Users Guide before filing a report. There are a"
+      , text "few situations unlikely to occur in practical programs for which"
+      , text "simplifier non-termination has been judged acceptable."
+      , space
+      , pp_details sc
+      , pprSimplCount sc ]
     pp_details sc
       | hasDetailedCounts sc = empty
       | otherwise = text "To see detailed counts use -ddump-simpl-stats"
