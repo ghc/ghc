@@ -776,27 +776,32 @@ type ContInfo = (Label, Int, [GlobalReg])
 -- | Native function calls. First arg indicates whether there is a continuation.
 genNativeCall :: Maybe ContInfo -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
 
--- Native call to a known function
+-- FIXME(kavon): the only difference I can see between these two cases is
+-- whether we need to cast the function pointer or not. We could combine the
+-- two cases of this function otherwise.
+
+-- Native call to a known function 
 genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
+    dflags <- getDynFlags
     (vf, stmts, top) <- getHsFunc live lbl
     (stgRegs, stgStmts) <- funEpilogue live
     let retTy = getRetTy $ getVarType vf
+        before = stmts `appOL` stgStmts
     case maybeCont of
         -- tail call to a known fun
         Nothing -> do 
             (retV, s1) <- doExpr retTy $ Call TailCall vf stgRegs llvmStdFunAttrs
             let s2  = Return (Just retV)
-            return (stmts `appOL` stgStmts `snocOL` s1 `snocOL` s2, top)
+            return (before `snocOL` s1 `snocOL` s2, top)
             
         -- non-tail call to a known fun
-        Just contInfo -> do 
-            -- TODO add metadata to this StdCall with the offset and label name
-            (retV, s1) <- doExpr retTy $ Call StdCall vf stgRegs llvmStdFunAttrs
-            endStms <- doReturnTo contInfo retV
-            return (stmts `appOL` stgStmts `snocOL` s1 `appOL` endStms, top)
+        Just contInfo -> do
+            after <- mkNonTailCall dflags contInfo retTy vf stgRegs
+            return (before `appOL` after, top)
+            
     
--- Tail call to unknown function / address. TODO: check if the expr is P64[Sp] to gen a ret.
-genNativeCall _ expr live = do
+-- Native call to unknown function / address.
+genNativeCall maybeCont expr live = do
     fty <- llvmFunTy live
     (vf, stmts, top) <- exprToVar expr
     dflags <- getDynFlags
@@ -811,10 +816,41 @@ genNativeCall _ expr live = do
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
     (stgRegs, stgStmts) <- funEpilogue live
     let retTy = getRetTy fty
-    (retV, s2) <- doExpr retTy $ Call TailCall v1 stgRegs llvmStdFunAttrs
-    let s3 = Return (Just retV)
-    return (stmts `snocOL` s1 `appOL` stgStmts `snocOL` s2 `snocOL` s3,
-            top)
+        before = stmts `snocOL` s1 `appOL` stgStmts
+    case maybeCont of
+        Nothing -> do
+            (retV, s2) <- doExpr retTy $ Call TailCall v1 stgRegs llvmStdFunAttrs
+            let s3 = Return (Just retV)
+            return (before `snocOL` s2 `snocOL` s3,
+                top)
+        Just contInfo -> do
+            after <- mkNonTailCall dflags contInfo retTy v1 stgRegs
+            return (before `appOL` after, top)
+             
+mkNonTailCall :: DynFlags -> ContInfo -> LlvmType -> LlvmVar -> [LlvmVar] -> LlvmM LlvmStatements
+mkNonTailCall dflags contInfo retTy vf stgRegs = do
+    (retV, callStm) <- doExpr retTy $ Call StdCall vf stgRegs llvmStdFunAttrs
+    let s1 = withReturnMeta dflags contInfo callStm
+    endStms <- doReturnTo contInfo retV
+    return $ s1 `consOL` endStms
+            
+cps_retpt :: LMString
+cps_retpt = fsLit "cps.retpt" 
+            
+withReturnMeta :: DynFlags -> ContInfo -> LlvmStatement -> LlvmStatement
+withReturnMeta dflags (retl, argOff, _) stm = let 
+        -- some unique name for the mangler corresponding to retl
+        name = MetaStr $ fsLit "todo" -- TODO(kavon)
+        
+        -- offset into the Sp where the return address should be written
+        wordBytes = widthInBytes $ wordWidth dflags
+        offInt = argOff - wordBytes
+        off = MetaStr $ mkFastString $ show offInt
+        
+        expr = MetaStruct [name, off]
+    in
+        MetaStmt [MetaAnnot cps_retpt expr] stm
+    
             
             
 doReturnTo :: ContInfo -> LlvmVar -> LlvmM LlvmStatements
