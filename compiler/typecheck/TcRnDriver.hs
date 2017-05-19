@@ -365,7 +365,7 @@ tcRnImports hsc_env import_decls
         ; let { dir_imp_mods = moduleEnvKeys
                              . imp_mods
                              $ imports }
-        ; tcg_env <- checkFamInstConsistency (imp_finsts imports) dir_imp_mods ;
+        ; tcg_env <- checkFamInstConsistency dir_imp_mods ;
 
         ; return tcg_env } }
 
