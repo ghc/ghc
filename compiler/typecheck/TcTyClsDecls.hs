@@ -209,7 +209,7 @@ tcTyClDecls tyclds role_annots
                  -- Also extend the local type envt with bindings giving
                  -- the (polymorphic) kind of each knot-tied TyCon or Class
                  -- See Note [Type checking recursive type and class declarations]
-             tcExtendKindEnv2 (map mkTcTyConPair tc_tycons)              $
+             tcExtendKindEnv (foldl extendEnvWithTcTyCon emptyNameEnv tc_tycons) $
 
                  -- Kind and type check declarations for this group
                mapM (tcTyClDecl roles) tyclds
@@ -340,21 +340,19 @@ kcTyClGroup decls
           -- See Note [Kind checking for type and class decls]
 
         ; lcl_env <- solveEqualities $
-          do {
-               -- Step 1: Bind kind variables for all decls
-               initial_kinds <- getInitialKinds decls
-             ; traceTc "kcTyClGroup: initial kinds" $
-               vcat (map pp_initial_kind initial_kinds)
-             ; tcExtendKindEnv2 initial_kinds $ do {
+                     do { -- Step 1: Bind kind variables for all decls
+                          initial_kinds <- getInitialKinds decls
+                        ; traceTc "kcTyClGroup: initial kinds" $
+                          ppr initial_kinds
 
-             -- Step 2: Set extended envt, kind-check the decls
-             ; mapM_ kcLTyClDecl decls
+                        -- Step 2: Set extended envt, kind-check the decls
+                        ; tcExtendKindEnv initial_kinds $
+                          do { mapM_ kcLTyClDecl decls
+                             ; getLclEnv } }
 
-             ; getLclEnv } }
-
-             -- Step 4: generalisation
-             -- Kind checking done for this group
-             -- Now we have to kind generalize the flexis
+        -- Step 3: generalisation
+        -- Kind checking done for this group
+        -- Now we have to kind generalize the flexis
         ; res <- concatMapM (generaliseTCD (tcl_env lcl_env)) decls
 
         ; traceTc "kcTyClGroup result" (vcat (map pp_res res))
@@ -407,44 +405,70 @@ kcTyClGroup decls
     generaliseFamDecl kind_env (FamilyDecl { fdLName = L _ name })
       = generalise kind_env name
 
-    pp_initial_kind (name, ATcTyCon tc)
-      = ppr name <+> dcolon <+> ppr (tyConKind tc)
-    pp_initial_kind pair
-      = ppr pair
-
     pp_res tc = ppr (tyConName tc) <+> dcolon <+> ppr (tyConKind tc)
 
-mkTcTyConPair :: TcTyCon -> (Name, TcTyThing)
+--------------
+mkTcTyConEnv :: TcTyCon -> TcTypeEnv
+mkTcTyConEnv tc = unitNameEnv (getName tc) (ATcTyCon tc)
+
+extendEnvWithTcTyCon :: TcTypeEnv -> TcTyCon -> TcTypeEnv
 -- Makes a binding to put in the local envt, binding
 -- a name to a TcTyCon
-mkTcTyConPair tc
-  = (getName tc, ATcTyCon tc)
+extendEnvWithTcTyCon env tc
+  = extendNameEnv env (getName tc) (ATcTyCon tc)
 
-mk_thing_env :: [LTyClDecl Name] -> [(Name, TcTyThing)]
-mk_thing_env [] = []
-mk_thing_env (decl : decls)
-  | L _ (ClassDecl { tcdLName = L _ nm, tcdATs = ats }) <- decl
-  = (nm, APromotionErr ClassPE) :
-    (map (, APromotionErr TyConPE) $ map (unLoc . fdLName . unLoc) ats) ++
-    (mk_thing_env decls)
+--------------
+mkPromotionErrorEnv :: [LTyClDecl Name] -> TcTypeEnv
+-- Maps each tycon/datacon to a suitable promotion error
+--    tc :-> APromotionErr TyConPE
+--    dc :-> APromotionErr RecDataConPE
+--    See Note [ARecDataCon: Recursion and promoting data constructors]
 
-  | otherwise
-  = (tcdName (unLoc decl), APromotionErr TyConPE) :
-    (mk_thing_env decls)
+mkPromotionErrorEnv decls
+  = foldr (plusNameEnv . mk_prom_err_env . unLoc)
+          emptyNameEnv decls
 
-getInitialKinds :: [LTyClDecl Name] -> TcM [(Name, TcTyThing)]
+mk_prom_err_env :: TyClDecl Name -> TcTypeEnv
+mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdATs = ats })
+  = unitNameEnv nm (APromotionErr ClassPE)
+    `plusNameEnv`
+    mkNameEnv [ (name, APromotionErr TyConPE)
+              | L _ (FamilyDecl { fdLName = L _ name }) <- ats ]
+
+mk_prom_err_env (DataDecl { tcdLName = L _ name
+                          , tcdDataDefn = HsDataDefn { dd_cons = cons } })
+  = unitNameEnv name (APromotionErr TyConPE)
+    `plusNameEnv`
+    mkNameEnv [ (con, APromotionErr RecDataConPE)
+              | L _ con' <- cons, L _ con <- getConNames con' ]
+
+mk_prom_err_env decl
+  = unitNameEnv (tcdName decl) (APromotionErr TyConPE)
+    -- Works for family declarations too
+
+--------------
+getInitialKinds :: [LTyClDecl Name] -> TcM (NameEnv TcTyThing)
+-- Maps each tycon to its initial kind,
+-- and each datacon to a suitable promotion error
+--    tc :-> ATcTyCon (tc:initial_kind)
+--    dc :-> APromotionErr RecDataConPE
+--    See Note [ARecDataCon: Recursion and promoting data constructors]
+
 getInitialKinds decls
-  = tcExtendKindEnv2 (mk_thing_env decls) $
-    do { pairss <- mapM (addLocM getInitialKind) decls
-       ; return (concat pairss) }
+  = tcExtendKindEnv promotion_err_env $
+    do { tc_kinds <- mapM (addLocM getInitialKind) decls
+       ; return (foldl plusNameEnv promotion_err_env tc_kinds) }
+  where
+    promotion_err_env = mkPromotionErrorEnv decls
 
 getInitialKind :: TyClDecl Name
-               -> TcM [(Name, TcTyThing)]    -- Mixture of ATcTyCon and APromotionErr
+               -> TcM (NameEnv TcTyThing)
 -- Allocate a fresh kind variable for each TyCon and Class
--- For each tycon, return   (name, ATcTyCon (TcCyCon with kind k))
---                 where k is the kind of tc, derived from the LHS
---                       of the definition (and probably including
---                       kind unification variables)
+-- For each tycon, return a NameEnv with
+--      name :-> ATcTyCon (TcCyCon with kind k))
+-- where k is the kind of tc, derived from the LHS
+--       of the definition (and probably including
+--       kind unification variables)
 --      Example: data T a b = ...
 --      return (T, kv1 -> kv2 -> kv3)
 --
@@ -452,33 +476,26 @@ getInitialKind :: TyClDecl Name
 --   * The kind signatures on type-variable binders
 --   * The result kinds signature on a TyClDecl
 --
--- ALSO for each datacon, return (dc, APromotionErr RecDataConPE)
---    See Note [ARecDataCon: Recursion and promoting data constructors]
---
 -- No family instances are passed to getInitialKinds
 
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
-  = do { (tycon, inner_prs) <-
+  = do { let cusk = hsDeclHasCusk decl
+       ; (tycon, inner_prs) <-
            kcHsTyVarBndrs name True cusk False True ktvs $
            do { inner_prs <- getFamDeclInitialKinds (Just cusk) ats
               ; return (constraintKind, inner_prs) }
-       ; return (mkTcTyConPair tycon : inner_prs) }
-  where
-    cusk = hsDeclHasCusk decl
+       ; return (extendEnvWithTcTyCon inner_prs tycon) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdTyVars = ktvs
-                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
-                                                         , dd_cons = cons } })
+                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig } })
   = do  { (tycon, _) <-
            kcHsTyVarBndrs name True (hsDeclHasCusk decl) False True ktvs $
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKind ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
-        ; let inner_prs = [ (unLoc con, APromotionErr RecDataConPE)
-                          | L _ con' <- cons, con <- getConNames con' ]
-        ; return (mkTcTyConPair tycon : inner_prs) }
+        ; return (mkTcTyConEnv tycon) }
 
 getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind Nothing decl
@@ -492,7 +509,7 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
                             Nothing -> newMetaKindVar
                             Just ksig -> tcLHsKind ksig
                 ; return (res_k, ()) }
-        ; return [ mkTcTyConPair tycon ] }
+        ; return (mkTcTyConEnv tycon) }
   where
     -- Keep this synchronized with 'hsDeclHasCusk'.
     kind_annotation (L _ ty) = case ty of
@@ -502,15 +519,15 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
 
 ---------------------------------
 getFamDeclInitialKinds :: Maybe Bool  -- if assoc., CUSKness of assoc. class
-                       -> [LFamilyDecl Name] -> TcM [(Name, TcTyThing)]
+                       -> [LFamilyDecl Name]
+                       -> TcM TcTypeEnv
 getFamDeclInitialKinds mb_cusk decls
-  = tcExtendKindEnv2 [ (n, APromotionErr TyConPE)
-                     | L _ (FamilyDecl { fdLName = L _ n }) <- decls] $
-    concatMapM (addLocM (getFamDeclInitialKind mb_cusk)) decls
+  = do { tc_kinds <- mapM (addLocM (getFamDeclInitialKind mb_cusk)) decls
+       ; return (foldr plusNameEnv emptyNameEnv tc_kinds) }
 
 getFamDeclInitialKind :: Maybe Bool  -- if assoc., CUSKness of assoc. class
                       -> FamilyDecl Name
-                      -> TcM [(Name, TcTyThing)]
+                      -> TcM TcTypeEnv
 getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                                                , fdTyVars    = ktvs
                                                , fdResultSig = L _ resultSig
@@ -526,7 +543,7 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                         -- by default
                         | otherwise                -> newMetaKindVar
               ; return (res_k, ()) }
-       ; return [ mkTcTyConPair tycon ] }
+       ; return (mkTcTyConEnv tycon) }
   where
     cusk  = famDeclHasCusk mb_cusk decl
     (open, unsat) = case info of

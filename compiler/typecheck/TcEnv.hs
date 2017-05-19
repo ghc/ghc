@@ -26,7 +26,7 @@ module TcEnv(
         lookupGlobal,
 
         -- Local environment
-        tcExtendKindEnv2,
+        tcExtendKindEnv, tcExtendKindEnvList,
         tcExtendTyVarEnv, tcExtendTyVarEnv2,
         tcExtendLetEnv, tcExtendLetEnvIds,
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
@@ -368,15 +368,23 @@ getInLocalScope :: TcM (Name -> Bool)
 getInLocalScope = do { lcl_env <- getLclTypeEnv
                      ; return (`elemNameEnv` lcl_env) }
 
-tcExtendKindEnv2 :: [(Name, TcTyThing)] -> TcM r -> TcM r
+tcExtendKindEnvList :: [(Name, TcTyThing)] -> TcM r -> TcM r
 -- Used only during kind checking, for TcThings that are
 --      ATcTyCon or APromotionErr
 -- No need to update the global tyvars, or tcl_th_bndrs, or tcl_rdr
-tcExtendKindEnv2 things thing_inside
-  = do { traceTc "txExtendKindEnv" (ppr things)
+tcExtendKindEnvList things thing_inside
+  = do { traceTc "txExtendKindEnvList" (ppr things)
        ; updLclEnv upd_env thing_inside }
   where
     upd_env env = env { tcl_env = extendNameEnvList (tcl_env env) things }
+
+tcExtendKindEnv :: NameEnv TcTyThing -> TcM r -> TcM r
+-- A variant of tcExtendKindEvnList
+tcExtendKindEnv extra_env thing_inside
+  = do { traceTc "txExtendKindEnv" (ppr extra_env)
+       ; updLclEnv upd_env thing_inside }
+  where
+    upd_env env = env { tcl_env = tcl_env env `plusNameEnv` extra_env }
 
 -----------------------
 -- Scoped type and kind variables
@@ -561,8 +569,8 @@ tcExtendIdBndrs bndrs thing_inside
 tcAddDataFamConPlaceholders :: [LInstDecl Name] -> TcM a -> TcM a
 -- See Note [AFamDataCon: not promoting data family constructors]
 tcAddDataFamConPlaceholders inst_decls thing_inside
-  = tcExtendKindEnv2 [ (con, APromotionErr FamDataConPE)
-                     | lid <- inst_decls, con <- get_cons lid ]
+  = tcExtendKindEnvList [ (con, APromotionErr FamDataConPE)
+                        | lid <- inst_decls, con <- get_cons lid ]
       thing_inside
       -- Note [AFamDataCon: not promoting data family constructors]
   where
@@ -581,8 +589,8 @@ tcAddDataFamConPlaceholders inst_decls thing_inside
 tcAddPatSynPlaceholders :: [PatSynBind Name Name] -> TcM a -> TcM a
 -- See Note [Don't promote pattern synonyms]
 tcAddPatSynPlaceholders pat_syns thing_inside
-  = tcExtendKindEnv2 [ (name, APromotionErr PatSynPE)
-                     | PSB{ psb_id = L _ name } <- pat_syns ]
+  = tcExtendKindEnvList [ (name, APromotionErr PatSynPE)
+                        | PSB{ psb_id = L _ name } <- pat_syns ]
        thing_inside
 
 getTypeSigNames :: [LSig Name] -> NameSet
