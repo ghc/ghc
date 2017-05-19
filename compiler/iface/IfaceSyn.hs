@@ -1345,12 +1345,21 @@ freeNamesIfConDecls (IfNewTyCon  c) = freeNamesIfConDecl c
 freeNamesIfConDecls _                   = emptyNameSet
 
 freeNamesIfConDecl :: IfaceConDecl -> NameSet
-freeNamesIfConDecl c
-  = freeNamesIfTyVarBndrs (ifConExTvs c) &&&
-    freeNamesIfContext (ifConCtxt c) &&&
-    fnList freeNamesIfType (ifConArgTys c) &&&
-    mkNameSet (map flSelector (ifConFields c)) &&&
-    fnList freeNamesIfType (map snd (ifConEqSpec c)) -- equality constraints
+freeNamesIfConDecl (IfCon { ifConExTvs   = ex_tvs, ifConCtxt = ctxt
+                          , ifConArgTys  = arg_tys
+                          , ifConFields  = flds
+                          , ifConEqSpec  = eq_spec
+                          , ifConStricts = bangs })
+  = freeNamesIfTyVarBndrs ex_tvs &&&
+    freeNamesIfContext ctxt &&&
+    fnList freeNamesIfType arg_tys &&&
+    mkNameSet (map flSelector flds) &&&
+    fnList freeNamesIfType (map snd eq_spec) &&& -- equality constraints
+    fnList freeNamesIfBang bangs
+
+freeNamesIfBang :: IfaceBang -> NameSet
+freeNamesIfBang (IfUnpackCo co) = freeNamesIfCoercion co
+freeNamesIfBang _               = emptyNameSet
 
 freeNamesIfKind :: IfaceType -> NameSet
 freeNamesIfKind = freeNamesIfType
