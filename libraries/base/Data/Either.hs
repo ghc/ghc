@@ -178,6 +178,7 @@ either _ g (Right y)    =  g y
 --
 lefts   :: [Either a b] -> [a]
 lefts x = [a | Left a <- x]
+{-# INLINEABLE lefts #-} -- otherwise doesnt get an unfolding, see #13689
 
 -- | Extracts from a list of 'Either' all the 'Right' elements.
 -- All the 'Right' elements are extracted in order.
@@ -192,6 +193,7 @@ lefts x = [a | Left a <- x]
 --
 rights   :: [Either a b] -> [b]
 rights x = [a | Right a <- x]
+{-# INLINEABLE rights #-} -- otherwise doesnt get an unfolding, see #13689
 
 -- | Partitions a list of 'Either' into two lists.
 -- All the 'Left' elements are extracted, in order, to the first
