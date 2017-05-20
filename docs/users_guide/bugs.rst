@@ -342,7 +342,7 @@ The Foreign Function Interface
 ``hs_init()``, ``hs_exit()``
     The FFI spec requires the implementation to support re-initialising
     itself after being shut down with ``hs_exit()``, but GHC does not
-    currently support that.
+    currently support that. See :ghc-ticket:`13693`.
 
     .. index::
         single: hs_init

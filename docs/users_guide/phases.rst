@@ -324,7 +324,7 @@ defined by your local GHC installation, the following trick is useful:
     This macro is available starting GHC 8.0.  It is defined for every
     exposed package. This macro is provided for convenience to write CPP
     conditionals testing if a package version is ``x.y.z`` or
-    less.  It is identical in behavior to the ``MIN_VERSION_pkgname``
+    later.  It is identical in behavior to the ``MIN_VERSION_pkgname``
     macros that Cabal defines.
 
 .. _cpp-string-gaps:
@@ -459,7 +459,11 @@ Options affecting code generation
     :noindex:
 
     When generating code, assume that entities imported from a different
-    package will reside in a different shared library or binary.
+    package will be dynamically linked. This can reduce code size
+    tremendously, but may slow-down cross-package calls of non-inlined
+    functions. There can be some complications combining :ghc-flag:`-shared`
+    with this flag relating to linking in the RTS under Linux. See
+    :ghc-ticket:`10352`.
 
     Note that using this option when linking causes GHC to link against
     shared libraries.
