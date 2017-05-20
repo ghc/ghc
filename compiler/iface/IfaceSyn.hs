@@ -1003,7 +1003,15 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
                                pprParendIfaceCoercion co
 
     pprParendBangTy (bang, ty) = ppr_bang bang <> pprParendIfaceType ty
-    pprBangTy       (bang, ty) = ppr_bang bang <> ppr ty
+    pprBangTy       (bang, ty) = ppr_bang bang <> ppr_banged_ty ty
+      where
+        -- The presence of bang patterns or UNPACK annotations requires
+        -- surrounding the type with parentheses, if needed (#13699)
+        ppr_banged_ty = case bang of
+                          IfNoBang     -> ppr
+                          IfStrict     -> pprParendIfaceType
+                          IfUnpack     -> pprParendIfaceType
+                          IfUnpackCo{} -> pprParendIfaceType
 
     pp_args :: [SDoc]  -- With parens, e.g  (Maybe a)  or  !(Maybe a)
     pp_args = map pprParendBangTy tys_w_strs
