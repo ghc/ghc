@@ -1144,12 +1144,10 @@ versionedFilePath dflags =     TARGET_ARCH
 -- 'HscNothing' can be used to avoid generating any output, however, note
 -- that:
 --
---  * If a program uses Template Haskell the typechecker may try to run code
---    from an imported module.  This will fail if no code has been generated
---    for this module.  You can use 'GHC.needsTemplateHaskell' to detect
---    whether this might be the case and choose to either switch to a
---    different target or avoid typechecking such modules.  (The latter may be
---    preferable for security reasons.)
+--  * If a program uses Template Haskell the typechecker may need to run code
+--    from an imported module.  To facilitate this, code generation is enabled
+--    for modules imported by modules that use template haskell.
+--    See Note [-fno-code mode].
 --
 data HscTarget
   = HscC           -- ^ Generate C code.

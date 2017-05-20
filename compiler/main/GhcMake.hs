@@ -84,6 +84,7 @@ import Control.Monad
 import Data.IORef
 import Data.List
 import qualified Data.List as List
+import Data.Foldable (toList)
 import Data.Maybe
 import Data.Ord ( comparing )
 import Data.Time
@@ -1356,11 +1357,13 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
 
             -- If OPTIONS_GHC contains -fasm or -fllvm, be careful that
             -- we don't do anything dodgy: these should only work to change
-            -- from -fllvm to -fasm and vice-versa, otherwise we could
-            -- end up trying to link object code to byte code.
+            -- from -fllvm to -fasm and vice-versa, or away from -fno-code,
+            -- otherwise we could end up trying to link object code to byte
+            -- code.
             target = if prevailing_target /= local_target
                         && (not (isObjectTarget prevailing_target)
                             || not (isObjectTarget local_target))
+                        && not (prevailing_target == HscNothing)
                         then prevailing_target
                         else local_target
 
@@ -1477,7 +1480,7 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                           linkable <- liftIO $ findObjectLinkable this_mod obj_fn obj_date
                           compile_it_discard_iface (Just linkable) SourceUnmodified
 
-          -- See Note [Recompilation checking when typechecking only]
+          -- See Note [Recompilation checking in -fno-code mode]
           | writeInterfaceOnlyMode dflags,
             Just if_date <- mb_if_date,
             if_date >= hs_date -> do
@@ -1490,14 +1493,77 @@ upsweep_mod hsc_env mHscMessage old_hpt (stable_obj, stable_bco) summary mod_ind
                            (text "compiling mod:" <+> ppr this_mod_name)
                 compile_it Nothing SourceModified
 
--- Note [Recompilation checking when typechecking only]
+
+{- Note [-fno-code mode]
+~~~~~~~~~~~~~~~~~~~~~~~~
+GHC offers the flag -fno-code for the purpose of parsing and typechecking a
+program without generating object files. This is intended to be used by tooling
+and IDEs to provide quick feedback on any parser or type errors as cheaply as
+possible.
+
+When GHC is invoked with -fno-code no object files or linked output will be
+generated. As many errors and warnings as possible will be generated, as if
+-fno-code had not been passed. The session DynFlags will have
+hscTarget == HscNothing.
+
+-fwrite-interface
+~~~~~~~~~~~~~~~~
+Whether interface files are generated in -fno-code mode is controlled by the
+-fwrite-interface flag. The -fwrite-interface flag is a no-op if -fno-code is
+not also passed. Recompilation avoidance requires interface files, so passing
+-fno-code without -fwrite-interface should be avoided. If -fno-code were
+re-implemented today, -fwrite-interface would be discarded and it would be
+considered always on; this behaviour is as it is for backwards compatibility.
+
+================================================================
+IN SUMMARY: ALWAYS PASS -fno-code AND -fwrite-interface TOGETHER
+================================================================
+
+Template Haskell
+~~~~~~~~~~~~~~~~
+A module using template haskell may invoke an imported function from inside a
+splice. This will cause the type-checker to attempt to execute that code, which
+would fail if no object files had been generated. See #8025. To rectify this,
+during the downsweep we patch the DynFlags in the ModSummary of any home module
+that is imported by a module that uses template haskell, to generate object
+code.
+
+The flavour of generated object code is chosen by defaultObjectTarget for the
+target platform. It would likely be faster to generate bytecode, but this is not
+supported on all platforms(?Please Confirm?), and does not support the entirety
+of GHC haskell. See #1257.
+
+The object files (and interface files if -fwrite-interface is disabled) produced
+for template haskell are written to temporary files.
+
+Note that since template haskell can run arbitrary IO actions, -fno-code mode
+is no more secure than running without it.
+
+Potential TODOS:
+~~~~~
+* Remove -fwrite-interface and have interface files always written in -fno-code
+  mode
+* Both .o and .dyn_o files are generated for template haskell, but we only need
+  .dyn_o. Fix it.
+* In make mode, a message like
+  Compiling A (A.hs, /tmp/ghc_123.o)
+  is shown if downsweep enabled object code generation for A. Perhaps we should
+  show "nothing" or "temporary object file" instead. Note that one
+  can currently use -keep-tmp-files and inspect the generated file with the
+  current behaviour.
+* Offer a -no-codedir command line option, and write what were temporary
+  object files there. This would speed up recompilation.
+* Use existing object files (if they are up to date) instead of always
+  generating temporary ones.
+-}
+
+-- Note [Recompilation checking in -fno-code mode]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -- If we are compiling with -fno-code -fwrite-interface, there won't
 -- be any object code that we can compare against, nor should there
 -- be: we're *just* generating interface files.  In this case, we
 -- want to check if the interface file is new, in lieu of the object
 -- file.  See also Trac #9243.
-
 
 -- Filter modules in the HPT
 retainInTopLevelEnvs :: [ModuleName] -> HomePackageTable -> HomePackageTable
@@ -1614,7 +1680,8 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
   where
     -- stronglyConnCompG flips the original order, so if we reverse
     -- the summaries we get a stable topological sort.
-    (graph, lookup_node) = moduleGraphNodes drop_hs_boot_nodes (reverse summaries)
+    (graph, lookup_node) =
+      moduleGraphNodes drop_hs_boot_nodes (reverse summaries)
 
     initial_graph = case mb_root_mod of
         Nothing -> graph
@@ -1623,8 +1690,11 @@ topSortModuleGraph drop_hs_boot_nodes summaries mb_root_mod
             -- the specified module.  We do this by building a graph with
             -- the full set of nodes, and determining the reachable set from
             -- the specified node.
-            let root | Just node <- lookup_node HsSrcFile root_mod, graph `hasVertexG` node = node
-                     | otherwise = throwGhcException (ProgramError "module does not exist")
+            let root | Just node <- lookup_node HsSrcFile root_mod
+                     , graph `hasVertexG` node
+                     = node
+                     | otherwise
+                     = throwGhcException (ProgramError "module does not exist")
             in graphFromEdgedVerticesUniq (seq root (reachableG graph root))
 
 type SummaryNode = Node Int ModSummary
@@ -1764,8 +1834,17 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
        rootSummariesOk <- reportImportErrors rootSummaries
        let root_map = mkRootMap rootSummariesOk
        checkDuplicates root_map
-       summs <- loop (concatMap calcDeps rootSummariesOk) root_map
-       return summs
+       map0 <- loop (concatMap calcDeps rootSummariesOk) root_map
+       -- if we have been passed -fno-code, we enable code generation
+       -- for dependencies of modules that have -XTemplateHaskell,
+       -- otherwise those modules will fail to compile.
+       -- See Note [-fno-code mode] #8025
+       map1 <- if hscTarget dflags == HscNothing
+         then enableCodeGenForTH
+           (defaultObjectTarget (targetPlatform dflags))
+           map0
+         else return map0
+       return $ concat $ nodeMapElts map1
      where
         calcDeps = msDeps
 
@@ -1812,16 +1891,15 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                         -- Visited set; the range is a list because
                         -- the roots can have the same module names
                         -- if allow_dup_roots is True
-             -> IO [Either ErrMsg ModSummary]
-                        -- The result includes the worklist, except
-                        -- for those mentioned in the visited set
-        loop [] done      = return (concat (nodeMapElts done))
+             -> IO (NodeMap [Either ErrMsg ModSummary])
+                        -- The result is the completed NodeMap
+        loop [] done = return done
         loop ((wanted_mod, is_boot) : ss) done
           | Just summs <- Map.lookup key done
           = if isSingleton summs then
                 loop ss done
             else
-                do { multiRootsErr dflags (rights summs); return [] }
+                do { multiRootsErr dflags (rights summs); return Map.empty }
           | otherwise
           = do mb_s <- summariseModule hsc_env old_summary_map
                                        is_boot wanted_mod True
@@ -1829,10 +1907,80 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
                case mb_s of
                    Nothing -> loop ss done
                    Just (Left e) -> loop ss (Map.insert key [Left e] done)
-                   Just (Right s)-> loop (calcDeps s ++ ss)
-                                         (Map.insert key [Right s] done)
+                   Just (Right s)-> do
+                     new_map <-
+                       loop (calcDeps s) (Map.insert key [Right s] done)
+                     loop ss new_map
           where
             key = (unLoc wanted_mod, is_boot)
+
+-- | Update the every ModSummary that is depended on
+-- by a module that needs template haskell. We enable codegen to
+-- the specified target, disable optimization and change the .hi
+-- and .o file locations to be temporary files.
+-- See Note [-fno-code mode]
+enableCodeGenForTH :: HscTarget
+  -> NodeMap [Either ErrMsg ModSummary]
+  -> IO (NodeMap [Either ErrMsg ModSummary])
+enableCodeGenForTH target nodemap =
+  traverse (traverse (traverse enable_code_gen)) nodemap
+  where
+    enable_code_gen ms
+      | ModSummary
+        { ms_mod = ms_mod
+        , ms_location = ms_location
+        , ms_hsc_src = HsSrcFile
+        , ms_hspp_opts = dflags@DynFlags
+          {hscTarget = HscNothing}
+        } <- ms
+      , ms_mod `Set.member` needs_codegen_set
+      = do
+        let add_intermediate_file f =
+              consIORef (filesToNotIntermediateClean dflags) f
+            new_temp_file suf dynsuf = do
+              tn <- newTempName dflags suf
+              let dyn_tn = tn -<.> dynsuf
+              add_intermediate_file tn
+              add_intermediate_file dyn_tn
+              addFilesToClean dflags [dyn_tn]
+              return tn
+          -- We don't want to create .o or .hi files unless we have been asked
+          -- to by the user. But we need them, so we patch their locations in
+          -- the ModSummary with temporary files.
+          --
+        hi_file <-
+          if gopt Opt_WriteInterface dflags
+            then return $ ml_hi_file ms_location
+            else new_temp_file (hiSuf dflags) (dynHiSuf dflags)
+        o_temp_file <- new_temp_file (objectSuf dflags) (dynObjectSuf dflags)
+        return $
+          ms
+          { ms_location =
+              ms_location {ml_hi_file = hi_file, ml_obj_file = o_temp_file}
+          , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
+          }
+      | otherwise = return ms
+    needs_codegen_set = transitive_deps_set Set.empty th_modSums
+    th_modSums =
+      [ ms
+      | mss <- Map.elems nodemap
+      , Right ms <- mss
+      , xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+      ]
+    transitive_deps_set marked_mods modSums = foldl' go marked_mods modSums
+    go marked_mods ms
+      | Set.member (ms_mod ms) marked_mods = marked_mods
+      | otherwise =
+        let deps =
+              [ dep_ms
+              | (L _ mn, NotBoot) <- msDeps ms
+              , dep_ms <-
+                  toList (Map.lookup (mn, NotBoot) nodemap) >>= toList >>=
+                  toList
+              ]
+            new_marked_mods =
+              marked_mods `Set.union` Set.fromList (fmap ms_mod deps)
+        in transitive_deps_set new_marked_mods deps
 
 mkRootMap :: [ModSummary] -> NodeMap [Either ErrMsg ModSummary]
 mkRootMap summaries = Map.insertListWith (flip (++))

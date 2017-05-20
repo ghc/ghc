@@ -2624,7 +2624,7 @@ data ModSummary
         ms_iface_date   :: Maybe UTCTime,
           -- ^ Timestamp of hi file, if we *only* are typechecking (it is
           -- 'Nothing' otherwise.
-          -- See Note [Recompilation checking when typechecking only] and #9243
+          -- See Note [Recompilation checking in -fno-code mode] and #9243
         ms_srcimps      :: [(Maybe FastString, Located ModuleName)],
           -- ^ Source imports of the module
         ms_textual_imps :: [(Maybe FastString, Located ModuleName)],

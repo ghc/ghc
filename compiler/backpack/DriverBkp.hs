@@ -155,6 +155,7 @@ withBkpSession cid insts deps session_type do_this = do
       -- turn on interface writing.  However, if the user also
       -- explicitly passed in `-fno-code`, we DON'T want to write
       -- interfaces unless the user also asked for `-fwrite-interface`.
+      -- See Note [-fno-code mode]
       (case session_type of
         -- Make sure to write interfaces when we are type-checking
         -- indefinite packages.

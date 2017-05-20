@@ -1570,39 +1570,46 @@ getLocation src_flavour mod_name = do
 
     PipeEnv{ src_basename=basename,
              src_suffix=suff } <- getPipeEnv
+    PipeState { maybe_loc=maybe_loc} <- getPipeState
+    case maybe_loc of
+        -- Build a ModLocation to pass to hscMain.
+        -- The source filename is rather irrelevant by now, but it's used
+        -- by hscMain for messages.  hscMain also needs
+        -- the .hi and .o filenames. If we already have a ModLocation
+        -- then simply update the extensions of the interface and object
+        -- files to match the DynFlags, otherwise use the logic in Finder.
+      Just l -> return $ l
+        { ml_hs_file = Just $ basename <.> suff
+        , ml_hi_file = ml_hi_file l -<.> hiSuf dflags
+        , ml_obj_file = ml_obj_file l -<.> objectSuf dflags
+        }
+      _ -> do
+        location1 <- liftIO $ mkHomeModLocation2 dflags mod_name basename suff
 
-    -- Build a ModLocation to pass to hscMain.
-    -- The source filename is rather irrelevant by now, but it's used
-    -- by hscMain for messages.  hscMain also needs
-    -- the .hi and .o filenames, and this is as good a way
-    -- as any to generate them, and better than most. (e.g. takes
-    -- into account the -osuf flags)
-    location1 <- liftIO $ mkHomeModLocation2 dflags mod_name basename suff
-
-    -- Boot-ify it if necessary
-    let location2 | HsBootFile <- src_flavour = addBootSuffixLocn location1
-                  | otherwise                 = location1
+        -- Boot-ify it if necessary
+        let location2 | HsBootFile <- src_flavour = addBootSuffixLocn location1
+                      | otherwise                 = location1
 
 
-    -- Take -ohi into account if present
-    -- This can't be done in mkHomeModuleLocation because
-    -- it only applies to the module being compiles
-    let ohi = outputHi dflags
-        location3 | Just fn <- ohi = location2{ ml_hi_file = fn }
-                  | otherwise      = location2
+        -- Take -ohi into account if present
+        -- This can't be done in mkHomeModuleLocation because
+        -- it only applies to the module being compiles
+        let ohi = outputHi dflags
+            location3 | Just fn <- ohi = location2{ ml_hi_file = fn }
+                      | otherwise      = location2
 
-    -- Take -o into account if present
-    -- Very like -ohi, but we must *only* do this if we aren't linking
-    -- (If we're linking then the -o applies to the linked thing, not to
-    -- the object file for one module.)
-    -- Note the nasty duplication with the same computation in compileFile above
-    let expl_o_file = outputFile dflags
-        location4 | Just ofile <- expl_o_file
-                  , isNoLink (ghcLink dflags)
-                  = location3 { ml_obj_file = ofile }
-                  | otherwise = location3
-
-    return location4
+        -- Take -o into account if present
+        -- Very like -ohi, but we must *only* do this if we aren't linking
+        -- (If we're linking then the -o applies to the linked thing, not to
+        -- the object file for one module.)
+        -- Note the nasty duplication with the same computation in compileFile
+        -- above
+        let expl_o_file = outputFile dflags
+            location4 | Just ofile <- expl_o_file
+                      , isNoLink (ghcLink dflags)
+                      = location3 { ml_obj_file = ofile }
+                      | otherwise = location3
+        return location4
 
 mkExtraObj :: DynFlags -> Suffix -> String -> IO FilePath
 mkExtraObj dflags extn xs
