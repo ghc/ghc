@@ -78,3 +78,11 @@ CaretDiagnostics1.hs:20:17-18: error:
    |
 20 | tabby =         ()
    |                 ^^
+
+CaretDiagnostics1.hs:23:25-26: error:
+    • Couldn't match expected type ‘Int’ with actual type ‘()’
+    • In the expression: ()
+      In an equation for ‘tabby2’: tabby2 = ()
+   |
+23 | tabby2 =                ()
+   |                         ^^

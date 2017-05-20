@@ -278,13 +278,16 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
 
       where
 
-        fixWhitespace (i, c)
-          | c == '\n' = ""
-            -- show tabs in a device-independent manner #13664
-          | c == '\t' = replicate (8 - i `mod` 8) ' '
-          | otherwise = [c]
+        -- expand tabs in a device-independent manner #13664
+        expandTabs tabWidth i s =
+          case s of
+            ""        -> ""
+            '\t' : cs -> replicate effectiveWidth ' ' ++
+                         expandTabs tabWidth (i + effectiveWidth) cs
+            c    : cs -> c : expandTabs tabWidth (i + 1) cs
+          where effectiveWidth = tabWidth - i `mod` tabWidth
 
-        srcLine = concat (map fixWhitespace (zip [0..] srcLineWithNewline))
+        srcLine = filter (/= '\n') (expandTabs 8 0 srcLineWithNewline)
 
         start = srcSpanStartCol span - 1
         end | multiline = length srcLine
