@@ -311,19 +311,16 @@ can separate out any arguments for the RTS (i.e. those arguments between
 After we've finished invoking our Haskell functions, we can call
 ``hs_exit()``, which terminates the RTS.
 
-There can be multiple calls to ``hs_init()``, but each one should be
-matched by one (and only one) call to ``hs_exit()`` [1]_.
+There can be multiple calls to ``hs_init()``, but each one should be matched by
+one (and only one) call to ``hs_exit()``. The outermost ``hs_exit()`` will
+actually de-initialise the system.  Note that currently GHC's runtime cannot
+reliably re-initialise after this has happened; see :ref:`infelicities-ffi`.
 
 .. note::
     When linking the final program, it is normally easiest to do the
     link using GHC, although this isn't essential. If you do use GHC, then
     don't forget the flag :ghc-flag:`-no-hs-main`, otherwise GHC
     will try to link to the ``Main`` Haskell module.
-
-.. [1]
-   The outermost ``hs_exit()`` will actually de-initialise the system.
-   Note that currently GHC's runtime cannot reliably re-initialise after
-   this has happened, see :ref:`infelicities-ffi`.
 
 To use ``+RTS`` flags with ``hs_init()``, we have to modify the example
 slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags
