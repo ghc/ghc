@@ -1018,6 +1018,10 @@ install_packages: rts/dist/package.conf.install
 # with an 077 umask.
 	for f in '$(INSTALLED_PACKAGE_CONF)'/*; do $(CREATE_DATA) "$$f"; done
 
+# Finally, update package.cache to ensure it's newer than the registration
+# files. This avoids #13375.
+	$(INSTALLED_GHC_PKG_REAL) --global-package-db "$(INSTALLED_PACKAGE_CONF)" recache
+
 # -----------------------------------------------------------------------------
 # Binary distributions
 
