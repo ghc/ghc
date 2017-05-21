@@ -8446,7 +8446,7 @@ think about compiling this to runnable code, though, problems appear.
 In particular, when we call ``bad``, we must somehow pass ``x`` into
 ``bad``. How wide (that is, how many bits) is ``x``? Is it a pointer?
 What kind of register (floating-point or integral) should ``x`` go in?
-It's all impossible to say, because ``x``'s type, ``TYPE r2`` is
+It's all impossible to say, because ``x``'s type, ``a :: TYPE r1`` is
 levity polymorphic. We thus forbid such constructions, via the
 following straightforward rule:
 
