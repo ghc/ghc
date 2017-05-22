@@ -11671,7 +11671,7 @@ abstraction.
 We could define our own operator ::
 
     untilA :: ArrowChoice a => a (e,s) () -> a (e,s) Bool -> a (e,s) ()
-    untilA body cond = proc x ->
+    untilA body cond = proc x -> do
             b <- cond -< x
             if b then returnA -< ()
             else do
