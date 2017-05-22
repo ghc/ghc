@@ -209,10 +209,12 @@ mkLocMessageAnn ann severity locn msg
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
-          prefix = locn' <> colon <+>
+          header = locn' <> colon <+>
                    coloured sevColour sevText <> optAnn
 
-      in coloured (Col.sMessage (colScheme dflags)) (hang prefix 4 msg)
+      in coloured (Col.sMessage (colScheme dflags))
+                  (hang (coloured (Col.sHeader (colScheme dflags)) header) 4
+                        msg)
 
   where
     sevText =

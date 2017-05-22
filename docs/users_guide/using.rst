@@ -804,14 +804,30 @@ messages and in GHCi:
 
     .. code-block:: none
 
-        message=1:warning=1;35:error=1;31:fatal=1;31:margin=1;34
+        header=:message=1:warning=1;35:error=1;31:fatal=1;31:margin=1;34
 
     Each value is expected to be a `Select Graphic Rendition (SGR) substring
-    <https://en.wikipedia.org/wiki/ANSI_escape_code#graphics>`_.
+    <https://en.wikipedia.org/wiki/ANSI_escape_code#graphics>`_.  The
+    formatting of each element can inherit from parent elements.  For example,
+    if ``header`` is left empty, it will inherit the formatting of
+    ``message``.  Alternatively if ``header`` is set to ``1`` (bold), it will
+    be bolded but still inherits the color of ``message``.
+
+    Currently, in the primary message, the following inheritance tree is in
+    place:
+
+    - ``message``
+      - ``header``
+        - ``warning``
+        - ``error``
+        - ``fatal``
+
+    In the caret diagnostics, there is currently no inheritance at all between
+    ``margin``, ``warning``, ``error``, and ``fatal``.
 
     The environment variable can also be set to the magical values ``never``
     or ``always``, which is equivalent to setting the corresponding
-    ``-fdiagnostics-color`` flag but has lower precedence.
+    ``-fdiagnostics-color`` flag but with lower precedence.
 
 .. ghc-flag:: -f[no-]diagnostics-show-caret
 
