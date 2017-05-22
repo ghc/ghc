@@ -30,6 +30,8 @@ test('NonLinearSigErr', normal, compile, [''])
 test('GADTwrong1', normal, compile_fail, [''])
 
 test('Over', [], multimod_compile_fail, ['OverD', '-no-hs-main -c -v0'])
+test('OverDirectThisMod', [], multimod_compile_fail, ['OverDirectThisModC', '-no-hs-main -c -v0'])
+test('OverIndirectThisMod', [], multimod_compile_fail, ['OverIndirectThisModD', '-no-hs-main -c -v0'])
 
 test('SkolemOccursLoop', expect_fail, compile_fail, [''])
 
