@@ -601,7 +601,9 @@ uint64_t osNumaMask(void)
     if (osNumaNodes() > sizeof(StgWord)*8) {
         barf("osNumaMask: too many NUMA nodes (%d)", osNumaNodes());
     }
-    return mask->maskp[0];
+    uint64_t r = mask->maskp[0];
+    numa_bitmask_free(mask);
+    return r;
 #else
     return 1;
 #endif
