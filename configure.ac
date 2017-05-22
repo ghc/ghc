@@ -27,7 +27,7 @@ AC_INIT([The Glorious Glasgow Haskell Compilation System], [8.3], [glasgow-haske
 # when the source distribution was created.
 
 if test ! -f mk/config.h.in; then
-   echo "mk/config.h.in doesn't exist: perhaps you haven't run 'perl boot'?"
+   echo "mk/config.h.in doesn't exist: perhaps you haven't run 'python3 boot'?"
    exit 1
 fi
 
