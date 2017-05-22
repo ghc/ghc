@@ -131,7 +131,10 @@ module Module
 
         -- * Sets of Modules
         ModuleSet,
-        emptyModuleSet, mkModuleSet, moduleSetElts, extendModuleSet, elemModuleSet
+        emptyModuleSet, mkModuleSet, moduleSetElts,
+        extendModuleSet, extendModuleSetList,
+        elemModuleSet, intersectModuleSet, minusModuleSet, unionModuleSet,
+        unitModuleSet
     ) where
 
 import Config
@@ -1255,6 +1258,9 @@ mkModuleSet = Set.fromList . coerce
 extendModuleSet :: ModuleSet -> Module -> ModuleSet
 extendModuleSet s m = Set.insert (NDModule m) s
 
+extendModuleSetList :: ModuleSet -> [Module] -> ModuleSet
+extendModuleSetList s ms = foldl' (coerce . flip Set.insert) s ms
+
 emptyModuleSet :: ModuleSet
 emptyModuleSet = Set.empty
 
@@ -1263,6 +1269,18 @@ moduleSetElts = sort . coerce . Set.toList
 
 elemModuleSet :: Module -> ModuleSet -> Bool
 elemModuleSet = Set.member . coerce
+
+intersectModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
+intersectModuleSet = coerce Set.intersection
+
+minusModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
+minusModuleSet = coerce Set.difference
+
+unionModuleSet :: ModuleSet -> ModuleSet -> ModuleSet
+unionModuleSet = coerce Set.union
+
+unitModuleSet :: Module -> ModuleSet
+unitModuleSet = coerce Set.singleton
 
 {-
 A ModuleName has a Unique, so we can build mappings of these using
