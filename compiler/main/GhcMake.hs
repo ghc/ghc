@@ -164,23 +164,41 @@ warnMissingHomeModules :: GhcMonad m => HscEnv -> ModuleGraph -> m ()
 warnMissingHomeModules hsc_env mod_graph =
     when (wopt Opt_WarnMissingHomeModules dflags && not (null missing)) $
         logWarnings (listToBag [warn])
-    where
+  where
     dflags = hsc_dflags hsc_env
-    missing = filter (`notElem` targets) imports
-    imports = map (moduleName . ms_mod) mod_graph
-    targets = map (targetid_to_name . targetId) (hsc_targets hsc_env)
+    targets = map targetId (hsc_targets hsc_env)
+
+    is_known_module mod = any (is_my_target mod) targets
+
+    -- We need to be careful to handle the case where (possibly
+    -- path-qualified) filenames (aka 'TargetFile') rather than module
+    -- names are being passed on the GHC command-line.
+    --
+    -- For instance, `ghc --make src-exe/Main.hs` and
+    -- `ghc --make -isrc-exe Main` are supposed to be equivalent.
+    -- Note also that we can't always infer the associated module name
+    -- directly from the filename argument.  See Trac #13727.
+    is_my_target mod (TargetModule name)
+      = moduleName (ms_mod mod) == name
+    is_my_target mod (TargetFile target_file _)
+      | Just mod_file <- ml_hs_file (ms_location mod)
+      = target_file == mod_file ||
+           --  We can get a file target even if a module name was
+           --  originally specified in a command line because it can
+           --  be converted in guessTarget (by appending .hs/.lhs).
+           --  So let's convert it back and compare with module name
+           mkModuleName (fst $ splitExtension target_file)
+            == moduleName (ms_mod mod)
+    is_my_target _ _ = False
+
+    missing = map (moduleName . ms_mod) $
+      filter (not . is_known_module) mod_graph
 
     msg = text "Modules are not listed in command line: "
         <> sep (map ppr missing)
     warn = makeIntoWarning
       (Reason Opt_WarnMissingHomeModules)
       (mkPlainErrMsg dflags noSrcSpan msg)
-
-    targetid_to_name (TargetModule name) = name
-    targetid_to_name (TargetFile file _) =
-      -- We can get a file even if module name in specified in command line
-      -- because it can be converted in guessTarget. So let's convert it back.
-      mkModuleName (fst $ splitExtension file)
 
 -- | Describes which modules of the module graph need to be loaded.
 data LoadHowMuch
