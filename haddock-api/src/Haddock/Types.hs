@@ -57,7 +57,7 @@ type InstIfaceMap  = Map Module InstalledInterface  -- TODO: rename
 type DocMap a      = Map Name (MDoc a)
 type ArgMap a      = Map Name (Map Int (MDoc a))
 type SubMap        = Map Name [Name]
-type DeclMap       = Map Name [LHsDecl Name]
+type DeclMap       = Map Name [LHsDecl GHCR]
 type InstMap       = Map SrcSpan Name
 type FixMap        = Map Name Fixity
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
@@ -99,7 +99,7 @@ data Interface = Interface
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
     -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: !(Map Name [LHsDecl Name])
+  , ifaceDeclMap         :: !(Map Name [LHsDecl GHCR])
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
@@ -114,8 +114,8 @@ data Interface = Interface
   , ifaceSubMap          :: !(Map Name [Name])
   , ifaceFixMap          :: !(Map Name Fixity)
 
-  , ifaceExportItems     :: ![ExportItem Name]
-  , ifaceRnExportItems   :: ![ExportItem DocName]
+  , ifaceExportItems     :: ![ExportItem GHCR]
+  , ifaceRnExportItems   :: ![ExportItem DocNameI]
 
     -- | All names exported by the module.
   , ifaceExports         :: ![Name]
@@ -133,8 +133,8 @@ data Interface = Interface
   , ifaceFamInstances    :: ![FamInst]
 
     -- | Orphan instances
-  , ifaceOrphanInstances :: ![DocInstance Name]
-  , ifaceRnOrphanInstances :: ![DocInstance DocName]
+  , ifaceOrphanInstances :: ![DocInstance GHCR]
+  , ifaceRnOrphanInstances :: ![DocInstance DocNameI]
 
     -- | The number of haddockable and haddocked items in the module, as a
     -- tuple. Haddockable items are the exports and the module itself.
@@ -217,17 +217,17 @@ data ExportItem name
 
         -- | Maybe a doc comment, and possibly docs for arguments (if this
         -- decl is a function or type-synonym).
-      , expItemMbDoc :: !(DocForDecl name)
+      , expItemMbDoc :: !(DocForDecl (IdP name))
 
         -- | Subordinate names, possibly with documentation.
-      , expItemSubDocs :: ![(name, DocForDecl name)]
+      , expItemSubDocs :: ![(IdP name, DocForDecl (IdP name))]
 
         -- | Instances relevant to this declaration, possibly with
         -- documentation.
       , expItemInstances :: ![DocInstance name]
 
         -- | Fixity decls relevant to this declaration (including subordinates).
-      , expItemFixities :: ![(name, Fixity)]
+      , expItemFixities :: ![(IdP name, Fixity)]
 
         -- | Whether the ExportItem is from a TH splice or not, for generating
         -- the appropriate type of Source link.
@@ -237,10 +237,10 @@ data ExportItem name
   -- | An exported entity for which we have no documentation (perhaps because it
   -- resides in another package).
   | ExportNoDecl
-      { expItemName :: !name
+      { expItemName :: !(IdP name)
 
         -- | Subordinate names.
-      , expItemSubs :: ![name]
+      , expItemSubs :: ![IdP name]
       }
 
   -- | A section heading.
@@ -253,11 +253,11 @@ data ExportItem name
       , expItemSectionId :: !String
 
         -- | Section heading text.
-      , expItemSectionText :: !(Doc name)
+      , expItemSectionText :: !(Doc (IdP name))
       }
 
   -- | Some documentation.
-  | ExportDoc !(MDoc name)
+  | ExportDoc !(MDoc (IdP name))
 
   -- | A cross-reference to another module.
   | ExportModule !Module
@@ -297,14 +297,10 @@ data DocName
      -- documentation, as far as Haddock knows.
   deriving (Eq, Data)
 
-type instance PostRn DocName NameSet  = PlaceHolder
-type instance PostRn DocName Fixity   = PlaceHolder
-type instance PostRn DocName Bool     = PlaceHolder
-type instance PostRn DocName [Name]   = PlaceHolder
+data DocNameI
 
-type instance PostTc DocName Kind     = PlaceHolder
-type instance PostTc DocName Type     = PlaceHolder
-type instance PostTc DocName Coercion = PlaceHolder
+type instance IdP DocNameI = DocName
+
 
 instance NamedThing DocName where
   getName (Documented name _) = name
@@ -351,7 +347,7 @@ data InstType name
   | TypeInst  (Maybe (HsType name)) -- ^ Body (right-hand side)
   | DataInst (TyClDecl name)        -- ^ Data constructors
 
-instance (OutputableBndrId a)
+instance (SourceTextX a, OutputableBndrId a)
          => Outputable (InstType a) where
   ppr (ClassInst { .. }) = text "ClassInst"
       <+> ppr clsiCtx
@@ -370,7 +366,7 @@ instance (OutputableBndrId a)
 -- 'PseudoFamilyDecl' type is introduced.
 data PseudoFamilyDecl name = PseudoFamilyDecl
     { pfdInfo :: FamilyInfo name
-    , pfdLName :: Located name
+    , pfdLName :: Located (IdP name)
     , pfdTyVars :: [LHsType name]
     , pfdKindSig :: LFamilyResultSig name
     }
@@ -392,12 +388,12 @@ mkPseudoFamilyDecl (FamilyDecl { .. }) = PseudoFamilyDecl
 
 
 -- | An instance head that may have documentation and a source location.
-type DocInstance name = (InstHead name, Maybe (MDoc name), Located name)
+type DocInstance name = (InstHead name, Maybe (MDoc (IdP name)), Located (IdP name))
 
 -- | The head of an instance. Consists of a class name, a list of kind
 -- parameters, a list of type parameters and an instance type
 data InstHead name = InstHead
-    { ihdClsName :: name
+    { ihdClsName :: IdP name
     , ihdKinds :: [HsType name]
     , ihdTypes :: [HsType name]
     , ihdInstType :: InstType name
@@ -676,14 +672,14 @@ instance Monad ErrMsgGhc where
 -- * Pass sensitive types
 -----------------------------------------------------------------------------
 
-type instance PostRn DocName NameSet        = PlaceHolder
-type instance PostRn DocName Fixity         = PlaceHolder
-type instance PostRn DocName Bool           = PlaceHolder
-type instance PostRn DocName Name           = DocName
-type instance PostRn DocName (Located Name) = Located DocName
-type instance PostRn DocName [Name]         = PlaceHolder
-type instance PostRn DocName DocName        = DocName
+type instance PostRn DocNameI NameSet        = PlaceHolder
+type instance PostRn DocNameI Fixity         = PlaceHolder
+type instance PostRn DocNameI Bool           = PlaceHolder
+type instance PostRn DocNameI Name           = DocName
+type instance PostRn DocNameI (Located Name) = Located DocName
+type instance PostRn DocNameI [Name]         = PlaceHolder
+type instance PostRn DocNameI DocName        = DocName
 
-type instance PostTc DocName Kind     = PlaceHolder
-type instance PostTc DocName Type     = PlaceHolder
-type instance PostTc DocName Coercion = PlaceHolder
+type instance PostTc DocNameI Kind     = PlaceHolder
+type instance PostTc DocNameI Type     = PlaceHolder
+type instance PostTc DocNameI Coercion = PlaceHolder

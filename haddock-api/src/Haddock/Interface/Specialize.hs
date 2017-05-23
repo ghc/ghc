@@ -30,9 +30,9 @@ import qualified Data.Set as Set
 
 
 -- | Instantiate all occurrences of given name with particular type.
-specialize :: (Eq name, Typeable name)
+specialize :: (Eq (IdP name), Typeable name)
            => Data a
-           => name -> HsType name -> a -> a
+           => IdP name -> HsType name -> a -> a
 specialize name details =
     everywhere $ mkT step
   where
@@ -44,9 +44,9 @@ specialize name details =
 --
 -- It is just a convenience function wrapping 'specialize' that supports more
 -- that one specialization.
-specialize' :: (Eq name, Typeable name)
+specialize' :: (Eq (IdP name), Typeable name)
             => Data a
-            => [(name, HsType name)] -> a -> a
+            => [(IdP name, HsType name)] -> a -> a
 specialize' = flip $ foldr (uncurry specialize)
 
 
@@ -54,7 +54,7 @@ specialize' = flip $ foldr (uncurry specialize)
 --
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
-specializeTyVarBndrs :: (Eq name, DataId name)
+specializeTyVarBndrs :: (Eq (IdP name), DataId name)
                      => Data a
                      => LHsQTyVars name -> [HsType name]
                      -> a -> a
@@ -66,7 +66,7 @@ specializeTyVarBndrs bndrs typs =
     bname (KindedTyVar (L _ name) _) = name
 
 
-specializePseudoFamilyDecl :: (Eq name, DataId name)
+specializePseudoFamilyDecl :: (Eq (IdP name), DataId name)
                            => LHsQTyVars name -> [HsType name]
                            -> PseudoFamilyDecl name
                            -> PseudoFamilyDecl name
@@ -76,7 +76,7 @@ specializePseudoFamilyDecl bndrs typs decl =
     specializeTyVars = specializeTyVarBndrs bndrs typs
 
 
-specializeSig :: forall name . (Eq name, DataId name, SetName name)
+specializeSig :: forall name . (Eq (IdP name), DataId name, SetName (IdP name))
               => LHsQTyVars name -> [HsType name]
               -> Sig name
               -> Sig name
@@ -93,7 +93,7 @@ specializeSig _ _ sig = sig
 
 -- | Make all details of instance head (signatures, associated types)
 -- specialized to that particular instance type.
-specializeInstHead :: (Eq name, DataId name, SetName name)
+specializeInstHead :: (Eq (IdP name), DataId name, SetName (IdP name))
                    => InstHead name -> InstHead name
 specializeInstHead ihd@InstHead { ihdInstType = clsi@ClassInst { .. }, .. } =
     ihd { ihdInstType = instType' }
@@ -113,7 +113,7 @@ specializeInstHead ihd = ihd
 -- and tuple literals resulting in types like @[] a@ or @(,,) a b c@. This
 -- can be fixed using 'sugar' function, that will turn such types into @[a]@
 -- and @(a, b, c)@.
-sugar :: forall name. (NamedThing name, DataId name)
+sugar :: forall name. (NamedThing (IdP name), DataId name)
       => HsType name -> HsType name
 sugar =
     everywhere $ mkT step
@@ -122,7 +122,7 @@ sugar =
     step = sugarOperators . sugarTuples . sugarLists
 
 
-sugarLists :: NamedThing name => HsType name -> HsType name
+sugarLists :: NamedThing (IdP name) => HsType name -> HsType name
 sugarLists (HsAppTy (L _ (HsTyVar _ (L _ name))) ltyp)
     | isBuiltInSyntax name' && strName == "[]" = HsListTy ltyp
   where
@@ -131,7 +131,7 @@ sugarLists (HsAppTy (L _ (HsTyVar _ (L _ name))) ltyp)
 sugarLists typ = typ
 
 
-sugarTuples :: NamedThing name => HsType name -> HsType name
+sugarTuples :: NamedThing (IdP name) => HsType name -> HsType name
 sugarTuples typ =
     aux [] typ
   where
@@ -148,7 +148,7 @@ sugarTuples typ =
     aux _ _ = typ
 
 
-sugarOperators :: NamedThing name => HsType name -> HsType name
+sugarOperators :: NamedThing (IdP name) => HsType name -> HsType name
 sugarOperators (HsAppTy (L _ (HsAppTy (L _ (HsTyVar _ (L l name))) la)) lb)
     | isSymOcc $ getOccName name' = mkHsOpTy la (L l name) lb
     | isBuiltInSyntax name' && getOccString name == "(->)" = HsFunTy la lb
@@ -216,7 +216,7 @@ setInternalOccName occ name =
 
 
 -- | Compute set of free variables of given type.
-freeVariables :: forall name. (NamedThing name, DataId name)
+freeVariables :: forall name. (NamedThing (IdP name), DataId name)
               => HsType name -> Set NameRep
 freeVariables =
     everythingWithState Set.empty Set.union query
@@ -239,7 +239,7 @@ freeVariables =
 -- different type variable than latter one. Applying 'rename' function
 -- will fix that type to be visually unambiguous again (making it something
 -- like @(a -> c) -> b@).
-rename :: SetName name => Set NameRep -> HsType name -> HsType name
+rename :: SetName (IdP name) => Set NameRep -> HsType name -> HsType name
 rename fv typ = runReader (renameType typ) $ RenameEnv
     { rneFV = fv
     , rneCtx = Map.empty
@@ -258,7 +258,7 @@ data RenameEnv name = RenameEnv
     }
 
 
-renameType :: SetName name => HsType name -> Rename name (HsType name)
+renameType :: SetName (IdP name) => HsType name -> Rename (IdP name) (HsType name)
 renameType (HsForAllTy bndrs lt) = rebind bndrs $ \bndrs' ->
     HsForAllTy
         <$> pure bndrs'
@@ -294,19 +294,19 @@ renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 renameType (HsAppsTy _) = error "HsAppsTy: Only used before renaming"
 
 
-renameLType :: SetName name => LHsType name -> Rename name (LHsType name)
+renameLType :: SetName (IdP name) => LHsType name -> Rename (IdP name) (LHsType name)
 renameLType = located renameType
 
 
-renameLTypes :: SetName name => [LHsType name] -> Rename name [LHsType name]
+renameLTypes :: SetName (IdP name) => [LHsType name] -> Rename (IdP name) [LHsType name]
 renameLTypes = mapM renameLType
 
 
-renameContext :: SetName name => HsContext name -> Rename name (HsContext name)
+renameContext :: SetName (IdP name) => HsContext name -> Rename (IdP name) (HsContext name)
 renameContext = renameLTypes
 
 {-
-renameLTyOp :: SetName name => LHsTyOp name -> Rename name (LHsTyOp name)
+renameLTyOp :: SetName (IdP name) => LHsTyOp name -> Rename name (LHsTyOp name)
 renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
 -}
 
@@ -317,21 +317,21 @@ renameName name = do
     pure $ fromMaybe name (Map.lookup (getName name) ctx)
 
 
-rebind :: SetName name
-       => [LHsTyVarBndr name] -> ([LHsTyVarBndr name] -> Rename name a)
-       -> Rename name a
+rebind :: SetName (IdP name)
+       => [LHsTyVarBndr name] -> ([LHsTyVarBndr name] -> Rename (IdP name) a)
+       -> Rename (IdP name) a
 rebind lbndrs action = do
     (lbndrs', env') <- runState (rebindLTyVarBndrs lbndrs) <$> ask
     local (const env') (action lbndrs')
 
 
-rebindLTyVarBndrs :: SetName name
-                  => [LHsTyVarBndr name] -> Rebind name [LHsTyVarBndr name]
+rebindLTyVarBndrs :: SetName (IdP name)
+                  => [LHsTyVarBndr name] -> Rebind (IdP name) [LHsTyVarBndr name]
 rebindLTyVarBndrs lbndrs = mapM (located rebindTyVarBndr) lbndrs
 
 
-rebindTyVarBndr :: SetName name
-                => HsTyVarBndr name -> Rebind name (HsTyVarBndr name)
+rebindTyVarBndr :: SetName (IdP name)
+                => HsTyVarBndr name -> Rebind (IdP name) (HsTyVarBndr name)
 rebindTyVarBndr (UserTyVar (L l name)) =
     UserTyVar . L l <$> rebindName name
 rebindTyVarBndr (KindedTyVar name kinds) =
@@ -402,6 +402,6 @@ located :: Functor f => (a -> f b) -> Located a -> f (Located b)
 located f (L loc e) = L loc <$> f e
 
 
-tyVarName :: HsTyVarBndr name -> name
+tyVarName :: HsTyVarBndr name -> IdP name
 tyVarName (UserTyVar name) = unLoc name
 tyVarName (KindedTyVar (L _ name) _) = name

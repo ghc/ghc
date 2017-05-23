@@ -167,7 +167,7 @@ processModule verbosity modsum flags modMap instIfaceMap = do
                                                             , expItemMbDoc = (Documentation Nothing _, _)
                                                             } <- ifaceExportItems interface ]
           where
-            formatName :: SrcSpan -> HsDecl Name -> String
+            formatName :: SrcSpan -> HsDecl GHCR -> String
             formatName loc n = p (getMainDeclBinder n) ++ case loc of
               RealSrcSpan rss -> " (" ++ unpackFS (srcSpanFile rss) ++ ":" ++ show (srcSpanStartLine rss) ++ ")"
               _ -> ""

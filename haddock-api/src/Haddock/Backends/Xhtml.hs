@@ -580,7 +580,7 @@ miniSynopsis mdl iface unicode qual =
     exports = numberSectionHeadings (ifaceRnExportItems iface)
 
 
-processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocName
+processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocNameI
                        -> [Html]
 processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 } =
   ((divTopDecl <<).(declElem <<)) <$> case decl0 of
@@ -604,14 +604,14 @@ ppNameMini notation mdl nm =
       << ppBinder' notation nm
 
 
-ppTyClBinderWithVarsMini :: Module -> TyClDecl DocName -> Html
+ppTyClBinderWithVarsMini :: Module -> TyClDecl DocNameI -> Html
 ppTyClBinderWithVarsMini mdl decl =
   let n = tcdName decl
       ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
   in ppTypeApp n [] ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
 
 ppModuleContents :: Qualification
-                 -> [ExportItem DocName]
+                 -> [ExportItem DocNameI]
                  -> Bool -- ^ Orphans sections
                  -> Html
 ppModuleContents qual exports orphan
@@ -627,7 +627,7 @@ ppModuleContents qual exports orphan
     | orphan =  [ linkedAnchor "section.orphans" << "Orphan instances" ]
     | otherwise = []
 
-  process :: Int -> [ExportItem DocName] -> ([Html],[ExportItem DocName])
+  process :: Int -> [ExportItem DocNameI] -> ([Html],[ExportItem DocNameI])
   process _ [] = ([], [])
   process n items@(ExportGroup lev id0 doc : rest)
     | lev <= n  = ( [], items )
@@ -644,9 +644,9 @@ ppModuleContents qual exports orphan
 
 -- we need to assign a unique id to each section heading so we can hyperlink
 -- them from the contents:
-numberSectionHeadings :: [ExportItem DocName] -> [ExportItem DocName]
+numberSectionHeadings :: [ExportItem DocNameI] -> [ExportItem DocNameI]
 numberSectionHeadings = go 1
-  where go :: Int -> [ExportItem DocName] -> [ExportItem DocName]
+  where go :: Int -> [ExportItem DocNameI] -> [ExportItem DocNameI]
         go _ [] = []
         go n (ExportGroup lev _ doc : es)
           = ExportGroup lev (show n) doc : go (n+1) es
@@ -655,7 +655,7 @@ numberSectionHeadings = go 1
 
 
 processExport :: Bool -> LinksInfo -> Bool -> Qualification
-              -> ExportItem DocName -> Maybe Html
+              -> ExportItem DocNameI -> Maybe Html
 processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual (mkMeta doc)
