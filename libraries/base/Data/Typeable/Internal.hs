@@ -187,9 +187,6 @@ data TypeRep (a :: k) where
             -> TypeRep b
             -> TypeRep (a -> b)
 
-on :: (a -> a -> r) -> (b -> a) -> (b -> b -> r)
-on f g = \ x y -> g x `f` g y
-
 -- Compare keys for equality
 
 -- | @since 2.01
@@ -207,7 +204,8 @@ instance TestEquality TypeRep where
 
 -- | @since 4.4.0.0
 instance Ord (TypeRep a) where
-  compare = compare `on` typeRepFingerprint
+  compare _ _ = EQ
+  {-# INLINABLE compare #-}
 
 -- | A non-indexed type representation.
 data SomeTypeRep where
@@ -305,11 +303,11 @@ someTypeRepTyCon (SomeTypeRep t) = typeRepTyCon t
 typeRepTyCon :: TypeRep a -> TyCon
 typeRepTyCon (TrTyCon _ tc _) = tc
 typeRepTyCon (TrApp _ a _)    = typeRepTyCon a
-typeRepTyCon (TrFun _ _ _)    = error "typeRepTyCon: FunTy" -- TODO
+typeRepTyCon (TrFun _ _ _)    = typeRepTyCon $ typeRep @(->)
 
 -- | Type equality
 --
--- @since TODO
+-- @since 4.10
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)
 eqTypeRep a b
