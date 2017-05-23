@@ -921,15 +921,25 @@ endif
 install_libs: $(INSTALL_LIBS)
 	$(call installLibsTo, $(INSTALL_LIBS), "$(DESTDIR)$(ghclibdir)")
 
+# We rename ghc-stage2, so that the right program name is used in error
+# messages etc. But not on windows.
+RENAME_LIBEXEC_GHC_STAGE_TO_GHC = YES
+ifeq "$(Stage1Only) $(Windows_Host)" "YES YES"
+# resulting ghc-stage1 is built to run on windows
+RENAME_LIBEXEC_GHC_STAGE_TO_GHC = NO
+endif
+ifeq "$(Stage1Only) $(Windows_Target)" "NO YES"
+# resulting ghc-stage1 is built to run on windows
+RENAME_LIBEXEC_GHC_STAGE_TO_GHC = NO
+endif
+
 install_libexecs:  $(INSTALL_LIBEXECS)
 ifneq "$(INSTALL_LIBEXECS)" ""
 	$(INSTALL_DIR) "$(DESTDIR)$(ghclibexecdir)/bin"
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)/bin"; \
 	done
-# We rename ghc-stage2, so that the right program name is used in error
-# messages etc.
-ifeq "$(Windows_Target)" "NO"
+ifeq "$(RENAME_LIBEXEC_GHC_STAGE_TO_GHC)" "YES"
 	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
 endif
 endif
