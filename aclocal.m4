@@ -479,8 +479,18 @@ AC_DEFUN([FP_SETTINGS],
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
-        SettingsDllWrapCommand="/bin/false"
-        SettingsWindresCommand="/bin/false"
+        if test -z "$DllWrap"
+        then
+            SettingsDllWrapCommand="/bin/false"
+        else
+            SettingsDllWrapCommand="$DllWrap"
+        fi
+        if test -z "$Windres"
+        then
+            SettingsWindresCommand="/bin/false"
+        else
+            SettingsWindresCommand="$Windres"
+        fi
         SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
     fi
