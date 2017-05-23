@@ -446,7 +446,7 @@ Note [Binders]
    rather than
       cm_lam :: TypeMapG (CoreMapG a)
 
- * We don't need to look at the type of some binders, notalby
+ * We don't need to look at the type of some binders, notably
      - the case binder in (Case _ b _ _)
      - the binders in an alternative
    because they are totally fixed by the context

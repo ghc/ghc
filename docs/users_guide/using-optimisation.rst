@@ -648,7 +648,7 @@ by saying ``-fno-wombat``.
     :default: on
 
     When solving constraints, try to eagerly solve
-    super classes using availible dictionaries.
+    super classes using available dictionaries.
 
     For example::
 
@@ -663,7 +663,7 @@ by saying ``-fno-wombat``.
     constraint from the context  because we have `C Int b` and that provides us
     a
     solution for `Num Int`. However, we can often produce much better code
-    by directly solving for an availible `Num Int` dictionary we might have at
+    by directly solving for an available `Num Int` dictionary we might have at
     hand. This removes potentially many layers of indirection and crucially
     allows other optimisations to fire as the dictionary will be statically
     known and selector functions can be inlined.

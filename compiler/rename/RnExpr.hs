@@ -833,7 +833,7 @@ rnStmt ctxt rnBody (L loc (BindStmt pat body _ _ _)) thing_inside
 
         ; xMonadFailEnabled <- fmap (xopt LangExt.MonadFailDesugaring) getDynFlags
         ; let getFailFunction
-                -- If the pattern is irrefutible (e.g.: wildcard, tuple,
+                -- If the pattern is irrefutable (e.g.: wildcard, tuple,
                 -- ~pat, etc.) we should not need to fail.
                 | isIrrefutableHsPat pat
                                     = return (noSyntaxExpr, emptyFVs)
