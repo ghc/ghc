@@ -57,7 +57,7 @@ type InstIfaceMap  = Map Module InstalledInterface  -- TODO: rename
 type DocMap a      = Map Name (MDoc a)
 type ArgMap a      = Map Name (Map Int (MDoc a))
 type SubMap        = Map Name [Name]
-type DeclMap       = Map Name [LHsDecl GHCR]
+type DeclMap       = Map Name [LHsDecl GhcRn]
 type InstMap       = Map SrcSpan Name
 type FixMap        = Map Name Fixity
 type DocPaths      = (FilePath, Maybe FilePath) -- paths to HTML and sources
@@ -99,7 +99,7 @@ data Interface = Interface
     -- | Declarations originating from the module. Excludes declarations without
     -- names (instances and stand-alone documentation comments). Includes
     -- names of subordinate declarations mapped to their parent declarations.
-  , ifaceDeclMap         :: !(Map Name [LHsDecl GHCR])
+  , ifaceDeclMap         :: !(Map Name [LHsDecl GhcRn])
 
     -- | Documentation of declarations originating from the module (including
     -- subordinates).
@@ -114,7 +114,7 @@ data Interface = Interface
   , ifaceSubMap          :: !(Map Name [Name])
   , ifaceFixMap          :: !(Map Name Fixity)
 
-  , ifaceExportItems     :: ![ExportItem GHCR]
+  , ifaceExportItems     :: ![ExportItem GhcRn]
   , ifaceRnExportItems   :: ![ExportItem DocNameI]
 
     -- | All names exported by the module.
@@ -133,7 +133,7 @@ data Interface = Interface
   , ifaceFamInstances    :: ![FamInst]
 
     -- | Orphan instances
-  , ifaceOrphanInstances :: ![DocInstance GHCR]
+  , ifaceOrphanInstances :: ![DocInstance GhcRn]
   , ifaceRnOrphanInstances :: ![DocInstance DocNameI]
 
     -- | The number of haddockable and haddocked items in the module, as a

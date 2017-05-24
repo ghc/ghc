@@ -56,13 +56,13 @@ variables =
     everything (<|>) (var `combine` rec)
   where
     var term = case cast term of
-        (Just ((GHC.L sspan (GHC.HsVar name)) :: GHC.LHsExpr GHC.GHCR)) ->
+        (Just ((GHC.L sspan (GHC.HsVar name)) :: GHC.LHsExpr GHC.GhcRn)) ->
             pure (sspan, RtkVar (GHC.unLoc name))
         (Just (GHC.L _ (GHC.RecordCon (GHC.L sspan name) _ _ _))) ->
             pure (sspan, RtkVar name)
         _ -> empty
     rec term = case cast term of
-        Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LHsExpr GHC.GHCR) _) ->
+        Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LHsExpr GHC.GhcRn) _) ->
             pure (sspan, RtkVar name)
         _ -> empty
 
@@ -72,7 +72,7 @@ types =
     everything (<|>) ty
   where
     ty term = case cast term of
-        (Just ((GHC.L sspan (GHC.HsTyVar _ name)) :: GHC.LHsType GHC.GHCR)) ->
+        (Just ((GHC.L sspan (GHC.HsTyVar _ name)) :: GHC.LHsType GHC.GhcRn)) ->
             pure (sspan, RtkType (GHC.unLoc name))
         _ -> empty
 
@@ -86,11 +86,11 @@ binds =
     everything (<|>) (fun `combine` pat `combine` tvar)
   where
     fun term = case cast term of
-        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GHCR)) ->
+        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GhcRn)) ->
             pure (sspan, RtkBind name)
         _ -> empty
     pat term = case cast term of
-        (Just ((GHC.L sspan (GHC.VarPat name)) :: GHC.LPat GHC.GHCR)) ->
+        (Just ((GHC.L sspan (GHC.VarPat name)) :: GHC.LPat GHC.GhcRn)) ->
             pure (sspan, RtkBind (GHC.unLoc name))
         (Just (GHC.L _ (GHC.ConPatIn (GHC.L sspan name) recs))) ->
             [(sspan, RtkVar name)] ++ everything (<|>) rec recs
@@ -98,11 +98,11 @@ binds =
             pure (sspan, RtkBind name)
         _ -> empty
     rec term = case cast term of
-        (Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LPat GHC.GHCR) _)) ->
+        (Just (GHC.HsRecField (GHC.L sspan name) (_ :: GHC.LPat GHC.GhcRn) _)) ->
             pure (sspan, RtkVar name)
         _ -> empty
     tvar term = case cast term of
-        (Just ((GHC.L sspan (GHC.UserTyVar name)) :: GHC.LHsTyVarBndr GHC.GHCR)) ->
+        (Just ((GHC.L sspan (GHC.UserTyVar name)) :: GHC.LHsTyVarBndr GHC.GhcRn)) ->
             pure (sspan, RtkBind (GHC.unLoc name))
         (Just (GHC.L _ (GHC.KindedTyVar (GHC.L sspan name) _))) ->
             pure (sspan, RtkBind name)
@@ -122,21 +122,21 @@ decls (group, _, _, _) = concatMap ($ group)
         GHC.FamDecl fam -> pure . decl $ GHC.fdLName fam
         GHC.ClassDecl{..} -> [decl tcdLName] ++ concatMap sig tcdSigs
     fun term = case cast term of
-        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GHCR))
+        (Just (GHC.FunBind (GHC.L sspan name) _ _ _ _ :: GHC.HsBind GHC.GhcRn))
             | GHC.isExternalName name -> pure (sspan, RtkDecl name)
         _ -> empty
     con term = case cast term of
-        (Just (cdcl :: GHC.ConDecl GHC.GHCR)) ->
+        (Just (cdcl :: GHC.ConDecl GHC.GhcRn)) ->
             map decl (GHC.getConNames cdcl) ++ everything (<|>) fld cdcl
         Nothing -> empty
     ins term = case cast term of
-        (Just ((GHC.DataFamInstD inst) :: GHC.InstDecl GHC.GHCR))
+        (Just ((GHC.DataFamInstD inst) :: GHC.InstDecl GHC.GhcRn))
           -> pure . tyref $ GHC.dfid_tycon inst
         (Just (GHC.TyFamInstD (GHC.TyFamInstDecl (GHC.L _ eqn) _))) ->
             pure . tyref $ GHC.tfe_tycon eqn
         _ -> empty
     fld term = case cast term of
-        Just (field :: GHC.ConDeclField GHC.GHCR)
+        Just (field :: GHC.ConDeclField GHC.GhcRn)
           -> map (decl . fmap GHC.selectorFieldOcc) $ GHC.cd_fld_names field
         Nothing -> empty
     sig (GHC.L _ (GHC.TypeSig names _)) = map decl names
@@ -153,7 +153,7 @@ imports src@(_, imps, _, _) =
     everything (<|>) ie src ++ mapMaybe (imp . GHC.unLoc) imps
   where
     ie term = case cast term of
-        (Just ((GHC.IEVar v) :: GHC.IE GHC.GHCR)) -> pure $ var $ GHC.ieLWrappedName v
+        (Just ((GHC.IEVar v) :: GHC.IE GHC.GhcRn)) -> pure $ var $ GHC.ieLWrappedName v
         (Just (GHC.IEThingAbs t)) -> pure $ typ $ GHC.ieLWrappedName t
         (Just (GHC.IEThingAll t)) -> pure $ typ $ GHC.ieLWrappedName t
         (Just (GHC.IEThingWith t _ vs _fls)) ->

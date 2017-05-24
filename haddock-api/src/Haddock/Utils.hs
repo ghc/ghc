@@ -125,12 +125,12 @@ toInstalledDescription = fmap mkMeta . hmi_description . instInfo
 mkMeta :: Doc a -> MDoc a
 mkMeta x = emptyMetaDoc { _doc = x }
 
-mkEmptySigWcType :: LHsType GHCR -> LHsSigWcType GHCR
+mkEmptySigWcType :: LHsType GhcRn -> LHsSigWcType GhcRn
 -- Dubious, because the implicit binders are empty even
 -- though the type might have free varaiables
 mkEmptySigWcType ty = mkEmptyWildCardBndrs (mkEmptyImplicitBndrs ty)
 
-addClassContext :: IdP GHCR -> LHsQTyVars GHCR -> LSig GHCR -> LSig GHCR
+addClassContext :: Name -> LHsQTyVars GhcRn -> LSig GhcRn -> LSig GhcRn
 -- Add the class context to a class-op signature
 addClassContext cls tvs0 (L pos (ClassOpSig _ lname ltype))
   = L pos (TypeSig lname (mkEmptySigWcType (go (hsSigType ltype))))
@@ -148,7 +148,7 @@ addClassContext cls tvs0 (L pos (ClassOpSig _ lname ltype))
 
 addClassContext _ _ sig = sig   -- E.g. a MinimalSig is fine
 
-lHsQTyVarsToTypes :: LHsQTyVars GHCR -> [LHsType GHCR]
+lHsQTyVarsToTypes :: LHsQTyVars GhcRn -> [LHsType GhcRn]
 lHsQTyVarsToTypes tvs
   = [ noLoc (HsTyVar NotPromoted (noLoc (hsLTyVarName tv)))
     | tv <- hsQTvExplicit tvs ]
@@ -158,7 +158,7 @@ lHsQTyVarsToTypes tvs
 --------------------------------------------------------------------------------
 
 
-restrictTo :: [IdP GHCR] -> LHsDecl GHCR -> LHsDecl GHCR
+restrictTo :: [Name] -> LHsDecl GhcRn -> LHsDecl GhcRn
 restrictTo names (L loc decl) = L loc $ case decl of
   TyClD d | isDataDecl d  ->
     TyClD (d { tcdDataDefn = restrictDataDefn names (tcdDataDefn d) })
@@ -167,7 +167,7 @@ restrictTo names (L loc decl) = L loc $ case decl of
                tcdATs = restrictATs names (tcdATs d) })
   _ -> decl
 
-restrictDataDefn :: [IdP GHCR] -> HsDataDefn GHCR -> HsDataDefn GHCR
+restrictDataDefn :: [Name] -> HsDataDefn GhcRn -> HsDataDefn GhcRn
 restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
   | DataType <- new_or_data
   = defn { dd_cons = restrictCons names cons }
@@ -177,7 +177,7 @@ restrictDataDefn names defn@(HsDataDefn { dd_ND = new_or_data, dd_cons = cons })
       [con] -> defn { dd_cons = [con] }
       _ -> error "Should not happen"
 
-restrictCons :: [IdP GHCR] -> [LConDecl GHCR] -> [LConDecl GHCR]
+restrictCons :: [Name] -> [LConDecl GhcRn] -> [LConDecl GhcRn]
 restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
   where
     keep d | any (\n -> n `elem` names) (map unLoc $ getConNames d) =
@@ -197,7 +197,7 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
         h98ConDecl c@ConDeclGADT{} = c'
           where
             (details,_res_ty,cxt,tvs) = gadtDeclDetails (con_type c)
-            c' :: ConDecl GHCR
+            c' :: ConDecl GhcRn
             c' = ConDeclH98
                    { con_name = head (con_names c)
                    , con_qvars = Just $ HsQTvs { hsq_implicit = mempty
@@ -208,18 +208,18 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
                    , con_doc = con_doc c
                    }
 
-        field_avail :: LConDeclField GHCR -> Bool
+        field_avail :: LConDeclField GhcRn -> Bool
         field_avail (L _ (ConDeclField fs _ _))
             = all (\f -> selectorFieldOcc (unLoc f) `elem` names) fs
         field_types flds = [ t | ConDeclField _ t _ <- flds ]
 
     keep _ = Nothing
 
-restrictDecls :: [IdP GHCR] -> [LSig GHCR] -> [LSig GHCR]
+restrictDecls :: [Name] -> [LSig GhcRn] -> [LSig GhcRn]
 restrictDecls names = mapMaybe (filterLSigNames (`elem` names))
 
 
-restrictATs :: [IdP GHCR] -> [LFamilyDecl GHCR] -> [LFamilyDecl GHCR]
+restrictATs :: [Name] -> [LFamilyDecl GhcRn] -> [LFamilyDecl GhcRn]
 restrictATs names ats = [ at | at <- ats , unL (fdLName (unL at)) `elem` names ]
 
 emptyHsQTvs :: LHsQTyVars Name

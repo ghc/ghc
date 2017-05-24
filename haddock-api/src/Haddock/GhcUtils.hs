@@ -151,7 +151,7 @@ reL = L undefined
 -------------------------------------------------------------------------------
 
 
-instance NamedThing (TyClDecl GHCR) where
+instance NamedThing (TyClDecl GhcRn) where
   getName = tcdName
 
 -------------------------------------------------------------------------------
@@ -163,14 +163,14 @@ class Parent a where
   children :: a -> [Name]
 
 
-instance Parent (ConDecl GHCR) where
+instance Parent (ConDecl GhcRn) where
   children con =
     case getConDetails con of
       RecCon fields -> map (selectorFieldOcc . unL) $
                          concatMap (cd_fld_names . unL) (unL fields)
       _             -> []
 
-instance Parent (TyClDecl GHCR) where
+instance Parent (TyClDecl GhcRn) where
   children d
     | isDataDecl  d = map unL $ concatMap (getConNames . unL)
                               $ (dd_cons . tcdDataDefn) $ d
@@ -185,12 +185,12 @@ family :: (NamedThing a, Parent a) => a -> (Name, [Name])
 family = getName &&& children
 
 
-familyConDecl :: ConDecl GHC.GHCR -> [(IdP GHCR, [IdP GHCR])]
+familyConDecl :: ConDecl GHC.GhcRn -> [(Name, [Name])]
 familyConDecl d = zip (map unL (getConNames d)) (repeat $ children d)
 
 -- | A mapping from the parent (main-binder) to its children and from each
 -- child to its grand-children, recursively.
-families :: TyClDecl GHCR -> [(IdP GHCR, [IdP GHCR])]
+families :: TyClDecl GhcRn -> [(Name, [Name])]
 families d
   | isDataDecl  d = family d : concatMap (familyConDecl . unL) (dd_cons (tcdDataDefn d))
   | isClassDecl d = [family d]
@@ -198,12 +198,12 @@ families d
 
 
 -- | A mapping from child to parent
-parentMap :: TyClDecl GHCR -> [(IdP GHCR, IdP GHCR)]
+parentMap :: TyClDecl GhcRn -> [(Name, Name)]
 parentMap d = [ (c, p) | (p, cs) <- families d, c <- cs ]
 
 
 -- | The parents of a subordinate in a declaration
-parents :: IdP GHCR -> HsDecl GHCR -> [IdP GHCR]
+parents :: Name -> HsDecl GhcRn -> [Name]
 parents n (TyClD d) = [ p | (c, p) <- parentMap d, c == n ]
 parents _ _ = []
 

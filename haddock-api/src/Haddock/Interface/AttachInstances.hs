@@ -67,7 +67,7 @@ attachInstances expInfo ifaces instIfaceMap = mapM attach ifaces
                      , ifaceOrphanInstances = orphanInstances
                      }
 
-attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance GHCR]
+attachOrphanInstances :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap -> [ClsInst] -> [DocInstance GhcRn]
 attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
   [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, (L (getSrcSpan n) n))
   | let is = [ (instanceSig i, getName i) | i <- cls_instances, isOrphan (is_orphan i) ]
@@ -77,8 +77,8 @@ attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
 
 
 attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap
-                   -> ExportItem GHCR
-                   -> Ghc (ExportItem GHCR)
+                   -> ExportItem GhcRn
+                   -> Ghc (ExportItem GhcRn)
 attachToExportItem expInfo iface ifaceMap instIfaceMap export =
   case attachFixities export of
     e@ExportDecl { expItemDecl = L eSpan (TyClD d) } -> do
