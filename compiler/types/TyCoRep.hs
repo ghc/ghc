@@ -55,9 +55,10 @@ module TyCoRep (
         pickLR,
 
         -- * Pretty-printing
-        pprType, pprParendType, pprTypeApp, pprTvBndr, pprTvBndrs,
+        pprType, pprParendType, pprPrecType,
+        pprTypeApp, pprTvBndr, pprTvBndrs,
         pprSigmaType,
-        pprTheta, pprForAll, pprUserForAll,
+        pprTheta, pprParendTheta, pprForAll, pprUserForAll,
         pprTyVar, pprTyVars,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
@@ -2424,27 +2425,17 @@ defined to use this.  @pprParendType@ is the same, except it puts
 parens around the type, except for the atomic cases.  @pprParendType@
 works just by setting the initial context precedence very high.
 
-Note [Precedence in types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-We don't keep the fixity of type operators in the operator. So the pretty printer
-follows the following precedence order:
-   Type constructor application   binds more tightly than
-   Operator applications          which bind more tightly than
-   Function arrow
-
-So we might see  a :+: T b -> c
-meaning          (a :+: (T b)) -> c
-
-Maybe operator applications should bind a bit less tightly?
-
-Anyway, that's the current story; it is used consistently for Type and HsType.
+See Note [Precedence in types] in BasicTypes.
 -}
 
 ------------------
 
 pprType, pprParendType :: Type -> SDoc
-pprType       = pprIfaceType       . tidyToIfaceType
-pprParendType = pprParendIfaceType . tidyToIfaceType
+pprType       = pprPrecType TopPrec
+pprParendType = pprPrecType TyConPrec
+
+pprPrecType :: TyPrec -> Type -> SDoc
+pprPrecType prec ty = pprPrecIfaceType prec (tidyToIfaceType ty)
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
@@ -2471,7 +2462,10 @@ pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
 ------------
 pprTheta :: ThetaType -> SDoc
-pprTheta = pprIfaceContext . map tidyToIfaceType
+pprTheta = pprIfaceContext TopPrec . map tidyToIfaceType
+
+pprParendTheta :: ThetaType -> SDoc
+pprParendTheta = pprIfaceContext TyConPrec . map tidyToIfaceType
 
 pprThetaArrowTy :: ThetaType -> SDoc
 pprThetaArrowTy = pprIfaceContextArr . map tidyToIfaceType

@@ -3,11 +3,11 @@ TYPE SIGNATURES
   DataFamilyInstanceLHS.B :: MyKind
   DataFamilyInstanceLHS.SingA ::
     forall (_ :: MyKind).
-    _ ~ 'A =>
+    (_ ~ 'A) =>
     DataFamilyInstanceLHS.R:SingMyKind_ _
   DataFamilyInstanceLHS.SingB ::
     forall (_ :: MyKind).
-    _ ~ 'B =>
+    (_ ~ 'B) =>
     DataFamilyInstanceLHS.R:SingMyKind_ _
   foo :: Sing 'A
 TYPE CONSTRUCTORS

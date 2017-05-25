@@ -151,26 +151,26 @@ data Ex a
     Ex4 (forall a. a -> a)
 <document comment>
 k ::
-  T () ()  This argument has type 'T'
-  -> (T2 Int Int)  This argument has type 'T2 Int Int'
-     -> (T3 Bool Bool
-         -> T4 Float Float)  This argument has type @T3 Bool Bool -> T4 Float Float@
-        -> T5 () ()  This argument has a very long description that should
+  (T () ()  This argument has type 'T')
+  -> ((T2 Int Int)  This argument has type 'T2 Int Int')
+     -> ((T3 Bool Bool
+          -> T4 Float Float)  This argument has type @T3 Bool Bool -> T4 Float Float@)
+        -> (T5 () ()  This argument has a very long description that should
  hopefully cause some wrapping to happen when it is finally
- rendered by Haddock in the generated HTML page.
+ rendered by Haddock in the generated HTML page.)
            -> IO ()  This is the result type
-l :: (Int, Int, Float)  takes a triple -> Int  returns an 'Int'
+l :: ((Int, Int, Float)  takes a triple) -> Int  returns an 'Int'
 <document comment>
 m ::
-  R -> N1 ()  one of the arguments -> IO Int  and the return value
+  R -> (N1 ()  one of the arguments) -> IO Int  and the return value
 <document comment>
 newn ::
-  R  one of the arguments, an 'R'
-  -> N1 ()  one of the arguments -> IO Int
+  (R  one of the arguments, an 'R')
+  -> (N1 ()  one of the arguments) -> IO Int
 newn = undefined
 <document comment>
 foreign import ccall unsafe "header.h" o
-  :: Float  The input float -> IO Float  The output float
+  :: (Float  The input float) -> IO Float  The output float
 <document comment>
 newp :: Int
 newp = undefined

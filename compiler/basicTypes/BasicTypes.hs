@@ -700,12 +700,67 @@ data TyPrec   -- See Note [Precedence in types] in TyCoRep.hs
   | FunPrec         -- Function args; no parens for tycon apps
   | TyOpPrec        -- Infix operator
   | TyConPrec       -- Tycon args; no parens for atomic
-  deriving( Eq, Ord )
+
+instance Eq TyPrec where
+  (==) a b = case compare a b of
+               EQ -> True
+               _  -> False
+
+instance Ord TyPrec where
+  compare TopPrec TopPrec  = EQ
+  compare TopPrec _        = LT
+
+  compare FunPrec TopPrec   = GT
+  compare FunPrec FunPrec   = EQ
+  compare FunPrec TyOpPrec  = EQ   -- See Note [Type operator precedence]
+  compare FunPrec TyConPrec = LT
+
+  compare TyOpPrec TopPrec   = GT
+  compare TyOpPrec FunPrec   = EQ  -- See Note [Type operator precedence]
+  compare TyOpPrec TyOpPrec  = EQ
+  compare TyOpPrec TyConPrec = LT
+
+  compare TyConPrec TyConPrec = EQ
+  compare TyConPrec _         = GT
 
 maybeParen :: TyPrec -> TyPrec -> SDoc -> SDoc
 maybeParen ctxt_prec inner_prec pretty
   | ctxt_prec < inner_prec = pretty
   | otherwise              = parens pretty
+
+{- Note [Precedence in types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Many pretty-printing functions have type
+    ppr_ty :: TyPrec -> Type -> SDoc
+
+The TyPrec gives the binding strength of the context.  For example, in
+   T ty1 ty2
+we will pretty-print 'ty1' and 'ty2' with the call
+  (ppr_ty TyConPrec ty)
+to indicate that the context is that of an argument of a TyConApp.
+
+We use this consistently for Type and HsType.
+
+Note [Type operator precedence]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't keep the fixity of type operators in the operator. So the
+pretty printer follows the following precedence order:
+
+   TyConPrec         Type constructor application
+   TyOpPrec/FunPrec  Operator application and function arrow
+
+We have FunPrec and TyOpPrec to represent the precedence of function
+arrow and type operators respectively, but currently we implement
+FunPred == TyOpPrec, so that we don't distinguish the two. Reason:
+it's hard to parse a type like
+    a ~ b => c * d -> e - f
+
+By treating TyOpPrec = FunPrec we end up with more parens
+    (a ~ b) => (c * d) -> (e - f)
+
+But the two are different constructors of TyPrec so we could make
+(->) bind more or less tightly if we wanted.
+-}
 
 {-
 ************************************************************************

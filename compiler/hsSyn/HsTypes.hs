@@ -1286,7 +1286,7 @@ ppr_mono_ty _    (HsListTy ty)       = brackets (ppr_mono_lty TopPrec ty)
 ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty TopPrec ty)
 ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec FunPrec (ppr n <+> dcolon <+> ppr_mono_lty TopPrec ty)
 ppr_mono_ty _    (HsSpliceTy s _)    = pprSplice s
-ppr_mono_ty _    (HsCoreTy ty)       = ppr ty
+ppr_mono_ty prec (HsCoreTy ty)       = pprPrecType prec ty
 ppr_mono_ty _    (HsExplicitListTy Promoted _ tys)
   = quote $ brackets (interpp'SP tys)
 ppr_mono_ty _    (HsExplicitListTy NotPromoted _ tys)
@@ -1300,7 +1300,7 @@ ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
     ppr_mono_lty TyOpPrec ty1 <+> char '~' <+> ppr_mono_lty TyOpPrec ty2
 
 ppr_mono_ty _ctxt_prec (HsAppsTy tys)
-  = hsep (map (ppr_app_ty TopPrec . unLoc) tys)
+  = hsep (map (ppr_app_ty TyConPrec . unLoc) tys)
 
 ppr_mono_ty _ctxt_prec (HsAppTy fun_ty arg_ty)
   = hsep [ppr_mono_lty FunPrec fun_ty, ppr_mono_lty TyConPrec arg_ty]

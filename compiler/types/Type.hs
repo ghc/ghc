@@ -182,7 +182,8 @@ module Type (
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
         -- * Pretty-printing
-        pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprShortTyThing,
+        pprType, pprParendType, pprPrecType,
+        pprTypeApp, pprTyThingCategory, pprShortTyThing,
         pprTvBndr, pprTvBndrs, pprForAll, pprUserForAll,
         pprSigmaType, ppSuggestExplicitKinds,
         pprTheta, pprThetaArrowTy, pprClassPred,
