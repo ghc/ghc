@@ -1959,7 +1959,7 @@ data InjectivityAnn = InjectivityAnn Name [Name]
   deriving ( Show, Eq, Ord, Data, Generic )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
-           | StrTyLit String              -- ^ @"Hello"@
+           | StrTyLit String              -- ^ @\"Hello\"@
   deriving ( Show, Eq, Ord, Data, Generic )
 
 -- | Role annotations
