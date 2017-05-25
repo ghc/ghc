@@ -192,12 +192,26 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
       = do {   -- Look up the variable actually bound by lpat
                -- and check that it has the expected type
              arg_id <- tcLookupId arg_name
-           ; coi <- unifyType (Just arg_id)
-                              (idType arg_id)
-                              (substTyUnchecked subst arg_ty)
-           ; return (mkLHsWrapCo coi $ nlHsVar arg_id) }
+           ; wrap <- tcSubType_NC GenSigCtxt
+                                 (idType arg_id)
+                                 (substTyUnchecked subst arg_ty)
+                -- Why do we need tcSubType here?
+                -- See Note [Pattern synonyms and higher rank types]
+           ; return (mkLHsWrap wrap $ nlHsVar arg_id) }
 
-{- Note [Checking against a pattern signature]
+{- [Pattern synonyms and higher rank types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  data T = MkT (forall a. a->a)
+
+  pattern P :: (Int -> Int) -> T
+  pattern P x <- MkT x
+
+This should work.  But in the matcher we must match against MkT, and then
+instantiate its argument 'x', to get a functino of type (Int -> Int).
+Equality is not enough!  Trac #13752 was an example.
+
+Note [Checking against a pattern signature]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 When checking the actual supplied pattern against the pattern synonym
 signature, we need to be quite careful.

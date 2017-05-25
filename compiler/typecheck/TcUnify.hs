@@ -638,8 +638,8 @@ tc_sub_tc_type :: CtOrigin   -- used when calling uType
 -- If wrap = tc_sub_type t1 t2
 --    => wrap :: t1 ~> t2
 tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty_expected
-  | is_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
-  , not (is_poly ty_actual)
+  | definitely_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
+  , not (possibly_poly ty_actual)
   = do { traceTc "tc_sub_tc_type (drop to equality)" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
@@ -656,13 +656,21 @@ tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty_expected
                                                  ty_actual sk_rho
        ; return (sk_wrap <.> inner_wrap) }
   where
-    is_poly ty
+    possibly_poly ty
       | isForAllTy ty                        = True
-      | Just (_, res) <- splitFunTy_maybe ty = is_poly res
+      | Just (_, res) <- splitFunTy_maybe ty = possibly_poly res
       | otherwise                            = False
       -- NB *not* tcSplitFunTy, because here we want
       -- to decompose type-class arguments too
 
+    definitely_poly ty
+      | (tvs, theta, tau) <- tcSplitSigmaTy ty
+      , (tv:_) <- tvs
+      , null theta
+      , isInsolubleOccursCheck NomEq tv tau
+      = True
+      | otherwise
+      = False
 
 {- Note [Don't skolemise unnecessarily]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -674,11 +682,31 @@ error.  It's better to say that
     (Char->Char) ~ (forall a. a->a)
 fails.
 
-In general,
- * if the RHS type an outermost forall (i.e. skolemisation
-   is the next thing we'd do)
- * and the LHS has no top-level polymorphism (but looking deeply)
-then we can revert to simple equality.
+So roughly:
+ * if the ty_expected has an outermost forall
+      (i.e. skolemisation is the next thing we'd do)
+ * and the ty_actual has no top-level polymorphism (but looking deeply)
+then we can revert to simple equality.  But we need to be careful.
+These examples are allfine:
+
+ * (Char -> forall a. a->a) <= (forall a. Char -> a -> a)
+      Polymorphism is buried in ty_actual
+
+ * (Char->Char) <= (forall a. Char -> Char)
+      ty_expected isn't really polymorphic
+
+ * (Char->Char) <= (forall a. (a~Char) => a -> a)
+      ty_expected isn't really polymorphic
+
+ * (Char->Char) <= (forall a. F [a] Char -> Char)
+                   where type instance F [x] t = t
+     ty_expected isn't really polymorphic
+
+If we prematurely go to equality we'll reject a program we should
+accept (e.g. Grac #13752).  So the test (which is only to improve
+error messagse) is very conservative:
+ * ty_actual is /definitely/ monomorphic
+ * ty_expected is /definitely/ polymorphic
 -}
 
 ---------------
