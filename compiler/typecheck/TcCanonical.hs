@@ -1297,10 +1297,9 @@ representational equality, this is a little subtler. Once again, (a ~R [a])
 is a bad thing, but (a ~R N a) for a newtype N might be just fine. This
 means also that (a ~ b a) might be fine, because `b` might become a newtype.
 
-So, we must check: does tv1 appear in xi2 under any type constructor that
-is generative w.r.t. representational equality? That's what isTyVarUnderDatatype
-does. (The other name I considered, isTyVarUnderTyConGenerativeWrtReprEq was
-a bit verbose. And the shorter name gets the point across.)
+So, we must check: does tv1 appear in xi2 under any type constructor
+that is generative w.r.t. representational equality? That's what
+isInsolubleOccursCheck does.
 
 See also #10715, which induced this addition.
 
