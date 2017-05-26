@@ -2152,7 +2152,9 @@ isInsolubleOccursCheck eq_rel tv ty
     go (CoercionTy _) = False   -- ToDo: what about the coercion
     go (TyConApp tc tys)
       | isGenerativeTyCon tc role = any go tys
-      | otherwise                 = False
+      | otherwise                 = any go (drop (tyConArity tc) tys)
+         -- (a ~ F b a), where F has arity 1,
+         -- has an insoluble occurs check
 
     role = eqRelRole eq_rel
 
