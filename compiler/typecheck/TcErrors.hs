@@ -2035,7 +2035,7 @@ Conclusion: if there's an insoluble occurs check (isInsolubleOccursCheck)
 then report it first.
 
 (NB: there are potentially-soluble ones, like (a ~ F a b), and we don't
-wnat to be as draconian with them.)
+want to be as draconian with them.)
 
 Note [Expanding type synonyms to make types similar]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

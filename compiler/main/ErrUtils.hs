@@ -153,7 +153,7 @@ data Severity
   | SevInteractive
 
   | SevDump
-    -- ^ Log messagse intended for compiler developers
+    -- ^ Log message intended for compiler developers
     -- No file/line/column stuff
 
   | SevInfo

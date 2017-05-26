@@ -926,7 +926,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 decideQuantifiedTyVars
    :: TyCoVarSet        -- Monomorphic tyvars
    -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
-   -> [TcIdSigInst]     -- Parital signatures
+   -> [TcIdSigInst]     -- Partial signatures
    -> [PredType]        -- Candidates, zonked
    -> TcM [TyVar]
 -- Fix what tyvars we are going to quantify over, and quantify them
@@ -1955,7 +1955,7 @@ floatEqualities skols no_given_eqs
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
 
   | otherwise
-  = do { -- First zonk: the inert set (from whence they came) are is fully
+  = do { -- First zonk: the inert set (from whence they came) is fully
          -- zonked, but unflattening may have filled in unification
          -- variables, and we /must/ see them.  Otherwise we may float
          -- constraints that mention the skolems!

@@ -2837,7 +2837,7 @@ unflattenGivens :: IORef InertSet -> TcM ()
 -- NB: this is the /only/ way that a fsk (MetaDetails = FlatSkolTv)
 --     is filled in. Nothing else does so.
 --
--- It's here (rather than in TcFlatten) becuause the Right Places
+-- It's here (rather than in TcFlatten) because the Right Places
 -- to call it are in runTcSWithEvBinds/nestImplicTcS, where it
 -- is nicely paired with the creation an empty inert_fsks list.
 unflattenGivens inert_var
@@ -2885,7 +2885,7 @@ demoteUnfilledFmv fmv
 
 {- *********************************************************************
 *                                                                      *
-*                Instantaiation etc
+*                Instantiation etc.
 *                                                                      *
 ********************************************************************* -}
 

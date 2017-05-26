@@ -208,7 +208,7 @@ Consider
   pattern P x <- MkT x
 
 This should work.  But in the matcher we must match against MkT, and then
-instantiate its argument 'x', to get a functino of type (Int -> Int).
+instantiate its argument 'x', to get a function of type (Int -> Int).
 Equality is not enough!  Trac #13752 was an example.
 
 Note [Checking against a pattern signature]

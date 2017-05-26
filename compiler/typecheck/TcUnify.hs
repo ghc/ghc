@@ -687,7 +687,7 @@ So roughly:
       (i.e. skolemisation is the next thing we'd do)
  * and the ty_actual has no top-level polymorphism (but looking deeply)
 then we can revert to simple equality.  But we need to be careful.
-These examples are allfine:
+These examples are all fine:
 
  * (Char -> forall a. a->a) <= (forall a. Char -> a -> a)
       Polymorphism is buried in ty_actual
@@ -703,8 +703,8 @@ These examples are allfine:
      ty_expected isn't really polymorphic
 
 If we prematurely go to equality we'll reject a program we should
-accept (e.g. Grac #13752).  So the test (which is only to improve
-error messagse) is very conservative:
+accept (e.g. Trac #13752).  So the test (which is only to improve
+error message) is very conservative:
  * ty_actual is /definitely/ monomorphic
  * ty_expected is /definitely/ polymorphic
 -}

@@ -1619,7 +1619,7 @@ decideGeneralisationPlan dflags lbinds closed sig_fn
     binds = map unLoc lbinds
 
     partial_sig_mrs :: [Bool]
-    -- One for each parital signature (so empty => no partial sigs)
+    -- One for each partial signature (so empty => no partial sigs)
     -- The Bool is True if the signature has no constraint context
     --      so we should apply the MR
     -- See Note [Partial type signatures and generalisation]
