@@ -1244,7 +1244,7 @@ pprConDecl (ConDeclH98 { con_name = L _ con
   where
     ppr_details (InfixCon t1 t2) = hsep [ppr t1, pprInfixOcc con, ppr t2]
     ppr_details (PrefixCon tys)  = hsep (pprPrefixOcc con
-                                   : map (pprParendHsType . unLoc) tys)
+                                   : map (pprHsType . unLoc) tys)
     ppr_details (RecCon fields)  = pprPrefixOcc con
                                  <+> pprConDeclFields (unLoc fields)
     tvs = case mtvs of
@@ -1495,10 +1495,10 @@ pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) fixity context
    where
      pp_pats (patl:patsr)
        | fixity == Infix
-          = hsep [pprParendHsType (unLoc patl), pprInfixOcc (unLoc thing)
-          , hsep (map (pprParendHsType.unLoc) patsr)]
+          = hsep [pprHsType (unLoc patl), pprInfixOcc (unLoc thing)
+          , hsep (map (pprHsType.unLoc) patsr)]
        | otherwise = hsep [ pprPrefixOcc (unLoc thing)
-                   , hsep (map (pprParendHsType.unLoc) (patl:patsr))]
+                   , hsep (map (pprHsType.unLoc) (patl:patsr))]
      pp_pats [] = empty
 
 instance (OutputableBndrId name) => Outputable (ClsInstDecl name) where

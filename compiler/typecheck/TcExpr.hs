@@ -1858,7 +1858,7 @@ too_many_args fun args
        2 (sep (map pp args))
   where
     pp (Left e)                             = ppr e
-    pp (Right (HsWC { hswc_body = L _ t })) = pprParendHsType t
+    pp (Right (HsWC { hswc_body = L _ t })) = pprHsType t
 
 
 {-

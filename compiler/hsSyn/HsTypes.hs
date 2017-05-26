@@ -64,7 +64,7 @@ module HsTypes (
         hsLTyVarBndrToType, hsLTyVarBndrsToTypes,
 
         -- Printing
-        pprParendHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
+        pprHsType, pprHsForAll, pprHsForAllTvs, pprHsForAllExtra,
         pprHsContext, pprHsContextNoArrow, pprHsContextMaybe
     ) where
 
@@ -615,7 +615,7 @@ data HsAppType name
 deriving instance (DataId name) => Data (HsAppType name)
 
 instance (OutputableBndrId name) => Outputable (HsAppType name) where
-  ppr = ppr_app_ty TopPrec
+  ppr = ppr_app_ty
 
 {-
 Note [HsForAllTy tyvar binders]
@@ -1207,13 +1207,13 @@ pprHsContextNoArrow = fromMaybe empty . pprHsContextMaybe
 
 pprHsContextMaybe :: (OutputableBndrId name) => HsContext name -> Maybe SDoc
 pprHsContextMaybe []         = Nothing
-pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty FunPrec pred
+pprHsContextMaybe [L _ pred] = Just $ ppr_mono_ty pred
 pprHsContextMaybe cxt        = Just $ parens (interpp'SP cxt)
 
 -- For use in a HsQualTy, which always gets printed if it exists.
 pprHsContextAlways :: (OutputableBndrId name) => HsContext name -> SDoc
 pprHsContextAlways []  = parens empty <+> darrow
-pprHsContextAlways [L _ ty] = ppr_mono_ty FunPrec ty <+> darrow
+pprHsContextAlways [L _ ty] = ppr_mono_ty ty <+> darrow
 pprHsContextAlways cxt = parens (interpp'SP cxt) <+> darrow
 
 -- True <=> print an extra-constraints wildcard, e.g. @(Show a, _) =>@
@@ -1252,96 +1252,90 @@ seems like the Right Thing anyway.)
 
 -- Printing works more-or-less as for Types
 
-pprHsType, pprParendHsType :: (OutputableBndrId name) => HsType name -> SDoc
+pprHsType :: (OutputableBndrId name) => HsType name -> SDoc
+pprHsType ty = ppr_mono_ty ty
 
-pprHsType ty       = ppr_mono_ty TopPrec ty
-pprParendHsType ty = ppr_mono_ty TyConPrec ty
+ppr_mono_lty :: (OutputableBndrId name) => LHsType name -> SDoc
+ppr_mono_lty ty = ppr_mono_ty (unLoc ty)
 
-ppr_mono_lty :: (OutputableBndrId name) => TyPrec -> LHsType name -> SDoc
-ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
+ppr_mono_ty :: (OutputableBndrId name) => HsType name -> SDoc
+ppr_mono_ty (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
+  = sep [pprHsForAllTvs tvs, ppr_mono_lty ty]
 
-ppr_mono_ty :: (OutputableBndrId name) => TyPrec -> HsType name -> SDoc
-ppr_mono_ty ctxt_prec (HsForAllTy { hst_bndrs = tvs, hst_body = ty })
-  = maybeParen ctxt_prec FunPrec $
-    sep [pprHsForAllTvs tvs, ppr_mono_lty TopPrec ty]
+ppr_mono_ty (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
+  = sep [pprHsContextAlways ctxt, ppr_mono_lty ty]
 
-ppr_mono_ty _ctxt_prec (HsQualTy { hst_ctxt = L _ ctxt, hst_body = ty })
-  = sep [pprHsContextAlways ctxt, ppr_mono_lty TopPrec ty]
-
-ppr_mono_ty _    (HsBangTy b ty)     = ppr b <> ppr_mono_lty TyConPrec ty
-ppr_mono_ty _    (HsRecTy flds)      = pprConDeclFields flds
-ppr_mono_ty _    (HsTyVar NotPromoted (L _ name))= pprPrefixOcc name
-ppr_mono_ty _    (HsTyVar Promoted (L _ name))
+ppr_mono_ty (HsBangTy b ty)     = ppr b <> ppr_mono_lty ty
+ppr_mono_ty (HsRecTy flds)      = pprConDeclFields flds
+ppr_mono_ty (HsTyVar NotPromoted (L _ name))= pprPrefixOcc name
+ppr_mono_ty (HsTyVar Promoted (L _ name))
   = space <> quote (pprPrefixOcc name)
                          -- We need a space before the ' above, so the parser
                          -- does not attach it to the previous symbol
-ppr_mono_ty prec (HsFunTy ty1 ty2)   = ppr_fun_ty prec ty1 ty2
-ppr_mono_ty _    (HsTupleTy con tys) = tupleParens std_con (pprWithCommas ppr tys)
+ppr_mono_ty (HsFunTy ty1 ty2)   = ppr_fun_ty ty1 ty2
+ppr_mono_ty (HsTupleTy con tys) = tupleParens std_con (pprWithCommas ppr tys)
   where std_con = case con of
                     HsUnboxedTuple -> UnboxedTuple
                     _              -> BoxedTuple
-ppr_mono_ty _    (HsSumTy tys)       = tupleParens UnboxedTuple (pprWithBars ppr tys)
-ppr_mono_ty _    (HsKindSig ty kind) = parens (ppr_mono_lty TopPrec ty <+> dcolon <+> ppr kind)
-ppr_mono_ty _    (HsListTy ty)       = brackets (ppr_mono_lty TopPrec ty)
-ppr_mono_ty _    (HsPArrTy ty)       = paBrackets (ppr_mono_lty TopPrec ty)
-ppr_mono_ty prec (HsIParamTy n ty)   = maybeParen prec FunPrec (ppr n <+> dcolon <+> ppr_mono_lty TopPrec ty)
-ppr_mono_ty _    (HsSpliceTy s _)    = pprSplice s
-ppr_mono_ty prec (HsCoreTy ty)       = pprPrecType prec ty
-ppr_mono_ty _    (HsExplicitListTy Promoted _ tys)
+ppr_mono_ty (HsSumTy tys)       = tupleParens UnboxedTuple (pprWithBars ppr tys)
+ppr_mono_ty (HsKindSig ty kind) = parens (ppr_mono_lty ty <+> dcolon <+> ppr kind)
+ppr_mono_ty (HsListTy ty)       = brackets (ppr_mono_lty ty)
+ppr_mono_ty (HsPArrTy ty)       = paBrackets (ppr_mono_lty ty)
+ppr_mono_ty (HsIParamTy n ty)   = (ppr n <+> dcolon <+> ppr_mono_lty ty)
+ppr_mono_ty (HsSpliceTy s _)    = pprSplice s
+ppr_mono_ty (HsCoreTy ty)       = ppr ty
+ppr_mono_ty (HsExplicitListTy Promoted _ tys)
   = quote $ brackets (interpp'SP tys)
-ppr_mono_ty _    (HsExplicitListTy NotPromoted _ tys)
+ppr_mono_ty (HsExplicitListTy NotPromoted _ tys)
   = brackets (interpp'SP tys)
-ppr_mono_ty _    (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
-ppr_mono_ty _    (HsTyLit t)         = ppr_tylit t
-ppr_mono_ty _    (HsWildCardTy {})   = char '_'
+ppr_mono_ty (HsExplicitTupleTy _ tys) = quote $ parens (interpp'SP tys)
+ppr_mono_ty (HsTyLit t)         = ppr_tylit t
+ppr_mono_ty (HsWildCardTy {})   = char '_'
 
-ppr_mono_ty ctxt_prec (HsEqTy ty1 ty2)
-  = maybeParen ctxt_prec TyOpPrec $
-    ppr_mono_lty TyOpPrec ty1 <+> char '~' <+> ppr_mono_lty TyOpPrec ty2
+ppr_mono_ty (HsEqTy ty1 ty2)
+  = ppr_mono_lty ty1 <+> char '~' <+> ppr_mono_lty ty2
 
-ppr_mono_ty _ctxt_prec (HsAppsTy tys)
-  = hsep (map (ppr_app_ty TyConPrec . unLoc) tys)
+ppr_mono_ty (HsAppsTy tys)
+  = hsep (map (ppr_app_ty . unLoc) tys)
 
-ppr_mono_ty _ctxt_prec (HsAppTy fun_ty arg_ty)
-  = hsep [ppr_mono_lty FunPrec fun_ty, ppr_mono_lty TyConPrec arg_ty]
+ppr_mono_ty (HsAppTy fun_ty arg_ty)
+  = hsep [ppr_mono_lty fun_ty, ppr_mono_lty arg_ty]
 
-ppr_mono_ty ctxt_prec (HsOpTy ty1 (L _ op) ty2)
-  = maybeParen ctxt_prec TyOpPrec $
-    sep [ ppr_mono_lty TyOpPrec ty1
-        , sep [pprInfixOcc op, ppr_mono_lty TyOpPrec ty2 ] ]
+ppr_mono_ty (HsOpTy ty1 (L _ op) ty2)
+  = sep [ ppr_mono_lty ty1
+        , sep [pprInfixOcc op, ppr_mono_lty ty2 ] ]
 
-ppr_mono_ty _         (HsParTy ty)
-  = parens (ppr_mono_lty TopPrec ty)
+ppr_mono_ty (HsParTy ty)
+  = parens (ppr_mono_lty ty)
   -- Put the parens in where the user did
   -- But we still use the precedence stuff to add parens because
   --    toHsType doesn't put in any HsParTys, so we may still need them
 
-ppr_mono_ty ctxt_prec (HsDocTy ty doc)
-  = maybeParen ctxt_prec TyOpPrec $
-    ppr_mono_lty TyOpPrec ty <+> ppr (unLoc doc)
+ppr_mono_ty (HsDocTy ty doc)
+  -- AZ: Should we add parens?  Should we introduce "-- ^"?
+  = ppr_mono_lty ty <+> ppr (unLoc doc)
   -- we pretty print Haddock comments on types as if they were
   -- postfix operators
 
 --------------------------
 ppr_fun_ty :: (OutputableBndrId name)
-           => TyPrec -> LHsType name -> LHsType name -> SDoc
-ppr_fun_ty ctxt_prec ty1 ty2
-  = let p1 = ppr_mono_lty FunPrec ty1
-        p2 = ppr_mono_lty TopPrec ty2
+           => LHsType name -> LHsType name -> SDoc
+ppr_fun_ty ty1 ty2
+  = let p1 = ppr_mono_lty ty1
+        p2 = ppr_mono_lty ty2
     in
-    maybeParen ctxt_prec FunPrec $
     sep [p1, text "->" <+> p2]
 
 --------------------------
-ppr_app_ty :: (OutputableBndrId name) => TyPrec -> HsAppType name -> SDoc
-ppr_app_ty _    (HsAppInfix (L _ n))                  = pprInfixOcc n
-ppr_app_ty _    (HsAppPrefix (L _ (HsTyVar NotPromoted (L _ n))))
+ppr_app_ty :: (OutputableBndrId name) => HsAppType name -> SDoc
+ppr_app_ty (HsAppInfix (L _ n))                  = pprInfixOcc n
+ppr_app_ty (HsAppPrefix (L _ (HsTyVar NotPromoted (L _ n))))
   = pprPrefixOcc n
-ppr_app_ty _    (HsAppPrefix (L _ (HsTyVar Promoted  (L _ n))))
+ppr_app_ty (HsAppPrefix (L _ (HsTyVar Promoted  (L _ n))))
   = space <> quote (pprPrefixOcc n) -- We need a space before the ' above, so
                                     -- the parser does not attach it to the
                                     -- previous symbol
-ppr_app_ty ctxt (HsAppPrefix ty)                      = ppr_mono_lty ctxt ty
+ppr_app_ty (HsAppPrefix ty) = ppr_mono_lty ty
 
 --------------------------
 ppr_tylit :: HsTyLit -> SDoc

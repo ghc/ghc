@@ -1057,7 +1057,7 @@ ppr_apps fun args = hang (ppr_expr fun) 2 (sep (map pp args))
   where
     pp (Left arg)                             = ppr arg
     pp (Right (LHsWcTypeX (HsWC { hswc_body = L _ arg })))
-      = char '@' <> pprParendHsType arg
+      = char '@' <> pprHsType arg
 
 pprExternalSrcLoc :: (StringLiteral,(Int,Int),(Int,Int)) -> SDoc
 pprExternalSrcLoc (StringLiteral _ src,(n1,n2),(n3,n4))

@@ -14,4 +14,4 @@ Simple14.hs:8:8: error:
         Actual type: EQ_ z z
     • In the ambiguity check for ‘eqE’
       To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
-      In the type signature: eqE :: EQ_ x y -> ((x ~ y) => EQ_ z z) -> p
+      In the type signature: eqE :: EQ_ x y -> (x ~ y => EQ_ z z) -> p

@@ -1210,7 +1210,11 @@ cvtTypeKind ty_str ty
              -> mk_apps (HsTyVar NotPromoted (noLoc (getRdrName (sumTyCon n))))
                         tys'
            ArrowT
-             | [x',y'] <- tys' -> returnL (HsFunTy x' y')
+             | [x',y'] <- tys' -> do
+                 case x' of
+                   (L _ HsFunTy{}) -> do { x'' <- returnL (HsParTy x')
+                                         ; returnL (HsFunTy x'' y') }
+                   _  -> returnL (HsFunTy x' y')
              | otherwise ->
                   mk_apps (HsTyVar NotPromoted (noLoc (getRdrName funTyCon)))
                           tys'
