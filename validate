@@ -181,9 +181,9 @@ if [ $no_clean -eq 0 ]; then
     INSTDIR="$thisdir/inst"
 
     if [ $use_dph -eq 1 ]; then
-        python3 ./boot --validate --required-tag=dph
+        perl -w boot --validate --required-tag=dph
     else
-        python3 ./boot --validate
+        perl -w boot --validate
     fi
     ./configure --prefix="$INSTDIR" $config_args
 fi
