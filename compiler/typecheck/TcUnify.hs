@@ -1603,7 +1603,6 @@ canSolveByUnification tclvl tv xi
                                         SigTv -> True
                                         _     -> False
                        SkolemTv {} -> True
-                       FlatSkol {} -> False
                        RuntimeUnk  -> True
 
 {- Note [Fmv Orientation Invariant]

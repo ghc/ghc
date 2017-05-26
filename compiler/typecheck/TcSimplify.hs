@@ -615,8 +615,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                         psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
-                  ; solveWanteds wanteds }
-       ; wanted_transformed_incl_derivs <- TcM.zonkWC wanted_transformed_incl_derivs
+                  ; wanteds' <- solveWanteds wanteds
+                  ; TcS.zonkWC wanteds' }
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
@@ -1953,20 +1953,29 @@ floatEqualities skols no_given_eqs
                 wanteds@(WC { wc_simple = simples })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
+
   | otherwise
-  = do { outer_tclvl <- TcS.getTcLevel
+  = do { -- First zonk: the inert set (from whence they came) are is fully
+         -- zonked, but unflattening may have filled in unification
+         -- variables, and we /must/ see them.  Otherwise we may float
+         -- constraints that mention the skolems!
+         simples <- TcS.zonkSimples simples
+
+       -- Now we can pick the ones to float
+       ; let (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
+             skol_set = mkVarSet skols
+
+       -- Promote any unification variables mentioned in the floated equalities
+       -- See Note [Promoting unification variables]
+       ; outer_tclvl <- TcS.getTcLevel
        ; mapM_ (promoteTyVarTcS outer_tclvl)
                (tyCoVarsOfCtsList float_eqs)
-           -- See Note [Promoting unification variables]
 
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
                                           , text "Simples =" <+> ppr simples
                                           , text "Floated eqs =" <+> ppr float_eqs])
        ; return ( float_eqs
                 , wanteds { wc_simple = remaining_simples } ) }
-  where
-    skol_set = mkVarSet skols
-    (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
 
 usefulToFloat :: VarSet -> Ct -> Bool
 usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalised

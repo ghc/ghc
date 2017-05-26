@@ -1538,7 +1538,7 @@ Suppose we have  [G] Num (F [a])
 then we flatten to
      [G] Num fsk
      [G] F [a] ~ fsk
-where fsk is a flatten-skolem (FlatSkol). Suppose we have
+where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
       type instance F [a] = a
 then we'll reduce the second constraint to
      [G] a ~ fsk

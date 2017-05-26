@@ -1589,8 +1589,8 @@ data Ct
         --    *never* over-saturated (because if so
         --    we should have decomposed)
 
-      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkol skolem
-                            -- [Wanted] always a FlatMetaTv unification variable
+      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkolTv
+                            -- [Wanted] always a FlatMetaTv
         -- See Note [The flattening story] in TcFlatten
     }
 

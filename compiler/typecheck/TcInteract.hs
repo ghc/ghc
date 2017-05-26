@@ -160,6 +160,7 @@ solveSimpleGivens givens
 solveSimpleWanteds :: Cts -> TcS WantedConstraints
 -- NB: 'simples' may contain /derived/ equalities, floated
 --     out from a nested implication. So don't discard deriveds!
+-- The result is not necessarily zonked
 solveSimpleWanteds simples
   = do { traceTcS "solveSimpleWanteds {" (ppr simples)
        ; dflags <- getDynFlags
@@ -199,12 +200,13 @@ solveSimpleWanteds simples
 solve_simple_wanteds :: WantedConstraints -> TcS (Int, WantedConstraints)
 -- Try solving these constraints
 -- Affects the unification state (of course) but not the inert set
+-- The result is not necessarily zonked
 solve_simple_wanteds (WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 })
   = nestTcS $
     do { solveSimples simples1
        ; (implics2, tv_eqs, fun_eqs, insols2, others) <- getUnsolvedInerts
        ; (unif_count, unflattened_eqs) <- reportUnifications $
-                                          unflatten tv_eqs fun_eqs
+                                          unflattenWanteds tv_eqs fun_eqs
             -- See Note [Unflatten after solving the simple wanteds]
        ; return ( unif_count
                 , WC { wc_simple = others `andCts` unflattened_eqs
@@ -2241,6 +2243,13 @@ Other notes:
      - natural numbers
      - Typeable
 
+* Flatten-skolems: we do not treat a flatten-skolem as unifiable
+  for this purpose.
+  E.g.   f :: Eq (F a) => [a] -> [a]
+         f xs = ....(xs==xs).....
+  Here we get [W] Eq [a], and we don't want to refrain from solving
+  it because of the given (Eq (F a)) constraint!
+
 * The given-overlap problem is arguably not easy to appear in practice
   due to our aggressive prioritization of equality solving over other
   constraints, but it is possible. I've added a test case in
@@ -2274,7 +2283,7 @@ Other notes:
   in point.
 
 All of this is disgustingly delicate, so to discourage people from writing
-simplifiable class givens, we warn about signatures that contain them;#
+simplifiable class givens, we warn about signatures that contain them;
 see TcValidity Note [Simplifiable given constraints].
 -}
 

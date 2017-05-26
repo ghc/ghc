@@ -550,8 +550,13 @@ instSkolTyCoVarX mk_tcv subst tycovar
 newFskTyVar :: TcType -> TcM TcTyVar
 newFskTyVar fam_ty
   = do { uniq <- newUnique
-       ; let name = mkSysTvName uniq (fsLit "fsk")
-       ; return (mkTcTyVar name (typeKind fam_ty) (FlatSkol fam_ty)) }
+       ; ref  <- newMutVar Flexi
+       ; let details = MetaTv { mtv_info  = FlatSkolTv
+                              , mtv_ref   = ref
+                              , mtv_tclvl = fmvTcLevel }
+             name = mkMetaTyVarName uniq (fsLit "fsk")
+       ; return (mkTcTyVar name (typeKind fam_ty) details) }
+
 {-
 Note [Kind substitution when instantiating]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -593,10 +598,9 @@ newFmvTyVar :: TcType -> TcM TcTyVar
 newFmvTyVar fam_ty
   = do { uniq <- newUnique
        ; ref  <- newMutVar Flexi
-       ; cur_lvl <- getTcLevel
        ; let details = MetaTv { mtv_info  = FlatMetaTv
                               , mtv_ref   = ref
-                              , mtv_tclvl = fmvTcLevel cur_lvl }
+                              , mtv_tclvl = fmvTcLevel }
              name = mkMetaTyVarName uniq (fsLit "s")
        ; return (mkTcTyVar name (typeKind fam_ty) details) }
 
@@ -707,7 +711,7 @@ writeMetaTyVarRef tyvar ref ty
     tv_lvl = tcTyVarLevel tyvar
     ty_lvl = tcTypeLevel ty
 
-    level_check_ok = isFmvTyVar tyvar
+    level_check_ok = isFlattenTyVar tyvar
                   || not (ty_lvl `strictlyDeeperThan` tv_lvl)
     level_check_msg = ppr ty_lvl $$ ppr tv_lvl $$ ppr tyvar $$ ppr ty
 
@@ -768,6 +772,7 @@ newAnonMetaTyVar meta_info kind
               s = case meta_info of
                         TauTv       -> fsLit "t"
                         FlatMetaTv  -> fsLit "fmv"
+                        FlatSkolTv  -> fsLit "fsk"
                         SigTv       -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }
@@ -998,7 +1003,7 @@ zonkQuantifiedTyVar tv
 
       MetaTv {} -> skolemiseUnboundMetaTyVar tv
 
-      _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- FlatSkol, RuntimeUnk
+      _other -> pprPanic "zonkQuantifiedTyVar" (ppr tv) -- RuntimeUnk
 
 defaultTyVar :: Bool      -- True <=> please default this kind variable to *
              -> TcTyVar   -- If it's a MetaTyVar then it is unbound
@@ -1490,7 +1495,6 @@ zonkTcTyVar tv
   = case tcTyVarDetails tv of
       SkolemTv {}   -> zonk_kind_and_return
       RuntimeUnk {} -> zonk_kind_and_return
-      FlatSkol ty   -> zonkTcType ty
       MetaTv { mtv_ref = ref }
          -> do { cts <- readMutVar ref
                ; case cts of

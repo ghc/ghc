@@ -1,8 +1,6 @@
 
 T9834.hs:23:10: warning: [-Wdeferred-type-errors (in -Wdefault)]
-    • Couldn't match type ‘p’ with ‘(->) (p a0)’
-      ‘p’ is a rigid type variable bound by
-        the class declaration for ‘ApplicativeFix’ at T9834.hs:21:39
+    • Occurs check: cannot construct the infinite type: p ~ (->) (p a0)
       Expected type: (forall (q :: * -> *).
                       Applicative q =>
                       Comp p q a -> Comp p q a)

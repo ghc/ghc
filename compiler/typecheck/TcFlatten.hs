@@ -4,7 +4,7 @@ module TcFlatten(
    FlattenMode(..),
    flatten, flattenManyNom,
 
-   unflatten,
+   unflattenWanteds
  ) where
 
 #include "HsVersions.h"
@@ -36,31 +36,50 @@ import Control.Arrow ( first )
 Note [The flattening story]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * A CFunEqCan is either of form
-     [G] <F xis> : F xis ~ fsk   -- fsk is a FlatSkol
-     [W]       x : F xis ~ fmv   -- fmv is a unification variable,
-                                 -- but untouchable,
-                                 -- with MetaInfo = FlatMetaTv
+     [G] <F xis> : F xis ~ fsk   -- fsk is a FlatSkolTv
+     [W]       x : F xis ~ fmv   -- fmv is a FlatMetaTv
   where
      x is the witness variable
-     fsk/fmv is a flatten skolem
      xis are function-free
-  CFunEqCans are always [Wanted], or [Given], never [Derived]
+     fsk/fmv is a flatten skolem;
+        it is always untouchable (level 0)
 
-  fmv untouchable just means that in a CTyVarEq, say,
-       fmv ~ Int
-  we do NOT unify fmv.
+* CFunEqCans can have any flavour: [G], [W], [WD] or [D]
 
 * KEY INSIGHTS:
 
    - A given flatten-skolem, fsk, is known a-priori to be equal to
-     F xis (the LHS), with <F xis> evidence
+     F xis (the LHS), with <F xis> evidence.  The fsk is still a
+     unification variable, but it is "owned" by its CFunEqCan, and
+     is filled in (unflattened) only by unflattenGivens.
 
    - A unification flatten-skolem, fmv, stands for the as-yet-unknown
-     type to which (F xis) will eventually reduce
+     type to which (F xis) will eventually reduce.  It is filled in
+     only by dischargeFmv.
 
-* Inert set invariant: if F xis1 ~ fsk1, F xis2 ~ fsk2
-                       then xis1 /= xis2
-  i.e. at most one CFunEqCan with a particular LHS
+   - All fsk/fmv variables are "untouchable".  To make it simple to test,
+     we simply give them TcLevel=0.  This means that in a CTyVarEq, say,
+       fmv ~ Int
+     we NEVER unify fmv.
+
+   - A unification flatten-skolems, fmv, ONLY gets unified when either
+       a) The CFunEqCan takes a step, using an axiom
+       b) By unflattenWanteds
+    They are never unified in any other form of equality.
+    For example [W] ffmv ~ Int  is stuck; it does not unify with fmv.
+
+* We *never* substitute in the RHS (i.e. the fsk/fmv) of a CFunEqCan.
+  That would destroy the invariant about the shape of a CFunEqCan,
+  and it would risk wanted/wanted interactions. The only way we
+  learn information about fsk is when the CFunEqCan takes a step.
+
+  However we *do* substitute in the LHS of a CFunEqCan (else it
+  would never get to fire!)
+
+* Unflattening:
+   - We unflatten Givens when leaving their scope (see unflattenGivens)
+   - We unflatten Wanteds at the end of each attempt to simplify the
+     wanteds; see unflattenWanteds, called from solveSimpleWanteds.
 
 * Each canonical [G], [W], or [WD] CFunEqCan x : F xis ~ fsk/fmv
   has its own distinct evidence variable x and flatten-skolem fsk/fmv.
@@ -70,7 +89,11 @@ Note [The flattening story]
   In contrast a [D] CFunEqCan shares its fmv with its partner [W],
   but does not "own" it.  If we reduce a [D] F Int ~ fmv, where
   say type instance F Int = ty, then we don't discharge fmv := ty.
-  Rather we simply generate [D] fmv ~ ty
+  Rather we simply generate [D] fmv ~ ty (in TcInteract.reduce_top_fun_eq)
+
+* Inert set invariant: if F xis1 ~ fsk1, F xis2 ~ fsk2
+                       then xis1 /= xis2
+  i.e. at most one CFunEqCan with a particular LHS
 
 * Function applications can occur in the RHS of a CTyEqCan.  No reason
   not allow this, and it reduces the amount of flattening that must occur.
@@ -103,20 +126,6 @@ Note [The flattening story]
     - New wanted  x2 :: F flat_xis ~ fsk/fmv
     - Add new wanted to flat cache
     - Discharge x = F cos ; x2
-
-* Unification flatten-skolems, fmv, ONLY get unified when either
-    a) The CFunEqCan takes a step, using an axiom
-    b) During un-flattening
-  They are never unified in any other form of equality.
-  For example [W] ffmv ~ Int  is stuck; it does not unify with fmv.
-
-* We *never* substitute in the RHS (i.e. the fsk/fmv) of a CFunEqCan.
-  That would destroy the invariant about the shape of a CFunEqCan,
-  and it would risk wanted/wanted interactions. The only way we
-  learn information about fsk is when the CFunEqCan takes a step.
-
-  However we *do* substitute in the LHS of a CFunEqCan (else it
-  would never get to fire!)
 
 * [Interacting rule]
     (inert)     [W] x1 : F tys ~ fmv1
@@ -1476,8 +1485,8 @@ flattens to
 We must solve both!
 -}
 
-unflatten :: Cts -> Cts -> TcS Cts
-unflatten tv_eqs funeqs
+unflattenWanteds :: Cts -> Cts -> TcS Cts
+unflattenWanteds tv_eqs funeqs
  = do { tclvl    <- getTcLevel
 
       ; traceTcS "Unflattening" $ braces $
@@ -1506,10 +1515,7 @@ unflatten tv_eqs funeqs
       ; let all_flat = tv_eqs `andCts` funeqs
       ; traceTcS "Unflattening done" $ braces (pprCts all_flat)
 
-          -- Step 5: zonk the result
-          -- Motivation: makes them nice and ready for the next step
-          --             (see TcInteract.solveSimpleWanteds)
-      ; zonkSimples all_flat }
+      ; return all_flat }
   where
     ----------------
     unflatten_funeq :: Ct -> Cts -> TcS Cts
