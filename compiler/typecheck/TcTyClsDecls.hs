@@ -555,7 +555,11 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
 kcLTyClDecl :: LTyClDecl Name -> TcM ()
   -- See Note [Kind checking for type and class decls]
 kcLTyClDecl (L loc decl)
-  = setSrcSpan loc $ tcAddDeclCtxt decl $ kcTyClDecl decl
+  = setSrcSpan loc $
+    tcAddDeclCtxt decl $
+    do { traceTc "kcTyClDecl {" (ppr (tyClDeclLName decl))
+       ; kcTyClDecl decl
+       ; traceTc "kcTyClDecl done }" (ppr (tyClDeclLName decl)) }
 
 kcTyClDecl :: TyClDecl Name -> TcM ()
 -- This function is used solely for its side effect on kind variables
