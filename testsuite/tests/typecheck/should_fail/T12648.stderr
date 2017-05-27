@@ -1,0 +1,17 @@
+
+T12648.hs:76:2: error:
+    • Couldn't match type ‘a’ with ‘()’
+      ‘a’ is a rigid type variable bound by
+        the type signature for:
+          f :: forall (m :: * -> *) a. MonadBaseUnlift m IO => m a
+        at T12648.hs:71:1-34
+      Expected type: m a
+        Actual type: m ()
+    • In a stmt of a 'do' block: return ()
+      In the expression:
+        do _ <- askUnliftBase
+           return ()
+      In an equation for ‘f’:
+          f = do _ <- askUnliftBase
+                 return ()
+    • Relevant bindings include f :: m a (bound at T12648.hs:72:1)
