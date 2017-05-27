@@ -1,8 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE RecordWildCards #-}
-
 
 module Haddock.Interface.Specialize
     ( specializeInstHead
@@ -27,73 +27,66 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-
-
--- | Instantiate all occurrences of given name with particular type.
-specialize :: (Eq name, Typeable name)
-           => Data a
-           => name -> HsType name -> a -> a
-specialize name details =
-    everywhere $ mkT step
-  where
-    step (HsTyVar _ (L _ name')) | name == name' = details
-    step typ = typ
-
+import Data.Foldable
 
 -- | Instantiate all occurrences of given names with corresponding types.
---
--- It is just a convenience function wrapping 'specialize' that supports more
--- that one specialization.
-specialize' :: (Eq name, Typeable name)
+specialize :: forall name a. (Ord name, DataId name, NamedThing name)
             => Data a
             => [(name, HsType name)] -> a -> a
-specialize' = flip $ foldr (uncurry specialize)
+specialize specs = go
+  where
+    go :: forall x. Data x => x -> x
+    go = everywhereButType @name $ mkT $ sugar . specialize_ty_var
+    specialize_ty_var (HsTyVar _ (L _ name'))
+      | Just t <- Map.lookup name' spec_map = t
+    specialize_ty_var typ = typ
+    -- This is a tricky recursive definition that is guaranteed to terminate
+    -- because a type binder cannot be instantiated with a type that depends
+    -- on that binder. i.e. @a -> Maybe a@ is invalid
+    spec_map = Map.fromList [ (n, go t) | (n, t) <- specs]
 
 
 -- | Instantiate given binders with corresponding types.
 --
 -- Again, it is just a convenience function around 'specialize'. Note that
 -- length of type list should be the same as the number of binders.
-specializeTyVarBndrs :: (Eq name, DataId name)
+specializeTyVarBndrs :: (Ord name, DataId name, NamedThing name)
                      => Data a
                      => LHsQTyVars name -> [HsType name]
                      -> a -> a
 specializeTyVarBndrs bndrs typs =
-    specialize' $ zip bndrs' typs
+    specialize $ zip bndrs' typs
   where
     bndrs' = map (bname . unLoc) . hsq_explicit $ bndrs
     bname (UserTyVar (L _ name)) = name
     bname (KindedTyVar (L _ name) _) = name
 
 
-specializePseudoFamilyDecl :: (Eq name, DataId name)
+specializePseudoFamilyDecl :: (Ord name, DataId name, NamedThing name)
                            => LHsQTyVars name -> [HsType name]
                            -> PseudoFamilyDecl name
                            -> PseudoFamilyDecl name
 specializePseudoFamilyDecl bndrs typs decl =
-    decl { pfdTyVars = map specializeTyVars (pfdTyVars decl) }
-  where
-    specializeTyVars = specializeTyVarBndrs bndrs typs
+  decl {pfdTyVars = map (specializeTyVarBndrs bndrs typs) (pfdTyVars decl)}
 
-
-specializeSig :: forall name . (Eq name, DataId name, SetName name)
+specializeSig :: forall name . (Ord name, DataId name, SetName name, NamedThing name)
               => LHsQTyVars name -> [HsType name]
               -> Sig name
               -> Sig name
 specializeSig bndrs typs (TypeSig lnames typ) =
-    TypeSig lnames (typ { hswc_body = (hswc_body typ) { hsib_body = noLoc typ'}})
+  TypeSig lnames (typ {hswc_body = (hswc_body typ) {hsib_body = noLoc typ'}})
   where
     true_type :: HsType name
     true_type = unLoc (hsSigWcType typ)
     typ' :: HsType name
-    typ' = rename fv . sugar $ specializeTyVarBndrs bndrs typs true_type
+    typ' = rename fv $ specializeTyVarBndrs bndrs typs true_type
     fv = foldr Set.union Set.empty . map freeVariables $ typs
 specializeSig _ _ sig = sig
 
 
 -- | Make all details of instance head (signatures, associated types)
 -- specialized to that particular instance type.
-specializeInstHead :: (Eq name, DataId name, SetName name)
+specializeInstHead :: (Ord name, DataId name, SetName name, NamedThing name)
                    => InstHead name -> InstHead name
 specializeInstHead ihd@InstHead { ihdInstType = clsi@ClassInst { .. }, .. } =
     ihd { ihdInstType = instType' }
@@ -115,12 +108,7 @@ specializeInstHead ihd = ihd
 -- and @(a, b, c)@.
 sugar :: forall name. (NamedThing name, DataId name)
       => HsType name -> HsType name
-sugar =
-    everywhere $ mkT step
-  where
-    step :: HsType name -> HsType name
-    step = sugarOperators . sugarTuples . sugarLists
-
+sugar = sugarOperators . sugarTuples . sugarLists
 
 sugarLists :: NamedThing name => HsType name -> HsType name
 sugarLists (HsAppTy (L _ (HsTyVar _ (L _ name))) ltyp)
