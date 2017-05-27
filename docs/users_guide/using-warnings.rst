@@ -1033,6 +1033,8 @@ of ``-W(no-)*``.
 
 .. ghc-flag:: -Wcpp-undef
 
+    :since: 8.2
+
     This flag passes ``-Wundef`` to the C pre-processor (if its being used)
     which causes the pre-processor to warn on uses of the `#if` directive on
     undefined identifiers.
