@@ -3,7 +3,7 @@ module ToIface where
 import {-# SOURCE #-} TyCoRep
 import {-# SOURCE #-} IfaceType( IfaceType, IfaceTyCon, IfaceForAllBndr
                                , IfaceCoercion, IfaceTyLit, IfaceTcArgs )
-import Var ( TyVar, TyVarBinder )
+import Var ( TyVarBinder )
 import TyCon ( TyCon )
 import VarSet( VarSet )
 
