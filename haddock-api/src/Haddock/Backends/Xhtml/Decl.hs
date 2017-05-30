@@ -520,9 +520,8 @@ ppClassDecl summary links instances fixities loc d subdocs
                                                , f@(n',_) <- fixities
                                                , n == n' ]
                                  names = map unLoc lnames ]
-                           -- FIXME: is taking just the first name ok? Is it possible that
-                           -- there are different subdocs for different names in a single
-                           -- type signature?
+                           -- N.B. taking just the first name is ok. Signatures with multiple names
+                           -- are expanded so that each name gets its own signature.
 
     minimalBit = case [ s | MinimalSig _ (L _ s) <- sigs ] of
       -- Miminal complete definition = every shown method
