@@ -27,7 +27,6 @@ import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Set (Set)
 import qualified Data.Set as Set
-import Data.Foldable
 
 -- | Instantiate all occurrences of given names with corresponding types.
 specialize :: forall name a. (Ord name, DataId name, NamedThing name)

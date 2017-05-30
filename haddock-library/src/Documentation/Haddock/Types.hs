@@ -1,4 +1,4 @@
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE CPP, DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
 
 -- |
 -- Module      :  Documentation.Haddock.Types
@@ -14,8 +14,10 @@
 -- Exposes documentation data types used for (some) of Haddock.
 module Documentation.Haddock.Types where
 
+#if !MIN_VERSION_base(4,8,0)
 import Data.Foldable
 import Data.Traversable
+#endif
 
 -- | With the advent of 'Version', we may want to start attaching more
 -- meta-data to comments. We make a structure for this ahead of time

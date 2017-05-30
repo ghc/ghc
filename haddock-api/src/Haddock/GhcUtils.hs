@@ -17,17 +17,13 @@ module Haddock.GhcUtils where
 
 
 import Control.Arrow
-import Data.Function
 
 import Exception
 import Outputable
 import Name
 import Lexeme
 import Module
-import RdrName (GlobalRdrEnv)
-import GhcMonad (withSession)
 import HscTypes
-import UniqFM
 import GHC
 import Class
 

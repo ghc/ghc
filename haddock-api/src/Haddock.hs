@@ -398,12 +398,12 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
     ghcLink   = NoLink
     }
   let dynflags'' = updOptLevel 0 $ gopt_unset dynflags' Opt_SplitObjs
-  defaultCleanupHandler dynflags'' $ do
-      -- ignore the following return-value, which is a list of packages
-      -- that may need to be re-linked: Haddock doesn't do any
-      -- dynamic or static linking at all!
-      _ <- setSessionDynFlags dynflags''
-      ghcActs dynflags''
+
+  -- ignore the following return-value, which is a list of packages
+  -- that may need to be re-linked: Haddock doesn't do any
+  -- dynamic or static linking at all!
+  _ <- setSessionDynFlags dynflags''
+  ghcActs dynflags''
   where
     parseGhcFlags :: MonadIO m => DynFlags -> m DynFlags
     parseGhcFlags dynflags = do
