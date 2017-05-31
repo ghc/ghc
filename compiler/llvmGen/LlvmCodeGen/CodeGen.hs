@@ -776,31 +776,13 @@ type ContInfo = (Label, Int, [GlobalReg])
 -- | Native function calls. First arg indicates whether there is a continuation.
 genNativeCall :: Maybe ContInfo -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
 
--- FIXME(kavon): the only difference I can see between these two cases is
--- whether we need to cast the function pointer or not. We could combine the
--- two cases of this function otherwise.
-
--- Native call to a known function 
+-- Native call to a known Cmm function 
 genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
-    dflags <- getDynFlags
     (vf, stmts, top) <- getHsFunc live lbl
-    (stgRegs, stgStmts) <- funEpilogue live
-    let retTy = getRetTy $ getVarType vf
-        before = stmts `appOL` stgStmts
-    case maybeCont of
-        -- tail call to a known fun
-        Nothing -> do 
-            (retV, s1) <- doExpr retTy $ Call TailCall vf stgRegs llvmStdFunAttrs
-            let s2  = Return (Just retV)
-            return (before `snocOL` s1 `snocOL` s2, top)
-            
-        -- non-tail call to a known fun
-        Just contInfo -> do
-            after <- mkNonTailCall dflags contInfo retTy vf stgRegs
-            return (before `appOL` after, top)
-            
+    rest <- genNativeCall' maybeCont vf live
+    return (stmts `appOL` rest, top)
     
--- Native call to unknown function / address.
+-- Native call to unknown Cmm function / address.
 genNativeCall maybeCont expr live = do
     fty <- llvmFunTy live
     (vf, stmts, top) <- exprToVar expr
@@ -812,21 +794,31 @@ genNativeCall maybeCont expr live = do
 
          ty -> panic $ "genNativeCall: Expr is of bad type for function call! ("
                      ++ showSDoc dflags (ppr ty) ++ ")"
-
+                     
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
+    rest <- genNativeCall' maybeCont v1 live
+    return (stmts `snocOL` s1 `appOL` rest, top)
+
+-- now that we have the function we want to call as an LlvmVar, actually
+-- build the statements needed to do so.
+genNativeCall' :: Maybe ContInfo -> LlvmVar -> [GlobalReg] -> LlvmM LlvmStatements
+genNativeCall' maybeCont fv live = do
+    dflags <- getDynFlags
     (stgRegs, stgStmts) <- funEpilogue live
-    let retTy = getRetTy fty
-        before = stmts `snocOL` s1 `appOL` stgStmts
+    let retTy = getRetTy $ getVarType fv
     case maybeCont of
-        Nothing -> do
-            (retV, s2) <- doExpr retTy $ Call TailCall v1 stgRegs llvmStdFunAttrs
-            let s3 = Return (Just retV)
-            return (before `snocOL` s2 `snocOL` s3,
-                top)
+        -- tail call
+        Nothing -> do 
+            (retV, s1) <- doExpr retTy $ Call TailCall fv stgRegs llvmStdFunAttrs
+            let s2  = Return (Just retV)
+            return (stgStmts `snocOL` s1 `snocOL` s2)
+            
+        -- non-tail call
         Just contInfo -> do
-            after <- mkNonTailCall dflags contInfo retTy v1 stgRegs
-            return (before `appOL` after, top)
-             
+            ntCallStms <- mkNonTailCall dflags contInfo retTy fv stgRegs
+            return (stgStmts `appOL` ntCallStms)
+
+
 mkNonTailCall :: DynFlags -> ContInfo -> LlvmType -> LlvmVar -> [LlvmVar] -> LlvmM LlvmStatements
 mkNonTailCall dflags contInfo retTy vf stgRegs = do
     (retV, callStm) <- doExpr retTy $ Call StdCall vf stgRegs llvmStdFunAttrs
@@ -839,8 +831,8 @@ cps_retpt = fsLit "cps.retpt"
             
 withReturnMeta :: DynFlags -> ContInfo -> LlvmStatement -> LlvmStatement
 withReturnMeta dflags (retl, argOff, _) stm = let 
-        -- some unique name for the mangler corresponding to retl
-        name = MetaStr $ fsLit "todo" -- TODO(kavon)
+        -- TODO some unique name for the mangler corresponding to retl
+        name = MetaStr $ fsLit "todo"
         
         -- offset into the Sp where the return address should be written
         wordBytes = widthInBytes $ wordWidth dflags
