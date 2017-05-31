@@ -38,7 +38,7 @@ import Control.Monad.Trans.Writer
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
 #endif
-import Data.List ( nub )
+import Data.List ( nub, elemIndex )
 import Data.Maybe ( catMaybes )
 import Control.Monad ( foldM )
 
@@ -821,27 +821,27 @@ genNativeCall' maybeCont fv live = do
 
 mkNonTailCall :: DynFlags -> ContInfo -> LlvmType -> LlvmVar -> [LlvmVar] -> LlvmM LlvmStatements
 mkNonTailCall dflags contInfo retTy vf stgRegs = do
-    (retV, callStm) <- doExpr retTy $ Call StdCall vf stgRegs llvmStdFunAttrs
-    let s1 = withReturnMeta dflags contInfo callStm
+    let ct = getCallType dflags contInfo
+    (retV, callStm) <- doExpr retTy $ Call ct vf stgRegs llvmStdFunAttrs
     endStms <- doReturnTo contInfo retV
-    return $ s1 `consOL` endStms
+    return $ callStm `consOL` endStms
+    
             
-cps_retpt :: LMString
-cps_retpt = fsLit "cps.retpt" 
-            
-withReturnMeta :: DynFlags -> ContInfo -> LlvmStatement -> LlvmStatement
-withReturnMeta dflags (retl, argOff, _) stm = let 
-        -- TODO some unique name for the mangler corresponding to retl
-        name = MetaStr $ fsLit "todo"
+getCallType :: DynFlags -> ContInfo -> LlvmCallType
+getCallType dflags (retl, argOff, _) = let
+        -- mangler will look for this unique number
+        info64 = fromIntegral $ getKey $ getUnique retl
         
         -- offset into the Sp where the return address should be written
         wordBytes = widthInBytes $ wordWidth dflags
-        offInt = argOff - wordBytes
-        off = MetaStr $ mkFastString $ show offInt
+        ra32 = fromIntegral $ argOff - wordBytes
         
-        expr = MetaStruct [name, off]
+        -- get argument number of Sp in our calling convention
+        allRegs = activeStgRegs $ targetPlatform dflags
+        Just spArgnum = elemIndex Sp allRegs
+        argnum16 = fromIntegral spArgnum
     in
-        MetaStmt [MetaAnnot cps_retpt expr] stm
+        CPSCall {info_id = info64, ra_off = ra32, sp_argnum = argnum16}
     
             
             
