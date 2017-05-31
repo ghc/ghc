@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Types for the per-module compiler
 module HscTypes (
@@ -12,7 +13,9 @@ module HscTypes (
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
-        ModuleGraph, emptyMG, mapMG,
+        ModuleGraph, emptyMG, mkModuleGraph, mgHead, mgReverse, extendMG, mapMG,
+        mgModSummaries, mgElemModule, mgElemBootModule, mgLookupModule,
+        needsTemplateHaskellOrQQ,
         HscStatus(..),
         IServ(..),
 
@@ -199,6 +202,7 @@ import Platform
 import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
+import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
@@ -2606,13 +2610,120 @@ soExt platform
 --
 -- The graph is not necessarily stored in topologically-sorted order.  Use
 -- 'GHC.topSortModuleGraph' and 'Digraph.flattenSCC' to achieve this.
-type ModuleGraph = [ModSummary]
+data ModuleGraph = ModuleGraph
+  { mg_mss :: [ModSummary]
+  , mg_non_boot :: ModuleEnv ModSummary
+    -- a map of all non-boot ModSummaries keyed by Modules
+  , mg_boot :: ModuleEnv ModSummary
+    -- a map of all boot ModSummaries keyed by Modules
+  , mg_needs_th_or_qq :: ModuleEnv ModSummary
+    -- all non-boot Modules that need TemplateHaskell or QuasiQuotes
+  }
+
+-- | Determines whether a set of modules requires Template Haskell or
+-- Quasi Quotes
+--
+-- Note that if the session's 'DynFlags' enabled Template Haskell when
+-- 'depanal' was called, then each module in the returned module graph will
+-- have Template Haskell enabled whether it is actually needed or not.
+needsTemplateHaskellOrQQ :: ModuleGraph -> Bool
+needsTemplateHaskellOrQQ mg = not $ isEmptyModuleEnv $ mg_needs_th_or_qq mg
+
+-- | Map a function 'f' over all the 'ModSummaries'.
+-- To preserve invariants 'f' can't change the isBoot status.
+mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
+mapMG f ModuleGraph{..} =
+  ModuleGraph
+    { mg_mss = map f mg_mss
+    , mg_non_boot = mapModuleEnv f mg_non_boot
+    , mg_boot = mapModuleEnv f mg_boot
+    , mg_needs_th_or_qq = mapModuleEnv f mg_needs_th_or_qq
+    }
+
+mgModSummaries :: ModuleGraph -> [ModSummary]
+mgModSummaries = mg_mss
+
+mgElemModule :: ModuleGraph -> Module -> Bool
+mgElemModule mg m = mgElemNonBootModule mg m || mgElemBootModule mg m
+
+mgElemBootModule :: ModuleGraph -> Module -> Bool
+mgElemBootModule ModuleGraph{..} m = elemModuleEnv m mg_boot
+
+mgElemNonBootModule :: ModuleGraph -> Module -> Bool
+mgElemNonBootModule ModuleGraph{..} m = elemModuleEnv m mg_non_boot
+
+mgLookupNonBootModule :: ModuleGraph -> Module -> Maybe ModSummary
+mgLookupNonBootModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
+
+mgLookupBootModule :: ModuleGraph -> Module -> Maybe ModSummary
+mgLookupBootModule ModuleGraph{..} m = lookupModuleEnv mg_boot m
+
+-- | Look up a ModSummary in the ModuleGraph, in non-boot ModSummaries first,
+-- falling back to boot ModSummaries.
+mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
+mgLookupModule mg m =
+  case mgLookupNonBootModule mg m of
+    Nothing -> mgLookupBootModule mg m
+    a -> a
 
 emptyMG :: ModuleGraph
-emptyMG = []
+emptyMG =
+  ModuleGraph [] emptyModuleEnv emptyModuleEnv emptyModuleEnv
 
-mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
-mapMG = map
+-- | Reverse the order of elements in the ModuleGraph.
+mgReverse :: ModuleGraph -> ModuleGraph
+mgReverse mg@ModuleGraph { mg_mss = mg_mss } = mg { mg_mss = reverse mg_mss }
+
+isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
+isTemplateHaskellOrQQNonBoot ms =
+  (xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+    || xopt LangExt.QuasiQuotes (ms_hspp_opts ms)) &&
+  not (isBootSummary ms)
+
+-- | Add a ModSummary to ModuleGraph. Assumes that the new ModSummary is
+-- not an element of the ModuleGraph.
+extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
+extendMG ModuleGraph{..} ms = ModuleGraph
+  { mg_mss = ms:mg_mss
+  , mg_non_boot = extendModEnvIf (not . isBootSummary) mg_non_boot ms
+  , mg_boot = extendModEnvIf isBootSummary mg_boot ms
+  , mg_needs_th_or_qq =
+      extendModEnvIf isTemplateHaskellOrQQNonBoot mg_needs_th_or_qq ms
+  }
+  where
+  extendModEnvIf
+    :: (ModSummary -> Bool)
+    -> ModuleEnv ModSummary
+    -> ModSummary
+    -> ModuleEnv ModSummary
+  extendModEnvIf p me ms
+    | p ms = extendModuleEnv me (ms_mod ms) ms
+    | otherwise = me
+
+-- | Take the first element from the ModuleGraph and remove it from the
+-- graph.
+mgHead :: ModuleGraph -> Maybe (ModSummary, ModuleGraph)
+mgHead ModuleGraph { mg_mss = [] } = Nothing
+mgHead ModuleGraph { mg_mss = (ms:mss), ..} = Just (ms, mg')
+  where
+  mg' = ModuleGraph
+    { mg_mss = mss
+    , mg_non_boot = delModEnvIf (not . isBootSummary) mg_non_boot ms
+    , mg_boot = delModEnvIf isBootSummary mg_boot ms
+    , mg_needs_th_or_qq =
+        delModEnvIf isTemplateHaskellOrQQNonBoot mg_needs_th_or_qq ms
+    }
+  delModEnvIf
+    :: (ModSummary -> Bool)
+    -> ModuleEnv ModSummary
+    -> ModSummary
+    -> ModuleEnv ModSummary
+  delModEnvIf p me ms
+    | p ms = delModuleEnv me (ms_mod ms)
+    | otherwise = me
+
+mkModuleGraph :: [ModSummary] -> ModuleGraph
+mkModuleGraph = foldr (flip extendMG) emptyMG
 
 -- | A single node in a 'ModuleGraph'. The nodes of the module graph
 -- are one of:
