@@ -269,16 +269,22 @@ ppCall ct fptr args attrs = let
                         ++ " called with either global var of function type or "
                         ++ "local var of pointer function type."
                         
-        ppRegularCall tailMarker (LlvmFunctionDecl _ _ cc ret argTy params _) =
-            let ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
-                ppArgTy  = (ppCommaJoin $ map fst params) <>
-                           (case argTy of
-                               VarArgs   -> text ", ..."
-                               FixedArgs -> empty)
-                fnty = space <> lparen <> ppArgTy <> rparen
+        ppRegularCall tailmrk (LlvmFunctionDecl _ _ cc ret argTy params _) = let
+                ppRet = ppr ret
+                ppFnName = ppName fptr
+                ppArgs = hsep $ punctuate comma $ map ppCallMetaExpr args
+                ppArgTys  = (ppCommaJoin $ map fst params) <>
+                               (case argTy of
+                                   VarArgs   -> text ", ..."
+                                   FixedArgs -> empty)
+            in
+                ppCallWith tailmrk cc ppRet ppFnName ppArgTys ppArgs
+            
+        ppCallWith tailmrk cc ppRet ppFnName ppArgTys ppArgs =
+            let fnty = space <> lparen <> ppArgTys <> rparen
                 attrDoc = ppSpaceJoin attrs
-            in  tailMarker <> text "call" <+> ppr cc <+> ppr ret
-                    <> fnty <+> ppName fptr <> lparen <+> ppValues
+            in  tailmrk <> text "call" <+> ppr cc <+> ppRet
+                    <> fnty <+> ppFnName <> lparen <+> ppArgs
                     <+> rparen <+> attrDoc
 
         -- Metadata needs to be marked as having the `metadata` type when used
