@@ -251,30 +251,33 @@ ppLlvmExpression expr
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.
 ppCall :: LlvmCallType -> LlvmVar -> [MetaExpr] -> [LlvmFuncAttr] -> SDoc
-ppCall ct fptr args attrs = case fptr of
-                           --
-    -- if local var function pointer, unwrap
-    LMLocalVar _ (LMPointer (LMFunction d)) -> ppCall' d
-
-    -- should be function type otherwise
-    LMGlobalVar _ (LMFunction d) _ _ _ _    -> ppCall' d
-
-    -- not pointer or function, so error
-    _other -> error $ "ppCall called with non LMFunction type!\nMust be "
-                ++ " called with either global var of function type or "
-                ++ "local var of pointer function type."
-
+ppCall ct fptr args attrs = let
+        decl = getDecl fptr
+    in case ct of 
+        TailCall -> ppRegularCall (text "tail ") decl
+        StdCall  -> ppRegularCall empty decl
+        CPSCall {} -> panic "pp CPSCall pls"
+    
     where
-        ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
-            let tc = if ct == TailCall then text "tail " else empty
-                ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
+        getDecl fptr = case fptr of
+            -- if local var function pointer, unwrap
+            LMLocalVar _ (LMPointer (LMFunction d)) -> d
+            -- should be function type otherwise
+            LMGlobalVar _ (LMFunction d) _ _ _ _    -> d
+            -- not pointer or function, so error
+            _other -> error $ "ppCall called with non LMFunction type!\nMust be "
+                        ++ " called with either global var of function type or "
+                        ++ "local var of pointer function type."
+                        
+        ppRegularCall tailMarker (LlvmFunctionDecl _ _ cc ret argTy params _) =
+            let ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
                 ppArgTy  = (ppCommaJoin $ map fst params) <>
                            (case argTy of
                                VarArgs   -> text ", ..."
                                FixedArgs -> empty)
                 fnty = space <> lparen <> ppArgTy <> rparen
                 attrDoc = ppSpaceJoin attrs
-            in  tc <> text "call" <+> ppr cc <+> ppr ret
+            in  tailMarker <> text "call" <+> ppr cc <+> ppr ret
                     <> fnty <+> ppName fptr <> lparen <+> ppValues
                     <+> rparen <+> attrDoc
 
