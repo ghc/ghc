@@ -236,10 +236,7 @@ compileOne' m_tc_result mHscMessage
        input_fn    = expectJust "compile:hs" (ml_hs_file location)
        input_fnpp  = ms_hspp_file summary
        mod_graph   = hsc_mod_graph hsc_env0
-       needsLinker = any (\ModSummary {ms_hspp_opts} ->
-                            xopt LangExt.TemplateHaskell ms_hspp_opts
-                            || xopt LangExt.QuasiQuotes ms_hspp_opts
-                         ) mod_graph
+       needsLinker = needsTemplateHaskellOrQQ mod_graph
        isDynWay    = any (== WayDyn) (ways dflags0)
        isProfWay   = any (== WayProf) (ways dflags0)
        internalInterpreter = not (gopt Opt_ExternalInterpreter dflags0)

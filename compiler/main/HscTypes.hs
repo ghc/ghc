@@ -5,6 +5,7 @@
 -}
 
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
+{-# LANGUAGE RecordWildCards #-}
 
 -- | Types for the per-module compiler
 module HscTypes (
@@ -12,10 +13,13 @@ module HscTypes (
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
-        needsTemplateHaskellOrQQ,
-        ModuleGraph, emptyMG, mapMG,
         HscStatus(..),
         IServ(..),
+
+        -- * ModuleGraph
+        ModuleGraph, emptyMG, mkModuleGraph, extendMG, mapMG,
+        mgModSummaries, mgElemModule, mgLookupModule,
+        needsTemplateHaskellOrQQ, mgBootModules,
 
         -- * Hsc monad
         Hsc(..), runHsc, runInteractiveHsc,
@@ -28,7 +32,7 @@ module HscTypes (
 
         ModSummary(..), ms_imps, ms_installed_mod, ms_mod_name, showModMsg, isBootSummary,
         msHsFilePath, msHiFilePath, msObjFilePath,
-        SourceModified(..),
+        SourceModified(..), isTemplateHaskellOrQQNonBoot,
 
         -- * Information about the module being compiled
         -- (re-exported from DriverPhases)
@@ -2618,8 +2622,16 @@ soExt platform
 --
 -- The graph is not necessarily stored in topologically-sorted order.  Use
 -- 'GHC.topSortModuleGraph' and 'Digraph.flattenSCC' to achieve this.
-type ModuleGraph = [ModSummary]
-
+data ModuleGraph = ModuleGraph
+  { mg_mss :: [ModSummary]
+  , mg_non_boot :: ModuleEnv ModSummary
+    -- a map of all non-boot ModSummaries keyed by Modules
+  , mg_boot :: ModuleSet
+    -- a set of boot Modules
+  , mg_needs_th_or_qq :: !Bool
+    -- does any of the modules in mg_mss require TemplateHaskell or
+    -- QuasiQuotes?
+  }
 
 -- | Determines whether a set of modules requires Template Haskell or
 -- Quasi Quotes
@@ -2628,19 +2640,54 @@ type ModuleGraph = [ModSummary]
 -- 'depanal' was called, then each module in the returned module graph will
 -- have Template Haskell enabled whether it is actually needed or not.
 needsTemplateHaskellOrQQ :: ModuleGraph -> Bool
-needsTemplateHaskellOrQQ mg = any isTemplateHaskellOrQQNonBoot mg
+needsTemplateHaskellOrQQ mg = mg_needs_th_or_qq mg
+
+-- | Map a function 'f' over all the 'ModSummaries'.
+-- To preserve invariants 'f' can't change the isBoot status.
+mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
+mapMG f mg@ModuleGraph{..} = mg
+  { mg_mss = map f mg_mss
+  , mg_non_boot = mapModuleEnv f mg_non_boot
+  }
+
+mgBootModules :: ModuleGraph -> ModuleSet
+mgBootModules ModuleGraph{..} = mg_boot
+
+mgModSummaries :: ModuleGraph -> [ModSummary]
+mgModSummaries = mg_mss
+
+mgElemModule :: ModuleGraph -> Module -> Bool
+mgElemModule ModuleGraph{..} m = elemModuleEnv m mg_non_boot
+
+-- | Look up a ModSummary in the ModuleGraph
+mgLookupModule :: ModuleGraph -> Module -> Maybe ModSummary
+mgLookupModule ModuleGraph{..} m = lookupModuleEnv mg_non_boot m
 
 emptyMG :: ModuleGraph
-emptyMG = []
-
-mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
-mapMG = map
+emptyMG = ModuleGraph [] emptyModuleEnv emptyModuleSet False
 
 isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
 isTemplateHaskellOrQQNonBoot ms =
   (xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
     || xopt LangExt.QuasiQuotes (ms_hspp_opts ms)) &&
   not (isBootSummary ms)
+
+-- | Add a ModSummary to ModuleGraph. Assumes that the new ModSummary is
+-- not an element of the ModuleGraph.
+extendMG :: ModuleGraph -> ModSummary -> ModuleGraph
+extendMG ModuleGraph{..} ms = ModuleGraph
+  { mg_mss = ms:mg_mss
+  , mg_non_boot = if isBootSummary ms
+      then mg_non_boot
+      else extendModuleEnv mg_non_boot (ms_mod ms) ms
+  , mg_boot = if isBootSummary ms
+      then extendModuleSet mg_boot (ms_mod ms)
+      else mg_boot
+  , mg_needs_th_or_qq = mg_needs_th_or_qq || isTemplateHaskellOrQQNonBoot ms
+  }
+
+mkModuleGraph :: [ModSummary] -> ModuleGraph
+mkModuleGraph = foldr (flip extendMG) emptyMG
 
 -- | A single node in a 'ModuleGraph'. The nodes of the module graph
 -- are one of:

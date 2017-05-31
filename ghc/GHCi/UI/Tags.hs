@@ -72,7 +72,7 @@ ghciCreateTagsFile kind file = do
 createTagsFile :: TagsKind -> FilePath -> GHCi ()
 createTagsFile tagskind tagsFile = do
   graph <- GHC.getModuleGraph
-  mtags <- mapM listModuleTags (map GHC.ms_mod graph)
+  mtags <- mapM listModuleTags (map GHC.ms_mod $ GHC.mgModSummaries graph)
   either_res <- liftIO $ collateAndWriteTags tagskind tagsFile $ concat mtags
   case either_res of
     Left e  -> liftIO $ hPutStrLn stderr $ ioeGetErrorString e

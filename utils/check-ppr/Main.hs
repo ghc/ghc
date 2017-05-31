@@ -77,7 +77,7 @@ parseOneFile libdir fileName = do
          _ <- load LoadAllTargets
          graph <- getModuleGraph
          let
-           modSum = case filter modByFile graph of
+           modSum = case filter modByFile (mgModSummaries graph) of
                      [x] -> x
                      xs -> error $ "Can't find module, got:"
                               ++ show (map (ml_hs_file . ms_location) xs)

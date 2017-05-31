@@ -59,7 +59,8 @@ module GHC (
         compileToCoreModule, compileToCoreSimplified,
 
         -- * Inspecting the module structure of the program
-        ModuleGraph, emptyMG, mapMG,
+        ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
+        mgLookupModule,
         ModSummary(..), ms_mod_name, ModLocation(..),
         getModSummary,
         getModuleGraph,
@@ -873,7 +874,10 @@ type TypecheckedSource = LHsBinds GhcTc
 getModSummary :: GhcMonad m => ModuleName -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
-   case [ ms | ms <- mg, ms_mod_name ms == mod, not (isBootSummary ms) ] of
+   let mods_by_name = [ ms | ms <- mgModSummaries mg
+                      , ms_mod_name ms == mod
+                      , not (isBootSummary ms) ]
+   case mods_by_name of
      [] -> do dflags <- getDynFlags
               liftIO $ throwIO $ mkApiErr dflags (text "Module not part of module graph")
      [ms] -> return ms
@@ -1023,7 +1027,7 @@ compileCore simplify fn = do
    _ <- load LoadAllTargets
    -- Then find dependencies
    modGraph <- depanal [] True
-   case find ((== fn) . msHsFilePath) modGraph of
+   case find ((== fn) . msHsFilePath) (mgModSummaries modGraph) of
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
@@ -1111,7 +1115,7 @@ data ModuleInfo = ModuleInfo {
 getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
 getModuleInfo mdl = withSession $ \hsc_env -> do
   let mg = hsc_mod_graph hsc_env
-  if mdl `elem` map ms_mod mg
+  if mgElemModule mg mdl
         then liftIO $ getHomeModuleInfo hsc_env mdl
         else do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
