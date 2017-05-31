@@ -32,7 +32,7 @@ module TcEnv(
         tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2,
         tcExtendIdBndrs, tcExtendLocalTypeEnv,
         isTypeClosedLetBndr, tcEmitBindingUsage,
-        tcCollectingUsage,
+        tcCollectingUsage, tcScalingUsage,
 
         tcLookup, tcLookupLocated, tcLookupLocalIds,
         tcLookupId, tcLookupTyVar,
@@ -593,6 +593,14 @@ tcCollectingUsage thing_inside
     push_fresh_usage env
       = do { usage <- newTcRef zeroUE
            ; return ( usage , env { tcl_usage = usage } ) }
+
+-- | @tcScalingUsage weight thing_inside@ runs @thing_inside@ and scales all the
+-- usage information by @weight@.
+tcScalingUsage :: Rig -> TcM a -> TcM a
+tcScalingUsage weight thing_inside
+  = do { (usage, result) <- tcCollectingUsage thing_inside
+       ; tcEmitBindingUsage $ scaleUE weight usage
+       ; return result }
 
 -------------------------------------------------------------
 -- Extending the TcIdBinderStack, used only for error messages

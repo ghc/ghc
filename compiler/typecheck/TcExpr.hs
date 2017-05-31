@@ -558,10 +558,11 @@ tcExpr (HsCase scrut matches) res_ty
            --
            -- But now, in the GADT world, we need to typecheck the scrutinee
            -- first, to get type info that may be refined in the case alternatives
-          (scrut', scrut_ty) <- tcInferRho scrut
+          let weight = Omega -- TODO: arnaud: add support for weight annotation on case. In the meantime, suppose it's always Omega.
+        ; (scrut', scrut_ty) <- tcScalingUsage weight $ tcInferRho scrut
 
         ; traceTc "HsCase" (ppr scrut_ty)
-        ; matches' <- tcMatchesCase match_ctxt (unrestricted scrut_ty) matches res_ty -- TODO: arnaud: add support for weight annotation on case. In the meantime, suppose it's always Omega (it's incorrect, of course, as we can make 1-things into ω-things this way, and when a check is implemented to prevent that behaviour, then we will not be able to typecheck linear matches)
+        ; matches' <- tcMatchesCase match_ctxt (Weighted weight scrut_ty) matches res_ty
         ; return (HsCase scrut' matches') }
  where
     match_ctxt = MC { mc_what = CaseAlt,
@@ -1281,10 +1282,8 @@ tcArg :: LHsExpr Name                    -- The function (for error messages)
       -> Weighted TcRhoType              -- expected (weighted) arg type
       -> Int                             -- # of argument
       -> TcM (LHsExpr TcId)             -- Resulting argument
-tcArg fun arg (Weighted weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $ do
-                          (usage,result) <- tcCollectingUsage $ tcPolyExprNC arg ty
-                          tcEmitBindingUsage $ scaleUE weight usage
-                          return result
+tcArg fun arg (Weighted weight ty) arg_no = addErrCtxt (funAppCtxt fun arg arg_no) $
+                          tcScalingUsage weight $ tcPolyExprNC arg ty
 
 ----------------
 tcTupArgs :: [LHsTupArg Name] -> [TcSigmaType] -> TcM [LHsTupArg TcId]
