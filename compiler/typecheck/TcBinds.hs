@@ -408,7 +408,10 @@ tcValBinds top_lvl binds sigs thing_inside
                 -- declared with complete type signatures
                 -- Do not extend the TcIdBinderStack; instead
                 -- we extend it on a per-rhs basis in tcExtendForRhs
-        ; tcExtendLetEnvIds top_lvl [(idName id, unrestricted id) | id <- poly_ids] $ do -- TODO: arnaud: it may be right to use unrestricted here, since we don't have type information (unless `LSig` is), but I need to make sure
+                --
+                -- For the moment, let bindings and top-level bindings introduce
+                -- only unrestricted variables.
+        ; tcExtendLetEnvIds top_lvl [(idName id, unrestricted id) | id <- poly_ids] $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
                    { thing <- thing_inside
                      -- See Note [Pattern synonym builders don't yield dependencies]
@@ -1267,7 +1270,7 @@ tcMonoBinds is_rec sig_fn no_gen
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
-               tcMatchesFun (L nm_loc name) matches exp_ty
+               tcScalingUsage Omega $ tcMatchesFun (L nm_loc name) matches exp_ty
 
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
@@ -1296,7 +1299,10 @@ tcMonoBinds _ sig_fn no_gen binds
         ; traceTc "tcMonoBinds" $ vcat [ ppr n <+> ppr id <+> ppr (idType id)
                                        | (n,id) <- rhs_id_env]
         ; binds' <- tcExtendLetEnvIds NotTopLevel (map (fmap unrestricted) rhs_id_env) $
-                    mapM (wrapLocM tcRhs) tc_binds
+                    tcScalingUsage Omega $ mapM (wrapLocM tcRhs) tc_binds
+                    -- toplevel and let-bindings are, at the moment, always
+                    -- unrestricted. The value being bound must, accordingly, be
+                    -- unrestricted. Hence them being scaled above.
 
         ; return (listToBag binds', mono_infos) }
 
