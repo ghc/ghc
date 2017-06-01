@@ -53,6 +53,7 @@ import SrcLoc
 import DynFlags
 import ListSetOps       ( equivClasses )
 import Maybes
+import Pair
 import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, unionFV )
 
@@ -478,19 +479,23 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- (see TcRnTypes.trulyInsoluble) is caught here, otherwise
     -- we might suppress its error message, and proceed on past
     -- type checking to get a Lint error later
-    report1 = [ ("custom_error", is_user_type_error,
-                                                  True, mkUserTypeErrorReporter)
+    report1 = [ ("custom_error", is_user_type_error,True, mkUserTypeErrorReporter)
               , given_eq_spec
-              , ("insoluble2",   utterly_wrong,   True, mkGroupReporter mkEqErr)
-              , ("skolem eq1",   very_wrong,      True, mkSkolReporter)
-              , ("skolem eq2",   skolem_eq,       True, mkSkolReporter)
-              , ("non-tv eq",    non_tv_eq,       True, mkSkolReporter)
-              , ("Out of scope", is_out_of_scope, True, mkHoleReporter)
-              , ("Holes",        is_hole,         False, mkHoleReporter)
+              , ("insoluble2 ty", utterly_wrong_ty, True, mkGroupReporter mkEqErr)
+              , ("insoluble2_ki", utterly_wrong,    True, mkGroupReporter mkEqErr)
+              , ("skolem eq1",    very_wrong,       True, mkSkolReporter)
+              , ("skolem eq2",    skolem_eq,        True, mkSkolReporter)
+              , ("non-tv eq",     non_tv_eq,        True, mkSkolReporter)
+              , ("Out of scope",  is_out_of_scope,  True, mkHoleReporter)
+              , ("Holes",         is_hole,          False, mkHoleReporter)
 
                   -- The only remaining equalities are alpha ~ ty,
                   -- where alpha is untouchable; and representational equalities
-              , ("Other eqs",    is_equality,     False, mkGroupReporter mkEqErr) ]
+                  -- Prefer homogeneous equalities over hetero, because the
+                  -- former might be holding up the latter.
+                  -- See Note [Equalities with incompatible kinds] in TcCanonical
+              , ("Homo eqs",      is_homo_equality, True,  mkGroupReporter mkEqErr)
+              , ("Other eqs",     is_equality,      False, mkGroupReporter mkEqErr) ]
 
     -- report2: we suppress these if there are insolubles elsewhere in the tree
     report2 = [ ("Implicit params", is_ip,           False, mkGroupReporter mkIPErr)
@@ -510,6 +515,12 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
     utterly_wrong _ _                      = False
 
+     -- Like utterly_wrong, but suppress derived kind equalities
+    utterly_wrong_ty ct pred
+      = utterly_wrong ct pred && case ctOrigin ct of
+                                   KindEqOrigin {} -> False
+                                   _               -> True
+
     -- Things like (a ~N Int)
     very_wrong _ (EqPred NomEq ty1 ty2) = isSkolemTy tc_lvl ty1 && isRigidTy ty2
     very_wrong _ _                      = False
@@ -526,6 +537,9 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     is_hole         ct _ = isHoleCt ct
 
     is_user_type_error ct _ = isUserTypeErrorCt ct
+
+    is_homo_equality _ (EqPred _ ty1 ty2) = typeKind ty1 `tcEqType` typeKind ty2
+    is_homo_equality _ _                  = False
 
     is_equality _ (EqPred {}) = True
     is_equality _ _           = False
@@ -1447,9 +1461,9 @@ the unsolved (t ~ Bool), t won't look like an untouchable meta-var
 any more.  So we don't assert that it is.
 -}
 
-mkEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 -- Don't have multiple equality errors from the same location
 -- E.g.   (Int,Bool) ~ (Bool,Int)   one error will do!
+mkEqErr :: ReportErrCtxt -> [Ct] -> TcM ErrMsg
 mkEqErr ctxt (ct:_) = mkEqErr1 ctxt ct
 mkEqErr _ [] = panic "mkEqErr"
 
@@ -1589,9 +1603,12 @@ mkEqErr_help :: DynFlags -> ReportErrCtxt -> Report
              -> Maybe SwapFlag   -- Nothing <=> not sure
              -> TcType -> TcType -> TcM ErrMsg
 mkEqErr_help dflags ctxt report ct oriented ty1 ty2
-  | Just tv1 <- tcGetTyVar_maybe ty1 = mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
-  | Just tv2 <- tcGetTyVar_maybe ty2 = mkTyVarEqErr dflags ctxt report ct swapped  tv2 ty1
-  | otherwise                        = reportEqErr ctxt report ct oriented ty1 ty2
+  | Just (tv1, co1) <- tcGetCastedTyVar_maybe ty1
+  = mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
+  | Just (tv2, co2) <- tcGetCastedTyVar_maybe ty2
+  = mkTyVarEqErr dflags ctxt report ct swapped  tv2 co2 ty1
+  | otherwise
+  = reportEqErr ctxt report ct oriented ty1 ty2
   where
     swapped = fmap flipSwap oriented
 
@@ -1606,13 +1623,13 @@ reportEqErr ctxt report ct oriented ty1 ty2
 
 mkTyVarEqErr, mkTyVarEqErr'
   :: DynFlags -> ReportErrCtxt -> Report -> Ct
-             -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
+             -> Maybe SwapFlag -> TcTyVar -> TcCoercionN -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
-mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
-  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
-       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2 }
+mkTyVarEqErr dflags ctxt report ct oriented tv1 co1 ty2
+  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr co1 $$ ppr ty2)
+       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2 }
 
-mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
+mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   | not insoluble_occurs_check   -- See Note [Occurs check wins]
   , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
@@ -1661,6 +1678,23 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
        -- to be helpful since this is just an unimplemented feature.
        ; mkErrorMsgFromCt ctxt ct $ report { report_important = [msg] } }
 
+   -- check for heterogeneous equality next; see Note [Equalities with incompatible kinds]
+   -- in TcCanonical
+  | not (k1 `tcEqType` k2)
+  = do { let main_msg = addArising (ctOrigin ct) $
+                        vcat [ hang (text "Kind mismatch: cannot unify" <+>
+                                     parens (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)) <+>
+                                     text "with")
+                                  2 (sep [ppr ty2, dcolon, ppr k2])
+                             , text "Their kinds differ." ]
+             cast_msg
+               | isTcReflexiveCo co1 = empty
+               | otherwise           = text "NB:" <+> ppr tv1 <+>
+                                       text "was casted to have kind" <+>
+                                       quotes (ppr k1)
+
+       ; mkErrorMsgFromCt ctxt ct (mconcat [important main_msg, important cast_msg, report]) }
+
   -- If the immediately-enclosing implication has 'tv' a skolem, and
   -- we know by now its an InferSkol kind of skolem, then presumably
   -- it started life as a SigTv, else it'd have been unified, given
@@ -1706,7 +1740,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
   , Implic { ic_env = env, ic_given = given
            , ic_tclvl = lvl, ic_info = skol_info } <- implic
   = ASSERT2( not (isTouchableMetaTyVar lvl tv1)
-           , ppr tv1 )  -- See Note [Error messages for untouchables]
+           , ppr tv1 $$ ppr lvl )  -- See Note [Error messages for untouchables]
     do { let msg = important $ misMatchMsg ct oriented ty1 ty2
              tclvl_extra = important $
                   nest 2 $
@@ -1725,6 +1759,9 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
         -- Consider an ambiguous top-level constraint (a ~ F a)
         -- Not an occurs check, because F is a type function.
   where
+    Pair _ k1 = tcCoercionKind co1
+    k2        = typeKind ty2
+
     ty1 = mkTyVarTy tv1
     occ_check_expand       = occCheckForErrors dflags tv1 ty2
     insoluble_occurs_check = isInsolubleOccursCheck (ctEqRel ct) tv1 ty2

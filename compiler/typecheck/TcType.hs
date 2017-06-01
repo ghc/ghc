@@ -66,7 +66,7 @@ module TcType (
   tcRepSplitTyConApp_maybe, tcRepSplitTyConApp_maybe',
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
-  tcGetTyVar_maybe, tcGetTyVar, nextRole,
+  tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
 
   ---------------------------------
@@ -1570,6 +1570,14 @@ tcSplitAppTys ty
                    Nothing         -> (ty,args)
 
 -----------------------
+-- | If the type is a tyvar, possibly under a cast, returns it, along
+-- with the coercion. Thus, the co is :: kind tv ~N kind type
+tcGetCastedTyVar_maybe :: Type -> Maybe (TyVar, CoercionN)
+tcGetCastedTyVar_maybe ty | Just ty' <- tcView ty = tcGetCastedTyVar_maybe ty'
+tcGetCastedTyVar_maybe (CastTy (TyVarTy tv) co) = Just (tv, co)
+tcGetCastedTyVar_maybe (TyVarTy tv)             = Just (tv, mkNomReflCo (tyVarKind tv))
+tcGetCastedTyVar_maybe _                        = Nothing
+
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
 tcGetTyVar_maybe (TyVarTy tv)   = Just tv

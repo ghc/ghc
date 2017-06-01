@@ -1,19 +1,14 @@
 
-T8603.hs:13:10: error:
-    • No instance for (Applicative RV)
-        arising from the superclasses of an instance declaration
-    • In the instance declaration for ‘Monad RV’
-
-T8603.hs:29:17: error:
+T8603.hs:33:17: error:
     • Couldn't match type ‘RV a1’ with ‘StateT s RV a0’
       Expected type: [Integer] -> StateT s RV a0
-        Actual type: (->) ((->) [a1]) (RV a1)
+        Actual type: t0 ((->) [a1]) (RV a1)
     • The function ‘lift’ is applied to two arguments,
-      but its type ‘([a1] -> RV a1) -> (->) ((->) [a1]) (RV a1)’
+      but its type ‘([a1] -> RV a1) -> t0 ((->) [a1]) (RV a1)’
       has only one
       In a stmt of a 'do' block: prize <- lift uniform [1, 2, 3]
       In the expression:
         do prize <- lift uniform [1, 2, ....]
            return False
     • Relevant bindings include
-        testRVState1 :: RVState s Bool (bound at T8603.hs:28:1)
+        testRVState1 :: RVState s Bool (bound at T8603.hs:32:1)

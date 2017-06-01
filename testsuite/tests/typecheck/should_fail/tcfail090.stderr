@@ -1,6 +1,8 @@
 
 tcfail090.hs:11:9: error:
     • Couldn't match a lifted type with an unlifted type
-      When matching the kind of ‘ByteArray#’
+      When matching types
+        a0 :: *
+        ByteArray# :: TYPE 'UnliftedRep
     • In the expression: my_undefined
       In an equation for ‘die’: die _ = my_undefined

@@ -615,8 +615,8 @@ getTyVar_maybe ty | Just ty' <- coreView ty = getTyVar_maybe ty'
                   | otherwise               = repGetTyVar_maybe ty
 
 -- | If the type is a tyvar, possibly under a cast, returns it, along
--- with the coercion. Thus, the co is :: kind tv ~R kind type
-getCastedTyVar_maybe :: Type -> Maybe (TyVar, Coercion)
+-- with the coercion. Thus, the co is :: kind tv ~N kind type
+getCastedTyVar_maybe :: Type -> Maybe (TyVar, CoercionN)
 getCastedTyVar_maybe ty | Just ty' <- coreView ty = getCastedTyVar_maybe ty'
 getCastedTyVar_maybe (CastTy (TyVarTy tv) co)     = Just (tv, co)
 getCastedTyVar_maybe (TyVarTy tv)

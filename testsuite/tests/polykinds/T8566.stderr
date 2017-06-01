@@ -1,6 +1,6 @@
 
 T8566.hs:32:9: error:
-    • Could not deduce (C ('AA (t (I a ps)) as) ps fs0)
+    • Could not deduce (C ('AA (t1 (I a ps)) as) ps fs0)
         arising from a use of ‘c’
       from the context: C ('AA (t (I a ps)) as) ps fs
         bound by the instance declaration at T8566.hs:30:10-67

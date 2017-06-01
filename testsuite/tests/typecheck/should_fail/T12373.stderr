@@ -1,0 +1,8 @@
+
+T12373.hs:10:19: error:
+    • Couldn't match a lifted type with an unlifted type
+      Expected type: (# State# RealWorld, a1 #)
+        Actual type: (# State# RealWorld, MVar# RealWorld a0 #)
+    • In the expression: newMVar# rw
+      In the first argument of ‘IO’, namely ‘(\ rw -> newMVar# rw)’
+      In the first argument of ‘(>>)’, namely ‘IO (\ rw -> newMVar# rw)’

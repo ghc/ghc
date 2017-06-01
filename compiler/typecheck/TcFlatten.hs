@@ -584,7 +584,7 @@ setMode new_mode thing_inside
     else runFlatM thing_inside (env { fe_mode = new_mode })
 
 -- | Use when flattening kinds/kind coercions. See
--- Note [No derived kind equalities] in TcCanonical
+-- Note [No derived kind equalities]
 flattenKinds :: FlatM a -> FlatM a
 flattenKinds thing_inside
   = FlatM $ \env ->
@@ -716,6 +716,18 @@ violate the expectation of "xi"s for a bit, but the canonicaliser will
 soon throw out the phantoms when decomposing a TyConApp. (Or, the
 canonicaliser will emit an insoluble, in which case the unflattened version
 yields a better error message anyway.)
+
+Note [No derived kind equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We call flattenKinds in two places: in flatten_co (Note [Flattening coercions])
+and in flattenTyVar. The latter case is easier to understand; flattenKinds is
+used to flatten the kind of a flat (i.e. inert) tyvar. Flattening a kind
+naturally produces a coercion. This coercion is then used in the flattened type.
+However, danger lurks if the flattening flavour (that is, the fe_flavour of the
+FlattenEnv) is Derived: the coercion might be bottom. (This can happen when
+looks up a kindvar in the inert set only to find a Derived equality, with
+no coercion.) The solution is simple: ensure that the fe_flavour is not derived
+when flattening a kind. This is what flattenKinds does.
 
 -}
 
@@ -1326,10 +1338,9 @@ flattenTyVar tv
 
            FTRNotFollowed   -- Done
              -> do { let orig_kind = tyVarKind tv
-                   ; (_new_kind, kind_co) <- setMode FM_SubstOnly $
-                                             flattenKinds $
+                   ; (_new_kind, kind_co) <- flattenKinds $
                                              flatten_one orig_kind
-                     ; let Pair _ zonked_kind = coercionKind kind_co
+                   ; let Pair _ zonked_kind = coercionKind kind_co
              -- NB: kind_co :: _new_kind ~ zonked_kind
              -- But zonked_kind is not necessarily the same as orig_kind
              -- because that may have filled-in metavars.
@@ -1339,13 +1350,13 @@ flattenTyVar tv
              -- See also Note [Flattening]
              -- An alternative would to use (zonkTcType orig_kind),
              -- but some simple measurements suggest that's a little slower
-                    ; let tv'    = setTyVarKind tv zonked_kind
-                          tv_ty' = mkTyVarTy tv'
-                          ty'    = tv_ty' `mkCastTy` mkSymCo kind_co
+                   ; let tv'    = setTyVarKind tv zonked_kind
+                         tv_ty' = mkTyVarTy tv'
+                         ty'    = tv_ty' `mkCastTy` mkSymCo kind_co
 
-                    ; role <- getRole
-                    ; return (ty', mkReflCo role tv_ty'
-                                   `mkCoherenceLeftCo` mkSymCo kind_co) } }
+                   ; role <- getRole
+                   ; return (ty', mkReflCo role tv_ty'
+                                  `mkCoherenceLeftCo` mkSymCo kind_co) } }
 
 flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- "Flattening" a type variable means to apply the substitution to it

@@ -1,12 +1,12 @@
 
-T5691.hs:14:9: error:
+T5691.hs:15:24: error:
     • Couldn't match type ‘p’ with ‘PrintRuleInterp’
       Expected type: PrintRuleInterp a
         Actual type: p a
-    • When checking that the pattern signature: p a
-        fits the type of its context: PrintRuleInterp a
-      In the pattern: f :: p a
-      In an equation for ‘test’: test (f :: p a) = MkPRI $ printRule_ f
+    • In the first argument of ‘printRule_’, namely ‘f’
+      In the second argument of ‘($)’, namely ‘printRule_ f’
+      In the expression: MkPRI $ printRule_ f
+    • Relevant bindings include f :: p a (bound at T5691.hs:14:9)
 
 T5691.hs:24:10: error:
     • No instance for (Alternative RecDecParser)
