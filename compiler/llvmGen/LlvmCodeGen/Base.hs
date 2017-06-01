@@ -31,7 +31,7 @@ module LlvmCodeGen.Base (
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
 
-        aliasify,
+        aliasify, cpsCallOf,
     ) where
 
 #include "HsVersions.h"
@@ -500,6 +500,21 @@ aliasify (LMGlobal var val) = do
     return [ LMGlobal defVar val
            , LMGlobal aliasVar (Just aliasVal)
            ]
+
+cpsCallOf :: LlvmType -> LlvmType
+cpsCallOf givenFn = LMFunction $
+    LlvmFunctionDecl {
+        -- NB skipping type mangling because of current assumptions
+        decName = fsLit "llvm.experimental.cpscall.x",
+        funcLinkage = ExternallyVisible,
+        funcCc = CC_Ghc,
+        decReturnType = getRetTy givenFn,
+        decVarargs = VarArgs,
+        decParams = map noAttr [givenFn, i64, i32, i16],
+        funcAlign = Nothing
+    }
+    where
+        noAttr ty = (ty, [])
 
 -- Note [Llvm Forward References]
 --

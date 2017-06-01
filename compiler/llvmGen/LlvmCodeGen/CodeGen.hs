@@ -779,8 +779,8 @@ genNativeCall :: Maybe ContInfo -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
 -- Native call to a known Cmm function 
 genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
     (vf, stmts, top) <- getHsFunc live lbl
-    rest <- genNativeCall' maybeCont vf live
-    return (stmts `appOL` rest, top)
+    (rest, top2) <- genNativeCall' maybeCont vf live
+    return (stmts `appOL` rest, top ++ top2)
     
 -- Native call to unknown Cmm function / address.
 genNativeCall maybeCont expr live = do
@@ -796,12 +796,12 @@ genNativeCall maybeCont expr live = do
                      ++ showSDoc dflags (ppr ty) ++ ")"
                      
     (v1, s1) <- doExpr (pLift fty) $ Cast cast vf (pLift fty)
-    rest <- genNativeCall' maybeCont v1 live
-    return (stmts `snocOL` s1 `appOL` rest, top)
+    (rest, top2) <- genNativeCall' maybeCont v1 live
+    return (stmts `snocOL` s1 `appOL` rest, top ++ top2)
 
 -- now that we have the function we want to call as an LlvmVar, actually
 -- build the statements needed to do so.
-genNativeCall' :: Maybe ContInfo -> LlvmVar -> [GlobalReg] -> LlvmM LlvmStatements
+genNativeCall' :: Maybe ContInfo -> LlvmVar -> [GlobalReg] -> LlvmM StmtData
 genNativeCall' maybeCont fv live = do
     dflags <- getDynFlags
     (stgRegs, stgStmts) <- funEpilogue live
@@ -811,37 +811,48 @@ genNativeCall' maybeCont fv live = do
         Nothing -> do 
             (retV, s1) <- doExpr retTy $ Call TailCall fv stgRegs llvmStdFunAttrs
             let s2  = Return (Just retV)
-            return (stgStmts `snocOL` s1 `snocOL` s2)
+            return (stgStmts `snocOL` s1 `snocOL` s2, [])
             
         -- non-tail call
         Just contInfo -> do
-            ntCallStms <- mkNonTailCall dflags contInfo retTy fv stgRegs
-            return (stgStmts `appOL` ntCallStms)
+            (ntCallStms, top) <- mkNonTailCall dflags contInfo retTy fv stgRegs
+            return (stgStmts `appOL` ntCallStms, top)
 
 
-mkNonTailCall :: DynFlags -> ContInfo -> LlvmType -> LlvmVar -> [LlvmVar] -> LlvmM LlvmStatements
+mkNonTailCall :: DynFlags -> ContInfo -> LlvmType -> LlvmVar -> [LlvmVar] -> LlvmM StmtData
 mkNonTailCall dflags contInfo retTy vf stgRegs = do
-    let ct = getCallType dflags contInfo
-    (retV, callStm) <- doExpr retTy $ Call ct vf stgRegs llvmStdFunAttrs
+    -- fetch the intrinsic.
+    let cpscallTy @ (LMFunction decl) = cpsCallOf $ getVarType vf
+    (intFun, intStm, top) <- getInstrinct2 (decName decl) cpscallTy
+    
+    -- collect the args to the intrinsic
+    let consts = cpsCallConsts dflags contInfo
+        args = vf : consts ++ stgRegs
+    
+    (retV, callStm) <- doExpr retTy $ Call StdCall intFun args llvmStdFunAttrs
     endStms <- doReturnTo contInfo retV
-    return $ callStm `consOL` endStms
+    return (intStm `snocOL` callStm `appOL` endStms, top)
     
             
-getCallType :: DynFlags -> ContInfo -> LlvmCallType
-getCallType dflags (retl, argOff, _) = let
+cpsCallConsts :: DynFlags -> ContInfo -> [LlvmVar]
+cpsCallConsts dflags (retl, argOff, _) = let
         -- mangler will look for this unique number
-        info64 = fromIntegral $ getKey $ getUnique retl
+        info64 = toInteger $ getKey $ getUnique retl
         
         -- offset into the Sp where the return address should be written
         wordBytes = widthInBytes $ wordWidth dflags
-        ra32 = fromIntegral $ argOff - wordBytes
+        ra32 = toInteger $ argOff - wordBytes
         
         -- get argument number of Sp in our calling convention
         allRegs = activeStgRegs $ targetPlatform dflags
         Just spArgnum = elemIndex Sp allRegs
-        argnum16 = fromIntegral spArgnum
+        argnum16 = toInteger spArgnum
+        
+        mk ty val = LMLitVar $ LMIntLit val ty
     in
-        CPSCall {info_id = info64, ra_off = ra32, sp_argnum = argnum16}
+        [mk i64 info64,
+         mk i32 ra32,
+         mk i16 argnum16]
     
             
             

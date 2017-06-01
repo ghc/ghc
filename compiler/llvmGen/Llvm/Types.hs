@@ -583,13 +583,6 @@ data LlvmCallType
   = StdCall
   -- | Tail call, perform the call in the current stack frame.
   | TailCall
-  -- | A non-tail call in continuation-passing style,
-  -- which is described with the intrinsic @llvm.experimental.cpscall
-  | CPSCall {
-        info_id :: Int64,    -- an ID used by the mangler 
-        ra_off :: Int32,     -- byte offset from Sp for the return address
-        sp_argnum :: Int16   -- indicates the Sp arg passed to callee
-    }
   deriving (Eq,Show)
 
 -- | Different calling conventions a function can use.
