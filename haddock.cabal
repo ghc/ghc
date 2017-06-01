@@ -23,6 +23,7 @@ extra-source-files:
   doc/README.md
   doc/*.rst
   doc/conf.py
+  driver-test/*.hs
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
