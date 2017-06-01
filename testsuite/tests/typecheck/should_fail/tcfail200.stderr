@@ -1,7 +1,11 @@
 
 tcfail200.hs:5:15: error:
     • Couldn't match a lifted type with an unlifted type
-      When matching the kind of ‘GHC.Prim.Int#’
+      When matching types
+        a1 :: *
+        GHC.Prim.Int# :: TYPE 'GHC.Types.IntRep
     • In the expression: 1#
       In the expression: (1#, 'c')
       In an equation for ‘x’: x = (1#, 'c')
+    • Relevant bindings include
+        x :: (a1, Char) (bound at tcfail200.hs:5:9)

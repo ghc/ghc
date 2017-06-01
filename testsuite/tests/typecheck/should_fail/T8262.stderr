@@ -1,7 +1,11 @@
 
 T8262.hs:5:15: error:
     • Couldn't match a lifted type with an unlifted type
-      When matching the kind of ‘GHC.Prim.Int#’
+      When matching types
+        a :: *
+        GHC.Prim.Int# :: TYPE 'GHC.Types.IntRep
     • In the first argument of ‘Just’, namely ‘(1#)’
       In the expression: Just (1#)
       In an equation for ‘foo’: foo x = Just (1#)
+    • Relevant bindings include
+        foo :: p -> Maybe a (bound at T8262.hs:5:1)

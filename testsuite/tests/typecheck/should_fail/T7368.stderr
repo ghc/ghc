@@ -1,7 +1,11 @@
 
 T7368.hs:3:10: error:
     • Couldn't match kind ‘*’ with ‘* -> *’
-      When matching the kind of ‘Maybe’
+      When matching types
+        b0 :: *
+        Maybe :: * -> *
+      Expected type: a0 -> b0
+        Actual type: c0 Maybe
     • In the first argument of ‘b’, namely ‘(l Nothing)’
       In the expression: b (l Nothing)
       In an equation for ‘f’: f = b (l Nothing)

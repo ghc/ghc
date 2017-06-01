@@ -29,3 +29,59 @@ T12593.hs:12:40: error:
         run :: k2 q =>
                Free k k1 k2 p a b
                -> (forall (c :: k) (d :: k1). p c d -> q c d) -> q a b
+
+T12593.hs:12:47: error:
+    • Couldn't match kind ‘(((k0 -> k1 -> *) -> Constraint)
+                            -> (k2 -> k3 -> *) -> *)
+                           -> Constraint’
+                     with ‘*’
+      When matching kinds
+        k :: (((k0 -> k1 -> *) -> Constraint) -> (k2 -> k3 -> *) -> *)
+             -> Constraint
+        k2 :: *
+    • In the first argument of ‘p’, namely ‘c’
+      In the type signature:
+        run :: k2 q =>
+               Free k k1 k2 p a b
+               -> (forall (c :: k) (d :: k1). p c d -> q c d) -> q a b
+
+T12593.hs:12:49: error:
+    • Couldn't match kind ‘((k0 -> k1 -> *) -> Constraint)
+                           -> (k2 -> k3 -> *) -> *’
+                     with ‘*’
+      When matching kinds
+        k4 :: ((k0 -> k1 -> *) -> Constraint) -> (k2 -> k3 -> *) -> *
+        k3 :: *
+    • In the second argument of ‘p’, namely ‘d’
+      In the type signature:
+        run :: k2 q =>
+               Free k k1 k2 p a b
+               -> (forall (c :: k) (d :: k1). p c d -> q c d) -> q a b
+
+T12593.hs:12:56: error:
+    • Couldn't match kind ‘(((k0 -> k1 -> *) -> Constraint)
+                            -> (k2 -> k3 -> *) -> *)
+                           -> Constraint’
+                     with ‘*’
+      When matching kinds
+        k :: (((k0 -> k1 -> *) -> Constraint) -> (k2 -> k3 -> *) -> *)
+             -> Constraint
+        k0 :: *
+    • In the first argument of ‘q’, namely ‘c’
+      In the type signature:
+        run :: k2 q =>
+               Free k k1 k2 p a b
+               -> (forall (c :: k) (d :: k1). p c d -> q c d) -> q a b
+
+T12593.hs:12:58: error:
+    • Couldn't match kind ‘((k0 -> k1 -> *) -> Constraint)
+                           -> (k2 -> k3 -> *) -> *’
+                     with ‘*’
+      When matching kinds
+        k4 :: ((k0 -> k1 -> *) -> Constraint) -> (k2 -> k3 -> *) -> *
+        k1 :: *
+    • In the second argument of ‘q’, namely ‘d’
+      In the type signature:
+        run :: k2 q =>
+               Free k k1 k2 p a b
+               -> (forall (c :: k) (d :: k1). p c d -> q c d) -> q a b

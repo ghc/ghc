@@ -1,0 +1,7 @@
+
+T13530.hs:11:7: error:
+    • Couldn't match a lifted type with an unlifted type
+      Expected type: (# Int#, Int# #)
+        Actual type: (# Int#, a0 #)
+    • In the expression: g x
+      In an equation for ‘f’: f x = g x
