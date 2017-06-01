@@ -1906,6 +1906,9 @@ AC_DEFUN([GHC_CONVERT_OS],[
       aix*) # e.g. powerpc-ibm-aix7.1.3.0
         $3="aix"
         ;;
+      darwin*) # e.g. aarch64-apple-darwin14
+        $3="darwin"
+        ;;
       freebsd*) # like i686-gentoo-freebsd7
                 #      i686-gentoo-freebsd8
                 #      i686-gentoo-freebsd8.2
