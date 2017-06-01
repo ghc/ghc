@@ -70,8 +70,8 @@ instance Outputable LlvmType where
   ppr (LMVector nr tp ) = char '<' <> ppr nr <> text " x " <> ppr tp <> char '>'
   ppr (LMLabel        ) = text "label"
   ppr (LMVoid         ) = text "void"
-  ppr (LMStruct tys   ) = text "<{" <> ppCommaJoin tys <> text "}>"
-  ppr (LMStructU tys  ) = text "{" <> ppCommaJoin tys <> text "}"
+  ppr (LMStruct tys   ) = text "<{" <> ppSlimCommaJoin tys <> text "}>"
+  ppr (LMStructU tys  ) = text "{" <> ppSlimCommaJoin tys <> text "}"
   ppr (LMMetadata     ) = text "metadata"
 
   ppr (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
@@ -83,11 +83,11 @@ ppParams :: LlvmParameterListType -> [LlvmParameter] -> SDoc
 ppParams varg p
   = let varg' = case varg of
           VarArgs | null args -> sLit "..."
-                  | otherwise -> sLit ", ..."
+                  | otherwise -> sLit ",..."
           _otherwise          -> sLit ""
         -- by default we don't print param attributes
         args = map fst p
-    in ppCommaJoin args <> ptext varg'
+    in ppSlimCommaJoin args <> ptext varg'
 
 -- | An LLVM section definition. If Nothing then let LLVM decide the section
 type LMSection = Maybe LMString
@@ -895,6 +895,10 @@ fixEndian = reverse
 --------------------------------------------------------------------------------
 -- * Misc functions
 --------------------------------------------------------------------------------
+
+-- no spaces version of CommaJoin
+ppSlimCommaJoin :: (Outputable a) => [a] -> SDoc
+ppSlimCommaJoin strs = hcat $ punctuate comma (map ppr strs)
 
 ppCommaJoin :: (Outputable a) => [a] -> SDoc
 ppCommaJoin strs = hsep $ punctuate comma (map ppr strs)
