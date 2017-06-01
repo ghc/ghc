@@ -268,9 +268,9 @@ ppCall ct fptr args attrs = case fptr of
         ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
             let tc = if ct == TailCall then text "tail " else empty
                 ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
-                ppArgTy  = (ppCommaJoin $ map fst params) <>
+                ppArgTy  = (ppSlimCommaJoin $ map fst params) <>
                            (case argTy of
-                               VarArgs   -> text ", ..."
+                               VarArgs   -> text ",..."
                                FixedArgs -> empty)
                 fnty = space <> lparen <> ppArgTy <> rparen
                 attrDoc = ppSpaceJoin attrs
