@@ -8347,9 +8347,9 @@ enabled).
 The only way ``*`` is unordinary is in its parsing. In order to be backward
 compatible, ``*`` is parsed as if it were an alphanumeric idenfifier; note
 that we do not write ``Int :: (*)`` but just plain ``Int :: *``. Due to the
-bizarreness with which ``*`` is parsed-and the fact that it is the only such
-operator in GHC-there are some corner cases that are
-not handled. We are aware of two:
+bizarreness with which ``*`` is parsed--and the fact that it is the only such
+operator in GHC--there are some corner cases that are
+not handled. We are aware of three:
 
 - In a Haskell-98-style data constructor, you must put parentheses around
   ``*``, like this: ::
@@ -8362,6 +8362,10 @@ not handled. We are aware of two:
 
   Note that the keyword ``type`` there is just to disambiguate the import
   from a term-level ``(*)``. (:ref:`explicit-namespaces`)
+
+- In an instance declaration head (the part after the word ``instance``), you
+  must parenthesize ``*``. This applies to all manners of instances, including
+  the left-hand sides of individual equations of a closed type family.
 
 The ``Data.Kind`` module also exports ``Type`` as a synonym for ``*``.
 Now that type synonyms work in kinds, it is conceivable that we will deprecate
