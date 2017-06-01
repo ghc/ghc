@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, NamedFieldPuns #-}
 
 --------------------------------------------------------------------------------
 -- | Pretty print LLVM IR Code.
@@ -30,6 +30,7 @@ import Llvm.MetaData
 import Llvm.Types
 
 import Data.List ( intersperse )
+import Data.Bits ( finiteBitSize )
 import Outputable
 import Unique
 import FastString ( sLit )
@@ -256,7 +257,7 @@ ppCall ct fptr args attrs = let
     in case ct of 
         TailCall -> ppRegularCall (text "tail ") decl
         StdCall  -> ppRegularCall empty decl
-        CPSCall {} -> panic "pp CPSCall pls"
+        (x@CPSCall {}) -> ppCPSCall x decl
     
     where
         getDecl fptr = case fptr of
@@ -269,24 +270,69 @@ ppCall ct fptr args attrs = let
                         ++ " called with either global var of function type or "
                         ++ "local var of pointer function type."
                         
-        ppRegularCall tailmrk (LlvmFunctionDecl _ _ cc ret argTy params _) = let
-                ppRet = ppr ret
-                ppFnName = ppName fptr
-                ppArgs = hsep $ punctuate comma $ map ppCallMetaExpr args
-                ppArgTys  = (ppCommaJoin $ map fst params) <>
-                               (case argTy of
-                                   VarArgs   -> text ", ..."
-                                   FixedArgs -> empty)
+        ppRegularCall tailMark (LlvmFunctionDecl _ _ cc ret argTy params _) = let 
+                ppArgTys  = mkArgTys argTy params
+                ppFnTy = joinFnTy (ppr ret) ppArgTys
             in
-                ppCallWith tailmrk cc ppRet ppFnName ppArgTys ppArgs
+                joinCall tailMark cc ppFnTy ppFnName ppArgs
+                
+        ppCPSCall (CPSCall{info_id, ra_off, sp_argnum}) 
+                  (LlvmFunctionDecl _ _ cc ret argTy params _) = let
+                  
+                md = [cvt info_id, cvt ra_off, cvt sp_argnum]
+                
+                retTy = ppr ret
+                calleeTy = (joinFnTy retTy $ mkArgTys argTy params) <> text "*"
+                
+                intArgTys = calleeTy <> comma <>
+                            (hcat $ map printTy md) <> 
+                            text "..."
+                            
+                intTy = joinFnTy retTy intArgTys
+                -- NB if there's a possibility of the callees having
+                -- different types, you'll want to place the mangled
+                -- type name here instead of "x". At the moment this
+                -- does not occur
+                intName = text "@llvm.experimental.cpscall.x"
+                
+                intArgs = calleeTy <+> ppFnName <> comma <+>
+                          (hcat $ map printUse md) <> 
+                          ppArgs
+                
+            in
+                joinCall empty cc intTy intName intArgs
+                
+        ppCPSCall _ _ = panic "ppCPSCall: unexpected"
+    
+    
+        ppFnName = ppName fptr
+        ppArgs = hsep $ punctuate comma $ map ppCallMetaExpr args
+        
+        -- helper funs
+        
+        cvt i = (ppr $ LMInt $ finiteBitSize i, text $ show i)
+        printTy (ty, _) = ty <> comma
+        printUse (ty, val) = ty <+> val <> text ", "
+        
+        mkArgTys argTy params = 
+            (ppSlimCommaJoin $ map fst params) <>
+               (case argTy of
+                   VarArgs   -> text ",..."
+                   FixedArgs -> empty)
+                
+        joinFnTy ppRetTy ppArgTys = 
+            ppRetTy <+> lparen <> ppArgTys <> rparen
+                
+        joinCall ppTail conv ppFnTy ppFn ppArgs =
+            let attrDoc = ppSpaceJoin attrs
+            in  ppTail 
+                <> text "call" 
+                <+> ppr conv 
+                <+> ppFnTy
+                <+> ppFn <> lparen 
+                    <> ppArgs
+                <> rparen <+> attrDoc
             
-        ppCallWith tailmrk cc ppRet ppFnName ppArgTys ppArgs =
-            let fnty = space <> lparen <> ppArgTys <> rparen
-                attrDoc = ppSpaceJoin attrs
-            in  tailmrk <> text "call" <+> ppr cc <+> ppRet
-                    <> fnty <+> ppFnName <> lparen <+> ppArgs
-                    <+> rparen <+> attrDoc
-
         -- Metadata needs to be marked as having the `metadata` type when used
         -- in a call argument
         ppCallMetaExpr (MetaVar v) = ppr v
