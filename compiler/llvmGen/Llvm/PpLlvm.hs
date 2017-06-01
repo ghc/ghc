@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, NamedFieldPuns #-}
+{-# LANGUAGE CPP #-}
 
 --------------------------------------------------------------------------------
 -- | Pretty print LLVM IR Code.
@@ -30,7 +30,6 @@ import Llvm.MetaData
 import Llvm.Types
 
 import Data.List ( intersperse )
-import Data.Bits ( finiteBitSize )
 import Outputable
 import Unique
 import FastString ( sLit )
@@ -252,87 +251,33 @@ ppLlvmExpression expr
 -- | Should always be a function pointer. So a global var of function type
 -- (since globals are always pointers) or a local var of pointer function type.
 ppCall :: LlvmCallType -> LlvmVar -> [MetaExpr] -> [LlvmFuncAttr] -> SDoc
-ppCall ct fptr args attrs = let
-        decl = getDecl fptr
-    in case ct of 
-        TailCall -> ppRegularCall (text "tail ") decl
-        StdCall  -> ppRegularCall empty decl
-        (x@CPSCall {}) -> ppCPSCall x decl
-    
+ppCall ct fptr args attrs = case fptr of
+                           --
+    -- if local var function pointer, unwrap
+    LMLocalVar _ (LMPointer (LMFunction d)) -> ppCall' d
+
+    -- should be function type otherwise
+    LMGlobalVar _ (LMFunction d) _ _ _ _    -> ppCall' d
+
+    -- not pointer or function, so error
+    _other -> error $ "ppCall called with non LMFunction type!\nMust be "
+                ++ " called with either global var of function type or "
+                ++ "local var of pointer function type."
+
     where
-        getDecl fptr = case fptr of
-            -- if local var function pointer, unwrap
-            LMLocalVar _ (LMPointer (LMFunction d)) -> d
-            -- should be function type otherwise
-            LMGlobalVar _ (LMFunction d) _ _ _ _    -> d
-            -- not pointer or function, so error
-            _other -> error $ "ppCall called with non LMFunction type!\nMust be "
-                        ++ " called with either global var of function type or "
-                        ++ "local var of pointer function type."
-                        
-        ppRegularCall tailMark (LlvmFunctionDecl _ _ cc ret argTy params _) = let 
-                ppArgTys  = mkArgTys argTy params
-                ppFnTy = joinFnTy (ppr ret) ppArgTys
-            in
-                joinCall tailMark cc ppFnTy ppFnName ppArgs
-                
-        ppCPSCall (CPSCall{info_id, ra_off, sp_argnum}) 
-                  (LlvmFunctionDecl _ _ cc ret argTy params _) = let
-                  
-                md = [cvt info_id, cvt ra_off, cvt sp_argnum]
-                
-                retTy = ppr ret
-                calleeTy = (joinFnTy retTy $ mkArgTys argTy params) <> text "*"
-                
-                intArgTys = calleeTy <> comma <>
-                            (hcat $ map printTy md) <> 
-                            text "..."
-                            
-                intTy = joinFnTy retTy intArgTys
-                -- NB if there's a possibility of the callees having
-                -- different types, you'll want to place the mangled
-                -- type name here instead of "x". At the moment this
-                -- does not occur
-                intName = text "@llvm.experimental.cpscall.x"
-                
-                intArgs = calleeTy <+> ppFnName <> comma <+>
-                          (hcat $ map printUse md) <> 
-                          ppArgs
-                
-            in
-                joinCall empty cc intTy intName intArgs
-                
-        ppCPSCall _ _ = panic "ppCPSCall: unexpected"
-    
-    
-        ppFnName = ppName fptr
-        ppArgs = hsep $ punctuate comma $ map ppCallMetaExpr args
-        
-        -- helper funs
-        
-        cvt i = (ppr $ LMInt $ finiteBitSize i, text $ show i)
-        printTy (ty, _) = ty <> comma
-        printUse (ty, val) = ty <+> val <> text ", "
-        
-        mkArgTys argTy params = 
-            (ppSlimCommaJoin $ map fst params) <>
-               (case argTy of
-                   VarArgs   -> text ",..."
-                   FixedArgs -> empty)
-                
-        joinFnTy ppRetTy ppArgTys = 
-            ppRetTy <+> lparen <> ppArgTys <> rparen
-                
-        joinCall ppTail conv ppFnTy ppFn ppArgs =
-            let attrDoc = ppSpaceJoin attrs
-            in  ppTail 
-                <> text "call" 
-                <+> ppr conv 
-                <+> ppFnTy
-                <+> ppFn <> lparen 
-                    <> ppArgs
-                <> rparen <+> attrDoc
-            
+        ppCall' (LlvmFunctionDecl _ _ cc ret argTy params _) =
+            let tc = if ct == TailCall then text "tail " else empty
+                ppValues = hsep $ punctuate comma $ map ppCallMetaExpr args
+                ppArgTy  = (ppCommaJoin $ map fst params) <>
+                           (case argTy of
+                               VarArgs   -> text ", ..."
+                               FixedArgs -> empty)
+                fnty = space <> lparen <> ppArgTy <> rparen
+                attrDoc = ppSpaceJoin attrs
+            in  tc <> text "call" <+> ppr cc <+> ppr ret
+                    <> fnty <+> ppName fptr <> lparen <+> ppValues
+                    <+> rparen <+> attrDoc
+
         -- Metadata needs to be marked as having the `metadata` type when used
         -- in a call argument
         ppCallMetaExpr (MetaVar v) = ppr v
