@@ -449,3 +449,5 @@ test('T13983', normal, compile_fail, [''])
 test('T13530', normal, compile_fail, [''])
 test('T12373', normal, compile_fail, [''])
 test('T13610', normal, compile_fail, [''])
+test('T11672', normal, compile_fail, [''])
+

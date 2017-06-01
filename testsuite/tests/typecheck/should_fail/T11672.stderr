@@ -1,0 +1,21 @@
+
+T11672.hs:9:10: error:
+    • Couldn't match kind ‘Symbol’ with ‘*’
+      When matching types
+        a0 :: Symbol
+        Int -> Bool :: *
+      Expected type: Proxy a0
+        Actual type: Proxy (Int -> Bool)
+    • In the first argument of ‘f’, namely
+        ‘(Proxy :: Proxy (Int -> Bool))’
+      In the expression: f (Proxy :: Proxy (Int -> Bool))
+      In an equation for ‘f’: f _ = f (Proxy :: Proxy (Int -> Bool))
+
+T11672.hs:9:10: error:
+    • Couldn't match type ‘*’ with ‘Symbol’
+      Expected type: Proxy a0
+        Actual type: Proxy (Int -> Bool)
+    • In the first argument of ‘f’, namely
+        ‘(Proxy :: Proxy (Int -> Bool))’
+      In the expression: f (Proxy :: Proxy (Int -> Bool))
+      In an equation for ‘f’: f _ = f (Proxy :: Proxy (Int -> Bool))
