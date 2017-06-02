@@ -19,7 +19,7 @@ import Finder           ( mkStubPaths )
 import PprC             ( writeCs )
 import CmmLint          ( cmmLint )
 import Packages
-import Cmm              ( RawCmmGroup )
+import Cmm              ( RawCmmGroup, ManglerInfo )
 import HscTypes
 import DynFlags
 import Config
@@ -57,7 +57,8 @@ codeOutput :: DynFlags
            -> Stream IO RawCmmGroup ()                       -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
-                  [(ForeignSrcLang, FilePath)]{-foreign_fps-})
+                  [(ForeignSrcLang, FilePath)],{-foreign_fps-}
+                  ManglerInfo)
 
 codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
   cmm_stream
@@ -91,15 +92,15 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
             { fp <- outputForeignFile dflags lang file_contents;
             ; return (lang, fp);
             }
-        ; case hscTarget dflags of {
-             HscAsm         -> outputAsm dflags this_mod location filenm
-                                         linted_cmm_stream;
-             HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
-             HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
-             HscInterpreted -> panic "codeOutput: HscInterpreted";
-             HscNothing     -> panic "codeOutput: HscNothing"
+        ; info <- case hscTarget dflags of {
+                     HscAsm         -> outputAsm dflags this_mod location filenm
+                                                 linted_cmm_stream;
+                     HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
+                     HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
+                     HscInterpreted -> panic "codeOutput: HscInterpreted";
+                     HscNothing     -> panic "codeOutput: HscNothing"
           }
-        ; return (filenm, stubs_exist, foreign_fps)
+        ; return (filenm, stubs_exist, foreign_fps, info)
         }
 
 doOutput :: String -> (Handle -> IO a) -> IO a
@@ -117,7 +118,7 @@ outputC :: DynFlags
         -> FilePath
         -> Stream IO RawCmmGroup ()
         -> [InstalledUnitId]
-        -> IO ()
+        -> IO ManglerInfo
 
 outputC dflags filenm cmm_stream packages
   = do
@@ -146,6 +147,8 @@ outputC dflags filenm cmm_stream packages
           hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
           hPutStr h cc_injects
           writeCs dflags h rawcmms
+          
+       return Nothing
 
 {-
 ************************************************************************
@@ -157,7 +160,7 @@ outputC dflags filenm cmm_stream packages
 
 outputAsm :: DynFlags -> Module -> ModLocation -> FilePath
           -> Stream IO RawCmmGroup ()
-          -> IO ()
+          -> IO ManglerInfo
 outputAsm dflags this_mod location filenm cmm_stream
  | cGhcWithNativeCodeGen == "YES"
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
@@ -167,7 +170,7 @@ outputAsm dflags this_mod location filenm cmm_stream
        _ <- {-# SCC "OutputAsm" #-} doOutput filenm $
            \h -> {-# SCC "NativeCodeGen" #-}
                  nativeCodeGen dflags this_mod location h ncg_uniqs cmm_stream
-       return ()
+       return Nothing
 
  | otherwise
   = panic "This compiler was built without a native code generator"
@@ -180,13 +183,14 @@ outputAsm dflags this_mod location filenm cmm_stream
 ************************************************************************
 -}
 
-outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputLlvm :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ManglerInfo
 outputLlvm dflags filenm cmm_stream
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
 
        {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
                  llvmCodeGen dflags f ncg_uniqs cmm_stream
+       return Nothing -- TODO(kavon): return something
 
 {-
 ************************************************************************

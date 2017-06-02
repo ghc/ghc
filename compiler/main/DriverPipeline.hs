@@ -630,8 +630,7 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
          -- we start the pipeline, because otherwise it will just run off the
          -- end.
          let happensBefore' = happensBefore dflags
-         case start_phase of
-             RealPhase start_phase' ->
+             check start_phase' = 
                  -- See Note [Partial ordering on phases]
                  -- Not the same as: (stop_phase `happensBefore` start_phase')
                  when (not (start_phase' `happensBefore'` stop_phase ||
@@ -639,6 +638,9 @@ runPipeline stop_phase hsc_env0 (input_fn, mb_phase)
                        throwGhcExceptionIO (UsageError
                                    ("cannot compile this file to desired target: "
                                       ++ input_fn))
+         case start_phase of
+             RealPhase start_phase' -> check start_phase'
+             RealPhaseWithInfo _ start_phase' -> check start_phase'
              HscOut {} -> return ()
 
          debugTraceMsg dflags 4 (text "Running the pipeline")
@@ -1070,7 +1072,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files) <- liftIO $
+                    (outputFilename, mStub, foreign_files, mangInfo) <- liftIO $ -- TODO(kavon) use mangInfo
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
@@ -1557,6 +1559,9 @@ runPhase (RealPhase MergeForeign) input_fn dflags
 -- warning suppression
 runPhase (RealPhase other) _input_fn _dflags =
    panic ("runPhase: don't know how to run phase " ++ show other)
+ 
+runPhase (RealPhaseWithInfo _ other) _input_fn _dflags =
+   panic ("runPhase: don't know how to run phase (with info) " ++ show other)
 
 maybeMergeForeign :: CompPipeline Phase
 maybeMergeForeign

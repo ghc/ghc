@@ -439,27 +439,43 @@ compiler_stage2_dll0_MODULES = \
 	BasicTypes \
 	Binary \
 	BinFingerprint \
+	BlockId \
 	BooleanFormula \
 	BufWrite \
 	ByteCodeTypes \
+	CLabel \
 	Class \
 	CmdLineParser \
+	Cmm \
+	CmmExpr \
+	CmmMachOp \
+	CmmNode \
+	CmmSwitch \
 	CmmType \
 	CoAxiom \
-	ConLike \
+	CodeGen.Platform \
+	CodeGen.Platform.ARM \
+	CodeGen.Platform.ARM64 \
+	CodeGen.Platform.NoRegs \
+	CodeGen.Platform.PPC \
+	CodeGen.Platform.PPC_Darwin \
+	CodeGen.Platform.SPARC \
+	CodeGen.Platform.X86 \
+	CodeGen.Platform.X86_64 \
 	Coercion \
 	Config \
+	ConLike \
 	Constants \
 	CoreArity \
 	CoreFVs \
-	CoreSubst \
 	CoreOpt \
+	CoreSeq \
+	CoreStats \
+	CoreSubst \
 	CoreSyn \
 	CoreTidy \
 	CoreUnfold \
 	CoreUtils \
-	CoreSeq \
-	CoreStats \
 	CostCentre \
 	DataCon \
 	Demand \
@@ -482,28 +498,24 @@ compiler_stage2_dll0_MODULES = \
 	FV \
 	Hooks \
 	HsBinds \
+	HscTypes \
 	HsDecls \
 	HsDoc \
 	HsExpr \
 	HsImpExp \
 	HsLit \
-	PlaceHolder \
-	PmExpr \
 	HsPat \
 	HsSyn \
 	HsTypes \
 	HsUtils \
-	HscTypes \
-	IOEnv \
-	NameCache \
 	Id \
 	IdInfo \
 	IfaceSyn \
 	IfaceType \
-	InteractiveEvalTypes \
-	Json \
-	ToIface \
 	InstEnv \
+	InteractiveEvalTypes \
+	IOEnv \
+	Json \
 	Kind \
 	KnownUniques \
 	Lexeme \
@@ -515,6 +527,7 @@ compiler_stage2_dll0_MODULES = \
 	Module \
 	MonadUtils \
 	Name \
+	NameCache \
 	NameEnv \
 	NameSet \
 	OccName \
@@ -528,27 +541,33 @@ compiler_stage2_dll0_MODULES = \
 	Panic \
 	PatSyn \
 	PipelineMonad \
+	PlaceHolder \
 	Platform \
 	PlatformConstants \
+	PmExpr \
 	PprColour \
 	PprCore \
 	PrelNames \
 	PrelRules \
 	Pretty \
 	PrimOp \
-	RepType \
 	RdrName \
+	Reg \
+	RegClass \
+	RepType \
 	Rules \
+	SMRep \
 	SrcLoc \
 	StringBuffer \
 	SysTools.Terminal \
 	TcEvidence \
 	TcRnTypes \
 	TcType \
+	ToIface \
 	TrieMap \
 	TyCon \
-	Type \
 	TyCoRep \
+	Type \
 	TysPrim \
 	TysWiredIn \
 	Unify \
