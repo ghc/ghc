@@ -49,7 +49,7 @@ whatGlasgowExtsDoes = unlines
 flagsTable :: [Flag] -> ReST
 flagsTable theFlags =
     table [50, 100, 30, 55]
-          ["Flag", "Description", "Static/Dynamic", "Reverse"]
+          ["Flag", "Description", "Type", "Reverse"]
           (map flagRow theFlags)
   where
     flagRow flag =
@@ -60,7 +60,6 @@ flagsTable theFlags =
         ]
       where
         type_ = case flagType flag of
-                  StaticFlag          -> "static"
                   DynamicFlag         -> "dynamic"
                   DynamicSettableFlag -> "dynamic/``:set``"
                   ModeFlag            -> "mode"

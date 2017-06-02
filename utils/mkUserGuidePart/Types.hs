@@ -1,8 +1,6 @@
 module Types where
 
-data FlagType = StaticFlag
-                -- ^ Static flag
-              | DynamicFlag
+data FlagType = DynamicFlag
                 -- ^ Dynamic flag
               | DynamicSettableFlag
                 -- ^ Dynamic flag on which @:set@ can be used in GHCi
