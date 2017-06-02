@@ -41,6 +41,74 @@
    http://www.x86-64.org/documentation/abi.pdf
 
    The current code is based on version 0.99.6 - October 2013
+
+   Note [BFD import library]
+
+   On Windows, compilers don't link directly to dynamic libraries.
+   The reason for this is that the exports are not always by symbol, the
+   Import Address Table (IAT) also allows exports by ordinal number
+   or raw addresses.
+
+   So to solve the linking issue, import libraries were added. Import libraries
+   can be seen as a specification of how to link implicitly against a dynamic
+   library. As a side note, import libraries are also the mechanism which
+   can be used to break mutual dependencies between shared libraries and to
+   implement delay loading or override the location of a shared library at
+   startup.
+
+   Linkers use these import libraries to populate the IAT of the resulting
+   binary. At startup the system dynamic loader processes the IAT entries
+   and populates the symbols with the correct addresses.
+
+   Anyway, the Windows PE format specifies a simple and efficient format for
+   this: It's essentially a list, saying these X symbols can be found in DLL y.
+   Commonly, y is a versioned name. e.g. liby_43.dll. This is an artifact of
+   the days when Windows did not support side-by-side assemblies. So the
+   solution was to version the DLLs by renaming them to include explicit
+   version numbers, and to then use the import libraries to point to the right
+   version, having the linker do the leg work.
+
+   The format in the PE specification is commonly named using the suffix .lib.
+   Unfortunately, GCC/binutils decided not to implement this format, and instead
+   have created their own format. This format is either named using the suffix
+   .dll.a or .a depending on the tool that makes them. This format is
+   undocumented. However the source of dlltool.c in binutils is pretty handy to
+   understant it.
+
+   To understand the implementation in GHC, this is what is important:
+
+   the .idata section group is used to hold this information. An import library
+   object file will always have these section groups, but the specific
+   configuration depends on what the purpose of the file is. They will also
+   never have a CODE or DATA section, though depending on the tool that creates
+   them they may have the section headers, which will mostly be empty.
+
+   You have to different possible configuration:
+
+   1) Those that define a redirection. In this case the .idata$7 section will
+      contain the name of the actual dll to load. This will be the only content
+      of the section. In the symbol table, the last symbol will be the name
+      used to refer to the dll in the relocation tables. This name will always
+      be in the format "symbol_name_iname", however when refered to, the format
+      "_head_symbol_name" is used.
+
+      We record this symbol early on during GetNames and load the dll and use
+      the module handle as the symbol address.
+
+   2) Symbol definitions. In this case .idata$6 will contain the symbol to load.
+      This is stored in the fixed format of 2-byte ordinals followed by a null
+      terminated string with the symbol name. The ordinal is to be used when
+      the dll does not export symbols by name. (NOTE: We don't currently
+      support this in the runtime linker, but it's easy to add should it be
+      needed). The last symbol in the symbol table of the section will contain
+      the name symbol which contains the dll name to use to resolve the
+      reference.
+
+   As a technicality, this also means that the GCC format will allow us to use
+   one library to store references to multiple dlls. This can't be produced by
+   dlltool, but it can be combined using ar. This is an important feature
+   required for dynamic linking support for GHC. So the runtime linker now
+   supports this too.
 */
 
 #include "Rts.h"
@@ -176,16 +244,21 @@ static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
     } while (imports->Name);
 }
 
-static bool checkIfDllLoaded(HINSTANCE instance)
+static OpenedDLL* findLoadedDll(HINSTANCE instance)
 {
     for (OpenedDLL* o_dll = opened_dlls; o_dll != NULL; o_dll = o_dll->next) {
         if (o_dll->instance == instance)
         {
-            return true;
+            return o_dll;
         }
     }
 
-    return false;
+    return NULL;
+}
+
+static bool checkIfDllLoaded(HINSTANCE instance)
+{
+    return findLoadedDll (instance) != NULL;
 }
 
 void freePreloadObjectFile_PEi386(ObjectCode *oc)
@@ -202,8 +275,11 @@ void freePreloadObjectFile_PEi386(ObjectCode *oc)
     indirects = NULL;
 }
 
+/* Loads the DLL specified by DLL_NAME, and if successful
+   adds the DLL to the internal linker map and returns the instance handle
+   of the loaded dll in LOADED if LOADED is not NULL. */
 const char *
-addDLL_PEi386( pathchar *dll_name )
+addDLL_PEi386( pathchar *dll_name, HINSTANCE *loaded )
 {
    /* ------------------- Win32 DLL loader ------------------- */
 
@@ -244,8 +320,7 @@ addDLL_PEi386( pathchar *dll_name )
         {
             snwprintf(buf, bufsize, formats[cFormat], dll_name);
             instance = LoadLibraryExW(buf, NULL, flags[cFlag]);
-            if (instance == NULL)
-            {
+            if (instance == NULL) {
                 if (GetLastError() != ERROR_MOD_NOT_FOUND)
                 {
                     goto error;
@@ -264,6 +339,9 @@ addDLL_PEi386( pathchar *dll_name )
     }
 
     addDLLHandle(buf, instance);
+    if (loaded) {
+        *loaded = instance;
+    }
     stgFree(buf);
 
     return NULL;
@@ -449,73 +527,6 @@ allocateImageAndTrampolines (
    }
 
    return image + PEi386_IMAGE_OFFSET;
-}
-
-bool findAndLoadImportLibrary(ObjectCode* oc)
-{
-    int i;
-
-    COFF_header*  hdr;
-    COFF_section* sectab;
-    COFF_symbol*  symtab;
-    uint8_t*      strtab;
-
-    hdr = (COFF_header*)(oc->image);
-    sectab = (COFF_section*)(
-        ((uint8_t*)(oc->image))
-        + sizeof_COFF_header + hdr->SizeOfOptionalHeader
-        );
-
-    symtab = (COFF_symbol*)(
-        ((uint8_t*)(oc->image))
-        + hdr->PointerToSymbolTable
-        );
-
-    strtab = ((uint8_t*)symtab)
-        + hdr->NumberOfSymbols * sizeof_COFF_symbol;
-
-    for (i = 0; i < oc->n_sections; i++)
-    {
-        COFF_section* sectab_i
-            = (COFF_section*)myindex(sizeof_COFF_section, sectab, i);
-
-        char *secname = cstring_from_section_name(sectab_i->Name, strtab);
-
-        // Find the first entry containing a valid .idata$7 section.
-        if (strcmp(secname, ".idata$7") == 0) {
-            /* First load the containing DLL if not loaded. */
-            Section section = oc->sections[i];
-
-            pathchar* dirName = pathdir(oc->fileName);
-            HsPtr token       = addLibrarySearchPath(dirName);
-            stgFree(dirName);
-            char* dllName = (char*)section.start;
-
-            if (strlen(dllName) == 0 || dllName[0] == ' ')
-            {
-                continue;
-            }
-
-            IF_DEBUG(linker, debugBelch("lookupSymbol: on-demand '%ls' => `%s'\n", oc->fileName, dllName));
-
-            pathchar* dll = mkPath(dllName);
-            removeLibrarySearchPath(token);
-
-            const char* result = addDLL(dll);
-            stgFree(dll);
-
-            if (result != NULL) {
-                errorBelch("Could not load `%s'. Reason: %s\n", (char*)dllName, result);
-                return false;
-            }
-
-            break;
-        }
-
-        stgFree(secname);
-    }
-
-    return true;
 }
 
 bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f )
@@ -970,6 +981,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
    COFF_section* sectab;
    COFF_symbol*  symtab;
    uint8_t*        strtab;
+   bool          has_code_section = false;
 
    uint8_t*     sname;
    SymbolAddr* addr;
@@ -1053,21 +1065,57 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       IF_DEBUG(linker, debugBelch("section name = %s\n", secname ));
 
       /* The PE file section flag indicates whether the section contains code or data. */
-      if (sectab_i->Characteristics & IMAGE_SCN_CNT_CODE ||
-          sectab_i->Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA)
-         kind = SECTIONKIND_CODE_OR_RODATA;
+      if (sectab_i->Characteristics & IMAGE_SCN_CNT_CODE) {
+          has_code_section = has_code_section || sectab_i->SizeOfRawData > 0;
+          kind = SECTIONKIND_CODE_OR_RODATA;
+       }
+
+       if (sectab_i->Characteristics & IMAGE_SCN_CNT_INITIALIZED_DATA)
+           kind = SECTIONKIND_CODE_OR_RODATA;
 
       /* Check next if it contains any uninitialized data */
       if (sectab_i->Characteristics & IMAGE_SCN_CNT_UNINITIALIZED_DATA)
-         kind = SECTIONKIND_RWDATA;
+          kind = SECTIONKIND_RWDATA;
 
       /* Finally check if it can be discarded. This will also ignore .debug sections */
       if (sectab_i->Characteristics & IMAGE_SCN_MEM_DISCARDABLE ||
           sectab_i->Characteristics & IMAGE_SCN_LNK_REMOVE)
           kind = SECTIONKIND_OTHER;
 
-      if (0==strcmp(".ctors", (char*)secname))
-         kind = SECTIONKIND_INIT_ARRAY;
+      if (0==strncmp(".ctors", (char*)secname, 6))
+          kind = SECTIONKIND_INIT_ARRAY;
+
+      if (0==strncmp(".idata", (char*)secname, 6))
+          kind = SECTIONKIND_IMPORT;
+
+      /* See Note [BFD import library].  */
+      if (0==strncmp(".idata$7", (char*)secname, 8))
+          kind = SECTIONKIND_IMPORT_LIBRARY;
+
+      if (0==strncmp(".idata$6", (char*)secname, 8)) {
+          /* The first two bytes contain the ordinal of the function
+             in the format of lowpart highpart. The two bytes combined
+             for the total range of 16 bits which is the function export limit
+             of DLLs.  */
+          sname = ((uint8_t*)section.start)+2;
+          COFF_symbol* symtab_i = (COFF_symbol*)
+                myindex ( sizeof_COFF_symbol, symtab, hdr->NumberOfSymbols-1 );
+          addr = (char*)cstring_from_COFF_symbol_name(symtab_i->N.ShortName,
+                                                      strtab);
+
+          IF_DEBUG(linker,
+                   debugBelch("addImportSymbol `%s' => `%s'\n",
+                              sname, (char*)addr));
+          if (!ghciInsertSymbolTable(oc->fileName, symhash, (SymbolName*)sname,
+                                     addr, false, oc))
+             return false;
+          setImportSymbol (oc, sname);
+
+          /* Don't process this oc any futher. Just exit.  */
+          oc->n_symbols = 0;
+          oc->symbols   = NULL;
+          return true;
+      }
 
       ASSERT(sectab_i->SizeOfRawData == 0 || sectab_i->Misc.VirtualSize == 0);
       sz = sectab_i->SizeOfRawData;
@@ -1126,8 +1174,15 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
       addr = NULL;
       bool isWeak = false;
+      Section *section = symtab_i->SectionNumber > 0
+                       ? &oc->sections[symtab_i->SectionNumber-1]
+                       : NULL;
+      sname = cstring_from_COFF_symbol_name(symtab_i->N.ShortName, strtab);
+
       if (   symtab_i->SectionNumber != IMAGE_SYM_UNDEFINED
-          && symtab_i->SectionNumber > 0) {
+          && symtab_i->SectionNumber > 0
+          && section
+          && section->kind != SECTIONKIND_IMPORT_LIBRARY) {
          /* This symbol is global and defined, viz, exported */
          /* for IMAGE_SYMCLASS_EXTERNAL
                 && !IMAGE_SYM_UNDEFINED,
@@ -1140,9 +1195,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
                                         symtab_i->SectionNumber-1 );
          if (symtab_i->StorageClass == IMAGE_SYM_CLASS_EXTERNAL
             || (   symtab_i->StorageClass == IMAGE_SYM_CLASS_STATIC
-                && sectabent->Characteristics & IMAGE_SCN_LNK_COMDAT)
+                && sectabent->Characteristics & IMAGE_SCN_LNK_COMDAT
+                && section)
             ) {
-                 addr = (void*)((size_t)oc->sections[symtab_i->SectionNumber-1].start
+                 addr = (void*)((size_t)section->start
                       + symtab_i->Value);
                  if (sectabent->Characteristics & IMAGE_SCN_LNK_COMDAT) {
                     isWeak = true;
@@ -1160,10 +1216,73 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           bss = (SymbolAddr*)((StgWord)bss + (StgWord)symtab_i->Value);
           IF_DEBUG(linker, debugBelch("bss symbol @ %p %lu\n", addr, symtab_i->Value));
       }
+      else if (symtab_i->SectionNumber > 0
+               && section
+               && section->kind == SECTIONKIND_IMPORT_LIBRARY) {
+          /* This is an import section. We should load the dll and lookup
+             the symbols.
+             See Note [BFD import library].  */
+          char* dllName = (char*)section->start;
+          if (strlen(dllName) == 0 || dllName[0] == 0 || has_code_section)
+              continue;
 
-      sname = cstring_from_COFF_symbol_name(symtab_i->N.ShortName, strtab);
-      if (addr != NULL || isWeak) {
+          pathchar* dirName = pathdir(oc->fileName);
+          HsPtr token       = addLibrarySearchPath(dirName);
+          stgFree(dirName);
 
+          symtab_i = (COFF_symbol*)
+                 myindex ( sizeof_COFF_symbol, symtab, oc->n_symbols-1 );
+          sname = cstring_from_COFF_symbol_name(symtab_i->N.ShortName, strtab);
+
+          IF_DEBUG(linker,
+                   debugBelch("loading symbol `%s' from dll: '%ls' => `%s'\n",
+                              sname, oc->fileName, dllName));
+
+          pathchar* dll = mkPath(dllName);
+          HINSTANCE dllInstance = 0;
+          const char* result = addDLL_PEi386(dll, &dllInstance);
+          removeLibrarySearchPath(token);
+          stgFree(dll);
+
+          if (result != NULL || dllInstance == 0) {
+              errorBelch("Could not load `%s'. Reason: %s\n",
+                         (char*)dllName, result);
+              return false;
+          }
+
+          /* Set the _dll_iname symbol to the dll's handle.  */
+          addr = (SymbolAddr*)dllInstance;
+
+          /* the symbols are named <name>_iname when defined, but are named
+             _head_<name> when looked up. (Ugh. thanks GCC.) So correct it when
+             stored so we don't have to correct it each time when retrieved.  */
+          int size = strlen((char*)sname)+1;
+          char *tmp = stgMallocBytes(size*sizeof(char),
+                                     "ocGetNames_PEi386");
+          strncpy(tmp, (char*)sname, size);
+          char *pos = strstr(tmp, "_iname");
+          /* drop anything after the name. There are some inconsistencies with
+             whitespaces trailing the name.  */
+          if (pos) pos[0] = '\0';
+          int start = 0;
+
+          /* msys2 project's import lib builder has some inconsistent name
+             manglings. Their names start with _ or __ yet they drop this when
+             making the _head_ symbol. So do the same.  */
+          while (tmp[start]=='_')
+            start++;
+
+          snprintf((char*)sname, size, "_head_%s", tmp+start);
+          sname[size-start]='\0';
+          stgFree(tmp);
+          if (!ghciInsertSymbolTable(oc->fileName, symhash, (SymbolName*)sname,
+                                     addr, false, oc))
+               return false;
+          break;
+      }
+
+      if ((addr != NULL || isWeak)
+         && (!section || (section && section->kind != SECTIONKIND_IMPORT))) {
          /* debugBelch("addSymbol %p `%s' Weak:%lld \n", addr, sname, isWeak); */
          IF_DEBUG(linker, debugBelch("addSymbol %p `%s'\n", addr,sname));
          ASSERT(i >= 0 && i < oc->n_symbols);
@@ -1381,7 +1500,6 @@ ocResolve_PEi386 ( ObjectCode* oc )
             copyName ( sym->N.ShortName, strtab, symbol, 1000-1 );
             S = (size_t) lookupSymbol_( (char*)symbol );
             if ((void*)S == NULL) {
-
                 errorBelch(" | %" PATH_FMT ": unknown symbol `%s'", oc->fileName, symbol);
                 return false;
             }
@@ -1573,6 +1691,26 @@ SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl)
             char symBuffer[50];
             sprintf(symBuffer, "_%s", lbl);
             pinfo->value = GetProcAddress(GetModuleHandle("msvcrt"), symBuffer);
+        }
+        else if (pinfo && pinfo->owner && isSymbolImport (pinfo->owner, lbl))
+        {
+            /* See Note [BFD import library].  */
+            HINSTANCE dllInstance = (HINSTANCE)lookupSymbol(pinfo->value);
+            if (!dllInstance && pinfo->value)
+               return pinfo->value;
+
+            if (!dllInstance)
+            {
+               errorBelch("Unable to load import dll symbol `%s'. "
+                          "No _iname symbol.", lbl);
+               return NULL;
+            }
+            IF_DEBUG(linker,
+               debugBelch("indexing import %s => %s using dll instance %p\n",
+                   lbl, (char*)pinfo->value, dllInstance));
+            pinfo->value = GetProcAddress((HMODULE)dllInstance, lbl);
+            clearImportSymbol (pinfo->owner, lbl);
+            return pinfo->value;
         }
 #endif
         return loadSymbol(lbl, pinfo);

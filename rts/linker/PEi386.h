@@ -15,10 +15,9 @@
 #endif
 
 void initLinker_PEi386( void );
-const char * addDLL_PEi386( pathchar *dll_name );
+const char * addDLL_PEi386( pathchar *dll_name, HINSTANCE *instance  );
 void freePreloadObjectFile_PEi386( ObjectCode *oc );
 
-bool findAndLoadImportLibrary( ObjectCode* oc );
 bool checkAndLoadImportLibrary( pathchar* arch_name, char* member_name, FILE* f);
 
 pathchar* findSystemLibrary_PEi386( pathchar* dll_name );
@@ -31,7 +30,7 @@ bool ocGetNames_PEi386    ( ObjectCode* oc );
 bool ocVerifyImage_PEi386 ( ObjectCode* oc );
 SymbolAddr *lookupSymbol_PEi386(SymbolName *lbl);
 bool ocAllocateSymbolExtras_PEi386 ( ObjectCode* oc );
-void *lookupSymbolInDLLs ( unsigned char *lbl );
+SymbolAddr *lookupSymbolInDLLs ( unsigned char *lbl );
 /* See Note [mingw-w64 name decoration scheme] */
 
 char *

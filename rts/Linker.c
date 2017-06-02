@@ -230,6 +230,9 @@ static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
     RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
     if (!pinfo || owner != pinfo->owner) return;
     removeStrHashTable(table, key, NULL);
+    if (isSymbolImport (owner, key))
+      stgFree(pinfo->value);
+
     stgFree(pinfo);
 }
 
@@ -731,7 +734,7 @@ addDLL( pathchar *dll_name )
    return errmsg;
 
 #  elif defined(OBJFORMAT_PEi386)
-   return addDLL_PEi386(dll_name);
+   return addDLL_PEi386(dll_name, NULL);
 
 #  else
    barf("addDLL: not implemented on this platform");
