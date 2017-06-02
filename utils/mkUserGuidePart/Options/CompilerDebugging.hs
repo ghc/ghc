@@ -175,11 +175,11 @@ compilerDebuggingOptions =
          }
   , flag { flagName = "-dno-debug-output"
          , flagDescription = "Suppress unsolicited debugging output"
-         , flagType = StaticFlag
+         , flagType = DynamicFlag
          }
   , flag { flagName = "-dppr-debug"
          , flagDescription = "Turn on debug printing (more verbose)"
-         , flagType = StaticFlag
+         , flagType = DynamicFlag
          }
   , flag { flagName = "-dppr-user-length"
          , flagDescription =

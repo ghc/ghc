@@ -209,7 +209,7 @@ optimizationsOptions =
          }
   , flag { flagName = "-fno-opt-coercion"
          , flagDescription = "Turn off the coercion optimiser"
-         , flagType = StaticFlag
+         , flagType = DynamicFlag
          }
   , flag { flagName = "-fno-pre-inlining"
          , flagDescription = "Turn off pre-inlining"
@@ -220,7 +220,7 @@ optimizationsOptions =
            "Turn off the \"state hack\" whereby any lambda with a real-world "++
            "state token as argument is considered to be single-entry. Hence "++
            "OK to inline things inside it."
-         , flagType = StaticFlag
+         , flagType = DynamicFlag
          }
   , flag { flagName = "-fomit-interface-pragmas"
          , flagDescription =
