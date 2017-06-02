@@ -420,13 +420,15 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
+  -- We take great care not to use do-notation in the expressions below, as
+  -- they are fragile in the presence of RebindableSyntax (Trac #13385).
   nobuf <- GHC.compileExprRemote $
-   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
+   "                  System.IO.hSetBuffering System.IO.stdin  System.IO.NoBuffering" ++
+   "`GHC.Base.thenIO` System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
+   "`GHC.Base.thenIO` System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
   flush <- GHC.compileExprRemote $
-   "do { System.IO.hFlush System.IO.stdout; " ++
-       " System.IO.hFlush System.IO.stderr }"
+   "                  System.IO.hFlush System.IO.stdout" ++
+   "`GHC.Base.thenIO` System.IO.hFlush System.IO.stderr"
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter
