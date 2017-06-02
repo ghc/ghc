@@ -879,7 +879,7 @@ type TcIdSet     = IdSet
 
 type TcIdBinderStack = [TcIdBinder]
    -- This is a stack of locally-bound ids, innermost on top
-   -- Used ony in error reporting (relevantBindings in TcError)
+   -- Used only in error reporting (relevantBindings in TcError)
    -- We can't use the tcl_env type environment, because it doesn't
    --   keep track of the nesting order
 

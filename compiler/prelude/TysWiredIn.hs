@@ -1080,7 +1080,7 @@ runtimeRepTy = mkTyConTy runtimeRepTyCon
 
 liftedTypeKindTyCon, starKindTyCon, unicodeStarKindTyCon :: TyCon
 
--- Type syononyms; see Note [TYPE and RuntimeRep] in TysPrim
+-- Type synonyms; see Note [TYPE and RuntimeRep] in TysPrim
 -- type Type = tYPE 'LiftedRep
 -- type *    = tYPE 'LiftedRep
 -- type *    = tYPE 'LiftedRep  -- Unicode variant

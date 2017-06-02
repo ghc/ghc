@@ -721,7 +721,7 @@ checkWildCard _ Nothing
   = return ()
 
 checkAnonWildCard :: RnTyKiEnv -> HsWildCardInfo RdrName -> RnM ()
--- Report an error if an anonymoous wildcard is illegal here
+-- Report an error if an anonymous wildcard is illegal here
 checkAnonWildCard env wc
   = checkWildCard env mb_bad
   where

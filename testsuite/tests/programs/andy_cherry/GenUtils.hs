@@ -189,8 +189,8 @@ mapAccumL f s (b:bs) = (c:cs,s'')
 
 
 
--- Now some utilties involving arrays.
--- Here is a version of @elem@ that uses partual application
+-- Now some utilities involving arrays.
+-- Here is a version of @elem@ that uses partial application
 -- to optimise lookup.
 
 arrElem :: (Ix a) => [a] -> a -> Bool
