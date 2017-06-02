@@ -1039,7 +1039,7 @@ install_packages: rts/dist/package.conf.install
 
 # Finally, update package.cache to ensure it's newer than the registration
 # files. This avoids #13375.
-	$(INSTALLED_GHC_PKG_REAL) --global-package-db "$(INSTALLED_PACKAGE_CONF)" recache
+	"$(INSTALLED_GHC_PKG_REAL)" --global-package-db "$(INSTALLED_PACKAGE_CONF)" recache
 
 # -----------------------------------------------------------------------------
 # Binary distributions
