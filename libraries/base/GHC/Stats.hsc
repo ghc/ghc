@@ -15,7 +15,7 @@
 module GHC.Stats
     (
     -- * Runtime statistics
-      RTSStats(..), GCDetails(..)
+      RTSStats(..), GCDetails(..), RtsTime
     , getRTSStats
     , getRTSStatsEnabled
 
@@ -104,7 +104,7 @@ data RTSStats = RTSStats {
 
     -- | Details about the most recent GC
   , gc :: GCDetails
-  }
+  } deriving (Read, Show)
 
 --
 -- | Statistics about a single GC.  This is a mirror of the C @struct
@@ -138,9 +138,9 @@ data GCDetails = GCDetails {
   , gcdetails_cpu_ns :: RtsTime
     -- | The time elapsed during GC itself
   , gcdetails_elapsed_ns :: RtsTime
-  }
+  } deriving (Read, Show)
 
-
+-- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64
 
 -- @since 4.9.0.0
