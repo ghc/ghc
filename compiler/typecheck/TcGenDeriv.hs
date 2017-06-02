@@ -381,7 +381,7 @@ gen_Ord_binds loc tycon = do
 
     mkOrdOpRhs :: DynFlags -> OrdOp -> LHsExpr RdrName
     mkOrdOpRhs dflags op       -- RHS for comparing 'a' and 'b' according to op
-      | length nullary_cons <= 2  -- Two nullary or fewer, so use cases
+      | nullary_cons `lengthAtMost` 2 -- Two nullary or fewer, so use cases
       = nlHsCase (nlHsVar a_RDR) $
         map (mkOrdOpAlt dflags op) tycon_data_cons
         -- i.e.  case a of { C1 x y -> case b of C1 x y -> ....compare x,y...
@@ -1027,7 +1027,7 @@ gen_Read_binds get_fixity loc tycon
         labels       = map flLabel $ dataConFieldLabels data_con
         dc_nm        = getName data_con
         is_infix     = dataConIsInfix data_con
-        is_record    = length labels > 0
+        is_record    = labels `lengthExceeds` 0
         as_needed    = take con_arity as_RDRs
         read_args    = zipWithEqual "gen_Read_binds" read_arg as_needed (dataConOrigArgTys data_con)
         (read_a1:read_a2:_) = read_args

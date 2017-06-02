@@ -917,7 +917,7 @@ canTyConApp :: CtEvidence -> EqRel
 -- See Note [Decomposing TyConApps]
 canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
-  , length tys1 == length tys2
+  , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
          then do { traceTcS "canTyConApp"

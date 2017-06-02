@@ -1183,7 +1183,7 @@ cvtTypeKind ty_str ty
   = do { (head_ty, tys') <- split_ty_app ty
        ; case head_ty of
            TupleT n
-             | length tys' == n         -- Saturated
+             | tys' `lengthIs` n         -- Saturated
              -> if n==1 then return (head tys') -- Singleton tuples treated
                                                 -- like nothing (ie just parens)
                         else returnL (HsTupleTy HsBoxedOrConstraintTuple tys')
@@ -1193,7 +1193,7 @@ cvtTypeKind ty_str ty
              -> mk_apps (HsTyVar NotPromoted
                                (noLoc (getRdrName (tupleTyCon Boxed n)))) tys'
            UnboxedTupleT n
-             | length tys' == n         -- Saturated
+             | tys' `lengthIs` n         -- Saturated
              -> returnL (HsTupleTy HsUnboxedTuple tys')
              | otherwise
              -> mk_apps (HsTyVar NotPromoted
@@ -1204,7 +1204,7 @@ cvtTypeKind ty_str ty
                    vcat [ text "Illegal sum arity:" <+> text (show n)
                         , nest 2 $
                             text "Sums must have an arity of at least 2" ]
-             | length tys' == n -- Saturated
+             | tys' `lengthIs` n -- Saturated
              -> returnL (HsSumTy tys')
              | otherwise
              -> mk_apps (HsTyVar NotPromoted (noLoc (getRdrName (sumTyCon n))))

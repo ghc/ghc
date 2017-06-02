@@ -566,7 +566,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
        -- Check that the binder's arity is within the bounds imposed by
        -- the type and the strictness signature. See Note [exprArity invariant]
        -- and Note [Trimming arity]
-       ; checkL (idArity binder <= length (typeArity (idType binder)))
+       ; checkL (typeArity (idType binder) `lengthAtLeast` idArity binder)
            (text "idArity" <+> ppr (idArity binder) <+>
            text "exceeds typeArity" <+>
            ppr (length (typeArity (idType binder))) <> colon <+>
@@ -574,7 +574,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
 
        ; case splitStrictSig (idStrictness binder) of
            (demands, result_info) | isBotRes result_info ->
-             checkL (idArity binder <= length demands)
+             checkL (demands `lengthAtLeast` idArity binder)
                (text "idArity" <+> ppr (idArity binder) <+>
                text "exceeds arity imposed by the strictness signature" <+>
                ppr (idStrictness binder) <> colon <+>
@@ -1288,12 +1288,12 @@ lintType ty@(TyConApp tc tys)
   -- should be represented with the FunTy constructor. See Note [Linting
   -- function types] and Note [Representation of function types].
   | isFunTyCon tc
-  , length tys == 4
+  , tys `lengthIs` 4
   = failWithL (hang (text "Saturated application of (->)") 2 (ppr ty))
 
   | isTypeSynonymTyCon tc || isTypeFamilyTyCon tc
        -- Also type synonyms and type families
-  , length tys < tyConArity tc
+  , tys `lengthLessThan` tyConArity tc
   = failWithL (hang (text "Un-saturated type application") 2 (ppr ty))
 
   | otherwise
@@ -1715,7 +1715,7 @@ lintCoercion the_co@(NthCo n co)
              , isInjectiveTyCon tc_s r
                  -- see Note [NthCo and newtypes] in TyCoRep
              , tys_s `equalLength` tys_t
-             , n < length tys_s
+             , tys_s `lengthExceeds` n
              -> return (ks, kt, ts, tt, tr)
              where
                ts = getNth tys_s n
@@ -1766,7 +1766,7 @@ lintCoercion co@(AxiomInstCo con ind cos)
                         , cab_roles = roles
                         , cab_lhs   = lhs
                         , cab_rhs   = rhs } = coAxiomNthBranch con ind
-       ; unless (length ktvs + length cvs == length cos) $
+       ; unless (cos `equalLength` (ktvs ++ cvs)) $
            bad_ax (text "lengths")
        ; subst <- getTCvSubst
        ; let empty_subst = zapTCvSubst subst

@@ -1087,7 +1087,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
          checkTc (isTypeFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
        -- Arity check
-       ; checkTc (length exp_vars == fam_arity)
+       ; checkTc (exp_vars `lengthIs` fam_arity)
                  (wrongNumberOfParmsErr fam_arity)
 
        -- Typecheck RHS
@@ -2295,7 +2295,7 @@ checkValidTyConTyVars tc
                          2 (vcat (map pp_tv stripped_tvs)) ])) }
   where
     tvs = tyConTyVars tc
-    duplicate_vars = sizeVarSet (mkVarSet tvs) < length tvs
+    duplicate_vars = tvs `lengthExceeds` sizeVarSet (mkVarSet tvs)
 
     pp_tv tv = ppr tv <+> dcolon <+> ppr (tyVarKind tv)
 

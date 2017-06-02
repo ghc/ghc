@@ -676,7 +676,7 @@ mkPiTys tbs ty = foldr mkPiTy ty tbs
 isCoercionType :: Type -> Bool
 isCoercionType (TyConApp tc tys)
   | (tc `hasKey` eqPrimTyConKey) || (tc `hasKey` eqReprPrimTyConKey)
-  , length tys == 4
+  , tys `lengthIs` 4
   = True
 isCoercionType _ = False
 
@@ -1897,7 +1897,7 @@ mkTyCoInScopeSet tys cos
 zipTvSubst :: [TyVar] -> [Type] -> TCvSubst
 zipTvSubst tvs tys
   | debugIsOn
-  , not (all isTyVar tvs) || length tvs /= length tys
+  , not (all isTyVar tvs) || neLength tvs tys
   = pprTrace "zipTvSubst" (ppr tvs $$ ppr tys) emptyTCvSubst
   | otherwise
   = mkTvSubst (mkInScopeSet (tyCoVarsOfTypes tys)) tenv
@@ -1909,7 +1909,7 @@ zipTvSubst tvs tys
 zipCvSubst :: [CoVar] -> [Coercion] -> TCvSubst
 zipCvSubst cvs cos
   | debugIsOn
-  , not (all isCoVar cvs) || length cvs /= length cos
+  , not (all isCoVar cvs) || neLength cvs cos
   = pprTrace "zipCvSubst" (ppr cvs $$ ppr cos) emptyTCvSubst
   | otherwise
   = TCvSubst (mkInScopeSet (tyCoVarsOfCos cos)) emptyTvSubstEnv cenv
@@ -2008,7 +2008,7 @@ ForAllCo tv (sym h) (sym g[tv |-> tv |> sym h])
 substTyWith :: HasCallStack => [TyVar] -> [Type] -> Type -> Type
 -- Works only if the domain of the substitution is a
 -- superset of the type being substituted into
-substTyWith tvs tys = ASSERT( length tvs == length tys )
+substTyWith tvs tys = ASSERT( tvs `equalLength` tys )
                       substTy (zipTvSubst tvs tys)
 
 -- | Type substitution, see 'zipTvSubst'. Disables sanity checks.
@@ -2018,7 +2018,7 @@ substTyWith tvs tys = ASSERT( length tvs == length tys )
 -- substTy and remove this function. Please don't use in new code.
 substTyWithUnchecked :: [TyVar] -> [Type] -> Type -> Type
 substTyWithUnchecked tvs tys
-  = ASSERT( length tvs == length tys )
+  = ASSERT( tvs `equalLength` tys )
     substTyUnchecked (zipTvSubst tvs tys)
 
 -- | Substitute tyvars within a type using a known 'InScopeSet'.
@@ -2027,13 +2027,13 @@ substTyWithUnchecked tvs tys
 -- and of 'ty' minus the domain of the subst.
 substTyWithInScope :: InScopeSet -> [TyVar] -> [Type] -> Type -> Type
 substTyWithInScope in_scope tvs tys ty =
-  ASSERT( length tvs == length tys )
+  ASSERT( tvs `equalLength` tys )
   substTy (mkTvSubst in_scope tenv) ty
   where tenv = zipTyEnv tvs tys
 
 -- | Coercion substitution, see 'zipTvSubst'
 substCoWith :: HasCallStack => [TyVar] -> [Type] -> Coercion -> Coercion
-substCoWith tvs tys = ASSERT( length tvs == length tys )
+substCoWith tvs tys = ASSERT( tvs `equalLength` tys )
                       substCo (zipTvSubst tvs tys)
 
 -- | Coercion substitution, see 'zipTvSubst'. Disables sanity checks.
@@ -2043,7 +2043,7 @@ substCoWith tvs tys = ASSERT( length tvs == length tys )
 -- substCo and remove this function. Please don't use in new code.
 substCoWithUnchecked :: [TyVar] -> [Type] -> Coercion -> Coercion
 substCoWithUnchecked tvs tys
-  = ASSERT( length tvs == length tys )
+  = ASSERT( tvs `equalLength` tys )
     substCoUnchecked (zipTvSubst tvs tys)
 
 
@@ -2054,12 +2054,12 @@ substTyWithCoVars cvs cos = substTy (zipCvSubst cvs cos)
 
 -- | Type substitution, see 'zipTvSubst'
 substTysWith :: [TyVar] -> [Type] -> [Type] -> [Type]
-substTysWith tvs tys = ASSERT( length tvs == length tys )
+substTysWith tvs tys = ASSERT( tvs `equalLength` tys )
                        substTys (zipTvSubst tvs tys)
 
 -- | Type substitution, see 'zipTvSubst'
 substTysWithCoVars :: [CoVar] -> [Coercion] -> [Type] -> [Type]
-substTysWithCoVars cvs cos = ASSERT( length cvs == length cos )
+substTysWithCoVars cvs cos = ASSERT( cvs `equalLength` cos )
                              substTys (zipCvSubst cvs cos)
 
 -- | Substitute within a 'Type' after adding the free variables of the type

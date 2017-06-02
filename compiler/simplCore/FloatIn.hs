@@ -665,7 +665,7 @@ sepBindsByDropPoint dflags is_case drop_pts floaters
   = [] : [[] | _ <- drop_pts]
 
   | otherwise
-  = ASSERT( length drop_pts >= 2 )
+  = ASSERT( drop_pts `lengthAtLeast` 2 )
     go floaters (map (\fvs -> (fvs, [])) (emptyDVarSet : drop_pts))
   where
     n_alts = length drop_pts

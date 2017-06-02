@@ -583,13 +583,13 @@ opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
 -- Eta rules
 opt_trans_rule is co1@(TyConAppCo r tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
-  = ASSERT( length cos1 == length cos2 )
+  = ASSERT( cos1 `equalLength` cos2 )
     fireTransRule "EtaCompL" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
 opt_trans_rule is co1 co2@(TyConAppCo r tc cos2)
   | Just cos1 <- etaTyConAppCo_maybe tc co1
-  = ASSERT( length cos1 == length cos2 )
+  = ASSERT( cos1 `equalLength` cos2 )
     fireTransRule "EtaCompR" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
@@ -934,7 +934,7 @@ etaTyConAppCo_maybe tc co
   , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in TyCoRep
   , let n = length tys1
   = ASSERT( tc == tc1 )
-    ASSERT( n == length tys2 )
+    ASSERT( tys2 `lengthIs` n )
     Just (decomposeCo n co)
     -- NB: n might be <> tyConArity tc
     -- e.g.   data family T a :: * -> *

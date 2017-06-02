@@ -249,7 +249,7 @@ lintAlt scrut_ty (DataAlt con, args, rhs) = do
                 -- This does not work for existential constructors
 
          checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con)
-         checkL (length args == dataConRepArity con) (mkAlgAltMsg3 con args)
+         checkL (args `lengthIs` dataConRepArity con) (mkAlgAltMsg3 con args)
          when (isVanillaDataCon con) $
            mapM_ check (zipEqual "lintAlgAlt:stg" arg_tys args)
          return ()
@@ -398,7 +398,7 @@ checkFunApp fun_ty arg_tys msg
 
       | Just (tc,tc_args) <- splitTyConApp_maybe fun_ty
       , isNewTyCon tc
-      = if length tc_args < tyConArity tc
+      = if tc_args `lengthLessThan` tyConArity tc
         then WARN( True, text "cfa: unsaturated newtype" <+> ppr fun_ty $$ msg )
              (Nothing, Nothing)   -- This is odd, but I've seen it
         else cfa False (newTyConInstRhs tc tc_args) arg_tys

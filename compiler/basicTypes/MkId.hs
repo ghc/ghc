@@ -713,7 +713,7 @@ dataConSrcToImplBang dflags fam_envs arg_ty
       NoSrcUnpack ->
         gopt Opt_UnboxStrictFields dflags
             || (gopt Opt_UnboxSmallStrictFields dflags
-                && length rep_tys <= 1) -- See Note [Unpack one-wide fields]
+                && rep_tys `lengthAtMost` 1) -- See Note [Unpack one-wide fields]
       srcUnpack -> isSrcUnpacked srcUnpack
   = case mb_co of
       Nothing     -> HsUnpack Nothing

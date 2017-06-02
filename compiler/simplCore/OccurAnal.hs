@@ -2572,7 +2572,7 @@ adjustRhsUsage mb_join_arity rec_flag bndrs usage
                  Nothing            -> all isOneShotBndr bndrs
 
     exact_join = case mb_join_arity of
-                   Just join_arity -> join_arity == length bndrs
+                   Just join_arity -> bndrs `lengthIs` join_arity
                    _               -> False
 
 type IdWithOccInfo = Id
@@ -2718,7 +2718,7 @@ decideJoinPointHood NotTopLevel usage bndrs
 
     ok_rule _ BuiltinRule{} = False -- only possible with plugin shenanigans
     ok_rule join_arity (Rule { ru_args = args })
-      = length args == join_arity
+      = args `lengthIs` join_arity
         -- Invariant 1 as applied to LHSes of rules
 
 willBeJoinId_maybe :: CoreBndr -> Maybe JoinArity

@@ -41,6 +41,7 @@ import Var
 import UniqDFM
 import Unique( Unique )
 import FastString(FastString)
+import Util
 
 import qualified Data.Map    as Map
 import qualified Data.IntMap as IntMap
@@ -526,7 +527,7 @@ instance Eq (DeBruijn CoreExpr) where
       && D (extendCME env1 v1) e1 == D (extendCME env2 v2) e2
 
     go (Let (Rec ps1) e1) (Let (Rec ps2) e2)
-      = length ps1 == length ps2
+      = equalLength ps1 ps2
       && D env1' rs1 == D env2' rs2
       && D env1' e1  == D env2' e2
       where

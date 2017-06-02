@@ -1984,7 +1984,7 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
 callToPats env bndr_occs (Call _ args con_env)
-  | length args < length bndr_occs      -- Check saturated
+  | args `ltLength` bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
   = do  { let in_scope      = substInScope (sc_subst env)

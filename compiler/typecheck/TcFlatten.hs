@@ -1132,7 +1132,7 @@ flatten_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
   --   flatten_exact_fam_app_fully lifts out the application to top level
   -- Postcondition: Coercion :: Xi ~ F tys
 flatten_fam_app tc tys  -- Can be over-saturated
-    = ASSERT2( tyConArity tc <= length tys
+    = ASSERT2( tys `lengthAtLeast` tyConArity tc
              , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
                  -- Type functions are saturated
                  -- The type function might be *over* saturated

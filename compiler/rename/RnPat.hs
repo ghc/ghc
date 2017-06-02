@@ -625,7 +625,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
     rn_dotdot (Just {}) Nothing _flds   -- Constructor out of scope
       = return []
     rn_dotdot (Just n) (Just con) flds -- ".." on record construction / pat match
-      = ASSERT( n == length flds )
+      = ASSERT( flds `lengthIs` n )
         do { loc <- getSrcSpanM -- Rather approximate
            ; dd_flag <- xoptM LangExt.RecordWildCards
            ; checkErr dd_flag (needFlagDotDot ctxt)

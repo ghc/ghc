@@ -80,6 +80,7 @@ import RtClosureInspect
 import Outputable
 import FastString
 import Bag
+import Util
 import qualified Lexer (P (..), ParseResult(..), unP, mkPState)
 import qualified Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
@@ -400,7 +401,7 @@ moveHist fn = do
             history = resumeHistory r
             new_ix = fn ix
         --
-        when (new_ix > length history) $ liftIO $
+        when (history `lengthLessThan` new_ix) $ liftIO $
            throwGhcExceptionIO (ProgramError "no more logged breakpoints")
         when (new_ix < 0) $ liftIO $
            throwGhcExceptionIO (ProgramError "already at the beginning of the history")

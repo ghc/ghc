@@ -891,7 +891,7 @@ okParent :: Name -> AlgTyConFlav -> Bool
 okParent _       (VanillaAlgTyCon {})            = True
 okParent _       (UnboxedAlgTyCon {})            = True
 okParent tc_name (ClassTyCon cls _)              = tc_name == tyConName (classTyCon cls)
-okParent _       (DataFamInstTyCon _ fam_tc tys) = tyConArity fam_tc == length tys
+okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthIs` tyConArity fam_tc
 
 isNoParent :: AlgTyConFlav -> Bool
 isNoParent (VanillaAlgTyCon {}) = True
@@ -1734,7 +1734,7 @@ isDataSumTyCon_maybe :: TyCon -> Maybe [DataCon]
 isDataSumTyCon_maybe (AlgTyCon { algTcRhs = rhs })
   = case rhs of
       DataTyCon { data_cons = cons }
-        | length cons > 1
+        | cons `lengthExceeds` 1
         , all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
         -> Just cons
       SumTyCon { data_cons = cons }
@@ -2024,10 +2024,10 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case arity `compare` length tys of
-        LT -> Just (tvs `zip` tys, rhs, drop arity tys)
+  = case tys `listLengthCmp` arity of
+        GT -> Just (tvs `zip` tys, rhs, drop arity tys)
         EQ -> Just (tvs `zip` tys, rhs, [])
-        GT -> Nothing
+        LT -> Nothing
    | otherwise
    = Nothing
 

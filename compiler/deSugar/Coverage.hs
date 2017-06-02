@@ -187,7 +187,7 @@ writeMixEntries dflags mod count entries filename
         modTime <- getModificationUTCTime filename
         let entries' = [ (hpcPos, box)
                        | (span,_,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
-        when (length entries' /= count) $ do
+        when (entries' `lengthIsNot` count) $ do
           panic "the number of .mix entries are inconsistent"
         let hashNo = mixHash filename modTime tabStop entries'
         mixCreate hpc_mod_dir mod_name

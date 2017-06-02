@@ -365,7 +365,7 @@ vectTypeEnv tycons vectTypeDecls vectClassDecls
         defDataCons
           | isAbstract = return ()
           | otherwise
-          = do { MASSERT(length (tyConDataCons origTyCon) == length (tyConDataCons vectTyCon))
+          = do { MASSERT(tyConDataCons origTyCon `equalLength` tyConDataCons vectTyCon)
                ; zipWithM_ defDataCon (tyConDataCons origTyCon) (tyConDataCons vectTyCon)
                }
 

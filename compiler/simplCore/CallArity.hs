@@ -18,6 +18,7 @@ import CoreArity ( typeArity )
 import CoreUtils ( exprIsCheap, exprIsTrivial )
 import UnVarGraph
 import Demand
+import Util
 
 import Control.Arrow ( first, second )
 
@@ -671,11 +672,11 @@ callArityRecEnv any_boring ae_rhss ae_body
 
     cross_calls
         -- See Note [Taking boring variables into account]
-        | any_boring          = completeGraph (domRes ae_combined)
+        | any_boring               = completeGraph (domRes ae_combined)
         -- Also, calculating cross_calls is expensive. Simply be conservative
         -- if the mutually recursive group becomes too large.
-        | length ae_rhss > 25 = completeGraph (domRes ae_combined)
-        | otherwise           = unionUnVarGraphs $ map cross_call ae_rhss
+        | lengthExceeds ae_rhss 25 = completeGraph (domRes ae_combined)
+        | otherwise                = unionUnVarGraphs $ map cross_call ae_rhss
     cross_call (v, ae_rhs) = completeBipartiteGraph called_by_v called_with_v
       where
         is_thunk = idCallArity v == 0

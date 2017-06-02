@@ -348,7 +348,7 @@ mkBindsRep gk tycon =
         (from_alts, to_alts) = mkSum gk_ (1 :: US) datacons
           where gk_ = case gk of
                   Gen0 -> Gen0_
-                  Gen1 -> ASSERT(length tyvars >= 1)
+                  Gen1 -> ASSERT(tyvars `lengthAtLeast` 1)
                           Gen1_ (last tyvars)
                     where tyvars = tyConTyVars tycon
 
@@ -572,7 +572,7 @@ tc_mkRepTy gk_ tycon k =
         prod :: [Type] -> [HsSrcBang] -> [HsImplBang] -> [FieldLabel] -> Type
         prod [] _  _  _  = mkTyConApp u1 [k]
         prod l  sb ib fl = foldBal mkProd
-                                   [ ASSERT(null fl || length fl > j)
+                                   [ ASSERT(null fl || lengthExceeds fl j)
                                      arg t sb' ib' (if null fl
                                                        then Nothing
                                                        else Just (fl !! j))
@@ -617,7 +617,7 @@ tc_mkRepTy gk_ tycon k =
         buildFix n assoc = mkTyConApp pInfix [ mkTyConTy assoc
                                              , mkNumLitTy (fromIntegral n)]
 
-        isRec c = mkTyConTy $ if length (dataConFieldLabels c) > 0
+        isRec c = mkTyConTy $ if dataConFieldLabels c `lengthExceeds` 0
                               then promotedTrueDataCon
                               else promotedFalseDataCon
 

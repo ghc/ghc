@@ -789,7 +789,7 @@ isTFHeaded ty | Just ty' <- coreView ty
               = isTFHeaded ty'
 isTFHeaded ty | (TyConApp tc args) <- ty
               , isTypeFamilyTyCon tc
-              = tyConArity tc == length args
+              = args `lengthIs` tyConArity tc
 isTFHeaded _  = False
 
 

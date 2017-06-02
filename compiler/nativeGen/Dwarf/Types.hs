@@ -32,6 +32,7 @@ import Platform
 import Unique
 import Reg
 import SrcLoc
+import Util
 
 import Dwarf.Constants
 
@@ -577,7 +578,7 @@ pprString' str = text "\t.asciz \"" <> str <> char '"'
 pprString :: String -> SDoc
 pprString str
   = pprString' $ hcat $ map escapeChar $
-    if utf8EncodedLength str == length str
+    if str `lengthIs` utf8EncodedLength str
     then str
     else map (chr . fromIntegral) $ bytesFS $ mkFastString str
 

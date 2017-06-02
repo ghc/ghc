@@ -1030,7 +1030,7 @@ applyTysX :: [TyVar] -> Type -> [Type] -> Type
 -- applyTyxX beta-reduces (/\tvs. body_ty) arg_tys
 -- Assumes that (/\tvs. body_ty) is closed
 applyTysX tvs body_ty arg_tys
-  = ASSERT2( length arg_tys >= n_tvs, pp_stuff )
+  = ASSERT2( arg_tys `lengthAtLeast` n_tvs, pp_stuff )
     ASSERT2( tyCoVarsOfType body_ty `subVarSet` mkVarSet tvs, pp_stuff )
     mkAppTys (substTyWith tvs (take n_tvs arg_tys) body_ty)
              (drop n_tvs arg_tys)
@@ -1094,7 +1094,7 @@ tyConAppArgN :: Int -> Type -> Type
 -- Executing Nth
 tyConAppArgN n ty
   = case tyConAppArgs_maybe ty of
-      Just tys -> ASSERT2( n < length tys, ppr n <+> ppr tys ) tys `getNth` n
+      Just tys -> ASSERT2( tys `lengthExceeds` n, ppr n <+> ppr tys ) tys `getNth` n
       Nothing  -> pprPanic "tyConAppArgN" (ppr n <+> ppr ty)
 
 -- | Attempts to tease a type apart into a type constructor and the application
@@ -1587,9 +1587,9 @@ isPredTy ty = go ty []
     go_tc :: TyCon -> [KindOrType] -> Bool
     go_tc tc args
       | tc `hasKey` eqPrimTyConKey || tc `hasKey` eqReprPrimTyConKey
-                  = length args == 4  -- ~# and ~R# sadly have result kind #
-                                      -- not Constraint; but we still want
-                                      -- isPredTy to reply True.
+                  = args `lengthIs` 4  -- ~# and ~R# sadly have result kind #
+                                       -- not Constraint; but we still want
+                                       -- isPredTy to reply True.
       | otherwise = go_k (tyConKind tc) args
 
     go_k :: Kind -> [KindOrType] -> Bool
@@ -1890,7 +1890,7 @@ mkFamilyTyConApp :: TyCon -> [Type] -> Type
 mkFamilyTyConApp tc tys
   | Just (fam_tc, fam_tys) <- tyConFamInst_maybe tc
   , let tvs = tyConTyVars tc
-        fam_subst = ASSERT2( length tvs == length tys, ppr tc <+> ppr tys )
+        fam_subst = ASSERT2( tvs `equalLength` tys, ppr tc <+> ppr tys )
                     zipTvSubst tvs tys
   = mkTyConApp fam_tc (substTys fam_subst fam_tys)
   | otherwise

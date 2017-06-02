@@ -613,7 +613,7 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
                 -- Typeable is special, because Typeable :: forall k. k -> Constraint
                 -- so the argument kind 'k' is not decomposable by splitKindFunTys
                 -- as is the case for all other derivable type classes
-        ; when (length cls_arg_kinds /= 1) $
+        ; when (cls_arg_kinds `lengthIsNot` 1) $
             failWithTc (nonUnaryErr deriv_pred)
         ; let [cls_arg_kind] = cls_arg_kinds
         ; if className cls == typeableClassName
@@ -1101,7 +1101,7 @@ mkNewTypeEqn dflags overlap_mode tvs
              cls cls_tys tycon tc_args rep_tycon rep_tc_args
              mtheta deriv_strat
 -- Want: instance (...) => cls (cls_tys ++ [tycon tc_args]) where ...
-  = ASSERT( length cls_tys + 1 == classArity cls )
+  = ASSERT( cls_tys `lengthIs` (classArity cls - 1) )
     case deriv_strat of
       Just StockStrategy    -> mk_eqn_stock dflags mtheta cls cls_tys rep_tycon
                                  go_for_it_other bale_out
@@ -1302,7 +1302,7 @@ mkNewTypeEqn dflags overlap_mode tvs
            && isNothing at_without_last_cls_tv
 
         -- Check that eta reduction is OK
-        eta_ok = nt_eta_arity <= length rep_tc_args
+        eta_ok = rep_tc_args `lengthAtLeast` nt_eta_arity
                 -- The newtype can be eta-reduced to match the number
                 --     of type argument actually supplied
                 --        newtype T a b = MkT (S [a] b) deriving( Monad )

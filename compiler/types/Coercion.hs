@@ -797,7 +797,7 @@ mkAxInstCo role ax index tys cos
 -- worker function; just checks to see if it should produce Refl
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkAxiomInstCo ax index args
-  = ASSERT( coAxiomArity ax index == length args )
+  = ASSERT( args `lengthIs` coAxiomArity ax index )
     AxiomInstCo ax index args
 
 -- to be used only with unbranched axioms
@@ -1210,7 +1210,7 @@ promoteCoercion co = case co of
 
     NthCo n co1
       | Just (_, args) <- splitTyConAppCo_maybe co1
-      , n < length args
+      , args `lengthExceeds` n
       -> promoteCoercion (args !! n)
 
       | Just _ <- splitForAllCo_maybe co
@@ -1837,7 +1837,7 @@ coercionKind co = go co
     go (TransCo co1 co2)      = Pair (pFst $ go co1) (pSnd $ go co2)
     go g@(NthCo d co)
       | Just argss <- traverse tyConAppArgs_maybe tys
-      = ASSERT( and $ ((d <) . length) <$> argss )
+      = ASSERT( and $ (`lengthExceeds` d) <$> argss )
         (`getNth` d) <$> argss
 
       | d == 0

@@ -112,13 +112,9 @@ getResult ls = do
       | null us && null rs && null is = old
       | otherwise =
         let PmResult prov' rs' (UncoveredPatterns us') is' = new
-            lr  = length rs
-            lr' = length rs'
-            li  = length is
-            li' = length is'
-        in case compare (length us) (length us')
-                `mappend` (compare li li')
-                `mappend` (compare lr lr')
+        in case compareLength us us'
+                `mappend` (compareLength is is')
+                `mappend` (compareLength rs rs')
                 `mappend` (compare prov prov') of
               GT  -> Just new
               EQ  -> Just new
@@ -709,7 +705,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
     -- Generate a simple constructor pattern and make up fresh variables for
     -- the rest of the fields
   | matched_lbls `subsetOf` orig_lbls
-  = ASSERT(length orig_lbls == length arg_tys)
+  = ASSERT(orig_lbls `equalLength` arg_tys)
       let translateOne (lbl, ty) = case lookup lbl matched_pats of
             Just p  -> translatePat fam_insts p
             Nothing -> mkPmVars [ty]

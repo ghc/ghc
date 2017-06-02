@@ -15,6 +15,7 @@ import CmmUtils
 import CmmSwitch (mapSwitchTargets)
 import Maybes
 import Panic
+import Util
 
 import Control.Monad
 import Prelude hiding (succ, unzip, zip)
@@ -392,7 +393,7 @@ predMap blocks = foldr add_preds mapEmpty blocks
 -- Removing unreachable blocks
 removeUnreachableBlocksProc :: CmmDecl -> CmmDecl
 removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
-   | length used_blocks < mapSize (toBlockMap g)
+   | used_blocks `lengthLessThan` mapSize (toBlockMap g)
    = CmmProc info' lbl live g'
    | otherwise
    = proc

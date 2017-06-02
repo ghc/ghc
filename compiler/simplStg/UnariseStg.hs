@@ -420,7 +420,7 @@ unariseAlts rho (MultiValAlt n) bndr [(DEFAULT, [], e)]
 unariseAlts rho (MultiValAlt n) bndr [(DataAlt _, ys, e)]
   | isUnboxedTupleBndr bndr
   = do (rho', ys1) <- unariseConArgBinders rho ys
-       MASSERT(n == length ys1)
+       MASSERT(ys1 `lengthIs` n)
        let rho'' = extendRho rho' bndr (MultiVal (map StgVarArg ys1))
        e' <- unariseExpr rho'' e
        return [(DataAlt (tupleDataCon Unboxed n), ys1, e')]

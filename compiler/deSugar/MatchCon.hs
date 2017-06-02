@@ -177,7 +177,7 @@ matchOneConLike vars ty (eqn1 : eqns)   -- All eqns for a single constructor
       | RecCon flds <- arg_pats
       , let rpats = rec_flds flds
       , not (null rpats)     -- Treated specially; cf conArgPats
-      = ASSERT2( length fields1 == length arg_vars,
+      = ASSERT2( fields1 `equalLength` arg_vars,
                  ppr con1 $$ ppr fields1 $$ ppr arg_vars )
         map lookup_fld rpats
       | otherwise

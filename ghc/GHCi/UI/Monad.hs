@@ -46,6 +46,7 @@ import GHCi
 import GHCi.RemoteTypes
 import HsSyn (ImportDecl)
 import RdrName (RdrName)
+import Util
 
 import Exception
 import Numeric
@@ -396,8 +397,8 @@ printTimes dflags mallocs secs
   where
     separateThousands n = reverse . sep . reverse . show $ n
       where sep n'
-              | length n' <= 3 = n'
-              | otherwise = take 3 n' ++ "," ++ sep (drop 3 n')
+              | n' `lengthAtMost` 3 = n'
+              | otherwise           = take 3 n' ++ "," ++ sep (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs

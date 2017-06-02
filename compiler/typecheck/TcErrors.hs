@@ -1548,7 +1548,7 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
 
     has_unknown_roles ty
       | Just (tc, tys) <- tcSplitTyConApp_maybe ty
-      = length tys >= tyConArity tc  -- oversaturated tycon
+      = tys `lengthAtLeast` tyConArity tc  -- oversaturated tycon
       | Just (s, _) <- tcSplitAppTy_maybe ty
       = has_unknown_roles s
       | isTyVarTy ty
@@ -2503,7 +2503,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-     = ASSERT( length matches == 1 && not (null unsafe_ispecs) )
+     = ASSERT( matches `lengthIs` 1 && not (null unsafe_ispecs) )
        vcat [ addArising orig (text "Unsafe overlapping instances for"
                        <+> pprType (mkClassPred clas tys))
             , sep [text "The matching instance is:",
@@ -2706,7 +2706,7 @@ pprPotentials dflags sty herald insts
                      <+> text "involving out-of-scope types")
            2 (ppWhen show_potentials (pprInstances not_in_scope))
 
-    flag_hint = ppUnless (show_potentials || length show_these == length insts) $
+    flag_hint = ppUnless (show_potentials || equalLength show_these insts) $
                 text "(use -fprint-potential-instances to see them all)"
 
 {- Note [Displaying potential instances]

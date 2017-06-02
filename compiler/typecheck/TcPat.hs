@@ -468,7 +468,7 @@ tc_pat penv (TuplePat pats boxity _) pat_ty thing_inside
                 | otherwise                 = unmangled_result
 
         ; pat_ty <- readExpType pat_ty
-        ; ASSERT( length con_arg_tys == length pats ) -- Syntactically enforced
+        ; ASSERT( con_arg_tys `equalLength` pats ) -- Syntactically enforced
           return (mkHsWrapPat coi possibly_mangled_result pat_ty, res)
         }
 

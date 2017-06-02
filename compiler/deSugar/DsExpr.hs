@@ -853,9 +853,9 @@ dsExplicitList :: Type -> Maybe (SyntaxExpr Id) -> [LHsExpr Id]
 dsExplicitList elt_ty Nothing xs
   = do { dflags <- getDynFlags
        ; xs' <- mapM dsLExprNoLP xs
-       ; if length xs' > maxBuildLength
+       ; if xs' `lengthExceeds` maxBuildLength
                 -- Don't generate builds if the list is very long.
-         || length xs' == 0
+         || null xs'
                 -- Don't generate builds when the [] constructor will do
          || not (gopt Opt_EnableRewriteRules dflags)  -- Rewrite rules off
                 -- Don't generate a build if there are no rules to eliminate it!
