@@ -275,8 +275,6 @@ RTS_FUN_DECL(stg_PAP_apply);
 
 RTS_FUN_DECL(stg_gc_noregs);
 
-RTS_RET(stg_enter_checkbh);
-
 RTS_RET(stg_ret_v);
 RTS_RET(stg_ret_p);
 RTS_RET(stg_ret_n);

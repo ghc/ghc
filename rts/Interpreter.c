@@ -115,6 +115,16 @@
    cap->r.rRet = (retcode);                     \
    return cap;
 
+// Note [avoiding threadPaused]
+//
+// Switching between the interpreter to compiled code can happen very
+// frequently, so we don't want to call threadPaused(), which is
+// expensive.  BUT we must be careful not to violate the invariant
+// that threadPaused() has been called on all threads before we GC
+// (see Note [upd-black-hole].  So the scheduler must ensure that when
+// we return in this way that we definitely immediately run the thread
+// again and don't GC or do something else.
+//
 #define RETURN_TO_SCHEDULER_NO_PAUSE(todo,retcode)      \
    SAVE_THREAD_STATE();                                 \
    cap->r.rCurrentTSO->what_next = (todo);              \

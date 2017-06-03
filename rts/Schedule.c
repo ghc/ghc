@@ -1215,10 +1215,9 @@ scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
 
     ASSERT(t->_link == END_TSO_QUEUE);
 
-    // Shortcut if we're just switching evaluators: don't bother
-    // doing stack squeezing (which can be expensive), just run the
-    // thread.
-    if (cap->context_switch == 0 && t->what_next != prev_what_next) {
+    // Shortcut if we're just switching evaluators: just run the thread.  See
+    // Note [avoiding threadPaused] in Interpreter.c.
+    if (t->what_next != prev_what_next) {
         debugTrace(DEBUG_sched,
                    "--<< thread %ld (%s) stopped to switch evaluators",
                    (long)t->id, what_next_strs[t->what_next]);

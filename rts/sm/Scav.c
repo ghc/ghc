@@ -39,6 +39,7 @@ static void scavenge_large_bitmap (StgPtr p,
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 # define evacuate(a) evacuate1(a)
+# define evacuate_BLACKHOLE(a) evacuate_BLACKHOLE1(a)
 # define scavenge_loop(a) scavenge_loop1(a)
 # define scavenge_block(a) scavenge_block1(a)
 # define scavenge_mutable_list(bd,g) scavenge_mutable_list1(bd,g)
@@ -1891,6 +1892,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 
     case UPDATE_FRAME:
         // Note [upd-black-hole]
+        //
         // In SMP, we can get update frames that point to indirections
         // when two threads evaluate the same thunk.  We do attempt to
         // discover this situation in threadPaused(), but it's
@@ -1906,35 +1908,57 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
         // Now T is an indirection, and the update frame is already
         // marked on A's stack, so we won't traverse it again in
         // threadPaused().  We could traverse the whole stack again
-        // before GC, but that seems like overkill.
+        // before GC, but that would be too expensive.
         //
         // Scavenging this update frame as normal would be disastrous;
-        // the updatee would end up pointing to the value.  So we
-        // check whether the value after evacuation is a BLACKHOLE,
-        // and if not, we change the update frame to an stg_enter
-        // frame that simply returns the value.  Hence, blackholing is
-        // compulsory (otherwise we would have to check for thunks
-        // too).
+        // the indirection will be shorted out, and the updatee would
+        // end up pointing to the value.  The update code will then
+        // overwrite the value, instead of the BLACKHOLE it is
+        // expecting to write to.
         //
-        // One slight hiccup is that the THUNK_SELECTOR machinery can
-        // overwrite the updatee with an IND.  In parallel GC, this
-        // could even be happening concurrently, so we can't check for
-        // the IND.  Fortunately if we assume that blackholing is
-        // happening (either lazy or eager), then we can be sure that
-        // the updatee is never a THUNK_SELECTOR and we're ok.
-        // NB. this is a new invariant: blackholing is not optional.
+        // One way we could try to fix this is to detect when the
+        // BLACKHOLE has been updated by another thread, and then
+        // replace this update frame with a special frame that just
+        // enters the value.  But this introduces some other
+        // complexities:
+        //
+        // - we must be careful to call checkBlockingQueues() in this
+        //   special frame, because we might otherwise miss wakeups
+        //   for threads that blocked on the original BLACKHOLE,
+        // - we must spot this frame when we're stripping the stack in
+        //   raiseAsync() and raiseExceptionHelper(), and arrange to call
+        //   checkBlockingQueues() there too.
+        //
+        // This is hard to get right, indeed we previously got it
+        // wrong (see #13751).  So we now take a different approach:
+        // always copy the BLACKHOLE, even if it is actually an
+        // indirection.  This way we keep the update frame, we're
+        // guaranteed to still perform the update, and check for
+        // missed wakeups even when stripping the stack in
+        // raiseAsync() and raiseExceptionHelper().  This is also a
+        // little more efficient, because evacuating a known BLACKHOLE
+        // is faster than evacuating an unknown closure.
+        //
+        // NOTE: for the reasons above, blackholing (either lazy or
+        // eager) is NOT optional.  See also Note [avoiding
+        // threadPaused] in Interpreter.c.
+        //
+        // There are a couple of alternative solutions:
+        // - if we see an update frame that points to an indirection,
+        //   arrange to call checkBlockingQueues() on that thread
+        //   after GC.
+        // - spot a BLOCKING_QUEUE that points to a value and
+        //   arrange to wake it up after the GC.
+        //
+        // These are more difficult to implement, requiring an extra
+        // list to be maintained during GC.  They also rely on more
+        // subtle invariants than the solution implemented here.
+        //
+
     {
         StgUpdateFrame *frame = (StgUpdateFrame *)p;
-        StgClosure *v;
 
-        evacuate(&frame->updatee);
-        v = frame->updatee;
-        if (GET_CLOSURE_TAG(v) != 0 ||
-            (get_itbl(v)->type != BLACKHOLE)) {
-            // blackholing is compulsory, see above.
-            frame->header.info = (const StgInfoTable*)&stg_enter_checkbh_info;
-        }
-        ASSERT(v->header.info != &stg_TSO_info);
+        evacuate_BLACKHOLE(&frame->updatee);
         p += sizeofW(StgUpdateFrame);
         continue;
     }
