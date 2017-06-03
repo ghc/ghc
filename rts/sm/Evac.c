@@ -34,6 +34,7 @@ StgWord64 whitehole_spin = 0;
 
 #if defined(THREADED_RTS) && !defined(PARALLEL_GC)
 #define evacuate(p) evacuate1(p)
+#define evacuate_BLACKHOLE(p) evacuate_BLACKHOLE1(p)
 #define HEAP_ALLOCED_GC(p) HEAP_ALLOCED(p)
 #endif
 
@@ -532,7 +533,6 @@ loop:
   ASSERTM(LOOKS_LIKE_CLOSURE_PTR(q), "invalid closure, info=%p", q->header.info);
 
   if (!HEAP_ALLOCED_GC(q)) {
-
       if (!major_gc) return;
 
       info = get_itbl(q);
@@ -870,6 +870,68 @@ loop:
   }
 
   barf("evacuate");
+}
+
+/* -----------------------------------------------------------------------------
+   Evacuate a pointer that is guaranteed to point to a BLACKHOLE.
+
+   This is used for evacuating the updatee of an update frame on the stack.  We
+   want to copy the blackhole even if it has been updated by another thread and
+   is now an indirection, because the original update frame still needs to
+   update it.
+
+   See also Note [upd-black-hole] in sm/Scav.c.
+   -------------------------------------------------------------------------- */
+
+void
+evacuate_BLACKHOLE(StgClosure **p)
+{
+    bdescr *bd;
+    uint32_t gen_no;
+    StgClosure *q;
+    const StgInfoTable *info;
+    q = *p;
+
+    // closure is required to be a heap-allocated BLACKHOLE
+    ASSERT(HEAP_ALLOCED_GC(q));
+    ASSERT(GET_CLOSURE_TAG(q) == 0);
+
+    bd = Bdescr((P_)q);
+
+    // blackholes can't be in a compact, or large
+    ASSERT((bd->flags & (BF_COMPACT | BF_LARGE)) == 0);
+
+    if (bd->flags & BF_EVACUATED) {
+        if (bd->gen_no < gct->evac_gen_no) {
+            gct->failed_to_evac = true;
+            TICK_GC_FAILED_PROMOTION();
+        }
+        return;
+    }
+    if (bd->flags & BF_MARKED) {
+        if (!is_marked((P_)q,bd)) {
+            mark((P_)q,bd);
+            push_mark_stack((P_)q);
+        }
+        return;
+    }
+    gen_no = bd->dest_no;
+    info = q->header.info;
+    if (IS_FORWARDING_PTR(info))
+    {
+        StgClosure *e = (StgClosure*)UN_FORWARDING_PTR(info);
+        *p = e;
+        if (gen_no < gct->evac_gen_no) {  // optimisation
+            if (Bdescr((P_)e)->gen_no < gct->evac_gen_no) {
+                gct->failed_to_evac = true;
+                TICK_GC_FAILED_PROMOTION();
+            }
+        }
+        return;
+    }
+
+    ASSERT(INFO_PTR_TO_STRUCT(info)->type == BLACKHOLE);
+    copy(p,info,q,sizeofW(StgInd),gen_no);
 }
 
 /* -----------------------------------------------------------------------------
