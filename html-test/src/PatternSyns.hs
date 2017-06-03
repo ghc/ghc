@@ -20,3 +20,8 @@ data (a :: *) >< b = Empty
 
 -- | Pattern for 'Empty'
 pattern E = Empty
+
+-- | Earlier ghc versions didn't allow explicit signatures
+-- on pattern synonyms.
+pattern PatWithExplicitSig :: Eq somex => somex -> FooType somex
+pattern PatWithExplicitSig x = FooCtor x

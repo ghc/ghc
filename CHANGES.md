@@ -1,5 +1,7 @@
 ## Changes in version 2.18.0
 
+ * Support user defined signatures on pattern synonyms
+
  * Synopsis is working again (#599)
 
 ## Changes in version 2.17.4

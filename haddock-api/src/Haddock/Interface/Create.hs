@@ -842,6 +842,7 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
     expandSig :: Sig name -> [Sig name]
     expandSig (TypeSig names t)      = [ TypeSig [n] t      | n <- names ]
     expandSig (ClassOpSig b names t) = [ ClassOpSig b [n] t | n <- names ]
+    expandSig (PatSynSig names t)    = [ PatSynSig [n] t    | n <- names ]
     expandSig x                      = [x]
 
     mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))
