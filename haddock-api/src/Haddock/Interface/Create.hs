@@ -50,6 +50,7 @@ import qualified SrcLoc
 import GHC
 import HscTypes
 import Name
+import NameSet
 import Bag
 import RdrName
 import TcRnTypes
@@ -651,9 +652,8 @@ mkExportItems
         sub_names = map fst subs'
         fixities = [ (n, f) | n <- name:sub_names, Just f <- [M.lookup n fixMap] ]
 
-
-    isExported = (`elem` exportedNames)
-
+    exportedNameSet = mkNameSet exportedNames
+    isExported n = elemNameSet n exportedNameSet
 
     findDecl :: Name -> ErrMsgGhc ([LHsDecl Name], (DocForDecl Name, [(Name, DocForDecl Name)]))
     findDecl n
