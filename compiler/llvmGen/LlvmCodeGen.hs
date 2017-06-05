@@ -40,7 +40,7 @@ import System.IO
 --
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply
                -> Stream.Stream IO RawCmmGroup ()
-               -> IO ()
+               -> IO ManglerInfo
 llvmCodeGen dflags h us cmm_stream
   = withTiming (pure dflags) (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
@@ -63,12 +63,13 @@ llvmCodeGen dflags h us cmm_stream
                             $+$ text "We will try though...")
 
        -- run code generation
-       runLlvm dflags ver bufh us $
-         llvmCodeGen' (liftStream cmm_stream)
+       info <- runLlvm dflags ver bufh us $
+                    llvmCodeGen' (liftStream cmm_stream)
 
        bFlush bufh
+       return info
 
-llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
+llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ManglerInfo
 llvmCodeGen' cmm_stream
   = do  -- Preamble
         renderLlvm pprLlvmHeader
@@ -77,15 +78,20 @@ llvmCodeGen' cmm_stream
 
         -- Procedures
         let llvmStream = Stream.mapM llvmGroupLlvmGens cmm_stream
-        _ <- Stream.collect llvmStream
+        infos <- Stream.collect llvmStream
 
         -- Declare aliases for forward references
         renderLlvm . pprLlvmData =<< generateExternDecls
 
         -- Postamble
         cmmUsedLlvmGens
+        
+        -- combine all info
+        let info = foldl mapUnion mapEmpty infos
+        
+        return $ Just info
 
-llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
+llvmGroupLlvmGens :: RawCmmGroup -> LlvmM (LabelMap CmmStatics)
 llvmGroupLlvmGens cmm = do
 
         -- Insert functions into map, collect data
@@ -99,11 +105,19 @@ llvmGroupLlvmGens cmm = do
               funInsert lml =<< llvmFunTy live
               return Nothing
         cdata <- fmap catMaybes $ mapM split cmm
+        
+        -- collect mangler info
+        let joinInfo acc grp = case grp of
+                CmmProc info _ _ _ -> mapUnion acc info
+                CmmData _ _ -> acc    
+            info = foldl joinInfo mapEmpty cmm
 
         {-# SCC "llvm_datas_gen" #-}
           cmmDataLlvmGens cdata
         {-# SCC "llvm_procs_gen" #-}
           mapM_ cmmLlvmGen cmm
+        
+        return info
 
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.

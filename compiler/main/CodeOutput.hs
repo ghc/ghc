@@ -190,7 +190,6 @@ outputLlvm dflags filenm cmm_stream
        {-# SCC "llvm_output" #-} doOutput filenm $
            \f -> {-# SCC "llvm_CodeGen" #-}
                  llvmCodeGen dflags f ncg_uniqs cmm_stream
-       return Nothing -- TODO(kavon): return something
 
 {-
 ************************************************************************

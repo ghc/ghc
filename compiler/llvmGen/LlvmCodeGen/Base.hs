@@ -252,10 +252,10 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM () -> IO ()
+runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM a -> IO a
 runLlvm dflags ver out us m = do
-    _ <- runLlvmM m env
-    return ()
+    (a, _) <- runLlvmM m env
+    return a
   where env = LlvmEnv { envFunMap = emptyUFM
                       , envVarMap = emptyUFM
                       , envStackRegs = []
