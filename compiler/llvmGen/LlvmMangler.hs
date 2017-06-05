@@ -35,16 +35,19 @@ llvmFixupAsm dflags gcInfo f1 f2 = {-# SCC "llvm_mangler" #-}
     go :: Handle -> Handle -> IO ()
     go r w = do
       e_l <- try $ B.hGetLine r ::IO (Either IOError B.ByteString)
-      let writeline a = B.hPutStrLn w (rewriteLine dflags rewrites a) >> go r w
+      let writeline a = B.hPutStrLn w (rewriteLine dflags (rewrites gcInfo) a) >> go r w
       case e_l of
         Right l -> writeline l
         Left _  -> return ()
 
 -- | These are the rewrites that the mangler will perform
-rewrites :: [Rewrite]
-rewrites = [rewriteSymType, rewriteAVX]
+rewrites :: LabelMap CmmStatics -> [Rewrite]
+rewrites info = [rewriteSymType, rewriteAVX, addInfoTable info]
 
 type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
+
+addInfoTable :: LabelMap CmmStatics -> Rewrite
+addInfoTable info dflags line = Nothing -- TODO(kavon): fill this in
 
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies.
