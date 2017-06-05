@@ -1551,7 +1551,7 @@ runPhase (RealPhaseWithInfo (Just info) LlvmMangle) input_fn dflags
   = do
       let next_phase = if gopt Opt_SplitObjs dflags then Splitter else As False
       output_fn <- phaseOutputFilename next_phase
-      liftIO $ llvmFixupAsm dflags input_fn output_fn
+      liftIO $ llvmFixupAsm dflags info input_fn output_fn
       return (RealPhase next_phase, output_fn)
       
 runPhase (RealPhaseWithInfo Nothing LlvmMangle) _ _ = panic "phase LlvmMangle needs info!"
