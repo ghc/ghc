@@ -200,10 +200,10 @@ test('T8959a',
 
 test('T703', normal, run_command, ['$MAKE -s --no-print-directory T703'])
 test('T2182', normal, run_command, ['$MAKE -s --no-print-directory T2182'])
-test('T8101', expect_broken(10600), compile, ['-Wall -fno-code'])
-test('T8101b', expect_broken(10600), multimod_compile,
+test('T8101', normal, compile, ['-Wall -fno-code'])
+test('T8101b', normal, multimod_compile,
      ['T8101b', '-Wall -fno-code'])
-test('T10600', expect_broken(10600), compile_fail, ['-fno-code'])
+test('T10600', normal, compile_fail, ['-fno-code'])
 
 # Should not panic when compiling cmm file together with -outputdir.
 test('T9050', cmm_src, compile, ['-outputdir=.'])

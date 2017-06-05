@@ -137,6 +137,7 @@ import FamInstEnv
 import Fingerprint      ( Fingerprint )
 import Hooks
 import TcEnv
+import PrelNames
 
 import DynFlags
 import ErrUtils
@@ -657,8 +658,6 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- to get those warnings too. (But we'll always exit at that point
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
-    let dflags = hsc_dflags hsc_env
-
     e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
             mod_summary source_modified mb_old_iface mod_index
     case e of
@@ -686,61 +685,58 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
-            (status, hmi, no_change)
-                <- case ms_hsc_src mod_summary of
-                        HsSrcFile | hscTarget dflags /= HscNothing ->
-                            finish              hsc_env mod_summary tc_result mb_old_hash
-                        _ ->
-                            finishTypecheckOnly hsc_env mod_summary tc_result mb_old_hash
-            liftIO $ hscMaybeWriteIface dflags (hm_iface hmi) no_change mod_summary
-            return (status, hmi)
-
--- Generates and writes out the final interface for a typecheck.
-finishTypecheckOnly :: HscEnv
-              -> ModSummary
-              -> TcGblEnv
-              -> Maybe Fingerprint
-              -> Hsc (HscStatus, HomeModInfo, Bool)
-finishTypecheckOnly hsc_env summary tc_result mb_old_hash = do
-    let dflags = hsc_dflags hsc_env
-    (iface, changed, details) <- liftIO $ hscSimpleIface hsc_env tc_result mb_old_hash
-    let hsc_status =
-          case (hscTarget dflags, ms_hsc_src summary) of
-            (HscNothing, _) -> HscNotGeneratingCode
-            (_, HsBootFile) -> HscUpdateBoot
-            (_, HsigFile) -> HscUpdateSig
-            _ -> panic "finishTypecheckOnly"
-    return (hsc_status,
-            HomeModInfo{ hm_details  = details,
-                         hm_iface    = iface,
-                         hm_linkable = Nothing },
-            changed)
+        Right (FrontendTypecheck tc_result, mb_old_hash) ->
+            finish hsc_env mod_summary tc_result mb_old_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify),
 -- and then generates and writes out the final interface. We want
 -- to write the interface AFTER simplification so we can get
 -- as up-to-date and good unfoldings and other info as possible
--- in the interface file.  This is only ever run for HsSrcFile,
--- and NOT for HscNothing.
+-- in the interface file.
 finish :: HscEnv
        -> ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc (HscStatus, HomeModInfo, Bool)
+       -> Hsc (HscStatus, HomeModInfo)
 finish hsc_env summary tc_result mb_old_hash = do
-    let dflags = hsc_dflags hsc_env
-    MASSERT( ms_hsc_src summary == HsSrcFile )
-    MASSERT( hscTarget dflags /= HscNothing )
-    guts0 <- hscDesugar' (ms_location summary) tc_result
-    guts <- hscSimplify' guts0
-    (iface, changed, details, cgguts) <- liftIO $ hscNormalIface hsc_env guts mb_old_hash
-
-    return (HscRecomp cgguts summary,
-            HomeModInfo{ hm_details  = details,
-                         hm_iface    = iface,
-                         hm_linkable = Nothing },
-            changed)
+  let dflags = hsc_dflags hsc_env
+      target = hscTarget dflags
+      hsc_src = ms_hsc_src summary
+      should_desugar =
+        ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
+      mk_simple_iface = do
+        let hsc_status =
+              case (target, hsc_src) of
+                (HscNothing, _) -> HscNotGeneratingCode
+                (_, HsBootFile) -> HscUpdateBoot
+                (_, HsigFile) -> HscUpdateSig
+                _ -> panic "finish"
+        (iface, changed, details) <- liftIO $
+          hscSimpleIface hsc_env tc_result mb_old_hash
+        return (iface, changed, details, hsc_status)
+  (iface, changed, details, hsc_status) <-
+    -- we usually desugar even when we are not generating code, otherwise
+    -- we would miss errors thrown by the desugaring (see #10600). The only
+    -- exceptions are when the Module is Ghc.Prim or when
+    -- it is not a HsSrcFile Module.
+    if should_desugar
+      then do
+        desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
+        if target == HscNothing
+          -- We are not generating code, so we can skip simplification
+          -- and generate a simple interface.
+          then mk_simple_iface
+          else do
+            desugared_guts <- hscSimplify' desugared_guts0
+            (iface, changed, details, cgguts) <-
+              liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
+            return (iface, changed, details, HscRecomp cgguts summary)
+      else mk_simple_iface
+  liftIO $ hscMaybeWriteIface dflags iface changed summary
+  return
+    ( hsc_status
+    , HomeModInfo
+      {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
 hscMaybeWriteIface dflags iface changed summary =
