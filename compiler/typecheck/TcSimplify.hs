@@ -818,16 +818,19 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        ; gbl_tvs <- tcGetGlobalTyCoVars
        ; let eq_constraints  = filter isEqPred candidates
-             constrained_tvs = tyCoVarsOfTypes no_quant
-             mono_tvs1       = growThetaTyVars eq_constraints $
-                               gbl_tvs `unionVarSet` constrained_tvs
+             mono_tvs1       = growThetaTyVars eq_constraints gbl_tvs
+             constrained_tvs = growThetaTyVars eq_constraints (tyCoVarsOfTypes no_quant)
+                               `minusVarSet` mono_tvs1
+             mono_tvs2       = mono_tvs1 `unionVarSet` constrained_tvs
+             -- A type variable is only "constrained" (so that the MR bites)
+             -- if it is not free in the environment (Trac #13785)
 
        -- Always quantify over partial-sig qtvs, so they are not mono
        -- Need to zonk them because they are meta-tyvar SigTvs
        -- Note [Quantification and partial signatures], wrinkle 3
        ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
                       concatMap (map snd . sig_inst_skols) psigs
-       ; let mono_tvs = mono_tvs1 `delVarSetList` psig_qtvs
+       ; let mono_tvs = mono_tvs2 `delVarSetList` psig_qtvs
 
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
@@ -863,11 +866,12 @@ decideMonoTyVars infer_mode name_taus psigs candidates
       = False
 
     pp_bndrs = pprWithCommas (quotes . ppr . fst) name_taus
-    mr_msg = hang (text "The Monomorphism Restriction applies to the binding"
-                   <> plural name_taus <+> text "for" <+> pp_bndrs)
-                2 (text "Consider giving a type signature for"
-                   <+> if isSingleton name_taus then pp_bndrs
-                                                else text "these binders")
+    mr_msg = hang (sep [ text "The Monomorphism Restriction applies to the binding"
+                         <> plural name_taus
+                       , text "for" <+> pp_bndrs ])
+                2 (hsep [ text "Consider giving"
+                        , text (if isSingleton name_taus then "it" else "them")
+                        , text "a type signature"])
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
