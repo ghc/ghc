@@ -1072,7 +1072,7 @@ runPhase (HscOut src_flavour mod_name result) _ dflags = do
 
                     PipeState{hsc_env=hsc_env'} <- getPipeState
 
-                    (outputFilename, mStub, foreign_files, mangInfo) <- liftIO $ -- TODO(kavon) use mangInfo
+                    (outputFilename, mStub, foreign_files, mangInfo) <- liftIO $
                       hscGenHardCode hsc_env' cgguts mod_summary output_fn
                     stub_o <- liftIO (mapM (compileStub hsc_env') mStub)
                     foreign_os <- liftIO $
