@@ -2,7 +2,7 @@
 
 module Type where
 import TyCon
-import Var ( TyVar )
+import Var ( TyCoVar )
 import {-# SOURCE #-} TyCoRep( Type, Coercion, Kind )
 import Util
 
@@ -21,6 +21,7 @@ partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
 coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
 
-tyCoVarsOfTypesWellScoped :: [Type] -> [TyVar]
-tyCoVarsOfTypeWellScoped :: Type -> [TyVar]
+tyCoVarsOfTypesWellScoped :: [Type] -> [TyCoVar]
+tyCoVarsOfTypeWellScoped :: Type -> [TyCoVar]
+toposortTyVars :: [TyCoVar] -> [TyCoVar]
 splitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])

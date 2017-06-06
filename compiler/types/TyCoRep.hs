@@ -62,9 +62,11 @@ module TyCoRep (
         pprTyVar, pprTyVars,
         pprThetaArrowTy, pprClassPred,
         pprKind, pprParendKind, pprTyLit,
-        TyPrec(..), maybeParen, pprTcAppCo,
+        TyPrec(..), maybeParen,
         pprPrefixApp, pprArrowChain,
         pprDataCons, ppSuggestExplicitKinds,
+
+        pprCo, pprParendCo,
 
         -- * Free variables
         tyCoVarsOfType, tyCoVarsOfTypeDSet, tyCoVarsOfTypes, tyCoVarsOfTypesDSet,
@@ -139,13 +141,14 @@ import {-# SOURCE #-} DataCon( dataConFullSig
 import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
+                          , toposortTyVars
                           , coreView, typeKind )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
 import {-# SOURCE #-} ConLike ( ConLike(..), conLikeName )
 import {-# SOURCE #-} ToIface( toIfaceTypeX, toIfaceTyLit, toIfaceForAllBndr
-                             , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercion )
+                             , toIfaceTyCon, toIfaceTcArgs, toIfaceCoercionX )
 
 -- friends:
 import IfaceType
@@ -2473,6 +2476,29 @@ tidyToIfaceType ty = toIfaceTypeX (mkVarSet free_tcvs) (tidyType env ty)
     free_tcvs = tyCoVarsOfTypeWellScoped ty
 
 ------------
+pprCo, pprParendCo :: Coercion -> SDoc
+pprCo       co = getPprStyle $ \ sty -> pprIfaceCoercion (tidyToIfaceCoSty co sty)
+pprParendCo co = getPprStyle $ \ sty -> pprParendIfaceCoercion (tidyToIfaceCoSty co sty)
+
+tidyToIfaceCoSty :: Coercion -> PprStyle -> IfaceCoercion
+tidyToIfaceCoSty co sty
+  | userStyle sty = tidyToIfaceCo co
+  | otherwise     = toIfaceCoercionX (tyCoVarsOfCo co) co
+     -- in latter case, don't tidy, as we'll be printing uniques.
+
+tidyToIfaceCo :: Coercion -> IfaceCoercion
+-- It's vital to tidy before converting to an IfaceType
+-- or nested binders will become indistinguishable!
+--
+-- Also for the free type variables, tell toIfaceCoercionX to
+-- leave them as IfaceFreeCoVar.  This is super-important
+-- for debug printing.
+tidyToIfaceCo co = toIfaceCoercionX (mkVarSet free_tcvs) (tidyCo env co)
+  where
+    env       = tidyFreeTyCoVars emptyTidyEnv free_tcvs
+    free_tcvs = toposortTyVars $ tyCoVarsOfCoList co
+
+------------
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = pprTypeApp (classTyCon clas) tys
 
@@ -2595,11 +2621,6 @@ pprTypeApp tc tys
   = pprIfaceTypeApp TopPrec (toIfaceTyCon tc)
                             (toIfaceTcArgs tc tys)
     -- TODO: toIfaceTcArgs seems rather wasteful here
-
-pprTcAppCo :: TyPrec -> (TyPrec -> Coercion -> SDoc)
-           -> TyCon -> [Coercion] -> SDoc
-pprTcAppCo p _pp tc cos
-  = pprIfaceCoTcApp p (toIfaceTyCon tc) (map toIfaceCoercion cos)
 
 ------------------
 

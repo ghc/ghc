@@ -1828,7 +1828,7 @@ predTypeEqRel ty
 --
 -- This is a deterministic sorting operation
 -- (that is, doesn't depend on Uniques).
-toposortTyVars :: [TyVar] -> [TyVar]
+toposortTyVars :: [TyCoVar] -> [TyCoVar]
 toposortTyVars tvs = reverse $
                      [ node_payload node | node <- topologicalSortG $
                                           graphFromEdgedVerticesOrd nodes ]

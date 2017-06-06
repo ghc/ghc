@@ -1070,7 +1070,8 @@ ppr_co ctxt_prec (IfaceAxiomInstCo n i cos)
 ppr_co ctxt_prec (IfaceSymCo co)
   = ppr_special_co ctxt_prec (text "Sym") [co]
 ppr_co ctxt_prec (IfaceTransCo co1 co2)
-  = ppr_special_co ctxt_prec  (text "Trans") [co1,co2]
+  = maybeParen ctxt_prec TyOpPrec $
+    ppr_co TyOpPrec co1 <+> semi <+> ppr_co TyOpPrec co2
 ppr_co ctxt_prec (IfaceNthCo d co)
   = ppr_special_co ctxt_prec (text "Nth:" <> int d) [co]
 ppr_co ctxt_prec (IfaceLRCo lr co)

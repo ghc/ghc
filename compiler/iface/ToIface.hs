@@ -22,7 +22,7 @@ module ToIface
     , tidyToIfaceContext
     , tidyToIfaceTcArgs
       -- * Coercions
-    , toIfaceCoercion
+    , toIfaceCoercion, toIfaceCoercionX
       -- * Pattern synonyms
     , patSynToIfaceDecl
       -- * Expressions
@@ -216,7 +216,7 @@ toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion
 toIfaceCoercionX fr co
   = go co
   where
-    go (Refl r ty)          = IfaceReflCo r (toIfaceType ty)
+    go (Refl r ty)          = IfaceReflCo r (toIfaceTypeX fr ty)
     go (CoVarCo cv)
       -- See [TcTyVars in IfaceType] in IfaceType
       | cv `elemVarSet` fr  = IfaceFreeCoVar cv
