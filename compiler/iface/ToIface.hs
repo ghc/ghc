@@ -217,7 +217,10 @@ toIfaceCoercionX fr co
   = go co
   where
     go (Refl r ty)          = IfaceReflCo r (toIfaceType ty)
-    go (CoVarCo cv)         = IfaceCoVarCo  (toIfaceCoVar cv)
+    go (CoVarCo cv)
+      -- See [TcTyVars in IfaceType] in IfaceType
+      | cv `elemVarSet` fr  = IfaceFreeCoVar cv
+      | otherwise           = IfaceCoVarCo  (toIfaceCoVar cv)
     go (AppCo co1 co2)      = IfaceAppCo  (go co1) (go co2)
     go (SymCo co)           = IfaceSymCo (go co)
     go (TransCo co1 co2)    = IfaceTransCo (go co1) (go co2)
@@ -236,8 +239,7 @@ toIfaceCoercionX fr co
       | tc `hasKey` funTyConKey
       , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
       | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r co1 co2)   = IfaceFunCo r (toIfaceCoercion co1)
-                                          (toIfaceCoercion co2)
+    go (FunCo r co1 co2)   = IfaceFunCo r (go co1) (go co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
                                           (toIfaceCoercionX fr' k)

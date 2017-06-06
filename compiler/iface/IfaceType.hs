@@ -109,7 +109,7 @@ data IfaceOneShot    -- See Note [Preserve OneShotInfo] in CoreTicy
 type IfaceKind     = IfaceType
 
 data IfaceType     -- A kind of universal type, used for types and kinds
-  = IfaceFreeTyVar TyVar                 -- See Note [Free tyvars in IfaceType]
+  = IfaceFreeTyVar TyVar                -- See Note [Free tyvars in IfaceType]
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceType
@@ -204,6 +204,7 @@ Note that:
   to deserialise one.  IfaceFreeTyVar is used only in the "convert to IfaceType
   and then pretty-print" pipeline.
 
+We do the same for covars, naturally.
 
 Note [Equality predicates in IfaceType]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -242,6 +243,7 @@ data IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
+  | IfaceFreeCoVar    CoVar       -- See Note [Free tyvars in IfaceType]
   | IfaceCoVarCo      IfLclName
   | IfaceAxiomInstCo  IfExtName BranchIndex [IfaceCoercion]
   | IfaceUnivCo       IfaceUnivCoProv Role IfaceType IfaceType
@@ -395,6 +397,7 @@ substIfaceType env ty
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
+    go_co (IfaceFreeCoVar cv)        = IfaceFreeCoVar cv
     go_co (IfaceCoVarCo cv)          = IfaceCoVarCo cv
     go_co (IfaceAxiomInstCo a i cos) = IfaceAxiomInstCo a i (go_cos cos)
     go_co (IfaceUnivCo prov r t1 t2) = IfaceUnivCo (go_prov prov) r (go t1) (go t2)
@@ -1039,6 +1042,8 @@ ppr_co ctxt_prec co@(IfaceForAllCo {})
       = let (tvs, co'') = split_co co' in ((name,kind_co):tvs,co'')
     split_co co' = ([], co')
 
+-- Why these two? See Note [TcTyVars in IfaceType]
+ppr_co _         (IfaceFreeCoVar covar)     = ppr covar
 ppr_co _         (IfaceCoVarCo covar)       = ppr covar
 
 ppr_co ctxt_prec (IfaceUnivCo IfaceUnsafeCoerceProv r ty1 ty2)
@@ -1321,6 +1326,8 @@ instance Binary IfaceCoercion where
           put_ bh a
           put_ bh b
           put_ bh c
+  put_ _ (IfaceFreeCoVar cv)
+       = pprPanic "Can't serialise IfaceFreeCoVar" (ppr cv)
   put_ bh (IfaceCoVarCo a) = do
           putByte bh 6
           put_ bh a
