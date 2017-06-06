@@ -65,43 +65,41 @@ withComment com line = B.concat [B.pack $ wrap com, line]
 -- above that label.
 addInfoTable :: LabelMap CmmStatics -> Rewrite
 addInfoTable info _ line = do
-        return $ withComment (show line) line
-        -- labName <- B.stripPrefix labPrefix line
-        -- return $ withComment "stripped an L" labName
-        -- (i, _) <- B.readInt labName
-        -- return $ withComment (show i) line
-        -- statics <- mapLookup (toKey i) info
+        labName <- B.stripPrefix labPrefix line
+        (i, _) <- B.readInt labName
+        statics <- mapLookup (toKey i) info
+        return $ withComment ("found statics for: " ++ show i) line
         -- return $ emitInfo line statics
 
     where
-        labPrefix = B.pack "\nL" -- TODO(kavon): check if this changes on different platforms.
+        labPrefix = B.pack "L" -- TODO(kavon): check if this changes on different platforms.
         toKey = uniqueToLbl . intToUnique
-        eol = "\n"
-        
-        emitInfo label (Statics _ statics) = 
-            -- TODO(kavon): maybe put an alignment directive first?
-            B.concat $ (map staticToByteStr statics) ++ [label]
-            
-        staticToByteStr :: CmmStatic -> B.ByteString
-        staticToByteStr (CmmUninitialised sz) = let
-                width = gcd sz 8
-                zeroes = take (sz `div` width) ['0','0'..]
-                name = szName width
-            in
-                B.pack $ name ++ (intersperse ',' zeroes) ++ eol
-        
-        staticToByteStr (CmmStaticLit (CmmLabelDiffOff _ _ _)) = B.pack "# label diff static\n"
-                
-        staticToByteStr _ = B.pack "# todo: other static\n"
-                
-        -- TODO(kavon): does this change on ARM?
-        -- translate a size (in bytes) to its assembly directive, followed by a space.
-        szName :: Int -> String
-        szName 1 = ".byte "
-        szName 2 = ".value "
-        szName 4 = ".long "
-        szName 8 = ".quad "
-        szName _ = error "szName -- invalid byte width"
+        -- eol = "\n"
+        -- 
+        -- emitInfo label (Statics _ statics) = 
+        --     -- TODO(kavon): maybe put an alignment directive first?
+        --     B.concat $ (map staticToByteStr statics) ++ [label]
+        --     
+        -- staticToByteStr :: CmmStatic -> B.ByteString
+        -- staticToByteStr (CmmUninitialised sz) = let
+        --         width = gcd sz 8
+        --         zeroes = take (sz `div` width) ['0','0'..]
+        --         name = szName width
+        --     in
+        --         B.pack $ name ++ (intersperse ',' zeroes) ++ eol
+        -- 
+        -- staticToByteStr (CmmStaticLit (CmmLabelDiffOff _ _ _)) = B.pack "# label diff static\n"
+        --         
+        -- staticToByteStr _ = B.pack "# todo: other static\n"
+        --         
+        -- -- TODO(kavon): does this change on ARM?
+        -- -- translate a size (in bytes) to its assembly directive, followed by a space.
+        -- szName :: Int -> String
+        -- szName 1 = ".byte "
+        -- szName 2 = ".value "
+        -- szName 4 = ".long "
+        -- szName 8 = ".quad "
+        -- szName _ = error "szName -- invalid byte width"
             
 
 -- | Rewrite a line of assembly source with the given rewrites,
