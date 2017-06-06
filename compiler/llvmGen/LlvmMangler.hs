@@ -21,6 +21,8 @@ import qualified Data.ByteString.Char8 as B
 import System.IO
 import Cmm
 import Compiler.Hoopl
+import Compiler.Hoopl.Internals ( uniqueToLbl )
+import Data.List ( intersperse )
 
 -- | Read in assembly file and process
 llvmFixupAsm :: DynFlags -> LabelMap CmmStatics -> FilePath -> FilePath -> IO ()
@@ -42,12 +44,61 @@ llvmFixupAsm dflags gcInfo f1 f2 = {-# SCC "llvm_mangler" #-}
 
 -- | These are the rewrites that the mangler will perform
 rewrites :: LabelMap CmmStatics -> [Rewrite]
-rewrites info = [rewriteSymType, rewriteAVX, addInfoTable info]
+rewrites info = [addInfoTable info] -- TODO(kavon): reenable [rewriteSymType, rewriteAVX, addInfoTable info]
 
 type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
 
+-- XXX(kavon): debug only delete me later
+withComment :: String -> B.ByteString -> B.ByteString
+withComment com line = B.concat [B.pack $ wrap com, line]
+    where
+        wrap c = "## comment -- " ++ c ++ "\n"
+
+-- | This rewrite looks for return points of a llvm.cpscall and adds GC info
+-- above that label.
 addInfoTable :: LabelMap CmmStatics -> Rewrite
-addInfoTable info dflags line = Nothing -- TODO(kavon): fill this in
+addInfoTable info _ line = do
+        return $ withComment (show line) line
+        -- labName <- B.stripPrefix labPrefix line
+        -- return $ withComment "stripped an L" labName
+        -- (i, _) <- B.readInt labName
+        -- return $ withComment (show i) line
+        -- statics <- mapLookup (toKey i) info
+        -- return $ emitInfo line statics
+
+    where
+        labPrefix = B.pack "\nL" -- TODO(kavon): check if this changes on different platforms.
+        toKey = uniqueToLbl . intToUnique
+        eol = "\n"
+        
+        emitInfo label (Statics _ statics) = 
+            -- TODO(kavon): maybe put an alignment directive first?
+            B.concat $ (map staticToByteStr statics) ++ [label]
+            
+        staticToByteStr :: CmmStatic -> B.ByteString
+        staticToByteStr (CmmUninitialised sz) = let
+                width = gcd sz 8
+                zeroes = take (sz `div` width) ['0','0'..]
+                name = szName width
+            in
+                B.pack $ name ++ (intersperse ',' zeroes) ++ eol
+        
+        staticToByteStr (CmmStaticLit (CmmLabelDiffOff _ _ _)) = B.pack "# label diff static\n"
+                
+        staticToByteStr _ = B.pack "# todo: other static\n"
+                
+        -- TODO(kavon): does this change on ARM?
+        -- translate a size (in bytes) to its assembly directive, followed by a space.
+        szName :: Int -> String
+        szName 1 = ".byte "
+        szName 2 = ".value "
+        szName 4 = ".long "
+        szName 8 = ".quad "
+        szName _ = error "szName -- invalid byte width"
+            
+
+
+    
 
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies.

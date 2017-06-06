@@ -802,6 +802,7 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
           keep_this_output =
                case next_phase of
                        As _    | keep_s     -> True
+                       LlvmMangle | keep_s  -> True
                        LlvmOpt | keep_bc    -> True
                        HCc     | keep_hc    -> True
                        _other               -> False
