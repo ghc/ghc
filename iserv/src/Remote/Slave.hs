@@ -61,7 +61,7 @@ startSlave' verbose base_path port = do
     when verbose $ putStrLn "Opening socket"
     pipe <- acceptSocket sock >>= socketToPipe
     putStrLn $ "Listening on port " ++ show port
-    when verbose $ putStrLn "Staring serv"
+    when verbose $ putStrLn "Starting serv"
     uninterruptibleMask $ serv verbose (hook verbose base_path pipe) pipe
     when verbose $ putStrLn "serv ended"
     return ()
