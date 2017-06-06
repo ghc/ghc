@@ -15,7 +15,7 @@ import DynFlags
 import DriverPhases
 import HscTypes
 import Module
-import Cmm ( ManglerInfo )
+import LlvmMangler ( ManglerInfo )
 
 import Control.Monad
 

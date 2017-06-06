@@ -4,7 +4,7 @@
 --
 
 module LlvmCodeGen.Data (
-        genLlvmData, genData
+        genLlvmData, genData, cvtForMangler
     ) where
 
 #include "HsVersions.h"
@@ -20,6 +20,7 @@ import Platform
 
 import FastString
 import Outputable
+import qualified Data.ByteString.Char8 as B
 
 -- ----------------------------------------------------------------------------
 -- * Constants
@@ -148,3 +149,8 @@ genStaticLit (CmmBlock b) = genStaticLit $ CmmLabel $ infoTblLbl b
 
 genStaticLit (CmmHighStackMark)
     = panic "genStaticLit: CmmHighStackMark unsupported!"
+    
+
+-- | Convert a CmmStatic into a byte string for the mangler
+cvtForMangler :: CmmStatics -> LlvmM B.ByteString
+cvtForMangler _ = error "implement cvtForMangler"

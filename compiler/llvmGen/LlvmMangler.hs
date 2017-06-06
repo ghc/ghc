@@ -9,7 +9,7 @@
 -- instructions require 32-byte alignment.
 --
 
-module LlvmMangler ( llvmFixupAsm ) where
+module LlvmMangler ( llvmFixupAsm, ManglerInfo, ManglerStr ) where
 
 import DynFlags ( DynFlags, targetPlatform )
 import Platform ( platformArch, Arch(..) )
@@ -19,14 +19,15 @@ import Outputable ( text )
 import Control.Exception
 import qualified Data.ByteString.Char8 as B
 import System.IO
-import Cmm
 import Compiler.Hoopl
 import Compiler.Hoopl.Internals ( uniqueToLbl )
-import Data.List ( intersperse )
 import Data.Maybe ( fromMaybe )
 
+type ManglerStr = B.ByteString
+type ManglerInfo = Maybe (LabelMap ManglerStr)
+
 -- | Read in assembly file and process
-llvmFixupAsm :: DynFlags -> LabelMap CmmStatics -> FilePath -> FilePath -> IO ()
+llvmFixupAsm :: DynFlags -> LabelMap ManglerStr -> FilePath -> FilePath -> IO ()
 llvmFixupAsm dflags gcInfo f1 f2 = {-# SCC "llvm_mangler" #-}
     withTiming (pure dflags) (text "LLVM Mangler") id $
     withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
@@ -50,7 +51,7 @@ rewrites :: [Rewrite]
 rewrites = [rewriteSymType, rewriteAVX]
 
 -- | These are the label-based rewrites that the mangler will perform
-labRewrites :: LabelMap CmmStatics -> [Rewrite]
+labRewrites :: LabelMap ManglerStr -> [Rewrite]
 labRewrites info = [addInfoTable info]
 
 type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
@@ -63,7 +64,7 @@ withComment com line = B.concat [B.pack $ wrap com, line]
 
 -- | This rewrite looks for return points of a llvm.cpscall and adds GC info
 -- above that label.
-addInfoTable :: LabelMap CmmStatics -> Rewrite
+addInfoTable :: LabelMap ManglerStr -> Rewrite
 addInfoTable info _ line = do
         labName <- B.stripPrefix labPrefix line
         (i, _) <- B.readInt labName

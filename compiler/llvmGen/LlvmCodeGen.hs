@@ -31,7 +31,7 @@ import UniqSupply
 import SysTools ( figureLlvmVersion )
 import qualified Stream
 
-import Control.Monad ( when )
+import Control.Monad ( when, foldM )
 import Data.Maybe ( fromMaybe, catMaybes )
 import System.IO
 
@@ -91,7 +91,7 @@ llvmCodeGen' cmm_stream
         
         return $ Just info
 
-llvmGroupLlvmGens :: RawCmmGroup -> LlvmM (LabelMap CmmStatics)
+llvmGroupLlvmGens :: RawCmmGroup -> LlvmM (LabelMap ManglerStr)
 llvmGroupLlvmGens cmm = do
 
         -- Insert functions into map, collect data
@@ -105,19 +105,22 @@ llvmGroupLlvmGens cmm = do
               funInsert lml =<< llvmFunTy live
               return Nothing
         cdata <- fmap catMaybes $ mapM split cmm
-        
-        -- collect mangler info
-        let joinInfo acc grp = case grp of
-                CmmProc info _ _ _ -> mapUnion acc info
-                CmmData _ _ -> acc    
-            info = foldl joinInfo mapEmpty cmm
 
         {-# SCC "llvm_datas_gen" #-}
           cmmDataLlvmGens cdata
         {-# SCC "llvm_procs_gen" #-}
           mapM_ cmmLlvmGen cmm
-        
-        return info
+          
+        -- collect mangler info
+        let 
+            joinInfo :: LabelMap ManglerStr -> RawCmmDecl -> LlvmM (LabelMap ManglerStr)
+            joinInfo acc grp = case grp of
+                CmmProc info _ _ _ -> do
+                    newInfo <- mapMap cvtForMangler info 
+                    return $ mapUnion acc newInfo
+                CmmData _ _ -> return acc
+          
+        foldM joinInfo mapEmpty cmm
 
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.
