@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Dependencies (
-    fileDependencies, contextDependencies, needContext, dependenciesOracles
+    fileDependencies, contextDependencies, needContext, dependenciesOracles,
+    pkgDependencies
     ) where
 
 import qualified Data.HashMap.Strict as Map
@@ -46,6 +47,12 @@ contextDependencies context@Context {..} = do
     deps <- unpack <$> askOracle (PkgDepsKey $ pkgNameString package)
     pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
     return . map pkgContext $ intersectOrd (compare . pkgNameString) pkgs deps
+
+-- | Given a `Package`, this `Action` looks up its package dependencies
+-- 'Settings.Paths.packageDependencies' using 'packageDependenciesOracle'
+-- The context will be the vanilla context with stage equal to 1
+pkgDependencies :: Package -> Action [Package]
+pkgDependencies = fmap (map Context.package) . contextDependencies . vanillaContext Stage1
 
 -- | Coarse-grain 'need': make sure given contexts are fully built.
 needContext :: [Context] -> Action ()
