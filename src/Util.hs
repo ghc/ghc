@@ -3,7 +3,8 @@ module Util (
     removeFile, copyDirectory, copyDirectoryContents, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
     makeExecutable, renderProgram, renderLibrary, Match(..), builderEnvironment,
-    needBuilder, copyFileUntracked
+    needBuilder, copyFileUntracked, installDir, installData, installScript,
+    installProgram, linkSymbolic
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -18,6 +19,7 @@ import GHC
 import Oracles.ArgsHash
 import Oracles.DirectoryContents
 import Oracles.Path
+import Oracles.Config.Setting
 import Settings
 import Settings.Builders.Ar
 import Target
@@ -168,6 +170,46 @@ applyPatch dir patch = do
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
     quietly $ cmd Shell cmdEcho [Cwd dir] [path, "-p0 <", patch]
+
+-- | Install a directory
+installDir :: FilePath -> Action ()
+installDir dir = do
+    i <- setting InstallDir
+    putBuild $ "| Install directory" ++ dir
+    quietly $ cmd i dir
+
+-- | Install data file to a directory
+installData :: [FilePath] -> FilePath -> Action ()
+installData fs dir = do
+    i <- setting InstallData
+    forM_ fs $ \f ->
+        putBuild $ "| Install data " ++ f ++ " to " ++ dir
+    quietly $ cmd i fs dir
+
+-- | Install executable file to a directory
+installProgram :: FilePath -> FilePath -> Action ()
+installProgram f dir = do
+    i <- setting InstallProgram
+    putBuild $ "| Install program " ++ f ++ " to " ++ dir
+    quietly $ cmd i f dir
+
+-- | Install executable script to a directory
+installScript :: FilePath -> FilePath -> Action ()
+installScript f dir = do
+    i <- setting InstallScript
+    putBuild $ "| Install script " ++ f ++ " to " ++ dir
+    quietly $ cmd i f dir
+
+-- | Create a symbolic link from source file to target file when supported
+linkSymbolic :: FilePath -> FilePath -> Action ()
+linkSymbolic source target = do
+    lns <- setting LnS
+    when (lns /= "") $ do
+        need [source] -- Guarantee source is built before printing progress info.
+        let dir = takeDirectory target
+        liftIO $ IO.createDirectoryIfMissing True dir
+        putProgressInfo $ renderAction "Create symbolic link" source target
+        quietly $ cmd lns source target
 
 isInternal :: Builder -> Bool
 isInternal = isJust . builderProvenance

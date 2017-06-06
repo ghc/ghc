@@ -2,7 +2,8 @@ module Oracles.Config.Setting (
     Setting (..), SettingList (..), setting, settingList, getSetting,
     getSettingList, anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
-    ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost
+    ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost,
+    relocatableBuild, installDocDir, installGhcLibDir
     ) where
 
 import Control.Monad.Trans.Reader
@@ -51,6 +52,19 @@ data Setting = BuildArch
              | GmpLibDir
              | IconvIncludeDir
              | IconvLibDir
+             -- Paths to where GHC is installed
+             | InstallPrefix
+             | InstallBinDir
+             | InstallLibDir
+             | InstallDataRootDir
+             -- "install" utility
+             | Install
+             | InstallData
+             | InstallProgram
+             | InstallScript
+             | InstallDir
+             -- symbolic link
+             | LnS
 
 data SettingList = ConfCcArgs Stage
                  | ConfCppArgs Stage
@@ -94,6 +108,16 @@ setting key = unsafeAskConfig $ case key of
     GmpLibDir          -> "gmp-lib-dir"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
+    InstallPrefix      -> "install-prefix"
+    InstallBinDir      -> "install-bindir"
+    InstallLibDir      -> "install-libdir"
+    InstallDataRootDir -> "install-datarootdir"
+    Install            -> "install"
+    InstallDir         -> "install-dir"
+    InstallProgram     -> "install-program"
+    InstallScript      -> "install-script"
+    InstallData        -> "install-data"
+    LnS                -> "ln-s"
 
 settingList :: SettingList -> Action [String]
 settingList key = fmap words $ unsafeAskConfig $ case key of
@@ -173,3 +197,27 @@ cmdLineLengthLimit = do
         (False, True) -> 200000
         -- On all other systems, we try this:
         _             -> 4194304 -- Cabal library needs a bit more than 2MB!
+
+-- | On Windows we normally want to make a relocatable bindist,
+-- to we ignore flags like libdir
+-- ref: mk/config.mk.in:232
+relocatableBuild :: Action Bool
+relocatableBuild = windowsHost
+
+installDocDir :: Action String
+installDocDir = do
+  version <- setting ProjectVersion
+  (-/- ("doc/ghc-" ++ version)) <$> setting InstallDataRootDir
+
+-- | Unix: override libdir and datadir to put ghc-specific stuff in
+-- a subdirectory with the version number included.
+-- ref: mk/install.mk:101
+-- TODO: CroosCompilePrefix
+installGhcLibDir :: Action String
+installGhcLibDir = do
+  r <- relocatableBuild
+  libdir <- setting InstallLibDir
+  if r then return libdir
+       else do
+         v <- setting ProjectVersion
+         return (libdir -/- ("ghc-" ++ v))

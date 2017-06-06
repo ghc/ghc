@@ -22,6 +22,7 @@ system-ghc-pkg = @GhcPkgCmd@
 tar            = @TarCmd@
 patch          = @PatchCmd@
 perl           = @PerlCmd@
+ln-s           = @LN_S@
 
 # Information about builders:
 #============================
@@ -117,3 +118,17 @@ ffi-lib-dir       = @FFILibDir@
 #=======================
 
 with-libdw = @UseLibdw@
+
+# Installation:
+#=======================
+
+install-prefix          = @prefix@
+install-bindir          = @prefix@/bin
+install-libdir          = @prefix@/lib
+install-datarootdir     = @prefix@/share
+
+install         = @INSTALL@
+install-program = @INSTALL@ -m 755
+install-script  = @INSTALL@ -m 755
+install-data    = @INSTALL@ -m 644
+install-dir     = @INSTALL@ -m 755 -d
