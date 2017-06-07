@@ -161,21 +161,40 @@ cvtForMangler (Statics _ datum) =
     where
         cvtStatic :: CmmStatic -> LlvmM (B.ByteString -> B.ByteString)
         cvtStatic (CmmStaticLit lit) = cvtLit lit
+        cvtStatic _ = error "cvtStatic -- unexpected static kind"
         
-        -- XXX these are not expected to appear at return points at the moment.
-        cvtStatic (CmmUninitialised _) = error "cvtStatic -- uninit unhandled"
-        cvtStatic (CmmString _) = error "cvtStatic -- string unhandled"
-        
-        
-        cvtLit _ = return $ test $ B.pack "## todo: some other CmmLit for " 
-        
-        some bstr _ = bstr
-        
-        test bstr lab = B.concat [
-                bstr,
-                lab,
-                B.pack "\n"
+        cvtLit (CmmInt i w) = return $ just $ B.concat [
+                szName w,
+                B.pack $ show i,
+                eol
             ]
+            
+        -- NB: we do not check label2 of this lit because of the
+        -- limitations described in CmmExpr.hs. What that boils down
+        -- to is, for an info table of this form:
+        --  
+        --     Statics a [..., (CmmLabelDiff _ b _), ...]
+        --
+        --  then a == b. We rely on this property when creating
+        --  its corresponding byte string.
+        cvtLit (CmmLabelDiffOff srt _ off) = do
+            var <- getGlobalPtr =<< strCLabel_llvm srt
+            return $ dbg (B.pack "## diffOff -- get name of var ")
+            
+        cvtLit _ = return $ dbg (B.pack "## some other lit for ")
+        
+        
+        just bstr _ = bstr
+        dbg bstr lab = B.concat [bstr, lab, eol]
+            
+        szName :: Width -> B.ByteString
+        szName W8 = B.pack "\t.byte\t"
+        szName W16 = B.pack "\t.value\t"
+        szName W32 = B.pack "\t.long\t"
+        szName W64 = B.pack "\t.quad\t"
+        szName _ = error "szName -- invalid CmmInt width"
+        
+        eol = B.pack "\n"
         
         -- eol = "\n"
         -- 
@@ -197,11 +216,6 @@ cvtForMangler (Statics _ datum) =
         --         
         -- -- TODO(kavon): does this change on ARM?
         -- -- translate a size (in bytes) to its assembly directive, followed by a space.
-        -- szName :: Int -> String
-        -- szName 1 = ".byte "
-        -- szName 2 = ".value "
-        -- szName 4 = ".long "
-        -- szName 8 = ".quad "
-        -- szName _ = error "szName -- invalid byte width"
+        -- 
         
         
