@@ -26,7 +26,7 @@ module LlvmCodeGen.Base (
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, tysToParams, llvmFunSection, llvmStdConv,
+        llvmPtrBits, tysToParams, llvmFunSection, llvmStdConv, llvmStdFunDefAttrs,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -166,9 +166,13 @@ llvmFunArgs dflags live =
     map (lmGlobalRegArg dflags) (llvmStdConv dflags live)
     
 
--- | Llvm standard fun attributes
+-- | Llvm standard function call attributes
 llvmStdFunAttrs :: [LlvmFuncAttr]
 llvmStdFunAttrs = [NoUnwind]
+
+-- | Llvm standard function definition attributes
+llvmStdFunDefAttrs :: [LlvmFuncAttr]
+llvmStdFunDefAttrs = [NoUnwind, Naked]
 
 -- | Convert a list of types to a list of function parameters
 -- (each with no parameter attributes)

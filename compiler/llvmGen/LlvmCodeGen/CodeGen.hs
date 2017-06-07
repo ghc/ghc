@@ -445,7 +445,7 @@ genCall target res args = runStmtsDecls $ do
     fptr    <- getFunPtrW funTy target
 
     let doReturn | ccTy == TailCall  = statement $ Return Nothing
-                 | never_returns     = statement $ Unreachable
+                 | never_returns     = statement $ Unreachable  -- TODO(kavon): this breaks TCO
                  | otherwise         = return ()
 
     doTrashStmts
