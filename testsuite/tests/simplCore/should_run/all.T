@@ -73,3 +73,5 @@ test('T12689a', normal, compile_and_run, [''])
 
 test('T13172', only_ways(['optasm']), compile_and_run, ['-dcore-lint'])
 test('T13227', normal, compile_and_run, [''])
+test('T13429', normal, compile_and_run, [''])
+test('T13429_2', normal, compile_and_run, [''])
