@@ -21,8 +21,6 @@ import FastString
 import Outputable
 import Unique
 
-import DynFlags (targetPlatform)
-
 -- ----------------------------------------------------------------------------
 -- * Top level
 --
@@ -151,75 +149,8 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
            alias = LMGlobal funVar
                             (Just $ LMBitc (LMStaticPointer defVar)
                                            (LMPointer $ LMInt 8))
-       -- our beloved dead_strip preventer.
-       -- the idea here is to inject
-       --
-       -- module asm "_symbol$dsp = _symbol-24" -- assuming prefix
-       --                                          of <{i64, i64, i64}>
-       -- module asm ".no_dead_strip _symbol$dsp"
-       --
-       -- and thereby generating a second symbol
-       -- at the start of the info table, which is dead strip prevented.
-       --
-       -- ideally, llvm should generate these for us, but as
-       -- things stand, this is the least hacky solution to
-       -- prevent dead_stripping of the prefix data, while
-       -- retaining dead stripping in general.
-       --
-       -- The general layout of the above code results in the following:
-       --
-       --   .------------. <- @<name>$def$dsp
-       --   | Info Table |
-       --   |------------| <- @<name>, @<name>$def
-       --   | Fn Body    |
-       --   '------------'
-       --
-       -- Why this @<name> and @<name>$def?  As the textual llvm ir
-       -- generator is only handed typeless labels, it often does not
-       -- know the type of the label (e.g. function to call), until
-       -- the actual call happens.  However, llvm requires symbol
-       -- lookups to be typed.  Therefore we create the actual function
-       -- as @<name>$def, and alias a bitcast to i8* as @<name>.
-       --   Any subsequent lookup can lookup @<name> as i8* and
-       -- bitcast it to the required type once we want to call it.
-       --
-       -- Why .no_dead_strip? Doesn't this prevent the linker from
-       -- -dead_strip'ing anything? Yes, it does. And we'll have to
-       -- live with this wart until a better solution is found that
-       -- ensures that all symbols that are used directly or
-       -- indirectly are marked used.
-       --
-       -- This is all rather annoying. ghc 8.2 uses the infamous
-       -- Mangler to drop the .subsections_via_symbols directive
-       -- from the assembly.  LLVM ingeniously emits said directive
-       -- unconditionally for mach-o files.  To lift the need for
-       -- extra mangler step, we explicitly mark every symbol
-       -- .no_dead_strip.
-       --
-       -- We are making a few assumptions here:
-       -- - the symbols end up being name _<symbol> in the final
-       --   assembly file.
-       --
-       dsp <- case mb_info of
-         Nothing -> pure empty
-         Just (Statics _ statics)
-           | platformHasSubsectionsViaSymbols (targetPlatform dflags) -> do
-               infoStatics <- mapM genData statics
-               -- remember, the prefix_size is in bits!
-               let prefix_size = sum (map (llvmWidthInBits dflags . getStatType)
-                                          infoStatics)
-                   dspName = defName `appendFS` fsLit "$dsp"
-                   defSymbol = text "_" <> ftext defName
-                   dspSymbol = text "_" <> ftext dspName
-                   moduleAsm s = text "module asm" <+> doubleQuotes s
-               return $ text "; insert dead_strip preventer"
-                      $+$ moduleAsm (dspSymbol <+> text "=" <+> defSymbol
-                                     <> text "-" <> int (prefix_size `div` 8))
-                      $+$ moduleAsm (text ".no_dead_strip" <+> dspSymbol)
-                      $+$ text "; end dead_strip preventer"
-           | otherwise -> pure empty
 
-       return (ppLlvmGlobal alias $+$ ppLlvmFunction fun' $+$ dsp, [])
+       return (ppLlvmGlobal alias $+$ ppLlvmFunction fun', [])
 
 
 -- | The section we are putting info tables and their entry code into, should
