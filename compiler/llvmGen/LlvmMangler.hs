@@ -23,7 +23,19 @@ import Compiler.Hoopl
 import Compiler.Hoopl.Internals ( uniqueToLbl )
 import Data.Maybe ( fromMaybe )
 
-type ManglerStr = B.ByteString
+-- note [mangler string func]
+-- A ManglerStr takes the name of the label it will be attached to,
+-- and returns the data that should appear before that label.
+-- We do this because some of the static data is of the form 
+--
+--      .quad  SRT_LAB-CUR_LABEL
+--
+-- and we do not have a name for CUR_LABEL until LLVM generates
+-- the assembly code for the function. The name for SRT_LAB 
+-- is only in the LLVM monad, so we need two stages to generate
+-- that line
+
+type ManglerStr = [B.ByteString -> B.ByteString]
 type ManglerInfo = Maybe (LabelMap ManglerStr)
 
 -- | Read in assembly file and process

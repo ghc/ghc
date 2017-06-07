@@ -152,6 +152,18 @@ genStaticLit (CmmHighStackMark)
     = panic "genStaticLit: CmmHighStackMark unsupported!"
     
 
--- | Convert a CmmStatic into a byte string for the mangler
+-- | Convert a CmmStatic into a byte string for the LLVM mangler.
+-- The mangler will insert the ManglerStr representations of the
+-- CmmStatic at return points of a cpscall.
 cvtForMangler :: CmmStatics -> LlvmM ManglerStr
-cvtForMangler _ = error "implement cvtForMangler"
+cvtForMangler (Statics _ datum) =
+        mapM doStatic datum
+    where
+        doStatic :: CmmStatic -> LlvmM (B.ByteString -> B.ByteString)
+        doStatic (CmmStaticLit lit) = return $ \ _ -> B.pack "## todo"
+        
+        -- XXX these are not expected to appear at return points at the moment.
+        doStatic (CmmUninitialised _) = error "doStatic -- uninit unhandled"
+        doStatic (CmmString _) = error "doStatic -- string unhandled"
+        
+        
