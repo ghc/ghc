@@ -12,7 +12,8 @@ import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Path (topDirectory)
 import Rules.Wrappers (WrappedBinary(..), Wrapper,
-                       ghcWrapper, runGhcWrapper, inplaceGhcPkgWrapper)
+                       ghcWrapper, runGhcWrapper, inplaceGhcPkgWrapper,
+                       hpcWrapper, hp2psWrapper, hsc2hsWrapper)
 import Settings
 import Settings.Path (buildPath, inplaceLibBinPath, rtsContext, objectPath,
                       inplaceLibPath, inplaceBinPath)
@@ -22,10 +23,13 @@ import Util
 
 -- | List of wrappers we build.
 wrappers :: [(Context, Wrapper)]
-wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
-           , (vanillaContext Stage1 ghc   , ghcWrapper   )
+wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper)
+           , (vanillaContext Stage1 ghc   , ghcWrapper)
            , (vanillaContext Stage1 runGhc, runGhcWrapper)
-           , (vanillaContext Stage0 ghcPkg, inplaceGhcPkgWrapper) ]
+           , (vanillaContext Stage0 ghcPkg, inplaceGhcPkgWrapper)
+           , (vanillaContext Stage1 hp2ps , hp2psWrapper)
+           , (vanillaContext Stage1 hpc   , hpcWrapper)
+           , (vanillaContext Stage1 hsc2hs, hsc2hsWrapper) ]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do

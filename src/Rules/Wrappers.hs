@@ -1,13 +1,15 @@
 module Rules.Wrappers (
   WrappedBinary(..), Wrapper, ghcWrapper, runGhcWrapper,
-  inplaceGhcPkgWrapper, installGhcPkgWrapper
+  inplaceGhcPkgWrapper, installGhcPkgWrapper, hp2psWrapper,
+  hpcWrapper, hsc2hsWrapper
   ) where
 
 import Base
-import Expression (Expr, getStage)
+import Expression
 import Settings.Install (installPackageDbDirectory)
 import Settings.Path (inplacePackageDbDirectory)
 import Oracles.Path (getTopDirectory)
+import Oracles.Config.Setting (SettingList(..), settingList)
 
 -- | Wrapper is an expression depending on the 'FilePath' to the
 -- | library path and name of the wrapped binary.
@@ -61,3 +63,33 @@ installGhcPkgWrapper WrappedBinary{..} = do
         [ "#!/bin/bash"
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " --global-package-db " ++ packageDb ++ " ${1+\"$@\"}" ]
+
+hp2psWrapper :: WrappedBinary -> Expr String
+hp2psWrapper WrappedBinary{..} = do
+    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    return $ unlines
+        [ "#!/bin/bash"
+        , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
+
+hpcWrapper :: WrappedBinary -> Expr String
+hpcWrapper WrappedBinary{..} = do
+    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    return $ unlines
+        [ "#!/bin/bash"
+        , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
+
+hsc2hsWrapper :: WrappedBinary -> Expr String
+hsc2hsWrapper WrappedBinary{..} = do
+    top <- getTopDirectory
+    lift $ need [ sourcePath -/- "Rules/Wrappers.hs" ]
+    contents <- lift $ readFile' $ top -/- "utils/hsc2hs/hsc2hs.wrapper"
+    let executableName = binaryLibPath -/- "bin" -/- binaryName
+    confCcArgs <- lift $ settingList (ConfCcArgs Stage1)
+    confGccLinkerArgs <- lift $ settingList (ConfGccLinkerArgs Stage1)
+    let hsc2hsExtra = unwords (map ("-cflags=" ++) confCcArgs) ++ " " ++
+                      unwords (map ("-lflags=" ++) confGccLinkerArgs)
+    return $ unlines
+        [ "#!/bin/bash"
+        , "executablename=\"" ++ executableName ++ "\""
+        , "HSC2HS_EXTRA=\"" ++ hsc2hsExtra ++ "\""
+        , contents ]
