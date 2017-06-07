@@ -178,13 +178,31 @@ cvtForMangler (Statics _ datum) =
         --  then a == b. We rely on this property when creating
         --  its corresponding byte string.
         cvtLit (CmmLabelDiffOff srt _ off) = do
-            var <- getGlobalPtr =<< strCLabel_llvm srt
-            return $ dbg (B.pack "## diffOff -- get name of var ")
+            srtVar <- getGlobalPtr =<< strCLabel_llvm srt
+            let srtLab = asmNameOf srtVar
+            return $ mkDiffOff srtLab off
             
         cvtLit _ = return $ dbg (B.pack "## some other lit for ")
         
+        mkDiffOff srt off mine = B.concat [
+                szName W64,
+                srt,
+                B.pack "-",
+                mine,
+                B.pack ("+" ++ show off),
+                eol
+            ]
         
-        just bstr _ = bstr
+        -- TODO(kavon): consult dflags to put the right number of underscores on the name
+        asmNameOf (LMGlobalVar fs _ _ _ _ _) = let
+                llName = "_" ++ unpackFS fs
+            in
+                B.pack llName
+        
+        
+        
+        
+        -- XXX delete me later
         dbg bstr lab = B.concat [bstr, lab, eol]
             
         szName :: Width -> B.ByteString
@@ -195,6 +213,7 @@ cvtForMangler (Statics _ datum) =
         szName _ = error "szName -- invalid CmmInt width"
         
         eol = B.pack "\n"
+        just bstr _ = bstr
         
         -- eol = "\n"
         -- 
