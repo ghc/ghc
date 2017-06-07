@@ -156,8 +156,10 @@ genStaticLit (CmmHighStackMark)
 -- The mangler will insert the ManglerStr representations of the
 -- CmmStatic at return points of a cpscall.
 cvtForMangler :: CmmStatics -> LlvmM ManglerStr
-cvtForMangler (Statics _ datum) =
-        mapM cvtStatic datum
+cvtForMangler (Statics _ datum) = do
+        let header = just align
+        body <- mapM cvtStatic datum
+        return $ header : body
     where
         cvtStatic :: CmmStatic -> LlvmM (B.ByteString -> B.ByteString)
         cvtStatic (CmmStaticLit lit) = cvtLit lit
@@ -213,6 +215,7 @@ cvtForMangler (Statics _ datum) =
         szName _ = error "szName -- invalid CmmInt width"
         
         eol = B.pack "\n"
+        align = B.pack "\t.p2align\t4, 0x90\n"
         just bstr _ = bstr
         
         -- eol = "\n"
