@@ -16,9 +16,8 @@ import CoreSyn
 import Outputable
 import Coercion
 import Var
-import Type (Type, typeSize, seqType)
-import Id (idType, isJoinId)
-import CoreSeq (megaSeqIdInfo)
+import Type (Type, typeSize)
+import Id (isJoinId)
 
 import Data.List (foldl')
 
@@ -105,29 +104,24 @@ coreBindsSize bs = sum (map bindSize bs)
 
 exprSize :: CoreExpr -> Int
 -- ^ A measure of the size of the expressions, strictly greater than 0
--- It also forces the expression pretty drastically as a side effect
 -- Counts *leaves*, not internal nodes. Types and coercions are not counted.
-exprSize (Var v)         = v `seq` 1
-exprSize (Lit lit)       = lit `seq` 1
+exprSize (Var _)         = 1
+exprSize (Lit _)         = 1
 exprSize (App f a)       = exprSize f + exprSize a
 exprSize (Lam b e)       = bndrSize b + exprSize e
 exprSize (Let b e)       = bindSize b + exprSize e
-exprSize (Case e b t as) = seqType t `seq`
-                           exprSize e + bndrSize b + 1 + sum (map altSize as)
-exprSize (Cast e co)     = (seqCo co `seq` 1) + exprSize e
+exprSize (Case e b _ as) = exprSize e + bndrSize b + 1 + sum (map altSize as)
+exprSize (Cast e _)      = 1 + exprSize e
 exprSize (Tick n e)      = tickSize n + exprSize e
-exprSize (Type t)        = seqType t `seq` 1
-exprSize (Coercion co)   = seqCo co `seq` 1
+exprSize (Type _)        = 1
+exprSize (Coercion _)    = 1
 
 tickSize :: Tickish Id -> Int
-tickSize (ProfNote cc _ _) = cc `seq` 1
-tickSize _ = 1 -- the rest are strict
+tickSize (ProfNote _ _ _) = 1
+tickSize _ = 1
 
 bndrSize :: Var -> Int
-bndrSize b | isTyVar b = seqType (tyVarKind b) `seq` 1
-           | otherwise = seqType (idType b)             `seq`
-                         megaSeqIdInfo (idInfo b)       `seq`
-                         1
+bndrSize _ = 1
 
 bndrsSize :: [Var] -> Int
 bndrsSize = sum . map bndrSize
@@ -140,4 +134,4 @@ pairSize :: (Var, CoreExpr) -> Int
 pairSize (b,e) = bndrSize b + exprSize e
 
 altSize :: CoreAlt -> Int
-altSize (c,bs,e) = c `seq` bndrsSize bs + exprSize e
+altSize (_,bs,e) = bndrsSize bs + exprSize e
