@@ -78,43 +78,17 @@ withComment com line = B.concat [B.pack $ wrap com, line]
 -- above that label.
 addInfoTable :: LabelMap ManglerStr -> Rewrite
 addInfoTable info _ line = do
-        labName <- B.stripPrefix labPrefix line
-        (i, _) <- B.readInt labName
+        retPt <- B.stripPrefix labPrefix line
+        (i, _) <- B.readInt retPt
         statics <- mapLookup (toKey i) info
-        return $ withComment ("found statics for: " ++ show i) line
-        -- return $ emitInfo line statics
-
+        fullName <- B.stripSuffix colon line
+        return $ B.concat $ (map (\f -> f fullName) statics) ++ [line]
     where
-        labPrefix = B.pack "L" -- TODO(kavon): check if this changes on different platforms.
+        -- TODO(kavon): check if prefix changes on different platforms.
+        labPrefix = B.pack "L" 
+        colon = B.pack ":"
         toKey = uniqueToLbl . intToUnique
-        -- eol = "\n"
-        -- 
-        -- emitInfo label (Statics _ statics) = 
-        --     -- TODO(kavon): maybe put an alignment directive first?
-        --     B.concat $ (map staticToByteStr statics) ++ [label]
-        --     
-        -- staticToByteStr :: CmmStatic -> B.ByteString
-        -- staticToByteStr (CmmUninitialised sz) = let
-        --         width = gcd sz 8
-        --         zeroes = take (sz `div` width) ['0','0'..]
-        --         name = szName width
-        --     in
-        --         B.pack $ name ++ (intersperse ',' zeroes) ++ eol
-        -- 
-        -- staticToByteStr (CmmStaticLit (CmmLabelDiffOff _ _ _)) = B.pack "# label diff static\n"
-        --         
-        -- staticToByteStr _ = B.pack "# todo: other static\n"
-        --         
-        -- -- TODO(kavon): does this change on ARM?
-        -- -- translate a size (in bytes) to its assembly directive, followed by a space.
-        -- szName :: Int -> String
-        -- szName 1 = ".byte "
-        -- szName 2 = ".value "
-        -- szName 4 = ".long "
-        -- szName 8 = ".quad "
-        -- szName _ = error "szName -- invalid byte width"
-            
-
+        
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies for each kind of rewrite (label and non-label).
 rewriteLine :: DynFlags -> [Rewrite] -> [Rewrite] -> B.ByteString -> B.ByteString

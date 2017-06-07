@@ -157,13 +157,51 @@ genStaticLit (CmmHighStackMark)
 -- CmmStatic at return points of a cpscall.
 cvtForMangler :: CmmStatics -> LlvmM ManglerStr
 cvtForMangler (Statics _ datum) =
-        mapM doStatic datum
+        mapM cvtStatic datum
     where
-        doStatic :: CmmStatic -> LlvmM (B.ByteString -> B.ByteString)
-        doStatic (CmmStaticLit lit) = return $ \ _ -> B.pack "## todo"
+        cvtStatic :: CmmStatic -> LlvmM (B.ByteString -> B.ByteString)
+        cvtStatic (CmmStaticLit lit) = cvtLit lit
         
         -- XXX these are not expected to appear at return points at the moment.
-        doStatic (CmmUninitialised _) = error "doStatic -- uninit unhandled"
-        doStatic (CmmString _) = error "doStatic -- string unhandled"
+        cvtStatic (CmmUninitialised _) = error "cvtStatic -- uninit unhandled"
+        cvtStatic (CmmString _) = error "cvtStatic -- string unhandled"
+        
+        
+        cvtLit _ = return $ test $ B.pack "## todo: some other CmmLit for " 
+        
+        some bstr _ = bstr
+        
+        test bstr lab = B.concat [
+                bstr,
+                lab,
+                B.pack "\n"
+            ]
+        
+        -- eol = "\n"
+        -- 
+        -- emitInfo label (Statics _ statics) = 
+        --     -- TODO(kavon): maybe put an alignment directive first?
+        --     B.concat $ (map staticToByteStr statics) ++ [label]
+        --     
+        -- staticToByteStr :: CmmStatic -> B.ByteString
+        -- staticToByteStr (CmmUninitialised sz) = let
+        --         width = gcd sz 8
+        --         zeroes = take (sz `div` width) ['0','0'..]
+        --         name = szName width
+        --     in
+        --         B.pack $ name ++ (intersperse ',' zeroes) ++ eol
+        -- 
+        -- staticToByteStr (CmmStaticLit (CmmLabelDiffOff _ _ _)) = B.pack "# label diff static\n"
+        --         
+        -- staticToByteStr _ = B.pack "# todo: other static\n"
+        --         
+        -- -- TODO(kavon): does this change on ARM?
+        -- -- translate a size (in bytes) to its assembly directive, followed by a space.
+        -- szName :: Int -> String
+        -- szName 1 = ".byte "
+        -- szName 2 = ".value "
+        -- szName 4 = ".long "
+        -- szName 8 = ".quad "
+        -- szName _ = error "szName -- invalid byte width"
         
         
