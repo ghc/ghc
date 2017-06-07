@@ -10,24 +10,22 @@ import Oracles.Config.Setting
 import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Rules.Wrappers.Ghc
-import Rules.Wrappers.GhcPkg
-import Rules.Wrappers.RunGhc
+import Oracles.Path (topDirectory)
+import Rules.Wrappers (WrappedBinary(..), Wrapper,
+                       ghcWrapper, runGhcWrapper, inplaceGhcPkgWrapper)
 import Settings
-import Settings.Path
+import Settings.Path (buildPath, inplaceLibBinPath, rtsContext, objectPath,
+                      inplaceLibPath, inplaceBinPath)
 import Target
 import UserSettings
 import Util
-
--- | Wrapper is an expression depending on the 'FilePath' to the wrapped binary.
-type Wrapper = FilePath -> Expr String
 
 -- | List of wrappers we build.
 wrappers :: [(Context, Wrapper)]
 wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 ghc   , ghcWrapper   )
            , (vanillaContext Stage1 runGhc, runGhcWrapper)
-           , (vanillaContext Stage0 ghcPkg, ghcPkgWrapper) ]
+           , (vanillaContext Stage0 ghcPkg, inplaceGhcPkgWrapper) ]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
@@ -40,12 +38,12 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
 
     -- Rules for programs built in install directories
     when (stage == Stage0 || package == ghc) $ do
-        -- Some binaries in programInplacePath are wrapped
-        programInplacePath -/- programName context <.> exe %> \bin -> do
+        -- Some binaries in inplace/bin are wrapped
+        inplaceBinPath -/- programName context <.> exe %> \bin -> do
             binStage <- installStage
             buildBinaryAndWrapper rs (context { stage = binStage }) bin
-        -- We build only unwrapped binaries in programInplaceLibPath
-        programInplaceLibPath -/- programName context <.> exe %> \bin -> do
+        -- We build only unwrapped binaries in inplace/lib/bin
+        inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
             binStage <- installStage
             buildBinary rs (context { stage = binStage }) bin
 
@@ -57,13 +55,15 @@ buildBinaryAndWrapper rs context bin = do
     else case lookup context wrappers of
         Nothing      -> buildBinary rs context bin -- No wrapper found
         Just wrapper -> do
-            let wrappedBin = programInplaceLibPath -/- takeFileName bin
+            top <- topDirectory
+            let libdir = top -/- inplaceLibPath
+            let wrappedBin = inplaceLibBinPath -/- takeFileName bin
             need [wrappedBin]
-            buildWrapper context wrapper bin wrappedBin
+            buildWrapper context wrapper bin (WrappedBinary libdir (takeFileName bin))
 
-buildWrapper :: Context -> Wrapper -> FilePath -> FilePath -> Action ()
-buildWrapper context@Context {..} wrapper wrapperPath binPath = do
-    contents <- interpretInContext context $ wrapper binPath
+buildWrapper :: Context -> Wrapper -> FilePath -> WrappedBinary -> Action ()
+buildWrapper context@Context {..} wrapper wrapperPath wrapped = do
+    contents <- interpretInContext context $ wrapper wrapped
     writeFileChanged wrapperPath contents
     makeExecutable wrapperPath
     putSuccess $ "| Successfully created wrapper for " ++

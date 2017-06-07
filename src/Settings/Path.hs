@@ -2,10 +2,10 @@ module Settings.Path (
     stageDirectory, buildPath, pkgDataFile, pkgHaddockFile, pkgLibraryFile,
     pkgLibraryFile0, pkgGhciLibraryFile, gmpContext, gmpBuildPath, gmpObjects,
     gmpLibraryH, gmpBuildInfoPath, generatedPath, libffiContext, libffiBuildPath,
-    rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,packageDbDirectory,
+    rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,inplacePackageDbDirectory,
     pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
-    objectPath, programInplacePath, programInplaceLibPath, installPath,
-    autogenPath, pkgInplaceConfig
+    objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
+    installPath, autogenPath, pkgInplaceConfig, ghcSplitPath
     ) where
 
 import Base
@@ -38,12 +38,16 @@ stageDirectory :: Stage -> FilePath
 stageDirectory = stageString
 
 -- | Directory for binaries that are built "in place".
-programInplacePath :: FilePath
-programInplacePath = "inplace/bin"
+inplaceBinPath :: FilePath
+inplaceBinPath = "inplace/bin"
+
+-- | Directory for libraries that are built "in place".
+inplaceLibPath :: FilePath
+inplaceLibPath = "inplace/lib"
 
 -- | Directory for binary wrappers, and auxiliary binaries such as @touchy@.
-programInplaceLibPath :: FilePath
-programInplaceLibPath = "inplace/lib/bin"
+inplaceLibBinPath :: FilePath
+inplaceLibBinPath = "inplace/lib/bin"
 
 -- | Path to the directory containing build artefacts of a given 'Context'.
 buildPath :: Context -> FilePath
@@ -142,19 +146,19 @@ libffiBuildPath = buildPath libffiContext
 
 -- | Path to package database directory of a given 'Stage'. Note: StageN, N > 0,
 -- share the same packageDbDirectory.
-packageDbDirectory :: Stage -> FilePath
-packageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
-packageDbDirectory _      = "inplace/lib/package.conf.d"
+inplacePackageDbDirectory :: Stage -> FilePath
+inplacePackageDbDirectory Stage0 = buildRootPath -/- "stage0/bootstrapping.conf"
+inplacePackageDbDirectory _      = "inplace/lib/package.conf.d"
 
 -- | We use a stamp file to track the existence of a package database.
 packageDbStamp :: Stage -> FilePath
-packageDbStamp stage = packageDbDirectory stage -/- ".stamp"
+packageDbStamp stage = inplacePackageDbDirectory stage -/- ".stamp"
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile context@Context {..} = do
     componentId <- pkgData . ComponentId $ buildPath context
-    return $ packageDbDirectory stage -/- componentId <.> "conf"
+    return $ inplacePackageDbDirectory stage -/- componentId <.> "conf"
 
 -- | Given a 'FilePath' to a source file, return 'True' if it is generated.
 -- The current implementation simply assumes that a file is generated if it
@@ -180,6 +184,11 @@ objectPath context@Context {..} src
 -- installed. Most programs are installed in 'programInplacePath'.
 installPath :: Package -> FilePath
 installPath pkg
-    | pkg == touchy = programInplaceLibPath
-    | pkg == unlit  = programInplaceLibPath
-    | otherwise     = programInplacePath
+    | pkg == touchy = inplaceLibBinPath
+    | pkg == unlit  = inplaceLibBinPath
+    | otherwise     = inplaceBinPath
+
+-- | @ghc-split@ is a Perl script used by GHC with @-split-objs@ flag. It is
+-- generated in "Rules.Generators.GhcSplit".
+ghcSplitPath :: FilePath
+ghcSplitPath = inplaceLibBinPath -/- "ghc-split"

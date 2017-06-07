@@ -1,6 +1,6 @@
 module Rules.Generate (
     isGeneratedCFile, isGeneratedCmmFile, generatePackageCode, generateRules,
-    installTargets, copyRules, includesDependencies, generatedDependencies
+    inplaceLibCopyTargets, copyRules, includesDependencies, generatedDependencies
     ) where
 
 import Base
@@ -24,12 +24,17 @@ import Target
 import UserSettings
 import Util
 
-installTargets :: [FilePath]
-installTargets = [ "inplace/lib/ghc-usage.txt"
-                 , "inplace/lib/ghci-usage.txt"
-                 , "inplace/lib/platformConstants"
-                 , "inplace/lib/settings"
-                 , "inplace/lib/template-hsc.h" ]
+-- | Files that need to be copied over to inplace/lib
+-- ref: ghc/ghc.mk:142
+-- ref: driver/ghc.mk
+-- ref: utils/hsc2hs/ghc.mk:35
+inplaceLibCopyTargets :: [FilePath]
+inplaceLibCopyTargets = map (inplaceLibPath -/-)
+  [ "ghc-usage.txt"
+  , "ghci-usage.txt"
+  , "platformConstants"
+  , "settings"
+  , "template-hsc.h" ]
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
@@ -59,7 +64,7 @@ ghcPrimDependencies = do
     return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
 derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = installTargets ++ fmap (generatedPath -/-)
+derivedConstantsDependencies = inplaceLibCopyTargets ++ fmap (generatedPath -/-)
     [ "DerivedConstants.h"
     , "GHCConstantsHaskellExports.hs"
     , "GHCConstantsHaskellType.hs"
@@ -145,11 +150,11 @@ generatePackageCode context@(Context stage pkg _) =
 
 copyRules :: Rules ()
 copyRules = do
-    "inplace/lib/ghc-usage.txt"      <~ "driver"
-    "inplace/lib/ghci-usage.txt"     <~ "driver"
-    "inplace/lib/platformConstants"  <~ generatedPath
-    "inplace/lib/settings"           <~ "."
-    "inplace/lib/template-hsc.h"     <~ pkgPath hsc2hs
+    (inplaceLibPath -/- "ghc-usage.txt")     <~ "driver"
+    (inplaceLibPath -/- "ghci-usage.txt"  )  <~ "driver"
+    (inplaceLibPath -/- "platformConstants") <~ generatedPath
+    (inplaceLibPath -/- "settings")          <~ "."
+    (inplaceLibPath -/- "template-hsc.h")    <~ pkgPath hsc2hs
     rtsBuildPath -/- "c/sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
     rtsBuildPath -/- "c/sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
   where
@@ -161,9 +166,9 @@ generateRules = do
     (generatedPath -/- "ghcplatform.h") <~ generateGhcPlatformH
     (generatedPath -/-  "ghcversion.h") <~ generateGhcVersionH
 
-    ghcSplit %> \_ -> do
-        generate ghcSplit emptyTarget generateGhcSplit
-        makeExecutable ghcSplit
+    ghcSplitPath %> \_ -> do
+        generate ghcSplitPath emptyTarget generateGhcSplit
+        makeExecutable ghcSplitPath
 
     -- TODO: simplify, get rid of fake rts context
     generatedPath ++ "//*" %> \file -> do

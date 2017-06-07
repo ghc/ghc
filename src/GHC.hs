@@ -4,11 +4,10 @@ module GHC (
     array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes,
     compiler, containers, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci,
-    ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hoopl, hp2ps,
+    ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps,
     hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart,
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
-
     defaultKnownPackages, builderProvenance, programName, nonCabalContext,
     nonHsMainPackage
     ) where
@@ -88,11 +87,6 @@ unlit               = utility  "unlit"
 unix                = library  "unix"
 win32               = library  "Win32"
 xhtml               = library  "xhtml"
-
--- | @ghc-split@ is a Perl script used by GHC with @-split-objs@ flag. It is
--- generated in "Rules.Generators.GhcSplit".
-ghcSplit :: FilePath
-ghcSplit = "inplace/lib/bin/ghc-split"
 
 -- | Some builders are built by this very build system, in which case
 -- 'builderProvenance' returns the corresponding build 'Context' (which includes

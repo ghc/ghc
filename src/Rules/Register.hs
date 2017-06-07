@@ -14,7 +14,7 @@ import Util
 registerPackage :: [(Resource, Int)] -> Context -> Rules ()
 registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
     let confIn = pkgInplaceConfig context
-        dir    = packageDbDirectory stage
+        dir    = inplacePackageDbDirectory stage
 
     matchVersionedFilePath (dir -/- pkgNameString package) "conf" ?> \conf -> do
         need [confIn]

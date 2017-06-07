@@ -11,8 +11,8 @@ cleanRules = do
     "clean" ~> do
         forM_ [Stage0 ..] $ removeDirectory . (buildRootPath -/-) . stageString
         removeDirectory generatedPath
-        removeDirectory programInplacePath
-        removeDirectory "inplace/lib"
+        removeDirectory inplaceBinPath
+        removeDirectory inplaceLibPath
         removeDirectory "sdistprep"
         putBuild $ "| Remove Hadrian files..."
         removeFilesAfter buildRootPath ["//*"]

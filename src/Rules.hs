@@ -27,7 +27,7 @@ allStages = [minBound ..]
 -- | This rule 'need' all top-level build targets.
 topLevelTargets :: Rules ()
 topLevelTargets = do
-    want $ Rules.Generate.installTargets
+    want $ Rules.Generate.inplaceLibCopyTargets
 
     forM_ allStages $ \stage ->
         forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
