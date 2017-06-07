@@ -19,13 +19,14 @@ import Finder           ( mkStubPaths )
 import PprC             ( writeCs )
 import CmmLint          ( cmmLint )
 import Packages
-import Cmm              ( RawCmmGroup, ManglerInfo )
+import Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
 import Config
 import SysTools
 import Stream           (Stream)
 import qualified Stream
+import LlvmMangler ( ManglerInfo )
 
 import ErrUtils
 import Outputable

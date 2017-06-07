@@ -116,10 +116,15 @@ llvmGroupLlvmGens cmm = do
             joinInfo :: LabelMap ManglerStr -> RawCmmDecl -> LlvmM (LabelMap ManglerStr)
             joinInfo acc grp = case grp of
                 CmmProc info _ _ _ -> do
-                    newInfo <- mapMap cvtForMangler info 
+                    let asL = mapToList info
+                    newInfo <- foldM cvt mapEmpty asL
                     return $ mapUnion acc newInfo
                 CmmData _ _ -> return acc
-          
+                
+            cvt acc (key, val) = do
+                str <- cvtForMangler val
+                return $ mapInsert key str acc
+                
         foldM joinInfo mapEmpty cmm
 
 -- -----------------------------------------------------------------------------

@@ -137,6 +137,7 @@ import FamInstEnv
 import Fingerprint      ( Fingerprint )
 import Hooks
 import TcEnv
+import LlvmMangler ( ManglerInfo )
 
 import DynFlags
 import ErrUtils

@@ -11,6 +11,7 @@ module LlvmCodeGen.Data (
 
 import Llvm
 import LlvmCodeGen.Base
+import LlvmMangler ( ManglerStr )
 
 import BlockId
 import CLabel
@@ -152,5 +153,5 @@ genStaticLit (CmmHighStackMark)
     
 
 -- | Convert a CmmStatic into a byte string for the mangler
-cvtForMangler :: CmmStatics -> LlvmM B.ByteString
+cvtForMangler :: CmmStatics -> LlvmM ManglerStr
 cvtForMangler _ = error "implement cvtForMangler"
