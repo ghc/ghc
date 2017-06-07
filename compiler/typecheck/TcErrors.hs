@@ -640,7 +640,7 @@ mkGivenErrorReporter implic ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct'
                              Nothing ty1 ty2
 
-       ; traceTc "mkGivenErrorRporter" (ppr ct)
+       ; traceTc "mkGivenErrorReporter" (ppr ct)
        ; maybeReportError ctxt err }
   where
     (ct : _ )  = cts    -- Never empty
@@ -648,9 +648,9 @@ mkGivenErrorReporter implic ctxt cts
 
 ignoreErrorReporter :: Reporter
 -- Discard Given errors that don't come from
--- a pattern match; maybe we should warn instead?ignoreErrorReporter ctxt cts
+-- a pattern match; maybe we should warn instead?
 ignoreErrorReporter ctxt cts
-  = do { traceTc "mkGivenErrorRporter no" (ppr cts $$ ppr (cec_encl ctxt))
+  = do { traceTc "mkGivenErrorReporter no" (ppr cts $$ ppr (cec_encl ctxt))
        ; return () }
 
 
