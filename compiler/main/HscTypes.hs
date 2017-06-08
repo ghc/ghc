@@ -40,7 +40,6 @@ module HscTypes (
         addToHpt, addListToHpt, lookupHptDirectly, listToHpt,
         hptCompleteSigs,
         hptInstances, hptRules, hptVectInfo, pprHPT,
-        hptObjs,
 
         -- * State relating to known packages
         ExternalPackageState(..), EpsStats(..), addEpsInStats,
@@ -688,8 +687,6 @@ hptSomeThingsBelowUs extract include_hi_boot hsc_env deps
         -- And get its dfuns
     , thing <- things ]
 
-hptObjs :: HomePackageTable -> [FilePath]
-hptObjs hpt = concat (map (maybe [] linkableObjs . hm_linkable) (eltsHpt hpt))
 
 {-
 ************************************************************************

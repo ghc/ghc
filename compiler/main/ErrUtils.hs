@@ -52,6 +52,7 @@ module ErrUtils (
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
+        traceCmd
     ) where
 
 #include "HsVersions.h"
@@ -673,3 +674,23 @@ isWarnMsgFatal :: DynFlags -> WarnMsg -> Bool
 isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
   = wopt_fatal wflag dflags
 isWarnMsgFatal dflags _ = gopt Opt_WarnIsError dflags
+
+traceCmd :: DynFlags -> String -> String -> IO a -> IO a
+-- trace the command (at two levels of verbosity)
+traceCmd dflags phase_name cmd_line action
+ = do   { let verb = verbosity dflags
+        ; showPass dflags phase_name
+        ; debugTraceMsg dflags 3 (text cmd_line)
+        ; case flushErr dflags of
+              FlushErr io -> io
+
+           -- And run it!
+        ; action `catchIO` handle_exn verb
+        }
+  where
+    handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
+                              ; debugTraceMsg dflags 2
+                                (text "Failed:"
+                                 <+> text cmd_line
+                                 <+> text (show exn))
+                              ; throwGhcExceptionIO (ProgramError (show exn))}

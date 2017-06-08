@@ -1110,6 +1110,17 @@ test('MultiLayerModules',
      multimod_compile,
      ['MultiLayerModules', '-v0'])
 
+test('T13701',
+     [ compiler_stats_num_field('bytes allocated',
+          [(platform('x86_64-apple-darwin'), 2217187888, 10),
+           (wordsize(64), 2511285600, 10),
+          ]),
+       pre_cmd('./genT13701'),
+       extra_files(['genT13701']),
+     ],
+     multimod_compile,
+     ['T13701', '-v0'])
+
 test('T13719',
      [ compiler_stats_num_field('bytes allocated',
           [(wordsize(64), 5187889872, 10),

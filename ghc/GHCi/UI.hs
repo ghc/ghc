@@ -42,7 +42,7 @@ import GHCi
 import GHCi.RemoteTypes
 import GHCi.BreakArray
 import DynFlags
-import ErrUtils
+import ErrUtils hiding (traceCmd)
 import GhcMonad ( modifySession )
 import qualified GHC
 import GHC ( LoadHowMuch(..), Target(..),  TargetId(..), InteractiveImport(..),

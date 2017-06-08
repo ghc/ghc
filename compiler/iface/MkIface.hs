@@ -966,9 +966,9 @@ lookupOccEnvL env k = lookupOccEnv env k `orElse` []
                else return fp
 
 oldMD5 dflags bh = do
-  tmp <- newTempName dflags "bin"
+  tmp <- newTempName dflags CurrentModule "bin"
   writeBinMem bh tmp
-  tmp2 <- newTempName dflags "md5"
+  tmp2 <- newTempName dflags CurrentModule "md5"
   let cmd = "md5sum " ++ tmp ++ " >" ++ tmp2
   r <- system cmd
   case r of

@@ -333,8 +333,9 @@ import qualified Parser
 import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
-import Data.Set (Set)
+import FileCleanup
 
+import Data.Set (Set)
 import System.Directory ( doesFileExist )
 import Data.Maybe
 import Data.List        ( find )
