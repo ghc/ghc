@@ -5,7 +5,7 @@
 
 #include "BeginPrivate.h"
 
-#include "ElfTypes.h"
+#include <linker/ElfTypes.h>
 
 void ocInit_ELF          ( ObjectCode* oc );
 void ocDeinit_ELF        ( ObjectCode* oc );

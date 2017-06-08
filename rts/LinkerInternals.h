@@ -111,16 +111,7 @@ typedef struct ForeignExportStablePtr_ {
     struct ForeignExportStablePtr_ *next;
 } ForeignExportStablePtr;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) \
-    || defined(arm_HOST_ARCH)
-/* ios currently uses adjacent got tables, and no symbol extras */
-#if !defined(ios_HOST_OS)
-#define NEED_SYMBOL_EXTRAS 1
-#endif /* ios_HOST_OS */
-#endif
-
-/* iOS Simulator however, needs symbol extras for now (#13678) */
-#if defined(ios_HOST_OS) && defined(x86_64_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
 #endif
 
