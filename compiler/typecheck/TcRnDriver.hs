@@ -35,6 +35,7 @@ module TcRnDriver (
         tcRnMergeSignatures,
         instantiateSignature,
         tcRnInstantiateSignature,
+        loadUnqualIfaces,
         -- More private...
         badReexportedBootThing,
         checkBootDeclM,

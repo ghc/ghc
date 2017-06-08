@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP, NondecreasingIndentation, ScopedTypeVariables #-}
+{-# LANGUAGE TupleSections, NamedFieldPuns #-}
 
 -- -----------------------------------------------------------------------------
 --
@@ -113,6 +114,7 @@ module GHC (
         getInfo,
         showModule,
         moduleIsBootOrNotObjectLinkable,
+        getNameToInstancesIndex,
 
         -- ** Inspecting types and kinds
         exprType, TcRnExprMode(..),
@@ -333,9 +335,18 @@ import qualified Parser
 import Lexer
 import ApiAnnotation
 import qualified GHC.LanguageExtensions as LangExt
+import NameEnv
+import CoreFVs          ( orphNamesOfFamInst )
+import FamInstEnv       ( famInstEnvElts )
+import TcRnDriver
+import Inst
+import FamInst
 import FileCleanup
 
+import Data.Foldable
+import qualified Data.Map.Strict as Map
 import Data.Set (Set)
+import qualified Data.Sequence as Seq
 import System.Directory ( doesFileExist )
 import Data.Maybe
 import Data.List        ( find )
@@ -1227,6 +1238,36 @@ findGlobalAnns deserialize target = withSession $ \hsc_env -> do
 -- | get the GlobalRdrEnv for a session
 getGRE :: GhcMonad m => m GlobalRdrEnv
 getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
+
+-- | Retrieve all type and family instances in the environment, indexed
+-- by 'Name'. Each name's lists will contain every instance in which that name
+-- is mentioned in the instance head.
+getNameToInstancesIndex :: HscEnv
+  -> IO (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+getNameToInstancesIndex hsc_env
+  = runTcInteractive hsc_env $
+    do { loadUnqualIfaces hsc_env (hsc_IC hsc_env)
+       ; InstEnvs {ie_global, ie_local, ie_visible} <- tcGetInstEnvs
+       ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
+       -- We use flip mappend to maintain the order of instances,
+       -- and Data.Sequence.Seq to keep flip mappend fast
+       ; let cls_index = Map.fromListWith (flip mappend)
+                 [ (n, Seq.singleton ispec)
+                 | ispec <- instEnvElts ie_local ++ instEnvElts ie_global
+                 , instIsVisible ie_visible ispec
+                 , n <- nameSetElemsStable $ orphNamesOfClsInst ispec
+                 ]
+       ; let fam_index = Map.fromListWith (flip mappend)
+                 [ (n, Seq.singleton fispec)
+                 | fispec <- famInstEnvElts home_fie ++ famInstEnvElts pkg_fie
+                 , n <- nameSetElemsStable $ orphNamesOfFamInst fispec
+                 ]
+       ; return $ mkNameEnv $
+           [ (nm, (toList clss, toList fams))
+           | (nm, (clss, fams)) <- Map.toList $ Map.unionWith mappend
+               (fmap (,Seq.empty) cls_index)
+               (fmap (Seq.empty,) fam_index)
+           ] }
 
 -- -----------------------------------------------------------------------------
 
