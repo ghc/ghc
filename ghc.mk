@@ -1000,7 +1000,7 @@ $(foreach p,$(filter-out compiler,$(INSTALL_PACKAGES)),\
 INSTALL_DISTDIR_compiler = stage2
 
 # Now we can do the installation
-install_packages: install_libexecs
+install_packages: install_libexecs install_bins
 install_packages: rts/dist/package.conf.install
 	$(INSTALL_DIR) "$(DESTDIR)$(topdir)"
 	$(call removeTrees,"$(INSTALLED_PACKAGE_CONF)")
@@ -1017,13 +1017,13 @@ install_packages: rts/dist/package.conf.install
 	                                  '$(ghclibdir)'              \
 	                                  '$(docdir)/html/libraries'  \
 	                                  '$(GhcLibWays)'))
-	"$(INSTALLED_GHC_PKG_REAL)" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist/package.conf.install
+	"$(bindir)/ghc-pkg" --force --global-package-db "$(INSTALLED_PACKAGE_CONF)" update rts/dist/package.conf.install
 	$(foreach p, $(INSTALL_PACKAGES),                             \
 	    $(call make-command,                                      \
 	           "$(ghc-cabal_INPLACE)" register                    \
 	                                  $p $(INSTALL_DISTDIR_$p)    \
-	                                  "$(INSTALLED_GHC_REAL)"     \
-	                                  "$(INSTALLED_GHC_PKG_REAL)" \
+	                                  "$(bindir)/ghc"     \
+	                                  "$(bindir)/ghc-pkg" \
 	                                  "$(DESTDIR)$(topdir)"       \
 	                                  '$(DESTDIR)'                \
 	                                  '$(prefix)'                 \
