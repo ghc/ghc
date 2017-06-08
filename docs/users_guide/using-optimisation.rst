@@ -45,11 +45,9 @@ optimisation to be performed, which can have an impact on how much of
 your program needs to be recompiled when you change something. This is
 one reason to stick to no-optimisation when developing code.
 
-.. ghc-flag:: -O*
-
-    This is taken to mean: “Please compile quickly; I'm not
-    over-bothered about compiled-code quality.” So, for example:
-    ``ghc -c Foo.hs``
+**No ``-O*``-type option specified:** This is taken to mean “Please 
+compile quickly; I'm not over-bothered about compiled-code quality.”
+So, for example, ``ghc -c Foo.hs``
 
 .. ghc-flag:: -O0
 
