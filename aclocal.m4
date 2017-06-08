@@ -491,8 +491,13 @@ AC_DEFUN([FP_SETTINGS],
         else
             SettingsWindresCommand="$Windres"
         fi
-        SettingsLibtoolCommand="libtool"
-        SettingsTouchCommand='touch'
+       SettingsTouchCommand='touch'
+    fi
+    if test -z "$LibtoolCmd"
+    then
+      SettingsLibtoolCommand="libtool"
+    else
+      SettingsLibtoolCommand="$LibtoolCmd"
     fi
     if test -z "$LlcCmd"
     then

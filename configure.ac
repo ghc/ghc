@@ -569,6 +569,11 @@ fi
 RanlibCmd="$RANLIB"
 RANLIB="$RanlibCmd"
 
+dnl ** which libtool to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([LIBTOOL], [libtool])
+LibtoolCmd="$LIBTOOL"
+LIBTOOL="$LibtoolCmd"
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -1250,6 +1255,7 @@ echo "\
    ar           : $ArCmd
    ld           : $LdCmd
    nm           : $NmCmd
+   libtool      : $LibtoolCmd
    objdump      : $ObjdumpCmd
    ranlib       : $RanlibCmd
    windres      : $Windres
