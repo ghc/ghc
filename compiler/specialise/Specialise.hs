@@ -1854,7 +1854,7 @@ We gather the call info for (f @T $df), and we don't want to drop it
 when we come across the binding for $df.  So we add $df to the floats
 and continue.  But then we have to add $c== to the floats, and so on.
 These all float above the binding for 'f', and and now we can
-successfullly specialise 'f'.
+successfully specialise 'f'.
 
 So the DictBinds in (ud_binds :: Bag DictBind) may contain
 non-dictionary bindings too.

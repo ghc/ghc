@@ -1118,7 +1118,7 @@ do_Elf_Rel_relocations ( ObjectCode* oc, char* ehdrC,
        case COMPAT_R_ARM_CALL:
        case COMPAT_R_ARM_JUMP24:
        {
-           // N.B. LLVM's LLD linker's relocation implement is a fantastic
+           // N.B. LLVM's LLD linker's relocation implementation is a fantastic
            // resource
            StgWord32 *word = (StgWord32 *)P;
            StgInt32 imm = (*word & ((1<<24)-1)) << 2;

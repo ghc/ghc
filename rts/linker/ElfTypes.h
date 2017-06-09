@@ -149,7 +149,7 @@ struct _Stub {
     void * target;
     /* flags can hold architecture specific information they are used during
      * lookup of stubs as well. Thus two stubs for the same target with
-     * different flags are considerd unequal.
+     * different flags are considered unequal.
     */
     uint8_t flags;
     struct _Stub * next;
