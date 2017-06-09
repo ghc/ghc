@@ -27,6 +27,7 @@ module LlvmCodeGen.Base (
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
         llvmPtrBits, tysToParams, llvmFunSection, llvmStdConv, llvmStdFunDefAttrs,
+        llvmStdRetConv,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -125,10 +126,13 @@ llvmFunSig' live lbl link
                       | otherwise   = (x, [])
        dflags <- getDynFlags
        -- the standard set of argument types passed/returned.
-       let stdConvention = map getVarType (llvmFunArgs dflags live)
-       let retTy = LMStructU $ stdConvention -- TODO(kavon): introduce a type alias to reduce bytes output
+       let regToTy = getVarType . (lmGlobalRegArg dflags)
+           callConv = map getVarType (llvmFunArgs dflags live)
+           retConv = map regToTy (llvmStdRetConv dflags)
+       -- TODO(kavon): introduce a type alias for the ret struct to reduce bytes output
+           retTy = LMStructU $ retConv
        return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) retTy FixedArgs
-                                 (map toParams stdConvention)
+                                 (map toParams callConv)
                                  (llvmFunAlign dflags)
 
 -- | Alignment to use for functions
@@ -146,19 +150,33 @@ llvmFunSection dflags lbl
     | otherwise                     = Nothing
 
 -- | The full set of Cmm registers passed to a function, in the correct order,
---   given the live argument registers. This is used for both call and return.
+--   given the live argument registers.
 llvmStdConv :: DynFlags -> LiveGlobalRegs -> [GlobalReg]
 llvmStdConv dflags live = 
     filter isPassed (activeStgRegs platform)
     where platform = targetPlatform dflags
-          isLive r = not (isSSE r) || r `elem` alwaysLive || r `elem` live
-          isPassed r = not (isSSE r) || isLive r
-          isSSE (FloatReg _)  = True
-          isSSE (DoubleReg _) = True
-          isSSE (XmmReg _)    = True
-          isSSE (YmmReg _)    = True
-          isSSE (ZmmReg _)    = True
-          isSSE _             = False
+          isLive r = r `elem` alwaysLive || r `elem` live
+          isPassed r = not (isFloatReg r || isVectorReg r) || isLive r
+          
+-- | The full set of Cmm registers returned from a function, in the correct order.
+llvmStdRetConv :: DynFlags -> [GlobalReg]
+llvmStdRetConv dflags = 
+    -- NB: the return type of all LLVM fuctions must match up for tail-call optimization,
+    --     so we pick a safe superset of all return types here.
+    filter isPassed (activeStgRegs platform)
+    where platform = targetPlatform dflags
+          isPassed r = not $ isVectorReg r -- TODO(kavon): I see no reason why we can't return a vector reg
+          
+isFloatReg :: GlobalReg -> Bool
+isFloatReg (FloatReg _)  = True
+isFloatReg (DoubleReg _) = True
+isFloatReg _             = False
+          
+isVectorReg :: GlobalReg -> Bool
+isVectorReg (XmmReg _) = True
+isVectorReg (YmmReg _) = True
+isVectorReg (ZmmReg _) = True
+isVectorReg _          = False
 
 -- | A Function's arguments
 llvmFunArgs :: DynFlags -> LiveGlobalRegs -> [LlvmVar]

@@ -865,8 +865,9 @@ doReturnTo (retl, _, retArgs) llRetV = do
         -- we could avoid emitting those extracts by slimming down the retRegs list.
         
         -- retRegs is a subset of allRegs, with the _same relative ordering_
-        retRegs = llvmStdConv dflags retArgs
-        allRegs = activeStgRegs $ targetPlatform dflags
+        allRegs = llvmStdRetConv dflags
+        isPassed r = r `elem` retArgs || r `elem` alwaysLive
+        retRegs = filter isPassed allRegs
         
         extract (z@(_, [], _)) _ = return z -- no more slots needed
         extract (i, x:xs, stms) reg
