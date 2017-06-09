@@ -41,11 +41,12 @@ import BooleanFormula
 import RdrName ( rdrNameOcc )
 
 ppDecl :: Bool -> LinksInfo -> LHsDecl DocName
-       -> DocForDecl DocName -> [DocInstance DocName] -> [(DocName, Fixity)]
+       -> [(HsDecl DocName, DocForDecl DocName)]
+       -> DocForDecl DocName ->  [DocInstance DocName] -> [(DocName, Fixity)]
        -> [(DocName, DocForDecl DocName)] -> Splice -> Unicode -> Qualification -> Html
-ppDecl summ links (L loc decl) (mbDoc, fnArgsDoc) instances fixities subdocs splice unicode qual = case decl of
+ppDecl summ links (L loc decl) pats (mbDoc, fnArgsDoc) instances fixities subdocs splice unicode qual = case decl of
   TyClD (FamDecl d)            -> ppTyFam summ False links instances fixities loc mbDoc d splice unicode qual
-  TyClD d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d splice unicode qual
+  TyClD d@(DataDecl {})        -> ppDataDecl summ links instances fixities subdocs loc mbDoc d pats splice unicode qual
   TyClD d@(SynDecl {})         -> ppTySyn summ links fixities loc (mbDoc, fnArgsDoc) d splice unicode qual
   TyClD d@(ClassDecl {})       -> ppClassDecl summ links instances fixities loc mbDoc subdocs d splice unicode qual
   SigD (TypeSig lnames lty)    -> ppLFunSig summ links loc (mbDoc, fnArgsDoc) lnames
@@ -613,7 +614,7 @@ ppInstHead links splice unicode qual mdoc origin orphan no ihd@(InstHead {..}) =
             , [subFamInstDetails iid pdecl])
           where
             pdata = keyword "data" <+> typ
-            pdecl = pdata <+> ppShortDataDecl False True dd unicode qual
+            pdecl = pdata <+> ppShortDataDecl False True dd [] unicode qual
   where
     iid = instanceId origin no orphan ihd
     typ = ppAppNameTypes ihdClsName ihdKinds ihdTypes unicode qual
@@ -662,20 +663,23 @@ instanceId origin no orphan ihd = concat $
 
 
 -- TODO: print contexts
-ppShortDataDecl :: Bool -> Bool -> TyClDecl DocName -> Unicode -> Qualification -> Html
-ppShortDataDecl summary dataInst dataDecl unicode qual
+ppShortDataDecl :: Bool -> Bool -> TyClDecl DocName
+                -> [(HsDecl DocName,DocForDecl DocName)]
+                -> Unicode -> Qualification -> Html
+ppShortDataDecl summary dataInst dataDecl pats unicode qual
 
-  | [] <- cons = dataHeader
+  | [] <- cons
+  , [] <- pats = dataHeader
 
-  | [lcon] <- cons, isH98,
+  | [lcon] <- cons, [] <- pats, isH98,
     (cHead,cBody,cFoot) <- ppShortConstrParts summary dataInst (unLoc lcon) unicode qual
        = (dataHeader <+> equals <+> cHead) +++ cBody +++ cFoot
 
-  | isH98 = dataHeader
-      +++ shortSubDecls dataInst (zipWith doConstr ('=':repeat '|') cons)
+  | [] <- pats, isH98 = dataHeader
+      +++ shortSubDecls dataInst (zipWith doConstr ('=':repeat '|') cons ++ pats1)
 
   | otherwise = (dataHeader <+> keyword "where")
-      +++ shortSubDecls dataInst (map doGADTConstr cons)
+      +++ shortSubDecls dataInst (map doGADTConstr cons ++ pats1)
 
   where
     dataHeader
@@ -689,16 +693,25 @@ ppShortDataDecl summary dataInst dataDecl unicode qual
                   ConDeclH98 {} -> True
                   ConDeclGADT{} -> False
 
+    pats1 = [ hsep [ keyword "pattern"
+                   , hsep $ punctuate comma $ map (ppBinder summary . getOccName) lnames
+                   , dcolon unicode
+                   , ppLType unicode qual (hsSigType typ)
+                   ]
+            | (SigD (PatSynSig lnames typ),_) <- pats
+            ]
+
 
 ppDataDecl :: Bool -> LinksInfo -> [DocInstance DocName] -> [(DocName, Fixity)] ->
               [(DocName, DocForDecl DocName)] ->
               SrcSpan -> Documentation DocName -> TyClDecl DocName ->
+              [(HsDecl DocName,DocForDecl DocName)] ->
               Splice -> Unicode -> Qualification -> Html
-ppDataDecl summary links instances fixities subdocs loc doc dataDecl
+ppDataDecl summary links instances fixities subdocs loc doc dataDecl pats
            splice unicode qual
 
-  | summary   = ppShortDataDecl summary False dataDecl unicode qual
-  | otherwise = header_ +++ docSection Nothing qual doc +++ constrBit +++ instancesBit
+  | summary   = ppShortDataDecl summary False dataDecl pats unicode qual
+  | otherwise = header_ +++ docSection Nothing qual doc +++ constrBit +++ patternBit +++ instancesBit
 
   where
     docname   = tcdName dataDecl
@@ -713,7 +726,9 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
     fix = ppFixities (filter (\(n,_) -> n == docname) fixities) qual
 
     whereBit
-      | null cons = noHtml
+      | null cons
+      , null pats = noHtml
+      | null cons = keyword "where"
       | otherwise = if isH98 then noHtml else keyword "where"
 
     constrBit = subConstructors qual
@@ -721,6 +736,17 @@ ppDataDecl summary links instances fixities subdocs loc doc dataDecl
       | c <- cons
       , let subfixs = filter (\(n,_) -> any (\cn -> cn == n)
                                      (map unLoc (getConNames (unLoc c)))) fixities
+      ]
+
+    patternBit = subPatterns qual
+      [ (hsep [ keyword "pattern"
+              , hsep $ punctuate comma $ map (ppBinder summary . getOccName) lnames
+              , dcolon unicode
+              , ppLType unicode qual (hsSigType typ)
+              ] <+> ppFixities subfixs qual
+        ,combineDocumentation (fst d), [])
+      | (SigD (PatSynSig lnames typ),d) <- pats
+      , let subfixs = filter (\(n,_) -> any (\cn -> cn == n) (map unLoc lnames)) fixities
       ]
 
     instancesBit = ppInstances links (OriginData docname) instances

@@ -42,7 +42,7 @@ import Control.Arrow (second)
 import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Control.Monad
-import Data.Function (on)
+import Data.Traversable
 
 import qualified Packages
 import qualified Module
@@ -81,7 +81,10 @@ createInterface tm flags modMap instIfaceMap = do
       !fam_instances = md_fam_insts md
       !exportedNames = modInfoExports mi
 
-      (TcGblEnv {tcg_rdr_env = gre, tcg_warns = warnings}, md) = tm_internals_ tm
+      (TcGblEnv { tcg_rdr_env = gre
+                , tcg_warns   = warnings
+                , tcg_patsyns = patsyns
+                }, md) = tm_internals_ tm
 
   -- The renamed source should always be available to us, but it's best
   -- to be on the safe side.
@@ -101,6 +104,28 @@ createInterface tm flags modMap instIfaceMap = do
   (!info, mbDoc) <- liftErrMsg $ processModuleHeader dflags gre safety mayDocHeader
 
   let declsWithDocs = topDecls group_
+
+      exports0 = fmap (reverse . map unLoc) mayExports
+      exports
+        | OptIgnoreExports `elem` opts = Nothing
+        | otherwise = exports0
+      warningMap = mkWarningMap dflags warnings gre exportedNames
+
+      localBundledPatSyns :: Map Name [Name]
+      localBundledPatSyns =
+        case exports of
+          Nothing  -> M.empty
+          Just ies ->
+            M.map (nubByName id) $
+            M.fromListWith (++) [ (ieWrappedName ty_name, bundled_patsyns)
+                                | IEThingWith (L _ ty_name) _ exported _ <- ies
+                                , let bundled_patsyns =
+                                        filter is_patsyn (map (ieWrappedName . unLoc) exported)
+                                , not (null bundled_patsyns)
+                                ]
+        where
+          is_patsyn name = elemNameSet name (mkNameSet (map getName patsyns))
+
       fixMap = mkFixMap group_
       (decls, _) = unzip declsWithDocs
       localInsts = filter (nameIsLocalOrFrom sem_mdl)
@@ -112,18 +137,12 @@ createInterface tm flags modMap instIfaceMap = do
       maps@(!docMap, !argMap, !subMap, !declMap, _) =
         mkMaps dflags gre localInsts declsWithDocs
 
-  let exports0 = fmap (reverse . map unLoc) mayExports
-      exports
-        | OptIgnoreExports `elem` opts = Nothing
-        | otherwise = exports0
-      warningMap = mkWarningMap dflags warnings gre exportedNames
-
   let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
 
   -- The MAIN functionality: compute the export items which will
   -- each be the actual documentation of this module.
   exportItems <- mkExportItems is_sig modMap mdl sem_mdl allWarnings gre exportedNames decls
-                   maps fixMap splices exports instIfaceMap dflags
+                   maps localBundledPatSyns fixMap splices exports instIfaceMap dflags
 
   let !visibleNames = mkVisibleNames maps exportItems opts
 
@@ -147,32 +166,33 @@ createInterface tm flags modMap instIfaceMap = do
   tokenizedSrc <- mkMaybeTokenizedSrc flags tm
 
   return $! Interface {
-    ifaceMod             = mdl
-  , ifaceIsSig           = is_sig
-  , ifaceOrigFilename    = msHsFilePath ms
-  , ifaceInfo            = info
-  , ifaceDoc             = Documentation mbDoc modWarn
-  , ifaceRnDoc           = Documentation Nothing Nothing
-  , ifaceOptions         = opts
-  , ifaceDocMap          = docMap
-  , ifaceArgMap          = argMap
-  , ifaceRnDocMap        = M.empty
-  , ifaceRnArgMap        = M.empty
-  , ifaceExportItems     = prunedExportItems
-  , ifaceRnExportItems   = []
-  , ifaceExports         = exportedNames
-  , ifaceVisibleExports  = visibleNames
-  , ifaceDeclMap         = declMap
-  , ifaceSubMap          = subMap
-  , ifaceFixMap          = fixMap
-  , ifaceModuleAliases   = aliases
-  , ifaceInstances       = instances
-  , ifaceFamInstances    = fam_instances
+    ifaceMod               = mdl
+  , ifaceIsSig             = is_sig
+  , ifaceOrigFilename      = msHsFilePath ms
+  , ifaceInfo              = info
+  , ifaceDoc               = Documentation mbDoc modWarn
+  , ifaceRnDoc             = Documentation Nothing Nothing
+  , ifaceOptions           = opts
+  , ifaceDocMap            = docMap
+  , ifaceArgMap            = argMap
+  , ifaceRnDocMap          = M.empty
+  , ifaceRnArgMap          = M.empty
+  , ifaceExportItems       = prunedExportItems
+  , ifaceRnExportItems     = []
+  , ifaceExports           = exportedNames
+  , ifaceVisibleExports    = visibleNames
+  , ifaceDeclMap           = declMap
+  , ifaceBundledPatSynMap  = localBundledPatSyns
+  , ifaceSubMap            = subMap
+  , ifaceFixMap            = fixMap
+  , ifaceModuleAliases     = aliases
+  , ifaceInstances         = instances
+  , ifaceFamInstances      = fam_instances
   , ifaceOrphanInstances   = [] -- Filled in `attachInstances`
   , ifaceRnOrphanInstances = [] -- Filled in `renameInterface`
-  , ifaceHaddockCoverage = coverage
-  , ifaceWarningMap      = warningMap
-  , ifaceTokenizedSrc    = tokenizedSrc
+  , ifaceHaddockCoverage   = coverage
+  , ifaceWarningMap        = warningMap
+  , ifaceTokenizedSrc      = tokenizedSrc
   }
 
 -- | Given all of the @import M as N@ declarations in a package,
@@ -295,8 +315,9 @@ mkMaps :: DynFlags
        -> [(LHsDecl Name, [HsDocString])]
        -> Maps
 mkMaps dflags gre instances decls =
-  let (a, b, c, d) = unzip4 $ map mappings decls
-  in (f' $ map (nubBy ((==) `on` fst)) a , f b, f c, f d, instanceMap)
+  let
+    (a, b, c, d) = unzip4 $ map mappings decls
+  in (f' $ map (nubByName fst) a , f b, f c, f d, instanceMap)
   where
     f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
     f = M.fromListWith (<>) . concat
@@ -362,7 +383,9 @@ mkMaps dflags gre instances decls =
 -- | Get all subordinate declarations inside a declaration, and their docs.
 -- A subordinate declaration is something like the associate type or data
 -- family of a type class.
-subordinates :: InstMap -> HsDecl Name -> [(Name, [HsDocString], Map Int HsDocString)]
+subordinates :: InstMap
+             -> HsDecl Name
+             -> [(Name, [HsDocString], Map Int HsDocString)]
 subordinates instMap decl = case decl of
   InstD (ClsInstD d) -> do
     DataFamInstDecl { dfid_tycon = L l _
@@ -539,6 +562,7 @@ mkExportItems
   -> [Name]             -- exported names (orig)
   -> [LHsDecl Name]     -- renamed source declarations
   -> Maps
+  -> Map Name [Name]
   -> FixMap
   -> [SrcSpan]          -- splice locations
   -> Maybe [IE Name]
@@ -547,15 +571,21 @@ mkExportItems
   -> ErrMsgGhc [ExportItem Name]
 mkExportItems
   is_sig modMap thisMod semMod warnings gre exportedNames decls
-  maps@(docMap, argMap, subMap, declMap, instMap) fixMap splices optExports instIfaceMap dflags =
+  maps@(docMap, argMap, subMap, declMap, instMap) patSynMap fixMap splices optExports instIfaceMap dflags =
   case optExports of
     Nothing -> fullModuleContents dflags warnings gre maps fixMap splices decls
     Just exports -> liftM concat $ mapM lookupExport exports
   where
-    lookupExport (IEVar (L _ x))         = declWith $ ieWrappedName x
-    lookupExport (IEThingAbs (L _ t))    = declWith $ ieWrappedName t
-    lookupExport (IEThingAll (L _ t))    = declWith $ ieWrappedName t
-    lookupExport (IEThingWith (L _ t) _ _ _) = declWith $ ieWrappedName t
+    lookupExport (IEVar (L _ x))         = declWith [] $ ieWrappedName x
+    lookupExport (IEThingAbs (L _ t))    = declWith [] $ ieWrappedName t
+    lookupExport (IEThingAll (L _ t))    = do
+      let name     = ieWrappedName t
+      pats <- findBundledPatterns name
+      declWith pats name
+    lookupExport (IEThingWith (L _ t) _ _ _) = do
+      let name     = ieWrappedName t
+      pats <- findBundledPatterns name
+      declWith pats name
     lookupExport (IEModuleContents (L _ m)) =
       -- TODO: We could get more accurate reporting here if IEModuleContents
       -- also recorded the actual names that are exported here.  We CAN
@@ -574,8 +604,8 @@ mkExportItems
         Nothing -> []
         Just doc -> return . ExportDoc $ processDocStringParas dflags gre doc
 
-    declWith :: Name -> ErrMsgGhc [ ExportItem Name ]
-    declWith t = do
+    declWith :: [(HsDecl Name, DocForDecl Name)] -> Name -> ErrMsgGhc [ ExportItem Name ]
+    declWith pats t = do
       r <- findDecl t
       case r of
         ([L l (ValD _)], (doc, _)) -> do
@@ -612,15 +642,15 @@ mkExportItems
                     -- fromJust is safe since we already checked in guards
                     -- that 't' is a name declared in this declaration.
                     let newDecl = L loc . SigD . fromJust $ filterSigNames (== t) sig
-                    in return [ mkExportDecl t newDecl docs_ ]
+                    in return [ mkExportDecl t newDecl pats docs_ ]
 
                   L loc (TyClD cl@ClassDecl{}) -> do
                     mdef <- liftGhcToErrMsgGhc $ minimalDef t
                     let sig = maybeToList $ fmap (noLoc . MinimalSig NoSourceText . noLoc . fmap noLoc) mdef
                     return [ mkExportDecl t
-                      (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) docs_ ]
+                      (L loc $ TyClD cl { tcdSigs = sig ++ tcdSigs cl }) pats docs_ ]
 
-                  _ -> return [ mkExportDecl t decl docs_ ]
+                  _ -> return [ mkExportDecl t decl pats docs_ ]
 
         -- Declaration from another package
         ([], _) -> do
@@ -637,20 +667,24 @@ mkExportItems
                    liftErrMsg $ tell
                       ["Warning: Couldn't find .haddock for export " ++ pretty dflags t]
                    let subs_ = [ (n, noDocForDecl) | (n, _, _) <- subordinates instMap (unLoc decl) ]
-                   return [ mkExportDecl t decl (noDocForDecl, subs_) ]
+                   return [ mkExportDecl t decl pats (noDocForDecl, subs_) ]
                 Just iface ->
-                   return [ mkExportDecl t decl (lookupDocs t warnings (instDocMap iface) (instArgMap iface) (instSubMap iface)) ]
+                   return [ mkExportDecl t decl pats (lookupDocs t warnings (instDocMap iface) (instArgMap iface) (instSubMap iface)) ]
 
         _ -> return []
 
 
-    mkExportDecl :: Name -> LHsDecl Name -> (DocForDecl Name, [(Name, DocForDecl Name)]) -> ExportItem Name
-    mkExportDecl name decl (doc, subs) = decl'
+    mkExportDecl :: Name -> LHsDecl Name -> [(HsDecl Name, DocForDecl Name)]
+                 -> (DocForDecl Name, [(Name, DocForDecl Name)]) -> ExportItem Name
+    mkExportDecl name decl pats (doc, subs) = decl'
       where
-        decl' = ExportDecl (restrictTo sub_names (extractDecl name decl)) doc subs' [] fixities False
+        decl' = ExportDecl (restrictTo sub_names (extractDecl name decl)) pats' doc subs' [] fixities False
         subs' = filter (isExported . fst) subs
+        pats' = [ d | d@(patsyn_decl, _) <- pats
+                    , all isExported (getMainDeclBinder patsyn_decl) ]
         sub_names = map fst subs'
-        fixities = [ (n, f) | n <- name:sub_names, Just f <- [M.lookup n fixMap] ]
+        pat_names = [ n | (patsyn_decl, _) <- pats', n <- getMainDeclBinder patsyn_decl]
+        fixities = [ (n, f) | n <- name:sub_names++pat_names, Just f <- [M.lookup n fixMap] ]
 
     exportedNameSet = mkNameSet exportedNames
     isExported n = elemNameSet n exportedNameSet
@@ -683,6 +717,40 @@ mkExportItems
       | otherwise = return ([], (noDocForDecl, []))
       where
         m = nameModule n
+
+    findBundledPatterns :: Name -> ErrMsgGhc [(HsDecl Name, DocForDecl Name)]
+    findBundledPatterns t =
+      let
+        m = nameModule t
+
+        local_bundled_patsyns =
+          M.findWithDefault [] t patSynMap
+
+        iface_bundled_patsyns
+          | Just iface <- M.lookup (semToIdMod (moduleUnitId thisMod) m) modMap
+          , Just patsyns <- M.lookup t (ifaceBundledPatSynMap iface)
+          = patsyns
+
+          | Just iface <- M.lookup m instIfaceMap
+          , Just patsyns <- M.lookup t (instBundledPatSynMap iface)
+          = patsyns
+
+          | otherwise
+          = []
+
+        patsyn_decls = do
+          for (local_bundled_patsyns ++ iface_bundled_patsyns) $ \patsyn_name -> do
+            -- call declWith here so we don't have to prepare the pattern synonym for
+            -- showing ourselves.
+            export_items <- declWith [] patsyn_name
+            pure [ (unLoc patsyn_decl, patsyn_doc)
+                 | ExportDecl {
+                       expItemDecl  = patsyn_decl
+                     , expItemMbDoc = patsyn_doc
+                     } <- export_items
+                 ]
+
+      in concat <$> patsyn_decls
 
 -- | Given a 'Module' from a 'Name', convert it into a 'Module' that
 -- we can actually find in the 'IfaceMap'.
@@ -718,7 +786,7 @@ hiValExportItem dflags name nLoc doc splice fixity = do
   mayDecl <- hiDecl dflags name
   case mayDecl of
     Nothing -> return (ExportNoDecl name [])
-    Just decl -> return (ExportDecl (fixSpan decl) doc [] [] fixities splice)
+    Just decl -> return (ExportDecl (fixSpan decl) [] doc [] [] fixities splice)
   where
     fixSpan (L l t) = L (SrcLoc.combineSrcSpans l nLoc) t
     fixities = case fixity of
@@ -873,12 +941,12 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
     fixities name subs = [ (n,f) | n <- name : map fst subs
                                  , Just f <- [M.lookup n fixMap] ]
 
-    expDecl decl l name = return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
+    expDecl decl l name = return $ Just (ExportDecl decl [] doc subs [] (fixities name subs) (l `elem` splices))
       where (doc, subs) = lookupDocs name warnings docMap argMap subMap
 
     expInst decl l name =
         let (doc, subs) = lookupDocs name warnings docMap argMap subMap in
-        return $ Just (ExportDecl decl doc subs [] (fixities name subs) (l `elem` splices))
+        return $ Just (ExportDecl decl [] doc subs [] (fixities name subs) (l `elem` splices))
 
 
 -- | Sometimes the declaration we want to export is not the "main" declaration:
@@ -958,8 +1026,9 @@ mkVisibleNames (_, _, _, _, instMap) exports opts
   | otherwise = let ns = concatMap exportName exports
                 in seqList ns `seq` ns
   where
-    exportName e@ExportDecl {} = name ++ subs
-      where subs = map fst (expItemSubDocs e)
+    exportName e@ExportDecl {} = name ++ subs ++ patsyns
+      where subs    = map fst (expItemSubDocs e)
+            patsyns = concatMap (getMainDeclBinder . fst) (expItemPats e)
             name = case unLoc $ expItemDecl e of
               InstD d -> maybeToList $ M.lookup (getInstLoc d) instMap
               decl    -> getMainDeclBinder decl

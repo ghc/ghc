@@ -21,7 +21,6 @@ import Haddock.GhcUtils
 import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)
-import Data.Function (on)
 import Data.Maybe ( maybeToList, mapMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
@@ -109,13 +108,17 @@ attachToExportItem expInfo iface ifaceMap instIfaceMap export =
       return $ e { expItemInstances = insts }
     e -> return e
   where
-    attachFixities e@ExportDecl{ expItemDecl = L _ d } = e { expItemFixities =
-      nubBy ((==) `on` fst) $ expItemFixities e ++
+    attachFixities e@ExportDecl{ expItemDecl = L _ d
+                               , expItemPats = patsyns
+                               } = e { expItemFixities =
+      nubByName fst $ expItemFixities e ++
       [ (n',f) | n <- getMainDeclBinder d
               , Just subs <- [instLookup instSubMap n iface ifaceMap instIfaceMap]
-              , n' <- n : subs
+              , n' <- n : (subs ++ patsyn_names)
               , Just f <- [instLookup instFixMap n' iface ifaceMap instIfaceMap]
       ] }
+      where
+        patsyn_names = concatMap (getMainDeclBinder . fst) patsyns
 
     attachFixities e = e
     -- spanName: attach the location to the name that is the same file as the instance location

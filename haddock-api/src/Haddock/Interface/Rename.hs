@@ -55,7 +55,7 @@ renameInterface dflags renamingEnv warnings iface =
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise always be missing.
-      missingNames = nub $ filter isExternalName  -- XXX: isExternalName filters out too much
+      missingNames = nubByName id $ filter isExternalName  -- XXX: isExternalName filters out too much
                     (missingNames1 ++ missingNames2 ++ missingNames3
                      ++ missingNames4 ++ missingNames5)
 
@@ -314,6 +314,11 @@ renameInstHead InstHead {..} = do
 renameLDecl :: LHsDecl Name -> RnM (LHsDecl DocName)
 renameLDecl (L loc d) = return . L loc =<< renameDecl d
 
+renamePats :: [(HsDecl Name,DocForDecl Name)] -> RnM [(HsDecl DocName,DocForDecl DocName)]
+renamePats = mapM
+  (\(d,doc) -> do { d'   <- renameDecl d
+                  ; doc' <- renameDocForDecl doc
+                  ; return (d',doc')})
 
 renameDecl :: HsDecl Name -> RnM (HsDecl DocName)
 renameDecl decl = case decl of
@@ -601,15 +606,16 @@ renameExportItem item = case item of
   ExportGroup lev id_ doc -> do
     doc' <- renameDoc doc
     return (ExportGroup lev id_ doc')
-  ExportDecl decl doc subs instances fixities splice -> do
+  ExportDecl decl pats doc subs instances fixities splice -> do
     decl' <- renameLDecl decl
+    pats' <- renamePats pats
     doc'  <- renameDocForDecl doc
     subs' <- mapM renameSub subs
     instances' <- forM instances renameDocInstance
     fixities' <- forM fixities $ \(name, fixity) -> do
       name' <- lookupRn name
       return (name', fixity)
-    return (ExportDecl decl' doc' subs' instances' fixities' splice)
+    return (ExportDecl decl' pats' doc' subs' instances' fixities' splice)
   ExportNoDecl x subs -> do
     x'    <- lookupRn x
     subs' <- mapM lookupRn subs

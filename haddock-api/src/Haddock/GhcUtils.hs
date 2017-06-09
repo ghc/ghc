@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, ViewPatterns #-}
+{-# LANGUAGE BangPatterns, FlexibleInstances, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -21,6 +21,7 @@ import Control.Arrow
 import Exception
 import Outputable
 import Name
+import NameSet
 import Lexeme
 import Module
 import HscTypes
@@ -134,6 +135,17 @@ declATs _ = []
 
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr
+
+nubByName :: (a -> Name) -> [a] -> [a]
+nubByName f ns = go emptyNameSet ns
+  where
+    go !_ [] = []
+    go !s (x:xs)
+      | y `elemNameSet` s = go s xs
+      | otherwise         = let !s' = extendNameSet s y
+                            in x : go s' xs
+      where
+        y = f x
 
 -------------------------------------------------------------------------------
 -- * Located

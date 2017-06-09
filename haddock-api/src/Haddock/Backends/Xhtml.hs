@@ -604,8 +604,8 @@ processExport :: Bool -> LinksInfo -> Bool -> Qualification
 processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual (mkMeta doc)
-processExport summary links unicode qual (ExportDecl decl doc subdocs insts fixities splice)
-  = processDecl summary $ ppDecl summary links decl doc insts fixities subdocs splice unicode qual
+processExport summary links unicode qual (ExportDecl decl pats doc subdocs insts fixities splice)
+  = processDecl summary $ ppDecl summary links decl pats doc insts fixities subdocs splice unicode qual
 processExport summary _ _ qual (ExportNoDecl y [])
   = processDeclOneLiner summary $ ppDocName qual Prefix True y
 processExport summary _ _ qual (ExportNoDecl y subs)

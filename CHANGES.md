@@ -4,6 +4,8 @@
 
  * Synopsis is working again (#599)
 
+ * Support for bundled pattern synonyms (#494, #551, #626)
+
 ## Changes in version 2.17.4
 
  * Fix 'internal error: links: UnhelpfulSpan' (#554, #565)
