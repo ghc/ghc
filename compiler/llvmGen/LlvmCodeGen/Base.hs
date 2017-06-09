@@ -526,8 +526,7 @@ aliasify (LMGlobal var val) = do
 cpsCallOf :: LlvmType -> LlvmType
 cpsCallOf givenFn = LMFunction $
     LlvmFunctionDecl {
-        -- NB skipping type mangling because of current assumptions
-        decName = fsLit "llvm.experimental.cpscall.x",
+        decName = fsLit $ "llvm.experimental.cpscall." ++ mangle givenFn,
         funcLinkage = ExternallyVisible,
         funcCc = CC_Ghc,
         decReturnType = getRetTy givenFn,
@@ -537,6 +536,37 @@ cpsCallOf givenFn = LMFunction $
     }
     where
         noAttr ty = (ty, [])
+        mangleP (ty, _) = mangle ty
+        
+        -- We need a unique name for this instance of the intrinsic, 
+        -- which depends on to the type of the function called.
+        -- The nice thing is that we don't have to match LLVM's type
+        -- mangler function, it just has to be a valid identifier. 
+        -- We could compute a unique hash number for the type if
+        -- we want to save on the length of this name. -- kavon, Jun '17
+        mangle :: LlvmType -> String
+        mangle (LMInt sz) = 'i' : show sz
+        mangle LMFloat = "f32"
+        mangle LMDouble = "f64"
+        mangle (LMPointer ty) = "p0" ++ mangle ty
+        mangle (LMArray nr ty) = 'a' : show nr ++ mangle ty
+        mangle (LMVector nr ty) = 'v' : show nr ++ mangle ty
+        mangle (LMStruct tys) = "ps" ++ concatMap mangle tys
+        mangle (LMStructU tys) = 's' : concatMap mangle tys
+        mangle (LMFunction (LlvmFunctionDecl _ _ _ r varg p _))
+            =  prefix 
+               ++ mangle r ++ "_" 
+               ++ concatMap mangleP p ++ "_f"
+            where
+                prefix = case varg of
+                            FixedArgs -> "f_"
+                            VarArgs -> "fv_"
+        mangle LMFloat80 = "f80"
+        mangle LMFloat128 = "f128"
+        mangle LMVoid = "void"
+        mangle _ = error "cpsCallOf's type mangler did not expect this type!"
+                        
+        
 
 -- Note [Llvm Forward References]
 --
