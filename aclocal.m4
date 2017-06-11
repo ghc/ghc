@@ -460,7 +460,7 @@ AC_DEFUN([GET_ARM_ISA],
 # Set the variables used in the settings file
 AC_DEFUN([FP_SETTINGS],
 [
-    if test "$windows" = YES
+    if test "$windows" = YES -a "$EnableDistroToolchain" = "NO"
     then
         mingw_bin_prefix=mingw/bin/
         SettingsCCompilerCommand="\$topdir/../${mingw_bin_prefix}gcc.exe"
@@ -472,6 +472,18 @@ AC_DEFUN([FP_SETTINGS],
         SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
         SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
         SettingsTouchCommand='$topdir/bin/touchy.exe'
+    elif test "$EnableDistroToolchain" = "YES"
+    then
+        SettingsCCompilerCommand="$(basename $CC)"
+        SettingsCCompilerFlags="$CONF_CC_OPTS_STAGE2"
+        SettingsHaskellCPPCommand="$(basename $HaskellCPPCmd)"
+        SettingsHaskellCPPFlags="$HaskellCPPArgs"
+        SettingsLdCommand="$(basename $LdCmd)"
+        SettingsArCommand="$(basename $ArCmd)"
+        SettingsPerlCommand="$(basename $PerlCmd)"
+        SettingsDllWrapCommand="$(basename $DllWrapCmd)"
+        SettingsWindresCommand="$(basename $WindresCmd)"
+        SettingsTouchCommand='$topdir/bin/touchy.exe'
     else
         SettingsCCompilerCommand="$CC"
         SettingsHaskellCPPCommand="$HaskellCPPCmd"
@@ -479,17 +491,17 @@ AC_DEFUN([FP_SETTINGS],
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
         SettingsPerlCommand="$PerlCmd"
-        if test -z "$DllWrap"
+        if test -z "$DllWrapCmd"
         then
             SettingsDllWrapCommand="/bin/false"
         else
-            SettingsDllWrapCommand="$DllWrap"
+            SettingsDllWrapCommand="$DllWrapCmd"
         fi
-        if test -z "$Windres"
+        if test -z "$WindresCmd"
         then
             SettingsWindresCommand="/bin/false"
         else
-            SettingsWindresCommand="$Windres"
+            SettingsWindresCommand="$WindresCmd"
         fi
        SettingsTouchCommand='touch'
     fi
