@@ -50,6 +50,7 @@ import OrdList
 import Pair
 import Util
 import Hooks
+import Encoding
 
 import Data.Maybe
 import Data.List
@@ -410,16 +411,12 @@ dsFExportDynamic :: Id
                  -> CCallConv
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
-    fe_id <-  newSysLocalDs ty
     mod <- getModule
     dflags <- getDynFlags
-    let
-        -- hack: need to get at the name of the C stub we're about to generate.
-        -- TODO: There's no real need to go via String with
-        -- (mkFastString . zString). In fact, is there a reason to convert
-        -- to FastString at all now, rather than sticking with FastZString?
-        fe_nm    = mkFastString (zString (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
-
+    let fe_nm = mkFastString $ zEncodeString
+            (moduleStableString mod ++ "$" ++ toCName dflags id)
+        -- Construct the label based on the passed id, don't use names
+        -- depending on Unique. See #13807 and Note [Unique Determinism].
     cback <- newSysLocalDs arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
