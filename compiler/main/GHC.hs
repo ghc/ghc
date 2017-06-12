@@ -316,7 +316,8 @@ import TidyPgm
 import DriverPhases     ( Phase(..), isHaskellSrcFilename )
 import Finder
 import HscTypes
-import DynFlags
+import CmdLineParser
+import DynFlags hiding (WarnReason(..))
 import SysTools
 import Annotations
 import Module
@@ -654,7 +655,7 @@ getInteractiveDynFlags = withSession $ \h -> return (ic_dflags (hsc_IC h))
 
 parseDynamicFlags :: MonadIO m =>
                      DynFlags -> [Located String]
-                  -> m (DynFlags, [Located String], [Located String])
+                  -> m (DynFlags, [Located String], [Warn])
 parseDynamicFlags = parseDynamicFlagsCmdLine
 
 -- | Checks the set of new DynFlags for possibly erroneous option
@@ -664,7 +665,7 @@ checkNewDynFlags :: MonadIO m => DynFlags -> m DynFlags
 checkNewDynFlags dflags = do
   -- See Note [DynFlags consistency]
   let (dflags', warnings) = makeDynFlagsConsistent dflags
-  liftIO $ handleFlagWarnings dflags warnings
+  liftIO $ handleFlagWarnings dflags (map (Warn NoReason) warnings)
   return dflags'
 
 checkNewInteractiveDynFlags :: MonadIO m => DynFlags -> m DynFlags

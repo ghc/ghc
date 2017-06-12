@@ -12,6 +12,7 @@ import HscTypes         ( msHsFilePath )
 import Name             ( getOccString )
 --import ErrUtils         ( printBagOfErrors )
 import Panic            ( panic )
+import CmdLineParser    (warnMsg)
 import DynFlags         ( defaultFatalMessager, defaultFlushOut )
 import Bag
 import Exception
@@ -114,7 +115,7 @@ main = do
                                           (map noLoc ghcArgs)
       unless (null unrec) $
         liftIO $ putStrLn $ "Unrecognised options:\n" ++ show (map unLoc unrec)
-      liftIO $ mapM_ putStrLn (map unLoc warns)
+      liftIO $ mapM_ putStrLn (map (unLoc . warnMsg) warns)
       let dflags2 = pflags { hscTarget = HscNothing } -- don't generate anything
       -- liftIO $ print ("pkgDB", case (pkgDatabase dflags2) of Nothing -> 0
       --                                                        Just m -> sizeUFM m)

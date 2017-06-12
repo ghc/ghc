@@ -171,7 +171,8 @@ import {-# SOURCE #-} PrelNames ( mAIN )
 import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
-import CmdLineParser
+import CmdLineParser hiding (WarnReason(..))
+import qualified CmdLineParser as Cmd
 import Constants
 import Panic
 import qualified PprColour as Col
@@ -2347,7 +2348,7 @@ updOptLevel n dfs
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
 parseDynamicFlagsCmdLine :: MonadIO m => DynFlags -> [Located String]
-                         -> m (DynFlags, [Located String], [Located String])
+                         -> m (DynFlags, [Located String], [Warn])
                             -- ^ Updated 'DynFlags', left-over arguments, and
                             -- list of warnings.
 parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
@@ -2357,7 +2358,7 @@ parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
 -- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
 parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
-                       -> m (DynFlags, [Located String], [Located String])
+                       -> m (DynFlags, [Located String], [Warn])
                           -- ^ Updated 'DynFlags', left-over arguments, and
                           -- list of warnings.
 parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
@@ -2372,14 +2373,14 @@ parseDynamicFlagsFull :: MonadIO m
                   -> Bool                          -- ^ are the arguments from the command line?
                   -> DynFlags                      -- ^ current dynamic flags
                   -> [Located String]              -- ^ arguments to parse
-                  -> m (DynFlags, [Located String], [Located String])
+                  -> m (DynFlags, [Located String], [Warn])
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let ((leftover, errs, warns), dflags1)
           = runCmdLine (processArgs activeFlags args) dflags0
 
   -- See Note [Handling errors when parsing commandline flags]
-  unless (null errs) $ liftIO $ throwGhcExceptionIO $
-      errorsToGhcException . map (showPpr dflags0 . getLoc &&& unLoc) $ errs
+  unless (null errs) $ liftIO $ throwGhcExceptionIO $ errorsToGhcException $
+    map ((showPpr dflags0 . getLoc &&& unLoc) . errMsg) $ errs
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
@@ -2426,7 +2427,9 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   liftIO $ setUnsafeGlobalDynFlags dflags7
 
-  return (dflags7, leftover, consistency_warnings ++ sh_warns ++ warns)
+  let warns' = map (Warn Cmd.NoReason) (consistency_warnings ++ sh_warns)
+
+  return (dflags7, leftover, warns' ++ warns)
 
 setLogAction :: DynFlags -> IO DynFlags
 setLogAction dflags = do
@@ -2592,8 +2595,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , (Deprecated, defFlag "#include"
       (HasArg (\_s ->
-         addWarn ("-#include and INCLUDE pragmas are " ++
-                  "deprecated: They no longer have any effect"))))
+         deprecate ("-#include and INCLUDE pragmas are " ++
+                    "deprecated: They no longer have any effect"))))
   , make_ord_flag defFlag "v"        (OptIntSuffix setVerbosity)
 
   , make_ord_flag defGhcFlag "j"     (OptIntSuffix
@@ -3265,11 +3268,11 @@ dynamic_flags_deps = [
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjTarget HscAsm))
   , make_ord_flag defGhcFlag "fvia-c"           (NoArg
-         (addWarn $ "The -fvia-c flag does nothing; " ++
-                    "it will be removed in a future GHC release"))
+         (deprecate $ "The -fvia-c flag does nothing; " ++
+                      "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fvia-C"           (NoArg
-         (addWarn $ "The -fvia-C flag does nothing; " ++
-                    "it will be removed in a future GHC release"))
+         (deprecate $ "The -fvia-C flag does nothing; " ++
+                      "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjTarget HscLlvm))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
@@ -3343,7 +3346,8 @@ unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addWarn $ "unrecognised warning flag: -" ++ prefix ++ flag
+      when f $ addFlagWarn Cmd.ReasonUnrecognisedFlag $
+        "unrecognised warning flag: -" ++ prefix ++ flag
 
 -- See Note [Supporting CLI completion]
 package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]

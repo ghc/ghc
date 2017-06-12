@@ -177,7 +177,8 @@ import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule
                         , eqTyConName )
 import TysWiredIn
 import Packages hiding  ( Version(..) )
-import DynFlags
+import CmdLineParser
+import DynFlags hiding  ( WarnReason(..) )
 import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
 import BasicTypes
 import IfaceSyn
@@ -200,7 +201,7 @@ import UniqDSet
 import GHC.Serialized   ( Serialized )
 
 import Foreign
-import Control.Monad    ( guard, liftM, when, ap )
+import Control.Monad    ( guard, liftM, ap )
 import Data.Foldable    ( foldl' )
 import Data.IORef
 import Data.Time
@@ -325,15 +326,25 @@ printOrThrowWarnings dflags warns
   | otherwise
   = printBagOfErrors dflags warns
 
-handleFlagWarnings :: DynFlags -> [Located String] -> IO ()
-handleFlagWarnings dflags warns
- = when (wopt Opt_WarnDeprecatedFlags dflags) $ do
-        -- It would be nicer if warns :: [Located MsgDoc], but that
-        -- has circular import problems.
-      let bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
-                          | L loc warn <- warns ]
+handleFlagWarnings :: DynFlags -> [Warn] -> IO ()
+handleFlagWarnings dflags warns = do
+  let warns' = filter (shouldPrintWarning dflags . warnReason)  warns
 
-      printOrThrowWarnings dflags bag
+      -- It would be nicer if warns :: [Located MsgDoc], but that
+      -- has circular import problems.
+      bag = listToBag [ mkPlainWarnMsg dflags loc (text warn)
+                      | Warn _ (L loc warn) <- warns' ]
+
+  printOrThrowWarnings dflags bag
+
+-- Given a warn reason, check to see if it's associated -W opt is enabled
+shouldPrintWarning :: DynFlags -> WarnReason -> Bool
+shouldPrintWarning dflags ReasonDeprecatedFlag
+  = wopt Opt_WarnDeprecatedFlags dflags
+shouldPrintWarning dflags ReasonUnrecognisedFlag
+  = wopt Opt_WarnUnrecognisedWarningFlags dflags
+shouldPrintWarning _ _
+  = True
 
 {-
 ************************************************************************
