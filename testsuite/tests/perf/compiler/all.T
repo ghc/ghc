@@ -1043,6 +1043,17 @@ test('T12234',
      compile,
      [''])
 
+test('T12545',
+     [ only_ways(['normal']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 3538652464, 5),
+          # 2017-06-08    3538652464  initial
+          ]),
+       extra_clean(['T12545a.hi', 'T12545a.o'])
+     ],
+     multimod_compile,
+     ['T12545', '-v0'] )
+
 test('T13035',
      [ only_ways(['normal']),
        compiler_stats_num_field('bytes allocated',
