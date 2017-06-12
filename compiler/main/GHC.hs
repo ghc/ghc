@@ -1241,22 +1241,24 @@ getGRE = withSession $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
 -- | Retrieve all type and family instances in the environment, indexed
 -- by 'Name'. Each name's lists will contain every instance in which that name
 -- is mentioned in the instance head.
-getNameToInstancesIndex :: HscEnv
-  -> IO (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
-getNameToInstancesIndex hsc_env
-  = runTcInteractive hsc_env $
+getNameToInstancesIndex :: GhcMonad m
+  => m (Messages, Maybe (NameEnv ([ClsInst], [FamInst])))
+getNameToInstancesIndex = do
+  hsc_env <- getSession
+  liftIO $ runTcInteractive hsc_env $
     do { loadUnqualIfaces hsc_env (hsc_IC hsc_env)
        ; InstEnvs {ie_global, ie_local, ie_visible} <- tcGetInstEnvs
        ; (pkg_fie, home_fie) <- tcGetFamInstEnvs
-       -- We use flip mappend to maintain the order of instances,
-       -- and Data.Sequence.Seq to keep flip mappend fast
-       ; let cls_index = Map.fromListWith (flip mappend)
+       -- We use Data.Sequence.Seq because we are creating left associated
+       -- mappends.
+       -- cls_index and fam_index below are adapted from TcRnDriver.lookupInsts
+       ; let cls_index = Map.fromListWith mappend
                  [ (n, Seq.singleton ispec)
                  | ispec <- instEnvElts ie_local ++ instEnvElts ie_global
                  , instIsVisible ie_visible ispec
                  , n <- nameSetElemsStable $ orphNamesOfClsInst ispec
                  ]
-       ; let fam_index = Map.fromListWith (flip mappend)
+       ; let fam_index = Map.fromListWith mappend
                  [ (n, Seq.singleton fispec)
                  | fispec <- famInstEnvElts home_fie ++ famInstEnvElts pkg_fie
                  , n <- nameSetElemsStable $ orphNamesOfFamInst fispec
