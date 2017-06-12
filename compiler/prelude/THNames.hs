@@ -94,7 +94,7 @@ templateHaskellNames = [
     -- Type
     forallTName, varTName, conTName, appTName, equalityTName,
     tupleTName, unboxedTupleTName, unboxedSumTName,
-    arrowTName, listTName, sigTName, litTName,
+    arrowTName, listTName, sigTName, sigTDataConName, litTName,
     promotedTName, promotedTupleTName, promotedNilTName, promotedConsTName,
     wildCardTName,
     -- TyLit
@@ -428,9 +428,10 @@ recordPatSynName = libFun (fsLit "recordPatSyn") recordPatSynIdKey
 
 -- data Type = ...
 forallTName, varTName, conTName, tupleTName, unboxedTupleTName,
-    unboxedSumTName, arrowTName, listTName, appTName, sigTName, equalityTName,
-    litTName, promotedTName, promotedTupleTName, promotedNilTName,
-    promotedConsTName, wildCardTName :: Name
+    unboxedSumTName, arrowTName, listTName, appTName, sigTName,
+    sigTDataConName, equalityTName, litTName, promotedTName,
+    promotedTupleTName, promotedNilTName, promotedConsTName,
+    wildCardTName :: Name
 forallTName         = libFun (fsLit "forallT")        forallTIdKey
 varTName            = libFun (fsLit "varT")           varTIdKey
 conTName            = libFun (fsLit "conT")           conTIdKey
@@ -441,6 +442,9 @@ arrowTName          = libFun (fsLit "arrowT")         arrowTIdKey
 listTName           = libFun (fsLit "listT")          listTIdKey
 appTName            = libFun (fsLit "appT")           appTIdKey
 sigTName            = libFun (fsLit "sigT")           sigTIdKey
+-- Yes, we need names for both the monadic sigT as well as the pure SigT. Why?
+-- Refer to the documentation for repLKind in DsMeta.
+sigTDataConName     = thCon  (fsLit "SigT")           sigTDataConKey
 equalityTName       = libFun (fsLit "equalityT")      equalityTIdKey
 litTName            = libFun (fsLit "litT")           litTIdKey
 promotedTName       = libFun (fsLit "promotedT")      promotedTIdKey
@@ -947,8 +951,9 @@ recordPatSynIdKey = mkPreludeMiscIdUnique 372
 -- data Type = ...
 forallTIdKey, varTIdKey, conTIdKey, tupleTIdKey, unboxedTupleTIdKey,
     unboxedSumTIdKey, arrowTIdKey, listTIdKey, appTIdKey, sigTIdKey,
-    equalityTIdKey, litTIdKey, promotedTIdKey, promotedTupleTIdKey,
-    promotedNilTIdKey, promotedConsTIdKey, wildCardTIdKey :: Unique
+    sigTDataConKey, equalityTIdKey, litTIdKey, promotedTIdKey,
+    promotedTupleTIdKey, promotedNilTIdKey, promotedConsTIdKey,
+    wildCardTIdKey :: Unique
 forallTIdKey        = mkPreludeMiscIdUnique 381
 varTIdKey           = mkPreludeMiscIdUnique 382
 conTIdKey           = mkPreludeMiscIdUnique 383
@@ -959,13 +964,14 @@ arrowTIdKey         = mkPreludeMiscIdUnique 387
 listTIdKey          = mkPreludeMiscIdUnique 388
 appTIdKey           = mkPreludeMiscIdUnique 389
 sigTIdKey           = mkPreludeMiscIdUnique 390
-equalityTIdKey      = mkPreludeMiscIdUnique 391
-litTIdKey           = mkPreludeMiscIdUnique 392
-promotedTIdKey      = mkPreludeMiscIdUnique 393
-promotedTupleTIdKey = mkPreludeMiscIdUnique 394
-promotedNilTIdKey   = mkPreludeMiscIdUnique 395
-promotedConsTIdKey  = mkPreludeMiscIdUnique 396
-wildCardTIdKey      = mkPreludeMiscIdUnique 397
+sigTDataConKey      = mkPreludeMiscIdUnique 391
+equalityTIdKey      = mkPreludeMiscIdUnique 392
+litTIdKey           = mkPreludeMiscIdUnique 393
+promotedTIdKey      = mkPreludeMiscIdUnique 394
+promotedTupleTIdKey = mkPreludeMiscIdUnique 395
+promotedNilTIdKey   = mkPreludeMiscIdUnique 396
+promotedConsTIdKey  = mkPreludeMiscIdUnique 397
+wildCardTIdKey      = mkPreludeMiscIdUnique 398
 
 -- data TyLit = ...
 numTyLitIdKey, strTyLitIdKey :: Unique

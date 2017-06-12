@@ -1069,6 +1069,12 @@ repTyLit (HsStrTy _ s) = do { s' <- mkStringExprFS s
 
 -- represent a kind
 --
+-- It would be great to scrap this function in favor of repLTy, since Types
+-- and Kinds are the same things. We have not done so yet for engineering
+-- reasons, as repLTy returns a monadic TypeQ, whereas repLKind returns a pure
+-- Kind, so in order to replace repLKind with repLTy, we'd need to go through
+-- and purify repLTy and every monadic function it calls. This is the subject
+-- GHC Trac #11785.
 repLKind :: LHsKind GhcRn -> DsM (Core TH.Kind)
 repLKind ki
   = do { let (kis, ki') = splitHsFunType ki
@@ -1108,6 +1114,10 @@ repNonArrowKind (HsListTy k)        = do  { k' <- repLKind k
 repNonArrowKind (HsTupleTy _ ks)    = do  { ks' <- mapM repLKind ks
                                           ; kcon <- repKTuple (length ks)
                                           ; repKApps kcon ks'
+                                          }
+repNonArrowKind (HsKindSig k sort)  = do  { k'    <- repLKind k
+                                          ; sort' <- repLKind sort
+                                          ; repKSig k' sort'
                                           }
 repNonArrowKind k                   = notHandled "Exotic form of kind" (ppr k)
 
@@ -2350,6 +2360,9 @@ repKStar = rep2 starKName []
 
 repKConstraint :: DsM (Core TH.Kind)
 repKConstraint = rep2 constraintKName []
+
+repKSig :: Core TH.Kind -> Core TH.Kind -> DsM (Core TH.Kind)
+repKSig (MkC k) (MkC sort) = rep2 sigTDataConName [k, sort]
 
 ----------------------------------------------------------
 --       Type family result signature
