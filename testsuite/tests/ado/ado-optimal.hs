@@ -18,8 +18,19 @@ test1 = do
   x5 <- const e (x1,x4)
   return (const () x5)
 
+-- (a | c); (b | d); e
+test2 :: M ()
+test2 = do
+  x1 <- a
+  x3 <- c
+  x2 <- const b x1
+  x4 <- const d x3
+  x5 <- const e (x1,x4)
+  return (const () x5)
+
 main = mapM_ run
  [ test1
+ , test2
  ]
 
 -- Testing code, prints out the structure of a monad/applicative expression
