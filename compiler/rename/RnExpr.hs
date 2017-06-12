@@ -1592,7 +1592,7 @@ mkStmtTreeOptimal stmts =
               (StmtTreeOne (stmt_arr ! hi), 1))
            | left_cost < right_cost
            = ((left,left_cost), (StmtTreeOne (stmt_arr ! hi), 1))
-           | otherwise -- left_cost > right_cost
+           | left_cost > right_cost
            = ((StmtTreeOne (stmt_arr ! lo), 1), (right,right_cost))
            | otherwise = minimumBy (comparing cost) alternatives
            where
