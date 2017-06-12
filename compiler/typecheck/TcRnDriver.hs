@@ -2441,6 +2441,14 @@ tcRnGetInfo hsc_env name
        ; (cls_insts, fam_insts) <- lookupInsts thing
        ; return (thing, fixity, cls_insts, fam_insts) }
 
+
+-- Lookup all class and family instances for a type constructor.
+--
+-- This function filters all instances in the type environment, so there
+-- is a lot of duplicated work if it is called many times in the same
+-- type environment. If this becomes a problem, the NameEnv computed
+-- in GHC.getNameToInstancesIndex could be cached in TcM and both functions
+-- could be changed to consult that index.
 lookupInsts :: TyThing -> TcM ([ClsInst],[FamInst])
 lookupInsts (ATyCon tc)
   = do  { InstEnvs { ie_global = pkg_ie, ie_local = home_ie, ie_visible = vis_mods } <- tcGetInstEnvs
