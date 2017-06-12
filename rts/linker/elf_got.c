@@ -116,7 +116,7 @@ verifyGot(ObjectCode * oc) {
                 ASSERT((void*)(*(void**)symbol->got_addr)
                        == (void*)symbol->addr);
             }
-            ASSERT(0 == ((uint64_t)symbol->addr & 0xffff000000000000));
+            ASSERT(0 == ((uintptr_t)symbol->addr & 0xffff000000000000));
         }
     }
     return EXIT_SUCCESS;
