@@ -1479,6 +1479,7 @@ runPhase (RealPhaseWithInfo mangInfo LlvmLlc) input_fn dflags
 
     liftIO $ SysTools.runLlvmLlc dflags
                 ([ SysTools.Option (llvmOpts !! opt_lvl),
+                    SysTools.Option cpscall_workaround,
                     SysTools.Option $ "-relocation-model=" ++ rmodel,
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
@@ -1500,6 +1501,10 @@ runPhase (RealPhaseWithInfo mangInfo LlvmLlc) input_fn dflags
 
     return (doNext, output_fn)
   where
+        
+        -- TODO(kavon): temporary
+        cpscall_workaround = "-disable-machine-cse"
+      
         -- Bug in LLVM at O3 on OSX.
         llvmOpts = if platformOS (targetPlatform dflags) == OSDarwin
                    then ["-O1", "-O2", "-O2"]
