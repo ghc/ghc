@@ -12,7 +12,7 @@ module HscTypes (
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
-        ModuleGraph, emptyMG,
+        ModuleGraph, emptyMG, mapMG,
         HscStatus(..),
         IServ(..),
 
@@ -2610,6 +2610,9 @@ type ModuleGraph = [ModSummary]
 
 emptyMG :: ModuleGraph
 emptyMG = []
+
+mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
+mapMG = map
 
 -- | A single node in a 'ModuleGraph'. The nodes of the module graph
 -- are one of:
