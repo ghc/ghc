@@ -123,6 +123,8 @@ modules are required, directly or indirectly, by the topmost module, and load
 them all in dependency order. The :ghc-flag:`-hide-loaded-modules` flag
 can be used to suppress the full list of loaded modules before the prompt.
 
+.. _ghci-hide-loaded-modules:
+
 .. [3]
    If you started up GHCi from the command line then GHCi's current
    directory is the same as the current directory of the shell from
