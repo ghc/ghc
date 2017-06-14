@@ -62,4 +62,10 @@ interactiveOptions =
            "expressions in GHCi <ghci-interactive-print>`"
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-hide-loaded-modules"
+         , flagDescription =
+           ":ref:`Do not print the module list before the prompt " ++
+           "<ghci-hide-loaded-modules>`"
+         , flagType = DynamicFlag
+         }
   ]

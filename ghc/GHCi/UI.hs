@@ -1816,7 +1816,14 @@ modulesLoadedMsg ok mods = do
                    Failed    -> text "Failed"
                    Succeeded -> text "Ok"
 
-      msg = status <> text ", modules loaded:" <+> mod_commas
+      append_mod_commas = if gopt Opt_HideLoadedMods dflags
+        then ""
+        else ":" <+> mod_commas
+      numMods = length mod_names
+      numModsPP = if numMods == 1
+        then "1 module"
+        else int numMods <+> "modules"
+      msg = status <> text "," <+> numModsPP <+> "loaded" <> append_mod_commas
 
   when (verbosity dflags > 0) $
      liftIO $ putStrLn $ showSDocForUser dflags unqual msg

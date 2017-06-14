@@ -120,7 +120,10 @@ name of the "topmost" module to the :ghci-cmd:`:load` command (hint:
 :ghci-cmd:`:load` can be abbreviated to ``:l``). The topmost module will
 normally be ``Main``, but it doesn't have to be. GHCi will discover which
 modules are required, directly or indirectly, by the topmost module, and load
-them all in dependency order.
+them all in dependency order. The :ghc-flag:`-hide-loaded-modules` flag
+can be used to suppress the full list of loaded modules before the prompt.
+
+.. _ghci-hide-loaded-modules:
 
 .. [3]
    If you started up GHCi from the command line then GHCi's current
