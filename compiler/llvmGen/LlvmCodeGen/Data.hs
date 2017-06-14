@@ -186,11 +186,21 @@ cvtForMangler (Statics _ datum) = do
             
         cvtLit _ = return $ dbg (B.pack "## some other lit for ")
         
-        mkDiffOff srt off mine = B.concat [
+        mkDiffOff srt 0 mine = B.concat [
                 szName W64,
                 srt,
                 B.pack "-",
                 mine,
+                eol
+            ]
+        
+        mkDiffOff srt off mine = B.concat [
+                szName W64,
+                B.pack "(",
+                srt,
+                B.pack "-",
+                mine,
+                B.pack ")",
                 B.pack ("+" ++ show off),
                 eol
             ]
@@ -200,6 +210,8 @@ cvtForMangler (Statics _ datum) = do
                 llName = "_" ++ unpackFS fs
             in
                 B.pack llName
+                
+        asmNameOf _ = error "asmNameOf -- unexpected name kind"
         
         
         
