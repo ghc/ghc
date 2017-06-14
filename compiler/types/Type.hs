@@ -789,7 +789,7 @@ splitAppTys ty = split ty ty []
     split orig_ty _                     args  = (orig_ty, args)
 
 -- | Like 'splitAppTys', but doesn't look through type synonyms
-repSplitAppTys :: Type -> (Type, [Type])
+repSplitAppTys :: HasDebugCallStack => Type -> (Type, [Type])
 repSplitAppTys ty = split ty []
   where
     split (AppTy ty arg) args = split ty (arg:args)

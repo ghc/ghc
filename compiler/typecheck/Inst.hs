@@ -33,7 +33,7 @@ module Inst (
 #include "HsVersions.h"
 
 import {-# SOURCE #-}   TcExpr( tcPolyExpr, tcSyntaxOp )
-import {-# SOURCE #-}   TcUnify( unifyType, unifyKind, noThing )
+import {-# SOURCE #-}   TcUnify( unifyType, unifyKind )
 
 import BasicTypes ( IntegralLit(..), SourceText(..) )
 import FastString
@@ -324,13 +324,13 @@ instCallConstraints orig preds
   where
     go pred
      | Just (Nominal, ty1, ty2) <- getEqPredTys_maybe pred -- Try short-cut #1
-     = do  { co <- unifyType noThing ty1 ty2
+     = do  { co <- unifyType Nothing ty1 ty2
            ; return (EvCoercion co) }
 
        -- Try short-cut #2
      | Just (tc, args@[_, _, ty1, ty2]) <- splitTyConApp_maybe pred
      , tc `hasKey` heqTyConKey
-     = do { co <- unifyType noThing ty1 ty2
+     = do { co <- unifyType Nothing ty1 ty2
           ; return (EvDFunApp (dataConWrapId heqDataCon) args [EvCoercion co]) }
 
      | otherwise
@@ -409,7 +409,7 @@ tcInstBinder _ subst (Anon ty)
                                    , uo_expected = k2
                                    , uo_thing    = Nothing }
        ; co <- case role of
-                 Nominal          -> unifyKind noThing k1 k2
+                 Nominal          -> unifyKind Nothing k1 k2
                  Representational -> emitWantedEq origin KindLevel role k1 k2
                  Phantom          -> pprPanic "tcInstBinder Phantom" (ppr ty)
        ; arg' <- mk co k1 k2

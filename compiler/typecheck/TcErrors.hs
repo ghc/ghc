@@ -1684,7 +1684,7 @@ mkTyVarEqErr' dflags ctxt report ct oriented tv1 co1 ty2
   = do { let main_msg = addArising (ctOrigin ct) $
                         vcat [ hang (text "Kind mismatch: cannot unify" <+>
                                      parens (ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1)) <+>
-                                     text "with")
+                                     text "with:")
                                   2 (sep [ppr ty2, dcolon, ppr k2])
                              , text "Their kinds differ." ]
              cast_msg
@@ -1999,7 +1999,7 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
         -> empty
 
     thing_msg = case maybe_thing of
-                  Just thing -> \_ -> quotes (ppr thing) <+> text "is"
+                  Just thing -> \_ -> quotes thing <+> text "is"
                   Nothing    -> \vowel -> text "got a" <>
                                           if vowel then char 'n' else empty
     msg2 = sep [ text "Expecting a lifted type, but"
@@ -2009,12 +2009,12 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
     msg4 = maybe_num_args_msg $$
            sep [ text "Expected a type, but"
                , maybe (text "found something with kind")
-                       (\thing -> quotes (ppr thing) <+> text "has kind")
+                       (\thing -> quotes thing <+> text "has kind")
                        maybe_thing
                , quotes (ppr act) ]
 
     msg5 th = hang (text "Expected" <+> kind_desc <> comma)
-                 2 (text "but" <+> quotes (ppr th) <+> text "has kind" <+>
+                 2 (text "but" <+> quotes th <+> text "has kind" <+>
                     quotes (ppr act))
       where
         kind_desc | isConstraintKind exp = text "a constraint"
@@ -2026,17 +2026,13 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
         -> let n_act = count_args act
                n_exp = count_args exp in
            case n_act - n_exp of
-             n | n /= 0
+             n | n > 0   -- we don't know how many args there are, so don't
+                         -- recommend removing args that aren't
                , Just thing <- maybe_thing
-               , case errorThingNumArgs_maybe thing of
-                   Nothing           -> n > 0
-                   Just num_act_args -> num_act_args >= -n
-                     -- don't report to strip off args that aren't there
                -> Just $ text "Expecting" <+> speakN (abs n) <+>
-                         more_or_fewer <+> quotes (ppr thing)
+                         more <+> quotes thing
                where
-                 more_or_fewer
-                  | n < 0     = text "fewer arguments to"
+                 more
                   | n == 1    = text "more argument to"
                   | otherwise = text "more arguments to"  -- n > 1
              _ -> Nothing

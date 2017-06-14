@@ -17,11 +17,13 @@ tcSpliceExpr :: HsSplice GhcRn
              -> ExpRhoType
              -> TcM (HsExpr GhcTcId)
 
-tcUntypedBracket :: HsBracket GhcRn
+tcUntypedBracket :: HsExpr GhcRn
+                 -> HsBracket GhcRn
                  -> [PendingRnSplice]
                  -> ExpRhoType
                  -> TcM (HsExpr GhcTcId)
-tcTypedBracket :: HsBracket GhcRn
+tcTypedBracket :: HsExpr GhcRn
+               -> HsBracket GhcRn
                -> ExpRhoType
                -> TcM (HsExpr GhcTcId)
 

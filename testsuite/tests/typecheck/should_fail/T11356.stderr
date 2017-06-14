@@ -1,5 +1,4 @@
 
 T11356.hs:3:7: error:
-    • Expecting one fewer arguments to ‘T p’
-      Expected kind ‘k0 -> Constraint’, but ‘T p’ has kind ‘Constraint’
+    • Expected kind ‘k0 -> Constraint’, but ‘T p’ has kind ‘Constraint’
     • In the class declaration for ‘C’

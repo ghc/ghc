@@ -7,12 +7,3 @@ tcfail123.hs:11:9: error:
     • In the first argument of ‘f’, namely ‘3#’
       In the expression: f 3#
       In an equation for ‘h’: h v = f 3#
-
-tcfail123.hs:11:9: error:
-    • Couldn't match a lifted type with an unlifted type
-      When matching types
-        p0 :: *
-        GHC.Prim.Int# :: TYPE 'GHC.Types.IntRep
-    • In the first argument of ‘f’, namely ‘3#’
-      In the expression: f 3#
-      In an equation for ‘h’: h v = f 3#

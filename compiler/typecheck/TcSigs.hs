@@ -32,7 +32,7 @@ import TcRnMonad
 import TcType
 import TcMType
 import TcValidity ( checkValidType )
-import TcUnify( tcSkolemise, unifyType, noThing )
+import TcUnify( tcSkolemise, unifyType )
 import Inst( topInstantiate )
 import TcEnv( tcLookupId )
 import TcEvidence( HsWrapper, (<.>) )
@@ -722,7 +722,7 @@ tcSpecWrapper ctxt poly_ty spec_ty
   = do { (sk_wrap, inst_wrap)
                <- tcSkolemise ctxt spec_ty $ \ _ spec_tau ->
                   do { (inst_wrap, tau) <- topInstantiate orig poly_ty
-                     ; _ <- unifyType noThing spec_tau tau
+                     ; _ <- unifyType Nothing spec_tau tau
                             -- Deliberately ignore the evidence
                             -- See Note [Handling SPECIALISE pragmas],
                             --   wrinkle (2)

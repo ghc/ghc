@@ -348,7 +348,7 @@ tc_pat penv (LazyPat pat) pat_ty thing_inside
 
         -- Check that the expected pattern type is itself lifted
         ; pat_ty <- readExpType pat_ty
-        ; _ <- unifyType noThing (typeKind pat_ty) liftedTypeKind
+        ; _ <- unifyType Nothing (typeKind pat_ty) liftedTypeKind
 
         ; return (LazyPat pat', res) }
 
@@ -382,7 +382,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
         ; (expr_wrap1, [inf_arg_ty], inf_res_ty)
-            <- matchActualFunTys herald expr_orig (Just expr) 1 expr'_inferred
+            <- matchActualFunTys herald expr_orig (Just (unLoc expr)) 1 expr'_inferred
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
          -- check that overall pattern is more polymorphic than arg type
@@ -896,7 +896,7 @@ matchExpectedConTy (PE { pe_orig = orig }) data_tc exp_pat_ty
                                              ppr exp_pat_ty,
                                              ppr pat_ty,
                                              ppr pat_rho, ppr wrap])
-       ; co1 <- unifyType noThing (mkTyConApp fam_tc (substTys subst fam_args)) pat_rho
+       ; co1 <- unifyType Nothing (mkTyConApp fam_tc (substTys subst fam_args)) pat_rho
              -- co1 : T (ty1,ty2) ~N pat_rho
              -- could use tcSubType here... but it's the wrong way round
              -- for actual vs. expected in error messages.

@@ -166,8 +166,8 @@ NB: The res_ty is always deeply skolemised.
 -}
 
 tcExpr :: HsExpr GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
-tcExpr (HsVar (L _ name)) res_ty = tcCheckId name res_ty
-tcExpr (HsUnboundVar uv)  res_ty = tcUnboundId uv res_ty
+tcExpr (HsVar (L _ name))   res_ty = tcCheckId name res_ty
+tcExpr e@(HsUnboundVar uv)  res_ty = tcUnboundId e uv res_ty
 
 tcExpr e@(HsApp {})     res_ty = tcApp1 e res_ty
 tcExpr e@(HsAppType {}) res_ty = tcApp1 e res_ty
@@ -370,7 +370,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        ; let doc   = text "The first argument of ($) takes"
              orig1 = lexprCtOrigin arg1
        ; (wrap_arg1, [arg2_sigma], op_res_ty) <-
-           matchActualFunTys doc orig1 (Just arg1) 1 arg1_ty
+           matchActualFunTys doc orig1 (Just (unLoc arg1)) 1 arg1_ty
 
          -- We have (arg1 $ arg2)
          -- So: arg1_ty = arg2_ty -> op_res_ty
@@ -385,7 +385,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
        --
        -- The *result* type can have any kind (Trac #8739),
        -- so we don't need to check anything for that
-       ; _ <- unifyKind (Just arg2_sigma) (typeKind arg2_sigma) liftedTypeKind
+       ; _ <- unifyKind (Just (HsCoreTy arg2_sigma)) (typeKind arg2_sigma) liftedTypeKind
            -- ignore the evidence. arg2_sigma must have type * or #,
            -- because we know arg2_sigma -> or_res_ty is well-kinded
            -- (because otherwise matchActualFunTys would fail)
@@ -434,7 +434,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 tcExpr expr@(SectionR op arg2) res_ty
   = do { (op', op_ty) <- tcInferFun op
        ; (wrap_fun, [arg1_ty, arg2_ty], op_res_ty)
-                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just op) 2 op_ty
+                  <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op)) 2 op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
                                  (mkFunTy arg1_ty op_res_ty) res_ty
        ; arg2' <- tcArg op arg2 arg2_ty 2
@@ -453,7 +453,7 @@ tcExpr expr@(SectionL arg1 op) res_ty
                          | otherwise                            = 2
 
        ; (wrap_fn, (arg1_ty:arg_tys), op_res_ty)
-           <- matchActualFunTys (mk_op_msg op) fn_orig (Just op)
+           <- matchActualFunTys (mk_op_msg op) fn_orig (Just (unLoc op))
                                 n_reqd_args op_ty
        ; wrap_res <- tcSubTypeHR SectionOrigin (Just expr)
                                  (mkFunTys arg_tys op_res_ty) res_ty
@@ -938,7 +938,7 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
 
         ; wrap_res <- tcSubTypeHR (exprCtOrigin expr)
                                   (Just expr) rec_res_ty res_ty
-        ; co_scrut <- unifyType (Just record_expr) record_rho scrut_ty
+        ; co_scrut <- unifyType (Just (unLoc record_expr)) record_rho scrut_ty
                 -- NB: normal unification is OK here (as opposed to subsumption),
                 -- because for this to work out, both record_rho and scrut_ty have
                 -- to be normal datatypes -- no contravariant stuff can go on
@@ -974,8 +974,8 @@ tcExpr expr@(RecordUpd { rupd_expr = record_expr, rupd_flds = rbnds }) res_ty
                     , rupd_cons = relevant_cons, rupd_in_tys = scrut_inst_tys
                     , rupd_out_tys = result_inst_tys, rupd_wrap = req_wrap } }
 
-tcExpr (HsRecFld f) res_ty
-    = tcCheckRecSelId f res_ty
+tcExpr e@(HsRecFld f) res_ty
+    = tcCheckRecSelId e f res_ty
 
 {-
 ************************************************************************
@@ -1037,10 +1037,10 @@ tcExpr (HsSpliceE (HsSpliced mod_finalizers (HsSplicedExpr expr)))
        tcExpr expr res_ty
 tcExpr (HsSpliceE splice)        res_ty
   = tcSpliceExpr splice res_ty
-tcExpr (HsBracket brack)         res_ty
-  = tcTypedBracket   brack res_ty
-tcExpr (HsRnBracketOut brack ps) res_ty
-  = tcUntypedBracket brack ps res_ty
+tcExpr e@(HsBracket brack)         res_ty
+  = tcTypedBracket e brack res_ty
+tcExpr e@(HsRnBracketOut brack ps) res_ty
+  = tcUntypedBracket e brack ps res_ty
 
 {-
 ************************************************************************
@@ -1194,7 +1194,7 @@ tcApp m_herald orig_fun orig_args res_ty
                 -- up to call that function
            ; wrap_res <- addFunResCtxt True (unLoc fun) actual_res_ty res_ty $
                          tcSubTypeDS_NC_O orig GenSigCtxt
-                           (Just $ foldl mk_hs_app fun args)
+                           (Just $ unLoc $ foldl mk_hs_app fun args)
                            actual_res_ty res_ty
 
            ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
@@ -1290,7 +1290,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
 
     go acc_args n fun_ty (Left arg : args)
       = do { (wrap, [arg_ty], res_ty)
-               <- matchActualFunTysPart herald fun_orig (Just fun) 1 fun_ty
+               <- matchActualFunTysPart herald fun_orig (Just (unLoc fun)) 1 fun_ty
                                         acc_args orig_arity
                -- wrap :: fun_ty "->" arg_ty -> res_ty
            ; arg' <- tcArg fun arg arg_ty n
@@ -1449,7 +1449,7 @@ tcSynArgA :: CtOrigin
             -- and a wrapper to be applied to the overall expression
 tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
   = do { (match_wrapper, arg_tys, res_ty)
-           <- matchActualFunTys herald orig noThing (length arg_shapes) sigma_ty
+           <- matchActualFunTys herald orig Nothing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
            <- tc_syn_args_e arg_tys arg_shapes $ \ arg_results ->
@@ -1623,18 +1623,18 @@ tcCheckId name res_ty
   = do { (expr, actual_res_ty) <- tcInferId name
        ; traceTc "tcCheckId" (vcat [ppr name, ppr actual_res_ty, ppr res_ty])
        ; addFunResCtxt False (HsVar (noLoc name)) actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOf name)  expr actual_res_ty res_ty }
+         tcWrapResultO (OccurrenceOf name) (HsVar (noLoc name)) expr actual_res_ty res_ty }
 
-tcCheckRecSelId :: AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
-tcCheckRecSelId f@(Unambiguous (L _ lbl) _) res_ty
+tcCheckRecSelId :: HsExpr GhcRn -> AmbiguousFieldOcc GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcCheckRecSelId rn_expr f@(Unambiguous (L _ lbl) _) res_ty
   = do { (expr, actual_res_ty) <- tcInferRecSelId f
        ; addFunResCtxt False (HsRecFld f) actual_res_ty res_ty $
-         tcWrapResultO (OccurrenceOfRecSel lbl) expr actual_res_ty res_ty }
-tcCheckRecSelId (Ambiguous lbl _) res_ty
+         tcWrapResultO (OccurrenceOfRecSel lbl) rn_expr expr actual_res_ty res_ty }
+tcCheckRecSelId rn_expr (Ambiguous lbl _) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
       Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
-                          ; tcCheckRecSelId (Unambiguous lbl sel_name) res_ty }
+                          ; tcCheckRecSelId rn_expr (Unambiguous lbl sel_name) res_ty }
 
 ------------------------
 tcInferRecSelId :: AmbiguousFieldOcc GhcRn -> TcM (HsExpr GhcTcId, TcRhoType)
@@ -1724,7 +1724,7 @@ tc_infer_id lbl id_name
       | otherwise                  = return ()
 
 
-tcUnboundId :: UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcUnboundId :: HsExpr GhcRn -> UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- Typecheck an occurrence of an unbound Id
 --
 -- Some of these started life as a true expression hole "_".
@@ -1733,7 +1733,7 @@ tcUnboundId :: UnboundVar -> ExpRhoType -> TcM (HsExpr GhcTcId)
 -- We turn all of them into HsVar, since HsUnboundVar can't contain an
 -- Id; and indeed the evidence for the CHoleCan does bind it, so it's
 -- not unbound any more!
-tcUnboundId unbound res_ty
+tcUnboundId rn_expr unbound res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (Trac #12531)
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
@@ -1745,7 +1745,7 @@ tcUnboundId unbound res_ty
                                               , ctev_loc  = loc}
                            , cc_hole = ExprHole unbound }
       ; emitInsoluble can
-      ; tcWrapResultO (UnboundOccurrenceOf occ) (HsVar (noLoc ev)) ty res_ty }
+      ; tcWrapResultO (UnboundOccurrenceOf occ) rn_expr (HsVar (noLoc ev)) ty res_ty }
 
 
 {-

@@ -12,7 +12,7 @@ T3540.hs:10:13: error:
     • In the type signature: thing2 :: (a ~ Int) -> Int
 
 T3540.hs:13:12: error:
-    • Expected a type, but ‘?dude::Int’ has kind ‘Constraint’
+    • Expected a type, but ‘?dude :: Int’ has kind ‘Constraint’
     • In the type signature: thing3 :: (?dude :: Int) -> Int
 
 T3540.hs:16:11: error:

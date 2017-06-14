@@ -1203,7 +1203,7 @@ kcDataDefn fam_name (HsIB { hsib_body = pats })
             Just k  -> do { k' <- tcLHsKindSig k
                           ; unifyKind (Just hs_ty_pats) res_k k' } }
   where
-    hs_ty_pats = mkHsAppTys (noLoc $ HsTyVar NotPromoted (noLoc fam_name)) pats
+    hs_ty_pats = unLoc $ mkHsAppTys (noLoc $ HsTyVar NotPromoted (noLoc fam_name)) pats
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.

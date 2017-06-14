@@ -66,7 +66,6 @@ module TcMType (
   --------------------------------
   -- Zonking and tidying
   zonkTidyTcType, zonkTidyOrigin,
-  mkTypeErrorThing, mkTypeErrorThingArgs,
   tidyEvVar, tidyCt, tidySkolemInfo,
   skolemiseRuntimeUnk,
   zonkTcTyVar, zonkTcTyVars, zonkTcTyVarToTyVar,
@@ -1526,32 +1525,17 @@ zonkTidyTcType :: TidyEnv -> TcType -> TcM (TidyEnv, TcType)
 zonkTidyTcType env ty = do { ty' <- zonkTcType ty
                            ; return (tidyOpenType env ty') }
 
--- | Make an 'ErrorThing' storing a type.
-mkTypeErrorThing :: TcType -> ErrorThing
-mkTypeErrorThing ty = ErrorThing ty (Just $ length $ snd $ repSplitAppTys ty)
-                                 zonkTidyTcType
-   -- NB: Use *rep*splitAppTys, else we get #11313
-
--- | Make an 'ErrorThing' storing a type, with some extra args known about
-mkTypeErrorThingArgs :: TcType -> Int -> ErrorThing
-mkTypeErrorThingArgs ty num_args
-  = ErrorThing ty (Just $ (length $ snd $ repSplitAppTys ty) + num_args)
-               zonkTidyTcType
-
 zonkTidyOrigin :: TidyEnv -> CtOrigin -> TcM (TidyEnv, CtOrigin)
 zonkTidyOrigin env (GivenOrigin skol_info)
   = do { skol_info1 <- zonkSkolemInfo skol_info
        ; let skol_info2 = tidySkolemInfo env skol_info1
        ; return (env, GivenOrigin skol_info2) }
 zonkTidyOrigin env orig@(TypeEqOrigin { uo_actual   = act
-                                      , uo_expected = exp
-                                      , uo_thing    = m_thing })
+                                      , uo_expected = exp })
   = do { (env1, act') <- zonkTidyTcType env  act
        ; (env2, exp') <- zonkTidyTcType env1 exp
-       ; (env3, m_thing') <- zonkTidyErrorThing env2 m_thing
-       ; return ( env3, orig { uo_actual   = act'
-                             , uo_expected = exp'
-                             , uo_thing    = m_thing' }) }
+       ; return ( env2, orig { uo_actual   = act'
+                             , uo_expected = exp' }) }
 zonkTidyOrigin env (KindEqOrigin ty1 m_ty2 orig t_or_k)
   = do { (env1, ty1')   <- zonkTidyTcType env  ty1
        ; (env2, m_ty2') <- case m_ty2 of
@@ -1569,14 +1553,6 @@ zonkTidyOrigin env (FunDepOrigin2 p1 o1 p2 l2)
        ; (env3, o1') <- zonkTidyOrigin env2 o1
        ; return (env3, FunDepOrigin2 p1' o1' p2' l2) }
 zonkTidyOrigin env orig = return (env, orig)
-
-zonkTidyErrorThing :: TidyEnv -> Maybe ErrorThing
-                   -> TcM (TidyEnv, Maybe ErrorThing)
-zonkTidyErrorThing env (Just (ErrorThing thing n_args zonker))
-  = do { (env', thing') <- zonker env thing
-       ; return (env', Just $ ErrorThing thing' n_args zonker) }
-zonkTidyErrorThing env Nothing
-  = return (env, Nothing)
 
 ----------------
 tidyCt :: TidyEnv -> Ct -> Ct

@@ -1,7 +1,6 @@
 
 T12593.hs:11:16: error:
-    • Expecting two fewer arguments to ‘Free k k4 k5 p’
-      Expected kind ‘k0 -> k1 -> *’, but ‘Free k k4 k5 p’ has kind ‘*’
+    • Expected kind ‘k0 -> k1 -> *’, but ‘Free k k1 k2 p’ has kind ‘*’
     • In the type signature:
         run :: k2 q =>
                Free k k1 k2 p a b
@@ -20,9 +19,9 @@ T12593.hs:12:31: error:
                -> (forall (c :: k) (d :: k1). p c d -> q c d) -> q a b
 
 T12593.hs:12:40: error:
-    • Expecting two more arguments to ‘k4’
+    • Expecting two more arguments to ‘k1’
       Expected a type, but
-      ‘k4’ has kind
+      ‘k1’ has kind
       ‘((k0 -> k1 -> *) -> Constraint) -> (k2 -> k3 -> *) -> *’
     • In the kind ‘k1’
       In the type signature:

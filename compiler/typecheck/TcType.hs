@@ -66,6 +66,7 @@ module TcType (
   tcRepSplitTyConApp_maybe, tcRepSplitTyConApp_maybe',
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
+  tcRepGetNumAppTys,
   tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
 
@@ -1568,6 +1569,12 @@ tcSplitAppTys ty
     go ty args = case tcSplitAppTy_maybe ty of
                    Just (ty', arg) -> go ty' (arg:args)
                    Nothing         -> (ty,args)
+
+-- | Returns the number of arguments in the given type, without
+-- looking through synonyms. This is used only for error reporting.
+-- We don't look through synonyms because of #11313.
+tcRepGetNumAppTys :: Type -> Arity
+tcRepGetNumAppTys = length . snd . repSplitAppTys
 
 -----------------------
 -- | If the type is a tyvar, possibly under a cast, returns it, along
