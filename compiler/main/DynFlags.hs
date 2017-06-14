@@ -525,6 +525,7 @@ data GeneralFlag
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
+   | Opt_HideLoadedMods -- Hide lists of loaded modules in ghci
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -3760,7 +3761,8 @@ fFlagsDeps = [
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,
-  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs
+  flagSpec "whole-archive-hs-libs"            Opt_WholeArchiveHsLibs,
+  flagGhciSpec "hide-loaded-modules"          Opt_HideLoadedMods
   ]
 
 -- | These @-f\<blah\>@ flags can all be reversed with @-fno-\<blah\>@
