@@ -64,15 +64,9 @@ Here is a running example:
   body are stored in AST at the location of the static form.
 
 * The typechecker verifies that all free variables occurring in the
-  static form are closed (see Note [Bindings with closed types] in
-  TcRnTypes).  In our example, 'k' is closed, even though it is bound
-  in a nested let, we are fine.
-
-  The typechecker also surrounds the static form with a call to
-  `GHC.StaticPtr.fromStaticPtr`.
-
-   f x = let k = map toUpper
-         in ...fromStaticPtr (static k)...
+  static form are floatable to top level (see Note [Meaning of
+  IdBindingInfo] in TcRnTypes).  In our example, 'k' is floatable, even
+  though it is bound in a nested let, we are fine.
 
 * The desugarer replaces the static form with an application of the
   function 'makeStatic' (defined in module GHC.StaticPtr.Internal of

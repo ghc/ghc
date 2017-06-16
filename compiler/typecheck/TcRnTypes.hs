@@ -40,7 +40,7 @@ module TcRnTypes(
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
         TcTyThing(..), PromotionErr(..),
-        IdBindingInfo(..),
+        IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
@@ -60,9 +60,9 @@ module TcRnTypes(
         ArrowCtxt(..),
 
         -- TcSigInfo
-        TcSigInfo(..), TcIdSigInfo(..),
+        TcSigFun, TcSigInfo(..), TcIdSigInfo(..),
         TcIdSigInst(..), TcPatSynInfo(..),
-        isPartialSig,
+        isPartialSig, hasCompleteSig,
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
@@ -805,8 +805,11 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
-        tcl_th_bndrs   :: ThBindEnv,       -- Binding level of in-scope Names
-                                           -- defined in this module (not imported)
+        tcl_th_bndrs   :: ThBindEnv,       -- and binder info
+            -- The ThBindEnv records the TH binding level of in-scope Names
+            -- defined in this module (not imported)
+            -- We can't put this info in the TypeEnv because it's needed
+            -- (and extended) in the renamer, for untyed splices
 
         tcl_arrow_ctxt :: ArrowCtxt,       -- Arrow-notation context
 
@@ -839,6 +842,14 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
+
+type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+        -- Monadic so that we have a chance
+        -- to deal with bound type variables just before error
+        -- message construction
+
+        -- Bool:  True <=> this is a landmark context; do not
+        --                 discard it when trimming for display
 
 type TcTypeEnv = NameEnv TcTyThing
 
@@ -1042,9 +1053,10 @@ data ArrowCtxt   -- Note [Escaping the arrow scope]
 data TcTyThing
   = AGlobal TyThing             -- Used only in the return type of a lookup
 
-  | ATcId   {           -- Ids defined in this module; may not be fully zonked
-        tct_id     :: TcId,
-        tct_info :: IdBindingInfo }   -- See Note [Bindings with closed types]
+  | ATcId           -- Ids defined in this module; may not be fully zonked
+      { tct_id   :: TcId
+      , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
+      }
 
   | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
                                 -- variable is bound. We only need the Name
@@ -1086,45 +1098,136 @@ instance Outputable TcTyThing where     -- Debugging only
    ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
 
--- | Describes how an Id is bound.
+-- | IdBindingInfo describes how an Id is bound.
 --
 -- It is used for the following purposes:
---
 -- a) for static forms in TcExpr.checkClosedInStaticForm and
--- b) to figure out when a nested binding can be generalised (in
---    TcBinds.decideGeneralisationPlan).
+-- b) to figure out when a nested binding can be generalised,
+--    in TcBinds.decideGeneralisationPlan.
 --
--- See Note [Meaning of IdBindingInfo].
-data IdBindingInfo
+data IdBindingInfo -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
     = NotLetBound
     | ClosedLet
-    | NonClosedLet NameSet Bool
+    | NonClosedLet
+         RhsNames        -- Used for (static e) checks only
+         ClosedTypeId    -- Used for generalisation checks
+                         -- and for (static e) checks
 
--- Note [Meaning of IdBindingInfo]
---
--- @NotLetBound@ means that the Id is not let-bound (e.g. it is bound in a
--- lambda-abstraction or in a case pattern).
---
--- @ClosedLet@ means that the Id is let-bound, it is closed and its type is
--- closed as well.
---
--- @NonClosedLet fvs type-closed@ means that the Id is let-bound but it is not
--- closed. The @fvs@ set contains the free variables of the rhs. The type-closed
--- flag indicates if the type of Id is closed.
+-- | IsGroupClosed describes a group of mutually-recursive bindings
+data IsGroupClosed
+  = IsGroupClosed
+      (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the goup
+                          -- Used only for (static e) checks
+
+      ClosedTypeId        -- True <=> all the free vars of the group are
+                          --          imported or ClosedLet or
+                          --          NonClosedLet with ClosedTypeId=True.
+                          --          In particular, no tyvars, no NotLetBound
+
+type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
+                          -- a definition, that are not Global or ClosedLet
+
+type ClosedTypeId = Bool
+  -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
+
+{- Note [Meaning of IdBindingInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NotLetBound means that
+  the Id is not let-bound (e.g. it is bound in a
+  lambda-abstraction or in a case pattern)
+
+ClosedLet means that
+   - The Id is let-bound,
+   - Any free term variables are also Global or ClosedLet
+   - Its type has no free variables (NB: a top-level binding subject
+     to the MR might have free vars in its type)
+   These ClosedLets can definitely be floated to top level; and we
+   may need to do so for static forms.
+
+   Property:   ClosedLet
+             is equivalent to
+               NonClosedLet emptyNameSet True
+
+(NonClosedLet (fvs::RhsNames) (cl::ClosedTypeId)) means that
+   - The Id is let-bound
+
+   - The fvs::RhsNames contains the free names of the RHS,
+     excluding Global and ClosedLet ones.
+
+   - For the ClosedTypeId field see Note [Bindings with closed types]
+
+For (static e) to be valid, we need for every 'x' free in 'e',
+x's binding must be floatable to top level.  Specifically:
+   * x's RhsNames must be non-empty
+   * x's type has no free variables
+See Note [Grand plan for static forms] in StaticPtrTable.hs.
+This test is made in TcExpr.checkClosedInStaticForm.
+Actually knowing x's RhsNames (rather than just its emptiness
+or otherwise) is just so we can produce better error messages
+
+Note [Bindings with closed types: ClosedTypeId]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  f x = let g ys = map not ys
+        in ...
+
+Can we generalise 'g' under the OutsideIn algorithm?  Yes,
+because all g's free variables are top-level; that is they themselves
+have no free type variables, and it is the type variables in the
+environment that makes things tricky for OutsideIn generalisation.
+
+Here's the invariant:
+   If an Id has ClosedTypeId=True (in its IdBindingInfo), then
+   the Id's type is /definitely/ closed (has no free type variables).
+   Specifically,
+       a) The Id's acutal type is closed (has no free tyvars)
+       b) Either the Id has a (closed) user-supplied type signature
+          or all its free varaibles are Global/ClosedLet
+             or NonClosedLet with ClosedTypeId=True.
+          In particular, none are NotLetBound.
+
+Why is (b) needed?   Consider
+    \x. (x :: Int, let y = x+1 in ...)
+Initially x::alpha.  If we happen to typecheck the 'let' before the
+(x::Int), y's type will have a free tyvar; but if the other way round
+it won't.  So we treat any let-bound variable with a free
+non-let-bound variable as not ClosedTypeId, regardless of what the
+free vars of its type actually are.
+
+But if it has a signature, all is well:
+   \x. ...(let { y::Int; y = x+1 } in
+           let { v = y+2 } in ...)...
+Here the signature on 'v' makes 'y' a ClosedTypeId, so we can
+generalise 'v'.
+
+Note that:
+
+  * A top-level binding may not have ClosedTypeId=True, if it suffers
+    from the MR
+
+  * A nested binding may be closed (eg 'g' in the example we started
+    with). Indeed, that's the point; whether a function is defined at
+    top level or nested is orthogonal to the question of whether or
+    not it is closed.
+
+  * A binding may be non-closed because it mentions a lexically scoped
+    *type variable*  Eg
+        f :: forall a. blah
+        f x = let g y = ...(y::a)...
+
+Under OutsideIn we are free to generalise an Id all of whose free
+variables have ClosedTypeId=True (or imported).  This is an extension
+compared to the JFP paper on OutsideIn, which used "top-level" as a
+proxy for "closed".  (It's not a good proxy anyway -- the MR can make
+a top-level binding with a free type variable.)
+-}
 
 instance Outputable IdBindingInfo where
   ppr NotLetBound = text "NotLetBound"
   ppr ClosedLet = text "TopLevelLet"
   ppr (NonClosedLet fvs closed_type) =
     text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
-
--- | Tells if a group of binders is closed.
---
--- When it is not closed, it provides a map of binder ids to the free vars
--- in their right-hand sides.
---
-data IsGroupClosed = ClosedGroup
-                   | NonClosedGroup (NameEnv NameSet)
 
 instance Outputable PromotionErr where
   ppr ClassPE        = text "ClassPE"
@@ -1154,58 +1257,6 @@ pprPECategory NoDataKindsTC  = text "Type constructor"
 pprPECategory NoDataKindsDC  = text "Data constructor"
 pprPECategory NoTypeInTypeTC = text "Type constructor"
 pprPECategory NoTypeInTypeDC = text "Data constructor"
-
-{- Note [Bindings with closed types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-
-  f x = let g ys = map not ys
-        in ...
-
-Can we generalise 'g' under the OutsideIn algorithm?  Yes,
-because all g's free variables are top-level; that is they themselves
-have no free type variables, and it is the type variables in the
-environment that makes things tricky for OutsideIn generalisation.
-
-Definition:
-   A variable is "closed", and has tct_info set to TopLevel,
-iff
-   a) all its free variables are imported, or are let-bound and closed
-   b) generalisation is not restricted by the monomorphism restriction
-
-Invariant: a closed variable has no free type variables in its type.
-Why? Assume (induction hypothesis) that closed variables have closed
-types, and that we have a new binding f = e, satisfying (a) and (b).
-Then since monomorphism restriction does not apply, and there are no
-free type variables, we can fully generalise, so its type will be closed.
-
-Under OutsideIn we are free to generalise a closed let-binding.
-This is an extension compared to the JFP paper on OutsideIn, which
-used "top-level" as a proxy for "closed".  (It's not a good proxy
-anyway -- the MR can make a top-level binding with a free type
-variable.)
-
-Note that:
-  * A top-level binding may not be closed, if it suffers from the MR
-
-  * A nested binding may be closed (eg 'g' in the example we started with)
-    Indeed, that's the point; whether a function is defined at top level
-    or nested is orthogonal to the question of whether or not it is closed
-
-  * A binding may be non-closed because it mentions a lexically scoped
-    *type variable*  Eg
-        f :: forall a. blah
-        f x = let g y = ...(y::a)...
-
--}
-
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
-        -- Monadic so that we have a chance
-        -- to deal with bound type variables just before error
-        -- message construction
-
-        -- Bool:  True <=> this is a landmark context; do not
-        --                 discard it when trimming for display
 
 {-
 ************************************************************************
@@ -1365,6 +1416,8 @@ instance Outputable WhereFrom where
 -- TcSimplify uses them, and TcSimplify is fairly
 -- low down in the module hierarchy
 
+type TcSigFun  = Name -> Maybe TcSigInfo
+
 data TcSigInfo = TcIdSig     TcIdSigInfo
                | TcPatSynSig TcPatSynInfo
 
@@ -1503,6 +1556,12 @@ isPartialSig :: TcIdSigInst -> Bool
 isPartialSig (TISI { sig_inst_sig = PartialSig {} }) = True
 isPartialSig _                                       = False
 
+-- | No signature or a partial signature
+hasCompleteSig :: TcSigFun -> Name -> Bool
+hasCompleteSig sig_fn name
+  = case sig_fn name of
+      Just (TcIdSig (CompleteSig {})) -> True
+      _                               -> False
 
 
 {-

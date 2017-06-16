@@ -13,7 +13,7 @@ module TcSigs(
        TcPatSynInfo(..),
        TcSigFun,
 
-       isPartialSig, noCompleteSig, tcIdSigName, tcSigInfoName,
+       isPartialSig, hasCompleteSig, tcIdSigName, tcSigInfoName,
        completeSigPolyId_maybe,
 
        tcTySigs, tcUserTypeSig, completeSigFromId,
@@ -143,13 +143,6 @@ errors were dealt with by the renamer.
              Utility functions for TcSigInfo
 *                                                                      *
 ********************************************************************* -}
-
-type TcSigFun  = Name -> Maybe TcSigInfo
-
--- | No signature or a partial signature
-noCompleteSig :: Maybe TcSigInfo -> Bool
-noCompleteSig (Just (TcIdSig (CompleteSig {}))) = False
-noCompleteSig _                                 = True
 
 tcIdSigName :: TcIdSigInfo -> Name
 tcIdSigName (CompleteSig { sig_bndr = id }) = idName id
