@@ -2178,7 +2178,13 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     Capability *old_capabilities = NULL;
     uint32_t old_n_capabilities = n_capabilities;
 
-    if (new_n_capabilities == enabled_capabilities) return;
+    if (new_n_capabilities == enabled_capabilities) {
+        return;
+    } else if (new_n_capabilities <= 0) {
+        errorBelch("setNumCapabilities: Capability count must be positive");
+        return;
+    }
+
 
     debugTrace(DEBUG_sched, "changing the number of Capabilities from %d to %d",
                enabled_capabilities, new_n_capabilities);
