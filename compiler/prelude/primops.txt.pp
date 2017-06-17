@@ -825,11 +825,10 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
   {Given a source array, an offset into the source array, a
    destination array, an offset into the destination array, and a
    number of elements to copy, copy the elements from the source array
-   to the destination array. The source and destination arrays can
-   refer to the same array. Both arrays must fully contain the
-   specified ranges, but this is not checked. 
-   The regions are allowed to overlap, although this is only possible when the same 
-   array is provided as both the source and the destination. }
+   to the destination array. Both arrays must fully contain the
+   specified ranges, but this is not checked. In the case where
+   the source and destination are the same array the source and
+   destination regions may overlap.}
   with
   out_of_line      = True
   has_side_effects = True
@@ -992,9 +991,9 @@ primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
    number of elements to copy, copy the elements from the source array
    to the destination array. The source and destination arrays can
    refer to the same array. Both arrays must fully contain the
-   specified ranges, but this is not checked.
-   The regions are allowed to overlap, although this is only possible when the same 
-   array is provided as both the source and the destination. }
+   specified ranges, but this is not checked. In the case where
+   the source and destination are the same array the source and
+   destination regions may overlap.}
   with
   out_of_line      = True
   has_side_effects = True
@@ -1404,9 +1403,9 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
   {Copy a range of the first MutableByteArray# to the specified region in the second MutableByteArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked. The regions are
-   allowed to overlap, although this is only possible when the same array is provided
-   as both the source and the destination.}
+   Both arrays must fully contain the specified ranges, but this is not checked.
+   In the case where the source and destination are the same array the
+   source and destination regions may overlap.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
@@ -1634,9 +1633,8 @@ primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
   {Copy a range of the first MutableArrayArray# to the specified region in the second
    MutableArrayArray#.
    Both arrays must fully contain the specified ranges, but this is not checked.
-   The regions are allowed to overlap, although this is only possible when the same 
-   array is provided as both the source and the destination.
-   }
+   In the case where the source and destination are the same array the source and
+   destination regions may overlap.}
   with
   out_of_line      = True
   has_side_effects = True
