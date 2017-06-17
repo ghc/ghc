@@ -17,6 +17,7 @@ generally likely to indicate bugs in your program. These are:
 
     * :ghc-flag:`-Woverlapping-patterns`
     * :ghc-flag:`-Wwarnings-deprecations`
+    * :ghc-flag:`-Wdeprecations`
     * :ghc-flag:`-Wdeprecated-flags`
     * :ghc-flag:`-Wunrecognised-pragmas`
     * :ghc-flag:`-Wduplicate-constraints`
@@ -243,6 +244,18 @@ of ``-W(no-)*``.
     Causes a warning to be emitted when a module, function or type with
     a ``WARNING`` or ``DEPRECATED pragma`` is used. See
     :ref:`warning-deprecated-pragma` for more details on the pragmas.
+
+    This option is on by default.
+
+.. ghc-flag:: -Wdeprecations
+
+    .. index::
+       single: deprecations
+
+    Causes a warning to be emitted when a module, function or type with
+    a ``WARNING`` or ``DEPRECATED pragma`` is used. See
+    :ref:`warning-deprecated-pragma` for more details on the pragmas.
+    An alias for :ghc-flag:`-Wwarnings-deprecations`.
 
     This option is on by default.
 
