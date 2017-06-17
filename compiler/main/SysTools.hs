@@ -202,17 +202,10 @@ initSysTools mbMinusB
                             Nothing ->
                                 pgmError ("Can't parse " ++
                                           show platformConstantsFile)
-       let getSetting key = case lookup key mySettings of
-                            Just xs ->
-                                return $ case stripPrefix "$topdir" xs of
-                                         Just [] ->
-                                             top_dir
-                                         Just xs'@(c:_)
-                                          | isPathSeparator c ->
-                                             top_dir ++ xs'
-                                         _ ->
-                                             xs
-                            Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+       let getSettingRaw key = case lookup key mySettings of
+                                 Just xs -> return xs
+                                 Nothing -> pgmError ("No entry for " ++ show key ++ " in " ++ show settingsFile)
+           getSetting key = resolveTopDir top_dir <$> getSettingRaw key
            getBooleanSetting key = case lookup key mySettings of
                                    Just "YES" -> return True
                                    Just "NO" -> return False
@@ -239,7 +232,11 @@ initSysTools mbMinusB
        -- with the settings file, but it would be a little fiddly
        -- to make that possible, so for now you can't.
        gcc_prog <- getSetting "C compiler command"
-       gcc_args_str <- getSetting "C compiler flags"
+       -- TopDir can expand to something that contains spaces
+       -- for the argument string we apply words to the string in order to
+       -- break it up. So defer the expansion of $TopDir till after the words
+       -- call here.
+       gcc_args_str <- getSettingRaw "C compiler flags"
        gccSupportsNoPie <- getBooleanSetting "C compiler supports -no-pie"
        cpp_prog <- getSetting "Haskell CPP command"
        cpp_args_str <- getSetting "Haskell CPP flags"
@@ -252,7 +249,7 @@ initSysTools mbMinusB
                = ["-DTABLES_NEXT_TO_CODE"]
             | otherwise = []
            cpp_args= map Option (words cpp_args_str)
-           gcc_args = map Option (words gcc_args_str
+           gcc_args = map (Option . resolveTopDir top_dir) (words gcc_args_str
                                ++ unreg_gcc_args
                                ++ tntc_gcc_args)
        ldSupportsCompactUnwind <- getBooleanSetting "ld supports compact unwind"
@@ -362,6 +359,21 @@ initSysTools mbMinusB
                     sOpt_i       = [],
                     sPlatformConstants = platformConstants
              }
+
+-- | This function will replace any usage of $TopDir in the given string
+--   regardless of it's location within the string.
+resolveTopDir :: String -- ^ The value of $TopDir
+              -> String -- ^ The string to perform substitutions in
+              -> String -- ^ The resulting string with all subs done.
+resolveTopDir top_dir str
+  = case break (=='$') str of
+      (_, []) -> str
+      (x, xs) -> let rst = case stripPrefix "$topdir" xs of
+                             Just [] -> top_dir
+                             Just xs'@(c:_) | isPathSeparator c
+                                     -> top_dir ++ xs'
+                             _       -> xs
+                 in x ++ resolveTopDir top_dir rst
 
 -- returns a Unix-format path (relying on getBaseDir to do so too)
 findTopDir :: Maybe String -- Maybe TopDir path (without the '-B' prefix).
