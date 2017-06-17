@@ -827,7 +827,9 @@ primop  CopyMutableArrayOp "copyMutableArray#" GenPrimOp
    number of elements to copy, copy the elements from the source array
    to the destination array. The source and destination arrays can
    refer to the same array. Both arrays must fully contain the
-   specified ranges, but this is not checked.}
+   specified ranges, but this is not checked. 
+   The regions are allowed to overlap, although this is only possible when the same 
+   array is provided as both the source and the destination. }
   with
   out_of_line      = True
   has_side_effects = True
@@ -990,7 +992,9 @@ primop  CopySmallMutableArrayOp "copySmallMutableArray#" GenPrimOp
    number of elements to copy, copy the elements from the source array
    to the destination array. The source and destination arrays can
    refer to the same array. Both arrays must fully contain the
-   specified ranges, but this is not checked.}
+   specified ranges, but this is not checked.
+   The regions are allowed to overlap, although this is only possible when the same 
+   array is provided as both the source and the destination. }
   with
   out_of_line      = True
   has_side_effects = True
@@ -1400,7 +1404,9 @@ primop  CopyByteArrayOp "copyByteArray#" GenPrimOp
 primop  CopyMutableByteArrayOp "copyMutableByteArray#" GenPrimOp
   MutableByteArray# s -> Int# -> MutableByteArray# s -> Int# -> Int# -> State# s -> State# s
   {Copy a range of the first MutableByteArray# to the specified region in the second MutableByteArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.}
+   Both arrays must fully contain the specified ranges, but this is not checked. The regions are
+   allowed to overlap, although this is only possible when the same array is provided
+   as both the source and the destination.}
   with
   has_side_effects = True
   code_size = { primOpCodeSizeForeignCall + 4 }
@@ -1627,7 +1633,10 @@ primop  CopyMutableArrayArrayOp "copyMutableArrayArray#" GenPrimOp
   MutableArrayArray# s -> Int# -> MutableArrayArray# s -> Int# -> Int# -> State# s -> State# s
   {Copy a range of the first MutableArrayArray# to the specified region in the second
    MutableArrayArray#.
-   Both arrays must fully contain the specified ranges, but this is not checked.}
+   Both arrays must fully contain the specified ranges, but this is not checked.
+   The regions are allowed to overlap, although this is only possible when the same 
+   array is provided as both the source and the destination.
+   }
   with
   out_of_line      = True
   has_side_effects = True
