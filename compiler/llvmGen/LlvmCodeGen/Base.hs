@@ -190,7 +190,7 @@ llvmStdFunAttrs = [NoUnwind]
 
 -- | Llvm standard function definition attributes
 llvmStdFunDefAttrs :: [LlvmFuncAttr]
-llvmStdFunDefAttrs = [NoUnwind, Naked]
+llvmStdFunDefAttrs = [NoUnwind]
 
 -- | Convert a list of types to a list of function parameters
 -- (each with no parameter attributes)
