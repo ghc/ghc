@@ -401,6 +401,13 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-warnings-deprecations"
          }
+  , flag { flagName = "-Wdeprecations"
+         , flagDescription =
+           "warn about uses of functions & types that have warnings or "++
+           "deprecated pragmas. Alias for :ghc-flag:`-Wwarnings-deprecations`"
+         , flagType = DynamicFlag
+         , flagReverse = "-Wno-deprecations"
+         }
   , flag { flagName = "-Wamp"
          , flagDescription =
            "*(deprecated)* warn on definitions conflicting with the "++
