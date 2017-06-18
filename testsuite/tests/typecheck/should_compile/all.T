@@ -563,3 +563,4 @@ test('T13585', [extra_files(['T13585.hs', 'T13585a.hs', 'T13585b.hs'])], run_com
 test('T13651', normal, compile, [''])
 test('T13785', normal, compile, [''])
 test('T13804', normal, compile, [''])
+test('T13822', normal, compile, [''])
