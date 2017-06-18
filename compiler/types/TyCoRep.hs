@@ -1352,21 +1352,21 @@ tyCoVarsOfType :: Type -> TyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfType ty = fvVarSet $ tyCoFVsOfType ty
 
--- | `tyVarsOfType` that returns free variables of a type in a deterministic
+-- | `tyCoFVsOfType` that returns free variables of a type in a deterministic
 -- set. For explanation of why using `VarSet` is not deterministic see
 -- Note [Deterministic FV] in FV.
 tyCoVarsOfTypeDSet :: Type -> DTyCoVarSet
 -- See Note [Free variables of types]
 tyCoVarsOfTypeDSet ty = fvDVarSet $ tyCoFVsOfType ty
 
--- | `tyVarsOfType` that returns free variables of a type in deterministic
+-- | `tyCoFVsOfType` that returns free variables of a type in deterministic
 -- order. For explanation of why using `VarSet` is not deterministic see
 -- Note [Deterministic FV] in FV.
 tyCoVarsOfTypeList :: Type -> [TyCoVar]
 -- See Note [Free variables of types]
 tyCoVarsOfTypeList ty = fvVarList $ tyCoFVsOfType ty
 
--- | The worker for `tyVarsOfType` and `tyVarsOfTypeList`.
+-- | The worker for `tyCoFVsOfType` and `tyCoFVsOfTypeList`.
 -- The previous implementation used `unionVarSet` which is O(n+m) and can
 -- make the function quadratic.
 -- It's exported, so that it can be composed with
