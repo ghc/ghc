@@ -167,7 +167,7 @@ test('T3294',
              # 2015-07-11 43196344 (x86/Linux, 64-bit machine) use +RTS -G1
              # 2016-04-06 28686588 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 63131248, 20)]),
+           (wordsize(64), 34050960, 20)]),
              # prev:           25753192 (amd64/Linux)
              # 29/08/2012:     37724352 (amd64/Linux)
              #  (increase due to new codegen, see #7198)
@@ -186,6 +186,7 @@ test('T3294',
              # 2016-07-11:     54609256  (Windows) before fix for #12227
              # 2016-07-11:     52992688  (Windows) after fix for #12227
              # 2017-02-17:     63131248  (amd64/Linux) Type indexed Typeable
+             # 2017-05-14:     34050960  (amd64/Linux) Two-pass CmmLayoutStack
 
       compiler_stats_num_field('bytes allocated',
           [(wordsize(32), 1377050640, 5),
@@ -195,7 +196,7 @@ test('T3294',
            # 2013-11-13: 1478325844  (x86/Windows, 64bit machine)
            # 2014-01-12: 1565185140  (x86/Linux)
            # 2013-04-04: 1377050640  (x86/Windows, 64bit machine)
-           (wordsize(64), 2758641264, 5)]),
+           (wordsize(64), 2253557280, 5)]),
             # old:        1357587088 (amd64/Linux)
             # 29/08/2012: 2961778696 (amd64/Linux)
             # (^ increase due to new codegen, see #7198)
@@ -209,6 +210,7 @@ test('T3294',
             # 2016-07-11: 2664479936 (Windows) before fix for #12227
             # 2016-07-11: 2739731144 (Windows) after fix for #12227 (ignoring)
             # 2017-02-17: 2758641264 (amd64/Linux) (Type indexed Typeable)
+            # 2017-05-14: 2253557280 (amd64/Linux) Two-pass CmmLayoutStack
       conf_3294,
 
       # Use `+RTS -G1` for more stable residency measurements. Note [residency].
@@ -538,7 +540,7 @@ test('T5321Fun',
              # 2016-04-06: 279922360 x86/Linux
              # 2017-03-24: 244387620 x86/Linux (64-bit machine)
 
-            (wordsize(64), 488295304, 5)])
+            (wordsize(64), 449577856, 5)])
              # prev:       585521080
              # 2012-08-29: 713385808     #  (increase due to new codegen)
              # 2013-05-15: 628341952     #  (reason for decrease unknown)
@@ -564,6 +566,7 @@ test('T5321Fun',
              # 2017-01-31: 498135752     #  Join points (#12988)
              # 2017-02-23: 524706256     #  Type-indexed Typeable? (on Darwin)
              # 2017-02-25: 488295304     #  Early inlining patch
+             # 2017-05-14: 449577856     #  (amd64/Linxu) Two-pass CmmLayoutStack
       ],
       compile,[''])
 
@@ -578,7 +581,7 @@ test('T5321FD',
             #  (due to better optCoercion, 5e7406d9, #9233)
             # 2016-04-06: 250757460 (x86/Linux)
 
-           (wordsize(64), 477840432, 10)])
+           (wordsize(64), 415136648, 10)])
             # prev:       418306336
             # 29/08/2012: 492905640
             #  (increase due to new codegen)
@@ -599,6 +602,7 @@ test('T5321FD',
             #  D757: emit Typeable instances at site of type definition
             # 2016-07-16: 477840432
             #  Optimize handling of built-in OccNames
+            # 2017-05-14: 415136648 (amd64/Linux) Two-pass CmmLayoutStack
       ],
       compile,[''])
 
@@ -1086,13 +1090,14 @@ test('T13056',
 
 test('T12707',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 1231809592, 5),
+          [(wordsize(64), 1163821528, 5),
           # initial:    1271577192
           # 2017-01-22: 1348865648  Allow top-level strings in Core
           # 2017-01-31: 1280336112  Join points (#12988)
           # 2017-02-11: 1310037632  Check local family instances vs imports
           # 2017-02-23: 1386110512  Type-indexed Typeable? (on Darwin)
           # 2017-03-02: 1231809592  Drift from recent simplifier improvements
+          # 2017-05-14: 1163821528  (amd64/Linux) Two-pass CmmLayoutStack
           ]),
      ],
      compile,
@@ -1100,7 +1105,9 @@ test('T12707',
 
 test('T13379',
      [ compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 411597856, 10),
+          [(platform('x86_64-apple-darwin'), 453166912, 10),
+          # 453166912: add osx-specific after two-pass CmmLayoutStack
+           (wordsize(64), 411597856, 10),
           # initial:    411597856
           # widen window to 10%, Darwin had 449080520, a 9.1% difference
           ]),

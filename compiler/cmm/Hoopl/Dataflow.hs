@@ -21,16 +21,20 @@ module Hoopl.Dataflow
   ( C, O, Block
   , lastNode, entryLabel
   , foldNodesBwdOO
-  , DataflowLattice(..), OldFact(..), NewFact(..), JoinedFact(..), TransferFun
+  , foldRewriteNodesBwdOO
+  , DataflowLattice(..), OldFact(..), NewFact(..), JoinedFact(..)
+  , TransferFun, RewriteFun
   , Fact, FactBase
   , getFact, mkFactBase
   , analyzeCmmFwd, analyzeCmmBwd
+  , rewriteCmmBwd
   , changedIf
   , joinOutFacts
   )
 where
 
 import Cmm
+import UniqSupply
 
 import Data.Array
 import Data.List
@@ -70,6 +74,14 @@ data DataflowLattice a = DataflowLattice
 data Direction = Fwd | Bwd
 
 type TransferFun f = CmmBlock -> FactBase f -> FactBase f
+
+-- | Function for rewrtiting and analysis combined. To be used with
+-- @rewriteCmm@.
+--
+-- Currently set to work with @UniqSM@ monad, but we could probably abstract
+-- that away (if we do that, we might want to specialize the fixpoint algorithms
+-- to the particular monads through SPECIALIZE).
+type RewriteFun f = CmmBlock -> FactBase f -> UniqSM (CmmBlock, FactBase f)
 
 analyzeCmmBwd, analyzeCmmFwd
     :: DataflowLattice f
@@ -134,6 +146,74 @@ fixpointAnalysis direction lattice do_block entries blockmap = loop start
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         in loop todo2 fbase2
 
+rewriteCmmBwd
+    :: DataflowLattice f
+    -> RewriteFun f
+    -> CmmGraph
+    -> FactBase f
+    -> UniqSM (CmmGraph, FactBase f)
+rewriteCmmBwd = rewriteCmm Bwd
+
+rewriteCmm
+    :: Direction
+    -> DataflowLattice f
+    -> RewriteFun f
+    -> CmmGraph
+    -> FactBase f
+    -> UniqSM (CmmGraph, FactBase f)
+rewriteCmm dir lattice rwFun cmmGraph initFact = do
+    let entry = g_entry cmmGraph
+        hooplGraph = g_graph cmmGraph
+        blockMap1 =
+            case hooplGraph of
+                GMany NothingO bm NothingO -> bm
+        entries = if mapNull initFact then [entry] else mapKeys initFact
+    (blockMap2, facts) <-
+        fixpointRewrite dir lattice rwFun entries blockMap1 initFact
+    return (cmmGraph {g_graph = GMany NothingO blockMap2 NothingO}, facts)
+
+fixpointRewrite
+    :: forall f.
+       Direction
+    -> DataflowLattice f
+    -> RewriteFun f
+    -> [Label]
+    -> LabelMap CmmBlock
+    -> FactBase f
+    -> UniqSM (LabelMap CmmBlock, FactBase f)
+fixpointRewrite dir lattice do_block entries blockmap = loop start blockmap
+  where
+    -- Sorting the blocks helps to minimize the number of times we need to
+    -- process blocks. For instance, for forward analysis we want to look at
+    -- blocks in reverse postorder. Also, see comments for sortBlocks.
+    blocks     = sortBlocks dir entries blockmap
+    num_blocks = length blocks
+    block_arr  = {-# SCC "block_arr_rewrite" #-}
+                 listArray (0, num_blocks - 1) blocks
+    start      = {-# SCC "start_rewrite" #-} [0 .. num_blocks - 1]
+    dep_blocks = {-# SCC "dep_blocks_rewrite" #-} mkDepBlocks dir blocks
+    join       = fact_join lattice
+
+    loop
+        :: IntHeap            -- ^ Worklist, i.e., blocks to process
+        -> LabelMap CmmBlock  -- ^ Rewritten blocks.
+        -> FactBase f         -- ^ Current facts.
+        -> UniqSM (LabelMap CmmBlock, FactBase f)
+    loop []              !blocks1 !fbase1 = return (blocks1, fbase1)
+    loop (index : todo1) !blocks1 !fbase1 = do
+        -- Note that we use the *original* block here. This is important.
+        -- We're optimistically rewriting blocks even before reaching the fixed
+        -- point, which means that the rewrite might be incorrect. So if the
+        -- facts change, we need to rewrite the original block again (taking
+        -- into account the new facts).
+        let block = block_arr ! index
+        (new_block, out_facts) <- {-# SCC "do_block_rewrite" #-}
+            do_block block fbase1
+        let blocks2 = mapInsert (entryLabel new_block) new_block blocks1
+            (todo2, fbase2) = {-# SCC "mapFoldWithKey_rewrite" #-}
+                mapFoldWithKey
+                    (updateFact join dep_blocks) (todo1, fbase1) out_facts
+        loop todo2 blocks2 fbase2
 
 
 {-
@@ -316,6 +396,39 @@ foldNodesBwdOO funOO = go
     go (BMiddle n) f = funOO n f
     go BNil f = f
 {-# INLINABLE foldNodesBwdOO #-}
+
+-- | Folds backward over all the nodes of an open-open block and allows
+-- rewriting them. The accumulator is both the block of nodes and @f@ (usually
+-- dataflow facts).
+-- Strict in both accumulated parts.
+foldRewriteNodesBwdOO
+    :: forall f.
+       (CmmNode O O -> f -> UniqSM (Block CmmNode O O, f))
+    -> Block CmmNode O O
+    -> f
+    -> UniqSM (Block CmmNode O O, f)
+foldRewriteNodesBwdOO rewriteOO initBlock initFacts = go initBlock initFacts
+  where
+    go (BCons node1 block1) !fact1 = (rewriteOO node1 `comp` go block1) fact1
+    go (BSnoc block1 node1) !fact1 = (go block1 `comp` rewriteOO node1) fact1
+    go (BCat blockA1 blockB1) !fact1 = (go blockA1 `comp` go blockB1) fact1
+    go (BMiddle node) !fact1 = rewriteOO node fact1
+    go BNil !fact = return (BNil, fact)
+
+    comp rew1 rew2 = \f1 -> do
+        (b, f2) <- rew2 f1
+        (a, !f3) <- rew1 f2
+        let !c = joinBlocksOO a b
+        return (c, f3)
+    {-# INLINE comp #-}
+{-# INLINABLE foldRewriteNodesBwdOO #-}
+
+joinBlocksOO :: Block n O O -> Block n O O -> Block n O O
+joinBlocksOO BNil b = b
+joinBlocksOO b BNil = b
+joinBlocksOO (BMiddle n) b = blockCons n b
+joinBlocksOO b (BMiddle n) = blockSnoc b n
+joinBlocksOO b1 b2 = BCat b1 b2
 
 -- -----------------------------------------------------------------------------
 -- a Heap of Int
