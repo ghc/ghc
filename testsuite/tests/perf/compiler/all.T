@@ -1152,3 +1152,14 @@ test('Naperian',
      ],
      compile,
      [''])
+
+test ('T9630',
+      [ compiler_stats_num_field('max_bytes_used', # Note [residency]
+          [(wordsize(64), 41568168, 15)
+          # initial:    56955240
+          # 2017-06-07: 41568168     Stop the specialiser generating loopy code
+          ]),
+      extra_clean(['T9630a.hi', 'T9630a.o'])
+      ],
+      multimod_compile,
+      ['T9630', '-v0 -O'])
