@@ -112,7 +112,7 @@ gcastWith Refl x = x
 apply :: (f :~: g) -> (a :~: b) -> (f a :~: g b)
 apply Refl Refl = Refl
 
--- | Extract equality of the arguments from an equality of a applied types
+-- | Extract equality of the arguments from an equality of applied types
 inner :: (f a :~: g b) -> (a :~: b)
 inner Refl = Refl
 
