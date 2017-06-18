@@ -1559,6 +1559,10 @@ openStatsFile (char *filename,           // filename, or NULL
         if (*filename != '\0') {  /* stats file specified */
             f = fopen(filename,"w");
         } else {
+            if (filename_fmt == NULL) {
+                errorBelch("Invalid stats filename format (NULL)\n");
+                return -1;
+            }
             /* default <program>.<ext> */
             char stats_filename[STATS_FILENAME_MAXLEN];
             sprintf(stats_filename, filename_fmt, prog_name);
