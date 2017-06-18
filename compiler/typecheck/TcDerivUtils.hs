@@ -512,7 +512,8 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ rep_tc
     tc_tvs            = tyConTyVars rep_tc
     Just (_, last_tv) = snocView tc_tvs
     bad_stupid_theta  = filter is_bad (tyConStupidTheta rep_tc)
-    is_bad pred       = last_tv `elemVarSet` tyCoVarsOfType pred
+    is_bad pred       = last_tv `elemVarSet` exactTyCoVarsOfType pred
+      -- See Note [Check that the type variable is truly universal]
 
     data_cons = tyConDataCons rep_tc
     check_con con = allValid (check_universal con : foldDataConArgs (ft_check con) con)
@@ -524,7 +525,7 @@ cond_functorOK allowFunctions allowExQuantifiedLastTyVar _ rep_tc
                 -- in TcGenFunctor
       | Just tv <- getTyVar_maybe (last (tyConAppArgs (dataConOrigResTy con)))
       , tv `elem` dataConUnivTyVars con
-      , not (tv `elemVarSet` tyCoVarsOfTypes (dataConTheta con))
+      , not (tv `elemVarSet` exactTyCoVarsOfTypes (dataConTheta con))
       = IsValid   -- See Note [Check that the type variable is truly universal]
       | otherwise
       = NotValid (badCon con existential)
@@ -666,4 +667,17 @@ As a result, T can have a derived Foldable instance:
     foldr _ z T6       = z
 
 See Note [DeriveFoldable with ExistentialQuantification] in TcGenFunctor.
+
+For Functor and Traversable, we must take care not to let type synonyms
+unfairly reject a type for not being truly universally quantified. An
+example of this is:
+
+    type C (a :: Constraint) b = a
+    data T a b = C (Show a) b => MkT b
+
+Here, the existential context (C (Show a) b) does technically mention the last
+type variable b. But this is OK, because expanding the type synonym C would
+give us the context (Show a), which doesn't mention b. Therefore, we must make
+sure to expand type synonyms before performing this check. Not doing so led to
+Trac #13813.
 -}
