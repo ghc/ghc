@@ -77,7 +77,7 @@ instance {-# INCOHERENT #-} a ~~ b => a ~ b
   -- INCOHERENT because we want to use this instance eagerly, even when
   -- the tyvars are partially unknown.
 
-infix 4 :~:
+infix 4 :~:, :~~:
 
 -- | Propositional equality. If @a :~: b@ is inhabited by some terminating
 -- value, then the type @a@ is the same as the type @b@. To use this equality
