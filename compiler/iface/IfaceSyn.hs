@@ -853,7 +853,7 @@ pprIfaceDecl _ (IfacePatSyn { ifName = name,
              , univ_msg, pprIfaceContextArr req_ctxt
              , ppWhen insert_empty_ctxt $ parens empty <+> darrow
              , ex_msg, pprIfaceContextArr prov_ctxt
-             , pprIfaceType $ foldr IfaceFunTy pat_ty arg_tys]
+             , pprIfaceType $ foldr (IfaceFunTy Omega) pat_ty arg_tys]
       where
         univ_msg = pprUserIfaceForAll univ_bndrs
         ex_msg   = pprUserIfaceForAll ex_bndrs
@@ -1378,7 +1378,7 @@ freeNamesIfType (IfaceTyConApp tc ts) = freeNamesIfTc tc &&& freeNamesIfTcArgs t
 freeNamesIfType (IfaceTupleTy _ _ ts) = freeNamesIfTcArgs ts
 freeNamesIfType (IfaceLitTy _)        = emptyNameSet
 freeNamesIfType (IfaceForAllTy tv t)  = freeNamesIfTyVarBndr tv &&& freeNamesIfType t
-freeNamesIfType (IfaceFunTy s t)      = freeNamesIfType s &&& freeNamesIfType t
+freeNamesIfType (IfaceFunTy _ s t)    = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceDFunTy s t)     = freeNamesIfType s &&& freeNamesIfType t
 freeNamesIfType (IfaceCastTy t c)     = freeNamesIfType t &&& freeNamesIfCoercion c
 freeNamesIfType (IfaceCoercionTy c)   = freeNamesIfCoercion c

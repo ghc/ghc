@@ -54,6 +54,7 @@ import {-# SOURCE #-} TysWiredIn ( liftedRepDataConTyCon )
 
 import DynFlags
 import TyCon hiding ( pprPromotionQuote )
+import Weight
 import CoAxiom
 import Var
 import PrelNames
@@ -114,7 +115,7 @@ data IfaceType     -- A kind of universal type, used for types and kinds
   | IfaceTyVar     IfLclName            -- Type/coercion variable only, not tycon
   | IfaceLitTy     IfaceTyLit
   | IfaceAppTy     IfaceType IfaceType
-  | IfaceFunTy     IfaceType IfaceType
+  | IfaceFunTy     Rig IfaceType IfaceType
   | IfaceDFunTy    IfaceType IfaceType
   | IfaceForAllTy  IfaceForAllBndr IfaceType
   | IfaceTyConApp  IfaceTyCon IfaceTcArgs  -- Not necessarily saturated
@@ -347,7 +348,7 @@ ifTypeIsVarFree ty = go ty
     go (IfaceTyVar {})         = False
     go (IfaceFreeTyVar {})     = False
     go (IfaceAppTy fun arg)    = go fun && go arg
-    go (IfaceFunTy arg res)    = go arg && go res
+    go (IfaceFunTy _ arg res)    = go arg && go res
     go (IfaceDFunTy arg res)   = go arg && go res
     go (IfaceForAllTy {})      = False
     go (IfaceTyConApp _ args)  = go_args args
@@ -378,7 +379,7 @@ substIfaceType env ty
     go (IfaceFreeTyVar tv)    = IfaceFreeTyVar tv
     go (IfaceTyVar tv)        = substIfaceTyVar env tv
     go (IfaceAppTy  t1 t2)    = IfaceAppTy  (go t1) (go t2)
-    go (IfaceFunTy  t1 t2)    = IfaceFunTy  (go t1) (go t2)
+    go (IfaceFunTy  w t1 t2)  = IfaceFunTy w (go t1) (go t2)
     go (IfaceDFunTy t1 t2)    = IfaceDFunTy (go t1) (go t2)
     go ty@(IfaceLitTy {})     = ty
     go (IfaceTyConApp tc tys) = IfaceTyConApp tc (substIfaceTcArgs env tys)
@@ -483,8 +484,8 @@ eqIfaceType env (IfaceTyVar tv1) (IfaceTyVar tv2) =
 eqIfaceType _   (IfaceLitTy l1) (IfaceLitTy l2) = l1 == l2
 eqIfaceType env (IfaceAppTy t11 t12) (IfaceAppTy t21 t22)
     = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
-eqIfaceType env (IfaceFunTy t11 t12) (IfaceFunTy t21 t22)
-    = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
+eqIfaceType env (IfaceFunTy w1 t11 t12) (IfaceFunTy w2 t21 t22)
+    = w1 == w2 && eqIfaceType env t11 t21 && eqIfaceType env t12 t22
 eqIfaceType env (IfaceDFunTy t11 t12) (IfaceDFunTy t21 t22)
     = eqIfaceType env t11 t21 && eqIfaceType env t12 t22
 eqIfaceType env (IfaceForAllTy bndr1 t1) (IfaceForAllTy bndr2 t2)
@@ -673,15 +674,19 @@ ppr_ty ctxt_prec (IfaceTyConApp tc tys) = pprTyTcApp ctxt_prec tc tys
 ppr_ty _         (IfaceTupleTy i p tys) = pprTuple i p tys
 ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
         -- Function types
-ppr_ty ctxt_prec (IfaceFunTy ty1 ty2)
+ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec FunPrec $
     sep [ppr_ty FunPrec ty1, sep (ppr_fun_tail ty2)]
   where
-    ppr_fun_tail (IfaceFunTy ty1 ty2)
-      = (arrow <+> ppr_ty FunPrec ty1) : ppr_fun_tail ty2
+    ppr_fun_tail (IfaceFunTy w ty1 ty2)
+      = (ppr_fun_arrow w <+> ppr_ty FunPrec ty1) : ppr_fun_tail ty2
     ppr_fun_tail other_ty
-      = [arrow <+> pprIfaceType other_ty]
+      = [ppr_fun_arrow w <+> pprIfaceType other_ty]
+
+    ppr_fun_arrow Omega = arrow
+    ppr_fun_arrow One = lollipop
+    ppr_fun_arrow _ = arrow -- arnaud: TODO: generic notation for non-1/ω multiplicities
 
 ppr_ty ctxt_prec (IfaceAppTy ty1 ty2)
   = if_print_coercions
@@ -781,8 +786,8 @@ defaultRuntimeRepVars = go emptyFsEnv
       | tv `elemFsEnv` subs
       = IfaceTyConApp liftedRep ITC_Nil
 
-    go subs (IfaceFunTy kind ty)
-      = IfaceFunTy (go subs kind) (go subs ty)
+    go subs (IfaceFunTy w kind ty)
+      = IfaceFunTy w (go subs kind) (go subs ty)
 
     go subs (IfaceAppTy x y)
       = IfaceAppTy (go subs x) (go subs y)
@@ -1336,8 +1341,9 @@ instance Binary IfaceType where
             putByte bh 2
             put_ bh ae
             put_ bh af
-    put_ bh (IfaceFunTy ag ah) = do
+    put_ bh (IfaceFunTy w ag ah) = do
             putByte bh 3
+            put_ bh w
             put_ bh ag
             put_ bh ah
     put_ bh (IfaceDFunTy ag ah) = do
@@ -1366,9 +1372,10 @@ instance Binary IfaceType where
               2 -> do ae <- get bh
                       af <- get bh
                       return (IfaceAppTy ae af)
-              3 -> do ag <- get bh
+              3 -> do w  <- get bh
+                      ag <- get bh
                       ah <- get bh
-                      return (IfaceFunTy ag ah)
+                      return (IfaceFunTy w ag ah)
               4 -> do ag <- get bh
                       ah <- get bh
                       return (IfaceDFunTy ag ah)
