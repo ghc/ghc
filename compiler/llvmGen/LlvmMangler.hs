@@ -43,20 +43,19 @@ llvmFixupAsm :: DynFlags -> LabelMap ManglerStr -> FilePath -> FilePath -> IO ()
 llvmFixupAsm dflags gcInfo f1 f2 = {-# SCC "llvm_mangler" #-}
     withTiming (pure dflags) (text "LLVM Mangler") id $
     withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
-        go r w []
+        go r w
         hClose r
         hClose w
         return ()
   where
-    doRewrite x = rewriteLine dflags (labRewrites gcInfo) rewrites x
+    doRewrite a = rewriteLine dflags (labRewrites gcInfo) rewrites a
     
-    go :: Handle -> Handle -> [Line] -> IO ()
-    go r w pL = do
+    go :: Handle -> Handle -> IO ()
+    go r w = do
       e_l <- try $ B.hGetLine r ::IO (Either IOError B.ByteString)
-      let writeline x = B.hPutStrLn w newL >> go r w newPL
-            where (newPL, newL) = doRewrite x
+      let writeline a = B.hPutStrLn w (doRewrite a) >> go r w
       case e_l of
-        Right l -> writeline (pL, l)
+        Right l -> writeline l
         Left _  -> return ()
 
 -- | These are the non-label rewrites that the mangler will perform
@@ -64,12 +63,10 @@ rewrites :: [Rewrite]
 rewrites = [rewriteSymType, rewriteAVX]
 
 -- | These are the label-based rewrites that the mangler will perform
-labRewrites :: LabelMap ManglerStr -> [LabRewrite]
+labRewrites :: LabelMap ManglerStr -> [Rewrite]
 labRewrites info = [addInfoTable info]
 
-type Line = B.ByteString
-type Rewrite = DynFlags -> Line -> Maybe Line
-type LabRewrite = DynFlags -> ([Line], Line) -> Maybe Line
+type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
 
 -- XXX(kavon): debug only delete me later
 withComment :: String -> B.ByteString -> B.ByteString
@@ -79,13 +76,13 @@ withComment com line = B.concat [B.pack $ wrap com, line]
 
 -- | This rewrite looks for return points of a llvm.cpscall and adds GC info
 -- above that label.
-addInfoTable :: LabelMap ManglerStr -> LabRewrite
-addInfoTable info _ (prevLabs, line) = do
+addInfoTable :: LabelMap ManglerStr -> Rewrite
+addInfoTable info _ line = do
         retPt <- B.stripPrefix labPrefix line
         (i, _) <- B.readInt retPt
         statics <- mapLookup (toKey i) info
         fullName <- B.stripSuffix colon line
-        return $ B.concat $ (map (\f -> f fullName) statics) ++ prevLabs ++ [line]
+        return $ B.concat $ (map (\f -> f fullName) statics) ++ [line]
     where
         -- TODO(kavon): check if prefix changes on different platforms.
         labPrefix = B.pack "L" 
@@ -94,28 +91,19 @@ addInfoTable info _ (prevLabs, line) = do
         
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies for each kind of rewrite (label and non-label).
-rewriteLine :: DynFlags -> [LabRewrite] -> [Rewrite] -> ([Line], Line) -> ([Line], Line)
-rewriteLine dflags labRewrites rewrites (prevLabs, l) =
-    case (maybNewSym, maybNewRest, B.null rest) of
-        -- untouched line only has a label, collect it and emit nothing
-        (Nothing, Nothing, True) -> (l : prevLabs, B.empty) 
-        -- a lab rewrite occurred, consuming the prevLabs in its result
-        (Just s, newR, _)        -> ([], smush s (fromMaybe rest newR))
-        -- the line did not only contain a label, and a label rewrite
-        -- hasn't occured, so we emit all collected labels
-        (Nothing, newR, _)       -> ([], smush allLabs (fromMaybe rest newR))
-            where
-                allLabs = revCat $ symbol : prevLabs
+rewriteLine :: DynFlags -> [Rewrite] -> [Rewrite] -> B.ByteString -> B.ByteString
+rewriteLine dflags labRewrites rewrites l =
+    case (maybNewSym, maybNewRest) of
+        (Nothing, Nothing) -> l -- avoid concat
+        (newS, newR)       -> cat (fromMaybe symbol newS) (fromMaybe rest newR)
   where
-    smush sym rst = B.concat $ [sym, B.pack "\t", rst]
-    
-    revCat ls = B.concat $ reverse ls
+    cat sym rst = B.concat $ [sym, B.pack "\t", rst]
     
     findRwOf txt rws = firstJust $ map (\rw -> rw dflags txt) rws
     
     (symbol, rest) = splitLine l
-    maybNewSym = findRwOf (prevLabs, symbol) labRewrites  -- check for new label part
-    maybNewRest = findRwOf rest rewrites                  -- check for new non-label part
+    maybNewSym = findRwOf symbol labRewrites  -- check for new label part
+    maybNewRest = findRwOf rest rewrites      -- check for new non-label part
 
     firstJust :: [Maybe a] -> Maybe a
     firstJust (jx@(Just _):_) = jx
