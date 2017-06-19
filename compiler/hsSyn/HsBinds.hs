@@ -301,15 +301,57 @@ deriving instance (DataId idL, DataId idR) => Data (PatSynBind idL idR)
 {-
 Note [AbsBinds]
 ~~~~~~~~~~~~~~~
-The AbsBinds constructor is used in the output of the type checker, to record
-*typechecked* and *generalised* bindings.  Consider a module M, with this
-top-level binding, where there is no type signature for M.reverse,
+The AbsBinds constructor is used in the output of the type checker, to
+record *typechecked* and *generalised* bindings.  Specifically
+
+         AbsBinds { abs_tvs      = tvs
+                  , abs_ev_vars  = [d1,d2]
+                  , abs_exports  = [ABE { abe_poly = fp, abe_mono = fm
+                                        , abe_wrap = fwrap }
+                                    ABE { slly for g } ]
+                  , abs_ev_binds = DBINDS
+                  , abs_binds    = BIND[fm,gm] }
+
+where 'BIND' binds the monomorphic Ids 'fm' and 'gm', means
+
+        fp = fwrap [/\ tvs. \d1 d2. letrec { DBINDS        ]
+                   [                       ; BIND[fm,gm] } ]
+                   [                 in fm                 ]
+
+        gp = ...same again, with gm instead of fm
+
+The 'fwrap' is an impedence-matcher that typically does nothing; see
+Note [ABExport wrapper].
+
+This is a pretty bad translation, because it duplicates all the bindings.
+So the desugarer tries to do a better job:
+
+        fp = /\ [a,b] -> \ [d1,d2] -> case tp [a,b] [d1,d2] of
+                                        (fm,gm) -> fm
+        ..ditto for gp..
+
+        tp = /\ [a,b] -> \ [d1,d2] -> letrec { DBINDS; BIND }
+                                      in (fm,gm)
+
+In general:
+
+  * abs_tvs are the type variables over which the binding group is
+    generalised
+  * abs_ev_var are the evidence variables (usually dictionaries)
+    over which the binding group is generalised
+  * abs_binds are the monomorphic bindings
+  * abs_ex_binds are the evidence bindings that wrap the abs_binds
+  * abs_exports connects the monomorphic Ids bound by abs_binds
+    with the polymorphic Ids bound by the AbsBinds itself.
+
+For example, consider a module M, with this top-level binding, where
+there is no type signature for M.reverse,
     M.reverse []     = []
     M.reverse (x:xs) = M.reverse xs ++ [x]
 
-In Hindley-Milner, a recursive binding is typechecked with the *recursive* uses
-being *monomorphic*.  So after typechecking *and* desugaring we will get something
-like this
+In Hindley-Milner, a recursive binding is typechecked with the
+*recursive* uses being *monomorphic*.  So after typechecking *and*
+desugaring we will get something like this
 
     M.reverse :: forall a. [a] -> [a]
       = /\a. letrec
@@ -326,19 +368,22 @@ That's after desugaring.  What about after type checking but before
 desugaring?  That's where AbsBinds comes in.  It looks like this:
 
    AbsBinds { abs_tvs     = [a]
+            , abs_ev_vars = []
             , abs_exports = [ABE { abe_poly = M.reverse :: forall a. [a] -> [a],
                                  , abe_mono = reverse :: [a] -> [a]}]
+            , abs_ev_binds = {}
             , abs_binds = { reverse :: [a] -> [a]
                                = \xs -> case xs of
                                             []     -> []
                                             (x:xs) -> reverse xs ++ [x] } }
 
 Here,
-  * abs_tvs says what type variables are abstracted over the binding group,
-    just 'a' in this case.
+
+  * abs_tvs says what type variables are abstracted over the binding
+    group, just 'a' in this case.
   * abs_binds is the *monomorphic* bindings of the group
-  * abs_exports describes how to get the polymorphic Id 'M.reverse' from the
-    monomorphic one 'reverse'
+  * abs_exports describes how to get the polymorphic Id 'M.reverse'
+    from the monomorphic one 'reverse'
 
 Notice that the *original* function (the polymorphic one you thought
 you were defining) appears in the abe_poly field of the
@@ -536,32 +581,6 @@ plusHsValBinds (ValBindsOut ds1 sigs1) (ValBindsOut ds2 sigs2)
   = ValBindsOut (ds1 ++ ds2) (sigs1 ++ sigs2)
 plusHsValBinds _ _
   = panic "HsBinds.plusHsValBinds"
-
-{-
-What AbsBinds means
-~~~~~~~~~~~~~~~~~~~
-         AbsBinds tvs
-                  [d1,d2]
-                  [(tvs1, f1p, f1m),
-                   (tvs2, f2p, f2m)]
-                  BIND
-means
-
-        f1p = /\ tvs -> \ [d1,d2] -> letrec DBINDS and BIND
-                                     in fm
-
-        gp = ...same again, with gm instead of fm
-
-This is a pretty bad translation, because it duplicates all the bindings.
-So the desugarer tries to do a better job:
-
-        fp = /\ [a,b] -> \ [d1,d2] -> case tp [a,b] [d1,d2] of
-                                        (fm,gm) -> fm
-        ..ditto for gp..
-
-        tp = /\ [a,b] -> \ [d1,d2] -> letrec DBINDS and BIND
-                                      in (fm,gm)
--}
 
 instance (SourceTextX idL, SourceTextX idR,
           OutputableBndrId idL, OutputableBndrId idR)
