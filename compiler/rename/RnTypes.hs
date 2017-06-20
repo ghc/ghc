@@ -62,7 +62,7 @@ import FastString
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List        ( (\\), nubBy, partition )
+import Data.List        ( nubBy, partition )
 import Control.Monad    ( unless, when )
 
 #include "HsVersions.h"
@@ -215,12 +215,11 @@ extractFilteredRdrTyVars hs_ty
 -- When the extension is disabled, the function returns the argument
 -- and empty list.  See Note [Renaming named wild cards]
 partition_nwcs :: FreeKiTyVars -> RnM (FreeKiTyVars, [Located RdrName])
-partition_nwcs free_vars@(FKTV { fktv_tys = tys, fktv_all = all })
+partition_nwcs free_vars@(FKTV { fktv_tys = tys })
   = do { wildcards_enabled <- fmap (xopt LangExt.NamedWildCards) getDynFlags
        ; let (nwcs, no_nwcs) | wildcards_enabled = partition is_wildcard tys
                              | otherwise         = ([], tys)
-             free_vars' = free_vars { fktv_tys = no_nwcs
-                                    , fktv_all = all \\ nwcs }
+             free_vars' = free_vars { fktv_tys = no_nwcs }
        ; return (free_vars', nwcs) }
   where
      is_wildcard :: Located RdrName -> Bool
@@ -1538,20 +1537,16 @@ See also Note [HsBSig binder lists] in HsTypes
 -}
 
 data FreeKiTyVars = FKTV { fktv_kis    :: [Located RdrName]
-                         , _fktv_k_set :: OccSet  -- for efficiency,
-                                                  -- only used internally
-                         , fktv_tys    :: [Located RdrName]
-                         , _fktv_t_set :: OccSet
-                         , fktv_all    :: [Located RdrName] }
+                         , fktv_tys    :: [Located RdrName] }
 
 instance Outputable FreeKiTyVars where
-  ppr (FKTV kis _ tys _ _) = ppr (kis, tys)
+  ppr (FKTV kis tys) = ppr (kis, tys)
 
 emptyFKTV :: FreeKiTyVars
-emptyFKTV = FKTV [] emptyOccSet [] emptyOccSet []
+emptyFKTV = FKTV [] []
 
 freeKiTyVarsAllVars :: FreeKiTyVars -> [Located RdrName]
-freeKiTyVarsAllVars = fktv_all
+freeKiTyVarsAllVars (FKTV tys kvs) = tys ++ kvs
 
 freeKiTyVarsKindVars :: FreeKiTyVars -> [Located RdrName]
 freeKiTyVarsKindVars = fktv_kis
@@ -1560,15 +1555,11 @@ freeKiTyVarsTypeVars :: FreeKiTyVars -> [Located RdrName]
 freeKiTyVarsTypeVars = fktv_tys
 
 filterInScope :: LocalRdrEnv -> FreeKiTyVars -> FreeKiTyVars
-filterInScope rdr_env (FKTV kis k_set tys t_set all)
+filterInScope rdr_env (FKTV kis tys)
   = FKTV (filterOut in_scope kis)
-         (filterOccSet (not . in_scope_occ) k_set)
          (filterOut in_scope tys)
-         (filterOccSet (not . in_scope_occ) t_set)
-         (filterOut in_scope all)
   where
     in_scope         = inScope rdr_env . unLoc
-    in_scope_occ occ = isJust $ lookupLocalRdrOcc rdr_env occ
 
 inScope :: LocalRdrEnv -> RdrName -> Bool
 inScope rdr_env rdr = rdr `elemLocalRdrEnv` rdr_env
@@ -1582,10 +1573,10 @@ extractHsTyRdrTyVars :: LHsType GhcPs -> RnM FreeKiTyVars
 -- occurrence is returned.
 -- See Note [Kind and type-variable binders]
 extractHsTyRdrTyVars ty
-  = do { FKTV kis k_set tys t_set all <- extract_lty TypeLevel ty emptyFKTV
-       ; return (FKTV (nubL kis) k_set
-                      (nubL tys) t_set
-                      (nubL all)) }
+  = do { FKTV kis tys <- extract_lty TypeLevel ty emptyFKTV
+       ; return (FKTV (nubL kis)
+                      (nubL tys)) }
+
 
 -- | Extracts free type and kind variables from types in a list.
 -- When the same name occurs multiple times in the types, only the first
@@ -1604,8 +1595,8 @@ extractHsTysRdrTyVarsDups tys
 
 -- | Removes multiple occurrences of the same name from FreeKiTyVars.
 rmDupsInRdrTyVars :: FreeKiTyVars -> FreeKiTyVars
-rmDupsInRdrTyVars (FKTV kis k_set tys t_set all)
-  = FKTV (nubL kis) k_set (nubL tys) t_set (nubL all)
+rmDupsInRdrTyVars (FKTV kis tys)
+  = FKTV (nubL kis) (nubL tys)
 
 extractRdrKindSigVars :: LFamilyResultSig GhcPs -> RnM [Located RdrName]
 extractRdrKindSigVars (L _ resultSig)
@@ -1715,46 +1706,38 @@ extract_hs_tv_bndrs :: [LHsTyVarBndr GhcPs] -> FreeKiTyVars
 --     'b' is a free type variable
 --     'e' is a free kind variable
 extract_hs_tv_bndrs tvs
-                    (FKTV acc_kvs acc_k_set acc_tvs acc_t_set acc_all)
+                    (FKTV acc_kvs acc_tvs)
                            -- Note accumulator comes first
-                    (FKTV body_kvs body_k_set body_tvs body_t_set body_all)
+                    (FKTV body_kvs body_tvs)
   | null tvs
   = return $
-    FKTV (body_kvs ++ acc_kvs) (body_k_set `unionOccSets` acc_k_set)
-         (body_tvs ++ acc_tvs) (body_t_set `unionOccSets` acc_t_set)
-         (body_all ++ acc_all)
+    FKTV (body_kvs ++ acc_kvs) (body_tvs ++ acc_tvs)
   | otherwise
-  = do { FKTV bndr_kvs bndr_k_set _ _ _
+  = do { FKTV bndr_kvs _
            <- foldrM extract_lkind emptyFKTV [k | L _ (KindedTyVar _ k) <- tvs]
 
-       ; let locals = mkOccSet $ map (rdrNameOcc . hsLTyVarName) tvs
+       ; let locals = map hsLTyVarName tvs
        ; return $
-         FKTV (filterOut ((`elemOccSet` locals) . rdrNameOcc . unLoc) (bndr_kvs ++ body_kvs) ++ acc_kvs)
-              ((body_k_set `minusOccSet` locals) `unionOccSets` acc_k_set `unionOccSets` bndr_k_set)
-              (filterOut ((`elemOccSet` locals) . rdrNameOcc . unLoc) body_tvs ++ acc_tvs)
-              ((body_t_set `minusOccSet` locals) `unionOccSets` acc_t_set)
-              (filterOut ((`elemOccSet` locals) . rdrNameOcc . unLoc) (bndr_kvs ++ body_all) ++ acc_all) }
+         FKTV (filterOut ((`elem` locals) . unLoc) (bndr_kvs ++ body_kvs)
+                ++ acc_kvs)
+              (filterOut ((`elem` locals) . unLoc)  body_tvs ++ acc_tvs) }
 
 extract_tv :: TypeOrKind -> Located RdrName -> FreeKiTyVars
            -> RnM FreeKiTyVars
 extract_tv t_or_k ltv@(L _ tv) acc
   | isRdrTyVar tv = case acc of
-      FKTV kvs k_set tvs t_set all
+      FKTV kvs tvs
         |  isTypeLevel t_or_k
-        -> do { when (not_exact && occ `elemOccSet` k_set) $
+        -> do { when (ltv `elemRdr` kvs) $
                 mixedVarsErr ltv
-              ; return (FKTV kvs k_set (ltv : tvs) (t_set `extendOccSet` occ)
-                             (ltv : all)) }
+              ; return (FKTV kvs (ltv : tvs)) }
         |  otherwise
-        -> do { when (not_exact && occ `elemOccSet` t_set) $
+        -> do { when (ltv `elemRdr` tvs) $
                 mixedVarsErr ltv
-              ; return (FKTV (ltv : kvs) (k_set `extendOccSet` occ) tvs t_set
-                             (ltv : all)) }
+              ; return (FKTV (ltv : kvs) tvs) }
   | otherwise     = return acc
   where
-    occ = rdrNameOcc tv
-    -- See Note [TypeInType validity checking and Template Haskell]
-    not_exact = not $ isExact tv
+    elemRdr x = any (eqLocated x)
 
 mixedVarsErr :: Located RdrName -> RnM ()
 mixedVarsErr (L loc tv)
@@ -1767,37 +1750,3 @@ mixedVarsErr (L loc tv)
 -- just used in this module; seemed convenient here
 nubL :: Eq a => [Located a] -> [Located a]
 nubL = nubBy eqLocated
-
-{-
-Note [TypeInType validity checking and Template Haskell]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-extract_tv enforces an invariant that no variable can be used as both a kind
-and a type unless -XTypeInType is enabled. It does so by accumulating two sets
-of variables' OccNames (one for type variables and one for kind variables) that
-it has seen before. If a new type variable's OccName appears in the kind set,
-then it errors, and similarly for kind variables and the type set.
-
-This relies on the assumption that any two variables with the same OccName
-are the same. While this is always true of user-written code, it is not always
-true in the presence of Template Haskell! GHC Trac #12503 demonstrates a
-scenario where two different Exact TH-generated names can have the same
-OccName. As a result, if one of these Exact names is for a type variable
-and the other Exact name is for a kind variable, then extracting them both
-can lead to a spurious error in extract_tv.
-
-To avoid such a scenario, we simply don't check the invariant in extract_tv
-when the name is Exact. This allows Template Haskell users to write code that
-uses -XPolyKinds without needing to enable -XTypeInType.
-
-This is a somewhat arbitrary design choice, as adding this special case causes
-this code to be accepted when spliced in via Template Haskell:
-
-  data T1 k e
-  class C1 b
-  instance C1 (T1 k (e :: k))
-
-Even if -XTypeInType is _not enabled. But accepting too many programs without
-the prerequisite GHC extensions is better than the alternative, where some
-programs would not be accepted unless enabling an extension which has nothing
-to do with the code itself.
--}
