@@ -292,7 +292,7 @@ extendWorkListCt ct wl
      EqPred {}
        -> extendWorkListEq ct wl
 
-     ClassPred cls _  -- See Note [Prioritise class equalites]
+     ClassPred cls _  -- See Note [Prioritise class equalities]
        |  cls `hasKey` heqTyConKey
        || cls `hasKey` eqTyConKey
        -> extendWorkListEq ct wl
