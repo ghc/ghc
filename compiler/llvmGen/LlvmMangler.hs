@@ -38,24 +38,31 @@ import Data.Maybe ( fromMaybe )
 type ManglerStr = [B.ByteString -> B.ByteString]
 type ManglerInfo = Maybe (LabelMap ManglerStr)
 
+-- to manage the simple state machine for adjacent labels
+data State
+    = Default
+    | FirstLabel
+    | OtherLabel
+
 -- | Read in assembly file and process
 llvmFixupAsm :: DynFlags -> LabelMap ManglerStr -> FilePath -> FilePath -> IO ()
 llvmFixupAsm dflags gcInfo f1 f2 = {-# SCC "llvm_mangler" #-}
     withTiming (pure dflags) (text "LLVM Mangler") id $
     withBinaryFile f1 ReadMode $ \r -> withBinaryFile f2 WriteMode $ \w -> do
-        go r w
+        go r w Default
         hClose r
         hClose w
         return ()
   where
-    doRewrite a = rewriteLine dflags (labRewrites gcInfo) rewrites a
+    doRewrite = rewriteLine dflags (labRewrites gcInfo) rewrites
     
-    go :: Handle -> Handle -> IO ()
-    go r w = do
+    go :: Handle -> Handle -> State -> IO ()
+    go r w s = do
       e_l <- try $ B.hGetLine r ::IO (Either IOError B.ByteString)
-      let writeline a = B.hPutStrLn w (doRewrite a) >> go r w
+      let writeline a s = let (newL, newS) = doRewrite a s in
+                            B.hPutStrLn w newL >> go r w newS
       case e_l of
-        Right l -> writeline l
+        Right l -> writeline l s
         Left _  -> return ()
 
 -- | These are the non-label rewrites that the mangler will perform
@@ -63,21 +70,16 @@ rewrites :: [Rewrite]
 rewrites = [rewriteSymType, rewriteAVX]
 
 -- | These are the label-based rewrites that the mangler will perform
-labRewrites :: LabelMap ManglerStr -> [Rewrite]
+labRewrites :: LabelMap ManglerStr -> [LabRewrite]
 labRewrites info = [addInfoTable info]
 
 type Rewrite = DynFlags -> B.ByteString -> Maybe B.ByteString
-
--- XXX(kavon): debug only delete me later
-withComment :: String -> B.ByteString -> B.ByteString
-withComment com line = B.concat [B.pack $ wrap com, line]
-    where
-        wrap c = "## comment -- " ++ c ++ "\n"
+type LabRewrite = State -> Rewrite
 
 -- | This rewrite looks for return points of a llvm.cpscall and adds GC info
 -- above that label.
-addInfoTable :: LabelMap ManglerStr -> Rewrite
-addInfoTable info _ line = do
+addInfoTable :: LabelMap ManglerStr -> LabRewrite
+addInfoTable info FirstLabel _ line = do
         retPt <- B.stripPrefix labPrefix line
         (i, _) <- B.readInt retPt
         statics <- mapLookup (toKey i) info
@@ -89,21 +91,35 @@ addInfoTable info _ line = do
         colon = B.pack ":"
         toKey = uniqueToLbl . intToUnique
         
+addInfoTable _ _ _ _ = Nothing
+        
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies for each kind of rewrite (label and non-label).
-rewriteLine :: DynFlags -> [Rewrite] -> [Rewrite] -> B.ByteString -> B.ByteString
-rewriteLine dflags labRewrites rewrites l =
+rewriteLine :: DynFlags -> [LabRewrite] -> [Rewrite] -> B.ByteString -> State -> (B.ByteString, State)
+rewriteLine dflags labRewrites rewrites l state = withState $
     case (maybNewSym, maybNewRest) of
         (Nothing, Nothing) -> l -- avoid concat
         (newS, newR)       -> cat (fromMaybe symbol newS) (fromMaybe rest newR)
   where
+    
+    -- the transition function of the state machine
+    withState l = (l, curState)
+    curState = case (isOnlyLabel split, state) of 
+                    (True, Default)    -> FirstLabel
+                    (True, FirstLabel) -> OtherLabel
+                    (False, _)         -> Default
+                    _                  -> state
+      
     cat sym rst = B.concat $ [sym, B.pack "\t", rst]
     
+    addState state rws = map (\rw -> rw state) rws
     findRwOf txt rws = firstJust $ map (\rw -> rw dflags txt) rws
     
-    (symbol, rest) = splitLine l
-    maybNewSym = findRwOf symbol labRewrites  -- check for new label part
-    maybNewRest = findRwOf rest rewrites      -- check for new non-label part
+    (split @ (symbol, rest)) = splitLine l
+    -- check for new label part
+    maybNewSym = findRwOf symbol $ addState curState labRewrites
+    -- check for new non-label part
+    maybNewRest = findRwOf rest rewrites
 
     firstJust :: [Maybe a] -> Maybe a
     firstJust (jx@(Just _):_) = jx
@@ -167,3 +183,7 @@ splitLine l = (symbol, B.dropWhile isSpace rest)
     isSpace '\t' = True
     isSpace _ = False
     (symbol, rest) = B.span (not . isSpace) l
+    
+isOnlyLabel :: (B.ByteString, B.ByteString) -> Bool
+isOnlyLabel (symbol, rest) = 
+    (B.null rest || B.head rest == '#') && not (B.null symbol)
