@@ -1,6 +1,6 @@
 [1 of 1] Compiling A                ( A.hs, interpreted )
-Ok, modules loaded: A.
+Ok, 1 module loaded.
 True
 [1 of 1] Compiling A                ( A.hs, interpreted )
-Ok, modules loaded: A.
+Ok, 1 module loaded.
 False
