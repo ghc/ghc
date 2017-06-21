@@ -1345,8 +1345,6 @@ StgWord calcTotalCompactW (void)
    writing code into memory, so the processor reliably sees it. */
 void flushExec (W_ len, AdjustorExecutable exec_addr)
 {
-  /* warning suppression */
-  (void)gcc_clear_cache;
 #if defined(i386_HOST_ARCH) || defined(x86_64_HOST_ARCH)
   /* x86 doesn't need to do anything, so just suppress some warnings. */
   (void)len;
