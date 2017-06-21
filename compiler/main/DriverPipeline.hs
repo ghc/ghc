@@ -1424,7 +1424,7 @@ runPhase (RealPhase SplitAs) _input_fn dflags
 
 runPhase (RealPhaseWithInfo mangInfo LlvmOpt) input_fn dflags
   = do
-    let opt_lvl  = max 0 (min 2 $ optLevel dflags)
+    let opt_lvl  = max 0 (min 0 $ optLevel dflags) -- FIXME(kavon) change back to min 2
         -- don't specify anything if user has specified commands. We do this
         -- for opt but not llc since opt is very specifically for optimisation
         -- passes only, so if the user is passing us extra options we assume
@@ -1478,7 +1478,7 @@ runPhase (RealPhaseWithInfo mangInfo LlvmLlc) input_fn dflags
     output_fn <- phaseOutputFilename next_phase
 
     liftIO $ SysTools.runLlvmLlc dflags
-                ([ SysTools.Option (llvmOpts !! opt_lvl),
+                ([ -- FIXME(kavon) SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.Option cpscall_workaround,
                     SysTools.Option $ "-relocation-model=" ++ rmodel,
                     SysTools.FileOption "" input_fn,
