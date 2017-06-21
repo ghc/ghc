@@ -1341,6 +1341,26 @@ StgWord calcTotalCompactW (void)
 #include <libkern/OSCacheControl.h>
 #endif
 
+#if defined(__GNUC__)
+/* __clear_cache is a libgcc function.
+ * It existed before __builtin___clear_cache was introduced.
+ * See Trac #8562.
+ */
+extern void __clear_cache(char * begin, char * end);
+
+STATIC_INLINE void gcc_clear_cache(void * begin, void * end)
+{
+    /* __builtin___clear_cache is supported since GNU C 4.3.6.
+     * We pick 4.4 to simplify condition a bit.
+     */
+#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 4)
+    __builtin___clear_cache(begin, end);
+#else
+    __clear_cache(begin, end);
+#endif
+}
+#endif /* __GNUC__ */
+
 /* On ARM and other platforms, we need to flush the cache after
    writing code into memory, so the processor reliably sees it. */
 void flushExec (W_ len, AdjustorExecutable exec_addr)
@@ -1356,7 +1376,7 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
   /* For all other platforms, fall back to a libgcc builtin. */
   unsigned char* begin = (unsigned char*)exec_addr;
   unsigned char* end   = begin + len;
-  __clear_cache((void*)begin, (void*)end);
+  gcc_clear_cache((void*)begin, (void*)end);
 #else
 #error Missing support to flush the instruction cache
 #endif
