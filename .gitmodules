@@ -6,6 +6,10 @@
 	path = libraries/bytestring
 	url = ../packages/bytestring.git
 	ignore = untracked
+[submodule "libraries/text"]
+	path = libraries/text
+	url = https://github.com/bollu/text.git
+	ignore = untracked
 [submodule "libraries/Cabal"]
 	path = libraries/Cabal
 	url = ../packages/Cabal.git

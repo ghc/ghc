@@ -34,6 +34,7 @@ Executable ghc
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
                    filepath   >= 1   && < 1.5,
+                   text       == 1.2.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc        == @ProjectVersionMunged@
 
