@@ -731,7 +731,7 @@ atomically (STM m) = IO (\s -> (atomically# m) s )
 -- values in TVars which mean that it should not continue (e.g. the TVars
 -- represent a shared buffer that is now empty).  The implementation may
 -- block the thread until one of the TVars that it has read from has been
--- udpated. (GHC only)
+-- updated. (GHC only)
 retry :: STM a
 retry = STM $ \s# -> retry# s#
 
