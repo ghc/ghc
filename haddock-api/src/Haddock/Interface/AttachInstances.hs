@@ -21,7 +21,7 @@ import Haddock.GhcUtils
 import Control.Arrow hiding ((<+>))
 import Data.List
 import Data.Ord (comparing)
-import Data.Maybe ( maybeToList, mapMaybe )
+import Data.Maybe ( maybeToList, mapMaybe, fromMaybe )
 import qualified Data.Map as Map
 import qualified Data.Set as Set
 
@@ -32,14 +32,13 @@ import ErrUtils
 import FamInstEnv
 import FastString
 import GHC
-import GhcMonad (withSession)
 import InstEnv
 import MonadUtils (liftIO)
 import Name
+import NameEnv
 import Outputable (text, sep, (<+>))
 import PrelNames
 import SrcLoc
-import TcRnDriver (tcRnGetInfo)
 import TyCon
 import TyCoRep
 import TysPrim( funTyCon )
@@ -52,13 +51,15 @@ type ExportInfo = (ExportedNames, Modules)
 
 -- Also attaches fixities
 attachInstances :: ExportInfo -> [Interface] -> InstIfaceMap -> Ghc [Interface]
-attachInstances expInfo ifaces instIfaceMap = mapM attach ifaces
+attachInstances expInfo ifaces instIfaceMap = do
+  (_msgs, mb_index) <- getNameToInstancesIndex
+  mapM (attach $ fromMaybe emptyNameEnv mb_index) ifaces
   where
     -- TODO: take an IfaceMap as input
     ifaceMap = Map.fromList [ (ifaceMod i, i) | i <- ifaces ]
 
-    attach iface = do
-      newItems <- mapM (attachToExportItem expInfo iface ifaceMap instIfaceMap)
+    attach index iface = do
+      newItems <- mapM (attachToExportItem index expInfo iface ifaceMap instIfaceMap)
                        (ifaceExportItems iface)
       let orphanInstances = attachOrphanInstances expInfo iface ifaceMap instIfaceMap (ifaceInstances iface)
       return $ iface { ifaceExportItems = newItems
@@ -74,37 +75,42 @@ attachOrphanInstances expInfo iface ifaceMap instIfaceMap cls_instances =
   ]
 
 
-attachToExportItem :: ExportInfo -> Interface -> IfaceMap -> InstIfaceMap
-                   -> ExportItem Name
-                   -> Ghc (ExportItem Name)
-attachToExportItem expInfo iface ifaceMap instIfaceMap export =
+attachToExportItem
+  :: NameEnv ([ClsInst], [FamInst])
+  -> ExportInfo
+  -> Interface
+  -> IfaceMap
+  -> InstIfaceMap
+  -> ExportItem Name
+  -> Ghc (ExportItem Name)
+attachToExportItem index expInfo iface ifaceMap instIfaceMap export =
   case attachFixities export of
     e@ExportDecl { expItemDecl = L eSpan (TyClD d) } -> do
-      mb_info <- getAllInfo (tcdName d)
-      insts <- case mb_info of
-        Just (_, _, cls_instances, fam_instances) ->
-          let fam_insts = [ (synifyFamInst i opaque, doc,spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d)) )
-                          | i <- sortBy (comparing instFam) fam_instances
-                          , let n = getName i
-                          , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
-                          , not $ isNameHidden expInfo (fi_fam i)
-                          , not $ any (isTypeHidden expInfo) (fi_tys i)
-                          , let opaque = isTypeHidden expInfo (fi_rhs i)
-                          ]
-              cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L eSpan (tcdName d)))
-                          | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
-                          , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
-                          , not $ isInstanceHidden expInfo cls tys
-                          ]
+      insts <-
+        let mb_instances  = lookupNameEnv index (tcdName d)
+            cls_instances = maybeToList mb_instances >>= fst
+            fam_instances = maybeToList mb_instances >>= snd
+            fam_insts = [ (synifyFamInst i opaque, doc,spanNameE n (synifyFamInst i opaque) (L eSpan (tcdName d)) )
+                        | i <- sortBy (comparing instFam) fam_instances
+                        , let n = getName i
+                        , let doc = instLookup instDocMap n iface ifaceMap instIfaceMap
+                        , not $ isNameHidden expInfo (fi_fam i)
+                        , not $ any (isTypeHidden expInfo) (fi_tys i)
+                        , let opaque = isTypeHidden expInfo (fi_rhs i)
+                        ]
+            cls_insts = [ (synifyInstHead i, instLookup instDocMap n iface ifaceMap instIfaceMap, spanName n (synifyInstHead i) (L eSpan (tcdName d)))
+                        | let is = [ (instanceSig i, getName i) | i <- cls_instances ]
+                        , (i@(_,_,cls,tys), n) <- sortBy (comparing $ first instHead) is
+                        , not $ isInstanceHidden expInfo cls tys
+                        ]
               -- fam_insts but with failing type fams filtered out
-              cleanFamInsts = [ (fi, n, L l r) | (Right fi, n, L l (Right r)) <- fam_insts ]
-              famInstErrs = [ errm | (Left errm, _, _) <- fam_insts ]
-          in do
-            dfs <- getDynFlags
-            let mkBug = (text "haddock-bug:" <+>) . text
-            liftIO $ putMsg dfs (sep $ map mkBug famInstErrs)
-            return $ cls_insts ++ cleanFamInsts
-        Nothing -> return []
+            cleanFamInsts = [ (fi, n, L l r) | (Right fi, n, L l (Right r)) <- fam_insts ]
+            famInstErrs = [ errm | (Left errm, _, _) <- fam_insts ]
+        in do
+          dfs <- getDynFlags
+          let mkBug = (text "haddock-bug:" <+>) . text
+          liftIO $ putMsg dfs (sep $ map mkBug famInstErrs)
+          return $ cls_insts ++ cleanFamInsts
       return $ e { expItemInstances = insts }
     e -> return e
   where
@@ -144,14 +150,6 @@ instLookup f name iface ifaceMap instIfaceMap =
       let ifaceMaps = Map.union (fmap toInstalledIface ifaceMap) instIfaceMap
       iface' <- Map.lookup (nameModule name) ifaceMaps
       Map.lookup name (f iface')
-
--- | Like GHC's getInfo but doesn't cut things out depending on the
--- interative context, which we don't set sufficiently anyway.
-getAllInfo :: GhcMonad m => Name -> m (Maybe (TyThing,Fixity,[ClsInst],[FamInst]))
-getAllInfo name = withSession $ \hsc_env -> do
-   (_msgs, r) <- liftIO $ tcRnGetInfo hsc_env name
-   return r
-
 
 --------------------------------------------------------------------------------
 -- Collecting and sorting instances
