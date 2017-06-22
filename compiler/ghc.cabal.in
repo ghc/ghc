@@ -62,6 +62,7 @@ Library
                    template-haskell == 2.12.*,
                    hpc        == 0.6.*,
                    transformers == 0.5.*,
+                   text          == 1.2.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
