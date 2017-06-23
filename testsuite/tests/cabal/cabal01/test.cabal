@@ -12,5 +12,5 @@ Main-is: MainA.hs
 Extensions: OverlappingInstances
 
 Executable: testB
-Other-Modules: B.A
+Other-Modules: A, B.A
 Main-is: B/MainB.hs
