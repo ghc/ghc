@@ -1613,8 +1613,7 @@ hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
             val <- getHValue hsc_env (idName i)
-            pprTrace "add_spt_entry" (ppr fpr <+> ppr i) $
-                addSptEntry hsc_env fpr val
+            addSptEntry hsc_env fpr val
     mapM_ add_spt_entry entries
 
 {-
