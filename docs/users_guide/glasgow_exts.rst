@@ -8943,10 +8943,23 @@ the function is callable. For example: ::
 
 Here ``strange``\'s type is ambiguous, but the call in ``foo`` is OK
 because it gives rise to a constraint ``(D Bool beta)``, which is
-soluble by the ``(D Bool b)`` instance. So the language extension
-:ghc-flag:`-XAllowAmbiguousTypes` allows you to switch off the ambiguity check.
-But even with ambiguity checking switched off, GHC will complain about a
-function that can *never* be called, such as this one: ::
+soluble by the ``(D Bool b)`` instance.
+
+Another way of getting rid of the ambiguity at the call site is to use
+the :ghc-flag:`-XTypeApplications` flag to specify the types. For example: ::
+
+      class D a b where
+        h :: b
+      instance D Int Int where ...
+
+      main = print (h @Int @Int)
+
+Here ``a`` is ambiguous in the definition of ``D`` but later specified
+to be `Int` using type applications.
+
+So the language extension :ghc-flag:`-XAllowAmbiguousTypes` allows you to
+switch off the ambiguity check.  But even with ambiguity checking switched off,
+GHC will complain about a function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
 
