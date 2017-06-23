@@ -26,7 +26,8 @@ import Reg
 import TargetReg
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import CodeGen.Platform
 import Cmm
 import FastString

@@ -18,7 +18,9 @@ import Cmm
 import PprCmm
 import CmmUtils
 import CmmSwitch
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Collections
 
 import DynFlags
 import FastString

@@ -26,7 +26,8 @@ import qualified Data.Map as Map
 import System.FilePath
 import System.Directory ( getCurrentDirectory )
 
-import qualified Compiler.Hoopl as H
+import qualified Hoopl.Label as H
+import qualified Hoopl.Collections as H
 
 -- | Generate DWARF/debug information
 dwarfGen :: DynFlags -> ModLocation -> UniqSupply -> [DebugBlock]

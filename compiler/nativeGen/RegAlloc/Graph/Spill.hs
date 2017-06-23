@@ -12,7 +12,7 @@ import Instruction
 import Reg
 import Cmm hiding (RegSet)
 import BlockId
-import Hoopl
+import Hoopl.Collections
 
 import MonadUtils
 import State

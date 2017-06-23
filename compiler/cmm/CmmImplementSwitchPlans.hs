@@ -4,7 +4,7 @@ module CmmImplementSwitchPlans
   )
 where
 
-import Hoopl
+import Hoopl.Block
 import BlockId
 import Cmm
 import CmmUtils

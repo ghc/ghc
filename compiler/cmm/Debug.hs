@@ -35,7 +35,10 @@ import PprCmmExpr      ( pprExpr )
 import SrcLoc
 import Util
 
-import Compiler.Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Graph
+import Hoopl.Label
 
 import Data.Maybe
 import Data.List     ( minimumBy, nubBy )

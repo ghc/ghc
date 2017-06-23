@@ -79,7 +79,10 @@ import CodeGen.Platform
 import Data.Word
 import Data.Maybe
 import Data.Bits
-import Hoopl
+import Hoopl.Graph
+import Hoopl.Label
+import Hoopl.Block
+import Hoopl.Collections
 
 ---------------------------------------------------
 --

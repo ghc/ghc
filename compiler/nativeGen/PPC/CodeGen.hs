@@ -46,7 +46,8 @@ import Cmm
 import CmmUtils
 import CmmSwitch
 import CLabel
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
 
 -- The rest:
 import OrdList

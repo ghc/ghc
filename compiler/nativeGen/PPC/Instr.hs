@@ -33,7 +33,8 @@ import Reg
 
 import CodeGen.Platform
 import BlockId
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import DynFlags
 import Cmm
 import CmmInfo

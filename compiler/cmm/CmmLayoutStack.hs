@@ -17,7 +17,11 @@ import ForeignCall
 import CmmLive
 import CmmProcPoint
 import SMRep
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Dataflow
+import Hoopl.Graph
+import Hoopl.Label
 import UniqSupply
 import StgCmmUtils      ( newTemp )
 import Maybes

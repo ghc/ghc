@@ -8,7 +8,10 @@ module CmmContFlowOpt
     )
 where
 
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Graph
+import Hoopl.Label
 import BlockId
 import Cmm
 import CmmUtils

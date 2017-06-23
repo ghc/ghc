@@ -7,7 +7,11 @@ where
 
 #include "HsVersions.h"
 
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Label
+import Hoopl.Collections
+import Hoopl.Dataflow
 import Digraph
 import Bitmap
 import CLabel

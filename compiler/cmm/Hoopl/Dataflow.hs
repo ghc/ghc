@@ -42,10 +42,14 @@ import Data.Maybe
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as IntSet
 
--- Hide definitions from Hoopl's Dataflow module.
-import Compiler.Hoopl hiding ( DataflowLattice, OldFact, NewFact, JoinFun
-                             , fact_bot, fact_join, joinOutFacts, mkFactBase
-                             )
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Collections
+import Hoopl.Label
+
+type family   Fact x f :: *
+type instance Fact C f = FactBase f
+type instance Fact O f = f
 
 newtype OldFact a = OldFact a
 

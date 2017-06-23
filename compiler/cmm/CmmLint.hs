@@ -10,7 +10,10 @@ module CmmLint (
     cmmLint, cmmLintGraph
   ) where
 
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Graph
+import Hoopl.Label
 import Cmm
 import CmmUtils
 import CmmLive

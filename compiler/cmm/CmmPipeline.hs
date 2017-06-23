@@ -16,7 +16,7 @@ import CmmProcPoint
 import CmmContFlowOpt
 import CmmLayoutStack
 import CmmSink
-import Hoopl
+import Hoopl.Collections
 
 import UniqSupply
 import DynFlags

@@ -32,7 +32,8 @@ import Reg
 import PprBase
 
 
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import BasicTypes       (Alignment)
 import DynFlags
 import Cmm              hiding (topInfoTable)

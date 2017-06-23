@@ -53,7 +53,8 @@ import Util
 import PprCore ()
 
 import BasicTypes
-import Compiler.Hoopl
+import Hoopl.Block
+import Hoopl.Graph
 import Data.List
 import Prelude hiding (succ)
 

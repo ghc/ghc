@@ -13,7 +13,7 @@ module CmmSwitch (
 
 import Outputable
 import DynFlags
-import Compiler.Hoopl (Label)
+import Hoopl.Label (Label)
 
 import Data.Maybe
 import Data.List (groupBy)
