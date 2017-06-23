@@ -784,6 +784,10 @@ cvtl e = wrapL (cvt e)
                             ; t' <- cvtType t
                             ; tp <- wrap_apps t'
                             ; return $ HsAppType e' $ mkHsWildCardBndrs tp }
+    cvt (LamE [] e)    = cvt e -- Degenerate case. We convert the body as its
+                               -- own expression to avoid pretty-printing
+                               -- oddities that can result from zero-argument
+                               -- lambda expressions. See #13856.
     cvt (LamE ps e)    = do { ps' <- cvtPats ps; e' <- cvtl e
                             ; return $ HsLam (mkMatchGroup FromSource
                                              [mkSimpleMatch LambdaExpr ps' e'])}
