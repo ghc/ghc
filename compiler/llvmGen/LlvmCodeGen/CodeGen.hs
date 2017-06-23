@@ -1788,7 +1788,7 @@ genLit _ CmmHighStackMark
 -- save a few lines in the output and hopefully speed compilation up a
 -- bit. 
 --
--- FIXME(kavon): it seems inefficient to scan the whole function for reg assigns,
+-- FIXME(kavon): it seems inefficient to scan the whole function for reg overwrites,
 -- we could instead update a map of CmmRegs -> LlvmVars when we see assignments during
 -- translation of a function's blocks, and then prepend the allocas to the entry block
 -- once we're done.
@@ -1798,11 +1798,20 @@ funPrologue live cmmBlocks = do
   trash <- getTrashRegs
   let getAssignedRegs :: CmmNode O O -> [CmmReg]
       getAssignedRegs (CmmAssign reg _)  = [reg]
-      -- Calls will trash all registers. Unfortunately, this needs them to
+      -- Foreign calls will trash all registers. Unfortunately, this needs them to
       -- be stack-allocated in the first place.
       getAssignedRegs (CmmUnsafeForeignCall _ rs _) = map CmmGlobal trash ++ map CmmLocal rs
       getAssignedRegs _                  = []
-      getRegsBlock (_, body, _)          = concatMap getAssignedRegs $ blockToList body
+      
+      getTailRegs :: CmmNode O C -> [CmmReg]
+      -- When a native call returns, we reassign the values returned. See `doReturnTo`
+      getTailRegs (CmmCall {cml_cont = Just _, cml_ret_regs = regs}) = map CmmGlobal regs
+      getTailRegs _  = []
+      
+      getRegsBlock (_, body, tl) = tailRegs ++ bodyRegs
+            where
+                tailRegs = getTailRegs tl
+                bodyRegs = concatMap getAssignedRegs $ blockToList body
       
       -- because we emit non-tail calls, the pinned registers such as the BasePtr is
       -- returned and we need to use an alloca for it. -kavon
