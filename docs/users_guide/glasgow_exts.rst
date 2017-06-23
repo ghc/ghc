@@ -8862,9 +8862,9 @@ the :ghc-flag:`-XTypeApplications` flag to specify the types. For example: ::
 Here ``a`` is ambiguous in the definition of ``D`` but later specified
 to be `Int` using type applications.
 
-So the language extension :ghc-flag:`-XAllowAmbiguousTypes` allows you to
-switch off the ambiguity check.  But even with ambiguity checking switched off,
-GHC will complain about a function that can *never* be called, such as this one: ::
+:ghc-flag:`-XAllowAmbiguousTypes` allows you to switch off the ambiguity check.
+However, even with ambiguity checking switched off, GHC will complain about a
+function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
 
