@@ -9,7 +9,7 @@ test('haddock.base',
           [(platform('x86_64-unknown-mingw32'), 24286343184, 5)
             # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
 
-          ,(wordsize(64), 19573969096, 5)
+          ,(wordsize(64), 18122310128, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
             # 2012-09-20:  5829972376 (amd64/Linux)
             # 2012-10-08:  5902601224 (amd64/Linux)
@@ -40,6 +40,7 @@ test('haddock.base',
             # 2017-02-17: 38425793776 (x86_64/Linux) - Generalize kind of (->)
             # 2017-02-12: 25592972912 (x86_64/Linux) - Type-indexed Typeable
             # 2017-06-16: 19573969096 (x86_64/Linux) - Don't desugar for haddock
+            # 2017-06-23: 18122310128 (x86_64/Linux) - Use getNameToInstancesIndex
 
           ,(platform('i386-unknown-mingw32'), 2885173512, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
@@ -134,7 +135,7 @@ test('haddock.compiler',
      [extra_files(['../../../../compiler/stage2/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 55777283352, 10)
+          [(wordsize(64), 48049549248, 10)
             # 2012-08-14: 26070600504 (amd64/Linux)
             # 2012-08-29: 26353100288 (amd64/Linux, new CG)
             # 2012-09-18: 26882813032 (amd64/Linux)
@@ -152,6 +153,7 @@ test('haddock.compiler',
             # 2016-11-29: 60911147344 (amd64/Linux) unknown cause
             # 2017-02-11: 62070477608 (amd64/Linux) OccurAnal / One-Shot  (#13227) (and others)
             # 2017-02-25: 55777283352 (amd64/Linux) Early inline patch
+            # 2017-06-23: 48049549248 (amd64/Linux) Use getNameToInstancesIndex
 
           ,(platform('i386-unknown-mingw32'),   367546388, 10)
             # 2012-10-30:                     13773051312 (x86/Windows)
