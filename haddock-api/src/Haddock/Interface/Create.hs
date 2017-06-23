@@ -317,13 +317,21 @@ mkMaps :: DynFlags
 mkMaps dflags gre instances decls =
   let
     (a, b, c, d) = unzip4 $ map mappings decls
-  in (f' $ map (nubByName fst) a , f b, f c, f d, instanceMap)
+  in ( f' (map (nubByName fst) a)
+     , f  (filterMapping (not . M.null) b)
+     , f  (filterMapping (not . null) c)
+     , f  (filterMapping (not . null) d)
+     , instanceMap
+     )
   where
     f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
     f = M.fromListWith (<>) . concat
 
     f' :: [[(Name, MDoc Name)]] -> Map Name (MDoc Name)
     f' = M.fromListWith metaDocAppend . concat
+
+    filterMapping :: (b -> Bool) ->  [[(a, b)]] -> [[(a, b)]]
+    filterMapping p = map (filter (p . snd))
 
     mappings :: (LHsDecl Name, [HsDocString])
              -> ( [(Name, MDoc Name)]
