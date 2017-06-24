@@ -136,3 +136,6 @@
 [submodule "hadrian"]
 	path = hadrian
 	url = ../hadrian.git
+[submodule "libraries/prettyprinter-core"]
+	path = libraries/prettyprinter-core
+	url = https://github.com/bollu/prettyprinter-core.git
