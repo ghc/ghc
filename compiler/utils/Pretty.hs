@@ -63,10 +63,10 @@ allocation in the compiler (see thomie's comments in
 https://github.com/haskell/pretty/pull/9).
 -}
 
-module Pretty (
+module Pretty  (
 
         -- * The document type
-        Doc, TextDetails(..),
+        Doc,
 
         -- * Constructing documents
 
@@ -89,7 +89,7 @@ module Pretty (
         sep, cat,
         fsep, fcat,
         nest,
-        hang, hangNotEmpty, punctuate,
+        Pretty.hang, hangNotEmpty, punctuate,
 
         -- * Predicates on documents
         isEmpty,
@@ -103,11 +103,11 @@ module Pretty (
         Mode(..),
 
         -- ** General rendering
-        fullRender,
+        -- fullRender,
 
         -- ** GHC-specific rendering
         printDoc, printDoc_,
-        bufLeftRender -- performance hack
+        -- bufLeftRender -- performance hack
 
   ) where
 
@@ -120,6 +120,18 @@ import Prelude hiding (error)
 --for a RULES
 import GHC.Base ( unpackCString# )
 import GHC.Ptr  ( Ptr(..) )
+
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+
+import Data.Text.Prettyprint.Doc
+-- PI = PrettyprinterInternal
+import Data.Text.Prettyprint.Doc.Internal as PI
+
+import Data.Text.Prettyprint.Doc.Render.Text
+
+import  GHC.Float (float2Double)
+
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
@@ -201,10 +213,16 @@ But it doesn't work, for if x=empty, we would have
 
 -- ---------------------------------------------------------------------------
 -- Operator fixity
-
+{-
 infixl 6 <>
 infixl 6 <+>
 infixl 5 $$, $+$
+-}
+($+$) :: Doc a -> Doc a -> Doc a
+($+$) a b = vsep [a, b]
+
+($$) :: Doc a -> Doc a -> Doc a
+($$) = ($+$)
 
 
 -- ---------------------------------------------------------------------------
@@ -213,6 +231,8 @@ infixl 5 $$, $+$
 -- | The abstract type of documents.
 -- A Doc represents a *set* of layouts. A Doc with
 -- no occurrences of Union or NoDoc represents just one layout.
+{-
+
 data Doc
   = Empty                                            -- empty
   | NilAbove Doc                                     -- text "" $$ x
@@ -222,6 +242,8 @@ data Doc
   | NoDoc                                            -- The empty set of documents
   | Beside Doc Bool Doc                              -- True <=> space between
   | Above Doc Bool Doc                               -- True <=> never overlap
+
+-}
 
 {-
 Here are the invariants:
@@ -258,31 +280,41 @@ Notice the difference between
 
 
 -- | RDoc is a "reduced GDoc", guaranteed not to have a top-level Above or Beside.
-type RDoc = Doc
+-- type RDoc = Doc
 
 -- | The TextDetails data type
 --
 -- A TextDetails represents a fragment of text that will be
 -- output at some point.
+{-
 data TextDetails = Chr  {-# UNPACK #-} !Char -- ^ A single Char fragment
                  | Str  String -- ^ A whole String fragment
                  | PStr FastString                      -- a hashed string
                  | ZStr FastZString                     -- a z-encoded string
                  | LStr {-# UNPACK #-} !LitString {-#UNPACK #-} !Int
                    -- a '\0'-terminated array of bytes
+-}
 
+{-
 instance Show Doc where
   showsPrec _ doc cont = fullRender (mode style) (lineLength style)
                                     (ribbonsPerLine style)
                                     txtPrinter cont doc
+-}
 
 
 -- ---------------------------------------------------------------------------
 -- Values and Predicates on GDocs and TextDetails
 
 -- | A document of height and width 1, containing a literal character.
+{-
 char :: Char -> Doc
 char c = textBeside_ (Chr c) 1 Empty
+-}
+
+char :: Char -> Doc a
+char = pretty
+
 
 -- | A document of height 1 containing a literal string.
 -- 'text' satisfies the following laws:
@@ -293,6 +325,91 @@ char c = textBeside_ (Chr c) 1 Empty
 --
 -- The side condition on the last law is necessary because @'text' \"\"@
 -- has height 1, while 'empty' has no height.
+
+text :: String -> Doc a
+text = pretty
+
+-- DEPRECATED
+{-# DEPRECATED zeroWidthText "woo" #-}
+zeroWidthText :: String -> Doc a
+zeroWidthText s = PI.Text 0 (T.pack s)
+
+
+ftext :: FastString -> Doc a
+ftext = pretty . unpackFS
+
+ptext :: LitString -> Doc a
+ptext = pretty . unpackLitString
+
+ztext :: FastZString -> Doc a
+ztext = pretty . zString
+
+-- | Some text with any width. (@text s = sizedText (length s) s@)
+sizedText :: Int -> String -> Doc a
+sizedText size s = PI.Text size (T.pack s)
+
+int      :: Int      -> Doc a -- ^ @int n = text (show n)@
+integer  :: Integer  -> Doc a -- ^ @integer n = text (show n)@
+float    :: Float    -> Doc a -- ^ @float n = text (show n)@
+double   :: Double   -> Doc a -- ^ @double n = text (show n)@
+rational :: Rational -> Doc a -- ^ @rational n = text (show n)@
+int       = pretty
+integer   = pretty
+float     = pretty
+double    = pretty
+rational  = pretty . show
+
+lbrack :: Doc a -- ^ A '[' character
+lbrack = lbracket
+
+rbrack :: Doc a -- ^ A ']' character
+rbrack = rbracket
+
+quotes       :: Doc a -> Doc a -- ^ Wrap document in @\'...\'@
+quotes = squotes
+
+doubleQuotes :: Doc a -> Doc a -- ^ Wrap document in @\"...\"@
+doubleQuotes = dquotes
+
+quote     :: Doc a -> Doc a-- ^Prefix document with @\'@
+quote p        = char '\'' <> p
+
+
+-- | Apply 'parens' to 'Doc' if boolean is true.
+maybeParens :: Bool -> Doc a -> Doc a
+maybeParens False = id
+maybeParens True = parens
+
+empty :: Doc a
+empty = emptyDoc
+
+-- | \"Paragraph fill\" version of 'sep'.
+fsep :: [Doc a] -> Doc a
+fsep = sep
+
+fcat :: [Doc a] -> Doc a
+fcat = cat
+
+-- | Returns 'True' if the document is empty
+isEmpty :: Doc a -> Bool
+isEmpty PI.Empty = True
+isEmpty _     = False
+
+-- | @hang d1 n d2 = sep [d1, nest n d2]@
+hang :: Doc a -> Int -> Doc a -> Doc a
+hang d1 n d2 = sep [d1, nest n d2]
+
+
+
+-- | Apply 'hang' to the arguments if the first 'Doc' is not empty.
+hangNotEmpty :: Doc a -> Int -> Doc a -> Doc a
+hangNotEmpty d1 n d2 = if isEmpty d1
+                       then d2
+                       else Pretty.hang d1 n d2
+
+
+
+{-
 text :: String -> Doc
 text s = case length s of {sl -> textBeside_ (Str s)  sl Empty}
 {-# NOINLINE [0] text #-}   -- Give the RULE a chance to fire
@@ -313,6 +430,7 @@ ptext s = case lengthLS s of {sl -> textBeside_ (LStr s sl) sl Empty}
 
 ztext :: FastZString -> Doc
 ztext s = case lengthFZS s of {sl -> textBeside_ (ZStr s) sl Empty}
+
 
 -- | Some text with any width. (@text s = sizedText (length s) s@)
 sizedText :: Int -> String -> Doc
@@ -339,6 +457,7 @@ isEmpty _     = False
 -- an old version inserted tabs being 8 columns apart in the output.
 spaces :: Int -> String
 spaces !n = replicate n ' '
+-}
 
 {-
 Q: What is the reason for negative indentation (i.e. argument to indent
@@ -369,6 +488,9 @@ translating b horizontally by (k-s). Now if the i^th line of b has an
 indentation k0 < (k-s), it is translated out-of-page, causing
 `negative indentation'.
 -}
+
+-- mega comment
+{-
 
 
 semi   :: Doc -- ^ A ';' character
@@ -853,6 +975,8 @@ oneLiner (Beside {})         = error "oneLiner Beside"
 
 -- ---------------------------------------------------------------------------
 -- Rendering
+-}
+
 
 -- | A rendering style.
 data Style
@@ -871,11 +995,50 @@ data Mode = PageMode     -- ^ Normal
           | LeftMode     -- ^ No indentation, infinitely long lines
           | OneLineMode  -- ^ All on one line
 
--- | Render the @Doc@ to a String using the given @Style@.
-renderStyle :: Style -> Doc -> String
-renderStyle s = fullRender (mode s) (lineLength s) (ribbonsPerLine s)
-                txtPrinter ""
+-- currently ignoring Mode. Need to respect this later on
+styleToLayoutOptions :: Style -> LayoutOptions
+styleToLayoutOptions s = case (mode s) of
+                          LeftMode -> LayoutOptions Unbounded
+                          _ -> LayoutOptions (AvailablePerLine (lineLength s) (float2Double (ribbonsPerLine s)))
 
+-- | Render the @Doc@ to a String using the given @Style@.
+renderStyle :: Style -> Doc a -> String
+renderStyle s d = TL.unpack $ renderLazy (layoutPretty (styleToLayoutOptions s) d)
+
+printDoc :: Mode -> Int -> Handle -> Doc a -> IO ()
+-- printDoc adds a newline to the end
+printDoc mode cols hdl doc = printDoc_ mode cols hdl (doc <> hardline)
+
+printDoc_ :: Mode -> Int -> Handle -> Doc a -> IO ()
+printDoc_ mode pprCols hdl doc = renderIO hdl (layoutPretty (mkLayoutOptions mode pprCols) doc) where
+  mkLayoutOptions :: Mode -> Int -> LayoutOptions
+  -- Note that this should technically be 1.5 as per the old implementation.
+  -- I have no idea why that is.
+  mkLayoutOptions PageMode pprCols = LayoutOptions (AvailablePerLine pprCols 1.0)
+  mkLayoutOptions LeftMode pprCols = LayoutOptions Unbounded
+
+
+-- printDoc_ does not add a newline at the end, so that
+-- successive calls can output stuff on the same line
+-- Rather like putStr vs putStrLn
+-- printDoc_ LeftMode _ hdl doc
+--   = do { printLeftRender hdl doc; hFlush hdl }
+-- printDoc_ mode pprCols hdl doc
+--   = do { fullRender mode pprCols 1.5 put done doc ;
+--          hFlush hdl }
+--   where
+--     put (Chr c)  next = hPutChar hdl c >> next
+--     put (Str s)  next = hPutStr  hdl s >> next
+--     put (PStr s) next = hPutStr  hdl (unpackFS s) >> next
+--                         -- NB. not hPutFS, we want this to go through
+--                         -- the I/O library's encoding layer. (#3398)
+--     put (ZStr s) next = hPutFZS  hdl s >> next
+--     put (LStr s l) next = hPutLitString hdl s l >> next
+
+--     done = return () -- hPutChar hdl '\n'
+
+
+{-
 -- | Default TextDetails printer
 txtPrinter :: TextDetails -> String -> String
 txtPrinter (Chr c)   s  = c:s
@@ -907,7 +1070,6 @@ fullRender m lineLen ribbons txt rest doc
     bestLineLen = case m of
                       ZigZagMode -> maxBound
                       _          -> lineLen
-
 easyDisplay :: TextDetails
              -> (Doc -> Doc -> Doc)
              -> (TextDetails -> a -> a)
@@ -1048,3 +1210,4 @@ layLeft _ _                  = panic "layLeft: Unhandled case"
 -- Define error=panic, for easier comparison with libraries/pretty.
 error :: String -> a
 error = panic
+-}

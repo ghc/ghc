@@ -311,7 +311,9 @@ code (either C or assembly), or generating interface files.
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
 -- or 'renderWithStyle'.  Avoid calling 'runSDoc' directly as it breaks the
 -- abstraction layer.
-newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc }
+-- Note that for now, it is Doc (). This should be changed to hold
+-- annotation.
+newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc () }
 
 data SDocContext = SDC
   { sdocStyle      :: !PprStyle
@@ -336,7 +338,7 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 -- | This is not a recommended way to render 'SDoc', since it breaks the
 -- abstraction layer of 'SDoc'.  Prefer to use 'printSDoc', 'printSDocLn',
 -- 'bufLeftRenderSDoc', or 'renderWithStyle' instead.
-withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
+withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc ()
 withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 sdocWithPprDebug :: (Bool -> SDoc) -> SDoc
@@ -463,11 +465,15 @@ printForC :: DynFlags -> Handle -> SDoc -> IO ()
 printForC dflags handle doc =
   printSDocLn LeftMode dflags handle (PprCode CStyle) doc
 
+-- | TODO: I don't know the correct number, please correct this.
+pprColumnsGuess :: Int
+pprColumnsGuess = 80
+
 -- | An efficient variant of 'printSDoc' specialized for 'LeftMode' that
 -- outputs to a 'BufHandle'.
-bufLeftRenderSDoc :: DynFlags -> BufHandle -> PprStyle -> SDoc -> IO ()
-bufLeftRenderSDoc dflags bufHandle sty doc =
-  Pretty.bufLeftRender bufHandle (runSDoc doc (initSDocContext dflags sty))
+bufLeftRenderSDoc :: DynFlags -> Handle -> PprStyle -> SDoc -> IO ()
+bufLeftRenderSDoc dflags handle sty doc =
+  Pretty.printDoc_ LeftMode pprColumnsGuess handle (runSDoc doc (initSDocContext dflags sty))
 
 pprCode :: CodeStyle -> SDoc -> SDoc
 pprCode cs d = withPprStyle (PprCode cs) d
@@ -535,7 +541,7 @@ isEmpty :: DynFlags -> SDoc -> Bool
 isEmpty dflags sdoc = Pretty.isEmpty $ runSDoc sdoc dummySDocContext
    where dummySDocContext = initSDocContext dflags PprDebug
 
-docToSDoc :: Doc -> SDoc
+docToSDoc :: Doc () -> SDoc
 docToSDoc d = SDoc (\_ -> d)
 
 empty    :: SDoc
