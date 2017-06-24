@@ -123,6 +123,7 @@ import GHC.Ptr  ( Ptr(..) )
 
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.IO as TL
 
 import Data.Text.Prettyprint.Doc
 -- PI = PrettyprinterInternal
@@ -1010,7 +1011,7 @@ printDoc :: Mode -> Int -> Handle -> Doc a -> IO ()
 printDoc mode cols hdl doc = printDoc_ mode cols hdl (doc <> hardline)
 
 printDoc_ :: Mode -> Int -> Handle -> Doc a -> IO ()
-printDoc_ mode pprCols hdl doc = renderIO hdl (layoutPretty (mkLayoutOptions mode pprCols) doc) where
+printDoc_ mode pprCols hdl doc = TL.hPutStr hdl (renderLazy $ layoutPretty (mkLayoutOptions mode pprCols) doc) where
   mkLayoutOptions :: Mode -> Int -> LayoutOptions
   -- Note that this should technically be 1.5 as per the old implementation.
   -- I have no idea why that is.
