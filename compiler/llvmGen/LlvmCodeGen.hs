@@ -46,7 +46,6 @@ llvmCodeGen :: DynFlags -> Handle -> UniqSupply
                -> IO ()
 llvmCodeGen dflags h us cmm_stream
   = withTiming (pure dflags) (text "LLVM CodeGen") (const ()) $ do
-       bufh <- newBufHandle h
 
        -- Pass header
        showPass dflags "LLVM CodeGen"
@@ -66,10 +65,9 @@ llvmCodeGen dflags h us cmm_stream
                             $+$ text "We will try though...")
 
        -- run code generation
-       runLlvm dflags ver bufh us $
+       runLlvm dflags ver h us $
          llvmCodeGen' (liftStream cmm_stream)
 
-       bFlush bufh
 
 llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ()
 llvmCodeGen' cmm_stream

@@ -84,7 +84,6 @@ import Unique
 import BasicTypes       ( Alignment )
 import Digraph
 import qualified Pretty
-import BufWrite
 import Outputable
 import FastString
 import UniqSet
@@ -102,6 +101,7 @@ import Data.Ord         ( comparing )
 import Control.Exception
 import Control.Monad
 import System.IO
+import System.IO (Handle)
 
 {-
 The native-code generator has machine-independent and
@@ -333,31 +333,26 @@ nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                -> IO UniqSupply
 nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
  = do
-        -- BufHandle is a performance hack.  We could hide it inside
-        -- Pretty if it weren't for the fact that we do lots of little
-        -- printDocs here (in order to do codegen in constant space).
-        bufh <- newBufHandle h
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
-        (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl bufh us
+        (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl h us
                                          cmms ngs0
-        finishNativeGen dflags modLoc bufh us' ngs
+        finishNativeGen dflags modLoc h us' ngs
 
 finishNativeGen :: Instruction instr
                 => DynFlags
                 -> ModLocation
-                -> BufHandle
+                -> Handle
                 -> UniqSupply
                 -> NativeGenAcc statics instr
                 -> IO UniqSupply
-finishNativeGen dflags modLoc bufh@(BufHandle _ _ h) us ngs
+finishNativeGen dflags modLoc h us ngs
  = do
         -- Write debug data and finish
         let emitDw = debugLevel dflags > 0 && not (gopt Opt_SplitObjs dflags)
         us' <- if not emitDw then return us else do
           (dwarf, us') <- dwarfGen dflags modLoc us (ngs_debug ngs)
-          emitNativeCode dflags bufh dwarf
+          emitNativeCode dflags h dwarf
           return us'
-        bFlush bufh
 
         -- dump global NCG stats for graph coloring allocator
         let stats = concat (ngs_colorStats ngs)
@@ -398,7 +393,7 @@ cmmNativeGenStream :: (Outputable statics, Outputable instr, Instruction instr)
               => DynFlags
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
-              -> BufHandle
+              -> Handle
               -> UniqSupply
               -> Stream IO RawCmmGroup ()
               -> NativeGenAcc statics instr
@@ -463,7 +458,7 @@ cmmNativeGens :: forall statics instr jumpDest.
               => DynFlags
               -> Module -> ModLocation
               -> NcgImpl statics instr jumpDest
-              -> BufHandle
+              -> Handle
               -> LabelMap DebugBlock
               -> UniqSupply
               -> [RawCmmDecl]
@@ -523,7 +518,7 @@ cmmNativeGens dflags this_mod modLoc ncgImpl h dbgMap = go
     seqString (x:xs)        = x `seq` seqString xs
 
 
-emitNativeCode :: DynFlags -> BufHandle -> SDoc -> IO ()
+emitNativeCode :: DynFlags -> Handle -> SDoc -> IO ()
 emitNativeCode dflags h sdoc = do
 
         {-# SCC "pprNativeCode" #-} bufLeftRenderSDoc dflags h

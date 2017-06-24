@@ -52,12 +52,14 @@ import Platform
 import UniqFM
 import Unique
 import BufWrite   ( BufHandle )
+import System.IO (Handle)
 import UniqSet
 import UniqSupply
 import ErrUtils
 import qualified Stream
 
 import Control.Monad (ap)
+
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
@@ -192,7 +194,7 @@ llvmVersionStr (major, minor) = show major ++ "." ++ show minor
 data LlvmEnv = LlvmEnv
   { envVersion :: LlvmVersion      -- ^ LLVM version
   , envDynFlags :: DynFlags        -- ^ Dynamic flags
-  , envOutput :: BufHandle         -- ^ Output buffer
+  , envOutput :: Handle            -- ^ Output buffer
   , envUniq :: UniqSupply          -- ^ Supply of unique values
   , envFreshMeta :: MetaId         -- ^ Supply of fresh metadata IDs
   , envUniqMeta :: UniqFM MetaId   -- ^ Global metadata nodes
@@ -244,7 +246,7 @@ liftIO m = LlvmM $ \env -> do x <- m
                               return (x, env)
 
 -- | Get initial Llvm environment.
-runLlvm :: DynFlags -> LlvmVersion -> BufHandle -> UniqSupply -> LlvmM () -> IO ()
+runLlvm :: DynFlags -> LlvmVersion -> Handle -> UniqSupply -> LlvmM () -> IO ()
 runLlvm dflags ver out us m = do
     _ <- runLlvmM m env
     return ()
