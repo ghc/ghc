@@ -35,6 +35,7 @@ Executable ghc
                    process    >= 1   && < 1.7,
                    filepath   >= 1   && < 1.5,
                    text       == 1.2.*,
+                   prettyprinter == 1.1.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc        == @ProjectVersionMunged@
 
