@@ -1008,10 +1008,10 @@ renderStyle s d = TL.unpack $ renderLazy (layoutPretty (styleToLayoutOptions s) 
 
 printDoc :: Mode -> Int -> Handle -> Doc a -> IO ()
 -- printDoc adds a newline to the end
-printDoc mode cols hdl doc = printDoc_ mode cols hdl (doc <> hardline)
+printDoc mode cols hdl doc = printDoc_ mode cols hdl (doc)
 
 printDoc_ :: Mode -> Int -> Handle -> Doc a -> IO ()
-printDoc_ mode pprCols hdl doc = TL.hPutStr hdl (renderLazy $ layoutPretty (mkLayoutOptions mode pprCols) doc) where
+printDoc_ mode pprCols hdl doc = TL.hPutStrLn hdl (renderLazy $ layoutPretty (mkLayoutOptions mode pprCols) doc) where
   mkLayoutOptions :: Mode -> Int -> LayoutOptions
   -- Note that this should technically be 1.5 as per the old implementation.
   -- I have no idea why that is.
