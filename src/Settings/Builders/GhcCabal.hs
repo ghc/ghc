@@ -269,8 +269,6 @@ dll0Args = do
                   , "CodeGen.Platform.X86"
                   , "CodeGen.Platform.X86_64"
                   , "FastBool"
-                  , "Hoopl"
-                  , "Hoopl.Dataflow"
                   , "InteractiveEvalTypes"
                   , "MkGraph"
                   , "PprCmm"

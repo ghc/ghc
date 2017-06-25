@@ -115,7 +115,6 @@ stage0Packages = do
              , ghcPkg
              , ghcTags
              , hsc2hs
-             , hoopl
              , hp2ps
              , hpc
              , mkUserGuidePart

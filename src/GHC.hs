@@ -4,7 +4,7 @@ module GHC (
     array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes,
     compiler, containers, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci,
-    ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hoopl, hp2ps,
+    ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps,
     hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart,
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, time, touchy, transformers, unlit, unix, win32, xhtml,
@@ -28,7 +28,7 @@ defaultKnownPackages =
     , compiler, containers, deepseq, deriveConstants, directory, dllSplit
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal
     , ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs
-    , hoopl, hp2ps, hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi
+    , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi
     , mkUserGuidePart, parallel, pretty, primitive, process, rts, runGhc, stm
     , templateHaskell, terminfo, time, touchy, transformers, unlit, unix, win32
     , xhtml ]
@@ -62,7 +62,6 @@ ghcTags             = utility  "ghctags"
 haddock             = utility  "haddock"
 haskeline           = library  "haskeline"
 hsc2hs              = utility  "hsc2hs"
-hoopl               = library  "hoopl"
 hp2ps               = utility  "hp2ps"
 hpc                 = library  "hpc"
 hpcBin              = utility  "hpc-bin"      `setPath` "utils/hpc"
