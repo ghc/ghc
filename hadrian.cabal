@@ -55,6 +55,7 @@ executable hadrian
                        , Rules.Generators.GhcVersionH
                        , Rules.Generators.VersionHs
                        , Rules.Gmp
+                       , Rules.Install
                        , Rules.Libffi
                        , Rules.Library
                        , Rules.Oracles

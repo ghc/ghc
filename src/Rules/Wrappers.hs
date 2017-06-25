@@ -1,11 +1,10 @@
 module Rules.Wrappers (
-  WrappedBinary(..), Wrapper, ghcWrapper, runGhcWrapper,
-  inplaceGhcPkgWrapper, installGhcPkgWrapper, hp2psWrapper,
-  hpcWrapper, hsc2hsWrapper
+  WrappedBinary(..), Wrapper, inplaceWrappers, installWrappers
   ) where
 
 import Base
 import Expression
+import GHC
 import Settings.Install (installPackageDbDirectory)
 import Settings.Path (inplacePackageDbDirectory)
 import Oracles.Path (getTopDirectory)
@@ -28,14 +27,22 @@ ghcWrapper WrappedBinary{..} = do
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " -B" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
 
-
-runGhcWrapper :: WrappedBinary -> Expr String
-runGhcWrapper WrappedBinary{..} = do
+inplaceRunGhcWrapper :: WrappedBinary -> Expr String
+inplaceRunGhcWrapper WrappedBinary{..} = do
     lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
     return $ unlines
         [ "#!/bin/bash"
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
-          ++ " -f" ++ (binaryLibPath -/- "bin/ghc-stage2") -- HACK
+          ++ " -f" ++ (binaryLibPath -/- "bin/ghc-stage2") -- TODO: use ProgramName
+          ++ " -B" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
+
+installRunGhcWrapper :: WrappedBinary -> Expr String
+installRunGhcWrapper WrappedBinary{..} = do
+    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    return $ unlines
+        [ "#!/bin/bash"
+        , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
+          ++ " -f" ++ (binaryLibPath -/- "bin/ghc") -- TODO: use ProgramName
           ++ " -B" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
 
 inplaceGhcPkgWrapper :: WrappedBinary -> Expr String
@@ -93,3 +100,23 @@ hsc2hsWrapper WrappedBinary{..} = do
         , "executablename=\"" ++ executableName ++ "\""
         , "HSC2HS_EXTRA=\"" ++ hsc2hsExtra ++ "\""
         , contents ]
+
+wrappersCommon :: [(Context, Wrapper)]
+wrappersCommon = [ (vanillaContext Stage0 ghc   , ghcWrapper)
+                 , (vanillaContext Stage1 ghc   , ghcWrapper)
+                 , (vanillaContext Stage1 hp2ps , hp2psWrapper)
+                 , (vanillaContext Stage1 hpc   , hpcWrapper)
+                 , (vanillaContext Stage1 hsc2hs, hsc2hsWrapper) ]
+
+-- | List of wrappers for inplace artefacts
+inplaceWrappers :: [(Context, Wrapper)]
+inplaceWrappers = wrappersCommon ++
+                  [ (vanillaContext Stage0 ghcPkg, inplaceGhcPkgWrapper)
+                  , (vanillaContext Stage1 runGhc, inplaceRunGhcWrapper) ]
+
+-- | List of wrappers for installation
+installWrappers :: [(Context, Wrapper)]
+installWrappers = wrappersCommon ++
+                  [ (vanillaContext Stage0 ghcPkg, installGhcPkgWrapper)
+                  , (vanillaContext Stage1 runGhc, installRunGhcWrapper) ]
+

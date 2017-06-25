@@ -6,6 +6,7 @@ import qualified CmdLineFlag
 import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
+import qualified Rules.Install
 import qualified Rules.Oracles
 import qualified Rules.SourceDist
 import qualified Rules.Selftest
@@ -29,6 +30,7 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
         Rules.Test.testRules
         Rules.buildRules
         Rules.topLevelTargets
+        Rules.Install.installRules
     options :: ShakeOptions
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest

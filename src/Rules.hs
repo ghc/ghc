@@ -1,4 +1,4 @@
-module Rules (topLevelTargets, buildRules) where
+module Rules (topLevelTargets, buildLib, buildRules) where
 
 import Base
 import Context
@@ -30,18 +30,21 @@ topLevelTargets = do
     want $ Rules.Generate.inplaceLibCopyTargets
 
     forM_ allStages $ \stage ->
-        forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> action $ do
-            let context = vanillaContext stage pkg
-            activePackages <- interpretInContext context getPackages
-            when (pkg `elem` activePackages) $
-                if isLibrary pkg
-                then do -- build a library
-                    ways <- interpretInContext context getLibraryWays
-                    libs <- mapM (pkgLibraryFile . Context stage pkg) ways
-                    docs <- interpretInContext context $ buildHaddock flavour
-                    need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
-                else -- otherwise build a program
-                    need =<< maybeToList <$> programPath (programContext stage pkg)
+        forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> action (buildLib stage pkg)
+
+buildLib :: Stage -> Package -> Action ()
+buildLib stage pkg = do
+    let context = vanillaContext stage pkg
+    activePackages <- interpretInContext context getPackages
+    when (pkg `elem` activePackages) $
+        if isLibrary pkg
+        then do -- build a library
+            ways <- interpretInContext context getLibraryWays
+            libs <- mapM (pkgLibraryFile . Context stage pkg) ways
+            docs <- interpretInContext context $ buildHaddock flavour
+            need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
+        else -- otherwise build a program
+            need =<< maybeToList <$> programPath (programContext stage pkg)
 
 packageRules :: Rules ()
 packageRules = do

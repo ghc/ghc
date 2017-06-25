@@ -1,6 +1,6 @@
 module Rules.Generate (
     isGeneratedCFile, isGeneratedCmmFile, generatePackageCode, generateRules,
-    inplaceLibCopyTargets, copyRules, includesDependencies, generatedDependencies
+    copyRules, includesDependencies, generatedDependencies, inplaceLibCopyTargets
     ) where
 
 import Base
@@ -64,7 +64,7 @@ ghcPrimDependencies = do
     return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
 derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = inplaceLibCopyTargets ++ fmap (generatedPath -/-)
+derivedConstantsDependencies = fmap (generatedPath -/-)
     [ "DerivedConstants.h"
     , "GHCConstantsHaskellExports.hs"
     , "GHCConstantsHaskellType.hs"

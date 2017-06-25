@@ -5,7 +5,7 @@ module Settings.Path (
     rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,inplacePackageDbDirectory,
     pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
     objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
-    installPath, autogenPath, pkgInplaceConfig, ghcSplitPath
+    installPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath
     ) where
 
 import Base
@@ -13,6 +13,8 @@ import Context
 import Expression
 import GHC
 import Oracles.PackageData
+import Oracles.Config.Setting (setting, Setting(..))
+import Oracles.Path (getTopDirectory)
 import UserSettings
 
 -- | Path to the directory containing the Shake database and other auxiliary
@@ -192,3 +194,16 @@ installPath pkg
 -- generated in "Rules.Generators.GhcSplit".
 ghcSplitPath :: FilePath
 ghcSplitPath = inplaceLibBinPath -/- "ghc-split"
+
+-- | Command line tool for stripping
+-- ref: mk/config.mk
+stripCmdPath :: Context -> Action FilePath
+stripCmdPath ctx = do
+    targetPlatform <- setting TargetPlatform
+    top <- interpretInContext ctx getTopDirectory
+    case targetPlatform of
+        "x86_64-unknown-mingw32" ->
+             return (top -/- "inplace/mingw/bin/strip.exe")
+        "arm-unknown-linux" ->
+             return ":" -- HACK: from the make-based system, see the ref above
+        _ -> return "strip"

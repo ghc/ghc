@@ -11,25 +11,13 @@ import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Path (topDirectory)
-import Rules.Wrappers (WrappedBinary(..), Wrapper,
-                       ghcWrapper, runGhcWrapper, inplaceGhcPkgWrapper,
-                       hpcWrapper, hp2psWrapper, hsc2hsWrapper)
+import Rules.Wrappers (WrappedBinary(..), Wrapper, inplaceWrappers)
 import Settings
 import Settings.Path (buildPath, inplaceLibBinPath, rtsContext, objectPath,
                       inplaceLibPath, inplaceBinPath)
 import Target
 import UserSettings
 import Util
-
--- | List of wrappers we build.
-wrappers :: [(Context, Wrapper)]
-wrappers = [ (vanillaContext Stage0 ghc   , ghcWrapper)
-           , (vanillaContext Stage1 ghc   , ghcWrapper)
-           , (vanillaContext Stage1 runGhc, runGhcWrapper)
-           , (vanillaContext Stage0 ghcPkg, inplaceGhcPkgWrapper)
-           , (vanillaContext Stage1 hp2ps , hp2psWrapper)
-           , (vanillaContext Stage1 hpc   , hpcWrapper)
-           , (vanillaContext Stage1 hsc2hs, hsc2hsWrapper) ]
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
@@ -56,7 +44,7 @@ buildBinaryAndWrapper rs context bin = do
     windows <- windowsHost
     if windows
     then buildBinary rs context bin -- We don't build wrappers on Windows
-    else case lookup context wrappers of
+    else case lookup context inplaceWrappers of
         Nothing      -> buildBinary rs context bin -- No wrapper found
         Just wrapper -> do
             top <- topDirectory

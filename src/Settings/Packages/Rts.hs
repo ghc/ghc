@@ -48,6 +48,7 @@ rtsPackageArgs = package rts ? do
     libffiName     <- lift rtsLibffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
+    ghclibDir      <- lift installGhcLibDir
     mconcat
         [ builder Cc ? mconcat
           [ arg "-Irts"
@@ -91,7 +92,10 @@ rtsPackageArgs = package rts ? do
             , inputs ["//Evac_thr.c", "//Scav_thr.c"] ?
               append [ "-DPARALLEL_GC", "-Irts/sm" ]
 
-            , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr" ]
+            , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
+            , input "//RetainerProfile.c" ? flag GccIsClang ?
+                append [ "-Wno-incompatible-pointer-types" ]
+            ]
 
         , builder Ghc ? arg "-Irts"
 
@@ -99,7 +103,17 @@ rtsPackageArgs = package rts ? do
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
-          , "-DFFI_LIB="         ++ show libffiName ] ]
+          , "-DFFI_LIB="         ++ show libffiName ]
+
+        , builder HsCpp ?
+          input "//package.conf.in" ?
+          output "//package.conf.install.raw" ?
+          append
+            [ "-DINSTALLING"
+            , "-DLIB_DIR=\"" ++ destDir ++ ghclibDir ++ "\""
+            , "-DINCLUDE_DIR=\"" ++ destDir ++ ghclibDir -/- "include\""
+            ]
+        ]
 
 -- # If we're compiling on windows, enforce that we only support XP+
 -- # Adding this here means it doesn't have to be done in individual .c files

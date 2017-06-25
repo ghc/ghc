@@ -3,7 +3,7 @@ module Settings (
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
     getContextDirectory, getBuildPath, stagePackages, builderPath,
     getBuilderPath, isSpecified, latestBuildStage, programPath, programContext,
-    integerLibraryName
+    integerLibraryName, destDir, pkgConfInstallPath
     ) where
 
 import Base
@@ -114,3 +114,6 @@ programPath context@Context {..} = do
         install <- (\l -> l == stage || package == ghc) <$> maybeLatest
         let path = if install then installPath package else buildPath context
         return $ path -/- programName context <.> exe
+
+pkgConfInstallPath :: FilePath
+pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) -/- "package.conf.install"

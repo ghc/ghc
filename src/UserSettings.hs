@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     buildRootPath, userFlavours, userKnownPackages, verboseCommands,
-    putBuild, putSuccess
+    putBuild, putSuccess, destDir
     ) where
 
 import System.Console.ANSI
@@ -42,3 +42,10 @@ putBuild = putColoured Dull Magenta
 -- | Customise build success messages (e.g. a package is built successfully).
 putSuccess :: String -> Action ()
 putSuccess = putColoured Dull Green
+
+-- | Path to the GHC install destination
+-- It is by default empty, representing the root of file system,
+-- or it might be a directory.
+-- It is usually used with @prefix@, like @/usr/local@
+destDir :: FilePath
+destDir = ""

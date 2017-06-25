@@ -33,9 +33,10 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
 
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
-    path <- getPackagePath
-    dir  <- getContextDirectory
-    append [ "hscolour", path, dir ]
+    path    <- getPackagePath
+    top     <- getTopDirectory
+    context <- getContext
+    append [ "hscolour", path, top -/- buildPath context ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?

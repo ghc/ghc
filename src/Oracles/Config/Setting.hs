@@ -53,6 +53,7 @@ data Setting = BuildArch
              | IconvIncludeDir
              | IconvLibDir
              -- Paths to where GHC is installed
+             -- ref: mk/install.mk
              | InstallPrefix
              | InstallBinDir
              | InstallLibDir
