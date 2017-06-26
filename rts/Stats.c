@@ -285,29 +285,76 @@ stat_endGC (Capability *cap, gc_thread *gct,
             W_ live, W_ copied, W_ slop, uint32_t gen,
             uint32_t par_n_threads, W_ par_max_copied)
 {
+    // -------------------------------------------------
+    // Collect all the stats about this GC in stats.gc. We always do this since
+    // it's relatively cheap and we need allocated_bytes to catch heap
+    // overflows.
+
+    stats.gc.gen = gen;
+    stats.gc.threads = par_n_threads;
+
+    uint64_t tot_alloc_bytes = calcTotalAllocated() * sizeof(W_);
+
+    // allocated since the last GC
+    stats.gc.allocated_bytes = tot_alloc_bytes - stats.allocated_bytes;
+
+    stats.gc.live_bytes = live * sizeof(W_);
+    stats.gc.large_objects_bytes = calcTotalLargeObjectsW() * sizeof(W_);
+    stats.gc.compact_bytes = calcTotalCompactW() * sizeof(W_);
+    stats.gc.slop_bytes = slop * sizeof(W_);
+    stats.gc.mem_in_use_bytes = mblocks_allocated * MBLOCK_SIZE;
+    stats.gc.copied_bytes = copied * sizeof(W_);
+    stats.gc.par_max_copied_bytes = par_max_copied * sizeof(W_);
+
+    // -------------------------------------------------
+    // Update the cumulative stats
+
+    stats.gcs++;
+    stats.allocated_bytes = tot_alloc_bytes;
+    stats.max_mem_in_use_bytes = peak_mblocks_allocated * MBLOCK_SIZE;
+
+    GC_coll_cpu[gen] += stats.gc.cpu_ns;
+    GC_coll_elapsed[gen] += stats.gc.elapsed_ns;
+    if (GC_coll_max_pause[gen] < stats.gc.elapsed_ns) {
+        GC_coll_max_pause[gen] = stats.gc.elapsed_ns;
+    }
+
+    stats.copied_bytes += stats.gc.copied_bytes;
+    if (par_n_threads > 1) {
+        stats.par_copied_bytes += stats.gc.copied_bytes;
+        stats.cumulative_par_max_copied_bytes +=
+            stats.gc.par_max_copied_bytes;
+    }
+    stats.gc_cpu_ns += stats.gc.cpu_ns;
+    stats.gc_elapsed_ns += stats.gc.elapsed_ns;
+
+    if (gen == RtsFlags.GcFlags.generations-1) { // major GC?
+        stats.major_gcs++;
+        if (stats.gc.live_bytes > stats.max_live_bytes) {
+            stats.max_live_bytes = stats.gc.live_bytes;
+        }
+        if (stats.gc.large_objects_bytes > stats.max_large_objects_bytes) {
+            stats.max_large_objects_bytes = stats.gc.large_objects_bytes;
+        }
+        if (stats.gc.compact_bytes > stats.max_compact_bytes) {
+            stats.max_compact_bytes = stats.gc.compact_bytes;
+        }
+        if (stats.gc.slop_bytes > stats.max_slop_bytes) {
+            stats.max_slop_bytes = stats.gc.slop_bytes;
+        }
+        stats.cumulative_live_bytes += stats.gc.live_bytes;
+    }
+
+    // -------------------------------------------------
+    // Do the more expensive bits only when stats are enabled.
+
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS ||
         rtsConfig.gcDoneHook != NULL ||
         RtsFlags.ProfFlags.doHeapProfile) // heap profiling needs GC_tot_time
     {
-        // -------------------------------------------------
-        // Collect all the stats about this GC in stats.gc
-
-        stats.gc.gen = gen;
-        stats.gc.threads = par_n_threads;
-
-        uint64_t tot_alloc_bytes = calcTotalAllocated() * sizeof(W_);
-
-        // allocated since the last GC
-        stats.gc.allocated_bytes = tot_alloc_bytes - stats.allocated_bytes;
-
-        stats.gc.live_bytes = live * sizeof(W_);
-        stats.gc.large_objects_bytes = calcTotalLargeObjectsW() * sizeof(W_);
-        stats.gc.compact_bytes = calcTotalCompactW() * sizeof(W_);
-        stats.gc.slop_bytes = slop * sizeof(W_);
-        stats.gc.mem_in_use_bytes = mblocks_allocated * MBLOCK_SIZE;
-        stats.gc.copied_bytes = copied * sizeof(W_);
-        stats.gc.par_max_copied_bytes = par_max_copied * sizeof(W_);
-
+        // We only update the times when stats are explicitly enabled since
+        // getProcessTimes (e.g. requiring a system call) can be expensive on
+        // some platforms.
         Time current_cpu, current_elapsed;
         getProcessTimes(&current_cpu, &current_elapsed);
         stats.cpu_ns = current_cpu - start_init_cpu;
@@ -317,45 +364,6 @@ stat_endGC (Capability *cap, gc_thread *gct,
           gct->gc_start_elapsed - gct->gc_sync_start_elapsed;
         stats.gc.elapsed_ns = current_elapsed - gct->gc_start_elapsed;
         stats.gc.cpu_ns = current_cpu - gct->gc_start_cpu;
-
-        // -------------------------------------------------
-        // Update the cumulative stats
-
-        stats.gcs++;
-        stats.allocated_bytes = tot_alloc_bytes;
-        stats.max_mem_in_use_bytes = peak_mblocks_allocated * MBLOCK_SIZE;
-
-        GC_coll_cpu[gen] += stats.gc.cpu_ns;
-        GC_coll_elapsed[gen] += stats.gc.elapsed_ns;
-        if (GC_coll_max_pause[gen] < stats.gc.elapsed_ns) {
-            GC_coll_max_pause[gen] = stats.gc.elapsed_ns;
-        }
-
-        stats.copied_bytes += stats.gc.copied_bytes;
-        if (par_n_threads > 1) {
-            stats.par_copied_bytes += stats.gc.copied_bytes;
-            stats.cumulative_par_max_copied_bytes +=
-                stats.gc.par_max_copied_bytes;
-        }
-        stats.gc_cpu_ns += stats.gc.cpu_ns;
-        stats.gc_elapsed_ns += stats.gc.elapsed_ns;
-
-        if (gen == RtsFlags.GcFlags.generations-1) { // major GC?
-            stats.major_gcs++;
-            if (stats.gc.live_bytes > stats.max_live_bytes) {
-                stats.max_live_bytes = stats.gc.live_bytes;
-            }
-            if (stats.gc.large_objects_bytes > stats.max_large_objects_bytes) {
-                stats.max_large_objects_bytes = stats.gc.large_objects_bytes;
-            }
-            if (stats.gc.compact_bytes > stats.max_compact_bytes) {
-                stats.max_compact_bytes = stats.gc.compact_bytes;
-            }
-            if (stats.gc.slop_bytes > stats.max_slop_bytes) {
-                stats.max_slop_bytes = stats.gc.slop_bytes;
-            }
-            stats.cumulative_live_bytes += stats.gc.live_bytes;
-        }
 
         // -------------------------------------------------
         // Emit events to the event log
