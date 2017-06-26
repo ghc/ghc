@@ -95,7 +95,8 @@ addInfoTable _ _ _ _ = Nothing
         
 -- | Rewrite a line of assembly source with the given rewrites,
 -- taking the first rewrite that applies for each kind of rewrite (label and non-label).
-rewriteLine :: DynFlags -> [LabRewrite] -> [Rewrite] -> B.ByteString -> State -> (B.ByteString, State)
+rewriteLine :: DynFlags -> [LabRewrite] -> [Rewrite] 
+                        -> B.ByteString -> State -> (B.ByteString, State)
 rewriteLine dflags labRewrites rewrites l state = withState $
     case (maybNewSym, maybNewRest) of
         (Nothing, Nothing) -> l -- avoid concat
