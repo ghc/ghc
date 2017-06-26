@@ -161,7 +161,7 @@ libsuf way@(Way set) =
         version   <- setting ProjectVersion    -- e.g., 7.11.20141222
         let prefix = wayPrefix . Way . Set.delete (fromEnum Dynamic) $ set
         -- e.g., p_ghc7.11.20141222.dll (the result)
-        return $ prefix ++ "ghc" ++ version ++ extension
+        return $ prefix ++ "-ghc" ++ version ++ extension
 
 instance Binary Way where
     put = put . show

@@ -19,6 +19,7 @@ ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
 ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do
     stage   <- getStage
+    way     <- getWay
     pkg     <- getPackage
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
@@ -28,7 +29,9 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                    buildInfo <- lift $ readFileLines gmpBuildInfoPath
                    return $ concatMap (words . strip) buildInfo
                else return []
-    mconcat [ arg "-no-auto-link-packages"
+    mconcat [ (Dynamic `wayUnit` way) ?
+              append [ "-shared", "-dynamic", "-dynload", "deploy" ]
+            , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
             , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]

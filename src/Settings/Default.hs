@@ -165,9 +165,8 @@ stage2Packages = buildHaddock flavour ? append [ haddock ]
 defaultLibraryWays :: Ways
 defaultLibraryWays = mconcat
     [ append [vanilla]
-    , notStage0 ? append [profiling] ]
-    -- FIXME: Fix dynamic way and uncomment the line below, #4.
-    -- , notStage0 ? platformSupportsSharedLibs ? append [dynamic] ]
+    , notStage0 ? append [profiling]
+    , notStage0 ? platformSupportsSharedLibs ? append [dynamic] ]
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways

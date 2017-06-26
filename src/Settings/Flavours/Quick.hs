@@ -2,13 +2,16 @@ module Settings.Flavours.Quick (quickFlavour) where
 
 import Flavour
 import Predicate
+import Oracles.Config.Flag (platformSupportsSharedLibs)
 import {-# SOURCE #-} Settings.Default
 
 quickFlavour :: Flavour
 quickFlavour = defaultFlavour
     { name        = "quick"
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
-    , libraryWays = append [vanilla] }
+    , libraryWays = mconcat
+                    [ append [vanilla]
+                    , notStage0 ? platformSupportsSharedLibs ? append [dynamic] ] }
 
 quickArgs :: Args
 quickArgs = sourceArgs $ SourceArgs

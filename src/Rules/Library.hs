@@ -1,4 +1,7 @@
-module Rules.Library (buildPackageLibrary, buildPackageGhciLibrary) where
+module Rules.Library (
+    buildPackageLibrary, buildPackageGhciLibrary,
+    buildDynamicLib
+) where
 
 import Data.Char
 import qualified System.Directory as IO
@@ -10,33 +13,62 @@ import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
+import Oracles.Dependencies (contextDependencies)
 import Settings
 import Settings.Path
 import Target
 import UserSettings
 import Util
 
+getLibraryObjs :: Context -> Action [FilePath]
+getLibraryObjs context@Context{..} = do
+    hsObjs   <- hsObjects    context
+    noHsObjs <- nonHsObjects context
+
+    -- This will create split objects if required (we don't track them
+    -- explicitly as this would needlessly bloat the Shake database).
+    need $ noHsObjs ++ hsObjs
+
+    split <- interpretInContext context $ splitObjects flavour
+    let getSplitObjs = concatForM hsObjs $ \obj -> do
+             let dir = dropExtension obj ++ "_" ++ osuf way ++ "_split"
+             contents <- liftIO $ IO.getDirectoryContents dir
+             return . map (dir -/-) $ filter (not . all (== '.')) contents
+
+    (noHsObjs ++) <$> if split then getSplitObjs else return hsObjs
+
+buildDynamicLib :: Context -> Rules ()
+buildDynamicLib context@Context{..} = do
+    -- macOS
+    matchGhcVersionedFilePath libPrefix "dylib" ?> buildDynamicLibUNIX
+    -- Linux
+    matchGhcVersionedFilePath libPrefix "so" ?> buildDynamicLibUNIX
+    -- TODO: Windows
+  where
+    path       = buildPath context
+    libPrefix  = path -/- "libHS" ++ pkgNameString package
+
+    buildDynamicLibUNIX so = do
+        deps <- contextDependencies context
+
+        forM_ deps $ \dep -> do
+            lib <- pkgLibraryFile dep
+            need [lib]
+
+        removeFile so
+
+        objs <- getLibraryObjs context
+
+        build $ Target context (Ghc LinkHs stage) objs [so]
+
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
     let path       = buildPath context
         libPrefix  = path -/- "libHS" ++ pkgNameString package
-    -- TODO: handle dynamic libraries
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
         removeFile a
-        hsObjs   <- hsObjects    context
-        noHsObjs <- nonHsObjects context
 
-        -- This will create split objects if required (we don't track them
-        -- explicitly as this would needlessly bloat the Shake database).
-        need $ noHsObjs ++ hsObjs
-
-        split <- interpretInContext context $ splitObjects flavour
-        let getSplitObjs = concatForM hsObjs $ \obj -> do
-                let dir = dropExtension obj ++ "_" ++ osuf way ++ "_split"
-                contents <- liftIO $ IO.getDirectoryContents dir
-                return . map (dir -/-) $ filter (not . all (== '.')) contents
-
-        objs <- (noHsObjs ++) <$> if split then getSplitObjs else return hsObjs
+        objs <- getLibraryObjs context
 
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a

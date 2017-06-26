@@ -19,7 +19,7 @@ module Base (
 
     -- * Miscellaneous utilities
     minusOrd, intersectOrd, lookupAll, replaceEq, replaceSeparators, unifyPath,
-    quote, (-/-), matchVersionedFilePath, putColoured
+    quote, (-/-), matchVersionedFilePath, matchGhcVersionedFilePath, putColoured
     ) where
 
 import Control.Applicative
@@ -138,6 +138,12 @@ matchVersionedFilePath prefix suffix filePath =
     case stripPrefix prefix filePath >>= stripSuffix suffix of
         Nothing      -> False
         Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
+
+matchGhcVersionedFilePath :: String -> String -> FilePath -> Bool
+matchGhcVersionedFilePath prefix ext filePath =
+    case stripPrefix prefix filePath >>= stripSuffix ext of
+        Nothing -> False
+        Just _  -> True
 
 -- | A more colourful version of Shake's putNormal.
 putColoured :: ColorIntensity -> Color -> String -> Action ()

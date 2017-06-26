@@ -2,6 +2,7 @@ module Settings.Flavours.Quickest (quickestFlavour) where
 
 import Flavour
 import Predicate
+import Oracles.Config.Flag (platformSupportsSharedLibs)
 import {-# SOURCE #-} Settings.Default
 
 quickestFlavour :: Flavour

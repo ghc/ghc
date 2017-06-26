@@ -3,12 +3,16 @@ module Settings.Builders.Cc (ccBuilderArgs) where
 import Settings.Builders.Common
 
 ccBuilderArgs :: Args
-ccBuilderArgs = builder Cc ? mconcat
+ccBuilderArgs = do
+  way <- getWay
+  builder Cc ? mconcat
     [ append =<< getPkgDataList CcArgs
     , argSettingList . ConfCcArgs =<< getStage
     , cIncludeArgs
 
     , builder (Cc CompileC) ? mconcat [ arg "-Werror"
+                                      , (Dynamic `wayUnit` way) ?
+				        append [ "-fPIC", "-DDYNAMIC" ]
                                       -- mk/warning.mk:
                                       --  SRC_CC_OPTS     += -Wall $(WERROR)
                                       , arg "-c", arg =<< getInput

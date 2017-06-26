@@ -64,6 +64,10 @@ packageRules = do
         [ Rules.Compile.compilePackage readPackageDb
         , Rules.Library.buildPackageLibrary ]
 
+    let dynamicContexts = liftM3 Context [Stage1 ..] knownPackages [dynamic]
+
+    forM_ dynamicContexts Rules.Library.buildDynamicLib
+
     forM_ programContexts $ Rules.Program.buildProgram readPackageDb
 
     forM_ vanillaContexts $ mconcat
