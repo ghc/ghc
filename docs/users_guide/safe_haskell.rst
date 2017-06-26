@@ -273,11 +273,6 @@ Furthermore, we restrict the following features:
   this reason, the ``Data.Coerce`` module is also considered unsafe. We are
   hoping to find a better solution here in the future.
 
-- ``Data.Typeable`` — Hand crafted instances of the Typeable type class are not allowed
-  in Safe Haskell as this can easily be abused to unsafely coerce
-  between types. Derived instances (through the :ghc-flag:`-XDeriveDataTypeable`
-  extension) are still allowed.
-
 - ``GHC.Generics`` — Hand crafted instances of the ``Generic`` type class are
   not allowed in Safe Haskell. Such instances aren't strictly unsafe, but
   there is an important invariant that a ``Generic`` instance should adhere to

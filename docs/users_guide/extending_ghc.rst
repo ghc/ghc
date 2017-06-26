@@ -425,7 +425,7 @@ will print out the name of any top-level non-recursive binding with the
     import Control.Monad (unless)
     import Data.Data
 
-    data SomeAnn = SomeAnn deriving (Data, Typeable)
+    data SomeAnn = SomeAnn deriving Data
 
     plugin :: Plugin
     plugin = defaultPlugin {
