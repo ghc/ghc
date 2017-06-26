@@ -516,14 +516,7 @@ pprByte x = text "\t.byte " <> ppr (fromIntegral x :: Word)
 
 -- | Assembly for a two-byte constant integer
 pprHalf :: Word16 -> SDoc
-pprHalf x = sdocWithPlatform $ \plat ->
-  -- Naturally Darwin doesn't support `.hword` and binutils uses `.short`
-  -- as a synonym for `.word` (but only some of the time!). The madness
-  -- is nearly too much to bear.
-  let dir = case platformOS plat of
-        OSDarwin -> text ".short"
-        _        -> text ".hword"
-  in text "\t" <> dir <+> ppr (fromIntegral x :: Word)
+pprHalf x = text "\t.short" <+> ppr (fromIntegral x :: Word)
 
 -- | Assembly for a constant DWARF flag
 pprFlag :: Bool -> SDoc
