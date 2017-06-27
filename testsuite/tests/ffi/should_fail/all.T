@@ -14,4 +14,8 @@ test('T5664', normal, compile_fail, ['-v0'])
 test('T7506', normal, compile_fail, [''])
 test('T7243', normal, compile_fail, [''])
 test('T10461', normal, compile_fail, [''])
-
+test('UnsafeReenter', [omit_ways(['ghciext', 'ghci']), exit_code(1)], compile_and_run, ['-v0 UnsafeReenterC.c'])
+test('UnsafeReenterGhci',
+     [exit_code(1), extra_files(['UnsafeReenter.hs', 'UnsafeReenterC.c']), expect_broken(13730)],
+     run_command,
+     ['$MAKE -s --no-print-directory UnsafeReenterGhci'])

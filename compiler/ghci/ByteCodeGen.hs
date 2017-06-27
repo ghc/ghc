@@ -1164,8 +1164,12 @@ generateCCall d0 s p (CCallSpec target cconv safety) fn args_r_to_l
 
      let
          -- do the call
-         do_call      = unitOL (CCALL stk_offset token
-                                 (fromIntegral (fromEnum (playInterruptible safety))))
+         do_call      = unitOL (CCALL stk_offset token flags)
+           where flags = case safety of
+                           PlaySafe          -> 0x0
+                           PlayInterruptible -> 0x1
+                           PlayRisky         -> 0x2
+
          -- slide and return
          wrapup       = mkSLIDE r_sizeW (d_after_r - fromIntegral r_sizeW - s)
                         `snocOL` RETURN_UBX (toArgRep r_rep)

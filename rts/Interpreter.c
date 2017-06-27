@@ -1598,7 +1598,9 @@ run_BCO:
             void *tok;
             int stk_offset            = BCO_NEXT;
             int o_itbl                = BCO_GET_LARGE_ARG;
-            int interruptible         = BCO_NEXT;
+            int flags                 = BCO_NEXT;
+            bool interruptible        = flags & 0x1;
+            bool unsafe_call          = flags & 0x2;
             void(*marshall_fn)(void*) = (void (*)(void*))BCO_LIT(o_itbl);
 
             /* the stack looks like this:
@@ -1686,15 +1688,19 @@ run_BCO:
             Sp[1] = (W_)obj;
             Sp[0] = (W_)&stg_ret_p_info;
 
-            SAVE_THREAD_STATE();
-            tok = suspendThread(&cap->r, interruptible);
+            if (!unsafe_call) {
+                SAVE_THREAD_STATE();
+                tok = suspendThread(&cap->r, interruptible);
+            }
 
             // We already made a copy of the arguments above.
             ffi_call(cif, fn, ret, argptrs);
 
             // And restart the thread again, popping the stg_ret_p frame.
-            cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
-            LOAD_THREAD_STATE();
+            if (!unsafe_call) {
+                cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - STG_FIELD_OFFSET(Capability,r)));
+                LOAD_THREAD_STATE();
+            }
 
             if (Sp[0] != (W_)&stg_ret_p_info) {
                 // the stack is not how we left it.  This probably
