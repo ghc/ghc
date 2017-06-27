@@ -19,8 +19,9 @@ import Outputable ( text )
 import Control.Exception
 import qualified Data.ByteString.Char8 as B
 import System.IO
-import Compiler.Hoopl
-import Compiler.Hoopl.Internals ( uniqueToLbl )
+import Hoopl.Label
+import Hoopl.Collections
+import Hoopl.Unique ( intToUnique )
 import Data.Maybe ( fromMaybe )
 
 -- note [mangler string func]

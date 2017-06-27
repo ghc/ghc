@@ -493,6 +493,9 @@ compiler_stage2_dll0_MODULES = \
 	PlaceHolder \
 	HsExtension \
 	PmExpr \
+	Hoopl.Collections \
+	Hoopl.Label \
+	Hoopl.Unique \
 	HsPat \
 	HsSyn \
 	HsTypes \

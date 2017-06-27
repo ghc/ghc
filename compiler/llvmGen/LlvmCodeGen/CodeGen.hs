@@ -21,6 +21,7 @@ import CmmSwitch
 import Hoopl.Block
 import Hoopl.Graph
 import Hoopl.Collections
+import Hoopl.Label
 
 import DynFlags
 import FastString
