@@ -222,9 +222,9 @@ fileTarget filename = Target (TargetFile filename Nothing) True Nothing
 ---------------------------------------------------------------
 ----- CRAWLING ABSTRACT SYNTAX TO SNAFFLE THE DEFINITIONS -----
 
-graphData :: [ModSummary] -> (Maybe Handle, Maybe Handle) -> Ghc ()
-graphData mss handles = do
-    mapM_ foundthings mss
+graphData :: ModuleGraph -> (Maybe Handle, Maybe Handle) -> Ghc ()
+graphData graph handles = do
+    mapM_ foundthings graph
     where foundthings ms =
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms

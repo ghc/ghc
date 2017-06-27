@@ -184,7 +184,7 @@ newHscEnv dflags = do
     iserv_mvar <- newMVar Nothing
     return HscEnv {  hsc_dflags       = dflags
                   ,  hsc_targets      = []
-                  ,  hsc_mod_graph    = emptyMG
+                  ,  hsc_mod_graph    = []
                   ,  hsc_IC           = emptyInteractiveContext dflags
                   ,  hsc_HPT          = emptyHomePackageTable
                   ,  hsc_EPS          = eps_var

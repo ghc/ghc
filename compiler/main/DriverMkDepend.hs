@@ -75,11 +75,11 @@ doMkDependHS srcs = do
     targets <- mapM (\s -> GHC.guessTarget s Nothing) srcs
     GHC.setTargets targets
     let excl_mods = depExcludeMods dflags
-    module_graph <- GHC.depanal excl_mods True {- Allow dup roots -}
+    mod_summaries <- GHC.depanal excl_mods True {- Allow dup roots -}
 
     -- Sort into dependency order
     -- There should be no cycles
-    let sorted = GHC.topSortModuleGraph False module_graph Nothing
+    let sorted = GHC.topSortModuleGraph False mod_summaries Nothing
 
     -- Print out the dependencies if wanted
     liftIO $ debugTraceMsg dflags 2 (text "Module dependencies" $$ ppr sorted)
@@ -91,7 +91,7 @@ doMkDependHS srcs = do
     mapM_ (liftIO . processDeps dflags hsc_env excl_mods root (mkd_tmp_hdl files)) sorted
 
     -- If -ddump-mod-cycles, show cycles in the module graph
-    liftIO $ dumpModCycles dflags module_graph
+    liftIO $ dumpModCycles dflags mod_summaries
 
     -- Tidy up
     liftIO $ endMkDependHS dflags files
@@ -338,8 +338,8 @@ endMkDependHS dflags
 --              Module cycles
 -----------------------------------------------------------------
 
-dumpModCycles :: DynFlags -> ModuleGraph -> IO ()
-dumpModCycles dflags module_graph
+dumpModCycles :: DynFlags -> [ModSummary] -> IO ()
+dumpModCycles dflags mod_summaries
   | not (dopt Opt_D_dump_mod_cycles dflags)
   = return ()
 
@@ -351,8 +351,7 @@ dumpModCycles dflags module_graph
   where
 
     cycles :: [[ModSummary]]
-    cycles =
-      [ c | CyclicSCC c <- GHC.topSortModuleGraph True module_graph Nothing ]
+    cycles = [ c | CyclicSCC c <- GHC.topSortModuleGraph True mod_summaries Nothing ]
 
     pp_cycles = vcat [ (text "---------- Cycle" <+> int n <+> ptext (sLit "----------"))
                         $$ pprCycle c $$ blankLine
@@ -380,8 +379,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
           loop_breaker = head boot_only
           all_others   = tail boot_only ++ others
-          groups =
-            GHC.topSortModuleGraph True (mkModuleGraph all_others) Nothing
+          groups = GHC.topSortModuleGraph True all_others Nothing
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
                        <+> (pp_imps empty (map snd (ms_imps summary)) $$

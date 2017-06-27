@@ -23,7 +23,7 @@ module GHC (
         gcatch, gbracket, gfinally,
         printException,
         handleSourceError,
-        needsTemplateHaskellOrQQ,
+        needsTemplateHaskell,
 
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
@@ -59,8 +59,7 @@ module GHC (
         compileToCoreModule, compileToCoreSimplified,
 
         -- * Inspecting the module structure of the program
-        ModuleGraph, emptyMG, mapMG, mkModuleGraph, mgModSummaries,
-        mgLookupModule,
+        ModuleGraph, emptyMG, mapMG,
         ModSummary(..), ms_mod_name, ModLocation(..),
         getModSummary,
         getModuleGraph,
@@ -874,10 +873,7 @@ type TypecheckedSource = LHsBinds GhcTc
 getModSummary :: GhcMonad m => ModuleName -> m ModSummary
 getModSummary mod = do
    mg <- liftM hsc_mod_graph getSession
-   let mods_by_name = [ ms | ms <- mgModSummaries mg
-                      , ms_mod_name ms == mod
-                      , not (isBootSummary ms) ]
-   case mods_by_name of
+   case [ ms | ms <- mg, ms_mod_name ms == mod, not (isBootSummary ms) ] of
      [] -> do dflags <- getDynFlags
               liftIO $ throwIO $ mkApiErr dflags (text "Module not part of module graph")
      [ms] -> return ms
@@ -1027,7 +1023,7 @@ compileCore simplify fn = do
    _ <- load LoadAllTargets
    -- Then find dependencies
    modGraph <- depanal [] True
-   case find ((== fn) . msHsFilePath) (mgModSummaries modGraph) of
+   case find ((== fn) . msHsFilePath) modGraph of
      Just modSummary -> do
        -- Now we have the module name;
        -- parse, typecheck and desugar the module
@@ -1079,6 +1075,15 @@ compileCore simplify fn = do
 getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
 
+-- | Determines whether a set of modules requires Template Haskell.
+--
+-- Note that if the session's 'DynFlags' enabled Template Haskell when
+-- 'depanal' was called, then each module in the returned module graph will
+-- have Template Haskell enabled whether it is actually needed or not.
+needsTemplateHaskell :: ModuleGraph -> Bool
+needsTemplateHaskell ms =
+    any (xopt LangExt.TemplateHaskell . ms_hspp_opts) ms
+
 -- | Return @True@ <==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool
 isLoaded m = withSession $ \hsc_env ->
@@ -1115,7 +1120,7 @@ data ModuleInfo = ModuleInfo {
 getModuleInfo :: GhcMonad m => Module -> m (Maybe ModuleInfo)  -- XXX: Maybe X
 getModuleInfo mdl = withSession $ \hsc_env -> do
   let mg = hsc_mod_graph hsc_env
-  if mgElemModule mg mdl
+  if mdl `elem` map ms_mod mg
         then liftIO $ getHomeModuleInfo hsc_env mdl
         else do
   {- if isHomeModule (hsc_dflags hsc_env) mdl
