@@ -1131,7 +1131,9 @@ test('MultiLayerModules',
 test('T13701',
      [ compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 2217187888, 10),
-           (wordsize(64), 2511285600, 10),
+           (wordsize(64), 2188045288, 10),
+           # initial:     2511285600
+           # 2017-06-23:  2188045288    treat banged variable bindings as FunBinds
           ]),
        pre_cmd('./genT13701'),
        extra_files(['genT13701']),

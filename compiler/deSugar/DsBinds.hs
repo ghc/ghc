@@ -140,8 +140,8 @@ dsHsBind dflags
         ; return (force_var, [core_bind]) }
 
 dsHsBind dflags
-         (FunBind { fun_id = L _ fun, fun_matches = matches
-                  , fun_co_fn = co_fn, fun_tick = tick })
+         b@(FunBind { fun_id = L _ fun, fun_matches = matches
+                    , fun_co_fn = co_fn, fun_tick = tick })
  = do   { (args, body) <- matchWrapper
                            (mkPrefixFunRhs (noLoc $ idName fun))
                            Nothing matches
@@ -149,12 +149,16 @@ dsHsBind dflags
         ; let body' = mkOptTickBox tick body
               rhs   = core_wrap (mkLams args body')
               core_binds@(id,_) = makeCorePair dflags fun False 0 rhs
-              force_var =
-                if xopt LangExt.Strict dflags
-                   && matchGroupArity matches == 0 -- no need to force lambdas
-                then [id]
-                else []
-        ; {- pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun)) $ -}
+              force_var
+                  -- Bindings are strict when -XStrict is enabled
+                | xopt LangExt.Strict dflags
+                , matchGroupArity matches == 0 -- no need to force lambdas
+                = [id]
+                | isBangedBind b
+                = [id]
+                | otherwise
+                = []
+        ; --pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun) $$ ppr (mg_alts matches) $$ ppr args $$ ppr core_binds) $
            return (force_var, [core_binds]) }
 
 dsHsBind dflags
@@ -182,11 +186,11 @@ dsHsBind dflags
   | ABE { abe_wrap = wrap, abe_poly = global
         , abe_mono = local, abe_prags = prags } <- export
   , not (xopt LangExt.Strict dflags)             -- Handle strict binds
-  , not (anyBag (isBangedPatBind . unLoc) binds) --        in the next case
+  , not (anyBag (isBangedBind . unLoc) binds)    --        in the next case
   = -- See Note [AbsBinds wrappers] in HsBinds
     addDictsDs (toTcTypeBag (listToBag dicts)) $
          -- addDictsDs: push type constraints deeper for pattern match check
-    do { (_, bind_prs) <- dsLHsBinds binds
+    do { (force_vars, bind_prs) <- dsLHsBinds binds
        ; ds_binds <- dsTcEvBinds_s ev_binds
        ; core_wrap <- dsHsWrapper wrap -- Usually the identity
 
@@ -201,7 +205,8 @@ dsHsBind dflags
                main_bind = makeCorePair dflags global' (isDefaultMethod prags)
                                         (dictArity dicts) rhs
 
-       ; return ([], main_bind : fromOL spec_binds) }
+       ; ASSERT(null force_vars)
+         return ([], main_bind : fromOL spec_binds) }
 
         -- Another common case: no tyvars, no dicts
         -- In this case we can have a much simpler desugaring
@@ -342,6 +347,8 @@ dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
              force_vars
                | xopt LangExt.Strict dflags
                , matchGroupArity matches == 0 -- no need to force lambdas
+               = [global]
+               | isBangedBind (unLoc bind)
                = [global]
                | otherwise
                = []
