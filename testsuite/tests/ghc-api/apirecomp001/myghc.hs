@@ -42,7 +42,9 @@ main = do
 
     -- set context to module "A"
     mg <- getModuleGraph
-    let [mod] = [ ms_mod_name m | m <- mg, moduleNameString (ms_mod_name m) == "A" ]
+    let [mod] = [ ms_mod_name m
+                | m <- mgModSummaries mg
+                , moduleNameString (ms_mod_name m) == "A" ]
     setContext [IIModule mod]
     liftIO $ hFlush stdout  -- make sure things above are printed before
                             -- interactive output

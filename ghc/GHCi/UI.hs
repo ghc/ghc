@@ -1401,7 +1401,7 @@ changeDirectory "" = do
      Right dir -> changeDirectory dir
 changeDirectory dir = do
   graph <- GHC.getModuleGraph
-  when (not (null graph)) $
+  when (not (null $ GHC.mgModSummaries graph)) $
         liftIO $ putStrLn "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed."
   GHC.setTargets []
   _ <- GHC.load LoadAllTargets
@@ -1461,7 +1461,8 @@ chooseEditFile =
   do let hasFailed x = fmap not $ GHC.isLoaded $ GHC.ms_mod_name x
 
      graph <- GHC.getModuleGraph
-     failed_graph <- filterM hasFailed graph
+     failed_graph <-
+       GHC.mkModuleGraph <$> filterM hasFailed (GHC.mgModSummaries graph)
      let order g  = flattenSCCs $ GHC.topSortModuleGraph True g Nothing
          pick xs  = case xs of
                       x : _ -> GHC.ml_hs_file (GHC.ms_location x)
@@ -1687,7 +1688,8 @@ doLoadAndCollectInfo retain_context howmuch = do
 
   doLoad retain_context howmuch >>= \case
     Succeeded | doCollectInfo -> do
-      loaded <- getModuleGraph >>= filterM GHC.isLoaded . map GHC.ms_mod_name
+      mod_summaries <- GHC.mgModSummaries <$> getModuleGraph
+      loaded <- filterM GHC.isLoaded $ map GHC.ms_mod_name mod_summaries
       v <- mod_infos <$> getGHCiState
       !newInfos <- collectInfo v loaded
       modifyGHCiState (\st -> st { mod_infos = newInfos })
@@ -1732,8 +1734,9 @@ setContextAfterLoad keep_ctxt ms = do
   targets <- GHC.getTargets
   case [ m | Just m <- map (findTarget ms) targets ] of
         []    ->
-          let graph' = flattenSCCs (GHC.topSortModuleGraph True ms Nothing) in
-          load_this (last graph')
+          let graph = GHC.mkModuleGraph ms
+              graph' = flattenSCCs (GHC.topSortModuleGraph True graph Nothing)
+          in load_this (last graph')
         (m:_) ->
           load_this m
  where
@@ -2811,7 +2814,7 @@ showModules = do
 getLoadedModules :: GHC.GhcMonad m => m [GHC.ModSummary]
 getLoadedModules = do
   graph <- GHC.getModuleGraph
-  filterM (GHC.isLoaded . GHC.ms_mod_name) graph
+  filterM (GHC.isLoaded . GHC.ms_mod_name) (GHC.mgModSummaries graph)
 
 showBindings :: GHCi ()
 showBindings = do
@@ -3048,7 +3051,7 @@ completeHomeModule = wrapIdentCompleter listHomeModules
 listHomeModules :: String -> GHCi [String]
 listHomeModules w = do
     g <- GHC.getModuleGraph
-    let home_mods = map GHC.ms_mod_name g
+    let home_mods = map GHC.ms_mod_name (GHC.mgModSummaries g)
     dflags <- getDynFlags
     return $ sort $ filter (w `isPrefixOf`)
             $ map (showPpr dflags) home_mods
@@ -3490,10 +3493,10 @@ list2  _other =
 listModuleLine :: Module -> Int -> InputT GHCi ()
 listModuleLine modl line = do
    graph <- GHC.getModuleGraph
-   let this = filter ((== modl) . GHC.ms_mod) graph
+   let this = GHC.mgLookupModule graph modl
    case this of
-     [] -> panic "listModuleLine"
-     summ:_ -> do
+     Nothing -> panic "listModuleLine"
+     Just summ -> do
            let filename = expectJust "listModuleLine" (ml_hs_file (GHC.ms_location summ))
                loc = mkRealSrcLoc (mkFastString (filename)) line 0
            listAround (realSrcLocSpan loc) False
