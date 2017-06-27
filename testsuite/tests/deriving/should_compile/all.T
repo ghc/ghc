@@ -1,6 +1,6 @@
 def just_the_deriving( msg ):
   return msg[0:msg.find('Filling in method body')]
-  
+
 test('drv001', normal, compile, [''])
 test('drv002', normal, compile, [''])
 test('drv003', normal, compile, [''])
@@ -88,5 +88,7 @@ test('T12814', normal, compile, ['-Wredundant-constraints'])
 test('T13272', normal, compile, [''])
 test('T13272a', normal, compile, [''])
 test('T13297', normal, compile, [''])
+test('T13758', normal, compile, [''])
 test('drv-empty-data', [normalise_errmsg_fun(just_the_deriving)],compile, ['-ddump-deriv -dsuppress-uniques'])
 test('drv-phantom', [normalise_errmsg_fun(just_the_deriving)],compile, ['-ddump-deriv -dsuppress-uniques'])
+test('T13813', normal, compile, [''])

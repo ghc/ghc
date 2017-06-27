@@ -39,7 +39,8 @@ import Reg
 import Instruction
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import Cmm hiding (RegSet, emptyRegSet)
 import PprCmm()
 

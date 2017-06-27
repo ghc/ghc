@@ -15,3 +15,9 @@ main = do
 
 fóo :: Int
 fóo = ()
+
+tabby :: Int
+tabby =  	()
+
+tabby2 :: Int
+tabby2 =		()

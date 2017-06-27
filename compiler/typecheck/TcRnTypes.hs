@@ -35,12 +35,12 @@ module TcRnTypes(
         -- Renamer types
         ErrCtxt, RecFieldEnv,
         ImportAvails(..), emptyImportAvails, plusImportAvails,
-        WhereFrom(..), mkModDeps,
+        WhereFrom(..), mkModDeps, modDepsElts,
 
         -- Typechecker types
         TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
         TcTyThing(..), PromotionErr(..),
-        IdBindingInfo(..),
+        IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
         SelfBootInfo(..),
         pprTcTyThingCategory, pprPECategory, CompleteMatch(..),
@@ -60,9 +60,9 @@ module TcRnTypes(
         ArrowCtxt(..),
 
         -- TcSigInfo
-        TcSigInfo(..), TcIdSigInfo(..),
+        TcSigFun, TcSigInfo(..), TcIdSigInfo(..),
         TcIdSigInst(..), TcPatSynInfo(..),
-        isPartialSig,
+        isPartialSig, hasCompleteSig,
 
         -- Canonical constraints
         Xi, Ct(..), Cts, emptyCts, andCts, andManyCts, pprCts,
@@ -86,7 +86,7 @@ module TcRnTypes(
         addInsols, getInsolubles, insolublesOnly, addSimples, addImplics,
         tyCoVarsOfWC, dropDerivedWC, dropDerivedSimples, dropDerivedInsols,
         tyCoVarsOfWCList, trulyInsoluble,
-        isDroppableDerivedLoc, insolubleImplic,
+        isDroppableDerivedLoc, isDroppableDerivedCt, insolubleImplic,
         arisesFromGivens,
 
         Implication(..), ImplicStatus(..), isInsolubleStatus, isSolvedStatus,
@@ -144,7 +144,7 @@ import HscTypes
 import TcEvidence
 import Type
 import Class    ( Class )
-import TyCon    ( TyCon )
+import TyCon    ( TyCon, tyConKind )
 import Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
 import DataCon  ( DataCon, dataConUserType, dataConOrigArgTys )
@@ -169,7 +169,7 @@ import Module
 import SrcLoc
 import VarSet
 import ErrUtils
-import UniqDFM
+import UniqFM
 import UniqSupply
 import BasicTypes
 import Bag
@@ -189,6 +189,7 @@ import qualified Control.Monad.Fail as MonadFail
 import Data.Set      ( Set )
 import qualified Data.Set as S
 
+import Data.List ( sort )
 import Data.Map ( Map )
 import Data.Dynamic  ( Dynamic )
 import Data.Typeable ( TypeRep )
@@ -409,8 +410,8 @@ data DsMetaVal
                         -- Will be dynamically alpha renamed.
                         -- The Id has type THSyntax.Var
 
-   | DsSplice (HsExpr Id) -- These bindings are introduced by
-                          -- the PendingSplices on a HsBracketOut
+   | DsSplice (HsExpr GhcTc) -- These bindings are introduced by
+                             -- the PendingSplices on a HsBracketOut
 
 
 {-
@@ -615,22 +616,22 @@ data TcGblEnv
         -- The binds, rules and foreign-decl fields are collected
         -- initially in un-zonked form and are finally zonked in tcRnSrcDecls
 
-        tcg_rn_exports :: Maybe [Located (IE Name)],
+        tcg_rn_exports :: Maybe [Located (IE GhcRn)],
                 -- Nothing <=> no explicit export list
                 -- Is always Nothing if we don't want to retain renamed
                 -- exports
 
-        tcg_rn_imports :: [LImportDecl Name],
+        tcg_rn_imports :: [LImportDecl GhcRn],
                 -- Keep the renamed imports regardless.  They are not
                 -- voluminous and are needed if you want to report unused imports
 
-        tcg_rn_decls :: Maybe (HsGroup Name),
+        tcg_rn_decls :: Maybe (HsGroup GhcRn),
           -- ^ Renamed decls, maybe.  @Nothing@ <=> Don't retain renamed
           -- decls.
 
         tcg_dependent_files :: TcRef [FilePath], -- ^ dependencies from addDependentFile
 
-        tcg_th_topdecls :: TcRef [LHsDecl RdrName],
+        tcg_th_topdecls :: TcRef [LHsDecl GhcPs],
         -- ^ Top-level declarations from addTopDecls
 
         tcg_th_foreign_files :: TcRef [(ForeignSrcLang, String)],
@@ -654,10 +655,10 @@ data TcGblEnv
         -- Things defined in this module, or (in GHCi)
         -- in the declarations for a single GHCi command.
         -- For the latter, see Note [The interactive package] in HscTypes
-        tcg_tr_module :: Maybe Id,           -- Id for $trModule :: GHC.Types.Module
+        tcg_tr_module :: Maybe Id,   -- Id for $trModule :: GHC.Types.Module
                                              -- for which every module has a top-level defn
                                              -- except in GHCi in which case we have Nothing
-        tcg_binds     :: LHsBinds Id,        -- Value bindings in this module
+        tcg_binds     :: LHsBinds GhcTc,     -- Value bindings in this module
         tcg_sigs      :: NameSet,            -- ...Top-level names that *lack* a signature
         tcg_imp_specs :: [LTcSpecPrag],      -- ...SPECIALISE prags for imported Ids
         tcg_warns     :: Warnings,           -- ...Warnings and deprecations
@@ -665,10 +666,10 @@ data TcGblEnv
         tcg_tcs       :: [TyCon],            -- ...TyCons and Classes
         tcg_insts     :: [ClsInst],          -- ...Instances
         tcg_fam_insts :: [FamInst],          -- ...Family instances
-        tcg_rules     :: [LRuleDecl Id],     -- ...Rules
-        tcg_fords     :: [LForeignDecl Id],  -- ...Foreign import & exports
-        tcg_vects     :: [LVectDecl Id],     -- ...Vectorisation declarations
-        tcg_patsyns   :: [PatSyn],           -- ...Pattern synonyms
+        tcg_rules     :: [LRuleDecl GhcTc],  -- ...Rules
+        tcg_fords     :: [LForeignDecl GhcTc], -- ...Foreign import & exports
+        tcg_vects     :: [LVectDecl GhcTc],   -- ...Vectorisation declarations
+        tcg_patsyns   :: [PatSyn],            -- ...Pattern synonyms
 
         tcg_doc_hdr   :: Maybe LHsDocString, -- ^ Maybe Haddock header docs
         tcg_hpc       :: AnyHpcUsage,        -- ^ @True@ if any part of the
@@ -804,8 +805,11 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_tclvl      :: TcLevel,         -- Birthplace for new unification variables
 
         tcl_th_ctxt    :: ThStage,         -- Template Haskell context
-        tcl_th_bndrs   :: ThBindEnv,       -- Binding level of in-scope Names
-                                           -- defined in this module (not imported)
+        tcl_th_bndrs   :: ThBindEnv,       -- and binder info
+            -- The ThBindEnv records the TH binding level of in-scope Names
+            -- defined in this module (not imported)
+            -- We can't put this info in the TypeEnv because it's needed
+            -- (and extended) in the renamer, for untyed splices
 
         tcl_arrow_ctxt :: ArrowCtxt,       -- Arrow-notation context
 
@@ -838,6 +842,14 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_lie  :: TcRef WantedConstraints,    -- Place to accumulate type constraints
         tcl_errs :: TcRef Messages              -- Place to accumulate errors
     }
+
+type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
+        -- Monadic so that we have a chance
+        -- to deal with bound type variables just before error
+        -- message construction
+
+        -- Bool:  True <=> this is a landmark context; do not
+        --                 discard it when trimming for display
 
 type TcTypeEnv = NameEnv TcTyThing
 
@@ -878,7 +890,7 @@ type TcIdSet     = IdSet
 
 type TcIdBinderStack = [TcIdBinder]
    -- This is a stack of locally-bound ids, innermost on top
-   -- Used ony in error reporting (relevantBindings in TcError)
+   -- Used only in error reporting (relevantBindings in TcError)
    -- We can't use the tcl_env type environment, because it doesn't
    --   keep track of the nesting order
 
@@ -1041,9 +1053,10 @@ data ArrowCtxt   -- Note [Escaping the arrow scope]
 data TcTyThing
   = AGlobal TyThing             -- Used only in the return type of a lookup
 
-  | ATcId   {           -- Ids defined in this module; may not be fully zonked
-        tct_id     :: TcId,
-        tct_info :: IdBindingInfo }   -- See Note [Bindings with closed types]
+  | ATcId           -- Ids defined in this module; may not be fully zonked
+      { tct_id   :: TcId
+      , tct_info :: IdBindingInfo   -- See Note [Meaning of IdBindingInfo]
+      }
 
   | ATyVar  Name TcTyVar        -- The type variable to which the lexically scoped type
                                 -- variable is bound. We only need the Name
@@ -1082,48 +1095,139 @@ instance Outputable TcTyThing where     -- Debugging only
                                  <> ppr (varType (tct_id elt)) <> comma
                                  <+> ppr (tct_info elt))
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
-   ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc
+   ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
 
--- | Describes how an Id is bound.
+-- | IdBindingInfo describes how an Id is bound.
 --
 -- It is used for the following purposes:
---
 -- a) for static forms in TcExpr.checkClosedInStaticForm and
--- b) to figure out when a nested binding can be generalised (in
---    TcBinds.decideGeneralisationPlan).
+-- b) to figure out when a nested binding can be generalised,
+--    in TcBinds.decideGeneralisationPlan.
 --
--- See Note [Meaning of IdBindingInfo].
-data IdBindingInfo
+data IdBindingInfo -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
     = NotLetBound
     | ClosedLet
-    | NonClosedLet NameSet Bool
+    | NonClosedLet
+         RhsNames        -- Used for (static e) checks only
+         ClosedTypeId    -- Used for generalisation checks
+                         -- and for (static e) checks
 
--- Note [Meaning of IdBindingInfo]
---
--- @NotLetBound@ means that the Id is not let-bound (e.g. it is bound in a
--- lambda-abstraction or in a case pattern).
---
--- @ClosedLet@ means that the Id is let-bound, it is closed and its type is
--- closed as well.
---
--- @NonClosedLet fvs type-closed@ means that the Id is let-bound but it is not
--- closed. The @fvs@ set contains the free variables of the rhs. The type-closed
--- flag indicates if the type of Id is closed.
+-- | IsGroupClosed describes a group of mutually-recursive bindings
+data IsGroupClosed
+  = IsGroupClosed
+      (NameEnv RhsNames)  -- Free var info for the RHS of each binding in the goup
+                          -- Used only for (static e) checks
+
+      ClosedTypeId        -- True <=> all the free vars of the group are
+                          --          imported or ClosedLet or
+                          --          NonClosedLet with ClosedTypeId=True.
+                          --          In particular, no tyvars, no NotLetBound
+
+type RhsNames = NameSet   -- Names of variables, mentioned on the RHS of
+                          -- a definition, that are not Global or ClosedLet
+
+type ClosedTypeId = Bool
+  -- See Note [Meaning of IdBindingInfo and ClosedTypeId]
+
+{- Note [Meaning of IdBindingInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+NotLetBound means that
+  the Id is not let-bound (e.g. it is bound in a
+  lambda-abstraction or in a case pattern)
+
+ClosedLet means that
+   - The Id is let-bound,
+   - Any free term variables are also Global or ClosedLet
+   - Its type has no free variables (NB: a top-level binding subject
+     to the MR might have free vars in its type)
+   These ClosedLets can definitely be floated to top level; and we
+   may need to do so for static forms.
+
+   Property:   ClosedLet
+             is equivalent to
+               NonClosedLet emptyNameSet True
+
+(NonClosedLet (fvs::RhsNames) (cl::ClosedTypeId)) means that
+   - The Id is let-bound
+
+   - The fvs::RhsNames contains the free names of the RHS,
+     excluding Global and ClosedLet ones.
+
+   - For the ClosedTypeId field see Note [Bindings with closed types]
+
+For (static e) to be valid, we need for every 'x' free in 'e',
+x's binding must be floatable to top level.  Specifically:
+   * x's RhsNames must be non-empty
+   * x's type has no free variables
+See Note [Grand plan for static forms] in StaticPtrTable.hs.
+This test is made in TcExpr.checkClosedInStaticForm.
+Actually knowing x's RhsNames (rather than just its emptiness
+or otherwise) is just so we can produce better error messages
+
+Note [Bindings with closed types: ClosedTypeId]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+
+  f x = let g ys = map not ys
+        in ...
+
+Can we generalise 'g' under the OutsideIn algorithm?  Yes,
+because all g's free variables are top-level; that is they themselves
+have no free type variables, and it is the type variables in the
+environment that makes things tricky for OutsideIn generalisation.
+
+Here's the invariant:
+   If an Id has ClosedTypeId=True (in its IdBindingInfo), then
+   the Id's type is /definitely/ closed (has no free type variables).
+   Specifically,
+       a) The Id's acutal type is closed (has no free tyvars)
+       b) Either the Id has a (closed) user-supplied type signature
+          or all its free varaibles are Global/ClosedLet
+             or NonClosedLet with ClosedTypeId=True.
+          In particular, none are NotLetBound.
+
+Why is (b) needed?   Consider
+    \x. (x :: Int, let y = x+1 in ...)
+Initially x::alpha.  If we happen to typecheck the 'let' before the
+(x::Int), y's type will have a free tyvar; but if the other way round
+it won't.  So we treat any let-bound variable with a free
+non-let-bound variable as not ClosedTypeId, regardless of what the
+free vars of its type actually are.
+
+But if it has a signature, all is well:
+   \x. ...(let { y::Int; y = x+1 } in
+           let { v = y+2 } in ...)...
+Here the signature on 'v' makes 'y' a ClosedTypeId, so we can
+generalise 'v'.
+
+Note that:
+
+  * A top-level binding may not have ClosedTypeId=True, if it suffers
+    from the MR
+
+  * A nested binding may be closed (eg 'g' in the example we started
+    with). Indeed, that's the point; whether a function is defined at
+    top level or nested is orthogonal to the question of whether or
+    not it is closed.
+
+  * A binding may be non-closed because it mentions a lexically scoped
+    *type variable*  Eg
+        f :: forall a. blah
+        f x = let g y = ...(y::a)...
+
+Under OutsideIn we are free to generalise an Id all of whose free
+variables have ClosedTypeId=True (or imported).  This is an extension
+compared to the JFP paper on OutsideIn, which used "top-level" as a
+proxy for "closed".  (It's not a good proxy anyway -- the MR can make
+a top-level binding with a free type variable.)
+-}
 
 instance Outputable IdBindingInfo where
   ppr NotLetBound = text "NotLetBound"
   ppr ClosedLet = text "TopLevelLet"
   ppr (NonClosedLet fvs closed_type) =
     text "TopLevelLet" <+> ppr fvs <+> ppr closed_type
-
--- | Tells if a group of binders is closed.
---
--- When it is not closed, it provides a map of binder ids to the free vars
--- in their right-hand sides.
---
-data IsGroupClosed = ClosedGroup
-                   | NonClosedGroup (NameEnv NameSet)
 
 instance Outputable PromotionErr where
   ppr ClassPE        = text "ClassPE"
@@ -1153,58 +1257,6 @@ pprPECategory NoDataKindsTC  = text "Type constructor"
 pprPECategory NoDataKindsDC  = text "Data constructor"
 pprPECategory NoTypeInTypeTC = text "Type constructor"
 pprPECategory NoTypeInTypeDC = text "Data constructor"
-
-{- Note [Bindings with closed types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-
-  f x = let g ys = map not ys
-        in ...
-
-Can we generalise 'g' under the OutsideIn algorithm?  Yes,
-because all g's free variables are top-level; that is they themselves
-have no free type variables, and it is the type variables in the
-environment that makes things tricky for OutsideIn generalisation.
-
-Definition:
-   A variable is "closed", and has tct_info set to TopLevel,
-iff
-   a) all its free variables are imported, or are let-bound and closed
-   b) generalisation is not restricted by the monomorphism restriction
-
-Invariant: a closed variable has no free type variables in its type.
-Why? Assume (induction hypothesis) that closed variables have closed
-types, and that we have a new binding f = e, satisfying (a) and (b).
-Then since monomorphism restriction does not apply, and there are no
-free type variables, we can fully generalise, so its type will be closed.
-
-Under OutsideIn we are free to generalise a closed let-binding.
-This is an extension compared to the JFP paper on OutsideIn, which
-used "top-level" as a proxy for "closed".  (It's not a good proxy
-anyway -- the MR can make a top-level binding with a free type
-variable.)
-
-Note that:
-  * A top-level binding may not be closed, if it suffers from the MR
-
-  * A nested binding may be closed (eg 'g' in the example we started with)
-    Indeed, that's the point; whether a function is defined at top level
-    or nested is orthogonal to the question of whether or not it is closed
-
-  * A binding may be non-closed because it mentions a lexically scoped
-    *type variable*  Eg
-        f :: forall a. blah
-        f x = let g y = ...(y::a)...
-
--}
-
-type ErrCtxt = (Bool, TidyEnv -> TcM (TidyEnv, MsgDoc))
-        -- Monadic so that we have a chance
-        -- to deal with bound type variables just before error
-        -- message construction
-
-        -- Bool:  True <=> this is a landmark context; do not
-        --                 discard it when trimming for display
 
 {-
 ************************************************************************
@@ -1240,7 +1292,7 @@ data ImportAvails
           -- different packages. (currently not the case, but might be in the
           -- future).
 
-        imp_dep_mods :: DModuleNameEnv (ModuleName, IsBootInterface),
+        imp_dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface),
           -- ^ Home-package modules needed by the module being compiled
           --
           -- It doesn't matter whether any of these dependencies
@@ -1282,14 +1334,21 @@ data ImportAvails
       }
 
 mkModDeps :: [(ModuleName, IsBootInterface)]
-          -> DModuleNameEnv (ModuleName, IsBootInterface)
-mkModDeps deps = foldl add emptyUDFM deps
+          -> ModuleNameEnv (ModuleName, IsBootInterface)
+mkModDeps deps = foldl add emptyUFM deps
                where
-                 add env elt@(m,_) = addToUDFM env m elt
+                 add env elt@(m,_) = addToUFM env m elt
+
+modDepsElts
+  :: ModuleNameEnv (ModuleName, IsBootInterface)
+  -> [(ModuleName, IsBootInterface)]
+modDepsElts = sort . nonDetEltsUFM
+  -- It's OK to use nonDetEltsUFM here because sorting by module names
+  -- restores determinism
 
 emptyImportAvails :: ImportAvails
 emptyImportAvails = ImportAvails { imp_mods          = emptyModuleEnv,
-                                   imp_dep_mods      = emptyUDFM,
+                                   imp_dep_mods      = emptyUFM,
                                    imp_dep_pkgs      = S.empty,
                                    imp_trust_pkgs    = S.empty,
                                    imp_trust_own_pkg = False,
@@ -1312,7 +1371,7 @@ plusImportAvails
                   imp_trust_pkgs = tpkgs2, imp_trust_own_pkg = tself2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
   = ImportAvails { imp_mods          = plusModuleEnv_C (++) mods1 mods2,
-                   imp_dep_mods      = plusUDFM_C plus_mod_dep dmods1 dmods2,
+                   imp_dep_mods      = plusUFM_C plus_mod_dep dmods1 dmods2,
                    imp_dep_pkgs      = dpkgs1 `S.union` dpkgs2,
                    imp_trust_pkgs    = tpkgs1 `S.union` tpkgs2,
                    imp_trust_own_pkg = tself1 || tself2,
@@ -1357,6 +1416,8 @@ instance Outputable WhereFrom where
 -- TcSimplify uses them, and TcSimplify is fairly
 -- low down in the module hierarchy
 
+type TcSigFun  = Name -> Maybe TcSigInfo
+
 data TcSigInfo = TcIdSig     TcIdSigInfo
                | TcPatSynSig TcPatSynInfo
 
@@ -1377,8 +1438,9 @@ data TcIdSigInfo   -- See Note [Complete and partial type signatures]
                    -- wildcards). In this case it doesn't make sense to give
                    -- the polymorphic Id, because we are going to /infer/ its
                    -- type, so we can't make the polymorphic Id ab-initio
-      { psig_name  :: Name               -- Name of the function; used when report wildcards
-      , psig_hs_ty :: LHsSigWcType Name  -- The original partial signature in HsSyn form
+      { psig_name  :: Name   -- Name of the function; used when report wildcards
+      , psig_hs_ty :: LHsSigWcType GhcRn  -- The original partial signature in
+                                          -- HsSyn form
       , sig_ctxt   :: UserTypeCtxt
       , sig_loc    :: SrcSpan            -- Location of the type signature
       }
@@ -1494,6 +1556,12 @@ isPartialSig :: TcIdSigInst -> Bool
 isPartialSig (TISI { sig_inst_sig = PartialSig {} }) = True
 isPartialSig _                                       = False
 
+-- | No signature or a partial signature
+hasCompleteSig :: TcSigFun -> Name -> Bool
+hasCompleteSig sig_fn name
+  = case sig_fn name of
+      Just (TcIdSig (CompleteSig {})) -> True
+      _                               -> False
 
 
 {-
@@ -1523,14 +1591,14 @@ data Ct
   -- Atomic canonical constraints
   = CDictCan {  -- e.g.  Num xi
       cc_ev     :: CtEvidence, -- See Note [Ct/evidence invariant]
+
       cc_class  :: Class,
-      cc_tyargs :: [Xi],       -- cc_tyargs are function-free, hence Xi
-      cc_pend_sc :: Bool       -- True <=> (a) cc_class has superclasses
-                               --          (b) we have not (yet) added those
-                               --              superclasses as Givens
-           -- NB: cc_pend_sc is used for G/W/D.  For W/D the reason
-           --     we need superclasses is to expose possible improvement
-           --     via fundeps
+      cc_tyargs :: [Xi],   -- cc_tyargs are function-free, hence Xi
+
+      cc_pend_sc :: Bool   -- See Note [The superclass story] in TcCanonical
+                           -- True <=> (a) cc_class has superclasses
+                           --          (b) we have not (yet) added those
+                           --              superclasses as Givens
     }
 
   | CIrredEvCan {  -- These stand for yet-unusable predicates
@@ -1581,8 +1649,8 @@ data Ct
         --    *never* over-saturated (because if so
         --    we should have decomposed)
 
-      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkol skolem
-                            -- [Wanted] always a FlatMetaTv unification variable
+      cc_fsk    :: TcTyVar  -- [Given]  always a FlatSkolTv
+                            -- [Wanted] always a FlatMetaTv
         -- See Note [The flattening story] in TcFlatten
     }
 
@@ -1608,9 +1676,8 @@ holeOcc :: Hole -> OccName
 holeOcc (ExprHole uv)  = unboundVarOcc uv
 holeOcc (TypeHole occ) = occ
 
-{-
-Note [Hole constraints]
-~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Hole constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 CHoleCan constraints are used for two kinds of holes,
 distinguished by cc_hole:
 
@@ -1805,21 +1872,36 @@ dropDerivedSimples simples = mapMaybeBag dropDerivedCt simples
 dropDerivedCt :: Ct -> Maybe Ct
 dropDerivedCt ct
   = case ctEvFlavour ev of
-      Wanted WOnly -> Just (ct { cc_ev = ev_wd })
-      Wanted _     -> Just ct
+      Wanted WOnly -> Just (ct' { cc_ev = ev_wd })
+      Wanted _     -> Just ct'
       _            -> ASSERT( isDerivedCt ct ) Nothing
                       -- simples are all Wanted or Derived
   where
     ev    = ctEvidence ct
     ev_wd = ev { ctev_nosh = WDeriv }
+    ct'   = setPendingScDict ct -- See Note [Resetting cc_pend_sc]
+
+{- Note [Resetting cc_pend_sc]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When we discard Derived constraints, in dropDerivedSimples, we must
+set the cc_pend_sc flag to True, so that if we re-process this
+CDictCan we will re-generate its derived superclasses. Otherwise
+we might miss some fundeps.  Trac #13662 showed this up.
+
+See Note [The superclass story] in TcCanonical.
+-}
+
 
 dropDerivedInsols :: Cts -> Cts
 -- See Note [Dropping derived constraints]
-dropDerivedInsols insols = filterBag keep insols
-  where                    -- insols can include Given
-    keep ct
-      | isDerivedCt ct = not (isDroppableDerivedLoc (ctLoc ct))
-      | otherwise      = True
+dropDerivedInsols insols
+  = filterBag (not . isDroppableDerivedCt) insols
+              -- insols can include Given
+
+isDroppableDerivedCt :: Ct -> Bool
+isDroppableDerivedCt ct
+  | isDerivedCt ct = isDroppableDerivedLoc (ctLoc ct)
+  | otherwise      = False
 
 isDroppableDerivedLoc :: CtLoc -> Bool
 -- See Note [Dropping derived constraints]
@@ -2010,6 +2092,12 @@ isPendingScDict :: Ct -> Maybe Ct
 isPendingScDict ct@(CDictCan { cc_pend_sc = True })
                   = Just (ct { cc_pend_sc = False })
 isPendingScDict _ = Nothing
+
+setPendingScDict :: Ct -> Ct
+-- Set the cc_pend_sc flag to True
+setPendingScDict ct@(CDictCan { cc_pend_sc = False })
+                    = ct { cc_pend_sc = True }
+setPendingScDict ct = ct
 
 superClassesMightHelp :: Ct -> Bool
 -- ^ True if taking superclasses of givens, or of wanteds (to perhaps
@@ -3073,19 +3161,19 @@ data CtOrigin
   | IPOccOrigin  HsIPName       -- Occurrence of an implicit parameter
   | OverLabelOrigin FastString  -- Occurrence of an overloaded label
 
-  | LiteralOrigin (HsOverLit Name)      -- Occurrence of a literal
+  | LiteralOrigin (HsOverLit GhcRn)     -- Occurrence of a literal
   | NegateOrigin                        -- Occurrence of syntactic negation
 
-  | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
-  | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
+  | ArithSeqOrigin (ArithSeqInfo GhcRn) -- [x..], [x..y] etc
+  | PArrSeqOrigin  (ArithSeqInfo GhcRn) -- [:x..y:] and [:x,y..z:]
   | SectionOrigin
   | TupleOrigin                        -- (..,..)
   | ExprSigOrigin       -- e :: ty
   | PatSigOrigin        -- p :: ty
   | PatOrigin           -- Instantiating a polytyped pattern at a constructor
   | ProvCtxtOrigin      -- The "provided" context of a pattern synonym signature
-        (PatSynBind Name Name) -- Information about the pattern synonym, in particular
-                               -- the name and the right-hand side
+        (PatSynBind GhcRn GhcRn) -- Information about the pattern synonym, in
+                                 -- particular the name and the right-hand side
   | RecordUpdOrigin
   | ViewPatOrigin
 
@@ -3103,11 +3191,11 @@ data CtOrigin
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
   | DefaultOrigin       -- Typechecking a default decl
   | DoOrigin            -- Arising from a do expression
-  | DoPatOrigin (LPat Name) -- Arising from a failable pattern in
-                            -- a do expression
+  | DoPatOrigin (LPat GhcRn) -- Arising from a failable pattern in
+                             -- a do expression
   | MCompOrigin         -- Arising from a monad comprehension
-  | MCompPatOrigin (LPat Name) -- Arising from a failable pattern in a
-                               -- monad comprehension
+  | MCompPatOrigin (LPat GhcRn) -- Arising from a failable pattern in a
+                                -- monad comprehension
   | IfOrigin            -- Arising from an if statement
   | ProcOrigin          -- Arising from a proc expression
   | AnnOrigin           -- An annotation
@@ -3126,9 +3214,10 @@ data CtOrigin
   | UnboundOccurrenceOf OccName
   | ListOrigin          -- An overloaded list
   | StaticOrigin        -- A static form
-  | FailablePattern (LPat TcId) -- A failable pattern in do-notation for the
-                                -- MonadFail Proposal (MFP). Obsolete when
-                                -- actual desugaring to MonadFail.fail is live.
+  | FailablePattern (LPat GhcTcId) -- A failable pattern in do-notation for the
+                                   -- MonadFail Proposal (MFP). Obsolete when
+                                   -- actual desugaring to MonadFail.fail is
+                                   -- live.
   | Shouldn'tHappenOrigin String
                             -- the user should never see this one,
                             -- unless ImpredicativeTypes is on, where all
@@ -3178,10 +3267,10 @@ ctoHerald :: SDoc
 ctoHerald = text "arising from"
 
 -- | Extract a suitable CtOrigin from a HsExpr
-lexprCtOrigin :: LHsExpr Name -> CtOrigin
+lexprCtOrigin :: LHsExpr GhcRn -> CtOrigin
 lexprCtOrigin (L _ e) = exprCtOrigin e
 
-exprCtOrigin :: HsExpr Name -> CtOrigin
+exprCtOrigin :: HsExpr GhcRn -> CtOrigin
 exprCtOrigin (HsVar (L _ name)) = OccurrenceOf name
 exprCtOrigin (HsUnboundVar uv)  = UnboundOccurrenceOf (unboundVarOcc uv)
 exprCtOrigin (HsConLikeOut {})  = panic "exprCtOrigin HsConLikeOut"
@@ -3236,7 +3325,7 @@ exprCtOrigin (ELazyPat {})      = panic "exprCtOrigin ELazyPat"
 exprCtOrigin (HsWrap {})        = panic "exprCtOrigin HsWrap"
 
 -- | Extract a suitable CtOrigin from a MatchGroup
-matchesCtOrigin :: MatchGroup Name (LHsExpr Name) -> CtOrigin
+matchesCtOrigin :: MatchGroup GhcRn (LHsExpr GhcRn) -> CtOrigin
 matchesCtOrigin (MG { mg_alts = alts })
   | L _ [L _ match] <- alts
   , Match { m_grhss = grhss } <- match
@@ -3246,11 +3335,11 @@ matchesCtOrigin (MG { mg_alts = alts })
   = Shouldn'tHappenOrigin "multi-way match"
 
 -- | Extract a suitable CtOrigin from guarded RHSs
-grhssCtOrigin :: GRHSs Name (LHsExpr Name) -> CtOrigin
+grhssCtOrigin :: GRHSs GhcRn (LHsExpr GhcRn) -> CtOrigin
 grhssCtOrigin (GRHSs { grhssGRHSs = lgrhss }) = lGRHSCtOrigin lgrhss
 
 -- | Extract a suitable CtOrigin from a list of guarded RHSs
-lGRHSCtOrigin :: [LGRHS Name (LHsExpr Name)] -> CtOrigin
+lGRHSCtOrigin :: [LGRHS GhcRn (LHsExpr GhcRn)] -> CtOrigin
 lGRHSCtOrigin [L _ (GRHS _ (L _ e))] = exprCtOrigin e
 lGRHSCtOrigin _ = Shouldn'tHappenOrigin "multi-way GRHS"
 
@@ -3454,9 +3543,9 @@ data TcPluginResult
 *                                                                      *
 ********************************************************************* -}
 
-type RoleAnnotEnv = NameEnv (LRoleAnnotDecl Name)
+type RoleAnnotEnv = NameEnv (LRoleAnnotDecl GhcRn)
 
-mkRoleAnnotEnv :: [LRoleAnnotDecl Name] -> RoleAnnotEnv
+mkRoleAnnotEnv :: [LRoleAnnotDecl GhcRn] -> RoleAnnotEnv
 mkRoleAnnotEnv role_annot_decls
  = mkNameEnv [ (name, ra_decl)
              | ra_decl <- role_annot_decls
@@ -3468,10 +3557,11 @@ mkRoleAnnotEnv role_annot_decls
 emptyRoleAnnotEnv :: RoleAnnotEnv
 emptyRoleAnnotEnv = emptyNameEnv
 
-lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl Name)
+lookupRoleAnnot :: RoleAnnotEnv -> Name -> Maybe (LRoleAnnotDecl GhcRn)
 lookupRoleAnnot = lookupNameEnv
 
-getRoleAnnots :: [Name] -> RoleAnnotEnv -> ([LRoleAnnotDecl Name], RoleAnnotEnv)
+getRoleAnnots :: [Name] -> RoleAnnotEnv
+              -> ([LRoleAnnotDecl GhcRn], RoleAnnotEnv)
 getRoleAnnots bndrs role_env
   = ( mapMaybe (lookupRoleAnnot role_env) bndrs
     , delListFromNameEnv role_env bndrs )

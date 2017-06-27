@@ -274,7 +274,7 @@ direct_call :: String
             -> CLabel -> RepArity
             -> [(ArgRep,Maybe CmmExpr)] -> FCode ReturnKind
 direct_call caller call_conv lbl arity args
-  | debugIsOn && real_arity > length args  -- Too few args
+  | debugIsOn && args `lengthLessThan` real_arity  -- Too few args
   = do -- Caller should ensure that there enough args!
        pprPanic "direct_call" $
             text caller <+> ppr arity <+>

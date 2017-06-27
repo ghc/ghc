@@ -12,7 +12,7 @@
 # Versioning scheme: A.B.C
 #         A: major version, decimal, any number of digits
 #         B: minor version, decimal, any number of digits
-#	  C: patchlevel, one digit, omitted if zero.
+#     C: patchlevel, one digit, omitted if zero.
 #
 # ProjectVersionInt does *not* contain the patchlevel (rationale: this
 # figure is used for conditional compilations, and library interfaces
@@ -35,7 +35,7 @@ ProjectGitCommitId = @ProjectGitCommitId@
 
 ################################################################################
 #
-#		Platform variables
+#       Platform variables
 #
 ################################################################################
 
@@ -81,24 +81,25 @@ ProjectGitCommitId = @ProjectGitCommitId@
 # You have to do a lot of work by hand to cross compile: see the
 # section on "Porting GHC" in the Building Guide.
 
-HOSTPLATFORM			= @HostPlatform@
-TARGETPLATFORM			= @TargetPlatform@
-BUILDPLATFORM			= @BuildPlatform@
+HOSTPLATFORM            = @HostPlatform@
+TARGETPLATFORM          = @TargetPlatform@
+BUILDPLATFORM           = @BuildPlatform@
 
-HostPlatform_CPP		= @HostPlatform_CPP@
-HostArch_CPP			= @HostArch_CPP@
-HostOS_CPP			= @HostOS_CPP@
-HostVendor_CPP	                = @HostVendor_CPP@
+HostPlatform_CPP        = @HostPlatform_CPP@
+HostArch_CPP            = @HostArch_CPP@
+HostOS_CPP              = @HostOS_CPP@
+HostVendor_CPP          = @HostVendor_CPP@
 
-TargetPlatform_CPP		= @TargetPlatform_CPP@
-TargetArch_CPP			= @TargetArch_CPP@
-TargetOS_CPP			= @TargetOS_CPP@
-TargetVendor_CPP                = @TargetVendor_CPP@
+TargetPlatform_CPP      = @TargetPlatform_CPP@
+TargetArch_CPP          = @TargetArch_CPP@
+TargetOS_CPP            = @TargetOS_CPP@
+TargetVendor_CPP        = @TargetVendor_CPP@
+LLVMTarget_CPP          = @LLVMTarget_CPP@
 
-BuildPlatform_CPP		= @BuildPlatform_CPP@
-BuildArch_CPP			= @BuildArch_CPP@
-BuildOS_CPP			= @BuildOS_CPP@
-BuildVendor_CPP                 = @BuildVendor_CPP@
+BuildPlatform_CPP       = @BuildPlatform_CPP@
+BuildArch_CPP           = @BuildArch_CPP@
+BuildOS_CPP             = @BuildOS_CPP@
+BuildVendor_CPP         = @BuildVendor_CPP@
 
 @HostPlatform_CPP@_HOST           = 1
 @TargetPlatform_CPP@_TARGET       = 1
@@ -118,7 +119,7 @@ BuildVendor_CPP                 = @BuildVendor_CPP@
 
 ################################################################################
 #
-#		Global configuration options
+#       Global configuration options
 #
 ################################################################################
 

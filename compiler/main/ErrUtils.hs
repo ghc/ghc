@@ -52,6 +52,7 @@ module ErrUtils (
         debugTraceMsg,
         ghcExit,
         prettyPrintGhcErrors,
+        traceCmd
     ) where
 
 #include "HsVersions.h"
@@ -153,7 +154,7 @@ data Severity
   | SevInteractive
 
   | SevDump
-    -- ^ Log messagse intended for compiler developers
+    -- ^ Log message intended for compiler developers
     -- No file/line/column stuff
 
   | SevInfo
@@ -209,10 +210,12 @@ mkLocMessageAnn ann severity locn msg
 
           -- Add prefixes, like    Foo.hs:34: warning:
           --                           <the warning message>
-          prefix = locn' <> colon <+>
+          header = locn' <> colon <+>
                    coloured sevColour sevText <> optAnn
 
-      in coloured (Col.sMessage (colScheme dflags)) (hang prefix 4 msg)
+      in coloured (Col.sMessage (colScheme dflags))
+                  (hang (coloured (Col.sHeader (colScheme dflags)) header) 4
+                        msg)
 
   where
     sevText =
@@ -261,8 +264,6 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
     rowStr = show row
     multiline = row /= srcSpanEndLine span
 
-    stripNewlines = filter (/= '\n')
-
     caretDiagnostic Nothing = empty
     caretDiagnostic (Just srcLineWithNewline) =
       sdocWithDynFlags $ \ dflags ->
@@ -280,7 +281,16 @@ getCaretDiagnostic severity (RealSrcSpan span) = do
 
       where
 
-        srcLine = stripNewlines srcLineWithNewline
+        -- expand tabs in a device-independent manner #13664
+        expandTabs tabWidth i s =
+          case s of
+            ""        -> ""
+            '\t' : cs -> replicate effectiveWidth ' ' ++
+                         expandTabs tabWidth (i + effectiveWidth) cs
+            c    : cs -> c : expandTabs tabWidth (i + 1) cs
+          where effectiveWidth = tabWidth - i `mod` tabWidth
+
+        srcLine = filter (/= '\n') (expandTabs 8 0 srcLineWithNewline)
 
         start = srcSpanStartCol span - 1
         end | multiline = length srcLine
@@ -664,3 +674,23 @@ isWarnMsgFatal :: DynFlags -> WarnMsg -> Bool
 isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
   = wopt_fatal wflag dflags
 isWarnMsgFatal dflags _ = gopt Opt_WarnIsError dflags
+
+traceCmd :: DynFlags -> String -> String -> IO a -> IO a
+-- trace the command (at two levels of verbosity)
+traceCmd dflags phase_name cmd_line action
+ = do   { let verb = verbosity dflags
+        ; showPass dflags phase_name
+        ; debugTraceMsg dflags 3 (text cmd_line)
+        ; case flushErr dflags of
+              FlushErr io -> io
+
+           -- And run it!
+        ; action `catchIO` handle_exn verb
+        }
+  where
+    handle_exn _verb exn = do { debugTraceMsg dflags 2 (char '\n')
+                              ; debugTraceMsg dflags 2
+                                (text "Failed:"
+                                 <+> text cmd_line
+                                 <+> text (show exn))
+                              ; throwGhcExceptionIO (ProgramError (show exn))}

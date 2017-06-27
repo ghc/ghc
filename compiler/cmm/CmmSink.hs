@@ -7,7 +7,10 @@ import Cmm
 import CmmOpt
 import CmmLive
 import CmmUtils
-import Hoopl
+import Hoopl.Block
+import Hoopl.Label
+import Hoopl.Collections
+import Hoopl.Graph
 import CodeGen.Platform
 import Platform (isARM, platformArch)
 

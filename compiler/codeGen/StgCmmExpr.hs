@@ -562,7 +562,7 @@ chooseReturnBndrs bndr (PrimAlt _) _alts
   = assertNonVoidIds [bndr]
 
 chooseReturnBndrs _bndr (MultiValAlt n) [(_, ids, _)]
-  = ASSERT2(n == length ids, ppr n $$ ppr ids $$ ppr _bndr)
+  = ASSERT2(ids `lengthIs` n, ppr n $$ ppr ids $$ ppr _bndr)
     assertNonVoidIds ids     -- 'bndr' is not assigned!
 
 chooseReturnBndrs bndr (AlgAlt _) _alts

@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, RecordWildCards, GADTs #-}
+{-# LANGUAGE BangPatterns, CPP, RecordWildCards, GADTs #-}
 module CmmLayoutStack (
        cmmLayoutStack, setInfoTableStackMap
   ) where
@@ -17,7 +17,11 @@ import ForeignCall
 import CmmLive
 import CmmProcPoint
 import SMRep
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Dataflow
+import Hoopl.Graph
+import Hoopl.Label
 import UniqSupply
 import StgCmmUtils      ( newTemp )
 import Maybes
@@ -60,6 +64,11 @@ We want to do stack allocation so that as far as possible
 The algorithm we use is a variant of linear-scan register allocation,
 where the stack is our register file.
 
+We proceed in two passes, see Note [Two pass approach] for why they are not easy
+to merge into one.
+
+Pass 1:
+
  - First, we do a liveness analysis, which annotates every block with
    the variables live on entry to the block.
 
@@ -80,9 +89,10 @@ where the stack is our register file.
 
     - Look up the StackMap for this block.
 
-    - If this block is a proc point (or a call continuation, if we
-      aren't splitting proc points), emit instructions to reload all
-      the live variables from the stack, according to the StackMap.
+    - If this block is a proc point (or a call continuation, if we aren't
+      splitting proc points), we need to reload all the live variables from the
+      stack - but this is done in Pass 2, which calculates more precise liveness
+      information (see description of Pass 2).
 
     - Walk forwards through the instructions:
       - At an assignment  x = Sp[loc]
@@ -119,10 +129,52 @@ where the stack is our register file.
     an input. I hate cyclic programming, but it's just too convenient
     sometimes.)
 
-There are plenty of tricky details: update frames, proc points, return
-addresses, foreign calls, and some ad-hoc optimisations that are
-convenient to do here and effective in common cases.  Comments in the
-code below explain these.
+  There are plenty of tricky details: update frames, proc points, return
+  addresses, foreign calls, and some ad-hoc optimisations that are
+  convenient to do here and effective in common cases.  Comments in the
+  code below explain these.
+
+Pass 2:
+
+- Calculate live registers, but taking into account that nothing is live at the
+  entry to a proc point.
+
+- At each proc point and call continuation insert reloads of live registers from
+  the stack (they were saved by Pass 1).
+
+
+Note [Two pass approach]
+
+The main reason for Pass 2 is being able to insert only the reloads that are
+needed and the fact that the two passes need different liveness information.
+Let's consider an example:
+
+  .....
+   \ /
+    D   <- proc point
+   / \
+  E   F
+   \ /
+    G   <- proc point
+    |
+    X
+
+Pass 1 needs liveness assuming that local variables are preserved across calls.
+This is important because it needs to save any local registers to the stack
+(e.g., if register a is used in block X, it must be saved before any native
+call).
+However, for Pass 2, where we want to reload registers from stack (in a proc
+point), this is overly conservative and would lead us to generate reloads in D
+for things used in X, even though we're going to generate reloads in G anyway
+(since it's also a proc point).
+So Pass 2 calculates liveness knowing that nothing is live at the entry to a
+proc point. This means that in D we only need to reload things used in E or F.
+This can be quite important, for an extreme example see testcase for #3294.
+
+Merging the two passes is not trivial - Pass 2 is a backward rewrite and Pass 1
+is a forward one. Furthermore, Pass 1 is creating code that uses local registers
+(saving them before a call), which the liveness analysis for Pass 2 must see to
+be correct.
 
 -}
 
@@ -201,9 +253,14 @@ cmmLayoutStack dflags procpoints entry_args
             layout dflags procpoints liveness entry entry_args
                    rec_stackmaps rec_high_sp blocks
 
-    new_blocks' <- mapM (lowerSafeForeignCall dflags) new_blocks
+    blocks_with_reloads <-
+        insertReloadsAsNeeded dflags procpoints final_stackmaps entry new_blocks
+    new_blocks' <- mapM (lowerSafeForeignCall dflags) blocks_with_reloads
     return (ofBlockList entry new_blocks', final_stackmaps)
 
+-- -----------------------------------------------------------------------------
+-- Pass 1
+-- -----------------------------------------------------------------------------
 
 layout :: DynFlags
        -> LabelSet                      -- proc points
@@ -249,31 +306,25 @@ layout dflags procpoints liveness entry entry_args final_stackmaps final_sp_high
        --     assignments in this block
        let stack1 = foldBlockNodesF (procMiddle acc_stackmaps) middle0 stack0
 
-       -- (b) Insert assignments to reload all the live variables if this
-       --     block is a proc point
-       let middle1 = if entry_lbl `setMember` procpoints
-                        then foldr blockCons middle0 (insertReloads stack0)
-                        else middle0
-
-       -- (c) Look at the last node and if we are making a call or
+       -- (b) Look at the last node and if we are making a call or
        --     jumping to a proc point, we must save the live
        --     variables, adjust Sp, and construct the StackMaps for
        --     each of the successor blocks.  See handleLastNode for
        --     details.
-       (middle2, sp_off, last1, fixup_blocks, out)
+       (middle1, sp_off, last1, fixup_blocks, out)
            <- handleLastNode dflags procpoints liveness cont_info
                              acc_stackmaps stack1 tscope middle0 last0
 
-       -- (d) Manifest Sp: run over the nodes in the block and replace
+       -- (c) Manifest Sp: run over the nodes in the block and replace
        --     CmmStackSlot with CmmLoad from Sp with a concrete offset.
        --
        -- our block:
-       --    middle1          -- the original middle nodes
-       --    middle2          -- live variable saves from handleLastNode
+       --    middle0          -- the original middle nodes
+       --    middle1          -- live variable saves from handleLastNode
        --    Sp = Sp + sp_off -- Sp adjustment goes here
        --    last1            -- the last node
        --
-       let middle_pre = blockToList $ foldl blockSnoc middle1 middle2
+       let middle_pre = blockToList $ foldl blockSnoc middle0 middle1
 
        let final_blocks =
                manifestSp dflags final_stackmaps stack0 sp0 final_sp_high
@@ -834,7 +885,6 @@ manifestSp dflags stackmaps stack0 sp0 sp_high
 
     fixup_blocks' = map (mapBlock3' (id, adj_post_sp, id)) fixup_blocks
 
-
 getAreaOff :: LabelMap StackMap -> (Area -> StackLoc)
 getAreaOff _ Old = 0
 getAreaOff stackmaps (Young l) =
@@ -849,7 +899,8 @@ maybeAddSpAdj dflags sp_off block = block `blockSnoc` adj
   where
     adj = CmmAssign spReg (cmmOffset dflags (CmmReg spReg) sp_off)
 
-{-
+{- Note [SP old/young offsets]
+
 Sp(L) is the Sp offset on entry to block L relative to the base of the
 OLD area.
 
@@ -990,6 +1041,62 @@ stackMapToLiveness dflags StackMap{..} =
                    , isGcPtrType (localRegType r) ]
                    -- See Note [Unique Determinism and code generation]
 
+-- -----------------------------------------------------------------------------
+-- Pass 2
+-- -----------------------------------------------------------------------------
+
+insertReloadsAsNeeded
+    :: DynFlags
+    -> ProcPointSet
+    -> LabelMap StackMap
+    -> BlockId
+    -> [CmmBlock]
+    -> UniqSM [CmmBlock]
+insertReloadsAsNeeded dflags procpoints final_stackmaps entry blocks = do
+    toBlockList . fst <$>
+        rewriteCmmBwd liveLattice rewriteCC (ofBlockList entry blocks) mapEmpty
+  where
+    rewriteCC :: RewriteFun CmmLocalLive
+    rewriteCC (BlockCC e_node middle0 x_node) fact_base0 = do
+        let entry_label = entryLabel e_node
+            stackmap = case mapLookup entry_label final_stackmaps of
+                Just sm -> sm
+                Nothing -> panic "insertReloadsAsNeeded: rewriteCC: stackmap"
+
+            -- Merge the liveness from successor blocks and analyse the last
+            -- node.
+            joined = gen_kill dflags x_node $!
+                         joinOutFacts liveLattice x_node fact_base0
+            -- What is live at the start of middle0.
+            live_at_middle0 = foldNodesBwdOO (gen_kill dflags) middle0 joined
+
+            -- If this is a procpoint we need to add the reloads, but only if
+            -- they're actually live. Furthermore, nothing is live at the entry
+            -- to a proc point.
+            (middle1, live_with_reloads)
+                | entry_label `setMember` procpoints
+                = let reloads = insertReloads dflags stackmap live_at_middle0
+                  in (foldr blockCons middle0 reloads, emptyRegSet)
+                | otherwise
+                = (middle0, live_at_middle0)
+
+            -- Final liveness for this block.
+            !fact_base2 = mapSingleton entry_label live_with_reloads
+
+        return (BlockCC e_node middle1 x_node, fact_base2)
+
+insertReloads :: DynFlags -> StackMap -> CmmLocalLive -> [CmmNode O O]
+insertReloads dflags stackmap live =
+     [ CmmAssign (CmmLocal reg)
+                 -- This cmmOffset basically corresponds to manifesting
+                 -- @CmmStackSlot Old sp_off@, see Note [SP old/young offsets]
+                 (CmmLoad (cmmOffset dflags (CmmReg spReg) (sp_off - reg_off))
+                          (localRegType reg))
+     | (reg, reg_off) <- stackSlotRegs stackmap
+     , reg `elemRegSet` live
+     ]
+   where
+     sp_off = sm_sp stackmap
 
 -- -----------------------------------------------------------------------------
 -- Lowering safe foreign calls
@@ -1132,14 +1239,6 @@ localRegWords dflags = toWords dflags . localRegBytes dflags
 
 toWords :: DynFlags -> ByteOff -> WordOff
 toWords dflags x = x `quot` wORD_SIZE dflags
-
-
-insertReloads :: StackMap -> [CmmNode O O]
-insertReloads stackmap =
-   [ CmmAssign (CmmLocal r) (CmmLoad (CmmStackSlot Old sp)
-                                     (localRegType r))
-   | (r,sp) <- stackSlotRegs stackmap
-   ]
 
 
 stackSlotRegs :: StackMap -> [(LocalReg, StackLoc)]

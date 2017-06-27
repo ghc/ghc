@@ -17,7 +17,10 @@ module CmdLineParser
       Flag(..), defFlag, defGhcFlag, defGhciFlag, defHiddenFlag,
       errorsToGhcException,
 
-      EwM, runEwM, addErr, addWarn, getArg, getCurLoc, liftEwM, deprecate
+      Err(..), Warn(..), WarnReason(..),
+
+      EwM, runEwM, addErr, addWarn, addFlagWarn, getArg, getCurLoc, liftEwM,
+      deprecate
     ) where
 
 #include "HsVersions.h"
@@ -27,6 +30,7 @@ import Outputable
 import Panic
 import Bag
 import SrcLoc
+import Json
 
 import Data.Function
 import Data.List
@@ -81,8 +85,30 @@ data OptKind m                             -- Suppose the flag is -f
 --         The EwM monad
 --------------------------------------------------------
 
-type Err   = Located String
-type Warn  = Located String
+-- | Used when filtering warnings: if a reason is given
+-- it can be filtered out when displaying.
+data WarnReason
+  = NoReason
+  | ReasonDeprecatedFlag
+  | ReasonUnrecognisedFlag
+  deriving (Eq, Show)
+
+instance Outputable WarnReason where
+  ppr = text . show
+
+instance ToJson WarnReason where
+  json NoReason = JSNull
+  json reason   = JSString $ show reason
+
+-- | A command-line error message
+newtype Err  = Err { errMsg :: Located String }
+
+-- | A command-line warning message and the reason it arose
+data Warn = Warn
+  {   warnReason :: WarnReason,
+      warnMsg    :: Located String
+  }
+
 type Errs  = Bag Err
 type Warns = Bag Warn
 
@@ -110,15 +136,19 @@ setArg :: Located String -> EwM m () -> EwM m ()
 setArg l (EwM f) = EwM (\_ es ws -> f l es ws)
 
 addErr :: Monad m => String -> EwM m ()
-addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` L loc e, ws, ()))
+addErr e = EwM (\(L loc _) es ws -> return (es `snocBag` Err (L loc e), ws, ()))
 
 addWarn :: Monad m => String -> EwM m ()
-addWarn msg = EwM (\(L loc _) es ws -> return (es, ws `snocBag` L loc msg, ()))
+addWarn = addFlagWarn NoReason
+
+addFlagWarn :: Monad m => WarnReason -> String -> EwM m ()
+addFlagWarn reason msg = EwM $
+  (\(L loc _) es ws -> return (es, ws `snocBag` Warn reason (L loc msg), ()))
 
 deprecate :: Monad m => String -> EwM m ()
 deprecate s = do
     arg <- getArg
-    addWarn (arg ++ " is deprecated: " ++ s)
+    addFlagWarn ReasonDeprecatedFlag (arg ++ " is deprecated: " ++ s)
 
 getArg :: Monad m => EwM m String
 getArg = EwM (\(L _ arg) es ws -> return (es, ws, arg))
@@ -164,8 +194,8 @@ processArgs :: Monad m
             => [Flag m]               -- cmdline parser spec
             -> [Located String]       -- args
             -> m ( [Located String],  -- spare args
-                   [Located String],  -- errors
-                   [Located String] ) -- warnings
+                   [Err],  -- errors
+                   [Warn] ) -- warnings
 processArgs spec args = do
     (errs, warns, spare) <- runEwM action
     return (spare, bagToList errs, bagToList warns)

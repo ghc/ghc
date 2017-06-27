@@ -5,13 +5,14 @@ Since the 7.10 release GHC can emit a debugging information to help debugging
 tools understand the code that GHC produces. This debugging information is
 useable by most UNIX debugging tools.
 
-.. warning::
+.. ghc-flag:: -g, -g<n>
 
-   This feature is still in technology preview state. There are known cases
-   where requesting a stack-trace can cause your program to segmentation fault
-   (e.g. :ghc-ticket:`11353`, :ghc-ticket:`11338`, and :ghc-ticket:`11337`).
-   Consequently, we can not recommend that stack trace support be used in
-   production code.
+    :since: 7.10, numeric levels since 8.0
+
+    Emit debug information in object code. Currently only DWARF debug
+    information is supported on x86-64 and i386. Currently debug levels 0
+    through 3 are accepted, with 0 disabling debug information production.
+    Levels 1 through 3 are functionally equivalent.
 
 
 Tutorial
@@ -290,19 +291,19 @@ changes outside the span are guaranteed not to affect the code in the block.
 
 Spans are described with the following attributes,
 
-``DW_AT_ghc_span_file`` (0x2b10, string)
+``DW_AT_ghc_span_file`` (0x2b00, string)
   the name of the source file
 
-``DW_AT_ghc_span_start_line`` (0x2b11, integer)
+``DW_AT_ghc_span_start_line`` (0x2b01, integer)
   the line number of the beginning of the span
 
-``DW_AT_ghc_span_start_col`` (0x2b11, integer)
+``DW_AT_ghc_span_start_col`` (0x2b02, integer)
   the column number of the beginning of the span
 
-``DW_AT_ghc_span_end_line`` (0x2b11, integer)
+``DW_AT_ghc_span_end_line`` (0x2b03, integer)
   the line number of the end of the span
 
-``DW_AT_ghc_span_end_col`` (0x2b11, integer)
+``DW_AT_ghc_span_end_col`` (0x2b04, integer)
   the column number of the end of the span
 
 

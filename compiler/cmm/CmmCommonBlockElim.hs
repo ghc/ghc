@@ -13,7 +13,10 @@ import CmmContFlowOpt
 -- import PprCmm ()
 import Prelude hiding (iterate, succ, unzip, zip)
 
-import Hoopl hiding (ChangeFlag)
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Label
+import Hoopl.Collections
 import Data.Bits
 import Data.Maybe (mapMaybe)
 import qualified Data.List as List

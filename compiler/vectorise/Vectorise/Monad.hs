@@ -31,7 +31,6 @@ import TcRnMonad
 import DsMonad
 import HscTypes hiding ( MonadThings(..) )
 import DynFlags
-import MonadUtils (liftIO)
 import InstEnv
 import Class
 import TyCon

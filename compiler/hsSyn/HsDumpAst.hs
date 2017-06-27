@@ -22,7 +22,6 @@ import BasicTypes
 import FastString
 import NameSet
 import Name
-import RdrName
 import DataCon
 import SrcLoc
 import HsSyn
@@ -47,7 +46,8 @@ showAstData b = showAstData' 0
     showAstData' n =
       generic
               `ext1Q` list
-              `extQ` string `extQ` fastString `extQ` srcSpan `extQ` lit
+              `extQ` string `extQ` fastString `extQ` srcSpan
+              `extQ` lit `extQ` litr `extQ` litt
               `extQ` bytestring
               `extQ` name `extQ` occName `extQ` moduleName `extQ` var
               `extQ` dataCon
@@ -78,12 +78,26 @@ showAstData b = showAstData' 0
                                 ++ "]"
 
             -- Eliminate word-size dependence
-            lit :: HsLit -> String
+            lit :: HsLit GhcPs -> String
             lit (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
             lit (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
             lit (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
             lit (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
             lit l                  = generic l
+
+            litr :: HsLit GhcRn -> String
+            litr (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
+            litr (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
+            litr (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
+            litr (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
+            litr l                  = generic l
+
+            litt :: HsLit GhcTc -> String
+            litt (HsWordPrim   s x) = numericLit "HsWord{64}Prim" x s
+            litt (HsWord64Prim s x) = numericLit "HsWord{64}Prim" x s
+            litt (HsIntPrim    s x) = numericLit "HsInt{64}Prim"  x s
+            litt (HsInt64Prim  s x) = numericLit "HsInt{64}Prim"  x s
+            litt l                  = generic l
 
             numericLit :: String -> Integer -> SourceText -> String
             numericLit tag x s = indent n ++ unwords [ "{" ++ tag
@@ -114,15 +128,15 @@ showAstData b = showAstData' 0
             dataCon :: DataCon -> String
             dataCon    = ("{DataCon: "++) . (++"}") . showSDoc_ . ppr
 
-            bagRdrName:: Bag (Located (HsBind RdrName)) -> String
-            bagRdrName = ("{Bag(Located (HsBind RdrName)): "++) . (++"}")
+            bagRdrName:: Bag (Located (HsBind GhcPs)) -> String
+            bagRdrName = ("{Bag(Located (HsBind GhcPs)): "++) . (++"}")
                           . list . bagToList
 
-            bagName   :: Bag (Located (HsBind Name)) -> String
+            bagName   :: Bag (Located (HsBind GhcRn)) -> String
             bagName    = ("{Bag(Located (HsBind Name)): "++) . (++"}")
                            . list . bagToList
 
-            bagVar    :: Bag (Located (HsBind Var)) -> String
+            bagVar    :: Bag (Located (HsBind GhcTc)) -> String
             bagVar     = ("{Bag(Located (HsBind Var)): "++) . (++"}")
                            . list . bagToList
 

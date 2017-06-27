@@ -409,7 +409,7 @@ But there are wrinkles
 
   Solution: only float cases into the branches of other cases, and
   not into the arguments of an application, or the RHS of a let. This
-  is somewhat conservative, but it's simple.  And it stil hits the
+  is somewhat conservative, but it's simple.  And it still hits the
   cases like Trac #5658.   This is implemented in sepBindsByJoinPoint;
   if is_case is False we dump all floating cases right here.
 
@@ -485,7 +485,7 @@ fiBind dflags to_drop (AnnNonRec id ann_rhs@(rhs_fvs, rhs)) body_fvs
   where
     body_fvs2 = body_fvs `delDVarSet` id
 
-    rule_fvs = idRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
+    rule_fvs = bndrRuleAndUnfoldingVarsDSet id        -- See Note [extra_fvs (2): free variables of rules]
     extra_fvs | noFloatIntoRhs NonRecursive id rhs
               = rule_fvs `unionDVarSet` rhs_fvs
               | otherwise
@@ -515,7 +515,7 @@ fiBind dflags to_drop (AnnRec bindings) body_fvs
     rhss_fvs = map freeVarsOf rhss
 
         -- See Note [extra_fvs (1,2)]
-    rule_fvs = mapUnionDVarSet idRuleAndUnfoldingVarsDSet ids
+    rule_fvs = mapUnionDVarSet bndrRuleAndUnfoldingVarsDSet ids
     extra_fvs = rule_fvs `unionDVarSet`
                 unionDVarSets [ rhs_fvs | (bndr, (rhs_fvs, rhs)) <- bindings
                               , noFloatIntoRhs Recursive bndr rhs ]
@@ -665,7 +665,7 @@ sepBindsByDropPoint dflags is_case drop_pts floaters
   = [] : [[] | _ <- drop_pts]
 
   | otherwise
-  = ASSERT( length drop_pts >= 2 )
+  = ASSERT( drop_pts `lengthAtLeast` 2 )
     go floaters (map (\fvs -> (fvs, [])) (emptyDVarSet : drop_pts))
   where
     n_alts = length drop_pts

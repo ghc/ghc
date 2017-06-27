@@ -127,6 +127,9 @@ stg_returnToSched /* no args: explicit stack layout */
 // current thread.  This is used for switching from compiled execution to the
 // interpreter, where calling threadPaused() on every switch would be too
 // expensive.
+//
+// See Note [avoiding threadPaused] in Interpreter.c
+//
 stg_returnToSchedNotPaused /* no args: explicit stack layout */
 {
   SAVE_THREAD_STATE();

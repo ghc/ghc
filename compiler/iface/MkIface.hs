@@ -105,7 +105,6 @@ import Binary
 import Fingerprint
 import Exception
 import UniqSet
-import UniqDFM
 import Packages
 
 import Control.Monad
@@ -477,10 +476,9 @@ addFingerprints hsc_env mb_old_fingerprint iface0 new_decls
                   extendOccEnvList env [ (b,n) | b <- ifaceDeclImplicitBndrs d ]
                   where n = getOccName d
 
-        -- strongly-connected groups of declarations, in dependency order
+        -- Strongly-connected groups of declarations, in dependency order
        groups :: [SCC IfaceDeclABI]
-       groups =
-           stronglyConnCompFromEdgedVerticesUniq edges
+       groups = stronglyConnCompFromEdgedVerticesUniq edges
 
        global_hash_fn = mkHashFun hsc_env eps
 
@@ -968,9 +966,9 @@ lookupOccEnvL env k = lookupOccEnv env k `orElse` []
                else return fp
 
 oldMD5 dflags bh = do
-  tmp <- newTempName dflags "bin"
+  tmp <- newTempName dflags CurrentModule "bin"
   writeBinMem bh tmp
-  tmp2 <- newTempName dflags "md5"
+  tmp2 <- newTempName dflags CurrentModule "md5"
   let cmd = "md5sum " ++ tmp ++ " >" ++ tmp2
   r <- system cmd
   case r of
@@ -1220,14 +1218,14 @@ checkVersions hsc_env mod_summary iface
        -- We do this regardless of compilation mode, although in --make mode
        -- all the dependent modules should be in the HPT already, so it's
        -- quite redundant
-       ; updateEps_ $ \eps  -> eps { eps_is_boot = udfmToUfm mod_deps }
+       ; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
        ; recomp <- checkList [checkModUsage this_pkg u | u <- mi_usages iface]
        ; return (recomp, Just iface)
     }}}}}}
   where
     this_pkg = thisPackage (hsc_dflags hsc_env)
     -- This is a bit of a hack really
-    mod_deps :: DModuleNameEnv (ModuleName, IsBootInterface)
+    mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
 
 -- | Check if an hsig file needs recompilation because its

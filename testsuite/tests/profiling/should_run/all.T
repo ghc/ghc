@@ -130,3 +130,5 @@ test('toplevel_scc_1',
      [extra_ways(['prof_no_auto']), only_ways(['prof_no_auto'])],
      compile_and_run,
      [''])
+
+test('T12962', [], compile_and_run, [''])

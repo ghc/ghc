@@ -615,8 +615,8 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                         psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
-                  ; solveWanteds wanteds }
-       ; wanted_transformed_incl_derivs <- TcM.zonkWC wanted_transformed_incl_derivs
+                  ; wanteds' <- solveWanteds wanteds
+                  ; TcS.zonkWC wanteds' }
 
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
@@ -818,16 +818,20 @@ decideMonoTyVars infer_mode name_taus psigs candidates
 
        ; gbl_tvs <- tcGetGlobalTyCoVars
        ; let eq_constraints  = filter isEqPred candidates
-             constrained_tvs = tyCoVarsOfTypes no_quant
-             mono_tvs1       = growThetaTyVars eq_constraints $
-                               gbl_tvs `unionVarSet` constrained_tvs
+             mono_tvs1       = growThetaTyVars eq_constraints gbl_tvs
+             constrained_tvs = growThetaTyVars eq_constraints
+                                               (tyCoVarsOfTypes no_quant)
+                               `minusVarSet` mono_tvs1
+             mono_tvs2       = mono_tvs1 `unionVarSet` constrained_tvs
+             -- A type variable is only "constrained" (so that the MR bites)
+             -- if it is not free in the environment (Trac #13785)
 
        -- Always quantify over partial-sig qtvs, so they are not mono
        -- Need to zonk them because they are meta-tyvar SigTvs
        -- Note [Quantification and partial signatures], wrinkle 3
        ; psig_qtvs <- mapM zonkTcTyVarToTyVar $
                       concatMap (map snd . sig_inst_skols) psigs
-       ; let mono_tvs = mono_tvs1 `delVarSetList` psig_qtvs
+       ; let mono_tvs = mono_tvs2 `delVarSetList` psig_qtvs
 
            -- Warn about the monomorphism restriction
        ; warn_mono <- woptM Opt_WarnMonomorphism
@@ -863,11 +867,13 @@ decideMonoTyVars infer_mode name_taus psigs candidates
       = False
 
     pp_bndrs = pprWithCommas (quotes . ppr . fst) name_taus
-    mr_msg = hang (text "The Monomorphism Restriction applies to the binding"
-                   <> plural name_taus <+> text "for" <+> pp_bndrs)
-                2 (text "Consider giving a type signature for"
-                   <+> if isSingleton name_taus then pp_bndrs
-                                                else text "these binders")
+    mr_msg =
+         hang (sep [ text "The Monomorphism Restriction applies to the binding"
+                     <> plural name_taus
+                   , text "for" <+> pp_bndrs ])
+            2 (hsep [ text "Consider giving"
+                    , text (if isSingleton name_taus then "it" else "them")
+                    , text "a type signature"])
 
 -------------------
 defaultTyVarsAndSimplify :: TcLevel
@@ -926,7 +932,7 @@ defaultTyVarsAndSimplify rhs_tclvl mono_tvs candidates
 decideQuantifiedTyVars
    :: TyCoVarSet        -- Monomorphic tyvars
    -> [(Name,TcType)]   -- Annotated theta and (name,tau) pairs
-   -> [TcIdSigInst]     -- Parital signatures
+   -> [TcIdSigInst]     -- Partial signatures
    -> [PredType]        -- Candidates, zonked
    -> TcM [TyVar]
 -- Fix what tyvars we are going to quantify over, and quantify them
@@ -1201,7 +1207,9 @@ solveWanteds :: WantedConstraints -> TcS WantedConstraints
 solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics })
   = do { traceTcS "solveWanteds {" (ppr wc)
 
-       ; wc1 <- solveSimpleWanteds simples
+       ; wc1 <- solveSimpleWanteds (simples `unionBags` insols)
+                -- Why solve 'insols'?  See Note [Rewrite insolubles] in TcSMonad
+
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
 
        ; (floated_eqs, implics2) <- solveNestedImplications (implics `unionBags` implics1)
@@ -1213,8 +1221,9 @@ solveWanteds wc@(WC { wc_simple = simples, wc_insol = insols, wc_impl = implics 
        ; dflags <- getDynFlags
        ; final_wc <- simpl_loop 0 (solverIterations dflags) floated_eqs
                                 no_new_scs
-                                (WC { wc_simple = simples2, wc_impl = implics2
-                                    , wc_insol  = insols `unionBags` insols1 })
+                                (WC { wc_simple = simples2
+                                    , wc_insol  = insols1
+                                    , wc_impl   = implics2 })
 
        ; bb <- TcS.getTcEvBindsMap
        ; traceTcS "solveWanteds }" $
@@ -1257,25 +1266,30 @@ simpl_loop n limit floated_eqs no_new_deriveds
 
        -- solveSimples may make progress if either float_eqs hold
        ; (unifs1, wc1) <- reportUnifications $
-                          solveSimpleWanteds (floated_eqs `unionBags` simples)
-                               -- Put floated_eqs first so they get solved first
-                               -- NB: the floated_eqs may include /derived/ equalities
-                               --     arising from fundeps inside an implication
+                          solveSimpleWanteds $
+                          floated_eqs `unionBags` simples `unionBags` insols
+            -- Notes:
+            --   - Why solve 'insols'?  See Note [Rewrite insolubles] in TcSMonad
+            --   - Put floated_eqs first so they get solved first
+            --     NB: the floated_eqs may include /derived/ equalities
+            --     arising from fundeps inside an implication
 
        ; let WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 } = wc1
        ; (no_new_scs, simples2) <- expandSuperClasses simples1
 
        -- We have already tried to solve the nested implications once
        -- Try again only if we have unified some meta-variables
-       -- (which is a bit like adding more givens
+       -- (which is a bit like adding more givens)
        -- See Note [Cutting off simpl_loop]
        ; (floated_eqs2, implics2) <- if unifs1 == 0 && isEmptyBag implics1
                                      then return (emptyBag, implics)
                                      else solveNestedImplications (implics `unionBags` implics1)
 
        ; simpl_loop (n+1) limit floated_eqs2 no_new_scs
-                    (WC { wc_simple = simples2, wc_impl = implics2
-                        , wc_insol  = insols `unionBags` insols1 }) }
+                    (WC { wc_simple = simples2
+                        , wc_insol  = insols1
+                        , wc_impl   = implics2 }) }
+
 
 expandSuperClasses :: Cts -> TcS (Bool, Cts)
 -- If there are any unsolved wanteds, expand one step of
@@ -1945,20 +1959,29 @@ floatEqualities skols no_given_eqs
                 wanteds@(WC { wc_simple = simples })
   | not no_given_eqs  -- There are some given equalities, so don't float
   = return (emptyBag, wanteds)   -- Note [Float Equalities out of Implications]
+
   | otherwise
-  = do { outer_tclvl <- TcS.getTcLevel
+  = do { -- First zonk: the inert set (from whence they came) is fully
+         -- zonked, but unflattening may have filled in unification
+         -- variables, and we /must/ see them.  Otherwise we may float
+         -- constraints that mention the skolems!
+         simples <- TcS.zonkSimples simples
+
+       -- Now we can pick the ones to float
+       ; let (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
+             skol_set = mkVarSet skols
+
+       -- Promote any unification variables mentioned in the floated equalities
+       -- See Note [Promoting unification variables]
+       ; outer_tclvl <- TcS.getTcLevel
        ; mapM_ (promoteTyVarTcS outer_tclvl)
                (tyCoVarsOfCtsList float_eqs)
-           -- See Note [Promoting unification variables]
 
        ; traceTcS "floatEqualities" (vcat [ text "Skols =" <+> ppr skols
                                           , text "Simples =" <+> ppr simples
                                           , text "Floated eqs =" <+> ppr float_eqs])
        ; return ( float_eqs
                 , wanteds { wc_simple = remaining_simples } ) }
-  where
-    skol_set = mkVarSet skols
-    (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
 
 usefulToFloat :: VarSet -> Ct -> Bool
 usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalised

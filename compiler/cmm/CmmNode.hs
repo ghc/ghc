@@ -33,7 +33,9 @@ import SMRep
 import CoreSyn (Tickish)
 import qualified Unique as U
 
-import Compiler.Hoopl
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Label
 import Data.Maybe
 import Data.List (tails,sortBy)
 import Prelude hiding (succ)

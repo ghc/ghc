@@ -70,15 +70,6 @@ GhcStage1HcOpts=
 GhcStage2HcOpts=-O2
 GhcStage3HcOpts=-O2
 
-# Disable -O2 optimization. Otherwise amount of generated C code
-# makes things very slow to compile (~5 minutes on core-i7 for 'compiler/hsSyn/HsExpr.hs')
-# and sometimes not compile at all (powerpc64 overflows something
-# on 'compiler/hsSyn/HsExpr.hs').
-ifeq "$(GhcUnregisterised)" "YES"
-GhcStage1HcOpts=
-GhcStage2HcOpts=
-GhcStage3HcOpts=
-endif
 
 # Note [Stage number in build variables].
 #
@@ -901,3 +892,20 @@ GMP_LIB_DIRS = @GMP_LIB_DIRS@
 
 CURSES_INCLUDE_DIRS = @CURSES_INCLUDE_DIRS@
 CURSES_LIB_DIRS = @CURSES_LIB_DIRS@
+
+# See Note [Disable -O2 in unregisterised mode]
+# Be careful: 'GhcUnregisterised' should be defined earlier in this file.
+ifeq "$(GhcUnregisterised)" "YES"
+GhcStage1HcOpts=
+GhcStage2HcOpts=
+GhcStage3HcOpts=
+
+GhcLibHcOpts=
+endif
+
+# Note [Disable -O2 in unregisterised mode]
+# Disable -O2 optimization in unregisterised mode. Otherwise amount
+# of generated C code # makes things very slow to compile (~5 minutes
+# on core-i7 for 'compiler/hsSyn/HsExpr.hs') and sometimes not compile
+# at all: powerpc64 overflows TOC section on 'compiler/hsSyn/HsExpr.hs'
+#         ia64 overflows short data section on 'compiler/main/DynFlags.hs'

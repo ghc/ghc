@@ -300,7 +300,7 @@ lubStr (SCall _)  (SProd _)    = HeadStr
 lubStr (SProd sx) HyperStr     = SProd sx
 lubStr (SProd _)  HeadStr      = HeadStr
 lubStr (SProd s1) (SProd s2)
-    | length s1 == length s2   = mkSProd (zipWith lubArgStr s1 s2)
+    | s1 `equalLength` s2      = mkSProd (zipWith lubArgStr s1 s2)
     | otherwise                = HeadStr
 lubStr (SProd _) (SCall _)     = HeadStr
 lubStr HeadStr   _             = HeadStr
@@ -325,7 +325,7 @@ bothStr (SCall _)  (SProd _)   = HyperStr  -- Weird
 bothStr (SProd _)  HyperStr    = HyperStr
 bothStr (SProd s1) HeadStr     = SProd s1
 bothStr (SProd s1) (SProd s2)
-    | length s1 == length s2   = mkSProd (zipWith bothArgStr s1 s2)
+    | s1 `equalLength` s2      = mkSProd (zipWith bothArgStr s1 s2)
     | otherwise                = HyperStr  -- Weird
 bothStr (SProd _) (SCall _)    = HyperStr
 
@@ -459,7 +459,7 @@ lubUse (UCall c1 u1) (UCall c2 u2) = UCall (lubCount c1 c2) (lubUse u1 u2)
 lubUse (UCall _ _) _               = Used
 lubUse (UProd ux) UHead            = UProd ux
 lubUse (UProd ux1) (UProd ux2)
-     | length ux1 == length ux2    = UProd $ zipWith lubArgUse ux1 ux2
+     | ux1 `equalLength` ux2       = UProd $ zipWith lubArgUse ux1 ux2
      | otherwise                   = Used
 lubUse (UProd {}) (UCall {})       = Used
 -- lubUse (UProd {}) Used             = Used
@@ -489,7 +489,7 @@ bothUse (UCall _ u1) (UCall _ u2)   = UCall Many (u1 `lubUse` u2)
 bothUse (UCall {}) _                = Used
 bothUse (UProd ux) UHead            = UProd ux
 bothUse (UProd ux1) (UProd ux2)
-      | length ux1 == length ux2    = UProd $ zipWith bothArgUse ux1 ux2
+      | ux1 `equalLength` ux2       = UProd $ zipWith bothArgUse ux1 ux2
       | otherwise                   = Used
 bothUse (UProd {}) (UCall {})       = Used
 -- bothUse (UProd {}) Used             = Used  -- Note [Used should win]

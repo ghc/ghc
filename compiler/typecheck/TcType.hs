@@ -183,7 +183,7 @@ module TcType (
 
   pprKind, pprParendKind, pprSigmaType,
   pprType, pprParendType, pprTypeApp, pprTyThingCategory, tyThingCategory,
-  pprTheta, pprThetaArrowTy, pprClassPred,
+  pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTvBndr, pprTvBndrs,
 
   TypeSize, sizeType, sizeTypes, toposortTyVars
@@ -496,10 +496,6 @@ data TcTyVarDetails
                   --          when looking up instances
                   -- See Note [Binding when looking up instances] in InstEnv
 
-  | FlatSkol      -- A flatten-skolem.  It stands for the TcType, and zonking
-       TcType     -- will replace it by that type.
-                  -- See Note [The flattening story] in TcFlatten
-
   | RuntimeUnk    -- Stands for an as-yet-unknown type in the GHCi
                   -- interactive context
 
@@ -523,11 +519,17 @@ data MetaInfo
                    -- never contains any ForAlls.
 
    | SigTv         -- A variant of TauTv, except that it should not be
-                   -- unified with a type, only with a type variable
+                   --   unified with a type, only with a type variable
                    -- See Note [Signature skolems]
 
    | FlatMetaTv    -- A flatten meta-tyvar
                    -- It is a meta-tyvar, but it is always untouchable, with level 0
+                   -- See Note [The flattening story] in TcFlatten
+
+   | FlatSkolTv    -- A flatten skolem tyvar
+                   -- Just like FlatMetaTv, but is comletely "owned" by
+                   --   its Given CFunEqCan.
+                   -- It is filled in /only/ by unflattenGivens
                    -- See Note [The flattening story] in TcFlatten
 
 instance Outputable MetaDetails where
@@ -536,8 +538,7 @@ instance Outputable MetaDetails where
 
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
-pprTcTyVarDetails (RuntimeUnk {})  = text "rt"
-pprTcTyVarDetails (FlatSkol {})    = text "fsk"
+pprTcTyVarDetails (RuntimeUnk {})      = text "rt"
 pprTcTyVarDetails (SkolemTv lvl True)  = text "ssk" <> colon <> ppr lvl
 pprTcTyVarDetails (SkolemTv lvl False) = text "sk"  <> colon <> ppr lvl
 pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
@@ -546,7 +547,8 @@ pprTcTyVarDetails (MetaTv { mtv_info = info, mtv_tclvl = tclvl })
     pp_info = case info of
                 TauTv      -> text "tau"
                 SigTv      -> text "sig"
-                FlatMetaTv -> text "fuv"
+                FlatMetaTv -> text "fmv"
+                FlatSkolTv -> text "fsk"
 
 
 {- *********************************************************************
@@ -715,7 +717,7 @@ Note [TcLevel assignment]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 We arrange the TcLevels like this
 
-   0   Level for flatten meta-vars
+   0   Level for all flatten meta-vars
    1   Top level
    2   First-level implication constraints
    3   Second-level implication constraints
@@ -727,9 +729,9 @@ The flatten meta-vars are all at level 0, just to make them untouchable.
 maxTcLevel :: TcLevel -> TcLevel -> TcLevel
 maxTcLevel (TcLevel a) (TcLevel b) = TcLevel (a `max` b)
 
-fmvTcLevel :: TcLevel -> TcLevel
+fmvTcLevel :: TcLevel
 -- See Note [TcLevel assignment]
-fmvTcLevel _ = TcLevel 0
+fmvTcLevel = TcLevel 0
 
 topTcLevel :: TcLevel
 -- See Note [TcLevel assignment]
@@ -763,7 +765,6 @@ tcTyVarLevel tv
     case tcTyVarDetails tv of
           MetaTv { mtv_tclvl = tv_lvl } -> tv_lvl
           SkolemTv tv_lvl _             -> tv_lvl
-          FlatSkol ty                   -> tcTypeLevel ty
           RuntimeUnk                    -> topTcLevel
 
 tcTypeLevel :: TcType -> TcLevel
@@ -1167,20 +1168,15 @@ isFmvTyVar tv
         MetaTv { mtv_info = FlatMetaTv } -> True
         _                                -> False
 
--- | True of both given and wanted flatten-skolems (fak and usk)
-isFlattenTyVar tv
-  = ASSERT2( tcIsTcTyVar tv, ppr tv )
-    case tcTyVarDetails tv of
-        FlatSkol {}                      -> True
-        MetaTv { mtv_info = FlatMetaTv } -> True
-        _                                -> False
-
--- | True of FlatSkol skolems only
 isFskTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
-        FlatSkol {} -> True
-        _           -> False
+        MetaTv { mtv_info = FlatSkolTv } -> True
+        _                                -> False
+
+-- | True of both given and wanted flatten-skolems (fak and usk)
+isFlattenTyVar tv
+  = isFmvTyVar tv || isFskTyVar tv
 
 isSkolemTyVar tv
   = ASSERT2( tcIsTcTyVar tv, ppr tv )
@@ -2152,7 +2148,9 @@ isInsolubleOccursCheck eq_rel tv ty
     go (CoercionTy _) = False   -- ToDo: what about the coercion
     go (TyConApp tc tys)
       | isGenerativeTyCon tc role = any go tys
-      | otherwise                 = False
+      | otherwise                 = any go (drop (tyConArity tc) tys)
+         -- (a ~ F b a), where F has arity 1,
+         -- has an insoluble occurs check
 
     role = eqRelRole eq_rel
 

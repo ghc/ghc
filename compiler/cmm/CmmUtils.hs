@@ -79,7 +79,10 @@ import CodeGen.Platform
 import Data.Word
 import Data.Maybe
 import Data.Bits
-import Hoopl
+import Hoopl.Graph
+import Hoopl.Label
+import Hoopl.Block
+import Hoopl.Collections
 
 ---------------------------------------------------
 --
@@ -510,7 +513,7 @@ toBlockListEntryFirst g
 -- have both true and false successors. Block ordering can make a big difference
 -- in performance in the LLVM backend. Note that we rely crucially on the order
 -- of successors returned for CmmCondBranch by the NonLocal instance for CmmNode
--- defind in cmm/CmmNode.hs. -GBM
+-- defined in cmm/CmmNode.hs. -GBM
 toBlockListEntryFirstFalseFallthrough :: CmmGraph -> [CmmBlock]
 toBlockListEntryFirstFalseFallthrough g
   | mapNull m  = []

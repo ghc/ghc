@@ -44,8 +44,8 @@ import SrcLoc
 import Module
 import GHCi
 import GHCi.RemoteTypes
-import HsSyn (ImportDecl)
-import RdrName (RdrName)
+import HsSyn (ImportDecl, GhcPs)
+import Util
 
 import Exception
 import Numeric
@@ -108,7 +108,7 @@ data GHCiState = GHCiState
             -- :load, :reload, and :add.  In between it may be modified
             -- by :module.
 
-        extra_imports  :: [ImportDecl RdrName],
+        extra_imports  :: [ImportDecl GhcPs],
             -- ^ These are "always-on" imports, added to the
             -- context regardless of what other imports we have.
             -- This is useful for adding imports that are required
@@ -121,7 +121,7 @@ data GHCiState = GHCiState
             -- on the GHCi code.  Potentially we could also expose
             -- this functionality via GHCi commands.
 
-        prelude_imports :: [ImportDecl RdrName],
+        prelude_imports :: [ImportDecl GhcPs],
             -- ^ These imports are added to the context when
             -- -XImplicitPrelude is on and we don't have a *-module
             -- in the context.  They can also be overridden by another
@@ -396,8 +396,8 @@ printTimes dflags mallocs secs
   where
     separateThousands n = reverse . sep . reverse . show $ n
       where sep n'
-              | length n' <= 3 = n'
-              | otherwise = take 3 n' ++ "," ++ sep (drop 3 n')
+              | n' `lengthAtMost` 3 = n'
+              | otherwise           = take 3 n' ++ "," ++ sep (drop 3 n')
 
 -----------------------------------------------------------------------------
 -- reverting CAFs
@@ -420,13 +420,15 @@ foreign import ccall "revertCAFs" rts_revertCAFs  :: IO ()
 -- | Compile "hFlush stdout; hFlush stderr" once, so we can use it repeatedly
 initInterpBuffering :: Ghc (ForeignHValue, ForeignHValue)
 initInterpBuffering = do
+  -- We take great care not to use do-notation in the expressions below, as
+  -- they are fragile in the presence of RebindableSyntax (Trac #13385).
   nobuf <- GHC.compileExprRemote $
-   "do { System.IO.hSetBuffering System.IO.stdin System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering; " ++
-       " System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering }"
+   "                  System.IO.hSetBuffering System.IO.stdin  System.IO.NoBuffering" ++
+   "`GHC.Base.thenIO` System.IO.hSetBuffering System.IO.stdout System.IO.NoBuffering" ++
+   "`GHC.Base.thenIO` System.IO.hSetBuffering System.IO.stderr System.IO.NoBuffering"
   flush <- GHC.compileExprRemote $
-   "do { System.IO.hFlush System.IO.stdout; " ++
-       " System.IO.hFlush System.IO.stderr }"
+   "                  System.IO.hFlush System.IO.stdout" ++
+   "`GHC.Base.thenIO` System.IO.hFlush System.IO.stderr"
   return (nobuf, flush)
 
 -- | Invoke "hFlush stdout; hFlush stderr" in the interpreter

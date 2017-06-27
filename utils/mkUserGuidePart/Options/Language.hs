@@ -702,6 +702,17 @@ languageOptions =
          , flagReverse = "-XNoTypeFamilies"
          , flagSince = "6.8.1"
          }
+  , flag { flagName = "-XTypeInType"
+         , flagDescription =
+           "Allow :ref:`kinds to be used as types <type-in-type>`, " ++
+           "including explicit kind variable quantification, higher-rank "++
+           "kinds, kind synonyms, and kind families. "++
+           "Implies :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`, " ++
+           "and :ghc-flag:`-XPolyKinds`."
+         , flagType = DynamicFlag
+         , flagReverse = "-XNoTypeInType"
+         , flagSince = "8.0.1"
+         }
   , flag { flagName = "-XTypeOperators"
          , flagDescription =
            "Enable :ref:`type operators <type-operators>`. "++

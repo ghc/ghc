@@ -39,7 +39,8 @@ import PprBase
 import Cmm hiding (topInfoTable)
 import PprCmm()
 import CLabel
-import Hoopl
+import Hoopl.Label
+import Hoopl.Collections
 
 import Unique           ( Uniquable(..), pprUniqueAlways )
 import Outputable

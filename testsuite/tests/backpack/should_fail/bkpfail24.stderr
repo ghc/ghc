@@ -7,15 +7,15 @@ bkpfail24.bkp:14:15: error:
     • Could not deduce: a ~ b
       from the context: {H1.T} ~ {H2.T}
         bound by the type signature for:
-                   f :: forall a b. {H1.T} ~ {H2.T} => a -> b
+                   f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b
         at bkpfail24.bkp:13:9-34
       ‘a’ is a rigid type variable bound by
         the type signature for:
-          f :: forall a b. {H1.T} ~ {H2.T} => a -> b
+          f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b
         at bkpfail24.bkp:13:9-34
       ‘b’ is a rigid type variable bound by
         the type signature for:
-          f :: forall a b. {H1.T} ~ {H2.T} => a -> b
+          f :: forall a b. ({H1.T} ~ {H2.T}) => a -> b
         at bkpfail24.bkp:13:9-34
     • In the expression: x
       In an equation for ‘f’: f x = x

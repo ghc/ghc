@@ -20,7 +20,8 @@ import RegClass
 import TargetReg
 
 import Cmm hiding (topInfoTable)
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 
 import CLabel
 

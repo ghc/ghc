@@ -394,7 +394,7 @@ patSynInstArgTys :: PatSyn -> [Type] -> [Type]
 patSynInstArgTys (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                            , psExTyVars = ex_tvs, psArgs = arg_tys })
                  inst_tys
-  = ASSERT2( length tyvars == length inst_tys
+  = ASSERT2( tyvars `equalLength` inst_tys
           , text "patSynInstArgTys" <+> ppr name $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
@@ -409,7 +409,7 @@ patSynInstResTy :: PatSyn -> [Type] -> Type
 patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
                           , psOrigResTy = res_ty })
                 inst_tys
-  = ASSERT2( length univ_tvs == length inst_tys
+  = ASSERT2( univ_tvs `equalLength` inst_tys
            , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
     substTyWith (binderVars univ_tvs) inst_tys res_ty
 

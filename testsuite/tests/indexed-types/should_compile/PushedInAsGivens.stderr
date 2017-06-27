@@ -4,7 +4,7 @@ PushedInAsGivens.hs:10:31: error:
         because type variable ‘a1’ would escape its scope
       This (rigid, skolem) type variable is bound by
         the type signature for:
-          foo :: forall a1. F Int ~ [a1] => a1 -> Int
+          foo :: forall a1. (F Int ~ [a1]) => a1 -> Int
         at PushedInAsGivens.hs:9:13-44
     • In the expression: y
       In the first argument of ‘length’, namely ‘[x, y]’

@@ -8,6 +8,7 @@
   * Add instances `Num`, `Functor`, `Applicative`, `Monad`, `Semigroup`
     and `Monoid` for `Data.Ord.Down` (#13097).
 
+  * Add `infixl 9 !!` declaration for `Data.List.NonEmpty.!!`
 
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*

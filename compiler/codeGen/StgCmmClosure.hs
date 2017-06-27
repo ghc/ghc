@@ -553,7 +553,7 @@ getCallMethod dflags _ id _ n_args v_args _cg_loc
               (Just (self_loop_id, block_id, args))
   | gopt Opt_Loopification dflags
   , id == self_loop_id
-  , n_args - v_args == length args
+  , args `lengthIs` (n_args - v_args)
   -- If these patterns match then we know that:
   --   * loopification optimisation is turned on
   --   * function is performing a self-recursive call in a tail position

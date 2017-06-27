@@ -80,7 +80,7 @@ doBackpack [src_filename] = do
     buf <- liftIO $ hGetStringBuffer src_filename
     let loc = mkRealSrcLoc (mkFastString src_filename) 1 1 -- TODO: not great
     case unP parseBackpack (mkPState dflags buf loc) of
-        PFailed span err -> do
+        PFailed _ span err -> do
             liftIO $ throwOneError (mkPlainErrMsg dflags span err)
         POk _ pkgname_bkp -> do
             -- OK, so we have an LHsUnit PackageName, but we want an
@@ -155,6 +155,7 @@ withBkpSession cid insts deps session_type do_this = do
       -- turn on interface writing.  However, if the user also
       -- explicitly passed in `-fno-code`, we DON'T want to write
       -- interfaces unless the user also asked for `-fwrite-interface`.
+      -- See Note [-fno-code mode]
       (case session_type of
         -- Make sure to write interfaces when we are type-checking
         -- indefinite packages.
@@ -708,7 +709,7 @@ summariseRequirement pn mod_name = do
 summariseDecl :: PackageName
               -> HscSource
               -> Located ModuleName
-              -> Maybe (Located (HsModule RdrName))
+              -> Maybe (Located (HsModule GhcPs))
               -> BkpM ModSummary
 summariseDecl pn hsc_src (L _ modname) (Just hsmod) = hsModuleToModSummary pn hsc_src modname hsmod
 summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
@@ -735,7 +736,7 @@ summariseDecl _pn hsc_src lmodname@(L loc modname) Nothing
 hsModuleToModSummary :: PackageName
                      -> HscSource
                      -> ModuleName
-                     -> Located (HsModule RdrName)
+                     -> Located (HsModule GhcPs)
                      -> BkpM ModSummary
 hsModuleToModSummary pn hsc_src modname
                      hsmod = do

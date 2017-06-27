@@ -11,7 +11,9 @@ import Control.Exception
 import Control.Concurrent
 import Control.Monad (when, forever)
 import System.Directory
-import System.FilePath (takeDirectory)
+import System.FilePath (takeDirectory, (</>), dropTrailingPathSeparator,
+                        isAbsolute, joinPath, splitPath)
+import GHCi.ResolvedBCO
 
 import Data.IORef
 import GHCi.Message (Pipe(..), Msg(..), Message(..), readPipe, writePipe)
@@ -23,6 +25,17 @@ import GHC.Fingerprint (getFileHash)
 
 import qualified Data.ByteString as BS
 
+
+dropLeadingPathSeparator :: FilePath -> FilePath
+dropLeadingPathSeparator p | isAbsolute p = joinPath (drop 1 (splitPath p))
+                           | otherwise    = p
+
+-- | Path concatenation that prevents a double path separator to appear in the
+-- final path. "/foo/bar/" <//> "/baz/quux" == "/foo/bar/baz/quux"
+(<//>) :: FilePath -> FilePath -> FilePath
+lhs <//> rhs = dropTrailingPathSeparator lhs </> dropLeadingPathSeparator rhs
+infixr 5 <//>
+
 foreign export ccall startSlave :: Bool -> Int -> CString -> IO ()
 
 -- | @startSlave@ is the exported slave function, that the
@@ -33,23 +46,25 @@ startSlave verbose port s = do
   putStr "DocRoot: "
   base_path <- peekCString s
   putStrLn base_path
-  startSlave' verbose base_path (toEnum port)
+  _ <- forkIO $ startSlave' verbose base_path (toEnum port)
+  return ()
 
+-- | @startSlave'@ provdes a blocking haskell interface, that
+-- the hosting application on the target can use to start the
+-- slave process.
 startSlave' :: Bool -> String -> PortNumber -> IO ()
 startSlave' verbose base_path port = do
 
   sock <- openSocket port
 
-  _ <- forkIO $ forever $ do
+  forever $ do
     when verbose $ putStrLn "Opening socket"
     pipe <- acceptSocket sock >>= socketToPipe
     putStrLn $ "Listening on port " ++ show port
-    when verbose $ putStrLn "Staring serv"
+    when verbose $ putStrLn "Starting serv"
     uninterruptibleMask $ serv verbose (hook verbose base_path pipe) pipe
     when verbose $ putStrLn "serv ended"
     return ()
-
-  return ()
 
 -- | The iserv library may need access to files, specifically
 -- archives and object files to be linked. If ghc and the slave
@@ -89,18 +104,24 @@ handleLoad pipe path localPath = do
 hook :: Bool -> String -> Pipe -> Msg -> IO Msg
 hook verbose base_path pipe m = case m of
   Msg (AddLibrarySearchPath p) -> do
-    when verbose $ putStrLn ("Need Path: " ++ base_path ++ p)
-    createDirectoryIfMissing True (base_path ++ p)
-    return $ Msg (AddLibrarySearchPath (base_path ++ p))
+    when verbose $ putStrLn ("Need Path: " ++ (base_path <//> p))
+    createDirectoryIfMissing True (base_path <//> p)
+    return $ Msg (AddLibrarySearchPath (base_path <//> p))
   Msg (LoadObj path) -> do
-    handleLoad pipe path (base_path ++ path)
-    return $ Msg (LoadObj (base_path ++ path))
+    when verbose $ putStrLn ("Need Obj: " ++ (base_path <//> path))
+    handleLoad pipe path (base_path <//> path)
+    return $ Msg (LoadObj (base_path <//> path))
   Msg (LoadArchive path) -> do
-    handleLoad pipe path (base_path ++ path)
-    return $ Msg (LoadArchive (base_path ++ path))
-  -- Msg (LoadDLL path) -> do
-  --   handleLoad ctl_pipe path (base_path ++ path)
-  --   return $ Msg (LoadDLL (base_path ++ path))
+    handleLoad pipe path (base_path <//> path)
+    return $ Msg (LoadArchive (base_path <//> path))
+  -- when loading DLLs (.so, .dylib, .dll, ...) and these are provided
+  -- as relative paths, the intention is to load a pre-existing system library,
+  -- therefore we hook the LoadDLL call only for absolute paths to ship the
+  -- dll from the host to the target.
+  Msg (LoadDLL path) | isAbsolute path -> do
+    when verbose $ putStrLn ("Need DLL: " ++ (base_path <//> path))
+    handleLoad pipe path (base_path <//> path)
+    return $ Msg (LoadDLL (base_path <//> path))
   _other -> return m
 
 --------------------------------------------------------------------------------

@@ -1,2 +1,4 @@
 
-B.hs:4:6: Not in scope: type constructor or class ‘Class’
+B.hs:4:6: error:
+    Not in scope: type constructor or class ‘Class’
+    A data constructor of that name is in scope; did you mean DataKinds?

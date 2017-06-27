@@ -24,7 +24,7 @@
 
 (LiteralsTest.hs:5:3,ITequal,[=]),
 
-(LiteralsTest.hs:5:5-8,ITinteger (SourceText "0003") 3,[0003]),
+(LiteralsTest.hs:5:5-8,ITinteger (IL {il_text = SourceText "0003", il_neg = False, il_value = 3}),[0003]),
 
 (LiteralsTest.hs:6:1,ITsemi,[]),
 
@@ -32,7 +32,7 @@
 
 (LiteralsTest.hs:6:3,ITequal,[=]),
 
-(LiteralsTest.hs:6:5-8,ITinteger (SourceText "0x04") 4,[0x04]),
+(LiteralsTest.hs:6:5-8,ITinteger (IL {il_text = SourceText "0x04", il_neg = False, il_value = 4}),[0x04]),
 
 (LiteralsTest.hs:8:1,ITsemi,[]),
 
@@ -80,7 +80,7 @@
 
 (LiteralsTest.hs:15:3,ITequal,[=]),
 
-(LiteralsTest.hs:15:5-8,ITrational (FL {fl_text = "0.00", fl_value = 0 % 1}),[0.00]),
+(LiteralsTest.hs:15:5-8,ITrational (FL {fl_text = SourceText "0.00", fl_neg = False, fl_value = 0 % 1}),[0.00]),
 
 (LiteralsTest.hs:17:1,ITsemi,[]),
 
@@ -122,7 +122,7 @@
 
 (LiteralsTest.hs:22:12,ITequal,[=]),
 
-(LiteralsTest.hs:22:14-18,ITprimfloat (FL {fl_text = "3.20", fl_value = 16 % 5}),[3.20#]),
+(LiteralsTest.hs:22:14-18,ITprimfloat (FL {fl_text = SourceText "3.20", fl_neg = False, fl_value = 16 % 5}),[3.20#]),
 
 (LiteralsTest.hs:23:5,ITsemi,[]),
 
@@ -130,7 +130,7 @@
 
 (LiteralsTest.hs:23:13,ITequal,[=]),
 
-(LiteralsTest.hs:23:15-21,ITprimdouble (FL {fl_text = "04.16", fl_value = 104 % 25}),[04.16##]),
+(LiteralsTest.hs:23:15-21,ITprimdouble (FL {fl_text = SourceText "04.16", fl_neg = False, fl_value = 104 % 25}),[04.16##]),
 
 (LiteralsTest.hs:24:5,ITsemi,[]),
 
@@ -138,7 +138,7 @@
 
 (LiteralsTest.hs:24:7,ITequal,[=]),
 
-(LiteralsTest.hs:24:9,ITinteger (SourceText "1") 1,[1]),
+(LiteralsTest.hs:24:9,ITinteger (IL {il_text = SourceText "1", il_neg = False, il_value = 1}),[1]),
 
 (LiteralsTest.hs:25:1,ITvccurly,[]),
 

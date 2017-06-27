@@ -22,6 +22,7 @@ import Var
 import Outputable
 import DynFlags
 import FastString
+import Util
 import Control.Monad
 
 
@@ -199,7 +200,7 @@ prDFunApply dfun tys
   = return $ Var dfun `mkTyApps` tys
 
   | Just tycons <- ctxs
-  , length tycons == length tys
+  , tycons `equalLength` tys
   = do
       pa <- builtin paTyCon
       pr <- builtin prTyCon

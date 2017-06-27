@@ -46,7 +46,7 @@ getNth xs n = ASSERT2( xs `lengthExceeds` n, ppr n $$ ppr xs )
 unionLists :: (Outputable a, Eq a) => [a] -> [a] -> [a]
 -- Assumes that the arguments contain no duplicates
 unionLists xs ys
-  = WARN(length xs > 100 || length ys > 100, ppr xs $$ ppr ys)
+  = WARN(lengthExceeds xs 100 || lengthExceeds ys 100, ppr xs $$ ppr ys)
     [x | x <- xs, isn'tIn "unionLists" x ys] ++ ys
 
 -- | Calculate the set difference of two lists. This is

@@ -19,7 +19,8 @@ import BlockId
 import CgUtils ( fixStgRegisters )
 import Cmm
 import CmmUtils
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
 import PprCmm
 
 import BufWrite

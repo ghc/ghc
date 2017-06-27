@@ -114,7 +114,8 @@ import DynFlags
 -- compiler/basicTypes
 import SrcLoc
 import Module
-import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..), FractionalLit(..),
+import BasicTypes     ( InlineSpec(..), RuleMatchInfo(..),
+                        IntegralLit(..), FractionalLit(..),
                         SourceText(..) )
 
 -- compiler/parser
@@ -707,7 +708,7 @@ data Token
 
   | ITchar     SourceText Char       -- Note [Literal source text] in BasicTypes
   | ITstring   SourceText FastString -- Note [Literal source text] in BasicTypes
-  | ITinteger  SourceText Integer    -- Note [Literal source text] in BasicTypes
+  | ITinteger  IntegralLit           -- Note [Literal source text] in BasicTypes
   | ITrational FractionalLit
 
   | ITprimchar   SourceText Char     -- Note [Literal source text] in BasicTypes
@@ -1276,15 +1277,21 @@ tok_integral itint transint transbuf translen (radix,char_to_int) span buf len
        $! transint $ parseUnsignedInteger
        (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
--- some conveniences for use with tok_integral
 tok_num :: (Integer -> Integer)
-        -> Int -> Int
-        -> (Integer, (Char->Int)) -> Action
-tok_num = tok_integral ITinteger
+                        -> Int -> Int
+                        -> (Integer, (Char->Int)) -> Action
+tok_num = tok_integral itint
+  where
+    itint st@(SourceText ('-':str)) val = ITinteger (((IL $! st) $! True)      $! val)
+    itint st@(SourceText      str ) val = ITinteger (((IL $! st) $! False)     $! val)
+    itint st@(NoSourceText        ) val = ITinteger (((IL $! st) $! (val < 0)) $! val)
+
 tok_primint :: (Integer -> Integer)
             -> Int -> Int
             -> (Integer, (Char->Int)) -> Action
 tok_primint = tok_integral ITprimint
+
+
 tok_primword :: Int -> Int
              -> (Integer, (Char->Int)) -> Action
 tok_primword = tok_integral ITprimword positive
@@ -1299,12 +1306,14 @@ hexadecimal = (16,hexDigit)
 
 -- readRational can understand negative rationals, exponents, everything.
 tok_float, tok_primfloat, tok_primdouble :: String -> Token
-tok_float        str = ITrational   $! readFractionalLit str
-tok_primfloat    str = ITprimfloat  $! readFractionalLit str
-tok_primdouble   str = ITprimdouble $! readFractionalLit str
+tok_float      str  = ITrational   $! readFractionalLit str
+tok_primfloat  str  = ITprimfloat  $! readFractionalLit str
+tok_primdouble str  = ITprimdouble $! readFractionalLit str
 
 readFractionalLit :: String -> FractionalLit
-readFractionalLit str = (FL $! str) $! readRational str
+readFractionalLit str = ((FL $! (SourceText str)) $! is_neg) $! readRational str
+                        where is_neg = case str of ('-':_) -> True
+                                                   _       -> False
 
 -- -----------------------------------------------------------------------------
 -- Layout processing
@@ -1791,10 +1800,14 @@ data LayoutContext
 data ParseResult a
   = POk PState a
   | PFailed
-        SrcSpan         -- The start and end of the text span related to
-                        -- the error.  Might be used in environments which can
-                        -- show this span, e.g. by highlighting it.
-        MsgDoc          -- The error message
+        (DynFlags -> Messages) -- A function that returns warnings that
+                               -- accumulated during parsing, including
+                               -- the warnings related to tabs.
+        SrcSpan                -- The start and end of the text span related
+                               -- to the error.  Might be used in environments
+                               -- which can show this span, e.g. by
+                               -- highlighting it.
+        MsgDoc                 -- The error message
 
 -- | Test whether a 'WarningFlag' is set
 warnopt :: WarningFlag -> ParserFlags -> Bool
@@ -1893,19 +1906,27 @@ thenP :: P a -> (a -> P b) -> P b
 (P m) `thenP` k = P $ \ s ->
         case m s of
                 POk s1 a         -> (unP (k a)) s1
-                PFailed span err -> PFailed span err
+                PFailed warnFn span err -> PFailed warnFn span err
 
 failP :: String -> P a
-failP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
+failP msg =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (last_loc s)) (text msg)
 
 failMsgP :: String -> P a
-failMsgP msg = P $ \s -> PFailed (RealSrcSpan (last_loc s)) (text msg)
+failMsgP msg =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (last_loc s)) (text msg)
 
 failLocMsgP :: RealSrcLoc -> RealSrcLoc -> String -> P a
-failLocMsgP loc1 loc2 str = P $ \_ -> PFailed (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
+failLocMsgP loc1 loc2 str =
+  P $ \s ->
+    PFailed (getMessages s) (RealSrcSpan (mkRealSrcSpan loc1 loc2)) (text str)
 
 failSpanMsgP :: SrcSpan -> SDoc -> P a
-failSpanMsgP span msg = P $ \_ -> PFailed span msg
+failSpanMsgP span msg =
+  P $ \s ->
+    PFailed (getMessages s) span msg
 
 getPState :: P PState
 getPState = P $ \s -> POk s s
@@ -2366,8 +2387,10 @@ popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, options = o, context = ctx,
                               last_len = len, last_loc = last_loc }) ->
   case ctx of
-        (_:tl) -> POk s{ context = tl } ()
-        []     -> PFailed (RealSrcSpan last_loc) (srcParseErr o buf len)
+        (_:tl) ->
+          POk s{ context = tl } ()
+        []     ->
+          PFailed (getMessages s) (RealSrcSpan last_loc) (srcParseErr o buf len)
 
 -- Push a new layout context at the indentation of the last token read.
 pushCurrentContext :: GenSemic -> P ()
@@ -2424,9 +2447,9 @@ srcParseErr options buf len
 -- the location of the error.  This is the entry point for errors
 -- detected during parsing.
 srcParseFail :: P a
-srcParseFail = P $ \PState{ buffer = buf, options = o, last_len = len,
+srcParseFail = P $ \s@PState{ buffer = buf, options = o, last_len = len,
                             last_loc = last_loc } ->
-    PFailed (RealSrcSpan last_loc) (srcParseErr o buf len)
+    PFailed (getMessages s) (RealSrcSpan last_loc) (srcParseErr o buf len)
 
 -- A lexical error is reported at a particular position in the source file,
 -- not over a token range.
@@ -2515,7 +2538,7 @@ alternativeLayoutRuleToken t
              (_, ALRLayout _ col : _ls, Just expectingOCurly)
               | (thisCol > col) ||
                 (thisCol == col &&
-                 isNonDecreasingIntentation expectingOCurly) ->
+                 isNonDecreasingIndentation expectingOCurly) ->
                  do setAlrExpectingOCurly Nothing
                     setALRContext (ALRLayout expectingOCurly thisCol : context)
                     setNextToken t
@@ -2659,9 +2682,9 @@ isALRclose ITccurly = True
 isALRclose ITcubxparen = True
 isALRclose _        = False
 
-isNonDecreasingIntentation :: ALRLayout -> Bool
-isNonDecreasingIntentation ALRLayoutDo = True
-isNonDecreasingIntentation _           = False
+isNonDecreasingIndentation :: ALRLayout -> Bool
+isNonDecreasingIndentation ALRLayoutDo = True
+isNonDecreasingIndentation _           = False
 
 containsCommas :: Token -> Bool
 containsCommas IToparen = True

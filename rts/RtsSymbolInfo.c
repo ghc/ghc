@@ -15,31 +15,79 @@
 #include "Hash.h"
 #include "RtsUtils.h"
 
-typedef struct _SymbolInfo {
-    /* Determines if the
-       symbol is weak */
-    HsBool isWeak;
+#include <stdbool.h>
 
-} SymbolInfo;
+/* Generic function to update any extra info fields.  */
+void setSymbolInfo(ObjectCode *owner, const void *label, symbolUpdater updater)
+{
+    SymbolInfo *info;
+    if (owner && label)
+    {
+        info = NULL;
+        if (!owner->extraInfos)
+            owner->extraInfos = allocStrHashTable();
+        else
+            info = lookupStrHashTable(owner->extraInfos, label);
+
+        if (!info)
+        {
+            info = stgMallocBytes(sizeof(SymbolInfo), "setSymbolInfo");
+            info->kind = 0;
+        }
+
+        updater(info);
+        insertStrHashTable(owner->extraInfos, label, info);
+    }
+}
 
 /* -----------------------------------------------------------------------------
 * Performs a check to see if the symbol at the given address
 * is a weak symbol or not.
 *
-* Returns: HS_BOOL_TRUE on symbol being weak, else HS_BOOL_FALSE
+* Returns: true on symbol being weak, else false
 */
-HsBool isSymbolWeak(ObjectCode *owner, void *label)
+bool isSymbolWeak(ObjectCode *owner, const void *label)
 {
     SymbolInfo *info;
-    if (owner
+    return owner
         && label
         && owner->extraInfos
-        && (info = lookupStrHashTable(owner->extraInfos, label)) != NULL)
-    {
-        return info->isWeak;
-    }
+        && (info = lookupStrHashTable(owner->extraInfos, label)) != NULL
+        && (info->kind & KIND_WEAK) == KIND_WEAK;
+}
 
-    return HS_BOOL_FALSE;
+/* -----------------------------------------------------------------------------
+* Performs a check to see if the symbol at the given address
+* is an import symbol or not.
+*
+* Returns: true on symbol being weak, else false
+*/
+bool isSymbolImport(ObjectCode *owner, const void *label)
+{
+    SymbolInfo *info;
+    return owner
+        && label
+        && owner->extraInfos
+        && (info = lookupStrHashTable(owner->extraInfos, label)) != NULL
+        && (info->kind & KIND_IMPORT) == KIND_IMPORT;
+}
+
+static void markWeak(SymbolInfo* info)
+{
+    if(info)
+      info->kind |= KIND_WEAK;
+}
+
+static void markImport(SymbolInfo* info)
+{
+    if(info)
+      info->kind |= KIND_IMPORT;
+}
+
+static void unmarkImport(SymbolInfo* info)
+{
+    if(info)
+      info->kind &= ~KIND_IMPORT;
 }
 
 /* -----------------------------------------------------------------------------
@@ -47,26 +95,27 @@ HsBool isSymbolWeak(ObjectCode *owner, void *label)
 * If the extra symbol infos table has not been initialized
 * yet this will create and allocate a new Hashtable
 */
-void setWeakSymbol(ObjectCode *owner, void *label)
+void setWeakSymbol(ObjectCode *owner, const void *label)
 {
-    SymbolInfo *info;
-    if (owner && label)
-    {
-        info = NULL;
-        if (!owner->extraInfos)
-        {
-            owner->extraInfos = allocStrHashTable();
-        }
-        else {
-            info = lookupStrHashTable(owner->extraInfos, label);
-        }
+    setSymbolInfo (owner, label, &markWeak);
+}
 
-        if (!info){
-            info = stgMallocBytes(sizeof(SymbolInfo), "setWeakSymbol");
-        }
+/* -----------------------------------------------------------------------------
+* Marks the symbol at the given address as import or not.
+* If the extra symbol infos table has not been initialized
+* yet this will create and allocate a new Hashtable
+*/
+void setImportSymbol(ObjectCode *owner, const void *label)
+{
+    setSymbolInfo (owner, label, &markImport);
+}
 
-        info->isWeak = HS_BOOL_TRUE;
-
-        insertStrHashTable(owner->extraInfos, label, info);
-    }
+/* -----------------------------------------------------------------------------
+* Clear the import symbol flag.
+* If the extra symbol infos table has not been initialized
+* yet this will create and allocate a new Hashtable
+*/
+void clearImportSymbol(ObjectCode *owner, const void *label)
+{
+    setSymbolInfo (owner, label, &unmarkImport);
 }

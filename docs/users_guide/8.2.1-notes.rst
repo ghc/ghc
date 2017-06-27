@@ -281,8 +281,8 @@ Runtime system
   move long-lived data outside of the heap so that the garbage
   collector does not have to trace it repeatedly.  Compacted data can
   also be serialized, stored, and deserialized again later by the same
-  program.  For more details see the :compact-ref:`Data.Compact
-  <Data-Compact.html>` module.
+  program.  For more details see the :compact-ref:`GHC.Compact
+  <GHC-Compact.html>` module.
 
 - There is new support for improving performance on machines with a
   Non-Uniform Memory Architecture (NUMA).  See :rts-flag:`--numa`.
@@ -418,7 +418,8 @@ filepath
 ghc
 ~~~
 
--
+-  Version number 8.2.1
+
 ghc-boot
 ~~~~~~~~
 

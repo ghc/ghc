@@ -312,7 +312,7 @@ Use a bigger heap!
     calculate a value based on the amount of live data.
 
 Compact your data:
-    The :compact-ref:`Data.Compact <Data-Compact.html>` module
+    The :compact-ref:`GHC.Compact <GHC-Compact.html>` module
     provides a way to make garbage collection more efficient for
     long-lived data structures. Compacting a data structure collects
     the objects together in memory, where they are treated as a single

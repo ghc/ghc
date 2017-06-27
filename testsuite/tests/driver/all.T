@@ -200,9 +200,10 @@ test('T8959a',
 
 test('T703', normal, run_command, ['$MAKE -s --no-print-directory T703'])
 test('T2182', normal, run_command, ['$MAKE -s --no-print-directory T2182'])
-test('T8101', expect_broken(10600), compile, ['-Wall -fno-code'])
-test('T8101b', expect_broken(10600), multimod_compile,
+test('T8101', normal, compile, ['-Wall -fno-code'])
+test('T8101b', normal, multimod_compile,
      ['T8101b', '-Wall -fno-code'])
+test('T10600', normal, compile_fail, ['-fno-code'])
 
 # Should not panic when compiling cmm file together with -outputdir.
 test('T9050', cmm_src, compile, ['-outputdir=.'])
@@ -250,6 +251,11 @@ test('T11429c', normal, compile_fail, ['-Wunrecognised-warning-flags -Werror -Wf
 test('T11763', normal, compile_and_run, ['-fno-version-macros'])
 
 test('T10320', [], run_command, ['$MAKE -s --no-print-directory T10320'])
+
+test('T12056a', normal, compile, ['-w -Wfoo -Wbar'])
+test('T12056b', normal, compile, ['-w -XOverlappingInstances -Wfoo -Wunrecognised-warning-flags -Wbar'])
+test('T12056c', normal, compile,
+     ['-w -Wdeprecated-flags -XOverlappingInstances -Wfoo -Wunrecognised-warning-flags -Wbar'])
 
 test('T12135', [expect_broken(12135)], run_command,
      ['$MAKE -s --no-print-directory T12135'])

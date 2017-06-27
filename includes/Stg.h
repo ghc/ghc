@@ -360,7 +360,7 @@ INLINE_HEADER StgDouble PK_DBL    (W_ p_src[])                 { return *(StgDou
  * independently - unfortunately this code isn't writable in C, we
  * have to use inline assembler.
  */
-#if sparc_HOST_ARCH
+#if defined(sparc_HOST_ARCH)
 
 #define ASSIGN_DBL(dst0,src) \
     { StgPtr dst = (StgPtr)(dst0); \

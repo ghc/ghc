@@ -12,14 +12,8 @@ import Name
 import NameSet
 import RdrName
 import Var
-import Coercion
-import ConLike (ConLike)
-import FieldLabel
-import SrcLoc (Located)
-import TcEvidence ( HsWrapper )
 
 import Data.Data hiding ( Fixity )
-import BasicTypes       (Fixity)
 
 
 {-
@@ -36,18 +30,6 @@ import BasicTypes       (Fixity)
 -- | used as place holder in PostTc and PostRn values
 data PlaceHolder = PlaceHolder
   deriving (Data)
-
--- | Types that are not defined until after type checking
-type family PostTc id ty  -- Note [Pass sensitive types]
-type instance PostTc Id      ty = ty
-type instance PostTc Name    ty = PlaceHolder
-type instance PostTc RdrName ty = PlaceHolder
-
--- | Types that are not defined until after renaming
-type family PostRn id ty  -- Note [Pass sensitive types]
-type instance PostRn Id      ty = ty
-type instance PostRn Name    ty = ty
-type instance PostRn RdrName ty = PlaceHolder
 
 placeHolderKind :: PlaceHolder
 placeHolderKind = PlaceHolder
@@ -103,31 +85,6 @@ DataId constraint type based on this, so even though it is safe the
 UndecidableInstances pragma is required where this is used.
 -}
 
-type DataId id =
-  ( DataIdPost id
-  , DataIdPost (NameOrRdrName id)
-  )
-
-type DataIdPost id =
-  ( Data id
-  , Data (PostRn id NameSet)
-  , Data (PostRn id Fixity)
-  , Data (PostRn id Bool)
-  , Data (PostRn id Name)
-  , Data (PostRn id (Located Name))
-  , Data (PostRn id [Name])
-
-  , Data (PostRn id id)
-  , Data (PostTc id Type)
-  , Data (PostTc id Coercion)
-  , Data (PostTc id id)
-  , Data (PostTc id [Type])
-  , Data (PostTc id ConLike)
-  , Data (PostTc id [ConLike])
-  , Data (PostTc id HsWrapper)
-  , Data (PostTc id [FieldLabel])
-  )
-
 
 -- |Follow the @id@, but never beyond Name. This is used in a 'HsMatchContext',
 -- for printing messages related to a 'Match'
@@ -135,10 +92,3 @@ type family NameOrRdrName id where
   NameOrRdrName Id      = Name
   NameOrRdrName Name    = Name
   NameOrRdrName RdrName = RdrName
-
--- |Constraint type to bundle up the requirement for 'OutputableBndr' on both
--- the @id@ and the 'NameOrRdrName' type for it
-type OutputableBndrId id =
-  ( OutputableBndr id
-  , OutputableBndr (NameOrRdrName id)
-  )

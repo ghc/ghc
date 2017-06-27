@@ -47,6 +47,7 @@ import UniqDSet
 import FastString
 import Platform
 import SysTools
+import FileCleanup
 
 -- Standard libraries
 import Control.Monad
@@ -883,7 +884,8 @@ dynLoadObjs hsc_env pls objs = do
     let platform = targetPlatform dflags
     let minus_ls = [ lib | Option ('-':'l':lib) <- ldInputs dflags ]
     let minus_big_ls = [ lib | Option ('-':'L':lib) <- ldInputs dflags ]
-    (soFile, libPath , libName) <- newTempLibName dflags (soExt platform)
+    (soFile, libPath , libName) <-
+      newTempLibName dflags TFL_CurrentModule (soExt platform)
     let
         dflags2 = dflags {
                       -- We don't want the original ldInputs in
@@ -931,7 +933,9 @@ dynLoadObjs hsc_env pls objs = do
     -- Note: We are loading packages with local scope, so to see the
     -- symbols in this link we must link all loaded packages again.
     linkDynLib dflags2 objs (pkgs_loaded pls)
-    consIORef (filesToNotIntermediateClean dflags) soFile
+
+    -- if we got this far, extend the lifetime of the library file
+    changeTempFilesLifetime dflags TFL_GhcSession [soFile]
     m <- loadDLL hsc_env soFile
     case m of
         Nothing -> return pls { temp_sos = (libPath, libName) : temp_sos pls }

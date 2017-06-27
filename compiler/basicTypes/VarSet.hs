@@ -16,7 +16,7 @@ module VarSet (
         unionVarSet, unionVarSets, mapUnionVarSet,
         intersectVarSet, intersectsVarSet, disjointVarSet,
         isEmptyVarSet, delVarSet, delVarSetList, delVarSetByKey,
-        minusVarSet, filterVarSet,
+        minusVarSet, filterVarSet, mapVarSet,
         anyVarSet, allVarSet,
         transCloVarSet, fixVarSet,
         lookupVarSet_Directly, lookupVarSet, lookupVarSetByName,
@@ -146,8 +146,8 @@ anyVarSet = uniqSetAny
 allVarSet :: (Var -> Bool) -> VarSet -> Bool
 allVarSet = uniqSetAll
 
--- There used to exist mapVarSet, see Note [Unsound mapUniqSet] in UniqSet for
--- why it got removed.
+mapVarSet :: Uniquable b => (a -> b) -> UniqSet a -> UniqSet b
+mapVarSet = mapUniqSet
 
 fixVarSet :: (VarSet -> VarSet)   -- Map the current set to a new set
           -> VarSet -> VarSet

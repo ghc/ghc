@@ -155,7 +155,7 @@ ubxSumRepType constrs0
   -- has at least two disjuncts. But it could happen if a user writes, e.g.,
   -- forall (a :: TYPE (SumRep [IntRep])). ...
   -- which could never be instantiated. We still don't want to panic.
-  | length constrs0 < 2
+  | constrs0 `lengthLessThan` 2
   = [WordSlot]
 
   | otherwise

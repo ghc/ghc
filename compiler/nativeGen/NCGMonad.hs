@@ -42,7 +42,8 @@ import Format
 import TargetReg
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
 import CLabel           ( CLabel, mkAsmTempLabel )
 import Debug
 import FastString       ( FastString )
@@ -53,8 +54,6 @@ import DynFlags
 import Module
 
 import Control.Monad    ( liftM, ap )
-
-import Compiler.Hoopl   ( LabelMap, Label )
 
 data NatM_State
         = NatM_State {

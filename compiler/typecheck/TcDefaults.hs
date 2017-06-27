@@ -4,11 +4,11 @@
 
 \section[TcDefaults]{Typechecking \tr{default} declarations}
 -}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcDefaults ( tcDefaults ) where
 
 import HsSyn
-import Name
 import Class
 import TcRnMonad
 import TcEnv
@@ -23,7 +23,7 @@ import Outputable
 import FastString
 import qualified GHC.LanguageExtensions as LangExt
 
-tcDefaults :: [LDefaultDecl Name]
+tcDefaults :: [LDefaultDecl GhcRn]
            -> TcM (Maybe [Type])    -- Defaulting types to heave
                                     -- into Tc monad for later use
                                     -- in Disambig.
@@ -66,7 +66,7 @@ tcDefaults decls@(L locn (DefaultDecl _) : _)
     failWithTc (dupDefaultDeclErr decls)
 
 
-tc_default_ty :: [Class] -> LHsType Name -> TcM Type
+tc_default_ty :: [Class] -> LHsType GhcRn -> TcM Type
 tc_default_ty deflt_clss hs_ty
  = do   { (ty, _kind) <- solveEqualities $
                          tcLHsType hs_ty
@@ -90,7 +90,7 @@ check_instance ty cls
 defaultDeclCtxt :: SDoc
 defaultDeclCtxt = text "When checking the types in a default declaration"
 
-dupDefaultDeclErr :: [Located (DefaultDecl Name)] -> SDoc
+dupDefaultDeclErr :: [Located (DefaultDecl GhcRn)] -> SDoc
 dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
   = hang (text "Multiple default declarations")
        2 (vcat (map pp dup_things))

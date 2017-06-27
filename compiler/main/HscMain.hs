@@ -137,6 +137,7 @@ import FamInstEnv
 import Fingerprint      ( Fingerprint )
 import Hooks
 import TcEnv
+import PrelNames
 import LlvmMangler ( ManglerInfo )
 
 import DynFlags
@@ -292,7 +293,7 @@ hscGetModuleInterface hsc_env0 mod = runInteractiveHsc hsc_env0 $ do
 
 -- -----------------------------------------------------------------------------
 -- | Rename some import declarations
-hscRnImportDecls :: HscEnv -> [LImportDecl RdrName] -> IO GlobalRdrEnv
+hscRnImportDecls :: HscEnv -> [LImportDecl GhcPs] -> IO GlobalRdrEnv
 hscRnImportDecls hsc_env0 import_decls = runInteractiveHsc hsc_env0 $ do
   hsc_env <- getHscEnv
   ioMsgMaybe $ tcRnImportDecls hsc_env import_decls
@@ -329,7 +330,9 @@ hscParse' mod_summary
                  | otherwise = parseModule
 
     case unP parseMod (mkPState dflags buf loc) of
-        PFailed span err ->
+        PFailed warnFn span err -> do
+            logWarningsReportErrors (warnFn dflags)
+            handleWarnings
             liftIO $ throwOneError (mkPlainErrMsg dflags span err)
 
         POk pst rdr_module -> do
@@ -380,7 +383,7 @@ hscParse' mod_summary
 -- can become a Nothing and decide whether this should instead throw an
 -- exception/signal an error.
 type RenamedStuff =
-        (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
+        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [LIE GhcRn],
                 Maybe LHsDocString))
 
 -- | Rename and typecheck a module, additionally returning the renamed syntax
@@ -656,8 +659,6 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
     -- to get those warnings too. (But we'll always exit at that point
     -- because the desugarer runs ioMsgMaybe.)
     runHsc hsc_env $ do
-    let dflags = hsc_dflags hsc_env
-
     e <- hscIncrementalFrontend always_do_basic_recompilation_check m_tc_result mHscMessage
             mod_summary source_modified mb_old_iface mod_index
     case e of
@@ -685,61 +686,58 @@ hscIncrementalCompile always_do_basic_recompilation_check m_tc_result
         -- the interface that existed on disk; it's possible we had
         -- to retypecheck but the resulting interface is exactly
         -- the same.)
-        Right (FrontendTypecheck tc_result, mb_old_hash) -> do
-            (status, hmi, no_change)
-                <- case ms_hsc_src mod_summary of
-                        HsSrcFile | hscTarget dflags /= HscNothing ->
-                            finish              hsc_env mod_summary tc_result mb_old_hash
-                        _ ->
-                            finishTypecheckOnly hsc_env mod_summary tc_result mb_old_hash
-            liftIO $ hscMaybeWriteIface dflags (hm_iface hmi) no_change mod_summary
-            return (status, hmi)
-
--- Generates and writes out the final interface for a typecheck.
-finishTypecheckOnly :: HscEnv
-              -> ModSummary
-              -> TcGblEnv
-              -> Maybe Fingerprint
-              -> Hsc (HscStatus, HomeModInfo, Bool)
-finishTypecheckOnly hsc_env summary tc_result mb_old_hash = do
-    let dflags = hsc_dflags hsc_env
-    (iface, changed, details) <- liftIO $ hscSimpleIface hsc_env tc_result mb_old_hash
-    let hsc_status =
-          case (hscTarget dflags, ms_hsc_src summary) of
-            (HscNothing, _) -> HscNotGeneratingCode
-            (_, HsBootFile) -> HscUpdateBoot
-            (_, HsigFile) -> HscUpdateSig
-            _ -> panic "finishTypecheckOnly"
-    return (hsc_status,
-            HomeModInfo{ hm_details  = details,
-                         hm_iface    = iface,
-                         hm_linkable = Nothing },
-            changed)
+        Right (FrontendTypecheck tc_result, mb_old_hash) ->
+            finish hsc_env mod_summary tc_result mb_old_hash
 
 -- Runs the post-typechecking frontend (desugar and simplify),
 -- and then generates and writes out the final interface. We want
 -- to write the interface AFTER simplification so we can get
 -- as up-to-date and good unfoldings and other info as possible
--- in the interface file.  This is only ever run for HsSrcFile,
--- and NOT for HscNothing.
+-- in the interface file.
 finish :: HscEnv
        -> ModSummary
        -> TcGblEnv
        -> Maybe Fingerprint
-       -> Hsc (HscStatus, HomeModInfo, Bool)
+       -> Hsc (HscStatus, HomeModInfo)
 finish hsc_env summary tc_result mb_old_hash = do
-    let dflags = hsc_dflags hsc_env
-    MASSERT( ms_hsc_src summary == HsSrcFile )
-    MASSERT( hscTarget dflags /= HscNothing )
-    guts0 <- hscDesugar' (ms_location summary) tc_result
-    guts <- hscSimplify' guts0
-    (iface, changed, details, cgguts) <- liftIO $ hscNormalIface hsc_env guts mb_old_hash
-
-    return (HscRecomp cgguts summary,
-            HomeModInfo{ hm_details  = details,
-                         hm_iface    = iface,
-                         hm_linkable = Nothing },
-            changed)
+  let dflags = hsc_dflags hsc_env
+      target = hscTarget dflags
+      hsc_src = ms_hsc_src summary
+      should_desugar =
+        ms_mod summary /= gHC_PRIM && hsc_src == HsSrcFile
+      mk_simple_iface = do
+        let hsc_status =
+              case (target, hsc_src) of
+                (HscNothing, _) -> HscNotGeneratingCode
+                (_, HsBootFile) -> HscUpdateBoot
+                (_, HsigFile) -> HscUpdateSig
+                _ -> panic "finish"
+        (iface, changed, details) <- liftIO $
+          hscSimpleIface hsc_env tc_result mb_old_hash
+        return (iface, changed, details, hsc_status)
+  (iface, changed, details, hsc_status) <-
+    -- we usually desugar even when we are not generating code, otherwise
+    -- we would miss errors thrown by the desugaring (see #10600). The only
+    -- exceptions are when the Module is Ghc.Prim or when
+    -- it is not a HsSrcFile Module.
+    if should_desugar
+      then do
+        desugared_guts0 <- hscDesugar' (ms_location summary) tc_result
+        if target == HscNothing
+          -- We are not generating code, so we can skip simplification
+          -- and generate a simple interface.
+          then mk_simple_iface
+          else do
+            desugared_guts <- hscSimplify' desugared_guts0
+            (iface, changed, details, cgguts) <-
+              liftIO $ hscNormalIface hsc_env desugared_guts mb_old_hash
+            return (iface, changed, details, HscRecomp cgguts summary)
+      else mk_simple_iface
+  liftIO $ hscMaybeWriteIface dflags iface changed summary
+  return
+    ( hsc_status
+    , HomeModInfo
+      {hm_details = details, hm_iface = iface, hm_linkable = Nothing})
 
 hscMaybeWriteIface :: DynFlags -> ModIface -> Bool -> ModSummary -> IO ()
 hscMaybeWriteIface dflags iface changed summary =
@@ -1498,7 +1496,7 @@ hscStmtWithLocation hsc_env0 stmt source linenumber =
         liftIO $ hscParsedStmt hsc_env parsed_stmt
 
 hscParsedStmt :: HscEnv
-              -> GhciLStmt RdrName  -- ^ The parsed statement
+              -> GhciLStmt GhcPs  -- ^ The parsed statement
               -> IO ( Maybe ([Id]
                     , ForeignHValue {- IO [HValue] -}
                     , FixityEnv))
@@ -1614,8 +1612,7 @@ hscAddSptEntries hsc_env entries = do
     let add_spt_entry :: SptEntry -> IO ()
         add_spt_entry (SptEntry i fpr) = do
             val <- getHValue hsc_env (idName i)
-            pprTrace "add_spt_entry" (ppr fpr <+> ppr i) $
-                addSptEntry hsc_env fpr val
+            addSptEntry hsc_env fpr val
     mapM_ add_spt_entry entries
 
 {-
@@ -1634,7 +1631,7 @@ hscAddSptEntries hsc_env entries = do
 
 -}
 
-hscImport :: HscEnv -> String -> IO (ImportDecl RdrName)
+hscImport :: HscEnv -> String -> IO (ImportDecl GhcPs)
 hscImport hsc_env str = runInteractiveHsc hsc_env $ do
     (L _ (HsModule{hsmodImports=is})) <-
        hscParseThing parseModule str
@@ -1666,7 +1663,7 @@ hscKcType hsc_env0 normalise str = runInteractiveHsc hsc_env0 $ do
     ty <- hscParseType str
     ioMsgMaybe $ tcRnType hsc_env normalise ty
 
-hscParseExpr :: String -> Hsc (LHsExpr RdrName)
+hscParseExpr :: String -> Hsc (LHsExpr GhcPs)
 hscParseExpr expr = do
   hsc_env <- getHscEnv
   maybe_stmt <- hscParseStmt expr
@@ -1675,15 +1672,15 @@ hscParseExpr expr = do
     _ -> throwErrors $ unitBag $ mkPlainErrMsg (hsc_dflags hsc_env) noSrcSpan
       (text "not an expression:" <+> quotes (text expr))
 
-hscParseStmt :: String -> Hsc (Maybe (GhciLStmt RdrName))
+hscParseStmt :: String -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmt = hscParseThing parseStmt
 
 hscParseStmtWithLocation :: String -> Int -> String
-                         -> Hsc (Maybe (GhciLStmt RdrName))
+                         -> Hsc (Maybe (GhciLStmt GhcPs))
 hscParseStmtWithLocation source linenumber stmt =
     hscParseThingWithLocation source linenumber parseStmt stmt
 
-hscParseType :: String -> Hsc (LHsType RdrName)
+hscParseType :: String -> Hsc (LHsType GhcPs)
 hscParseType = hscParseThing parseType
 
 hscParseIdentifier :: HscEnv -> String -> IO (Located RdrName)
@@ -1706,7 +1703,9 @@ hscParseThingWithLocation source linenumber parser str
         loc = mkRealSrcLoc (fsLit source) linenumber 1
 
     case unP parser (mkPState dflags buf loc) of
-        PFailed span err -> do
+        PFailed warnFn span err -> do
+            logWarningsReportErrors (warnFn dflags)
+            handleWarnings
             let msg = mkPlainErrMsg dflags span err
             throwErrors $ unitBag msg
 

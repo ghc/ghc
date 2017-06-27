@@ -176,7 +176,7 @@ lookupTyFixityRn (L _ n) = lookupFixityRn n
 -- the field label, which might be different to the 'OccName' of the selector
 -- 'Name' if @DuplicateRecordFields@ is in use (Trac #1173). If there are
 -- multiple possible selectors with different fixities, generate an error.
-lookupFieldFixityRn :: AmbiguousFieldOcc Name -> RnM Fixity
+lookupFieldFixityRn :: AmbiguousFieldOcc GhcRn -> RnM Fixity
 lookupFieldFixityRn (Unambiguous (L _ rdr) n)
   = lookupFixityRn' n (rdrNameOcc rdr)
 lookupFieldFixityRn (Ambiguous   (L _ rdr) _) = get_ambiguous_fixity rdr

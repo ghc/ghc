@@ -1,38 +1,38 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module TcSplice where
-import HsSyn    ( HsSplice, HsBracket, HsExpr, LHsExpr )
+import Name
 import HsExpr   ( PendingRnSplice )
-import Name     ( Name )
-import TcRnTypes( TcM, TcId )
+import TcRnTypes( TcM , SpliceType )
 import TcType   ( ExpRhoType )
 import Annotations ( Annotation, CoreAnnTarget )
+import HsExtension ( GhcTcId, GhcRn, GhcPs )
 
-import HsSyn      ( LHsType, LPat, LHsDecl, ThModFinalizers )
-import RdrName    ( RdrName )
-import TcRnTypes  ( SpliceType )
+import HsSyn      ( HsSplice, HsBracket, HsExpr, LHsExpr, LHsType, LPat,
+                    LHsDecl, ThModFinalizers )
 import qualified Language.Haskell.TH as TH
 
-tcSpliceExpr :: HsSplice Name
+tcSpliceExpr :: HsSplice GhcRn
              -> ExpRhoType
-             -> TcM (HsExpr TcId)
+             -> TcM (HsExpr GhcTcId)
 
-tcUntypedBracket :: HsBracket Name
+tcUntypedBracket :: HsBracket GhcRn
                  -> [PendingRnSplice]
                  -> ExpRhoType
-                 -> TcM (HsExpr TcId)
-tcTypedBracket :: HsBracket Name
+                 -> TcM (HsExpr GhcTcId)
+tcTypedBracket :: HsBracket GhcRn
                -> ExpRhoType
-               -> TcM (HsExpr TcId)
+               -> TcM (HsExpr GhcTcId)
 
-runAnnotation     :: CoreAnnTarget -> LHsExpr Name -> TcM Annotation
+runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
-tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr TcId) -> TcM (LHsExpr TcId)
+tcTopSpliceExpr :: SpliceType -> TcM (LHsExpr GhcTcId) -> TcM (LHsExpr GhcTcId)
 
-runMetaE :: LHsExpr TcId -> TcM (LHsExpr RdrName)
-runMetaP :: LHsExpr TcId -> TcM (LPat RdrName)
-runMetaT :: LHsExpr TcId  -> TcM (LHsType RdrName)
-runMetaD :: LHsExpr TcId -> TcM [LHsDecl RdrName]
+runMetaE :: LHsExpr GhcTcId -> TcM (LHsExpr GhcPs)
+runMetaP :: LHsExpr GhcTcId -> TcM (LPat GhcPs)
+runMetaT :: LHsExpr GhcTcId -> TcM (LHsType GhcPs)
+runMetaD :: LHsExpr GhcTcId -> TcM [LHsDecl GhcPs]
 
 lookupThName_maybe :: TH.Name -> TcM (Maybe Name)
 runQuasi :: TH.Q a -> TcM a

@@ -36,7 +36,7 @@ import StgCmmEnv
 
 import MkGraph
 
-import Hoopl
+import Hoopl.Label
 import SMRep
 import BlockId
 import Cmm

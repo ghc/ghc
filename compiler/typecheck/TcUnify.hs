@@ -59,7 +59,6 @@ import VarEnv
 import ErrUtils
 import DynFlags
 import BasicTypes
-import Name   ( Name )
 import Bag
 import Util
 import Pair( pFst )
@@ -638,8 +637,8 @@ tc_sub_tc_type :: CtOrigin   -- used when calling uType
 -- If wrap = tc_sub_type t1 t2
 --    => wrap :: t1 ~> t2
 tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty_expected
-  | is_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
-  , not (is_poly ty_actual)
+  | definitely_poly ty_expected      -- See Note [Don't skolemise unnecessarily]
+  , not (possibly_poly ty_actual)
   = do { traceTc "tc_sub_tc_type (drop to equality)" $
          vcat [ text "ty_actual   =" <+> ppr ty_actual
               , text "ty_expected =" <+> ppr ty_expected ]
@@ -656,13 +655,21 @@ tc_sub_tc_type eq_orig inst_orig ctxt ty_actual ty_expected
                                                  ty_actual sk_rho
        ; return (sk_wrap <.> inner_wrap) }
   where
-    is_poly ty
+    possibly_poly ty
       | isForAllTy ty                        = True
-      | Just (_, res) <- splitFunTy_maybe ty = is_poly res
+      | Just (_, res) <- splitFunTy_maybe ty = possibly_poly res
       | otherwise                            = False
       -- NB *not* tcSplitFunTy, because here we want
       -- to decompose type-class arguments too
 
+    definitely_poly ty
+      | (tvs, theta, tau) <- tcSplitSigmaTy ty
+      , (tv:_) <- tvs
+      , null theta
+      , isInsolubleOccursCheck NomEq tv tau
+      = True
+      | otherwise
+      = False
 
 {- Note [Don't skolemise unnecessarily]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -674,11 +681,31 @@ error.  It's better to say that
     (Char->Char) ~ (forall a. a->a)
 fails.
 
-In general,
- * if the RHS type an outermost forall (i.e. skolemisation
-   is the next thing we'd do)
- * and the LHS has no top-level polymorphism (but looking deeply)
-then we can revert to simple equality.
+So roughly:
+ * if the ty_expected has an outermost forall
+      (i.e. skolemisation is the next thing we'd do)
+ * and the ty_actual has no top-level polymorphism (but looking deeply)
+then we can revert to simple equality.  But we need to be careful.
+These examples are all fine:
+
+ * (Char -> forall a. a->a) <= (forall a. Char -> a -> a)
+      Polymorphism is buried in ty_actual
+
+ * (Char->Char) <= (forall a. Char -> Char)
+      ty_expected isn't really polymorphic
+
+ * (Char->Char) <= (forall a. (a~Char) => a -> a)
+      ty_expected isn't really polymorphic
+
+ * (Char->Char) <= (forall a. F [a] Char -> Char)
+                   where type instance F [x] t = t
+     ty_expected isn't really polymorphic
+
+If we prematurely go to equality we'll reject a program we should
+accept (e.g. Trac #13752).  So the test (which is only to improve
+error message) is very conservative:
+ * ty_actual is /definitely/ monomorphic
+ * ty_expected is /definitely/ polymorphic
 -}
 
 ---------------
@@ -772,14 +799,14 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
 -----------------
 -- needs both un-type-checked (for origins) and type-checked (for wrapping)
 -- expressions
-tcWrapResult :: HsExpr Name -> HsExpr TcId -> TcSigmaType -> ExpRhoType
-             -> TcM (HsExpr TcId)
+tcWrapResult :: HsExpr GhcRn -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
+             -> TcM (HsExpr GhcTcId)
 tcWrapResult rn_expr = tcWrapResultO (exprCtOrigin rn_expr)
 
 -- | Sometimes we don't have a @HsExpr Name@ to hand, and this is more
 -- convenient.
-tcWrapResultO :: CtOrigin -> HsExpr TcId -> TcSigmaType -> ExpRhoType
-               -> TcM (HsExpr TcId)
+tcWrapResultO :: CtOrigin -> HsExpr GhcTcId -> TcSigmaType -> ExpRhoType
+               -> TcM (HsExpr GhcTcId)
 tcWrapResultO orig expr actual_ty res_ty
   = do { traceTc "tcWrapResult" (vcat [ text "Actual:  " <+> ppr actual_ty
                                       , text "Expected:" <+> ppr res_ty ])
@@ -1170,7 +1197,7 @@ unifyType thing ty1 ty2 = traceTc "utype" (ppr ty1 $$ ppr ty2 $$ ppr thing) >>
 -- | Use this instead of 'Nothing' when calling 'unifyType' without
 -- a good "thing" (where the "thing" has the "actual" type passed in)
 -- This has an 'Outputable' instance, avoiding amgiguity problems.
-noThing :: Maybe (HsExpr Name)
+noThing :: Maybe (HsExpr GhcRn)
 noThing = Nothing
 
 unifyKind :: Outputable a => Maybe a -> TcKind -> TcKind -> TcM CoercionN
@@ -1301,7 +1328,7 @@ uType origin t_or_k orig_ty1 orig_ty2
 
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       -- See Note [Mismatched type lists and application decomposition]
-      | tc1 == tc2, length tys1 == length tys2
+      | tc1 == tc2, equalLength tys1 tys2
       = ASSERT2( isGenerativeTyCon tc1 Nominal, ppr tc1 )
         do { cos <- zipWithM (uType origin t_or_k) tys1 tys2
            ; return $ mkTyConAppCo Nominal tc1 cos }
@@ -1575,7 +1602,6 @@ canSolveByUnification tclvl tv xi
                                         SigTv -> True
                                         _     -> False
                        SkolemTv {} -> True
-                       FlatSkol {} -> False
                        RuntimeUnk  -> True
 
 {- Note [Fmv Orientation Invariant]

@@ -578,7 +578,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                 foldr (addAltSize . size_up_alt) case_size alts
       where
           case_size
-           | is_inline_scrut e, not (lengthExceeds alts 1)  = sizeN (-10)
+           | is_inline_scrut e, lengthAtMost alts 1 = sizeN (-10)
            | otherwise = sizeZero
                 -- Normally we don't charge for the case itself, but
                 -- we charge one per alternative (see size_up_alt,
@@ -593,7 +593,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                 --      case touch# x# of _ -> ...  should cost 0
                 -- (see #4978)
                 --
-                -- I would like to not have the "not (lengthExceeds alts 1)"
+                -- I would like to not have the "lengthAtMost alts 1"
                 -- condition above, but without that some programs got worse
                 -- (spectral/hartel/event and spectral/para).  I don't fully
                 -- understand why. (SDM 24/5/11)

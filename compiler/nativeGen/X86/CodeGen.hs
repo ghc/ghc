@@ -55,7 +55,8 @@ import PprCmm           ()
 import CmmUtils
 import CmmSwitch
 import Cmm
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
 import CLabel
 import CoreSyn          ( Tickish(..) )
 import SrcLoc           ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )

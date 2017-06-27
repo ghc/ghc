@@ -109,6 +109,7 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /tests/boxy/T2193
 /tests/cabal/1750.hs
 /tests/cabal/1750.out
+/tests/cabal/T13703.package.conf/
 /tests/cabal/T1750.hs
 /tests/cabal/T1750.out
 /tests/cabal/cabal01/dist/
@@ -1628,4 +1629,5 @@ mk/ghcconfig*_test___spaces_ghc*.exe.mk
 /timeout/calibrate.out
 /timeout/dist/
 /timeout/install-inplace/
+/timeout/TimeMe
 /tests/typecheck/should_run/T11049

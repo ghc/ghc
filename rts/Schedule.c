@@ -1215,10 +1215,9 @@ scheduleHandleYield( Capability *cap, StgTSO *t, uint32_t prev_what_next )
 
     ASSERT(t->_link == END_TSO_QUEUE);
 
-    // Shortcut if we're just switching evaluators: don't bother
-    // doing stack squeezing (which can be expensive), just run the
-    // thread.
-    if (cap->context_switch == 0 && t->what_next != prev_what_next) {
+    // Shortcut if we're just switching evaluators: just run the thread.  See
+    // Note [avoiding threadPaused] in Interpreter.c.
+    if (t->what_next != prev_what_next) {
         debugTrace(DEBUG_sched,
                    "--<< thread %ld (%s) stopped to switch evaluators",
                    (long)t->id, what_next_strs[t->what_next]);
@@ -2179,7 +2178,13 @@ setNumCapabilities (uint32_t new_n_capabilities USED_IF_THREADS)
     Capability *old_capabilities = NULL;
     uint32_t old_n_capabilities = n_capabilities;
 
-    if (new_n_capabilities == enabled_capabilities) return;
+    if (new_n_capabilities == enabled_capabilities) {
+        return;
+    } else if (new_n_capabilities <= 0) {
+        errorBelch("setNumCapabilities: Capability count must be positive");
+        return;
+    }
+
 
     debugTrace(DEBUG_sched, "changing the number of Capabilities from %d to %d",
                enabled_capabilities, new_n_capabilities);
@@ -2835,7 +2840,7 @@ deleteThread_(Capability *cap, StgTSO *tso)
 /* -----------------------------------------------------------------------------
    raiseExceptionHelper
 
-   This function is called by the raise# primitve, just so that we can
+   This function is called by the raise# primitive, just so that we can
    move some of the tricky bits of raising an exception from C-- into
    C.  Who knows, it might be a useful re-useable thing here too.
    -------------------------------------------------------------------------- */

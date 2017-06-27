@@ -161,18 +161,19 @@ canClass ev cls tys pend_sc
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We need to add superclass constraints for two reasons:
 
-* For givens, they give us a route to to proof.  E.g.
+* For givens [G], they give us a route to to proof.  E.g.
     f :: Ord a => a -> Bool
     f x = x == x
   We get a Wanted (Eq a), which can only be solved from the superclass
   of the Given (Ord a).
 
-* For wanteds, they may give useful functional dependencies.  E.g.
+* For wanteds [W], and deriveds [WD], [D], they may give useful
+  functional dependencies.  E.g.
      class C a b | a -> b where ...
      class C a b => D a b where ...
-  Now a Wanted constraint (D Int beta) has (C Int beta) as a superclass
+  Now a [W] constraint (D Int beta) has (C Int beta) as a superclass
   and that might tell us about beta, via C's fundeps.  We can get this
-  by generateing a Derived (C Int beta) constraint.  It's derived because
+  by generating a [D] (C Int beta) constraint.  It's derived because
   we don't actually have to cough up any evidence for it; it's only there
   to generate fundep equalities.
 
@@ -227,11 +228,19 @@ So here's the plan:
 4. Go round to (2) again.  This loop (2,3,4) is implemented
    in TcSimplify.simpl_loop.
 
-We try to terminate the loop by flagging which class constraints
-(given or wanted) are potentially un-expanded.  This is what the
-cc_pend_sc flag is for in CDictCan.  So in Step 3 we only expand
-superclasses for constraints with cc_pend_sc set to true (i.e.
+The cc_pend_sc flag in a CDictCan records whether the superclasses of
+this constraint have been expanded.  Specifically, in Step 3 we only
+expand superclasses for constraints with cc_pend_sc set to true (i.e.
 isPendingScDict holds).
+
+Why do we do this?  Two reasons:
+
+* To avoid repeated work, by repeatedly expanding the superclasses of
+  same constraint,
+
+* To terminate the above loop, at least in the -XNoRecursiveSuperClasses
+  case.  If there are recursive superclasses we could, in principle,
+  expand forever, always encountering new constraints.
 
 When we take a CNonCanonical or CIrredCan, but end up classifying it
 as a CDictCan, we set the cc_pend_sc flag to False.
@@ -908,7 +917,7 @@ canTyConApp :: CtEvidence -> EqRel
 -- See Note [Decomposing TyConApps]
 canTyConApp ev eq_rel tc1 tys1 tc2 tys2
   | tc1 == tc2
-  , length tys1 == length tys2
+  , tys1 `equalLength` tys2
   = do { inerts <- getTcSInerts
        ; if can_decompose inerts
          then do { traceTcS "canTyConApp"
@@ -1237,7 +1246,7 @@ When an equality fails, we still want to rewrite the equality
 all the way down, so that it accurately reflects
  (a) the mutable reference substitution in force at start of solving
  (b) any ty-binds in force at this point in solving
-See Note [Kick out insolubles] in TcSMonad.
+See Note [Rewrite insolubles] in TcSMonad.
 And if we don't do this there is a bad danger that
 TcSimplify.applyTyVarDefaulting will find a variable
 that has in fact been substituted.
@@ -1288,10 +1297,9 @@ representational equality, this is a little subtler. Once again, (a ~R [a])
 is a bad thing, but (a ~R N a) for a newtype N might be just fine. This
 means also that (a ~ b a) might be fine, because `b` might become a newtype.
 
-So, we must check: does tv1 appear in xi2 under any type constructor that
-is generative w.r.t. representational equality? That's what isTyVarUnderDatatype
-does. (The other name I considered, isTyVarUnderTyConGenerativeWrtReprEq was
-a bit verbose. And the shorter name gets the point across.)
+So, we must check: does tv1 appear in xi2 under any type constructor
+that is generative w.r.t. representational equality? That's what
+isInsolubleOccursCheck does.
 
 See also #10715, which induced this addition.
 
@@ -1530,7 +1538,7 @@ Suppose we have  [G] Num (F [a])
 then we flatten to
      [G] Num fsk
      [G] F [a] ~ fsk
-where fsk is a flatten-skolem (FlatSkol). Suppose we have
+where fsk is a flatten-skolem (FlatSkolTv). Suppose we have
       type instance F [a] = a
 then we'll reduce the second constraint to
      [G] a ~ fsk

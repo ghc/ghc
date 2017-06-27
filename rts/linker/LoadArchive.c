@@ -479,16 +479,6 @@ static HsInt loadArchive_ (pathchar *path)
         * Linker members (e.g. filename / are skipped since they are not needed)
         */
         isImportLib = thisFileNameSize >= 4 && strncmp(fileName + thisFileNameSize - 4, ".dll", 4) == 0;
-
-        /*
-         * Note [GCC import files (ext .dll.a)]
-         * GCC stores import information in the same binary format
-         * as the object file normally has. The only difference is that
-         * all the information are put in .idata sections. The only real
-         * way to tell if we're dealing with an import lib is by looking
-         * at the file extension.
-         */
-        isImportLib = isImportLib || endsWithPath(path, WSTR(".dll.a"));
 #endif // windows
 
         DEBUG_LOG("\tthisFileNameSize = %d\n", (int)thisFileNameSize);
@@ -553,20 +543,8 @@ static HsInt loadArchive_ (pathchar *path)
                 fclose(f);
                 return 0;
             } else {
-#if defined(OBJFORMAT_PEi386)
-                if (isImportLib)
-                {
-                    findAndLoadImportLibrary(oc);
-                    stgFree(oc);
-                    oc = NULL;
-                    break;
-                } else {
-#endif
-                    oc->next = objects;
-                    objects = oc;
-#if defined(OBJFORMAT_PEi386)
-                }
-#endif
+                oc->next = objects;
+                objects = oc;
             }
         }
         else if (isGnuIndex) {

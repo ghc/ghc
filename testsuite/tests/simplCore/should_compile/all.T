@@ -253,10 +253,19 @@ test('T13338', only_ways(['optasm']), compile, ['-dcore-lint'])
 test('T13367', normal, run_command, ['$MAKE -s --no-print-directory T13367'])
 test('T13417', normal, compile, ['-O'])
 test('T13413', normal, compile, [''])
-test('T13429', normal, compile, [''])
 test('T13410', normal, compile, ['-O2'])
 test('T13468',
      normal,
      run_command,
      ['$MAKE -s --no-print-directory T13468'])
 test('T13543', normal, compile, ['-ddump-str-signatures'])
+test('T11272',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T11272'])
+test('T12600',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T12600'])
+test('T13658', normal, compile, ['-dcore-lint'])
+test('T13708', normal, compile, [''])

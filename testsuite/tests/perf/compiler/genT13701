@@ -1,0 +1,14 @@
+#!/bin/bash
+# Generate $DEPTH layers of modules with $WIDTH modules on each layer
+# Every module on layer N imports all the modules on layer N-1
+# MultiLayerModules.hs imports all the modules from the last layer
+DEPTH=0
+WIDTH=1000
+ROOT=T13701
+for i in $(seq -w 1 $WIDTH); do
+  echo "module DummyLevel0M$i where" > DummyLevel0M$i.hs;
+done
+echo "module $ROOT where" > "$ROOT.hs"
+for j in $(seq -w 1 $WIDTH); do
+  echo "import DummyLevel${DEPTH}M$j" >> "$ROOT.hs";
+done

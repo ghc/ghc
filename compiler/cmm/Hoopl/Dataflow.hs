@@ -21,25 +21,35 @@ module Hoopl.Dataflow
   ( C, O, Block
   , lastNode, entryLabel
   , foldNodesBwdOO
-  , DataflowLattice(..), OldFact(..), NewFact(..), JoinedFact(..), TransferFun
+  , foldRewriteNodesBwdOO
+  , DataflowLattice(..), OldFact(..), NewFact(..), JoinedFact(..)
+  , TransferFun, RewriteFun
   , Fact, FactBase
   , getFact, mkFactBase
   , analyzeCmmFwd, analyzeCmmBwd
+  , rewriteCmmBwd
   , changedIf
   , joinOutFacts
   )
 where
 
 import Cmm
+import UniqSupply
 
 import Data.Array
 import Data.List
 import Data.Maybe
+import Data.IntSet (IntSet)
+import qualified Data.IntSet as IntSet
 
--- Hide definitions from Hoopl's Dataflow module.
-import Compiler.Hoopl hiding ( DataflowLattice, OldFact, NewFact, JoinFun
-                             , fact_bot, fact_join, joinOutFacts, mkFactBase
-                             )
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Collections
+import Hoopl.Label
+
+type family   Fact x f :: *
+type instance Fact C f = FactBase f
+type instance Fact O f = f
 
 newtype OldFact a = OldFact a
 
@@ -68,6 +78,14 @@ data DataflowLattice a = DataflowLattice
 data Direction = Fwd | Bwd
 
 type TransferFun f = CmmBlock -> FactBase f -> FactBase f
+
+-- | Function for rewrtiting and analysis combined. To be used with
+-- @rewriteCmm@.
+--
+-- Currently set to work with @UniqSM@ monad, but we could probably abstract
+-- that away (if we do that, we might want to specialize the fixpoint algorithms
+-- to the particular monads through SPECIALIZE).
+type RewriteFun f = CmmBlock -> FactBase f -> UniqSM (CmmBlock, FactBase f)
 
 analyzeCmmBwd, analyzeCmmFwd
     :: DataflowLattice f
@@ -132,6 +150,74 @@ fixpointAnalysis direction lattice do_block entries blockmap = loop start
                     (updateFact join dep_blocks) (todo1, fbase1) out_facts
         in loop todo2 fbase2
 
+rewriteCmmBwd
+    :: DataflowLattice f
+    -> RewriteFun f
+    -> CmmGraph
+    -> FactBase f
+    -> UniqSM (CmmGraph, FactBase f)
+rewriteCmmBwd = rewriteCmm Bwd
+
+rewriteCmm
+    :: Direction
+    -> DataflowLattice f
+    -> RewriteFun f
+    -> CmmGraph
+    -> FactBase f
+    -> UniqSM (CmmGraph, FactBase f)
+rewriteCmm dir lattice rwFun cmmGraph initFact = do
+    let entry = g_entry cmmGraph
+        hooplGraph = g_graph cmmGraph
+        blockMap1 =
+            case hooplGraph of
+                GMany NothingO bm NothingO -> bm
+        entries = if mapNull initFact then [entry] else mapKeys initFact
+    (blockMap2, facts) <-
+        fixpointRewrite dir lattice rwFun entries blockMap1 initFact
+    return (cmmGraph {g_graph = GMany NothingO blockMap2 NothingO}, facts)
+
+fixpointRewrite
+    :: forall f.
+       Direction
+    -> DataflowLattice f
+    -> RewriteFun f
+    -> [Label]
+    -> LabelMap CmmBlock
+    -> FactBase f
+    -> UniqSM (LabelMap CmmBlock, FactBase f)
+fixpointRewrite dir lattice do_block entries blockmap = loop start blockmap
+  where
+    -- Sorting the blocks helps to minimize the number of times we need to
+    -- process blocks. For instance, for forward analysis we want to look at
+    -- blocks in reverse postorder. Also, see comments for sortBlocks.
+    blocks     = sortBlocks dir entries blockmap
+    num_blocks = length blocks
+    block_arr  = {-# SCC "block_arr_rewrite" #-}
+                 listArray (0, num_blocks - 1) blocks
+    start      = {-# SCC "start_rewrite" #-} [0 .. num_blocks - 1]
+    dep_blocks = {-# SCC "dep_blocks_rewrite" #-} mkDepBlocks dir blocks
+    join       = fact_join lattice
+
+    loop
+        :: IntHeap            -- ^ Worklist, i.e., blocks to process
+        -> LabelMap CmmBlock  -- ^ Rewritten blocks.
+        -> FactBase f         -- ^ Current facts.
+        -> UniqSM (LabelMap CmmBlock, FactBase f)
+    loop []              !blocks1 !fbase1 = return (blocks1, fbase1)
+    loop (index : todo1) !blocks1 !fbase1 = do
+        -- Note that we use the *original* block here. This is important.
+        -- We're optimistically rewriting blocks even before reaching the fixed
+        -- point, which means that the rewrite might be incorrect. So if the
+        -- facts change, we need to rewrite the original block again (taking
+        -- into account the new facts).
+        let block = block_arr ! index
+        (new_block, out_facts) <- {-# SCC "do_block_rewrite" #-}
+            do_block block fbase1
+        let blocks2 = mapInsert (entryLabel new_block) new_block blocks1
+            (todo2, fbase2) = {-# SCC "mapFoldWithKey_rewrite" #-}
+                mapFoldWithKey
+                    (updateFact join dep_blocks) (todo1, fbase1) out_facts
+        loop todo2 blocks2 fbase2
 
 
 {-
@@ -215,42 +301,52 @@ sortBlocks direction entries blockmap =
 -- reverse of what is used for the forward one.
 
 
--- | construct a mapping from L -> block indices.  If the fact for L
--- changes, re-analyse the given blocks.
-mkDepBlocks :: NonLocal n => Direction -> [Block n C C] -> LabelMap [Int]
+-- | Construct a mapping from a @Label@ to the block indexes that should be
+-- re-analyzed if the facts at that @Label@ change.
+--
+-- Note that we're considering here the entry point of the block, so if the
+-- facts change at the entry:
+-- * for a backward analysis we need to re-analyze all the predecessors, but
+-- * for a forward analysis, we only need to re-analyze the current block
+--   (and that will in turn propagate facts into its successors).
+mkDepBlocks :: Direction -> [CmmBlock] -> LabelMap IntSet
 mkDepBlocks Fwd blocks = go blocks 0 mapEmpty
-  where go []     !_  m = m
-        go (b:bs) !n m = go bs (n+1) $! mapInsert (entryLabel b) [n] m
+  where
+    go []     !_ !dep_map = dep_map
+    go (b:bs) !n !dep_map =
+        go bs (n + 1) $ mapInsert (entryLabel b) (IntSet.singleton n) dep_map
 mkDepBlocks Bwd blocks = go blocks 0 mapEmpty
-  where go []     !_ m = m
-        go (b:bs) !n m = go bs (n+1) $! go' (successors b) m
-            where go' [] m = m
-                  go' (l:ls) m = go' ls (mapInsertWith (++) l [n] m)
-
+  where
+    go []     !_ !dep_map = dep_map
+    go (b:bs) !n !dep_map =
+        let insert m l = mapInsertWith IntSet.union l (IntSet.singleton n) m
+        in go bs (n + 1) $ foldl' insert dep_map (successors b)
 
 -- | After some new facts have been generated by analysing a block, we
 -- fold this function over them to generate (a) a list of block
 -- indices to (re-)analyse, and (b) the new FactBase.
---
-updateFact :: JoinFun f -> LabelMap [Int]
-           -> Label -> f       -- out fact
-           -> (IntHeap, FactBase f)
-           -> (IntHeap, FactBase f)
-
+updateFact
+    :: JoinFun f
+    -> LabelMap IntSet
+    -> Label
+    -> f -- out fact
+    -> (IntHeap, FactBase f)
+    -> (IntHeap, FactBase f)
 updateFact fact_join dep_blocks lbl new_fact (todo, fbase)
   = case lookupFact lbl fbase of
-      Nothing       -> let !z = mapInsert lbl new_fact fbase in (changed, z)
-                           -- Note [no old fact]
+      Nothing ->
+          -- Note [No old fact]
+          let !z = mapInsert lbl new_fact fbase in (changed, z)
       Just old_fact ->
-        case fact_join (OldFact old_fact) (NewFact new_fact) of
-          (NotChanged _) -> (todo, fbase)
-          (Changed f) -> let !z = mapInsert lbl f fbase in (changed, z)
+          case fact_join (OldFact old_fact) (NewFact new_fact) of
+              (NotChanged _) -> (todo, fbase)
+              (Changed f) -> let !z = mapInsert lbl f fbase in (changed, z)
   where
-     changed = foldr insertIntHeap todo $
-                 mapFindWithDefault [] lbl dep_blocks
+    changed = IntSet.foldr insertIntHeap todo $
+              mapFindWithDefault IntSet.empty lbl dep_blocks
 
 {-
-Note [no old fact]
+Note [No old fact]
 
 We know that the new_fact is >= _|_, so we don't need to join.  However,
 if the new fact is also _|_, and we have already analysed its block,
@@ -304,6 +400,39 @@ foldNodesBwdOO funOO = go
     go (BMiddle n) f = funOO n f
     go BNil f = f
 {-# INLINABLE foldNodesBwdOO #-}
+
+-- | Folds backward over all the nodes of an open-open block and allows
+-- rewriting them. The accumulator is both the block of nodes and @f@ (usually
+-- dataflow facts).
+-- Strict in both accumulated parts.
+foldRewriteNodesBwdOO
+    :: forall f.
+       (CmmNode O O -> f -> UniqSM (Block CmmNode O O, f))
+    -> Block CmmNode O O
+    -> f
+    -> UniqSM (Block CmmNode O O, f)
+foldRewriteNodesBwdOO rewriteOO initBlock initFacts = go initBlock initFacts
+  where
+    go (BCons node1 block1) !fact1 = (rewriteOO node1 `comp` go block1) fact1
+    go (BSnoc block1 node1) !fact1 = (go block1 `comp` rewriteOO node1) fact1
+    go (BCat blockA1 blockB1) !fact1 = (go blockA1 `comp` go blockB1) fact1
+    go (BMiddle node) !fact1 = rewriteOO node fact1
+    go BNil !fact = return (BNil, fact)
+
+    comp rew1 rew2 = \f1 -> do
+        (b, f2) <- rew2 f1
+        (a, !f3) <- rew1 f2
+        let !c = joinBlocksOO a b
+        return (c, f3)
+    {-# INLINE comp #-}
+{-# INLINABLE foldRewriteNodesBwdOO #-}
+
+joinBlocksOO :: Block n O O -> Block n O O -> Block n O O
+joinBlocksOO BNil b = b
+joinBlocksOO b BNil = b
+joinBlocksOO (BMiddle n) b = blockCons n b
+joinBlocksOO b (BMiddle n) = blockSnoc b n
+joinBlocksOO b1 b2 = BCat b1 b2
 
 -- -----------------------------------------------------------------------------
 -- a Heap of Int

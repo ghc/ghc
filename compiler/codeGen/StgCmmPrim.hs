@@ -619,7 +619,7 @@ emitPrimOp dflags [res] (VecBroadcastOp vcat n w) [e] = do
 
 emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
     checkVecCompatibility dflags vcat n w
-    when (length es /= n) $
+    when (es `lengthIsNot` n) $
         panic "emitPrimOp: VecPackOp has wrong number of arguments"
     doVecPackOp (vecElemInjectCast dflags vcat w) ty zeros es res
   where
@@ -637,7 +637,7 @@ emitPrimOp dflags [res] (VecPackOp vcat n w) es = do
 
 emitPrimOp dflags res (VecUnpackOp vcat n w) [arg] = do
     checkVecCompatibility dflags vcat n w
-    when (length res /= n) $
+    when (res `lengthIsNot` n) $
         panic "emitPrimOp: VecUnpackOp has wrong number of results"
     doVecUnpackOp (vecElemProjectCast dflags vcat w) ty arg res
   where

@@ -31,7 +31,7 @@ module InteractiveEval (
         typeKind,
         parseName,
         showModule,
-        isModuleInterpreted,
+        moduleIsBootOrNotObjectLinkable,
         parseExpr, compileParsedExpr,
         compileExpr, dynCompileExpr,
         compileExprRemote, compileParsedExprRemote,
@@ -80,6 +80,7 @@ import RtClosureInspect
 import Outputable
 import FastString
 import Bag
+import Util
 import qualified Lexer (P (..), ParseResult(..), unP, mkPState)
 import qualified Parser (parseStmt, parseModule, parseDeclaration, parseImport)
 
@@ -245,7 +246,7 @@ withVirtualCWD m = do
 
   gbracket set_cwd reset_cwd $ \_ -> m
 
-parseImportDecl :: GhcMonad m => String -> m (ImportDecl RdrName)
+parseImportDecl :: GhcMonad m => String -> m (ImportDecl GhcPs)
 parseImportDecl expr = withSession $ \hsc_env -> liftIO $ hscImport hsc_env expr
 
 emptyHistory :: Int -> BoundedList History
@@ -400,7 +401,7 @@ moveHist fn = do
             history = resumeHistory r
             new_ix = fn ix
         --
-        when (new_ix > length history) $ liftIO $
+        when (history `lengthLessThan` new_ix) $ liftIO $
            throwGhcExceptionIO (ProgramError "no more logged breakpoints")
         when (new_ix < 0) $ liftIO $
            throwGhcExceptionIO (ProgramError "already at the beginning of the history")
@@ -673,7 +674,7 @@ findGlobalRdrEnv hsc_env imports
            ([], imods_env) -> Right (foldr plusGlobalRdrEnv idecls_env imods_env)
            (err : _, _)    -> Left err }
   where
-    idecls :: [LImportDecl RdrName]
+    idecls :: [LImportDecl GhcPs]
     idecls = [noLoc d | IIDecl d <- imports]
 
     imods :: [ModuleName]
@@ -782,14 +783,14 @@ isStmt :: DynFlags -> String -> Bool
 isStmt dflags stmt =
   case parseThing Parser.parseStmt dflags stmt of
     Lexer.POk _ _ -> True
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
 
 -- | Returns @True@ if passed string has an import declaration.
 hasImport :: DynFlags -> String -> Bool
 hasImport dflags stmt =
   case parseThing Parser.parseModule dflags stmt of
     Lexer.POk _ thing -> hasImports thing
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
   where
     hasImports = not . null . hsmodImports . unLoc
 
@@ -798,7 +799,7 @@ isImport :: DynFlags -> String -> Bool
 isImport dflags stmt =
   case parseThing Parser.parseImport dflags stmt of
     Lexer.POk _ _ -> True
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
 
 -- | Returns @True@ if passed string is a declaration but __/not a splice/__.
 isDecl :: DynFlags -> String -> Bool
@@ -808,7 +809,7 @@ isDecl dflags stmt = do
       case unLoc thing of
         SpliceD _ -> False
         _ -> True
-    Lexer.PFailed _ _ -> False
+    Lexer.PFailed _ _ _ -> False
 
 parseThing :: Lexer.P thing -> DynFlags -> String -> Lexer.ParseResult thing
 parseThing parser dflags stmt = do
@@ -840,7 +841,7 @@ typeKind normalise str = withSession $ \hsc_env -> do
 
 -- | Parse an expression, the parsed expression can be further processed and
 -- passed to compileParsedExpr.
-parseExpr :: GhcMonad m => String -> m (LHsExpr RdrName)
+parseExpr :: GhcMonad m => String -> m (LHsExpr GhcPs)
 parseExpr expr = withSession $ \hsc_env -> do
   liftIO $ runInteractiveHsc hsc_env $ hscParseExpr expr
 
@@ -858,7 +859,7 @@ compileExprRemote expr = do
 
 -- | Compile an parsed expression (before renaming), run it and deliver
 -- the resulting HValue.
-compileParsedExprRemote :: GhcMonad m => LHsExpr RdrName -> m ForeignHValue
+compileParsedExprRemote :: GhcMonad m => LHsExpr GhcPs -> m ForeignHValue
 compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
   -- > let _compileParsedExpr = expr
   -- Create let stmt from expr to make hscParsedStmt happy.
@@ -878,7 +879,7 @@ compileParsedExprRemote expr@(L loc _) = withSession $ \hsc_env -> do
       liftIO $ throwIO (fromSerializableException e)
     _ -> panic "compileParsedExpr"
 
-compileParsedExpr :: GhcMonad m => LHsExpr RdrName -> m HValue
+compileParsedExpr :: GhcMonad m => LHsExpr GhcPs -> m HValue
 compileParsedExpr expr = do
    fhv <- compileParsedExprRemote expr
    dflags <- getDynFlags
@@ -901,17 +902,17 @@ dynCompileExpr expr = do
 showModule :: GhcMonad m => ModSummary -> m String
 showModule mod_summary =
     withSession $ \hsc_env -> do
-        interpreted <- isModuleInterpreted mod_summary
+        interpreted <- moduleIsBootOrNotObjectLinkable mod_summary
         let dflags = hsc_dflags hsc_env
         return (showModMsg dflags (hscTarget dflags) interpreted mod_summary)
 
-isModuleInterpreted :: GhcMonad m => ModSummary -> m Bool
-isModuleInterpreted mod_summary = withSession $ \hsc_env ->
+moduleIsBootOrNotObjectLinkable :: GhcMonad m => ModSummary -> m Bool
+moduleIsBootOrNotObjectLinkable mod_summary = withSession $ \hsc_env ->
   case lookupHpt (hsc_HPT hsc_env) (ms_mod_name mod_summary) of
         Nothing       -> panic "missing linkable"
-        Just mod_info -> return (not obj_linkable)
-                      where
-                         obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
+        Just mod_info -> return $ case hm_linkable mod_info of
+          Nothing       -> True
+          Just linkable -> not (isObjectLinkable linkable)
 
 ----------------------------------------------------------------------------
 -- RTTI primitives

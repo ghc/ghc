@@ -50,7 +50,7 @@ testOneFile libdir fileName = do
     where
      gq ast = everything (++) ([] `mkQ` doLHsTupArg) ast
 
-     doLHsTupArg :: LHsTupArg RdrName -> [(SrcSpan,String,HsExpr RdrName)]
+     doLHsTupArg :: LHsTupArg GhcPs -> [(SrcSpan,String,HsExpr GhcPs)]
      doLHsTupArg (L l arg@(Present _)) = [(l,"p",ExplicitTuple [L l arg] Boxed)]
      doLHsTupArg (L l arg@(Missing _)) = [(l,"m",ExplicitTuple [L l arg] Boxed)]
 

@@ -145,6 +145,7 @@ $1_$2_$3_MOST_HC_OPTS = \
  $$($1_$2_HC_OPTS) \
  $$(CONF_HC_OPTS_STAGE$4) \
  $$($1_$2_MORE_HC_OPTS) \
+ $$($1_EXTRA_HC_OPTS) \
  $$($1_$2_EXTRA_HC_OPTS) \
  $$($1_$2_$3_HC_OPTS) \
  $$($$(basename $$(subst ./,,$$<))_HC_OPTS) \

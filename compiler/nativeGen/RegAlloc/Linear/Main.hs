@@ -118,7 +118,7 @@ import Instruction
 import Reg
 
 import BlockId
-import Hoopl
+import Hoopl.Collections
 import Cmm hiding (RegSet)
 
 import Digraph

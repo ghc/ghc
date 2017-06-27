@@ -22,7 +22,7 @@
  *
  * In the threaded RTS, we can't tick in CPU time because the thread
  * which has the virtual timer might be idle, so the tick would never
- * fire.  Therfore we used to tick in realtime in the threaded RTS and
+ * fire.  Therefore we used to tick in realtime in the threaded RTS and
  * in CPU time otherwise, but now we always tick in realtime, for
  * several reasons:
  *

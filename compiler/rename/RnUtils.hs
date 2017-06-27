@@ -90,7 +90,6 @@ bindLocalNamesFV names enclosed_scope
 -------------------------------------
 
 extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-        -- This function is used only in rnSourceDecl on InstDecl
 extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
@@ -341,6 +340,7 @@ checkTupSize tup_size
                  nest 2 (parens (text "max size is" <+> int mAX_TUPLE_SIZE)),
                  nest 2 (text "Workaround: use nested tuples or define a data type")])
 
+
 {-
 ************************************************************************
 *                                                                      *
@@ -369,7 +369,7 @@ data HsDocContext
   | TypBrCtx
   | HsTypeCtx
   | GHCiCtx
-  | SpliceTypeCtx (LHsType RdrName)
+  | SpliceTypeCtx (LHsType GhcPs)
   | ClassInstanceCtx
   | VectDeclCtx (Located RdrName)
   | GenericCtx SDoc   -- Maybe we want to use this more!

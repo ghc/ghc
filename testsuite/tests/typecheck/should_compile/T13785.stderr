@@ -1,0 +1,12 @@
+
+T13785.hs:16:5: warning: [-Wmonomorphism-restriction]
+    • The Monomorphism Restriction applies to the bindings
+      for ‘bar2’, ‘baz2’
+        Consider giving them a type signature
+    • In an equation for ‘foo’:
+          foo
+            = bar >> baz >> bar2
+            where
+                bar, baz :: m Char
+                (bar, baz) = c
+                (bar2, baz2) = c

@@ -12,15 +12,12 @@
  */
 
 #  define ELF_TARGET_AMD64 /* Used inside <elf.h> on Solaris 11 */
-#if defined(powerpc64_HOST_ARCH) || defined(powerpc64le_HOST_ARCH) \
- || defined(ia64_HOST_ARCH) || defined(aarch64_HOST_ARCH) \
- || defined(x86_64_HOST_ARCH)
+
+/* __LP64__ is a rough proxy if a platform is ELFCLASS64 */
+#if defined(__LP64__) || defined(_LP64)
 #  define ELF_64BIT
-#elif defined(sparc_HOST_ARCH) || defined(i386_HOST_ARCH) \
- || defined(arm_HOST_ARCH)
-#  define ELF_32BIT
 #else
-#  error "Unsupported arch!"
+#  define ELF_32BIT
 #endif
 
 #if defined(ELF_64BIT)
@@ -130,7 +127,7 @@ typedef struct _ElfRelocationATable {
  * Header provides Information about the sections.
  *
  */
-typedef struct _ObjectCodeFormatInfo {
+struct ObjectCodeFormatInfo {
     Elf_Ehdr             *elfHeader;
     Elf_Phdr             *programHeader;
     Elf_Shdr             *sectionHeader;
@@ -144,17 +141,21 @@ typedef struct _ObjectCodeFormatInfo {
     /* pointer to the global offset table */
     void *                got_start;
     size_t                got_size;
-
-} ObjectCodeFormatInfo;
+};
 
 typedef
 struct _Stub {
     void * addr;
     void * target;
+    /* flags can hold architecture specific information they are used during
+     * lookup of stubs as well. Thus two stubs for the same target with
+     * different flags are considered unequal.
+    */
+    uint8_t flags;
     struct _Stub * next;
 } Stub;
 
-typedef struct _SectionFormatInfo {
+struct SectionFormatInfo {
     /*
      * The following fields are relevant for stubs next to sections only.
      */
@@ -166,6 +167,6 @@ typedef struct _SectionFormatInfo {
     char * name;
 
     Elf_Shdr *sectionHeader;
-} SectionFormatInfo;
+};
 #endif /* OBJECTFORMAT_ELF */
 #endif /* ElfTypes_h */

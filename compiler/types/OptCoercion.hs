@@ -364,6 +364,20 @@ opt_phantom env sym co
   where
     Pair ty1 ty2 = coercionKind co
 
+{- Note [Differing kinds]
+   ~~~~~~~~~~~~~~~~~~~~~~
+The two types may not have the same kind (although that would be very unusual).
+But even if they have the same kind, and the same type constructor, the number
+of arguments in a `CoTyConApp` can differ. Consider
+
+  Any :: forall k. k
+
+  Any * Int                      :: *
+  Any (*->*) Maybe Int  :: *
+
+Hence the need to compare argument lengths; see Trac #13658
+ -}
+
 opt_univ :: LiftingContext -> SymFlag -> UnivCoProvenance -> Role
          -> Type -> Type -> Coercion
 opt_univ env sym (PhantomProv h) _r ty1 ty2
@@ -378,6 +392,7 @@ opt_univ env sym prov role oty1 oty2
   | Just (tc1, tys1) <- splitTyConApp_maybe oty1
   , Just (tc2, tys2) <- splitTyConApp_maybe oty2
   , tc1 == tc2
+  , equalLength tys1 tys2 -- see Note [Differing kinds]
       -- NB: prov must not be the two interesting ones (ProofIrrel & Phantom);
       -- Phantom is already taken care of, and ProofIrrel doesn't relate tyconapps
   = let roles    = tyConRolesX role tc1
@@ -555,6 +570,11 @@ opt_trans_rule is in_co1@(TyConAppCo r1 tc1 cos1) in_co2@(TyConAppCo r2 tc2 cos2
     fireTransRule "PushTyConApp" in_co1 in_co2 $
     mkTyConAppCo r1 tc1 (opt_transList is cos1 cos2)
 
+opt_trans_rule is in_co1@(FunCo r1 co1a co1b) in_co2@(FunCo r2 co2a co2b)
+  = ASSERT( r1 == r2 )   -- Just like the TyConAppCo/TyConAppCo case
+    fireTransRule "PushFun" in_co1 in_co2 $
+    mkFunCo r1 (opt_trans is co1a co2a) (opt_trans is co1b co2b)
+
 opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
   = fireTransRule "TrPushApp" in_co1 in_co2 $
     mkAppCo (opt_trans is co1a co2a)
@@ -563,13 +583,13 @@ opt_trans_rule is in_co1@(AppCo co1a co1b) in_co2@(AppCo co2a co2b)
 -- Eta rules
 opt_trans_rule is co1@(TyConAppCo r tc cos1) co2
   | Just cos2 <- etaTyConAppCo_maybe tc co2
-  = ASSERT( length cos1 == length cos2 )
+  = ASSERT( cos1 `equalLength` cos2 )
     fireTransRule "EtaCompL" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
 opt_trans_rule is co1 co2@(TyConAppCo r tc cos2)
   | Just cos1 <- etaTyConAppCo_maybe tc co1
-  = ASSERT( length cos1 == length cos2 )
+  = ASSERT( cos1 `equalLength` cos2 )
     fireTransRule "EtaCompR" co1 co2 $
     mkTyConAppCo r tc (opt_transList is cos1 cos2)
 
@@ -774,7 +794,7 @@ checkAxInstCo _ = Nothing
 
 -----------
 wrapSym :: SymFlag -> Coercion -> Coercion
-wrapSym sym co | sym       = SymCo co
+wrapSym sym co | sym       = mkSymCo co
                | otherwise = co
 
 -- | Conditionally set a role to be representational
@@ -914,7 +934,7 @@ etaTyConAppCo_maybe tc co
   , isInjectiveTyCon tc r  -- See Note [NthCo and newtypes] in TyCoRep
   , let n = length tys1
   = ASSERT( tc == tc1 )
-    ASSERT( n == length tys2 )
+    ASSERT( tys2 `lengthIs` n )
     Just (decomposeCo n co)
     -- NB: n might be <> tyConArity tc
     -- e.g.   data family T a :: * -> *

@@ -33,7 +33,6 @@ import Instruction
 import Reg
 
 import BlockId
-import Hoopl
 import Cmm
 import UniqSet
 import UniqFM
@@ -41,6 +40,7 @@ import Unique
 import State
 import Outputable
 import Platform
+import Hoopl.Collections
 
 import Data.List
 import Data.Maybe

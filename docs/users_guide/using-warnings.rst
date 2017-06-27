@@ -17,6 +17,7 @@ generally likely to indicate bugs in your program. These are:
 
     * :ghc-flag:`-Woverlapping-patterns`
     * :ghc-flag:`-Wwarnings-deprecations`
+    * :ghc-flag:`-Wdeprecations`
     * :ghc-flag:`-Wdeprecated-flags`
     * :ghc-flag:`-Wunrecognised-pragmas`
     * :ghc-flag:`-Wduplicate-constraints`
@@ -104,6 +105,7 @@ to abort.
     warnings when doing batch compilation.
 
 .. ghc-flag:: -Werror=<wflag>
+    :noindex:
 
     :implies: ``-W<wflag>``
 
@@ -116,6 +118,7 @@ to abort.
     default, but can be useful to negate a :ghc-flag:`-Werror` flag.
 
 .. ghc-flag:: -Wwarn=<wflag>
+    :noindex:
 
     Causes a specific warning to be treated as normal warning, not fatal error.
 
@@ -241,6 +244,18 @@ of ``-W(no-)*``.
     Causes a warning to be emitted when a module, function or type with
     a ``WARNING`` or ``DEPRECATED pragma`` is used. See
     :ref:`warning-deprecated-pragma` for more details on the pragmas.
+
+    This option is on by default.
+
+.. ghc-flag:: -Wdeprecations
+
+    .. index::
+       single: deprecations
+
+    Causes a warning to be emitted when a module, function or type with
+    a ``WARNING`` or ``DEPRECATED pragma`` is used. See
+    :ref:`warning-deprecated-pragma` for more details on the pragmas.
+    An alias for :ghc-flag:`-Wwarnings-deprecations`.
 
     This option is on by default.
 
@@ -900,18 +915,20 @@ of ``-W(no-)*``.
        single: binds, unused
 
     Warn if a pattern binding binds no variables at all, unless it is a
-    lone, possibly-banged, wild-card pattern. For example: ::
+    lone wild-card pattern, or a banged pattern. For example: ::
 
         Just _ = rhs3    -- Warning: unused pattern binding
         (_, _) = rhs4    -- Warning: unused pattern binding
         _  = rhs3        -- No warning: lone wild-card pattern
-        !_ = rhs4        -- No warning: banged wild-card pattern; behaves like seq
+        !() = rhs4       -- No warning: banged pattern; behaves like seq
 
+    In general a lazy pattern binding `p = e` is a no-op if `p` does not
+    bind any variables.
     The motivation for allowing lone wild-card patterns is they are not
     very different from ``_v = rhs3``, which elicits no warning; and
     they can be useful to add a type constraint, e.g. ``_ = x::Int``. A
-    lone banged wild-card pattern is useful as an alternative (to
-    ``seq``) way to force evaluation.
+    banged pattern (see :ref:`bang-patterns`) is *not* a no-op, because
+    it forces evaluation, and is useful as an alternative to ``seq``.
 
 .. ghc-flag:: -Wunused-imports
 
@@ -1028,6 +1045,8 @@ of ``-W(no-)*``.
     :ref:`rules-inline`.
 
 .. ghc-flag:: -Wcpp-undef
+
+    :since: 8.2
 
     This flag passes ``-Wundef`` to the C pre-processor (if its being used)
     which causes the pre-processor to warn on uses of the `#if` directive on

@@ -59,7 +59,7 @@ char *flattenAndQuoteArgs(char *ptr, int argc, char *argv[])
         *ptr++ = '"';
         src = argv[i];
         while(*src) {
-            if (*src == '"') {
+            if (*src == '"' || *src == '\\') {
                 *ptr++ = '\\';
             }
             *ptr++ = *src++;

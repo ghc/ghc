@@ -25,7 +25,11 @@ import Control.Monad
 import Outputable
 import Platform
 import UniqSupply
-import Hoopl
+import Hoopl.Block
+import Hoopl.Collections
+import Hoopl.Dataflow
+import Hoopl.Graph
+import Hoopl.Label
 
 -- Compute a minimal set of proc points for a control-flow graph.
 

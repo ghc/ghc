@@ -379,7 +379,9 @@ to avoid contention with other processes in the machine.
 @since 4.5.0.0
 -}
 setNumCapabilities :: Int -> IO ()
-setNumCapabilities i = c_setNumCapabilities (fromIntegral i)
+setNumCapabilities i
+  | i <= 0    = fail $ "setNumCapabilities: Capability count ("++show i++") must be positive"
+  | otherwise = c_setNumCapabilities (fromIntegral i)
 
 foreign import ccall safe "setNumCapabilities"
   c_setNumCapabilities :: CUInt -> IO ()
@@ -729,7 +731,7 @@ atomically (STM m) = IO (\s -> (atomically# m) s )
 -- values in TVars which mean that it should not continue (e.g. the TVars
 -- represent a shared buffer that is now empty).  The implementation may
 -- block the thread until one of the TVars that it has read from has been
--- udpated. (GHC only)
+-- updated. (GHC only)
 retry :: STM a
 retry = STM $ \s# -> retry# s#
 

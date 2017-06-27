@@ -59,6 +59,8 @@ import System.Environment
 import System.Exit
 import Text.Printf
 import GHC.Fingerprint (getFileHash)
+import System.Directory
+import System.FilePath (isAbsolute)
 
 import Data.Binary
 import qualified Data.ByteString as BS
@@ -68,7 +70,7 @@ dieWithUsage = do
     prog <- getProgName
     die $ prog ++ ": " ++ msg
   where
-#ifdef WINDOWS
+#if defined(WINDOWS)
     msg = "usage: iserv <write-handle> <read-handle> <slave ip> [-v]"
 #else
     msg = "usage: iserv <write-fd> <read-fd> <slave ip> [-v]"
@@ -228,6 +230,10 @@ proxy verbose local remote = loop
           reply resp
           loop
         LoadObj{} -> do
+          resp <- fwdLoadCall verbose local remote msg'
+          reply resp
+          loop
+        LoadDLL path | isAbsolute path -> do
           resp <- fwdLoadCall verbose local remote msg'
           reply resp
           loop

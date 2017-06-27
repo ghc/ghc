@@ -160,6 +160,7 @@ solveSimpleGivens givens
 solveSimpleWanteds :: Cts -> TcS WantedConstraints
 -- NB: 'simples' may contain /derived/ equalities, floated
 --     out from a nested implication. So don't discard deriveds!
+-- The result is not necessarily zonked
 solveSimpleWanteds simples
   = do { traceTcS "solveSimpleWanteds {" (ppr simples)
        ; dflags <- getDynFlags
@@ -199,12 +200,13 @@ solveSimpleWanteds simples
 solve_simple_wanteds :: WantedConstraints -> TcS (Int, WantedConstraints)
 -- Try solving these constraints
 -- Affects the unification state (of course) but not the inert set
+-- The result is not necessarily zonked
 solve_simple_wanteds (WC { wc_simple = simples1, wc_insol = insols1, wc_impl = implics1 })
   = nestTcS $
     do { solveSimples simples1
        ; (implics2, tv_eqs, fun_eqs, insols2, others) <- getUnsolvedInerts
        ; (unif_count, unflattened_eqs) <- reportUnifications $
-                                          unflatten tv_eqs fun_eqs
+                                          unflattenWanteds tv_eqs fun_eqs
             -- See Note [Unflatten after solving the simple wanteds]
        ; return ( unif_count
                 , WC { wc_simple = others `andCts` unflattened_eqs
@@ -1739,17 +1741,21 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
   -- see Note [Type inference for type families with injectivity]
   | isOpenTypeFamilyTyCon fam_tc
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  , let fam_insts = lookupFamInstEnvByTyCon fam_envs fam_tc
   = -- it is possible to have several compatible equations in an open type
     -- family but we only want to derive equalities from one such equation.
-    concatMapM (injImproveEqns injective_args) (take 1 $
-      buildImprovementData (lookupFamInstEnvByTyCon fam_envs fam_tc)
-                           fi_tvs fi_tys fi_rhs (const Nothing))
+    do { let improvs = buildImprovementData fam_insts
+                           fi_tvs fi_tys fi_rhs (const Nothing)
+
+       ; traceTcS "improve_top_fun_eqs2" (ppr improvs)
+       ; concatMapM (injImproveEqns injective_args) $
+         take 1 improvs }
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
   , Injective injective_args <- familyTyConInjectivityInfo fam_tc
   = concatMapM (injImproveEqns injective_args) $
-      buildImprovementData (fromBranches (co_ax_branches ax))
-                           cab_tvs cab_lhs cab_rhs Just
+    buildImprovementData (fromBranches (co_ax_branches ax))
+                         cab_tvs cab_lhs cab_rhs Just
 
   | otherwise
   = return []
@@ -2237,6 +2243,13 @@ Other notes:
      - natural numbers
      - Typeable
 
+* Flatten-skolems: we do not treat a flatten-skolem as unifiable
+  for this purpose.
+  E.g.   f :: Eq (F a) => [a] -> [a]
+         f xs = ....(xs==xs).....
+  Here we get [W] Eq [a], and we don't want to refrain from solving
+  it because of the given (Eq (F a)) constraint!
+
 * The given-overlap problem is arguably not easy to appear in practice
   due to our aggressive prioritization of equality solving over other
   constraints, but it is possible. I've added a test case in
@@ -2270,7 +2283,7 @@ Other notes:
   in point.
 
 All of this is disgustingly delicate, so to discourage people from writing
-simplifiable class givens, we warn about signatures that contain them;#
+simplifiable class givens, we warn about signatures that contain them;
 see TcValidity Note [Simplifiable given constraints].
 -}
 

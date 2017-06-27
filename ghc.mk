@@ -430,7 +430,7 @@ else # CLEANING
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 
-PACKAGES_STAGE0 = binary Cabal/Cabal hpc ghc-boot-th ghc-boot hoopl transformers template-haskell ghci
+PACKAGES_STAGE0 = binary Cabal/Cabal hpc ghc-boot-th ghc-boot transformers template-haskell ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
@@ -461,7 +461,6 @@ PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-boot-th
 PACKAGES_STAGE1 += ghc-boot
 PACKAGES_STAGE1 += template-haskell
-PACKAGES_STAGE1 += hoopl
 PACKAGES_STAGE1 += transformers
 PACKAGES_STAGE1 += ghc-compact
 
@@ -921,15 +920,25 @@ endif
 install_libs: $(INSTALL_LIBS)
 	$(call installLibsTo, $(INSTALL_LIBS), "$(DESTDIR)$(ghclibdir)")
 
+# We rename ghc-stage2, so that the right program name is used in error
+# messages etc. But not on windows.
+RENAME_LIBEXEC_GHC_STAGE_TO_GHC = YES
+ifeq "$(Stage1Only) $(Windows_Host)" "YES YES"
+# resulting ghc-stage1 is built to run on windows
+RENAME_LIBEXEC_GHC_STAGE_TO_GHC = NO
+endif
+ifeq "$(Stage1Only) $(Windows_Target)" "NO YES"
+# resulting ghc-stage1 is built to run on windows
+RENAME_LIBEXEC_GHC_STAGE_TO_GHC = NO
+endif
+
 install_libexecs:  $(INSTALL_LIBEXECS)
 ifneq "$(INSTALL_LIBEXECS)" ""
 	$(INSTALL_DIR) "$(DESTDIR)$(ghclibexecdir)/bin"
 	for i in $(INSTALL_LIBEXECS); do \
 		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i "$(DESTDIR)$(ghclibexecdir)/bin"; \
 	done
-# We rename ghc-stage2, so that the right program name is used in error
-# messages etc.
-ifeq "$(Windows_Target)" "NO"
+ifeq "$(RENAME_LIBEXEC_GHC_STAGE_TO_GHC)" "YES"
 	"$(MV)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc-stage$(INSTALL_GHC_STAGE)" "$(DESTDIR)$(ghclibexecdir)/bin/ghc"
 endif
 endif
@@ -1026,6 +1035,10 @@ install_packages: rts/dist/package.conf.install
 # This means "sudo make install" does the right thing even if it runs
 # with an 077 umask.
 	for f in '$(INSTALLED_PACKAGE_CONF)'/*; do $(CREATE_DATA) "$$f"; done
+
+# Finally, update package.cache to ensure it's newer than the registration
+# files. This avoids #13375.
+	"$(INSTALLED_GHC_PKG_REAL)" --global-package-db "$(INSTALLED_PACKAGE_CONF)" recache
 
 # -----------------------------------------------------------------------------
 # Binary distributions

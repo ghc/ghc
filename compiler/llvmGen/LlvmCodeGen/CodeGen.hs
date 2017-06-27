@@ -18,7 +18,9 @@ import Cmm
 import PprCmm
 import CmmUtils
 import CmmSwitch
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Collections
 
 import DynFlags
 import FastString
@@ -517,7 +519,7 @@ genCallExtract
     :: ForeignTarget           -- ^ PrimOp
     -> Width                   -- ^ Width of the operands.
     -> (CmmActual, CmmActual)  -- ^ Actual arguments.
-    -> (LlvmType, LlvmType)    -- ^ LLLVM types of the returned sturct.
+    -> (LlvmType, LlvmType)    -- ^ LLVM types of the returned struct.
     -> LlvmM (LlvmVar, LlvmVar, StmtData)
 genCallExtract target@(PrimTarget op) w (argA, argB) (llvmTypeA, llvmTypeB) = do
     let width = widthToLlvmInt w

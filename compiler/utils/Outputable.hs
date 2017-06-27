@@ -723,19 +723,18 @@ ppUnless False doc = doc
 --
 -- Only takes effect if colours are enabled.
 coloured :: Col.PprColour -> SDoc -> SDoc
-coloured col@(Col.PprColour c) sdoc =
+coloured col sdoc =
   sdocWithDynFlags $ \dflags ->
     if shouldUseColor dflags
-    then SDoc $ \ctx@SDC{ sdocLastColour = Col.PprColour lc } ->
+    then SDoc $ \ctx@SDC{ sdocLastColour = lastCol } ->
          case ctx of
            SDC{ sdocStyle = PprUser _ _ Coloured } ->
-             let ctx' = ctx{ sdocLastColour = col } in
-             Pretty.zeroWidthText (cReset ++ c)
+             let ctx' = ctx{ sdocLastColour = lastCol `mappend` col } in
+             Pretty.zeroWidthText (Col.renderColour col)
                Pretty.<> runSDoc sdoc ctx'
-               Pretty.<> Pretty.zeroWidthText (cReset ++ lc)
+               Pretty.<> Pretty.zeroWidthText (Col.renderColourAfresh lastCol)
            _ -> runSDoc sdoc ctx
     else sdoc
-  where Col.PprColour cReset = Col.colReset
 
 keyword :: SDoc -> SDoc
 keyword = coloured Col.colBold

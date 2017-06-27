@@ -65,7 +65,9 @@ import BlockId
 import CgUtils          ( fixStgRegisters )
 import Cmm
 import CmmUtils
-import Hoopl
+import Hoopl.Collections
+import Hoopl.Label
+import Hoopl.Block
 import CmmOpt           ( cmmMachOpFold )
 import PprCmm
 import CLabel

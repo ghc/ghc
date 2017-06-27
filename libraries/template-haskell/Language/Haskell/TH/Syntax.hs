@@ -1538,7 +1538,7 @@ data Exp
   | ConE Name                          -- ^ @data T1 = C1 t1 t2; p = {C1} e1 e2  @
   | LitE Lit                           -- ^ @{ 5 or \'c\'}@
   | AppE Exp Exp                       -- ^ @{ f x }@
-  | AppTypeE Exp Type                  -- ^ @{ f \@Int }
+  | AppTypeE Exp Type                  -- ^ @{ f \@Int }@
 
   | InfixE (Maybe Exp) Exp (Maybe Exp) -- ^ @{x + y} or {(x+)} or {(+ x)} or {(+)}@
 
@@ -1941,7 +1941,7 @@ data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<t
           | StarT                         -- ^ @*@
           | ConstraintT                   -- ^ @Constraint@
           | LitT TyLit                    -- ^ @0,1,2, etc.@
-          | WildCardT                     -- ^ @_,
+          | WildCardT                     -- ^ @_@
       deriving( Show, Eq, Ord, Data, Generic )
 
 data TyVarBndr = PlainTV  Name            -- ^ @a@
@@ -1959,7 +1959,7 @@ data InjectivityAnn = InjectivityAnn Name [Name]
   deriving ( Show, Eq, Ord, Data, Generic )
 
 data TyLit = NumTyLit Integer             -- ^ @2@
-           | StrTyLit String              -- ^ @"Hello"@
+           | StrTyLit String              -- ^ @\"Hello\"@
   deriving ( Show, Eq, Ord, Data, Generic )
 
 -- | Role annotations

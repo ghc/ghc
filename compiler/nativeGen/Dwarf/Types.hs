@@ -32,6 +32,7 @@ import Platform
 import Unique
 import Reg
 import SrcLoc
+import Util
 
 import Dwarf.Constants
 
@@ -516,14 +517,7 @@ pprByte x = text "\t.byte " <> ppr (fromIntegral x :: Word)
 
 -- | Assembly for a two-byte constant integer
 pprHalf :: Word16 -> SDoc
-pprHalf x = sdocWithPlatform $ \plat ->
-  -- Naturally Darwin doesn't support `.hword` and binutils uses `.short`
-  -- as a synonym for `.word` (but only some of the time!). The madness
-  -- is nearly too much to bear.
-  let dir = case platformOS plat of
-        OSDarwin -> text ".short"
-        _        -> text ".hword"
-  in text "\t" <> dir <+> ppr (fromIntegral x :: Word)
+pprHalf x = text "\t.short" <+> ppr (fromIntegral x :: Word)
 
 -- | Assembly for a constant DWARF flag
 pprFlag :: Bool -> SDoc
@@ -577,7 +571,7 @@ pprString' str = text "\t.asciz \"" <> str <> char '"'
 pprString :: String -> SDoc
 pprString str
   = pprString' $ hcat $ map escapeChar $
-    if utf8EncodedLength str == length str
+    if str `lengthIs` utf8EncodedLength str
     then str
     else map (chr . fromIntegral) $ bytesFS $ mkFastString str
 

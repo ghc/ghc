@@ -55,7 +55,10 @@ rts_S_SRCS += rts/AdjustorAsm.S
 endif
 # this matches substrings of powerpc64le, including "powerpc" and "powerpc64"
 ifneq "$(findstring $(TargetArch_CPP), powerpc64le)" ""
+# unregisterised builds use the mini interpreter
+ifneq "$(GhcUnregisterised)" "YES"
 rts_S_SRCS += rts/StgCRunAsm.S
+endif
 endif
 endif
 

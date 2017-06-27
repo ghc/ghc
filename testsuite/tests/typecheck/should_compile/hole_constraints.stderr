@@ -37,8 +37,8 @@ hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
       Constraints include Eq a (from hole_constraints.hs:16:10-22)
 
 hole_constraints.hs:20:19: warning: [-Wtyped-holes (in -Wdefault)]
-    • Found hole: _ :: b
-      Where: ‘b’ is a rigid type variable bound by
+    • Found hole: _ :: a
+      Where: ‘a’ is a rigid type variable bound by
                the type signature for:
                  castWith :: forall a b. (a :~: b) -> a -> b
                at hole_constraints.hs:19:1-29

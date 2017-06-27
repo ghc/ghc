@@ -23,9 +23,9 @@ import Cmm              ( RawCmmGroup )
 import HscTypes
 import DynFlags
 import Config
-import SysTools
 import Stream           (Stream)
 import qualified Stream
+import FileCleanup
 import LlvmMangler ( ManglerInfo )
 
 import ErrUtils
@@ -206,7 +206,7 @@ outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
 outputForeignStubs dflags mod location stubs
  = do
    let stub_h = mkStubPaths dflags (moduleName mod) location
-   stub_c <- newTempName dflags "c"
+   stub_c <- newTempName dflags TFL_CurrentModule "c"
 
    case stubs of
      NoStubs ->
@@ -280,6 +280,6 @@ outputForeignFile dflags lang file_contents
      LangCxx -> return "cpp"
      LangObjc -> return "m"
      LangObjcxx -> return "mm"
-   fp <- newTempName dflags extension
+   fp <- newTempName dflags TFL_CurrentModule extension
    writeFile fp file_contents
    return fp

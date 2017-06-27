@@ -15,6 +15,7 @@ import DynFlags
 import DriverPhases
 import HscTypes
 import Module
+import FileCleanup (TempFileLifetime)
 import LlvmMangler ( ManglerInfo )
 
 import Control.Monad
@@ -75,7 +76,7 @@ data PipeState = PipeState {
   }
 
 data PipelineOutput
-  = Temporary
+  = Temporary TempFileLifetime
         -- ^ Output should be to a temporary file: we're going to
         -- run more compilation steps on this output later.
   | Persistent

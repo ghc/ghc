@@ -640,7 +640,7 @@ mkGivenErrorReporter implic ctxt cts
        ; err <- mkEqErr_help dflags ctxt report ct'
                              Nothing ty1 ty2
 
-       ; traceTc "mkGivenErrorRporter" (ppr ct)
+       ; traceTc "mkGivenErrorReporter" (ppr ct)
        ; maybeReportError ctxt err }
   where
     (ct : _ )  = cts    -- Never empty
@@ -648,9 +648,9 @@ mkGivenErrorReporter implic ctxt cts
 
 ignoreErrorReporter :: Reporter
 -- Discard Given errors that don't come from
--- a pattern match; maybe we should warn instead?ignoreErrorReporter ctxt cts
+-- a pattern match; maybe we should warn instead?
 ignoreErrorReporter ctxt cts
-  = do { traceTc "mkGivenErrorRporter no" (ppr cts $$ ppr (cec_encl ctxt))
+  = do { traceTc "mkGivenErrorReporter no" (ppr cts $$ ppr (cec_encl ctxt))
        ; return () }
 
 
@@ -1236,7 +1236,7 @@ mkIPErr ctxt cts
              msg | null givens
                  = addArising orig $
                    sep [ text "Unbound implicit parameter" <> plural cts
-                       , nest 2 (pprTheta preds) ]
+                       , nest 2 (pprParendTheta preds) ]
                  | otherwise
                  = couldNotDeduce givens (preds, orig)
 
@@ -1466,7 +1466,7 @@ mkEqErr1 ctxt ct   -- Wanted or derived;
                NomEq  -> empty
                ReprEq -> mkCoercibleExplanation rdr_env fam_envs ty1 ty2
        ; dflags <- getDynFlags
-       ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctOrigin ct))
+       ; traceTc "mkEqErr1" (ppr ct $$ pprCtOrigin (ctOrigin ct) $$ ppr keep_going)
        ; let report = mconcat [important wanted_msg, important coercible_msg,
                                relevant_bindings binds_msg]
        ; if keep_going
@@ -1548,7 +1548,7 @@ mkCoercibleExplanation rdr_env fam_envs ty1 ty2
 
     has_unknown_roles ty
       | Just (tc, tys) <- tcSplitTyConApp_maybe ty
-      = length tys >= tyConArity tc  -- oversaturated tycon
+      = tys `lengthAtLeast` tyConArity tc  -- oversaturated tycon
       | Just (s, _) <- tcSplitAppTy_maybe ty
       = has_unknown_roles s
       | isTyVarTy ty
@@ -1604,15 +1604,21 @@ reportEqErr ctxt report ct oriented ty1 ty2
   where misMatch = important $ misMatchOrCND ctxt ct oriented ty1 ty2
         eqInfo = important $ mkEqInfoMsg ct ty1 ty2
 
-mkTyVarEqErr :: DynFlags -> ReportErrCtxt -> Report -> Ct
+mkTyVarEqErr, mkTyVarEqErr'
+  :: DynFlags -> ReportErrCtxt -> Report -> Ct
              -> Maybe SwapFlag -> TcTyVar -> TcType -> TcM ErrMsg
 -- tv1 and ty2 are already tidied
 mkTyVarEqErr dflags ctxt report ct oriented tv1 ty2
-  | isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
+  = do { traceTc "mkTyVarEqErr" (ppr ct $$ ppr tv1 $$ ppr ty2)
+       ; mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2 }
+
+mkTyVarEqErr' dflags ctxt report ct oriented tv1 ty2
+  | not insoluble_occurs_check   -- See Note [Occurs check wins]
+  , isUserSkolem ctxt tv1   -- ty2 won't be a meta-tyvar, or else the thing would
                             -- be oriented the other way round;
                             -- see TcCanonical.canEqTyVarTyVar
-  || isSigTyVar tv1 && not (isTyVarTy ty2)
-  || ctEqRel ct == ReprEq && not insoluble_occurs_check
+    || isSigTyVar tv1 && not (isTyVarTy ty2)
+    || ctEqRel ct == ReprEq
      -- the cases below don't really apply to ReprEq (except occurs check)
   = mkErrorMsgFromCt ctxt ct $ mconcat
         [ important $ misMatchOrCND ctxt ct oriented ty1 ty2
@@ -1827,7 +1833,6 @@ extraTyVarInfo ctxt tv
   = ASSERT2( isTyVar tv, ppr tv )
     case tcTyVarDetails tv of
           SkolemTv {}   -> pprSkol implics tv
-          FlatSkol {}   -> pp_tv <+> text "is a flattening type variable"
           RuntimeUnk {} -> pp_tv <+> text "is an interactive-debugger skolem"
           MetaTv {}     -> empty
   where
@@ -2016,7 +2021,22 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
 
 mkExpectedActualMsg _ _ _ _ _ = panic "mkExpectedAcutalMsg"
 
-{-
+{- Note [Insoluble occurs check wins]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider [G] a ~ [a],  [W] a ~ [a] (Trac #13674).  The Given is insoluble
+so we don't use it for rewriting.  The Wanted is also insoluble, and
+we don't solve it from the Given.  It's very confusing to say
+    Cannot solve a ~ [a] from given constraints a ~ [a]
+
+And indeed even thinking about the Givens is silly; [W] a ~ [a] is
+just as insoluble as Int ~ Bool.
+
+Conclusion: if there's an insoluble occurs check (isInsolubleOccursCheck)
+then report it first.
+
+(NB: there are potentially-soluble ones, like (a ~ F a b), and we don't
+want to be as draconian with them.)
+
 Note [Expanding type synonyms to make types similar]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -2483,7 +2503,7 @@ mk_dict_err ctxt@(CEC {cec_encl = implics}) (ct, (matches, unifiers, unsafe_over
     -- Overlap error because of Safe Haskell (first
     -- match should be the most specific match)
     safe_haskell_msg
-     = ASSERT( length matches == 1 && not (null unsafe_ispecs) )
+     = ASSERT( matches `lengthIs` 1 && not (null unsafe_ispecs) )
        vcat [ addArising orig (text "Unsafe overlapping instances for"
                        <+> pprType (mkClassPred clas tys))
             , sep [text "The matching instance is:",
@@ -2686,7 +2706,7 @@ pprPotentials dflags sty herald insts
                      <+> text "involving out-of-scope types")
            2 (ppWhen show_potentials (pprInstances not_in_scope))
 
-    flag_hint = ppUnless (show_potentials || length show_these == length insts) $
+    flag_hint = ppUnless (show_potentials || equalLength show_these insts) $
                 text "(use -fprint-potential-instances to see them all)"
 
 {- Note [Displaying potential instances]

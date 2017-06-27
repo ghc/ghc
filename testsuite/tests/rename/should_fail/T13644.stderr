@@ -1,0 +1,6 @@
+
+T13644.hs:6:24: error:
+    • Constructor ‘FuncId’ does not have field ‘name’
+    • In the pattern: FuncId {name = nm}
+      In an equation for ‘baseENDECfuncs’:
+          baseENDECfuncs FuncId {name = nm} = undefined

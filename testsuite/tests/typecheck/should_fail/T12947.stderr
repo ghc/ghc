@@ -1,0 +1,3 @@
+
+T12947.hs:15:14: error:
+    Data constructor not in scope: ContT :: (p0 -> m0 a0) -> P m a

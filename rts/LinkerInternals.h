@@ -20,9 +20,6 @@
 typedef void SymbolAddr;
 typedef char SymbolName;
 
-typedef struct _SectionFormatInfo SectionFormatInfo;
-typedef struct _ObjectCodeFormatInfo ObjectCodeFormatInfo;
-
 /* See Linker.c Note [runtime-linker-phases] */
 typedef enum {
     OBJECT_LOADED,
@@ -35,13 +32,23 @@ typedef enum {
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
+   See Note [BFD import libraries].
 */
 typedef
-   enum { SECTIONKIND_CODE_OR_RODATA,
+   enum { /* Section is code or readonly. e.g. .text or .r(o)data.  */
+          SECTIONKIND_CODE_OR_RODATA,
+          /* Section contains read/write data. e.g. .data.  */
           SECTIONKIND_RWDATA,
+          /* Static initializer section. e.g. .ctors.  */
           SECTIONKIND_INIT_ARRAY,
+          /* We don't know what the section is and don't care.  */
           SECTIONKIND_OTHER,
-          SECTIONKIND_NOINFOAVAIL }
+          /* Section belongs to an import section group. e.g. .idata$.  */
+          SECTIONKIND_IMPORT,
+          /* Section defines an import library entry, e.g. idata$7.  */
+          SECTIONKIND_IMPORT_LIBRARY,
+          SECTIONKIND_NOINFOAVAIL
+        }
    SectionKind;
 
 typedef
@@ -51,6 +58,18 @@ typedef
           SECTION_MALLOC,
         }
    SectionAlloc;
+
+/*
+ * Note [No typedefs for customizable types]
+ * Some pointer-to-struct types are defined opaquely
+ * first, and customized later to architecture/ABI-specific
+ * instantiations. Having the usual
+ *   typedef struct _Foo {...} Foo;
+ * wrappers is hard to get right with older versions of GCC,
+ * so just have a
+ *   struct Foo {...};
+ * and always refer to it with the 'struct' qualifier.
+ */
 
 typedef
    struct _Section {
@@ -66,8 +85,10 @@ typedef
       void* mapped_start;         /* start of mmap() block */
       StgWord mapped_size;        /* size of mmap() block */
 
-      /* A customizable type to augment the Section type. */
-       SectionFormatInfo* info;
+      /* A customizable type to augment the Section type.
+       * See Note [No typedefs for customizable types]
+       */
+      struct SectionFormatInfo* info;
    }
    Section;
 
@@ -90,12 +111,8 @@ typedef struct ForeignExportStablePtr_ {
     struct ForeignExportStablePtr_ *next;
 } ForeignExportStablePtr;
 
-#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH) \
-    || defined(arm_HOST_ARCH)
-/* ios currently uses adjacent got tables, and no symbol extras */
-#if !defined(ios_HOST_OS)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 #define NEED_SYMBOL_EXTRAS 1
-#endif /* ios_HOST_OS */
 #endif
 
 /* Jump Islands are sniplets of machine code required for relative
@@ -142,8 +159,10 @@ typedef struct _ObjectCode {
     /* ptr to mem containing the object file image */
     char*      image;
 
-    /* A customizable type, that formats can use to augment ObjectCode */
-    ObjectCodeFormatInfo *info;
+    /* A customizable type, that formats can use to augment ObjectCode
+     * See Note [No typedefs for customizable types]
+     */
+    struct ObjectCodeFormatInfo* info;
 
     /* non-zero if the object file was mmap'd, otherwise malloc'd */
     int        imageMapped;
@@ -321,8 +340,8 @@ char *cstring_from_section_name(
 #  include "linker/ElfTypes.h"
 #elif defined (mingw32_HOST_OS)
 #  define OBJFORMAT_PEi386
-struct _SectionFormatInfo { void* placeholder; };
-struct _ObjectCodeFormatInfo { void* placeholder; };
+struct SectionFormatInfo { void* placeholder; };
+struct ObjectCodeFormatInfo { void* placeholder; };
 #elif defined(darwin_HOST_OS) || defined(ios_HOST_OS)
 #  define OBJFORMAT_MACHO
 #  include "linker/MachOTypes.h"

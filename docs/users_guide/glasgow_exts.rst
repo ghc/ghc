@@ -8446,7 +8446,7 @@ think about compiling this to runnable code, though, problems appear.
 In particular, when we call ``bad``, we must somehow pass ``x`` into
 ``bad``. How wide (that is, how many bits) is ``x``? Is it a pointer?
 What kind of register (floating-point or integral) should ``x`` go in?
-It's all impossible to say, because ``x``'s type, ``TYPE r2`` is
+It's all impossible to say, because ``x``'s type, ``a :: TYPE r1`` is
 levity polymorphic. We thus forbid such constructions, via the
 following straightforward rule:
 
@@ -8943,9 +8943,22 @@ the function is callable. For example: ::
 
 Here ``strange``\'s type is ambiguous, but the call in ``foo`` is OK
 because it gives rise to a constraint ``(D Bool beta)``, which is
-soluble by the ``(D Bool b)`` instance. So the language extension
+soluble by the ``(D Bool b)`` instance.
+
+Another way of getting rid of the ambiguity at the call site is to use
+the :ghc-flag:`-XTypeApplications` flag to specify the types. For example: ::
+
+      class D a b where
+        h :: b
+      instance D Int Int where ...
+
+      main = print (h @Int @Int)
+
+Here ``a`` is ambiguous in the definition of ``D`` but later specified
+to be `Int` using type applications.
+
 :ghc-flag:`-XAllowAmbiguousTypes` allows you to switch off the ambiguity check.
-But even with ambiguity checking switched off, GHC will complain about a
+However, even with ambiguity checking switched off, GHC will complain about a
 function that can *never* be called, such as this one: ::
 
       f :: (Int ~ Bool) => a -> a
@@ -9497,7 +9510,7 @@ Here are the details:
        visible type application.
 
      * Universal variables always come first, in precisely the order they
-       appear in the type delcaration. Universal variables that are
+       appear in the type declaration. Universal variables that are
        constrained by a GADT return type are not included in the data constructor.
 
      * Existential variables come next. Their order is determined by a user-
@@ -10545,7 +10558,7 @@ for constructing pretty-printed error messages, ::
         | ErrorMessage :<>: ErrorMessage     -- Put two chunks of error message next to each other
         | ErrorMessage :$$: ErrorMessage     -- Put two chunks of error message above each other
 
-in the ``GHC.TypeLits`` :base-ref:`module <GHC-TypeList.html>`.
+in the ``GHC.TypeLits`` :base-ref:`module <GHC-TypeLits.html>`.
 
 For instance, we might use this interface to provide a more useful error
 message for applications of ``show`` on unsaturated functions like this, ::
@@ -11671,7 +11684,7 @@ abstraction.
 We could define our own operator ::
 
     untilA :: ArrowChoice a => a (e,s) () -> a (e,s) Bool -> a (e,s) ()
-    untilA body cond = proc x ->
+    untilA body cond = proc x -> do
             b <- cond -< x
             if b then returnA -< ()
             else do
@@ -12597,6 +12610,12 @@ are two ways of using these pragmas.
    type constructor ``T`` *or* the data constructor ``T``, or both if
    both are in scope. If both are in scope, there is currently no way to
    specify one without the other (c.f. fixities :ref:`infix-tycons`).
+
+Also note that the argument to ``DEPRECATED`` and ``WARNING`` can also be a list
+of strings, in which case the strings will be presented on separate lines in the
+resulting warning message, ::
+
+    {-# DEPRECATED foo, bar ["Don't use these", "Use gar instead"] #-}
 
 Warnings and deprecations are not reported for (a) uses within the
 defining module, (b) defining a method in a class instance, and (c) uses

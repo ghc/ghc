@@ -45,11 +45,9 @@ optimisation to be performed, which can have an impact on how much of
 your program needs to be recompiled when you change something. This is
 one reason to stick to no-optimisation when developing code.
 
-.. ghc-flag:: -O*
-
-    This is taken to mean: “Please compile quickly; I'm not
-    over-bothered about compiled-code quality.” So, for example:
-    ``ghc -c Foo.hs``
+**No ``-O*``-type option specified:** This is taken to mean “Please 
+compile quickly; I'm not over-bothered about compiled-code quality.”
+So, for example, ``ghc -c Foo.hs``
 
 .. ghc-flag:: -O0
 
@@ -108,8 +106,7 @@ The easiest way to see what ``-O`` (etc.) “really mean” is to run with
 These flags turn on and off individual optimisations. Flags marked as
 on by default are enabled by ``-O``, and as such you shouldn't
 need to set any of them explicitly. A flag ``-fwombat`` can be negated
-by saying ``-fno-wombat``. See :ref:`options-f-compact` for a compact
-list.
+by saying ``-fno-wombat``.
 
 .. ghc-flag:: -fcase-merge
 
@@ -649,7 +646,7 @@ list.
     :default: on
 
     When solving constraints, try to eagerly solve
-    super classes using availible dictionaries.
+    super classes using available dictionaries.
 
     For example::
 
@@ -664,7 +661,7 @@ list.
     constraint from the context  because we have `C Int b` and that provides us
     a
     solution for `Num Int`. However, we can often produce much better code
-    by directly solving for an availible `Num Int` dictionary we might have at
+    by directly solving for an available `Num Int` dictionary we might have at
     hand. This removes potentially many layers of indirection and crucially
     allows other optimisations to fire as the dictionary will be statically
     known and selector functions can be inlined.

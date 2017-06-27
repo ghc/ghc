@@ -20,7 +20,7 @@ import Reg
 
 import GraphBase
 
-import Hoopl (mapLookup)
+import Hoopl.Collections (mapLookup)
 import Cmm
 import UniqFM
 import UniqSet

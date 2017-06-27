@@ -1952,8 +1952,8 @@ trim_pats env fn (SI { si_n_specs = done_spec_count }) pats
      -- segment of this list
 
     pat_cons :: CallPat -> Int
-    -- How many data consturorst of literals are in
-    -- the patten.  More data-cons => less general
+    -- How many data constructors of literals are in
+    -- the pattern.  More data-cons => less general
     pat_cons (qs, ps) = foldr ((+) . n_cons) 0 ps
        where
           q_set = mkVarSet qs
@@ -1984,7 +1984,7 @@ callToPats :: ScEnv -> [ArgOcc] -> Call -> UniqSM (Maybe CallPat)
         --      over the following term variables
         -- The [CoreExpr] are the argument patterns for the rule
 callToPats env bndr_occs (Call _ args con_env)
-  | length args < length bndr_occs      -- Check saturated
+  | args `ltLength` bndr_occs      -- Check saturated
   = return Nothing
   | otherwise
   = do  { let in_scope      = substInScope (sc_subst env)

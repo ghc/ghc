@@ -230,30 +230,6 @@ stg_gc_prim_p_ll
 }
 
 /* -----------------------------------------------------------------------------
-   stg_enter_checkbh is just like stg_enter, except that we also call
-   checkBlockingQueues().  The point of this is that the GC can
-   replace an stg_marked_upd_frame with an stg_enter_checkbh if it
-   finds that the BLACKHOLE has already been updated by another
-   thread.  It would be unsafe to use stg_enter, because there might
-   be an orphaned BLOCKING_QUEUE now.
-   -------------------------------------------------------------------------- */
-
-/* The stg_enter_checkbh frame has the same shape as an update frame: */
-
-INFO_TABLE_RET ( stg_enter_checkbh, RET_SMALL,
-                 UPDATE_FRAME_FIELDS(W_,P_,info_ptr,ccs,p2,updatee))
-    return (P_ ret)
-{
-    foreign "C" checkBlockingQueues(MyCapability() "ptr",
-                                    CurrentTSO);
-
-    // we need to return updatee now.  Note that it might be a pointer
-    // to an indirection or a tagged value, we don't know which, so we
-    // need to ENTER() rather than return().
-    ENTER(updatee);
-}
-
-/* -----------------------------------------------------------------------------
    Info tables for returning values of various types.  These are used
    when we want to push a frame on the stack that will return a value
    to the frame underneath it.

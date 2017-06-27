@@ -41,7 +41,7 @@ import SMRep
 import Bitmap
 import Stream (Stream)
 import qualified Stream
-import Hoopl
+import Hoopl.Collections
 
 import Maybes
 import DynFlags

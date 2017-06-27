@@ -64,8 +64,7 @@ Library
                    transformers == 0.5.*,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
-                   ghci == @ProjectVersionMunged@,
-                   hoopl      >= 3.10.2 && < 3.11
+                   ghci == @ProjectVersionMunged@
 
     if os(windows)
         Build-Depends: Win32  >= 2.3 && < 2.6
@@ -165,6 +164,7 @@ Library
         vectorise
 
     Exposed-Modules:
+        FileCleanup
         DriverBkp
         BkpSyn
         NameShape
@@ -312,6 +312,7 @@ Library
         HsImpExp
         HsLit
         PlaceHolder
+        HsExtension
         HsPat
         HsSyn
         HsTypes
@@ -544,8 +545,12 @@ Library
         Vectorise.Env
         Vectorise.Exp
         Vectorise
+        Hoopl.Block
+        Hoopl.Collections
         Hoopl.Dataflow
-        Hoopl
+        Hoopl.Graph
+        Hoopl.Label
+        Hoopl.Unique
 --        CgInfoTbls used in ghci/DebuggerUtils
 --        CgHeapery  mkVirtHeapOffsets used in ghci
 

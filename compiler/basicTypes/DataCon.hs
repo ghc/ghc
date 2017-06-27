@@ -233,7 +233,7 @@ It's a flaw in the language.
         it separately in the type checker on occurrences of a
         constructor, either in an expression or in a pattern.
 
-        [May 2003: actually I think this decision could evasily be
+        [May 2003: actually I think this decision could easily be
         reversed now, and probably should be.  Generics could be
         disabled for types with a stupid context; record updates now
         (H98) needs the context too; etc.  It's an unforced change, so
@@ -1130,7 +1130,7 @@ dataConInstArgTys :: DataCon    -- ^ A datacon with no existentials or equality 
                   -> [Type]
 dataConInstArgTys dc@(MkData {dcUnivTyVars = univ_tvs,
                               dcExTyVars = ex_tvs}) inst_tys
- = ASSERT2( length univ_tvs == length inst_tys
+ = ASSERT2( univ_tvs `equalLength` inst_tys
           , text "dataConInstArgTys" <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2( null ex_tvs, ppr dc )
    map (substTyWith (binderVars univ_tvs) inst_tys) (dataConRepArgTys dc)
@@ -1147,7 +1147,7 @@ dataConInstOrigArgTys
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcUnivTyVars = univ_tvs,
                                   dcExTyVars = ex_tvs}) inst_tys
-  = ASSERT2( length tyvars == length inst_tys
+  = ASSERT2( tyvars `equalLength` inst_tys
           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where

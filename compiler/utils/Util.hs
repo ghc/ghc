@@ -36,9 +36,10 @@ module Util (
 
         foldl1', foldl2, count, all2,
 
-        lengthExceeds, lengthIs, lengthAtLeast,
+        lengthExceeds, lengthIs, lengthIsNot,
+        lengthAtLeast, lengthAtMost, lengthLessThan,
         listLengthCmp, atLength,
-        equalLength, compareLength, leLength,
+        equalLength, neLength, compareLength, leLength, ltLength,
 
         isSingleton, only, singleton,
         notNull, snocView,
@@ -494,6 +495,7 @@ lengthExceeds lst n
   | otherwise
   = atLength notNull False lst n
 
+-- | @(lengthAtLeast xs n) = (length xs >= n)@
 lengthAtLeast :: [a] -> Int -> Bool
 lengthAtLeast = atLength (const True) False
 
@@ -505,6 +507,24 @@ lengthIs lst n
   | otherwise
   = atLength null False lst n
 
+-- | @(lengthIsNot xs n) = (length xs /= n)@
+lengthIsNot :: [a] -> Int -> Bool
+lengthIsNot lst n
+  | n < 0 = True
+  | otherwise = atLength notNull True lst n
+
+-- | @(lengthAtMost xs n) = (length xs <= n)@
+lengthAtMost :: [a] -> Int -> Bool
+lengthAtMost lst n
+  | n < 0
+  = False
+  | otherwise
+  = atLength null True lst n
+
+-- | @(lengthLessThan xs n) == (length xs < n)@
+lengthLessThan :: [a] -> Int -> Bool
+lengthLessThan = atLength (const False) True
+
 listLengthCmp :: [a] -> Int -> Ordering
 listLengthCmp = atLength atLen atEnd
  where
@@ -514,9 +534,16 @@ listLengthCmp = atLength atLen atEnd
   atLen _      = GT
 
 equalLength :: [a] -> [b] -> Bool
+-- ^ True if length xs == length ys
 equalLength []     []     = True
 equalLength (_:xs) (_:ys) = equalLength xs ys
 equalLength _      _      = False
+
+neLength :: [a] -> [b] -> Bool
+-- ^ True if length xs /= length ys
+neLength []     []     = False
+neLength (_:xs) (_:ys) = neLength xs ys
+neLength _      _      = True
 
 compareLength :: [a] -> [b] -> Ordering
 compareLength []     []     = EQ
@@ -529,6 +556,13 @@ leLength :: [a] -> [b] -> Bool
 leLength xs ys = case compareLength xs ys of
                    LT -> True
                    EQ -> True
+                   GT -> False
+
+ltLength :: [a] -> [b] -> Bool
+-- ^ True if length xs < length ys
+ltLength xs ys = case compareLength xs ys of
+                   LT -> True
+                   EQ -> False
                    GT -> False
 
 ----------------------------

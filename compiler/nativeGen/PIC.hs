@@ -58,7 +58,7 @@ import Reg
 import NCGMonad
 
 
-import Hoopl
+import Hoopl.Collections
 import Cmm
 import CLabel           ( CLabel, ForeignLabelSource(..), pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),

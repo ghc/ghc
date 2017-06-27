@@ -5,7 +5,7 @@
 \section{@Vars@: Variables}
 -}
 
-{-# LANGUAGE CPP, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
+{-# LANGUAGE CPP, FlexibleContexts, MultiWayIf, FlexibleInstances, DeriveDataTypeable #-}
 
 -- |
 -- #name_types#
@@ -521,7 +521,7 @@ instance Binary ArgFlag where
 ************************************************************************
 -}
 
-idInfo :: Id -> IdInfo
+idInfo :: HasDebugCallStack => Id -> IdInfo
 idInfo (Id { id_info = info }) = info
 idInfo other                   = pprPanic "idInfo" (ppr other)
 

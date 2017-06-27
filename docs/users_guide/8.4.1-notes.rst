@@ -76,9 +76,15 @@ Now we generate ::
 
       _ == _ = error ...
 
-- Lots of other bugs. See `Trac
-   <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
-   for a complete list.
+- Configure on Windows now supports ``--enable-distro-toolchain`` which can be
+  used to build a GHC using compilers on your ``PATH`` instead of using the
+  bundled bindist. See :ghc-ticket:`13792`
+
+- Windows no longer uses an intermediate GCC driver and instead calls GCC
+  directly. See :ghc-ticket:`13709`.
+
+- Lots of other bugs. See `Trac <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
+  for a complete list.
 
 Runtime system
 ~~~~~~~~~~~~~~
@@ -86,8 +92,46 @@ Runtime system
 - Function ``hs_add_root()`` was removed. It was a no-op since GHC-7.2.1
   where module initialisation stopped requiring a call to ``hs_add_root()``.
 
+- Proper import library support added to GHC which can handle all of the libraries produced
+  by dlltool. The limitation of them needing to be named with the suffix .dll.a is also removed.
+  See :ghc-ticket:`13606`, :ghc-ticket:`12499`, :ghc-ticket:`12498`
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
 ``ghc`` library
 ~~~~~~~~~~~~~~~
+
+- hsSyn Abstract Syntax Tree (AST) is now extensible via the mechanism described in `Trees that Grow <http://www.jucs.org/jucs_23_1/trees_that_grow/jucs_23_01_0042_0062_najd.pdf>`_
+
+  The main change for users of the GHC API is that the AST is no longer indexed
+  by the type used as the identifier, but by a specific index type, ::
+
+      type GhcPs   = GhcPass 'Parsed      -- Old 'RdrName' type param
+      type GhcRn   = GhcPass 'Renamed     -- Old 'Name' type param
+      type GhcTc   = GhcPass 'Typechecked -- Old 'Id' type para,
+      type GhcTcId = GhcTc                -- Old 'TcId' type param
+
+  The simplest way to support the current GHC as well as earlier ones is to define ::
+
+      #if MIN_VERSION_ghc(8,3,0)
+      type ParseI     = GhcPs
+      type RenameI    = GhcRn
+      type TypecheckI = GhcTc
+      #else
+      type ParseI     = RdrName
+      type RenameI    = Name
+      type TypecheckI = Var
+      #endif
+
+  and then replace all hardcoded index types accordingly. For polymorphic types,
+  the constraint ::
+
+      #if MIN_VERSION_ghc(8,3,0)
+      -- |bundle up the constraints required for a trees that grow pass
+      type IsPass pass = (DataId pass, OutputableBndrId pass, SourceTextX pass)
+      else
+      type IsPass pass = (DataId pass, OutputableBndrId pass)
+      #endif
+
+  can be used.

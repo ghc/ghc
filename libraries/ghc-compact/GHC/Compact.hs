@@ -104,12 +104,12 @@ import GHC.Types
 --
 -- The cost of compaction is similar to the cost of GC for the same
 -- data, but it is performed only once.  However, because
--- "Data.Compact.compact" does not stop-the-world, retaining internal
+-- "GHC.Compact.compact" does not stop-the-world, retaining internal
 -- sharing during the compaction process is very costly. The user
 -- can choose whether to 'compact' or 'compactWithSharing'.
 --
 -- When you have a @'Compact' a@, you can get a pointer to the actual object
--- in the region using "Data.Compact.getCompact".  The 'Compact' type
+-- in the region using "GHC.Compact.getCompact".  The 'Compact' type
 -- serves as handle on the region itself; you can use this handle
 -- to add data to a specific 'Compact' with 'compactAdd' or
 -- 'compactAddWithSharing' (giving you a new handle which corresponds

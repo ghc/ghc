@@ -3,28 +3,7 @@
 #include "Rts.h"
 #include "linker/CacheFlush.h"
 
-#if defined(arm_HOST_ARCH)
-
-void
-ocFlushInstructionCache( ObjectCode *oc )
-{
-    int i;
-    // Object code
-    for (i=0; i < oc->n_sections; i++) {
-        Section *s = &oc->sections[i];
-        // This is a bit too broad but we don't have any way to determine what
-        // is certainly code
-        if (s->kind == SECTIONKIND_CODE_OR_RODATA)
-            __clear_cache(s->start, (void*) ((uintptr_t) s->start + s->size));
-    }
-
-    // Jump islands
-    // Note the (+1) to ensure that the last symbol extra is covered by the
-    // flush.
-    __clear_cache(oc->symbol_extras, &oc->symbol_extras[oc->n_symbol_extras+1]);
-}
-
-#elif defined(powerpc_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH)
 /*
    ocFlushInstructionCache
 

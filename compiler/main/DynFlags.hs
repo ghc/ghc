@@ -155,6 +155,9 @@ module DynFlags (
         -- * Linker/compiler information
         LinkerInfo(..),
         CompilerInfo(..),
+
+        -- * File cleanup
+        FilesToClean(..), emptyFilesToClean
   ) where
 
 #include "HsVersions.h"
@@ -168,7 +171,8 @@ import {-# SOURCE #-} PrelNames ( mAIN )
 import {-# SOURCE #-} Packages (PackageState, emptyPackageState)
 import DriverPhases     ( Phase(..), phaseInputExt )
 import Config
-import CmdLineParser
+import CmdLineParser hiding (WarnReason(..))
+import qualified CmdLineParser as Cmd
 import Constants
 import Panic
 import qualified PprColour as Col
@@ -796,6 +800,8 @@ data DynFlags = DynFlags {
   pluginModNames        :: [ModuleName],
   pluginModNameOpts     :: [(ModuleName,String)],
   frontendPluginOpts    :: [String],
+    -- ^ the @-ffrontend-opt@ flags given on the command line, in *reverse*
+    -- order that they're specified on the command line.
 
   -- GHC API hooks
   hooks                 :: Hooks,
@@ -838,9 +844,8 @@ data DynFlags = DynFlags {
   -- Temporary files
   -- These have to be IORefs, because the defaultCleanupHandler needs to
   -- know what to clean when an exception happens
-  filesToClean          :: IORef [FilePath],
+  filesToClean          :: IORef FilesToClean,
   dirsToClean           :: IORef (Map FilePath FilePath),
-  filesToNotIntermediateClean :: IORef [FilePath],
   -- The next available suffix to uniquely name a temp file, updated atomically
   nextTempSuffix        :: IORef Int,
 
@@ -1142,12 +1147,10 @@ versionedFilePath dflags =     TARGET_ARCH
 -- 'HscNothing' can be used to avoid generating any output, however, note
 -- that:
 --
---  * If a program uses Template Haskell the typechecker may try to run code
---    from an imported module.  This will fail if no code has been generated
---    for this module.  You can use 'GHC.needsTemplateHaskell' to detect
---    whether this might be the case and choose to either switch to a
---    different target or avoid typechecking such modules.  (The latter may be
---    preferable for security reasons.)
+--  * If a program uses Template Haskell the typechecker may need to run code
+--    from an imported module.  To facilitate this, code generation is enabled
+--    for modules imported by modules that use template haskell.
+--    See Note [-fno-code mode].
 --
 data HscTarget
   = HscC           -- ^ Generate C code.
@@ -1504,9 +1507,8 @@ initDynFlags dflags = do
          = platformOS (targetPlatform dflags) /= OSMinGW32
  refCanGenerateDynamicToo <- newIORef platformCanGenerateDynamicToo
  refNextTempSuffix <- newIORef 0
- refFilesToClean <- newIORef []
+ refFilesToClean <- newIORef emptyFilesToClean
  refDirsToClean <- newIORef Map.empty
- refFilesToNotIntermediateClean <- newIORef []
  refGeneratedDumps <- newIORef Set.empty
  refRtldInfo <- newIORef Nothing
  refRtccInfo <- newIORef Nothing
@@ -1530,7 +1532,6 @@ initDynFlags dflags = do
         nextTempSuffix = refNextTempSuffix,
         filesToClean   = refFilesToClean,
         dirsToClean    = refDirsToClean,
-        filesToNotIntermediateClean = refFilesToNotIntermediateClean,
         generatedDumps = refGeneratedDumps,
         nextWrapperNum = wrapperNum,
         useUnicode    = canUseUnicode,
@@ -1647,7 +1648,6 @@ defaultDynFlags mySettings =
         nextTempSuffix = panic "defaultDynFlags: No nextTempSuffix",
         filesToClean   = panic "defaultDynFlags: No filesToClean",
         dirsToClean    = panic "defaultDynFlags: No dirsToClean",
-        filesToNotIntermediateClean = panic "defaultDynFlags: No filesToNotIntermediateClean",
         generatedDumps = panic "defaultDynFlags: No generatedDumps",
         haddockOptions = Nothing,
         dumpFlags = EnumSet.empty,
@@ -2348,7 +2348,7 @@ updOptLevel n dfs
 -- Throws a 'UsageError' if errors occurred during parsing (such as unknown
 -- flags or missing arguments).
 parseDynamicFlagsCmdLine :: MonadIO m => DynFlags -> [Located String]
-                         -> m (DynFlags, [Located String], [Located String])
+                         -> m (DynFlags, [Located String], [Warn])
                             -- ^ Updated 'DynFlags', left-over arguments, and
                             -- list of warnings.
 parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
@@ -2358,7 +2358,7 @@ parseDynamicFlagsCmdLine = parseDynamicFlagsFull flagsAll True
 -- (-package, -hide-package, -ignore-package, -hide-all-packages, -package-db).
 -- Used to parse flags set in a modules pragma.
 parseDynamicFilePragma :: MonadIO m => DynFlags -> [Located String]
-                       -> m (DynFlags, [Located String], [Located String])
+                       -> m (DynFlags, [Located String], [Warn])
                           -- ^ Updated 'DynFlags', left-over arguments, and
                           -- list of warnings.
 parseDynamicFilePragma = parseDynamicFlagsFull flagsDynamic False
@@ -2373,14 +2373,14 @@ parseDynamicFlagsFull :: MonadIO m
                   -> Bool                          -- ^ are the arguments from the command line?
                   -> DynFlags                      -- ^ current dynamic flags
                   -> [Located String]              -- ^ arguments to parse
-                  -> m (DynFlags, [Located String], [Located String])
+                  -> m (DynFlags, [Located String], [Warn])
 parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
   let ((leftover, errs, warns), dflags1)
           = runCmdLine (processArgs activeFlags args) dflags0
 
   -- See Note [Handling errors when parsing commandline flags]
-  unless (null errs) $ liftIO $ throwGhcExceptionIO $
-      errorsToGhcException . map (showPpr dflags0 . getLoc &&& unLoc) $ errs
+  unless (null errs) $ liftIO $ throwGhcExceptionIO $ errorsToGhcException $
+    map ((showPpr dflags0 . getLoc &&& unLoc) . errMsg) $ errs
 
   -- check for disabled flags in safe haskell
   let (dflags2, sh_warns) = safeFlagCheck cmdline dflags1
@@ -2427,7 +2427,9 @@ parseDynamicFlagsFull activeFlags cmdline dflags0 args = do
 
   liftIO $ setUnsafeGlobalDynFlags dflags7
 
-  return (dflags7, leftover, consistency_warnings ++ sh_warns ++ warns)
+  let warns' = map (Warn Cmd.NoReason) (consistency_warnings ++ sh_warns)
+
+  return (dflags7, leftover, warns' ++ warns)
 
 setLogAction :: DynFlags -> IO DynFlags
 setLogAction dflags = do
@@ -2593,8 +2595,8 @@ dynamic_flags_deps = [
   , make_ord_flag defFlag "F"        (NoArg (setGeneralFlag Opt_Pp))
   , (Deprecated, defFlag "#include"
       (HasArg (\_s ->
-         addWarn ("-#include and INCLUDE pragmas are " ++
-                  "deprecated: They no longer have any effect"))))
+         deprecate ("-#include and INCLUDE pragmas are " ++
+                    "deprecated: They no longer have any effect"))))
   , make_ord_flag defFlag "v"        (OptIntSuffix setVerbosity)
 
   , make_ord_flag defGhcFlag "j"     (OptIntSuffix
@@ -3266,11 +3268,11 @@ dynamic_flags_deps = [
 
   , make_ord_flag defGhcFlag "fasm"             (NoArg (setObjTarget HscAsm))
   , make_ord_flag defGhcFlag "fvia-c"           (NoArg
-         (addWarn $ "The -fvia-c flag does nothing; " ++
-                    "it will be removed in a future GHC release"))
+         (deprecate $ "The -fvia-c flag does nothing; " ++
+                      "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fvia-C"           (NoArg
-         (addWarn $ "The -fvia-C flag does nothing; " ++
-                    "it will be removed in a future GHC release"))
+         (deprecate $ "The -fvia-C flag does nothing; " ++
+                      "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjTarget HscLlvm))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
@@ -3344,7 +3346,8 @@ unrecognisedWarning prefix = defHiddenFlag prefix (Prefix action)
     action :: String -> EwM (CmdLineP DynFlags) ()
     action flag = do
       f <- wopt Opt_WarnUnrecognisedWarningFlags <$> liftEwM getCmdLineState
-      when f $ addWarn $ "unrecognised warning flag: -" ++ prefix ++ flag
+      when f $ addFlagWarn Cmd.ReasonUnrecognisedFlag $
+        "unrecognised warning flag: -" ++ prefix ++ flag
 
 -- See Note [Supporting CLI completion]
 package_flags_deps :: [(Deprecation, Flag (CmdLineP DynFlags))]
@@ -5326,3 +5329,24 @@ decodeSize str
 
 foreign import ccall unsafe "setHeapSize"       setHeapSize       :: Int -> IO ()
 foreign import ccall unsafe "enableTimingStats" enableTimingStats :: IO ()
+
+-- -----------------------------------------------------------------------------
+-- Types for managing temporary files.
+--
+-- these are here because FilesToClean is used in DynFlags
+
+-- | A collection of files that must be deleted before ghc exits.
+-- The current collection
+-- is stored in an IORef in DynFlags, 'filesToClean'.
+data FilesToClean = FilesToClean {
+  ftcGhcSession :: !(Set FilePath),
+  -- ^ Files that will be deleted at the end of runGhc(T)
+  ftcCurrentModule :: !(Set FilePath)
+  -- ^ Files that will be deleted the next time
+  -- 'FileCleanup.cleanCurrentModuleTempFiles' is called, or otherwise at the
+  -- end of the session.
+  }
+
+-- | An empty FilesToClean
+emptyFilesToClean :: FilesToClean
+emptyFilesToClean = FilesToClean Set.empty Set.empty

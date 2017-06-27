@@ -403,6 +403,9 @@ tyConBinderArgFlag (TvBndr _ (NamedTCB vis)) = vis
 tyConBinderArgFlag (TvBndr _ AnonTCB)        = Required
 
 isNamedTyConBinder :: TyConBinder -> Bool
+-- Identifies kind variables
+-- E.g. data T k (a:k) = blah
+-- Here 'k' is a NamedTCB, a variable used in the kind of other binders
 isNamedTyConBinder (TvBndr _ (NamedTCB {})) = True
 isNamedTyConBinder _                        = False
 
@@ -427,7 +430,7 @@ mkTyConKind bndrs res_kind = foldr mk res_kind bndrs
 All TyCons have this group of fields
   tyConBinders :: [TyConBinder]
   tyConResKind :: Kind
-  tyConTyVars  :: [TyVra] -- Cached = binderVars tyConBinders
+  tyConTyVars  :: [TyVar] -- Cached = binderVars tyConBinders
   tyConKind    :: Kind    -- Cached = mkTyConKind tyConBinders tyConResKind
   tyConArity   :: Arity   -- Cached = length tyConBinders
 
@@ -888,7 +891,7 @@ okParent :: Name -> AlgTyConFlav -> Bool
 okParent _       (VanillaAlgTyCon {})            = True
 okParent _       (UnboxedAlgTyCon {})            = True
 okParent tc_name (ClassTyCon cls _)              = tc_name == tyConName (classTyCon cls)
-okParent _       (DataFamInstTyCon _ fam_tc tys) = tyConArity fam_tc == length tys
+okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthIs` tyConArity fam_tc
 
 isNoParent :: AlgTyConFlav -> Bool
 isNoParent (VanillaAlgTyCon {}) = True
@@ -1731,7 +1734,7 @@ isDataSumTyCon_maybe :: TyCon -> Maybe [DataCon]
 isDataSumTyCon_maybe (AlgTyCon { algTcRhs = rhs })
   = case rhs of
       DataTyCon { data_cons = cons }
-        | length cons > 1
+        | cons `lengthExceeds` 1
         , all (null . dataConExTyVars) cons -- FIXME(osa): Why do we need this?
         -> Just cons
       SumTyCon { data_cons = cons }
@@ -2021,10 +2024,10 @@ expandSynTyCon_maybe
 -- ^ Expand a type synonym application, if any
 expandSynTyCon_maybe tc tys
   | SynonymTyCon { tyConTyVars = tvs, synTcRhs = rhs, tyConArity = arity } <- tc
-  = case arity `compare` length tys of
-        LT -> Just (tvs `zip` tys, rhs, drop arity tys)
+  = case tys `listLengthCmp` arity of
+        GT -> Just (tvs `zip` tys, rhs, drop arity tys)
         EQ -> Just (tvs `zip` tys, rhs, [])
-        GT -> Nothing
+        LT -> Nothing
    | otherwise
    = Nothing
 

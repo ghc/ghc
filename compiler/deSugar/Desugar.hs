@@ -7,6 +7,7 @@ The Desugarer: turning HsSyn into Core.
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Desugar (
     -- * Desugaring operations
@@ -250,7 +251,7 @@ So we pull out the type/coercion variables (which are in dependency order),
 and Rec the rest.
 -}
 
-deSugarExpr :: HscEnv -> LHsExpr Id -> IO (Messages, Maybe CoreExpr)
+deSugarExpr :: HscEnv -> LHsExpr GhcTc -> IO (Messages, Maybe CoreExpr)
 
 deSugarExpr hsc_env tc_expr = do {
          let dflags = hsc_dflags hsc_env
@@ -362,7 +363,7 @@ Reason
 ************************************************************************
 -}
 
-dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
+dsRule :: LRuleDecl GhcTc -> DsM (Maybe CoreRule)
 dsRule (L loc (HsRule name rule_act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $
     do  { let bndrs' = [var | L _ (RuleBndr (L _ var)) <- vars]
@@ -541,7 +542,7 @@ subsequent transformations could fire.
 ************************************************************************
 -}
 
-dsVect :: LVectDecl Id -> DsM CoreVect
+dsVect :: LVectDecl GhcTc -> DsM CoreVect
 dsVect (L loc (HsVect _ (L _ v) rhs))
   = putSrcSpanDs loc $
     do { rhs' <- dsLExpr rhs

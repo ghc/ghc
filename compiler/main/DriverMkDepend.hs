@@ -19,7 +19,7 @@ import GhcMonad
 import DynFlags
 import Util
 import HscTypes
-import SysTools         ( newTempName )
+import FileCleanup      ( newTempName )
 import qualified SysTools
 import Module
 import Digraph          ( SCC(..) )
@@ -29,6 +29,7 @@ import Panic
 import SrcLoc
 import Data.List
 import FastString
+import FileCleanup
 
 import Exception
 import ErrUtils
@@ -121,7 +122,7 @@ beginMkDependHS :: DynFlags -> IO MkDepFiles
 beginMkDependHS dflags = do
         -- open a new temp file in which to stuff the dependency info
         -- as we go along.
-  tmp_file <- newTempName dflags "dep"
+  tmp_file <- newTempName dflags TFL_CurrentModule "dep"
   tmp_hdl <- openFile tmp_file WriteMode
 
         -- open the makefile

@@ -170,7 +170,7 @@ knownKeyNamesOkay all_names
   where
     namesEnv      = foldl (\m n -> extendNameEnv_Acc (:) singleton m n n)
                           emptyUFM all_names
-    badNamesEnv   = filterNameEnv (\ns -> length ns > 1) namesEnv
+    badNamesEnv   = filterNameEnv (\ns -> ns `lengthExceeds` 1) namesEnv
     badNamesPairs = nonDetUFMToList badNamesEnv
       -- It's OK to use nonDetUFMToList here because the ordering only affects
       -- the message when we get a panic

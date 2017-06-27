@@ -11,12 +11,11 @@ module BlockId
 import CLabel
 import IdInfo
 import Name
-import Outputable
 import Unique
 import UniqSupply
 
-import Compiler.Hoopl as Hoopl hiding (Unique)
-import Compiler.Hoopl.Internals (uniqueToLbl, lblToUnique)
+import Hoopl.Label (Label, uniqueToLbl)
+import Hoopl.Unique (intToUnique)
 
 ----------------------------------------------------------------
 --- Block Ids, their environments, and their sets
@@ -30,13 +29,7 @@ most assembly languages allow, a label is visible throughout the entire
 compilation unit in which it appears.
 -}
 
-type BlockId = Hoopl.Label
-
-instance Uniquable BlockId where
-  getUnique label = getUnique (lblToUnique label)
-
-instance Outputable BlockId where
-  ppr label = ppr (getUnique label)
+type BlockId = Label
 
 mkBlockId :: Unique -> BlockId
 mkBlockId unique = uniqueToLbl $ intToUnique $ getKey unique

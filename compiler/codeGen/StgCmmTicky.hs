@@ -124,6 +124,7 @@ import Id
 import BasicTypes
 import FastString
 import Outputable
+import Util
 
 import DynFlags
 
@@ -381,7 +382,7 @@ tickyUnboxedTupleReturn arity
 -- Ticks at a *call site*:
 tickyDirectCall :: RepArity -> [StgArg] -> FCode ()
 tickyDirectCall arity args
-  | arity == length args = tickyKnownCallExact
+  | args `lengthIs` arity = tickyKnownCallExact
   | otherwise = do tickyKnownCallExtraArgs
                    tickySlowCallPat (map argPrimRep (drop arity args))
 
@@ -412,7 +413,7 @@ tickySlowCallPat :: [PrimRep] -> FCode ()
 tickySlowCallPat args = ifTicky $
   let argReps = map toArgRep args
       (_, n_matched) = slowCallPattern argReps
-  in if n_matched > 0 && n_matched == length args
+  in if n_matched > 0 && args `lengthIs` n_matched
      then bumpTickyLbl $ mkRtsSlowFastTickyCtrLabel $ concatMap (map Data.Char.toLower . argRepString) argReps
      else bumpTickyCounter $ fsLit "VERY_SLOW_CALL_ctr"
 

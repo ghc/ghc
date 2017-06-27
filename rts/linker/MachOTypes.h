@@ -6,13 +6,14 @@
 
 #include <mach-o/loader.h>
 
-#if x86_64_HOST_ARCH || powerpc64_HOST_ARCH \
- || aarch64_HOST_ARCH || arm64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH) || defined(powerpc64_HOST_ARCH) \
+ || defined(aarch64_HOST_ARCH) || defined(arm64_HOST_ARCH)
 typedef struct mach_header_64     MachOHeader;
 typedef struct segment_command_64 MachOSegmentCommand;
 typedef struct section_64         MachOSection;
 typedef struct nlist_64           MachONList;
-#elif i386_HOST_ARCH || powerpc_HOST_ARCH || arm_HOST_ARCH
+#elif defined(i386_HOST_ARCH) || defined(powerpc_HOST_ARCH) \
+ || defined(arm_HOST_ARCH)
 typedef struct mach_header     MachOHeader;
 typedef struct segment_command MachOSegmentCommand;
 typedef struct section         MachOSection;
@@ -38,7 +39,7 @@ typedef struct _MachOSymbol {
     MachONList * nlist; /* the nlist symbol entry */
 } MachOSymbol;
 
-typedef struct _ObjectCodeFormatInfo {
+struct ObjectCodeFormatInfo {
     // while we have the image
     // we can store some pointers
     // into it, so we don't have
@@ -63,7 +64,7 @@ typedef struct _ObjectCodeFormatInfo {
     /* pointer to the global offset table */
     void                 *got_start;
     size_t                got_size;
-} ObjectCodeFormatInfo;
+};
 
 /* When loading sections of the macho
  * into different pages, such that the
@@ -112,7 +113,7 @@ struct _Stub {
 }
 Stub;
 
-typedef struct _SectionFormatInfo {
+struct SectionFormatInfo {
     /*
      * The following fields are relevant for stubs next to sections only.
      */
@@ -126,6 +127,6 @@ typedef struct _SectionFormatInfo {
      */
     MachOSection * macho_section;
     MachORelocationInfo * relocation_info;
-} SectionFormatInfo;
+};
 
 #endif /* OBJECTFORMAT_MACHO */

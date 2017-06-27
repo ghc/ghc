@@ -1,0 +1,5 @@
+
+on the commandline: warning:
+    -XOverlappingInstances is deprecated: instead use per-instance pragmas OVERLAPPING/OVERLAPPABLE/OVERLAPS
+
+on the commandline: warning: unrecognised warning flag: -Wbar

@@ -26,7 +26,9 @@ import Cmm
 import CmmCallConv
 import CmmSwitch (SwitchTargets)
 
-import Compiler.Hoopl hiding (Unique, (<*>), mkFirst, mkMiddle, mkLast, mkLabel, mkBranch, Shape(..))
+import Hoopl.Block
+import Hoopl.Graph
+import Hoopl.Label
 import DynFlags
 import FastString
 import ForeignCall

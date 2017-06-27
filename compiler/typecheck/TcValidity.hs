@@ -504,7 +504,7 @@ check_syn_tc_app :: TidyEnv -> UserTypeCtxt -> Rank -> KindOrType
 -- which must be saturated,
 -- but not data families, which need not be saturated
 check_syn_tc_app env ctxt rank ty tc tys
-  | tc_arity <= length tys   -- Saturated
+  | tys `lengthAtLeast` tc_arity   -- Saturated
        -- Check that the synonym has enough args
        -- This applies equally to open and closed synonyms
        -- It's OK to have an *over-applied* type synonym
@@ -739,7 +739,7 @@ check_eq_pred :: TidyEnv -> DynFlags -> PredType -> TyCon -> [TcType] -> TcM ()
 check_eq_pred env dflags pred tc tys
   =         -- Equational constraints are valid in all contexts if type
             -- families are permitted
-    do { checkTc (length tys == tyConArity tc) (tyConArityErr tc tys)
+    do { checkTc (tys `lengthIs` tyConArity tc) (tyConArityErr tc tys)
        ; checkTcM (xopt LangExt.TypeFamilies dflags
                    || xopt LangExt.GADTs dflags)
                   (eqPredTyErr env pred) }
@@ -814,7 +814,7 @@ check_class_pred env dflags ctxt pred cls tys
        ; when warn_simp check_simplifiable_class_constraint
        ; checkTcM arg_tys_ok (predTyVarErr env pred) }
   where
-    check_arity = checkTc (classArity cls == length tys)
+    check_arity = checkTc (tys `lengthIs` classArity cls)
                           (tyConArityErr (classTyCon cls) tys)
 
     -- Check the arguments of a class constraint
@@ -1047,7 +1047,7 @@ checkValidInstHead ctxt clas cls_args
                        all tcInstHeadTyAppAllTyVars ty_args)
                  (instTypeErr clas cls_args head_type_args_tyvars_msg)
             ; checkTc (xopt LangExt.MultiParamTypeClasses dflags ||
-                       length ty_args == 1 ||  -- Only count type arguments
+                       lengthIs ty_args 1 ||  -- Only count type arguments
                        (xopt LangExt.NullaryTypeClasses dflags &&
                         null ty_args))
                  (instTypeErr clas cls_args head_one_type_msg) }
@@ -1239,7 +1239,7 @@ validDerivPred tv_set pred
     check_tys cls tys
               = hasNoDups fvs
                    -- use sizePred to ignore implicit args
-                && sizePred pred == fromIntegral (length fvs)
+                && lengthIs fvs (sizePred pred)
                 && all (`elemVarSet` tv_set) fvs
       where tys' = filterOutInvisibleTypes (classTyCon cls) tys
             fvs  = fvTypes tys'
@@ -1274,7 +1274,7 @@ and we /really/ don't want that.  So we carefully do /not/ expand
 synonyms, by matching on TyConApp directly.
 -}
 
-checkValidInstance :: UserTypeCtxt -> LHsSigType Name -> Type
+checkValidInstance :: UserTypeCtxt -> LHsSigType GhcRn -> Type
                    -> TcM ([TyVar], ThetaType, Class, [Type])
 checkValidInstance ctxt hs_type ty
   | not is_tc_app
@@ -1738,7 +1738,7 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs ty_pats
          --     type family F a :: * -> *
          --     type instance F Int y = y
          -- because then the type (F Int) would be like (\y.y)
-         checkTc (length ty_pats == fam_arity) $
+         checkTc (ty_pats `lengthIs` fam_arity) $
            wrongNumberOfParmsErr (fam_arity - count isInvisibleTyConBinder fam_bndrs)
              -- report only explicit arguments
 

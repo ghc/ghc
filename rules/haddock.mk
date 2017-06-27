@@ -42,6 +42,9 @@ html_$1 : $$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE)
 
 $$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_DEPS = $$(foreach n,$$($1_$2_DEPS),$$($$n_HADDOCK_FILE) $$($$n_dist-install_$$(HADDOCK_WAY)_LIB))
 
+# We don't pass -dcore-lint to haddock because it caused a performance regression in #13789
+$1_$2_HADDOCK_GHC_OPTS = $$(foreach opt, $$(filter-out -dcore-lint,$$($1_$2_$$(HADDOCK_WAY)_ALL_HC_OPTS)),--optghc=$$(opt))
+
 ifeq "$$(HSCOLOUR_SRCS)" "YES"
 $1_$2_HADDOCK_FLAGS += --source-module=src/%{MODULE/./-}.html --source-entity=src/%{MODULE/./-}.html\#%{NAME}
 endif
@@ -56,23 +59,23 @@ ifeq "$$(HSCOLOUR_SRCS)" "YES"
 	"$$(ghc-cabal_INPLACE)" hscolour $1 $2
 endif
 	"$$(TOP)/$$(INPLACE_BIN)/haddock" \
-	  --verbosity=0 \
-	  --odir="$1/$2/doc/html/$$($1_PACKAGE)" \
-	  --no-tmp-comp-dir \
-	  --dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
-	  --html \
-	  --hoogle \
-	  --title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
-	  --prologue="$1/$2/haddock-prologue.txt" \
-	  --optghc="-D__HADDOCK_VERSION__=$$(HADDOCK_VERSION_STRING)" \
-	  $$(foreach mod,$$($1_$2_HIDDEN_MODULES),--hide=$$(mod)) \
-	  $$(foreach pkg,$$($1_$2_DEPS),$$(if $$($$(pkg)_HADDOCK_FILE),--read-interface=../$$(pkg)$$(comma)../$$(pkg)/src/%{MODULE/./-}.html\#%{NAME}$$(comma)$$($$(pkg)_HADDOCK_FILE))) \
-	  $$(foreach opt,$$($1_$2_$$(HADDOCK_WAY)_ALL_HC_OPTS),--optghc=$$(opt)) \
-	  $$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS) \
-	  $$($1_$2_HS_SRCS) \
-	  $$($1_$2_EXTRA_HADDOCK_SRCS) \
-	  $$(EXTRA_HADDOCK_OPTS) \
-	  +RTS -t"$1/$2/haddock.t" --machine-readable
+		--verbosity=0 \
+		--odir="$1/$2/doc/html/$$($1_PACKAGE)" \
+		--no-tmp-comp-dir \
+		--dump-interface=$$($$($1_PACKAGE)-$$($1_$2_VERSION)_HADDOCK_FILE) \
+		--html \
+		--hoogle \
+		--title="$$($1_PACKAGE)-$$($1_$2_VERSION)$$(if $$(strip $$($1_$2_SYNOPSIS)),: $$(strip $$($1_$2_SYNOPSIS)),)" \
+		--prologue="$1/$2/haddock-prologue.txt" \
+		--optghc="-D__HADDOCK_VERSION__=$$(HADDOCK_VERSION_STRING)" \
+		$$(foreach mod,$$($1_$2_HIDDEN_MODULES),--hide=$$(mod)) \
+		$$(foreach pkg,$$($1_$2_DEPS),$$(if $$($$(pkg)_HADDOCK_FILE),--read-interface=../$$(pkg)$$(comma)../$$(pkg)/src/%{MODULE/./-}.html\#%{NAME}$$(comma)$$($$(pkg)_HADDOCK_FILE))) \
+		$$($1_$2_HADDOCK_GHC_OPTS) \
+		$$($1_$2_HADDOCK_FLAGS) $$($1_$2_HADDOCK_OPTS) \
+		$$($1_$2_HS_SRCS) \
+		$$($1_$2_EXTRA_HADDOCK_SRCS) \
+		$$(EXTRA_HADDOCK_OPTS) \
+		+RTS -t"$1/$2/haddock.t" --machine-readable
 
 # --no-tmp-comp-dir above is important: it saves a few minutes in a
 # validate.  This flag lets Haddock use the pre-compiled object files
@@ -89,4 +92,3 @@ endif # $1_$2_DO_HADDOCK
 
 $(call profEnd, haddock($1,$2))
 endef
-

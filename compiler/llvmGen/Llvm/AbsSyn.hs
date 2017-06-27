@@ -275,7 +275,7 @@ data LlvmExpression
 
   {- |
     Cast the variable from to the to type. This is an abstraction of three
-    cast operators in Llvm, inttoptr, prttoint and bitcast.
+    cast operators in Llvm, inttoptr, ptrtoint and bitcast.
        * cast: Cast type
        * from: Variable to cast
        * to:   type to cast to

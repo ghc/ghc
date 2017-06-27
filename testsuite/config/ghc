@@ -229,7 +229,7 @@ def get_compiler_info():
 # Arguably the above code for writing `:set args` should be smarter. This
 # is tricky to get right though, because in GHCI `:set args foo\bar` (no
 # double quotes) works perfectly fine, and is interpreted as the Haskell
-# string "foo\\bar". Therfore, simply escaping all backward slashes in
+# string "foo\\bar". Therefore, simply escaping all backward slashes in
 # opts.extra_run_opts before concatenating it with ':set args' is not right
 # either.
 #

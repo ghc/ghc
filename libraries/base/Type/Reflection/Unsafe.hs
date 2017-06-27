@@ -15,11 +15,11 @@
 
 module Type.Reflection.Unsafe (
       -- * Type representations
-      TypeRep, mkTrApp, mkTyCon
+      TypeRep, mkTrApp, mkTyCon, typeRepFingerprint, someTypeRepFingerprint
       -- * Kind representations
     , KindRep(..), TypeLitSort(..)
       -- * Type constructors
-    , TyCon, mkTrCon, tyConKindRep, tyConKindArgs,
+    , TyCon, mkTrCon, tyConKindRep, tyConKindArgs, tyConFingerprint
   ) where
 
 import Data.Typeable.Internal

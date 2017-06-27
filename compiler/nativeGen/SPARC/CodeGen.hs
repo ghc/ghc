@@ -44,7 +44,8 @@ import BlockId
 import Cmm
 import CmmUtils
 import CmmSwitch
-import Hoopl
+import Hoopl.Block
+import Hoopl.Graph
 import PIC
 import Reg
 import CLabel

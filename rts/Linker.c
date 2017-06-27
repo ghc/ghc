@@ -230,6 +230,9 @@ static void ghciRemoveSymbolTable(HashTable *table, const SymbolName* key,
     RtsSymbolInfo *pinfo = lookupStrHashTable(table, key);
     if (!pinfo || owner != pinfo->owner) return;
     removeStrHashTable(table, key, NULL);
+    if (isSymbolImport (owner, key))
+      stgFree(pinfo->value);
+
     stgFree(pinfo);
 }
 
@@ -731,7 +734,7 @@ addDLL( pathchar *dll_name )
    return errmsg;
 
 #  elif defined(OBJFORMAT_PEi386)
-   return addDLL_PEi386(dll_name);
+   return addDLL_PEi386(dll_name, NULL);
 
 #  else
    barf("addDLL: not implemented on this platform");
@@ -1562,32 +1565,32 @@ int ocTryLoad (ObjectCode* oc) {
         }
     }
 
-#           if defined(OBJFORMAT_ELF)
-        r = ocResolve_ELF ( oc );
-#           elif defined(OBJFORMAT_PEi386)
-        r = ocResolve_PEi386 ( oc );
-#           elif defined(OBJFORMAT_MACHO)
-        r = ocResolve_MachO ( oc );
-#           else
+#   if defined(OBJFORMAT_ELF)
+    r = ocResolve_ELF ( oc );
+#   elif defined(OBJFORMAT_PEi386)
+    r = ocResolve_PEi386 ( oc );
+#   elif defined(OBJFORMAT_MACHO)
+    r = ocResolve_MachO ( oc );
+#   else
     barf("ocTryLoad: not implemented on this platform");
-#           endif
-        if (!r) { return r; }
+#   endif
+    if (!r) { return r; }
 
-        // run init/init_array/ctors/mod_init_func
+    // run init/init_array/ctors/mod_init_func
 
-        loading_obj = oc; // tells foreignExportStablePtr what to do
+    loading_obj = oc; // tells foreignExportStablePtr what to do
 #if defined(OBJFORMAT_ELF)
-        r = ocRunInit_ELF ( oc );
+    r = ocRunInit_ELF ( oc );
 #elif defined(OBJFORMAT_PEi386)
-        r = ocRunInit_PEi386 ( oc );
+    r = ocRunInit_PEi386 ( oc );
 #elif defined(OBJFORMAT_MACHO)
-        r = ocRunInit_MachO ( oc );
+    r = ocRunInit_MachO ( oc );
 #else
     barf("ocTryLoad: initializers not implemented on this platform");
 #endif
-        loading_obj = NULL;
+    loading_obj = NULL;
 
-        if (!r) { return r; }
+    if (!r) { return r; }
 
     oc->status = OBJECT_RESOLVED;
 
@@ -1766,7 +1769,7 @@ addSection (Section *s, SectionKind kind, SectionAlloc alloc,
    s->mapped_start = mapped_start; /* start of mmap() block */
    s->mapped_size  = mapped_size;  /* size of mmap() block */
 
-   s->info = (SectionFormatInfo*)stgCallocBytes(1, sizeof(SectionFormatInfo),
+   s->info = (struct SectionFormatInfo*)stgCallocBytes(1, sizeof *s->info,
                                             "addSection(SectionFormatInfo)");
 
    IF_DEBUG(linker,
