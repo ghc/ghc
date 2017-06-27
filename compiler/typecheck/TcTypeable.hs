@@ -439,7 +439,7 @@ typeIsTypeable (TyConApp tc args)   = tyConIsTypeable tc
 typeIsTypeable (ForAllTy{})         = False
 typeIsTypeable (LitTy _)            = True
 typeIsTypeable (CastTy{})           = False
-typeIsTypeable (CoercionTy{})       = panic "typeIsTypeable(Coercion)"
+typeIsTypeable (CoercionTy{})       = False
 
 -- | Maps kinds to 'KindRep' bindings. This binding may either be defined in
 -- some other module (in which case the @Maybe (LHsExpr Id@ will be 'Nothing')
