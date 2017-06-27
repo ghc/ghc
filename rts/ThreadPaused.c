@@ -275,10 +275,9 @@ threadPaused(Capability *cap, StgTSO *tso)
             // deadlocked on itself.  See #5226 for an instance of
             // this bug.
             //
-            if ((bh_info == &stg_WHITEHOLE_info ||
-                 bh_info == &stg_BLACKHOLE_info)
-                &&
-                ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+            if (((bh_info == &stg_BLACKHOLE_info)
+                 && ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+                || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
                            "suspending duplicate work: %ld words of stack",
