@@ -37,7 +37,7 @@ module TcHsType (
         kindGeneralize,
 
         -- Sort-checking kinds
-        tcLHsKind,
+        tcLHsKindSig,
 
         -- Pattern type signatures
         tcHsPatSigType, tcPatSig, funAppCtxt
@@ -1428,7 +1428,7 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
            ; return tv_pair }
 
     kc_hs_tv (KindedTyVar (L _ name) lhs_kind)
-      = do { kind <- tcLHsKind lhs_kind
+      = do { kind <- tcLHsKindSig lhs_kind
            ; tcHsTyVarName (Just kind) name }
 
     report_non_cusk_tvs all_tvs
@@ -1545,7 +1545,7 @@ tcHsTyVarBndr new_tv (UserTyVar (L _ name))
        ; new_tv name kind }
 
 tcHsTyVarBndr new_tv (KindedTyVar (L _ name) kind)
-  = do { kind <- tcLHsKind kind
+  = do { kind <- tcLHsKindSig kind
        ; new_tv name kind }
 
 newWildTyVar :: Name -> TcM TcTyVar
@@ -2031,12 +2031,20 @@ unifyKinds act_kinds
 *                                                                      *
 ************************************************************************
 
-tcLHsKind converts a user-written kind to an internal, sort-checked kind.
+tcLHsKindSig converts a user-written kind to an internal, sort-checked kind.
 It does sort checking and desugaring at the same time, in one single pass.
 -}
 
-tcLHsKind :: LHsKind GhcRn -> TcM Kind
-tcLHsKind = tc_lhs_kind kindLevelMode
+tcLHsKindSig :: LHsKind GhcRn -> TcM Kind
+tcLHsKindSig hs_kind
+  = do { kind <- tc_lhs_kind kindLevelMode hs_kind
+       ; zonkTcType kind }
+         -- This zonk is very important in the case of higher rank kinds
+         -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
+         --                          <more blah>
+         --      When instanting p's kind at occurrences of p in <more blah>
+         --      it's crucial that the kind we instantiate is fully zonked,
+         --      else we may fail to substitute properly
 
 tc_lhs_kind :: TcTyMode -> LHsKind GhcRn -> TcM Kind
 tc_lhs_kind mode k

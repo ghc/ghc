@@ -493,7 +493,7 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
   = do  { (tycon, _) <-
            kcHsTyVarBndrs name True (hsDeclHasCusk decl) False True ktvs $
            do { res_k <- case m_sig of
-                           Just ksig -> tcLHsKind ksig
+                           Just ksig -> tcLHsKindSig ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
         ; return (mkTcTyConEnv tycon) }
@@ -508,7 +508,7 @@ getInitialKind decl@(SynDecl { tcdLName = L _ name
                             False {- not open -} True ktvs $
             do  { res_k <- case kind_annotation rhs of
                             Nothing -> newMetaKindVar
-                            Just ksig -> tcLHsKind ksig
+                            Just ksig -> tcLHsKindSig ksig
                 ; return (res_k, ()) }
         ; return (mkTcTyConEnv tycon) }
   where
@@ -536,8 +536,8 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
   = do { (tycon, _) <-
            kcHsTyVarBndrs name unsat cusk open True ktvs $
            do { res_k <- case resultSig of
-                      KindSig ki                        -> tcLHsKind ki
-                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKind ki
+                      KindSig ki                        -> tcLHsKindSig ki
+                      TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKindSig ki
                       _ -- open type families have * return kind by default
                         | open                     -> return liftedTypeKind
                         -- closed type families have their return kind inferred
@@ -1191,7 +1191,7 @@ kcDataDefn fam_name (HsIB { hsib_body = pats })
         ; discardResult $
           case mb_kind of
             Nothing -> unifyKind (Just hs_ty_pats) res_k liftedTypeKind
-            Just k  -> do { k' <- tcLHsKind k
+            Just k  -> do { k' <- tcLHsKindSig k
                           ; unifyKind (Just hs_ty_pats) res_k k' } }
   where
     hs_ty_pats = mkHsAppTys (noLoc $ HsTyVar NotPromoted (noLoc fam_name)) pats
