@@ -1519,8 +1519,7 @@ simplLam env (bndr:bndrs) body (ApplyToVal { sc_arg = arg, sc_env = arg_se
         ; simplNonRecE env zapped_bndr (arg, arg_se) (bndrs, body) cont }
   where
     zapped_bndr  -- See Note [Zap unfolding when beta-reducing]
-      | isId bndr, isStableUnfolding (realIdUnfolding bndr)
-                  = setIdUnfolding bndr NoUnfolding
+      | isId bndr = zapStableUnfolding bndr
       | otherwise = bndr
 
       -- discard a non-counting tick on a lambda.  This may change the

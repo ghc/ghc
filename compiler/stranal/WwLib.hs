@@ -587,8 +587,11 @@ mkWWstr_one dflags fam_envs arg
         ; let   unpk_args = zipWith3 mk_ww_arg uniqs inst_con_arg_tys cs
                 unbox_fn  = mkUnpackCase (Var arg) co uniq1
                                          data_con unpk_args
-                rebox_fn  = Let (NonRec arg con_app)
-                con_app   = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
+                arg_no_unf = zapStableUnfolding arg
+                             -- See Note [Zap unfolding when beta-reducing]
+                             -- in Simplify.hs; and see Trac #13890
+                rebox_fn   = Let (NonRec arg_no_unf con_app)
+                con_app    = mkConApp2 data_con inst_tys unpk_args `mkCast` mkSymCo co
          ; (_, worker_args, wrap_fn, work_fn) <- mkWWstr dflags fam_envs unpk_args
          ; return (True, worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) }
                            -- Don't pass the arg, rebox instead
