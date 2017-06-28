@@ -6,7 +6,7 @@
 -- how to achieve something similar to the old behavior. This is
 -- preventing HSP (and by extension, happstack) from migrating to GHC
 -- 7. I reported this earlier on the mailing lists, but I have further
--- simplied the test case here.
+-- simplified the test case here.
 
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses
   , FlexibleContexts, FlexibleInstances, UndecidableInstances

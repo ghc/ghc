@@ -1052,7 +1052,7 @@ dataConInstSig
   -> [Type]    -- Instantiate the *universal* tyvars with these types
   -> ([TyVar], ThetaType, [Type])  -- Return instantiated existentials
                                    -- theta and arg tys
--- ^ Instantantiate the universal tyvars of a data con,
+-- ^ Instantiate the universal tyvars of a data con,
 --   returning the instantiated existentials, constraints, and args
 dataConInstSig (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs
                        , dcEqSpec = eq_spec, dcOtherTheta  = theta

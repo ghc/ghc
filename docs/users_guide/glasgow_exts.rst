@@ -12268,7 +12268,7 @@ If we did it in Haskell source, thus ::
 
    let f = ... in f `seq` body
 
-then ``f``\ 's polymorphic type would get intantiated, so the Core
+then ``f``\ 's polymorphic type would get instantiated, so the Core
 translation would be ::
 
    let f = ... in f Any `seq` body

@@ -4100,7 +4100,7 @@ impliedXFlags
 --  * utils/mkUserGuidePart/Options/
 --  * docs/users_guide/using.rst
 --
--- The first contains the Flag Refrence section, which breifly lists all
+-- The first contains the Flag Reference section, which briefly lists all
 -- available flags. The second contains a detailed description of the
 -- flags. Both places should contain information whether a flag is implied by
 -- -O0, -O or -O2.
