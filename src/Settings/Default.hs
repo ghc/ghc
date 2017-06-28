@@ -72,9 +72,9 @@ defaultErrorGhcFlags =
   mconcat [ notStage0 ? arg "-Werror"
           , (not <$> flag GccIsClang) ? mconcat [
                 (not <$> flag GccLt46) ? (not <$> windowsHost) ?
-                  arg "-Werror=unused-but-set-variable"
-              , (not <$> flag GccLt44) ? arg "-Wno-error=inline" ]
-          , flag GccIsClang ? arg "-Wno-unknown-pragmas" ]
+                  arg "-optc-Werror=unused-but-set-variable"
+              , (not <$> flag GccLt44) ? arg "-optc-Wno-error=inline" ]
+          , flag GccIsClang ? arg "-optc-Wno-unknown-pragmas" ]
 
 -- | Default source arguments, e.g. optimisation settings.
 defaultSourceArgs :: SourceArgs
