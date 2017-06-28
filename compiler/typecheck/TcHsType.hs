@@ -2042,7 +2042,7 @@ tcLHsKindSig hs_kind
          -- This zonk is very important in the case of higher rank kinds
          -- E.g. Trac #13879    f :: forall (p :: forall z (y::z). <blah>).
          --                          <more blah>
-         --      When instanting p's kind at occurrences of p in <more blah>
+         --      When instantiating p's kind at occurrences of p in <more blah>
          --      it's crucial that the kind we instantiate is fully zonked,
          --      else we may fail to substitute properly
 

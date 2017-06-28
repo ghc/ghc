@@ -385,7 +385,7 @@ data DsGblEnv
                                                 -- iff '-fvectorise' flag was given as well as
                                                 -- exported entities of 'Data.Array.Parallel' iff
                                                 -- '-XParallelArrays' was given; otherwise, empty
-        , ds_parr_bi :: PArrBuiltin             -- desugarar names for '-XParallelArrays'
+        , ds_parr_bi :: PArrBuiltin             -- desugarer names for '-XParallelArrays'
         , ds_complete_matches :: CompleteMatchMap
            -- Additional complete pattern matches
         }

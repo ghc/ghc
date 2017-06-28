@@ -161,7 +161,7 @@ This witness should replace the literal.
 
 This dual role is unusual, because we're replacing 'fromInteger' with
 a call to fromInteger.  Reason: it allows commoning up of the fromInteger
-calls, which wouldn't be possible if the desguarar made the application.
+calls, which wouldn't be possible if the desugarer made the application.
 
 The PostTcType in each branch records the type the overload literal is
 found to have.

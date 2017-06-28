@@ -429,7 +429,7 @@ Note [Rules and inlining]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 Common special case: no type or dictionary abstraction
 This is a bit less trivial than you might suppose
-The naive way woudl be to desguar to something like
+The naive way would be to desugar to something like
         f_lcl = ...f_lcl...     -- The "binds" from AbsBinds
         M.f = f_lcl             -- Generated from "exports"
 But we don't want that, because if M.f isn't exported,
