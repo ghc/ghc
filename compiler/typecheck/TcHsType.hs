@@ -56,7 +56,7 @@ import TcIface
 import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
-import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
+import Inst   ( tcInstBindersX, tcInstBinderX )
 import Type
 import Kind
 import RdrName( lookupLocalRdrOcc )
@@ -422,7 +422,7 @@ metavariable.
 In types, however, we're not so lucky, because *we cannot re-generalize*!
 There is no lambda. So, we must be careful only to instantiate at the last
 possible moment, when we're sure we're never going to want the lost polymorphism
-again. This is done in calls to tcInstBinders and tcInstBindersX.
+again. This is done in calls to tcInstBindersX.
 
 To implement this behavior, we use bidirectional type checking, where we
 explicitly think about whether we know the kind of the type we're checking
