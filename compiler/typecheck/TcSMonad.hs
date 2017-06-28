@@ -7,7 +7,7 @@ module TcSMonad (
     WorkList(..), isEmptyWorkList, emptyWorkList,
     extendWorkListNonEq, extendWorkListCt, extendWorkListDerived,
     extendWorkListCts, extendWorkListEq, extendWorkListFunEq,
-    appendWorkList,
+    appendWorkList, extendWorkListImplic,
     selectNextWorkItem,
     workListSize, workListWantedCount,
     getWorkList, updWorkListTcS,
@@ -16,9 +16,9 @@ module TcSMonad (
     TcS, runTcS, runTcSDeriveds, runTcSWithEvBinds,
     failTcS, warnTcS, addErrTcS,
     runTcSEqualities,
-    nestTcS, nestImplicTcS, setEvBindsTcS,
+    nestTcS, nestImplicTcS, setEvBindsTcS, buildImplication,
 
-    runTcPluginTcS, addUsedGRE, addUsedGREs, deferTcSForAllEq,
+    runTcPluginTcS, addUsedGRE, addUsedGREs,
 
     -- Tracing etc
     panicTcS, traceTcS,
@@ -93,7 +93,7 @@ module TcSMonad (
     -- MetaTyVars
     newFlexiTcSTy, instFlexi, instFlexiX,
     cloneMetaTyVar, demoteUnfilledFmv,
-    tcInstType,
+    tcInstType, tcInstSkolTyVarsX,
 
     TcLevel, isTouchableMetaTyVarTcS,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
@@ -277,8 +277,8 @@ extendWorkListDeriveds loc evs wl
   | isDroppableDerivedLoc loc = wl { wl_deriv = evs ++ wl_deriv wl }
   | otherwise                 = extendWorkListEqs (map mkNonCanonical evs) wl
 
-extendWorkListImplic :: Implication -> WorkList -> WorkList
-extendWorkListImplic implic wl = wl { wl_implics = implic `consBag` wl_implics wl }
+extendWorkListImplic :: Bag Implication -> WorkList -> WorkList
+extendWorkListImplic implics wl = wl { wl_implics = implics `unionBags` wl_implics wl }
 
 extendWorkListCt :: Ct -> WorkList -> WorkList
 -- Agnostic
@@ -2530,6 +2530,45 @@ nestTcS (TcS thing_inside)
 
        ; return res }
 
+buildImplication :: SkolemInfo
+                 -> [TcTyVar]        -- Skolems
+                 -> [EvVar]          -- Givens
+                 -> TcS result
+                 -> TcS (Bag Implication, TcEvBinds, result)
+-- Just like TcUnify.buildImplication, but in the TcS monnad,
+-- using the work-list to gather the constraints
+buildImplication skol_info skol_tvs givens (TcS thing_inside)
+  = TcS $ \ env ->
+    do { new_wl_var <- TcM.newTcRef emptyWorkList
+       ; tc_lvl <- TcM.getTcLevel
+       ; let new_tclvl = pushTcLevel tc_lvl
+
+       ; res <- TcM.setTcLevel new_tclvl $
+                thing_inside (env { tcs_worklist = new_wl_var })
+
+       ; wl@WL { wl_eqs = eqs } <- TcM.readTcRef new_wl_var
+       ; if null eqs
+         then return (emptyBag, emptyTcEvBinds, res)
+         else
+    do { env <- TcM.getLclEnv
+       ; ev_binds_var <- TcM.newTcEvBinds
+       ; let wc  = ASSERT2( null (wl_funeqs wl) && null (wl_rest wl) &&
+                            null (wl_deriv wl) && null (wl_implics wl), ppr wl )
+                   WC { wc_simple = listToCts eqs
+                      , wc_impl   = emptyBag
+                      , wc_insol  = emptyCts }
+             imp = Implic { ic_tclvl  = new_tclvl
+                          , ic_skols  = skol_tvs
+                          , ic_no_eqs = True
+                          , ic_given  = givens
+                          , ic_wanted = wc
+                          , ic_status = IC_Unsolved
+                          , ic_binds  = ev_binds_var
+                          , ic_env    = env
+                          , ic_needed = emptyVarSet
+                          , ic_info   = skol_info }
+      ; return (unitBag imp, TcEvBinds ev_binds_var, res) } }
+
 {-
 Note [Propagate the solved dictionaries]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2925,7 +2964,8 @@ tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
                 -- (type vars, preds (incl equalities), rho)
 tcInstType inst_tyvars id = wrapTcS (TcM.tcInstType inst_tyvars id)
 
-
+tcInstSkolTyVarsX :: TCvSubst -> [TyVar] -> TcS (TCvSubst, [TcTyVar])
+tcInstSkolTyVarsX subst tvs = wrapTcS $ TcM.tcInstSkolTyVarsX subst tvs
 
 -- Creating and setting evidence variables and CtFlavors
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -3144,47 +3184,3 @@ from which we get the implication
 See TcSMonad.deferTcSForAllEq
 -}
 
--- Deferring forall equalities as implications
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-deferTcSForAllEq :: Role -- Nominal or Representational
-                 -> CtLoc  -- Original wanted equality flavor
-                 -> [Coercion]        -- among the kinds of the binders
-                 -> ([TyVarBinder],TcType)   -- ForAll tvs1 body1
-                 -> ([TyVarBinder],TcType)   -- ForAll tvs2 body2
-                 -> TcS Coercion
-deferTcSForAllEq role loc kind_cos (bndrs1,body1) (bndrs2,body2)
- = do { let tvs1'  = zipWithEqual "deferTcSForAllEq"
-                       mkCastTy (mkTyVarTys tvs1) kind_cos
-            body2' = substTyWithUnchecked tvs2 tvs1' body2
-      ; (subst, skol_tvs) <- wrapTcS $ TcM.tcInstSkolTyVars tvs1
-      ; let phi1  = Type.substTyUnchecked subst body1
-            phi2  = Type.substTyUnchecked subst body2'
-            skol_info = UnifyForAllSkol phi1
-
-      ; (ctev, hole_co) <- newWantedEq loc role phi1 phi2
-      ; env <- getLclEnv
-      ; ev_binds <- newTcEvBinds
-           -- We have nowhere to put these bindings
-           -- but TcSimplify.setImplicationStatus
-           -- checks that we don't actually use them
-      ; let new_tclvl = pushTcLevel (tcl_tclvl env)
-            wc        = WC { wc_simple = singleCt (mkNonCanonical ctev)
-                           , wc_impl   = emptyBag
-                           , wc_insol  = emptyCts }
-            imp       = Implic { ic_tclvl  = new_tclvl
-                               , ic_skols  = skol_tvs
-                               , ic_no_eqs = True
-                               , ic_given  = []
-                               , ic_wanted = wc
-                               , ic_status = IC_Unsolved
-                               , ic_binds  = ev_binds
-                               , ic_env    = env
-                               , ic_needed = emptyVarSet
-                               , ic_info   = skol_info }
-      ; updWorkListTcS (extendWorkListImplic imp)
-      ; let cobndrs    = zip skol_tvs kind_cos
-      ; return $ mkForAllCos cobndrs hole_co }
-   where
-     tvs1 = binderVars bndrs1
-     tvs2 = binderVars bndrs2
