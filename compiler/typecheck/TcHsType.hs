@@ -56,7 +56,7 @@ import TcIface
 import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
-import Inst   ( tcInstBinders, tcInstBindersX, tcInstBinderX )
+import Inst   ( tcInstBindersX, tcInstBinderX )
 import Type
 import Kind
 import RdrName( lookupLocalRdrOcc )
@@ -928,11 +928,16 @@ instantiateTyN n ty ki
         num_to_inst                  = length bndrs - n
            -- NB: splitAt is forgiving with invalid numbers
         (inst_bndrs, leftover_bndrs) = splitAt num_to_inst bndrs
+        empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ki))
     in
     if num_to_inst <= 0 then return (ty, ki) else
-    do { (subst, inst_args) <- tcInstBinders inst_bndrs
+    do { (subst, inst_args) <- tcInstBindersX empty_subst Nothing inst_bndrs
        ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
              ki'        = substTy subst rebuilt_ki
+       ; traceTc "instantiateTyN" (vcat [ ppr ty <+> dcolon <+> ppr ki
+                                        , ppr subst
+                                        , ppr rebuilt_ki
+                                        , ppr ki' ])
        ; return (mkNakedAppTys ty inst_args, ki') }
 
 ---------------------------
