@@ -1469,8 +1469,10 @@ tcImplicitTKBndrsX :: (Name -> TcM (TcTyVar, Bool))  -- new_tv function
                    -> [Name]
                    -> TcM (a, TyVarSet)
                    -> TcM ([TcTyVar], a)
--- Returned TcTyVars have the supplied Names
---   i.e. no cloning of fresh names
+-- Returned TcTyVars have the supplied Names,
+-- but may be in different order to the original [Name]
+--   (because of sorting to respect dependency)
+-- Returned TcTyVars have zonked kinds
 tcImplicitTKBndrsX new_tv var_ns thing_inside
   = do { tkvs_pairs <- mapM new_tv var_ns
        ; let must_scope_tkvs = [ tkv | (tkv, False) <- tkvs_pairs ]
@@ -1478,9 +1480,14 @@ tcImplicitTKBndrsX new_tv var_ns thing_inside
        ; (result, bound_tvs) <- tcExtendTyVarEnv must_scope_tkvs $
                                 thing_inside
 
-         -- it's possible that we guessed the ordering of variables
-         -- wrongly. Adjust.
+         -- Check that the implicitly-bound kind variable
+         -- really can go at the beginning.
+         -- e.g.   forall (a :: k) (b :: *). ...(forces k :: b)...
        ; tkvs <- mapM zonkTyCoVarKind tkvs
+                 -- NB: /not/ zonkTcTyVarToTyVar. tcImplicitTKBndrsX
+                 -- guarantees to return TcTyVars with the same Names
+                 -- as the var_ns.  See [Pattern signature binders]
+
        ; let extra = text "NB: Implicitly-bound variables always come" <+>
                      text "before other ones."
        ; checkValidInferredKinds tkvs bound_tvs extra
@@ -1836,9 +1843,10 @@ tcHsPartialSigType ctxt sig_ty
 
         ; emitWildCardHoleConstraints wcs
 
-        -- See Note [Solving equalities in partial type signatures]
-        ; all_tvs <- mapM (updateTyVarKindM zonkTcType)
-                          (implicit_tvs ++ explicit_tvs)
+        ; explicit_tvs <- mapM zonkTyCoVarKind explicit_tvs
+        ; let all_tvs = implicit_tvs ++ explicit_tvs
+                        -- The implicit_tvs alraedy have zonked kinds
+
         ; theta   <- mapM zonkTcType theta
         ; tau     <- zonkTcType tau
         ; checkValidType ctxt (mkSpecForAllTys all_tvs $ mkPhiTy theta tau)
@@ -1864,8 +1872,8 @@ tcPartialContext hs_theta
 tcHsPatSigType :: UserTypeCtxt
                -> LHsSigWcType GhcRn          -- The type signature
                -> TcM ( [(Name, TcTyVar)]     -- Wildcards
-                      , [TcTyVar]     -- The new bit of type environment, binding
-                                      -- the scoped type variables
+                      , [(Name, TcTyVar)]     -- The new bit of type environment, binding
+                                              -- the scoped type variables
                       , TcType)       -- The type
 -- Used for type-checking type signatures in
 -- (a) patterns           e.g  f (x::Int) = e
@@ -1888,8 +1896,10 @@ tcHsPatSigType ctxt sig_ty
         ; sig_ty <- zonkTcType sig_ty
         ; checkValidType ctxt sig_ty
 
+        ; tv_pairs <- mapM mk_tv_pair implicit_tvs
+
         ; traceTc "tcHsPatSigType" (ppr sig_vars)
-        ; return (wcs, implicit_tvs, sig_ty) }
+        ; return (wcs, tv_pairs, sig_ty) }
   where
     new_implicit_tv name = do { kind <- newMetaKindVar
                               ; tv <- new_tv name kind
@@ -1901,12 +1911,18 @@ tcHsPatSigType ctxt sig_ty
       -- See Note [Pattern signature binders]
       -- See Note [Unifying SigTvs]
 
+    mk_tv_pair tv = do { tv' <- zonkTcTyVarToTyVar tv
+                       ; return (tyVarName tv, tv') }
+         -- The Name is one of sig_vars, the lexically scoped name
+         -- But if it's a SigTyVar, it might have been unified
+         -- with an existing in-scope skolem, so we must zonk
+         -- here.  See Note [Pattern signature binders]
 
 tcPatSig :: Bool                    -- True <=> pattern binding
          -> LHsSigWcType GhcRn
          -> ExpSigmaType
          -> TcM (TcType,            -- The type to use for "inside" the signature
-                 [TcTyVar],         -- The new bit of type environment, binding
+                 [(Name,TcTyVar)],  -- The new bit of type environment, binding
                                     -- the scoped type variables
                  [(Name,TcTyVar)],  -- The wildcards
                  HsWrapper)         -- Coercion due to unification with actual ty
@@ -1937,7 +1953,7 @@ tcPatSig in_pat_bind sig res_ty
                 --      f :: Int -> Int
                 --      f (x :: T a) = ...
                 -- Here 'a' doesn't get a binding.  Sigh
-        ; let bad_tvs = [ tv | tv <- sig_tvs
+        ; let bad_tvs = [ tv | (_,tv) <- sig_tvs
                              , not (tv `elemVarSet` exactTyCoVarsOfType sig_ty) ]
         ; checkTc (null bad_tvs) (badPatSigTvs sig_ty bad_tvs)
 
@@ -1959,30 +1975,46 @@ tcPatSig in_pat_bind sig res_ty
                                           2 (ppr res_ty)) ]
             ; return (tidy_env, msg) }
 
-patBindSigErr :: [TcTyVar] -> SDoc
+patBindSigErr :: [(Name,TcTyVar)] -> SDoc
 patBindSigErr sig_tvs
   = hang (text "You cannot bind scoped type variable" <> plural sig_tvs
-          <+> pprQuotedList sig_tvs)
+          <+> pprQuotedList (map fst sig_tvs))
        2 (text "in a pattern binding signature")
 
-{-
-Note [Pattern signature binders]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{- Note [Pattern signature binders]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider
    data T = forall a. T a (a->Int)
-   f (T x (f :: a->Int) = blah)
+   f (T x (f :: b->Int)) = blah
 
 Here
  * The pattern (T p1 p2) creates a *skolem* type variable 'a_sk',
    It must be a skolem so that that it retains its identity, and
    TcErrors.getSkolemInfo can thereby find the binding site for the skolem.
 
- * The type signature pattern (f :: a->Int) binds "a" -> a_sig in the envt
+ * The type signature pattern (f :: b->Int) makes a fresh meta-tyvar b_sig
+   (a SigTv), and binds "b" :-> b_sig in the envt
 
- * Then unification makes a_sig := a_sk
+ * Then unification makes b_sig := a_sk
+   That's why we must make b_sig a MetaTv (albeit a SigTv),
+   not a SkolemTv, so that it can unify to a_sk.
 
-That's why we must make a_sig a MetaTv (albeit a SigTv),
-not a SkolemTv, so that it can unify to a_sk.
+ * Finally, in 'blah' we must have the envt "b" :-> a_sk.  The pair
+   ("b" :-> a_sk) is returned by tcHsPatSigType, constructed by
+   mk_tv_pair in that funcion.
+
+Another example (Trac #13881):
+   fl :: forall (l :: [a]). Sing l -> Sing l
+   fl (SNil :: Sing (l :: [y])) = SNil
+When we reach the pattern signature, 'l' is in scope from the
+outer 'forall':
+   "a" :-> a_sk :: *
+   "l" :-> l_sk :: [a_sk]
+We make up a fresh meta-SigTv, y_sig, for 'y', and kind-check
+the pattern signature
+   Sing (l :: [y])
+That unifies y_sig := a_sk.  We return from tcHsPatSigType with
+the pair ("y" :-> a_sk).
 
 For RULE binders, though, things are a bit different (yuk).
   RULE "foo" forall (x::a) (y::[a]).  f x y = ...
