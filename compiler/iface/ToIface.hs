@@ -257,7 +257,7 @@ toIfaceTcArgs = toIfaceTcArgsX emptyVarSet
 
 toIfaceTcArgsX :: VarSet -> TyCon -> [Type] -> IfaceTcArgs
 -- See Note [Suppressing invisible arguments]
--- We produce a result list of args describing visiblity
+-- We produce a result list of args describing visibility
 -- The awkward case is
 --    T :: forall k. * -> k
 -- And consider
