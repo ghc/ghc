@@ -1,8 +1,10 @@
 ## Changes in version 2.18.0
 
- * Support user defined signatures on pattern synonyms
-
  * Synopsis is working again (#599)
+
+ * Per-argument documentation on class methods working again (#647)
+
+ * Support user defined signatures on pattern synonyms
 
  * Support for bundled pattern synonyms (#494, #551, #626)
 

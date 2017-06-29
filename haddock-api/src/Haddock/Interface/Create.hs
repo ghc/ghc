@@ -429,8 +429,9 @@ typeDocs :: HsDecl Name -> Map Int HsDocString
 typeDocs d =
   let docs = go 0 in
   case d of
-    SigD (TypeSig _ ty)   -> docs (unLoc (hsSigWcType ty))
-    SigD (PatSynSig _ ty) -> docs (unLoc (hsSigType ty))
+    SigD (TypeSig _ ty)      -> docs (unLoc (hsSigWcType ty))
+    SigD (ClassOpSig _ _ ty) -> docs (unLoc (hsSigType ty))
+    SigD (PatSynSig _ ty)    -> docs (unLoc (hsSigType ty))
     ForD (ForeignImport _ ty _ _)   -> docs (unLoc (hsSigType ty))
     TyClD (SynDecl { tcdRhs = ty }) -> docs (unLoc ty)
     _ -> M.empty
