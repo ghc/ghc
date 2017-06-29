@@ -84,23 +84,11 @@ FIND_LLVM_PROG([OPT], [opt], [opt], [$LlvmVersion])
 OptCmd="$OPT"
 AC_SUBST([OptCmd])
 
-dnl ** Which ld to use?
-dnl --------------------------------------------------------------
-FIND_LD([LdCmd])
-AC_SUBST([LdCmd])
-
 FP_GCC_VERSION
 FP_GCC_SUPPORTS_NO_PIE
 AC_PROG_CPP
 
-FP_PROG_LD_IS_GNU
-FP_PROG_LD_BUILD_ID
-FP_PROG_LD_NO_COMPACT_UNWIND
-FP_PROG_LD_FILELIST
-
-#
 dnl ** Check gcc version and flags we need to pass it **
-#
 FP_GCC_EXTRA_FLAGS
 
 FP_SET_CFLAGS_C99([CC],[CFLAGS],[CPPFLAGS])
@@ -126,6 +114,19 @@ AC_SUBST(CONF_LD_LINKER_OPTS_STAGE2)
 AC_SUBST(CONF_CPP_OPTS_STAGE0)
 AC_SUBST(CONF_CPP_OPTS_STAGE1)
 AC_SUBST(CONF_CPP_OPTS_STAGE2)
+
+dnl ** Which ld to use?
+dnl --------------------------------------------------------------
+FIND_LD([$target],[GccUseLdOpt])
+CONF_GCC_LINKER_OPTS_STAGE1="$CONF_GCC_LINKER_OPTS_STAGE1 $GccUseLdOpt"
+CONF_GCC_LINKER_OPTS_STAGE2="$CONF_GCC_LINKER_OPTS_STAGE2 $GccUseLdOpt"
+LdCmd="$LD"
+AC_SUBST([LdCmd])
+
+FP_PROG_LD_IS_GNU
+FP_PROG_LD_BUILD_ID
+FP_PROG_LD_NO_COMPACT_UNWIND
+FP_PROG_LD_FILELIST
 
 dnl ** Set up the variables for the platform in the settings file.
 dnl May need to use gcc to find platform details.

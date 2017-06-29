@@ -623,15 +623,12 @@ AC_DEFUN([FPTOOLS_SET_C_LD_FLAGS],
         # instructions (ie not Thumb) and to link using the gold linker.
         # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
         $2="$$2 -marm"
-        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $3="$$3 -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
         ;;
 
     aarch64*linux*)
-        # On aarch64/linux and aarch64/android, tell gcc to link using the
-        # gold linker.
-        # Forcing LD to be ld.gold is done in FIND_LD m4 macro.
-        $3="$$3 -fuse-ld=gold -Wl,-z,noexecstack"
+        $3="$$3 -Wl,-z,noexecstack"
         $4="$$4 -z noexecstack"
         ;;
 
@@ -2068,31 +2065,6 @@ AC_DEFUN([FIND_LLVM_PROG],[
     fi
 ])
 
-# FIND_LD
-# Find the version of `ld` to use. This is used in both in the top level
-# configure.ac and in distrib/configure.ac.in.
-#
-# $1 = the variable to set
-#
-AC_DEFUN([FIND_LD],[
-    FP_ARG_WITH_PATH_GNU_PROG([LD], [ld], [ld])
-    case $target in
-        arm*linux*       | \
-        aarch64*linux*   )
-            # Arm and Aarch64 requires use of the binutils ld.gold linker.
-            # This case should catch at least arm-unknown-linux-gnueabihf,
-            # arm-linux-androideabi, arm64-unknown-linux and
-            # aarch64-linux-android
-            FP_ARG_WITH_PATH_GNU_PROG([LD_GOLD], [ld.gold], [ld.gold])
-            $1="$LD_GOLD"
-            ;;
-        *)
-            $1="$LD"
-            ;;
-    esac
-    CHECK_LD_COPY_BUG($1)
-])
-
 # CHECK_LD_COPY_BUG()
 # -------------------
 # Check for binutils bug #16177 present in some versions of the bfd ld
@@ -2325,6 +2297,65 @@ AC_DEFUN([FP_BFD_SUPPORT], [
             LIBS="$save_LIBS"
         ]
     )
+])
+
+
+# FP_CC_LINKER_FLAG_TRY()
+# --------------------
+# Try a particular linker to see whether we can use it. In particular, determine
+# whether we can convince gcc to use it via a -fuse-ld=... flag.
+#
+# $1 = the name of the linker to try
+# $2 = the variable to set with the appropriate GHC flag if the linker is
+# found to be usable
+AC_DEFUN([FP_CC_LINKER_FLAG_TRY], [
+    AC_MSG_CHECKING([whether C compiler supports -fuse-ld=$1])
+    echo 'int main(void) {return 0;}' > conftest.c
+    if $CC -o conftest.o -fuse-ld=$1 conftest.c > /dev/null 2>&1
+    then
+        $2="-fuse-ld=$1"
+        AC_MSG_RESULT([yes])
+    else
+        AC_MSG_RESULT([no])
+    fi
+    rm -f conftest.c conftest.o
+])
+
+# FIND_LD
+# ---------
+# Find the version of `ld` to use and figure out how to get gcc to use it for
+# linking (if --enable-ld-override is enabled). This is used in both in the top
+# level configure.ac and in distrib/configure.ac.in.
+#
+# $1 = the platform
+# $2 = the variable to set with GHC options to configure gcc to use the chosen linker
+#
+AC_DEFUN([FIND_LD],[
+    AC_ARG_ENABLE(ld-override,
+      [AC_HELP_STRING([--disable-ld-override],
+        [Prevent GHC from overriding the default linker used by gcc. If ld-override is enabled GHC will try to tell gcc to use whichever linker is selected by the LD environment variable. [default=override enabled]])],
+      [],
+      [enable_ld_override=yes])
+
+    if test "x$enable_ld_override" = "xyes"; then
+        AC_CHECK_TARGET_TOOLS([LD], [ld.gold ld.lld ld])
+        UseLd=''
+
+        out=`$LD --version`
+        case $out in
+          "GNU ld"*)   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
+          "GNU gold"*) FP_CC_LINKER_FLAG_TRY(gold, $2) ;;
+          "LLD"*)      FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
+          *) AC_MSG_NOTICE([unknown linker version $out]) ;;
+        esac
+        if test "z$2" = "z"; then
+            AC_MSG_NOTICE([unable to convince '$CC' to use linker '$LD'])
+        fi
+   else
+        AC_CHECK_TARGET_TOOL([LD], [ld])
+   fi
+
+   CHECK_LD_COPY_BUG([$1])
 ])
 
 # LocalWords:  fi
