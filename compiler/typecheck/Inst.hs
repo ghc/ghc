@@ -15,7 +15,7 @@ module Inst (
        instCall, instDFunType, instStupidTheta,
        newWanted, newWanteds,
 
-       tcInstBinders, tcInstBindersX, tcInstBinderX,
+       tcInstBindersX, tcInstBinderX,
 
        newOverloadedLit, mkOverLit,
 
@@ -377,11 +377,6 @@ instStupidTheta orig theta
 -}
 
 ---------------------------
--- | This is used to instantiate binders when type-checking *types* only.
--- See also Note [Bidirectional type checking]
-tcInstBinders :: [TyBinder] -> TcM (TCvSubst, [TcType])
-tcInstBinders = tcInstBindersX emptyTCvSubst Nothing
-
 -- | This is used to instantiate binders when type-checking *types* only.
 -- The @VarEnv Kind@ gives some known instantiations.
 -- See also Note [Bidirectional type checking]
