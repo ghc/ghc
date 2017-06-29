@@ -302,6 +302,8 @@ fail() {
 if test "$HostOS" = "mingw32"
 then
     # Find the mingw-w64 7z file to extract.
+    # NB. If you update the tarballs to a new version of gcc, don't
+    # forget to tweak the paths in driver/gcc/gcc.c.
     if test "$HostArch" = "i386"
     then
         mingw_arch="i686"
@@ -363,6 +365,12 @@ set_up_tarballs() {
 
         mv "inplace/${tarball_mingw_dir}" inplace/mingw &&
         touch inplace/mingw
+
+        # NB. Now since the GCC is hardcoded to use /mingw32 we need to
+        # make a wrapper around it to give it the proper paths
+        mv inplace/mingw/bin/gcc.exe inplace/mingw/bin/realgcc.exe
+        PATH=`pwd`/inplace/mingw/bin:$PATH
+        inplace/mingw/bin/realgcc.exe driver/gcc/gcc.c driver/utils/cwrapper.c driver/utils/getLocation.c -Idriver/utils -o inplace/mingw/bin/gcc.exe
 
         AC_MSG_NOTICE([In-tree MingW-w64 tree created])
     fi
