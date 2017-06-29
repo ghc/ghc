@@ -405,8 +405,8 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
 tc_pat penv (SigPatIn pat sig_ty) pat_ty thing_inside
   = do  { (inner_ty, tv_binds, wcs, wrap) <- tcPatSig (inPatBind penv)
                                                             sig_ty pat_ty
-        ; (pat', res) <- tcExtendTyVarEnv2 wcs     $
-                         tcExtendTyVarEnv tv_binds $
+        ; (pat', res) <- tcExtendTyVarEnv2 wcs      $
+                         tcExtendTyVarEnv2 tv_binds $
                          tc_lpat pat (mkCheckExpType inner_ty) penv thing_inside
         ; pat_ty <- readExpType pat_ty
         ; return (mkHsWrapPat wrap (SigPatOut pat' inner_ty) pat_ty, res) }

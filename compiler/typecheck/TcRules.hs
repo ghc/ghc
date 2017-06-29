@@ -148,9 +148,9 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk
-        ; vars <- tcExtendTyVarEnv tvs $
+        ; vars <- tcExtendTyVarEnv2 tvs $
                   tcRuleBndrs rule_bndrs
-        ; return (tvs ++ id : vars) }
+        ; return (map snd tvs ++ id : vars) }
 
 ruleCtxt :: FastString -> SDoc
 ruleCtxt name = text "When checking the transformation rule" <+>
