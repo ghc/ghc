@@ -80,6 +80,9 @@ Now we generate ::
   used to build a GHC using compilers on your ``PATH`` instead of using the
   bundled bindist. See :ghc-ticket:`13792`
 
+- The optional ``instance`` keyword is now usable in type family instance
+  declarations. See :ghc-ticket:`13747`
+
 - Lots of other bugs. See `Trac <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.4.1&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
   for a complete list.
 
