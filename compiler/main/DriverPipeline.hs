@@ -1493,8 +1493,8 @@ runPhase (RealPhaseWithInfo mangInfo LlvmLlc) input_fn dflags
     output_fn <- phaseOutputFilename next_phase
 
     liftIO $ SysTools.runLlvmLlc dflags
-                ([ -- FIXME(kavon) SysTools.Option (llvmOpts !! opt_lvl),
-                    SysTools.Option cpscall_workaround,
+                ( map SysTools.Option cpscall_workaround
+                ++ [ -- FIXME(kavon) SysTools.Option (llvmOpts !! opt_lvl),
                     SysTools.Option $ "-relocation-model=" ++ rmodel,
                     SysTools.FileOption "" input_fn,
                     SysTools.Option "-o", SysTools.FileOption "" output_fn]
@@ -1518,7 +1518,7 @@ runPhase (RealPhaseWithInfo mangInfo LlvmLlc) input_fn dflags
   where
         
         -- TODO(kavon): temporary
-        cpscall_workaround = "-disable-machine-cse"
+        cpscall_workaround = ["-disable-machine-cse", "-enable-shrink-wrap=false"]
       
         -- Bug in LLVM at O3 on OSX.
         llvmOpts = if platformOS (targetPlatform dflags) == OSDarwin
