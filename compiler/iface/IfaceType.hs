@@ -677,12 +677,12 @@ ppr_ty _         (IfaceLitTy n)         = pprIfaceTyLit n
 ppr_ty ctxt_prec (IfaceFunTy w ty1 ty2)
   = -- We don't want to lose synonyms, so we mustn't use splitFunTys here.
     maybeParen ctxt_prec FunPrec $
-    sep [ppr_ty FunPrec ty1, sep (ppr_fun_tail ty2)]
+    sep [ppr_ty FunPrec ty1, sep (ppr_fun_tail w ty2)]
   where
-    ppr_fun_tail (IfaceFunTy w ty1 ty2)
-      = (ppr_fun_arrow w <+> ppr_ty FunPrec ty1) : ppr_fun_tail ty2
-    ppr_fun_tail other_ty
-      = [ppr_fun_arrow w <+> pprIfaceType other_ty]
+    ppr_fun_tail wthis (IfaceFunTy wnext ty1 ty2)
+      = (ppr_fun_arrow wthis <+> ppr_ty FunPrec ty1) : ppr_fun_tail wnext ty2
+    ppr_fun_tail wthis other_ty
+      = [ppr_fun_arrow wthis <+> pprIfaceType other_ty]
 
     ppr_fun_arrow Omega = arrow
     ppr_fun_arrow One = lollipop
