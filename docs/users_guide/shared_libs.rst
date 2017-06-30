@@ -117,12 +117,12 @@ the :ghc-flag:`-dynamic`, :ghc-flag:`-fPIC` and :ghc-flag:`-shared` flags:
 
     ghc --make -dynamic -shared -fPIC Foo.hs -o libfoo.so
 
-As before, the ``-dynamic`` flag specifies that this library links
-against the shared library versions of the rts and base package. The
-``-fPIC`` flag is required for all code that will end up in a shared
-library. The ``-shared`` flag specifies to make a shared library rather
-than a program. To make this clearer we can break this down into
-separate compilation and link steps:
+As before, the :ghc-flag:`-dynamic` flag specifies that this library links
+against the shared library versions of the ``rts`` and ``base`` package. The
+:ghc-flag:`-fPIC` flag is required for all code that will end up in a shared
+library. The :ghc-flag:`-shared` flag specifies to make a shared library rather
+than a program. To make this clearer we can break this down into separate
+compilation and link steps:
 
 .. code-block:: none
 
@@ -130,12 +130,11 @@ separate compilation and link steps:
     ghc -dynamic -shared Foo.o -o libfoo.so
 
 In principle you can use :ghc-flag:`-shared` without :ghc-flag:`-dynamic` in the
-link step. That means to statically link the rts all the base libraries into
-your new shared library. This would make a very big, but standalone
-shared library. On most platforms however that would require all the
+link step. That means to statically link the runtime system and all of the base
+libraries into your new shared library. This would make a very big, but
+standalone shared library. On most platforms however that would require all the
 static libraries to have been built with :ghc-flag:`-fPIC` so that the code is
-suitable to include into a shared library and we do not do that at the
-moment.
+suitable to include into a shared library and we do not do that at the moment.
 
 .. warning::
     If your shared library exports a Haskell API then you cannot
