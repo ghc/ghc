@@ -56,7 +56,7 @@ import TcIface
 import TcSimplify ( solveEqualities )
 import TcType
 import TcHsSyn( zonkSigType )
-import Inst   ( tcInstBindersX, tcInstBinderX )
+import Inst   ( tcInstBinders, tcInstBinder )
 import Type
 import Kind
 import RdrName( lookupLocalRdrOcc )
@@ -422,7 +422,7 @@ metavariable.
 In types, however, we're not so lucky, because *we cannot re-generalize*!
 There is no lambda. So, we must be careful only to instantiate at the last
 possible moment, when we're sure we're never going to want the lost polymorphism
-again. This is done in calls to tcInstBindersX.
+again. This is done in calls to tcInstBinders.
 
 To implement this behavior, we use bidirectional type checking, where we
 explicitly think about whether we know the kind of the type we're checking
@@ -810,7 +810,7 @@ tcInferArgs fun tc_binders mb_kind_info args
         -- now, we need to instantiate any remaining invisible arguments
        ; let (invis_bndrs, other_binders) = break isVisibleBinder leftover_binders
        ; (subst', invis_args)
-           <- tcInstBindersX subst mb_kind_info invis_bndrs
+           <- tcInstBinders subst mb_kind_info invis_bndrs
        ; return ( subst'
                 , other_binders
                 , args' `chkAppend` invis_args
@@ -838,7 +838,7 @@ tc_infer_args mode orig_ty binders mb_kind_info orig_args n0
     go subst (binder:binders) all_args@(arg:args) n acc
       | isInvisibleBinder binder
       = do { traceTc "tc_infer_args (invis)" (ppr binder)
-           ; (subst', arg') <- tcInstBinderX mb_kind_info subst binder
+           ; (subst', arg') <- tcInstBinder mb_kind_info subst binder
            ; go subst' binders all_args n (arg' : acc) }
 
       | otherwise
@@ -932,7 +932,7 @@ instantiateTyN n ty ki
         empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ki))
     in
     if num_to_inst <= 0 then return (ty, ki) else
-    do { (subst, inst_args) <- tcInstBindersX empty_subst Nothing inst_bndrs
+    do { (subst, inst_args) <- tcInstBinders empty_subst Nothing inst_bndrs
        ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
              ki'        = substTy subst rebuilt_ki
        ; traceTc "instantiateTyN" (vcat [ ppr ty <+> dcolon <+> ppr ki
