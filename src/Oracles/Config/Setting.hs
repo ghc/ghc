@@ -52,6 +52,7 @@ data Setting = BuildArch
              | GmpLibDir
              | IconvIncludeDir
              | IconvLibDir
+             | CursesLibDir
              -- Paths to where GHC is installed
              -- ref: mk/install.mk
              | InstallPrefix
@@ -73,6 +74,7 @@ data SettingList = ConfCcArgs Stage
                  | ConfLdLinkerArgs Stage
                  | HsCppArgs
 
+-- | Maps 'Setting's to names in @cfg/system.config.in@.
 setting :: Setting -> Action String
 setting key = unsafeAskConfig $ case key of
     BuildArch          -> "build-arch"
@@ -109,6 +111,7 @@ setting key = unsafeAskConfig $ case key of
     GmpLibDir          -> "gmp-lib-dir"
     IconvIncludeDir    -> "iconv-include-dir"
     IconvLibDir        -> "iconv-lib-dir"
+    CursesLibDir       -> "curses-lib-dir"
     InstallPrefix      -> "install-prefix"
     InstallBinDir      -> "install-bindir"
     InstallLibDir      -> "install-libdir"

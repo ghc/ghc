@@ -63,8 +63,10 @@ customBuild rs opts target@Target {..} = do
                     cmd [Cwd output] [path] "x" (top -/- input)
 
             Configure dir -> do
-                -- Inject /bin/bash into `libtool`, instead of /bin/sh
-                let env = AddEnv "CONFIG_SHELL" "/bin/bash"
+                -- Inject /bin/bash into `libtool`, instead of /bin/sh, otherwise Windows breaks.
+                -- TODO: Figure out why.
+                bash <- bashPath
+                let env = AddEnv "CONFIG_SHELL" bash
                 cmd Shell cmdEcho env [Cwd dir] [path] opts argList
 
             HsCpp    -> captureStdout target path argList

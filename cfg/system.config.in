@@ -104,6 +104,8 @@ conf-ld-linker-args-stage2  = @CONF_LD_LINKER_OPTS_STAGE2@
 # Include and library directories:
 #=================================
 
+curses-lib-dir    = @CURSES_LIB_DIRS@
+
 iconv-include-dir = @ICONV_INCLUDE_DIRS@
 iconv-lib-dir     = @ICONV_LIB_DIRS@
 

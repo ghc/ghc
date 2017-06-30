@@ -7,7 +7,7 @@ import Expression
 import GHC
 import Settings.Install (installPackageDbDirectory)
 import Settings.Path (inplacePackageDbDirectory)
-import Oracles.Path (getTopDirectory)
+import Oracles.Path (getTopDirectory, bashPath)
 import Oracles.Config.Setting (SettingList(..), settingList)
 
 -- | Wrapper is an expression depending on the 'FilePath' to the
@@ -22,16 +22,18 @@ type Wrapper = WrappedBinary -> Expr String
 ghcWrapper :: WrappedBinary -> Expr String
 ghcWrapper WrappedBinary{..} = do
     lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " -B" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
 
 inplaceRunGhcWrapper :: WrappedBinary -> Expr String
 inplaceRunGhcWrapper WrappedBinary{..} = do
     lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " -f" ++ (binaryLibPath -/- "bin/ghc-stage2") -- TODO: use ProgramName
           ++ " -B" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
@@ -39,8 +41,9 @@ inplaceRunGhcWrapper WrappedBinary{..} = do
 installRunGhcWrapper :: WrappedBinary -> Expr String
 installRunGhcWrapper WrappedBinary{..} = do
     lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " -f" ++ (binaryLibPath -/- "bin/ghc") -- TODO: use ProgramName
           ++ " -B" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
@@ -53,8 +56,9 @@ inplaceGhcPkgWrapper WrappedBinary{..} = do
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
     let packageDb = top -/- inplacePackageDbDirectory (succ stage)
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " --global-package-db " ++ packageDb ++ " ${1+\"$@\"}" ]
 
@@ -66,23 +70,26 @@ installGhcPkgWrapper WrappedBinary{..} = do
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
     let packageDb = installPackageDbDirectory binaryLibPath top (succ stage)
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
           ++ " --global-package-db " ++ packageDb ++ " ${1+\"$@\"}" ]
 
 hp2psWrapper :: WrappedBinary -> Expr String
 hp2psWrapper WrappedBinary{..} = do
     lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
 
 hpcWrapper :: WrappedBinary -> Expr String
 hpcWrapper WrappedBinary{..} = do
     lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
 
 hsc2hsWrapper :: WrappedBinary -> Expr String
@@ -95,8 +102,9 @@ hsc2hsWrapper WrappedBinary{..} = do
     confGccLinkerArgs <- lift $ settingList (ConfGccLinkerArgs Stage1)
     let hsc2hsExtra = unwords (map ("-cflags=" ++) confCcArgs) ++ " " ++
                       unwords (map ("-lflags=" ++) confGccLinkerArgs)
+    bash <- lift bashPath
     return $ unlines
-        [ "#!/bin/bash"
+        [ "#!"++bash
         , "executablename=\"" ++ executableName ++ "\""
         , "HSC2HS_EXTRA=\"" ++ hsc2hsExtra ++ "\""
         , contents ]

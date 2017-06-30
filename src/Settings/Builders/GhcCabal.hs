@@ -77,6 +77,7 @@ configureArgs = do
         , conf "--with-iconv-libraries"   $ argSetting IconvLibDir
         , conf "--with-gmp-includes"      $ argSetting GmpIncludeDir
         , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
+        , conf "--with-curses-libraries"  $ argSetting CursesLibDir
         , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
         , conf "--with-cc" $ argStagedBuilderPath (Cc CompileC) ]
 

@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Path (
-    topDirectory, getTopDirectory, systemBuilderPath, pathOracle
+    topDirectory, getTopDirectory, systemBuilderPath, pathOracle, bashPath
     ) where
 
 import Control.Monad.Trans.Reader
@@ -28,7 +28,7 @@ systemBuilderPath builder = case builder of
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!
-    Configure _     -> return "bash configure"
+    Configure _     -> return "sh configure"
     Ghc _  Stage0   -> fromKey "system-ghc"
     GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
@@ -54,6 +54,10 @@ systemBuilderPath builder = case builder of
                 ++ quote key ++ " is not specified in system.config file."
             return "" -- TODO: Use a safe interface.
         else fixAbsolutePathOnWindows =<< lookupInPath path
+
+-- | Lookup the path to the @bash@ interpreter.
+bashPath :: Action FilePath
+bashPath = lookupInPath "bash"
 
 -- | Lookup an executable in @PATH@.
 lookupInPath :: FilePath -> Action FilePath
@@ -95,4 +99,3 @@ pathOracle = do
         path <- unifyPath <$> unpack <$> liftIO (findExecutable name)
         putLoud $ "Executable found: " ++ name ++ " => " ++ path
         return path
-
