@@ -5,7 +5,8 @@ module Settings.Path (
     rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,inplacePackageDbDirectory,
     pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
     objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
-    installPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath
+    installPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath,
+    pkgSetupConfigFile
     ) where
 
 import Base
@@ -73,6 +74,11 @@ pkgInplaceConfig context = buildPath context -/- "inplace-pkg-config"
 -- | Path to the @package-data.mk@ of a given 'Context'.
 pkgDataFile :: Context -> FilePath
 pkgDataFile context = buildPath context -/- "package-data.mk"
+
+
+-- | Path to the @setup-config@ of a given 'Context'.
+pkgSetupConfigFile :: Context -> FilePath
+pkgSetupConfigFile context = buildPath context -/- "setup-config"
 
 -- | Path to the haddock file of a given 'Context', e.g.:
 -- "_build/stage1/libraries/array/doc/html/array/array.haddock".

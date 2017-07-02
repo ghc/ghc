@@ -20,8 +20,9 @@ buildPackageData context@Context {..} = do
         cabalFile = pkgCabalFile package
         configure = pkgPath package -/- "configure"
         dataFile  = pkgDataFile context
+        setupConfigFile = pkgSetupConfigFile context
 
-    dataFile %> \mk -> do
+    [dataFile, setupConfigFile] &%> \(mk:setupConfig:_) -> do
         -- Make sure all generated dependencies are in place before proceeding.
         orderOnly =<< interpretInContext context generatedDependencies
 
@@ -32,7 +33,7 @@ buildPackageData context@Context {..} = do
         need =<< mapM pkgConfFile =<< contextDependencies context
 
         need [cabalFile]
-        build $ Target context GhcCabal [cabalFile] [mk]
+        build $ Target context GhcCabal [cabalFile] [mk, setupConfig]
         postProcessPackageData context mk
 
     pkgInplaceConfig context %> \conf -> do
@@ -107,6 +108,7 @@ packageCmmSources pkg
 -- For example, @libraries/deepseq/dist-install_VERSION = 1.4.0.0@
 -- is replaced by @VERSION = 1.4.0.0@.
 -- Reason: Shake's built-in makefile parser doesn't recognise slashes
+-- TODO (izgzhen): should fix DEP_LIB_REL_DIRS_SEARCHPATH
 postProcessPackageData :: Context -> FilePath -> Action ()
 postProcessPackageData context@Context {..} file = do
     top     <- topDirectory

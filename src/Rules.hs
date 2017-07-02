@@ -39,6 +39,8 @@ buildLib stage pkg = do
     when (pkg `elem` activePackages) $
         if isLibrary pkg
         then do -- build a library
+            when (nonCabalContext context) $
+                need [pkgSetupConfigFile context]
             ways <- interpretInContext context getLibraryWays
             libs <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs <- interpretInContext context $ buildHaddock flavour

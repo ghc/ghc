@@ -18,7 +18,7 @@ import Oracles.Config.Setting
 import Oracles.PackageData
 import Oracles.Path
 
-import qualified System.Directory.Extra as IO
+import qualified System.Directory as IO
 
 {- | Install the built binaries etc. to the @destDir ++ prefix@.
 
@@ -133,6 +133,7 @@ withLatestBuildStage pkg m = do
 installPackageConf :: Action ()
 installPackageConf = do
     let context = vanillaContext Stage0 rts
+    liftIO $ IO.createDirectoryIfMissing True (takeDirectory pkgConfInstallPath)
     build $ Target context HsCpp [ pkgPath rts -/- "package.conf.in" ]
                                  [ pkgConfInstallPath <.> "raw" ]
     Stdout out <- cmd ("grep" :: String) [ "-v", "^#pragma GCC"
