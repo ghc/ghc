@@ -635,8 +635,10 @@ ppInstanceSigs :: LinksInfo -> Splice -> Unicode -> Qualification
 ppInstanceSigs links splice unicode qual sigs = do
     TypeSig lnames typ <- sigs
     let names = map unLoc lnames
-        L loc rtyp = hsSigWcType typ
-    return $ ppSimpleSig links splice unicode qual loc names rtyp
+        L _ rtyp = hsSigWcType typ
+    -- Instance methods signatures are synified and thus don't have a useful 
+    -- SrcSpan value. Use the methods name location instead.
+    return $ ppSimpleSig links splice unicode qual (getLoc $ head $ lnames) names rtyp
 
 
 lookupAnySubdoc :: Eq id1 => id1 -> [(id1, DocForDecl id2)] -> DocForDecl id2
