@@ -285,7 +285,7 @@ interpretBCO (Capability* cap)
     // that these entities are non-aliasable.
     register StgPtr       Sp;    // local state -- stack pointer
     register StgPtr       SpLim; // local state -- stack lim pointer
-    register StgClosure   *tagged_obj = 0, *obj;
+    register StgClosure   *tagged_obj = 0, *obj = NULL;
     uint32_t n, m;
 
     LOAD_THREAD_STATE();
