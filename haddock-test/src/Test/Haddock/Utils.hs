@@ -48,3 +48,10 @@ copyFile' :: FilePath -> FilePath -> IO ()
 copyFile' old new = do
     createDirectoryIfMissing True $ takeDirectory new
     copyFile old new
+
+
+crlfToLf :: String -> String
+crlfToLf "" = ""
+crlfToLf ('\r' : '\n' : rest) = '\n' : crlfToLf rest
+crlfToLf ('\r' : rest)  = '\n' : crlfToLf rest
+crlfToLf (other : rest) = other : crlfToLf rest

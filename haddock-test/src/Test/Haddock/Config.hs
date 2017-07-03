@@ -193,7 +193,7 @@ loadConfig ccfg dcfg flags files = do
         , baseDependencies ghcPath
         ]
 
-    let cfgHaddockStdOut = fromMaybe "/dev/null" (flagsHaddockStdOut flags)
+    let cfgHaddockStdOut = fromMaybe defaultStdOut (flagsHaddockStdOut flags)
 
     cfgDiffTool <- if FlagNoDiff `elem` flags
         then pure Nothing
@@ -254,6 +254,14 @@ defaultDiffTool =
     liftM listToMaybe . filterM isAvailable $ ["colordiff", "diff"]
   where
     isAvailable = liftM isJust . findProgramLocation silent
+
+
+defaultStdOut :: FilePath
+#ifdef mingw32_HOST_OS
+defaultStdOut = "nul"
+#else
+defaultStdOut = "/dev/null"
+#endif
 
 
 processFileArgs :: DirConfig -> [String] -> IO [TestPackage]

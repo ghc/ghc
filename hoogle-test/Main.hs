@@ -1,10 +1,12 @@
 {-# LANGUAGE CPP #-}
 
 
+import Data.Function
 import System.Environment
 import System.FilePath
 
 import Test.Haddock
+import Test.Haddock.Utils
 
 
 checkConfig :: CheckConfig String
@@ -12,7 +14,7 @@ checkConfig = CheckConfig
     { ccfgRead = Just
     , ccfgClean = \_ -> id
     , ccfgDump = id
-    , ccfgEqual = (==)
+    , ccfgEqual = (==) `on` crlfToLf
     }
 
 
