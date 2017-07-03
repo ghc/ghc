@@ -928,6 +928,7 @@ is as follows. If the do-expression has the following form: ::
     do p1 <- E1; ...; pn <- En; return E
 
 where none of the variables defined by ``p1...pn`` are mentioned in ``E1...En``,
+and ``p1...pn`` are all variables or lazy patterns,
 then the expression will only require ``Applicative``. Otherwise, the expression
 will require ``Monad``. The block may return a pure expression ``E`` depending
 upon the results ``p1...pn`` with either ``return`` or ``pure``.
@@ -967,12 +968,47 @@ the optimal solution, provided as an option:
     statements).  The default ``ApplicativeDo`` algorithm is ``O(n^2)``.
 
 
+.. _applicative-do-strict:
+
+Strict patterns
+~~~~~~~~~~~~~~~
+
+
+A strict pattern match in a bind statement prevents
+``ApplicativeDo`` from transforming that statement to use
+``Applicative``.  This is because the transformation would change the
+semantics by making the expression lazier.
+
+For example, this code will require a ``Monad`` constraint::
+
+    > :t \m -> do { (x:xs) <- m; return x }
+    \m -> do { (x:xs) <- m; return x } :: Monad m => m [b] -> m b
+
+but making the pattern match lazy allows it to have a ``Functor`` constraint::
+
+    > :t \m -> do { ~(x:xs) <- m; return x }
+    \m -> do { ~(x:xs) <- m; return x } :: Functor f => f [b] -> f b
+
+A "strict pattern match" is any pattern match that can fail.  For
+example, ``()``, ``(x:xs)``, ``!z``, and ``C x`` are strict patterns,
+but ``x`` and ``~(1,2)`` are not.  For the purposes of
+``ApplicativeDo``, a pattern match against a ``newtype`` constructor
+is considered strict.
+
+When there's a strict pattern match in a sequence of statements,
+``ApplicativeDo`` places a ``>>=`` between that statement and the one
+that follows it.  The sequence may be transformed to use ``<*>``
+elsewhere, but the strict pattern match and the following statement
+will always be connected with ``>>=``, to retain the same strictness
+semantics as the standard do-notation.  If you don't want this, simply
+put a ``~`` on the pattern match to make it lazy.
+
 .. _applicative-do-existential:
 
 Existential patterns and GADTs
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Note that when the pattern in a statement matches a constructor with
+When the pattern in a statement matches a constructor with
 existential type variables and/or constraints, the transformation that
 ``ApplicativeDo`` performs may mean that the pattern does not scope
 over the statements that follow it.  This is because the rearrangement
@@ -985,7 +1021,8 @@ program does not typecheck::
 
     test = do
       A x <- undefined
-      _ <- return True
+      _ <- return 'a'
+      _ <- return 'b'
       return (x == x)
 
 The reason is that the ``Eq`` constraint that would be brought into
@@ -995,8 +1032,12 @@ rearranged the expression to look like this::
 
     test =
       (\x _ -> x == x)
-        <$> do A x <- undefined; return x
-        <*> return True
+        <$> do A x <- undefined; _ <- return 'a'; return x
+        <*> return 'b'
+
+(Note that the ``return 'a'`` and ``return 'b'`` statements are needed
+to make ``ApplicativeDo`` apply despite the restriction noted in
+:ref:`applicative-do-strict`, because ``A x`` is a strict pattern match.)
 
 Turning off ``ApplicativeDo`` lets the program typecheck.  This is
 something to bear in mind when using ``ApplicativeDo`` in combination
