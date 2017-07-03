@@ -406,8 +406,18 @@ eval_obj:
     case FUN_STATIC:
 #if defined(PROFILING)
         if (cap->r.rCCCS != obj->header.prof.ccs) {
+            int arity = get_fun_itbl(obj)->f.arity;
+            // Tag the function correctly.  We guarantee that pap->fun
+            // is correctly tagged (this is checked by
+            // Sanity.c:checkPAP()), but we don't guarantee that every
+            // pointer to a FUN is tagged on the stack or elsewhere,
+            // so we fix the tag here. (#13767)
+            // For full details of the invariants on tagging, see
+            // https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/HaskellExecution/PointerTagging
             tagged_obj =
-                newEmptyPAP(cap, tagged_obj, get_fun_itbl(obj)->f.arity);
+                newEmptyPAP(cap,
+                            arity <= TAG_MASK ? obj + arity : obj,
+                            arity);
         }
 #endif
         break;
@@ -424,7 +434,7 @@ eval_obj:
         ASSERT(((StgBCO *)obj)->arity > 0);
 #if defined(PROFILING)
         if (cap->r.rCCCS != obj->header.prof.ccs) {
-            tagged_obj = newEmptyPAP(cap, tagged_obj, ((StgBCO *)obj)->arity);
+            tagged_obj = newEmptyPAP(cap, obj, ((StgBCO *)obj)->arity);
         }
 #endif
         break;
