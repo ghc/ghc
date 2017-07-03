@@ -1374,7 +1374,7 @@ where_decls :: { Located ([AddAnn]
                                           ,sL1 $3 (snd $ unLoc $3)) }
 
 pattern_synonym_sig :: { LSig RdrName }
-        : 'pattern' con_list '::' sigtype
+        : 'pattern' con_list '::' sigtypedoc
                    {% ams (sLL $1 $> $ PatSynSig (unLoc $2) (mkLHsSigType $4))
                           [mj AnnPattern $1, mu AnnDcolon $3] }
 
