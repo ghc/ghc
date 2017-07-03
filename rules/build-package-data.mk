@@ -90,10 +90,6 @@ ifneq "$$(GMP_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-gmp-libraries="$$(GMP_LIB_DIRS)"
 endif
 
-ifneq "$$(CURSES_INCLUDE_DIRS)" ""
-$1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-includes="$$(CURSES_INCLUDE_DIRS)"
-endif
-
 ifneq "$$(CURSES_LIB_DIRS)" ""
 $1_$2_CONFIGURE_OPTS += --configure-option=--with-curses-libraries="$$(CURSES_LIB_DIRS)"
 endif
