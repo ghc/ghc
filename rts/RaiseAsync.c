@@ -873,6 +873,7 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 
             ap->size = words;
             ap->fun  = (StgClosure *)sp[0];
+
             sp++;
             for(i=0; i < words; ++i) {
                 ap->payload[i] = (StgClosure *)*sp++;
