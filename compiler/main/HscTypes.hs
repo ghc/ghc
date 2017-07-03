@@ -12,6 +12,7 @@ module HscTypes (
         HscEnv(..), hscEPS,
         FinderCache, FindResult(..), InstalledFindResult(..),
         Target(..), TargetId(..), pprTarget, pprTargetId,
+        needsTemplateHaskellOrQQ,
         ModuleGraph, emptyMG, mapMG,
         HscStatus(..),
         IServ(..),
@@ -199,6 +200,7 @@ import Platform
 import Util
 import UniqDSet
 import GHC.Serialized   ( Serialized )
+import qualified GHC.LanguageExtensions as LangExt
 
 import Foreign
 import Control.Monad    ( guard, liftM, ap )
@@ -2608,11 +2610,27 @@ soExt platform
 -- 'GHC.topSortModuleGraph' and 'Digraph.flattenSCC' to achieve this.
 type ModuleGraph = [ModSummary]
 
+
+-- | Determines whether a set of modules requires Template Haskell or
+-- Quasi Quotes
+--
+-- Note that if the session's 'DynFlags' enabled Template Haskell when
+-- 'depanal' was called, then each module in the returned module graph will
+-- have Template Haskell enabled whether it is actually needed or not.
+needsTemplateHaskellOrQQ :: ModuleGraph -> Bool
+needsTemplateHaskellOrQQ mg = any isTemplateHaskellOrQQNonBoot mg
+
 emptyMG :: ModuleGraph
 emptyMG = []
 
 mapMG :: (ModSummary -> ModSummary) -> ModuleGraph -> ModuleGraph
 mapMG = map
+
+isTemplateHaskellOrQQNonBoot :: ModSummary -> Bool
+isTemplateHaskellOrQQNonBoot ms =
+  (xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+    || xopt LangExt.QuasiQuotes (ms_hspp_opts ms)) &&
+  not (isBootSummary ms)
 
 -- | A single node in a 'ModuleGraph'. The nodes of the module graph
 -- are one of:

@@ -23,7 +23,7 @@ module GHC (
         gcatch, gbracket, gfinally,
         printException,
         handleSourceError,
-        needsTemplateHaskell,
+        needsTemplateHaskellOrQQ,
 
         -- * Flags and settings
         DynFlags(..), GeneralFlag(..), Severity(..), HscTarget(..), gopt,
@@ -1074,15 +1074,6 @@ compileCore simplify fn = do
 -- | Get the module dependency graph.
 getModuleGraph :: GhcMonad m => m ModuleGraph -- ToDo: DiGraph ModSummary
 getModuleGraph = liftM hsc_mod_graph getSession
-
--- | Determines whether a set of modules requires Template Haskell.
---
--- Note that if the session's 'DynFlags' enabled Template Haskell when
--- 'depanal' was called, then each module in the returned module graph will
--- have Template Haskell enabled whether it is actually needed or not.
-needsTemplateHaskell :: ModuleGraph -> Bool
-needsTemplateHaskell ms =
-    any (xopt LangExt.TemplateHaskell . ms_hspp_opts) ms
 
 -- | Return @True@ <==> module is loaded.
 isLoaded :: GhcMonad m => ModuleName -> m Bool

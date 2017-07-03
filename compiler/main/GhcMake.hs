@@ -1994,7 +1994,7 @@ enableCodeGenForTH target nodemap =
       [ ms
       | mss <- Map.elems nodemap
       , Right ms <- mss
-      , xopt LangExt.TemplateHaskell (ms_hspp_opts ms)
+      , needsTemplateHaskellOrQQ $ [ms]
       ]
     transitive_deps_set marked_mods modSums = foldl' go marked_mods modSums
     go marked_mods ms
