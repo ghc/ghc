@@ -377,3 +377,4 @@ test('T12497', [ unless(opsys('mingw32'), skip)
 
 test('T12903', [when(opsys('mingw32'), skip)], compile_and_run, [''])
 test('T13832', exit_code(1), compile_and_run, ['-threaded'])
+test('T13894', normal, compile_and_run, [''])
