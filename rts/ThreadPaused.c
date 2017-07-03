@@ -275,10 +275,12 @@ threadPaused(Capability *cap, StgTSO *tso)
             // deadlocked on itself.  See #5226 for an instance of
             // this bug.
             //
-            if ((bh_info == &stg_WHITEHOLE_info ||
-                 bh_info == &stg_BLACKHOLE_info)
-                &&
-                ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+            // Note that great care is required when entering computations
+            // suspended by this mechanism. See Note [AP_STACKs must be eagerly
+            // blackholed] for details.
+            if (((bh_info == &stg_BLACKHOLE_info)
+                 && ((StgInd*)bh)->indirectee != (StgClosure*)tso)
+                || (bh_info == &stg_WHITEHOLE_info))
             {
                 debugTrace(DEBUG_squeeze,
                            "suspending duplicate work: %ld words of stack",
@@ -304,6 +306,12 @@ threadPaused(Capability *cap, StgTSO *tso)
                 continue;
             }
 
+            // We should never have made it here in the event of blackholes that
+            // we already own; they should have been marked when we blackholed
+            // them and consequently we should have stopped our stack walk
+            // above.
+            ASSERT(!((bh_info == &stg_BLACKHOLE_info)
+                     && (((StgInd*)bh)->indirectee == (StgClosure*)tso)));
 
             // zero out the slop so that the sanity checker can tell
             // where the next closure is.
