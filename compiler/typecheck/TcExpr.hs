@@ -2413,7 +2413,11 @@ addFunResCtxt has_args fun fun_res_ty env_ty
                              do { dumping <- doptM Opt_D_dump_tc_trace
                                 ; MASSERT( dumping )
                                 ; newFlexiTyVarTy liftedTypeKind }
-           ; let (_, _, fun_tau) = tcSplitSigmaTy fun_res'
+           ; let -- See Note [Splitting nested sigma types in mismatched
+                 --           function types]
+                 (_, _, fun_tau) = tcSplitNestedSigmaTys fun_res'
+                 -- No need to call tcSplitNestedSigmaTys here, since env_ty is
+                 -- an ExpRhoTy, i.e., it's already deeply instantiated.
                  (_, _, env_tau) = tcSplitSigmaTy env'
                  (args_fun, res_fun) = tcSplitFunTys fun_tau
                  (args_env, res_env) = tcSplitFunTys env_tau
@@ -2439,6 +2443,44 @@ addFunResCtxt has_args fun fun_res_ty env_ty
           = case tcSplitTyConApp_maybe ty of
               Just (tc, _) -> isAlgTyCon tc
               Nothing      -> False
+
+{-
+Note [Splitting nested sigma types in mismatched function types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When one applies a function to too few arguments, GHC tries to determine this
+fact if possible so that it may give a helpful error message. It accomplishes
+this by checking if the type of the applied function has more argument types
+than supplied arguments.
+
+Previously, GHC computed the number of argument types through tcSplitSigmaTy.
+This is incorrect in the face of nested foralls, however! This caused Trac
+#13311, for instance:
+
+  f :: forall a. (Monoid a) => forall b. (Monoid b) => Maybe a -> Maybe b
+
+If one uses `f` like so:
+
+  do { f; putChar 'a' }
+
+Then tcSplitSigmaTy will decompose the type of `f` into:
+
+  Tyvars: [a]
+  Context: (Monoid a)
+  Argument types: []
+  Return type: forall b. Monoid b => Maybe a -> Maybe b
+
+That is, it will conclude that there are *no* argument types, and since `f`
+was given no arguments, it won't print a helpful error message. On the other
+hand, tcSplitNestedSigmaTys correctly decomposes `f`'s type down to:
+
+  Tyvars: [a, b]
+  Context: (Monoid a, Monoid b)
+  Argument types: [Maybe a]
+  Return type: Maybe b
+
+So now GHC recognizes that `f` has one more argument type than it was actually
+provided.
+-}
 
 badFieldTypes :: [(FieldLabelString,TcType)] -> SDoc
 badFieldTypes prs

@@ -2498,7 +2498,7 @@ checkValidClass cls
           op_name = idName sel_id
           op_ty   = idType sel_id
           (_,cls_pred,tau1) = tcSplitMethodTy op_ty
-          -- See Note [Splitting nested sigma types]
+          -- See Note [Splitting nested sigma types in class type signatures]
           (_,op_theta,tau2) = tcSplitNestedSigmaTys tau1
 
           check_constraint :: TcPredType -> TcM ()
@@ -2550,7 +2550,8 @@ checkValidClass cls
               -- Note [Default method type signatures must align]
               -- to learn why this is OK.
               --
-              -- See also Note [Splitting nested sigma types]
+              -- See also
+              -- Note [Splitting nested sigma types in class type signatures]
               -- for an explanation of why we don't use tcSplitSigmaTy here.
               (_, _, dm_tau) = tcSplitNestedSigmaTys dm_ty
 
@@ -2715,10 +2716,10 @@ when we validity-check default type signatures, we ignore contexts completely.
 
 Note that when checking whether two type signatures match, we must take care to
 split as many foralls as it takes to retrieve the tau types we which to check.
-See Note [Splitting nested sigma types].
+See Note [Splitting nested sigma types in class type signatures].
 
-Note [Splitting nested sigma types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Splitting nested sigma types in class type signatures]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this type synonym and class definition:
 
   type Traversal s t a b = forall f. Applicative f => (a -> f b) -> s -> f t
