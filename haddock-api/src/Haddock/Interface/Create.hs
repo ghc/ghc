@@ -79,7 +79,7 @@ createInterface tm flags modMap instIfaceMap = do
       dflags         = ms_hspp_opts ms
       !instances     = modInfoInstances mi
       !fam_instances = md_fam_insts md
-      !exportedNames = modInfoExports mi
+      !exportedNames = modInfoExportsWithSelectors mi
 
       (TcGblEnv { tcg_rdr_env = gre
                 , tcg_warns   = warnings
