@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Haddock.Interface
@@ -48,14 +49,20 @@ import qualified Data.Set as Set
 import Distribution.Verbosity
 import System.Directory
 import System.FilePath
+import System.IO
 import Text.Printf
 
 import Digraph
 import DynFlags hiding (verbosity)
 import Exception
 import GHC hiding (verbosity)
+#if defined(mingw32_HOST_OS)
+import GHC.IO.Encoding.CodePage (mkLocaleEncoding)
+import GHC.IO.Encoding.Failure (CodingFailureMode(TransliterateCodingFailure))
+#endif
 import HscTypes
 import FastString (unpackFS)
+import MonadUtils (liftIO)
 
 -- | Create 'Interface's and a link environment by typechecking the list of
 -- modules using the GHC API and processing the resulting syntax trees.
@@ -68,6 +75,10 @@ processModules
   -> Ghc ([Interface], LinkEnv) -- ^ Resulting list of interfaces and renaming
                                 -- environment
 processModules verbosity modules flags extIfaces = do
+#if defined(mingw32_HOST_OS)
+  -- Avoid internal error: <stderr>: hPutChar: invalid argument (invalid character)' non UTF-8 Windows
+  liftIO $ hSetEncoding stderr $ mkLocaleEncoding TransliterateCodingFailure
+#endif
 
   out verbosity verbose "Creating interfaces..."
   let instIfaceMap =  Map.fromList [ (instMod iface, iface) | ext <- extIfaces
