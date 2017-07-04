@@ -506,9 +506,9 @@ Here we have two threads (TSO 1 and TSO 2) which are in currently pausing (e.g.
 in threadPaused). Since they are pausing, their stacks are headed by a pointer
 to the continuation code which we will run on resumption (go and fun,
 respectively). We also see that there are two thunks on the heap: THUNK A and
-THUNK B where THUNK A is reachable from THUNK B (for instance, as an argument or
-free variable). We see that thread 1 has THUNK A under evaluation, and both
-threads have THUNK B under evaluation.
+THUNK B where THUNK B depends upon THUNK A (as in, evaluation of B will force
+A). We see that thread 1 has THUNK A under evaluation, and both threads have
+THUNK B under evaluation.
 
 As each thread enters threadPaused, threadPaused will walk its stack looking for
 duplicate computation (see Note [suspend duplicate work], although there is some
