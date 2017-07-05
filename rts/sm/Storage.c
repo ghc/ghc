@@ -1341,13 +1341,7 @@ StgWord calcTotalCompactW (void)
 #include <libkern/OSCacheControl.h>
 #endif
 
-#if defined(__CLANG__)
-/* clang defines __clear_cache as a builtin on some platforms.
- * For example on armv7-linux-androideabi. The type slightly
- * differs from gcc.
- */
-extern void __clear_cache(void * begin, void * end);
-#elif defined(__GNUC__)
+#if defined(__GNUC__)
 /* __clear_cache is a libgcc function.
  * It existed before __builtin___clear_cache was introduced.
  * See Trac #8562.
@@ -1366,16 +1360,11 @@ void flushExec (W_ len, AdjustorExecutable exec_addr)
 #elif (defined(arm_HOST_ARCH) || defined(aarch64_HOST_ARCH)) && defined(ios_HOST_OS)
   /* On iOS we need to use the special 'sys_icache_invalidate' call. */
   sys_icache_invalidate(exec_addr, len);
-#elif defined(__CLANG__)
-# if __has_builtin(__builtin___clear_cache)
-  __builtin___clear_cache((void*)begin, (void*)end);
-# else
-  __clear_cache((void*)begin, (void*)end);
-# endif
 #elif defined(__GNUC__)
   /* For all other platforms, fall back to a libgcc builtin. */
   unsigned char* begin = (unsigned char*)exec_addr;
   unsigned char* end   = begin + len;
+
   /* __builtin___clear_cache is supported since GNU C 4.3.6.
    * We pick 4.4 to simplify condition a bit.
    */
