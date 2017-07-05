@@ -719,7 +719,7 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go (FunTy act_weight act_arg act_res) (FunTy exp_weight exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
-      , act_weight == exp_weight -- arnaud: TODO: weight subsumption when it is implemented
+      , subweight act_weight exp_weight -- arnaud: TODO: this probably needs to be turned into a coercion for core
       = -- See Note [Co/contra-variance of subsumption checking]
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
