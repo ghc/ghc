@@ -1,6 +1,8 @@
-# GHC fork with linear types
+# GHC branch with linear types
 
-This is an in-development fork of GHC with support for linear types.
+This is an *in-development* branch of GHC with support for linear
+types. This branch is not supported by GHC HQ or anyone else. Please
+don't submit tickets about issues in this branch to GHC Trac.
 
 ## Building & Installing
 
@@ -56,7 +58,7 @@ use, and what the relevant image actually builds.
   $ git clone https://github.com/ghc/ghc
   ```
 
-2. Add our fork as a remote source:
+2. Add this branch as a remote source:
 
   ```
   $ cd ghc
