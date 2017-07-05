@@ -15,16 +15,16 @@ definition is part of the Haskell Report on
 FFI support is enabled by default, but can be enabled or disabled
 explicitly with the :ghc-flag:`-XForeignFunctionInterface` flag.
 
-GHC implements a number of GHC-specific extensions to the FFI Addendum.
-These extensions are described in :ref:`ffi-ghcexts`, but please note
-that programs using these features are not portable. Hence, these
+GHC implements a number of GHC-specific extensions to the FFI Chapter of the
+Haskell 2010 Report. These extensions are described in :ref:`ffi-ghcexts`, but
+please note that programs using these features are not portable. Hence, these
 features should be avoided where possible.
 
 The FFI libraries are documented in the accompanying library
 documentation; see for example the :base-ref:`Foreign <Foreign.html>` module.
 
-GHC differences to the FFI Addendum
------------------------------------
+GHC differences to the FFI Chapter
+----------------------------------
 
 Guaranteed call safety
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -41,7 +41,7 @@ otherwise-unnecessary copy. However, this can only be done safely under
 collector in the middle of the call.
 
 In previous releases, GHC would take advantage of the freedom afforded by the
-Addendum by performing ``safe`` foreign calls in place of ``unsafe`` calls in
+Chapter by performing ``safe`` foreign calls in place of ``unsafe`` calls in
 the bytecode interpreter. This meant that some packages which worked when
 compiled would fail under GHCi (e.g. :ghc-ticket:`13730`).
 
@@ -52,8 +52,8 @@ bytecode interpreter.
 
 .. _ffi-ghcexts:
 
-GHC extensions to the FFI Addendum
-----------------------------------
+GHC extensions to the FFI Chapter
+---------------------------------
 
 The FFI features that are described in this section are specific to GHC.
 Your code will not be portable to other compilers if you use them.
@@ -62,7 +62,7 @@ Unboxed types
 ~~~~~~~~~~~~~
 
 The following unboxed types may be used as basic foreign types (see FFI
-Addendum, Section 3.2): ``Int#``, ``Word#``, ``Char#``, ``Float#``,
+Chapter, Section 8.6): ``Int#``, ``Word#``, ``Char#``, ``Float#``,
 ``Double#``, ``Addr#``, ``StablePtr# a``, ``MutableByteArray#``,
 ``ForeignObj#``, and ``ByteArray#``.
 
