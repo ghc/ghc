@@ -527,7 +527,7 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
                 (mkTyVarBinders Specified ex_tyvars)
                 []      -- No equality spec
                 []      -- No theta
-                (map unrestricted arg_tys) -- TODO: arnaud: is unrestricted correct?
+                (map linear arg_tys) -- Here, we're assuming that we don't need non-linear wired-in types.
                 (mkTyConApp tycon (mkTyVarTys tyvars))
                 rri
                 tycon
