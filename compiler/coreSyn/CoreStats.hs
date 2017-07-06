@@ -37,6 +37,7 @@ instance Outputable CoreStats where
                   text "joins:"     <+> intWithCommas i5 <> char '/' <>
                                         intWithCommas (i4 + i5) ])
 
+
 plusCS :: CoreStats -> CoreStats -> CoreStats
 plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1, cs_vb = v1, cs_jb = j1 })
        (CS { cs_tm = p2, cs_ty = q2, cs_co = r2, cs_vb = v2, cs_jb = j2 })
