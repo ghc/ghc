@@ -139,7 +139,7 @@ instance (OutputableBndrId pass) => Outputable (ImportDecl pass) where
 ************************************************************************
 -}
 
--- | A name in an import or export specfication which may have adornments. Used
+-- | A name in an import or export specification which may have adornments. Used
 -- primarily for accurate pretty printing of ParsedSource, and API Annotation
 -- placement.
 data IEWrappedName name

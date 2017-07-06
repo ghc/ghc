@@ -462,7 +462,7 @@ middle of an ST action multiple times, resulting in duplication of effects.
 In short, the construction of an AP_STACK allows us to suspend a computation
 which should not be duplicated. When running with lazy blackholing, we can then
 enter this AP_STACK multiple times, duplicating the computation with potentially
-disasterous consequences.
+disastrous consequences.
 
 For instance, consider the case of a simple ST program which computes a sum
 using in─place mutation,

@@ -1845,7 +1845,7 @@ tcHsPartialSigType ctxt sig_ty
 
         ; explicit_tvs <- mapM zonkTyCoVarKind explicit_tvs
         ; let all_tvs = implicit_tvs ++ explicit_tvs
-                        -- The implicit_tvs alraedy have zonked kinds
+                        -- The implicit_tvs already have zonked kinds
 
         ; theta   <- mapM zonkTcType theta
         ; tau     <- zonkTcType tau

@@ -30,7 +30,7 @@ extern W_ ticky_entry_ctrs[];
 extern W_ top_ct[];
 #endif
 
-/* The rest are not explicity declared in rts/Ticky.c.  Instead
+/* The rest are not explicitly declared in rts/Ticky.c.  Instead
    we use the same trick as in the former StgTicky.h: recycle the 
    same declarations for both extern decls (which are included everywhere)
    and initializations (which only happen once) 

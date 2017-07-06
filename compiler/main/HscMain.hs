@@ -1119,7 +1119,7 @@ markUnsafeInfer tcg_env whyUnsafe = do
              mkPlainWarnMsg dflags (warnUnsafeOnLoc dflags) (whyUnsafe' dflags))
 
     liftIO $ writeIORef (tcg_safeInfer tcg_env) (False, whyUnsafe)
-    -- NOTE: Only wipe trust when not in an explicity safe haskell mode. Other
+    -- NOTE: Only wipe trust when not in an explicitly safe haskell mode. Other
     -- times inference may be on but we are in Trustworthy mode -- so we want
     -- to record safe-inference failed but not wipe the trust dependencies.
     case safeHaskell dflags == Sf_None of

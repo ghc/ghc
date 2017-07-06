@@ -34,7 +34,7 @@ The FFI addendum stipulates that an implementation is free to implement an
 arbitrary thread and may be subject to concurrent garbage collection). This
 greatly constrains library authors since it implies that it is never safe to
 pass any heap object reference to a foreign function, even if invoked with an
-``unsafe`` call. For instance, it is often desireable to pass an unpinned
+``unsafe`` call. For instance, it is often desirable to pass an unpinned
 ``ByteArray#``\s directly to native code to avoid making an
 otherwise-unnecessary copy. However, this can only be done safely under
 ``unsafe`` call semantics as otherwise the array may be moved by the garbage
