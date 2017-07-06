@@ -128,7 +128,7 @@ module TyCoRep (
         tidyTyVarBinder, tidyTyVarBinders,
 
         -- * Sizes
-        typeSize, coercionSize, provSize
+        typeSize, coercionSize, typeSizePlus, coercionSizePlus, provSize
     ) where
 
 #include "HsVersions.h"
@@ -2824,37 +2824,53 @@ tidyCos env = map (tidyCo env)
 --     function is used only in reporting, not decision-making.
 
 typeSize :: Type -> Int
-typeSize (LitTy {})                 = 1
-typeSize (TyVarTy {})               = 1
-typeSize (AppTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (FunTy t1 t2)              = typeSize t1 + typeSize t2
-typeSize (ForAllTy (TvBndr tv _) t) = typeSize (tyVarKind tv) + typeSize t
-typeSize (TyConApp _ ts)            = 1 + sum (map typeSize ts)
-typeSize (CastTy ty co)             = typeSize ty + coercionSize co
-typeSize (CoercionTy co)            = coercionSize co
+typeSize t = typeSizePlus t 0
 
 coercionSize :: Coercion -> Int
-coercionSize (Refl _ ty)         = typeSize ty
-coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
-coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
-coercionSize (CoVarCo _)         = 1
-coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
-coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2
-coercionSize (SymCo co)          = 1 + coercionSize co
-coercionSize (TransCo co1 co2)   = 1 + coercionSize co1 + coercionSize co2
-coercionSize (NthCo _ co)        = 1 + coercionSize co
-coercionSize (LRCo  _ co)        = 1 + coercionSize co
-coercionSize (InstCo co arg)     = 1 + coercionSize co + coercionSize arg
-coercionSize (CoherenceCo c1 c2) = 1 + coercionSize c1 + coercionSize c2
-coercionSize (KindCo co)         = 1 + coercionSize co
-coercionSize (SubCo co)          = 1 + coercionSize co
-coercionSize (AxiomRuleCo _ cs)  = 1 + sum (map coercionSize cs)
+coercionSize t = coercionSizePlus t 0
+
+sizerPlus :: (Int -> Int) -> (Int -> Int) -> Int -> Int
+sizerPlus f g x = g $! f $! x
+{-# INLINE sizerPlus #-}
+
+typeSizePlus :: Type -> Int -> Int
+typeSizePlus (LitTy {})                 = (+ 1)
+typeSizePlus (TyVarTy {})               = (+ 1)
+typeSizePlus (AppTy t1 t2)              = typeSizePlus t1 `sizerPlus` typeSizePlus t2
+typeSizePlus (FunTy t1 t2)              = typeSizePlus t1 `sizerPlus` typeSizePlus t2
+typeSizePlus (ForAllTy (TvBndr tv _) t) = typeSizePlus (tyVarKind tv) `sizerPlus` typeSizePlus t
+typeSizePlus (TyConApp _ ts)            = \acc0 ->
+                        foldl' (\acc arg -> typeSizePlus arg acc) (acc0 + 1) ts
+typeSizePlus (CastTy ty co)             = typeSizePlus ty `sizerPlus` coercionSizePlus co
+typeSizePlus (CoercionTy co)            = coercionSizePlus co
+
+coercionSizePlus (Refl _ ty)         = typeSizePlus ty
+coercionSizePlus (TyConAppCo _ _ args) = \acc0 ->
+                        foldl' (\acc arg -> coercionSizePlus arg acc) (acc0 + 1) args
+coercionSizePlus (AppCo co arg)      = coercionSizePlus co `sizerPlus` coercionSizePlus arg
+coercionSizePlus (ForAllCo _ h co)   = (+ 1) `sizerPlus` coercionSizePlus co `sizerPlus` coercionSizePlus h
+coercionSizePlus (FunCo _ co1 co2)   = (+ 1) `sizerPlus` coercionSizePlus co1 `sizerPlus` coercionSizePlus co2
+coercionSizePlus (CoVarCo _)         = (+ 1)
+coercionSizePlus (AxiomInstCo _ _ args) = \acc0 ->
+                        foldl' (\acc arg -> coercionSizePlus arg acc) (acc0 + 1) args
+coercionSizePlus (UnivCo p _ t1 t2)  = (+ 1) `sizerPlus` provSizePlus p `sizerPlus` typeSizePlus t1 `sizerPlus` typeSizePlus t2
+coercionSizePlus (SymCo co)          = (+ 1) `sizerPlus` coercionSizePlus co
+coercionSizePlus (TransCo co1 co2)   = (+ 1) `sizerPlus` coercionSizePlus co1 `sizerPlus` coercionSizePlus co2
+coercionSizePlus (NthCo _ co)        = (+ 1) `sizerPlus` coercionSizePlus co
+coercionSizePlus (LRCo  _ co)        = (+ 1) `sizerPlus` coercionSizePlus co
+coercionSizePlus (InstCo co arg)     = (+ 1) `sizerPlus`  coercionSizePlus co `sizerPlus` coercionSizePlus arg
+coercionSizePlus (CoherenceCo c1 c2) = (+ 1) `sizerPlus` coercionSizePlus c1 `sizerPlus` coercionSizePlus c2
+coercionSizePlus (KindCo co)         = (+ 1) `sizerPlus` coercionSizePlus co
+coercionSizePlus (SubCo co)          = (+ 1) `sizerPlus` coercionSizePlus co
+coercionSizePlus (AxiomRuleCo _ cs)  = \acc0 ->
+                        foldl' (\acc arg -> coercionSizePlus arg acc) (acc0 + 1) cs
 
 provSize :: UnivCoProvenance -> Int
-provSize UnsafeCoerceProv    = 1
-provSize (PhantomProv co)    = 1 + coercionSize co
-provSize (ProofIrrelProv co) = 1 + coercionSize co
-provSize (PluginProv _)      = 1
-provSize (HoleProv h)        = pprPanic "provSize hits a hole" (ppr h)
+provSize prov = provSizePlus prov 0
+
+provSizePlus :: UnivCoProvenance -> Int -> Int
+provSizePlus UnsafeCoerceProv    = (+ 1)
+provSizePlus (PhantomProv co)    = (+ 1) `sizerPlus` coercionSizePlus co
+provSizePlus (ProofIrrelProv co) = (+ 1) `sizerPlus` coercionSizePlus co
+provSizePlus (PluginProv _)      = (+ 1)
+provSizePlus (HoleProv h)        = \a -> a `seq` pprPanic "provSizePlus hits a hole" (ppr h)

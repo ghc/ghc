@@ -27,6 +27,7 @@ data CoreStats = CS { cs_tm :: !Int    -- Terms
                     , cs_vb :: !Int    -- Local value bindings
                     , cs_jb :: !Int }  -- Local join bindings
 
+type CST = CoreStats -> CoreStats
 
 instance Outputable CoreStats where
  ppr (CS { cs_tm = i1, cs_ty = i2, cs_co = i3, cs_vb = i4, cs_jb = i5 })
@@ -42,59 +43,69 @@ plusCS (CS { cs_tm = p1, cs_ty = q1, cs_co = r1, cs_vb = v1, cs_jb = j1 })
   = CS { cs_tm = p1+p2, cs_ty = q1+q2, cs_co = r1+r2, cs_vb = v1+v2
        , cs_jb = j1+j2 }
 
+plusCST :: CST -> CST -> CST
+plusCST f g acc = g $! f acc
+
+zeroCST, oneTMT :: CST
+zeroCST = plusCS zeroCS
+oneTMT = plusCS oneTM
+
 zeroCS, oneTM :: CoreStats
 zeroCS = CS { cs_tm = 0, cs_ty = 0, cs_co = 0, cs_vb = 0, cs_jb = 0 }
 oneTM  = zeroCS { cs_tm = 1 }
 
-sumCS :: (a -> CoreStats) -> [a] -> CoreStats
-sumCS f = foldl' (\s a -> plusCS s (f a)) zeroCS
+sumCST :: (a -> CST) -> [a] -> CST
+sumCST f = foldr (\a r s -> r $! f a $! s) zeroCST
 
 coreBindsStats :: [CoreBind] -> CoreStats
-coreBindsStats = sumCS (bindStats TopLevel)
+coreBindsStats binds = sumCST (bindStats TopLevel) binds zeroCS
 
-bindStats :: TopLevelFlag -> CoreBind -> CoreStats
+bindStats :: TopLevelFlag -> CoreBind -> CST
 bindStats top_lvl (NonRec v r) = bindingStats top_lvl v r
-bindStats top_lvl (Rec prs)    = sumCS (\(v,r) -> bindingStats top_lvl v r) prs
+bindStats top_lvl (Rec prs)    = sumCST (\(v,r) -> bindingStats top_lvl v r) prs
 
-bindingStats :: TopLevelFlag -> Var -> CoreExpr -> CoreStats
-bindingStats top_lvl v r = letBndrStats top_lvl v `plusCS` exprStats r
+bindingStats :: TopLevelFlag -> Var -> CoreExpr -> CST
+bindingStats top_lvl v r = letBndrStats top_lvl v `plusCST` exprStatsT r
 
-bndrStats :: Var -> CoreStats
-bndrStats v = oneTM `plusCS` tyStats (varType v)
+bndrStats :: Var -> CST
+bndrStats v = oneTMT `plusCST` tyStats (varType v)
 
-letBndrStats :: TopLevelFlag -> Var -> CoreStats
+letBndrStats :: TopLevelFlag -> Var -> CST
 letBndrStats top_lvl v
   | isTyVar v || isTopLevel top_lvl = bndrStats v
-  | isJoinId v = oneTM { cs_jb = 1 } `plusCS` ty_stats
-  | otherwise  = oneTM { cs_vb = 1 } `plusCS` ty_stats
+  | isJoinId v = plusCS (oneTM { cs_jb = 1 }) `plusCST` ty_stats
+  | otherwise  = plusCS (oneTM { cs_vb = 1 }) `plusCST` ty_stats
   where
     ty_stats = tyStats (varType v)
 
 exprStats :: CoreExpr -> CoreStats
-exprStats (Var {})        = oneTM
-exprStats (Lit {})        = oneTM
-exprStats (Type t)        = tyStats t
-exprStats (Coercion c)    = coStats c
-exprStats (App f a)       = exprStats f `plusCS` exprStats a
-exprStats (Lam b e)       = bndrStats b `plusCS` exprStats e
-exprStats (Let b e)       = bindStats NotTopLevel b `plusCS` exprStats e
-exprStats (Case e b _ as) = exprStats e `plusCS` bndrStats b
-                                        `plusCS` sumCS altStats as
-exprStats (Cast e co)     = coStats co `plusCS` exprStats e
-exprStats (Tick _ e)      = exprStats e
+exprStats e = exprStatsT e zeroCS
 
-altStats :: CoreAlt -> CoreStats
-altStats (_, bs, r) = altBndrStats bs `plusCS` exprStats r
+exprStatsT :: CoreExpr -> CST
+exprStatsT (Var {})        = oneTMT
+exprStatsT (Lit {})        = oneTMT
+exprStatsT (Type t)        = tyStats t
+exprStatsT (Coercion c)    = coStats c
+exprStatsT (App f a)       = exprStatsT f `plusCST` exprStatsT a
+exprStatsT (Lam b e)       = bndrStats b `plusCST` exprStatsT e
+exprStatsT (Let b e)       = bindStats NotTopLevel b `plusCST` exprStatsT e
+exprStatsT (Case e b _ as) = exprStatsT e `plusCST` bndrStats b
+                                        `plusCST` sumCST altStats as
+exprStatsT (Cast e co)     = coStats co `plusCST` exprStatsT e
+exprStatsT (Tick _ e)      = exprStatsT e
 
-altBndrStats :: [Var] -> CoreStats
+altStats :: CoreAlt -> CST
+altStats (_, bs, r) = altBndrStats bs `plusCST` exprStatsT r
+
+altBndrStats :: [Var] -> CST
 -- Charge one for the alternative, not for each binder
-altBndrStats vs = oneTM `plusCS` sumCS (tyStats . varType) vs
+altBndrStats vs = oneTMT `plusCST` sumCST (tyStats . varType) vs
 
-tyStats :: Type -> CoreStats
-tyStats ty = zeroCS { cs_ty = typeSize ty }
+tyStats :: Type -> CST
+tyStats ty = plusCS $ zeroCS { cs_ty = typeSize ty }
 
-coStats :: Coercion -> CoreStats
-coStats co = zeroCS { cs_co = coercionSize co }
+coStats :: Coercion -> CST
+coStats co = plusCS $ zeroCS { cs_co = coercionSize co }
 
 coreBindsSize :: [CoreBind] -> Int
 -- We use coreBindStats for user printout
