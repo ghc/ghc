@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     buildRootPath, userFlavours, userKnownPackages, verboseCommands,
-    putBuild, putSuccess, destDir
+    putBuild, putSuccess, defaultDestDir, defaultStage1Only
     ) where
 
 import System.Console.ANSI
@@ -47,5 +47,20 @@ putSuccess = putColoured Dull Green
 -- It is by default empty, representing the root of file system,
 -- or it might be a directory.
 -- It is usually used with @prefix@, like @/usr/local@
-destDir :: FilePath
-destDir = ""
+defaultDestDir :: FilePath
+defaultDestDir = ""
+
+{-
+  Stage1Only=YES means:
+   - don't build ghc-stage2 (the executable)
+   - don't build utils that rely on ghc-stage2
+     See Note [No stage2 packages when CrossCompiling or Stage1Only] in
+     ./ghc.mk.
+   - install ghc-stage1 instead of ghc-stage2
+   - install the ghc-pkg that was built with the stage0 compiler
+   - (*do* still build compiler/stage2 (i.e. the ghc library))
+   - (*do* still build all other libraries)
+-}
+-- | Stage1Only flag, default off
+defaultStage1Only :: Bool
+defaultStage1Only = False

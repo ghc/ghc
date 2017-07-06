@@ -63,7 +63,7 @@ needContext cs = do
         lib0     <- buildDll0          context
         ghciLib  <- pkgGhciLibraryFile context
         ghciFlag <- interpretInContext context $ getPkgData BuildGhciLib
-        let ghci = ghciFlag == "YES" && stage context == Stage1
+        let ghci = ghciFlag == "YES" && (stage context == Stage1 || stage1Only)
         return $ [ libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
     confs <- mapM pkgConfFile cs
     need $ libs ++ confs

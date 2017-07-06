@@ -191,7 +191,7 @@ installPackages = do
                 let context = vanillaContext stg pkg
                 top <- interpretInContext context getTopDirectory
                 let installDistDir = top -/- buildPath context
-                buildLib stg pkg
+                buildPackage stg pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
                 version <- interpretInContext context (getPkgData Version)

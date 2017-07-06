@@ -3,7 +3,7 @@ module Settings (
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
     getContextDirectory, getBuildPath, stagePackages, builderPath,
     getBuilderPath, isSpecified, latestBuildStage, programPath, programContext,
-    integerLibraryName, destDir, pkgConfInstallPath
+    integerLibraryName, destDir, pkgConfInstallPath, stage1Only
     ) where
 
 import Base
@@ -117,3 +117,13 @@ programPath context@Context {..} = do
 
 pkgConfInstallPath :: FilePath
 pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) -/- "package.conf.install"
+
+-- | Stage1Only flag
+-- TODO: Set this by cmdline flags
+stage1Only :: Bool
+stage1Only = defaultStage1Only
+
+-- | Install's DESTDIR flag
+-- TODO: Set this by cmdline flags
+destDir :: FilePath
+destDir = defaultDestDir

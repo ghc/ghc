@@ -1,4 +1,4 @@
-module Rules (topLevelTargets, buildLib, buildRules) where
+module Rules (topLevelTargets, buildPackage, buildRules) where
 
 import Base
 import Context
@@ -18,22 +18,35 @@ import qualified Rules.Library
 import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
+import Oracles.Dependencies (needContext)
+import Util (needBuilder)
 import Settings
 import Settings.Path
 
 allStages :: [Stage]
 allStages = [minBound ..]
 
--- | This rule 'need' all top-level build targets.
+-- | This rule 'need' all top-level build targets
+-- or Stage1Only targets
 topLevelTargets :: Rules ()
-topLevelTargets = do
-    want $ Rules.Generate.inplaceLibCopyTargets
+topLevelTargets = action $ do
+    need $ Rules.Generate.inplaceLibCopyTargets
 
-    forM_ allStages $ \stage ->
-        forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> action (buildLib stage pkg)
+    if stage1Only
+        then do
+             forAllPkgs $ \stg pkg ->
+                 when (isLibrary pkg) $
+                     buildPackage stg pkg
+             forM_ programsStage1Only $ buildPackage Stage0
+        else
+             forAllPkgs buildPackage
+  where
+    forAllPkgs f =
+      forM_ allStages $ \stage ->
+          forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> f stage pkg
 
-buildLib :: Stage -> Package -> Action ()
-buildLib stage pkg = do
+buildPackage :: Stage -> Package -> Action ()
+buildPackage stage pkg = do
     let context = vanillaContext stage pkg
     activePackages <- interpretInContext context getPackages
     when (pkg `elem` activePackages) $
@@ -44,6 +57,7 @@ buildLib stage pkg = do
             ways <- interpretInContext context getLibraryWays
             libs <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs <- interpretInContext context $ buildHaddock flavour
+            needContext [context]
             need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
         else -- otherwise build a program
             need =<< maybeToList <$> programPath (programContext stage pkg)
@@ -90,3 +104,9 @@ buildRules = do
     Rules.Libffi.libffiRules
     packageRules
     Rules.Perl.perlScriptRules
+
+programsStage1Only :: [Package]
+programsStage1Only =
+  [ deriveConstants, genprimopcode, hp2ps, runGhc
+  , ghcCabal, hpc, dllSplit, ghcPkg, hsc2hs
+  , genapply, ghc ]
