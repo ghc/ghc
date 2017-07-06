@@ -2844,6 +2844,7 @@ typeSizePlus (TyConApp _ ts)            = \acc0 ->
 typeSizePlus (CastTy ty co)             = typeSizePlus ty `sizerPlus` coercionSizePlus co
 typeSizePlus (CoercionTy co)            = coercionSizePlus co
 
+coercionSizePlus :: Coercion -> Int -> Int
 coercionSizePlus (Refl _ ty)         = typeSizePlus ty
 coercionSizePlus (TyConAppCo _ _ args) = \acc0 ->
                         foldl' (\acc arg -> coercionSizePlus arg acc) (acc0 + 1) args
