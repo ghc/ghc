@@ -64,9 +64,24 @@ test-suite spec
       -DTEST
 
   other-modules:
-      Documentation.Haddock.ParserSpec
-      Documentation.Haddock.Utf8Spec
+      Data.Attoparsec.ByteString
+      Data.Attoparsec.ByteString.Buffer
+      Data.Attoparsec.ByteString.Char8
+      Data.Attoparsec.ByteString.FastSet
+      Data.Attoparsec.ByteString.Internal
+      Data.Attoparsec.Combinator
+      Data.Attoparsec.Internal
+      Data.Attoparsec.Internal.Fhthagn
+      Data.Attoparsec.Internal.Types
+      Documentation.Haddock.Doc
+      Documentation.Haddock.Parser
+      Documentation.Haddock.Parser.Monad
+      Documentation.Haddock.Parser.Util
       Documentation.Haddock.Parser.UtilSpec
+      Documentation.Haddock.ParserSpec
+      Documentation.Haddock.Types
+      Documentation.Haddock.Utf8
+      Documentation.Haddock.Utf8Spec
 
   build-depends:
       base
@@ -80,7 +95,7 @@ test-suite spec
 
   build-tool-depends:
     hspec-discover:hspec-discover
-    
+
 source-repository head
   type:     git
   subdir:   haddock-library

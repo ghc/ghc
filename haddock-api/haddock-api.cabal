@@ -113,6 +113,8 @@ test-suite spec
 
   other-modules:
     Haddock.Backends.Hyperlinker.ParserSpec
+    Haddock.Backends.Hyperlinker.Parser
+    Haddock.Backends.Hyperlinker.Types
 
   build-depends:
       base

@@ -126,11 +126,18 @@ executable haddock
     -- we pin down to a single haddock-api version.
     build-depends:  haddock-api == 2.18.0
 
+    other-modules:
+      ResponseFile
+
 test-suite driver-test
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          Main.hs
   hs-source-dirs:   driver-test, driver
+  other-modules:
+    ResponseFile
+    ResponseFileSpec
+
   build-depends:    base, hspec
 
 test-suite html-test
