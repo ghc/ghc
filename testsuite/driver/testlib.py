@@ -1086,6 +1086,7 @@ def stats( name, way, stats_file ):
 # Check -t stats info
 
 def checkStats(name, way, stats_file, range_fields):
+
     full_name = name + '(' + way + ')'
 
     result = passed()
