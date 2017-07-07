@@ -796,7 +796,7 @@ def do_test(name, way, func, args, files):
     full_name = name + '(' + way + ')'
 
     if_verbose(2, "=====> {0} {1} of {2} {3}".format(
-        full_name, t.total_tests, len(allTestNames), 
+        full_name, t.total_tests, len(allTestNames),
         [len(t.unexpected_passes),
          len(t.unexpected_failures),
          len(t.framework_failures)]))
@@ -1085,6 +1085,7 @@ def stats( name, way, stats_file ):
 # Check -t stats info
 
 def checkStats(name, way, stats_file, range_fields):
+
     full_name = name + '(' + way + ')'
 
     result = passed()
@@ -1107,6 +1108,11 @@ def checkStats(name, way, stats_file, range_fields):
             upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)))
 
             deviation = round(((float(val) * 100)/ expected) - 100, 1)
+
+            # Add val into the git note if option is set.
+            if config.use_git_notes:
+                test_env = config.TEST_ENV
+                config.accumulate_metrics.append(test_env + '\t' + name + '\t' + way + '\t' + field + '\t' + str(val))
 
             if val < lowerBound:
                 print(field, 'value is too low:')
@@ -1969,7 +1975,7 @@ def findTFiles(roots):
     for root in roots:
         for path, dirs, files in os.walk(root, topdown=True):
             # Never pick up .T files in uncleaned .run directories.
-            dirs[:] = [dir for dir in sorted(dirs)  
+            dirs[:] = [dir for dir in sorted(dirs)
                            if not dir.endswith(testdir_suffix)]
             for filename in files:
                 if filename.endswith('.T'):

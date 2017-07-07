@@ -47,6 +47,10 @@ def lndir(srcdir, dstdir):
             os.mkdir(dst)
             lndir(src, dst)
 
+# def git_append(note):
+# def print_metrics():
+#     print(config.accumulate_metrics)
+
 # On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
 # when using msys2, as GHC does. Unfortunately, only Administrative users have
 # the privileges necessary to create symbolic links by default. Consequently we
@@ -63,7 +67,7 @@ class Watcher(object):
     global pool
     global evt
     global sync_lock
-    
+
     def __init__(self, count):
         self.pool = count
         self.evt = threading.Event()
