@@ -106,6 +106,14 @@ are still up-to-date.
 
 To build a GHC source distribution tarball, run Hadrian with the `sdist-ghc` target.
 
+#### Installation
+
+To build and install GHC artifacts, run the `install` target.
+
+By default, the artifacts will be installed to `<prefix>` on your system. For example,
+`ghc` will be installed to `/usr/local/bin`. By modifying `defaultDestDir` in `UserSettings.hs`,
+you can install things to non-system path `DESTDIR/<prefix>` instead.
+
 #### Testing
 
 * `build validate` runs GHC tests by simply executing `make fast` in `testsuite/tests`
@@ -122,12 +130,12 @@ zero (see [#197][test-issue]).
 Current limitations
 -------------------
 The new build system still lacks many important features:
-* There is currently no support for the `dynamic` build way: [#4][dynamic-issue].
 * Validation is not implemented: [#187][validation-issue].
+* Dynamic linking on Windows is not supported [#343][dynamic-windows-issue].
 * Only HTML Haddock documentation is supported (use `--haddock` flag). 
 * Not all modes of the old build system are supported, e.g. [#250][freeze-issue].
 * Cross-compilation is not implemented: [#177][cross-compilation-issue].
-* There is no support for installation or binary distribution: [#219][install-issue].
+* There is no support for binary distribution: [#219][install-issue].
 
 Check out [milestones] to see when we hope to resolve the above limitations.
 
@@ -162,8 +170,8 @@ helped me endure and enjoy the project.
 [windows-build]: https://github.com/snowleopard/hadrian/blob/master/doc/windows.md
 [ghc-split-objs-bug]: https://ghc.haskell.org/trac/ghc/ticket/11315
 [test-issue]: https://github.com/snowleopard/hadrian/issues/197
-[dynamic-issue]: https://github.com/snowleopard/hadrian/issues/4
 [validation-issue]: https://github.com/snowleopard/hadrian/issues/187
+[dynamic-windows-issue]: https://github.com/snowleopard/hadrian/issues/343
 [freeze-issue]: https://github.com/snowleopard/hadrian/issues/250
 [cross-compilation-issue]: https://github.com/snowleopard/hadrian/issues/177
 [install-issue]: https://github.com/snowleopard/hadrian/issues/219
