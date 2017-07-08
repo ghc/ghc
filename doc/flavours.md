@@ -118,45 +118,59 @@ Libraries and GHC can be built in different _ways_, e.g. with or without profili
 information. The following table lists ways that are built in different flavours.
 
 <table>
-  <tr>
-    <th rowspan="2">Flavour</th>
-    <th colspan="2">Library ways</th>
-    <th colspan="2">RTS ways</th>
-    <th colspan="2">Profiled GHC</th>
-  </tr>
-  <tr>
-    <th>stage0</td>
-    <th>stage1+</td>
-    <th>stage0</td>
-    <th>stage1+</td>
-    <th>stage0</td>
-    <th>stage1+</td>
-  </tr>
-  <tr>
+    <tr>
+        <th rowspan="2">Flavour</th>
+        <th colspan="2">Library ways</th>
+        <th colspan="2">RTS ways</th>
+        <th colspan="2">Profiled GHC</th>
+    </tr>
+    <tr>
+        <th>stage0</th>
+        <th>stage1+</th>
+        <th>stage0</th>
+        <th>stage1+</th>
+        <th>stage0</th>
+        <th>stage1+</th>
+    </tr>
+    <tr>
     <th>default<br>perf<br>prof<br>devel1<br>devel2</td>
     <td>vanilla</td>
-    <td>vanilla<br>profiling</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging<br>threadedProfiling<br></td>
+    <td>vanilla<br>profiling<br>dynamic</td>
+    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
+        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
+        <br>loggingDynamic<br>threadedLoggingDynamic
+    </td>
+    <td>
+        logging<br>debug<br>threaded<br>threadedDebug<br>
+        threadedLogging<br>threadedProfiling
+        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
+        <br>loggingDynamic<br>threadedLoggingDynamic
+    </td>
     <td>Only in<br>prof<br>flavour</td>
     <td>Only in<br>prof<br>flavour</td>
-  </tr>
-  <tr>
-    <th>quick</td>
+</tr>
+<tr>
+    <th>quick</th>
     <td>vanilla</td>
-    <td>vanilla</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging</td>
-    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging</td>
+    <td>vanilla<br>dynamic</td>
+    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
+        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
+        <br>loggingDynamic<br>threadedLoggingDynamic
+    </td>
+    <td>logging<br>debug<br>threaded<br>threadedDebug<br>threadedLogging
+        <br>debugDynamic<br>threadedDynamic<br>threadedDebugDynamic
+        <br>loggingDynamic<br>threadedLoggingDynamic
+    </td>
     <td>No</td>
     <td>No</td>
-  </tr>
-  <tr>
-    <th>quickest</td>
+</tr>
+<tr>
+    <th>quickest</th>
     <td>vanilla</td>
     <td>vanilla</td>
     <td>vanilla<br>threaded (when --haddock)</td>
     <td>vanilla<br>threaded (when --haddock)</td>
     <td>No</td>
     <td>No</td>
-  </tr>
+</tr>
 </table>
