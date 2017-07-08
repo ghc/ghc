@@ -19,7 +19,6 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Oracles.Dependencies (needContext)
-import Util (needBuilder)
 import Settings
 import Settings.Path
 

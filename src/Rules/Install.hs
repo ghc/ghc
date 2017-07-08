@@ -15,7 +15,7 @@ import Rules.Libffi
 import Rules.Generate
 import Settings.Packages.Rts
 import Oracles.Config.Setting
-import Oracles.PackageData
+import Oracles.Dependencies (sortPkgsByDep)
 import Oracles.Path
 
 import qualified System.Directory as IO
@@ -81,7 +81,6 @@ installLibExecs = do
                          (destDir ++ libExecDir -/- "ghc" <.> exe)
 
 -- | Binaries to install
--- TODO: Consider Stage1Only
 installBinPkgs :: [Package]
 installBinPkgs =
     [ ghc, ghcPkg, ghcSplit, hp2ps
@@ -176,14 +175,10 @@ installPackages = do
 
     copyFile ghcBootPlatformHeader (pkgPath compiler -/- "ghc_boot_platform.h")
 
-    -- TODO: Consider Stage1Only
-    -- TODO: Use automatic dependency analysis, rather than hardcoding
-    -- the ordering
-    let installLibPkgs = [ ghcPrim, integerSimple, base, filepath
-                         , array, deepseq, bytestring, containers, time, unix
-                         , directory, process, hpc, pretty, binary, cabal
-                         , ghcBootTh, ghcBoot, templateHaskell
-                         , transformers, terminfo, haskeline, ghci, compiler ]
+    activePackages <- filterM ((isJust <$>) . latestBuildStage)
+                              (knownPackages \\ [rts, libffi])
+
+    installLibPkgs <- sortPkgsByDep (filter isLibrary activePackages)
 
     forM_ installLibPkgs $ \pkg@Package{..} -> do
         when (isLibrary pkg) $
@@ -194,10 +189,9 @@ installPackages = do
                 buildPackage stg pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
-                version <- interpretInContext context (getPkgData Version)
+
                 -- Copy over packages
-                let targetDest = destDir ++ ghclibDir -/-
-                                 pkgNameString pkg ++ "-" ++ version
+
                 strip <- stripCmdPath context
                 ways <- interpretInContext context getLibraryWays
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" -- HACK?

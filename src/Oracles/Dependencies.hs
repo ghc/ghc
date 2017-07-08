@@ -1,7 +1,7 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TupleSections #-}
 module Oracles.Dependencies (
     fileDependencies, contextDependencies, needContext, dependenciesOracles,
-    pkgDependencies
+    pkgDependencies, sortPkgsByDep
     ) where
 
 import qualified Data.HashMap.Strict as Map
@@ -81,3 +81,18 @@ dependenciesOracles = do
         putLoud $ "Reading dependencies from " ++ file ++ "..."
         contents <- map words <$> readFileLines file
         return $ Map.fromList [ (key, values) | (key:values) <- contents ]
+
+-- | Sort packages by their dependency
+-- HACK (izgzhen): See https://github.com/snowleopard/hadrian/issues/344 for details
+sortPkgsByDep :: [Package] -> Action [Package]
+sortPkgsByDep pkgs = do
+    elems <- mapM (\p -> (p,) <$> pkgDependencies p) pkgs
+    return $ map fst $ topSort elems
+  where
+    annotateInDeg es e =
+     (foldr (\e' s -> if fst e' `elem` snd e then s + 1 else s) 0 es, e)
+    topSort [] = []
+    topSort es =
+      let annotated = map (annotateInDeg es) es
+          inDegZero = map snd $ filter ((== 0). fst) annotated
+      in  inDegZero ++ topSort (es \\ inDegZero)
