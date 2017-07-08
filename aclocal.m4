@@ -2035,7 +2035,7 @@ AC_DEFUN([CHECK_LD_COPY_BUG],[
           .size object_reference, 4
 EOF
 
-        cat >aclib.s <<-EOF 
+        cat >aclib.s <<-EOF
           .data
           .globl data_object
           .type data_object, %object
@@ -2060,6 +2060,8 @@ EOF
         else
             AC_MSG_RESULT([unaffected])
         fi
+
+        rm -f aclib.s aclib.o aclib.so actest.s actest.o actest
         ;;
       *)
         ;;
