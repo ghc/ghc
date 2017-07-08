@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Rules.Install (installRules) where
 
 import Base
@@ -39,8 +39,8 @@ XXX (izgzhen): Do we need @INSTALL_OPTS@ in the make scripts?
 installRules :: Rules ()
 installRules = do
     "install" ~> do
-        installPackageConf
         installIncludes
+        installPackageConf
         installCommonLibs
         installLibExecs
         installLibExecScripts
@@ -54,7 +54,6 @@ getLibExecDir = (-/- "bin") <$> installGhcLibDir
 -- ref: ghc.mk
 installLibExecScripts :: Action ()
 installLibExecScripts = do
-    need libExecScripts
     libExecDir <- getLibExecDir
     installDir (destDir ++ libExecDir)
     forM_ libExecScripts $ \script -> do
@@ -74,7 +73,6 @@ installLibExecs = do
         withLatestBuildStage pkg $ \stg -> do
             let context = programContext stg pkg
             let bin = inplaceLibBinPath -/- programName context <.> exe
-            need [bin]
             installProgram bin (destDir ++ libExecDir)
             when (pkg == ghc) $ do
                 moveFile (destDir ++ libExecDir -/- programName context <.> exe)
@@ -111,10 +109,9 @@ installBins = do
                     contents <- interpretInContext context $
                                     wrapper
                                     (WrappedBinary (destDir ++ libDir) symName)
-                    withTempDir $ \tmp -> do
-                        let tmpfile = tmp -/- binName
-                        writeFileChanged tmpfile contents
-                        installProgram tmpfile (destDir ++ binDir)
+                    let wrapperPath = destDir ++ binDir -/- binName
+                    writeFileChanged wrapperPath contents
+                    makeExecutable wrapperPath
                     unlessM windowsHost $
                         linkSymbolic (destDir ++ binDir -/- binName)
                                      (destDir ++ binDir -/- symName)
@@ -130,18 +127,17 @@ withLatestBuildStage pkg m = do
 -- Note that each time it will be recreated
 -- ref: rules/manual-package-conf.mk
 installPackageConf :: Action ()
-installPackageConf = do
+installPackageConf = do    
     let context = vanillaContext Stage0 rts
     liftIO $ IO.createDirectoryIfMissing True (takeDirectory pkgConfInstallPath)
     build $ Target context HsCpp [ pkgPath rts -/- "package.conf.in" ]
                                  [ pkgConfInstallPath <.> "raw" ]
-    Stdout out <- cmd ("grep" :: String) [ "-v", "^#pragma GCC"
-                                         , pkgConfInstallPath <.> "raw" ]
+    Stdout content <- cmd "grep" [ "-v", "^#pragma GCC"
+                                 , pkgConfInstallPath <.> "raw" ]
     withTempFile $ \tmp -> do
-        liftIO $ writeFile tmp out
-        Stdout out' <- cmd ("sed" :: String)
-                           [ "-e", "s/\"\"//g", "-e", "s/:[   ]*,/: /g", tmp ]
-        liftIO $ writeFile pkgConfInstallPath out'
+        liftIO $ writeFile tmp content
+        Stdout content' <- cmd "sed" [ "-e", "s/\"\"//g", "-e", "s/:[   ]*,/: /g", tmp ]
+        liftIO $ writeFile pkgConfInstallPath content'
 
 -- | Install packages to @prefix/lib@
 -- ref: ghc.mk
@@ -195,6 +191,7 @@ installPackages = do
                 strip <- stripCmdPath context
                 ways <- interpretInContext context getLibraryWays
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" -- HACK?
+                need [ ghcCabalInplace ]
 
                 -- HACK (#318): copy stuff back to the place favored by ghc-cabal
                 quietly $ copyDirectoryContents (Not excluded)
@@ -250,7 +247,7 @@ installPackages = do
                [ "--force", "--global-package-db"
                , installedPackageConf, "recache" ]
   where
-    createData f = unit $ cmd ("chmod" :: String) [ "644", f ]
+    createData f = unit $ cmd "chmod" [ "644", f ]
     excluded = Or
         [ Test "//haddock-prologue.txt"
         , Test "//package-data.mk"

@@ -184,6 +184,7 @@ installDir dir = do
 installData :: [FilePath] -> FilePath -> Action ()
 installData fs dir = do
     i <- setting InstallData
+    need fs
     forM_ fs $ \f ->
         putBuild $ "| Install data " ++ f ++ " to " ++ dir
     quietly $ cmd i fs dir
@@ -192,6 +193,7 @@ installData fs dir = do
 installProgram :: FilePath -> FilePath -> Action ()
 installProgram f dir = do
     i <- setting InstallProgram
+    need [f]
     putBuild $ "| Install program " ++ f ++ " to " ++ dir
     quietly $ cmd i f dir
 
@@ -199,6 +201,7 @@ installProgram f dir = do
 installScript :: FilePath -> FilePath -> Action ()
 installScript f dir = do
     i <- setting InstallScript
+    need [f]
     putBuild $ "| Install script " ++ f ++ " to " ++ dir
     quietly $ cmd i f dir
 
