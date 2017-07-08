@@ -99,6 +99,8 @@ Runtime system
   by dlltool. The limitation of them needing to be named with the suffix .dll.a is also removed.
   See :ghc-ticket:`13606`, :ghc-ticket:`12499`, :ghc-ticket:`12498`
 
+- The GHCi runtime linker on Windows now supports the `big-obj` file format.
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
