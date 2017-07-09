@@ -7,10 +7,13 @@ import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
+import Oracles.Path (getTopDirectory)
 import Settings
 import Settings.Path
 import Target
 import Util
+
+import qualified System.Directory as IO
 
 haddockHtmlLib :: FilePath
 haddockHtmlLib = "inplace/lib/html/haddock-util.js"
@@ -31,13 +34,6 @@ buildPackageDocumentation context@Context {..} =
                            , depPkg /= rts ]
             need $ srcs ++ haddocks ++ [haddockHtmlLib]
 
-            -- HsColour sources
-            -- TODO: what is the output of GhcCabalHsColour?
-            whenM (isSpecified HsColour) $ do
-                pkgConf <- pkgConfFile context
-                need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
-                build $ Target context GhcCabalHsColour [cabalFile] []
-
             -- Build Haddock documentation
             -- TODO: pass the correct way from Rules via Context
             let haddockWay = if dynamicGhcPrograms flavour then dynamic else vanilla
@@ -47,6 +43,13 @@ buildPackageDocumentation context@Context {..} =
             let dir = takeDirectory haddockHtmlLib
             liftIO $ removeFiles dir ["//*"]
             copyDirectory "utils/haddock/haddock-api/resources/html" dir
+  where
+    excluded = Or
+        [ Test "//haddock-prologue.txt"
+        , Test "//package-data.mk"
+        , Test "//setup-config"
+        , Test "//inplace-pkg-config"
+        , Test "//build" ]
 
 -- # Make the haddocking depend on the library .a file, to ensure
 -- # that we wait until the library is fully built before we haddock it

@@ -109,12 +109,21 @@ hsc2hsWrapper WrappedBinary{..} = do
         , "HSC2HS_EXTRA=\"" ++ hsc2hsExtra ++ "\""
         , contents ]
 
+haddockWrapper :: WrappedBinary -> Expr String
+haddockWrapper WrappedBinary{..} = do
+  lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+  return $ unlines
+    [ "#!/bin/bash"
+    , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
+      ++ " -B" ++ binaryLibPath ++ " -l" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
+
 wrappersCommon :: [(Context, Wrapper)]
 wrappersCommon = [ (vanillaContext Stage0 ghc   , ghcWrapper)
                  , (vanillaContext Stage1 ghc   , ghcWrapper)
                  , (vanillaContext Stage1 hp2ps , hp2psWrapper)
                  , (vanillaContext Stage1 hpc   , hpcWrapper)
-                 , (vanillaContext Stage1 hsc2hs, hsc2hsWrapper) ]
+                 , (vanillaContext Stage1 hsc2hs, hsc2hsWrapper)
+                 , (vanillaContext Stage2 haddock, haddockWrapper)]
 
 -- | List of wrappers for inplace artefacts
 inplaceWrappers :: [(Context, Wrapper)]
@@ -127,4 +136,3 @@ installWrappers :: [(Context, Wrapper)]
 installWrappers = wrappersCommon ++
                   [ (vanillaContext Stage0 ghcPkg, installGhcPkgWrapper)
                   , (vanillaContext Stage1 runGhc, installRunGhcWrapper) ]
-
