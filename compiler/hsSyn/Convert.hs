@@ -1330,6 +1330,7 @@ mk_apps head_ty (ty:tys) =
      ; mk_apps (HsAppTy head_ty' p_ty) tys }
   where
     add_parens t@(L _ HsAppTy{}) = returnL (HsParTy t)
+    add_parens t@(L _ HsFunTy{}) = returnL (HsParTy t)
     add_parens t                 = return t
 
 wrap_apps  :: LHsType GhcPs -> CvtM (LHsType GhcPs)
