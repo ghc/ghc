@@ -28,7 +28,7 @@ data GhcPkgMode = Init | Update deriving (Eq, Generic, Show)
 -- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@.
 -- @GhcPkg Stage1@ is the one built in Stage0.
 data Builder = Alex
-             | Ar
+             | Ar Stage
              | DeriveConstants
              | Cc CcMode Stage
              | Configure FilePath

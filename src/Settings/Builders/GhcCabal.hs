@@ -25,7 +25,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , packageConstraints
             , withStaged $ Cc CompileC
             , notStage0 ? with Ld
-            , with Ar
+            , withStaged Ar
             , with Alex
             , with Happy
             , verbosity < Chatty ? append [ "-v0", "--configure-option=--quiet"
@@ -91,7 +91,7 @@ cppArgs = arg $ "-I" ++ generatedPath
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
-    Ar         -> "--with-ar="
+    Ar _       -> "--with-ar="
     Ld         -> "--with-ld="
     Cc  _ _    -> "--with-gcc="
     Ghc _ _    -> "--with-ghc="

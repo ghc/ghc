@@ -25,7 +25,7 @@ gmpMakefile = gmpBuildPath -/- "Makefile"
 
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
-                                , builderEnvironment "AR" Ar
+                                , builderEnvironment "AR" (Ar Stage1)
                                 , builderEnvironment "NM" Nm ]
 
 gmpRules :: Rules ()
@@ -43,7 +43,7 @@ gmpRules = do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
             need [gmpLibrary]
             createDirectory gmpObjects
-            build $ Target gmpContext Ar [gmpLibrary] [gmpObjects]
+            build $ Target gmpContext (Ar Stage1) [gmpLibrary] [gmpObjects]
             copyFile (gmpBuildPath -/- "gmp.h") header
             copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryInTreeH
 

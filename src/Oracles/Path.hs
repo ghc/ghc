@@ -24,7 +24,8 @@ getTopDirectory = lift topDirectory
 systemBuilderPath :: Builder -> Action FilePath
 systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
-    Ar              -> fromKey "ar"
+    Ar Stage0       -> fromKey "system-ar"
+    Ar _            -> fromKey "ar"
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!

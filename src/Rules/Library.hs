@@ -72,8 +72,8 @@ buildPackageLibrary context@Context {..} = do
 
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
-        if isLib0 then build $ Target context Ar []   [a] -- TODO: Scan for dlls
-                  else build $ Target context Ar objs [a]
+        if isLib0 then build $ Target context (Ar stage) []   [a] -- TODO: Scan for dlls
+                  else build $ Target context (Ar stage) objs [a]
 
         synopsis <- interpretInContext context $ getPkgData Synopsis
         unless isLib0 . putSuccess $ renderLibrary

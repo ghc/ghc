@@ -53,7 +53,7 @@ customBuild rs opts target@Target {..} = do
     withResources rs $ do
         putInfo target
         quietlyUnlessVerbose $ case builder of
-            Ar -> do
+            Ar _ -> do
                 output <- interpret target getOutput
                 if "//*.a" ?== output
                 then arCmd path argList

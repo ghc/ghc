@@ -31,7 +31,7 @@ configureEnvironment = do
     sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
              , builderEnvironment "CXX" $ Cc CompileC Stage1
              , builderEnvironment "LD" Ld
-             , builderEnvironment "AR" Ar
+             , builderEnvironment "AR" (Ar Stage1)
              , builderEnvironment "NM" Nm
              , builderEnvironment "RANLIB" Ranlib
              , return . AddEnv  "CFLAGS" $ unwords  cFlags ++ " -w"

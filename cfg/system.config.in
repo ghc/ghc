@@ -16,6 +16,7 @@ make           = @MakeCmd@
 nm             = @NmCmd@
 objdump        = @ObjdumpCmd@
 ranlib         = @REAL_RANLIB_CMD@
+system-ar      = @AR_STAGE0@
 system-cc      = @CC_STAGE0@
 system-ghc     = @WithGhc@
 system-ghc-pkg = @GhcPkgCmd@
