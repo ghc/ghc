@@ -10,38 +10,43 @@ performance improvements over the 8.0 branch.
 Highlights
 ----------
 
-The highlights since the 8.0 branch are:
+The highlights since the 8.0 release are:
 
-- TODO FIXME
+- A new, more expressive ``Typeable`` mechanism
+
+- Colorful error messages with caret diagnostics
+
 - SCC annotations can now be used for declarations.
+
 - Heap overflow throws an exception in certain circumstances.
+
+- Improved code generation of join points
+
+- Deriving strategies
+
+- Compact regions support, allowing efficient garbage collection of large heaps
 
 Full details
 ------------
 
-- Heap overflow throws a catchable exception, provided that it was detected
-  by the RTS during a GC cycle due to the program exceeding a limit set by
-  ``+RTS -M``, and not due to an allocation being refused by the operating
-  system.  This exception is thrown to the same thread that receives
-  ``UserInterrupt`` exceptions, and may be caught by user programs.
-
 Language
 ~~~~~~~~
-
--  TODO FIXME.
 
 - Pattern synonym signatures can now be applied to multiple patterns, just like
   value-level binding signatures. See :ref:`patsyn-typing` for details.
 
+- It is now possible to explicitly pick a strategy to use when deriving a
+  class instance using the :ghc-flag:`-XDerivingStrategies` language extension
+  (see :ref:`deriving-strategies`).
+
+
 Compiler
 ~~~~~~~~
-
--  TODO FIXME.
 
 - Old profiling flags ``-auto-all``, ``-auto``, and ``-caf-all`` are deprecated
   and their usage provokes a compile-time warning.
 
-- Support for adding cost centres to declarations is added. The same `SCC`
+- Support for adding cost centres to declarations is added. The same ``SCC``
   syntax can be used, in addition to a new form for specifying the cost centre
   name. See :ref:`scc-pragma` for examples.
 
@@ -50,10 +55,6 @@ Compiler
   the corresponding main method's type signature modulo differences in the
   signatures' contexts. Otherwise, the typechecker will reject that class's
   definition. See :ref:`class-default-signatures` for further details.
-
-- It is now possible to explicitly pick a strategy to use when deriving a
-  class instance using the :ghc-flag:`-XDerivingStrategies` language extension
-  (see :ref:`deriving-strategies`).
 
 - :ghc-flag:`-XDeriveAnyClass` is no longer limited to type classes whose
   argument is of kind ``*`` or ``* -> *``.
@@ -149,7 +150,7 @@ Compiler
     -- uses of `Monoid MyMonoid` here are improved
     bar :: MonadWriter MyMonoid m => ...
 
-- GHC now derives the definition of ``<$`` when using ``DeriveFunctor``
+- GHC now derives the definition of ``<$`` when using :ghc-flag:`DeriveFunctor`
   rather than using the default definition. This prevents unnecessary
   allocation and a potential space leak when deriving ``Functor`` for
   a recursive type.
@@ -204,8 +205,6 @@ Compiler
 GHCi
 ~~~~
 
--  TODO FIXME.
-
 - Added :ghc-flag:`-flocal-ghci-history` which uses current directory for `.ghci-history`.
 
 - Added support for :ghc-flag:`-XStaticPointers` in interpreted modules. Note, however,
@@ -213,8 +212,6 @@ GHCi
 
 Template Haskell
 ~~~~~~~~~~~~~~~~
-
--  TODO FIXME.
 
 -  Reifying types that contain unboxed tuples now works correctly. (Previously,
    Template Haskell reified unboxed tuples as boxed tuples with twice their
@@ -275,7 +272,11 @@ Template Haskell
 Runtime system
 ~~~~~~~~~~~~~~
 
-- TODO FIXME.
+- Heap overflow throws a catchable exception, provided that it was detected
+  by the RTS during a GC cycle due to the program exceeding a limit set by
+  ``+RTS -M``, and not due to an allocation being refused by the operating
+  system.  This exception is thrown to the same thread that receives
+  ``UserInterrupt`` exceptions, and may be caught by user programs.
 
 - Added support for *Compact Regions*, which offer a way to manually
   move long-lived data outside of the heap so that the garbage
@@ -289,9 +290,10 @@ Runtime system
   This is supported on Linux and Windows systems.
 
 - The garbage collector can be told to use fewer threads than the
-  global number of capabilities set by :rts-flag:`-N`.  See
-  :rts-flag:`-qn`, and a `blog post
-  <http://simonmar.github.io/posts/2016-12-08-Haskell-in-the-datacentre.html>`_
+  global number of capabilities set by :rts-flag:`-N`. By default, the garbage
+  collector will use a number of threads equal to the lesser of the global number
+  of capabilities or the number of physical cores. See :rts-flag:`-qn`, and a
+  `blog post <http://simonmar.github.io/posts/2016-12-08-Haskell-in-the-datacentre.html>`_
   that describes this.
 
 - The :ref:`heap profiler <prof-heap>` can now emit heap census data to the GHC
@@ -316,17 +318,15 @@ Runtime system
 Build system
 ~~~~~~~~~~~~
 
--  TODO FIXME.
-
-Package system
-~~~~~~~~~~~~~~
-
--  TODO FIXME.
+- GHC will now use ``ld.gold`` or ``ld.lld`` instead of the system's default
+  ``ld``, if available. Linker availability will be evaluated at ``configure``
+  time. The user can manually override which linker to use by passing the ``LD``
+  variable to ``configure``.
 
 hsc2hs
 ~~~~~~
 
--  TODO FIXME.
+-  Version number 0.68.2
 
 Libraries
 ---------
@@ -334,8 +334,7 @@ Libraries
 array
 ~~~~~
 
--  Version number XXXXX (was 0.5.0.0)
-
+-  Version number 0.5.2.0 (was 0.5.0.0)
 
 .. _lib-base:
 
@@ -373,47 +372,37 @@ See ``changelog.md`` in the ``base`` package for full release notes.
 binary
 ~~~~~~
 
--  Version number XXXXX (was 0.7.1.0)
+-  Version number 0.8.5.1 (was 0.7.1.0)
 
 bytestring
 ~~~~~~~~~~
 
--  Version number XXXXX (was 0.10.4.0)
+-  Version number 0.10.8.2 (was 0.10.4.0)
 
 Cabal
 ~~~~~
 
--  Version number XXXXX (was 1.18.1.3)
+-  Version number 2.0.0.0 (was 1.24.2.0)
 
 containers
 ~~~~~~~~~~
 
--  Version number XXXXX (was 0.5.4.0)
-
-compact
-~~~~~~~
-
-The ``compact`` library provides an experimental API for placing immutable
-data structures into a contiguous memory region.  Data in these regions
-is not traced during garbage collection and can be serialized to disk or
-over the network.
-
-- Version number 1.0.0.0 (newly added)
+-  Version number 0.5.10.2 (was 0.5.4.0)
 
 deepseq
 ~~~~~~~
 
--  Version number XXXXX (was 1.3.0.2)
+-  Version number 1.4.3.0 (was 1.3.0.2)
 
 directory
 ~~~~~~~~~
 
--  Version number XXXXX (was 1.2.0.2)
+-  Version number 1.3.0.2 (was 1.2.0.2)
 
 filepath
 ~~~~~~~~
 
--  Version number XXXXX (was 1.3.0.2)
+-  Version number 1.4.1.2 (was 1.3.0.2)
 
 ghc
 ~~~
@@ -425,62 +414,50 @@ ghc-boot
 
 -  This is an internal package. Use with caution.
 
--  TODO FIXME.
+ghc-compact
+~~~~~~~~~~~
+
+The ``ghc-compact`` library provides an experimental API for placing immutable
+data structures into a contiguous memory region. Data in these regions is not
+traced during garbage collection and can be serialized to disk or over the
+network.
+
+- Version number 0.1.0.0 (newly added)
 
 ghc-prim
 ~~~~~~~~
 
--  Version number XXXXX (was 0.3.1.0)
+-  Version number 0.5.0.0 (was 0.3.1.0)
 
 -  Added new ``isByteArrayPinned#`` and ``isMutableByteArrayPinned#`` operation.
 
 -  New function ``noinline`` in ``GHC.Magic`` lets you mark that a function
    should not be inlined.  It is optimized away after the simplifier runs.
 
-haskell98
-~~~~~~~~~
-
--  Version number XXXXX (was 2.0.0.3)
-
-haskell2010
-~~~~~~~~~~~
-
--  Version number XXXXX (was 1.1.1.1)
-
 hoopl
 ~~~~~
 
--  Version number XXXXX (was 3.10.0.0)
+-  Version number 3.10.2.2 (was 3.10.2.1)
 
 hpc
 ~~~
 
--  Version number XXXXX (was 0.6.0.1)
+-  Version number 0.6.0.3 (was 0.6.0.2)
 
 integer-gmp
 ~~~~~~~~~~~
 
--  Version number XXXXX (was 0.5.1.0)
-
-old-locale
-~~~~~~~~~~
-
--  Version number XXXXX (was 1.0.0.6)
-
-old-time
-~~~~~~~~
-
--  Version number XXXXX (was 1.1.0.2)
+-  Version number 1.0.0.1 (was 1.0.0.1)
 
 process
 ~~~~~~~
 
--  Version number XXXXX (was 1.2.0.0)
+-  Version number 1.6.0.0 (was 1.4.3.0)
 
 template-haskell
 ~~~~~~~~~~~~~~~~
 
--  Version number XXXXX (was 2.9.0.0)
+-  Version 2.12.0.0 XXXXX (was 2.11.1.0)
 
 -  Added support for unboxed sums :ghc-ticket:`12478`.
 
@@ -489,19 +466,20 @@ template-haskell
 time
 ~~~~
 
--  Version number XXXXX (was 1.4.1)
+-  Version number 1.8.0.1 (was 1.6.0.1)
 
 unix
 ~~~~
 
--  Version number XXXXX (was 2.7.0.0)
+-  Version number 2.7.2.2 (was 2.7.2.1)
 
 Win32
 ~~~~~
 
--  Version number XXXXX (was 2.3.0.1)
+-  Version number 2.3.1.1 (was 2.3.1.1)
 
 Known bugs
 ----------
 
--  TODO FIXME
+- At least one known program regresses in compile time significantly over 8.0.
+  See :ghc-ticket:`13535`.
