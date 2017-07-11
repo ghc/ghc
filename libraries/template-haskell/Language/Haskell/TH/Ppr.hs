@@ -399,7 +399,7 @@ ppr_data :: Doc -> Cxt -> Name -> Doc -> Maybe Kind -> [Con] -> [DerivClause]
 ppr_data maybeInst ctxt t argsDoc ksig cs decs
   = sep [text "data" <+> maybeInst
             <+> pprCxt ctxt
-            <+> ppr t <+> argsDoc <+> ksigDoc <+> maybeWhere,
+            <+> pprName' Applied t <+> argsDoc <+> ksigDoc <+> maybeWhere,
          nest nestDepth (sep (pref $ map ppr cs)),
          if null decs
            then empty
@@ -679,8 +679,9 @@ pprStrictType = pprBangType
 
 ------------------------------
 pprParendType :: Type -> Doc
-pprParendType (VarT v)            = ppr v
-pprParendType (ConT c)            = ppr c
+pprParendType (VarT v)            = pprName' Applied v
+-- `Applied` is used here instead of `ppr` because of infix names (#13887)
+pprParendType (ConT c)            = pprName' Applied c
 pprParendType (TupleT 0)          = text "()"
 pprParendType (TupleT n)          = parens (hcat (replicate (n-1) comma))
 pprParendType (UnboxedTupleT n)   = hashParens $ hcat $ replicate (n-1) comma
