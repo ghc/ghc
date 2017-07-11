@@ -38,6 +38,12 @@ Compiler
 
 -  TODO FIXME.
 
+- A bug in the :ghc-flag:`-XApplicativeDo` extension resulting in strict pattern
+  matches to be performed lazily (:ghc-ticket:`13875`) has been fixed. Note that
+  this means some programs which previously typechecked under ``ApplicativeDo``
+  will no longer as it is not possible to implement strict pattern matching
+  using only ``Applicative``.
+
 - Old profiling flags ``-auto-all``, ``-auto``, and ``-caf-all`` are deprecated
   and their usage provokes a compile-time warning.
 
