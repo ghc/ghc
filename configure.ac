@@ -875,8 +875,8 @@ FP_CHECK_SIZEOF_AND_ALIGNMENT(uint64_t)
 
 
 dnl for use in settings.in
-WordSize=$ac_cv_sizeof_void_p
-AC_SUBST(WordSize)
+TargetWordSize=$ac_cv_sizeof_void_p
+AC_SUBST(TargetWordSize)
 FP_CHECK_FUNC([WinExec],
   [@%:@include <windows.h>], [WinExec("",0)])
 
