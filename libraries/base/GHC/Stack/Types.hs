@@ -41,12 +41,10 @@ Ideally these would live in GHC.Stack but sadly they can't due to this
 import cycle,
 
     Module imports form a cycle:
-           module ‘Data.Maybe’ (libraries/base/Data/Maybe.hs)
-          imports ‘GHC.Base’ (libraries/base/GHC/Base.hs)
-    which imports ‘GHC.Err’ (libraries/base/GHC/Err.hs)
+           module ‘GHC.Base’ (libraries/base/GHC/Base.hs)
+          imports ‘GHC.Err’ (libraries/base/GHC/Err.hs)
     which imports ‘GHC.Stack’ (libraries/base/dist-install/build/GHC/Stack.hs)
-    which imports ‘GHC.Foreign’ (libraries/base/GHC/Foreign.hs)
-    which imports ‘Data.Maybe’ (libraries/base/Data/Maybe.hs)
+    which imports ‘GHC.Base‘ (libraries/base/GHC/Base.hs)
 -}
 
 import GHC.Classes (Eq)
