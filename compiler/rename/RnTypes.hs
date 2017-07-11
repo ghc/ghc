@@ -1431,8 +1431,9 @@ sectionPrecErr op@(n1,_) arg_op@(n2,_) section
          nest 4 (text "in the section:" <+> quotes (ppr section))]
 
 is_unbound :: OpName -> Bool
-is_unbound UnboundOp{} = True
-is_unbound _           = False
+is_unbound (NormalOp n) = isUnboundName n
+is_unbound UnboundOp{}  = True
+is_unbound _            = False
 
 ppr_opfix :: (OpName, Fixity) -> SDoc
 ppr_opfix (op, fixity) = pp_op <+> brackets (ppr fixity)
