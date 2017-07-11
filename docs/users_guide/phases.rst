@@ -551,11 +551,9 @@ for example).
 
 .. ghc-flag:: -staticlib
 
-    On Darwin/OS X/iOS only, link all passed files into a static library
-    suitable for linking into an iOS (when using a cross-compiler) or
-    Mac Xcode project. To control the name, use the :ghc-flag:`-o ⟨file⟩` option
-    as usual. The default name is ``liba.a``. This should nearly always
-    be passed when compiling for iOS with a cross-compiler.
+    Link all passed files into a static library suitable for linking.
+    To control the name, use the :ghc-flag:`-o` ⟨name⟩ option
+    as usual. The default name is ``liba.a``.
 
 .. ghc-flag:: -L ⟨dir⟩
 

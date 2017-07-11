@@ -2063,10 +2063,7 @@ linkDynLibCheck dflags o_files dep_packages
 
 linkStaticLibCheck :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
 linkStaticLibCheck dflags o_files dep_packages
- = do
-    when (platformOS (targetPlatform dflags) `notElem` [OSiOS, OSDarwin]) $
-      throwGhcExceptionIO (ProgramError "Static archive creation only supported on Darwin/OS X/iOS")
-    linkBinary' True dflags o_files dep_packages
+ = linkBinary' True dflags o_files dep_packages
 
 -- -----------------------------------------------------------------------------
 -- Running CPP
