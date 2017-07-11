@@ -347,7 +347,8 @@ void traceEventGcStats_  (Capability *cap,
                           W_        fragmentation,
                           uint32_t  par_n_threads,
                           W_        par_max_copied,
-                          W_        par_tot_copied)
+                          W_        par_tot_copied,
+                          W_        par_balanced_copied)
 {
 #if defined(DEBUG)
     if (RtsFlags.TraceFlags.tracing == TRACE_STDERR) {
@@ -357,7 +358,8 @@ void traceEventGcStats_  (Capability *cap,
     {
         postEventGcStats(cap, heap_capset, gen,
                          copied, slop, fragmentation,
-                         par_n_threads, par_max_copied, par_tot_copied);
+                         par_n_threads, par_max_copied,
+                         par_tot_copied, par_balanced_copied);
     }
 }
 

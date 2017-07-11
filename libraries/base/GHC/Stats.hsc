@@ -81,8 +81,10 @@ data RTSStats = RTSStats {
   , copied_bytes :: Word64
     -- | Sum of copied_bytes across all parallel GCs
   , par_copied_bytes :: Word64
-    -- | Sum of par_max_copied_bytes across all parallel GCs
+    -- | Sum of par_max_copied_bytes across all parallel GCs. Deprecated.
   , cumulative_par_max_copied_bytes :: Word64
+    -- | Sum of par_balanced_copied bytes across all parallel GCs
+  , cumulative_par_balanced_copied_bytes :: Word64
 
   -- -----------------------------------
   -- Cumulative stats about time use
@@ -130,8 +132,11 @@ data GCDetails = GCDetails {
   , gcdetails_mem_in_use_bytes :: Word64
     -- | Total amount of data copied during this GC
   , gcdetails_copied_bytes :: Word64
-    -- | In parallel GC, the max amount of data copied by any one thread
+    -- | In parallel GC, the max amount of data copied by any one thread.
+    -- Deprecated.
   , gcdetails_par_max_copied_bytes :: Word64
+    -- | In parallel GC, the amount of balanced data copied by all threads
+  , gcdetails_par_balanced_copied_bytes :: Word64
     -- | The time elapsed during synchronisation before GC
   , gcdetails_sync_elapsed_ns :: RtsTime
     -- | The CPU time used during GC itself
@@ -170,6 +175,8 @@ getRTSStats = do
     par_copied_bytes <- (# peek RTSStats, par_copied_bytes) p
     cumulative_par_max_copied_bytes <-
       (# peek RTSStats, cumulative_par_max_copied_bytes) p
+    cumulative_par_balanced_copied_bytes <-
+      (# peek RTSStats, cumulative_par_balanced_copied_bytes) p
     mutator_cpu_ns <- (# peek RTSStats, mutator_cpu_ns) p
     mutator_elapsed_ns <- (# peek RTSStats, mutator_elapsed_ns) p
     gc_cpu_ns <- (# peek RTSStats, gc_cpu_ns) p
@@ -190,6 +197,8 @@ getRTSStats = do
       gcdetails_copied_bytes <- (# peek GCDetails, copied_bytes) pgc
       gcdetails_par_max_copied_bytes <-
         (# peek GCDetails, par_max_copied_bytes) pgc
+      gcdetails_par_balanced_copied_bytes <-
+        (# peek GCDetails, par_balanced_copied_bytes) pgc
       gcdetails_sync_elapsed_ns <- (# peek GCDetails, sync_elapsed_ns) pgc
       gcdetails_cpu_ns <- (# peek GCDetails, cpu_ns) pgc
       gcdetails_elapsed_ns <- (# peek GCDetails, elapsed_ns) pgc
@@ -259,8 +268,19 @@ data GCStats = GCStats
     -- thread each GC.  The ratio of 'parTotBytesCopied' divided by
     -- 'parMaxBytesCopied' approaches 1 for a maximally sequential
     -- run and approaches the number of threads (set by the RTS flag
-    -- @-N@) for a maximally parallel run.
+    -- @-N@) for a maximally parallel run. This is included for
+    -- backwards compatibility; to compute work balance use
+    -- `parBalancedBytesCopied`.
     , parMaxBytesCopied :: !Int64
+
+    -- | Sum of number of balanced bytes copied on each thread of each GC.
+    -- Balanced bytes are those up to a
+    -- limit = (parTotBytesCopied / num_gc_threads).
+    -- This number is normalized so that when balance is perfect
+    -- @parBalancedBytesCopied =  parTotBytesCopied@ and when all
+    -- gc is done by a single thread @parBalancedBytesCopied = 0@.
+    , parBalancedBytesCopied :: !Int64
+
     } deriving (Show, Read)
 
 -- | Retrieves garbage collection and memory statistics as of the last
@@ -306,6 +326,8 @@ getGCStats = do
     wallSeconds <- nsToSecs <$> (# peek RTSStats, elapsed_ns) p
     parTotBytesCopied <- (# peek RTSStats, par_copied_bytes) p
     parMaxBytesCopied <- (# peek RTSStats, cumulative_par_max_copied_bytes) p
+    parBalancedBytesCopied <-
+      (# peek RTSStats, cumulative_par_balanced_copied_bytes) p
     return GCStats { .. }
 
 nsToSecs :: Int64 -> Double

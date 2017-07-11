@@ -30,7 +30,7 @@ void      stat_startGCSync(struct gc_thread_ *_gct);
 void      stat_startGC(Capability *cap, struct gc_thread_ *_gct);
 void      stat_endGC  (Capability *cap, struct gc_thread_ *_gct, W_ live,
                        W_ copied, W_ slop, uint32_t gen, uint32_t n_gc_threads,
-                       W_ par_max_copied);
+                       W_ par_max_copied, W_ par_balanced_copied);
 
 #if defined(PROFILING)
 void      stat_startRP(void);

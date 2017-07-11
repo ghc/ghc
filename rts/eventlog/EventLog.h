@@ -121,7 +121,8 @@ void postEventGcStats  (Capability    *cap,
                         W_           fragmentation,
                         uint32_t     par_n_threads,
                         W_           par_max_copied,
-                        W_           par_tot_copied);
+                        W_           par_tot_copied,
+                        W_           par_balanced_copied);
 
 void postTaskCreateEvent (EventTaskId taskId,
                           EventCapNo cap,

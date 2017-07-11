@@ -188,7 +188,7 @@ GarbageCollect (uint32_t collect_gen,
 {
   bdescr *bd;
   generation *gen;
-  StgWord live_blocks, live_words, par_max_copied;
+  StgWord live_blocks, live_words, par_max_copied, par_balanced_copied;
 #if defined(THREADED_RTS)
   gc_thread *saved_gct;
 #endif
@@ -460,8 +460,14 @@ GarbageCollect (uint32_t collect_gen,
 
   copied = 0;
   par_max_copied = 0;
+  par_balanced_copied = 0;
   {
       uint32_t i;
+      uint64_t par_balanced_copied_acc = 0;
+
+      for (i=0; i < n_gc_threads; i++) {
+          copied += gc_threads[i]->copied;
+      }
       for (i=0; i < n_gc_threads; i++) {
           if (n_gc_threads > 1) {
               debugTrace(DEBUG_gc,"thread %d:", i);
@@ -471,11 +477,20 @@ GarbageCollect (uint32_t collect_gen,
               debugTrace(DEBUG_gc,"   no_work          %ld", gc_threads[i]->no_work);
               debugTrace(DEBUG_gc,"   scav_find_work %ld",   gc_threads[i]->scav_find_work);
           }
-          copied += gc_threads[i]->copied;
           par_max_copied = stg_max(gc_threads[i]->copied, par_max_copied);
+          par_balanced_copied_acc +=
+            stg_min(n_gc_threads * gc_threads[i]->copied, copied);
       }
       if (n_gc_threads == 1) {
           par_max_copied = 0;
+          par_balanced_copied = 0;
+      }
+      else
+      {
+          // See Note [Work Balance] for an explanation of this computation
+          par_balanced_copied =
+              (par_balanced_copied_acc - copied + (n_gc_threads - 1) / 2) /
+              (n_gc_threads - 1);
       }
   }
 
@@ -782,7 +797,7 @@ GarbageCollect (uint32_t collect_gen,
   // ok, GC over: tell the stats department what happened.
   stat_endGC(cap, gct, live_words, copied,
              live_blocks * BLOCK_SIZE_W - live_words /* slop */,
-             N, n_gc_threads, par_max_copied);
+             N, n_gc_threads, par_max_copied, par_balanced_copied);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
