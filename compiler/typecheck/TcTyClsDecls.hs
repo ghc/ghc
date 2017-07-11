@@ -1586,10 +1586,10 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
        ; ctxt    <- zonkTcTypeToTypes ze ctxt
        ; res_ty  <- zonkTcTypeToType ze res_ty
 
-       ; let (univ_tvs, ex_tvs, eq_preds, res_ty', arg_subst)
+       ; let (univ_tvs, ex_tvs, eq_preds, arg_subst)
                = rejigConRes tmpl_bndrs res_tmpl qtkvs res_ty
-             -- NB: this is a /lazy/ binding, so we pass five thunks to buildDataCon
-             --     without yet forcing the guards in rejigConRes
+             -- NB: this is a /lazy/ binding, so we pass four thunks to
+             --     buildDataCon without yet forcing the guards in rejigConRes
              -- See Note [Checking GADT return types]
 
              -- See Note [Wrong visibility for GADTs]
@@ -1611,7 +1611,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                             univ_bndrs ex_bndrs eq_preds
                             (substTys arg_subst ctxt)
                             (substTys arg_subst arg_tys)
-                            (substTy  arg_subst res_ty')
+                            (substTy  arg_subst res_ty)
                             rep_tycon
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
@@ -1724,7 +1724,7 @@ Both of these bullets are currently violated. GHCi reports MkX's type as
 
   MkX :: forall k (a :: k) b. b -> Proxy a -> X a
 
-It turns out that this is a hard to fix. The problem is that GHC expects data
+It turns out that this is hard to fix. The problem is that GHC expects data
 constructors to have their universal variables followed by their existential
 variables, always. And yet that's violated in the desired type for MkX.
 Furthermore, given the way that GHC deals with GADT return types ("rejigging",
@@ -1782,8 +1782,8 @@ defined yet.
 
 So, we want to make rejigConRes lazy and then check the validity of
 the return type in checkValidDataCon.  To do this we /always/ return a
-5-tuple from rejigConRes (so that we can extract ret_ty from it, which
-checkValidDataCon needs), but the first four fields may be bogus if
+4-tuple from rejigConRes (so that we can compute the return type from it, which
+checkValidDataCon needs), but the first three fields may be bogus if
 the return type isn't valid (the last equation for rejigConRes).
 
 This is better than an earlier solution which reduced the number of
@@ -1808,7 +1808,6 @@ rejigConRes :: [TyConBinder] -> Type    -- Template for result type; e.g.
             -> ([TyVar],          -- Universal
                 [TyVar],          -- Existential (distinct OccNames from univs)
                 [EqSpec],      -- Equality predicates
-                Type,          -- Typechecked return type
                 TCvSubst)      -- Substitution to apply to argument types
         -- We don't check that the TyCon given in the ResTy is
         -- the same as the parent tycon, because checkValidDataCon will do it
@@ -1824,7 +1823,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
         --          b              b~z
         --          z
         -- Existentials are the leftover type vars: [x,y]
-        -- So we return ([a,b,z], [x,y], [a~(x,y),b~z], T [(x,y)] z z)
+        -- So we return ([a,b,z], [x,y], [a~(x,y),b~z], <arg-subst>)
   | Just subst <- ASSERT( isLiftedTypeKind (typeKind res_ty) )
                   ASSERT( isLiftedTypeKind (typeKind res_tmpl) )
                   tcMatchTy res_tmpl res_ty
@@ -1835,7 +1834,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
 
         substed_eqs = map (substEqSpec arg_subst) raw_eqs
     in
-    (univ_tvs, substed_ex_tvs, substed_eqs, res_ty, arg_subst)
+    (univ_tvs, substed_ex_tvs, substed_eqs, arg_subst)
 
   | otherwise
         -- If the return type of the data constructor doesn't match the parent
@@ -1848,7 +1847,7 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
         -- albeit bogus, relying on checkValidDataCon to check the
         --  bad-result-type error before seeing that the other fields look odd
         -- See Note [Checking GADT return types]
-  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, [], res_ty, emptyTCvSubst)
+  = (tmpl_tvs, dc_tvs `minusList` tmpl_tvs, [], emptyTCvSubst)
   where
     tmpl_tvs = binderVars tmpl_bndrs
 
