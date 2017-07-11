@@ -2054,7 +2054,7 @@ def printUnexpectedTests(file, testInfoss):
                        if not name.endswith('.T'))
     if unexpected:
         file.write('Unexpected results from:\n')
-        file.write('TEST="' + ' '.join(unexpected) + '"\n')
+        file.write('TEST="' + ' '.join(sorted(unexpected)) + '"\n')
         file.write('\n')
 
 def printTestInfosSummary(file, testInfos):
