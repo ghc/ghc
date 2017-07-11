@@ -2272,18 +2272,20 @@ AC_DEFUN([FIND_LD],[
       [enable_ld_override=yes])
 
     if test "x$enable_ld_override" = "xyes"; then
-        AC_CHECK_TARGET_TOOLS([LD], [ld.gold ld.lld ld])
-        UseLd=''
+        AC_CHECK_TARGET_TOOLS([TmpLd], [ld.gold ld.lld ld])
 
-        out=`$LD --version`
+        out=`$TmpLd --version`
         case $out in
           "GNU ld"*)   FP_CC_LINKER_FLAG_TRY(bfd, $2) ;;
           "GNU gold"*) FP_CC_LINKER_FLAG_TRY(gold, $2) ;;
           "LLD"*)      FP_CC_LINKER_FLAG_TRY(lld, $2) ;;
           *) AC_MSG_NOTICE([unknown linker version $out]) ;;
         esac
-        if test "z$2" = "z"; then
-            AC_MSG_NOTICE([unable to convince '$CC' to use linker '$LD'])
+        if test "z$$2" = "z"; then
+            AC_MSG_NOTICE([unable to convince '$CC' to use linker '$TmpLd'])
+            AC_CHECK_TARGET_TOOL([LD], [ld])
+        else
+            LD="$TmpLd"
         fi
    else
         AC_CHECK_TARGET_TOOL([LD], [ld])
