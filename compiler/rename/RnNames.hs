@@ -266,8 +266,7 @@ rnImportDecl this_mod
     -- the non-boot module depends on the compilation order, which
     -- is not deterministic.  The hs-boot test can show this up.
     dflags <- getDynFlags
-    warnIf NoReason
-           (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
+    warnIf (want_boot && not (mi_boot iface) && isOneShot (ghcMode dflags))
            (warnRedundantSourceImport imp_mod_name)
     when (mod_safe && not (safeImportsOn dflags)) $
         addErr (text "safe import can't be used as Safe Haskell isn't on!"

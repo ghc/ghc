@@ -14,7 +14,7 @@ module ErrUtils (
         Severity(..),
 
         -- * Messages
-        ErrMsg, errMsgDoc,
+        ErrMsg, errMsgDoc, errMsgSeverity, errMsgReason,
         ErrDoc, errDoc, errDocImportant, errDocContext, errDocSupplementary,
         WarnMsg, MsgDoc,
         Messages, ErrorMessages, WarningMessages,
@@ -32,7 +32,7 @@ module ErrUtils (
         emptyMessages, mkLocMessage, mkLocMessageAnn, makeIntoWarning,
         mkErrMsg, mkPlainErrMsg, mkErrDoc, mkLongErrMsg, mkWarnMsg,
         mkPlainWarnMsg,
-        warnIsErrorMsg, mkLongWarnMsg,
+        mkLongWarnMsg,
 
         -- * Utilities
         doIfSet, doIfSet_dyn,
@@ -348,10 +348,6 @@ emptyMessages = (emptyBag, emptyBag)
 
 isEmptyMessages :: Messages -> Bool
 isEmptyMessages (warns, errs) = isEmptyBag warns && isEmptyBag errs
-
-warnIsErrorMsg :: DynFlags -> ErrMsg
-warnIsErrorMsg dflags
-    = mkPlainErrMsg dflags noSrcSpan (text "\nFailing due to -Werror.")
 
 errorsFound :: DynFlags -> Messages -> Bool
 errorsFound _dflags (_warns, errs) = not (isEmptyBag errs)
@@ -670,10 +666,15 @@ prettyPrintGhcErrors dflags
                           liftIO $ throwIO e
 
 -- | Checks if given 'WarnMsg' is a fatal warning.
-isWarnMsgFatal :: DynFlags -> WarnMsg -> Bool
+isWarnMsgFatal :: DynFlags -> WarnMsg -> Maybe (Maybe WarningFlag)
 isWarnMsgFatal dflags ErrMsg{errMsgReason = Reason wflag}
-  = wopt_fatal wflag dflags
-isWarnMsgFatal dflags _ = gopt Opt_WarnIsError dflags
+  = if wopt_fatal wflag dflags
+      then Just (Just wflag)
+      else Nothing
+isWarnMsgFatal dflags _
+  = if gopt Opt_WarnIsError dflags
+      then Just Nothing
+      else Nothing
 
 traceCmd :: DynFlags -> String -> String -> IO a -> IO a
 -- trace the command (at two levels of verbosity)

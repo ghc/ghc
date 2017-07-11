@@ -695,7 +695,7 @@ tcSpecPrag poly_id prag@(SpecSig fun_name hs_tys inl)
 -- However we want to use fun_name in the error message, since that is
 -- what the user wrote (Trac #8537)
   = addErrCtxt (spec_ctxt prag) $
-    do  { warnIf NoReason (not (isOverloadedTy poly_ty || isInlinePragma inl))
+    do  { warnIf (not (isOverloadedTy poly_ty || isInlinePragma inl))
                  (text "SPECIALISE pragma for non-overloaded function"
                   <+> quotes (ppr fun_name))
                   -- Note [SPECIALISE pragmas]

@@ -179,7 +179,7 @@ import PrelNames        ( gHC_PRIM, ioTyConName, printName, mkInteractiveModule
 import TysWiredIn
 import Packages hiding  ( Version(..) )
 import CmdLineParser
-import DynFlags hiding  ( WarnReason(..) )
+import DynFlags
 import DriverPhases     ( Phase, HscSource(..), isHsBootOrSig, hscSourceString )
 import BasicTypes
 import IfaceSyn
@@ -322,11 +322,21 @@ instance Exception GhcApiError
 -- | Given a bag of warnings, turn them into an exception if
 -- -Werror is enabled, or print them out otherwise.
 printOrThrowWarnings :: DynFlags -> Bag WarnMsg -> IO ()
-printOrThrowWarnings dflags warns
-  | anyBag (isWarnMsgFatal dflags) warns
-  = throwIO $ mkSrcErr $ warns `snocBag` warnIsErrorMsg dflags
-  | otherwise
-  = printBagOfErrors dflags warns
+printOrThrowWarnings dflags warns = do
+  let (make_error, warns') =
+        mapAccumBagL
+          (\make_err warn ->
+            case isWarnMsgFatal dflags warn of
+              Nothing ->
+                (make_err, warn)
+              Just err_reason ->
+                (True, warn{ errMsgSeverity = SevError
+                           , errMsgReason = ErrReason err_reason
+                           }))
+          False warns
+  if make_error
+    then throwIO (mkSrcErr warns')
+    else printBagOfErrors dflags warns
 
 handleFlagWarnings :: DynFlags -> [Warn] -> IO ()
 handleFlagWarnings dflags warns = do
@@ -340,7 +350,7 @@ handleFlagWarnings dflags warns = do
   printOrThrowWarnings dflags bag
 
 -- Given a warn reason, check to see if it's associated -W opt is enabled
-shouldPrintWarning :: DynFlags -> WarnReason -> Bool
+shouldPrintWarning :: DynFlags -> CmdLineParser.WarnReason -> Bool
 shouldPrintWarning dflags ReasonDeprecatedFlag
   = wopt Opt_WarnDeprecatedFlags dflags
 shouldPrintWarning dflags ReasonUnrecognisedFlag

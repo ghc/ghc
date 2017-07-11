@@ -1,17 +1,14 @@
 [1 of 2] Compiling OverloadedRecFldsFail12_A ( OverloadedRecFldsFail12_A.hs, OverloadedRecFldsFail12_A.o )
 [2 of 2] Compiling Main             ( overloadedrecfldsfail12.hs, overloadedrecfldsfail12.o )
 
-overloadedrecfldsfail12.hs:10:11: warning: [-Wdeprecations (in -Wdefault)]
+overloadedrecfldsfail12.hs:10:11: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
     In the use of ‘foo’ (imported from OverloadedRecFldsFail12_A):
     "Deprecated foo"
 
-overloadedrecfldsfail12.hs:10:20: warning: [-Wdeprecations (in -Wdefault)]
+overloadedrecfldsfail12.hs:10:20: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
     In the use of ‘bar’ (imported from OverloadedRecFldsFail12_A):
     "Deprecated bar"
 
-overloadedrecfldsfail12.hs:13:5: warning: [-Wdeprecations (in -Wdefault)]
+overloadedrecfldsfail12.hs:13:5: error: [-Wdeprecations (in -Wdefault), -Werror=deprecations]
     In the use of ‘foo’ (imported from OverloadedRecFldsFail12_A):
     "Deprecated foo"
-
-<no location info>: error: 
-Failing due to -Werror.

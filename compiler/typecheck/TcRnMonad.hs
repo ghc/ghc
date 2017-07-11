@@ -82,7 +82,7 @@ module TcRnMonad(
   failWithTc, failWithTcM,
   checkTc, checkTcM,
   failIfTc, failIfTcM,
-  warnIf, warnTc, warnTcM,
+  warnIfFlag, warnIf, warnTc, warnTcM,
   addWarnTc, addWarnTcM, addWarn, addWarnAt, add_warn,
   tcInitTidyEnv, tcInitOpenTidyEnv, mkErrInfo,
 
@@ -1231,15 +1231,18 @@ failIfTcM True  err = failWithTcM err
 
 --         Warnings have no 'M' variant, nor failure
 
--- | Display a warning if a condition is met.
+-- | Display a warning if a condition is met,
 --   and the warning is enabled
-warnIf :: WarnReason -> Bool -> MsgDoc -> TcRn ()
-warnIf reason is_bad msg
-  = do { warn_on <- case reason of
-                       NoReason         -> return True
-                       Reason warn_flag -> woptM warn_flag
+warnIfFlag :: WarningFlag -> Bool -> MsgDoc -> TcRn ()
+warnIfFlag warn_flag is_bad msg
+  = do { warn_on <- woptM warn_flag
        ; when (warn_on && is_bad) $
-         addWarn reason msg }
+         addWarn (Reason warn_flag) msg }
+
+-- | Display a warning if a condition is met.
+warnIf :: Bool -> MsgDoc -> TcRn ()
+warnIf is_bad msg
+  = when is_bad (addWarn NoReason msg)
 
 -- | Display a warning if a condition is met.
 warnTc :: WarnReason -> Bool -> MsgDoc -> TcM ()
