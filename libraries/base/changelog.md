@@ -1,7 +1,7 @@
 # Changelog for [`base` package](http://hackage.haskell.org/package/base)
 
-## 4.10.0.0 *April 2017*
-  * Bundled with GHC *TBA*
+## 4.10.0.0 *July 2017*
+  * Bundled with GHC 8.2.1
 
   * `Data.Type.Bool.Not` given a type family dependency (#12057).
 
