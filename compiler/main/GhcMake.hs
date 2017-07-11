@@ -195,7 +195,12 @@ warnMissingHomeModules hsc_env mod_graph =
     missing = map (moduleName . ms_mod) $
       filter (not . is_known_module) mod_graph
 
-    msg = text "Modules are not listed in command line: "
+    msg
+      | gopt Opt_BuildingCabalPackage dflags
+      = text "These modules are needed for compilation but not listed in your .cabal file's other-modules: "
+        <> sep (map ppr missing)
+      | otherwise
+      = text "Modules are not listed in command line but needed for compilation: "
         <> sep (map ppr missing)
     warn = makeIntoWarning
       (Reason Opt_WarnMissingHomeModules)
