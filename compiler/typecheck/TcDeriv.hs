@@ -237,7 +237,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; dflags <- getDynFlags
 
-        ; let (_, deriv_stuff, maybe_fvs) = unzip3 (insts1 ++ insts2)
+        ; let (_, deriv_stuff, fvs) = unzip3 (insts1 ++ insts2)
         ; loc <- getSrcSpanM
         ; let (binds, famInsts) = genAuxBinds dflags loc
                                     (unionManyBags deriv_stuff)
@@ -276,7 +276,7 @@ tcDeriving deriv_infos deriv_decls
 
         ; gbl_env <- tcExtendLocalInstEnv (map iSpec (bagToList inst_info))
                                           getGblEnv
-        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ catMaybes maybe_fvs)
+        ; let all_dus = rn_dus `plusDU` usesOnly (NameSet.mkFVs $ concat fvs)
         ; return (addTcgDUs gbl_env all_dus, inst_info, rn_binds) } }
   where
     ddump_deriving :: Bag (InstInfo GhcRn) -> HsValBinds GhcRn
@@ -380,7 +380,7 @@ had written
      ...etc...
 
 So we want to signal a user of the data constructor 'MkP'.
-This is the reason behind the (Maybe Name) part of the return type
+This is the reason behind the [Name] part of the return type
 of genInst.
 
 Note [Staging of tcDeriving]
@@ -1523,15 +1523,15 @@ the renamer.  What a great hack!
 -- case of instances for indexed families.
 --
 genInst :: DerivSpec theta
-        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, Maybe Name)
+        -> TcM (ThetaType -> TcM (InstInfo GhcPs), BagDerivStuff, [Name])
 -- We must use continuation-returning style here to get the order in which we
 -- typecheck family instances and derived instances right.
 -- See Note [Staging of tcDeriving]
 genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                  , ds_mechanism = mechanism, ds_tys = tys
                  , ds_cls = clas, ds_loc = loc })
-  = do (meth_binds, deriv_stuff) <- genDerivStuff mechanism loc clas
-                                      rep_tycon tys tvs
+  = do (meth_binds, deriv_stuff, unusedNames)
+         <- genDerivStuff mechanism loc clas rep_tycon tys tvs
        let mk_inst_info theta = do
              inst_spec <- newDerivClsInst theta spec
              doDerivInstErrorChecks2 clas inst_spec mechanism
@@ -1544,16 +1544,8 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                                      , ib_pragmas = []
                                      , ib_extensions = extensions
                                      , ib_derived = True } }
-       return (mk_inst_info, deriv_stuff, unusedConName)
+       return (mk_inst_info, deriv_stuff, unusedNames)
   where
-    unusedConName :: Maybe Name
-    unusedConName
-      | isDerivSpecNewtype mechanism
-        -- See Note [Newtype deriving and unused constructors]
-      = Just $ getName $ head $ tyConDataCons rep_tycon
-      | otherwise
-      = Nothing
-
     extensions :: [LangExt.Extension]
     extensions
       | isDerivSpecNewtype mechanism
@@ -1611,12 +1603,13 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
 
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
               -> TyCon -> [Type] -> [TyVar]
-              -> TcM (LHsBinds GhcPs, BagDerivStuff)
+              -> TcM (LHsBinds GhcPs, BagDerivStuff, [Name])
 genDerivStuff mechanism loc clas tycon inst_tys tyvars
   = case mechanism of
       -- See Note [Bindings for Generalised Newtype Deriving]
-      DerivSpecNewtype rhs_ty -> gen_Newtype_binds loc clas tyvars
-                                                   inst_tys rhs_ty
+      DerivSpecNewtype rhs_ty -> do
+        (binds, faminsts) <- gen_Newtype_binds loc clas tyvars inst_tys rhs_ty
+        return (binds, faminsts, maybeToList unusedConName)
 
       -- Try a stock deriver
       DerivSpecStock gen_fn -> gen_fn loc tycon inst_tys
@@ -1639,7 +1632,15 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
                -- ...but we may need to generate binding for associated type
                -- family default instances.
                -- See Note [DeriveAnyClass and default family instances]
-               )
+               , [] )
+  where
+    unusedConName :: Maybe Name
+    unusedConName
+      | isDerivSpecNewtype mechanism
+        -- See Note [Newtype deriving and unused constructors]
+      = Just $ getName $ head $ tyConDataCons tycon
+      | otherwise
+      = Nothing
 
 {-
 Note [Bindings for Generalised Newtype Deriving]
