@@ -16,4 +16,3 @@ readFail001.hs:107:42: error: Not in scope: data constructor ‘Bar’
 
 readFail001.hs:112:23: error:
     Not in scope: type constructor or class ‘Foo’
-    A data constructor of that name is in scope; did you mean DataKinds?

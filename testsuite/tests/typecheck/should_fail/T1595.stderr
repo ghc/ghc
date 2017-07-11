@@ -1,8 +1,6 @@
 
 T1595.hs:8:15: error:
     Not in scope: type constructor or class ‘DoesNotExist’
-    A data constructor of that name is in scope; did you mean DataKinds?
 
 T1595.hs:13:22: error:
     Not in scope: type constructor or class ‘DoesNotExist’
-    A data constructor of that name is in scope; did you mean DataKinds?

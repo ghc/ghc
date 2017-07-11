@@ -1,4 +1,2 @@
 
-mod122.hs:5:6: error:
-    Not in scope: type constructor or class ‘C’
-    A data constructor of that name is in scope; did you mean DataKinds?
+mod122.hs:5:6: error: Not in scope: type constructor or class ‘C’
