@@ -16,6 +16,7 @@ module PprBase (
 
 where
 
+import AsmUtils
 import CLabel
 import Cmm
 import DynFlags
@@ -131,7 +132,7 @@ pprGNUSectionHeader sep t suffix = sdocWithDynFlags $ \dflags ->
       CString
         | OSMinGW32 <- platformOS (targetPlatform dflags)
                     -> empty
-        | otherwise -> text ",\"aMS\",@progbits,1"
+        | otherwise -> text ",\"aMS\"," <> sectionType "progbits" <> text ",1"
       _ -> empty
 
 -- XCOFF doesn't support relocating label-differences, so we place all

@@ -35,6 +35,7 @@ module DriverPipeline (
 
 #include "HsVersions.h"
 
+import AsmUtils
 import PipelineMonad
 import Packages
 import HeaderInfo
@@ -1714,14 +1715,15 @@ mkNoteObjsToLinkIntoBinary dflags dep_packages = do
   where
     link_opts info = hcat [
       -- "link info" section (see Note [LinkInfo section])
-      makeElfNote dflags ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
+      makeElfNote ghcLinkInfoSectionName ghcLinkInfoNoteName 0 info,
 
       -- ALL generated assembly must have this section to disable
       -- executable stacks.  See also
       -- compiler/nativeGen/AsmCodeGen.hs for another instance
       -- where we need to do this.
       if platformHasGnuNonexecStack (targetPlatform dflags)
-        then text ".section .note.GNU-stack,\"\",@progbits\n"
+        then text ".section .note.GNU-stack,\"\","
+             <> sectionType "progbits" <> char '\n'
         else Outputable.empty
       ]
 

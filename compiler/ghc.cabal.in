@@ -170,6 +170,7 @@ Library
         NameShape
         RnModIface
         Avail
+        AsmUtils
         BasicTypes
         ConLike
         DataCon
