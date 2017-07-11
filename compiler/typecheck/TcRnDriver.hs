@@ -66,6 +66,7 @@ import HsSyn
 import IfaceSyn ( ShowSub(..), showToHeader )
 import IfaceType( ShowForAllFlag(..) )
 import PrelNames
+import PrelInfo
 import RdrName
 import TcHsSyn
 import TcExpr
@@ -2419,7 +2420,8 @@ tcRnLookupName' name = do
 
 tcRnGetInfo :: HscEnv
             -> Name
-            -> IO (Messages, Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
+            -> IO ( Messages
+                  , Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 
 -- Used to implement :info in GHCi
 --
@@ -2439,7 +2441,8 @@ tcRnGetInfo hsc_env name
        ; thing  <- tcRnLookupName' name
        ; fixity <- lookupFixityRn name
        ; (cls_insts, fam_insts) <- lookupInsts thing
-       ; return (thing, fixity, cls_insts, fam_insts) }
+       ; let info = lookupKnownNameInfo name
+       ; return (thing, fixity, cls_insts, fam_insts, info) }
 
 
 -- Lookup all class and family instances for a type constructor.

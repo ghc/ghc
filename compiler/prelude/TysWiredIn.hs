@@ -102,7 +102,7 @@ module TysWiredIn (
 
         -- * Equality predicates
         heqTyCon, heqClass, heqDataCon,
-        coercibleTyCon, coercibleDataCon, coercibleClass,
+        coercibleTyCon, coercibleTyConName, coercibleDataCon, coercibleClass,
 
         -- * RuntimeRep and friends
         runtimeRepTyCon, vecCountTyCon, vecElemTyCon,

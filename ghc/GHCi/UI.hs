@@ -1338,7 +1338,8 @@ infoThing :: GHC.GhcMonad m => Bool -> String -> m SDoc
 infoThing allInfo str = do
     names     <- GHC.parseName str
     mb_stuffs <- mapM (GHC.getInfo allInfo) names
-    let filtered = filterOutChildren (\(t,_f,_ci,_fi) -> t) (catMaybes mb_stuffs)
+    let filtered = filterOutChildren (\(t,_f,_ci,_fi,_sd) -> t)
+                                     (catMaybes mb_stuffs)
     return $ vcat (intersperse (text "") $ map pprInfo filtered)
 
   -- Filter out names whose parent is also there Good
@@ -1353,9 +1354,10 @@ filterOutChildren get_thing xs
                      Just p  -> getName p `elemNameSet` all_names
                      Nothing -> False
 
-pprInfo :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst]) -> SDoc
-pprInfo (thing, fixity, cls_insts, fam_insts)
-  =  pprTyThingInContextLoc thing
+pprInfo :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst], SDoc) -> SDoc
+pprInfo (thing, fixity, cls_insts, fam_insts, docs)
+  =  docs
+  $$ pprTyThingInContextLoc thing
   $$ show_fixity
   $$ vcat (map GHC.pprInstance cls_insts)
   $$ vcat (map GHC.pprFamInst  fam_insts)
@@ -2828,8 +2830,8 @@ showBindings = do
         mb_stuff <- GHC.getInfo False (getName tt)
         return $ maybe (text "") pprTT mb_stuff
 
-    pprTT :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst]) -> SDoc
-    pprTT (thing, fixity, _cls_insts, _fam_insts)
+    pprTT :: (TyThing, Fixity, [GHC.ClsInst], [GHC.FamInst], SDoc) -> SDoc
+    pprTT (thing, fixity, _cls_insts, _fam_insts, _docs)
       = pprTyThing showToHeader thing
         $$ show_fixity
       where

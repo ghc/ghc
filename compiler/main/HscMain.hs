@@ -275,7 +275,8 @@ hscTcRcLookupName hsc_env0 name = runInteractiveHsc hsc_env0 $ do
       -- "name not found", and the Maybe in the return type
       -- is used to indicate that.
 
-hscTcRnGetInfo :: HscEnv -> Name -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst]))
+hscTcRnGetInfo :: HscEnv -> Name
+               -> IO (Maybe (TyThing, Fixity, [ClsInst], [FamInst], SDoc))
 hscTcRnGetInfo hsc_env0 name
   = runInteractiveHsc hsc_env0 $
     do { hsc_env <- getHscEnv
