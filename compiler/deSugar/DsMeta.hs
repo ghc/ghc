@@ -1171,7 +1171,7 @@ repE (HsVar (L _ x))            =
         Just (DsSplice e)  -> do { e' <- dsExpr e
                                  ; return (MkC e') } }
 repE e@(HsIPVar _) = notHandled "Implicit parameters" (ppr e)
-repE e@(HsOverLabel{}) = notHandled "Overloaded labels" (ppr e)
+repE (HsOverLabel _ s) = repOverLabel s
 
 repE e@(HsRecFld f) = case f of
   Unambiguous _ x -> repE (HsVar (noLoc x))
@@ -2458,6 +2458,12 @@ repSequenceQ ty_a (MkC list)
 
 repUnboundVar :: Core TH.Name -> DsM (Core TH.ExpQ)
 repUnboundVar (MkC name) = rep2 unboundVarEName [name]
+
+repOverLabel :: FastString -> DsM (Core TH.ExpQ)
+repOverLabel fs = do
+                    (MkC s) <- coreStringLit $ unpackFS fs
+                    rep2 labelEName [s]
+
 
 ------------ Lists -------------------
 -- turn a list of patterns into a single pattern matching a list

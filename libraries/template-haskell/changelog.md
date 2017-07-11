@@ -32,6 +32,8 @@
     - `interruptible` and `funDep`
     - `valueAnnotation`, `typeAnnotation`, and `moduleAnnotation`
 
+  * Add support for overloaded labels.
+
 ## 2.11.0.0  *May 2016*
 
   * Bundled with GHC 8.0.1

@@ -864,6 +864,7 @@ cvtl e = wrapL (cvt e)
                               ; return $ mkRdrRecordUpd e' flds' }
     cvt (StaticE e)      = fmap (HsStatic placeHolderNames) $ cvtl e
     cvt (UnboundVarE s)  = do { s' <- vName s; return $ HsVar (noLoc s') }
+    cvt (LabelE s)       = do { return $ HsOverLabel Nothing (fsLit s) }
 
 {- Note [Dropping constructors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
