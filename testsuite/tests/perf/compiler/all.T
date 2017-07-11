@@ -1131,7 +1131,7 @@ test('MultiLayerModules',
 test('T13701',
      [ compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 2217187888, 10),
-           (platform('x86_64-unknown-linux'), 2467546360, 10),
+           (platform('x86_64-unknown-linux'), 2187906120, 10),
            # initial:     2511285600
            # 2017-06-23:  2188045288    treat banged variable bindings as FunBinds
            # 2017-07-11:  2187920960
