@@ -30,6 +30,7 @@ import Settings.Builders.Ld
 import Settings.Builders.Make
 import Settings.Builders.Tar
 import Settings.Packages.Base
+import Settings.Packages.Cabal
 import Settings.Packages.Compiler
 import Settings.Packages.Ghc
 import Settings.Packages.GhcCabal
@@ -268,6 +269,7 @@ disableWarningArgsLibs = do
 defaultPackageArgs :: Args
 defaultPackageArgs = mconcat
     [ basePackageArgs
+    , cabalPackageArgs
     , compilerPackageArgs
     , ghcPackageArgs
     , ghcCabalPackageArgs
@@ -279,4 +281,5 @@ defaultPackageArgs = mconcat
     , runGhcPackageArgs
     , disableWarningArgsStage0
     , disableWarningArgsStage1
-    , disableWarningArgsLibs ]
+    , disableWarningArgsLibs
+    ]
