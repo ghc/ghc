@@ -211,8 +211,8 @@ type BCInstrList = OrdList BCInstr
 
 type Sequel = Word -- back off to this depth before ENTER
 
--- Maps Ids to the offset from the stack _base_ so we don't have
--- to mess with it after each push/pop.
+-- | Maps Ids to their stack depth. This allows us to avoid having to mess with
+-- it after each push/pop.
 type BCEnv = Map Id Word -- To find vars on the stack
 
 {-
@@ -403,13 +403,20 @@ schemeER_wrk d p rhs
    | otherwise = schemeE (fromIntegral d) 0 p rhs
 
 getVarOffSets :: Word -> BCEnv -> [Id] -> [(Id, Word16)]
-getVarOffSets d p = catMaybes . map (getOffSet d p)
-
-getOffSet :: Word -> BCEnv -> Id -> Maybe (Id, Word16)
-getOffSet d env id
-   = case lookupBCEnv_maybe id env of
+getVarOffSets depth env = catMaybes . map getOffSet
+  where
+    getOffSet id = case lookupBCEnv_maybe id env of
         Nothing     -> Nothing
-        Just offset -> Just (id, trunc16 $ d - offset)
+        Just offset ->
+            -- michalt: I'm not entirely sure why we need the stack
+            -- adjustement by 2 here. I initially thought that there's
+            -- something off with getIdValFromApStack (the only user of this
+            -- value), but it looks ok to me. My current hypothesis is that
+            -- this "adjustement" is needed due to stack manipulation for
+            -- BRK_FUN in Interpreter.c In any case, this is used only when
+            -- we trigger a breakpoint.
+            let adjustement = 2
+            in Just (id, trunc16 $ depth - offset + adjustement)
 
 trunc16 :: Word -> Word16
 trunc16 w
@@ -471,7 +478,8 @@ schemeE d s p (AnnLet (AnnNonRec x (_,rhs)) (_,body))
         -- saturated constructor application.
         -- Just allocate the constructor and carry on
         alloc_code <- mkConAppCode d s p data_con args_r_to_l
-        body_code <- schemeE (d+1) s (Map.insert x d p) body
+        let !d2 = d + 1
+        body_code <- schemeE d2 s (Map.insert x d2 p) body
         return (alloc_code `appOL` body_code)
 
 -- General case for let.  Generates correct, if inefficient, code in
@@ -861,10 +869,9 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
 
         -- Env in which to compile the alts, not including
         -- any vars bound by the alts themselves
-        d_bndr' = fromIntegral d_bndr - 1
-        p_alts0 = Map.insert bndr d_bndr' p
+        p_alts0 = Map.insert bndr d_bndr p
         p_alts = case is_unboxed_tuple of
-                   Just ubx_bndr -> Map.insert ubx_bndr d_bndr' p_alts0
+                   Just ubx_bndr -> Map.insert ubx_bndr d_bndr p_alts0
                    Nothing       -> p_alts0
 
         bndr_ty = idType bndr
@@ -947,7 +954,7 @@ doCase d s p (_,scrut) bndr alts is_unboxed_tuple
           rel_slots = nub $ map fromIntegral $ concat (map spread binds)
           spread (id, offset) | isFollowableArg (bcIdArgRep id) = [ rel_offset ]
                               | otherwise                      = []
-                where rel_offset = trunc16 $ d - fromIntegral offset - 1
+                where rel_offset = trunc16 $ d - fromIntegral offset
 
      alt_stuff <- mapM codeAlt alts
      alt_final <- mkMultiBranch maybe_ncons alt_stuff
@@ -1377,18 +1384,14 @@ pushAtom d p (AnnVar v)
    = do dflags <- getDynFlags
         let sz :: Word16
             sz = fromIntegral (idSizeW dflags v)
-            l = trunc16 $ d - d_v + fromIntegral sz - 2
+            l = trunc16 $ d - d_v + fromIntegral sz - 1
         return (toOL (genericReplicate sz (PUSH_L l)), sz)
-         -- d - d_v                 the number of words between the TOS
-         --                         and the 1st slot of the object
-         --
-         -- d - d_v - 1             the offset from the TOS of the 1st slot
-         --
-         -- d - d_v - 1 + sz - 1    the offset from the TOS of the last slot
-         --                         of the object.
-         --
-         -- Having found the last slot, we proceed to copy the right number of
-         -- slots on to the top of the stack.
+        -- d - d_v           offset from TOS to the first slot of the object
+        --
+        -- d - d_v + sz - 1  offset from the TOS of the last slot of the object
+        --
+        -- Having found the last slot, we proceed to copy the right number of
+        -- slots on to the top of the stack.
 
    | otherwise  -- v must be a global variable
    = do topStrings <- getTopStrings
@@ -1676,12 +1679,11 @@ atomRep e = toArgRep (atomPrimRep e)
 isPtrAtom :: AnnExpr' Id ann -> Bool
 isPtrAtom e = isFollowableArg (atomRep e)
 
--- Let szsw be the sizes in words of some items pushed onto the stack,
--- which has initial depth d'.  Return the values which the stack environment
--- should map these items to.
+-- | Let szsw be the sizes in words of some items pushed onto the stack, which
+-- has initial depth @original_depth@.  Return the values which the stack
+-- environment should map these items to.
 mkStackOffsets :: Word -> [Word] -> [Word]
-mkStackOffsets original_depth szsw
-   = map (subtract 1) (tail (scanl (+) original_depth szsw))
+mkStackOffsets original_depth szsw = tail (scanl' (+) original_depth szsw)
 
 typeArgRep :: Type -> ArgRep
 typeArgRep = toArgRep . typePrimRep1

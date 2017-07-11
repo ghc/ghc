@@ -344,9 +344,7 @@ mkCostCentres _ _ = return []
 
 getIdValFromApStack :: HValue -> Int -> IO (Maybe HValue)
 getIdValFromApStack apStack (I# stackDepth) = do
-   case getApStackVal# apStack (stackDepth +# 1#) of
-                                -- The +1 is magic!  I don't know where it comes
-                                -- from, but this makes things line up.  --SDM
+   case getApStackVal# apStack stackDepth of
         (# ok, result #) ->
             case ok of
               0# -> return Nothing -- AP_STACK not found
