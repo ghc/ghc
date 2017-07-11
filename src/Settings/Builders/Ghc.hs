@@ -2,7 +2,6 @@ module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs) w
 
 import Flavour
 import GHC
-import Settings.Path (ghcSplitPath)
 import Settings.Builders.Common
 
 ghcBuilderArgs :: Args

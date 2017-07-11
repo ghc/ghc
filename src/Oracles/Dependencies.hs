@@ -90,7 +90,7 @@ sortPkgsByDep pkgs = do
     return $ map fst $ topSort elems
   where
     annotateInDeg es e =
-     (foldr (\e' s -> if fst e' `elem` snd e then s + 1 else s) 0 es, e)
+     (foldr (\e' s -> if fst e' `elem` snd e then s + 1 else s) (0 :: Int) es, e)
     topSort [] = []
     topSort es =
       let annotated = map (annotateInDeg es) es

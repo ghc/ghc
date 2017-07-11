@@ -4,10 +4,8 @@ import Distribution.PackageDescription.Parse
 
 import Base
 import GHC
-import Oracles.Config.Setting
 import Oracles.Dependencies (pkgDependencies)
 import Predicate
-import Package (pkgCabalFile)
 import Distribution.Verbosity (silent)
 import Distribution.Text (display)
 import Distribution.Package (pkgVersion)
@@ -16,7 +14,6 @@ import qualified Distribution.PackageDescription as DP
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
-    win <- lift windowsHost
     cabalDeps <- lift $ pkgDependencies cabal
     lift $ need [pkgCabalFile cabal]
     pd <- liftIO . readGenericPackageDescription silent $ pkgCabalFile cabal

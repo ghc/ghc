@@ -7,13 +7,10 @@ import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Oracles.Path (getTopDirectory)
 import Settings
 import Settings.Path
 import Target
 import Util
-
-import qualified System.Directory as IO
 
 haddockHtmlLib :: FilePath
 haddockHtmlLib = "inplace/lib/html/haddock-util.js"
@@ -23,8 +20,7 @@ haddockHtmlLib = "inplace/lib/html/haddock-util.js"
 -- files in the Shake database seems fragile and unnecessary.
 buildPackageDocumentation :: Context -> Rules ()
 buildPackageDocumentation context@Context {..} =
-    let cabalFile   = pkgCabalFile package
-        haddockFile = pkgHaddockFile context
+    let haddockFile = pkgHaddockFile context
     in when (stage == Stage1) $ do
         haddockFile %> \file -> do
             srcs <- hsSources context
@@ -43,13 +39,6 @@ buildPackageDocumentation context@Context {..} =
             let dir = takeDirectory haddockHtmlLib
             liftIO $ removeFiles dir ["//*"]
             copyDirectory "utils/haddock/haddock-api/resources/html" dir
-  where
-    excluded = Or
-        [ Test "//haddock-prologue.txt"
-        , Test "//package-data.mk"
-        , Test "//setup-config"
-        , Test "//inplace-pkg-config"
-        , Test "//build" ]
 
 -- # Make the haddocking depend on the library .a file, to ensure
 -- # that we wait until the library is fully built before we haddock it
