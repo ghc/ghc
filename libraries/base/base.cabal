@@ -288,6 +288,7 @@ Library
         System.CPUTime
         System.Console.GetOpt
         System.Environment
+        System.Environment.Blank
         System.Exit
         System.IO
         System.IO.Error

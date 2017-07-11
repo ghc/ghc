@@ -262,9 +262,10 @@ ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
 
 -- | @setEnv name value@ sets the specified environment variable to @value@.
 --
--- On Windows setting an environment variable to the /empty string/ removes
+-- Early versions of this function operated under the mistaken belief that
+-- setting an environment variable to the /empty string/ on Windows removes
 -- that environment variable from the environment.  For the sake of
--- compatibility we adopt that behavior.  In particular
+-- compatibility, it adopted that behavior.  In particular
 --
 -- @
 -- setEnv name \"\"
@@ -276,12 +277,10 @@ ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
 -- `unsetEnv` name
 -- @
 --
--- If you don't care about Windows support and want to set an environment
--- variable to the empty string use @System.Posix.Env.setEnv@ from the @unix@
--- package instead.
+-- If you'd like to be able to set environment variables to blank strings,
+-- use `System.Environment.Blank.setEnv`.
 --
--- Throws `Control.Exception.IOException` if @name@ is the empty string or
--- contains an equals sign.
+-- Throws `Control.Exception.IOException` if @name@ contains an equals sign.
 --
 -- @since 4.7.0.0
 setEnv :: String -> String -> IO ()
