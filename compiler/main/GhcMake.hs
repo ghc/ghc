@@ -1994,27 +1994,32 @@ enableCodeGenForTH target nodemap =
           , ms_hspp_opts = updOptLevel 0 $ dflags {hscTarget = target}
           }
       | otherwise = return ms
-    needs_codegen_set = transitive_deps_set Set.empty th_modSums
-    th_modSums =
+
+    needs_codegen_set = transitive_deps_set
       [ ms
       | mss <- Map.elems nodemap
       , Right ms <- mss
       , needsTemplateHaskellOrQQ $ [ms]
       ]
-    transitive_deps_set marked_mods modSums = foldl' go marked_mods modSums
-    go marked_mods ms
-      | Set.member (ms_mod ms) marked_mods = marked_mods
-      | otherwise =
-        let deps =
-              [ dep_ms
-              | (L _ mn, NotBoot) <- msDeps ms
-              , dep_ms <-
-                  toList (Map.lookup (mn, NotBoot) nodemap) >>= toList >>=
-                  toList
-              ]
-            new_marked_mods =
-              marked_mods `Set.union` Set.fromList (fmap ms_mod deps)
-        in transitive_deps_set new_marked_mods deps
+
+    -- find the set of all transitive dependencies of a list of modules.
+    transitive_deps_set modSums = foldl' go Set.empty modSums
+      where
+        go marked_mods ms@ModSummary{ms_mod}
+          | ms_mod `Set.member` marked_mods = marked_mods
+          | otherwise =
+            let deps =
+                  [ dep_ms
+                  -- If a module imports a boot module, msDeps helpfully adds a
+                  -- dependency to that non-boot module in it's result. This
+                  -- means we don't have to think about boot modules here.
+                  | (L _ mn, NotBoot) <- msDeps ms
+                  , dep_ms <-
+                      toList (Map.lookup (mn, NotBoot) nodemap) >>= toList >>=
+                      toList
+                  ]
+                new_marked_mods = Set.insert ms_mod marked_mods
+            in foldl' go new_marked_mods deps
 
 mkRootMap :: [ModSummary] -> NodeMap [Either ErrMsg ModSummary]
 mkRootMap summaries = Map.insertListWith (flip (++))
