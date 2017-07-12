@@ -194,7 +194,7 @@ assembleBCO dflags (ProtoBCO nm instrs bitmap bsize arity _origin _malloced) = d
 
   return ul_bco
 
-mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word
+mkBitmapArray :: Word16 -> [StgWord] -> UArray Int Word64
 -- Here the return type must be an array of Words, not StgWords,
 -- because the underlying ByteArray# will end up as a component
 -- of a BCO object.

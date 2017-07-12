@@ -80,7 +80,7 @@ data UnlinkedBCO
         unlinkedBCOName   :: !Name,
         unlinkedBCOArity  :: {-# UNPACK #-} !Int,
         unlinkedBCOInstrs :: !(UArray Int Word16),      -- insns
-        unlinkedBCOBitmap :: !(UArray Int Word),        -- bitmap
+        unlinkedBCOBitmap :: !(UArray Int Word64),      -- bitmap
         unlinkedBCOLits   :: !(SizedSeq BCONPtr),       -- non-ptrs
         unlinkedBCOPtrs   :: !(SizedSeq BCOPtr)         -- ptrs
    }

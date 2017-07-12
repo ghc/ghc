@@ -57,6 +57,7 @@ library
 
     exposed-modules:
         GHCi.BreakArray
+        GHCi.BinaryArray
         GHCi.Message
         GHCi.ResolvedBCO
         GHCi.RemoteTypes
