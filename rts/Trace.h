@@ -398,7 +398,7 @@ void dtraceUserMarkerWrapper(Capability *cap, char *msg);
                            par_n_threads,               \
                            par_max_copied,              \
                            par_tot_copied,              \
-                           par_balanced_copied)
+                           par_balanced_copied)         \
     HASKELLEVENT_GC_STATS(heap_capset, gens,            \
                            copies, slop, fragmentation, \
                            par_n_threads,               \
