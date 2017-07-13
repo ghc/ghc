@@ -328,6 +328,8 @@ else:
     sys.stdout.flush()
 
     summary(t, sys.stdout, config.no_print_summary)
+    print("Only perf tests: " + str(config.only_perf_tests) + "\n")
+    print("Skip perf tests: " + str(config.skip_perf_tests) + "\n")
 
     # Write our accumulated metrics into the git notes for this commit.
     if config.use_git_notes:
