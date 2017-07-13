@@ -4,7 +4,8 @@ This is an *in-development* branch of GHC with support for linear
 types. This branch is not supported by GHC HQ or anyone else. Please
 don't submit tickets about issues in this branch to GHC Trac.
 
-## Building & Installing
+Building & Installing
+=====================
 
 There are two ways of running this locally:
 
@@ -99,15 +100,132 @@ use, and what the relevant image actually builds.
    `--interactive` to use `ghci`.
 
 
-## Issues & further instructions
+## Issues & further building instructions
 
 If you run into trouble building, please consult
 the
 [GHC Building Guide](https://ghc.haskell.org/trac/ghc/wiki/Building)
 for possible answers.
 
-## Filing bugs
 
-Please note that this is under active development, but if you find
-something that definitiely looks off you are welcome to submit a bug
-through GitHub.
+Usage documentation
+===================
+
+The extention is provided as-is, but here is some basic documentation of how
+to use it.
+
+
+## Activating the extension
+The extension is _always on_ for the time being, so no need to set any
+flags or pragmas. In the future it will be an ordinary extension.
+
+
+## Writing linear functions
+Only the unicode lollipop arrow `⊸` is currently recognised. In the future there
+will be an ASCII version, but no decision has been taken on notation.
+
+When writing a function, you declare in the types which arguments are to be
+checked for linearity. If you do not treat these as such in your
+implementation, the type checker will nag on you:
+
+```
+λ> let frugal :: a ⊸ (a,a); frugal a = (a,a)
+
+<interactive>:2:33: error:
+    • Couldn't match expected weight ‘1’ of variable ‘a’ with actual weight ‘ω’
+    • In an equation for ‘frugal’: frugal a = (a, a)
+
+
+λ> let wasteful :: a ⊸ b ⊸ a; wasteful a b = a
+
+<interactive>:3:39: error:
+    • Couldn't match expected weight ‘1’ of variable ‘b’ with actual weight ‘0’
+    • In an equation for ‘wasteful’: wasteful a b = a
+```
+
+As you can see, the type checker gives some hints on _how_ you treated your
+variable wrongly, multiplicity `ω` means it was used more than once, or a 
+varying number in different code branches. 
+
+This `expected ‘1’ but actually ‘ω’`-error also occurs when the variables are
+passed to unrestricted functions, this is not always very obvious so be
+mindful of that possibility: 
+
+```
+λ> let plus1 :: Int ⊸ Int; plus1 x = x + 1
+
+<interactive>:12:31: error:
+    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘ω’
+    • In an equation for ‘plus1’: plus1 x = x + 1
+```
+
+This unfortunately applies to _all of prelude_ (`+` is the offender
+here), which means you might see this a few times.
+
+
+Currently the type checker does not check linearity when not asked to do so,
+hence it is a requirement to explicitly declare the types of linear functions.
+Otherwise, they are assumed to be unrestricted which can give you errors from
+using functions that are _implemented_ linearly, but not declared as such.
+In particular, functions in `where`-clauses are easy to forget to annotate
+(`-XPartialTypeSignatures` or `-XScopedTypeVariables` are useful for this),
+but lambdas are inferred properly.
+
+
+## Calling them
+By design, there is no obligations put on the caller of a linear function. This
+means any linear function can take unrestricted arguments, which is great
+since it makes all functions "linearly polymorphic". However, passing a
+_linear_ variable as an _unrestricted_ argument is illegal and will give you
+an error, as shown above. The key takeaway here is that any linear function
+can also act as an unrestricted one; just pass it unrestricted arguments.
+
+
+## Unimplemented features & known limitations
+There are some parts of Haskell that are not yet implemented linearly, meaning
+you cannot use them with linear variables, most
+notably `case` and `let`:
+
+```
+λ> let f :: a ⊸ a; f x = case x of x -> x
+
+<interactive>:27:19: error:
+    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘ω’
+    • In an equation for ‘f’: f x = case x of { x -> x }
+
+
+λ> let f :: a ⊸ a; f x = let y = x in y
+
+<interactive>:28:19: error:
+    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘ω’
+    • In an equation for ‘f’: f x = let y = x in y
+```
+
+`@`-patterns also do not work as expected:
+
+```
+λ> let f :: a ⊸ a; f y@x = y
+
+<interactive>:32:21: error:
+    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘0’
+    • In an equation for ‘f’: f y@x = y
+```
+
+Other than that, pattern synonyms are also not compatible with linear types
+(and probably incorrect). These are the current _known_ limitations; there may
+be more but it has not been thoroughly tested yet.
+
+
+## Bugs
+There is currently one particular bug causing headaches, where linear and
+non-linear arrows get equalised under certain conditions. It happens when you
+pass a non-linear function where a linear function is expected, and the
+linearity checker happily accepts this, making stuff like this look fine while
+it really is not:
+
+```
+λ> skip :: a ⊸ (); skip = const ()
+```
+
+There are probably more bugs; if you find something that definitely looks off,
+we would appreciate a well-documented bug report to this repo.
