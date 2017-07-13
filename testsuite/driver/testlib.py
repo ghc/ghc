@@ -714,6 +714,7 @@ def test_common_work(watcher, name, opts, func, args):
             and (getTestOpts().only_ways == None or way in getTestOpts().only_ways) \
             and (config.cmdline_ways == [] or way in config.cmdline_ways) \
             and (not (config.skip_perf_tests and isStatsTest())) \
+            and (not (config.only_perf_tests and (not isStatsTest()))) \
             and way not in getTestOpts().omit_ways
 
         # Which ways we are asked to skip

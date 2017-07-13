@@ -306,6 +306,8 @@ else:
     sys.stdout.flush()
 
     summary(t, sys.stdout, config.no_print_summary)
+    print("Only perf tests: " + str(config.only_perf_tests) + "\n")
+    print("Skip perf tests: " + str(config.skip_perf_tests) + "\n")
 
     if config.summary_file:
         with open(config.summary_file, 'w') as file:
