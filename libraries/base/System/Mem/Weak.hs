@@ -146,7 +146,7 @@ A heap object is /reachable/ if:
 
 {- $notes
 
-A finalizers is not always called after its weak pointer\'s object becomes
+A finalizer is not always called after its weak pointer\'s object becomes
 unreachable. There are two situations that can cause this:
 
  * If the object becomes unreachable right before the program exits,
@@ -160,8 +160,8 @@ unreachable. There are two situations that can cause this:
    discouraged.
 
 Other than these two caveats, users can always expect that a finalizer
-will be after its weak pointer\'s object becomes unreachable. However,
-the second caveats means that users need to trust that all of their
+will be run after its weak pointer\'s object becomes unreachable. However,
+the second caveat means that users need to trust that all of their
 transitive dependencies do not throw exceptions in finalizers, since
 any finalizers can end up queued together.
 
