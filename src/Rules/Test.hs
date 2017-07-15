@@ -5,6 +5,7 @@ import Builder
 import Expression
 import Flavour
 import GHC
+import qualified Rules.Generate
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.Path
@@ -16,6 +17,7 @@ import Util
 testRules :: Rules ()
 testRules = do
     "validate" ~> do
+        need $ Rules.Generate.inplaceLibCopyTargets
         needBuilder $ Ghc CompileHs Stage2
         needBuilder $ GhcPkg Update Stage1
         needBuilder Hpc
