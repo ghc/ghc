@@ -96,7 +96,6 @@ wayGhcArgs = do
 
 packageGhcArgs :: Args
 packageGhcArgs = do
-    pkg       <- getPackage
     compId    <- getPkgData ComponentId
     pkgDepIds <- getPkgDataList DepIds
     -- FIXME: Get rid of to-be-deprecated -this-package-key.
@@ -107,7 +106,7 @@ packageGhcArgs = do
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , bootPackageDatabaseArgs
-            , isLibrary pkg ? arg (thisArg ++ compId)
+            , libraryPackage ? arg (thisArg ++ compId)
             , append $ map ("-package-id " ++) pkgDepIds ]
 
 includeGhcArgs :: Args

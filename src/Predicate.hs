@@ -2,7 +2,7 @@
 -- | Convenient predicates
 module Predicate (
     module Expression, stage, stage0, stage1, stage2, notStage0, builder,
-    package, notPackage, input, inputs, output, outputs, way
+    package, notPackage, input, inputs, output, outputs, way, libraryPackage
     ) where
 
 import Base
@@ -87,3 +87,7 @@ notStage0 = notM stage0
 -- | Is a certain package /not/ built right now?
 notPackage :: Package -> Predicate
 notPackage = notM . package
+
+-- | Is a library package currently being built?
+libraryPackage :: Predicate
+libraryPackage = isLibrary <$> getPackage

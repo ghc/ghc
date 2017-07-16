@@ -51,13 +51,12 @@ data SourceArgs = SourceArgs
 
 -- | Concatenate source arguments in appropriate order.
 sourceArgs :: SourceArgs -> Args
-sourceArgs SourceArgs {..} = builder Ghc ? do
-    pkg       <- getPackage
-    mconcat [ hsDefault
-            , append =<< getPkgDataList HsArgs
-            , isLibrary pkg    ? hsLibrary
-            , package compiler ? hsCompiler
-            , package ghc      ? hsGhc ]
+sourceArgs SourceArgs {..} = builder Ghc ? mconcat
+    [ hsDefault
+    , append =<< getPkgDataList HsArgs
+    , libraryPackage   ? hsLibrary
+    , package compiler ? hsCompiler
+    , package ghc      ? hsGhc ]
 
 -- | All default command line arguments.
 defaultArgs :: Args
@@ -66,24 +65,23 @@ defaultArgs = mconcat
     , sourceArgs defaultSourceArgs
     , defaultPackageArgs ]
 
--- | Default flags about Werror
--- | mk/warnings.mk
-defaultErrorGhcFlags :: Args
-defaultErrorGhcFlags =
-  mconcat [ notStage0 ? arg "-Werror"
-          , (not <$> flag GccIsClang) ? mconcat [
-                (not <$> flag GccLt46) ? (not <$> windowsHost) ?
-                  arg "-optc-Werror=unused-but-set-variable"
-              , (not <$> flag GccLt44) ? arg "-optc-Wno-error=inline" ]
-          , flag GccIsClang ? arg "-optc-Wno-unknown-pragmas" ]
+-- ref: mk/warnings.mk
+-- | Default Haskell warning-related arguments.
+defaultHsWarningsArgs :: Args
+defaultHsWarningsArgs = mconcat
+    [ notStage0 ? arg "-Werror"
+    , (not <$> flag GccIsClang) ? mconcat
+      [ (not <$> flag GccLt46) ? (not <$> windowsHost) ? arg "-optc-Werror=unused-but-set-variable"
+      , (not <$> flag GccLt44) ? arg "-optc-Wno-error=inline" ]
+    , flag GccIsClang ? arg "-optc-Wno-unknown-pragmas" ]
 
 -- | Default source arguments, e.g. optimisation settings.
 defaultSourceArgs :: SourceArgs
 defaultSourceArgs = SourceArgs
-    { hsDefault  = mconcat [ stage0 ? arg "-O"
+    { hsDefault  = mconcat [ stage0    ? arg "-O"
                            , notStage0 ? arg "-O2"
                            , arg "-H32m"
-                           , defaultErrorGhcFlags ]
+                           , defaultHsWarningsArgs ]
     , hsLibrary  = mempty
     , hsCompiler = mempty
     , hsGhc      = mempty }
@@ -228,42 +226,42 @@ defaultBuilderArgs = mconcat
     , makeBuilderArgs
     , tarBuilderArgs ]
 
--- | Disable some warnings in packages we use
--- | https://github.com/ghc/ghc/blob/master/mk/warnings.mk#L46
-disableWarningArgsStage0 :: Args
-disableWarningArgsStage0 = stage Stage0 ? builder Ghc ? mconcat
-    [ package transformers ? append [ "-fno-warn-unused-matches", "-fno-warn-unused-imports" ]
-    , package terminfo ? append [ "-fno-warn-unused-imports" ] ]
+-- TODO: Disable warnings for Windows specifics.
+-- TODO: Move this elsewhere?
+-- ref: mk/warnings.mk
+-- | Disable warnings in packages we use.
+disableWarningArgs :: Args
+disableWarningArgs = builder Ghc ? mconcat
+    [ stage0 ? mconcat
+      [ package terminfo     ? append [ "-fno-warn-unused-imports" ]
+      , package transformers ? append [ "-fno-warn-unused-matches"
+                                      , "-fno-warn-unused-imports" ]
+      , libraryPackage       ? append [ "-fno-warn-deprecated-flags" ] ]
 
-disableWarningArgsStage1 :: Args
-disableWarningArgsStage1 = notStage0 ? builder Ghc ? mconcat
-    [ package bytestring ? append [ "-Wno-inline-rule-shadowing" ]
-    , package haddock ? append [ "-Wno-unused-imports", "-Wno-deprecations" ]
-    , package directory ? append [ "-Wno-unused-imports" ]
-    , package binary ? append [ "-Wno-deprecations" ]
-    , package haskeline ? append [ "-Wno-deprecations", "-Wno-unused-imports",
-                                 "-Wno-redundant-constraints",
-                                 "-Wno-simplifiable-class-constraints" ]
-    , package pretty ? append [ "-Wno-unused-imports" ]
-    , package primitive ? append [ "-Wno-unused-imports", "-Wno-deprecations" ]
-    , package terminfo ? append [ "-Wno-unused-imports" ]
-    , package xhtml ? append [ "-Wno-unused-imports", "-Wno-tabs" ]
-    , package transformers ? append [ "-Wno-unused-matches", "-Wno-unused-imports",
-                                    "-Wno-redundant-constraints", "-Wno-orphans" ]
-    , package base ? append [ "-Wno-trustworthy-safe" ]
-    , package ghcPrim ? append [ "-Wno-trustworthy-safe" ]
-    , package win32 ? append [ "-Wno-trustworthy-safe" ] ]
-
--- GhcLibExtraHcOpts += -Wno-deprecated-flags
--- GhcBootLibExtraHcOpts += -fno-warn-deprecated-flags
-disableWarningArgsLibs :: Args
-disableWarningArgsLibs = do
-  pkg <- getPackage
-  isLibrary pkg ? builder Ghc ? mconcat
-    [ notStage0 ? arg "-Wno-deprecated-flags"
-    , stage Stage0 ? arg "-fno-warn-deprecated-flags"]
-
--- TODO: Disable warnings for Windows specifics
+    , notStage0 ? mconcat
+      [ package base         ? append [ "-Wno-trustworthy-safe" ]
+      , package binary       ? append [ "-Wno-deprecations" ]
+      , package bytestring   ? append [ "-Wno-inline-rule-shadowing" ]
+      , package directory    ? append [ "-Wno-unused-imports" ]
+      , package ghcPrim      ? append [ "-Wno-trustworthy-safe" ]
+      , package haddock      ? append [ "-Wno-unused-imports"
+                                      , "-Wno-deprecations" ]
+      , package haskeline    ? append [ "-Wno-deprecations"
+                                      , "-Wno-unused-imports"
+                                      , "-Wno-redundant-constraints"
+                                      , "-Wno-simplifiable-class-constraints" ]
+      , package pretty       ? append [ "-Wno-unused-imports" ]
+      , package primitive    ? append [ "-Wno-unused-imports"
+                                      , "-Wno-deprecations" ]
+      , package terminfo     ? append [ "-Wno-unused-imports" ]
+      , package transformers ? append [ "-Wno-unused-matches"
+                                      , "-Wno-unused-imports"
+                                      , "-Wno-redundant-constraints"
+                                      , "-Wno-orphans" ]
+      , package win32        ? append [ "-Wno-trustworthy-safe" ]
+      , package xhtml        ? append [ "-Wno-unused-imports"
+                                      , "-Wno-tabs" ]
+      , libraryPackage       ? append [ "-Wno-deprecated-flags" ] ] ]
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args
@@ -279,7 +277,4 @@ defaultPackageArgs = mconcat
     , integerGmpPackageArgs
     , rtsPackageArgs
     , runGhcPackageArgs
-    , disableWarningArgsStage0
-    , disableWarningArgsStage1
-    , disableWarningArgsLibs
-    ]
+    , disableWarningArgs ]

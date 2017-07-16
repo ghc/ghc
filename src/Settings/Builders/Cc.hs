@@ -10,13 +10,13 @@ ccBuilderArgs = do
     , argSettingList . ConfCcArgs =<< getStage
     , cIncludeArgs
 
-    , builder (Cc CompileC) ? mconcat [ arg "-Werror"
-                                      , (Dynamic `wayUnit` way) ?
-				        append [ "-fPIC", "-DDYNAMIC" ]
-                                      -- mk/warning.mk:
-                                      --  SRC_CC_OPTS     += -Wall $(WERROR)
-                                      , arg "-c", arg =<< getInput
-                                      , arg "-o", arg =<< getOutput ]
+    , builder (Cc CompileC) ? mconcat
+        [ arg "-Werror"
+        , Dynamic `wayUnit` way ? append [ "-fPIC", "-DDYNAMIC" ]
+        -- ref: mk/warning.mk:
+        --  SRC_CC_OPTS     += -Wall $(WERROR)
+        , arg "-c", arg =<< getInput
+        , arg "-o", arg =<< getOutput ]
 
     , builder (Cc FindCDependencies) ? do
         output <- getOutput
