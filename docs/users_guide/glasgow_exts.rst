@@ -6982,7 +6982,7 @@ However see :ref:`ghci-decls` for the overlap rules in GHCi.
 Decidability of type synonym instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-.. ghc-flag:: -XUndeciableInstances
+.. ghc-flag:: -XUndecidableInstances
 
     Relax restrictions on the decidability of type synonym family instances.
 
