@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveGeneric #-}
 module Oracles.DirectoryContents (
-    directoryContents, directoryContentsOracle, Match (..)
+    directoryContents, directoryContentsOracle, Match (..), matchAll
     ) where
 
 import System.Directory.Extra
@@ -14,6 +14,11 @@ newtype DirectoryContents = DirectoryContents (Match, FilePath)
 data Match = Test FilePattern | Not Match | And [Match] | Or [Match]
     deriving (Generic, Eq, Show, Typeable)
 
+-- | A 'Match' expression that always evaluates to 'True' (i.e. always matches).
+matchAll :: Match
+matchAll = And []
+
+-- | Check if a file name matches a given 'Match' expression.
 matches :: Match -> FilePath -> Bool
 matches (Test p) f = p ?== f
 matches (Not  m) f = not $ matches m f

@@ -16,23 +16,28 @@ import Rules.Generate
 import Settings.Packages.Rts
 import Oracles.Config.Setting
 import Oracles.Dependencies (sortPkgsByDep)
+import Oracles.DirectoryContents
 import Oracles.Path
 
 import qualified System.Directory as IO
 
 {- | Install the built binaries etc. to the @destDir ++ prefix@.
 
-The installation prefix is usually like @/usr/local@ on Unix system.
-The resulting tree structure is organized under @destDir ++ prefix@, like below
+The installation prefix is usually @/usr/local@ on a Unix system.
+The resulting tree structure is organized under @destDir ++ prefix@ as follows:
 
-* @bin@: executable wrapper scripts, installed by 'installBins', e.g. @ghc@
+* @bin@: executable wrapper scripts, installed by 'installBins', e.g. @ghc@.
+
 * @lib/ghc-<version>/bin@: executable binaries/scripts,
-  installed by 'installLibExecs' and 'installLibExecScripts'
-* @lib/ghc-<version>/include@: headers etc., installed by 'installIncludes'
-* @lib/ghc-<version>/<pkg-name>@: built packages, installed by 'installPackages',
-  e.g. @base@
-* @lib/ghc-<version>/settings@ etc.: other files in @lib@ path, installed by
-  'installCommonLibs'
+  installed by 'installLibExecs' and 'installLibExecScripts'.
+
+* @lib/ghc-<version>/include@: headers etc., installed by 'installIncludes'.
+
+* @lib/ghc-<version>/<pkg-name>@: built packages, e.g. @base@, installed
+  by 'installPackages'.
+
+* @lib/ghc-<version>/settings@ etc.: other files in @lib@ directory,
+  installed by 'installCommonLibs'.
 
 XXX (izgzhen): Do we need @INSTALL_OPTS@ in the make scripts?
 -}
@@ -47,11 +52,15 @@ installRules = do
         installBins
         installPackages
 
+-- | Binaries to install.
+installBinPkgs :: [Package]
+installBinPkgs = [ghc, ghcPkg, ghcSplit, hp2ps, hpc, hsc2hs, runGhc, unlit]
+
 getLibExecDir :: Action FilePath
 getLibExecDir = (-/- "bin") <$> installGhcLibDir
 
--- | Install executable scripts to @prefix/lib/bin@
 -- ref: ghc.mk
+-- | Install executable scripts to @prefix/lib/bin@.
 installLibExecScripts :: Action ()
 installLibExecScripts = do
     libExecDir <- getLibExecDir
@@ -60,55 +69,50 @@ installLibExecScripts = do
         installScript script (destDir ++ libExecDir)
   where
     libExecScripts :: [FilePath]
-    libExecScripts = [ ghcSplitPath ]
+    libExecScripts = [ghcSplitPath]
 
-
--- | Install executable binaries to @prefix/lib/bin@
 -- ref: ghc.mk
+-- | Install executable binaries to @prefix/lib/bin@.
 installLibExecs :: Action ()
 installLibExecs = do
     libExecDir <- getLibExecDir
     installDirectory (destDir ++ libExecDir)
     forM_ installBinPkgs $ \pkg -> do
-        withLatestBuildStage pkg $ \stg -> do
-            let context = programContext stg pkg
-            let bin = inplaceLibBinPath -/- programName context <.> exe
+        withLatestBuildStage pkg $ \stage -> do
+            let context = programContext stage pkg
+                bin     = inplaceLibBinPath -/- programName context <.> exe
             installProgram bin (destDir ++ libExecDir)
             when (pkg == ghc) $ do
                 moveFile (destDir ++ libExecDir -/- programName context <.> exe)
                          (destDir ++ libExecDir -/- "ghc" <.> exe)
 
--- | Binaries to install
-installBinPkgs :: [Package]
-installBinPkgs =
-    [ ghc, ghcPkg, ghcSplit, hp2ps
-    , hpc, hsc2hs, runGhc, unlit ]
-
--- | Install executable wrapper scripts to @prefix/bin@
 -- ref: ghc.mk
+-- | Install executable wrapper scripts to @prefix/bin@.
 installBins :: Action ()
 installBins = do
     binDir <- setting InstallBinDir
+    libDir <- installGhcLibDir
     installDirectory (destDir ++ binDir)
-    forM_ installBinPkgs $ \pkg ->
-        withLatestBuildStage pkg $ \stg -> do
-            let context = programContext stg pkg
+    win <- windowsHost
+    when win $
+        copyDirectoryContents matchAll (destDir ++ libDir -/- "bin") (destDir ++ binDir)
+    unless win $ forM_ installBinPkgs $ \pkg ->
+        withLatestBuildStage pkg $ \stage -> do
+            let context = programContext stage pkg
             version <- setting ProjectVersion
-            -- binary's name
+            -- Name of the binary file
             let binName = if pkg == ghc
                           then "ghc-" ++ version <.> exe
                           else programName context ++ "-" ++ version <.> exe
-            -- symbolic link's name
+            -- Name of the symbolic link
             let symName = if pkg == ghc
                           then "ghc" <.> exe
                           else programName context <.> exe
             case lookup context installWrappers of
                 Nothing -> return ()
                 Just wrapper -> do
-                    libDir <- installGhcLibDir
                     contents <- interpretInContext context $
-                                    wrapper
-                                    (WrappedBinary (destDir ++ libDir) symName)
+                        wrapper (WrappedBinary (destDir ++ libDir) symName)
                     let wrapperPath = destDir ++ binDir -/- binName
                     writeFileChanged wrapperPath contents
                     makeExecutable wrapperPath
@@ -118,14 +122,14 @@ installBins = do
 
 withLatestBuildStage :: Package -> (Stage -> Action ()) -> Action ()
 withLatestBuildStage pkg m = do
-  stg' <- latestBuildStage pkg
-  case stg' of
-      Nothing -> return ()
-      Just stg -> m stg
+  maybeStage <- latestBuildStage pkg
+  case maybeStage of
+      Just stage -> m stage
+      Nothing    -> return ()
 
--- | Install @package.conf.install@ for each package
--- Note that each time it will be recreated
 -- ref: rules/manual-package-conf.mk
+-- | Install @package.conf.install@ for each package. Note that it will be
+-- recreated each time.
 installPackageConf :: Action ()
 installPackageConf = do
     let context = vanillaContext Stage0 rts
@@ -136,17 +140,17 @@ installPackageConf = do
                                  , pkgConfInstallPath <.> "raw" ]
     withTempFile $ \tmp -> do
         liftIO $ writeFile tmp content
-        Stdout content' <- cmd "sed" [ "-e", "s/\"\"//g", "-e", "s/:[   ]*,/: /g", tmp ]
-        liftIO $ writeFile pkgConfInstallPath content'
+        Stdout result <- cmd "sed" [ "-e", "s/\"\"//g", "-e", "s/:[   ]*,/: /g", tmp ]
+        liftIO $ writeFile pkgConfInstallPath result
 
--- | Install packages to @prefix/lib@
 -- ref: ghc.mk
+-- | Install packages to @prefix/lib@.
 installPackages :: Action ()
 installPackages = do
-    need [ pkgConfInstallPath ]
+    need [pkgConfInstallPath]
 
     ghcLibDir <- installGhcLibDir
-    binDir <- setting InstallBinDir
+    binDir    <- setting InstallBinDir
 
     -- Install package.conf
     let installedPackageConf = destDir ++ ghcLibDir -/- "package.conf.d"
@@ -166,8 +170,7 @@ installPackages = do
 
     -- HACK (issue #327)
     let ghcBootPlatformHeader =
-          buildPath (vanillaContext Stage1 compiler) -/-
-          "ghc_boot_platform.h"
+            buildPath (vanillaContext Stage1 compiler) -/- "ghc_boot_platform.h"
 
     copyFile ghcBootPlatformHeader (pkgPath compiler -/- "ghc_boot_platform.h")
 
@@ -178,101 +181,96 @@ installPackages = do
 
     forM_ installLibPkgs $ \pkg@Package{..} -> do
         when (isLibrary pkg) $
-            withLatestBuildStage pkg $ \stg -> do
-                let context = vanillaContext stg pkg
+            withLatestBuildStage pkg $ \stage -> do
+                let context = vanillaContext stage pkg
                 top <- interpretInContext context getTopDirectory
                 let installDistDir = top -/- buildPath context
-                buildPackage stg pkg
+                buildPackage stage pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
 
                 -- Copy over packages
-
                 strip <- stripCmdPath context
-                ways <- interpretInContext context getLibraryWays
-                let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" -- HACK?
-                need [ ghcCabalInplace ]
+                ways  <- interpretInContext context getLibraryWays
+                let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" <.> exe -- HACK?
+                need [ghcCabalInplace]
 
                 let cabalFile = pkgCabalFile pkg
 
                 pkgConf <- pkgConfFile context
-                need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
+                need [cabalFile, pkgConf] -- TODO: check if need pkgConf
 
                 -- HACK (#318): copy stuff back to the place favored by ghc-cabal
                 quietly $ copyDirectoryContents (Not excluded)
-                            installDistDir (installDistDir -/- "build")
+                    installDistDir (installDistDir -/- "build")
 
                 whenM (isSpecified HsColour) $
                     build $ Target context GhcCabalHsColour [cabalFile] []
 
                 pref <- setting InstallPrefix
-                unit $ cmd ghcCabalInplace
-                           [ "copy"
-                           , pkgPath
-                           , installDistDir
-                           , strip
-                           , destDir
-                           , pref
-                           , ghclibDir
-                           , docDir -/- "html/libraries"
-                           , intercalate "  " (map show ways) ]
+                unit $ cmd ghcCabalInplace [ "copy"
+                                           , pkgPath
+                                           , installDistDir
+                                           , strip
+                                           , destDir
+                                           , pref
+                                           , ghclibDir
+                                           , docDir -/- "html/libraries"
+                                           , intercalate " " (map show ways) ]
 
     -- Register packages
     let installedGhcPkgReal = destDir ++ binDir -/- "ghc-pkg" <.> exe
-    let installedGhcReal = destDir ++ binDir -/- "ghc" <.> exe
+        installedGhcReal    = destDir ++ binDir -/- "ghc"     <.> exe
     -- TODO: Extend GhcPkg builder args to support --global-package-db
-    unit $ cmd installedGhcPkgReal
-               [ "--force", "--global-package-db"
-               , installedPackageConf, "update"
-               , pkgConfInstallPath ]
+    unit $ cmd installedGhcPkgReal [ "--force", "--global-package-db"
+                                   , installedPackageConf, "update"
+                                   , pkgConfInstallPath ]
 
     forM_ installLibPkgs $ \pkg@Package{..} -> do
         when (isLibrary pkg) $
-            withLatestBuildStage pkg $ \stg -> do
-                let context = vanillaContext stg pkg
+            withLatestBuildStage pkg $ \stage -> do
+                let context = vanillaContext stage pkg
                 top <- interpretInContext context getTopDirectory
                 let installDistDir = top -/- buildPath context
                 -- TODO: better reference to the built inplace binary path
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal"
-                pref <- setting InstallPrefix
+                pref   <- setting InstallPrefix
                 docDir <- installDocDir
-                r <- relocatableBuild
+                r      <- relocatableBuild
                 unit $ cmd ghcCabalInplace
-                           [ "register"
-                           , pkgPath
-                           , installDistDir
-                           , installedGhcReal
-                           , installedGhcPkgReal
-                           , destDir ++ ghcLibDir
-                           , destDir
-                           , destDir ++ pref
-                           , destDir ++ ghcLibDir
-                           , destDir ++ docDir -/- "html/libraries"
-                           , if r then "YES" else "NO" ]
+                    [ "register"
+                    , pkgPath
+                    , installDistDir
+                    , installedGhcReal
+                    , installedGhcPkgReal
+                    , destDir ++ ghcLibDir
+                    , destDir
+                    , destDir ++ pref
+                    , destDir ++ ghcLibDir
+                    , destDir ++ docDir -/- "html/libraries"
+                    , if r then "YES" else "NO" ]
 
     confs <- getDirectoryContents installedPackageConf
     forM_ confs (\f -> createData $ installedPackageConf -/- f)
-    unit $ cmd installedGhcPkgReal
-               [ "--force", "--global-package-db"
-               , installedPackageConf, "recache" ]
+    unit $ cmd installedGhcPkgReal [ "--force", "--global-package-db"
+                                   , installedPackageConf, "recache" ]
   where
     createData f = unit $ cmd "chmod" [ "644", f ]
-    excluded = Or
-        [ Test "//haddock-prologue.txt"
-        , Test "//package-data.mk"
-        , Test "//setup-config"
-        , Test "//inplace-pkg-config"
-        , Test "//build" ]
+    excluded = Or [ Test "//haddock-prologue.txt"
+                  , Test "//package-data.mk"
+                  , Test "//setup-config"
+                  , Test "//inplace-pkg-config"
+                  , Test "//build" ]
 
--- | Install settings etc. files to @prefix/lib@
 -- ref: ghc.mk
+-- | Install settings etc. files to @prefix/lib@.
 installCommonLibs :: Action ()
 installCommonLibs = do
     ghcLibDir <- installGhcLibDir
     installLibsTo inplaceLibCopyTargets (destDir ++ ghcLibDir)
 
--- | Install library files to some path
 -- ref: ghc.mk
+-- | Install library files to some path.
 installLibsTo :: [FilePath] -> FilePath -> Action ()
 installLibsTo libs dir = do
     installDirectory dir
@@ -286,23 +284,23 @@ installLibsTo libs dir = do
                build $ Target context Ranlib [out] [out]
            _ -> installData [lib] dir
 
--- | All header files are in includes/{one of these subdirectories}
 -- ref: includes/ghc.mk
+-- | All header files are in includes/{one of these subdirectories}.
 includeHSubdirs :: [FilePath]
-includeHSubdirs = [ ".", "rts", "rts/prof", "rts/storage", "stg" ]
+includeHSubdirs = [".", "rts", "rts/prof", "rts/storage", "stg"]
 
--- | Install header files to @prefix/lib/ghc-<version>/include@
 -- ref: includes/ghc.mk
+-- | Install header files to @prefix/lib/ghc-<version>/include@.
 installIncludes ::Action ()
 installIncludes = do
     ghclibDir <- installGhcLibDir
     let ghcheaderDir = ghclibDir -/- "include"
     installDirectory (destDir ++ ghcheaderDir)
-    forM_ includeHSubdirs $ \d -> do
-        installDirectory (destDir ++ ghcheaderDir -/- d)
-        headers <- getDirectoryFiles ("includes" -/- d) ["*.h"]
-        installHeader (map (("includes" -/- d) -/-) headers)
-                      (destDir ++ ghcheaderDir -/- d ++ "/")
+    forM_ includeHSubdirs $ \dir -> do
+        installDirectory (destDir ++ ghcheaderDir -/- dir)
+        headers <- getDirectoryFiles ("includes" -/- dir) ["*.h"]
+        installHeader (map (("includes" -/- dir) -/-) headers)
+                      (destDir ++ ghcheaderDir -/- dir ++ "/")
     installHeader (includesDependencies ++
                    [generatedPath -/- "DerivedConstants.h"] ++
                    libffiDependencies)

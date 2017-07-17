@@ -2,7 +2,7 @@ module Util (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, copyDirectoryContents, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
-    makeExecutable, renderProgram, renderLibrary, Match(..), builderEnvironment,
+    makeExecutable, renderProgram, renderLibrary, builderEnvironment,
     needBuilder, copyFileUntracked, installDirectory, installData, installScript,
     installProgram, linkSymbolic
     ) where
@@ -91,7 +91,7 @@ cmdEcho = EchoStdout $ cmdProgressInfo `elem` [Normal, Unicorn]
 captureStdout :: Target -> FilePath -> [String] -> Action ()
 captureStdout target path argList = do
     file <- interpret target getOutput
-    Stdout output <- cmd cmdEcho [path] argList
+    Stdout output <- cmd [path] argList
     writeFileChanged file output
 
 -- | Copy a file tracking the source, create the target directory if missing.
