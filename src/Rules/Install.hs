@@ -194,22 +194,17 @@ installPackages = do
                 need [ ghcCabalInplace ]
 
                 let cabalFile = pkgCabalFile pkg
-                -- HsColour sources
-                -- QUESTION: what is the output of GhcCabalHsColour?
-                whenM (isSpecified HsColour) $ do
-                    top <- interpretInContext context getTopDirectory
-                    let installDistDir = top -/- buildPath context
-                    -- HACK: copy stuff back to the place favored by ghc-cabal
-                    quietly $ copyDirectoryContents (Not excluded)
-                                  installDistDir (installDistDir -/- "build")
 
                 pkgConf <- pkgConfFile context
                 need [ cabalFile, pkgConf ] -- TODO: check if need pkgConf
-                build $ Target context GhcCabalHsColour [cabalFile] []
 
                 -- HACK (#318): copy stuff back to the place favored by ghc-cabal
                 quietly $ copyDirectoryContents (Not excluded)
                             installDistDir (installDistDir -/- "build")
+
+                whenM (isSpecified HsColour) $
+                    build $ Target context GhcCabalHsColour [cabalFile] []
+
                 pref <- setting InstallPrefix
                 unit $ cmd ghcCabalInplace
                            [ "copy"
