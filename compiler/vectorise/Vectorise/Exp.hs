@@ -655,7 +655,7 @@ mkScalarFun arg_tys res_ty expr
 -- In other words, all methods in that dictionary are scalar functions — to be vectorised with
 -- 'vectScalarFun'.  The dictionary "function" itself may be a constant, though.
 --
--- NB: You may think that we could implement this function guided by the struture of the Core
+-- NB: You may think that we could implement this function guided by the structure of the Core
 --     expression of the right-hand side of the dictionary function.  We cannot proceed like this as
 --     'vectScalarDFun' must also work for *imported* dfuns, where we don't necessarily have access
 --     to the Core code of the unvectorised dfun.

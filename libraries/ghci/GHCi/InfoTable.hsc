@@ -17,10 +17,10 @@ module GHCi.InfoTable
 import Data.Maybe (fromJust)
 #endif
 import Foreign
-import Foreign.C
-import GHC.Ptr
-import GHC.Exts
-import System.IO.Unsafe
+import Foreign.C -- needed for 2nd stage
+import GHC.Ptr -- needed for 2nd stage
+import GHC.Exts -- needed for 2nd stage
+import System.IO.Unsafe -- needed for 2nd stage
 
 type ItblCodes = Either [Word8] [Word32]
 
@@ -33,7 +33,7 @@ type HalfWord = Word32
 #elif SIZEOF_VOID_P == 4
 type HalfWord = Word16
 #else
-#error Uknown SIZEOF_VOID_P
+#error Unknown SIZEOF_VOID_P
 #endif
 
 type EntryFunPtr = FunPtr (Ptr () -> IO (Ptr ()))
