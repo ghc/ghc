@@ -993,8 +993,8 @@ scheduleProcessInbox (Capability **pcap USED_IF_THREADS)
     Capability *cap = *pcap;
 
     while (!emptyInbox(cap)) {
-        if (cap->r.rCurrentNursery->link == NULL ||
-            g0->n_new_large_words >= large_alloc_lim) {
+        // Executing messages might use heap, so we should check for GC.
+        if (doYouWantToGC(cap)) {
             scheduleDoGC(pcap, cap->running_task, false);
             cap = *pcap;
         }
@@ -1183,20 +1183,7 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
         }
     }
 
-    // if we got here because we exceeded large_alloc_lim, then
-    // proceed straight to GC.
-    if (g0->n_new_large_words >= large_alloc_lim) {
-        return true;
-    }
-
-    // Otherwise, we just ran out of space in the current nursery.
-    // Grab another nursery if we can.
-    if (getNewNursery(cap)) {
-        debugTrace(DEBUG_sched, "thread %ld got a new nursery", t->id);
-        return false;
-    }
-
-    return true;
+    return doYouWantToGC(cap);
     /* actual GC is done at the end of the while loop in schedule() */
 }
 
