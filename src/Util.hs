@@ -115,7 +115,7 @@ copyFileUntracked source target = do
 moveFile :: FilePath -> FilePath -> Action ()
 moveFile source target = do
     putProgressInfo $ renderAction "Move file" source target
-    liftIO $ IO.renameFile source target
+    quietly $ cmd ["mv", source, target]
 
 -- | Remove a file that doesn't necessarily exist.
 removeFile :: FilePath -> Action ()
