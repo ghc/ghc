@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Path (
-    topDirectory, getTopDirectory, systemBuilderPath, pathOracle, bashPath
+    topDirectory, getTopDirectory, systemBuilderPath, pathOracle, bashPath,
+    fixAbsolutePathOnWindows
     ) where
 
 import Control.Monad.Trans.Reader

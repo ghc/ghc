@@ -55,7 +55,7 @@ getLibExecDir = (-/- "bin") <$> installGhcLibDir
 installLibExecScripts :: Action ()
 installLibExecScripts = do
     libExecDir <- getLibExecDir
-    installDir (destDir ++ libExecDir)
+    installDirectory (destDir ++ libExecDir)
     forM_ libExecScripts $ \script -> do
         installScript script (destDir ++ libExecDir)
   where
@@ -68,7 +68,7 @@ installLibExecScripts = do
 installLibExecs :: Action ()
 installLibExecs = do
     libExecDir <- getLibExecDir
-    installDir (destDir ++ libExecDir)
+    installDirectory (destDir ++ libExecDir)
     forM_ installBinPkgs $ \pkg -> do
         withLatestBuildStage pkg $ \stg -> do
             let context = programContext stg pkg
@@ -89,7 +89,7 @@ installBinPkgs =
 installBins :: Action ()
 installBins = do
     binDir <- setting InstallBinDir
-    installDir (destDir ++ binDir)
+    installDirectory (destDir ++ binDir)
     forM_ installBinPkgs $ \pkg ->
         withLatestBuildStage pkg $ \stg -> do
             let context = programContext stg pkg
@@ -127,7 +127,7 @@ withLatestBuildStage pkg m = do
 -- Note that each time it will be recreated
 -- ref: rules/manual-package-conf.mk
 installPackageConf :: Action ()
-installPackageConf = do    
+installPackageConf = do
     let context = vanillaContext Stage0 rts
     liftIO $ IO.createDirectoryIfMissing True (takeDirectory pkgConfInstallPath)
     build $ Target context HsCpp [ pkgPath rts -/- "package.conf.in" ]
@@ -150,13 +150,13 @@ installPackages = do
 
     -- Install package.conf
     let installedPackageConf = destDir ++ ghcLibDir -/- "package.conf.d"
-    installDir (destDir ++ ghcLibDir)
+    installDirectory (destDir ++ ghcLibDir)
     removeDirectory installedPackageConf
-    installDir installedPackageConf
+    installDirectory installedPackageConf
 
     -- Install RTS
     let rtsDir = destDir ++ ghcLibDir -/- "rts"
-    installDir rtsDir
+    installDirectory rtsDir
     ways <- interpretInContext (vanillaContext Stage1 rts) getRtsWays
     rtsLibs <- mapM pkgLibraryFile $ map (Context Stage1 rts) ways
     ffiLibs <- sequence $ map rtsLibffiLibrary ways
@@ -280,7 +280,7 @@ installCommonLibs = do
 -- ref: ghc.mk
 installLibsTo :: [FilePath] -> FilePath -> Action ()
 installLibsTo libs dir = do
-    installDir dir
+    installDirectory dir
     forM_ libs $ \lib -> do
        case takeExtension lib of
            ".a" -> do
@@ -302,9 +302,9 @@ installIncludes ::Action ()
 installIncludes = do
     ghclibDir <- installGhcLibDir
     let ghcheaderDir = ghclibDir -/- "include"
-    installDir (destDir ++ ghcheaderDir)
+    installDirectory (destDir ++ ghcheaderDir)
     forM_ includeHSubdirs $ \d -> do
-        installDir (destDir ++ ghcheaderDir -/- d)
+        installDirectory (destDir ++ ghcheaderDir -/- d)
         headers <- getDirectoryFiles ("includes" -/- d) ["*.h"]
         installHeader (map (("includes" -/- d) -/-) headers)
                       (destDir ++ ghcheaderDir -/- d ++ "/")

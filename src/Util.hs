@@ -3,7 +3,7 @@ module Util (
     removeFile, copyDirectory, copyDirectoryContents, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
     makeExecutable, renderProgram, renderLibrary, Match(..), builderEnvironment,
-    needBuilder, copyFileUntracked, installDir, installData, installScript,
+    needBuilder, copyFileUntracked, installDirectory, installData, installScript,
     installProgram, linkSymbolic
     ) where
 
@@ -60,7 +60,7 @@ customBuild rs opts target@Target {..} = do
                 else do
                     input <- interpret target getInput
                     top   <- topDirectory
-                    cmd [Cwd output] [path] "x" (top -/- input)
+                    cmd cmdEcho [Cwd output] [path] "x" (top -/- input)
 
             Configure dir -> do
                 -- Inject /bin/bash into `libtool`, instead of /bin/sh, otherwise Windows breaks.
@@ -76,13 +76,14 @@ customBuild rs opts target@Target {..} = do
                 src  <- interpret target getInput
                 file <- interpret target getOutput
                 input <- readFile' src
-                Stdout output <- cmd (Stdin input) [path] argList
+                Stdout output <- cmd cmdEcho (Stdin input) [path] argList
                 writeFileChanged file output
 
             Make dir -> cmd Shell cmdEcho path ["-C", dir] argList
 
-            _  -> cmd [path] argList
+            _  -> cmd cmdEcho [path] argList
 
+-- | Suppress build output depending on the @--progress-info@ flag.
 cmdEcho :: CmdOption
 cmdEcho = EchoStdout $ cmdProgressInfo `elem` [Normal, Unicorn]
 
@@ -90,7 +91,7 @@ cmdEcho = EchoStdout $ cmdProgressInfo `elem` [Normal, Unicorn]
 captureStdout :: Target -> FilePath -> [String] -> Action ()
 captureStdout target path argList = do
     file <- interpret target getOutput
-    Stdout output <- cmd [path] argList
+    Stdout output <- cmd cmdEcho [path] argList
     writeFileChanged file output
 
 -- | Copy a file tracking the source, create the target directory if missing.
@@ -102,7 +103,7 @@ copyFile source target = do
     putProgressInfo $ renderAction "Copy file" source target
     copyFileChanged source target
 
--- Same as copyFile, but not tracking the source as a build dependency
+-- | Copy a file without tracking the source, create the target directory if missing.
 copyFileUntracked :: FilePath -> FilePath -> Action ()
 copyFileUntracked source target = do
     let dir = takeDirectory target
@@ -138,7 +139,7 @@ removeDirectory dir = do
 copyDirectory :: FilePath -> FilePath -> Action ()
 copyDirectory source target = do
     putProgressInfo $ renderAction "Copy directory" source target
-    quietly $ cmd cmdEcho ["cp", "-r", source, target]
+    quietly $ cmd ["cp", "-r", source, target]
 
 -- | Copy the contents of the source directory that matches a given 'Match'
 -- expression into the target directory. The copied contents is tracked.
@@ -152,7 +153,7 @@ copyDirectoryContents expr source target = do
 moveDirectory :: FilePath -> FilePath -> Action ()
 moveDirectory source target = do
     putProgressInfo $ renderAction "Move directory" source target
-    quietly $ cmd cmdEcho ["mv", source, target]
+    quietly $ cmd ["mv", source, target]
 
 -- | Transform a given file by applying a function to its contents.
 fixFile :: FilePath -> (String -> String) -> Action ()
@@ -165,51 +166,52 @@ fixFile file f = do
         return new
     liftIO $ writeFile file contents
 
+-- | Apply a patch by executing the 'Patch' builder in a given directory.
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
     let file = dir -/- patch
     needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
-    quietly $ cmd Shell cmdEcho [Cwd dir] [path, "-p0 <", patch]
+    quietly $ cmd Shell [Cwd dir] [path, "-p0 <", patch]
 
--- | Install a directory
-installDir :: FilePath -> Action ()
-installDir dir = do
-    i <- setting InstallDir
-    putBuild $ "| Install directory" ++ dir
-    quietly $ cmd i dir
+-- | Install a directory.
+installDirectory :: FilePath -> Action ()
+installDirectory dir = do
+    path <- fixAbsolutePathOnWindows =<< setting InstallDir
+    putBuild $ "| Install directory " ++ dir
+    quietly $ cmd path dir
 
--- | Install data file to a directory
+-- | Install data files to a directory and track them.
 installData :: [FilePath] -> FilePath -> Action ()
 installData fs dir = do
-    i <- setting InstallData
+    path <- fixAbsolutePathOnWindows =<< setting InstallData
     need fs
-    forM_ fs $ \f ->
-        putBuild $ "| Install data " ++ f ++ " to " ++ dir
-    quietly $ cmd i fs dir
+    forM_ fs $ \f -> putBuild $ "| Install data " ++ f ++ " to " ++ dir
+    quietly $ cmd path fs dir
 
--- | Install executable file to a directory
+-- | Install an executable file to a directory and track it.
 installProgram :: FilePath -> FilePath -> Action ()
 installProgram f dir = do
-    i <- setting InstallProgram
+    path <- fixAbsolutePathOnWindows =<< setting InstallProgram
     need [f]
     putBuild $ "| Install program " ++ f ++ " to " ++ dir
-    quietly $ cmd i f dir
+    quietly $ cmd path f dir
 
--- | Install executable script to a directory
+-- | Install an executable script to a directory and track it.
 installScript :: FilePath -> FilePath -> Action ()
 installScript f dir = do
-    i <- setting InstallScript
+    path <- fixAbsolutePathOnWindows =<< setting InstallScript
     need [f]
     putBuild $ "| Install script " ++ f ++ " to " ++ dir
-    quietly $ cmd i f dir
+    quietly $ cmd path f dir
 
--- | Create a symbolic link from source file to target file when supported
+-- | Create a symbolic link from source file to target file (when symbolic links
+-- are supported) and track the source file.
 linkSymbolic :: FilePath -> FilePath -> Action ()
 linkSymbolic source target = do
     lns <- setting LnS
-    when (lns /= "") $ do
+    unless (null lns) $ do
         need [source] -- Guarantee source is built before printing progress info.
         let dir = takeDirectory target
         liftIO $ IO.createDirectoryIfMissing True dir
@@ -237,6 +239,7 @@ builderEnvironment variable builder = do
 runBuilder :: Builder -> [String] -> Action ()
 runBuilder = runBuilderWith []
 
+-- | Run a builder with given list of arguments using custom 'cmd' options.
 runBuilderWith :: [CmdOption] -> Builder -> [String] -> Action ()
 runBuilderWith options builder args = do
     needBuilder builder
@@ -245,6 +248,7 @@ runBuilderWith options builder args = do
     putBuild $ "| Run " ++ show builder ++ note
     quietly $ cmd options [path] args
 
+-- | Make a given file executable by running the @chmod@ command.
 makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
     putBuild $ "| Make " ++ quote file ++ " executable."
