@@ -122,7 +122,7 @@ programName Context {..}
     | package == iservBin = "ghc-iserv"
     | otherwise           = pkgNameString package
 
--- | Some contexts are special: their packages do have @.cabal@ metadata or
+-- | Some contexts are special: their packages do not have @.cabal@ metadata or
 -- we cannot run @ghc-cabal@ on them, e.g. because the latter hasn't been built
 -- yet (this is the case with the 'ghcCabal' package in 'Stage0').
 nonCabalContext :: Context -> Bool
