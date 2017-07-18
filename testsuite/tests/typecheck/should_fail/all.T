@@ -451,4 +451,4 @@ test('T12373', normal, compile_fail, [''])
 test('T13610', normal, compile_fail, [''])
 test('T11672', normal, compile_fail, [''])
 test('T13819', normal, compile_fail, [''])
-
+test('T11963', normal, compile_fail, [''])

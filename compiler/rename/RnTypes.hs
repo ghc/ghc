@@ -1717,11 +1717,25 @@ extract_hs_tv_bndrs tvs
   = do { FKTV bndr_kvs _
            <- foldrM extract_lkind emptyFKTV [k | L _ (KindedTyVar _ k) <- tvs]
 
-       ; let locals = map hsLTyVarName tvs
+       ; let locals = map hsLTyVarLocName tvs
+
+         -- These checks are all tested in typecheck/should_fail/T11963
+       ; check_for_mixed_vars bndr_kvs acc_tvs
+       ; check_for_mixed_vars bndr_kvs body_tvs
+       ; check_for_mixed_vars body_tvs acc_kvs
+       ; check_for_mixed_vars body_kvs acc_tvs
+       ; check_for_mixed_vars locals body_kvs
+
        ; return $
-         FKTV (filterOut ((`elem` locals) . unLoc) (bndr_kvs ++ body_kvs)
+         FKTV (filterOut (`elemRdr` locals) (bndr_kvs ++ body_kvs)
                 ++ acc_kvs)
-              (filterOut ((`elem` locals) . unLoc)  body_tvs ++ acc_tvs) }
+              (filterOut (`elemRdr` locals) body_tvs ++ acc_tvs) }
+  where
+    check_for_mixed_vars :: [Located RdrName] -> [Located RdrName] -> RnM ()
+    check_for_mixed_vars tvs1 tvs2 = mapM_ check tvs1
+      where
+        check tv1 = when (isRdrTyVar (unLoc tv1) && (tv1 `elemRdr` tvs2)) $
+                    mixedVarsErr tv1
 
 extract_tv :: TypeOrKind -> Located RdrName -> FreeKiTyVars
            -> RnM FreeKiTyVars
@@ -1737,8 +1751,6 @@ extract_tv t_or_k ltv@(L _ tv) acc
                 mixedVarsErr ltv
               ; return (FKTV (ltv : kvs) tvs) }
   | otherwise     = return acc
-  where
-    elemRdr x = any (eqLocated x)
 
 mixedVarsErr :: Located RdrName -> RnM ()
 mixedVarsErr (L loc tv)
@@ -1751,3 +1763,6 @@ mixedVarsErr (L loc tv)
 -- just used in this module; seemed convenient here
 nubL :: Eq a => [Located a] -> [Located a]
 nubL = nubBy eqLocated
+
+elemRdr :: Located RdrName -> [Located RdrName] -> Bool
+elemRdr x = any (eqLocated x)

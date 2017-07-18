@@ -1,0 +1,20 @@
+
+T11963.hs:13:26: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
+
+T11963.hs:16:22: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
+
+T11963.hs:20:15: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
+
+T11963.hs:24:32: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
+
+T11963.hs:28:33: error:
+    Variable ‘k’ used as both a kind and a type
+    Did you intend to use TypeInType?
