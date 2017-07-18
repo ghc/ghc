@@ -922,30 +922,42 @@ checkExpectedKind hs_ty ty act_kind exp_kind
                        , TcKind ) -- its new kind
     instantiate ty act_ki exp_ki
       = let (exp_bndrs, _) = splitPiTysInvisible exp_ki in
-        instantiateTyN (length exp_bndrs) ty act_ki
+        instantiateTyUntilN (length exp_bndrs) ty act_ki
 
--- | Instantiate a type to have at most @n@ invisible arguments.
-instantiateTyN :: Int    -- ^ @n@
-               -> TcType -- ^ the type
-               -> TcKind -- ^ its kind
-               -> TcM (TcType, TcKind)   -- ^ The inst'ed type with kind
-instantiateTyN n ty ki
-  = let (bndrs, inner_ki)            = splitPiTysInvisible ki
-        num_to_inst                  = length bndrs - n
-           -- NB: splitAt is forgiving with invalid numbers
-        (inst_bndrs, leftover_bndrs) = splitAt num_to_inst bndrs
+-- | Instantiate @n@ invisible arguments to a type. If @n <= 0@, no instantiation
+-- occurs. If @n@ is too big, then all available invisible arguments are instantiated.
+-- (In other words, this function is very forgiving about bad values of @n@.)
+instantiateTyN :: Int                              -- ^ @n@
+               -> TcType                           -- ^ the type
+               -> [TyBinder] -> TcKind             -- ^ its kind
+               -> TcM (TcType, TcKind)             -- ^ The inst'ed type with kind
+instantiateTyN n ty bndrs inner_ki
+  = let   -- NB: splitAt is forgiving with invalid numbers
+        (inst_bndrs, leftover_bndrs) = splitAt n bndrs
+        ki          = mkPiTys bndrs inner_ki
         empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfType ki))
     in
-    if num_to_inst <= 0 then return (ty, ki) else
+    if n <= 0 then return (ty, ki) else
     do { (subst, inst_args) <- tcInstBinders empty_subst Nothing inst_bndrs
        ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
              ki'        = substTy subst rebuilt_ki
        ; traceTc "instantiateTyN" (vcat [ ppr ty <+> dcolon <+> ppr ki
+                                        , ppr n
                                         , ppr subst
                                         , ppr rebuilt_ki
                                         , ppr ki' ])
        ; return (mkNakedAppTys ty inst_args, ki') }
 
+-- | Instantiate a type to have at most @n@ invisible arguments.
+instantiateTyUntilN :: Int         -- ^ @n@
+                    -> TcType      -- ^ the type
+                    -> TcKind      -- ^ its kind
+                    -> TcM (TcType, TcKind)   -- ^ The inst'ed type with kind
+instantiateTyUntilN n ty ki
+  = let (bndrs, inner_ki) = splitPiTysInvisible ki
+        num_to_inst       = length bndrs - n
+    in
+    instantiateTyN num_to_inst ty bndrs inner_ki
 
 ---------------------------
 tcHsContext :: LHsContext GhcRn -> TcM [PredType]
@@ -1018,8 +1030,8 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
 
     -- if we are type-checking a type family tycon, we must instantiate
     -- any invisible arguments right away. Otherwise, we get #11246
-    handle_tyfams :: TyCon   -- the tycon to instantiate (might be loopy)
-                  -> TyCon   -- a non-loopy version of the tycon
+    handle_tyfams :: TyCon     -- the tycon to instantiate (might be loopy)
+                  -> TcTyCon   -- a non-loopy version of the tycon
                   -> TcM (TcType, TcKind)
     handle_tyfams tc tc_tc
       | mightBeUnsaturatedTyCon tc_tc
@@ -1027,7 +1039,8 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
            ; return (ty, tc_kind) }
 
       | otherwise
-      = do { (tc_ty, kind) <- instantiateTyN 0 ty tc_kind
+      = do { (tc_ty, kind) <- instantiateTyN (length (tyConBinders tc_tc))
+                                             ty tc_kind_bndrs tc_inner_ki
            -- tc and tc_ty must not be traced here, because that would
            -- force the evaluation of a potentially knot-tied variable (tc),
            -- and the typechecker would hang, as per #11708
@@ -1035,8 +1048,9 @@ tcTyVar mode name         -- Could be a tyvar, a tycon, or a datacon
                                        , ppr kind ])
            ; return (tc_ty, kind) }
       where
-        ty      = mkNakedTyConApp tc []
-        tc_kind = tyConKind tc_tc
+        ty                           = mkNakedTyConApp tc []
+        tc_kind                      = tyConKind tc_tc
+        (tc_kind_bndrs, tc_inner_ki) = splitPiTysInvisible tc_kind
 
     get_loopy_tc :: Name -> TyCon -> TcM TyCon
     -- Return the knot-tied global TyCon if there is one

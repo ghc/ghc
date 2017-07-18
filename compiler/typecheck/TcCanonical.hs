@@ -24,7 +24,7 @@ import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import VarEnv( mkInScopeSet )
-import VarSet( extendVarSetList )
+import VarSet
 import Outputable
 import DynFlags( DynFlags )
 import NameSet
@@ -683,7 +683,7 @@ can_eq_nc_forall ev eq_rel s1 s2
             go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
 
             empty_subst2 = mkEmptyTCvSubst $ mkInScopeSet $
-                           free_tvs2 `extendVarSetList` skol_tvs
+                           free_tvs2 `unionVarSet` closeOverKinds (mkVarSet skol_tvs)
 
       ; (implic, _ev_binds, all_co) <- buildImplication skol_info skol_tvs [] $
                                        go skol_tvs empty_subst2 bndrs2
