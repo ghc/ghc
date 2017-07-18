@@ -148,6 +148,8 @@ at present and we expect a lot of further refactoring. If you would like to
 work on a particular issue, please let everyone know by adding a comment about
 this. The issues that are currently on the critical path and therefore require
 particular attention are listed in [#239](https://github.com/snowleopard/hadrian/issues/239).
+Also have a look at [projects](https://github.com/snowleopard/hadrian/projects)
+where open issues and pull requests are grouped into categories.
 
 Acknowledgements
 ----------------
