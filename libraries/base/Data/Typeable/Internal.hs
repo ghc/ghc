@@ -117,7 +117,7 @@ tyConName :: TyCon -> String
 tyConName (TyCon _ _ _ n _ _) = trNameString n
 
 trNameString :: TrName -> String
-trNameString (TrNameS s) = unpackCString# s
+trNameString (TrNameS s) = unpackCStringUtf8# s
 trNameString (TrNameD s) = s
 
 tyConFingerprint :: TyCon -> Fingerprint
@@ -361,7 +361,7 @@ instantiateKindRep vars = go
       = SomeTypeRep $ Fun (unsafeCoerceRep $ go a) (unsafeCoerceRep $ go b)
     go (KindRepTYPE r) = unkindedTypeRep $ tYPE `kApp` runtimeRepTypeRep r
     go (KindRepTypeLitS sort s)
-      = mkTypeLitFromString sort (unpackCString# s)
+      = mkTypeLitFromString sort (unpackCStringUtf8# s)
     go (KindRepTypeLitD sort s)
       = mkTypeLitFromString sort s
 
@@ -569,7 +569,7 @@ pattern KindRepTypeLit sort t <- (getKindRepTypeLit -> Just (sort, t))
              KindRepTYPE, KindRepTypeLit #-}
 
 getKindRepTypeLit :: KindRep -> Maybe (TypeLitSort, String)
-getKindRepTypeLit (KindRepTypeLitS sort t) = Just (sort, unpackCString# t)
+getKindRepTypeLit (KindRepTypeLitS sort t) = Just (sort, unpackCStringUtf8# t)
 getKindRepTypeLit (KindRepTypeLitD sort t) = Just (sort, t)
 getKindRepTypeLit _                        = Nothing
 
@@ -586,9 +586,9 @@ mkTyCon# pkg modl name n_kinds kind_rep
   where
     mod = Module (TrNameS pkg) (TrNameS modl)
     fingerprint :: Fingerprint
-    fingerprint = mkTyConFingerprint (unpackCString# pkg)
-                                     (unpackCString# modl)
-                                     (unpackCString# name)
+    fingerprint = mkTyConFingerprint (unpackCStringUtf8# pkg)
+                                     (unpackCStringUtf8# modl)
+                                     (unpackCStringUtf8# name)
 
 -- it is extremely important that this fingerprint computation
 -- remains in sync with that in TcTypeable to ensure that type
