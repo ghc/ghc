@@ -47,9 +47,15 @@ def lndir(srcdir, dstdir):
             os.mkdir(dst)
             lndir(src, dst)
 
-# def git_append(note):
-# def print_metrics():
-#     print(config.accumulate_metrics)
+# This function allows one to read in git notes from the commandline
+# and then breaks it into a list of dictionaries that can be parsed
+# later on in the testing functions.
+def parse_git_notes(namespace):
+    logFields = ['TEST_ENV','TEST','WAY','METRIC','VALUE']
+    log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show']).decode('utf-8')
+    log = log.strip('\n').split('\n')
+    log = [entry.strip('\t').split('\t') for entry in log]
+    log = [dict(zip(logFields, row)) for row in log]
 
 # On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
 # when using msys2, as GHC does. Unfortunately, only Administrative users have
