@@ -121,3 +121,15 @@
 [submodule ".arc-linters/arcanist-external-json-linter"]
 	path = .arc-linters/arcanist-external-json-linter
 	url = ../arcanist-external-json-linter.git
+[submodule "libraries/parsec"]
+	path = libraries/parsec
+	url = ../packages/parsec.git
+	ignore = none
+[submodule "libraries/mtl"]
+	path = libraries/mtl
+	url = ../packages/mtl.git
+	ignore = none
+[submodule "libraries/text"]
+	path = libraries/text
+	url = ../packages/text.git
+	ignore = none

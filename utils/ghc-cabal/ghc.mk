@@ -27,9 +27,9 @@ CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 # `cabal_macros_boot.h` also for GHC >= 8 (in which case it becomes a
 # dummy include that doesn't contribute any macro definitions).
 ifeq "$(Windows_Host)" "YES"
-CABAL_BUILD_DEPS := base array time containers bytestring deepseq process pretty directory Win32
+CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory Win32
 else
-CABAL_BUILD_DEPS := base array time containers bytestring deepseq process pretty directory unix
+CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory unix
 endif
 
 ghc-cabal_DIST_BINARY_NAME = ghc-cabal$(exeext0)
@@ -40,11 +40,23 @@ ifneq "$(BINDIST)" "YES"
 $(ghc-cabal_INPLACE) : $(ghc-cabal_DIST_BINARY) | $$(dir $$@)/.
 	"$(CP)" $< $@
 
+# Minor hack, since we can't reuse the `hs-suffix-rules-srcdir` macro
+ifneq ($(wildcard libraries/Cabal/Cabal/Distribution/Parsec/Lexer.x),)
+# Lexer.x exists so we have to call Alex ourselves
+CABAL_LEXER_DEP := bootstrapping/Cabal/Distribution/Parsec/Lexer.hs
+
+bootstrapping/Cabal/Distribution/Parsec/Lexer.hs: libraries/Cabal/Cabal/Distribution/Parsec/Lexer.x
+	mkdir -p bootstrapping/Cabal/Distribution/Parsec
+	$(call cmd,ALEX) $< -o $@
+else
+CABAL_LEXER_DEP := libraries/Cabal/Cabal/Distribution/Parsec/Lexer.hs
+endif
+
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*/*.hs)
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*/*.hs)
 $(ghc-cabal_DIST_BINARY): $(wildcard libraries/Cabal/Cabal/Distribution/*.hs)
 
-$(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
+$(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. bootstrapping/.
 	"$(GHC)" $(SRC_HC_OPTS) \
 	       $(addprefix -optc, $(SRC_CC_OPTS) $(CONF_CC_OPTS_STAGE0)) \
 	       $(addprefix -optl, $(SRC_LD_OPTS) $(CONF_GCC_LINKER_OPTS_STAGE0)) \
@@ -54,14 +66,21 @@ $(ghc-cabal_DIST_BINARY): utils/ghc-cabal/Main.hs $(TOUCH_DEP) | $$(dir $$@)/. b
 	       -no-user-$(GHC_PACKAGE_DB_FLAG) \
 	       -Wall -fno-warn-unused-imports -fno-warn-warnings-deprecations \
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
+	       -DCABAL_PARSEC \
 	       -DBOOTSTRAPPING \
 	       -optP-include -optPutils/ghc-cabal/cabal_macros_boot.h \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
+	       $(CABAL_LEXER_DEP) \
 	       -ilibraries/Cabal/Cabal \
 	       -ilibraries/binary/src \
 	       -ilibraries/filepath \
 	       -ilibraries/hpc \
+	       -ilibraries/mtl \
+	       -ilibraries/text \
+	       libraries/text/cbits/cbits.c \
+	       -Ilibraries/text/include \
+	       -ilibraries/parsec \
 	       $(utils/ghc-cabal_dist_EXTRA_HC_OPTS) \
 	       $(EXTRA_HC_OPTS)
 	"$(TOUCH_CMD)" $@

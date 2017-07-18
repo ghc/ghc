@@ -430,7 +430,7 @@ else # CLEANING
 # programs such as GHC and ghc-pkg, that we do not assume the stage0
 # compiler already has installed (or up-to-date enough).
 
-PACKAGES_STAGE0 = binary Cabal/Cabal hpc ghc-boot-th ghc-boot transformers template-haskell ghci
+PACKAGES_STAGE0 = binary text transformers mtl parsec Cabal/Cabal hpc ghc-boot-th ghc-boot template-haskell ghci
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
@@ -457,11 +457,17 @@ PACKAGES_STAGE1 += process
 PACKAGES_STAGE1 += hpc
 PACKAGES_STAGE1 += pretty
 PACKAGES_STAGE1 += binary
+PACKAGES_STAGE1 += text
+PACKAGES_STAGE1 += transformers
+PACKAGES_STAGE1 += mtl
+PACKAGES_STAGE1 += parsec
+# temporary until Cabal switches to parsec mode by default
+libraries/Cabal/Cabal_dist-boot_CONFIGURE_OPTS += --flag parsec
+libraries/Cabal/Cabal_dist-install_CONFIGURE_OPTS += --flag parsec
 PACKAGES_STAGE1 += Cabal/Cabal
 PACKAGES_STAGE1 += ghc-boot-th
 PACKAGES_STAGE1 += ghc-boot
 PACKAGES_STAGE1 += template-haskell
-PACKAGES_STAGE1 += transformers
 PACKAGES_STAGE1 += ghc-compact
 
 ifeq "$(HADDOCK_DOCS)" "YES"
@@ -1263,6 +1269,7 @@ $(eval $(call sdist-ghc-file,compiler,stage2,parser,Parser,y))
 $(eval $(call sdist-ghc-file,utils/hpc,dist-install,,HpcParser,y))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Lexer,x))
 $(eval $(call sdist-ghc-file,utils/genprimopcode,dist,,Parser,y))
+$(eval $(call sdist-ghc-file2,libraries/Cabal/Cabal,dist-install,Distribution/Parsec,Lexer,x))
 
 .PHONY: sdist-ghc-prep
 sdist-ghc-prep : sdist-ghc-prep-tree
