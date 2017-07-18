@@ -525,6 +525,8 @@ data GeneralFlag
    | Opt_OptimalApplicativeDo
    | Opt_VersionMacros
    | Opt_WholeArchiveHsLibs
+   | Opt_OmitTypeFamilyCoercions -- replace coercions resulting from type
+                                 -- family flattening with UnivCo
 
    -- PreInlining is on by default. The option is there just to see how
    -- bad things get if you turn it off!
@@ -3736,6 +3738,7 @@ fFlagsDeps = [
   flagHiddenSpec "llvm-fill-undef-with-garbage" Opt_LlvmFillUndefWithGarbage,
   flagSpec "loopification"                    Opt_Loopification,
   flagSpec "omit-interface-pragmas"           Opt_OmitInterfacePragmas,
+  flagSpec "omit-type-family-coercions"       Opt_OmitTypeFamilyCoercions,
   flagSpec "omit-yields"                      Opt_OmitYields,
   flagSpec "optimal-applicative-do"           Opt_OptimalApplicativeDo,
   flagSpec "pedantic-bottoms"                 Opt_PedanticBottoms,

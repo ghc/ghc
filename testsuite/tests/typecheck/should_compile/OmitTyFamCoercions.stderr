@@ -1,0 +1,126 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 63, types: 31, coercions: 17, joins: 0/0}
+
+-- RHS size: {terms: 1, types: 1, coercions: 17, joins: 0/0}
+foo
+  :: Countdown ('S ('S ('S ('S ('S ('S ('S ('S ('S ('S 'Z))))))))))
+     -> Int
+[GblId]
+foo
+  = (id @ Int)
+    `cast` (UnsafeCo representational
+              Int
+              (Countdown ('S ('S ('S ('S ('S ('S ('S ('S ('S ('S 'Z)))))))))))
+            -> <Int>_R
+            :: (Int -> Int :: *)
+               ~R# (Countdown ('S ('S ('S ('S ('S ('S ('S ('S ('S ('S 'Z))))))))))
+                    -> Int :: *))
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1_rTi :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule1_rTi = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2_rTz :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule2_rTz = GHC.Types.TrNameS $trModule1_rTi
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3_rTA :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule3_rTA = "OmitTyFamCoercions"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4_rTB :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule4_rTB = GHC.Types.TrNameS $trModule3_rTA
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+OmitTyFamCoercions.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs]
+OmitTyFamCoercions.$trModule
+  = GHC.Types.Module $trModule2_rTz $trModule4_rTB
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tcN1_rTC :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$tcN1_rTC = "N"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tcN2_rTD :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$tcN2_rTD = GHC.Types.TrNameS $tcN1_rTC
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+OmitTyFamCoercions.$tcN :: GHC.Types.TyCon
+[GblId]
+OmitTyFamCoercions.$tcN
+  = GHC.Types.TyCon
+      10986362045750609911##
+      17252763998195801839##
+      OmitTyFamCoercions.$trModule
+      $tcN2_rTD
+      0#
+      GHC.Types.krep$*
+
+-- RHS size: {terms: 3, types: 1, coercions: 0, joins: 0/0}
+$krep_rTE :: GHC.Types.KindRep
+[GblId]
+$krep_rTE
+  = GHC.Types.KindRepTyConApp
+      OmitTyFamCoercions.$tcN (GHC.Types.[] @ GHC.Types.KindRep)
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tc'Z1_rTF :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$tc'Z1_rTF = "'Z"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tc'Z2_rTG :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$tc'Z2_rTG = GHC.Types.TrNameS $tc'Z1_rTF
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+OmitTyFamCoercions.$tc'Z :: GHC.Types.TyCon
+[GblId]
+OmitTyFamCoercions.$tc'Z
+  = GHC.Types.TyCon
+      4644564235544244111##
+      10926620795288904532##
+      OmitTyFamCoercions.$trModule
+      $tc'Z2_rTG
+      0#
+      $krep_rTE
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+$krep1_rTH :: GHC.Types.KindRep
+[GblId]
+$krep1_rTH = GHC.Types.KindRepFun $krep_rTE $krep_rTE
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$tc'S1_rTI :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$tc'S1_rTI = "'S"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$tc'S2_rTJ :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$tc'S2_rTJ = GHC.Types.TrNameS $tc'S1_rTI
+
+-- RHS size: {terms: 7, types: 0, coercions: 0, joins: 0/0}
+OmitTyFamCoercions.$tc'S :: GHC.Types.TyCon
+[GblId]
+OmitTyFamCoercions.$tc'S
+  = GHC.Types.TyCon
+      12843356727716621616##
+      10217746361553368891##
+      OmitTyFamCoercions.$trModule
+      $tc'S2_rTJ
+      0#
+      $krep1_rTH
+
+
+

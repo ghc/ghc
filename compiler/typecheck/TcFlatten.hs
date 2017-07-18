@@ -9,6 +9,7 @@ module TcFlatten(
 
 #include "HsVersions.h"
 
+import DynFlags
 import TcRnTypes
 import TcType
 import Type
@@ -1145,12 +1146,18 @@ flatten_fam_app tc tys  -- Can be over-saturated
                -- all Nominal roles b/c the tycon is oversaturated
          ; (xis_rest, cos_rest) <- flatten_many (repeat Nominal) tys_rest
                -- cos_res :: xis_rest ~ tys_rest
-
-         ; return ( mkAppTys xi1 xis_rest   -- NB mkAppTys: rhs_xi might not be a type variable
-                                            --    cf Trac #5655
-                  , mkAppCos co1 cos_rest
+         ; let ty' = mkAppTys xi1 xis_rest -- NB mkAppTys: rhs_xi might not be a type variable
+                                           --    cf Trac #5655
+         ; omitTypeFamilyCoercionsEnabled <-
+             gopt Opt_OmitTypeFamilyCoercions <$> liftTcS getDynFlags
+         ; if omitTypeFamilyCoercionsEnabled
+             then do { orig_ty_zonked <- liftTcS $ zonkTcType $ mkTyConApp tc tys
+                     ; role <- getRole
+                     ; return (ty', mkUnsafeCo role ty' orig_ty_zonked) }
+             else return ( ty'
+                         , mkAppCos co1 cos_rest
                             -- (rhs_xi :: F xis) ; (F cos :: F xis ~ F tys)
-                  ) }
+                         ) }
 
 flatten_exact_fam_app, flatten_exact_fam_app_fully ::
   TyCon -> [TcType] -> FlatM (Xi, Coercion)
