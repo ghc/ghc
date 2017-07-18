@@ -1,6 +1,9 @@
 
 T13530.hs:11:7: error:
     • Couldn't match a lifted type with an unlifted type
+      When matching types
+        a0 :: *
+        Int# :: TYPE 'IntRep
       Expected type: (# Int#, Int# #)
         Actual type: (# Int#, a0 #)
     • In the expression: g x

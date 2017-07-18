@@ -58,7 +58,7 @@ module TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitPiTys, tcSplitForAllTyVarBndrs,
+  tcSplitForAllTys, tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
@@ -187,7 +187,11 @@ module TcType (
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTvBndr, pprTvBndrs,
 
-  TypeSize, sizeType, sizeTypes, toposortTyVars
+  TypeSize, sizeType, sizeTypes, toposortTyVars,
+
+  ---------------------------------
+  -- argument visibility
+  tcTyConVisibilities, isNextTyConArgVisible, isNextArgVisible
 
   ) where
 
@@ -220,6 +224,7 @@ import BasicTypes
 import Util
 import Bag
 import Maybes
+import ListSetOps ( getNth )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -1357,6 +1362,10 @@ variables.  It's up to you to make sure this doesn't matter.
 -- Always succeeds, even if it returns an empty list.
 tcSplitPiTys :: Type -> ([TyBinder], Type)
 tcSplitPiTys = splitPiTys
+
+-- | Splits a type into a TyBinder and a body, if possible. Panics otherwise
+tcSplitPiTy_maybe :: Type -> Maybe (TyBinder, Type)
+tcSplitPiTy_maybe = splitPiTy_maybe
 
 tcSplitForAllTy_maybe :: Type -> Maybe (TyVarBinder, Type)
 tcSplitForAllTy_maybe ty | Just ty' <- tcView ty = tcSplitForAllTy_maybe ty'
@@ -2590,3 +2599,28 @@ sizeType = go
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
+
+-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
+-----------------------
+-- | For every arg a tycon can take, the returned list says True if the argument
+-- is taken visibly, and False otherwise. Ends with an infinite tail of Trues to
+-- allow for oversaturation.
+tcTyConVisibilities :: TyCon -> [Bool]
+tcTyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
+  where
+    tc_binder_viss      = map isVisibleTyConBinder (tyConBinders tc)
+    tc_return_kind_viss = map isVisibleBinder (fst $ tcSplitPiTys (tyConResKind tc))
+
+-- | If the tycon is applied to the types, is the next argument visible?
+isNextTyConArgVisible :: TyCon -> [Type] -> Bool
+isNextTyConArgVisible tc tys
+  = tcTyConVisibilities tc `getNth` length tys
+
+-- | Should this type be applied to a visible argument?
+isNextArgVisible :: TcType -> Bool
+isNextArgVisible ty
+  | Just (bndr, _) <- tcSplitPiTy_maybe ty = isVisibleBinder bndr
+  | otherwise                              = True
+    -- this second case might happen if, say, we have an unzonked TauTv.
+    -- But TauTvs can't range over types that take invisible arguments

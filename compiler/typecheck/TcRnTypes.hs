@@ -95,8 +95,9 @@ module TcRnTypes(
         CtLoc(..), ctLocSpan, ctLocEnv, ctLocLevel, ctLocOrigin,
         ctLocTypeOrKind_maybe,
         ctLocDepth, bumpCtLocDepth,
-        setCtLocOrigin, setCtLocEnv, setCtLocSpan,
+        setCtLocOrigin, updateCtLocOrigin, setCtLocEnv, setCtLocSpan,
         CtOrigin(..), exprCtOrigin, lexprCtOrigin, matchesCtOrigin, grhssCtOrigin,
+        isVisibleOrigin, toInvisibleOrigin,
         TypeOrKind(..), isTypeLevel, isKindLevel,
         pprCtOrigin, pprCtLoc,
         pushErrCtxt, pushErrCtxtSameOrigin,
@@ -2969,6 +2970,10 @@ bumpCtLocDepth loc@(CtLoc { ctl_depth = d }) = loc { ctl_depth = bumpSubGoalDept
 setCtLocOrigin :: CtLoc -> CtOrigin -> CtLoc
 setCtLocOrigin ctl orig = ctl { ctl_origin = orig }
 
+updateCtLocOrigin :: CtLoc -> (CtOrigin -> CtOrigin) -> CtLoc
+updateCtLocOrigin ctl@(CtLoc { ctl_origin = orig }) upd
+  = ctl { ctl_origin = upd orig }
+
 setCtLocEnv :: CtLoc -> TcLclEnv -> CtLoc
 setCtLocEnv ctl env = ctl { ctl_env = env }
 
@@ -3160,7 +3165,11 @@ data CtOrigin
   | TypeEqOrigin { uo_actual   :: TcType
                  , uo_expected :: TcType
                  , uo_thing    :: Maybe SDoc
-                                  -- ^ The thing that has type "actual"
+                       -- ^ The thing that has type "actual"
+                 , uo_visible  :: Bool
+                       -- ^ Is at least one of the three elements above visible?
+                       -- (Errors from the polymorphic subsumption check are considered
+                       -- visible.) Only used for prioritizing error messages.
                  }
 
   | KindEqOrigin
@@ -3251,6 +3260,21 @@ isTypeLevel KindLevel = False
 isKindLevel :: TypeOrKind -> Bool
 isKindLevel TypeLevel = False
 isKindLevel KindLevel = True
+
+-- An origin is visible if the place where the constraint arises is manifest
+-- in user code. Currently, all origins are visible except for invisible
+-- TypeEqOrigins. This is used when choosing which error of
+-- several to report
+isVisibleOrigin :: CtOrigin -> Bool
+isVisibleOrigin (TypeEqOrigin { uo_visible = vis }) = vis
+isVisibleOrigin (KindEqOrigin _ _ sub_orig _)       = isVisibleOrigin sub_orig
+isVisibleOrigin _                                   = True
+
+-- Converts a visible origin to an invisible one, if possible. Currently,
+-- this works only for TypeEqOrigin
+toInvisibleOrigin :: CtOrigin -> CtOrigin
+toInvisibleOrigin orig@(TypeEqOrigin {}) = orig { uo_visible = False }
+toInvisibleOrigin orig                   = orig
 
 instance Outputable CtOrigin where
   ppr = pprCtOrigin
@@ -3451,7 +3475,7 @@ pprCtO DefaultOrigin         = text "a 'default' declaration"
 pprCtO DoOrigin              = text "a do statement"
 pprCtO MCompOrigin           = text "a statement in a monad comprehension"
 pprCtO ProcOrigin            = text "a proc expression"
-pprCtO (TypeEqOrigin t1 t2 _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
+pprCtO (TypeEqOrigin t1 t2 _ _)= text "a type equality" <+> sep [ppr t1, char '~', ppr t2]
 pprCtO AnnOrigin             = text "an annotation"
 pprCtO HoleOrigin            = text "a use of" <+> quotes (text "_")
 pprCtO ListOrigin            = text "an overloaded list"

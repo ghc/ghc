@@ -930,7 +930,10 @@ can_eq_app ev NomEq s1 t1 s2 t2
        ; stopWith ev "Decomposed [D] AppTy" }
   | CtWanted { ctev_dest = dest, ctev_loc = loc } <- ev
   = do { co_s <- unifyWanted loc Nominal s1 s2
-       ; co_t <- unifyWanted loc Nominal t1 t2
+       ; let arg_loc
+               | isNextArgVisible s1 = loc
+               | otherwise           = updateCtLocOrigin loc toInvisibleOrigin
+       ; co_t <- unifyWanted arg_loc Nominal t1 t2
        ; let co = mkAppCo co_s co_t
        ; setWantedEq dest co
        ; stopWith ev "Decomposed [W] AppTy" }
@@ -1224,13 +1227,16 @@ canDecomposableTyConAppOK ev eq_rel tc tys1 tys2
       -- the following makes a better distinction between "kind" and "type"
       -- in error messages
     bndrs      = tyConBinders tc
-    kind_loc   = toKindLoc loc
     is_kinds   = map isNamedTyConBinder bndrs
-    new_locs | Just KindLevel <- ctLocTypeOrKind_maybe loc
-             = repeat loc
-             | otherwise
-             = map (\is_kind -> if is_kind then kind_loc else loc) is_kinds
+    is_viss    = map isVisibleTyConBinder bndrs
 
+    kind_xforms = map (\is_kind -> if is_kind then toKindLoc else id) is_kinds
+    vis_xforms  = map (\is_vis  -> if is_vis  then id
+                                   else flip updateCtLocOrigin toInvisibleOrigin)
+                      is_viss
+
+    -- zipWith3 (.) composes its first two arguments and applies it to the third
+    new_locs = zipWith3 (.) kind_xforms vis_xforms (repeat loc)
 
 -- | Call when canonicalizing an equality fails, but if the equality is
 -- representational, there is some hope for the future.

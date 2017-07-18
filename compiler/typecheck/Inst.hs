@@ -407,7 +407,8 @@ tcInstBinder _ subst (Anon ty)
   | Just (mk, role, k1, k2) <- get_pred_tys_maybe substed_ty
   = do { let origin = TypeEqOrigin { uo_actual   = k1
                                    , uo_expected = k2
-                                   , uo_thing    = Nothing }
+                                   , uo_thing    = Nothing
+                                   , uo_visible  = True }
        ; co <- case role of
                  Nominal          -> unifyKind Nothing k1 k2
                  Representational -> emitWantedEq origin KindLevel role k1 k2

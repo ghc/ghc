@@ -902,8 +902,9 @@ checkExpectedKind hs_ty ty act_kind exp_kind
  = do { (ty', act_kind') <- instantiate ty act_kind exp_kind
       ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                   , uo_expected = exp_kind
-                                  , uo_thing    = Just (ppr hs_ty) }
-      ; co_k <- uType origin KindLevel act_kind' exp_kind
+                                  , uo_thing    = Just (ppr hs_ty)
+                                  , uo_visible  = True } -- the hs_ty is visible
+      ; co_k <- uType KindLevel origin act_kind' exp_kind
       ; traceTc "checkExpectedKind" (vcat [ ppr act_kind
                                           , ppr exp_kind
                                           , ppr co_k ])

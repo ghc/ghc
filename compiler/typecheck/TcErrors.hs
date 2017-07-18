@@ -481,8 +481,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- type checking to get a Lint error later
     report1 = [ ("custom_error", is_user_type_error,True, mkUserTypeErrorReporter)
               , given_eq_spec
-              , ("insoluble2 ty", utterly_wrong_ty, True, mkGroupReporter mkEqErr)
-              , ("insoluble2_ki", utterly_wrong,    True, mkGroupReporter mkEqErr)
+              , ("insoluble2",    utterly_wrong,    True, mkGroupReporter mkEqErr)
               , ("skolem eq1",    very_wrong,       True, mkSkolReporter)
               , ("skolem eq2",    skolem_eq,        True, mkSkolReporter)
               , ("non-tv eq",     non_tv_eq,        True, mkSkolReporter)
@@ -514,12 +513,6 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
     -- Things like (Int ~N Bool)
     utterly_wrong _ (EqPred NomEq ty1 ty2) = isRigidTy ty1 && isRigidTy ty2
     utterly_wrong _ _                      = False
-
-     -- Like utterly_wrong, but suppress derived kind equalities
-    utterly_wrong_ty ct pred
-      = utterly_wrong ct pred && case ctOrigin ct of
-                                   KindEqOrigin {} -> False
-                                   _               -> True
 
     -- Things like (a ~N Int)
     very_wrong _ (EqPred NomEq ty1 ty2) = isSkolemTy tc_lvl ty1 && isRigidTy ty2
@@ -829,17 +822,21 @@ maybeAddDeferredHoleBinding ctxt err ct
 tryReporters :: ReportErrCtxt -> [ReporterSpec] -> [Ct] -> TcM (ReportErrCtxt, [Ct])
 -- Use the first reporter in the list whose predicate says True
 tryReporters ctxt reporters cts
-  = do { traceTc "tryReporters {" (ppr cts)
-       ; (ctxt', cts') <- go ctxt reporters cts
+  = do { let (vis_cts, invis_cts) = partition (isVisibleOrigin . ctOrigin) cts
+       ; traceTc "tryReporters {" (ppr vis_cts $$ ppr invis_cts)
+       ; (ctxt', cts') <- go ctxt reporters vis_cts invis_cts
        ; traceTc "tryReporters }" (ppr cts')
        ; return (ctxt', cts') }
   where
-    go ctxt [] cts
-      = return (ctxt, cts)
+    go ctxt [] vis_cts invis_cts
+      = return (ctxt, vis_cts ++ invis_cts)
 
-    go ctxt (r : rs) cts
-      = do { (ctxt', cts') <- tryReporter ctxt r cts
-           ; go ctxt' rs cts' }
+    go ctxt (r : rs) vis_cts invis_cts
+       -- always look at *visible* Origins before invisible ones
+       -- this is the whole point of isVisibleOrigin
+      = do { (ctxt', vis_cts') <- tryReporter ctxt r vis_cts
+           ; (ctxt'', invis_cts') <- tryReporter ctxt' r invis_cts
+           ; go ctxt'' rs vis_cts' invis_cts' }
                 -- Carry on with the rest, because we must make
                 -- deferred bindings for them if we have -fdefer-type-errors
                 -- But suppress their error messages
