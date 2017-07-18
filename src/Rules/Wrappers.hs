@@ -5,8 +5,9 @@ module Rules.Wrappers (
 import Base
 import Expression
 import GHC
+import Settings (getPackages, latestBuildStage)
 import Settings.Install (installPackageDbDirectory)
-import Settings.Path (inplacePackageDbDirectory)
+import Settings.Path (buildPath, inplacePackageDbDirectory)
 import Oracles.Path (getTopDirectory, bashPath)
 import Oracles.Config.Setting (SettingList(..), settingList)
 
@@ -117,13 +118,32 @@ haddockWrapper WrappedBinary{..} = do
     , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
       ++ " -B" ++ binaryLibPath ++ " -l" ++ binaryLibPath ++ " ${1+\"$@\"}" ]
 
+iservBinWrapper :: WrappedBinary -> Expr String
+iservBinWrapper WrappedBinary{..} = do
+    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    activePackages <- filter isLibrary <$> getPackages
+    -- TODO: Figure our the reason of this hardcoded exclusion
+    let pkgs = activePackages \\ [ cabal, process, haskeline
+                                 , terminfo, ghcCompact, hpc, compiler ]
+    contexts <- catMaybes <$> mapM (\p -> do
+                                        m <- lift $ latestBuildStage p
+                                        return $ fmap (\s -> vanillaContext s p) m
+                                   ) pkgs
+    let buildPaths = map buildPath contexts
+    return $ unlines
+        [ "#!/bin/bash"
+        , "export DYLD_LIBRARY_PATH=\"" ++ intercalate ":" buildPaths ++
+          "${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}\""
+       , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
+
 wrappersCommon :: [(Context, Wrapper)]
 wrappersCommon = [ (vanillaContext Stage0 ghc   , ghcWrapper)
                  , (vanillaContext Stage1 ghc   , ghcWrapper)
                  , (vanillaContext Stage1 hp2ps , hp2psWrapper)
                  , (vanillaContext Stage1 hpc   , hpcWrapper)
                  , (vanillaContext Stage1 hsc2hs, hsc2hsWrapper)
-                 , (vanillaContext Stage2 haddock, haddockWrapper)]
+                 , (vanillaContext Stage2 haddock, haddockWrapper)
+                 , (vanillaContext Stage1 iservBin, iservBinWrapper) ]
 
 -- | List of wrappers for inplace artefacts
 inplaceWrappers :: [(Context, Wrapper)]

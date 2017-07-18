@@ -116,10 +116,11 @@ builderProvenance = \case
 -- 'Library', the function simply returns its name.
 programName :: Context -> String
 programName Context {..}
-    | package == ghc    = "ghc-stage" ++ show (fromEnum stage + 1)
-    | package == hpcBin = "hpc"
-    | package == runGhc = "runhaskell"
-    | otherwise         = pkgNameString package
+    | package == ghc      = "ghc-stage" ++ show (fromEnum stage + 1)
+    | package == hpcBin   = "hpc"
+    | package == runGhc   = "runhaskell"
+    | package == iservBin = "ghc-iserv"
+    | otherwise           = pkgNameString package
 
 -- | Some contexts are special: their packages do have @.cabal@ metadata or
 -- we cannot run @ghc-cabal@ on them, e.g. because the latter hasn't been built

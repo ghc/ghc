@@ -34,10 +34,34 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
         inplaceBinPath -/- programName context <.> exe %> \bin -> do
             binStage <- installStage
             buildBinaryAndWrapper rs (context { stage = binStage }) bin
-        -- We build only unwrapped binaries in inplace/lib/bin
+
         inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
             binStage <- installStage
+            if package /= iservBin then
+                -- We *normally* build only unwrapped binaries in inplace/lib/bin,
+                buildBinary rs (context { stage = binStage }) bin
+            else
+                -- build both binary and wrapper in inplace/lib/bin
+                -- for ghc-iserv on *nix platform now
+                buildBinaryAndWrapperLib rs (context { stage = binStage }) bin
+
+        inplaceLibBinPath -/- programName context <.> "bin" %> \bin -> do
+            binStage <- installStage
             buildBinary rs (context { stage = binStage }) bin
+
+buildBinaryAndWrapperLib :: [(Resource, Int)] -> Context -> FilePath -> Action ()
+buildBinaryAndWrapperLib rs context bin = do
+    windows <- windowsHost
+    if windows
+    then buildBinary rs context bin -- We don't build wrappers on Windows
+    else case lookup context inplaceWrappers of
+        Nothing      -> buildBinary rs context bin -- No wrapper found
+        Just wrapper -> do
+            top <- topDirectory
+            let libdir = top -/- inplaceLibPath
+            let wrappedBin = inplaceLibBinPath -/- programName context <.> "bin"
+            need [wrappedBin]
+            buildWrapper context wrapper bin (WrappedBinary libdir (takeFileName wrappedBin))
 
 buildBinaryAndWrapper :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinaryAndWrapper rs context bin = do

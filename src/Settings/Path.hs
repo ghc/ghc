@@ -5,7 +5,7 @@ module Settings.Path (
     rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,inplacePackageDbDirectory,
     pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
     objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
-    installPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath,
+    inplaceInstallPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath,
     pkgSetupConfigFile
     ) where
 
@@ -190,11 +190,12 @@ objectPath context@Context {..} src
 
 -- | Given a 'Package', return the path where the corresponding program is
 -- installed. Most programs are installed in 'programInplacePath'.
-installPath :: Package -> FilePath
-installPath pkg
-    | pkg == touchy = inplaceLibBinPath
-    | pkg == unlit  = inplaceLibBinPath
-    | otherwise     = inplaceBinPath
+inplaceInstallPath :: Package -> FilePath
+inplaceInstallPath pkg
+    | pkg == touchy   = inplaceLibBinPath
+    | pkg == unlit    = inplaceLibBinPath
+    | pkg == iservBin = inplaceLibBinPath
+    | otherwise       = inplaceBinPath
 
 -- | @ghc-split@ is a Perl script used by GHC with @-split-objs@ flag. It is
 -- generated in "Rules.Generators.GhcSplit".

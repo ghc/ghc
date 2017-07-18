@@ -112,7 +112,7 @@ programPath context@Context {..} = do
     maybeLatest <- latestBuildStage package
     return $ do
         install <- (\l -> l == stage || package == ghc) <$> maybeLatest
-        let path = if install then installPath package else buildPath context
+        let path = if install then inplaceInstallPath package else buildPath context
         return $ path -/- programName context <.> exe
 
 pkgConfInstallPath :: FilePath
