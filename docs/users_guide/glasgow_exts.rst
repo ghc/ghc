@@ -1109,7 +1109,7 @@ Generalised list comprehensions are a further enhancement to the list
 comprehension syntactic sugar to allow operations such as sorting and
 grouping which are familiar from SQL. They are fully described in the
 paper `Comprehensive comprehensions: comprehensions with "order by" and
-"group by" <http://research.microsoft.com/~simonpj/papers/list-comp>`__,
+"group by" <https://www.microsoft.com/en-us/research/wp-content/uploads/2007/09/list-comp.pdf>`__,
 except that the syntax we use differs slightly from the paper.
 
 The extension is enabled with the flag :ghc-flag:`-XTransformListComp`.
@@ -5703,7 +5703,7 @@ reduction step makes the problem smaller by at least one constructor.
 You can find lots of background material about the reason for these
 restrictions in the paper `Understanding functional dependencies via
 Constraint Handling
-Rules <http://research.microsoft.com/%7Esimonpj/papers/fd%2Dchr/>`__.
+Rules <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp06.pdf>`__.
 
 For example, these are okay:
 
@@ -9246,7 +9246,7 @@ restriction is not closed, and hence may in turn prevent generalisation
 of bindings that mention it.
 
 The rationale for this more conservative strategy is given in `the
-papers <http://research.microsoft.com/~simonpj/papers/constraints/index.htm>`__
+papers <https://www.microsoft.com/en-us/research/wp-content/uploads/2016/02/jfp-outsidein.pdf>`__
 "Let should not be generalised" and "Modular type inference with local
 assumptions", and a related `blog post <http://ghc.haskell.org/trac/ghc/blog/LetGeneralisationInGhc7>`__.
 
@@ -10519,7 +10519,7 @@ ignore the problems in ``a``.
 
 For more motivation and details please refer to the
 :ghc-wiki:`Wiki <DeferErrorsToRuntime>` page or the `original
-paper <http://research.microsoft.com/en-us/um/people/simonpj/papers/ext-f/>`__.
+paper <https://www.microsoft.com/en-us/research/wp-content/uploads/2012/01/icfp12.pdf>`__.
 
 Enabling deferring of type errors
 ---------------------------------

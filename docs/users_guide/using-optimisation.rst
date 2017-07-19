@@ -230,7 +230,7 @@ by saying ``-fno-wombat``.
     Usually GHC black-holes a thunk only when it switches threads. This
     flag makes it do so as soon as the thunk is entered. See `Haskell on
     a shared-memory
-    multiprocessor <http://research.microsoft.com/en-us/um/people/simonpj/papers/parallel/>`__.
+    multiprocessor <http://community.haskell.org/~simonmar/papers/multiproc.pdf>`__.
 
 .. ghc-flag:: -fexcess-precision
 
