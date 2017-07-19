@@ -43,10 +43,11 @@ putBuild = putColoured Dull Magenta
 putSuccess :: String -> Action ()
 putSuccess = putColoured Dull Green
 
--- | Path to the GHC install destination
--- It is by default empty, representing the root of file system,
--- or it might be a directory.
--- It is usually used with @prefix@, like @/usr/local@
+-- | Path to the GHC install destination. It is empty by default, which
+-- corresponds to the root of the file system. You can replace it by a specific
+-- directory. Make sure you use correct absolute path on Windows, e.g. "C:/path".
+-- The destination directory is used with a @prefix@, commonly @/usr/local@,
+-- i.e. GHC is installed into "C:/path/usr/local" for the above example.
 defaultDestDir :: FilePath
 defaultDestDir = ""
 
