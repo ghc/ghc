@@ -1442,8 +1442,11 @@ postProcessDmdResult _              res       = res
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
 postProcessDmdEnv ds@(JD { sd = ss, ud = us }) env
   | Abs <- us       = emptyDmdEnv
-  | Str _ _   <- ss
-  , Use One _ <- us = env  -- Shell is a no-op
+    -- In this case (postProcessDmd ds) == id; avoid a redundant rebuild
+    -- of the environment. Be careful, bad things will happen if this doesn't
+    -- match postProcessDmd (see #13977).
+  | Str VanStr _ <- ss
+  , Use One _ <- us = env
   | otherwise       = mapVarEnv (postProcessDmd ds) env
   -- For the Absent case just discard all usage information
   -- We only processed the thing at all to analyse the body
