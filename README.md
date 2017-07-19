@@ -163,22 +163,24 @@ This unfortunately applies to _all of prelude_ (`+` is the offender
 here), which means you might see this a few times.
 
 
-Currently the type checker does not check linearity when not asked to do so,
+Currently the type checker does not infer linearity when not asked to do so,
 hence it is a requirement to explicitly declare the types of linear functions.
 Otherwise, they are assumed to be unrestricted which can give you errors from
 using functions that are _implemented_ linearly, but not declared as such.
 In particular, functions in `where`-clauses are easy to forget to annotate
-(`-XPartialTypeSignatures` or `-XScopedTypeVariables` are useful for this),
-but lambdas are inferred properly.
+with signatures (`-XPartialTypeSignatures` or `-XScopedTypeVariables` are
+useful for this). Lambda expressions are linearly inferred using type
+information from their context. Worth noting is that there is currently a
+caveat here, see section on Bugs below.
 
 
 ## Calling them
-By design, there is no obligations put on the caller of a linear function. This
-means any linear function can take unrestricted arguments, which is great
-since it makes all functions "linearly polymorphic". However, passing a
-_linear_ variable as an _unrestricted_ argument is illegal and will give you
-an error, as shown above. The key takeaway here is that any linear function
-can also act as an unrestricted one; just pass it unrestricted arguments.
+By design, there is no obligations put on the caller of a linear function.
+This means any linear function can take unrestricted arguments, which makes
+all first-order ones "linearly polymorphic". However, passing a _linear_
+variable as an _unrestricted_ argument is illegal and will give you an error,
+as shown above. The key takeaway here is that a linear function can also act
+as an unrestricted one; just pass it unrestricted arguments.
 
 
 ## Unimplemented features & known limitations
@@ -201,14 +203,11 @@ notably `case` and `let`:
     • In an equation for ‘f’: f x = let y = x in y
 ```
 
-`@`-patterns also do not work as expected:
+`@`-patterns also do not work as expected, as this passes just fine while
+being incorrect:
 
 ```
-λ> let f :: a ⊸ a; f y@x = y
-
-<interactive>:32:21: error:
-    • Couldn't match expected weight ‘1’ of variable ‘x’ with actual weight ‘0’
-    • In an equation for ‘f’: f y@x = y
+λ> let dup :: a ⊸ (a,a); dup y@x = (y,x)
 ```
 
 Other than that, pattern synonyms are also not compatible with linear types
@@ -224,8 +223,11 @@ linearity checker happily accepts this, making stuff like this look fine while
 it really is not:
 
 ```
-λ> skip :: a ⊸ (); skip = const ()
+λ> let skip :: a ⊸ (); skip = const ()
 ```
 
+This also applies to lambda expressions under certain conditions.
+
 There are probably more bugs; if you find something that definitely looks off,
-we would appreciate a well-documented bug report to this repo.
+we would appreciate a well-documented bug report to
+[the issue tracker](https://github.com/tweag/ghc/issues) of this repository.
