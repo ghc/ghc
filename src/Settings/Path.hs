@@ -14,8 +14,8 @@ import Context
 import Expression
 import GHC
 import Oracles.PackageData
-import Oracles.Config.Setting (setting, Setting(..))
-import Oracles.Path (getTopDirectory)
+import Oracles.Config.Setting
+import Oracles.Path
 import UserSettings
 
 -- | Path to the directory containing the Shake database and other auxiliary
@@ -202,12 +202,12 @@ inplaceInstallPath pkg
 ghcSplitPath :: FilePath
 ghcSplitPath = inplaceLibBinPath -/- "ghc-split"
 
--- | Command line tool for stripping
 -- ref: mk/config.mk
-stripCmdPath :: Context -> Action FilePath
-stripCmdPath ctx = do
+-- | Command line tool for stripping.
+stripCmdPath :: Action FilePath
+stripCmdPath = do
     targetPlatform <- setting TargetPlatform
-    top <- interpretInContext ctx getTopDirectory
+    top <- topDirectory
     case targetPlatform of
         "x86_64-unknown-mingw32" ->
              return (top -/- "inplace/mingw/bin/strip.exe")

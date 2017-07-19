@@ -128,6 +128,7 @@ withLatestBuildStage pkg m = do
       Nothing    -> return ()
 
 -- ref: rules/manual-package-conf.mk
+-- TODO: Should we use a temporary file instead of pkgConfInstallPath?
 -- | Install @package.conf.install@ for each package. Note that it will be
 -- recreated each time.
 installPackageConf :: Action ()
@@ -161,7 +162,7 @@ installPackages = do
     -- Install RTS
     let rtsDir = destDir ++ ghcLibDir -/- "rts"
     installDirectory rtsDir
-    ways <- interpretInContext (vanillaContext Stage1 rts) getRtsWays
+    ways    <- interpretInContext (vanillaContext Stage1 rts) getRtsWays
     rtsLibs <- mapM pkgLibraryFile $ map (Context Stage1 rts) ways
     ffiLibs <- sequence $ map rtsLibffiLibrary ways
 
@@ -183,14 +184,14 @@ installPackages = do
         when (isLibrary pkg) $
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
-                top <- interpretInContext context getTopDirectory
+                top <- topDirectory
                 let installDistDir = top -/- buildPath context
                 buildPackage stage pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
 
                 -- Copy over packages
-                strip <- stripCmdPath context
+                strip <- stripCmdPath
                 ways  <- interpretInContext context getLibraryWays
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" <.> exe -- HACK?
                 need [ghcCabalInplace]
@@ -230,7 +231,7 @@ installPackages = do
         when (isLibrary pkg) $
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
-                top <- interpretInContext context getTopDirectory
+                top <- topDirectory
                 let installDistDir = top -/- buildPath context
                 -- TODO: better reference to the built inplace binary path
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal"

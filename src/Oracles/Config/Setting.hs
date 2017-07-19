@@ -53,19 +53,18 @@ data Setting = BuildArch
              | IconvIncludeDir
              | IconvLibDir
              | CursesLibDir
-             -- Paths to where GHC is installed
-             -- ref: mk/install.mk
+             -- Paths to where GHC is installed (ref: mk/install.mk)
              | InstallPrefix
              | InstallBinDir
              | InstallLibDir
              | InstallDataRootDir
-             -- "install" utility
+             -- Command lines for invoking the @install@ utility
              | Install
              | InstallData
              | InstallProgram
              | InstallScript
              | InstallDir
-             -- symbolic link
+             -- Command line for creating a symbolic link
              | LnS
 
 data SettingList = ConfCcArgs Stage
@@ -202,9 +201,10 @@ cmdLineLengthLimit = do
         -- On all other systems, we try this:
         _             -> 4194304 -- Cabal library needs a bit more than 2MB!
 
--- | On Windows we normally want to make a relocatable bindist,
--- to we ignore flags like libdir
--- ref: mk/config.mk.in:232
+-- ref: https://ghc.haskell.org/trac/ghc/wiki/Building/Installing#HowGHCfindsitsfiles
+-- | On Windows we normally build a relocatable installation, which assumes that
+-- the library directory @libdir@ is in a fixed location relative to the GHC
+-- binary, namely @../lib@.
 relocatableBuild :: Action Bool
 relocatableBuild = windowsHost
 
@@ -213,10 +213,10 @@ installDocDir = do
   version <- setting ProjectVersion
   (-/- ("doc/ghc-" ++ version)) <$> setting InstallDataRootDir
 
--- | Unix: override libdir and datadir to put ghc-specific stuff in
--- a subdirectory with the version number included.
 -- ref: mk/install.mk:101
 -- TODO: CroosCompilePrefix
+-- | Unix: override @libdir@ and @datadir@ to put GHC-specific files in a
+-- subdirectory with the version number included.
 installGhcLibDir :: Action String
 installGhcLibDir = do
   r <- relocatableBuild
@@ -224,4 +224,4 @@ installGhcLibDir = do
   if r then return libdir
        else do
          v <- setting ProjectVersion
-         return (libdir -/- ("ghc-" ++ v))
+         return $ libdir -/- ("ghc-" ++ v)
