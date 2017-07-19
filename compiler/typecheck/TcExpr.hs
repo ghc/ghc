@@ -54,6 +54,7 @@ import NameEnv
 import NameSet
 import RdrName
 import TyCon
+import TyCoRep
 import Type
 import TcEvidence
 import VarSet
@@ -1170,6 +1171,16 @@ tcApp m_herald orig_fun orig_args res_ty
            ; sel_name  <- disambiguateSelector lbl sig_tc_ty
            ; go (L loc (HsRecFld (Unambiguous lbl sel_name))) args }
 
+    -- See Note [Visible type application for the empty list constructor]
+    go (L loc (ExplicitList _ Nothing [])) [Right ty_arg]
+      = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
+           ; let list_ty = TyConApp listTyCon [ty_arg']
+           ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
+                              list_ty res_ty
+           ; let expr :: LHsExpr GhcTcId
+                 expr = L loc $ ExplicitList ty_arg' Nothing []
+           ; return (idHsWrapper, expr, []) }
+
     go fun args
       = do {   -- Type-check the function
            ; (fun1, fun_sigma) <- tcInferFun fun
@@ -1197,6 +1208,26 @@ mk_app_msg fun = sep [ text "The function" <+> quotes (ppr fun)
 
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
+
+{-
+Note [Visible type application for the empty list constructor]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Getting the expression [] @Int to typecheck is slightly tricky since [] isn't
+an ordinary data constructor. By default, when tcExpr typechecks a list
+expression, it wraps the expression in a coercion, which gives it a type to the
+effect of p[a]. It isn't until later zonking that the type becomes
+forall a. [a], but that's too late for visible type application.
+
+The workaround is to check for empty list expressions that have a visible type
+argument in tcApp, and if so, directly typecheck [] @ty data constructor name.
+This avoids the intermediate coercion and produces an expression of type [ty],
+as one would intuitively expect.
+
+Unfortunately, this workaround isn't terribly robust, since more involved
+expressions such as (let in []) @Int won't work. Until a more elegant fix comes
+along, however, this at least allows direct type application on [] to work,
+which is better than before.
+-}
 
 ----------------
 tcInferFun :: LHsExpr GhcRn -> TcM (LHsExpr GhcTcId, TcSigmaType)
