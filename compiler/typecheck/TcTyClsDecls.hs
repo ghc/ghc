@@ -369,6 +369,7 @@ kcTyClGroup decls
                  kc_binders  = tyConBinders tc
                  kc_res_kind = tyConResKind tc
                  kc_tyvars   = tyConTyVars tc
+                 kc_flav     = tyConFlavour tc
            ; kvs <- kindGeneralize (mkTyConKind kc_binders kc_res_kind)
            ; let all_binders = mkNamedTyConBinders Inferred kvs ++ kc_binders
 
@@ -382,8 +383,8 @@ kcTyClGroup decls
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
            ; return (mkTcTyCon name all_binders' kc_res_kind'
-                               (mightBeUnsaturatedTyCon tc)
-                               (tcTyConScopedTyVars tc)) }
+                               (tcTyConScopedTyVars tc)
+                               kc_flav) }
 
     generaliseTCD :: TcTypeEnv
                   -> LTyClDecl GhcRn -> TcM [TcTyCon]
@@ -482,21 +483,26 @@ getInitialKind :: TyClDecl GhcRn
 getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
   = do { let cusk = hsDeclHasCusk decl
        ; (tycon, inner_prs) <-
-           kcHsTyVarBndrs name True cusk False True ktvs $
+           kcHsTyVarBndrs name ClassFlavour cusk True ktvs $
            do { inner_prs <- getFamDeclInitialKinds (Just cusk) ats
               ; return (constraintKind, inner_prs) }
        ; return (extendEnvWithTcTyCon inner_prs tycon) }
 
 getInitialKind decl@(DataDecl { tcdLName = L _ name
                               , tcdTyVars = ktvs
-                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig } })
+                              , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
+                                                         , dd_ND = new_or_data } })
   = do  { (tycon, _) <-
-           kcHsTyVarBndrs name True (hsDeclHasCusk decl) False True ktvs $
+           kcHsTyVarBndrs name flav (hsDeclHasCusk decl) True ktvs $
            do { res_k <- case m_sig of
                            Just ksig -> tcLHsKindSig ksig
                            Nothing   -> return liftedTypeKind
               ; return (res_k, ()) }
         ; return (mkTcTyConEnv tycon) }
+  where
+    flav = case new_or_data of
+             NewType  -> NewtypeFlavour
+             DataType -> DataTypeFlavour
 
 getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind Nothing decl
@@ -504,8 +510,9 @@ getInitialKind (FamDecl { tcdFam = decl })
 getInitialKind decl@(SynDecl { tcdLName = L _ name
                              , tcdTyVars = ktvs
                              , tcdRhs = rhs })
-  = do  { (tycon, _) <- kcHsTyVarBndrs name False (hsDeclHasCusk decl)
-                            False {- not open -} True ktvs $
+  = do  { (tycon, _) <- kcHsTyVarBndrs name TypeSynonymFlavour
+                            (hsDeclHasCusk decl)
+                            True ktvs $
             do  { res_k <- case kind_annotation rhs of
                             Nothing -> newMetaKindVar
                             Just ksig -> tcLHsKindSig ksig
@@ -534,12 +541,12 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
                                                , fdResultSig = L _ resultSig
                                                , fdInfo      = info })
   = do { (tycon, _) <-
-           kcHsTyVarBndrs name unsat cusk open True ktvs $
+           kcHsTyVarBndrs name flav cusk True ktvs $
            do { res_k <- case resultSig of
                       KindSig ki                        -> tcLHsKindSig ki
                       TyVarSig (L _ (KindedTyVar _ ki)) -> tcLHsKindSig ki
                       _ -- open type families have * return kind by default
-                        | open                     -> return liftedTypeKind
+                        | tcFlavourIsOpen flav     -> return liftedTypeKind
                         -- closed type families have their return kind inferred
                         -- by default
                         | otherwise                -> newMetaKindVar
@@ -547,10 +554,10 @@ getFamDeclInitialKind mb_cusk decl@(FamilyDecl { fdLName     = L _ name
        ; return (mkTcTyConEnv tycon) }
   where
     cusk  = famDeclHasCusk mb_cusk decl
-    (open, unsat) = case info of
-      DataFamily         -> (True,  True)
-      OpenTypeFamily     -> (True,  False)
-      ClosedTypeFamily _ -> (False, False)
+    flav  = case info of
+      DataFamily         -> DataFamilyFlavour
+      OpenTypeFamily     -> OpenTypeFamilyFlavour
+      ClosedTypeFamily _ -> ClosedTypeFamilyFlavour
 
 ------------------------------------------------------------------------
 kcLTyClDecl :: LTyClDecl GhcRn -> TcM ()
@@ -616,8 +623,10 @@ kcConDecl (ConDeclH98 { con_name = name, con_qvars = ex_tvs
   = addErrCtxt (dataConCtxtName [name]) $
          -- the 'False' says that the existentials don't have a CUSK, as the
          -- concept doesn't really apply here. We just need to bring the variables
-         -- into scope.
-    do { _ <- kcHsTyVarBndrs (unLoc name) False False False False
+         -- into scope. (Similarly, the choice of PromotedDataConFlavour isn't
+         -- particularly important.)
+    do { _ <- kcHsTyVarBndrs (unLoc name) PromotedDataConFlavour
+                             False False
                              ((fromMaybe emptyLHsQTvs ex_tvs)) $
               do { _ <- tcHsContext (fromMaybe (noLoc []) ex_ctxt)
                  ; mapM_ (tcHsOpenType . getBangType) (hsConDeclArgTys details)
@@ -3101,7 +3110,7 @@ addTyConCtxt tc
   = addErrCtxt ctxt
   where
     name = getName tc
-    flav = text (tyConFlavour tc)
+    flav = ppr (tyConFlavour tc)
     ctxt = hsep [ text "In the", flav
                 , text "declaration for", quotes (ppr name) ]
 

@@ -1310,15 +1310,14 @@ tcWildCardBindersX new_wc wc_names thing_inside
 --
 -- This function does not do telescope checking.
 kcHsTyVarBndrs :: Name    -- ^ of the thing being checked
-               -> Bool    -- ^ True <=> the TyCon being kind-checked can be unsaturated
+               -> TyConFlavour -- ^ What sort of 'TyCon' is being checked
                -> Bool    -- ^ True <=> the decl being checked has a CUSK
-               -> Bool    -- ^ True <=> the decl is an open type/data family
                -> Bool    -- ^ True <=> all the hsq_implicit are *kind* vars
                           -- (will give these kind * if -XNoTypeInType)
                -> LHsQTyVars GhcRn
                -> TcM (Kind, r)     -- ^ The result kind, possibly with other info
                -> TcM (TcTyCon, r)  -- ^ A suitably-kinded TcTyCon
-kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
+kcHsTyVarBndrs name flav cusk all_kind_vars
   (HsQTvs { hsq_implicit = kv_ns, hsq_explicit = hs_tvs
           , hsq_dependent = dep_names }) thing_inside
   | cusk
@@ -1353,12 +1352,12 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
                                  `unionVarSet` tyCoVarsOfType res_kind
              unmentioned_kvs   = filterOut (`elemVarSet` all_mentioned_tvs)
                                            scoped_kvs
-       ; reportFloatingKvs name all_tc_tvs unmentioned_kvs
+       ; reportFloatingKvs name flav all_tc_tvs unmentioned_kvs
 
        ; let final_binders = map (mkNamedTyConBinder Specified) good_tvs
                             ++ tc_binders
              tycon = mkTcTyCon name final_binders res_kind
-                               unsat (scoped_kvs ++ tc_tvs)
+                               (scoped_kvs ++ tc_tvs) flav
                            -- the tvs contain the binders already
                            -- in scope from an enclosing class, but
                            -- re-adding tvs to the env't doesn't cause
@@ -1374,10 +1373,12 @@ kcHsTyVarBndrs name unsat cusk open_fam all_kind_vars
               bind_telescope hs_tvs thing_inside
        ; let   -- NB: Don't add scoped_kvs to tyConTyVars, because they
                -- must remain lined up with the binders
-             tycon = mkTcTyCon name binders res_kind unsat
-                               (scoped_kvs ++ binderVars binders)
+             tycon = mkTcTyCon name binders res_kind
+                               (scoped_kvs ++ binderVars binders) flav
        ; return (tycon, stuff) }
   where
+    open_fam = tcFlavourIsOpen flav
+
       -- if -XNoTypeInType and we know all the implicits are kind vars,
       -- just give the kind *. This prevents test
       -- dependent/should_fail/KindLevelsB from compiling, as it should
@@ -1741,7 +1742,7 @@ tcTyClTyVars tycon_name thing_inside
           -- See Note [Free-floating kind vars]
        ; zonked_scoped_tvs <- mapM zonkTcTyVarToTyVar scoped_tvs
        ; let still_sig_tvs = filter isSigTyVar zonked_scoped_tvs
-       ; checkNoErrs $ reportFloatingKvs tycon_name
+       ; checkNoErrs $ reportFloatingKvs tycon_name (tyConFlavour tycon)
                                          zonked_scoped_tvs still_sig_tvs
 
           -- Add the *unzonked* tyvars to the env't, because those
@@ -2131,11 +2132,12 @@ funAppCtxt fun arg arg_no
        2 (quotes (ppr arg))
 
 -- See Note [Free-floating kind vars]
-reportFloatingKvs :: Name        -- of the tycon
-                  -> [TcTyVar]   -- all tyvars, not necessarily zonked
-                  -> [TcTyVar]   -- floating tyvars
+reportFloatingKvs :: Name         -- of the tycon
+                  -> TyConFlavour -- What sort of TyCon it is
+                  -> [TcTyVar]    -- all tyvars, not necessarily zonked
+                  -> [TcTyVar]    -- floating tyvars
                   -> TcM ()
-reportFloatingKvs tycon_name all_tvs bad_tvs
+reportFloatingKvs tycon_name flav all_tvs bad_tvs
   = unless (null bad_tvs) $  -- don't bother zonking if there's no error
     do { all_tvs <- mapM zonkTcTyVarToTyVar all_tvs
        ; bad_tvs <- mapM zonkTcTyVarToTyVar bad_tvs
@@ -2147,7 +2149,7 @@ reportFloatingKvs tycon_name all_tvs bad_tvs
     report typeintype tidy_all_tvs tidy_bad_tv
       = addErr $
         vcat [ text "Kind variable" <+> quotes (ppr tidy_bad_tv) <+>
-               text "is implicitly bound in datatype"
+               text "is implicitly bound in" <+> ppr flav
              , quotes (ppr tycon_name) <> comma <+>
                text "but does not appear as the kind of any"
              , text "of its type variables. Perhaps you meant"
