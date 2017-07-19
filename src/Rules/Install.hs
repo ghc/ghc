@@ -15,7 +15,7 @@ import Rules.Libffi
 import Rules.Generate
 import Settings.Packages.Rts
 import Oracles.Config.Setting
-import Oracles.Dependencies (sortPkgsByDep)
+import Oracles.Dependencies
 import Oracles.DirectoryContents
 import Oracles.Path
 
@@ -178,7 +178,7 @@ installPackages = do
     activePackages <- filterM ((isJust <$>) . latestBuildStage)
                               (knownPackages \\ [rts, libffi])
 
-    installLibPkgs <- sortPkgsByDep (filter isLibrary activePackages)
+    installLibPkgs <- topsortPackages (filter isLibrary activePackages)
 
     forM_ installLibPkgs $ \pkg@Package{..} -> do
         when (isLibrary pkg) $
@@ -186,7 +186,7 @@ installPackages = do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
                 let installDistDir = top -/- buildPath context
-                buildPackage stage pkg
+                need =<< packageTargets stage pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
 

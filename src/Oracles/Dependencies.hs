@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, TupleSections #-}
 module Oracles.Dependencies (
-    fileDependencies, contextDependencies, needContext, dependenciesOracles,
-    pkgDependencies, sortPkgsByDep
+    fileDependencies, contextDependencies, libraryTargets, needLibrary,
+    dependenciesOracles, pkgDependencies, topsortPackages
     ) where
 
 import qualified Data.HashMap.Strict as Map
@@ -54,19 +54,21 @@ contextDependencies context@Context {..} = do
 pkgDependencies :: Package -> Action [Package]
 pkgDependencies = fmap (map Context.package) . contextDependencies . vanillaContext Stage1
 
--- | Coarse-grain 'need': make sure given contexts are fully built.
-needContext :: [Context] -> Action ()
-needContext cs = do
-    libs <- concatForM cs $ \context -> do
-        libFile  <- pkgLibraryFile     context
-        lib0File <- pkgLibraryFile0    context
-        lib0     <- buildDll0          context
-        ghciLib  <- pkgGhciLibraryFile context
-        ghciFlag <- interpretInContext context $ getPkgData BuildGhciLib
-        let ghci = ghciFlag == "YES" && (stage context == Stage1 || stage1Only)
-        return $ [ libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
-    confs <- mapM pkgConfFile cs
-    need $ libs ++ confs
+-- | Given a library 'Package' this action computes all of its targets.
+libraryTargets :: Context -> Action [FilePath]
+libraryTargets context = do
+    confFile <- pkgConfFile        context
+    libFile  <- pkgLibraryFile     context
+    lib0File <- pkgLibraryFile0    context
+    lib0     <- buildDll0          context
+    ghciLib  <- pkgGhciLibraryFile context
+    ghciFlag <- interpretInContext context $ getPkgData BuildGhciLib
+    let ghci = ghciFlag == "YES" && (stage context == Stage1 || stage1Only)
+    return $ [ confFile, libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
+
+-- | Coarse-grain 'need': make sure all given libraries are fully built.
+needLibrary :: [Context] -> Action ()
+needLibrary cs = need =<< concatMapM libraryTargets cs
 
 -- | Oracles for the package dependencies and 'path/dist/.dependencies' files.
 dependenciesOracles :: Rules ()
@@ -82,10 +84,10 @@ dependenciesOracles = do
         contents <- map words <$> readFileLines file
         return $ Map.fromList [ (key, values) | (key:values) <- contents ]
 
--- | Sort packages by their dependency
+-- | Topological sort of packages according to their dependencies.
 -- HACK (izgzhen): See https://github.com/snowleopard/hadrian/issues/344 for details
-sortPkgsByDep :: [Package] -> Action [Package]
-sortPkgsByDep pkgs = do
+topsortPackages :: [Package] -> Action [Package]
+topsortPackages pkgs = do
     elems <- mapM (\p -> (p,) <$> pkgDependencies p) pkgs
     return $ map fst $ topSort elems
   where

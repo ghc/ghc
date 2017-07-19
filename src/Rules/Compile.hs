@@ -24,7 +24,7 @@ compilePackage rs context@Context {..} = do
             (src, deps) <- fileDependencies context obj
             need $ src : deps
             when (isLibrary package) $ need =<< return <$> pkgConfFile context
-            needContext =<< contextDependencies context
+            needLibrary =<< contextDependencies context
             buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
 
     priority 2.0 $ do

@@ -1,4 +1,4 @@
-module Rules (topLevelTargets, buildPackage, buildRules) where
+module Rules (topLevelTargets, packageTargets, buildRules) where
 
 import Base
 import Context
@@ -18,7 +18,7 @@ import qualified Rules.Library
 import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
-import Oracles.Dependencies (needContext)
+import Oracles.Dependencies
 import Settings
 import Settings.Path
 
@@ -30,36 +30,35 @@ allStages = [minBound ..]
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
     need $ Rules.Generate.inplaceLibCopyTargets
+    let libraryPackages = filter isLibrary (knownPackages \\ [rts, libffi])
+    need =<< if stage1Only
+             then do
+                 libs <- concatForM [Stage0, Stage1] $ \stage ->
+                     concatForM libraryPackages $ packageTargets stage
+                 prgs <- concatForM programsStage1Only $ packageTargets Stage0
+                 return $ libs ++ prgs
+             else
+                 concatForM allStages $ \stage ->
+                     concatForM (knownPackages \\ [rts, libffi]) $ packageTargets stage
 
-    if stage1Only
-        then do
-             forAllPkgs $ \stg pkg ->
-                 when (isLibrary pkg) $
-                     buildPackage stg pkg
-             forM_ programsStage1Only $ buildPackage Stage0
-        else
-             forAllPkgs buildPackage
-  where
-    forAllPkgs f =
-      forM_ allStages $ \stage ->
-          forM_ (knownPackages \\ [rts, libffi]) $ \pkg -> f stage pkg
-
-buildPackage :: Stage -> Package -> Action ()
-buildPackage stage pkg = do
+-- | Return the list of targets associated with a given 'Stage' and 'Package'.
+packageTargets :: Stage -> Package -> Action [FilePath]
+packageTargets stage pkg = do
     let context = vanillaContext stage pkg
     activePackages <- interpretInContext context getPackages
-    when (pkg `elem` activePackages) $
-        if isLibrary pkg
-        then do -- build a library
-            when (nonCabalContext context) $
-                need [pkgSetupConfigFile context]
+    if pkg `notElem` activePackages
+    then return [] -- Skip inactive packages.
+    else if isLibrary pkg
+        then do -- Collect all targets of a library package.
             ways <- interpretInContext context getLibraryWays
             libs <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs <- interpretInContext context $ buildHaddock flavour
-            needContext [context]
-            need $ libs ++ [ pkgHaddockFile context | docs && stage == Stage1 ]
-        else -- otherwise build a program
-            need =<< maybeToList <$> programPath (programContext stage pkg)
+            more <- libraryTargets context
+            return $ [ pkgSetupConfigFile context | nonCabalContext context ]
+                  ++ [ pkgHaddockFile     context | docs && stage == Stage1 ]
+                  ++ libs ++ more
+        else -- The only target of a program package is the executable.
+            maybeToList <$> programPath (programContext stage pkg)
 
 packageRules :: Rules ()
 packageRules = do
