@@ -625,14 +625,17 @@ Consider
   data S = MkS (Proxy 'MkT)
 
 Is it ok to use the promoted data family instance constructor 'MkT' in
-the data declaration for S?  No, we don't allow this. It *might* make
-sense, but at least it would mean that we'd have to interleave
-typechecking instances and data types, whereas at present we do data
-types *then* instances.
+the data declaration for S (where both declarations live in the same module)?
+No, we don't allow this. It *might* make sense, but at least it would mean that
+we'd have to interleave typechecking instances and data types, whereas at
+present we do data types *then* instances.
 
 So to check for this we put in the TcLclEnv a binding for all the family
 constructors, bound to AFamDataCon, so that if we trip over 'MkT' when
 type checking 'S' we'll produce a decent error message.
+
+Trac #12088 describes this limitation. Of course, when MkT and S live in
+different modules then all is well.
 
 Note [Don't promote pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

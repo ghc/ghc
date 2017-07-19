@@ -169,7 +169,7 @@ mkTypeableBinds
       | tc `elem` [runtimeRepTyCon, vecCountTyCon, vecElemTyCon]
       = False
       | otherwise =
-          (not (isFamInstTyCon tc) && isAlgTyCon tc)
+          isAlgTyCon tc
        || isDataFamilyTyCon tc
        || isClassTyCon tc
 
@@ -242,12 +242,12 @@ todoForTyCons mod mod_id tycons = do
                             }
             | tc     <- tycons
             , tc'    <- tc : tyConATs tc
-              -- If the tycon itself isn't typeable then we needn't look
-              -- at its promoted datacons as their kinds aren't Typeable
-            , Just _ <- pure $ tyConRepName_maybe tc'
               -- We need type representations for any associated types
             , let promoted = map promoteDataCon (tyConDataCons tc')
             , tc''   <- tc' : promoted
+              -- Don't make bindings for data-family instance tycons.
+              -- Do, however, make them for their promoted datacon (see #13915).
+            , not $ isFamInstTyCon tc''
             , Just rep_name <- pure $ tyConRepName_maybe tc''
             , typeIsTypeable $ dropForAlls $ tyConKind tc''
             ]
