@@ -137,7 +137,7 @@ These data types are the heart of the compiler
 -}
 
 -- | This is the data type that represents GHCs core intermediate language. Currently
--- GHC uses System FC <http://research.microsoft.com/~simonpj/papers/ext-f/> for this purpose,
+-- GHC uses System FC <https://www.microsoft.com/en-us/research/publication/system-f-with-type-equality-coercions/> for this purpose,
 -- which is closely related to the simpler and better known System F <http://en.wikipedia.org/wiki/System_F>.
 --
 -- We get from Haskell source to this Core language in a number of stages:

@@ -47,14 +47,14 @@ The functions exported by this library include:
 -  Synchronised mutable variables, called ``MVars``
 
 -  Support for bound threads; see the paper `Extending the FFI with
-   concurrency <http://research.microsoft.com/%7Esimonpj/Papers/conc-ffi/index.htm>`__.
+   concurrency <http://community.haskell.org/~simonmar/papers/conc-ffi.pdf>`__.
 
 Software Transactional Memory
 -----------------------------
 
 GHC now supports a new way to coordinate the activities of Concurrent
 Haskell threads, called Software Transactional Memory (STM). The `STM
-papers <http://research.microsoft.com/%7Esimonpj/papers/stm/index.htm>`__
+papers <https://wiki.haskell.org/Research_papers/Parallelism_and_concurrency#Lock_free_data_structures_and_transactional_memory>`__
 are an excellent introduction to what STM is, and how to use it.
 
 The main library you need to use is the `stm
