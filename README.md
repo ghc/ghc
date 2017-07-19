@@ -203,13 +203,6 @@ notably `case` and `let`:
     • In an equation for ‘f’: f x = let y = x in y
 ```
 
-`@`-patterns also do not work as expected, as this passes just fine while
-being incorrect:
-
-```
-λ> let dup :: a ⊸ (a,a); dup y@x = (y,x)
-```
-
 Other than that, pattern synonyms are also not compatible with linear types
 (and probably incorrect). These are the current _known_ limitations; there may
 be more but it has not been thoroughly tested yet.
@@ -227,6 +220,15 @@ it really is not:
 ```
 
 This also applies to lambda expressions under certain conditions.
+
+
+`@`-patterns also do not work as expected, as this passes just fine while
+being incorrect:
+
+```
+λ> let dup :: a ⊸ (a,a); dup y@x = (y,x)
+```
+
 
 There are probably more bugs; if you find something that definitely looks off,
 we would appreciate a well-documented bug report to
