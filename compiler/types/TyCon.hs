@@ -222,7 +222,10 @@ See also Note [Wrappers for data instance tycons] in MkId.hs
         DataFamInstTyCon T [Int] ax_ti
 
 * The axiom ax_ti may be eta-reduced; see
-  Note [Eta reduction for data family axioms] in TcInstDcls
+  Note [Eta reduction for data family axioms] in FamInstEnv
+
+* Data family instances may have a different arity than the data family.
+  See Note [Arity of data families] in FamInstEnv
 
 * The data constructor T2 has a wrapper (which is what the
   source-level "T2" invokes):
@@ -940,7 +943,8 @@ data AlgTyConFlav
           -- use the tyConTyVars of this TyCon
         TyCon   -- The family TyCon
         [Type]  -- Argument types (mentions the tyConTyVars of this TyCon)
-                -- Match in length the tyConTyVars of the family TyCon
+                -- No shorter in length than the tyConTyVars of the family TyCon
+                -- How could it be longer? See [Arity of data families] in FamInstEnv
 
         -- E.g.  data instance T [a] = ...
         -- gives a representation tycon:
@@ -961,7 +965,7 @@ okParent :: Name -> AlgTyConFlav -> Bool
 okParent _       (VanillaAlgTyCon {})            = True
 okParent _       (UnboxedAlgTyCon {})            = True
 okParent tc_name (ClassTyCon cls _)              = tc_name == tyConName (classTyCon cls)
-okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthIs` tyConArity fam_tc
+okParent _       (DataFamInstTyCon _ fam_tc tys) = tys `lengthAtLeast` tyConArity fam_tc
 
 isNoParent :: AlgTyConFlav -> Bool
 isNoParent (VanillaAlgTyCon {}) = True

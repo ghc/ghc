@@ -6772,6 +6772,11 @@ entirely optional, so that we can declare ``Array`` alternatively with ::
 
     data family Array :: * -> *
 
+Unlike with ordinary data definitions, the result kind of a data family
+does not need to be ``*``: it can alternatively be a kind variable
+(with :ghc-flag:`-XPolyKinds`). Data instances' kinds must end in
+``*``, however.
+    
 .. _data-instance-declarations:
 
 Data instance declarations

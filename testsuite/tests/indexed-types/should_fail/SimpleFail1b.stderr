@@ -1,6 +1,4 @@
 
-SimpleFail1b.hs:4:1:
-    Too many parameters to T1:
-      Char is unexpected;
-      expected only two parameters
-    In the data instance declaration for ‘T1’
+SimpleFail1b.hs:4:1: error:
+    • Number of parameters must match family declaration; expected 2
+    • In the data instance declaration for ‘T1’

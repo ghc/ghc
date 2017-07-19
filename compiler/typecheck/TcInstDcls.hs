@@ -638,8 +638,9 @@ tcDataFamInstDecl mb_clsinfo
        ; checkTc (isDataFamilyTyCon fam_tc) (wrongKindOfFamily fam_tc)
 
          -- Kind check type patterns
+       ; let mb_kind_env = thdOf3 <$> mb_clsinfo
        ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo pats
-                     (kcDataDefn (unLoc fam_tc_name) pats defn) $
+                     (kcDataDefn mb_kind_env (unLoc fam_tc_name) pats defn) $
              \tvs pats res_kind ->
     do { stupid_theta <- solveEqualities $ tcHsContext ctxt
 
@@ -655,17 +656,27 @@ tcDataFamInstDecl mb_clsinfo
        ; rep_tc_name <- newFamInstTyConName fam_tc_name pats'
        ; axiom_name  <- newFamInstAxiomName fam_tc_name [pats']
 
+         -- Deal with any kind signature.
+         -- See also Note [Arity of data families] in FamInstEnv
+       ; (extra_tcbs, final_res_kind) <- tcDataKindSig True res_kind'
+
        ; let (eta_pats, etad_tvs) = eta_reduce pats'
              eta_tvs              = filterOut (`elem` etad_tvs) tvs'
+                 -- NB: the "extra" tvs from tcDataKindSig would always be eta-reduced
+
              full_tvs             = eta_tvs ++ etad_tvs
                  -- Put the eta-removed tyvars at the end
                  -- Remember, tvs' is in arbitrary order (except kind vars are
                  -- first, so there is no reason to suppose that the etad_tvs
                  -- (obtained from the pats) are at the end (Trac #11148)
-             orig_res_ty          = mkTyConApp fam_tc pats'
+
+             extra_pats           = map (mkTyVarTy . binderVar) extra_tcbs
+             all_pats             = pats' `chkAppend` extra_pats
+             orig_res_ty          = mkTyConApp fam_tc all_pats
 
        ; (rep_tc, axiom) <- fixM $ \ ~(rec_rep_tc, _) ->
-           do { let ty_binders = mkTyConBindersPreferAnon full_tvs liftedTypeKind
+           do { let ty_binders = mkTyConBindersPreferAnon full_tvs res_kind'
+                                 `chkAppend` extra_tcbs
               ; data_cons <- tcConDecls rec_rep_tc
                                         (ty_binders, orig_res_ty) cons
               ; tc_rhs <- case new_or_data of
@@ -676,10 +687,10 @@ tcDataFamInstDecl mb_clsinfo
               ; let axiom  = mkSingleCoAxiom Representational
                                              axiom_name eta_tvs [] fam_tc eta_pats
                                              (mkTyConApp rep_tc (mkTyVarTys eta_tvs))
-                    parent = DataFamInstTyCon axiom fam_tc pats'
+                    parent = DataFamInstTyCon axiom fam_tc all_pats
 
 
-                      -- NB: Use the full_tvs from the pats. See bullet toward
+                      -- NB: Use the full ty_binders from the pats. See bullet toward
                       -- the end of Note [Data type families] in TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
                                           ty_binders liftedTypeKind
@@ -697,10 +708,10 @@ tcDataFamInstDecl mb_clsinfo
          -- Remember to check validity; no recursion to worry about here
          -- Check that left-hand sides are ok (mono-types, no type families,
          -- consistent instantiations, etc)
-       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats'
+       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats' extra_pats
 
          -- Result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind res_kind') $
+       ; checkTc (isLiftedTypeKind final_res_kind) $
          tooFewParmsErr (tyConArity fam_tc)
 
        ; checkValidTyCon rep_tc

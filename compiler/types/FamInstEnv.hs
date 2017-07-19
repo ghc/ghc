@@ -125,8 +125,45 @@ data FamFlavor
   = SynFamilyInst         -- A synonym family
   | DataFamilyInst TyCon  -- A data family, with its representation TyCon
 
-{- Note [Eta reduction for data families]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+{-
+Note [Arity of data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Data family instances might legitimately be over- or under-saturated.
+
+Under-saturation has two potential causes:
+ U1) Eta reduction. See Note [Eta reduction for data families].
+ U2) When the user has specified a return kind instead of written out patterns.
+     Example:
+
+       data family Sing (a :: k)
+       data instance Sing :: Bool -> Type
+
+     The data family tycon Sing has an arity of 2, the k and the a. But
+     the data instance has only one pattern, Bool (standing in for k).
+     This instance is equivalent to `data instance Sing (a :: Bool)`, but
+     without the last pattern, we have an under-saturated data family instance.
+     On its own, this example is not compelling enough to add support for
+     under-saturation, but U1 makes this feature more compelling.
+
+Over-saturation is also possible:
+  O1) If the data family's return kind is a type variable (see also #12369),
+      an instance might legitimately have more arguments than the family.
+      Example:
+
+        data family Fix :: (Type -> k) -> k
+        data instance Fix f = MkFix1 (f (Fix f))
+        data instance Fix f x = MkFix2 (f (Fix f x) x)
+
+      In the first instance here, the k in the data family kind is chosen to
+      be Type. In the second, it's (Type -> Type).
+
+      However, we require that any over-saturation is eta-reducible. That is,
+      we require that any extra patterns be bare unrepeated type variables;
+      see Note [Eta reduction for data families]. Accordingly, the FamInst
+      is never over-saturated.
+
+Note [Eta reduction for data families]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
    data family T a b :: *
    newtype instance T Int a = MkT (IO a) deriving( Monad )
@@ -156,7 +193,7 @@ See also Note [Newtype eta] in TyCon.
 
 Bottom line:
   For a FamInst with fi_flavour = DataFamilyInst rep_tc,
-  - fi_tvs may be shorter than tyConTyVars of rep_tc
+  - fi_tvs may be shorter than tyConTyVars of rep_tc.
   - fi_tys may be shorter than tyConArity of the family tycon
        i.e. LHS is unsaturated
   - fi_rhs will be (rep_tc fi_tvs)

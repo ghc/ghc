@@ -34,7 +34,7 @@ module TcHsSyn (
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo, zonkSigType,
-        zonkEvBinds,
+        zonkEvBinds, zonkTcEvBinds
   ) where
 
 #include "HsVersions.h"

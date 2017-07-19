@@ -56,7 +56,6 @@ import Util
 import ListSetOps
 import SrcLoc
 import Outputable
-import BasicTypes
 import Module
 import Unique      ( mkAlphaTyVarUnique )
 import qualified GHC.LanguageExtensions as LangExt
@@ -1684,7 +1683,7 @@ checkValidTyFamEqn :: Maybe ClsInstInfo
                    -> TcM ()
 checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs loc
   = setSrcSpan loc $
-    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats
+    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats []
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -1722,7 +1721,10 @@ checkFamInstRhs lhsTys famInsts
         what    = text "type family application" <+> quotes (pprType (TyConApp tc tys))
         bad_tvs = fvTypes tys \\ fvs
 
-checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar] -> [Type] -> TcM ()
+checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
+                  -> [Type]   -- ^ patterns the user wrote
+                  -> [Type]   -- ^ "extra" patterns from a data instance kind sig
+                  -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
 -- a) contain no type family applications
 --    (vanilla synonyms are fine, though)
@@ -1730,29 +1732,16 @@ checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar] -> [Type] 
 --    e.g. we disallow (Trac #7536)
 --         type T a = Int
 --         type instance F (T a) = a
--- c) Have the right number of patterns
--- d) For associated types, are consistently instantiated
-checkValidFamPats mb_clsinfo fam_tc tvs cvs ty_pats
-  = do { -- A family instance must have exactly the same number of type
-         -- parameters as the family declaration.  You can't write
-         --     type family F a :: * -> *
-         --     type instance F Int y = y
-         -- because then the type (F Int) would be like (\y.y)
-         checkTc (ty_pats `lengthIs` fam_arity) $
-           wrongNumberOfParmsErr (fam_arity - count isInvisibleTyConBinder fam_bndrs)
-             -- report only explicit arguments
+-- c) For associated types, are consistently instantiated
+checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats
+  = do { mapM_ checkValidTypePat user_ty_pats
 
-       ; mapM_ checkValidTypePat ty_pats
-
-       ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes ty_pats) (tvs ++ cvs)
-       ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs ty_pats)
+       ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes user_ty_pats)
+                                      (tvs ++ cvs)
+       ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs user_ty_pats)
 
          -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc tvs ty_pats }
-  where
-     fam_arity = tyConArity fam_tc
-     fam_bndrs = tyConBinders fam_tc
-
+       ; checkConsistentFamInst mb_clsinfo fam_tc tvs (user_ty_pats `chkAppend` extra_ty_pats) }
 
 checkValidTypePat :: Type -> TcM ()
 -- Used for type patterns in class instances,
@@ -1773,11 +1762,6 @@ isTyFamFree :: Type -> Bool
 isTyFamFree = null . tcTyFamInsts
 
 -- Error messages
-
-wrongNumberOfParmsErr :: Arity -> SDoc
-wrongNumberOfParmsErr exp_arity
-  = text "Number of parameters must match family declaration; expected"
-    <+> ppr exp_arity
 
 inaccessibleCoAxBranch :: CoAxiom br -> CoAxBranch -> SDoc
 inaccessibleCoAxBranch fi_ax cur_branch
