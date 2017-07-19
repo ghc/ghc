@@ -125,7 +125,7 @@ class TestConfig:
         # To accumulate the metrics for the git notes
         self.accumulate_metrics = []
         # Has the user defined a custom test environment? Local is default.
-        self.TEST_ENV = 'local'
+        self.test_env = 'local'
 
 global config
 config = TestConfig()

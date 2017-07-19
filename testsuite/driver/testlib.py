@@ -1086,7 +1086,6 @@ def stats( name, way, stats_file ):
 # Check -t stats info
 
 def checkStats(name, way, stats_file, range_fields):
-
     full_name = name + '(' + way + ')'
 
     result = passed()
@@ -1112,8 +1111,8 @@ def checkStats(name, way, stats_file, range_fields):
 
             # Add val into the git note if option is set.
             if config.use_git_notes:
-                test_env = config.TEST_ENV
-                config.accumulate_metrics.append(test_env + '\t' + name + '\t' + way + '\t' + field + '\t' + str(val))
+                test_env = config.test_env
+                config.accumulate_metrics.append('\t'.join([test_env, name, way, field, str(val)]))
 
             if val < lowerBound:
                 print(field, 'value is too low:')

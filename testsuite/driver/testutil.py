@@ -54,8 +54,10 @@ def parse_git_notes(namespace):
     logFields = ['TEST_ENV','TEST','WAY','METRIC','VALUE']
     log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show']).decode('utf-8')
     log = log.strip('\n').split('\n')
-    log = [entry.strip('\t').split('\t') for entry in log]
-    log = [dict(zip(logFields, row)) for row in log]
+    log = [line.strip('\t').split('\t') for line in log]
+    log = [dict(zip(logFields, field)) for field in log]
+    return log
+    # Add a print statement here if you want to see what's being loaded from git notes.
 
 # On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
 # when using msys2, as GHC does. Unfortunately, only Administrative users have
