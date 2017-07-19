@@ -1,5 +1,4 @@
 sudo: true
-language: haskell
 matrix:
     include:
         - os: linux
