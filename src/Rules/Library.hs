@@ -1,6 +1,5 @@
 module Rules.Library (
-    buildPackageLibrary, buildPackageGhciLibrary,
-    buildDynamicLib
+    buildPackageLibrary, buildPackageGhciLibrary, buildDynamicLib
 ) where
 
 import Data.Char
@@ -13,15 +12,15 @@ import Flavour
 import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Oracles.Dependencies (contextDependencies)
+import Oracles.Dependencies
 import Settings
 import Settings.Path
 import Target
 import UserSettings
 import Util
 
-getLibraryObjs :: Context -> Action [FilePath]
-getLibraryObjs context@Context{..} = do
+libraryObjects :: Context -> Action [FilePath]
+libraryObjects context@Context{..} = do
     hsObjs   <- hsObjects    context
     noHsObjs <- nonHsObjects context
 
@@ -31,34 +30,26 @@ getLibraryObjs context@Context{..} = do
 
     split <- interpretInContext context $ splitObjects flavour
     let getSplitObjs = concatForM hsObjs $ \obj -> do
-             let dir = dropExtension obj ++ "_" ++ osuf way ++ "_split"
-             contents <- liftIO $ IO.getDirectoryContents dir
-             return . map (dir -/-) $ filter (not . all (== '.')) contents
+            let dir = dropExtension obj ++ "_" ++ osuf way ++ "_split"
+            contents <- liftIO $ IO.getDirectoryContents dir
+            return . map (dir -/-) $ filter (not . all (== '.')) contents
 
     (noHsObjs ++) <$> if split then getSplitObjs else return hsObjs
 
 buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
-    -- macOS
-    matchGhcVersionedFilePath libPrefix "dylib" ?> buildDynamicLibUNIX
+    let path       = buildPath context
+        libPrefix  = path -/- "libHS" ++ pkgNameString package
+    -- OS X
+    matchGhcVersionedFilePath libPrefix "dylib" ?> buildDynamicLibUnix
     -- Linux
-    matchGhcVersionedFilePath libPrefix "so" ?> buildDynamicLibUNIX
+    matchGhcVersionedFilePath libPrefix "so"    ?> buildDynamicLibUnix
     -- TODO: Windows
   where
-    path       = buildPath context
-    libPrefix  = path -/- "libHS" ++ pkgNameString package
-
-    buildDynamicLibUNIX so = do
+    buildDynamicLibUnix so = do
         deps <- contextDependencies context
-
-        forM_ deps $ \dep -> do
-            lib <- pkgLibraryFile dep
-            need [lib]
-
-        removeFile so
-
-        objs <- getLibraryObjs context
-
+        need =<< mapM pkgLibraryFile deps
+        objs <- libraryObjects context
         build $ Target context (Ghc LinkHs stage) objs [so]
 
 buildPackageLibrary :: Context -> Rules ()
@@ -66,12 +57,10 @@ buildPackageLibrary context@Context {..} = do
     let path       = buildPath context
         libPrefix  = path -/- "libHS" ++ pkgNameString package
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
-        removeFile a
-
-        objs <- getLibraryObjs context
-
+        objs <- libraryObjects context
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
+        removeFile a
         if isLib0 then build $ Target context (Ar stage) []   [a] -- TODO: Scan for dlls
                   else build $ Target context (Ar stage) objs [a]
 
