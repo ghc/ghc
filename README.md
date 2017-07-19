@@ -157,9 +157,12 @@ Acknowledgements
 I started this project as part of my 6-month research visit to Microsoft
 Research Cambridge, which was funded by Newcastle University, EPSRC, and
 Microsoft Research. I would like to thank Simon Peyton Jones, Neil Mitchell
-and Simon Marlow for kick-starting the project and for their guidance. Last
-but not least, big thanks to the project [contributors][contributors], who
-helped me endure and enjoy the project.
+and Simon Marlow for kick-starting the project and for their guidance. 
+Zhen Zhang has done fantastic work on Hadrian as part of his Summer of
+Haskell 2017 [project](https://summer.haskell.org/ideas.html#hadrian-ghc),
+solving a few heavy and long-overdue issues. Last but not least, big thanks
+to all other project [contributors][contributors], who helped me endure and
+enjoy the project.
 
 [ghc]: https://en.wikipedia.org/wiki/Glasgow_Haskell_Compiler
 [shake]: https://github.com/ndmitchell/shake/blob/master/README.md
