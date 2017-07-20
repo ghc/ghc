@@ -13,7 +13,6 @@ copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
 cabal-version:        >= 2.0
-stability:            experimental
 tested-with:          GHC==8.2.*
 
 extra-source-files:

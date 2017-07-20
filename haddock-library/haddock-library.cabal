@@ -15,7 +15,6 @@ bug-reports:          https://github.com/haskell/haddock/issues
 category:             Documentation
 build-type:           Simple
 cabal-version:        >= 2.0
-stability:            experimental
 
 library
   default-language:     Haskell2010
