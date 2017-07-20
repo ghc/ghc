@@ -126,7 +126,7 @@ canEvNC ev
 
 canClassNC :: CtEvidence -> Class -> [Type] -> TcS (StopOrContinue Ct)
 -- "NC" means "non-canonical"; that is, we have got here
--- from a NonCanonical constrataint, not from a CDictCan
+-- from a NonCanonical constraint, not from a CDictCan
 -- Precondition: EvVar is class evidence
 canClassNC ev cls tys
   | isGiven ev  -- See Note [Eagerly expand given superclasses]

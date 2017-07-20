@@ -1865,7 +1865,7 @@ latter's strictness when simplifying e2, e3.  Moreover, suppose we have
 
 Then given (f Int e1) we rewrite to
    (\x. x True) e1
-without simpifying e1.  Now we can inline x into its unique call site,
+without simplifying e1.  Now we can inline x into its unique call site,
 and absorb the True into it all in the same pass.  If we simplified
 e1 first, we couldn't do that; see Note [Avoiding exponential behaviour].
 

@@ -409,14 +409,14 @@ getVarOffSets depth env = catMaybes . map getOffSet
         Nothing     -> Nothing
         Just offset ->
             -- michalt: I'm not entirely sure why we need the stack
-            -- adjustement by 2 here. I initially thought that there's
+            -- adjustment by 2 here. I initially thought that there's
             -- something off with getIdValFromApStack (the only user of this
             -- value), but it looks ok to me. My current hypothesis is that
-            -- this "adjustement" is needed due to stack manipulation for
+            -- this "adjustment" is needed due to stack manipulation for
             -- BRK_FUN in Interpreter.c In any case, this is used only when
             -- we trigger a breakpoint.
-            let adjustement = 2
-            in Just (id, trunc16 $ depth - offset + adjustement)
+            let adjustment = 2
+            in Just (id, trunc16 $ depth - offset + adjustment)
 
 trunc16 :: Word -> Word16
 trunc16 w

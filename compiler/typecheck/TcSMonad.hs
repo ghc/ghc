@@ -1842,7 +1842,7 @@ getNoGivenEqs tclvl skol_tvs
     eqs_given_here _ = False
 
     ev_given_here :: CtEvidence -> Bool
-    -- True for a Given bound by the curent implication,
+    -- True for a Given bound by the current implication,
     -- i.e. the current level
     ev_given_here ev
       =  isGiven ev

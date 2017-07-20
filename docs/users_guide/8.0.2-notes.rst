@@ -132,7 +132,7 @@ Compiler
    (see :ghc-ticket:`12816`).
 
 -  GHC now reliably runs on macOS Sierra systems. Sierra introduced a linker
-   limitation which GHC occassionally surpassed when compiling programs with
+   limitation which GHC occasionally surpassed when compiling programs with
    many package dependencies. (see :ghc-ticket:`12479`).
 
 -  The :ghc-flag:`-Wredundant-constraints` flag has been removed from the

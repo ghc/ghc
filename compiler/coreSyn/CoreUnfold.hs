@@ -649,7 +649,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
         -- Don't charge for args, so that wrappers look cheap
         -- (See comments about wrappers with Case)
         --
-        -- IMPORATANT: *do* charge 1 for the alternative, else we
+        -- IMPORTANT: *do* charge 1 for the alternative, else we
         -- find that giant case nests are treated as practically free
         -- A good example is Foreign.C.Error.errnoToIOError
 

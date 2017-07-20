@@ -1652,7 +1652,7 @@ In unfoldings and rules, we guarantee that the template is occ-analysed,
 so that the occurrence info on the binders is correct.  This is important,
 because the Simplifier does not re-analyse the template when using it. If
 the occurrence info is wrong
-  - We may get more simpifier iterations than necessary, because
+  - We may get more simplifier iterations than necessary, because
     once-occ info isn't there
   - More seriously, we may get an infinite loop if there's a Rec
     without a loop breaker marked
