@@ -470,6 +470,7 @@ data GeneralFlag
    | Opt_CprAnal
    | Opt_WorkerWrapper
    | Opt_SolveConstantDicts
+   | Opt_CatchBottoms
 
    -- Interface files
    | Opt_IgnoreInterfacePragmas
@@ -3778,6 +3779,7 @@ fFlagsDeps = [
   flagSpec "version-macros"                   Opt_VersionMacros,
   flagSpec "worker-wrapper"                   Opt_WorkerWrapper,
   flagSpec "solve-constant-dicts"             Opt_SolveConstantDicts,
+  flagSpec "catch-bottoms"                    Opt_CatchBottoms,
   flagSpec "show-warning-groups"              Opt_ShowWarnGroups,
   flagSpec "hide-source-paths"                Opt_HideSourcePaths,
   flagSpec "show-hole-constraints"            Opt_ShowHoleConstraints,

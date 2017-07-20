@@ -30,6 +30,7 @@ module CoreUtils (
         exprIsBig, exprIsConLike,
         rhsIsStatic, isCheapApp, isExpandableApp,
         exprIsLiteralString, exprIsTopLevelBindable,
+        altsAreExhaustive,
 
         -- * Equality
         cheapEqExpr, cheapEqExpr', eqExpr,

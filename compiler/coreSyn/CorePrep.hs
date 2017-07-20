@@ -645,8 +645,21 @@ cpeRhsE env (Case scrut bndr ty alts)
        ; let bndr1 = bndr `setIdUnfolding` evaldUnfolding
             -- Record that the case binder is evaluated in the alternatives
        ; (env', bndr2) <- cpCloneBndr env bndr1
-       ; alts' <- mapM (sat_alt env') alts
-       ; return (floats, Case scrut' bndr2 ty alts') }
+       ; let alts'
+                 -- This flag is intended to aid in debugging strictness
+                 -- analysis bugs. These are particularly nasty to chase down as
+                 -- they may manifest as segmentation faults. When this flag is
+                 -- enabled we instead produce an 'error' expression to catch
+                 -- the case where a function we think should bottom
+                 -- unexpectedly returns.
+               | gopt Opt_CatchBottoms (cpe_dynFlags env)
+               , not (altsAreExhaustive alts)
+               = addDefault alts (Just err)
+               | otherwise = alts
+               where err = mkRuntimeErrorApp rUNTIME_ERROR_ID ty
+                                             "Bottoming expression returned"
+       ; alts'' <- mapM (sat_alt env') alts'
+       ; return (floats, Case scrut' bndr2 ty alts'') }
   where
     sat_alt env (con, bs, rhs)
        = do { (env2, bs') <- cpCloneBndrs env bs

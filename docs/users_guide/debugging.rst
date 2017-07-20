@@ -389,6 +389,13 @@ Checking for consistency
     instead of ``undef`` in calls. This makes it easier to catch subtle
     code generator and runtime system bugs (e.g. see :ghc-ticket:`11487`).
 
+.. ghc-flag:: -fcatch-bottoms
+
+    Instructs the simplifier to emit ``error`` expressions in the continuation
+    of empty case analyses (which should bottom and consequently not return).
+    This is helpful when debugging demand analysis bugs which can sometimes
+    manifest as segmentation faults.
+
 .. _checking-determinism:
 
 Checking for determinism

@@ -278,4 +278,10 @@ compilerDebuggingOptions =
            "Takes a string argument."
          , flagType = DynamicFlag
          }
+  , flag { flagName = "-fcatch-bottoms"
+         , flagDescription =
+           "Insert ``error`` expressions after bottoming expressions; useful "++
+           "when debugging the compiler."
+         , flagType = DynamicFlag
+         }
   ]
