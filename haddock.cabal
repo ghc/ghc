@@ -1,8 +1,26 @@
 name:                 haddock
 version:              2.18.1
 synopsis:             A documentation-generation tool for Haskell libraries
-description:          Haddock is a documentation-generation tool for Haskell
-                      libraries
+description:
+  This is Haddock, a tool for automatically generating documentation
+  from annotated Haskell source code. It is primary intended for documenting
+  library interfaces, but it should be useful for any kind of Haskell code.
+  .
+  Haddock lets you write documentation annotations next to the definitions of
+  functions and types in the source code, in a syntax that is easy on the eye
+  when writing the source code (no heavyweight mark-up).
+  .
+  Haddock understands Haskell's module system, so you can structure your code
+  however you like without worrying that internal structure will be exposed in
+  the generated documentation. For example, it is common to implement a library
+  in several modules, but define the external API by having a single module
+  which re-exports parts of these implementation modules. Using Haddock, you can
+  still write documentation annotations next to the actual definitions of the
+  functions and types in the library, but the documentation annotations from the
+  implementation will be propagated to the external API when the documentation is
+  generated. Abstract types and classes are handled correctly. In fact, even
+  without any documentation annotations, Haddock can generate useful documentation
+  from your source code.
 license:              BSD3
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
