@@ -213,38 +213,40 @@ This confines the peculiarities to 'seq#', which is indeed rather essentially
 peculiar.
 -}
 
--- Vanilla strictness domain
+-- | Vanilla strictness domain
 data StrDmd
-  = HyperStr             -- Hyper-strict
-                         -- Bottom of the lattice
-                         -- Note [HyperStr and Use demands]
+  = HyperStr             -- ^ Hyper-strict (bottom of the lattice).
+                         -- See Note [HyperStr and Use demands]
 
-  | SCall StrDmd         -- Call demand
+  | SCall StrDmd         -- ^ Call demand
                          -- Used only for values of function type
 
-  | SProd [ArgStr]     -- Product
+  | SProd [ArgStr]       -- ^ Product
                          -- Used only for values of product type
                          -- Invariant: not all components are HyperStr (use HyperStr)
                          --            not all components are Lazy     (use HeadStr)
 
-  | HeadStr              -- Head-Strict
+  | HeadStr              -- ^ Head-Strict
                          -- A polymorphic demand: used for values of all types,
                          --                       including a type variable
 
   deriving ( Eq, Show )
 
+-- | Strictness of a function argument.
 type ArgStr = Str StrDmd
 
-data Str s = Lazy         -- Lazy
-                          -- Top of the lattice
-           | Str ExnStr s
+-- | Strictness demand.
+data Str s = Lazy         -- ^ Lazy (top of the lattice)
+           | Str ExnStr s -- ^ Strict
   deriving ( Eq, Show )
 
+-- | How are exceptions handled for strict demands?
 data ExnStr  -- See Note [Exceptions and strictness]
-  = VanStr   -- "Vanilla" case, ordinary strictness
+  = VanStr   -- ^ "Vanilla" case, ordinary strictness
 
-  | ExnStr   -- (Str ExnStr d) means be strict like 'd' but then degrade
-             --                the Termination info ThrowsExn to Dunno
+  | ExnStr   -- ^ @Str ExnStr d@ means be strict like @d@ but then degrade
+             -- the 'Termination' info 'ThrowsExn' to 'Dunno'.
+             -- e.g. the first argument of @catch@ has this strictness.
   deriving( Eq, Show )
 
 -- Well-formedness preserving constructors for the Strictness domain
@@ -376,27 +378,28 @@ splitStrProdDmd _ (SCall {}) = Nothing
        Abs
 -}
 
--- Domain for genuine usage
+-- | Domain for genuine usage
 data UseDmd
-  = UCall Count UseDmd   -- Call demand for absence
+  = UCall Count UseDmd   -- ^ Call demand for absence.
                          -- Used only for values of function type
 
-  | UProd [ArgUse]     -- Product
+  | UProd [ArgUse]       -- ^ Product.
                          -- Used only for values of product type
                          -- See Note [Don't optimise UProd(Used) to Used]
-                         -- [Invariant] Not all components are Abs
-                         --             (in that case, use UHead)
+                         --
+                         -- Invariant: Not all components are Abs
+                         -- (in that case, use UHead)
 
-  | UHead                -- May be used; but its sub-components are
+  | UHead                -- ^ May be used but its sub-components are
                          -- definitely *not* used.  Roughly U(AAA)
-                         -- Eg the usage of x in x `seq` e
+                         -- e.g. the usage of @x@ in @x `seq` e@
                          -- A polymorphic demand: used for values of all types,
                          --                       including a type variable
                          -- Since (UCall _ Abs) is ill-typed, UHead doesn't
                          -- make sense for lambdas
 
-  | Used                 -- May be used; and its sub-components may be used
-                         -- Top of the lattice
+  | Used                 -- ^ May be used and its sub-components may be used.
+                         -- (top of the lattice)
   deriving ( Eq, Show )
 
 -- Extended usage demand for absence and counting
@@ -409,7 +412,7 @@ data Use u
   | Use Count u     -- May be used with some cardinality
   deriving ( Eq, Show )
 
--- Abstract counting of usages
+-- | Abstract counting of usages
 data Count = One | Many
   deriving ( Eq, Show )
 
