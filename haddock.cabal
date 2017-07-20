@@ -21,6 +21,8 @@ description:
   generated. Abstract types and classes are handled correctly. In fact, even
   without any documentation annotations, Haddock can generate useful documentation
   from your source code.
+  .
+  <<https://cdn.rawgit.com/haskell/haddock/master/doc/cheatsheet/haddocks.svg>>
 license:              BSD3
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
