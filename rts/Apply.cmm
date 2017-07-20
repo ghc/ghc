@@ -637,11 +637,6 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
    * than continuing to evaluate the now-defunct closure.
    */
   STK_CHK_ENTER(WDS(Words) + SIZEOF_StgUpdateFrame + WDS(AP_STACK_SPLIM), R1);
-  /* ensure there is at least AP_STACK_SPLIM words of headroom available
-   * after unpacking the AP_STACK. See bug #1466 */
-
-  PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);
-  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(Words);
 
   /*
    * It is imperative that we blackhole lest we may duplicate computation which
@@ -656,6 +651,11 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
   StgInd_indirectee(ap) = CurrentTSO;
   prim_write_barrier;
   SET_INFO(ap, __stg_EAGER_BLACKHOLE_info);
+
+  /* ensure there is at least AP_STACK_SPLIM words of headroom available
+   * after unpacking the AP_STACK. See bug #1466 */
+  PUSH_UPD_FRAME(Sp - SIZEOF_StgUpdateFrame, R1);
+  Sp = Sp - SIZEOF_StgUpdateFrame - WDS(Words);
 
   TICK_ENT_AP();
   LDV_ENTER(ap);
