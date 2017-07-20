@@ -807,7 +807,14 @@ tc_iface_decl _parent ignore_prags
 tc_iface_decl _ _ (IfaceAxiom { ifName = tc_name, ifTyCon = tc
                               , ifAxBranches = branches, ifRole = role })
   = do { tc_tycon    <- tcIfaceTyCon tc
-       ; tc_branches <- tc_ax_branches branches
+       -- Must be done lazily, because axioms are forced when checking
+       -- for family instance consistency, and the RHS may mention
+       -- a hs-boot declared type constructor that is going to be
+       -- defined by this module.
+       -- e.g. type instance F Int = ToBeDefined
+       -- See Trac #13803
+       ; tc_branches <- forkM (text "Axiom branches" <+> ppr tc_name)
+                      $ tc_ax_branches branches
        ; let axiom = CoAxiom { co_ax_unique   = nameUnique tc_name
                              , co_ax_name     = tc_name
                              , co_ax_tc       = tc_tycon
