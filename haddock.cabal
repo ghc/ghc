@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.18.0
+version:              2.18.1
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries
@@ -14,7 +14,7 @@ category:             Documentation
 build-type:           Simple
 cabal-version:        >= 2.0
 stability:            experimental
-tested-with:          GHC==8.2.*, GHC==8.3
+tested-with:          GHC==8.2.*
 
 extra-source-files:
   CHANGES.md
@@ -124,7 +124,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.18.0
+    build-depends:  haddock-api == 2.18.1
 
     other-modules:
       ResponseFile
