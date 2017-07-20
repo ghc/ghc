@@ -1,6 +1,6 @@
 module Rules.Generate (
     isGeneratedCFile, isGeneratedCmmFile, generatePackageCode, generateRules,
-    copyRules, includesDependencies, generatedDependencies, inplaceLibCopyTargets
+    copyRules, includesDependencies, generatedDependencies
     ) where
 
 import Base
@@ -23,18 +23,6 @@ import Settings.Path
 import Target
 import UserSettings
 import Util
-
--- | Files that need to be copied over to inplace/lib
--- ref: ghc/ghc.mk:142
--- ref: driver/ghc.mk
--- ref: utils/hsc2hs/ghc.mk:35
-inplaceLibCopyTargets :: [FilePath]
-inplaceLibCopyTargets = map (inplaceLibPath -/-)
-  [ "ghc-usage.txt"
-  , "ghci-usage.txt"
-  , "platformConstants"
-  , "settings"
-  , "template-hsc.h" ]
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"

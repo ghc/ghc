@@ -4,7 +4,7 @@ module Settings.Builders.GhcCabal (
 
 import Context
 import Flavour
-import Settings.Builders.Common
+import Settings.Builders.Common hiding (package)
 import Util
 
 ghcCabalBuilderArgs :: Args
@@ -12,6 +12,8 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
     verbosity <- lift $ getVerbosity
     top       <- getTopDirectory
     context   <- getContext
+    when (package context /= deriveConstants) $
+        lift (need inplaceLibCopyTargets)
     mconcat [ arg "configure"
             , arg =<< getPackagePath
             , arg $ top -/- buildPath context

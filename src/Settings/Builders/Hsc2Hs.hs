@@ -1,9 +1,7 @@
 module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 
 import Settings.Builders.Common
-
-templateHsc :: FilePath
-templateHsc = "inplace/lib/template-hsc.h"
+import Settings.Path (templateHscPath)
 
 hsc2hsBuilderArgs :: Args
 hsc2hsBuilderArgs = builder Hsc2Hs ? do
@@ -20,7 +18,6 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     version <- if stage == Stage0
                then lift ghcCanonVersion
                else getSetting ProjectVersionInt
-    lift $ need [templateHsc]
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
             , notM windowsHost ? arg "--cross-safe"
@@ -33,7 +30,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
             , notStage0 ? arg ("--cflag=-D" ++ tArch ++ "_HOST_ARCH=1")
             , notStage0 ? arg ("--cflag=-D" ++ tOs   ++ "_HOST_OS=1"  )
             , arg $ "--cflag=-D__GLASGOW_HASKELL__=" ++ version
-            , arg $ "--template=" ++ top -/- templateHsc
+            , arg $ "--template=" ++ top -/- templateHscPath
             , arg $ "-I" ++ top -/- "inplace/lib/include/"
             , arg =<< getInput
             , arg "-o", arg =<< getOutput ]

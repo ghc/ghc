@@ -14,7 +14,7 @@ import Oracles.Path (topDirectory)
 import Rules.Wrappers (WrappedBinary(..), Wrapper, inplaceWrappers)
 import Settings
 import Settings.Path (buildPath, inplaceLibBinPath, rtsContext, objectPath,
-                      inplaceLibPath, inplaceBinPath)
+                      inplaceLibPath, inplaceBinPath, inplaceLibCopyTargets)
 import Target
 import UserSettings
 import Util
@@ -27,6 +27,8 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
 
     buildPath context -/- programName context <.> exe %>
         buildBinaryAndWrapper rs context
+
+    when (package == ghc) $ want inplaceLibCopyTargets
 
     -- Rules for programs built in install directories
     when (stage == Stage0 || package == ghc) $ do

@@ -6,7 +6,7 @@ module Settings.Path (
     pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
     objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
     inplaceInstallPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath,
-    pkgSetupConfigFile
+    pkgSetupConfigFile, inplaceLibCopyTargets, templateHscPath
     ) where
 
 import Base
@@ -214,3 +214,18 @@ stripCmdPath = do
         "arm-unknown-linux" ->
              return ":" -- HACK: from the make-based system, see the ref above
         _ -> return "strip"
+
+-- | Files that need to be copied over to inplace/lib
+-- ref: ghc/ghc.mk:142
+-- ref: driver/ghc.mk
+-- ref: utils/hsc2hs/ghc.mk:35
+inplaceLibCopyTargets :: [FilePath]
+inplaceLibCopyTargets = map (inplaceLibPath -/-)
+  [ "ghc-usage.txt"
+  , "ghci-usage.txt"
+  , "platformConstants"
+  , "settings"
+  , "template-hsc.h" ]
+
+templateHscPath :: FilePath
+templateHscPath = "inplace/lib/template-hsc.h"

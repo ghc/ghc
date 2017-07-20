@@ -29,7 +29,6 @@ allStages = [minBound ..]
 -- or Stage1Only targets
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
-    need $ Rules.Generate.inplaceLibCopyTargets
     let libraryPackages = filter isLibrary (knownPackages \\ [rts, libffi])
     need =<< if stage1Only
              then do

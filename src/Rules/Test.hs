@@ -10,6 +10,7 @@ import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.Path
 import Settings
+import Settings.Path (inplaceLibCopyTargets)
 import Target
 import Util
 
@@ -17,7 +18,7 @@ import Util
 testRules :: Rules ()
 testRules = do
     "validate" ~> do
-        need $ Rules.Generate.inplaceLibCopyTargets
+        need inplaceLibCopyTargets
         needBuilder $ Ghc CompileHs Stage2
         needBuilder $ GhcPkg Update Stage1
         needBuilder Hpc
