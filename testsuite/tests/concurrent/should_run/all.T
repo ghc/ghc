@@ -284,4 +284,3 @@ test('hs_try_putmvar003',
 
 # Check forkIO exception determinism under optimization
 test('T13330', normal, compile_and_run, ['-O'])
-test('T13916', normal, compile_and_run, ['-O2'])
