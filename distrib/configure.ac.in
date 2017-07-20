@@ -13,6 +13,13 @@ dnl--------------------------------------------------------------------
 FP_GMP
 
 bootstrap_target=@TargetPlatform@
+
+# We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
+# values it computes.
+AC_CANONICAL_BUILD
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
+
 FPTOOLS_SET_PLATFORM_VARS
 
 # Requires FPTOOLS_SET_PLATFORM_VARS to be run first.
