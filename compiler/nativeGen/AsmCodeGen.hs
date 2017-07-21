@@ -100,7 +100,7 @@ import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Exception
 import Control.Monad
-import System.IO (Handle)
+import System.IO
 
 {-
 The native-code generator has machine-independent and
@@ -332,6 +332,7 @@ nativeCodeGen' :: (Outputable statics, Outputable instr, Instruction instr)
                -> IO UniqSupply
 nativeCodeGen' dflags this_mod modLoc ncgImpl h us cmms
  = do
+        hSetEncoding h latin1
         let ngs0 = NGS [] [] [] [] [] [] emptyUFM mapEmpty
         (ngs, us') <- cmmNativeGenStream dflags this_mod modLoc ncgImpl h us
                                          cmms ngs0
