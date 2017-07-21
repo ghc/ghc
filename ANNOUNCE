@@ -1,53 +1,54 @@
 
            ===============================================
-            The Glasgow Haskell Compiler -- version 8.0.1
+            The Glasgow Haskell Compiler -- version 8.2.1
            ===============================================
 
-The GHC Team is pleased to announce a new super-major release of GHC. This is
-the most significant GHC release in quite some time, including both a number
-of major features and numerous bug fixes. These include,
+The GHC Team is pleased to announce a new major release of GHC. The themes of this 
+release have been performance, stability, and consolidation. Consequently
+cleanups can be seen throughout the compiler,
 
- * The TypeInType extension, which unifies types and kinds, allowing GHC
-   to reason about kind equality and enabling promotion of GADTs to the type
-   level.
+ * Significant improvements in compiler performance
 
- * Support for record pattern synonyms
+ * More robust support for levity polymorphism
 
- * The -XDeriveAnyClass extension learned to derive instances for classes with
-   associated types
+ * Reliable DWARF debugging information
 
- * More reliable DWARF debugging information
+ * Improved runtime system performance on NUMA systems
 
- * Support for injective type families
+ * Retooling of the cost-center profiler, including support for live streaming
+   of profile data via the GHC event log
 
- * Applicative do-notation
+ * Deterministic interface files
 
- * Support for wildcards in data and type family instances
+ * More robust treatment of join points, enabling significantly better code
+   generation in many cases
 
- * Strict and StrictData extensions, allowing modules to be compiled with
-   strict-by-default bindings
+ * Numerous improvements in robustness on Windows
 
- * The DuplicateRecordFields extensions, allowing multiple datatypes to declare
-   the same record field names provided they are used unambiguously
+ * Resolution of over 500 tickets
 
- * Support for implicit parameters providing light-weight callstacks and source
-   locations
+In addition, there are a number of new features,
 
- * User-defined error messages for type errors
+ * A new more type-safe Typeable mechanism
 
- * A rewritten (and greatly improved) pattern exhaustiveness checker
+ * The long-awaited Backpack module system
 
- * GHCi can run the interpreter in a separate process, and the interpreter can
-   now run profiled code
+ * Deriving strategies to disambiguate between GHC's various instance deriving
+   mechanisms
 
- * A native code generator for powerpc64 and powerpc64le architectures
+ * Unboxed sums types, for efficient unpacked representation of sum data types
 
- * and more!
+ * Compact regions, allowing better control over garbage collection with in the
+   presence of large heaps containing many long-lived objects.
+
+ * Colorful messages and caret diagnostics for more legible errors
+
+ * Automatic support for using the faster gold and lld linkers when available
 
 A more thorough list of the changes in the release can be found in the release
 notes,
 
-  http://haskell.org/ghc/docs/8.0.1/html/users_guide/release-8-0-1.html
+  http://haskell.org/ghc/docs/8.2.1/html/users_guide/release-8-2-1.html
 
 
 How to get it
