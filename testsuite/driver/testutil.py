@@ -3,7 +3,6 @@ import os
 import platform
 import subprocess
 import shutil
-
 import threading
 
 def strip_quotes(s):
@@ -50,14 +49,17 @@ def lndir(srcdir, dstdir):
 # This function allows one to read in git notes from the commandline
 # and then breaks it into a list of dictionaries that can be parsed
 # later on in the testing functions.
-def parse_git_notes(namespace):
+# I wanted to put it in perf_notes.py but couldn't figure out a nice way to do that.
+def parse_git_notes(namespace, commits=['HEAD']):
     logFields = ['TEST_ENV','TEST','WAY','METRIC','VALUE']
-    log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show']).decode('utf-8')
+    log = ""
+    for commit in commits:
+        log += subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit]).decode('utf-8')
+
     log = log.strip('\n').split('\n')
     log = [line.strip('\t').split('\t') for line in log]
     log = [dict(zip(logFields, field)) for field in log]
     return log
-    # Add a print statement here if you want to see what's being loaded from git notes.
 
 # On Windows, os.symlink is not defined with Python 2.7, but is in Python 3
 # when using msys2, as GHC does. Unfortunately, only Administrative users have
