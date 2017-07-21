@@ -362,7 +362,7 @@ getHeader :: Get (Word32, Word32)
 getHeader = do
     magic <- getByteString (BS.length headerMagic)
     when (magic /= headerMagic) $
-      fail "not a ghc-pkg db file, wrong file magic number"
+      fail $ "not a ghc-pkg db file, wrong file magic number (saw "++show magic++", expected "++show headerMagic++")"
 
     majorVersion <- get :: Get Word32
     -- The major version is for incompatible changes
