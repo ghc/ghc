@@ -10,7 +10,7 @@ performance improvements over the 8.0 branch.
 Highlights
 ----------
 
-The highlights since the 8.0 release are:
+The highlights since the 8.0 release include:
 
 - A new, more expressive ``Typeable`` mechanism
 
@@ -25,6 +25,8 @@ The highlights since the 8.0 release are:
 - Deriving strategies
 
 - Compact regions support, allowing efficient garbage collection of large heaps
+
+- More reliable DWARF debug information
 
 Full details
 ------------
@@ -427,7 +429,7 @@ network.
 ghc-prim
 ~~~~~~~~
 
--  Version number 0.5.0.0 (was 0.3.1.0)
+-  Version number 0.5.1.0 (was 0.3.1.0)
 
 -  Added new ``isByteArrayPinned#`` and ``isMutableByteArrayPinned#`` operation.
 
@@ -452,12 +454,12 @@ integer-gmp
 process
 ~~~~~~~
 
--  Version number 1.6.0.0 (was 1.4.3.0)
+-  Version number 1.6.1.0 (was 1.4.3.0)
 
 template-haskell
 ~~~~~~~~~~~~~~~~
 
--  Version 2.12.0.0 XXXXX (was 2.11.1.0)
+-  Version 2.12.0.0 (was 2.11.1.0)
 
 -  Added support for unboxed sums :ghc-ticket:`12478`.
 
@@ -476,10 +478,15 @@ unix
 Win32
 ~~~~~
 
--  Version number 2.3.1.1 (was 2.3.1.1)
+-  Version number 2.5.4.1 (was 2.3.1.1)
 
 Known bugs
 ----------
 
 - At least one known program regresses in compile time significantly over 8.0.
   See :ghc-ticket:`13535`.
+
+- Some uses of type applications may cause GHC to panic. See :ghc-ticket:`13819`.
+
+- The compiler may loop during typechecking on some modules using
+  :ghc-flag:`-XUndecidableInstances`. See :ghc-ticket:`13943`.
