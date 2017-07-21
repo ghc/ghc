@@ -51,7 +51,6 @@ import Outputable as Outp
 import Platform
 import UniqFM
 import Unique
-import BufWrite   ( BufHandle )
 import System.IO (Handle)
 import UniqSet
 import UniqSupply
