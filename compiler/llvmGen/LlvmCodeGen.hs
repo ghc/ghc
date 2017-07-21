@@ -23,7 +23,6 @@ import Hoopl.Block
 import Hoopl.Collections
 import PprCmm
 
-import BufWrite
 import DynFlags
 import ErrUtils
 import FastString
