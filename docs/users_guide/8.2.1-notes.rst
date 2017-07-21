@@ -45,6 +45,29 @@ Language
 Compiler
 ~~~~~~~~
 
+- GHC will now use ``ld.gold`` or ``ld.lld`` instead of the system's default
+  ``ld``, if available. Linker availability will be evaluated at ``configure``
+  time. The user can manually override which linker to use by passing the ``LD``
+  variable to ``configure``. You can revert to the old behavior of using the
+  system's default ``ld`` by passing the ``--disable-ld-override`` flag to
+  ``configure``.
+
+- GHC now uses section splitting (i.e. :ghc-flag:`-split-sections`) instead of
+  object splitting (i.e. :ghc-flag:`-split-objs`) as the default mechanism for
+  linker-based dead code removal. While the effect is the same, split sections
+  tends to produce significantly smaller objects than split objects and more
+  closely mirrors the approach used by other compilers. Split objects will
+  be deprecated and eventually removed in a future GHC release.
+
+  Note that some versions of the ubiquitous BFD linker exhibit performance
+  trouble with large libraries with section splitting enabled (see
+  :ghc-ticket:`13739`). It is recommended that you use either the ``gold`` or
+  ``lld`` linker if you observe this. This will require that you install one of
+  these compilers, rerun ``configure``, and reinstall GHC.
+
+  Split sections is enabled by default in the official binary distributions for
+  platforms that support it.
+
 - Old profiling flags ``-auto-all``, ``-auto``, and ``-caf-all`` are deprecated
   and their usage provokes a compile-time warning.
 
@@ -316,14 +339,6 @@ Runtime system
 
 - advapi32, shell32 and user32 are now automatically loaded in GHCi. libGCC is also
   loaded when a depencency requires it. See :ghc-ticket:`13189`.
-
-Build system
-~~~~~~~~~~~~
-
-- GHC will now use ``ld.gold`` or ``ld.lld`` instead of the system's default
-  ``ld``, if available. Linker availability will be evaluated at ``configure``
-  time. The user can manually override which linker to use by passing the ``LD``
-  variable to ``configure``.
 
 hsc2hs
 ~~~~~~
