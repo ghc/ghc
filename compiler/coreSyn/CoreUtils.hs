@@ -300,6 +300,11 @@ mkTick t orig_expr = mkTick' id id orig_expr
           -> CoreExpr
   mkTick' top rest expr = case expr of
 
+    -- Never tick primitive string literals. These should ultimately float up to
+    -- the top-level where they must be unadorned. See Note
+    -- [CoreSyn top-level string literals] for details.
+    _ | exprIsLiteralString expr          -> expr
+
     -- Cost centre ticks should never be reordered relative to each
     -- other. Therefore we can stop whenever two collide.
     Tick t2 e

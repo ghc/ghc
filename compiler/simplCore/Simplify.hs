@@ -611,19 +611,10 @@ prepareRhs top_lvl env0 id rhs0
         -- On the other hand, for scoping ticks we need to be able to
         -- copy them on the floats, which in turn is only allowed if
         -- we can obtain non-counting ticks.
-        | (not (tickishCounts t) || tickishCanSplit t)
+        | not (tickishCounts t) || tickishCanSplit t
         = do { (is_exp, env', rhs') <- go n_val_args (zapFloats env) rhs
-                    -- env' has the extra let-bindings from
-                    -- the makeTrivial calls in 'go'; no join floats
-             ; let tickIt (id, expr)
-                       -- we have to take care not to tick top-level literal
-                       -- strings. See Note [CoreSyn top-level string literals].
-                     | isTopLevel top_lvl && exprIsLiteralString expr
-                     = (id, expr)
-                     | otherwise
-                     = (id, mkTick (mkNoCount t) expr)
-                   floats' = seLetFloats env `addFlts`
-                             mapFloats (seLetFloats env') tickIt
+             ; let tickIt (id, expr) = (id, mkTick (mkNoCount t) expr)
+                   floats' = seLetFloats env `addFlts` mapFloats (seLetFloats env') tickIt
              ; return (is_exp, env' { seLetFloats = floats' }, Tick t rhs') }
 
     go _ env other

@@ -402,6 +402,8 @@ It is important to note that top-level primitive string literals cannot be
 wrapped in Ticks, as is otherwise done with lifted bindings. CoreToStg expects
 to see just a plain (Lit (MachStr ...)) expression on the RHS of primitive
 string bindings; anything else and things break. CoreLint checks this invariant.
+To ensure that ticks don't sneak in CoreUtils.mkTick refuses to wrap any
+primitive string expression with a tick.
 
 Also see Note [Compilation plan for top-level string literals].
 
