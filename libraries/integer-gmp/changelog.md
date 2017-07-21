@@ -1,10 +1,14 @@
 # Changelog for [`integer-gmp` package](http://hackage.haskell.org/package/integer-gmp)
 
-## 1.0.0.2 *July 2017*
+## 1.0.1.0 *July 2017*
 
   * Bundled with GHC 8.2.1
 
   * Optimize `minusInteger`
+
+  * Fix the right-shift operation for negative big integers (fixes GHC #12136)
+
+  * Make operations more strict
 
 ## 1.0.0.1  *Feb 2016*
 
