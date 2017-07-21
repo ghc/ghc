@@ -100,7 +100,6 @@ import Data.Maybe
 import Data.Ord         ( comparing )
 import Control.Exception
 import Control.Monad
-import System.IO
 import System.IO (Handle)
 
 {-
