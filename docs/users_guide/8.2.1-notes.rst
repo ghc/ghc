@@ -12,7 +12,7 @@ Highlights
 
 The highlights since the 8.0 release include:
 
-- A new, more expressive ``Typeable`` mechanism
+- A new, more expressive ``Typeable`` mechanism, ``Type.Reflection``
 
 - Colorful error messages with caret diagnostics
 
@@ -88,7 +88,7 @@ Compiler
   been completely overhauled. The instance context is now inferred using the
   type signatures (and default type signatures) of the derived class's methods
   instead of using the datatype's definition, which often led to
-  overconstrained instances or instances that didn't typecheck (or worse,
+  over-constrained instances or instances that didn't typecheck (or worse,
   triggered GHC panics). See the section on
   :ref:`DeriveAnyClass <derive-any-class>` for more details.
 
@@ -167,7 +167,7 @@ Compiler
   on feedback from tooling authors for the next release.
 
 - GHC is now able to better optimize polymorphic expressions by using known
-  superclass dictionaries where possible. Some examples:
+  superclass dictionaries where possible. Some examples: ::
 
     -- uses of `Monad IO` or `Applicative IO` here are improved
     foo :: MonadBaseControl IO m => ...
@@ -186,12 +186,12 @@ Compiler
 - GHC now ignores ``RULES`` for data constructors (:ghc-ticket:`13290`).
   Previously, it accepted::
 
-    "NotAllowed" forall x. Just x = e
+    {-# RULES "NotAllowed" forall x. Just x = e #-}
 
   That rule will no longer take effect, and a warning will be issued. ``RULES``
   may still mention data constructors, but not in the outermost position::
 
-    "StillWorks" forall x. f (Just x) = e
+    {-# RULES "StillWorks" forall x. f (Just x) = e #-}
 
 - Type synonyms can no longer appear in the class position of an instance.
   This means something like this is no longer allowed: ::
@@ -299,9 +299,9 @@ Runtime system
 
 - Heap overflow throws a catchable exception, provided that it was detected
   by the RTS during a GC cycle due to the program exceeding a limit set by
-  ``+RTS -M``, and not due to an allocation being refused by the operating
-  system.  This exception is thrown to the same thread that receives
-  ``UserInterrupt`` exceptions, and may be caught by user programs.
+  ``+RTS -M`` (see :rts-flag:`-M`), and not due to an allocation being refused
+  by the operating system. This exception is thrown to the same thread that
+  receives ``UserInterrupt`` exceptions, and may be caught by user programs.
 
 - Added support for *Compact Regions*, which offer a way to manually
   move long-lived data outside of the heap so that the garbage
