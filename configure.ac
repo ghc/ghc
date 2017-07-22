@@ -420,13 +420,13 @@ then
     AC_PATH_PROG([OBJDUMP],[objdump])
     AC_PATH_PROG([DllWrap],[dllwrap])
     AC_PATH_PROG([Windres],[windres])
-
-    DllWrapCmd="$DllWrap"
-    WindresCmd="$Windres"
-
-    AC_SUBST([DllWrapCmd])
-    AC_SUBST([WindresCmd])
 fi
+
+DllWrapCmd="$DllWrap"
+WindresCmd="$Windres"
+
+AC_SUBST([DllWrapCmd])
+AC_SUBST([WindresCmd])
 
 FP_ICONV
 FP_GMP
