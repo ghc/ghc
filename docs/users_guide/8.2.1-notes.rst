@@ -31,6 +31,12 @@ The highlights since the 8.0 release include:
 Full details
 ------------
 
+Package system
+~~~~~~~~~~~~~~
+
+- The long awaited Backpack module system is now fully usable. See
+  :ghc-wiki:`the GHC Wiki <Backpack>` for details.
+
 Language
 ~~~~~~~~
 
@@ -41,6 +47,12 @@ Language
   class instance using the :ghc-flag:`-XDerivingStrategies` language extension
   (see :ref:`deriving-strategies`).
 
+- The new :ghc-flag:`-XUnboxedSums` extension allows more efficient representation
+  of sum data. Some future GHC release will have support for worker/wrapper
+  transformation of sum arguments and constructor unpacking.
+
+- Support for overloaded record fields via a new ``HasField`` class and
+  associated compiler logic (see :ref:`record-field-selector-polymorphism`)
 
 Compiler
 ~~~~~~~~
