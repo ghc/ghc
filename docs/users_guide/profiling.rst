@@ -429,6 +429,8 @@ enclosed between ``+RTS ... -RTS`` as usual):
 
 .. rts-flag:: -V ⟨secs⟩
 
+    :default: 0.02
+
     Sets the interval that the RTS clock ticks at, which is also the sampling
     interval of the time and allocation profile. The default is 0.02 seconds.
     The runtime uses a single timer signal to count ticks; this timer signal is
@@ -929,14 +931,15 @@ reasons for this:
 
 -  Garbage collection requires more memory than the actual residency.  The
    factor depends on the kind of garbage collection algorithm in use: a major GC
-   in the standard generation copying collector will usually require 3L bytes of
-   memory, where L is the amount of live data. This is because by default (see
-   the RTS :rts-flag:`-F ⟨factor⟩` option) we allow the old generation to grow
-   to twice its size (2L) before collecting it, and we require additionally L
-   bytes to copy the live data into. When using compacting collection (see the
-   :rts-flag:`-c` option), this is reduced to 2L, and can further be reduced by
-   tweaking the :rts-flag:`-F ⟨factor⟩` option. Also add the size of the
-   allocation area (see :rts-flag:`-A ⟨size⟩`).
+   in the standard generation copying collector will usually require :math:`3L`
+   bytes of memory, where :math:`L` is the amount of live data. This is because
+   by default (see the RTS :rts-flag:`-F ⟨factor⟩` option) we allow the old
+   generation to grow to twice its size (:math:`2L`) before collecting it, and
+   we require additionally :math:`L` bytes to copy the live data into. When
+   using compacting collection (see the :rts-flag:`-c` option), this is reduced
+   to :math:`2L`, and can further be reduced by tweaking the :rts-flag:`-F
+   ⟨factor⟩` option. Also add the size of the allocation area (see :rts-flag:`-A
+   ⟨size⟩`).
 
 -  The stack isn't counted in the heap profile by default. See the
    RTS :rts-flag:`-xt` option.

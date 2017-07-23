@@ -1190,8 +1190,8 @@ generation are:
 .. ghc-flag:: -dep-suffix ⟨suffix⟩
 
     Make dependencies that declare that files with suffix
-    ``.<suf><osuf>`` depend on interface files with suffix
-    ``.<suf>hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
+    ``.⟨suf⟩⟨osuf⟩`` depend on interface files with suffix
+    ``.⟨suf⟩hi``, or (for ``{-# SOURCE #-}`` imports) on ``.hi-boot``.
     Multiple ``-dep-suffix`` flags are permitted. For example,
     ``-dep-suffix a_ -dep-suffix b_`` will make dependencies for ``.hs``
     on ``.hi``, ``.a_hs`` on ``.a_hi``, and ``.b_hs`` on ``.b_hi``.
@@ -1200,7 +1200,7 @@ generation are:
 
 .. ghc-flag:: --exclude-module=⟨file⟩
 
-    Regard ``<file>`` as "stable"; i.e., exclude it from having
+    Regard ``⟨file⟩`` as "stable"; i.e., exclude it from having
     dependencies on it.
 
 .. ghc-flag:: -include-pkg-deps

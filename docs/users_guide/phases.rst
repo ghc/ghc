@@ -545,7 +545,7 @@ for example).
 
 .. ghc-flag:: -L ⟨dir⟩
 
-    Where to f ind user-supplied libraries… Prepend the directory ⟨dir⟩
+    Where to find user-supplied libraries… Prepend the directory ⟨dir⟩
     to the library directories path.
 
 .. ghc-flag:: -framework-path ⟨dir⟩
