@@ -12,7 +12,14 @@ dnl--------------------------------------------------------------------
 
 FP_GMP
 
+dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
+
+FFIIncludeDir=@FFIIncludeDir@
+FFILibDir=@FFILibDir@
+AC_SUBST(FFILibDir)
+AC_SUBST(FFIIncludeDir)
+
 
 # We have to run these unconditionally as FPTOOLS_SET_PLATFORM_VARS wants the
 # values it computes.
