@@ -825,7 +825,7 @@ in ``list``, ``describe``, and ``field``, where a ``'*'`` indicates open
 substring ends (``prefix*``, ``*suffix``, ``*infix*``). Examples (output
 omitted):
 
-::
+.. code-block:: none
 
     -- list all regex-related packages
     ghc-pkg list '*regex*' --ignore-case

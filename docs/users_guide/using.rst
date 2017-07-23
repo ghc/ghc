@@ -93,7 +93,7 @@ to the files ``Foo.hs`` and ``Bar.hs``.
     Note that command-line options are *order-dependent*, with arguments being
     evaluated from left-to-right. This can have seemingly strange effects in the
     presence of flag implication. For instance, consider
-    :ghc-flag:`-fno-specialise` and :ghc-flag:`-O1` (which implies
+    :ghc-flag:`-fno-specialise <-fspecialise>` and :ghc-flag:`-O1` (which implies
     :ghc-flag:`-fspecialise`). These two command lines mean very different
     things:
 
@@ -620,9 +620,10 @@ See also the ``--help``, ``--version``, ``--numeric-version``, and
 
 .. ghc-flag:: -fhide-source-paths
 
-    Starting with minimal verbosity (see :ghc-flag:`-v1`), GHC displays the
-    name, the source path and the target path of each compiled module. This flag
-    can be used to reduce GHC's output by hiding source paths and target paths.
+    Starting with minimal verbosity (``-v1``, see :ghc-flag:`-v`), GHC
+    displays the name, the source path and the target path of each compiled
+    module. This flag can be used to reduce GHC's output by hiding source paths
+    and target paths.
 
 The following flags control the way in which GHC displays types in error
 messages and in GHCi:
@@ -818,7 +819,9 @@ messages and in GHCi:
     place:
 
     - ``message``
+
       - ``header``
+
         - ``warning``
         - ``error``
         - ``fatal``
@@ -906,7 +909,6 @@ Some flags only make sense for particular target platforms.
     SSE2 is unconditionally used on x86-64 platforms.
 
 .. ghc-flag:: -msse4.2
-    :noindex:
 
     (x86 only, added in GHC 7.4.1) Use the SSE4.2 instruction set to
     implement some floating point and bit operations when using the

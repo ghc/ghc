@@ -4643,6 +4643,10 @@ Note the following details
 Deriving strategies
 -------------------
 
+.. ghc-flag:: -XDerivingStrategies
+
+    Allow multiple ``deriving``, each optionally qualified with a *strategy*.
+
 In most scenarios, every ``deriving`` statement generates a typeclass instance
 in an unambiguous fashion. There is a corner case, however, where
 simultaneously enabling both the :ghc-flag:`-XGeneralizedNewtypeDeriving` and
@@ -4693,8 +4697,8 @@ Currently, the deriving strategies are:
 
 If an explicit deriving strategy is not given, GHC has an algorithm for
 determining how it will actually derive an instance. For brevity, the algorithm
-is omitted here. You can read the full algorithm at
-:ghc-wiki:`Wiki page <DerivingStrategies>`.
+is omitted here. You can read the full algorithm on the
+:ghc-wiki:`GHC Wiki <Commentary/Compiler/DerivingStrategies>`.
 
 .. _pattern-synonyms:
 
@@ -7119,6 +7123,7 @@ Decidability of type synonym instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XUndecidableInstances
+    :noindex:
 
     Relax restrictions on the decidability of type synonym family instances.
 
@@ -9969,7 +9974,7 @@ Here we do not need to give a type signature to ``w``, because it is an
 argument of constructor ``T1`` and that tells GHC all it needs to know.
 
 
-.. _implicit-quant:
+.. _implicit-quantification:
 
 Implicit quantification
 -----------------------
@@ -10126,14 +10131,15 @@ Here are some more details:
    containing holes, by using the :ghc-flag:`-fdefer-typed-holes` flag. This
    flag defers errors produced by typed holes until runtime, and
    converts them into compile-time warnings. These warnings can in turn
-   be suppressed entirely by :ghc-flag:`-fno-warn-typed-holes`.
+   be suppressed entirely by :ghc-flag:`-Wno-typed-holes <-Wtyped-holes>`.
 
    The same behaviour for "``Variable out of scope``" errors, it terminates
    compilation by default. You can defer such errors by using the
    :ghc-flag:`-fdefer-out-of-scope-variables` flag. This flag defers errors
    produced by out of scope variables until runtime, and
    converts them into compile-time warnings. These warnings can in turn
-   be suppressed entirely by :ghc-flag:`-fno-warn-deferred-out-of-scope-variables`.
+   be suppressed entirely by :ghc-flag:`-Wno-deferred-out-of-scope-variables
+   <-Wdeferred-out-of-scope-variables>`.
 
    The result is that a hole or a variable will behave like ``undefined``, but with
    the added benefits that it shows a warning at compile time, and will
@@ -10662,17 +10668,18 @@ Enabling deferring of type errors
 
 The flag :ghc-flag:`-fdefer-type-errors` controls whether type errors are
 deferred to runtime. Type errors will still be emitted as warnings, but
-will not prevent compilation. You can use
-:ghc-flag:`-Wno-deferred-type-errors <-Wdeferred-type-errors>` to suppress these
-warnings.
+will not prevent compilation. You can use :ghc-flag:`-Wno-type-errors
+<-Wtype-errors>` to suppress these warnings.
 
 This flag implies the :ghc-flag:`-fdefer-typed-holes` and
-:ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this
-behaviour for `typed holes <#typed-holes>`__ and variables. Should you so wish, it is
+:ghc-flag:`-fdefer-out-of-scope-variables` flags, which enables this behaviour
+for `typed holes <#typed-holes>`__ and variables. Should you so wish, it is
 possible to enable :ghc-flag:`-fdefer-type-errors` without enabling
 :ghc-flag:`-fdefer-typed-holes` or :ghc-flag:`-fdefer-out-of-scope-variables`,
-by explicitly specifying :ghc-flag:`-fno-defer-typed-holes` or :ghc-flag:`-fno-defer-out-of-scope-variables`
-on the command-line after the :ghc-flag:`-fdefer-type-errors` flag.
+by explicitly specifying :ghc-flag:`-fno-defer-typed-holes
+<-fdefer-typed-holes>` or :ghc-flag:`-fno-defer-out-of-scope-variables
+<-fdefer-out-of-scope-variables>` on the command-line after the
+:ghc-flag:`-fdefer-type-errors` flag.
 
 At runtime, whenever a term containing a type error would need to be
 evaluated, the error is converted into a runtime exception of type
@@ -10713,7 +10720,9 @@ Otherwise, in the common case of a simple type error such as typing
 immediately-following type error when the expression is evaluated.
 
 This exception doesn't apply to statements, as the following example
-demonstrates: ::
+demonstrates:
+
+.. code-block:: none
 
     Prelude> let x = (True, 1 == 'a')
 
@@ -10737,12 +10746,10 @@ in "`Template Meta-programming for
 Haskell <http://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
 (Proc Haskell Workshop 2002).
 
-There is a Wiki page about Template Haskell at
-http://www.haskell.org/haskellwiki/Template_Haskell, and that is the
-best place to look for further details. You may also consult the `online
-Haskell library reference
-material <http://www.haskell.org/ghc/docs/latest/html/libraries/index.html>`__
-(look for module ``Language.Haskell.TH``). Many changes to the original
+The `Template Haskell <http://www.haskell.org/haskellwiki/Template_Haskell>`__
+page on the GHC Wiki has a wealth of information. You may also consult the
+:th-ref:`Haddock reference documentation <Language-Haskell-TH.html>`.
+Many changes to the original
 design are described in `Notes on Template Haskell version
 2 <http://research.microsoft.com/~simonpj/papers/meta-haskell/notes2.ps>`__.
 Not all of these changes are in GHC, however.

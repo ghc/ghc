@@ -84,7 +84,7 @@ As always, for RTS options that take ⟨size⟩s: If the last character of
 or G, by 1,000,000,000. (And any wraparound in the counters is *your*
 fault!)
 
-Giving a ``+RTS -?`` ``-?``\ RTS option option will print out the RTS
+Giving a ``+RTS -?`` RTS option option will print out the RTS
 options actually available in your program (which vary, depending on how
 you compiled).
 
@@ -156,55 +156,51 @@ can override the defaults.
 Owing to the vagaries of DLL linking, these hooks don't work under
 Windows when the program is built dynamically.
 
+Runtime events
+##############
+
 You can change the messages printed when the runtime system "blows up,"
 e.g., on stack overflow. The hooks for these are as follows:
 
-``void OutOfHeapHook (unsigned long, unsigned long)``
-    .. index::
-       single: OutOfHeapHook
+.. c:function:: void OutOfHeapHook (unsigned long, unsigned long)
 
     The heap-overflow message.
 
-``void StackOverflowHook (long int)``
-    .. index::
-       single: StackOverflowHook
+.. c:function:: void StackOverflowHook (long int)
 
     The stack-overflow message.
 
-``void MallocFailHook (long int)``
-    .. index::
-       single: MallocFailHook
+.. c:function:: void MallocFailHook (long int)
 
     The message printed if ``malloc`` fails.
 
-Furthermore GHC lets you specify the way event log data (:rts-flag:`-l`)
-is written through a custom `EventLogWriter`:
+Event log output
+################
 
-``void initEventLogWriter(void)``
-    .. index::
-       single: initEventLogWriter
+Furthermore GHC lets you specify the way event log data (see :rts-flag:`-l`) is
+written through a custom :c:type:`EventLogWriter`:
 
-    Initializes your `EventLogWriter`. This is optional.
+.. c:type:: EventLogWriter
 
-``bool writeEventLog(void *eventlog, size_t eventlog_size)``
-    .. index::
-       single: writeEventLog
+    A sink of event-log data.
 
-    Hands buffered event log data to your event log writer.
-    Required for a custom `EventLogWriter`.
+    .. c:member:: void initEventLogWriter(void)
 
- ``void flushEventLog(void)``
-    .. index::
-       single: flushEventLog
+        Initializes your :c:type:`EventLogWriter`. This is optional.
 
-    Flush buffers (if any) of your custom `EventLogWriter`. This is
-    optional.
+    .. c:member:: bool writeEventLog(void *eventlog, size_t eventlog_size)
 
- ``void stopEventLogWriter(void)``
-    .. index::
-       single: stopEventLogWriter
+        Hands buffered event log data to your event log writer.
+        Required for a custom :c:type:`EventLogWriter`.
 
-    Called when event logging is about to stop. This is optional.
+    .. c:member:: void flushEventLog(void)
+
+        Flush buffers (if any) of your custom :c:type:`EventLogWriter`. This can
+        be ``NULL``.
+
+    .. c:member:: void stopEventLogWriter(void)
+
+        Called when event logging is about to stop. This can be ``NULL``.
 
 .. _rts-options-misc:
 
@@ -214,7 +210,7 @@ Miscellaneous RTS options
 .. rts-flag:: --install-signal-handlers=⟨yes|no⟩
 
     If yes (the default), the RTS installs signal handlers to catch
-    things like ctrl-C. This option is primarily useful for when you are
+    things like :kbd:`Ctrl-C`. This option is primarily useful for when you are
     using the Haskell code as a DLL, and want to set your own signal
     handlers.
 
@@ -294,7 +290,7 @@ performance.
 
 .. rts-flag:: -AL ⟨size⟩
 
-    :default: ``-A`` value
+    :default: :rts-flag:`-A <-A ⟨size⟩>` value
     :since: 8.2.1
 
     .. index::
@@ -302,7 +298,8 @@ performance.
 
     Sets the limit on the total size of "large objects" (objects
     larger than about 3KB) that can be allocated before a GC is
-    triggered.  By default this limit is the same as the ``-A`` value.
+    triggered. By default this limit is the same as the :rts-flag:`-A <-A
+    ⟨size⟩>` value.
 
     Large objects are not allocated from the normal allocation area
     set by the ``-A`` flag, which is why there is a separate limit for
@@ -334,7 +331,7 @@ performance.
 
 .. rts-flag:: -n ⟨size⟩
 
-    :default: 4m with ``-A16m`` or larger, otherwise 0.
+    :default: 4m with :rts-flag:`-A16m <-A ⟨size⟩>` or larger, otherwise 0.
 
     .. index::
        single: allocation area, chunk size
@@ -383,14 +380,13 @@ performance.
        requested using the ``-G1`` option.
 
 .. rts-flag:: -c ⟨n⟩
-    :noindex:
 
     :default: 30
 
     Automatically enable compacting collection when the live data exceeds ⟨n⟩%
     of the maximum heap size (see the :rts-flag:`-M ⟨size⟩` option). Note that
     the maximum heap size is unlimited by default, so this option has no effect
-    unless the maximum heap size is set with ``-M ⟨size⟩.``
+    unless the maximum heap size is set with :rts-flag:`-M ⟨size⟩`.
 
 .. rts-flag:: -F ⟨factor⟩
 
@@ -408,11 +404,10 @@ performance.
 
     The default seems to work well here. If you have plenty of memory, it is
     usually better to use ``-H ⟨size⟩`` (see :rts-flag:`-H [⟨size⟩]`) than to
-    increase ``-F ⟨factor⟩.``
+    increase :rts-flag:`-F ⟨factor⟩`.
 
-    The ``-F ⟨factor⟩`` setting will be automatically reduced by the garbage
-    collector when the maximum heap size (the ``-M ⟨size⟩`` setting, see
-    :rts-flag:`-M ⟨size⟩`) is approaching.
+    The :rts-flag:`-F ⟨factor⟩` setting will be automatically reduced by the garbage
+    collector when the maximum heap size (the :rts-flag:`-M ⟨size⟩` setting) is approaching.
 
 .. rts-flag:: -G ⟨generations⟩
 
@@ -444,17 +439,17 @@ performance.
     parallel GC completely, reverting to sequential GC.
 
     The default parallel GC settings are usually suitable for parallel programs
-    (i.e. those using ``par``, Strategies, or with multiple threads). However,
-    it is sometimes beneficial to enable the parallel GC for a single-threaded
-    sequential program too, especially if the program has a large amount of
-    heap data and GC is a significant fraction of runtime. To use the parallel
-    GC in a sequential program, enable the parallel runtime with a suitable
-    :rts-flag:`-N ⟨x⟩` option, and additionally it might be beneficial to
-    restrict parallel GC to the old generation with ``-qg1``.
+    (i.e. those using :base-ref:`par <GHC-Conc.html#v:par>`, Strategies, or with
+    multiple threads). However, it is sometimes beneficial to enable the
+    parallel GC for a single-threaded sequential program too, especially if the
+    program has a large amount of heap data and GC is a significant fraction of
+    runtime. To use the parallel GC in a sequential program, enable the parallel
+    runtime with a suitable :rts-flag:`-N ⟨x⟩` option, and additionally it might
+    be beneficial to restrict parallel GC to the old generation with ``-qg1``.
 
 .. rts-flag:: -qb ⟨gen⟩
 
-    :default: 1 for ``-A`` < 32M, 0 otherwise
+    :default: 1 for :rts-flag:`-A <-A ⟨size⟩>` < 32M, 0 otherwise
     :since: 6.12.1
 
     Use load-balancing in the parallel GC in generation ⟨gen⟩ and higher.
@@ -472,7 +467,7 @@ performance.
 
 .. rts-flag:: -qn ⟨x⟩
 
-    :default: the value of ``-N`` or the number of CPU cores,
+    :default: the value of :rts-flag:`-N <-N ⟨x⟩>` or the number of CPU cores,
               whichever is smaller.
     :since: 8.2.1
 
@@ -758,7 +753,7 @@ RTS options to produce runtime statistics
        data during a major GC, which is why the number of samples
        corresponds to the number of major GCs (and is usually relatively
        small). To get a better picture of the heap profile of your
-       program, use the ``-hT`` RTS option (:ref:`rts-profiling`).
+       program, use the :rts-flag:`-hT` RTS option (:ref:`rts-profiling`).
 
     -  The peak memory the RTS has allocated from the OS.
 
@@ -917,13 +912,14 @@ one profiling option that is available for ordinary non-profiled
 executables:
 
 .. rts-flag:: -hT
+              -h
 
     Generates a basic heap profile, in the file :file:`prog.hp`. To produce the
     heap profile graph, use :command:`hp2ps` (see :ref:`hp2ps`). The basic heap
     profile is broken down by data constructor, with other types of closures
     (functions, thunks, etc.) grouped into broad categories (e.g. ``FUN``,
     ``THUNK``). To get a more detailed profile, use the full profiling support
-    (:ref:`profiling`). Can be shortened to ``-h``.
+    (:ref:`profiling`). Can be shortened to :rts-flag:`-h`.
 
 .. rts-flag:: -L ⟨n⟩
 

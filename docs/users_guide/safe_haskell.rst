@@ -375,7 +375,7 @@ Safe Imports
 Safe Haskell enables a small extension to the usual import syntax of
 Haskell, adding a ``safe`` keyword:
 
-::
+.. code-block:: none
 
     impdecl -> import [safe] [qualified] modid [as modid] [impspec]
 
