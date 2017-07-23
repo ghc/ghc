@@ -6044,16 +6044,16 @@ Now suppose that, in some client module, we are searching for an
 instance of the *target constraint* ``(C ty1 .. tyn)``. The search works
 like this:
 
--  Find all instances I that *match* the target constraint; that is, the
-   target constraint is a substitution instance of I. These instance
+-  Find all instances :math:`I` that *match* the target constraint; that is, the
+   target constraint is a substitution instance of :math:`I`. These instance
    declarations are the *candidates*.
 
--  Eliminate any candidate IX for which both of the following hold:
+-  Eliminate any candidate :math:`IX` for which both of the following hold:
 
-   -  There is another candidate IY that is strictly more specific; that
-      is, IY is a substitution instance of IX but not vice versa.
+   -  There is another candidate :math:`IY` that is strictly more specific; that
+      is, :math:`IY` is a substitution instance of :math:`IX` but not vice versa.
 
-   -  Either IX is *overlappable*, or IY is *overlapping*. (This
+   -  Either :math:`IX` is *overlappable*, or :math:`IY` is *overlapping*. (This
       "either/or" design, rather than a "both/and" design, allow a
       client to deliberately override an instance from a library,
       without requiring a change to the library.)
