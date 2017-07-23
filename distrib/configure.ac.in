@@ -15,6 +15,9 @@ FP_GMP
 dnl Various things from the source distribution configure
 bootstrap_target=@TargetPlatform@
 
+HaskellHaveRTSLinker=@HaskellHaveRTSLinker@
+AC_SUBST(HaskellHaveRTSLinker)
+
 FFIIncludeDir=@FFIIncludeDir@
 FFILibDir=@FFILibDir@
 AC_SUBST(FFILibDir)
