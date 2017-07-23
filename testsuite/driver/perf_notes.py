@@ -7,6 +7,11 @@
 # metrics across arbitrary commits. The file will produce a table comparing
 # metrics between measurements taken for given commits in the environment given
 # by --test-env.
+<<<<<<< HEAD
+=======
+
+from __future__ import print_function
+>>>>>>> Cleaning up my trash code for the perf_notes comparison tool
 
 import argparse
 import re
