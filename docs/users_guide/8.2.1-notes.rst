@@ -187,7 +187,7 @@ Compiler
     -- uses of `Monoid MyMonoid` here are improved
     bar :: MonadWriter MyMonoid m => ...
 
-- GHC now derives the definition of ``<$`` when using :ghc-flag:`DeriveFunctor`
+- GHC now derives the definition of ``<$`` when using :ghc-flag:`-XDeriveFunctor`
   rather than using the default definition. This prevents unnecessary
   allocation and a potential space leak when deriving ``Functor`` for
   a recursive type.
@@ -231,8 +231,8 @@ Compiler
     instance Foo (Either a b) where
       type Bar (Either a b) = b -> a
 
-  See the section on `associated type family instances <assoc-data-inst>` for
-  more information.
+  See the section on :ref:`associated type family instances <assoc-data-inst>`
+  for more information.
 
 - A bug involving the interaction between :ghc-flag:`-XMonoLocalBinds` and
   :ghc-flag:`-XPolyKinds` has been fixed. This can cause some programs to fail
@@ -311,7 +311,7 @@ Runtime system
 
 - Heap overflow throws a catchable exception, provided that it was detected
   by the RTS during a GC cycle due to the program exceeding a limit set by
-  ``+RTS -M`` (see :rts-flag:`-M`), and not due to an allocation being refused
+  ``+RTS -M`` (see :rts-flag:`-M ⟨size⟩`), and not due to an allocation being refused
   by the operating system. This exception is thrown to the same thread that
   receives ``UserInterrupt`` exceptions, and may be caught by user programs.
 
@@ -346,12 +346,13 @@ Runtime system
   threads to all cores in systems which have multiple processor groups.
   (e.g. > 64 cores, see :ghc-ticket:`11054`)
 
-- Output of :ref:`Event log <rts-eventlog>` data can now be configured.
-  Enabling external tools to collect and analyze the event log data while the
+- Output of :ref:`Event log <rts-eventlog>` data can now be configured,
+  enabling external tools to collect and analyze the event log data while the
   application is still running.
 
-- advapi32, shell32 and user32 are now automatically loaded in GHCi. libGCC is also
-  loaded when a depencency requires it. See :ghc-ticket:`13189`.
+- ``advapi32``, ``shell32`` and ``user32`` are now automatically loaded in GHCi.
+  ``libGCC`` is also loaded when a dependency requires it. See
+  :ghc-ticket:`13189`.
 
 hsc2hs
 ~~~~~~

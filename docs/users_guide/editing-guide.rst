@@ -222,12 +222,27 @@ commands for referring to documentation for the following core GHC packages,
 * ``cabal``: ``:cabal-ref:``
 * ``ghc-prim``: ``:ghc-prim-ref:``
 
+These are defined in :file:`docs/users_guide/ghc_config.py.in`.
+
 For instance,
 
 .. code-block:: rest
 
     See the documentation for :base-ref:`Control.Applicative <Control-Applicative.html>`
     for details.
+
+Math
+^^^^
+
+You can insert type-set equations using ``:math:``. For instance,
+
+.. code-block:: rest
+
+    Fick's law of diffusion, :math:`J = -D \frac{d \varphi}{d x}`, ...
+
+will render as,
+
+    Fick's law of diffusion, :math:`J = -D \frac{d \varphi}{d x}`, ...
 
 
 Index entries

@@ -30,7 +30,7 @@ interactiveOptions =
            "Set the number of entries GHCi keeps for ``:history``." ++
            " See :ref:`ghci-debugger`."
          , flagType = DynamicFlag
-         , flagReverse = "(default is 50)"
+         , flagReverse = ""
          }
   , flag { flagName = "-fprint-evld-with-show"
          , flagDescription =

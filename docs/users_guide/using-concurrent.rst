@@ -86,7 +86,7 @@ following compiler options affect parallelism:
     parallel program, because we can tell when a computation is already
     in progress.
 
-    The option ``-feager-blackholing`` causes each thunk to be
+    The option :ghc-flag:`-feager-blackholing` causes each thunk to be
     blackholed as soon as evaluation begins. The default is "lazy
     blackholing", whereby thunks are only marked as being under
     evaluation when a thread is paused for some reason. Lazy blackholing
@@ -96,7 +96,7 @@ following compiler options affect parallelism:
     turns out to be important for parallelism.
 
     We recommend compiling any code that is intended to be run in
-    parallel with the ``-feager-blackholing`` flag.
+    parallel with the :ghc-flag:`-feager-blackholing` flag.
 
 .. _parallel-options:
 
@@ -104,8 +104,9 @@ RTS options for SMP parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 There are two ways to run a program on multiple processors: call
-``Control.Concurrent.setNumCapabilities`` from your program, or use the
-RTS ``-N`` options.
+:base-ref:`Control.Concurrent.setNumCapabilities
+<Control.Concurrent.html#v:setNumCapabilities>` from your program, or
+use the RTS :rts-flag:`-N ⟨x⟩` options.
 
 .. rts-flag:: -N ⟨x⟩
               -maxN ⟨x⟩
@@ -155,10 +156,9 @@ CPUs:
     Use the OS's affinity facilities to try to pin OS threads to CPU
     cores.
 
-    When this option is enabled, the OS threads for a capability *i* are
-    bound to the CPU core *i* using the API provided by the OS for
-    setting thread affinity. e.g. on Linux GHC uses
-    ``sched_setaffinity()``.
+    When this option is enabled, the OS threads for a capability :math:`i` are
+    bound to the CPU core :math:`i` using the API provided by the OS for setting
+    thread affinity. e.g. on Linux GHC uses ``sched_setaffinity()``.
 
     Depending on your workload and the other activity on the machine,
     this may or may not result in a performance improvement. We
@@ -174,7 +174,7 @@ CPUs:
 
     This option is probably only of use for concurrent programs that
     explicitly schedule threads onto CPUs with
-    ``Control.Concurrent.forkOn``.
+    :base-ref:`Control.Concurrent.forkOn <Control-Concurrent.html#v:forkOn>`.
 
 Hints for using SMP parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

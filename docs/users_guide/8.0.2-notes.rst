@@ -158,7 +158,7 @@ Compiler
    (:ghc-ticket:`4012`)
 
 - Nearly two-hundred more bugs. See `Trac
-   <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.0.2&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`_
+   <https://ghc.haskell.org/trac/ghc/query?status=closed&milestone=8.0.2&col=id&col=summary&col=status&col=type&col=priority&col=milestone&col=component&order=priority>`__
    for a complete list.
 
 Runtime system

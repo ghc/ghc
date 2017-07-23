@@ -571,7 +571,6 @@ For instance, a simple profile might look like this,
           "src_loc": "<entire-module>",
           "is_caf": true
         }
-        ...
       ],
       "profile": {
         "id": 162,
@@ -1312,8 +1311,12 @@ case :file:`Recip.tix`, which contains the coverage data for this run of the
 program. The program may be run multiple times (e.g. with different test
 data), and the coverage data from the separate runs is accumulated in
 the ``.tix`` file. To reset the coverage data and start again, just
-remove the ``.tix`` file.  You can control where the ``.tix`` file
+remove the ``.tix`` file. You can control where the ``.tix`` file
 is generated using the environment variable :envvar:`HPCTIXFILE`.
+
+.. envvar:: HPCTIXFILE
+
+    Set the HPC ``.tix`` file output path.
 
 Having run the program, we can generate a textual summary of coverage:
 
@@ -1565,6 +1568,10 @@ Using “ticky-ticky” profiling (for implementors)
 
 .. index::
    single: ticky-ticky profiling
+
+.. ghc-flag:: -ticky
+
+   Enable ticky-ticky profiling.
 
 Because ticky-ticky profiling requires a certain familiarity with GHC
 internals, we have moved the documentation to the GHC developers wiki.

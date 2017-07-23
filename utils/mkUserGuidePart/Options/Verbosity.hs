@@ -8,7 +8,7 @@ verbosityOptions =
          , flagDescription = "verbose mode (equivalent to ``-v3``)"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-v⟨n⟩"
+  , flag { flagName = "-v ⟨n⟩"
          , flagDescription = "set verbosity level"
          , flagType = DynamicFlag
          , flagReverse = ""

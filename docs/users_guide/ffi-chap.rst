@@ -4,9 +4,12 @@ Foreign function interface (FFI)
 ================================
 
 .. index::
-   single: -XForeignFunctionInterface
    single: Foreign function interface
    single: interfacing with native code
+
+.. ghc-flag:: -XForeignFunctionInterface
+
+    Allow use of the Haskell foreign function interface.
 
 GHC (mostly) conforms to the Haskell Foreign Function Interface, whose
 definition is part of the Haskell Report on

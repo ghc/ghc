@@ -12,7 +12,7 @@ import os
 sys.path.insert(0, os.path.abspath('.'))
 from ghc_config import extlinks, version
 
-extensions = ['sphinx.ext.extlinks']
+extensions = ['sphinx.ext.extlinks', 'sphinx.ext.mathjax']
 
 templates_path = ['.templates']
 source_suffix = '.rst'

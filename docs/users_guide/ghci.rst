@@ -480,6 +480,11 @@ instead of layout:
     6
     Prelude>
 
+.. ghci-cmd:: :{
+              :}
+
+    Begin or end a multi-line GHCi command block.
+
 To alleviate this issue, GHCi commands can be split over multiple lines,
 by wrapping them in ``:{`` and ``:}`` (each on a single line of its
 own):

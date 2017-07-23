@@ -163,12 +163,15 @@ Options affecting the C pre-processor
 
 .. ghc-flag:: -D⟨symbol⟩[=⟨value⟩]
 
-    Define macro ⟨symbol⟩ in the usual way. NB: does *not* affect ``-D``
-    macros passed to the C compiler when compiling with :ghc-flag:`-fvia-C`! For
-    those, use the ``-optc-Dfoo`` hack… (see :ref:`forcing-options-through`).
+    Define macro ⟨symbol⟩ in the usual way. When no value is given, the value is
+    taken to be ``1``. For instance, ``-DUSE_MYLIB`` is equivalent to
+    ``-DUSE_MYLIB=1``.
 
-    When no value is given, the value is taken to be ``1``. For instance,
-    ``-DUSE_MYLIB`` is equivalent to ``-DUSE_MYLIB=1``.
+    .. note::
+
+        :ghc-flag:`-D⟨symbol⟩[=⟨value⟩]` does *not* affect ``-D``
+        macros passed to the C compiler when compiling an unregisterised build! In
+        this case use the ``-optc-Dfoo`` hack… (see :ref:`forcing-options-through`).
 
 .. ghc-flag:: -U⟨symbol⟩
 
