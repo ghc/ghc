@@ -323,12 +323,12 @@ reliably re-initialise after this has happened; see :ref:`infelicities-ffi`.
     will try to link to the ``Main`` Haskell module.
 
 To use ``+RTS`` flags with ``hs_init()``, we have to modify the example
-slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags
-(see :ref:`options-linker`), and the :ghc-flag:`-rtsopts`
-link-time flag overrides this. However, :ghc-flag:`-rtsopts` has no effect when
-:ghc-flag:`-no-hs-main` is in use (and the same goes for :ghc-flag:`-with-rtsopts`). To
-set these options we have to call a GHC-specific API instead of
-``hs_init()``:
+slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags (see
+:ref:`options-linker`), and the :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`
+link-time flag overrides this. However, :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`
+has no effect when :ghc-flag:`-no-hs-main` is in use (and the same goes for
+:ghc-flag:`-with-rtsopts=⟨opts⟩`). To set these options we have to call a
+GHC-specific API instead of ``hs_init()``:
 
 .. code-block:: c
 
@@ -536,7 +536,7 @@ single Haskell thread, and possibly also use a bound thread (see
 
 Note that foreign calls made by different Haskell threads may execute in
 *parallel*, even when the ``+RTS -N`` flag is not being used
-(:ref:`parallel-options`). The :rts-flag:`-N` flag controls parallel
+(:ref:`parallel-options`). The :rts-flag:`-N ⟨x⟩` flag controls parallel
 execution of Haskell threads, but there may be an arbitrary number of
 foreign calls in progress at any one time, regardless of the ``+RTS -N``
 value.

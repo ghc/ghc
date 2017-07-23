@@ -16,7 +16,7 @@ for that module.
 Optionally, the program may be linked with the :ghc-flag:`-threaded` option (see
 :ref:`options-linker`. This provides two benefits:
 
-- It enables the :rts-flag:`-N` to be used, which allows threads to run in
+- It enables the :rts-flag:`-N ⟨x⟩` to be used, which allows threads to run in
   parallelism on a multi-processor or multi-core machine. See :ref:`using-smp`.
 
 - If a thread makes a foreign call (and the call is not marked
@@ -31,7 +31,7 @@ programs:
 .. index::
    single: RTS options; concurrent
 
-.. rts-flag:: -C <s>
+.. rts-flag:: -C ⟨s⟩
 
     :default: 20 milliseconds
 
@@ -107,8 +107,8 @@ There are two ways to run a program on multiple processors: call
 ``Control.Concurrent.setNumCapabilities`` from your program, or use the
 RTS ``-N`` options.
 
-.. rts-flag:: -N <x>
-              -maxN <x>
+.. rts-flag:: -N ⟨x⟩
+              -maxN ⟨x⟩
 
     Use ⟨x⟩ simultaneous threads when running the program.
 
@@ -179,11 +179,11 @@ CPUs:
 Hints for using SMP parallelism
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Add the :rts-flag:`-s` RTS option when running the program to see timing stats,
-which will help to tell you whether your program got faster by using
-more CPUs or not. If the user time is greater than the elapsed time,
-then the program used more than one CPU. You should also run the program
-without :rts-flag:`-N` for comparison.
+Add the :rts-flag:`-s [⟨file⟩]` RTS option when running the program to see
+timing stats, which will help to tell you whether your program got faster by
+using more CPUs or not. If the user time is greater than the elapsed time, then
+the program used more than one CPU. You should also run the program without
+:rts-flag:`-N ⟨x⟩` for comparison.
 
 The output of ``+RTS -s`` tells you how many "sparks" were created and
 executed during the run of the program (see :ref:`rts-options-gc`),

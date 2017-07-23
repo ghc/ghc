@@ -31,20 +31,20 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wwarn"
          }
-  , flag { flagName = "-Werror=<wflag>"
+  , flag { flagName = "-Werror=⟨wflag⟩"
          , flagDescription = "make a specific warning fatal"
          , flagType = DynamicFlag
-         , flagReverse = "-Wwarn=<wflag>"
+         , flagReverse = "-Wwarn=⟨wflag⟩"
          }
   , flag { flagName = "-Wwarn"
          , flagDescription = "make warnings non-fatal"
          , flagType = DynamicFlag
          , flagReverse = "-Werror"
          }
-  , flag { flagName = "-Wwarn=<wflag>"
+  , flag { flagName = "-Wwarn=⟨wflag⟩"
          , flagDescription = "make a specific warning non-fatal"
          , flagType = DynamicFlag
-         , flagReverse = "-Werror=<wflag>"
+         , flagReverse = "-Werror=⟨wflag⟩"
          }
   , flag { flagName = "-Wunrecognised-warning-flags"
          , flagDescription =
@@ -150,7 +150,7 @@ warningsOptions =
          , flagType = DynamicFlag
          , flagReverse = "-Wno-incomplete-uni-patterns"
          }
-  , flag { flagName = "-Wmax-pmcheck-iterations=<N>"
+  , flag { flagName = "-fmax-pmcheck-iterations=⟨n⟩"
          , flagDescription =
            "the iteration limit for the pattern match checker"
          , flagType = DynamicFlag

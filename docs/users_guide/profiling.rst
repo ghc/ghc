@@ -402,8 +402,9 @@ enclosed between ``+RTS ... -RTS`` as usual):
        single: time profile
 
     The :rts-flag:`-p` option produces a standard *time profile* report. It is
-    written into the file :file:`<stem>.prof`; the stem is taken to be the program
-    name by default, but can be overridden by the :rts-flag:`-po` flag.
+    written into the file :file:`<stem>.prof`; the stem is taken to be the
+    program name by default, but can be overridden by the :rts-flag:`-po
+    ⟨stem⟩` flag.
 
     The :rts-flag:`-P` option produces a more detailed report containing the
     actual time and allocation data as well. (Not used much.)
@@ -418,19 +419,36 @@ enclosed between ``+RTS ... -RTS`` as usual):
 
 .. rts-flag:: -po ⟨stem⟩
 
-    The :rts-flag:`-po` option overrides the stem used to form the output file
-    paths for the cost-centre profiler (see :rts-flag:`-p` and :rts-flag:`-pj`
-    flags above) and heap profiler (see :rts-flag:`-h`).
+    The :rts-flag:`-po ⟨stem⟩` option overrides the stem used to form the
+    output file paths for the cost-centre profiler (see :rts-flag:`-p` and
+    :rts-flag:`-pj` flags above) and heap profiler (see :rts-flag:`-h`).
 
     For instance, running a program with ``+RTS -h -p -pohello-world`` would
     produce a heap profile named :file:`hello-world.hp` and a cost-centre
     profile named :file:`hello-world.prof`.
 
-.. rts-flag:: -V <secs>
+.. rts-flag:: -V ⟨secs⟩
 
-    Sets the interval that the RTS clock ticks at, which is also the
-    sampling interval of the time and allocation profile. The default is
-    0.02 seconds.
+    Sets the interval that the RTS clock ticks at, which is also the sampling
+    interval of the time and allocation profile. The default is 0.02 seconds.
+    The runtime uses a single timer signal to count ticks; this timer signal is
+    used to control the context switch timer (:ref:`using-concurrent`) and the
+    heap profiling timer :ref:`rts-options-heap-prof`. Also, the time profiler
+    uses the RTS timer signal directly to record time profiling samples.
+
+    Normally, setting the :rts-flag:`-V ⟨secs⟩` option directly is not
+    necessary: the resolution of the RTS timer is adjusted automatically if a
+    short interval is requested with the :rts-flag:`-C ⟨s⟩` or :rts-flag:`-i
+    ⟨secs⟩` options. However, setting :rts-flag:`-V ⟨secs⟩` is required in
+    order to increase the resolution of the time profiler.
+
+    Using a value of zero disables the RTS clock completely, and has the
+    effect of disabling timers that depend on it: the context switch
+    timer and the heap profiling timer. Context switches will still
+    happen, but deterministically and at a rate much faster than normal.
+    Disabling the interval timer is useful for debugging, because it
+    eliminates a source of non-determinism at runtime.
+
 
 .. rts-flag:: -xc
 
@@ -456,7 +474,7 @@ has the following properties,
     The command line arguments passed to the runtime system
 ``initial_capabilities`` (integral number)
     How many capabilities the program was started with (e.g. using the
-    :rts-flag:`-N` option). Note that the number of capabilities may change
+    :rts-flag:`-N ⟨x⟩` option). Note that the number of capabilities may change
     during execution due to the ``setNumCapabilities`` function.
 ``total_time`` (number)
     The total wall time of the program's execution in seconds.
@@ -694,42 +712,42 @@ follows:
     The flags below are marked with ``:noindex:`` to avoid duplicate
     ID warnings from Sphinx.
 
-.. rts-flag:: -hc <name>
+.. rts-flag:: -hc ⟨name⟩
     :noindex:
 
     Restrict the profile to closures produced by cost-centre stacks with
     one of the specified cost centres at the top.
 
-.. rts-flag:: -hC <name>
+.. rts-flag:: -hC ⟨name⟩
     :noindex:
 
     Restrict the profile to closures produced by cost-centre stacks with
     one of the specified cost centres anywhere in the stack.
 
-.. rts-flag:: -hm <module>
+.. rts-flag:: -hm ⟨module⟩
     :noindex:
 
     Restrict the profile to closures produced by the specified modules.
 
-.. rts-flag:: -hd <desc>
+.. rts-flag:: -hd ⟨desc⟩
     :noindex:
 
     Restrict the profile to closures with the specified description
     strings.
 
-.. rts-flag:: -hy <type>
+.. rts-flag:: -hy ⟨type⟩
     :noindex:
 
     Restrict the profile to closures with the specified types.
 
-.. rts-flag:: -hr <cc>
+.. rts-flag:: -hr ⟨cc⟩
     :noindex:
 
     Restrict the profile to closures with retainer sets containing
     cost-centre stacks with one of the specified cost centres at the
     top.
 
-.. rts-flag:: -hb <bio>
+.. rts-flag:: -hb ⟨bio⟩
     :noindex:
 
     Restrict the profile to closures with one of the specified
@@ -750,7 +768,7 @@ doesn't currently support mixing the :rts-flag:`-hr` and :rts-flag:`-hb` options
 
 There are three more options which relate to heap profiling:
 
-.. rts-flag:: -i <secs>
+.. rts-flag:: -i ⟨secs⟩
 
     Set the profiling (sampling) interval to ⟨secs⟩ seconds (the default
     is 0.1 second). Fractions are allowed: for example ``-i0.2`` will
@@ -772,7 +790,7 @@ There are three more options which relate to heap profiling:
     “STACK” respectively when displaying the profile by closure
     description or type description.
 
-.. rts-flag:: -L <num>
+.. rts-flag:: -L ⟨num⟩
 
     Sets the maximum length of a cost-centre stack name in a heap
     profile. Defaults to 25.
@@ -809,9 +827,9 @@ to discover the full retainer set for each object, which can be quite
 slow. So we set a limit on the maximum size of a retainer set, where all
 retainer sets larger than the maximum retainer set size are replaced by
 the special set ``MANY``. The maximum set size defaults to 8 and can be
-altered with the :rts-flag:`-R` RTS option:
+altered with the :rts-flag:`-R ⟨size⟩` RTS option:
 
-.. rts-flag:: -R <size>
+.. rts-flag:: -R ⟨size⟩
 
     Restrict the number of elements in a retainer set to ⟨size⟩ (default
     8).
@@ -909,17 +927,16 @@ reasons for this:
    currently 2 extra words per heap object, which probably results in
    about a 30% overhead.
 
--  Garbage collection requires more memory than the actual residency.
-   The factor depends on the kind of garbage collection algorithm in
-   use: a major GC in the standard generation copying collector will
-   usually require 3L bytes of memory, where L is the amount of live
-   data. This is because by default (see the RTS :rts-flag:`-F` option) we
-   allow the old generation to grow to twice its size (2L) before
-   collecting it, and we require additionally L bytes to copy the live
-   data into. When using compacting collection (see the :rts-flag:`-c`
-   option), this is reduced to 2L, and can further be reduced by
-   tweaking the :rts-flag:`-F` option. Also add the size of the allocation area
-   (see :rts-flag:`-A`).
+-  Garbage collection requires more memory than the actual residency.  The
+   factor depends on the kind of garbage collection algorithm in use: a major GC
+   in the standard generation copying collector will usually require 3L bytes of
+   memory, where L is the amount of live data. This is because by default (see
+   the RTS :rts-flag:`-F ⟨factor⟩` option) we allow the old generation to grow
+   to twice its size (2L) before collecting it, and we require additionally L
+   bytes to copy the live data into. When using compacting collection (see the
+   :rts-flag:`-c` option), this is reduced to 2L, and can further be reduced by
+   tweaking the :rts-flag:`-F ⟨factor⟩` option. Also add the size of the
+   allocation area (see :rts-flag:`-A ⟨size⟩`).
 
 -  The stack isn't counted in the heap profile by default. See the
    RTS :rts-flag:`-xt` option.
@@ -976,7 +993,7 @@ The flags are:
     to use a big box instead. The ``-b`` option forces ``hp2ps`` to use
     a big box.
 
-.. option:: -e<float>[in|mm|pt]
+.. option:: -e⟨float⟩[in|mm|pt]
 
     Generate encapsulated PostScript suitable for inclusion in LaTeX
     documents. Usually, the PostScript graph is drawn in landscape mode
@@ -1004,7 +1021,7 @@ The flags are:
     necessary. No key is produced as it won't fit!. It is useful for
     creation time profiles with many bands.
 
-.. option:: -m<int>
+.. option:: -m⟨int⟩
 
     Normally a profile is limited to 20 bands with additional
     identifiers being grouped into an ``OTHER`` band. The ``-m`` flag
@@ -1029,7 +1046,7 @@ The flags are:
 
     Use a small box for the title.
 
-.. option:: -t<float>
+.. option:: -t⟨float⟩
 
     Normally trace elements which sum to a total of less than 1% of the
     profile are removed from the profile. The ``-t`` option allows this
@@ -1174,7 +1191,7 @@ Profiling Parallel and Concurrent Programs
 
 Combining :ghc-flag:`-threaded` and :ghc-flag:`-prof` is perfectly fine, and
 indeed it is possible to profile a program running on multiple processors with
-the RTS :rts-flag:`-N` option. [3]_
+the RTS :rts-flag:`-N ⟨x⟩` option. [3]_
 
 Some caveats apply, however. In the current implementation, a profiled
 program is likely to scale much less well than the unprofiled program,

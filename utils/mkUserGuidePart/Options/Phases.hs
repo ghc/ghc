@@ -7,7 +7,7 @@ phaseOptions =
   [ flag { flagName = "-F"
          , flagDescription =
            "Enable the use of a :ref:`pre-processor <pre-processor>` "++
-           "(set with :ghc-flag:`-pgmF`)"
+           "(set with :ghc-flag:`-pgmF ⟨cmd⟩`)"
          , flagType = DynamicFlag
          }
   , flag { flagName = "-E"
@@ -26,7 +26,7 @@ phaseOptions =
          , flagDescription = "Stop after generating object (``.o``) file"
          , flagType = ModeFlag
          }
-  , flag { flagName = "-x⟨suffix⟩"
+  , flag { flagName = "-x ⟨suffix⟩"
          , flagDescription = "Override default behaviour for source files"
          , flagType = DynamicFlag
          }

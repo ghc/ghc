@@ -104,7 +104,7 @@ to abort.
     Makes any warning into a fatal error. Useful so that you don't miss
     warnings when doing batch compilation.
 
-.. ghc-flag:: -Werror=<wflag>
+.. ghc-flag:: -Werror=⟨wflag⟩
     :noindex:
 
     :implies: ``-W<wflag>``
@@ -117,7 +117,7 @@ to abort.
     Warnings are treated only as warnings, not as errors. This is the
     default, but can be useful to negate a :ghc-flag:`-Werror` flag.
 
-.. ghc-flag:: -Wwarn=<wflag>
+.. ghc-flag:: -Wwarn=⟨wflag⟩
     :noindex:
 
     Causes a specific warning to be treated as normal warning, not fatal error.
@@ -562,7 +562,7 @@ of ``-W(no-)*``.
         h = \[] -> 2
         Just k = f y
 
-.. ghc-flag:: -fmax-pmcheck-iterations=<N>
+.. ghc-flag:: -fmax-pmcheck-iterations=⟨n⟩
 
     :default: 2000000
 

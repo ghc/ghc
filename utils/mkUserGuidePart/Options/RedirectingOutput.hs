@@ -16,7 +16,7 @@ redirectingOutputOptions =
          , flagDescription = "set the suffix to use for interface files"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-o ⟨filename⟩"
+  , flag { flagName = "-o ⟨file⟩"
          , flagDescription = "set output filename"
          , flagType = DynamicFlag
          }
@@ -24,7 +24,7 @@ redirectingOutputOptions =
          , flagDescription = "set directory for object files"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-ohi ⟨filename⟩"
+  , flag { flagName = "-ohi ⟨file⟩"
          , flagDescription = "set the filename in which to put the interface"
          , flagType = DynamicFlag
          }
@@ -44,15 +44,15 @@ redirectingOutputOptions =
          , flagDescription = "set output directory"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-dyno <filename>"
+  , flag { flagName = "-dyno ⟨file⟩"
          , flagDescription = "Set the output filename for dynamic object files (see ``-dynamic-too``)"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-dynosuf <suffix>"
+  , flag { flagName = "-dynosuf ⟨suffix⟩"
          , flagDescription = "Set the object suffix for dynamic object files (see ``-dynamic-too``)"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-dynhisuf <suffix>"
+  , flag { flagName = "-dynhisuf ⟨suffix⟩"
          , flagDescription = "Set the hi suffix for dynamic object files (see ``-dynamic-too``)"
          , flagType = DynamicFlag
          }

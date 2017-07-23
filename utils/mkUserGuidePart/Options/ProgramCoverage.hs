@@ -9,7 +9,7 @@ programCoverageOptions =
            "Turn on Haskell program coverage instrumentation"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-hpcdir dir"
+  , flag { flagName = "-hpcdir ⟨dir⟩"
          , flagDescription =
            "Directory to deposit ``.mix`` files during compilation "++
            "(default is ``.hpc``)"

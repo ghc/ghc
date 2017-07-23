@@ -136,7 +136,7 @@ compilerDebuggingOptions =
          , flagDescription = "Dump typechecker output"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-dth-dec-file"
+  , flag { flagName = "-dth-dec-file=⟨file⟩"
          , flagDescription =
            "Show evaluated TH declarations in a .th.hs file"
          , flagType = DynamicFlag
@@ -186,7 +186,7 @@ compilerDebuggingOptions =
            "Set the depth for printing expressions in error msgs"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-dppr-cols⟨N⟩"
+  , flag { flagName = "-dppr-cols=⟨n⟩"
          , flagDescription =
            "Set the width of debugging output. For example ``-dppr-cols200``"
          , flagType = DynamicFlag

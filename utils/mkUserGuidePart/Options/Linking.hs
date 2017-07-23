@@ -26,29 +26,29 @@ linkingOptions =
            "Selects one of a number of modes for finding shared libraries at runtime."
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-framework⟨name⟩"
+  , flag { flagName = "-framework ⟨name⟩"
          , flagDescription =
            "On Darwin/OS X/iOS only, link in the framework ⟨name⟩. This " ++
            "option corresponds to the ``-framework`` option for Apple's Linker."
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-framework-path⟨name⟩"
+  , flag { flagName = "-framework-path ⟨dir⟩"
          , flagDescription =
            "On Darwin/OS X/iOS only, add ⟨dir⟩ to the list of directories " ++
            "searched for frameworks. This option corresponds to the ``-F`` "++
            "option for Apple's Linker."
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-l⟨lib⟩"
+  , flag { flagName = "-l ⟨lib⟩"
          , flagDescription = "Link in library ⟨lib⟩"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-L⟨dir⟩"
+  , flag { flagName = "-L ⟨dir⟩"
          , flagDescription =
            "Add ⟨dir⟩ to the list of directories searched for libraries"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-main-is"
+  , flag { flagName = "-main-is ⟨thing⟩"
          , flagDescription = "Set main module and function"
          , flagType = DynamicFlag
          }
@@ -60,7 +60,7 @@ linkingOptions =
          , flagDescription = "Don't assume this program contains ``main``"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-rtsopts,-rtsopts={none,some,all}"
+  , flag { flagName = "-rtsopts[=⟨none|some|all⟩]"
          , flagDescription =
            "Control whether the RTS behaviour can be tweaked via command-line"++
            "flags and the ``GHCRTS`` environment variable. Using ``none`` " ++
@@ -69,13 +69,14 @@ linkingOptions =
            "argument at all) means that all RTS flags are permitted."
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-with-rtsopts=opts"
+  , flag { flagName = "-with-rtsopts=⟨opts⟩"
          , flagDescription = "Set the default RTS options to ⟨opts⟩."
          , flagType = DynamicFlag
          }
   , flag { flagName = "-no-rtsopts-suggestions"
          , flagDescription =
-           "Don't print RTS suggestions about linking with :ghc-flag:`-rtsopts`."
+           "Don't print RTS suggestions about linking with "++
+           ":ghc-flag:`-rtsopts[=⟨none|some|all⟩]`."
          , flagType = DynamicFlag
          }
   , flag { flagName = "-no-link"
