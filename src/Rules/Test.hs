@@ -22,8 +22,9 @@ testRules = do
         needBuilder $ Ghc CompileHs Stage2
         needBuilder $ GhcPkg Update Stage1
         needBuilder Hpc
-        needBuilder Hsc2Hs
-        need ["inplace/bin/hp2ps"] -- TODO: Eliminate explicit filepaths in "need" (#376)
+        need ["inplace/bin/hp2ps", "inplace/bin/hsc2hs"]
+        -- TODO: Eliminate explicit filepaths in "need" (#376)
+        -- FIXME: needBuilder Hsc2Hs doesn't work
         build $ Target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
