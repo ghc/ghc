@@ -643,7 +643,7 @@ performance.
     ``-F`` parameter will be reduced in order to avoid exceeding the
     maximum heap size.
 
-.. rts-flag:: -Mgrace= ⟨size⟩
+.. rts-flag:: -Mgrace=⟨size⟩
 
     :default: 1M
 
