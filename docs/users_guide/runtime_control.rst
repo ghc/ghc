@@ -253,7 +253,7 @@ Miscellaneous RTS options
     This option relates to allocation limits; for more about this see
     :base-ref:`enableAllocationLimit <GHC-Conc.html#v%3AenableAllocationLimit>`.
     When a thread hits its allocation limit, the RTS throws an exception
-    to the thread, and the thread gets an additional quota of allo
+    to the thread, and the thread gets an additional quota of allocation
     before the exception is raised again, the idea being so that the
     thread can execute its exception handlers. The ``-xq`` controls the
     size of this additional quota.
@@ -339,7 +339,7 @@ performance.
     .. index::
        single: allocation area, chunk size
 
-    [Example: ``-n4m``\ ] When set to a non-zero value, this
+    [Example: ``-n4m`` ] When set to a non-zero value, this
     option divides the allocation area (``-A`` value) into chunks of the
     specified size. During execution, when a processor exhausts its
     current chunk, it is given another chunk from the pool until the
