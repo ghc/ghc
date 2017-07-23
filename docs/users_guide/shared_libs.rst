@@ -212,14 +212,13 @@ paths. The unix tool ``readelf --dynamic`` is handy for inspecting the
 Mac OS X
 ~~~~~~~~
 
-The standard assumption on Darwin/Mac OS X is that dynamic libraries
-will be stamped at build time with an "install name", which is the full
-ultimate install path of the library file. Any libraries or executables
-that subsequently link against it (even if it hasn't been installed yet)
-will pick up that path as their runtime search location for it. When
-compiling with ghc directly, the install name is set by default to the
-location where it is built. You can override this with the
-:ghc-flag:`-dylib-install-name` option (which passes ``-install_name`` to the
-Apple linker). Cabal does this for you. It automatically sets the
-install name for dynamic libraries to the absolute path of the ultimate
-install location.
+The standard assumption on Darwin/Mac OS X is that dynamic libraries will be
+stamped at build time with an "install name", which is the full ultimate
+install path of the library file. Any libraries or executables that
+subsequently link against it (even if it hasn't been installed yet) will pick
+up that path as their runtime search location for it. When compiling with ghc
+directly, the install name is set by default to the location where it is built.
+You can override this with the :ghc-flag:`-dylib-install-name ⟨path⟩` option
+(which passes ``-install_name`` to the Apple linker). Cabal does this for you.
+It automatically sets the install name for dynamic libraries to the absolute
+path of the ultimate install location.

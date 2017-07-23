@@ -34,7 +34,7 @@ verbosityOptions =
   , flag { flagName = "-fprint-explicit-kinds"
          , flagDescription =
            "Print explicit kind foralls and kind arguments in types. " ++
-           "See also :ghc-flag:`-XKindSignature`"
+           "See also :ghc-flag:`-XKindSignatures`"
          , flagType = DynamicFlag
          , flagReverse = "-fno-print-explicit-kinds"
          }

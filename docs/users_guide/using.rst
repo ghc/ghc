@@ -309,7 +309,7 @@ The available mode flags are:
     generate dependency information suitable for use in a ``Makefile``.
     See :ref:`makefile-dependencies`.
 
-.. ghc-flag:: --frontend <module>
+.. ghc-flag:: --frontend ⟨module⟩
 
     .. index::
         single: frontend plugins; using
@@ -417,9 +417,9 @@ The main advantages to using ``ghc --make`` over traditional
 -  GHC re-calculates the dependencies each time it is invoked, so the
    dependencies never get out of sync with the source.
 
--  Using the :ghc-flag:`-j` flag, you can compile modules in parallel. Specify
-   ``-j⟨N⟩`` to compile ⟨N⟩ jobs in parallel. If N is omitted,
-   then it defaults to the number of processors.
+-  Using the :ghc-flag:`-j[⟨n⟩]` flag, you can compile modules in parallel.
+   Specify ``-j ⟨n⟩`` to compile ⟨n⟩ jobs in parallel. If ⟨n⟩ is omitted, then
+   it defaults to the number of processors.
 
 Any of the command-line options described in the rest of this chapter
 can be used with ``--make``, but note that any options you give on the
@@ -445,7 +445,7 @@ The source files for the program don't all need to be in the same
 directory; the :ghc-flag:`-i` option can be used to add directories to the
 search path (see :ref:`search-path`).
 
-.. ghc-flag:: -j [N]
+.. ghc-flag:: -j[⟨n⟩]
 
     Perform compilation in parallel when possible. GHC will use up to ⟨N⟩
     threads during compilation. If N is omitted, then it defaults to the
@@ -549,10 +549,11 @@ to compile the Haskell source file ``Foo.hs`` to an object file
 Overriding the default behaviour for a file
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-As described above, the way in which a file is processed by GHC depends
-on its suffix. This behaviour can be overridden using the :ghc-flag:`-x` option:
+As described above, the way in which a file is processed by GHC depends on its
+suffix. This behaviour can be overridden using the :ghc-flag:`-x ⟨suffix⟩`
+option:
 
-.. ghc-flag:: -x <suffix>
+.. ghc-flag:: -x ⟨suffix⟩
 
     Causes all files following this option on the command line to be
     processed as if they had the suffix ⟨suffix⟩. For example, to
@@ -791,7 +792,7 @@ messages and in GHCi:
                   in a’
         or by using the flag -fno-warn-unused-do-bind
 
-.. ghc-flag:: -fdiagnostics-color=(always|auto|never)
+.. ghc-flag:: -fdiagnostics-color=⟨always|auto|never⟩
 
     Causes GHC to display error messages with colors.  To do this, the
     terminal must have support for ANSI color codes, or else garbled text will
@@ -867,7 +868,7 @@ messages and in GHCi:
     start at zero. This choice was made to follow existing convention
     (i.e. this is how Emacs does it).
 
-.. ghc-flag:: -H <size>
+.. ghc-flag:: -H ⟨size⟩
 
     Set the minimum size of the heap to ⟨size⟩. This option is
     equivalent to ``+RTS -Hsize``, see :ref:`rts-options-gc`.

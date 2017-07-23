@@ -30,11 +30,11 @@ Use more memory:
     .. index::
        single: -H; RTS option
 
-    If it says you're using more than 20% of total time in garbage
-    collecting, then more memory might help: use the ``-H⟨size⟩`` (see
-    :rts-flag:`-H`) option. Increasing the default allocation area size used by
-    the compiler's RTS might also help: use the ``+RTS -A⟨size⟩ -RTS``
-    option (see :rts-flag:`-A`).
+    If it says you're using more than 20% of total time in garbage collecting,
+    then more memory might help: use the ``-H⟨size⟩`` (see :rts-flag:`-H
+    [⟨size⟩]`) option. Increasing the default allocation area size used by the
+    compiler's RTS might also help: use the ``+RTS -A⟨size⟩ -RTS`` option (see
+    :rts-flag:`-A ⟨size⟩`).
 
     .. index::
        single: -A⟨size⟩; RTS option
@@ -114,13 +114,13 @@ Optimise, using ``-O`` or ``-O2``:
 
 Compile via LLVM:
     The :ref:`LLVM code generator <llvm-code-gen>` can sometimes do a far
-    better job at producing fast code than the :ref:`native code
-    generator <native-code-gen>`. This is not universal and depends
-    on the code. Numeric heavy code seems to show the best improvement
-    when compiled via LLVM. You can also experiment with passing
-    specific flags to LLVM with the :ghc-flag:`-optlo` and :ghc-flag:`-optlc`
-    flags. Be careful though as setting these flags stops GHC from setting its
-    usual flags for the LLVM optimiser and compiler.
+    better job at producing fast code than the :ref:`native code generator
+    <native-code-gen>`. This is not universal and depends on the code. Numeric
+    heavy code seems to show the best improvement when compiled via LLVM. You
+    can also experiment with passing specific flags to LLVM with the
+    :ghc-flag:`-optlo ⟨option⟩` and :ghc-flag:`-optlc ⟨option⟩` flags. Be
+    careful though as setting these flags stops GHC from setting its usual
+    flags for the LLVM optimiser and compiler.
 
 Overloaded functions are not your friend:
     Haskell's overloading (using type classes) is elegant, neat, etc.,
@@ -149,7 +149,7 @@ Use ``SPECIALIZE`` pragmas:
 "But how do I know where overloading is creeping in?"
     A low-tech way: grep (search) your interface files for overloaded
     type signatures. You can view interface files using the
-    :ghc-flag:`--show-iface` option (see :ref:`hi-options`).
+    :ghc-flag:`--show-iface ⟨file⟩` option (see :ref:`hi-options`).
 
     .. code-block:: sh
 
@@ -303,13 +303,13 @@ Use unboxed arrays (``UArray``)
     ``Data.Array`` library.
 
 Use a bigger heap!
-    If your program's GC stats (:rts-flag:`-S` RTS option) indicate that
-    it's doing lots of garbage-collection (say, more than 20% of execution
+    If your program's GC stats (:rts-flag:`-S [⟨file⟩]` RTS option) indicate
+    that it's doing lots of garbage-collection (say, more than 20% of execution
     time), more memory might help — with the ``-H⟨size⟩`` or ``-A⟨size⟩`` RTS
     options (see :ref:`rts-options-gc`). As a rule of thumb, try setting
     ``-H⟨size⟩`` to the amount of memory you're willing to let your process
-    consume, or perhaps try passing :ghc-flag:`-H` without any argument to let GHC
-    calculate a value based on the amount of live data.
+    consume, or perhaps try passing :ghc-flag:`-H ⟨size⟩` without any argument
+    to let GHC calculate a value based on the amount of live data.
 
 Compact your data:
     The :compact-ref:`GHC.Compact <GHC-Compact.html>` module

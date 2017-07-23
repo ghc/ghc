@@ -21,12 +21,12 @@ modeOptions =
            "``make``; see :ref:`make-mode` for details."
          , flagType = ModeFlag
          }
-  , flag { flagName = "-e expr"
+  , flag { flagName = "-e ⟨expr⟩"
          , flagDescription =
            "Evaluate ``expr``; see :ref:`eval-mode` for details."
          , flagType = ModeFlag
          }
-  , flag { flagName = "--show-iface"
+  , flag { flagName = "--show-iface ⟨file⟩"
          , flagDescription = "display the contents of an interface file."
          , flagType = ModeFlag
          }

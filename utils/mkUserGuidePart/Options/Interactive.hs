@@ -56,7 +56,7 @@ interactiveOptions =
            "<ghci-import-qualified>`"
          , flagType = DynamicFlag
          }
-  , flag { flagName = "-interactive-print"
+  , flag { flagName = "-interactive-print ⟨expr⟩"
          , flagDescription =
            ":ref:`Select the function to use for printing evaluated " ++
            "expressions in GHCi <ghci-interactive-print>`"

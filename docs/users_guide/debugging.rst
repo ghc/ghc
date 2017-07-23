@@ -63,7 +63,7 @@ Dumping out compiler intermediate structures
         Dump Template Haskell expressions that we splice in, and what
         Haskell code the expression evaluates to.
 
-    .. ghc-flag:: -dth-dec-file=<file>
+    .. ghc-flag:: -dth-dec-file=⟨file⟩
 
         Dump expansions of all top-level Template Haskell splices into ⟨file⟩.
 
@@ -282,7 +282,7 @@ Formatting dumps
     with subexpressions beyond the depth replaced by ellipses. This flag
     sets the depth. Its default value is 5.
 
-.. ghc-flag:: -dppr-cols=N
+.. ghc-flag:: -dppr-cols=⟨n⟩
 
     Set the width of debugging output. Use this if your code is wrapping
     too much. For example: ``-dppr-cols=200``.
@@ -412,8 +412,8 @@ Checking for determinism
 
     Set the increment for the generated ``Unique``'s to ⟨i⟩.
 
-    This is useful in combination with :ghc-flag:`-dinitial-unique` to test if the
-    generated files depend on the order of ``Unique``'s.
+    This is useful in combination with :ghc-flag:`-dinitial-unique=⟨s⟩` to test
+    if the generated files depend on the order of ``Unique``'s.
 
     Some interesting values:
 

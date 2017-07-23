@@ -5912,7 +5912,7 @@ Condition (described in :ref:`instance-termination`) are lifted.
 Termination is still ensured by having a fixed-depth recursion stack. If
 you exceed the stack depth you get a sort of backtrace, and the
 opportunity to increase the stack depth with
-``-freduction-depth=``\ *N*. However, if you should exceed the default
+``-freduction-depth=⟨n⟩``. However, if you should exceed the default
 reduction depth limit, it is probably best just to disable depth
 checking, with ``-freduction-depth=0``. The exact depth your program
 requires depends on minutiae of your code, and it may change between
@@ -10033,7 +10033,7 @@ Impredicative polymorphism
 
 .. ghc-flag:: -XImpredicativeTypes
 
-    :implies: :ghc-flag:`-RankNTypes`
+    :implies: :ghc-flag:`-XRankNTypes`
 
     Allow impredicative polymorphic types.
 
@@ -11124,17 +11124,17 @@ non-trivial program, you may be interested in combining this with the
 :ghc-flag:`-ddump-to-file` flag (see :ref:`dumping-output`. For each file using
 Template Haskell, this will show the output in a ``.dump-splices`` file.
 
-The flag :ghc-flag:`-dth-dec-file` shows the expansions of all top-level TH
-declaration splices, both typed and untyped, in the file :file:`M.th.hs`
-where M is the name of the module being compiled. Note that other types
-of splices (expressions, types, and patterns) are not shown. Application
-developers can check this into their repository so that they can grep
-for identifiers that were defined in Template Haskell. This is similar
-to using :ghc-flag:`-ddump-to-file` with :ghc-flag:`-ddump-splices` but it always
+The flag :ghc-flag:`-dth-dec-file=⟨file⟩` shows the expansions of all top-level
+TH declaration splices, both typed and untyped, in the file :file:`M.th.hs`
+where M is the name of the module being compiled. Note that other types of
+splices (expressions, types, and patterns) are not shown. Application
+developers can check this into their repository so that they can grep for
+identifiers that were defined in Template Haskell. This is similar to using
+:ghc-flag:`-ddump-to-file` with :ghc-flag:`-ddump-splices` but it always
 generates a file instead of being coupled to :ghc-flag:`-ddump-to-file`. The
-format is also different: it does not show code from the original file,
-instead it only shows generated code and has a comment for the splice
-location of the original file.
+format is also different: it does not show code from the original file, instead
+it only shows generated code and has a comment for the splice location of the
+original file.
 
 Below is a sample output of :ghc-flag:`-ddump-splices` ::
 
@@ -11145,7 +11145,7 @@ Below is a sample output of :ghc-flag:`-ddump-splices` ::
       foo :: Int -> Int
       foo x = (x + 1)
 
-Below is the output of the same sample using :ghc-flag:`-dth-dec-file` ::
+Below is the output of the same sample using :ghc-flag:`-dth-dec-file=⟨file⟩` ::
 
     -- TH_pragma.hs:(6,4)-(8,26): Splicing declarations
     foo :: Int -> Int
@@ -11247,15 +11247,15 @@ Fortunately GHC provides two workarounds.
 
 The first option is to compile the program twice:
 
-1. Compile the program or library first the normal way, without :ghc-flag:`-prof`.
+1. Compile the program or library first the normal way, without
+   :ghc-flag:`-prof`.
 
-2. Then compile it again with :ghc-flag:`-prof`, and additionally use ``-osuf p_o``
-   to name the object files differently (you can
-   choose any suffix that isn't the normal object suffix here). GHC will
-   automatically load the object files built in the first step when
-   executing splice expressions. If you omit the :ghc-flag:`-osuf` flag when
-   building with :ghc-flag:`-prof` and Template Haskell is used, GHC will emit
-   an error message.
+2. Then compile it again with :ghc-flag:`-prof`, and additionally use ``-osuf
+   p_o`` to name the object files differently (you can choose any suffix that
+   isn't the normal object suffix here). GHC will automatically load the object
+   files built in the first step when executing splice expressions. If you omit
+   the :ghc-flag:`-osuf ⟨suffix⟩` flag when building with :ghc-flag:`-prof` and
+   Template Haskell is used, GHC will emit an error message.
 
    .. index::
       single : -osuf; using with profiling
@@ -13537,7 +13537,7 @@ From a semantic point of view:
 -  Rules are enabled (that is, used during optimisation) by the
    :ghc-flag:`-fenable-rewrite-rules` flag. This flag is implied by
    :ghc-flag:`-O`, and may be switched off (as usual) by
-   :ghc-flag:`-fno-enable-rewrite-rules <-f-enable-rewrite-rules>`. (NB: enabling
+   :ghc-flag:`-fno-enable-rewrite-rules <-fenable-rewrite-rules>`. (NB: enabling
    :ghc-flag:`-fenable-rewrite-rules` without :ghc-flag:`-O` may not do what you
    expect, though, because without :ghc-flag:`-O` GHC ignores all optimisation
    information in interface files; see :ghc-flag:`-fignore-interface-pragmas`).

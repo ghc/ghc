@@ -1133,14 +1133,14 @@ IO ()``, and it works by converting the value to ``String`` using ``show``.
 This is not ideal in certain cases, like when the output is long, or
 contains strings with non-ascii characters.
 
-The :ghc-flag:`-interactive-print` flag allows to specify any function of type
-``C a => a -> IO ()``, for some constraint ``C``, as the function for
-printing evaluated expressions. The function can reside in any loaded
-module or any registered package, but only when it resides in a registered
-package will it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
+The :ghc-flag:`-interactive-print ⟨expr⟩` flag allows to specify any function
+of type ``C a => a -> IO ()``, for some constraint ``C``, as the function for
+printing evaluated expressions. The function can reside in any loaded module or
+any registered package, but only when it resides in a registered package will
+it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
 :ghci-cmd:`:reload` or, :ghci-cmd:`:set`.
 
-.. ghc-flag:: -interactive-print <expr>
+.. ghc-flag:: -interactive-print ⟨expr⟩
 
     Set the function used by GHCi to print evaluation results. Expression
     must be of type ``C a => a -> IO ()``.
@@ -1172,8 +1172,8 @@ will start an interactive session where values with be printed using
 A custom pretty printing function can be used, for example, to format
 tree-like and nested structures in a more readable way.
 
-The :ghc-flag:`-interactive-print` flag can also be used when running GHC in
-``-e mode``:
+The :ghc-flag:`-interactive-print ⟨expr⟩` flag can also be used when running
+GHC in ``-e mode``:
 
 .. code-block:: none
 
@@ -1729,7 +1729,7 @@ The history is only available when using :ghci-cmd:`:trace`; the reason for this
 is we found that logging each breakpoint in the history cuts performance
 by a factor of 2 or more.
 
-.. ghc-flag:: -fghci-hist-size
+.. ghc-flag:: -fghci-hist-size=⟨n⟩
 
     :default: 50
 
@@ -1961,7 +1961,7 @@ to specify any extra flags at all: they will be automatically loaded the
 first time they are needed.
 
 For hidden packages, however, you need to request the package be loaded
-by using the :ghc-flag:`-package` flag:
+by using the :ghc-flag:`-package ⟨pkg⟩` flag:
 
 .. code-block:: none
 
@@ -1999,7 +1999,7 @@ On systems with ``.so``-style shared libraries, the actual library
 loaded will the ``liblib.so``. GHCi searches the following places for
 libraries, in this order:
 
--  Paths specified using the :ghc-flag:`-L` command-line option,
+-  Paths specified using the :ghc-flag:`-L ⟨dir⟩` command-line option,
 
 -  the standard library search path for your system, which on some
    systems may be overridden by setting the :envvar:`LD_LIBRARY_PATH`
@@ -2321,7 +2321,7 @@ commonly used commands.
     Display the history of evaluation steps. With a number, displays
     that many steps (default: 20). For use with :ghci-cmd:`:trace`; see
     :ref:`tracing`. To set the number of history entries stored by GHCi,
-    use the :ghc-flag:`-fghci-hist-size` flag.
+    use the :ghc-flag:`-fghci-hist-size=⟨n⟩` flag.
 
 .. ghci-cmd:: :info;[!] ⟨name⟩
 
@@ -2585,7 +2585,7 @@ commonly used commands.
     Sets the string to be used as the continuation prompt (used when
     using the :ghci-cmd:`:{` command) in GHCi.
 
-.. ghci-cmd:: :set prompt-function; <prompt-function>
+.. ghci-cmd:: :set prompt-function; ⟨prompt-function⟩
 
     .. index::
        single: GHCi prompt function; setting
@@ -2598,7 +2598,7 @@ commonly used commands.
     more information). The second arguments is the line number (as referenced
     in compiler  messages) of the current prompt.
 
-.. ghci-cmd:: :set prompt-cont-function; <prompt-function>
+.. ghci-cmd:: :set prompt-cont-function; ⟨prompt-function⟩
 
    Sets the function to be used for the continuation prompt (used when
    using the :ghci-cmd:`:{` command) displaying in GHCi.
@@ -2911,9 +2911,9 @@ option, you can set the reverse option:
 :ref:`flag-reference` lists the reverse for each option where
 applicable.
 
-Certain static options (:ghc-flag:`-package`, :ghc-flag:`-I`, :ghc-flag:`-i`,
-and :ghc-flag:`-l` in particular) will also work, but some may not take effect
-until the next reload.
+Certain static options (:ghc-flag:`-package ⟨pkg⟩`, :ghc-flag:`-I⟨dir⟩`,
+:ghc-flag:`-i⟨dir⟩[:⟨dir⟩]*`, and :ghc-flag:`-l ⟨lib⟩` in particular) will also
+work, but some may not take effect until the next reload.
 
 .. index::
    single: static; options
@@ -3156,8 +3156,8 @@ using messages over a pipe.
     GHCi debugger, so breakpoints and single-stepping don't work with
     :ghc-flag:`-fexternal-interpreter`.
 
-    See also the :ghc-flag:`-pgmi` (:ref:`replacing-phases`) and :ghc-flag:`-opti`
-    (:ref:`forcing-options-through`) flags.
+    See also the :ghc-flag:`-pgmi ⟨cmd⟩` (:ref:`replacing-phases`) and
+    :ghc-flag:`-opti ⟨option⟩` (:ref:`forcing-options-through`) flags.
 
 Why might we want to do this?  The main reason is that the RTS running
 the interpreted code can be a different flavour (profiling or

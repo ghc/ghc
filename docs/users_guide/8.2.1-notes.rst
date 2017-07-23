@@ -328,9 +328,9 @@ Runtime system
   This is supported on Linux and Windows systems.
 
 - The garbage collector can be told to use fewer threads than the
-  global number of capabilities set by :rts-flag:`-N`. By default, the garbage
+  global number of capabilities set by :rts-flag:`-N ⟨x⟩`. By default, the garbage
   collector will use a number of threads equal to the lesser of the global number
-  of capabilities or the number of physical cores. See :rts-flag:`-qn`, and a
+  of capabilities or the number of physical cores. See :rts-flag:`-qn ⟨x⟩`, and a
   `blog post <http://simonmar.github.io/posts/2016-12-08-Haskell-in-the-datacentre.html>`_
   that describes this.
 
