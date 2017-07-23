@@ -313,12 +313,6 @@ else:
             # v-- This is in a nonsensical area. It should be happening before all of the tests are even run.
             # parse_git_notes('perf') # Should it even be happening in the test-driver logic anymore?
 
-    # Write our accumulated metrics into the git notes for this commit.
-    if config.use_git_notes:
-            note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
-            # v-- This is in a nonsensical area. It should be happening before all of the tests are even run.
-            # parse_git_notes('perf') # Should it even be happening in the test-driver logic anymore?
-
     if config.summary_file:
         with open(config.summary_file, 'w') as file:
             summary(t, file)
