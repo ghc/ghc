@@ -305,9 +305,9 @@ Use unboxed arrays (``UArray``)
 Use a bigger heap!
     If your program's GC stats (:rts-flag:`-S [⟨file⟩]` RTS option) indicate
     that it's doing lots of garbage-collection (say, more than 20% of execution
-    time), more memory might help — with the ``-H⟨size⟩`` or ``-A⟨size⟩`` RTS
+    time), more memory might help — with the :rts-flag:`-H⟨size⟩` or :rts-flag:`-A⟨size⟩` RTS
     options (see :ref:`rts-options-gc`). As a rule of thumb, try setting
-    ``-H⟨size⟩`` to the amount of memory you're willing to let your process
+    :rts-flag:`-H ⟨size⟩` to the amount of memory you're willing to let your process
     consume, or perhaps try passing :ghc-flag:`-H ⟨size⟩` without any argument
     to let GHC calculate a value based on the amount of live data.
 
@@ -328,11 +328,11 @@ Smaller: producing a program that is smaller
    single: -funfolding-use-threshold0 option
 
 Decrease the "go-for-it" threshold for unfolding smallish expressions.
-Give a ``-funfolding-use-threshold0`` option for the extreme case.
-(“Only unfoldings with zero cost should proceed.”) Warning: except in
-certain specialised cases (like Happy parsers) this is likely to
-actually *increase* the size of your program, because unfolding
-generally enables extra simplifying optimisations to be performed.
+Give a :ghc-flag:`-funfolding-use-threshold=0 <-funfolding-use-threshold=⟨n⟩>`
+option for the extreme case. (“Only unfoldings with zero cost should proceed.”)
+Warning: except in certain specialised cases (like Happy parsers) this is likely
+to actually *increase* the size of your program, because unfolding generally
+enables extra simplifying optimisations to be performed.
 
 Avoid ``Read``.
 
@@ -350,9 +350,10 @@ Thriftier: producing a program that gobbles less heap space
 
 "I think I have a space leak..."
 
-Re-run your program with ``+RTS -S``, and remove all doubt! (You'll see the
-heap usage get bigger and bigger...) (Hmmm... this might be even easier with
-the ``-G1`` RTS option; so... ``./a.out +RTS -S -G1``)
+Re-run your program with :ghc-flag:`+RTS -S <-S [⟨file⟩]>`, and remove all
+doubt! (You'll see the heap usage get bigger and bigger...) (Hmmm... this might
+be even easier with the :rts-flag:`-G1 <-G ⟨generations⟩>` RTS option; so...
+``./a.out +RTS -S -G1``)
 
 .. index::
     single: -G RTS option
