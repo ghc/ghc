@@ -125,24 +125,28 @@ unpackCStringUtf8# :: Addr# -> [Char]
 unpackCStringUtf8# addr
   = unpack 0#
   where
+    -- We take care to strictly evaluate the character decoding as
+    -- indexCharOffAddr# is marked with the can_fail flag and
+    -- consequently GHC won't evaluate the expression unless it is absolutely
+    -- needed.
     unpack nh
       | isTrue# (ch `eqChar#` '\0'#  ) = []
       | isTrue# (ch `leChar#` '\x7F'#) = C# ch : unpack (nh +# 1#)
       | isTrue# (ch `leChar#` '\xDF'#) =
-          C# (chr# (((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6#) +#
-                     (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#))) :
-          unpack (nh +# 2#)
+          let !c = C# (chr# (((ord# ch                                  -# 0xC0#) `uncheckedIShiftL#`  6#) +#
+                              (ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#)))
+          in c : unpack (nh +# 2#)
       | isTrue# (ch `leChar#` '\xEF'#) =
-          C# (chr# (((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12#) +#
-                    ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
-                     (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#))) :
-          unpack (nh +# 3#)
+          let !c = C# (chr# (((ord# ch                                  -# 0xE0#) `uncheckedIShiftL#` 12#) +#
+                             ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
+                              (ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#)))
+          in c : unpack (nh +# 3#)
       | True                           =
-          C# (chr# (((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18#) +#
-                    ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12#) +#
-                    ((ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
-                     (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
-          unpack (nh +# 4#)
+          let !c = C# (chr# (((ord# ch                                  -# 0xF0#) `uncheckedIShiftL#` 18#) +#
+                             ((ord# (indexCharOffAddr# addr (nh +# 1#)) -# 0x80#) `uncheckedIShiftL#` 12#) +#
+                             ((ord# (indexCharOffAddr# addr (nh +# 2#)) -# 0x80#) `uncheckedIShiftL#`  6#) +#
+                              (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#)))
+          in c : unpack (nh +# 4#)
       where
         !ch = indexCharOffAddr# addr nh
 
