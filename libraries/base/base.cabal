@@ -202,6 +202,7 @@ Library
         Foreign.Storable
         GHC.Arr
         GHC.Base
+        GHC.ByteOrder
         GHC.Char
         GHC.Conc
         GHC.Conc.IO
