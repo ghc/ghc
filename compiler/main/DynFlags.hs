@@ -1446,11 +1446,7 @@ wayOptl :: Platform -> Way -> [String]
 wayOptl _ (WayCustom {}) = []
 wayOptl platform WayThreaded =
         case platformOS platform of
-        -- FreeBSD's default threading library is the KSE-based M:N libpthread,
-        -- which GHC has some problems with.  It's currently not clear whether
-        -- the problems are our fault or theirs, but it seems that using the
-        -- alternative 1:1 threading library libthr works around it:
-        OSFreeBSD  -> ["-lthr"]
+        OSFreeBSD  -> ["-pthread"]
         OSOpenBSD  -> ["-pthread"]
         OSNetBSD   -> ["-pthread"]
         _          -> []
