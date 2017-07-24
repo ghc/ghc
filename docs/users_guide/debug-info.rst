@@ -177,7 +177,7 @@ will be of little use unless debug information is available in the executable
 and its dependent libraries.
 
 Stack trace functionality is exposed for use by Haskell programs in the
-:base-ref:`GHC.ExecutionStack <GHC-ExecutionStack.html>` module. See the Haddock
+:base-ref:`GHC.ExecutionStack.` module. See the Haddock
 documentation in this module for details regarding usage.
 
 Requesting a stack trace with ``SIGUSR2``

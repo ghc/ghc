@@ -73,7 +73,7 @@ case. And if it isn't, we'd like to know about it.
 
 All these primitive data types and operations are exported by the
 library ``GHC.Prim``, for which there is
-:ghc-prim-ref:`detailed online documentation <GHC-Prim.html>`. (This
+:ghc-prim-ref:`detailed online documentation <GHC.Prim.>`. (This
 documentation is generated from the file ``compiler/prelude/primops.txt.pp``.)
 
 If you want to mention any of the primitive data types or operations in
@@ -1342,7 +1342,7 @@ Monad comprehensions support:
 
    Parallel statements are translated using the ``mzip`` function, which
    requires a ``MonadZip`` instance defined in
-   :base-ref:`Control.Monad.Zip <Control-Monad-Zip.html>`:
+   :base-ref:`Control.Monad.Zip.`:
 
    ::
 
@@ -3273,7 +3273,7 @@ More details:
 Record field selector polymorphism
 ----------------------------------
 
-The module :base-ref:`GHC.Records <GHC-Records.html>` defines the following: ::
+The module :base-ref:`GHC.Records.` defines the following: ::
 
   class HasField (x :: k) r a | x r -> a where
     getField :: r -> a
@@ -6382,7 +6382,7 @@ argument in GHC 8.0, but this was removed in GHC 8.2 as a type application (see
 
 There are no predefined instances of this class.  It is not in scope by default,
 but can be brought into scope by importing
-:base-ref:`GHC.OverloadedLabels <GHC-OverloadedLabels.html>`.  Unlike
+:base-ref:`GHC.OverloadedLabels.`.  Unlike
 ``IsString``, there are no special defaulting rules for ``IsLabel``.
 
 During typechecking, GHC will replace an occurrence of an overloaded label like
@@ -8750,10 +8750,9 @@ The ``Coercible`` constraint
 
 The constraint ``Coercible t1 t2`` is similar to ``t1 ~ t2``, but
 denotes representational equality between ``t1`` and ``t2`` in the sense
-of Roles (:ref:`roles`). It is exported by
-:base-ref:`Data.Coerce <Data-Coerce.html>`, which also
-contains the documentation. More details and discussion can be found in
-the paper
+of Roles (:ref:`roles`). It is exported by :base-ref:`Data.Coerce.`, which also
+contains the documentation. More details and discussion can be found in the
+paper
 `"Safe Coercions" <http://www.cis.upenn.edu/~eir/papers/2014/coercible/coercible.pdf>`__.
 
 .. _constraint-kind:
@@ -10610,7 +10609,7 @@ for constructing pretty-printed error messages, ::
         | ErrorMessage :<>: ErrorMessage     -- Put two chunks of error message next to each other
         | ErrorMessage :$$: ErrorMessage     -- Put two chunks of error message above each other
 
-in the ``GHC.TypeLits`` :base-ref:`module <GHC-TypeLits.html>`.
+in the :base-ref:`GHC.TypeLits.` module.
 
 For instance, we might use this interface to provide a more useful error
 message for applications of ``show`` on unsaturated functions like this, ::
@@ -10748,7 +10747,7 @@ Haskell <http://research.microsoft.com/~simonpj/papers/meta-haskell/>`__"
 
 The `Template Haskell <http://www.haskell.org/haskellwiki/Template_Haskell>`__
 page on the GHC Wiki has a wealth of information. You may also consult the
-:th-ref:`Haddock reference documentation <Language-Haskell-TH.html>`.
+:th-ref:`Haddock reference documentation <Language.Haskell.TH.>`.
 Many changes to the original
 design are described in `Notes on Template Haskell version
 2 <http://research.microsoft.com/~simonpj/papers/meta-haskell/notes2.ps>`__.
@@ -11495,7 +11494,7 @@ more details, see
 
 With the :ghc-flag:`-XArrows` flag, GHC supports the arrow notation described in
 the second of these papers, translating it using combinators from the
-:base-ref:`Control.Arrow <Control-Arrow.html>` module.
+:base-ref:`Control.Arrow.` module.
 What follows is a brief introduction to the notation; it won't make much
 sense unless you've read Hughes's paper.
 
@@ -11595,8 +11594,8 @@ You can read this much like ordinary ``do``-notation, but with commands
 in place of monadic expressions. The first line sends the value of
 ``x+1`` as an input to the arrow ``f``, and matches its output against
 ``y``. In the next line, the output is discarded. The arrow ``returnA``
-is defined in the :base-ref:`Control.Arrow <Control-Arrow.html>` module as ``arr
-id``. The above example is treated as an abbreviation for ::
+is defined in the :base-ref:`Control.Arrow.` module as ``arr id``. The above
+example is treated as an abbreviation for ::
 
     arr (\ x -> (x, x)) >>>
             first (arr (\ x -> x+1) >>> f) >>>
@@ -11610,8 +11609,7 @@ id``. The above example is treated as an abbreviation for ::
 
 Note that variables not used later in the composition are projected out.
 After simplification using rewrite rules (see :ref:`rewrite-rules`)
-defined in the :base-ref:`Control.Arrow <Control-Arrow.html>` module, this
-reduces to ::
+defined in the :base-ref:`Control.Arrow.` module, this reduces to ::
 
     arr (\ x -> (x+1, x)) >>>
             first f >>>
@@ -11853,7 +11851,7 @@ to check arrow programs with GHC; tracing type errors in the
 preprocessor output is not easy. Modules intended for both GHC and the
 preprocessor must observe some additional restrictions:
 
--  The module must import :base-ref:`Control.Arrow <Control-Arrow.html>`.
+-  The module must import :base-ref:`Control.Arrow.`.
 
 -  The preprocessor cannot cope with other Haskell extensions. These
    would have to go in separate modules.
@@ -12388,7 +12386,7 @@ will be rewritten to ``e``. You can also disable assertions using the
 allows enabling assertions even when optimisation is turned on.
 
 Assertion failures can be caught, see the documentation for the
-:base-ref:`Control.Exception <Control-Exception.html>` library for the details.
+:base-ref:`Control.Exception` library for the details.
 
 .. _static-pointers:
 
@@ -12425,12 +12423,11 @@ Using static pointers
 ---------------------
 
 Each reference is given a key which can be used to locate it at runtime
-with
-:base-ref:`unsafeLookupStaticPtr <GHC-StaticPtr.html#v%3AunsafeLookupStaticPtr>`
+with :base-ref:`GHC.StaticPtr.unsafeLookupStaticPtr`
 which uses a global and immutable table called the Static Pointer Table.
 The compiler includes entries in this table for all static forms found
 in the linked modules. The value can be obtained from the reference via
-:base-ref:`deRefStaticPtr <GHC-StaticPtr.html#v%3AdeRefStaticPtr>`.
+:base-ref:`GHC.StaticPtr.deRefStaticPtr`.
 
 The body ``e`` of a ``static e`` expression must be a closed expression. Where
 we say an expression is *closed* when all of its free (type) variables are
@@ -12491,7 +12488,7 @@ The only predefined instance is the obvious one that does nothing: ::
     instance IsStatic StaticPtr where
         fromStaticPtr sptr = sptr
 
-See :base-ref:`IsStatic <GHC-StaticPtr.html#t%3AIsStatic>`.
+See :base-ref:`GHC.StaticPtr.IsStatic`.
 
 Furthermore, type ``t`` is constrained to have a ``Typeable`` instance.
 The following are therefore illegal: ::
@@ -12587,9 +12584,8 @@ A list of all supported language extensions can be obtained by invoking
 ``ghc --supported-extensions`` (see :ghc-flag:`--supported-extensions`).
 
 Any extension from the ``Extension`` type defined in
-:cabal-ref:`Language.Haskell.Extension <Language-Haskell-Extension.html>`
-may be used. GHC will report an error if any of the requested extensions
-are not supported.
+:cabal-ref:`Language.Haskell.Extension.` may be used. GHC will report an error
+if any of the requested extensions are not supported.
 
 .. _options-pragma:
 
@@ -13870,14 +13866,12 @@ Special built-in functions
 
 GHC has a few built-in functions with special behaviour. In particular:
 
--  :base-ref:`inline <GHC-Exts.html#v%3Ainline>`
-   allows control over inlining on a per-call-site basis.
+-  :base-ref:`GHC.Exts.inline` allows control over inlining on a per-call-site basis.
 
--  :base-ref:`lazy <GHC-Exts.html#v%3Alazy>` restrains the strictness analyser.
+-  :base-ref:`GHC.Exts.lazy` restrains the strictness analyser.
 
--  :base-ref:`oneShot <GHC-Exts.html#v%3AoneShot>`
-   gives a hint to the compiler about how often a function is being
-   called.
+-  :base-ref:`GHC.Exts.oneShot` gives a hint to the compiler about how often a
+   function is being called.
 
 .. _generic-classes:
 
@@ -13896,11 +13890,9 @@ Generic programming
 ===================
 
 Using a combination of :ghc-flag:`-XDeriveGeneric`,
-:ghc-flag:`-XDefaultSignatures`, and
-:ghc-flag:`-XDeriveAnyClass`, you can easily do
-datatype-generic programming using the :base-ref:`GHC.Generics
-<GHC-Generics.html>` framework. This section gives a very brief overview of how
-to do it.
+:ghc-flag:`-XDefaultSignatures`, and :ghc-flag:`-XDeriveAnyClass`, you can
+easily do datatype-generic programming using the :base-ref:`GHC.Generics.`
+framework. This section gives a very brief overview of how to do it.
 
 Generic programming support in GHC allows defining classes with methods
 that do not need a user specification when instantiating: the method

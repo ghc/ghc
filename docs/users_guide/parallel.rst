@@ -37,8 +37,7 @@ squad <http://research.microsoft.com/%7Esimonpj/papers/marktoberdorf/>`__.
 
 To the programmer, Concurrent Haskell introduces no new language
 constructs; rather, it appears simply as a library,
-:base-ref:`Control.Concurrent <Control-Concurrent.html>`.
-The functions exported by this library include:
+:base-ref:`Control.Concurrent.`. The functions exported by this library include:
 
 -  Forking and killing threads.
 

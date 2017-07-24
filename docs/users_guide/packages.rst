@@ -24,8 +24,7 @@ package. All you need to do is write a simple configuration file, put a
 few files in the right places, and you have a package. See the `Cabal
 documentation <http://www.haskell.org/cabal/users-guide/>`__ for
 details, and also the Cabal libraries
-(:cabal-ref:`Distribution.Simple <Distribution-Simple.html>`,
-for example).
+(:cabal-ref:`Distribution.Simple.`, for example).
 
 .. _using-packages:
 
@@ -1033,8 +1032,7 @@ package as well.
 -------------------------------------------------
 
 A package specification is a Haskell record; in particular, it is the
-record
-:cabal-ref:`InstalledPackageInfo <Distribution-InstalledPackageInfo.html#%tInstalledPackageInfo>`
+record :cabal-ref:`Distribution.InstalledPackageInfo.InstalledPackageInfo`
 in the module Distribution.InstalledPackageInfo, which is part of the
 Cabal package distributed with GHC.
 
@@ -1142,7 +1140,7 @@ The allowed fields, with their types, are:
 
     (string) The type of license under which this package is
     distributed. This field is a value of the
-    :cabal-ref:`License <Distribution-License.html#t:License>` type.
+    :cabal-ref:`Distribution.License.License` type.
 
 ``license-file``
     .. index::

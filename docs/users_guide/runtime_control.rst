@@ -247,7 +247,7 @@ Miscellaneous RTS options
     :default: 100k
 
     This option relates to allocation limits; for more about this see
-    :base-ref:`enableAllocationLimit <GHC-Conc.html#v%3AenableAllocationLimit>`.
+    :base-ref:`GHC.Conc.enableAllocationLimit`.
     When a thread hits its allocation limit, the RTS throws an exception
     to the thread, and the thread gets an additional quota of allocation
     before the exception is raised again, the idea being so that the
@@ -439,7 +439,7 @@ performance.
     parallel GC completely, reverting to sequential GC.
 
     The default parallel GC settings are usually suitable for parallel programs
-    (i.e. those using :base-ref:`par <GHC-Conc.html#v:par>`, Strategies, or with
+    (i.e. those using :base-ref:`GHC.Conc.par`, Strategies, or with
     multiple threads). However, it is sometimes beneficial to enable the
     parallel GC for a single-threaded sequential program too, especially if the
     program has a large amount of heap data and GC is a significant fraction of
@@ -732,7 +732,7 @@ RTS options to produce runtime statistics
     output is sent to ``stderr``.
 
     If you use the ``-T`` flag then, you should access the statistics
-    using :base-ref:`GHC.Stats <GHC-Stats.html>`.
+    using :base-ref:`GHC.Stats.`.
 
     If you use the ``-t`` flag then, when your program finishes, you
     will see something like this:

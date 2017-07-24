@@ -298,9 +298,9 @@ Don't use ``Float``\s:
 Use unboxed arrays (``UArray``)
     GHC supports arrays of unboxed elements, for several basic
     arithmetic element types including ``Int`` and ``Char``: see the
-    ``Data.Array.Unboxed`` library for details. These arrays are likely
-    to be much faster than using standard Haskell 98 arrays from the
-    ``Data.Array`` library.
+    :array-ref:`Data.Array.Unboxed.` library for details. These arrays are
+    likely to be much faster than using standard Haskell 98 arrays from the
+    :array-ref:`Data.Array.` library.
 
 Use a bigger heap!
     If your program's GC stats (:rts-flag:`-S [⟨file⟩]` RTS option) indicate
@@ -312,7 +312,7 @@ Use a bigger heap!
     to let GHC calculate a value based on the amount of live data.
 
 Compact your data:
-    The :ghc-compact-ref:`GHC.Compact <GHC-Compact.html>` module
+    The :ghc-compact-ref:`GHC.Compact.` module
     provides a way to make garbage collection more efficient for
     long-lived data structures. Compacting a data structure collects
     the objects together in memory, where they are treated as a single
@@ -334,7 +334,7 @@ Warning: except in certain specialised cases (like Happy parsers) this is likely
 to actually *increase* the size of your program, because unfolding generally
 enables extra simplifying optimisations to be performed.
 
-Avoid ``Read``.
+Avoid :base-ref:`Prelude.Read`.
 
 Use :command:`strip` on your executables.
 

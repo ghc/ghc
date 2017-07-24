@@ -11,6 +11,7 @@ import os
 # Support for :base-ref:, etc.
 sys.path.insert(0, os.path.abspath('.'))
 from ghc_config import extlinks, version
+import ghc_config
 
 extensions = ['sphinx.ext.extlinks', 'sphinx.ext.mathjax']
 
@@ -150,6 +151,37 @@ def parse_flag(env, sig, signode):
     # Reference name left unchanged
     return sig
 
+def haddock_role(lib):
+    """
+    For instance,
+     * reference to module:      :base-ref:`Control.Applicative.`
+     * reference to identifier:  :base-ref:`Control.Applicative.pure`
+     * reference to type:        :base-ref:`Control.Applicative.Applicative`
+    """
+    path = '%s/%s-%s' % (ghc_config.libs_base_uri, lib, ghc_config.lib_versions[lib])
+    def role(name, rawtext, text, lineno, inliner, options={}, content=[]):
+        try:
+            parts = text.split('.')
+            module_parts = parts[:-1]
+            thing = parts[-1]
+            if thing != '':
+                # reference to type or identifier
+                tag = 't' if thing[0].isupper() else 'v'
+                anchor = '#%s:%s' % (tag, thing)
+                link_text = text
+            else:
+                # reference to module
+                anchor = ''
+                link_text = '.'.join(module_parts)
+
+            uri = '%s/%s.html%s' % (path, '-'.join(module_parts), anchor)
+            node = nodes.reference(link_text, link_text, refuri=uri)
+            return [node], []
+        except ValueError:
+            msg = inliner.reporter.error('')
+
+    return role
+
 def setup(app):
     from sphinx.util.docfields import Field, TypedField
 
@@ -170,6 +202,15 @@ def setup(app):
                             Field('default', label='Default value', names=['default']),
                             Field('static')
                         ])
+
+    # Haddock references
+    app.add_role('th-ref', haddock_role('template-haskell'))
+    app.add_role('base-ref', haddock_role('base'))
+    app.add_role('cabal-ref', haddock_role('Cabal'))
+    app.add_role('ghc-compact-ref', haddock_role('ghc-compact'))
+    app.add_role('ghc-prim-ref', haddock_role('ghc-prim'))
+    app.add_role('parallel-ref', haddock_role('parallel'))
+    app.add_role('array-ref', haddock_role('array'))
 
     app.add_object_type('rts-flag', 'rts-flag',
                         objname='runtime system command-line option',

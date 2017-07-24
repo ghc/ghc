@@ -505,8 +505,8 @@ not to replace module loading but to make definitions in .ghci-files
 
 Any exceptions raised during the evaluation or execution of the
 statement are caught and printed by the GHCi command line interface (for
-more information on exceptions, see the module ``Control.Exception`` in
-the libraries :base-ref:`documentation <Control-Exception.html>`).
+more information on exceptions, see the module :base-ref:`Control.Exception.` in
+the libraries documentation.
 
 Every new binding shadows any existing bindings of the same name,
 including entities that are in scope in the current module context.

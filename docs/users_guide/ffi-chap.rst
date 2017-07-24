@@ -23,8 +23,8 @@ Haskell 2010 Report. These extensions are described in :ref:`ffi-ghcexts`, but
 please note that programs using these features are not portable. Hence, these
 features should be avoided where possible.
 
-The FFI libraries are documented in the accompanying library
-documentation; see for example the :base-ref:`Foreign <Foreign.html>` module.
+The FFI libraries are documented in the accompanying  library
+documentation; see for example the :base-ref:`Foreign.` module.
 
 GHC differences to the FFI Chapter
 ----------------------------------
@@ -581,7 +581,7 @@ where it is useful to have more control over which OS thread is used,
 for example when calling foreign code that makes use of thread-local
 state. For cases like this, we provide *bound threads*, which are
 Haskell threads tied to a particular OS thread. For information on bound
-threads, see the documentation for the :base-ref:`Control.Concurrent <Control-Concurrent.html>` module.
+threads, see the documentation for the :base-ref:`Control.Concurrent.` module.
 
 Foreign exports and multi-threading
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
