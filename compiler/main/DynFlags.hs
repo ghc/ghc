@@ -750,7 +750,6 @@ data DynFlags = DynFlags {
   -- ways
   ways                  :: [Way],       -- ^ Way flags from the command line
   buildTag              :: String,      -- ^ The global \"way\" (e.g. \"p\" for prof)
-  rtsBuildTag           :: String,      -- ^ The RTS \"way\"
 
   -- For object splitting
   splitInfo             :: Maybe (String,Int),
@@ -1644,7 +1643,6 @@ defaultDynFlags mySettings =
         pkgState                = emptyPackageState,
         ways                    = defaultWays mySettings,
         buildTag                = mkBuildTag (defaultWays mySettings),
-        rtsBuildTag             = mkBuildTag (defaultWays mySettings),
         splitInfo               = Nothing,
         settings                = mySettings,
         -- ghc -M values
@@ -2477,8 +2475,7 @@ updateWays dflags
     = let theWays = sort $ nub $ ways dflags
       in dflags {
              ways        = theWays,
-             buildTag    = mkBuildTag (filter (not . wayRTSOnly) theWays),
-             rtsBuildTag = mkBuildTag                            theWays
+             buildTag    = mkBuildTag (filter (not . wayRTSOnly) theWays)
          }
 
 -- | Check (and potentially disable) any extensions that aren't allowed
