@@ -14025,8 +14025,19 @@ we show generic serialization: ::
     instance (Serialize a) => GSerialize (K1 i a) where
       gput (K1 x) = put x
 
-Typically this class will not be exported, as it only makes sense to
-have instances for the representation types.
+A caveat: this encoding strategy may not be reliable across different versions
+of GHC. When deriving a ``Generic`` instance is free to choose any nesting of
+``:+:`` and ``:*:`` it chooses, so if GHC chooses ``(a :+: b) :+: c``, then the
+encoding for ``a`` would be ``[O, O]``, ``b`` would be ``[O, I]``, and ``c``
+would be ``[I]``. However, if GHC chooses ``a :+: (b :+: c)``, then the
+encoding for ``a`` would be ``[O]``, ``b`` would be ``[I, O]``, and ``c`` would
+be ``[I, I]``. (In practice, the current implementation tries to produce a
+more-or-less balanced nesting of ``:+:`` and ``:*:`` so that the traversal of
+the structure of the datatype from the root to a particular component can be
+performed in logarithmic rather than linear time.)
+
+Typically this ``GSerialize`` class will not be exported, as it only makes
+sense to have instances for the representation types.
 
 Unlifted representation types
 -----------------------------
