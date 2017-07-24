@@ -95,7 +95,7 @@ module TyCoRep (
         extendTCvInScope, extendTCvInScopeList, extendTCvInScopeSet,
         extendTCvSubst,
         extendCvSubst, extendCvSubstWithClone,
-        extendTvSubst, extendTvSubstBinder, extendTvSubstWithClone,
+        extendTvSubst, extendTvSubstBinderAndInScope, extendTvSubstWithClone,
         extendTvSubstList, extendTvSubstAndInScope,
         unionTCvSubst, zipTyEnv, zipCoEnv, mkTyCoInScopeSet,
         zipTvSubst, zipCvSubst,
@@ -1848,10 +1848,10 @@ extendTvSubst :: TCvSubst -> TyVar -> Type -> TCvSubst
 extendTvSubst (TCvSubst in_scope tenv cenv) tv ty
   = TCvSubst in_scope (extendVarEnv tenv tv ty) cenv
 
-extendTvSubstBinder :: TCvSubst -> TyBinder -> Type -> TCvSubst
-extendTvSubstBinder subst (Named bndr) ty
-  = extendTvSubst subst (binderVar bndr) ty
-extendTvSubstBinder subst (Anon _)     _
+extendTvSubstBinderAndInScope :: TCvSubst -> TyBinder -> Type -> TCvSubst
+extendTvSubstBinderAndInScope subst (Named bndr) ty
+  = extendTvSubstAndInScope subst (binderVar bndr) ty
+extendTvSubstBinderAndInScope subst (Anon _)     _
   = subst
 
 extendTvSubstWithClone :: TCvSubst -> TyVar -> TyVar -> TCvSubst

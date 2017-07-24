@@ -787,42 +787,6 @@ bigConstraintTuple arity
        2 (text "Instead, use a nested tuple")
 
 ---------------------------
--- | See comments for 'tcInferArgs'. But this version does not instantiate
--- any remaining invisible arguments. "RAE" update
-tc_infer_args :: Outputable fun
-              => TcTyMode
-              -> fun                      -- ^ the function
-              -> [TyBinder]               -- ^ function kind's binders (zonked)
-              -> Maybe (VarEnv Kind)      -- ^ possibly, kind info (see above)
-              -> [LHsType GhcRn]          -- ^ args
-              -> Int                      -- ^ number to start arg counter at
-              -> TcM (TCvSubst, [TyBinder], [TcType], [LHsType GhcRn], Int)
-tc_infer_args mode orig_ty binders mb_kind_info orig_args n0
-  = go emptyTCvSubst binders orig_args n0 []
-  where
-    go subst binders []   n acc
-      = return ( subst, binders, reverse acc, [], n )
-    -- when we call this when checking type family patterns, we really
-    -- do want to instantiate all invisible arguments. During other
-    -- typechecking, we don't.
-
-    go subst (binder:binders) all_args@(arg:args) n acc
-      | isInvisibleBinder binder
-      = do { traceTc "tc_infer_args (invis)" (ppr binder)
-           ; (subst', arg') <- tcInstBinder mb_kind_info subst binder
-           ; go subst' binders all_args n (arg' : acc) }
-
-      | otherwise
-      = do { traceTc "tc_infer_args (vis)" (ppr binder $$ ppr arg)
-           ; arg' <- addErrCtxt (funAppCtxt orig_ty arg n) $
-                     tc_lhs_type mode arg (substTyUnchecked subst $
-                                           tyBinderType binder)
-           ; let subst' = extendTvSubstBinder subst binder arg'
-           ; go subst' binders args (n+1) (arg' : acc) }
-
-    go subst [] all_args n acc
-      = return (subst, [], reverse acc, all_args, n)
-
 -- | Apply a type of a given kind to a list of arguments. This instantiates
 -- invisible parameters as necessary. Always consumes all the arguments,
 -- using matchExpectedFunKind as necessary.
@@ -836,28 +800,65 @@ tcInferApps :: TcTyMode
             -> TcKind               -- ^ Function kind (zonked)
             -> [LHsType GhcRn]      -- ^ Args
             -> TcM (TcType, [TcType], TcKind) -- ^ (f args, args, result kind)
-tcInferApps mode mb_kind_info orig_ty ty ki args = go [] [] ty ki args 1
+tcInferApps mode mb_kind_info orig_ty ty ki args
+  = do { traceTc "tcInferApps" (ppr orig_ty $$ ppr args $$ ppr ki)
+       ; go [] [] orig_subst ty orig_ki_binders orig_inner_ki args 1 }
   where
-    go _acc_hs_args acc_args fun fun_kind []   _ = return (fun, reverse acc_args, fun_kind)
-    go acc_hs_args acc_args fun fun_kind args n
-      | let (binders, res_kind) = splitPiTys fun_kind
-      , not (null binders)
-      = do { (subst, leftover_binders, args', leftover_args, n')
-                <- tc_infer_args mode orig_ty binders mb_kind_info args n
-           ; let fun_kind' = substTyUnchecked subst $
-                             mkPiTys leftover_binders res_kind
-           ; go (reverse (dropTail (length leftover_args) args) ++ acc_hs_args)
-                (reverse args' ++ acc_args)
-                (mkNakedAppTys fun args') fun_kind' leftover_args n' }
+    orig_subst                       = mkEmptyTCvSubst $ mkInScopeSet $ tyCoVarsOfType ki
+    (orig_ki_binders, orig_inner_ki) = tcSplitPiTys ki
 
-    go acc_hs_args acc_args fun fun_kind (arg:args) n
-      = do { (co, arg_k, res_k) <- matchExpectedFunKind (mkHsAppTys orig_ty (reverse acc_hs_args))
-                                                        fun_kind
+    go :: [LHsType GhcRn] -- already type-checked args, in reverse order, for errors
+       -> [TcType]        -- already type-checked args, in reverse order
+       -> TCvSubst        -- instantiating substitution
+       -> TcType          -- function applied to some args, could be knot-tied
+       -> [TyBinder]      -- binders in function kind (both vis. and invis.)
+       -> TcKind          -- function kind body (not a Pi-type)
+       -> [LHsType GhcRn] -- un-type-checked args
+       -> Int             -- the # of the next argument
+       -> TcM (TcType, [TcType], TcKind)  -- same as overall return type
+
+      -- no user-written args left. We're done!
+    go _acc_hs_args acc_args subst fun ki_binders inner_ki [] _
+      = return (fun, reverse acc_args, substTy subst $ mkPiTys ki_binders inner_ki)
+
+      -- The function's kind has a binder. Is it visible or invisible?
+    go acc_hs_args acc_args subst fun (ki_binder:ki_binders) inner_ki
+       all_args@(arg:args) n
+      | isInvisibleBinder ki_binder
+        -- It's invisible. Instantiate.
+      = do { traceTc "tcInferApps (invis)" (ppr ki_binder $$ ppr subst)
+           ; (subst', arg') <- tcInstBinder mb_kind_info subst ki_binder
+           ; go acc_hs_args (arg' : acc_args) subst' (mkNakedAppTy fun arg')
+                ki_binders inner_ki all_args n }
+
+      | otherwise
+        -- It's visible. Check the next user-written argument
+      = do { traceTc "tcInferApps (vis)" (ppr ki_binder $$ ppr arg $$ ppr subst)
            ; arg' <- addErrCtxt (funAppCtxt orig_ty arg n) $
-                     tc_lhs_type mode arg arg_k
-           ; go (arg : acc_hs_args) (arg' : acc_args)
-                (mkNakedAppTy (fun `mkNakedCastTy` co) arg')
-                res_k args (n+1) }
+                     tc_lhs_type mode arg (substTy subst $ tyBinderType ki_binder)
+           ; let subst' = extendTvSubstBinderAndInScope subst ki_binder arg'
+           ; go (arg : acc_hs_args) (arg' : acc_args) subst' (mkNakedAppTy fun arg')
+                ki_binders inner_ki args (n+1) }
+
+       -- We've run out of known binders in the functions's kind.
+    go acc_hs_args acc_args subst fun [] inner_ki all_args n
+      | not (null new_ki_binders)
+         -- But, after substituting, we have more binders.
+      = go acc_hs_args acc_args zapped_subst fun new_ki_binders new_inner_ki all_args n
+
+      | otherwise
+         -- Even after substituting, still no binders. Use matchExpectedFunKind
+      = do { traceTc "tcInferApps (no binder)" (ppr new_inner_ki $$ ppr zapped_subst)
+           ; (co, arg_k, res_k)
+               <- matchExpectedFunKind (mkHsAppTys orig_ty (reverse acc_hs_args))
+                                       substed_inner_ki
+           ; let subst' = zapped_subst `extendTCvInScopeSet` tyCoVarsOfTypes [arg_k, res_k]
+           ; go acc_hs_args acc_args subst' (fun `mkNakedCastTy` co)
+                [mkAnonBinder arg_k] res_k all_args n }
+      where
+        substed_inner_ki               = substTy subst inner_ki
+        (new_ki_binders, new_inner_ki) = tcSplitPiTys substed_inner_ki
+        zapped_subst                   = zapTCvSubst subst
 
 -- | Applies a type to a list of arguments.
 -- Always consumes all the arguments, using 'matchExpectedFunKind' as
@@ -941,7 +942,7 @@ instantiateTyN mb_kind_env n ty bndrs inner_ki
     do { (subst, inst_args) <- tcInstBinders empty_subst mb_kind_env inst_bndrs
        ; let rebuilt_ki = mkPiTys leftover_bndrs inner_ki
              ki'        = substTy subst rebuilt_ki
-       ; traceTc "instantiateTyN" (vcat [ ppr ty <+> dcolon <+> ppr ki
+       ; traceTc "instantiateTyN" (vcat [ ppr ki
                                         , ppr n
                                         , ppr subst
                                         , ppr rebuilt_ki
