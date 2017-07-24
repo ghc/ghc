@@ -347,9 +347,6 @@ for all modules in a program.
 
 .. ghc-flag:: -fprof-auto-calls
 
-    .. index::
-       single: -fprof-auto-calls
-
     Adds an automatic ``SCC`` annotation to all *call sites*. This is
     particularly useful when using profiling for the purposes of
     generating stack traces; see the function :base-ref:`traceStack <Debug-Trace.html#traceShow>` in the
@@ -372,9 +369,6 @@ for all modules in a program.
     Disables any previous :ghc-flag:`-fprof-cafs` option.
 
 .. ghc-flag:: -fno-prof-count-entries
-
-    .. index::
-       single: -fno-prof-count-entries
 
     Tells GHC not to collect information about how often functions are
     entered at runtime (the "entries" column of the time profile), for
