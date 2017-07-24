@@ -10660,7 +10660,7 @@ ignore the problems in ``a``.
 
 For more motivation and details please refer to the
 :ghc-wiki:`Wiki <DeferErrorsToRuntime>` page or the `original
-paper <https://www.microsoft.com/en-us/research/wp-content/uploads/2012/01/icfp12.pdf>`__.
+paper <http://dreixel.net/research/pdf/epdtecp.pdf>`__.
 
 Enabling deferring of type errors
 ---------------------------------
