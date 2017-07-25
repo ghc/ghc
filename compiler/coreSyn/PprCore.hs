@@ -12,7 +12,7 @@ module PprCore (
         pprCoreExpr, pprParendExpr,
         pprCoreBinding, pprCoreBindings, pprCoreAlt,
         pprCoreBindingWithSize, pprCoreBindingsWithSize,
-        pprRules, pprOptCo
+        pprRules, pprOptCo, pprCoreBindingsWithAnn
     ) where
 
 import CoreSyn
@@ -32,6 +32,7 @@ import BasicTypes
 import Maybes
 import Util
 import Outputable
+import OutputableAnnotation
 import FastString
 import SrcLoc      ( pprUserRealSpan )
 
@@ -65,6 +66,9 @@ instance OutputableBndr b => Outputable (Bind b) where
 instance OutputableBndr b => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
 
+pprCoreBindingsWithAnn :: [CoreBind] -> SDoc
+pprCoreBindingsWithAnn = pprTopBinds realAnn
+
 {-
 ************************************************************************
 *                                                                      *
@@ -79,6 +83,9 @@ type Annotation b = Expr b -> SDoc
 -- | Annotate with the size of the right-hand-side
 sizeAnn :: CoreExpr -> SDoc
 sizeAnn e = text "-- RHS size:" <+> ppr (exprStats e)
+
+realAnn :: CoreExpr -> SDoc
+realAnn e = addAnn (PCoreExpr e) (ppr e)
 
 -- | No annotation
 noAnn :: Expr b -> SDoc

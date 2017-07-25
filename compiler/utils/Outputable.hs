@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, ImplicitParams #-}
+{-# LANGUAGE CPP, ImplicitParams, GADTs #-}
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-1998
@@ -39,6 +39,8 @@ module Outputable (
         unicodeSyntax,
 
         coloured, keyword,
+
+        addAnn,
 
         -- * Converting 'SDoc' into strings and outputing it
         printSDoc, printSDocLn, printForUser, printForUserPartWay,
@@ -82,6 +84,7 @@ module Outputable (
         pprTrace, pprTraceDebug, pprTraceIt, warnPprTrace, pprSTrace,
         trace, pgmError, panic, sorry, assertPanic,
         pprDebugAndThen, callStackDoc
+
     ) where
 
 import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
@@ -91,13 +94,15 @@ import {-# SOURCE #-}   DynFlags( DynFlags, hasPprDebug, hasNoDebugOutput,
 import {-# SOURCE #-}   Module( UnitId, Module, ModuleName, moduleName )
 import {-# SOURCE #-}   OccName( OccName )
 
+import {-# SOURCE #-} OutputableAnnotation
+
 import BufWrite (BufHandle)
 import FastString
 import qualified Pretty
 import Util
 import Platform
 import qualified PprColour as Col
-import Pretty           ( Doc, Mode(..) )
+import Pretty           ( Doc, Mode(..), annotate )
 import Panic
 import GHC.Serialized
 import GHC.LanguageExtensions (Extension)
@@ -122,6 +127,7 @@ import Data.List (intersperse)
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
+import Data.Void
 
 {-
 ************************************************************************
@@ -306,6 +312,7 @@ code (either C or assembly), or generating interface files.
 ************************************************************************
 -}
 
+
 -- | Represents a pretty-printable document.
 --
 -- To display an 'SDoc', use 'printSDoc', 'printSDocLn', 'bufLeftRenderSDoc',
@@ -313,7 +320,10 @@ code (either C or assembly), or generating interface files.
 -- abstraction layer.
 -- Note that for now, it is Doc (). This should be changed to hold
 -- annotation.
-newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc () }
+newtype SDoc = SDoc { runSDoc :: SDocContext -> Doc PExpr }
+
+addAnn :: PExpr -> SDoc -> SDoc
+addAnn pe (SDoc s) = (SDoc (\ctx -> annotate pe (s ctx)))
 
 data SDocContext = SDC
   { sdocStyle      :: !PprStyle
@@ -338,7 +348,7 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 -- | This is not a recommended way to render 'SDoc', since it breaks the
 -- abstraction layer of 'SDoc'.  Prefer to use 'printSDoc', 'printSDocLn',
 -- 'bufLeftRenderSDoc', or 'renderWithStyle' instead.
-withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc ()
+withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc PExpr
 withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
 sdocWithPprDebug :: (Bool -> SDoc) -> SDoc
@@ -541,7 +551,7 @@ isEmpty :: DynFlags -> SDoc -> Bool
 isEmpty dflags sdoc = Pretty.isEmpty $ runSDoc sdoc dummySDocContext
    where dummySDocContext = initSDocContext dflags PprDebug
 
-docToSDoc :: Doc () -> SDoc
+docToSDoc :: Doc PExpr -> SDoc
 docToSDoc d = SDoc (\_ -> d)
 
 empty    :: SDoc

@@ -506,6 +506,7 @@ Library
         MonadUtils
         OrdList
         Outputable
+        OutputableAnnotation
         Pair
         Panic
         PprColour

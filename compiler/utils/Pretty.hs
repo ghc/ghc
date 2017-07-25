@@ -108,6 +108,7 @@ module Pretty  (
         -- ** GHC-specific rendering
         printDoc, printDoc_,
         -- bufLeftRender -- performance hack
+        annotate
 
   ) where
 

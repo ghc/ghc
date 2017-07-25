@@ -526,6 +526,7 @@ compiler_stage2_dll0_MODULES = \
 	OptCoercion \
 	OrdList \
 	Outputable \
+	OutputableAnnotation \
 	PackageConfig \
 	Packages \
 	Pair \
