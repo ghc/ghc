@@ -1,0 +1,5 @@
+
+T12801.hs:8:17: error:
+    • Can't make a derived instance of ‘Functor Wibble’:
+        You need DeriveFunctor to derive an instance for this class
+    • In the data declaration for ‘Wibble’
