@@ -1,5 +1,5 @@
 module Plugins (
-    FrontendPlugin(..), defaultFrontendPlugin,
+    FrontendPlugin(..), defaultFrontendPlugin, FrontendPluginAction,
     Plugin(..), CommandLineOption,
     defaultPlugin
     ) where
