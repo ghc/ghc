@@ -2067,7 +2067,7 @@ solvable from the other. So, we do lookup in the inert set using
 loose types, which omit the kind-check.
 
 We must be careful when using the result of a lookup because it may
-not match the requsted info exactly!
+not match the requested info exactly!
 
 -}
 
