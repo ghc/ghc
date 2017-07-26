@@ -104,7 +104,7 @@
 	ignore = none
 [submodule "utils/haddock"]
 	path = utils/haddock
-	url = git@github.com:mpickering/haddock.git
+	url = https://github.com/mpickering/haddock.git
 	ignore = none
 	branch = wip/T14005
 [submodule "nofib"]
