@@ -6,7 +6,6 @@
 
 from __future__ import print_function
 
-import argparse
 import signal
 import sys
 import os
