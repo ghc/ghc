@@ -67,7 +67,7 @@ instance OutputableBndr b => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
 
 pprCoreBindingsWithAnn :: [CoreBind] -> SDoc
-pprCoreBindingsWithAnn = pprTopBinds realAnn
+pprCoreBindingsWithAnn = pprTopBinds noAnn
 
 {-
 ************************************************************************
@@ -99,8 +99,8 @@ pprTopBinds :: OutputableBndr a
 pprTopBinds ann binds = vcat (map (pprTopBind ann) binds)
 
 pprTopBind :: OutputableBndr a => Annotation a -> Bind a -> SDoc
-pprTopBind ann (NonRec binder expr)
- = ppr_binding ann (binder,expr) $$ blankLine
+pprTopBind ann b@(NonRec binder expr)
+ = addAnn (PBind b) (ppr_binding ann (binder,expr)) $$ blankLine
 
 pprTopBind _ (Rec [])
   = text "Rec { }"
@@ -120,13 +120,14 @@ ppr_bind ann (Rec binds)           = vcat (map pp binds)
 
 ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
-  = ann expr $$ pprBndr LetBind val_bdr $$ pp_bind
+  = ann expr $$ (pprBndr LetBind val_bdr) $$ pp_bind
   where
     pp_bind = case bndrIsJoin_maybe val_bdr of
                 Nothing -> pp_normal_bind
                 Just ar -> pp_join_bind ar
 
-    pp_normal_bind = hang (ppr val_bdr) 2 (equals <+> pprCoreExpr expr)
+    pp_normal_bind = hang (ppr val_bdr) 2 (equals <+>
+                            addAnn (PCoreExpr expr) (pprCoreExpr expr))
 
       -- For a join point of join arity n, we want to print j = \x1 ... xn -> e
       -- as "j x1 ... xn = e" to differentiate when a join point returns a
@@ -134,7 +135,7 @@ ppr_binding ann (val_bdr, expr)
       -- an n-argument function).
     pp_join_bind join_arity
       = hang (ppr val_bdr <+> sep (map (pprBndr LambdaBind) lhs_bndrs))
-           2 (equals <+> pprCoreExpr rhs)
+           2 (equals <+> (addAnn (PCoreExpr expr) (pprCoreExpr rhs)))
       where
         (lhs_bndrs, rhs) = collectNBinders join_arity expr
 
@@ -348,9 +349,9 @@ binders are printed as "_".
 -- These instances are sadly orphans
 
 instance OutputableBndr Var where
-  pprBndr = pprCoreBinder
-  pprInfixOcc  = pprInfixName  . varName
-  pprPrefixOcc = pprPrefixName . varName
+  pprBndr bs b = addAnn (varBinder b) (pprCoreBinder bs b)
+  pprInfixOcc b = addAnn (varReference b) (pprInfixName  (varName b))
+  pprPrefixOcc b = addAnn (varReference b) (pprPrefixName (varName b))
   bndrIsJoin_maybe = isJoinId_maybe
 
 instance Outputable b => OutputableBndr (TaggedBndr b) where
