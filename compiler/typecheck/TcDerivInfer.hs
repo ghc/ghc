@@ -760,7 +760,7 @@ Similarly for 'baz', givng the constraint C2
                                 ~ Maybe s -> Maybe s -> Bool)
 
 In this case baz has no local quantification, so the implication
-constraint has no local skolems and there are no unificaiton
+constraint has no local skolems and there are no unification
 variables.
 
 [STEP DAC SOLVE]

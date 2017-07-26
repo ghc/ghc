@@ -171,7 +171,7 @@ doingRetainerProfiling( void )
 }
 #endif /* PROFILING */
 
-// Precesses a closure 'c' being destroyed whose size is 'size'.
+// Processes a closure 'c' being destroyed whose size is 'size'.
 // Make sure that LDV_recordDead() is not invoked on 'inherently used' closures
 // such as TSO; they should not be involved in computing dragNew or voidNew.
 //
