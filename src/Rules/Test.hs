@@ -5,7 +5,6 @@ import Builder
 import Expression
 import Flavour
 import GHC
-import qualified Rules.Generate
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.Path

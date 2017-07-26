@@ -1,7 +1,6 @@
 module Settings.Builders.Hsc2Hs (hsc2hsBuilderArgs) where
 
 import Settings.Builders.Common
-import Settings.Path (templateHscPath)
 
 hsc2hsBuilderArgs :: Args
 hsc2hsBuilderArgs = builder Hsc2Hs ? do

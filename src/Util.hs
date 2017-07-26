@@ -22,7 +22,6 @@ import Oracles.Path
 import Oracles.Config.Setting
 import Settings
 import Settings.Builders.Ar
-import Settings.Path
 import Target
 import UserSettings
 
