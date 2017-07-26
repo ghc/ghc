@@ -1564,7 +1564,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
 
              ; buildDataCon fam_envs name is_infix rep_nm
                             stricts Nothing field_lbls
-                            (mkDataConUnivTyVarBinders tmpl_bndrs)
+                            (tyConTyVarBinders tmpl_bndrs)
                             ex_tvs
                             [{- no eq_preds -}] ctxt arg_tys
                             res_tmpl rep_tycon

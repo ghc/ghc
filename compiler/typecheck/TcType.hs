@@ -1728,7 +1728,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
        -- be oversaturated
       where
         bndrs = tyConBinders tc
-        viss  = map (isVisibleArgFlag . tyConBinderArgFlag) bndrs
+        viss  = map isVisibleTyConBinder bndrs
     tc_vis False _ = repeat False  -- if we're not in a visible context, our args
                                    -- aren't either
 

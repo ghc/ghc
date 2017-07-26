@@ -15,8 +15,7 @@ module TcPatSyn ( tcInferPatSynDecl, tcCheckPatSynDecl
 
 import HsSyn
 import TcPat
-import Type( mkTyVarBinders, mkEmptyTCvSubst
-           , tidyTyVarBinders, tidyTypes, tidyType )
+import Type( mkEmptyTCvSubst, tidyTyVarBinders, tidyTypes, tidyType )
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv

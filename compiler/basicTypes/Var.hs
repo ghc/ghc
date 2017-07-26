@@ -64,6 +64,7 @@ module Var (
         TyVarBndr(..), ArgFlag(..), TyVarBinder,
         binderVar, binderVars, binderArgFlag, binderKind,
         isVisibleArgFlag, isInvisibleArgFlag, sameVis,
+        mkTyVarBinder, mkTyVarBinders,
 
         -- ** Constructing TyVar's
         mkTyVar, mkTcTyVar,
@@ -374,7 +375,7 @@ updateVarTypeM f id = do { ty' <- f (varType id)
 -- Is something required to appear in source Haskell ('Required'),
 -- permitted by request ('Specified') (visible type application), or
 -- prohibited entirely from appearing in source Haskell ('Inferred')?
--- See Note [TyBinders and ArgFlags] in TyCoRep
+-- See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visibility] in TyCoRep
 data ArgFlag = Required | Specified | Inferred
   deriving (Eq, Data)
 
@@ -428,6 +429,14 @@ binderArgFlag (TvBndr _ argf) = argf
 
 binderKind :: TyVarBndr TyVar argf -> Kind
 binderKind (TvBndr tv _) = tyVarKind tv
+
+-- | Make a named binder
+mkTyVarBinder :: ArgFlag -> Var -> TyVarBinder
+mkTyVarBinder vis var = TvBndr var vis
+
+-- | Make many named binders
+mkTyVarBinders :: ArgFlag -> [TyVar] -> [TyVarBinder]
+mkTyVarBinders vis = map (mkTyVarBinder vis)
 
 {-
 ************************************************************************

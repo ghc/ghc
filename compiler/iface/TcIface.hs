@@ -893,7 +893,7 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
                                 ; mkNewTyConRhs tycon_name tycon data_con }
   where
     univ_tv_bndrs :: [TyVarBinder]
-    univ_tv_bndrs = mkDataConUnivTyVarBinders tc_tybinders
+    univ_tv_bndrs = tyConTyVarBinders tc_tybinders
 
     tc_con_decl (IfCon { ifConInfix = is_infix,
                          ifConExTvs = ex_bndrs,
