@@ -142,8 +142,8 @@ mkHsPar :: LHsExpr id -> LHsExpr id
 mkHsPar e = L (getLoc e) (HsPar e)
 
 mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP id))
-              -> [LPat id] -> Located (body id)
-              -> LMatch id (Located (body id))
+              -> [LPat id] -> Located (body (GHC id))
+              -> LMatch id (Located (body (GHC id)))
 mkSimpleMatch ctxt pats rhs
   = L loc $
     Match ctxt pats Nothing (unguardedGRHSs rhs)
@@ -152,16 +152,16 @@ mkSimpleMatch ctxt pats rhs
                 []      -> getLoc rhs
                 (pat:_) -> combineSrcSpans (getLoc pat) (getLoc rhs)
 
-unguardedGRHSs :: Located (body id) -> GRHSs id (Located (body id))
+unguardedGRHSs :: Located (body (GHC id)) -> GRHSs id (Located (body (GHC id)))
 unguardedGRHSs rhs@(L loc _)
   = GRHSs (unguardedRHS loc rhs) (noLoc emptyLocalBinds)
 
-unguardedRHS :: SrcSpan -> Located (body id) -> [LGRHS id (Located (body id))]
+unguardedRHS :: SrcSpan -> Located (body (GHC id)) -> [LGRHS id (Located (body (GHC id)))]
 unguardedRHS loc rhs = [L loc (GRHS [] rhs)]
 
 mkMatchGroup :: (PostTc name Type ~ PlaceHolder)
-             => Origin -> [LMatch name (Located (body name))]
-             -> MatchGroup name (Located (body name))
+             => Origin -> [LMatch name (Located (body (GHC name)))]
+             -> MatchGroup name (Located (body (GHC name)))
 mkMatchGroup origin matches = MG { mg_alts = mkLocatedList matches
                                  , mg_arg_tys = []
                                  , mg_res_ty = placeHolderType
@@ -192,7 +192,7 @@ mkHsLams tyvars dicts expr = mkLHsWrap (mkWpTyLams tyvars
 
 -- |A simple case alternative with a single pattern, no binds, no guards;
 -- pre-typechecking
-mkHsCaseAlt :: LPat id -> (Located (body id)) -> LMatch id (Located (body id))
+mkHsCaseAlt :: LPat id -> (Located (body (GHC id))) -> LMatch id (Located (body (GHC id)))
 mkHsCaseAlt pat expr
   = mkSimpleMatch CaseAlt [pat] expr
 
@@ -234,14 +234,14 @@ mkNPat      :: Located (HsOverLit GhcPs) -> Maybe (SyntaxExpr GhcPs)
 mkNPlusKPat :: Located RdrName -> Located (HsOverLit GhcPs) -> Pat GhcPs
 
 mkLastStmt :: SourceTextX idR
-           => Located (bodyR idR) -> StmtLR idL idR (Located (bodyR idR))
-mkBodyStmt :: Located (bodyR GhcPs)
-           -> StmtLR idL GhcPs (Located (bodyR GhcPs))
+           => Located (bodyR (GHC idR)) -> StmtLR idL idR (Located (bodyR (GHC idR)))
+mkBodyStmt :: Located (bodyR (GHC GhcPs))
+           -> StmtLR idL GhcPs (Located (bodyR (GHC GhcPs)))
 mkBindStmt :: (SourceTextX idR, PostTc idR Type ~ PlaceHolder)
-           => LPat idL -> Located (bodyR idR)
-           -> StmtLR idL idR (Located (bodyR idR))
-mkTcBindStmt :: LPat GhcTc -> Located (bodyR GhcTc)
-             -> StmtLR GhcTc GhcTc (Located (bodyR GhcTc))
+           => LPat idL -> Located (bodyR (GHC idR))
+           -> StmtLR idL idR (Located (bodyR (GHC idR)))
+mkTcBindStmt :: LPat GhcTc -> Located (bodyR (GHC GhcTc))
+             -> StmtLR GhcTc GhcTc (Located (bodyR (GHC GhcTc)))
 
 emptyRecStmt     :: StmtLR idL  GhcPs bodyR
 emptyRecStmtName :: StmtLR GhcRn GhcRn bodyR
@@ -626,7 +626,7 @@ typeToLHsType ty
       | isPredTy arg
       , (theta, tau) <- tcSplitPhiTy ty
       = noLoc (HsQualTy { hst_ctxt = noLoc (map go theta)
-                        , hst_body = go tau })
+                        , hst_bodyy = go tau })
     go (FunTy arg res) = nlHsFunTy (go arg) (go res)
     go ty@(ForAllTy {})
       | (tvs, tau) <- tcSplitForAllTys ty
@@ -710,7 +710,7 @@ mkFunBind :: Located RdrName -> [LMatch GhcPs (LHsExpr GhcPs)]
 mkFunBind fn ms = FunBind { fun_id = fn
                           , fun_matches = mkMatchGroup Generated ms
                           , fun_co_fn = idHsWrapper
-                          , bind_fvs = placeHolderNames
+                          , bind_fvsf = placeHolderNames
                           , fun_tick = [] }
 
 mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
@@ -719,7 +719,7 @@ mkTopFunBind :: Origin -> Located Name -> [LMatch GhcRn (LHsExpr GhcRn)]
 mkTopFunBind origin fn ms = FunBind { fun_id = fn
                                     , fun_matches = mkMatchGroup origin ms
                                     , fun_co_fn = idHsWrapper
-                                    , bind_fvs = emptyNameSet -- NB: closed
+                                    , bind_fvsf = emptyNameSet -- NB: closed
                                                               --     binding
                                     , fun_tick = [] }
 
@@ -1048,14 +1048,14 @@ hsLTyClDeclBinders :: Located (TyClDecl pass)
 
 hsLTyClDeclBinders (L loc (FamDecl { tcdFam = FamilyDecl { fdLName = L _ name } }))
   = ([L loc name], [])
-hsLTyClDeclBinders (L loc (SynDecl     { tcdLName = L _ name })) = ([L loc name], [])
-hsLTyClDeclBinders (L loc (ClassDecl   { tcdLName = L _ cls_name
+hsLTyClDeclBinders (L loc (SynDecl     { tcdLNameS = L _ name })) = ([L loc name], [])
+hsLTyClDeclBinders (L loc (ClassDecl   { tcdLNameC = L _ cls_name
                                        , tcdSigs = sigs, tcdATs = ats }))
   = (L loc cls_name :
      [ L fam_loc fam_name | L fam_loc (FamilyDecl { fdLName = L _ fam_name }) <- ats ] ++
      [ L mem_loc mem_name | L mem_loc (ClassOpSig False ns _) <- sigs, L _ mem_name <- ns ]
     , [])
-hsLTyClDeclBinders (L loc (DataDecl    { tcdLName = L _ name, tcdDataDefn = defn }))
+hsLTyClDeclBinders (L loc (DataDecl    { tcdLNameD = L _ name, tcdDataDefn = defn }))
   = (\ (xs, ys) -> (L loc name : xs, ys)) $ hsDataDefnBinders defn
 
 -------------------
@@ -1063,7 +1063,7 @@ hsForeignDeclsBinders :: [LForeignDecl pass] -> [Located (IdP pass)]
 -- See Note [SrcSpan for binders]
 hsForeignDeclsBinders foreign_decls
   = [ L decl_loc n
-    | L decl_loc (ForeignImport { fd_name = L _ n }) <- foreign_decls]
+    | L decl_loc (ForeignImport { fd_nameI = L _ n }) <- foreign_decls]
 
 
 -------------------
@@ -1192,13 +1192,13 @@ The main purpose is to find names introduced by record wildcards so that we can 
 warning the user when they don't use those names (#4404)
 -}
 
-lStmtsImplicits :: [LStmtLR GhcRn idR (Located (body idR))] -> NameSet
+lStmtsImplicits :: [LStmtLR GhcRn idR (Located (body (GHC idR)))] -> NameSet
 lStmtsImplicits = hs_lstmts
   where
-    hs_lstmts :: [LStmtLR GhcRn idR (Located (body idR))] -> NameSet
+    hs_lstmts :: [LStmtLR GhcRn idR (Located (body (GHC idR)))] -> NameSet
     hs_lstmts = foldr (\stmt rest -> unionNameSet (hs_stmt (unLoc stmt)) rest) emptyNameSet
 
-    hs_stmt :: StmtLR GhcRn idR (Located (body idR)) -> NameSet
+    hs_stmt :: StmtLR GhcRn idR (Located (body (GHC idR))) -> NameSet
     hs_stmt (BindStmt pat _ _ _ _) = lPatImplicits pat
     hs_stmt (ApplicativeStmt args _ _) = unionNameSets (map do_arg args)
       where do_arg (_, ApplicativeArgOne pat _) = lPatImplicits pat

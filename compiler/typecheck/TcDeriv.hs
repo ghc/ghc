@@ -200,7 +200,7 @@ mkDerivInfos :: [LTyClDecl GhcRn] -> TcM [DerivInfo]
 mkDerivInfos decls = concatMapM (mk_deriv . unLoc) decls
   where
 
-    mk_deriv decl@(DataDecl { tcdLName = L _ data_name
+    mk_deriv decl@(DataDecl { tcdLNameD = L _ data_name
                             , tcdDataDefn =
                                 HsDataDefn { dd_derivs = L _ clauses } })
       = do { tycon <- tcLookupTyCon data_name

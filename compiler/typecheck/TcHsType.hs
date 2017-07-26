@@ -566,7 +566,7 @@ tc_hs_type mode (HsForAllTy { hst_bndrs = hs_tvs, hst_body = ty }) exp_kind
              bndrs      = mkTyVarBinders Specified tvs'
        ; return (mkForAllTys bndrs ty', bound_vars) }
 
-tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_body = ty }) exp_kind
+tc_hs_type mode (HsQualTy { hst_ctxt = ctxt, hst_bodyy = ty }) exp_kind
   | null (unLoc ctxt)
   = tc_lhs_type mode ty exp_kind
 

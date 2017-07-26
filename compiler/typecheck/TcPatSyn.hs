@@ -474,7 +474,7 @@ tcPatSynMatcher (L loc name) lpat
        ; let bind = FunBind{ fun_id = L loc matcher_id
                            , fun_matches = mg
                            , fun_co_fn = idHsWrapper
-                           , bind_fvs = emptyNameSet
+                           , bind_fvsf = emptyNameSet
                            , fun_tick = [] }
              matcher_bind = unitBag (noLoc bind)
 
@@ -559,7 +559,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
              bind = FunBind { fun_id      = L loc (idName builder_id)
                             , fun_matches = match_group'
                             , fun_co_fn   = idHsWrapper
-                            , bind_fvs    = placeHolderNamesTc
+                            , bind_fvsf   = placeHolderNamesTc
                             , fun_tick    = [] }
 
              sig = completeSigFromId (PatSynCtxt name) builder_id

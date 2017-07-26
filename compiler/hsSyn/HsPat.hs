@@ -5,6 +5,7 @@
 \section[PatSyntax]{Abstract Haskell syntax---patterns}
 -}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -15,30 +16,81 @@
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 
-module HsPat (
-        Pat(..), InPat, OutPat, LPat,
+module HsPat
+  ( Pat
+      , pattern WildPat
+      , pattern VarPat
+      , pattern LazyPat
+      , pattern AsPat
+      , pattern ParPat
+      , pattern BangPat
+      , pattern ListPat
+      , pattern TuplePat
+      , pattern SumPat
+      , pattern PArrPat
+      , pattern ConPatIn
+      , pattern ConPatOut
+          , pat_con
+          , pat_arg_tys
+          , pat_tvs
+          , pat_dicts
+          , pat_binds
+          , pat_args
+          , pat_wrap
+      , pattern ViewPat
+      , pattern SplicePat
+      , pattern LitPat
+      , pattern NPat
+      , pattern NPlusKPat
+      , pattern SigPatIn
+      , pattern SigPatOut
+      , pattern CoPat
+  , InPat
+  , OutPat
+  , LPat
+  , HsConPatDetails
+  , HsRecFields
+      , pattern HsRecFields
+          , rec_flds
+          , rec_dotdot
+  , LHsRecFields
+  , HsRecField'
+      , pattern HsRecField
+          , hsRecFieldLbl
+          , hsRecFieldArg
+          , hsRecPun
+  , LHsRecField'
+  , hsConPatArgs
+  , HsRecField
+  , LHsRecField
+  , HsRecUpdField
+  , LHsRecUpdField
+  , hsRecFields
+  , hsRecFieldSel
+  , hsRecFieldId
+  , hsRecFieldsArgs
+  , hsRecUpdFieldId
+  , hsRecUpdFieldOcc
+  , hsRecUpdFieldRdr
+  , mkPrefixConPat
+  , mkCharLitPat
+  , mkNilPat
+  , looksLazyPatBind
+  , isBangedLPat
+  , isBangedPatBind
+  , hsPatNeedsParens
+  , isIrrefutableHsPat
+  , collectEvVarsPats
+  , pprParendLPat
+  , pprConArgs
+  ) where
 
-        HsConPatDetails, hsConPatArgs,
-        HsRecFields(..), HsRecField'(..), LHsRecField',
-        HsRecField, LHsRecField,
-        HsRecUpdField, LHsRecUpdField,
-        hsRecFields, hsRecFieldSel, hsRecFieldId, hsRecFieldsArgs,
-        hsRecUpdFieldId, hsRecUpdFieldOcc, hsRecUpdFieldRdr,
-
-        mkPrefixConPat, mkCharLitPat, mkNilPat,
-
-        looksLazyPatBind,
-        isBangedLPat, isBangedPatBind,
-        hsPatNeedsParens,
-        isIrrefutableHsPat,
-
-        collectEvVarsPats,
-
-        pprParendLPat, pprConArgs
-    ) where
-
-import {-# SOURCE #-} HsExpr            (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
+import {-# SOURCE #-} HsExpr
+  (SyntaxExpr, LHsExpr, HsSplice, pprLExpr, pprSplice)
 
 -- friends:
 import HsBinds
@@ -64,65 +116,93 @@ import Maybes
 -- libraries:
 import Data.Data hiding (TyCon,Fixity)
 
-type InPat p  = LPat p        -- No 'Out' constructors
-type OutPat p = LPat p        -- No 'In' constructors
+import qualified AST
 
-type LPat p = Located (Pat p)
+-- -----------------------------------------------------------------------------
+-- * Data Declarations
+-- -----------------------------------------------------------------------------
 
--- | Pattern
+type
+  Pat pass = AST.Pat (GHC pass)
+-- ^ Pattern
 --
 -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 
 -- For details on above see note [Api annotations] in ApiAnnotation
-data Pat p
-  =     ------------ Simple patterns ---------------
-    WildPat     (PostTc p Type)        -- ^ Wildcard Pattern
-        -- The sole reason for a type on a WildPat is to
-        -- support hsPatType :: Pat Id -> Type
+pattern
+  WildPat ::
+    (PostTc pass Type) ->
+    Pat pass
+  -- ^ Wildcard Pattern
+  -- The sole reason for a type on a WildPat is to
+  -- support hsPatType :: Pat Id -> Type
 
-       -- AZ:TODO above comment needs to be updated
-  | VarPat      (Located (IdP p))  -- ^ Variable Pattern
+  -- AZ:TODO above comment needs to be updated
+pattern
+  VarPat ::
+    (LIdP pass) ->
+    Pat pass
+  -- ^ Variable Pattern
 
-                             -- See Note [Located RdrNames] in HsExpr
-  | LazyPat     (LPat p)                -- ^ Lazy Pattern
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
+  -- See Note [Located RdrNames] in HsExpr
+pattern
+  LazyPat ::
+    (LPat pass) ->
+    Pat pass
+  -- ^ Lazy Pattern
+  -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnTilde'
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  AsPat ::
+    (LIdP pass) ->
+    (LPat pass) ->
+    Pat pass
+  -- ^ As pattern
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
 
-  | AsPat       (Located (IdP p)) (LPat p)    -- ^ As pattern
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnAt'
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  ParPat ::
+    (LPat pass) ->
+    Pat pass
+  -- ^ Parenthesised pattern
+  -- See Note [Parens in HsSyn] in HsExpr
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
+  --                                    'ApiAnnotation.AnnClose' @')'@
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  BangPat ::
+    (LPat pass) ->
+    Pat pass
+  -- ^ Bang pattern
+  --  - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
 
-  | ParPat      (LPat p)                -- ^ Parenthesised pattern
-                                        -- See Note [Parens in HsSyn] in HsExpr
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'('@,
-    --                                    'ApiAnnotation.AnnClose' @')'@
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  ListPat ::
+    [LPat pass] ->
+    (PostTc pass Type) ->         -- The type of the elements
+    (Maybe (PostTc pass Type
+           , SyntaxExpr pass)) -> -- For rebindable syntax
+                                  -- For OverloadedLists a Just (ty,fn) gives
+                                  -- overall type of the pattern, and the toList
+                                  -- function to convert the scrutinee to a list
+                                  -- value
+    Pat pass
+  -- ^ Syntactic List
+  --
+  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
+  --                                    'ApiAnnotation.AnnClose' @']'@
 
-    -- For details on above see note [Api annotations] in ApiAnnotation
-  | BangPat     (LPat p)                -- ^ Bang pattern
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnBang'
-
-    -- For details on above see note [Api annotations] in ApiAnnotation
-
-        ------------ Lists, tuples, arrays ---------------
-  | ListPat     [LPat p]
-                (PostTc p Type)                      -- The type of the elements
-                (Maybe (PostTc p Type, SyntaxExpr p)) -- For rebindable syntax
-                   -- For OverloadedLists a Just (ty,fn) gives
-                   -- overall type of the pattern, and the toList
-                   -- function to convert the scrutinee to a list value
-    -- ^ Syntactic List
-    --
-    -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'['@,
-    --                                    'ApiAnnotation.AnnClose' @']'@
-
-    -- For details on above see note [Api annotations] in ApiAnnotation
-
-  | TuplePat    [LPat p]         -- Tuple sub-patterns
-                Boxity           -- UnitPat is TuplePat []
-                [PostTc p Type]  -- [] before typechecker, filled in afterwards
-                                 -- with the types of the tuple components
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  TuplePat ::
+    [LPat pass] ->         -- Tuple sub-patterns
+    Boxity ->              -- UnitPat is TuplePat []
+    [PostTc pass Type] ->  -- [] before typechecker, filled in afterwards
+                           -- with the types of the tuple components
         -- You might think that the PostTc p Type was redundant, because we can
         -- get the pattern type by getting the types of the sub-patterns.
         -- But it's essential
@@ -138,247 +218,447 @@ data Pat p
         -- of the tuple is of type 'a' not Int.  See selectMatchVar
         -- (June 14: I'm not sure this comment is right; the sub-patterns
         --           will be wrapped in CoPats, no?)
-    -- ^ Tuple sub-patterns
-    --
-    -- - 'ApiAnnotation.AnnKeywordId' :
-    --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
-    --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
-
-  | SumPat      (LPat p)           -- Sum sub-pattern
-                ConTag             -- Alternative (one-based)
-                Arity              -- Arity
-                (PostTc p [Type])  -- PlaceHolder before typechecker, filled in
-                                   -- afterwards with the types of the
-                                   -- alternative
-    -- ^ Anonymous sum pattern
-    --
-    -- - 'ApiAnnotation.AnnKeywordId' :
-    --            'ApiAnnotation.AnnOpen' @'(#'@,
-    --            'ApiAnnotation.AnnClose' @'#)'@
-
-    -- For details on above see note [Api annotations] in ApiAnnotation
-  | PArrPat     [LPat p]                -- Syntactic parallel array
-                (PostTc p Type)         -- The type of the elements
-    -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
-    --                                    'ApiAnnotation.AnnClose' @':]'@
-
-    -- For details on above see note [Api annotations] in ApiAnnotation
-        ------------ Constructor patterns ---------------
-  | ConPatIn    (Located (IdP p))
-                (HsConPatDetails p)
-    -- ^ Constructor Pattern In
-
-  | ConPatOut {
-        pat_con     :: Located ConLike,
-        pat_arg_tys :: [Type],          -- The universal arg types, 1-1 with the universal
-                                        -- tyvars of the constructor/pattern synonym
-                                        --   Use (conLikeResTy pat_con pat_arg_tys) to get
-                                        --   the type of the pattern
-
-        pat_tvs   :: [TyVar],           -- Existentially bound type variables
-                                        -- in correctly-scoped order e.g. [k:*, x:k]
-        pat_dicts :: [EvVar],           -- Ditto *coercion variables* and *dictionaries*
-                                        -- One reason for putting coercion variable here, I think,
-                                        --      is to ensure their kinds are zonked
-
-        pat_binds :: TcEvBinds,         -- Bindings involving those dictionaries
-        pat_args  :: HsConPatDetails p,
-        pat_wrap  :: HsWrapper          -- Extra wrapper to pass to the matcher
-                                        -- Only relevant for pattern-synonyms;
-                                        --   ignored for data cons
-    }
-    -- ^ Constructor Pattern Out
-
-        ------------ View patterns ---------------
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
+    Pat pass
+  -- ^ Tuple sub-patterns
+  --
+  -- - 'ApiAnnotation.AnnKeywordId' :
+  --            'ApiAnnotation.AnnOpen' @'('@ or @'(#'@,
+  --            'ApiAnnotation.AnnClose' @')'@ or  @'#)'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | ViewPat       (LHsExpr p)
-                  (LPat p)
-                  (PostTc p Type)   -- The overall type of the pattern
-                                    -- (= the argument type of the view function)
-                                    -- for hsPatType.
-    -- ^ View Pattern
+pattern
+  SumPat ::
+    (LPat pass) ->            -- Sum sub-pattern
+    ConTag ->                 -- Alternative (one-based)
+    Arity ->                  -- Arity
+    (PostTc pass [Type]) ->   -- PlaceHolder before typechecker, filled in
+                              -- afterwards with the types of the
+                              -- alternative
+    Pat pass
+  -- ^ Anonymous sum pattern
+  --
+  -- - 'ApiAnnotation.AnnKeywordId' :
+  --            'ApiAnnotation.AnnOpen' @'(#'@,
+  --            'ApiAnnotation.AnnClose' @'#)'@
 
-        ------------ Pattern splices ---------------
-  -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  PArrPat ::
+    [LPat pass] ->        -- Syntactic parallel array
+    (PostTc pass Type) -> -- The type of the elements
+    Pat pass
+  -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'[:'@,
+  --                                    'ApiAnnotation.AnnClose' @':]'@
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  ConPatIn ::
+    (LIdP pass) ->
+    (HsConPatDetails pass) ->
+    Pat pass
+  -- ^ Constructor Pattern In
+
+pattern
+  ConPatOut ::
+    (Located ConLike) ->
+    ([Type]) ->               -- The universal arg types, 1-1 with the universal
+                              -- tyvars of the constructor/pattern synonym
+                              --   Use (conLikeResTy pat_con pat_arg_tys) to get
+                              --   the type of the pattern
+    ([TyVar]) ->              -- Existentially bound type variables
+                              -- in correctly-scoped order e.g. [k:*, x:k]
+    ([EvVar]) ->              -- Ditto *coercion variables* and *dictionaries*
+                              -- One reason for putting coercion variable here,
+                              -- I think is to ensure their kinds are zonked
+    (TcEvBinds) ->            -- Bindings involving those dictionaries
+    (HsConPatDetails pass) ->
+    (HsWrapper) ->            -- Extra wrapper to pass to the matcher
+                              -- Only relevant for pattern-synonyms;
+                              --   ignored for data cons
+    Pat pass
+  -- ^ Constructor Pattern Out
+pattern
+  ViewPat ::
+    (LHsExpr pass) ->
+    (LPat pass) ->
+    (PostTc pass Type) ->     -- The overall type of the pattern
+                              -- (= the argument type of the view function)
+                              -- for hsPatType.
+    Pat pass
+  -- ^ View Pattern
+  -- 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnRarrow'
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  SplicePat ::
+    (HsSplice pass) ->
+    Pat pass
+  -- ^ Splice Pattern (Includes quasi-quotes)
+  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnOpen' @'$('@
   --        'ApiAnnotation.AnnClose' @')'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | SplicePat       (HsSplice p)    -- ^ Splice Pattern (Includes quasi-quotes)
-
-        ------------ Literal and n+k patterns ---------------
-  | LitPat          (HsLit p)           -- ^ Literal Pattern
-                                        -- Used for *non-overloaded* literal patterns:
-                                        -- Int#, Char#, Int, Char, String, etc.
-
-  | NPat                -- Natural Pattern
-                        -- Used for all overloaded literals,
-                        -- including overloaded strings with -XOverloadedStrings
-                    (Located (HsOverLit p))     -- ALWAYS positive
-                    (Maybe (SyntaxExpr p)) -- Just (Name of 'negate') for
-                                           -- negative patterns, Nothing
-                                           -- otherwise
-                    (SyntaxExpr p)       -- Equality checker, of type t->t->Bool
-                    (PostTc p Type)      -- Overall type of pattern. Might be
-                                         -- different than the literal's type
-                                         -- if (==) or negate changes the type
-
+pattern
+  LitPat ::
+    (HsLit pass) ->
+    Pat pass
+  -- ^ Literal Pattern
+  -- Used for *non-overloaded* literal patterns:
+  -- Int#, Char#, Int, Char, String, etc.
+pattern
+  NPat :: -- Natural Pattern
+          -- Used for all overloaded literals,
+          -- including overloaded strings with -XOverloadedStrings
+    (LHsOverLit pass) -> -- ALWAYS positive
+    (Maybe (SyntaxExpr pass)) ->  -- Just (Name of 'negate') for
+                                  -- negative patterns, Nothing
+                                  -- otherwise
+    (SyntaxExpr pass) ->          -- Equality checker, of type t->t->Bool
+    (PostTc pass Type) ->         -- Overall type of pattern. Might be
+                                  -- different than the literal's type
+                                  -- if (==) or negate changes the type
+    Pat pass
   -- ^ Natural Pattern
   --
   -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnVal' @'+'@
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | NPlusKPat       (Located (IdP p))        -- n+k pattern
-                    (Located (HsOverLit p))  -- It'll always be an HsIntegral
-                    (HsOverLit p)       -- See Note [NPlusK patterns] in TcPat
-                     -- NB: This could be (PostTc ...), but that induced a
-                     -- a new hs-boot file. Not worth it.
-
-                    (SyntaxExpr p)   -- (>=) function, of type t1->t2->Bool
-                    (SyntaxExpr p)   -- Name of '-' (see RnEnv.lookupSyntaxName)
-                    (PostTc p Type)  -- Type of overall pattern
+pattern
+  NPlusKPat ::
+    (LIdP pass) ->                -- n+k pattern
+    (LHsOverLit pass) -> -- It'll always be an HsIntegral
+    (HsOverLit pass) ->  -- See Note [NPlusK patterns] in TcPat
+                         -- NB: This could be (PostTc ...), but that induced a
+                         -- a new hs-boot file. Not worth it.
+    (SyntaxExpr pass) -> -- (>=) function, of type t1->t2->Bool
+    (SyntaxExpr pass) -> -- Name of '-' (see RnEnv.lookupSyntaxName)
+    (PostTc pass Type) -> -- Type of overall pattern
+    Pat pass
   -- ^ n+k pattern
-
-        ------------ Pattern type signatures ---------------
+pattern
+  SigPatIn ::
+    (LPat pass) ->          -- Pattern with a type signature
+    (LHsSigWcType pass) ->  -- Signature can bind both
+                            -- kind and type vars
+    Pat pass
+  -- ^ Pattern with a type signature
   -- | - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDcolon'
 
   -- For details on above see note [Api annotations] in ApiAnnotation
-  | SigPatIn        (LPat p)                  -- Pattern with a type signature
-                    (LHsSigWcType p)          -- Signature can bind both
-                                              -- kind and type vars
-    -- ^ Pattern with a type signature
+pattern
+  SigPatOut ::
+    (LPat pass) ->
+    Type ->
+    Pat pass
+  -- ^ Pattern with a type signature
+pattern
+  CoPat ::
+    HsWrapper ->  -- Coercion Pattern
+                  -- If co :: t1 ~ t2, p :: t2,
+                  -- then (CoPat co p) :: t1
+    (Pat pass) -> -- Why not LPat?  Ans: existing locn will do
+    Type ->       -- Type of whole pattern, t1
+                  -- During desugaring a (CoPat co pat) turns into a cast with
+                  -- 'co' on the scrutinee, followed by a match on 'pat'
+    Pat pass
+  -- ^ Coercion Pattern
 
-  | SigPatOut       (LPat p)
-                    Type
-    -- ^ Pattern with a type signature
+pattern
+  WildPat a
+    = AST.WildPat a
 
-        ------------ Pattern coercions (translation only) ---------------
-  | CoPat       HsWrapper           -- Coercion Pattern
-                                    -- If co :: t1 ~ t2, p :: t2,
-                                    -- then (CoPat co p) :: t1
-                (Pat p)             -- Why not LPat?  Ans: existing locn will do
-                Type                -- Type of whole pattern, t1
-        -- During desugaring a (CoPat co pat) turns into a cast with 'co' on
-        -- the scrutinee, followed by a match on 'pat'
-    -- ^ Coercion Pattern
-deriving instance (DataId p) => Data (Pat p)
+pattern
+  VarPat a
+    = AST.VarPat NoFieldExt a
+
+pattern
+  LazyPat a
+    = AST.LazyPat NoFieldExt a
+
+pattern
+  AsPat a b
+    = AST.AsPat NoFieldExt a b
+
+pattern
+  ParPat a
+    = AST.ParPat NoFieldExt a
+
+pattern
+  BangPat a
+    = AST.BangPat NoFieldExt a
+
+pattern
+  ListPat a b c
+    = AST.ListPat (b , c) a
+
+pattern
+  TuplePat a b c
+    = AST.TuplePat c a b
+
+pattern
+  SumPat a b c d
+    = AST.SumPat d a b c
+
+pattern
+  PArrPat a b
+    = AST.PArrPat b a
+
+pattern
+  ConPatIn a b
+    = AST.ConPat NoFieldExt a b
+
+pattern
+  ConPatOut { pat_con, pat_arg_tys, pat_tvs, pat_dicts, pat_binds, pat_args,
+              pat_wrap }
+    = AST.NewPat
+        (NConPatOut pat_con pat_arg_tys pat_tvs pat_dicts pat_binds pat_args
+                    pat_wrap)
+
+pattern
+  ViewPat a b c
+    = AST.ViewPat c a b
+
+pattern
+  SplicePat a
+    = AST.SplicePat NoFieldExt a
+
+pattern
+  LitPat a
+    = AST.LitPat NoFieldExt a
+
+pattern
+  NPat a b c d
+    = AST.NPat (b, c, d) a
+
+pattern
+  NPlusKPat a b c d e f
+    = AST.NPlusKPat (d, e, f) a b c
+
+pattern
+  SigPatIn a b
+    = AST.SigPat NoFieldExt a b
+
+pattern
+  SigPatOut a b
+    = AST.NewPat (NSigPatOut a b)
+
+pattern
+  CoPat a b c
+    = AST.NewPat (NCoPat a b c)
+
+{-#
+  COMPLETE
+    WildPat,
+    VarPat,
+    LazyPat,
+    AsPat,
+    ParPat,
+    BangPat,
+    ListPat,
+    TuplePat,
+    SumPat,
+    PArrPat,
+    ConPatIn,
+    ConPatOut,
+    ViewPat,
+    SplicePat,
+    LitPat,
+    NPat,
+    NPlusKPat,
+    SigPatIn,
+    SigPatOut,
+    CoPat
+  #-}
+
+type instance
+  AST.XWildPat   (GHC pass) = PostTc pass Type
+type instance
+  AST.XVarPat    (GHC pass) = NoFieldExt
+type instance
+  AST.XLazyPat   (GHC pass) = NoFieldExt
+type instance
+  AST.XAsPat     (GHC pass) = NoFieldExt
+type instance
+  AST.XParPat    (GHC pass) = NoFieldExt
+type instance
+  AST.XViewPat   (GHC pass) = PostTc pass Type
+type instance
+  AST.XSplicePat (GHC pass) = NoFieldExt
+type instance
+  AST.XBangPat   (GHC pass) = NoFieldExt
+type instance
+  AST.XListPat   (GHC pass) = ( PostTc pass Type
+                              , Maybe (PostTc pass Type, SyntaxExpr pass))
+type instance
+  AST.XTuplePat  (GHC pass) = [PostTc pass Type]
+type instance
+  AST.XSumPat    (GHC pass) = PostTc pass [Type]
+type instance
+  AST.XPArrPat   (GHC pass) = PostTc pass Type
+type instance
+  AST.XConPat    (GHC pass) = NoFieldExt
+type instance
+  AST.XLitPat    (GHC pass) = NoFieldExt
+type instance
+  AST.XNPat      (GHC pass) = ( Maybe (SyntaxExpr pass)
+                              , SyntaxExpr pass
+                              , PostTc pass Type )
+type instance
+  AST.XNPlusKPat (GHC pass) = ( SyntaxExpr pass
+                              , SyntaxExpr pass
+                              , PostTc pass Type)
+type instance
+  AST.XSigPat    (GHC pass) = NoFieldExt
+type instance
+  AST.XNewPat    (GHC pass) = NewHsPat pass
+
+data NewHsPat pass
+  = NConPatOut
+      (Located ConLike)
+      [Type]
+      [TyVar]
+      [EvVar]
+      TcEvBinds
+      (HsConPatDetails pass)
+      HsWrapper
+  | NSigPatOut
+      (LPat pass)
+      Type
+  | NCoPat
+      HsWrapper
+      (Pat pass)
+      Type
+
+type LPat pass = AST.LPat (GHC pass)
+
+-- ------------------------------------
+
+type InPat  pass = LPat pass        -- No 'Out' constructors
+type OutPat pass = LPat pass        -- No 'In' constructors
+
+-- TODO: after introducing growable AST,
+-- we may be able to enforce above statically
+
+-- ------------------------------------
+
+type
+  HsRecFields pass arg = AST.RecFields (GHC pass) arg
+                         -- note AST.RecFields is not extensible, hence we
+                         -- use `pass` instead of (GHC pass)
+  -- ^ Haskell Record Fields
+  --
+  -- HsRecFields is used only for patterns and expressions (not data type
+  -- declarations)
+  --  A bunch of record fields
+  --   { x = 3, y = True }
+  -- Used for both expressions and patterns
+pattern
+  HsRecFields ::
+    [LHsRecField pass arg] ->
+    (Maybe Int) ->             -- Note [DotDot fields]
+    HsRecFields pass arg
+
+pattern
+  HsRecFields { rec_flds, rec_dotdot }
+    = AST.RecFields rec_flds rec_dotdot
+
+{-#
+  COMPLETE
+    HsRecFields
+  #-}
+
+type LHsRecFields pass arg = AST.LRecFields (GHC pass) arg
+
+-- ------------------------------------
+
+type
+  HsRecField' id arg = AST.RecField' id arg -- notice it's `id` not pass
+  -- ^ Haskell Record Field
+  --
+  -- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
+  --
+
+  -- For details on above see note [Api annotations] in ApiAnnotation
+pattern
+  HsRecField ::
+    Located id ->
+    arg ->         -- ^ Filled in by renamer when punning
+    Bool ->        -- ^ Note [Punning]
+    HsRecField' id arg
+
+pattern
+  HsRecField { hsRecFieldLbl, hsRecFieldArg, hsRecPun }
+    = AST.RecField hsRecFieldLbl hsRecFieldArg hsRecPun
+
+{-#
+  COMPLETE
+    HsRecField
+  #-}
+
+-- | Located Haskell Record Field
+type LHsRecField' id arg = AST.LRecField' id arg
+
+-- ------------------------------------
+
+-- | Haskell Record Field
+type HsRecField   pass arg = AST.RecField (GHC pass) arg
+
+-- | Located Haskell Record Field
+type LHsRecField  pass arg = AST.LRecField (GHC pass) arg
+
+-- ------------------------------------
+
+-- | Haskell Record Update Field
+type HsRecUpdField  pass = AST.RecUpdField (GHC pass)
+
+-- | Located Haskell Record Update Field
+type LHsRecUpdField pass = AST.LRecUpdField (GHC pass)
+
+-- ------------------------------------
 
 -- | Haskell Constructor Pattern Details
-type HsConPatDetails p = HsConDetails (LPat p) (HsRecFields p (LPat p))
+type HsConPatDetails pass = AST.ConPatDetails (GHC pass)
+
+-- ------------------------------------
+
+deriving instance
+  (DataId pass, ForallX Data pass) => Data (NewHsPat pass)
+
+deriving instance
+  (DataId pass) => Data (Pat pass)
+
+deriving instance
+  (DataId pass, Data arg) => Data (HsRecFields pass arg)
+
+deriving instance
+  (Data id, Data arg) => Data (HsRecField' id arg)
+
+-- ------------------------------------
 
 hsConPatArgs :: HsConPatDetails p -> [LPat p]
 hsConPatArgs (PrefixCon ps)   = ps
 hsConPatArgs (RecCon fs)      = map (hsRecFieldArg . unLoc) (rec_flds fs)
 hsConPatArgs (InfixCon p1 p2) = [p1,p2]
 
--- | Haskell Record Fields
---
--- HsRecFields is used only for patterns and expressions (not data type
--- declarations)
-data HsRecFields p arg         -- A bunch of record fields
-                                --      { x = 3, y = True }
-        -- Used for both expressions and patterns
-  = HsRecFields { rec_flds   :: [LHsRecField p arg],
-                  rec_dotdot :: Maybe Int }  -- Note [DotDot fields]
-  deriving (Functor, Foldable, Traversable)
-deriving instance (DataId p, Data arg) => Data (HsRecFields p arg)
+-- ------------------------------------
 
+deriving instance
+  Functor     (AST.RecFields id)
+deriving instance
+  Foldable    (AST.RecFields id)
+deriving instance
+  Traversable (AST.RecFields id)
 
--- Note [DotDot fields]
--- ~~~~~~~~~~~~~~~~~~~~
--- The rec_dotdot field means this:
---   Nothing => the normal case
---   Just n  => the group uses ".." notation,
---
--- In the latter case:
---
---   *before* renamer: rec_flds are exactly the n user-written fields
---
---   *after* renamer:  rec_flds includes *all* fields, with
---                     the first 'n' being the user-written ones
---                     and the remainder being 'filled in' implicitly
+-- ------------------------------------
 
--- | Located Haskell Record Field
-type LHsRecField' p arg = Located (HsRecField' p arg)
+deriving instance
+  Functor     (AST.RecField' id)
+deriving instance
+  Foldable    (AST.RecField' id)
+deriving instance
+  Traversable (AST.RecField' id)
 
--- | Located Haskell Record Field
-type LHsRecField  p arg = Located (HsRecField  p arg)
-
--- | Located Haskell Record Update Field
-type LHsRecUpdField p   = Located (HsRecUpdField p)
-
--- | Haskell Record Field
-type HsRecField    p arg = HsRecField' (FieldOcc p) arg
-
--- | Haskell Record Update Field
-type HsRecUpdField p     = HsRecField' (AmbiguousFieldOcc p) (LHsExpr p)
-
--- | Haskell Record Field
---
--- - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnEqual',
---
--- For details on above see note [Api annotations] in ApiAnnotation
-data HsRecField' id arg = HsRecField {
-        hsRecFieldLbl :: Located id,
-        hsRecFieldArg :: arg,           -- ^ Filled in by renamer when punning
-        hsRecPun      :: Bool           -- ^ Note [Punning]
-  } deriving (Data, Functor, Foldable, Traversable)
-
-
--- Note [Punning]
--- ~~~~~~~~~~~~~~
--- If you write T { x, y = v+1 }, the HsRecFields will be
---      HsRecField x x True ...
---      HsRecField y (v+1) False ...
--- That is, for "punned" field x is expanded (in the renamer)
--- to x=x; but with a punning flag so we can detect it later
--- (e.g. when pretty printing)
---
--- If the original field was qualified, we un-qualify it, thus
---    T { A.x } means T { A.x = x }
-
-
--- Note [HsRecField and HsRecUpdField]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
--- A HsRecField (used for record construction and pattern matching)
--- contains an unambiguous occurrence of a field (i.e. a FieldOcc).
--- We can't just store the Name, because thanks to
--- DuplicateRecordFields this may not correspond to the label the user
--- wrote.
---
--- A HsRecUpdField (used for record update) contains a potentially
--- ambiguous occurrence of a field (an AmbiguousFieldOcc).  The
--- renamer will fill in the selector function if it can, but if the
--- selector is ambiguous the renamer will defer to the typechecker.
--- After the typechecker, a unique selector will have been determined.
---
--- The renamer produces an Unambiguous result if it can, rather than
--- just doing the lookup in the typechecker, so that completely
--- unambiguous updates can be represented by 'DsMeta.repUpdFields'.
---
--- For example, suppose we have:
---
---     data S = MkS { x :: Int }
---     data T = MkT { x :: Int }
---
---     f z = (z { x = 3 }) :: S
---
--- The parsed HsRecUpdField corresponding to the record update will have:
---
---     hsRecFieldLbl = Unambiguous "x" PlaceHolder :: AmbiguousFieldOcc RdrName
---
--- After the renamer, this will become:
---
---     hsRecFieldLbl = Ambiguous   "x" PlaceHolder :: AmbiguousFieldOcc Name
---
--- (note that the Unambiguous constructor is not type-correct here).
--- The typechecker will determine the particular selector:
---
---     hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
---
--- See also Note [Disambiguating record fields] in TcExpr.
+-- ------------------------------------
 
 hsRecFields :: HsRecFields p arg -> [PostRn p (IdP p)]
 hsRecFields rbinds = map (unLoc . hsRecFieldSel . unLoc) (rec_flds rbinds)
@@ -402,120 +682,14 @@ hsRecUpdFieldId = fmap selectorFieldOcc . hsRecUpdFieldOcc
 hsRecUpdFieldOcc :: HsRecField' (AmbiguousFieldOcc GhcTc) arg -> LFieldOcc GhcTc
 hsRecUpdFieldOcc = fmap unambiguousFieldOcc . hsRecFieldLbl
 
-
-{-
-************************************************************************
-*                                                                      *
-*              Printing patterns
-*                                                                      *
-************************************************************************
--}
-
-instance (SourceTextX pass, OutputableBndrId pass)
-       => Outputable (Pat pass) where
-    ppr = pprPat
-
-pprPatBndr :: OutputableBndr name => name -> SDoc
-pprPatBndr var                  -- Print with type info if -dppr-debug is on
-  = getPprStyle $ \ sty ->
-    if debugStyle sty then
-        parens (pprBndr LambdaBind var)         -- Could pass the site to pprPat
-                                                -- but is it worth it?
-    else
-        pprPrefixOcc var
-
-pprParendLPat :: (SourceTextX pass, OutputableBndrId pass) => LPat pass -> SDoc
-pprParendLPat (L _ p) = pprParendPat p
-
-pprParendPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
-pprParendPat p = sdocWithDynFlags $ \ dflags ->
-                 if need_parens dflags p
-                 then parens (pprPat p)
-                 else  pprPat p
-  where
-    need_parens dflags p
-      | CoPat {} <- p = gopt Opt_PrintTypecheckerElaboration dflags
-      | otherwise     = hsPatNeedsParens p
-      -- For a CoPat we need parens if we are going to show it, which
-      -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
-      -- But otherwise the CoPat is discarded, so it
-      -- is the pattern inside that matters.  Sigh.
-
-pprPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
-pprPat (VarPat (L _ var))     = pprPatBndr var
-pprPat (WildPat _)            = char '_'
-pprPat (LazyPat pat)          = char '~' <> pprParendLPat pat
-pprPat (BangPat pat)          = char '!' <> pprParendLPat pat
-pprPat (AsPat name pat)       = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
-pprPat (ViewPat expr pat _)   = hcat [pprLExpr expr, text " -> ", ppr pat]
-pprPat (ParPat pat)           = parens (ppr pat)
-pprPat (LitPat s)             = ppr s
-pprPat (NPat l Nothing  _ _)  = ppr l
-pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
-pprPat (NPlusKPat n k _ _ _ _)= hcat [ppr n, char '+', ppr k]
-pprPat (SplicePat splice)     = pprSplice splice
-pprPat (CoPat co pat _)       = pprHsWrapper co (\parens -> if parens
-                                                            then pprParendPat pat
-                                                            else pprPat pat)
-pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
-pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
-pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
-pprPat (PArrPat pats _)       = paBrackets (interpp'SP pats)
-pprPat (TuplePat pats bx _)   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
-pprPat (SumPat pat alt arity _) = sumParens (pprAlternative ppr pat alt arity)
-pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
-pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
-                    pat_binds = binds, pat_args = details })
-  = sdocWithDynFlags $ \dflags ->
-       -- Tiresome; in TcBinds.tcRhs we print out a
-       -- typechecked Pat in an error message,
-       -- and we want to make sure it prints nicely
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-        ppr con
-          <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
-                         , ppr binds])
-          <+> pprConArgs details
-    else pprUserCon (unLoc con) details
-
-
-pprUserCon :: (SourceTextX p, OutputableBndr con, OutputableBndrId p)
-           => con -> HsConPatDetails p -> SDoc
-pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
-pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
-
-pprConArgs :: (SourceTextX p, OutputableBndrId p) => HsConPatDetails p -> SDoc
-pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
-pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
-pprConArgs (RecCon rpats)   = ppr rpats
-
-instance (Outputable arg)
-      => Outputable (HsRecFields p arg) where
-  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
-        = braces (fsep (punctuate comma (map ppr flds)))
-  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
-        = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
-        where
-          dotdot = text ".." <+> ifPprDebug (ppr (drop n flds))
-
-instance (Outputable p, Outputable arg)
-      => Outputable (HsRecField' p arg) where
-  ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
-                    hsRecPun = pun })
-    = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
-
-
-{-
-************************************************************************
-*                                                                      *
-*              Building patterns
-*                                                                      *
-************************************************************************
--}
+-- ** Building patterns
+-- ------------------------------------
 
 mkPrefixConPat :: DataCon -> [OutPat p] -> [Type] -> OutPat p
 -- Make a vanilla Prefix constructor pattern
 mkPrefixConPat dc pats tys
-  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc), pat_tvs = [], pat_dicts = [],
+  = noLoc $ ConPatOut { pat_con = noLoc (RealDataCon dc), pat_tvs = [],
+                        pat_dicts = [],
                         pat_binds = emptyTcEvBinds, pat_args = PrefixCon pats,
                         pat_arg_tys = tys, pat_wrap = idHsWrapper }
 
@@ -526,13 +700,10 @@ mkCharLitPat :: (SourceTextX p) => SourceText -> Char -> OutPat p
 mkCharLitPat src c = mkPrefixConPat charDataCon
                           [noLoc $ LitPat (HsCharPrim (setSourceText src) c)] []
 
-{-
-************************************************************************
-*                                                                      *
-* Predicates for checking things about pattern-lists in EquationInfo   *
-*                                                                      *
-************************************************************************
+-- ** Predicates for checking things about pattern-lists in EquationInfo
+-- ------------------------------------
 
+{-
 \subsection[Pat-list-predicates]{Look for interesting things in patterns}
 
 Unlike in the Wadler chapter, where patterns are either ``variables''
@@ -667,9 +838,7 @@ conPatNeedsParens (PrefixCon {}) = False
 conPatNeedsParens (InfixCon {})  = True
 conPatNeedsParens (RecCon {})    = False
 
-{-
-% Collect all EvVars from all constructor patterns
--}
+-- Collect all EvVars from all constructor patterns
 
 -- May need to add more cases
 collectEvVarsPats :: [Pat p] -> Bag EvVar
@@ -699,3 +868,170 @@ collectEvVarsPat pat =
     ConPatIn _  _     -> panic "foldMapPatBag: ConPatIn"
     SigPatIn _ _      -> panic "foldMapPatBag: SigPatIn"
     _other_pat        -> emptyBag
+
+-- -----------------------------------------------------------------------------
+-- * Pretty Printing
+-- -----------------------------------------------------------------------------
+
+instance (SourceTextX pass, OutputableBndrId pass)
+       => Outputable (Pat pass) where
+    ppr = pprPat
+
+pprPatBndr :: OutputableBndr name => name -> SDoc
+pprPatBndr var                  -- Print with type info if -dppr-debug is on
+  = getPprStyle $ \ sty ->
+    if debugStyle sty then
+        parens (pprBndr LambdaBind var)         -- Could pass the site to pprPat
+                                                -- but is it worth it?
+    else
+        pprPrefixOcc var
+
+pprParendLPat :: (SourceTextX pass, OutputableBndrId pass) => LPat pass -> SDoc
+pprParendLPat (L _ p) = pprParendPat p
+
+pprParendPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
+pprParendPat p = sdocWithDynFlags $ \ dflags ->
+                 if need_parens dflags p
+                 then parens (pprPat p)
+                 else  pprPat p
+  where
+    need_parens dflags p
+      | CoPat {} <- p = gopt Opt_PrintTypecheckerElaboration dflags
+      | otherwise     = hsPatNeedsParens p
+      -- For a CoPat we need parens if we are going to show it, which
+      -- we do if -fprint-typechecker-elaboration is on (c.f. pprHsWrapper)
+      -- But otherwise the CoPat is discarded, so it
+      -- is the pattern inside that matters.  Sigh.
+
+pprPat :: (SourceTextX pass, OutputableBndrId pass) => Pat pass -> SDoc
+pprPat (VarPat (L _ var))     = pprPatBndr var
+pprPat (WildPat _)            = char '_'
+pprPat (LazyPat pat)          = char '~' <> pprParendLPat pat
+pprPat (BangPat pat)          = char '!' <> pprParendLPat pat
+pprPat (AsPat name pat)       = hcat [pprPrefixOcc (unLoc name), char '@', pprParendLPat pat]
+pprPat (ViewPat expr pat _)   = hcat [pprLExpr expr, text " -> ", ppr pat]
+pprPat (ParPat pat)           = parens (ppr pat)
+pprPat (LitPat s)             = ppr s
+pprPat (NPat l Nothing  _ _)  = ppr l
+pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
+pprPat (NPlusKPat n k _ _ _ _)= hcat [ppr n, char '+', ppr k]
+pprPat (SplicePat splice)     = pprSplice splice
+pprPat (CoPat co pat _)       = pprHsWrapper co (\parens -> if parens
+                                                            then pprParendPat pat
+                                                            else pprPat pat)
+pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
+pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
+pprPat (ListPat pats _ _)     = brackets (interpp'SP pats)
+pprPat (PArrPat pats _)       = paBrackets (interpp'SP pats)
+pprPat (TuplePat pats bx _)   = tupleParens (boxityTupleSort bx) (pprWithCommas ppr pats)
+pprPat (SumPat pat alt arity _) = sumParens (pprAlternative ppr pat alt arity)
+pprPat (ConPatIn con details) = pprUserCon (unLoc con) details
+pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
+                    pat_binds = binds, pat_args = details })
+  = sdocWithDynFlags $ \dflags ->
+       -- Tiresome; in TcBinds.tcRhs we print out a
+       -- typechecked Pat in an error message,
+       -- and we want to make sure it prints nicely
+    if gopt Opt_PrintTypecheckerElaboration dflags then
+        ppr con
+          <> braces (sep [ hsep (map pprPatBndr (tvs ++ dicts))
+                         , ppr binds])
+          <+> pprConArgs details
+    else pprUserCon (unLoc con) details
+
+
+pprUserCon :: (SourceTextX p, OutputableBndr con, OutputableBndrId p)
+           => con -> HsConPatDetails p -> SDoc
+pprUserCon c (InfixCon p1 p2) = ppr p1 <+> pprInfixOcc c <+> ppr p2
+pprUserCon c details          = pprPrefixOcc c <+> pprConArgs details
+
+pprConArgs :: (SourceTextX p, OutputableBndrId p) => HsConPatDetails p -> SDoc
+pprConArgs (PrefixCon pats) = sep (map pprParendLPat pats)
+pprConArgs (InfixCon p1 p2) = sep [pprParendLPat p1, pprParendLPat p2]
+pprConArgs (RecCon rpats)   = ppr rpats
+
+instance (Outputable arg)
+      => Outputable (HsRecFields p arg) where
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
+        = braces (fsep (punctuate comma (map ppr flds)))
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
+        = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
+        where
+          dotdot = text ".." <+> ifPprDebug (ppr (drop n flds))
+
+instance (Outputable p, Outputable arg)
+      => Outputable (HsRecField' p arg) where
+  ppr (HsRecField { hsRecFieldLbl = f, hsRecFieldArg = arg,
+                    hsRecPun = pun })
+    = ppr f <+> (ppUnless pun $ equals <+> ppr arg)
+
+-- -----------------------------------------------------------------------------
+-- Notes
+-- -----------------------------------------------------------------------------
+{-
+Note [DotDot fields]
+~~~~~~~~~~~~~~~~~~~~
+The rec_dotdot field means this:
+  Nothing => the normal case
+  Just n  => the group uses ".." notation,
+
+In the latter case:
+
+  *before* renamer: rec_flds are exactly the n user-written fields
+
+  *after* renamer:  rec_flds includes *all* fields, with
+                    the first 'n' being the user-written ones
+                    and the remainder being 'filled in' implicitly
+
+Note [Punning]
+~~~~~~~~~~~~~~
+If you write T { x, y = v+1 }, the HsRecFields will be
+     HsRecField x x True ...
+     HsRecField y (v+1) False ...
+That is, for "punned" field x is expanded (in the renamer)
+to x=x; but with a punning flag so we can detect it later
+(e.g. when pretty printing)
+
+If the original field was qualified, we un-qualify it, thus
+   T { A.x } means T { A.x = x }
+
+Note [HsRecField and HsRecUpdField]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+A HsRecField (used for record construction and pattern matching)
+contains an unambiguous occurrence of a field (i.e. a FieldOcc).
+We can't just store the Name, because thanks to
+DuplicateRecordFields this may not correspond to the label the user
+wrote.
+
+A HsRecUpdField (used for record update) contains a potentially
+ambiguous occurrence of a field (an AmbiguousFieldOcc).  The
+renamer will fill in the selector function if it can, but if the
+selector is ambiguous the renamer will defer to the typechecker.
+After the typechecker, a unique selector will have been determined.
+
+The renamer produces an Unambiguous result if it can, rather than
+just doing the lookup in the typechecker, so that completely
+unambiguous updates can be represented by 'DsMeta.repUpdFields'.
+
+For example, suppose we have:
+
+    data S = MkS { x :: Int }
+    data T = MkT { x :: Int }
+
+    f z = (z { x = 3 }) :: S
+
+The parsed HsRecUpdField corresponding to the record update will have:
+
+    hsRecFieldLbl = Unambiguous "x" PlaceHolder :: AmbiguousFieldOcc RdrName
+
+After the renamer, this will become:
+
+    hsRecFieldLbl = Ambiguous   "x" PlaceHolder :: AmbiguousFieldOcc Name
+
+(note that the Unambiguous constructor is not type-correct here).
+The typechecker will determine the particular selector:
+
+    hsRecFieldLbl = Unambiguous "x" $sel:x:MkS  :: AmbiguousFieldOcc Id
+
+See also Note [Disambiguating record fields] in TcExpr.
+-}

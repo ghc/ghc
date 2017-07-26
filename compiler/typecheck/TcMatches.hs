@@ -49,7 +49,7 @@ import MkCore
 
 import Control.Monad
 import Control.Arrow ( second )
-
+import qualified AST
 #include "HsVersions.h"
 
 {-
@@ -112,12 +112,12 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
 parser guarantees that each equation has exactly one argument.
 -}
 
-tcMatchesCase :: (Outputable (body GhcRn)) =>
+tcMatchesCase :: (Outputable (body (GHC GhcRn))) =>
                 TcMatchCtxt body                        -- Case context
              -> TcSigmaType                             -- Type of scrutinee
-             -> MatchGroup GhcRn (Located (body GhcRn)) -- The case alternatives
+             -> MatchGroup GhcRn (Located (body (GHC GhcRn))) -- The case alternatives
              -> ExpRhoType                    -- Type of whole case expressions
-             -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
+             -> TcM (MatchGroup GhcTcId (Located (body (GHC GhcTcId))))
                 -- Translated alternatives
                 -- wrapper goes from MatchGroup's ty to expected ty
 
@@ -125,7 +125,7 @@ tcMatchesCase ctxt scrut_ty matches res_ty
   = tcMatches ctxt [mkCheckExpType scrut_ty] res_ty matches
 
 tcMatchLambda :: SDoc -- see Note [Herald for matchExpectedFunTys] in TcUnify
-              -> TcMatchCtxt HsExpr
+              -> TcMatchCtxt AST.Expr
               -> MatchGroup GhcRn (LHsExpr GhcRn)
               -> ExpRhoType   -- deeply skolemised
               -> TcM (MatchGroup GhcTcId (LHsExpr GhcTcId), HsWrapper)
@@ -195,18 +195,18 @@ tauifyMultipleMatches group exp_tys
   -- NB: In the empty-match case, this ensures we fill in the ExpType
 
 -- | Type-check a MatchGroup.
-tcMatches :: (Outputable (body GhcRn)) => TcMatchCtxt body
+tcMatches :: (Outputable (body (GHC GhcRn))) => TcMatchCtxt body
           -> [ExpSigmaType]      -- Expected pattern types
           -> ExpRhoType          -- Expected result-type of the Match.
-          -> MatchGroup GhcRn (Located (body GhcRn))
-          -> TcM (MatchGroup GhcTcId (Located (body GhcTcId)))
+          -> MatchGroup GhcRn (Located (body (GHC GhcRn)))
+          -> TcM (MatchGroup GhcTcId (Located (body (GHC GhcTcId))))
 
 data TcMatchCtxt body   -- c.f. TcStmtCtxt, also in this module
   = MC { mc_what :: HsMatchContext Name,  -- What kind of thing this is
-         mc_body :: Located (body GhcRn)         -- Type checker for a body of
+         mc_body :: Located (body (GHC GhcRn))         -- Type checker for a body of
                                                 -- an alternative
                  -> ExpRhoType
-                 -> TcM (Located (body GhcTcId)) }
+                 -> TcM (Located (body (GHC GhcTcId))) }
 
 tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                                   , mg_origin = origin })
@@ -222,11 +222,11 @@ tcMatches ctxt pat_tys rhs_ty (MG { mg_alts = L l matches
                     , mg_origin = origin }) }
 
 -------------
-tcMatch :: (Outputable (body GhcRn)) => TcMatchCtxt body
+tcMatch :: (Outputable (body (GHC GhcRn))) => TcMatchCtxt body
         -> [ExpSigmaType]        -- Expected pattern types
         -> ExpRhoType            -- Expected result-type of the Match.
-        -> LMatch GhcRn (Located (body GhcRn))
-        -> TcM (LMatch GhcTcId (Located (body GhcTcId)))
+        -> LMatch GhcRn (Located (body (GHC GhcRn)))
+        -> TcM (LMatch GhcTcId (Located (body (GHC GhcTcId))))
 
 tcMatch ctxt pat_tys rhs_ty match
   = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
@@ -252,8 +252,8 @@ tcMatch ctxt pat_tys rhs_ty match
             _          -> addErrCtxt (pprMatchInCtxt match) thing_inside
 
 -------------
-tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (Located (body GhcRn)) -> ExpRhoType
-        -> TcM (GRHSs GhcTcId (Located (body GhcTcId)))
+tcGRHSs :: TcMatchCtxt body -> GRHSs GhcRn (Located (body (GHC GhcRn))) -> ExpRhoType
+        -> TcM (GRHSs GhcTcId (Located (body (GHC GhcTcId))))
 
 -- Notice that we pass in the full res_ty, so that we get
 -- good inference from simple things like
@@ -269,8 +269,8 @@ tcGRHSs ctxt (GRHSs grhss (L l binds)) res_ty
         ; return (GRHSs grhss' (L l binds')) }
 
 -------------
-tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (Located (body GhcRn))
-       -> TcM (GRHS GhcTcId (Located (body GhcTcId)))
+tcGRHS :: TcMatchCtxt body -> ExpRhoType -> GRHS GhcRn (Located (body (GHC GhcRn)))
+       -> TcM (GRHS GhcTcId (Located (body (GHC GhcTcId))))
 
 tcGRHS ctxt res_ty (GRHS guards rhs)
   = do  { (guards', rhs')
@@ -339,32 +339,32 @@ tcBody body res_ty
 ************************************************************************
 -}
 
-type TcExprStmtChecker = TcStmtChecker HsExpr ExpRhoType
-type TcCmdStmtChecker  = TcStmtChecker HsCmd  TcRhoType
+type TcExprStmtChecker = TcStmtChecker AST.Expr ExpRhoType
+type TcCmdStmtChecker  = TcStmtChecker AST.Cmd  TcRhoType
 
 type TcStmtChecker body rho_type
   =  forall thing. HsStmtContext Name
-                -> Stmt GhcRn (Located (body GhcRn))
+                -> Stmt GhcRn (Located (body (GHC GhcRn)))
                 -> rho_type                 -- Result type for comprehension
                 -> (rho_type -> TcM thing)  -- Checker for what follows the stmt
-                -> TcM (Stmt GhcTcId (Located (body GhcTcId)), thing)
+                -> TcM (Stmt GhcTcId (Located (body (GHC GhcTcId))), thing)
 
-tcStmts :: (Outputable (body GhcRn)) => HsStmtContext Name
+tcStmts :: (Outputable (body (GHC GhcRn))) => HsStmtContext Name
         -> TcStmtChecker body rho_type   -- NB: higher-rank type
-        -> [LStmt GhcRn (Located (body GhcRn))]
+        -> [LStmt GhcRn (Located (body (GHC GhcRn)))]
         -> rho_type
-        -> TcM [LStmt GhcTcId (Located (body GhcTcId))]
+        -> TcM [LStmt GhcTcId (Located (body (GHC GhcTcId)))]
 tcStmts ctxt stmt_chk stmts res_ty
   = do { (stmts', _) <- tcStmtsAndThen ctxt stmt_chk stmts res_ty $
                         const (return ())
        ; return stmts' }
 
-tcStmtsAndThen :: (Outputable (body GhcRn)) => HsStmtContext Name
+tcStmtsAndThen :: (Outputable (body (GHC GhcRn))) => HsStmtContext Name
                -> TcStmtChecker body rho_type    -- NB: higher-rank type
-               -> [LStmt GhcRn (Located (body GhcRn))]
+               -> [LStmt GhcRn (Located (body (GHC GhcRn)))]
                -> rho_type
                -> (rho_type -> TcM thing)
-               -> TcM ([LStmt GhcTcId (Located (body GhcTcId))], thing)
+               -> TcM ([LStmt GhcTcId (Located (body (GHC GhcTcId)))], thing)
 
 -- Note the higher-rank type.  stmt_chk is applied at different
 -- types in the equations for tcStmts

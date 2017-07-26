@@ -20,7 +20,8 @@ addFieldDocs (x:xs) doc = addFieldDoc x doc : xs
 
 addConDoc :: LConDecl a -> Maybe LHsDocString -> LConDecl a
 addConDoc decl    Nothing = decl
-addConDoc (L p c) doc     = L p ( c { con_doc = con_doc c `mplus` doc } )
+addConDoc (L p c) doc     = L p (setConDoc (getConDoc c `mplus` doc) c)
+
 
 addConDocs :: [LConDecl a] -> Maybe LHsDocString -> [LConDecl a]
 addConDocs [] _ = []

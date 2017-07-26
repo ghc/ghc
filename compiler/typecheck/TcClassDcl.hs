@@ -168,7 +168,7 @@ tcClassSigs clas sigs def_methods
 tcClassDecl2 :: LTyClDecl GhcRn          -- The class declaration
              -> TcM (LHsBinds GhcTcId)
 
-tcClassDecl2 (L _ (ClassDecl {tcdLName = class_name, tcdSigs = sigs,
+tcClassDecl2 (L _ (ClassDecl {tcdLNameC = class_name, tcdSigs = sigs,
                                 tcdMeths = default_binds}))
   = recoverM (return emptyLHsBinds)     $
     setSrcSpan (getLoc class_name)      $
@@ -281,8 +281,8 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                            , abe_mono  = local_dm_id
                            , abe_wrap  = idHsWrapper
                            , abe_prags = IsDefaultMethod }
-             full_bind = AbsBinds { abs_tvs      = tyvars
-                                  , abs_ev_vars  = [this_dict]
+             full_bind = AbsBinds { abs_tvsa     = tyvars
+                                  , abs_ev_varsa = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]
                                   , abs_binds    = tc_bind }

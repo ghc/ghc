@@ -670,34 +670,34 @@ See Note [Deterministic UniqFM] to learn more about nondeterminism.
 -}
 
 -- | Rename some Stmts
-rnStmts :: Outputable (body GhcPs)
+rnStmts :: Outputable (body (GHC GhcPs))
         => HsStmtContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+        -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
            -- ^ How to rename the body of each statement (e.g. rnLExpr)
-        -> [LStmt GhcPs (Located (body GhcPs))]
+        -> [LStmt GhcPs (Located (body (GHC GhcPs)))]
            -- ^ Statements
         -> ([Name] -> RnM (thing, FreeVars))
            -- ^ if these statements scope over something, this renames it
            -- and returns the result.
-        -> RnM (([LStmt GhcRn (Located (body GhcRn))], thing), FreeVars)
+        -> RnM (([LStmt GhcRn (Located (body (GHC GhcRn)))], thing), FreeVars)
 rnStmts ctxt rnBody = rnStmtsWithPostProcessing ctxt rnBody noPostProcessStmts
 
 -- | like 'rnStmts' but applies a post-processing step to the renamed Stmts
 rnStmtsWithPostProcessing
-        :: Outputable (body GhcPs)
+        :: Outputable (body (GHC GhcPs))
         => HsStmtContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+        -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
            -- ^ How to rename the body of each statement (e.g. rnLExpr)
         -> (HsStmtContext Name
-              -> [(LStmt GhcRn (Located (body GhcRn)), FreeVars)]
-              -> RnM ([LStmt GhcRn (Located (body GhcRn))], FreeVars))
+              -> [(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)]
+              -> RnM ([LStmt GhcRn (Located (body (GHC GhcRn)))], FreeVars))
            -- ^ postprocess the statements
-        -> [LStmt GhcPs (Located (body GhcPs))]
+        -> [LStmt GhcPs (Located (body (GHC GhcPs)))]
            -- ^ Statements
         -> ([Name] -> RnM (thing, FreeVars))
            -- ^ if these statements scope over something, this renames it
            -- and returns the result.
-        -> RnM (([LStmt GhcRn (Located (body GhcRn))], thing), FreeVars)
+        -> RnM (([LStmt GhcRn (Located (body (GHC GhcRn)))], thing), FreeVars)
 rnStmtsWithPostProcessing ctxt rnBody ppStmts stmts thing_inside
  = do { ((stmts', thing), fvs) <-
           rnStmtsWithFreeVars ctxt rnBody stmts thing_inside
@@ -725,17 +725,17 @@ postProcessStmtsForApplicativeDo ctxt stmts
 -- | strip the FreeVars annotations from statements
 noPostProcessStmts
   :: HsStmtContext Name
-  -> [(LStmt GhcRn (Located (body GhcRn)), FreeVars)]
-  -> RnM ([LStmt GhcRn (Located (body GhcRn))], FreeVars)
+  -> [(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)]
+  -> RnM ([LStmt GhcRn (Located (body (GHC GhcRn)))], FreeVars)
 noPostProcessStmts _ stmts = return (map fst stmts, emptyNameSet)
 
 
-rnStmtsWithFreeVars :: Outputable (body GhcPs)
+rnStmtsWithFreeVars :: Outputable (body (GHC GhcPs))
         => HsStmtContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-        -> [LStmt GhcPs (Located (body GhcPs))]
+        -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+        -> [LStmt GhcPs (Located (body (GHC GhcPs)))]
         -> ([Name] -> RnM (thing, FreeVars))
-        -> RnM ( ([(LStmt GhcRn (Located (body GhcRn)), FreeVars)], thing)
+        -> RnM ( ([(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)], thing)
                , FreeVars)
 -- Each Stmt body is annotated with its FreeVars, so that
 -- we can rearrange statements for ApplicativeDo.
@@ -793,15 +793,15 @@ exhaustive list). How we deal with pattern match failure is context-dependent.
 At one point we failed to make this distinction, leading to #11216.
 -}
 
-rnStmt :: Outputable (body GhcPs)
+rnStmt :: Outputable (body (GHC GhcPs))
        => HsStmtContext Name
-       -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+       -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
           -- ^ How to rename the body of the statement
-       -> LStmt GhcPs (Located (body GhcPs))
+       -> LStmt GhcPs (Located (body (GHC GhcPs)))
           -- ^ The statement
        -> ([Name] -> RnM (thing, FreeVars))
           -- ^ Rename the stuff that this statement scopes over
-       -> RnM ( ([(LStmt GhcRn (Located (body GhcRn)), FreeVars)], thing)
+       -> RnM ( ([(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)], thing)
               , FreeVars)
 -- Variables bound by the Stmt, and mentioned in thing_inside,
 -- do not appear in the result FreeVars
@@ -1048,13 +1048,13 @@ type Segment stmts = (Defs,
 
 
 -- wrapper that does both the left- and right-hand sides
-rnRecStmtsAndThen :: Outputable (body GhcPs) =>
-                     (Located (body GhcPs)
-                  -> RnM (Located (body GhcRn), FreeVars))
-                  -> [LStmt GhcPs (Located (body GhcPs))]
+rnRecStmtsAndThen :: Outputable (body (GHC GhcPs)) =>
+                     (Located (body (GHC GhcPs))
+                  -> RnM (Located (body (GHC GhcRn)), FreeVars))
+                  -> [LStmt GhcPs (Located (body (GHC GhcPs)))]
                          -- assumes that the FreeVars returned includes
                          -- the FreeVars of the Segments
-                  -> ([Segment (LStmt GhcRn (Located (body GhcRn)))]
+                  -> ([Segment (LStmt GhcRn (Located (body (GHC GhcRn))))]
                       -> RnM (a, FreeVars))
                   -> RnM (a, FreeVars)
 rnRecStmtsAndThen rnBody s cont
@@ -1150,11 +1150,11 @@ rn_rec_stmts_lhs fix_env stmts
 
 -- right-hand-sides
 
-rn_rec_stmt :: (Outputable (body GhcPs)) =>
-               (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+rn_rec_stmt :: (Outputable (body (GHC GhcPs))) =>
+               (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
             -> [Name]
-            -> (LStmtLR GhcRn GhcPs (Located (body GhcPs)), FreeVars)
-            -> RnM [Segment (LStmt GhcRn (Located (body GhcRn)))]
+            -> (LStmtLR GhcRn GhcPs (Located (body (GHC GhcPs))), FreeVars)
+            -> RnM [Segment (LStmt GhcRn (Located (body (GHC GhcRn))))]
         -- Rename a Stmt that is inside a RecStmt (or mdo)
         -- Assumes all binders are already in scope
         -- Turns each stmt into a singleton Stmt
@@ -1210,11 +1210,11 @@ rn_rec_stmt _ _ (L _ (LetStmt (L _ EmptyLocalBinds)), _)
 rn_rec_stmt _ _ stmt@(L _ (ApplicativeStmt {}), _)
   = pprPanic "rn_rec_stmt: ApplicativeStmt" (ppr stmt)
 
-rn_rec_stmts :: Outputable (body GhcPs) =>
-                (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
+rn_rec_stmts :: Outputable (body (GHC GhcPs)) =>
+                (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
              -> [Name]
-             -> [(LStmtLR GhcRn GhcPs (Located (body GhcPs)), FreeVars)]
-             -> RnM [Segment (LStmt GhcRn (Located (body GhcRn)))]
+             -> [(LStmtLR GhcRn GhcPs (Located (body (GHC GhcPs))), FreeVars)]
+             -> RnM [Segment (LStmt GhcRn (Located (body (GHC GhcRn))))]
 rn_rec_stmts rnBody bndrs stmts
   = do { segs_s <- mapM (rn_rec_stmt rnBody bndrs) stmts
        ; return (concat segs_s) }
@@ -1803,10 +1803,10 @@ splitSegment stmts
       _other -> (stmts,[])
 
 slurpIndependentStmts
-   :: [(LStmt GhcRn (Located (body GhcRn)), FreeVars)]
-   -> Maybe ( [(LStmt GhcRn (Located (body GhcRn)), FreeVars)] -- LetStmts
-            , [(LStmt GhcRn (Located (body GhcRn)), FreeVars)] -- BindStmts
-            , [(LStmt GhcRn (Located (body GhcRn)), FreeVars)] )
+   :: [(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)]
+   -> Maybe ( [(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)] -- LetStmts
+            , [(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)] -- BindStmts
+            , [(LStmt GhcRn (Located (body (GHC GhcRn))), FreeVars)] )
 slurpIndependentStmts stmts = go [] [] emptyNameSet stmts
  where
   -- If we encounter a BindStmt that doesn't depend on a previous BindStmt
@@ -1918,9 +1918,9 @@ emptyErr (TransStmtCtxt {}) = text "Empty statement group preceding 'group' or '
 emptyErr ctxt               = text "Empty" <+> pprStmtContext ctxt
 
 ----------------------
-checkLastStmt :: Outputable (body GhcPs) => HsStmtContext Name
-              -> LStmt GhcPs (Located (body GhcPs))
-              -> RnM (LStmt GhcPs (Located (body GhcPs)))
+checkLastStmt :: Outputable (body (GHC GhcPs)) => HsStmtContext Name
+              -> LStmt GhcPs (Located (body (GHC GhcPs)))
+              -> RnM (LStmt GhcPs (Located (body (GHC GhcPs))))
 checkLastStmt ctxt lstmt@(L loc stmt)
   = case ctxt of
       ListComp  -> check_comp
@@ -1950,7 +1950,7 @@ checkLastStmt ctxt lstmt@(L loc stmt)
 
 -- Checking when a particular Stmt is ok
 checkStmt :: HsStmtContext Name
-          -> LStmt GhcPs (Located (body GhcPs))
+          -> LStmt GhcPs (Located (body (GHC GhcPs)))
           -> RnM ()
 checkStmt ctxt (L _ stmt)
   = do { dflags <- getDynFlags
@@ -1977,7 +1977,7 @@ emptyInvalid = NotValid Outputable.empty
 
 okStmt, okDoStmt, okCompStmt, okParStmt, okPArrStmt
    :: DynFlags -> HsStmtContext Name
-   -> Stmt GhcPs (Located (body GhcPs)) -> Validity
+   -> Stmt GhcPs (Located (body (GHC GhcPs))) -> Validity
 -- Return Nothing if OK, (Just extra) if not ok
 -- The "extra" is an SDoc that is appended to an generic error message
 
@@ -1995,7 +1995,7 @@ okStmt dflags ctxt stmt
       TransStmtCtxt ctxt -> okStmt dflags ctxt stmt
 
 -------------
-okPatGuardStmt :: Stmt GhcPs (Located (body GhcPs)) -> Validity
+okPatGuardStmt :: Stmt GhcPs (Located (body (GHC GhcPs))) -> Validity
 okPatGuardStmt stmt
   = case stmt of
       BodyStmt {} -> IsValid

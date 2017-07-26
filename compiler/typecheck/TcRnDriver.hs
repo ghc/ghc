@@ -1986,7 +1986,7 @@ tcUserStmt (L loc (BodyStmt expr _ _ _))
               matches   = [mkMatch (mkPrefixFunRhs (L loc fresh_it)) [] rn_expr
                                    (noLoc emptyLocalBinds)]
               -- [it = expr]
-              the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvs = fvs }
+              the_bind  = L loc $ (mkTopFunBind FromSource (L loc fresh_it) matches) { bind_fvsf = fvs }
                           -- Care here!  In GHCi the expression might have
                           -- free variables, and they in turn may have free type variables
                           -- (if we are at a breakpoint, say).  We must put those free vars

@@ -183,9 +183,9 @@ cvtDec (TySynD tc tvs rhs)
   = do  { (_, tc', tvs') <- cvt_tycl_hdr [] tc tvs
         ; rhs' <- cvtType rhs
         ; returnJustL $ TyClD $
-          SynDecl { tcdLName = tc', tcdTyVars = tvs'
-                  , tcdFixity = Prefix
-                  , tcdFVs = placeHolderNames
+          SynDecl { tcdLNameS = tc', tcdTyVarsS = tvs'
+                  , tcdFixityS = Prefix
+                  , tcdFVsS = placeHolderNames
                   , tcdRhs = rhs' } }
 
 cvtDec (DataD ctxt tc tvs ksig constrs derivs)
@@ -208,11 +208,11 @@ cvtDec (DataD ctxt tc tvs ksig constrs derivs)
                                 , dd_ctxt = ctxt'
                                 , dd_kindSig = ksig'
                                 , dd_cons = cons', dd_derivs = derivs' }
-        ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
-                                        , tcdFixity = Prefix
+        ; returnJustL $ TyClD (DataDecl { tcdLNameD = tc', tcdTyVarsD = tvs'
+                                        , tcdFixityD = Prefix
                                         , tcdDataDefn = defn
                                         , tcdDataCusk = PlaceHolder
-                                        , tcdFVs = placeHolderNames }) }
+                                        , tcdFVsD = placeHolderNames }) }
 
 cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
   = do  { (ctxt', tc', tvs') <- cvt_tycl_hdr ctxt tc tvs
@@ -224,11 +224,11 @@ cvtDec (NewtypeD ctxt tc tvs ksig constr derivs)
                                 , dd_kindSig = ksig'
                                 , dd_cons = [con']
                                 , dd_derivs = derivs' }
-        ; returnJustL $ TyClD (DataDecl { tcdLName = tc', tcdTyVars = tvs'
-                                    , tcdFixity = Prefix
+        ; returnJustL $ TyClD (DataDecl { tcdLNameD = tc', tcdTyVarsD = tvs'
+                                    , tcdFixityD = Prefix
                                     , tcdDataDefn = defn
                                     , tcdDataCusk = PlaceHolder
-                                    , tcdFVs = placeHolderNames }) }
+                                    , tcdFVsD = placeHolderNames }) }
 
 cvtDec (ClassD ctxt cl tvs fds decs)
   = do  { (cxt', tc', tvs') <- cvt_tycl_hdr ctxt cl tvs
@@ -240,12 +240,12 @@ cvtDec (ClassD ctxt cl tvs fds decs)
                    $$ (Outputable.ppr adts'))
         ; at_defs <- mapM cvt_at_def ats'
         ; returnJustL $ TyClD $
-          ClassDecl { tcdCtxt = cxt', tcdLName = tc', tcdTyVars = tvs'
-                    , tcdFixity = Prefix
+          ClassDecl { tcdCtxt = cxt', tcdLNameC = tc', tcdTyVarsC = tvs'
+                    , tcdFixityC = Prefix
                     , tcdFDs = fds', tcdSigs = Hs.mkClassOpSigs sigs'
                     , tcdMeths = binds'
                     , tcdATs = fams', tcdATDefs = at_defs, tcdDocs = []
-                    , tcdFVs = placeHolderNames }
+                    , tcdFVsC = placeHolderNames }
                               -- no docs in TH ^^
         }
   where
@@ -604,9 +604,9 @@ cvtForD (ImportF callconv safety from nm ty)
     mk_imp impspec
       = do { nm' <- vNameL nm
            ; ty' <- cvtType ty
-           ; return (ForeignImport { fd_name = nm'
-                                   , fd_sig_ty = mkLHsSigType ty'
-                                   , fd_co = noForeignImportCoercionYet
+           ; return (ForeignImport { fd_nameI = nm'
+                                   , fd_sig_tyI = mkLHsSigType ty'
+                                   , fd_coI = noForeignImportCoercionYet
                                    , fd_fi = impspec })
            }
     safety' = case safety of
@@ -621,9 +621,9 @@ cvtForD (ExportF callconv as nm ty)
                                                 (mkFastString as)
                                                 (cvt_conv callconv)))
                                                 (noLoc (SourceText as))
-        ; return $ ForeignExport { fd_name = nm'
-                                 , fd_sig_ty = mkLHsSigType ty'
-                                 , fd_co = noForeignExportCoercionYet
+        ; return $ ForeignExport { fd_nameE = nm'
+                                 , fd_sig_tyE = mkLHsSigType ty'
+                                 , fd_coE = noForeignExportCoercionYet
                                  , fd_fe = e } }
 
 cvt_conv :: TH.Callconv -> CCallConv
@@ -1411,14 +1411,14 @@ cvtPatSynSigTy (ForallT univs reqs (ForallT exis provs ty))
   | null univs, null reqs = do { l   <- getL
                                ; ty' <- cvtType (ForallT exis provs ty)
                                ; return $ L l (HsQualTy { hst_ctxt = L l []
-                                                        , hst_body = ty' }) }
+                                                        , hst_bodyy = ty' }) }
   | null reqs             = do { l      <- getL
                                ; univs' <- hsQTvExplicit <$> cvtTvs univs
                                ; ty'    <- cvtType (ForallT exis provs ty)
                                ; let forTy = HsForAllTy { hst_bndrs = univs'
                                                         , hst_body = L l cxtTy }
                                      cxtTy = HsQualTy { hst_ctxt = L l []
-                                                      , hst_body = ty' }
+                                                      , hst_bodyy = ty' }
                                ; return $ L l forTy }
   | otherwise             = cvtType (ForallT univs reqs (ForallT exis provs ty))
 cvtPatSynSigTy ty         = cvtType ty
@@ -1498,7 +1498,7 @@ mkHsQualTy :: TH.Cxt
            -- ^ The complete type, qualified with a context if necessary
 mkHsQualTy ctxt loc ctxt' ty
   | null ctxt = ty
-  | otherwise = L loc $ HsQualTy { hst_ctxt = ctxt', hst_body = ty }
+  | otherwise = L loc $ HsQualTy { hst_ctxt = ctxt', hst_bodyy = ty }
 
 --------------------------------------------------------------------
 --      Turning Name back into RdrName

@@ -9,6 +9,11 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 -}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -29,9 +34,15 @@ module HsSyn (
         module PlaceHolder,
         module HsExtension,
         Fixity,
-
-        HsModule(..)
-) where
+        HsModule,
+        pattern HsModule,
+          hsmodName,
+          hsmodExports,
+          hsmodImports,
+          hsmodDecls,
+          hsmodDeprecMessage,
+          hsmodHaddockModHeader
+  ) where
 
 -- friends:
 import HsDecls
@@ -55,60 +66,95 @@ import Module           ( ModuleName )
 -- libraries:
 import Data.Data hiding ( Fixity )
 
--- | Haskell Module
---
--- All we actually declare here is the top-level structure for a module.
-data HsModule name
-  = HsModule {
-      hsmodName :: Maybe (Located ModuleName),
-        -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
-        --     field is Nothing too)
-      hsmodExports :: Maybe (Located [LIE name]),
-        -- ^ Export list
-        --
-        --  - @Nothing@: export list omitted, so export everything
-        --
-        --  - @Just []@: export /nothing/
-        --
-        --  - @Just [...]@: as you would expect...
-        --
-        --
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
-        --                                   ,'ApiAnnotation.AnnClose'
+import qualified AST
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
-      hsmodImports :: [LImportDecl name],
-        -- ^ We snaffle interesting stuff out of the imported interfaces early
-        -- on, adding that info to TyDecls/etc; so this list is often empty,
-        -- downstream.
-      hsmodDecls :: [LHsDecl name],
-        -- ^ Type, class, value, and interface signature decls
-      hsmodDeprecMessage :: Maybe (Located WarningTxt),
-        -- ^ reason\/explanation for warning/deprecation of this module
-        --
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
-        --                                   ,'ApiAnnotation.AnnClose'
-        --
+-- -----------------------------------------------------------------------------
+-- * Data Declarations
+-- -----------------------------------------------------------------------------
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
-      hsmodHaddockModHeader :: Maybe LHsDocString
-        -- ^ Haddock module info and description, unparsed
-        --
-        --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
-        --                                   ,'ApiAnnotation.AnnClose'
+type
+  HsModule pass = AST.Module (GHC pass)
+  -- ^ Haskell Module
+  --
+  -- All we actually declare here is the top-level structure for a module.
+pattern
+  HsModule ::
+    (Maybe (Located ModuleName)) ->
+    -- ^ @Nothing@: \"module X where\" is omitted (in which case the next
+    --     field is Nothing too)
+    (Maybe (Located [LIE pass])) ->
+    -- ^ Export list
+    --
+    --  - @Nothing@: export list omitted, so export everything
+    --
+    --  - @Just []@: export /nothing/
+    --
+    --  - @Just [...]@: as you would expect...
+    --
+    --
+    --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
+    --                                   ,'ApiAnnotation.AnnClose'
 
-        -- For details on above see note [Api annotations] in ApiAnnotation
-   }
-     -- ^ 'ApiAnnotation.AnnKeywordId's
-     --
-     --  - 'ApiAnnotation.AnnModule','ApiAnnotation.AnnWhere'
-     --
-     --  - 'ApiAnnotation.AnnOpen','ApiAnnotation.AnnSemi',
-     --    'ApiAnnotation.AnnClose' for explicit braces and semi around
-     --    hsmodImports,hsmodDecls if this style is used.
+    -- For details on above see note [Api annotations] in ApiAnnotation
+    ([LImportDecl pass]) ->
+    -- ^ We snaffle interesting stuff out of the imported interfaces early
+    -- on, adding that info to TyDecls/etc; so this list is often empty,
+    -- downstream.
+    ([LHsDecl pass]) ->
+    -- ^ Type, class, value, and interface signature decls
+    (Maybe (Located WarningTxt)) ->
+    -- ^ reason\/explanation for warning/deprecation of this module
+    --
+    --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
+    --                                   ,'ApiAnnotation.AnnClose'
+    --
 
-     -- For details on above see note [Api annotations] in ApiAnnotation
-deriving instance (DataId name) => Data (HsModule name)
+    -- For details on above see note [Api annotations] in ApiAnnotation
+    (Maybe LHsDocString) ->
+    -- ^ Haddock module info and description, unparsed
+    --
+    --  - 'ApiAnnotation.AnnKeywordId's : 'ApiAnnotation.AnnOpen'
+    --                                   ,'ApiAnnotation.AnnClose'
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
+    HsModule pass
+    -- ^ 'ApiAnnotation.AnnKeywordId's
+    --
+    --  - 'ApiAnnotation.AnnModule','ApiAnnotation.AnnWhere'
+    --
+    --  - 'ApiAnnotation.AnnOpen','ApiAnnotation.AnnSemi',
+    --    'ApiAnnotation.AnnClose' for explicit braces and semi around
+    --    hsmodImports,hsmodDecls if this style is used.
+
+    -- For details on above see note [Api annotations] in ApiAnnotation
+
+pattern
+  HsModule { hsmodName, hsmodExports, hsmodImports, hsmodDecls,
+             hsmodDeprecMessage, hsmodHaddockModHeader }
+    = AST.Module NoFieldExt
+        hsmodName hsmodExports hsmodImports hsmodDecls
+        hsmodDeprecMessage hsmodHaddockModHeader
+
+{-#
+  COMPLETE
+    HsModule
+  #-}
+
+type instance
+  AST.XModule    (GHC pass) = NoFieldExt
+type instance
+  AST.XNewModule (GHC pass) = NoConExt
+
+-- -----------------------------------------------------------------------------
+-- * Utilities
+-- -----------------------------------------------------------------------------
+
+deriving instance
+  (DataId name) => Data (HsModule name)
+
+-- -----------------------------------------------------------------------------
+-- * Pretty Printing
+-- -----------------------------------------------------------------------------
 
 instance (SourceTextX pass, OutputableBndrId pass)
   => Outputable (HsModule pass) where

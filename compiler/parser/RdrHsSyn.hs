@@ -143,13 +143,13 @@ mkClassDecl loc (L _ (mcxt, tycl_hdr)) fds where_cls
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (text "class") whereDots cls tparams
        ; at_defs <- mapM (eitherToP . mkATDefault) at_insts
-       ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls, tcdTyVars = tyvars
-                                  , tcdFixity = fixity
+       ; return (L loc (ClassDecl { tcdCtxt = cxt, tcdLNameC = cls, tcdTyVarsC = tyvars
+                                  , tcdFixityC = fixity
                                   , tcdFDs = snd (unLoc fds)
                                   , tcdSigs = mkClassOpSigs sigs
                                   , tcdMeths = binds
                                   , tcdATs = ats, tcdATDefs = at_defs, tcdDocs  = docs
-                                  , tcdFVs = placeHolderNames })) }
+                                  , tcdFVsC = placeHolderNames })) }
 
 mkATDefault :: LTyFamInstDecl GhcPs
             -> Either (SrcSpan, SDoc) (LTyFamDefltEqn GhcPs)
@@ -181,11 +181,11 @@ mkTyData loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_deriv
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (ppr new_or_data) equalsDots tc tparams
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (DataDecl { tcdLName = tc, tcdTyVars = tyvars,
-                                   tcdFixity = fixity,
+       ; return (L loc (DataDecl { tcdLNameD = tc, tcdTyVarsD = tyvars,
+                                   tcdFixityD = fixity,
                                    tcdDataDefn = defn,
                                    tcdDataCusk = PlaceHolder,
-                                   tcdFVs = placeHolderNames })) }
+                                   tcdFVsD = placeHolderNames })) }
 
 mkDataDefn :: NewOrData
            -> Maybe (Located CType)
@@ -212,9 +212,9 @@ mkTySynonym loc lhs rhs
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; tyvars <- checkTyVarsP (text "type") equalsDots tc tparams
-       ; return (L loc (SynDecl { tcdLName = tc, tcdTyVars = tyvars
-                                , tcdFixity = fixity
-                                , tcdRhs = rhs, tcdFVs = placeHolderNames })) }
+       ; return (L loc (SynDecl { tcdLNameS = tc, tcdTyVarsS = tyvars
+                                , tcdFixityS = fixity
+                                , tcdRhs = rhs, tcdFVsS = placeHolderNames })) }
 
 mkTyFamInstEqn :: LHsType GhcPs
                -> LHsType GhcPs
@@ -554,14 +554,14 @@ mkConDeclH98 name mb_forall cxt details
                              -- AZ:TODO: when can cxt be Nothing?
                              --          remembering that () is a valid context.
                , con_details  = details
-               , con_doc      = Nothing }
+               , con_docA      = Nothing }
 
 mkGadtDecl :: [Located RdrName]
            -> LHsSigType GhcPs     -- Always a HsForAllTy
            -> ConDecl GhcPs
 mkGadtDecl names ty = ConDeclGADT { con_names = names
                                   , con_type  = ty
-                                  , con_doc   = Nothing }
+                                  , con_docG   = Nothing }
 
 setRdrNameSpace :: RdrName -> NameSpace -> RdrName
 -- ^ This rather gruesome function is used mainly by the parser.
@@ -974,7 +974,7 @@ makeFunBind fn ms
   = FunBind { fun_id = fn,
               fun_matches = mkMatchGroup FromSource ms,
               fun_co_fn = idHsWrapper,
-              bind_fvs = placeHolderNames,
+              bind_fvsf = placeHolderNames,
               fun_tick = [] }
 
 checkPatBind :: SDoc
@@ -1361,10 +1361,10 @@ mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
         importSpec = CImport cconv safety Nothing funcTarget (L loc esrc)
 
     returnSpec spec = return $ ForD $ ForeignImport
-          { fd_name   = v
-          , fd_sig_ty = ty
-          , fd_co     = noForeignImportCoercionYet
-          , fd_fi     = spec
+          { fd_nameI   = v
+          , fd_sig_tyI = ty
+          , fd_coI     = noForeignImportCoercionYet
+          , fd_fi      = spec
           }
 
 
@@ -1374,7 +1374,7 @@ mkImport cconv safety (L loc (StringLiteral esrc entity), v, ty) =
 -- that one.
 parseCImport :: Located CCallConv -> Located Safety -> FastString -> String
              -> Located SourceText
-             -> Maybe ForeignImport
+             -> Maybe (ForeignImport)
 parseCImport cconv safety nm str sourceText =
  listToMaybe $ map fst $ filter (null.snd) $
      readP_to_S parse str
@@ -1434,8 +1434,9 @@ mkExport :: Located CCallConv
          -> P (HsDecl GhcPs)
 mkExport (L lc cconv) (L le (StringLiteral esrc entity), v, ty)
  = return $ ForD $
-   ForeignExport { fd_name = v, fd_sig_ty = ty
-                 , fd_co = noForeignExportCoercionYet
+   ForeignExport { fd_nameE = v
+                 , fd_sig_tyE = ty
+                 , fd_coE = noForeignExportCoercionYet
                  , fd_fe = CExport (L lc (CExportStatic esrc entity' cconv))
                                    (L le esrc) }
   where

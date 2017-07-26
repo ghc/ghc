@@ -1746,7 +1746,7 @@ ctype   :: { LHsType GhcPs }
         | context '=>' ctype          {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
-                                                     , hst_body = $3 }) }
+                                                     , hst_bodyy = $3 }) }
         | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy $1 $3))
                                              [mu AnnDcolon $2] }
         | type                        { $1 }
@@ -1771,7 +1771,7 @@ ctypedoc :: { LHsType GhcPs }
         | context '=>' ctypedoc       {% addAnnotation (gl $1) (toUnicodeAnn AnnDarrow $2) (gl $2)
                                          >> return (sLL $1 $> $
                                             HsQualTy { hst_ctxt = $1
-                                                     , hst_body = $3 }) }
+                                                     , hst_bodyy = $3 }) }
         | ipvar '::' type             {% ams (sLL $1 $> (HsIParamTy $1 $3))
                                              [mu AnnDcolon $2] }
         | typedoc                     { $1 }

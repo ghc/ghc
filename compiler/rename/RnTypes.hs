@@ -154,7 +154,7 @@ rnWcBody ctxt nwc_rdrs hs_ty
         do { (hs_body', fvs) <- rn_lty env hs_body
            ; return (HsForAllTy { hst_bndrs = tvs', hst_body = hs_body' }, fvs) }
 
-    rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt, hst_body = hs_ty })
+    rn_ty env (HsQualTy { hst_ctxt = L cx hs_ctxt, hst_bodyy = hs_ty })
       | Just (hs_ctxt1, hs_ctxt_last) <- snocView hs_ctxt
       , L lx (HsWildCardTy wc) <- ignoreParens hs_ctxt_last
       = do { (hs_ctxt1', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt1
@@ -163,13 +163,13 @@ rnWcBody ctxt nwc_rdrs hs_ty
                        ; rnAnonWildCard wc }
            ; let hs_ctxt' = hs_ctxt1' ++ [L lx (HsWildCardTy wc')]
            ; (hs_ty', fvs2) <- rnLHsTyKi env hs_ty
-           ; return (HsQualTy { hst_ctxt = L cx hs_ctxt', hst_body = hs_ty' }
+           ; return (HsQualTy { hst_ctxt = L cx hs_ctxt', hst_bodyy = hs_ty' }
                     , fvs1 `plusFV` fvs2) }
 
       | otherwise
       = do { (hs_ctxt', fvs1) <- mapFvRn (rn_top_constraint env) hs_ctxt
            ; (hs_ty', fvs2)   <- rnLHsTyKi env hs_ty
-           ; return (HsQualTy { hst_ctxt = L cx hs_ctxt', hst_body = hs_ty' }
+           ; return (HsQualTy { hst_ctxt = L cx hs_ctxt', hst_bodyy = hs_ty' }
                     , fvs1 `plusFV` fvs2) }
 
     rn_ty env hs_ty = rnHsTyKi env hs_ty
@@ -472,11 +472,11 @@ rnHsTyKi env ty@(HsForAllTy { hst_bndrs = tyvars, hst_body  = tau })
        ; return ( HsForAllTy { hst_bndrs = tyvars', hst_body =  tau' }
                 , fvs) } }
 
-rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_body = tau })
+rnHsTyKi env ty@(HsQualTy { hst_ctxt = lctxt, hst_bodyy = tau })
   = do { checkTypeInType env ty  -- See Note [QualTy in kinds]
        ; (ctxt', fvs1) <- rnTyKiContext env lctxt
        ; (tau',  fvs2) <- rnLHsTyKi env tau
-       ; return (HsQualTy { hst_ctxt = ctxt', hst_body =  tau' }
+       ; return (HsQualTy { hst_ctxt = ctxt', hst_bodyy =  tau' }
                 , fvs1 `plusFV` fvs2) }
 
 rnHsTyKi env (HsTyVar ip (L loc rdr_name))
@@ -1068,7 +1068,7 @@ collectAnonWildCards lty = go lty
                  , hst_body = ty } -> collectAnonWildCardsBndrs bndrs
                                       `mappend` go ty
       HsQualTy { hst_ctxt = L _ ctxt
-               , hst_body = ty }  -> gos ctxt `mappend` go ty
+               , hst_bodyy = ty }  -> gos ctxt `mappend` go ty
       HsSpliceTy (HsSpliced _ (HsSplicedTy ty)) _ -> go $ L noSrcSpan ty
       HsSpliceTy{} -> mempty
       HsCoreTy{} -> mempty
@@ -1685,7 +1685,7 @@ extract_lty t_or_k (L _ ty) acc
       HsForAllTy { hst_bndrs = tvs, hst_body = ty }
                                 -> extract_hs_tv_bndrs tvs acc =<<
                                    extract_lty t_or_k ty emptyFKTV
-      HsQualTy { hst_ctxt = ctxt, hst_body = ty }
+      HsQualTy { hst_ctxt = ctxt, hst_bodyy = ty }
                                 -> extract_lctxt t_or_k ctxt   =<<
                                    extract_lty t_or_k ty acc
       -- We deal with these separately in rnLHsTypeWithWildCards

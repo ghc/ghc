@@ -313,6 +313,7 @@ Library
         HsImpExp
         HsLit
         PlaceHolder
+        AST
         HsExtension
         HsPat
         HsSyn

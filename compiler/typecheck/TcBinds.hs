@@ -556,7 +556,7 @@ type BKey = Int -- Just number off the bindings
 mkEdges :: TcSigFun -> LHsBinds GhcRn -> [Node BKey (LHsBind GhcRn)]
 -- See Note [Polymorphic recursion] in HsBinds.
 mkEdges sig_fn binds
-  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
+  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (get_bind_fvs (unLoc bind)),
                          Just key <- [lookupNameEnv key_map n], no_sig n ]
     | (bind, key) <- keyd_binds
     ]
@@ -714,7 +714,7 @@ tcPolyCheck prag_fn
        ; let bind' = FunBind { fun_id      = L nm_loc mono_id
                              , fun_matches = matches'
                              , fun_co_fn   = co_fn
-                             , bind_fvs    = placeHolderNamesTc
+                             , bind_fvsf   = placeHolderNamesTc
                              , fun_tick    = funBindTicks nm_loc mono_id mod prag_sigs }
 
              abs_bind = L loc $ AbsBindsSig
@@ -797,8 +797,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              abs_bind = L loc $
-                        AbsBinds { abs_tvs = qtvs
-                                 , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
+                        AbsBinds { abs_tvsa = qtvs
+                                 , abs_ev_varsa = givens, abs_ev_binds = [ev_binds]
                                  , abs_exports = exports, abs_binds = binds' }
 
        ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
@@ -1251,7 +1251,7 @@ tcMonoBinds :: RecFlag  -- Whether the binding is recursive for typechecking pur
             -> TcM (LHsBinds GhcTcId, [MonoBindInfo])
 tcMonoBinds is_rec sig_fn no_gen
            [ L b_loc (FunBind { fun_id = L nm_loc name,
-                                fun_matches = matches, bind_fvs = fvs })]
+                                fun_matches = matches, bind_fvsf = fvs })]
                              -- Single function binding,
   | NonRecursive <- is_rec   -- ...binder isn't mentioned in RHS
   , Nothing <- sig_fn name   -- ...with no type signature
@@ -1276,7 +1276,7 @@ tcMonoBinds is_rec sig_fn no_gen
         ; mono_id <- newLetBndr no_gen name rhs_ty
         ; return (unitBag $ L b_loc $
                      FunBind { fun_id = L nm_loc mono_id,
-                               fun_matches = matches', bind_fvs = fvs,
+                               fun_matches = matches', bind_fvsf = fvs,
                                fun_co_fn = co_fn, fun_tick = [] },
                   [MBI { mbi_poly_name = name
                        , mbi_sig       = Nothing
@@ -1424,7 +1424,7 @@ tcRhs (TcFunBind info@(MBI { mbi_sig = mb_sig, mbi_mono_id = mono_id })
         ; return ( FunBind { fun_id = L loc mono_id
                            , fun_matches = matches'
                            , fun_co_fn = co_fn
-                           , bind_fvs = placeHolderNamesTc
+                           , bind_fvsf = placeHolderNamesTc
                            , fun_tick = [] } ) }
 
 tcRhs (TcPatBind infos pat' grhss pat_ty)
@@ -1678,7 +1678,7 @@ isClosedBndrGroup type_env binds
     fv_env = mkNameEnv $ concatMap (bindFvs . unLoc) binds
 
     bindFvs :: HsBindLR GhcRn idR -> [(Name, NameSet)]
-    bindFvs (FunBind { fun_id = L _ f, bind_fvs = fvs })
+    bindFvs (FunBind { fun_id = L _ f, bind_fvsf = fvs })
        = let open_fvs = filterNameSet (not . is_closed) fvs
          in [(f, open_fvs)]
     bindFvs (PatBind { pat_lhs = pat, bind_fvs = fvs })

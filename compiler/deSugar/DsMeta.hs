@@ -267,20 +267,20 @@ repTyClD :: LTyClDecl GhcRn -> DsM (Maybe (SrcSpan, Core TH.DecQ))
 
 repTyClD (L loc (FamDecl { tcdFam = fam })) = liftM Just $ repFamilyDecl (L loc fam)
 
-repTyClD (L loc (SynDecl { tcdLName = tc, tcdTyVars = tvs, tcdRhs = rhs }))
+repTyClD (L loc (SynDecl { tcdLNameS = tc, tcdTyVarsS = tvs, tcdRhs = rhs }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
                 repSynDecl tc1 bndrs rhs
        ; return (Just (loc, dec)) }
 
-repTyClD (L loc (DataDecl { tcdLName = tc, tcdTyVars = tvs, tcdDataDefn = defn }))
+repTyClD (L loc (DataDecl { tcdLNameD = tc, tcdTyVarsD = tvs, tcdDataDefn = defn }))
   = do { tc1 <- lookupLOcc tc           -- See note [Binders and occurrences]
        ; dec <- addTyClTyVarBinds tvs $ \bndrs ->
                 repDataDefn tc1 bndrs Nothing defn
        ; return (Just (loc, dec)) }
 
-repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLName = cls,
-                             tcdTyVars = tvs, tcdFDs = fds,
+repTyClD (L loc (ClassDecl { tcdCtxt = cxt, tcdLNameC = cls,
+                             tcdTyVarsC = tvs, tcdFDs = fds,
                              tcdSigs = sigs, tcdMeths = meth_binds,
                              tcdATs = ats, tcdATDefs = atds }))
   = do { cls1 <- lookupLOcc cls         -- See note [Binders and occurrences]
@@ -521,7 +521,7 @@ repDataFamInstD (DataFamInstDecl { dfid_tycon = tc_name
             ; repDataDefn tc bndrs (Just tys1) defn } }
 
 repForD :: Located (ForeignDecl GhcRn) -> DsM (SrcSpan, Core TH.DecQ)
-repForD (L loc (ForeignImport { fd_name = name, fd_sig_ty = typ
+repForD (L loc (ForeignImport { fd_nameI = name, fd_sig_tyI = typ
                               , fd_fi = CImport (L _ cc) (L _ s) mch cis _ }))
  = do MkC name' <- lookupLOcc name
       MkC typ' <- repHsSigType typ
@@ -781,6 +781,7 @@ rep_wc_ty_sig mk_sig loc sig_ty nm
                 else repTForall th_explicit_tvs th_ctxt th_ty
        ; sig <- repProto mk_sig nm1 ty1
        ; return (loc, sig) }
+rep_wc_ty_sig _ _ _ _ = error "Impossible!"
 
 rep_inline :: Located Name
            -> InlinePragma      -- Never defaultInlinePragma

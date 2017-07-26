@@ -1,3 +1,4 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP, KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-} -- Note [Pass sensitive types]
@@ -5,27 +6,26 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ExistentialQuantification #-}
-
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 module HsExpr where
 
-import SrcLoc     ( Located )
 import Outputable ( SDoc, Outputable )
 import {-# SOURCE #-} HsPat  ( LPat )
 import BasicTypes ( SpliceExplicitFlag(..))
-import HsExtension ( OutputableBndrId, DataId, SourceTextX )
+import HsExtension ( OutputableBndrId, DataId, SourceTextX, GHC )
 import Data.Data hiding ( Fixity )
+import qualified AST
 
-type role HsExpr nominal
-type role HsCmd nominal
-type role MatchGroup nominal representational
-type role GRHSs nominal representational
-type role HsSplice nominal
+
+type HsExpr     pass      = AST.Expr       (GHC pass)
+type HsCmd      pass      = AST.Cmd        (GHC pass)
+type HsSplice   pass      = AST.Splice     (GHC pass)
+type MatchGroup pass body = AST.MatchGroup (GHC pass) body
+type GRHSs      pass body = AST.GRHSs      (GHC pass) body
+type LHsExpr    pass      = AST.LExpr    (GHC pass)
+
 type role SyntaxExpr nominal
-data HsExpr (i :: *)
-data HsCmd  (i :: *)
-data HsSplice (i :: *)
-data MatchGroup (a :: *) (body :: *)
-data GRHSs (a :: *) (body :: *)
 data SyntaxExpr (i :: *)
 
 instance (DataId p) => Data (HsSplice p)
@@ -38,7 +38,6 @@ instance (DataId p) => Data (SyntaxExpr p)
 instance (SourceTextX p, OutputableBndrId p) => Outputable (HsExpr p)
 instance (SourceTextX p, OutputableBndrId p) => Outputable (HsCmd p)
 
-type LHsExpr a = Located (HsExpr a)
 
 pprLExpr :: (SourceTextX p, OutputableBndrId p) => LHsExpr p -> SDoc
 

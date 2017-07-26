@@ -49,7 +49,8 @@ import NameEnv
 import Avail
 import Outputable
 import Bag
-import BasicTypes       ( DerivStrategy, RuleName, pprRuleName )
+import BasicTypes       ( DerivStrategy, RuleName, pprRuleName,
+                          SpliceExplicitFlag(..) )
 import FastString
 import SrcLoc
 import DynFlags
@@ -401,7 +402,7 @@ rnDefaultDecl (DefaultDecl tys)
 -}
 
 rnHsForeignDecl :: ForeignDecl GhcPs -> RnM (ForeignDecl GhcRn, FreeVars)
-rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
+rnHsForeignDecl (ForeignImport { fd_nameI = name, fd_sig_tyI = ty, fd_fi = spec })
   = do { topEnv :: HscEnv <- getTopEnv
        ; name' <- lookupLocatedTopBndrRn name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
@@ -410,15 +411,15 @@ rnHsForeignDecl (ForeignImport { fd_name = name, fd_sig_ty = ty, fd_fi = spec })
        ; let unitId = thisPackage $ hsc_dflags topEnv
              spec'      = patchForeignImport unitId spec
 
-       ; return (ForeignImport { fd_name = name', fd_sig_ty = ty'
-                               , fd_co = noForeignImportCoercionYet
+       ; return (ForeignImport { fd_nameI = name', fd_sig_tyI = ty'
+                               , fd_coI = noForeignImportCoercionYet
                                , fd_fi = spec' }, fvs) }
 
-rnHsForeignDecl (ForeignExport { fd_name = name, fd_sig_ty = ty, fd_fe = spec })
+rnHsForeignDecl (ForeignExport { fd_nameE = name, fd_sig_tyE = ty, fd_fe = spec })
   = do { name' <- lookupLocatedOccRn name
        ; (ty', fvs) <- rnHsSigType (ForeignDeclCtx name) ty
-       ; return (ForeignExport { fd_name = name', fd_sig_ty = ty'
-                               , fd_co = noForeignExportCoercionYet
+       ; return (ForeignExport { fd_nameE = name', fd_sig_tyE = ty'
+                               , fd_coE = noForeignExportCoercionYet
                                , fd_fe = spec }
                 , fvs `addOneFV` unLoc name') }
         -- NB: a foreign export is an *occurrence site* for name, so
@@ -855,12 +856,12 @@ rnATDecls cls at_decls
   = rnList (rnFamDecl (Just cls)) at_decls
 
 rnATInstDecls :: (Maybe (Name, [Name]) -> -- The function that renames
-                  decl GhcPs ->            -- an instance. rnTyFamInstDecl
-                  RnM (decl GhcRn, FreeVars)) -- or rnDataFamInstDecl
+                  decl (GHC GhcPs) ->            -- an instance. rnTyFamInstDecl
+                  RnM (decl (GHC GhcRn), FreeVars)) -- or rnDataFamInstDecl
               -> Name      -- Class
               -> [Name]
-              -> [Located (decl GhcPs)]
-              -> RnM ([Located (decl GhcRn)], FreeVars)
+              -> [Located (decl (GHC GhcPs))]
+              -> RnM ([Located (decl (GHC GhcRn))], FreeVars)
 -- Used for data and type family defaults in a class decl
 -- and the family instance declarations in an instance
 --
@@ -1649,8 +1650,8 @@ rnTyClDecl (FamDecl { tcdFam = decl })
   = do { (decl', fvs) <- rnFamDecl Nothing decl
        ; return (FamDecl decl', fvs) }
 
-rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
-                      tcdFixity = fixity, tcdRhs = rhs })
+rnTyClDecl (SynDecl { tcdLNameS = tycon, tcdTyVarsS = tyvars,
+                      tcdFixityS = fixity, tcdRhs = rhs })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- freeKiTyVarsKindVars <$> extractHsTyRdrTyVars rhs
        ; let doc = TySynCtx tycon
@@ -1659,14 +1660,14 @@ rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                                     \ tyvars' _ ->
                                     do { (rhs', fvs) <- rnTySyn doc rhs
                                        ; return ((tyvars', rhs'), fvs) }
-       ; return (SynDecl { tcdLName = tycon', tcdTyVars = tyvars'
-                         , tcdFixity = fixity
-                         , tcdRhs = rhs', tcdFVs = fvs }, fvs) }
+       ; return (SynDecl { tcdLNameS = tycon', tcdTyVarsS = tyvars'
+                         , tcdFixityS = fixity
+                         , tcdRhs = rhs', tcdFVsS = fvs }, fvs) }
 
 -- "data", "newtype" declarations
 -- both top level and (for an associated type) in an instance decl
-rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
-                       tcdFixity = fixity, tcdDataDefn = defn })
+rnTyClDecl (DataDecl { tcdLNameD = tycon, tcdTyVarsD = tyvars,
+                       tcdFixityD = fixity, tcdDataDefn = defn })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
        ; kvs <- extractDataDefnKindVars defn
        ; let doc = TyDataCtx tycon
@@ -1681,13 +1682,13 @@ rnTyClDecl (DataDecl { tcdLName = tycon, tcdTyVars = tyvars,
        ; typeintype <- xoptM LangExt.TypeInType
        ; let cusk = hsTvbAllKinded tyvars' &&
                     (not typeintype || no_kvs)
-       ; return (DataDecl { tcdLName = tycon', tcdTyVars = tyvars'
-                          , tcdFixity = fixity
+       ; return (DataDecl { tcdLNameD = tycon', tcdTyVarsD = tyvars'
+                          , tcdFixityD = fixity
                           , tcdDataDefn = defn', tcdDataCusk = cusk
-                          , tcdFVs = fvs }, fvs) }
+                          , tcdFVsD = fvs }, fvs) }
 
-rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
-                        tcdTyVars = tyvars, tcdFixity = fixity,
+rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLNameC = lcls,
+                        tcdTyVarsC = tyvars, tcdFixityC = fixity,
                         tcdFDs = fds, tcdSigs = sigs,
                         tcdMeths = mbinds, tcdATs = ats, tcdATDefs = at_defs,
                         tcdDocs = docs})
@@ -1741,11 +1742,11 @@ rnTyClDecl (ClassDecl { tcdCtxt = context, tcdLName = lcls,
         ; docs' <- mapM (wrapLocM rnDocDecl) docs
 
         ; let all_fvs = meth_fvs `plusFV` stuff_fvs `plusFV` fv_at_defs
-        ; return (ClassDecl { tcdCtxt = context', tcdLName = lcls',
-                              tcdTyVars = tyvars', tcdFixity = fixity,
+        ; return (ClassDecl { tcdCtxt = context', tcdLNameC = lcls',
+                              tcdTyVarsC = tyvars', tcdFixityC = fixity,
                               tcdFDs = fds', tcdSigs = sigs',
                               tcdMeths = mbinds', tcdATs = ats', tcdATDefs = at_defs',
-                              tcdDocs = docs', tcdFVs = all_fvs },
+                              tcdDocs = docs', tcdFVsC = all_fvs },
                   all_fvs ) }
   where
     cls_doc  = ClassDeclCtx lcls
@@ -2026,7 +2027,7 @@ rnConDecls = mapFvRn (wrapLocFstM rnConDecl)
 rnConDecl :: ConDecl GhcPs -> RnM (ConDecl GhcRn, FreeVars)
 rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
                            , con_cxt = mcxt, con_details = details
-                           , con_doc = mb_doc })
+                           , con_docA = mb_doc })
   = do  { _ <- addLocM checkConName name
         ; new_name     <- lookupLocatedTopBndrRn name
         ; let doc = ConDeclCtx [new_name]
@@ -2051,7 +2052,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
                 Just _ -> Just new_tyvars
         ; return (decl { con_name = new_name, con_qvars = new_tyvars'
                        , con_cxt = new_context, con_details = new_details'
-                       , con_doc = mb_doc' },
+                       , con_docA = mb_doc' },
                   all_fvs) }}
  where
     cxt = maybe [] unLoc mcxt
@@ -2067,7 +2068,7 @@ rnConDecl decl@(ConDeclH98 { con_name = name, con_qvars = qtvs
       = return ([], mkHsQTvs [])
 
 rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
-                            , con_doc = mb_doc })
+                            , con_docG = mb_doc })
   = do  { mapM_ (addLocM checkConName) names
         ; new_names    <- mapM lookupLocatedTopBndrRn names
         ; let doc = ConDeclCtx new_names
@@ -2077,7 +2078,7 @@ rnConDecl decl@(ConDeclGADT { con_names = names, con_type = ty
         ; traceRn "rnConDecl" (ppr names <+> vcat
              [ text "fvs:" <+> ppr fvs ])
         ; return (decl { con_names = new_names, con_type = ty'
-                       , con_doc = mb_doc' },
+                       , con_docG = mb_doc' },
                   fvs) }
 
 rnConDeclDetails

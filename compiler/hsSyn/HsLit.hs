@@ -5,6 +5,7 @@
 \section[HsLit]{Abstract syntax: source-language literals}
 -}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# LANGUAGE CPP, DeriveDataTypeable #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -14,8 +15,39 @@
                                       -- in module PlaceHolder
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE PatternSynonyms #-}
 
-module HsLit where
+module HsLit
+  ( HsLit
+      , pattern HsChar
+      , pattern HsCharPrim
+      , pattern HsString
+      , pattern HsStringPrim
+      , pattern HsInt
+      , pattern HsIntPrim
+      , pattern HsWordPrim
+      , pattern HsInt64Prim
+      , pattern HsWord64Prim
+      , pattern HsInteger
+      , pattern HsRat
+      , pattern HsFloatPrim
+      , pattern HsDoublePrim
+  , HsOverLit
+      , pattern OverLit
+          , ol_val
+          , ol_rebindable
+          , ol_witness
+          , ol_type
+  , LHsOverLit
+  , OverLitVal
+      , pattern HsIntegral
+      , pattern HsFractional
+      , pattern HsIsString
+  , negateOverLitVal
+  , overLitType
+  , convertLit
+  , pmPprHsLit
+  ) where
 
 #include "HsVersions.h"
 
@@ -30,53 +62,232 @@ import HsExtension
 import Data.ByteString (ByteString)
 import Data.Data hiding ( Fixity )
 
-{-
-************************************************************************
-*                                                                      *
-\subsection[HsLit]{Literals}
-*                                                                      *
-************************************************************************
--}
+import qualified AST
+
+-- -----------------------------------------------------------------------------
+-- * Data Declarations
+-- -----------------------------------------------------------------------------
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
 -- Note [Trees that grow] in HsExtension for the Xxxxx fields in the following
+
 -- | Haskell Literal
-data HsLit x
-  = HsChar (XHsChar x) {- SourceText -} Char
-      -- ^ Character
-  | HsCharPrim (XHsCharPrim x) {- SourceText -} Char
-      -- ^ Unboxed character
-  | HsString (XHsString x) {- SourceText -} FastString
-      -- ^ String
-  | HsStringPrim (XHsStringPrim x) {- SourceText -} ByteString
-      -- ^ Packed bytes
-  | HsInt (XHsInt x)  IntegralLit
-      -- ^ Genuinely an Int; arises from
-      -- @TcGenDeriv@, and from TRANSLATION
-  | HsIntPrim (XHsIntPrim x) {- SourceText -} Integer
-      -- ^ literal @Int#@
-  | HsWordPrim (XHsWordPrim x) {- SourceText -} Integer
-      -- ^ literal @Word#@
-  | HsInt64Prim (XHsInt64Prim x) {- SourceText -} Integer
-      -- ^ literal @Int64#@
-  | HsWord64Prim (XHsWord64Prim x) {- SourceText -} Integer
-      -- ^ literal @Word64#@
-  | HsInteger (XHsInteger x) {- SourceText -} Integer Type
-      -- ^ Genuinely an integer; arises only
-      -- from TRANSLATION (overloaded
-      -- literals are done with HsOverLit)
-  | HsRat (XHsRat x)  FractionalLit Type
-      -- ^ Genuinely a rational; arises only from
-      -- TRANSLATION (overloaded literals are
-      -- done with HsOverLit)
-  | HsFloatPrim (XHsFloatPrim x)   FractionalLit
-      -- ^ Unboxed Float
-  | HsDoublePrim (XHsDoublePrim x) FractionalLit
-      -- ^ Unboxed Double
+type HsLit x = AST.Lit (GHC x)
 
-deriving instance (DataId x) => Data (HsLit x)
+pattern
+   HsChar :: (XHsChar x) -> Char -> HsLit x
+   -- ^ Character
+pattern
+   HsCharPrim :: (XHsCharPrim x) -> Char -> HsLit x
+   -- ^ Unboxed character
+pattern
+   HsString :: (XHsString x) -> FastString -> HsLit x
+   -- ^ String
+pattern
+   HsStringPrim :: (XHsStringPrim x) -> ByteString -> HsLit x
+   -- ^ Packed bytes
+pattern
+   HsInt :: (XHsInt x) -> IntegralLit -> HsLit x
+   -- ^ Genuinely an Int; arises from
+   -- @TcGenDeriv@, and from TRANSLATION
+pattern
+   HsIntPrim :: (XHsIntPrim x) -> Integer -> HsLit x
+   -- ^ literal @Int#@
+pattern
+   HsWordPrim :: (XHsWordPrim x) -> Integer -> HsLit x
+   -- ^ literal @Word#@
+pattern
+   HsInt64Prim :: (XHsInt64Prim x) -> Integer -> HsLit x
+   -- ^ literal @Int64#@
+pattern
+   HsWord64Prim :: (XHsWord64Prim x) -> Integer -> HsLit x
+   -- ^ literal @Word64#@
+pattern
+   HsInteger :: (XHsInteger x) -> Integer -> Type -> HsLit x
+   -- ^ Genuinely an integer; arises only
+   -- from TRANSLATION (overloaded
+   -- literals are done with HsOverLit)
+pattern
+   HsRat :: (XHsRat x) -> FractionalLit -> Type -> HsLit x
+   -- ^ Genuinely a rational; arises only from
+   -- TRANSLATION (overloaded literals are
+   -- done with HsOverLit)
+pattern
+   HsFloatPrim :: (XHsFloatPrim x) -> FractionalLit -> HsLit x
+   -- ^ Unboxed Float
+pattern
+   HsDoublePrim :: (XHsDoublePrim x) -> FractionalLit -> HsLit x
+   -- ^ Unboxed Double
 
+pattern
+   HsChar a b = AST.Char a b
+pattern
+   HsCharPrim a b = AST.CharPrim a b
+pattern
+   HsString a b = AST.String a b
+pattern
+   HsStringPrim a b = AST.StringPrim a b
+pattern
+   HsInt a b = AST.NewLit (NHsInt a b)
+pattern
+   HsIntPrim a b = AST.IntPrim a b
+pattern
+   HsWordPrim a b = AST.WordPrim a b
+pattern
+   HsInt64Prim a b = AST.Int64Prim a b
+pattern
+   HsWord64Prim a b = AST.Word64Prim a b
+pattern
+   HsInteger a b c = AST.NewLit (NHsInteger a b c)
+pattern
+   HsRat a b c = AST.NewLit (NHsRat a b c)
+pattern
+   HsFloatPrim a b = AST.FloatPrim a b
+pattern
+   HsDoublePrim a b = AST.DoublePrim a b
+
+{-# COMPLETE
+      HsChar,
+      HsCharPrim,
+      HsString,
+      HsStringPrim,
+      HsInt,
+      HsIntPrim,
+      HsWordPrim,
+      HsInt64Prim,
+      HsWord64Prim,
+      HsInteger,
+      HsRat,
+      HsFloatPrim,
+      HsDoublePrim
+  #-}
+
+type instance
+   AST.XChar       (GHC pass) = XHsChar       pass
+type instance
+   AST.XCharPrim   (GHC pass) = XHsCharPrim   pass
+type instance
+   AST.XString     (GHC pass) = XHsString     pass
+type instance
+   AST.XStringPrim (GHC pass) = XHsStringPrim pass
+type instance
+   AST.XIntPrim    (GHC pass) = XHsIntPrim    pass
+type instance
+   AST.XWordPrim   (GHC pass) = XHsWordPrim   pass
+type instance
+   AST.XInt64Prim  (GHC pass) = XHsInt64Prim  pass
+type instance
+   AST.XWord64Prim (GHC pass) = XHsWord64Prim pass
+type instance
+   AST.XFloatPrim  (GHC pass) = XHsFloatPrim  pass
+type instance
+   AST.XDoublePrim (GHC pass) = XHsDoublePrim pass
+type instance
+   AST.XNewLit     (GHC pass) = NewHsLit      pass
+
+data NewHsLit pass
+  = NHsInt
+      (XHsInt pass)
+      IntegralLit
+
+  | NHsInteger
+      (XHsInteger pass)
+      Integer
+      Type
+
+  | NHsRat
+      (XHsRat pass)
+      FractionalLit
+      Type
+
+-- ------------------------------------
+
+type
+  HsOverLit pass = AST.OverLit (GHC pass)
+-- ^ Haskell Overloaded Literal
+pattern
+  OverLit ::
+    (OverLitVal) ->
+    (PostRn pass Bool) -> -- Note [ol_rebindable]
+    (HsExpr pass) ->      -- Note [Overloaded literal witnesses]
+    (PostTc pass Type) ->
+    (HsOverLit pass)
+pattern
+  OverLit { ol_val, ol_rebindable, ol_witness, ol_type }
+    = AST.OverLit (ol_rebindable, ol_witness, ol_type) ol_val
+
+{-#
+  COMPLETE
+    OverLit
+  #-}
+
+type instance
+  AST.XOverLit    (GHC pass) = ( PostRn pass Bool
+                               , HsExpr pass
+                               , PostTc pass Type)
+type instance
+  AST.XNewOverLit (GHC pass) = NoConExt
+
+type LHsOverLit pass = AST.LOverLit (GHC pass)
+
+-- ------------------------------------
+
+type
+  OverLitVal = AST.OverLitVal
+pattern
+  HsIntegral ::
+    IntegralLit ->
+    OverLitVal
+  -- ^ Integer-looking literals;
+pattern
+  HsFractional ::
+    FractionalLit ->
+    OverLitVal
+  -- ^ Frac-looking literals
+pattern
+  HsIsString ::
+    SourceText ->
+    FastString ->
+    OverLitVal
+  -- ^ String-looking literals
+
+pattern
+  HsIntegral a
+    = AST.Integral a
+
+pattern
+  HsFractional a
+    = AST.Fractional a
+
+pattern
+  HsIsString a b
+    = AST.IsString a b
+
+{-#
+  COMPLETE
+    HsIntegral,
+    HsFractional,
+    HsIsString
+  #-}
+
+-- -----------------------------------------------------------------------------
+-- * Utilities
+-- -----------------------------------------------------------------------------
+
+deriving instance
+  (DataId pass) => Data (NewHsLit pass)
+
+deriving instance
+  (DataId x) => Data (HsLit x)
+
+deriving instance
+  (DataId p, DataId p) => Data (HsOverLit p)
+
+deriving instance
+  Data OverLitVal
+
+-- ------------------------------------
 
 instance Eq (HsLit x) where
   (HsChar _ x1)       == (HsChar _ x2)       = x1==x2
@@ -94,26 +305,21 @@ instance Eq (HsLit x) where
   (HsDoublePrim _ x1) == (HsDoublePrim _ x2) = x1==x2
   _                   == _                   = False
 
--- | Haskell Overloaded Literal
-data HsOverLit p
-  = OverLit {
-        ol_val :: OverLitVal,
-        ol_rebindable :: PostRn p Bool, -- Note [ol_rebindable]
-        ol_witness :: HsExpr p,         -- Note [Overloaded literal witnesses]
-        ol_type :: PostTc p Type }
-deriving instance (DataId p, DataId p) => Data (HsOverLit p)
+-- Comparison operations are needed when grouping literals
+-- for compiling pattern-matching (module MatchLit)
+instance Eq (HsOverLit p) where
+  (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
 
--- Note [Literal source text] in BasicTypes for SourceText fields in
--- the following
--- | Overloaded Literal Value
-data OverLitVal
-  = HsIntegral   !IntegralLit            -- ^ Integer-looking literals;
-  | HsFractional !FractionalLit          -- ^ Frac-looking literals
-  | HsIsString   !SourceText !FastString -- ^ String-looking literals
-  deriving Data
+instance Eq OverLitVal where
+  (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
+  (HsFractional f1)   == (HsFractional f2)   = f1 == f2
+  (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
+  _                   == _                   = False
 
-negateOverLitVal :: OverLitVal -> OverLitVal
-negateOverLitVal (HsIntegral i) = HsIntegral (negateIntegralLit i)
+-- ------------------------------------
+
+negateOverLitVal :: OverLitVal  -> OverLitVal
+negateOverLitVal (HsIntegral i)   = HsIntegral (negateIntegralLit i)
 negateOverLitVal (HsFractional f) = HsFractional (negateFractionalLit f)
 negateOverLitVal _ = panic "negateOverLitVal: argument is not a number"
 
@@ -137,47 +343,6 @@ convertLit (HsRat a x b)      = (HsRat (convert a) x b)
 convertLit (HsFloatPrim a x)  = (HsFloatPrim (convert a) x)
 convertLit (HsDoublePrim a x) = (HsDoublePrim (convert a) x)
 
-{-
-Note [ol_rebindable]
-~~~~~~~~~~~~~~~~~~~~
-The ol_rebindable field is True if this literal is actually
-using rebindable syntax.  Specifically:
-
-  False iff ol_witness is the standard one
-  True  iff ol_witness is non-standard
-
-Equivalently it's True if
-  a) RebindableSyntax is on
-  b) the witness for fromInteger/fromRational/fromString
-     that happens to be in scope isn't the standard one
-
-Note [Overloaded literal witnesses]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*Before* type checking, the HsExpr in an HsOverLit is the
-name of the coercion function, 'fromInteger' or 'fromRational'.
-*After* type checking, it is a witness for the literal, such as
-        (fromInteger 3) or lit_78
-This witness should replace the literal.
-
-This dual role is unusual, because we're replacing 'fromInteger' with
-a call to fromInteger.  Reason: it allows commoning up of the fromInteger
-calls, which wouldn't be possible if the desugarer made the application.
-
-The PostTcType in each branch records the type the overload literal is
-found to have.
--}
-
--- Comparison operations are needed when grouping literals
--- for compiling pattern-matching (module MatchLit)
-instance Eq (HsOverLit p) where
-  (OverLit {ol_val = val1}) == (OverLit {ol_val=val2}) = val1 == val2
-
-instance Eq OverLitVal where
-  (HsIntegral   i1)   == (HsIntegral   i2)   = i1 == i2
-  (HsFractional f1)   == (HsFractional f2)   = f1 == f2
-  (HsIsString _ s1)   == (HsIsString _ s2)   = s1 == s2
-  _                   == _                   = False
-
 instance Ord (HsOverLit p) where
   compare (OverLit {ol_val=val1}) (OverLit {ol_val=val2}) = val1 `compare` val2
 
@@ -191,6 +356,10 @@ instance Ord OverLitVal where
   compare (HsIsString _ s1)   (HsIsString _ s2)   = s1 `compare` s2
   compare (HsIsString _ _)    (HsIntegral   _)    = GT
   compare (HsIsString _ _)    (HsFractional _)    = GT
+
+-- -----------------------------------------------------------------------------
+-- * Pretty Printing
+-- -----------------------------------------------------------------------------
 
 -- Instance specific to GhcPs, need the SourceText
 instance (SourceTextX x) => Outputable (HsLit x) where
@@ -252,3 +421,37 @@ pmPprHsLit (HsInteger _ i _)  = integer i
 pmPprHsLit (HsRat _ f _)      = ppr f
 pmPprHsLit (HsFloatPrim _ f)  = ppr f
 pmPprHsLit (HsDoublePrim _ d) = ppr d
+
+-- -----------------------------------------------------------------------------
+-- Notes
+-- -----------------------------------------------------------------------------
+
+{-
+Note [ol_rebindable]
+~~~~~~~~~~~~~~~~~~~~
+The ol_rebindable field is True if this literal is actually
+using rebindable syntax.  Specifically:
+
+  False iff ol_witness is the standard one
+  True  iff ol_witness is non-standard
+
+Equivalently it's True if
+  a) RebindableSyntax is on
+  b) the witness for fromInteger/fromRational/fromString
+     that happens to be in scope isn't the standard one
+
+Note [Overloaded literal witnesses]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*Before* type checking, the HsExpr in an HsOverLit is the
+name of the coercion function, 'fromInteger' or 'fromRational'.
+*After* type checking, it is a witness for the literal, such as
+        (fromInteger 3) or lit_78
+This witness should replace the literal.
+
+This dual role is unusual, because we're replacing 'fromInteger' with
+a call to fromInteger.  Reason: it allows commoning up of the fromInteger
+calls, which wouldn't be possible if the desugarer made the application.
+
+The PostTcType in each branch records the type the overload literal is
+found to have.
+-}

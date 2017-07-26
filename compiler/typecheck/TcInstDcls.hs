@@ -872,8 +872,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                           , abe_mono = self_dict
                           , abe_prags = dfun_spec_prags }
                           -- NB: see Note [SPECIALISE instance pragmas]
-             main_bind = AbsBinds { abs_tvs = inst_tyvars
-                                  , abs_ev_vars = dfun_ev_vars
+             main_bind = AbsBinds { abs_tvsa = inst_tyvars
+                                  , abs_ev_varsa = dfun_ev_vars
                                   , abs_exports = [export]
                                   , abs_ev_binds = []
                                   , abs_binds = unitBag dict_bind }
@@ -1020,8 +1020,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
                               , abe_mono = sc_ev_id
                               , abe_prags = noSpecPrags }
                  local_ev_binds = TcEvBinds ev_binds_var
-                 bind = AbsBinds { abs_tvs      = tyvars
-                                 , abs_ev_vars  = dfun_evs
+                 bind = AbsBinds { abs_tvsa      = tyvars
+                                 , abs_ev_varsa  = dfun_evs
                                  , abs_exports  = [export]
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
                                  , abs_binds    = emptyBag }
@@ -1367,8 +1367,8 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
                            , abe_prags     = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
-              full_bind = AbsBinds { abs_tvs      = tyvars
-                                   , abs_ev_vars  = dfun_ev_vars
+              full_bind = AbsBinds { abs_tvsa      = tyvars
+                                   , abs_ev_varsa  = dfun_ev_vars
                                    , abs_exports  = [export]
                                    , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
                                    , abs_binds    = tc_bind }
@@ -1414,7 +1414,7 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
                           , abe_prags = noSpecPrags }
 
        ; return (unitBag $ L (getLoc meth_bind) $
-                 AbsBinds { abs_tvs = [], abs_ev_vars = []
+                 AbsBinds { abs_tvsa = [], abs_ev_varsa = []
                           , abs_exports = [export]
                           , abs_binds = tc_bind, abs_ev_binds = [] }) }
 
@@ -1503,15 +1503,15 @@ polymorphic than the instantiated class method type?  We just do a
 tcSubType call in tcMethodBodyHelp, and generate a nested AbsBind, like
 this (for the example above
 
- AbsBind { abs_tvs = [a], abs_ev_vars = [d:Ord a]
+ AbsBind { abs_tvsa = [a], abs_ev_varsa = [d:Ord a]
          , abs_exports
              = ABExport { (>) :: forall a. Ord a => T a -> T a -> Bool
                         , gr_lcl :: T a -> T a -> Bool }
          , abs_binds
-             = AbsBind { abs_tvs = [], abs_ev_vars = []
+             = AbsBind { abs_tvsa = [], abs_ev_varsa = []
                        , abs_exports = ABExport { gr_lcl :: T a -> T a -> Bool
                                                 , gr_inner :: forall b. b -> b -> Bool }
-                       , abs_binds = AbsBind { abs_tvs = [b], abs_ev_vars = []
+                       , abs_binds = AbsBind { abs_tvsa = [b], abs_ev_varsa = []
                                              , ..etc.. }
                } }
 

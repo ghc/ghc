@@ -892,7 +892,7 @@ instance TH.Quasi TcM where
         = return ()
       checkTopDecl (AnnD _)
         = return ()
-      checkTopDecl (ForD (ForeignImport { fd_name = L _ name }))
+      checkTopDecl (ForD (ForeignImport { fd_nameI = L _ name }))
         = bindName name
       checkTopDecl _
         = addErr $ text "Only function, value, annotation, and foreign import declarations may be added with addTopDecl"

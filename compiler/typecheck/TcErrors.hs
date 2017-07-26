@@ -1,5 +1,5 @@
 {-# LANGUAGE CPP, ScopedTypeVariables #-}
-
+{-# LANGUAGE PatternSynonyms #-}
 module TcErrors(
        reportUnsolved, reportAllUnsolved, warnAllUnsolved,
        warnDefaulting,
@@ -29,7 +29,7 @@ import Class
 import DataCon
 import TcEvidence
 import HsExpr  ( UnboundVar(..) )
-import HsBinds ( PatSynBind(..) )
+import HsBinds ( pattern PSB, psb_def, psb_id  )
 import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan, pprNameProvenance

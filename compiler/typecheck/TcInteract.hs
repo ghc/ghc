@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module TcInteract (
      solveSimpleGivens,   -- Solves [Ct]
@@ -11,7 +12,7 @@ module TcInteract (
 
 import BasicTypes ( SwapFlag(..), isSwapped,
                     infinity, IntWithInf, intGtLimit )
-import HsTypes ( HsIPName(..) )
+import HsTypes ( pattern HsIPName)
 import TcCanonical
 import TcFlatten
 import TcUnify( canSolveByUnification )

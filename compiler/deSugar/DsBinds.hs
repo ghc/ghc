@@ -180,7 +180,7 @@ dsHsBind dflags
         -- So do self-recursive bindings
         -- Bindings with complete signatures are AbsBindsSigs, below
 dsHsBind dflags
-         (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
+         (AbsBinds { abs_tvsa = tyvars, abs_ev_varsa = dicts
                    , abs_exports = [export]
                    , abs_ev_binds = ev_binds, abs_binds = binds })
   | ABE { abe_wrap = wrap, abe_poly = global
@@ -211,7 +211,7 @@ dsHsBind dflags
         -- Another common case: no tyvars, no dicts
         -- In this case we can have a much simpler desugaring
 dsHsBind dflags
-         (AbsBinds { abs_tvs = [], abs_ev_vars = []
+         (AbsBinds { abs_tvsa = [], abs_ev_varsa = []
                    , abs_exports = exports
                    , abs_ev_binds = ev_binds, abs_binds = binds })
   = do { (force_vars, bind_prs) <- dsLHsBinds binds
@@ -229,7 +229,7 @@ dsHsBind dflags
        ; return (force_vars, flattenBinds ds_binds ++ bind_prs ++ main_binds) }
 
 dsHsBind dflags
-         (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
+         (AbsBinds { abs_tvsa = tyvars, abs_ev_varsa = dicts
                    , abs_exports = exports, abs_ev_binds = ev_binds
                    , abs_binds = binds })
          -- See Note [Desugaring AbsBinds]

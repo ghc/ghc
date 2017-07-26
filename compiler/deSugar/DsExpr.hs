@@ -128,7 +128,7 @@ ds_val_bind (NonRecursive, hsbinds) body
 
             ; dsUnliftedBind bind body }
   where
-    is_polymorphic (AbsBinds { abs_tvs = tvs, abs_ev_vars = evs })
+    is_polymorphic (AbsBinds { abs_tvsa = tvs, abs_ev_varsa = evs })
                      = not (null tvs && null evs)
     is_polymorphic (AbsBindsSig { abs_tvs = tvs, abs_ev_vars = evs })
                      = not (null tvs && null evs)
@@ -175,7 +175,7 @@ ds_val_bind (is_rec, binds) body
 
 ------------------
 dsUnliftedBind :: HsBind GhcTc -> CoreExpr -> DsM CoreExpr
-dsUnliftedBind (AbsBinds { abs_tvs = [], abs_ev_vars = []
+dsUnliftedBind (AbsBinds { abs_tvsa = [], abs_ev_varsa = []
                , abs_exports = exports
                , abs_ev_binds = ev_binds
                , abs_binds = lbinds }) body

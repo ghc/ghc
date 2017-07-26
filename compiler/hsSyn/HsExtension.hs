@@ -7,6 +7,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE PatternSynonyms #-}
 
 module HsExtension where
 
@@ -27,6 +28,7 @@ import Outputable
 import SrcLoc (Located)
 import Coercion
 import TcEvidence
+import Data.Void
 
 {-
 Note [Trees that grow]
@@ -52,6 +54,27 @@ A further goal is to provide a means to harmonise the Template Haskell and
 haskell-src-exts ASTs as well.
 
 -}
+
+-- | A data type index stating "there are no constructor extensions"
+--   see "Trees that Grow"
+type NoConExt = Void
+
+
+-- | A data type index stating "there are no field extensions"
+--   see "Trees that Grow"
+type NoFieldExt = ()
+pattern
+  NoFieldExt :: NoFieldExt
+pattern
+  NoFieldExt = ()
+
+-- | A data type index for pass `x` of GHC
+data GHC x
+
+-- TODO: unify `GHC` and `Ghcpass` by making `GhcTcId` part of `Ghcpass`
+
+deriving instance Data x => Data (GHC x)
+
 
 -- | Used as a data type index for the hsSyn AST
 data GhcPass (c :: Pass)
@@ -85,7 +108,13 @@ type family IdP p
 type instance IdP GhcPs = RdrName
 type instance IdP GhcRn = Name
 type instance IdP GhcTc = Id
+type instance IdP (GHC x) = IdP x
+-- type instance IdP RdrName = RdrName
+-- type instance IdP Name    = Name
+-- type instance IdP Id      = Id
 
+
+type LIdP p = Located (IdP p)
 
 -- We define a type family for each extension point. This is based on prepending
 -- 'X' to the constructor name, for ease of reference.

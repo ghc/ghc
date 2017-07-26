@@ -410,7 +410,7 @@ rnBindLHS name_maker _ bind@(PatBind { pat_lhs = pat })
 rnBindLHS name_maker _ bind@(FunBind { fun_id = rdr_name })
   = do { name <- applyNameMaker name_maker rdr_name
        ; return (bind { fun_id   = name
-                      , bind_fvs = placeHolderNamesTc }) }
+                      , bind_fvsf = placeHolderNamesTc }) }
 
 rnBindLHS name_maker _ (PatSynBind psb@PSB{ psb_id = rdrname })
   | isTopRecNameMaker name_maker
@@ -498,7 +498,7 @@ rnBind sig_fn bind@(FunBind { fun_id = name
 
         ; fvs' `seq` -- See Note [Free-variable space leak]
           return (bind { fun_matches = matches'
-                       , bind_fvs   = fvs' },
+                       , bind_fvsf   = fvs' },
                   [plain_name], rhs_fvs)
       }
 
@@ -874,7 +874,7 @@ rnMethodBindLHS _ cls (L loc bind@(FunBind { fun_id = name })) rest
     do { sel_name <- wrapLocM (lookupInstDeclBndr cls (text "method")) name
                      -- We use the selector name as the binder
        ; let bind' = bind { fun_id = sel_name
-                          , bind_fvs = placeHolderNamesTc }
+                          , bind_fvsf = placeHolderNamesTc }
 
        ; return (L loc bind' `consBag` rest ) }
 
@@ -1135,26 +1135,26 @@ checkDupMinimalSigs sigs
 ************************************************************************
 -}
 
-rnMatchGroup :: Outputable (body GhcPs) => HsMatchContext Name
-             -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-             -> MatchGroup GhcPs (Located (body GhcPs))
-             -> RnM (MatchGroup GhcRn (Located (body GhcRn)), FreeVars)
+rnMatchGroup :: Outputable (body (GHC GhcPs)) => HsMatchContext Name
+             -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+             -> MatchGroup GhcPs (Located (body (GHC GhcPs)))
+             -> RnM (MatchGroup GhcRn (Located (body (GHC GhcRn))), FreeVars)
 rnMatchGroup ctxt rnBody (MG { mg_alts = L _ ms, mg_origin = origin })
   = do { empty_case_ok <- xoptM LangExt.EmptyCase
        ; when (null ms && not empty_case_ok) (addErr (emptyCaseErr ctxt))
        ; (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt rnBody) ms
        ; return (mkMatchGroup origin new_ms, ms_fvs) }
 
-rnMatch :: Outputable (body GhcPs) => HsMatchContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-        -> LMatch GhcPs (Located (body GhcPs))
-        -> RnM (LMatch GhcRn (Located (body GhcRn)), FreeVars)
+rnMatch :: Outputable (body (GHC GhcPs)) => HsMatchContext Name
+        -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+        -> LMatch GhcPs (Located (body (GHC GhcPs)))
+        -> RnM (LMatch GhcRn (Located (body (GHC GhcRn))), FreeVars)
 rnMatch ctxt rnBody = wrapLocFstM (rnMatch' ctxt rnBody)
 
-rnMatch' :: Outputable (body GhcPs) => HsMatchContext Name
-         -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-         -> Match GhcPs (Located (body GhcPs))
-         -> RnM (Match GhcRn (Located (body GhcRn)), FreeVars)
+rnMatch' :: Outputable (body (GHC GhcPs)) => HsMatchContext Name
+         -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+         -> Match GhcPs (Located (body (GHC GhcPs)))
+         -> RnM (Match GhcRn (Located (body (GHC GhcRn))), FreeVars)
 rnMatch' ctxt rnBody match@(Match { m_ctxt = mf, m_pats = pats
                                   , m_type = maybe_rhs_sig, m_grhss = grhss })
   = do  {       -- Result type signatures are no longer supported
@@ -1201,24 +1201,24 @@ resSigErr match ty
 -}
 
 rnGRHSs :: HsMatchContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-        -> GRHSs GhcPs (Located (body GhcPs))
-        -> RnM (GRHSs GhcRn (Located (body GhcRn)), FreeVars)
+        -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+        -> GRHSs GhcPs (Located (body (GHC GhcPs)))
+        -> RnM (GRHSs GhcRn (Located (body (GHC GhcRn))), FreeVars)
 rnGRHSs ctxt rnBody (GRHSs grhss (L l binds))
   = rnLocalBindsAndThen binds   $ \ binds' _ -> do
     (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt rnBody) grhss
     return (GRHSs grhss' (L l binds'), fvGRHSs)
 
 rnGRHS :: HsMatchContext Name
-       -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-       -> LGRHS GhcPs (Located (body GhcPs))
-       -> RnM (LGRHS GhcRn (Located (body GhcRn)), FreeVars)
+       -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+       -> LGRHS GhcPs (Located (body (GHC GhcPs)))
+       -> RnM (LGRHS GhcRn (Located (body (GHC GhcRn))), FreeVars)
 rnGRHS ctxt rnBody = wrapLocFstM (rnGRHS' ctxt rnBody)
 
 rnGRHS' :: HsMatchContext Name
-        -> (Located (body GhcPs) -> RnM (Located (body GhcRn), FreeVars))
-        -> GRHS GhcPs (Located (body GhcPs))
-        -> RnM (GRHS GhcRn (Located (body GhcRn)), FreeVars)
+        -> (Located (body (GHC GhcPs)) -> RnM (Located (body (GHC GhcRn)), FreeVars))
+        -> GRHS GhcPs (Located (body (GHC GhcPs)))
+        -> RnM (GRHS GhcRn (Located (body (GHC GhcRn))), FreeVars)
 rnGRHS' ctxt rnBody (GRHS guards rhs)
   = do  { pattern_guards_allowed <- xoptM LangExt.PatternGuards
         ; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) rnLExpr guards $ \ _ ->

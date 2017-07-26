@@ -389,7 +389,7 @@ kcTyClGroup decls
     generaliseTCD :: TcTypeEnv
                   -> LTyClDecl GhcRn -> TcM [TcTyCon]
     generaliseTCD kind_env (L _ decl)
-      | ClassDecl { tcdLName = (L _ name), tcdATs = ats } <- decl
+      | ClassDecl { tcdLNameC = (L _ name), tcdATs = ats } <- decl
       = do { first <- generalise kind_env name
            ; rest <- mapM ((generaliseFamDecl kind_env) . unLoc) ats
            ; return (first : rest) }
@@ -431,13 +431,13 @@ mkPromotionErrorEnv decls
           emptyNameEnv decls
 
 mk_prom_err_env :: TyClDecl GhcRn -> TcTypeEnv
-mk_prom_err_env (ClassDecl { tcdLName = L _ nm, tcdATs = ats })
+mk_prom_err_env (ClassDecl { tcdLNameC = L _ nm, tcdATs = ats })
   = unitNameEnv nm (APromotionErr ClassPE)
     `plusNameEnv`
     mkNameEnv [ (name, APromotionErr TyConPE)
               | L _ (FamilyDecl { fdLName = L _ name }) <- ats ]
 
-mk_prom_err_env (DataDecl { tcdLName = L _ name
+mk_prom_err_env (DataDecl { tcdLNameD = L _ name
                           , tcdDataDefn = HsDataDefn { dd_cons = cons } })
   = unitNameEnv name (APromotionErr TyConPE)
     `plusNameEnv`
@@ -480,7 +480,7 @@ getInitialKind :: TyClDecl GhcRn
 --
 -- No family instances are passed to getInitialKinds
 
-getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs = ats })
+getInitialKind decl@(ClassDecl { tcdLNameC = L _ name, tcdTyVarsC = ktvs, tcdATs = ats })
   = do { let cusk = hsDeclHasCusk decl
        ; (tycon, inner_prs) <-
            kcHsTyVarBndrs name ClassFlavour cusk True ktvs $
@@ -488,8 +488,8 @@ getInitialKind decl@(ClassDecl { tcdLName = L _ name, tcdTyVars = ktvs, tcdATs =
               ; return (constraintKind, inner_prs) }
        ; return (extendEnvWithTcTyCon inner_prs tycon) }
 
-getInitialKind decl@(DataDecl { tcdLName = L _ name
-                              , tcdTyVars = ktvs
+getInitialKind decl@(DataDecl { tcdLNameD = L _ name
+                              , tcdTyVarsD = ktvs
                               , tcdDataDefn = HsDataDefn { dd_kindSig = m_sig
                                                          , dd_ND = new_or_data } })
   = do  { (tycon, _) <-
@@ -507,8 +507,8 @@ getInitialKind decl@(DataDecl { tcdLName = L _ name
 getInitialKind (FamDecl { tcdFam = decl })
   = getFamDeclInitialKind Nothing decl
 
-getInitialKind decl@(SynDecl { tcdLName = L _ name
-                             , tcdTyVars = ktvs
+getInitialKind decl@(SynDecl { tcdLNameS = L _ name
+                             , tcdTyVarsS = ktvs
                              , tcdRhs = rhs })
   = do  { (tycon, _) <- kcHsTyVarBndrs name TypeSynonymFlavour
                             (hsDeclHasCusk decl)
@@ -575,7 +575,7 @@ kcTyClDecl :: TyClDecl GhcRn -> TcM ()
 --    result kind signature have already been dealt with
 --    by getInitialKind, so we can ignore them here.
 
-kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
+kcTyClDecl (DataDecl { tcdLNameD = L _ name, tcdDataDefn = defn })
   | HsDataDefn { dd_cons = cons, dd_kindSig = Just _ } <- defn
   = mapM_ (wrapLocM kcConDecl) cons
     -- hs_tvs and dd_kindSig already dealt with in getInitialKind
@@ -590,14 +590,14 @@ kcTyClDecl (DataDecl { tcdLName = L _ name, tcdDataDefn = defn })
     do  { _ <- tcHsContext ctxt
         ; mapM_ (wrapLocM kcConDecl) cons }
 
-kcTyClDecl (SynDecl { tcdLName = L _ name, tcdRhs = lrhs })
+kcTyClDecl (SynDecl { tcdLNameS = L _ name, tcdRhs = lrhs })
   = kcTyClTyVars name $
     do  { syn_tc <- kcLookupTcTyCon name
         -- NB: check against the result kind that we allocated
         -- in getInitialKinds.
         ; discardResult $ tcCheckLHsType lrhs (tyConResKind syn_tc) }
 
-kcTyClDecl (ClassDecl { tcdLName = L _ name
+kcTyClDecl (ClassDecl { tcdLNameC = L _ name
                       , tcdCtxt = ctxt, tcdSigs = sigs })
   = kcTyClTyVars name $
     do  { _ <- tcHsContext ctxt
@@ -766,20 +766,20 @@ tcTyClDecl1 parent _roles_info (FamDecl { tcdFam = fd })
 
   -- "type" synonym declaration
 tcTyClDecl1 _parent roles_info
-            (SynDecl { tcdLName = L _ tc_name, tcdRhs = rhs })
+            (SynDecl { tcdLNameS = L _ tc_name, tcdRhs = rhs })
   = ASSERT( isNothing _parent )
     tcTyClTyVars tc_name $ \ binders res_kind ->
     tcTySynRhs roles_info tc_name binders res_kind rhs
 
   -- "data/newtype" declaration
 tcTyClDecl1 _parent roles_info
-            (DataDecl { tcdLName = L _ tc_name, tcdDataDefn = defn })
+            (DataDecl { tcdLNameD = L _ tc_name, tcdDataDefn = defn })
   = ASSERT( isNothing _parent )
     tcTyClTyVars tc_name $ \ tycon_binders res_kind ->
     tcDataDefn roles_info tc_name tycon_binders res_kind defn
 
 tcTyClDecl1 _parent roles_info
-            (ClassDecl { tcdLName = L _ class_name
+            (ClassDecl { tcdLNameC = L _ class_name
             , tcdCtxt = ctxt, tcdMeths = meths
             , tcdFDs = fundeps, tcdSigs = sigs
             , tcdATs = ats, tcdATDefs = at_defs })
