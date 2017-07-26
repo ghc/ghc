@@ -1,0 +1,6 @@
+
+T14033.hs:5:16: error:
+    • The constructor of a newtype must have exactly one field
+        but ‘Zero’ has none
+    • In the definition of data constructor ‘Zero’
+      In the newtype declaration for ‘Zero’
