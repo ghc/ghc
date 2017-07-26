@@ -158,7 +158,7 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
 
 ppr_expr add_par (Var name)
  | isJoinId name               = add_par ((text "jump") <+> ppr name)
- | otherwise                   = ppr name
+ | otherwise                   = addAnn (varReference name) (ppr name)
 ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
 ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
 ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
@@ -202,7 +202,7 @@ ppr_expr add_par expr@(App {})
                    _ -> parens (hang fun_doc 2 pp_args)
                    where
                      fun_doc | isJoinId f = text "jump" <+> ppr f
-                             | otherwise  = ppr f
+                             | otherwise  = addAnn (varReference f) (ppr f)
 
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }

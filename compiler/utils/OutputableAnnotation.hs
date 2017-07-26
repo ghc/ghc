@@ -1,5 +1,5 @@
 {-# LANGUAGE GADTs #-}
-module OutputableAnnotation (PExpr(..), BindType, varBinder, varReference) where
+module OutputableAnnotation (PExpr(..), BindType(..), varBinder, varReference) where
 
 import CoreSyn
 import Outputable ( OutputableBndr(..))
