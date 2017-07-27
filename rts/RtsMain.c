@@ -13,6 +13,7 @@
 #include "RtsAPI.h"
 
 #include "RtsUtils.h"
+#include "RtsFlags.h"
 #include "Prelude.h"
 #include "Task.h"
 #include "Excn.h"
@@ -47,6 +48,16 @@ int hs_main ( int argc, char *argv[],       // program args
 
     int exit_status;
     SchedulerStatus status;
+
+    // See Note: [Windows Unicode Arguments] in rts/RtsFlags.c
+    #if defined(mingw32_HOST_OS)
+    {
+        argv = getUTF8Args(&argc);
+    }
+    #endif
+
+
+
 
     hs_init_ghc(&argc, &argv, rts_config);
 

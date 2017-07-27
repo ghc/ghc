@@ -179,7 +179,33 @@ hs_init_ghc(int *argc, char **argv[], RtsConfig rts_config)
     if (argc == NULL || argv == NULL) {
         // Use a default for argc & argv if either is not supplied
         int my_argc = 1;
+        #if defined(mingw32_HOST_OS)
+        //Retry larger buffer sizes on error up to about the NTFS length limit.
+        wchar_t* pathBuf;
+        char *my_argv[2] = { NULL, NULL };
+        for(DWORD maxLength = MAX_PATH; maxLength <= 33280; maxLength *= 2)
+        {
+            pathBuf = (wchar_t*) stgMallocBytes(sizeof(wchar_t) * maxLength,
+                "hs_init_ghc: GetModuleFileName");
+            DWORD pathLength = GetModuleFileNameW(NULL, pathBuf, maxLength);
+            if(GetLastError() == ERROR_INSUFFICIENT_BUFFER || pathLength == 0) {
+                stgFree(pathBuf);
+                pathBuf = NULL;
+            } else {
+                break;
+            }
+        }
+        if(pathBuf == NULL) {
+            my_argv[0] = "<unknown>";
+        } else {
+            my_argv[0] = lpcwstrToUTF8(pathBuf);
+            stgFree(pathBuf);
+        }
+
+
+        #else
         char *my_argv[] = { "<unknown>", NULL };
+        #endif
         setFullProgArgv(my_argc,my_argv);
         setupRtsFlags(&my_argc, my_argv, rts_config);
     } else {
