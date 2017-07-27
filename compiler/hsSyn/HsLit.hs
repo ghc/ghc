@@ -101,7 +101,7 @@ data HsOverLit p
         ol_rebindable :: PostRn p Bool, -- Note [ol_rebindable]
         ol_witness :: HsExpr p,         -- Note [Overloaded literal witnesses]
         ol_type :: PostTc p Type }
-deriving instance (DataId p, DataId p) => Data (HsOverLit p)
+deriving instance (DataId p) => Data (HsOverLit p)
 
 -- Note [Literal source text] in BasicTypes for SourceText fields in
 -- the following
