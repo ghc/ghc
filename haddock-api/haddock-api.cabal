@@ -1,5 +1,5 @@
 name:                 haddock-api
-version:              2.18.1
+version:              2.18.2
 synopsis:             A documentation-generation tool for Haskell libraries
 description:          Haddock is a documentation-generation tool for Haskell
                       libraries

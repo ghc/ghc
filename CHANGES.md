@@ -1,3 +1,7 @@
+## Changes in version 2.18.2
+
+ * to be released
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)

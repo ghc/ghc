@@ -1,5 +1,5 @@
 name:                 haddock
-version:              2.18.1
+version:              2.18.2
 synopsis:             A documentation-generation tool for Haskell libraries
 description:
   This is Haddock, a tool for automatically generating documentation
@@ -143,7 +143,7 @@ executable haddock
   else
     -- in order for haddock's advertised version number to have proper meaning,
     -- we pin down to a single haddock-api version.
-    build-depends:  haddock-api == 2.18.1
+    build-depends:  haddock-api == 2.18.2
 
     other-modules:
       ResponseFile
