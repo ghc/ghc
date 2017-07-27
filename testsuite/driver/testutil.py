@@ -50,14 +50,13 @@ def lndir(srcdir, dstdir):
 # and then breaks it into a list of dictionaries that can be parsed
 # later on in the testing functions.
 # I wanted to put it in perf_notes.py but couldn't figure out a nice way to do that.
-def parse_git_notes(namespace, commits=['HEAD']):
-    logFields = ['TEST_ENV','TEST','WAY','METRIC','VALUE']
-    log = ""
-    for commit in commits:
-        log += subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit]).decode('utf-8')
+def parse_git_notes(namespace, commit='HEAD'):
+    logFields = ['test_env','test','way','metric','value','commit']
 
+    log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit]).decode('utf-8')
     log = log.strip('\n').split('\n')
     log = [line.strip('\t').split('\t') for line in log]
+    [x.append(commit) for x in log]
     log = [dict(zip(logFields, field)) for field in log]
     return log
 
