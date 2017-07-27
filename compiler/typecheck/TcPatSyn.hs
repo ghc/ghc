@@ -80,8 +80,8 @@ tcInferPatSynDecl PSB{ psb_id = lname@(L _ name), psb_args = details,
 
        ; let named_taus = (name, pat_ty) : map (\arg -> (getName arg, varType arg)) args
 
-       ; (qtvs, req_dicts, ev_binds) <- simplifyInfer tclvl NoRestrictions []
-                                                      named_taus wanted
+       ; (qtvs, req_dicts, ev_binds, _) <- simplifyInfer tclvl NoRestrictions []
+                                                         named_taus wanted
 
        ; let (ex_tvs, prov_dicts) = tcCollectEx lpat'
              ex_tv_set  = mkVarSet ex_tvs

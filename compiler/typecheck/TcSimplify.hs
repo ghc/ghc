@@ -22,6 +22,7 @@ import Class         ( Class, classKey, classTyCon )
 import DynFlags      ( WarningFlag ( Opt_WarnMonomorphism )
                      , WarnReason ( Reason )
                      , DynFlags( solverIterations ) )
+import Id            ( idType )
 import Inst
 import ListSetOps
 import Maybes
@@ -576,14 +577,16 @@ simplifyInfer :: TcLevel               -- Used when generating the constraints
               -> WantedConstraints
               -> TcM ([TcTyVar],    -- Quantify over these type variables
                       [EvVar],      -- ... and these constraints (fully zonked)
-                      TcEvBinds)    -- ... binding these evidence variables
+                      TcEvBinds,    -- ... binding these evidence variables
+                      Bool)         -- True <=> there was an insoluble type error
+                                    --          in these bindings
 simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
   | isEmptyWC wanteds
   = do { gbl_tvs <- tcGetGlobalTyCoVars
        ; dep_vars <- zonkTcTypesAndSplitDepVars (map snd name_taus)
        ; qtkvs <- quantifyTyVars gbl_tvs dep_vars
        ; traceTc "simplifyInfer: empty WC" (ppr name_taus $$ ppr qtkvs)
-       ; return (qtkvs, [], emptyTcEvBinds) }
+       ; return (qtkvs, [], emptyTcEvBinds, False) }
 
   | otherwise
   = do { traceTc "simplifyInfer {"  $ vcat
@@ -618,26 +621,24 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
                   ; wanteds' <- solveWanteds wanteds
                   ; TcS.zonkWC wanteds' }
 
+
        -- Find quant_pred_candidates, the predicates that
        -- we'll consider quantifying over
        -- NB1: wanted_transformed does not include anything provable from
        --      the psig_theta; it's just the extra bit
        -- NB2: We do not do any defaulting when inferring a type, this can lead
        --      to less polymorphic types, see Note [Default while Inferring]
-
-       ; let wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
-             quant_pred_candidates   -- Fully zonked
-                 | insolubleWC wanted_transformed_incl_derivs
-                 = []   -- See Note [Quantification with errors]
-                        -- NB: must include derived errors in this test,
-                        --     hence "incl_derivs"
-
-                 | otherwise
-                 = ctsPreds (approximateWC False wanted_transformed)
-
-       -- NB: quant_pred_candidates is already fully zonked
+       ; let definite_error = insolubleWC wanted_transformed_incl_derivs
+                              -- See Note [Quantification with errors]
+                              -- NB: must include derived errors in this test,
+                              --     hence "incl_derivs"
+             wanted_transformed = dropDerivedWC wanted_transformed_incl_derivs
+             quant_pred_candidates
+               | definite_error = []
+               | otherwise      = ctsPreds (approximateWC False wanted_transformed)
 
        -- Decide what type variables and constraints to quantify
+       -- NB: quant_pred_candidates is already fully zonked
        -- NB: bound_theta are constraints we want to quantify over,
        --     /apart from/ the psig_theta, which we always quantify over
        ; (qtvs, bound_theta) <- decideQuantification infer_mode rhs_tclvl
@@ -648,41 +649,58 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
         -- remaining constraints from the RHS.
         -- We must retain the psig_theta_vars, because we've used them in
         -- evidence bindings constructed by solveWanteds earlier
-       ; psig_theta_vars  <- mapM zonkId psig_theta_vars
+       ; psig_theta_vars  <- mapM zonkId       psig_theta_vars
        ; bound_theta_vars <- mapM TcM.newEvVar bound_theta
-       ; let full_theta      = psig_theta      ++ bound_theta
-             full_theta_vars = psig_theta_vars ++ bound_theta_vars
-             skol_info   = InferSkol [ (name, mkSigmaTy [] full_theta ty)
-                                     | (name, ty) <- name_taus ]
-                        -- Don't add the quantified variables here, because
-                        -- they are also bound in ic_skols and we want them
-                        -- to be tidied uniformly
+       ; let full_theta_vars = psig_theta_vars ++ bound_theta_vars
 
-             implic = Implic { ic_tclvl    = rhs_tclvl
-                             , ic_skols    = qtvs
-                             , ic_no_eqs   = False
-                             , ic_given    = full_theta_vars
-                             , ic_wanted   = wanted_transformed
-                             , ic_status   = IC_Unsolved
-                             , ic_binds    = ev_binds_var
-                             , ic_info     = skol_info
-                             , ic_needed   = emptyVarSet
-                             , ic_env      = tc_lcl_env }
-       ; emitImplication implic
+       ; emitResidualImplication rhs_tclvl tc_lcl_env ev_binds_var
+                                 name_taus qtvs full_theta_vars
+                                 wanted_transformed
 
          -- All done!
        ; traceTc "} simplifyInfer/produced residual implication for quantification" $
          vcat [ text "quant_pred_candidates =" <+> ppr quant_pred_candidates
               , text "psig_theta =" <+> ppr psig_theta
               , text "bound_theta =" <+> ppr bound_theta
-              , text "full_theta =" <+> ppr full_theta
+              , text "full_theta =" <+> ppr (map idType full_theta_vars)
               , text "qtvs ="       <+> ppr qtvs
-              , text "implic ="     <+> ppr implic ]
+              , text "definite_error =" <+> ppr definite_error ]
 
-       ; return ( qtvs, full_theta_vars, TcEvBinds ev_binds_var ) }
+       ; return ( qtvs, full_theta_vars, TcEvBinds ev_binds_var, definite_error ) }
          -- NB: full_theta_vars must be fully zonked
 
 
+--------------------
+emitResidualImplication :: TcLevel -> TcLclEnv -> EvBindsVar
+                        -> [(Name, TcTauType)] -> [TcTyVar] -> [EvVar]
+                        -> WantedConstraints -> TcM ()
+emitResidualImplication rhs_tclvl tc_lcl_env ev_binds_var
+                        name_taus qtvs full_theta_vars wanteds
+ | isEmptyWC wanteds
+ = return ()
+ | otherwise
+ = do { traceTc "emitResidualImplication" (ppr implic)
+      ; emitImplication implic }
+ where
+   implic = Implic { ic_tclvl    = rhs_tclvl
+                   , ic_skols    = qtvs
+                   , ic_no_eqs   = False
+                   , ic_given    = full_theta_vars
+                   , ic_wanted   = wanteds
+                   , ic_status   = IC_Unsolved
+                   , ic_binds    = ev_binds_var
+                   , ic_info     = skol_info
+                   , ic_needed   = emptyVarSet
+                   , ic_env      = tc_lcl_env }
+
+   full_theta = map idType full_theta_vars
+   skol_info  = InferSkol [ (name, mkSigmaTy [] full_theta ty)
+                          | (name, ty) <- name_taus ]
+                        -- Don't add the quantified variables here, because
+                        -- they are also bound in ic_skols and we want them
+                        -- to be tidied uniformly
+
+--------------------
 ctsPreds :: Cts -> [PredType]
 ctsPreds cts = [ ctEvPred ev | ct <- bagToList cts
                              , let ev = ctEvidence ct ]
@@ -1092,13 +1110,33 @@ Notice that
 Note [Quantification with errors]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 If we find that the RHS of the definition has some absolutely-insoluble
-constraints, we abandon all attempts to find a context to quantify
-over, and instead make the function fully-polymorphic in whatever
-type we have found.  For two reasons
-  a) Minimise downstream errors
-  b) Avoid spurious errors from this function
+constraints (including especially "variable not in scope"), we
 
-But NB that we must include *derived* errors in the check. Example:
+* Abandon all attempts to find a context to quantify over,
+  and instead make the function fully-polymorphic in whatever
+  type we have found
+
+* Return a flag from simplifyInfer, indicating that we found an
+  insoluble constraint.  This flag is used to suppress the ambiguity
+  check for the inferred type, which may well be bogus, and which
+  tends to obscure the real error.  This fix feels a bit clunky,
+  but I failed to come up with anything better.
+
+Reasons:
+    - Avoid downstream errors
+    - Do not perform an ambiguity test on a bogus type, which might well
+      fail spuriously, thereby obfuscating the original insoluble error.
+      Trac #14000 is an example
+
+I tried an alterantive approach: simply failM, after emitting the
+residual implication constraint; the exception will be caught in
+TcBinds.tcPolyBinds, which gives all the binders in the group the type
+(forall a. a).  But that didn't work with -fdefer-type-errors, because
+the recovery from failM emits no code at all, so there is no function
+to run!   But -fdefer-type-errors aspires to produce a runnable program.
+
+NB that we must include *derived* errors in the check for insolubles.
+Example:
     (a::*) ~ Int#
 We get an insoluble derived error *~#, and we don't want to discard
 it before doing the isInsolubleWC test!  (Trac #8262)
