@@ -6,11 +6,11 @@
 
 from __future__ import print_function
 
+import argparse
 import signal
 import sys
 import os
 import string
-import getopt
 import shutil
 import tempfile
 import time
@@ -41,81 +41,61 @@ def signal_handler(signal, frame):
 # -----------------------------------------------------------------------------
 # cmd-line options
 
-long_options = [
-  "configfile=",	# config file
-  "config=",  		# config field
-  "rootdir=", 		# root of tree containing tests (default: .)
-  "summary-file=",      # file in which to save the (human-readable) summary
-  "no-print-summary=",  # should we print the summary?
-  "only=",		# just this test (can be give multiple --only= flags)
-  "way=",		# just this way
-  "skipway=",		# skip this way
-  "threads=",           # threads to run simultaneously
-  "check-files-written", # check files aren't written by multiple tests
-  "verbose=",          # verbose (0,1,2 so far)
-  "skip-perf-tests",       # skip performance tests
-  ]
+parser = argparse.ArgumentParser(description="GHC's testsuite driver",
+                                 allow_abbrev=False)
 
-opts, args = getopt.getopt(sys.argv[1:], "e:", long_options)
-       
-for opt,arg in opts:
-    if opt == '--configfile':
-        exec(open(arg).read())
+parser.add_argument("-e", action='append', help="A string to execute from the command line.")
+parser.add_argument("--config-file", action="append", help="config file")
+parser.add_argument("--config", action='append', help="config field")
+parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
+parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
+parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
+parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
+parser.add_argument("--way", choices=config.run_ways+config.compile_ways+config.other_ways, help="just this way")
+parser.add_argument("--skipway", action="append", choices=config.run_ways+config.compile_ways+config.other_ways, help="skip this way")
+parser.add_argument("--threads", type=int, help="threads to run simultaneously")
+parser.add_argument("--check-files-written", help="check files aren't written by multiple tests") # NOTE: This doesn't seem to exist?
+parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
+parser.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 
-    # -e is a string to execute from the command line.  For example:
-    # testframe -e 'config.compiler=ghc-5.04'
-    if opt == '-e':
-        exec(arg)
+args = parser.parse_args()
 
-    if opt == '--config':
-        field, value = arg.split('=', 1)
-        setattr(config, field, value)
+for e in args.e:
+    exec(e)
 
-    if opt == '--rootdir':
-        config.rootdirs.append(arg)
+for arg in args.config_file:
+    exec(open(arg).read())
 
-    if opt == '--summary-file':
-        config.summary_file = arg
+for arg in args.config:
+    field, value = arg.split('=', 1)
+    setattr(config, field, value)
 
-    if opt == '--no-print-summary':
-        config.no_print_summary = True
+config.rootdirs = args.rootdir
+config.summary_file = args.summary_file
+config.no_print_summary = args.no_print_summary
 
-    if opt == '--only':
-        config.run_only_some_tests = True
-        config.only.add(arg)
+if args.only:
+    config.only = args.only
+    config.run_only_some_tests = True
 
-    if opt == '--way':
-        if (arg not in config.run_ways and arg not in config.compile_ways and arg not in config.other_ways):
-            sys.stderr.write("ERROR: requested way \'" +
-                             arg + "\' does not exist\n")
-            sys.exit(1)
-        config.cmdline_ways = [arg] + config.cmdline_ways
-        if (arg in config.other_ways):
-            config.run_ways = [arg] + config.run_ways
-            config.compile_ways = [arg] + config.compile_ways
+if args.way:
+    config.cmdline_ways = [args.way] + config.cmdline_ways
+    if (args.way in config.other_ways):
+        config.run_ways = [args.way] + config.run_ways
+        config.compile_ways = [args.way] + config.compile_ways
 
-    if opt == '--skipway':
-        if (arg not in config.run_ways and arg not in config.compile_ways and arg not in config.other_ways):
-            sys.stderr.write("ERROR: requested way \'" +
-                             arg + "\' does not exist\n")
-            sys.exit(1)
-        config.other_ways = [w for w in config.other_ways if w != arg]
-        config.run_ways = [w for w in config.run_ways if w != arg]
-        config.compile_ways = [w for w in config.compile_ways if w != arg]
+if args.skipway:
+    config.other_ways = [w for w in config.other_ways if w != args.skipway]
+    config.run_ways = [w for w in config.run_ways if w != args.skipway]
+    config.compile_ways = [w for w in config.compile_ways if w != args.skipway]
 
-    if opt == '--threads':
-        config.threads = int(arg)
-        config.use_threads = 1
+if args.threads:
+    config.threads = args.threads
+    config.use_threads = True
 
-    if opt == '--skip-perf-tests':
-        config.skip_perf_tests = True
-
-    if opt == '--verbose':
-        if arg not in ["0","1","2","3","4","5"]:
-            sys.stderr.write("ERROR: requested verbosity %s not supported, use 0,1,2,3,4 or 5" % arg)
-            sys.exit(1)
-        config.verbose = int(arg)
-
+if args.verbose:
+    config.verbose = args.verbose
+config.skip_perf_tests = args.skip_perf_tests
 
 config.cygwin = False
 config.msys = False
@@ -326,7 +306,7 @@ else:
 
     summary(t, sys.stdout, config.no_print_summary)
 
-    if config.summary_file != '':
+    if config.summary_file:
         with open(config.summary_file, 'w') as file:
             summary(t, file)
 
