@@ -88,7 +88,6 @@ import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Maybe (mapMaybe)
 import Data.Monoid (First(..))
 #if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
