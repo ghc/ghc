@@ -24,7 +24,6 @@ import FamInstEnv ( FamInstEnvs )
 import FamInst ( tcTopNormaliseNewTypeTF_maybe )
 import Var
 import VarEnv( mkInScopeSet )
-import VarSet
 import Outputable
 import DynFlags( DynFlags )
 import NameSet
@@ -644,8 +643,7 @@ can_eq_nc_forall :: CtEvidence -> EqRel
 
 can_eq_nc_forall ev eq_rel s1 s2
  | CtWanted { ctev_loc = loc, ctev_dest = orig_dest } <- ev
- = do { let free_tvs1 = tyCoVarsOfType s1
-            free_tvs2 = tyCoVarsOfType s2
+ = do { let free_tvs       = tyCoVarsOfTypes [s1,s2]
             (bndrs1, phi1) = tcSplitForAllTyVarBndrs s1
             (bndrs2, phi2) = tcSplitForAllTyVarBndrs s2
       ; if not (equalLength bndrs1 bndrs2)
@@ -656,7 +654,7 @@ can_eq_nc_forall ev eq_rel s1 s2
                 ; canEqHardFailure ev s1 s2 }
         else
    do { traceTcS "Creating implication for polytype equality" $ ppr ev
-      ; let empty_subst1 = mkEmptyTCvSubst $ mkInScopeSet free_tvs1
+      ; let empty_subst1 = mkEmptyTCvSubst $ mkInScopeSet free_tvs
       ; (subst1, skol_tvs) <- tcInstSkolTyVarsX empty_subst1 $
                               binderVars bndrs1
 
@@ -682,8 +680,7 @@ can_eq_nc_forall ev eq_rel s1 s2
 
             go _ _ _ = panic "cna_eq_nc_forall"  -- case (s:ss) []
 
-            empty_subst2 = mkEmptyTCvSubst $ mkInScopeSet $
-                           free_tvs2 `unionVarSet` closeOverKinds (mkVarSet skol_tvs)
+            empty_subst2 = mkEmptyTCvSubst (getTCvInScope subst1)
 
       ; (implic, _ev_binds, all_co) <- buildImplication skol_info skol_tvs [] $
                                        go skol_tvs empty_subst2 bndrs2
