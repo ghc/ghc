@@ -18,7 +18,7 @@ module Check (
 #include "HsVersions.h"
 
 import TmOracle
-
+import Unify( tcMatchTy )
 import BasicTypes
 import DynFlags
 import HsSyn
@@ -45,6 +45,7 @@ import Var           (EvVar)
 import Type
 import UniqSupply
 import DsGRHSs       (isTrueLHsExpr)
+import Maybes        ( expectJust )
 
 import Data.List     (find)
 import Data.Maybe    (isJust, fromMaybe)
@@ -971,14 +972,14 @@ mkOneConFull :: Id -> ConLike -> DsM (ValAbs, ComplexEq, Bag EvVar)
 --          ComplexEq:       x ~ K y1..yn
 --          [EvVar]:         Q
 mkOneConFull x con = do
-  let -- res_ty == TyConApp (ConLikeTyCon cabs_con) cabs_arg_tys
-      res_ty  = idType x
-      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, _)
+  let res_ty  = idType x
+      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
-      tc_args = case splitTyConApp_maybe res_ty of
-                  Just (_, tys) -> tys
-                  Nothing -> pprPanic "mkOneConFull: Not TyConApp:" (ppr res_ty)
-      subst1  = zipTvSubst univ_tvs tc_args
+      tc_args = tyConAppArgs res_ty
+      subst1  = case con of
+                  RealDataCon {} -> zipTvSubst univ_tvs tc_args
+                  PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
+                                    -- See Note [Pattern synonym result type] in PatSyn
 
   (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 

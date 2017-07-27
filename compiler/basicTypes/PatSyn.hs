@@ -63,7 +63,7 @@ data PatSyn
                                        -- record pat syn or same length as
                                        -- psArgs
 
-        -- Universially-quantified type variables
+        -- Universally-quantified type variables
         psUnivTyVars  :: [TyVarBinder],
 
         -- Required dictionaries (may mention psUnivTyVars)
@@ -76,7 +76,8 @@ data PatSyn
         psProvTheta   :: ThetaType,
 
         -- Result type
-        psOrigResTy   :: Type,         -- Mentions only psUnivTyVars
+        psResultTy   :: Type,  -- Mentions only psUnivTyVars
+                                -- See Note [Pattern synonym result type]
 
         -- See Note [Matchers and builders for pattern synonyms]
         psMatcher     :: (Id, Bool),
@@ -145,6 +146,43 @@ Example 3:
    You can see it's existential because it doesn't appear in the
    result type (T3 b).
 
+Note [Pattern synonym result type]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   data T a b = MkT b a
+
+   pattern P :: a -> T [a] Bool
+   pattern P x = MkT True [x]
+
+P's psResultTy is (T a Bool), and it really only matches values of
+type (T [a] Bool).  For example, this is ill-typed
+
+   f :: T p q -> String
+   f (P x) = "urk"
+
+This is differnet to the situation with GADTs:
+
+   data S a where
+     MkS :: Int -> S Bool
+
+Now MkS (and pattern synonyms coming from MkS) can match a
+value of type (S a), not just (S Bool); we get type refinement.
+
+That in turn means that if you have a pattern
+
+   P x :: T [ty] Bool
+
+it's not entirely straightforward to work out the instantiation of
+P's universal tyvars. You have to /match/
+  the type of the pattern, (T [ty] Bool)
+against
+  the psResultTy for the pattern synonym, T [a] Bool
+to get the insantiation a := ty.
+
+This is very unlike DataCons, where univ tyvars match 1-1 the
+arguments of the TyCon.
+
+
 Note [Pattern synonym representation]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider the following pattern synonym declaration
@@ -174,7 +212,7 @@ In this case, the fields of MkPatSyn will be set as follows:
   psExTyVars   = [b]
   psProvTheta  = (Show (Maybe t), Ord b)
   psReqTheta   = (Eq t, Num t)
-  psOrigResTy  = T (Maybe t)
+  psResultTy  = T (Maybe t)
 
 Note [Matchers and builders for pattern synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -325,7 +363,7 @@ mkPatSyn name declared_infix
                 psInfix = declared_infix,
                 psArgs = orig_args,
                 psArity = length orig_args,
-                psOrigResTy = orig_res_ty,
+                psResultTy = orig_res_ty,
                 psMatcher = matcher,
                 psBuilder = builder,
                 psFieldLabels = field_labels
@@ -368,7 +406,7 @@ patSynExTyVarBinders = psExTyVars
 patSynSig :: PatSyn -> ([TyVar], ThetaType, [TyVar], ThetaType, [Type], Type)
 patSynSig (MkPatSyn { psUnivTyVars = univ_tvs, psExTyVars = ex_tvs
                     , psProvTheta = prov, psReqTheta = req
-                    , psArgs = arg_tys, psOrigResTy = res_ty })
+                    , psArgs = arg_tys, psResultTy = res_ty })
   = (binderVars univ_tvs, req, binderVars ex_tvs, prov, arg_tys, res_ty)
 
 patSynMatcher :: PatSyn -> (Id,Bool)
@@ -405,9 +443,9 @@ patSynInstResTy :: PatSyn -> [Type] -> Type
 -- E.g.  pattern P x y = Just (x,x,y)
 --         P :: a -> b -> Just (a,a,b)
 --         (patSynInstResTy P [Int,Bool] = Maybe (Int,Int,Bool)
--- NB: unlikepatSynInstArgTys, the inst_tys should be just the *universal* tyvars
+-- NB: unlike patSynInstArgTys, the inst_tys should be just the *universal* tyvars
 patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
-                          , psOrigResTy = res_ty })
+                          , psResultTy = res_ty })
                 inst_tys
   = ASSERT2( univ_tvs `equalLength` inst_tys
            , text "patSynInstResTy" <+> ppr name $$ ppr univ_tvs $$ ppr inst_tys )
@@ -417,7 +455,7 @@ patSynInstResTy (MkPatSyn { psName = name, psUnivTyVars = univ_tvs
 pprPatSynType :: PatSyn -> SDoc
 pprPatSynType (MkPatSyn { psUnivTyVars = univ_tvs,  psReqTheta  = req_theta
                         , psExTyVars   = ex_tvs,    psProvTheta = prov_theta
-                        , psArgs       = orig_args, psOrigResTy = orig_res_ty })
+                        , psArgs       = orig_args, psResultTy = orig_res_ty })
   = sep [ pprForAll univ_tvs
         , pprThetaArrowTy req_theta
         , ppWhen insert_empty_ctxt $ parens empty <+> darrow
