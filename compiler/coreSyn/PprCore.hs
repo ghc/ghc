@@ -18,7 +18,7 @@ module PprCore (
 import CoreSyn
 import CoreStats (exprStats)
 import Literal( pprLiteral )
-import Name( pprInfixName, pprPrefixName )
+import Name( pprInfixName, pprPrefixName, NamedThing)
 import Var
 import Id
 import IdInfo
@@ -46,10 +46,10 @@ import SrcLoc      ( pprUserRealSpan )
 @pprParendCoreExpr@ puts parens around non-atomic Core expressions.
 -}
 
-pprCoreBindings :: OutputableBndr b => [Bind b] -> SDoc
-pprCoreBinding  :: OutputableBndr b => Bind b  -> SDoc
-pprCoreExpr     :: OutputableBndr b => Expr b  -> SDoc
-pprParendExpr   :: OutputableBndr b => Expr b  -> SDoc
+pprCoreBindings :: (OutputableBndr b, NamedThing b) => [Bind b] -> SDoc
+pprCoreBinding  :: (OutputableBndr b, NamedThing b) => Bind b  -> SDoc
+pprCoreExpr     :: (OutputableBndr b, NamedThing b) => Expr b  -> SDoc
+pprParendExpr   :: (OutputableBndr b, NamedThing b) => Expr b  -> SDoc
 
 pprCoreBindings = pprTopBinds noAnn
 pprCoreBinding  = pprTopBind noAnn
@@ -60,10 +60,10 @@ pprCoreBindingWithSize  :: CoreBind  -> SDoc
 pprCoreBindingsWithSize = pprTopBinds sizeAnn
 pprCoreBindingWithSize = pprTopBind sizeAnn
 
-instance OutputableBndr b => Outputable (Bind b) where
+instance (OutputableBndr b, NamedThing b) => Outputable (Bind b) where
     ppr bind = ppr_bind noAnn bind
 
-instance OutputableBndr b => Outputable (Expr b) where
+instance (OutputableBndr b, NamedThing b) => Outputable (Expr b) where
     ppr expr = pprCoreExpr expr
 
 pprCoreBindingsWithAnn :: [CoreBind] -> SDoc
@@ -91,14 +91,14 @@ realAnn e = addAnn (PCoreExpr e) (ppr e)
 noAnn :: Expr b -> SDoc
 noAnn _ = empty
 
-pprTopBinds :: OutputableBndr a
+pprTopBinds :: (OutputableBndr a, NamedThing a)
             => Annotation a -- ^ generate an annotation to place before the
                             -- binding
             -> [Bind a]     -- ^ bindings to show
             -> SDoc         -- ^ the pretty result
 pprTopBinds ann binds = vcat (map (pprTopBind ann) binds)
 
-pprTopBind :: OutputableBndr a => Annotation a -> Bind a -> SDoc
+pprTopBind :: (OutputableBndr a, NamedThing a) => Annotation a -> Bind a -> SDoc
 pprTopBind ann b@(NonRec binder expr)
  = addAnn (PBind b) (ppr_binding ann (binder,expr)) $$ blankLine
 
@@ -111,14 +111,14 @@ pprTopBind ann (Rec (b:bs))
           text "end Rec }",
           blankLine]
 
-ppr_bind :: OutputableBndr b => Annotation b -> Bind b -> SDoc
+ppr_bind :: (OutputableBndr b, NamedThing b) => Annotation b -> Bind b -> SDoc
 
 ppr_bind ann (NonRec val_bdr expr) = ppr_binding ann (val_bdr, expr)
 ppr_bind ann (Rec binds)           = vcat (map pp binds)
                                     where
                                       pp bind = ppr_binding ann bind <> semi
 
-ppr_binding :: OutputableBndr b => Annotation b -> (b, Expr b) -> SDoc
+ppr_binding :: (OutputableBndr b, NamedThing b) => Annotation b -> (b, Expr b) -> SDoc
 ppr_binding ann (val_bdr, expr)
   = ann expr $$ (pprBndr LetBind val_bdr) $$ pp_bind
   where
@@ -152,7 +152,7 @@ pprOptCo co = sdocWithDynFlags $ \dflags ->
               then angleBrackets (text "Co:" <> int (coercionSize co))
               else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
-ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
+ppr_expr :: (OutputableBndr b, NamedThing b) => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
@@ -287,11 +287,11 @@ ppr_expr add_par (Tick tickish expr)
   then ppr_expr add_par expr
   else add_par (sep [ppr tickish, pprCoreExpr expr])
 
-pprCoreAlt :: OutputableBndr a => (AltCon, [a] , Expr a) -> SDoc
+pprCoreAlt :: (OutputableBndr a, NamedThing a) => (AltCon, [a] , Expr a) -> SDoc
 pprCoreAlt (con, args, rhs)
   = hang (ppr_case_pat con args <+> arrow) 2 (pprCoreExpr rhs)
 
-ppr_case_pat :: OutputableBndr a => AltCon -> [a] -> SDoc
+ppr_case_pat :: (OutputableBndr a, NamedThing a) => AltCon -> [a] -> SDoc
 ppr_case_pat (DataAlt dc) args
   | Just sort <- tyConTuple_maybe tc
   = tupleParens sort (pprWithCommas ppr_bndr args)
@@ -306,7 +306,7 @@ ppr_case_pat con args
 
 
 -- | Pretty print the argument in a function application.
-pprArg :: OutputableBndr a => Expr a -> SDoc
+pprArg :: (OutputableBndr a, NamedThing a) => Expr a -> SDoc
 pprArg (Type ty)
  = sdocWithDynFlags $ \dflags ->
    if gopt Opt_SuppressTypeApplications dflags

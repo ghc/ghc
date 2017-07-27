@@ -1762,6 +1762,9 @@ type TaggedAlt  t = Alt  (TaggedBndr t)
 instance Outputable b => Outputable (TaggedBndr b) where
   ppr (TB b l) = char '<' <> ppr b <> comma <> ppr l <> char '>'
 
+instance NamedThing (TaggedBndr b) where
+  getName (TB v _) = getName v
+
 deTagExpr :: TaggedExpr t -> CoreExpr
 deTagExpr (Var v)                   = Var v
 deTagExpr (Lit l)                   = Lit l
