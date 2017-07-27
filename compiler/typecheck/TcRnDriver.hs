@@ -2180,9 +2180,9 @@ tcRnExpr hsc_env mode rdr_expr
                   else return expr_ty } ;
 
     -- Generalise
-    ((qtvs, dicts, _), lie_top) <- captureTopConstraints $
-                                   {-# SCC "simplifyInfer" #-}
-                                   simplifyInfer tclvl
+    ((qtvs, dicts, _, _), lie_top) <- captureTopConstraints $
+                                      {-# SCC "simplifyInfer" #-}
+                                      simplifyInfer tclvl
                                                  infer_mode
                                                  []    {- No sig vars -}
                                                  [(fresh_it, res_ty)]

@@ -2207,7 +2207,13 @@ getInsolubles = wc_insol
 
 insolublesOnly :: WantedConstraints -> WantedConstraints
 -- Keep only the insolubles
-insolublesOnly wc = wc { wc_simple = emptyBag, wc_impl = emptyBag }
+insolublesOnly (WC { wc_insol = insols, wc_impl = implics })
+  = WC { wc_simple = emptyBag
+       , wc_insol  = insols
+       , wc_impl = mapBag implic_insols_only implics }
+  where
+    implic_insols_only implic
+      = implic { ic_wanted = insolublesOnly (ic_wanted implic) }
 
 dropDerivedWC :: WantedConstraints -> WantedConstraints
 -- See Note [Dropping derived constraints]
