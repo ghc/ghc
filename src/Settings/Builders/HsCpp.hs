@@ -5,7 +5,7 @@ import Settings.Builders.Common
 hsCppBuilderArgs :: Args
 hsCppBuilderArgs = builder HsCpp ? do
     stage <- getStage
-    mconcat [ argSettingList HsCppArgs
+    mconcat [ getSettingList HsCppArgs
             , arg "-P"
             , arg "-Iincludes"
             , arg $ "-I" ++ generatedPath

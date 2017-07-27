@@ -7,7 +7,7 @@ ccBuilderArgs = do
   way <- getWay
   builder Cc ? mconcat
     [ append =<< getPkgDataList CcArgs
-    , argSettingList . ConfCcArgs =<< getStage
+    , getSettingList . ConfCcArgs =<< getStage
     , cIncludeArgs
 
     , builder (Cc CompileC) ? mconcat

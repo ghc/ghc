@@ -7,7 +7,7 @@ ghcPkgBuilderArgs = mconcat
     [ builder (GhcPkg Init) ? mconcat [ arg "init", arg =<< getOutput ]
 
     , builder (GhcPkg Update) ? do
-        verbosity <- lift $ getVerbosity
+        verbosity <- expr getVerbosity
         mconcat [ arg "update"
                 , arg "--force"
                 , verbosity < Chatty ? arg "-v0"

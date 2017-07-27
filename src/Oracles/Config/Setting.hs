@@ -1,12 +1,10 @@
 module Oracles.Config.Setting (
-    Setting (..), SettingList (..), setting, settingList, getSetting,
-    getSettingList, anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
+    Setting (..), SettingList (..), setting, settingList,
+    anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
     ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost,
     relocatableBuild, installDocDir, installGhcLibDir
     ) where
-
-import Control.Monad.Trans.Reader
 
 import Base
 import Oracles.Config
@@ -129,12 +127,6 @@ settingList key = fmap words $ unsafeAskConfig $ case key of
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage
     ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString stage
     HsCppArgs               -> "hs-cpp-args"
-
-getSetting :: Setting -> ReaderT a Action String
-getSetting = lift . setting
-
-getSettingList :: SettingList -> ReaderT a Action [String]
-getSettingList = lift . settingList
 
 matchSetting :: Setting -> [String] -> Action Bool
 matchSetting key values = fmap (`elem` values) $ setting key

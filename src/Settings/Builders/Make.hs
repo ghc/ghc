@@ -4,7 +4,7 @@ import Settings.Builders.Common
 
 makeBuilderArgs :: Args
 makeBuilderArgs = do
-    threads <- shakeThreads <$> lift getShakeOptions
+    threads <- shakeThreads <$> (expr getShakeOptions)
     let t = show $ max 4 (threads - 2) -- Don't use all Shake's threads
     mconcat
         [ builder (Make gmpBuildPath     ) ? append ["MAKEFLAGS=-j" ++ t]

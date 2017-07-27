@@ -25,7 +25,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     gmpLibs <- if stage > Stage0 && integerLibrary flavour == integerGmp
                then do -- TODO: get this data more gracefully
                    let strip = fromMaybe "" . stripPrefix "extra-libraries: "
-                   buildInfo <- lift $ readFileLines gmpBuildInfoPath
+                   buildInfo <- expr $ readFileLines gmpBuildInfoPath
                    return $ concatMap (words . strip) buildInfo
                else return []
     mconcat [ (Dynamic `wayUnit` way) ?
@@ -36,14 +36,14 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
             , append [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
 
-needTouchy :: ReaderT Target Action ()
+needTouchy :: Expr ()
 needTouchy = notStage0 ? do
-    maybePath <- lift $ programPath (vanillaContext Stage0 touchy)
-    lift . whenJust maybePath $ \path -> need [path]
+    maybePath <- expr $ programPath (vanillaContext Stage0 touchy)
+    expr . whenJust maybePath $ \path -> need [path]
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects flavour ? do
-    lift $ need [ghcSplitPath]
+    expr $ need [ghcSplitPath]
     arg "-split-objs"
 
 ghcMBuilderArgs :: Args

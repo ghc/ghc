@@ -1,10 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.Path (
-    topDirectory, getTopDirectory, systemBuilderPath, pathOracle, bashPath,
+    topDirectory, systemBuilderPath, pathOracle, bashPath,
     fixAbsolutePathOnWindows
     ) where
 
-import Control.Monad.Trans.Reader
 import Data.Char
 import System.Directory
 
@@ -17,9 +16,6 @@ import Stage
 -- | Path to the GHC source tree.
 topDirectory :: Action FilePath
 topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
-
-getTopDirectory :: ReaderT a Action FilePath
-getTopDirectory = lift topDirectory
 
 -- | Determine the location of a system 'Builder'.
 systemBuilderPath :: Builder -> Action FilePath

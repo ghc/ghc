@@ -10,8 +10,8 @@ module Settings.Builders.Common (
     module Settings,
     module Settings.Path,
     module UserSettings,
-    cIncludeArgs, ldArgs, cArgs, cWarnings, argSetting, argSettingList,
-    argStagedBuilderPath, argStagedSettingList, bootPackageDatabaseArgs
+    cIncludeArgs, ldArgs, cArgs, cWarnings, argStagedBuilderPath,
+    argStagedSettingList, bootPackageDatabaseArgs
     ) where
 
 import Base
@@ -53,12 +53,6 @@ cWarnings = do
             , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
             , gccGe46 ? arg "-Wno-error=inline" ]
 
-argM :: Action String -> Args
-argM = (arg =<<) . lift
-
-argSetting :: Setting -> Args
-argSetting = argM . setting
-
 argSettingList :: SettingList -> Args
 argSettingList = (append =<<) . getSettingList
 
@@ -66,12 +60,15 @@ argStagedSettingList :: (Stage -> SettingList) -> Args
 argStagedSettingList ss = argSettingList . ss =<< getStage
 
 argStagedBuilderPath :: (Stage -> Builder) -> Args
-argStagedBuilderPath sb = argM . builderPath . sb =<< getStage
+argStagedBuilderPath sb = do
+    stage <- getStage
+    path <- expr $ builderPath (sb stage)
+    arg path
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
     stage <- getStage
-    lift $ need [packageDbStamp stage]
+    expr $ need [packageDbStamp stage]
     stage0 ? do
         path   <- getTopDirectory
         prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")

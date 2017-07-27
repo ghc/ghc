@@ -17,7 +17,7 @@ generateGhcSplit = do
     targetPlatform <- getSetting TargetPlatform
     ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
     perlPath       <- getBuilderPath Perl
-    contents       <- lift $ readFileLines ghcSplitSource
+    contents       <- expr $ readFileLines ghcSplitSource
     return . unlines $
         [ "#!" ++ perlPath
         , "my $TARGETPLATFORM = " ++ show targetPlatform ++ ";"

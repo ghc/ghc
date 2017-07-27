@@ -1,9 +1,7 @@
 module Oracles.Config.Flag (
-    Flag (..), flag, getFlag, crossCompiling, platformSupportsSharedLibs,
+    Flag (..), flag, crossCompiling, platformSupportsSharedLibs,
     ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
     ) where
-
-import Control.Monad.Trans.Reader
 
 import Base
 import Oracles.Config
@@ -43,9 +41,6 @@ flag f = do
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ "cannot be parsed."
     return $ value == "YES"
-
-getFlag :: Flag -> ReaderT a Action Bool
-getFlag = lift . flag
 
 crossCompiling :: Action Bool
 crossCompiling = flag CrossCompiling

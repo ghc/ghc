@@ -19,8 +19,8 @@ undefinePackage s
 generateGhcAutoconfH :: Expr String
 generateGhcAutoconfH = do
     trackSource "Rules/Generators/GhcAutoconfH.hs"
-    configHContents  <- lift $ map undefinePackage <$> readFileLines configH
-    tablesNextToCode <- lift $ ghcEnableTablesNextToCode
+    configHContents  <- expr $ map undefinePackage <$> readFileLines configH
+    tablesNextToCode <- expr ghcEnableTablesNextToCode
     ghcUnreg         <- getFlag GhcUnregisterised
     ccLlvmBackend    <- getSetting CcLlvmBackend
     ccClangBackend   <- getSetting CcClangBackend

@@ -7,7 +7,6 @@ module Base (
     module Data.List.Extra,
     module Data.Maybe,
     module Data.Monoid,
-    MonadTrans(lift),
 
     -- * Shake
     module Development.Shake,

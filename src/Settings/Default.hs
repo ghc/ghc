@@ -4,7 +4,6 @@ module Settings.Default (
     defaultFlavour, defaultSplitObjects
     ) where
 
-import Base
 import CmdLineFlag
 import Flavour
 import GHC
@@ -95,8 +94,8 @@ defaultPackages = mconcat [ stage0 ? stage0Packages
 
 stage0Packages :: Packages
 stage0Packages = do
-    win <- lift windowsHost
-    ios <- lift iosHost
+    win <- expr windowsHost
+    ios <- expr iosHost
     append $ [ binary
              , cabal
              , checkApiAnnotations
@@ -125,10 +124,9 @@ stage0Packages = do
 
 stage1Packages :: Packages
 stage1Packages = do
-    win <- lift windowsHost
+    win <- expr windowsHost
     doc <- buildHaddock flavour
-    mconcat [ stage0Packages
-            , apply (filter isLibrary) -- Build all Stage0 libraries in Stage1
+    mconcat [ (filter isLibrary) <$> stage0Packages -- Build all Stage0 libraries in Stage1
             , append $ [ array
                        , base
                        , bytestring
@@ -200,7 +198,7 @@ defaultSplitObjects :: Predicate
 defaultSplitObjects = do
     goodStage <- notStage0 -- We don't split bootstrap (stage 0) packages
     pkg       <- getPackage
-    supported <- lift supportsSplitObjects
+    supported <- expr supportsSplitObjects
     let goodPackage = isLibrary pkg && pkg /= compiler && pkg /= rts
     return $ cmdSplitObjects && goodStage && goodPackage && supported
 

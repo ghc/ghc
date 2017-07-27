@@ -9,11 +9,10 @@ import Util
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
-    verbosity <- lift $ getVerbosity
+    verbosity <- expr getVerbosity
     top       <- getTopDirectory
     context   <- getContext
-    when (package context /= deriveConstants) $
-        lift (need inplaceLibCopyTargets)
+    when (package context /= deriveConstants) $ expr (need inplaceLibCopyTargets)
     mconcat [ arg "configure"
             , arg =<< getPackagePath
             , arg $ top -/- buildPath context
@@ -45,7 +44,7 @@ ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
 libraryArgs :: Args
 libraryArgs = do
     ways     <- getLibraryWays
-    withGhci <- lift ghcWithInterpreter
+    withGhci <- expr ghcWithInterpreter
     append [ if vanilla `elem` ways
              then  "--enable-library-vanilla"
              else "--disable-library-vanilla"
@@ -63,29 +62,32 @@ libraryArgs = do
 configureArgs :: Args
 configureArgs = do
     top <- getTopDirectory
-    let conf key = appendSubD $ "--configure-option=" ++ key
-        cFlags   = mconcat [ cArgs
-                           , remove ["-Werror"]
+    let conf key expr = do
+            values <- unwords <$> expr
+            not (null values) ?
+                arg ("--configure-option=" ++ key ++ "=" ++ values)
+        cFlags   = mconcat [ remove ["-Werror"] cArgs
                            , argStagedSettingList ConfCcArgs
                            , arg $ "-I" ++ top -/- generatedPath ]
         ldFlags  = ldArgs  <> (argStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (argStagedSettingList ConfCppArgs)
+    cldFlags <- unwords <$> (cFlags <> ldFlags)
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
         , conf "CPPFLAGS" cppFlags
-        , appendSubD "--gcc-options" $ cFlags <> ldFlags
-        , conf "--with-iconv-includes"    $ argSetting IconvIncludeDir
-        , conf "--with-iconv-libraries"   $ argSetting IconvLibDir
-        , conf "--with-gmp-includes"      $ argSetting GmpIncludeDir
-        , conf "--with-gmp-libraries"     $ argSetting GmpLibDir
-        , conf "--with-curses-libraries"  $ argSetting CursesLibDir
-        , crossCompiling ? (conf "--host" $ argSetting TargetPlatformFull)
+        , not (null cldFlags) ? arg ("--gcc-options=" ++ cldFlags)
+        , conf "--with-iconv-includes"    $ return <$> getSetting IconvIncludeDir
+        , conf "--with-iconv-libraries"   $ return <$> getSetting IconvLibDir
+        , conf "--with-gmp-includes"      $ return <$> getSetting GmpIncludeDir
+        , conf "--with-gmp-libraries"     $ return <$> getSetting GmpLibDir
+        , conf "--with-curses-libraries"  $ return <$> getSetting CursesLibDir
+        , crossCompiling ? (conf "--host" $ return <$> getSetting TargetPlatformFull)
         , conf "--with-cc" $ argStagedBuilderPath (Cc CompileC) ]
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do
-    constraints <- lift . readFileLines $ bootPackageConstraints
+    constraints <- expr . readFileLines $ bootPackageConstraints
     append $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args
@@ -108,7 +110,7 @@ with :: Builder -> Args
 with b = isSpecified b ? do
     top  <- getTopDirectory
     path <- getBuilderPath b
-    lift $ needBuilder b
+    expr $ needBuilder b
     arg $ withBuilderKey b ++ unifyPath (top </> path)
 
 withStaged :: (Stage -> Builder) -> Args
@@ -125,8 +127,8 @@ buildDll0 Context {..} = do
 dll0Args :: Args
 dll0Args = do
     context  <- getContext
-    dll0     <- lift $ buildDll0 context
-    withGhci <- lift ghcWithInterpreter
+    dll0     <- expr $ buildDll0 context
+    withGhci <- expr ghcWithInterpreter
     arg . unwords . concat $ [ modules     | dll0             ]
                           ++ [ ghciModules | dll0 && withGhci ] -- see #9552
   where

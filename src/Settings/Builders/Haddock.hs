@@ -18,8 +18,8 @@ haddockBuilderArgs = builder Haddock ? do
     synopsis <- getPkgData Synopsis
     deps     <- getPkgDataList Deps
     depNames <- getPkgDataList DepNames
-    hVersion <- lift . pkgData . Version $ buildPath (vanillaContext Stage2 haddock)
-    ghcOpts  <- fromDiffExpr haddockGhcArgs
+    hVersion <- expr . pkgData . Version $ buildPath (vanillaContext Stage2 haddock)
+    ghcOpts  <- haddockGhcArgs
     mconcat
         [ arg $ "--odir=" ++ takeDirectory output
         , arg "--verbosity=0"

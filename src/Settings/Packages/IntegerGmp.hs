@@ -20,5 +20,5 @@ integerGmpPackageArgs = package integerGmp ? do
             , builder GhcCabal ? mconcat
               [ (null gmpIncludeDir && null gmpLibDir) ?
                 arg "--configure-option=--with-intree-gmp"
-              , appendSub "--configure-option=CFLAGS" [includeGmp]
-              , appendSub "--gcc-options"             [includeGmp] ] ]
+              , arg ("--configure-option=CFLAGS=" ++ includeGmp)
+              , arg ("--gcc-options="             ++ includeGmp) ] ]

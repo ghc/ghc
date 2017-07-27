@@ -14,9 +14,9 @@ import qualified Distribution.PackageDescription as DP
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
-    cabalDeps <- lift $ pkgDependencies cabal
-    lift $ need [pkgCabalFile cabal]
-    pd <- liftIO . readGenericPackageDescription silent $ pkgCabalFile cabal
+    cabalDeps <- expr $ pkgDependencies cabal
+    expr $ need [pkgCabalFile cabal]
+    pd <- exprIO . readGenericPackageDescription silent $ pkgCabalFile cabal
     let identifier   = DP.package . packageDescription $ pd
         cabalVersion = display . pkgVersion $ identifier
 

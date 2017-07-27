@@ -24,10 +24,10 @@ fixLibffiMakefile top =
 -- TODO: check code duplication w.r.t. ConfCcArgs
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = do
-    cFlags  <- interpretInContext libffiContext . fromDiffExpr $ mconcat
+    cFlags  <- interpretInContext libffiContext $ mconcat
                [ cArgs
                , argStagedSettingList ConfCcArgs ]
-    ldFlags <- interpretInContext libffiContext $ fromDiffExpr ldArgs
+    ldFlags <- interpretInContext libffiContext ldArgs
     sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
              , builderEnvironment "CXX" $ Cc CompileC Stage1
              , builderEnvironment "LD" Ld

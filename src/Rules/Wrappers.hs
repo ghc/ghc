@@ -8,7 +8,7 @@ import GHC
 import Settings (getPackages, latestBuildStage)
 import Settings.Install (installPackageDbDirectory)
 import Settings.Path (buildPath, inplacePackageDbDirectory)
-import Oracles.Path (getTopDirectory, bashPath)
+import Oracles.Path (bashPath)
 import Oracles.Config.Setting (SettingList(..), settingList)
 
 -- | Wrapper is an expression depending on the 'FilePath' to the
@@ -22,8 +22,8 @@ type Wrapper = WrappedBinary -> Expr String
 
 ghcWrapper :: WrappedBinary -> Expr String
 ghcWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    bash <- lift bashPath
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
@@ -31,8 +31,8 @@ ghcWrapper WrappedBinary{..} = do
 
 inplaceRunGhcWrapper :: WrappedBinary -> Expr String
 inplaceRunGhcWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    bash <- lift bashPath
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
@@ -41,8 +41,8 @@ inplaceRunGhcWrapper WrappedBinary{..} = do
 
 installRunGhcWrapper :: WrappedBinary -> Expr String
 installRunGhcWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    bash <- lift bashPath
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
@@ -51,13 +51,13 @@ installRunGhcWrapper WrappedBinary{..} = do
 
 inplaceGhcPkgWrapper :: WrappedBinary -> Expr String
 inplaceGhcPkgWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
     stage <- getStage
     top <- getTopDirectory
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
     let packageDb = top -/- inplacePackageDbDirectory (succ stage)
-    bash <- lift bashPath
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
@@ -65,13 +65,13 @@ inplaceGhcPkgWrapper WrappedBinary{..} = do
 
 installGhcPkgWrapper :: WrappedBinary -> Expr String
 installGhcPkgWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
     stage <- getStage
     top <- getTopDirectory
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
     let packageDb = installPackageDbDirectory binaryLibPath top (succ stage)
-    bash <- lift bashPath
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
@@ -79,16 +79,16 @@ installGhcPkgWrapper WrappedBinary{..} = do
 
 hp2psWrapper :: WrappedBinary -> Expr String
 hp2psWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    bash <- lift bashPath
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
 
 hpcWrapper :: WrappedBinary -> Expr String
 hpcWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    bash <- lift bashPath
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++ " ${1+\"$@\"}" ]
@@ -96,14 +96,14 @@ hpcWrapper WrappedBinary{..} = do
 hsc2hsWrapper :: WrappedBinary -> Expr String
 hsc2hsWrapper WrappedBinary{..} = do
     top <- getTopDirectory
-    lift $ need [ sourcePath -/- "Rules/Wrappers.hs" ]
-    contents <- lift $ readFile' $ top -/- "utils/hsc2hs/hsc2hs.wrapper"
+    expr $ need [ sourcePath -/- "Rules/Wrappers.hs" ]
+    contents <- expr $ readFile' $ top -/- "utils/hsc2hs/hsc2hs.wrapper"
     let executableName = binaryLibPath -/- "bin" -/- binaryName
-    confCcArgs <- lift $ settingList (ConfCcArgs Stage1)
-    confGccLinkerArgs <- lift $ settingList (ConfGccLinkerArgs Stage1)
+    confCcArgs <- expr $ settingList (ConfCcArgs Stage1)
+    confGccLinkerArgs <- expr $ settingList (ConfGccLinkerArgs Stage1)
     let hsc2hsExtra = unwords (map ("-cflags=" ++) confCcArgs) ++ " " ++
                       unwords (map ("-lflags=" ++) confGccLinkerArgs)
-    bash <- lift bashPath
+    bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
         , "executablename=\"" ++ executableName ++ "\""
@@ -112,7 +112,7 @@ hsc2hsWrapper WrappedBinary{..} = do
 
 haddockWrapper :: WrappedBinary -> Expr String
 haddockWrapper WrappedBinary{..} = do
-  lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+  expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
   return $ unlines
     [ "#!/bin/bash"
     , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
@@ -120,13 +120,13 @@ haddockWrapper WrappedBinary{..} = do
 
 iservBinWrapper :: WrappedBinary -> Expr String
 iservBinWrapper WrappedBinary{..} = do
-    lift $ need [sourcePath -/- "Rules/Wrappers.hs"]
+    expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
     activePackages <- filter isLibrary <$> getPackages
     -- TODO: Figure our the reason of this hardcoded exclusion
     let pkgs = activePackages \\ [ cabal, process, haskeline
                                  , terminfo, ghcCompact, hpc, compiler ]
     contexts <- catMaybes <$> mapM (\p -> do
-                                        m <- lift $ latestBuildStage p
+                                        m <- expr $ latestBuildStage p
                                         return $ fmap (\s -> vanillaContext s p) m
                                    ) pkgs
     let buildPaths = map buildPath contexts

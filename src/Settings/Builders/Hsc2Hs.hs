@@ -15,7 +15,7 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     tArch   <- getSetting TargetArch
     tOs     <- getSetting TargetOs
     version <- if stage == Stage0
-               then lift ghcCanonVersion
+               then expr ghcCanonVersion
                else getSetting ProjectVersionInt
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
@@ -35,13 +35,11 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
             , arg "-o", arg =<< getOutput ]
 
 getCFlags :: Expr [String]
-getCFlags = fromDiffExpr $ do
+getCFlags = do
     context   <- getContext
     cppArgs   <- getPkgDataList CppArgs
     depCcArgs <- getPkgDataList DepCcArgs
-    mconcat [ cArgs
-            , argStagedSettingList ConfCcArgs
-            , remove ["-O"]
+    mconcat [ remove ["-O"] (cArgs <> argStagedSettingList ConfCcArgs)
             , argStagedSettingList ConfCppArgs
             , cIncludeArgs
             , append cppArgs
@@ -50,7 +48,7 @@ getCFlags = fromDiffExpr $ do
             , arg "-include", arg $ autogenPath context -/- "cabal_macros.h" ]
 
 getLFlags :: Expr [String]
-getLFlags = fromDiffExpr $ do
+getLFlags = do
     pkgLdArgs <- getPkgDataList LdArgs
     libDirs   <- getPkgDataList DepLibDirs
     extraLibs <- getPkgDataList DepExtraLibs

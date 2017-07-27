@@ -4,7 +4,6 @@ import Base
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Oracles.Path
 import Predicate
 import Settings
 import Settings.Path
@@ -26,7 +25,7 @@ rtsLibffiLibrary way = do
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
-    let yesNo = lift . fmap (\x -> if x then "YES" else "NO")
+    let yesNo = expr . fmap (\x -> if x then "YES" else "NO")
     projectVersion <- getSetting ProjectVersion
     hostPlatform   <- getSetting HostPlatform
     hostArch       <- getSetting HostArch
@@ -45,10 +44,10 @@ rtsPackageArgs = package rts ? do
     way            <- getWay
     path           <- getBuildPath
     top            <- getTopDirectory
-    libffiName     <- lift rtsLibffiLibraryName
+    libffiName     <- expr rtsLibffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
-    ghclibDir      <- lift installGhcLibDir
+    ghclibDir      <- expr installGhcLibDir
     mconcat
         [ builder Cc ? mconcat
           [ arg "-Irts"

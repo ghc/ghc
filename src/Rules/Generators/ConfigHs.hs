@@ -31,7 +31,7 @@ generateConfigHs = do
     cGhcEnableTablesNextToCode <- yesNo ghcEnableTablesNextToCode
     cLeadingUnderscore         <- yesNo $ flag LeadingUnderscore
     cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
-    cLibFFI                    <- lift useLibFFIForAdjustors
+    cLibFFI                    <- expr useLibFFIForAdjustors
     rtsWays                    <- getRtsWays
     cGhcRtsWithLibdw           <- getFlag WithLibdw
     let cGhcRTSWays = unwords $ map show rtsWays

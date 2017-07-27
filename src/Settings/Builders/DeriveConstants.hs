@@ -5,7 +5,7 @@ import Settings.Builders.Common
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
-    cFlags                <- fromDiffExpr includeCcArgs
+    cFlags                <- includeCcArgs
     [outputFile, tempDir] <- getOutputs
     mconcat
         [ output "//DerivedConstants.h"             ? arg "--gen-header"
@@ -20,13 +20,13 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , arg "--nm-program", arg =<< getBuilderPath Nm
         , isSpecified Objdump ? mconcat [ arg "--objdump-program"
                                         , arg =<< getBuilderPath Objdump ]
-        , arg "--target-os", argSetting TargetOs ]
+        , arg "--target-os", return <$> getSetting TargetOs ]
 
 includeCcArgs :: Args
 includeCcArgs = mconcat
     [ cArgs
     , cWarnings
-    , argSettingList $ ConfCcArgs Stage1
+    , getSettingList $ ConfCcArgs Stage1
     , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
     , arg "-Irts"
     , arg "-Iincludes"

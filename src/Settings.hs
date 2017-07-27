@@ -24,16 +24,16 @@ import Settings.Path
 import UserSettings
 
 getArgs :: Expr [String]
-getArgs = fromDiffExpr $ args flavour
+getArgs = args flavour
 
 getLibraryWays :: Expr [Way]
-getLibraryWays = fromDiffExpr $ libraryWays flavour
+getLibraryWays = libraryWays flavour
 
 getRtsWays :: Expr [Way]
-getRtsWays = fromDiffExpr $ rtsWays flavour
+getRtsWays = rtsWays flavour
 
 getPackages :: Expr [Package]
-getPackages = fromDiffExpr $ packages flavour
+getPackages = packages flavour
 
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = interpretInContext (stageContext stage) getPackages
@@ -48,10 +48,10 @@ getBuildPath :: Expr FilePath
 getBuildPath = buildPath <$> getContext
 
 getPkgData :: (FilePath -> PackageData) -> Expr String
-getPkgData key = lift . pkgData . key =<< getBuildPath
+getPkgData key = expr . pkgData . key =<< getBuildPath
 
 getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
-getPkgDataList key = lift . pkgDataList . key =<< getBuildPath
+getPkgDataList key = expr . pkgDataList . key =<< getBuildPath
 
 hadrianFlavours :: [Flavour]
 hadrianFlavours =
@@ -92,8 +92,8 @@ builderPath builder = case builderProvenance builder of
         let msg = error $ show builder ++ " is never built by Hadrian."
         return $ fromMaybe msg maybePath
 
-getBuilderPath :: Builder -> ReaderT a Action FilePath
-getBuilderPath = lift . builderPath
+getBuilderPath :: Builder -> Expr FilePath
+getBuilderPath = expr . builderPath
 
 -- | Was the path to a given 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool
