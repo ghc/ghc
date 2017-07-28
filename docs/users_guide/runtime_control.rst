@@ -117,8 +117,8 @@ Setting RTS options with the ``GHCRTS`` environment variable
 
 .. envvar:: GHCRTS
 
-    If the ``-rtsopts`` flag is set to something other than ``none`` when
-    linking, RTS options are also taken from the environment variable
+    If the ``-rtsopts`` flag is set to something other than ``none`` or ``ignoreAll``
+    when linking, RTS options are also taken from the environment variable
     :envvar:`GHCRTS`. For example, to set the maximum heap size to 2G
     for all GHC-compiled programs (using an ``sh``\-like shell):
 

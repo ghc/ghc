@@ -740,6 +740,15 @@ for example).
         an error message. If the ``GHCRTS`` environment variable is set,
         then the program will emit a warning message, ``GHCRTS`` will be
         ignored, and the program will run as normal.
+    
+    ``-rtsopts=ignore``
+        Disables all processing of RTS options. Unlike ``none`` this treats
+        all RTS flags appearing on the command line the same way as regular
+        arguments. (Passing them on to your program as arguments).
+        ``GHCRTS`` options will be processed normally.
+
+    ``-rtsopts=ignoreAll``
+        Same as ``ignore`` but also ignores ``GHCRTS``.
 
     ``-rtsopts=some``
         [this is the default setting] Enable only the "safe" RTS

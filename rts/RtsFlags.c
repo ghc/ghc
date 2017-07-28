@@ -615,6 +615,8 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
 
     // process arguments from the GHCRTS environment variable next
     // (arguments from the command line override these).
+    // If we ignore all non-builtin rtsOpts we skip these.
+    if(rtsConfig.rts_opts_enabled != RtsOptsIgnoreAll)
     {
         char *ghc_rts = getenv("GHCRTS");
 
@@ -631,34 +633,44 @@ void setupRtsFlags (int *argc, char *argv[], RtsConfig rts_config)
         }
     }
 
-    // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
-    //   argv[0] must be PGM argument -- leave in argv
-    //
-    for (mode = PGM; arg < total_arg; arg++) {
-        // The '--RTS' argument disables all future +RTS ... -RTS processing.
-        if (strequal("--RTS", argv[arg])) {
 
-            arg++;
-            break;
+    // If we ignore all commandline rtsOpts we skip processing of argv by
+    // the RTS completely
+    if(!(rtsConfig.rts_opts_enabled == RtsOptsIgnoreAll ||
+         rtsConfig.rts_opts_enabled == RtsOptsIgnore)
+    )
+    {
+        // Split arguments (argv) into PGM (argv) and RTS (rts_argv) parts
+        //   argv[0] must be PGM argument -- leave in argv
+        //
+        for (mode = PGM; arg < total_arg; arg++) {
+            // The '--RTS' argument disables all future
+            // +RTS ... -RTS processing.
+            if (strequal("--RTS", argv[arg])) {
+                arg++;
+                break;
+            }
+            // The '--' argument is passed through to the program, but
+            // disables all further +RTS ... -RTS processing.
+            else if (strequal("--", argv[arg])) {
+                break;
+            }
+            else if (strequal("+RTS", argv[arg])) {
+                mode = RTS;
+            }
+            else if (strequal("-RTS", argv[arg])) {
+                mode = PGM;
+            }
+            else if (mode == RTS) {
+                appendRtsArg(copyArg(argv[arg]));
+            }
+            else {
+                argv[(*argc)++] = argv[arg];
+            }
         }
-        // The '--' argument is passed through to the program, but
-        // disables all further +RTS ... -RTS processing.
-        else if (strequal("--", argv[arg])) {
-            break;
-        }
-        else if (strequal("+RTS", argv[arg])) {
-            mode = RTS;
-        }
-        else if (strequal("-RTS", argv[arg])) {
-            mode = PGM;
-        }
-        else if (mode == RTS) {
-            appendRtsArg(copyArg(argv[arg]));
-        }
-        else {
-            argv[(*argc)++] = argv[arg];
-        }
+
     }
+
     // process remaining program arguments
     for (; arg < total_arg; arg++) {
         argv[(*argc)++] = argv[arg];
