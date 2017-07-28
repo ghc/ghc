@@ -76,7 +76,7 @@ customBuild rs opts target@Target {..} = do
                 src  <- interpret target getInput
                 file <- interpret target getOutput
                 input <- readFile' src
-                Stdout output <- cmd cmdEcho (Stdin input) [path] argList
+                Stdout output <- cmd (Stdin input) [path] argList
                 writeFileChanged file output
 
             Make dir -> cmd Shell cmdEcho path ["-C", dir] argList
