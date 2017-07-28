@@ -42,8 +42,7 @@ def signal_handler(signal, frame):
 # -----------------------------------------------------------------------------
 # cmd-line options
 
-parser = argparse.ArgumentParser(description="GHC's testsuite driver",
-                                 allow_abbrev=False)
+parser = argparse.ArgumentParser(description="GHC's testsuite driver")
 
 parser.add_argument("-e", action='append', help="A string to execute from the command line.")
 parser.add_argument("--config-file", action="append", help="config file")
