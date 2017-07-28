@@ -915,7 +915,14 @@ tcIfaceDataCons tycon_name tycon tc_tybinders if_cons
         ; ~(eq_spec, theta, arg_tys, stricts) <- forkM (mk_doc dc_name) $
              do { eq_spec <- tcIfaceEqSpec spec
                 ; theta   <- tcIfaceCtxt ctxt
-                ; arg_tys <- mapM tcIfaceType args
+                -- This fixes #13710.  The enclosing lazy thunk gets
+                -- forced when typechecking record wildcard pattern
+                -- matching (it's not completely clear why this
+                -- tuple is needed), which causes trouble if one of
+                -- the argument types was recursively defined.
+                -- See also Note [Tying the knot]
+                ; arg_tys <- forkM (mk_doc dc_name <+> text "arg_tys")
+                           $ mapM tcIfaceType args
                 ; stricts <- mapM tc_strict if_stricts
                         -- The IfBang field can mention
                         -- the type itself; hence inside forkM
