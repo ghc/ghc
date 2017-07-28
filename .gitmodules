@@ -70,10 +70,6 @@
 	path = libraries/filepath
 	url = ../packages/filepath.git
 	ignore = none
-[submodule "libraries/hoopl"]
-	path = libraries/hoopl
-	url = ../packages/hoopl.git
-	ignore = none
 [submodule "libraries/hpc"]
 	path = libraries/hpc
 	url = ../packages/hpc.git
