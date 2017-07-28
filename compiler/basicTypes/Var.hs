@@ -159,7 +159,7 @@ type TyCoVar = Id       -- Type, *or* coercion variable
 
 
 {- Many passes apply a substitution, and it's very handy to have type
-   synonyms to remind us whether or not the subsitution has been applied -}
+   synonyms to remind us whether or not the substitution has been applied -}
 
 type InVar      = Var
 type InTyVar    = TyVar
