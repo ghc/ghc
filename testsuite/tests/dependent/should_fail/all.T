@@ -17,3 +17,7 @@ test('T11471', normal, compile_fail, [''])
 test('T12174', normal, compile_fail, [''])
 test('T12081', normal, compile_fail, [''])
 test('T13135', normal, compile_fail, [''])
+test('T13601', normal, compile_fail, [''])
+test('T13780a', normal, compile_fail, [''])
+test('T13780c', [extra_files(['T13780b.hs'])],
+                multimod_compile_fail, ['T13780c', ''])

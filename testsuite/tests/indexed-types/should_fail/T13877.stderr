@@ -1,0 +1,31 @@
+
+T13877.hs:65:17: error:
+    • Couldn't match type ‘p xs’ with ‘Apply p xs’
+      Expected type: Sing x
+                     -> Sing xs -> App [a] (':->) * p xs -> App [a] (':->) * p (x : xs)
+        Actual type: Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs)
+    • In the expression: listElimPoly @(:->) @a @p @l
+      In an equation for ‘listElimTyFun’:
+          listElimTyFun = listElimPoly @(:->) @a @p @l
+    • Relevant bindings include
+        listElimTyFun :: Sing l
+                         -> (p @@ '[])
+                         -> (forall (x :: a) (xs :: [a]).
+                             Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
+                         -> p @@ l
+          (bound at T13877.hs:65:1)
+
+T13877.hs:65:41: error:
+    • Expecting one more argument to ‘p’
+      Expected kind ‘(-?>) [a] * (':->)’, but ‘p’ has kind ‘[a] ~> *’
+    • In the type ‘p’
+      In the expression: listElimPoly @(:->) @a @p @l
+      In an equation for ‘listElimTyFun’:
+          listElimTyFun = listElimPoly @(:->) @a @p @l
+    • Relevant bindings include
+        listElimTyFun :: Sing l
+                         -> (p @@ '[])
+                         -> (forall (x :: a) (xs :: [a]).
+                             Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs))
+                         -> p @@ l
+          (bound at T13877.hs:65:1)
