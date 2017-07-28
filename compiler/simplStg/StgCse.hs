@@ -137,7 +137,7 @@ data CseEnv = CseEnv
         --   * If we remove `let x = Con z` because  `let y = Con z` is in scope,
         --     we note this here as x ↦ y.
     , ce_bndrMap     :: IdEnv OutId
-        --   If we come across a case expression case x as b of … with a trivial
+        -- ^ If we come across a case expression case x as b of … with a trivial
         --   binder, we add b ↦ x to this.
         --   This map is *only* used when looking something up in the ce_conAppMap.
         --   See Note [Trivial case scrutinee]
