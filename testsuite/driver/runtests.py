@@ -4,8 +4,7 @@
 # (c) Simon Marlow 2002
 #
 
-from __future__ import print_function
-
+import argparse
 import signal
 import sys
 import os
@@ -115,9 +114,7 @@ if args.verbose:
 config.skip_perf_tests = args.skip_perf_tests
 config.only_perf_tests = args.only_perf_tests
 config.use_git_notes = args.use_git_notes
-
-if args.test_env:
-        config.test_env = args.test_env
+config.test_env = args.test_env
 
 config.cygwin = False
 config.msys = False
