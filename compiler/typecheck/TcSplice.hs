@@ -1138,7 +1138,11 @@ reifyInstances th_nm th_tys
         ; let tv_rdrs = freeKiTyVarsAllVars free_vars
           -- Rename  to HsType Name
         ; ((tv_names, rn_ty), _fvs)
-            <- bindLRdrNames tv_rdrs $ \ tv_names ->
+            <- checkNoErrs $ -- If there are out-of-scope Names here, then we
+                             -- must error before proceeding to typecheck the
+                             -- renamed type, as that will result in GHC
+                             -- internal errors (#13837).
+               bindLRdrNames tv_rdrs $ \ tv_names ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
         ; (_tvs, ty)
