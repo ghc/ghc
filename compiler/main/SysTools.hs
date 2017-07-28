@@ -45,6 +45,9 @@ module SysTools (
 
         Option(..),
 
+        -- platform-specifics
+        libmLinkOpts,
+
         -- frameworks
         getPkgFrameworkOpts,
         getFrameworkOpts
@@ -1736,6 +1739,7 @@ linkDynLib dflags0 o_files dep_packages
 
             runLink dflags (
                     map Option verbFlags
+                 ++ libmLinkOpts
                  ++ [ Option "-o"
                     , FileOption "" output_fn
                     ]
@@ -1754,6 +1758,16 @@ linkDynLib dflags0 o_files dep_packages
                  ++ map Option pkg_lib_path_opts
                  ++ map Option pkg_link_opts
               )
+
+-- | Some platforms require that we explicitly link against @libm@ if any
+-- math-y things are used (which we assume to include all programs). See #14022.
+libmLinkOpts :: [Option]
+libmLinkOpts =
+#if defined(HAVE_LIBM)
+  [Option "-lm"]
+#else
+  []
+#endif
 
 getPkgFrameworkOpts :: DynFlags -> Platform -> [InstalledUnitId] -> IO [String]
 getPkgFrameworkOpts dflags platform dep_packages
