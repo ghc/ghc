@@ -2283,7 +2283,7 @@ AC_DEFUN([FIND_LD],[
       [enable_ld_override=yes])
 
     if test "x$enable_ld_override" = "xyes"; then
-        AC_CHECK_TARGET_TOOLS([TmpLd], [ld.gold ld.lld ld])
+        AC_CHECK_TARGET_TOOLS([TmpLd], [ld.lld ld.gold ld])
 
         out=`$TmpLd --version`
         case $out in
