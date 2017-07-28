@@ -214,3 +214,4 @@ test('T13191',
       ['-O'])
 test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
+test('functorOperators', normal, compile_and_run, [''])
