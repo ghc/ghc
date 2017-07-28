@@ -26,6 +26,7 @@ import subprocess
 
 from testutil import *
 from testglobals import *
+from junit import junit
 
 # Readline sometimes spews out ANSI escapes for some values of TERM,
 # which result in test failures. Thus set TERM to a nice, simple, safe
@@ -57,6 +58,7 @@ parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--check-files-written", help="check files aren't written by multiple tests") # NOTE: This doesn't seem to exist?
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
 parser.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
+parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
 
 args = parser.parse_args()
 
@@ -309,6 +311,9 @@ else:
     if config.summary_file:
         with open(config.summary_file, 'w') as file:
             summary(t, file)
+
+    if args.junit:
+        junit(t).write(args.junit)
 
 cleanup_and_exit(0)
 

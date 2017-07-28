@@ -171,6 +171,7 @@ _darcs/
 /rts/package.conf.install.raw
 /stage3.package.conf
 /testsuite_summary*.txt
+/testsuite*.xml
 /testlog*
 /utils/mkUserGuidePart/mkUserGuidePart.cabal
 /utils/runghc/runghc.cabal

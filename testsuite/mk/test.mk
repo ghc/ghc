@@ -246,6 +246,10 @@ RUNTEST_OPTS +=  \
 
 RUNTEST_OPTS += -e "config.stage=$(GhcStage)"
 
+ifneq "$(JUNIT_FILE)" ""
+RUNTEST_OPTS +=  \
+  --junit "$(JUNIT_FILE)"
+endif
 ifneq "$(SUMMARY_FILE)" ""
 RUNTEST_OPTS +=  \
 	--summary-file "$(SUMMARY_FILE)"
