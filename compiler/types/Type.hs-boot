@@ -11,7 +11,7 @@ isCoercionTy :: Type -> Bool
 
 mkAppTy :: Type -> Type -> Type
 mkCastTy :: Type -> Coercion -> Type
-piResultTy :: Type -> Type -> Type
+piResultTy :: HasDebugCallStack => Type -> Type -> Type
 
 typeKind :: Type -> Kind
 eqType :: Type -> Type -> Bool
