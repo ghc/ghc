@@ -7,10 +7,6 @@
 {-# LANGUAGE DeriveTraversable  #-}
 {-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE RecordWildCards    #-}
-{-# OPTIONS_GHC -fno-omit-interface-pragmas #-}
-   -- Workaround for Trac #5252 crashes the bootstrap compiler without -O
-   -- When the earliest compiler we want to boostrap with is
-   -- GHC 7.2, we can make RealSrcLoc properly abstract
 
 -- | This module contains types that relate to the positions of things
 -- in source files, and allow tagging of those things with locations
