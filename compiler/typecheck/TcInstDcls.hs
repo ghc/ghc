@@ -626,9 +626,10 @@ tcDataFamInstDecl mb_clsinfo
     (L loc decl@(DataFamInstDecl
        { dfid_pats = pats
        , dfid_tycon = fam_tc_name
-       , dfid_defn = defn@HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                                     , dd_ctxt = ctxt, dd_cons = cons
-                                     , dd_derivs = derivs } }))
+       , dfid_fixity = fixity
+       , dfid_defn = HsDataDefn { dd_ND = new_or_data, dd_cType = cType
+                                , dd_ctxt = ctxt, dd_cons = cons
+                                , dd_kindSig = m_ksig, dd_derivs = derivs } }))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_tc_name
@@ -640,7 +641,7 @@ tcDataFamInstDecl mb_clsinfo
          -- Kind check type patterns
        ; let mb_kind_env = thdOf3 <$> mb_clsinfo
        ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo pats
-                     (kcDataDefn mb_kind_env (unLoc fam_tc_name) pats defn) $
+                     (kcDataDefn mb_kind_env decl) $
              \tvs pats res_kind ->
     do { stupid_theta <- solveEqualities $ tcHsContext ctxt
 
@@ -708,7 +709,7 @@ tcDataFamInstDecl mb_clsinfo
          -- Remember to check validity; no recursion to worry about here
          -- Check that left-hand sides are ok (mono-types, no type families,
          -- consistent instantiations, etc)
-       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats' extra_pats
+       ; checkValidFamPats mb_clsinfo fam_tc tvs' [] pats' extra_pats pp_hs_pats
 
          -- Result kind must be '*' (otherwise, we have too few patterns)
        ; checkTc (isLiftedTypeKind final_res_kind) $
@@ -741,6 +742,7 @@ tcDataFamInstDecl mb_clsinfo
       = go pats (tv : etad_tvs)
     go pats etad_tvs = (reverse pats, etad_tvs)
 
+    pp_hs_pats = pprFamInstLHS fam_tc_name pats fixity (unLoc ctxt) m_ksig
 
 {- *********************************************************************
 *                                                                      *

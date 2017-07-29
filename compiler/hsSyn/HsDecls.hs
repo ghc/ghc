@@ -37,7 +37,7 @@ module HsDecls (
   -- ** Instance declarations
   InstDecl(..), LInstDecl, NewOrData(..), FamilyInfo(..),
   TyFamInstDecl(..), LTyFamInstDecl, instDeclDataFamInsts,
-  DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour,
+  DataFamInstDecl(..), LDataFamInstDecl, pprDataFamInstFlavour, pprFamInstLHS,
   TyFamEqn(..), TyFamInstEqn, LTyFamInstEqn, TyFamDefltEqn, LTyFamDefltEqn,
   HsTyPats,
   LClsInstDecl, ClsInstDecl(..),
@@ -1408,7 +1408,6 @@ data DataFamInstDecl pass
     -- For details on above see note [Api annotations] in ApiAnnotation
 deriving instance (DataId pass) => Data (DataFamInstDecl pass)
 
-
 ----------------- Class instances -------------
 
 -- | Located Class Instance Declaration
@@ -1473,7 +1472,7 @@ ppr_fam_inst_eqn (L _ (TyFamEqn { tfe_tycon = tycon
                                 , tfe_pats  = pats
                                 , tfe_fixity = fixity
                                 , tfe_rhs   = rhs }))
-    = pp_fam_inst_lhs tycon pats fixity [] <+> equals <+> ppr rhs
+    = pprFamInstLHS tycon pats fixity [] Nothing <+> equals <+> ppr rhs
 
 ppr_fam_deflt_eqn :: (SourceTextX pass, OutputableBndrId pass)
                   => LTyFamDefltEqn pass -> SDoc
@@ -1497,21 +1496,22 @@ pprDataFamInstDecl top_lvl (DataFamInstDecl { dfid_tycon = tycon
   = pp_data_defn pp_hdr defn
   where
     pp_hdr ctxt = ppr_instance_keyword top_lvl
-              <+> pp_fam_inst_lhs tycon pats fixity ctxt
+              <+> pprFamInstLHS tycon pats fixity ctxt (dd_kindSig defn)
 
 pprDataFamInstFlavour :: DataFamInstDecl pass -> SDoc
 pprDataFamInstFlavour (DataFamInstDecl { dfid_defn = (HsDataDefn { dd_ND = nd }) })
   = ppr nd
 
-pp_fam_inst_lhs :: (SourceTextX pass, OutputableBndrId pass)
+pprFamInstLHS :: (SourceTextX pass, OutputableBndrId pass)
    => Located (IdP pass)
    -> HsTyPats pass
    -> LexicalFixity
    -> HsContext pass
+   -> Maybe (LHsKind pass)
    -> SDoc
-pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) fixity context
+pprFamInstLHS thing (HsIB { hsib_body = typats }) fixity context mb_kind_sig
                                               -- explicit type patterns
-   = hsep [ pprHsContext context, pp_pats typats]
+   = hsep [ pprHsContext context, pp_pats typats, pp_kind_sig ]
    where
      pp_pats (patl:patsr)
        | fixity == Infix
@@ -1519,7 +1519,13 @@ pp_fam_inst_lhs thing (HsIB { hsib_body = typats }) fixity context
           , hsep (map (pprHsType.unLoc) patsr)]
        | otherwise = hsep [ pprPrefixOcc (unLoc thing)
                    , hsep (map (pprHsType.unLoc) (patl:patsr))]
-     pp_pats [] = empty
+     pp_pats [] = pprPrefixOcc (unLoc thing)
+
+     pp_kind_sig
+       | Just k <- mb_kind_sig
+       = dcolon <+> ppr k
+       | otherwise
+       = empty
 
 instance (SourceTextX pass, OutputableBndrId pass)
        => Outputable (ClsInstDecl pass) where

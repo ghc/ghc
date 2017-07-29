@@ -1539,13 +1539,13 @@ type AssocInstArgShape = (Maybe Type, Type)
 checkConsistentFamInst
                :: Maybe ClsInstInfo
                -> TyCon              -- ^ Family tycon
-               -> [TyVar]            -- ^ Type variables of the family instance
                -> [Type]             -- ^ Type patterns from instance
+               -> SDoc               -- ^ pretty-printed user-written instance head
                -> TcM ()
 -- See Note [Checking consistent instantiation]
 
 checkConsistentFamInst Nothing _ _ _ = return ()
-checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc _at_tvs at_tys
+checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc at_tys pp_hs_pats
   = do { -- Check that the associated type indeed comes from this class
          checkTc (Just clas == tyConAssoc_maybe fam_tc)
                  (badATErr (className clas) (tyConName fam_tc))
@@ -1578,7 +1578,7 @@ checkConsistentFamInst (Just (clas, inst_tvs, mini_env)) fam_tc _at_tvs at_tys
 
     pp_exp_act
       = vcat [ text "Expected:" <+> ppr (mkTyConApp fam_tc expected_args)
-             , text "  Actual:" <+> ppr (mkTyConApp fam_tc at_tys)
+             , text "  Actual:" <+> pp_hs_pats
              , sdocWithDynFlags $ \dflags ->
                ppWhen (has_poly_args dflags) $
                vcat [ text "where the `<tv>' arguments are type variables,"
@@ -1668,7 +1668,9 @@ checkValidCoAxBranch mb_clsinfo fam_tc
                     (CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
                                 , cab_lhs = typats
                                 , cab_rhs = rhs, cab_loc = loc })
-  = checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs loc
+  = checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
+  where
+    pp_lhs = ppr (mkTyConApp fam_tc typats)
 
 -- | Do validity checks on a type family equation, including consistency
 -- with any enclosing class instance head, termination, and lack of
@@ -1679,11 +1681,12 @@ checkValidTyFamEqn :: Maybe ClsInstInfo
                    -> [CoVar] -- ^ bound covars in the equation
                    -> [Type]  -- ^ type patterns
                    -> Type    -- ^ rhs
+                   -> SDoc    -- ^ user-written LHS
                    -> SrcSpan
                    -> TcM ()
-checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs loc
+checkValidTyFamEqn mb_clsinfo fam_tc tvs cvs typats rhs pp_lhs loc
   = setSrcSpan loc $
-    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats []
+    do { checkValidFamPats mb_clsinfo fam_tc tvs cvs typats [] pp_lhs
 
          -- The argument patterns, and RHS, are all boxed tau types
          -- E.g  Reject type family F (a :: k1) :: k2
@@ -1724,6 +1727,7 @@ checkFamInstRhs lhsTys famInsts
 checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
                   -> [Type]   -- ^ patterns the user wrote
                   -> [Type]   -- ^ "extra" patterns from a data instance kind sig
+                  -> SDoc     -- ^ pretty-printed user-written instance head
                   -> TcM ()
 -- Patterns in a 'type instance' or 'data instance' decl should
 -- a) contain no type family applications
@@ -1733,7 +1737,7 @@ checkValidFamPats :: Maybe ClsInstInfo -> TyCon -> [TyVar] -> [CoVar]
 --         type T a = Int
 --         type instance F (T a) = a
 -- c) For associated types, are consistently instantiated
-checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats
+checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats pp_hs_pats
   = do { mapM_ checkValidTypePat user_ty_pats
 
        ; let unbound_tcvs = filterOut (`elemVarSet` exactTyCoVarsOfTypes user_ty_pats)
@@ -1741,7 +1745,7 @@ checkValidFamPats mb_clsinfo fam_tc tvs cvs user_ty_pats extra_ty_pats
        ; checkTc (null unbound_tcvs) (famPatErr fam_tc unbound_tcvs user_ty_pats)
 
          -- Check that type patterns match the class instance head
-       ; checkConsistentFamInst mb_clsinfo fam_tc tvs (user_ty_pats `chkAppend` extra_ty_pats) }
+       ; checkConsistentFamInst mb_clsinfo fam_tc (user_ty_pats `chkAppend` extra_ty_pats) pp_hs_pats }
 
 checkValidTypePat :: Type -> TcM ()
 -- Used for type patterns in class instances,

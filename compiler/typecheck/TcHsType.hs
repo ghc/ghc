@@ -882,11 +882,10 @@ checkExpectedKind :: HsType GhcRn
                   -> TcKind
                   -> TcKind
                   -> TcM TcType
-checkExpectedKind hs_ty ty act exp = fstOf3 <$> checkExpectedKindX Nothing hs_ty ty act exp
+checkExpectedKind hs_ty ty act exp = fstOf3 <$> checkExpectedKindX Nothing (ppr hs_ty) ty act exp
 
-checkExpectedKindX :: Outputable hs_ty
-                   => Maybe (VarEnv Kind)  -- Possibly, instantiations for kind vars
-                   -> hs_ty                -- HsType whose kind we're checking
+checkExpectedKindX :: Maybe (VarEnv Kind)  -- Possibly, instantiations for kind vars
+                   -> SDoc                 -- HsType whose kind we're checking
                    -> TcType               -- the type whose kind we're checking
                    -> TcKind               -- the known kind of that type, k
                    -> TcKind               -- the expected kind, exp_kind
@@ -896,11 +895,11 @@ checkExpectedKindX :: Outputable hs_ty
 --      (checkExpectedKind ty act_kind exp_kind)
 -- checks that the actual kind act_kind is compatible
 --      with the expected kind exp_kind
-checkExpectedKindX mb_kind_env hs_ty ty act_kind exp_kind
+checkExpectedKindX mb_kind_env pp_hs_ty ty act_kind exp_kind
  = do { (ty', new_args, act_kind') <- instantiate ty act_kind exp_kind
       ; let origin = TypeEqOrigin { uo_actual   = act_kind'
                                   , uo_expected = exp_kind
-                                  , uo_thing    = Just (ppr hs_ty)
+                                  , uo_thing    = Just pp_hs_ty
                                   , uo_visible  = True } -- the hs_ty is visible
       ; co_k <- uType KindLevel origin act_kind' exp_kind
       ; traceTc "checkExpectedKind" (vcat [ ppr act_kind

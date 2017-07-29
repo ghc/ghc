@@ -1088,8 +1088,8 @@ tcDefaultAssocDecl _ (d1:_:_)
   = failWithTc (text "More than one default declaration for"
                 <+> ppr (tfe_tycon (unLoc d1)))
 
-tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
-                                           , tfe_pats = hs_tvs
+tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = lname@(L _ tc_name)
+                                           , tfe_pats = hs_tvs, tfe_fixity = fixity
                                            , tfe_rhs = rhs })]
   | HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } <- hs_tvs
   = -- See Note [Type-checking default assoc decls]
@@ -1111,6 +1111,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
        ; let pats = HsIB { hsib_vars = imp_vars ++ map hsLTyVarName exp_vars
                          , hsib_body = map hsLTyVarBndrToType exp_vars
                          , hsib_closed = False } -- this field is ignored, anyway
+             pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
 
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
@@ -1122,7 +1123,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = L _ tc_name
           -- enclosing class. So it's treated more as a freestanding beast.
        ; (pats', rhs_ty)
            <- tcFamTyPats shape Nothing pats
-              (kcTyFamEqnRhs Nothing (mkFamApp fam_tc_name pats) rhs) $
+              (kcTyFamEqnRhs Nothing pp_lhs rhs) $
               \tvs pats rhs_kind ->
               do { rhs_ty <- solveEqualities $
                              tcCheckLHsType rhs rhs_kind
@@ -1165,26 +1166,29 @@ proper tcMatchTys here.)  -}
 -------------------------
 kcTyFamInstEqn :: FamTyConShape -> LTyFamInstEqn GhcRn -> TcM ()
 kcTyFamInstEqn fam_tc_shape@(FamTyConShape { fs_name = fam_tc_name })
-    (L loc (TyFamEqn { tfe_tycon = L _ eqn_tc_name
-                     , tfe_pats  = pats
-                     , tfe_rhs   = hs_ty }))
+    (L loc (TyFamEqn { tfe_tycon  = lname@(L _ eqn_tc_name)
+                     , tfe_pats   = pats
+                     , tfe_fixity = fixity
+                     , tfe_rhs    = hs_ty }))
   = setSrcSpan loc $
     do { checkTc (fam_tc_name == eqn_tc_name)
                  (wrongTyFamName fam_tc_name eqn_tc_name)
        ; discardResult $
          tc_fam_ty_pats fam_tc_shape Nothing -- not an associated type
-                        pats (kcTyFamEqnRhs Nothing (mkFamApp fam_tc_name pats) hs_ty) }
+                        pats (kcTyFamEqnRhs Nothing pp_lhs hs_ty) }
+  where
+    pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
 
 -- Infer the kind of the type on the RHS of a type family eqn. Then use
 -- this kind to check the kind of the LHS of the equation. This is useful
 -- as the callback to tc_fam_ty_pats and the kind-checker to
 -- tcFamTyPats.
 kcTyFamEqnRhs :: Maybe ClsInstInfo
-              -> HsType GhcRn         -- ^ Eqn LHS (for errors only)
+              -> SDoc                 -- ^ Eqn LHS (for errors only)
               -> LHsType GhcRn        -- ^ Eqn RHS
               -> TcKind               -- ^ Inferred kind of left-hand side
               -> TcM ([TcType], TcKind)  -- ^ New pats, inst'ed kind of left-hand side
-kcTyFamEqnRhs mb_clsinfo lhs_ty rhs_hs_ty lhs_ki
+kcTyFamEqnRhs mb_clsinfo pp_lhs_ty rhs_hs_ty lhs_ki
   = do { -- It's still possible the lhs_ki has some foralls. Instantiate these away.
          (_lhs_ty', new_pats, insted_lhs_ki)
            <- instantiateTyUntilN mb_kind_env 0 bogus_ty lhs_ki
@@ -1194,26 +1198,21 @@ kcTyFamEqnRhs mb_clsinfo lhs_ty rhs_hs_ty lhs_ki
   where
     mb_kind_env = thdOf3 <$> mb_clsinfo
 
-    bogus_ty = pprPanic "kcTyFamEqnRhs" (ppr lhs_ty $$ ppr rhs_hs_ty)
-
-  -- useful when we need an HsType GhcRn for error messages
-  -- not exported from this module
-mkFamApp :: Name -> HsTyPats GhcRn -> HsType GhcRn
-mkFamApp fam_tc_name (HsIB { hsib_body = pats })
-  = unLoc $ mkHsAppTys (noLoc $ HsTyVar NotPromoted (noLoc fam_tc_name)) pats
+    bogus_ty = pprPanic "kcTyFamEqnRhs" (pp_lhs_ty $$ ppr rhs_hs_ty)
 
 tcTyFamInstEqn :: FamTyConShape -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
                -> TcM CoAxBranch
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 tcTyFamInstEqn fam_tc_shape@(FamTyConShape { fs_name = fam_tc_name }) mb_clsinfo
-    (L loc (TyFamEqn { tfe_tycon = L _ eqn_tc_name
-                     , tfe_pats  = pats
-                     , tfe_rhs   = hs_ty }))
+    (L loc (TyFamEqn { tfe_tycon  = lname@(L _ eqn_tc_name)
+                     , tfe_pats   = pats
+                     , tfe_fixity = fixity
+                     , tfe_rhs    = hs_ty }))
   = ASSERT( fam_tc_name == eqn_tc_name )
     setSrcSpan loc $
     tcFamTyPats fam_tc_shape mb_clsinfo pats
-                (kcTyFamEqnRhs mb_clsinfo (mkFamApp fam_tc_name pats) hs_ty) $
+                (kcTyFamEqnRhs mb_clsinfo pp_lhs hs_ty) $
                     \tvs pats res_kind ->
     do { rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
 
@@ -1225,12 +1224,12 @@ tcTyFamInstEqn fam_tc_shape@(FamTyConShape { fs_name = fam_tc_name }) mb_clsinfo
        ; return (mkCoAxBranch tvs' [] pats' rhs_ty'
                               (map (const Nominal) tvs')
                               loc) }
+  where
+    pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
 
 kcDataDefn :: Maybe (VarEnv Kind) -- ^ Possibly, instantiations for vars
                                   -- (associated types only)
-           -> Name                -- ^ the family name, for error msgs only
-           -> HsTyPats GhcRn      -- ^ the patterns, for error msgs only
-           -> HsDataDefn GhcRn    -- ^ the RHS
+           -> DataFamInstDecl GhcRn
            -> TcKind              -- ^ the kind of the tycon applied to pats
            -> TcM ([TcType], TcKind)
              -- ^ the kind signature might force instantiation
@@ -1238,8 +1237,13 @@ kcDataDefn :: Maybe (VarEnv Kind) -- ^ Possibly, instantiations for vars
              -- See Note [Instantiating a family tycon]
 -- Used for 'data instance' only
 -- Ordinary 'data' is handled by kcTyClDec
-kcDataDefn mb_kind_env fam_name pats
-           (HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind }) res_k
+kcDataDefn mb_kind_env
+           (DataFamInstDecl
+             { dfid_tycon  = fam_name
+             , dfid_pats   = pats
+             , dfid_fixity = fixity
+             , dfid_defn   = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind } })
+           res_k
   = do  { _ <- tcHsContext ctxt
         ; checkNoErrs $ mapM_ (wrapLocM kcConDecl) cons
           -- See Note [Failing early in kcDataDefn]
@@ -1266,7 +1270,7 @@ kcDataDefn mb_kind_env fam_name pats
         ; (ev_binds, (_, new_args, co))
             <- solveEqualities $
                checkConstraints skol_info tvs' [] $
-               checkExpectedKindX mb_kind_env hs_fam_app
+               checkExpectedKindX mb_kind_env pp_fam_app
                                   bogus_ty res_k inner_res_kind'
 
         ; let Pair lhs_ki rhs_ki = tcCoercionKind co
@@ -1281,7 +1285,7 @@ kcDataDefn mb_kind_env fam_name pats
         ; return (new_args, lhs_ki) }
   where
     bogus_ty   = pprPanic "kcDataDefn" (ppr fam_name <+> ppr pats)
-    hs_fam_app = mkFamApp fam_name pats
+    pp_fam_app = pprFamInstLHS fam_name pats fixity (unLoc ctxt) mb_kind
 
 {-
 Kind check type patterns and kind annotate the embedded type variables.
@@ -1346,10 +1350,10 @@ two bad things could happen:
 
 -----------------
 data TypeOrDataFamily = TypeFam | DataFam
-data FamTyConShape = FamTyConShape { fs_name :: Name
-                                   , fs_arity :: Arity
-                                   , fs_flavor :: TypeOrDataFamily
-                                   , fs_binders :: [TyConBinder]
+data FamTyConShape = FamTyConShape { fs_name     :: Name
+                                   , fs_arity    :: Arity -- the visible args
+                                   , fs_flavor   :: TypeOrDataFamily
+                                   , fs_binders  :: [TyConBinder]
                                    , fs_res_kind :: Kind }
   -- See Note [Type-checking type patterns]
 
@@ -1392,13 +1396,12 @@ tc_fam_ty_pats (FamTyConShape { fs_name = name, fs_arity = arity
          -- understand.
          let should_check_arity
                | TypeFam <- flav = True
-                  -- check for data families that don't have any polymorphism
-                  -- why not always? See [Arity of data families] in FamInstEnv
-               | otherwise       = isEmptyVarSet (tyCoVarsOfType res_kind)
+                  -- why not check data families? See [Arity of data families] in FamInstEnv
+               | otherwise       = False
 
        ; when should_check_arity $
          checkTc (arg_pats `lengthIs` arity) $
-         wrongNumberOfParmsErr (arity - count isInvisibleTyConBinder binders)
+         wrongNumberOfParmsErr arity
                       -- report only explicit arguments
 
          -- Kind-check and quantify
@@ -2655,9 +2658,10 @@ checkValidClass cls
              -- Check that any default declarations for associated types are valid
            ; whenIsJust m_dflt_rhs $ \ (rhs, loc) ->
              checkValidTyFamEqn mb_cls fam_tc
-                                fam_tvs [] (mkTyVarTys fam_tvs) rhs loc }
+                                fam_tvs [] (mkTyVarTys fam_tvs) rhs pp_lhs loc }
         where
           fam_tvs = tyConTyVars fam_tc
+          pp_lhs  = ppr (mkTyConApp fam_tc (mkTyVarTys fam_tvs))
 
     check_dm :: UserTypeCtxt -> Id -> PredType -> Type -> DefMethInfo -> TcM ()
     -- Check validity of the /top-level/ generic-default type

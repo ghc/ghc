@@ -1,0 +1,7 @@
+
+T14045a.hs:11:3: error:
+    • Type indexes must match class instance head
+      Expected: S z
+        Actual: S :: Bool -> Type
+    • In the data instance declaration for ‘S’
+      In the instance declaration for ‘C (z :: Bool)’
