@@ -133,5 +133,11 @@ executable hadrian
                        , happy >= 1.19.4
     ghc-options:         -Wall
                          -fno-warn-name-shadowing
-                         -rtsopts -with-rtsopts=-I0
+                         -rtsopts
+                         -- Disable idle GC to avoid redundant GCs while waiting
+                         -- for external processes
+                         -with-rtsopts=-I0
+                         -- Don't use parallel GC as the synchronization time tends to eat any
+                         -- benefit.
+                         -with-rtsopts=-qg0
                          -threaded
