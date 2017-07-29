@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, ViewPatterns, LambdaCase #-}
 
 {-|
 Note [CSE for Stg]
@@ -99,6 +99,9 @@ import Data.Maybe (fromMaybe)
 import CoreMap
 import NameEnv
 import Control.Monad( (>=>) )
+import Data.Function (on)
+import Name (NamedThing (..), getOccString, mkFCallName)
+import Unique(Uniquable(..), mkUniqueGrimily)
 
 --------------
 -- The Trie --
@@ -126,9 +129,40 @@ instance TrieMap StgArgMap where
 
 newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
 
+newtype LaxDataCon = Lax DataCon
+
+unLax (Lax dc) = dc
+{-
+instance Eq LaxDataCon where
+--  (==) = (==) `on` dataConTag . unLax
+  Lax dcl == Lax dcr | dcl == dcr = True
+                     | True {- ((==) `on` dataConTag) dcl dcr
+                     && ((&&) `on` isVanillaDataCon) dcl dcr
+                     && ((==) `on` length {- FIXME? -} . dataConOrigArgTys) dcl dcr -}
+                         = error $ show (getOccString dcl, getOccString dcr) -- True
+                     | otherwise = False
+-}
+{-
+instance Ord LaxDataCon where
+  l@(Lax dcl) `compare` r@(Lax dcr) = if l == r then EQ else dcl `compare` dcr
+-}
+
+instance NamedThing LaxDataCon where
+  --getName = getName . unLax
+  getName (Lax dc) | isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "%%%HALLO"
+    where uniq = mkUniqueGrimily . negate $ dataConTag dc * 10000 + length (dataConOrigArgTys dc)
+          hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
+          unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
+  getName (Lax dc) = getName dc
+
+instance Uniquable LaxDataCon where
+  getUnique = error "Uniquable" -- mkUniqueGrimily . dataConTag . unLax
+
+
 instance TrieMap ConAppMap where
-    type Key ConAppMap = (DataCon, [StgArg])
+    type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
+    --lookupTM ((getOccString -> "Just"), args) = error (show ("args", length args))
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
@@ -195,13 +229,13 @@ initEnv in_scope = CseEnv
     , ce_in_scope  = in_scope
     }
 
-envLookup :: DataCon -> [OutStgArg] -> CseEnv -> Maybe OutId
+envLookup :: LaxDataCon -> [OutStgArg] -> CseEnv -> Maybe OutId
 envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
   where args' = map go args -- See Note [Trivial case scrutinee]
         go (StgVarArg v  ) = StgVarArg (fromMaybe v $ lookupVarEnv (ce_bndrMap env) v)
         go (StgLitArg lit) = StgLitArg lit
 
-addDataCon :: OutId -> DataCon -> [OutStgArg] -> CseEnv -> CseEnv
+addDataCon :: OutId -> LaxDataCon -> [OutStgArg] -> CseEnv -> CseEnv
 -- do not bother with nullary data constructors, they are static anyways
 addDataCon _ _ [] env = env
 addDataCon bndr dataCon args env = env { ce_conAppMap = new_env }
@@ -321,7 +355,7 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 -- A constructor application.
 -- To be removed by a variable use when found in the CSE environment
 stgCseExpr env (StgConApp dataCon args tys)
-    | Just bndr' <- envLookup dataCon args' env
+    | Just bndr' <- envLookup (Lax dataCon) args' env
     = StgApp bndr' []
     | otherwise
     = StgConApp dataCon args' tys
@@ -356,6 +390,7 @@ stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
             = addDataCon case_bndr dataCon (map StgVarArg args') env1
             | otherwise
             = env1
+--- NOT YET!          env2 = addDataCon case_bndr (Lax dataCon) (map StgVarArg args') env1
             -- see note [Case 2: CSEing case binders]
           rhs' = stgCseExpr env2 rhs
       in (DataAlt dataCon, args', rhs')
@@ -390,11 +425,11 @@ stgCsePairs env0 ((b,e):pairs)
 -- If it is a constructor application, either short-cut it or extend the environment
 stgCseRhs :: CseEnv -> OutId -> InStgRhs -> (Maybe (OutId, OutStgRhs), CseEnv)
 stgCseRhs env bndr (StgRhsCon ccs dataCon args)
-    | Just other_bndr <- envLookup dataCon args' env
+    | Just other_bndr <- envLookup (Lax dataCon) args' env
     = let env' = addSubst bndr other_bndr env
       in (Nothing, env')
     | otherwise
-    = let env' = addDataCon bndr dataCon args' env
+    = let env' = addDataCon bndr (Lax dataCon) args' env
             -- see note [Case 1: CSEing allocated closures]
           pair = (bndr, StgRhsCon ccs dataCon args')
       in (Just pair, env')
