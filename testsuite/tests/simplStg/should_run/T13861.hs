@@ -18,20 +18,26 @@ foo' (R x) = Just x
 foo' _ = Nothing
 {-# NOINLINE foo' #-}
 
+baz :: [a] -> Maybe a
+baz [] = Nothing
+baz [a] = Just a
+baz _ = Nothing
+{-# NOINLINE baz #-}
 
-nested :: Either Int (Either Int a) -> Either Bool (Either Bool a)
-nested (Right (Right x)) = Right (Right x)
+
+nested :: Either Int (Either Int a) -> Either Bool (Maybe a)
+nested (Right (Right x)) = Right (Just x)
 nested _ = Left True
 {-# NOINLINE nested #-}
 
 
 -- CSE in a recursive group
-data Tree x = T x (Either Int (Tree x)) (Either Bool (Tree x))
+data Tree x = T x (Either Int (Tree x)) (Maybe (Tree x))
 rec1 :: x -> Tree x
 rec1 x =
     let t = T x r1 r2
         r1 = Right t
-        r2 = Right t
+        r2 = Just t
     in t
 {-# NOINLINE rec1 #-}
 
@@ -51,13 +57,16 @@ test x = do
     (same $! r1) $! r3
     let (r30, r31) = (R 'l', foo' r30)
     (same $! r30) $! r31
-    -- let (r4,_) = bar r1
-    -- let r5 = nested r4
-    -- (same $! r4) $! r5
-    -- let (T _ r6 r7) = rec1 x
-    -- (same $! r6) $! r7
-    -- let s1@(S _ s2) = rec2 x
-    -- (same $! s1) $! s2
+    
+    let (r40, r41) = (['l'], baz r40)
+    (same $! r40) $! r41
+    let (r4,_) = bar r1
+    let r5 = nested r4
+    (same $! r4) $! r5
+    let (T _ r6 r7) = rec1 x
+    (same $! r6) $! r7
+    let s1@(S _ s2) = rec2 x
+    (same $! s1) $! s2
     case r3 of
       Just b -> print ("YAY", b)
       Nothing -> print "BAD"
