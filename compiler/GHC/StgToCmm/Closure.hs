@@ -1,5 +1,5 @@
-{-# LANGUAGE CPP, RecordWildCards #-}
-
+{-# LANGUAGE CPP, RecordWildCards, StandaloneDeriving #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 -----------------------------------------------------------------------------
 --
 -- Stg to C-- code generation:
@@ -67,6 +67,7 @@ module GHC.StgToCmm.Closure (
 import GhcPrelude
 
 import GHC.Stg.Syntax
+import CoreSyn (isEvaldUnfolding)
 import SMRep
 import Cmm
 import PprCmmExpr() -- For Outputable instances
@@ -231,8 +232,13 @@ data LambdaFormInfo
                         -- always a value, needs evaluation
 
   | LFLetNoEscape       -- See LetNoEscape module for precise description
+ deriving Show
 
-
+deriving instance Show TopLevelFlag
+deriving instance Show OneShotInfo
+deriving instance Show ArgDescr
+deriving instance Show StandardFormInfo
+instance Show DataCon where show _ = "<DATACON>"
 -------------------------
 -- StandardFormInfo tells whether this thunk has one of
 -- a small number of standard forms
@@ -617,6 +623,14 @@ getCallMethod dflags name id (LFThunk _ _ updatable std_form_info is_fun)
 
 getCallMethod _ _name _ (LFUnknown True) _n_arg _v_args _cg_locs _self_loop_info
   = SlowCall -- might be a function
+
+getCallMethod _ _name id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
+  | isEvaldUnfolding (idUnfolding id)
+  = ReturnIt -- seems to come from case, must be (tagged) WHNF already
+
+getCallMethod _ name _id (LFUnknown False) 0 _v_args _cg_loc _self_loop_info
+  | occNameString (nameOccName name) == "wild" -- TODO: make this robust
+  = ReturnIt -- seems to come from case, must be (tagged) WHNF already
 
 getCallMethod _ name _ (LFUnknown False) n_args _v_args _cg_loc _self_loop_info
   = ASSERT2( n_args == 0, ppr name <+> ppr n_args )
