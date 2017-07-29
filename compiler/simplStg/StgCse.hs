@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeFamilies, LambdaCase #-}
 
 {-|
 Note [CSE for Stg]
@@ -12,6 +12,13 @@ This was originally reported as #9291.
 There are two types of common code occurrences that we aim for, see
 note [Case 1: CSEing allocated closures] and
 note [Case 2: CSEing case binders] below.
+
+TODOs:
+- vanilla for unpacked tuples?
+- rerun occurrence analysis
+- dumping of STG misses binder
+- does not look up in scope to find low-hanging fruit
+- can we dedup info tables for representationally equal data constructors?
 
 
 Note [Case 1: CSEing allocated closures]
@@ -99,13 +106,19 @@ import Data.Maybe (fromMaybe)
 import CoreMap
 import NameEnv
 import Control.Monad( (>=>) )
+import Name (NamedThing (..), mkFCallName)
+import Unique (mkUniqueGrimily)
+
+import Data.List (partition, sortBy, groupBy)
+import Data.Function (on)
+import Data.Ord (Down(..), comparing)
 
 --------------
 -- The Trie --
 --------------
 
 -- A lookup trie for data constructor applications, i.e.
--- keys of type `(DataCon, [StgArg])`, following the patterns in TrieMap.
+-- keys of type `(LaxDataCon, [StgArg])`, following the patterns in TrieMap.
 
 data StgArgMap a = SAM
     { sam_var :: DVarEnv a
@@ -126,14 +139,26 @@ instance TrieMap StgArgMap where
 
 newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
 
+newtype LaxDataCon = Lax DataCon
+
+instance NamedThing LaxDataCon where
+  getName (Lax dc) | long && isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "" -- FIXME: is there a better way?
+    where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
+          hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
+          unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
+          long = True -- length (dataConOrigArgTys dc) > 0
+  getName (Lax dc) = getName dc
+
+
 instance TrieMap ConAppMap where
-    type Key ConAppMap = (DataCon, [StgArg])
+    type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
+
 
 -----------------
 -- The CSE Env --
@@ -195,15 +220,15 @@ initEnv in_scope = CseEnv
     , ce_in_scope  = in_scope
     }
 
-envLookup :: DataCon -> [OutStgArg] -> CseEnv -> Maybe OutId
+envLookup :: LaxDataCon -> [OutStgArg] -> CseEnv -> Maybe OutId
 envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
   where args' = map go args -- See Note [Trivial case scrutinee]
         go (StgVarArg v  ) = StgVarArg (fromMaybe v $ lookupVarEnv (ce_bndrMap env) v)
         go (StgLitArg lit) = StgLitArg lit
 
-addDataCon :: OutId -> DataCon -> [OutStgArg] -> CseEnv -> CseEnv
--- do not bother with nullary data constructors, they are static anyways
-addDataCon _ _ [] env = env
+addDataCon :: OutId -> LaxDataCon -> [OutStgArg] -> CseEnv -> CseEnv
+addDataCon bndr dataCon [] env = env { ce_conAppMap = new_env }
+  where new_env = alterTM (dataCon, []) (\case Nothing -> pure bndr; p -> p) (ce_conAppMap env)
 addDataCon bndr dataCon args env = env { ce_conAppMap = new_env }
   where
     new_env = insertTM (dataCon, args) bndr (ce_conAppMap env)
@@ -321,11 +346,12 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 -- A constructor application.
 -- To be removed by a variable use when found in the CSE environment
 stgCseExpr env (StgConApp dataCon args tys)
-    | Just bndr' <- envLookup dataCon args' env
+    | Just bndr' <- envLookup dc args' env
     = StgApp bndr' []
     | otherwise
     = StgConApp dataCon args' tys
   where args' = substArgs env args
+        dc = Lax dataCon
 
 -- Let bindings
 -- The binding might be removed due to CSE (we do not want trivial bindings on
@@ -353,9 +379,10 @@ stgCseAlt env ty case_bndr (DataAlt dataCon, args, rhs)
             -- `stgCaseBndrInScope` here. If the case binder is not in scope we
             -- don't add it to the CSE env. See also #15300.
             | stgCaseBndrInScope ty True -- CSE runs after unarise
-            = addDataCon case_bndr dataCon (map StgVarArg args') env1
+            = addDataCon case_bndr (Lax dataCon) (map StgVarArg args') env1
             | otherwise
             = env1
+--- NOT YET!          env2 = addDataCon case_bndr (Lax dataCon) (map StgVarArg args') env1
             -- see note [Case 2: CSEing case binders]
           rhs' = stgCseExpr env2 rhs
       in (DataAlt dataCon, args', rhs')
@@ -390,11 +417,11 @@ stgCsePairs env0 ((b,e):pairs)
 -- If it is a constructor application, either short-cut it or extend the environment
 stgCseRhs :: CseEnv -> OutId -> InStgRhs -> (Maybe (OutId, OutStgRhs), CseEnv)
 stgCseRhs env bndr (StgRhsCon ccs dataCon args)
-    | Just other_bndr <- envLookup dataCon args' env
+    | Just other_bndr <- envLookup (Lax dataCon) args' env
     = let env' = addSubst bndr other_bndr env
       in (Nothing, env')
     | otherwise
-    = let env' = addDataCon bndr dataCon args' env
+    = let env' = addDataCon bndr (Lax dataCon) args' env
             -- see note [Case 1: CSEing allocated closures]
           pair = (bndr, StgRhsCon ccs dataCon args')
       in (Just pair, env')
@@ -408,13 +435,38 @@ stgCseRhs env bndr (StgRhsClosure ext ccs upd args body)
 
 mkStgCase :: StgExpr -> OutId -> AltType -> [StgAlt] -> StgExpr
 mkStgCase scrut bndr ty alts | all isBndr alts = scrut
-                             | otherwise       = StgCase scrut bndr ty alts
+                             | Just alts' <- lump alts = StgCase scrut bndr ty alts'
+                             | otherwise = StgCase scrut bndr ty alts
 
   where
     -- see Note [All alternatives are the binder]
     isBndr (_, _, StgApp f []) = f == bndr
     isBndr _                   = False
-
+    -- see Note [Lumping alternatives together]
+    lump (def@(DEFAULT, _, _) : alts)
+      | isBndr def
+      , ((_:_),rest) <- partition isBndr alts
+      = Just (def:rest)
+    lump ((DEFAULT, _, _):_) = Nothing
+    lump alts
+      | (lits@(_:_:_),rest) <- partition
+                (\case (_,_,StgLit _) -> True; _ -> False) alts
+      , let itsLit (_,_,StgLit l) = l
+            itsLit _ = pprPanic "mkStgCase" (text "not StgLit")
+            glits = groupBy ((==) `on` itsLit) lits
+      , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) glits
+      = Just ((DEFAULT, [], res) : concat others ++ rest)
+    lump alts | ((_:_:_),rest) <- partition isBndr alts
+                 = Just ((DEFAULT, [], StgApp bndr []) : rest)
+    lump alts
+      | (cons@(_:_:_),rest) <- partition
+                (\case (_,_,StgConApp _ [] []) -> True; _ -> False) alts
+      , let itsCon (_,_,StgConApp c [] []) = c
+            itsCon _ = pprPanic "mkStgCase" (text "not StgConApp")
+            gcons = groupBy ((==) `on` itsCon) cons
+      , (((_,_,res):_:_):others) <- sortBy (comparing $ Down . length) gcons
+      = Just ((DEFAULT, [], res) : concat others ++ rest)
+    lump _ = Nothing
 
 -- Utilities
 
@@ -426,7 +478,7 @@ mkStgLet stgLet (Just binds) body = stgLet binds body
 
 {-
 Note [All alternatives are the binder]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When all alternatives simply refer to the case binder, then we do not have
 to bother with the case expression at all (#13588). CoreSTG does this as well,
@@ -442,6 +494,16 @@ Core cannot just turn this into
 
 as this would not be well-typed. But to STG, where MkT is no longer in the way,
 we can.
+
+Note [Lumping alternatives together]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When some (>1) alternatives return the binder or a constructor,
+and there is no DEFAULT, then we can establish a new default case
+and lump those together. We can even do better, if we discover that
+the DEFAULT is present, but returns the same thing. Then we can simply
+drop the lumped-together cases. Ideally we should weight our choices
+by the count of the potentially lumped-together alternatives.
 
 Note [Trivial case scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
