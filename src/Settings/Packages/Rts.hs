@@ -48,8 +48,7 @@ rtsPackageArgs = package rts ? do
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     ghclibDir      <- expr installGhcLibDir
-    mconcat
-        [ builder Cc ? mconcat
+    let cArgs =
           [ arg "-Irts"
           , arg $ "-I" ++ path
           , arg $ "-DRtsWay=\"rts_" ++ show way ++ "\""
@@ -96,8 +95,10 @@ rtsPackageArgs = package rts ? do
                 append [ "-Wno-incompatible-pointer-types" ]
             ]
 
+    mconcat
+        [ builder (Cc FindCDependencies) ? mconcat cArgs
+        , builder (Ghc CompileCWithGhc) ? mconcat (map (map ("-optc" ++) <$>) cArgs)
         , builder Ghc ? arg "-Irts"
-
         , builder HsCpp ? append
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir

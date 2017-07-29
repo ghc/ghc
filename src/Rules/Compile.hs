@@ -28,9 +28,9 @@ compilePackage rs context@Context {..} = do
             buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
 
     priority 2.0 $ do
-        nonHs "c"   %> compile (Cc  CompileC ) (obj2src "c"   isGeneratedCFile  )
-        nonHs "cmm" %> compile (Ghc CompileHs) (obj2src "cmm" isGeneratedCmmFile)
-        nonHs "s"   %> compile (Ghc CompileHs) (obj2src "S"   $ const False     )
+        nonHs "c"   %> compile (Ghc CompileCWithGhc) (obj2src "c"   isGeneratedCFile  )
+        nonHs "cmm" %> compile (Ghc CompileHs)       (obj2src "cmm" isGeneratedCmmFile)
+        nonHs "s"   %> compile (Ghc CompileHs)       (obj2src "S"   $ const False     )
 
     -- TODO: Add dependencies for #include of .h and .hs-incl files (gcc -MM?).
     [ path <//> "*" <.> suf way | suf <- [    osuf,     hisuf] ] &%> compileHs

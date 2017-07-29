@@ -1,4 +1,7 @@
-module Settings.Builders.Ghc (ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs) where
+module Settings.Builders.Ghc (
+  ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs,
+  ghcCbuilderArgs
+) where
 
 import Flavour
 import GHC
@@ -14,6 +17,25 @@ ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , builder (Ghc CompileHs) ? arg "-c"
             , append =<< getInputs
             , arg "-o", arg =<< getOutput ]
+
+ghcCbuilderArgs :: Args
+ghcCbuilderArgs =
+  builder (Ghc CompileCWithGhc) ? do
+    way <- getWay
+    let ccArgs = [ append =<< getPkgDataList CcArgs
+                 , getSettingList . ConfCcArgs =<< getStage
+                 , cIncludeArgs
+                 , arg "-Werror"
+                 , Dynamic `wayUnit` way ? append [ "-fPIC", "-DDYNAMIC" ] ]
+
+    mconcat [ arg "-Wall"
+            , ghcLinkArgs
+            , commonGhcArgs
+            , mconcat (map (map ("-optc" ++) <$>) ccArgs)
+            , arg "-c"
+            , append =<< getInputs
+            , arg "-o"
+            , arg =<< getOutput ]
 
 ghcLinkArgs :: Args
 ghcLinkArgs = builder (Ghc LinkHs) ? do

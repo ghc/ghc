@@ -212,6 +212,7 @@ defaultBuilderArgs = mconcat
     , deriveConstantsBuilderArgs
     , genPrimopCodeBuilderArgs
     , ghcBuilderArgs
+    , ghcCbuilderArgs
     , ghcCabalBuilderArgs
     , ghcCabalHsColourBuilderArgs
     , ghcMBuilderArgs
