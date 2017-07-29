@@ -113,8 +113,8 @@ newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
 newtype LaxDataCon = Lax DataCon
 
 instance NamedThing LaxDataCon where
-  getName (Lax dc) | isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "%%%HALLO" -- FIXME
-    where uniq = mkUniqueGrimily . negate $ dataConTag dc * 10000 + length (dataConOrigArgTys dc)
+  getName (Lax dc) | isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "" -- FIXME: is there a better way?
+    where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
           hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
           unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
   getName (Lax dc) = getName dc
