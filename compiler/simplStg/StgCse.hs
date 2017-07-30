@@ -113,7 +113,7 @@ newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
 newtype LaxDataCon = Lax DataCon
 
 instance NamedThing LaxDataCon where
-  getName (Lax dc) | isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "" -- FIXME: is there a better way?
+  getName (Lax dc) | False && isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "" -- FIXME: is there a better way?
     where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
           hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
           unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
@@ -123,11 +123,15 @@ instance NamedThing LaxDataCon where
 instance TrieMap ConAppMap where
     type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
+    lookupTM (dataCon, args) | traceLookup dataCon = undefined
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
+
+traceLookup (Lax dc) = pprTrace "lookupTM" (ppr dc) False
+{-# NOINLINE traceLookup #-}
 
 -----------------
 -- The CSE Env --
@@ -197,7 +201,9 @@ envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
 
 addDataCon :: OutId -> LaxDataCon -> [OutStgArg] -> CseEnv -> CseEnv
 -- do not bother with nullary data constructors, they are static anyways
-addDataCon _ _ [] env = env
+addDataCon bndr dataCon [] env = env { ce_conAppMap = new_env }
+  where new_env = alterTM (dataCon, []) (\case Nothing -> pure bndr; p -> p) (ce_conAppMap env)
+--addDataCon _ _ [] env = env
 addDataCon bndr dataCon args env = env { ce_conAppMap = new_env }
   where
     new_env = insertTM (dataCon, args) bndr (ce_conAppMap env)
