@@ -1,5 +1,4 @@
 {-# LANGUAGE TypeFamilies, LambdaCase #-}
-{-# OPTIONS_GHC -Wno-unused-matches -Wno-missing-signatures #-}
 
 {-|
 Note [CSE for Stg]
@@ -124,15 +123,15 @@ instance NamedThing LaxDataCon where
 instance TrieMap ConAppMap where
     type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
-    lookupTM (dataCon, args) | traceLookup dataCon = undefined
+    --lookupTM (dataCon, args) | traceLookup dataCon = undefined
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
 
-traceLookup (Lax dc) = pprTrace "lookupTM" (ppr dc) False
-{-# NOINLINE traceLookup #-}
+--traceLookup (Lax dc) = pprTrace "lookupTM" (ppr dc) False
+--{-# NOINLINE traceLookup #-}
 
 -----------------
 -- The CSE Env --
