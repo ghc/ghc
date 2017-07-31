@@ -80,7 +80,7 @@ dsTopLHsBinds binds
      -- see Note [Strict binds checks]
   | not (isEmptyBag unlifted_binds) || not (isEmptyBag bang_binds)
   = do { mapBagM_ (top_level_err "bindings for unlifted types") unlifted_binds
-       ; mapBagM_ (top_level_err "strict pattern bindings")    bang_binds
+       ; mapBagM_ (top_level_err "strict bindings")             bang_binds
        ; return nilOL }
 
   | otherwise
@@ -94,7 +94,7 @@ dsTopLHsBinds binds
 
   where
     unlifted_binds = filterBag (isUnliftedHsBind . unLoc) binds
-    bang_binds     = filterBag (isBangedPatBind  . unLoc) binds
+    bang_binds     = filterBag (isBangedHsBind   . unLoc) binds
 
     top_level_err desc (L loc bind)
       = putSrcSpanDs loc $
@@ -152,7 +152,7 @@ dsHsBind dflags b@(FunBind { fun_id = L _ fun, fun_matches = matches
                 | xopt LangExt.Strict dflags
                 , matchGroupArity matches == 0 -- no need to force lambdas
                 = [id]
-                | isBangedBind b
+                | isBangedHsBind b
                 = [id]
                 | otherwise
                 = []
@@ -603,7 +603,7 @@ We define an "unlifted bind" to be any bind that binds an unlifted id. Note that
 
 is *not* an unlifted bind. Unlifted binds are detected by HsUtils.isUnliftedHsBind.
 
-Define a "banged bind" to have a top-level bang. Detected by HsPat.isBangedPatBind.
+Define a "banged bind" to have a top-level bang. Detected by HsPat.isBangedHsBind.
 Define a "strict bind" to be either an unlifted bind or a banged bind.
 
 The restrictions are:

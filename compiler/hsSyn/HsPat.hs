@@ -29,7 +29,7 @@ module HsPat (
         mkPrefixConPat, mkCharLitPat, mkNilPat,
 
         looksLazyPatBind,
-        isBangedLPat, isBangedPatBind,
+        isBangedLPat,
         hsPatNeedsParens,
         isIrrefutableHsPat,
 
@@ -557,10 +557,6 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 -}
-
-isBangedPatBind :: HsBind p -> Bool
-isBangedPatBind (PatBind {pat_lhs = pat}) = isBangedLPat pat
-isBangedPatBind _ = False
 
 isBangedLPat :: LPat p -> Bool
 isBangedLPat (L _ (ParPat p))   = isBangedLPat p

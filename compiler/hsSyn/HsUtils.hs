@@ -72,7 +72,7 @@ module HsUtils(
   noRebindableInfo,
 
   -- Collecting binders
-  isUnliftedHsBind, isBangedBind,
+  isUnliftedHsBind, isBangedHsBind,
 
   collectLocalBinders, collectHsValBinders, collectHsBindListBinders,
   collectHsIdBinders,
@@ -844,14 +844,18 @@ isUnliftedHsBind bind
   where
     is_unlifted_id id = isUnliftedType (idType id)
 
--- | Is a binding a strict variable bind (e.g. @!x = ...@)?
-isBangedBind :: HsBind GhcTc -> Bool
-isBangedBind b | isBangedPatBind b = True
-isBangedBind (FunBind {fun_matches = matches})
+-- | Is a binding a strict variable or pattern bind (e.g. @!x = ...@)?
+isBangedHsBind :: HsBind GhcTc -> Bool
+isBangedHsBind (AbsBinds { abs_binds = binds })
+  = anyBag (isBangedHsBind . unLoc) binds
+isBangedHsBind (FunBind {fun_matches = matches})
   | [L _ match] <- unLoc $ mg_alts matches
   , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
   = True
-isBangedBind _ = False
+isBangedHsBind (PatBind {pat_lhs = pat})
+  = isBangedLPat pat
+isBangedHsBind _
+  = False
 
 collectLocalBinders :: HsLocalBindsLR idL idR -> [IdP idL]
 collectLocalBinders (HsValBinds binds) = collectHsIdBinders binds
