@@ -119,11 +119,11 @@ def withMingw(String msystem, Closure f) {
   if (msystem == 'MINGW32') {
     prefix = "${msysRoot}\\mingw32"
     carch = 'i686'
-    ghcPath = "${home}/ghc-8.0.1-i386/bin"
+    ghcPath = "${home}/ghc-8.2.1-i386/bin"
   } else if (msystem == 'MINGW64') {
     prefix = "${msysRoot}\\mingw64"
     carch = 'x86_64'
-    ghcPath = "${home}/ghc-8.0.2-x86_64/bin"
+    ghcPath = "${home}/ghc-8.2.1-x86_64/bin"
   } else {
     fail
   }
