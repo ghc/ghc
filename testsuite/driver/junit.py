@@ -18,8 +18,8 @@ def junit(t):
                                      classname = testname,
                                      name = way)
             result = ET.SubElement(testcase, 'failure',
-                                   type = result,
-                                   message = reason)
+                                   type = reason,
+                                   message = result)
 
     for (directory, testname, reason, way) in t.framework_failures:
         testcase = ET.SubElement(testsuite, 'testcase',
