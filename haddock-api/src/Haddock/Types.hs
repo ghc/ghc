@@ -189,7 +189,7 @@ data InstalledInterface = InstalledInterface
   , instSubMap           :: Map Name [Name]
 
   , instBundledPatSynMap :: Map Name [Name]
-  
+
   , instFixMap           :: Map Name Fixity
   }
 
@@ -443,6 +443,8 @@ type LDoc id = Located (Doc id)
 type Doc id = DocH (ModuleName, OccName) id
 type MDoc id = MetaDoc (ModuleName, OccName) id
 
+type DocMarkup id a = DocMarkupH (ModuleName, OccName) id a
+
 instance (NFData a, NFData mod)
          => NFData (DocH mod a) where
   rnf doc = case doc of
@@ -493,34 +495,6 @@ instance NFData Example where
 exampleToString :: Example -> String
 exampleToString (Example expression result) =
     ">>> " ++ expression ++ "\n" ++  unlines result
-
-
-data DocMarkup id a = Markup
-  { markupEmpty                :: a
-  , markupString               :: String -> a
-  , markupParagraph            :: a -> a
-  , markupAppend               :: a -> a -> a
-  , markupIdentifier           :: id -> a
-  , markupIdentifierUnchecked  :: (ModuleName, OccName) -> a
-  , markupModule               :: String -> a
-  , markupWarning              :: a -> a
-  , markupEmphasis             :: a -> a
-  , markupBold                 :: a -> a
-  , markupMonospaced           :: a -> a
-  , markupUnorderedList        :: [a] -> a
-  , markupOrderedList          :: [a] -> a
-  , markupDefList              :: [(a,a)] -> a
-  , markupCodeBlock            :: a -> a
-  , markupHyperlink            :: Hyperlink -> a
-  , markupAName                :: String -> a
-  , markupPic                  :: Picture -> a
-  , markupMathInline           :: String -> a
-  , markupMathDisplay          :: String -> a
-  , markupProperty             :: String -> a
-  , markupExample              :: [Example] -> a
-  , markupHeader               :: Header a -> a
-  }
-
 
 data HaddockModInfo name = HaddockModInfo
   { hmi_description :: Maybe (Doc name)

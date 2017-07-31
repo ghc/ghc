@@ -20,6 +20,7 @@ module Haddock.Backends.Xhtml.DocMarkup (
 ) where
 
 import Data.List
+import Documentation.Haddock.Markup
 import Haddock.Backends.Xhtml.Names
 import Haddock.Backends.Xhtml.Utils
 import Haddock.Types

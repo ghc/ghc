@@ -2,6 +2,8 @@
 
  * to be released
 
+ * Move markup related data types to haddock-library
+
 ## Changes in version 2.18.1
 
  * Synopsis is working again (#599)

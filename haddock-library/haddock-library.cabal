@@ -31,10 +31,11 @@ library
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2
 
   exposed-modules:
+    Documentation.Haddock.Doc
+    Documentation.Haddock.Markup
     Documentation.Haddock.Parser
     Documentation.Haddock.Parser.Monad
     Documentation.Haddock.Types
-    Documentation.Haddock.Doc
     Documentation.Haddock.Utf8
 
   other-modules:

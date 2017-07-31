@@ -16,6 +16,7 @@ module Haddock.Backends.LaTeX (
 ) where
 
 
+import Documentation.Haddock.Markup
 import Haddock.Types
 import Haddock.Utils
 import Haddock.GhcUtils
