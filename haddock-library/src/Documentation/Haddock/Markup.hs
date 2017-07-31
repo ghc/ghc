@@ -1,4 +1,8 @@
-module Documentation.Haddock.Markup where
+-- | @since 1.4.5
+module Documentation.Haddock.Markup (
+    markup
+  , idMarkup
+  ) where
 
 import Documentation.Haddock.Types
 
