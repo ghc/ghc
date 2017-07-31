@@ -38,7 +38,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, mkTyVarBinder, splitTyConApp_maybe)
+import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn( cTupleTyConName )
 import Id
@@ -717,13 +717,18 @@ tcPolyCheck prag_fn
                              , bind_fvs    = placeHolderNamesTc
                              , fun_tick    = funBindTicks nm_loc mono_id mod prag_sigs }
 
-             abs_bind = L loc $ AbsBindsSig
-                        { abs_sig_export  = poly_id
-                        , abs_tvs         = skol_tvs
-                        , abs_ev_vars     = ev_vars
-                        , abs_sig_prags   = SpecPrags spec_prags
-                        , abs_sig_ev_bind = ev_binds
-                        , abs_sig_bind    = L loc bind' }
+             export = ABE { abe_wrap = idHsWrapper
+                          , abe_poly  = poly_id
+                          , abe_mono  = mono_id
+                          , abe_prags = SpecPrags spec_prags }
+
+             abs_bind = L loc $
+                        AbsBinds { abs_tvs      = skol_tvs
+                                 , abs_ev_vars  = ev_vars
+                                 , abs_ev_binds = [ev_binds]
+                                 , abs_exports  = [export]
+                                 , abs_binds    = unitBag (L loc bind')
+                                 , abs_sig      = True }
 
        ; return (unitBag abs_bind, [poly_id]) }
 
@@ -799,7 +804,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
              abs_bind = L loc $
                         AbsBinds { abs_tvs = qtvs
                                  , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
-                                 , abs_exports = exports, abs_binds = binds' }
+                                 , abs_exports = exports, abs_binds = binds'
+                                 , abs_sig = False }
 
        ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
        ; return (unitBag abs_bind, poly_ids) }
@@ -858,9 +864,9 @@ mkExport prag_fn insoluble qtvs theta
 
         ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
-                      , abe_poly = poly_id
-                      , abe_mono = mono_id
-                      , abe_prags = SpecPrags spec_prags}) }
+                      , abe_poly  = poly_id
+                      , abe_mono  = mono_id
+                      , abe_prags = SpecPrags spec_prags }) }
   where
     prag_sigs = lookupPragEnv prag_fn poly_name
     sig_ctxt  = InfSigCtxt poly_name
@@ -1611,7 +1617,7 @@ data GeneralisationPlan
 
   | CheckGen (LHsBind GhcRn) TcIdSigInfo
                         -- One FunBind with a signature
-                        -- Explicit generalisation; there is an AbsBindsSig
+                        -- Explicit generalisation
 
 -- A consequence of the no-AbsBinds choice (NoGen) is that there is
 -- no "polymorphic Id" and "monmomorphic Id"; there is just the one

@@ -1475,7 +1475,6 @@ rep_bind (L _ (VarBind { var_id = v, var_rhs = e}))
         ; return (srcLocSpan (getSrcLoc v), ans) }
 
 rep_bind (L _ (AbsBinds {}))  = panic "rep_bind: AbsBinds"
-rep_bind (L _ (AbsBindsSig {})) = panic "rep_bind: AbsBindsSig"
 rep_bind (L loc (PatSynBind (PSB { psb_id   = syn
                                  , psb_fvs  = _fvs
                                  , psb_args = args

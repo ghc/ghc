@@ -577,8 +577,6 @@ looksLazyPatBind (PatBind { pat_lhs = p })
   = looksLazyLPat p
 looksLazyPatBind (AbsBinds { abs_binds = binds })
   = anyBag (looksLazyPatBind . unLoc) binds
-looksLazyPatBind (AbsBindsSig { abs_sig_bind = L _ bind })
-  = looksLazyPatBind bind
 looksLazyPatBind _
   = False
 

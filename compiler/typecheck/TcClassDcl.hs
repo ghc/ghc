@@ -278,14 +278,15 @@ tcDefMeth clas tyvars this_dict binds_in hs_sig_fn prag_fn
                               (L bind_loc lm_bind)
 
        ; let export = ABE { abe_poly   = global_dm_id
-                           , abe_mono  = local_dm_id
-                           , abe_wrap  = idHsWrapper
-                           , abe_prags = IsDefaultMethod }
+                          , abe_mono  = local_dm_id
+                          , abe_wrap  = idHsWrapper
+                          , abe_prags = IsDefaultMethod }
              full_bind = AbsBinds { abs_tvs      = tyvars
                                   , abs_ev_vars  = [this_dict]
                                   , abs_exports  = [export]
                                   , abs_ev_binds = [ev_binds]
-                                  , abs_binds    = tc_bind }
+                                  , abs_binds    = tc_bind
+                                  , abs_sig      = True }
 
        ; return (unitBag (L bind_loc full_bind)) }
 

@@ -281,31 +281,6 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , isInlinePragma (idInlinePragma pid) ] }
 
-addTickLHsBind (L pos bind@(AbsBindsSig { abs_sig_bind   = val_bind
-                                        , abs_sig_export = poly_id }))
-  | L _ FunBind { fun_id = L _ mono_id } <- val_bind
-  = do withEnv (add_export  mono_id) $ do
-       withEnv (add_inlines mono_id) $ do
-       val_bind' <- addTickLHsBind val_bind
-       return $ L pos $ bind { abs_sig_bind = val_bind' }
-
-  | otherwise
-  = pprPanic "addTickLHsBind" (ppr bind)
- where
-  -- see AbsBinds comments
-  add_export mono_id env
-    | idName poly_id `elemNameSet` exports env
-    = env { exports = exports env `extendNameSet` idName mono_id }
-    | otherwise
-    = env
-
-  -- See Note [inline sccs]
-  add_inlines mono_id env
-    | isInlinePragma (idInlinePragma poly_id)
-    = env { inlines = inlines env `extendVarSet` mono_id }
-    | otherwise
-    = env
-
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let name = getOccString id
   decl_path <- getPathEntry

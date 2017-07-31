@@ -269,22 +269,9 @@ data HsBindLR idL idR
         abs_ev_binds :: [TcEvBinds],
 
         -- | Typechecked user bindings
-        abs_binds    :: LHsBinds idL
-    }
+        abs_binds    :: LHsBinds idL,
 
-  -- | Abstraction Bindings Signature
-  | AbsBindsSig {  -- Simpler form of AbsBinds, used with a type sig
-                   -- in tcPolyCheck. Produces simpler desugaring and
-                   -- is necessary to avoid #11405, comment:3.
-        abs_tvs     :: [TyVar],
-        abs_ev_vars :: [EvVar],
-
-        abs_sig_export :: IdP idL,  -- like abe_poly
-        abs_sig_prags  :: TcSpecPrags,
-
-        abs_sig_ev_bind :: TcEvBinds,  -- no list needed here
-        abs_sig_bind    :: LHsBind idL -- always only one, and it's always a
-                                       -- FunBind
+        abs_sig :: Bool  -- See Note [The abs_sig field of AbsBinds]
     }
 
   -- | Patterns Synonym Binding
@@ -312,7 +299,7 @@ deriving instance (DataId idL, DataId idR) => Data (HsBindLR idL idR)
 
 -- | Abtraction Bindings Export
 data ABExport p
-  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragmas is attached to this Id
+  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
         , abe_mono      :: IdP p
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
@@ -480,6 +467,53 @@ bindings only when
  * Each binding in the group has at least one binder that
    lacks a user type signature
  * The group forms a strongly connected component
+
+
+Note [The abs_sig field of AbsBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The abs_sig field supports a couple of special cases for bindings.
+Consider
+
+  x :: Num a => (# a, a #)
+  x = (# 3, 4 #)
+
+The general desugaring for AbsBinds would give
+
+  x = /\a. \ ($dNum :: Num a) ->
+      letrec xm = (# fromInteger $dNum 3, fromInteger $dNum 4 #) in
+      xm
+
+But that has an illegal let-binding for an unboxed tuple.  In this
+case we'd prefer to generate the (more direct)
+
+  x = /\ a. \ ($dNum :: Num a) ->
+     (# fromInteger $dNum 3, fromInteger $dNum 4 #)
+
+A similar thing happens with representation-polymorphic defns
+(Trac #11405):
+
+  undef :: forall (r :: RuntimeRep) (a :: TYPE r). HasCallStack => a
+  undef = error "undef"
+
+Again, the vanilla desugaring gives a local let-binding for a
+representation-polymorphic (undefm :: a), which is illegal.  But
+again we can desugar without a let:
+
+  undef = /\ a. \ (d:HasCallStack) -> error a d "undef"
+
+The abs_sig field supports this direct desugaring, with no local
+let-bining.  When abs_sig = True
+
+ * the abs_binds is single FunBind
+
+ * the abs_exports is a singleton
+
+ * we have a complete type sig for binder
+   and hence the abs_binds is non-recursive
+   (it binds the mono_id but refers to the poly_id
+
+These properties are exploited in DsBinds.dsAbsBinds to
+generate code without a let-binding.
 
 Note [ABExport wrapper]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -662,21 +696,6 @@ ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dictvars
       , text "Evidence:" <+> ppr ev_binds ]
     else
       pprLHsBinds val_binds
-ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
-                          , abs_ev_vars     = dictvars
-                          , abs_sig_export  = poly_id
-                          , abs_sig_ev_bind = ev_bind
-                          , abs_sig_bind    = bind })
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-      hang (text "AbsBindsSig" <+> brackets (interpp'SP tyvars)
-                               <+> brackets (interpp'SP dictvars))
-         2 $ braces $ vcat
-      [ text "Exported type:" <+> pprBndr LetBind poly_id
-      , text "Bind:"     <+> ppr bind
-      , text "Evidence:" <+> ppr ev_bind ]
-    else
-      ppr bind
 
 instance (OutputableBndrId p) => Outputable (ABExport p) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })

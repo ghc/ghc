@@ -889,7 +889,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = ibinds })
                                   , abs_ev_vars = dfun_ev_vars
                                   , abs_exports = [export]
                                   , abs_ev_binds = []
-                                  , abs_binds = unitBag dict_bind }
+                                  , abs_binds = unitBag dict_bind
+                                  , abs_sig = True }
 
        ; return (unitBag (L loc main_bind) `unionBags` sc_meth_binds)
        }
@@ -1037,7 +1038,8 @@ tcSuperClasses dfun_id cls tyvars dfun_evs inst_tys dfun_ev_binds sc_theta
                                  , abs_ev_vars  = dfun_evs
                                  , abs_exports  = [export]
                                  , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
-                                 , abs_binds    = emptyBag }
+                                 , abs_binds    = emptyBag
+                                 , abs_sig      = False }
            ; return (sc_top_id, L loc bind, sc_implic) }
 
 -------------------
@@ -1374,17 +1376,18 @@ tcMethodBody clas tyvars dfun_ev_vars inst_tys
        ; spec_prags     <- tcSpecPrags global_meth_id prags
 
         ; let specs  = mk_meth_spec_prags global_meth_id spec_inst_prags spec_prags
-              export = ABE { abe_poly      = global_meth_id
-                           , abe_mono      = local_meth_id
-                           , abe_wrap      = idHsWrapper
-                           , abe_prags     = specs }
+              export = ABE { abe_poly  = global_meth_id
+                           , abe_mono  = local_meth_id
+                           , abe_wrap  = idHsWrapper
+                           , abe_prags = specs }
 
               local_ev_binds = TcEvBinds ev_binds_var
               full_bind = AbsBinds { abs_tvs      = tyvars
                                    , abs_ev_vars  = dfun_ev_vars
                                    , abs_exports  = [export]
                                    , abs_ev_binds = [dfun_ev_binds, local_ev_binds]
-                                   , abs_binds    = tc_bind }
+                                   , abs_binds    = tc_bind
+                                   , abs_sig      = True }
 
         ; return (global_meth_id, L bind_loc full_bind, Just meth_implic) }
   where
@@ -1429,7 +1432,8 @@ tcMethodBodyHelp hs_sig_fn sel_id local_meth_id meth_bind
        ; return (unitBag $ L (getLoc meth_bind) $
                  AbsBinds { abs_tvs = [], abs_ev_vars = []
                           , abs_exports = [export]
-                          , abs_binds = tc_bind, abs_ev_binds = [] }) }
+                          , abs_binds = tc_bind, abs_ev_binds = []
+                          , abs_sig = True }) }
 
   | otherwise  -- No instance signature
   = do { let ctxt = FunSigCtxt sel_name False

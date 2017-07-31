@@ -52,6 +52,7 @@ import Name
 import VarSet
 import Rules
 import VarEnv
+import Var( EvVar )
 import Outputable
 import Module
 import SrcLoc
@@ -105,8 +106,7 @@ dsTopLHsBinds binds
 -- later be forced in the binding group body, see Note [Desugar Strict binds]
 dsLHsBinds :: LHsBinds GhcTc -> DsM ([Id], [(Id,CoreExpr)])
 dsLHsBinds binds
-  = do { MASSERT( allBag (not . isUnliftedHsBind . unLoc) binds )
-       ; ds_bs <- mapBagM dsLHsBind binds
+  = do { ds_bs <- mapBagM dsLHsBind binds
        ; return (foldBag (\(a, a') (b, b') -> (a ++ b, a' ++ b'))
                          id ([], []) ds_bs) }
 
@@ -124,10 +124,9 @@ dsHsBind :: DynFlags
          -- binding group see Note [Desugar Strict binds] and all
          -- bindings and their desugared right hand sides.
 
-dsHsBind dflags
-         (VarBind { var_id = var
-                  , var_rhs = expr
-                  , var_inline = inline_regardless })
+dsHsBind dflags (VarBind { var_id = var
+                         , var_rhs = expr
+                         , var_inline = inline_regardless })
   = do  { core_expr <- dsLExpr expr
                 -- Dictionary bindings are always VarBinds,
                 -- so we only need do this here
@@ -139,9 +138,8 @@ dsHsBind dflags
                           else []
         ; return (force_var, [core_bind]) }
 
-dsHsBind dflags
-         b@(FunBind { fun_id = L _ fun, fun_matches = matches
-                    , fun_co_fn = co_fn, fun_tick = tick })
+dsHsBind dflags b@(FunBind { fun_id = L _ fun, fun_matches = matches
+                           , fun_co_fn = co_fn, fun_tick = tick })
  = do   { (args, body) <- matchWrapper
                            (mkPrefixFunRhs (noLoc $ idName fun))
                            Nothing matches
@@ -158,12 +156,14 @@ dsHsBind dflags
                 = [id]
                 | otherwise
                 = []
-        ; --pprTrace "dsHsBind" (ppr fun <+> ppr (idInlinePragma fun) $$ ppr (mg_alts matches) $$ ppr args $$ ppr core_binds) $
-           return (force_var, [core_binds]) }
+        ; --pprTrace "dsHsBind" (vcat [ ppr fun <+> ppr (idInlinePragma fun)
+          --                          , ppr (mg_alts matches)
+          --                          , ppr args, ppr core_binds]) $
+          return (force_var, [core_binds]) }
 
-dsHsBind dflags
-         (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty
-                  , pat_ticks = (rhs_tick, var_ticks) })
+dsHsBind dflags (PatBind { pat_lhs = pat, pat_rhs = grhss
+                         , pat_rhs_ty = ty
+                         , pat_ticks = (rhs_tick, var_ticks) })
   = do  { body_expr <- dsGuarded grhss ty
         ; let body' = mkOptTickBox rhs_tick body_expr
               pat'  = decideBangHood dflags pat
@@ -175,47 +175,73 @@ dsHsBind dflags
                            else []
         ; return (force_var', sel_binds) }
 
-        -- A common case: one exported variable, only non-strict binds
-        -- Non-recursive bindings come through this way
-        -- So do self-recursive bindings
-        -- Bindings with complete signatures are AbsBindsSigs, below
-dsHsBind dflags
-         (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
-                   , abs_exports = [export]
-                   , abs_ev_binds = ev_binds, abs_binds = binds })
-  | ABE { abe_wrap = wrap, abe_poly = global
-        , abe_mono = local, abe_prags = prags } <- export
-  , not (xopt LangExt.Strict dflags)             -- Handle strict binds
-  , not (anyBag (isBangedBind . unLoc) binds)    --        in the next case
-  = -- See Note [AbsBinds wrappers] in HsBinds
-    addDictsDs (toTcTypeBag (listToBag dicts)) $
-         -- addDictsDs: push type constraints deeper for pattern match check
-    do { (force_vars, bind_prs) <- dsLHsBinds binds
-       ; ds_binds <- dsTcEvBinds_s ev_binds
-       ; core_wrap <- dsHsWrapper wrap -- Usually the identity
+dsHsBind dflags (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
+                          , abs_exports = exports
+                          , abs_ev_binds = ev_binds
+                          , abs_binds = binds, abs_sig = has_sig })
+  = do { ds_binds <- addDictsDs (toTcTypeBag (listToBag dicts)) $
+                     dsLHsBinds binds
+                                   -- addDictsDs: push type constraints deeper
+                                   --             for inner pattern match check
+
+       ; ds_ev_binds <- dsTcEvBinds_s ev_binds
+
+       -- dsAbsBinds does the hard work
+       ; dsAbsBinds dflags tyvars dicts exports ds_ev_binds ds_binds has_sig }
+
+dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
+
+
+-----------------------
+dsAbsBinds :: DynFlags
+           -> [TyVar] -> [EvVar] -> [ABExport GhcTc]
+           -> [CoreBind]                -- Desugared evidence bidings
+           -> ([Id], [(Id,CoreExpr)])   -- Desugared value bindings
+           -> Bool                      -- Single binding with signature
+           -> DsM ([Id], [(Id,CoreExpr)])
+
+dsAbsBinds dflags tyvars dicts exports
+           ds_ev_binds (force_vars, bind_prs) has_sig
+
+    -- A very important common case: one exported variable
+    -- Non-recursive bindings come through this way
+    -- So do self-recursive bindings
+  | [export] <- exports
+  , ABE { abe_poly = global_id, abe_mono = local_id
+        , abe_wrap = wrap, abe_prags = prags } <- export
+  , Just force_vars' <- case force_vars of
+                           []                  -> Just []
+                           [v] | v == local_id -> Just [global_id]
+                           _                   -> Nothing
+       -- If there is a variable to force, it's just the
+       -- single variable we are binding here
+  = do { core_wrap <- dsHsWrapper wrap -- Usually the identity
 
        ; let rhs = core_wrap $
                    mkLams tyvars $ mkLams dicts $
-                   mkCoreLets ds_binds $
-                   mkLetRec bind_prs $
-                   Var local
+                   mkCoreLets ds_ev_binds $
+                   body
+
+             body | has_sig
+                  , [(_, lrhs)] <- bind_prs
+                  = lrhs
+                  | otherwise
+                  = mkLetRec bind_prs (Var local_id)
+
        ; (spec_binds, rules) <- dsSpecs rhs prags
 
-       ; let   global'  = addIdSpecialisations global rules
-               main_bind = makeCorePair dflags global' (isDefaultMethod prags)
-                                        (dictArity dicts) rhs
+       ; let global_id' = addIdSpecialisations global_id rules
+             main_bind  = makeCorePair dflags global_id'
+                                       (isDefaultMethod prags)
+                                       (dictArity dicts) rhs
 
-       ; ASSERT(null force_vars)
-         return ([], main_bind : fromOL spec_binds) }
+       ; return (force_vars', main_bind : fromOL spec_binds) }
 
-        -- Another common case: no tyvars, no dicts
-        -- In this case we can have a much simpler desugaring
-dsHsBind dflags
-         (AbsBinds { abs_tvs = [], abs_ev_vars = []
-                   , abs_exports = exports
-                   , abs_ev_binds = ev_binds, abs_binds = binds })
-  = do { (force_vars, bind_prs) <- dsLHsBinds binds
-       ; let mk_bind (ABE { abe_wrap = wrap
+    -- Another common case: no tyvars, no dicts
+    -- In this case we can have a much simpler desugaring
+  | null tyvars, null dicts
+
+  = do { let mk_bind (ABE { abe_wrap = wrap
                           , abe_poly = global
                           , abe_mono = local
                           , abe_prags = prags })
@@ -225,42 +251,35 @@ dsHsBind dflags
                                           0 (core_wrap (Var local))) }
        ; main_binds <- mapM mk_bind exports
 
-       ; ds_binds <- dsTcEvBinds_s ev_binds
-       ; return (force_vars, flattenBinds ds_binds ++ bind_prs ++ main_binds) }
+       ; return (force_vars, flattenBinds ds_ev_binds ++ bind_prs ++ main_binds) }
 
-dsHsBind dflags
-         (AbsBinds { abs_tvs = tyvars, abs_ev_vars = dicts
-                   , abs_exports = exports, abs_ev_binds = ev_binds
-                   , abs_binds = binds })
-         -- See Note [Desugaring AbsBinds]
-  = addDictsDs (toTcTypeBag (listToBag dicts)) $
-         -- addDictsDs: push type constraints deeper for pattern match check
-     do { (local_force_vars, bind_prs) <- dsLHsBinds binds
-        ; let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
+    -- The general case
+    -- See Note [Desugaring AbsBinds]
+  | otherwise
+  = do { let core_bind = Rec [ makeCorePair dflags (add_inline lcl_id) False 0 rhs
                               | (lcl_id, rhs) <- bind_prs ]
                 -- Monomorphic recursion possible, hence Rec
-              new_force_vars = get_new_force_vars local_force_vars
-              locals       = map abe_mono exports
-              all_locals   = locals ++ new_force_vars
-              tup_expr     = mkBigCoreVarTup all_locals
-              tup_ty       = exprType tup_expr
-        ; ds_binds <- dsTcEvBinds_s ev_binds
-        ; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
-                             mkCoreLets ds_binds $
-                             mkLet core_bind $
-                             tup_expr
+             new_force_vars = get_new_force_vars force_vars
+             locals       = map abe_mono exports
+             all_locals   = locals ++ new_force_vars
+             tup_expr     = mkBigCoreVarTup all_locals
+             tup_ty       = exprType tup_expr
+       ; let poly_tup_rhs = mkLams tyvars $ mkLams dicts $
+                            mkCoreLets ds_ev_binds $
+                            mkLet core_bind $
+                            tup_expr
 
-        ; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
+       ; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
         -- Note [Desugar Strict binds]
-        ; (exported_force_vars, extra_exports) <- get_exports local_force_vars
+       ; (exported_force_vars, extra_exports) <- get_exports force_vars
 
-        ; let mk_bind (ABE { abe_wrap = wrap
-                           , abe_poly = global
-                           , abe_mono = local, abe_prags = spec_prags })
-                         -- See Note [AbsBinds wrappers] in HsBinds
+       ; let mk_bind (ABE { abe_wrap = wrap
+                          , abe_poly = global
+                          , abe_mono = local, abe_prags = spec_prags })
+                          -- See Note [AbsBinds wrappers] in HsBinds
                 = do { tup_id  <- newSysLocalDs tup_ty
                      ; core_wrap <- dsHsWrapper wrap
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
@@ -275,10 +294,10 @@ dsHsBind dflags
                            -- Id is just the selector.  Hmm.
                      ; return ((global', rhs) : fromOL spec_binds) }
 
-        ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
+       ; export_binds_s <- mapM mk_bind (exports ++ extra_exports)
 
-        ; return (exported_force_vars
-                 ,(poly_tup_id, poly_tup_rhs) :
+       ; return ( exported_force_vars
+                , (poly_tup_id, poly_tup_rhs) :
                    concat export_binds_s) }
   where
     inline_env :: IdEnv Id -- Maps a monomorphic local Id to one with
@@ -321,57 +340,10 @@ dsHsBind dflags
     mk_export local =
       do global <- newSysLocalDs
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
-         return (ABE {abe_poly = global
-                     ,abe_mono = local
-                     ,abe_wrap = WpHole
-                     ,abe_prags = SpecPrags []})
-
--- AbsBindsSig is a combination of AbsBinds and FunBind
-dsHsBind dflags (AbsBindsSig { abs_tvs = tyvars, abs_ev_vars = dicts
-                             , abs_sig_export  = global
-                             , abs_sig_prags   = prags
-                             , abs_sig_ev_bind = ev_bind
-                             , abs_sig_bind    = bind })
-  | L bind_loc FunBind { fun_matches = matches
-                       , fun_co_fn   = co_fn
-                       , fun_tick    = tick } <- bind
-  = putSrcSpanDs bind_loc $
-    addDictsDs (toTcTypeBag (listToBag dicts)) $
-             -- addDictsDs: push type constraints deeper for pattern match check
-    do { (args, body) <- matchWrapper
-                           (mkPrefixFunRhs (noLoc $ idName global))
-                           Nothing matches
-       ; core_wrap <- dsHsWrapper co_fn
-       ; let body'   = mkOptTickBox tick body
-             fun_rhs = core_wrap (mkLams args body')
-             force_vars
-               | xopt LangExt.Strict dflags
-               , matchGroupArity matches == 0 -- no need to force lambdas
-               = [global]
-               | isBangedBind (unLoc bind)
-               = [global]
-               | otherwise
-               = []
-
-       ; ds_binds <- dsTcEvBinds ev_bind
-       ; let rhs = mkLams tyvars $
-                   mkLams dicts $
-                   mkCoreLets ds_binds $
-                   fun_rhs
-
-       ; (spec_binds, rules) <- dsSpecs rhs prags
-       ; let global' = addIdSpecialisations global rules
-             main_bind = makeCorePair dflags global' (isDefaultMethod prags)
-                                      (dictArity dicts) rhs
-
-       ; return (force_vars, main_bind : fromOL spec_binds) }
-
-  | otherwise
-  = pprPanic "dsHsBind: AbsBindsSig" (ppr bind)
-
-dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
-
-
+         return (ABE { abe_poly  = global
+                     , abe_mono  = local
+                     , abe_wrap  = WpHole
+                     , abe_prags = SpecPrags [] })
 
 -- | This is where we apply INLINE and INLINABLE pragmas. All we need to
 -- do is to attach the unfolding information to the Id.
