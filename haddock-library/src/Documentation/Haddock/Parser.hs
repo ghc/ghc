@@ -14,7 +14,7 @@
 -- library, the most commonly used combination of functions is going
 -- to be
 --
--- @'toRegular' . 'parseParas'@
+-- @'toRegular' . '_doc' . 'parseParas'@
 module Documentation.Haddock.Parser ( parseString, parseParas
                                     , overIdentifier, toRegular, Identifier
                                     ) where
