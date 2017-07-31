@@ -162,6 +162,11 @@ Over-saturation is also possible:
       see Note [Eta reduction for data families]. Accordingly, the FamInst
       is never over-saturated.
 
+Why can we allow such flexibility for data families but not for type families?
+Because data families can be decomposed -- that is, they are generative and
+injective. A Type family is neither and so always must be applied to all its
+arguments.
+
 Note [Eta reduction for data families]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this
