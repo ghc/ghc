@@ -2359,11 +2359,10 @@ pp_dotdot = text " .. "
 -- Context of a pattern match. This is more subtle than it would seem. See Note
 -- [Varieties of pattern matches].
 data HsMatchContext id -- Not an extensible tag
-  = FunRhs { mc_fun :: Located id -- ^ function binder of @f@
-           , mc_fixity :: LexicalFixity -- ^ fixing of @f@
-           , mc_strictness :: SrcStrictness
-             -- ^ was the pattern banged? See
-             -- Note [Varieties of binding pattern matches]
+  = FunRhs { mc_fun        :: Located id    -- ^ function binder of @f@
+           , mc_fixity     :: LexicalFixity -- ^ fixing of @f@
+           , mc_strictness :: SrcStrictness -- ^ was @f@ banged?
+                                            -- See Note [FunBind vs PatBind]
            }
                                 -- ^A pattern matching on an argument of a
                                 -- function binding

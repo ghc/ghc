@@ -1741,9 +1741,9 @@ pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
 
     (ppr_match, pref)
         = case kind of
-             FunRhs (L _ fun) _ _ -> (pprMatchContext kind,
-                                      \ pp -> ppr fun <+> pp)
-             _                    -> (pprMatchContext kind, \ pp -> pp)
+             FunRhs { mc_fun = L _ fun }
+                  -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
+             _    -> (pprMatchContext kind, \ pp -> pp)
 
 ppr_pats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
 ppr_pats kind pats

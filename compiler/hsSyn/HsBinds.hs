@@ -129,9 +129,8 @@ type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
 -- | Located Haskell Binding with separate Left and Right identifier types
 type LHsBindLR  idL idR = Located (HsBindLR idL idR)
 
-{- Note [Varieties of binding pattern matches]
-   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+{- Note [FunBind vs PatBind]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 The distinction between FunBind and PatBind is a bit subtle. FunBind covers
 patterns which resemble function bindings and simple variable bindings.
 
@@ -142,12 +141,17 @@ patterns which resemble function bindings and simple variable bindings.
     x `f` y = e     -- FunRhs has Infix
 
 The actual patterns and RHSs of a FunBind are encoding in fun_matches.
-The m_ctxt field of Match will be FunRhs and carries two bits of information
-about the match,
+The m_ctxt field of each Match in fun_matches will be FunRhs and carries
+two bits of information about the match,
 
-  * the mc_strictness field describes whether the match is decorated with a bang
-    (e.g. `!x = e`)
-  * the mc_fixity field describes the fixity of the function binder
+  * The mc_fixity field on each Match describes the fixity of the
+    function binder in that match.  E.g. this is legal:
+         f True False  = e1
+         True `f` True = e2
+
+  * The mc_strictness field is used /only/ for nullary FunBinds: ones
+    with one Match, which has no pats. For these, it describes whether
+    the match is decorated with a bang (e.g. `!x = e`).
 
 By contrast, PatBind represents data constructor patterns, as well as a few
 other interesting cases. Namely,
@@ -175,7 +179,7 @@ data HsBindLR idL idR
     --                                        @(f :: a -> a) = ... @
     --
     -- Strict bindings have their strictness recorded in the 'SrcStrictness' of their
-    -- 'MatchContext'. See Note [Varieties of binding pattern matches] for
+    -- 'MatchContext'. See Note [FunBind vs PatBind] for
     -- details about the relationship between FunBind and PatBind.
     --
     --  'ApiAnnotation.AnnKeywordId's
@@ -219,7 +223,7 @@ data HsBindLR idL idR
   --
   -- The pattern is never a simple variable;
   -- That case is done by FunBind.
-  -- See Note [Varieties of binding pattern matches] for details about the
+  -- See Note [FunBind vs PatBind] for details about the
   -- relationship between FunBind and PatBind.
 
   --

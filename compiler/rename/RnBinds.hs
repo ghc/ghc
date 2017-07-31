@@ -47,7 +47,7 @@ import NameSet
 import RdrName          ( RdrName, rdrNameOcc )
 import SrcLoc
 import ListSetOps       ( findDupsEq )
-import BasicTypes       ( RecFlag(..), LexicalFixity(..) )
+import BasicTypes       ( RecFlag(..) )
 import Digraph          ( SCC(..) )
 import Bag
 import Util
@@ -1162,14 +1162,13 @@ rnMatch' ctxt rnBody match@(Match { m_ctxt = mf, m_pats = pats
                 Nothing -> return ()
                 Just (L loc ty) -> addErrAt loc (resSigErr match ty)
 
-        ; let fixity = if isInfixMatch match then Infix else Prefix
                -- Now the main event
                -- Note that there are no local fixity decls for matches
         ; rnPats ctxt pats      $ \ pats' -> do
         { (grhss', grhss_fvs) <- rnGRHSs ctxt rnBody grhss
-        ; let mf' = case (ctxt,mf) of
-                      (FunRhs (L _ funid) _ _,FunRhs (L lf _) _ strict)
-                                            -> FunRhs (L lf funid) fixity strict
+        ; let mf' = case (ctxt, mf) of
+                      (FunRhs { mc_fun = L _ funid }, FunRhs { mc_fun = L lf _ })
+                                            -> mf { mc_fun = L lf funid }
                       _                     -> ctxt
         ; return (Match { m_ctxt = mf', m_pats = pats'
                         , m_type = Nothing, m_grhss = grhss'}, grhss_fvs ) }}
