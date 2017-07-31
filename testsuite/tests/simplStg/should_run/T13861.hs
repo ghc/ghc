@@ -1,5 +1,6 @@
-{-# LANGUAGE MagicHash, BangPatterns #-}
+{-# LANGUAGE MagicHash, BangPatterns, TypeOperators, GADTs #-}
 import GHC.Exts
+import Data.Type.Equality
 import Unsafe.Coerce
 
 foo :: Either Int a -> Maybe a
@@ -50,6 +51,13 @@ rec2 x =
     in s1
 {-# NOINLINE rec2 #-}
 
+
+eq1 :: a :~: b -> [a]
+eq1 Refl = []
+{-# NOINLINE eq1 #-}
+
+
+
 test x = do
     let (r1,r2) = bar x
     (same $! r1) $! r2
@@ -57,9 +65,16 @@ test x = do
     (same $! r1) $! r3
     let (r30, r31) = (R 'l', foo' r30)
     (same $! r30) $! r31
-    
+
     let (r40, r41) = (['l'], baz r40)
     (same $! r40) $! r41
+    let (r42, r43) = ([], eq1 r42)
+    (same $! r42) $! r43
+    let (r44, r45) = ("ab", eq1 r44)
+    (same $! r44) $! r45
+    let (r46, r47) = (Refl, eq1 r46)
+    (same $! r46) $! r47
+
     let (r4,_) = bar r1
     let r5 = nested r4
     (same $! r4) $! r5
