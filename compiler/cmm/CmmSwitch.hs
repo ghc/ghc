@@ -257,6 +257,7 @@ data SwitchPlan
 targetSupportsSwitch :: HscTarget -> Bool
 targetSupportsSwitch HscC = True
 targetSupportsSwitch HscLlvm = True
+targetSupportsSwitch HscLlvmNG = True
 targetSupportsSwitch _ = False
 
 -- | This function creates a SwitchPlan from a SwitchTargets value, breaking it

@@ -1255,6 +1255,7 @@ data HscTarget
   = HscC           -- ^ Generate C code.
   | HscAsm         -- ^ Generate assembly using the native code generator.
   | HscLlvm        -- ^ Generate assembly using the llvm code generator.
+  | HscLlvmNG      -- ^ Generate assembly using the llvm bitcode code generator.
   | HscInterpreted -- ^ Generate bytecode.  (Requires 'LinkInMemory')
   | HscNothing     -- ^ Don't generate any code.  See notes above.
   deriving (Eq, Show)
@@ -1264,6 +1265,7 @@ isObjectTarget :: HscTarget -> Bool
 isObjectTarget HscC     = True
 isObjectTarget HscAsm   = True
 isObjectTarget HscLlvm  = True
+isObjectTarget HscLlvmNG= True
 isObjectTarget _        = False
 
 -- | Does this target retain *all* top-level bindings for a module,
@@ -1392,7 +1394,7 @@ defaultObjectTarget :: Platform -> HscTarget
 defaultObjectTarget platform
   | platformUnregisterised platform     =  HscC
   | cGhcWithNativeCodeGen == "YES"      =  HscAsm
-  | otherwise                           =  HscLlvm
+  | otherwise                           =  HscLlvmNG
 
 tablesNextToCode :: DynFlags -> Bool
 tablesNextToCode dflags
@@ -3399,6 +3401,7 @@ dynamic_flags_deps = [
          (deprecate $ "The -fvia-C flag does nothing; " ++
                       "it will be removed in a future GHC release"))
   , make_ord_flag defGhcFlag "fllvm"            (NoArg (setObjTarget HscLlvm))
+  , make_ord_flag defGhcFlag "fllvmng"          (NoArg (setObjTarget HscLlvmNG))
 
   , make_ord_flag defFlag "fno-code"         (NoArg ((upd $ \d ->
                   d { ghcLink=NoLink }) >> setTarget HscNothing))
@@ -4957,6 +4960,9 @@ setTargetWithPlatform f = upd set
                 then dfs{ hscTarget = l }
                 else dfs
 
+isLlvmTarget :: HscTarget -> Bool
+isLlvmTarget t = t == HscLlvm || t == HscLlvmNG
+
 -- Changes the target only if we're compiling object code.  This is
 -- used by -fasm and -fllvm, which switch from one to the other, but
 -- not from bytecode to object-code.  The idea is that -fasm/-fllvm
@@ -4965,6 +4971,8 @@ setObjTarget :: HscTarget -> DynP ()
 setObjTarget l = updM set
   where
    set dflags
+     -- do not change HscLlvm to HscLlvmNG or HscLlvmNG to HscLlvm
+     | isLlvmTarget l && isLlvmTarget (hscTarget dflags) = return dflags
      | isObjectTarget (hscTarget dflags)
        = return $ dflags { hscTarget = l }
      | otherwise = return dflags
@@ -5327,7 +5335,7 @@ makeDynFlagsConsistent dflags
     = let dflags' = gopt_unset dflags Opt_Hpc
           warn = "Hpc can't be used with byte-code interpreter. Ignoring -fhpc."
       in loop dflags' warn
- | hscTarget dflags `elem` [HscAsm, HscLlvm] &&
+ | hscTarget dflags `elem` [HscAsm, HscLlvm, HscLlvmNG] &&
    platformUnregisterised (targetPlatform dflags)
     = loop (dflags { hscTarget = HscC })
            "Compiler unregisterised, so compiling via C"

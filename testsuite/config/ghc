@@ -18,8 +18,8 @@ config.confdir               = '.'
 # this group are 'optasm', 'optllvm', 'profasm', 'threaded1', 'threaded2',
 # 'profthreaded', 'ghci', and whichever of 'static/dyn' is not this GHC's
 # default mode. Other ways should be set explicitly from .T files.
-config.compile_ways       = ['normal', 'hpc']
-config.run_ways           = ['normal', 'hpc']
+config.compile_ways       = ['llvmng'] # ['normal', 'hpc']
+config.run_ways           = ['llvmng'] # ['normal', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways         = ['prof', 'normal_h',
@@ -29,6 +29,7 @@ config.other_ways         = ['prof', 'normal_h',
                              'threaded1_ls', 'threaded2_hT', 'debug_numa',
                              'llvm', 'debugllvm',
                              'profllvm', 'profoptllvm', 'profthreadedllvm',
+                             'llvmng', 'debugllvmng',
                              'debug',
                              'ghci-ext', 'ghci-ext-prof',
                              'ext-interp']
@@ -66,6 +67,8 @@ if (ghc_with_llvm == 1 and not config.unregisterised):
     config.compile_ways.append('optllvm')
     config.run_ways.append('optllvm')
 
+config.run_ways.append('llvmng')
+
 config.way_flags = {
     'normal'       : [],
     'normal_h'     : [],
@@ -76,6 +79,9 @@ config.way_flags = {
     'llvm'         : ['-fllvm'],
     'optllvm'      : ['-O', '-fllvm'],
     'debugllvm'    : ['-fllvm', '-keep-llvm-files'],
+    'llvmng'       : ['-fllvmng'],
+    'optllvmng'    : ['-O', '-fllvmng'],
+    'debugllvmng'  : ['-fllvmng', '-keep-llvm-files'],
     'prof'         : ['-prof', '-static', '-fprof-auto', '-fasm'],
     'prof_no_auto' : ['-prof', '-static', '-fasm'],
     'profasm'      : ['-O', '-prof', '-static', '-fprof-auto'],
@@ -114,6 +120,9 @@ config.way_rts_flags = {
     'llvm'         : [],
     'optllvm'      : [],
     'debugllvm'    : [],
+    'llvmng'       : [],
+    'optllvmng'    : [],
+    'debugllvmng'  : [],
     'prof'         : ['-p'],
     'prof_no_auto' : ['-p'],
     'profasm'      : ['-hc', '-p'], # test heap profiling too
@@ -156,6 +165,9 @@ opt_ways      = [x[0] for x in config.way_flags.items()
 
 llvm_ways     = [x[0] for x in config.way_flags.items()
                       if '-fflvm' in x[1]]
+
+llvmng_ways   = [x[0] for x in config.way_flags.items ()
+                      if '-fllvmng' in x[1]]
 
 def get_compiler_info():
     s = getStdout([config.compiler, '--info']).decode('utf8')

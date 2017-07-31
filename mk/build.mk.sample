@@ -22,8 +22,14 @@
 # Fast build with optimised libraries, no profiling, with LLVM:
 #BuildFlavour = quick-llvm
 
-# Fast build configured for a cross compiler
-#BuildFlavour  = quick-cross
+# Fast build with optimized libraries, no profiling, with LLVM-NG:
+#BuildFlavour = quick-llvmng
+
+# Fast build configured for a cross compiler, with LLVM:
+#BuildFlavour = quick-cross
+
+# Fast build configured for a cross compiler, with LLVM-NG:
+#BuildFlavour = quick-cross-ng
 
 # Even faster build.  NOT RECOMMENDED: the libraries will be
 # completely unoptimised, so any code built with this compiler
@@ -36,6 +42,9 @@
 
 # Profile the stage2 compiler (LLVM backend):
 #BuildFlavour = prof-llvm
+
+# Profile the stage2 compiler (LLVM-NG backend):
+#BuildFlavour = prof-llvmng
 
 # A development build, working on the stage 1 compiler:
 #BuildFlavour = devel1

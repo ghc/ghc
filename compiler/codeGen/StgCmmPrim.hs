@@ -886,6 +886,7 @@ callishPrimOpSupported dflags op
            _      -> False
   llvm = case hscTarget dflags of
            HscLlvm -> True
+           HscLlvmNG -> True
            _       -> False
   x86ish = case platformArch (targetPlatform dflags) of
              ArchX86    -> True
@@ -1530,7 +1531,7 @@ vecElemProjectCast _      _        _   =  Nothing
 -- given the current set of dynamic flags.
 checkVecCompatibility :: DynFlags -> PrimOpVecCat -> Length -> Width -> FCode ()
 checkVecCompatibility dflags vcat l w = do
-    when (hscTarget dflags /= HscLlvm) $ do
+    when (not $ hscTarget dflags `elem` [HscLlvm, HscLlvmNG]) $ do
         sorry $ unlines ["SIMD vector instructions require the LLVM back-end."
                          ,"Please use -fllvm."]
     check vecWidth vcat l w

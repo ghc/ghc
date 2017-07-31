@@ -497,13 +497,15 @@ checkCOrAsmOrLlvm :: HscTarget -> Validity
 checkCOrAsmOrLlvm HscC    = IsValid
 checkCOrAsmOrLlvm HscAsm  = IsValid
 checkCOrAsmOrLlvm HscLlvm = IsValid
+checkCOrAsmOrLlvm HscLlvmNG = IsValid
 checkCOrAsmOrLlvm _
-  = NotValid (text "requires unregisterised, llvm (-fllvm) or native code generation (-fasm)")
+  = NotValid (text "requires unregisterised, llvm (-fllvm / -fllvmng) or native code generation (-fasm)")
 
 checkCOrAsmOrLlvmOrInterp :: HscTarget -> Validity
 checkCOrAsmOrLlvmOrInterp HscC           = IsValid
 checkCOrAsmOrLlvmOrInterp HscAsm         = IsValid
 checkCOrAsmOrLlvmOrInterp HscLlvm        = IsValid
+checkCOrAsmOrLlvmOrInterp HscLlvmNG      = IsValid
 checkCOrAsmOrLlvmOrInterp HscInterpreted = IsValid
 checkCOrAsmOrLlvmOrInterp _
   = NotValid (text "requires interpreted, unregisterised, llvm or native code generation")

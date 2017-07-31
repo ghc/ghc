@@ -38,6 +38,9 @@
 # localpath                  tag         remotepath                      upstreamurl
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ghc-tarballs                 windows     ghc-tarballs.git                -
+libraries/data-bitcode       -           -                               https://github.com/angerman/data-bitcode.git
+libraries/data-bitcode-llvm  -           -                               https://github.com/angerman/data-bitcode-llvm.git
+libraries/data-bitcode-edsl  -           -                               https://github.com/angerman/data-bitcode-edsl.git
 libffi-tarballs              -           -                               -
 utils/hsc2hs                 -           -                               ssh://git@github.com/haskell/hsc2hs.git
 utils/haddock                -           -                               ssh://git@github.com/haskell/haddock.git

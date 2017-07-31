@@ -61,7 +61,10 @@ Library
                    filepath   >= 1   && < 1.5,
                    template-haskell == 2.13.*,
                    hpc        == 0.6.*,
-                   transformers == 0.5.*,
+                   transformers == 0.5.*
+                 , pretty
+                 , data-bitcode-edsl
+                 , data-bitcode-llvm,
                    ghc-boot   == @ProjectVersionMunged@,
                    ghc-boot-th == @ProjectVersionMunged@,
                    ghci == @ProjectVersionMunged@
@@ -145,6 +148,7 @@ Library
         hsSyn
         iface
         llvmGen
+        llvmGen-ng
         main
         nativeGen
         parser
@@ -170,6 +174,8 @@ Library
 
     Exposed-Modules:
         Ar
+        Data.BitCode.LLVM.Gen
+        Data.BitCode.LLVM.Gen.Monad
         FileCleanup
         DriverBkp
         BkpSyn

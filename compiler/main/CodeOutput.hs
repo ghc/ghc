@@ -40,6 +40,8 @@ import System.FilePath
 import System.IO
 import Control.Monad (forM)
 
+import qualified Data.BitCode.LLVM.Gen.Monad as LlvmNG (liftStream)
+import qualified Data.BitCode.LLVM.Gen as LlvmNG (runLlvm, llvmCodeGen)
 {-
 ************************************************************************
 *                                                                      *
@@ -98,6 +100,7 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
                                          linted_cmm_stream;
              HscC           -> outputC dflags filenm linted_cmm_stream pkg_deps;
              HscLlvm        -> outputLlvm dflags filenm linted_cmm_stream;
+             HscLlvmNG      -> outputLlvmNG dflags filenm linted_cmm_stream;
              HscInterpreted -> panic "codeOutput: HscInterpreted";
              HscNothing     -> panic "codeOutput: HscNothing"
           }
@@ -190,6 +193,13 @@ outputLlvm dflags filenm cmm_stream
            \f -> {-# SCC "llvm_CodeGen" #-}
                  llvmCodeGen dflags f ncg_uniqs cmm_stream
 
+
+outputLlvmNG :: DynFlags -> FilePath -> Stream IO RawCmmGroup () -> IO ()
+outputLlvmNG dflags filenm cmm_stream
+  = do ncg_uniqs <- mkSplitUniqSupply 'n'
+
+       {-# SCC "LlvmNG.runLlvm" #-} LlvmNG.runLlvm [] dflags filenm ncg_uniqs $
+         LlvmNG.llvmCodeGen (LlvmNG.liftStream cmm_stream)
 {-
 ************************************************************************
 *                                                                      *

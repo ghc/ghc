@@ -1304,7 +1304,7 @@ runPhase (RealPhase (As with_cpp)) input_fn dflags
   = do
         -- LLVM from version 3.0 onwards doesn't support the OS X system
         -- assembler, so we use clang as the assembler instead. (#5636)
-        let whichAsProg | hscTarget dflags == HscLlvm &&
+        let whichAsProg | (hscTarget dflags == HscLlvm || hscTarget dflags == HscLlvmNG) &&
                           platformOS (targetPlatform dflags) == OSDarwin
                         = return SysTools.runClang
                         | otherwise = return SysTools.runAs
@@ -2076,7 +2076,7 @@ doCpp dflags raw input_fn output_fn = do
                        ])
 
 getBackendDefs :: DynFlags -> IO [String]
-getBackendDefs dflags | hscTarget dflags == HscLlvm = do
+getBackendDefs dflags | (hscTarget dflags == HscLlvm || hscTarget dflags == HscLlvmNG) = do
     llvmVer <- figureLlvmVersion dflags
     return $ case llvmVer of
                Just n -> [ "-D__GLASGOW_HASKELL_LLVM__=" ++ format n ]
@@ -2195,6 +2195,7 @@ hscPostBackendPhase dflags _ hsc_lang =
         HscAsm | gopt Opt_SplitObjs dflags -> Splitter
                | otherwise                 -> As False
         HscLlvm        -> LlvmOpt
+        HscLlvmNG      -> LlvmOpt
         HscNothing     -> StopLn
         HscInterpreted -> StopLn
 

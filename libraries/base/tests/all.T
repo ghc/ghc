@@ -59,7 +59,7 @@ test('length001',
      # excessive amounts of stack space. So we specifically set a low
      # stack limit and mark it as failing under a few conditions.
      [extra_run_opts('+RTS -K8m -RTS'),
-     expect_fail_for(['normal', 'threaded1', 'llvm'])],
+     expect_fail_for(['normal', 'threaded1', 'llvm', 'llvmng'])],
      compile_and_run, [''])
 
 test('ratio001', 	normal, compile_and_run, [''])

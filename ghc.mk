@@ -424,6 +424,9 @@ PACKAGES_STAGE0 = binary text transformers mtl parsec Cabal/Cabal hpc ghc-boot-t
 ifeq "$(Windows_Host)" "NO"
 PACKAGES_STAGE0 += terminfo
 endif
+PACKAGES_STAGE0 += data-bitcode
+PACKAGES_STAGE0 += data-bitcode-llvm
+PACKAGES_STAGE0 += data-bitcode-edsl
 
 PACKAGES_STAGE1 += ghc-prim
 PACKAGES_STAGE1 += $(INTEGER_LIBRARY)
@@ -460,6 +463,7 @@ PACKAGES_STAGE1 += ghc-boot
 PACKAGES_STAGE1 += template-haskell
 PACKAGES_STAGE1 += ghc-compact
 
+
 ifeq "$(HADDOCK_DOCS)" "YES"
 PACKAGES_STAGE1 += xhtml
 endif
@@ -474,6 +478,10 @@ PACKAGES_STAGE1 += stm
 PACKAGES_STAGE1 += haskeline
 PACKAGES_STAGE1 += ghci
 PACKAGES_STAGE1 += libiserv
+
+PACKAGES_STAGE1 += data-bitcode
+PACKAGES_STAGE1 += data-bitcode-llvm
+PACKAGES_STAGE1 += data-bitcode-edsl
 
 # See Note [No stage2 packages when CrossCompiling or Stage1Only].
 # See Note [Stage1Only vs stage=1] in mk/config.mk.in.
