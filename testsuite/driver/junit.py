@@ -1,5 +1,6 @@
 from datetime import datetime
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape
 
 def junit(t):
     testsuites = ET.Element('testsuites')
@@ -18,21 +19,21 @@ def junit(t):
                                      classname = testname,
                                      name = way)
             result = ET.SubElement(testcase, 'failure',
-                                   type = reason,
-                                   message = result)
+                                   type = 'unexpected failure',
+                                   message = escape(reason))
 
     for (directory, testname, reason, way) in t.framework_failures:
         testcase = ET.SubElement(testsuite, 'testcase',
                                  classname = testname,
-                                 name = way)
+                                 name = escape(way))
         result = ET.SubElement(testcase, 'error',
                                type = "framework failure",
-                               message = reason)
+                               message = escape(reason))
 
     for (directory, testname, way) in t.expected_passes:
         testcase = ET.SubElement(testsuite, 'testcase',
                                  classname = testname,
-                                 name = way)
+                                 name = escape(way))
 
     return ET.ElementTree(testsuites)
 
