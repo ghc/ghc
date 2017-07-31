@@ -315,11 +315,11 @@ def nofib(params) {
     stage('Run nofib') {
       installPkgs(['regex-compat'])
       sh """
-        cd nofib
-        ${makeCmd} clean
-        ${makeCmd} boot
-        ${makeCmd} >../nofib.log 2>&1
-        """
+         cd nofib
+         ${makeCmd} clean
+         ${makeCmd} boot
+         ${makeCmd} >../nofib.log 2>&1
+         """
       archiveArtifacts artifacts: 'nofib.log'
     }
   }
