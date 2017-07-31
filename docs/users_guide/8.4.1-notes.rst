@@ -146,3 +146,9 @@ Template Haskell
       #endif
 
   can be used.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Blank strings can now be used as values for environment variables using the
+  System.Environment.Blank module. See :ghc-ticket:`12494`
