@@ -373,7 +373,7 @@ checkMatches' vars matches
         (NotCovered, Diverged )   -> (final_prov,  rs, final_u, m:is)
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
-    hsLMatchToLPats (L l (Match _ pats _ _)) = L l pats
+    hsLMatchToLPats (L l (Match { m_pats = pats })) = L l pats
 
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
@@ -748,7 +748,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
                -> DsM (PatVec,[PatVec])
-translateMatch fam_insts (L _ (Match _ lpats _ grhss)) = do
+translateMatch fam_insts (L _ (Match { m_pats = lpats, m_grhss = grhss })) = do
   pats'   <- concat <$> translatePatVec fam_insts pats
   guards' <- mapM (translateGuards fam_insts) guards
   return (pats', guards')

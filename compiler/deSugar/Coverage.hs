@@ -657,10 +657,10 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
-addTickMatch isOneOfMany isLambda (Match mf pats opSig gRHSs) =
+addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
-    return $ Match mf pats opSig gRHSs'
+    return $ match { m_grhss = gRHSs' }
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -898,10 +898,10 @@ addTickCmdMatchGroup mg@(MG { mg_alts = L l matches }) = do
   return $ mg { mg_alts = L l matches' }
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
-addTickCmdMatch (Match mf pats opSig gRHSs) =
+addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
-    return $ Match mf pats opSig gRHSs'
+    return $ match { m_grhss = gRHSs' }
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs guarded (L l local_binds)) = do
@@ -1279,7 +1279,7 @@ hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 matchesOneOfMany :: [LMatch GhcTc body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
-        matchCount (L _ (Match _ _pats _ty (GRHSs grhss _binds))) = length grhss
+        matchCount (L _ (Match { m_grhss = GRHSs grhss _binds })) = length grhss
 
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 

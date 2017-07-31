@@ -146,7 +146,8 @@ mkSimpleMatch :: HsMatchContext (NameOrRdrName (IdP id))
               -> LMatch id (Located (body id))
 mkSimpleMatch ctxt pats rhs
   = L loc $
-    Match ctxt pats Nothing (unguardedGRHSs rhs)
+    Match { m_ctxt = ctxt, m_pats = pats, m_type = Nothing
+          , m_grhss = unguardedGRHSs rhs }
   where
     loc = case pats of
                 []      -> getLoc rhs
@@ -766,8 +767,10 @@ mkPrefixFunRhs n = FunRhs { mc_fun = n
 mkMatch :: HsMatchContext (NameOrRdrName (IdP p)) -> [LPat p] -> LHsExpr p
         -> Located (HsLocalBinds p) -> LMatch p (LHsExpr p)
 mkMatch ctxt pats expr lbinds
-  = noLoc (Match ctxt (map paren pats) Nothing
-                 (GRHSs (unguardedRHS noSrcSpan expr) lbinds))
+  = noLoc (Match { m_ctxt  = ctxt
+                 , m_pats  = map paren pats
+                 , m_type  = Nothing
+                 , m_grhss = GRHSs (unguardedRHS noSrcSpan expr) lbinds })
   where
     paren lp@(L l p) | hsPatNeedsParens p = L l (ParPat lp)
                      | otherwise          = lp

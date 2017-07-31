@@ -565,10 +565,11 @@ zonkMatch :: ZonkEnv
           -> (ZonkEnv -> Located (body GhcTcId) -> TcM (Located (body GhcTc)))
           -> LMatch GhcTcId (Located (body GhcTcId))
           -> TcM (LMatch GhcTc (Located (body GhcTc)))
-zonkMatch env zBody (L loc (Match mf pats _ grhss))
+zonkMatch env zBody (L loc match@(Match { m_pats = pats, m_grhss = grhss }))
   = do  { (env1, new_pats) <- zonkPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
-        ; return (L loc (Match mf new_pats Nothing new_grhss)) }
+        ; return (L loc (match { m_pats = new_pats, m_type = Nothing
+                               , m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
 zonkGRHSs :: ZonkEnv

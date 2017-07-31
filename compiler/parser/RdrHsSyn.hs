@@ -425,8 +425,8 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1),
 getMonoBind bind binds = (bind, binds)
 
 has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
-has_args []                           = panic "RdrHsSyn:has_args"
-has_args ((L _ (Match _ args _ _)) : _) = not (null args)
+has_args []                                    = panic "RdrHsSyn:has_args"
+has_args ((L _ (Match { m_pats = args })) : _) = not (null args)
         -- Don't group together FunBinds if they have
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
@@ -1247,9 +1247,9 @@ checkCmdMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs)
 checkCmdMatchGroup mg@(MG { mg_alts = L l ms }) = do
     ms' <- mapM (locMap $ const convert) ms
     return $ mg { mg_alts = L l ms' }
-    where convert (Match mf pat mty grhss) = do
+    where convert match@(Match { m_grhss = grhss }) = do
             grhss' <- checkCmdGRHSs grhss
-            return $ Match mf pat mty grhss'
+            return $ match { m_grhss = grhss'}
 
 checkCmdGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> P (GRHSs GhcPs (LHsCmd GhcPs))
 checkCmdGRHSs (GRHSs grhss binds) = do

@@ -1257,7 +1257,7 @@ repE e                     = notHandled "Expression form" (ppr e)
 -- Building representations of auxillary structures like Match, Clause, Stmt,
 
 repMatchTup ::  LMatch GhcRn (LHsExpr GhcRn) -> DsM (Core TH.MatchQ)
-repMatchTup (L _ (Match _ [p] _ (GRHSs guards (L _ wheres)))) =
+repMatchTup (L _ (Match { m_pats = [p], m_grhss = GRHSs guards (L _ wheres) })) =
   do { ss1 <- mkGenSyms (collectPatBinders p)
      ; addBinds ss1 $ do {
      ; p1 <- repLP p
@@ -1269,7 +1269,7 @@ repMatchTup (L _ (Match _ [p] _ (GRHSs guards (L _ wheres)))) =
 repMatchTup _ = panic "repMatchTup: case alt with more than one arg"
 
 repClauseTup ::  LMatch GhcRn (LHsExpr GhcRn) -> DsM (Core TH.ClauseQ)
-repClauseTup (L _ (Match _ ps _ (GRHSs guards (L _ wheres)))) =
+repClauseTup (L _ (Match { m_pats = ps, m_grhss = GRHSs guards (L _ wheres) })) =
   do { ss1 <- mkGenSyms (collectPatsBinders ps)
      ; addBinds ss1 $ do {
        ps1 <- repLPs ps
@@ -1439,8 +1439,8 @@ rep_bind :: LHsBind GhcRn -> DsM (SrcSpan, Core TH.DecQ)
 rep_bind (L loc (FunBind
                  { fun_id = fn,
                    fun_matches = MG { mg_alts
-                           = L _ [L _ (Match _ [] _
-                                             (GRHSs guards (L _ wheres)))] } }))
+                           = L _ [L _ (Match { m_pats = []
+                                             , m_grhss = GRHSs guards (L _ wheres) })] } }))
  = do { (ss,wherecore) <- repBinds wheres
         ; guardcore <- addBinds ss (repGuards guards)
         ; fn'  <- lookupLBinder fn
@@ -1581,7 +1581,8 @@ repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]
 -- (\ p1 .. pn -> exp) by causing an error.
 
 repLambda :: LMatch GhcRn (LHsExpr GhcRn) -> DsM (Core TH.ExpQ)
-repLambda (L _ (Match _ ps _ (GRHSs [L _ (GRHS [] e)] (L _ EmptyLocalBinds))))
+repLambda (L _ (Match { m_pats = ps
+                      , m_grhss = GRHSs [L _ (GRHS [] e)] (L _ EmptyLocalBinds) } ))
  = do { let bndrs = collectPatsBinders ps ;
       ; ss  <- mkGenSyms bndrs
       ; lam <- addBinds ss (

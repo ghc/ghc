@@ -1484,7 +1484,7 @@ matchGroupArity (MG { mg_alts = alts })
   | otherwise        = panic "matchGroupArity"
 
 hsLMatchPats :: LMatch id body -> [LPat id]
-hsLMatchPats (L _ (Match _ pats _ _)) = pats
+hsLMatchPats (L _ (Match { m_pats = pats })) = pats
 
 -- | Guarded Right-Hand Sides
 --
