@@ -185,8 +185,10 @@ as an unrestricted one; just pass it unrestricted arguments.
 
 ## Unimplemented features & known limitations
 There are some parts of Haskell that are not yet implemented linearly, meaning
-you cannot use them with linear variables, most
-notably `case` and `let`:
+you cannot use them with linear variables.
+
+### `case` and `let`
+The probably most noteworthy things are `case` and `let`:
 
 ```
 λ> let f :: a ⊸ a; f x = case x of x -> x
@@ -203,7 +205,26 @@ notably `case` and `let`:
     • In an equation for ‘f’: f x = let y = x in y
 ```
 
-Other than that, pattern synonyms are also not compatible with linear types
+### Records
+Record syntax itself works fine, but please note that the constructors are fully
+linear; this is mainly because mixed-linearity records would need a new and
+probably complicated syntax. Record _projections_ are considered unrestricted,
+because in general they are. Consider something like
+
+```
+data P a b = P { p1 :: a, p2 :: b }
+```
+
+Here, both the `a` and `b` are linear, but the corresponding projections are
+not. However, your can always work around this by writing your own, linear,
+projections like:
+
+```
+unP :: P a b ⊸ (a, b)
+```
+
+### Pattern synonyms
+Pattern synonyms are also not compatible with linear types
 (and probably incorrect). These are the current _known_ limitations; there may
 be more but it has not been thoroughly tested yet.
 
