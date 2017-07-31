@@ -1254,7 +1254,7 @@ Help functions for type applications
 
 addTypeCtxt :: LHsType GhcRn -> TcM a -> TcM a
         -- Wrap a context around only if we want to show that contexts.
-        -- Omit invisble ones and ones user's won't grok
+        -- Omit invisible ones and ones user's won't grok
 addTypeCtxt (L _ ty) thing
   = addErrCtxt doc thing
   where

@@ -389,7 +389,7 @@ matchExpectedTyConApp tc orig_ty
     -- kind-compatible with T.  For example, suppose we have
     --       matchExpectedTyConApp T (f Maybe)
     -- where data T a = MkT a
-    -- Then we don't want to instantate T's data constructors with
+    -- Then we don't want to instantiate T's data constructors with
     --    (a::*) ~ Maybe
     -- because that'll make types that are utterly ill-kinded.
     -- This happened in Trac #7368

@@ -485,7 +485,7 @@ That is, its TyVarBinders should be
                             , TvBndr (a:k->*) Specified
                             , TvBndr (b:k)    Specified ]
 
-So tyConTyVarBinders conversts TyCon's TyConBinders into TyVarBinders:
+So tyConTyVarBinders converts TyCon's TyConBinders into TyVarBinders:
   - variable names from the TyConBinders
   - but changing Anon/Required to Specified
 

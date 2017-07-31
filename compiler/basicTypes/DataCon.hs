@@ -902,7 +902,7 @@ dataConExTyVars (MkData { dcExTyVars = tvbs }) = binderVars tvbs
 dataConExTyVarBinders :: DataCon -> [TyVarBinder]
 dataConExTyVarBinders = dcExTyVars
 
--- | Both the universal and existentiatial type variables of the constructor
+-- | Both the universal and existential type variables of the constructor
 dataConAllTyVars :: DataCon -> [TyVar]
 dataConAllTyVars (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs })
   = binderVars (univ_tvs ++ ex_tvs)

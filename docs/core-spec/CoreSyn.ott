@@ -318,7 +318,7 @@ terminals :: 'terminals_' ::=
   | no_duplicates ::  :: no_duplicates    {{ tex \textsf{no\_duplicates } }}
   | vars_of      ::   :: vars_of          {{ tex \textsf{vars\_of } }}
   | not          ::   :: not              {{ tex \neg }}
-  | isUnLiftedTyCon :: :: isUnLiftenTyCon {{ tex \textsf{isUnLiftedTyCon} }}
+  | isUnLiftedTyCon :: :: isUnLiftedTyCon {{ tex \textsf{isUnLiftedTyCon} }}
   | compatibleUnBoxedTys :: :: compatibleUnBoxedTys {{ tex \textsf{compatibleUnBoxedTys} }}
   | false        ::   :: false            {{ tex \textsf{false} }}
   | true         ::   :: true             {{ tex \textsf{true} }}

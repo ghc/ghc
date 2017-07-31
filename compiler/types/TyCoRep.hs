@@ -477,7 +477,7 @@ Note [TyVarBndrs, TyVarBinders, TyConBinders, and visiblity]
 This table summarises the visiblity rules:
 ---------------------------------------------------------------------------------------
 |                                                      Occurrences look like this
-|                             GHC displays type as     in Haskell souce code
+|                             GHC displays type as     in Haskell source code
 |-----------------------------------------------------------------------
 | TvBndr a tvis :: TyVarBinder, in the binder of ForAllTy for a term
 |  tvis :: ArgFlag

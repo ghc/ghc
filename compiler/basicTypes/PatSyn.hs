@@ -177,7 +177,7 @@ P's universal tyvars. You have to /match/
   the type of the pattern, (T [ty] Bool)
 against
   the psResultTy for the pattern synonym, T [a] Bool
-to get the insantiation a := ty.
+to get the instantiation a := ty.
 
 This is very unlike DataCons, where univ tyvars match 1-1 the
 arguments of the TyCon.

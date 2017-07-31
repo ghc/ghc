@@ -350,7 +350,7 @@ Note [Thunks in recursive groups]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We never eta-expand a thunk in a recursive group, on the grounds that if it is
-part of a recursive group, then it will be called multipe times.
+part of a recursive group, then it will be called multiple times.
 
 This is not necessarily true, e.g.  it would be safe to eta-expand t2 (but not
 t1) in the following code:

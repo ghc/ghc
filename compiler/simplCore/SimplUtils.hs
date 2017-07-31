@@ -1785,7 +1785,7 @@ prepareAlts scrut case_bndr' alts
 mkCase tries these things
 
 * Note [Nerge nested cases]
-* Note [Elimiante identity case]
+* Note [Eliminate identity case]
 * Note [Scrutinee constant folding]
 
 Note [Merge Nested Cases]

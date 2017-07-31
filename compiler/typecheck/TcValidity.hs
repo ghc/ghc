@@ -1200,7 +1200,7 @@ It checks for three things
     might be applications thus (f (g x)).
 
     Note that tys only includes the visible arguments of the class type
-    constructor. Including the non-vivisble arguments can cause the following,
+    constructor. Including the non-visible arguments can cause the following,
     perfectly valid instance to be rejected:
        class Category (cat :: k -> k -> *) where ...
        newtype T (c :: * -> * -> *) a b = MkT (c a b)

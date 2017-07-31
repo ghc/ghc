@@ -62,7 +62,7 @@ sinkReg fm r
 
 -- | Slurp out mov instructions that only serve to join live ranges.
 --
---   During a mov, if the source reg dies and the destiation reg is
+--   During a mov, if the source reg dies and the destination reg is
 --   born then we can rename the two regs to the same thing and
 --   eliminate the move.
 slurpJoinMovs
