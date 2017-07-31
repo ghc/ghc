@@ -201,9 +201,9 @@ envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
 
 addDataCon :: OutId -> LaxDataCon -> [OutStgArg] -> CseEnv -> CseEnv
 -- do not bother with nullary data constructors, they are static anyways
-addDataCon bndr dataCon [] env = env { ce_conAppMap = new_env }
-  where new_env = alterTM (dataCon, []) (\case Nothing -> pure bndr; p -> p) (ce_conAppMap env)
---addDataCon _ _ [] env = env
+--addDataCon bndr dataCon [] env = env { ce_conAppMap = new_env }
+--  where new_env = alterTM (dataCon, []) (\case Nothing -> pure bndr; p -> p) (ce_conAppMap env)
+addDataCon _ _ [] env = env
 addDataCon bndr dataCon args env = env { ce_conAppMap = new_env }
   where
     new_env = insertTM (dataCon, args) bndr (ce_conAppMap env)
