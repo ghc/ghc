@@ -68,9 +68,9 @@ test x = do
 
     let (r40, r41) = (['l'], baz r40)
     (same $! r40) $! r41
-    let (r42, r43) = ([], eq1 r42)
+    let (r42, r43) = ([], baz r42)
     (same $! r42) $! r43
-    let (r44, r45) = ("ab", eq1 r44)
+    let (r44, r45) = ("ab", baz r44)
     (same $! r44) $! r45
     let (r46, r47) = (Refl, eq1 r46)
     (same $! r46) $! r47
