@@ -13,6 +13,12 @@ There are two types of common code occurrences that we aim for, see
 note [Case 1: CSEing allocated closures] and
 note [Case 2: CSEing case binders] below.
 
+TODOs:
+- rerun occurrence analysis
+- dumping of STG misses binder
+- does not look up in scope to find low-hanging fruit
+- can we dedup info tables for representationally equal data constructors?
+
 
 Note [Case 1: CSEing allocated closures]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -219,9 +225,9 @@ envLookup dataCon args env = lookupTM (dataCon, args') (ce_conAppMap env)
 
 addDataCon :: OutId -> LaxDataCon -> [OutStgArg] -> CseEnv -> CseEnv
 -- do not bother with nullary data constructors, they are static anyways
---addDataCon bndr dataCon [] env = env { ce_conAppMap = new_env }
---  where new_env = alterTM (dataCon, []) (\case Nothing -> pure bndr; p -> p) (ce_conAppMap env)
-addDataCon _ _ [] env = env
+addDataCon bndr dataCon [] env = env { ce_conAppMap = new_env }
+  where new_env = alterTM (dataCon, []) (\case Nothing -> pure bndr; p -> p) (ce_conAppMap env)
+--addDataCon _ _ [] env = env
 addDataCon bndr dataCon args env = env { ce_conAppMap = new_env }
   where
     new_env = insertTM (dataCon, args) bndr (ce_conAppMap env)
