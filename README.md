@@ -206,22 +206,29 @@ The probably most noteworthy things are `case` and `let`:
 ```
 
 ### Records
-Record syntax itself works fine, but please note that the constructors are fully
-linear; this is mainly because mixed-linearity records would need a new and
-probably complicated syntax. Record _projections_ are considered unrestricted,
-because in general they are. Consider something like
+Record syntax itself works fine, but please note that type constructors are by 
+default linear; mixed-linearity records could be possible but would need a new and
+probably complicated syntax. This does however affect record _projections_, which
+must be considered unrestricted, because in general they are. Consider something
+like
 
 ```
 data P a b = P { p1 :: a, p2 :: b }
+p1 :: P a b -> a
+p2 :: P a b -> b
 ```
 
-Here, both the `a` and `b` are linear, but the corresponding projections are
-not. However, your can always work around this by writing your own, linear,
-projections like:
+Here both the `a` and `b` are linear, but the corresponding projections are
+not, because they discard the other field. However, your can always work around
+this by writing your own, linear, projections like so:
 
 ```
 unP :: P a b ⊸ (a, b)
 ```
+
+It may in the future be possible to special-case single field records,
+which could be useful for convenient `newtype`s.
+
 
 ### Pattern synonyms
 Pattern synonyms are also not compatible with linear types
