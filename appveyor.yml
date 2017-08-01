@@ -26,6 +26,7 @@ install:
 
 build_script:
     # Build Hadrian
+    - stack build alex happy # Otherwise 'stack build' fails on AppVeyor
     - stack build
 
     # Run internal Hadrian tests
