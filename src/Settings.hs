@@ -70,7 +70,7 @@ integerLibraryName = pkgNameString $ integerLibrary flavour
 
 programContext :: Stage -> Package -> Context
 programContext stage pkg
-    | pkg == ghc && ghcProfiled flavour = Context stage pkg profiling
+    | pkg == ghc && ghcProfiled flavour && stage > Stage0 = Context stage pkg profiling
     | otherwise = vanillaContext stage pkg
 
 -- TODO: switch to Set Package as the order of packages should not matter?
