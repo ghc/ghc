@@ -122,10 +122,10 @@ executable hadrian
                        , ansi-terminal        == 0.6.*
                        , Cabal                == 2.0.0.2
                        , containers           == 0.5.*
-                       , directory            == 1.2.*
+                       , directory            >= 1.2 && < 1.4
                        , extra                >= 1.4.7
                        , mtl                  == 2.2.*
-                       , QuickCheck           >= 2.6 && < 2.9
+                       , QuickCheck           >= 2.6 && < 2.10
                        , shake                >= 0.15.6
                        , transformers         >= 0.4 && < 0.6
                        , unordered-containers == 0.2.*
