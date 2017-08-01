@@ -44,3 +44,34 @@ sdist_$1_$2_$4 : $1/$2/build/$4.hs
 # didn't generate all package-data.mk files.
 $$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3))
 endef
+
+# -----------------------------------------------------------------------------
+# Variant of sdist-ghc-file whose `$3`-argument is interpreted
+# differently in a more appropriate way for cabal-packages
+
+define sdist-ghc-file2
+# $1 = dir
+# $2 = distdir
+# $3 = moduledir
+# $4 = filename
+# $5 = extension
+
+.PHONY: sdist_$1_$2_$4
+
+# We should do this before creating the `sdist-ghc` tarball, or when just
+# running `make sdist-ghc-prep`.
+sdist-ghc-prep : sdist_$1_$2_$4
+
+# But first create SRC_DIST_GHC_DIR.
+sdist_$1_$2_$4 : sdist-ghc-prep-tree
+
+# Generate the .hs files if they don't exist yet, then do actual copying and
+# moving.
+sdist_$1_$2_$4 : $1/$2/build/$3/$4.hs
+	"$(CP)" $1/$2/build/$3/$4.hs $(SRC_DIST_GHC_DIR)/$1/$3
+	mv $(SRC_DIST_GHC_DIR)/$1/$3/$4.$5 $(SRC_DIST_GHC_DIR)/$1/$3/$4.$5.source
+
+# And make sure the rules for generating the .hs files exist, even when we
+# didn't generate all package-data.mk files.
+$$(eval $$(call hs-suffix-rules-srcdir,$1,$2,$3))
+endef
