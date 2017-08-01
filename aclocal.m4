@@ -227,7 +227,7 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkVendor() {
         case [$]1 in
-        dec|none|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld)
+        dec|none|unknown|hp|apple|next|sun|sgi|ibm|montavista|portbld|alpine)
             ;;
         *)
             AC_MSG_WARN([Unknown vendor [$]1])
