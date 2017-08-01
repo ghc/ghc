@@ -36,7 +36,8 @@ import PprCore          ( pprCoreExpr )
 import CoreUnfold
 import CoreUtils
 import CoreOpt          ( pushCoTyArg, pushCoValArg
-                        , joinPointBinding_maybe, joinPointBindings_maybe )
+                        , joinPointBinding_maybe, joinPointBindings_maybe
+                        , loopificationJoinPointBinding_maybe )
 import Rules            ( mkRuleInfo, lookupRule, getRules )
 import Demand           ( mkClosedStrictSig, topDmd, exnRes )
 import BasicTypes       ( TopLevelFlag(..), isNotTopLevel, isTopLevel,
@@ -143,6 +144,8 @@ simplTopBinds env0 binds0
                                       ; (floats, env2) <- simpl_binds env1 binds
                                       ; return (float `addFloats` floats, env2) }
 
+    simpl_bind env bind | Just bind' <- maybeLoopify bind
+                        = simpl_bind env bind'
     simpl_bind env (Rec pairs)  = simplRecBind env TopLevel Nothing pairs
     simpl_bind env (NonRec b r) = do { (env', b') <- addBndrRules env b (lookupRecBndr env b)
                                      ; simplRecOrTopPair env' TopLevel
@@ -910,6 +913,10 @@ simplExprF1 env (Case scrut bndr _ alts) cont
                                  , sc_alts = alts
                                  , sc_env = env, sc_cont = cont })
 
+simplExprF1 env (Let bind body) cont
+  | Just bind' <- maybeLoopify bind
+  = simplExprF1 env (Let bind' body) cont
+
 simplExprF1 env (Let (Rec pairs) body) cont
   | Just pairs' <- joinPointBindings_maybe pairs
   = simplRecJoinPoint env pairs' body cont
@@ -1609,8 +1616,27 @@ Bottom line: if case-of-case is off, we must stop pushing the continuation
 inwards altogether at any join point.  Instead simplify the (join ... in ...)
 with a Stop continuation, and wrap the original continuation around the
 outside.  Surprisingly tricky!
+-}
 
+-- Is this a tail-recursive function that we want to loopify? Then
+-- lets loopify it and simplify that
+maybeLoopify :: InBind -> Maybe InBind
+maybeLoopify (Rec [(bndr, rhs)])
+  | Just (bndr', join_bndr, join_rhs) <- loopificationJoinPointBinding_maybe bndr rhs
+  = do  { let Just arity = isJoinId_maybe join_bndr
+        ; let (join_params, _join_body) = collectNBinders arity join_rhs
+        ; let join_params' =
+                [ if isId var then zapIdOccInfo var else var
+                | var <- join_params ]
+            -- Some might be marked as dead (in the RHS), but there are not dead here
+        ; let rhs' = mkLams join_params' $
+                     mkLetRec [(join_bndr,join_rhs)] $
+                     mkVarApps (Var join_bndr) join_params'
+        ; Just (NonRec bndr' rhs')
+        }
+maybeLoopify _ = Nothing
 
+{-
 ************************************************************************
 *                                                                      *
                      Variables

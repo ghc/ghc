@@ -2,7 +2,9 @@ test('T5644', [extra_files(['Conf.hs', 'ManyQueue.hs', 'Util.hs', 'heap-overflow
                
                 only_ways(['optasm','threaded1','threaded2']),
                 extra_run_opts('+RTS -M20m -RTS'),
-                exit_code(251) # RTS exit code for "out of memory"
+                exit_code(251), # RTS exit code for "out of memory"
+		# With loopification, the code does no longer run out of heap space:
+		expect_broken(14068)
               ],
               multimod_compile_and_run,
               ['heap-overflow.hs','-O'])

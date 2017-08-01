@@ -72,7 +72,7 @@ module BasicTypes(
         OneBranch, oneBranch, notOneBranch,
         InterestingCxt,
         TailCallInfo(..), tailCallInfo, zapOccTailCallInfo,
-        isAlwaysTailCalled,
+        isAlwaysTailCalled, isSometimesTailCalled,
 
         EP(..),
 
@@ -936,6 +936,7 @@ notOneBranch = False
 
 -----------------
 data TailCallInfo = AlwaysTailCalled JoinArity -- See Note [TailCallInfo]
+                  | RecursiveTailCalled JoinArity
                   | NoTailCallInfo
   deriving (Eq)
 
@@ -949,12 +950,20 @@ zapOccTailCallInfo occ       = occ { occ_tail = NoTailCallInfo }
 
 isAlwaysTailCalled :: OccInfo -> Bool
 isAlwaysTailCalled occ
-  = case tailCallInfo occ of AlwaysTailCalled{} -> True
-                             NoTailCallInfo     -> False
+  = case tailCallInfo occ of AlwaysTailCalled{}     -> True
+                             RecursiveTailCalled {} -> False
+                             NoTailCallInfo         -> False
+
+isSometimesTailCalled :: OccInfo -> Bool
+isSometimesTailCalled occ
+  = case tailCallInfo occ of AlwaysTailCalled{}     -> True
+                             RecursiveTailCalled {} -> True
+                             NoTailCallInfo         -> False
 
 instance Outputable TailCallInfo where
-  ppr (AlwaysTailCalled ar) = sep [ text "Tail", int ar ]
-  ppr _                     = empty
+  ppr (AlwaysTailCalled ar)    = sep [ text "Tail", int ar ]
+  ppr (RecursiveTailCalled ar) = sep [ text "Tail(rec)", int ar ]
+  ppr _                        = empty
 
 -----------------
 strongLoopBreaker, weakLoopBreaker :: OccInfo
@@ -1004,8 +1013,9 @@ instance Outputable OccInfo where
           pp_tail             = pprShortTailCallInfo tail_info
 
 pprShortTailCallInfo :: TailCallInfo -> SDoc
-pprShortTailCallInfo (AlwaysTailCalled ar) = char 'T' <> brackets (int ar)
-pprShortTailCallInfo NoTailCallInfo        = empty
+pprShortTailCallInfo (AlwaysTailCalled ar)    = char 'T'  <> brackets (int ar)
+pprShortTailCallInfo (RecursiveTailCalled ar) = text "TR" <> brackets (int ar)
+pprShortTailCallInfo NoTailCallInfo           = empty
 
 {-
 Note [TailCallInfo]
@@ -1037,6 +1047,10 @@ point can also be invoked from other join points, not just from case branches:
 
 Here both 'j1' and 'j2' will get marked AlwaysTailCalled, but j1 will get
 ManyOccs and j2 will get `OneOcc { occ_one_br = True }`.
+
+The RecursiveTailCalled marker, which is only valid for a recursive binder,
+says: All recursive calls are tail calls in the sense of AlwaysTailCalled,
+even if some calls in the body might not be.
 
 ************************************************************************
 *                                                                      *

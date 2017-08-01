@@ -550,8 +550,8 @@ zapFragileUnfolding unf
 zapTailCallInfo :: IdInfo -> Maybe IdInfo
 zapTailCallInfo info
   = case occInfo info of
-      occ | isAlwaysTailCalled occ -> Just (info `setOccInfo` safe_occ)
-          | otherwise              -> Nothing
+      occ | isSometimesTailCalled occ -> Just (info `setOccInfo` safe_occ)
+          | otherwise                 -> Nothing
         where
           safe_occ = occ { occ_tail = NoTailCallInfo }
 

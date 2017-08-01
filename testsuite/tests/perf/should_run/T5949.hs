@@ -53,4 +53,4 @@ e x y = x `seq` if y > 10
         else e x (y + 1)
 
 
-main = foldr (seq) 0 [e (n,0) 0| n <- [0..10000]] `seq` return ()
+main = sum [uncurry (+) (e (n,n) 0)| n <- [0..10000]] `seq` return ()
