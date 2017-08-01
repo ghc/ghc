@@ -71,11 +71,7 @@ import qualified Data.Map as Map
 import qualified Data.IntMap as IntMap
 import qualified FiniteMap as Map
 import Data.Ord
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Generating byte code for a complete module

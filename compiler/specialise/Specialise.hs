@@ -43,9 +43,7 @@ import State
 import UniqDFM
 
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 
 {-
 ************************************************************************
@@ -2289,10 +2287,8 @@ instance Monad SpecM where
                                        z
     fail str = SpecM $ fail str
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail SpecM where
     fail str = SpecM $ fail str
-#endif
 
 instance MonadUnique SpecM where
     getUniqueSupplyM

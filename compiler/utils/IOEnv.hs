@@ -1,5 +1,3 @@
-{-# LANGUAGE CPP #-}
-
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -41,9 +39,7 @@ import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef,
 import System.IO.Unsafe ( unsafeInterleaveIO )
 import System.IO        ( fixIO )
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import MonadUtils
 import Control.Applicative (Alternative(..))
 
@@ -62,11 +58,8 @@ instance Monad (IOEnv m) where
     (>>)   = (*>)
     fail _ = failM -- Ignore the string
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail (IOEnv m) where
     fail _ = failM -- Ignore the string
-#endif
-
 
 instance Applicative (IOEnv m) where
     pure = returnM

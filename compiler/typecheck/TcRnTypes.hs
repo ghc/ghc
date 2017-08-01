@@ -183,9 +183,7 @@ import Util
 import PrelNames ( isUnboundName )
 
 import Control.Monad (ap, liftM, msum)
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import Data.Set      ( Set )
 import qualified Data.Set as S
 
@@ -3513,10 +3511,8 @@ instance Monad TcPluginM where
     TcPluginM (\ ev -> do a <- m ev
                           runTcPluginM (k a) ev)
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail TcPluginM where
   fail x   = TcPluginM (const $ fail x)
-#endif
 
 runTcPluginM :: TcPluginM a -> EvBindsVar -> TcM a
 runTcPluginM (TcPluginM m) = m

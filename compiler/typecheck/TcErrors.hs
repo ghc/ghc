@@ -61,10 +61,8 @@ import Control.Monad    ( when )
 import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
 import qualified Data.Set as Set
 
-#if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-#endif
 
 
 {-
@@ -247,10 +245,8 @@ Unfortunately, unlike the context, the relevant bindings are added in
 multiple places so they have to be in the Report.
 -}
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup Report where
     Report a1 b1 c1 <> Report a2 b2 c2 = Report (a1 ++ a2) (b1 ++ b2) (c1 ++ c2)
-#endif
 
 instance Monoid Report where
     mempty = Report [] [] []

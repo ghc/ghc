@@ -9,7 +9,6 @@ Based on @UniqFMs@ (as you would expect).
 Basically, the things need to be in class @Uniquable@.
 -}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module UniqSet (
@@ -53,9 +52,7 @@ import Data.Coerce
 import Outputable
 import Data.Foldable (foldl')
 import Data.Data
-#if __GLASGOW_HASKELL__ >= 801
 import qualified Data.Semigroup
-#endif
 
 -- Note [UniqSet invariant]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -189,10 +186,8 @@ unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where
     ppr = pprUniqSet ppr
-#if __GLASGOW_HASKELL__ >= 801
 instance Data.Semigroup.Semigroup (UniqSet a) where
   (<>) = mappend
-#endif
 instance Monoid (UniqSet a) where
   mempty = UniqSet mempty
   UniqSet s `mappend` UniqSet t = UniqSet (s `mappend` t)

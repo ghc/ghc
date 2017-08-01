@@ -3,7 +3,7 @@
 (c) University of Glasgow, 2007
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation, RecordWildCards #-}
+{-# LANGUAGE NondecreasingIndentation, RecordWildCards #-}
 
 module Coverage (addTicksToBinds, hpcInitCode) where
 
@@ -11,11 +11,7 @@ import qualified GHCi
 import GHCi.RemoteTypes
 import Data.Array
 import ByteCodeTypes
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
-#endif
 import Type
 import HsSyn
 import Module

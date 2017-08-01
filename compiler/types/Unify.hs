@@ -42,9 +42,7 @@ import UniqFM
 import UniqSet
 
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import Control.Applicative hiding ( empty )
 import qualified Control.Applicative
 
@@ -1050,10 +1048,8 @@ instance Alternative UM where
 
 instance MonadPlus UM
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail UM where
     fail _   = UM (\_ -> SurelyApart) -- failed pattern match
-#endif
 
 initUM :: TvSubstEnv  -- subst to extend
        -> CvSubstEnv

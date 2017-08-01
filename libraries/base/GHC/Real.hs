@@ -646,14 +646,12 @@ lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 gcdInt' :: Int -> Int -> Int
 gcdInt' (I# x) (I# y) = I# (gcdInt x y)
 
-#if MIN_VERSION_integer_gmp(1,0,0)
 {-# RULES
 "gcd/Word->Word->Word"          gcd = gcdWord'
  #-}
 
 gcdWord' :: Word -> Word -> Word
 gcdWord' (W# x) (W# y) = W# (gcdWord x y)
-#endif
 #endif
 
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]

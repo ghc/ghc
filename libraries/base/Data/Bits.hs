@@ -57,17 +57,13 @@ module Data.Bits (
 
 #include "MachDeps.h"
 
-#if defined(MIN_VERSION_integer_gmp)
-# define HAVE_INTEGER_GMP1 MIN_VERSION_integer_gmp(1,0,0)
-#endif
-
 import Data.Maybe
 import GHC.Enum
 import GHC.Num
 import GHC.Base
 import GHC.Real
 
-#if HAVE_INTEGER_GMP1
+#if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals (bitInteger, popCountInteger)
 #endif
 
@@ -526,7 +522,7 @@ instance Bits Integer where
    testBit x (I# i) = testBitInteger x i
    zeroBits   = 0
 
-#if HAVE_INTEGER_GMP1
+#if defined(MIN_VERSION_integer_gmp)
    bit (I# i#) = bitInteger i#
    popCount x  = I# (popCountInteger x)
 #else

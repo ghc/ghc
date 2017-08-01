@@ -4,9 +4,7 @@
 
 -- The default iteration limit is a bit too low for the definitions
 -- in this module.
-#if __GLASGOW_HASKELL__ >= 800
 {-# OPTIONS_GHC -fmax-pmcheck-iterations=10000000 #-}
-#endif
 
 module OptCoercion ( optCoercion, checkAxInstCo ) where
 

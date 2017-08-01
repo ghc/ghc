@@ -47,16 +47,10 @@ module GHC.Natural
 
 #include "MachDeps.h"
 
-#if defined(MIN_VERSION_integer_gmp)
-# define HAVE_GMP_BIGNAT MIN_VERSION_integer_gmp(1,0,0)
-#else
-# define HAVE_GMP_BIGNAT 0
-#endif
-
 import GHC.Arr
 import GHC.Base
 import {-# SOURCE #-} GHC.Exception (underflowException)
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 import GHC.Integer.GMP.Internals
 import Data.Word
 import Data.Int
@@ -87,7 +81,7 @@ underflowError = raise# underflowException
 -- Natural type
 -------------------------------------------------------------------------------
 
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 -- TODO: if saturated arithmetic is to used, replace 'underflowError' by '0'
 
 -- | Type representing arbitrary-precision non-negative integers.
@@ -450,7 +444,7 @@ naturalToInt :: Natural -> Int
 naturalToInt (NatS# w#) = I# (word2Int# w#)
 naturalToInt (NatJ# bn) = I# (bigNatToInt bn)
 
-#else /* !HAVE_GMP_BIGNAT */
+#else /* !defined(MIN_VERSION_integer_gmp) */
 ----------------------------------------------------------------------------
 -- Use wrapped 'Integer' as fallback; taken from Edward Kmett's nats package
 
@@ -606,7 +600,7 @@ instance Integral Natural where
 --
 -- @since 4.8.0.0
 wordToNatural :: Word -> Natural
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 wordToNatural (W# w#) = NatS# w#
 #else
 wordToNatural w = Natural (fromIntegral w)
@@ -617,7 +611,7 @@ wordToNatural w = Natural (fromIntegral w)
 --
 -- @since 4.8.0.0
 naturalToWordMaybe :: Natural -> Maybe Word
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 naturalToWordMaybe (NatS# w#) = Just (W# w#)
 naturalToWordMaybe (NatJ# _)  = Nothing
 #else
@@ -633,7 +627,7 @@ naturalToWordMaybe (Natural i)
 --
 -- @since 4.8.0.0
 powModNatural :: Natural -> Natural -> Natural -> Natural
-#if HAVE_GMP_BIGNAT
+#if defined(MIN_VERSION_integer_gmp)
 powModNatural _           _           (NatS# 0##) = divZeroError
 powModNatural _           _           (NatS# 1##) = NatS# 0##
 powModNatural _           (NatS# 0##) _           = NatS# 1##
