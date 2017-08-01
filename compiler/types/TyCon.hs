@@ -2108,6 +2108,10 @@ expandSynTyCon_maybe tc tys
 -- | Check if the tycon actually refers to a proper `data` or `newtype`
 --  with user defined constructors rather than one from a class or other
 --  construction.
+
+-- NB: This is only used in TcRnExports.checkPatSynParent to determine if an
+-- exported tycon can have a pattern synonym bundled with it, e.g.,
+-- module Foo (TyCon(.., PatSyn)) where
 isTyConWithSrcDataCons :: TyCon -> Bool
 isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcParent = parent }) =
   case rhs of
@@ -2117,6 +2121,8 @@ isTyConWithSrcDataCons (AlgTyCon { algTcRhs = rhs, algTcParent = parent }) =
     _ -> False
   where
     isSrcParent = isNoParent parent
+isTyConWithSrcDataCons (FamilyTyCon { famTcFlav = DataFamilyTyCon {} })
+                         = True -- #14058
 isTyConWithSrcDataCons _ = False
 
 
