@@ -778,7 +778,7 @@ mkDataCon name declared_infix prom_info
 --      data T a where { MkT :: S }
 -- then it's possible that the univ_tvs may hit an assertion failure
 -- if you pull on univ_tvs.  This case is checked by checkValidDataCon,
--- so the error is detected properly... it's just that asaertions here
+-- so the error is detected properly... it's just that assertions here
 -- are a little dodgy.
 
   = con

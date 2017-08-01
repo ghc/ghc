@@ -195,7 +195,7 @@ dsHsBind _ (PatSynBind{}) = panic "dsHsBind: PatSynBind"
 -----------------------
 dsAbsBinds :: DynFlags
            -> [TyVar] -> [EvVar] -> [ABExport GhcTc]
-           -> [CoreBind]                -- Desugared evidence bidings
+           -> [CoreBind]                -- Desugared evidence bindings
            -> ([Id], [(Id,CoreExpr)])   -- Desugared value bindings
            -> Bool                      -- Single binding with signature
            -> DsM ([Id], [(Id,CoreExpr)])

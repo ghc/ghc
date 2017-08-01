@@ -2699,7 +2699,7 @@ Note [Add unfolding for scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general it's unlikely that a variable scrutinee will appear
 in the case alternatives   case x of { ...x unlikely to appear... }
-because the binder-swap in OccAnal has got rid of all such occcurrences
+because the binder-swap in OccAnal has got rid of all such occurrences
 See Note [Binder swap] in OccAnal.
 
 BUT it is still VERY IMPORTANT to add a suitable unfolding for a
