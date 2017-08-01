@@ -11,6 +11,7 @@ import ErrUtils
 import Outputable
 import Util
 import Exception
+import Fingerprint
 import DriverPhases
 
 import Control.Monad
@@ -154,8 +155,8 @@ getTempDir dflags = do
     mapping <- readIORef dir_ref
     case Map.lookup tmp_dir mapping of
         Nothing -> do
-            pid <- getProcessID
-            let prefix = tmp_dir </> "ghc" ++ show pid ++ "_"
+            pid <- getStableProcessID
+            let prefix = tmp_dir </> "ghc" ++ pid ++ "_"
             mask_ $ mkTempDir prefix
         Just dir -> return dir
   where
@@ -189,6 +190,13 @@ getTempDir dflags = do
                 return dir
       `catchIO` \e -> if isAlreadyExistsError e
                       then mkTempDir prefix else ioError e
+
+      -- Get reproducible output, by not using the "random" pid, but rather
+      -- something deterministic.
+      getStableProcessID :: IO String
+      getStableProcessID = do
+          args <- getArgs
+          return $ take 4 $ show $ fingerprintString $ unwords args
 
 {- Note [Deterministic base name]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
