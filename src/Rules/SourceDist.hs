@@ -4,12 +4,14 @@ import Base
 import Builder
 import Oracles.Config.Setting
 import Oracles.DirectoryContents
+import Rules.Clean
 import UserSettings
 import Util
 
 sourceDistRules :: Rules ()
 sourceDistRules = do
     "sdist-ghc" ~> do
+        cleanSourceTree -- We clean the source tree first, see #384
         version <- setting ProjectVersion
         need ["sdistprep/ghc-" ++ version ++ "-src.tar.xz"]
         putSuccess "| Done"
@@ -41,6 +43,7 @@ prepareTree dest = do
         , Test "//*~"
         , Test "//autom4te*"
         , Test "//dist"
+        , Test "//dist-install"
         , Test "//log"
         , Test "//stage0"
         , Test "//stage1"
