@@ -11,6 +11,7 @@ cabal.sandbox.config
 
 # build.cabal-new.sh specific
 /dist-newstyle/
+.ghc.environment.*
 
 # build.stack.sh and build.stack.bat specific
 /.stack-work/
