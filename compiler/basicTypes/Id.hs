@@ -5,7 +5,7 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 -}
 
-{-# LANGUAGE ImplicitParams, CPP #-}
+{-# LANGUAGE CPP #-}
 
 -- |
 -- #name_types#

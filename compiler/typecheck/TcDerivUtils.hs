@@ -6,7 +6,6 @@
 Error-checking and other utilities for @deriving@ clauses or declarations.
 -}
 
-{-# LANGUAGE ImplicitParams #-}
 {-# LANGUAGE TypeFamilies #-}
 
 module TcDerivUtils (
