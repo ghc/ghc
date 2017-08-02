@@ -955,7 +955,8 @@ recording inlinings for any Ids which aren't marked as "no-inline" as it goes.
 
 -- Return the bindings sorted into a plausible order, and marked with loop breakers.
 loopBreakNodes depth bndr_set weak_fvs nodes binds
-  = go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
+  = -- pprTrace "loopBreakNodes" (ppr nodes) $
+    go (stronglyConnCompFromEdgedVerticesUniqR nodes) binds
   where
     go []         binds = binds
     go (scc:sccs) binds = loop_break_scc scc (go sccs binds)
@@ -972,8 +973,8 @@ reOrderNodes :: Int -> VarSet -> VarSet -> [LetrecNode] -> [Binding] -> [Binding
 reOrderNodes _ _ _ []     _     = panic "reOrderNodes"
 reOrderNodes _ _ _ [node] binds = mk_loop_breaker node : binds
 reOrderNodes depth bndr_set weak_fvs (node : nodes) binds
-  = -- pprTrace "reOrderNodes" (text "unchosen" <+> ppr unchosen $$
-    --                           text "chosen" <+> ppr chosen_nodes) $
+  = -- pprTrace "reOrderNodes" (vcat [ text "unchosen" <+> ppr unchosen
+    --                              , text "chosen" <+> ppr chosen_nodes ]) $
     loopBreakNodes new_depth bndr_set weak_fvs unchosen $
     (map mk_loop_breaker chosen_nodes ++ binds)
   where
