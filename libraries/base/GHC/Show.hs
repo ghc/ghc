@@ -196,6 +196,7 @@ showWord w# cs
  | otherwise = case chr# (ord# '0'# +# word2Int# (w# `remWord#` 10##)) of
                c# ->
                    showWord (w# `quotWord#` 10##) (C# c# : cs)
+{-# NOINLINE showWord #-}
 
 deriving instance Show a => Show (Maybe a)
 deriving instance Show a => Show (NonEmpty a)
