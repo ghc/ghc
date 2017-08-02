@@ -1094,6 +1094,7 @@ instance Outputable TcTyThing where     -- Debugging only
                                  <> ppr (varType (tct_id elt)) <> comma
                                  <+> ppr (tct_info elt))
    ppr (ATyVar n tv)    = text "Type variable" <+> quotes (ppr n) <+> equals <+> ppr tv
+                            <+> dcolon <+> ppr (varType tv)
    ppr (ATcTyCon tc)    = text "ATcTyCon" <+> ppr tc <+> dcolon <+> ppr (tyConKind tc)
    ppr (APromotionErr err) = text "APromotionErr" <+> ppr err
 

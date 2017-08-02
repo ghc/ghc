@@ -280,12 +280,9 @@ isEmptyLHsQTvs _                = False
 
 ------------------------------------------------
 --            HsImplicitBndrs
--- Used to quantify the binders of a type in cases
--- when a HsForAll isn't appropriate:
+-- Used to quantify the implicit binders of a type
+--    * Implicit binders of a type signature (LHsSigType/LHsSigWcType)
 --    * Patterns in a type/data family instance (HsTyPats)
---    * Type of a rule binder (RuleBndr)
---    * Pattern type signatures (SigPatIn)
--- In the last of these, wildcards can happen, so we must accommodate them
 
 -- | Haskell Implicit Binders
 data HsImplicitBndrs pass thing   -- See Note [HsType binders]

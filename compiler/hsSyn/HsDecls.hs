@@ -1330,7 +1330,7 @@ type patterns, i.e. fv(pat_tys).  Note in particular
   '_' gets its own unique.  In this context wildcards behave just like
   an ordinary type variable, only anonymous.
 
-* The hsib_vars *including* type variables that are already in scope
+* The hsib_vars *includes* type variables that are already in scope
 
    Eg   class C s t where
           type F t p :: *
