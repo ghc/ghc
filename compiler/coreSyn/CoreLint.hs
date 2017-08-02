@@ -548,6 +548,7 @@ lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
                                   (mkInvalidJoinPointMsg binder binder_ty)
 
        ; when (lf_check_inline_loop_breakers flags
+               && isStableUnfolding (realIdUnfolding binder)
                && isStrongLoopBreaker (idOccInfo binder)
                && isInlinePragma (idInlinePragma binder))
               (addWarnL (text "INLINE binder is (non-rule) loop breaker:" <+> ppr binder))
