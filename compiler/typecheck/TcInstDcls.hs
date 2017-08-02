@@ -695,7 +695,7 @@ tcDataFamInstDecl mb_clsinfo
                       -- the end of Note [Data type families] in TyCon
                     rep_tc   = mkAlgTyCon rep_tc_name
                                           ty_binders liftedTypeKind
-                                          (map (const Nominal) full_tvs)
+                                          (map (const Nominal) ty_binders)
                                           (fmap unLoc cType) stupid_theta
                                           tc_rhs parent
                                           gadt_syntax
