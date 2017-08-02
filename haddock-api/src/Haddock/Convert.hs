@@ -191,7 +191,7 @@ synifyTyCon _coax tc
                        synifyFamilyResultSig resultVar (tyConResKind tc)
                  , fdInjectivityAnn =
                        synifyInjectivityAnn  resultVar (tyConTyVars tc)
-                                       (familyTyConInjectivityInfo tc)
+                                       (tyConInjectivityInfo tc)
                  }
 
 synifyTyCon coax tc
