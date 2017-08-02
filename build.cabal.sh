@@ -48,7 +48,6 @@ if [ "${CABVER[0]}" -eq 2 -o "${CABVER[0]}" -eq 1 -a "${CABVER[1]}" -ge 24 ]; th
 
     # there's no 'cabal new-run' yet, but it's easy to emulate
     "$CABAL" new-build --disable-profiling --disable-documentation -j exe:hadrian
-    PKGVER="$(awk '/^version:/ { print $2 }' hadrian.cabal)"
     $(find ./dist-newstyle -type f -name hadrian | head -n 1) \
         --lint                         \
         --directory "$absoluteRoot/.." \
