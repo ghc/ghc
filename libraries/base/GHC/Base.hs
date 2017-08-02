@@ -1183,6 +1183,7 @@ eqString :: String -> String -> Bool
 eqString []       []       = True
 eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
 eqString _        _        = False
+{-# NOINLINE eqString #-}
 
 {-# RULES "eqString" (==) = eqString #-}
 -- eqString also has a BuiltInRule in PrelRules.hs:
