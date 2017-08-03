@@ -30,7 +30,7 @@ module Type (
         mkTyConApp, mkTyConTy,
         tyConAppTyCon_maybe, tyConAppTyConPicky_maybe,
         tyConAppArgs_maybe, tyConAppTyCon, tyConAppArgs,
-        splitTyConApp_maybe, splitTyConApp, tyConAppArgN, nextRole,
+        splitTyConApp_maybe, splitTyConApp, tyConAppArgN,
         tcRepSplitTyConApp_maybe, tcSplitTyConApp_maybe,
         splitListTyConApp_maybe,
         repSplitTyConApp_maybe,
@@ -92,7 +92,7 @@ module Type (
         mkAnonBinder,
         isAnonTyBinder, isNamedTyBinder,
         binderVar, binderVars, binderKind, binderArgFlag,
-        tyBinderType,
+        tyBinderType, tyBinderVar_maybe,
         binderRelevantType_maybe, caseBinder,
         isVisibleArgFlag, isInvisibleArgFlag, isVisibleBinder, isInvisibleBinder,
         tyConBindersTyBinders,
@@ -659,6 +659,11 @@ the type checker (e.g. when matching type-function equations).
 
 -- | Applies a type to another, as in e.g. @k a@
 mkAppTy :: Type -> Type -> Type
+  -- See Note [Respecting definitional equality], invariant (EQ1).
+mkAppTy (CastTy fun_ty co) arg_ty
+  | ([arg_co], res_co) <- decomposePiCos (typeKind fun_ty) [arg_ty] co
+  = (fun_ty `mkAppTy` (arg_ty `mkCastTy` arg_co)) `mkCastTy` res_co
+
 mkAppTy (TyConApp tc tys) ty2 = mkTyConApp tc (tys ++ [ty2])
 mkAppTy ty1               ty2 = AppTy ty1 ty2
         -- Note that the TyConApp could be an
@@ -672,6 +677,15 @@ mkAppTy ty1               ty2 = AppTy ty1 ty2
 
 mkAppTys :: Type -> [Type] -> Type
 mkAppTys ty1                []   = ty1
+mkAppTys (CastTy fun_ty co) arg_tys  -- much more efficient then nested mkAppTy
+                                     -- Why do this? See (EQ1) of
+                                     -- Note [Respecting definitional equality]
+                                     -- in TyCoRep
+  = foldl AppTy ((mkAppTys fun_ty casted_arg_tys) `mkCastTy` res_co) leftovers
+  where
+    (arg_cos, res_co) = decomposePiCos (typeKind fun_ty) arg_tys co
+    (args_to_cast, leftovers) = splitAtList arg_cos arg_tys
+    casted_arg_tys = zipWith mkCastTy args_to_cast arg_cos
 mkAppTys (TyConApp tc tys1) tys2 = mkTyConApp tc (tys1 ++ tys2)
 mkAppTys ty1                tys2 = foldl AppTy ty1 tys2
 
@@ -1126,20 +1140,6 @@ splitListTyConApp_maybe ty = case splitTyConApp_maybe ty of
   Just (tc,[e]) | tc == listTyCon -> Just e
   _other                          -> Nothing
 
--- | What is the role assigned to the next parameter of this type? Usually,
--- this will be 'Nominal', but if the type is a 'TyConApp', we may be able to
--- do better. The type does *not* have to be well-kinded when applied for this
--- to work!
-nextRole :: Type -> Role
-nextRole ty
-  | Just (tc, tys) <- splitTyConApp_maybe ty
-  , let num_tys = length tys
-  , num_tys < tyConArity tc
-  = tyConRoles tc `getNth` num_tys
-
-  | otherwise
-  = Nominal
-
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- ^ Unwrap one 'layer' of newtype on a type constructor and its
 -- arguments, using an eta-reduced version of the @newtype@ if possible.
@@ -1156,47 +1156,6 @@ newTyConInstRhs tycon tys
                            ~~~~~~
 A casted type has its *kind* casted into something new.
 
-Note [No reflexive casts in types]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-As far as possible, we would like to maintain the following property:
-
-  (*) If (t1 `eqType` t2), then t1 and t2 are treated identically within GHC.
-
-The (*) property is very useful, because we have a tendency to compare two
-types to see if they're equal, and then arbitrarily choose one. We don't
-want this arbitrary choice to then matter later on. Maintaining (*) means
-that every function that looks at a structure of a type must think about
-casts. In places where we directly pattern-match, this consideration is
-forced by consideration of the CastTy constructor.
-
-But, when we call a splitXXX function, it's easy to ignore the possibility
-of casts. In particular, splitTyConApp is used extensively, and we don't
-want it to fail on (T a b c |> co). Happily, if we have
-  (T a b c |> co) `eqType` (T d e f)
-then co must be reflexive. Why? eqType checks that the kinds are equal, as
-well as checking that (a `eqType` d), (b `eqType` e), and (c `eqType` f).
-By the kind check, we know that (T a b c |> co) and (T d e f) have the same
-kind. So the only way that co could be non-reflexive is for (T a b c) to have
-a different kind than (T d e f). But because T's kind is closed (all tycon kinds
-are closed), the only way for this to happen is that one of the arguments has
-to differ, leading to a contradiction. Thus, co is reflexive.
-
-Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
-about outermost casts to uphold (*).
-
-Unfortunately, that's not the end of the story. Consider comparing
-  (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> sym co)
-These two types have the same kind (Type), but the left type is a TyConApp
-while the right type is not. To handle this case, we will have to implement
-some variant of the dreaded KPush algorithm (c.f. CoreOpt.pushCoDataCon).
-This stone is left unturned for now, meaning that we don't yet uphold (*).
-
-The other place where (*) will be hard to guarantee is in splitAppTy, because
-I (Richard E) can't think of a way to push coercions into AppTys. The good
-news here is that splitAppTy is not used all that much, and so all clients of
-that function can simply be told to use splitCastTy as well, in order to
-uphold (*). This, too, is left undone, for now.
-
 -}
 
 splitCastTy_maybe :: Type -> Maybe (Type, Coercion)
@@ -1206,16 +1165,17 @@ splitCastTy_maybe _                            = Nothing
 
 -- | Make a 'CastTy'. The Coercion must be nominal. Checks the
 -- Coercion for reflexivity, dropping it if it's reflexive.
--- See Note [No reflexive casts in types]
+-- See Note [Respecting definitional equality] in TyCoRep
 mkCastTy :: Type -> Coercion -> Type
-mkCastTy ty co | isReflexiveCo co = ty
+mkCastTy ty co | isReflexiveCo co = ty  -- (EQ2) from the Note
 -- NB: Do the slow check here. This is important to keep the splitXXX
 -- functions working properly. Otherwise, we may end up with something
 -- like (((->) |> something_reflexive_but_not_obviously_so) biz baz)
 -- fails under splitFunTy_maybe. This happened with the cheaper check
 -- in test dependent/should_compile/dynamic-paper.
 
-mkCastTy (CastTy ty co1) co2 = mkCastTy ty (co1 `mkTransCo` co2)
+mkCastTy (CastTy ty co1) co2 = mkCastTy ty (co1 `mkTransCo` co2) -- (EQ3) from the Note
+                          -- call mkCastTy again for the reflexivity check
 mkCastTy ty co = CastTy ty co
 
 tyConBindersTyBinders :: [TyConBinder] -> [TyBinder]
@@ -1494,6 +1454,10 @@ isAnonTyBinder (Anon {})  = True
 isNamedTyBinder :: TyBinder -> Bool
 isNamedTyBinder (Named {}) = True
 isNamedTyBinder (Anon {})  = False
+
+tyBinderVar_maybe :: TyBinder -> Maybe TyVar
+tyBinderVar_maybe (Named tv) = Just $ binderVar tv
+tyBinderVar_maybe _          = Nothing
 
 tyBinderType :: TyBinder -> Type
 -- Barely used

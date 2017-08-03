@@ -2,7 +2,7 @@
 
 module TcFlatten(
    FlattenMode(..),
-   flatten, flattenManyNom,
+   flatten, flattenKind, flattenArgsNom,
 
    unflattenWanteds
  ) where
@@ -20,17 +20,16 @@ import TyCon
 import TyCoRep   -- performs delicate algorithm on types
 import Coercion
 import Var
+import VarSet
 import VarEnv
 import Outputable
 import TcSMonad as TcS
 import BasicTypes( SwapFlag(..) )
 
+import Pair
 import Util
 import Bag
-import Pair
 import Control.Monad
-import MonadUtils ( zipWithAndUnzipM )
-import GHC.Exts ( inline )
 
 import Control.Arrow ( first )
 
@@ -57,7 +56,7 @@ Note [The flattening story]
 
    - A unification flatten-skolem, fmv, stands for the as-yet-unknown
      type to which (F xis) will eventually reduce.  It is filled in
-     only by dischargeFmv.
+
 
    - All fsk/fmv variables are "untouchable".  To make it simple to test,
      we simply give them TcLevel=0.  This means that in a CTyVarEq, say,
@@ -479,13 +478,6 @@ eqFlattenMode FM_SubstOnly  FM_SubstOnly  = True
 --  FM_Avoid tv1 b1 `eq` FM_Avoid tv2 b2 = tv1 == tv2 && b1 == b2
 eqFlattenMode _  _ = False
 
-mkFlattenEnv :: FlattenMode -> CtEvidence -> FlatWorkListRef -> FlattenEnv
-mkFlattenEnv fm ctev ref = FE { fe_mode    = fm
-                              , fe_loc     = ctEvLoc ctev
-                              , fe_flavour = ctEvFlavour ctev
-                              , fe_eq_rel  = ctEvEqRel ctev
-                              , fe_work    = ref }
-
 -- | The 'FlatM' monad is a wrapper around 'TcS' with the following
 -- extra capabilities: (1) it offers access to a 'FlattenEnv';
 -- and (2) it maintains the flattening worklist.
@@ -513,15 +505,23 @@ emitFlatWork :: Ct -> FlatM ()
 -- See Note [The flattening work list]
 emitFlatWork ct = FlatM $ \env -> updTcRef (fe_work env) (ct :)
 
-runFlatten :: FlattenMode -> CtEvidence -> FlatM a -> TcS a
+-- convenient wrapper when you have a CtEvidence describing
+-- the flattening operation
+runFlattenCtEv :: FlattenMode -> CtEvidence -> FlatM a -> TcS a
+runFlattenCtEv mode ev
+  = runFlatten mode (ctEvLoc ev) (ctEvFlavour ev) (ctEvEqRel ev)
+
 -- Run thing_inside (which does flattening), and put all
 -- the work it generates onto the main work list
 -- See Note [The flattening work list]
--- NB: The returned evidence is always the same as the original, but with
--- perhaps a new CtLoc
-runFlatten mode ev thing_inside
+runFlatten :: FlattenMode -> CtLoc -> CtFlavour -> EqRel -> FlatM a -> TcS a
+runFlatten mode loc flav eq_rel thing_inside
   = do { flat_ref <- newTcRef []
-       ; let fmode = mkFlattenEnv mode ev flat_ref
+       ; let fmode = FE { fe_mode = mode
+                        , fe_loc  = loc
+                        , fe_flavour = flav
+                        , fe_eq_rel = eq_rel
+                        , fe_work = flat_ref }
        ; res <- runFlatM thing_inside fmode
        ; new_flats <- readTcRef flat_ref
        ; updWorkListTcS (add_flats new_flats)
@@ -585,16 +585,18 @@ setMode new_mode thing_inside
     then runFlatM thing_inside env
     else runFlatM thing_inside (env { fe_mode = new_mode })
 
--- | Use when flattening kinds/kind coercions. See
+-- | Make sure that flattening actually produces a coercion (in other
+-- words, make sure our flavour is not Derived)
 -- Note [No derived kind equalities]
-flattenKinds :: FlatM a -> FlatM a
-flattenKinds thing_inside
+noBogusCoercions :: FlatM a -> FlatM a
+noBogusCoercions thing_inside
   = FlatM $ \env ->
     let kind_flav = case fe_flavour env of
-                      Given -> Given
-                      _     -> Wanted WDeriv
+                      Derived -> Wanted WDeriv
+                      other   -> other
     in
-    runFlatM thing_inside (env { fe_eq_rel = NomEq, fe_flavour = kind_flav })
+    runFlatM thing_inside (env { fe_flavour = kind_flav })
+
 
 bumpDepth :: FlatM a -> FlatM a
 bumpDepth (FlatM thing_inside)
@@ -721,15 +723,11 @@ yields a better error message anyway.)
 
 Note [No derived kind equalities]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We call flattenKinds in two places: in flatten_co (Note [Flattening coercions])
-and in flattenTyVar. The latter case is easier to understand; flattenKinds is
-used to flatten the kind of a flat (i.e. inert) tyvar. Flattening a kind
-naturally produces a coercion. This coercion is then used in the flattened type.
-However, danger lurks if the flattening flavour (that is, the fe_flavour of the
-FlattenEnv) is Derived: the coercion might be bottom. (This can happen when
-looks up a kindvar in the inert set only to find a Derived equality, with
-no coercion.) The solution is simple: ensure that the fe_flavour is not derived
-when flattening a kind. This is what flattenKinds does.
+A kind-level coercion can appear in types, via mkCastTy. So, whenever
+we are generating a coercion in a dependent context (in other words,
+in a kind) we need to make sure that our flavour is never Derived
+(as Derived constraints have no evidence). The noBogusCoercions function
+changes the flavour from Derived just for this purpose.
 
 -}
 
@@ -746,21 +744,36 @@ flatten :: FlattenMode -> CtEvidence -> TcType
         -> TcS (Xi, TcCoercion)
 flatten mode ev ty
   = do { traceTcS "flatten {" (ppr mode <+> ppr ty)
-       ; (ty', co) <- runFlatten mode ev (flatten_one ty)
+       ; (ty', co) <- runFlattenCtEv mode ev (flatten_one ty)
        ; traceTcS "flatten }" (ppr ty')
        ; return (ty', co) }
 
-flattenManyNom :: CtEvidence -> [TcType] -> TcS ([Xi], [TcCoercion])
+-- specialized to flattening kinds: never Derived, always Nominal
+-- See Note [No derived kind equalities]
+flattenKind :: CtLoc -> CtFlavour -> TcType -> TcS (Xi, TcCoercionN)
+flattenKind loc flav ty
+  = do { traceTcS "flattenKind {" (ppr flav <+> ppr ty)
+       ; let flav' = case flav of
+                       Derived -> Wanted WDeriv  -- the WDeriv/WOnly choice matters not
+                       _       -> flav
+       ; (ty', co) <- runFlatten FM_FlattenAll loc flav' NomEq (flatten_one ty)
+       ; traceTcS "flattenKind }" (ppr ty' $$ ppr co) -- co is never a panic
+       ; return (ty', co) }
+
+flattenArgsNom :: CtEvidence -> TyCon -> [TcType] -> TcS ([Xi], [TcCoercion], TcCoercionN)
 -- Externally-callable, hence runFlatten
--- Flatten a bunch of types all at once; in fact they are
--- always the arguments of a saturated type-family, so
+-- Flatten a vector of types all at once; in fact they are
+-- always the arguments of type family or class, so
 --      ctEvFlavour ev = Nominal
 -- and we want to flatten all at nominal role
-flattenManyNom ev tys
-  = do { traceTcS "flatten_many {" (vcat (map ppr tys))
-       ; (tys', cos) <- runFlatten FM_FlattenAll ev (flatten_many_nom tys)
+-- The kind passed in is the kind of the type family or class, call it T
+-- The last coercion returned has type (typeKind(T xis) ~N typeKind(T tys))
+flattenArgsNom ev tc tys
+  = do { traceTcS "flatten_args {" (vcat (map ppr tys))
+       ; (tys', cos, kind_co)
+           <- runFlattenCtEv FM_FlattenAll ev (flatten_args_tc tc (repeat Nominal) tys)
        ; traceTcS "flatten }" (vcat (map ppr tys'))
-       ; return (tys', cos) }
+       ; return (tys', cos, kind_co) }
 
 
 {- *********************************************************************
@@ -778,6 +791,11 @@ flattenManyNom ev tys
          has no filled-in metavariables
       co :: xi ~ ty
 
+Key invariants:
+  (F0) co :: xi ~ zonk(ty)
+  (F1) typeKind(xi) succeeds and returns a fully zonked kind
+  (F2) typeKind(xi) `eqType` zonk(typeKind(ty))
+
 Note that it is flatten's job to flatten *every type function it sees*.
 flatten is only called on *arguments* to type functions, by canEqGiven.
 
@@ -787,9 +805,10 @@ Flattening also:
 
 Because flattening zonks and the returned coercion ("co" above) is also
 zonked, it's possible that (co :: xi ~ ty) isn't quite true. So, instead,
-we can rely on these facts:
+we can rely on this fact:
+
   (F1) typeKind(xi) succeeds and returns a fully zonked kind
-  (F2) co :: xi ~ zonk(ty)
+
 Note that the left-hand type of co is *always* precisely xi. The right-hand
 type may or may not be ty, however: if ty has unzonked filled-in metavariables,
 then the right-hand type of co will be the zonked version of ty.
@@ -798,45 +817,16 @@ occasionally have to explicitly zonk, when (co :: xi ~ ty) is important
 even before we zonk the whole program. For example, see the FTRNotFollowed
 case in flattenTyVar.
 
-Why have these invariants on flattening? Really, they're both to ensure
-invariant (F1), which is a Good Thing because we sometimes use typeKind
+Why have these invariants on flattening? Because we sometimes use typeKind
 during canonicalisation, and we want this kind to be zonked (e.g., see
-TcCanonical.homogeniseRhsKind). Invariant (F2) is needed solely to support
-(F1). It is relied on in one place:
+TcCanonical.canEqTyVar).
 
- - The FTRNotFollowed case in flattenTyVar. Here, we have a tyvar
- that cannot be reduced any further (that is, no equality over the tyvar
- is in the inert set such that the inert equality can rewrite the constraint
- at hand, and it is not a filled-in metavariable).
- But its kind might still not be flat,
- if it mentions a type family or a variable that can be rewritten. Flattened
- types have flattened kinds (see below), so we must flatten the kind. Here is
- an example:
+Flattening is always homogeneous. That is, the kind of the result of flattening is
+always the same as the kind of the input, modulo zonking. More formally:
 
-   let kappa be a filled-in metavariable such that kappa := k.
-   [G] co :: k ~ Type
+  (F2) typeKind(xi) `eqType` zonk(typeKind(ty))
 
-   We are flattening
-     a :: kappa
-   where a is a skolem.
-
- We end up in the FTRNotFollowed case, but we need to flatten the kind kappa.
- Flattening kappa yields (Type, kind_co), where kind_co :: Type ~ k. Note that the
- right-hand type of kind_co is *not* kappa, because (F1) tells us it's zonk(kappa),
- which is k. Now, we return (a |> sym kind_co). If we are to uphold (F1), then
- the right-hand type of (sym kind_co) had better be fully zonked. In other words,
- the left-hand type of kind_co needs to be zonked... which is precisely what (F2)
- guarantees.
-
-In order to support (F2), we require that ctEvCoercion, when called on a
-zonked CtEvidence, always returns a zonked coercion. See Note [Given in
-ctEvCoercion]. This requirement comes into play in flatten_tyvar2. (I suppose
-we could move the logic from ctEvCoercion to flatten_tyvar2, but it's much
-easier to do in ctEvCoercion.)
-
-Flattening a type also means flattening its kind. In the case of a type
-variable whose kind mentions a type family, this might mean that the result
-of flattening has a cast in it.
+This invariant means that the kind of a flattened type might not itself be flat.
 
 Recall that in comments we use alpha[flat = ty] to represent a
 flattening skolem variable alpha which has been generated to stand in
@@ -863,12 +853,12 @@ transitive expansion contains any type function applications.  If so,
 it expands the synonym and proceeds; if not, it simply returns the
 unexpanded synonym.
 
-Note [flatten_many performance]
+Note [flatten_args performance]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In programs with lots of type-level evaluation, flatten_many becomes
+In programs with lots of type-level evaluation, flatten_args becomes
 part of a tight loop. For example, see test perf/compiler/T9872a, which
-calls flatten_many a whopping 7,106,808 times. It is thus important
-that flatten_many be efficient.
+calls flatten_args a whopping 7,106,808 times. It is thus important
+that flatten_args be efficient.
 
 Performance testing showed that the current implementation is indeed
 efficient. It's critically important that zipWithAndUnzipM be
@@ -879,8 +869,8 @@ it. On test T9872a, here are the allocation stats (Dec 16, 2014):
  * Specialized, uninlined:       6,639,253,488 bytes allocated in the heap
  * Specialized, inlined:         6,281,539,792 bytes allocated in the heap
 
-To improve performance even further, flatten_many_nom is split off
-from flatten_many, as nominal equality is the common case. This would
+To improve performance even further, flatten_args_nom is split off
+from flatten_args, as nominal equality is the common case. This would
 be natural to write using mapAndUnzipM, but even inlined, that function
 is not as performant as a hand-written loop.
 
@@ -893,32 +883,331 @@ and T5321Fun.
 If we need to make this yet more performant, a possible way forward is to
 duplicate the flattener code for the nominal case, and make that case
 faster. This doesn't seem quite worth it, yet.
+
+Note [flatten_args]
+~~~~~~~~~~~~~~~~~~~
+Invariant (F2) of Note [Flattening] says that flattening is homogeneous.
+This causes some trouble when flattening a function applied to a telescope
+of arguments, perhaps with dependency. For example, suppose
+
+  type family F :: forall (j :: Type) (k :: Type). Maybe j -> Either j k -> Bool -> [k]
+
+and we wish to flatten the args of (with kind applications explicit)
+
+  F a b (Just a c) (Right a b d) False
+
+where all variables are skolems and
+
+  a :: Type
+  b :: Type
+  c :: a
+  d :: k
+
+  [G] aco :: a ~ fa
+  [G] bco :: b ~ fb
+  [G] cco :: c ~ fc
+  [G] dco :: d ~ fd
+
+We process the args in left-to-right order. The first two args are easy:
+
+  (sym aco, fa) <- flatten a
+  (sym bco, fb) <- flatten b
+
+But now consider flattening (Just a c :: Maybe a). Regardless of how this
+flattens, the result will have kind (Maybe a), due to (F2). And yet, when
+we build the application (F fa fb ...), we need this argument to have kind
+(Maybe fa), not (Maybe a). Suppose (Just a c) flattens to f3 (the "3" is
+because it's the 3rd argument). We know f3 :: Maybe a. In order to get f3
+to have kind Maybe fa, we must cast it. The coercion to use is determined
+by the kind of F: we see in F's kind that the third argument has kind
+Maybe j. Critically, we also know that the argument corresponding to j
+(in our example, a) flattened with a coercion (sym aco). We can thus
+know the coercion needed for the 3rd argument is (Maybe aco).
+
+More generally, we must use the Lifting Lemma, as implemented in
+Coercion.liftCoSubst. As we work left-to-right, any variable that is a
+dependent parameter (j and k, in our example) gets mapped in a lifting context
+to the coercion that is output from flattening the corresponding argument (aco
+and bco, in our example). Then, after flattening later arguments, we lift the
+kind of these arguments in the lifting context that we've be building up.
+This coercion is then used to keep the result of flattening well-kinded.
+
+Working through our example, this is what happens:
+
+  1. Flatten a, getting (sym aco, fa). Extend the (empty) LC with [j |-> sym aco]
+
+  2. Flatten b, getting (sym bco, fb). Extend the LC with [k |-> sym bco].
+
+  3. Flatten (Just a c), getting (co3, f3). Lifting the kind (Maybe j) with our LC
+     yields lco3 :: Maybe fa ~ Maybe a. Use (f3 |> sym lco3) as the argument to
+     F.
+
+  4. Flatten (Right a b d), getting (co4, f4). Lifting the kind (Either j k) with our LC
+     yields lco4 :: Either fa fb ~ Either a b. Use (f4 |> sym lco4) as the 4th
+     argument to F.
+
+  5. Flatten False, getting (<False>, False). We lift Bool with our LC, getting <Bool>;
+     casting has no effect. (Indeed we lifted and casted with no effect for steps 1 and 2, as well.)
+
+We're now almost done, but the new application (F fa fb (f3 |> sym lco3) (f4
+|> sym lco4) False) has the wrong kind. Its kind is [fb], instead of the original [b].
+So we must use our LC one last time to lift the result kind [k], getting res_co :: [fb] ~ [b], and
+we cast our result.
+
+Accordingly, the final result is
+
+  F fa fb (Just fa (fc |> aco) |> Maybe (sym aco) |> sym (Maybe (sym aco)))
+          (Right fa fb (fd |> bco) |> Either (sym aco) (sym bco) |> sym (Either (sym aco) (sym bco)))
+          False
+            |> [sym bco]
+
+The res_co is returned as the third return value from flatten_args.
+
+Note [Last case in flatten_args]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In writing flatten_args's `go`, we know here that tys cannot be empty,
+because that case is first. We've run out of
+binders. But perhaps inner_ki is a tyvar that has been instantiated with a
+Π-type. I believe this, today, this Π-type must be an ordinary function.
+But tomorrow, we may allow, say, visible type application in types. And
+it's best to be prepared.
+
+Here is an example.
+
+  a :: forall (k :: Type). k -> k
+  type family Star
+  Proxy :: forall j. j -> Type
+  axStar :: Star ~ Type
+  type family NoWay :: Bool
+  axNoWay :: NoWay ~ False
+  bo :: Type
+  [G] bc :: bo ~ Bool   (in inert set)
+
+  co :: (forall j. j -> Type) ~ (forall (j :: Star). (j |> axStar) -> Star)
+  co = forall (j :: sym axStar). (<j> -> sym axStar)
+
+  We are flattening:
+  a (forall (j :: Star). (j |> axStar) -> Star)   -- 1
+    (Proxy |> co)                                 -- 2
+    (bo |> sym axStar)                            -- 3
+    (NoWay |> sym bc)                             -- 4
+      :: Star
+
+Flattening (1) gives us
+    (forall j. j -> Type)
+    co1 :: (forall j. j -> Type) ~ (forall (j :: Star). (j |> axStar) -> Star)
+We also extend the lifting context with
+    k |-> co1
+
+Flattening (2) gives us
+    (Proxy |> co)
+But building (a (forall j. j -> Type) Proxy) would be ill-kinded. So we cast the
+result of flattening by sym co1, to get
+    (Proxy |> co |> sym co1)
+Happily, co and co1 cancel each other out, leaving us with
+    Proxy
+    co2 :: Proxy ~ (Proxy |> co)
+
+Now we need to flatten (3). After flattening, should we tack on a homogenizing
+coercion? The way we normally tell is to look at the kind of `a`. (See Note
+[flatten_args].) Here, the remainder of the kind of `a` that we're left with
+after processing two arguments is just `k`.
+
+The way forward is look up k in the lifting context, getting co1. If we're at
+all well-typed, co1 will be a coercion between Π-types, with enough binders on
+both sides to accommodate any remaining arguments in flatten_args. So, let's
+decompose co1 with decomposePiCos. This decomposition needs arguments to use
+to instantiate any kind parameters. Look at the type of co1. If we just
+decomposed it, we would end up with coercions whose types include j, which is
+out of scope here. Accordingly, decomposePiCos takes a list of types whose
+kinds are the *right-hand* types in the decomposed coercion. (See comments on
+decomposePiCos, which also reverses the orientation of the coercions.)
+The right-hand types are the unflattened ones -- conveniently what we have to
+hand.
+
+So we now call
+
+  decomposePiCos (forall j. j -> Type)
+                 [bo |> sym axStar, NoWay |> sym bc]
+                 co1
+
+to get
+
+  co3 :: Star ~ Type
+  co4 :: (j |> axStar) ~ (j |> co3), substituted to
+                              (bo |> sym axStar |> axStar) ~ (bo |> sym axStar |> co3)
+                           == bo ~ bo
+  res_co :: Type ~ Star -- this one's not reversed in decomposePiCos
+
+We then use these casts on (3) and (4) to get
+
+  (bo |> sym axStar |> co3 :: Type)   -- (C3)
+  (NoWay |> sym bc |> co4 :: bo)      -- (C4)
+
+We can simplify to
+
+  bo                          -- (C3)
+  (NoWay |> sym bc :: bo)     -- (C4)
+
+Now, to flatten (C3) and (C4), we still need to keep track of dependency.
+We know the type of the function applied to (C3) and (C4) must be
+(forall j. j -> Type), the flattened type
+associated with k (the final type in the kind of `a`.) (We discard the lifting
+context up to this point; as we've already substituted k, the domain of the
+lifting context we used for (1) and (2), away.)
+
+We now flatten (C3) to get
+  Bool                        -- F3
+  co5 :: Bool ~ bo
+and flatten (C4) to get
+  (False |> sym bc)
+Like we did when flattening (2), we need to cast the result of flattening
+(4), by lifting the type j with a lifting context containing
+[j |-> co5]. This lifting yields co5.
+We cast the result of flattening (C4) by sym co5 (this is the normal
+cast-after-flattening; see Note [flatten_args]):
+  (False |> sym bc |> sym co5)
+which is really just
+  False                       -- F4
+  co4 :: False ~ (NoWay |> sym bc)
+
+Now, we build up the result
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+    False
+      |> res_co
+
+Let's check whether this is well-typed. We know
+
+  a :: forall (k :: Type). k -> k
+
+  a (forall j. j -> Type) :: (forall j. j -> Type) -> forall j. j -> Type
+
+  a (forall j. j -> Type)
+    Proxy
+      :: forall j. j -> Type
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+      :: Bool -> Type
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+    False
+      :: Type
+
+  a (forall j. j -> Type)
+    Proxy
+    Bool
+    False
+     |> res_co
+     :: Star
+
+as desired. (Why do we want Star? Because we started with something of kind Star!)
+
+Whew.
+
 -}
 
-flatten_many :: [Role] -> [Type] -> FlatM ([Xi], [Coercion])
--- Coercions :: Xi ~ Type, at roles given
--- Returns True iff (no flattening happened)
--- NB: The EvVar inside the 'fe_ev :: CtEvidence' is unused,
---     we merely want (a) Given/Solved/Derived/Wanted info
---                    (b) the GivenLoc/WantedLoc for when we create new evidence
-flatten_many roles tys
--- See Note [flatten_many performance]
-  = inline zipWithAndUnzipM go roles tys
+flatten_args_tc :: TyCon -> [Role] -> [Type] -> FlatM ([Xi], [Coercion], CoercionN)
+flatten_args_tc tc = flatten_args (bndrs `chkAppend` inner_bndrs) inner_ki emptyVarSet
+                                                 -- NB: TyCon kinds are always closed
   where
-    go Nominal          ty = setEqRel NomEq  $ flatten_one ty
-    go Representational ty = setEqRel ReprEq $ flatten_one ty
-    go Phantom          ty = -- See Note [Phantoms in the flattener]
-                             do { ty <- liftTcS $ zonkTcType ty
-                                ; return ( ty, mkReflCo Phantom ty ) }
+    bndrs                   = tyConBindersTyBinders (tyConBinders tc)
+    (inner_bndrs, inner_ki) = splitPiTys (tyConResKind tc)
+      -- it's possible that the result kind has arrows (for, e.g., a type family)
+      -- so we must split it
 
--- | Like 'flatten_many', but assumes that every role is nominal.
-flatten_many_nom :: [Type] -> FlatM ([Xi], [Coercion])
-flatten_many_nom [] = return ([], [])
--- See Note [flatten_many performance]
-flatten_many_nom (ty:tys)
-  = do { (xi, co) <- flatten_one ty
-       ; (xis, cos) <- flatten_many_nom tys
-       ; return (xi:xis, co:cos) }
+flatten_args :: [TyBinder] -> Kind -> TcTyCoVarSet -- function kind; kind's free vars
+             -> [Role] -> [Type]   -- these are in 1-to-1 correspondence
+             -> FlatM ([Xi], [Coercion], CoercionN)
+-- Coercions :: Xi ~ Type, at roles given
+-- Third coercion :: typeKind(fun xis) ~N typeKind(fun tys)
+-- That is, the third coercion relates the kind of some function (whose kind is
+-- passed as the first parameter) instantiated at xis to the kind of that function
+-- instantiated at the tys. This is useful in keeping flattening homoegeneous.
+-- The list of roles must be at least as long as the list of types.
+-- See Note [flatten_args]
+flatten_args orig_binders orig_inner_ki orig_fvs orig_roles orig_tys
+  = go [] [] orig_lc orig_binders orig_inner_ki orig_roles orig_tys
+  where
+    orig_lc = emptyLiftingContext $ mkInScopeSet $ orig_fvs
+
+    go :: [Xi]        -- Xis accumulator, in reverse order
+       -> [Coercion]  -- Coercions accumulator, in reverse order
+                      -- These are in 1-to-1 correspondence
+       -> LiftingContext  -- mapping from tyvars to flattening coercions
+       -> [TyBinder]  -- Unsubsted binders of function's kind
+       -> Kind        -- Unsubsted result kind of function (not a Pi-type)
+       -> [Role]      -- Roles at which to flatten these ...
+       -> [Type]      -- ... unflattened types
+       -> FlatM ([Xi], [Coercion], CoercionN)
+    go acc_xis acc_cos lc binders inner_ki _ []
+      = return (reverse acc_xis, reverse acc_cos, kind_co)
+      where
+        final_kind = mkPiTys binders inner_ki
+        kind_co    = liftCoSubst Nominal lc final_kind
+
+    go acc_xis acc_cos lc (binder:binders) inner_ki (role:roles) (ty:tys)
+      = do { (xi, co) <- case role of
+               Nominal          -> setEqRel NomEq $
+                                   if isNamedTyBinder binder
+                                   then noBogusCoercions $ flatten_one ty
+                                   else                    flatten_one ty
+
+               Representational -> ASSERT( isAnonTyBinder binder )
+                                   setEqRel ReprEq $ flatten_one ty
+
+               Phantom          -> -- See Note [Phantoms in the flattener]
+                                   ASSERT( isAnonTyBinder binder )
+                                   do { ty <- liftTcS $ zonkTcType ty
+                                      ; return (ty, mkReflCo Phantom ty) }
+
+             -- By Note [Flattening] invariant (F2), typeKind(xi) = typeKind(ty).
+             -- But, it's possible that xi will be used as an argument to a function
+             -- whose kind is different, if earlier arguments have been flattened
+             -- to new types. We thus need a coercion (kind_co :: old_kind ~ new_kind).
+           ; let kind_co = mkTcSymCo $ liftCoSubst Nominal lc (tyBinderType binder)
+                 casted_xi = xi `mkCastTy` kind_co
+                 casted_co = co `mkTcCoherenceLeftCo` kind_co
+
+             -- now, extend the lifting context with the new binding
+                 new_lc | Just tv <- tyBinderVar_maybe binder
+                        = extendLiftingContextAndInScope lc tv casted_co
+                        | otherwise
+                        = lc
+
+           ; go (casted_xi : acc_xis) (casted_co : acc_cos) new_lc binders inner_ki roles tys }
+
+      -- See Note [Last case in flatten_args]
+    go acc_xis acc_cos lc [] inner_ki roles tys
+      | Just k   <- tcGetTyVar_maybe inner_ki
+      , Just co1 <- liftCoSubstTyVar lc Nominal k
+      = do { let Pair flattened_kind _ = coercionKind co1
+                 (arg_cos, res_co)     = decomposePiCos flattened_kind tys co1
+                 casted_tys            = zipWith mkCastTy tys arg_cos
+                 zapped_lc             = zapLiftingContext lc
+                 (bndrs, new_inner)    = splitPiTys flattened_kind
+
+           ; (xis_out, cos_out, res_co_out)
+               <- go acc_xis acc_cos zapped_lc bndrs new_inner roles casted_tys
+           -- cos_out :: xis_out ~ casted_tys
+           -- we need to return cos :: xis_out ~ tys
+           ; let cos = zipWith mkTcCoherenceRightCo cos_out (map mkTcSymCo arg_cos)
+
+
+           ; return (xis_out, cos, res_co_out `mkTcTransCo` res_co) }
+
+    go _ _ _ _ _ _ _ = pprPanic "flatten_args wandered into deeper water than usual"
+                                     (vcat [ppr orig_binders,
+                                            ppr orig_inner_ki,
+                                            ppr (take 10 orig_roles),  -- often infinite!
+                                            ppr orig_tys])
+
 ------------------
 flatten_one :: TcType -> FlatM (Xi, Coercion)
 -- Flatten a type to get rid of type function applications, returning
@@ -936,32 +1225,7 @@ flatten_one (TyVarTy tv)
   = flattenTyVar tv
 
 flatten_one (AppTy ty1 ty2)
-  = do { (xi1,co1) <- flatten_one ty1
-       ; eq_rel <- getEqRel
-       ; case (eq_rel, nextRole xi1) of
-           -- We need nextRole here because although ty1 definitely
-           -- isn't a TyConApp, xi1 might be.
-           -- ToDo: but can such a substitution change roles??
-           (NomEq,  _)                -> flatten_rhs xi1 co1 NomEq
-           (ReprEq, Nominal)          -> flatten_rhs xi1 co1 NomEq
-           (ReprEq, Representational) -> flatten_rhs xi1 co1 ReprEq
-           (ReprEq, Phantom)          -> -- See Note [Phantoms in the flattener]
-             do { ty2 <- liftTcS $ zonkTcType ty2
-                ; return ( mkAppTy xi1 ty2
-                         , mkAppCo co1 (mkNomReflCo ty2)) } }
-  where
-    flatten_rhs xi1 co1 eq_rel2
-      = do { (xi2,co2) <- setEqRel eq_rel2 $ flatten_one ty2
-           ; role1 <- getRole
-           ; let role2 = eqRelRole eq_rel2
-           ; traceFlat "flatten/appty"
-                       (ppr ty1 $$ ppr ty2 $$ ppr xi1 $$
-                        ppr xi2 $$ ppr role1 $$ ppr role2)
-
-           ; return ( mkAppTy xi1 xi2
-                    , mkTransAppCo role1 co1 xi1 ty1
-                                   role2 co2 xi2 ty2
-                                   role1 ) }  -- output should match fmode
+  = flatten_app_tys ty1 [ty2]
 
 flatten_one (TyConApp tc tys)
   -- Expand type synonyms that mention type families
@@ -1019,88 +1283,90 @@ flatten_one (CastTy ty g)
 
 flatten_one (CoercionTy co) = first mkCoercionTy <$> flatten_co co
 
--- | "Flatten" a coercion. Really, just flatten the types that it coerces
--- between and then use transitivity. See Note [Flattening coercions]
+-- | "Flatten" a coercion. Really, just zonk it so we can uphold
+-- (F1) of Note [Flattening]
 flatten_co :: Coercion -> FlatM (Coercion, Coercion)
 flatten_co co
-  = do { co <- liftTcS $ zonkCo co  -- see Note [Zonking when flattening a coercion]
-       ; let (Pair ty1 ty2, role) = coercionKindRole co
-       ; (co1, co2) <- flattenKinds $
-                       do { (_, co1) <- flatten_one ty1
-                          ; (_, co2) <- flatten_one ty2
-                          ; return (co1, co2) }
-       ; let co' = downgradeRole role Nominal co1 `mkTransCo`
-                   co `mkTransCo`
-                   mkSymCo (downgradeRole role Nominal co2)
-             -- kco :: (ty1' ~r ty2') ~N (ty1 ~r ty2)
-             kco = mkTyConAppCo Nominal (equalityTyCon role)
-                     [ mkKindCo co1, mkKindCo co2, co1, co2 ]
-       ; traceFlat "flatten_co" (vcat [ ppr co, ppr co1, ppr co2, ppr co' ])
+  = do { co <- liftTcS $ zonkCo co
        ; env_role <- getRole
-       ; return (co', mkProofIrrelCo env_role kco co' co) }
+       ; return (co, mkTcReflCo env_role (mkCoercionTy co)) }
+
+-- flatten (nested) AppTys
+flatten_app_tys :: Type -> [Type] -> FlatM (Xi, Coercion)
+-- commoning up nested applications allows us to look up the function's kind
+-- only once. Without commoning up like this, we would spend a quadratic amount
+-- of time looking up functions' types
+flatten_app_tys (AppTy ty1 ty2) tys = flatten_app_tys ty1 (ty2:tys)
+flatten_app_tys fun_ty arg_tys
+  = do { (fun_xi, fun_co) <- flatten_one fun_ty
+       ; flatten_app_ty_args fun_xi fun_co arg_tys }
+
+-- Given a flattened function (with the coercion produced by flattening) and
+-- a bunch of unflattened arguments, flatten the arguments and apply
+flatten_app_ty_args :: Xi -> Coercion -> [Type] -> FlatM (Xi, Coercion)
+flatten_app_ty_args fun_xi fun_co []
+  -- this will be a common case when called from flatten_fam_app, so shortcut
+  = return (fun_xi, fun_co)
+flatten_app_ty_args fun_xi fun_co arg_tys
+  = do { (xi, co, kind_co) <- case tcSplitTyConApp_maybe fun_xi of
+           Just (tc, xis) ->
+             do { let tc_roles  = tyConRolesRepresentational tc
+                      arg_roles = dropList xis tc_roles
+                ; (arg_xis, arg_cos, kind_co)
+                    <- flatten_vector (typeKind fun_xi) arg_roles arg_tys
+
+                  -- Here, we have fun_co :: T xi1 xi2 ~ ty
+                  -- and we need to apply fun_co to the arg_cos. The problem is that
+                  -- using mkAppCo is wrong because that function expects its second
+                  -- coercion to be Nominal, and the arg_cos might not be. The solution
+                  -- is to use transitivity: T <xi1> <xi2> arg_cos ;; fun_co <arg_tys>
+                ; eq_rel <- getEqRel
+                ; let app_xi = mkTyConApp tc (xis ++ arg_xis)
+                      app_co = case eq_rel of
+                        NomEq  -> mkAppCos fun_co arg_cos
+                        ReprEq -> mkTcTyConAppCo Representational tc
+                                    (zipWith mkReflCo tc_roles xis ++ arg_cos)
+                                  `mkTcTransCo`
+                                  mkAppCos fun_co (map mkNomReflCo arg_tys)
+                ; return (app_xi, app_co, kind_co) }
+           Nothing ->
+             do { (arg_xis, arg_cos, kind_co)
+                    <- flatten_vector (typeKind fun_xi) (repeat Nominal) arg_tys
+                ; return (mkAppTys fun_xi arg_xis, mkAppCos fun_co arg_cos, kind_co) }
+
+       ; return (homogenise_result xi co kind_co) }
 
 flatten_ty_con_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_ty_con_app tc tys
+  = do { role <- getRole
+       ; (xis, cos, kind_co) <- flatten_args_tc tc (tyConRolesX role tc) tys
+       ; let tyconapp_xi = mkTyConApp tc xis
+             tyconapp_co = mkTyConAppCo role tc cos
+       ; return (homogenise_result tyconapp_xi tyconapp_co kind_co) }
+
+-- Make the result of flattening homogeneous (Note [Flattening] (F2))
+homogenise_result :: Xi              -- a flattened type
+                  -> Coercion        -- :: xi ~ original ty
+                  -> CoercionN       -- kind_co :: typeKind(xi) ~N typeKind(ty)
+                  -> (Xi, Coercion)  -- (xi |> kind_co, (xi |> kind_co) ~ original ty)
+homogenise_result xi co kind_co
+  = (xi `mkCastTy` kind_co, co `mkTcCoherenceLeftCo` kind_co)
+
+-- Flatten a vector (list of arguments).
+flatten_vector :: Kind   -- of the function being applied to these arguments
+               -> [Role] -- If we're flatten w.r.t. ReprEq, what roles do the args have?
+               -> [Type] -- the args to flatten
+               -> FlatM ([Xi], [Coercion], CoercionN)
+flatten_vector ki roles tys
   = do { eq_rel <- getEqRel
-       ; let role = eqRelRole eq_rel
-       ; (xis, cos) <- case eq_rel of
-                         NomEq  -> flatten_many_nom tys
-                         ReprEq -> flatten_many (tyConRolesRepresentational tc) tys
-       ; return (mkTyConApp tc xis, mkTyConAppCo role tc cos) }
+       ; case eq_rel of
+           NomEq  -> flatten_args bndrs inner_ki fvs (repeat Nominal) tys
+           ReprEq -> flatten_args bndrs inner_ki fvs roles            tys }
+  where
+    (bndrs, inner_ki) = tcSplitPiTys ki
+    fvs               = tyCoVarsOfType ki
 
 {-
-Note [Flattening coercions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Because a flattened type has a flattened kind, we also must "flatten"
-coercions as we walk through a type. Otherwise, the "from" type of
-the coercion might not match the (now flattened) kind of the type
-that it's casting. flatten_co does the work, taking a coercion of
-type (ty1 ~ ty2) and flattening it to have type (fty1 ~ fty2),
-where flatten(ty1) = fty1 and flatten(ty2) = fty2.
-
-In other words:
-
-  If  r1 is a role
-      co :: s ~r1 t
-      flatten_co co = (fco, kco)
-      r2 is the role in the FlatM
-
-  then
-      fco :: fs ~r1 ft
-      fs, ft are flattened types
-      kco :: fco ~r2 co
-
-The second return value of flatten_co is always a ProofIrrelCo. As
-such, it doesn't contain any information the caller doesn't have and
-might not be necessary in whatever comes next.
-
-Note that a flattened coercion might have unzonked metavariables or
-type functions in it -- but its *kind* will not. Instead of just flattening
-the kinds and using mkTransCo, we could actually flatten the coercion
-structurally. But doing so seems harder than simply flattening the types.
-
-Note [Zonking when flattening a coercion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-The first step in flatten_co (see Note [Flattening coercions]) is to
-zonk the input. This is necessary because we want to ensure the following
-invariants (c.f. the invariants (F1) and (F2) in Note [Flattening])
-  If
-    (co', kco) <- flatten_co co
-  Then
-    (FC1) coercionKind(co') succeeds and produces a fully zonked pair of kinds
-    (FC2) kco :: co' ~ zonk(co)
-We must zonk to ensure (1). This is because fco is built by using mkTransCo
-to build up on the input co. But if the only action that happens during
-flattening ty1 and ty2 is to zonk metavariables, the coercions returned
-(co1 and co2) will be reflexive. The mkTransCo calls will drop the reflexive
-coercions and co' will be the same as co -- with unzonked kinds.
-
-These invariants are necessary to uphold (F1) and (F2) in the CastTy and
-CoercionTy cases.
-
-We zonk right at the beginning to avoid duplicating work when flattening the
-ty1 and ty2.
-
 Note [Flattening synonyms]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 Not expanding synonyms aggressively improves error messages, and
@@ -1151,58 +1417,39 @@ flatten_fam_app :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_fam_app tc tys  -- Can be over-saturated
     = ASSERT2( tys `lengthAtLeast` tyConArity tc
              , ppr tc $$ ppr (tyConArity tc) $$ ppr tys)
+
+      do { mode <- getMode
+         ; case mode of
+             { FM_SubstOnly  -> flatten_ty_con_app tc tys
+             ; FM_FlattenAll ->
+
                  -- Type functions are saturated
                  -- The type function might be *over* saturated
                  -- in which case the remaining arguments should
                  -- be dealt with by AppTys
       do { let (tys1, tys_rest) = splitAt (tyConArity tc) tys
-         ; (xi1, co1) <- flatten_exact_fam_app tc tys1
+         ; (xi1, co1) <- flatten_exact_fam_app_fully tc tys1
                -- co1 :: xi1 ~ F tys1
 
-               -- all Nominal roles b/c the tycon is oversaturated
-         ; (xis_rest, cos_rest) <- flatten_many (repeat Nominal) tys_rest
-               -- cos_res :: xis_rest ~ tys_rest
+         ; flatten_app_ty_args xi1 co1 tys_rest } } }
 
-         ; return ( mkAppTys xi1 xis_rest   -- NB mkAppTys: rhs_xi might not be a type variable
-                                            --    cf Trac #5655
-                  , mkAppCos co1 cos_rest
-                            -- (rhs_xi :: F xis) ; (F cos :: F xis ~ F tys)
-                  ) }
-
-flatten_exact_fam_app, flatten_exact_fam_app_fully ::
-  TyCon -> [TcType] -> FlatM (Xi, Coercion)
-
-flatten_exact_fam_app tc tys
-  = do { mode <- getMode
-       ; role <- getRole
-       ; case mode of
-               -- These roles are always going to be Nominal for now,
-               -- but not if #8177 is implemented
-           FM_SubstOnly -> do { let roles = tyConRolesX role tc
-                              ; (xis, cos) <- flatten_many roles tys
-                              ; return ( mkTyConApp tc xis
-                                       , mkTyConAppCo role tc cos ) }
-
-           FM_FlattenAll -> flatten_exact_fam_app_fully tc tys }
-
---       FM_Avoid tv flat_top ->
---         do { (xis, cos) <- flatten_many fmode roles tys
---            ; if flat_top || tv `elemVarSet` tyCoVarsOfTypes xis
---              then flatten_exact_fam_app_fully fmode tc tys
---              else return ( mkTyConApp tc xis
---                          , mkTcTyConAppCo (feRole fmode) tc cos ) }
-
+-- the [TcType] exactly saturate the TyCon
+flatten_exact_fam_app_fully :: TyCon -> [TcType] -> FlatM (Xi, Coercion)
 flatten_exact_fam_app_fully tc tys
   -- See Note [Reduce type family applications eagerly]
-  = try_to_reduce tc tys False id $
+     -- the following typeKind should never be evaluated, as it's just used in
+     -- casting, and casts by refl are dropped
+  = try_to_reduce tc tys (mkNomReflCo (typeKind (mkTyConApp tc tys))) False id $
     do { -- First, flatten the arguments
-       ; (xis, cos) <- setEqRel NomEq    $
-                       flatten_many_nom tys
+       ; (xis, cos, kind_co)
+           <- setEqRel NomEq $  -- just do this once, instead of for each arg
+              flatten_args_tc tc (repeat Nominal) tys
+              -- kind_co :: typeKind(F xis) ~N typeKind(F tys)
        ; eq_rel   <- getEqRel
        ; cur_flav <- getFlavour
        ; let role   = eqRelRole eq_rel
              ret_co = mkTyConAppCo role tc cos
-              -- ret_co :: F xis ~ F tys
+              -- ret_co :: F xis ~ F tys; might be heterogeneous
 
         -- Now, look in the cache
        ; mb_ct <- liftTcS $ lookupFlatCache tc xis
@@ -1216,15 +1463,15 @@ flatten_exact_fam_app_fully tc tys
                    ; (fsk_xi, fsk_co) <- flatten_one rhs_ty
                           -- The fsk may already have been unified, so flatten it
                           -- fsk_co :: fsk_xi ~ fsk
-                   ; return ( fsk_xi
-                            , fsk_co `mkTransCo`
+                   ; return ( fsk_xi `mkCastTy` kind_co
+                            , (fsk_co `mkTcCoherenceLeftCo` kind_co) `mkTransCo`
                               maybeSubCo eq_rel (mkSymCo co) `mkTransCo`
                               ret_co ) }
                                     -- :: fsk_xi ~ F xis
 
            -- Try to reduce the family application right now
            -- See Note [Reduce type family applications eagerly]
-           _ -> try_to_reduce tc xis True (`mkTransCo` ret_co) $
+           _ -> try_to_reduce tc xis kind_co True (`mkTransCo` ret_co) $
                 do { loc <- getLoc
                    ; (ev, co, fsk) <- liftTcS $ newFlattenSkolem cur_flav loc tc xis
 
@@ -1241,22 +1488,27 @@ flatten_exact_fam_app_fully tc tys
 
                    -- NB: fsk's kind is already flattend because
                    --     the xis are flattened
-                   ; return (mkTyVarTy fsk, maybeSubCo eq_rel (mkSymCo co)
-                                            `mkTransCo` ret_co ) }
+                   ; return ( mkTyVarTy fsk `mkCastTy` kind_co
+                            , (maybeSubCo eq_rel (mkSymCo co) `mkTcCoherenceLeftCo` kind_co)
+                              `mkTransCo` ret_co ) }
         }
 
   where
     try_to_reduce :: TyCon   -- F, family tycon
                   -> [Type]  -- args, not necessarily flattened
+                  -> CoercionN -- kind_co :: typeKind(F args) ~N typeKind(F orig_args), where
+                               -- orig_args is what was passed to the outer function
                   -> Bool    -- add to the flat cache?
-                  -> (   Coercion     -- :: xi ~ F args
+                  -> (   Coercion     -- :: (xi |> kind_co) ~ F args
                       -> Coercion )   -- what to return from outer function
                   -> FlatM (Xi, Coercion)  -- continuation upon failure
                   -> FlatM (Xi, Coercion)
-    try_to_reduce tc tys cache update_co k
+    try_to_reduce tc tys kind_co cache update_co k
       = do { checkStackDepth (mkTyConApp tc tys)
            ; mb_match <- liftTcS $ matchFam tc tys
            ; case mb_match of
+                 -- NB: norm_co will always be homogeneous. All type families
+                 -- are homogeneous.
                Just (norm_co, norm_ty)
                  -> do { traceFlat "Eager T.F. reduction success" $
                          vcat [ ppr tc, ppr tys, ppr norm_ty
@@ -1272,7 +1524,8 @@ flatten_exact_fam_app_fully tc tys
                        ; when (cache && eq_rel == NomEq) $
                          liftTcS $
                          extendFlatCache tc tys ( co, xi, flavour )
-                       ; return ( xi, update_co $ mkSymCo co ) }
+                       ; return ( xi `mkCastTy` kind_co
+                                , update_co $ (mkSymCo co `mkTcCoherenceLeftCo` kind_co) ) }
                Nothing -> k }
 
 {- Note [Reduce type family applications eagerly]
@@ -1341,27 +1594,12 @@ flattenTyVar tv
                    -- ; traceFlat "flattenTyVar2" (ppr tv $$ ppr ty2)
                    ; return (ty2, co2 `mkTransCo` co1) }
 
-           FTRNotFollowed   -- Done
-             -> do { let orig_kind = tyVarKind tv
-                   ; (_new_kind, kind_co) <- flattenKinds $
-                                             flatten_one orig_kind
-                   ; let Pair _ zonked_kind = coercionKind kind_co
-             -- NB: kind_co :: _new_kind ~ zonked_kind
-             -- But zonked_kind is not necessarily the same as orig_kind
-             -- because that may have filled-in metavars.
-             -- Moreover the returned Xi type must be well-kinded
-             -- (e.g. in canEqTyVarTyVar we use getCastedTyVar_maybe)
-             -- If you remove it, then e.g. dependent/should_fail/T11407 panics
-             -- See also Note [Flattening]
-             -- An alternative would to use (zonkTcType orig_kind),
-             -- but some simple measurements suggest that's a little slower
-                   ; let tv'    = setTyVarKind tv zonked_kind
-                         tv_ty' = mkTyVarTy tv'
-                         ty'    = tv_ty' `mkCastTy` mkSymCo kind_co
-
+           FTRNotFollowed   -- Done, but make sure the kind is zonked
+                            -- Note [Flattening] invariant (F1)
+             -> do { tv' <- liftTcS $ updateTyVarKindM zonkTcType tv
                    ; role <- getRole
-                   ; return (ty', mkReflCo role tv_ty'
-                                  `mkCoherenceLeftCo` mkSymCo kind_co) } }
+                   ; let ty' = mkTyVarTy tv'
+                   ; return (ty', mkTcReflCo role ty') } }
 
 flatten_tyvar1 :: TcTyVar -> FlatM FlattenTvResult
 -- "Flattening" a type variable means to apply the substitution to it

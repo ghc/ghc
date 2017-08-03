@@ -2648,15 +2648,6 @@ For Givens we make new EvVars and bind them immediately. Two main reasons:
 
 So a Given has EvVar inside it rather than (as previously) an EvTerm.
 
-Note [Given in ctEvCoercion]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-When retrieving the evidence from a Given equality, we update the type of the EvVar
-from the ctev_pred field. In Note [Evidence field of CtEvidence], we claim that
-the type of the evidence is never looked at -- but this isn't true in the case of
-a coercion that is used in a type. (See the comments in Note [Flattening] in TcFlatten
-about the FTRNotFollowed case of flattenTyVar.) So, right here where we are retrieving
-the coercion from a Given, we update the type to make sure it's zonked.
-
 -}
 
 -- | A place for type-checking evidence to go after it is generated.
@@ -2713,11 +2704,9 @@ ctEvExpr :: CtEvidence -> EvExpr
 ctEvExpr ev@(CtWanted { ctev_dest = HoleDest _ }) = evCoercion $ ctEvCoercion ev
 ctEvExpr ev = evId (ctEvEvId ev)
 
--- Always returns a coercion whose type is precisely ctev_pred of the CtEvidence.
--- See also Note [Given in ctEvCoercion]
 ctEvCoercion :: CtEvidence -> Coercion
-ctEvCoercion (CtGiven { ctev_pred = pred_ty, ctev_evar = ev_id })
-  = mkTcCoVarCo (setVarType ev_id pred_ty)  -- See Note [Given in ctEvCoercion]
+ctEvCoercion (CtGiven { ctev_evar = ev_id })
+  = mkTcCoVarCo ev_id
 ctEvCoercion (CtWanted { ctev_dest = dest })
   | HoleDest hole <- dest
   = -- ctEvCoercion is only called on type equalities
