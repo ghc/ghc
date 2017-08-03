@@ -263,8 +263,10 @@ data Type
         Type
         Type            -- ^ Type application to something other than a 'TyCon'. Parameters:
                         --
-                        --  1) Function: must /not/ be a 'TyConApp',
+                        --  1) Function: must /not/ be a 'TyConApp' or 'CastTy',
                         --     must be another 'AppTy', or 'TyVarTy'
+                        --     See Note [Respecting definitional equality] (EQ1) about the
+                        --     no 'CastTy' requirement
                         --
                         --  2) Argument type
 
@@ -297,8 +299,8 @@ data Type
         Type
         KindCoercion  -- ^ A kind cast. The coercion is always nominal.
                       -- INVARIANT: The cast is never refl.
-                      -- INVARIANT: The cast is "pushed down" as far as it
-                      -- can go. See Note [Pushing down casts]
+                      -- INVARIANT: The Type is not a CastTy (use TransCo instead)
+                      -- See Note [Respecting definitional equality] (EQ2) and (EQ3)
 
   | CoercionTy
         Coercion    -- ^ Injection of a Coercion into a type
@@ -338,19 +340,12 @@ kinds or types.
 
 This kind instantiation only happens in TyConApp currently.
 
-Note [Pushing down casts]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose we have (a :: k1 -> *), (b :: k1), and (co :: * ~ q).
-The type (a b |> co) is `eqType` to ((a |> co') b), where
-co' = (->) <k1> co. Thus, to make this visible to functions
-that inspect types, we always push down coercions, preferring
-the second form. Note that this also applies to TyConApps!
-
 Note [Non-trivial definitional equality]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Is Int |> <*> the same as Int? YES! In order to reduce headaches,
-we decide that any reflexive casts in types are just ignored. More
-generally, the `eqType` function, which defines Core's type equality
+we decide that any reflexive casts in types are just ignored.
+(Indeed they must be. See Note [Respecting definitional equality].)
+More generally, the `eqType` function, which defines Core's type equality
 relation, ignores casts and coercion arguments, as long as the
 two types have the same kind. This allows us to be a little sloppier
 in keeping track of coercions, which is a good thing. It also means
@@ -383,6 +378,9 @@ The effect of this all is that eqType, the implementation of the implicit
 equality check, can use any homogeneous relation that is smaller than ~, as
 those rules must also be admissible.
 
+A more drawn out argument around all of this is presented in Section 7.2 of
+Richard E's thesis (http://cs.brynmawr.edu/~rae/papers/2016/thesis/eisenberg-thesis.pdf).
+
 What would go wrong if we insisted on the casts matching? See the beginning of
 Section 8 in the unpublished paper above. Theoretically, nothing at all goes
 wrong. But in practical terms, getting the coercions right proved to be
@@ -403,10 +401,67 @@ constructors and destructors in Type respect whatever relation is chosen.
 
 Another helpful principle with eqType is this:
 
- ** If (t1 eqType t2) then I can replace t1 by t2 anywhere. **
+ (EQ) If (t1 `eqType` t2) then I can replace t1 by t2 anywhere.
 
 This principle also tells us that eqType must relate only types with the
 same kinds.
+
+Note [Respecting definitional equality]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Non-trivial definitional equality] introduces the property (EQ).
+How is this upheld?
+
+Any function that pattern matches on all the constructors will have to
+consider the possibility of CastTy. Presumably, those functions will handle
+CastTy appropriately and we'll be OK.
+
+More dangerous are the splitXXX functions. Let's focus on splitTyConApp.
+We don't want it to fail on (T a b c |> co). Happily, if we have
+  (T a b c |> co) `eqType` (T d e f)
+then co must be reflexive. Why? eqType checks that the kinds are equal, as
+well as checking that (a `eqType` d), (b `eqType` e), and (c `eqType` f).
+By the kind check, we know that (T a b c |> co) and (T d e f) have the same
+kind. So the only way that co could be non-reflexive is for (T a b c) to have
+a different kind than (T d e f). But because T's kind is closed (all tycon kinds
+are closed), the only way for this to happen is that one of the arguments has
+to differ, leading to a contradiction. Thus, co is reflexive.
+
+Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
+about outermost casts to uphold (EQ). Eliminating reflexive casts is done
+in mkCastTy.
+
+Unforunately, that's not the end of the story. Consider comparing
+  (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> co)
+These two types have the same kind (Type), but the left type is a TyConApp
+while the right type is not. To handle this case, we say that the right-hand
+type is ill-formed, requiring an AppTy never to have a casted TyConApp
+on its left. It is easy enough to pull around the coercions to maintain
+this invariant, as done in Type.mkAppTy. In the example above, trying to
+form the right-hand type will instead yield (T a b (c |> co |> sym co) |> <Type>).
+Both the casts there are reflexive and will be dropped. Huzzah.
+
+This idea of pulling coercions to the right works for splitAppTy as well.
+
+However, there is one hiccup: it's possible that a coercion doesn't relate two
+Pi-types. For example, if we have @type family Fun a b where Fun a b = a -> b@,
+then we might have (T :: Fun Type Type) and (T |> axFun) Int. That axFun can't
+be pulled to the right. But we don't need to pull it: (T |> axFun) Int is not
+`eqType` to any proper TyConApp -- thus, leaving it where it is doesn't violate
+our (EQ) property.
+
+Lastly, in order to detect reflexive casts reliably, we must make sure not
+to have nested casts: we update (t |> co1 |> co2) to (t |> (co1 `TransCo` co2)).
+
+In sum, in order to uphold (EQ), we need the following three invariants:
+
+  (EQ1) No decomposable CastTy to the left of an AppTy, where a decomposable
+        cast is one that relates either a FunTy to a FunTy or a
+        ForAllTy to a ForAllTy.
+  (EQ2) No reflexive casts in CastTy.
+  (EQ3) No nested CastTys.
+
+These invariants are all documented above, in the declaration for Type.
+
 -}
 
 {- **********************************************************************

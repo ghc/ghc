@@ -675,9 +675,11 @@ writeMetaTyVarRef tyvar ref ty
   = do { meta_details <- readMutVar ref;
        -- Zonk kinds to allow the error check to work
        ; zonked_tv_kind <- zonkTcType tv_kind
-       ; zonked_ty_kind <- zonkTcType ty_kind
-       ; let kind_check_ok = isPredTy tv_kind  -- Don't check kinds for updates
-                                               -- to coercion variables.  Why not??
+       ; zonked_ty      <- zonkTcType ty
+       ; let zonked_ty_kind = typeKind zonked_ty  -- need to zonk even before typeKind;
+                                                  -- otherwise, we can panic in piResultTy
+             kind_check_ok = isPredTy tv_kind  -- Don't check kinds for updates
+                                               -- to coercion variables. TODO (RAE): Why not?
                           || isConstraintKind zonked_tv_kind
                           || tcEqKind zonked_ty_kind zonked_tv_kind
              -- Hack alert! isConstraintKind: see TcHsType
@@ -686,7 +688,7 @@ writeMetaTyVarRef tyvar ref ty
              kind_msg = hang (text "Ill-kinded update to meta tyvar")
                            2 (    ppr tyvar <+> text "::" <+> (ppr tv_kind $$ ppr zonked_tv_kind)
                               <+> text ":="
-                              <+> ppr ty <+> text "::" <+> (ppr ty_kind $$ ppr zonked_ty_kind) )
+                              <+> ppr ty <+> text "::" <+> (ppr zonked_ty_kind) )
 
        ; traceTc "writeMetaTyVar" (ppr tyvar <+> text ":=" <+> ppr ty)
 
@@ -704,7 +706,6 @@ writeMetaTyVarRef tyvar ref ty
        ; writeMutVar ref (Indirect ty) }
   where
     tv_kind = tyVarKind tyvar
-    ty_kind = typeKind ty
 
     tv_lvl = tcTyVarLevel tyvar
     ty_lvl = tcTypeLevel ty

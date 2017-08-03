@@ -83,6 +83,7 @@ module TcSMonad (
 
     -- The flattening cache
     lookupFlatCache, extendFlatCache, newFlattenSkolem,            -- Flatten skolems
+    dischargeFmv, pprKicked,
 
     -- Inert CFunEqCans
     updInertFunEqs, findFunEq,
@@ -2967,6 +2968,30 @@ demoteUnfilledFmv fmv
                    do { tv_ty <- TcM.newFlexiTyVarTy (tyVarKind fmv)
                       ; TcM.writeMetaTyVar fmv tv_ty } }
 
+-----------------------------
+dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
+-- (dischargeFmv x fmv co ty)
+--     [W] ev :: F tys ~ fmv
+--         co :: F tys ~ xi
+-- Precondition: fmv is not filled, and fmv `notElem` xi
+--               ev is Wanted
+--
+-- Then set fmv := xi,
+--      set ev  := co
+--      kick out any inert things that are now rewritable
+--
+-- Does not evaluate 'co' if 'ev' is Derived
+dischargeFmv ev@(CtWanted { ctev_dest = dest }) fmv co xi
+  = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
+    do { setWantedEvTerm dest (EvCoercion co)
+       ; unflattenFmv fmv xi
+       ; n_kicked <- kickOutAfterUnification fmv
+       ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ pprKicked n_kicked) }
+dischargeFmv ev _ _ _ = pprPanic "dischargeFmv" (ppr ev)
+
+pprKicked :: Int -> SDoc
+pprKicked 0 = empty
+pprKicked n = parens (int n <+> text "kicked out")
 
 {- *********************************************************************
 *                                                                      *
@@ -3229,4 +3254,3 @@ from which we get the implication
    (forall a. t1 ~ t2)
 See TcSMonad.deferTcSForAllEq
 -}
-

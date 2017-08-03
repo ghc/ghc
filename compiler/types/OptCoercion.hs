@@ -93,8 +93,8 @@ optCoercion env co
         (Pair in_ty1  in_ty2,  in_role)  = coercionKindRole co
         (Pair out_ty1 out_ty2, out_role) = coercionKindRole out_co
     in
-    ASSERT2( substTyUnchecked env in_ty1 `eqType` out_ty1 &&
-             substTyUnchecked env in_ty2 `eqType` out_ty2 &&
+    ASSERT2( substTy env in_ty1 `eqType` out_ty1 &&
+             substTy env in_ty2 `eqType` out_ty2 &&
              in_role == out_role
            , text "optCoercion changed types!"
              $$ hang (text "in_co:") 2 (ppr co)
@@ -595,15 +595,11 @@ opt_trans_rule is co1 co2@(TyConAppCo r tc cos2)
 
 opt_trans_rule is co1@(AppCo co1a co1b) co2
   | Just (co2a,co2b) <- etaAppCo_maybe co2
-  = fireTransRule "EtaAppL" co1 co2 $
-    mkAppCo (opt_trans is co1a co2a)
-            (opt_trans is co1b co2b)
+  = opt_trans_rule_app is co1 co2 co1a [co1b] co2a [co2b]
 
 opt_trans_rule is co1 co2@(AppCo co2a co2b)
   | Just (co1a,co1b) <- etaAppCo_maybe co1
-  = fireTransRule "EtaAppR" co1 co2 $
-    mkAppCo (opt_trans is co1a co2a)
-            (opt_trans is co1b co2b)
+  = opt_trans_rule_app is co1 co2 co1a [co1b] co2a [co2b]
 
 -- Push transitivity inside forall
 opt_trans_rule is co1 co2
@@ -697,10 +693,45 @@ opt_trans_rule _ co1 co2        -- Identity rule
 
 opt_trans_rule _ _ _ = Nothing
 
+-- See Note [EtaAppCo]
+opt_trans_rule_app :: InScopeSet
+                   -> Coercion   -- original left-hand coercion (printing only)
+                   -> Coercion   -- original right-hand coercion (printing only)
+                   -> Coercion   -- left-hand coercion "function"
+                   -> [Coercion] -- left-hand coercion "args"
+                   -> Coercion   -- right-hand coercion "function"
+                   -> [Coercion] -- right-hand coercion "args"
+                   -> Maybe Coercion
+opt_trans_rule_app is orig_co1 orig_co2 co1a co1bs co2a co2bs
+  | AppCo co1aa co1ab <- co1a
+  , Just (co2aa, co2ab) <- etaAppCo_maybe co2a
+  = opt_trans_rule_app is orig_co1 orig_co2 co1aa (co1ab:co1bs) co2aa (co2ab:co2bs)
+
+  | AppCo co2aa co2ab <- co2a
+  , Just (co1aa, co1ab) <- etaAppCo_maybe co1a
+  = opt_trans_rule_app is orig_co1 orig_co2 co1aa (co1ab:co1bs) co2aa (co2ab:co2bs)
+
+  | otherwise
+  = ASSERT( co1bs `equalLength` co2bs )
+    fireTransRule ("EtaApps:" ++ show (length co1bs)) orig_co1 orig_co2 $
+    let Pair _ rt1a = coercionKind co1a
+        Pair lt2a _ = coercionKind co2a
+
+        Pair _ rt1bs = traverse coercionKind co1bs
+        Pair lt2bs _ = traverse coercionKind co2bs
+
+        kcoa = mkKindCo $ buildCoercion lt2a rt1a
+        kcobs = map mkKindCo $ zipWith buildCoercion lt2bs rt1bs
+
+        co2a' = mkCoherenceLeftCo co2a kcoa
+        co2bs' = zipWith mkCoherenceLeftCo co2bs kcobs
+    in
+    mkAppCos (opt_trans is co1a co2a')
+             (zipWith (opt_trans is) co1bs co2bs')
+
 fireTransRule :: String -> Coercion -> Coercion -> Coercion -> Maybe Coercion
 fireTransRule _rule _co1 _co2 res
-  = -- pprTrace ("Trans rule fired: " ++ _rule) (vcat [ppr _co1, ppr _co2, ppr res]) $
-    Just res
+  = Just res
 
 {-
 Note [Conflict checking with AxiomInstCo]
@@ -757,6 +788,65 @@ that (Id Int) and (Id Bool) are Surely Apart, as they're headed by type
 families. At the time of writing, I (Richard Eisenberg) couldn't think of
 a way of detecting this any more efficient than just building the optimised
 coercion and checking.
+
+Note [EtaAppCo]
+~~~~~~~~~~~~~~~
+Suppose we're trying to optimize (co1a co1b ; co2a co2b). Ideally, we'd
+like to rewrite this to (co1a ; co2a) (co1b ; co2b). The problem is that
+the resultant coercions might not be well kinded. Here is an example (things
+labeled with x don't matter in this example):
+
+  k1 :: Type
+  k2 :: Type
+
+  a :: k1 -> Type
+  b :: k1
+
+  h :: k1 ~ k2
+
+  co1a :: x1 ~ (a |> (h -> <Type>)
+  co1b :: x2 ~ (b |> h)
+
+  co2a :: a ~ x3
+  co2b :: b ~ x4
+
+First, convince yourself of the following:
+
+  co1a co1b :: x1 x2 ~ (a |> (h -> <Type>)) (b |> h)
+  co2a co2b :: a b   ~ x3 x4
+
+  (a |> (h -> <Type>)) (b |> h) `eqType` a b
+
+That last fact is due to Note [Non-trivial definitional equality] in TyCoRep,
+where we ignore coercions in types as long as two types' kinds are the same.
+In our case, we meet this last condition, because
+
+  (a |> (h -> <Type>)) (b |> h) :: Type
+    and
+  a b :: Type
+
+So the input coercion (co1a co1b ; co2a co2b) is well-formed. But the
+suggested output coercions (co1a ; co2a) and (co1b ; co2b) are not -- the
+kinds don't match up.
+
+The solution here is to twiddle the kinds in the output coercions. First, we
+need to find coercions
+
+  ak :: kind(a |> (h -> <Type>)) ~ kind(a)
+  bk :: kind(b |> h)             ~ kind(b)
+
+This can be done with mkKindCo and buildCoercion. The latter assumes two
+types are identical modulo casts and builds a coercion between them.
+
+Then, we build (co1a ; co2a |> sym ak) and (co1b ; co2b |> sym bk) as the
+output coercions. These are well-kinded. (We cast the right-hand coercion
+because mkCoherenceLeftCo is smaller than mkCoherenceRightCo.)
+
+Also, note that all of this is done after accumulated any nested AppCo
+parameters. This step is to avoid quadratic behavior in calling coercionKind.
+
+The problem described here was first found in dependent/should_compile/dynamic-paper.
+
 -}
 
 -- | Check to make sure that an AxInstCo is internally consistent.

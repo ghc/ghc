@@ -1425,7 +1425,7 @@ interactTyVarEq inerts workItem@(CTyEqCan { cc_tyvar = tv
        ; if canSolveByUnification tclvl tv rhs
          then do { solveByUnification ev tv rhs
                  ; n_kicked <- kickOutAfterUnification tv
-                 ; return (Stop ev (text "Solved by unification" <+> ppr_kicked n_kicked)) }
+                 ; return (Stop ev (text "Solved by unification" <+> pprKicked n_kicked)) }
 
          else unsolved_inert }
 
@@ -1467,10 +1467,6 @@ solveByUnification wd tv xi
 
        ; unifyTyVar tv xi
        ; setEvBindIfWanted wd (EvCoercion (mkTcNomReflCo xi)) }
-
-ppr_kicked :: Int -> SDoc
-ppr_kicked 0 = empty
-ppr_kicked n = parens (int n <+> text "kicked out")
 
 {- Note [Avoid double unifications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1788,58 +1784,33 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
 shortCutReduction :: CtEvidence -> TcTyVar -> TcCoercion
                   -> TyCon -> [TcType] -> TcS (StopOrContinue Ct)
 -- See Note [Top-level reductions for type functions]
+-- Previously, we flattened the tc_args here, but there's no need to do so.
+-- And, if we did, this function would have all the complication of
+-- TcCanonical.canCFunEqCan. See Note [canCFunEqCan]
 shortCutReduction old_ev fsk ax_co fam_tc tc_args
   = ASSERT( ctEvEqRel old_ev == NomEq)
-    do { (xis, cos) <- flattenManyNom old_ev tc_args
                -- ax_co :: F args ~ G tc_args
-               -- cos   :: xis ~ tc_args
                -- old_ev :: F args ~ fsk
-               -- G cos ; sym ax_co ; old_ev :: G xis ~ fsk
-
-       ; new_ev <- case ctEvFlavour old_ev of
+    do { new_ev <- case ctEvFlavour old_ev of
            Given -> newGivenEvVar deeper_loc
-                         ( mkPrimEqPred (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
-                         , EvCoercion (mkTcTyConAppCo Nominal fam_tc cos
-                                        `mkTcTransCo` mkTcSymCo ax_co
-                                        `mkTcTransCo` ctEvCoercion old_ev) )
+                         ( mkPrimEqPred (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
+                         , EvCoercion (mkTcSymCo ax_co
+                                       `mkTcTransCo` ctEvCoercion old_ev) )
 
            Wanted {} ->
              do { (new_ev, new_co) <- newWantedEq deeper_loc Nominal
-                                        (mkTyConApp fam_tc xis) (mkTyVarTy fsk)
-                ; setWantedEq (ctev_dest old_ev) $
-                     ax_co `mkTcTransCo` mkTcSymCo (mkTcTyConAppCo Nominal
-                                                      fam_tc cos)
-                           `mkTcTransCo` new_co
+                                        (mkTyConApp fam_tc tc_args) (mkTyVarTy fsk)
+                ; setWantedEq (ctev_dest old_ev) $ ax_co `mkTcTransCo` new_co
                 ; return new_ev }
 
            Derived -> pprPanic "shortCutReduction" (ppr old_ev)
 
        ; let new_ct = CFunEqCan { cc_ev = new_ev, cc_fun = fam_tc
-                                , cc_tyargs = xis, cc_fsk = fsk }
+                                , cc_tyargs = tc_args, cc_fsk = fsk }
        ; updWorkListTcS (extendWorkListFunEq new_ct)
        ; stopWith old_ev "Fun/Top (shortcut)" }
   where
     deeper_loc = bumpCtLocDepth (ctEvLoc old_ev)
-
-dischargeFmv :: CtEvidence -> TcTyVar -> TcCoercion -> TcType -> TcS ()
--- (dischargeFmv x fmv co ty)
---     [W] ev :: F tys ~ fmv
---         co :: F tys ~ xi
--- Precondition: fmv is not filled, and fmv `notElem` xi
---               ev is Wanted
---
--- Then set fmv := xi,
---      set ev  := co
---      kick out any inert things that are now rewritable
---
--- Does not evaluate 'co' if 'ev' is Derived
-dischargeFmv ev@(CtWanted { ctev_dest = dest }) fmv co xi
-  = ASSERT2( not (fmv `elemVarSet` tyCoVarsOfType xi), ppr ev $$ ppr fmv $$ ppr xi )
-    do { setWantedEvTerm dest (EvCoercion co)
-       ; unflattenFmv fmv xi
-       ; n_kicked <- kickOutAfterUnification fmv
-       ; traceTcS "dischargeFmv" (ppr fmv <+> equals <+> ppr xi $$ ppr_kicked n_kicked) }
-dischargeFmv ev _ _ _ = pprPanic "dischargeFmv" (ppr ev)
 
 {- Note [Top-level reductions for type functions]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
