@@ -555,8 +555,8 @@ tcMcStmt :: TcExprStmtChecker
 tcMcStmt _ (LastStmt body noret return_op) res_ty thing_inside
   = do  { (body', return_op')
             <- tcSyntaxOp MCompOrigin return_op [SynRho] res_ty $
-               \ [a_ty] ->
-               tcMonoExprNC body (mkCheckExpType a_ty)
+               \ [a_ty] [weight]->
+               tcScalingUsage weight $ tcMonoExprNC body (mkCheckExpType a_ty)
         ; thing      <- thing_inside (panic "tcMcStmt: thing_inside")
         ; return (LastStmt body' noret return_op', thing) }
 
@@ -570,11 +570,11 @@ tcMcStmt ctxt (BindStmt pat rhs bind_op fail_op _) res_ty thing_inside
            -- (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
   = do  { ((rhs', pat', thing, new_res_ty), bind_op')
             <- tcSyntaxOp MCompOrigin bind_op
-                          [SynRho, SynFun SynAny SynRho] res_ty $
-               \ [rhs_ty, pat_ty, new_res_ty] ->
-               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                  ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
-                                           (unrestricted $ mkCheckExpType pat_ty) $
+                          [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
+               \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight, fun_weight, pat_weight] ->
+               do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                  ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
+                                           (Weighted pat_weight $ mkCheckExpType pat_ty) $
                                      thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', pat', thing, new_res_ty) }
 
@@ -594,13 +594,14 @@ tcMcStmt _ (BodyStmt rhs then_op guard_op _) res_ty thing_inside
           -- Where test_ty is, for example, Bool
         ; ((thing, rhs', rhs_ty, guard_op'), then_op')
             <- tcSyntaxOp MCompOrigin then_op [SynRho, SynRho] res_ty $
-               \ [rhs_ty, new_res_ty] ->
+               \ [rhs_ty, new_res_ty] [rhs_weight, fun_weight] ->
                do { (rhs', guard_op')
-                      <- tcSyntaxOp MCompOrigin guard_op [SynAny]
+                      <- tcScalingUsage rhs_weight $
+                         tcSyntaxOp MCompOrigin guard_op [SynAny]
                                     (mkCheckExpType rhs_ty) $
-                         \ [test_ty] ->
-                         tcMonoExpr rhs (mkCheckExpType test_ty)
-                  ; thing <- thing_inside (mkCheckExpType new_res_ty)
+                         \ [test_ty] [test_weight] ->
+                         tcScalingUsage test_weight $ tcMonoExpr rhs (mkCheckExpType test_ty)
+                  ; thing <- tcScalingUsage fun_weight $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (thing, rhs', rhs_ty, guard_op') }
         ; return (BodyStmt rhs' then_op' guard_op' rhs_ty, thing) }
 
@@ -671,7 +672,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
                 --   return :: (a,b,c,..) -> m (a,b,c,..)
                 ; (_, return_op') <- tcSyntaxOp MCompOrigin return_op
                                        [synKnownType (mkBigCoreVarTupTy bndr_ids)]
-                                       res_ty' $ \ _ -> return ()
+                                       res_ty' $ \ _ _ -> return ()
 
                 ; return (bndr_ids, by', return_op') }
 
@@ -681,7 +682,7 @@ tcMcStmt ctxt (TransStmt { trS_stmts = stmts, trS_bndrs = bindersMap
        ; (_, bind_op')  <- tcSyntaxOp MCompOrigin bind_op
                              [ synKnownType using_res_ty
                              , synKnownType (n_app tup_ty `mkFunTyOm` new_res_ty) ]
-                             res_ty $ \ _ -> return ()
+                             res_ty $ \ _ _ -> return ()
 
        --------------- Typecheck the 'fmap' function -------------
        ; fmap_op' <- case form of
@@ -772,8 +773,8 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
        ; (((blocks', thing), inner_res_ty), bind_op')
            <- tcSyntaxOp MCompOrigin bind_op
                          [ synKnownType (m_ty `mkAppTy` tuple_ty)
-                         , SynFun (synKnownType tuple_ty) SynRho ] res_ty $
-              \ [inner_res_ty] ->
+                         , SynFun SynAnyMult (synKnownType tuple_ty) SynRho ] res_ty $
+              \ [inner_res_ty] _ -> -- TODO: arnaud: we need to do something with the linearity of `(>>=)` in the parallel-comprehension case. I don't understand yet how `(>>=)` is used in this syntax.
               do { stuff <- loop m_ty (mkCheckExpType inner_res_ty)
                                  tup_tys bndr_stmts_s
                  ; return (stuff, inner_res_ty) }
@@ -803,7 +804,7 @@ tcMcStmt ctxt (ParStmt bndr_stmts_s mzip_op bind_op _) res_ty thing_inside
                       ; (_, return_op') <-
                           tcSyntaxOp MCompOrigin return_op
                                      [synKnownType tup_ty] m_tup_ty' $
-                                     \ _ -> return ()
+                                     \ _ _ -> return ()
                       ; (pairs', thing) <- loop m_ty inner_res_ty tup_tys_in pairs
                       ; return (ids, return_op', pairs', thing) }
            ; return (ParStmtBlock stmts' ids return_op' : pairs', thing) }
@@ -832,11 +833,11 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op _) res_ty thing_inside
                 -- in full generality; see Trac #1537
 
           ((rhs', pat', new_res_ty, thing), bind_op')
-            <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAny SynRho] res_ty $
-                \ [rhs_ty, pat_ty, new_res_ty] ->
-                do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                   ; (pat', thing) <- tcPat (StmtCtxt ctxt) pat
-                                            (unrestricted $ mkCheckExpType pat_ty) $
+            <- tcSyntaxOp DoOrigin bind_op [SynRho, SynFun SynAnyMult SynAny SynRho] res_ty $
+                \ [rhs_ty, pat_ty, new_res_ty] [rhs_weight,fun_weight,pat_weight] ->
+                do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                   ; (pat', thing) <- tcScalingUsage fun_weight $ tcPat (StmtCtxt ctxt) pat
+                                            (Weighted pat_weight $ mkCheckExpType pat_ty) $
                                       thing_inside (mkCheckExpType new_res_ty)
                    ; return (rhs', pat', new_res_ty, thing) }
 
@@ -853,7 +854,7 @@ tcDoStmt ctxt (ApplicativeStmt pairs mb_join _) res_ty thing_inside
             Just join_op ->
               second Just <$>
               (tcSyntaxOp DoOrigin join_op [SynRho] res_ty $
-               \ [rhs_ty] -> tc_app_stmts (mkCheckExpType rhs_ty))
+               \ [rhs_ty] [rhs_weight] -> tcScalingUsage rhs_weight $ tc_app_stmts (mkCheckExpType rhs_ty)) -- TODO: arnaud: probably not quite correct, check ApplicativeDo with linearity
 
         ; return (ApplicativeStmt pairs' mb_join' body_ty, thing) }
 
@@ -862,9 +863,9 @@ tcDoStmt _ (BodyStmt rhs then_op _ _) res_ty thing_inside
                 --   (>>) :: rhs_ty -> new_res_ty -> res_ty
         ; ((rhs', rhs_ty, thing), then_op')
             <- tcSyntaxOp DoOrigin then_op [SynRho, SynRho] res_ty $
-               \ [rhs_ty, new_res_ty] ->
-               do { rhs' <- tcMonoExprNC rhs (mkCheckExpType rhs_ty)
-                  ; thing <- thing_inside (mkCheckExpType new_res_ty)
+               \ [rhs_ty, new_res_ty] [rhs_weight,fun_weight] ->
+               do { rhs' <- tcScalingUsage rhs_weight $ tcMonoExprNC rhs (mkCheckExpType rhs_ty)
+                  ; thing <- tcScalingUsage fun_weight $ thing_inside (mkCheckExpType new_res_ty)
                   ; return (rhs', rhs_ty, thing) }
         ; return (BodyStmt rhs' then_op' noSyntaxExpr rhs_ty, thing) }
 
@@ -887,21 +888,21 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
                              -- be polymorphic) with those of "knot-tied" Ids
                       ; (_, ret_op')
                           <- tcSyntaxOp DoOrigin ret_op [synKnownType tup_ty]
-                                        inner_res_ty $ \_ -> return ()
+                                        inner_res_ty $ \_ _ -> return ()
                       ; return (ret_op', tup_rets) }
 
         ; ((_, mfix_op'), mfix_res_ty)
             <- tcInferInst $ \ exp_ty ->
                tcSyntaxOp DoOrigin mfix_op
                           [synKnownType (mkFunTyOm tup_ty stmts_ty)] exp_ty $
-               \ _ -> return ()
+               \ _ _ -> return ()
 
         ; ((thing, new_res_ty), bind_op')
             <- tcSyntaxOp DoOrigin bind_op
                           [ synKnownType mfix_res_ty
-                          , synKnownType tup_ty `SynFun` SynRho ]
+                          , SynFun SynAnyMult (synKnownType tup_ty) SynRho ]
                           res_ty $
-               \ [new_res_ty] ->
+               \ [new_res_ty] _ -> -- TODO: arnaud: recursive should probably interact with linearity. Have to figure out how.
                do { thing <- thing_inside (mkCheckExpType new_res_ty)
                   ; return (thing, new_res_ty) }
 
@@ -957,7 +958,7 @@ tcMonadFailOp orig pat fail_op res_ty
 
         -- Get the fail op itself
         ; snd <$> (tcSyntaxOp orig fail_op [synKnownType stringTy]
-                             (mkCheckExpType res_ty) $ \_ -> return ()) }
+                             (mkCheckExpType res_ty) $ \_ _ -> return ()) }
 
 emitMonadFailConstraint :: LPat TcId -> TcType -> TcRn ()
 emitMonadFailConstraint pat res_ty
@@ -1049,7 +1050,7 @@ tcApplicativeStmts ctxt pairs rhs_ty thing_inside
       = do { (_, op')
                <- tcSyntaxOp DoOrigin op
                              [synKnownType t_left, synKnownType exp_ty] t_i $
-                   \ _ -> return ()
+                   \ _ _ -> return ()
            ; t_i <- readExpType t_i
            ; ops' <- goOps t_i ops
            ; return (op' : ops') }

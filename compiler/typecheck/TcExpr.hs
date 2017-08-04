@@ -196,8 +196,8 @@ tcExpr (HsOverLit lit) res_ty
 tcExpr (NegApp expr neg_expr) res_ty
   = do  { (expr', neg_expr')
             <- tcSyntaxOp NegateOrigin neg_expr [SynAny] res_ty $
-               \[arg_ty] ->
-               tcMonoExpr expr (mkCheckExpType arg_ty)
+               \[arg_ty] [arg_weight] ->
+               tcScalingUsage arg_weight $ tcMonoExpr expr (mkCheckExpType arg_ty)
         ; return (NegApp expr' neg_expr') }
 
 tcExpr e@(HsIPVar x) res_ty
@@ -518,9 +518,9 @@ tcExpr (ExplicitList _ witness exprs) res_ty
       Just fln -> do { ((exprs', elt_ty), fln')
                          <- tcSyntaxOp ListOrigin fln
                                        [synKnownType intTy, SynList] res_ty $
-                            \ [elt_ty] ->
+                            \ [elt_ty] _ -> -- TODO: arnaud: enforce that all the multiplicities are Omega (even if it was not imposed by the type-class definition, `fromListN` will use the list notation twice anyway: once to compute the length of the list and once as the list itself)
                             do { exprs' <-
-                                    mapM (tc_elt elt_ty) exprs
+                                    mapM (tcScalingUsage Omega . tc_elt elt_ty) exprs
                                ; return (exprs', elt_ty) }
 
                      ; return $ ExplicitList elt_ty (Just fln') exprs' }
@@ -582,7 +582,7 @@ tcExpr (HsIf Nothing pred b1 b2) res_ty    -- Ordinary 'if'
 tcExpr (HsIf (Just fun) pred b1 b2) res_ty
   = do { ((pred', b1', b2'), fun')
            <- tcSyntaxOp IfOrigin fun [SynAny, SynAny, SynAny] res_ty $
-              \ [pred_ty, b1_ty, b2_ty] ->
+              \ [pred_ty, b1_ty, b2_ty] _ -> -- TODO: arnaud: overloaded ifThenElse must be unrestricted.
               do { pred' <- tcPolyExpr pred pred_ty
                  ; b1'   <- tcPolyExpr b1   b1_ty
                  ; b2'   <- tcPolyExpr b2   b2_ty
@@ -1107,7 +1107,7 @@ arithSeqEltType Nothing res_ty
 arithSeqEltType (Just fl) res_ty
   = do { (elt_ty, fl')
            <- tcSyntaxOp ListOrigin fl [SynList] res_ty $
-              \ [elt_ty] -> return elt_ty
+              \ [elt_ty] _ -> return elt_ty -- TODO:arnaud: ensure that the multiplicity is Omega?
        ; return (idHsWrapper, elt_ty, Just fl') }
 
 {-
@@ -1300,7 +1300,7 @@ tcSyntaxOp :: CtOrigin
            -> SyntaxExpr Name
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpRhoType               -- ^ overall result type
-           -> ([TcSigmaType] -> TcM a) -- ^ Type check any arguments
+           -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ Type check any arguments
            -> TcM (a, SyntaxExpr TcId)
 -- ^ Typecheck a syntax operator
 -- The operator is always a variable at this stage (i.e. renamer output)
@@ -1313,7 +1313,7 @@ tcSyntaxOpGen :: CtOrigin
               -> SyntaxExpr Name
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> TcM a)
+              -> ([TcSigmaType] -> [Rig] -> TcM a)
               -> TcM (a, SyntaxExpr TcId)
 tcSyntaxOpGen orig (SyntaxExpr { syn_expr = HsVar (L _ op) })
               arg_tys res_ty thing_inside
@@ -1342,7 +1342,7 @@ two tcSynArgs.
 tcSynArgE :: CtOrigin
           -> TcSigmaType
           -> SyntaxOpType                -- ^ shape it is expected to have
-          -> ([TcSigmaType] -> TcM a)    -- ^ check the arguments
+          -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper)
            -- ^ returns a wrapper :: (type of right shape) "->" (type passed in)
 tcSynArgE orig sigma_ty syn_ty thing_inside
@@ -1352,26 +1352,26 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
        ; return (result, skol_wrap <.> ty_wrapper) }
     where
     go rho_ty SynAny
-      = do { result <- thing_inside [rho_ty]
+      = do { result <- thing_inside [rho_ty] []
            ; return (result, idHsWrapper) }
 
     go rho_ty SynRho   -- same as SynAny, because we skolemise eagerly
-      = do { result <- thing_inside [rho_ty]
+      = do { result <- thing_inside [rho_ty] []
            ; return (result, idHsWrapper) }
 
     go rho_ty SynList
       = do { (list_co, elt_ty) <- matchExpectedListTy rho_ty
-           ; result <- thing_inside [elt_ty]
+           ; result <- thing_inside [elt_ty] []
            ; return (result, mkWpCastN list_co) }
 
-    go rho_ty (SynFun arg_shape res_shape)
+    go rho_ty (SynFun mult_shape arg_shape res_shape)
       = do { ( ( ( (result, arg_ty, res_ty)
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
                <- matchExpectedFunTys herald 1 (mkCheckExpType rho_ty) $
                   \ [arg_ty] res_ty ->
-                  do { arg_tc_ty <- expTypeToType (weightedThing arg_ty) -- TODO: arnaud: rather fmap, probably, but it changes the type of thing_inside, which I have to check whether it's worth it or not
+                  do { arg_tc_ty <- expTypeToType (weightedThing arg_ty)
                      ; res_tc_ty <- expTypeToType res_ty
 
                          -- another nested arrow is too much for now,
@@ -1382,11 +1382,12 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                                , text "Too many nested arrows in SyntaxOpType" $$
                                  pprCtOrigin orig )
 
+                     ; arg_inferred_mult <- synMult (weightedWeight arg_ty)
                      ; tcSynArgA orig arg_tc_ty [] arg_shape $
-                       \ arg_results ->
+                       \ arg_results arg_res_weights ->
                        tcSynArgE orig res_tc_ty res_shape $
-                       \ res_results ->
-                       do { result <- thing_inside (arg_results ++ res_results)
+                       \ res_results res_res_weights ->
+                       do { result <- thing_inside (arg_results ++ res_results) (arg_inferred_mult ++ arg_res_weights ++ res_res_weights)
                           ; return (result, arg_tc_ty, res_tc_ty) }}
 
            ; return ( result
@@ -1396,10 +1397,19 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
       where
         herald = text "This rebindable syntax expects a function with"
         doc = text "When checking a rebindable syntax operator arising from" <+> ppr orig
+        synMult arg_mult =
+          case mult_shape of
+            SynAnyMult -> return [arg_mult]
+            SynMult mult ->
+              if arg_mult == mult then -- TODO: arnaud: should be sub-multiplicity here, but I need, then to return a wrapper. Fix when the wrappers for multiplicity are about
+                return []
+              else
+                addErrTc (text "Incorrect multiplicity in rebindable syntax") >> -- TODO: arnaud: helpful error message required here
+                return []
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypeET orig GenSigCtxt the_ty rho_ty
-           ; result <- thing_inside []
+           ; result <- thing_inside [] []
            ; return (result, wrap) }
 
 -- works on "actual" types, instantiating where necessary
@@ -1408,7 +1418,7 @@ tcSynArgA :: CtOrigin
           -> TcSigmaType
           -> [SyntaxOpType]              -- ^ argument shapes
           -> SyntaxOpType                -- ^ result shape
-          -> ([TcSigmaType] -> TcM a)    -- ^ check the arguments
+          -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ check the arguments
           -> TcM (a, HsWrapper, [HsWrapper], HsWrapper)
             -- ^ returns a wrapper to be applied to the original function,
             -- wrappers to be applied to arguments
@@ -1418,24 +1428,24 @@ tcSynArgA orig sigma_ty arg_shapes res_shape thing_inside
            <- matchActualFunTys herald orig noThing (length arg_shapes) sigma_ty
               -- match_wrapper :: sigma_ty "->" (arg_tys -> res_ty)
        ; ((result, res_wrapper), arg_wrappers)
-           <- tc_syn_args_e (map weightedThing arg_tys) arg_shapes $ \ arg_results -> -- TODO: arnaud: quite possibly incorrect here. I don't know what we're checking yet
+           <- tc_syn_args_e (map weightedThing arg_tys) arg_shapes $ \ arg_results arg_res_weights ->
               tc_syn_arg    res_ty  res_shape  $ \ res_results ->
-              thing_inside (arg_results ++ res_results)
+              thing_inside (arg_results ++ res_results) (map weightedWeight arg_tys ++ arg_res_weights)
        ; return (result, match_wrapper, arg_wrappers, res_wrapper) }
   where
     herald = text "This rebindable syntax expects a function with"
 
     tc_syn_args_e :: [TcSigmaType] -> [SyntaxOpType]
-                  -> ([TcSigmaType] -> TcM a)
+                  -> ([TcSigmaType] -> [Rig] -> TcM a)
                   -> TcM (a, [HsWrapper])
                     -- the wrappers are for arguments
     tc_syn_args_e (arg_ty : arg_tys) (arg_shape : arg_shapes) thing_inside
       = do { ((result, arg_wraps), arg_wrap)
-               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results ->
-                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results ->
-                  thing_inside (arg1_results ++ args_results)
+               <- tcSynArgE     orig arg_ty  arg_shape  $ \ arg1_results arg1_weights ->
+                  tc_syn_args_e      arg_tys arg_shapes $ \ args_results args_weights ->
+                  thing_inside (arg1_results ++ args_results) (arg1_weights ++ args_weights)
            ; return (result, arg_wrap : arg_wraps) }
-    tc_syn_args_e _ _ thing_inside = (, []) <$> thing_inside []
+    tc_syn_args_e _ _ thing_inside = (, []) <$> thing_inside [] []
 
     tc_syn_arg :: TcSigmaType -> SyntaxOpType
                -> ([TcSigmaType] -> TcM a)

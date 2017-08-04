@@ -3,6 +3,7 @@ import HsSyn    ( HsExpr, LHsExpr, SyntaxExpr )
 import Name     ( Name )
 import TcType   ( TcRhoType, TcSigmaType, SyntaxOpType, ExpType, ExpRhoType )
 import TcRnTypes( TcM, TcId, CtOrigin )
+import Weight
 
 tcPolyExpr ::
           LHsExpr Name
@@ -26,14 +27,14 @@ tcSyntaxOp :: CtOrigin
            -> SyntaxExpr Name
            -> [SyntaxOpType]           -- ^ shape of syntax operator arguments
            -> ExpType                  -- ^ overall result type
-           -> ([TcSigmaType] -> TcM a) -- ^ Type check any arguments
+           -> ([TcSigmaType] -> [Rig] -> TcM a) -- ^ Type check any arguments
            -> TcM (a, SyntaxExpr TcId)
 
 tcSyntaxOpGen :: CtOrigin
               -> SyntaxExpr Name
               -> [SyntaxOpType]
               -> SyntaxOpType
-              -> ([TcSigmaType] -> TcM a)
+              -> ([TcSigmaType] -> [Rig] -> TcM a)
               -> TcM (a, SyntaxExpr TcId)
 
 

@@ -439,7 +439,7 @@ tc_pat penv (ListPat pats _ (Just (_,e))) pat_ty thing_inside
         ; ((pats', res, elt_ty), e')
             <- tcSyntaxOpGen ListOrigin e [SynType (mkCheckExpType tau_pat_ty)]
                                           SynList $
-                 \ [elt_ty] ->
+                 \ [elt_ty] _ -> -- TODO: arnaud: we know the weight of the pattern, we ought, I suppose, to verify that it can be applied to the view thus. View patterns should be properly understood, though, maybe they don't interact well with linear types at all, in which case we should disallow them. In particular, I'm thinking of the fact that the view is not necessarily well-factored (though this just creates more branches, so it's alright), what happens with default clauses, too (in this case, if there are like a `Just x` pattern in one branch and a "view -> ..." pattern on another?) The default pattern question may be more general too.
                  do { (pats', res) <- tcMultiple (\p -> tc_lpat p (pat_ty `weightedSet` mkCheckExpType elt_ty))
                                                  pats penv thing_inside
                     ; return (pats', res, elt_ty) }
@@ -535,7 +535,7 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq _) pat_ty thing_inside
         ; ((lit', mb_neg'), eq')
             <- tcSyntaxOp orig eq [SynType (weightedThing pat_ty), SynAny]
                           (mkCheckExpType boolTy) $
-               \ [neg_lit_ty] ->
+               \ [neg_lit_ty] _ -> -- TODO: arnaud: when desugaring a literal pattern in to an equality, we need, somewhat, to contribute the usage of the variable `x` (first argument of the equality) to the typing environment and check that all is consistent, to be designed. Alternatively: assume that literal pattern do not work for linear patterns.
                let new_over_lit lit_ty = newOverloadedLit over_lit
                                            (mkCheckExpType lit_ty)
                in case mb_neg of
@@ -544,7 +544,10 @@ tc_pat _ (NPat (L l over_lit) mb_neg eq _) pat_ty thing_inside
                              -- The 'negate' is re-mappable syntax
                    second Just <$>
                    (tcSyntaxOp orig neg [SynRho] (mkCheckExpType neg_lit_ty) $
-                    \ [lit_ty] -> new_over_lit lit_ty)
+                    \ [lit_ty] _ -> new_over_lit lit_ty)
+                     -- applied to a closed literal: linearity doesn't matter as
+                     -- literals are typed in an empty environment, hence have
+                     -- all multiplicities.
 
         ; res <- thing_inside
         ; pat_ty <- readExpType (weightedThing pat_ty)
@@ -585,11 +588,11 @@ tc_pat penv (NPlusKPat (L nm_loc name) (L loc lit) _ ge minus _) pat_ty_weighted
         ; (lit1', ge')
             <- tcSyntaxOp orig ge [synKnownType pat_ty, SynRho]
                                   (mkCheckExpType boolTy) $
-               \ [lit1_ty] ->
+               \ [lit1_ty] _ -> -- TODO: arnaud: checking linearity finely, for NPlusK patterns, looks devilishly hard. See also the corresponding comment for literal patterns. Maybe just refuse non-unrestricted patterns.
                newOverloadedLit lit (mkCheckExpType lit1_ty)
         ; ((lit2', minus_wrap, bndr_id), minus')
             <- tcSyntaxOpGen orig minus [synKnownType pat_ty, SynRho] SynAny $
-               \ [lit2_ty, var_ty] ->
+               \ [lit2_ty, var_ty] _ -> -- TODO: arnaud: see above: either handle correctly or reject non linear.
                do { lit2' <- newOverloadedLit lit (mkCheckExpType lit2_ty)
                   ; (wrap, bndr_id) <- setSrcSpan nm_loc $
                                      tcPatBndr penv name (pat_ty_weighted `weightedSet` mkCheckExpType var_ty)

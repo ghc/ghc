@@ -172,7 +172,7 @@ tc_cmd env (HsCmdIf (Just fun) pred b1 b2) res_ty -- Rebindable syntax for if
                   (text "Predicate type of `ifThenElse' depends on result type")
         ; (pred', fun')
             <- tcSyntaxOp IfOrigin fun (map synKnownType [pred_ty, r_ty, r_ty])
-                                       (mkCheckExpType r_ty) $ \ _ ->
+                                       (mkCheckExpType r_ty) $ \ _ _ -> -- TODO: arnaud: typing of `ifThenElse` in the arrow syntax. I'm guessing we can't do much here: having `ifThenElse` be a function of two arguments is an intuitionistic thing. With linear types, the type of `IfThenElse` would be `Bool ⊸ a&a ⊸ a` Which is quite different. Probably just require `Omega` everywhere.
                tcMonoExpr pred (mkCheckExpType pred_ty)
 
         ; b1'   <- tcCmd env b1 res_ty

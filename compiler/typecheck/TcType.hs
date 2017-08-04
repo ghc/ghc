@@ -26,7 +26,7 @@ module TcType (
 
   ExpType(..), InferResult(..), ExpSigmaType, ExpRhoType, mkCheckExpType,
 
-  SyntaxOpType(..), synKnownType, mkSynFunTys,
+  SyntaxOpType(..), SyntaxOpMultiplicity(..), synKnownType, mkSynFunTys,
 
   -- TcLevel
   TcLevel(..), topTcLevel, pushTcLevel, isTopTcLevel,
@@ -385,6 +385,9 @@ mkCheckExpType = Check
 *                                                                      *
 ********************************************************************* -}
 
+-- TODO: arnaud: in the comment below, when the syntax for multiplicities is
+-- fixed, arrange for one of the multiplicities to be known for the sake of the
+-- example.
 -- | What to expect for an argument to a rebindable-syntax operator.
 -- Quite like 'Type', but allows for holes to be filled in by tcSyntaxOp.
 -- The callback called from tcSyntaxOp gets a list of types; the meaning
@@ -396,17 +399,26 @@ mkCheckExpType = Check
 -- you'll get three types back: one for the first 'SynAny', the /element/
 -- type of the list, and one for the last 'SynAny'. You don't get anything
 -- for the 'SynType', because you've said positively that it should be an
--- Int, and so it shall be.
+-- Int, and so it shall be. You'll also get three multiplicities back: one
+-- for each function arrow.
 --
 -- This is defined here to avoid defining it in TcExpr.hs-boot.
 data SyntaxOpType
   = SynAny     -- ^ Any type
   | SynRho     -- ^ A rho type, deeply skolemised or instantiated as appropriate
   | SynList    -- ^ A list type. You get back the element type of the list
-  | SynFun SyntaxOpType SyntaxOpType
+  | SynFun SyntaxOpMultiplicity SyntaxOpType SyntaxOpType
                -- ^ A function.
   | SynType ExpType   -- ^ A known type.
-infixr 0 `SynFun`
+
+data SyntaxOpMultiplicity
+  = SynAnyMult  -- ^ A multiplicity hole
+  | SynMult Rig -- ^ A known multiplicity
+
+-- | Shortcut for unrestricted functions
+synFun :: SyntaxOpType -> SyntaxOpType -> SyntaxOpType
+synFun = SynFun (SynMult Omega)
+infixr 0 `synFun`
 
 -- | Like 'SynType' but accepts a regular TcType
 synKnownType :: TcType -> SyntaxOpType
@@ -414,7 +426,7 @@ synKnownType = SynType . mkCheckExpType
 
 -- | Like 'mkFunTys' but for 'SyntaxOpType'
 mkSynFunTys :: [SyntaxOpType] -> ExpType -> SyntaxOpType
-mkSynFunTys arg_tys res_ty = foldr SynFun (SynType res_ty) arg_tys
+mkSynFunTys arg_tys res_ty = foldr synFun (SynType res_ty) arg_tys
 
 
 {-

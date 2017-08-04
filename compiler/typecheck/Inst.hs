@@ -539,7 +539,7 @@ newNonTrivialOverloadedLit orig
         ; let lit_ty = hsLitType hs_lit
         ; (_, fi') <- tcSyntaxOp orig (mkRnSyntaxExpr meth_name)
                                       [synKnownType lit_ty] res_ty $
-                      \_ -> return ()
+                      \_ _ -> return ()
         ; let L _ witness = nlHsSyntaxApps fi' [nlHsLit hs_lit]
         ; res_ty <- readExpType res_ty
         ; return (lit { ol_witness = witness
