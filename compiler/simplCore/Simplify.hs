@@ -145,7 +145,9 @@ simplTopBinds env0 binds0
                                       ; return (float `addFloats` floats, env2) }
 
     simpl_bind env bind | Just bind' <- maybeLoopify bind
-                        = simpl_bind env bind'
+                        = do -- update the env, as maybeLoopify changes the id info
+                             env1 <- simplRecBndrs env (bindersOf bind')
+                             simpl_bind env1 bind'
     simpl_bind env (Rec pairs)  = simplRecBind env TopLevel Nothing pairs
     simpl_bind env (NonRec b r) = do { (env', b') <- addBndrRules env b (lookupRecBndr env b)
                                      ; simplRecOrTopPair env' TopLevel
