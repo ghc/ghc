@@ -5,9 +5,9 @@ import Settings.Builders.Ghc
 
 -- | Given a version string such as "2.16.2" produce an integer equivalent.
 versionToInt :: String -> Int
-versionToInt s = major * 1000 + minor * 10 + patch
-  where
-    [major, minor, patch] = map read . words $ replaceEq '.' ' ' s
+versionToInt s = case map read . words $ replaceEq '.' ' ' s of
+    [major, minor, patch] -> major * 1000 + minor * 10 + patch
+    _                     -> error "versionToInt: cannot parse version."
 
 haddockBuilderArgs :: Args
 haddockBuilderArgs = builder Haddock ? do

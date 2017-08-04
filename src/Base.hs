@@ -6,7 +6,7 @@ module Base (
     module Data.Function,
     module Data.List.Extra,
     module Data.Maybe,
-    module Data.Monoid,
+    module Data.Semigroup,
 
     -- * Shake
     module Development.Shake,
@@ -29,7 +29,7 @@ import Data.Char
 import Data.Function
 import Data.List.Extra
 import Data.Maybe
-import Data.Monoid
+import Data.Semigroup
 import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath

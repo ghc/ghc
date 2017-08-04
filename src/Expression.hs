@@ -19,7 +19,7 @@ module Expression (
     getTopDirectory,
 
     -- * Re-exports
-    module Data.Monoid,
+    module Data.Semigroup,
     module Builder,
     module Package,
     module Stage,
@@ -28,7 +28,7 @@ module Expression (
 
 import Control.Monad.Trans.Reader
 import Control.Monad.Trans
-import Data.Monoid
+import Data.Semigroup
 
 import Base
 import Builder
@@ -52,9 +52,13 @@ expr = Expr . lift
 exprIO :: IO a -> Expr a
 exprIO = Expr . liftIO
 
-instance Monoid a => Monoid (Expr a) where
-    mempty                    = Expr $ return mempty
-    mappend (Expr x) (Expr y) = Expr $ (<>) <$> x <*> y
+instance Semigroup a => Semigroup (Expr a) where
+    Expr x <> Expr y = Expr $ (<>) <$> x <*> y
+
+-- TODO: The 'Semigroup a' constraint will at some point become redundant.
+instance (Semigroup a, Monoid a) => Monoid (Expr a) where
+    mempty  = pure mempty
+    mappend = (<>)
 
 instance Applicative Expr where
     pure  = Expr . pure
@@ -78,15 +82,15 @@ type Ways      = Expr [Way]
 -- Basic operations on expressions:
 
 -- | Append something to an expression.
-append :: Monoid a => a -> Expr a
-append = Expr . return
+append :: a -> Expr a
+append = pure
 
 -- | Remove given elements from a list expression.
 remove :: Eq a => [a] -> Expr [a] -> Expr [a]
 remove xs e = filter (`notElem` xs) <$> e
 
 -- | Apply a predicate to an expression.
-applyPredicate :: Monoid a => Predicate -> Expr a -> Expr a
+applyPredicate :: (Monoid a, Semigroup a) => Predicate -> Expr a -> Expr a
 applyPredicate predicate expr = do
     bool <- predicate
     if bool then expr else mempty
@@ -97,7 +101,7 @@ arg = append . return
 
 -- | A convenient operator for predicate application.
 class PredicateLike a where
-    (?) :: Monoid m => a -> Expr m -> Expr m
+    (?) :: (Monoid m, Semigroup m) => a -> Expr m -> Expr m
 
 infixr 3 ?
 
