@@ -19,13 +19,13 @@ compilePackage rs context@Context {..} = do
             let src = obj2src context obj
             need [src]
             needDependencies context src $ obj <.> "d"
-            build $ Target context (compiler stage) [src] [obj]
+            build $ target context (compiler stage) [src] [obj]
         compileHs = \[obj, _hi] -> do
             (src, deps) <- fileDependencies context obj
             need $ src : deps
             when (isLibrary package) $ need =<< return <$> pkgConfFile context
             needLibrary =<< contextDependencies context
-            buildWithResources rs $ Target context (Ghc CompileHs stage) [src] [obj]
+            buildWithResources rs $ target context (Ghc CompileHs stage) [src] [obj]
 
     priority 2.0 $ do
         nonHs "c"   %> compile (Ghc CompileCWithGhc) (obj2src "c"   isGeneratedCFile  )
@@ -43,7 +43,7 @@ needDependencies :: Context -> FilePath -> FilePath -> Action ()
 needDependencies context@Context {..} src depFile = discover
   where
     discover = do
-        build $ Target context (Cc FindCDependencies stage) [src] [depFile]
+        build $ target context (Cc FindCDependencies stage) [src] [depFile]
         deps <- parseFile depFile
         -- Generated dependencies, if not yet built, will not be found and hence
         -- will be referred to simply by their file names.

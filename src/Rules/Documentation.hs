@@ -33,7 +33,7 @@ buildPackageDocumentation context@Context {..} =
             -- Build Haddock documentation
             -- TODO: pass the correct way from Rules via Context
             let haddockWay = if dynamicGhcPrograms flavour then dynamic else vanilla
-            build $ Target (context {way = haddockWay}) Haddock srcs [file]
+            build $ target (context {way = haddockWay}) Haddock srcs [file]
 
         when (package == haddock) $ haddockHtmlLib %> \_ -> do
             let dir = takeDirectory haddockHtmlLib

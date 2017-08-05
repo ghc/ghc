@@ -24,7 +24,7 @@ testRules = do
         need ["inplace/bin/hp2ps", "inplace/bin/hsc2hs"]
         -- TODO: Eliminate explicit filepaths in "need" (#376)
         -- FIXME: needBuilder Hsc2Hs doesn't work
-        build $ Target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
+        build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
         let yesNo x = show $ if x then "YES" else "NO"

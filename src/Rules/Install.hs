@@ -135,7 +135,7 @@ installPackageConf :: Action ()
 installPackageConf = do
     let context = vanillaContext Stage0 rts
     liftIO $ IO.createDirectoryIfMissing True (takeDirectory pkgConfInstallPath)
-    build $ Target context HsCpp [ pkgPath rts -/- "package.conf.in" ]
+    build $ target context HsCpp [ pkgPath rts -/- "package.conf.in" ]
                                  [ pkgConfInstallPath <.> "raw" ]
     Stdout content <- cmd "grep" [ "-v", "^#pragma GCC"
                                  , pkgConfInstallPath <.> "raw" ]
@@ -206,7 +206,7 @@ installPackages = do
                     installDistDir (installDistDir -/- "build")
 
                 whenM (isSpecified HsColour) $
-                    build $ Target context GhcCabalHsColour [cabalFile] []
+                    build $ target context GhcCabalHsColour [cabalFile] []
 
                 pref <- setting InstallPrefix
                 unit $ cmd ghcCabalInplace [ "copy"
@@ -282,7 +282,7 @@ installLibsTo libs dir = do
                installData [out] dir
                let context = vanillaContext Stage0 $ topLevel (PackageName "")
                -- TODO: Get rid of meaningless context for certain builder like ranlib
-               build $ Target context Ranlib [out] [out]
+               build $ target context Ranlib [out] [out]
            _ -> installData [lib] dir
 
 -- ref: includes/ghc.mk

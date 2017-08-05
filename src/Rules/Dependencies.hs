@@ -21,7 +21,7 @@ buildPackageDependencies rs context@Context {..} =
         if srcs == []
         then writeFileChanged mk ""
         else buildWithResources rs $
-            Target context (Ghc FindHsDependencies stage) srcs [mk]
+            target context (Ghc FindHsDependencies stage) srcs [mk]
         removeFile $ mk <.> "bak"
         mkDeps <- readFile' mk
         writeFileChanged deps . unlines

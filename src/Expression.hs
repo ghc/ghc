@@ -1,17 +1,15 @@
-{-# LANGUAGE DeriveFunctor, FlexibleInstances, LambdaCase #-}
 module Expression (
     -- * Expressions
-    Expr, expr, exprIO,
-    -- ** Operators
-    append, arg, remove,
+    Expr, Predicate, Args, Ways, Packages,
+
+    -- ** Construction and modification
+    expr, exprIO, append, arg, remove, (?),
+
     -- ** Evaluation
     interpret, interpretInContext,
-    -- ** Predicates
-    Predicate, (?), applyPredicate,
-    -- ** Common expressions
-    Args, Ways, Packages,
+
     -- ** Context and Target
-    Context, vanillaContext, stageContext, Target, dummyTarget,
+    Context, vanillaContext, stageContext, Target,
 
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
@@ -26,11 +24,11 @@ module Expression (
     module Way
     ) where
 
-import Control.Monad.Trans.Reader
-import Control.Monad.Trans
 import Data.Semigroup
 
-import Base
+import qualified Hadrian.Expression as H
+import Hadrian.Expression hiding (Expr, Predicate, Args)
+
 import Builder
 import Context
 import Package
@@ -44,38 +42,13 @@ import Oracles.Path
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
 -- read parameters of the current build 'Target'.
-newtype Expr a = Expr (ReaderT Target Action a) deriving Functor
-
-expr :: Action a -> Expr a
-expr = Expr . lift
-
-exprIO :: IO a -> Expr a
-exprIO = Expr . liftIO
-
-instance Semigroup a => Semigroup (Expr a) where
-    Expr x <> Expr y = Expr $ (<>) <$> x <*> y
-
--- TODO: The 'Semigroup a' constraint will at some point become redundant.
-instance (Semigroup a, Monoid a) => Monoid (Expr a) where
-    mempty  = pure mempty
-    mappend = (<>)
-
-instance Applicative Expr where
-    pure  = Expr . pure
-    (<*>) = ap
-
-instance Monad Expr where
-    return       = pure
-    Expr e >>= f = Expr $ do
-        re <- e
-        let Expr rf = f re
-        rf
+type Expr a = H.Expr Context Builder a
 
 -- | The following expressions are used throughout the build system for
 -- specifying conditions ('Predicate'), lists of arguments ('Args'), 'Ways'
 -- and 'Packages'.
-type Predicate = Expr Bool
-type Args      = Expr [String]
+type Predicate = H.Predicate Context Builder
+type Args      = H.Args      Context Builder
 type Packages  = Expr [Package]
 type Ways      = Expr [Way]
 
@@ -85,88 +58,17 @@ type Ways      = Expr [Way]
 append :: a -> Expr a
 append = pure
 
--- | Remove given elements from a list expression.
-remove :: Eq a => [a] -> Expr [a] -> Expr [a]
-remove xs e = filter (`notElem` xs) <$> e
-
--- | Apply a predicate to an expression.
-applyPredicate :: (Monoid a, Semigroup a) => Predicate -> Expr a -> Expr a
-applyPredicate predicate expr = do
-    bool <- predicate
-    if bool then expr else mempty
-
--- | Add a single argument to 'Args'.
-arg :: String -> Args
-arg = append . return
-
--- | A convenient operator for predicate application.
-class PredicateLike a where
-    (?) :: (Monoid m, Semigroup m) => a -> Expr m -> Expr m
-
-infixr 3 ?
-
-instance PredicateLike Predicate where
-    (?) = applyPredicate
-
-instance PredicateLike Bool where
-    (?) = applyPredicate . Expr . return
-
-instance PredicateLike (Action Bool) where
-    (?) = applyPredicate . expr
-
--- | Interpret a given expression according to the given 'Target'.
-interpret :: Target -> Expr a -> Action a
-interpret target (Expr e) = runReaderT e target
-
--- | Interpret a given expression by looking only at the given 'Context'.
-interpretInContext :: Context -> Expr a -> Action a
-interpretInContext = interpret . dummyTarget
-
--- | Get the current build 'Context'.
-getContext :: Expr Context
-getContext = Expr $ asks context
-
 -- | Get the 'Stage' of the current 'Context'.
 getStage :: Expr Stage
-getStage = Expr $ stage <$> asks context
+getStage = stage <$> getContext
 
 -- | Get the 'Package' of the current 'Context'.
 getPackage :: Expr Package
-getPackage = Expr $ package <$> asks context
+getPackage = package <$> getContext
 
 -- | Get the 'Way' of the current 'Context'.
 getWay :: Expr Way
-getWay = Expr $ way <$> asks context
-
--- | Get the 'Builder' for the current 'Target'.
-getBuilder :: Expr Builder
-getBuilder = Expr $ asks builder
-
--- | Get the input files of the current 'Target'.
-getInputs :: Expr [FilePath]
-getInputs = Expr $ asks inputs
-
--- | Run 'getInputs' and check that the result contains one input file only.
-getInput :: Expr FilePath
-getInput = Expr $ do
-    target <- ask
-    getSingleton ("Exactly one input file expected in " ++ show target) <$> asks inputs
-
--- | Get the files produced by the current 'Target'.
-getOutputs :: Expr [FilePath]
-getOutputs = Expr $ asks outputs
-
--- | Run 'getOutputs' and check that the result contains one output file only.
-getOutput :: Expr FilePath
-getOutput = Expr $ do
-    target <- ask
-    getSingleton ("Exactly one output file expected in " ++ show target) <$> asks outputs
-
--- | Extract a value from a singleton list, or raise an error if the list does
--- not contain exactly one value.
-getSingleton :: String -> [a] -> a
-getSingleton _ [res] = res
-getSingleton msg _   = error msg
+getWay = way <$> getContext
 
 getSetting :: Setting -> Expr String
 getSetting = expr . setting

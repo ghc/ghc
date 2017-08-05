@@ -26,6 +26,8 @@ executable hadrian
                        , Expression
                        , Flavour
                        , GHC
+                       , Hadrian.Expression
+                       , Hadrian.Target
                        , Oracles.ArgsHash
                        , Oracles.Config
                        , Oracles.Config.Flag

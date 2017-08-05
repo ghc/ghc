@@ -49,7 +49,7 @@ libffiRules = do
                 copyFile (ffiIncludeDir -/- file) (rtsBuildPath -/- file)
             putSuccess $ "| Successfully copied system FFI library header files"
         else do
-            build $ Target libffiContext (Make libffiBuildPath) [] []
+            build $ target libffiContext (Make libffiBuildPath) [] []
 
             hs <- getDirectoryFiles "" [libffiBuildPath -/- "inst/lib/*/include/*"]
             forM_ hs $ \header ->
@@ -72,7 +72,7 @@ libffiRules = do
         removeDirectory (buildRootPath -/- libname)
         -- TODO: Simplify.
         actionFinally (do
-            build $ Target libffiContext Tar [tarball] [buildRootPath]
+            build $ target libffiContext Tar [tarball] [buildRootPath]
             moveDirectory (buildRootPath -/- libname) libffiBuildPath) $
                 removeFiles buildRootPath [libname <//> "*"]
 
@@ -86,4 +86,4 @@ libffiRules = do
 
         env <- configureEnvironment
         buildWithCmdOptions env $
-            Target libffiContext (Configure libffiBuildPath) [mk <.> "in"] [mk]
+            target libffiContext (Configure libffiBuildPath) [mk <.> "in"] [mk]

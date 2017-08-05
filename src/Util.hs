@@ -43,16 +43,17 @@ buildWithCmdOptions :: [CmdOption] -> Target -> Action ()
 buildWithCmdOptions = customBuild []
 
 customBuild :: [(Resource, Int)] -> [CmdOption] -> Target -> Action ()
-customBuild rs opts target@Target {..} = do
-    needBuilder builder
-    path    <- builderPath builder
+customBuild rs opts target = do
+    let targetBuilder = builder target
+    needBuilder targetBuilder
+    path    <- builderPath targetBuilder
     argList <- interpret target getArgs
     verbose <- interpret target verboseCommands
     let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
     checkArgsHash target -- Rerun the rule if the hash of argList has changed.
     withResources rs $ do
         putInfo target
-        quietlyUnlessVerbose $ case builder of
+        quietlyUnlessVerbose $ case targetBuilder of
             Ar _ -> do
                 output <- interpret target getOutput
                 if "//*.a" ?== output
@@ -256,13 +257,15 @@ makeExecutable file = do
 
 -- | Print out information about the command being executed.
 putInfo :: Target -> Action ()
-putInfo Target {..} = putProgressInfo $ renderAction
-    ("Run " ++ show builder ++ contextInfo) (digest inputs) (digest outputs)
+putInfo t = putProgressInfo $ renderAction
+    ("Run " ++ show (builder t) ++ contextInfo)
+    (digest $ inputs  t)
+    (digest $ outputs t)
   where
     contextInfo = concat $ [ " (" ]
-        ++ [ "stage = "     ++ show (stage context) ]
-        ++ [ ", package = " ++ pkgNameString (package context) ]
-        ++ [ ", way = "     ++ show (way context) | way context /= vanilla ]
+        ++ [ "stage = "     ++ show (stage $ context t) ]
+        ++ [ ", package = " ++ pkgNameString (package $ context t) ]
+        ++ [ ", way = "     ++ show (way $ context t) | (way $ context t) /= vanilla ]
         ++ [ ")" ]
     digest [] = "none"
     digest [x] = x

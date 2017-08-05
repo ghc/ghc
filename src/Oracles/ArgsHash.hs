@@ -21,10 +21,10 @@ newtype ArgsHashKey = ArgsHashKey Target
 -- argument list constructors are assumed not to examine target sources, but
 -- only append them to argument lists where appropriate.
 checkArgsHash :: Target -> Action ()
-checkArgsHash target = do
-    let hashed = [ show . hash $ inputs target ]
-    _ <- askOracle . ArgsHashKey $ target { inputs = hashed } :: Action Int
-    return ()
+checkArgsHash t = do
+    let hashedInputs = [ show $ hash (inputs t) ]
+        hashedTarget = target (context t) (builder t) hashedInputs (outputs t)
+    void (askOracle $ ArgsHashKey hashedTarget :: Action Int)
 
 -- | Oracle for storing per-target argument list hashes.
 argsHashOracle :: Rules ()

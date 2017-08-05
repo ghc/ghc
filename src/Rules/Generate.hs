@@ -109,7 +109,7 @@ generatePackageCode context@(Context stage pkg _) =
             let unpack = fromMaybe . error $ "No generator for " ++ file ++ "."
             (src, builder) <- unpack <$> findGenerator context file
             need [src]
-            build $ Target context builder [src] [file]
+            build $ target context builder [src] [file]
             let boot = src -<.> "hs-boot"
             whenM (doesFileExist boot) . copyFile boot $ file -<.> "hs-boot"
 
@@ -121,7 +121,7 @@ generatePackageCode context@(Context stage pkg _) =
         when (pkg == compiler) $ do
             primopsTxt stage %> \file -> do
                 need $ [platformH stage, primopsSource] ++ includesDependencies
-                build $ Target context HsCpp [primopsSource] [file]
+                build $ target context HsCpp [primopsSource] [file]
 
             platformH stage %> go generateGhcBootPlatformH
 
@@ -131,10 +131,10 @@ generatePackageCode context@(Context stage pkg _) =
             , "GHC/PrimopWrappers.hs"
             , "*.hs-incl" ] |%> \file -> do
                 need [primopsTxt stage]
-                build $ Target context GenPrimopCode [primopsTxt stage] [file]
+                build $ target context GenPrimopCode [primopsTxt stage] [file]
 
         when (pkg == rts) $ path -/- "cmm/AutoApply.cmm" %> \file ->
-            build $ Target context GenApply [] [file]
+            build $ target context GenApply [] [file]
 
 copyRules :: Rules ()
 copyRules = do
@@ -161,7 +161,7 @@ generateRules = do
     -- TODO: simplify, get rid of fake rts context
     generatedPath ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
-            Target rtsContext DeriveConstants [] [file, dir]
+            target rtsContext DeriveConstants [] [file, dir]
   where
     file <~ gen = file %> \out -> generate out emptyTarget gen
 

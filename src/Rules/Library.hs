@@ -50,7 +50,7 @@ buildDynamicLib context@Context{..} = do
         deps <- contextDependencies context
         need =<< mapM pkgLibraryFile deps
         objs <- libraryObjects context
-        build $ Target context (Ghc LinkHs stage) objs [so]
+        build $ target context (Ghc LinkHs stage) objs [so]
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
@@ -61,8 +61,8 @@ buildPackageLibrary context@Context {..} = do
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
         removeFile a
-        if isLib0 then build $ Target context (Ar stage) []   [a] -- TODO: Scan for dlls
-                  else build $ Target context (Ar stage) objs [a]
+        if isLib0 then build $ target context (Ar stage) []   [a] -- TODO: Scan for dlls
+                  else build $ target context (Ar stage) objs [a]
 
         synopsis <- interpretInContext context $ getPkgData Synopsis
         unless isLib0 . putSuccess $ renderLibrary
@@ -75,7 +75,7 @@ buildPackageGhciLibrary context@Context {..} = priority 2 $ do
     matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
         objs <- allObjects context
         need objs
-        build $ Target context Ld objs [obj]
+        build $ target context Ld objs [obj]
 
 allObjects :: Context -> Action [FilePath]
 allObjects context = (++) <$> nonHsObjects context <*> hsObjects context

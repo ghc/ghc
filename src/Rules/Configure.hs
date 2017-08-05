@@ -29,7 +29,7 @@ configureRules = do
             let srcs    = map (<.> "in") outs
                 context = vanillaContext Stage0 compiler
             need srcs
-            build $ Target context (Configure ".") srcs outs
+            build $ target context (Configure ".") srcs outs
 
     ["configure", configH <.> "in"] &%> \_ -> do
         if cmdSkipConfigure

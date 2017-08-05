@@ -43,13 +43,13 @@ gmpRules = do
             putBuild "| No GMP library/framework detected; in tree GMP will be built"
             need [gmpLibrary]
             createDirectory gmpObjects
-            build $ Target gmpContext (Ar Stage1) [gmpLibrary] [gmpObjects]
+            build $ target gmpContext (Ar Stage1) [gmpLibrary] [gmpObjects]
             copyFile (gmpBuildPath -/- "gmp.h") header
             copyFile (gmpBuildPath -/- "gmp.h") gmpLibraryInTreeH
 
     -- Build in-tree GMP library
     gmpLibrary %> \lib -> do
-        build $ Target gmpContext (Make gmpBuildPath) [gmpMakefile] [lib]
+        build $ target gmpContext (Make gmpBuildPath) [gmpMakefile] [lib]
         putSuccess "| Successfully built custom library 'gmp'"
 
     -- In-tree GMP header is built in the gmpLibraryH rule
@@ -64,7 +64,7 @@ gmpRules = do
         env <- configureEnvironment
         need [mk <.> "in"]
         buildWithCmdOptions env $
-            Target gmpContext (Configure gmpBuildPath) [mk <.> "in"] [mk]
+            target gmpContext (Configure gmpBuildPath) [mk <.> "in"] [mk]
 
     -- Extract in-tree GMP sources and apply patches
     gmpMakefile <.> "in" %> \_ -> do
@@ -79,7 +79,7 @@ gmpRules = do
         withTempDir $ \dir -> do
             let tmp = unifyPath dir
             need [tarball]
-            build $ Target gmpContext Tar [tarball] [tmp]
+            build $ target gmpContext Tar [tarball] [tmp]
 
             let patch     = gmpBase -/- "gmpsrc.patch"
                 patchName = takeFileName patch

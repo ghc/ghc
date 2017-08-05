@@ -33,7 +33,7 @@ buildPackageData context@Context {..} = do
         need =<< mapM pkgConfFile =<< contextDependencies context
 
         need [cabalFile]
-        build $ Target context GhcCabal [cabalFile] [mk, setupConfig]
+        build $ target context GhcCabal [cabalFile] [mk, setupConfig]
         postProcessPackageData context mk
 
     pkgInplaceConfig context %> \conf -> do
@@ -41,7 +41,7 @@ buildPackageData context@Context {..} = do
         if package == rts
         then do
             need [rtsConfIn]
-            build $ Target context HsCpp [rtsConfIn] [conf]
+            build $ target context HsCpp [rtsConfIn] [conf]
             fixFile conf $ unlines
                          . map
                          ( replace "\"\"" ""
