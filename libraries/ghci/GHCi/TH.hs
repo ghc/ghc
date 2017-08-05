@@ -97,6 +97,7 @@ import GHC.Serialized
 
 import Control.Exception
 import qualified Control.Monad.Fail as Fail
+import Control.Monad.IO.Class (MonadIO (..))
 import Data.Binary
 import Data.Binary.Put
 import Data.ByteString (ByteString)
@@ -160,6 +161,9 @@ ghcCmd m = GHCiQ $ \s -> do
     THException str -> throwIO (GHCiQException s str)
     THComplete res -> return (res, s)
 
+instance MonadIO GHCiQ where
+  liftIO m = GHCiQ $ \s -> fmap (,s) m
+
 instance TH.Quasi GHCiQ where
   qNewName str = ghcCmd (NewName str)
   qReport isError msg = ghcCmd (Report isError msg)
@@ -190,7 +194,6 @@ instance TH.Quasi GHCiQ where
   qReifyModule m = ghcCmd (ReifyModule m)
   qReifyConStrictness name = ghcCmd (ReifyConStrictness name)
   qLocation = fromMaybe noLoc . qsLocation <$> getState
-  qRunIO m = GHCiQ $ \s -> fmap (,s) m
   qAddDependentFile file = ghcCmd (AddDependentFile file)
   qAddTopDecls decls = ghcCmd (AddTopDecls decls)
   qAddForeignFile str lang = ghcCmd (AddForeignFile str lang)

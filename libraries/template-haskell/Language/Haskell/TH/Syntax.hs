@@ -30,6 +30,7 @@ import Data.Data hiding (Fixity(..))
 import Data.IORef
 import System.IO.Unsafe ( unsafePerformIO )
 import Control.Monad (liftM)
+import Control.Monad.IO.Class (MonadIO (..))
 import System.IO        ( hPutStrLn, stderr )
 import Data.Char        ( isAlpha, isAlphaNum, isUpper )
 import Data.Int
@@ -49,7 +50,7 @@ import qualified Control.Monad.Fail as Fail
 --
 -----------------------------------------------------
 
-class Fail.MonadFail m => Quasi m where
+class (MonadIO m, Fail.MonadFail m) => Quasi m where
   qNewName :: String -> m Name
         -- ^ Fresh names
 
@@ -78,6 +79,7 @@ class Fail.MonadFail m => Quasi m where
   qLocation :: m Loc
 
   qRunIO :: IO a -> m a
+  qRunIO = liftIO
   -- ^ Input/output (dangerous)
 
   qAddDependentFile :: FilePath -> m ()
@@ -131,8 +133,6 @@ instance Quasi IO where
   qPutQ _               = badIO "putQ"
   qIsExtEnabled _       = badIO "isExtEnabled"
   qExtsEnabled          = badIO "extsEnabled"
-
-  qRunIO m = m
 
 badIO :: String -> IO a
 badIO op = do   { qReport True ("Can't do `" ++ op ++ "' in the IO monad")
@@ -494,6 +494,9 @@ isExtEnabled ext = Q (qIsExtEnabled ext)
 extsEnabled :: Q [Extension]
 extsEnabled = Q qExtsEnabled
 
+instance MonadIO Q where
+  liftIO = runIO
+
 instance Quasi Q where
   qNewName            = newName
   qReport             = report
@@ -507,7 +510,6 @@ instance Quasi Q where
   qReifyConStrictness = reifyConStrictness
   qLookupName         = lookupName
   qLocation           = location
-  qRunIO              = runIO
   qAddDependentFile   = addDependentFile
   qAddTopDecls        = addTopDecls
   qAddForeignFile     = addForeignFile

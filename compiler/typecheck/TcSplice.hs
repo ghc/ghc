@@ -869,7 +869,6 @@ instance TH.Quasi TcM where
         -- the recovery action is chosen.  Otherwise
         -- we'll only fail higher up.
   qRecover recover main = tryTcDiscardingErrs recover main
-  qRunIO io = liftIO io
 
   qAddDependentFile fp = do
     ref <- fmap tcg_dependent_files getGblEnv
