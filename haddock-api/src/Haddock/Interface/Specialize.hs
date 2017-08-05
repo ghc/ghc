@@ -17,7 +17,6 @@ import Name
 import FastString
 
 import Control.Monad
-import Control.Monad.Trans.Reader
 import Control.Monad.Trans.State
 
 import Data.Data
@@ -204,7 +203,7 @@ setInternalOccName occ name =
 
 -- | Compute set of free variables of given type.
 freeVariables :: forall name. (NamedThing name, DataId name)
-              => HsType name -> Set NameRep
+              => HsType name -> Set Name
 freeVariables =
     everythingWithState Set.empty Set.union query
   where
@@ -213,7 +212,7 @@ freeVariables =
             (Set.empty, Set.union ctx (bndrsNames bndrs))
         Just (HsTyVar _ (L _ name))
             | getName name `Set.member` ctx -> (Set.empty, ctx)
-            | otherwise -> (Set.singleton $ getNameRep name, ctx)
+            | otherwise -> (Set.singleton $ getName name, ctx)
         _ -> (Set.empty, ctx)
     bndrsNames = Set.fromList . map (getName . tyVarName . unLoc)
 
@@ -225,33 +224,36 @@ freeVariables =
 -- @(a -> b)@ we get @(a -> b) -> b@ where first occurrence of @b@ refers to
 -- different type variable than latter one. Applying 'rename' function
 -- will fix that type to be visually unambiguous again (making it something
--- like @(a -> c) -> b@).
-rename :: SetName name => Set NameRep -> HsType name -> HsType name
-rename fv typ = runReader (renameType typ) $ RenameEnv
-    { rneFV = fv
-    , rneCtx = Map.empty
-    }
-
+-- like @(a -> b0) -> b@).
+rename :: (Eq name, DataId name, SetName name)
+       => Set Name -> HsType name -> HsType name
+rename fv typ = evalState (renameType typ) env
+  where
+    env = RenameEnv
+      { rneHeadFVs = Map.fromList . map mkPair . Set.toList $ fv
+      , rneSigFVs = Set.map getNameRep $ freeVariables typ
+      , rneCtx = Map.empty
+      }
+    mkPair name = (getNameRep name, name)
 
 -- | Renaming monad.
-type Rename name = Reader (RenameEnv name)
-
--- | Binding generation monad.
-type Rebind name = State (RenameEnv name)
+type Rename name = State (RenameEnv name)
 
 data RenameEnv name = RenameEnv
-    { rneFV :: Set NameRep
-    , rneCtx :: Map Name name
-    }
+  { rneHeadFVs :: Map NameRep Name
+  , rneSigFVs :: Set NameRep
+  , rneCtx :: Map Name name
+  }
 
 
-renameType :: SetName name => HsType name -> Rename name (HsType name)
-renameType (HsForAllTy bndrs lt) = rebind bndrs $ \bndrs' ->
+renameType :: (Eq name, SetName name)
+           => HsType name -> Rename name (HsType name)
+renameType (HsForAllTy bndrs lt) =
     HsForAllTy
-        <$> pure bndrs'
+        <$> mapM (located renameBinder) bndrs
         <*> renameLType lt
 renameType (HsQualTy lctxt lt) =
-  HsQualTy
+    HsQualTy
         <$> located renameContext lctxt
         <*> renameLType lt
 renameType (HsTyVar ip name) = HsTyVar ip <$> located renameName name
@@ -281,85 +283,61 @@ renameType (HsWildCardTy wc) = pure (HsWildCardTy wc)
 renameType (HsAppsTy _) = error "HsAppsTy: Only used before renaming"
 
 
-renameLType :: SetName name => LHsType name -> Rename name (LHsType name)
+renameLType :: (Eq name, SetName name)
+            => LHsType name -> Rename name (LHsType name)
 renameLType = located renameType
 
 
-renameLTypes :: SetName name => [LHsType name] -> Rename name [LHsType name]
+renameLTypes :: (Eq name, SetName name)
+             => [LHsType name] -> Rename name [LHsType name]
 renameLTypes = mapM renameLType
 
 
-renameContext :: SetName name => HsContext name -> Rename name (HsContext name)
+renameContext :: (Eq name, SetName name)
+              => HsContext name -> Rename name (HsContext name)
 renameContext = renameLTypes
 
-{-
-renameLTyOp :: SetName name => LHsTyOp name -> Rename name (LHsTyOp name)
-renameLTyOp (wrap, lname) = (,) wrap <$> located renameName lname
--}
+
+renameBinder :: (Eq name, SetName name)
+             => HsTyVarBndr name -> Rename name (HsTyVarBndr name)
+renameBinder (UserTyVar lname) = UserTyVar <$> located renameName lname
+renameBinder (KindedTyVar lname lkind) =
+  KindedTyVar <$> located renameName lname <*> located renameType lkind
 
 
-renameName :: SetName name => name -> Rename name name
+-- | Core renaming logic.
+renameName :: (Eq name, SetName name) => name -> Rename name name
 renameName name = do
-    RenameEnv { rneCtx = ctx } <- ask
-    pure $ fromMaybe name (Map.lookup (getName name) ctx)
-
-
-rebind :: SetName name
-       => [LHsTyVarBndr name] -> ([LHsTyVarBndr name] -> Rename name a)
-       -> Rename name a
-rebind lbndrs action = do
-    (lbndrs', env') <- runState (rebindLTyVarBndrs lbndrs) <$> ask
-    local (const env') (action lbndrs')
-
-
-rebindLTyVarBndrs :: SetName name
-                  => [LHsTyVarBndr name] -> Rebind name [LHsTyVarBndr name]
-rebindLTyVarBndrs lbndrs = mapM (located rebindTyVarBndr) lbndrs
-
-
-rebindTyVarBndr :: SetName name
-                => HsTyVarBndr name -> Rebind name (HsTyVarBndr name)
-rebindTyVarBndr (UserTyVar (L l name)) =
-    UserTyVar . L l <$> rebindName name
-rebindTyVarBndr (KindedTyVar name kinds) =
-    KindedTyVar <$> located rebindName name <*> pure kinds
-
-
-rebindName :: SetName name => name -> Rebind name name
-rebindName name = do
     RenameEnv { .. } <- get
-    taken <- takenNames
     case Map.lookup (getName name) rneCtx of
-        Just name' -> pure name'
-        Nothing | getNameRep name `Set.member` taken -> freshName name
-        Nothing -> reuseName name
+      Nothing
+        | Just headTv <- Map.lookup (getNameRep name) rneHeadFVs
+        , headTv /= getName name -> freshName name
+      Just name' -> return name'
+      _ -> return name
 
 
 -- | Generate fresh occurrence name, put it into context and return.
-freshName :: SetName name => name -> Rebind name name
+freshName :: SetName name => name -> Rename name name
 freshName name = do
-    env@RenameEnv { .. } <- get
     taken <- takenNames
     let name' = setInternalNameRep (findFreshName taken rep) name
-    put $ env { rneCtx = Map.insert nname name' rneCtx }
+    modify $ \rne -> rne
+      { rneCtx = Map.insert (getName name) name' (rneCtx rne) }
     return name'
   where
     nname = getName name
     rep = getNameRep nname
 
 
-reuseName :: SetName name => name -> Rebind name name
-reuseName name = do
-    env@RenameEnv { .. } <- get
-    put $ env { rneCtx = Map.insert (getName name) name rneCtx }
-    return name
-
-
-takenNames :: NamedThing name => Rebind name (Set NameRep)
+takenNames :: NamedThing name => Rename name (Set NameRep)
 takenNames = do
     RenameEnv { .. } <- get
-    return $ Set.union rneFV (ctxElems rneCtx)
+    return $ headReps rneHeadFVs `Set.union`
+             rneSigFVs `Set.union`
+             ctxElems rneCtx
   where
+    headReps = Set.fromList . Map.keys
     ctxElems = Set.fromList . map getNameRep . Map.elems
 
 
@@ -371,15 +349,7 @@ findFreshName taken =
 
 
 alternativeNames :: NameRep -> [NameRep]
-alternativeNames name
-    | [_] <- nameRepString name = letterNames ++ alternativeNames' name
-  where
-    letterNames = map (stringNameRep . pure) ['a'..'z']
-alternativeNames name = alternativeNames' name
-
-
-alternativeNames' :: NameRep -> [NameRep]
-alternativeNames' name =
+alternativeNames name =
     [ stringNameRep $ str ++ show i | i :: Int <- [0..] ]
   where
     str = nameRepString name
