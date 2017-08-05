@@ -27,6 +27,7 @@ import Id
 import ConLike
 import Name
 import FamInstEnv
+import TysPrim (tYPETyCon)
 import TysWiredIn
 import TyCon
 import SrcLoc
@@ -440,6 +441,19 @@ inhabitationCandidates fam_insts ty
             (_:_) -> do var <- liftD $ mkPmId (toTcType core_ty)
                         let va = build_tm (PmVar var) dcs
                         return $ Right [(va, mkIdEq var, emptyBag)]
+
+          -- TYPE (which is the underlying kind behind Type, among others)
+          -- is conceptually an empty datatype, so one would expect this code
+          -- (from #14086) to compile without warnings:
+          --
+          --   f :: Type -> Int
+          --   f x = case x of {}
+          --
+          -- However, since TYPE is a primitive builtin type, not an actual
+          -- datatype, we must convince the coverage checker of this fact by
+          -- adding a special case here.
+        | tc == tYPETyCon -> pure (Right [])
+
         | isClosedAlgType core_ty -> liftD $ do
             var  <- mkPmId (toTcType core_ty) -- it would be wrong to unify x
             alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
