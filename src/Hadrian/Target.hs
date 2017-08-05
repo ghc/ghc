@@ -1,9 +1,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Hadrian.Target (Target, target, context, builder, inputs, outputs) where
 
+import Development.Shake.Classes
 import GHC.Generics
-
-import Base
 
 -- | Each invocation of a builder is fully described by a 'Target', which
 -- comprises a build context (type variable @c@), a builder (type variable @b@),

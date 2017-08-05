@@ -1,17 +1,20 @@
 module Rules.Oracles (oracleRules) where
 
+import qualified Hadrian.Oracles.ArgsHash
+
 import Base
-import qualified Oracles.ArgsHash
 import qualified Oracles.Config
 import qualified Oracles.Dependencies
 import qualified Oracles.DirectoryContents
 import qualified Oracles.ModuleFiles
 import qualified Oracles.PackageData
 import qualified Oracles.Path
+import Target
+import Settings
 
 oracleRules :: Rules ()
 oracleRules = do
-    Oracles.ArgsHash.argsHashOracle
+    Hadrian.Oracles.ArgsHash.argsHashOracle trackArgument getArgs
     Oracles.Config.configOracle
     Oracles.Dependencies.dependenciesOracles
     Oracles.DirectoryContents.directoryContentsOracle

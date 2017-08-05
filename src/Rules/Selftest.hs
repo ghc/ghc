@@ -12,6 +12,7 @@ import Oracles.Config.Setting
 import Oracles.ModuleFiles
 import Settings
 import Settings.Builders.Ar
+import Target
 import UserSettings
 
 instance Arbitrary Way where
@@ -36,11 +37,12 @@ selftestRules =
 
 testBuilder :: Action ()
 testBuilder = do
-    putBuild $ "==== trackedArgument"
+    putBuild $ "==== trackArgument"
+    let make = target undefined (Make undefined) undefined undefined
     test $ forAll (elements ["-j", "MAKEFLAGS=-j", "THREADS="])
          $ \prefix (NonNegative n) ->
-            trackedArgument (Make undefined) prefix == False &&
-            trackedArgument (Make undefined) ("-j" ++ show (n :: Int)) == False
+            trackArgument make prefix == False &&
+            trackArgument make ("-j" ++ show (n :: Int)) == False
 
 testChunksOfSize :: Action ()
 testChunksOfSize = do

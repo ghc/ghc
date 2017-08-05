@@ -11,12 +11,13 @@ import qualified System.Directory.Extra as IO
 import qualified System.IO              as IO
 import qualified Control.Exception.Base as IO
 
+import Hadrian.Oracles.ArgsHash
+
 import Base
 import CmdLineFlag
 import Context
 import Expression
 import GHC
-import Oracles.ArgsHash
 import Oracles.DirectoryContents
 import Oracles.Path
 import Oracles.Config.Setting
