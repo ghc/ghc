@@ -51,7 +51,7 @@ customBuild rs opts target = do
     argList <- interpret target getArgs
     verbose <- interpret target verboseCommands
     let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
-    checkArgsHash target -- Rerun the rule if the hash of argList has changed.
+    trackArgsHash target -- Rerun the rule if the hash of argList has changed.
     withResources rs $ do
         putInfo target
         quietlyUnlessVerbose $ case targetBuilder of

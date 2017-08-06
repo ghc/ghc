@@ -1,6 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Hadrian.Oracles.ArgsHash (
-    TrackArgument, trackAllArguments, checkArgsHash, argsHashOracle
+    TrackArgument, trackAllArguments, trackArgsHash, argsHashOracle
     ) where
 
 import Control.Monad
@@ -34,13 +34,14 @@ newtype ArgsHashKey c b = ArgsHashKey (Target c b)
 -- in the Shake database. This optimisation is normally harmless, because
 -- argument list constructors are assumed not to examine target sources, but
 -- only append them to argument lists where appropriate.
-checkArgsHash :: (ShakeValue c, ShakeValue b) => Target c b -> Action ()
-checkArgsHash t = do
+trackArgsHash :: (ShakeValue c, ShakeValue b) => Target c b -> Action ()
+trackArgsHash t = do
     let hashedInputs  = [ show $ hash (inputs t) ]
         hashedTarget = target (context t) (builder t) hashedInputs (outputs t)
     void (askOracle $ ArgsHashKey hashedTarget :: Action Int)
 
--- | Oracle for storing per-target argument list hashes.
+-- | This oracle stores per-target argument list hashes in the Shake database,
+-- allowing the user to track them between builds using 'trackArgsHash' queries.
 argsHashOracle :: (ShakeValue c, ShakeValue b) => TrackArgument c b -> Args c b -> Rules ()
 argsHashOracle trackArgument args = void $
     addOracle $ \(ArgsHashKey target) -> do
