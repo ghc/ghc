@@ -11,9 +11,6 @@ import System.Directory.Extra
 
 import Hadrian.Utilities
 
-newtype DirectoryContents = DirectoryContents (Match, FilePath)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-
 data Match = Test FilePattern | Not Match | And [Match] | Or [Match]
     deriving (Generic, Eq, Show, Typeable)
 
@@ -36,6 +33,9 @@ matches (Or  ms) f = any (`matches` f) ms
 -- its subdirectories to find and return all matching contents.
 directoryContents :: Match -> FilePath -> Action [FilePath]
 directoryContents expr dir = askOracle $ DirectoryContents (expr, dir)
+
+newtype DirectoryContents = DirectoryContents (Match, FilePath)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | This oracle answers 'directoryContents' queries and tracks the results.
 directoryContentsOracle :: Rules ()

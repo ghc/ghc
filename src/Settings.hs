@@ -6,14 +6,16 @@ module Settings (
     integerLibraryName, destDir, pkgConfInstallPath, stage1Only
     ) where
 
+import Hadrian.Oracles.Path
+
 import Base
 import Context
 import CmdLineFlag
 import Expression
 import Flavour
 import GHC
+import Oracles.Config
 import Oracles.PackageData
-import Oracles.Path
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
 import Settings.Flavours.Performance
@@ -82,6 +84,42 @@ knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 -- Note: this is slow but we keep it simple as there are just ~50 packages
 findKnownPackage :: PackageName -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
+
+-- | Determine the location of a system 'Builder'.
+systemBuilderPath :: Builder -> Action FilePath
+systemBuilderPath builder = case builder of
+    Alex            -> fromKey "alex"
+    Ar Stage0       -> fromKey "system-ar"
+    Ar _            -> fromKey "ar"
+    Cc  _  Stage0   -> fromKey "system-cc"
+    Cc  _  _        -> fromKey "cc"
+    -- We can't ask configure for the path to configure!
+    Configure _     -> return "sh configure"
+    Ghc _  Stage0   -> fromKey "system-ghc"
+    GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Happy           -> fromKey "happy"
+    HsColour        -> fromKey "hscolour"
+    HsCpp           -> fromKey "hs-cpp"
+    Ld              -> fromKey "ld"
+    Make _          -> fromKey "make"
+    Nm              -> fromKey "nm"
+    Objdump         -> fromKey "objdump"
+    Patch           -> fromKey "patch"
+    Perl            -> fromKey "perl"
+    Ranlib          -> fromKey "ranlib"
+    Tar             -> fromKey "tar"
+    _               -> error $ "No system.config entry for " ++ show builder
+  where
+    fromKey key = do
+        let unpack = fromMaybe . error $ "Cannot find path to builder "
+                ++ quote key ++ " in system.config file. Did you skip configure?"
+        path <- unpack <$> askConfig key
+        if null path
+        then do
+            unless (isOptional builder) . error $ "Non optional builder "
+                ++ quote key ++ " is not specified in system.config file."
+            return "" -- TODO: Use a safe interface.
+        else fixAbsolutePathOnWindows =<< lookupInPath path
 
 -- | Determine the location of a 'Builder'.
 builderPath :: Builder -> Action FilePath

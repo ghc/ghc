@@ -29,6 +29,7 @@ executable hadrian
                        , Hadrian.Expression
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
+                       , Hadrian.Oracles.Path
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Config
@@ -37,7 +38,6 @@ executable hadrian
                        , Oracles.Dependencies
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
-                       , Oracles.Path
                        , Package
                        , Predicate
                        , Rules

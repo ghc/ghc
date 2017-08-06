@@ -69,10 +69,6 @@ replaceSeparators = replaceWhen isPathSeparator
 replaceWhen :: (a -> Bool) -> a -> [a] -> [a]
 replaceWhen p to = map (\from -> if p from then to else from)
 
--- | Add single quotes around a String.
-quote :: String -> String
-quote s = "'" ++ s ++ "'"
-
 -- Explicit definition to avoid dependency on Data.List.Ordered
 -- | Difference of two ordered lists.
 minusOrd :: Ord a => [a] -> [a] -> [a]

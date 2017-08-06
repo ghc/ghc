@@ -10,7 +10,7 @@ import Util
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
     verbosity <- expr getVerbosity
-    top       <- getTopDirectory
+    top       <- expr topDirectory
     context   <- getContext
     when (package context /= deriveConstants) $ expr (need inplaceLibCopyTargets)
     mconcat [ arg "configure"
@@ -35,7 +35,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
     path    <- getPackagePath
-    top     <- getTopDirectory
+    top     <- expr topDirectory
     context <- getContext
     append [ "hscolour", path, top -/- buildPath context ]
 
@@ -61,7 +61,7 @@ libraryArgs = do
 -- TODO: LD_OPTS?
 configureArgs :: Args
 configureArgs = do
-    top <- getTopDirectory
+    top <- expr topDirectory
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
@@ -108,7 +108,7 @@ withBuilderKey b = case b of
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
 with b = isSpecified b ? do
-    top  <- getTopDirectory
+    top  <- expr topDirectory
     path <- getBuilderPath b
     expr $ needBuilder b
     arg $ withBuilderKey b ++ unifyPath (top </> path)

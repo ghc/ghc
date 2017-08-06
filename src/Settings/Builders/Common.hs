@@ -5,7 +5,6 @@ module Settings.Builders.Common (
     module Oracles.Config.Flag,
     module Oracles.Config.Setting,
     module Oracles.PackageData,
-    module Oracles.Path,
     module Predicate,
     module Settings,
     module Settings.Path,
@@ -20,7 +19,6 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Oracles.Path
 import Predicate
 import Settings
 import Settings.Path
@@ -70,6 +68,6 @@ bootPackageDatabaseArgs = do
     stage <- getStage
     expr $ need [packageDbStamp stage]
     stage0 ? do
-        path   <- getTopDirectory
+        path   <- expr topDirectory
         prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
         arg $ prefix ++ path -/- inplacePackageDbDirectory Stage0

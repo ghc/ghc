@@ -6,7 +6,6 @@ import Expression
 import GHC
 import Oracles.Config.Setting
 import Oracles.Dependencies
-import Oracles.Path
 import Rules.Generate
 import Settings.Path
 import Target

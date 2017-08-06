@@ -43,7 +43,7 @@ rtsPackageArgs = package rts ? do
     ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
     way            <- getWay
     path           <- getBuildPath
-    top            <- getTopDirectory
+    top            <- expr topDirectory
     libffiName     <- expr rtsLibffiLibraryName
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir

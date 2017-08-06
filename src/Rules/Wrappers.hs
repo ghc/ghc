@@ -5,11 +5,11 @@ module Rules.Wrappers (
 import Base
 import Expression
 import GHC
-import Settings (getPackages, latestBuildStage)
-import Settings.Install (installPackageDbDirectory)
-import Settings.Path (buildPath, inplacePackageDbDirectory)
-import Oracles.Path (bashPath)
-import Oracles.Config.Setting (SettingList(..), settingList)
+import Oracles.Config.Setting
+import Settings
+import Settings.Install
+import Settings.Path
+import Util
 
 -- | Wrapper is an expression depending on the 'FilePath' to the
 -- | library path and name of the wrapped binary.
@@ -53,7 +53,7 @@ inplaceGhcPkgWrapper :: WrappedBinary -> Expr String
 inplaceGhcPkgWrapper WrappedBinary{..} = do
     expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
     stage <- getStage
-    top <- getTopDirectory
+    top   <- expr topDirectory
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
     let packageDb = top -/- inplacePackageDbDirectory (succ stage)
@@ -67,7 +67,7 @@ installGhcPkgWrapper :: WrappedBinary -> Expr String
 installGhcPkgWrapper WrappedBinary{..} = do
     expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
     stage <- getStage
-    top <- getTopDirectory
+    top   <- expr topDirectory
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
     let packageDb = installPackageDbDirectory binaryLibPath top (succ stage)
@@ -95,7 +95,7 @@ hpcWrapper WrappedBinary{..} = do
 
 hsc2hsWrapper :: WrappedBinary -> Expr String
 hsc2hsWrapper WrappedBinary{..} = do
-    top <- getTopDirectory
+    top <- expr topDirectory
     expr $ need [ sourcePath -/- "Rules/Wrappers.hs" ]
     contents <- expr $ readFile' $ top -/- "utils/hsc2hs/hsc2hs.wrapper"
     let executableName = binaryLibPath -/- "bin" -/- binaryName

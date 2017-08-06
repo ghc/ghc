@@ -12,13 +12,12 @@ import Settings.Path
 import Util
 import GHC
 import Rules
-import Rules.Wrappers (WrappedBinary(..), installWrappers)
-import Rules.Libffi
 import Rules.Generate
+import Rules.Libffi
+import Rules.Wrappers
 import Settings.Packages.Rts
 import Oracles.Config.Setting
 import Oracles.Dependencies
-import Oracles.Path
 
 import qualified System.Directory as IO
 

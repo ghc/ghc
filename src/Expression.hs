@@ -14,7 +14,6 @@ module Expression (
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
     getInput, getOutput, getSingleton, getSetting, getSettingList, getFlag,
-    getTopDirectory,
 
     -- * Re-exports
     module Data.Semigroup,
@@ -38,7 +37,6 @@ import Way
 
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Oracles.Path
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
 -- read parameters of the current build 'Target'.
@@ -78,6 +76,3 @@ getSettingList = expr . settingList
 
 getFlag :: Flag -> Predicate
 getFlag = expr . flag
-
-getTopDirectory :: Expr FilePath
-getTopDirectory = expr topDirectory

@@ -22,9 +22,6 @@ type TrackArgument c b = Target c b -> String -> Bool
 trackAllArguments :: TrackArgument c b
 trackAllArguments _ _ = True
 
-newtype ArgsHashKey c b = ArgsHashKey (Target c b)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-
 -- | Given a 'Target' this 'Action' determines the corresponding argument list
 -- and computes its hash. The resulting value is tracked in a Shake oracle,
 -- hence initiating rebuilds when the hash changes (a hash change indicates
@@ -39,6 +36,9 @@ trackArgsHash t = do
     let hashedInputs  = [ show $ hash (inputs t) ]
         hashedTarget = target (context t) (builder t) hashedInputs (outputs t)
     void (askOracle $ ArgsHashKey hashedTarget :: Action Int)
+
+newtype ArgsHashKey c b = ArgsHashKey (Target c b)
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | This oracle stores per-target argument list hashes in the Shake database,
 -- allowing the user to track them between builds using 'trackArgsHash' queries.

@@ -4,7 +4,7 @@ module Util (
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
     makeExecutable, renderProgram, renderLibrary, builderEnvironment,
     needBuilder, copyFileUntracked, installDirectory, installData, installScript,
-    installProgram, linkSymbolic
+    installProgram, linkSymbolic, bashPath
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -13,15 +13,16 @@ import qualified Control.Exception.Base as IO
 
 import Hadrian.Oracles.ArgsHash
 import Hadrian.Oracles.DirectoryContents
+import Hadrian.Oracles.Path
 
 import Base
 import CmdLineFlag
 import Context
 import Expression
 import GHC
-import Oracles.Path
 import Oracles.Config.Setting
 import Settings
+import Settings.Path
 import Settings.Builders.Ar
 import Target
 import UserSettings
@@ -255,6 +256,10 @@ makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
     putBuild $ "| Make " ++ quote file ++ " executable."
     quietly $ cmd "chmod +x " [file]
+
+-- | Lookup the path to the @bash@ interpreter.
+bashPath :: Action FilePath
+bashPath = lookupInPath "bash"
 
 -- | Print out information about the command being executed.
 putInfo :: Target -> Action ()

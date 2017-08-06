@@ -10,11 +10,9 @@ import Oracles.Config.Setting
 import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Oracles.Path (topDirectory)
-import Rules.Wrappers (WrappedBinary(..), Wrapper, inplaceWrappers)
+import Rules.Wrappers
 import Settings
-import Settings.Path (buildPath, inplaceLibBinPath, rtsContext, objectPath,
-                      inplaceLibPath, inplaceBinPath, inplaceLibCopyTargets)
+import Settings.Path
 import Target
 import UserSettings
 import Util

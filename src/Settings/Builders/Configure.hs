@@ -12,7 +12,7 @@ configureBuilderArgs = mconcat
                , "--build=" ++ buildPlatform ]
 
     , builder (Configure libffiBuildPath) ? do
-        top            <- getTopDirectory
+        top            <- expr topDirectory
         targetPlatform <- getSetting TargetPlatform
         append [ "--prefix=" ++ top -/- libffiBuildPath -/- "inst"
                , "--libdir=" ++ top -/- libffiBuildPath -/- "inst/lib"
