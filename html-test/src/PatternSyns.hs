@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms, PolyKinds, TypeOperators #-}
+{-# LANGUAGE ExistentialQuantification, PatternSynonyms, PolyKinds, TypeOperators #-}
 
 -- | Testing some pattern synonyms
 module PatternSyns where
@@ -14,6 +14,12 @@ pattern Bar x = FooCtor (Foo x)
 
 -- | Pattern synonym for (':<->')
 pattern x :<-> y = (Foo x, Bar y)
+
+-- | BlubType is existentially quantified
+data BlubType = forall x. Show x => BlubCtor x
+
+-- | Pattern synonym for 'Blub' x
+pattern Blub x = BlubCtor x
 
 -- | Doc for ('><')
 data (a :: *) >< b = Empty

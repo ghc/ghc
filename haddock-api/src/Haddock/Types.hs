@@ -579,6 +579,12 @@ makeModuleQual qual aliases mdl =
     OptFullQual       -> FullQual
     OptNoQual         -> NoQual
 
+-- | Whether to hide empty contexts
+-- Since pattern synonyms have two contexts with different semantics, it is
+-- important to all of them, even if one of them is empty.
+data HideEmptyContexts
+  = HideEmptyContexts
+  | ShowEmptyToplevelContexts
 
 -----------------------------------------------------------------------------
 -- * Error handling
