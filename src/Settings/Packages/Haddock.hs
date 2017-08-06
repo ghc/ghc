@@ -1,7 +1,7 @@
 module Settings.Packages.Haddock (haddockPackageArgs) where
 
 import GHC
-import Predicate
+import Expression
 
 haddockPackageArgs :: Args
 haddockPackageArgs = package haddock ?

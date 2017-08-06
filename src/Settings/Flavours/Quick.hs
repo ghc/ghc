@@ -1,7 +1,7 @@
 module Settings.Flavours.Quick (quickFlavour) where
 
 import Flavour
-import Predicate
+import Expression
 import Oracles.Config.Flag (platformSupportsSharedLibs)
 import {-# SOURCE #-} Settings.Default
 

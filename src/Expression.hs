@@ -3,7 +3,11 @@ module Expression (
     Expr, Predicate, Args, Ways, Packages,
 
     -- ** Construction and modification
-    expr, exprIO, append, arg, remove, (?),
+    expr, exprIO, append, arg, remove,
+
+    -- ** Predicates
+    (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
+    input, inputs, output, outputs, way, libraryPackage,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -23,16 +27,18 @@ module Expression (
     module Way
     ) where
 
+import Control.Monad.Extra
 import Data.Semigroup
+import Development.Shake
 
 import qualified Hadrian.Expression as H
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 
 import Builder
-import Context
+import Context (Context, vanillaContext, stageContext, getStage, getPackage, getWay)
 import Package
 import Stage
-import Target
+import Target hiding (builder, inputs, outputs)
 import Way
 
 import Oracles.Config.Flag
@@ -56,18 +62,6 @@ type Ways      = Expr [Way]
 append :: a -> Expr a
 append = pure
 
--- | Get the 'Stage' of the current 'Context'.
-getStage :: Expr Stage
-getStage = stage <$> getContext
-
--- | Get the 'Package' of the current 'Context'.
-getPackage :: Expr Package
-getPackage = package <$> getContext
-
--- | Get the 'Way' of the current 'Context'.
-getWay :: Expr Way
-getWay = way <$> getContext
-
 getSetting :: Setting -> Expr String
 getSetting = expr . setting
 
@@ -76,3 +70,55 @@ getSettingList = expr . settingList
 
 getFlag :: Flag -> Predicate
 getFlag = expr . flag
+
+-- | Is the build currently in the provided stage?
+stage :: Stage -> Predicate
+stage s = (s ==) <$> getStage
+
+-- | Is a particular package being built?
+package :: Package -> Predicate
+package p = (p ==) <$> getPackage
+
+-- | Is the current build 'Way' equal to a certain value?
+way :: Way -> Predicate
+way w = (w ==) <$> getWay
+
+-- | Is the build currently in stage 0?
+stage0 :: Predicate
+stage0 = stage Stage0
+
+-- | Is the build currently in stage 1?
+stage1 :: Predicate
+stage1 = stage Stage1
+
+-- | Is the build currently in stage 2?
+stage2 :: Predicate
+stage2 = stage Stage2
+
+-- | Is the build /not/ in stage 0 right now?
+notStage0 :: Predicate
+notStage0 = notM stage0
+
+-- | Is a certain package /not/ built right now?
+notPackage :: Package -> Predicate
+notPackage = notM . package
+
+-- | Is a library package currently being built?
+libraryPackage :: Predicate
+libraryPackage = isLibrary <$> getPackage
+
+-- | Does any of the input files match a given pattern?
+input :: FilePattern -> Predicate
+input f = any (f ?==) <$> getInputs
+
+-- | Does any of the input files match any of the given patterns?
+inputs :: [FilePattern] -> Predicate
+inputs = anyM input
+
+-- | Does any of the output files match a given pattern?
+output :: FilePattern -> Predicate
+output f = any (f ?==) <$> getOutputs
+
+-- | Does any of the output files match any of the given patterns?
+outputs :: [FilePattern] -> Predicate
+outputs = anyM output

@@ -8,7 +8,7 @@ import Data.List.Extra
 import qualified Hadrian.Target as H
 import Hadrian.Target hiding (Target)
 
-import Builder
+import Builder hiding (builder)
 import Context
 
 type Target = H.Target Context Builder

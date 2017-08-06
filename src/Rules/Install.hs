@@ -4,9 +4,9 @@ module Rules.Install (installRules) where
 import Hadrian.Oracles.DirectoryContents
 
 import Base
+import Expression hiding (builder)
 import Target
 import Context
-import Predicate hiding (builder)
 import Settings
 import Settings.Path
 import Util

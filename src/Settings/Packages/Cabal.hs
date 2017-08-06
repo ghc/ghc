@@ -1,7 +1,7 @@
 module Settings.Packages.Cabal where
 
 import GHC
-import Predicate
+import Expression
 
 cabalPackageArgs :: Args
 cabalPackageArgs = package cabal ? do

@@ -9,7 +9,7 @@ import Hadrian.Utilities
 
 import Base
 import Context
-import Expression
+import Expression hiding (stage)
 import Oracles.PackageData
 import Settings
 import Settings.Builders.GhcCabal

@@ -4,7 +4,7 @@ import Data.Char
 
 import Base
 import Context
-import Expression
+import Expression hiding (stage, way)
 import GHC
 import Oracles.Config.Setting
 import Oracles.Dependencies

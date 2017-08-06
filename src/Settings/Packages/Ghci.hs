@@ -1,7 +1,7 @@
 module Settings.Packages.Ghci (ghciPackageArgs) where
 
 import GHC
-import Predicate
+import Expression
 
 ghciPackageArgs :: Args
-ghciPackageArgs = notStage0 ? package ghci ? builder GhcCabal ? arg "--flags=ghci"
+ghciPackageArgs = package ghci ? notStage0 ? builder GhcCabal ? arg "--flags=ghci"

@@ -2,7 +2,7 @@ module Rules.Documentation (buildPackageDocumentation) where
 
 import Base
 import Context
-import Expression
+import Expression hiding (way)
 import Flavour
 import GHC
 import Oracles.ModuleFiles

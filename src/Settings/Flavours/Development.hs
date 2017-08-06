@@ -1,7 +1,7 @@
 module Settings.Flavours.Development (developmentFlavour) where
 
 import Flavour
-import Predicate
+import Expression
 import {-# SOURCE #-} Settings.Default
 
 -- TODO: Implement an equivalent of LAX_DEPENDENCIES = YES setting, see #250.

@@ -1,8 +1,8 @@
 module Settings.Packages.Ghc (ghcPackageArgs) where
 
 import GHC
+import Expression
 import Oracles.Config.Setting
-import Predicate
 import Settings.Path
 
 ghcPackageArgs :: Args

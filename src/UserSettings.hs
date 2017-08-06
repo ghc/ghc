@@ -11,7 +11,7 @@ import System.Console.ANSI
 
 import Base
 import Flavour
-import Predicate
+import Expression
 
 -- See doc/user-settings.md for instructions.
 

@@ -1,7 +1,7 @@
 module Settings.Flavours.Quickest (quickestFlavour) where
 
 import Flavour
-import Predicate
+import Expression
 import {-# SOURCE #-} Settings.Default
 
 quickestFlavour :: Flavour

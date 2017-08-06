@@ -5,12 +5,12 @@ module Settings.Default (
     ) where
 
 import CmdLineFlag
+import Expression
 import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicate
 import Settings
 import Settings.Builders.Alex
 import Settings.Builders.Ar

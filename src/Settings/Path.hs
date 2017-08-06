@@ -13,7 +13,7 @@ import Hadrian.Oracles.Path
 
 import Base
 import Context
-import Expression
+import Expression hiding (stage)
 import GHC
 import Oracles.PackageData
 import Oracles.Config.Setting

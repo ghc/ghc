@@ -18,7 +18,7 @@ import Hadrian.Oracles.Path
 import Base
 import CmdLineFlag
 import Context
-import Expression
+import Expression hiding (builder, inputs, outputs, way, stage, package)
 import GHC
 import Oracles.Config.Setting
 import Settings

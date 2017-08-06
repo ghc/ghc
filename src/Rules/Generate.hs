@@ -13,7 +13,6 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.ModuleFiles
-import Predicate
 import Rules.Libffi
 import Settings
 import Settings.Path

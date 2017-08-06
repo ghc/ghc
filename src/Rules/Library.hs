@@ -7,7 +7,7 @@ import qualified System.Directory as IO
 
 import Base
 import Context
-import Expression
+import Expression hiding (way, package)
 import Flavour
 import GHC
 import Oracles.ModuleFiles

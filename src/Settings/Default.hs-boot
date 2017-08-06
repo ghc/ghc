@@ -5,7 +5,7 @@ module Settings.Default (
     ) where
 
 import Flavour
-import Predicate
+import Expression
 
 data SourceArgs = SourceArgs
     { hsDefault  :: Args

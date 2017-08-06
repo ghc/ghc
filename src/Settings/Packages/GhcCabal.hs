@@ -1,16 +1,16 @@
 module Settings.Packages.GhcCabal (ghcCabalPackageArgs) where
 
-import Distribution.PackageDescription.Parse
-
-import Base
-import GHC
-import Oracles.Dependencies (pkgDependencies)
-import Predicate
-import Distribution.Verbosity (silent)
-import Distribution.Text (display)
 import Distribution.Package (pkgVersion)
 import Distribution.PackageDescription (packageDescription)
+import Distribution.PackageDescription.Parse
 import qualified Distribution.PackageDescription as DP
+import Distribution.Text (display)
+import Distribution.Verbosity (silent)
+
+import Base
+import Expression
+import GHC
+import Oracles.Dependencies (pkgDependencies)
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do

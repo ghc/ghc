@@ -5,7 +5,6 @@ module Settings.Builders.Common (
     module Oracles.Config.Flag,
     module Oracles.Config.Setting,
     module Oracles.PackageData,
-    module Predicate,
     module Settings,
     module Settings.Path,
     module UserSettings,
@@ -19,7 +18,6 @@ import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
 import Oracles.PackageData
-import Predicate
 import Settings
 import Settings.Path
 import UserSettings

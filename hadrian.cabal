@@ -39,7 +39,6 @@ executable hadrian
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
                        , Package
-                       , Predicate
                        , Rules
                        , Rules.Cabal
                        , Rules.Clean

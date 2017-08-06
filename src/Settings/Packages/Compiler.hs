@@ -1,11 +1,11 @@
 module Settings.Packages.Compiler (compilerPackageArgs) where
 
 import Base
+import Expression
 import Flavour
 import GHC
 import Oracles.Config.Flag
 import Oracles.Config.Setting
-import Predicate
 import Settings
 
 compilerPackageArgs :: Args

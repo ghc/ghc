@@ -8,7 +8,7 @@ import Distribution.Types.CondTree
 import Distribution.Verbosity
 
 import Base
-import Expression
+import Expression hiding (package)
 import GHC
 import Settings
 import Settings.Path
