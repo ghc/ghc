@@ -15,25 +15,25 @@ ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , splitObjectsArgs
             , ghcLinkArgs
             , builder (Ghc CompileHs) ? arg "-c"
-            , append =<< getInputs
+            , getInputs
             , arg "-o", arg =<< getOutput ]
 
 ghcCbuilderArgs :: Args
 ghcCbuilderArgs =
   builder (Ghc CompileCWithGhc) ? do
     way <- getWay
-    let ccArgs = [ append =<< getPkgDataList CcArgs
-                 , getSettingList . ConfCcArgs =<< getStage
+    let ccArgs = [ getPkgDataList CcArgs
+                 , getStagedSettingList ConfCcArgs
                  , cIncludeArgs
                  , arg "-Werror"
-                 , Dynamic `wayUnit` way ? append [ "-fPIC", "-DDYNAMIC" ] ]
+                 , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ] ]
 
     mconcat [ arg "-Wall"
             , ghcLinkArgs
             , commonGhcArgs
             , mconcat (map (map ("-optc" ++) <$>) ccArgs)
             , arg "-c"
-            , append =<< getInputs
+            , getInputs
             , arg "-o"
             , arg =<< getOutput ]
 
@@ -51,12 +51,12 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
                    return $ concatMap (words . strip) buildInfo
                else return []
     mconcat [ (Dynamic `wayUnit` way) ?
-              append [ "-shared", "-dynamic", "-dynload", "deploy" ]
+              pure [ "-shared", "-dynamic", "-dynload", "deploy" ]
             , arg "-no-auto-link-packages"
             ,      nonHsMainPackage pkg  ? arg "-no-hs-main"
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
-            , append [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
-            , append [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
+            , pure [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
+            , pure [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
 
 needTouchy :: Expr ()
 needTouchy = notStage0 ? do
@@ -75,29 +75,26 @@ ghcMBuilderArgs = builder (Ghc FindHsDependencies) ? do
             , commonGhcArgs
             , arg "-include-pkg-deps"
             , arg "-dep-makefile", arg =<< getOutput
-            , append $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
-            , append =<< getInputs ]
+            , pure $ concat [ ["-dep-suffix", wayPrefix w] | w <- ways ]
+            , getInputs ]
 
 haddockGhcArgs :: Args
-haddockGhcArgs = mconcat [ commonGhcArgs, append =<< getPkgDataList HsArgs ]
+haddockGhcArgs = mconcat [ commonGhcArgs, getPkgDataList HsArgs ]
 
 -- This is included into ghcBuilderArgs, ghcMBuilderArgs and haddockGhcArgs.
 commonGhcArgs :: Args
 commonGhcArgs = do
     way     <- getWay
     path    <- getBuildPath
-    confCc  <- getSettingList . ConfCcArgs =<< getStage
-    confCpp <- getSettingList . ConfCppArgs =<< getStage
-    cppArgs <- getPkgDataList CppArgs
     mconcat [ arg "-hisuf", arg $ hisuf way
             , arg "-osuf" , arg $  osuf way
             , arg "-hcsuf", arg $ hcsuf way
             , wayGhcArgs
             , packageGhcArgs
             , includeGhcArgs
-            , append $ map ("-optc" ++) confCc
-            , append $ map ("-optP" ++) confCpp
-            , append $ map ("-optP" ++) cppArgs
+            , map ("-optc" ++) <$> getStagedSettingList ConfCcArgs
+            , map ("-optP" ++) <$> getStagedSettingList ConfCppArgs
+            , map ("-optP" ++) <$> getPkgDataList CppArgs
             , arg "-odir"    , arg path
             , arg "-hidir"   , arg path
             , arg "-stubdir" , arg path ]
@@ -107,20 +104,19 @@ wayGhcArgs :: Args
 wayGhcArgs = do
     way <- getWay
     mconcat [ if (Dynamic `wayUnit` way)
-              then append ["-fPIC", "-dynamic"]
+              then pure ["-fPIC", "-dynamic"]
               else arg "-static"
             , (Threaded  `wayUnit` way) ? arg "-optc-DTHREADED_RTS"
             , (Debug     `wayUnit` way) ? arg "-optc-DDEBUG"
             , (Profiling `wayUnit` way) ? arg "-prof"
             , (Logging   `wayUnit` way) ? arg "-eventlog"
             , (way == debug || way == debugDynamic) ?
-              append ["-ticky", "-DTICKY_TICKY"] ]
+              pure ["-ticky", "-DTICKY_TICKY"] ]
 
+-- FIXME: Get rid of to-be-deprecated -this-package-key.
 packageGhcArgs :: Args
 packageGhcArgs = do
     compId    <- getPkgData ComponentId
-    pkgDepIds <- getPkgDataList DepIds
-    -- FIXME: Get rid of to-be-deprecated -this-package-key.
     thisArg <- do
         not0 <- notStage0
         unit <- getFlag SupportsThisUnitId
@@ -129,7 +125,7 @@ packageGhcArgs = do
             , arg "-no-user-package-db"
             , bootPackageDatabaseArgs
             , libraryPackage ? arg (thisArg ++ compId)
-            , append $ map ("-package-id " ++) pkgDepIds ]
+            , map ("-package-id " ++) <$> getPkgDataList DepIds ]
 
 includeGhcArgs :: Args
 includeGhcArgs = do
@@ -140,10 +136,10 @@ includeGhcArgs = do
     mconcat [ arg "-i"
             , arg $ "-i" ++ path
             , arg $ "-i" ++ autogenPath context
-            , append [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
+            , pure [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
             , arg $      "-I" ++ generatedPath
             , arg $ "-optc-I" ++ generatedPath
             , (not $ nonCabalContext context) ?
-              append [ "-optP-include"
-                     , "-optP" ++ autogenPath context -/- "cabal_macros.h" ] ]
+              pure [ "-optP-include"
+                   , "-optP" ++ autogenPath context -/- "cabal_macros.h" ] ]

@@ -69,7 +69,7 @@ rtsPackageArgs = package rts ? do
           , inputs ["//RtsMessages.c", "//Trace.c"] ?
             arg ("-DProjectVersion=" ++ show projectVersion)
 
-          , input "//RtsUtils.c" ? append
+          , input "//RtsUtils.c" ? pure
             [ "-DProjectVersion="            ++ show projectVersion
             , "-DHostPlatform="              ++ show hostPlatform
             , "-DHostArch="                  ++ show hostArch
@@ -89,18 +89,17 @@ rtsPackageArgs = package rts ? do
             , inputs ["//Evac.c", "//Evac_thr.c"] ? arg "-funroll-loops"
 
             , inputs ["//Evac_thr.c", "//Scav_thr.c"] ?
-              append [ "-DPARALLEL_GC", "-Irts/sm" ]
+              pure [ "-DPARALLEL_GC", "-Irts/sm" ]
 
             , input "//StgCRun.c" ? windowsHost ? arg "-Wno-return-local-addr"
             , input "//RetainerProfile.c" ? flag GccIsClang ?
-                append [ "-Wno-incompatible-pointer-types" ]
-            ]
+              pure [ "-Wno-incompatible-pointer-types" ] ]
 
     mconcat
         [ builder (Cc FindCDependencies) ? mconcat cArgs
         , builder (Ghc CompileCWithGhc) ? mconcat (map (map ("-optc" ++) <$>) cArgs)
         , builder Ghc ? arg "-Irts"
-        , builder HsCpp ? append
+        , builder HsCpp ? pure
           [ "-DTOP="             ++ show top
           , "-DFFI_INCLUDE_DIR=" ++ show ffiIncludeDir
           , "-DFFI_LIB_DIR="     ++ show ffiLibraryDir
@@ -109,12 +108,9 @@ rtsPackageArgs = package rts ? do
         , builder HsCpp ?
           input "//package.conf.in" ?
           output "//package.conf.install.raw" ?
-          append
-            [ "-DINSTALLING"
-            , "-DLIB_DIR=\"" ++ destDir ++ ghclibDir ++ "\""
-            , "-DINCLUDE_DIR=\"" ++ destDir ++ ghclibDir -/- "include\""
-            ]
-        ]
+          pure [ "-DINSTALLING"
+               , "-DLIB_DIR=\"" ++ destDir ++ ghclibDir ++ "\""
+               , "-DINCLUDE_DIR=\"" ++ destDir ++ ghclibDir -/- "include\"" ] ]
 
 -- # If we're compiling on windows, enforce that we only support XP+
 -- # Adding this here means it doesn't have to be done in individual .c files

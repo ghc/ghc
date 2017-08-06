@@ -5,4 +5,4 @@ import Expression
 
 haddockPackageArgs :: Args
 haddockPackageArgs = package haddock ?
-    builder GhcCabal ? append ["--flag", "in-ghc-tree"]
+    builder GhcCabal ? pure ["--flag", "in-ghc-tree"]

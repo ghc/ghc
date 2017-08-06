@@ -8,8 +8,7 @@ module Settings.Builders.Common (
     module Settings,
     module Settings.Path,
     module UserSettings,
-    cIncludeArgs, ldArgs, cArgs, cWarnings, argStagedBuilderPath,
-    argStagedSettingList, bootPackageDatabaseArgs
+    cIncludeArgs, ldArgs, cArgs, cWarnings, bootPackageDatabaseArgs
     ) where
 
 import Base
@@ -31,8 +30,8 @@ cIncludeArgs = do
     mconcat [ arg "-Iincludes"
             , arg $ "-I" ++ generatedPath
             , arg $ "-I" ++ path
-            , append [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
-            , append [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
+            , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
+            , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
 
 ldArgs :: Args
 ldArgs = mempty
@@ -48,18 +47,6 @@ cWarnings = do
             , flag GccIsClang ? arg "-Wno-unknown-pragmas"
             , gccGe46 ? notM windowsHost ? arg "-Werror=unused-but-set-variable"
             , gccGe46 ? arg "-Wno-error=inline" ]
-
-argSettingList :: SettingList -> Args
-argSettingList = (append =<<) . getSettingList
-
-argStagedSettingList :: (Stage -> SettingList) -> Args
-argStagedSettingList ss = argSettingList . ss =<< getStage
-
-argStagedBuilderPath :: (Stage -> Builder) -> Args
-argStagedBuilderPath sb = do
-    stage <- getStage
-    path <- expr $ builderPath (sb stage)
-    arg path
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do

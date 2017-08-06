@@ -12,7 +12,7 @@ profiledFlavour = defaultFlavour
 
 profiledArgs :: Args
 profiledArgs = sourceArgs $ SourceArgs
-    { hsDefault  = append ["-O0", "-H32m"]
+    { hsDefault  = pure ["-O0", "-H32m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler = arg "-O"
     , hsGhc      = arg "-O" }

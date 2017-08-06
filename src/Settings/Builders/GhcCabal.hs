@@ -29,7 +29,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , withStaged Ar
             , with Alex
             , with Happy
-            , verbosity < Chatty ? append [ "-v0", "--configure-option=--quiet"
+            , verbosity < Chatty ? pure [ "-v0", "--configure-option=--quiet"
                 , "--configure-option=--disable-option-checking"  ] ]
 
 ghcCabalHsColourBuilderArgs :: Args
@@ -37,7 +37,7 @@ ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
     path    <- getPackagePath
     top     <- expr topDirectory
     context <- getContext
-    append [ "hscolour", path, top -/- buildPath context ]
+    pure [ "hscolour", path, top -/- buildPath context ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
@@ -45,18 +45,18 @@ libraryArgs :: Args
 libraryArgs = do
     ways     <- getLibraryWays
     withGhci <- expr ghcWithInterpreter
-    append [ if vanilla `elem` ways
-             then  "--enable-library-vanilla"
-             else "--disable-library-vanilla"
-           , if vanilla `elem` ways && withGhci && not (dynamicGhcPrograms flavour)
-             then  "--enable-library-for-ghci"
-             else "--disable-library-for-ghci"
-           , if profiling `elem` ways
-             then  "--enable-library-profiling"
-             else "--disable-library-profiling"
-           , if dynamic `elem` ways
-             then  "--enable-shared"
-             else "--disable-shared" ]
+    pure [ if vanilla `elem` ways
+           then  "--enable-library-vanilla"
+           else "--disable-library-vanilla"
+         , if vanilla `elem` ways && withGhci && not (dynamicGhcPrograms flavour)
+           then  "--enable-library-for-ghci"
+           else "--disable-library-for-ghci"
+         , if profiling `elem` ways
+           then  "--enable-library-profiling"
+           else "--disable-library-profiling"
+         , if dynamic `elem` ways
+           then  "--enable-shared"
+           else "--disable-shared" ]
 
 -- TODO: LD_OPTS?
 configureArgs :: Args
@@ -67,28 +67,28 @@ configureArgs = do
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
-                           , argStagedSettingList ConfCcArgs
+                           , getStagedSettingList ConfCcArgs
                            , arg $ "-I" ++ top -/- generatedPath ]
-        ldFlags  = ldArgs  <> (argStagedSettingList ConfGccLinkerArgs)
-        cppFlags = cppArgs <> (argStagedSettingList ConfCppArgs)
+        ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
+        cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)
     cldFlags <- unwords <$> (cFlags <> ldFlags)
     mconcat
         [ conf "CFLAGS"   cFlags
         , conf "LDFLAGS"  ldFlags
         , conf "CPPFLAGS" cppFlags
         , not (null cldFlags) ? arg ("--gcc-options=" ++ cldFlags)
-        , conf "--with-iconv-includes"    $ return <$> getSetting IconvIncludeDir
-        , conf "--with-iconv-libraries"   $ return <$> getSetting IconvLibDir
-        , conf "--with-gmp-includes"      $ return <$> getSetting GmpIncludeDir
-        , conf "--with-gmp-libraries"     $ return <$> getSetting GmpLibDir
-        , conf "--with-curses-libraries"  $ return <$> getSetting CursesLibDir
-        , crossCompiling ? (conf "--host" $ return <$> getSetting TargetPlatformFull)
-        , conf "--with-cc" $ argStagedBuilderPath (Cc CompileC) ]
+        , conf "--with-iconv-includes"    $ arg =<< getSetting IconvIncludeDir
+        , conf "--with-iconv-libraries"   $ arg =<< getSetting IconvLibDir
+        , conf "--with-gmp-includes"      $ arg =<< getSetting GmpIncludeDir
+        , conf "--with-gmp-libraries"     $ arg =<< getSetting GmpLibDir
+        , conf "--with-curses-libraries"  $ arg =<< getSetting CursesLibDir
+        , crossCompiling ? (conf "--host" $ arg =<< getSetting TargetPlatformFull)
+        , conf "--with-cc" $ arg =<< getBuilderPath . (Cc CompileC) =<< getStage ]
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do
     constraints <- expr . readFileLines $ bootPackageConstraints
-    append $ concat [ ["--constraint", c] | c <- constraints ]
+    pure $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args
 cppArgs = arg $ "-I" ++ generatedPath

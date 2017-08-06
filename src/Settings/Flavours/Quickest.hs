@@ -8,17 +8,17 @@ quickestFlavour :: Flavour
 quickestFlavour = defaultFlavour
     { name        = "quickest"
     , args        = defaultBuilderArgs <> quickestArgs <> defaultPackageArgs
-    , libraryWays = append [vanilla]
+    , libraryWays = pure [vanilla]
     , rtsWays     = quickestRtsWays }
 
 quickestArgs :: Args
 quickestArgs = sourceArgs $ SourceArgs
-    { hsDefault  = append ["-O0", "-H32m"]
+    { hsDefault  = pure ["-O0", "-H32m"]
     , hsLibrary  = mempty
     , hsCompiler = mempty
     , hsGhc      = mempty }
 
 quickestRtsWays :: Ways
 quickestRtsWays = mconcat
-    [ append [vanilla]
-    , buildHaddock defaultFlavour ? append [threaded] ]
+    [ pure [vanilla]
+    , buildHaddock defaultFlavour ? pure [threaded] ]

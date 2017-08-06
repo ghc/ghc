@@ -10,12 +10,12 @@ quickFlavour = defaultFlavour
     { name        = "quick"
     , args        = defaultBuilderArgs <> quickArgs <> defaultPackageArgs
     , libraryWays = mconcat
-                    [ append [vanilla]
-                    , notStage0 ? platformSupportsSharedLibs ? append [dynamic] ] }
+                    [ pure [vanilla]
+                    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ] }
 
 quickArgs :: Args
 quickArgs = sourceArgs $ SourceArgs
-    { hsDefault  = append ["-O0", "-H32m"]
+    { hsDefault  = pure ["-O0", "-H32m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler =    stage0 ? arg "-O"
     , hsGhc      =    stage0 ? arg "-O" }

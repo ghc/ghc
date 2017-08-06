@@ -5,7 +5,7 @@ import Settings.Builders.Common
 arBuilderArgs :: Args
 arBuilderArgs = builder Ar ? mconcat [ arg "q"
                                      , arg =<< getOutput
-                                     , append =<< getInputs ]
+                                     , getInputs ]
 
 -- This count includes arg "q" and arg file parameters in arBuilderArgs.
 -- Update this value appropriately when changing arBuilderArgs.

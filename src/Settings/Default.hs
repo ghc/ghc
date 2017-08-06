@@ -52,7 +52,7 @@ data SourceArgs = SourceArgs
 sourceArgs :: SourceArgs -> Args
 sourceArgs SourceArgs {..} = builder Ghc ? mconcat
     [ hsDefault
-    , append =<< getPkgDataList HsArgs
+    , getPkgDataList HsArgs
     , libraryPackage   ? hsLibrary
     , package compiler ? hsCompiler
     , package ghc      ? hsGhc ]
@@ -96,64 +96,64 @@ stage0Packages :: Packages
 stage0Packages = do
     win <- expr windowsHost
     ios <- expr iosHost
-    append $ [ binary
-             , cabal
-             , checkApiAnnotations
-             , compareSizes
-             , compiler
-             , deriveConstants
-             , dllSplit
-             , genapply
-             , genprimopcode
-             , ghc
-             , ghcBoot
-             , ghcBootTh
-             , ghcCabal
-             , ghci
-             , ghcPkg
-             , ghcTags
-             , hsc2hs
-             , hp2ps
-             , hpc
-             , mkUserGuidePart
-             , templateHaskell
-             , transformers
-             , unlit                       ] ++
-             [ terminfo | not win, not ios ] ++
-             [ touchy   | win              ]
+    pure $ [ binary
+           , cabal
+           , checkApiAnnotations
+           , compareSizes
+           , compiler
+           , deriveConstants
+           , dllSplit
+           , genapply
+           , genprimopcode
+           , ghc
+           , ghcBoot
+           , ghcBootTh
+           , ghcCabal
+           , ghci
+           , ghcPkg
+           , ghcTags
+           , hsc2hs
+           , hp2ps
+           , hpc
+           , mkUserGuidePart
+           , templateHaskell
+           , transformers
+           , unlit                       ] ++
+           [ terminfo | not win, not ios ] ++
+           [ touchy   | win              ]
 
 stage1Packages :: Packages
 stage1Packages = do
     win <- expr windowsHost
     doc <- buildHaddock flavour
     mconcat [ (filter isLibrary) <$> stage0Packages -- Build all Stage0 libraries in Stage1
-            , append $ [ array
-                       , base
-                       , bytestring
-                       , containers
-                       , deepseq
-                       , directory
-                       , filepath
-                       , ghc
-                       , ghcCabal
-                       , ghcCompact
-                       , ghcPrim
-                       , haskeline
-                       , hpcBin
-                       , hsc2hs
-                       , integerLibrary flavour
-                       , pretty
-                       , process
-                       , rts
-                       , runGhc
-                       , time               ] ++
-                       [ iservBin | not win ] ++
-                       [ unix     | not win ] ++
-                       [ win32    | win     ] ++
-                       [ xhtml    | doc     ] ]
+            , pure $ [ array
+                     , base
+                     , bytestring
+                     , containers
+                     , deepseq
+                     , directory
+                     , filepath
+                     , ghc
+                     , ghcCabal
+                     , ghcCompact
+                     , ghcPrim
+                     , haskeline
+                     , hpcBin
+                     , hsc2hs
+                     , integerLibrary flavour
+                     , pretty
+                     , process
+                     , rts
+                     , runGhc
+                     , time               ] ++
+                     [ iservBin | not win ] ++
+                     [ unix     | not win ] ++
+                     [ win32    | win     ] ++
+                     [ xhtml    | doc     ] ]
 
 stage2Packages :: Packages
-stage2Packages = buildHaddock flavour ? append [ haddock ]
+stage2Packages = buildHaddock flavour ? pure [ haddock ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
@@ -161,19 +161,19 @@ stage2Packages = buildHaddock flavour ? append [ haddock ]
 -- * We build 'dynamic' way when stage > Stage0 and the platform supports it.
 defaultLibraryWays :: Ways
 defaultLibraryWays = mconcat
-    [ append [vanilla]
-    , notStage0 ? append [profiling]
-    , notStage0 ? platformSupportsSharedLibs ? append [dynamic] ]
+    [ pure [vanilla]
+    , notStage0 ? pure [profiling]
+    , notStage0 ? platformSupportsSharedLibs ? pure [dynamic] ]
 
 -- | Default build ways for the RTS.
 defaultRtsWays :: Ways
 defaultRtsWays = do
     ways <- getLibraryWays
     mconcat
-        [ append [ logging, debug, threaded, threadedDebug, threadedLogging ]
-        , (profiling `elem` ways) ? append [threadedProfiling]
+        [ pure [ logging, debug, threaded, threadedDebug, threadedLogging ]
+        , (profiling `elem` ways) ? pure [threadedProfiling]
         , (dynamic `elem` ways) ?
-          append [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
+          pure [ dynamic, debugDynamic, threadedDynamic, threadedDebugDynamic
                  , loggingDynamic, threadedLoggingDynamic ] ]
 
 -- | Default build flavour. Other build flavours are defined in modules
@@ -232,35 +232,35 @@ defaultBuilderArgs = mconcat
 disableWarningArgs :: Args
 disableWarningArgs = builder Ghc ? mconcat
     [ stage0 ? mconcat
-      [ package terminfo     ? append [ "-fno-warn-unused-imports" ]
-      , package transformers ? append [ "-fno-warn-unused-matches"
-                                      , "-fno-warn-unused-imports" ]
-      , libraryPackage       ? append [ "-fno-warn-deprecated-flags" ] ]
+      [ package terminfo     ? pure [ "-fno-warn-unused-imports" ]
+      , package transformers ? pure [ "-fno-warn-unused-matches"
+                                    , "-fno-warn-unused-imports" ]
+      , libraryPackage       ? pure [ "-fno-warn-deprecated-flags" ] ]
 
     , notStage0 ? mconcat
-      [ package base         ? append [ "-Wno-trustworthy-safe" ]
-      , package binary       ? append [ "-Wno-deprecations" ]
-      , package bytestring   ? append [ "-Wno-inline-rule-shadowing" ]
-      , package directory    ? append [ "-Wno-unused-imports" ]
-      , package ghcPrim      ? append [ "-Wno-trustworthy-safe" ]
-      , package haddock      ? append [ "-Wno-unused-imports"
-                                      , "-Wno-deprecations" ]
-      , package haskeline    ? append [ "-Wno-deprecations"
-                                      , "-Wno-unused-imports"
-                                      , "-Wno-redundant-constraints"
-                                      , "-Wno-simplifiable-class-constraints" ]
-      , package pretty       ? append [ "-Wno-unused-imports" ]
-      , package primitive    ? append [ "-Wno-unused-imports"
-                                      , "-Wno-deprecations" ]
-      , package terminfo     ? append [ "-Wno-unused-imports" ]
-      , package transformers ? append [ "-Wno-unused-matches"
-                                      , "-Wno-unused-imports"
-                                      , "-Wno-redundant-constraints"
-                                      , "-Wno-orphans" ]
-      , package win32        ? append [ "-Wno-trustworthy-safe" ]
-      , package xhtml        ? append [ "-Wno-unused-imports"
-                                      , "-Wno-tabs" ]
-      , libraryPackage       ? append [ "-Wno-deprecated-flags" ] ] ]
+      [ package base         ? pure [ "-Wno-trustworthy-safe" ]
+      , package binary       ? pure [ "-Wno-deprecations" ]
+      , package bytestring   ? pure [ "-Wno-inline-rule-shadowing" ]
+      , package directory    ? pure [ "-Wno-unused-imports" ]
+      , package ghcPrim      ? pure [ "-Wno-trustworthy-safe" ]
+      , package haddock      ? pure [ "-Wno-unused-imports"
+                                    , "-Wno-deprecations" ]
+      , package haskeline    ? pure [ "-Wno-deprecations"
+                                    , "-Wno-unused-imports"
+                                    , "-Wno-redundant-constraints"
+                                    , "-Wno-simplifiable-class-constraints" ]
+      , package pretty       ? pure [ "-Wno-unused-imports" ]
+      , package primitive    ? pure [ "-Wno-unused-imports"
+                                    , "-Wno-deprecations" ]
+      , package terminfo     ? pure [ "-Wno-unused-imports" ]
+      , package transformers ? pure [ "-Wno-unused-matches"
+                                    , "-Wno-unused-imports"
+                                    , "-Wno-redundant-constraints"
+                                    , "-Wno-orphans" ]
+      , package win32        ? pure [ "-Wno-trustworthy-safe" ]
+      , package xhtml        ? pure [ "-Wno-unused-imports"
+                                    , "-Wno-tabs" ]
+      , libraryPackage       ? pure [ "-Wno-deprecated-flags" ] ] ]
 
 -- | All 'Package'-dependent command line arguments.
 defaultPackageArgs :: Args

@@ -7,4 +7,4 @@ import Expression
 runGhcPackageArgs :: Args
 runGhcPackageArgs = package runGhc ? builder Ghc ? input "//Main.hs" ? do
     version <- getSetting ProjectVersion
-    append ["-cpp", "-DVERSION=" ++ show version]
+    pure ["-cpp", "-DVERSION=" ++ show version]

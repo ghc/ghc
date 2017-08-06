@@ -7,8 +7,6 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     stage   <- getStage
     ccPath  <- getBuilderPath $ Cc CompileC stage
     gmpDir  <- getSetting GmpIncludeDir
-    cFlags  <- getCFlags
-    lFlags  <- getLFlags
     top     <- expr topDirectory
     hArch   <- getSetting HostArch
     hOs     <- getSetting HostOs
@@ -20,9 +18,9 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
     mconcat [ arg $ "--cc=" ++ ccPath
             , arg $ "--ld=" ++ ccPath
             , notM windowsHost ? arg "--cross-safe"
-            , append . map ("-I"       ++) $ words gmpDir
-            , append $ map ("--cflag=" ++) cFlags
-            , append $ map ("--lflag=" ++) lFlags
+            , pure $ map ("-I" ++) (words gmpDir)
+            , map ("--cflag=" ++) <$> getCFlags
+            , map ("--lflag=" ++) <$> getLFlags
             , notStage0 ? crossCompiling ? arg "--cross-compile"
             , stage0    ? arg ("--cflag=-D" ++ hArch ++ "_HOST_ARCH=1")
             , stage0    ? arg ("--cflag=-D" ++ hOs   ++ "_HOST_OS=1"  )
@@ -37,25 +35,21 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
 getCFlags :: Expr [String]
 getCFlags = do
     context   <- getContext
-    cppArgs   <- getPkgDataList CppArgs
-    depCcArgs <- getPkgDataList DepCcArgs
-    mconcat [ remove ["-O"] (cArgs <> argStagedSettingList ConfCcArgs)
-            , argStagedSettingList ConfCppArgs
+    mconcat [ remove ["-O"] (cArgs <> getStagedSettingList ConfCcArgs)
+            , getStagedSettingList ConfCppArgs
             , cIncludeArgs
-            , append cppArgs
-            , append depCcArgs
+            , getPkgDataList CppArgs
+            , getPkgDataList DepCcArgs
             , cWarnings
             , arg "-include", arg $ autogenPath context -/- "cabal_macros.h" ]
 
 getLFlags :: Expr [String]
 getLFlags = do
-    pkgLdArgs <- getPkgDataList LdArgs
     libDirs   <- getPkgDataList DepLibDirs
     extraLibs <- getPkgDataList DepExtraLibs
-    depLdArgs <- getPkgDataList DepLdArgs
-    mconcat [ argStagedSettingList ConfGccLinkerArgs
+    mconcat [ getStagedSettingList ConfGccLinkerArgs
             , ldArgs
-            , append pkgLdArgs
-            , append $ [ "-L" ++ unifyPath dir | dir <- libDirs ]
-            , append $ [ "-l" ++ unifyPath dir | dir <- extraLibs ]
-            , append depLdArgs ]
+            , getPkgDataList LdArgs
+            , pure [ "-L" ++ unifyPath dir | dir <- libDirs ]
+            , pure [ "-l" ++ unifyPath dir | dir <- extraLibs ]
+            , getPkgDataList DepLdArgs ]

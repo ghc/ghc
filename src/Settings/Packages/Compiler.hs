@@ -18,7 +18,7 @@ compilerPackageArgs = package compiler ? do
             , builder (Ghc CompileHs) ? mconcat
               [ inputs ["//GHC.hs", "//GhcMake.hs"] ? arg "-fprof-auto"
               , input "//Parser.hs" ?
-                append ["-O0", "-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
+                pure ["-O0", "-fno-ignore-interface-pragmas", "-fcmm-sink" ] ]
 
             , builder GhcCabal ? mconcat
               [ arg $ "--ghc-option=-DSTAGE=" ++ show (fromEnum stage + 1)

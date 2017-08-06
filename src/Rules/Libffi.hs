@@ -28,7 +28,7 @@ configureEnvironment :: Action [CmdOption]
 configureEnvironment = do
     cFlags  <- interpretInContext libffiContext $ mconcat
                [ cArgs
-               , argStagedSettingList ConfCcArgs ]
+               , getStagedSettingList ConfCcArgs ]
     ldFlags <- interpretInContext libffiContext ldArgs
     sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
              , builderEnvironment "CXX" $ Cc CompileC Stage1

@@ -6,13 +6,13 @@ ccBuilderArgs :: Args
 ccBuilderArgs = do
   way <- getWay
   builder Cc ? mconcat
-    [ append =<< getPkgDataList CcArgs
-    , getSettingList . ConfCcArgs =<< getStage
+    [ getPkgDataList CcArgs
+    , getStagedSettingList ConfCcArgs
     , cIncludeArgs
 
     , builder (Cc CompileC) ? mconcat
         [ arg "-Werror"
-        , Dynamic `wayUnit` way ? append [ "-fPIC", "-DDYNAMIC" ]
+        , Dynamic `wayUnit` way ? pure [ "-fPIC", "-DDYNAMIC" ]
         -- ref: mk/warning.mk:
         --  SRC_CC_OPTS     += -Wall $(WERROR)
         , arg "-c", arg =<< getInput

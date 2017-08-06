@@ -32,18 +32,18 @@ haddockBuilderArgs = builder Haddock ? do
         , arg $ "--title=" ++ pkgNameString pkg ++ "-" ++ version ++ ": " ++ synopsis
         , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
         , arg $ "--optghc=-D__HADDOCK_VERSION__=" ++ show (versionToInt hVersion)
-        , append . map ("--hide=" ++) =<< getPkgDataList HiddenModules
-        , append $ [ "--read-interface=../" ++ dep
-                     ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
-                     ++ pkgHaddockFile (vanillaContext Stage1 depPkg)
-                   | (dep, depName) <- zip deps depNames
-                   , Just depPkg <- [findKnownPackage $ PackageName depName]
-                   , depPkg /= rts ]
-        , append [ "--optghc=" ++ opt | opt <- ghcOpts ]
+        , map ("--hide=" ++) <$> getPkgDataList HiddenModules
+        , pure [ "--read-interface=../" ++ dep
+                 ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
+                 ++ pkgHaddockFile (vanillaContext Stage1 depPkg)
+               | (dep, depName) <- zip deps depNames
+               , Just depPkg <- [findKnownPackage $ PackageName depName]
+               , depPkg /= rts ]
+        , pure [ "--optghc=" ++ opt | opt <- ghcOpts ]
         , isSpecified HsColour ?
-          append [ "--source-module=src/%{MODULE/./-}.html"
-                 , "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}" ]
-        , append =<< getInputs
+          pure [ "--source-module=src/%{MODULE/./-}.html"
+               , "--source-entity=src/%{MODULE/./-}.html\\#%{NAME}" ]
+        , getInputs
         , arg "+RTS"
         , arg $ "-t" ++ path -/- "haddock.t"
         , arg "--machine-readable"

@@ -3,7 +3,7 @@ module Expression (
     Expr, Predicate, Args, Ways, Packages,
 
     -- ** Construction and modification
-    expr, exprIO, append, arg, remove,
+    expr, exprIO, arg, remove,
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
@@ -17,7 +17,7 @@ module Expression (
 
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
-    getInput, getOutput, getSetting, getSettingList, getFlag,
+    getInput, getOutput, getSetting, getSettingList, getStagedSettingList, getFlag,
 
     -- * Re-exports
     module Data.Semigroup,
@@ -57,15 +57,14 @@ type Ways      = Expr [Way]
 
 -- Basic operations on expressions:
 
--- | Append something to an expression.
-append :: a -> Expr a
-append = pure
-
 getSetting :: Setting -> Expr String
 getSetting = expr . setting
 
 getSettingList :: SettingList -> Expr [String]
 getSettingList = expr . settingList
+
+getStagedSettingList :: (Stage -> SettingList) -> Expr [String]
+getStagedSettingList f = getSettingList . f =<< getStage
 
 getFlag :: Flag -> Predicate
 getFlag = expr . flag
@@ -105,4 +104,3 @@ notPackage = notM . package
 -- | Is a library package currently being built?
 libraryPackage :: Predicate
 libraryPackage = isLibrary <$> getPackage
-

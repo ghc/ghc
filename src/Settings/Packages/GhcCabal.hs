@@ -21,7 +21,7 @@ ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
         cabalVersion = display . pkgVersion $ identifier
 
     mconcat
-        [ append [ "-package " ++ pkgNameString pkg | pkg <- cabalDeps ]
+        [ pure [ "-package " ++ pkgNameString pkg | pkg <- cabalDeps ]
         , arg "--make"
         , arg "-j"
         , arg ("-DCABAL_VERSION=" ++ replace "." "," cabalVersion)
