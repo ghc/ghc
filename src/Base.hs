@@ -33,6 +33,7 @@ import Data.Semigroup
 import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
+import Hadrian.Utilities
 import System.Console.ANSI
 import System.IO
 import System.Info
@@ -71,19 +72,6 @@ replaceWhen p to = map (\from -> if p from then to else from)
 -- | Add single quotes around a String.
 quote :: String -> String
 quote s = "'" ++ s ++ "'"
-
--- | Normalise a path and convert all path separators to @/@, even on Windows.
-unifyPath :: FilePath -> FilePath
-unifyPath = toStandard . normaliseEx
-
--- | Combine paths with a forward slash regardless of platform.
-(-/-) :: FilePath -> FilePath -> FilePath
-"" -/- b = b
-a  -/- b
-    | last a == '/' = a ++       b
-    | otherwise     = a ++ '/' : b
-
-infixr 6 -/-
 
 -- Explicit definition to avoid dependency on Data.List.Ordered
 -- | Difference of two ordered lists.

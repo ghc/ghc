@@ -28,12 +28,13 @@ executable hadrian
                        , GHC
                        , Hadrian.Expression
                        , Hadrian.Oracles.ArgsHash
+                       , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Target
+                       , Hadrian.Utilities
                        , Oracles.Config
                        , Oracles.Config.Flag
                        , Oracles.Config.Setting
                        , Oracles.Dependencies
-                       , Oracles.DirectoryContents
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
                        , Oracles.Path

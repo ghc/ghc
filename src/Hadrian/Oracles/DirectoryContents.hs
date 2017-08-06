@@ -1,18 +1,25 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveGeneric #-}
-module Oracles.DirectoryContents (
+module Hadrian.Oracles.DirectoryContents (
     directoryContents, directoryContentsOracle, Match (..), matchAll
     ) where
 
-import System.Directory.Extra
+import Control.Monad
+import Development.Shake
+import Development.Shake.Classes
 import GHC.Generics
+import System.Directory.Extra
 
-import Base
+import Hadrian.Utilities
 
 newtype DirectoryContents = DirectoryContents (Match, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 data Match = Test FilePattern | Not Match | And [Match] | Or [Match]
     deriving (Generic, Eq, Show, Typeable)
+
+instance Binary   Match
+instance Hashable Match
+instance NFData   Match
 
 -- | A 'Match' expression that always evaluates to 'True' (i.e. always matches).
 matchAll :: Match
@@ -30,11 +37,8 @@ matches (Or  ms) f = any (`matches` f) ms
 directoryContents :: Match -> FilePath -> Action [FilePath]
 directoryContents expr dir = askOracle $ DirectoryContents (expr, dir)
 
+-- | This oracle answers 'directoryContents' queries and tracks the results.
 directoryContentsOracle :: Rules ()
 directoryContentsOracle = void $
     addOracle $ \(DirectoryContents (expr, dir)) -> liftIO $ map unifyPath .
         filter (matches expr) <$> listFilesInside (return . matches expr) dir
-
-instance Binary Match
-instance Hashable Match
-instance NFData Match

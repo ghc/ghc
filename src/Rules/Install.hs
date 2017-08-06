@@ -1,6 +1,8 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Rules.Install (installRules) where
 
+import Hadrian.Oracles.DirectoryContents
+
 import Base
 import Target
 import Context
@@ -16,7 +18,6 @@ import Rules.Generate
 import Settings.Packages.Rts
 import Oracles.Config.Setting
 import Oracles.Dependencies
-import Oracles.DirectoryContents
 import Oracles.Path
 
 import qualified System.Directory as IO
