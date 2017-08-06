@@ -73,6 +73,7 @@ library
     Haddock.Interface.Rename
     Haddock.Interface.Create
     Haddock.Interface.AttachInstances
+    Haddock.Interface.Json
     Haddock.Interface.LexParseRn
     Haddock.Interface.ParseModuleHeader
     Haddock.Interface.Specialize

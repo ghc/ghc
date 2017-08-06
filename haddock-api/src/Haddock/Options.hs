@@ -25,6 +25,7 @@ module Haddock.Options (
   sourceUrls,
   wikiUrls,
   optDumpInterfaceFile,
+  optShowInterfaceFile,
   optLaTeXStyle,
   optMathjax,
   qualification,
@@ -53,6 +54,7 @@ data Flag
 --  | Flag_DocBook
   | Flag_ReadInterface String
   | Flag_DumpInterface String
+  | Flag_ShowInterface String
   | Flag_Heading String
   | Flag_Html
   | Flag_Hoogle
@@ -112,6 +114,8 @@ options backwardsCompat =
       "read an interface from FILE",
     Option ['D']  ["dump-interface"] (ReqArg Flag_DumpInterface "FILE")
       "write the resulting interface to FILE",
+    Option []     ["show-interface"] (ReqArg Flag_ShowInterface "FILE")
+      "print the interface in a human readable form",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)
 --  "output in DocBook XML",
     Option ['h']  ["html"]     (NoArg Flag_Html)
@@ -270,6 +274,8 @@ wikiUrls flags =
 optDumpInterfaceFile :: [Flag] -> Maybe FilePath
 optDumpInterfaceFile flags = optLast [ str | Flag_DumpInterface str <- flags ]
 
+optShowInterfaceFile :: [Flag] -> Maybe FilePath
+optShowInterfaceFile flags = optLast [ str | Flag_ShowInterface str <- flags ]
 
 optLaTeXStyle :: [Flag] -> Maybe String
 optLaTeXStyle flags = optLast [ str | Flag_LaTeXStyle str <- flags ]

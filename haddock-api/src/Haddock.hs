@@ -32,6 +32,7 @@ import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Backends.Hyperlinker
 import Haddock.Interface
+import Haddock.Interface.Json
 import Haddock.Parser
 import Haddock.Types
 import Haddock.Version
@@ -68,6 +69,7 @@ import System.Directory (doesDirectoryExist)
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
+import ErrUtils
 import Packages
 import Panic (handleGhcException)
 import Module
@@ -163,6 +165,11 @@ haddockWithGhc ghc args = handleTopExceptions $ do
   ghc flags' $ do
 
     dflags <- getDynFlags
+
+    forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
+      mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)]
+      forM_ mIfaceFile $ \(_, ifaceFile) -> do
+        putMsg dflags (renderJson (jsonInterfaceFile ifaceFile))
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files

@@ -19,6 +19,11 @@ import Data.Foldable
 import Data.Traversable
 #endif
 
+#if MIN_VERSION_base(4,8,0)
+import Control.Arrow ((***))
+import Data.Bifunctor
+#endif
+
 -- | With the advent of 'Version', we may want to start attaching more
 -- meta-data to comments. We make a structure for this ahead of time
 -- so we don't have to gut half the core each time we want to add such
@@ -81,6 +86,33 @@ data DocH mod id
   | DocHeader (Header (DocH mod id))
   deriving (Eq, Show, Functor, Foldable, Traversable)
 
+#if MIN_VERSION_base(4,8,0)
+instance Bifunctor DocH where
+  bimap _ _ DocEmpty = DocEmpty
+  bimap f g (DocAppend docA docB) = DocAppend (bimap f g docA) (bimap f g docB)
+  bimap _ _ (DocString s) = DocString s
+  bimap f g (DocParagraph doc) = DocParagraph (bimap f g doc)
+  bimap _ g (DocIdentifier i) = DocIdentifier (g i)
+  bimap f _ (DocIdentifierUnchecked m) = DocIdentifierUnchecked (f m)
+  bimap _ _ (DocModule s) = DocModule s
+  bimap f g (DocWarning doc) = DocWarning (bimap f g doc)
+  bimap f g (DocEmphasis doc) = DocEmphasis (bimap f g doc)
+  bimap f g (DocMonospaced doc) = DocMonospaced (bimap f g doc)
+  bimap f g (DocBold doc) = DocBold (bimap f g doc)
+  bimap f g (DocUnorderedList docs) = DocUnorderedList (map (bimap f g) docs)
+  bimap f g (DocOrderedList docs) = DocOrderedList (map (bimap f g) docs)
+  bimap f g (DocDefList docs) = DocDefList (map (bimap f g *** bimap f g) docs)
+  bimap f g (DocCodeBlock doc) = DocCodeBlock (bimap f g doc)
+  bimap _ _ (DocHyperlink hyperlink) = DocHyperlink hyperlink
+  bimap _ _ (DocPic picture) = DocPic picture
+  bimap _ _ (DocMathInline s) = DocMathInline s
+  bimap _ _ (DocMathDisplay s) = DocMathDisplay s
+  bimap _ _ (DocAName s) = DocAName s
+  bimap _ _ (DocProperty s) = DocProperty s
+  bimap _ _ (DocExamples examples) = DocExamples examples
+  bimap f g (DocHeader (Header level title)) = DocHeader (Header level (bimap f g title))
+#endif
+
 -- | 'DocMarkupH' is a set of instructions for marking up documentation.
 -- In fact, it's really just a mapping from 'Doc' to some other
 -- type [a], where [a] is usually the type of the output (HTML, say).
@@ -114,4 +146,3 @@ data DocMarkupH mod id a = Markup
   , markupExample              :: [Example] -> a
   , markupHeader               :: Header a -> a
   }
-

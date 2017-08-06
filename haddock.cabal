@@ -106,6 +106,7 @@ executable haddock
       Documentation.Haddock
       Haddock
       Haddock.Interface
+      Haddock.Interface.Json
       Haddock.Interface.Rename
       Haddock.Interface.Create
       Haddock.Interface.AttachInstances
