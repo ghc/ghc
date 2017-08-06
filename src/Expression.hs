@@ -29,7 +29,6 @@ module Expression (
 
 import Control.Monad.Extra
 import Data.Semigroup
-import Development.Shake
 
 import qualified Hadrian.Expression as H
 import Hadrian.Expression hiding (Expr, Predicate, Args)
@@ -107,18 +106,3 @@ notPackage = notM . package
 libraryPackage :: Predicate
 libraryPackage = isLibrary <$> getPackage
 
--- | Does any of the input files match a given pattern?
-input :: FilePattern -> Predicate
-input f = any (f ?==) <$> getInputs
-
--- | Does any of the input files match any of the given patterns?
-inputs :: [FilePattern] -> Predicate
-inputs = anyM input
-
--- | Does any of the output files match a given pattern?
-output :: FilePattern -> Predicate
-output f = any (f ?==) <$> getOutputs
-
--- | Does any of the output files match any of the given patterns?
-outputs :: [FilePattern] -> Predicate
-outputs = anyM output

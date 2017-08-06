@@ -1,11 +1,14 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, TypeFamilies #-}
 {-# LANGUAGE FlexibleInstances, MultiParamTypeClasses #-}
 module Hadrian.Expression (
     -- * Expressions
     Expr, Predicate, Args,
 
     -- ** Construction and modification
-    expr, exprIO, arg, remove, (?),
+    expr, exprIO, arg, remove,
+
+    -- ** Predicates
+    (?), input, inputs, output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -14,12 +17,14 @@ module Hadrian.Expression (
     getContext, getBuilder, getOutputs, getInputs, getInput, getOutput
     ) where
 
+import Control.Monad.Extra
 import Control.Monad.Trans
 import Control.Monad.Trans.Reader
 import Data.Semigroup
 import Development.Shake
 
-import Hadrian.Target
+import qualified Hadrian.Target as Target
+import Hadrian.Target (Target, target)
 import Hadrian.Utilities
 
 -- | 'Expr' @c b a@ is a computation that produces a value of type 'Action' @a@
@@ -71,7 +76,7 @@ p ? e = do
     bool <- toPredicate p
     if bool then e else mempty
 
-instance ToPredicate (Predicate c b) c b where
+instance (c ~ c', b ~ b') => ToPredicate (Predicate c b) c' b' where
     toPredicate = id
 
 instance ToPredicate Bool c b where
@@ -93,28 +98,46 @@ interpretInContext c = interpret $ target c
 
 -- | Get the current build 'Context'.
 getContext :: Expr c b c
-getContext = Expr $ asks context
+getContext = Expr $ asks Target.context
 
 -- | Get the 'Builder' for the current 'Target'.
 getBuilder :: Expr c b b
-getBuilder = Expr $ asks builder
+getBuilder = Expr $ asks Target.builder
 
 -- | Get the input files of the current 'Target'.
 getInputs :: Expr c b [FilePath]
-getInputs = Expr $ asks inputs
+getInputs = Expr $ asks Target.inputs
 
 -- | Run 'getInputs' and check that the result contains one input file only.
 getInput :: (Show b, Show c) => Expr c b FilePath
 getInput = Expr $ do
     target <- ask
-    fromSingleton ("Exactly one input file expected in " ++ show target) <$> asks inputs
+    fromSingleton ("Exactly one input file expected in " ++ show target) <$>
+        asks Target.inputs
 
 -- | Get the files produced by the current 'Target'.
 getOutputs :: Expr c b [FilePath]
-getOutputs = Expr $ asks outputs
+getOutputs = Expr $ asks Target.outputs
 
 -- | Run 'getOutputs' and check that the result contains one output file only.
 getOutput :: (Show b, Show c) => Expr c b FilePath
 getOutput = Expr $ do
     target <- ask
-    fromSingleton ("Exactly one output file expected in " ++ show target) <$> asks outputs
+    fromSingleton ("Exactly one output file expected in " ++ show target) <$>
+        asks Target.outputs
+
+-- | Does any of the input files match a given pattern?
+input :: FilePattern -> Predicate c b
+input f = any (f ?==) <$> getInputs
+
+-- | Does any of the input files match any of the given patterns?
+inputs :: [FilePattern] -> Predicate c b
+inputs = anyM input
+
+-- | Does any of the output files match a given pattern?
+output :: FilePattern -> Predicate c b
+output f = any (f ?==) <$> getOutputs
+
+-- | Does any of the output files match any of the given patterns?
+outputs :: [FilePattern] -> Predicate c b
+outputs = anyM output

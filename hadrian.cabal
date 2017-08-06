@@ -102,7 +102,6 @@ executable hadrian
                        , UserSettings
                        , Util
                        , Way
-
     default-language:    Haskell2010
     default-extensions:  RecordWildCards
     other-extensions:    DeriveFunctor
@@ -110,8 +109,10 @@ executable hadrian
                        , FlexibleInstances
                        , GeneralizedNewtypeDeriving
                        , LambdaCase
+                       , MultiParamTypeClasses
                        , OverloadedStrings
                        , ScopedTypeVariables
+                       , TypeFamilies
     build-depends:       base >= 4.8 && < 5
                        , ansi-terminal        == 0.6.*
                        , Cabal                == 2.0.0.2

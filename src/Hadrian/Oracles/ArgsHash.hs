@@ -7,7 +7,7 @@ import Control.Monad
 import Development.Shake
 import Development.Shake.Classes
 
-import Hadrian.Expression
+import Hadrian.Expression hiding (inputs, outputs)
 import Hadrian.Target
 
 -- | 'TrackArgument' is used to specify the arguments that should be tracked by
