@@ -1,5 +1,7 @@
 module Settings.Builders.Haddock (haddockBuilderArgs) where
 
+import Hadrian.Utilities
+
 import Settings.Builders.Common
 import Settings.Builders.Ghc
 

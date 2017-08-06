@@ -1,5 +1,7 @@
 module Rules.Libffi (libffiRules, libffiDependencies) where
 
+import Hadrian.Utilities
+
 import Settings.Builders.Common
 import Settings.Packages.Rts
 import Target
@@ -63,7 +65,7 @@ libffiRules = do
 
     libffiMakefile <.> "in" %> \mkIn -> do
         removeDirectory libffiBuildPath
-        tarball <- unifyPath . getSingleton "Exactly one LibFFI tarball is expected"
+        tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
                <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
 
         need [tarball]

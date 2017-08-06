@@ -11,8 +11,9 @@ module Way (
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
+import Hadrian.Utilities
 
-import Base hiding (unit)
+import Base
 import Oracles.Config.Setting
 
 -- Note: order of constructors is important for compatibility with the old build

@@ -1,5 +1,7 @@
 module Settings.Packages.Rts (rtsPackageArgs, rtsLibffiLibrary) where
 
+import Hadrian.Utilities
+
 import Base
 import GHC
 import Oracles.Config.Flag
@@ -25,7 +27,6 @@ rtsLibffiLibrary way = do
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do
-    let yesNo = expr . fmap (\x -> if x then "YES" else "NO")
     projectVersion <- getSetting ProjectVersion
     hostPlatform   <- getSetting HostPlatform
     hostArch       <- getSetting HostArch
@@ -39,8 +40,8 @@ rtsPackageArgs = package rts ? do
     targetArch     <- getSetting TargetArch
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
-    ghcUnreg       <- yesNo $ flag GhcUnregisterised
-    ghcEnableTNC   <- yesNo ghcEnableTablesNextToCode
+    ghcUnreg       <- expr $ yesNo <$> flag GhcUnregisterised
+    ghcEnableTNC   <- expr $ yesNo <$> ghcEnableTablesNextToCode
     way            <- getWay
     path           <- getBuildPath
     top            <- expr topDirectory

@@ -49,14 +49,6 @@ executable hadrian
                        , Rules.Dependencies
                        , Rules.Documentation
                        , Rules.Generate
-                       , Rules.Generators.Common
-                       , Rules.Generators.ConfigHs
-                       , Rules.Generators.GhcAutoconfH
-                       , Rules.Generators.GhcBootPlatformH
-                       , Rules.Generators.GhcPlatformH
-                       , Rules.Generators.GhcSplit
-                       , Rules.Generators.GhcVersionH
-                       , Rules.Generators.VersionHs
                        , Rules.Gmp
                        , Rules.Install
                        , Rules.Libffi

@@ -13,7 +13,7 @@ module Expression (
 
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
-    getInput, getOutput, getSingleton, getSetting, getSettingList, getFlag,
+    getInput, getOutput, getSetting, getSettingList, getFlag,
 
     -- * Re-exports
     module Data.Semigroup,

@@ -3,6 +3,7 @@
 module Rules.Selftest (selftestRules) where
 
 import Development.Shake
+import Hadrian.Utilities
 import Test.QuickCheck
 
 import Base

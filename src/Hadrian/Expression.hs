@@ -11,7 +11,7 @@ module Hadrian.Expression (
     interpret, interpretInContext,
 
     -- * Convenient accessors
-    getContext, getBuilder, getOutputs, getInputs, getInput, getOutput, getSingleton
+    getContext, getBuilder, getOutputs, getInputs, getInput, getOutput
     ) where
 
 import Control.Monad.Trans
@@ -20,6 +20,7 @@ import Data.Semigroup
 import Development.Shake
 
 import Hadrian.Target
+import Hadrian.Utilities
 
 -- | 'Expr' @c b a@ is a computation that produces a value of type 'Action' @a@
 -- and can read parameters of the current build 'Target' @c b@.
@@ -106,7 +107,7 @@ getInputs = Expr $ asks inputs
 getInput :: (Show b, Show c) => Expr c b FilePath
 getInput = Expr $ do
     target <- ask
-    getSingleton ("Exactly one input file expected in " ++ show target) <$> asks inputs
+    fromSingleton ("Exactly one input file expected in " ++ show target) <$> asks inputs
 
 -- | Get the files produced by the current 'Target'.
 getOutputs :: Expr c b [FilePath]
@@ -116,10 +117,4 @@ getOutputs = Expr $ asks outputs
 getOutput :: (Show b, Show c) => Expr c b FilePath
 getOutput = Expr $ do
     target <- ask
-    getSingleton ("Exactly one output file expected in " ++ show target) <$> asks outputs
-
--- | Extract a value from a singleton list, or raise an error if the list does
--- not contain exactly one value.
-getSingleton :: String -> [a] -> a
-getSingleton _ [res] = res
-getSingleton msg _   = error msg
+    fromSingleton ("Exactly one output file expected in " ++ show target) <$> asks outputs

@@ -1,5 +1,7 @@
 module Rules.Test (testRules) where
 
+import Hadrian.Utilities
+
 import Base
 import Builder
 import Expression
@@ -26,7 +28,6 @@ testRules = do
         build $ target (vanillaContext Stage2 compiler) (Make "testsuite/tests") [] []
 
     "test" ~> do
-        let yesNo x = show $ if x then "YES" else "NO"
         pkgs     <- stagePackages Stage1
         tests    <- filterM doesDirectoryExist $ concat
                     [ [ pkgPath pkg -/- "tests", pkgPath pkg -/- "tests-ghc" ]
@@ -47,7 +48,7 @@ testRules = do
             , "-e", "config.speed=2"
             , "-e", "ghc_compiler_always_flags=" ++ show "-fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-db -rtsopts"
             , "-e", "ghc_with_native_codegen=" ++ show ghcWithNativeCodeGenInt
-            , "-e", "ghc_debugged=" ++ yesNo (ghcDebugged flavour)
+            , "-e", "ghc_debugged=" ++ show (yesNo $ ghcDebugged flavour)
             , "-e", "ghc_with_vanilla=1" -- TODO: do we always build vanilla?
             , "-e", "ghc_with_dynamic=0" -- TODO: support dynamic
             , "-e", "ghc_with_profiling=0" -- TODO: support profiling

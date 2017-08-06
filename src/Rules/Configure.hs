@@ -7,7 +7,7 @@ import Builder
 import CmdLineFlag
 import Context
 import GHC
-import Rules.Generators.GhcAutoconfH
+import Settings.Path
 import Stage
 import Target
 import UserSettings

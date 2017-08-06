@@ -3,26 +3,27 @@ module Rules.Generate (
     copyRules, includesDependencies, generatedDependencies
     ) where
 
+import Hadrian.Utilities
+
 import Base
 import Context hiding (package)
 import Expression
 import Flavour
 import GHC
+import Oracles.Config.Flag
+import Oracles.Config.Setting
 import Oracles.ModuleFiles
 import Predicate
-import Rules.Generators.ConfigHs
-import Rules.Generators.GhcAutoconfH
-import Rules.Generators.GhcBootPlatformH
-import Rules.Generators.GhcPlatformH
-import Rules.Generators.GhcSplit
-import Rules.Generators.GhcVersionH
-import Rules.Generators.VersionHs
 import Rules.Libffi
 import Settings
 import Settings.Path
 import Target
 import UserSettings
 import Util
+
+-- | Track this file to rebuild generated files whenever it changes.
+trackGenerateHs :: Expr ()
+trackGenerateHs = expr $ need [sourcePath -/- "Rules/Generate.hs"]
 
 primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
@@ -171,3 +172,298 @@ generateRules = do
 emptyTarget :: Context
 emptyTarget = vanillaContext (error "Rules.Generate.emptyTarget: unknown stage")
                              (error "Rules.Generate.emptyTarget: unknown package")
+
+-- Generators
+
+-- | Given a 'String' replace charaters '.' and '-' by underscores ('_') so that
+-- the resulting 'String' is a valid C preprocessor identifier.
+cppify :: String -> String
+cppify = replaceEq '-' '_' . replaceEq '.' '_'
+
+ghcSplitSource :: FilePath
+ghcSplitSource = "driver/split/ghc-split.pl"
+
+-- ref: rules/build-perl.mk
+-- | Generate the @ghc-split@ Perl script.
+generateGhcSplit :: Expr String
+generateGhcSplit = do
+    trackGenerateHs
+    targetPlatform <- getSetting TargetPlatform
+    ghcEnableTNC   <- expr $ yesNo <$> ghcEnableTablesNextToCode
+    perlPath       <- getBuilderPath Perl
+    contents       <- expr $ readFileLines ghcSplitSource
+    return . unlines $
+        [ "#!" ++ perlPath
+        , "my $TARGETPLATFORM = " ++ show targetPlatform ++ ";"
+        -- I don't see where the ghc-split tool uses TNC, but
+        -- it's in the build-perl macro.
+        , "my $TABLES_NEXT_TO_CODE = " ++ show ghcEnableTNC ++ ";"
+        ] ++ contents
+
+-- | Generate @ghcplatform.h@ header.
+generateGhcPlatformH :: Expr String
+generateGhcPlatformH = do
+    trackGenerateHs
+    hostPlatform   <- getSetting HostPlatform
+    hostArch       <- getSetting HostArch
+    hostOs         <- getSetting HostOs
+    hostVendor     <- getSetting HostVendor
+    targetPlatform <- getSetting TargetPlatform
+    targetArch     <- getSetting TargetArch
+    targetOs       <- getSetting TargetOs
+    targetVendor   <- getSetting TargetVendor
+    ghcUnreg       <- getFlag GhcUnregisterised
+    return . unlines $
+        [ "#ifndef __GHCPLATFORM_H__"
+        , "#define __GHCPLATFORM_H__"
+        , ""
+        , "#define BuildPlatform_TYPE  " ++ cppify hostPlatform
+        , "#define HostPlatform_TYPE   " ++ cppify targetPlatform
+        , ""
+        , "#define " ++ cppify hostPlatform   ++ "_BUILD 1"
+        , "#define " ++ cppify targetPlatform ++ "_HOST 1"
+        , ""
+        , "#define " ++ hostArch   ++ "_BUILD_ARCH 1"
+        , "#define " ++ targetArch ++ "_HOST_ARCH 1"
+        , "#define BUILD_ARCH " ++ show hostArch
+        , "#define HOST_ARCH "  ++ show targetArch
+        , ""
+        , "#define " ++ hostOs   ++ "_BUILD_OS 1"
+        , "#define " ++ targetOs ++ "_HOST_OS 1"
+        , "#define BUILD_OS " ++ show hostOs
+        , "#define HOST_OS "  ++ show targetOs
+        , ""
+        , "#define " ++ hostVendor   ++ "_BUILD_VENDOR 1"
+        , "#define " ++ targetVendor ++ "_HOST_VENDOR 1"
+        , "#define BUILD_VENDOR " ++ show hostVendor
+        , "#define HOST_VENDOR "  ++ show targetVendor
+        , ""
+        , "/* These TARGET macros are for backwards compatibility... DO NOT USE! */"
+        , "#define TargetPlatform_TYPE " ++ cppify targetPlatform
+        , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
+        , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
+        , "#define TARGET_ARCH " ++ show targetArch
+        , "#define " ++ targetOs ++ "_TARGET_OS 1"
+        , "#define TARGET_OS " ++ show targetOs
+        , "#define " ++ targetVendor ++ "_TARGET_VENDOR 1" ]
+        ++
+        [ "#define UnregisterisedCompiler 1" | ghcUnreg ]
+        ++
+        [ "\n#endif /* __GHCPLATFORM_H__ */" ]
+
+-- | Generate @Config.hs@ files.
+generateConfigHs :: Expr String
+generateConfigHs = do
+    trackGenerateHs
+    cProjectName        <- getSetting ProjectName
+    cProjectGitCommitId <- getSetting ProjectGitCommitId
+    cProjectVersion     <- getSetting ProjectVersion
+    cProjectVersionInt  <- getSetting ProjectVersionInt
+    cProjectPatchLevel  <- getSetting ProjectPatchLevel
+    cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
+    cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
+    cBooterVersion      <- getSetting GhcVersion
+    let cIntegerLibraryType
+            | integerLibrary flavour == integerGmp    = "IntegerGMP"
+            | integerLibrary flavour == integerSimple = "IntegerSimple"
+            | otherwise = error $ "Unknown integer library: " ++ integerLibraryName
+    cSupportsSplitObjs         <- expr $ yesNo <$> supportsSplitObjects
+    cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
+    cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
+    cGhcWithSMP                <- expr $ yesNo <$> ghcWithSMP
+    cGhcEnableTablesNextToCode <- expr $ yesNo <$> ghcEnableTablesNextToCode
+    cLeadingUnderscore         <- expr $ yesNo <$> flag LeadingUnderscore
+    cGHC_UNLIT_PGM             <- fmap takeFileName $ getBuilderPath Unlit
+    cLibFFI                    <- expr useLibFFIForAdjustors
+    rtsWays                    <- getRtsWays
+    cGhcRtsWithLibdw           <- getFlag WithLibdw
+    let cGhcRTSWays = unwords $ map show rtsWays
+    return $ unlines
+        [ "{-# LANGUAGE CPP #-}"
+        , "module Config where"
+        , ""
+        , "#include \"ghc_boot_platform.h\""
+        , ""
+        , "data IntegerLibrary = IntegerGMP"
+        , "                    | IntegerSimple"
+        , "                    deriving Eq"
+        , ""
+        , "cBuildPlatformString :: String"
+        , "cBuildPlatformString = BuildPlatform_NAME"
+        , "cHostPlatformString :: String"
+        , "cHostPlatformString = HostPlatform_NAME"
+        , "cTargetPlatformString :: String"
+        , "cTargetPlatformString = TargetPlatform_NAME"
+        , ""
+        , "cProjectName          :: String"
+        , "cProjectName          = " ++ show cProjectName
+        , "cProjectGitCommitId   :: String"
+        , "cProjectGitCommitId   = " ++ show cProjectGitCommitId
+        , "cProjectVersion       :: String"
+        , "cProjectVersion       = " ++ show cProjectVersion
+        , "cProjectVersionInt    :: String"
+        , "cProjectVersionInt    = " ++ show cProjectVersionInt
+        , "cProjectPatchLevel    :: String"
+        , "cProjectPatchLevel    = " ++ show cProjectPatchLevel
+        , "cProjectPatchLevel1   :: String"
+        , "cProjectPatchLevel1   = " ++ show cProjectPatchLevel1
+        , "cProjectPatchLevel2   :: String"
+        , "cProjectPatchLevel2   = " ++ show cProjectPatchLevel2
+        , "cBooterVersion        :: String"
+        , "cBooterVersion        = " ++ show cBooterVersion
+        , "cStage                :: String"
+        , "cStage                = show (STAGE :: Int)"
+        , "cIntegerLibrary       :: String"
+        , "cIntegerLibrary       = " ++ show integerLibraryName
+        , "cIntegerLibraryType   :: IntegerLibrary"
+        , "cIntegerLibraryType   = " ++ cIntegerLibraryType
+        , "cSupportsSplitObjs    :: String"
+        , "cSupportsSplitObjs    = " ++ show cSupportsSplitObjs
+        , "cGhcWithInterpreter   :: String"
+        , "cGhcWithInterpreter   = " ++ show cGhcWithInterpreter
+        , "cGhcWithNativeCodeGen :: String"
+        , "cGhcWithNativeCodeGen = " ++ show cGhcWithNativeCodeGen
+        , "cGhcWithSMP           :: String"
+        , "cGhcWithSMP           = " ++ show cGhcWithSMP
+        , "cGhcRTSWays           :: String"
+        , "cGhcRTSWays           = " ++ show cGhcRTSWays
+        , "cGhcEnableTablesNextToCode :: String"
+        , "cGhcEnableTablesNextToCode = " ++ show cGhcEnableTablesNextToCode
+        , "cLeadingUnderscore    :: String"
+        , "cLeadingUnderscore    = " ++ show cLeadingUnderscore
+        , "cGHC_UNLIT_PGM        :: String"
+        , "cGHC_UNLIT_PGM        = " ++ show cGHC_UNLIT_PGM
+        , "cGHC_SPLIT_PGM        :: String"
+        , "cGHC_SPLIT_PGM        = " ++ show "ghc-split"
+        , "cLibFFI               :: Bool"
+        , "cLibFFI               = " ++ show cLibFFI
+        , "cGhcThreaded :: Bool"
+        , "cGhcThreaded = " ++ show (threaded `elem` rtsWays)
+        , "cGhcDebugged :: Bool"
+        , "cGhcDebugged = " ++ show (ghcDebugged flavour)
+        , "cGhcRtsWithLibdw :: Bool"
+        , "cGhcRtsWithLibdw = " ++ show cGhcRtsWithLibdw ]
+
+-- | Generate @ghcautoconf.h@ header.
+generateGhcAutoconfH :: Expr String
+generateGhcAutoconfH = do
+    trackGenerateHs
+    configHContents  <- expr $ map undefinePackage <$> readFileLines configH
+    tablesNextToCode <- expr ghcEnableTablesNextToCode
+    ghcUnreg         <- getFlag GhcUnregisterised
+    ccLlvmBackend    <- getSetting CcLlvmBackend
+    ccClangBackend   <- getSetting CcClangBackend
+    return . unlines $
+        [ "#ifndef __GHCAUTOCONF_H__"
+        , "#define __GHCAUTOCONF_H__" ]
+        ++ configHContents ++
+        [ "\n#define TABLES_NEXT_TO_CODE 1" | tablesNextToCode && not ghcUnreg ]
+        ++
+        [ "\n#define llvm_CC_FLAVOR 1"      | ccLlvmBackend == "1" ]
+        ++
+        [ "\n#define clang_CC_FLAVOR 1"     | ccClangBackend == "1" ]
+        ++
+        [ "#endif /* __GHCAUTOCONF_H__ */" ]
+  where
+    undefinePackage s
+        | "#define PACKAGE_" `isPrefixOf` s
+            = "/* #undef " ++ takeWhile (/=' ') (drop 8 s) ++ " */"
+        | otherwise = s
+
+-- | Generate @ghc_boot_platform.h@ headers.
+generateGhcBootPlatformH :: Expr String
+generateGhcBootPlatformH = do
+    trackGenerateHs
+    stage <- getStage
+    let chooseSetting x y = getSetting $ if stage == Stage0 then x else y
+    buildPlatform  <- chooseSetting BuildPlatform HostPlatform
+    buildArch      <- chooseSetting BuildArch     HostArch
+    buildOs        <- chooseSetting BuildOs       HostOs
+    buildVendor    <- chooseSetting BuildVendor   HostVendor
+    hostPlatform   <- chooseSetting HostPlatform  TargetPlatform
+    hostArch       <- chooseSetting HostArch      TargetArch
+    hostOs         <- chooseSetting HostOs        TargetOs
+    hostVendor     <- chooseSetting HostVendor    TargetVendor
+    targetPlatform <- getSetting TargetPlatform
+    targetArch     <- getSetting TargetArch
+    targetOs       <- getSetting TargetOs
+    targetVendor   <- getSetting TargetVendor
+    return $ unlines
+        [ "#ifndef __PLATFORM_H__"
+        , "#define __PLATFORM_H__"
+        , ""
+        , "#define BuildPlatform_NAME  " ++ show buildPlatform
+        , "#define HostPlatform_NAME   " ++ show hostPlatform
+        , "#define TargetPlatform_NAME " ++ show targetPlatform
+        , ""
+        , "#define " ++ cppify buildPlatform  ++ "_BUILD 1"
+        , "#define " ++ cppify hostPlatform   ++ "_HOST 1"
+        , "#define " ++ cppify targetPlatform ++ "_TARGET 1"
+        , ""
+        , "#define " ++ buildArch  ++ "_BUILD_ARCH 1"
+        , "#define " ++ hostArch   ++ "_HOST_ARCH 1"
+        , "#define " ++ targetArch ++ "_TARGET_ARCH 1"
+        , "#define BUILD_ARCH "  ++ show buildArch
+        , "#define HOST_ARCH "   ++ show hostArch
+        , "#define TARGET_ARCH " ++ show targetArch
+        , ""
+        , "#define " ++ buildOs  ++ "_BUILD_OS 1"
+        , "#define " ++ hostOs   ++ "_HOST_OS 1"
+        , "#define " ++ targetOs ++ "_TARGET_OS 1"
+        , "#define BUILD_OS "  ++ show buildOs
+        , "#define HOST_OS "   ++ show hostOs
+        , "#define TARGET_OS " ++ show targetOs
+        , ""
+        , "#define " ++ buildVendor  ++ "_BUILD_VENDOR 1"
+        , "#define " ++ hostVendor   ++ "_HOST_VENDOR 1"
+        , "#define " ++ targetVendor ++ "_TARGET_VENDOR  1"
+        , "#define BUILD_VENDOR "  ++ show buildVendor
+        , "#define HOST_VENDOR "   ++ show hostVendor
+        , "#define TARGET_VENDOR " ++ show targetVendor
+        , ""
+        , "#endif /* __PLATFORM_H__ */" ]
+
+-- | Generate @ghcversion.h@ header.
+generateGhcVersionH :: Expr String
+generateGhcVersionH = do
+    trackGenerateHs
+    version     <- getSetting ProjectVersionInt
+    patchLevel1 <- getSetting ProjectPatchLevel1
+    patchLevel2 <- getSetting ProjectPatchLevel2
+    return . unlines $
+        [ "#ifndef __GHCVERSION_H__"
+        , "#define __GHCVERSION_H__"
+        , ""
+        , "#ifndef __GLASGOW_HASKELL__"
+        , "# define __GLASGOW_HASKELL__ " ++ version
+        , "#endif"
+        , ""]
+        ++
+        [ "#define __GLASGOW_HASKELL_PATCHLEVEL1__ " ++ patchLevel1 | patchLevel1 /= "" ]
+        ++
+        [ "#define __GLASGOW_HASKELL_PATCHLEVEL2__ " ++ patchLevel2 | patchLevel2 /= "" ]
+        ++
+        [ ""
+        , "#define MIN_VERSION_GLASGOW_HASKELL(ma,mi,pl1,pl2) (\\"
+        , "   ((ma)*100+(mi)) <  __GLASGOW_HASKELL__ || \\"
+        , "   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\"
+        , "          && (pl1) <  __GLASGOW_HASKELL_PATCHLEVEL1__ || \\"
+        , "   ((ma)*100+(mi)) == __GLASGOW_HASKELL__    \\"
+        , "          && (pl1) == __GLASGOW_HASKELL_PATCHLEVEL1__ \\"
+        , "          && (pl2) <= __GLASGOW_HASKELL_PATCHLEVEL2__ )"
+        , ""
+        , "#endif /* __GHCVERSION_H__ */" ]
+
+-- | Generate @Version.hs@ files.
+generateVersionHs :: Expr String
+generateVersionHs = do
+    trackGenerateHs
+    projectVersion <- getSetting ProjectVersion
+    targetOs       <- getSetting TargetOs
+    targetArch     <- getSetting TargetArch
+    return $ unlines
+        [ "module Version where"
+        , "version, targetOS, targetARCH :: String"
+        , "version    = " ++ show projectVersion
+        , "targetOS   = " ++ show targetOs
+        , "targetARCH = " ++ show targetArch ]

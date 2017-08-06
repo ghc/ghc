@@ -1,12 +1,15 @@
 module Rules.Gmp (gmpRules) where
 
+import Hadrian.Utilities
+
 import Base
 import Builder
-import Expression
 import GHC
 import Oracles.Config.Setting
+import Package
 import Settings.Packages.IntegerGmp
 import Settings.Path
+import Stage
 import Target
 import UserSettings
 import Util
@@ -73,7 +76,7 @@ gmpRules = do
         -- gmp-4.2.4.tar.bz2 repacked without the doc/ directory contents.
         -- That's because the doc/ directory contents are under the GFDL,
         -- which causes problems for Debian.
-        tarball <- unifyPath . getSingleton "Exactly one GMP tarball is expected"
+        tarball <- unifyPath . fromSingleton "Exactly one GMP tarball is expected"
                <$> getDirectoryFiles "" [gmpBase -/- "gmp-tarballs/gmp*.tar.bz2"]
 
         withTempDir $ \dir -> do

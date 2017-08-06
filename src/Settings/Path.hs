@@ -4,7 +4,7 @@ module Settings.Path (
     gmpLibraryH, gmpBuildInfoPath, generatedPath, libffiContext, libffiBuildPath,
     rtsContext, rtsBuildPath, rtsConfIn, shakeFilesPath,inplacePackageDbDirectory,
     pkgConfFile, packageDbStamp, bootPackageConstraints, packageDependencies,
-    objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath,
+    objectPath, inplaceBinPath, inplaceLibBinPath, inplaceLibPath, configH,
     inplaceInstallPath, autogenPath, pkgInplaceConfig, ghcSplitPath, stripCmdPath,
     pkgSetupConfigFile, inplaceLibCopyTargets, templateHscPath, topDirectory
     ) where
@@ -44,6 +44,11 @@ generatedPath = buildRootPath -/- "generated"
 -- | Relative path to the directory containing build artefacts of a given 'Stage'.
 stageDirectory :: Stage -> FilePath
 stageDirectory = stageString
+
+-- TODO: change @mk/config.h@ to @shake-build/cfg/config.h@
+-- | Path to the generated @mk/config.h file.
+configH :: FilePath
+configH = "mk/config.h"
 
 -- | Directory for binaries that are built "in place".
 inplaceBinPath :: FilePath
