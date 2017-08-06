@@ -42,7 +42,7 @@ library
                , Cabal           ^>= 2.0.0
                , ghc             ^>= 8.2
                , ghc-paths       ^>= 0.1.0.9
-               , haddock-library ^>= 1.4.5
+               , haddock-library ^>= 1.4.6
                , xhtml           ^>= 3000.2.2
 
   -- Versions for the dependencies below are transitively pinned by
