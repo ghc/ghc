@@ -14,7 +14,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
     context   <- getContext
     when (package context /= deriveConstants) $ expr (need inplaceLibCopyTargets)
     mconcat [ arg "configure"
-            , arg =<< getPackagePath
+            , arg =<< pkgPath <$> getPackage
             , arg $ top -/- buildPath context
             , dll0Args
             , withStaged $ Ghc CompileHs
@@ -34,7 +34,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
 
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
-    path    <- getPackagePath
+    path    <- pkgPath <$> getPackage
     top     <- expr topDirectory
     context <- getContext
     pure [ "hscolour", path, top -/- buildPath context ]

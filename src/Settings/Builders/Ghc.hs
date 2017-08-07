@@ -1,10 +1,8 @@
 module Settings.Builders.Ghc (
-  ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs,
-  ghcCbuilderArgs
-) where
+    ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs, ghcCbuilderArgs
+    ) where
 
 import Flavour
-import GHC
 import Settings.Builders.Common
 
 ghcBuilderArgs :: Args
@@ -17,6 +15,11 @@ ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , builder (Ghc CompileHs) ? arg "-c"
             , getInputs
             , arg "-o", arg =<< getOutput ]
+
+needTouchy :: Expr ()
+needTouchy = notStage0 ? do
+    maybePath <- expr $ programPath (vanillaContext Stage0 touchy)
+    expr . whenJust maybePath $ \path -> need [path]
 
 ghcCbuilderArgs :: Args
 ghcCbuilderArgs =
@@ -57,11 +60,6 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , not (nonHsMainPackage pkg) ? arg "-rtsopts"
             , pure [ "-optl-l" ++           lib | lib <- libs ++ gmpLibs ]
             , pure [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
-
-needTouchy :: Expr ()
-needTouchy = notStage0 ? do
-    maybePath <- expr $ programPath (vanillaContext Stage0 touchy)
-    expr . whenJust maybePath $ \path -> need [path]
 
 splitObjectsArgs :: Args
 splitObjectsArgs = splitObjects flavour ? do
@@ -116,10 +114,10 @@ wayGhcArgs = do
 -- FIXME: Get rid of to-be-deprecated -this-package-key.
 packageGhcArgs :: Args
 packageGhcArgs = do
-    compId    <- getPkgData ComponentId
+    compId  <- getPkgData ComponentId
     thisArg <- do
         not0 <- notStage0
-        unit <- getFlag SupportsThisUnitId
+        unit <- expr $ flag SupportsThisUnitId
         return $ if not0 || unit then "-this-unit-id " else "-this-package-key "
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"

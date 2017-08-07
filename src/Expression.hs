@@ -7,7 +7,7 @@ module Expression (
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
-    input, inputs, output, outputs, way, libraryPackage,
+    libraryPackage, way, input, inputs, output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -17,7 +17,7 @@ module Expression (
 
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
-    getInput, getOutput, getSetting, getSettingList, getStagedSettingList, getFlag,
+    getInput, getOutput, getSetting, getSettingList, getStagedSettingList,
 
     -- * Re-exports
     module Data.Semigroup,
@@ -40,7 +40,6 @@ import Stage
 import Target hiding (builder, inputs, outputs)
 import Way
 
-import Oracles.Config.Flag
 import Oracles.Config.Setting
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
@@ -55,19 +54,17 @@ type Args      = H.Args      Context Builder
 type Packages  = Expr [Package]
 type Ways      = Expr [Way]
 
--- Basic operations on expressions:
-
+-- | Get a configuration setting.
 getSetting :: Setting -> Expr String
 getSetting = expr . setting
 
-getSettingList :: SettingList -> Expr [String]
+-- | Get a list of configuration settings.
+getSettingList :: SettingList -> Args
 getSettingList = expr . settingList
 
-getStagedSettingList :: (Stage -> SettingList) -> Expr [String]
+-- | Get a list of configuration settings for the current stage.
+getStagedSettingList :: (Stage -> SettingList) -> Args
 getStagedSettingList f = getSettingList . f =<< getStage
-
-getFlag :: Flag -> Predicate
-getFlag = expr . flag
 
 -- | Is the build currently in the provided stage?
 stage :: Stage -> Predicate

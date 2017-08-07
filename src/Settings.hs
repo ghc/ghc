@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
-    findKnownPackage, getPkgData, getPkgDataList, isLibrary, getPackagePath,
-    getContextDirectory, getBuildPath, stagePackages, builderPath,
+    findKnownPackage, getPkgData, getPkgDataList, isLibrary,
+    getBuildPath, stagePackages, builderPath,
     getBuilderPath, isSpecified, latestBuildStage, programPath, programContext,
     integerLibraryName, destDir, pkgConfInstallPath, stage1Only
     ) where
@@ -25,26 +25,20 @@ import Settings.Flavours.Quickest
 import Settings.Path
 import UserSettings
 
-getArgs :: Expr [String]
+getArgs :: Args
 getArgs = args flavour
 
-getLibraryWays :: Expr [Way]
+getLibraryWays :: Ways
 getLibraryWays = libraryWays flavour
 
-getRtsWays :: Expr [Way]
+getRtsWays :: Ways
 getRtsWays = rtsWays flavour
 
-getPackages :: Expr [Package]
+getPackages :: Packages
 getPackages = packages flavour
 
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = interpretInContext (stageContext stage) getPackages
-
-getPackagePath :: Expr FilePath
-getPackagePath = pkgPath <$> getPackage
-
-getContextDirectory :: Expr FilePath
-getContextDirectory = stageDirectory <$> getStage
 
 getBuildPath :: Expr FilePath
 getBuildPath = buildPath <$> getContext
@@ -80,7 +74,7 @@ programContext stage pkg
 knownPackages :: [Package]
 knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 
--- TODO: Speed up?
+-- TODO: Speed up? Switch to Set?
 -- Note: this is slow but we keep it simple as there are just ~50 packages
 findKnownPackage :: PackageName -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
@@ -156,12 +150,12 @@ programPath context@Context {..} = do
 pkgConfInstallPath :: FilePath
 pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) -/- "package.conf.install"
 
--- | Stage1Only flag
--- TODO: Set this by cmdline flags
+-- TODO: Set this from command line
+-- | Stage1Only flag.
 stage1Only :: Bool
 stage1Only = defaultStage1Only
 
--- | Install's DESTDIR flag
--- TODO: Set this by cmdline flags
+-- TODO: Set this from command line
+-- | Install's DESTDIR setting.
 destDir :: FilePath
 destDir = defaultDestDir
