@@ -5,7 +5,7 @@ module Rules.Wrappers (
 import Base
 import Expression
 import GHC
-import Oracles.Config.Setting
+import Oracles.Setting
 import Settings
 import Settings.Install
 import Settings.Path

@@ -7,8 +7,8 @@ import Builder
 import Expression
 import Flavour
 import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
+import Oracles.Flag
+import Oracles.Setting
 import Settings
 import Settings.Path
 import Target

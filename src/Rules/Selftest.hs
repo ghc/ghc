@@ -9,8 +9,8 @@ import Test.QuickCheck
 import Base
 import Expression
 import GHC
-import Oracles.Config.Setting
 import Oracles.ModuleFiles
+import Oracles.Setting
 import Settings
 import Settings.Builders.Ar
 import Target

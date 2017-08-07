@@ -5,8 +5,8 @@ import Hadrian.Utilities
 import Base
 import Expression
 import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
+import Oracles.Flag
+import Oracles.Setting
 import Settings
 import Settings.Path
 

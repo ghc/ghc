@@ -1,11 +1,12 @@
-module Oracles.Config.Flag (
+module Oracles.Flag (
     Flag (..), flag, crossCompiling, platformSupportsSharedLibs,
     ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
+import Hadrian.Oracles.Config
+
 import Base
-import Oracles.Config
-import Oracles.Config.Setting
+import Oracles.Setting
 
 data Flag = ArSupportsAtFile
           | CrossCompiling

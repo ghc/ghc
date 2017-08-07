@@ -1,7 +1,7 @@
 module Settings.Packages.GhcPrim (ghcPrimPackageArgs) where
 
 import GHC
-import Oracles.Config.Flag
+import Oracles.Flag
 import Expression
 
 ghcPrimPackageArgs :: Args

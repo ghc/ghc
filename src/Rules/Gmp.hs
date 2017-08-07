@@ -5,7 +5,7 @@ import Hadrian.Utilities
 import Base
 import Builder
 import GHC
-import Oracles.Config.Setting
+import Oracles.Setting
 import Package
 import Settings.Packages.IntegerGmp
 import Settings.Path

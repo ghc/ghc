@@ -2,9 +2,9 @@ module Settings.Builders.Common (
     module Base,
     module Expression,
     module GHC,
-    module Oracles.Config.Flag,
-    module Oracles.Config.Setting,
+    module Oracles.Flag,
     module Oracles.PackageData,
+    module Oracles.Setting,
     module Settings,
     module Settings.Path,
     module UserSettings,
@@ -14,9 +14,9 @@ module Settings.Builders.Common (
 import Base
 import Expression
 import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
+import Oracles.Flag
 import Oracles.PackageData
+import Oracles.Setting
 import Settings
 import Settings.Path
 import UserSettings

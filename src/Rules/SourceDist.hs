@@ -4,7 +4,7 @@ import Hadrian.Oracles.DirectoryContents
 
 import Base
 import Builder
-import Oracles.Config.Setting
+import Oracles.Setting
 import Rules.Clean
 import UserSettings
 import Util

@@ -4,8 +4,8 @@ import Base
 import Context
 import Expression
 import GHC
-import Oracles.Config.Setting
 import Oracles.Dependencies
+import Oracles.Setting
 import Rules.Generate
 import Settings.Path
 import Target

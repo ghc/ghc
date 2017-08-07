@@ -20,7 +20,7 @@ import CmdLineFlag
 import Context
 import Expression hiding (builder, inputs, outputs, way, stage, package)
 import GHC
-import Oracles.Config.Setting
+import Oracles.Setting
 import Settings
 import Settings.Path
 import Settings.Builders.Ar

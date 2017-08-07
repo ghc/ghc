@@ -40,7 +40,7 @@ import Stage
 import Target hiding (builder, inputs, outputs)
 import Way
 
-import Oracles.Config.Setting
+import Oracles.Setting
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
 -- read parameters of the current build 'Target'.

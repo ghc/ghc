@@ -6,6 +6,7 @@ module Settings (
     integerLibraryName, destDir, pkgConfInstallPath, stage1Only
     ) where
 
+import Hadrian.Oracles.Config
 import Hadrian.Oracles.Path
 
 import Base
@@ -14,7 +15,6 @@ import CmdLineFlag
 import Expression
 import Flavour
 import GHC
-import Oracles.Config
 import Oracles.PackageData
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development

@@ -10,9 +10,9 @@ import Context hiding (package)
 import Expression
 import Flavour
 import GHC
-import Oracles.Config.Flag
-import Oracles.Config.Setting
+import Oracles.Flag
 import Oracles.ModuleFiles
+import Oracles.Setting
 import Rules.Libffi
 import Settings
 import Settings.Path

@@ -14,7 +14,7 @@ import qualified Data.IntSet as Set
 import Hadrian.Utilities
 
 import Base
-import Oracles.Config.Setting
+import Oracles.Setting
 
 -- Note: order of constructors is important for compatibility with the old build
 -- system, e.g. we want "thr_p", not "p_thr" (see instance Show Way).

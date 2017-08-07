@@ -2,7 +2,7 @@ module Settings.Packages.Ghc (ghcPackageArgs) where
 
 import GHC
 import Expression
-import Oracles.Config.Setting
+import Oracles.Setting
 import Settings.Path
 
 ghcPackageArgs :: Args

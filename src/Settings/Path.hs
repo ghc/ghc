@@ -16,7 +16,7 @@ import Context
 import Expression hiding (stage)
 import GHC
 import Oracles.PackageData
-import Oracles.Config.Setting
+import Oracles.Setting
 import UserSettings
 
 -- | Path to the directory containing the Shake database and other auxiliary

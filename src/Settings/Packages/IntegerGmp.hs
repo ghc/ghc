@@ -3,7 +3,7 @@ module Settings.Packages.IntegerGmp (integerGmpPackageArgs, gmpBuildPath) where
 import Base
 import Expression
 import GHC
-import Oracles.Config.Setting
+import Oracles.Setting
 import Settings.Path
 
 -- TODO: Is this needed?

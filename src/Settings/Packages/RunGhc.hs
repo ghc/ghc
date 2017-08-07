@@ -1,7 +1,7 @@
 module Settings.Packages.RunGhc (runGhcPackageArgs) where
 
 import GHC
-import Oracles.Config.Setting
+import Oracles.Setting
 import Expression
 
 runGhcPackageArgs :: Args

@@ -1,4 +1,4 @@
-module Oracles.Config.Setting (
+module Oracles.Setting (
     Setting (..), SettingList (..), setting, settingList,
     anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
@@ -6,8 +6,9 @@ module Oracles.Config.Setting (
     relocatableBuild, installDocDir, installGhcLibDir
     ) where
 
+import Hadrian.Oracles.Config
+
 import Base
-import Oracles.Config
 import Stage
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
@@ -202,8 +203,9 @@ relocatableBuild = windowsHost
 
 installDocDir :: Action String
 installDocDir = do
-  version <- setting ProjectVersion
-  (-/- ("doc/ghc-" ++ version)) <$> setting InstallDataRootDir
+    version <- setting ProjectVersion
+    dataDir <- setting InstallDataRootDir
+    return $ dataDir -/- ("doc/ghc-" ++ version)
 
 -- ref: mk/install.mk:101
 -- TODO: CroosCompilePrefix
@@ -211,9 +213,9 @@ installDocDir = do
 -- subdirectory with the version number included.
 installGhcLibDir :: Action String
 installGhcLibDir = do
-  r <- relocatableBuild
-  libdir <- setting InstallLibDir
-  if r then return libdir
-       else do
-         v <- setting ProjectVersion
-         return $ libdir -/- ("ghc-" ++ v)
+    rBuild <- relocatableBuild
+    libdir <- setting InstallLibDir
+    if rBuild then return libdir
+         else do
+             version <- setting ProjectVersion
+             return $ libdir -/- ("ghc-" ++ version)

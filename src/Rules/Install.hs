@@ -2,24 +2,23 @@
 module Rules.Install (installRules) where
 
 import Hadrian.Oracles.DirectoryContents
+import qualified System.Directory as IO
 
 import Base
-import Expression hiding (builder)
-import Target
 import Context
-import Settings
-import Settings.Path
-import Util
+import Expression hiding (builder)
 import GHC
+import Oracles.Dependencies
+import Oracles.Setting
 import Rules
 import Rules.Generate
 import Rules.Libffi
 import Rules.Wrappers
+import Settings
 import Settings.Packages.Rts
-import Oracles.Config.Setting
-import Oracles.Dependencies
-
-import qualified System.Directory as IO
+import Settings.Path
+import Target
+import Util
 
 {- | Install the built binaries etc. to the @destDir ++ prefix@.
 

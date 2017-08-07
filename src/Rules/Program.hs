@@ -6,10 +6,10 @@ import Base
 import Context
 import Expression hiding (stage, way)
 import GHC
-import Oracles.Config.Setting
 import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
+import Oracles.Setting
 import Rules.Wrappers
 import Settings
 import Settings.Path
