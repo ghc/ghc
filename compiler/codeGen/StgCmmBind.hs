@@ -1,4 +1,5 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -506,10 +507,16 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 -- Load free vars out of closure *after*
                 -- heap check, to reduce live vars over check
                 ; when node_points $ load_fvs node lf_info fv_bindings
-                ; void $ cgExpr body
+                ; retKind <- cgExpr body
+                ; let !x = trace (retK2s retKind) ()
+                ; return ()
                 }}}
 
   }
+
+retK2s :: ReturnKind -> String  
+retK2s AssignedDirectly = "AssignedDirectly"
+retK2s (ReturnedTo _ _ _) = "ReturnedTo"
 
 -- Note [NodeReg clobbered with loopification]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -590,7 +597,10 @@ thunkCode cl_info fv_details _cc node arity body
                ; let lf_info = closureLFInfo cl_info
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings
-               ; void $ cgExpr body }}}
+               ; retKind <- cgExpr body
+               ; let !x = trace (retK2s retKind) ()
+               ; return ()
+               }}}
 
 
 ------------------------------------------------------------------------
