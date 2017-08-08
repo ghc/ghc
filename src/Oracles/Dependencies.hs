@@ -15,7 +15,7 @@ import Settings
 import Settings.Builders.GhcCabal
 import Settings.Path
 
-newtype ObjDepsKey = ObjDepsKey (FilePath, FilePath)
+newtype Dependency = Dependency (FilePath, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | 'Action' @fileDependencies context file@ looks up dependencies of a @file@
@@ -26,14 +26,11 @@ newtype ObjDepsKey = ObjDepsKey (FilePath, FilePath)
 fileDependencies :: Context -> FilePath -> Action (FilePath, [FilePath])
 fileDependencies context obj = do
     let path = buildPath context -/- ".dependencies"
-    deps <- askOracle $ ObjDepsKey (path, obj)
+    deps <- askOracle $ Dependency (path, obj)
     case deps of
         Nothing -> error $ "No dependencies found for file " ++ obj
         Just [] -> error $ "No source file found for file " ++ obj
         Just (source : files) -> return (source, files)
-
-newtype PkgDepsKey = PkgDepsKey String
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | Given a 'Context' this 'Action' looks up its package dependencies in
 -- 'Settings.Paths.packageDependencies' using 'packageDependenciesOracle', and
@@ -45,7 +42,7 @@ contextDependencies :: Context -> Action [Context]
 contextDependencies context@Context {..} = do
     let pkgContext = \pkg -> Context (min stage Stage1) pkg way
         unpack     = fromMaybe . error $ "No dependencies for " ++ show context
-    deps <- unpack <$> askOracle (PkgDepsKey $ pkgNameString package)
+    deps <- unpack <$> askOracle (Dependency (packageDependencies, pkgNameString package))
     pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
     return . map pkgContext $ intersectOrd (compare . pkgNameString) pkgs deps
 
@@ -74,16 +71,11 @@ needLibrary cs = need =<< concatMapM libraryTargets cs
 -- | Oracles for the package dependencies and 'path/dist/.dependencies' files.
 dependenciesOracles :: Rules ()
 dependenciesOracles = do
-    deps <- newCache readDependencies
-    void $ addOracle $ \(ObjDepsKey (file, obj)) -> Map.lookup obj <$> deps file
-
-    pkgDeps <- newCache $ \_ -> readDependencies packageDependencies
-    void $ addOracle $ \(PkgDepsKey pkg) -> Map.lookup pkg <$> pkgDeps ()
-  where
-    readDependencies file = do
+    deps <- newCache $ \file -> do
         putLoud $ "Reading dependencies from " ++ file ++ "..."
         contents <- map words <$> readFileLines file
         return $ Map.fromList [ (key, values) | (key:values) <- contents ]
+    void $ addOracle $ \(Dependency (file, key)) -> Map.lookup key <$> deps file
 
 -- | Topological sort of packages according to their dependencies.
 -- HACK (izgzhen): See https://github.com/snowleopard/hadrian/issues/344 for details

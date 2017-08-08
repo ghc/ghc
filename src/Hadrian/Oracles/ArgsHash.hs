@@ -35,16 +35,16 @@ trackArgsHash :: (ShakeValue c, ShakeValue b) => Target c b -> Action ()
 trackArgsHash t = do
     let hashedInputs  = [ show $ hash (inputs t) ]
         hashedTarget = target (context t) (builder t) hashedInputs (outputs t)
-    void (askOracle $ ArgsHashKey hashedTarget :: Action Int)
+    void (askOracle $ ArgsHash hashedTarget :: Action Int)
 
-newtype ArgsHashKey c b = ArgsHashKey (Target c b)
+newtype ArgsHash c b = ArgsHash (Target c b)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | This oracle stores per-target argument list hashes in the Shake database,
 -- allowing the user to track them between builds using 'trackArgsHash' queries.
 argsHashOracle :: (ShakeValue c, ShakeValue b) => TrackArgument c b -> Args c b -> Rules ()
 argsHashOracle trackArgument args = void $
-    addOracle $ \(ArgsHashKey target) -> do
+    addOracle $ \(ArgsHash target) -> do
         argList <- interpret target args
         let trackedArgList = filter (trackArgument target) argList
         return $ hash trackedArgList

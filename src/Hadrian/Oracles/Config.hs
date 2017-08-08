@@ -10,7 +10,7 @@ import Development.Shake.Config
 
 import Hadrian.Utilities
 
-newtype ConfigKey = ConfigKey String
+newtype Config = Config String
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 -- | Lookup a configuration setting raising an error if the key is not found.
@@ -21,7 +21,7 @@ unsafeAskConfig key = (fromMaybe $ error msg) <$> askConfig key
 
 -- | Lookup a configuration setting.
 askConfig :: String -> Action (Maybe String)
-askConfig = askOracle . ConfigKey
+askConfig = askOracle . Config
 
 -- | This oracle reads and parses a configuration file consisting of key-value
 -- pairs @key = value@ and answers 'askConfig' queries tracking the results.
@@ -31,4 +31,4 @@ configOracle configFile = void $ do
         need [configFile]
         putLoud $ "Reading " ++ configFile ++ "..."
         liftIO $ readConfigFile configFile
-    addOracle $ \(ConfigKey key) -> Map.lookup key <$> cfg ()
+    addOracle $ \(Config key) -> Map.lookup key <$> cfg ()
