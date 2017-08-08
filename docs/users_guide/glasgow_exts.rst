@@ -5407,8 +5407,8 @@ of a class declaration; e.g. ::
 
       class Foo a b c | a b -> c where ...
 
-There should be more documentation, but there isn't (yet). Yell if you
-need it.
+More documentation can be found in the `Haskell Wiki
+<https://wiki.haskell.org/Functional_dependencies>`_.
 
 .. [Jones2000]
     "`Type Classes with Functional
