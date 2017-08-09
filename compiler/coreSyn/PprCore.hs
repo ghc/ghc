@@ -349,7 +349,7 @@ binders are printed as "_".
 -- These instances are sadly orphans
 
 instance OutputableBndr Var where
-  pprBndr bs b = addAnn (varBinder b) (pprCoreBinder bs b)
+  pprBndr bs b = pprCoreBinder bs b
   pprInfixOcc b = addAnn (varReference b) (pprInfixName  (varName b))
   pprPrefixOcc b = addAnn (varReference b) (pprPrefixName (varName b))
   bndrIsJoin_maybe = isJoinId_maybe
@@ -373,7 +373,7 @@ pprCoreBinder bind_site bndr
 
 pprUntypedBinder :: Var -> SDoc
 pprUntypedBinder binder
-  | isTyVar binder = text "@" <+> ppr binder    -- NB: don't print kind
+  | isTyVar binder = text "@" <+> addAnn (varBinder binder) (ppr binder)    -- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedLamBinder :: BindingSite -> Bool -> Var -> SDoc
@@ -423,12 +423,12 @@ pprTypedLetBinder binder
 pprKindedTyVarBndr :: TyVar -> SDoc
 -- Print a type variable binder with its kind (but not if *)
 pprKindedTyVarBndr tyvar
-  = text "@" <+> pprTyVar tyvar
+  = text "@" <+> addAnn (varBinder tyvar) (pprTyVar tyvar)
 
 -- pprIdBndr does *not* print the type
 -- When printing any Id binder in debug mode, we print its inline pragma and one-shot-ness
 pprIdBndr :: Id -> SDoc
-pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
+pprIdBndr id = addAnn (varBinder id) (ppr id) <+> pprIdBndrInfo (idInfo id)
 
 pprIdBndrInfo :: IdInfo -> SDoc
 pprIdBndrInfo info
