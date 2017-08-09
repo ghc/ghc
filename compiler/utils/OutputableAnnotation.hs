@@ -6,16 +6,16 @@ import Outputable ( OutputableBndr(..))
 import Name (NamedThing)
 
 data PExpr where
-  PCoreExpr :: (OutputableBndr a, NamedThing a) => Expr a -> PExpr
-  PBind :: (OutputableBndr a, NamedThing a) => Bind a -> PExpr
-  PVar :: (OutputableBndr a, NamedThing a) => BindType -> a -> PExpr
+  PCoreExpr :: NamedThing a => Expr a -> PExpr
+  PBind :: NamedThing a => Bind a -> PExpr
+  PVar :: NamedThing a => BindType -> a -> PExpr
 
 data BindType = Binder | Reference
 
-varBinder :: (OutputableBndr a, NamedThing a) => a -> PExpr
+varBinder :: NamedThing a => a -> PExpr
 varBinder a = PVar Binder a
 
-varReference :: (OutputableBndr a, NamedThing a) => a -> PExpr
+varReference :: NamedThing a => a -> PExpr
 varReference a = PVar Reference a
 
 
