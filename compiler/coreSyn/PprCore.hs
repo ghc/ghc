@@ -104,12 +104,13 @@ pprTopBind ann b@(NonRec binder expr)
 
 pprTopBind _ (Rec [])
   = text "Rec { }"
-pprTopBind ann (Rec (b:bs))
-  = vcat [text "Rec {",
+pprTopBind ann bi@(Rec (b:bs))
+  = addAnn (PBind bi)
+      (vcat [text "Rec {",
           ppr_binding ann b,
           vcat [blankLine $$ ppr_binding ann b | b <- bs],
           text "end Rec }",
-          blankLine]
+          blankLine])
 
 ppr_bind :: (OutputableBndr b, NamedThing b) => Annotation b -> Bind b -> SDoc
 
