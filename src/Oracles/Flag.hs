@@ -3,7 +3,7 @@ module Oracles.Flag (
     ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
-import Hadrian.Oracles.Config
+import Hadrian.Oracles.KeyValue
 
 import Base
 import Oracles.Setting
@@ -38,7 +38,7 @@ flag f = do
             SupportsThisUnitId -> "supports-this-unit-id"
             WithLibdw          -> "with-libdw"
             UseSystemFfi       -> "use-system-ffi"
-    value <- unsafeAskConfig key
+    value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ "cannot be parsed."
     return $ value == "YES"

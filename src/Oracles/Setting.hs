@@ -6,7 +6,7 @@ module Oracles.Setting (
     relocatableBuild, installDocDir, installGhcLibDir
     ) where
 
-import Hadrian.Oracles.Config
+import Hadrian.Oracles.KeyValue
 
 import Base
 import Stage
@@ -74,7 +74,7 @@ data SettingList = ConfCcArgs Stage
 
 -- | Maps 'Setting's to names in @cfg/system.config.in@.
 setting :: Setting -> Action String
-setting key = unsafeAskConfig $ case key of
+setting key = lookupValueOrError configFile $ case key of
     BuildArch          -> "build-arch"
     BuildOs            -> "build-os"
     BuildPlatform      -> "build-platform"
@@ -122,7 +122,7 @@ setting key = unsafeAskConfig $ case key of
     LnS                -> "ln-s"
 
 settingList :: SettingList -> Action [String]
-settingList key = fmap words $ unsafeAskConfig $ case key of
+settingList key = fmap words $ lookupValueOrError configFile $ case key of
     ConfCcArgs        stage -> "conf-cc-args-"         ++ stageString stage
     ConfCppArgs       stage -> "conf-cpp-args-"        ++ stageString stage
     ConfGccLinkerArgs stage -> "conf-gcc-linker-args-" ++ stageString stage

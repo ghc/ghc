@@ -1,12 +1,11 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.PackageData (
-    PackageData (..), PackageDataList (..), pkgData, pkgDataList, packageDataOracle
+    PackageData (..), PackageDataList (..), pkgData, pkgDataList
     ) where
 
-import Development.Shake.Config
-import qualified Data.HashMap.Strict as Map
-
-import Base
+import Data.List
+import Development.Shake
+import Hadrian.Oracles.KeyValue
+import Hadrian.Utilities
 
 data PackageData = BuildGhciLib FilePath
                  | ComponentId  FilePath
@@ -33,12 +32,8 @@ data PackageDataList = AsmSrcs        FilePath
                      | Modules        FilePath
                      | SrcDirs        FilePath
 
-newtype PackageDataKey = PackageDataKey (FilePath, String)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-
 askPackageData :: FilePath -> String -> Action String
-askPackageData path key = fromMaybe "" <$>
-    askOracle (PackageDataKey (path -/- "package-data.mk", key))
+askPackageData path = lookupValueOrEmpty (path -/- "package-data.mk")
 
 -- | For each @PackageData path@ the file 'path/package-data.mk' contains a line
 -- of the form 'path_VERSION = 1.2.3.4'. @pkgData (PackageData path)@ is an
@@ -76,12 +71,3 @@ pkgDataList packageData = fmap (map unquote . words) $ case packageData of
     SrcDirs        path -> askPackageData path "HS_SRC_DIRS"
   where
     unquote = dropWhile (== '\'') . dropWhileEnd (== '\'')
-
--- | Oracle for 'package-data.mk' files.
-packageDataOracle :: Rules ()
-packageDataOracle = void $ do
-    keys <- newCache $ \file -> do
-        need [file]
-        putLoud $ "Reading " ++ file ++ "..."
-        liftIO $ readConfigFile file
-    addOracle $ \(PackageDataKey (file, key)) -> Map.lookup key <$> keys file

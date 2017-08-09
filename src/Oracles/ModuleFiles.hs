@@ -12,7 +12,7 @@ import Expression
 import Oracles.PackageData
 import Settings.Path
 
-newtype ModuleFilesKey = ModuleFilesKey (Stage, Package)
+newtype ModuleFiles = ModuleFiles (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
 newtype Generator = Generator (Stage, Package, FilePath)
@@ -102,7 +102,7 @@ moduleSource moduleName = replaceEq '.' '/' moduleName <.> "hs"
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context@Context {..} = do
     modules <- fmap sort . pkgDataList . Modules $ buildPath context
-    zip modules <$> askOracle (ModuleFilesKey (stage, package))
+    zip modules <$> askOracle (ModuleFiles (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
 -- files. It takes a 'Stage' and a 'Package', looks up corresponding source
@@ -117,7 +117,7 @@ contextFiles context@Context {..} = do
 -- Just "compiler/parser/Lexer.x"]. The oracle ignores @.(l)hs-boot@ files.
 moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
-    void . addOracle $ \(ModuleFilesKey (stage, package)) -> do
+    void . addOracle $ \(ModuleFiles (stage, package)) -> do
         let context = vanillaContext stage package
             path    = buildPath context
         srcDirs <-             pkgDataList $ SrcDirs path

@@ -28,8 +28,8 @@ executable hadrian
                        , GHC
                        , Hadrian.Expression
                        , Hadrian.Oracles.ArgsHash
-                       , Hadrian.Oracles.Config
                        , Hadrian.Oracles.DirectoryContents
+                       , Hadrian.Oracles.KeyValue
                        , Hadrian.Oracles.Path
                        , Hadrian.Target
                        , Hadrian.Utilities

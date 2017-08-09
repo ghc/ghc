@@ -6,7 +6,7 @@ module Settings (
     integerLibraryName, destDir, pkgConfInstallPath, stage1Only
     ) where
 
-import Hadrian.Oracles.Config
+import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
 
 import Base
@@ -107,7 +107,7 @@ systemBuilderPath builder = case builder of
     fromKey key = do
         let unpack = fromMaybe . error $ "Cannot find path to builder "
                 ++ quote key ++ " in system.config file. Did you skip configure?"
-        path <- unpack <$> askConfig key
+        path <- unpack <$> lookupValue configFile key
         if null path
         then do
             unless (isOptional builder) . error $ "Non optional builder "
