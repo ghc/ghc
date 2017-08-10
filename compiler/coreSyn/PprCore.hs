@@ -128,7 +128,7 @@ ppr_binding ann (val_bdr, expr)
                 Just ar -> pp_join_bind ar
 
     pp_normal_bind = hang (ppr val_bdr) 2 (equals <+>
-                            addAnn (PCoreExpr expr) (pprCoreExpr expr))
+                            (pprCoreExpr expr))
 
       -- For a join point of join arity n, we want to print j = \x1 ... xn -> e
       -- as "j x1 ... xn = e" to differentiate when a join point returns a
@@ -153,21 +153,26 @@ pprOptCo co = sdocWithDynFlags $ \dflags ->
               then angleBrackets (text "Co:" <> int (coercionSize co))
               else parens (sep [ppr co, dcolon <+> ppr (coercionType co)])
 
+-- This version adds an annotation, we want recursive calls
+-- to add annotations as well.
 ppr_expr :: (OutputableBndr b, NamedThing b) => (SDoc -> SDoc) -> Expr b -> SDoc
+ppr_expr add_par e = addAnn (PCoreExpr e) (ppr_expr_prim add_par e)
+
+ppr_expr_prim :: (OutputableBndr b, NamedThing b) => (SDoc -> SDoc) -> Expr b -> SDoc
         -- The function adds parens in context that need
         -- an atomic value (e.g. function args)
 
-ppr_expr add_par (Var name)
+ppr_expr_prim add_par (Var name)
  | isJoinId name               = add_par ((text "jump") <+> ppr name)
  | otherwise                   = addAnn (varReference name) (ppr name)
-ppr_expr add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
-ppr_expr add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
-ppr_expr add_par (Lit lit)     = pprLiteral add_par lit
+ppr_expr_prim add_par (Type ty)     = add_par (text "TYPE:" <+> ppr ty)       -- Weird
+ppr_expr_prim add_par (Coercion co) = add_par (text "CO:" <+> ppr co)
+ppr_expr_prim add_par (Lit lit)     = pprLiteral add_par lit
 
-ppr_expr add_par (Cast expr co)
+ppr_expr_prim add_par (Cast expr co)
   = add_par $ sep [pprParendExpr expr, text "`cast`" <+> pprOptCo co]
 
-ppr_expr add_par expr@(Lam _ _)
+ppr_expr_prim add_par expr@(Lam _ _)
   = let
         (bndrs, body) = collectBinders expr
     in
@@ -175,7 +180,7 @@ ppr_expr add_par expr@(Lam _ _)
     hang (text "\\" <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
          2 (pprCoreExpr body)
 
-ppr_expr add_par expr@(App {})
+ppr_expr_prim add_par expr@(App {})
   = sdocWithDynFlags $ \dflags ->
     case collectArgs expr of { (fun, args) ->
     let
@@ -208,7 +213,7 @@ ppr_expr add_par expr@(App {})
         _ -> parens (hang (pprParendExpr fun) 2 pp_args)
     }
 
-ppr_expr add_par (Case expr var ty [(con,args,rhs)])
+ppr_expr_prim add_par (Case expr var ty [(con,args,rhs)])
   = sdocWithDynFlags $ \dflags ->
     if gopt Opt_PprCaseAsLet dflags
     then add_par $  -- See Note [Print case as let]
@@ -233,7 +238,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   where
     ppr_bndr = pprBndr CaseBind
 
-ppr_expr add_par (Case expr var ty alts)
+ppr_expr_prim add_par (Case expr var ty alts)
   = add_par $
     sep [sep [text "case"
                 <+> pprCoreExpr expr
@@ -250,7 +255,7 @@ ppr_expr add_par (Case expr var ty alts)
 -- ("disgusting" SLPJ)
 
 {-
-ppr_expr add_par (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
+ppr_expr_prim add_par (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
   = add_par $
     vcat [
       hsep [text "let {", (pprBndr LetBind val_bdr $$ ppr val_bndr), equals],
@@ -258,7 +263,7 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
       text "} in",
       pprCoreExpr body ]
 
-ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
+ppr_expr_prim add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = add_par
     (hang (text "let {")
           2 (hsep [ppr_binding (val_bdr,rhs),
@@ -269,7 +274,7 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 
 
 -- General case (recursive case, too)
-ppr_expr add_par (Let bind expr)
+ppr_expr_prim add_par (Let bind expr)
   = add_par $
     sep [hang (keyword bind <+> char '{') 2 (ppr_bind noAnn bind <+> text "} in"),
          pprCoreExpr expr]
@@ -282,7 +287,7 @@ ppr_expr add_par (Let bind expr)
      , isJust (bndrIsJoin_maybe b) = text "joinrec"
      | otherwise                   = text "letrec"
 
-ppr_expr add_par (Tick tickish expr)
+ppr_expr_prim add_par (Tick tickish expr)
   = sdocWithDynFlags $ \dflags ->
   if gopt Opt_SuppressTicks dflags
   then ppr_expr add_par expr
