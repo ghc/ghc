@@ -8300,7 +8300,7 @@ Consider the type ::
 
 This datatype ``G`` is GADT-like in both its kind and its type. Suppose you
 have ``g :: G a``, where ``a :: k``. Then pattern matching to discover that
-``g`` is in fact ```GMaybe`` tells you both that ``k ~ (* -> *)`` and
+``g`` is in fact ``GMaybe`` tells you both that ``k ~ (* -> *)`` and
 ``a ~ Maybe``. The definition for ``G`` requires that :ghc-flag:`-XTypeInType`
 be in effect, but pattern-matching on ``G`` requires no extension beyond
 :ghc-flag:`-XGADTs`. That this works is actually a straightforward extension
