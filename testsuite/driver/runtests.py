@@ -114,7 +114,9 @@ if args.verbose:
 config.skip_perf_tests = args.skip_perf_tests
 config.only_perf_tests = args.only_perf_tests
 config.use_git_notes = args.use_git_notes
-config.test_env = args.test_env
+
+if args.test_env:
+        config.test_env = args.test_env
 
 config.cygwin = False
 config.msys = False
@@ -328,8 +330,6 @@ else:
     # Write our accumulated metrics into the git notes for this commit.
     if config.use_git_notes:
             note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
-            # v-- This is in a nonsensical area. It should be happening before all of the tests are even run.
-            # parse_git_notes('perf') # Should it even be happening in the test-driver logic anymore?
 
     # This here is loading up all of the git notes into memory.
     # It's most likely in the wrong spot and I haven't fully fleshed out
