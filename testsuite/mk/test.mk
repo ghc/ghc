@@ -204,7 +204,7 @@ RUNTEST_OPTS += --use-git-notes
 endif
 
 ifneq "$(TEST_ENV)" ""
-RUNTEST_OPTS += --TEST_ENV="$(TEST_ENV)"
+RUNTEST_OPTS += --test_env="$(TEST_ENV)"
 endif
 
 ifeq "$(CLEANUP)" "0"

@@ -8,11 +8,8 @@
 # metrics between measurements taken for given commits in the environment given
 # by --test-env.
 
-# TODO: Actually figure out what imports I need.
 import argparse
 import re
-import os
-import string
 import subprocess
 
 from testutil import parse_git_notes
@@ -23,24 +20,30 @@ parser.add_argument("--test-env",
 parser.add_argument("--test-name",
                     help="Optional: If given, filters table to include only \
                     tests matching the given regular expression.")
-# This is always going to be the last processing done on the metrics list because of how destructive it is.
 parser.add_argument("--min-delta",type=float,
                     help="Optional: Display only tests where the relative \
                     spread is greater than the given value.")
 parser.add_argument("--add-note", nargs=3,
                     help="Development only. Adds N fake metrics to the given commit. \
-                    The third argument is a useless flag to add some functionality.")
+                    If the third argument is not a blank string, this will generate \
+                    different looking fake metrics.")
 parser.add_argument("commits", nargs=argparse.REMAINDER,
                     help="The rest of the arguments will be the commits that will be used.")
-
 args = parser.parse_args()
 
-# Defaults (can I avoid doing this?)
+#
+# Defaults and utilities
+#
+
 env = 'local'
 name = re.compile('.*')
 # metrics is a dictionary of the form
 # [ {'test_env': 'local', 'test': 'T100', 'way': 'some_way', 'metric': 'some_field', 'value': '1000', 'commit': 'HEAD'} ]
 metrics = []
+
+#
+# Main logic of program
+#
 
 if args.commits:
     for c in args.commits:
@@ -55,27 +58,19 @@ if args.test_name:
 
 if args.min_delta:
     delta = args.min_delta
-    print(delta)
 
-    # Took me way too long to realize I had the math utterly borked for the comparison
     def cmp(v1, v2):
         if v1 > v2:
             return (100 * (v1 - v2)/v2) > delta
         else:
             return (100 * (v2 - v1)/v1) > delta
 
-    # I only want to compare the first commit with everything else.
-    # So go through every item in the first commit and look up that test in
-    # the other commits. Keep the falses.
-    latest_commit = [t for t in metrics if t['commit'] == args.commits[0]]
-
-    m = [] # tempy variable
+    m = []
     for t in latest_commit:
         m += [(t,test) for test in metrics if (t['test'] == test['test']) and (t['commit'] != test['commit'])]
 
     deltas = []
     for fst,snd in m:
-        # So... Much... Casting... oh my gawd.
         if cmp(float(fst['value']),float(snd['value'])):
             deltas.append(fst)
 
@@ -84,10 +79,7 @@ if args.min_delta:
 if args.add_note:
     def note_gen(n, commit, delta=''):
         note = []
-        # To generate good testing data, I need some similar test names, test metrics, environments in every commit.
-        # I also need some same tests but different metric values, same test name, different test environment names, etc.
-        # This will do for now, but it's not really sufficient.
-        # There's a better test_metrics = {} dictionary I just stuck in a file for now.
+        # Generates simple fake data. Likely not comprehensive enough to catch all edge cases.
         if not delta:
             [note.append('\t'.join(['local', 'T'+ str(i*100), 'some_way', 'some_field', str(i*1000)])) for i in range(1,int(int(n)/2)+1)]
             [note.append('\t'.join(['non-local', 'W'+ str(i*100), 'other_way', 'other_field', str(i*100)])) for i in range(int(int(n)/2)+1,int(n)+1)]
@@ -99,14 +91,58 @@ if args.add_note:
 
     note_gen(args.add_note[0],args.add_note[1],args.add_note[2])
 
-latest_commit = [t for t in metrics if t['commit'] == args.commits[0]]
-rest = [t for t in metrics if t['commit'] != args.commits[0]]
+#
+# String utilities for pretty-printing
+#
 
+string = ''
+for i in args.commits:
+    string+='{:18}'
+commits = string.format(*[c[:10] for c in args.commits])
+latest_commit = [test for test in metrics if test['commit'] == args.commits[0]]
+
+def cmtline(insert):
+    return string.format(*[insert for c in args.commits]).strip()
+
+def header(unit):
+    first_line = "{:27}{:30}".format('    ','      ') + cmtline(unit)
+    second_line = ("{:27}{:30}".format('Test','Metric') + commits).strip()
+
+    # Test   Metric   c1   c2   c3 ...
+    print("-" * (len(second_line)+1))
+    print(first_line)
+    print(second_line)
+    print("-" * (len(second_line)+1))
+
+def commit_string(test, flag):
+    def delta(v1, v2):
+        return round((100 * (v1 - v2)/v2),2)
+
+    i = 0
+    string = []
+    fmtstr = ""
+    for commit in args.commits:
+        fmtstr+="{:18}"
+        string += [t['value'] for t in metrics if t['commit'] == args.commits[i] and t['test'] == test]
+        i+=1
+        string = string[:i]
+
+    if flag == 'metrics':
+        return fmtstr.format(*string).strip()
+    if flag == 'percentages':
+        s = [str(delta(float(string[0]),float(val))) + '%' for val in string]
+        return fmtstr.format(*s).strip()
+
+#
+# The pretty-printed output
+#
+
+header('commit')
+# Printing out metrics.
 for test in latest_commit:
-    print("{:<13} {:5} {:<13}".format('TEST: ' + test['test'], ' | ', 'METRIC: ' + test['metric']))
-    print("-------------------------------")
-    print("{:<13} {:5} {:<13}".format('commit:' + test['commit'], ' | ', test['value']))
-    for t in rest:
-        if t['test'] == test['test']:
-            print("{:<13} {:5} {:<13}".format('commit:' + t['commit'], ' | ', t['value']))
-    print('\n')
+    print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'metrics'))
+
+header('percent')
+# Printing out percentages.
+for test in latest_commit:
+    print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))

@@ -43,11 +43,13 @@ def signal_handler(signal, frame):
 # cmd-line options
 
 parser = argparse.ArgumentParser(description="GHC's testsuite driver")
+perf_group = parser.add_mutually_exclusive_group()
 
 parser.add_argument("-e", action='append', help="A string to execute from the command line.")
 parser.add_argument("--config-file", action="append", help="config file")
-parser.add_argument("--config", action='append', help="config field")
-parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)")
+parser.add_argument("--configfile", action="append", help="config file") # Some old tests have this
+parser.add_argument("--config", action='append', help="config field") # Should these config options be mutually exclusive?
+parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)") # This should NOT have a default setting or it fucks up duplicates. How to fix?
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
@@ -56,22 +58,35 @@ parser.add_argument("--skipway", action="append", choices=config.run_ways+config
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--check-files-written", help="check files aren't written by multiple tests") # NOTE: This doesn't seem to exist?
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
-parser.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
+perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
+perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
+parser.add_argument("--use-git-notes", action="store_true", help="use git notes to store metrics. NOTE: This is expected to become the default and will eventually be taken out.")
+parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 
 args = parser.parse_args()
 
-for e in args.e:
-    exec(e)
+if args.e:
+    for e in args.e:
+        exec(e)
 
-for arg in args.config_file:
-    exec(open(arg).read())
+if args.configfile:
+    for arg in args.configfile:
+        exec(open(arg).read())
 
-for arg in args.config:
-    field, value = arg.split('=', 1)
-    setattr(config, field, value)
+if args.config_file:
+    for arg in args.config_file:
+        exec(open(arg).read())
 
-config.rootdirs = args.rootdir
+if args.config:
+    for arg in args.config:
+        field, value = arg.split('=', 1)
+        setattr(config, field, value)
+
+if args.rootdir:
+    config.rootdirs = args.rootdir
+
+
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
 
@@ -96,7 +111,14 @@ if args.threads:
 
 if args.verbose:
     config.verbose = args.verbose
+
+# Might need to encase these in if statements.
 config.skip_perf_tests = args.skip_perf_tests
+config.only_perf_tests = args.only_perf_tests
+config.use_git_notes = args.use_git_notes
+
+if args.test_env:
+        config.test_env = args.test_env
 
 config.cygwin = False
 config.msys = False
@@ -310,8 +332,6 @@ else:
     # Write our accumulated metrics into the git notes for this commit.
     if config.use_git_notes:
             note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
-            # v-- This is in a nonsensical area. It should be happening before all of the tests are even run.
-            # parse_git_notes('perf') # Should it even be happening in the test-driver logic anymore?
 
     if config.summary_file:
         with open(config.summary_file, 'w') as file:
