@@ -67,6 +67,14 @@ instance Exception Void
 -- | Since 'Void' values logically don't exist, this witnesses the
 -- logical reasoning tool of \"ex falso quodlibet\".
 --
+-- >>> let x :: Either Void Int; x = Right 5
+-- >>> :{
+-- case x of
+--     Right r -> r
+--     Left l  -> absurd l
+-- :}
+-- 5
+--
 -- @since 4.8.0.0
 absurd :: Void -> a
 absurd a = case a of {}
