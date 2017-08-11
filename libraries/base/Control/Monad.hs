@@ -146,15 +146,15 @@ the list arguments. This could be an issue where @('>>')@ and the `folded
 function' are not commutative.
 
 
->       foldM f a1 [x1, x2, ..., xm]
-
-==
-
->       do
->         a2 <- f a1 x1
->         a3 <- f a2 x2
->         ...
->         f am xm
+> foldM f a1 [x1, x2, ..., xm]
+>
+> ==
+>
+> do
+>   a2 <- f a1 x1
+>   a3 <- f a2 x2
+>   ...
+>   f am xm
 
 If right-to-left evaluation is required, the input list should be reversed.
 
@@ -264,19 +264,19 @@ The functions in this library use the following naming conventions:
   The monad type constructor @m@ is added to function results
   (modulo currying) and nowhere else.  So, for example,
 
->  filter  ::              (a ->   Bool) -> [a] ->   [a]
->  filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
+> filter  ::              (a ->   Bool) -> [a] ->   [a]
+> filterM :: (Monad m) => (a -> m Bool) -> [a] -> m [a]
 
 * A postfix \'@_@\' changes the result type from @(m a)@ to @(m ())@.
   Thus, for example:
 
->  sequence  :: Monad m => [m a] -> m [a]
->  sequence_ :: Monad m => [m a] -> m ()
+> sequence  :: Monad m => [m a] -> m [a]
+> sequence_ :: Monad m => [m a] -> m ()
 
 * A prefix \'@m@\' generalizes an existing function to a monadic form.
   Thus, for example:
 
->  sum  :: Num a       => [a]   -> a
->  msum :: MonadPlus m => [m a] -> m a
+> sum  :: Num a       => [a]   -> a
+> msum :: MonadPlus m => [m a] -> m a
 
 -}

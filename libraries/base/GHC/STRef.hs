@@ -24,9 +24,21 @@ module GHC.STRef (
 import GHC.ST
 import GHC.Base
 
+-- $setup
+-- import Prelude
+
 data STRef s a = STRef (MutVar# s a)
 -- ^ a value of type @STRef s a@ is a mutable variable in state thread @s@,
 -- containing a value of type @a@
+--
+-- >>> :{
+-- runST (do
+--     ref <- newSTRef "hello"
+--     x <- readSTRef ref
+--     writeSTRef ref (x ++ "world")
+--     readSTRef ref )
+-- :}
+-- "helloworld"
 
 -- |Build a new 'STRef' in the current state thread
 newSTRef :: a -> ST s (STRef s a)

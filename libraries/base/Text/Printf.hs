@@ -102,6 +102,10 @@ import System.IO
 -------------------
 
 -- | Format a variable number of arguments with the C-style formatting string.
+--
+-- >>> printf "%s, %d, %.4f" "hello" 123 pi
+-- hello, 123, 3.1416
+--
 -- The return value is either 'String' or @('IO' a)@ (which
 -- should be @('IO' '()')@, but Haskell's type system
 -- makes this hard).
@@ -133,11 +137,11 @@ import System.IO
 -- A conversion specification begins with the
 -- character @%@, followed by zero or more of the following flags:
 --
--- >    -      left adjust (default is right adjust)
--- >    +      always use a sign (+ or -) for signed conversions
--- >    space  leading space for positive numbers in signed conversions
--- >    0      pad with zeros rather than spaces
--- >    #      use an \"alternate form\": see below
+-- > -      left adjust (default is right adjust)
+-- > +      always use a sign (+ or -) for signed conversions
+-- > space  leading space for positive numbers in signed conversions
+-- > 0      pad with zeros rather than spaces
+-- > #      use an \"alternate form\": see below
 --
 -- When both flags are given, @-@ overrides @0@ and @+@ overrides space.
 -- A negative width specifier in a @*@ conversion is treated as
@@ -146,32 +150,32 @@ import System.IO
 -- The \"alternate form\" for unsigned radix conversions is
 -- as in C @printf(3)@:
 --
--- >    %o           prefix with a leading 0 if needed
--- >    %x           prefix with a leading 0x if nonzero
--- >    %X           prefix with a leading 0X if nonzero
--- >    %b           prefix with a leading 0b if nonzero
--- >    %[eEfFgG]    ensure that the number contains a decimal point
+-- > %o           prefix with a leading 0 if needed
+-- > %x           prefix with a leading 0x if nonzero
+-- > %X           prefix with a leading 0X if nonzero
+-- > %b           prefix with a leading 0b if nonzero
+-- > %[eEfFgG]    ensure that the number contains a decimal point
 --
 -- Any flags are followed optionally by a field width:
 --
--- >    num    field width
--- >    *      as num, but taken from argument list
+-- > num    field width
+-- > *      as num, but taken from argument list
 --
 -- The field width is a minimum, not a maximum: it will be
 -- expanded as needed to avoid mutilating a value.
 --
 -- Any field width is followed optionally by a precision:
 --
--- >    .num   precision
--- >    .      same as .0
--- >    .*     as num, but taken from argument list
+-- > .num   precision
+-- > .      same as .0
+-- > .*     as num, but taken from argument list
 --
 -- Negative precision is taken as 0. The meaning of the
 -- precision depends on the conversion type.
 --
--- >    Integral    minimum number of digits to show
--- >    RealFloat   number of digits after the decimal point
--- >    String      maximum number of characters
+-- > Integral    minimum number of digits to show
+-- > RealFloat   number of digits after the decimal point
+-- > String      maximum number of characters
 --
 -- The precision for Integral types is accomplished by zero-padding.
 -- If both precision and zero-pad are given for an Integral field,
@@ -182,29 +186,29 @@ import System.IO
 -- to set the implicit size of the operand for conversion of
 -- a negative operand to unsigned:
 --
--- >    hh     Int8
--- >    h      Int16
--- >    l      Int32
--- >    ll     Int64
--- >    L      Int64
+-- > hh     Int8
+-- > h      Int16
+-- > l      Int32
+-- > ll     Int64
+-- > L      Int64
 --
 -- The specification ends with a format character:
 --
--- >    c      character               Integral
--- >    d      decimal                 Integral
--- >    o      octal                   Integral
--- >    x      hexadecimal             Integral
--- >    X      hexadecimal             Integral
--- >    b      binary                  Integral
--- >    u      unsigned decimal        Integral
--- >    f      floating point          RealFloat
--- >    F      floating point          RealFloat
--- >    g      general format float    RealFloat
--- >    G      general format float    RealFloat
--- >    e      exponent format float   RealFloat
--- >    E      exponent format float   RealFloat
--- >    s      string                  String
--- >    v      default format          any type
+-- > c      character               Integral
+-- > d      decimal                 Integral
+-- > o      octal                   Integral
+-- > x      hexadecimal             Integral
+-- > X      hexadecimal             Integral
+-- > b      binary                  Integral
+-- > u      unsigned decimal        Integral
+-- > f      floating point          RealFloat
+-- > F      floating point          RealFloat
+-- > g      general format float    RealFloat
+-- > G      general format float    RealFloat
+-- > e      exponent format float   RealFloat
+-- > E      exponent format float   RealFloat
+-- > s      string                  String
+-- > v      default format          any type
 --
 -- The \"%v\" specifier is provided for all built-in types,
 -- and should be provided for user-defined type formatters
@@ -212,11 +216,11 @@ import System.IO
 -- type. For the built-in types the \"%v\" specifier is
 -- converted as follows:
 --
--- >    c      Char
--- >    u      other unsigned Integral
--- >    d      other signed Integral
--- >    g      RealFloat
--- >    s      String
+-- > c      Char
+-- > u      other unsigned Integral
+-- > d      other signed Integral
+-- > g      RealFloat
+-- > s      String
 --
 -- Mismatch between the argument types and the format
 -- string, as well as any other syntactic or semantic errors
@@ -246,16 +250,6 @@ import System.IO
 --
 -- * Haskell 'printf' will place a zero after a decimal point when
 --   possible.
---
--- ==== __Examples__
---
--- >   > printf "%d\n" (23::Int)
--- >   23
--- >   > printf "%s %s\n" "Hello" "World"
--- >   Hello World
--- >   > printf "%.2f\n" pi
--- >   3.14
---
 printf :: (PrintfType r) => String -> r
 printf fmts = spr fmts []
 
