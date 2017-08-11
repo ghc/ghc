@@ -67,6 +67,9 @@ infixr 6 <>
 -- Monoid instances.
 
 -- | The dual of a 'Monoid', obtained by swapping the arguments of 'mappend'.
+--
+-- >>> getDual (mappend (Dual "Hello") (Dual "World"))
+-- "WorldHello"
 newtype Dual a = Dual { getDual :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1)
 
@@ -89,6 +92,10 @@ instance Monad Dual where
     m >>= k  = k (getDual m)
 
 -- | The monoid of endomorphisms under composition.
+--
+-- >>> let computation = Endo ("Hello, " ++) <> Endo (++ "!")
+-- >>> appEndo computation "Haskell"
+-- "Hello, Haskell!"
 newtype Endo a = Endo { appEndo :: a -> a }
                deriving (Generic)
 
@@ -98,6 +105,12 @@ instance Monoid (Endo a) where
         Endo f `mappend` Endo g = Endo (f . g)
 
 -- | Boolean monoid under conjunction ('&&').
+--
+-- >>> getAll (All True <> mempty <> All False)
+-- False
+--
+-- >>> getAll (mconcat (map (\x -> All (even x)) [2,4,6,7,8]))
+-- False
 newtype All = All { getAll :: Bool }
         deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
@@ -107,6 +120,12 @@ instance Monoid All where
         All x `mappend` All y = All (x && y)
 
 -- | Boolean monoid under disjunction ('||').
+--
+-- >>> getAny (Any True <> mempty <> Any False)
+-- True
+--
+-- >>> getAny (mconcat (map (\x -> Any (even x)) [2,4,6,7,8]))
+-- True
 newtype Any = Any { getAny :: Bool }
         deriving (Eq, Ord, Read, Show, Bounded, Generic)
 
@@ -116,6 +135,9 @@ instance Monoid Any where
         Any x `mappend` Any y = Any (x || y)
 
 -- | Monoid under addition.
+--
+-- >>> getSum (Sum 1 <> Sum 2 <> mempty)
+-- 3
 newtype Sum a = Sum { getSum :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
 
@@ -139,6 +161,9 @@ instance Monad Sum where
     m >>= k  = k (getSum m)
 
 -- | Monoid under multiplication.
+--
+-- >>> getProduct (Product 3 <> Product 4 <> mempty)
+-- 12
 newtype Product a = Product { getProduct :: a }
         deriving (Eq, Ord, Read, Show, Bounded, Generic, Generic1, Num)
 
@@ -197,6 +222,9 @@ instance Monad Product where
 --
 -- @'First' a@ is isomorphic to @'Alt' 'Maybe' a@, but precedes it
 -- historically.
+--
+-- >>> getFirst (First (Just "hello") <> First Nothing <> First (Just "world"))
+-- Just "hello"
 newtype First a = First { getFirst :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1,
                   Functor, Applicative, Monad)
@@ -211,6 +239,9 @@ instance Monoid (First a) where
 --
 -- @'Last' a@ is isomorphic to @'Dual' ('First' a)@, and thus to
 -- @'Dual' ('Alt' 'Maybe' a)@
+--
+-- >>> getLast (Last (Just "hello") <> Last Nothing <> Last (Just "world"))
+-- Just "world"
 newtype Last a = Last { getLast :: Maybe a }
         deriving (Eq, Ord, Read, Show, Generic, Generic1,
                   Functor, Applicative, Monad)
@@ -253,3 +284,6 @@ prop_mconcatLast x =
         where listLastToMaybe [] = Nothing
               listLastToMaybe lst = Just (last lst)
 -- -}
+
+-- $setup
+-- >>> import Prelude

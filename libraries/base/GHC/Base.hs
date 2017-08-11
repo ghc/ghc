@@ -207,13 +207,13 @@ data  Maybe a  =  Nothing | Just a
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following laws:
 --
---  * @mappend mempty x = x@
+--  * @'mappend' 'mempty' x = x@
 --
---  * @mappend x mempty = x@
+--  * @'mappend' x 'mempty' = x@
 --
---  * @mappend x (mappend y z) = mappend (mappend x y) z@
+--  * @'mappend' x ('mappend' y z) = 'mappend' ('mappend' x y) z@
 --
---  * @mconcat = 'foldr' mappend mempty@
+--  * @'mconcat' = 'foldr' 'mappend' 'mempty'@
 --
 -- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
