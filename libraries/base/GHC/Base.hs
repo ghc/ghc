@@ -379,6 +379,7 @@ class  Functor f  where
 -- the same as their default definitions:
 --
 --      @('<*>') = 'liftA2' 'id'@
+--
 --      @'liftA2' f x y = f '<$>' x '<*>' y@
 --
 -- Further, any definition must satisfy the following:
