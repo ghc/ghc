@@ -1766,6 +1766,7 @@ isStrictPattern (L _ pat) =
     SigPatIn p _ -> isStrictPattern p
     SigPatOut p _ -> isStrictPattern p
     BangPat{} -> True
+    ListPat{} -> True
     TuplePat{} -> True
     SumPat{} -> True
     PArrPat{} -> True
