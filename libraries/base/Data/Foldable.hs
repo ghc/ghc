@@ -506,6 +506,9 @@ sequence_ :: (Foldable t, Monad m) => t (m a) -> m ()
 sequence_ = foldr (>>) (return ())
 
 -- | The sum of a collection of actions, generalizing 'concat'.
+--
+-- asum [Just "Hello", Nothing, Just "World"]
+-- Just "Hello"
 asum :: (Foldable t, Alternative f) => t (f a) -> f a
 {-# INLINE asum #-}
 asum = foldr (<|>) empty

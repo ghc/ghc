@@ -55,6 +55,9 @@ import GHC.Show
 import GHC.Stack
 import Data.List
 
+-- $setup
+-- >>> import Prelude
+
 -- $tracing
 --
 -- The 'trace', 'traceShow' and 'traceIO' functions print messages to an output
@@ -104,7 +107,10 @@ before returning the second argument as its result.
 
 For example, this returns the value of @f x@ but first outputs the message.
 
-> trace ("calling f with x = " ++ show x) (f x)
+>>> let x = 123; f = show
+>>> trace ("calling f with x = " ++ show x) (f x)
+"calling f with x = 123
+123"
 
 The 'trace' function should /only/ be used for debugging, or for monitoring
 execution. The function is not referentially transparent: its type indicates
@@ -119,6 +125,10 @@ trace string expr = unsafePerformIO $ do
 {-|
 Like 'trace' but returns the message instead of a third value.
 
+>>> traceId "hello"
+"hello
+hello"
+
 @since 4.7.0.0
 -}
 traceId :: String -> String
@@ -129,23 +139,26 @@ Like 'trace', but uses 'show' on the argument to convert it to a 'String'.
 
 This makes it convenient for printing the values of interesting variables or
 expressions inside a function. For example here we print the value of the
-variables @x@ and @z@:
+variables @x@ and @y@:
 
-> f x y =
->     traceShow (x, z) $ result
->   where
->     z = ...
->     ...
+>>> let f x y = traceShow (x,y) (x + y) in f (1+2) 5
+(3,5)
+8
+
 -}
-traceShow :: (Show a) => a -> b -> b
+traceShow :: Show a => a -> b -> b
 traceShow = trace . show
 
 {-|
 Like 'traceShow' but returns the shown value instead of a third value.
 
+>>> traceShowId (1+2+3, "hello" ++ "world")
+(6,"helloworld")
+(6,"helloworld")
+
 @since 4.7.0.0
 -}
-traceShowId :: (Show a) => a -> a
+traceShowId :: Show a => a -> a
 traceShowId a = trace (show a) a
 
 {-|
@@ -159,25 +172,37 @@ the @do@-block is executed, @traceM "not crashed"@ would only be reduced once,
 and the message would only be printed once.  If your monad is in 'MonadIO',
 @liftIO . traceIO@ may be a better option.
 
-> ... = do
->   x <- ...
->   traceM $ "x: " ++ show x
->   y <- ...
->   traceM $ "y: " ++ show y
+>>> :{
+do
+    x <- Just 3
+    traceM ("x: " ++ show x)
+    y <- pure 12
+    traceM ("y: " ++ show y)
+    pure (x*2 + y)
+:}
+x: 3
+y: 12
+Just 18
 
 @since 4.7.0.0
 -}
-traceM :: (Applicative f) => String -> f ()
+traceM :: Applicative f => String -> f ()
 traceM string = trace string $ pure ()
 
 {-|
 Like 'traceM', but uses 'show' on the argument to convert it to a 'String'.
 
-> ... = do
->   x <- ...
->   traceShowM $ x
->   y <- ...
->   traceShowM $ x + y
+>>> :{
+do
+    x <- Just 3
+    traceShowM x
+    y <- pure 12
+    traceShowM y
+    pure (x*2 + y)
+:}
+3
+12
+Just 18
 
 @since 4.7.0.0
 -}

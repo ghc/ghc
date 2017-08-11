@@ -86,8 +86,13 @@ underflowError = raise# underflowException
 
 -- | Type representing arbitrary-precision non-negative integers.
 --
--- Operations whose result would be negative
--- @'throw' ('Underflow' :: 'ArithException')@.
+-- >>> 2^20 :: Natural
+-- 1267650600228229401496703205376
+--
+-- Operations whose result would be negative @'throw' ('Underflow' :: 'ArithException')@,
+--
+-- >>> -1 :: Natural
+-- *** Exception: arithmetic underflow
 --
 -- @since 4.8.0.0
 data Natural = NatS#                 GmpLimb# -- ^ in @[0, maxBound::Word]@
