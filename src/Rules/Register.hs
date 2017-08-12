@@ -1,5 +1,7 @@
 module Rules.Register (registerPackage) where
 
+import Hadrian.Utilities
+
 import Base
 import Context
 import Expression
@@ -16,7 +18,7 @@ registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
     let confIn = pkgInplaceConfig context
         dir    = inplacePackageDbDirectory stage
 
-    dir -/- pkgNameString package ++ "*.conf" %> \conf -> do
+    matchVersionedFilePath (dir -/- pkgNameString package) "conf" ?> \conf -> do
         need [confIn]
         buildWithResources rs $
             target context (GhcPkg Update stage) [confIn] [conf]
