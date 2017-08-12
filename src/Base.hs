@@ -17,15 +17,13 @@ module Base (
     configPath, configFile, sourcePath,
 
     -- * Miscellaneous utilities
-    unifyPath, quote, (-/-), matchVersionedFilePath, matchGhcVersionedFilePath,
-    putColoured
+    unifyPath, quote, (-/-), putColoured
     ) where
 
 import Control.Applicative
 import Control.Monad.Extra
 import Control.Monad.Reader
 import Data.Bifunctor
-import Data.Char
 import Data.Function
 import Data.List.Extra
 import Data.Maybe
@@ -58,30 +56,7 @@ configFile = configPath -/- "system.config"
 sourcePath :: FilePath
 sourcePath = hadrianPath -/- "src"
 
--- | Given a @prefix@ and a @suffix@ check whether a @filePath@ matches the
--- template @prefix ++ version ++ suffix@ where @version@ is an arbitrary string
--- comprising digits (@0-9@), dashes (@-@), and dots (@.@). Examples:
---
---- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo/bar.a"     '==' 'True'@
---- * @'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'False'@
---- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar.a"     '==' 'True'@
---- * @'matchVersionedFilePath' "foo/bar"  ""   "foo/bar.a"     '==' 'False'@
---- * @'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar-0.1.a" '==' 'True'@
---- * @'matchVersionedFilePath' "foo/bar-" "a"  "foo/bar-0.1.a" '==' 'True'@
---- * @'matchVersionedFilePath' "foo/bar/" "a"  "foo/bar-0.1.a" '==' 'False'@
-matchVersionedFilePath :: String -> String -> FilePath -> Bool
-matchVersionedFilePath prefix suffix filePath =
-    case stripPrefix prefix filePath >>= stripSuffix suffix of
-        Nothing      -> False
-        Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
-
-matchGhcVersionedFilePath :: String -> String -> FilePath -> Bool
-matchGhcVersionedFilePath prefix ext filePath =
-    case stripPrefix prefix filePath >>= stripSuffix ext of
-        Nothing -> False
-        Just _  -> True
-
--- | A more colourful version of Shake's putNormal.
+-- | A more colourful version of Shake's 'putNormal'.
 putColoured :: ColorIntensity -> Color -> String -> Action ()
 putColoured intensity colour msg = do
     c <- useColour

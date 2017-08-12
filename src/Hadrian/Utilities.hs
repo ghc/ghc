@@ -7,9 +7,11 @@ module Hadrian.Utilities (
     quote, yesNo,
 
     -- * FilePath manipulation
-    unifyPath, (-/-)
+    unifyPath, (-/-), matchVersionedFilePath
     ) where
 
+import Data.Char
+import Data.List.Extra
 import Development.Shake.FilePath
 
 -- | Extract a value from a singleton list, or terminate with an error message
@@ -79,3 +81,22 @@ a  -/- b
     | otherwise     = a ++ '/' : b
 
 infixr 6 -/-
+
+-- | Given a @prefix@ and a @suffix@ check whether a 'FilePath' matches the
+-- template @prefix ++ version ++ suffix@ where @version@ is an arbitrary string
+-- comprising digits (@0-9@), dashes (@-@), and dots (@.@). Examples:
+--
+-- @
+-- 'matchVersionedFilePath' "foo/bar"  ".a" "foo/bar.a"     '==' 'True'
+-- 'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'False'
+-- 'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar.a"     '==' 'True'
+-- 'matchVersionedFilePath' "foo/bar"  ""   "foo/bar.a"     '==' 'False'
+-- 'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar-0.1.a" '==' 'True'
+-- 'matchVersionedFilePath' "foo/bar-" "a"  "foo/bar-0.1.a" '==' 'True'
+-- 'matchVersionedFilePath' "foo/bar/" "a"  "foo/bar-0.1.a" '==' 'False'
+-- @
+matchVersionedFilePath :: String -> String -> FilePath -> Bool
+matchVersionedFilePath prefix suffix filePath =
+    case stripPrefix prefix filePath >>= stripSuffix suffix of
+        Nothing      -> False
+        Just version -> all (\c -> isDigit c || c == '-' || c == '.') version

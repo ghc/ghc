@@ -3,6 +3,7 @@ module Rules.Library (
 ) where
 
 import Data.Char
+import Hadrian.Utilities
 import qualified System.Directory as IO
 
 import Base
@@ -38,24 +39,22 @@ libraryObjects context@Context{..} = do
 
 buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
-    let path       = buildPath context
-        libPrefix  = path -/- "libHS" ++ pkgNameString package
+    let libPrefix = buildPath context -/- "libHS" ++ pkgNameString package
     -- OS X
-    matchGhcVersionedFilePath libPrefix "dylib" ?> buildDynamicLibUnix
+    libPrefix ++ "*.dylib" %> buildDynamicLibUnix
     -- Linux
-    matchGhcVersionedFilePath libPrefix "so"    ?> buildDynamicLibUnix
+    libPrefix ++ "*.so"    %> buildDynamicLibUnix
     -- TODO: Windows
   where
-    buildDynamicLibUnix so = do
+    buildDynamicLibUnix lib = do
         deps <- contextDependencies context
         need =<< mapM pkgLibraryFile deps
         objs <- libraryObjects context
-        build $ target context (Ghc LinkHs stage) objs [so]
+        build $ target context (Ghc LinkHs stage) objs [lib]
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
-    let path       = buildPath context
-        libPrefix  = path -/- "libHS" ++ pkgNameString package
+    let libPrefix  = buildPath context -/- "libHS" ++ pkgNameString package
     matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
         objs <- libraryObjects context
         asuf <- libsuf way

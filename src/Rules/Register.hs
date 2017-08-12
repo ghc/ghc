@@ -16,7 +16,7 @@ registerPackage rs context@Context {..} = when (stage <= Stage1) $ do
     let confIn = pkgInplaceConfig context
         dir    = inplacePackageDbDirectory stage
 
-    matchVersionedFilePath (dir -/- pkgNameString package) "conf" ?> \conf -> do
+    dir -/- pkgNameString package ++ "*.conf" %> \conf -> do
         need [confIn]
         buildWithResources rs $
             target context (GhcPkg Update stage) [confIn] [conf]
