@@ -67,10 +67,43 @@ inferConstraints :: [TyVar] -> Class -> [TcType] -> TcType
 inferConstraints tvs main_cls cls_tys inst_ty
                  rep_tc rep_tc_args
                  mechanism
-  | is_generic && not is_anyclass          -- Generic constraints are easy
+  = do { (inferred_constraints, tvs', inst_tys') <- infer_constraints
+       ; traceTc "inferConstraints" $ vcat
+              [ ppr main_cls <+> ppr inst_tys'
+              , ppr inferred_constraints
+              ]
+       ; return ( sc_constraints ++ inferred_constraints
+                , tvs', inst_tys' ) }
+  where
+    is_anyclass = isDerivSpecAnyClass mechanism
+    infer_constraints
+      | is_anyclass = inferConstraintsDAC tvs main_cls inst_tys
+      | otherwise   = inferConstraintsDataConArgs tvs main_cls cls_tys inst_ty
+                                                  rep_tc rep_tc_args
+
+    inst_tys = cls_tys ++ [inst_ty]
+
+        -- Constraints arising from superclasses
+        -- See Note [Superclasses of derived instance]
+    cls_tvs  = classTyVars main_cls
+    sc_constraints = ASSERT2( equalLength cls_tvs inst_tys
+                            , ppr main_cls <+> ppr inst_tys )
+                     [ mkThetaOrigin DerivOrigin TypeLevel [] [] $
+                       substTheta cls_subst (classSCTheta main_cls) ]
+    cls_subst = ASSERT( equalLength cls_tvs inst_tys )
+                zipTvSubst cls_tvs inst_tys
+
+-- | Like 'inferConstraints', but used only in the case of deriving strategies
+-- where the constraints are inferred by inspecting the fields of each data
+-- constructor (i.e., stock- and newtype-deriving).
+inferConstraintsDataConArgs
+  :: [TyVar] -> Class -> [TcType] -> TcType -> TyCon -> [TcType]
+  -> TcM ([ThetaOrigin], [TyVar], [TcType])
+inferConstraintsDataConArgs tvs main_cls cls_tys inst_ty rep_tc rep_tc_args
+  | is_generic                             -- Generic constraints are easy
   = return ([], tvs, inst_tys)
 
-  | is_generic1 && not is_anyclass         -- Generic1 needs Functor
+  | is_generic1                            -- Generic1 needs Functor
   = ASSERT( rep_tc_tvs `lengthExceeds` 0 ) -- See Note [Getting base classes]
     ASSERT( cls_tys `lengthIs` 1 )         -- Generic1 has a single kind variable
     do { functorClass <- tcLookupClass functorClassName
@@ -82,20 +115,15 @@ inferConstraints tvs main_cls cls_tys inst_ty
     ASSERT2( equalLength rep_tc_tvs all_rep_tc_args
            , ppr main_cls <+> ppr rep_tc
              $$ ppr rep_tc_tvs $$ ppr all_rep_tc_args )
-      do { (arg_constraints, tvs', inst_tys') <- infer_constraints
-         ; traceTc "inferConstraints" $ vcat
+      do { (arg_constraints, tvs', inst_tys')
+             <- con_arg_constraints get_std_constrained_tys
+         ; traceTc "inferConstraintsDataConArgs" $ vcat
                 [ ppr main_cls <+> ppr inst_tys'
                 , ppr arg_constraints
                 ]
-         ; return (stupid_constraints ++ extra_constraints
-                    ++ sc_constraints ++ arg_constraints
+         ; return ( stupid_constraints ++ extra_constraints ++ arg_constraints
                   , tvs', inst_tys') }
   where
-    is_anyclass = isDerivSpecAnyClass mechanism
-    infer_constraints
-      | is_anyclass = inferConstraintsDAC main_cls tvs inst_tys
-      | otherwise   = con_arg_constraints get_std_constrained_tys
-
     tc_binders = tyConBinders rep_tc
     choose_level bndr
       | isNamedTyConBinder bndr = KindLevel
@@ -187,15 +215,7 @@ inferConstraints tvs main_cls cls_tys inst_ty
     all_rep_tc_args = rep_tc_args ++ map mkTyVarTy
                                      (drop (length rep_tc_args) rep_tc_tvs)
 
-        -- Constraints arising from superclasses
-        -- See Note [Superclasses of derived instance]
-    cls_tvs  = classTyVars main_cls
     inst_tys = cls_tys ++ [inst_ty]
-    sc_constraints = ASSERT2( equalLength cls_tvs inst_tys, ppr main_cls <+> ppr rep_tc)
-                     [ mkThetaOrigin DerivOrigin TypeLevel [] [] $
-                       substTheta cls_subst (classSCTheta main_cls) ]
-    cls_subst = ASSERT( equalLength cls_tvs inst_tys )
-                zipTvSubst cls_tvs inst_tys
 
         -- Stupid constraints
     stupid_constraints = [ mkThetaOrigin DerivOrigin TypeLevel [] [] $
@@ -240,9 +260,9 @@ typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
 -- See Note [Gathering and simplifying constraints for DeriveAnyClass]
 -- for an explanation of how these constraints are used to determine the
 -- derived instance context.
-inferConstraintsDAC :: Class -> [TyVar] -> [TcType]
+inferConstraintsDAC :: [TyVar] -> Class -> [TcType]
                     -> TcM ([ThetaOrigin], [TyVar], [TcType])
-inferConstraintsDAC cls tvs inst_tys
+inferConstraintsDAC tvs cls inst_tys
   = do { let gen_dms = [ (sel_id, dm_ty)
                        | (sel_id, Just (_, GenericDM dm_ty)) <- classOpItems cls ]
 
