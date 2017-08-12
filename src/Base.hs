@@ -17,7 +17,7 @@ module Base (
     configPath, configFile, sourcePath,
 
     -- * Miscellaneous utilities
-    unifyPath, quote, (-/-), putColoured
+    unifyPath, quote, (-/-)
     ) where
 
 import Control.Applicative
@@ -32,11 +32,6 @@ import Development.Shake hiding (parallel, unit, (*>), Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import Hadrian.Utilities
-import System.Console.ANSI
-import System.IO
-import System.Info
-
-import CmdLineFlag
 
 -- TODO: reexport Stage, etc.?
 
@@ -55,23 +50,3 @@ configFile = configPath -/- "system.config"
 -- sourcePath -/- "Base.hs". We use this to `need` some of the source files.
 sourcePath :: FilePath
 sourcePath = hadrianPath -/- "src"
-
--- | A more colourful version of Shake's 'putNormal'.
-putColoured :: ColorIntensity -> Color -> String -> Action ()
-putColoured intensity colour msg = do
-    c <- useColour
-    when c . liftIO $ setSGR [SetColor Foreground intensity colour]
-    putNormal msg
-    when c . liftIO $ do
-        setSGR []
-        hFlush stdout
-
-useColour :: Action Bool
-useColour = case cmdProgressColour of
-    Never  -> return False
-    Always -> return True
-    Auto   -> do
-        supported <- liftIO $ hSupportsANSI stdout
-        -- An ugly hack to always try to print colours when on mingw and cygwin.
-        let windows = any (`isPrefixOf` os) ["mingw", "cygwin"]
-        return $ windows || supported

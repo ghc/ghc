@@ -1,11 +1,12 @@
 module CmdLineFlag (
     putCmdLineFlags, cmdFlags, cmdBuildHaddock, cmdFlavour, cmdIntegerSimple,
-    cmdProgressColour, ProgressColour (..), cmdProgressInfo, ProgressInfo (..),
-    cmdSkipConfigure, cmdSplitObjects
+    cmdProgressColour, cmdProgressInfo, ProgressInfo (..), cmdSkipConfigure,
+    cmdSplitObjects
     ) where
 
 import Data.IORef
 import Data.List.Extra
+import Hadrian.Utilities
 import System.Console.GetOpt
 import System.IO.Unsafe
 
@@ -16,14 +17,13 @@ data Untracked = Untracked
     { buildHaddock   :: Bool
     , flavour        :: Maybe String
     , integerSimple  :: Bool
-    , progressColour :: ProgressColour
+    , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
     , skipConfigure  :: Bool
     , splitObjects   :: Bool }
     deriving (Eq, Show)
 
-data ProgressColour = Never | Auto | Always deriving (Eq, Show)
-data ProgressInfo   = None | Brief | Normal | Unicorn deriving (Eq, Show)
+data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show)
 
 -- | Default values for 'CmdLineFlag.Untracked'.
 defaultUntracked :: Untracked
@@ -49,12 +49,12 @@ readProgressColour :: Maybe String -> Either String (Untracked -> Untracked)
 readProgressColour ms =
     maybe (Left "Cannot parse progress-colour") (Right . set) (go =<< lower <$> ms)
   where
-    go :: String -> Maybe ProgressColour
+    go :: String -> Maybe UseColour
     go "never"   = Just Never
     go "auto"    = Just Auto
     go "always"  = Just Always
     go _         = Nothing
-    set :: ProgressColour -> Untracked -> Untracked
+    set :: UseColour -> Untracked -> Untracked
     set flag flags = flags { progressColour = flag }
 
 readProgressInfo :: Maybe String -> Either String (Untracked -> Untracked)
@@ -115,7 +115,7 @@ cmdFlavour = flavour getCmdLineFlags
 cmdIntegerSimple :: Bool
 cmdIntegerSimple = integerSimple getCmdLineFlags
 
-cmdProgressColour :: ProgressColour
+cmdProgressColour :: UseColour
 cmdProgressColour = progressColour getCmdLineFlags
 
 cmdProgressInfo :: ProgressInfo

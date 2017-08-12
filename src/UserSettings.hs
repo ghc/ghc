@@ -7,9 +7,11 @@ module UserSettings (
     putBuild, putSuccess, defaultDestDir, defaultStage1Only
     ) where
 
+import Hadrian.Utilities
 import System.Console.ANSI
 
 import Base
+import CmdLineFlag
 import Flavour
 import Expression
 
@@ -37,11 +39,11 @@ verboseCommands = return False
 
 -- | Customise build progress messages (e.g. executing a build command).
 putBuild :: String -> Action ()
-putBuild = putColoured Dull Magenta
+putBuild = putColoured cmdProgressColour Dull Magenta
 
 -- | Customise build success messages (e.g. a package is built successfully).
 putSuccess :: String -> Action ()
-putSuccess = putColoured Dull Green
+putSuccess = putColoured cmdProgressColour Dull Green
 
 -- | Path to the GHC install destination. It is empty by default, which
 -- corresponds to the root of the file system. You can replace it by a specific

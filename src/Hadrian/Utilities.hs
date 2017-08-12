@@ -7,12 +7,20 @@ module Hadrian.Utilities (
     quote, yesNo,
 
     -- * FilePath manipulation
-    unifyPath, (-/-), matchVersionedFilePath
+    unifyPath, (-/-), matchVersionedFilePath,
+
+    -- * Miscellaneous
+    UseColour (..), putColoured
     ) where
 
+import Control.Monad
 import Data.Char
 import Data.List.Extra
+import Development.Shake
 import Development.Shake.FilePath
+import System.Console.ANSI
+import System.Info.Extra
+import System.IO
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -100,3 +108,16 @@ matchVersionedFilePath prefix suffix filePath =
     case stripPrefix prefix filePath >>= stripSuffix suffix of
         Nothing      -> False
         Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
+
+data UseColour = Never | Auto | Always deriving (Eq, Show)
+
+-- | A more colourful version of Shake's 'putNormal'.
+putColoured :: UseColour -> ColorIntensity -> Color -> String -> Action ()
+putColoured useColour intensity colour msg = do
+    supported <- liftIO $ hSupportsANSI stdout
+    let c Never  = False
+        c Auto   = supported || isWindows -- Colours do work on Windows
+        c Always = True
+    when (c useColour) . liftIO $ setSGR [SetColor Foreground intensity colour]
+    putNormal msg
+    when (c useColour) . liftIO $ setSGR [] >> hFlush stdout
