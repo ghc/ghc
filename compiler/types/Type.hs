@@ -110,7 +110,7 @@ module Type (
 
         -- (Lifting and boxity)
         isLiftedType_maybe, isUnliftedType, isUnboxedTupleType, isUnboxedSumType,
-        isAlgType, isClosedAlgType, isDataFamilyAppType,
+        isAlgType, isDataFamilyAppType,
         isPrimitiveType, isStrictType,
         isRuntimeRepTy, isRuntimeRepVar, isRuntimeRepKindedTy,
         dropRuntimeRepArgs,
@@ -2018,17 +2018,6 @@ isAlgType ty
       Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
                             isAlgTyCon tc
       _other             -> False
-
--- | See "Type#type_classification" for what an algebraic type is.
--- Should only be applied to /types/, as opposed to e.g. partially
--- saturated type constructors. Closed type constructors are those
--- with a fixed right hand side, as opposed to e.g. associated types
-isClosedAlgType :: Type -> Bool
-isClosedAlgType ty
-  = case splitTyConApp_maybe ty of
-      Just (tc, ty_args) | isAlgTyCon tc && not (isFamilyTyCon tc)
-             -> ASSERT2( ty_args `lengthIs` tyConArity tc, ppr ty ) True
-      _other -> False
 
 -- | Check whether a type is a data family type
 isDataFamilyAppType :: Type -> Bool
