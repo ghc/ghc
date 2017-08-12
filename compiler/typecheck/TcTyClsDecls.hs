@@ -2994,6 +2994,10 @@ checkValidRoles tc
         ex_roles   = mkVarEnv (map (, Nominal) ex_tvs)
         role_env   = univ_roles `plusVarEnv` ex_roles
 
+    check_ty_roles env role ty
+      | Just ty' <- coreView ty -- #14101
+      = check_ty_roles env role ty'
+
     check_ty_roles env role (TyVarTy tv)
       = case lookupVarEnv env tv of
           Just role' -> unless (role' `ltRole` role || role' == role) $

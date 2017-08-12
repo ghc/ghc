@@ -580,6 +580,8 @@ irDataCon datacon
 irType :: VarSet -> Type -> RoleM ()
 irType = go
   where
+    go lcls ty                 | Just ty' <- coreView ty -- #14101
+                               = go lcls ty'
     go lcls (TyVarTy tv)       = unless (tv `elemVarSet` lcls) $
                                  updateRole Representational tv
     go lcls (AppTy t1 t2)      = go lcls t1 >> markNominal lcls t2
