@@ -14,6 +14,7 @@ module TcClassDcl ( tcClassSigs, tcClassDecl2,
                     tcClassMinimalDef,
                     HsSigFun, mkHsSigFun,
                     tcMkDeclCtxt, tcAddDeclCtxt, badMethodErr,
+                    instDeclCtxt1, instDeclCtxt2, instDeclCtxt3,
                     tcATDefault
                   ) where
 
@@ -461,9 +462,25 @@ warningMinimalDefIncomplete mindef
          , nest 2 (pprBooleanFormulaNice mindef)
          , text "but there is no default implementation." ]
 
-tcATDefault :: Bool -- If a warning should be emitted when a default instance
-                    -- definition is not provided by the user
-            -> SrcSpan
+instDeclCtxt1 :: LHsSigType GhcRn -> SDoc
+instDeclCtxt1 hs_inst_ty
+  = inst_decl_ctxt (ppr (getLHsInstDeclHead hs_inst_ty))
+
+instDeclCtxt2 :: Type -> SDoc
+instDeclCtxt2 dfun_ty
+  = instDeclCtxt3 cls tys
+  where
+    (_,_,cls,tys) = tcSplitDFunTy dfun_ty
+
+instDeclCtxt3 :: Class -> [Type] -> SDoc
+instDeclCtxt3 cls cls_tys
+  = inst_decl_ctxt (ppr (mkClassPred cls cls_tys))
+
+inst_decl_ctxt :: SDoc -> SDoc
+inst_decl_ctxt doc = hang (text "In the instance declaration for")
+                        2 (quotes doc)
+
+tcATDefault :: SrcSpan
             -> TCvSubst
             -> NameSet
             -> ClassATItem
@@ -471,7 +488,7 @@ tcATDefault :: Bool -- If a warning should be emitted when a default instance
 -- ^ Construct default instances for any associated types that
 -- aren't given a user definition
 -- Returns [] or singleton
-tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
+tcATDefault loc inst_subst defined_ats (ATI fam_tc defs)
   -- User supplied instances ==> everything is OK
   | tyConName fam_tc `elemNameSet` defined_ats
   = return []
@@ -503,7 +520,7 @@ tcATDefault emit_warn loc inst_subst defined_ats (ATI fam_tc defs)
 
    -- No defaults ==> generate a warning
   | otherwise  -- defs = Nothing
-  = do { when emit_warn $ warnMissingAT (tyConName fam_tc)
+  = do { warnMissingAT (tyConName fam_tc)
        ; return [] }
   where
     subst_tv subst tc_tv
