@@ -14,6 +14,7 @@ note [Case 1: CSEing allocated closures] and
 note [Case 2: CSEing case binders] below.
 
 TODOs:
+- vanilla for unpacked tuples?
 - rerun occurrence analysis
 - dumping of STG misses binder
 - does not look up in scope to find low-hanging fruit
@@ -105,8 +106,8 @@ import Data.Maybe (fromMaybe)
 import CoreMap
 import NameEnv
 import Control.Monad( (>=>) )
-import Name (NamedThing (..), mkFCallName)
-import Unique (mkUniqueGrimily)
+import Name (NamedThing (..), mkFCallName, nameUnique)
+import Unique (mkUniqueGrimily, getKey)
 
 --------------
 -- The Trie --
@@ -137,25 +138,28 @@ newtype ConAppMap a = CAM { un_cam :: DNameEnv (ListMap StgArgMap a) }
 newtype LaxDataCon = Lax DataCon
 
 instance NamedThing LaxDataCon where
-  getName (Lax dc) | isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "" -- FIXME: is there a better way?
+  getName (Lax dc) | long && isVanillaDataCon dc && not hasStrict && not unpacked = mkFCallName uniq "" -- FIXME: is there a better way?
     where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
           hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
           unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
+          long = length (dataConOrigArgTys dc) > 2
   getName (Lax dc) = getName dc
 
 
 instance TrieMap ConAppMap where
     type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
-    --lookupTM (dataCon, args) | traceLookup dataCon = undefined
+    lookupTM (dataCon, args) | traceLookup dataCon = undefined
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
 
---traceLookup (Lax dc) = pprTrace "lookupTM" (ppr dc) False
---{-# NOINLINE traceLookup #-}
+traceLookup l@(Lax dc) = pprTrace "lookupTM" (ppr dc <> (if getKey u < 0 then text " -" else text " ") <> ppr u') False
+  where u = nameUnique . getName $ l
+        u' = mkUniqueGrimily (abs(getKey u))
+{-# NOINLINE traceLookup #-}
 
 -----------------
 -- The CSE Env --
