@@ -58,7 +58,9 @@ import Maybes           ( orElse )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List        ( partition, sort )
+import Data.Foldable      ( toList )
+import Data.List          ( partition, sort )
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -1091,7 +1093,7 @@ okHsSig ctxt (L _ sig)
      (CompleteMatchSig {}, _)              -> False
 
 -------------------
-findDupSigs :: [LSig GhcPs] -> [[(Located RdrName, Sig GhcPs)]]
+findDupSigs :: [LSig GhcPs] -> [NonEmpty (Located RdrName, Sig GhcPs)]
 -- Check for duplicates on RdrName version,
 -- because renamed version has unboundName for
 -- not-in-scope binders, which gives bogus dup-sig errors
@@ -1243,16 +1245,17 @@ rnGRHS' ctxt rnBody (GRHS guards rhs)
 ************************************************************************
 -}
 
-dupSigDeclErr :: [(Located RdrName, Sig GhcPs)] -> RnM ()
-dupSigDeclErr pairs@((L loc name, sig) : _)
+dupSigDeclErr :: NonEmpty (Located RdrName, Sig GhcPs) -> RnM ()
+dupSigDeclErr pairs@((L loc name, sig) :| _)
   = addErrAt loc $
     vcat [ text "Duplicate" <+> what_it_is
            <> text "s for" <+> quotes (ppr name)
-         , text "at" <+> vcat (map ppr $ sort $ map (getLoc . fst) pairs) ]
+         , text "at" <+> vcat (map ppr $ sort
+                                       $ map (getLoc . fst)
+                                       $ toList pairs)
+         ]
   where
     what_it_is = hsSigDoc sig
-
-dupSigDeclErr [] = panic "dupSigDeclErr"
 
 misplacedSigErr :: LSig GhcRn -> RnM ()
 misplacedSigErr (L loc sig)

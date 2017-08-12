@@ -58,6 +58,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import FV ( fvVarList, unionFV )
 
 import Control.Monad    ( when )
+import Data.Foldable    ( toList )
 import Data.List        ( partition, mapAccumL, nub, sortBy, unfoldr )
 import qualified Data.Set as Set
 
@@ -697,7 +698,7 @@ mkGroupReporter :: (ReportErrCtxt -> [Ct] -> TcM ErrMsg)
 -- Group together errors from same location,
 -- and report only the first (to avoid a cascade)
 mkGroupReporter mk_err ctxt cts
-  = mapM_ (reportGroup mk_err ctxt) (equivClasses cmp_loc cts)
+  = mapM_ (reportGroup mk_err ctxt . toList) (equivClasses cmp_loc cts)
 
 eq_lhs_type :: Ct -> Ct -> Bool
 eq_lhs_type ct1 ct2

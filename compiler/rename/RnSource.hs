@@ -63,7 +63,9 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Control.Arrow ( first )
-import Data.List ( sortBy, mapAccumL )
+import Data.List ( mapAccumL )
+import qualified Data.List.NonEmpty as NE
+import Data.List.NonEmpty ( NonEmpty(..) )
 import Data.Maybe ( isJust )
 import qualified Data.Set as Set ( difference, fromList, toList, null )
 
@@ -320,7 +322,7 @@ rnSrcWarnDecls _ []
 
 rnSrcWarnDecls bndr_set decls'
   = do { -- check for duplicates
-       ; mapM_ (\ dups -> let (L loc rdr:lrdr':_) = dups
+       ; mapM_ (\ dups -> let (L loc rdr :| (lrdr':_)) = dups
                           in addErrAt loc (dupWarnDecl lrdr' rdr))
                warn_rdr_dups
        ; pairs_s <- mapM (addLocM rn_deprec) decls
@@ -341,7 +343,7 @@ rnSrcWarnDecls bndr_set decls'
    warn_rdr_dups = findDupRdrNames $ concatMap (\(L _ (Warning ns _)) -> ns)
                                                decls
 
-findDupRdrNames :: [Located RdrName] -> [[Located RdrName]]
+findDupRdrNames :: [Located RdrName] -> [NonEmpty (Located RdrName)]
 findDupRdrNames = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
 
 -- look for duplicates among the OccNames;
@@ -745,11 +747,11 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
 
                        -- Report unused binders on the LHS
                        -- See Note [Unused type variables in family instances]
-                    ; let groups :: [[Located RdrName]]
+                    ; let groups :: [NonEmpty (Located RdrName)]
                           groups = equivClasses cmpLocated $
                                    freeKiTyVarsAllVars pat_kity_vars_with_dups
                     ; tv_nms_dups <- mapM (lookupOccRn . unLoc) $
-                                     [ tv | (tv:_:_) <- groups ]
+                                     [ tv | (tv :| (_:_)) <- groups ]
                           -- Add to the used variables
                           --  a) any variables that appear *more than once* on the LHS
                           --     e.g.   F a Int a = Bool
@@ -1530,16 +1532,15 @@ rnRoleAnnots tc_names role_annots
                                           tycon
            ; return $ RoleAnnotDecl tycon' roles }
 
-dupRoleAnnotErr :: [LRoleAnnotDecl GhcPs] -> RnM ()
-dupRoleAnnotErr [] = panic "dupRoleAnnotErr"
+dupRoleAnnotErr :: NonEmpty (LRoleAnnotDecl GhcPs) -> RnM ()
 dupRoleAnnotErr list
   = addErrAt loc $
     hang (text "Duplicate role annotations for" <+>
           quotes (ppr $ roleAnnotDeclName first_decl) <> colon)
-       2 (vcat $ map pp_role_annot sorted_list)
+       2 (vcat $ map pp_role_annot $ NE.toList sorted_list)
     where
-      sorted_list = sortBy cmp_annot list
-      (L loc first_decl : _) = sorted_list
+      sorted_list = NE.sortBy cmp_annot list
+      (L loc first_decl :| _) = sorted_list
 
       pp_role_annot (L loc decl) = hang (ppr decl)
                                       4 (text "-- written at" <+> ppr loc)

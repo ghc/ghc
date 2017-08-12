@@ -72,6 +72,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
 ************************************************************************
@@ -2368,7 +2369,7 @@ checkValidTyCon tc
     -- result type against other candidates' types BOTH WAYS ROUND.
     -- If they magically agrees, take the substitution and
     -- apply them to the latter ones, and see if they match perfectly.
-    check_fields ((label, con1) : other_fields)
+    check_fields ((label, con1) :| other_fields)
         -- These fields all have the same name, but are from
         -- different constructors in the data type
         = recoverM (return ()) $ mapM_ checkOne other_fields
@@ -2386,7 +2387,6 @@ checkValidTyCon tc
             where
                 (_, _, _, res2) = dataConSig con2
                 fty2 = dataConFieldType con2 lbl
-    check_fields [] = panic "checkValidTyCon/check_fields []"
 
 checkFieldCompat :: FieldLabelString -> DataCon -> DataCon
                  -> Type -> Type -> Type -> Type -> TcM ()

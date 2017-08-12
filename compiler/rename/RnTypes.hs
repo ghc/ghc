@@ -62,8 +62,9 @@ import FastString
 import Maybes
 import qualified GHC.LanguageExtensions as LangExt
 
-import Data.List        ( nubBy, partition )
-import Control.Monad    ( unless, when )
+import Data.List          ( nubBy, partition )
+import Data.List.NonEmpty ( NonEmpty(..) )
+import Control.Monad      ( unless, when )
 
 #include "HsVersions.h"
 
@@ -974,7 +975,7 @@ bindLHsTyVarBndr doc mb_assoc kv_names tv_names hs_tv_bndr thing_inside
              addErrAt loc (vcat [ ki_ty_err_msg name
                                 , pprHsDocContext doc ])
            ; when (name `elemNameSet` tv_names) $
-             dupNamesErr getLoc [L loc name, L (nameSrcSpan name) name] }}
+             dupNamesErr getLoc (L loc name :| [L (nameSrcSpan name) name]) }}
 
     ki_ty_err_msg n = text "Variable" <+> quotes (ppr n) <+>
                       text "used as a kind variable before being bound" $$

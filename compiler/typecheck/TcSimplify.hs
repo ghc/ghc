@@ -51,7 +51,9 @@ import ErrUtils      ( emptyMessages )
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
-import Data.List     ( partition )
+import Data.Foldable      ( toList )
+import Data.List          ( partition )
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 {-
 *********************************************************************************
@@ -2161,7 +2163,8 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
   = []
   | otherwise
   = [ (tv, map fstOf3 group)
-    | group@((_,_,tv):_) <- unary_groups
+    | group'@((_,_,tv) :| _) <- unary_groups
+    , let group = toList group'
     , defaultable_tyvar tv
     , defaultable_classes (map sndOf3 group) ]
   where
@@ -2169,9 +2172,9 @@ findDefaultableGroups (default_tys, (ovl_strings, extended_defaults)) wanteds
     (unaries, non_unaries) = partitionWith find_unary (bagToList simples)
     unary_groups           = equivClasses cmp_tv unaries
 
-    unary_groups :: [[(Ct, Class, TcTyVar)]]  -- (C tv) constraints
-    unaries      ::  [(Ct, Class, TcTyVar)]   -- (C tv) constraints
-    non_unaries  :: [Ct]                      -- and *other* constraints
+    unary_groups :: [NonEmpty (Ct, Class, TcTyVar)] -- (C tv) constraints
+    unaries      :: [(Ct, Class, TcTyVar)]          -- (C tv) constraints
+    non_unaries  :: [Ct]                            -- and *other* constraints
 
         -- Finds unary type-class constraints
         -- But take account of polykinded classes like Typeable,

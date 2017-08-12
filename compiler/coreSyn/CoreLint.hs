@@ -66,6 +66,8 @@ import DynFlags
 import Control.Monad
 import qualified Control.Monad.Fail as MonadFail
 import MonadUtils
+import Data.Foldable      ( toList )
+import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
@@ -2427,15 +2429,15 @@ pprLeftOrRight :: LeftOrRight -> MsgDoc
 pprLeftOrRight CLeft  = text "left"
 pprLeftOrRight CRight = text "right"
 
-dupVars :: [[Var]] -> MsgDoc
+dupVars :: [NonEmpty Var] -> MsgDoc
 dupVars vars
   = hang (text "Duplicate variables brought into scope")
-       2 (ppr vars)
+       2 (ppr (map toList vars))
 
-dupExtVars :: [[Name]] -> MsgDoc
+dupExtVars :: [NonEmpty Name] -> MsgDoc
 dupExtVars vars
   = hang (text "Duplicate top-level variables with the same qualified name")
-       2 (ppr vars)
+       2 (ppr (map toList vars))
 
 {-
 ************************************************************************

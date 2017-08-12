@@ -68,6 +68,7 @@ import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad       ( when, liftM, ap, unless )
+import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
 {-
@@ -690,7 +691,7 @@ rnHsRecFields ctxt mk_arg (HsRecFields { rec_flds = flds, rec_dotdot = dotdot })
         -- Data constructor not lexically in scope at all
         -- See Note [Disambiguation and Template Haskell]
 
-    dup_flds :: [[RdrName]]
+    dup_flds :: [NE.NonEmpty RdrName]
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
@@ -769,7 +770,7 @@ rnHsRecUpdFields flds
                                      , hsRecFieldArg = arg''
                                      , hsRecPun      = pun }), fvs') }
 
-    dup_flds :: [[RdrName]]
+    dup_flds :: [NE.NonEmpty RdrName]
         -- Each list represents a RdrName that occurred more than once
         -- (the list contains all occurrences)
         -- Each list in dup_fields is non-empty
@@ -803,10 +804,10 @@ badPun :: Located RdrName -> SDoc
 badPun fld = vcat [text "Illegal use of punning for field" <+> quotes (ppr fld),
                    text "Use NamedFieldPuns to permit this"]
 
-dupFieldErr :: HsRecFieldContext -> [RdrName] -> SDoc
+dupFieldErr :: HsRecFieldContext -> NE.NonEmpty RdrName -> SDoc
 dupFieldErr ctxt dups
   = hsep [text "duplicate field name",
-          quotes (ppr (head dups)),
+          quotes (ppr (NE.head dups)),
           text "in record", pprRFC ctxt]
 
 pprRFC :: HsRecFieldContext -> SDoc

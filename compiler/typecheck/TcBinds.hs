@@ -67,6 +67,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import ConLike
 
 import Control.Monad
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 #include "HsVersions.h"
 
@@ -1160,7 +1161,7 @@ tcVectDecls decls
        ; return decls'
        }
   where
-    reportVectDups (first:_second:_more)
+    reportVectDups (first :| (_second:_more))
       = addErrAt (getSrcSpan first) $
           text "Duplicate vectorisation declarations for" <+> ppr first
     reportVectDups _ = return ()

@@ -62,6 +62,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad
 import Data.List        ( (\\) )
+import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -972,13 +973,13 @@ constraintSynErr env kind
     , hang (text "Illegal constraint synonym of kind:" <+> quotes (ppr_tidy env kind))
          2 (parens constraintKindsMsg) )
 
-dupPredWarn :: TidyEnv -> [[PredType]] -> (TidyEnv, SDoc)
+dupPredWarn :: TidyEnv -> [NE.NonEmpty PredType] -> (TidyEnv, SDoc)
 dupPredWarn env dups
   = ( env
     , text "Duplicate constraint" <> plural primaryDups <> text ":"
       <+> pprWithCommas (ppr_tidy env) primaryDups )
   where
-    primaryDups = map head dups
+    primaryDups = map NE.head dups
 
 tyConArityErr :: TyCon -> [TcType] -> SDoc
 -- For type-constructor arity errors, be careful to report
