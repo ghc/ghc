@@ -60,6 +60,10 @@ data Class
 
         classTyVars  :: [TyVar],        -- The class kind and type variables;
                                         -- identical to those of the TyCon
+           -- If you want visiblity info, look at the classTyCon
+           -- This field is redundant because it's duplicated in the
+           -- classTyCon, but classTyVars is used quite often, so maybe
+           -- it's a bit faster to cache it here
 
         classFunDeps :: [FunDep TyVar],  -- The functional dependencies
 

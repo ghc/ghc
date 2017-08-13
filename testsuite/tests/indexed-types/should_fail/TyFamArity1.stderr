@@ -1,6 +1,4 @@
 
-TyFamArity1.hs:4:23: error:
-    • Expecting one more argument to ‘IO’
-      Expected a type, but ‘IO’ has kind ‘* -> *’
-    • In the type ‘IO’
-      In the type instance declaration for ‘T’
+TyFamArity1.hs:4:15: error:
+    • Number of parameters must match family declaration; expected 2
+    • In the type instance declaration for ‘T’

@@ -6,7 +6,7 @@
 {-# LANGUAGE CPP #-}
 
 module BuildTyCl (
-        buildDataCon, mkDataConUnivTyVarBinders,
+        buildDataCon,
         buildPatSyn,
         TcMethInfo, buildClass,
         mkNewTyConRhs, mkDataTyConRhs,
@@ -119,7 +119,6 @@ buildDataCon :: FamInstEnvs
 --   a) makes the worker Id
 --   b) makes the wrapper Id if necessary, including
 --      allocating its unique (hence monadic)
---   c) Sorts out the TyVarBinders. See mkDataConUnivTyBinders
 buildDataCon fam_envs src_name declared_infix prom_info src_bangs impl_bangs field_lbls
              univ_tvs ex_tvs eq_spec ctxt arg_tys res_ty rep_tycon
   = do  { wrap_name <- newImplicitBinder src_name mkDataConWrapperOcc
@@ -164,69 +163,6 @@ mkDataConStupidTheta tycon arg_tys univ_tvs
     in_arg_tys pred = not $ isEmptyVarSet $
                       tyCoVarsOfType pred `intersectVarSet` arg_tyvars
 
-
-mkDataConUnivTyVarBinders :: [TyConBinder]   -- From the TyCon
-                          -> [TyVarBinder]   -- For the DataCon
--- See Note [Building the TyBinders for a DataCon]
-mkDataConUnivTyVarBinders tc_bndrs
- = map mk_binder tc_bndrs
- where
-   mk_binder (TvBndr tv tc_vis) = mkTyVarBinder vis tv
-      where
-        vis = case tc_vis of
-                AnonTCB           -> Specified
-                NamedTCB Required -> Specified
-                NamedTCB vis      -> vis
-
-{- Note [Building the TyBinders for a DataCon]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-A DataCon needs to keep track of the visibility of its universals and
-existentials, so that visible type application can work properly. This
-is done by storing the universal and existential TyVarBinders.
-See Note [TyVarBinders in DataCons] in DataCon.
-
-During construction of a DataCon, we often start from the TyBinders of
-the parent TyCon.  For example
-   data Maybe a = Nothing | Just a
-The DataCons start from the TyBinders of the parent TyCon.
-
-But the ultimate TyBinders for the DataCon are *different* than those
-of the DataCon. Here is an example:
-
-  data App a b = MkApp (a b) -- App :: forall {k}. (k->*) -> k -> *
-
-The TyCon has
-
-  tyConTyVars    = [ k:*,                              a:k->*,      b:k]
-  tyConTyBinders = [ Named (TvBndr (k :: *) Inferred), Anon (k->*), Anon k ]
-
-The TyBinders for App line up with App's kind, given above.
-
-But the DataCon MkApp has the type
-  MkApp :: forall {k} (a:k->*) (b:k). a b -> App k a b
-
-That is, its TyBinders should be
-
-  dataConUnivTyVarBinders = [ TvBndr (k:*)    Inferred
-                            , TvBndr (a:k->*) Specified
-                            , TvBndr (b:k)    Specified ]
-
-So we want to take the TyCon's TyBinders and the TyCon's TyVars and
-merge them, pulling
-  - variable names from the TyVars
-  - visibilities from the TyBinders
-  - but changing Anon/Required to Specified
-
-The last part about Required->Specified comes from this:
-  data T k (a:k) b = MkT (a b)
-Here k is Required in T's kind, but we don't have Required binders in
-the TyBinders for a term (see Note [No Required TyBinder in terms]
-in TyCoRep), so we change it to Specified when making MkT's TyBinders
-
-This merging operation is done by mkDataConUnivTyBinders. In contrast,
-the TyBinders passed to mkDataCon are the final TyBinders stored in the
-DataCon (mkDataCon does no further work).
--}
 
 ------------------------------------------------------
 buildPatSyn :: Name -> Bool
@@ -310,7 +246,7 @@ buildClass tycon_name binders roles fds Nothing
     do  { traceIf (text "buildClass")
 
         ; tc_rep_name  <- newTyConRepName tycon_name
-        ; let univ_bndrs = mkDataConUnivTyVarBinders binders
+        ; let univ_bndrs = tyConTyVarBinders binders
               univ_tvs   = binderVars univ_bndrs
               tycon = mkClassTyCon tycon_name binders roles
                                    AbstractTyCon rec_clas tc_rep_name
@@ -359,7 +295,7 @@ buildClass tycon_name binders roles fds
               op_names   = [op | (op,_,_) <- sig_stuff]
               arg_tys    = sc_theta ++ op_tys
               rec_tycon  = classTyCon rec_clas
-              univ_bndrs = mkDataConUnivTyVarBinders binders
+              univ_bndrs = tyConTyVarBinders binders
               univ_tvs   = binderVars univ_bndrs
 
         ; rep_nm   <- newTyConRepName datacon_name

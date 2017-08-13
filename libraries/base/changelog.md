@@ -10,6 +10,10 @@
 
   * Add `infixl 9 !!` declaration for `Data.List.NonEmpty.!!`
 
+  * Add `<&>` operator to `Data.Functor` (#14029)
+
+  * Remove the deprecated `Typeable{1..7}` type synonyms (#14047)
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 

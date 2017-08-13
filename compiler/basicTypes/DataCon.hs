@@ -778,7 +778,7 @@ mkDataCon name declared_infix prom_info
 --      data T a where { MkT :: S }
 -- then it's possible that the univ_tvs may hit an assertion failure
 -- if you pull on univ_tvs.  This case is checked by checkValidDataCon,
--- so the error is detected properly... it's just that asaertions here
+-- so the error is detected properly... it's just that assertions here
 -- are a little dodgy.
 
   = con
@@ -902,7 +902,7 @@ dataConExTyVars (MkData { dcExTyVars = tvbs }) = binderVars tvbs
 dataConExTyVarBinders :: DataCon -> [TyVarBinder]
 dataConExTyVarBinders = dcExTyVars
 
--- | Both the universal and existentiatial type variables of the constructor
+-- | Both the universal and existential type variables of the constructor
 dataConAllTyVars :: DataCon -> [TyVar]
 dataConAllTyVars (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs })
   = binderVars (univ_tvs ++ ex_tvs)

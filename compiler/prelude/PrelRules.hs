@@ -1517,7 +1517,7 @@ into
      0# -> e1
      1# -> e1
 
-This rule elimiantes a lot of boilerplate. For
+This rule eliminates a lot of boilerplate. For
   if (x>y) then e1 else e2
 we generate
   case tagToEnum (x ># y) of

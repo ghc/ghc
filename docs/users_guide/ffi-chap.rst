@@ -337,6 +337,12 @@ reliably re-initialise after this has happened; see :ref:`infelicities-ffi`.
     don't forget the flag :ghc-flag:`-no-hs-main`, otherwise GHC
     will try to link to the ``Main`` Haskell module.
 
+.. note::
+    On Windows hs_init treats argv as UTF8-encoded. Passing other encodings
+    might lead to unexpected results. Passing NULL as argv is valid but can
+    lead to <unknown> showing up in error messages instead of the name of the
+    executable.
+
 To use ``+RTS`` flags with ``hs_init()``, we have to modify the example
 slightly. By default, GHC's RTS will only accept "safe" ``+RTS`` flags (see
 :ref:`options-linker`), and the :ghc-flag:`-rtsopts[=⟨none|some|all⟩]`

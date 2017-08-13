@@ -160,9 +160,7 @@ import Maybes
 
 import TrieMap
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import MonadUtils
 import Data.IORef
 import Data.List ( foldl', partition )
@@ -2067,7 +2065,7 @@ solvable from the other. So, we do lookup in the inert set using
 loose types, which omit the kind-check.
 
 We must be careful when using the result of a lookup because it may
-not match the requsted info exactly!
+not match the requested info exactly!
 
 -}
 
@@ -2298,10 +2296,8 @@ instance Monad TcS where
   fail err  = TcS (\_ -> fail err)
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail TcS where
   fail err  = TcS (\_ -> fail err)
-#endif
 
 instance MonadUnique TcS where
    getUniqueSupplyM = wrapTcS getUniqueSupplyM

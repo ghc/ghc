@@ -67,7 +67,7 @@ typedef struct _RetainerSet {
   struct _RetainerSet *link;    // link to the next retainer set in the bucket
   int id;   // unique id of this retainer set (used when printing)
             // Its absolute value is interpreted as its true id; if id is
-            // negative, it indicates that this retainer set has had a postive
+            // negative, it indicates that this retainer set has had a positive
             // cost after some retainer profiling.
   retainer element[0];          // elements of this retainer set
   // do not put anything below here!

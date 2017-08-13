@@ -38,13 +38,13 @@ import Control.Exception.Base (bracket)
 #endif
 -- import GHC.IO
 import GHC.IO.Exception
-import GHC.IO.Encoding (getFileSystemEncoding)
 import qualified GHC.Foreign as GHC
 import Control.Monad
 #if defined(mingw32_HOST_OS)
-import GHC.Environment
+import GHC.IO.Encoding (argvEncoding)
 import GHC.Windows
 #else
+import GHC.IO.Encoding (getFileSystemEncoding, argvEncoding)
 import System.Posix.Internals (withFilePath)
 #endif
 
@@ -65,89 +65,21 @@ import System.Environment.ExecutablePath
 -- ---------------------------------------------------------------------------
 -- getArgs, getProgName, getEnv
 
-#if defined(mingw32_HOST_OS)
-
-{-
-Note [Ignore hs_init argv]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Ignore the arguments to hs_init on Windows for the sake of Unicode compat
-
-Instead on Windows we get the list of arguments from getCommandLineW and
-filter out arguments which the RTS would not have passed along.
-
-This is done to ensure we get the arguments in proper Unicode Encoding which
-the RTS at this moment does not seem provide. The filtering has to match the
-one done by the RTS to avoid inconsistencies like #13287.
--}
-
-getWin32ProgArgv_certainly :: IO [String]
-getWin32ProgArgv_certainly = do
-        mb_argv <- getWin32ProgArgv
-        case mb_argv of
-          -- see Note [Ignore hs_init argv]
-          Nothing   -> fmap dropRTSArgs getFullArgs
-          Just argv -> return argv
-
-withWin32ProgArgv :: [String] -> IO a -> IO a
-withWin32ProgArgv argv act = bracket begin setWin32ProgArgv (\_ -> act)
-  where
-    begin = do
-          mb_old_argv <- getWin32ProgArgv
-          setWin32ProgArgv (Just argv)
-          return mb_old_argv
-
-getWin32ProgArgv :: IO (Maybe [String])
-getWin32ProgArgv = alloca $ \p_argc -> alloca $ \p_argv -> do
-        c_getWin32ProgArgv p_argc p_argv
-        argc <- peek p_argc
-        argv_p <- peek p_argv
-        if argv_p == nullPtr
-         then return Nothing
-         else do
-          argv_ps <- peekArray (fromIntegral argc) argv_p
-          fmap Just $ mapM peekCWString argv_ps
-
-setWin32ProgArgv :: Maybe [String] -> IO ()
-setWin32ProgArgv Nothing = c_setWin32ProgArgv 0 nullPtr
-setWin32ProgArgv (Just argv) = withMany withCWString argv $ \argv_ps -> withArrayLen argv_ps $ \argc argv_p -> do
-        c_setWin32ProgArgv (fromIntegral argc) argv_p
-
-foreign import ccall unsafe "getWin32ProgArgv"
-  c_getWin32ProgArgv :: Ptr CInt -> Ptr (Ptr CWString) -> IO ()
-
-foreign import ccall unsafe "setWin32ProgArgv"
-  c_setWin32ProgArgv :: CInt -> Ptr CWString -> IO ()
-
--- See Note [Ignore hs_init argv]
-dropRTSArgs :: [String] -> [String]
-dropRTSArgs []             = []
-dropRTSArgs rest@("--":_)  = rest
-dropRTSArgs ("+RTS":rest)  = dropRTSArgs (dropWhile (/= "-RTS") rest)
-dropRTSArgs ("--RTS":rest) = rest
-dropRTSArgs ("-RTS":rest)  = dropRTSArgs rest
-dropRTSArgs (arg:rest)     = arg : dropRTSArgs rest
-
-#endif
-
 -- | Computation 'getArgs' returns a list of the program's command
 -- line arguments (not including the program name).
 getArgs :: IO [String]
-
-#if defined(mingw32_HOST_OS)
-getArgs =  fmap tail getWin32ProgArgv_certainly
-#else
 getArgs =
   alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
    getProgArgv p_argc p_argv
    p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
-   enc <- getFileSystemEncoding
+   enc <- argvEncoding
    peekArray (p - 1) (advancePtr argv 1) >>= mapM (GHC.peekCString enc)
+
 
 foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
-#endif
 
 {-|
 Computation 'getProgName' returns the name of the program as it was
@@ -160,10 +92,7 @@ between platforms: on Windows, for example, a program invoked as foo
 is probably really @FOO.EXE@, and that is what 'getProgName' will return.
 -}
 getProgName :: IO String
-#if defined(mingw32_HOST_OS)
 -- Ignore the arguments to hs_init on Windows for the sake of Unicode compat
-getProgName = fmap (basename . head) getWin32ProgArgv_certainly
-#else
 getProgName =
   alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
@@ -173,10 +102,9 @@ getProgName =
 
 unpackProgName  :: Ptr (Ptr CChar) -> IO String   -- argv[0]
 unpackProgName argv = do
-  enc <- getFileSystemEncoding
+  enc <- argvEncoding
   s <- peekElemOff argv 0 >>= GHC.peekCString enc
   return (basename s)
-#endif
 
 basename :: FilePath -> FilePath
 basename f = go f f
@@ -262,9 +190,10 @@ ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
 
 -- | @setEnv name value@ sets the specified environment variable to @value@.
 --
--- On Windows setting an environment variable to the /empty string/ removes
+-- Early versions of this function operated under the mistaken belief that
+-- setting an environment variable to the /empty string/ on Windows removes
 -- that environment variable from the environment.  For the sake of
--- compatibility we adopt that behavior.  In particular
+-- compatibility, it adopted that behavior on POSIX.  In particular
 --
 -- @
 -- setEnv name \"\"
@@ -276,9 +205,8 @@ ioe_missingEnvVar name = ioException (IOError Nothing NoSuchThing "getEnv"
 -- `unsetEnv` name
 -- @
 --
--- If you don't care about Windows support and want to set an environment
--- variable to the empty string use @System.Posix.Env.setEnv@ from the @unix@
--- package instead.
+-- If you'd like to be able to set environment variables to blank strings,
+-- use `System.Environment.Blank.setEnv`.
 --
 -- Throws `Control.Exception.IOException` if @name@ is the empty string or
 -- contains an equals sign.
@@ -371,15 +299,7 @@ withProgName nm act = do
 -- the duration of an action.
 
 withArgv :: [String] -> IO a -> IO a
-
-#if defined(mingw32_HOST_OS)
--- We have to reflect the updated arguments in the RTS-side variables as
--- well, because the RTS still consults them for error messages and the like.
--- If we don't do this then ghc-e005 fails.
-withArgv new_args act = withWin32ProgArgv new_args $ withProgArgv new_args act
-#else
 withArgv = withProgArgv
-#endif
 
 withProgArgv :: [String] -> IO a -> IO a
 withProgArgv new_args act = do
@@ -391,7 +311,7 @@ withProgArgv new_args act = do
 
 setProgArgv :: [String] -> IO ()
 setProgArgv argv = do
-  enc <- getFileSystemEncoding
+  enc <- argvEncoding
   GHC.withCStringsLen enc argv $ \len css ->
     c_setProgArgv (fromIntegral len) css
 

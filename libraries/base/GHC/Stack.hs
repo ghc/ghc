@@ -85,7 +85,10 @@ popCallStack stk = case stk of
 --
 -- @since 4.9.0.0
 callStack :: HasCallStack => CallStack
-callStack = popCallStack ?callStack
+callStack =
+  case ?callStack of
+    EmptyCallStack -> EmptyCallStack
+    _              -> popCallStack ?callStack
 {-# INLINE callStack #-}
 
 -- | Perform some computation without adding new entries to the 'CallStack'.

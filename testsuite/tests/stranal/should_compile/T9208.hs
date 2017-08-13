@@ -25,6 +25,7 @@ import           Control.Monad
 #if __GLASGOW_HASKELL__ >= 800
 import           Control.Monad.Fail (MonadFail(fail))
 #endif
+import           Control.Monad.IO.Class (MonadIO (..))
 
 import           Data.Binary
 import           Data.Binary.Get
@@ -81,7 +82,8 @@ instance MonadFail GHCJSQ where
   fail = undefined
 #endif
 
-instance TH.Quasi GHCJSQ where qRunIO m = GHCJSQ $ \s -> fmap (,s) m
+instance MonadIO GHCJSQ where liftIO m = GHCJSQ $ \s -> fmap (,s) m
+instance TH.Quasi GHCJSQ
 
 -- | the Template Haskell server
 runTHServer :: IO ()

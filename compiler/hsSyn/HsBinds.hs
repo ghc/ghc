@@ -278,7 +278,7 @@ pattern
   --
   -- The pattern is never a simple variable;
   -- That case is done by FunBind.
-  -- See Note [Varieties of binding pattern matches] for details about the
+  -- See Note [FunBind vs PatBind] for details about the
   -- relationship between FunBind and PatBind.
 
   --
@@ -315,22 +315,10 @@ pattern
     -- Note [Typechecking plan for instance declarations]
     (LHsBinds pass) ->
     -- ^ Typechecked user bindings
+    Bool            ->
+    -- See Note [The abs_sig field of AbsBinds]
     HsBindLR pass pass'
   -- ^ Abstraction Bindings
-pattern
-  AbsBindsSig ::
-    -- Simpler form of AbsBinds, used with a type sig
-    -- in tcPolyCheck. Produces simpler desugaring and
-    -- is necessary to avoid #11405, comment:3.
-    ([TyVar]) ->
-    ([EvVar]) ->
-    (IdP pass) ->     -- like abe_poly
-    (TcSpecPrags) ->
-    (TcEvBinds) ->    -- no list needed here
-    (LHsBind pass) -> -- always only one, and it's always a
-                      -- FunBind
-    HsBindLR pass pass'
-  -- | ^ Abstraction Bindings Signature
 
 pattern
   PatSynBind ::
@@ -369,15 +357,9 @@ pattern
     = AST.VarBind NoFieldExt var_id var_rhs var_inline
 pattern
   AbsBinds { abs_tvsa, abs_ev_varsa, abs_exports, abs_ev_binds,
-             abs_binds } -- abs_tvs --> abs_tvsa
+             abs_binds, abs_sig } -- abs_tvs --> abs_tvsa
     = AST.NewBindLR
-        (NAbsBinds abs_tvsa abs_ev_varsa abs_exports abs_ev_binds abs_binds)
-pattern
-  AbsBindsSig { abs_tvs, abs_ev_vars, abs_sig_export, abs_sig_prags,
-                abs_sig_ev_bind, abs_sig_bind }
-    = AST.NewBindLR
-        (NAbsBindsSig abs_tvs abs_ev_vars abs_sig_export abs_sig_prags
-                abs_sig_ev_bind abs_sig_bind)
+        (NAbsBinds abs_tvsa abs_ev_varsa abs_exports abs_ev_binds abs_binds abs_sig)
 pattern
   PatSynBind a
     = AST.PatSynBind NoFieldExt a
@@ -393,7 +375,6 @@ get_bind_fvs _           = error "field selector applied to a wrong constructor"
     PatBind,
     VarBind,
     AbsBinds,
-    AbsBindsSig,
     PatSynBind
   #-}
 
@@ -420,14 +401,8 @@ data NewHsBindLR pass pass'
       [ABExport pass]
       [TcEvBinds]
       (LHsBinds pass)
+      Bool
 
-  | NAbsBindsSig
-      [TyVar]
-      [EvVar]
-      (IdP pass)
-      TcSpecPrags
-      TcEvBinds
-      (LHsBind pass)
 
 -- | Located Haskell Binding with separate Left and Right identifier types
 type
@@ -438,7 +413,7 @@ type
 
 -- | Abtraction Bindings Export
 data ABExport p
-  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragmas is attached to this Id
+  = ABE { abe_poly      :: IdP p -- ^ Any INLINE pragma is attached to this Id
         , abe_mono      :: IdP p
         , abe_wrap      :: HsWrapper    -- ^ See Note [ABExport wrapper]
              -- Shape: (forall abs_tvs. abs_ev_vars => abe_mono) ~ abe_poly
@@ -1281,21 +1256,6 @@ ppr_monobind (AbsBinds { abs_tvsa = tyvars, abs_ev_varsa = dictvars
       , text "Evidence:" <+> ppr ev_binds ]
     else
       pprLHsBinds val_binds
-ppr_monobind (AbsBindsSig { abs_tvs         = tyvars
-                          , abs_ev_vars     = dictvars
-                          , abs_sig_export  = poly_id
-                          , abs_sig_ev_bind = ev_bind
-                          , abs_sig_bind    = bind })
-  = sdocWithDynFlags $ \ dflags ->
-    if gopt Opt_PrintTypecheckerElaboration dflags then
-      hang (text "AbsBindsSig" <+> brackets (interpp'SP tyvars)
-                               <+> brackets (interpp'SP dictvars))
-         2 $ braces $ vcat
-      [ text "Exported type:" <+> pprBndr LetBind poly_id
-      , text "Bind:"     <+> ppr bind
-      , text "Evidence:" <+> ppr ev_bind ]
-    else
-      ppr bind
 
 instance (OutputableBndrId p) => Outputable (ABExport p) where
   ppr (ABE { abe_wrap = wrap, abe_poly = gbl, abe_mono = lcl, abe_prags = prags })
@@ -1449,9 +1409,8 @@ pprMinimalSig (L _ bf) = ppr (fmap unLoc bf)
 -- Notes
 -- -----------------------------------------------------------------------------
 {-
-Note [Varieties of binding pattern matches]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
+Note [FunBind vs PatBind]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 The distinction between FunBind and PatBind is a bit subtle. FunBind covers
 patterns which resemble function bindings and simple variable bindings.
 
@@ -1462,12 +1421,17 @@ patterns which resemble function bindings and simple variable bindings.
     x `f` y = e     -- FunRhs has Infix
 
 The actual patterns and RHSs of a FunBind are encoding in fun_matches.
-The m_ctxt field of Match will be FunRhs and carries two bits of information
-about the match,
+The m_ctxt field of each Match in fun_matches will be FunRhs and carries
+two bits of information about the match,
 
-  * the mc_strictness field describes whether the match is decorated with a bang
-    (e.g. `!x = e`)
-  * the mc_fixity field describes the fixity of the function binder
+  * The mc_fixity field on each Match describes the fixity of the
+    function binder in that match.  E.g. this is legal:
+         f True False  = e1
+         True `f` True = e2
+
+  * The mc_strictness field is used /only/ for nullary FunBinds: ones
+    with one Match, which has no pats. For these, it describes whether
+    the match is decorated with a bang (e.g. `!x = e`).
 
 By contrast, PatBind represents data constructor patterns, as well as a few
 other interesting cases. Namely,
@@ -1678,5 +1642,51 @@ pattern Q{ x=x1, y=y1 } = ([x1,True], [y1,'v'])
 
 when we have a different name for the local and top-level binder
 the distinction between the two names clear
+
+Note [The abs_sig field of AbsBinds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The abs_sig field supports a couple of special cases for bindings.
+Consider
+
+  x :: Num a => (# a, a #)
+  x = (# 3, 4 #)
+
+The general desugaring for AbsBinds would give
+
+  x = /\a. \ ($dNum :: Num a) ->
+      letrec xm = (# fromInteger $dNum 3, fromInteger $dNum 4 #) in
+      xm
+
+But that has an illegal let-binding for an unboxed tuple.  In this
+case we'd prefer to generate the (more direct)
+
+  x = /\ a. \ ($dNum :: Num a) ->
+     (# fromInteger $dNum 3, fromInteger $dNum 4 #)
+
+A similar thing happens with representation-polymorphic defns
+(Trac #11405):
+
+  undef :: forall (r :: RuntimeRep) (a :: TYPE r). HasCallStack => a
+  undef = error "undef"
+
+Again, the vanilla desugaring gives a local let-binding for a
+representation-polymorphic (undefm :: a), which is illegal.  But
+again we can desugar without a let:
+
+  undef = /\ a. \ (d:HasCallStack) -> error a d "undef"
+
+The abs_sig field supports this direct desugaring, with no local
+let-bining.  When abs_sig = True
+
+ * the abs_binds is single FunBind
+
+ * the abs_exports is a singleton
+
+ * we have a complete type sig for binder
+   and hence the abs_binds is non-recursive
+   (it binds the mono_id but refers to the poly_id
+
+These properties are exploited in DsBinds.dsAbsBinds to
+generate code without a let-binding.
 
 -}

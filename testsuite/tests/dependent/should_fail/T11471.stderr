@@ -1,19 +1,22 @@
 
 T11471.hs:15:10: error:
     • Couldn't match a lifted type with an unlifted type
-      Expected type: Proxy Int#
+      When matching types
+        a :: *
+        Int# :: TYPE 'IntRep
+      Expected type: Proxy a
         Actual type: Proxy Int#
-      Use -fprint-explicit-kinds to see the kind arguments
     • In the first argument of ‘f’, namely ‘(undefined :: Proxy Int#)’
       In the expression: f (undefined :: Proxy Int#) 3#
       In an equation for ‘bad’: bad = f (undefined :: Proxy Int#) 3#
+    • Relevant bindings include bad :: F a (bound at T11471.hs:15:1)
 
 T11471.hs:15:35: error:
     • Couldn't match a lifted type with an unlifted type
       When matching types
-        F Int# :: *
+        F a :: *
         Int# :: TYPE 'IntRep
     • In the second argument of ‘f’, namely ‘3#’
       In the expression: f (undefined :: Proxy Int#) 3#
       In an equation for ‘bad’: bad = f (undefined :: Proxy Int#) 3#
-    • Relevant bindings include bad :: F Int# (bound at T11471.hs:15:1)
+    • Relevant bindings include bad :: F a (bound at T11471.hs:15:1)

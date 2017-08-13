@@ -86,8 +86,6 @@ module Data.Typeable
 
       -- * For backwards compatibility
     , typeOf1, typeOf2, typeOf3, typeOf4, typeOf5, typeOf6, typeOf7
-    , Typeable1, Typeable2, Typeable3, Typeable4
-    , Typeable5, Typeable6, Typeable7
     ) where
 
 import qualified Data.Typeable.Internal as I
@@ -225,19 +223,3 @@ typeOf6 _ = I.someTypeRep (Proxy :: Proxy t)
 typeOf7 :: forall t (a :: *) (b :: *) (c :: *) (d :: *) (e :: *) (f :: *)
                 (g :: *). Typeable t => t a b c d e f g -> TypeRep
 typeOf7 _ = I.someTypeRep (Proxy :: Proxy t)
-
-type Typeable1 (a :: * -> *)                               = Typeable a
-type Typeable2 (a :: * -> * -> *)                          = Typeable a
-type Typeable3 (a :: * -> * -> * -> *)                     = Typeable a
-type Typeable4 (a :: * -> * -> * -> * -> *)                = Typeable a
-type Typeable5 (a :: * -> * -> * -> * -> * -> *)           = Typeable a
-type Typeable6 (a :: * -> * -> * -> * -> * -> * -> *)      = Typeable a
-type Typeable7 (a :: * -> * -> * -> * -> * -> * -> * -> *) = Typeable a
-
-{-# DEPRECATED Typeable1 "renamed to 'Typeable'" #-} -- deprecated in 7.8
-{-# DEPRECATED Typeable2 "renamed to 'Typeable'" #-} -- deprecated in 7.8
-{-# DEPRECATED Typeable3 "renamed to 'Typeable'" #-} -- deprecated in 7.8
-{-# DEPRECATED Typeable4 "renamed to 'Typeable'" #-} -- deprecated in 7.8
-{-# DEPRECATED Typeable5 "renamed to 'Typeable'" #-} -- deprecated in 7.8
-{-# DEPRECATED Typeable6 "renamed to 'Typeable'" #-} -- deprecated in 7.8
-{-# DEPRECATED Typeable7 "renamed to 'Typeable'" #-} -- deprecated in 7.8

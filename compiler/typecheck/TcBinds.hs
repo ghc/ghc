@@ -38,7 +38,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, mkTyVarBinder, splitTyConApp_maybe)
+import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe)
 import TysPrim
 import TysWiredIn( cTupleTyConName )
 import Id
@@ -67,6 +67,7 @@ import qualified GHC.LanguageExtensions as LangExt
 import ConLike
 
 import Control.Monad
+import Data.List.NonEmpty ( NonEmpty(..) )
 
 #include "HsVersions.h"
 
@@ -556,7 +557,7 @@ type BKey = Int -- Just number off the bindings
 mkEdges :: TcSigFun -> LHsBinds GhcRn -> [Node BKey (LHsBind GhcRn)]
 -- See Note [Polymorphic recursion] in HsBinds.
 mkEdges sig_fn binds
-  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (get_bind_fvs (unLoc bind)),
+  = [ DigraphNode bind key [key | n <- nonDetEltsUniqSet (bind_fvs (unLoc bind)),
                          Just key <- [lookupNameEnv key_map n], no_sig n ]
     | (bind, key) <- keyd_binds
     ]
@@ -717,13 +718,18 @@ tcPolyCheck prag_fn
                              , bind_fvsf   = placeHolderNamesTc
                              , fun_tick    = funBindTicks nm_loc mono_id mod prag_sigs }
 
-             abs_bind = L loc $ AbsBindsSig
-                        { abs_sig_export  = poly_id
-                        , abs_tvs         = skol_tvs
-                        , abs_ev_vars     = ev_vars
-                        , abs_sig_prags   = SpecPrags spec_prags
-                        , abs_sig_ev_bind = ev_binds
-                        , abs_sig_bind    = L loc bind' }
+             export = ABE { abe_wrap = idHsWrapper
+                          , abe_poly  = poly_id
+                          , abe_mono  = mono_id
+                          , abe_prags = SpecPrags spec_prags }
+
+             abs_bind = L loc $
+                        AbsBinds { abs_tvs      = skol_tvs
+                                 , abs_ev_vars  = ev_vars
+                                 , abs_ev_binds = [ev_binds]
+                                 , abs_exports  = [export]
+                                 , abs_binds    = unitBag (L loc bind')
+                                 , abs_sig      = True }
 
        ; return (unitBag abs_bind, [poly_id]) }
 
@@ -787,19 +793,20 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
        ; mapM_ (checkOverloadedSig mono) sigs
 
        ; traceTc "simplifyInfer call" (ppr tclvl $$ ppr name_taus $$ ppr wanted)
-       ; (qtvs, givens, ev_binds)
+       ; (qtvs, givens, ev_binds, insoluble)
                  <- simplifyInfer tclvl infer_mode sigs name_taus wanted
 
        ; let inferred_theta = map evVarPred givens
        ; exports <- checkNoErrs $
-                    mapM (mkExport prag_fn qtvs inferred_theta) mono_infos
+                    mapM (mkExport prag_fn insoluble qtvs inferred_theta) mono_infos
 
        ; loc <- getSrcSpanM
        ; let poly_ids = map abe_poly exports
              abs_bind = L loc $
-                        AbsBinds { abs_tvsa = qtvs
-                                 , abs_ev_varsa = givens, abs_ev_binds = [ev_binds]
-                                 , abs_exports = exports, abs_binds = binds' }
+                        AbsBinds { abs_tvs = qtvs
+                                 , abs_ev_vars = givens, abs_ev_binds = [ev_binds]
+                                 , abs_exports = exports, abs_binds = binds'
+                                 , abs_sig = False }
 
        ; traceTc "Binding:" (ppr (poly_ids `zip` map idType poly_ids))
        ; return (unitBag abs_bind, poly_ids) }
@@ -807,6 +814,8 @@ tcPolyInfer rec_tc prag_fn tc_sig_fn mono bind_list
 
 --------------
 mkExport :: TcPragEnv
+         -> Bool                        -- True <=> there was an insoluble type error
+                                        --          when typechecking the bindings
          -> [TyVar] -> TcThetaType      -- Both already zonked
          -> MonoBindInfo
          -> TcM (ABExport GhcTc)
@@ -823,12 +832,12 @@ mkExport :: TcPragEnv
 
 -- Pre-condition: the qtvs and theta are already zonked
 
-mkExport prag_fn qtvs theta
+mkExport prag_fn insoluble qtvs theta
          mono_info@(MBI { mbi_poly_name = poly_name
                         , mbi_sig       = mb_sig
                         , mbi_mono_id   = mono_id })
   = do  { mono_ty <- zonkTcType (idType mono_id)
-        ; poly_id <- mkInferredPolyId qtvs theta poly_name mb_sig mono_ty
+        ; poly_id <- mkInferredPolyId insoluble qtvs theta poly_name mb_sig mono_ty
 
         -- NB: poly_id has a zonked type
         ; poly_id <- addInlinePrags poly_id prag_sigs
@@ -856,17 +865,19 @@ mkExport prag_fn qtvs theta
 
         ; return (ABE { abe_wrap = wrap
                         -- abe_wrap :: idType poly_id ~ (forall qtvs. theta => mono_ty)
-                      , abe_poly = poly_id
-                      , abe_mono = mono_id
-                      , abe_prags = SpecPrags spec_prags}) }
+                      , abe_poly  = poly_id
+                      , abe_mono  = mono_id
+                      , abe_prags = SpecPrags spec_prags }) }
   where
     prag_sigs = lookupPragEnv prag_fn poly_name
     sig_ctxt  = InfSigCtxt poly_name
 
-mkInferredPolyId :: [TyVar] -> TcThetaType
+mkInferredPolyId :: Bool  -- True <=> there was an insoluble error when
+                          --          checking the binding group for this Id
+                 -> [TyVar] -> TcThetaType
                  -> Name -> Maybe TcIdSigInst -> TcType
                  -> TcM TcId
-mkInferredPolyId qtvs inferred_theta poly_name mb_sig_inst mono_ty
+mkInferredPolyId insoluble qtvs inferred_theta poly_name mb_sig_inst mono_ty
   | Just (TISI { sig_inst_sig = sig })  <- mb_sig_inst
   , CompleteSig { sig_bndr = poly_id } <- sig
   = return poly_id
@@ -894,9 +905,13 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig_inst mono_ty
 
        ; traceTc "mkInferredPolyId" (vcat [ppr poly_name, ppr qtvs, ppr theta'
                                           , ppr inferred_poly_ty])
-       ; addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
+       ; unless insoluble $
+         addErrCtxtM (mk_inf_msg poly_name inferred_poly_ty) $
          checkValidType (InfSigCtxt poly_name) inferred_poly_ty
          -- See Note [Validity of inferred types]
+         -- If we found an insoluble error in the function definition, don't
+         -- do this check; otherwise (Trac #14000) we may report an ambiguity
+         -- error for a rather bogus type.
 
        ; return (mkLocalIdOrCoVar poly_name inferred_poly_ty) }
 
@@ -1146,7 +1161,7 @@ tcVectDecls decls
        ; return decls'
        }
   where
-    reportVectDups (first:_second:_more)
+    reportVectDups (first :| (_second:_more))
       = addErrAt (getSrcSpan first) $
           text "Duplicate vectorisation declarations for" <+> ppr first
     reportVectDups _ = return ()
@@ -1603,7 +1618,7 @@ data GeneralisationPlan
 
   | CheckGen (LHsBind GhcRn) TcIdSigInfo
                         -- One FunBind with a signature
-                        -- Explicit generalisation; there is an AbsBindsSig
+                        -- Explicit generalisation
 
 -- A consequence of the no-AbsBinds choice (NoGen) is that there is
 -- no "polymorphic Id" and "monmomorphic Id"; there is just the one

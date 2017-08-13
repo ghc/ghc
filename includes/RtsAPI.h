@@ -53,6 +53,8 @@ typedef struct CapabilityPublic_ {
 
 typedef enum {
     RtsOptsNone,         // +RTS causes an error
+    RtsOptsIgnore,       // Ignore command line arguments
+    RtsOptsIgnoreAll,    // Ignore command line and Environment arguments
     RtsOptsSafeOnly,     // safe RTS options allowed; others cause an error
     RtsOptsAll           // all RTS options allowed
   } RtsOptsEnabledEnum;

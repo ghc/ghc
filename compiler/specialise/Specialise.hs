@@ -43,9 +43,7 @@ import State
 import UniqDFM
 
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 
 {-
 ************************************************************************
@@ -147,7 +145,7 @@ becomes
                          in
                          fl
 
-We still have recusion for non-overloaded functions which we
+We still have recursion for non-overloaded functions which we
 specialise, but the recursive call should get specialised to the
 same recursive version.
 
@@ -2289,10 +2287,8 @@ instance Monad SpecM where
                                        z
     fail str = SpecM $ fail str
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail SpecM where
     fail str = SpecM $ fail str
-#endif
 
 instance MonadUnique SpecM where
     getUniqueSupplyM

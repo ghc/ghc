@@ -140,6 +140,7 @@ class TestRun:
        self.framework_failures = []
        self.framework_warnings = []
 
+       self.expected_passes = []
        self.unexpected_passes = []
        self.unexpected_failures = []
        self.unexpected_stat_failures = []

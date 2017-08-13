@@ -50,8 +50,7 @@ test('break009', [extra_files(['../Test6.hs']),
 test('break010', extra_files(['../Test6.hs']), ghci_script, ['break010.script'])
 test('break011',
      [extra_files(['../Test7.hs']),
-      combined_output,
-      when(msys(), expect_broken(12712))],
+      combined_output],
      ghci_script, ['break011.script'])
 test('break012', normal, ghci_script, ['break012.script'])
 test('break013', normal, ghci_script, ['break013.script'])

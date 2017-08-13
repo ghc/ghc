@@ -99,10 +99,11 @@ tcMatchesFun fn@(L _ fun_name) matches exp_ty
     arity = matchGroupArity matches
     herald = text "The equation(s) for"
              <+> quotes (ppr fun_name) <+> text "have"
-    match_ctxt = MC { mc_what = FunRhs fn Prefix strictness, mc_body = tcBody }
+    what = FunRhs { mc_fun = fn, mc_fixity = Prefix, mc_strictness = strictness }
+    match_ctxt = MC { mc_what = what, mc_body = tcBody }
     strictness
       | [L _ match] <- unLoc $ mg_alts matches
-      , FunRhs{mc_strictness = SrcStrict} <- m_ctxt match
+      , FunRhs{ mc_strictness = SrcStrict } <- m_ctxt match
       = SrcStrict
       | otherwise
       = NoSrcStrict
@@ -231,11 +232,13 @@ tcMatch :: (Outputable (body (GHC GhcRn))) => TcMatchCtxt body
 tcMatch ctxt pat_tys rhs_ty match
   = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
   where
-    tc_match ctxt pat_tys rhs_ty match@(Match _ pats maybe_rhs_sig grhss)
+    tc_match ctxt pat_tys rhs_ty
+             match@(Match { m_pats = pats, m_type = maybe_rhs_sig, m_grhss = grhss })
       = add_match_ctxt match $
         do { (pats', grhss') <- tcPats (mc_what ctxt) pats pat_tys $
                                 tc_grhss ctxt maybe_rhs_sig grhss rhs_ty
-           ; return (Match (mc_what ctxt) pats' Nothing grhss') }
+           ; return (Match { m_ctxt = mc_what ctxt, m_pats = pats'
+                           , m_type = Nothing, m_grhss = grhss' }) }
 
     tc_grhss ctxt Nothing grhss rhs_ty
       = tcGRHSs ctxt grhss rhs_ty       -- No result signature
@@ -1134,4 +1137,4 @@ checkArgs fun (MG { mg_alts = L _ (match1:matches) })
     bad_matches = [m | m <- matches, args_in_match m /= n_args1]
 
     args_in_match :: LMatch GhcRn body -> Int
-    args_in_match (L _ (Match _ pats _ _)) = length pats
+    args_in_match (L _ (Match { m_pats = pats })) = length pats

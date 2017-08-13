@@ -374,7 +374,7 @@ pprTypedLamBinder bind_site debug_on var
   = sdocWithDynFlags $ \dflags ->
     case () of
     _
-      | not debug_on            -- Show case-bound wild bilders only if debug is on
+      | not debug_on            -- Show case-bound wild binders only if debug is on
       , CaseBind <- bind_site
       , isDeadBinder var        -> empty
 

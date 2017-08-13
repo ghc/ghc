@@ -53,7 +53,7 @@ import HscTypes
 import TcEnv
 import TcRnMonad
 import RdrHsSyn         ( setRdrNameSpace )
-import TysWiredIn       ( starKindTyConName, unicodeStarKindTyConName )
+import TysWiredIn
 import Name
 import NameSet
 import NameEnv
@@ -1573,5 +1573,17 @@ opDeclErr n
 
 badOrigBinding :: RdrName -> SDoc
 badOrigBinding name
-  = text "Illegal binding of built-in syntax:" <+> ppr (rdrNameOcc name)
-        -- The rdrNameOcc is because we don't want to print Prelude.(,)
+  | Just _ <- isBuiltInOcc_maybe occ
+  = text "Illegal binding of built-in syntax:" <+> ppr occ
+    -- Use an OccName here because we don't want to print Prelude.(,)
+  | otherwise
+  = text "Cannot redefine a Name retrieved by a Template Haskell quote:"
+    <+> ppr name
+    -- This can happen when one tries to use a Template Haskell splice to
+    -- define a top-level identifier with an already existing name, e.g.,
+    --
+    --   $(pure [ValD (VarP 'succ) (NormalB (ConE 'True)) []])
+    --
+    -- (See Trac #13968.)
+  where
+    occ = rdrNameOcc name

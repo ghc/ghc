@@ -158,8 +158,8 @@ if test "$WithGhc" = ""
 then
     AC_MSG_ERROR([GHC is required.])
 fi
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.10],
-    [AC_MSG_ERROR([GHC version 7.10 or later is required to compile GHC.])])
+FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[8.0],
+    [AC_MSG_ERROR([GHC version 8.0 or later is required to compile GHC.])])
 
 if test `expr $GhcMinVersion % 2` = "1"
 then

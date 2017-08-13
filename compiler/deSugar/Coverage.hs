@@ -3,7 +3,7 @@
 (c) University of Glasgow, 2007
 -}
 
-{-# LANGUAGE CPP, NondecreasingIndentation, RecordWildCards #-}
+{-# LANGUAGE NondecreasingIndentation, RecordWildCards #-}
 
 module Coverage (addTicksToBinds, hpcInitCode) where
 
@@ -11,11 +11,7 @@ import qualified GHCi
 import GHCi.RemoteTypes
 import Data.Array
 import ByteCodeTypes
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack.CCS
-#else
-import GHC.Stack as GHC.Stack.CCS
-#endif
 import Type
 import HsSyn
 import Module
@@ -280,31 +276,6 @@ addTickLHsBind (L pos bind@(AbsBinds { abs_binds   = binds,
                       [ mid
                       | ABE{ abe_poly = pid, abe_mono = mid } <- abs_exports
                       , isInlinePragma (idInlinePragma pid) ] }
-
-addTickLHsBind (L pos bind@(AbsBindsSig { abs_sig_bind   = val_bind
-                                        , abs_sig_export = poly_id }))
-  | L _ FunBind { fun_id = L _ mono_id } <- val_bind
-  = do withEnv (add_export  mono_id) $ do
-       withEnv (add_inlines mono_id) $ do
-       val_bind' <- addTickLHsBind val_bind
-       return $ L pos $ bind { abs_sig_bind = val_bind' }
-
-  | otherwise
-  = pprPanic "addTickLHsBind" (ppr bind)
- where
-  -- see AbsBinds comments
-  add_export mono_id env
-    | idName poly_id `elemNameSet` exports env
-    = env { exports = exports env `extendNameSet` idName mono_id }
-    | otherwise
-    = env
-
-  -- See Note [inline sccs]
-  add_inlines mono_id env
-    | isInlinePragma (idInlinePragma poly_id)
-    = env { inlines = inlines env `extendVarSet` mono_id }
-    | otherwise
-    = env
 
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
   let name = getOccString id
@@ -682,10 +653,10 @@ addTickMatchGroup is_lam mg@(MG { mg_alts = L l matches }) = do
 
 addTickMatch :: Bool -> Bool -> Match GhcTc (LHsExpr GhcTc)
              -> TM (Match GhcTc (LHsExpr GhcTc))
-addTickMatch isOneOfMany isLambda (Match mf pats opSig gRHSs) =
+addTickMatch isOneOfMany isLambda match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickGRHSs isOneOfMany isLambda gRHSs
-    return $ Match mf pats opSig gRHSs'
+    return $ match { m_grhss = gRHSs' }
 
 addTickGRHSs :: Bool -> Bool -> GRHSs GhcTc (LHsExpr GhcTc)
              -> TM (GRHSs GhcTc (LHsExpr GhcTc))
@@ -923,10 +894,10 @@ addTickCmdMatchGroup mg@(MG { mg_alts = L l matches }) = do
   return $ mg { mg_alts = L l matches' }
 
 addTickCmdMatch :: Match GhcTc (LHsCmd GhcTc) -> TM (Match GhcTc (LHsCmd GhcTc))
-addTickCmdMatch (Match mf pats opSig gRHSs) =
+addTickCmdMatch match@(Match { m_pats = pats, m_grhss = gRHSs }) =
   bindLocals (collectPatsBinders pats) $ do
     gRHSs' <- addTickCmdGRHSs gRHSs
-    return $ Match mf pats opSig gRHSs'
+    return $ match { m_grhss = gRHSs' }
 
 addTickCmdGRHSs :: GRHSs GhcTc (LHsCmd GhcTc) -> TM (GRHSs GhcTc (LHsCmd GhcTc))
 addTickCmdGRHSs (GRHSs guarded (L l local_binds)) = do
@@ -1304,7 +1275,7 @@ hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 matchesOneOfMany :: [LMatch GhcTc body] -> Bool
 matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
   where
-        matchCount (L _ (Match _ _pats _ty (GRHSs grhss _binds))) = length grhss
+        matchCount (L _ (Match { m_grhss = GRHSs grhss _binds })) = length grhss
 
 type MixEntry_ = (SrcSpan, [String], [OccName], BoxLabel)
 

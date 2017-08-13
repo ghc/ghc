@@ -52,9 +52,12 @@ libraries/directory          -           -                               ssh://g
 libraries/filepath           -           -                               ssh://git@github.com/haskell/filepath.git
 libraries/haskeline          -           -                               https://github.com/judah/haskeline.git
 libraries/hpc                -           -                               -
+libraries/mtl                -           -                               https://github.com/ekmett/mtl.git
+libraries/parsec             -           -                               https://github.com/haskell/parsec.git
 libraries/pretty             -           -                               https://github.com/haskell/pretty.git
 libraries/process            -           -                               ssh://git@github.com/haskell/process.git
 libraries/terminfo           -           -                               https://github.com/judah/terminfo.git
+libraries/text               -           -                               https://github.com/bos/text.git
 libraries/time               -           -                               https://github.com/haskell/time.git
 libraries/transformers       -           -                               https://git.haskell.org/darcs-mirrors/transformers.git
 libraries/unix               -           -                               ssh://git@github.com/haskell/unix.git

@@ -4,11 +4,6 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE BangPatterns #-}
-#if __GLASGOW_HASKELL__ < 800
--- For CallStack business
-{-# LANGUAGE ImplicitParams #-}
-{-# LANGUAGE FlexibleContexts #-}
-#endif
 
 -- | Highly random utility functions
 --
@@ -124,12 +119,8 @@ module Util (
         hashString,
 
         -- * Call stacks
-#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-        GHC.Stack.CallStack,
-#endif
         HasCallStack,
         HasDebugCallStack,
-        prettyCurrentCallStack,
 
         -- * Utils for flags
         OverridingBool(..),
@@ -147,7 +138,7 @@ import System.IO.Unsafe ( unsafePerformIO )
 import Data.List        hiding (group)
 
 import GHC.Exts
-import qualified GHC.Stack
+import GHC.Stack (HasCallStack)
 
 import Control.Applicative ( liftA2 )
 import Control.Monad    ( liftM )
@@ -1368,33 +1359,11 @@ mulHi a b = fromIntegral (r `shiftR` 32)
    where r :: Int64
          r = fromIntegral a * fromIntegral b
 
--- | A compatibility wrapper for the @GHC.Stack.HasCallStack@ constraint.
-#if __GLASGOW_HASKELL__ >= 800
-type HasCallStack = GHC.Stack.HasCallStack
-#elif MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-type HasCallStack = (?callStack :: GHC.Stack.CallStack)
--- CallStack wasn't present in GHC 7.10.1, disable callstacks in stage 1
-#else
-type HasCallStack = (() :: Constraint)
-#endif
-
 -- | A call stack constraint, but only when 'isDebugOn'.
 #if defined(DEBUG)
 type HasDebugCallStack = HasCallStack
 #else
 type HasDebugCallStack = (() :: Constraint)
-#endif
-
--- | Pretty-print the current callstack
-#if __GLASGOW_HASKELL__ >= 800
-prettyCurrentCallStack :: HasCallStack => String
-prettyCurrentCallStack = GHC.Stack.prettyCallStack GHC.Stack.callStack
-#elif MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
-prettyCurrentCallStack :: (?callStack :: GHC.Stack.CallStack) => String
-prettyCurrentCallStack = GHC.Stack.showCallStack ?callStack
-#else
-prettyCurrentCallStack :: HasCallStack => String
-prettyCurrentCallStack = "Call stack unavailable"
 #endif
 
 data OverridingBool

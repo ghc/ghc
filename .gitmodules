@@ -70,13 +70,21 @@
 	path = libraries/filepath
 	url = ../packages/filepath.git
 	ignore = none
-[submodule "libraries/hoopl"]
-	path = libraries/hoopl
-	url = ../packages/hoopl.git
-	ignore = none
 [submodule "libraries/hpc"]
 	path = libraries/hpc
 	url = ../packages/hpc.git
+	ignore = none
+[submodule "libraries/parsec"]
+	path = libraries/parsec
+	url = ../packages/parsec.git
+	ignore = none
+[submodule "libraries/text"]
+	path = libraries/text
+	url = ../packages/text.git
+	ignore = none
+[submodule "libraries/mtl"]
+	path = libraries/mtl
+	url = ../packages/mtl.git
 	ignore = none
 [submodule "libraries/process"]
 	path = libraries/process

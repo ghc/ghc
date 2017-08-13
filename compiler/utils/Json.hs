@@ -39,7 +39,7 @@ escapeJsonString = concatMap escapeChar
     escapeChar '\n' = "\\n"
     escapeChar '\r' = "\\r"
     escapeChar '\t' = "\\t"
-    escapeChar '"'  = "\""
+    escapeChar '"'  = "\\\""
     escapeChar '\\'  = "\\\\"
     escapeChar c | isControl c || fromEnum c >= 0x7f  = uni_esc c
     escapeChar c = [c]

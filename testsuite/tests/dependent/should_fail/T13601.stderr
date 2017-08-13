@@ -1,0 +1,6 @@
+
+T13601.hs:18:16: error:
+    • Expected kind ‘TYPE (Rep 'LiftedRep)’,
+        but ‘Logic a’ has kind ‘TYPE (Rep rep)’
+    • In the first argument of ‘Boolean’, namely ‘(Logic a)’
+      In the class declaration for ‘Eq’

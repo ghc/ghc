@@ -34,7 +34,7 @@ module TcHsSyn (
         emptyZonkEnv, mkEmptyZonkEnv,
         zonkTcTypeToType, zonkTcTypeToTypes, zonkTyVarOcc,
         zonkCoToCo, zonkSigType,
-        zonkEvBinds,
+        zonkEvBinds, zonkTcEvBinds
   ) where
 
 #include "HsVersions.h"
@@ -455,24 +455,44 @@ zonk_bind env bind@(FunBind { fun_id = L loc var, fun_matches = ms
 zonk_bind env (AbsBinds { abs_tvsa = tyvars, abs_ev_varsa = evs
                         , abs_ev_binds = ev_binds
                         , abs_exports = exports
-                        , abs_binds = val_binds })
+                        , abs_binds = val_binds
+                        , abs_sig = has_sig })
   = ASSERT( all isImmutableTyVar tyvars )
     do { (env0, new_tyvars) <- zonkTyBndrsX env tyvars
        ; (env1, new_evs) <- zonkEvBndrsX env0 evs
        ; (env2, new_ev_binds) <- zonkTcEvBinds_s env1 ev_binds
        ; (new_val_bind, new_exports) <- fixM $ \ ~(new_val_binds, _) ->
-         do { let env3 = extendIdZonkEnvRec env2
-                           (collectHsBindsBinders new_val_binds)
-            ; new_val_binds <- zonkMonoBinds env3 val_binds
-            ; new_exports   <- mapM (zonkExport env3) exports
+         do { let env3 = extendIdZonkEnvRec env2 $
+                         collectHsBindsBinders new_val_binds
+            ; new_val_binds <- mapBagM (zonk_val_bind env3) val_binds
+            ; new_exports   <- mapM (zonk_export env3) exports
             ; return (new_val_binds, new_exports) }
        ; return (AbsBinds { abs_tvsa = new_tyvars, abs_ev_varsa = new_evs
                           , abs_ev_binds = new_ev_binds
-                          , abs_exports = new_exports, abs_binds = new_val_bind }) }
+                          , abs_exports = new_exports, abs_binds = new_val_bind
+                          , abs_sig = has_sig }) }
   where
-    zonkExport env (ABE{ abe_wrap = wrap
-                       , abe_poly = poly_id
-                       , abe_mono = mono_id, abe_prags = prags })
+    zonk_val_bind env lbind
+      | has_sig
+      , L loc bind@(FunBind { fun_id      = L mloc mono_id
+                            , fun_matches = ms
+                            , fun_co_fn   = co_fn }) <- lbind
+      = do { new_mono_id <- updateVarTypeM (zonkTcTypeToType env) mono_id
+                            -- Specifically /not/ zonkIdBndr; we do not
+                            -- want to complain about a levity-polymorphic binder
+           ; (env', new_co_fn) <- zonkCoFn env co_fn
+           ; new_ms            <- zonkMatchGroup env' zonkLExpr ms
+           ; return $ L loc $
+             bind { fun_id      = L mloc new_mono_id
+                  , fun_matches = new_ms
+                  , fun_co_fn   = new_co_fn } }
+      | otherwise
+      = zonk_lbind env lbind   -- The normal case
+
+    zonk_export env (ABE{ abe_wrap = wrap
+                        , abe_poly = poly_id
+                        , abe_mono = mono_id
+                        , abe_prags = prags })
         = do new_poly_id <- zonkIdBndr env poly_id
              (_, new_wrap) <- zonkCoFn env wrap
              new_prags <- zonkSpecPrags env prags
@@ -480,44 +500,6 @@ zonk_bind env (AbsBinds { abs_tvsa = tyvars, abs_ev_varsa = evs
                         , abe_poly = new_poly_id
                         , abe_mono = zonkIdOcc env mono_id
                         , abe_prags = new_prags })
-
-zonk_bind env outer_bind@(AbsBindsSig { abs_tvs         = tyvars
-                                      , abs_ev_vars     = evs
-                                      , abs_sig_export  = poly
-                                      , abs_sig_prags   = prags
-                                      , abs_sig_ev_bind = ev_bind
-                                      , abs_sig_bind    = lbind })
-  | L bind_loc bind@(FunBind { fun_id      = L loc local
-                             , fun_matches = ms
-                             , fun_co_fn   = co_fn }) <- lbind
-  = ASSERT( all isImmutableTyVar tyvars )
-    do { (env0, new_tyvars)  <- zonkTyBndrsX env  tyvars
-       ; (env1, new_evs)     <- zonkEvBndrsX env0 evs
-       ; (env2, new_ev_bind) <- zonkTcEvBinds env1 ev_bind
-           -- Inline zonk_bind (FunBind ...) because we wish to skip
-           -- the check for representation-polymorphic binders. The
-           -- local binder in the FunBind in an AbsBindsSig is never actually
-           -- bound in Core -- indeed, that's the whole point of AbsBindsSig.
-           -- just calling zonk_bind causes #11405.
-       ; new_local           <- updateVarTypeM (zonkTcTypeToType env2) local
-       ; (env3, new_co_fn)   <- zonkCoFn env2 co_fn
-       ; new_ms              <- zonkMatchGroup env3 zonkLExpr ms
-           -- If there is a representation polymorphism problem, it will
-           -- be caught here:
-       ; new_poly_id         <- zonkIdBndr env2 poly
-       ; new_prags           <- zonkSpecPrags env2 prags
-       ; let new_val_bind = L bind_loc (bind { fun_id      = L loc new_local
-                                             , fun_matches = new_ms
-                                             , fun_co_fn   = new_co_fn })
-       ; return (AbsBindsSig { abs_tvs         = new_tyvars
-                             , abs_ev_vars     = new_evs
-                             , abs_sig_export  = new_poly_id
-                             , abs_sig_prags   = new_prags
-                             , abs_sig_ev_bind = new_ev_bind
-                             , abs_sig_bind    = new_val_bind  }) }
-
-  | otherwise
-  = pprPanic "zonk_bind" (ppr outer_bind)
 
 zonk_bind env (PatSynBind bind@(PSB { psb_id = L loc id
                                     , psb_args = details
@@ -583,10 +565,11 @@ zonkMatch :: ZonkEnv
           -> (ZonkEnv -> Located (body (GHC GhcTcId)) -> TcM (Located (body (GHC GhcTc))))
           -> LMatch GhcTcId (Located (body (GHC GhcTcId)))
           -> TcM (LMatch GhcTc (Located (body (GHC GhcTc))))
-zonkMatch env zBody (L loc (Match mf pats _ grhss))
+zonkMatch env zBody (L loc match@(Match { m_pats = pats, m_grhss = grhss }))
   = do  { (env1, new_pats) <- zonkPats env pats
         ; new_grhss <- zonkGRHSs env1 zBody grhss
-        ; return (L loc (Match mf new_pats Nothing new_grhss)) }
+        ; return (L loc (match { m_pats = new_pats, m_type = Nothing
+                               , m_grhss = new_grhss })) }
 
 -------------------------------------------------------------------------
 zonkGRHSs :: ZonkEnv
