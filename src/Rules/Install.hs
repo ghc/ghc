@@ -5,7 +5,7 @@ import qualified System.Directory as IO
 
 import Base
 import Context
-import Expression hiding (builder)
+import Expression
 import GHC
 import Oracles.Setting
 import Rules

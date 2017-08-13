@@ -6,7 +6,6 @@ module Oracles.Setting (
     topDirectory, relocatableBuild, installDocDir, installGhcLibDir, libsuf
     ) where
 
-import Development.Shake
 import Hadrian.Expression
 import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path

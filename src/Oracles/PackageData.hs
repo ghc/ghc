@@ -2,10 +2,9 @@ module Oracles.PackageData (
     PackageData (..), PackageDataList (..), pkgData, pkgDataList
     ) where
 
-import Data.List
-import Development.Shake
 import Hadrian.Oracles.KeyValue
-import Hadrian.Utilities
+
+import Base
 
 data PackageData = BuildGhciLib FilePath
                  | ComponentId  FilePath

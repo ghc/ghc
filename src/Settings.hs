@@ -9,7 +9,6 @@ module Settings (
 import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
 
-import Base
 import Context
 import CmdLineFlag
 import Expression

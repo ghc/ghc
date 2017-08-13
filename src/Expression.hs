@@ -20,25 +20,15 @@ module Expression (
     getInput, getOutput,
 
     -- * Re-exports
-    module Data.Semigroup,
-    module Builder,
-    module Package,
-    module Stage,
-    module Way
+    module Base
     ) where
-
-import Control.Monad.Extra
-import Data.Semigroup
 
 import qualified Hadrian.Expression as H
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 
-import Builder
+import Base
 import Context (Context, vanillaContext, stageContext, getStage, getPackage, getWay)
-import Package
-import Stage
 import Target hiding (builder, inputs, outputs)
-import Way
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
 -- read parameters of the current build 'Target'.

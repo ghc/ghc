@@ -17,7 +17,6 @@ import Hadrian.Oracles.DirectoryContents
 import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
 
-import Base
 import CmdLineFlag
 import Context
 import Expression hiding (builder, inputs, outputs, way, stage, package)

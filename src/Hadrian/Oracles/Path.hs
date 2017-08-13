@@ -33,7 +33,6 @@ fixAbsolutePathOnWindows path = do
     else
         return path
 
-
 newtype LookupInPath = LookupInPath String
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 

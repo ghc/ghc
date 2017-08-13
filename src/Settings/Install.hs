@@ -1,6 +1,5 @@
 module Settings.Install (installPackageDbDirectory) where
 
-import Base
 import Expression
 import UserSettings
 

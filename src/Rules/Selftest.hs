@@ -1,7 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 module Rules.Selftest (selftestRules) where
 
-import Development.Shake
 import Test.QuickCheck
 
 import Base

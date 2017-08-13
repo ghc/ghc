@@ -5,7 +5,6 @@ import qualified Hadrian.Oracles.DirectoryContents
 import qualified Hadrian.Oracles.KeyValue
 import qualified Hadrian.Oracles.Path
 
-import Base
 import Context
 import Expression
 import Flavour
