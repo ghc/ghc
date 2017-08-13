@@ -7,7 +7,6 @@ import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
 import qualified Rules.Install
-import qualified Rules.Oracles
 import qualified Rules.SourceDist
 import qualified Rules.Selftest
 import qualified Rules.Test
@@ -23,14 +22,14 @@ main = shakeArgsWith options CmdLineFlag.cmdFlags $ \cmdLineFlags targets -> do
   where
     rules :: Rules ()
     rules = do
-        Rules.Clean.cleanRules
-        Rules.Oracles.oracleRules
-        Rules.SourceDist.sourceDistRules
-        Rules.Selftest.selftestRules
-        Rules.Test.testRules
         Rules.buildRules
-        Rules.topLevelTargets
+        Rules.Clean.cleanRules
         Rules.Install.installRules
+        Rules.oracleRules
+        Rules.Selftest.selftestRules
+        Rules.SourceDist.sourceDistRules
+        Rules.Test.testRules
+        Rules.topLevelTargets
     options :: ShakeOptions
     options = shakeOptions
         { shakeChange   = ChangeModtimeAndDigest

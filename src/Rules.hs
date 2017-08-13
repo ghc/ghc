@@ -1,10 +1,19 @@
-module Rules (topLevelTargets, packageTargets, buildRules) where
+module Rules (
+    buildRules, oracleRules, packageTargets, topLevelTargets
+    ) where
+
+import qualified Hadrian.Oracles.ArgsHash
+import qualified Hadrian.Oracles.DirectoryContents
+import qualified Hadrian.Oracles.KeyValue
+import qualified Hadrian.Oracles.Path
 
 import Base
 import Context
 import Expression
 import Flavour
 import GHC
+import qualified Oracles.Dependencies
+import qualified Oracles.ModuleFiles
 import qualified Rules.Compile
 import qualified Rules.Data
 import qualified Rules.Dependencies
@@ -18,9 +27,9 @@ import qualified Rules.Library
 import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
-import Oracles.Dependencies
 import Settings
 import Settings.Path
+import Target
 
 allStages :: [Stage]
 allStages = [minBound ..]
@@ -52,7 +61,7 @@ packageTargets stage pkg = do
             ways <- interpretInContext context getLibraryWays
             libs <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs <- interpretInContext context $ buildHaddock flavour
-            more <- libraryTargets context
+            more <- Oracles.Dependencies.libraryTargets context
             return $ [ pkgSetupConfigFile context | nonCabalContext context ]
                   ++ [ pkgHaddockFile     context | docs && stage == Stage1 ]
                   ++ libs ++ more
@@ -102,8 +111,17 @@ buildRules = do
     packageRules
     Rules.Perl.perlScriptRules
 
+oracleRules :: Rules ()
+oracleRules = do
+    Hadrian.Oracles.ArgsHash.argsHashOracle trackArgument getArgs
+    Hadrian.Oracles.DirectoryContents.directoryContentsOracle
+    Hadrian.Oracles.KeyValue.keyValueOracle
+    Hadrian.Oracles.Path.pathOracle
+    Oracles.Dependencies.dependenciesOracles
+    Oracles.ModuleFiles.moduleFilesOracle
+
 programsStage1Only :: [Package]
 programsStage1Only =
-  [ deriveConstants, genprimopcode, hp2ps, runGhc
-  , ghcCabal, hpc, dllSplit, ghcPkg, hsc2hs
-  , genapply, ghc ]
+    [ deriveConstants, genprimopcode, hp2ps, runGhc
+    , ghcCabal, hpc, dllSplit, ghcPkg, hsc2hs
+    , genapply, ghc ]

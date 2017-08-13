@@ -52,7 +52,6 @@ executable hadrian
                        , Rules.Install
                        , Rules.Libffi
                        , Rules.Library
-                       , Rules.Oracles
                        , Rules.Perl
                        , Rules.Program
                        , Rules.Register
