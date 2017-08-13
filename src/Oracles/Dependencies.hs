@@ -1,10 +1,10 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, TupleSections #-}
 module Oracles.Dependencies (
     fileDependencies, contextDependencies, libraryTargets, needLibrary,
-    dependenciesOracles, pkgDependencies, topsortPackages
+    pkgDependencies, topsortPackages
     ) where
 
-import qualified Data.HashMap.Strict as Map
+import Hadrian.Oracles.KeyValue
 
 import Base
 import Context
@@ -14,9 +14,6 @@ import Settings
 import Settings.Builders.GhcCabal
 import Settings.Path
 
-newtype Dependency = Dependency (FilePath, FilePath)
-    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-
 -- | 'Action' @fileDependencies context file@ looks up dependencies of a @file@
 -- in a generated dependency file @path/.dependencies@, where @path@ is the build
 -- path of the given @context@. The action returns a pair @(source, files)@,
@@ -25,7 +22,7 @@ newtype Dependency = Dependency (FilePath, FilePath)
 fileDependencies :: Context -> FilePath -> Action (FilePath, [FilePath])
 fileDependencies context obj = do
     let path = buildPath context -/- ".dependencies"
-    deps <- askOracle $ Dependency (path, obj)
+    deps <- lookupValues path obj
     case deps of
         Nothing -> error $ "No dependencies found for file " ++ obj
         Just [] -> error $ "No source file found for file " ++ obj
@@ -40,8 +37,7 @@ fileDependencies context obj = do
 contextDependencies :: Context -> Action [Context]
 contextDependencies context@Context {..} = do
     let pkgContext = \pkg -> Context (min stage Stage1) pkg way
-        unpack     = fromMaybe . error $ "No dependencies for " ++ show context
-    deps <- unpack <$> askOracle (Dependency (packageDependencies, pkgNameString package))
+    deps <- lookupValuesOrError packageDependencies (pkgNameString package)
     pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
     return . map pkgContext $ intersectOrd (compare . pkgNameString) pkgs deps
 
@@ -66,15 +62,6 @@ libraryTargets context = do
 -- | Coarse-grain 'need': make sure all given libraries are fully built.
 needLibrary :: [Context] -> Action ()
 needLibrary cs = need =<< concatMapM libraryTargets cs
-
--- | Oracles for the package dependencies and 'path/dist/.dependencies' files.
-dependenciesOracles :: Rules ()
-dependenciesOracles = do
-    deps <- newCache $ \file -> do
-        putLoud $ "Reading dependencies from " ++ file ++ "..."
-        contents <- map words <$> readFileLines file
-        return $ Map.fromList [ (key, values) | (key:values) <- contents ]
-    void $ addOracle $ \(Dependency (file, key)) -> Map.lookup key <$> deps file
 
 -- | Topological sort of packages according to their dependencies.
 -- HACK (izgzhen): See https://github.com/snowleopard/hadrian/issues/344 for details

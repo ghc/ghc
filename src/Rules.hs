@@ -117,7 +117,6 @@ oracleRules = do
     Hadrian.Oracles.DirectoryContents.directoryContentsOracle
     Hadrian.Oracles.KeyValue.keyValueOracle
     Hadrian.Oracles.Path.pathOracle
-    Oracles.Dependencies.dependenciesOracles
     Oracles.ModuleFiles.moduleFilesOracle
 
 programsStage1Only :: [Package]
