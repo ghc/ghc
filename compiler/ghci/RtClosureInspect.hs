@@ -637,7 +637,7 @@ addConstraint actual expected = do
       discardResult $
       captureConstraints $
       do { (ty1, ty2) <- congruenceNewtypes actual expected
-         ; unifyType noThing ty1 ty2 }
+         ; unifyType Nothing ty1 ty2 }
      -- TOMDO: what about the coercion?
      -- we should consider family instances
 
@@ -1186,7 +1186,7 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                (_, vars) <- instTyVars (tyConTyVars new_tycon)
                let ty' = mkTyConApp new_tycon (mkTyVarTys vars)
                    rep_ty = unwrapType ty'
-               _ <- liftTcM (unifyType noThing ty rep_ty)
+               _ <- liftTcM (unifyType Nothing ty rep_ty)
         -- assumes that reptype doesn't ^^^^ touch tyconApp args
                return ty'
 

@@ -58,7 +58,7 @@ module TcType (
   -- These are important because they do not look through newtypes
   getTyVar,
   tcSplitForAllTy_maybe,
-  tcSplitForAllTys, tcSplitPiTys, tcSplitForAllTyVarBndrs,
+  tcSplitForAllTys, tcSplitPiTys, tcSplitPiTy_maybe, tcSplitForAllTyVarBndrs,
   tcSplitPhiTy, tcSplitPredFunTy_maybe,
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcFunResultTyN,
   tcSplitFunTysN,
@@ -66,7 +66,8 @@ module TcType (
   tcRepSplitTyConApp_maybe, tcRepSplitTyConApp_maybe',
   tcTyConAppTyCon, tcTyConAppTyCon_maybe, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, tcRepSplitAppTy_maybe,
-  tcGetTyVar_maybe, tcGetTyVar, nextRole,
+  tcRepGetNumAppTys,
+  tcGetCastedTyVar_maybe, tcGetTyVar_maybe, tcGetTyVar, nextRole,
   tcSplitSigmaTy, tcSplitNestedSigmaTys, tcDeepSplitSigmaTy_maybe,
 
   ---------------------------------
@@ -186,7 +187,11 @@ module TcType (
   pprTheta, pprParendTheta, pprThetaArrowTy, pprClassPred,
   pprTvBndr, pprTvBndrs,
 
-  TypeSize, sizeType, sizeTypes, toposortTyVars
+  TypeSize, sizeType, sizeTypes, toposortTyVars,
+
+  ---------------------------------
+  -- argument visibility
+  tcTyConVisibilities, isNextTyConArgVisible, isNextArgVisible
 
   ) where
 
@@ -219,6 +224,7 @@ import BasicTypes
 import Util
 import Bag
 import Maybes
+import ListSetOps ( getNth )
 import Outputable
 import FastString
 import ErrUtils( Validity(..), MsgDoc, isValid )
@@ -1357,6 +1363,10 @@ variables.  It's up to you to make sure this doesn't matter.
 tcSplitPiTys :: Type -> ([TyBinder], Type)
 tcSplitPiTys = splitPiTys
 
+-- | Splits a type into a TyBinder and a body, if possible. Panics otherwise
+tcSplitPiTy_maybe :: Type -> Maybe (TyBinder, Type)
+tcSplitPiTy_maybe = splitPiTy_maybe
+
 tcSplitForAllTy_maybe :: Type -> Maybe (TyVarBinder, Type)
 tcSplitForAllTy_maybe ty | Just ty' <- tcView ty = tcSplitForAllTy_maybe ty'
 tcSplitForAllTy_maybe (ForAllTy tv ty) = Just (tv, ty)
@@ -1569,7 +1579,21 @@ tcSplitAppTys ty
                    Just (ty', arg) -> go ty' (arg:args)
                    Nothing         -> (ty,args)
 
+-- | Returns the number of arguments in the given type, without
+-- looking through synonyms. This is used only for error reporting.
+-- We don't look through synonyms because of #11313.
+tcRepGetNumAppTys :: Type -> Arity
+tcRepGetNumAppTys = length . snd . repSplitAppTys
+
 -----------------------
+-- | If the type is a tyvar, possibly under a cast, returns it, along
+-- with the coercion. Thus, the co is :: kind tv ~N kind type
+tcGetCastedTyVar_maybe :: Type -> Maybe (TyVar, CoercionN)
+tcGetCastedTyVar_maybe ty | Just ty' <- tcView ty = tcGetCastedTyVar_maybe ty'
+tcGetCastedTyVar_maybe (CastTy (TyVarTy tv) co) = Just (tv, co)
+tcGetCastedTyVar_maybe (TyVarTy tv)             = Just (tv, mkNomReflCo (tyVarKind tv))
+tcGetCastedTyVar_maybe _                        = Nothing
+
 tcGetTyVar_maybe :: Type -> Maybe TyVar
 tcGetTyVar_maybe ty | Just ty' <- tcView ty = tcGetTyVar_maybe ty'
 tcGetTyVar_maybe (TyVarTy tv)   = Just tv
@@ -1728,7 +1752,7 @@ tc_eq_type view_fun orig_ty1 orig_ty2 = go True orig_env orig_ty1 orig_ty2
        -- be oversaturated
       where
         bndrs = tyConBinders tc
-        viss  = map (isVisibleArgFlag . tyConBinderArgFlag) bndrs
+        viss  = map isVisibleTyConBinder bndrs
     tc_vis False _ = repeat False  -- if we're not in a visible context, our args
                                    -- aren't either
 
@@ -2559,8 +2583,11 @@ sizeType = go
     go (TyVarTy {})              = 1
     go (TyConApp tc tys)
       | isTypeFamilyTyCon tc     = infinity  -- Type-family applications can
-                                           -- expand to any arbitrary size
+                                             -- expand to any arbitrary size
       | otherwise                = sizeTypes (filterOutInvisibleTypes tc tys) + 1
+                                   -- Why filter out invisible args?  I suppose any
+                                   -- size ordering is sound, but why is this better?
+                                   -- I came across this when investigating #14010.
     go (LitTy {})                = 1
     go (FunTy arg res)           = go arg + go res + 1
     go (AppTy fun arg)           = go fun + go arg
@@ -2572,3 +2599,28 @@ sizeType = go
 
 sizeTypes :: [Type] -> TypeSize
 sizeTypes tys = sum (map sizeType tys)
+
+-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------
+-----------------------
+-- | For every arg a tycon can take, the returned list says True if the argument
+-- is taken visibly, and False otherwise. Ends with an infinite tail of Trues to
+-- allow for oversaturation.
+tcTyConVisibilities :: TyCon -> [Bool]
+tcTyConVisibilities tc = tc_binder_viss ++ tc_return_kind_viss ++ repeat True
+  where
+    tc_binder_viss      = map isVisibleTyConBinder (tyConBinders tc)
+    tc_return_kind_viss = map isVisibleBinder (fst $ tcSplitPiTys (tyConResKind tc))
+
+-- | If the tycon is applied to the types, is the next argument visible?
+isNextTyConArgVisible :: TyCon -> [Type] -> Bool
+isNextTyConArgVisible tc tys
+  = tcTyConVisibilities tc `getNth` length tys
+
+-- | Should this type be applied to a visible argument?
+isNextArgVisible :: TcType -> Bool
+isNextArgVisible ty
+  | Just (bndr, _) <- tcSplitPiTy_maybe ty = isVisibleBinder bndr
+  | otherwise                              = True
+    -- this second case might happen if, say, we have an unzonked TauTv.
+    -- But TauTvs can't range over types that take invisible arguments

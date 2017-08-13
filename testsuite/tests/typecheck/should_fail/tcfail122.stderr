@@ -1,7 +1,11 @@
 
 tcfail122.hs:8:9: error:
-    • Couldn't match kind ‘*’ with ‘* -> *’
-      When matching the kind of ‘a’
+    • Couldn't match kind ‘* -> *’ with ‘*’
+      When matching types
+        c0 :: (* -> *) -> *
+        a :: * -> *
+      Expected type: a b
+        Actual type: c0 d0
     • In the expression:
           undefined :: forall (c :: (* -> *) -> *) (d :: * -> *). c d
       In the expression:

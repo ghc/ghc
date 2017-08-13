@@ -45,6 +45,8 @@ Library
         Language.Haskell.TH.Syntax
         Language.Haskell.TH.LanguageExtensions
 
+        Language.Haskell.TH.Lib.Internal
+
     other-modules:
         Language.Haskell.TH.Lib.Map
 

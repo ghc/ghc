@@ -282,7 +282,7 @@ deriving instance
   (DataId x) => Data (HsLit x)
 
 deriving instance
-  (DataId p, DataId p) => Data (HsOverLit p)
+  (DataId p) => Data (HsOverLit p)
 
 deriving instance
   Data OverLitVal

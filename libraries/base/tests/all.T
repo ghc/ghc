@@ -201,6 +201,7 @@ test('T9848',
 test('T10149', normal, compile_and_run, [''])
 test('T11334a', normal, compile_and_run, [''])
 test('T11555', normal, compile_and_run, [''])
+test('T12494', normal, compile_and_run, [''])
 test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', normal, compile_and_run, ['-threaded -with-rtsopts=-N2'])
@@ -214,3 +215,4 @@ test('T13191',
       ['-O'])
 test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
+test('functorOperators', normal, compile_and_run, [''])

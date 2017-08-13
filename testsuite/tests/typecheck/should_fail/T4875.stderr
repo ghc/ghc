@@ -1,7 +1,5 @@
 
 T4875.hs:27:24: error:
-    • Expecting one fewer arguments to ‘r’
-      Expected kind ‘* -> *’, but ‘r’ has kind ‘*’
-    • In the type signature:
-        multiplicities :: r c -> [c]
+    • Expected kind ‘* -> *’, but ‘r’ has kind ‘*’
+    • In the type signature: multiplicities :: r c -> [c]
       In the class declaration for ‘Morphic’

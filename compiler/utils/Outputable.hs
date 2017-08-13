@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP, ImplicitParams #-}
 {-
 (c) The University of Glasgow 2006-2012
 (c) The GRASP Project, Glasgow University, 1992-1998
@@ -122,6 +121,7 @@ import Data.List (intersperse)
 
 import GHC.Fingerprint
 import GHC.Show         ( showMultiLineString )
+import GHC.Stack        ( callStack, prettyCallStack )
 
 {-
 ************************************************************************
@@ -1130,7 +1130,8 @@ doOrDoes _   = text "do"
 
 callStackDoc :: HasCallStack => SDoc
 callStackDoc =
-    hang (text "Call stack:") 4 (vcat $ map text $ lines prettyCurrentCallStack)
+    hang (text "Call stack:")
+       4 (vcat $ map text $ lines (prettyCallStack callStack))
 
 pprPanic :: HasCallStack => String -> SDoc -> a
 -- ^ Throw an exception saying "bug in GHC"

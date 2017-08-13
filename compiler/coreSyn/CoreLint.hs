@@ -64,10 +64,10 @@ import Demand ( splitStrictSig, isBotRes )
 import HscTypes
 import DynFlags
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import MonadUtils
+import Data.Foldable      ( toList )
+import Data.List.NonEmpty ( NonEmpty )
 import Data.Maybe
 import Pair
 import qualified GHC.LanguageExtensions as LangExt
@@ -1949,10 +1949,8 @@ instance Monad LintM where
                            Just r -> unLintM (k r) env errs'
                            Nothing -> (Nothing, errs'))
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail LintM where
     fail err = failWithL (text err)
-#endif
 
 instance HasDynFlags LintM where
   getDynFlags = LintM (\ e errs -> (Just (le_dynflags e), errs))
@@ -2431,15 +2429,15 @@ pprLeftOrRight :: LeftOrRight -> MsgDoc
 pprLeftOrRight CLeft  = text "left"
 pprLeftOrRight CRight = text "right"
 
-dupVars :: [[Var]] -> MsgDoc
+dupVars :: [NonEmpty Var] -> MsgDoc
 dupVars vars
   = hang (text "Duplicate variables brought into scope")
-       2 (ppr vars)
+       2 (ppr (map toList vars))
 
-dupExtVars :: [[Name]] -> MsgDoc
+dupExtVars :: [NonEmpty Name] -> MsgDoc
 dupExtVars vars
   = hang (text "Duplicate top-level variables with the same qualified name")
-       2 (ppr vars)
+       2 (ppr (map toList vars))
 
 {-
 ************************************************************************

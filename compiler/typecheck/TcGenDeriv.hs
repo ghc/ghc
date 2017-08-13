@@ -1679,7 +1679,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
                                     fam_tc rep_lhs_tys rep_rhs_ty
         -- Check (c) from Note [GND and associated type families] in TcDeriv
         checkValidTyFamEqn (Just (cls, cls_tvs, lhs_env)) fam_tc rep_tvs'
-                           rep_cvs' rep_lhs_tys rep_rhs_ty loc
+                           rep_cvs' rep_lhs_tys rep_rhs_ty pp_lhs loc
         newFamInst SynFamilyInst axiom
       where
         cls_tvs     = classTyVars cls
@@ -1696,6 +1696,7 @@ gen_Newtype_binds loc cls inst_tvs inst_tys rhs_ty
         (rep_tvs, rep_cvs) = partition isTyVar rep_tcvs
         rep_tvs'    = toposortTyVars rep_tvs
         rep_cvs'    = toposortTyVars rep_cvs
+        pp_lhs      = ppr (mkTyConApp fam_tc rep_lhs_tys)
 
 nlHsAppType :: LHsExpr GhcPs -> Type -> LHsExpr GhcPs
 nlHsAppType e s = noLoc (e `HsAppType` hs_ty)

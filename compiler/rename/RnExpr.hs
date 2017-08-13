@@ -57,6 +57,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Ord
 import Data.Array
+import qualified Data.List.NonEmpty as NE
 
 {-
 ************************************************************************
@@ -577,7 +578,7 @@ methodNamesMatch :: MatchGroup GhcRn (LHsCmd GhcRn) -> FreeVars
 methodNamesMatch (MG { mg_alts = L _ ms })
   = plusFVs (map do_one ms)
  where
-    do_one (L _ (Match _ _ _ grhss)) = methodNamesGRHSs grhss
+    do_one (L _ (Match { m_grhss = grhss })) = methodNamesGRHSs grhss
 
 -------------------------------------------------
 -- gaw 2004
@@ -970,7 +971,7 @@ rnParallelStmts ctxt return_op segs thing_inside
 
     cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
     dupErr vs = addErr (text "Duplicate binding in parallel list comprehension for:"
-                    <+> quotes (ppr (head vs)))
+                    <+> quotes (ppr (NE.head vs)))
 
 lookupStmtName :: HsStmtContext Name -> Name -> RnM (SyntaxExpr GhcRn, FreeVars)
 -- Like lookupSyntaxName, but respects contexts

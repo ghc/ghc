@@ -1755,11 +1755,11 @@ static void
 computeRetainerSet( void )
 {
     StgWeak *weak;
-    RetainerSet *rtl;
     uint32_t g, n;
     StgPtr ml;
     bdescr *bd;
 #if defined(DEBUG_RETAINER)
+    RetainerSet *rtl;
     RetainerSet tmpRetainerSet;
 #endif
 
@@ -1801,9 +1801,9 @@ computeRetainerSet( void )
             for (ml = bd->start; ml < bd->free; ml++) {
 
                 maybeInitRetainerSet((StgClosure *)*ml);
-                rtl = retainerSetOf((StgClosure *)*ml);
 
 #if defined(DEBUG_RETAINER)
+                rtl = retainerSetOf((StgClosure *)*ml);
                 if (rtl == NULL) {
                     // first visit to *ml
                     // This is a violation of the interface rule!

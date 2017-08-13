@@ -18,7 +18,6 @@ T2994.hs:13:23: error:
       In the instance declaration for ‘MonadReader (Reader' r)’
 
 T2994.hs:15:10: error:
-    • Expecting one fewer arguments to ‘MonadReader r r’
-      Expected kind ‘(* -> *) -> Constraint’,
+    • Expected kind ‘(* -> *) -> Constraint’,
         but ‘MonadReader r r’ has kind ‘Constraint’
     • In the instance declaration for ‘MonadReader r r (Reader' r)’

@@ -323,8 +323,8 @@ data LlvmExpression
     basic block in a new variable of type tp.
       * tp:         type of the merged variable, must match the types of the
                     predecessor variables.
-      * precessors: A list of variables and the basic block that they originate
-                    from.
+      * predecessors: A list of variables and the basic block that they originate
+                      from.
   -}
   | Phi LlvmType [(LlvmVar,LlvmVar)]
 

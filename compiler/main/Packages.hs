@@ -88,12 +88,9 @@ import Data.Char ( toUpper )
 import Data.List as List
 import Data.Map (Map)
 import Data.Set (Set)
-import Data.Maybe (mapMaybe)
 import Data.Monoid (First(..))
-#if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-#endif
 import qualified Data.Map as Map
 import qualified Data.Map.Strict as MapStrict
 import qualified Data.Set as Set
@@ -207,7 +204,6 @@ fromReexportedModules False pkg = ModOrigin Nothing [] [pkg] False
 fromFlag :: ModuleOrigin
 fromFlag = ModOrigin Nothing [] [] True
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup ModuleOrigin where
     ModOrigin e res rhs f <> ModOrigin e' res' rhs' f' =
         ModOrigin (g e e') (res ++ res') (rhs ++ rhs') (f || f')
@@ -217,7 +213,6 @@ instance Semigroup ModuleOrigin where
             g Nothing x = x
             g x Nothing = x
     _x <> _y = panic "ModOrigin: hidden module redefined"
-#endif
 
 instance Monoid ModuleOrigin where
     mempty = ModOrigin Nothing [] [] False

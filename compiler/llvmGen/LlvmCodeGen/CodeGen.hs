@@ -36,10 +36,8 @@ import Util
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Writer
 
-#if __GLASGOW_HASKELL__ > 710
 import Data.Semigroup   ( Semigroup )
 import qualified Data.Semigroup as Semigroup
-#endif
 import Data.List ( nub )
 import Data.Maybe ( catMaybes )
 
@@ -1863,11 +1861,9 @@ getTBAARegMeta = getTBAAMeta . getTBAA
 -- | A more convenient way of accumulating LLVM statements and declarations.
 data LlvmAccum = LlvmAccum LlvmStatements [LlvmCmmDecl]
 
-#if __GLASGOW_HASKELL__ > 710
 instance Semigroup LlvmAccum where
   LlvmAccum stmtsA declsA <> LlvmAccum stmtsB declsB =
         LlvmAccum (stmtsA Semigroup.<> stmtsB) (declsA Semigroup.<> declsB)
-#endif
 
 instance Monoid LlvmAccum where
     mempty = LlvmAccum nilOL []

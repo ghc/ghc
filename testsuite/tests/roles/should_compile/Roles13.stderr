@@ -13,7 +13,7 @@ convert :: Wrap Age -> Int
 [GblId, Arity=1, Caf=NoCafRefs]
 convert
   = convert1
-    `cast` (<Wrap Age>_R -> Roles13.N:Wrap[0] Roles13.N:Age[0]
+    `cast` (<Wrap Age>_R ->_R Roles13.N:Wrap[0] (Roles13.N:Age[0])
             :: (Wrap Age -> Wrap Age :: *) ~R# (Wrap Age -> Int :: *))
 
 -- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}

@@ -722,15 +722,6 @@ getLinkDeps hsc_env hpt pls replace_osuf span mods
             adjust_ul _ (DotA fp) = panic ("adjust_ul DotA " ++ show fp)
             adjust_ul _ (DotDLL fp) = panic ("adjust_ul DotDLL " ++ show fp)
             adjust_ul _ l@(BCOs {}) = return l
-#if !MIN_VERSION_filepath(1,4,1)
-    stripExtension :: String -> FilePath -> Maybe FilePath
-    stripExtension []        path = Just path
-    stripExtension ext@(x:_) path = stripSuffix dotExt path
-        where dotExt = if isExtSeparator x then ext else '.':ext
-
-    stripSuffix :: Eq a => [a] -> [a] -> Maybe [a]
-    stripSuffix xs ys = fmap reverse $ stripPrefix (reverse xs) (reverse ys)
-#endif
 
 
 

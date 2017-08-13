@@ -6,6 +6,19 @@
 
   * Add support for overloaded labels. Introduces `labelE :: String -> ExpQ`.
 
+  * Add `KindQ`, `TyVarBndrQ`, and `FamilyResultSigQ` aliases to
+    `Language.Haskell.TH.Lib`.
+
+  * Add `Language.Haskell.TH.Lib.Internal` module, which exposes some
+    additional functionality that is used internally in GHC's integration
+    with Template Haskell. This is not a part of the public API, and as
+    such, there are no API guarantees for this module from version to version.
+
+  * `MonadIO` is now a superclass of `Quasi`, `qRunIO` has a default
+    implementation `qRunIO = liftIO`
+
+  * Add `MonadIO Q` instance
+
 ## 2.12.0.0 *TBA*
 
   * Bundled with GHC *TBA*

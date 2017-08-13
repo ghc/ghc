@@ -238,7 +238,7 @@ ppLlvmExpression expr
         Malloc     tp amount        -> ppMalloc tp amount
         AtomicRMW  aop tgt src ordering -> ppAtomicRMW aop tgt src ordering
         CmpXChg    addr old new s_ord f_ord -> ppCmpXChg addr old new s_ord f_ord
-        Phi        tp precessors    -> ppPhi tp precessors
+        Phi        tp predecessors  -> ppPhi tp predecessors
         Asm        asm c ty v se sk -> ppAsm asm c ty v se sk
         MExpr      meta expr        -> ppMetaExpr meta expr
 

@@ -528,7 +528,8 @@ solveOneFromTheOther ev_i ev_w
 
   | CtWanted { ctev_loc = loc_w } <- ev_w
   , prohibitedSuperClassSolve (ctEvLoc ev_i) loc_w
-  = return (IRDelete, False)
+  = do { traceTcS "prohibitedClassSolve1" (ppr ev_i $$ ppr ev_w)
+       ; return (IRDelete, False) }
 
   | CtWanted { ctev_dest = dest } <- ev_w
        -- Inert is Given or Wanted
@@ -537,9 +538,10 @@ solveOneFromTheOther ev_i ev_w
 
   | CtWanted { ctev_loc = loc_i } <- ev_i   -- Work item is Given
   , prohibitedSuperClassSolve (ctEvLoc ev_w) loc_i
-  = return (IRKeep, False)  -- Just discard the un-usable Given
-                            -- This never actually happens because
-                            -- Givens get processed first
+  = do { traceTcS "prohibitedClassSolve2" (ppr ev_i $$ ppr ev_w)
+       ; return (IRKeep, False) } -- Just discard the un-usable Given
+                                  -- This never actually happens because
+                                  -- Givens get processed first
 
   | CtWanted { ctev_dest = dest } <- ev_i
   = do { setWantedEvTerm dest (ctEvTerm ev_w)
@@ -878,6 +880,7 @@ interactDict inerts workItem@(CDictCan { cc_ev = ev_w, cc_class = cls, cc_tyargs
       -- we solve it from the solution in the inerts we just retrieved.
       Nothing ->  do
         { (inert_effect, stop_now) <- solveOneFromTheOther ctev_i ev_w
+        ; traceTcS "lookupInertDict" (ppr inert_effect <+> ppr stop_now)
         ; case inert_effect of
             IRKeep    -> return ()
             IRDelete  -> updInertDicts $ \ ds -> delDict ds cls tys

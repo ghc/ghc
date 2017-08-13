@@ -21,7 +21,7 @@ import FamInst
 import TcDerivInfer
 import TcDerivUtils
 import TcValidity( allDistinctTyVars )
-import TcClassDcl( tcATDefault, tcMkDeclCtxt )
+import TcClassDcl( instDeclCtxt3, tcATDefault, tcMkDeclCtxt )
 import TcEnv
 import TcGenDeriv                       -- Deriv stuff
 import InstEnv
@@ -1600,8 +1600,9 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
                  , ds_mechanism = mechanism, ds_tys = tys
                  , ds_cls = clas, ds_loc = loc })
   = do (meth_binds, deriv_stuff, unusedNames)
-         <- genDerivStuff mechanism loc clas rep_tycon tys tvs
-       let mk_inst_info theta = do
+         <- set_span_and_ctxt $
+            genDerivStuff mechanism loc clas rep_tycon tys tvs
+       let mk_inst_info theta = set_span_and_ctxt $ do
              inst_spec <- newDerivClsInst theta spec
              doDerivInstErrorChecks2 clas inst_spec mechanism
              traceTc "newder" (ppr inst_spec)
@@ -1623,6 +1624,9 @@ genInst spec@(DS { ds_tvs = tvs, ds_tc = rep_tycon
       = [LangExt.ImpredicativeTypes, LangExt.RankNTypes]
       | otherwise
       = []
+
+    set_span_and_ctxt :: TcM a -> TcM a
+    set_span_and_ctxt = setSrcSpan loc . addErrCtxt (instDeclCtxt3 clas tys)
 
 doDerivInstErrorChecks1 :: Class -> [Type] -> TyCon -> [Type] -> TyCon
                         -> DerivContext -> Bool -> DerivSpecMechanism
@@ -1665,10 +1669,8 @@ doDerivInstErrorChecks2 clas clas_inst mechanism
       DerivSpecStock{} -> False
       _                -> True
 
-    gen_inst_err = hang (text ("Generic instances can only be derived in "
-                            ++ "Safe Haskell using the stock strategy.") $+$
-                         text "In the following instance:")
-                      2 (pprInstanceHdr clas_inst)
+    gen_inst_err = text "Generic instances can only be derived in"
+               <+> text "Safe Haskell using the stock strategy."
 
 genDerivStuff :: DerivSpecMechanism -> SrcSpan -> Class
               -> TyCon -> [Type] -> [TyVar]
@@ -1694,7 +1696,7 @@ genDerivStuff mechanism loc clas tycon inst_tys tyvars
           -- unless -XDeriveAnyClass is enabled.
           ASSERT2( isValid (canDeriveAnyClass dflags)
                  , ppr "genDerivStuff: bad derived class" <+> ppr clas )
-          mapM (tcATDefault False loc mini_subst emptyNameSet)
+          mapM (tcATDefault loc mini_subst emptyNameSet)
                (classATItems clas)
         return ( emptyBag -- No method bindings are needed...
                , listToBag (map DerivFamInst (concat tyfam_insts))
@@ -1755,8 +1757,8 @@ is used:
 In the latter case, we must take care to check if C has any associated type
 families with default instances, because -XDeriveAnyClass will never provide
 an implementation for them. We "fill in" the default instances using the
-tcATDefault function from TcClsDcl (which is also used in TcInstDcls to handle
-the empty instance declaration case).
+tcATDefault function from TcClassDcl (which is also used in TcInstDcls to
+handle the empty instance declaration case).
 
 Note [Deriving strategies]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~

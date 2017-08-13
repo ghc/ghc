@@ -13,4 +13,4 @@ toIfaceTyLit :: TyLit -> IfaceTyLit
 toIfaceForAllBndr :: TyVarBinder -> IfaceForAllBndr
 toIfaceTyCon :: TyCon -> IfaceTyCon
 toIfaceTcArgs :: TyCon -> [Type] -> IfaceTcArgs
-toIfaceCoercion :: Coercion -> IfaceCoercion
+toIfaceCoercionX :: VarSet -> Coercion -> IfaceCoercion

@@ -1,6 +1,6 @@
 
 KindVType.hs:8:8: error:
-    • Couldn't match type ‘*’ with ‘* -> *’
+    • Couldn't match type ‘Int’ with ‘Maybe’
       Expected type: Proxy Maybe
         Actual type: Proxy Int
     • In the expression: (Proxy :: Proxy Int)

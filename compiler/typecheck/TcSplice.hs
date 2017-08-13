@@ -135,8 +135,8 @@ import GHC.Exts         ( unsafeCoerce# )
 ************************************************************************
 -}
 
-tcTypedBracket   :: HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
-tcUntypedBracket :: HsBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
+tcTypedBracket   :: HsExpr GhcRn -> HsBracket GhcRn -> ExpRhoType -> TcM (HsExpr GhcTcId)
+tcUntypedBracket :: HsExpr GhcRn -> HsBracket GhcRn -> [PendingRnSplice] -> ExpRhoType
                  -> TcM (HsExpr GhcTcId)
 tcSpliceExpr     :: HsSplice GhcRn  -> ExpRhoType -> TcM (HsExpr GhcTcId)
         -- None of these functions add constraints to the LIE
@@ -157,7 +157,7 @@ runAnnotation     :: CoreAnnTarget -> LHsExpr GhcRn -> TcM Annotation
 
 -- See Note [How brackets and nested splices are handled]
 -- tcTypedBracket :: HsBracket Name -> TcRhoType -> TcM (HsExpr TcId)
-tcTypedBracket brack@(TExpBr expr) res_ty
+tcTypedBracket rn_expr brack@(TExpBr expr) res_ty
   = addErrCtxt (quotationCtxtDoc brack) $
     do { cur_stage <- getStage
        ; ps_ref <- newMutVar []
@@ -176,20 +176,21 @@ tcTypedBracket brack@(TExpBr expr) res_ty
        ; ps' <- readMutVar ps_ref
        ; texpco <- tcLookupId unsafeTExpCoerceName
        ; tcWrapResultO (Shouldn'tHappenOrigin "TExpBr")
+                       rn_expr
                        (unLoc (mkHsApp (nlHsTyApp texpco [expr_ty])
                                               (noLoc (HsTcBracketOut brack ps'))))
                        meta_ty res_ty }
-tcTypedBracket other_brack _
+tcTypedBracket _ other_brack _
   = pprPanic "tcTypedBracket" (ppr other_brack)
 
 -- tcUntypedBracket :: HsBracket Name -> [PendingRnSplice] -> ExpRhoType -> TcM (HsExpr TcId)
-tcUntypedBracket brack ps res_ty
+tcUntypedBracket rn_expr brack ps res_ty
   = do { traceTc "tc_bracket untyped" (ppr brack $$ ppr ps)
        ; ps' <- mapM tcPendingSplice ps
        ; meta_ty <- tcBrackTy brack
        ; traceTc "tc_bracket done untyped" (ppr meta_ty)
        ; tcWrapResultO (Shouldn'tHappenOrigin "untyped bracket")
-                       (HsTcBracketOut brack ps') meta_ty res_ty }
+                       rn_expr (HsTcBracketOut brack ps') meta_ty res_ty }
 
 ---------------
 tcBrackTy :: HsBracket GhcRn -> TcM TcType
@@ -868,7 +869,6 @@ instance TH.Quasi TcM where
         -- the recovery action is chosen.  Otherwise
         -- we'll only fail higher up.
   qRecover recover main = tryTcDiscardingErrs recover main
-  qRunIO io = liftIO io
 
   qAddDependentFile fp = do
     ref <- fmap tcg_dependent_files getGblEnv
@@ -1137,7 +1137,11 @@ reifyInstances th_nm th_tys
         ; let tv_rdrs = freeKiTyVarsAllVars free_vars
           -- Rename  to HsType Name
         ; ((tv_names, rn_ty), _fvs)
-            <- bindLRdrNames tv_rdrs $ \ tv_names ->
+            <- checkNoErrs $ -- If there are out-of-scope Names here, then we
+                             -- must error before proceeding to typecheck the
+                             -- renamed type, as that will result in GHC
+                             -- internal errors (#13837).
+               bindLRdrNames tv_rdrs $ \ tv_names ->
                do { (rn_ty, fvs) <- rnLHsType doc rdr_ty
                   ; return ((tv_names, rn_ty), fvs) }
         ; (_tvs, ty)

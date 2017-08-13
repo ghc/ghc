@@ -566,7 +566,6 @@ That's what the 'go' loop in prepareRhs does
 prepareRhs :: TopLevelFlag -> SimplEnv -> OutId -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- See Note [prepareRhs]
 -- Adds new floats to the env iff that allows us to return a good RHS
--- See Note [prepareRhs]
 prepareRhs top_lvl env id (Cast rhs co)    -- Note [Float coercions]
   | Pair ty1 _ty2 <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
   , not (isUnliftedType ty1)            -- see Note [Float coercions (unlifted)]
@@ -2700,7 +2699,7 @@ Note [Add unfolding for scrutinee]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 In general it's unlikely that a variable scrutinee will appear
 in the case alternatives   case x of { ...x unlikely to appear... }
-because the binder-swap in OccAnal has got rid of all such occcurrences
+because the binder-swap in OccAnal has got rid of all such occurrences
 See Note [Binder swap] in OccAnal.
 
 BUT it is still VERY IMPORTANT to add a suitable unfolding for a

@@ -21,6 +21,12 @@ Full details
 Language
 ~~~~~~~~
 
+- Data families have been generalised a bit: a data family declaration can now
+  end with a kind variable ``k`` instead of ``Type``. Additionally, data/newtype
+  instance no longer need to list all the patterns of the family if they don't
+  wish to; this is quite like how regular datatypes with a kind signature can omit
+  some type variables.
+
 Compiler
 ~~~~~~~~
 
@@ -140,3 +146,9 @@ Template Haskell
       #endif
 
   can be used.
+
+``base`` library
+~~~~~~~~~~~~~~~~
+
+- Blank strings can now be used as values for environment variables using the
+  System.Environment.Blank module. See :ghc-ticket:`12494`

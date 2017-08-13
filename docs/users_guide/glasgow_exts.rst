@@ -1701,8 +1701,8 @@ example, consider these two candidate definitions of ``absurd``:
 
 ::
 
-    data a :==: b where
-      Refl :: a :==: a
+    data a :~: b where
+      Refl :: a :~: a
 
     absurd :: True :~: False -> a
     absurd x = error "absurd"    -- (A)
@@ -1710,10 +1710,9 @@ example, consider these two candidate definitions of ``absurd``:
 
 We much prefer (B). Why? Because GHC can figure out that
 ``(True :~: False)`` is an empty type. So (B) has no partiality and GHC
-should be able to compile with :ghc-flag:`-Wincomplete-patterns`. (Though
-the pattern match checking is not yet clever enough to do that.) On the
-other hand (A) looks dangerous, and GHC doesn't check to make sure that,
-in fact, the function can never get called.
+is able to compile with :ghc-flag:`-Wincomplete-patterns` and
+:ghc-flag:`-Werror`. On the other hand (A) looks dangerous, and GHC doesn't
+check to make sure that, in fact, the function can never get called.
 
 .. _multi-way-if:
 
@@ -6772,6 +6771,11 @@ entirely optional, so that we can declare ``Array`` alternatively with ::
 
     data family Array :: * -> *
 
+Unlike with ordinary data definitions, the result kind of a data family
+does not need to be ``*``: it can alternatively be a kind variable
+(with :ghc-flag:`-XPolyKinds`). Data instances' kinds must end in
+``*``, however.
+    
 .. _data-instance-declarations:
 
 Data instance declarations
@@ -8347,9 +8351,9 @@ enabled).
 The only way ``*`` is unordinary is in its parsing. In order to be backward
 compatible, ``*`` is parsed as if it were an alphanumeric idenfifier; note
 that we do not write ``Int :: (*)`` but just plain ``Int :: *``. Due to the
-bizarreness with which ``*`` is parsed-and the fact that it is the only such
-operator in GHC-there are some corner cases that are
-not handled. We are aware of two:
+bizarreness with which ``*`` is parsed--and the fact that it is the only such
+operator in GHC--there are some corner cases that are
+not handled. We are aware of three:
 
 - In a Haskell-98-style data constructor, you must put parentheses around
   ``*``, like this: ::
@@ -8362,6 +8366,10 @@ not handled. We are aware of two:
 
   Note that the keyword ``type`` there is just to disambiguate the import
   from a term-level ``(*)``. (:ref:`explicit-namespaces`)
+
+- In an instance declaration head (the part after the word ``instance``), you
+  must parenthesize ``*``. This applies to all manners of instances, including
+  the left-hand sides of individual equations of a closed type family.
 
 The ``Data.Kind`` module also exports ``Type`` as a synonym for ``*``.
 Now that type synonyms work in kinds, it is conceivable that we will deprecate
@@ -10285,6 +10293,10 @@ type-checker will accept the inferred type for each hole, generating
 warnings instead of errors. Additionally, these warnings can be silenced
 with the :ghc-flag:`-Wno-partial-type-signatures <-Wpartial-type-signatures>`
 flag.
+
+However, because GHC must *infer* the type when part of a type is left
+out, it is unable to use polymorphic recursion. The same restriction
+takes place when the type signature is omitted completely.
 
 .. _pts-syntax:
 

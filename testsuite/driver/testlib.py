@@ -863,6 +863,7 @@ def do_test(name, way, func, args, files):
 
     if passFail == 'pass':
         if _expect_pass(way):
+            t.expected_passes.append((directory, name, way))
             t.n_expected_passes += 1
         else:
             if_verbose(1, '*** unexpected pass for %s' % full_name)

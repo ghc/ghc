@@ -425,8 +425,8 @@ getMonoBind (L loc1 (FunBind { fun_id = fun_id1@(L _ f1),
 getMonoBind bind binds = (bind, binds)
 
 has_args :: [LMatch GhcPs (LHsExpr GhcPs)] -> Bool
-has_args []                           = panic "RdrHsSyn:has_args"
-has_args ((L _ (Match _ args _ _)) : _) = not (null args)
+has_args []                                    = panic "RdrHsSyn:has_args"
+has_args ((L _ (Match { m_pats = args })) : _) = not (null args)
         -- Don't group together FunBinds if they have
         -- no arguments.  This is necessary now that variable bindings
         -- with no arguments are now treated as FunBinds rather
@@ -514,10 +514,16 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
         do { unless (name == patsyn_name) $
                wrongNameBindingErr loc decl
            ; match <- case details of
-               PrefixCon pats ->
-                        return $ Match (FunRhs ln Prefix NoSrcStrict) pats Nothing rhs
-               InfixCon pat1 pat2 ->
-                       return $ Match (FunRhs ln Infix NoSrcStrict) [pat1, pat2] Nothing rhs
+               PrefixCon pats -> return $ Match { m_ctxt = ctxt, m_pats = pats
+                                                , m_type = Nothing, m_grhss = rhs }
+                   where
+                     ctxt = FunRhs { mc_fun = ln, mc_fixity = Prefix, mc_strictness = NoSrcStrict }
+
+               InfixCon p1 p2 -> return $ Match { m_ctxt = ctxt, m_pats = [p1, p2]
+                                                , m_type = Nothing, m_grhss = rhs }
+                   where
+                     ctxt = FunRhs { mc_fun = ln, mc_fixity = Infix, mc_strictness = NoSrcStrict }
+
                RecCon{} -> recordPatSynErr loc pat
            ; return $ L loc match }
     fromDecl (L loc decl) = extraDeclErr loc decl
@@ -960,7 +966,9 @@ checkFunBind msg strictness ann lhs_loc fun is_infix pats opt_sig (L rhs_span gr
         -- Add back the annotations stripped from any HsPar values in the lhs
         -- mapM_ (\a -> a match_span) ann
         return (ann, makeFunBind fun
-                  [L match_span (Match { m_ctxt = FunRhs fun is_infix strictness
+                  [L match_span (Match { m_ctxt = FunRhs { mc_fun    = fun
+                                                         , mc_fixity = is_infix
+                                                         , mc_strictness = strictness }
                                        , m_pats = ps
                                        , m_type = opt_sig
                                        , m_grhss = grhss })])
@@ -1075,7 +1083,7 @@ isFunLhs e = go e [] []
    go (L l (HsPar e))   es@(_:_) ann = go e es (ann ++ mkParensApiAnn l)
 
         -- Things of the form `!x` are also FunBinds
-        -- See Note [Varieties of binding pattern matches]
+        -- See Note [FunBind vs PatBind]
    go (L _ (SectionR (L _ (HsVar (L _ bang))) (L l (HsVar (L _ var))))) [] ann
         | bang == bang_RDR
         , not (isRdrDataCon var)     = return (Just (L l var, Prefix, [], ann))
@@ -1239,9 +1247,9 @@ checkCmdMatchGroup :: MatchGroup GhcPs (LHsExpr GhcPs)
 checkCmdMatchGroup mg@(MG { mg_alts = L l ms }) = do
     ms' <- mapM (locMap $ const convert) ms
     return $ mg { mg_alts = L l ms' }
-    where convert (Match mf pat mty grhss) = do
+    where convert match@(Match { m_grhss = grhss }) = do
             grhss' <- checkCmdGRHSs grhss
-            return $ Match mf pat mty grhss'
+            return $ match { m_grhss = grhss'}
 
 checkCmdGRHSs :: GRHSs GhcPs (LHsExpr GhcPs) -> P (GRHSs GhcPs (LHsCmd GhcPs))
 checkCmdGRHSs (GRHSs grhss binds) = do

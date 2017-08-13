@@ -107,7 +107,7 @@ newtype ZipList a = ZipList { getZipList :: [a] }
 
 -- |
 -- > f '<$>' 'ZipList' xs1 '<*>' ... '<*>' 'ZipList' xsN
---       = 'ZipList' (zipWithN f xs1 ... xsN)
+-- >     = 'ZipList' (zipWithN f xs1 ... xsN)
 --
 -- where @zipWithN@ refers to the @zipWith@ function of the appropriate arity
 -- (@zipWith@, @zipWith3@, @zipWith4@, ...). For example:

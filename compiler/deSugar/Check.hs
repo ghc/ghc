@@ -12,13 +12,16 @@ module Check (
         checkSingle, checkMatches, isAnyPmCheckEnabled,
 
         -- See Note [Type and Term Equality Propagation]
-        genCaseTmCs1, genCaseTmCs2
+        genCaseTmCs1, genCaseTmCs2,
+
+        -- Pattern-match-specific type operations
+        pmIsClosedType, pmTopNormaliseType_maybe
     ) where
 
 #include "HsVersions.h"
 
 import TmOracle
-
+import Unify( tcMatchTy )
 import BasicTypes
 import DynFlags
 import HsSyn
@@ -27,6 +30,7 @@ import Id
 import ConLike
 import Name
 import FamInstEnv
+import TysPrim (tYPETyCon)
 import TysWiredIn
 import TyCon
 import SrcLoc
@@ -42,9 +46,11 @@ import TcType        (toTcType, isStringTy, isIntTy, isWordTy)
 import Bag
 import ErrUtils
 import Var           (EvVar)
+import TyCoRep
 import Type
 import UniqSupply
 import DsGRHSs       (isTrueLHsExpr)
+import Maybes        ( expectJust )
 
 import Data.List     (find)
 import Data.Maybe    (isJust, fromMaybe)
@@ -372,7 +378,7 @@ checkMatches' vars matches
         (NotCovered, Diverged )   -> (final_prov,  rs, final_u, m:is)
 
     hsLMatchToLPats :: LMatch id body -> Located [LPat id]
-    hsLMatchToLPats (L l (Match _ pats _ _)) = L l pats
+    hsLMatchToLPats (L l (Match { m_pats = pats })) = L l pats
 
 -- | Check an empty case expression. Since there are no clauses to process, we
 --   only compute the uncovered set. See Note [Checking EmptyCase Expressions]
@@ -405,6 +411,147 @@ checkEmptyCase' var = do
             then emptyPmResult
             else PmResult FromBuiltin [] uncovered []
     Nothing -> return emptyPmResult
+
+-- | Returns 'True' if the argument 'Type' is a fully saturated application of
+-- a closed type constructor.
+--
+-- Closed type constructors are those with a fixed right hand side, as
+-- opposed to e.g. associated types. These are of particular interest for
+-- pattern-match coverage checking, because GHC can exhaustively consider all
+-- possible forms that values of a closed type can take on.
+--
+-- Note that this function is intended to be used to check types of value-level
+-- patterns, so as a consequence, the 'Type' supplied as an argument to this
+-- function should be of kind @Type@.
+pmIsClosedType :: Type -> Bool
+pmIsClosedType ty
+  = case splitTyConApp_maybe ty of
+      Just (tc, ty_args)
+             | is_algebraic_like tc && not (isFamilyTyCon tc)
+             -> ASSERT2( ty_args `lengthIs` tyConArity tc, ppr ty ) True
+      _other -> False
+  where
+    -- This returns True for TyCons which /act like/ algebraic types.
+    -- (See "Type#type_classification" for what an algebraic type is.)
+    --
+    -- This is qualified with \"like\" because of a particular special
+    -- case: TYPE (the underlyind kind behind Type, among others). TYPE
+    -- is conceptually a datatype (and thus algebraic), but in practice it is
+    -- a primitive builtin type, so we must check for it specially.
+    --
+    -- NB: it makes sense to think of TYPE as a closed type in a value-level,
+    -- pattern-matching context. However, at the kind level, TYPE is certainly
+    -- not closed! Since this function is specifically tailored towards pattern
+    -- matching, however, it's OK to label TYPE as closed.
+    is_algebraic_like :: TyCon -> Bool
+    is_algebraic_like tc = isAlgTyCon tc || tc == tYPETyCon
+
+pmTopNormaliseType_maybe :: FamInstEnvs -> Type -> Maybe (Type, [DataCon], Type)
+-- ^ Get rid of *outermost* (or toplevel)
+--      * type function redex
+--      * data family redex
+--      * newtypes
+--
+-- Behaves exactly like `topNormaliseType_maybe`, but instead of returning a
+-- coercion, it returns useful information for issuing pattern matching
+-- warnings. See Note [Type normalisation for EmptyCase] for details.
+pmTopNormaliseType_maybe env typ
+  = do ((ty_f,tm_f), ty) <- topNormaliseTypeX stepper comb typ
+       return (eq_src_ty ty (typ : ty_f [ty]), tm_f [], ty)
+  where
+    -- Find the first type in the sequence of rewrites that is a data type,
+    -- newtype, or a data family application (not the representation tycon!).
+    -- This is the one that is equal (in source Haskell) to the initial type.
+    -- If none is found in the list, then all of them are type family
+    -- applications, so we simply return the last one, which is the *simplest*.
+    eq_src_ty :: Type -> [Type] -> Type
+    eq_src_ty ty tys = maybe ty id (find is_closed_or_data_family tys)
+
+    is_closed_or_data_family :: Type -> Bool
+    is_closed_or_data_family ty = pmIsClosedType ty || isDataFamilyAppType ty
+
+    -- For efficiency, represent both lists as difference lists.
+    -- comb performs the concatenation, for both lists.
+    comb (tyf1, tmf1) (tyf2, tmf2) = (tyf1 . tyf2, tmf1 . tmf2)
+
+    stepper = newTypeStepper `composeSteppers` tyFamStepper
+
+    -- A 'NormaliseStepper' that unwraps newtypes, careful not to fall into
+    -- a loop. If it would fall into a loop, it produces 'NS_Abort'.
+    newTypeStepper :: NormaliseStepper ([Type] -> [Type],[DataCon] -> [DataCon])
+    newTypeStepper rec_nts tc tys
+      | Just (ty', _co) <- instNewTyCon_maybe tc tys
+      = case checkRecTc rec_nts tc of
+          Just rec_nts' -> let tyf = ((TyConApp tc tys):)
+                               tmf = ((tyConSingleDataCon tc):)
+                           in  NS_Step rec_nts' ty' (tyf, tmf)
+          Nothing       -> NS_Abort
+      | otherwise
+      = NS_Done
+
+    tyFamStepper :: NormaliseStepper ([Type] -> [Type], [DataCon] -> [DataCon])
+    tyFamStepper rec_nts tc tys  -- Try to step a type/data family
+      = let (_args_co, ntys) = normaliseTcArgs env Representational tc tys in
+          -- NB: It's OK to use normaliseTcArgs here instead of
+          -- normalise_tc_args (which takes the LiftingContext described
+          -- in Note [Normalising types]) because the reduceTyFamApp below
+          -- works only at top level. We'll never recur in this function
+          -- after reducing the kind of a bound tyvar.
+
+        case reduceTyFamApp_maybe env Representational tc ntys of
+          Just (_co, rhs) -> NS_Step rec_nts rhs ((rhs:), id)
+          _               -> NS_Done
+
+{- Note [Type normalisation for EmptyCase]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+EmptyCase is an exception for pattern matching, since it is strict. This means
+that it boils down to checking whether the type of the scrutinee is inhabited.
+Function pmTopNormaliseType_maybe gets rid of the outermost type function/data
+family redex and newtypes, in search of an algebraic type constructor, which is
+easier to check for inhabitation.
+
+It returns 3 results instead of one, because there are 2 subtle points:
+1. Newtypes are isomorphic to the underlying type in core but not in the source
+   language,
+2. The representational data family tycon is used internally but should not be
+   shown to the user
+
+Hence, if pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty), then
+  (a) src_ty is the rewritten type which we can show to the user. That is, the
+      type we get if we rewrite type families but not data families or
+      newtypes.
+  (b) dcs is the list of data constructors "skipped", every time we normalise a
+      newtype to it's core representation, we keep track of the source data
+      constructor.
+  (c) core_ty is the rewritten type. That is,
+        pmTopNormaliseType_maybe env ty = Just (src_ty, dcs, core_ty)
+      implies
+        topNormaliseType_maybe env ty = Just (co, core_ty)
+      for some coercion co.
+
+To see how all cases come into play, consider the following example:
+
+  data family T a :: *
+  data instance T Int = T1 | T2 Bool
+  -- Which gives rise to FC:
+  --   data T a
+  --   data R:TInt = T1 | T2 Bool
+  --   axiom ax_ti : T Int ~R R:TInt
+
+  newtype G1 = MkG1 (T Int)
+  newtype G2 = MkG2 G1
+
+  type instance F Int  = F Char
+  type instance F Char = G2
+
+In this case pmTopNormaliseType_maybe env (F Int) results in
+
+  Just (G2, [MkG2,MkG1], R:TInt)
+
+Which means that in source Haskell:
+  - G2 is equivalent to F Int (in contrast, G1 isn't).
+  - if (x : R:TInt) then (MkG2 (MkG1 x) : F Int).
+-}
 
 -- | Generate all inhabitation candidates for a given type. The result is
 -- either (Left ty), if the type cannot be reduced to a closed algebraic type
@@ -439,7 +586,8 @@ inhabitationCandidates fam_insts ty
             (_:_) -> do var <- liftD $ mkPmId (toTcType core_ty)
                         let va = build_tm (PmVar var) dcs
                         return $ Right [(va, mkIdEq var, emptyBag)]
-        | isClosedAlgType core_ty -> liftD $ do
+
+        | pmIsClosedType core_ty -> liftD $ do
             var  <- mkPmId (toTcType core_ty) -- it would be wrong to unify x
             alts <- mapM (mkOneConFull var . RealDataCon) (tyConDataCons tc)
             return $ Right [(build_tm va dcs, eq, cs) | (va, eq, cs) <- alts]
@@ -747,7 +895,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
 -- Translate a single match
 translateMatch :: FamInstEnvs -> LMatch GhcTc (LHsExpr GhcTc)
                -> DsM (PatVec,[PatVec])
-translateMatch fam_insts (L _ (Match _ lpats _ grhss)) = do
+translateMatch fam_insts (L _ (Match { m_pats = lpats, m_grhss = grhss })) = do
   pats'   <- concat <$> translatePatVec fam_insts pats
   guards' <- mapM (translateGuards fam_insts) guards
   return (pats', guards')
@@ -971,14 +1119,14 @@ mkOneConFull :: Id -> ConLike -> DsM (ValAbs, ComplexEq, Bag EvVar)
 --          ComplexEq:       x ~ K y1..yn
 --          [EvVar]:         Q
 mkOneConFull x con = do
-  let -- res_ty == TyConApp (ConLikeTyCon cabs_con) cabs_arg_tys
-      res_ty  = idType x
-      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, _)
+  let res_ty  = idType x
+      (univ_tvs, ex_tvs, eq_spec, thetas, _req_theta , arg_tys, con_res_ty)
         = conLikeFullSig con
-      tc_args = case splitTyConApp_maybe res_ty of
-                  Just (_, tys) -> tys
-                  Nothing -> pprPanic "mkOneConFull: Not TyConApp:" (ppr res_ty)
-      subst1  = zipTvSubst univ_tvs tc_args
+      tc_args = tyConAppArgs res_ty
+      subst1  = case con of
+                  RealDataCon {} -> zipTvSubst univ_tvs tc_args
+                  PatSynCon {}   -> expectJust "mkOneConFull" (tcMatchTy con_res_ty res_ty)
+                                    -- See Note [Pattern synonym result type] in PatSyn
 
   (subst, ex_tvs') <- cloneTyVarBndrs subst1 ex_tvs <$> getUniqueSupplyM
 
@@ -1740,9 +1888,9 @@ pp_context singular (DsMatchContext kind _loc) msg rest_of_msg_fun
 
     (ppr_match, pref)
         = case kind of
-             FunRhs (L _ fun) _ _ -> (pprMatchContext kind,
-                                      \ pp -> ppr fun <+> pp)
-             _                    -> (pprMatchContext kind, \ pp -> pp)
+             FunRhs { mc_fun = L _ fun }
+                  -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
+             _    -> (pprMatchContext kind, \ pp -> pp)
 
 ppr_pats :: HsMatchContext Name -> [Pat GhcTc] -> SDoc
 ppr_pats kind pats
