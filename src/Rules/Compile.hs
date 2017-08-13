@@ -1,7 +1,5 @@
 module Rules.Compile (compilePackage) where
 
-import Development.Shake.Util
-
 import Base
 import Context
 import Expression

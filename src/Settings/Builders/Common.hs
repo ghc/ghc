@@ -1,5 +1,6 @@
 module Settings.Builders.Common (
     module Base,
+    module Context,
     module Expression,
     module GHC,
     module Oracles.Flag,
@@ -12,6 +13,7 @@ module Settings.Builders.Common (
     ) where
 
 import Base
+import Context (getStagedSettingList)
 import Expression
 import GHC
 import Oracles.Flag

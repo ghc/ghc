@@ -1,7 +1,5 @@
 module Settings.Packages.Rts (rtsPackageArgs, rtsLibffiLibrary) where
 
-import Hadrian.Utilities
-
 import Base
 import Expression
 import GHC

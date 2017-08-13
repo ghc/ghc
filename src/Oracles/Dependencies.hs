@@ -5,7 +5,6 @@ module Oracles.Dependencies (
     ) where
 
 import qualified Data.HashMap.Strict as Map
-import Hadrian.Utilities
 
 import Base
 import Context

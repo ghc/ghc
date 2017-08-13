@@ -1,10 +1,7 @@
 module Rules.Register (registerPackage) where
 
-import Hadrian.Utilities
-
 import Base
 import Context
-import Expression
 import GHC
 import Settings.Path
 import Target

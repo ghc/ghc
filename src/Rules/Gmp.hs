@@ -1,15 +1,10 @@
 module Rules.Gmp (gmpRules) where
 
-import Hadrian.Utilities
-
 import Base
-import Builder
 import GHC
 import Oracles.Setting
-import Package
 import Settings.Packages.IntegerGmp
 import Settings.Path
-import Stage
 import Target
 import UserSettings
 import Util

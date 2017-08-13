@@ -4,11 +4,9 @@ module Oracles.ModuleFiles (
     ) where
 
 import qualified Data.HashMap.Strict as Map
-import Hadrian.Utilities
 
 import Base
 import Context
-import Expression
 import Oracles.PackageData
 import Settings.Path
 

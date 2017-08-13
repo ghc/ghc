@@ -21,12 +21,12 @@ import GHC.Generics
 --   for the compiler. Since it serves no other purpose than that, the stage 3
 --   build is usually omitted in the build process.
 data Stage = Stage0 | Stage1 | Stage2 | Stage3
-           deriving (Show, Eq, Ord, Enum, Generic, Bounded)
+    deriving (Show, Eq, Ord, Enum, Generic, Bounded)
+
+instance Binary   Stage
+instance Hashable Stage
+instance NFData   Stage
 
 -- | Prettyprint a 'Stage'.
 stageString :: Stage -> String
 stageString stage = "stage" ++ show (fromEnum stage)
-
-instance Binary Stage
-instance Hashable Stage
-instance NFData Stage

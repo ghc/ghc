@@ -1,15 +1,17 @@
 module Oracles.Setting (
-    Setting (..), SettingList (..), setting, settingList,
-    anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
+    configFile, Setting (..), SettingList (..), setting, settingList, getSetting,
+    getSettingList,  anyTargetPlatform, anyTargetOs, anyTargetArch, anyHostOs,
     ghcWithInterpreter, ghcEnableTablesNextToCode, useLibFFIForAdjustors,
     ghcCanonVersion, cmdLineLengthLimit, iosHost, osxHost, windowsHost,
-    relocatableBuild, installDocDir, installGhcLibDir
+    topDirectory, relocatableBuild, installDocDir, installGhcLibDir, libsuf
     ) where
 
+import Development.Shake
+import Hadrian.Expression
 import Hadrian.Oracles.KeyValue
+import Hadrian.Oracles.Path
 
 import Base
-import Stage
 
 -- TODO: Reduce the variety of similar flags (e.g. CPP and non-CPP versions).
 -- | Each 'Setting' comes from @system.config@ file, e.g. 'target-os = mingw32'.
@@ -129,6 +131,14 @@ settingList key = fmap words $ lookupValueOrError configFile $ case key of
     ConfLdLinkerArgs  stage -> "conf-ld-linker-args-"  ++ stageString stage
     HsCppArgs               -> "hs-cpp-args"
 
+-- | Get a configuration setting.
+getSetting :: Setting -> Expr c b String
+getSetting = expr . setting
+
+-- | Get a list of configuration settings.
+getSettingList :: SettingList -> Args c b
+getSettingList = expr . settingList
+
 matchSetting :: Setting -> [String] -> Action Bool
 matchSetting key values = fmap (`elem` values) $ setting key
 
@@ -207,6 +217,10 @@ installDocDir = do
     dataDir <- setting InstallDataRootDir
     return $ dataDir -/- ("doc/ghc-" ++ version)
 
+-- | Path to the GHC source tree.
+topDirectory :: Action FilePath
+topDirectory = fixAbsolutePathOnWindows =<< setting GhcSourcePath
+
 -- ref: mk/install.mk:101
 -- TODO: CroosCompilePrefix
 -- | Unix: override @libdir@ and @datadir@ to put GHC-specific files in a
@@ -219,3 +233,20 @@ installGhcLibDir = do
          else do
              version <- setting ProjectVersion
              return $ libdir -/- ("ghc-" ++ version)
+
+-- TODO: find out why we need version number in the dynamic suffix
+-- The current theory: dynamic libraries are eventually placed in a single
+-- giant directory in the load path of the dynamic linker, and hence we must
+-- distinguish different versions of GHC. In contrast static libraries live
+-- in their own per-package directory and hence do not need a unique filename.
+-- We also need to respect the system's dynamic extension, e.g. .dll or .so.
+libsuf :: Way -> Action String
+libsuf way =
+    if (not . wayUnit Dynamic $ way)
+    then return $ waySuffix way ++ ".a" -- e.g., _p.a
+    else do
+        extension <- setting DynamicExtension  -- e.g., .dll or .so
+        version   <- setting ProjectVersion    -- e.g., 7.11.20141222
+        let prefix = wayPrefix $ removeWayUnit Dynamic way
+        -- e.g., p_ghc7.11.20141222.dll (the result)
+        return $ prefix ++ "-ghc" ++ version ++ extension

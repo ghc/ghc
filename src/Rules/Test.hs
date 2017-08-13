@@ -1,9 +1,6 @@
 module Rules.Test (testRules) where
 
-import Hadrian.Utilities
-
 import Base
-import Builder
 import Expression
 import Flavour
 import GHC

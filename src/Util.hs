@@ -22,7 +22,6 @@ import Expression hiding (builder, inputs, outputs, way, stage, package)
 import GHC
 import Oracles.Setting
 import Settings
-import Settings.Path
 import Settings.Builders.Ar
 import Target
 import UserSettings

@@ -3,7 +3,6 @@ module Rules.Library (
 ) where
 
 import Data.Char
-import Hadrian.Utilities
 import qualified System.Directory as IO
 
 import Base
@@ -11,9 +10,10 @@ import Context
 import Expression hiding (way, package)
 import Flavour
 import GHC
+import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
-import Oracles.Dependencies
+import Oracles.Setting
 import Settings
 import Settings.Path
 import Target

@@ -3,8 +3,6 @@ module Rules.Generate (
     copyRules, includesDependencies, generatedDependencies
     ) where
 
-import Hadrian.Utilities
-
 import Base
 import Context hiding (package)
 import Expression

@@ -3,12 +3,9 @@ module Rules.Configure (configureRules) where
 import qualified System.Info as System
 
 import Base
-import Builder
 import CmdLineFlag
 import Context
 import GHC
-import Settings.Path
-import Stage
 import Target
 import UserSettings
 import Util

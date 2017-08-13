@@ -1,15 +1,14 @@
 {-# LANGUAGE DeriveGeneric #-}
 module Context (
-    Context (..), vanillaContext, stageContext, getStage, getPackage, getWay
+    Context (..), vanillaContext, stageContext, getStage, getPackage, getWay,
+    getStagedSettingList
     ) where
 
 import GHC.Generics
 import Hadrian.Expression
 
 import Base
-import Package
-import Stage
-import Way
+import Oracles.Setting
 
 -- | Build context for a currently built 'Target'. We generate potentially
 -- different build rules for each 'Context'.
@@ -44,3 +43,6 @@ getPackage = package <$> getContext
 getWay :: Expr Context b Way
 getWay = way <$> getContext
 
+-- | Get a list of configuration settings for the current stage.
+getStagedSettingList :: (Stage -> SettingList) -> Args Context b
+getStagedSettingList f = getSettingList . f =<< getStage

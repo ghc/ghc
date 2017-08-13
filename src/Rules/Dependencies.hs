@@ -1,6 +1,7 @@
 module Rules.Dependencies (buildPackageDependencies) where
 
-import Development.Shake.Util
+import Data.Bifunctor
+import Data.Function
 
 import Base
 import Context

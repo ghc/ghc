@@ -3,11 +3,9 @@
 module Rules.Selftest (selftestRules) where
 
 import Development.Shake
-import Hadrian.Utilities
 import Test.QuickCheck
 
 import Base
-import Expression
 import GHC
 import Oracles.ModuleFiles
 import Oracles.Setting
@@ -64,7 +62,7 @@ testLookupAll = do
         in lookupAll items (sort dict) == map (flip lookup dict) items
   where
     dicts :: Gen [(Int, Int)]
-    dicts = nubBy ((==) `on` fst) <$> vector 20
+    dicts = nubBy (\x y -> fst x == fst y) <$> vector 20
     extras :: Gen [Int]
     extras = vector 20
 

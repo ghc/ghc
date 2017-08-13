@@ -2,7 +2,6 @@ module Rules.Clean (clean, cleanSourceTree, cleanRules) where
 
 import Base
 import Settings.Path
-import Stage
 import UserSettings
 import Util
 

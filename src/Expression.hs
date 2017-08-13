@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 module Expression (
     -- * Expressions
     Expr, Predicate, Args, Ways, Packages,
@@ -7,7 +8,7 @@ module Expression (
 
     -- ** Predicates
     (?), stage, stage0, stage1, stage2, notStage0, package, notPackage,
-    libraryPackage, way, input, inputs, output, outputs,
+    libraryPackage, builder, way, input, inputs, output, outputs,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -17,7 +18,7 @@ module Expression (
 
     -- * Convenient accessors
     getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
-    getInput, getOutput, getSetting, getSettingList, getStagedSettingList,
+    getInput, getOutput,
 
     -- * Re-exports
     module Data.Semigroup,
@@ -40,8 +41,6 @@ import Stage
 import Target hiding (builder, inputs, outputs)
 import Way
 
-import Oracles.Setting
-
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
 -- read parameters of the current build 'Target'.
 type Expr a = H.Expr Context Builder a
@@ -54,18 +53,6 @@ type Args      = H.Args      Context Builder
 type Packages  = Expr [Package]
 type Ways      = Expr [Way]
 
--- | Get a configuration setting.
-getSetting :: Setting -> Expr String
-getSetting = expr . setting
-
--- | Get a list of configuration settings.
-getSettingList :: SettingList -> Args
-getSettingList = expr . settingList
-
--- | Get a list of configuration settings for the current stage.
-getStagedSettingList :: (Stage -> SettingList) -> Args
-getStagedSettingList f = getSettingList . f =<< getStage
-
 -- | Is the build currently in the provided stage?
 stage :: Stage -> Predicate
 stage s = (s ==) <$> getStage
@@ -73,6 +60,41 @@ stage s = (s ==) <$> getStage
 -- | Is a particular package being built?
 package :: Package -> Predicate
 package p = (p ==) <$> getPackage
+
+-- | This type class allows the user to construct both precise builder
+-- predicates, such as @builder (Ghc CompileHs Stage1)@, as well as predicates
+-- covering a set of similar builders. For example, @builder (Ghc CompileHs)@
+-- matches any stage, and @builder Ghc@ matches any stage and any GHC mode.
+class BuilderPredicate a where
+    -- | Is a particular builder being used?
+    builder :: a -> Predicate
+
+instance BuilderPredicate Builder where
+    builder b = (b ==) <$> getBuilder
+
+instance BuilderPredicate a => BuilderPredicate (Stage -> a) where
+    builder f = builder . f =<< getStage
+
+instance BuilderPredicate a => BuilderPredicate (CcMode -> a) where
+    builder f = do
+        b <- getBuilder
+        case b of
+            Cc  c _ -> builder (f c)
+            _       -> return False
+
+instance BuilderPredicate a => BuilderPredicate (GhcMode -> a) where
+    builder f = do
+        b <- getBuilder
+        case b of
+            Ghc c _ -> builder (f c)
+            _       -> return False
+
+instance BuilderPredicate a => BuilderPredicate (FilePath -> a) where
+    builder f = do
+        b <- getBuilder
+        case b of
+            Configure path -> builder (f path)
+            _              -> return False
 
 -- | Is the current build 'Way' equal to a certain value?
 way :: Way -> Predicate

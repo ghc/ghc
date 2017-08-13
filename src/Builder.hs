@@ -1,13 +1,11 @@
-{-# LANGUAGE DeriveGeneric, FlexibleInstances, LambdaCase #-}
+{-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
-    CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..), isOptional, builder
+    CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..), isOptional
     ) where
 
+import Development.Shake.Classes
 import GHC.Generics
-import Hadrian.Expression
 
-import Base
-import Context
 import Stage
 
 -- | C compiler can be used in two different modes:
@@ -84,38 +82,3 @@ isOptional = \case
     HsColour -> True
     Objdump  -> True
     _        -> False
-
--- | This type class allows the user to construct both precise builder
--- predicates, such as @builder (Ghc CompileHs Stage1)@, as well as predicates
--- covering a set of similar builders. For example, @builder (Ghc CompileHs)@
--- matches any stage, and @builder Ghc@ matches any stage and any GHC mode.
-class BuilderPredicate a where
-    -- | Is a particular builder being used?
-    builder :: a -> Predicate Context Builder
-
-instance BuilderPredicate Builder where
-    builder b = (b ==) <$> getBuilder
-
-instance BuilderPredicate a => BuilderPredicate (Stage -> a) where
-    builder f = builder . f =<< getStage
-
-instance BuilderPredicate a => BuilderPredicate (CcMode -> a) where
-    builder f = do
-        b <- getBuilder
-        case b of
-            Cc  c _ -> builder (f c)
-            _       -> return False
-
-instance BuilderPredicate a => BuilderPredicate (GhcMode -> a) where
-    builder f = do
-        b <- getBuilder
-        case b of
-            Ghc c _ -> builder (f c)
-            _       -> return False
-
-instance BuilderPredicate a => BuilderPredicate (FilePath -> a) where
-    builder f = do
-        b <- getBuilder
-        case b of
-            Configure path -> builder (f path)
-            _              -> return False

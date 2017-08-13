@@ -1,20 +1,20 @@
 module Way (
-    WayUnit (..), Way, wayUnit, wayFromUnits, allWays,
+    WayUnit (..), Way, wayUnit, removeWayUnit, wayFromUnits, allWays,
 
     vanilla, profiling, dynamic, profilingDynamic, threaded, debug, logging,
     threadedDebug, threadedProfiling, threadedLogging, threadedDynamic,
     threadedDebugProfiling, threadedDebugDynamic, threadedProfilingDynamic,
     threadedLoggingDynamic, debugProfiling, debugDynamic, loggingDynamic,
 
-    wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf, libsuf
+    wayPrefix, waySuffix, hisuf, osuf, hcsuf, obootsuf, hibootsuf, ssuf
     ) where
 
 import Data.IntSet (IntSet)
 import qualified Data.IntSet as Set
+import Data.List
+import Data.Maybe
+import Development.Shake.Classes
 import Hadrian.Utilities
-
-import Base
-import Oracles.Setting
 
 -- Note: order of constructors is important for compatibility with the old build
 -- system, e.g. we want "thr_p", not "p_thr" (see instance Show Way).
@@ -43,6 +43,16 @@ instance Read WayUnit where
 -- is to be built.
 newtype Way = Way IntSet
 
+instance Binary Way where
+    put = put . show
+    get = fmap read get
+
+instance Hashable Way where
+    hashWithSalt salt = hashWithSalt salt . show
+
+instance NFData Way where
+    rnf (Way s) = s `seq` ()
+
 -- | Construct a 'Way' from multiple 'WayUnit's. Inverse of 'wayToUnits'.
 wayFromUnits :: [WayUnit] -> Way
 wayFromUnits = Way . Set.fromList . map fromEnum
@@ -55,6 +65,10 @@ wayToUnits (Way set) = map toEnum . Set.elems $ set
 -- | Check whether a 'Way' contains a certain 'WayUnit'.
 wayUnit :: WayUnit -> Way -> Bool
 wayUnit unit (Way set) = fromEnum unit `Set.member` set
+
+-- | Remove a 'WayUnit' from 'Way'.
+removeWayUnit :: WayUnit -> Way -> Way
+removeWayUnit unit (Way set) = Way . Set.delete (fromEnum unit) $ set
 
 instance Show Way where
     show way = if null tag then "v" else tag
@@ -146,30 +160,3 @@ hisuf     = (++ "hi"     ) . wayPrefix
 hcsuf     = (++ "hc"     ) . wayPrefix
 obootsuf  = (++ "o-boot" ) . wayPrefix
 hibootsuf = (++ "hi-boot") . wayPrefix
-
--- TODO: find out why we need version number in the dynamic suffix
--- The current theory: dynamic libraries are eventually placed in a single
--- giant directory in the load path of the dynamic linker, and hence we must
--- distinguish different versions of GHC. In contrast static libraries live
--- in their own per-package directory and hence do not need a unique filename.
--- We also need to respect the system's dynamic extension, e.g. .dll or .so.
-libsuf :: Way -> Action String
-libsuf way@(Way set) =
-    if (not . wayUnit Dynamic $ way)
-    then return $ waySuffix way ++ ".a" -- e.g., _p.a
-    else do
-        extension <- setting DynamicExtension  -- e.g., .dll or .so
-        version   <- setting ProjectVersion    -- e.g., 7.11.20141222
-        let prefix = wayPrefix . Way . Set.delete (fromEnum Dynamic) $ set
-        -- e.g., p_ghc7.11.20141222.dll (the result)
-        return $ prefix ++ "-ghc" ++ version ++ extension
-
-instance Binary Way where
-    put = put . show
-    get = fmap read get
-
-instance Hashable Way where
-    hashWithSalt salt = hashWithSalt salt . show
-
-instance NFData Way where
-    rnf (Way s) = s `seq` ()

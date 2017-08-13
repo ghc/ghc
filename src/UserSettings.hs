@@ -7,10 +7,10 @@ module UserSettings (
     putBuild, putSuccess, defaultDestDir, defaultStage1Only
     ) where
 
+import Development.Shake
 import Hadrian.Utilities
 import System.Console.ANSI
 
-import Base
 import CmdLineFlag
 import Flavour
 import Expression

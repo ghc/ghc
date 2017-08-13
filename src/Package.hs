@@ -8,9 +8,10 @@ module Package (
     ) where
 
 import Data.String
+import Development.Shake.Classes
+import Development.Shake.FilePath
 import GHC.Generics
-
-import Base
+import Hadrian.Utilities
 
 -- | The name of a Cabal package.
 newtype PackageName = PackageName { fromPackageName :: String }
@@ -27,6 +28,24 @@ data Package = Package
                              -- to the root, e.g. "compiler", "libraries/Cabal/Cabal".
     , pkgType :: PackageType -- ^ A library or a program.
     } deriving Generic
+
+-- TODO: Get rid of non-derived Show instances.
+instance Show Package where
+    show = pkgNameString
+
+instance Eq Package where
+    p == q = pkgName p == pkgName q
+
+instance Ord Package where
+    compare p q = compare (pkgName p) (pkgName q)
+
+instance Binary   Package
+instance Hashable Package
+instance NFData   Package
+
+instance Binary   PackageType
+instance Hashable PackageType
+instance NFData   PackageType
 
 -- | Prettyprint 'Package' name.
 pkgNameString :: Package -> String
@@ -65,21 +84,3 @@ isLibrary _ = False
 isProgram :: Package -> Bool
 isProgram (Package _ _ Program) = True
 isProgram _ = False
-
--- TODO: Get rid of non-derived Show instances.
-instance Show Package where
-    show = pkgNameString
-
-instance Eq Package where
-    (==) = (==) `on` pkgName
-
-instance Ord Package where
-    compare = compare `on` pkgName
-
-instance Binary Package
-instance Hashable Package where
-instance NFData Package
-
-instance Binary PackageType
-instance Hashable PackageType
-instance NFData PackageType
