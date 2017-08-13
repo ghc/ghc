@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleContexts #-}
 module Rules.Install (installRules) where
 
 import Hadrian.Oracles.DirectoryContents

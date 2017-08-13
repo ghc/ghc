@@ -1,4 +1,3 @@
-{-# LANGUAGE FlexibleInstances #-}
 module Expression (
     -- * Expressions
     Expr, Predicate, Args, Ways, Packages,

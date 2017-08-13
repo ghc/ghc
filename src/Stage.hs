@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Stage (Stage (..), stageString) where
 
 import Development.Shake.Classes

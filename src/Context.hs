@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Context (
     Context (..), vanillaContext, stageContext, getStage, getPackage, getWay,
     getStagedSettingList

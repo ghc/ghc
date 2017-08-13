@@ -1,6 +1,4 @@
-module Rules (
-    buildRules, oracleRules, packageTargets, topLevelTargets
-    ) where
+module Rules (buildRules, oracleRules, packageTargets, topLevelTargets) where
 
 import qualified Hadrian.Oracles.ArgsHash
 import qualified Hadrian.Oracles.DirectoryContents

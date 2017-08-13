@@ -1,10 +1,8 @@
-module Settings.Install (
-  installPackageDbDirectory
-  ) where
+module Settings.Install (installPackageDbDirectory) where
 
 import Base
-import Expression (Stage(..))
-import UserSettings (buildRootPath)
+import Expression
+import UserSettings
 
 -- | In the final installation path specified by "DEST", there is another package.conf.d,
 -- different from packageDbDirectory in Settings.Path.

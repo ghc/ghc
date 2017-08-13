@@ -101,16 +101,16 @@ executable hadrian
                        , Utilities
                        , Way
     default-language:    Haskell2010
-    default-extensions:  RecordWildCards
-                       , TupleSections
-    other-extensions:    DeriveFunctor
+    default-extensions:  DeriveFunctor
                        , DeriveGeneric
                        , FlexibleInstances
                        , GeneralizedNewtypeDeriving
                        , LambdaCase
-                       , MultiParamTypeClasses
-                       , OverloadedStrings
+                       , RecordWildCards
                        , ScopedTypeVariables
+                       , TupleSections
+    other-extensions:    MultiParamTypeClasses
+                       , OverloadedStrings
                        , TypeFamilies
     build-depends:       base >= 4.8 && < 5
                        , ansi-terminal        == 0.6.*

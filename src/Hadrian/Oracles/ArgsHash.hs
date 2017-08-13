@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Hadrian.Oracles.ArgsHash (
     TrackArgument, trackAllArguments, trackArgsHash, argsHashOracle
     ) where

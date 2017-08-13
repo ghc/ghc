@@ -1,6 +1,6 @@
 module Rules.Library (
     buildPackageLibrary, buildPackageGhciLibrary, buildDynamicLib
-) where
+    ) where
 
 import Data.Char
 import qualified System.Directory as IO

@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Hadrian.Oracles.Path (
     lookupInPath, fixAbsolutePathOnWindows, pathOracle
     ) where

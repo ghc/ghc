@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric, GeneralizedNewtypeDeriving #-}
 module Package (
     Package (..), PackageName (..), PackageType (..),
     -- * Queries

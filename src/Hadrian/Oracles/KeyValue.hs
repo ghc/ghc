@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Hadrian.Oracles.KeyValue (
     lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupValues,
     lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, keyValueOracle

@@ -1,6 +1,6 @@
 module Rules.Wrappers (
-  WrappedBinary(..), Wrapper, inplaceWrappers, installWrappers
-  ) where
+    WrappedBinary(..), Wrapper, inplaceWrappers, installWrappers
+    ) where
 
 import Base
 import Expression

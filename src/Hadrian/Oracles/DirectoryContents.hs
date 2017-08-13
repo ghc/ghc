@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveGeneric #-}
 module Hadrian.Oracles.DirectoryContents (
     directoryContents, directoryContentsOracle, Match (..), matchAll
     ) where

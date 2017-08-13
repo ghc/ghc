@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric, LambdaCase #-}
 module Builder (
     CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..), isOptional
     ) where

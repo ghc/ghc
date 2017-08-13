@@ -1,4 +1,3 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Oracles.ModuleFiles (
     decodeModule, encodeModule, findGenerator, hsSources, hsObjects, moduleFilesOracle
     ) where

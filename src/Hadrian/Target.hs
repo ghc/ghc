@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric #-}
 module Hadrian.Target (Target, target, context, builder, inputs, outputs) where
 
 import Development.Shake.Classes
