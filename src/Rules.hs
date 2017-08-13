@@ -12,7 +12,6 @@ import Context
 import Expression
 import Flavour
 import GHC
-import qualified Oracles.Dependencies
 import qualified Oracles.ModuleFiles
 import qualified Rules.Compile
 import qualified Rules.Data
@@ -30,6 +29,7 @@ import qualified Rules.Register
 import Settings
 import Settings.Path
 import Target
+import Utilities
 
 allStages :: [Stage]
 allStages = [minBound ..]
@@ -61,7 +61,7 @@ packageTargets stage pkg = do
             ways <- interpretInContext context getLibraryWays
             libs <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs <- interpretInContext context $ buildHaddock flavour
-            more <- Oracles.Dependencies.libraryTargets context
+            more <- libraryTargets context
             return $ [ pkgSetupConfigFile context | nonCabalContext context ]
                   ++ [ pkgHaddockFile     context | docs && stage == Stage1 ]
                   ++ libs ++ more

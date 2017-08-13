@@ -5,7 +5,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
 maintainer:          Andrey Mokhov <andrey.mokhov@gmail.com>, github: @snowleopard
-copyright:           Andrey Mokhov 2014-2016
+copyright:           Andrey Mokhov 2014-2017
 category:            Development
 build-type:          Simple
 cabal-version:       >=1.10
@@ -35,7 +35,6 @@ executable hadrian
                        , Hadrian.Utilities
                        , Oracles.Flag
                        , Oracles.Setting
-                       , Oracles.Dependencies
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
                        , Package
@@ -99,10 +98,11 @@ executable hadrian
                        , Stage
                        , Target
                        , UserSettings
-                       , Util
+                       , Utilities
                        , Way
     default-language:    Haskell2010
     default-extensions:  RecordWildCards
+                       , TupleSections
     other-extensions:    DeriveFunctor
                        , DeriveGeneric
                        , FlexibleInstances

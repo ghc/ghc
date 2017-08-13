@@ -7,7 +7,7 @@ import Settings.Packages.IntegerGmp
 import Settings.Path
 import Target
 import UserSettings
-import Util
+import Utilities
 
 gmpBase :: FilePath
 gmpBase = pkgPath integerGmp -/- "gmp"

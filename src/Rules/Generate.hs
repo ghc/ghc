@@ -16,7 +16,7 @@ import Settings
 import Settings.Path
 import Target
 import UserSettings
-import Util
+import Utilities
 
 -- | Track this file to rebuild generated files whenever it changes.
 trackGenerateHs :: Expr ()

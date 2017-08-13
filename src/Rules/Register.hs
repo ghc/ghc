@@ -6,7 +6,7 @@ import GHC
 import Settings.Path
 import Target
 import UserSettings
-import Util
+import Utilities
 
 -- | Build rules for registering packages and initialising package databases
 -- by running the @ghc-pkg@ utility.

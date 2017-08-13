@@ -10,7 +10,6 @@ import Context
 import Expression hiding (way, package)
 import Flavour
 import GHC
-import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Setting
@@ -18,7 +17,7 @@ import Settings
 import Settings.Path
 import Target
 import UserSettings
-import Util
+import Utilities
 
 libraryObjects :: Context -> Action [FilePath]
 libraryObjects context@Context{..} = do

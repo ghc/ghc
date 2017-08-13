@@ -1,11 +1,11 @@
 module Settings.Builders.GhcCabal (
-    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs, buildDll0
+    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs
     ) where
 
 import Context
 import Flavour
 import Settings.Builders.Common hiding (package)
-import Util
+import Utilities
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
@@ -115,11 +115,6 @@ with b = isSpecified b ? do
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage
-
-buildDll0 :: Context -> Action Bool
-buildDll0 Context {..} = do
-    windows <- windowsHost
-    return $ windows && stage == Stage1 && package == compiler
 
 -- This is a positional argument, hence:
 -- * if it is empty, we need to emit one empty string argument;

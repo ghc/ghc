@@ -6,7 +6,6 @@ import Base
 import Context
 import Expression hiding (stage, way)
 import GHC
-import Oracles.Dependencies
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Setting
@@ -15,7 +14,7 @@ import Settings
 import Settings.Path
 import Target
 import UserSettings
-import Util
+import Utilities
 
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do

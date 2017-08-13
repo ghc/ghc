@@ -4,13 +4,12 @@ import Base
 import Context
 import Expression
 import GHC
-import Oracles.Dependencies
 import Oracles.Setting
 import Rules.Generate
 import Settings.Path
 import Target
 import UserSettings
-import Util
+import Utilities
 
 -- | Build @package-data.mk@ by using ghc-cabal utility to process .cabal files.
 buildPackageData :: Context -> Rules ()

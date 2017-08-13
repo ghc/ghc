@@ -3,7 +3,7 @@ module Settings (
     findKnownPackage, getPkgData, getPkgDataList, isLibrary,
     getBuildPath, stagePackages, builderPath,
     getBuilderPath, isSpecified, latestBuildStage, programPath, programContext,
-    integerLibraryName, destDir, pkgConfInstallPath, stage1Only
+    integerLibraryName, destDir, pkgConfInstallPath, stage1Only, buildDll0
     ) where
 
 import Hadrian.Oracles.KeyValue
@@ -16,6 +16,7 @@ import Expression
 import Flavour
 import GHC
 import Oracles.PackageData
+import Oracles.Setting
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
 import Settings.Flavours.Performance
@@ -159,3 +160,8 @@ stage1Only = defaultStage1Only
 -- | Install's DESTDIR setting.
 destDir :: FilePath
 destDir = defaultDestDir
+
+buildDll0 :: Context -> Action Bool
+buildDll0 Context {..} = do
+    windows <- windowsHost
+    return $ windows && stage == Stage1 && package == compiler

@@ -10,7 +10,7 @@ import Oracles.PackageData
 import Settings
 import Settings.Path
 import Target
-import Util
+import Utilities
 
 haddockHtmlLib :: FilePath
 haddockHtmlLib = "inplace/lib/html/haddock-util.js"

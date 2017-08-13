@@ -9,7 +9,7 @@ import Oracles.Setting
 import Settings
 import Settings.Path
 import Target
-import Util
+import Utilities
 
 -- TODO: clean up after testing
 testRules :: Rules ()

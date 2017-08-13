@@ -1,7 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Hadrian.Oracles.KeyValue (
-    lookupValue, lookupValueOrEmpty, lookupValueOrError,
-    lookupValues, lookupValuesOrEmpty, lookupValuesOrError, keyValueOracle
+    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupValues,
+    lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, keyValueOracle
     ) where
 
 import Control.Monad
@@ -48,6 +48,18 @@ lookupValuesOrError :: FilePath -> String -> Action [String]
 lookupValuesOrError file key = (fromMaybe $ error msg) <$> lookupValues file key
   where
     msg = "Key " ++ quote key ++ " not found in file " ++ quote file
+
+-- | The 'Action' @lookupDependencies depFile file@ looks up dependencies of a
+-- @file@ in a (typically generated) dependency file @depFile@. The action
+-- returns a pair @(source, files)@, such that the @file@ can be produced by
+-- compiling @source@, which in turn also depends on a number of other @files@.
+lookupDependencies :: FilePath -> FilePath -> Action (FilePath, [FilePath])
+lookupDependencies depFile file = do
+    deps <- lookupValues depFile file
+    case deps of
+        Nothing -> error $ "No dependencies found for file " ++ quote file
+        Just [] -> error $ "No source file found for file " ++ quote file
+        Just (source : files) -> return (source, files)
 
 -- | This oracle reads and parses text files to answer 'lookupValue' and
 -- 'lookupValues' queries, as well as their derivatives, tracking the results.

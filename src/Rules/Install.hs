@@ -8,7 +8,6 @@ import Base
 import Context
 import Expression hiding (builder)
 import GHC
-import Oracles.Dependencies
 import Oracles.Setting
 import Rules
 import Rules.Generate
@@ -18,7 +17,7 @@ import Settings
 import Settings.Packages.Rts
 import Settings.Path
 import Target
-import Util
+import Utilities
 
 {- | Install the built binaries etc. to the @destDir ++ prefix@.
 

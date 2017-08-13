@@ -10,7 +10,7 @@ import Distribution.Verbosity (silent)
 import Base
 import Expression
 import GHC
-import Oracles.Dependencies (pkgDependencies)
+import Utilities
 
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do

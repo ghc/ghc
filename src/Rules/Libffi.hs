@@ -5,7 +5,7 @@ import Hadrian.Utilities
 import Settings.Builders.Common
 import Settings.Packages.Rts
 import Target
-import Util
+import Utilities
 
 libffiDependencies :: [FilePath]
 libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]

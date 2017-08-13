@@ -1,10 +1,11 @@
-module Util (
+module Utilities (
     build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
     removeFile, copyDirectory, copyDirectoryContents, createDirectory,
     moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
     makeExecutable, renderProgram, renderLibrary, builderEnvironment,
     needBuilder, copyFileUntracked, installDirectory, installData, installScript,
-    installProgram, linkSymbolic, bashPath
+    installProgram, linkSymbolic, bashPath, contextDependencies, pkgDependencies,
+    libraryTargets, needLibrary, topsortPackages
     ) where
 
 import qualified System.Directory.Extra as IO
@@ -13,6 +14,7 @@ import qualified Control.Exception.Base as IO
 
 import Hadrian.Oracles.ArgsHash
 import Hadrian.Oracles.DirectoryContents
+import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
 
 import Base
@@ -21,7 +23,9 @@ import Context
 import Expression hiding (builder, inputs, outputs, way, stage, package)
 import GHC
 import Oracles.Setting
+import Oracles.PackageData
 import Settings
+import Settings.Path
 import Settings.Builders.Ar
 import Target
 import UserSettings
@@ -259,6 +263,54 @@ makeExecutable file = do
 -- | Lookup the path to the @bash@ interpreter.
 bashPath :: Action FilePath
 bashPath = lookupInPath "bash"
+
+-- | Given a 'Context' this 'Action' looks up its package dependencies in
+-- 'Settings.Paths.packageDependencies' and wraps the results in appropriate
+-- contexts. The only subtlety here is that we never depend on packages built in
+-- 'Stage2' or later, therefore the stage of the resulting dependencies is
+-- bounded from above at 'Stage1'. To compute package dependencies we scan
+-- package cabal files, see "Rules.Cabal".
+contextDependencies :: Context -> Action [Context]
+contextDependencies Context {..} = do
+    let pkgContext = \pkg -> Context (min stage Stage1) pkg way
+    deps <- lookupValuesOrError packageDependencies (pkgNameString package)
+    pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
+    return . map pkgContext $ intersectOrd (compare . pkgNameString) pkgs deps
+
+-- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
+pkgDependencies :: Package -> Action [Package]
+pkgDependencies = fmap (map Context.package) . contextDependencies . vanillaContext Stage1
+
+-- | Given a library 'Package' this action computes all of its targets.
+libraryTargets :: Context -> Action [FilePath]
+libraryTargets context = do
+    confFile <- pkgConfFile        context
+    libFile  <- pkgLibraryFile     context
+    lib0File <- pkgLibraryFile0    context
+    lib0     <- buildDll0          context
+    ghciLib  <- pkgGhciLibraryFile context
+    ghciFlag <- interpretInContext context $ getPkgData BuildGhciLib
+    let ghci = ghciFlag == "YES" && (stage context == Stage1 || stage1Only)
+    return $ [ confFile, libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
+
+-- | Coarse-grain 'need': make sure all given libraries are fully built.
+needLibrary :: [Context] -> Action ()
+needLibrary cs = need =<< concatMapM libraryTargets cs
+
+-- HACK (izgzhen), see https://github.com/snowleopard/hadrian/issues/344.
+-- | Topological sort of packages according to their dependencies.
+topsortPackages :: [Package] -> Action [Package]
+topsortPackages pkgs = do
+    elems <- mapM (\p -> (p,) <$> pkgDependencies p) pkgs
+    return $ map fst $ topSort elems
+  where
+    annotateInDeg es e =
+     (foldr (\e' s -> if fst e' `elem` snd e then s + 1 else s) (0 :: Int) es, e)
+    topSort [] = []
+    topSort es =
+      let annotated = map (annotateInDeg es) es
+          inDegZero = map snd $ filter ((== 0). fst) annotated
+      in  inDegZero ++ topSort (es \\ inDegZero)
 
 -- | Print out information about the command being executed.
 putInfo :: Target -> Action ()

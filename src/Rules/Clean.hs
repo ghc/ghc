@@ -3,7 +3,7 @@ module Rules.Clean (clean, cleanSourceTree, cleanRules) where
 import Base
 import Settings.Path
 import UserSettings
-import Util
+import Utilities
 
 clean :: Action ()
 clean = do

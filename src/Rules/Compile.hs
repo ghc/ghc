@@ -1,13 +1,14 @@
 module Rules.Compile (compilePackage) where
 
+import Hadrian.Oracles.KeyValue
+
 import Base
 import Context
 import Expression
-import Oracles.Dependencies
 import Rules.Generate
 import Settings.Path
 import Target
-import Util
+import Utilities
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
@@ -19,7 +20,7 @@ compilePackage rs context@Context {..} = do
             needDependencies context src $ obj <.> "d"
             build $ target context (compiler stage) [src] [obj]
         compileHs = \[obj, _hi] -> do
-            (src, deps) <- fileDependencies context obj
+            (src, deps) <- lookupDependencies (path -/- ".dependencies") obj
             need $ src : deps
             when (isLibrary package) $ need =<< return <$> pkgConfFile context
             needLibrary =<< contextDependencies context

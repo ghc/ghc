@@ -6,7 +6,7 @@ import Base
 import Oracles.Setting
 import Rules.Clean
 import UserSettings
-import Util
+import Utilities
 
 sourceDistRules :: Rules ()
 sourceDistRules = do

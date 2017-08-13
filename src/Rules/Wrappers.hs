@@ -9,7 +9,7 @@ import Oracles.Setting
 import Settings
 import Settings.Install
 import Settings.Path
-import Util
+import Utilities
 
 -- | Wrapper is an expression depending on the 'FilePath' to the
 -- | library path and name of the wrapped binary.

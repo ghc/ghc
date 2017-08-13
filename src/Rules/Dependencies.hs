@@ -10,7 +10,7 @@ import Oracles.ModuleFiles
 import Rules.Generate
 import Settings.Path
 import Target
-import Util
+import Utilities
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =

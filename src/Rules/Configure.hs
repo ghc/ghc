@@ -8,7 +8,7 @@ import Context
 import GHC
 import Target
 import UserSettings
-import Util
+import Utilities
 
 configureRules :: Rules ()
 configureRules = do
