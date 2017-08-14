@@ -11,6 +11,10 @@ module Hadrian.Utilities (
     -- * Accessing Shake's type-indexed map
     insertExtra, userSetting,
 
+    -- * File system operations
+    copyFile, copyFileUntracked, fixFile, makeExecutable, moveFile, removeFile,
+    createDirectory, copyDirectory, moveDirectory, removeDirectory,
+
     -- * Diagnostic info
     UseColour (..), putColoured, BuildProgressColour (..), putBuild,
     SuccessColour (..), putSuccess, ProgressInfo (..),
@@ -18,19 +22,23 @@ module Hadrian.Utilities (
     renderUnicorn
     ) where
 
-import Control.Monad
+import Control.Monad.Extra
 import Data.Char
-import Data.Dynamic
+import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.HashMap.Strict (HashMap)
 import Data.List.Extra
 import Data.Maybe
+import Data.Typeable (TypeRep, typeOf)
 import Development.Shake hiding (Normal)
+import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
-import System.Info.Extra
-import System.IO
 
-import qualified Data.HashMap.Strict as Map
+import qualified Control.Exception.Base as IO
+import qualified Data.HashMap.Strict    as Map
+import qualified System.Directory.Extra as IO
+import qualified System.Info.Extra      as IO
+import qualified System.IO              as IO
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -131,19 +139,89 @@ userSetting defaultValue = do
     let maybeValue = fromDynamic =<< Map.lookup (typeOf defaultValue) extra
     return $ fromMaybe defaultValue maybeValue
 
+-- | Copy a file tracking the source. Create the target directory if missing.
+copyFile :: FilePath -> FilePath -> Action ()
+copyFile source target = do
+    need [source] -- Guarantee the source is built before printing progress info.
+    let dir = takeDirectory target
+    liftIO $ IO.createDirectoryIfMissing True dir
+    putProgressInfo =<< renderAction "Copy file" source target
+    copyFileChanged source target
+
+-- | Copy a file without tracking the source. Create the target directory if missing.
+copyFileUntracked :: FilePath -> FilePath -> Action ()
+copyFileUntracked source target = do
+    let dir = takeDirectory target
+    liftIO $ IO.createDirectoryIfMissing True dir
+    putProgressInfo =<< renderAction "Copy file (untracked)" source target
+    liftIO $ IO.copyFile source target
+
+-- | Transform a given file by applying a function to its contents.
+fixFile :: FilePath -> (String -> String) -> Action ()
+fixFile file f = do
+    putBuild $ "| Fix " ++ file
+    contents <- liftIO $ IO.withFile file IO.ReadMode $ \h -> do
+        old <- IO.hGetContents h
+        let new = f old
+        IO.evaluate $ rnf new
+        return new
+    liftIO $ writeFile file contents
+
+-- | Make a given file executable by running the @chmod +x@ command.
+makeExecutable :: FilePath -> Action ()
+makeExecutable file = do
+    putBuild $ "| Make " ++ quote file ++ " executable."
+    quietly $ cmd "chmod +x " [file]
+
+-- | Move a file. Note that we cannot track the source, because it is moved.
+moveFile :: FilePath -> FilePath -> Action ()
+moveFile source target = do
+    putProgressInfo =<< renderAction "Move file" source target
+    quietly $ cmd ["mv", source, target]
+
+-- | Remove a file that doesn't necessarily exist.
+removeFile :: FilePath -> Action ()
+removeFile file = do
+    putBuild $ "| Remove file " ++ file
+    liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
+
+-- | Create a directory if it does not already exist.
+createDirectory :: FilePath -> Action ()
+createDirectory dir = do
+    putBuild $ "| Create directory " ++ dir
+    liftIO $ IO.createDirectoryIfMissing True dir
+
+-- | Copy a directory. The contents of the source directory is untracked.
+copyDirectory :: FilePath -> FilePath -> Action ()
+copyDirectory source target = do
+    putProgressInfo =<< renderAction "Copy directory" source target
+    quietly $ cmd ["cp", "-r", source, target]
+
+-- | Move a directory. The contents of the source directory is untracked.
+moveDirectory :: FilePath -> FilePath -> Action ()
+moveDirectory source target = do
+    putProgressInfo =<< renderAction "Move directory" source target
+    quietly $ cmd ["mv", source, target]
+
+-- | Remove a directory that doesn't necessarily exist.
+removeDirectory :: FilePath -> Action ()
+removeDirectory dir = do
+    putBuild $ "| Remove directory " ++ dir
+    liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
+
 data UseColour = Never | Auto | Always deriving (Eq, Show, Typeable)
 
 -- | A more colourful version of Shake's 'putNormal'.
 putColoured :: ColorIntensity -> Color -> String -> Action ()
 putColoured intensity colour msg = do
     useColour <- userSetting Never
-    supported <- liftIO $ hSupportsANSI stdout
+    supported <- liftIO $ hSupportsANSI IO.stdout
     let c Never  = False
-        c Auto   = supported || isWindows -- Colours do work on Windows
+        c Auto   = supported || IO.isWindows -- Colours do work on Windows
         c Always = True
     when (c useColour) . liftIO $ setSGR [SetColor Foreground intensity colour]
     putNormal msg
-    when (c useColour) . liftIO $ setSGR [] >> hFlush stdout
+    when (c useColour) . liftIO $ setSGR [] >> IO.hFlush IO.stdout
 
 newtype BuildProgressColour = BuildProgressColour (ColorIntensity, Color)
     deriving Typeable
@@ -173,7 +251,7 @@ putSuccess msg = do
 
 data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show, Typeable)
 
--- | Version of 'putBuild' controlled by @--progress-info@ command line flag.
+-- | Version of 'putBuild' controlled by @--progress-info@ command line argument.
 putProgressInfo :: String -> Action ()
 putProgressInfo msg = do
     progressInfo <- userSetting None

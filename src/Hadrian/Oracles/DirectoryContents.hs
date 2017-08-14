@@ -1,14 +1,17 @@
 module Hadrian.Oracles.DirectoryContents (
-    directoryContents, directoryContentsOracle, Match (..), matchAll
+    directoryContents, copyDirectoryContents, directoryContentsOracle,
+    Match (..), matches, matchAll
     ) where
 
 import Control.Monad
 import Development.Shake
 import Development.Shake.Classes
+import Development.Shake.FilePath
 import GHC.Generics
-import System.Directory.Extra
 
 import Hadrian.Utilities
+
+import qualified System.Directory.Extra as IO
 
 data Match = Test FilePattern | Not Match | And [Match] | Or [Match]
     deriving (Generic, Eq, Show, Typeable)
@@ -33,6 +36,14 @@ matches (Or  ms) f = any (`matches` f) ms
 directoryContents :: Match -> FilePath -> Action [FilePath]
 directoryContents expr dir = askOracle $ DirectoryContents (expr, dir)
 
+-- | Copy the contents of the source directory that matches a given 'Match'
+-- expression into the target directory. The copied contents is tracked.
+copyDirectoryContents :: Match -> FilePath -> FilePath -> Action ()
+copyDirectoryContents expr source target = do
+    putProgressInfo =<< renderAction "Copy directory contents" source target
+    let cp file = copyFile file $ target -/- makeRelative source file
+    mapM_ cp =<< directoryContents expr source
+
 newtype DirectoryContents = DirectoryContents (Match, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 
@@ -40,4 +51,4 @@ newtype DirectoryContents = DirectoryContents (Match, FilePath)
 directoryContentsOracle :: Rules ()
 directoryContentsOracle = void $
     addOracle $ \(DirectoryContents (expr, dir)) -> liftIO $ map unifyPath .
-        filter (matches expr) <$> listFilesInside (return . matches expr) dir
+        filter (matches expr) <$> IO.listFilesInside (return . matches expr) dir

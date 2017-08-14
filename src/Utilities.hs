@@ -1,19 +1,13 @@
 module Utilities (
-    build, buildWithCmdOptions, buildWithResources, copyFile, fixFile, moveFile,
-    removeFile, copyDirectory, copyDirectoryContents, createDirectory,
-    moveDirectory, removeDirectory, applyPatch, runBuilder, runBuilderWith,
-    makeExecutable, renderProgram, renderLibrary, builderEnvironment,
-    needBuilder, copyFileUntracked, installDirectory, installData, installScript,
-    installProgram, linkSymbolic, bashPath, contextDependencies, pkgDependencies,
-    libraryTargets, needLibrary, topsortPackages
+    build, buildWithCmdOptions, buildWithResources, applyPatch, runBuilder,
+    runBuilderWith, builderEnvironment, needBuilder, needLibrary,
+    installDirectory, installData, installScript, installProgram, linkSymbolic,
+    contextDependencies, pkgDependencies, libraryTargets, topsortPackages
     ) where
 
 import qualified System.Directory.Extra as IO
-import qualified System.IO              as IO
-import qualified Control.Exception.Base as IO
 
 import Hadrian.Oracles.ArgsHash
-import Hadrian.Oracles.DirectoryContents
 import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
 import Hadrian.Utilities
@@ -108,78 +102,6 @@ captureStdout target path argList = do
     Stdout output <- cmd [path] argList
     writeFileChanged file output
 
--- | Copy a file tracking the source, create the target directory if missing.
-copyFile :: FilePath -> FilePath -> Action ()
-copyFile source target = do
-    need [source] -- Guarantee source is built before printing progress info.
-    let dir = takeDirectory target
-    liftIO $ IO.createDirectoryIfMissing True dir
-    putProgressInfo =<< renderAction "Copy file" source target
-    copyFileChanged source target
-
--- | Copy a file without tracking the source, create the target directory if missing.
-copyFileUntracked :: FilePath -> FilePath -> Action ()
-copyFileUntracked source target = do
-    let dir = takeDirectory target
-    liftIO $ IO.createDirectoryIfMissing True dir
-    putProgressInfo =<< renderAction "Copy file (Untracked)" source target
-    liftIO $ IO.copyFile source target
-
--- | Move a file; we cannot track the source, because it is moved.
-moveFile :: FilePath -> FilePath -> Action ()
-moveFile source target = do
-    putProgressInfo =<< renderAction "Move file" source target
-    quietly $ cmd ["mv", source, target]
-
--- | Remove a file that doesn't necessarily exist.
-removeFile :: FilePath -> Action ()
-removeFile file = do
-    putBuild $ "| Remove file " ++ file
-    liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
-
--- | Create a directory if it does not already exist.
-createDirectory :: FilePath -> Action ()
-createDirectory dir = do
-    putBuild $ "| Create directory " ++ dir
-    liftIO $ IO.createDirectoryIfMissing True dir
-
--- | Remove a directory that doesn't necessarily exist.
-removeDirectory :: FilePath -> Action ()
-removeDirectory dir = do
-    putBuild $ "| Remove directory " ++ dir
-    liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
-
--- | Copy a directory. The contents of the source directory is untracked.
-copyDirectory :: FilePath -> FilePath -> Action ()
-copyDirectory source target = do
-    putProgressInfo =<< renderAction "Copy directory" source target
-    quietly $ cmd ["cp", "-r", source, target]
-
--- | Copy the contents of the source directory that matches a given 'Match'
--- expression into the target directory. The copied contents is tracked.
-copyDirectoryContents :: Match -> FilePath -> FilePath -> Action ()
-copyDirectoryContents expr source target = do
-    putProgressInfo =<< renderAction "Copy directory contents" source target
-    let cp file = copyFile file $ target -/- makeRelative source file
-    mapM_ cp =<< directoryContents expr source
-
--- | Move a directory. The contents of the source directory is untracked.
-moveDirectory :: FilePath -> FilePath -> Action ()
-moveDirectory source target = do
-    putProgressInfo =<< renderAction "Move directory" source target
-    quietly $ cmd ["mv", source, target]
-
--- | Transform a given file by applying a function to its contents.
-fixFile :: FilePath -> (String -> String) -> Action ()
-fixFile file f = do
-    putBuild $ "| Fix " ++ file
-    contents <- liftIO $ IO.withFile file IO.ReadMode $ \h -> do
-        old <- IO.hGetContents h
-        let new = f old
-        IO.evaluate $ rnf new
-        return new
-    liftIO $ writeFile file contents
-
 -- | Apply a patch by executing the 'Patch' builder in a given directory.
 applyPatch :: FilePath -> FilePath -> Action ()
 applyPatch dir patch = do
@@ -262,16 +184,6 @@ runBuilderWith options builder args = do
     putBuild $ "| Run " ++ show builder ++ note
     quietly $ cmd options [path] args
 
--- | Make a given file executable by running the @chmod@ command.
-makeExecutable :: FilePath -> Action ()
-makeExecutable file = do
-    putBuild $ "| Make " ++ quote file ++ " executable."
-    quietly $ cmd "chmod +x " [file]
-
--- | Lookup the path to the @bash@ interpreter.
-bashPath :: Action FilePath
-bashPath = lookupInPath "bash"
-
 -- | Given a 'Context' this 'Action' looks up its package dependencies in
 -- 'Settings.Paths.packageDependencies' and wraps the results in appropriate
 -- contexts. The only subtlety here is that we never depend on packages built in
@@ -335,4 +247,3 @@ putInfo t = putProgressInfo =<< renderAction
     digest [] = "none"
     digest [x] = x
     digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"
-

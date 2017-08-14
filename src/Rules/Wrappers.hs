@@ -2,6 +2,8 @@ module Rules.Wrappers (
     WrappedBinary(..), Wrapper, inplaceWrappers, installWrappers
     ) where
 
+import Hadrian.Oracles.Path
+
 import Base
 import Expression
 import GHC
@@ -9,7 +11,6 @@ import Oracles.Setting
 import Settings
 import Settings.Install
 import Settings.Path
-import Utilities
 
 -- | Wrapper is an expression depending on the 'FilePath' to the
 -- | library path and name of the wrapped binary.
