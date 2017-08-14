@@ -37,9 +37,9 @@ compilerPackageArgs = package compiler ? do
                 notM (flag GhcUnregisterised) ?
                 notStage0 ? arg "--ghc-option=-DGHCI_TABLES_NEXT_TO_CODE"
               , ghcWithInterpreter ?
-                ghciWithDebugger flavour ?
+                ghciWithDebugger <$> flavour ?
                 notStage0 ? arg "--ghc-option=-DDEBUGGER"
-              , ghcProfiled flavour ?
+              , ghcProfiled <$> flavour ?
                 notStage0 ? arg "--ghc-pkg-option=--force" ]
 
             , builder Haddock ? arg ("--optghc=-I" ++ path) ]

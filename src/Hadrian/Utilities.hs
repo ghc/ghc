@@ -1,5 +1,4 @@
 module Hadrian.Utilities (
-
     -- * List manipulation
     fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll,
 
@@ -9,18 +8,29 @@ module Hadrian.Utilities (
     -- * FilePath manipulation
     unifyPath, (-/-), matchVersionedFilePath,
 
-    -- * Miscellaneous
-    UseColour (..), putColoured
+    -- * Accessing Shake's type-indexed map
+    insertExtra, userSetting,
+
+    -- * Diagnostic info
+    UseColour (..), putColoured, BuildProgressColour (..), putBuild,
+    SuccessColour (..), putSuccess, ProgressInfo (..),
+    putProgressInfo, renderAction, renderProgram, renderLibrary, renderBox,
+    renderUnicorn
     ) where
 
 import Control.Monad
 import Data.Char
+import Data.Dynamic
+import Data.HashMap.Strict (HashMap)
 import Data.List.Extra
-import Development.Shake
+import Data.Maybe
+import Development.Shake hiding (Normal)
 import Development.Shake.FilePath
 import System.Console.ANSI
 import System.Info.Extra
 import System.IO
+
+import qualified Data.HashMap.Strict as Map
 
 -- | Extract a value from a singleton list, or terminate with an error message
 -- if the list does not contain exactly one value.
@@ -109,11 +119,24 @@ matchVersionedFilePath prefix suffix filePath =
         Nothing      -> False
         Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
 
-data UseColour = Never | Auto | Always deriving (Eq, Show)
+-- | Insert a value into Shake's type-indexed map.
+insertExtra :: Typeable a => a -> HashMap TypeRep Dynamic -> HashMap TypeRep Dynamic
+insertExtra value = Map.insert (typeOf value) (toDyn value)
+
+-- | Lookup a user setting in Shake's type-indexed map 'shakeExtra'. If the
+-- setting is not found, return the provided default value instead.
+userSetting :: Typeable a => a -> Action a
+userSetting defaultValue = do
+    extra <- shakeExtra <$> getShakeOptions
+    let maybeValue = fromDynamic =<< Map.lookup (typeOf defaultValue) extra
+    return $ fromMaybe defaultValue maybeValue
+
+data UseColour = Never | Auto | Always deriving (Eq, Show, Typeable)
 
 -- | A more colourful version of Shake's 'putNormal'.
-putColoured :: UseColour -> ColorIntensity -> Color -> String -> Action ()
-putColoured useColour intensity colour msg = do
+putColoured :: ColorIntensity -> Color -> String -> Action ()
+putColoured intensity colour msg = do
+    useColour <- userSetting Never
     supported <- liftIO $ hSupportsANSI stdout
     let c Never  = False
         c Auto   = supported || isWindows -- Colours do work on Windows
@@ -121,3 +144,126 @@ putColoured useColour intensity colour msg = do
     when (c useColour) . liftIO $ setSGR [SetColor Foreground intensity colour]
     putNormal msg
     when (c useColour) . liftIO $ setSGR [] >> hFlush stdout
+
+newtype BuildProgressColour = BuildProgressColour (ColorIntensity, Color)
+    deriving Typeable
+
+-- | Default 'BuildProgressColour'.
+magenta :: BuildProgressColour
+magenta = BuildProgressColour (Dull, Magenta)
+
+-- | Print a build progress message (e.g. executing a build command).
+putBuild :: String -> Action ()
+putBuild msg = do
+    BuildProgressColour (intensity, colour) <- userSetting magenta
+    putColoured intensity colour msg
+
+newtype SuccessColour = SuccessColour (ColorIntensity, Color)
+    deriving Typeable
+
+-- | Default 'SuccessColour'.
+green :: SuccessColour
+green = SuccessColour (Dull, Green)
+
+-- | Print a success message (e.g. a package is built successfully).
+putSuccess :: String -> Action ()
+putSuccess msg = do
+    SuccessColour (intensity, colour) <- userSetting green
+    putColoured intensity colour msg
+
+data ProgressInfo = None | Brief | Normal | Unicorn deriving (Eq, Show, Typeable)
+
+-- | Version of 'putBuild' controlled by @--progress-info@ command line flag.
+putProgressInfo :: String -> Action ()
+putProgressInfo msg = do
+    progressInfo <- userSetting None
+    when (progressInfo /= None) $ putBuild msg
+
+-- | Render an action.
+renderAction :: String -> FilePath -> FilePath -> Action String
+renderAction what input output = do
+    progressInfo <- userSetting Normal
+    return $ case progressInfo of
+        None    -> ""
+        Brief   -> "| " ++ what ++ ": " ++ i ++ " => " ++ o
+        Normal  -> renderBox [ what, "     input: " ++ i, " => output: " ++ o ]
+        Unicorn -> renderUnicorn [ what, "     input: " ++ i, " => output: " ++ o ]
+  where
+    i = unifyPath input
+    o = unifyPath output
+
+-- | Render the successful build of a program.
+renderProgram :: String -> String -> String -> String
+renderProgram name bin synopsis = renderBox [ "Successfully built program " ++ name
+                                            , "Executable: " ++ bin
+                                            , "Program synopsis: " ++ synopsis ++ "."]
+
+-- | Render the successful build of a library.
+renderLibrary :: String -> String -> String -> String
+renderLibrary name lib synopsis = renderBox [ "Successfully built library " ++ name
+                                            , "Library: " ++ lib
+                                            , "Library synopsis: " ++ synopsis ++ "."]
+
+-- | Render the given set of lines in an ASCII box. The minimum width and
+-- whether to use Unicode symbols are hardcoded in the function's body.
+--
+-- >>> renderBox (words "lorem ipsum")
+-- /----------\
+-- | lorem    |
+-- | ipsum    |
+-- \----------/
+renderBox :: [String] -> String
+renderBox ls = tail $ concatMap ('\n' :) (boxTop : map renderLine ls ++ [boxBot])
+  where
+    -- Minimum total width of the box in characters
+    minimumBoxWidth = 32
+
+    -- TODO: Make this setting configurable? Setting to True by default seems
+    -- to work poorly with many fonts.
+    useUnicode = False
+
+    -- Characters to draw the box
+    (dash, pipe, topLeft, topRight, botLeft, botRight, padding)
+        | useUnicode = ('─', '│', '╭',  '╮', '╰', '╯', ' ')
+        | otherwise  = ('-', '|', '/', '\\', '\\', '/', ' ')
+
+    -- Box width, taking minimum desired length and content into account.
+    -- The -4 is for the beginning and end pipe/padding symbols, as
+    -- in "| xxx |".
+    boxContentWidth = (minimumBoxWidth - 4) `max` maxContentLength
+      where
+        maxContentLength = maximum (map length ls)
+
+    renderLine l = concat
+        [ [pipe, padding]
+        , padToLengthWith boxContentWidth padding l
+        , [padding, pipe] ]
+      where
+        padToLengthWith n filler x = x ++ replicate (n - length x) filler
+
+    (boxTop, boxBot) = ( topLeft : dashes ++ [topRight]
+                       , botLeft : dashes ++ [botRight] )
+      where
+        -- +1 for each non-dash (= corner) char
+        dashes = replicate (boxContentWidth + 2) dash
+
+-- | Render the given set of lines next to our favorite unicorn Robert.
+renderUnicorn :: [String] -> String
+renderUnicorn ls =
+    unlines $ take (max (length ponyLines) (length boxLines)) $
+        zipWith (++) (ponyLines ++ repeat ponyPadding) (boxLines ++ repeat "")
+  where
+    ponyLines :: [String]
+    ponyLines = [ "                   ,;,,;'"
+                , "                  ,;;'(    Robert the spitting unicorn"
+                , "       __       ,;;' ' \\   wants you to know"
+                , "     /'  '\\'~~'~' \\ /'\\.)  that a task      "
+                , "  ,;(      )    /  |.  /   just finished!   "
+                , " ,;' \\    /-.,,(   ) \\                      "
+                , " ^    ) /       ) / )|     Almost there!    "
+                , "      ||        ||  \\)                      "
+                , "      (_\\       (_\\                         " ]
+    ponyPadding :: String
+    ponyPadding = "                                            "
+    boxLines :: [String]
+    boxLines = ["", "", ""] ++ (lines . renderBox $ ls)

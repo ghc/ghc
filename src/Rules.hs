@@ -57,13 +57,13 @@ packageTargets stage pkg = do
         then do -- Collect all targets of a library package.
             ways <- interpretInContext context getLibraryWays
             libs <- mapM (pkgLibraryFile . Context stage pkg) ways
-            docs <- interpretInContext context $ buildHaddock flavour
+            docs <- interpretInContext context =<< buildHaddock <$> flavour
             more <- libraryTargets context
             return $ [ pkgSetupConfigFile context | nonCabalContext context ]
                   ++ [ pkgHaddockFile     context | docs && stage == Stage1 ]
                   ++ libs ++ more
         else -- The only target of a program package is the executable.
-            maybeToList <$> programPath (programContext stage pkg)
+            fmap maybeToList . programPath =<< programContext stage pkg
 
 packageRules :: Rules ()
 packageRules = do
@@ -77,17 +77,13 @@ packageRules = do
 
     let contexts        = liftM3 Context        allStages knownPackages allWays
         vanillaContexts = liftM2 vanillaContext allStages knownPackages
-        programContexts = liftM2 programContext allStages knownPackages
 
     forM_ contexts $ mconcat
         [ Rules.Compile.compilePackage readPackageDb
         , Rules.Library.buildPackageLibrary ]
 
     let dynamicContexts = liftM3 Context [Stage1 ..] knownPackages [dynamic]
-
     forM_ dynamicContexts Rules.Library.buildDynamicLib
-
-    forM_ programContexts $ Rules.Program.buildProgram readPackageDb
 
     forM_ vanillaContexts $ mconcat
         [ Rules.Data.buildPackageData
@@ -95,6 +91,7 @@ packageRules = do
         , Rules.Documentation.buildPackageDocumentation
         , Rules.Library.buildPackageGhciLibrary
         , Rules.Generate.generatePackageCode
+        , Rules.Program.buildProgram readPackageDb
         , Rules.Register.registerPackage writePackageDb ]
 
 buildRules :: Rules ()

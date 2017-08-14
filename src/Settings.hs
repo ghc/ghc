@@ -10,7 +10,7 @@ import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
 
 import Context
-import CmdLineFlag
+import CommandLine
 import Expression
 import Flavour
 import GHC
@@ -26,16 +26,16 @@ import Settings.Path
 import UserSettings
 
 getArgs :: Args
-getArgs = args flavour
+getArgs = expr flavour >>= args
 
 getLibraryWays :: Ways
-getLibraryWays = libraryWays flavour
+getLibraryWays = expr flavour >>= libraryWays
 
 getRtsWays :: Ways
-getRtsWays = rtsWays flavour
+getRtsWays = expr flavour >>= rtsWays
 
 getPackages :: Packages
-getPackages = packages flavour
+getPackages = expr flavour >>= packages
 
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = interpretInContext (stageContext stage) getPackages
@@ -54,20 +54,22 @@ hadrianFlavours =
     [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
     , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour ]
 
-flavour :: Flavour
-flavour = fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
-  where
-    unknownFlavour = error $ "Unknown build flavour: " ++ flavourName
-    flavours       = hadrianFlavours ++ userFlavours
-    flavourName    = fromMaybe "default" cmdFlavour
+flavour :: Action Flavour
+flavour = do
+    flavourName <- fromMaybe "default" <$> cmdFlavour
+    let unknownFlavour = error $ "Unknown build flavour: " ++ flavourName
+        flavours       = hadrianFlavours ++ userFlavours
+    return $ fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
 
-integerLibraryName :: String
-integerLibraryName = pkgNameString $ integerLibrary flavour
+integerLibraryName :: Action String
+integerLibraryName = pkgNameString <$> (integerLibrary =<< flavour)
 
-programContext :: Stage -> Package -> Context
-programContext stage pkg
-    | pkg == ghc && ghcProfiled flavour && stage > Stage0 = Context stage pkg profiling
-    | otherwise = vanillaContext stage pkg
+programContext :: Stage -> Package -> Action Context
+programContext stage pkg = do
+    profiled <- ghcProfiled <$> flavour
+    return $ if pkg == ghc && profiled && stage > Stage0
+             then Context stage pkg profiling
+             else vanillaContext stage pkg
 
 -- TODO: switch to Set Package as the order of packages should not matter?
 -- Otherwise we have to keep remembering to sort packages from time to time.

@@ -5,6 +5,8 @@ import GHC
 import Settings
 
 basePackageArgs :: Args
-basePackageArgs = package base ? mconcat
-    [ builder GhcCabal ? arg ("--flags=" ++ integerLibraryName)
-    , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ] -- Fix the 'unknown symbol stat' issue, see #259.
+basePackageArgs = package base ? do
+    integerLibrary <- expr integerLibraryName
+    mconcat [ builder GhcCabal ? arg ("--flags=" ++ integerLibrary)
+            -- Fix the 'unknown symbol stat' issue, see #259.
+            , builder (Ghc CompileCWithGhc) ? arg "-optc-O2" ]

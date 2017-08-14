@@ -11,7 +11,6 @@ import Base
 import GHC
 import Settings
 import Settings.Path
-import UserSettings
 
 cabalRules :: Rules ()
 cabalRules = do

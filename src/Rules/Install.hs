@@ -76,8 +76,8 @@ installLibExecs = do
     installDirectory (destDir ++ libExecDir)
     forM_ installBinPkgs $ \pkg -> do
         withLatestBuildStage pkg $ \stage -> do
-            let context = programContext stage pkg
-                bin     = inplaceLibBinPath -/- programName context <.> exe
+            context <- programContext stage pkg
+            let bin = inplaceLibBinPath -/- programName context <.> exe
             installProgram bin (destDir ++ libExecDir)
             when (pkg == ghc) $ do
                 moveFile (destDir ++ libExecDir -/- programName context <.> exe)
@@ -95,7 +95,7 @@ installBins = do
         copyDirectoryContents matchAll (destDir ++ libDir -/- "bin") (destDir ++ binDir)
     unless win $ forM_ installBinPkgs $ \pkg ->
         withLatestBuildStage pkg $ \stage -> do
-            let context = programContext stage pkg
+            context <- programContext stage pkg
             version <- setting ProjectVersion
             -- Name of the binary file
             let binName = if pkg == ghc

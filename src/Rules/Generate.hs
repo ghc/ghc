@@ -15,7 +15,6 @@ import Rules.Libffi
 import Settings
 import Settings.Path
 import Target
-import UserSettings
 import Utilities
 
 -- | Track this file to rebuild generated files whenever it changes.
@@ -58,12 +57,13 @@ derivedConstantsDependencies = fmap (generatedPath -/-)
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
-    stage <- getStage
+    stage  <- getStage
+    intLib <- expr (integerLibrary =<< flavour)
     let path = buildPath $ vanillaContext stage compiler
     mconcat [ return [platformH stage]
             , return includesDependencies
             , return derivedConstantsDependencies
-            , notStage0 ? integerLibrary flavour == integerGmp ? return [gmpLibraryH]
+            , notStage0 ? intLib == integerGmp ? return [gmpLibraryH]
             , notStage0 ? return libffiDependencies
             , return $ fmap (path -/-)
                   [ "primop-can-fail.hs-incl"
@@ -260,10 +260,12 @@ generateConfigHs = do
     cProjectPatchLevel1 <- getSetting ProjectPatchLevel1
     cProjectPatchLevel2 <- getSetting ProjectPatchLevel2
     cBooterVersion      <- getSetting GhcVersion
+    intLib              <- expr (integerLibrary =<< flavour)
+    debugged            <- ghcDebugged    <$> expr flavour
     let cIntegerLibraryType
-            | integerLibrary flavour == integerGmp    = "IntegerGMP"
-            | integerLibrary flavour == integerSimple = "IntegerSimple"
-            | otherwise = error $ "Unknown integer library: " ++ integerLibraryName
+            | intLib == integerGmp    = "IntegerGMP"
+            | intLib == integerSimple = "IntegerSimple"
+            | otherwise = error $ "Unknown integer library: " ++ pkgNameString intLib
     cSupportsSplitObjs         <- expr $ yesNo <$> supportsSplitObjects
     cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
     cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
@@ -311,7 +313,7 @@ generateConfigHs = do
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         , "cIntegerLibrary       :: String"
-        , "cIntegerLibrary       = " ++ show integerLibraryName
+        , "cIntegerLibrary       = " ++ show (pkgNameString intLib)
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
         , "cSupportsSplitObjs    :: String"
@@ -337,7 +339,7 @@ generateConfigHs = do
         , "cGhcThreaded :: Bool"
         , "cGhcThreaded = " ++ show (threaded `elem` rtsWays)
         , "cGhcDebugged :: Bool"
-        , "cGhcDebugged = " ++ show (ghcDebugged flavour)
+        , "cGhcDebugged = " ++ show debugged
         , "cGhcRtsWithLibdw :: Bool"
         , "cGhcRtsWithLibdw = " ++ show cGhcRtsWithLibdw ]
 

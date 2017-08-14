@@ -5,7 +5,6 @@ import Context
 import GHC
 import Settings.Path
 import Target
-import UserSettings
 import Utilities
 
 -- | Build rules for registering packages and initialising package databases

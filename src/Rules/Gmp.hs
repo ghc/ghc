@@ -6,7 +6,6 @@ import Oracles.Setting
 import Settings.Packages.IntegerGmp
 import Settings.Path
 import Target
-import UserSettings
 import Utilities
 
 gmpBase :: FilePath

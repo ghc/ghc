@@ -5,7 +5,6 @@ import Hadrian.Oracles.DirectoryContents
 import Base
 import Oracles.Setting
 import Rules.Clean
-import UserSettings
 import Utilities
 
 sourceDistRules :: Rules ()

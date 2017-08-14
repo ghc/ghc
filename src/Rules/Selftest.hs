@@ -10,7 +10,6 @@ import Oracles.Setting
 import Settings
 import Settings.Builders.Ar
 import Target
-import UserSettings
 
 instance Arbitrary Way where
     arbitrary = wayFromUnits <$> arbitrary

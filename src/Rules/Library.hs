@@ -16,7 +16,6 @@ import Oracles.Setting
 import Settings
 import Settings.Path
 import Target
-import UserSettings
 import Utilities
 
 libraryObjects :: Context -> Action [FilePath]
@@ -28,7 +27,7 @@ libraryObjects context@Context{..} = do
     -- explicitly as this would needlessly bloat the Shake database).
     need $ noHsObjs ++ hsObjs
 
-    split <- interpretInContext context $ splitObjects flavour
+    split <- interpretInContext context =<< splitObjects <$> flavour
     let getSplitObjs = concatForM hsObjs $ \obj -> do
             let dir = dropExtension obj ++ "_" ++ osuf way ++ "_split"
             contents <- liftIO $ IO.getDirectoryContents dir

@@ -3,17 +3,17 @@ module Rules.Configure (configureRules) where
 import qualified System.Info as System
 
 import Base
-import CmdLineFlag
+import CommandLine
 import Context
 import GHC
 import Target
-import UserSettings
 import Utilities
 
 configureRules :: Rules ()
 configureRules = do
     [configFile, "settings", configH] &%> \outs -> do
-        if cmdSkipConfigure
+        skip <- cmdSkipConfigure
+        if skip
         then unlessM (doesFileExist configFile) $
             error $ "Configuration file " ++ configFile ++ " is missing."
                 ++ "\nRun the configure script manually or do not use the "
@@ -29,7 +29,8 @@ configureRules = do
             build $ target context (Configure ".") srcs outs
 
     ["configure", configH <.> "in"] &%> \_ -> do
-        if cmdSkipConfigure
+        skip <- cmdSkipConfigure
+        if skip
         then unlessM (doesFileExist "configure") $
             error $ "The configure script is missing.\nRun the boot script"
                 ++ " manually or do not use the --skip-configure flag."

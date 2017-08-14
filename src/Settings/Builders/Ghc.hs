@@ -47,7 +47,8 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
     pkg     <- getPackage
     libs    <- getPkgDataList DepExtraLibs
     libDirs <- getPkgDataList DepLibDirs
-    gmpLibs <- if stage > Stage0 && integerLibrary flavour == integerGmp
+    intLib  <- expr (integerLibrary =<< flavour)
+    gmpLibs <- if stage > Stage0 && intLib == integerGmp
                then do -- TODO: get this data more gracefully
                    let strip = fromMaybe "" . stripPrefix "extra-libraries: "
                    buildInfo <- expr $ readFileLines gmpBuildInfoPath
@@ -62,7 +63,7 @@ ghcLinkArgs = builder (Ghc LinkHs) ? do
             , pure [ "-optl-L" ++ unifyPath dir | dir <- libDirs ] ]
 
 splitObjectsArgs :: Args
-splitObjectsArgs = splitObjects flavour ? do
+splitObjectsArgs = splitObjects <$> flavour ? do
     expr $ need [ghcSplitPath]
     arg "-split-objs"
 

@@ -13,17 +13,18 @@ import Rules.Wrappers
 import Settings
 import Settings.Path
 import Target
-import UserSettings
 import Utilities
 
+-- TODO: Drop way in build rule generation?
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
     let installStage = do
             latest <- latestBuildStage package -- fromJust below is safe
             return $ if package == ghc then stage else fromJust latest
 
-    buildPath context -/- programName context <.> exe %>
-        buildBinaryAndWrapper rs context
+    buildPath context -/- programName context <.> exe %> \bin -> do
+        context' <- programContext stage package
+        buildBinaryAndWrapper rs context' bin
 
     when (package == ghc) $ want inplaceLibCopyTargets
 
@@ -31,22 +32,25 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
     when (stage == Stage0 || package == ghc) $ do
         -- Some binaries in inplace/bin are wrapped
         inplaceBinPath -/- programName context <.> exe %> \bin -> do
+            context' <- programContext stage package
             binStage <- installStage
-            buildBinaryAndWrapper rs (context { stage = binStage }) bin
+            buildBinaryAndWrapper rs (context' { stage = binStage }) bin
 
         inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
             binStage <- installStage
+            context' <- programContext stage package
             if package /= iservBin then
                 -- We *normally* build only unwrapped binaries in inplace/lib/bin,
-                buildBinary rs (context { stage = binStage }) bin
+                buildBinary rs (context' { stage = binStage }) bin
             else
                 -- build both binary and wrapper in inplace/lib/bin
                 -- for ghc-iserv on *nix platform now
-                buildBinaryAndWrapperLib rs (context { stage = binStage }) bin
+                buildBinaryAndWrapperLib rs (context' { stage = binStage }) bin
 
         inplaceLibBinPath -/- programName context <.> "bin" %> \bin -> do
             binStage <- installStage
-            buildBinary rs (context { stage = binStage }) bin
+            context' <- programContext stage package
+            buildBinary rs (context' { stage = binStage }) bin
 
 buildBinaryAndWrapperLib :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinaryAndWrapperLib rs context bin = do

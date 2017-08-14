@@ -43,12 +43,13 @@ ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
 libraryArgs :: Args
 libraryArgs = do
-    ways     <- getLibraryWays
-    withGhci <- expr ghcWithInterpreter
+    ways        <- getLibraryWays
+    withGhci    <- expr ghcWithInterpreter
+    dynPrograms <- dynamicGhcPrograms <$> expr flavour
     pure [ if vanilla `elem` ways
            then  "--enable-library-vanilla"
            else "--disable-library-vanilla"
-         , if vanilla `elem` ways && withGhci && not (dynamicGhcPrograms flavour)
+         , if vanilla `elem` ways && withGhci && not dynPrograms
            then  "--enable-library-for-ghci"
            else "--disable-library-for-ghci"
          , if profiling `elem` ways

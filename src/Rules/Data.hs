@@ -8,7 +8,6 @@ import Oracles.Setting
 import Rules.Generate
 import Settings.Path
 import Target
-import UserSettings
 import Utilities
 
 -- | Build @package-data.mk@ by using ghc-cabal utility to process .cabal files.

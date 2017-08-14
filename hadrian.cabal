@@ -20,7 +20,7 @@ executable hadrian
                        , src
     other-modules:       Base
                        , Builder
-                       , CmdLineFlag
+                       , CommandLine
                        , Context
                        , Environment
                        , Expression

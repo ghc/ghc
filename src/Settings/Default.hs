@@ -4,7 +4,7 @@ module Settings.Default (
     defaultFlavour, defaultSplitObjects
     ) where
 
-import CmdLineFlag
+import CommandLine
 import Expression
 import Flavour
 import GHC
@@ -124,8 +124,9 @@ stage0Packages = do
 
 stage1Packages :: Packages
 stage1Packages = do
-    win <- expr windowsHost
-    doc <- buildHaddock flavour
+    win    <- expr windowsHost
+    doc    <- buildHaddock =<< expr flavour
+    intLib <- expr (integerLibrary =<< flavour)
     mconcat [ (filter isLibrary) <$> stage0Packages -- Build all Stage0 libraries in Stage1
             , pure $ [ array
                      , base
@@ -141,7 +142,7 @@ stage1Packages = do
                      , haskeline
                      , hpcBin
                      , hsc2hs
-                     , integerLibrary flavour
+                     , intLib
                      , pretty
                      , process
                      , rts
@@ -153,7 +154,7 @@ stage1Packages = do
                      [ xhtml    | doc     ] ]
 
 stage2Packages :: Packages
-stage2Packages = buildHaddock flavour ? pure [ haddock ]
+stage2Packages = buildHaddock <$> flavour ? pure [ haddock ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.
@@ -183,11 +184,11 @@ defaultFlavour = Flavour
     { name               = "default"
     , args               = defaultArgs
     , packages           = defaultPackages
-    , integerLibrary     = if cmdIntegerSimple then integerSimple else integerGmp
+    , integerLibrary     = (\x -> if x then integerSimple else integerGmp) <$> cmdIntegerSimple
     , libraryWays        = defaultLibraryWays
     , rtsWays            = defaultRtsWays
     , splitObjects       = defaultSplitObjects
-    , buildHaddock       = return cmdBuildHaddock
+    , buildHaddock       = expr cmdBuildHaddock
     , dynamicGhcPrograms = False
     , ghciWithDebugger   = False
     , ghcProfiled        = False
@@ -199,8 +200,9 @@ defaultSplitObjects = do
     goodStage <- notStage0 -- We don't split bootstrap (stage 0) packages
     pkg       <- getPackage
     supported <- expr supportsSplitObjects
+    split     <- expr cmdSplitObjects
     let goodPackage = isLibrary pkg && pkg /= compiler && pkg /= rts
-    return $ cmdSplitObjects && goodStage && goodPackage && supported
+    return $ split && goodStage && goodPackage && supported
 
 -- | All 'Builder'-dependent command line arguments.
 defaultBuilderArgs :: Args

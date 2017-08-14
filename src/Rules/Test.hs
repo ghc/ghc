@@ -35,6 +35,7 @@ testRules = do
         ghcPkg   <- builderPath $ GhcPkg Update Stage1
         haddock  <- builderPath Haddock
         threads  <- shakeThreads <$> getShakeOptions
+        debugged <- ghcDebugged <$> flavour
         ghcWithNativeCodeGenInt <- fromEnum <$> ghcWithNativeCodeGen
         ghcWithInterpreterInt   <- fromEnum <$> ghcWithInterpreter
         ghcUnregisterisedInt    <- fromEnum <$> flag GhcUnregisterised
@@ -45,7 +46,7 @@ testRules = do
             , "-e", "config.speed=2"
             , "-e", "ghc_compiler_always_flags=" ++ show "-fforce-recomp -dcore-lint -dcmm-lint -dno-debug-output -no-user-package-db -rtsopts"
             , "-e", "ghc_with_native_codegen=" ++ show ghcWithNativeCodeGenInt
-            , "-e", "ghc_debugged=" ++ show (yesNo $ ghcDebugged flavour)
+            , "-e", "ghc_debugged=" ++ show (yesNo debugged)
             , "-e", "ghc_with_vanilla=1" -- TODO: do we always build vanilla?
             , "-e", "ghc_with_dynamic=0" -- TODO: support dynamic
             , "-e", "ghc_with_profiling=0" -- TODO: support profiling

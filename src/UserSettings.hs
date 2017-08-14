@@ -4,14 +4,12 @@
 -- accidentally commit them.
 module UserSettings (
     buildRootPath, userFlavours, userKnownPackages, verboseCommands,
-    putBuild, putSuccess, defaultDestDir, defaultStage1Only
+    buildProgressColour, successColour, defaultDestDir, defaultStage1Only
     ) where
 
-import Development.Shake
 import Hadrian.Utilities
 import System.Console.ANSI
 
-import CmdLineFlag
 import Flavour
 import Expression
 
@@ -31,19 +29,19 @@ userFlavours = []
 userKnownPackages :: [Package]
 userKnownPackages = []
 
--- | Set to True to print full command lines during the build process. Note,
--- this is a Predicate, hence you can enable verbose output only for certain
+-- | Set to 'True' to print full command lines during the build process. Note:
+-- this is a 'Predicate', hence you can enable verbose output only for certain
 -- targets, e.g.: @verboseCommands = package ghcPrim@.
 verboseCommands :: Predicate
 verboseCommands = return False
 
--- | Customise build progress messages (e.g. executing a build command).
-putBuild :: String -> Action ()
-putBuild = putColoured cmdProgressColour Dull Magenta
+-- | Set colour for build progress messages (e.g. executing a build command).
+buildProgressColour :: BuildProgressColour
+buildProgressColour = BuildProgressColour (Dull, Magenta)
 
--- | Customise build success messages (e.g. a package is built successfully).
-putSuccess :: String -> Action ()
-putSuccess = putColoured cmdProgressColour Dull Green
+-- | Set colour for success messages (e.g. a package is built successfully).
+successColour :: SuccessColour
+successColour = SuccessColour (Dull, Green)
 
 -- | Path to the GHC install destination. It is empty by default, which
 -- corresponds to the root of the file system. You can replace it by a specific
