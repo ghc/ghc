@@ -149,13 +149,14 @@ instance NamedThing LaxDataCon where
 instance TrieMap ConAppMap where
     type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
-    lookupTM (dataCon, args) | traceLookup dataCon = undefined
+    lookupTM (dataCon, _) | traceLookup dataCon = undefined
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
     foldTM k = un_cam >.> foldTM (foldTM k)
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
 
+traceLookup :: LaxDataCon -> Bool
 traceLookup l@(Lax dc) = pprTrace "lookupTM" (ppr dc <> (if getKey u < 0 then text " -" else text " ") <> ppr u') False
   where u = nameUnique . getName $ l
         u' = mkUniqueGrimily (abs(getKey u))
