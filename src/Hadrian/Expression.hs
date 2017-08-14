@@ -75,14 +75,14 @@ p ? e = do
     bool <- toPredicate p
     if bool then e else mempty
 
-instance (c ~ c', b ~ b') => ToPredicate (Predicate c b) c' b' where
-    toPredicate = id
-
 instance ToPredicate Bool c b where
     toPredicate = pure
 
-instance ToPredicate (Action Bool) c b where
-    toPredicate = expr
+instance ToPredicate p c b => ToPredicate (Action p) c b where
+    toPredicate = toPredicate . expr
+
+instance (c ~ c', b ~ b', ToPredicate p c' b') => ToPredicate (Expr c b p) c' b' where
+    toPredicate p = toPredicate =<< p
 
 -- | Interpret a given expression according to the given 'Target'.
 interpret :: Target c b -> Expr c b a -> Action a
