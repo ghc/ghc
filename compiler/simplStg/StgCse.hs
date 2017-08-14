@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeFamilies, LambdaCase #-}
+{-# OPTIONS -Wno-error=unused-imports -Wno-error=unused-top-binds #-}
 
 {-|
 Note [CSE for Stg]
@@ -142,14 +143,14 @@ instance NamedThing LaxDataCon where
     where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
           hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
           unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
-          long = length (dataConOrigArgTys dc) > 2
+          long = length (dataConOrigArgTys dc) > 1
   getName (Lax dc) = getName dc
 
 
 instance TrieMap ConAppMap where
     type Key ConAppMap = (LaxDataCon, [StgArg])
     emptyTM  = CAM emptyTM
-    lookupTM (dataCon, _) | traceLookup dataCon = undefined
+    --lookupTM (dataCon, _) | traceLookup dataCon = undefined
     lookupTM (dataCon, args) = un_cam >.> lkDNamed dataCon >=> lookupTM args
     alterTM  (dataCon, args) f m =
         m { un_cam = un_cam m |> xtDNamed dataCon |>> alterTM args f }
@@ -157,9 +158,12 @@ instance TrieMap ConAppMap where
     mapTM f  = un_cam >.> mapTM (mapTM f) >.> CAM
 
 traceLookup :: LaxDataCon -> Bool
+traceLookup _ = False
+{-
 traceLookup l@(Lax dc) = pprTrace "lookupTM" (ppr dc <> (if getKey u < 0 then text " -" else text " ") <> ppr u') False
   where u = nameUnique . getName $ l
         u' = mkUniqueGrimily (abs(getKey u))
+-}
 {-# NOINLINE traceLookup #-}
 
 -----------------
