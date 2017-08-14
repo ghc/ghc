@@ -3,10 +3,11 @@ module CommandLine (
     cmdProgressColour, cmdProgressInfo, cmdSkipConfigure, cmdSplitObjects
     ) where
 
-import Data.Dynamic
+import Data.Dynamic (Dynamic)
 import Data.Either
 import qualified Data.HashMap.Strict as Map
 import Data.List.Extra
+import Data.Typeable (TypeRep)
 import Development.Shake hiding (Normal)
 import Hadrian.Utilities
 import System.Console.GetOpt
