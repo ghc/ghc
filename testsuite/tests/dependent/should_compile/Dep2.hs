@@ -1,4 +1,4 @@
-{-# LANGUAGE PolyKinds, GADTs #-}
+{-# LANGUAGE TypeInType, GADTs #-}
 
 module Dep2 where
 

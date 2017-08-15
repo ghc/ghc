@@ -2511,6 +2511,26 @@ checkValidDataCon dflags existential_ok tc con
         ; checkTc (existential_ok || isVanillaDataCon con)
                   (badExistential con)
 
+        ; typeintype <- xoptM LangExt.TypeInType
+        ; let invisible_gadt_eq_specs = filter is_invisible_eq_spec (dataConEqSpec con)
+              univ_tvs = dataConUnivTyVars con
+              tc_bndrs = tyConBinders tc
+
+                -- find the index of the univ tv mentioned in the eq_spec
+                -- then, look that up in the TyConBinders to see if it's visible
+                -- Maybe there's a better way, but I don't see it.
+                -- See Note [Wrong visibility for GADTs], though.
+              is_invisible_eq_spec eq_spec
+                = let eq_tv    = eqSpecTyVar eq_spec
+                      tv_index = expectJust "checkValidDataCon" $
+                                 elemIndex eq_tv univ_tvs
+                      tc_bndr  = tc_bndrs `getNth` tv_index
+                  in
+                  isInvisibleTyConBinder tc_bndr
+
+        ; checkTc (typeintype || null invisible_gadt_eq_specs)
+                  (badGADT con invisible_gadt_eq_specs)
+
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
@@ -3223,6 +3243,15 @@ badExistential con
                 text "has existential type variables, a context, or a specialised result type")
        2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
                , parens $ text "Use ExistentialQuantification or GADTs to allow this" ])
+
+badGADT :: DataCon -> [EqSpec] -> SDoc
+badGADT con eq_specs
+  = hang (text "Data constructor" <+> quotes (ppr con) <+>
+               text "constrains the choice of kind parameter" <> plural eq_specs <> colon)
+       2 (vcat (map ppr_eq_spec eq_specs)) $$
+    text "Use TypeInType to allow this"
+  where
+    ppr_eq_spec eq_spec = ppr (eqSpecTyVar eq_spec) <+> char '~' <+> ppr (eqSpecType eq_spec)
 
 badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name
