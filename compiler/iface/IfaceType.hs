@@ -325,9 +325,9 @@ suppressIfaceInvisibles dflags tys xs
     where
       suppress _       []      = []
       suppress []      a       = a
-      suppress (k:ks) a@(_:xs)
-        | isInvisibleTyConBinder k = suppress ks xs
-        | otherwise                = a
+      suppress (k:ks) (x:xs)
+        | isInvisibleTyConBinder k =     suppress ks xs
+        | otherwise                = x : suppress ks xs
 
 stripIfaceInvisVars :: DynFlags -> [IfaceTyConBinder] -> [IfaceTyConBinder]
 stripIfaceInvisVars dflags tyvars
