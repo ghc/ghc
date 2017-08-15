@@ -148,7 +148,8 @@ deSugar hsc_env
           keep_alive <- readIORef keep_var
         ; let (rules_for_locals, rules_for_imps) = partition isLocalRule all_rules
               final_prs = addExportFlagsAndRules target export_set keep_alive
-                                                 rules_for_locals (fromOL all_prs)
+                                                 mod rules_for_locals
+                                                 (fromOL all_prs)
 
               final_pgm = combineEvBinds ds_ev_binds final_prs
         -- Notice that we put the whole lot in a big Rec, even the foreign binds
@@ -278,9 +279,9 @@ deSugarExpr hsc_env tc_expr = do {
 -}
 
 addExportFlagsAndRules
-    :: HscTarget -> NameSet -> NameSet -> [CoreRule]
+    :: HscTarget -> NameSet -> NameSet -> Module -> [CoreRule]
     -> [(Id, t)] -> [(Id, t)]
-addExportFlagsAndRules target exports keep_alive rules prs
+addExportFlagsAndRules target exports keep_alive mod rules prs
   = mapFst add_one prs
   where
     add_one bndr = add_rules name (add_export name bndr)
@@ -313,10 +314,20 @@ addExportFlagsAndRules target exports keep_alive rules prs
         -- simplification), and retain them all in the TypeEnv so they are
         -- available from the command line.
         --
+        -- Most of the time, this can be accomplished by use of
+        -- targetRetainsAllBindings, which returns True if the target is
+        -- HscInteractive. However, there are cases when one can use GHCi with
+        -- a target other than HscInteractive (e.g., with the -fobject-code
+        -- flag enabled, as in #12091). In such scenarios,
+        -- targetRetainsAllBindings can return False, so we must fall back on
+        -- isInteractiveModule to be doubly sure we export entities defined in
+        -- a GHCi session.
+        --
         -- isExternalName separates the user-defined top-level names from those
         -- introduced by the type checker.
     is_exported :: Name -> Bool
-    is_exported | targetRetainsAllBindings target = isExternalName
+    is_exported | targetRetainsAllBindings target
+                  || isInteractiveModule mod      = isExternalName
                 | otherwise                       = (`elemNameSet` exports)
 
 {-
