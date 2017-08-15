@@ -2019,8 +2019,11 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
                   | otherwise            = text "kind" <+> quotes (ppr exp)
 
     num_args_msg = case level of
-      TypeLevel -> Nothing
       KindLevel
+        | not (isMetaTyVarTy exp) && not (isMetaTyVarTy act)
+           -- if one is a meta-tyvar, then it's possible that the user
+           -- has asked for something impredicative, and we couldn't unify.
+           -- Don't bother with counting arguments.
         -> let n_act = count_args act
                n_exp = count_args exp in
            case n_act - n_exp of
@@ -2034,6 +2037,8 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
                   | n == 1    = text "more argument to"
                   | otherwise = text "more arguments to"  -- n > 1
              _ -> Nothing
+
+      _ -> Nothing
 
     maybe_num_args_msg = case num_args_msg of
       Nothing -> empty
