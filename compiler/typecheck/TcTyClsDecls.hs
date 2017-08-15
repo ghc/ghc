@@ -2513,6 +2513,32 @@ checkValidDataCon dflags existential_ok tc con
         ; checkTc (existential_ok || isVanillaDataCon con)
                   (badExistential con)
 
+        ; typeintype <- xoptM LangExt.TypeInType
+        ; let (_, _, eq_specs, _, _, _) = dataConFullSig con
+                -- dataConEqSpec retrieves both the real GADT equalities
+                -- plus any user-written GADT-like equalities. But we don't
+                -- want anything user-written. If we don't exclude user-written
+                -- ones, test case polykinds/T13391a fails.
+
+              invisible_gadt_eq_specs = filter is_invisible_eq_spec eq_specs
+              univ_tvs = dataConUnivTyVars con
+              tc_bndrs = tyConBinders tc
+
+              vis_map :: VarEnv ArgFlag
+              vis_map = zipVarEnv univ_tvs (map tyConBinderArgFlag tc_bndrs)
+
+                -- See Note [Wrong visibility for GADTs] for why we have to build the map
+                -- above instead of just looking at the datacon tyvar binder
+              is_invisible_eq_spec eq_spec
+                = isInvisibleArgFlag arg_flag
+                where
+                  eq_tv    = eqSpecTyVar eq_spec
+                  arg_flag = expectJust "checkValidDataCon" $
+                             lookupVarEnv vis_map eq_tv
+
+        ; checkTc (typeintype || null invisible_gadt_eq_specs)
+                  (badGADT con invisible_gadt_eq_specs)
+
           -- Check that UNPACK pragmas and bangs work out
           -- E.g.  reject   data T = MkT {-# UNPACK #-} Int     -- No "!"
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
@@ -3225,6 +3251,15 @@ badExistential con
                 text "has existential type variables, a context, or a specialised result type")
        2 (vcat [ ppr con <+> dcolon <+> ppr (dataConUserType con)
                , parens $ text "Use ExistentialQuantification or GADTs to allow this" ])
+
+badGADT :: DataCon -> [EqSpec] -> SDoc
+badGADT con eq_specs
+  = hang (text "Data constructor" <+> quotes (ppr con) <+>
+               text "constrains the choice of kind parameter" <> plural eq_specs <> colon)
+       2 (vcat (map ppr_eq_spec eq_specs)) $$
+    text "Use TypeInType to allow this"
+  where
+    ppr_eq_spec eq_spec = ppr (eqSpecTyVar eq_spec) <+> char '~' <+> ppr (eqSpecType eq_spec)
 
 badStupidTheta :: Name -> SDoc
 badStupidTheta tc_name
