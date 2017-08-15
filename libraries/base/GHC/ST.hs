@@ -77,6 +77,11 @@ instance Monad (ST s) where
         case (k r) of { ST k2 ->
         (k2 new_s) }})
 
+-- | @since 4.11.0.0
+instance Monoid a => Monoid (ST s a) where
+    mempty = pure mempty
+    mappend = liftA2 mappend
+
 data STret s a = STret (State# s) a
 
 -- liftST is useful when we want a lifted result from an ST computation.  See

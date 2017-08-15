@@ -72,6 +72,7 @@ import           Prelude             hiding (foldr1)
 import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Fix
+import           Control.Monad.ST(ST)
 import           Data.Bifoldable
 import           Data.Bifunctor
 import           Data.Bitraversable
@@ -723,6 +724,10 @@ instance Semigroup (Proxy s) where
 
 -- | @since 4.10.0.0
 instance Semigroup a => Semigroup (IO a) where
+    (<>) = liftA2 (<>)
+
+-- | @since 4.11.0.0
+instance Semigroup a => Semigroup (ST s a) where
     (<>) = liftA2 (<>)
 
 #if !defined(mingw32_HOST_OS)

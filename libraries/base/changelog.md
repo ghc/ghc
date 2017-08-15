@@ -14,6 +14,8 @@
 
   * Remove the deprecated `Typeable{1..7}` type synonyms (#14047)
 
+  * Add instances `Semigroup` and `Monoid` for `Control.Monad.ST` (#14107).
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 
