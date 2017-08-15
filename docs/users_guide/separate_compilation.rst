@@ -522,11 +522,15 @@ files, thus: ::
         g :: TA -> TB
         g (MkTA x) = MkTB x
 
-``hs-boot`` files importing, ``hi-boot`` files Here ``A`` imports ``B``,
-but ``B`` imports ``A`` with a ``{-# SOURCE #-}`` pragma, which breaks
-the circular dependency. Every loop in the module import graph must be
-broken by a ``{-# SOURCE #-}`` import; or, equivalently, the module
-import graph must be acyclic if ``{-# SOURCE #-}`` imports are ignored.
+.. index::
+   single: ``hs-boot`` files
+   single: importing, ``hi-boot`` files
+
+Here ``A`` imports ``B``, but ``B`` imports ``A`` with a
+``{-# SOURCE #-}`` pragma, which breaks the circular dependency. Every
+loop in the module import graph must be broken by a ``{-# SOURCE #-}``
+import; or, equivalently, the module import graph must be acyclic if
+``{-# SOURCE #-}`` imports are ignored.
 
 For every module ``A.hs`` that is ``{-# SOURCE #-}``-imported in this
 way there must exist a source file ``A.hs-boot``. This file contains an
