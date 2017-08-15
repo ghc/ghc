@@ -1028,8 +1028,8 @@ checkBootTyCon is_boot tc1 tc2
             = eqClosedFamilyAx ax1 ax2
         eqFamFlav (BuiltInSynFamTyCon {}) (BuiltInSynFamTyCon {}) = tc1 == tc2
         eqFamFlav _ _ = False
-        injInfo1 = familyTyConInjectivityInfo tc1
-        injInfo2 = familyTyConInjectivityInfo tc2
+        injInfo1 = tyConInjectivityInfo tc1
+        injInfo2 = tyConInjectivityInfo tc2
     in
     -- check equality of roles, family flavours and injectivity annotations
     -- (NB: Type family roles are always nominal. But the check is

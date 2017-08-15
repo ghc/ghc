@@ -1174,7 +1174,7 @@ improveLocalFunEqs work_ev inerts fam_tc args fsk
     rhs           = lookupFlattenTyVar ieqs fsk
     work_loc      = ctEvLoc work_ev
     work_pred     = ctEvPred work_ev
-    fam_inj_info  = familyTyConInjectivityInfo fam_tc
+    fam_inj_info  = tyConInjectivityInfo fam_tc
 
     --------------------
     improvement_eqns :: [FunDepEqn CtLoc]
@@ -1743,7 +1743,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
 
   -- see Note [Type inference for type families with injectivity]
   | isOpenTypeFamilyTyCon fam_tc
-  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  , Injective injective_args <- tyConInjectivityInfo fam_tc
   , let fam_insts = lookupFamInstEnvByTyCon fam_envs fam_tc
   = -- it is possible to have several compatible equations in an open type
     -- family but we only want to derive equalities from one such equation.
@@ -1755,7 +1755,7 @@ improve_top_fun_eqs fam_envs fam_tc args rhs_ty
          take 1 improvs }
 
   | Just ax <- isClosedSynFamilyTyConWithAxiom_maybe fam_tc
-  , Injective injective_args <- familyTyConInjectivityInfo fam_tc
+  , Injective injective_args <- tyConInjectivityInfo fam_tc
   = concatMapM (injImproveEqns injective_args) $
     buildImprovementData (fromBranches (co_ax_branches ax))
                          cab_tvs cab_lhs cab_rhs Just

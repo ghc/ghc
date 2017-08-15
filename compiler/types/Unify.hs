@@ -804,7 +804,7 @@ unify_ty env ty1 ty2 _kco
   = if isInjectiveTyCon tc1 Nominal
     then unify_tys env tys1 tys2
     else do { let inj | isTypeFamilyTyCon tc1
-                      = case familyTyConInjectivityInfo tc1 of
+                      = case tyConInjectivityInfo tc1 of
                                NotInjective -> repeat False
                                Injective bs -> bs
                       | otherwise

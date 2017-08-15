@@ -52,6 +52,7 @@ import GHCi
 import HscMain
         -- These imports are the reason that TcSplice
         -- is very high up the module hierarchy
+import FV
 import RnSplice( traceSplice, SpliceInfo(..) )
 import RdrName
 import HscTypes
@@ -97,7 +98,7 @@ import GHC.Serialized
 import ErrUtils
 import Util
 import Unique
-import VarSet           ( isEmptyVarSet, filterVarSet, mkVarSet, elemVarSet )
+import VarSet
 import Data.List        ( find )
 import Data.Maybe
 import FastString
@@ -1380,7 +1381,7 @@ reifyTyCon tc
                    Nothing   -> (TH.KindSig kind', Nothing)
                    Just name ->
                      let thName   = reifyName name
-                         injAnnot = familyTyConInjectivityInfo tc
+                         injAnnot = tyConInjectivityInfo tc
                          sig = TH.TyVarSig (TH.KindedTV thName kind')
                          inj = case injAnnot of
                                  NotInjective -> Nothing
@@ -1682,7 +1683,7 @@ reifyType (AppTy t1 t2)     = do { [r1,r2] <- reifyTypes [t1,t2] ; return (r1 `T
 reifyType ty@(FunTy t1 t2)
   | isPredTy t1 = reify_for_all ty  -- Types like ((?x::Int) => Char -> Char)
   | otherwise   = do { [r1,r2] <- reifyTypes [t1,t2] ; return (TH.ArrowT `TH.AppT` r1 `TH.AppT` r2) }
-reifyType ty@(CastTy {})    = noTH (sLit "kind casts") (ppr ty)
+reifyType (CastTy t _)      = reifyType t -- Casts are ignored in TH
 reifyType ty@(CoercionTy {})= noTH (sLit "coercions in types") (ppr ty)
 
 reify_for_all :: TyCoRep.Type -> TcM TH.Type
@@ -1779,13 +1780,67 @@ For example:
    type instance F Bool = (Proxy :: (* -> *) -> *)
 
 It's hard to figure out where these annotations should appear, so we do this:
-Suppose the tycon is applied to n arguments. We strip off the first n
-arguments of the tycon's kind. If there are any variables left in the result
-kind, we put on a kind annotation. But we must be slightly careful: it's
-possible that the tycon's kind will have fewer than n arguments, in the case
-that the concrete application instantiates a result kind variable with an
-arrow kind. So, if we run out of arguments, we conservatively put on a kind
-annotation anyway. This should be a rare case, indeed. Here is an example:
+Suppose we have a tycon application (T ty1 ... tyn). Assuming that T is not
+oversatured (more on this later), we can assume T's declaration is of the form
+T (tvb1 :: s1) ... (tvbn :: sn) :: p. If any kind variable that
+is free in p is not free in an injective position in tvb1 ... tvbn,
+then we put on a kind annotation, since we would not otherwise be able to infer
+the kind of the whole tycon application.
+
+The injective positions in a tyvar binder are the injective positions in the
+kind of its tyvar, provided the tyvar binder is either:
+
+* Anonymous. For example, in the promoted data constructor '(:):
+
+    '(:) :: forall a. a -> [a] -> [a]
+
+  The second and third tyvar binders (of kinds `a` and `[a]`) are both
+  anonymous, so if we had '(:) 'True '[], then the inferred kinds of 'True and
+  '[] would contribute to the inferred kind of '(:) 'True '[].
+* Has required visibility. For example, in the type family:
+
+    type family Wurble k (a :: k) :: k
+    Wurble :: forall k -> k -> k
+
+  The first tyvar binder (of kind `forall k`) has required visibility, so if
+  we had Wurble (Maybe a) Nothing, then the inferred kind of Maybe a would
+  contribute to the inferred kind of Wurble (Maybe a) Nothing.
+
+An injective position in a type is one that does not occur as an argument to
+a non-injective type constructor (e.g., non-injective type families). See
+injectiveVarsOfType.
+
+How can be sure that this is correct? That is, how can we be sure that in the
+event that we leave off a kind annotation, that one could infer the kind of the
+tycon application from its arguments? It's essentially a proof by induction: if
+we can infer the kinds of every subtree of a type, then the whole tycon
+application will have an inferrable kind--unless, of course, the remainder of
+the tycon application's kind has uninstantiated kind variables.
+
+An earlier implementation of this algorithm only checked if p contained any
+free variables. But this was unsatisfactory, since a datatype like this:
+
+  data Foo = Foo (Proxy '[False, True])
+
+Would be reified like this:
+
+  data Foo = Foo (Proxy ('(:) False ('(:) True ('[] :: [Bool])
+                                     :: [Bool]) :: [Bool]))
+
+Which has a rather excessive amount of kind annotations. With the current
+algorithm, we instead reify Foo to this:
+
+  data Foo = Foo (Proxy ('(:) False ('(:) True ('[] :: [Bool]))))
+
+Since in the case of '[], the kind p is [a], and there are no arguments in the
+kind of '[]. On the other hand, in the case of '(:) True '[], the kind p is
+(forall a. [a]), but a occurs free in the first and second arguments of the
+full kind of '(:), which is (forall a. a -> [a] -> [a]). (See Trac #14060.)
+
+What happens if T is oversaturated? That is, if T's kind has fewer than n
+arguments, in the case that the concrete application instantiates a result
+kind variable with an arrow kind? If we run out of arguments, we do not attach
+a kind annotation. This should be a rare case, indeed. Here is an example:
 
    data T1 :: k1 -> k2 -> *
    data T2 :: k1 -> k2 -> *
@@ -1799,10 +1854,14 @@ Here G's kind is (forall k. k -> k), and the desugared RHS of that last
 instance of F is (G (* -> (* -> *) -> *) (T1 * (* -> *)) Bool). According to
 the algorithm above, there are 3 arguments to G so we should peel off 3
 arguments in G's kind. But G's kind has only two arguments. This is the
-rare special case, and we conservatively choose to put the annotation
-in.
+rare special case, and we choose not to annotate the application of G with
+a kind signature. After all, we needn't do this, since that instance would
+be reified as:
 
-See #8953 and test th/T8953.
+   type instance F Char = G (T1 :: * -> (* -> *) -> *) Bool
+
+So the kind of G isn't ambiguous anymore due to the explicit kind annotation
+on its argument. See #8953 and test th/T8953.
 -}
 
 reify_tc_app :: TyCon -> [Type.Type] -> TcM TH.Type
@@ -1841,12 +1900,45 @@ reify_tc_app tc tys
 
     needs_kind_sig
       | GT <- compareLength tys tc_binders
-      = tcIsTyVarTy tc_res_kind
+      = False
       | otherwise
-      = not . isEmptyVarSet $
-        filterVarSet isTyVar $
-        tyCoVarsOfType $
-        mkTyConKind (dropList tys tc_binders) tc_res_kind
+      = let (dropped_binders, remaining_binders)
+              = splitAtList  tys tc_binders
+            result_kind  = mkTyConKind remaining_binders tc_res_kind
+            result_vars  = tyCoVarsOfType result_kind
+            dropped_vars = fvVarSet $
+                           mapUnionFV injectiveVarsOfBinder dropped_binders
+
+        in not (subVarSet result_vars dropped_vars)
+
+    injectiveVarsOfBinder :: TyConBinder -> FV
+    injectiveVarsOfBinder (TvBndr tv vis) =
+      case vis of
+        AnonTCB           -> injectiveVarsOfType (tyVarKind tv)
+        NamedTCB Required -> FV.unitFV tv `unionFV`
+                             injectiveVarsOfType (tyVarKind tv)
+        NamedTCB _        -> emptyFV
+
+    injectiveVarsOfType :: Type -> FV
+    injectiveVarsOfType = go
+      where
+        go ty                | Just ty' <- coreView ty
+                             = go ty'
+        go (TyVarTy v)       = FV.unitFV v `unionFV` go (tyVarKind v)
+        go (AppTy f a)       = go f `unionFV` go a
+        go (FunTy ty1 ty2)   = go ty1 `unionFV` go ty2
+        go (TyConApp tc tys) =
+          case tyConInjectivityInfo tc of
+            NotInjective  -> emptyFV
+            Injective inj -> mapUnionFV go $
+                             filterByList (inj ++ repeat True) tys
+                             -- Oversaturated arguments to a tycon are
+                             -- always injective, hence the repeat True
+        go (ForAllTy tvb ty) = tyCoFVsBndr tvb $ go (tyVarKind (binderVar tvb))
+                                                 `unionFV` go ty
+        go LitTy{}           = emptyFV
+        go (CastTy ty _)     = go ty
+        go CoercionTy{}      = emptyFV
 
 reifyPred :: TyCoRep.PredType -> TcM TH.Pred
 reifyPred ty

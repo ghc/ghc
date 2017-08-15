@@ -1565,7 +1565,7 @@ tyConToIfaceDecl env tycon
                     ifFamFlav = to_if_fam_flav fam_flav,
                     ifBinders = if_binders,
                     ifResKind = if_res_kind,
-                    ifFamInj  = familyTyConInjectivityInfo tycon
+                    ifFamInj  = tyConInjectivityInfo tycon
                   })
 
   | isAlgTyCon tycon

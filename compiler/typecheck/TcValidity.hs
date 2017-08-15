@@ -1614,7 +1614,7 @@ checkValidCoAxiom ax@(CoAxiom { co_ax_tc = fam_tc, co_ax_branches = branches })
        ; foldlM_ check_branch_compat [] branch_list }
   where
     branch_list = fromBranches branches
-    injectivity = familyTyConInjectivityInfo fam_tc
+    injectivity = tyConInjectivityInfo fam_tc
 
     check_branch_compat :: [CoAxBranch]    -- previous branches in reverse order
                         -> CoAxBranch      -- current branch

@@ -59,7 +59,7 @@ module TyCon(
         isFamilyTyCon, isOpenFamilyTyCon,
         isTypeFamilyTyCon, isDataFamilyTyCon,
         isOpenTypeFamilyTyCon, isClosedSynFamilyTyConWithAxiom_maybe,
-        familyTyConInjectivityInfo,
+        tyConInjectivityInfo,
         isBuiltInSynFamTyCon_maybe,
         isUnliftedTyCon,
         isGadtSyntaxTyCon, isInjectiveTyCon, isGenerativeTyCon, isGenInjAlgRhs,
@@ -1925,11 +1925,17 @@ isClosedSynFamilyTyConWithAxiom_maybe
   (FamilyTyCon {famTcFlav = ClosedSynFamilyTyCon mb}) = mb
 isClosedSynFamilyTyConWithAxiom_maybe _               = Nothing
 
--- | Try to read the injectivity information from a FamilyTyCon.
--- For every other TyCon this function panics.
-familyTyConInjectivityInfo :: TyCon -> Injectivity
-familyTyConInjectivityInfo (FamilyTyCon { famTcInj = inj }) = inj
-familyTyConInjectivityInfo _ = panic "familyTyConInjectivityInfo"
+-- | @'tyConInjectivityInfo' tc@ returns @'Injective' is@ is @tc@ is an
+-- injective tycon (where @is@ states for which 'tyConBinders' @tc@ is
+-- injective), or 'NotInjective' otherwise.
+tyConInjectivityInfo :: TyCon -> Injectivity
+tyConInjectivityInfo tc
+  | FamilyTyCon { famTcInj = inj } <- tc
+  = inj
+  | isInjectiveTyCon tc Nominal
+  = Injective (replicate (tyConArity tc) True)
+  | otherwise
+  = NotInjective
 
 isBuiltInSynFamTyCon_maybe :: TyCon -> Maybe BuiltInSynFamily
 isBuiltInSynFamTyCon_maybe

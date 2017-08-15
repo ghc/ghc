@@ -720,7 +720,7 @@ checkForInjectivityConflicts :: FamInstEnvs -> FamInst -> TcM Bool
 checkForInjectivityConflicts instEnvs famInst
     | isTypeFamilyTyCon tycon
     -- type family is injective in at least one argument
-    , Injective inj <- familyTyConInjectivityInfo tycon = do
+    , Injective inj <- tyConInjectivityInfo tycon = do
     { let axiom = coAxiomSingleBranch fi_ax
           conflicts = lookupFamInstEnvInjectivityConflicts inj instEnvs famInst
           -- see Note [Verifying injectivity annotation] in FamInstEnv
@@ -808,7 +808,7 @@ injTyVarsOfType (TyVarTy v)
   = unitVarSet v `unionVarSet` injTyVarsOfType (tyVarKind v)
 injTyVarsOfType (TyConApp tc tys)
   | isTypeFamilyTyCon tc
-   = case familyTyConInjectivityInfo tc of
+   = case tyConInjectivityInfo tc of
         NotInjective  -> emptyVarSet
         Injective inj -> injTyVarsOfTypes (filterByList inj tys)
   | otherwise
