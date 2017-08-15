@@ -19,7 +19,10 @@ module Hadrian.Utilities (
     UseColour (..), putColoured, BuildProgressColour (..), putBuild,
     SuccessColour (..), putSuccess, ProgressInfo (..),
     putProgressInfo, renderAction, renderProgram, renderLibrary, renderBox,
-    renderUnicorn
+    renderUnicorn,
+
+    -- * Useful re-exports
+    Dynamic, fromDynamic, toDyn, TypeRep, typeOf
     ) where
 
 import Control.Monad.Extra
