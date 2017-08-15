@@ -9,6 +9,7 @@ Error-checking and other utilities for @deriving@ clauses or declarations.
 {-# LANGUAGE TypeFamilies #-}
 
 module TcDerivUtils (
+        DerivM, DerivEnv(..),
         DerivSpec(..), pprDerivSpec,
         DerivSpecMechanism(..), isDerivSpecStock,
         isDerivSpecNewtype, isDerivSpecAnyClass,
@@ -48,8 +49,67 @@ import Type
 import Util
 import VarSet
 
+import Control.Monad.Trans.Reader
 import qualified GHC.LanguageExtensions as LangExt
 import ListSetOps (assocMaybe)
+
+-- | To avoid having to manually plumb everything in 'DerivEnv' throughout
+-- various functions in @TcDeriv@ and @TcDerivInfer@, we use 'DerivM', which
+-- is a simple reader around 'TcRn'.
+type DerivM = ReaderT DerivEnv TcRn
+
+-- | Contains all of the information known about a derived instance when
+-- determining what its @EarlyDerivSpec@ should be.
+data DerivEnv = DerivEnv
+  { denv_overlap_mode :: Maybe OverlapMode
+    -- ^ Is this an overlapping instance?
+  , denv_tvs          :: [TyVar]
+    -- ^ Universally quantified type variables in the instance
+  , denv_cls          :: Class
+    -- ^ Class for which we need to derive an instance
+  , denv_cls_tys      :: [Type]
+    -- ^ Other arguments to the class except the last
+  , denv_tc           :: TyCon
+    -- ^ Type constructor for which the instance is requested
+    --   (last arguments to the type class)
+  , denv_tc_args      :: [Type]
+    -- ^ Arguments to the type constructor
+  , denv_rep_tc       :: TyCon
+    -- ^ The representation tycon for 'denv_tc'
+    --   (for data family instances)
+  , denv_rep_tc_args  :: [Type]
+    -- ^ The representation types for 'denv_tc_args'
+    --   (for data family instances)
+  , denv_mtheta       :: DerivContext
+    -- ^ 'Just' the context of the instance, for standalone deriving.
+    --   'Nothing' for @deriving@ clauses.
+  , denv_strat        :: Maybe DerivStrategy
+    -- ^ 'Just' if user requests a particular deriving strategy.
+    --   Otherwise, 'Nothing'.
+  }
+
+instance Outputable DerivEnv where
+  ppr (DerivEnv { denv_overlap_mode = overlap_mode
+                , denv_tvs          = tvs
+                , denv_cls          = cls
+                , denv_cls_tys      = cls_tys
+                , denv_tc           = tc
+                , denv_tc_args      = tc_args
+                , denv_rep_tc       = rep_tc
+                , denv_rep_tc_args  = rep_tc_args
+                , denv_mtheta       = mtheta
+                , denv_strat        = mb_strat })
+    = hang (text "DerivEnv")
+         2 (vcat [ text "denv_overlap_mode" <+> ppr overlap_mode
+                 , text "denv_tvs"          <+> ppr tvs
+                 , text "denv_cls"          <+> ppr cls
+                 , text "denv_cls_tys"      <+> ppr cls_tys
+                 , text "denv_tc"           <+> ppr tc
+                 , text "denv_tc_args"      <+> ppr tc_args
+                 , text "denv_rep_tc"       <+> ppr rep_tc
+                 , text "denv_rep_tc_args"  <+> ppr rep_tc_args
+                 , text "denv_mtheta"       <+> ppr mtheta
+                 , text "denv_strat"        <+> ppr mb_strat ])
 
 data DerivSpec theta = DS { ds_loc       :: SrcSpan
                           , ds_name      :: Name         -- DFun name
