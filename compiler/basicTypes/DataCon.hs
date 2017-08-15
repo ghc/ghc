@@ -312,6 +312,8 @@ data DataCon
         -- Universally-quantified type vars [a,b,c]
         -- INVARIANT: length matches arity of the dcRepTyCon
         -- INVARIANT: result type of data con worker is exactly (T a b c)
+        -- COROLLARY: The dcUnivTyVars are always in one-to-one correspondence with
+        --            the tyConTyVars of the parent TyCon
         dcUnivTyVars    :: [TyVarBinder],
 
         -- Existentially-quantified type vars [x,y]
