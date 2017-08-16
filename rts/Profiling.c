@@ -307,6 +307,25 @@ endProfiling ( void )
     }
 }
 
+
+/*
+  These are used in the C stubs produced by the code generator
+  to register code.
+ */
+void registerCcList(CostCentre **cc_list)
+{
+    for (CostCentre **i = cc_list; *i != NULL; i++) {
+        REGISTER_CC(*i);
+    }
+}
+
+void registerCcsList(CostCentreStack **cc_list)
+{
+    for (CostCentreStack **i = cc_list; *i != NULL; i++) {
+        REGISTER_CCS(*i);
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Set CCCS when entering a function.
 
