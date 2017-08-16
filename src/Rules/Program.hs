@@ -25,8 +25,6 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
         context' <- programContext stage package
         buildBinaryAndWrapper rs context' bin
 
-    when (package == ghc) $ want inplaceLibCopyTargets
-
     -- Rules for programs built in install directories
     when (stage == Stage0 || package == ghc) $ do
         -- Some binaries in inplace/bin are wrapped

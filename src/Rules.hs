@@ -40,10 +40,11 @@ topLevelTargets = action $ do
                  libs <- concatForM [Stage0, Stage1] $ \stage ->
                      concatForM libraryPackages $ packageTargets stage
                  prgs <- concatForM programsStage1Only $ packageTargets Stage0
-                 return $ libs ++ prgs
-             else
-                 concatForM allStages $ \stage ->
-                     concatForM (knownPackages \\ [rts, libffi]) $ packageTargets stage
+                 return $ libs ++ prgs ++ inplaceLibCopyTargets
+             else do
+                 targets <- concatForM allStages $ \stage ->
+                                concatForM (knownPackages \\ [rts, libffi]) $ packageTargets stage
+                 return $ targets ++ inplaceLibCopyTargets
 
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.
 packageTargets :: Stage -> Package -> Action [FilePath]
