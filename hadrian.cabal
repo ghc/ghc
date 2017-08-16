@@ -27,6 +27,7 @@ executable hadrian
                        , Flavour
                        , GHC
                        , Hadrian.Expression
+                       , Hadrian.Haskell.Cabal
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Oracles.KeyValue

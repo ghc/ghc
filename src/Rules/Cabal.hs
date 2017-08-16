@@ -1,11 +1,6 @@
 module Rules.Cabal (cabalRules) where
 
-import Distribution.Package as DP
-import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
-import Distribution.Text
-import Distribution.Types.CondTree
-import Distribution.Verbosity
+import Hadrian.Haskell.Cabal
 
 import Base
 import GHC
@@ -18,32 +13,18 @@ cabalRules = do
         bootPkgs <- stagePackages Stage0
         let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
         constraints <- forM (sort pkgs) $ \pkg -> do
-            need [pkgCabalFile pkg]
-            pd <- liftIO . readGenericPackageDescription silent $ pkgCabalFile pkg
-            let identifier          = package . packageDescription $ pd
-                version             = display . pkgVersion $ identifier
-            return $ unPackageName (DP.pkgName identifier) ++ " == " ++ version
+            (name, version) <- cabalNameVersion (pkgCabalFile pkg)
+            return $ name ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
         putSuccess $ "| Successfully generated boot package constraints"
 
     -- Cache package dependencies.
     "//" -/- packageDependencies %> \out -> do
         pkgDeps <- forM (sort knownPackages) $ \pkg -> do
-            exists <- doesFileExist $ pkgCabalFile pkg
+            exists <- doesFileExist (pkgCabalFile pkg)
             if not exists then return $ pkgNameString pkg
             else do
-                need [pkgCabalFile pkg]
-                pd <- liftIO . readGenericPackageDescription silent $ pkgCabalFile pkg
-                let depsLib  = collectDeps $ condLibrary pd
-                    depsExes = map (collectDeps . Just . snd) $ condExecutables pd
-                    deps     = concat $ depsLib : depsExes
-                    depNames = [ unPackageName name | Dependency name _ <- deps ]
-                return . unwords $ pkgNameString pkg : (sort depNames \\ [pkgNameString pkg])
+                deps <- sort <$> cabalDependencies (pkgCabalFile pkg)
+                return . unwords $ pkgNameString pkg : (deps \\ [pkgNameString pkg])
         writeFileChanged out $ unlines pkgDeps
         putSuccess $ "| Successfully generated package dependencies"
-
-collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
-collectDeps Nothing = []
-collectDeps (Just (CondNode _ deps ifs)) = deps ++ concatMap f ifs
-  where
-    f (CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt

@@ -1,11 +1,6 @@
 module Settings.Packages.GhcCabal (ghcCabalPackageArgs) where
 
-import Distribution.Package (pkgVersion)
-import Distribution.PackageDescription (packageDescription)
-import Distribution.PackageDescription.Parse
-import qualified Distribution.PackageDescription as DP
-import Distribution.Text (display)
-import Distribution.Verbosity (silent)
+import Hadrian.Haskell.Cabal
 
 import Base
 import Expression
@@ -15,11 +10,7 @@ import Utilities
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
     cabalDeps <- expr $ pkgDependencies cabal
-    expr $ need [pkgCabalFile cabal]
-    pd <- exprIO . readGenericPackageDescription silent $ pkgCabalFile cabal
-    let identifier   = DP.package . packageDescription $ pd
-        cabalVersion = display . pkgVersion $ identifier
-
+    (_, cabalVersion) <- expr $ cabalNameVersion (pkgCabalFile cabal)
     mconcat
         [ pure [ "-package " ++ pkgNameString pkg | pkg <- cabalDeps ]
         , arg "--make"
