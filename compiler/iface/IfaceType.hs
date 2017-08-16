@@ -681,11 +681,13 @@ defaultRuntimeRepVars = go emptyFsEnv
     go :: FastStringEnv () -> IfaceType -> IfaceType
     go subs (IfaceForAllTy bndr ty)
       | isRuntimeRep var_kind
+      , isInvisibleArgFlag (binderArgFlag bndr) -- don't default *visible* quantification
+                                                -- or we get the mess in #13963
       = let subs' = extendFsEnv subs var ()
         in go subs' ty
       | otherwise
       = IfaceForAllTy (TvBndr (var, go subs var_kind) (binderArgFlag bndr))
-        (go subs ty)
+                      (go subs ty)
       where
         var :: IfLclName
         (var, var_kind) = binderVar bndr
