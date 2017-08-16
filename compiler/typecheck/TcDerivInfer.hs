@@ -247,34 +247,34 @@ inferConstraintsDataConArgs inst_ty inst_tys
 
        if    -- Generic constraints are easy
           |  is_generic
-          -> return ([], tvs, inst_tys)
+           -> return ([], tvs, inst_tys)
 
              -- Generic1 needs Functor
              -- See Note [Getting base classes]
           |  is_generic1
-          -> ASSERT( rep_tc_tvs `lengthExceeds` 0 )
-             -- Generic1 has a single kind variable
-             ASSERT( cls_tys `lengthIs` 1 )
-             do { functorClass <- lift $ tcLookupClass functorClassName
-                ; pure $ con_arg_constraints
-                       $ get_gen1_constraints functorClass }
+           -> ASSERT( rep_tc_tvs `lengthExceeds` 0 )
+              -- Generic1 has a single kind variable
+              ASSERT( cls_tys `lengthIs` 1 )
+              do { functorClass <- lift $ tcLookupClass functorClassName
+                 ; pure $ con_arg_constraints
+                        $ get_gen1_constraints functorClass }
 
              -- The others are a bit more complicated
           |  otherwise
-          -> -- See the comment with all_rep_tc_args for an explanation of
-             -- this assertion
-             ASSERT2( equalLength rep_tc_tvs all_rep_tc_args
-                    , ppr main_cls <+> ppr rep_tc
-                      $$ ppr rep_tc_tvs $$ ppr all_rep_tc_args )
-               do { let (arg_constraints, tvs', inst_tys')
-                          = con_arg_constraints get_std_constrained_tys
-                  ; lift $ traceTc "inferConstraintsDataConArgs" $ vcat
-                         [ ppr main_cls <+> ppr inst_tys'
-                         , ppr arg_constraints
-                         ]
-                  ; return ( stupid_constraints ++ extra_constraints
-                                                ++ arg_constraints
-                           , tvs', inst_tys') }
+           -> -- See the comment with all_rep_tc_args for an explanation of
+              -- this assertion
+              ASSERT2( equalLength rep_tc_tvs all_rep_tc_args
+                     , ppr main_cls <+> ppr rep_tc
+                       $$ ppr rep_tc_tvs $$ ppr all_rep_tc_args )
+                do { let (arg_constraints, tvs', inst_tys')
+                           = con_arg_constraints get_std_constrained_tys
+                   ; lift $ traceTc "inferConstraintsDataConArgs" $ vcat
+                          [ ppr main_cls <+> ppr inst_tys'
+                          , ppr arg_constraints
+                          ]
+                   ; return ( stupid_constraints ++ extra_constraints
+                                                 ++ arg_constraints
+                            , tvs', inst_tys') }
 
 typeToTypeKind :: Kind
 typeToTypeKind = liftedTypeKind `mkFunTy` liftedTypeKind
