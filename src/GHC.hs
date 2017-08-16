@@ -18,8 +18,11 @@ module GHC (
     rtsContext, rtsBuildPath, rtsConfIn,
 
     -- * Miscellaneous
-    ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
+    systemBuilderPath, ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
     ) where
+
+import Hadrian.Oracles.KeyValue
+import Hadrian.Oracles.Path
 
 import Base
 import Context
@@ -117,6 +120,43 @@ builderProvenance = \case
     _                -> Nothing
   where
     context s p = Just $ vanillaContext s p
+
+-- | Determine the location of a system 'Builder'.
+systemBuilderPath :: Builder -> Action FilePath
+systemBuilderPath builder = case builder of
+    Alex            -> fromKey "alex"
+    Ar Stage0       -> fromKey "system-ar"
+    Ar _            -> fromKey "ar"
+    Cc  _  Stage0   -> fromKey "system-cc"
+    Cc  _  _        -> fromKey "cc"
+    -- We can't ask configure for the path to configure!
+    Configure _     -> return "sh configure"
+    Ghc _  Stage0   -> fromKey "system-ghc"
+    GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
+    Happy           -> fromKey "happy"
+    HsColour        -> fromKey "hscolour"
+    HsCpp           -> fromKey "hs-cpp"
+    Ld              -> fromKey "ld"
+    Make _          -> fromKey "make"
+    Nm              -> fromKey "nm"
+    Objdump         -> fromKey "objdump"
+    Patch           -> fromKey "patch"
+    Perl            -> fromKey "perl"
+    Ranlib          -> fromKey "ranlib"
+    Tar             -> fromKey "tar"
+    _               -> error $ "No entry for " ++ show builder ++ inCfg
+  where
+    inCfg = " in " ++ quote configFile ++ " file."
+    fromKey key = do
+        let unpack = fromMaybe . error $ "Cannot find path to builder "
+                ++ quote key ++ inCfg ++ " Did you skip configure?"
+        path <- unpack <$> lookupValue configFile key
+        if null path
+        then do
+            unless (isOptional builder) . error $ "Non optional builder "
+                ++ quote key ++ " is not specified" ++ inCfg
+            return "" -- TODO: Use a safe interface.
+        else fixAbsolutePathOnWindows =<< lookupInPath path
 
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC
