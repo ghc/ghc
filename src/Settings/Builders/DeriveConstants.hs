@@ -23,13 +23,14 @@ deriveConstantsBuilderArgs = builder DeriveConstants ? do
         , arg "--target-os", arg =<< getSetting TargetOs ]
 
 includeCcArgs :: Args
-includeCcArgs = mconcat
-    [ cArgs
-    , cWarnings
-    , getSettingList $ ConfCcArgs Stage1
-    , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
-    , arg "-Irts"
-    , arg "-Iincludes"
-    , arg $ "-I" ++ generatedPath
-    , notM ghcWithSMP ? arg "-DNOSMP"
-    , arg "-fcommon" ]
+includeCcArgs = do
+    root <- getBuildRoot
+    mconcat [ cArgs
+            , cWarnings
+            , getSettingList $ ConfCcArgs Stage1
+            , flag GhcUnregisterised ? arg "-DUSE_MINIINTERPRETER"
+            , arg "-Irts"
+            , arg "-Iincludes"
+            , arg $ "-I" ++ root -/- generatedDir
+            , notM ghcWithSMP ? arg "-DNOSMP"
+            , arg "-fcommon" ]

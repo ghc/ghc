@@ -6,20 +6,20 @@ import Base
 import Context
 import Expression
 import Rules.Generate
-import Settings.Path
 import Target
 import Utilities
 
 compilePackage :: [(Resource, Int)] -> Context -> Rules ()
 compilePackage rs context@Context {..} = do
-    let path            = buildPath context
-        nonHs extension = path -/- extension <//> "*" <.> osuf way
+    let dir             = "//" ++ contextDir context
+        nonHs extension = dir -/- extension <//> "*" <.> osuf way
         compile compiler obj2src obj = do
-            let src = obj2src context obj
+            src <- obj2src context obj
             need [src]
             needDependencies context src $ obj <.> "d"
             build $ target context (compiler stage) [src] [obj]
         compileHs = \[obj, _hi] -> do
+            path <- buildPath context
             (src, deps) <- lookupDependencies (path -/- ".dependencies") obj
             need $ src : deps
             when (isLibrary package) $ need =<< return <$> pkgConfFile context
@@ -32,8 +32,8 @@ compilePackage rs context@Context {..} = do
         nonHs "s"   %> compile (Ghc CompileHs)       (obj2src "S"   $ const False     )
 
     -- TODO: Add dependencies for #include of .h and .hs-incl files (gcc -MM?).
-    [ path <//> "*" <.> suf way | suf <- [    osuf,     hisuf] ] &%> compileHs
-    [ path <//> "*" <.> suf way | suf <- [obootsuf, hibootsuf] ] &%> compileHs
+    [ dir <//> "*" <.> suf way | suf <- [    osuf,     hisuf] ] &%> compileHs
+    [ dir <//> "*" <.> suf way | suf <- [obootsuf, hibootsuf] ] &%> compileHs
 
 -- | Discover dependencies of a given source file by iteratively calling @gcc@
 -- in the @-MM -MG@ mode and building generated dependencies if they are missing
@@ -71,11 +71,13 @@ fullPathIfGenerated context file = interpretInContext context $ do
     generated <- generatedDependencies
     return $ find ((== file) . takeFileName) generated
 
-obj2src :: String -> (FilePath -> Bool) -> Context -> FilePath -> FilePath
+obj2src :: String -> (FilePath -> Bool) -> Context -> FilePath -> Action FilePath
 obj2src extension isGenerated context@Context {..} obj
-    | isGenerated src = src
-    | otherwise       = pkgPath package ++ suffix
+    | isGenerated src = return src
+    | otherwise       = (pkgPath package ++) <$> suffix
   where
     src    = obj -<.> extension
-    suffix = fromMaybe ("Cannot determine source for " ++ obj)
-           $ stripPrefix (buildPath context -/- extension) src
+    suffix = do
+        path <- buildPath context
+        return $ fromMaybe ("Cannot determine source for " ++ obj)
+               $ stripPrefix (path -/- extension) src

@@ -26,7 +26,6 @@ selftestRules =
         testBuilder
         testChunksOfSize
         testLookupAll
-        testMatchVersionedFilePath
         testModuleName
         testPackages
         testWay
@@ -62,22 +61,6 @@ testLookupAll = do
     dicts = nubBy (\x y -> fst x == fst y) <$> vector 20
     extras :: Gen [Int]
     extras = vector 20
-
-testMatchVersionedFilePath :: Action ()
-testMatchVersionedFilePath = do
-    putBuild $ "==== matchVersionedFilePath"
-    test $ matchVersionedFilePath "foo/bar"  ".a" "foo/bar.a"     == True
-    test $ matchVersionedFilePath "foo/bar"  ".a" "foo\\bar.a"    == False
-    test $ matchVersionedFilePath "foo/bar"  "a"  "foo/bar.a"     == True
-    test $ matchVersionedFilePath "foo/bar"  ""   "foo/bar.a"     == False
-    test $ matchVersionedFilePath "foo/bar"  "a"  "foo/bar-0.1.a" == True
-    test $ matchVersionedFilePath "foo/bar-" "a"  "foo/bar-0.1.a" == True
-    test $ matchVersionedFilePath "foo/bar/" "a"  "foo/bar-0.1.a" == False
-
-    test $ \prefix suffix -> forAll versions $ \version ->
-        matchVersionedFilePath prefix suffix (prefix ++ version ++ suffix)
-  where
-    versions = listOf . elements $ '-' : '.' : ['0'..'9']
 
 testModuleName :: Action ()
 testModuleName = do

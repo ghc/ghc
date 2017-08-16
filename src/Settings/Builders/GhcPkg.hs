@@ -8,8 +8,10 @@ ghcPkgBuilderArgs = mconcat
 
     , builder (GhcPkg Update) ? do
         verbosity <- expr getVerbosity
+        context   <- getContext
+        config    <- expr $ pkgInplaceConfig context
         mconcat [ arg "update"
                 , arg "--force"
                 , verbosity < Chatty ? arg "-v0"
                 , bootPackageDatabaseArgs
-                , arg . pkgInplaceConfig =<< getContext ] ]
+                , arg config ] ]

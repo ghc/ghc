@@ -5,19 +5,17 @@ module Rules.Wrappers (
 import Hadrian.Oracles.Path
 
 import Base
+import Context
 import Expression
 import GHC
 import Oracles.Setting
 import Settings
-import Settings.Install
-import Settings.Path
 
--- | Wrapper is an expression depending on the 'FilePath' to the
--- | library path and name of the wrapped binary.
-data WrappedBinary = WrappedBinary {
-  binaryLibPath :: FilePath,
-  binaryName    :: String
-}
+-- | Wrapper is an expression depending on (i) the 'FilePath' to the library and
+-- (ii) the name of the wrapped binary.
+data WrappedBinary = WrappedBinary
+    { binaryLibPath :: FilePath
+    , binaryName    :: String }
 
 type Wrapper = WrappedBinary -> Expr String
 
@@ -53,16 +51,15 @@ installRunGhcWrapper WrappedBinary{..} = do
 inplaceGhcPkgWrapper :: WrappedBinary -> Expr String
 inplaceGhcPkgWrapper WrappedBinary{..} = do
     expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    stage <- getStage
-    top   <- expr topDirectory
-    -- Use the package configuration for the next stage in the wrapper.
-    -- The wrapper is generated in StageN, but used in StageN+1.
-    let packageDb = top -/- inplacePackageDbDirectory (succ stage)
+    top <- expr topDirectory
+    -- The wrapper is generated in StageN, but used in StageN+1. Therefore, we
+    -- always use the inplace package database, located at 'inplacePackageDbPath',
+    -- which is used in Stage1 and later.
     bash <- expr bashPath
     return $ unlines
-        [ "#!"++bash
-        , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName)
-          ++ " --global-package-db " ++ packageDb ++ " ${1+\"$@\"}" ]
+        [ "#!" ++ bash
+        , "exec " ++ (binaryLibPath -/- "bin" -/- binaryName) ++
+          " --global-package-db " ++ top -/- inplacePackageDbPath ++ " ${1+\"$@\"}" ]
 
 installGhcPkgWrapper :: WrappedBinary -> Expr String
 installGhcPkgWrapper WrappedBinary{..} = do
@@ -71,7 +68,7 @@ installGhcPkgWrapper WrappedBinary{..} = do
     top   <- expr topDirectory
     -- Use the package configuration for the next stage in the wrapper.
     -- The wrapper is generated in StageN, but used in StageN+1.
-    let packageDb = installPackageDbDirectory binaryLibPath top (succ stage)
+    packageDb <- expr $ installPackageDbPath binaryLibPath top (succ stage)
     bash <- expr bashPath
     return $ unlines
         [ "#!"++bash
@@ -130,7 +127,7 @@ iservBinWrapper WrappedBinary{..} = do
                                         m <- expr $ latestBuildStage p
                                         return $ fmap (\s -> vanillaContext s p) m
                                    ) pkgs
-    let buildPaths = map buildPath contexts
+    buildPaths <- expr $ mapM buildPath contexts
     return $ unlines
         [ "#!/bin/bash"
         , "export DYLD_LIBRARY_PATH=\"" ++ intercalate ":" buildPaths ++
@@ -157,3 +154,11 @@ installWrappers :: [(Context, Wrapper)]
 installWrappers = wrappersCommon ++
                   [ (vanillaContext Stage0 ghcPkg, installGhcPkgWrapper)
                   , (vanillaContext Stage1 runGhc, installRunGhcWrapper) ]
+
+-- | In the final installation path specified by @DEST@, there is another
+-- @package.conf.d@ different from 'inplacePackageDbPath' defined in "Base".
+installPackageDbPath :: FilePath -> FilePath -> Stage -> Action FilePath
+installPackageDbPath _ top Stage0 = do
+    path <- buildRoot
+    return $ top -/- path -/- "stage0/bootstrapping.conf"
+installPackageDbPath libdir _ _ = return $ libdir -/- "package.conf.d"

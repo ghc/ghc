@@ -7,7 +7,6 @@ import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings
-import Settings.Path
 import Target
 import Utilities
 

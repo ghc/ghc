@@ -93,8 +93,6 @@ executable hadrian
                        , Settings.Packages.IntegerGmp
                        , Settings.Packages.Rts
                        , Settings.Packages.RunGhc
-                       , Settings.Path
-                       , Settings.Install
                        , Stage
                        , Target
                        , UserSettings

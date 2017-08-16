@@ -6,7 +6,6 @@ import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings
-import Settings.Path
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do
@@ -19,9 +18,10 @@ rtsLibffiLibraryName = do
 
 rtsLibffiLibrary :: Way -> Action FilePath
 rtsLibffiLibrary way = do
-    name <- rtsLibffiLibraryName
-    suf  <- libsuf way
-    return $ rtsBuildPath -/- "lib" ++ name ++ suf
+    name    <- rtsLibffiLibraryName
+    suf     <- libsuf way
+    rtsPath <- rtsBuildPath
+    return $ rtsPath -/- "lib" ++ name ++ suf
 
 rtsPackageArgs :: Args
 rtsPackageArgs = package rts ? do

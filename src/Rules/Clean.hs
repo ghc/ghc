@@ -1,20 +1,20 @@
 module Rules.Clean (clean, cleanSourceTree, cleanRules) where
 
 import Base
-import Settings.Path
-import UserSettings
 
 clean :: Action ()
 clean = do
     cleanSourceTree
     putBuild $ "| Remove Hadrian files..."
-    removeDirectory generatedPath
-    removeFilesAfter buildRootPath ["//*"]
+    path <- buildRoot
+    removeDirectory $ path -/- generatedDir
+    removeFilesAfter path ["//*"]
     putSuccess $ "| Done. "
 
 cleanSourceTree :: Action ()
 cleanSourceTree = do
-    forM_ [Stage0 ..] $ removeDirectory . (buildRootPath -/-) . stageString
+    path <- buildRoot
+    forM_ [Stage0 ..] $ removeDirectory . (path -/-) . stageString
     removeDirectory inplaceBinPath
     removeDirectory inplaceLibPath
     removeDirectory "sdistprep"

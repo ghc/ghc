@@ -3,6 +3,7 @@ module Settings.Builders.Ghc (
     ) where
 
 import Flavour
+import Rules.Gmp
 import Settings.Builders.Common
 
 ghcBuilderArgs :: Args
@@ -130,15 +131,16 @@ includeGhcArgs :: Args
 includeGhcArgs = do
     pkg     <- getPackage
     path    <- getBuildPath
+    root    <- getBuildRoot
     context <- getContext
     srcDirs <- getPkgDataList SrcDirs
+    autogen <- expr $ autogenPath context
     mconcat [ arg "-i"
             , arg $ "-i" ++ path
-            , arg $ "-i" ++ autogenPath context
+            , arg $ "-i" ++ autogen
             , pure [ "-i" ++ pkgPath pkg -/- dir | dir <- srcDirs ]
             , cIncludeArgs
-            , arg $      "-I" ++ generatedPath
-            , arg $ "-optc-I" ++ generatedPath
+            , arg $      "-I" ++ root -/- generatedDir
+            , arg $ "-optc-I" ++ root -/- generatedDir
             , (not $ nonCabalContext context) ?
-              pure [ "-optP-include"
-                   , "-optP" ++ autogenPath context -/- "cabal_macros.h" ] ]
+              pure [ "-optP-include", "-optP" ++ autogen -/- "cabal_macros.h" ] ]

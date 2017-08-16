@@ -13,7 +13,7 @@ module Hadrian.Expression (
     interpret, interpretInContext,
 
     -- * Convenient accessors
-    getContext, getBuilder, getOutputs, getInputs, getInput, getOutput
+    getBuildRoot, getContext, getBuilder, getOutputs, getInputs, getInput, getOutput
     ) where
 
 import Control.Monad.Extra
@@ -94,6 +94,10 @@ interpretInContext c = interpret $ target c
     (error "contextOnlyTarget: builder not set")
     (error "contextOnlyTarget: inputs not set" )
     (error "contextOnlyTarget: outputs not set")
+
+-- | Get the directory of build results.
+getBuildRoot :: Expr c b FilePath
+getBuildRoot = expr buildRoot
 
 -- | Get the current build 'Context'.
 getContext :: Expr c b c

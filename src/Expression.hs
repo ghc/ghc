@@ -16,8 +16,8 @@ module Expression (
     Context, vanillaContext, stageContext, Target,
 
     -- * Convenient accessors
-    getContext, getStage, getPackage, getBuilder, getOutputs, getInputs, getWay,
-    getInput, getOutput,
+    getBuildRoot, getBuildPath, getContext, getStage, getPackage, getBuilder,
+    getOutputs, getInputs, getWay, getInput, getOutput,
 
     -- * Re-exports
     module Base
@@ -27,7 +27,7 @@ import qualified Hadrian.Expression as H
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 
 import Base
-import Context (Context, vanillaContext, stageContext, getStage, getPackage, getWay)
+import Context (Context, vanillaContext, stageContext, getBuildPath, getStage, getPackage, getWay)
 import Target hiding (builder, inputs, outputs)
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can

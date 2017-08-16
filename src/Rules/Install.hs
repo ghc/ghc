@@ -14,7 +14,6 @@ import Rules.Libffi
 import Rules.Wrappers
 import Settings
 import Settings.Packages.Rts
-import Settings.Path
 import Target
 import Utilities
 
@@ -124,6 +123,9 @@ withLatestBuildStage pkg m = do
       Just stage -> m stage
       Nothing    -> return ()
 
+pkgConfInstallPath :: Action FilePath
+pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) <&> (-/- "package.conf.install")
+
 -- ref: rules/manual-package-conf.mk
 -- TODO: Should we use a temporary file instead of pkgConfInstallPath?
 -- | Install @package.conf.install@ for each package. Note that it will be
@@ -131,21 +133,23 @@ withLatestBuildStage pkg m = do
 installPackageConf :: Action ()
 installPackageConf = do
     let context = vanillaContext Stage0 rts
-    liftIO $ IO.createDirectoryIfMissing True (takeDirectory pkgConfInstallPath)
+    confPath <- pkgConfInstallPath
+    liftIO $ IO.createDirectoryIfMissing True (takeDirectory confPath)
     build $ target context HsCpp [ pkgPath rts -/- "package.conf.in" ]
-                                 [ pkgConfInstallPath <.> "raw" ]
+                                 [ confPath <.> "raw" ]
     Stdout content <- cmd "grep" [ "-v", "^#pragma GCC"
-                                 , pkgConfInstallPath <.> "raw" ]
+                                 , confPath <.> "raw" ]
     withTempFile $ \tmp -> do
         liftIO $ writeFile tmp content
         Stdout result <- cmd "sed" [ "-e", "s/\"\"//g", "-e", "s/:[   ]*,/: /g", tmp ]
-        liftIO $ writeFile pkgConfInstallPath result
+        liftIO $ writeFile confPath result
 
 -- ref: ghc.mk
 -- | Install packages to @prefix/lib@.
 installPackages :: Action ()
 installPackages = do
-    need [pkgConfInstallPath]
+    confPath <- pkgConfInstallPath
+    need [confPath]
 
     ghcLibDir <- installGhcLibDir
     binDir    <- setting InstallBinDir
@@ -167,8 +171,8 @@ installPackages = do
     forM_ (rtsLibs ++ ffiLibs) $ \lib -> installData [lib] rtsDir
 
     -- HACK (issue #327)
-    let ghcBootPlatformHeader =
-            buildPath (vanillaContext Stage1 compiler) -/- "ghc_boot_platform.h"
+    ghcBootPlatformHeader <-
+        buildPath (vanillaContext Stage1 compiler) <&> (-/- "ghc_boot_platform.h")
 
     copyFile ghcBootPlatformHeader (pkgPath compiler -/- "ghc_boot_platform.h")
 
@@ -182,7 +186,7 @@ installPackages = do
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
-                let installDistDir = top -/- buildPath context
+                installDistDir <- (top -/-) <$> buildPath context
                 need =<< packageTargets stage pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
@@ -222,14 +226,14 @@ installPackages = do
     -- TODO: Extend GhcPkg builder args to support --global-package-db
     unit $ cmd installedGhcPkgReal [ "--force", "--global-package-db"
                                    , installedPackageConf, "update"
-                                   , pkgConfInstallPath ]
+                                   , confPath ]
 
     forM_ installLibPkgs $ \pkg@Package{..} -> do
         when (isLibrary pkg) $
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
-                let installDistDir = top -/- buildPath context
+                installDistDir <- (top -/-) <$> buildPath context
                 -- TODO: better reference to the built inplace binary path
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal"
                 pref   <- setting InstallPrefix
@@ -289,7 +293,7 @@ includeHSubdirs = [".", "rts", "rts/prof", "rts/storage", "stg"]
 
 -- ref: includes/ghc.mk
 -- | Install header files to @prefix/lib/ghc-<version>/include@.
-installIncludes ::Action ()
+installIncludes :: Action ()
 installIncludes = do
     ghclibDir <- installGhcLibDir
     let ghcheaderDir = ghclibDir -/- "include"
@@ -299,9 +303,11 @@ installIncludes = do
         headers <- getDirectoryFiles ("includes" -/- dir) ["*.h"]
         installHeader (map (("includes" -/- dir) -/-) headers)
                       (destDir ++ ghcheaderDir -/- dir ++ "/")
-    installHeader (includesDependencies ++
-                   [generatedPath -/- "DerivedConstants.h"] ++
-                   libffiDependencies)
+    root    <- buildRoot
+    rtsPath <- rtsBuildPath
+    installHeader (fmap (root -/-) includesDependencies ++
+                   [root -/- generatedDir -/- "DerivedConstants.h"] ++
+                   fmap (rtsPath -/-) libffiDependencies)
                   (destDir ++ ghcheaderDir ++ "/")
   where
     installHeader = installData -- they share same arguments

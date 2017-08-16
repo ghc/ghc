@@ -8,13 +8,12 @@ import Context
 import Expression
 import Oracles.ModuleFiles
 import Rules.Generate
-import Settings.Path
 import Target
 import Utilities
 
 buildPackageDependencies :: [(Resource, Int)] -> Context -> Rules ()
 buildPackageDependencies rs context@Context {..} =
-    buildPath context -/- ".dependencies" %> \deps -> do
+    "//" ++ contextDir context -/- ".dependencies" %> \deps -> do
         srcs <- hsSources context
         need srcs
         orderOnly =<< interpretInContext context generatedDependencies

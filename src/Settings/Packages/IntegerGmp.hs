@@ -1,10 +1,10 @@
-module Settings.Packages.IntegerGmp (integerGmpPackageArgs, gmpBuildPath) where
+module Settings.Packages.IntegerGmp (integerGmpPackageArgs) where
 
 import Base
 import Expression
 import GHC
 import Oracles.Setting
-import Settings.Path
+import Rules.Gmp
 
 -- TODO: Is this needed?
 -- ifeq "$(GMP_PREFER_FRAMEWORK)" "YES"
@@ -12,7 +12,8 @@ import Settings.Path
 -- endif
 integerGmpPackageArgs :: Args
 integerGmpPackageArgs = package integerGmp ? do
-    let includeGmp = "-I" ++ gmpBuildPath -/- "include"
+    path <- expr gmpBuildPath
+    let includeGmp = "-I" ++ path -/- "include"
     gmpIncludeDir <- getSetting GmpIncludeDir
     gmpLibDir     <- getSetting GmpLibDir
     mconcat [ builder Cc ? arg includeGmp

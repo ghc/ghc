@@ -10,12 +10,11 @@ import Distribution.Verbosity
 import Base
 import GHC
 import Settings
-import Settings.Path
 
 cabalRules :: Rules ()
 cabalRules = do
     -- Cache boot package constraints (to be used in 'cabalArgs').
-    bootPackageConstraints %> \out -> do
+    "//" -/- bootPackageConstraints %> \out -> do
         bootPkgs <- stagePackages Stage0
         let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
         constraints <- forM (sort pkgs) $ \pkg -> do
@@ -25,10 +24,10 @@ cabalRules = do
                 version             = display . pkgVersion $ identifier
             return $ unPackageName (DP.pkgName identifier) ++ " == " ++ version
         writeFileChanged out . unlines $ constraints
-        putSuccess $ "| Successfully computed boot package constraints"
+        putSuccess $ "| Successfully generated boot package constraints"
 
     -- Cache package dependencies.
-    packageDependencies %> \out -> do
+    "//" -/- packageDependencies %> \out -> do
         pkgDeps <- forM (sort knownPackages) $ \pkg -> do
             exists <- doesFileExist $ pkgCabalFile pkg
             if not exists then return $ pkgNameString pkg
@@ -41,7 +40,7 @@ cabalRules = do
                     depNames = [ unPackageName name | Dependency name _ <- deps ]
                 return . unwords $ pkgNameString pkg : (sort depNames \\ [pkgNameString pkg])
         writeFileChanged out $ unlines pkgDeps
-        putSuccess $ "| Successfully computed package dependencies"
+        putSuccess $ "| Successfully generated package dependencies"
 
 collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
 collectDeps Nothing = []

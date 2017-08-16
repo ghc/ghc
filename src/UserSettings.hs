@@ -3,7 +3,7 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    buildRootPath, userFlavours, userKnownPackages, verboseCommands,
+    userBuildRoot, userFlavours, userKnownPackages, verboseCommands,
     buildProgressColour, successColour, defaultDestDir, defaultStage1Only
     ) where
 
@@ -15,9 +15,9 @@ import Expression
 
 -- See doc/user-settings.md for instructions.
 
--- | All build results are put into 'buildRootPath' directory.
-buildRootPath :: FilePath
-buildRootPath = "_build"
+-- | All build results are put into the 'buildRoot' directory.
+userBuildRoot :: BuildRoot
+userBuildRoot = BuildRoot "_build"
 
 -- | User defined build flavours. See 'defaultFlavour' as an example.
 userFlavours :: [Flavour]

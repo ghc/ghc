@@ -19,7 +19,6 @@ import GHC
 import Oracles.Setting
 import Oracles.PackageData
 import Settings
-import Settings.Path
 import Settings.Builders.Ar
 import Target
 import UserSettings
@@ -185,15 +184,16 @@ runBuilderWith options builder args = do
     quietly $ cmd options [path] args
 
 -- | Given a 'Context' this 'Action' looks up its package dependencies in
--- 'Settings.Paths.packageDependencies' and wraps the results in appropriate
--- contexts. The only subtlety here is that we never depend on packages built in
--- 'Stage2' or later, therefore the stage of the resulting dependencies is
--- bounded from above at 'Stage1'. To compute package dependencies we scan
--- package cabal files, see "Rules.Cabal".
+-- 'Base.packageDependencies' and wraps the results in appropriate contexts.
+-- The only subtlety here is that we never depend on packages built in 'Stage2'
+-- or later, therefore the stage of the resulting dependencies is bounded from
+-- above at 'Stage1'. To compute package dependencies we scan package cabal
+-- files, see "Rules.Cabal".
 contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = do
     let pkgContext = \pkg -> Context (min stage Stage1) pkg way
-    deps <- lookupValuesOrError packageDependencies (pkgNameString package)
+    path <- buildRoot <&> (-/- packageDependencies)
+    deps <- lookupValuesOrError path (pkgNameString package)
     pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
     return . map pkgContext $ intersectOrd (compare . pkgNameString) pkgs deps
 

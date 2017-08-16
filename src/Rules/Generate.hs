@@ -11,9 +11,9 @@ import GHC
 import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting
+import Rules.Gmp
 import Rules.Libffi
 import Settings
-import Settings.Path
 import Target
 import Utilities
 
@@ -25,10 +25,10 @@ primopsSource :: FilePath
 primopsSource = "compiler/prelude/primops.txt.pp"
 
 primopsTxt :: Stage -> FilePath
-primopsTxt stage = buildPath (vanillaContext stage compiler) -/- "primops.txt"
+primopsTxt stage = contextDir (vanillaContext stage compiler) -/- "primops.txt"
 
 platformH :: Stage -> FilePath
-platformH stage = buildPath (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
+platformH stage = contextDir (vanillaContext stage compiler) -/- "ghc_boot_platform.h"
 
 isGeneratedCFile :: FilePath -> Bool
 isGeneratedCFile file = takeBaseName file `elem` ["Evac_thr", "Scav_thr"]
@@ -37,7 +37,7 @@ isGeneratedCmmFile :: FilePath -> Bool
 isGeneratedCmmFile file = takeBaseName file == "AutoApply"
 
 includesDependencies :: [FilePath]
-includesDependencies = fmap (generatedPath -/-)
+includesDependencies = fmap (generatedDir -/-)
     [ "ghcautoconf.h"
     , "ghcplatform.h"
     , "ghcversion.h" ]
@@ -45,11 +45,11 @@ includesDependencies = fmap (generatedPath -/-)
 ghcPrimDependencies :: Expr [FilePath]
 ghcPrimDependencies = do
     stage <- getStage
-    let path = buildPath $ vanillaContext stage ghcPrim
+    path  <- expr $ buildPath (vanillaContext stage ghcPrim)
     return [path -/- "GHC/Prim.hs", path -/- "GHC/PrimopWrappers.hs"]
 
 derivedConstantsDependencies :: [FilePath]
-derivedConstantsDependencies = fmap (generatedPath -/-)
+derivedConstantsDependencies = fmap (generatedDir -/-)
     [ "DerivedConstants.h"
     , "GHCConstantsHaskellExports.hs"
     , "GHCConstantsHaskellType.hs"
@@ -57,15 +57,18 @@ derivedConstantsDependencies = fmap (generatedPath -/-)
 
 compilerDependencies :: Expr [FilePath]
 compilerDependencies = do
-    stage  <- getStage
-    intLib <- expr (integerLibrary =<< flavour)
-    let path = buildPath $ vanillaContext stage compiler
-    mconcat [ return [platformH stage]
-            , return includesDependencies
-            , return derivedConstantsDependencies
-            , notStage0 ? intLib == integerGmp ? return [gmpLibraryH]
-            , notStage0 ? return libffiDependencies
-            , return $ fmap (path -/-)
+    root    <- getBuildRoot
+    stage   <- getStage
+    intLib  <- expr (integerLibrary =<< flavour)
+    ghcPath <- expr $ buildPath (vanillaContext stage compiler)
+    gmpPath <- expr gmpBuildPath
+    rtsPath <- expr rtsBuildPath
+    mconcat [ return [root -/- platformH stage]
+            , return ((root -/-) <$> includesDependencies)
+            , return ((root -/-) <$> derivedConstantsDependencies)
+            , notStage0 ? intLib == integerGmp ? return [gmpPath -/- gmpLibraryH]
+            , notStage0 ? return ((rtsPath -/-) <$> libffiDependencies)
+            , return $ fmap (ghcPath -/-)
                   [ "primop-can-fail.hs-incl"
                   , "primop-code-size.hs-incl"
                   , "primop-commutable.hs-incl"
@@ -83,13 +86,15 @@ compilerDependencies = do
                   , "primop-vector-uniques.hs-incl" ] ]
 
 generatedDependencies :: Expr [FilePath]
-generatedDependencies = mconcat
-    [ package compiler ? compilerDependencies
-    , package ghcPrim  ? ghcPrimDependencies
-    , package rts      ? return (libffiDependencies
-        ++ includesDependencies
-        ++ derivedConstantsDependencies)
-    , stage0 ? return includesDependencies ]
+generatedDependencies = do
+    root    <- getBuildRoot
+    rtsPath <- expr rtsBuildPath
+    mconcat [ package compiler ? compilerDependencies
+            , package ghcPrim  ? ghcPrimDependencies
+            , package rts      ? return (fmap (rtsPath -/-) libffiDependencies
+                ++ fmap (root -/-) includesDependencies
+                ++ fmap (root -/-) derivedConstantsDependencies)
+            , stage0 ? return (fmap (root -/-) includesDependencies) ]
 
 generate :: FilePath -> Context -> Expr String -> Action ()
 generate file context expr = do
@@ -99,8 +104,8 @@ generate file context expr = do
 
 generatePackageCode :: Context -> Rules ()
 generatePackageCode context@(Context stage pkg _) =
-    let path        = buildPath context
-        generated f = (path ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
+    let dir         = contextDir context
+        generated f = ("//" ++ dir ++ "//*.hs") ?== f && not ("//autogen/*" ?== f)
         go gen file = generate file context gen
     in do
         generated ?> \file -> do
@@ -112,52 +117,57 @@ generatePackageCode context@(Context stage pkg _) =
             whenM (doesFileExist boot) . copyFile boot $ file -<.> "hs-boot"
 
         priority 2.0 $ do
-            when (pkg == compiler) $ path -/- "Config.hs" %> go generateConfigHs
-            when (pkg == ghcPkg) $ path -/- "Version.hs" %> go generateVersionHs
+            when (pkg == compiler) $ "//" -/- dir -/- "Config.hs" %> go generateConfigHs
+            when (pkg == ghcPkg) $ "//" -/- dir -/- "Version.hs" %> go generateVersionHs
 
         -- TODO: needing platformH is ugly and fragile
         when (pkg == compiler) $ do
-            primopsTxt stage %> \file -> do
-                need $ [platformH stage, primopsSource] ++ includesDependencies
+            "//" ++ primopsTxt stage %> \file -> do
+                root <- buildRoot
+                need $ [root -/- platformH stage, primopsSource]
+                    ++ fmap (root -/-) includesDependencies
                 build $ target context HsCpp [primopsSource] [file]
 
-            platformH stage %> go generateGhcBootPlatformH
+            "//" ++ platformH stage %> go generateGhcBootPlatformH
 
         -- TODO: why different folders for generated files?
-        fmap (path -/-)
+        priority 2.0 $ fmap (("//" ++ dir) -/-)
             [ "GHC/Prim.hs"
             , "GHC/PrimopWrappers.hs"
             , "*.hs-incl" ] |%> \file -> do
-                need [primopsTxt stage]
-                build $ target context GenPrimopCode [primopsTxt stage] [file]
+                root <- buildRoot
+                need [root -/- primopsTxt stage]
+                build $ target context GenPrimopCode [root -/- primopsTxt stage] [file]
 
-        when (pkg == rts) $ path -/- "cmm/AutoApply.cmm" %> \file ->
+        when (pkg == rts) $ "//" ++ dir -/- "cmm/AutoApply.cmm" %> \file ->
             build $ target context GenApply [] [file]
 
 copyRules :: Rules ()
 copyRules = do
-    (inplaceLibPath -/- "ghc-usage.txt")     <~ "driver"
-    (inplaceLibPath -/- "ghci-usage.txt"  )  <~ "driver"
-    (inplaceLibPath -/- "platformConstants") <~ generatedPath
-    (inplaceLibPath -/- "settings")          <~ "."
-    (inplaceLibPath -/- "template-hsc.h")    <~ pkgPath hsc2hs
-    rtsBuildPath -/- "c/sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
-    rtsBuildPath -/- "c/sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
+    (inplaceLibPath -/- "ghc-usage.txt")     <~ return "driver"
+    (inplaceLibPath -/- "ghci-usage.txt"  )  <~ return "driver"
+    (inplaceLibPath -/- "platformConstants") <~ (buildRoot <&> (-/- generatedDir))
+    (inplaceLibPath -/- "settings")          <~ return "."
+    (inplaceLibPath -/- "template-hsc.h")    <~ return (pkgPath hsc2hs)
+    "//c/sm/Evac_thr.c" %> copyFile (pkgPath rts -/- "sm/Evac.c")
+    "//c/sm/Scav_thr.c" %> copyFile (pkgPath rts -/- "sm/Scav.c")
   where
-    file <~ dir = file %> copyFile (dir -/- takeFileName file)
+    pattern <~ mdir = pattern %> \file -> do
+        dir <- mdir
+        copyFile (dir -/- takeFileName file) file
 
 generateRules :: Rules ()
 generateRules = do
-    (generatedPath -/- "ghcautoconf.h") <~ generateGhcAutoconfH
-    (generatedPath -/- "ghcplatform.h") <~ generateGhcPlatformH
-    (generatedPath -/-  "ghcversion.h") <~ generateGhcVersionH
+    priority 2.0 $ ("//" ++ generatedDir -/- "ghcautoconf.h") <~ generateGhcAutoconfH
+    priority 2.0 $ ("//" ++ generatedDir -/- "ghcplatform.h") <~ generateGhcPlatformH
+    priority 2.0 $ ("//" ++ generatedDir -/-  "ghcversion.h") <~ generateGhcVersionH
 
     ghcSplitPath %> \_ -> do
         generate ghcSplitPath emptyTarget generateGhcSplit
         makeExecutable ghcSplitPath
 
     -- TODO: simplify, get rid of fake rts context
-    generatedPath ++ "//*" %> \file -> do
+    "//" ++ generatedDir ++ "//*" %> \file -> do
         withTempDir $ \dir -> build $
             target rtsContext DeriveConstants [] [file, dir]
   where

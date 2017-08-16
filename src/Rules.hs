@@ -24,7 +24,6 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
-import Settings.Path
 import Target
 import Utilities
 
@@ -55,12 +54,14 @@ packageTargets stage pkg = do
     then return [] -- Skip inactive packages.
     else if isLibrary pkg
         then do -- Collect all targets of a library package.
-            ways <- interpretInContext context getLibraryWays
-            libs <- mapM (pkgLibraryFile . Context stage pkg) ways
-            docs <- interpretInContext context =<< buildHaddock <$> flavour
-            more <- libraryTargets context
-            return $ [ pkgSetupConfigFile context | nonCabalContext context ]
-                  ++ [ pkgHaddockFile     context | docs && stage == Stage1 ]
+            ways    <- interpretInContext context getLibraryWays
+            libs    <- mapM (pkgLibraryFile . Context stage pkg) ways
+            docs    <- interpretInContext context =<< buildHaddock <$> flavour
+            more    <- libraryTargets context
+            setup   <- pkgSetupConfigFile context
+            haddock <- pkgHaddockFile     context
+            return $ [ setup   | nonCabalContext context ]
+                  ++ [ haddock | docs && stage == Stage1 ]
                   ++ libs ++ more
         else -- The only target of a program package is the executable.
             fmap maybeToList . programPath =<< programContext stage pkg

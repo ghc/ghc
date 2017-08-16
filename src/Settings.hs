@@ -1,9 +1,8 @@
 module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
-    findKnownPackage, getPkgData, getPkgDataList, isLibrary,
-    getBuildPath, stagePackages, builderPath,
-    getBuilderPath, isSpecified, latestBuildStage, programPath, programContext,
-    integerLibraryName, destDir, pkgConfInstallPath, stage1Only, buildDll0
+    findKnownPackage, getPkgData, getPkgDataList, isLibrary, stagePackages,
+    builderPath, getBuilderPath, isSpecified, latestBuildStage, programPath,
+    programContext, integerLibraryName, destDir, stage1Only, buildDll0
     ) where
 
 import Hadrian.Oracles.KeyValue
@@ -22,7 +21,6 @@ import Settings.Flavours.Performance
 import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
-import Settings.Path
 import UserSettings
 
 getArgs :: Args
@@ -39,9 +37,6 @@ getPackages = expr flavour >>= packages
 
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = interpretInContext (stageContext stage) getPackages
-
-getBuildPath :: Expr FilePath
-getBuildPath = buildPath <$> getContext
 
 getPkgData :: (FilePath -> PackageData) -> Expr String
 getPkgData key = expr . pkgData . key =<< getBuildPath
@@ -144,13 +139,11 @@ latestBuildStage pkg = do
 programPath :: Context -> Action (Maybe FilePath)
 programPath context@Context {..} = do
     maybeLatest <- latestBuildStage package
+    path        <- buildPath context
     return $ do
         install <- (\l -> l == stage || package == ghc) <$> maybeLatest
-        let path = if install then inplaceInstallPath package else buildPath context
-        return $ path -/- programName context <.> exe
-
-pkgConfInstallPath :: FilePath
-pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) -/- "package.conf.install"
+        let installPath = if install then inplaceInstallPath package else path
+        return $ installPath -/- programName context <.> exe
 
 -- TODO: Set this from command line
 -- | Stage1Only flag.

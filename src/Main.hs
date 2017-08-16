@@ -3,6 +3,7 @@ module Main (main) where
 import Development.Shake
 import Hadrian.Utilities
 
+import qualified Base
 import qualified CommandLine
 import qualified Environment
 import qualified Rules
@@ -11,7 +12,6 @@ import qualified Rules.Install
 import qualified Rules.SourceDist
 import qualified Rules.Selftest
 import qualified Rules.Test
-import qualified Settings.Path
 import qualified UserSettings
 
 main :: IO ()
@@ -20,12 +20,15 @@ main = do
     -- Shake's type-indexed map 'shakeExtra'.
     argsMap <- CommandLine.cmdLineArgsMap
     let extra = insertExtra UserSettings.buildProgressColour
-              $ insertExtra UserSettings.successColour argsMap
+              $ insertExtra UserSettings.successColour
+              $ insertExtra UserSettings.userBuildRoot argsMap
+
+        BuildRoot buildRoot = UserSettings.userBuildRoot
 
         options :: ShakeOptions
         options = shakeOptions
             { shakeChange   = ChangeModtimeAndDigest
-            , shakeFiles    = Settings.Path.shakeFilesPath
+            , shakeFiles    = buildRoot -/- Base.shakeFilesDir
             , shakeProgress = progressSimple
             , shakeTimings  = True
             , shakeExtra    = extra }

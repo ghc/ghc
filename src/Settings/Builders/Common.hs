@@ -7,30 +7,29 @@ module Settings.Builders.Common (
     module Oracles.PackageData,
     module Oracles.Setting,
     module Settings,
-    module Settings.Path,
     module UserSettings,
     cIncludeArgs, ldArgs, cArgs, cWarnings, bootPackageDatabaseArgs
     ) where
 
 import Base
-import Context (getStagedSettingList)
+import Context hiding (stage, package, way)
 import Expression
 import GHC
 import Oracles.Flag
 import Oracles.PackageData
 import Oracles.Setting
 import Settings
-import Settings.Path
 import UserSettings
 
 cIncludeArgs :: Args
 cIncludeArgs = do
     pkg     <- getPackage
+    root    <- getBuildRoot
     path    <- getBuildPath
     incDirs <- getPkgDataList IncludeDirs
     depDirs <- getPkgDataList DepIncludeDirs
     mconcat [ arg "-Iincludes"
-            , arg $ "-I" ++ generatedPath
+            , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
             , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]
             , pure [ "-I" ++       unifyPath dir | dir <- depDirs ] ]
@@ -52,9 +51,13 @@ cWarnings = do
 
 bootPackageDatabaseArgs :: Args
 bootPackageDatabaseArgs = do
+    root  <- getBuildRoot
     stage <- getStage
-    expr $ need [packageDbStamp stage]
+    let dbDir | stage == Stage0 = root -/- stage0PackageDbDir
+              | otherwise       = inplacePackageDbPath
+    expr $ need [dbDir -/- packageDbStamp]
     stage0 ? do
-        path   <- expr topDirectory
+        top    <- expr topDirectory
+        root   <- getBuildRoot
         prefix <- ifM (builder Ghc) (return "-package-db ") (return "--package-db=")
-        arg $ prefix ++ path -/- inplacePackageDbDirectory Stage0
+        arg $ prefix ++ top -/- root -/- stage0PackageDbDir

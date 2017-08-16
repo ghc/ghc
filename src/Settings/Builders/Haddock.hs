@@ -2,6 +2,7 @@ module Settings.Builders.Haddock (haddockBuilderArgs) where
 
 import Hadrian.Utilities
 
+import Rules.Documentation
 import Settings.Builders.Common
 import Settings.Builders.Ghc
 
@@ -19,8 +20,9 @@ haddockBuilderArgs = builder Haddock ? do
     version  <- getPkgData Version
     synopsis <- getPkgData Synopsis
     deps     <- getPkgDataList Deps
-    depNames <- getPkgDataList DepNames
-    hVersion <- expr . pkgData . Version $ buildPath (vanillaContext Stage2 haddock)
+    haddocks <- expr . haddockDependencies =<< getContext
+    progPath <- expr $ buildPath (vanillaContext Stage2 haddock)
+    hVersion <- expr $ pkgData (Version progPath)
     ghcOpts  <- haddockGhcArgs
     mconcat
         [ arg $ "--odir=" ++ takeDirectory output
@@ -35,10 +37,7 @@ haddockBuilderArgs = builder Haddock ? do
         , map ("--hide=" ++) <$> getPkgDataList HiddenModules
         , pure [ "--read-interface=../" ++ dep
                  ++ ",../" ++ dep ++ "/src/%{MODULE/./-}.html\\#%{NAME},"
-                 ++ pkgHaddockFile (vanillaContext Stage1 depPkg)
-               | (dep, depName) <- zip deps depNames
-               , Just depPkg <- [findKnownPackage $ PackageName depName]
-               , depPkg /= rts ]
+                 ++ haddock | (dep, haddock) <- zip deps haddocks ]
         , pure [ "--optghc=" ++ opt | opt <- ghcOpts ]
         , isSpecified HsColour ?
           pure [ "--source-module=src/%{MODULE/./-}.html"

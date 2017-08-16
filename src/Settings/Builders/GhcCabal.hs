@@ -12,10 +12,11 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
     verbosity <- expr getVerbosity
     top       <- expr topDirectory
     context   <- getContext
+    path      <- getBuildPath
     when (package context /= deriveConstants) $ expr (need inplaceLibCopyTargets)
     mconcat [ arg "configure"
             , arg =<< pkgPath <$> getPackage
-            , arg $ top -/- buildPath context
+            , arg $ top -/- path
             , dll0Args
             , withStaged $ Ghc CompileHs
             , withStaged (GhcPkg Update)
@@ -34,10 +35,10 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
 
 ghcCabalHsColourBuilderArgs :: Args
 ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
-    path    <- pkgPath <$> getPackage
+    srcPath <- pkgPath <$> getPackage
     top     <- expr topDirectory
-    context <- getContext
-    pure [ "hscolour", path, top -/- buildPath context ]
+    path    <- getBuildPath
+    pure [ "hscolour", srcPath, top -/- path ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
@@ -62,14 +63,15 @@ libraryArgs = do
 -- TODO: LD_OPTS?
 configureArgs :: Args
 configureArgs = do
-    top <- expr topDirectory
+    top  <- expr topDirectory
+    root <- getBuildRoot
     let conf key expr = do
             values <- unwords <$> expr
             not (null values) ?
                 arg ("--configure-option=" ++ key ++ "=" ++ values)
         cFlags   = mconcat [ remove ["-Werror"] cArgs
                            , getStagedSettingList ConfCcArgs
-                           , arg $ "-I" ++ top -/- generatedPath ]
+                           , arg $ "-I" ++ top -/- root -/- generatedDir ]
         ldFlags  = ldArgs  <> (getStagedSettingList ConfGccLinkerArgs)
         cppFlags = cppArgs <> (getStagedSettingList ConfCppArgs)
     cldFlags <- unwords <$> (cFlags <> ldFlags)
@@ -88,11 +90,14 @@ configureArgs = do
 
 packageConstraints :: Args
 packageConstraints = stage0 ? do
-    constraints <- expr . readFileLines $ bootPackageConstraints
+    path <- getBuildRoot <&> (-/- bootPackageConstraints)
+    constraints <- expr $ readFileLines path
     pure $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args
-cppArgs = arg $ "-I" ++ generatedPath
+cppArgs = do
+    root <- getBuildRoot
+    arg $ "-I" ++ root -/- generatedDir
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of

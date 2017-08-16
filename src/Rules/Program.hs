@@ -11,7 +11,6 @@ import Oracles.PackageData
 import Oracles.Setting
 import Rules.Wrappers
 import Settings
-import Settings.Path
 import Target
 import Utilities
 
@@ -22,7 +21,7 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
             latest <- latestBuildStage package -- fromJust below is safe
             return $ if package == ghc then stage else fromJust latest
 
-    buildPath context -/- programName context <.> exe %> \bin -> do
+    "//" ++ contextDir context -/- programName context <.> exe %> \bin -> do
         context' <- programContext stage package
         buildBinaryAndWrapper rs context' bin
 
@@ -98,8 +97,9 @@ buildBinary rs context@Context {..} bin = do
             when (stage > Stage0) $ do
                 ways <- interpretInContext context (getLibraryWays <> getRtsWays)
                 needLibrary [ rtsContext { way = w } | w <- ways ]
-            let path = buildPath context
-            cObjs  <- map (objectPath context) <$> pkgDataList (CSrcs path)
+            path   <- buildPath context
+            cSrcs  <- pkgDataList (CSrcs path)
+            cObjs  <- mapM (objectPath context) cSrcs
             hsObjs <- hsObjects context
             return $ cObjs ++ hsObjs
                   ++ [ path -/- "Paths_hsc2hs.o"  | package == hsc2hs  ]

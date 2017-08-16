@@ -1,4 +1,4 @@
-module Rules.Libffi (libffiRules, libffiDependencies) where
+module Rules.Libffi (libffiRules, libffiBuildPath, libffiDependencies) where
 
 import Hadrian.Utilities
 
@@ -7,14 +7,19 @@ import Settings.Packages.Rts
 import Target
 import Utilities
 
+-- | Libffi is considered a Stage1 package. This determines its build directory.
+libffiContext :: Context
+libffiContext = vanillaContext Stage1 libffi
+
+-- | Build directory for in-tree Libffi library.
+libffiBuildPath :: Action FilePath
+libffiBuildPath = buildPath libffiContext
+
 libffiDependencies :: [FilePath]
-libffiDependencies = (rtsBuildPath -/-) <$> [ "ffi.h", "ffitarget.h" ]
+libffiDependencies = ["ffi.h", "ffitarget.h"]
 
 libffiLibrary :: FilePath
-libffiLibrary = libffiBuildPath -/- "inst/lib/libffi.a"
-
-libffiMakefile :: FilePath
-libffiMakefile = libffiBuildPath -/- "Makefile"
+libffiLibrary = "inst/lib/libffi.a"
 
 fixLibffiMakefile :: FilePath -> String -> String
 fixLibffiMakefile top =
@@ -41,51 +46,62 @@ configureEnvironment = do
 
 libffiRules :: Rules ()
 libffiRules = do
-    (libffiLibrary : libffiDependencies) &%> \_ -> do
+    fmap ("//rts" -/-) libffiDependencies &%> \_ -> do
+        libffiPath <- libffiBuildPath
+        need [libffiPath -/- libffiLibrary]
+
+    "//" ++ libffiLibrary %> \_ -> do
         useSystemFfi <- flag UseSystemFfi
+        rtsPath      <- rtsBuildPath
         if useSystemFfi
         then do
             ffiIncludeDir <- setting FfiIncludeDir
             putBuild "| System supplied FFI library will be used"
             forM_ ["ffi.h", "ffitarget.h"] $ \file ->
-                copyFile (ffiIncludeDir -/- file) (rtsBuildPath -/- file)
+                copyFile (ffiIncludeDir -/- file) (rtsPath -/- file)
             putSuccess $ "| Successfully copied system FFI library header files"
         else do
-            build $ target libffiContext (Make libffiBuildPath) [] []
+            libffiPath <- libffiBuildPath
+            build $ target libffiContext (Make libffiPath) [] []
 
-            hs <- getDirectoryFiles "" [libffiBuildPath -/- "inst/lib/*/include/*"]
+            hs <- getDirectoryFiles "" [libffiPath -/- "inst/lib/*/include/*"]
             forM_ hs $ \header ->
-                copyFile header (rtsBuildPath -/- takeFileName header)
+                copyFile header (rtsPath -/- takeFileName header)
 
             ways <- interpretInContext libffiContext (getLibraryWays <> getRtsWays)
-            forM_ (nubOrd ways) $ \way ->
-                copyFileUntracked libffiLibrary =<< rtsLibffiLibrary way
+            forM_ (nubOrd ways) $ \way -> do
+                rtsLib <- rtsLibffiLibrary way
+                copyFileUntracked (libffiPath -/- libffiLibrary) rtsLib
 
             putSuccess $ "| Successfully built custom library 'libffi'"
 
-    libffiMakefile <.> "in" %> \mkIn -> do
-        removeDirectory libffiBuildPath
+    "//libffi/Makefile.in" %> \mkIn -> do
+        libffiPath <- libffiBuildPath
+        removeDirectory libffiPath
         tarball <- unifyPath . fromSingleton "Exactly one LibFFI tarball is expected"
                <$> getDirectoryFiles "" ["libffi-tarballs/libffi*.tar.gz"]
 
         need [tarball]
         let libname = dropExtension . dropExtension $ takeFileName tarball
 
-        removeDirectory (buildRootPath -/- libname)
+        root <- buildRoot
+        removeDirectory (root -/- libname)
         -- TODO: Simplify.
         actionFinally (do
-            build $ target libffiContext Tar [tarball] [buildRootPath]
-            moveDirectory (buildRootPath -/- libname) libffiBuildPath) $
-                removeFiles buildRootPath [libname <//> "*"]
+            build $ target libffiContext Tar [tarball] [root]
+            moveDirectory (root -/- libname) libffiPath) $
+                removeFiles root [libname <//> "*"]
 
         top <- topDirectory
         fixFile mkIn (fixLibffiMakefile top)
 
-    libffiMakefile %> \mk -> do
+    -- TODO: Get rid of hard-coded @libffi@.
+    "//libffi/Makefile" %> \mk -> do
         need [mk <.> "in"]
+        libffiPath <- libffiBuildPath
         forM_ ["config.guess", "config.sub"] $ \file ->
-            copyFile file (libffiBuildPath -/- file)
+            copyFile file (libffiPath -/- file)
 
         env <- configureEnvironment
         buildWithCmdOptions env $
-            target libffiContext (Configure libffiBuildPath) [mk <.> "in"] [mk]
+            target libffiContext (Configure libffiPath) [mk <.> "in"] [mk]

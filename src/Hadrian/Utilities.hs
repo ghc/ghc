@@ -6,10 +6,13 @@ module Hadrian.Utilities (
     quote, yesNo,
 
     -- * FilePath manipulation
-    unifyPath, (-/-), matchVersionedFilePath,
+    unifyPath, (-/-),
 
     -- * Accessing Shake's type-indexed map
     insertExtra, userSetting,
+
+    -- * Paths
+    BuildRoot (..), buildRoot, isGeneratedSource,
 
     -- * File system operations
     copyFile, copyFileUntracked, fixFile, makeExecutable, moveFile, removeFile,
@@ -21,12 +24,14 @@ module Hadrian.Utilities (
     putProgressInfo, renderAction, renderProgram, renderLibrary, renderBox,
     renderUnicorn,
 
+    -- * Miscellaneous
+    (<&>),
+
     -- * Useful re-exports
     Dynamic, fromDynamic, toDyn, TypeRep, typeOf
     ) where
 
 import Control.Monad.Extra
-import Data.Char
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.HashMap.Strict (HashMap)
 import Data.List.Extra
@@ -111,25 +116,6 @@ a  -/- b
 
 infixr 6 -/-
 
--- | Given a @prefix@ and a @suffix@ check whether a 'FilePath' matches the
--- template @prefix ++ version ++ suffix@ where @version@ is an arbitrary string
--- comprising digits (@0-9@), dashes (@-@), and dots (@.@). Examples:
---
--- @
--- 'matchVersionedFilePath' "foo/bar"  ".a" "foo/bar.a"     '==' 'True'
--- 'matchVersionedFilePath' "foo/bar"  ".a" "foo\bar.a"     '==' 'False'
--- 'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar.a"     '==' 'True'
--- 'matchVersionedFilePath' "foo/bar"  ""   "foo/bar.a"     '==' 'False'
--- 'matchVersionedFilePath' "foo/bar"  "a"  "foo/bar-0.1.a" '==' 'True'
--- 'matchVersionedFilePath' "foo/bar-" "a"  "foo/bar-0.1.a" '==' 'True'
--- 'matchVersionedFilePath' "foo/bar/" "a"  "foo/bar-0.1.a" '==' 'False'
--- @
-matchVersionedFilePath :: String -> String -> FilePath -> Bool
-matchVersionedFilePath prefix suffix filePath =
-    case stripPrefix prefix filePath >>= stripSuffix suffix of
-        Nothing      -> False
-        Just version -> all (\c -> isDigit c || c == '-' || c == '.') version
-
 -- | Insert a value into Shake's type-indexed map.
 insertExtra :: Typeable a => a -> HashMap TypeRep Dynamic -> HashMap TypeRep Dynamic
 insertExtra value = Map.insert (typeOf value) (toDyn value)
@@ -141,6 +127,32 @@ userSetting defaultValue = do
     extra <- shakeExtra <$> getShakeOptions
     let maybeValue = fromDynamic =<< Map.lookup (typeOf defaultValue) extra
     return $ fromMaybe defaultValue maybeValue
+
+newtype BuildRoot = BuildRoot FilePath deriving Typeable
+
+-- | All build results are put into the 'buildRoot' directory.
+buildRoot :: Action FilePath
+buildRoot = do
+    BuildRoot path <- userSetting (BuildRoot "")
+    return path
+
+-- | A version of 'fmap' with flipped arguments. Useful for manipulating values
+-- in context, e.g. 'buildRoot', as in the example below.
+--
+-- @
+-- buildRoot <&> (-/- "dir") == fmap (-/- "dir") buildRoot
+-- @
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+(<&>) = flip fmap
+
+infixl 1 <&>
+
+-- | Given a 'FilePath' to a source file, return 'True' if it is generated.
+-- The current implementation simply assumes that a file is generated if it
+-- lives in the 'buildRoot' directory. Since most files are not generated the
+-- test is usually very fast.
+isGeneratedSource :: FilePath -> Action Bool
+isGeneratedSource file = buildRoot <&> (`isPrefixOf` file)
 
 -- | Copy a file tracking the source. Create the target directory if missing.
 copyFile :: FilePath -> FilePath -> Action ()
@@ -162,7 +174,7 @@ copyFileUntracked source target = do
 -- | Transform a given file by applying a function to its contents.
 fixFile :: FilePath -> (String -> String) -> Action ()
 fixFile file f = do
-    putBuild $ "| Fix " ++ file
+    putProgressInfo $ "| Fix " ++ file
     contents <- liftIO $ IO.withFile file IO.ReadMode $ \h -> do
         old <- IO.hGetContents h
         let new = f old
@@ -173,7 +185,7 @@ fixFile file f = do
 -- | Make a given file executable by running the @chmod +x@ command.
 makeExecutable :: FilePath -> Action ()
 makeExecutable file = do
-    putBuild $ "| Make " ++ quote file ++ " executable."
+    putProgressInfo $ "| Make " ++ quote file ++ " executable."
     quietly $ cmd "chmod +x " [file]
 
 -- | Move a file. Note that we cannot track the source, because it is moved.
@@ -185,13 +197,13 @@ moveFile source target = do
 -- | Remove a file that doesn't necessarily exist.
 removeFile :: FilePath -> Action ()
 removeFile file = do
-    putBuild $ "| Remove file " ++ file
+    putProgressInfo $ "| Remove file " ++ file
     liftIO . whenM (IO.doesFileExist file) $ IO.removeFile file
 
 -- | Create a directory if it does not already exist.
 createDirectory :: FilePath -> Action ()
 createDirectory dir = do
-    putBuild $ "| Create directory " ++ dir
+    putProgressInfo $ "| Create directory " ++ dir
     liftIO $ IO.createDirectoryIfMissing True dir
 
 -- | Copy a directory. The contents of the source directory is untracked.
@@ -209,7 +221,7 @@ moveDirectory source target = do
 -- | Remove a directory that doesn't necessarily exist.
 removeDirectory :: FilePath -> Action ()
 removeDirectory dir = do
-    putBuild $ "| Remove directory " ++ dir
+    putProgressInfo $ "| Remove directory " ++ dir
     liftIO . whenM (IO.doesDirectoryExist dir) $ IO.removeDirectoryRecursive dir
 
 data UseColour = Never | Auto | Always deriving (Eq, Show, Typeable)

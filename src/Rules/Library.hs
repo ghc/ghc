@@ -13,8 +13,8 @@ import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Setting
+import Rules.Gmp
 import Settings
-import Settings.Path
 import Target
 import Utilities
 
@@ -37,7 +37,7 @@ libraryObjects context@Context{..} = do
 
 buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
-    let libPrefix = buildPath context -/- "libHS" ++ pkgNameString package
+    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgNameString package
     -- OS X
     libPrefix ++ "*.dylib" %> buildDynamicLibUnix
     -- Linux
@@ -52,8 +52,8 @@ buildDynamicLib context@Context{..} = do
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
-    let libPrefix  = buildPath context -/- "libHS" ++ pkgNameString package
-    matchVersionedFilePath libPrefix (waySuffix way <.> "a") ?> \a -> do
+    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgNameString package
+    libPrefix ++ "*" ++ (waySuffix way <.> "a") %> \a -> do
         objs <- libraryObjects context
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
@@ -68,8 +68,8 @@ buildPackageLibrary context@Context {..} = do
 
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
-    let libPrefix = buildPath context -/- "HS" ++ pkgNameString package
-    matchVersionedFilePath libPrefix (waySuffix way <.> "o") ?> \obj -> do
+    let libPrefix = "//" ++ contextDir context -/- "HS" ++ pkgNameString package
+    libPrefix ++ "*" ++ (waySuffix way <.> "o") %> \obj -> do
         objs <- allObjects context
         need objs
         build $ target context Ld objs [obj]
@@ -79,15 +79,18 @@ allObjects context = (++) <$> nonHsObjects context <*> hsObjects context
 
 nonHsObjects :: Context -> Action [FilePath]
 nonHsObjects context = do
-    let path = buildPath context
+    path    <- buildPath context
     cObjs   <- cObjects context
-    cmmObjs <- map (objectPath context) <$> pkgDataList (CmmSrcs path)
+    cmmSrcs <- pkgDataList (CmmSrcs path)
+    cmmObjs <- mapM (objectPath context) cmmSrcs
     eObjs   <- extraObjects context
     return $ cObjs ++ cmmObjs ++ eObjs
 
 cObjects :: Context -> Action [FilePath]
 cObjects context = do
-    objs <- map (objectPath context) <$> pkgDataList (CSrcs $ buildPath context)
+    path <- buildPath context
+    srcs <- pkgDataList (CSrcs path)
+    objs <- mapM (objectPath context) srcs
     return $ if way context == threaded
         then objs
         else filter ((`notElem` ["Evac_thr", "Scav_thr"]) . takeBaseName) objs
@@ -95,6 +98,7 @@ cObjects context = do
 extraObjects :: Context -> Action [FilePath]
 extraObjects context
     | package context == integerGmp = do
-        need [gmpLibraryH]
-        map unifyPath <$> getDirectoryFiles "" [gmpObjects -/- "*.o"]
+        gmpPath <- gmpBuildPath
+        need [gmpPath -/- gmpLibraryH]
+        map unifyPath <$> getDirectoryFiles "" [gmpPath -/- gmpObjectsDir -/- "*.o"]
     | otherwise         = return []

@@ -34,14 +34,15 @@ hsc2hsBuilderArgs = builder Hsc2Hs ? do
 
 getCFlags :: Expr [String]
 getCFlags = do
-    context   <- getContext
+    context <- getContext
+    autogen <- expr $ autogenPath context
     mconcat [ remove ["-O"] (cArgs <> getStagedSettingList ConfCcArgs)
             , getStagedSettingList ConfCppArgs
             , cIncludeArgs
             , getPkgDataList CppArgs
             , getPkgDataList DepCcArgs
             , cWarnings
-            , arg "-include", arg $ autogenPath context -/- "cabal_macros.h" ]
+            , arg "-include", arg $ autogen -/- "cabal_macros.h" ]
 
 getLFlags :: Expr [String]
 getLFlags = do

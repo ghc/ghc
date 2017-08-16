@@ -6,8 +6,8 @@ import qualified Data.HashMap.Strict as Map
 
 import Base
 import Context
+import GHC
 import Oracles.PackageData
-import Settings.Path
 
 newtype ModuleFiles = ModuleFiles (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -75,22 +75,25 @@ hsSources :: Context -> Action [FilePath]
 hsSources context = do
     let modFile (m, Nothing   ) = generatedFile context m
         modFile (m, Just file )
-            | takeExtension file `elem` haskellExtensions = file
+            | takeExtension file `elem` haskellExtensions = return file
             | otherwise = generatedFile context m
-    map modFile <$> contextFiles context
+    mapM modFile =<< contextFiles context
 
 -- | Find all Haskell object files for a given 'Context'. Note: this is a much
 -- simpler function compared to 'hsSources', because all object files live in
 -- the build directory regardless of whether they are generated or not.
 hsObjects :: Context -> Action [FilePath]
 hsObjects context = do
-    modules <- pkgDataList $ Modules (buildPath context)
+    path    <- buildPath context
+    modules <- pkgDataList (Modules path)
     -- GHC.Prim module is only for documentation, we do not actually build it.
-    return . map (objectPath context . moduleSource) $ filter (/= "GHC.Prim") modules
+    mapM (objectPath context . moduleSource) (filter (/= "GHC.Prim") modules)
 
 -- | Generated module files live in the 'Context' specific build directory.
-generatedFile :: Context -> String -> FilePath
-generatedFile context moduleName = buildPath context -/- moduleSource moduleName
+generatedFile :: Context -> String -> Action FilePath
+generatedFile context moduleName = do
+    path <- buildPath context
+    return $ path -/- moduleSource moduleName
 
 moduleSource :: String -> FilePath
 moduleSource moduleName = replaceEq '.' '/' moduleName <.> "hs"
@@ -98,7 +101,8 @@ moduleSource moduleName = replaceEq '.' '/' moduleName <.> "hs"
 -- | Module files for a given 'Context'.
 contextFiles :: Context -> Action [(String, Maybe FilePath)]
 contextFiles context@Context {..} = do
-    modules <- fmap sort . pkgDataList . Modules $ buildPath context
+    path    <- buildPath context
+    modules <- fmap sort . pkgDataList $ Modules path
     zip modules <$> askOracle (ModuleFiles (stage, package))
 
 -- | This is an important oracle whose role is to find and cache module source
@@ -116,10 +120,11 @@ moduleFilesOracle :: Rules ()
 moduleFilesOracle = void $ do
     void . addOracle $ \(ModuleFiles (stage, package)) -> do
         let context = vanillaContext stage package
-            path    = buildPath context
+        path    <- buildPath context
         srcDirs <-             pkgDataList $ SrcDirs path
         modules <- fmap sort . pkgDataList $ Modules path
-        let dirs = autogenPath context : map (pkgPath package -/-) srcDirs
+        autogen <- autogenPath context
+        let dirs = autogen : map (pkgPath package -/-) srcDirs
             modDirFiles = groupSort $ map decodeModule modules
         result <- concatForM dirs $ \dir -> do
             todo <- filterM (doesDirectoryExist . (dir -/-) . fst) modDirFiles
@@ -142,9 +147,10 @@ moduleFilesOracle = void $ do
     generators <- newCache $ \(stage, package) -> do
         let context = vanillaContext stage package
         files <- contextFiles context
-        return $ Map.fromList [ (generatedFile context modName, src)
-                              | (modName, Just src) <- files
-                              , takeExtension src `notElem` haskellExtensions ]
+        list  <- sequence [ (,src) <$> (generatedFile context modName)
+                          | (modName, Just src) <- files
+                          , takeExtension src `notElem` haskellExtensions ]
+        return $ Map.fromList list
 
     addOracle $ \(Generator (stage, package, file)) ->
         Map.lookup file <$> generators (stage, package)
