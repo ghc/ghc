@@ -56,6 +56,9 @@ instance Bitraversable MetaDoc where
 overDoc :: (DocH a b -> DocH c d) -> MetaDoc a b -> MetaDoc c d
 overDoc f d = d { _doc = f $ _doc d }
 
+overDocF :: Functor f => (DocH a b -> f (DocH c d)) -> MetaDoc a b -> f (MetaDoc c d)
+overDocF f d = (\x -> d { _doc = x }) <$> f (_doc d)
+
 type Version = [Int]
 
 data Hyperlink = Hyperlink

@@ -30,6 +30,7 @@ import Haddock.Backends.Hyperlinker.Types
 import Haddock.Backends.Hyperlinker.Ast as Hyperlinker
 import Haddock.Backends.Hyperlinker.Parser as Hyperlinker
 
+import Data.Bitraversable
 import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import Data.Map (Map)
@@ -38,8 +39,6 @@ import Data.Maybe
 import Data.Monoid
 import Data.Ord
 import Control.Applicative
-import Control.Arrow (second)
-import Control.DeepSeq (force)
 import Control.Exception (evaluate)
 import Control.Monad
 import Data.Traversable
@@ -109,7 +108,6 @@ createInterface tm flags modMap instIfaceMap = do
       exports
         | OptIgnoreExports `elem` opts = Nothing
         | otherwise = exports0
-      warningMap = mkWarningMap dflags warnings gre exportedNames
 
       localBundledPatSyns :: Map Name [Name]
       localBundledPatSyns =
@@ -134,8 +132,10 @@ createInterface tm flags modMap instIfaceMap = do
       -- Locations of all TH splices
       splices = [ l | L l (SpliceD _) <- hsmodDecls hsm ]
 
-      maps@(!docMap, !argMap, !subMap, !declMap, _) =
-        mkMaps dflags gre localInsts declsWithDocs
+  warningMap <- liftErrMsg (mkWarningMap dflags warnings gre exportedNames)
+
+  maps@(!docMap, !argMap, !subMap, !declMap, _) <-
+    liftErrMsg (mkMaps dflags gre localInsts declsWithDocs)
 
   let allWarnings = M.unions (warningMap : map ifaceWarningMap (M.elems modMap))
 
@@ -161,7 +161,8 @@ createInterface tm flags modMap instIfaceMap = do
 
   let !aliases =
         mkAliasMap dflags $ tm_renamed_source tm
-      modWarn = moduleWarning dflags gre warnings
+
+  modWarn <- liftErrMsg (moduleWarning dflags gre warnings)
 
   tokenizedSrc <- mkMaybeTokenizedSrc flags tm
 
@@ -245,27 +246,29 @@ lookupModuleDyn dflags Nothing mdlName =
 -- Warnings
 -------------------------------------------------------------------------------
 
-mkWarningMap :: DynFlags -> Warnings -> GlobalRdrEnv -> [Name] -> WarningMap
+mkWarningMap :: DynFlags -> Warnings -> GlobalRdrEnv -> [Name] -> ErrMsgM WarningMap
 mkWarningMap dflags warnings gre exps = case warnings of
-  NoWarnings  -> M.empty
-  WarnAll _   -> M.empty
+  NoWarnings  -> pure M.empty
+  WarnAll _   -> pure M.empty
   WarnSome ws ->
-    let ws' = [ (n, w) | (occ, w) <- ws, elt <- lookupGlobalRdrEnv gre occ
+    let ws' = [ (n, w)
+              | (occ, w) <- ws
+              , elt <- lookupGlobalRdrEnv gre occ
               , let n = gre_name elt, n `elem` exps ]
-    in M.fromList $ map (second $ parseWarning dflags gre) ws'
+    in M.fromList <$> traverse (bitraverse pure (parseWarning dflags gre)) ws'
 
-moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings -> Maybe (Doc Name)
-moduleWarning _ _ NoWarnings = Nothing
-moduleWarning _ _ (WarnSome _) = Nothing
-moduleWarning dflags gre (WarnAll w) = Just $ parseWarning dflags gre w
+moduleWarning :: DynFlags -> GlobalRdrEnv -> Warnings -> ErrMsgM (Maybe (Doc Name))
+moduleWarning _ _ NoWarnings = pure Nothing
+moduleWarning _ _ (WarnSome _) = pure Nothing
+moduleWarning dflags gre (WarnAll w) = Just <$> parseWarning dflags gre w
 
-parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> Doc Name
-parseWarning dflags gre w = force $ case w of
+parseWarning :: DynFlags -> GlobalRdrEnv -> WarningTxt -> ErrMsgM (Doc Name)
+parseWarning dflags gre w = case w of
   DeprecatedTxt _ msg -> format "Deprecated: " (concatFS $ map (sl_fs . unLoc) msg)
   WarningTxt    _ msg -> format "Warning: "    (concatFS $ map (sl_fs . unLoc) msg)
   where
     format x xs = DocWarning . DocParagraph . DocAppend (DocString x)
-                  . processDocString dflags gre $ HsDocString xs
+                  <$> processDocString dflags gre (HsDocString xs)
 
 
 -------------------------------------------------------------------------------
@@ -313,16 +316,15 @@ mkMaps :: DynFlags
        -> GlobalRdrEnv
        -> [Name]
        -> [(LHsDecl Name, [HsDocString])]
-       -> Maps
-mkMaps dflags gre instances decls =
-  let
-    (a, b, c, d) = unzip4 $ map mappings decls
-  in ( f' (map (nubByName fst) a)
-     , f  (filterMapping (not . M.null) b)
-     , f  (filterMapping (not . null) c)
-     , f  (filterMapping (not . null) d)
-     , instanceMap
-     )
+       -> ErrMsgM Maps
+mkMaps dflags gre instances decls = do
+  (a, b, c, d) <- unzip4 <$> traverse mappings decls
+  pure ( f' (map (nubByName fst) a)
+       , f  (filterMapping (not . M.null) b)
+       , f  (filterMapping (not . null) c)
+       , f  (filterMapping (not . null) d)
+       , instanceMap
+       )
   where
     f :: (Ord a, Monoid b) => [[(a, b)]] -> Map a b
     f = M.fromListWith (<>) . concat
@@ -334,35 +336,42 @@ mkMaps dflags gre instances decls =
     filterMapping p = map (filter (p . snd))
 
     mappings :: (LHsDecl Name, [HsDocString])
-             -> ( [(Name, MDoc Name)]
-                , [(Name, Map Int (MDoc Name))]
-                , [(Name, [Name])]
-                , [(Name,  [LHsDecl Name])]
-                )
-    mappings (ldecl, docStrs) =
+             -> ErrMsgM ( [(Name, MDoc Name)]
+                        , [(Name, Map Int (MDoc Name))]
+                        , [(Name, [Name])]
+                        , [(Name,  [LHsDecl Name])]
+                        )
+    mappings (ldecl, docStrs) = do
       let L l decl = ldecl
           declDoc :: [HsDocString] -> Map Int HsDocString
-                  -> (Maybe (MDoc Name), Map Int (MDoc Name))
-          declDoc strs m =
-            let doc' = processDocStrings dflags gre strs
-                m' = M.map (processDocStringParas dflags gre) m
-            in (doc', m')
-          (doc, args) = declDoc docStrs (typeDocs decl)
+                  -> ErrMsgM (Maybe (MDoc Name), Map Int (MDoc Name))
+          declDoc strs m = do
+            doc' <- processDocStrings dflags gre strs
+            m'   <- traverse (processDocStringParas dflags gre) m
+            pure (doc', m')
+
+      (doc, args) <- declDoc docStrs (typeDocs decl)
+
+      let
           subs :: [(Name, [HsDocString], Map Int HsDocString)]
           subs = subordinates instanceMap decl
-          (subDocs, subArgs) = unzip $ map (\(_, strs, m) -> declDoc strs m) subs
+
+      (subDocs, subArgs) <- unzip <$> traverse (\(_, strs, m) -> declDoc strs m) subs
+
+      let
           ns = names l decl
           subNs = [ n | (n, _, _) <- subs ]
           dm = [ (n, d) | (n, Just d) <- zip ns (repeat doc) ++ zip subNs subDocs ]
           am = [ (n, args) | n <- ns ] ++ zip subNs subArgs
           sm = [ (n, subNs) | n <- ns ]
           cm = [ (n, [ldecl]) | n <- ns ++ subNs ]
-      in seqList ns `seq`
-          seqList subNs `seq`
-          doc `seq`
-          seqList subDocs `seq`
-          seqList subArgs `seq`
-          (dm, am, sm, cm)
+
+      seqList ns `seq`
+        seqList subNs `seq`
+        doc `seq`
+        seqList subDocs `seq`
+        seqList subArgs `seq`
+        pure (dm, am, sm, cm)
 
     instanceMap :: Map SrcSpan Name
     instanceMap = M.fromList [ (getSrcSpan n, n) | n <- instances ]
@@ -602,16 +611,20 @@ mkExportItems
       -- do so.
       -- NB: Pass in identity module, so we can look it up in index correctly
       moduleExports thisMod m dflags warnings gre exportedNames decls modMap instIfaceMap maps fixMap splices
-    lookupExport (IEGroup lev docStr)  = return $
-      return . ExportGroup lev "" $ processDocString dflags gre docStr
+    lookupExport (IEGroup lev docStr)  = liftErrMsg $ do
+      doc <- processDocString dflags gre docStr
+      return [ExportGroup lev "" doc]
 
-    lookupExport (IEDoc docStr)        = return $
-      return . ExportDoc $ processDocStringParas dflags gre docStr
+    lookupExport (IEDoc docStr)        = liftErrMsg $ do
+      doc <- processDocStringParas dflags gre docStr
+      return [ExportDoc doc]
 
     lookupExport (IEDocNamed str)      = liftErrMsg $
-      findNamedDoc str [ unL d | d <- decls ] >>= return . \case
-        Nothing -> []
-        Just doc -> return . ExportDoc $ processDocStringParas dflags gre doc
+      findNamedDoc str [ unL d | d <- decls ] >>= \case
+        Nothing -> return  []
+        Just docStr -> do
+          doc <- processDocStringParas dflags gre docStr
+          return [ExportDoc doc]
 
     declWith :: [(HsDecl Name, DocForDecl Name)] -> Name -> ErrMsgGhc [ ExportItem Name ]
     declWith pats t = do
@@ -924,9 +937,11 @@ fullModuleContents dflags warnings gre (docMap, argMap, subMap, declMap, instMap
 
     mkExportItem :: LHsDecl Name -> ErrMsgGhc (Maybe (ExportItem Name))
     mkExportItem (L _ (DocD (DocGroup lev docStr))) = do
-      return . Just . ExportGroup lev "" $ processDocString dflags gre docStr
+      doc <- liftErrMsg (processDocString dflags gre docStr)
+      return . Just . ExportGroup lev "" $ doc
     mkExportItem (L _ (DocD (DocCommentNamed _ docStr))) = do
-      return . Just . ExportDoc $ processDocStringParas dflags gre docStr
+      doc <- liftErrMsg (processDocStringParas dflags gre docStr)
+      return . Just . ExportDoc $ doc
     mkExportItem (L l (ValD d))
       | name:_ <- collectHsBindBinders d, Just [L _ (ValD _)] <- M.lookup name declMap =
           -- Top-level binding without type signature.
