@@ -18,7 +18,7 @@ module GHC (
     rtsContext, rtsBuildPath, rtsConfIn,
 
     -- * Miscellaneous
-    ghcSplitPath, stripCmdPath, inplaceInstallPath
+    ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
     ) where
 
 import Base
@@ -192,3 +192,7 @@ rtsBuildPath = buildPath rtsContext
 rtsConfIn :: FilePath
 rtsConfIn = pkgPath rts -/- "package.conf.in"
 
+buildDll0 :: Context -> Action Bool
+buildDll0 Context {..} = do
+    windows <- windowsHost
+    return $ windows && stage == Stage1 && package == compiler

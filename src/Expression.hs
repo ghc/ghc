@@ -16,8 +16,8 @@ module Expression (
     Context, vanillaContext, stageContext, Target,
 
     -- * Convenient accessors
-    getBuildRoot, getBuildPath, getContext, getStage, getPackage, getBuilder,
-    getOutputs, getInputs, getWay, getInput, getOutput,
+    getBuildRoot, getBuildPath, getContext, getPkgData, getPkgDataList, getStage,
+    getPackage, getBuilder, getOutputs, getInputs, getWay, getInput, getOutput,
 
     -- * Re-exports
     module Base
@@ -28,6 +28,7 @@ import Hadrian.Expression hiding (Expr, Predicate, Args)
 
 import Base
 import Context (Context, vanillaContext, stageContext, getBuildPath, getStage, getPackage, getWay)
+import Oracles.PackageData
 import Target hiding (builder, inputs, outputs)
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
@@ -41,6 +42,14 @@ type Predicate = H.Predicate Context Builder
 type Args      = H.Args      Context Builder
 type Packages  = Expr [Package]
 type Ways      = Expr [Way]
+
+-- | Get a value from the @package-data.mk@ file of the current context.
+getPkgData :: (FilePath -> PackageData) -> Expr String
+getPkgData key = expr . pkgData . key =<< getBuildPath
+
+-- | Get a list of values from the @package-data.mk@ file of the current context.
+getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
+getPkgDataList key = expr . pkgDataList . key =<< getBuildPath
 
 -- | Is the build currently in the provided stage?
 stage :: Stage -> Predicate

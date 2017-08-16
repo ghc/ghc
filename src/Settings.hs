@@ -13,8 +13,6 @@ import CommandLine
 import Expression
 import Flavour
 import GHC
-import Oracles.PackageData
-import Oracles.Setting
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
 import Settings.Flavours.Performance
@@ -37,12 +35,6 @@ getPackages = expr flavour >>= packages
 
 stagePackages :: Stage -> Action [Package]
 stagePackages stage = interpretInContext (stageContext stage) getPackages
-
-getPkgData :: (FilePath -> PackageData) -> Expr String
-getPkgData key = expr . pkgData . key =<< getBuildPath
-
-getPkgDataList :: (FilePath -> PackageDataList) -> Expr [String]
-getPkgDataList key = expr . pkgDataList . key =<< getBuildPath
 
 hadrianFlavours :: [Flavour]
 hadrianFlavours =
@@ -154,8 +146,3 @@ stage1Only = defaultStage1Only
 -- | Install's DESTDIR setting.
 destDir :: FilePath
 destDir = defaultDestDir
-
-buildDll0 :: Context -> Action Bool
-buildDll0 Context {..} = do
-    windows <- windowsHost
-    return $ windows && stage == Stage1 && package == compiler
