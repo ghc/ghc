@@ -368,14 +368,13 @@ ds_expr _ (ExplicitTuple tup_args boxity)
              go (lam_vars, args) (L _ (Present expr))
                     -- Expressions that are present don't generate
                     -- lambdas, just arguments.
-               = do { core_expr <- dsLExpr expr
+               = do { core_expr <- dsLExprNoLP expr
                     ; return (lam_vars, core_expr : args) }
 
-       ; (lam_vars, args) <- foldM go ([], []) (reverse tup_args)
+       ; dsWhenNoErrs (foldM go ([], []) (reverse tup_args))
                 -- The reverse is because foldM goes left-to-right
-
-       ; return $ mkCoreLams lam_vars $
-                  mkCoreTupBoxity boxity args }
+                      (\(lam_vars, args) -> mkCoreLams lam_vars $
+                                            mkCoreTupBoxity boxity args) }
 
 ds_expr _ (ExplicitSum alt arity expr types)
   = do { core_expr <- dsLExpr expr
