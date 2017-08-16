@@ -6,13 +6,12 @@
 # This file will be a utility to help facilitate the comparison of performance
 # metrics across arbitrary commits. The file will produce a table comparing
 # metrics between measurements taken for given commits in the environment given
+
 # by --test-env.
 
 import argparse
 import re
 import subprocess
-
-from testutil import parse_git_notes
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--test-env",
@@ -22,7 +21,8 @@ parser.add_argument("--test-name",
                     tests matching the given regular expression.")
 parser.add_argument("--min-delta",type=float,
                     help="Optional: Display only tests where the relative \
-                    spread is greater than the given value.")
+                    spread is greater than the given value. \
+                    This will not be run if you only pass in one commit.")
 parser.add_argument("--add-note", nargs=3,
                     help="Development only. Adds N fake metrics to the given commit. \
                     If the third argument is not a blank string, this will generate \
@@ -40,6 +40,27 @@ name = re.compile('.*')
 # metrics is a dictionary of the form
 # [ {'test_env': 'local', 'test': 'T100', 'way': 'some_way', 'metric': 'some_field', 'value': '1000', 'commit': 'HEAD'} ]
 metrics = []
+singleton_commit = len(args.commits) == 1
+
+
+# This function allows one to read in git notes from the commandline
+# and then breaks it into a list of dictionaries that can be parsed
+# later on in the testing functions.
+# Silently returns an empty string if the note is not found.
+def parse_git_notes(namespace, commit='HEAD'):
+    logFields = ['test_env','test','way','metric','value','commit']
+
+    try:
+        log = subprocess.check_output(['git', 'notes', '--ref=' + namespace, 'show', commit], stderr=subprocess.STDOUT).decode('utf-8')
+    except subprocess.CalledProcessError:
+        return []
+
+    log = log.strip('\n').split('\n')
+    log = list(filter(None, log))
+    log = [line.strip('\t').split('\t') for line in log]
+    [x.append(commit) for x in log]
+    log = [dict(zip(logFields, field)) for field in log]
+    return log
 
 #
 # Main logic of program
@@ -74,7 +95,10 @@ if args.min_delta:
         if cmp(float(fst['value']),float(snd['value'])):
             deltas.append(fst)
 
-    metrics = deltas
+    # Throw away the work if we only have one commit passed in.
+    # Ugly way to do it but ¯\_(ツ)_/¯
+    if not singleton_list:
+        metrics = deltas
 
 if args.add_note:
     def note_gen(n, commit, delta=''):
@@ -90,6 +114,93 @@ if args.add_note:
         git_note = subprocess.check_output(["git","notes","--ref=perf","append",commit,"-m", "\n".join(note)])
 
     note_gen(args.add_note[0],args.add_note[1],args.add_note[2])
+
+#
+# Comparison tools for commits.
+#
+testing_metrics = ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
+
+# At some point this should be changed to handle tests like so:
+# - Upon noticing a: 5% regression, leave a comment on phabricator
+# -                 10% regression, flag commit for review on phabricator
+# -                 20% regression, fail test.
+def test_cmp(val, expected, dev=20):
+    result = passed()
+    lowerBound = trunc(           expected * ((100 - float(dev))/100))
+    upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)))
+    deviation = round(((float(val) * 100)/ expected) - 100, 1)
+
+    if val < lowerBound:
+        result = failBecause('value is too low:\n(If this is \
+        because you have improved GHC, please\nupdate the test so that GHC \
+        doesn\'t regress again)')
+    if val > upperBound:
+        result = failBecause('value is too high:\nstat is not good enough')
+
+    if val < lowerBound or val > upperBound or config.verbose >= 4:
+        verbose_print(expected, val, lowerBound, upperBound, deviation)
+
+    return result
+
+def verbose_print(expected, val, lowerBound, upperBound, deviation):
+    length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
+
+    def display(descr, val, extra):
+        print(descr, str(val).rjust(length), extra)
+
+    display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
+    display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
+    display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
+    display('    Actual      ' + full_name + ' ' + field + ':', val, '')
+    if val != expected:
+        display('    Deviation   ' + full_name + ' ' + field + ':', deviation, '%')
+
+def comparison(metric, deviation=20):
+    return lambda n=name, w=way, m=metric, d=deviation, s=stats_file, v=values: _comparison(name, w, m, d, s, v)
+
+def _comparison(name, way, metric, deviation, stats_file, values):
+    result = passed()
+
+    tests = parse_git_notes('HEAD^')
+    if tests == []:
+        return passed('There are no prior metrics for this test')
+
+    # Might have multiple metrics being measured for a single test.
+    test = [t for t in tests if t['test'] == name]
+
+    try: # Grab the results from the test.
+        f = open(in_testdir(stats_file))
+    except IOError as e:
+        return failBecause(str(e))
+    contents = f.read()
+    f.close()
+
+    if isinstance(metric, str):
+        if metric == 'all':
+            for field in testing_metrics:
+                result = evaluate_metric(test, field, deviation, contents)
+                if result['passFail'] == 'fail':
+                    return result
+        else:
+            result = evaluate_metric(test, metric, deviation, contents)
+
+    if isinstance(metric, list):
+        for field in metric:
+            result = evaluate_metric(test, field, deviation, contents)
+            if result['passFail'] == 'fail':
+                return result
+
+    return result
+
+def evaluate_metric(test, field, deviation, contents):
+    expected = [t for t in test if t['metric'] == field][0]
+    m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
+    if m == None:
+        print('Failed to find field: ', field)
+        return failBecause('no such stats field') # I think this is just supposed to blow up in the original code?
+
+    val = int(m.group(1))
+    return test_cmp(val, expected['value'], deviation)
 
 #
 # String utilities for pretty-printing
@@ -142,7 +253,9 @@ header('commit')
 for test in latest_commit:
     print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'metrics'))
 
-header('percent')
-# Printing out percentages.
-for test in latest_commit:
-    print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))
+# Has no meaningful output if there is no commit to compare to.
+if not singleton_commit:
+    header('percent')
+    # Printing out percentages.
+    for test in latest_commit:
+        print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))

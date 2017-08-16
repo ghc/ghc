@@ -23,6 +23,7 @@ import subprocess
 
 from testglobals import *
 from testutil import *
+from perf_notes import comparison
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 if config.use_threads:
@@ -65,7 +66,7 @@ def setLocalTestOpts(opts):
 
 def isStatsTest():
     opts = getTestOpts()
-    return bool(opts.compiler_stats_range_fields or opts.stats_range_fields)
+    return bool(opts.compiler_stats_range_fields or opts.stats_range_fields) # CHANGE
 
 
 # This can be called at the top of a file of tests, to set default test options
@@ -314,29 +315,67 @@ def _extra_files(name, opts, files):
 
 # -----
 
-def stats_num_field( field, expecteds ):
-    return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e);
+# Need to refactor out stats_range_fields and compiler_stats_range_fields
+def testing_metric(field):
+    return lambda name, opts, f=field: _testing_metric(name, opts, f);
 
-def _stats_num_field( name, opts, field, expecteds ):
-    if field in opts.stats_range_fields:
+def _testing_metric(name, opts, field):
+    # Just call out to the comparison tool.
+    # if field in opts.stats_range_fields: # REMOVE
+    #     framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
+
+    # if (I can load information from a git note):
+    #                             [ str ] = (str                 , str            )
+    #   -> opts.stats_range_fields[field] = (result from git note, small deviation) # will I need to care about word size differences here? # REMOVE
+                                                                                    # or can I assume I am always using the same machine with git notes?
+    # else:
+    #   -> sane default
+
+    # if type(expecteds) is list:
+    #     for (b, expected, dev) in expecteds:
+    #         if b:
+    #             opts.stats_range_fields[field] = (expected, dev) # REMOVE
+    #             return
+    #     framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+
+    # else:
+    #     (expected, dev) = expecteds
+    #     opts.stats_range_fields[field] = (expected, dev) # REMOVE
+    return
+# if string
+        # set the opts things
+    # if list
+        # set the opts things
+    # return
+
+
+# -----
+
+# This code is what is used in the all.T files
+# It is now useless and we need a different way to do it
+def stats_num_field( field, expecteds ): # REMOVE
+    return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e); # REMOVE
+
+def _stats_num_field( name, opts, field, expecteds ): # REMOVE
+    if field in opts.stats_range_fields: # REMOVE
         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
     if type(expecteds) is list:
         for (b, expected, dev) in expecteds:
             if b:
-                opts.stats_range_fields[field] = (expected, dev)
+                opts.stats_range_fields[field] = (expected, dev) # REMOVE
                 return
         framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
     else:
         (expected, dev) = expecteds
-        opts.stats_range_fields[field] = (expected, dev)
+        opts.stats_range_fields[field] = (expected, dev) # REMOVE
 
-def compiler_stats_num_field( field, expecteds ):
-    return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e);
+def compiler_stats_num_field( field, expecteds ): # REMOVE
+    return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e); # REMOVE
 
-def _compiler_stats_num_field( name, opts, field, expecteds ):
-    if field in opts.compiler_stats_range_fields:
+def _compiler_stats_num_field( name, opts, field, expecteds ): # REMOVE
+    if field in opts.compiler_stats_range_fields: # REMOVE
         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
     # Compiler performance numbers change when debugging is on, making the results
@@ -346,7 +385,7 @@ def _compiler_stats_num_field( name, opts, field, expecteds ):
 
     for (b, expected, dev) in expecteds:
         if b:
-            opts.compiler_stats_range_fields[field] = (expected, dev)
+            opts.compiler_stats_range_fields[field] = (expected, dev) # REMOVE
             return
 
     framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
@@ -921,8 +960,8 @@ def badResult(result):
     except (KeyError, TypeError):
         return True
 
-def passed():
-    return {'passFail': 'pass'}
+def passed(reason=''):
+    return {'passFail': 'pass', 'reason' : reason}
 
 def failBecause(reason, tag=None):
     return {'passFail': 'fail', 'reason': reason, 'tag': tag}
@@ -1078,20 +1117,16 @@ def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
 def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
 
-def stats( name, way, stats_file ):
-    opts = getTestOpts()
-    return checkStats(name, way, stats_file, opts.stats_range_fields)
-
 # -----------------------------------------------------------------------------
-# Check -t stats info
+# Check -t stats info # REMOVE
 
-def checkStats(name, way, stats_file, range_fields):
+def checkStats(name, way, stats_file, range_fields): # REMOVE
     full_name = name + '(' + way + ')'
 
     result = passed()
     if range_fields:
         try:
-            f = open(in_testdir(stats_file))
+            f = open(in_testdir(stats_file)) # REMOVE
         except IOError as e:
             return failBecause(str(e))
         contents = f.read()
@@ -1101,7 +1136,7 @@ def checkStats(name, way, stats_file, range_fields):
             m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
             if m == None:
                 print('Failed to find field: ', field)
-                result = failBecause('no such stats field')
+                result = failBecause('no such stats field') # REMOVE
             val = int(m.group(1))
 
             lowerBound = trunc(           expected * ((100 - float(dev))/100))
@@ -1183,9 +1218,9 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
     else:
         to_do = '-c' # just compile
 
-    stats_file = name + '.comp.stats'
-    if opts.compiler_stats_range_fields:
-        extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+    stats_file = name + '.comp.stats' # REMOVE
+    if opts.compiler_stats_range_fields: # Replace with an is_compiler_perf_test() function. # REMOVE
+        extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS' # REMOVE
     if backpack:
         extra_hc_opts += ' -outputdir ' + name + '.out'
 
@@ -1217,10 +1252,11 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields)
+    # REPLACE statsResult with my new function from perf_test comparison tool.
+    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields) # REMOVE
 
-    if badResult(statsResult):
-        return statsResult
+    if badResult(statsResult): # REMOVE
+        return statsResult # REMOVE
 
     if should_fail:
         if exit_code == 0:
@@ -1257,14 +1293,14 @@ def simple_run(name, way, prog, extra_run_opts):
 
     my_rts_flags = rts_flags(way)
 
-    stats_file = name + '.stats'
-    if opts.stats_range_fields:
-        stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
+    stats_file = name + '.stats' # REMOVE
+    if opts.stats_range_fields: # REMOVE
+        stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS' # REMOVE
     else:
-        stats_args = ''
+        stats_args = '' # REMOVE
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
+    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts # REMOVE
 
     if opts.cmd_wrapper != None:
         cmd = opts.cmd_wrapper(cmd)
@@ -1296,7 +1332,7 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return checkStats(name, way, stats_file, opts.stats_range_fields)
+    return checkStats(name, way, stats_file, opts.stats_range_fields) # REMOVE
 
 def rts_flags(way):
     args = config.way_rts_flags.get(way, [])
