@@ -2,7 +2,7 @@
 
  * to be released
 
- * Bifunctor instance for DocH
+ * Bifunctor, Bifoldable and Bitraversable instances for DocH and MetaDoc
 
 ## Changes in version 1.4.5
 
