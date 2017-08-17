@@ -2,6 +2,7 @@ module Rules (buildRules, oracleRules, packageTargets, topLevelTargets) where
 
 import qualified Hadrian.Oracles.ArgsHash
 import qualified Hadrian.Oracles.DirectoryContents
+import qualified Hadrian.Oracles.FileCache
 import qualified Hadrian.Oracles.KeyValue
 import qualified Hadrian.Oracles.Path
 
@@ -15,7 +16,6 @@ import qualified Rules.Data
 import qualified Rules.Dependencies
 import qualified Rules.Documentation
 import qualified Rules.Generate
-import qualified Rules.Cabal
 import qualified Rules.Configure
 import qualified Rules.Gmp
 import qualified Rules.Libffi
@@ -24,14 +24,15 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
+import Settings.Builders.GhcCabal
 import Target
 import Utilities
 
 allStages :: [Stage]
 allStages = [minBound ..]
 
--- | This rule 'need' all top-level build targets
--- or Stage1Only targets
+-- | This rule calls 'need' on all top-level build targets, respecting the
+-- 'Stage1Only' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
     let libraryPackages = filter isLibrary (knownPackages \\ [rts, libffi])
@@ -98,7 +99,6 @@ packageRules = do
 
 buildRules :: Rules ()
 buildRules = do
-    Rules.Cabal.cabalRules
     Rules.Configure.configureRules
     Rules.Generate.copyRules
     Rules.Generate.generateRules
@@ -107,16 +107,19 @@ buildRules = do
     packageRules
     Rules.Perl.perlScriptRules
 
+generators :: [(FilePattern, FilePath -> Action String)]
+generators = [ ("//" -/- bootPackageConstraints, bootPackageConstraintsGenerator)
+             , ("//" -/- packageDependencies   , packageDependenciesGenerator   ) ]
+
 oracleRules :: Rules ()
 oracleRules = do
     Hadrian.Oracles.ArgsHash.argsHashOracle trackArgument getArgs
     Hadrian.Oracles.DirectoryContents.directoryContentsOracle
+    Hadrian.Oracles.FileCache.fileCacheRules generators
     Hadrian.Oracles.KeyValue.keyValueOracle
     Hadrian.Oracles.Path.pathOracle
     Oracles.ModuleFiles.moduleFilesOracle
 
 programsStage1Only :: [Package]
-programsStage1Only =
-    [ deriveConstants, genprimopcode, hp2ps, runGhc
-    , ghcCabal, hpc, dllSplit, ghcPkg, hsc2hs
-    , genapply, ghc ]
+programsStage1Only = [ deriveConstants, dllSplit, genapply, genprimopcode, ghc
+                     , ghcCabal, ghcPkg, hp2ps, hpc, hsc2hs, runGhc ]

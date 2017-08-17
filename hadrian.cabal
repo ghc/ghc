@@ -30,6 +30,7 @@ executable hadrian
                        , Hadrian.Haskell.Cabal
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
+                       , Hadrian.Oracles.FileCache
                        , Hadrian.Oracles.KeyValue
                        , Hadrian.Oracles.Path
                        , Hadrian.Target
@@ -40,7 +41,6 @@ executable hadrian
                        , Oracles.PackageData
                        , Package
                        , Rules
-                       , Rules.Cabal
                        , Rules.Clean
                        , Rules.Compile
                        , Rules.Configure
