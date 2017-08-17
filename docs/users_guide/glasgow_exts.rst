@@ -2912,7 +2912,7 @@ Record field disambiguation
 
 .. ghc-flag:: -XDisambiguateRecordFields
 
-    :since 6.8.1
+    :since: 6.8.1
 
     Allow the compiler to automatically choose between identically-named
     record selectors based on type (if the choice is unambiguous).
