@@ -1996,7 +1996,7 @@ intToSBigNat# 0#     = PosBN zeroBigNat
 intToSBigNat# 1#     = PosBN oneBigNat
 intToSBigNat# (-1#)  = NegBN oneBigNat
 intToSBigNat# i# | isTrue# (i# ># 0#) = PosBN (wordToBigNat (int2Word# i#))
-                 | True   = PosBN (wordToBigNat (int2Word# (negateInt# i#)))
+                 | True   = NegBN (wordToBigNat (int2Word# (negateInt# i#)))
 
 -- | Convert 'Integer' into 'SBigNat'
 integerToSBigNat :: Integer -> SBigNat

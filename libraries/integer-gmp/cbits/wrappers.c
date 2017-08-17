@@ -312,7 +312,7 @@ integer_gmp_gcdext(mp_limb_t s0[], mp_limb_t g0[],
 
   const mp_size_t ssn = s[0]._mp_size;
   const mp_size_t sn  = mp_size_abs(ssn);
-  assert(sn <= xn);
+  assert(sn <= mp_size_abs(xn));
   memcpy(s0, s[0]._mp_d, sn*sizeof(mp_limb_t));
   mpz_clear (s);
 

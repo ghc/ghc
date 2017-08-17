@@ -85,10 +85,13 @@ main = do
     print $ gcdExtInteger e b
     print $ gcdExtInteger x y
     print $ gcdExtInteger y x
+    print $ gcdExtInteger x (-y)
+    print $ gcdExtInteger (-x) y
+    print $ gcdExtInteger (-x) (-y)
     print $ powInteger 12345 0
     print $ powInteger 12345 1
     print $ powInteger 12345 30
-    print $ [ (x,i) | x <- [0..71], let i = recipModInteger x (2*3*11*11*17*17), i /= 0 ]
+    print $ [ (x,i) | x <- [-7..71], let i = recipModInteger x (2*3*11*11*17*17), i /= 0 ]
     print $ I.nextPrimeInteger b
     print $ I.nextPrimeInteger e
     print $ [ k | k <- [ 0 .. 200 ], S# (I.testPrimeInteger k 25#) `elem` [1,2] ]
