@@ -1675,6 +1675,8 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
 ------------------------------
 reifyType :: TyCoRep.Type -> TcM TH.Type
 -- Monadic only because of failure
+reifyType ty                | isLiftedTypeKind ty = return TH.StarT
+                            | isConstraintKind ty = return TH.ConstraintT
 reifyType ty@(ForAllTy {})  = reify_for_all ty
 reifyType (LitTy t)         = do { r <- reifyTyLit t; return (TH.LitT r) }
 reifyType (TyVarTy tv)      = return (TH.VarT (reifyName tv))
@@ -1717,33 +1719,7 @@ reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
                 $ TH.ForallT exTyVars' prov' tau' }
 
 reifyKind :: Kind -> TcM TH.Kind
-reifyKind  ki
-  = do { let (kis, ki') = splitFunTys ki
-       ; ki'_rep <- reifyNonArrowKind ki'
-       ; kis_rep <- mapM reifyKind kis
-       ; return (foldr (TH.AppT . TH.AppT TH.ArrowT) ki'_rep kis_rep) }
-  where
-    reifyNonArrowKind k | isLiftedTypeKind k = return TH.StarT
-                        | isConstraintKind k = return TH.ConstraintT
-    reifyNonArrowKind (TyVarTy v)            = return (TH.VarT (reifyName v))
-    reifyNonArrowKind (FunTy _ k)            = reifyKind k
-    reifyNonArrowKind (ForAllTy _ k)         = reifyKind k
-    reifyNonArrowKind (TyConApp kc kis)      = reify_kc_app kc kis
-    reifyNonArrowKind (AppTy k1 k2)          = do { k1' <- reifyKind k1
-                                                  ; k2' <- reifyKind k2
-                                                  ; return (TH.AppT k1' k2')
-                                                  }
-    reifyNonArrowKind k                      = noTH (sLit "this kind") (ppr k)
-
-reify_kc_app :: TyCon -> [TyCoRep.Kind] -> TcM TH.Kind
-reify_kc_app kc kis
-  = fmap (mkThAppTs r_kc) (mapM reifyKind vis_kis)
-  where
-    r_kc | isTupleTyCon kc          = TH.TupleT (tyConArity kc)
-         | kc `hasKey` listTyConKey = TH.ListT
-         | otherwise                = TH.ConT (reifyName kc)
-
-    vis_kis = filterOutInvisibleTypes kc kis
+reifyKind = reifyType
 
 reifyCxt :: [PredType] -> TcM [TH.Pred]
 reifyCxt   = mapM reifyPred
