@@ -28,6 +28,7 @@ executable hadrian
                        , GHC
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
+                       , Hadrian.Haskell.Package
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Oracles.FileCache
@@ -39,7 +40,6 @@ executable hadrian
                        , Oracles.Setting
                        , Oracles.ModuleFiles
                        , Oracles.PackageData
-                       , Package
                        , Rules
                        , Rules.Clean
                        , Rules.Compile

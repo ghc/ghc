@@ -15,7 +15,7 @@ module Base (
 
     -- * Basic data types
     module Builder,
-    module Package,
+    module Hadrian.Haskell.Package,
     module Stage,
     module Way,
 
@@ -37,9 +37,9 @@ import Development.Shake.Classes
 import Development.Shake.FilePath
 import Development.Shake.Util
 import Hadrian.Utilities
+import Hadrian.Haskell.Package
 
 import Builder
-import Package
 import Stage
 import Way
 

@@ -1,4 +1,4 @@
-module Package (
+module Hadrian.Haskell.Package (
     Package (..), PackageName (..), PackageType (..),
     -- * Queries
     pkgNameString, pkgCabalFile,
@@ -12,20 +12,25 @@ import Development.Shake.FilePath
 import GHC.Generics
 import Hadrian.Utilities
 
--- | The name of a Cabal package.
+-- | The name of a Haskell package.
 newtype PackageName = PackageName { fromPackageName :: String }
     deriving (Binary, Eq, Generic, Hashable, IsString, NFData, Ord, Typeable)
 
 -- TODO: Make PackageType more precise, #12.
--- | We regard packages as either being libraries or programs. This is bit of a
--- convenient lie as Cabal packages can be both, but it works for now.
+-- | We regard packages as either being libraries or programs. This is a bit of
+-- a convenient lie as Haskell packages can be both, but it works for now.
 data PackageType = Library | Program deriving Generic
 
-data Package = Package
-    { pkgName :: PackageName -- ^ Examples: "ghc", "Cabal".
-    , pkgPath :: FilePath    -- ^ pkgPath is the path to the source code relative
-                             -- to the root, e.g. "compiler", "libraries/Cabal/Cabal".
-    , pkgType :: PackageType -- ^ A library or a program.
+-- | A Haskell package.
+data Package = Package {
+    -- | The name of a Haskell package. Examples: @Cabal@, @ghc-bin@.
+    pkgName :: PackageName,
+    -- | The path to the package source code relative to the root of the build
+    -- system. For example, @libraries/Cabal/Cabal@ and @ghc@ are paths to the
+    -- @Cabal@ and @ghc-bin@ packages in GHC.
+    pkgPath :: FilePath,
+    -- | A library (e.g. @Cabal@) or a program (e.g. @ghc-bin@).
+    pkgType :: PackageType
     } deriving Generic
 
 -- TODO: Get rid of non-derived Show instances.
