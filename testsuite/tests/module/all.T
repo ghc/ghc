@@ -179,7 +179,7 @@ test('mod131', [extra_files(['Mod131_A.hs', 'Mod131_B.hs'])], multimod_compile_f
 
 test('mod132', [extra_files(['Mod132_A.hs', 'Mod132_B.hs'])], multimod_compile_fail, ['mod132', '-v0'])
 
-test('mod133', reqlib('mtl'), compile, [''])
+test('mod133', normal, compile, [''])
 test('mod134', normal, compile_fail, [''])
 test('mod135', normal, compile_fail, [''])
 test('mod136', [extra_files(['Mod136_A.hs'])], multimod_compile_fail, ['mod136', '-v0'])
@@ -264,7 +264,7 @@ test('mod179', [extra_files(['Mod179_A.hs'])], multimod_compile, ['mod179', '-v0
 test('mod180', [extra_files(['Mod180_A.hs', 'Mod180_B.hs'])], multimod_compile_fail, ['mod180', '-v0'])
 
 test('T1148', normal, compile, [''])
-test('T1074', reqlib('mtl'), compile, [''])
+test('T1074', normal, compile, [''])
 test('T1074a', normal, compile, [''])
 test('T2267', reqlib('utf8-string'), compile, [''])
 test('T414', normal, compile_fail, [''])

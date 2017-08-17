@@ -131,7 +131,7 @@ test('IndTypesPerf',
      ['$MAKE -s --no-print-directory IndTypesPerf'])
 
 test('T4120', normal, compile, [''])
-test('T3787', reqlib('mtl'), compile, [''])
+test('T3787', normal, compile, [''])
 test('T3826', normal, compile, [''])
 test('T4200', normal, compile, [''])
 test('T3851', normal, compile, [''])
