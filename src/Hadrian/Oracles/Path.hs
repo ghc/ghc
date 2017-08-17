@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.Path (
     lookupInPath, bashPath, fixAbsolutePathOnWindows, pathOracle
     ) where
@@ -39,9 +40,11 @@ fixAbsolutePathOnWindows path = do
 
 newtype LookupInPath = LookupInPath String
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult LookupInPath = String
 
 newtype WindowsPath = WindowsPath FilePath
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult WindowsPath = String
 
 -- | Oracles for looking up paths. These are slow and require caching.
 pathOracle :: Rules ()

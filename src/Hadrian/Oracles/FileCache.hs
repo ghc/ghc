@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module     : Hadrian.Oracles.FileCache
@@ -22,6 +23,7 @@ import Hadrian.Utilities
 
 newtype FileCache = FileCache FilePath
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult FileCache = String
 
 -- | Read a text file, caching and tracking the result. To read and track
 -- individual lines of the file, see "Hadrian.Oracles.KeyValue".

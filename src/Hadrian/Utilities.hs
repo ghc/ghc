@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module Hadrian.Utilities (
     -- * List manipulation
     fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll,
@@ -23,6 +24,9 @@ module Hadrian.Utilities (
     SuccessColour (..), putSuccess, ProgressInfo (..),
     putProgressInfo, renderAction, renderProgram, renderLibrary, renderBox,
     renderUnicorn,
+
+    -- * Shake compatibility
+    RuleResult,
 
     -- * Miscellaneous
     (<&>), (%%>),
@@ -155,6 +159,9 @@ buildRoot = do
 (<&>) = flip fmap
 
 infixl 1 <&>
+
+-- | Introduced in shake-0.16, so use to make the rest of the code compatible
+type family RuleResult a
 
 -- | Given a 'FilePath' to a source file, return 'True' if it is generated.
 -- The current implementation simply assumes that a file is generated if it

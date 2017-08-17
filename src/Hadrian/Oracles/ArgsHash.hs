@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.ArgsHash (
     TrackArgument, trackAllArguments, trackArgsHash, argsHashOracle
     ) where
@@ -8,6 +9,7 @@ import Development.Shake.Classes
 
 import Hadrian.Expression hiding (inputs, outputs)
 import Hadrian.Target
+import Hadrian.Utilities
 
 -- | 'TrackArgument' is used to specify the arguments that should be tracked by
 -- the @ArgsHash@ oracle. The safest option is to track all arguments, but some
@@ -38,6 +40,7 @@ trackArgsHash t = do
 
 newtype ArgsHash c b = ArgsHash (Target c b)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult (ArgsHash c b) = Int
 
 -- | This oracle stores per-target argument list hashes in the Shake database,
 -- allowing the user to track them between builds using 'trackArgsHash' queries.

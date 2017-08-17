@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module Oracles.ModuleFiles (
     decodeModule, encodeModule, findGenerator, hsSources, hsObjects, moduleFilesOracle
     ) where
@@ -11,9 +12,11 @@ import Oracles.PackageData
 
 newtype ModuleFiles = ModuleFiles (Stage, Package)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult ModuleFiles = [Maybe FilePath]
 
 newtype Generator = Generator (Stage, Package, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult Generator = Maybe FilePath
 
 -- | We scan for the following Haskell source extensions when looking for module
 -- files. Note, we do not list "*.(l)hs-boot" files here, as they can never

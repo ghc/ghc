@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.DirectoryContents (
     directoryContents, copyDirectoryContents, directoryContentsOracle,
     Match (..), matches, matchAll
@@ -46,6 +47,7 @@ copyDirectoryContents expr source target = do
 
 newtype DirectoryContents = DirectoryContents (Match, FilePath)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult DirectoryContents = [FilePath]
 
 -- | This oracle answers 'directoryContents' queries and tracks the results.
 directoryContentsOracle :: Rules ()

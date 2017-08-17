@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.KeyValue (
     lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupValues,
     lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, keyValueOracle
@@ -14,9 +15,11 @@ import Hadrian.Utilities
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult KeyValue = Maybe String
 
 newtype KeyValues = KeyValues (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult KeyValues = Maybe [String]
 
 -- | Lookup a value in a text file, tracking the result. Each line of the file
 -- is expected to have @key = value@ format.
