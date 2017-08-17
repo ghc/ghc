@@ -8315,6 +8315,45 @@ It is thus only possible to use this feature if you have provided a
 complete user-supplied kind signature
 for the datatype (:ref:`complete-kind-signatures`).
 
+Higher-rank kinds
+-----------------
+
+In concert with :ghc-flag:`-XRankNTypes`, GHC supports higher-rank kinds.
+Here is an example::
+
+  -- Heterogeneous propositional equality
+  data (a :: k1) :~~: (b :: k2) where
+    HRefl :: a :~~: a
+
+  class HTestEquality (t :: forall k. k -> Type) where
+    hTestEquality :: forall k1 k2 (a :: k1) (b :: k2). t a -> t b -> Maybe (a :~~: b)
+
+Note that ``hTestEquality`` takes two arguments where the type variable ``t`` is applied
+to types of different kinds. That type variable must then be polykinded. Accordingly,
+the kind of ``HTestEquality`` (the class) is ``(forall k. k -> Type) -> Constraint``,
+a higher-rank kind.
+
+A big difference with higher-rank kinds as compared with higher-rank types is that
+``forall``\s in kinds *cannot* be moved. This is best illustrated by example.
+Suppose we want to have an instance of ``HTestEquality`` for ``(:~~:)``. ::
+
+  instance HTestEquality ((:~~:) a) where
+    hTestEquality HRefl HRefl = Just HRefl
+
+With the declaration of ``(:~~:)`` above, it gets kind ``forall k1 k2. k1 -> k2 -> Type``.
+Thus, the type ``(:~~:) a`` has kind ``k2 -> Type`` for some ``k2``. GHC cannot
+then *regeneralize* this kind to become ``forall k2. k2 -> Type`` as desired. Thus, the
+instance is rejected as ill-kinded.
+
+To allow for such an instance, we would have to define ``(:~~:)`` as follows::
+
+  data (:~~:) :: forall k1. k1 -> forall k2. k2 -> Type where
+    HRefl :: a :~~: a
+
+In this redefinition, we give an explicit kind for ``(:~~:)``, deferring the choice
+of ``k2`` until after the first argument (``a``) has been given. With this declaration
+for ``(:~~:)``, the instance for ``HTestEquality`` is accepted.
+
 Constraints in kinds
 --------------------
 
