@@ -247,6 +247,8 @@ GHCi
 - Added support for :ghc-flag:`-XStaticPointers` in interpreted modules. Note, however,
   that ``static`` expressions are still not allowed in expressions evaluated in the REPL.
 
+- Added support for :ghci-cmd:`:type +d` and :ghci-cmd:`:type +v`. (:ghc-ticket:`11975`)
+
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
