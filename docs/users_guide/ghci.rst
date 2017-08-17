@@ -37,7 +37,7 @@ command ``ghci``:
 .. code-block:: none
 
     $ ghci
-    GHCi, version 8.0.1: http://www.haskell.org/ghc/  :? for help
+    GHCi, version 8.y.z: http://www.haskell.org/ghc/  :? for help
     Prelude>
 
 There may be a short pause while GHCi loads the prelude and standard
@@ -68,6 +68,15 @@ In Haskell, a ``let`` expression is followed by ``in``. However, in
 GHCi, since the expression can also be interpreted in the ``IO`` monad,
 a ``let`` binding with no accompanying ``in`` statement can be signalled
 by an empty line, as in the above example.
+
+Since GHC 8.0.1, you can bind values and functions to names without ``let`` statement:
+
+.. code-block:: none
+
+    Prelude> x = 42
+    Prelude> x
+    42
+    Prelude>
 
 .. _loading-source-files:
 
@@ -987,10 +996,10 @@ of type ``a``. eg.:
 
 .. code-block:: none
 
-    Prelude> Time.getClockTime
-    Wed Mar 14 12:23:13 GMT 2001
+    Prelude> Data.Time.getZonedTime
+    2017-04-10 12:34:56.93213581 UTC
     Prelude> print it
-    Wed Mar 14 12:23:13 GMT 2001
+    2017-04-10 12:34:56.93213581 UTC
 
 The corresponding translation for an IO-typed ``e`` is
 
@@ -1162,7 +1171,7 @@ printed value. Running GHCi with the command:
 
 .. code-block:: none
 
-    ghci -interactive-print=SpecPrinter.sprinter SpecPrinter
+    ghci -interactive-print=SpecPrinter.sprint SpecPrinter
 
 will start an interactive session where values with be printed using
 ``sprint``:
@@ -1971,7 +1980,7 @@ by using the :ghc-flag:`-package ⟨pkg⟩` flag:
 .. code-block:: none
 
     $ ghci -package readline
-    GHCi, version 6.8.1: http://www.haskell.org/ghc/  :? for help
+    GHCi, version 8.y.z: http://www.haskell.org/ghc/  :? for help
     Loading package base ... linking ... done.
     Loading package readline-1.0 ... linking ... done.
     Prelude>
@@ -2238,17 +2247,17 @@ commonly used commands.
 
     .. code-block:: none
 
-        Prelude> let date _ = Time.getClockTime >>= print >> return ""
+        Prelude> let date _ = Data.Time.getZonedTime >>= print >> return ""
         Prelude> :def date date
         Prelude> :date
-        Fri Mar 23 15:16:40 GMT 2001
+        2017-04-10 12:34:56.93213581 UTC
 
     Here's an example of a command that takes an argument. It's a
     re-implementation of :ghci-cmd:`:cd`:
 
     .. code-block:: none
 
-        Prelude> let mycd d = Directory.setCurrentDirectory d >> return ""
+        Prelude> let mycd d = System.Directory.setCurrentDirectory d >> return ""
         Prelude> :def mycd mycd
         Prelude> :mycd ..
 
@@ -2745,7 +2754,7 @@ commonly used commands.
 	*X> :type +v length
 	length :: forall (t :: * -> *). Foldable t => forall a. t a -> Int
 
-.. ghci-cmd:: :type +d ⟨expression⟩
+.. ghci-cmd:: :type +d; ⟨expression⟩
 
     Infers and prints the type of ⟨expression⟩, defaulting type variables
     if possible. In this mode, if the inferred type is constrained by
