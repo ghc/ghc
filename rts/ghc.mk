@@ -170,8 +170,12 @@ rts_$1_CMM_OBJS = $$(patsubst rts/%.cmm,rts/dist/build/%.$$($1_osuf),$$(rts_CMM_
 
 rts_$1_OBJS = $$(rts_$1_C_OBJS) $$(rts_$1_S_OBJS) $$(rts_$1_CMM_OBJS)
 
+ifneq "$$(findstring linux solaris2, $(TargetOS_CPP))" ""
+NEED_DTRACE_PROBES_OBJ = YES
+endif
+
 ifeq "$(USE_DTRACE)" "YES"
-ifeq "$(TargetOS_CPP)" "solaris2"
+ifeq "$(NEED_DTRACE_PROBES_OBJ)" "YES"
 # On Darwin we don't need to generate binary containing probes defined
 # in DTrace script, but DTrace on Solaris expects generation of binary
 # from the DTrace probes definitions
