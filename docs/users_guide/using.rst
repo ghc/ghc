@@ -636,8 +636,8 @@ messages and in GHCi:
     .. code-block:: none
 
         ghci> :set -fprint-unicode-syntax
-        ghci> :t (>>)
-        (>>) :: ∀ (m :: * → *) a b. Monad m ⇒ m a → m b → m b
+        ghci> :t +v (>>)
+        (>>) ∷ Monad m ⇒ ∀ a b. m a → m b → m b
 
 .. _pretty-printing-types:
 
