@@ -53,7 +53,7 @@ buildDynamicLib context@Context{..} = do
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
     let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgNameString package
-    libPrefix ++ "*" ++ (waySuffix way <.> "a") %> \a -> do
+    libPrefix ++ "*" ++ (waySuffix way <.> "a") %%> \a -> do
         objs <- libraryObjects context
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a

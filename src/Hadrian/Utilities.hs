@@ -25,7 +25,7 @@ module Hadrian.Utilities (
     renderUnicorn,
 
     -- * Miscellaneous
-    (<&>),
+    (<&>), (%%>),
 
     -- * Useful re-exports
     Dynamic, fromDynamic, toDyn, TypeRep, typeOf
@@ -115,6 +115,15 @@ a  -/- b
     | otherwise     = a ++ '/' : b
 
 infixr 6 -/-
+
+-- | Like Shake's '%>' but gives higher priority to longer patterns. Useful
+-- in situations when a family of build rules, e.g. @"//*.a"@ and @"//*_p.a"@
+-- can be matched by the same file, such as @library_p.a@. We break the tie
+-- by preferring longer matches, which correpond to longer patterns.
+(%%>) :: FilePattern -> (FilePath -> Action ()) -> Rules ()
+p %%> a = priority (fromIntegral (length p) + 1) $ p %> a
+
+infix 1 %%>
 
 -- | Insert a value into Shake's type-indexed map.
 insertExtra :: Typeable a => a -> HashMap TypeRep Dynamic -> HashMap TypeRep Dynamic

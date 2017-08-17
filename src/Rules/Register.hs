@@ -15,17 +15,15 @@ registerPackage rs context@Context {..} = do
         -- Packages @ghc-boot@ and @ghc-boot-th@ both match the @ghc-boot*@
         -- pattern, therefore we need to use priorities to match the right rule.
         -- TODO: Get rid of this hack.
-        priority (fromIntegral . length $ pkgNameString package) $
-            "//" ++ stage0PackageDbDir -/- pkgNameString package ++ "*.conf" %>
-                buildConf rs context
+        "//" ++ stage0PackageDbDir -/- pkgNameString package ++ "*.conf" %%>
+            buildConf rs context
 
         when (package == ghc) $ "//" ++ stage0PackageDbDir -/- packageDbStamp %>
             buildStamp rs context
 
     when (stage == Stage1) $ do
-        priority (fromIntegral . length $ pkgNameString package) $
-            inplacePackageDbPath -/- pkgNameString package ++ "*.conf" %>
-                buildConf rs context
+        inplacePackageDbPath -/- pkgNameString package ++ "*.conf" %%>
+            buildConf rs context
 
         when (package == ghc) $ inplacePackageDbPath -/- packageDbStamp %>
             buildStamp rs context
