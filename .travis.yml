@@ -74,8 +74,7 @@ install:
 
     # Install all Hadrian and GHC build dependencies
     - cabal update
-    - cabal install alex happy ansi-terminal mtl shake quickcheck
-
+    - cabal install alex happy
 
     # Travis has already cloned Hadrian into ./ and we need to move it
     # to ./ghc/hadrian -- one way to do it is to move the .git directory
