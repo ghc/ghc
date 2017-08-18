@@ -1,7 +1,7 @@
 module Hadrian.Haskell.Package (
-    Package (..), PackageName (..), PackageType (..),
+    Package, PackageName (..), PackageType (..),
     -- * Queries
-    pkgNameString, pkgCabalFile,
+    pkgName, pkgPath, pkgType, pkgNameString, pkgCabalFile,
     -- * Helpers for constructing and using 'Package's
     setPath, topLevel, library, utility, setType, isLibrary, isProgram
     ) where

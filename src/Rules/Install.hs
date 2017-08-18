@@ -181,7 +181,7 @@ installPackages = do
 
     installLibPkgs <- topsortPackages (filter isLibrary activePackages)
 
-    forM_ installLibPkgs $ \pkg@Package{..} -> do
+    forM_ installLibPkgs $ \pkg -> do
         when (isLibrary pkg) $
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
@@ -211,7 +211,7 @@ installPackages = do
 
                 pref <- setting InstallPrefix
                 unit $ cmd ghcCabalInplace [ "copy"
-                                           , pkgPath
+                                           , pkgPath pkg
                                            , installDistDir
                                            , strip
                                            , destDir
@@ -228,7 +228,7 @@ installPackages = do
                                    , installedPackageConf, "update"
                                    , confPath ]
 
-    forM_ installLibPkgs $ \pkg@Package{..} -> do
+    forM_ installLibPkgs $ \pkg -> do
         when (isLibrary pkg) $
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
@@ -241,7 +241,7 @@ installPackages = do
                 r      <- relocatableBuild
                 unit $ cmd ghcCabalInplace
                     [ "register"
-                    , pkgPath
+                    , pkgPath pkg
                     , installDistDir
                     , installedGhcReal
                     , installedGhcPkgReal
