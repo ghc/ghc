@@ -1,11 +1,26 @@
-module Settings.Packages.Rts (rtsPackageArgs, rtsLibffiLibrary) where
+module Settings.Packages.Rts (
+    rtsContext, rtsBuildPath, rtsConfIn, rtsPackageArgs, rtsLibffiLibrary
+    ) where
 
 import Base
+import Context (buildPath)
 import Expression
 import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings
+
+-- | RTS is considered a Stage1 package. This determines RTS build directory.
+rtsContext :: Context
+rtsContext = vanillaContext Stage1 rts
+
+-- | Path to the RTS build directory.
+rtsBuildPath :: Action FilePath
+rtsBuildPath = buildPath rtsContext
+
+-- | Path to RTS package configuration file, to be processed by HsCpp.
+rtsConfIn :: FilePath
+rtsConfIn = pkgPath rts -/- "package.conf.in"
 
 rtsLibffiLibraryName :: Action FilePath
 rtsLibffiLibraryName = do

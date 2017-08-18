@@ -11,6 +11,7 @@ import Oracles.PackageData
 import Oracles.Setting
 import Rules.Wrappers
 import Settings
+import Settings.Packages.Rts
 import Target
 import Utilities
 

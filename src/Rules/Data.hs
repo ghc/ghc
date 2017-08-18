@@ -6,6 +6,7 @@ import Expression
 import GHC
 import Oracles.Setting
 import Rules.Generate
+import Settings.Packages.Rts
 import Target
 import Utilities
 

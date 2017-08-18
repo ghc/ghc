@@ -14,6 +14,7 @@ import Oracles.Setting
 import Rules.Gmp
 import Rules.Libffi
 import Settings
+import Settings.Packages.Rts
 import Target
 import Utilities
 
