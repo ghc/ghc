@@ -2,7 +2,7 @@ sudo: true
 matrix:
     include:
         - os: linux
-          env: MODE="--flavour=quickest --integer-simple"
+          env: MODE="--flavour=quickest inplace/bin/ghc-stage1"
           compiler: "GHC 8.0.2"
           addons:
               apt:
@@ -28,7 +28,7 @@ matrix:
               - inplace/bin/ghc-stage2 -e 1+2
 
         - os: linux
-          env: MODE="--flavour=quickest"
+          env: MODE="--flavour=quickest --integer-simple"
           compiler: "GHC 8.2.1"
           addons:
               apt:
@@ -55,7 +55,7 @@ matrix:
 
         - os: osx
           osx_image: xcode8
-          env: MODE="--flavour=quickest --integer-simple"
+          env: MODE="--flavour=quickest --integer-simple inplace/bin/ghc-stage1"
           before_install:
               - brew update
               - brew install ghc cabal-install
@@ -63,7 +63,7 @@ matrix:
           script:
               # Due to timeout limit of OS X build on Travis CI,
               # we will ignore selftest and build only stage1
-              - ./build.cabal.sh -j $MODE --verbose --no-progress --progress-colour=never --progress-info=brief --profile=- inplace/bin/ghc-stage1
+              - ./build.cabal.sh -j $MODE --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
 
 install:
     # Add Cabal to PATH
