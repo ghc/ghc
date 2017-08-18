@@ -116,7 +116,10 @@ stage0Packages = do
            , hp2ps
            , hpc
            , mkUserGuidePart
+           , mtl
+           , parsec
            , templateHaskell
+           , text
            , transformers
            , unlit                       ] ++
            [ terminfo | not win, not ios ] ++
