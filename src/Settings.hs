@@ -46,7 +46,7 @@ flavour = do
     return $ fromMaybe unknownFlavour $ find ((== flavourName) . name) flavours
 
 integerLibraryName :: Action String
-integerLibraryName = pkgNameString <$> (integerLibrary =<< flavour)
+integerLibraryName = pkgName <$> (integerLibrary =<< flavour)
 
 programContext :: Stage -> Package -> Action Context
 programContext stage pkg = do
@@ -62,7 +62,7 @@ knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 
 -- TODO: Speed up? Switch to Set?
 -- Note: this is slow but we keep it simple as there are just ~50 packages
-findKnownPackage :: PackageName -> Maybe Package
+findKnownPackage :: String -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
 
 -- | Determine the location of a 'Builder'.

@@ -62,7 +62,7 @@ generatePackageData context@Context {..} file = do
     genPath <- buildRoot <&> (-/- generatedDir)
     let pkgKey = if isLibrary package then "COMPONENT_ID = " else "PROGNAME = "
     writeFileChanged file . unlines $
-        [ pkgKey ++ pkgNameString package                                   ] ++
+        [ pkgKey ++ pkgName package                                         ] ++
         [ "S_SRCS = "   ++ unwords asmSrcs                                  ] ++
         [ "C_SRCS = "   ++ unwords cSrcs                                    ] ++
         [ "CMM_SRCS = " ++ unwords cmmSrcs                                  ] ++

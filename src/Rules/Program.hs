@@ -83,7 +83,7 @@ buildWrapper context@Context {..} wrapper wrapperPath wrapped = do
     writeFileChanged wrapperPath contents
     makeExecutable wrapperPath
     putSuccess $ "| Successfully created wrapper for " ++
-        quote (pkgNameString package) ++ " (" ++ show stage ++ ")."
+        quote (pkgName package) ++ " (" ++ show stage ++ ")."
 
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
 buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
@@ -106,6 +106,6 @@ buildBinary rs context@Context {..} bin = do
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
     synopsis <- interpretInContext context $ getPkgData Synopsis
     putSuccess $ renderProgram
-        (quote (pkgNameString package) ++ " (" ++ show stage ++ ").")
+        (quote (pkgName package) ++ " (" ++ show stage ++ ").")
         bin
         (dropWhileEnd isPunctuation synopsis)

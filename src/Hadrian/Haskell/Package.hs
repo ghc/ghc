@@ -1,41 +1,52 @@
+-----------------------------------------------------------------------------
+-- |
+-- Module     : Hadrian.Haskell.Package
+-- Copyright  : (c) Andrey Mokhov 2014-2017
+-- License    : MIT (see the file LICENSE)
+-- Maintainer : andrey.mokhov@gmail.com
+-- Stability  : experimental
+--
+-- Haskell packages and operations on them.
+-----------------------------------------------------------------------------
 module Hadrian.Haskell.Package (
-    Package, PackageName (..), PackageType (..),
-    -- * Queries
-    pkgName, pkgPath, pkgType, pkgNameString, pkgCabalFile,
-    -- * Helpers for constructing and using 'Package's
-    setPath, topLevel, library, utility, setType, isLibrary, isProgram
+    -- * Data type
+    Package,
+
+    -- * Construction and properties
+    library, program, pkgName, pkgPath, isLibrary, isProgram,
+
+    -- * Package directory structure
+    pkgCabalFile
     ) where
 
-import Data.String
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import GHC.Generics
 import Hadrian.Utilities
 
--- | The name of a Haskell package.
-newtype PackageName = PackageName { fromPackageName :: String }
-    deriving (Binary, Eq, Generic, Hashable, IsString, NFData, Ord, Typeable)
-
 -- TODO: Make PackageType more precise, #12.
--- | We regard packages as either being libraries or programs. This is a bit of
--- a convenient lie as Haskell packages can be both, but it works for now.
-data PackageType = Library | Program deriving Generic
+data PackageType = Library | Program deriving (Generic, Show)
 
--- | A Haskell package.
-data Package = Package {
-    -- | The name of a Haskell package. Examples: @Cabal@, @ghc-bin@.
-    pkgName :: PackageName,
-    -- | The path to the package source code relative to the root of the build
-    -- system. For example, @libraries/Cabal/Cabal@ and @ghc@ are paths to the
-    -- @Cabal@ and @ghc-bin@ packages in GHC.
-    pkgPath :: FilePath,
-    -- | A library (e.g. @Cabal@) or a program (e.g. @ghc-bin@).
-    pkgType :: PackageType
-    } deriving Generic
+-- | A Haskell package. The current implementation treats a package as either
+-- a library or a program, which is a gross oversimplification as Haskell
+-- packages can be both. This works for now, but in future we plan to support
+-- general Haskell packages. Also note that we assume that all packages have
+-- different names, hence two packages with the same name are considered equal.
+data Package = Package PackageType String FilePath deriving Generic
 
--- TODO: Get rid of non-derived Show instances.
+-- | The name of a Haskell package. Examples: @Cabal@, @ghc-bin@.
+pkgName :: Package -> String
+pkgName (Package _ name _) = name
+
+-- | The path to the package source code relative to the root of the build
+-- system. For example, @libraries/Cabal/Cabal@ and @ghc@ are paths to the
+-- @Cabal@ and @ghc-bin@ packages in GHC.
+pkgPath :: Package -> FilePath
+pkgPath (Package _ _ path) = path
+
 instance Show Package where
-    show = pkgNameString
+    show (Package Library n p) = "library " ++ show n ++ " " ++ show p
+    show (Package Program n p) = "program " ++ show n ++ " " ++ show p
 
 instance Eq Package where
     p == q = pkgName p == pkgName q
@@ -51,40 +62,24 @@ instance Binary   PackageType
 instance Hashable PackageType
 instance NFData   PackageType
 
--- | Prettyprint 'Package' name.
-pkgNameString :: Package -> String
-pkgNameString = fromPackageName . pkgName
+-- | Construct a library package.
+library :: String -> FilePath -> Package
+library = Package Library
 
--- | Relative path to cabal file, e.g.: "libraries/Cabal/Cabal/Cabal.cabal"
+-- | Construct a program package.
+program :: String -> FilePath -> Package
+program = Package Program
+
+-- | The path to a package cabal file, e.g.: @ghc/ghc-bin.cabal@.
 pkgCabalFile :: Package -> FilePath
-pkgCabalFile pkg = pkgPath pkg -/- pkgNameString pkg <.> "cabal"
-
--- | Smart constructor for a top-level package, e.g. 'compiler'.
-topLevel :: PackageName -> Package
-topLevel name = Package name (fromPackageName name) Library
-
--- | Smart constructor for a library package, e.g. 'array'.
-library :: PackageName -> Package
-library name = Package name ("libraries" -/- fromPackageName name) Library
-
--- | Smart constructor for a utility package, e.g. 'haddock'.
-utility :: PackageName -> Package
-utility name = Package name ("utils" -/- fromPackageName name) Program
-
--- | Amend package path. Useful when a package name doesn't match its path.
-setPath :: Package -> FilePath -> Package
-setPath pkg path = pkg { pkgPath = path }
-
--- | Amend package type.
-setType :: Package -> PackageType -> Package
-setType pkg ty = pkg { pkgType = ty }
+pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
 
 -- | Check whether a package is a library.
 isLibrary :: Package -> Bool
-isLibrary (Package _ _ Library) = True
+isLibrary (Package Library _ _) = True
 isLibrary _ = False
 
 -- | Check whether a package is a program.
 isProgram :: Package -> Bool
-isProgram (Package _ _ Program) = True
+isProgram (Package Program _ _) = True
 isProgram _ = False

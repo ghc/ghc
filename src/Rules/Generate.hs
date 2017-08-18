@@ -275,7 +275,7 @@ generateConfigHs = do
     let cIntegerLibraryType
             | intLib == integerGmp    = "IntegerGMP"
             | intLib == integerSimple = "IntegerSimple"
-            | otherwise = error $ "Unknown integer library: " ++ pkgNameString intLib
+            | otherwise = error $ "Unknown integer library: " ++ pkgName intLib
     cSupportsSplitObjs         <- expr $ yesNo <$> supportsSplitObjects
     cGhcWithInterpreter        <- expr $ yesNo <$> ghcWithInterpreter
     cGhcWithNativeCodeGen      <- expr $ yesNo <$> ghcWithNativeCodeGen
@@ -323,7 +323,7 @@ generateConfigHs = do
         , "cStage                :: String"
         , "cStage                = show (STAGE :: Int)"
         , "cIntegerLibrary       :: String"
-        , "cIntegerLibrary       = " ++ show (pkgNameString intLib)
+        , "cIntegerLibrary       = " ++ show (pkgName intLib)
         , "cIntegerLibraryType   :: IntegerLibrary"
         , "cIntegerLibraryType   = " ++ cIntegerLibraryType
         , "cSupportsSplitObjs    :: String"

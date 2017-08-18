@@ -109,7 +109,6 @@ executable hadrian
                        , ScopedTypeVariables
                        , TupleSections
     other-extensions:    MultiParamTypeClasses
-                       , OverloadedStrings
                        , TypeFamilies
     build-depends:       base >= 4.8 && < 5
                        , ansi-terminal        == 0.6.*

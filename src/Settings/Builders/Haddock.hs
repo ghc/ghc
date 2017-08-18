@@ -31,7 +31,7 @@ haddockBuilderArgs = builder Haddock ? do
         , arg $ "--dump-interface=" ++ output
         , arg "--html"
         , arg "--hoogle"
-        , arg $ "--title=" ++ pkgNameString pkg ++ "-" ++ version ++ ": " ++ synopsis
+        , arg $ "--title=" ++ pkgName pkg ++ "-" ++ version ++ ": " ++ synopsis
         , arg $ "--prologue=" ++ path -/- "haddock-prologue.txt"
         , arg $ "--optghc=-D__HADDOCK_VERSION__=" ++ show (versionToInt hVersion)
         , map ("--hide=" ++) <$> getPkgDataList HiddenModules

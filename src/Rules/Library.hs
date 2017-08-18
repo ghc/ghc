@@ -37,7 +37,7 @@ libraryObjects context@Context{..} = do
 
 buildDynamicLib :: Context -> Rules ()
 buildDynamicLib context@Context{..} = do
-    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgNameString package
+    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgName package
     -- OS X
     libPrefix ++ "*.dylib" %> buildDynamicLibUnix
     -- Linux
@@ -52,7 +52,7 @@ buildDynamicLib context@Context{..} = do
 
 buildPackageLibrary :: Context -> Rules ()
 buildPackageLibrary context@Context {..} = do
-    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgNameString package
+    let libPrefix = "//" ++ contextDir context -/- "libHS" ++ pkgName package
     libPrefix ++ "*" ++ (waySuffix way <.> "a") %%> \a -> do
         objs <- libraryObjects context
         asuf <- libsuf way
@@ -63,12 +63,12 @@ buildPackageLibrary context@Context {..} = do
 
         synopsis <- interpretInContext context $ getPkgData Synopsis
         unless isLib0 . putSuccess $ renderLibrary
-            (quote (pkgNameString package) ++ " (" ++ show stage ++ ", way "
+            (quote (pkgName package) ++ " (" ++ show stage ++ ", way "
             ++ show way ++ ").") a (dropWhileEnd isPunctuation synopsis)
 
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do
-    let libPrefix = "//" ++ contextDir context -/- "HS" ++ pkgNameString package
+    let libPrefix = "//" ++ contextDir context -/- "HS" ++ pkgName package
     libPrefix ++ "*" ++ (waySuffix way <.> "o") %> \obj -> do
         objs <- allObjects context
         need objs

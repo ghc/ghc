@@ -281,9 +281,8 @@ installLibsTo libs dir = do
            ".a" -> do
                let out = dir -/- takeFileName lib
                installData [out] dir
-               let context = vanillaContext Stage0 $ topLevel (PackageName "")
                -- TODO: Get rid of meaningless context for certain builder like ranlib
-               build $ target context Ranlib [out] [out]
+               build $ target (stageContext Stage0) Ranlib [out] [out]
            _ -> installData [lib] dir
 
 -- ref: includes/ghc.mk

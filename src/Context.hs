@@ -24,7 +24,7 @@ data Context = Context
     { stage   :: Stage   -- ^ Currently build Stage
     , package :: Package -- ^ Currently build Package
     , way     :: Way     -- ^ Currently build Way (usually 'vanilla')
-    } deriving (Show, Eq, Generic)
+    } deriving (Eq, Generic, Show)
 
 instance Binary   Context
 instance Hashable Context
@@ -96,7 +96,7 @@ pkgSetupConfigFile context = do
 pkgHaddockFile :: Context -> Action FilePath
 pkgHaddockFile context@Context {..} = do
     path <- buildPath context
-    let name = pkgNameString package
+    let name = pkgName package
     return $ path -/- "doc/html" -/- name -/- name <.> "haddock"
 
 -- | Path to the library file of a given 'Context', e.g.:

@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 module GHC (
     -- * GHC packages
@@ -30,9 +29,9 @@ import Oracles.Setting
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
--- package 'win32' is built only on Windows.
--- "Packages" defines default conditions for building each package, which can
--- be overridden in @hadrian/src/UserSettings.hs@.
+-- package 'win32' is built only on Windows. "Settings.Default" defines default
+-- conditions for building each package, which can be overridden in
+-- @hadrian/src/UserSettings.hs@.
 defaultKnownPackages :: [Package]
 defaultKnownPackages =
     [ array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes
@@ -45,59 +44,80 @@ defaultKnownPackages =
     , xhtml ]
 
 -- | Package definitions, see 'Package'.
-array               = library  "array"
-base                = library  "base"
-binary              = library  "binary"
-bytestring          = library  "bytestring"
-cabal               = library  "Cabal"        `setPath` "libraries/Cabal/Cabal"
-checkApiAnnotations = utility  "check-api-annotations"
-compareSizes        = utility  "compareSizes" `setPath` "utils/compare_sizes"
-compiler            = topLevel "ghc"          `setPath` "compiler"
-containers          = library  "containers"
-deepseq             = library  "deepseq"
-deriveConstants     = utility  "deriveConstants"
-directory           = library  "directory"
-dllSplit            = utility  "dll-split"
-filepath            = library  "filepath"
-genapply            = utility  "genapply"
-genprimopcode       = utility  "genprimopcode"
-ghc                 = topLevel "ghc-bin"      `setPath` "ghc"   `setType` Program
-ghcBoot             = library  "ghc-boot"
-ghcBootTh           = library  "ghc-boot-th"
-ghcCabal            = utility  "ghc-cabal"
-ghcCompact          = library  "ghc-compact"
-ghci                = library  "ghci"
-ghcPkg              = utility  "ghc-pkg"
-ghcPrim             = library  "ghc-prim"
-ghcTags             = utility  "ghctags"
-ghcSplit            = utility  "ghc-split"
-haddock             = utility  "haddock"
-haskeline           = library  "haskeline"
-hsc2hs              = utility  "hsc2hs"
-hp2ps               = utility  "hp2ps"
-hpc                 = library  "hpc"
-hpcBin              = utility  "hpc-bin"      `setPath` "utils/hpc"
-integerGmp          = library  "integer-gmp"
-integerSimple       = library  "integer-simple"
-iservBin            = topLevel "iserv-bin"    `setPath` "iserv" `setType` Program
-libffi              = topLevel "libffi"
-mkUserGuidePart     = utility  "mkUserGuidePart"
-parallel            = library  "parallel"
-pretty              = library  "pretty"
-primitive           = library  "primitive"
-process             = library  "process"
-rts                 = topLevel "rts"
-runGhc              = utility  "runghc"
-stm                 = library  "stm"
-templateHaskell     = library  "template-haskell"
-terminfo            = library  "terminfo"
-time                = library  "time"
-touchy              = utility  "touchy"
-transformers        = library  "transformers"
-unlit               = utility  "unlit"
-unix                = library  "unix"
-win32               = library  "Win32"
-xhtml               = library  "xhtml"
+array               = lib  "array"
+base                = lib  "base"
+binary              = lib  "binary"
+bytestring          = lib  "bytestring"
+cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
+checkApiAnnotations = util "check-api-annotations"
+compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
+compiler            = top  "ghc"             `setPath` "compiler"
+containers          = lib  "containers"
+deepseq             = lib  "deepseq"
+deriveConstants     = util "deriveConstants"
+directory           = lib  "directory"
+dllSplit            = util "dll-split"
+filepath            = lib  "filepath"
+genapply            = util "genapply"
+genprimopcode       = util "genprimopcode"
+ghc                 = prg  "ghc-bin"         `setPath` "ghc"
+ghcBoot             = lib  "ghc-boot"
+ghcBootTh           = lib  "ghc-boot-th"
+ghcCabal            = util "ghc-cabal"
+ghcCompact          = lib  "ghc-compact"
+ghci                = lib  "ghci"
+ghcPkg              = util "ghc-pkg"
+ghcPrim             = lib  "ghc-prim"
+ghcTags             = util "ghctags"
+ghcSplit            = util "ghc-split"
+haddock             = util "haddock"
+haskeline           = lib  "haskeline"
+hsc2hs              = util "hsc2hs"
+hp2ps               = util "hp2ps"
+hpc                 = lib  "hpc"
+hpcBin              = util "hpc-bin"         `setPath` "utils/hpc"
+integerGmp          = lib  "integer-gmp"
+integerSimple       = lib  "integer-simple"
+iservBin            = prg  "iserv-bin"       `setPath` "iserv"
+libffi              = top  "libffi"
+mkUserGuidePart     = util "mkUserGuidePart"
+parallel            = lib  "parallel"
+pretty              = lib  "pretty"
+primitive           = lib  "primitive"
+process             = lib  "process"
+rts                 = top  "rts"
+runGhc              = util "runghc"
+stm                 = lib  "stm"
+templateHaskell     = lib  "template-haskell"
+terminfo            = lib  "terminfo"
+time                = lib  "time"
+touchy              = util "touchy"
+transformers        = lib  "transformers"
+unlit               = util "unlit"
+unix                = lib  "unix"
+win32               = lib  "Win32"
+xhtml               = lib  "xhtml"
+
+-- | Construct a library package, e.g. @array@.
+lib :: String -> Package
+lib name = library name ("libraries" -/- name)
+
+-- | Construct a top-level library package, e.g. @compiler@.
+top :: String -> Package
+top name = library name name
+
+-- | Construct a top-level program package, e.g. @ghc@.
+prg :: String -> Package
+prg name = program name name
+
+-- | Construct a utility package, e.g. @haddock@.
+util :: String -> Package
+util name = program name ("utils" -/- name)
+
+-- | Amend a package path if it doesn't conform to a typical pattern.
+setPath :: Package -> FilePath -> Package
+setPath pkg path | isLibrary pkg = library (pkgName pkg) path
+                 | otherwise     = program (pkgName pkg) path
 
 -- | Some builders are built by this very build system, in which case
 -- 'builderProvenance' returns the corresponding build 'Context' (which includes
@@ -168,7 +188,7 @@ programName Context {..}
     | package == hpcBin   = "hpc"
     | package == runGhc   = "runhaskell"
     | package == iservBin = "ghc-iserv"
-    | otherwise           = pkgNameString package
+    | otherwise           = pkgName package
 
 -- | Some contexts are special: their packages do not have @.cabal@ metadata or
 -- we cannot run @ghc-cabal@ on them, e.g. because the latter hasn't been built
@@ -188,7 +208,7 @@ autogenPath context@Context {..}
     | package == ghc      = autogen "build/ghc"
     | package == hpcBin   = autogen "build/hpc"
     | package == iservBin = autogen "build/iserv"
-    | otherwise           = autogen $ "build" -/- pkgNameString package
+    | otherwise           = autogen $ "build" -/- pkgName package
   where
     autogen dir = buildPath context <&> (-/- dir -/- "autogen")
 
