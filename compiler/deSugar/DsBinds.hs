@@ -356,7 +356,8 @@ dsAbsBinds dflags tyvars dicts exports
 makeCorePair :: DynFlags -> Id -> Bool -> Arity -> CoreExpr
              -> (Id, CoreExpr)
 makeCorePair dflags gbl_id is_default_method dict_arity rhs
-  | is_default_method                 -- Default methods are *always* inlined
+  | is_default_method    -- Default methods are *always* inlined
+                         -- See Note [INLINE and default methods] in TcInstDcls
   = (gbl_id `setIdUnfolding` mkCompulsoryUnfolding rhs, rhs)
 
   | otherwise
