@@ -104,7 +104,7 @@ _darcs/
 /docs/index.html
 /docs/users_guide/users_guide
 /docs/users_guide/ghc.1
-/docs/users_guide/*.gen.rst
+/docs/users_guide/flags.pyc
 /docs/users_guide/ghc_config.py
 /docs/users_guide/ghc_config.pyc
 /docs/users_guide/users_guide.pdf

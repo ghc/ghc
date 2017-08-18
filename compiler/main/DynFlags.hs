@@ -4338,6 +4338,7 @@ disableGlasgowExts :: DynP ()
 disableGlasgowExts = do unSetGeneralFlag Opt_PrintExplicitForalls
                         mapM_ unSetExtensionFlag glasgowExtsFlags
 
+-- Please keep what_glasgow_exts_does.rst up to date with this list
 glasgowExtsFlags :: [LangExt.Extension]
 glasgowExtsFlags = [
              LangExt.ConstrainedClassMethods

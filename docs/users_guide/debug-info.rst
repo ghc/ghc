@@ -7,6 +7,11 @@ useable by most UNIX debugging tools.
 
 .. ghc-flag:: -g
               -g⟨n⟩
+    :shortdesc: Produce DWARF debug information in compiled object files.
+        ⟨n⟩ can be 0, 1, or 2, with higher numbers producing richer
+        output. If ⟨n⟩ is omitted level 2 is assumed.
+    :type: dynamic
+    :category: debugging
 
     :since: 7.10, numeric levels since 8.0
 

@@ -1,0 +1,33 @@
+.. hlist::
+
+ * ``-XConstrainedClassMethods``
+ * ``-XDeriveDataTypeable``
+ * ``-XDeriveFoldable``
+ * ``-XDeriveFunctor``
+ * ``-XDeriveGeneric``
+ * ``-XDeriveTraversable``
+ * ``-XEmptyDataDecls``
+ * ``-XExistentialQuantification``
+ * ``-XExplicitNamespaces``
+ * ``-XFlexibleContexts``
+ * ``-XFlexibleInstances``
+ * ``-XForeignFunctionInterface``
+ * ``-XFunctionalDependencies``
+ * ``-XGeneralizedNewtypeDeriving``
+ * ``-XImplicitParams``
+ * ``-XKindSignatures``
+ * ``-XLiberalTypeSynonyms``
+ * ``-XMagicHash``
+ * ``-XMultiParamTypeClasses``
+ * ``-XParallelListComp``
+ * ``-XPatternGuards``
+ * ``-XPostfixOperators``
+ * ``-XRankNTypes``
+ * ``-XRecursiveDo``
+ * ``-XScopedTypeVariables``
+ * ``-XStandaloneDeriving``
+ * ``-XTypeOperators``
+ * ``-XTypeSynonymInstances``
+ * ``-XUnboxedTuples``
+ * ``-XUnicodeSyntax``
+ * ``-XUnliftedFFITypes``

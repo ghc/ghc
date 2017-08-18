@@ -347,11 +347,29 @@ Will be rendered as,
 
        Sets the context switch interval to ⟨s⟩ seconds.
 
-and will have an associated index entry generated automatically. Note that, as
-in Style Conventions below, we use ``⟨⟩`` instead of less-than/greater-than
-signs. To reference a ``ghc-flag`` or ``rts-flag``, you must match the
-definition exactly, including the arguments. A quick way to find the exact
-names and special characters is,
+and will have an associated index entry generated automatically.
+
+The ``ghc-flag`` directive requires a few extra parameters to be passed.
+This extra information is used to generate the :ref:`flag-reference` and the
+man page. A ``ghc-flag`` directive looks like this,
+
+.. code-block:: rest
+
+    .. ghc-flag:: -fasm
+        :shortdesc: Use the native code generator
+        :type: dynamic
+        :reverse: -fllvm
+        :category: codegen
+
+        Regular description...
+
+When rendered, the extra parameters will be hidden, and the data stored for
+later use. For more details, see the Sphinx extension ``flags.py``.
+
+Note that, as in Style Conventions below, we use ``⟨⟩`` instead of
+less-than/greater-than signs. To reference a ``ghc-flag`` or ``rts-flag``, you
+must match the definition exactly, including the arguments. A quick way to find
+the exact names and special characters is,
 
 .. code-block:: sh
     

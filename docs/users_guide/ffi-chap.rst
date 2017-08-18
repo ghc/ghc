@@ -8,6 +8,12 @@ Foreign function interface (FFI)
    single: interfacing with native code
 
 .. ghc-flag:: -XForeignFunctionInterface
+    :shortdesc: Enable :ref:`foreign function interface <ffi>`.
+    :type: dynamic
+    :reverse: -XNoForeignFunctionInterface
+    :category: language
+
+    :since: 6.8.1
 
     Allow use of the Haskell foreign function interface.
 
@@ -118,6 +124,14 @@ come with GHC. For more details see the
 Interruptible foreign calls
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+.. ghc-flag:: -XInterruptibleFFI
+    :shortdesc: Enable interruptible FFI.
+    :type: dynamic
+    :reverse: -XNoInterruptibleFFI
+    :category: language
+
+    :since: 7.2.1
+
 This concerns the interaction of foreign calls with
 ``Control.Concurrent.throwTo``. Normally when the target of a
 ``throwTo`` is involved in a foreign call, the exception is not raised
@@ -166,6 +180,14 @@ it is not typically necessary to handle ``ERROR_OPERATION_ABORTED``.
 
 The CAPI calling convention
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. ghc-flag:: -XCApiFFI
+    :shortdesc: Enable :ref:`the CAPI calling convention <ffi-capi>`.
+    :type: dynamic
+    :reverse: -XNoCAPIFFI
+    :category: language
+
+    :since: 7.10.1
 
 The ``CApiFFI`` extension allows a calling convention of ``capi`` to be
 used in foreign declarations, e.g. ::

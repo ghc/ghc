@@ -434,6 +434,10 @@ The statement ``x <- return 42`` means “execute ``return 42`` in the
 future statements, for example to print it as we did above.
 
 .. ghc-flag:: -fprint-bind-result
+    :shortdesc: :ref:`Turn on printing of binding results in GHCi <ghci-stmts>`
+    :type: dynamic
+    :reverse: -fno-print-bind-result
+    :category:
 
     If :ghc-flag:`-fprint-bind-result` is set then GHCi will print the result of a
     statement if and only if:
@@ -1020,6 +1024,14 @@ Type defaulting in GHCi
    single: Show class
 
 .. ghc-flag:: -XExtendedDefaultRules
+    :shortdesc: Use GHCi's
+        :ref:`extended default rules <extended-default-rules>` in a normal
+        module.
+    :type: dynamic
+    :reverse: -XNoExtendedDefaultRules
+    :category: language
+
+    :since: 6.8.1
 
     Allow defaulting to take place for more than just numeric classes.
 
@@ -1155,6 +1167,10 @@ it survive a :ghci-cmd:`:cd`, :ghci-cmd:`:add`, :ghci-cmd:`:load`,
 :ghci-cmd:`:reload` or, :ghci-cmd:`:set`.
 
 .. ghc-flag:: -interactive-print ⟨expr⟩
+    :shortdesc: :ref:`Select the function to use for printing evaluated
+        expressions in GHCi <ghci-interactive-print>`
+    :type: dynamic
+    :category:
 
     Set the function used by GHCi to print evaluation results. Expression
     must be of type ``C a => a -> IO ()``.
@@ -1744,6 +1760,10 @@ is we found that logging each breakpoint in the history cuts performance
 by a factor of 2 or more.
 
 .. ghc-flag:: -fghci-hist-size=⟨n⟩
+    :shortdesc: Set the number of entries GHCi keeps for ``:history``.
+        See :ref:`ghci-debugger`.
+    :type: dynamic
+    :category:
 
     :default: 50
 
@@ -1808,12 +1828,26 @@ program was doing when it was in an infinite loop. Just hit Control-C,
 and examine the history to find out what was going on.
 
 .. ghc-flag:: -fbreak-on-exception
-              -fbreak-on-error
+    :shortdesc: :ref:`Break on any exception thrown <ghci-debugger-exceptions>`
+    :type: dynamic
+    :reverse: -fno-break-on-exception
+    :category:
 
     Causes GHCi to halt evaluation and return to the interactive prompt
-    in the event of an exception. While :ghc-flag:`-fbreak-on-exception` breaks
-    on all exceptions, :ghc-flag:`-fbreak-on-error` breaks on only those which
-    would otherwise be uncaught.
+    in the event of an exception. :ghc-flag:`-fbreak-on-exception` breaks
+    on all exceptions.
+
+.. ghc-flag:: -fbreak-on-error
+    :shortdesc: :ref:`Break on uncaught exceptions and errors
+        <ghci-debugger-exceptions>`
+    :type: dynamic
+    :reverse: -fno-break-on-error
+    :category:
+
+    Causes GHCi to halt evaluation and return to the interactive prompt in the
+    event of an exception.  :ghc-flag:`-fbreak-on-error` breaks on only those
+    exceptions which would otherwise be uncaught.
+
 
 Example: inspecting functions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -1954,15 +1988,20 @@ also make sense in interactive mode. The ones that don't make sense are
 mostly obvious.
 
 .. ghc-flag:: -flocal-ghci-history
+    :shortdesc: Use current directory for the GHCi command history
+        file ``.ghci-history``.
+    :type: dynamic
+    :reverse: -fno-local-ghci-history
+    :category:
 
-  By default, GHCi keeps global history in ``~/.ghc/ghci_history`` or
-  ``%APPDATA%/<app>/ghci_history``, but you can use current directory, e.g.:
+    By default, GHCi keeps global history in ``~/.ghc/ghci_history`` or
+    ``%APPDATA%/<app>/ghci_history``, but you can use current directory, e.g.:
 
-  .. code-block:: none
+    .. code-block:: none
 
-      $ ghci -flocal-ghci-history
+        $ ghci -flocal-ghci-history
 
-  It will create ``.ghci-history`` in current folder where GHCi is launched.
+    It will create ``.ghci-history`` in current folder where GHCi is launched.
 
 Packages
 ~~~~~~~~
@@ -3063,11 +3102,17 @@ Two command-line options control whether the startup files files are
 read:
 
 .. ghc-flag:: -ignore-dot-ghci
+    :shortdesc: Disable reading of ``.ghci`` files
+    :type: dynamic
+    :category:
 
     Don't read either :file:`./.ghci` or the other startup files when
     starting up.
 
 .. ghc-flag:: -ghci-script
+    :shortdesc: Read additional ``.ghci`` files
+    :type: dynamic
+    :category:
 
     Read a specific file after the usual startup files. Maybe be
     specified repeatedly for multiple inputs.
@@ -3156,6 +3201,9 @@ separate process for running interpreted code, and communicate with it
 using messages over a pipe.
 
 .. ghc-flag:: -fexternal-interpreter
+    :shortdesc: Run interpreted code in a separate process
+    :type: dynamic
+    :category: misc
 
     :since: 8.0.1
 

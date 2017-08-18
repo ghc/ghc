@@ -49,10 +49,15 @@ Although not recommended, the deprecated :ghc-flag:`-fglasgow-exts` flag enables
 a large swath of the extensions supported by GHC at once.
 
 .. ghc-flag:: -fglasgow-exts
+    :shortdesc: Deprecated. Enable most language extensions;
+        see :ref:`options-language` for exactly which ones.
+    :type: dynamic
+    :reverse: -fno-glasgow-exts
+    :category:
 
     The flag ``-fglasgow-exts`` is equivalent to enabling the following extensions:
 
-    .. include:: what_glasgow_exts_does.gen.rst
+    .. include:: what_glasgow_exts_does.rst
 
     Enabling these options is the *only* effect of ``-fglasgow-exts``. We are trying
     to move away from this portmanteau flag, and towards enabling features
@@ -201,6 +206,12 @@ Unboxed tuples
 --------------
 
 .. ghc-flag:: -XUnboxedTuples
+    :shortdesc: Enable :ref:`unboxed tuples <unboxed-tuples>`.
+    :type: dynamic
+    :reverse: -XNoUnboxedTuples
+    :category:
+
+    :since: 6.8.1
 
     Enable the use of unboxed tuple syntax.
 
@@ -262,6 +273,12 @@ Unboxed sums
 ------------
 
 .. ghc-flag:: -XUnboxedSums
+    :shortdesc: Enable :ref: `unboxed sums <unboxed-sums>`.
+    :type: dynamic
+    :reverse: -XNoUnboxedSums
+    :category:
+
+    :since: 8.2.1
 
     Enable the use of unboxed sum syntax.
 
@@ -344,6 +361,12 @@ Unicode syntax
 --------------
 
 .. ghc-flag:: -XUnicodeSyntax
+    :shortdesc: Enable :ref:`unicode syntax <unicode-syntax>`.
+    :type: dynamic
+    :reverse: -XNoUnicodeSyntax
+    :category:
+
+    :since: 6.8.1
 
     Enable the use of Unicode characters in place of their equivalent ASCII
     sequences.
@@ -391,6 +414,12 @@ The magic hash
 --------------
 
 .. ghc-flag:: -XMagicHash
+    :shortdesc: Allow ``#`` as a :ref:`postfix modifier on identifiers <magic-hash>`.
+    :type: dynamic
+    :reverse: -XNoMagicHash
+    :category:
+
+    :since: 6.8.1
 
     Enable the use of the hash character (``#``) as an identifier suffix.
 
@@ -433,6 +462,10 @@ Negative literals
 -----------------
 
 .. ghc-flag:: -XNegativeLiterals
+    :shortdesc: Enable support for :ref:`negative literals <negative-literals>`.
+    :type: dynamic
+    :reverse: -XNoNegativeLiterals
+    :category:
 
     :since: 7.8.1
 
@@ -454,6 +487,10 @@ Fractional looking integer literals
 -----------------------------------
 
 .. ghc-flag:: -XNumDecimals
+    :shortdesc: Enable support for 'fractional' integer literals.
+    :type: dynamic
+    :reverse: -XNoNumDecimals
+    :category:
 
     :since: 7.8.1
 
@@ -472,6 +509,10 @@ Binary integer literals
 -----------------------
 
 .. ghc-flag:: -XBinaryLiterals
+    :shortdesc: Enable support for :ref:`binary literals <binary-literals>`.
+    :type: dynamic
+    :reverse: -XNoBinaryLiterals
+    :category:
 
     :since: 7.10.1
 
@@ -492,6 +533,11 @@ Pattern guards
 --------------
 
 .. ghc-flag:: -XNoPatternGuards
+    :shortdesc: Disable :ref:`pattern guards <pattern-guards>`.
+        Implied by :ghc-flag:`-XHaskell98`.
+    :type: dynamic
+    :reverse: -XPatternGuards
+    :category:
 
     :implied by: :ghc-flag:`-XHaskell98`
     :since: 6.8.1
@@ -505,6 +551,12 @@ View patterns
 -------------
 
 .. ghc-flag:: -XViewPatterns
+    :shortdesc: Enable :ref:`view patterns <view-patterns>`.
+    :type: dynamic
+    :reverse: -XNoViewPatterns
+    :category:
+
+    :since: 6.10.1
 
     Allow use of view pattern syntax.
 
@@ -643,9 +695,14 @@ n+k patterns
 ------------
 
 .. ghc-flag:: -XNPlusKPatterns
+    :shortdesc: Enable support for ``n+k`` patterns.
+        Implied by :ghc-flag:`-XHaskell98`.
+    :type: dynamic
+    :reverse: -XNoNPlusKPatterns
+    :category:
 
     :implied by: :ghc-flag:`-XHaskell98`
-    :since: 6.12
+    :since: 6.12.1
 
     Enable use of ``n+k`` patterns.
 
@@ -655,6 +712,12 @@ The recursive do-notation
 -------------------------
 
 .. ghc-flag:: -XRecursiveDo
+    :shortdesc: Enable :ref:`recursive do (mdo) notation <recursive-do-notation>`.
+    :type: dynamic
+    :reverse: -XNoRecursiveDo
+    :category:
+
+    :since: 6.8.1
 
     Allow the use of recursive ``do`` notation.
 
@@ -867,6 +930,10 @@ Applicative do-notation
    single: do-notation; Applicative
 
 .. ghc-flag:: -XApplicativeDo
+    :shortdesc: Enable :ref:`Applicative do-notation desugaring <applicative-do>`
+    :type: dynamic
+    :reverse: -XNoApplicativeDo
+    :category:
 
     :since: 8.0.1
 
@@ -957,6 +1024,10 @@ cases it might miss an opportunity.  There is an algorithm that finds
 the optimal solution, provided as an option:
 
 .. ghc-flag:: -foptimal-applicative-do
+    :shortdesc: Use a slower but better algorithm for ApplicativeDo
+    :type: dynamic
+    :reverse: -fno-optimal-applicative-do
+    :category: optimization
 
     :since: 8.0.1
 
@@ -1093,6 +1164,14 @@ Parallel List Comprehensions
    single: parallel list comprehensions
 
 .. ghc-flag:: -XParallelListComp
+    :shortdesc: Enable :ref:`parallel list comprehensions
+        <parallel-list-comprehensions>`.
+        Implied by :ghc-flag:`-XParallelArrays`.
+    :type: dynamic
+    :reverse: -XNoParallelListComp
+    :category:
+
+    :since: 6.8.1
 
     Allow parallel list comprehension syntax.
 
@@ -1142,6 +1221,13 @@ Generalised (SQL-like) List Comprehensions
    single: SQL
 
 .. ghc-flag:: -XTransformListComp
+    :shortdesc: Enable :ref:`generalised list comprehensions
+        <generalised-list-comprehensions>`.
+    :type: dynamic
+    :reverse: -XNoTransformListComp
+    :category:
+
+    :since: 6.10.1
 
     Allow use of generalised list (SQL-like) comprehension syntax. This
     introduces the ``group``, ``by``, and ``using`` keywords.
@@ -1280,8 +1366,12 @@ Monad comprehensions
    single: monad comprehensions
 
 .. ghc-flag:: -XMonadComprehensions
+    :shortdesc: Enable :ref:`monad comprehensions <monad-comprehensions>`.
+    :type: dynamic
+    :reverse: -XNoMonadComprehensions
+    :category:
 
-    :since: 7.2
+    :since: 7.2.1
 
     Enable list comprehension syntax for arbitrary monads.
 
@@ -1442,6 +1532,10 @@ New monadic failure desugaring mechanism
 ----------------------------------------
 
 .. ghc-flag:: -XMonadFailDesugaring
+    :shortdesc: Enable :ref:`monadfail desugaring <monadfail-desugaring>`.
+    :type: dynamic
+    :reverse: -XNoMonadFailDesugaring
+    :category:
 
     :since: 8.0.1
 
@@ -1464,6 +1558,13 @@ Rebindable syntax and the implicit Prelude import
 -------------------------------------------------
 
 .. ghc-flag:: -XNoImplicitPrelude
+    :shortdesc: Don't implicitly ``import Prelude``.
+        Implied by :ghc-flag:`-XRebindableSyntax`.
+    :type: dynamic
+    :reverse: -XImplicitPrelude
+    :category:
+
+    :since: 6.8.1
 
     Don't import ``Prelude`` by default.
 
@@ -1474,6 +1575,11 @@ don't call it ``Prelude``; the Haskell module namespace is flat, and you
 must not conflict with any Prelude module.)
 
 .. ghc-flag:: -XRebindableSyntax
+    :shortdesc: Employ :ref:`rebindable syntax <rebindable-syntax>`.
+        Implies :ghc-flag:`-XNoImplicitPrelude`.
+    :type: dynamic
+    :reverse: -XNoRebindableSyntax
+    :category:
 
     :implies: :ghc-flag:`-XNoImplicitPrelude`
     :since: 7.0.1
@@ -1574,6 +1680,12 @@ Postfix operators
 -----------------
 
 .. ghc-flag:: -XPostfixOperators
+    :shortdesc: Enable :ref:`postfix operators <postfix-operators>`.
+    :type: dynamic
+    :reverse: -XNoPostfixOperators
+    :category:
+
+    :since: 7.10.1
 
     Allow the use of post-fix operators
 
@@ -1606,6 +1718,10 @@ Tuple sections
 --------------
 
 .. ghc-flag:: -XTupleSections
+    :shortdesc: Enable :ref:`tuple sections <tuple-sections>`.
+    :type: dynamic
+    :reverse: -XNoTupleSections
+    :category:
 
     :since: 6.12
 
@@ -1647,6 +1763,10 @@ Lambda-case
 -----------
 
 .. ghc-flag:: -XLambdaCase
+    :shortdesc: Enable :ref:`lambda-case expressions <lambda-case>`.
+    :type: dynamic
+    :reverse: -XNoLambdaCase
+    :category:
 
     :since: 7.6.1
 
@@ -1673,6 +1793,10 @@ Empty case alternatives
 -----------------------
 
 .. ghc-flag:: -XEmptyCase
+    :shortdesc: Allow :ref:`empty case alternatives <empty-case>`.
+    :type: dynamic
+    :reverse: -XNoEmptyCase
+    :category:
 
     :since: 7.8.1
 
@@ -1720,6 +1844,10 @@ Multi-way if-expressions
 ------------------------
 
 .. ghc-flag:: -XMultiWayIf
+    :shortdesc: Enable :ref:`multi-way if-expressions <multi-way-if>`.
+    :type: dynamic
+    :reverse: -XNoMultiWayIf
+    :category:
 
     :since: 7.6.1
 
@@ -1836,6 +1964,12 @@ Package-qualified imports
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XPackageImports
+    :shortdesc: Enable :ref:`package-qualified imports <package-imports>`.
+    :type: dynamic
+    :reverse: -XNoPackageImports
+    :category:
+
+    :since: 6.10.1
 
     Allow the use of package-qualified ``import`` syntax.
 
@@ -1867,11 +2001,32 @@ Safe imports
 ~~~~~~~~~~~~
 
 .. ghc-flag:: -XSafe
-              -XTrustworthy
-              -XUnsafe
+    :shortdesc: Enable the :ref:`Safe Haskell <safe-haskell>` Safe mode.
+    :type: dynamic
+    :category:
     :noindex:
 
-    :since: 7.2
+    :since: 7.2.1
+
+    Declare the Safe Haskell state of the current module.
+
+.. ghc-flag:: -XTrustworthy
+    :shortdesc: Enable the :ref:`Safe Haskell <safe-haskell>` Trustworthy mode.
+    :type: dynamic
+    :category:
+    :noindex:
+
+    :since: 7.2.1
+
+    Declare the Safe Haskell state of the current module.
+
+.. ghc-flag:: -XUnsafe
+    :shortdesc: Enable :ref:`Safe Haskell <safe-haskell>` Unsafe mode.
+    :type: dynamic
+    :category:
+    :noindex:
+
+    :since: 7.4.1
 
     Declare the Safe Haskell state of the current module.
 
@@ -1892,6 +2047,12 @@ Explicit namespaces in import/export
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XExplicitNamespaces
+    :shortdesc: Enable using the keyword ``type`` to specify the namespace of
+        entries in imports and exports (:ref:`explicit-namespaces`).
+        Implied by :ghc-flag:`-XTypeOperators` and :ghc-flag:`-XTypeFamilies`.
+    :type: dynamic
+    :reverse: -XNoExplicitNamespaces
+    :category:
 
     :since: 7.6.1
 
@@ -2027,6 +2188,12 @@ Data types with no constructors
 -------------------------------
 
 .. ghc-flag:: -XEmptyDataDecls
+    :shortdesc: Allow definition of empty ``data`` types.
+    :type: dynamic
+    :reverse: -XNoEmptyDataDecls
+    :category:
+
+    :since: 6.8.1
 
     Allow definition of empty ``data`` types.
 
@@ -2049,6 +2216,10 @@ Data type contexts
 ------------------
 
 .. ghc-flag:: -XDatatypeContexts
+    :shortdesc: Allow contexts on ``data`` types.
+    :type: dynamic
+    :reverse: -XNoEmptyDataDecls
+    :category:
 
     :since: 7.0.1
 
@@ -2121,8 +2292,14 @@ Type operators
 --------------
 
 .. ghc-flag:: -XTypeOperators
+    :shortdesc: Enable :ref:`type operators <type-operators>`.
+        Implies :ghc-flag:`-XExplicitNamespaces`.
+    :type: dynamic
+    :reverse: -XNoTypeOperators
+    :category:
 
     :implies: :ghc-flag:`-XExplicitNamespaces`
+    :since: 6.8.1
 
     Allow the use and definition of types with operator names.
 
@@ -2172,8 +2349,13 @@ Liberalised type synonyms
 -------------------------
 
 .. ghc-flag:: -XLiberalTypeSynonyms
+    :shortdesc: Enable :ref:`liberalised type synonyms <type-synonyms>`.
+    :type: dynamic
+    :reverse: -XNoLiberalTypeSynonyms
+    :category:
 
     :implies: :ghc-flag:`-XExplicitForAll`
+    :since: 6.8.1
 
     Relax many of the Haskell 98 rules on type synonym definitions.
 
@@ -2250,8 +2432,13 @@ Existentially quantified data constructors
 ------------------------------------------
 
 .. ghc-flag:: -XExistentialQuantification
+    :shortdesc: Enable :ref:`liberalised type synonyms <type-synonyms>`.
+    :type: dynamic
+    :reverse: -XNoLiberalTypeSynonyms
+    :category:
 
     :implies: :ghc-flag:`-XExplicitForAll`
+    :since: 6.8.1
 
     Allow existentially quantified type variables in types.
 
@@ -2506,8 +2693,12 @@ Declaring data types with explicit constructor signatures
 ---------------------------------------------------------
 
 .. ghc-flag:: -XGADTSyntax
+    :shortdesc: Enable :ref:`generalised algebraic data type syntax <gadt-style>`.
+    :type: dynamic
+    :reverse: -XNoGADTSyntax
+    :category:
 
-    :since: 7.2
+    :since: 7.2.1
 
     Allow the use of GADT syntax in data type definitions (but not GADTs
     themselves; for this see :ghc-flag:`-XGADTs`)
@@ -2758,8 +2949,14 @@ Generalised Algebraic Data Types (GADTs)
 ----------------------------------------
 
 .. ghc-flag:: -XGADTs
+    :shortdesc: Enable :ref:`generalised algebraic data types <gadt>`.
+        Implies :ghc-flag:`-XGADTSyntax` and :ghc-flag:`-XMonoLocalBinds`.
+    :type: dynamic
+    :reverse: -XNoGADTs
+    :category:
 
     :implies: :ghc-flag:`-XMonoLocalBinds`, :ghc-flag:`-XGADTSyntax`
+    :since: 6.8.1
 
     Allow use of Generalised Algebraic Data Types (GADTs).
 
@@ -2897,6 +3094,11 @@ Traditional record syntax
 -------------------------
 
 .. ghc-flag:: -XNoTraditionalRecordSyntax
+    :shortdesc: Disable support for traditional record syntax
+        (as supported by Haskell 98) ``C {f = x}``
+    :type: dynamic
+    :reverse: -XTraditionalRecordSyntax
+    :category:
 
     :since: 7.4.1
 
@@ -2911,6 +3113,13 @@ Record field disambiguation
 ---------------------------
 
 .. ghc-flag:: -XDisambiguateRecordFields
+    :shortdesc: Enable :ref:`record field disambiguation <disambiguate-fields>`.
+        Implied by :ghc-flag:`-XRecordWildCards`.
+    :type: dynamic
+    :reverse: -XNoDisambiguateRecordFields
+    :category:
+
+    :since: 6.8.1
 
     :since: 6.8.1
 
@@ -2984,6 +3193,10 @@ Duplicate record fields
 -----------------------
 
 .. ghc-flag:: -XDuplicateRecordFields
+    :shortdesc: Allow definition of record types with identically-named fields.
+    :type: dynamic
+    :reverse: -XNoDuplicateRecordFields
+    :category:
 
     :implies: :ghc-flag:`-XDisambiguateRecordFields`
     :since: 8.0.1
@@ -3118,6 +3331,12 @@ Record puns
 -----------
 
 .. ghc-flag:: -XNamedFieldPuns
+    :shortdesc: Enable :ref:`record puns <record-puns>`.
+    :type: dynamic
+    :reverse: -XNoNamedFieldPuns
+    :category:
+
+    :since: 6.10.1
 
     Allow use of record puns.
 
@@ -3179,8 +3398,14 @@ Record wildcards
 ----------------
 
 .. ghc-flag:: -XRecordWildCards
+    :shortdesc: Enable :ref:`record wildcards <record-wildcards>`.
+        Implies :ghc-flag:`-XDisambiguateRecordFields`.
+    :type: dynamic
+    :reverse: -XNoRecordWildCards
+    :category:
 
     :implies: :ghc-flag:`-XDisambiguateRecordFields`.
+    :since: 6.8.1
 
     Allow the use of wildcards in record construction and pattern matching.
 
@@ -3487,6 +3712,12 @@ Stand-alone deriving declarations
 ---------------------------------
 
 .. ghc-flag:: -XStandaloneDeriving
+    :shortdesc: Enable :ref:`standalone deriving <stand-alone-deriving>`.
+    :type: dynamic
+    :reverse: -XNoStandaloneDeriving
+    :category:
+
+    :since: 6.8.1
 
     Allow the use of stand-alone ``deriving`` declarations.
 
@@ -3588,28 +3819,46 @@ Deriving instances of extra classes (``Data``, etc.)
 ----------------------------------------------------
 
 .. ghc-flag:: -XDeriveGeneric
+    :shortdesc: Enable :ref:`deriving for the Generic class <deriving-typeable>`.
+    :type: dynamic
+    :reverse: -XNoDeriveGeneric
+    :category:
 
-    :since: 7.2
+    :since: 7.2.1
 
     Allow automatic deriving of instances for the ``Generic`` typeclass.
 
 .. ghc-flag:: -XDeriveFunctor
+    :shortdesc: Enable :ref:`deriving for the Functor class <deriving-extra>`.
+        Implied by :ghc-flag:`-XDeriveTraversable`.
+    :type: dynamic
+    :reverse: -XNoDeriveFunctor
+    :category:
 
-    :since: 6.12
+    :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Functor`` typeclass.
 
 .. ghc-flag:: -XDeriveFoldable
+    :shortdesc: Enable :ref:`deriving for the Foldable class <deriving-extra>`.
+        Implied by :ghc-flag:`-XDeriveTraversable`.
+    :type: dynamic
+    :reverse: -XNoDeriveFoldable
+    :category:
 
-    :since: 6.12
+    :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Foldable`` typeclass.
 
 .. ghc-flag:: -XDeriveTraversable
-
-    :since: 6.12
+    :shortdesc: Enable :ref:`deriving for the Traversable class <deriving-extra>`.
+        Implies :ghc-flag:`-XDeriveFunctor` and :ghc-flag:`-XDeriveFoldable`.
+    :type: dynamic
+    :reverse: -XNoDeriveTraversable
+    :category:
 
     :implies: :ghc-flag:`-XDeriveFoldable`, :ghc-flag:`-XDeriveFunctor`
+    :since: 7.10.1
 
     Allow automatic deriving of instances for the ``Traversable`` typeclass.
 
@@ -4048,6 +4297,13 @@ Deriving ``Data`` instances
 -------------------------------
 
 .. ghc-flag:: -XDeriveDataTypeable
+    :shortdesc: Enable ``deriving`` for the :ref:`Data class
+        <deriving-typeable>`. Implied by :ghc-flag:`-XAutoDeriveTypeable`.
+    :type: dynamic
+    :reverse: -XNoDeriveDataTypeable
+    :category:
+
+    :since: 6.8.1
 
     Enable automatic deriving of instances for the ``Data`` typeclass
 
@@ -4100,8 +4356,12 @@ Deriving ``Lift`` instances
 ---------------------------
 
 .. ghc-flag:: -XDeriveLift
+    :shortdesc: Enable :ref:`deriving for the Lift class <deriving-lift>`
+    :type: dynamic
+    :reverse: -XNoDeriveLift
+    :category:
 
-    :since: 8.0.1
+    :since: 7.2.1
 
     Enable automatic deriving of instances for the ``Lift`` typeclass for
     Template Haskell.
@@ -4181,6 +4441,12 @@ Generalised derived instances for newtypes
 
 .. ghc-flag:: -XGeneralisedNewtypeDeriving
               -XGeneralizedNewtypeDeriving
+    :shortdesc: Enable :ref:`newtype deriving <newtype-deriving>`.
+    :type: dynamic
+    :reverse: -XNoGeneralizedNewtypeDeriving
+    :category:
+
+    :since: 6.8.1
 
     Enable GHC's cunning generalised deriving mechanism for ``newtype``\s
 
@@ -4499,6 +4765,10 @@ Deriving any other class
 ------------------------
 
 .. ghc-flag:: -XDeriveAnyClass
+    :shortdesc: Enable :ref:`deriving for any class <derive-any-class>`.
+    :type: dynamic
+    :reverse: -XNoDeriveAnyClass
+    :category:
 
     :since: 7.10.1
 
@@ -4645,6 +4915,12 @@ Deriving strategies
 -------------------
 
 .. ghc-flag:: -XDerivingStrategies
+    :shortdesc: Enables :ref:`deriving strategies <deriving-strategies>`.
+    :type: dynamic
+    :reverse: -XNoDerivingStrategies
+    :category:
+
+    :since: 8.2.1
 
     Allow multiple ``deriving``, each optionally qualified with a *strategy*.
 
@@ -4707,6 +4983,10 @@ Pattern synonyms
 ================
 
 .. ghc-flag:: -XPatternSynonyms
+    :shortdesc: Enable :ref:`pattern synonyms <pattern-synonyms>`.
+    :type: dynamic
+    :reverse: -XNoPatternSynonyms
+    :category:
 
     :since: 7.8.1
 
@@ -5157,8 +5437,15 @@ Multi-parameter type classes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XMultiParamTypeClasses
+    :shortdesc: Enable :ref:`multi parameter type classes
+        <multi-param-type-classes>`. Implied by
+        :ghc-flag:`-XFunctionalDependencies`.
+    :type: dynamic
+    :reverse: -XNoMultiParamTypeClasses
+    :category:
 
     :implies: :ghc-flag:`-XConstrainedClassMethods`
+    :since: 6.8.1
 
     Allow the definition of typeclasses with more than one parameter.
 
@@ -5175,6 +5462,13 @@ The superclasses of a class declaration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XFlexibleContexts
+    :shortdesc: Enable :ref:`flexible contexts <flexible-contexts>`. Implied by
+        :ghc-flag:`-XImplicitParams`.
+    :type: dynamic
+    :reverse: -XNoFlexibleContexts
+    :category:
+
+    :since: 6.8.1
 
     Allow the use of complex constraints in class declaration contexts.
 
@@ -5225,6 +5519,12 @@ Constrained class method types
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XConstrainedClassMethods
+    :shortdesc: Enable :ref:`constrained class methods <class-method-types>`.
+    :type: dynamic
+    :reverse: -XNoConstrainedClassMethods
+    :category:
+
+    :since: 6.8.1
 
     Allows the definition of further constraints on individual class methods.
 
@@ -5265,8 +5565,12 @@ Default method signatures
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XDefaultSignatures
+    :shortdesc: Enable :ref:`default signatures <class-default-signatures>`.
+    :type: dynamic
+    :reverse: -XNoDefaultSignatures
+    :category:
 
-    :since: 7.2
+    :since: 7.2.1
 
     Allows the definition of default method signatures in class definitions.
 
@@ -5358,6 +5662,12 @@ Nullary type classes
 ~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XNullaryTypeClasses
+    :shortdesc: Deprecated, does nothing. :ref:`nullary (no parameter) type
+        classes <nullary-type-classes>` are now enabled using
+        :ghc-flag:`-XMultiParamTypeClasses`.
+    :type: dynamic
+    :reverse: -XNoNullaryTypeClasses
+    :category:
 
     :since: 7.8.1
 
@@ -5394,8 +5704,14 @@ Functional dependencies
 -----------------------
 
 .. ghc-flag:: -XFunctionalDependencies
+    :shortdesc: Enable :ref:`functional dependencies <functional-dependencies>`.
+        Implies :ghc-flag:`-XMultiParamTypeClasses`.
+    :type: dynamic
+    :reverse: -XNoFunctionalDependencies
+    :category:
 
     :implies: :ghc-flag:`-XMultiParamTypeClasses`
+    :since: 6.8.1
 
     Allow use of functional dependencies in class declarations.
 
@@ -5732,12 +6048,26 @@ Relaxed rules for the instance head
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XTypeSynonymInstances
+    :shortdesc: Enable :ref:`type synonyms in instance heads
+        <flexible-instance-head>`. Implied by :ghc-flag:`-XFlexibleInstances`.
+    :type: dynamic
+    :reverse: -XNoTypeSynonymInstances
+    :category:
+
+    :since: 6.8.1
 
     Allow definition of type class instances for type synonyms.
 
 .. ghc-flag:: -XFlexibleInstances
+    :shortdesc: Enable :ref:`flexible instances <instance-rules>`.
+        Implies :ghc-flag:`-XTypeSynonymInstances`.
+        Implied by :ghc-flag:`-XImplicitParams`.
+    :type: dynamic
+    :reverse: -XNoFlexibleInstances
+    :category:
 
     :implies: :ghc-flag:`-XTypeSynonymInstances`
+    :since: 6.8.1
 
     Allow definition of type class instances with arbitrary nested types in the
     instance head.
@@ -5809,6 +6139,12 @@ Instance termination rules
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XUndecidableInstances
+    :shortdesc: Enable :ref:`undecidable instances <undecidable-instances>`.
+    :type: dynamic
+    :reverse: -XNoUndecidableInstances
+    :category:
+
+    :since: 6.8.1
 
     Permit definition of instances which may lead to type-checker non-termination.
 
@@ -6002,9 +6338,24 @@ Overlapping instances
 ~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XOverlappingInstances
-              -XIncoherentInstances
+    :shortdesc: Enable :ref:`overlapping instances <instance-overlap>`.
+    :type: dynamic
+    :reverse: -XNoOverlappingInstances
+    :category:
 
-    Deprecated flags to weaken checks intended to ensure instance resolution
+    Deprecated flag to weaken checks intended to ensure instance resolution
+    termination.
+
+.. ghc-flag:: -XIncoherentInstances
+    :shortdesc: Enable :ref:`incoherent instances <instance-overlap>`.
+        Implies :ghc-flag:`-XOverlappingInstances`.
+    :type: dynamic
+    :reverse: -XNoIncoherentInstances
+    :category:
+
+    :since: 6.8.1
+
+    Deprecated flag to weaken checks intended to ensure instance resolution
     termination.
 
 In general, as discussed in :ref:`instance-resolution`, *GHC requires
@@ -6219,6 +6570,10 @@ Instance signatures: type signatures in instance declarations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XInstanceSigs
+    :shortdesc: Enable :ref:`instance signatures <instance-sigs>`.
+    :type: dynamic
+    :reverse: -XNoInstanceSigs
+    :category:
 
     :since: 7.6.1
 
@@ -6276,6 +6631,12 @@ Overloaded string literals
 --------------------------
 
 .. ghc-flag:: -XOverloadedStrings
+    :shortdesc: Enable :ref:`overloaded string literals <overloaded-strings>`.
+    :type: dynamic
+    :reverse: -XNoOverloadedStrings
+    :category:
+
+    :since: 6.8.1
 
     Enable overloaded string literals (e.g. string literals desugared via the
     ``IsString`` class).
@@ -6356,6 +6717,10 @@ Overloaded labels
 -----------------
 
 .. ghc-flag:: -XOverloadedLabels
+    :shortdesc: Enable :ref:`overloaded labels <overloaded-labels>`.
+    :type: dynamic
+    :reverse: -XNoOverloadedLabels
+    :category:
 
     :since: 8.0.1
 
@@ -6448,6 +6813,10 @@ Overloaded lists
 ----------------
 
 .. ghc-flag:: -XOverloadedLists
+    :shortdesc: Enable :ref:`overloaded lists <overloaded-lists>`.
+    :type: dynamic
+    :reverse: -XNoOverloadedLists
+    :category:
 
     :since: 7.8.1
 
@@ -6615,6 +6984,11 @@ Undecidable (or recursive) superclasses
 ---------------------------------------
 
 .. ghc-flag:: -XUndecidableSuperClasses
+    :shortdesc: Allow all superclass constraints, including those that may
+        result in non-termination of the typechecker.
+    :type: dynamic
+    :reverse: -XNoUndecidableSuperClasses
+    :category:
 
     :since: 8.0.1
 
@@ -6673,9 +7047,16 @@ Type families
 =============
 
 .. ghc-flag:: -XTypeFamilies
+    :shortdesc: Enable :ref:`type families <type-families>`.
+        Implies :ghc-flag:`-XExplicitNamespaces`, :ghc-flag:`-XKindSignatures`,
+        and :ghc-flag:`-XMonoLocalBinds`.
+    :type: dynamic
+    :reverse: -XNoTypeFamilies
+    :category:
 
     :implies: :ghc-flag:`-XMonoLocalBinds`, :ghc-flag:`-XKindSignatures`,
               :ghc-flag:`-XExplicitNamespaces`
+    :since: 6.8.1
 
     Allow use and definition of indexed type and data families.
 
@@ -7569,6 +7950,11 @@ Injective type families
 -----------------------
 
 .. ghc-flag:: -XTypeFamilyDependencies
+    :shortdesc: Enable :ref:`injective type families <injective-ty-fams>`.
+        Implies :ghc-flag:`-XTypeFamilies`.
+    :type: dynamic
+    :reverse: -XNoTypeFamilyDependencies
+    :category:
 
     :implies: :ghc-flag:`-XTypeFamilies`
     :since: 8.0.1
@@ -7697,6 +8083,10 @@ Datatype promotion
 ==================
 
 .. ghc-flag:: -XDataKinds
+    :shortdesc: Enable :ref:`datatype promotion <promotion>`.
+    :type: dynamic
+    :reverse: -XNoDataKinds
+    :category:
 
     :since: 7.4.1
 
@@ -7915,6 +8305,14 @@ Kind polymorphism and Type-in-Type
 ==================================
 
 .. ghc-flag:: -XTypeInType
+    :shortdesc: Allow :ref:`kinds to be used as types <type-in-type>`,
+        including explicit kind variable quantification, higher-rank
+        kinds, kind synonyms, and kind families.
+        Implies :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`,
+        and :ghc-flag:`-XPolyKinds`.
+    :type: dynamic
+    :reverse: -XNoTypeInType
+    :category:
 
     :implies: :ghc-flag:`-XPolyKinds`, :ghc-flag:`-XDataKinds`, :ghc-flag:`-XKindSignatures`
     :since: 8.0.1
@@ -7924,6 +8322,11 @@ Kind polymorphism and Type-in-Type
     families in kinds, among other features.
 
 .. ghc-flag:: -XPolyKinds
+    :shortdesc: Enable :ref:`kind polymorphism <kind-polymorphism>`.
+        Implies :ghc-flag:`-XKindSignatures`.
+    :type: dynamic
+    :reverse: -XNoPolyKinds
+    :category:
 
     :implies: :ghc-flag:`-XKindSignatures`
     :since: 7.4.1
@@ -8590,9 +8993,14 @@ Printing levity-polymorphic types
 ---------------------------------
 
 .. ghc-flag:: -Wprint-explicit-runtime-rep
+    :shortdesc: Print ``RuntimeRep`` variables in types which are
+        runtime-representation polymorphic.
+    :type: dynamic
+    :reverse: -fno-print-explicit-runtime-reps
+    :category:
 
-  Print ``RuntimeRep`` parameters as they appear; otherwise, they are
-  defaulted to ``'LiftedRep``.
+    Print ``RuntimeRep`` parameters as they appear; otherwise, they are
+    defaulted to ``'LiftedRep``.
 
 Most GHC users will not need to worry about levity polymorphism
 or unboxed types. For these users, seeing the levity polymorphism
@@ -8810,6 +9218,10 @@ The ``Constraint`` kind
 -----------------------
 
 .. ghc-flag:: -XConstraintKinds
+    :shortdesc: Enable a :ref:`kind of constraints <constraint-kind>`.
+    :type: dynamic
+    :reverse: -XNoConstraintKinds
+    :category:
 
     :since: 7.4.1
 
@@ -8894,8 +9306,14 @@ Explicit universal quantification (forall)
 ------------------------------------------
 
 .. ghc-flag:: -XExplicitForAll
+    :shortdesc: Enable :ref:`explicit universal quantification <explicit-foralls>`.
+        Implied by :ghc-flag:`-XScopedTypeVariables`, :ghc-flag:`-XLiberalTypeSynonyms`,
+        :ghc-flag:`-XRankNTypes` and :ghc-flag:`-XExistentialQuantification`.
+    :type: dynamic
+    :reverse: -XNoExplicitForAll
+    :category:
 
-    :since: 6.12
+    :since: 6.12.1
 
     Allow use of the ``forall`` keyword in places where universal quantification
     is implicit.
@@ -8955,6 +9373,11 @@ Ambiguous types and the ambiguity check
 ---------------------------------------
 
 .. ghc-flag:: -XAllowAmbiguousTypes
+    :shortdesc: Allow the user to write :ref:`ambiguous types <ambiguity>`, and
+        the type inference engine to infer them.
+    :type: dynamic
+    :reverse: -XNoAllowAmbiguousTypes
+    :category:
 
     :since: 7.8.1
 
@@ -9080,6 +9503,13 @@ Explicitly-kinded quantification
 --------------------------------
 
 .. ghc-flag:: -XKindSignatures
+    :shortdesc: Enable :ref:`kind signatures <kinding>`.
+        Implied by :ghc-flag:`-XTypeFamilies` and :ghc-flag:`-XPolyKinds`.
+    :type: dynamic
+    :reverse: -XNoKindSignatures
+    :category:
+
+    :since: 6.8.1
 
     Allow explicit kind signatures on type variables.
 
@@ -9144,8 +9574,14 @@ Lexically scoped type variables
 ===============================
 
 .. ghc-flag:: -XScopedTypeVariables
+    :shortdesc: Enable :ref:`lexically-scoped type variables
+        <scoped-type-variables>`.
+    :type: dynamic
+    :reverse: -XNoScopedTypeVariables
+    :category:
 
     :implies: :ghc-flag:`-XExplicitForAll`
+    :since: 6.8.1
 
     Enable lexical scoping of type variables explicitly introduced with
     ``forall``.
@@ -9367,8 +9803,13 @@ Switching off the dreaded Monomorphism Restriction
 --------------------------------------------------
 
 .. ghc-flag:: -XNoMonomorphismRestriction
+    :shortdesc: Disable the :ref:`monomorphism restriction <monomorphism>`.
+    :type: dynamic
+    :reverse: -XMonomorphismRestriction
+    :category:
 
     :default: on
+    :since: 6.8.1
 
     Prevents the compiler from applying the monomorphism restriction to
     bindings lacking explicit type signatures.
@@ -9386,8 +9827,13 @@ Let-generalisation
 ------------------
 
 .. ghc-flag:: -XMonoLocalBinds
+    :shortdesc: Enable :ref:`do not generalise local bindings <mono-local-binds>`.
+        Implied by :ghc-flag:`-XTypeFamilies` and :ghc-flag:`-XGADTs`.
+    :type: dynamic
+    :reverse: -XNoMonoLocalBinds
+    :category:
 
-    :since: 6.12
+    :since: 6.12.1
 
     Infer less polymorphic types for local bindings by default.
 
@@ -9493,6 +9939,10 @@ Visible type application
 ========================
 
 .. ghc-flag:: -XTypeApplications
+    :shortdesc: Enable :ref:`type application syntax <visible-type-application>`.
+    :type: dynamic
+    :reverse: -XNoTypeApplications
+    :category:
 
     :since: 8.0.1
 
@@ -9622,6 +10072,13 @@ Implicit parameters
 ===================
 
 .. ghc-flag:: -XImplicitParams
+    :shortdesc: Enable :ref:`Implicit Parameters <implicit-parameters>`.
+        Implies :ghc-flag:`-XFlexibleContexts` and :ghc-flag:`-XFlexibleInstances`.
+    :type: dynamic
+    :reverse: -XNoImplicitParams
+    :category:
+
+    :since: 6.8.1
 
     Allow definition of functions expecting implicit parameters.
 
@@ -9819,12 +10276,25 @@ Arbitrary-rank polymorphism
 ===========================
 
 .. ghc-flag:: -XRankNTypes
+    :shortdesc: Enable :ref:`rank-N types <universal-quantification>`.
+        Implied by :ghc-flag:`-XImpredicativeTypes`.
+    :type: dynamic
+    :reverse: -XNoRankNTypes
+    :category:
 
     :implies: :ghc-flag:`-XExplicitForAll`
+    :since: 6.8.1
 
     Allow types of arbitrary rank.
 
 .. ghc-flag:: -XRank2Types
+    :shortdesc: Enable :ref:`rank-2 types <universal-quantification>`.
+        Synonym for :ghc-flag:`-XRankNTypes`.
+    :type: dynamic
+    :reverse: -XNoRank2Types
+    :category:
+
+    :since: 6.8.1
 
     A deprecated alias of :ghc-flag:`-XRankNTypes`.
 
@@ -10085,8 +10555,14 @@ Impredicative polymorphism
 ==========================
 
 .. ghc-flag:: -XImpredicativeTypes
+    :shortdesc: Enable :ref:`impredicative types <impredicative-polymorphism>`.
+        Implies :ghc-flag:`-XRankNTypes`.
+    :type: dynamic
+    :reverse: -XNoImpredicativeTypes
+    :category:
 
     :implies: :ghc-flag:`-XRankNTypes`
+    :since: 6.10.1
 
     Allow impredicative polymorphic types.
 
@@ -10275,6 +10751,9 @@ There's a flag for controlling the amount of context information shown for
 typed holes:
 
 .. ghc-flag:: -fshow-hole-constraints
+    :shortdesc: Show constraints when reporting typed holes
+    :type: dynamic
+    :category: verbosity
 
     When reporting typed holes, also print constraints that are in scope.
     Example: ::
@@ -10305,6 +10784,10 @@ Partial Type Signatures
 =======================
 
 .. ghc-flag:: -XPartialTypeSignatures
+    :shortdesc: Enable :ref:`partial type signatures <partial-type-signatures>`.
+    :type: dynamic
+    :reverse: -XNoPartialTypeSignatures
+    :category:
 
     :since: 7.10.1
 
@@ -10418,6 +10901,10 @@ Named Wildcards
 ~~~~~~~~~~~~~~~
 
 .. ghc-flag:: -XNamedWildCards
+    :shortdesc: Enable :ref:`named wildcards <named-wildcards>`.
+    :type: dynamic
+    :reverse: -XNoNamedWildCards
+    :category:
 
     :since: 7.10.1
 
@@ -10819,13 +11306,22 @@ Syntax
 ------
 
 .. ghc-flag:: -XTemplateHaskell
+    :shortdesc: Enable :ref:`Template Haskell <template-haskell>`.
+    :type: dynamic
+    :reverse: -XNoTemplateHaskell
+    :category:
 
-    :since: 6.0. Typed splices introduced in GHC 7.8.1.
     :implies: :ghc-flag:`-XTemplateHaskellQuotes`
+    :since: 6.0. Typed splices introduced in GHC 7.8.1.
 
     Enable Template Haskell's splice and quotation syntax.
 
 .. ghc-flag:: -XTemplateHaskellQuotes
+    :shortdesc: Enable quotation subset of
+        :ref:`Template Haskell <template-haskell>`.
+    :type: dynamic
+    :reverse: -XNoTemplateHaskellQuotes
+    :category:
 
     :since: 8.0.1
 
@@ -11333,6 +11829,12 @@ Template Haskell Quasi-quotation
 --------------------------------
 
 .. ghc-flag:: -XQuasiQuotes
+    :shortdesc: Enable :ref:`quasiquotation <th-quasiquotation>`.
+    :type: dynamic
+    :reverse: -XNoQuasiQuotes
+    :category:
+
+    :since: 6.10.1
 
     Enable Template Haskell Quasi-quotation syntax.
 
@@ -11510,6 +12012,12 @@ Arrow notation
 ==============
 
 .. ghc-flag:: -XArrows
+    :shortdesc: Enable :ref:`arrow notation <arrow-notation>` extension
+    :type: dynamic
+    :reverse: -XNoArrows
+    :category:
+
+    :since: 6.8.1
 
     Enable arrow notation.
 
@@ -11951,6 +12459,12 @@ Bang patterns
 -------------
 
 .. ghc-flag:: -XBangPatterns
+    :shortdesc: Enable :ref:`bang patterns <bang-patterns>`.
+    :type: dynamic
+    :reverse: -XNoBangPatterns
+    :category:
+
+    :since: 6.8.1
 
     Allow use of bang pattern syntax.
 
@@ -12047,6 +12561,10 @@ Strict-by-default data types
 ----------------------------
 
 .. ghc-flag:: -XStrictData
+    :shortdesc: Enable :ref:`default strict datatype fields <strict-data>`.
+    :type: dynamic
+    :reverse: -XNoStrictData
+    :category:
 
     :since: 8.0.1
 
@@ -12075,6 +12593,10 @@ Strict-by-default pattern bindings
 ----------------------------------
 
 .. ghc-flag:: -XStrict
+    :shortdesc: Make bindings in the current module strict by default.
+    :type: dynamic
+    :reverse: -XNoStrict
+    :category:
 
     :implies: :ghc-flag:`-XStrictData`
     :since: 8.0.1
@@ -12450,6 +12972,10 @@ Static pointers
    single: Static pointers
 
 .. ghc-flag:: -XStaticPointers
+    :shortdesc: Enable :ref:`static pointers <static-pointers>`.
+    :type: dynamic
+    :reverse: -XNoStaticPointers
+    :category:
 
     :since: 7.10.1
 
@@ -13493,6 +14019,12 @@ individual rule firing and :ghc-flag:`-ddump-rule-rewrites` also shows what the
 code looks like before and after the rewrite.
 
 .. ghc-flag:: -fenable-rewrite-rules
+    :shortdesc: Switch on all rewrite rules (including rules generated by
+        automatic specialisation of overloaded functions). Implied by
+        :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-enable-rewrite-rules
+    :category: optimization
 
     Allow the compiler to apply rewrite rules to the source program.
 
@@ -14321,6 +14853,10 @@ Role annotations
 ----------------
 
 .. ghc-flag:: -XRoleAnnotations
+    :shortdesc: Enable :ref:`role annotations <role-annotations>`.
+    :type: dynamic
+    :reverse: -XNoRoleAnnotations
+    :category:
 
     :since: 7.8.1
 
