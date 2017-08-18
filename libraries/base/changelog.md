@@ -16,6 +16,9 @@
 
   * Add instances `Semigroup` and `Monoid` for `Control.Monad.ST` (#14107).
 
+  * Add `iterate'`, a strict version of `iterate`, to `Data.List`
+    and `Data.OldList` (#3474)
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 
