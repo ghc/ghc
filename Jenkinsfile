@@ -159,8 +159,8 @@ def buildGhc(params) {
   String makeCmd = params?.makeCmd ?: 'make'
 
   withGhcSrcDist() {
-    echo '${targetTriple}'
-    echo '${params}'
+    echo "${targetTriple}"
+    echo "${params}"
     stage('Configure') {
       sh 'echo $PATH'
       sh "which ghc"
@@ -189,7 +189,7 @@ def buildGhc(params) {
 
       def configure_opts = []
       if (crossCompiling) {
-        configure_opts += '--target=${targetTriple}'
+        configure_opts += "--target=${targetTriple}"
       }
       if (disableLargeAddrSpace) {
         configure_opts += '--disable-large-address-space'
