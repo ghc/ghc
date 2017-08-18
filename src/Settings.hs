@@ -62,7 +62,7 @@ knownPackages = sort $ defaultKnownPackages ++ userKnownPackages
 
 -- TODO: Speed up? Switch to Set?
 -- Note: this is slow but we keep it simple as there are just ~50 packages
-findKnownPackage :: String -> Maybe Package
+findKnownPackage :: PackageName -> Maybe Package
 findKnownPackage name = find (\pkg -> pkgName pkg == name) knownPackages
 
 -- | Determine the location of a 'Builder'.

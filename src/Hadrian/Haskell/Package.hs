@@ -10,7 +10,7 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Package (
     -- * Data type
-    Package,
+    Package, PackageName,
 
     -- * Construction and properties
     library, program, pkgName, pkgPath, isLibrary, isProgram,
@@ -24,6 +24,8 @@ import Development.Shake.FilePath
 import GHC.Generics
 import Hadrian.Utilities
 
+type PackageName = String
+
 -- TODO: Make PackageType more precise, #12.
 data PackageType = Library | Program deriving (Generic, Show)
 
@@ -32,10 +34,10 @@ data PackageType = Library | Program deriving (Generic, Show)
 -- packages can be both. This works for now, but in future we plan to support
 -- general Haskell packages. Also note that we assume that all packages have
 -- different names, hence two packages with the same name are considered equal.
-data Package = Package PackageType String FilePath deriving Generic
+data Package = Package PackageType PackageName FilePath deriving Generic
 
 -- | The name of a Haskell package. Examples: @Cabal@, @ghc-bin@.
-pkgName :: Package -> String
+pkgName :: Package -> PackageName
 pkgName (Package _ name _) = name
 
 -- | The path to the package source code relative to the root of the build
@@ -63,16 +65,12 @@ instance Hashable PackageType
 instance NFData   PackageType
 
 -- | Construct a library package.
-library :: String -> FilePath -> Package
+library :: PackageName -> FilePath -> Package
 library = Package Library
 
 -- | Construct a program package.
-program :: String -> FilePath -> Package
+program :: PackageName -> FilePath -> Package
 program = Package Program
-
--- | The path to a package cabal file, e.g.: @ghc/ghc-bin.cabal@.
-pkgCabalFile :: Package -> FilePath
-pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"
 
 -- | Check whether a package is a library.
 isLibrary :: Package -> Bool
@@ -83,3 +81,7 @@ isLibrary _ = False
 isProgram :: Package -> Bool
 isProgram (Package Program _ _) = True
 isProgram _ = False
+
+-- | The path to a package cabal file, e.g.: @ghc/ghc-bin.cabal@.
+pkgCabalFile :: Package -> FilePath
+pkgCabalFile pkg = pkgPath pkg -/- pkgName pkg <.> "cabal"

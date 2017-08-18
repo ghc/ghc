@@ -99,19 +99,19 @@ win32               = lib  "Win32"
 xhtml               = lib  "xhtml"
 
 -- | Construct a library package, e.g. @array@.
-lib :: String -> Package
+lib :: PackageName -> Package
 lib name = library name ("libraries" -/- name)
 
 -- | Construct a top-level library package, e.g. @compiler@.
-top :: String -> Package
+top :: PackageName -> Package
 top name = library name name
 
 -- | Construct a top-level program package, e.g. @ghc@.
-prg :: String -> Package
+prg :: PackageName -> Package
 prg name = program name name
 
 -- | Construct a utility package, e.g. @haddock@.
-util :: String -> Package
+util :: PackageName -> Package
 util name = program name ("utils" -/- name)
 
 -- | Amend a package path if it doesn't conform to a typical pattern.

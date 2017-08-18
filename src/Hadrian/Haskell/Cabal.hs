@@ -9,41 +9,44 @@
 -- Basic functionality for extracting Haskell package metadata stored in
 -- @.cabal@ files.
 -----------------------------------------------------------------------------
-module Hadrian.Haskell.Cabal (readCabal, cabalNameVersion, cabalDependencies) where
+module Hadrian.Haskell.Cabal (readCabal, pkgNameVersion, pkgDependencies) where
 
 import Development.Shake
-import Distribution.Package
-import Distribution.PackageDescription
-import Distribution.PackageDescription.Parse
-import Distribution.Text
-import Distribution.Types.CondTree
-import Distribution.Verbosity
+import qualified Distribution.Package                  as C
+import qualified Distribution.PackageDescription       as C
+import qualified Distribution.PackageDescription.Parse as C
+import qualified Distribution.Text                     as C
+import qualified Distribution.Types.CondTree           as C
+import qualified Distribution.Verbosity                as C
 
--- | Read a given @.cabal@ file and return the 'GenericPackageDescription'. The
--- @.cabal@ file is tracked.
-readCabal :: FilePath -> Action GenericPackageDescription
-readCabal cabal = do
-    need [cabal]
-    liftIO $ readGenericPackageDescription silent cabal
+import Hadrian.Haskell.Package
 
--- | Read a given @.cabal@ file and return the package name and version. The
--- @.cabal@ file is tracked.
-cabalNameVersion :: FilePath -> Action (String, String)
-cabalNameVersion cabal = do
-    identifier <- package . packageDescription <$> readCabal cabal
-    return (unPackageName $ pkgName identifier, display $ pkgVersion identifier)
+-- | Read the @.cabal@ file of a given package and return the
+-- 'GenericPackageDescription'. The @.cabal@ file is tracked.
+readCabal :: Package -> Action C.GenericPackageDescription
+readCabal pkg = do
+    need [pkgCabalFile pkg]
+    liftIO $ C.readGenericPackageDescription C.silent (pkgCabalFile pkg)
 
--- | Read a given @.cabal@ file and return the package dependencies. The
--- @.cabal@ file is tracked.
-cabalDependencies :: FilePath -> Action [String]
-cabalDependencies cabal = do
-    gpd <- readCabal cabal
-    let libDeps = collectDeps (condLibrary gpd)
-        exeDeps = map (collectDeps . Just . snd) (condExecutables gpd)
-    return [ unPackageName p | Dependency p _ <- concat (libDeps : exeDeps) ]
+-- | Read the @.cabal@ file of a given package and return the package name and
+-- version. The @.cabal@ file is tracked.
+pkgNameVersion :: Package -> Action (PackageName, String)
+pkgNameVersion pkg = do
+    pkgId <- C.package . C.packageDescription <$> readCabal pkg
+    return (C.unPackageName $ C.pkgName pkgId, C.display $ C.pkgVersion pkgId)
 
-collectDeps :: Maybe (CondTree v [Dependency] a) -> [Dependency]
+-- | Read the @.cabal@ file of a given package and return the list of its
+-- dependencies. The current version does not take care of Cabal conditionals
+-- and therefore returns a crude overapproximation of The @.cabal@ file is tracked.
+pkgDependencies :: Package -> Action [PackageName]
+pkgDependencies pkg = do
+    gpd <- readCabal pkg
+    let libDeps = collectDeps (C.condLibrary gpd)
+        exeDeps = map (collectDeps . Just . snd) (C.condExecutables gpd)
+    return [ C.unPackageName p | C.Dependency p _ <- concat (libDeps : exeDeps) ]
+
+collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
 collectDeps Nothing = []
-collectDeps (Just (CondNode _ deps ifs)) = deps ++ concatMap f ifs
+collectDeps (Just (C.CondNode _ deps ifs)) = deps ++ concatMap f ifs
   where
-    f (CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt
+    f (C.CondBranch _ t mt) = collectDeps (Just t) ++ collectDeps mt

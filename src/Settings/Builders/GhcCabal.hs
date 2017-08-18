@@ -96,7 +96,7 @@ bootPackageConstraintsGenerator _ = do
     bootPkgs <- stagePackages Stage0
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
     constraints <- forM (sort pkgs) $ \pkg -> do
-        (name, version) <- cabalNameVersion (pkgCabalFile pkg)
+        (name, version) <- pkgNameVersion pkg
         return (name ++ " == " ++ version)
     return (unlines constraints)
 

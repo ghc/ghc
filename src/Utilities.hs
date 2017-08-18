@@ -2,7 +2,7 @@ module Utilities (
     build, buildWithCmdOptions, buildWithResources, applyPatch, runBuilder,
     runBuilderWith, builderEnvironment, needBuilder, needLibrary,
     installDirectory, installData, installScript, installProgram, linkSymbolic,
-    contextDependencies, pkgDependencies, libraryTargets, topsortPackages,
+    contextDependencies, stage1Dependencies, libraryTargets, topsortPackages,
     packageDependenciesGenerator
     ) where
 
@@ -191,7 +191,7 @@ packageDependenciesGenerator _ = do
         exists <- doesFileExist (pkgCabalFile pkg)
         if not exists then return (pkgName pkg)
         else do
-            deps <- nubOrd . sort <$> cabalDependencies (pkgCabalFile pkg)
+            deps <- nubOrd . sort <$> pkgDependencies pkg
             return . unwords $ pkgName pkg : (deps \\ [pkgName pkg])
     return (unlines pkgDeps)
 
@@ -200,7 +200,7 @@ packageDependenciesGenerator _ = do
 -- The only subtlety here is that we never depend on packages built in 'Stage2'
 -- or later, therefore the stage of the resulting dependencies is bounded from
 -- above at 'Stage1'. To compute package dependencies we scan package cabal
--- files, see 'cabalDependencies' defined in "Hadrian.Haskell.Cabal".
+-- files, see 'pkgDependencies' defined in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = do
     let pkgContext = \pkg -> Context (min stage Stage1) pkg way
@@ -211,8 +211,9 @@ contextDependencies Context {..} = do
     return . map pkgContext $ intersectOrd (compare . pkgName) pkgs deps
 
 -- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
-pkgDependencies :: Package -> Action [Package]
-pkgDependencies = fmap (map Context.package) . contextDependencies . vanillaContext Stage1
+stage1Dependencies :: Package -> Action [Package]
+stage1Dependencies =
+    fmap (map Context.package) . contextDependencies . vanillaContext Stage1
 
 -- | Given a library 'Package' this action computes all of its targets.
 libraryTargets :: Context -> Action [FilePath]
@@ -234,7 +235,7 @@ needLibrary cs = need =<< concatMapM libraryTargets cs
 -- | Topological sort of packages according to their dependencies.
 topsortPackages :: [Package] -> Action [Package]
 topsortPackages pkgs = do
-    elems <- mapM (\p -> (p,) <$> pkgDependencies p) pkgs
+    elems <- mapM (\p -> (p,) <$> stage1Dependencies p) pkgs
     return $ map fst $ topSort elems
   where
     annotateInDeg es e =
