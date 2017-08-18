@@ -23,10 +23,6 @@ matrix:
               # Build GHC
               - ./build.cabal.sh -j $MODE --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
 
-              # Test GHC binary
-              - cd ..
-              - inplace/bin/ghc-stage2 -e 1+2
-
         - os: linux
           env: MODE="--flavour=quickest --integer-simple"
           compiler: "GHC 8.2.1"
@@ -43,9 +39,6 @@ matrix:
               - PATH="/opt/cabal/1.22/bin:$PATH"
 
           script:
-              # Run internal Hadrian tests
-              - ./build.cabal.sh selftest
-
               # Build GHC
               - ./build.cabal.sh -j $MODE --verbose --no-progress --progress-colour=never --progress-info=brief --profile=-
 
