@@ -1421,6 +1421,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           addr = (char*)cstring_from_COFF_symbol_name(
                                getSymShortName (info, symtab_i),
                                strtab);
+          stgFree (info);
 
           IF_DEBUG(linker,
                    debugBelch("addImportSymbol `%s' => `%s'\n",
@@ -1470,8 +1471,6 @@ ocGetNames_PEi386 ( ObjectCode* oc )
        }
        i += getSymNumberOfAuxSymbols (info, symtab_i);
    }
-
-   stgFree (info);
 
    /* Allocate BSS space */
    SymbolAddr* bss = NULL;
@@ -1570,6 +1569,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           if (result != NULL || dllInstance == 0) {
               errorBelch("Could not load `%s'. Reason: %s\n",
                          (char*)dllName, result);
+              stgFree (info);
               return false;
           }
 
@@ -1599,8 +1599,10 @@ ocGetNames_PEi386 ( ObjectCode* oc )
           sname[size-start]='\0';
           stgFree(tmp);
           if (!ghciInsertSymbolTable(oc->fileName, symhash, (SymbolName*)sname,
-                                     addr, false, oc))
+                                     addr, false, oc)) {
+               stgFree (info);
                return false;
+          }
           break;
       }
 
@@ -1617,6 +1619,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
 
          if (! ghciInsertSymbolTable(oc->fileName, symhash, (SymbolName*)sname, addr,
                                      isWeak, oc)) {
+             stgFree (info);
              return false;
          }
       } else {
@@ -1650,6 +1653,7 @@ ocGetNames_PEi386 ( ObjectCode* oc )
       i += getSymNumberOfAuxSymbols (info, symtab_i);
    }
 
+   stgFree (info);
    return true;
 }
 
