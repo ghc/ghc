@@ -17,8 +17,8 @@ module GHC (
     systemBuilderPath, ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
     ) where
 
-import Hadrian.Oracles.KeyValue
 import Hadrian.Oracles.Path
+import Hadrian.Oracles.TextFile
 
 import Base
 import Context

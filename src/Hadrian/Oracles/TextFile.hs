@@ -1,7 +1,19 @@
 {-# LANGUAGE TypeFamilies #-}
-module Hadrian.Oracles.KeyValue (
-    lookupValue, lookupValueOrEmpty, lookupValueOrError, lookupValues,
-    lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies, keyValueOracle
+-----------------------------------------------------------------------------
+-- |
+-- Module     : Hadrian.Oracles.TextFile
+-- Copyright  : (c) Andrey Mokhov 2014-2017
+-- License    : MIT (see the file LICENSE)
+-- Maintainer : andrey.mokhov@gmail.com
+-- Stability  : experimental
+--
+-- Read and parse text files, tracking their contents. This oracle can be used
+-- to read configuration or package metadata files and cache the parsing.
+-----------------------------------------------------------------------------
+module Hadrian.Oracles.TextFile (
+    readTextFile, lookupValue, lookupValueOrEmpty, lookupValueOrError,
+    lookupValues, lookupValuesOrEmpty, lookupValuesOrError, lookupDependencies,
+    readCabalFile, textFileOracle
     ) where
 
 import Control.Monad
@@ -12,6 +24,15 @@ import Development.Shake.Classes
 import Development.Shake.Config
 
 import Hadrian.Utilities
+import Hadrian.Haskell.Cabal.Parse
+
+newtype TextFile = TextFile FilePath
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult TextFile = String
+
+newtype CabalFile = CabalFile FilePath
+    deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
+type instance RuleResult CabalFile = String
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -20,6 +41,11 @@ type instance RuleResult KeyValue = Maybe String
 newtype KeyValues = KeyValues (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
 type instance RuleResult KeyValues = Maybe [String]
+
+-- | Read a text file, caching and tracking the result. To read and track
+-- individual lines of a text file use 'lookupValue' and its derivatives.
+readTextFile :: FilePath -> Action String
+readTextFile = askOracle . TextFile
 
 -- | Lookup a value in a text file, tracking the result. Each line of the file
 -- is expected to have @key = value@ format.
@@ -63,10 +89,18 @@ lookupDependencies depFile file = do
         Just [] -> error $ "No source file found for file " ++ quote file
         Just (source : files) -> return (source, files)
 
--- | This oracle reads and parses text files to answer 'lookupValue' and
--- 'lookupValues' queries, as well as their derivatives, tracking the results.
-keyValueOracle :: Rules ()
-keyValueOracle = void $ do
+-- | Read and parse a @.cabal@ file, caching and tracking the result.
+readCabalFile :: FilePath -> Action Cabal
+readCabalFile = askOracle . CabalFile
+
+-- | This oracle reads and parses text files to answer 'readTextFile' and
+-- 'lookupValue' queries, as well as their derivatives, tracking the results.
+textFileOracle :: Rules ()
+textFileOracle = do
+    text <- newCache $ \file -> do
+        need [file]
+        putLoud $ "Reading " ++ file ++ "..."
+        liftIO $ readFile file
     kv <- newCache $ \file -> do
         need [file]
         putLoud $ "Reading " ++ file ++ "..."
@@ -76,5 +110,11 @@ keyValueOracle = void $ do
         putLoud $ "Reading " ++ file ++ "..."
         contents <- map words <$> readFileLines file
         return $ Map.fromList [ (key, values) | (key:values) <- contents ]
+    cabal <- newCache $ \file -> do
+        need [file]
+        putLoud $ "Reading " ++ file ++ "..."
+        liftIO $ parseCabal file
+    void $ addOracle $ \(TextFile   file      ) -> text                   file
     void $ addOracle $ \(KeyValue  (file, key)) -> Map.lookup key <$> kv  file
     void $ addOracle $ \(KeyValues (file, key)) -> Map.lookup key <$> kvs file
+    void $ addOracle $ \(CabalFile  file      ) -> cabal                  file

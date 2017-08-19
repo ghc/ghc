@@ -2,7 +2,7 @@ module Oracles.PackageData (
     PackageData (..), PackageDataList (..), pkgData, pkgDataList
     ) where
 
-import Hadrian.Oracles.KeyValue
+import Hadrian.Oracles.TextFile
 
 import Base
 

@@ -1,6 +1,6 @@
 module Rules.Compile (compilePackage) where
 
-import Hadrian.Oracles.KeyValue
+import Hadrian.Oracles.TextFile
 
 import Base
 import Context

@@ -2,9 +2,8 @@ module Rules (buildRules, oracleRules, packageTargets, topLevelTargets) where
 
 import qualified Hadrian.Oracles.ArgsHash
 import qualified Hadrian.Oracles.DirectoryContents
-import qualified Hadrian.Oracles.FileCache
-import qualified Hadrian.Oracles.KeyValue
 import qualified Hadrian.Oracles.Path
+import qualified Hadrian.Oracles.TextFile
 
 import Context
 import Expression
@@ -24,7 +23,6 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
-import Settings.Builders.GhcCabal
 import Target
 import Utilities
 
@@ -107,17 +105,12 @@ buildRules = do
     packageRules
     Rules.Perl.perlScriptRules
 
-generators :: [(FilePattern, FilePath -> Action String)]
-generators = [ ("//" -/- bootPackageConstraints, bootPackageConstraintsGenerator)
-             , ("//" -/- packageDependencies   , packageDependenciesGenerator   ) ]
-
 oracleRules :: Rules ()
 oracleRules = do
     Hadrian.Oracles.ArgsHash.argsHashOracle trackArgument getArgs
     Hadrian.Oracles.DirectoryContents.directoryContentsOracle
-    Hadrian.Oracles.FileCache.fileCacheRules generators
-    Hadrian.Oracles.KeyValue.keyValueOracle
     Hadrian.Oracles.Path.pathOracle
+    Hadrian.Oracles.TextFile.textFileOracle
     Oracles.ModuleFiles.moduleFilesOracle
 
 programsStage1Only :: [Package]

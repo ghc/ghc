@@ -7,7 +7,7 @@ module Oracles.Setting (
     ) where
 
 import Hadrian.Expression
-import Hadrian.Oracles.KeyValue
+import Hadrian.Oracles.TextFile
 import Hadrian.Oracles.Path
 
 import Base

@@ -3,7 +3,7 @@ module Oracles.Flag (
     ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
-import Hadrian.Oracles.KeyValue
+import Hadrian.Oracles.TextFile
 
 import Base
 import Oracles.Setting
