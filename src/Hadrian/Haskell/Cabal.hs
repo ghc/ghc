@@ -11,7 +11,6 @@
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (pkgNameVersion, pkgDependencies) where
 
-import Data.List
 import Development.Shake
 
 import Hadrian.Haskell.Cabal.Parse
@@ -32,4 +31,4 @@ pkgNameVersion pkg = do
 pkgDependencies :: Package -> Action [PackageName]
 pkgDependencies pkg = do
     cabal <- readCabalFile (pkgCabalFile pkg)
-    return (dependencies cabal \\ [pkgName pkg])
+    return (dependencies cabal)

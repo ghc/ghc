@@ -44,14 +44,14 @@ parseCabal :: FilePath -> IO Cabal
 parseCabal file = do
     gpd <- liftIO $ C.readGenericPackageDescription C.silent file
     let pkgId   = C.package (C.packageDescription gpd)
+        name    = C.unPackageName (C.pkgName pkgId)
+        version = C.display (C.pkgVersion pkgId)
         libDeps = collectDeps (C.condLibrary gpd)
         exeDeps = map (collectDeps . Just . snd) (C.condExecutables gpd)
         allDeps = concat (libDeps : exeDeps)
         sorted  = sort [ C.unPackageName p | C.Dependency p _ <- allDeps ]
-    return $ Cabal
-        (C.unPackageName $ C.pkgName pkgId)
-        (C.display $ C.pkgVersion pkgId)
-        (nubOrd sorted)
+        deps    = nubOrd sorted \\ [name]
+    return $ Cabal name version deps
 
 collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
 collectDeps Nothing = []

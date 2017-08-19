@@ -52,11 +52,11 @@ pathOracle = do
     void $ addOracle $ \(WindowsPath path) -> do
         Stdout out <- quietly $ cmd ["cygpath", "-m", path]
         let windowsPath = unifyPath $ dropWhileEnd isSpace out
-        putLoud $ "Windows path mapping: " ++ path ++ " => " ++ windowsPath
+        putLoud $ "| Windows path mapping: " ++ path ++ " => " ++ windowsPath
         return windowsPath
 
     void $ addOracle $ \(LookupInPath name) -> do
         let unpack = fromMaybe . error $ "Cannot find executable " ++ quote name
         path <- unifyPath <$> unpack <$> liftIO (findExecutable name)
-        putLoud $ "Executable found: " ++ name ++ " => " ++ path
+        putLoud $ "| Executable found: " ++ name ++ " => " ++ path
         return path

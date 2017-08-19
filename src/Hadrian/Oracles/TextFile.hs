@@ -23,8 +23,8 @@ import Development.Shake
 import Development.Shake.Classes
 import Development.Shake.Config
 
-import Hadrian.Utilities
 import Hadrian.Haskell.Cabal.Parse
+import Hadrian.Utilities
 
 newtype TextFile = TextFile FilePath
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -32,7 +32,7 @@ type instance RuleResult TextFile = String
 
 newtype CabalFile = CabalFile FilePath
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
-type instance RuleResult CabalFile = String
+type instance RuleResult CabalFile = Cabal
 
 newtype KeyValue = KeyValue (FilePath, String)
     deriving (Binary, Eq, Hashable, NFData, Show, Typeable)
@@ -99,22 +99,25 @@ textFileOracle :: Rules ()
 textFileOracle = do
     text <- newCache $ \file -> do
         need [file]
-        putLoud $ "Reading " ++ file ++ "..."
+        putLoud $ "| TextFile oracle: reading " ++ quote file ++ "..."
         liftIO $ readFile file
+    void $ addOracle $ \(TextFile file) -> text file
+
     kv <- newCache $ \file -> do
         need [file]
-        putLoud $ "Reading " ++ file ++ "..."
+        putLoud $ "| KeyValue oracle: reading " ++ quote file ++ "..."
         liftIO $ readConfigFile file
+    void $ addOracle $ \(KeyValue (file, key)) -> Map.lookup key <$> kv file
+
     kvs <- newCache $ \file -> do
         need [file]
-        putLoud $ "Reading " ++ file ++ "..."
+        putLoud $ "| KeyValues oracle: reading " ++ quote file ++ "..."
         contents <- map words <$> readFileLines file
         return $ Map.fromList [ (key, values) | (key:values) <- contents ]
+    void $ addOracle $ \(KeyValues (file, key)) -> Map.lookup key <$> kvs file
+
     cabal <- newCache $ \file -> do
         need [file]
-        putLoud $ "Reading " ++ file ++ "..."
+        putLoud $ "| CabalFile oracle: reading " ++ quote file ++ "..."
         liftIO $ parseCabal file
-    void $ addOracle $ \(TextFile   file      ) -> text                   file
-    void $ addOracle $ \(KeyValue  (file, key)) -> Map.lookup key <$> kv  file
-    void $ addOracle $ \(KeyValues (file, key)) -> Map.lookup key <$> kvs file
-    void $ addOracle $ \(CabalFile  file      ) -> cabal                  file
+    void $ addOracle $ \(CabalFile file) -> cabal file
