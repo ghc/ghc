@@ -186,7 +186,9 @@ installPackages = do
             withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
-                installDistDir <- (top -/-) <$> buildPath context
+                installDistDir <- buildPath context
+                let absInstallDistDir = top -/- installDistDir
+
                 need =<< packageTargets stage pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
@@ -203,7 +205,7 @@ installPackages = do
                 need [cabalFile, pkgConf] -- TODO: check if need pkgConf
 
                 -- HACK (#318): copy stuff back to the place favored by ghc-cabal
-                quietly $ copyDirectoryContents (Not excluded)
+                quietly $ copyDirectoryContentsUntracked (Not excluded)
                     installDistDir (installDistDir -/- "build")
 
                 whenM (isSpecified HsColour) $
@@ -212,7 +214,7 @@ installPackages = do
                 pref <- setting InstallPrefix
                 unit $ cmd ghcCabalInplace [ "copy"
                                            , pkgPath pkg
-                                           , installDistDir
+                                           , absInstallDistDir
                                            , strip
                                            , destDir
                                            , pref

@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 module Hadrian.Oracles.DirectoryContents (
-    directoryContents, copyDirectoryContents, directoryContentsOracle,
+    directoryContents, copyDirectoryContents, directoryContentsOracle, copyDirectoryContentsUntracked,
     Match (..), matches, matchAll
     ) where
 
@@ -43,6 +43,14 @@ copyDirectoryContents :: Match -> FilePath -> FilePath -> Action ()
 copyDirectoryContents expr source target = do
     putProgressInfo =<< renderAction "Copy directory contents" source target
     let cp file = copyFile file $ target -/- makeRelative source file
+    mapM_ cp =<< directoryContents expr source
+
+-- | Copy the contents of the source directory that matches a given 'Match'
+-- expression into the target directory. The copied contents is untracked.
+copyDirectoryContentsUntracked :: Match -> FilePath -> FilePath -> Action ()
+copyDirectoryContentsUntracked expr source target = do
+    putProgressInfo =<< renderAction "Copy directory contents (untracked)" source target
+    let cp file = copyFileUntracked file $ target -/- makeRelative source file
     mapM_ cp =<< directoryContents expr source
 
 newtype DirectoryContents = DirectoryContents (Match, FilePath)
