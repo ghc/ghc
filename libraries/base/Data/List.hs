@@ -76,7 +76,6 @@ module Data.List
 
    -- ** Infinite lists
    , iterate
-   , iterate'
    , repeat
    , replicate
    , cycle

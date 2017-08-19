@@ -77,7 +77,6 @@ module Data.OldList
 
    -- ** Infinite lists
    , iterate
-   , iterate'
    , repeat
    , replicate
    , cycle

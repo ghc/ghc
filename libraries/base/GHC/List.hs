@@ -23,7 +23,7 @@ module GHC.List (
    map, (++), filter, concat,
    head, last, tail, init, uncons, null, length, (!!),
    foldl, foldl', foldl1, foldl1', scanl, scanl1, scanl', foldr, foldr1,
-   scanr, scanr1, iterate, iterate', repeat, replicate, cycle,
+   scanr, scanr1, iterate, repeat, replicate, cycle,
    take, drop, sum, product, maximum, minimum, splitAt, takeWhile, dropWhile,
    span, break, reverse, and, or,
    any, all, elem, notElem, lookup,
@@ -455,29 +455,6 @@ iterateFB c f x0 = go x0
 {-# RULES
 "iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
 "iterateFB"  [1]                iterateFB (:) = iterate
- #-}
-
-
--- | 'iterate\'' is the strict version of 'iterate'.
---
--- It ensures that the result of each application of force to weak head normal
--- form before proceeding.
-{-# NOINLINE [1] iterate' #-}
-iterate' :: (a -> a) -> a -> [a]
-iterate' f x =
-    let x' = f x
-    in x' `seq` (x : iterate' f x')
-
-{-# INLINE [0] iterate'FB #-} -- See Note [Inline FB functions]
-iterate'FB :: (a -> b -> b) -> (a -> a) -> a -> b
-iterate'FB c f x0 = go x0
-  where go x =
-            let x' = f x
-            in x' `seq` (x `c` go x')
-
-{-# RULES
-"iterate'"    [~1] forall f x.   iterate' f x = build (\c _n -> iterate'FB c f x)
-"iterate'FB"  [1]                iterate'FB (:) = iterate'
  #-}
 
 
