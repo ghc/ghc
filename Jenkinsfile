@@ -159,8 +159,6 @@ def buildGhc(params) {
   String makeCmd = params?.makeCmd ?: 'make'
 
   withGhcSrcDist() {
-    echo "${targetTriple}"
-    echo "${params}"
     stage('Configure') {
       sh 'echo $PATH'
       sh "which ghc"
