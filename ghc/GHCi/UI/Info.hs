@@ -3,7 +3,7 @@
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
--- | Get information on modules, expreesions, and identifiers
+-- | Get information on modules, expressions, and identifiers
 module GHCi.UI.Info
     ( ModInfo(..)
     , SpanInfo(..)
