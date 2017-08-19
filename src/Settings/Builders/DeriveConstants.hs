@@ -5,8 +5,11 @@ import Settings.Builders.Common
 -- TODO: do we need to support `includes_CC_OPTS += -DDYNAMIC_BY_DEFAULT`?
 deriveConstantsBuilderArgs :: Args
 deriveConstantsBuilderArgs = builder DeriveConstants ? do
-    cFlags                <- includeCcArgs
-    [outputFile, tempDir] <- getOutputs
+    cFlags <- includeCcArgs
+    outs   <- getOutputs
+    let (outputFile, tempDir) = case outs of
+            [a, b] -> (a, b)
+            _      -> error $ "DeriveConstants: expected two outputs, got " ++ show outs
     mconcat
         [ output "//DerivedConstants.h"             ? arg "--gen-header"
         , output "//GHCConstantsHaskellType.hs"     ? arg "--gen-haskell-type"
