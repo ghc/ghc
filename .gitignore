@@ -21,3 +21,6 @@ cabal.sandbox.config
 
 # Mostly temp file by emacs
 *~
+
+# ghcid output
+/ghcid.txt
