@@ -72,7 +72,7 @@ parallel (
     }
   },
   "linux x86-64 -> aarch64 unreg" : {
-    node(label: 'linux && amd64') {buildAndTestGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu', unreg: true)}
+    node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu', unreg: true)}
   },
   "linux x86-64 -> aarch64" : {
     node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu')}
