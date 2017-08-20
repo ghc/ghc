@@ -1,6 +1,7 @@
 module CommandLine (
     optDescrs, cmdLineArgsMap, cmdBuildHaddock, cmdFlavour, cmdIntegerSimple,
-    cmdProgressColour, cmdProgressInfo, cmdSkipConfigure, cmdSplitObjects
+    cmdProgressColour, cmdProgressInfo, cmdSkipConfigure, cmdSplitObjects,
+    cmdInstallDestDir
     ) where
 
 import Data.Either
@@ -14,6 +15,7 @@ import System.Environment
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
     { buildHaddock   :: Bool
+    , installDestDir :: Maybe String
     , flavour        :: Maybe String
     , integerSimple  :: Bool
     , progressColour :: UseColour
@@ -27,6 +29,7 @@ defaultCommandLineArgs :: CommandLineArgs
 defaultCommandLineArgs = CommandLineArgs
     { buildHaddock   = False
     , flavour        = Nothing
+    , installDestDir = Nothing
     , integerSimple  = False
     , progressColour = Auto
     , progressInfo   = Normal
@@ -38,6 +41,9 @@ readBuildHaddock = Right $ \flags -> flags { buildHaddock = True }
 
 readFlavour :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
 readFlavour ms = Right $ \flags -> flags { flavour = lower <$> ms }
+
+readInstallDestDir :: Maybe String -> Either String (CommandLineArgs -> CommandLineArgs)
+readInstallDestDir ms = Right $ \flags -> flags { installDestDir = ms }
 
 readIntegerSimple :: Either String (CommandLineArgs -> CommandLineArgs)
 readIntegerSimple = Right $ \flags -> flags { integerSimple = True }
@@ -80,6 +86,8 @@ optDescrs =
       "Build flavour (Default, Devel1, Devel2, Perf, Prof, Quick or Quickest)."
     , Option [] ["haddock"] (NoArg readBuildHaddock)
       "Generate Haddock documentation."
+    , Option [] ["install-destdir"] (OptArg readInstallDestDir "DESTDIR")
+      "Installation destination directory."
     , Option [] ["integer-simple"] (NoArg readIntegerSimple)
       "Build GHC with integer-simple library."
     , Option [] ["progress-colour"] (OptArg readProgressColour "MODE")
@@ -106,6 +114,9 @@ cmdLineArgs = userSetting defaultCommandLineArgs
 
 cmdBuildHaddock :: Action Bool
 cmdBuildHaddock = buildHaddock <$> cmdLineArgs
+
+cmdInstallDestDir :: Action (Maybe String)
+cmdInstallDestDir = installDestDir <$> cmdLineArgs
 
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs

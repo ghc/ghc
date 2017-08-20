@@ -60,6 +60,7 @@ getLibExecDir = (-/- "bin") <$> installGhcLibDir
 installLibExecScripts :: Action ()
 installLibExecScripts = do
     libExecDir <- getLibExecDir
+    destDir <- getDestDir
     installDirectory (destDir ++ libExecDir)
     forM_ libExecScripts $ \script -> do
         installScript script (destDir ++ libExecDir)
@@ -72,6 +73,7 @@ installLibExecScripts = do
 installLibExecs :: Action ()
 installLibExecs = do
     libExecDir <- getLibExecDir
+    destDir <- getDestDir
     installDirectory (destDir ++ libExecDir)
     forM_ installBinPkgs $ \pkg -> do
         withLatestBuildStage pkg $ \stage -> do
@@ -88,6 +90,7 @@ installBins :: Action ()
 installBins = do
     binDir <- setting InstallBinDir
     libDir <- installGhcLibDir
+    destDir <- getDestDir
     installDirectory (destDir ++ binDir)
     win <- windowsHost
     when win $
@@ -153,6 +156,7 @@ installPackages = do
 
     ghcLibDir <- installGhcLibDir
     binDir    <- setting InstallBinDir
+    destDir   <- getDestDir
 
     -- Install package.conf
     let installedPackageConf = destDir ++ ghcLibDir -/- "package.conf.d"
@@ -271,6 +275,7 @@ installPackages = do
 installCommonLibs :: Action ()
 installCommonLibs = do
     ghcLibDir <- installGhcLibDir
+    destDir   <- getDestDir
     installLibsTo inplaceLibCopyTargets (destDir ++ ghcLibDir)
 
 -- ref: ghc.mk
@@ -296,6 +301,7 @@ includeHSubdirs = [".", "rts", "rts/prof", "rts/storage", "stg"]
 installIncludes :: Action ()
 installIncludes = do
     ghclibDir <- installGhcLibDir
+    destDir   <- getDestDir
     let ghcheaderDir = ghclibDir -/- "include"
     installDirectory (destDir ++ ghcheaderDir)
     forM_ includeHSubdirs $ \dir -> do

@@ -2,7 +2,7 @@ module Settings (
     getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, stagePackages,
     builderPath, getBuilderPath, isSpecified, latestBuildStage, programPath,
-    programContext, integerLibraryName, destDir, stage1Only, buildDll0
+    programContext, integerLibraryName, getDestDir, stage1Only, buildDll0
     ) where
 
 import Context
@@ -103,7 +103,6 @@ programPath context@Context {..} = do
 stage1Only :: Bool
 stage1Only = defaultStage1Only
 
--- TODO: Set this from command line
 -- | Install's DESTDIR setting.
-destDir :: FilePath
-destDir = defaultDestDir
+getDestDir :: Action FilePath
+getDestDir = fromMaybe "" <$> cmdInstallDestDir

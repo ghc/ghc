@@ -62,6 +62,7 @@ rtsPackageArgs = package rts ? do
     ffiIncludeDir  <- getSetting FfiIncludeDir
     ffiLibraryDir  <- getSetting FfiLibDir
     ghclibDir      <- expr installGhcLibDir
+    destDir        <- expr getDestDir
     let cArgs =
           [ arg "-Irts"
           , arg $ "-I" ++ path
