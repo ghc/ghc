@@ -189,7 +189,7 @@ installPackages = do
                 installDistDir <- buildPath context
                 let absInstallDistDir = top -/- installDistDir
 
-                need =<< packageTargets stage pkg
+                need =<< packageTargets True stage pkg
                 docDir <- installDocDir
                 ghclibDir <- installGhcLibDir
 

@@ -203,21 +203,24 @@ stage1Dependencies :: Package -> Action [Package]
 stage1Dependencies =
     fmap (map Context.package) . contextDependencies . vanillaContext Stage1
 
--- | Given a library 'Package' this action computes all of its targets.
-libraryTargets :: Context -> Action [FilePath]
-libraryTargets context = do
+-- | Given a library 'Package' this action computes all of its targets. See
+-- 'packageTargets' for the explanation of the @includeGhciLib@ parameter.
+libraryTargets :: Bool -> Context -> Action [FilePath]
+libraryTargets includeGhciLib context = do
     confFile <- pkgConfFile        context
     libFile  <- pkgLibraryFile     context
     lib0File <- pkgLibraryFile0    context
     lib0     <- buildDll0          context
     ghciLib  <- pkgGhciLibraryFile context
-    ghciFlag <- interpretInContext context $ getPkgData BuildGhciLib
+    ghciFlag <- if includeGhciLib
+                then interpretInContext context $ getPkgData BuildGhciLib
+                else return "NO"
     let ghci = ghciFlag == "YES" && (stage context == Stage1 || stage1Only)
     return $ [ confFile, libFile ] ++ [ lib0File | lib0 ] ++ [ ghciLib | ghci ]
 
 -- | Coarse-grain 'need': make sure all given libraries are fully built.
 needLibrary :: [Context] -> Action ()
-needLibrary cs = need =<< concatMapM libraryTargets cs
+needLibrary cs = need =<< concatMapM (libraryTargets True) cs
 
 -- HACK (izgzhen), see https://github.com/snowleopard/hadrian/issues/344.
 -- | Topological sort of packages according to their dependencies.

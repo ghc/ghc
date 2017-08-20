@@ -2,6 +2,8 @@ module Settings.Builders.Ghc (
     ghcBuilderArgs, ghcMBuilderArgs, haddockGhcArgs, ghcCbuilderArgs
     ) where
 
+import Hadrian.Haskell.Cabal
+
 import Flavour
 import Rules.Gmp
 import Settings.Builders.Common
@@ -116,7 +118,8 @@ wayGhcArgs = do
 -- FIXME: Get rid of to-be-deprecated -this-package-key.
 packageGhcArgs :: Args
 packageGhcArgs = do
-    compId  <- getPkgData ComponentId
+    pkg     <- getPackage
+    pkgId   <- expr $ pkgIdentifier pkg
     thisArg <- do
         not0 <- notStage0
         unit <- expr $ flag SupportsThisUnitId
@@ -124,7 +127,7 @@ packageGhcArgs = do
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , bootPackageDatabaseArgs
-            , libraryPackage ? arg (thisArg ++ compId)
+            , libraryPackage ? arg (thisArg ++ pkgId)
             , map ("-package-id " ++) <$> getPkgDataList DepIds ]
 
 includeGhcArgs :: Args

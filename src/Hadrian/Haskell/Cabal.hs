@@ -9,7 +9,9 @@
 -- Basic functionality for extracting Haskell package metadata stored in
 -- @.cabal@ files.
 -----------------------------------------------------------------------------
-module Hadrian.Haskell.Cabal (pkgNameVersion, pkgDependencies) where
+module Hadrian.Haskell.Cabal (
+    pkgNameVersion, pkgIdentifier, pkgDependencies
+    ) where
 
 import Development.Shake
 
@@ -23,6 +25,20 @@ pkgNameVersion :: Package -> Action (PackageName, String)
 pkgNameVersion pkg = do
     cabal <- readCabalFile (pkgCabalFile pkg)
     return (name cabal, version cabal)
+
+-- | Read the @.cabal@ file of a given package and return the package identifier.
+-- If the @.cabal@ file does not exist return the package name. If the @.cabal@
+-- file exists it is tracked.
+pkgIdentifier :: Package -> Action String
+pkgIdentifier pkg = do
+    cabalExists <- doesFileExist (pkgCabalFile pkg)
+    if cabalExists
+    then do
+        cabal <- readCabalFile (pkgCabalFile pkg)
+        return $ if (null $ version cabal)
+            then name cabal
+            else name cabal ++ "-" ++ version cabal
+    else return (pkgName pkg)
 
 -- | Read the @.cabal@ file of a given package and return the sorted list of its
 -- dependencies. The current version does not take care of Cabal conditionals

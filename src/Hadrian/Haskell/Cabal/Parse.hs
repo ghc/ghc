@@ -22,11 +22,12 @@ import qualified Distribution.Verbosity                as C
 
 import Hadrian.Haskell.Package
 
+-- TODO: Use fine-grain tracking instead of tracking the whole @.cabal@ file.
 -- | Haskell package metadata extracted from a @.cabal@ file.
 data Cabal = Cabal
-    { name         :: PackageName
+    { dependencies :: [PackageName]
+    , name         :: PackageName
     , version      :: String
-    , dependencies :: [PackageName]
     } deriving (Eq, Read, Show, Typeable)
 
 instance Binary Cabal where
@@ -51,7 +52,7 @@ parseCabal file = do
         allDeps = concat (libDeps : exeDeps)
         sorted  = sort [ C.unPackageName p | C.Dependency p _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
-    return $ Cabal name version deps
+    return $ Cabal deps name version
 
 collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
 collectDeps Nothing = []

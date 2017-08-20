@@ -7,7 +7,6 @@ import Hadrian.Oracles.TextFile
 import Base
 
 data PackageData = BuildGhciLib FilePath
-                 | ComponentId  FilePath
                  | Synopsis     FilePath
                  | Version      FilePath
 
@@ -40,7 +39,6 @@ askPackageData path = lookupValueOrEmpty (path -/- "package-data.mk")
 pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of
     BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
-    ComponentId  path -> askPackageData path "COMPONENT_ID"
     Synopsis     path -> askPackageData path "SYNOPSIS"
     Version      path -> askPackageData path "VERSION"
 

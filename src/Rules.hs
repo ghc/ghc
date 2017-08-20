@@ -37,17 +37,26 @@ topLevelTargets = action $ do
     need =<< if stage1Only
              then do
                  libs <- concatForM [Stage0, Stage1] $ \stage ->
-                     concatForM libraryPackages $ packageTargets stage
-                 prgs <- concatForM programsStage1Only $ packageTargets Stage0
+                     concatForM libraryPackages $ packageTargets False stage
+                 prgs <- concatForM programsStage1Only $ packageTargets False Stage0
                  return $ libs ++ prgs ++ inplaceLibCopyTargets
              else do
                  targets <- concatForM allStages $ \stage ->
-                                concatForM (knownPackages \\ [rts, libffi]) $ packageTargets stage
+                     concatForM (knownPackages \\ [rts, libffi]) $
+                        packageTargets False stage
                  return $ targets ++ inplaceLibCopyTargets
 
+
+-- TODO: Get rid of the @includeGhciLib@ hack.
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.
-packageTargets :: Stage -> Package -> Action [FilePath]
-packageTargets stage pkg = do
+-- By setting the Boolean parameter to False it is possible to exclude the GHCi
+-- library from the targets, and avoid running @ghc-cabal@ to determine wether
+-- GHCi library needs to be built for this package. We typically want to set
+-- this parameter to True, however it is important to set it to False when
+-- computing 'topLevelTargets', as otherwise the whole build gets sequentialised
+-- because we need to run @ghc-cabal@ in the order respecting package dependencies.
+packageTargets :: Bool -> Stage -> Package -> Action [FilePath]
+packageTargets includeGhciLib stage pkg = do
     let context = vanillaContext stage pkg
     activePackages <- interpretInContext context getPackages
     if pkg `notElem` activePackages
@@ -57,7 +66,7 @@ packageTargets stage pkg = do
             ways    <- interpretInContext context getLibraryWays
             libs    <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs    <- interpretInContext context =<< buildHaddock <$> flavour
-            more    <- libraryTargets context
+            more    <- libraryTargets includeGhciLib context
             setup   <- pkgSetupConfigFile context
             haddock <- pkgHaddockFile     context
             return $ [ setup   | nonCabalContext context ]

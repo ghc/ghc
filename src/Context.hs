@@ -13,9 +13,9 @@ module Context (
 
 import GHC.Generics
 import Hadrian.Expression
+import Hadrian.Haskell.Cabal
 
 import Base
-import Oracles.PackageData
 import Oracles.Setting
 
 -- | Build context for a currently built 'Target'. We generate potentially
@@ -68,10 +68,10 @@ contextDir :: Context -> FilePath
 contextDir Context {..} = stageString stage -/- pkgPath package
 
 pkgFile :: Context -> String -> String -> Action FilePath
-pkgFile context prefix suffix = do
-    path <- buildPath context
-    componentId <- pkgData $ ComponentId path
-    return $ path -/- prefix ++ componentId ++ suffix
+pkgFile context@Context {..} prefix suffix = do
+    path  <- buildPath context
+    pkgId <- pkgIdentifier package
+    return $ path -/- prefix ++ pkgId ++ suffix
 
 -- | Path to inplace package configuration file of a given 'Context'.
 pkgInplaceConfig :: Context -> Action FilePath
@@ -120,13 +120,12 @@ pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 
 -- | Path to the configuration file of a given 'Context'.
 pkgConfFile :: Context -> Action FilePath
-pkgConfFile context@Context {..} = do
-    root        <- buildRoot
-    path        <- buildPath context
-    componentId <- pkgData $ ComponentId path
+pkgConfFile Context {..} = do
+    root  <- buildRoot
+    pkgId <- pkgIdentifier package
     let dbDir | stage == Stage0 = root -/- stage0PackageDbDir
               | otherwise       = inplacePackageDbPath
-    return $ dbDir -/- componentId <.> "conf"
+    return $ dbDir -/- pkgId <.> "conf"
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example:
