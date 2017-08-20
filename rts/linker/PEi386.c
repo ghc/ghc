@@ -156,6 +156,13 @@ static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
         (PIMAGE_IMPORT_DESCRIPTOR)((BYTE *)instance + header->
         OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 
+    bool importTableMissing =
+        header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size == 0;
+
+    if (importTableMissing) {
+        return;
+    }
+
     /* Ignore these compatibility shims.  */
     const pathchar* ms_dll = WSTR("api-ms-win-");
     const int len = wcslen(ms_dll);
