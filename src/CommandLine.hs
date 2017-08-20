@@ -15,8 +15,8 @@ import System.Environment
 -- | All arguments that can be passed to Hadrian via the command line.
 data CommandLineArgs = CommandLineArgs
     { buildHaddock   :: Bool
-    , installDestDir :: Maybe String
     , flavour        :: Maybe String
+    , installDestDir :: Maybe String
     , integerSimple  :: Bool
     , progressColour :: UseColour
     , progressInfo   :: ProgressInfo
@@ -115,11 +115,11 @@ cmdLineArgs = userSetting defaultCommandLineArgs
 cmdBuildHaddock :: Action Bool
 cmdBuildHaddock = buildHaddock <$> cmdLineArgs
 
-cmdInstallDestDir :: Action (Maybe String)
-cmdInstallDestDir = installDestDir <$> cmdLineArgs
-
 cmdFlavour :: Action (Maybe String)
 cmdFlavour = flavour <$> cmdLineArgs
+
+cmdInstallDestDir :: Action (Maybe String)
+cmdInstallDestDir = installDestDir <$> cmdLineArgs
 
 cmdIntegerSimple :: Action Bool
 cmdIntegerSimple = integerSimple <$> cmdLineArgs
@@ -135,4 +135,3 @@ cmdSkipConfigure = skipConfigure <$> cmdLineArgs
 
 cmdSplitObjects :: Action Bool
 cmdSplitObjects = splitObjects <$> cmdLineArgs
-

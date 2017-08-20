@@ -177,7 +177,7 @@ copyFile source target = do
     let dir = takeDirectory target
     liftIO $ IO.createDirectoryIfMissing True dir
     putProgressInfo =<< renderAction "Copy file" source target
-    copyFileChanged source target
+    quietly $ copyFileChanged source target
 
 -- | Copy a file without tracking the source. Create the target directory if missing.
 copyFileUntracked :: FilePath -> FilePath -> Action ()
