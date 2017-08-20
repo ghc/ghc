@@ -10,7 +10,7 @@
 -- @.cabal@ files.
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
-    pkgVersion, pkgIdentifier, pkgDependencies
+    pkgVersion, pkgIdentifier, pkgDependencies, pkgSynopsis
     ) where
 
 import Control.Monad
@@ -32,7 +32,7 @@ pkgVersion pkg = do
 -- e.g. @base-4.10.0.0@. If the @.cabal@ file does not exist return just the
 -- package name, e.g. @rts@. If the @.cabal@ file exists then it is tracked, and
 -- furthermore we check that the recorded package name matches the name of the
--- package passed as the parameter and raise an error otherwise.
+-- package passed as the parameter, and raise an error otherwise.
 pkgIdentifier :: Package -> Action String
 pkgIdentifier pkg = do
     cabalExists <- doesFileExist (pkgCabalFile pkg)
@@ -56,3 +56,15 @@ pkgDependencies :: Package -> Action [PackageName]
 pkgDependencies pkg = do
     cabal <- readCabalFile (pkgCabalFile pkg)
     return (dependencies cabal)
+
+-- | Read the @.cabal@ file of a given package and return the package synopsis
+-- or @Nothing@ if the @.cabal@ file does not exist. The existence and contents
+-- of the @.cabal@ file are tracked.
+pkgSynopsis :: Package -> Action (Maybe String)
+pkgSynopsis pkg = do
+    cabalExists <- doesFileExist (pkgCabalFile pkg)
+    if not cabalExists
+    then return Nothing
+    else do
+        cabal <- readCabalFile (pkgCabalFile pkg)
+        return $ Just (synopsis cabal)

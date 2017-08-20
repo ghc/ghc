@@ -19,7 +19,7 @@ haddockBuilderArgs = builder Haddock ? do
     pkg      <- getPackage
     path     <- getBuildPath
     version  <- expr $ pkgVersion pkg
-    synopsis <- getPkgData Synopsis
+    synopsis <- fromMaybe "" <$> expr (pkgSynopsis pkg)
     deps     <- getPkgDataList Deps
     haddocks <- expr . haddockDependencies =<< getContext
     hVersion <- expr $ pkgVersion haddock

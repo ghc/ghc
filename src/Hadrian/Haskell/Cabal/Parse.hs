@@ -27,6 +27,7 @@ import Hadrian.Haskell.Package
 data Cabal = Cabal
     { dependencies :: [PackageName]
     , name         :: PackageName
+    , synopsis     :: String
     , version      :: String
     } deriving (Eq, Read, Show, Typeable)
 
@@ -38,13 +39,14 @@ instance Hashable Cabal where
     hashWithSalt salt = hashWithSalt salt . show
 
 instance NFData Cabal where
-    rnf (Cabal a b c) = a `seq` b `seq` c `seq` ()
+    rnf (Cabal a b c d) = a `seq` b `seq` c `seq` d `seq` ()
 
 -- | Parse a @.cabal@ file.
 parseCabal :: FilePath -> IO Cabal
 parseCabal file = do
     gpd <- liftIO $ C.readGenericPackageDescription C.silent file
-    let pkgId   = C.package (C.packageDescription gpd)
+    let pd      = C.packageDescription gpd
+        pkgId   = C.package pd
         name    = C.unPackageName (C.pkgName pkgId)
         version = C.display (C.pkgVersion pkgId)
         libDeps = collectDeps (C.condLibrary gpd)
@@ -52,7 +54,7 @@ parseCabal file = do
         allDeps = concat (libDeps : exeDeps)
         sorted  = sort [ C.unPackageName p | C.Dependency p _ <- allDeps ]
         deps    = nubOrd sorted \\ [name]
-    return $ Cabal deps name version
+    return $ Cabal deps name (C.synopsis pd) version
 
 collectDeps :: Maybe (C.CondTree v [C.Dependency] a) -> [C.Dependency]
 collectDeps Nothing = []

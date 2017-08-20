@@ -2,7 +2,7 @@ module Rules.Library (
     buildPackageLibrary, buildPackageGhciLibrary, buildDynamicLib
     ) where
 
-import Data.Char
+import Hadrian.Haskell.Cabal
 import qualified System.Directory as IO
 
 import Base
@@ -61,10 +61,10 @@ buildPackageLibrary context@Context {..} = do
         if isLib0 then build $ target context (Ar stage) []   [a] -- TODO: Scan for dlls
                   else build $ target context (Ar stage) objs [a]
 
-        synopsis <- interpretInContext context $ getPkgData Synopsis
+        synopsis <- pkgSynopsis package
         unless isLib0 . putSuccess $ renderLibrary
             (quote (pkgName package) ++ " (" ++ show stage ++ ", way "
-            ++ show way ++ ").") a (dropWhileEnd isPunctuation synopsis)
+            ++ show way ++ ").") a synopsis
 
 buildPackageGhciLibrary :: Context -> Rules ()
 buildPackageGhciLibrary context@Context {..} = priority 2 $ do

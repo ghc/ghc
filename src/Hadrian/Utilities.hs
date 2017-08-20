@@ -36,6 +36,7 @@ module Hadrian.Utilities (
     ) where
 
 import Control.Monad.Extra
+import Data.Char
 import Data.Dynamic (Dynamic, fromDynamic, toDyn)
 import Data.HashMap.Strict (HashMap)
 import Data.List.Extra
@@ -302,16 +303,22 @@ renderAction what input output = do
     o = unifyPath output
 
 -- | Render the successful build of a program.
-renderProgram :: String -> String -> String -> String
-renderProgram name bin synopsis = renderBox [ "Successfully built program " ++ name
-                                            , "Executable: " ++ bin
-                                            , "Program synopsis: " ++ synopsis ++ "."]
+renderProgram :: String -> String -> Maybe String -> String
+renderProgram name bin synopsis = renderBox $
+    [ "Successfully built program " ++ name
+    , "Executable: " ++ bin ] ++
+    [ "Program synopsis: " ++ prettySynopsis synopsis | isJust synopsis ]
 
 -- | Render the successful build of a library.
-renderLibrary :: String -> String -> String -> String
-renderLibrary name lib synopsis = renderBox [ "Successfully built library " ++ name
-                                            , "Library: " ++ lib
-                                            , "Library synopsis: " ++ synopsis ++ "."]
+renderLibrary :: String -> String -> Maybe String -> String
+renderLibrary name lib synopsis = renderBox $
+    [ "Successfully built library " ++ name
+    , "Library: " ++ lib ] ++
+    [ "Library synopsis: " ++ prettySynopsis synopsis | isJust synopsis ]
+
+prettySynopsis :: Maybe String -> String
+prettySynopsis Nothing  = ""
+prettySynopsis (Just s) = dropWhileEnd isPunctuation s ++ "."
 
 -- | Render the given set of lines in an ASCII box. The minimum width and
 -- whether to use Unicode symbols are hardcoded in the function's body.

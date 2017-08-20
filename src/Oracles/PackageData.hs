@@ -7,7 +7,6 @@ import Hadrian.Oracles.TextFile
 import Base
 
 data PackageData = BuildGhciLib FilePath
-                 | Synopsis     FilePath
 
 data PackageDataList = AsmSrcs        FilePath
                      | CcArgs         FilePath
@@ -38,7 +37,6 @@ askPackageData path = lookupValueOrEmpty (path -/- "package-data.mk")
 pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of
     BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
-    Synopsis     path -> askPackageData path "SYNOPSIS"
 
 -- | @PackageDataList path@ is used for multiple string options separated by
 -- spaces, such as @path_MODULES = Data.Array Data.Array.Base ...@.

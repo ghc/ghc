@@ -68,8 +68,7 @@ generatePackageData context@Context {..} file = do
         [ "DEP_EXTRA_LIBS = m"                 | package == hp2ps           ] ++
         [ "CC_OPTS = -I" ++ genPath            | package `elem` [hp2ps, rts]] ++
         [ "MODULES = Main"                     | package == ghcCabal        ] ++
-        [ "HS_SRC_DIRS = ."                    | package == ghcCabal        ] ++
-        [ "SYNOPSIS = Bootstrapped ghc-cabal." | package == ghcCabal        ]
+        [ "HS_SRC_DIRS = ."                    | package == ghcCabal        ]
     putSuccess $ "| Successfully generated " ++ file
 
 packageCSources :: Package -> Action [FilePath]

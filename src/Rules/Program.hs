@@ -1,6 +1,6 @@
 module Rules.Program (buildProgram) where
 
-import Data.Char
+import Hadrian.Haskell.Cabal
 
 import Base
 import Context
@@ -105,8 +105,6 @@ buildBinary rs context@Context {..} bin = do
                   ++ [ path -/- "Paths_haddock.o" | package == haddock ]
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
-    synopsis <- interpretInContext context $ getPkgData Synopsis
+    synopsis <- pkgSynopsis package
     putSuccess $ renderProgram
-        (quote (pkgName package) ++ " (" ++ show stage ++ ").")
-        bin
-        (dropWhileEnd isPunctuation synopsis)
+        (quote (pkgName package) ++ " (" ++ show stage ++ ").") bin synopsis
