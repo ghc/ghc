@@ -61,9 +61,7 @@ generatePackageData context@Context {..} file = do
     cSrcs   <- packageCSources   package
     cmmSrcs <- packageCmmSources package
     genPath <- buildRoot <&> (-/- generatedDir)
-    let pkgKey = if isLibrary package then "COMPONENT_ID = " else "PROGNAME = "
     writeFileChanged file . unlines $
-        [ pkgKey ++ pkgName package                                         ] ++
         [ "S_SRCS = "   ++ unwords asmSrcs                                  ] ++
         [ "C_SRCS = "   ++ unwords cSrcs                                    ] ++
         [ "CMM_SRCS = " ++ unwords cmmSrcs                                  ] ++

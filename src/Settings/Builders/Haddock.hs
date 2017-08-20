@@ -1,6 +1,7 @@
 module Settings.Builders.Haddock (haddockBuilderArgs) where
 
 import Hadrian.Utilities
+import Hadrian.Haskell.Cabal
 
 import Rules.Documentation
 import Settings.Builders.Common
@@ -17,12 +18,11 @@ haddockBuilderArgs = builder Haddock ? do
     output   <- getOutput
     pkg      <- getPackage
     path     <- getBuildPath
-    version  <- getPkgData Version
+    version  <- expr $ pkgVersion pkg
     synopsis <- getPkgData Synopsis
     deps     <- getPkgDataList Deps
     haddocks <- expr . haddockDependencies =<< getContext
-    progPath <- expr $ buildPath (vanillaContext Stage2 haddock)
-    hVersion <- expr $ pkgData (Version progPath)
+    hVersion <- expr $ pkgVersion haddock
     ghcOpts  <- haddockGhcArgs
     mconcat
         [ arg $ "--odir=" ++ takeDirectory output

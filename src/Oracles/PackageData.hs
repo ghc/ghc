@@ -8,7 +8,6 @@ import Base
 
 data PackageData = BuildGhciLib FilePath
                  | Synopsis     FilePath
-                 | Version      FilePath
 
 data PackageDataList = AsmSrcs        FilePath
                      | CcArgs         FilePath
@@ -40,7 +39,6 @@ pkgData :: PackageData -> Action String
 pkgData packageData = case packageData of
     BuildGhciLib path -> askPackageData path "BUILD_GHCI_LIB"
     Synopsis     path -> askPackageData path "SYNOPSIS"
-    Version      path -> askPackageData path "VERSION"
 
 -- | @PackageDataList path@ is used for multiple string options separated by
 -- spaces, such as @path_MODULES = Data.Array Data.Array.Base ...@.
