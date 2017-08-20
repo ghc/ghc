@@ -108,7 +108,7 @@ import CoreMap
 import NameEnv
 import Control.Monad( (>=>) )
 import Name (NamedThing (..), mkFCallName, nameUnique)
-import Unique (mkUniqueGrimily, getKey)
+import Unique (mkUniqueGrimily, getKey, getUnique)
 
 --------------
 -- The Trie --
@@ -143,7 +143,7 @@ instance NamedThing LaxDataCon where
     where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
           hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
           unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
-          long = length (dataConOrigArgTys dc) > 1
+          long = True -- length (dataConOrigArgTys dc) > 0
   getName (Lax dc) = getName dc
 
 
@@ -354,11 +354,13 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 -- A constructor application.
 -- To be removed by a variable use when found in the CSE environment
 stgCseExpr env (StgConApp dataCon args tys)
-    | Just bndr' <- envLookup (Lax dataCon) args' env
-    = StgApp bndr' []
+    | Just bndr' <- envLookup dc args' env
+    = (if getKey u < 0 then pprTrace "stgCseExpr" (ppr dataCon) else id) $ StgApp bndr' []
     | otherwise
     = StgConApp dataCon args' tys
   where args' = substArgs env args
+        dc = Lax dataCon
+        u = getUnique (getName dc)
 
 -- Let bindings
 -- The binding might be removed due to CSE (we do not want trivial bindings on
