@@ -261,7 +261,11 @@ lockPackageDbWith mode file = do
                    return $ PackageDbLock hnd
 
 lockPackageDb = lockPackageDbWith ExclusiveLock
-unlockPackageDb (PackageDbLock hnd) = hClose hnd
+unlockPackageDb (PackageDbLock hnd) = do
+#if MIN_VERSION_base(4,11,0)
+    hUnlock hnd
+#endif
+    hClose hnd
 
 -- MIN_VERSION_base(4,10,0)
 #else
