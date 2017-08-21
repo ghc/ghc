@@ -16,6 +16,7 @@ module Haddock.Backends.LaTeX (
 ) where
 
 
+import Documentation.Haddock.Markup
 import Haddock.Types
 import Haddock.Utils
 import Haddock.GhcUtils
@@ -227,8 +228,8 @@ isExportModule _ = Nothing
 processExport :: ExportItem DocNameI -> LaTeX
 processExport (ExportGroup lev _id0 doc)
   = ppDocGroup lev (docToLaTeX doc)
-processExport (ExportDecl decl doc subdocs insts fixities _splice)
-  = ppDecl decl doc insts subdocs fixities
+processExport (ExportDecl decl pats doc subdocs insts fixities _splice)
+  = ppDecl decl pats doc insts subdocs fixities
 processExport (ExportNoDecl y [])
   = ppDocName y
 processExport (ExportNoDecl y subs)
@@ -278,16 +279,17 @@ moduleBasename mdl = map (\c -> if c == '.' then '-' else c)
 
 
 ppDecl :: LHsDecl DocNameI
+       -> [(HsDecl DocNameI, DocForDecl DocName)]
        -> DocForDecl DocName
        -> [DocInstance DocNameI]
        -> [(DocName, DocForDecl DocName)]
        -> [(DocName, Fixity)]
        -> LaTeX
 
-ppDecl (L loc decl) (doc, fnArgsDoc) instances subdocs _fixities = case decl of
+ppDecl (L loc decl) pats (doc, fnArgsDoc) instances subdocs _fixities = case decl of
   TyClD d@(FamDecl {})          -> ppTyFam False loc doc d unicode
   TyClD d@(DataDecl {})
-                                -> ppDataDecl instances subdocs loc (Just doc) d unicode
+                                -> ppDataDecl pats instances subdocs loc (Just doc) d unicode
   TyClD d@(SynDecl {})          -> ppTySyn loc (doc, fnArgsDoc) d unicode
 -- Family instances happen via FamInst now
 --  TyClD d@(TySynonym {})
@@ -565,11 +567,11 @@ lookupAnySubdoc n subdocs = case lookup n subdocs of
 -------------------------------------------------------------------------------
 
 
-ppDataDecl :: [DocInstance DocNameI] ->
+ppDataDecl :: [(HsDecl DocNameI, DocForDecl DocName)] -> [DocInstance DocNameI] ->
               [(DocName, DocForDecl DocName)] -> SrcSpan ->
               Maybe (Documentation DocName) -> TyClDecl DocNameI -> Bool ->
               LaTeX
-ppDataDecl instances subdocs _loc doc dataDecl unicode
+ppDataDecl pats instances subdocs _loc doc dataDecl unicode
 
    =  declWithDoc (ppDataHeader dataDecl unicode <+> whereBit)
                   (if null body then Nothing else Just (vcat body))
@@ -579,10 +581,12 @@ ppDataDecl instances subdocs _loc doc dataDecl unicode
     cons      = dd_cons (tcdDataDefn dataDecl)
     resTy     = (unLoc . head) cons
 
-    body = catMaybes [constrBit, doc >>= documentationToLaTeX]
+    body = catMaybes [constrBit,patternBit, doc >>= documentationToLaTeX]
 
     (whereBit, leaders)
-      | null cons = (empty,[])
+      | null cons
+      , null pats = (empty,[])
+      | null cons = (decltt (keyword "where"), repeat empty)
       | otherwise = case resTy of
         ConDeclGADT{} -> (decltt (keyword "where"), repeat empty)
         _             -> (empty, (decltt (text "=") : repeat (decltt (text "|"))))
@@ -592,6 +596,19 @@ ppDataDecl instances subdocs _loc doc dataDecl unicode
       | otherwise = Just $
           text "\\haddockbeginconstrs" $$
           vcat (zipWith (ppSideBySideConstr subdocs unicode) leaders cons) $$
+          text "\\end{tabulary}\\par"
+
+    patternBit
+      | null cons = Nothing
+      | otherwise = Just $
+          text "\\haddockbeginconstrs" $$
+          vcat [ hsep [ keyword "pattern"
+                      , hsep $ punctuate comma $ map (ppDocBinder . unLoc) lnames
+                      , dcolon unicode
+                      , ppLType unicode (hsSigType ty)
+                      ] <-> rDoc (fmap _doc . combineDocumentation . fst $ d)
+               | (SigD (PatSynSig lnames ty),d) <- pats
+               ] $$
           text "\\end{tabulary}\\par"
 
     instancesBit = ppDocInstances unicode instances

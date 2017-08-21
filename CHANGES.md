@@ -1,12 +1,49 @@
-Changes in version 2.17.3
+## Changes in version 2.18.2
+
+ * to be released
+
+ * Fix renaming of type variables after specializing instance method signatures (#613)
+
+ * Move markup related data types to haddock-library
+
+ * Fix: Show empty constraint contexts in pattern type signatures (#663)
+
+ * Fix: Generate constraint signatures for constructors exported as pattern
+   synonyms (#663)
+
+## Changes in version 2.18.1
+
+ * Synopsis is working again (#599)
+
+ * Per-argument documentation on class methods working again (#647)
+
+ * Support user defined signatures on pattern synonyms
+
+ * Support for bundled pattern synonyms (#494, #551, #626)
+
+## Changes in version 2.17.4
+
+ * Fix 'internal error: links: UnhelpfulSpan' (#554, #565)
+
+ * Hyperlink backend knows about `DataKinds` (#510)
+
+ * Fix rendering of class methods for `Eq` and `Ord` (#549)
+
+ * Export `MDoc` and `toInstalledIface` from `Haddock.Types`
+
+## Changes in version 2.17.3.1
+
+ * Disable `NFData` instances for GHC types when GHC >= 8.0.2 (#537)
+
+## Changes in version 2.17.3
 
  * Remove framed view of the HTML documentation
 
-Changes in version 2.17.2
+## Changes in version 2.17.2
 
  * Fix portability of documentation building within GHC
 
-Changes in version 2.17.1
+## Changes in version 2.17.1
 
  * Included with GHC 8.0.1
 
@@ -14,7 +51,7 @@ Changes in version 2.17.1
 
  * Fixed clean rule of GHC Makefile
 
-Changes in version 2.17.0 (not released)
+## Changes in version 2.17.0 (not released)
 
  * Support typesetting of mathematical expressions via Mathjax (#397)
 
@@ -24,7 +61,7 @@ Changes in version 2.17.0 (not released)
 
  * Support GCC-like response files (#470)
 
-Changes in version 2.16.2
+## Changes in version 2.16.2
 
  * Generate hyperlinked source ourselves (#410, part of GSOC 2015)
 
@@ -36,7 +73,7 @@ Changes in version 2.16.2
 
  * Line anchors in hyperlinked source (#420)
 
-Changes in version 2.16.1
+## Changes in version 2.16.1
 
  * Don't default to type constructors for out-of-scope names (#253 and
    #375)
@@ -59,7 +96,7 @@ Changes in version 2.16.1
 
  * Fix alignment of Source link for instances in Firefox (#384)
 
-Changes in version 2.16.0
+## Changes in version 2.16.0
 
  * Experimental collapsible header support (#335)
 
@@ -93,7 +130,7 @@ Changes in version 2.16.0
 
  * Deal better with long synopsis lines (#151)
 
-Changes in version 2.15.0
+## Changes in version 2.15.0
 
  * Always read in prologue files as UTF8 (#286 and Cabal #1721)
 
@@ -123,13 +160,13 @@ Changes in version 2.15.0
  * Remove some files which were really old or did not belong in the
    repository in the first place.
 
-Changes in version 2.14.3
+## Changes in version 2.14.3
 
  * Fix parsing of identifiers with ^ or ⋆ in them (#298)
 
  * Fix anchors (#308)
 
-Changes in version 2.14.2
+## Changes in version 2.14.2
 
  * Always drop --split-objs GHC flag for performance reasons (#292)
 
@@ -139,7 +176,7 @@ Changes in version 2.14.2
 
  * Fix crashes associated with exporting data family record selectors (#294)
 
-Changes in version 2.14.1
+## Changes in version 2.14.1
 
  * Render * and -> with their UnicodeSyntax equivalents if -U is enabled
 
@@ -147,7 +184,7 @@ Changes in version 2.14.1
 
  * Hide right hand side of TF instances with hidden names on the RHS
 
-Changes in version 2.14.0
+## Changes in version 2.14.0
 
  * Print entities with missing documentation (#258)
 
@@ -196,7 +233,7 @@ Changes in version 2.14.0
  * Bird tracks specified like "> code" no longer suffer from an extra leading
    space in the code output
 
-Changes in version 2.13.2
+## Changes in version 2.13.2
 
  * Handle HsExplicitListTy in renamer (#213)
 
@@ -207,7 +244,7 @@ Changes in version 2.13.2
  * Include everything that is required to run the test suite with the cabal
    package (#230)
 
-Changes in version 2.13.1
+## Changes in version 2.13.1
 
  * Hide instances that are "internal" to a module
 
@@ -217,13 +254,13 @@ Changes in version 2.13.1
 
  * Fix and extend the Haddock API
 
-Changes in version 2.12.0
+## Changes in version 2.12.0
 
  * Labeled URLs (e.g <http://example.net/ some label>)
 
  * Improved memory usage (new dependency: deepseq)
 
-Changes in version 2.11.0
+## Changes in version 2.11.0
 
  * Show deprecation messages for identifiers
 
@@ -244,7 +281,7 @@ Changes in version 2.11.0
 
  * Access to unexported identifiers through the Haddock API again
 
-Changes in version 2.10.0
+## Changes in version 2.10.0
 
  * Require GHC >= 7.4
 
@@ -260,13 +297,13 @@ Changes in version 2.10.0
 
  * Bug fix: module references to other packages work again
 
-Changes in version 2.9.4
+## Changes in version 2.9.4
 
   * Require GHC >= 7.2
 
   * Support Alex 3.x
 
-Changes in version 2.9.3
+## Changes in version 2.9.3
 
   [This is the version that comes with GHC 7.2.1 although it claims it's 2.9.2!]
 
@@ -278,19 +315,19 @@ Changes in version 2.9.3
 
   * Minor bug fixes
 
-Changes in version 2.9.2
+## Changes in version 2.9.2
 
   * Build with GHC 7.0.2
 
   * Write Hoogle output in utf8; fixes GHC build on Windows
 
-Changes in version 2.9.1
+## Changes in version 2.9.1
 
   * Fix build in GHC tree
 
   * Improve .cabal file
 
-Changes in version 2.9.0
+## Changes in version 2.9.0
 
   * Drop support for ghc < 7
 
@@ -304,7 +341,7 @@ Changes in version 2.9.0
 
   * Minor changes to the API
 
-Changes in the version that comes with GHC 7.0.1
+## Changes in the version that comes with GHC 7.0.1
 
   [This version claims it is 2.8.0 but is actually based on 2.8.1]
 
@@ -312,11 +349,11 @@ Changes in the version that comes with GHC 7.0.1
 
   * Support GHC 7.0
 
-Changes in version 2.8.1
+## Changes in version 2.8.1
 
   * Fix build on Windows with MinGW
 
-Changes in version 2.8.0
+## Changes in version 2.8.0
 
   * HTML backend completely rewritten to generate semantically rich XHTML
     using the xhtml package.
@@ -350,25 +387,25 @@ Changes in version 2.8.0
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.6.1 (bug fix release from the stable branch)
+## Changes in version 2.6.1 (bug fix release from the stable branch)
 
   * Fix #128
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.7.2
+## Changes in version 2.7.2
 
   * Add Paths_haddock to library
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.7.1:
+## Changes in version 2.7.1:
 
   * Fix problems with library part of .cabal file
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.7.0:
+## Changes in version 2.7.0:
 
   * Instances can be commented
 
@@ -378,7 +415,7 @@ Changes in version 2.7.0:
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.6.0:
+## Changes in version 2.6.0:
 
   * Drop support for GHC 6.10.*
 
@@ -498,7 +535,7 @@ Changed in version 2.2.2:
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.2.1:
+## Changes in version 2.2.1:
 
   * Support for GHC 6.8.3
 
@@ -519,7 +556,7 @@ Changes in version 2.2.1:
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.1.0:
+## Changes in version 2.1.0:
 
   * Fix a bug that made links point to the defining module instead
     of the "best" one (e.g Int pointing to GHC.Base instead of Data.Int)
@@ -532,7 +569,7 @@ Changes in version 2.1.0:
 
 -----------------------------------------------------------------------------
 
-Changes in version 2.0.0.0:
+## Changes in version 2.0.0.0:
 
   * The GHC API is used as the front-end
 
@@ -565,7 +602,7 @@ Changes in version 2.0.0.0:
 
 -----------------------------------------------------------------------------
 
-Changes in version 0.9:
+## Changes in version 0.9:
 
   * Infix type operators, e.g., first :: a~>a' -> (a,b)~>(a',b)
 
@@ -591,7 +628,7 @@ Changes in version 0.9:
 
 -----------------------------------------------------------------------------
 
-Changes in version 0.8:
+## Changes in version 0.8:
 
   * Haddock has a Cabal build system, and will build on Windows without
     Cygwin or MSYS.  GHC 6.4 or later is required.
@@ -610,9 +647,9 @@ Changes in version 0.8:
 
 -----------------------------------------------------------------------------
 
-Changes in version 0.7:
+## Changes in version 0.7:
 
-  * Changes in the way Haddock decides where to direct hyperlinks.  Each entity
+  * ## Changes in the way Haddock decides where to direct hyperlinks.  Each entity
     is now assigned a single "home" module, and all hyperlinks are directed
     to that module.  See the docs ("Hyperlinking and re-exported entities")
     for details.
@@ -638,7 +675,7 @@ Changes in version 0.7:
 
 -----------------------------------------------------------------------------
 
-Changes in version 0.6:
+## Changes in version 0.6:
 
   * Implicit parameters, zip comprehensions and 'mdo' are now
     supported by the parser.
@@ -675,7 +712,7 @@ Changes in version 0.6:
 
 -----------------------------------------------------------------------------
 
-Changes in version 0.5:
+## Changes in version 0.5:
 
   * Compiles with recent versions of GHC.
 
@@ -685,7 +722,7 @@ Changes in version 0.5:
 
 -----------------------------------------------------------------------------
 
-Changes in version 0.4:
+## Changes in version 0.4:
 
   * Import declarations which list entities in parentheses, or with
     hiding clauses, are now properly supported.  Modulo one or two
@@ -708,7 +745,7 @@ Changes in version 0.4:
   * Many bugs fixed
 
 -----------------------------------------------------------------------------
-Changes in version 0.3:
+## Changes in version 0.3:
 
   * Documentation on individual function arguments is now implemented
 
@@ -729,7 +766,7 @@ Changes in version 0.3:
   * Various bugs fixed.
 
 -----------------------------------------------------------------------------
-Changes in version 0.2:
+## Changes in version 0.2:
 
   * The [...] markup for typewriter font has been changed to @...@.
 

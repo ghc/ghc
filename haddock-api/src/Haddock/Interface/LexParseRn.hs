@@ -35,20 +35,21 @@ import EnumSet
 import RnEnv (dataTcOccs)
 
 processDocStrings :: DynFlags -> GlobalRdrEnv -> [HsDocString]
-                  -> Maybe (MDoc Name)
-processDocStrings dflags gre strs =
-  case metaDocConcat $ map (processDocStringParas dflags gre) strs of
+                  -> ErrMsgM (Maybe (MDoc Name))
+processDocStrings dflags gre strs = do
+  mdoc <- metaDocConcat <$> traverse (processDocStringParas dflags gre) strs
+  case mdoc of
     -- We check that we don't have any version info to render instead
     -- of just checking if there is no comment: there may not be a
     -- comment but we still want to pass through any meta data.
-    MetaDoc { _meta = Meta { _version = Nothing }, _doc = DocEmpty } -> Nothing
-    x -> Just x
+    MetaDoc { _meta = Meta { _version = Nothing }, _doc = DocEmpty } -> pure Nothing
+    x -> pure (Just x)
 
-processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> MDoc Name
+processDocStringParas :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (MDoc Name)
 processDocStringParas dflags gre (HsDocString fs) =
-  overDoc (rename dflags gre) $ parseParas dflags (unpackFS fs)
+  overDocF (rename dflags gre) $ parseParas dflags (unpackFS fs)
 
-processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> Doc Name
+processDocString :: DynFlags -> GlobalRdrEnv -> HsDocString -> ErrMsgM (Doc Name)
 processDocString dflags gre (HsDocString fs) =
   rename dflags gre $ parseString dflags (unpackFS fs)
 
@@ -61,9 +62,11 @@ processModuleHeader dflags gre safety mayStr = do
       Just (L _ (HsDocString fs)) -> do
         let str = unpackFS fs
             (hmi, doc) = parseModuleHeader dflags str
-            !descr = rename dflags gre <$> hmi_description hmi
-            hmi' = hmi { hmi_description = descr }
-            doc' = overDoc (rename dflags gre) doc
+        !descr <- case hmi_description hmi of
+                    Just hmi_descr -> Just <$> rename dflags gre hmi_descr
+                    Nothing        -> pure Nothing
+        let hmi' = hmi { hmi_description = descr }
+        doc'  <- overDocF (rename dflags gre) doc
         return (hmi', Just doc')
 
   let flags :: [LangExt.Extension]
@@ -83,12 +86,12 @@ processModuleHeader dflags gre safety mayStr = do
 -- fallbacks in case we can't locate the identifiers.
 --
 -- See the comments in the source for implementation commentary.
-rename :: DynFlags -> GlobalRdrEnv -> Doc RdrName -> Doc Name
+rename :: DynFlags -> GlobalRdrEnv -> Doc RdrName -> ErrMsgM (Doc Name)
 rename dflags gre = rn
   where
     rn d = case d of
-      DocAppend a b -> DocAppend (rn a) (rn b)
-      DocParagraph doc -> DocParagraph (rn doc)
+      DocAppend a b -> DocAppend <$> rn a <*> rn b
+      DocParagraph doc -> DocParagraph <$> rn doc
       DocIdentifier x -> do
         -- Generate the choices for the possible kind of thing this
         -- is.
@@ -101,7 +104,7 @@ rename dflags gre = rn
           -- We found no names in the env so we start guessing.
           [] ->
             case choices of
-              [] -> DocMonospaced (DocString (showPpr dflags x))
+              [] -> pure (DocMonospaced (DocString (showPpr dflags x)))
               -- There was nothing in the environment so we need to
               -- pick some default from what's available to us. We
               -- diverge here from the old way where we would default
@@ -110,37 +113,37 @@ rename dflags gre = rn
               -- type constructor names (such as in #253). So now we
               -- only get type constructor links if they are actually
               -- in scope.
-              a:_ -> outOfScope dflags a
+              a:_ -> pure (outOfScope dflags a)
 
           -- There is only one name in the environment that matches so
           -- use it.
-          [a] -> DocIdentifier a
+          [a] -> pure (DocIdentifier a)
           -- But when there are multiple names available, default to
           -- type constructors: somewhat awfully GHC returns the
           -- values in the list positionally.
-          a:b:_ | isTyConName a -> DocIdentifier a
-                | otherwise -> DocIdentifier b
+          a:b:_ | isTyConName a -> pure (DocIdentifier a)
+                | otherwise -> pure (DocIdentifier b)
 
-      DocWarning doc -> DocWarning (rn doc)
-      DocEmphasis doc -> DocEmphasis (rn doc)
-      DocBold doc -> DocBold (rn doc)
-      DocMonospaced doc -> DocMonospaced (rn doc)
-      DocUnorderedList docs -> DocUnorderedList (map rn docs)
-      DocOrderedList docs -> DocOrderedList (map rn docs)
-      DocDefList list -> DocDefList [ (rn a, rn b) | (a, b) <- list ]
-      DocCodeBlock doc -> DocCodeBlock (rn doc)
-      DocIdentifierUnchecked x -> DocIdentifierUnchecked x
-      DocModule str -> DocModule str
-      DocHyperlink l -> DocHyperlink l
-      DocPic str -> DocPic str
-      DocMathInline str -> DocMathInline str
-      DocMathDisplay str -> DocMathDisplay str
-      DocAName str -> DocAName str
-      DocProperty p -> DocProperty p
-      DocExamples e -> DocExamples e
-      DocEmpty -> DocEmpty
-      DocString str -> DocString str
-      DocHeader (Header l t) -> DocHeader $ Header l (rn t)
+      DocWarning doc -> DocWarning <$> rn doc
+      DocEmphasis doc -> DocEmphasis <$> rn doc
+      DocBold doc -> DocBold <$> rn doc
+      DocMonospaced doc -> DocMonospaced <$> rn doc
+      DocUnorderedList docs -> DocUnorderedList <$> traverse rn docs
+      DocOrderedList docs -> DocOrderedList <$> traverse rn docs
+      DocDefList list -> DocDefList <$> traverse (\(a, b) -> (,) <$> rn a <*> rn b) list
+      DocCodeBlock doc -> DocCodeBlock <$> rn doc
+      DocIdentifierUnchecked x -> pure (DocIdentifierUnchecked x)
+      DocModule str -> pure (DocModule str)
+      DocHyperlink l -> pure (DocHyperlink l)
+      DocPic str -> pure (DocPic str)
+      DocMathInline str -> pure (DocMathInline str)
+      DocMathDisplay str -> pure (DocMathDisplay str)
+      DocAName str -> pure (DocAName str)
+      DocProperty p -> pure (DocProperty p)
+      DocExamples e -> pure (DocExamples e)
+      DocEmpty -> pure (DocEmpty)
+      DocString str -> pure (DocString str)
+      DocHeader (Header l t) -> DocHeader . Header l <$> rn t
 
 -- | Wrap an identifier that's out of scope (i.e. wasn't found in
 -- 'GlobalReaderEnv' during 'rename') in an appropriate doc. Currently

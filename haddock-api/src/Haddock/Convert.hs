@@ -30,7 +30,7 @@ import Name
 import NameSet ( emptyNameSet )
 import RdrName ( mkVarUnqual )
 import PatSyn
-import SrcLoc ( Located, noLoc, unLoc )
+import SrcLoc ( Located, noLoc, unLoc, GenLocated(..), srcLocSpan )
 import TcType ( tcSplitSigmaTy )
 import TyCon
 import Type
@@ -319,7 +319,7 @@ synifyDataCon use_gadt_syntax dc =
                          , con_doc =  Nothing }
 
 synifyName :: NamedThing n => n -> Located Name
-synifyName = noLoc . getName
+synifyName n = L (srcLocSpan (getSrcLoc n)) (getName n)
 
 
 synifyIdSig :: SynifyTypeState -> Id -> Sig GhcRn

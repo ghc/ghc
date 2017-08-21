@@ -2,7 +2,7 @@
     Rank2Types, RecordWildCards, TypeFamilies #-}
 -- |
 -- Module      :  Data.Attoparsec.Internal.Types
--- Copyright   :  Bryan O'Sullivan 2007-2014
+-- Copyright   :  Bryan O'Sullivan 2007-2015
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -25,14 +25,17 @@ module Data.Attoparsec.Internal.Types
     , Chunk(..)
     ) where
 
-import Control.Applicative (Alternative(..), Applicative(..), (<$>))
+import Control.Applicative as App (Applicative(..), (<$>))
+import Control.Applicative (Alternative(..))
 import Control.DeepSeq (NFData(rnf))
 import Control.Monad (MonadPlus(..))
+import qualified Control.Monad.Fail as Fail (MonadFail(..))
+import Data.Monoid as Mon (Monoid(..))
+import Data.Semigroup  (Semigroup(..))
 import Data.Word (Word8)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
 import Data.ByteString.Internal (w2c)
-import Data.Monoid (Monoid(..))
 import Prelude hiding (getChar, succ)
 import qualified Data.Attoparsec.ByteString.Buffer as B
 
@@ -63,10 +66,13 @@ data IResult i r =
     -- not yet been consumed (if any) when the parse succeeded.
 
 instance (Show i, Show r) => Show (IResult i r) where
-    show (Fail t stk msg) =
-      unwords [ "Fail", show t, show stk, show msg]
-    show (Partial _)          = "Partial _"
-    show (Done t r)       = unwords ["Done", show t, show r]
+    showsPrec d ir = showParen (d > 10) $
+      case ir of
+        (Fail t stk msg) -> showString "Fail" . f t . f stk . f msg
+        (Partial _)      -> showString "Partial _"
+        (Done t r)       -> showString "Done" . f t . f r
+      where f :: Show a => a -> ShowS
+            f x = showChar ' ' . showsPrec 11 x
 
 instance (NFData i, NFData r) => NFData (IResult i r) where
     rnf (Fail t stk msg) = rnf t `seq` rnf stk `seq` rnf msg
@@ -79,8 +85,8 @@ instance Functor (IResult i) where
     fmap f (Partial k)      = Partial (fmap f . k)
     fmap f (Done t r)   = Done t (f r)
 
--- | The core parser type.  This is parameterised over the types @i@
--- of string being processed and @t@ of internal state representation.
+-- | The core parser type.  This is parameterised over the type @i@
+-- of string being processed.
 --
 -- This type is an instance of the following classes:
 --
@@ -116,23 +122,34 @@ type Success i t a r = t -> Pos -> More -> a -> IResult i r
 data More = Complete | Incomplete
             deriving (Eq, Show)
 
-instance Monoid More where
-    mappend c@Complete _ = c
-    mappend _ m          = m
-    mempty               = Incomplete
+instance Semigroup More where
+    c@Complete <> _ = c
+    _          <> m = m
+
+instance Mon.Monoid More where
+    mappend = (<>)
+    mempty  = Incomplete
 
 instance Monad (Parser i) where
-    fail err = Parser $ \t pos more lose _succ -> lose t pos more [] msg
-      where msg = "Failed reading: " ++ err
+    fail = Fail.fail
     {-# INLINE fail #-}
 
-    return = pure
+    return = App.pure
     {-# INLINE return #-}
 
     m >>= k = Parser $ \t !pos more lose succ ->
         let succ' t' !pos' more' a = runParser (k a) t' pos' more' lose succ
         in runParser m t pos more lose succ'
     {-# INLINE (>>=) #-}
+
+    (>>) = (*>)
+    {-# INLINE (>>) #-}
+
+
+instance Fail.MonadFail (Parser i) where
+    fail err = Parser $ \t pos more lose _succ -> lose t pos more [] msg
+      where msg = "Failed reading: " ++ err
+    {-# INLINE fail #-}
 
 plus :: Parser i a -> Parser i a -> Parser i a
 plus f g = Parser $ \t pos more lose succ ->
@@ -162,19 +179,19 @@ instance Applicative (Parser i) where
     {-# INLINE pure #-}
     (<*>)  = apP
     {-# INLINE (<*>) #-}
-
-    -- These definitions are equal to the defaults, but this
-    -- way the optimizer doesn't have to work so hard to figure
-    -- that out.
     m *> k = m >>= \_ -> k
     {-# INLINE (*>) #-}
-    x <* y = x >>= \a -> y >> return a
+    x <* y = x >>= \a -> y >> pure a
     {-# INLINE (<*) #-}
+
+instance Semigroup (Parser i a) where
+    (<>) = plus
+    {-# INLINE (<>) #-}
 
 instance Monoid (Parser i a) where
     mempty  = fail "mempty"
     {-# INLINE mempty #-}
-    mappend = plus
+    mappend = (<>)
     {-# INLINE mappend #-}
 
 instance Alternative (Parser i) where
@@ -186,7 +203,7 @@ instance Alternative (Parser i) where
 
     many v = many_v
         where many_v = some_v <|> pure []
-              some_v = (:) <$> v <*> many_v
+              some_v = (:) App.<$> v <*> many_v
     {-# INLINE many #-}
 
     some v = some_v
@@ -194,10 +211,6 @@ instance Alternative (Parser i) where
         many_v = some_v <|> pure []
         some_v = (:) <$> v <*> many_v
     {-# INLINE some #-}
-
-(<>) :: (Monoid m) => m -> m -> m
-(<>) = mappend
-{-# INLINE (<>) #-}
 
 -- | A common interface for input chunks.
 class Monoid c => Chunk c where

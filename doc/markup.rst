@@ -8,7 +8,7 @@ will just generate documentation that contains the type signatures, data
 type declarations, and class declarations exported by each of the
 modules being processed.
 
-Documenting a top-level declaration
+Documenting a Top-Level Declaration
 -----------------------------------
 
 The simplest example of a documentation annotation is for documenting
@@ -35,6 +35,8 @@ the following:
 
 -  A type signature for a top-level function,
 
+-  A definition for a top-level function with no type signature,
+
 -  A ``data`` declaration,
 
 -  A ``newtype`` declaration,
@@ -57,9 +59,12 @@ this is possible in Haddock too: ::
     -- ^The 'square' function squares an integer.
     square x = x * x
 
-Note that Haddock doesn't contain a Haskell type system — if you don't
-write the type signature for a function, then Haddock can't tell what
-its type is and it won't be included in the documentation.
+Since Haddock uses the GHC API internally, it can infer types for
+top-level functions without type signatures. However, you're
+encouraged to add explicit type signatures for all top-level
+functions, to make your source code more readable for your users, and
+at times to avoid GHC inferring overly general type signatures that
+are less helpful to your users.
 
 Documentation annotations may span several lines; the annotation
 continues until the first non-comment line in the source file. For
@@ -81,13 +86,13 @@ comments: ::
     square :: Int -> Int
     square x = x * x
 
-Documenting parts of a declaration
+Documenting Parts of a Declaration
 ----------------------------------
 
 In addition to documenting the whole declaration, in some cases we can
 also document individual parts of the declaration.
 
-Class methods
+Class Methods
 ~~~~~~~~~~~~~
 
 Class methods are documented in the same way as top level type
@@ -99,7 +104,7 @@ signatures, by using either the ``-- |`` or ``-- ^`` annotations: ::
        -- | This is the documentation for the 'g' method
        g :: Int -> a
 
-Constructors and record fields
+Constructors and Record Fields
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Constructors are documented like so: ::
@@ -150,7 +155,7 @@ would join up documentation of each field and render the result. The
 reason for this seemingly weird behaviour is the fact that ``someField``
 is actually the same (partial) function.
 
-Function arguments
+Function Arguments
 ~~~~~~~~~~~~~~~~~~
 
 Individual arguments to a function may be documented like this: ::
@@ -159,7 +164,9 @@ Individual arguments to a function may be documented like this: ::
        -> Float    -- ^ The 'Float' argument
        -> IO ()    -- ^ The return value
 
-The module description
+.. _module-description:
+
+The Module Description
 ----------------------
 
 A module itself may be documented with multiple fields that can then be
@@ -183,50 +190,100 @@ module documentation example and then talk about the fields. ::
     module W where
     ...
 
-The “Module” field should be clear. It currently doesn't affect the
-output of any of the backends but you might want to include it for human
-information or for any other tools that might be parsing these comments
-without the help of GHC.
-
-The “Description” field accepts some short text which outlines the
-general purpose of the module. If you're generating HTML, it will show
-up next to the module link in the module index.
-
-The “Copyright”, “License”, “Maintainer” and “Stability” fields should
-be obvious. An alternative spelling for the “License” field is accepted
-as “Licence” but the output will always prefer “License”.
-
-The “Portability” field has seen varied use by different library
-authors. Some people put down things like operating system constraints
-there while others put down which GHC extensions are used in the module.
-Note that you might want to consider using the “show-extensions” module
-flag for the latter.
-
-Finally, a module may contain a documentation comment before the module
-header, in which case this comment is interpreted by Haddock as an
-overall description of the module itself, and placed in a section
-entitled “Description” in the documentation for the module. All usual
-Haddock markup is valid in this comment.
-
 All fields are optional but they must be in order if they do appear.
 Multi-line fields are accepted but the consecutive lines have to start
 indented more than their label. If your label is indented one space as
-is often the case with “--” syntax, the consecutive lines have to start
-at two spaces at the very least. Please note that we do not enforce the
-format for any of the fields and the established formats are just a
-convention.
+is often the case with the ``--`` syntax, the consecutive lines have
+to start at two spaces at the very least. For example, above we saw a
+multiline ``Copyright`` field: ::
 
-Controlling the documentation structure
+    {-|
+    ...
+    Copyright   : (c) Some Guy, 2013
+                      Someone Else, 2014
+    ...
+    -}
+
+That could equivalently be written as ::
+
+    -- | ...
+    -- Copyright:
+    --  (c) Some Guy, 2013
+    --  Someone Else, 2014
+    -- ...
+
+or as ::
+
+    -- | ...
+    -- Copyright: (c) Some Guy, 2013
+    --     Someone Else, 2014
+    -- ...
+
+but not as ::
+
+    -- | ...
+    -- Copyright: (c) Some Guy, 2013
+    -- Someone Else, 2014
+    -- ...
+
+since the ``Someone`` needs to be indented more than the
+``Copyright``.
+
+Whether new lines and other formatting in multiline fields is
+preserved depends on the field type. For example, new lines in the
+``Copyright`` field are preserved, but new lines in the
+``Description`` field are not; leading whitespace is not preserved in
+either [#backend]_. Please note that we do not enforce the format for
+any of the fields and the established formats are just a convention.
+
+.. [#backend] Technically, whitespace and newlines in the
+   ``Description`` field are preserved verbatim by the HTML backend,
+   but because most browsers collapse whitespace in HTML, they don't
+   render as such. But other backends may render this whitespace.
+
+Fields of the Module Description
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``Module`` field specifies the current module name. Since the module
+name can be inferred automatically from the source file, it doesn't
+affect the output of any of the backends. But you might want to
+include it for any other tools that might be parsing these comments
+without the help of GHC.
+
+The ``Description`` field accepts some short text which outlines the
+general purpose of the module. If you're generating HTML, it will show
+up next to the module link in the module index.
+
+The ``Copyright``, ``License``, ``Maintainer`` and ``Stability`` fields should
+be obvious. An alternative spelling for the ``License`` field is accepted
+as ``Licence`` but the output will always prefer ``License``.
+
+The ``Portability`` field has seen varied use by different library
+authors. Some people put down things like operating system constraints
+there while others put down which GHC extensions are used in the module.
+Note that you might want to consider using the ``show-extensions`` module
+flag for the latter (see :ref:`module-attrs`).
+
+Finally, a module may contain a documentation comment before the
+module header, in which case this comment is interpreted by Haddock as
+an overall description of the module itself, and placed in a section
+entitled ``Description`` in the documentation for the module. All the
+usual Haddock :ref:`markup` is valid in this comment.
+
+Controlling the Documentation Structure
 ---------------------------------------
 
 Haddock produces interface documentation that lists only the entities
-actually exported by the module. The documentation for a module will
+actually exported by the module. If there is no export list then all
+entities defined by the module are exported.
+
+The documentation for a module will
 include *all* entities exported by that module, even if they were
-re-exported by another module. The only exception is when Haddock can't
+re-exported from another module. The only exception is when Haddock can't
 see the declaration for the re-exported entity, perhaps because it isn't
 part of the batch of modules currently being processed.
 
-However, to Haddock the export list has even more significance than just
+To Haddock the export list has even more significance than just
 specifying the entities to be included in the documentation. It also
 specifies the *order* that entities will be listed in the generated
 documentation. This leaves the programmer free to implement functions in
@@ -237,9 +294,154 @@ is often used as a kind of ad-hoc interface documentation, with
 headings, groups of functions, type signatures and declarations in
 comments.
 
+In the next section we give examples illustrating most of the
+structural markup features. After the examples we go into more detail
+explaining the related markup, namely :ref:`section-headings`,
+:ref:`named-chunks`, and :ref:`re-exporting-entire-module`.
+
+.. _structure-examples:
+
+Documentation Structure Examples
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We now give several examples that produce similar results and
+illustrate most of the structural markup features. The first two
+example use an export list, but the third example does not.
+
+The first example, using an export list with :ref:`section-headings`
+and inline section descriptions: ::
+
+    module Image
+      ( -- * Image importers
+        --
+        -- | There is a "smart" importer, 'readImage', that determines
+        -- the image format from the file extension, and several
+        -- "dumb" format-specific importers that decode the file at
+        -- the specified type.
+        readImage
+      , readPngImage
+      , readGifImage
+      , ...
+        -- * Image exporters
+        -- ...
+      ) where
+
+    import Image.Types ( Image )
+
+    -- | Read an image, guessing the format from the file name.
+    readImage :: FilePath -> IO Image
+    readImage = ...
+
+    -- | Read a GIF.
+    readGifImage :: FilePath -> IO Image
+    readGifImage = ...
+
+    -- | Read a PNG.
+    readPngImage :: FilePath -> IO Image
+    readPngImage = ...
+
+    ...
+
+Note that the order of the entities ``readPngImage`` and
+``readGifImage`` in the export list is different from the order of the
+actual declarations farther down; the order in the export list is the
+order used in the generated docs. Also, the imported ``Image`` type
+itself is not re-exported, so it will not be included in the rendered
+docs (see :ref:`hyperlinking-re-exported`).
+
+The second example, using an export list with a section description
+defined elsewhere (the ``$imageImporters``; see :ref:`named-chunks`):
+::
+
+    module Image
+      ( -- * Image importers
+        --
+        -- $imageImporters
+        readImage
+      , readPngImage
+      , readGifImage
+      , ...
+        -- * Image exporters
+        -- ...
+      ) where
+
+    import Image.Types ( Image )
+
+    -- $imageImporters
+    --
+    -- There is a "smart" importer, 'readImage', that determines the
+    -- image format from the file extension, and several "dumb"
+    -- format-specific importers that decode the file at the specified
+    -- type.
+
+    -- | Read an image, guessing the format from the file name.
+    readImage :: FilePath -> IO Image
+    readImage = ...
+
+    -- | Read a GIF.
+    readGifImage :: FilePath -> IO Image
+    readGifImage = ...
+
+    -- | Read a PNG.
+    readPngImage :: FilePath -> IO Image
+    readPngImage = ...
+
+    ...
+
+This produces the same rendered docs as the first example, but the
+source code itself is arguably more readable, since the documentation
+for the group of importer functions is closer to their definitions.
+
+The third example, without an export list: ::
+
+    module Image where
+
+    import Image.Types ( Image )
+
+    -- * Image importers
+    --
+    -- $imageImporters
+    --
+    -- There is a "smart" importer, 'readImage', that determines the
+    -- image format from the file extension, and several "dumb"
+    -- format-specific importers that decode the file at the specified
+    -- type.
+
+    -- | Read an image, guessing the format from the file name.
+    readImage :: FilePath -> IO Image
+    readImage = ...
+
+    -- | Read a GIF.
+    readGifImage :: FilePath -> IO Image
+    readGifImage = ...
+
+    -- | Read a PNG.
+    readPngImage :: FilePath -> IO Image
+    readPngImage = ...
+
+    ...
+
+    -- * Image exporters
+    -- ...
+
+Note that the section headers (e.g. ``-- * Image importers``) now
+appear in the module body itself, and that the section documentation
+is still given using :ref:`named-chunks`. Unlike in the first example
+when using an export list, the named chunk syntax ``$imageImporters``
+*must* be used for the section documentation; attempting to use the
+``-- | ...`` syntax to document the image importers here will wrongly
+associate the documentation chunk with the next definition!
+
+.. _section-headings:
+
+Section Headings
+~~~~~~~~~~~~~~~~
+
 You can insert headings and sub-headings in the documentation by
-including annotations at the appropriate point in the export list. For
-example: ::
+including annotations at the appropriate point in the export list, or
+in the module body directly when not using an export list.
+
+For example: ::
 
     module Foo (
       -- * Classes
@@ -276,7 +478,31 @@ line is also supported. e.g.: ::
       , g
       ) where
 
-Re-exporting an entire module
+When not using an export list, you may insert section headers in the
+module body. Such section headers associate with all entities
+declaried up until the next section header. For example: ::
+
+    module Foo where
+
+    -- * Classes
+    class C a where ...
+
+    -- * Types
+    -- ** A data type
+    data T = ...
+
+    -- ** A record
+    data R = ...
+
+    -- * Some functions
+    f :: ...
+    f = ...
+    g :: ...
+    g = ...
+
+.. _re-exporting-entire-module:
+
+Re-Exporting an Entire Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Haskell allows you to re-export the entire contents of a module (or at
@@ -292,8 +518,10 @@ What will the Haddock-generated documentation for this module look like?
 Well, it depends on how the modules ``B`` and ``C`` are imported. If
 they are imported wholly and without any ``hiding`` qualifiers, then the
 documentation will just contain a cross-reference to the documentation
-for ``B`` and ``C``. However, if the modules are not *completely*
-re-exported, for example: ::
+for ``B`` and ``C``.
+
+However, if the modules are not *completely* re-exported, for example:
+::
 
     module A (
       module B,
@@ -304,48 +532,39 @@ re-exported, for example: ::
     import C (a, b)
 
 then Haddock behaves as if the set of entities re-exported from ``B``
-and ``C`` had been listed explicitly in the export list [2]_.
+and ``C`` had been listed explicitly in the export list [#notImplemented]_.
 
-.. [2]
-   NOTE: this is not fully implemented at the time of writing (version
-   0.2). At the moment, Haddock always inserts a cross-reference.
+.. Comment: was this ever implemented? Perhaps this part of the docs
+   should just be removed until it is implemented?
+
+.. [#notImplemented] This is not implemented at the time of writing
+   (Haddock version 2.17.3 with GHC 8.0.2). At the moment, Haddock
+   always inserts a module cross-reference.
 
 The exception to this rule is when the re-exported module is declared
-with the ``hide`` attribute (:ref:`module-attrs`), in which case the module is
+with the ``hide`` attribute (see :ref:`module-attrs`), in which
+case the module is
 never cross-referenced; the contents are always expanded in place in the
 re-exporting module.
 
-Omitting the export list
-~~~~~~~~~~~~~~~~~~~~~~~~
+.. _named-chunks:
 
-If there is no export list in the module, how does Haddock generate
-documentation? Well, when the export list is omitted, e.g.: ::
+(Named) Chunks of Documentation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-    module Foo where
+It is often desirable to include a chunk of documentation which is not
+attached to any particular Haskell declaration, for example, when
+giving summary documentation for a group of related definitions (see
+:ref:`structure-examples`). In addition to including such documenation
+chunks at the top of the file, as part of the
+:ref:`module-description`, you can also associate them with
+:ref:`section-headings`.
 
-this is equivalent to an export list which mentions every entity defined
-at the top level in this module, and Haddock treats it in the same way.
-Furthermore, the generated documentation will retain the order in which
-entities are defined in the module. In this special case the module body
-may also include section headings (normally they would be ignored by
-Haddock). ::
+There are several ways to associate documentation chunks with section
+headings, depending on whether you are using an export list or not:
 
-    module Foo where
-
-    -- * This heading will now appear before foo.
-
-    -- | Documentation for 'foo'.
-    foo :: Integer
-    foo = 5
-
-Named chunks of documentation
------------------------------
-
-Occasionally it is desirable to include a chunk of documentation which
-is not attached to any particular Haskell declaration. There are two
-ways to do this:
-
--  The documentation can be included in the export list directly, e.g.: ::
+-  The documentation can be included in the export list directly, by
+   preceding it with a ``-- |``. For example: ::
 
        module Foo (
           -- * A section heading
@@ -354,11 +573,13 @@ ways to do this:
           ...
         ) where
 
+   In this case the chunk is not "named".
+
 -  If the documentation is large and placing it inline in the export
    list might bloat the export list and obscure the structure, then it
    can be given a name and placed out of line in the body of the module.
    This is achieved with a special form of documentation annotation
-   “``-- $``”: ::
+   ``-- $``, which we call a *named chunk*: ::
 
        module Foo (
           -- * A section heading
@@ -371,11 +592,48 @@ ways to do this:
        -- Here is a large chunk of documentation which may be referred to by
        -- the name $doc.
 
-   The documentation chunk is given a name, which is the sequence of
-   alphanumeric characters directly after the “``-- $``”, and it may be
-   referred to by the same name in the export list.
+   The documentation chunk is given a name of your choice (here
+   ``doc``), which is the sequence of alphanumeric characters directly
+   after the ``-- $``, and it may be referred to by the same name in
+   the export list. Note that named chunks must come *after* any
+   imports in the module body.
 
-Hyperlinking and re-exported entities
+-  If you aren't using an export list, then your only choice is to use
+   a named chunk with the ``-- $`` syntax. For example: ::
+
+       module Foo where
+
+       -- * A section heading
+       --
+       -- $doc
+       -- Here is a large chunk of documentation which may be referred to by
+       -- the name $doc.
+
+   Just like with entity declariations when not using an export list,
+   named chunks of documentation are associated with the preceding
+   section header here, or with the implicit top-level documentation
+   section if there is no preceding section header.
+
+   **Warning**: the form used in the first bullet above, where the
+   chunk is not named, *does not work* when you aren't using an
+   export list. For example ::
+
+       module Foo where
+
+       -- * A section heading
+       --
+       -- | Some documentation not attached to a particular Haskell entity
+
+       -- | The fooifier.
+       foo :: ...
+
+   will result in ``Some documentation not ...`` being attached to
+   *next* entity declaration, here ``foo``, in addition to any other
+   documentation that next entity already has!
+
+.. _hyperlinking-re-exported:
+
+Hyperlinking and Re-Exported Entities
 -------------------------------------
 
 When Haddock renders a type in the generated documentation, it
@@ -455,32 +713,35 @@ The options and module description can be in either order.
 
 The following attributes are currently understood by Haddock:
 
-``hide`` ``hide``
+``hide``
     Omit this module from the generated documentation, but nevertheless
     propagate definitions and documentation from within this module to
     modules that re-export those definitions.
 
-``hide`` ``prune``
+``prune``
     Omit definitions that have no documentation annotations from the
     generated documentation.
 
-``ignore-exports`` ``ignore-exports``
+``ignore-exports``
     Ignore the export list. Generate documentation as if the module had
     no export list - i.e. all the top-level declarations are exported,
     and section headings may be given in the body of the module.
 
-``not-home`` ``not-home``
+``not-home``
     Indicates that the current module should not be considered to be the
     home module for each entity it exports, unless that entity is not
-    exported from any other module. See ? for more details.
+    exported from any other module. See :ref:`hyperlinking-re-exported`
+    for more details.
 
-``show-extensions`` ``show-extensions``
+``show-extensions``
     Indicates that we should render the extensions used in this module
     in the resulting documentation. This will only render if the output
     format supports it. If Language is set, it will be shown as well and
     all the extensions implied by it won't. All enabled extensions will
     be rendered, including those implied by their more powerful
     versions.
+
+.. _markup:
 
 Markup
 ------
@@ -497,7 +758,7 @@ Paragraphs
 One or more blank lines separates two paragraphs in a documentation
 comment.
 
-Special characters
+Special Characters
 ~~~~~~~~~~~~~~~~~~
 
 The following characters have special meanings in documentation
@@ -514,7 +775,7 @@ Furthermore, the character sequence ``>>>`` has a special meaning at the
 beginning of a line. To escape it, just prefix the characters in the
 sequence with a backslash.
 
-Character references
+Character References
 ~~~~~~~~~~~~~~~~~~~~
 
 Although Haskell source files may contain any character from the Unicode
@@ -546,7 +807,9 @@ call these “bird tracks”). For example: ::
 There is an important difference between the two forms of code block: in
 the bird-track form, the text to the right of the ‘\ ``>``\ ’ is
 interpreted literally, whereas the ``@...@`` form interprets markup as
-normal inside the code block.
+normal inside the code block. In particular, ``/`` is markup for italics,
+and so e.g. ``@x / y / z@`` renders as ``x`` followed by italic
+``y`` with no slashes, followed by ``z``.
 
 Examples
 ~~~~~~~~
@@ -621,7 +884,7 @@ markup is accepted [3]_: ```T'``.
    because strictly speaking the ````` character should not be used as a
    left quote, it is a grave accent.
 
-Emphasis, Bold and Monospaced text
+Emphasis, Bold and Monospaced Text
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Emphasis may be added by surrounding text with ``/.../``. Other markup
@@ -637,9 +900,10 @@ underscore if you need it bold:
 Monospaced (or typewriter) text is indicated by surrounding it with
 ``@...@``. Other markup is valid inside a monospaced span: for example
 ``@'f' a b@`` will hyperlink the identifier ``f`` inside the code
-fragment.
+fragment, but ``@__FILE__@`` will render ``FILE`` in bold with no 
+underscores, which may not be what you had in mind.
 
-Linking to modules
+Linking to Modules
 ~~~~~~~~~~~~~~~~~~
 
 Linking to a module is done by surrounding the module name with double
@@ -652,7 +916,7 @@ is valid before turning it into a link but unlike with identifiers,
 whether the module is in scope isn't checked and will always be turned
 into a link.
 
-Itemized and Enumerated lists
+Itemized and Enumerated Lists
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 A bulleted item is represented by preceding a paragraph with either
@@ -732,7 +996,7 @@ which was unexpected. ::
         * bar
     -}
 
-Definition lists
+Definition Lists
 ~~~~~~~~~~~~~~~~
 
 Definition lists are written as follows: ::
@@ -833,7 +1097,7 @@ and will be removed in the future.
 Headings
 ~~~~~~~~
 
-Headings inside of comment documentation are possible be preceding them
+Headings inside of comment documentation are possible by preceding them
 with a number of ``=``\ s. From 1 to 6 are accepted. Extra ``=``\ s will
 be treated as belonging to the text of the heading. Note that it's up to
 the output format to decide how to render the different levels. ::

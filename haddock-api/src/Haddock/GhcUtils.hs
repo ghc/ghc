@@ -1,4 +1,4 @@
-{-# LANGUAGE FlexibleInstances, ViewPatterns #-}
+{-# LANGUAGE BangPatterns, FlexibleInstances, ViewPatterns #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 {-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
@@ -17,17 +17,14 @@ module Haddock.GhcUtils where
 
 
 import Control.Arrow
-import Data.Function
 
 import Exception
 import Outputable
 import Name
+import NameSet
 import Lexeme
 import Module
-import RdrName (GlobalRdrEnv)
-import GhcMonad (withSession)
 import HscTypes
-import UniqFM
 import GHC
 import Class
 
@@ -92,6 +89,10 @@ filterSigNames p (ClassOpSig is_default ns ty) =
   case filter (p . unLoc) ns of
     []       -> Nothing
     filtered -> Just (ClassOpSig is_default filtered ty)
+filterSigNames p (PatSynSig ns ty) =
+  case filter (p . unLoc) ns of
+    []       -> Nothing
+    filtered -> Just (PatSynSig filtered ty)
 filterSigNames _ _                           = Nothing
 
 ifTrueJust :: Bool -> name -> Maybe name
@@ -114,6 +115,7 @@ sigNameNoLoc _                         = []
 isUserLSig :: LSig name -> Bool
 isUserLSig (L _(TypeSig {}))    = True
 isUserLSig (L _(ClassOpSig {})) = True
+isUserLSig (L _(PatSynSig {}))  = True
 isUserLSig _                    = False
 
 
@@ -133,6 +135,17 @@ declATs _ = []
 
 pretty :: Outputable a => DynFlags -> a -> String
 pretty = showPpr
+
+nubByName :: (a -> Name) -> [a] -> [a]
+nubByName f ns = go emptyNameSet ns
+  where
+    go !_ [] = []
+    go !s (x:xs)
+      | y `elemNameSet` s = go s xs
+      | otherwise         = let !s' = extendNameSet s y
+                            in x : go s' xs
+      where
+        y = f x
 
 -------------------------------------------------------------------------------
 -- * Located

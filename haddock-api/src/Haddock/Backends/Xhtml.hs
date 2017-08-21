@@ -109,8 +109,8 @@ copyHtmlBits odir libdir themes = do
   return ()
 
 
-headHtml :: String -> Maybe String -> Themes -> Maybe String -> Html
-headHtml docTitle miniPage themes mathjax_url =
+headHtml :: String -> Themes -> Maybe String -> Html
+headHtml docTitle themes mathjax_url =
   header << [
     meta ! [httpequiv "Content-Type", content "text/html; charset=UTF-8"],
     thetitle << docTitle,
@@ -119,15 +119,12 @@ headHtml docTitle miniPage themes mathjax_url =
     script ! [src mjUrl, thetype "text/javascript"] << noHtml,
     script ! [thetype "text/javascript"]
         -- NB: Within XHTML, the content of script tags needs to be
-        -- a <![CDATA[ section. Will break if the miniPage name could
-        -- have "]]>" in it!
-      << primHtml (
-          "//<![CDATA[\nwindow.onload = function () {pageLoad();"
-          ++ setSynopsis ++ "};\n//]]>\n")
+        -- a <![CDATA[ section.
+      << primHtml
+          "//<![CDATA[\nwindow.onload = function () {pageLoad();};\n//]]>\n"
     ]
   where
-    setSynopsis = maybe "" (\p -> "setSynopsis(\"" ++ p ++ "\");") miniPage
-    mjUrl = maybe "https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
+    mjUrl = maybe "https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.0/MathJax.js?config=TeX-AMS-MML_HTMLorMML" id mathjax_url
 
 
 srcButton :: SourceURLs -> Maybe Interface -> Maybe Html
@@ -272,7 +269,7 @@ ppHtmlContents dflags odir doctitle _maybe_package
          | iface <- ifaces
          , instIsSig iface]
       html =
-        headHtml doctitle Nothing themes mathjax_url +++
+        headHtml doctitle themes mathjax_url +++
         bodyHtml doctitle Nothing
           maybe_source_url maybe_wiki_url
           Nothing maybe_index_url << [
@@ -373,7 +370,7 @@ ppHtmlIndex odir doctitle _maybe_package themes
 
   where
     indexPage showLetters ch items =
-      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") Nothing themes maybe_mathjax_url +++
+      headHtml (doctitle ++ " (" ++ indexName ch ++ ")") themes maybe_mathjax_url +++
       bodyHtml doctitle Nothing
         maybe_source_url maybe_wiki_url
         maybe_contents_url Nothing << [
@@ -495,7 +492,7 @@ ppHtmlModule odir doctitle themes
         = toHtml mdl_str
       real_qual = makeModuleQual qual aliases mdl
       html =
-        headHtml mdl_str_annot (Just $ "mini_" ++ moduleHtmlFile mdl) themes maybe_mathjax_url +++
+        headHtml mdl_str_annot themes maybe_mathjax_url +++
         bodyHtml doctitle (Just iface)
           maybe_source_url maybe_wiki_url
           maybe_contents_url maybe_index_url << [
@@ -505,22 +502,9 @@ ppHtmlModule odir doctitle themes
 
   createDirectoryIfMissing True odir
   writeFile (joinPath [odir, moduleHtmlFile mdl]) (renderToString debug html)
-  ppHtmlModuleMiniSynopsis odir doctitle themes maybe_mathjax_url iface unicode real_qual debug
 
 signatureDocURL :: String
 signatureDocURL = "https://wiki.haskell.org/Module_signature"
-
-ppHtmlModuleMiniSynopsis :: FilePath -> String -> Themes
-  -> Maybe String -> Interface -> Bool -> Qualification -> Bool -> IO ()
-ppHtmlModuleMiniSynopsis odir _doctitle themes maybe_mathjax_url iface unicode qual debug = do
-  let mdl = ifaceMod iface
-      html =
-        headHtml (moduleString mdl) Nothing themes maybe_mathjax_url +++
-        miniBody <<
-          (divModuleHeader << sectionName << moduleString mdl +++
-           miniSynopsis mdl iface unicode qual)
-  createDirectoryIfMissing True odir
-  writeFile (joinPath [odir, "mini_" ++ moduleHtmlFile mdl]) (renderToString debug html)
 
 
 ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> Bool -> Qualification -> Html
@@ -573,43 +557,6 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface unicode qual
     linksInfo = (maybe_source_url, maybe_wiki_url)
 
 
-miniSynopsis :: Module -> Interface -> Bool -> Qualification -> Html
-miniSynopsis mdl iface unicode qual =
-    divInterface << concatMap (processForMiniSynopsis mdl unicode qual) exports
-  where
-    exports = numberSectionHeadings (ifaceRnExportItems iface)
-
-
-processForMiniSynopsis :: Module -> Bool -> Qualification -> ExportItem DocNameI
-                       -> [Html]
-processForMiniSynopsis mdl unicode qual ExportDecl { expItemDecl = L _loc decl0 } =
-  ((divTopDecl <<).(declElem <<)) <$> case decl0 of
-    TyClD d -> let b = ppTyClBinderWithVarsMini mdl d in case d of
-        (FamDecl decl)    -> [ppTyFamHeader True False decl unicode qual]
-        (DataDecl{})   -> [keyword "data" <+> b]
-        (SynDecl{})    -> [keyword "type" <+> b]
-        (ClassDecl {}) -> [keyword "class" <+> b]
-    SigD (TypeSig lnames _) ->
-      map (ppNameMini Prefix mdl . nameOccName . getName . unLoc) lnames
-    _ -> []
-processForMiniSynopsis _ _ qual (ExportGroup lvl _id txt) =
-  [groupTag lvl << docToHtml Nothing qual (mkMeta txt)]
-processForMiniSynopsis _ _ _ _ = []
-
-
-ppNameMini :: Notation -> Module -> OccName -> Html
-ppNameMini notation mdl nm =
-    anchor ! [ href (moduleNameUrl mdl nm)
-             , target mainFrameName ]
-      << ppBinder' notation nm
-
-
-ppTyClBinderWithVarsMini :: Module -> TyClDecl DocNameI -> Html
-ppTyClBinderWithVarsMini mdl decl =
-  let n = tcdName decl
-      ns = tyvarNames $ tcdTyVars decl -- it's safe to use tcdTyVars, see code above
-  in ppTypeApp n [] ns (\is_infix -> ppNameMini is_infix mdl . nameOccName . getName) ppTyName
-
 ppModuleContents :: Qualification
                  -> [ExportItem DocNameI]
                  -> Bool -- ^ Orphans sections
@@ -659,8 +606,8 @@ processExport :: Bool -> LinksInfo -> Bool -> Qualification
 processExport _ _ _ _ ExportDecl { expItemDecl = L _ (InstD _) } = Nothing -- Hide empty instances
 processExport summary _ _ qual (ExportGroup lev id0 doc)
   = nothingIf summary $ groupHeading lev id0 << docToHtml (Just id0) qual (mkMeta doc)
-processExport summary links unicode qual (ExportDecl decl doc subdocs insts fixities splice)
-  = processDecl summary $ ppDecl summary links decl doc insts fixities subdocs splice unicode qual
+processExport summary links unicode qual (ExportDecl decl pats doc subdocs insts fixities splice)
+  = processDecl summary $ ppDecl summary links decl pats doc insts fixities subdocs splice unicode qual
 processExport summary _ _ qual (ExportNoDecl y [])
   = processDeclOneLiner summary $ ppDocName qual Prefix True y
 processExport summary _ _ qual (ExportNoDecl y subs)

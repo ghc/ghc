@@ -285,6 +285,7 @@ div.top h5 {
 	padding: 0 8px 2px 5px;
 	margin-right: -3px;
 	background-color: #f0f0f0;
+	-moz-user-select: none;
 }
 
 div.subs {

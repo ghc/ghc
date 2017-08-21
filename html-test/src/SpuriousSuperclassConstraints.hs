@@ -7,7 +7,7 @@
 --
 --   <http://www.haskell.org/pipermail/haskell-cafe/2012-September/103600.html>
 --
--- And here is the corresponding theard on glasgow-haskell-users:
+-- And here is the corresponding thread on glasgow-haskell-users:
 --
 --   <http://www.haskell.org/pipermail/glasgow-haskell-users/2012-September/022914.html>
 --

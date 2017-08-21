@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings, FlexibleInstances #-}
-{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
 module Documentation.Haddock.ParserSpec (main, spec) where
@@ -57,7 +56,7 @@ spec = do
         "&#x65;" `shouldParseTo` "e"
 
       it "allows to backslash-escape characters except \\r" $ do
-        property $ \case
+        property $ \y -> case y of
           '\r' -> "\\\r" `shouldParseTo` DocString "\\"
           x -> ['\\', x] `shouldParseTo` DocString [x]
 

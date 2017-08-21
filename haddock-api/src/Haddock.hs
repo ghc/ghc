@@ -32,6 +32,7 @@ import Haddock.Backends.LaTeX
 import Haddock.Backends.Hoogle
 import Haddock.Backends.Hyperlinker
 import Haddock.Interface
+import Haddock.Interface.Json
 import Haddock.Parser
 import Haddock.Types
 import Haddock.Version
@@ -68,12 +69,11 @@ import System.Directory (doesDirectoryExist)
 import GHC hiding (verbosity)
 import Config
 import DynFlags hiding (projectVersion, verbosity)
+import ErrUtils
 import Packages
 import Panic (handleGhcException)
 import Module
 import FastString
-import HscTypes
-import GhcMonad
 
 --------------------------------------------------------------------------------
 -- * Exception handling
@@ -164,6 +164,11 @@ haddockWithGhc ghc args = handleTopExceptions $ do
 
   ghc flags' $ do
     dflags <- getDynFlags
+
+    forM_ (optShowInterfaceFile flags) $ \path -> liftIO $ do
+      mIfaceFile <- readInterfaceFiles freshNameCache [(("", Nothing), path)]
+      forM_ mIfaceFile $ \(_, ifaceFile) -> do
+        putMsg dflags (renderJson (jsonInterfaceFile ifaceFile))
 
     if not (null files) then do
       (packages, ifaces, homeLinks) <- readPackagesAndProcessModules flags files
@@ -403,12 +408,11 @@ withGhc' libDir flags ghcActs = runGhc (Just libDir) $ do
   let dynflags'' = unsetPatternMatchWarnings $
         updOptLevel 0 $
         gopt_unset dynflags' Opt_SplitObjs
-  defaultCleanupHandler dynflags'' $ do
-      -- ignore the following return-value, which is a list of packages
-      -- that may need to be re-linked: Haddock doesn't do any
-      -- dynamic or static linking at all!
-      _ <- setSessionDynFlags dynflags''
-      ghcActs dynflags''
+  -- ignore the following return-value, which is a list of packages
+  -- that may need to be re-linked: Haddock doesn't do any
+  -- dynamic or static linking at all!
+  _ <- setSessionDynFlags dynflags''
+  ghcActs dynflags''
   where
     parseGhcFlags :: MonadIO m => DynFlags -> m DynFlags
     parseGhcFlags dynflags = do
@@ -442,15 +446,22 @@ getHaddockLibDir flags =
 #ifdef IN_GHC_TREE
       getInTreeDir
 #else
-      d <- getDataDir -- provided by Cabal
-      doesDirectoryExist d >>= \exists -> case exists of
-        True -> return d
-        False -> do
-          -- If directory does not exist then we are probably invoking from
-          -- ./dist/build/haddock/haddock so we use ./resources as a fallback.
-          doesDirectoryExist "resources" >>= \exists_ -> case exists_ of
-            True -> return "resources"
-            False -> die ("Haddock's resource directory (" ++ d ++ ") does not exist!\n")
+      -- if data directory does not exist we are probably
+      -- invoking from either ./haddock-api or ./
+      let res_dirs = [ getDataDir -- provided by Cabal
+                     , pure "resources"
+                     , pure "haddock-api/resources"
+                     ]
+
+          check get_path = do
+            p <- get_path
+            exists <- doesDirectoryExist p
+            pure $ if exists then Just p else Nothing
+
+      dirs <- mapM check res_dirs
+      case [p | Just p <- dirs] of
+        (p : _) -> return p
+        _       -> die "Haddock's resource directory does not exist!\n"
 #endif
     fs -> return (last fs)
 
@@ -498,7 +509,7 @@ shortcutFlags flags = do
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
-    throwE "-h cannot be used with --gen-index or --gen-contents"
+    throwE "-h/--html cannot be used with --gen-index or --gen-contents"
 
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Hoogle `elem` flags) $

@@ -1,7 +1,7 @@
-{-# LANGUAGE CPP, BangPatterns, ScopedTypeVariables #-}
+{-# LANGUAGE BangPatterns, CPP, ScopedTypeVariables #-}
 -- |
 -- Module      :  Data.Attoparsec.Internal
--- Copyright   :  Bryan O'Sullivan 2007-2014
+-- Copyright   :  Bryan O'Sullivan 2007-2015
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -15,17 +15,20 @@ module Data.Attoparsec.Internal
     ( compareResults
     , prompt
     , demandInput
+    , demandInput_
     , wantInput
     , endOfInput
     , atEnd
     , satisfyElem
+    , concatReverse
     ) where
 
+#if !MIN_VERSION_base(4,8,0)
 import Control.Applicative ((<$>))
-#if __GLASGOW_HASKELL__ >= 700
-import Data.ByteString (ByteString)
+import Data.Monoid (Monoid, mconcat)
 #endif
 import Data.Attoparsec.Internal.Types
+import Data.ByteString (ByteString)
 import Prelude hiding (succ)
 
 -- | Compare two 'IResult' values for equality.
@@ -41,8 +44,8 @@ compareResults (Done t0 r0) (Done t1 r1) =
 compareResults (Partial _) (Partial _) = Nothing
 compareResults _ _ = Just False
 
--- | Ask for input.  If we receive any, pass it to a success
--- continuation, otherwise to a failure continuation.
+-- | Ask for input.  If we receive any, pass the augmented input to a
+-- success continuation, otherwise to a failure continuation.
 prompt :: Chunk t
        => State t -> Pos -> More
        -> (State t -> Pos -> More -> IResult t r)
@@ -52,14 +55,12 @@ prompt t pos _more lose succ = Partial $ \s ->
   if nullChunk s
   then lose t pos Complete
   else succ (pappendChunk t s) pos Incomplete
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE prompt :: State ByteString -> Pos -> More
                       -> (State ByteString -> Pos -> More
                           -> IResult ByteString r)
                       -> (State ByteString -> Pos -> More
                           -> IResult ByteString r)
                       -> IResult ByteString r #-}
-#endif
 
 -- | Immediately demand more input via a 'Partial' continuation
 -- result.
@@ -67,12 +68,22 @@ demandInput :: Chunk t => Parser t ()
 demandInput = Parser $ \t pos more lose succ ->
   case more of
     Complete -> lose t pos more [] "not enough input"
-    _ -> let lose' t' pos' more' = lose t' pos' more' [] "not enough input"
+    _ -> let lose' _ pos' more' = lose t pos' more' [] "not enough input"
              succ' t' pos' more' = succ t' pos' more' ()
          in prompt t pos more lose' succ'
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE demandInput :: Parser ByteString () #-}
-#endif
+
+-- | Immediately demand more input via a 'Partial' continuation
+-- result.  Return the new input.
+demandInput_ :: Chunk t => Parser t t
+demandInput_ = Parser $ \t pos more lose succ ->
+  case more of
+    Complete -> lose t pos more [] "not enough input"
+    _ -> Partial $ \s ->
+         if nullChunk s
+         then lose t pos Complete [] "not enough input"
+         else succ (pappendChunk t s) pos more s
+{-# SPECIALIZE demandInput_ :: Parser ByteString ByteString #-}
 
 -- | This parser always succeeds.  It returns 'True' if any input is
 -- available either immediately or on demand, and 'False' if the end
@@ -97,9 +108,7 @@ endOfInput = Parser $ \t pos more lose succ ->
        let lose' t' pos' more' _ctx _msg = succ t' pos' more' ()
            succ' t' pos' more' _a = lose t' pos' more' [] "endOfInput"
        in  runParser demandInput t pos more lose' succ'
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE endOfInput :: Parser ByteString () #-}
-#endif
 
 -- | Return an indication of whether the end of input has been
 -- reached.
@@ -120,14 +129,12 @@ satisfySuspended p t pos more lose succ =
             Just (e, l) | p e -> succ' t' (pos' + Pos l) more' e
                         | otherwise -> lose' t' pos' more' [] "satisfyElem"
             Nothing -> runParser (demandInput >> go) t' pos' more' lose' succ'
-#if __GLASGOW_HASKELL__ >= 700
 {-# SPECIALIZE satisfySuspended :: (ChunkElem ByteString -> Bool)
                                 -> State ByteString -> Pos -> More
                                 -> Failure ByteString (State ByteString) r
                                 -> Success ByteString (State ByteString)
                                            (ChunkElem ByteString) r
                                 -> IResult ByteString r #-}
-#endif
 
 -- | The parser @satisfyElem p@ succeeds for any chunk element for which the
 -- predicate @p@ returns 'True'. Returns the element that is
@@ -140,3 +147,11 @@ satisfyElem p = Parser $ \t pos more lose succ ->
                   | otherwise -> lose t pos more [] "satisfyElem"
       Nothing -> satisfySuspended p t pos more lose succ
 {-# INLINE satisfyElem #-}
+
+-- | Concatenate a monoid after reversing its elements.  Used to
+-- glue together a series of textual chunks that have been accumulated
+-- \"backwards\".
+concatReverse :: Monoid m => [m] -> m
+concatReverse [x] = x
+concatReverse xs  = mconcat (reverse xs)
+{-# INLINE concatReverse #-}

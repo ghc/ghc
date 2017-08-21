@@ -29,6 +29,7 @@ module Haddock.Backends.Xhtml.Layout (
   subArguments,
   subAssociatedTypes,
   subConstructors,
+  subPatterns,
   subEquations,
   subFields,
   subInstances, subOrphanInstances,
@@ -179,6 +180,9 @@ subAssociatedTypes = divSubDecls "associated-types" "Associated Types" . subBloc
 
 subConstructors :: Qualification -> [SubDecl] -> Html
 subConstructors qual = divSubDecls "constructors" "Constructors" . subTable qual
+
+subPatterns :: Qualification -> [SubDecl] -> Html
+subPatterns qual = divSubDecls "bundled-patterns" "Bundled Patterns" . subTable qual
 
 subFields :: Qualification -> [SubDecl] -> Html
 subFields qual = divSubDecls "fields" "Fields" . subDlist qual

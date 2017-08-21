@@ -1,27 +1,48 @@
 name:                 haddock
-version:              2.17.3
+version:              2.18.2
 synopsis:             A documentation-generation tool for Haskell libraries
-description:          Haddock is a documentation-generation tool for Haskell
-                      libraries
+description:
+  This is Haddock, a tool for automatically generating documentation
+  from annotated Haskell source code. It is primary intended for documenting
+  library interfaces, but it should be useful for any kind of Haskell code.
+  .
+  Haddock lets you write documentation annotations next to the definitions of
+  functions and types in the source code, in a syntax that is easy on the eye
+  when writing the source code (no heavyweight mark-up).
+  .
+  Haddock understands Haskell's module system, so you can structure your code
+  however you like without worrying that internal structure will be exposed in
+  the generated documentation. For example, it is common to implement a library
+  in several modules, but define the external API by having a single module
+  which re-exports parts of these implementation modules. Using Haddock, you can
+  still write documentation annotations next to the actual definitions of the
+  functions and types in the library, but the documentation annotations from the
+  implementation will be propagated to the external API when the documentation is
+  generated. Abstract types and classes are handled correctly. In fact, even
+  without any documentation annotations, Haddock can generate useful documentation
+  from your source code.
+  .
+  <<https://cdn.rawgit.com/haskell/haddock/master/doc/cheatsheet/haddocks.svg>>
 license:              BSD3
 license-file:         LICENSE
 author:               Simon Marlow, David Waern
-maintainer:           Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
+maintainer:           Alex Biehl <alexbiehl@gmail.com>, Simon Hengel <sol@typeful.net>, Mateusz Kowalczyk <fuuzetsu@fuuzetsu.co.uk>
 homepage:             http://www.haskell.org/haddock/
 bug-reports:          https://github.com/haskell/haddock/issues
 copyright:            (c) Simon Marlow, David Waern
 category:             Documentation
 build-type:           Simple
-cabal-version:        >= 1.10
-stability:            experimental
+cabal-version:        >= 2.0
+tested-with:          GHC==8.2.*
 
 extra-source-files:
-  CHANGES
+  CHANGES.md
   README.md
   doc/Makefile
   doc/README.md
   doc/*.rst
   doc/conf.py
+  driver-test/*.hs
   haddock-api/src/haddock.sh
   html-test/src/*.hs
   html-test/ref/*.html
@@ -42,10 +63,11 @@ executable haddock
   hs-source-dirs:       driver
   ghc-options:          -funbox-strict-fields -Wall -fwarn-tabs -O2 -threaded
 
+  -- haddock typically only supports a single GHC major version
   build-depends:
-    base >= 4.3 && < 4.11
+    base >= 4.3 && < 4.12
   if flag(in-ghc-tree)
-    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.12.1.1, haddock-library/src
+    hs-source-dirs: haddock-api/src, haddock-library/vendor/attoparsec-0.13.1.0, haddock-library/src
     cpp-options: -DIN_GHC_TREE
     build-depends:
       filepath,
@@ -55,8 +77,8 @@ executable haddock
       array,
       xhtml >= 3000.2 && < 3000.3,
       Cabal >= 1.10,
-      ghc-boot == 8.3,
-      ghc == 8.3,
+      ghc-boot,
+      ghc == 8.3.*,
       bytestring,
       transformers
 
@@ -84,6 +106,7 @@ executable haddock
       Documentation.Haddock
       Haddock
       Haddock.Interface
+      Haddock.Interface.Json
       Haddock.Interface.Rename
       Haddock.Interface.Create
       Haddock.Interface.AttachInstances
@@ -119,43 +142,60 @@ executable haddock
       Haddock.Syb
       Haddock.Convert
   else
-    build-depends:  haddock-api == 2.17.*
+    -- in order for haddock's advertised version number to have proper meaning,
+    -- we pin down to a single haddock-api version.
+    build-depends:  haddock-api == 2.18.2
+
+    other-modules:
+      ResponseFile
 
 test-suite driver-test
   type:             exitcode-stdio-1.0
   default-language: Haskell2010
   main-is:          Main.hs
   hs-source-dirs:   driver-test, driver
+  other-modules:
+    ResponseFile
+    ResponseFileSpec
+
   build-depends:    base, hspec
 
 test-suite html-test
   type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   html-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
+  -- This tells cabal that this test depends on the executable
+  -- component 'haddock' from this very same package, as well
+  -- as adding the build-folder where the `haddock`
+  -- executable can be found in front of $PATH
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     html-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
 
 test-suite hypsrc-test
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   hypsrc-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
-  ghc-options:      -Wall -fwarn-tabs
+  type:               exitcode-stdio-1.0
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     hypsrc-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
+  ghc-options:        -Wall -fwarn-tabs
 
 test-suite latex-test
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   latex-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
+  type:               exitcode-stdio-1.0
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     latex-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
 
 test-suite hoogle-test
-  type:             exitcode-stdio-1.0
-  default-language: Haskell2010
-  main-is:          Main.hs
-  hs-source-dirs:   hoogle-test
-  build-depends:    base, filepath, haddock-test == 0.0.1
+  type:               exitcode-stdio-1.0
+  build-tool-depends: haddock:haddock
+  default-language:   Haskell2010
+  main-is:            Main.hs
+  hs-source-dirs:     hoogle-test
+  build-depends:      base, filepath, haddock-test == 0.0.1
 
 source-repository head
   type:     git

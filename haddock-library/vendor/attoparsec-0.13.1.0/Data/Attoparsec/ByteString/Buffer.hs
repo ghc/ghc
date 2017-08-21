@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 -- |
 -- Module      :  Data.Attoparsec.ByteString.Buffer
--- Copyright   :  Bryan O'Sullivan 2007-2014
+-- Copyright   :  Bryan O'Sullivan 2007-2015
 -- License     :  BSD3
 --
 -- Maintainer  :  bos@serpentine.com
@@ -57,7 +57,8 @@ import Control.Exception (assert)
 import Data.ByteString.Internal (ByteString(..), memcpy, nullForeignPtr)
 import Data.Attoparsec.Internal.Fhthagn (inlinePerformIO)
 import Data.List (foldl1')
-import Data.Monoid (Monoid(..))
+import Data.Monoid as Mon (Monoid(..))
+import Data.Semigroup (Semigroup(..))
 import Data.Word (Word8)
 import Foreign.ForeignPtr (ForeignPtr, withForeignPtr)
 import Foreign.Ptr (castPtr, plusPtr)
@@ -65,6 +66,7 @@ import Foreign.Storable (peek, peekByteOff, poke, sizeOf)
 import GHC.ForeignPtr (mallocPlainForeignPtrBytes)
 import Prelude hiding (length)
 
+-- If _cap is zero, this buffer is empty.
 data Buffer = Buf {
       _fp  :: {-# UNPACK #-} !(ForeignPtr Word8)
     , _off :: {-# UNPACK #-} !Int
@@ -85,18 +87,21 @@ buffer (PS fp off len) = Buf fp off len len 0
 unbuffer :: Buffer -> ByteString
 unbuffer (Buf fp off len _ _) = PS fp off len
 
+instance Semigroup Buffer where
+    (Buf _ _ _ 0 _) <> b                    = b
+    a               <> (Buf _ _ _ 0 _)      = a
+    buf             <> (Buf fp off len _ _) = append buf fp off len
+
 instance Monoid Buffer where
     mempty = Buf nullForeignPtr 0 0 0 0
 
-    mappend (Buf _ _ _ 0 _) b        = b
-    mappend a (Buf _ _ _ 0 _)        = a
-    mappend buf (Buf fp off len _ _) = append buf fp off len
+    mappend = (<>)
 
-    mconcat [] = mempty
+    mconcat [] = Mon.mempty
     mconcat xs = foldl1' mappend xs
 
 pappend :: Buffer -> ByteString -> Buffer
-pappend (Buf _ _ _ 0 _) (PS fp off len) = Buf fp off len 0 0
+pappend (Buf _ _ _ 0 _) bs  = buffer bs
 pappend buf (PS fp off len) = append buf fp off len
 
 append :: Buffer -> ForeignPtr a -> Int -> Int -> Buffer

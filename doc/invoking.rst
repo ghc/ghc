@@ -88,6 +88,11 @@ The following options are available:
     :option:`--read-interface` option for more details. The interface file is
     in a binary format; don't try to read it.
 
+.. option:: --show-interface=<file>
+
+    Dumps a binary interface file to stdout in a human readable fashion.
+    Uses json as output format.
+
 .. [1]
    Haddock interface files are not the same as Haskell interface files,
    I just couldn't think of a better name.
