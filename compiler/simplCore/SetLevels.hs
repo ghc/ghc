@@ -457,7 +457,8 @@ lvlCase :: LevelEnv             -- Level of in-scope names/tyvars
         -> LvlM LevelledExpr    -- Result expression
 lvlCase env scrut_fvs scrut' case_bndr ty alts
   | [(con@(DataAlt {}), bs, body)] <- alts
-  , exprOkForSpeculation scrut'   -- See Note [Check the output scrutinee for okForSpec]
+  , exprOkForSpeculation (deTagExpr scrut')
+                                  -- See Note [Check the output scrutinee for okForSpec]
   , not (isTopLvl dest_lvl)       -- Can't have top-level cases
   , not (floatTopLvlOnly env)     -- Can float anywhere
   =     -- See Note [Floating cases]
@@ -528,7 +529,7 @@ okForSpeculation we must be careful to test the *result* scrutinee ('x'
 in this case), not the *input* one 'y'.  The latter *is* ok for
 speculation here, but the former is not -- and indeed we can't float
 the inner case out, at least not unless x is also evaluated at its
-binding site.
+binding site.  See Trac #5453.
 
 That's why we apply exprOkForSpeculation to scrut' and not to scrut.
 -}
