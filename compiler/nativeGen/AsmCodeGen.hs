@@ -1212,15 +1212,15 @@ cmmExprNative referenceKind expr = do
         -- to use the register table, so we replace these registers
         -- with the corresponding labels:
         CmmReg (CmmGlobal EagerBlackholeInfo)
-          | arch == ArchPPC && not (gopt Opt_PIC dflags)
+          | arch == ArchPPC && not (positionIndependent dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_EAGER_BLACKHOLE_info")))
         CmmReg (CmmGlobal GCEnter1)
-          | arch == ArchPPC && not (gopt Opt_PIC dflags)
+          | arch == ArchPPC && not (positionIndependent dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_enter_1")))
         CmmReg (CmmGlobal GCFun)
-          | arch == ArchPPC && not (gopt Opt_PIC dflags)
+          | arch == ArchPPC && not (positionIndependent dflags)
           -> cmmExprNative referenceKind $
              CmmLit (CmmLabel (mkCmmCodeLabel rtsUnitId (fsLit "__stg_gc_fun")))
 
