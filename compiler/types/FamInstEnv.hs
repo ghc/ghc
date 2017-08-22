@@ -1288,13 +1288,7 @@ normalise_tc_app tc tys
     -- See Note [Normalisation and type synonyms]
     normalise_type (mkAppTys (substTy (mkTvSubstPrs tenv) rhs) tys')
 
-  | not (isTypeFamilyTyCon tc)
-  = -- A synonym with no type families in the RHS; or data type etc
-    -- Just normalise the arguments and rebuild
-    do { (args_co, ntys) <- normalise_tc_args tc tys
-       ; return (args_co, mkTyConApp tc ntys) }
-
-  | otherwise
+  | isFamilyTyCon tc
   = -- A type-family application
     do { env <- getEnv
        ; role <- getRole
@@ -1307,6 +1301,12 @@ normalise_tc_app tc tys
            _ -> -- No unique matching family instance exists;
                 -- we do not do anything
                 return (args_co, mkTyConApp tc ntys) }
+
+  | otherwise
+  = -- A synonym with no type families in the RHS; or data type etc
+    -- Just normalise the arguments and rebuild
+    do { (args_co, ntys) <- normalise_tc_args tc tys
+       ; return (args_co, mkTyConApp tc ntys) }
 
 ---------------
 -- | Normalise arguments to a tycon
