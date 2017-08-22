@@ -1905,7 +1905,7 @@ data PatSynArgs
   | RecordPatSyn [Name]        -- ^ @pattern P { {x,y,z} } = p@
   deriving( Show, Eq, Ord, Data, Generic )
 
-data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> -> \<type\>@
+data Type = ForallT [TyVarBndr] Cxt Type  -- ^ @forall \<vars\>. \<ctxt\> => \<type\>@
           | AppT Type Type                -- ^ @T a b@
           | SigT Type Kind                -- ^ @t :: k@
           | VarT Name                     -- ^ @a@
