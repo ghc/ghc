@@ -102,6 +102,7 @@ executable haddock
       Data.Attoparsec.Number
       Documentation.Haddock.Utf8
       Documentation.Haddock.Parser.Util
+      Documentation.Haddock.Markup
 
       Documentation.Haddock
       Haddock
