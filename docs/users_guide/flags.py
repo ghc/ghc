@@ -28,6 +28,7 @@ from docutils import nodes
 from docutils.parsers.rst import Directive, directives
 from sphinx import addnodes
 from sphinx.domains.std import GenericObject
+from sphinx.errors import SphinxError
 
 ### Settings
 
@@ -124,6 +125,12 @@ class Flag(GenericObject):
         # If noindex, then do not include this flag in the table
         if 'noindex' in self.options:
             return
+
+        # Validity checking
+        if 'shortdesc' not in self.options:
+            raise SphinxError('ghc-flag (%s) directive missing :shortdesc: key' % self.names)
+        if 'type' not in self.options:
+            raise SphinxError('ghc-flag (%s) directive missing :type: key' % self.names)
 
         # Set the flag category (default: misc)
         self.category = 'misc'
