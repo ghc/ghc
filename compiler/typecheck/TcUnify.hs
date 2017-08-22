@@ -98,6 +98,23 @@ This is used to construct a message of form
    The function 'f' is applied to two arguments
    but its type `Int -> Int' has only one
 
+When visible type applications (e.g., `f @Int 1 2`, as in #13902) enter the
+picture, we have a choice in deciding whether to count the type applications as
+proper arguments:
+
+   The function 'f' is applied to one visible type argument
+     and two value arguments
+   but its type `forall a. a -> a` has only one visible type argument
+     and one value argument
+
+Or whether to include the type applications as part of the herald itself:
+
+   The expression 'f @Int' is applied to two arguments
+   but its type `Int -> Int` has only one
+
+The latter is easier to implement and is arguably easier to understand, so we
+choose to implement that option.
+
 Note [matchExpectedFunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 matchExpectedFunTys checks that a sigma has the form

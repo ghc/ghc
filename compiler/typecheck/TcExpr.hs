@@ -1188,7 +1188,7 @@ tcApp m_herald orig_fun orig_args res_ty
 
            ; (wrap_fun, args1, actual_res_ty)
                <- tcArgs fun fun_sigma orig args
-                         (m_herald `orElse` mk_app_msg fun)
+                         (m_herald `orElse` mk_app_msg fun args)
 
                 -- this is just like tcWrapResult, but the types don't line
                 -- up to call that function
@@ -1202,9 +1202,16 @@ tcApp m_herald orig_fun orig_args res_ty
     mk_hs_app f (Left a)  = mkHsApp f a
     mk_hs_app f (Right a) = mkHsAppType f a
 
-mk_app_msg :: LHsExpr GhcRn -> SDoc
-mk_app_msg fun = sep [ text "The function" <+> quotes (ppr fun)
-                     , text "is applied to"]
+mk_app_msg :: LHsExpr GhcRn -> [LHsExprArgIn] -> SDoc
+mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)
+                          , text "is applied to"]
+  where
+    what | null type_app_args = "function"
+         | otherwise          = "expression"
+    -- Include visible type arguments (but not other arguments) in the herald.
+    -- See Note [Herald for matchExpectedFunTys] in TcUnify.
+    expr = mkHsAppTypes fun type_app_args
+    type_app_args = rights args
 
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
@@ -1261,7 +1268,11 @@ tcArgs :: LHsExpr GhcRn   -- ^ The function itself (for err msgs only)
 tcArgs fun orig_fun_ty fun_orig orig_args herald
   = go [] 1 orig_fun_ty orig_args
   where
-    orig_arity = length orig_args
+    -- Don't count visible type arguments when determining how many arguments
+    -- an expression is given in an arity mismatch error, since visible type
+    -- arguments reported as a part of the expression herald itself.
+    -- See Note [Herald for matchExpectedFunTys] in TcUnify.
+    orig_expr_args_arity = length $ lefts orig_args
 
     go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
@@ -1291,7 +1302,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     go acc_args n fun_ty (Left arg : args)
       = do { (wrap, [arg_ty], res_ty)
                <- matchActualFunTysPart herald fun_orig (Just (unLoc fun)) 1 fun_ty
-                                        acc_args orig_arity
+                                        acc_args orig_expr_args_arity
                -- wrap :: fun_ty "->" arg_ty -> res_ty
            ; arg' <- tcArg fun arg arg_ty n
            ; (inner_wrap, args', inner_res_ty)
