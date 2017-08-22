@@ -1366,6 +1366,8 @@ clean_files :
 	$(call removeTrees,inplace/bin)
 	$(call removeTrees,inplace/lib)
 	$(call removeTrees,libraries/bootstrapping.conf)
+# Clean the files that ./validate creates.
+	$(call removeFiles,mk/are-validating.mk)
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
@@ -1398,9 +1400,6 @@ clean_bindistprep:
 	$(call removeTrees,bindistprep/)
 
 distclean : clean
-# Clean the files that ./validate creates.
-	$(call removeFiles,mk/are-validating.mk)
-
 # Clean the files that we ask ./configure to create.
 	$(call removeFiles,mk/config.mk)
 	$(call removeFiles,mk/install.mk)
