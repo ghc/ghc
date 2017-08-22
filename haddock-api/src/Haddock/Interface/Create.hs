@@ -105,7 +105,7 @@ createInterface tm flags modMap instIfaceMap = do
 
   let declsWithDocs = topDecls group_
 
-      exports0 = fmap (reverse . map unLoc . fst . unzip) mayExports
+      exports0 = fmap (reverse . map unLoc) mayExports
       exports
         | OptIgnoreExports `elem` opts = Nothing
         | otherwise = exports0
