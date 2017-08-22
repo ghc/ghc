@@ -457,6 +457,7 @@ Formatting dumps
 .. ghc-flag:: -dno-debug-output
     :shortdesc: Suppress unsolicited debugging output
     :type: dynamic
+    :reverse: -ddebug-output
     :category:
 
     Suppress any unsolicited debugging output. When GHC has been built
