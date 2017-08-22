@@ -125,8 +125,7 @@ deriving instance Show (a :~: b)
 deriving instance Ord  (a :~: b)
 
 -- | @since 4.7.0.0
-instance a ~ b => Read (a :~: b) where
-  readsPrec d = readParen (d > 10) (\r -> [(Refl, s) | ("Refl",s) <- lex r ])
+deriving instance a ~ b => Read (a :~: b)
 
 -- | @since 4.7.0.0
 instance a ~ b => Enum (a :~: b) where
@@ -153,8 +152,7 @@ deriving instance Show (a :~~: b)
 deriving instance Ord  (a :~~: b)
 
 -- | @since 4.10.0.0
-instance a ~~ b => Read (a :~~: b) where
-  readsPrec d = readParen (d > 10) (\r -> [(HRefl, s) | ("HRefl",s) <- lex r ])
+deriving instance a ~~ b => Read (a :~~: b)
 
 -- | @since 4.10.0.0
 instance a ~~ b => Enum (a :~~: b) where

@@ -53,7 +53,9 @@ import GHC.Arr
 --
 -- >>> Proxy :: Proxy complicatedStructure
 -- Proxy
-data Proxy t = Proxy deriving Bounded
+data Proxy t = Proxy deriving ( Bounded
+                              , Read -- ^ @since 4.7.0.0
+                              )
 
 -- | A concrete, promotable proxy type, for use at the kind level
 -- There are no instances for this because it is intended at the kind level only
@@ -74,10 +76,6 @@ instance Ord (Proxy s) where
 -- | @since 4.7.0.0
 instance Show (Proxy s) where
   showsPrec _ _ = showString "Proxy"
-
--- | @since 4.7.0.0
-instance Read (Proxy s) where
-  readsPrec d = readParen (d > 10) (\r -> [(Proxy, s) | ("Proxy",s) <- lex r ])
 
 -- | @since 4.7.0.0
 instance Enum (Proxy s) where
