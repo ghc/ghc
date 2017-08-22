@@ -2692,7 +2692,7 @@ outOfLineCmmOp mop res args
 genSwitch :: DynFlags -> CmmExpr -> SwitchTargets -> NatM InstrBlock
 
 genSwitch dflags expr targets
-  | gopt Opt_PIC dflags
+  | positionIndependent dflags
   = do
         (reg,e_code) <- getNonClobberedReg (cmmOffset dflags expr offset)
            -- getNonClobberedReg because it needs to survive across t_code
@@ -2755,7 +2755,7 @@ createJumpTable :: DynFlags -> [Maybe BlockId] -> Section -> CLabel
                 -> GenCmmDecl (Alignment, CmmStatics) h g
 createJumpTable dflags ids section lbl
     = let jumpTable
-            | gopt Opt_PIC dflags =
+            | positionIndependent dflags =
                   let jumpTableEntryRel Nothing
                           = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)

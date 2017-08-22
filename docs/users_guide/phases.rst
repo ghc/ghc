@@ -877,3 +877,27 @@ for example).
     aren't referenced by any other code linked into the executable.
     If you're using ``-fwhole-archive-hs-libs``, you probably also
     want ``-rdynamic``.
+
+.. ghc-flag:: -pie
+    :shortdesc: Instruct the linker to produce a position-independent executable.
+    :type: dynamic
+    :category: linking
+
+    :since: 8.2.1
+
+    This instructs the linker to produce a position-independent executable.
+    This flag is only valid while producing executables and all object code
+    being linked must have been produced with :ghc-flag:`-fPIE`.
+
+    Position independent executables are required by some platforms as they
+    enable address-space layout randomization (ASLR), a common security measure.
+    They can also be useful as they can be dynamically loaded and used as shared
+    libraries by other executables.
+
+    Position independent executables should be dynamically-linked (e.g. built
+    with :ghc-flag:`-dynamic` and only loaded into other dynamically-linked
+    executables to ensure that only one ``libHSrts`` is present if
+    loaded into the address space of another Haskell process.
+
+    Also, you may need to use the :ghc-flags:`-rdynamic` flag to ensure that
+    that symbols are not dropped from your PIE object.
