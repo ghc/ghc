@@ -238,45 +238,55 @@ instance Outputable Sequel where
     ppr (AssignTo regs b) = text "AssignTo" <+> ppr regs <+> ppr b
 
 -- See Note [sharing continuations] below
+-- See Note [cmm return types] below
 data ReturnKind
-  = AssignedDirectly [CmmType]
+  = AssignedDirectly
+  | Returning [CmmType]
   | ReturnedTo BlockId ByteOff [GlobalReg]
   
+-- Note [cmm return types]
+-- We need to know the type of values returned by a CmmProc in order to use LLVM.
+-- During the codegen of a STG function body, we bubble up the needed information using
+-- the ReturnKind. Here is what each ReturnKind means in the context of determining
+-- the return type:
+--
+-- * AssignedDirectly indicates that either we have no information about the type of 
+--   the result values, or that we do not need the information.
+--
+-- * Returning means exactly the same thing as AssignedDirectly, but carries the needed 
+--   type information.
+--
+-- * ReturnedTo indicates that the expression has not finished with a result, so it is
+--   not useful for determining the return type.
+
+
+-- used to combine the ReturnKinds from processing an STG case so that
+-- any return type information is preserved.
 combineReturnKinds :: [ReturnKind] -> ReturnKind
-combineReturnKinds rks = foldl combine bot rks
+combineReturnKinds rks = foldl combine AssignedDirectly rks
     where
-        bot = AssignedDirectly []
+        combine (Returning a) (Returning b) = Returning $ tryCheck a b
+        combine _             (Returning b) = Returning b
+        combine acc           _             = acc
         
-        combine (AssignedDirectly a) (AssignedDirectly b) = 
-            AssignedDirectly $ tryMerge a b
-        combine (a @ (AssignedDirectly _)) (ReturnedTo _ _ _) = a  
-        -- a branch that returns to some other block does not directly return
-        -- from this case, so we skip over it.
+        check a b 
+            | a `equals` b  = a
+            | otherwise     = panic "combineReturnKinds: non-matching return kind!"
         
-        combine _ _ = panic "combineReturnKinds: unexpected situation"
-        
-        tryMerge a b = res
-            where
-                !x = trace ("\ntrying to merge: \n\t[" ++ cmmTy2String a ++ "]\n\t[" ++ cmmTy2String b ++ "]\n") ()
-                res = merge a b
-        
-        -- [] indicates either no information, or nothing is returned.
-        -- also, if two type lists do not match in length, we only check
-        -- up to the shortest list, and pick the longest since it has "more information". 
-        -- I believe we need to do this because some branches may not explicitly assign anything
-        -- to be returned? - TODO(kavon)
-        
-        merge ty1 ty2 
-            | ty1 `equals` ty2  = if length ty1 >= length ty2 then ty1 else ty2
-            | otherwise         = panic "combineReturnKinds: non-matching return kind!"
-        
-        equals [] _ = True
-        equals _ [] = True
+        -- CmmType does not derive Eq
+        equals [] []         = True
         equals (x:xs) (y:ys) = cmmEqType_ignoring_ptrhood x y && equals xs ys
-        -- equals _ _ = False
+        equals _ _           = False
         
+        -- debugging only XXX(kavon)
         cmmTy2String :: [CmmType] -> String
         cmmTy2String tys = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
+        
+        -- debugging only XXX(kavon)
+        tryCheck a b = res
+            where
+                !x = trace ("\ntrying to combine: \n\t[" ++ cmmTy2String a ++ "]\n\t[" ++ cmmTy2String b ++ "]\n") ()
+                res = check a b
         
 
 -- Note [sharing continuations]

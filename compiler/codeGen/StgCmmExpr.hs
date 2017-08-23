@@ -302,7 +302,7 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
             ; emitAssign (CmmLocal tmp_reg)
                          (tagToClosure dflags tycon tag_expr) }
 
-       ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly [])
+       ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
                                               (NonVoid bndr) alts
                                  -- See Note [GC for conditionals]
        ; let (branches', unifiedRk) = combineAlgAltRks branches
@@ -411,7 +411,7 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
        ; bindArgToReg (NonVoid bndr)
-       ; cgAlts (NoGcInAlts,AssignedDirectly []) (NonVoid bndr) alt_type alts }
+       ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
       -- Must compare SlotTys, not proper PrimReps, because with unboxed sums,
@@ -442,7 +442,7 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
        ; l <- newBlockId
        ; emitLabel l
        ; emit (mkBranch l)  -- an infinite loop
-       ; return $ AssignedDirectly []  -- [] indicates "anything" -kavon
+       ; return AssignedDirectly
        }
 
 {- Note [Handle seq#]
@@ -599,8 +599,7 @@ cgAlts gc_plan bndr (PrimAlt _) alts
               tagged_cmms' = [(lit,code)
                              | ((LitAlt lit, _), code) <- tagged_cmms]
                              
-                             -- TODO(kavon): shouldn't we combine rks from _all_ tagged_cmms?
-              rks          = [rk | ((LitAlt _, rk), _) <- tagged_cmms]
+              rks          =  [rk | ((_, rk), _) <- tagged_cmms]
               unifiedRk = combineReturnKinds rks
                              
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
@@ -703,7 +702,9 @@ cgAltRhss gc_plan bndr alts = do
 
 maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
 maybeAltHeapCheck (NoGcInAlts,_)  code = code
-maybeAltHeapCheck (GcInAlts regs, AssignedDirectly _) code =
+maybeAltHeapCheck (GcInAlts regs, AssignedDirectly) code =
+  altHeapCheck regs code
+maybeAltHeapCheck (GcInAlts regs, Returning _) code =
   altHeapCheck regs code
 maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off retRegs) code =
   altHeapCheckReturnsTo regs lret retRegs off code
@@ -778,7 +779,7 @@ cgIdApp fun_id args = do
           ; cmm_args <- getNonVoidArgAmodes args
           ; emitMultiAssign lne_regs cmm_args
           ; emit (mkBranch blk_id)
-          ; return $ AssignedDirectly [] }  -- no return type information
+          ; return AssignedDirectly }
 
 -- Note [Self-recursive tail calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -906,7 +907,7 @@ emitEnter fun = do
         { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
         ; emit $ mkJump dflags NativeNodeCall entry
                         [cmmUntag dflags fun] updfr_off
-        ; return $ AssignedDirectly []     -- no return type information
+        ; return AssignedDirectly   -- TODO(kavon): what is returned here?
         }
 
       -- The result will be scrutinised in the sequel.  This is where
