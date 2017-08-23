@@ -217,7 +217,7 @@ emitForeignCall safety results target args
     args' <- mapM maybe_assign_temp args
     emit $ mkUnsafeCall target' results args'
     emit caller_load
-    return AssignedDirectly
+    return $ AssignedDirectly (map localRegType results)
 
   | otherwise = do
     dflags <- getDynFlags

@@ -35,7 +35,7 @@ module StgCmmMonad (
         ConTagZ,
 
         Sequel(..), ReturnKind(..),
-        withSequel, getSequel,
+        withSequel, getSequel, combineReturnKinds,
 
         setTickyCtrLabel, getTickyCtrLabel,
         tickScope, getTickScope,
@@ -239,8 +239,31 @@ instance Outputable Sequel where
 
 -- See Note [sharing continuations] below
 data ReturnKind
-  = AssignedDirectly
+  = AssignedDirectly [CmmType]
   | ReturnedTo BlockId ByteOff [GlobalReg]
+  
+combineReturnKinds :: [ReturnKind] -> ReturnKind
+combineReturnKinds rks = foldl combine bot rks
+    where
+        bot = AssignedDirectly []
+        
+        combine (AssignedDirectly a) (AssignedDirectly b) = 
+            AssignedDirectly $ merge a b
+        combine _ _ = panic "combineReturnKinds: unexpected ReturnedTo"
+        -- ReturnedTo should not appear in a tail position.
+        
+        -- [] indicates either no information, or nothing is returned.
+        merge [] ty = ty
+        merge ty [] = ty
+        merge ty1 ty2 
+            | ty1 `equals` ty2  = ty1 
+            | otherwise         = panic "combineReturnKinds: non-matching return kind!"
+        
+         -- CmmType does not derive Eq
+        equals [] [] = True
+        equals (x:xs) (y:ys) = cmmEqType x y && equals xs ys
+        equals _ _ = False
+        
 
 -- Note [sharing continuations]
 --

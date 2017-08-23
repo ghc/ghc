@@ -515,7 +515,10 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
   }
 
 retK2s :: ReturnKind -> String  
-retK2s AssignedDirectly = "AssignedDirectly"
+retK2s (AssignedDirectly tys) = "AssignedDirectly with types: " ++ tyStr
+    where 
+        tyStr = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
+        
 retK2s (ReturnedTo _ _ _) = "ReturnedTo"
 
 -- Note [NodeReg clobbered with loopification]

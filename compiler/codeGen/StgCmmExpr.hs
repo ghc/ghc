@@ -302,11 +302,12 @@ cgCase (StgOpApp (StgPrimOp op) args _) bndr (AlgAlt tycon) alts
             ; emitAssign (CmmLocal tmp_reg)
                          (tagToClosure dflags tycon tag_expr) }
 
-       ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly)
+       ; (mb_deflt, branches) <- cgAlgAltRhss (NoGcInAlts,AssignedDirectly [])
                                               (NonVoid bndr) alts
                                  -- See Note [GC for conditionals]
-       ; emitSwitch tag_expr branches mb_deflt 0 (tyConFamilySize tycon - 1)
-       ; return AssignedDirectly
+       ; let (branches', unifiedRk) = combineAlgAltRks branches
+       ; emitSwitch tag_expr branches' mb_deflt 0 (tyConFamilySize tycon - 1)
+       ; return unifiedRk
        }
   where
     do_enum_primop :: PrimOp -> [StgArg] -> FCode CmmExpr
@@ -410,7 +411,7 @@ cgCase (StgApp v []) bndr alt_type@(PrimAlt _) alts
        ; emitAssign (CmmLocal (idToReg dflags (NonVoid bndr)))
                     (idInfoToAmode v_info)
        ; bindArgToReg (NonVoid bndr)
-       ; cgAlts (NoGcInAlts,AssignedDirectly) (NonVoid bndr) alt_type alts }
+       ; cgAlts (NoGcInAlts,AssignedDirectly []) (NonVoid bndr) alt_type alts }
   where
     reps_compatible = ((==) `on` (primRepSlot . idPrimRep)) v bndr
       -- Must compare SlotTys, not proper PrimReps, because with unboxed sums,
@@ -441,7 +442,7 @@ cgCase scrut@(StgApp v []) _ (PrimAlt _) _
        ; l <- newBlockId
        ; emitLabel l
        ; emit (mkBranch l)  -- an infinite loop
-       ; return AssignedDirectly
+       ; return $ AssignedDirectly []  -- [] indicates "anything" -kavon
        }
 
 {- Note [Handle seq#]
@@ -591,22 +592,28 @@ cgAlts gc_plan bndr (PrimAlt _) alts
         ; tagged_cmms <- cgAltRhss gc_plan bndr alts
 
         ; let bndr_reg = CmmLocal (idToReg dflags bndr)
-              (DEFAULT,deflt) = head tagged_cmms
+              ((DEFAULT,_),deflt) = head tagged_cmms
                 -- PrimAlts always have a DEFAULT case
                 -- and it always comes first
 
               tagged_cmms' = [(lit,code)
-                             | (LitAlt lit, code) <- tagged_cmms]
+                             | ((LitAlt lit, _), code) <- tagged_cmms]
+                             
+                             -- TODO(kavon): shouldn't we combine rks from _all_ tagged_cmms?
+              rks          = [rk | ((LitAlt _, rk), _) <- tagged_cmms]
+              unifiedRk = combineReturnKinds rks
+                             
         ; emitCmmLitSwitch (CmmReg bndr_reg) tagged_cmms' deflt
-        ; return AssignedDirectly }
+        ; return unifiedRk }
 
 cgAlts gc_plan bndr (AlgAlt tycon) alts
   = do  { dflags <- getDynFlags
 
-        ; (mb_deflt, branches) <- cgAlgAltRhss gc_plan bndr alts
+        ; (mb_deflt, orig_branches) <- cgAlgAltRhss gc_plan bndr alts
 
         ; let fam_sz   = tyConFamilySize tycon
               bndr_reg = CmmLocal (idToReg dflags bndr)
+              (branches, unifiedRk) = combineAlgAltRks orig_branches
 
                     -- Is the constructor tag in the node reg?
         ; if isSmallFamily dflags fam_sz
@@ -624,10 +631,16 @@ cgAlts gc_plan bndr (AlgAlt tycon) alts
                        tag_expr = getConstrTag dflags (untagged_ptr)
                    emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
 
-        ; return AssignedDirectly }
+        ; return unifiedRk }
 
 cgAlts _ _ _ _ = panic "cgAlts"
         -- UbxTupAlt and PolyAlt have only one alternative
+
+combineAlgAltRks :: [(a, b, ReturnKind)] -> ([(a, b)], ReturnKind)
+combineAlgAltRks branches = (others, combineReturnKinds rks)
+    where
+        lopsidedUnzipper (a, b, c) (others, rhs) = ((a, b) : others, c : rhs)
+        (others, rks) = foldr lopsidedUnzipper ([], []) branches
 
 
 -- Note [alg-alt heap check]
@@ -653,17 +666,17 @@ cgAlts _ _ _ _ = panic "cgAlts"
 -------------------
 cgAlgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
              -> FCode ( Maybe CmmAGraphScoped
-                      , [(ConTagZ, CmmAGraphScoped)] )
+                      , [(ConTagZ, CmmAGraphScoped, ReturnKind)] )
 cgAlgAltRhss gc_plan bndr alts
   = do { tagged_cmms <- cgAltRhss gc_plan bndr alts
 
        ; let { mb_deflt = case tagged_cmms of
-                           ((DEFAULT,rhs) : _) -> Just rhs
+                           (((DEFAULT,_),rhs) : _) -> Just rhs
                            _other              -> Nothing
                             -- DEFAULT is always first, if present
 
-              ; branches = [ (dataConTagZ con, cmm)
-                           | (DataAlt con, cmm) <- tagged_cmms ]
+              ; branches = [ (dataConTagZ con, cmm, rk)
+                           | ((DataAlt con, rk), cmm) <- tagged_cmms ]
               }
 
        ; return (mb_deflt, branches)
@@ -672,25 +685,25 @@ cgAlgAltRhss gc_plan bndr alts
 
 -------------------
 cgAltRhss :: (GcPlan,ReturnKind) -> NonVoid Id -> [StgAlt]
-          -> FCode [(AltCon, CmmAGraphScoped)]
+          -> FCode [((AltCon, ReturnKind), CmmAGraphScoped)]
 cgAltRhss gc_plan bndr alts = do
   dflags <- getDynFlags
   let
     base_reg = idToReg dflags bndr
-    cg_alt :: StgAlt -> FCode (AltCon, CmmAGraphScoped)
+    cg_alt :: StgAlt -> FCode ((AltCon, ReturnKind), CmmAGraphScoped)
     cg_alt (con, bndrs, rhs)
       = getCodeScoped             $
         maybeAltHeapCheck gc_plan $
         do { _ <- bindConArgs con base_reg (assertNonVoidIds bndrs)
                     -- alt binders are always non-void,
                     -- see Note [Post-unarisation invariants] in UnariseStg
-           ; _ <- cgExpr rhs
-           ; return con }
+           ; rk <- cgExpr rhs
+           ; return (con, rk) }
   forkAlts (map cg_alt alts)
 
 maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
 maybeAltHeapCheck (NoGcInAlts,_)  code = code
-maybeAltHeapCheck (GcInAlts regs, AssignedDirectly) code =
+maybeAltHeapCheck (GcInAlts regs, AssignedDirectly []) code =
   altHeapCheck regs code
 maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off retRegs) code =
   altHeapCheckReturnsTo regs lret retRegs off code
@@ -765,7 +778,7 @@ cgIdApp fun_id args = do
           ; cmm_args <- getNonVoidArgAmodes args
           ; emitMultiAssign lne_regs cmm_args
           ; emit (mkBranch blk_id)
-          ; return AssignedDirectly }
+          ; return $ AssignedDirectly [] }  -- no return type information
 
 -- Note [Self-recursive tail calls]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -893,7 +906,7 @@ emitEnter fun = do
         { let entry = entryCode dflags $ closureInfoPtr dflags $ CmmReg nodeReg
         ; emit $ mkJump dflags NativeNodeCall entry
                         [cmmUntag dflags fun] updfr_off
-        ; return AssignedDirectly
+        ; return $ AssignedDirectly []     -- no return type information
         }
 
       -- The result will be scrutinised in the sequel.  This is where

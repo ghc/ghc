@@ -83,7 +83,7 @@ emitReturn results
            AssignTo regs adjust ->
              do { when adjust adjustHpBackwards
                 ; emitMultiAssign  regs results }
-       ; return AssignedDirectly
+       ; return $ AssignedDirectly (map (cmmExprType dflags) results)
        }
 
 
@@ -112,7 +112,7 @@ emitCallWithExtraStack (callConv, retConv) fun args extra_stack
         ; case sequel of
             Return -> do
               emit $ mkJumpExtra dflags callConv fun args updfr_off extra_stack
-              return AssignedDirectly
+              return $ AssignedDirectly (map (cmmExprType dflags) args)
             AssignTo res_regs _ -> do
               k <- newBlockId
               let area = Young k
