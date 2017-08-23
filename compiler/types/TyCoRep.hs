@@ -40,7 +40,6 @@ module TyCoRep (
         mkPiTy, mkPiTys,
         isLiftedTypeKind, isUnliftedTypeKind,
         isCoercionType, isRuntimeRepTy, isRuntimeRepVar,
-        isRuntimeRepKindedTy, dropRuntimeRepArgs,
         sameVis,
 
         -- * Functions over binders
@@ -141,7 +140,7 @@ import {-# SOURCE #-} Type( isPredTy, isCoercionTy, mkAppTy, mkCastTy
                           , tyCoVarsOfTypeWellScoped
                           , tyCoVarsOfTypesWellScoped
                           , toposortTyVars
-                          , coreView, typeKind )
+                          , coreView )
    -- Transitively pulls in a LOT of stuff, better to break the loop
 
 import {-# SOURCE #-} Coercion
@@ -736,22 +735,9 @@ isRuntimeRepTy ty | Just ty' <- coreView ty = isRuntimeRepTy ty'
 isRuntimeRepTy (TyConApp tc []) = tc `hasKey` runtimeRepTyConKey
 isRuntimeRepTy _ = False
 
--- | Is this a type of kind RuntimeRep? (e.g. LiftedRep)
-isRuntimeRepKindedTy :: Type -> Bool
-isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
-
 -- | Is a tyvar of type 'RuntimeRep'?
 isRuntimeRepVar :: TyVar -> Bool
 isRuntimeRepVar = isRuntimeRepTy . tyVarKind
-
--- | Drops prefix of RuntimeRep constructors in 'TyConApp's. Useful for e.g.
--- dropping 'LiftedRep arguments of unboxed tuple TyCon applications:
---
---   dropRuntimeRepArgs [ 'LiftedRep, 'IntRep
---                      , String, Int# ] == [String, Int#]
---
-dropRuntimeRepArgs :: [Type] -> [Type]
-dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
 
 {-
 %************************************************************************

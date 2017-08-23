@@ -1956,6 +1956,19 @@ isUnliftedType ty
   = not (isLiftedType_maybe ty `orElse`
          pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty)))
 
+-- | Is this a type of kind RuntimeRep? (e.g. LiftedRep)
+isRuntimeRepKindedTy :: Type -> Bool
+isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
+
+-- | Drops prefix of RuntimeRep constructors in 'TyConApp's. Useful for e.g.
+-- dropping 'LiftedRep arguments of unboxed tuple TyCon applications:
+--
+--   dropRuntimeRepArgs [ 'LiftedRep, 'IntRep
+--                      , String, Int# ] == [String, Int#]
+--
+dropRuntimeRepArgs :: [Type] -> [Type]
+dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
+
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Returns 'Nothing' if this is not
 -- possible.
