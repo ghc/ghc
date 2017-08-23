@@ -185,6 +185,9 @@ installPackages = do
 
     installLibPkgs <- topsortPackages (filter isLibrary activePackages)
 
+    -- TODO (izgzhen): figure out what is the root cause of the missing ghc-gmp.h error
+    copyFile (pkgPath integerGmp -/- "gmp/ghc-gmp.h") (pkgPath integerGmp -/- "ghc-gmp.h")
+
     forM_ installLibPkgs $ \pkg -> do
         when (isLibrary pkg) $
             withLatestBuildStage pkg $ \stage -> do
