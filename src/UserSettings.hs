@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     userBuildRoot, userFlavours, userKnownPackages, verboseCommands,
-    buildProgressColour, successColour, defaultDestDir, defaultStage1Only
+    buildProgressColour, successColour, defaultStage1Only
     ) where
 
 import Hadrian.Utilities
@@ -33,7 +33,9 @@ userKnownPackages = []
 -- this is a 'Predicate', hence you can enable verbose output only for certain
 -- targets, e.g.: @verboseCommands = package ghcPrim@.
 verboseCommands :: Predicate
-verboseCommands = return False
+verboseCommands = do
+    verbosity <- expr getVerbosity
+    return $ verbosity >= Loud
 
 -- | Set colour for build progress messages (e.g. executing a build command).
 buildProgressColour :: BuildProgressColour
@@ -42,14 +44,6 @@ buildProgressColour = BuildProgressColour (Dull, Magenta)
 -- | Set colour for success messages (e.g. a package is built successfully).
 successColour :: SuccessColour
 successColour = SuccessColour (Dull, Green)
-
--- | Path to the GHC install destination. It is empty by default, which
--- corresponds to the root of the file system. You can replace it by a specific
--- directory. Make sure you use correct absolute path on Windows, e.g. "C:/path".
--- The destination directory is used with a @prefix@, commonly @/usr/local@,
--- i.e. GHC is installed into "C:/path/usr/local" for the above example.
-defaultDestDir :: FilePath
-defaultDestDir = ""
 
 {-
   Stage1Only=YES means:

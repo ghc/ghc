@@ -110,9 +110,12 @@ To build a GHC source distribution tarball, run Hadrian with the `sdist-ghc` tar
 
 To build and install GHC artifacts, run the `install` target.
 
-By default, the artifacts will be installed to `<prefix>` on your system. For example,
-`ghc` will be installed to `/usr/local/bin`. By setting flag `--install-destdir=[DESTDIR]`,
+By default, the artifacts will be installed to `<prefix>` on your system
+(in this case, the `DESTDIR` is empty, corresponds to the root of the file system).
+For example on UNIX, `ghc` will be installed to `/usr/local/bin`. By setting flag `--install-destdir=[DESTDIR]`,
 you can install things to non-system path `DESTDIR/<prefix>` instead.
+Make sure you use correct absolute path on Windows, e.g. `C:/path`,
+i.e. GHC is installed into `C:/path/usr/local` for the above example.
 
 #### Testing
 
