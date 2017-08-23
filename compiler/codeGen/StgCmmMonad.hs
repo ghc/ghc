@@ -1,4 +1,4 @@
-{-# LANGUAGE CPP, GADTs, UnboxedTuples #-}
+{-# LANGUAGE CPP, GADTs, UnboxedTuples, BangPatterns #-}
 
 -----------------------------------------------------------------------------
 --
@@ -248,21 +248,35 @@ combineReturnKinds rks = foldl combine bot rks
         bot = AssignedDirectly []
         
         combine (AssignedDirectly a) (AssignedDirectly b) = 
-            AssignedDirectly $ merge a b
-        combine _ _ = panic "combineReturnKinds: unexpected ReturnedTo"
-        -- ReturnedTo should not appear in a tail position.
+            AssignedDirectly $ tryMerge a b
+        combine (a @ (AssignedDirectly _)) (ReturnedTo _ _ _) = a  
+        -- a branch that returns to some other block does not directly return
+        -- from this case, so we skip over it.
+        
+        combine _ _ = panic "combineReturnKinds: unexpected situation"
+        
+        tryMerge a b = res
+            where
+                !x = trace ("\ntrying to merge: \n\t[" ++ cmmTy2String a ++ "]\n\t[" ++ cmmTy2String b ++ "]\n") ()
+                res = merge a b
         
         -- [] indicates either no information, or nothing is returned.
-        merge [] ty = ty
-        merge ty [] = ty
+        -- also, if two type lists do not match in length, we only check
+        -- up to the shortest list, and pick the longest since it has "more information". 
+        -- I believe we need to do this because some branches may not explicitly assign anything
+        -- to be returned? - TODO(kavon)
+        
         merge ty1 ty2 
-            | ty1 `equals` ty2  = ty1 
+            | ty1 `equals` ty2  = if length ty1 >= length ty2 then ty1 else ty2
             | otherwise         = panic "combineReturnKinds: non-matching return kind!"
         
-         -- CmmType does not derive Eq
-        equals [] [] = True
-        equals (x:xs) (y:ys) = cmmEqType x y && equals xs ys
-        equals _ _ = False
+        equals [] _ = True
+        equals _ [] = True
+        equals (x:xs) (y:ys) = cmmEqType_ignoring_ptrhood x y && equals xs ys
+        -- equals _ _ = False
+        
+        cmmTy2String :: [CmmType] -> String
+        cmmTy2String tys = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
         
 
 -- Note [sharing continuations]

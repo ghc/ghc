@@ -703,7 +703,7 @@ cgAltRhss gc_plan bndr alts = do
 
 maybeAltHeapCheck :: (GcPlan,ReturnKind) -> FCode a -> FCode a
 maybeAltHeapCheck (NoGcInAlts,_)  code = code
-maybeAltHeapCheck (GcInAlts regs, AssignedDirectly []) code =
+maybeAltHeapCheck (GcInAlts regs, AssignedDirectly _) code =
   altHeapCheck regs code
 maybeAltHeapCheck (GcInAlts regs, ReturnedTo lret off retRegs) code =
   altHeapCheckReturnsTo regs lret retRegs off code

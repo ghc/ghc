@@ -514,12 +514,17 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
 
   }
 
+-- start of temporary debugging utils --
+
 retK2s :: ReturnKind -> String  
-retK2s (AssignedDirectly tys) = "AssignedDirectly with types: " ++ tyStr
-    where 
-        tyStr = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
-        
-retK2s (ReturnedTo _ _ _) = "ReturnedTo"
+retK2s (AssignedDirectly tys) = "AssignedDirectly with types: " ++ cmmTy2String tys
+retK2s (ReturnedTo _ _ _) = panic "unexpected ReturnedTo from codegenning function body."
+
+cmmTy2String :: [CmmType] -> String
+cmmTy2String tys = concat [showSDocUnsafe (ppr t) ++ ", " | t <- tys]
+
+-- end of temporary debugging utils --
+
 
 -- Note [NodeReg clobbered with loopification]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
