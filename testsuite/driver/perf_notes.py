@@ -256,6 +256,7 @@ for test in latest_commit:
 # Has no meaningful output if there is no commit to compare to.
 if not singleton_commit:
     header('percent')
+
     # Printing out percentages.
     for test in latest_commit:
         print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))
