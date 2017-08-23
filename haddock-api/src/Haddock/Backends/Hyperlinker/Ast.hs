@@ -159,10 +159,11 @@ decls (group, _, _, _) = concatMap ($ group)
               ++ everythingInRenamedSource fld cdcl
         Nothing -> empty
     ins term = case cast term of
-        (Just ((GHC.DataFamInstD inst) :: GHC.InstDecl GHC.GhcRn))
-          -> pure . tyref $ GHC.dfid_tycon inst
-        (Just (GHC.TyFamInstD (GHC.TyFamInstDecl (GHC.L _ eqn) _))) ->
-            pure . tyref $ GHC.tfe_tycon eqn
+        (Just ((GHC.DataFamInstD (GHC.DataFamInstDecl eqn))
+                :: GHC.InstDecl GHC.GhcRn))
+          -> pure . tyref $ GHC.feqn_tycon $ GHC.hsib_body eqn
+        (Just (GHC.TyFamInstD (GHC.TyFamInstDecl eqn))) ->
+            pure . tyref $ GHC.feqn_tycon $ GHC.hsib_body eqn
         _ -> empty
     fld term = case cast term of
         Just (field :: GHC.ConDeclField GHC.GhcRn)

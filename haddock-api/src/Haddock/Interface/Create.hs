@@ -406,11 +406,13 @@ subordinates :: InstMap
              -> [(Name, [HsDocString], Map Int HsDocString)]
 subordinates instMap decl = case decl of
   InstD (ClsInstD d) -> do
-    DataFamInstDecl { dfid_tycon = L l _
-                    , dfid_defn = defn   } <- unLoc <$> cid_datafam_insts d
+    DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
+      FamEqn { feqn_tycon = L l _
+             , feqn_rhs   = defn }}} <- unLoc <$> cid_datafam_insts d
     [ (n, [], M.empty) | Just n <- [M.lookup l instMap] ] ++ dataSubs defn
 
-  InstD (DataFamInstD d)  -> dataSubs (dfid_defn d)
+  InstD (DataFamInstD (DataFamInstDecl (HsIB { hsib_body = d })))
+    -> dataSubs (feqn_rhs d)
   TyClD d | isClassDecl d -> classSubs d
           | isDataDecl  d -> dataSubs (tcdDataDefn d)
   _ -> []
@@ -1004,17 +1006,19 @@ extractDecl name decl
         in if isDataConName name
            then SigD <$> extractPatternSyn name n tyvar_tys (dd_cons (tcdDataDefn d))
            else SigD <$> extractRecSel name n tyvar_tys (dd_cons (tcdDataDefn d))
-      InstD (DataFamInstD DataFamInstDecl { dfid_tycon = L _ n
-                                          , dfid_pats = HsIB { hsib_body = tys }
-                                          , dfid_defn = defn }) ->
+      InstD (DataFamInstD (DataFamInstDecl (HsIB { hsib_body =
+                             FamEqn { feqn_tycon = L _ n
+                                    , feqn_pats  = tys
+                                    , feqn_rhs   = defn }}))) ->
         SigD <$> extractRecSel name n tys (dd_cons defn)
       InstD (ClsInstD ClsInstDecl { cid_datafam_insts = insts }) ->
-        let matches = [ d | L _ d <- insts
-                          -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (dfid_defn d)
-                          , RecCon rec <- map (getConDetails . unLoc) (dd_cons (dfid_defn d))
-                          , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
-                          , L _ n <- ns
-                          , selectorFieldOcc n == name
+        let matches = [ d' | L _ d'@(DataFamInstDecl (HsIB { hsib_body = d }))
+                               <- insts
+                             -- , L _ ConDecl { con_details = RecCon rec } <- dd_cons (feqn_rhs d)
+                           , RecCon rec <- map (getConDetails . unLoc) (dd_cons (feqn_rhs d))
+                           , ConDeclField { cd_fld_names = ns } <- map unLoc (unLoc rec)
+                           , L _ n <- ns
+                           , selectorFieldOcc n == name
                       ]
         in case matches of
           [d0] -> extractDecl name (noLoc . InstD $ DataFamInstD d0)

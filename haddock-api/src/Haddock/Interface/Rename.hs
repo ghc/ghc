@@ -415,7 +415,7 @@ renameFamilyInfo :: FamilyInfo GhcRn -> RnM (FamilyInfo DocNameI)
 renameFamilyInfo DataFamily     = return DataFamily
 renameFamilyInfo OpenTypeFamily = return OpenTypeFamily
 renameFamilyInfo (ClosedTypeFamily eqns)
-  = do { eqns' <- mapM (mapM renameLTyFamInstEqn) eqns
+  = do { eqns' <- mapM (mapM (mapM renameTyFamInstEqn)) eqns
        ; return $ ClosedTypeFamily eqns' }
 
 renameDataDefn :: HsDataDefn GhcRn -> RnM (HsDataDefn DocNameI)
@@ -542,39 +542,54 @@ renameClsInstD (ClsInstDecl { cid_overlap_mode = omode
 
 renameTyFamInstD :: TyFamInstDecl GhcRn -> RnM (TyFamInstDecl DocNameI)
 renameTyFamInstD (TyFamInstDecl { tfid_eqn = eqn })
-  = do { eqn' <- renameLTyFamInstEqn eqn
-       ; return (TyFamInstDecl { tfid_eqn = eqn'
-                               , tfid_fvs = placeHolderNames }) }
+  = do { eqn' <- renameTyFamInstEqn eqn
+       ; return (TyFamInstDecl { tfid_eqn = eqn' }) }
 
-renameLTyFamInstEqn :: LTyFamInstEqn GhcRn -> RnM (LTyFamInstEqn DocNameI)
-renameLTyFamInstEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_fixity = fixity, tfe_rhs = rhs }))
-  = do { tc' <- renameL tc
-       ; pats' <- renameImplicit (mapM renameLType) pats
-       ; rhs' <- renameLType rhs
-       ; return (L loc (TyFamEqn { tfe_tycon = tc'
-                                 , tfe_pats = pats'
-                                 , tfe_fixity = fixity
-                                 , tfe_rhs = rhs' })) }
+renameTyFamInstEqn :: TyFamInstEqn GhcRn -> RnM (TyFamInstEqn DocNameI)
+renameTyFamInstEqn eqn
+  = renameImplicit rename_ty_fam_eqn eqn
+  where
+    rename_ty_fam_eqn
+      :: FamEqn GhcRn (HsTyPats GhcRn) (LHsType GhcRn)
+      -> RnM (FamEqn DocNameI (HsTyPats DocNameI) (LHsType DocNameI))
+    rename_ty_fam_eqn (FamEqn { feqn_tycon = tc, feqn_pats = pats
+                              , feqn_fixity = fixity, feqn_rhs = rhs })
+      = do { tc' <- renameL tc
+           ; pats' <- mapM renameLType pats
+           ; rhs' <- renameLType rhs
+           ; return (FamEqn { feqn_tycon  = tc'
+                            , feqn_pats   = pats'
+                            , feqn_fixity = fixity
+                            , feqn_rhs    = rhs' }) }
 
 renameLTyFamDefltEqn :: LTyFamDefltEqn GhcRn -> RnM (LTyFamDefltEqn DocNameI)
-renameLTyFamDefltEqn (L loc (TyFamEqn { tfe_tycon = tc, tfe_pats = tvs, tfe_fixity = fixity, tfe_rhs = rhs }))
+renameLTyFamDefltEqn (L loc (FamEqn { feqn_tycon = tc, feqn_pats = tvs
+                                    , feqn_fixity = fixity, feqn_rhs = rhs }))
   = do { tc'  <- renameL tc
        ; tvs' <- renameLHsQTyVars tvs
        ; rhs' <- renameLType rhs
-       ; return (L loc (TyFamEqn { tfe_tycon = tc'
-                                 , tfe_pats = tvs'
-                                 , tfe_fixity = fixity
-                                 , tfe_rhs = rhs' })) }
+       ; return (L loc (FamEqn { feqn_tycon  = tc'
+                               , feqn_pats   = tvs'
+                               , feqn_fixity = fixity
+                               , feqn_rhs    = rhs' })) }
 
 renameDataFamInstD :: DataFamInstDecl GhcRn -> RnM (DataFamInstDecl DocNameI)
-renameDataFamInstD (DataFamInstDecl { dfid_tycon = tc, dfid_pats = pats, dfid_fixity = fixity, dfid_defn = defn })
-  = do { tc' <- renameL tc
-       ; pats' <- renameImplicit (mapM renameLType) pats
-       ; defn' <- renameDataDefn defn
-       ; return (DataFamInstDecl { dfid_tycon = tc'
-                                 , dfid_pats = pats'
-                                 , dfid_fixity = fixity
-                                 , dfid_defn = defn', dfid_fvs = placeHolderNames }) }
+renameDataFamInstD (DataFamInstDecl { dfid_eqn = eqn })
+  = do { eqn' <- renameImplicit rename_data_fam_eqn eqn
+       ; return (DataFamInstDecl { dfid_eqn = eqn' }) }
+  where
+    rename_data_fam_eqn
+      :: FamEqn GhcRn (HsTyPats GhcRn) (HsDataDefn GhcRn)
+      -> RnM (FamEqn DocNameI (HsTyPats DocNameI) (HsDataDefn DocNameI))
+    rename_data_fam_eqn (FamEqn { feqn_tycon = tc, feqn_pats = pats
+                                , feqn_fixity = fixity, feqn_rhs = defn })
+      = do { tc' <- renameL tc
+           ; pats' <- mapM renameLType pats
+           ; defn' <- renameDataDefn defn
+           ; return (FamEqn { feqn_tycon  = tc'
+                            , feqn_pats   = pats'
+                            , feqn_fixity = fixity
+                            , feqn_rhs    = defn' }) }
 
 renameImplicit :: (in_thing -> RnM out_thing)
                -> HsImplicitBndrs GhcRn in_thing

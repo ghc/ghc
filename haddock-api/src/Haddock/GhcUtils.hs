@@ -59,12 +59,13 @@ getMainDeclBinder _ = []
 -- instanceMap.
 getInstLoc :: InstDecl name -> SrcSpan
 getInstLoc (ClsInstD (ClsInstDecl { cid_poly_ty = ty })) = getLoc (hsSigType ty)
-getInstLoc (DataFamInstD (DataFamInstDecl { dfid_tycon = L l _ })) = l
+getInstLoc (DataFamInstD (DataFamInstDecl
+  { dfid_eqn = HsIB { hsib_body = FamEqn { feqn_tycon = L l _ }}})) = l
 getInstLoc (TyFamInstD (TyFamInstDecl
   -- Since CoAxioms' Names refer to the whole line for type family instances
   -- in particular, we need to dig a bit deeper to pull out the entire
   -- equation. This does not happen for data family instances, for some reason.
-  { tfid_eqn = L _ (TyFamEqn { tfe_rhs = L l _ })})) = l
+  { tfid_eqn = HsIB { hsib_body = FamEqn { feqn_rhs = L l _ }}})) = l
 
 -- Useful when there is a signature with multiple names, e.g.
 --   foo, bar :: Types..

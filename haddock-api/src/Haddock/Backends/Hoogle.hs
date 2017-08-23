@@ -184,11 +184,11 @@ ppClass dflags decl subdocs =
 
         tyFamEqnToSyn :: TyFamDefltEqn GhcRn -> TyClDecl GhcRn
         tyFamEqnToSyn tfe = SynDecl
-            { tcdLName = tfe_tycon tfe
-            , tcdTyVars = tfe_pats tfe
-            , tcdFixity = tfe_fixity tfe
-            , tcdRhs = tfe_rhs tfe
-            , tcdFVs = emptyNameSet
+            { tcdLName  = feqn_tycon tfe
+            , tcdTyVars = feqn_pats tfe
+            , tcdFixity = feqn_fixity tfe
+            , tcdRhs    = feqn_rhs tfe
+            , tcdFVs    = emptyNameSet
             }
 
 

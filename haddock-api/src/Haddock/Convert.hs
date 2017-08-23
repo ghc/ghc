@@ -113,20 +113,20 @@ synifyAxBranch tc (CoAxBranch { cab_tvs = tkvs, cab_lhs = args, cab_rhs = rhs })
   = let name       = synifyName tc
         typats     = map (synifyType WithinType) args
         hs_rhs     = synifyType WithinType rhs
-    in TyFamEqn { tfe_tycon = name
-                , tfe_pats  = HsIB { hsib_body = typats
-                                   , hsib_vars = map tyVarName tkvs
-                                   , hsib_closed = True }
-                , tfe_fixity = Prefix
-                , tfe_rhs   = hs_rhs }
+    in HsIB { hsib_vars   = map tyVarName tkvs
+            , hsib_closed = True
+            , hsib_body   = FamEqn { feqn_tycon  = name
+                                   , feqn_pats   = typats
+                                   , feqn_fixity = Prefix
+                                   , feqn_rhs    = hs_rhs } }
 
 synifyAxiom :: CoAxiom br -> Either ErrMsg (HsDecl GhcRn)
 synifyAxiom ax@(CoAxiom { co_ax_tc = tc })
   | isOpenTypeFamilyTyCon tc
   , Just branch <- coAxiomSingleBranch_maybe ax
-  = return $ InstD (TyFamInstD
-                    (TyFamInstDecl { tfid_eqn = noLoc $ synifyAxBranch tc branch
-                                   , tfid_fvs = placeHolderNamesTc }))
+  = return $ InstD
+           $ TyFamInstD
+           $ TyFamInstDecl { tfid_eqn = synifyAxBranch tc branch }
 
   | Just ax' <- isClosedSynFamilyTyConWithAxiom_maybe tc
   , getUnique ax' == getUnique ax   -- without the getUniques, type error
