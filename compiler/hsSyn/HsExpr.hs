@@ -196,7 +196,8 @@ data UnboundVar
   deriving Data
 
 instance Outputable UnboundVar where
-    ppr = ppr . unboundVarOcc
+    ppr (OutOfScope occ _) = text "OutOfScope" <> parens (ppr occ)
+    ppr (TrueExprHole occ) = text "ExprHole"   <> parens (ppr occ)
 
 unboundVarOcc :: UnboundVar -> OccName
 unboundVarOcc (OutOfScope occ _) = occ

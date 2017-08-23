@@ -1671,6 +1671,10 @@ data Hole = ExprHole UnboundVar
           | TypeHole OccName
             -- ^ A hole in a type (PartialTypeSignatures)
 
+instance Outputable Hole where
+  ppr (ExprHole ub)  = ppr ub
+  ppr (TypeHole occ) = text "TypeHole" <> parens (ppr occ)
+
 holeOcc :: Hole -> OccName
 holeOcc (ExprHole uv)  = unboundVarOcc uv
 holeOcc (TypeHole occ) = occ
@@ -1784,7 +1788,7 @@ instance Outputable Ct where
             | pend_sc   -> text "CDictCan(psc)"
             | otherwise -> text "CDictCan"
          CIrredEvCan {}   -> text "CIrredEvCan"
-         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr (holeOcc hole)
+         CHoleCan { cc_hole = hole } -> text "CHoleCan:" <+> ppr hole
 
 {-
 ************************************************************************
