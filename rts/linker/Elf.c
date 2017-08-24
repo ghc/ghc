@@ -1708,15 +1708,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 int
 ocResolve_ELF ( ObjectCode* oc )
 {
-   int       ok;
-   Elf_Word  i;
    char*     ehdrC = (char*)(oc->image);
    Elf_Ehdr* ehdr  = (Elf_Ehdr*) ehdrC;
    Elf_Shdr* shdr  = (Elf_Shdr*) (ehdrC + ehdr->e_shoff);
    const Elf_Word shnum = elf_shnum(ehdr);
 
 #if defined(SHN_XINDEX)
-   Elf_Word* shndxTable = get_shndx_table(ehdr);
+    Elf_Word* shndxTable = get_shndx_table(ehdr);
 #endif
 
     /* resolve section symbols
@@ -1749,9 +1747,9 @@ ocResolve_ELF ( ObjectCode* oc )
                 Elf_Word secno = symbol->elf_sym->st_shndx;
 #if defined(SHN_XINDEX)
                 if (secno == SHN_XINDEX) {
-                 ASSERT(shndxTable);
-                 secno = shndxTable[i];
-              }
+                    ASSERT(shndxTable);
+                    secno = shndxTable[i];
+                }
 #endif
                 ASSERT(symbol->elf_sym->st_name == 0);
                 ASSERT(symbol->elf_sym->st_value == 0);
@@ -1763,6 +1761,9 @@ ocResolve_ELF ( ObjectCode* oc )
 #if defined(NEED_GOT)
     if(fillGot( oc ))
         return 0;
+    /* silence warnings */
+    (void) shnum;
+    (void) shdr;
 #endif /* NEED_GOT */
 
 #if defined(aarch64_HOST_ARCH)
@@ -1770,27 +1771,27 @@ ocResolve_ELF ( ObjectCode* oc )
     if(relocateObjectCode( oc ))
         return 0;
 #else
-   /* Process the relocation sections. */
-   for (i = 0; i < shnum; i++) {
-      if (shdr[i].sh_type == SHT_REL) {
-         ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, i );
-         if (!ok)
-             return ok;
-      }
-      else
-      if (shdr[i].sh_type == SHT_RELA) {
-         ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr, i );
-         if (!ok)
-             return ok;
-      }
-   }
+    /* Process the relocation sections. */
+    for (Elf_Word i = 0; i < shnum; i++) {
+        if (shdr[i].sh_type == SHT_REL) {
+          bool ok = do_Elf_Rel_relocations ( oc, ehdrC, shdr, i );
+          if (!ok)
+              return ok;
+        }
+        else
+        if (shdr[i].sh_type == SHT_RELA) {
+          bool ok = do_Elf_Rela_relocations ( oc, ehdrC, shdr, i );
+          if (!ok)
+              return ok;
+        }
+    }
 #endif
 
 #if defined(powerpc_HOST_ARCH)
-   ocFlushInstructionCache( oc );
+    ocFlushInstructionCache( oc );
 #endif
 
-   return 1;
+    return 1;
 }
 
 int ocRunInit_ELF( ObjectCode *oc )
