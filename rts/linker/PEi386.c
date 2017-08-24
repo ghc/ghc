@@ -403,7 +403,7 @@ COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
 __attribute__ ((always_inline)) inline
 size_t getSymbolSize ( COFF_HEADER_INFO *info )
 {
-    ASSERT (info);
+    ASSERT(info);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -416,8 +416,8 @@ size_t getSymbolSize ( COFF_HEADER_INFO *info )
 __attribute__ ((always_inline)) inline
 int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -430,8 +430,8 @@ int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint32_t getSymValue ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -444,8 +444,8 @@ uint32_t getSymValue ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -458,8 +458,8 @@ uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -472,8 +472,8 @@ uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint16_t getSymType ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -486,8 +486,8 @@ uint16_t getSymType ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
