@@ -58,6 +58,7 @@
      tools. See note below.
 
    Note [BFD import library]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 
    On Windows, compilers don't link directly to dynamic libraries.
    The reason for this is that the exports are not always by symbol, the

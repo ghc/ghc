@@ -32,7 +32,7 @@ typedef enum {
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.
-   See Note [BFD import libraries].
+   See Note [BFD import library].
 */
 typedef
    enum { /* Section is code or readonly. e.g. .text or .r(o)data.  */
