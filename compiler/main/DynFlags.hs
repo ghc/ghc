@@ -232,14 +232,8 @@ import Foreign (Ptr) -- needed for 2nd stage
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 --
 -- If you modify anything in this file please make sure that your changes are
--- described in the User's Guide. Usually at least two sections need to be
--- updated:
---
---  * Flag Reference section generated from the modules in
---    utils/mkUserGuidePart/Options
---
---  * Flag description in docs/users_guide/using.rst provides a detailed
---    explanation of flags' usage.
+-- described in the User's Guide. Please update the flag description in the
+-- users guide (docs/users_guide) whenever you add or change a flag.
 
 -- Note [Supporting CLI completion]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -4132,8 +4126,7 @@ impliedXFlags
 -- If you change the list of flags enabled for particular optimisation levels
 -- please remember to update the User's Guide. The relevant files are:
 --
---  * utils/mkUserGuidePart/Options/
---  * docs/users_guide/using.rst
+--   docs/users_guide/using-optimisation.rst
 --
 -- The first contains the Flag Reference section, which briefly lists all
 -- available flags. The second contains a detailed description of the
@@ -4208,8 +4201,7 @@ removes an assertion failure. -}
 -- If you change the list of warning enabled by default
 -- please remember to update the User's Guide. The relevant file is:
 --
---  * utils/mkUserGuidePart/
---  * docs/users_guide/using-warnings.rst
+--  docs/users_guide/using-warnings.rst
 
 -- | Warning groups.
 --
