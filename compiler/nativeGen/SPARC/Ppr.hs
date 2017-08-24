@@ -402,7 +402,7 @@ pprInstr (LD format addr reg)
                pprReg reg
             ]
 
--- 64 bit FP storees are expanded into individual instructions in CodeGen.Expand
+-- 64 bit FP stores are expanded into individual instructions in CodeGen.Expand
 pprInstr (ST FF64 reg _)
         | RegReal (RealRegSingle{}) <- reg
         = panic "SPARC.Ppr: not emitting potentially misaligned ST FF64 instr"
