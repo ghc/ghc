@@ -36,6 +36,7 @@ module StgCmmMonad (
 
         Sequel(..), ReturnKind(..),
         withSequel, getSequel, combineReturnKinds,
+        updateRetTy, getRetTy,
 
         setTickyCtrLabel, getTickyCtrLabel,
         tickScope, getTickScope,
@@ -265,7 +266,7 @@ data ReturnKind
 combineReturnKinds :: [ReturnKind] -> ReturnKind
 combineReturnKinds rks = foldl combine AssignedDirectly rks
     where
-        combine (Returning a) (Returning b) = Returning $ tryCheck a b
+        combine (Returning a) (Returning b) = Returning $ check a b
         combine _             (Returning b) = Returning b
         combine acc           _             = acc
         
@@ -381,6 +382,8 @@ initUpdFrameOff dflags = widthInBytes (wordWidth dflags) -- space for the RA
 data CgState
   = MkCgState {
      cgs_stmts :: CmmAGraph,          -- Current procedure
+     
+     cgs_ret_ty :: CmmRetTy,          -- Current procedure's return type.
 
      cgs_tops  :: OrdList CmmDecl,
         -- Other procedures and data blocks in this compilation unit
@@ -438,6 +441,7 @@ Hp register.  (Changing virtHp doesn't matter.)
 initCgState :: UniqSupply -> CgState
 initCgState uniqs
   = MkCgState { cgs_stmts  = mkNop
+              , cgs_ret_ty = Nothing
               , cgs_tops   = nilOL
               , cgs_binds  = emptyVarEnv
               , cgs_hp_usg = initHpUsage
@@ -518,6 +522,18 @@ setBinds :: CgBindings -> FCode ()
 setBinds new_binds = do
         state <- getState
         setState $ state {cgs_binds = new_binds}
+        
+getRetTy :: FCode CmmRetTy
+getRetTy = do
+        state <- getState
+        return $ cgs_ret_ty state
+
+updateRetTy :: CmmRetTy -> FCode ()
+updateRetTy new_ty = do
+        state <- getState
+        case cgs_ret_ty state of
+            Nothing -> setState $ state {cgs_ret_ty = new_ty}
+            Just _ -> panic "updateRetTy: already have retTy info" 
 
 withState :: FCode a -> CgState -> FCode (a,CgState)
 withState (FCode fcode) newstate = FCode $ \info_down state ->
@@ -848,6 +864,7 @@ emitProc_ :: Maybe CmmInfoTable -> CLabel -> [GlobalReg] -> CmmAGraphScoped
 emitProc_ mb_info lbl live blocks offset do_layout
   = do  { dflags <- getDynFlags
         ; l <- newBlockId
+        ; retTy <- getRetTy
         ; let
               blks = labelAGraph l blocks
 

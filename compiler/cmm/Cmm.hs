@@ -6,7 +6,7 @@ module Cmm (
      CmmProgram, CmmGroup, GenCmmGroup,
      CmmDecl, GenCmmDecl(..),
      CmmGraph, GenCmmGraph(..),
-     CmmBlock,
+     CmmBlock, CmmRetTy,
      RawCmmDecl, RawCmmGroup,
      Section(..), SectionType(..), CmmStatics(..), CmmStatic(..),
      isSecConstant,
@@ -58,6 +58,8 @@ type CmmProgram = [CmmGroup]
 type GenCmmGroup d h g = [GenCmmDecl d h g]
 type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
 type RawCmmGroup = GenCmmGroup CmmStatics (LabelMap CmmStatics) CmmGraph
+
+type CmmRetTy = Maybe [CmmType]
 
 -----------------------------------------------------------------------------
 --  CmmDecl, GenCmmDecl

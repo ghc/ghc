@@ -508,11 +508,17 @@ closureCodeBody top_lvl bndr cl_info cc args arity body fv_details
                 -- heap check, to reduce live vars over check
                 ; when node_points $ load_fvs node lf_info fv_bindings
                 ; retKind <- cgExpr body
-                ; let !x = trace (retK2s retKind) ()
+                ; saveRetKind retKind
+                -- ; let !x = trace (retK2s retKind) ()
                 ; return ()
                 }}}
 
   }
+  
+saveRetKind :: ReturnKind -> FCode ()
+saveRetKind (Returning tys)  = updateRetTy $ Just tys
+saveRetKind AssignedDirectly = updateRetTy Nothing
+saveRetKind (ReturnedTo _ _ _) = panic "saveRetKind"
 
 -- start of temporary debugging utils --
 
@@ -607,7 +613,8 @@ thunkCode cl_info fv_details _cc node arity body
                ; fv_bindings <- mapM bind_fv fv_details
                ; load_fvs node lf_info fv_bindings
                ; retKind <- cgExpr body
-               ; let !x = trace (retK2s retKind) ()
+               ; saveRetKind retKind
+            --    ; let !x = trace (retK2s retKind) ()
                ; return ()
                }}}
 
