@@ -6,7 +6,6 @@
 # This file will be a utility to help facilitate the comparison of performance
 # metrics across arbitrary commits. The file will produce a table comparing
 # metrics between measurements taken for given commits in the environment given
-
 # by --test-env.
 
 import argparse
@@ -205,12 +204,12 @@ def evaluate_metric(test, field, deviation, contents):
 #
 # String utilities for pretty-printing
 #
-
-string = ''
-for i in args.commits:
-    string+='{:18}'
-commits = string.format(*[c[:10] for c in args.commits])
-latest_commit = [test for test in metrics if test['commit'] == args.commits[0]]
+def main_2():
+    string = ''
+    for i in args.commits:
+        string+='{:18}'
+    commits = string.format(*[c[:10] for c in args.commits])
+    latest_commit = [test for test in metrics if test['commit'] == args.commits[0]]
 
 def cmtline(insert):
     return string.format(*[insert for c in args.commits]).strip()
@@ -248,15 +247,21 @@ def commit_string(test, flag):
 # The pretty-printed output
 #
 
-header('commit')
-# Printing out metrics.
-for test in latest_commit:
-    print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'metrics'))
-
-# Has no meaningful output if there is no commit to compare to.
-if not singleton_commit:
-    header('percent')
-
-    # Printing out percentages.
+def main_3():
+    header('commit')
+    # Printing out metrics.
     for test in latest_commit:
-        print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))
+        print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'metrics'))
+
+    # Has no meaningful output if there is no commit to compare to.
+    if not singleton_commit:
+        header('percent')
+
+        # Printing out percentages.
+        for test in latest_commit:
+            print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))
+
+if __name__ == '__main__':
+    main()
+    main_2()
+    main_3()
