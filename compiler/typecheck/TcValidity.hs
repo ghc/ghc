@@ -225,6 +225,7 @@ wantAmbiguityCheck ctxt
   = case ctxt of  -- See Note [When we don't check for ambiguity]
       GhciCtxt     -> False
       TySynCtxt {} -> False
+      TypeAppCtxt  -> False
       _            -> True
 
 checkUserTypeError :: Type -> TcM ()
@@ -268,6 +269,10 @@ In a few places we do not want to check a user-specified type for ambiguity
   TcTyVars before calling checkValidType, so we get asertion failures
   from doing an ambiguity check on a type with TyVars in it.  Fixing this
   would not be hard, but let's wait till there's a reason.
+
+* TypeAppCtxt: visible type application
+     f @ty
+  No need to check ty for ambiguity
 
 
 ************************************************************************
