@@ -1106,6 +1106,16 @@ test('T12707',
      compile,
      [''])
 
+test('T12150',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 70773000, 5)
+          # initial:  70773000
+          ]),
+     ],
+    compile,
+     [''])
+
 test('T13379',
      [ compiler_stats_num_field('bytes allocated',
           [(platform('x86_64-apple-darwin'), 453166912, 10),
