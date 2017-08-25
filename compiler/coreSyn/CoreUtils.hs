@@ -83,7 +83,7 @@ import DynFlags
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
-import BasicTypes       ( Arity )
+import BasicTypes       ( Arity, isConLike )
 import Platform
 import Util
 import Pair
@@ -1168,22 +1168,11 @@ type CheapAppFun = Id -> Arity -> Bool
   --    isCheapApp
   --    isExpandableApp
 
-  -- NB: isCheapApp and isExpandableApp are called from outside
-  --     this module, so don't be tempted to move the notRedex
-  --     stuff into the call site in exprIsCheapX, and remove it
-  --     from the CheapAppFun implementations
-
-
-notRedex :: CheapAppFun
-notRedex fn n_val_args
-  =  n_val_args == 0           -- No value args
-  || n_val_args < idArity fn   -- Partial application
-  || isBottomingId fn   -- OK to duplicate calls to bottom;
-                        -- it certainly doesn't need to be shared!
-
 isWorkFreeApp :: CheapAppFun
 isWorkFreeApp fn n_val_args
-  | notRedex fn n_val_args
+  | n_val_args == 0           -- No value args
+  = True
+  | n_val_args < idArity fn   -- Partial application
   = True
   | otherwise
   = case idDetails fn of
@@ -1192,11 +1181,11 @@ isWorkFreeApp fn n_val_args
 
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
-  | notRedex fn n_val_args
-  = True
+  | isWorkFreeApp fn n_val_args = True
+  | isBottomingId fn            = True  -- See Note [isCheapApp: bottoming functions]
   | otherwise
   = case idDetails fn of
-      DataConWorkId {} -> True
+      DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId op      -> primOpIsCheap op
@@ -1208,21 +1197,24 @@ isCheapApp fn n_val_args
 
 isExpandableApp :: CheapAppFun
 isExpandableApp fn n_val_args
-  | notRedex fn n_val_args
-  = True
-  | isConLikeId fn
-  = True
+  | isWorkFreeApp fn n_val_args = True
   | otherwise
   = case idDetails fn of
-      DataConWorkId {} -> True
+      DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId {}      -> False
-      _                -> all_pred_args n_val_args (idType fn)
+      _ | isBottomingId fn               -> False
+          -- See Note [isExpandableApp: bottoming functions]
+        | isConLike (idRuleMatchInfo fn) -> True
+        | all_args_are_preds             -> True
+        | otherwise                      -> False
 
   where
-  -- See if all the arguments are PredTys (implicit params or classes)
-  -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     -- See if all the arguments are PredTys (implicit params or classes)
+     -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     all_args_are_preds = all_pred_args n_val_args (idType fn)
+
      all_pred_args n_val_args ty
        | n_val_args == 0
        = True
@@ -1235,7 +1227,35 @@ isExpandableApp fn n_val_args
        | otherwise
        = False
 
-{- Note [Record selection]
+{- Note [isCheapApp: bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I'm not sure why we have a special case for bottoming
+functions in isCheapApp.  Maybe we don't need it.
+
+Note [isExpandableApp: bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important that isExpandableApp does not respond True to bottoming
+functions.  Recall  undefined :: HasCallStack => a
+Suppose isExpandableApp responded True to (undefined d), and we had:
+
+  x = undefined <dict-expr>
+
+Then Simplify.prepareRhs would ANF the RHS:
+
+  d = <dict-expr>
+  x = undefined d
+
+This is already bad: we gain nothing from having x bound to (undefined
+var), unlike the case for data constructors.  Worse, we get the
+simplifier loop described in OccurAnal Note [Cascading inlines].
+Suppose x occurs just once; OccurAnal.occAnalNonRecRhs decides x will
+certainly_inline; so we end up inlining d right back into x; but in
+the end x doesn't inline because it is bottom (preInlineUnconditionally);
+so the process repeats.. We could elaborate the certainly_inline logic
+some more, but it's better just to treat bottoming bindings as
+non-expandable, because ANFing them is a bad idea in the first place.
+
+Note [Record selection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 I'm experimenting with making record selection
 look cheap, so we will substitute it inside a

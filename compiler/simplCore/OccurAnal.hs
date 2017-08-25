@@ -1564,8 +1564,8 @@ occAnalNonRecRhs env bndr bndrs body
     certainly_inline -- See Note [Cascading inlines]
       = case idOccInfo bndr of
           OneOcc { occ_in_lam = in_lam, occ_one_br = one_br }
-                                 -> not in_lam && one_br && active && not_stable
-          _                      -> False
+            -> not in_lam && one_br && active && not_stable
+          _ -> False
 
     dmd        = idDemandInfo bndr
     active     = isAlwaysActive (idInlineActivation bndr)
@@ -1654,15 +1654,19 @@ definitely inline the next time round, and so we analyse x3's rhs in
 an ordinary context, not rhsCtxt.  Hence the "certainly_inline" stuff.
 
 Annoyingly, we have to approximate SimplUtils.preInlineUnconditionally.
-If we say "yes" when preInlineUnconditionally says "no" the simplifier iterates
-indefinitely:
+If (a) the RHS is expandable (see isExpandableApp in occAnalApp), and
+   (b) certainly_inline says "yes" when preInlineUnconditionally says "no"
+then the simplifier iterates indefinitely:
         x = f y
-        k = Just x
+        k = Just x   -- We decide that k is 'certainly_inline'
+        v = ...k...  -- but preInlineUnconditionally doesn't inline it
 inline ==>
         k = Just (f y)
+        v = ...k...
 float ==>
         x1 = f y
         k = Just x1
+        v = ...k...
 
 This is worse than the slow cascade, so we only want to say "certainly_inline"
 if it really is certain.  Look at the note with preInlineUnconditionally
