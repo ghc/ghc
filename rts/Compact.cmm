@@ -188,9 +188,27 @@ eval:
     case
         SMALL_MUT_ARR_PTRS_FROZEN0,
         SMALL_MUT_ARR_PTRS_FROZEN: {
-        // (P_ to) = allocateForCompact(cap, compact, size);
-        // use prim memcpy
-        ccall barf("stg_compactAddWorkerzh: TODO: SMALL_MUT_ARR_PTRS");
+
+        W_ i, size, ptrs;
+        size = SIZEOF_StgMutArrPtrs + WDS(StgMutArrPtrs_size(p));
+        ptrs = StgMutArrPtrs_ptrs(p);
+        ALLOCATE(compact, BYTES_TO_WDS(size), p, to, tag);
+        P_[pp] = tag | to;
+        SET_HDR(to, StgHeader_info(p), StgHeader_ccs(p));
+        StgMutArrPtrs_ptrs(to) = ptrs;
+        StgMutArrPtrs_size(to) = StgMutArrPtrs_size(p);
+        prim %memcpy(to, p, size, 1);
+        i = 0;
+      loop0:
+        if (i < ptrs) {
+            W_ q;
+            q = to + SIZEOF_StgSmallMutArrPtrs + WDS(i);
+            call stg_compactAddWorkerzh(
+                compact, P_[p + SIZEOF_StgSmallMutArrPtrs + WDS(i)], q);
+            i = i + 1;
+            goto loop0;
+        }
+        return();
     }
 
     // Everything else we should copy and evaluate the components:
