@@ -19,7 +19,7 @@ import Finder           ( mkStubPaths )
 import PprC             ( writeCs )
 import CmmLint          ( cmmLint )
 import Packages
-import Cmm              ( RawCmmGroup )
+import Cmm              ( RawCmmGroup, RawCmmGroupPlus, discardRetTys )
 import HscTypes
 import DynFlags
 import Config
@@ -55,7 +55,7 @@ codeOutput :: DynFlags
            -> [(ForeignSrcLang, String)]
            -- ^ additional files to be compiled with with the C compiler
            -> [InstalledUnitId]
-           -> Stream IO RawCmmGroup ()                       -- Compiled C--
+           -> Stream IO RawCmmGroupPlus ()                   -- Compiled C--
            -> IO (FilePath,
                   (Bool{-stub_h_exists-}, Maybe FilePath{-stub_c_exists-}),
                   [(ForeignSrcLang, FilePath)],{-foreign_fps-}
@@ -66,10 +66,13 @@ codeOutput dflags this_mod filenm location foreign_stubs foreign_files pkg_deps
   =
     do  {
         -- Lint each CmmGroup as it goes past
-        ; let linted_cmm_stream =
+        ; let linted_cmmPlus_stream =
                  if gopt Opt_DoCmmLinting dflags
                     then Stream.mapM do_lint cmm_stream
                     else cmm_stream
+              
+              linted_cmm_stream =  
+                  Stream.map discardRetTys linted_cmmPlus_stream
 
               do_lint cmm = withTiming (pure dflags)
                                        (text "CmmLint"<+>brackets (ppr this_mod))

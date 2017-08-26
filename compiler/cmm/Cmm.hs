@@ -3,11 +3,11 @@
 
 module Cmm (
      -- * Cmm top-level datatypes
-     CmmProgram, CmmGroup, GenCmmGroup,
-     CmmDecl, GenCmmDecl(..),
+     CmmProgram, CmmGroup, CmmGroupPlus, GenCmmGroup,
+     CmmDecl, CmmDeclPlus, GenCmmDecl(..),
      CmmGraph, GenCmmGraph(..),
      CmmBlock, CmmRetTy,
-     RawCmmDecl, RawCmmGroup,
+     RawCmmDecl, RawCmmDeclPlus, RawCmmGroup, RawCmmGroupPlus,
      Section(..), SectionType(..), CmmStatics(..), CmmStatic(..),
      isSecConstant,
 
@@ -20,6 +20,7 @@ module Cmm (
      ClosureTypeInfo(..),
      C_SRT(..), needsSRT,
      ProfilingInfo(..), ConstrDescription,
+     discardRetTy, discardRetTys, toCmmPlus, addRetTy,
 
      -- * Statements, expressions and types
      module CmmNode,
@@ -56,8 +57,12 @@ import Data.Word        ( Word8 )
 type CmmProgram = [CmmGroup]
 
 type GenCmmGroup d h g = [GenCmmDecl d h g]
+
+type CmmGroupPlus = GenCmmGroup CmmStatics (CmmTopInfo, CmmRetTy) CmmGraph
 type CmmGroup = GenCmmGroup CmmStatics CmmTopInfo CmmGraph
+
 type RawCmmGroup = GenCmmGroup CmmStatics (LabelMap CmmStatics) CmmGraph
+type RawCmmGroupPlus = GenCmmGroup CmmStatics (LabelMap CmmStatics, CmmRetTy) CmmGraph
 
 type CmmRetTy = Maybe [CmmType]
 
@@ -91,12 +96,19 @@ data GenCmmDecl d h g
         Section
         d
 
+type CmmDeclPlus = GenCmmDecl CmmStatics (CmmTopInfo, CmmRetTy) CmmGraph
 type CmmDecl = GenCmmDecl CmmStatics CmmTopInfo CmmGraph
 
 type RawCmmDecl
    = GenCmmDecl
         CmmStatics
         (LabelMap CmmStatics)
+        CmmGraph
+        
+type RawCmmDeclPlus
+   = GenCmmDecl
+        CmmStatics
+        (LabelMap CmmStatics, CmmRetTy)
         CmmGraph
 
 -----------------------------------------------------------------------------
@@ -157,6 +169,26 @@ data C_SRT = NoC_SRT
 needsSRT :: C_SRT -> Bool
 needsSRT NoC_SRT       = False
 needsSRT (C_SRT _ _ _) = True
+
+-----------------------------------------------------------------------------
+--        Adding and removing return type information in the header.
+-----------------------------------------------------------------------------
+
+addRetTy :: GenCmmDecl d h g -> CmmRetTy -> GenCmmDecl d (h, CmmRetTy) g
+addRetTy (CmmProc h lab live g) retTy =
+    (CmmProc (h, retTy) lab live g)
+addRetTy (CmmData s d) _ = CmmData s d
+
+-- adds dummy return type info to the given group
+toCmmPlus :: GenCmmGroup d h g -> GenCmmGroup d (h, CmmRetTy) g
+toCmmPlus group = map (flip addRetTy Nothing) group
+
+discardRetTys :: GenCmmGroup d (h, CmmRetTy) g -> GenCmmGroup d h g
+discardRetTys group = map discardRetTy group
+
+discardRetTy :: GenCmmDecl d (h, CmmRetTy) g -> GenCmmDecl d h g
+discardRetTy (CmmProc (h, _) lab live g) = CmmProc h lab live g
+discardRetTy (CmmData s d) = CmmData s d
 
 -----------------------------------------------------------------------------
 --              Static Data

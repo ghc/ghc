@@ -138,8 +138,8 @@ import Prelude hiding (succ, unzip, zip)
 cmmCfgOpts :: Bool -> CmmGraph -> CmmGraph
 cmmCfgOpts split g = fst (blockConcat split g)
 
-cmmCfgOptsProc :: Bool -> CmmDecl -> CmmDecl
-cmmCfgOptsProc split (CmmProc info lbl live g) = CmmProc info' lbl live g'
+cmmCfgOptsProc :: Bool -> CmmDeclPlus -> CmmDeclPlus
+cmmCfgOptsProc split (CmmProc (info, rty) lbl live g) = CmmProc (info', rty) lbl live g'
     where (g', env) = blockConcat split g
           info' = info{ info_tbls = new_info_tbls }
           new_info_tbls = mapFromList (map upd_info (mapToList (info_tbls info)))
@@ -394,10 +394,10 @@ predMap blocks = foldr add_preds mapEmpty blocks
       where add lbl env = mapInsertWith (+) lbl 1 env
 
 -- Removing unreachable blocks
-removeUnreachableBlocksProc :: CmmDecl -> CmmDecl
-removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
+removeUnreachableBlocksProc :: CmmDeclPlus -> CmmDeclPlus
+removeUnreachableBlocksProc proc@(CmmProc (info, rty) lbl live g)
    | used_blocks `lengthLessThan` mapSize (toBlockMap g)
-   = CmmProc info' lbl live g'
+   = CmmProc (info', rty) lbl live g'
    | otherwise
    = proc
    where

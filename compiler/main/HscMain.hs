@@ -1374,7 +1374,7 @@ doCodeGen   :: HscEnv -> Module -> [TyCon]
             -> CollectedCCs
             -> [StgTopBinding]
             -> HpcInfo
-            -> IO (Stream IO CmmGroup ())
+            -> IO (Stream IO CmmGroupPlus ())
          -- Note we produce a 'Stream' of CmmGroups, so that the
          -- backend can be run incrementally.  Otherwise it generates all
          -- the C-- up front, which has a significant space cost.
@@ -1382,7 +1382,7 @@ doCodeGen hsc_env this_mod data_tycons
               cost_centre_info stg_binds hpc_info = do
     let dflags = hsc_dflags hsc_env
 
-    let cmm_stream :: Stream IO CmmGroup ()
+    let cmm_stream :: Stream IO CmmGroupPlus ()
         cmm_stream = {-# SCC "StgCmm" #-}
             StgCmm.codeGen dflags this_mod data_tycons
                            cost_centre_info stg_binds hpc_info

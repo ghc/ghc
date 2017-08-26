@@ -1013,9 +1013,9 @@ elimStackStores stackmap stackmaps area_off nodes
 -- Update info tables to include stack liveness
 
 
-setInfoTableStackMap :: DynFlags -> LabelMap StackMap -> CmmDecl -> CmmDecl
-setInfoTableStackMap dflags stackmaps (CmmProc top_info@TopInfo{..} l v g)
-  = CmmProc top_info{ info_tbls = mapMapWithKey fix_info info_tbls } l v g
+setInfoTableStackMap :: DynFlags -> LabelMap StackMap -> CmmDeclPlus -> CmmDeclPlus
+setInfoTableStackMap dflags stackmaps (CmmProc (top_info@TopInfo{..}, rty) l v g)
+  = CmmProc (top_info{ info_tbls = mapMapWithKey fix_info info_tbls }, rty) l v g
   where
     fix_info lbl info_tbl@CmmInfoTable{ cit_rep = StackRep _ } =
        info_tbl { cit_rep = StackRep (get_liveness lbl) }

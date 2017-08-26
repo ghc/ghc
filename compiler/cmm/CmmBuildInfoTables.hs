@@ -155,7 +155,7 @@ addCAF caf srt =
       , elt_map  = Map.insert caf last (elt_map srt) }
     where last  = next_elt srt
 
-srtToData :: TopSRT -> CmmGroup
+srtToData :: TopSRT -> CmmGroupPlus
 srtToData srt = [CmmData sec (Statics (lbl srt) tbl)]
     where tbl = map (CmmStaticLit . CmmLabel) (reverse (rev_elts srt))
           sec = Section RelocatableReadOnlyData (lbl srt)
@@ -168,7 +168,7 @@ srtToData srt = [CmmData sec (Statics (lbl srt) tbl)]
 -- in the SRT. Then, if the number of CAFs is small enough to fit in a bitmap,
 -- we make sure they're all close enough to the bottom of the table that the
 -- bitmap will be able to cover all of them.
-buildSRT :: DynFlags -> TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDecl, C_SRT)
+buildSRT :: DynFlags -> TopSRT -> CAFSet -> UniqSM (TopSRT, Maybe CmmDeclPlus, C_SRT)
 buildSRT dflags topSRT cafs =
   do let
          -- For each label referring to a function f without a static closure,
@@ -209,7 +209,7 @@ buildSRT dflags topSRT cafs =
 -- Construct an SRT bitmap.
 -- Adapted from simpleStg/SRT.hs, which expects Id's.
 procpointSRT :: DynFlags -> CLabel -> Map CLabel Int -> [CLabel] ->
-                UniqSM (Maybe CmmDecl, C_SRT)
+                UniqSM (Maybe CmmDeclPlus, C_SRT)
 procpointSRT _ _ _ [] =
  return (Nothing, NoC_SRT)
 procpointSRT dflags top_srt top_table entries =
@@ -227,7 +227,7 @@ maxBmpSize :: DynFlags -> Int
 maxBmpSize dflags = widthInBits (wordWidth dflags) `div` 2
 
 -- Adapted from codeGen/StgCmmUtils, which converts from SRT to C_SRT.
-to_SRT :: DynFlags -> CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDecl, C_SRT)
+to_SRT :: DynFlags -> CLabel -> Int -> Int -> Bitmap -> UniqSM (Maybe CmmDeclPlus, C_SRT)
 to_SRT dflags top_srt off len bmp
   | len > maxBmpSize dflags || bmp == [toStgWord dflags (fromStgHalfWord (srtEscape dflags))]
   = do id <- getUniqueM
@@ -249,10 +249,10 @@ to_SRT dflags top_srt off len bmp
 --  keep its CAFs live.)
 -- Any procedure referring to a non-static CAF c must keep live
 -- any CAF that is reachable from c.
-localCAFInfo :: CAFEnv -> CmmDecl -> (CAFSet, Maybe CLabel)
+localCAFInfo :: CAFEnv -> CmmDeclPlus -> (CAFSet, Maybe CLabel)
 localCAFInfo _      (CmmData _ _) = (Set.empty, Nothing)
 localCAFInfo cafEnv proc@(CmmProc _ top_l _ (CmmGraph {g_entry=entry})) =
-  case topInfoTable proc of
+  case topInfoTable $ discardRetTy proc of
     Just (CmmInfoTable { cit_rep = rep })
       | not (isStaticRep rep) && not (isStackRep rep)
       -> (cafs, Just (toClosureLbl top_l))
@@ -294,10 +294,10 @@ flatten env cafset = foldSet (lookup env) Set.empty cafset
              Nothing   -> Set.insert caf cafset'
 
 bundle :: Map CLabel CAFSet
-       -> (CAFEnv, CmmDecl)
+       -> (CAFEnv, CmmDeclPlus)
        -> (CAFSet, Maybe CLabel)
-       -> (LabelMap CAFSet, CmmDecl)
-bundle flatmap (env, decl@(CmmProc infos _lbl _ g)) (closure_cafs, mb_lbl)
+       -> (LabelMap CAFSet, CmmDeclPlus)
+bundle flatmap (env, decl@(CmmProc (infos, _rty) _lbl _ g)) (closure_cafs, mb_lbl)
   = ( mapMapWithKey get_cafs (info_tbls infos), decl )
  where
   entry = g_entry g
@@ -320,7 +320,7 @@ bundle _flatmap (_, decl) _
   = ( mapEmpty, decl )
 
 
-flattenCAFSets :: [(CAFEnv, [CmmDecl])] -> [(LabelMap CAFSet, CmmDecl)]
+flattenCAFSets :: [(CAFEnv, [CmmDeclPlus])] -> [(LabelMap CAFSet, CmmDeclPlus)]
 flattenCAFSets cpsdecls = zipWith (bundle flatmap) zipped localCAFs
    where
      zipped    = [ (env,decl) | (env,decls) <- cpsdecls, decl <- decls ]
@@ -329,8 +329,8 @@ flattenCAFSets cpsdecls = zipWith (bundle flatmap) zipped localCAFs
 
 doSRTs :: DynFlags
        -> TopSRT
-       -> [(CAFEnv, [CmmDecl])]
-       -> IO (TopSRT, [CmmDecl])
+       -> [(CAFEnv, [CmmDeclPlus])]
+       -> IO (TopSRT, [CmmDeclPlus])
 
 doSRTs dflags topSRT tops
   = do
@@ -347,7 +347,7 @@ doSRTs dflags topSRT tops
       return (topSRT, decl : rst)
 
 buildSRTs :: DynFlags -> TopSRT -> LabelMap CAFSet
-          -> UniqSM (TopSRT, [CmmDecl], LabelMap C_SRT)
+          -> UniqSM (TopSRT, [CmmDeclPlus], LabelMap C_SRT)
 buildSRTs dflags top_srt caf_map
   = foldM doOne (top_srt, [], mapEmpty) (mapToList caf_map)
   where
@@ -363,7 +363,7 @@ buildSRTs dflags top_srt caf_map
 - Each one needs an SRT.
 - We get the CAFSet for each one from the CAFEnv
 - flatten gives us
-    [(LabelMap CAFSet, CmmDecl)]
+    [(LabelMap CAFSet, CmmDeclPlus)]
 -
 -}
 
@@ -376,9 +376,9 @@ buildSRTs dflags top_srt caf_map
    instructions for forward refs.  --SDM
 -}
 
-updInfoSRTs :: LabelMap C_SRT -> CmmDecl -> CmmDecl
-updInfoSRTs srt_env (CmmProc top_info top_l live g) =
-  CmmProc (top_info {info_tbls = mapMapWithKey updInfoTbl (info_tbls top_info)}) top_l live g
+updInfoSRTs :: LabelMap C_SRT -> CmmDeclPlus -> CmmDeclPlus
+updInfoSRTs srt_env (CmmProc (top_info, rty) top_l live g) =
+  CmmProc (top_info {info_tbls = mapMapWithKey updInfoTbl (info_tbls top_info)}, rty) top_l live g
   where updInfoTbl l info_tbl
              = info_tbl { cit_srt = expectJust "updInfo" $ mapLookup l srt_env }
 updInfoSRTs _ t = t

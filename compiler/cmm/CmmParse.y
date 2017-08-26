@@ -1394,7 +1394,9 @@ initEnv dflags = listToUFM [
     VarN (CmmLit (CmmInt (fromIntegral (stdInfoTableSizeB dflags)) (wordWidth dflags)) ))
   ]
 
-parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroup)
+-- TODO(kavon): currently we don't read in the following info from a .cmm file:
+--               (1) return type, (2) registers live after a non-tail call
+parseCmmFile :: DynFlags -> FilePath -> IO (Messages, Maybe CmmGroupPlus)
 parseCmmFile dflags filename = withTiming (pure dflags) (text "ParseCmm"<+>brackets (text filename)) (\_ -> ()) $ do
   buf <- hGetStringBuffer filename
   let

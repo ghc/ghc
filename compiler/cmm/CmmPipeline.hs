@@ -33,8 +33,8 @@ import Platform
 cmmPipeline  :: HscEnv -- Compilation env including
                        -- dynamic flags: -dcmm-lint -ddump-cmm-cps
              -> TopSRT     -- SRT table and accumulating list of compiled procs
-             -> CmmGroup             -- Input C-- with Procedures
-             -> IO (TopSRT, CmmGroup) -- Output CPS transformed C--
+             -> CmmGroupPlus                 -- Input C-- with Procedures
+             -> IO (TopSRT, CmmGroupPlus)    -- Output CPS transformed C--
 
 cmmPipeline hsc_env topSRT prog =
   do let dflags = hsc_dflags hsc_env
@@ -47,7 +47,7 @@ cmmPipeline hsc_env topSRT prog =
      return (topSRT, cmms)
 
 
-cpsTop :: HscEnv -> CmmDecl -> IO (CAFEnv, [CmmDecl])
+cpsTop :: HscEnv -> CmmDeclPlus -> IO (CAFEnv, [CmmDeclPlus])
 cpsTop _ p@(CmmData {}) = return (mapEmpty, [p])
 cpsTop hsc_env proc =
     do
@@ -57,7 +57,7 @@ cpsTop hsc_env proc =
        -- later passes by removing lots of empty blocks, so we do it
        -- even when optimisation isn't turned on.
        --
-       CmmProc h l v g <- {-# SCC "cmmCfgOpts(1)" #-}
+       CmmProc (h, rty) l v g <- {-# SCC "cmmCfgOpts(1)" #-}
             return $ cmmCfgOptsProc splitting_proc_points proc
        dump Opt_D_dump_cmm_cfg "Post control-flow optimisations" g
 
@@ -117,10 +117,10 @@ cpsTop hsc_env proc =
                     splitAtProcPoints dflags l call_pps proc_points pp_map
                                       (CmmProc h l v g)
                dumps Opt_D_dump_cmm_split "Post splitting" g
-               return g
+               return $ toCmmPlus g     -- we mark decls as having no ret ty info
              else do
                -- attach info tables to return points
-               return $ [attachContInfoTables call_pps (CmmProc h l v g)]
+               return $ [addRetTy (attachContInfoTables call_pps (CmmProc h l v g)) rty]
 
        ------------- Populate info tables with stack info -----------------
        g <- {-# SCC "setInfoTableStackMap" #-}

@@ -62,8 +62,8 @@ mkEmptyContInfoTable info_lbl
                  , cit_prof = NoProfilingInfo
                  , cit_srt  = NoC_SRT }
 
-cmmToRawCmm :: DynFlags -> Stream IO CmmGroup ()
-            -> IO (Stream IO RawCmmGroup ())
+cmmToRawCmm :: DynFlags -> Stream IO CmmGroupPlus ()
+            -> IO (Stream IO RawCmmGroupPlus ())
 cmmToRawCmm dflags cmms
   = do { uniqs <- mkSplitUniqSupply 'i'
        ; let do_one uniqs cmm = do
@@ -106,20 +106,20 @@ cmmToRawCmm dflags cmms
 --
 --  * The SRT slot is only there if there is SRT info to record
 
-mkInfoTable :: DynFlags -> CmmDecl -> UniqSM [RawCmmDecl]
+mkInfoTable :: DynFlags -> CmmDeclPlus -> UniqSM [RawCmmDeclPlus]
 mkInfoTable _ (CmmData sec dat)
   = return [CmmData sec dat]
 
-mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
+mkInfoTable dflags proc@(CmmProc (infos, rty) entry_lbl live blocks)
   --
   -- in the non-tables-next-to-code case, procs can have at most a
   -- single info table associated with the entry label of the proc.
   --
   | not (tablesNextToCode dflags)
-  = case topInfoTable proc of   --  must be at most one
+  = case topInfoTable $ discardRetTy proc of   --  must be at most one
       -- no info table
       Nothing ->
-         return [CmmProc mapEmpty entry_lbl live blocks]
+         return [CmmProc (mapEmpty, rty) entry_lbl live blocks]
 
       Just info@CmmInfoTable { cit_lbl = info_lbl } -> do
         (top_decls, (std_info, extra_bits)) <-
@@ -132,7 +132,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
         -- point as first entry) and the entry code
         --
         return (top_decls ++
-                [CmmProc mapEmpty entry_lbl live blocks,
+                [CmmProc (mapEmpty, rty) entry_lbl live blocks,
                  mkRODataLits info_lbl
                     (CmmLabel entry_lbl : rel_std_info ++ rel_extra_bits)])
 
@@ -147,7 +147,7 @@ mkInfoTable dflags proc@(CmmProc infos entry_lbl live blocks)
     (top_declss, raw_infos) <-
        unzip `fmap` mapM do_one_info (mapToList (info_tbls infos))
     return (concat top_declss ++
-            [CmmProc (mapFromList raw_infos) entry_lbl live blocks])
+            [CmmProc (mapFromList raw_infos, rty) entry_lbl live blocks])
 
   where
    do_one_info (lbl,itbl) = do
@@ -169,8 +169,8 @@ type InfoTableContents = ( [CmmLit]          -- The standard part
 mkInfoTableContents :: DynFlags
                     -> CmmInfoTable
                     -> Maybe Int               -- Override default RTS type tag?
-                    -> UniqSM ([RawCmmDecl],             -- Auxiliary top decls
-                               InfoTableContents)       -- Info tbl + extra bits
+                    -> UniqSM ([RawCmmDeclPlus],             -- Auxiliary top decls
+                               InfoTableContents)            -- Info tbl + extra bits
 
 mkInfoTableContents dflags
                     info@(CmmInfoTable { cit_lbl  = info_lbl
@@ -212,7 +212,7 @@ mkInfoTableContents dflags
               -> UniqSM ( Maybe StgHalfWord  -- Override the SRT field with this
                         , Maybe CmmLit       -- Override the layout field with this
                         , [CmmLit]           -- "Extra bits" for info table
-                        , [RawCmmDecl])      -- Auxiliary data decls
+                        , [RawCmmDeclPlus])  -- Auxiliary data decls
     mk_pieces (Constr con_tag con_descr) _no_srt    -- A data constructor
       = do { (descr_lit, decl) <- newStringLit con_descr
            ; return ( Just (toStgHalfWord dflags (fromIntegral con_tag))
@@ -317,7 +317,7 @@ makeRelativeRefTo _ _ lit = lit
 -- The head of the stack layout is the top of the stack and
 -- the least-significant bit.
 
-mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDecl])
+mkLivenessBits :: DynFlags -> Liveness -> UniqSM (CmmLit, [RawCmmDeclPlus])
               -- ^ Returns:
               --   1. The bitmap (literal value or label)
               --   2. Large bitmap CmmData if needed
@@ -390,7 +390,7 @@ mkStdInfoTable dflags (type_descr, closure_descr) cl_type srt_len layout_lit
 --
 -------------------------------------------------------------------------
 
-mkProfLits :: DynFlags -> ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmDecl])
+mkProfLits :: DynFlags -> ProfilingInfo -> UniqSM ((CmmLit,CmmLit), [RawCmmDeclPlus])
 mkProfLits dflags NoProfilingInfo       = return ((zeroCLit dflags, zeroCLit dflags), [])
 mkProfLits _ (ProfilingInfo td cd)
   = do { (td_lit, td_decl) <- newStringLit td

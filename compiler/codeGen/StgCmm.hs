@@ -57,8 +57,8 @@ codeGen :: DynFlags
         -> CollectedCCs                -- (Local/global) cost-centres needing declaring/registering.
         -> [StgTopBinding]             -- Bindings to convert
         -> HpcInfo
-        -> Stream IO CmmGroup ()       -- Output as a stream, so codegen can
-                                        -- be interleaved with output
+        -> Stream IO CmmGroupPlus ()       -- Output as a stream, so codegen can
+                                           -- be interleaved with output
 
 codeGen dflags this_mod data_tycons
         cost_centre_info stg_binds hpc_info
@@ -66,7 +66,7 @@ codeGen dflags this_mod data_tycons
               -- Using an IORef to store the state is a bit crude, but otherwise
               -- we would need to add a state monad layer.
         ; cgref <- liftIO $ newIORef =<< initC
-        ; let cg :: FCode () -> Stream IO CmmGroup ()
+        ; let cg :: FCode () -> Stream IO CmmGroupPlus ()
               cg fcode = do
                 cmm <- liftIO $ do
                          st <- readIORef cgref
@@ -75,7 +75,8 @@ codeGen dflags this_mod data_tycons
                          -- NB. stub-out cgs_tops and cgs_stmts.  This fixes
                          -- a big space leak.  DO NOT REMOVE!
                          writeIORef cgref $! st'{ cgs_tops = nilOL,
-                                                  cgs_stmts = mkNop }
+                                                  cgs_stmts = mkNop,
+                                                  cgs_ret_ty = Nothing }
                          return a
                 yield cmm
 

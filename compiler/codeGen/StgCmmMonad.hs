@@ -385,7 +385,7 @@ data CgState
      
      cgs_ret_ty :: CmmRetTy,          -- Current procedure's return type.
 
-     cgs_tops  :: OrdList CmmDecl,
+     cgs_tops  :: OrdList CmmDeclPlus,
         -- Other procedures and data blocks in this compilation unit
         -- Both are ordered only so that we can
         -- reduce forward references, when it's easy to do so
@@ -816,7 +816,7 @@ emit ag
   = do  { state <- getState
         ; setState $ state { cgs_stmts = cgs_stmts state MkGraph.<*> ag } }
 
-emitDecl :: CmmDecl -> FCode ()
+emitDecl :: CmmDeclPlus -> FCode ()
 emitDecl decl
   = do  { state <- getState
         ; setState $ state { cgs_tops = cgs_tops state `snocOL` decl } }
@@ -878,12 +878,11 @@ emitProc_ mb_info lbl live blocks offset do_layout
               tinfo = TopInfo { info_tbls = infos
                               , stack_info=sinfo}
 
-              proc_block = CmmProc tinfo lbl live blks
+              proc_block = CmmProc (tinfo, retTy) lbl live blks
 
-        ; state <- getState
-        ; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
+        ; emitDecl proc_block }
 
-getCmm :: FCode () -> FCode CmmGroup
+getCmm :: FCode () -> FCode CmmGroupPlus
 -- Get all the CmmTops (there should be no stmts)
 -- Return a single Cmm which may be split from other Cmms by
 -- object splitting (at a later stage)
