@@ -38,13 +38,17 @@ mkDependencies
       -- Template Haskell used?
       th_used <- readIORef th_var
       let dep_mods = modDepsElts (delFromUFM (imp_dep_mods imports)
-                                           (moduleName mod))
+                                             (moduleName mod))
                 -- M.hi-boot can be in the imp_dep_mods, but we must remove
                 -- it before recording the modules on which this one depends!
                 -- (We want to retain M.hi-boot in imp_dep_mods so that
                 --  loadHiBootInterface can see if M's direct imports depend
                 --  on M.hi-boot, and hence that we should do the hi-boot consistency
                 --  check.)
+
+          dep_orphs = filter (/= mod) (imp_orphs imports)
+                -- We must also remove self-references from imp_orphs. See
+                -- #14128.
 
           pkgs | th_used   = Set.insert (toInstalledUnitId thUnitId) (imp_dep_pkgs imports)
                | otherwise = imp_dep_pkgs imports
@@ -57,7 +61,7 @@ mkDependencies
 
       return Deps { dep_mods   = dep_mods,
                     dep_pkgs   = dep_pkgs',
-                    dep_orphs  = sortBy stableModuleCmp (imp_orphs  imports),
+                    dep_orphs  = dep_orphs,
                     dep_finsts = sortBy stableModuleCmp (imp_finsts imports) }
                     -- sort to get into canonical order
                     -- NB. remember to use lexicographic ordering
