@@ -33,7 +33,7 @@ build_script:
     - stack exec hadrian -- --directory ".." selftest
 
     # Build GHC
-    - stack exec hadrian -- --lint --directory ".." -j --flavour=quickest --verbose --no-progress --progress-info=brief --progress-colour=never --profile=-
+    - stack exec hadrian -- --lint --directory ".." -j --flavour=quickest --no-progress --progress-info=brief --progress-colour=never --profile=-
 
     # Test GHC binary
     - cd ..
