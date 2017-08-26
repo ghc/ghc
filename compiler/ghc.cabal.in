@@ -425,6 +425,7 @@ Library
         StgSyn
         CallArity
         DmdAnal
+        Exitify
         WorkWrap
         WwLib
         FamInst

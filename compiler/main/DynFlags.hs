@@ -360,6 +360,7 @@ data DumpFlag
    | Opt_D_dump_prep
    | Opt_D_dump_stg
    | Opt_D_dump_call_arity
+   | Opt_D_dump_exitify
    | Opt_D_dump_stranal
    | Opt_D_dump_str_signatures
    | Opt_D_dump_tc
@@ -428,6 +429,7 @@ data GeneralFlag
 
    -- optimisation opts
    | Opt_CallArity
+   | Opt_Exitification
    | Opt_Strictness
    | Opt_LateDmdAnal
    | Opt_KillAbsence
@@ -3004,6 +3006,8 @@ dynamic_flags_deps = [
         (setDumpFlag Opt_D_dump_stg)
   , make_ord_flag defGhcFlag "ddump-call-arity"
         (setDumpFlag Opt_D_dump_call_arity)
+  , make_ord_flag defGhcFlag "ddump-exitify"
+        (setDumpFlag Opt_D_dump_exitify)
   , make_ord_flag defGhcFlag "ddump-stranal"
         (setDumpFlag Opt_D_dump_stranal)
   , make_ord_flag defGhcFlag "ddump-str-signatures"
@@ -3704,6 +3708,7 @@ fFlagsDeps = [
   flagGhciSpec "break-on-exception"           Opt_BreakOnException,
   flagSpec "building-cabal-package"           Opt_BuildingCabalPackage,
   flagSpec "call-arity"                       Opt_CallArity,
+  flagSpec "exitification"                    Opt_Exitification,
   flagSpec "case-merge"                       Opt_CaseMerge,
   flagSpec "case-folding"                     Opt_CaseFolding,
   flagSpec "cmm-elim-common-blocks"           Opt_CmmElimCommonBlocks,
@@ -4157,6 +4162,7 @@ optLevelFlags -- see Note [Documenting optimisation flags]
     , ([0],     Opt_OmitInterfacePragmas)
 
     , ([1,2],   Opt_CallArity)
+    , ([1,2],   Opt_Exitification)
     , ([1,2],   Opt_CaseMerge)
     , ([1,2],   Opt_CaseFolding)
     , ([1,2],   Opt_CmmElimCommonBlocks)
