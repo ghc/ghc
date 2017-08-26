@@ -29,11 +29,11 @@ executable hadrian
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
                        , Hadrian.Haskell.Cabal.Parse
-                       , Hadrian.Haskell.Package
                        , Hadrian.Oracles.ArgsHash
                        , Hadrian.Oracles.DirectoryContents
                        , Hadrian.Oracles.Path
                        , Hadrian.Oracles.TextFile
+                       , Hadrian.Package
                        , Hadrian.Target
                        , Hadrian.Utilities
                        , Oracles.Flag

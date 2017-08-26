@@ -190,11 +190,11 @@ runBuilderWith options builder args = do
 -- dependencies we scan package @.cabal@ files, see 'pkgDependencies' defined
 -- in "Hadrian.Haskell.Cabal".
 contextDependencies :: Context -> Action [Context]
-contextDependencies Context {..} = do
-    exists <- doesFileExist (pkgCabalFile package)
-    if not exists then return [] else do
+contextDependencies Context {..} = case pkgCabalFile package of
+    Nothing        -> return [] -- Non-Cabal packages have no dependencies.
+    Just cabalFile -> do
         let pkgContext = \pkg -> Context (min stage Stage1) pkg way
-        deps <- pkgDependencies package
+        deps <- pkgDependencies cabalFile
         pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
         return . map pkgContext $ intersectOrd (compare . pkgName) pkgs deps
 

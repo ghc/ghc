@@ -10,7 +10,7 @@ import Utilities
 ghcCabalPackageArgs :: Args
 ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
     cabalDeps    <- expr $ stage1Dependencies cabal
-    cabalVersion <- expr $ pkgVersion cabal
+    cabalVersion <- expr $ pkgVersion (unsafePkgCabalFile cabal) -- TODO: improve
     mconcat
         [ pure [ "-package " ++ pkgName pkg | pkg <- cabalDeps, pkg /= parsec ]
         , arg "--make"

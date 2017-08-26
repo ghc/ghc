@@ -14,7 +14,7 @@ import Utilities
 buildPackageData :: Context -> Rules ()
 buildPackageData context@Context {..} = do
     let dir       = "//" ++ contextDir context
-        cabalFile = pkgCabalFile package
+        cabalFile = unsafePkgCabalFile package -- TODO: improve
         configure = pkgPath package -/- "configure"
     -- TODO: Get rid of hardcoded file paths.
     [dir -/- "package-data.mk", dir -/- "setup-config"] &%> \[mk, setupConfig] -> do

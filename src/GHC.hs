@@ -41,82 +41,89 @@ defaultKnownPackages =
     , win32, xhtml ]
 
 -- | Package definitions, see 'Package'.
-array               = lib  "array"
-base                = lib  "base"
-binary              = lib  "binary"
-bytestring          = lib  "bytestring"
-cabal               = lib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
-checkApiAnnotations = util "check-api-annotations"
-compareSizes        = util "compareSizes"    `setPath` "utils/compare_sizes"
-compiler            = top  "ghc"             `setPath` "compiler"
-containers          = lib  "containers"
-deepseq             = lib  "deepseq"
-deriveConstants     = util "deriveConstants"
-directory           = lib  "directory"
-dllSplit            = util "dll-split"
-filepath            = lib  "filepath"
-genapply            = util "genapply"
-genprimopcode       = util "genprimopcode"
-ghc                 = prg  "ghc-bin"         `setPath` "ghc"
-ghcBoot             = lib  "ghc-boot"
-ghcBootTh           = lib  "ghc-boot-th"
-ghcCabal            = util "ghc-cabal"
-ghcCompact          = lib  "ghc-compact"
-ghci                = lib  "ghci"
-ghcPkg              = util "ghc-pkg"
-ghcPrim             = lib  "ghc-prim"
-ghcTags             = util "ghctags"
-ghcSplit            = util "ghc-split"
-haddock             = util "haddock"
-haskeline           = lib  "haskeline"
-hsc2hs              = util "hsc2hs"
-hp2ps               = util "hp2ps"
-hpc                 = lib  "hpc"
-hpcBin              = util "hpc-bin"         `setPath` "utils/hpc"
-integerGmp          = lib  "integer-gmp"
-integerSimple       = lib  "integer-simple"
-iservBin            = prg  "iserv-bin"       `setPath` "iserv"
-libffi              = top  "libffi"
-mtl                 = lib  "mtl"
-parsec              = lib  "parsec"
-parallel            = lib  "parallel"
-pretty              = lib  "pretty"
-primitive           = lib  "primitive"
-process             = lib  "process"
-rts                 = top  "rts"
-runGhc              = util "runghc"
-stm                 = lib  "stm"
-templateHaskell     = lib  "template-haskell"
-terminfo            = lib  "terminfo"
-text                = lib  "text"
-time                = lib  "time"
-touchy              = util "touchy"
-transformers        = lib  "transformers"
-unlit               = util "unlit"
-unix                = lib  "unix"
-win32               = lib  "Win32"
-xhtml               = lib  "xhtml"
+array               = hsLib  "array"
+base                = hsLib  "base"
+binary              = hsLib  "binary"
+bytestring          = hsLib  "bytestring"
+cabal               = hsLib  "Cabal"           `setPath` "libraries/Cabal/Cabal"
+checkApiAnnotations = hsUtil "check-api-annotations"
+compareSizes        = hsUtil "compareSizes"    `setPath` "utils/compare_sizes"
+compiler            = hsTop  "ghc"             `setPath` "compiler"
+containers          = hsLib  "containers"
+deepseq             = hsLib  "deepseq"
+deriveConstants     = hsUtil "deriveConstants"
+directory           = hsLib  "directory"
+dllSplit            = hsUtil "dll-split"
+filepath            = hsLib  "filepath"
+genapply            = hsUtil "genapply"
+genprimopcode       = hsUtil "genprimopcode"
+ghc                 = hsPrg  "ghc-bin"         `setPath` "ghc"
+ghcBoot             = hsLib  "ghc-boot"
+ghcBootTh           = hsLib  "ghc-boot-th"
+ghcCabal            = hsUtil "ghc-cabal"
+ghcCompact          = hsLib  "ghc-compact"
+ghci                = hsLib  "ghci"
+ghcPkg              = hsUtil "ghc-pkg"
+ghcPrim             = hsLib  "ghc-prim"
+ghcTags             = hsUtil "ghctags"
+ghcSplit            = hsUtil "ghc-split"
+haddock             = hsUtil "haddock"
+haskeline           = hsLib  "haskeline"
+hsc2hs              = hsUtil "hsc2hs"
+hp2ps               = cUtil  "hp2ps"
+hpc                 = hsLib  "hpc"
+hpcBin              = hsUtil "hpc-bin"         `setPath` "utils/hpc"
+integerGmp          = hsLib  "integer-gmp"
+integerSimple       = hsLib  "integer-simple"
+iservBin            = hsPrg  "iserv-bin"       `setPath` "iserv"
+libffi              = cTop   "libffi"
+mtl                 = hsLib  "mtl"
+parsec              = hsLib  "parsec"
+parallel            = hsLib  "parallel"
+pretty              = hsLib  "pretty"
+primitive           = hsLib  "primitive"
+process             = hsLib  "process"
+rts                 = cTop   "rts"
+runGhc              = hsUtil "runghc"
+stm                 = hsLib  "stm"
+templateHaskell     = hsLib  "template-haskell"
+terminfo            = hsLib  "terminfo"
+text                = hsLib  "text"
+time                = hsLib  "time"
+touchy              = cUtil  "touchy"
+transformers        = hsLib  "transformers"
+unlit               = cUtil  "unlit"
+unix                = hsLib  "unix"
+win32               = hsLib  "Win32"
+xhtml               = hsLib  "xhtml"
 
--- | Construct a library package, e.g. @array@.
-lib :: PackageName -> Package
-lib name = library name ("libraries" -/- name)
+-- | Construct a Haskell library package, e.g. @array@.
+hsLib :: PackageName -> Package
+hsLib name = hsLibrary name ("libraries" -/- name)
 
--- | Construct a top-level library package, e.g. @compiler@.
-top :: PackageName -> Package
-top name = library name name
+-- | Construct a top-level Haskell library package, e.g. @compiler@.
+hsTop :: PackageName -> Package
+hsTop name = hsLibrary name name
 
--- | Construct a top-level program package, e.g. @ghc@.
-prg :: PackageName -> Package
-prg name = program name name
+-- | Construct a top-level C library package, e.g. @rts@.
+cTop :: PackageName -> Package
+cTop name = cLibrary name name
 
--- | Construct a utility package, e.g. @haddock@.
-util :: PackageName -> Package
-util name = program name ("utils" -/- name)
+-- | Construct a top-level Haskell program package, e.g. @ghc@.
+hsPrg :: PackageName -> Package
+hsPrg name = hsProgram name name
+
+-- | Construct a Haskell utility package, e.g. @haddock@.
+hsUtil :: PackageName -> Package
+hsUtil name = hsProgram name ("utils" -/- name)
+
+-- | Construct a C utility package, e.g. @haddock@.
+cUtil :: PackageName -> Package
+cUtil name = cProgram name ("utils" -/- name)
 
 -- | Amend a package path if it doesn't conform to a typical pattern.
 setPath :: Package -> FilePath -> Package
-setPath pkg path | isLibrary pkg = library (pkgName pkg) path
-                 | otherwise     = program (pkgName pkg) path
+setPath pkg path = pkg { pkgPath = path }
 
 -- | Some builders are built by this very build system, in which case
 -- 'builderProvenance' returns the corresponding build 'Context' (which includes

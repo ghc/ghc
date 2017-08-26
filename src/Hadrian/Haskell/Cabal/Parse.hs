@@ -6,7 +6,7 @@
 -- Maintainer : andrey.mokhov@gmail.com
 -- Stability  : experimental
 --
--- Extracting Haskell package metadata stored in @.cabal@ files.
+-- Extracting Haskell package metadata stored in Cabal files.
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal.Parse (Cabal (..), parseCabal) where
 
@@ -20,10 +20,10 @@ import qualified Distribution.Text                     as C
 import qualified Distribution.Types.CondTree           as C
 import qualified Distribution.Verbosity                as C
 
-import Hadrian.Haskell.Package
+import Hadrian.Package
 
--- TODO: Use fine-grain tracking instead of tracking the whole @.cabal@ file.
--- | Haskell package metadata extracted from a @.cabal@ file.
+-- TODO: Use fine-grain tracking instead of tracking the whole Cabal file.
+-- | Haskell package metadata extracted from a Cabal file.
 data Cabal = Cabal
     { dependencies :: [PackageName]
     , name         :: PackageName
@@ -41,7 +41,7 @@ instance Hashable Cabal where
 instance NFData Cabal where
     rnf (Cabal a b c d) = a `seq` b `seq` c `seq` d `seq` ()
 
--- | Parse a @.cabal@ file.
+-- | Parse a Cabal file.
 parseCabal :: FilePath -> IO Cabal
 parseCabal file = do
     gpd <- liftIO $ C.readGenericPackageDescription C.silent file

@@ -4,6 +4,7 @@ module Context (
 
     -- * Expressions
     getStage, getPackage, getWay, getStagedSettingList, getBuildPath,
+    withHsPackage,
 
     -- * Paths
     contextDir, buildPath, pkgInplaceConfig, pkgDataFile, pkgSetupConfigFile,
@@ -55,23 +56,37 @@ getWay = way <$> getContext
 getStagedSettingList :: (Stage -> SettingList) -> Args Context b
 getStagedSettingList f = getSettingList . f =<< getStage
 
--- | Get the build path of the current 'Context'.
-getBuildPath :: Expr Context b FilePath
-getBuildPath = expr . buildPath =<< getContext
-
--- | Path to the directory containing build artefacts of a given 'Context'.
-buildPath :: Context -> Action FilePath
-buildPath context = buildRoot <&> (-/- contextDir context)
+-- | Construct an expression that depends on the Cabal file of the current
+-- package and is empty in a non-Haskell context.
+withHsPackage :: (Monoid a, Semigroup a) => (FilePath -> Expr Context b a) -> Expr Context b a
+withHsPackage expr = do
+    pkg <- getPackage
+    case pkgCabalFile pkg of
+        Just file -> expr file
+        Nothing   -> mempty
 
 -- | The directory in 'buildRoot' containing build artefacts of a given 'Context'.
 contextDir :: Context -> FilePath
 contextDir Context {..} = stageString stage -/- pkgPath package
 
+-- | Path to the directory containing build artefacts of a given 'Context'.
+buildPath :: Context -> Action FilePath
+buildPath context = buildRoot <&> (-/- contextDir context)
+
+-- | Get the build path of the current 'Context'.
+getBuildPath :: Expr Context b FilePath
+getBuildPath = expr . buildPath =<< getContext
+
+pkgId :: Package -> Action FilePath
+pkgId package = case pkgCabalFile package of
+    Just file -> pkgIdentifier file
+    Nothing   -> return (pkgName package) -- Non-Haskell packages, e.g. rts
+
 pkgFile :: Context -> String -> String -> Action FilePath
 pkgFile context@Context {..} prefix suffix = do
-    path  <- buildPath context
-    pkgId <- pkgIdentifier package
-    return $ path -/- prefix ++ pkgId ++ suffix
+    path <- buildPath context
+    pid  <- pkgId package
+    return $ path -/- prefix ++ pid ++ suffix
 
 -- | Path to inplace package configuration file of a given 'Context'.
 pkgInplaceConfig :: Context -> Action FilePath
@@ -122,10 +137,10 @@ pkgGhciLibraryFile context = pkgFile context "HS" ".o"
 pkgConfFile :: Context -> Action FilePath
 pkgConfFile Context {..} = do
     root  <- buildRoot
-    pkgId <- pkgIdentifier package
+    pid   <- pkgId package
     let dbDir | stage == Stage0 = root -/- stage0PackageDbDir
               | otherwise       = inplacePackageDbPath
-    return $ dbDir -/- pkgId <.> "conf"
+    return $ dbDir -/- pid <.> "conf"
 
 -- | Given a 'Context' and a 'FilePath' to a source file, compute the 'FilePath'
 -- to its object file. For example:

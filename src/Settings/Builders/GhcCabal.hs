@@ -94,9 +94,9 @@ bootPackageConstraints :: Args
 bootPackageConstraints = stage0 ? do
     bootPkgs <- expr $ stagePackages Stage0
     let pkgs = filter (\p -> p /= compiler && isLibrary p) bootPkgs
-    constraints <- expr $ forM (sort pkgs) $ \pkg -> do
-        version <- pkgVersion pkg
-        return (pkgName pkg ++ " == " ++ version)
+    constraints <- expr $ fmap catMaybes $ forM (sort pkgs) $ \pkg -> do
+        version <- traverse pkgVersion (pkgCabalFile pkg)
+        return $ fmap ((pkgName pkg ++ " == ") ++) version
     pure $ concat [ ["--constraint", c] | c <- constraints ]
 
 cppArgs :: Args

@@ -7,64 +7,38 @@
 -- Stability  : experimental
 --
 -- Basic functionality for extracting Haskell package metadata stored in
--- @.cabal@ files.
+-- Cabal files.
 -----------------------------------------------------------------------------
 module Hadrian.Haskell.Cabal (
     pkgVersion, pkgIdentifier, pkgDependencies, pkgSynopsis
     ) where
 
-import Control.Monad
 import Development.Shake
 
 import Hadrian.Haskell.Cabal.Parse
-import Hadrian.Haskell.Package
+import Hadrian.Package
 import Hadrian.Oracles.TextFile
-import Hadrian.Utilities
 
--- | Read the @.cabal@ file of a given package and return the package version.
--- The @.cabal@ file is tracked.
-pkgVersion :: Package -> Action String
-pkgVersion pkg = do
-    cabal <- readCabalFile (pkgCabalFile pkg)
-    return (version cabal)
+-- | Read a Cabal file and return the package version. The Cabal file is tracked.
+pkgVersion :: FilePath -> Action String
+pkgVersion cabalFile = version <$> readCabalFile cabalFile
 
--- | Read the @.cabal@ file of a given package and return the package identifier,
--- e.g. @base-4.10.0.0@. If the @.cabal@ file does not exist return just the
--- package name, e.g. @rts@. If the @.cabal@ file exists then it is tracked, and
--- furthermore we check that the recorded package name matches the name of the
--- package passed as the parameter, and raise an error otherwise.
-pkgIdentifier :: Package -> Action String
-pkgIdentifier pkg = do
-    cabalExists <- doesFileExist (pkgCabalFile pkg)
-    if not cabalExists
-    then return (pkgName pkg)
-    else do
-        cabal <- readCabalFile (pkgCabalFile pkg)
-        when (pkgName pkg /= name cabal) $
-            error $ "[Hadrian.Haskell.Cabal] Inconsistent package name: expected "
-                 ++ quote (pkgName pkg) ++ ", but " ++ quote (pkgCabalFile pkg)
-                 ++ " specifies " ++ quote (name cabal) ++ "."
-        return $ if (null $ version cabal)
-            then pkgName pkg
-            else pkgName pkg ++ "-" ++ version cabal
+-- | Read a Cabal file and return the package identifier, e.g. @base-4.10.0.0@.
+-- The Cabal file is tracked.
+pkgIdentifier :: FilePath -> Action String
+pkgIdentifier cabalFile = do
+    cabal <- readCabalFile cabalFile
+    return $ if (null $ version cabal)
+        then name cabal
+        else name cabal ++ "-" ++ version cabal
 
--- | Read the @.cabal@ file of a given package and return the sorted list of its
--- dependencies. The current version does not take care of Cabal conditionals
--- and therefore returns a crude overapproximation of actual dependencies. The
--- @.cabal@ file is tracked.
-pkgDependencies :: Package -> Action [PackageName]
-pkgDependencies pkg = do
-    cabal <- readCabalFile (pkgCabalFile pkg)
-    return (dependencies cabal)
+-- | Read a Cabal file and return the sorted list of the package dependencies.
+-- The current version does not take care of Cabal conditionals and therefore
+-- returns a crude overapproximation of actual dependencies. The Cabal file is
+-- tracked.
+pkgDependencies :: FilePath -> Action [PackageName]
+pkgDependencies cabalFile = dependencies <$> readCabalFile cabalFile
 
--- | Read the @.cabal@ file of a given package and return the package synopsis
--- or @Nothing@ if the @.cabal@ file does not exist. The existence and contents
--- of the @.cabal@ file are tracked.
-pkgSynopsis :: Package -> Action (Maybe String)
-pkgSynopsis pkg = do
-    cabalExists <- doesFileExist (pkgCabalFile pkg)
-    if not cabalExists
-    then return Nothing
-    else do
-        cabal <- readCabalFile (pkgCabalFile pkg)
-        return $ Just (synopsis cabal)
+-- | Read a Cabal file and return the package synopsis. The Cabal file is tracked.
+pkgSynopsis :: FilePath -> Action String
+pkgSynopsis cabalFile = synopsis <$> readCabalFile cabalFile

@@ -189,8 +189,9 @@ installPackages = do
     copyFile (pkgPath integerGmp -/- "gmp/ghc-gmp.h") (pkgPath integerGmp -/- "ghc-gmp.h")
 
     forM_ installLibPkgs $ \pkg -> do
-        when (isLibrary pkg) $
-            withLatestBuildStage pkg $ \stage -> do
+        case pkgCabalFile pkg of
+            Nothing -> error $ "Non-Haskell project in installLibPkgs" ++ show pkg
+            Just cabalFile -> withLatestBuildStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
                 installDistDir <- buildPath context
@@ -205,8 +206,6 @@ installPackages = do
                 ways  <- interpretInContext context getLibraryWays
                 let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal" <.> exe -- HACK?
                 need [ghcCabalInplace]
-
-                let cabalFile = pkgCabalFile pkg
 
                 pkgConf <- pkgConfFile context
                 need [cabalFile, pkgConf] -- TODO: check if need pkgConf

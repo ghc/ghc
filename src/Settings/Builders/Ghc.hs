@@ -117,9 +117,8 @@ wayGhcArgs = do
 
 -- FIXME: Get rid of to-be-deprecated -this-package-key.
 packageGhcArgs :: Args
-packageGhcArgs = do
-    pkg     <- getPackage
-    pkgId   <- expr $ pkgIdentifier pkg
+packageGhcArgs = withHsPackage $ \cabalFile -> do
+    pkgId   <- expr $ pkgIdentifier cabalFile
     thisArg <- do
         not0 <- notStage0
         unit <- expr $ flag SupportsThisUnitId

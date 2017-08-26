@@ -105,6 +105,6 @@ buildBinary rs context@Context {..} bin = do
                   ++ [ path -/- "Paths_haddock.o" | package == haddock ]
     need binDeps
     buildWithResources rs $ target context (Ghc LinkHs stage) binDeps [bin]
-    synopsis <- pkgSynopsis package
+    synopsis <- traverse pkgSynopsis (pkgCabalFile package)
     putSuccess $ renderProgram
         (quote (pkgName package) ++ " (" ++ show stage ++ ").") bin synopsis
