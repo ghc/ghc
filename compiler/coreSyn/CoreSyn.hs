@@ -77,7 +77,7 @@ module CoreSyn (
         collectAnnArgs, collectAnnArgsTicks,
 
         -- ** Operations on annotations
-        deAnnotate, deAnnotate', deAnnAlt,
+        deAnnotate, deAnnotate', deAnnAlt, deAnnBind,
         collectAnnBndrs, collectNAnnBndrs,
 
         -- * Orphanhood
@@ -2160,15 +2160,15 @@ deAnnotate' (AnnTick tick body)   = Tick tick (deAnnotate body)
 
 deAnnotate' (AnnLet bind body)
   = Let (deAnnBind bind) (deAnnotate body)
-  where
-    deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
-    deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
-
 deAnnotate' (AnnCase scrut v t alts)
   = Case (deAnnotate scrut) v t (map deAnnAlt alts)
 
 deAnnAlt :: AnnAlt bndr annot -> Alt bndr
 deAnnAlt (con,args,rhs) = (con,args,deAnnotate rhs)
+
+deAnnBind  :: AnnBind b annot -> Bind b
+deAnnBind (AnnNonRec var rhs) = NonRec var (deAnnotate rhs)
+deAnnBind (AnnRec pairs) = Rec [(v,deAnnotate rhs) | (v,rhs) <- pairs]
 
 -- | As 'collectBinders' but for 'AnnExpr' rather than 'Expr'
 collectAnnBndrs :: AnnExpr bndr annot -> ([bndr], AnnExpr bndr annot)

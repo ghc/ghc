@@ -282,3 +282,5 @@ test('T14140',
 
 test('T14272', normal, compile, [''])
 test('T14270a', normal, compile, [''])
+test('T14152', [ only_ways(['optasm']), check_errmsg(r'dead code') ], compile, ['-ddump-simpl'])
+test('T14152a', [ only_ways(['optasm']), check_errmsg(r'dead code') ], compile, ['-fno-exitification -ddump-simpl'])
