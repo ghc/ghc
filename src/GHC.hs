@@ -5,10 +5,10 @@ module GHC (
     compiler, containers, deepseq, deriveConstants, directory, dllSplit, filepath,
     genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci,
     ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hp2ps,
-    hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mkUserGuidePart,
-    mtl, parsec, parallel, pretty, primitive, process, rts, runGhc, stm,
-    templateHaskell, terminfo, text, time, touchy, transformers, unlit, unix,
-    win32, xhtml, defaultKnownPackages,
+    hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec,
+    parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
+    terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
+    defaultKnownPackages,
 
     -- * Package information
     builderProvenance, programName, nonCabalContext, nonHsMainPackage, autogenPath,
@@ -36,9 +36,9 @@ defaultKnownPackages =
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal
     , ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs
     , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi
-    , mkUserGuidePart, mtl, parsec, parallel, pretty, primitive, process, rts
-    , runGhc, stm, templateHaskell, terminfo, text, time, touchy, transformers
-    , unlit, unix, win32, xhtml ]
+    , mtl, parsec, parallel, pretty, primitive, process, rts, runGhc, stm
+    , templateHaskell, terminfo, text, time, touchy, transformers, unlit, unix
+    , win32, xhtml ]
 
 -- | Package definitions, see 'Package'.
 array               = lib  "array"
@@ -77,7 +77,6 @@ integerGmp          = lib  "integer-gmp"
 integerSimple       = lib  "integer-simple"
 iservBin            = prg  "iserv-bin"       `setPath` "iserv"
 libffi              = top  "libffi"
-mkUserGuidePart     = util "mkUserGuidePart"
 mtl                 = lib  "mtl"
 parsec              = lib  "parsec"
 parallel            = lib  "parallel"

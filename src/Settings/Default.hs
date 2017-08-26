@@ -115,7 +115,6 @@ stage0Packages = do
            , hsc2hs
            , hp2ps
            , hpc
-           , mkUserGuidePart
            , mtl
            , parsec
            , templateHaskell
