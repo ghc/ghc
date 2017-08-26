@@ -221,8 +221,8 @@ class TestOptions:
        #   9300000000,
        #   10)
        # To allow a 10% deviation from 9300000000.
-       self.compiler_stats_range_fields = {} # REMOVE
-       self.stats_range_fields = {} # REMOVE
+       # self.compiler_stats_range_fields = {} # REMOVE
+       self.stats_range_fields = {}
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads

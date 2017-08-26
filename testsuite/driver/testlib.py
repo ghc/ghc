@@ -23,7 +23,7 @@ import subprocess
 
 from testglobals import *
 from testutil import *
-from perf_notes import comparison
+from perf_notes import comparison, evaluate_metric
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 if config.use_threads:
@@ -91,8 +91,9 @@ def setTestOpts( f ):
 def normal( name, opts ):
     return;
 
-def skip( name, opts ):
-    opts.skip = 1
+# Never used anywhere.
+# def skip( name, opts ):
+#     opts.skip = 1
 
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
@@ -315,80 +316,45 @@ def _extra_files(name, opts, files):
 
 # -----
 
-# Need to refactor out stats_range_fields and compiler_stats_range_fields
-def testing_metric(field):
-    return lambda name, opts, f=field: _testing_metric(name, opts, f);
+# Depreciated. See perf_notes.py for new code.
+# # This code is what is used in the all.T files
+# # It is now useless and we need a different way to do it
+# def stats_num_field( field, expecteds ): # REMOVE
+#     return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e); # REMOVE
 
-def _testing_metric(name, opts, field):
-    # Just call out to the comparison tool.
-    # if field in opts.stats_range_fields: # REMOVE
-    #     framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
+# def _stats_num_field( name, opts, field, expecteds ): # REMOVE
+#     if field in opts.stats_range_fields: # REMOVE
+#         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
-    # if (I can load information from a git note):
-    #                             [ str ] = (str                 , str            )
-    #   -> opts.stats_range_fields[field] = (result from git note, small deviation) # will I need to care about word size differences here? # REMOVE
-                                                                                    # or can I assume I am always using the same machine with git notes?
-    # else:
-    #   -> sane default
+#     if type(expecteds) is list:
+#         for (b, expected, dev) in expecteds:
+#             if b:
+#                 opts.stats_range_fields[field] = (expected, dev) # REMOVE
+#                 return
+#         framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
-    # if type(expecteds) is list:
-    #     for (b, expected, dev) in expecteds:
-    #         if b:
-    #             opts.stats_range_fields[field] = (expected, dev) # REMOVE
-    #             return
-    #     framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+#     else:
+#         (expected, dev) = expecteds
+#         opts.stats_range_fields[field] = (expected, dev) # REMOVE
 
-    # else:
-    #     (expected, dev) = expecteds
-    #     opts.stats_range_fields[field] = (expected, dev) # REMOVE
-    return
-# if string
-        # set the opts things
-    # if list
-        # set the opts things
-    # return
+# def compiler_stats_num_field( field, expecteds ): # REMOVE
+#     return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e); # REMOVE
 
+# def _compiler_stats_num_field( name, opts, field, expecteds ): # REMOVE
+#     if field in opts.compiler_stats_range_fields: # REMOVE
+#         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
 
-# -----
+#     # Compiler performance numbers change when debugging is on, making the results
+#     # useless and confusing. Therefore, skip if debugging is on.
+#     if compiler_debugged():
+#         skip(name, opts)
 
-# This code is what is used in the all.T files
-# It is now useless and we need a different way to do it
-def stats_num_field( field, expecteds ): # REMOVE
-    return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e); # REMOVE
+#     for (b, expected, dev) in expecteds:
+#         if b:
+#             opts.compiler_stats_range_fields[field] = (expected, dev) # REMOVE
+#             return
 
-def _stats_num_field( name, opts, field, expecteds ): # REMOVE
-    if field in opts.stats_range_fields: # REMOVE
-        framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
-
-    if type(expecteds) is list:
-        for (b, expected, dev) in expecteds:
-            if b:
-                opts.stats_range_fields[field] = (expected, dev) # REMOVE
-                return
-        framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
-
-    else:
-        (expected, dev) = expecteds
-        opts.stats_range_fields[field] = (expected, dev) # REMOVE
-
-def compiler_stats_num_field( field, expecteds ): # REMOVE
-    return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e); # REMOVE
-
-def _compiler_stats_num_field( name, opts, field, expecteds ): # REMOVE
-    if field in opts.compiler_stats_range_fields: # REMOVE
-        framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
-
-    # Compiler performance numbers change when debugging is on, making the results
-    # useless and confusing. Therefore, skip if debugging is on.
-    if compiler_debugged():
-        skip(name, opts)
-
-    for (b, expected, dev) in expecteds:
-        if b:
-            opts.compiler_stats_range_fields[field] = (expected, dev) # REMOVE
-            return
-
-    framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
+#     framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
 # -----
 
@@ -1120,56 +1086,25 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Check -t stats info # REMOVE
 
-def checkStats(name, way, stats_file, range_fields): # REMOVE
-    full_name = name + '(' + way + ')'
-
+# Now uses the code in perf_notes.py
+def checkStats(name, way, stats_file, range_fields):
     result = passed()
+    opts = getTestOpts()
+
+    # print("sanity check 0")
     if range_fields:
+        # print("sanity check 01")
         try:
-            f = open(in_testdir(stats_file)) # REMOVE
+            f = open(in_testdir(stats_file))
         except IOError as e:
             return failBecause(str(e))
         contents = f.read()
         f.close()
 
         for (field, (expected, dev)) in range_fields.items():
-            m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
-            if m == None:
-                print('Failed to find field: ', field)
-                result = failBecause('no such stats field') # REMOVE
-            val = int(m.group(1))
-
-            lowerBound = trunc(           expected * ((100 - float(dev))/100))
-            upperBound = trunc(0.5 + ceil(expected * ((100 + float(dev))/100)))
-
-            deviation = round(((float(val) * 100)/ expected) - 100, 1)
-
-            # Add val into the git note if option is set.
-            if config.use_git_notes:
-                test_env = config.test_env
-                config.accumulate_metrics.append('\t'.join([test_env, name, way, field, str(val)]))
-
-            if val < lowerBound:
-                print(field, 'value is too low:')
-                print('(If this is because you have improved GHC, please')
-                print('update the test so that GHC doesn\'t regress again)')
-                result = failBecause('stat too good', tag='stat')
-            if val > upperBound:
-                print(field, 'value is too high:')
-                result = failBecause('stat not good enough', tag='stat')
-
-            if val < lowerBound or val > upperBound or config.verbose >= 4:
-                length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
-
-                def display(descr, val, extra):
-                    print(descr, str(val).rjust(length), extra)
-
-                display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
-                display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
-                display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
-                display('    Actual      ' + full_name + ' ' + field + ':', val, '')
-                if val != expected:
-                    display('    Deviation   ' + full_name + ' ' + field + ':', deviation, '%')
+            result = evaluate_metric(opts, name, field, dev, contents, way)
+            if result['passFail'] == 'fail':
+                return result
 
     return result
 
@@ -1252,8 +1187,8 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    # REPLACE statsResult with my new function from perf_test comparison tool.
-    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields) # REMOVE
+    # print ("wtf 01")
+    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields)
 
     if badResult(statsResult): # REMOVE
         return statsResult # REMOVE
@@ -1332,7 +1267,8 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return checkStats(name, way, stats_file, opts.stats_range_fields) # REMOVE
+    # print("wtf 02")
+    return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 def rts_flags(way):
     args = config.way_rts_flags.get(way, [])
