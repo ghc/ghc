@@ -51,12 +51,15 @@ type LlvmStatements = OrdList LlvmStatement
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM proc Code generator
 --
-genLlvmProc :: RawCmmDecl -> LlvmM [LlvmCmmDecl]
-genLlvmProc (CmmProc infos lbl live graph) = do
+genLlvmProc :: RawCmmDeclPlus -> LlvmM [LlvmCmmDecl]
+genLlvmProc (CmmProc (infos, rty) lbl live graph) = do
+    dflags <- getDynFlags
     let blocks = toBlockListEntryFirstFalseFallthrough graph
+        rets = llvmRetTyRegs dflags rty
+    setRetRegs rets
     (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
     let info = mapLookup (g_entry graph) infos
-        proc = CmmProc info lbl live (ListGraph lmblocks)
+        proc = CmmProc (info, rets) lbl live (ListGraph lmblocks)
     return (proc:lmdata)
 
 genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
@@ -781,13 +784,15 @@ genNativeCall :: Maybe ContInfo -> CmmExpr -> [GlobalReg] -> LlvmM StmtData
 
 -- Native call to a known Cmm function 
 genNativeCall maybeCont (CmmLit (CmmLabel lbl)) live = do
-    (vf, stmts, top) <- getHsFunc live lbl
+    rets <- getRetsOfCall maybeCont
+    (vf, stmts, top) <- getHsFunc live rets lbl
     (rest, top2) <- genNativeCall' maybeCont vf live
     return (stmts `appOL` rest, top ++ top2)
     
 -- Native call to unknown Cmm function / address.
 genNativeCall maybeCont expr live = do
-    fty <- llvmFunTy live
+    rets <- getRetsOfCall maybeCont
+    fty <- llvmFunTy live rets
     (vf, stmts, top) <- exprToVar expr
     dflags <- getDynFlags
 
@@ -821,6 +826,9 @@ genNativeCall' maybeCont fv live = do
             (ntCallStms, top) <- mkNonTailCall dflags contInfo retTy fv stgRegs
             return (stgStmts `appOL` ntCallStms, top)
 
+getRetsOfCall :: Maybe ContInfo -> LlvmM LiveGlobalRegs
+getRetsOfCall (Just (_, _, rets)) = return rets
+getRetsOfCall Nothing = getRetRegs  -- use current function's return type for tail call
 
 mkNonTailCall :: DynFlags -> ContInfo -> LlvmType -> LlvmVar -> [LlvmVar] -> LlvmM StmtData
 mkNonTailCall dflags contInfo retTy vf stgRegs = do
@@ -862,29 +870,17 @@ cpsCallConsts dflags (retl, argOff, _) = let
 doReturnTo :: ContInfo -> LlvmVar -> LlvmM LlvmStatements
 doReturnTo (retl, _, retArgs) llRetV = do
     dflags <- getDynFlags
-    let 
-        -- TODO(kavon): seems retRegs includes all of the Rx registers
-        -- even if they are not live. LLVM will clean that up but it'd be nice if
-        -- we could avoid emitting those extracts by slimming down the retRegs list.
+    let retRegs = llvmStdConv dflags retArgs
         
-        -- retRegs is a subset of allRegs, with the _same relative ordering_
-        allRegs = llvmStdRetConv dflags
-        isPassed r = r `elem` retArgs || r `elem` alwaysLive
-        retRegs = filter isPassed allRegs
-        
-        extract (z@(_, [], _)) _ = return z -- no more slots needed
-        extract (i, x:xs, stms) reg
-            | x /= reg = -- skip if x doesn't go in this slot
-                return (i+1, x:xs, stms) 
-            | otherwise = do
-                regAlloca <- getCmmReg $ CmmGlobal reg
-                let (LMPointer ty) = getVarType regAlloca
-                (newVal, s1) <- doExpr ty $ ExtractV llRetV i
-                let s2 = Store newVal regAlloca
-                return (i+1, xs, stms `snocOL` s1 `snocOL` s2)
+        extract (i, stms) reg = do
+            regAlloca <- getCmmReg $ CmmGlobal reg
+            let (LMPointer ty) = getVarType regAlloca
+            (newVal, s1) <- doExpr ty $ ExtractV llRetV i
+            let s2 = Store newVal regAlloca
+            return (i+1, stms `snocOL` s1 `snocOL` s2)
     
     -- update the allocas that correspond to the retRegs
-    (_, [], updateStms) <- foldM extract (0, retRegs, nilOL) allRegs
+    (_, updateStms) <- foldM extract (0, nilOL) retRegs
     let br = Branch $ blockIdToLlvm retl
     return (updateStms `snocOL` br)
 
@@ -1902,9 +1898,9 @@ getTrashRegs = do plat <- getLlvmPlatform
 --
 -- This is for Haskell functions, function type is assumed, so doesn't work
 -- with foreign functions.
-getHsFunc :: LiveGlobalRegs -> CLabel -> LlvmM ExprData
-getHsFunc live lbl
-  = do fty <- llvmFunTy live
+getHsFunc :: LiveGlobalRegs -> LiveGlobalRegs -> CLabel -> LlvmM ExprData
+getHsFunc live rets lbl
+  = do fty <- llvmFunTy live rets
        name <- strCLabel_llvm lbl
        getHsFunc' name fty
 

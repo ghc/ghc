@@ -41,7 +41,7 @@ import System.IO
 -- | Top-level of the LLVM Code generator
 --
 llvmCodeGen :: DynFlags -> Handle -> UniqSupply
-               -> Stream.Stream IO RawCmmGroup ()
+               -> Stream.Stream IO RawCmmGroupPlus ()
                -> IO ManglerInfo
 llvmCodeGen dflags h us cmm_stream
   = withTiming (pure dflags) (text "LLVM CodeGen") (const ()) $ do
@@ -71,7 +71,7 @@ llvmCodeGen dflags h us cmm_stream
        bFlush bufh
        return info
 
-llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroup () -> LlvmM ManglerInfo
+llvmCodeGen' :: Stream.Stream LlvmM RawCmmGroupPlus () -> LlvmM ManglerInfo
 llvmCodeGen' cmm_stream
   = do  -- Preamble
         renderLlvm pprLlvmHeader
@@ -93,18 +93,19 @@ llvmCodeGen' cmm_stream
         
         return $ Just info
 
-llvmGroupLlvmGens :: RawCmmGroup -> LlvmM (LabelMap ManglerStr)
+llvmGroupLlvmGens :: RawCmmGroupPlus -> LlvmM (LabelMap ManglerStr)
 llvmGroupLlvmGens cmm = do
-
+        dflags <- getDynFlags
         -- Insert functions into map, collect data
         let split (CmmData s d' )     = return $ Just (s, d')
-            split (CmmProc h l live g) = do
+            split (CmmProc (h, rty) l live g) = do
               -- Set function type
               let l' = case mapLookup (g_entry g) h of
                          Nothing                   -> l
                          Just (Statics info_lbl _) -> info_lbl
+                  retRegs = llvmRetTyRegs dflags rty
               lml <- strCLabel_llvm l'
-              funInsert lml =<< llvmFunTy live
+              funInsert lml =<< llvmFunTy live retRegs
               return Nothing
         cdata <- fmap catMaybes $ mapM split cmm
 
@@ -115,9 +116,9 @@ llvmGroupLlvmGens cmm = do
           
         -- collect mangler info
         let 
-            joinInfo :: LabelMap ManglerStr -> RawCmmDecl -> LlvmM (LabelMap ManglerStr)
+            joinInfo :: LabelMap ManglerStr -> RawCmmDeclPlus -> LlvmM (LabelMap ManglerStr)
             joinInfo acc grp = case grp of
-                CmmProc info _ _ _ -> do
+                CmmProc (info,_) _ _ _ -> do
                     let asL = mapToList info
                     newInfo <- foldM cvt mapEmpty asL
                     return $ mapUnion acc newInfo
@@ -151,13 +152,13 @@ cmmDataLlvmGens statics
 -- seen as an LLVM bug) so we rearrange the code to keep the original entry
 -- label which branches to a newly generated second label that branches back
 -- to itself. See: Trac #11649
-fixBottom :: RawCmmDecl -> LlvmM RawCmmDecl
+fixBottom :: RawCmmDeclPlus -> LlvmM RawCmmDeclPlus
 fixBottom cp@(CmmProc hdr entry_lbl live g) =
     maybe (pure cp) fix_block $ mapLookup (g_entry g) blk_map
   where
     blk_map = toBlockMap g
 
-    fix_block :: CmmBlock -> LlvmM RawCmmDecl
+    fix_block :: CmmBlock -> LlvmM RawCmmDeclPlus
     fix_block blk
         | (CmmEntry e_lbl tickscp, middle, CmmBranch b_lbl) <- blockSplit blk
         , isEmptyBlock middle
@@ -177,7 +178,7 @@ fixBottom cp@(CmmProc hdr entry_lbl live g) =
 fixBottom rcd = pure rcd
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
-cmmLlvmGen ::RawCmmDecl -> LlvmM ()
+cmmLlvmGen :: RawCmmDeclPlus -> LlvmM ()
 cmmLlvmGen cmm@CmmProc{} = do
 
     -- rewrite assignments to global regs

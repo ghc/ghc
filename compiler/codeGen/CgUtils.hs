@@ -121,7 +121,7 @@ get_Regtable_addr_from_offset dflags _ offset =
 
 -- | Fixup global registers so that they assign to locations within the
 -- RegTable if they aren't pinned for the current target.
-fixStgRegisters :: DynFlags -> RawCmmDecl -> RawCmmDecl
+fixStgRegisters :: DynFlags -> GenCmmDecl a b CmmGraph -> GenCmmDecl a b CmmGraph
 fixStgRegisters _ top@(CmmData _ _) = top
 
 fixStgRegisters dflags (CmmProc info lbl live graph) =
@@ -179,4 +179,3 @@ fixStgRegStmt dflags stmt = fixAssign $ mapExpDeep fixExpr stmt
                                                    (wordWidth dflags))]
 
         other_expr -> other_expr
-

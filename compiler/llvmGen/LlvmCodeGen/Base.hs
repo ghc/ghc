@@ -19,15 +19,14 @@ module LlvmCodeGen.Base (
         markStackReg, checkStackReg,
         funLookup, funInsert, getLlvmVer, getDynFlags, getDynFlag, getLlvmPlatform,
         dumpIfSetLlvm, renderLlvm, markUsedVar, getUsedVars,
-        ghcInternalFunctions,
+        ghcInternalFunctions, setRetRegs, getRetRegs,
 
         getMetaUniqueId,
         setUniqMeta, getUniqMeta,
 
         cmmToLlvmType, widthToLlvmFloat, widthToLlvmInt, llvmFunTy,
         llvmFunSig, llvmFunArgs, llvmStdFunAttrs, llvmFunAlign, llvmInfAlign,
-        llvmPtrBits, tysToParams, llvmFunSection, llvmStdConv, llvmStdFunDefAttrs,
-        llvmStdRetConv,
+        llvmPtrBits, tysToParams, llvmFunSection, llvmStdConv, llvmStdFunDefAttrs, llvmRetTyRegs,
 
         strCLabel_llvm, strDisplayName_llvm, strProcedureName_llvm,
         getGlobalPtr, generateExternDecls,
@@ -46,6 +45,7 @@ import CodeGen.Platform ( activeStgRegs )
 import DynFlags
 import FastString
 import Cmm              hiding ( succ )
+import CmmCallConv
 import Outputable as Outp
 import Platform
 import UniqFM
@@ -57,16 +57,20 @@ import ErrUtils
 import qualified Stream
 
 import Control.Monad (ap)
+import Data.Maybe (mapMaybe)
 
 -- ----------------------------------------------------------------------------
 -- * Some Data Types
 --
 
-type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics) (ListGraph LlvmStatement)
+type LlvmCmmDecl = GenCmmDecl [LlvmData] (Maybe CmmStatics, LiveRetRegs) (ListGraph LlvmStatement)
 type LlvmBasicBlock = GenBasicBlock LlvmStatement
 
 -- | Global registers live on proc entry
 type LiveGlobalRegs = [GlobalReg]
+
+-- | Just aliasing for better description
+type LiveRetRegs = LiveGlobalRegs
 
 -- | Unresolved code.
 -- Of the form: (data label, data type, unresolved data)
@@ -110,27 +114,35 @@ llvmGhcCC dflags
  | platformUnregisterised (targetPlatform dflags) = CC_Ccc
  | otherwise                                      = CC_Ghc
 
+llvmRetTyRegs :: DynFlags -> Maybe [CmmType] -> LiveGlobalRegs
+llvmRetTyRegs _ Nothing = []
+llvmRetTyRegs dflags (Just tys) = mapMaybe onlyRegs locs
+    where
+        (_, locs) = assignArgumentsPos dflags 0 NativeReturn id tys
+        
+        onlyRegs (_, RegisterParam reg) = Just reg
+        onlyRegs _ = Nothing
+        
+
 -- | Llvm Function type for Cmm function
-llvmFunTy :: LiveGlobalRegs -> LlvmM LlvmType
-llvmFunTy live = return . LMFunction =<< llvmFunSig' live (fsLit "a") ExternallyVisible
+llvmFunTy :: LiveGlobalRegs -> LiveGlobalRegs -> LlvmM LlvmType
+llvmFunTy args rets = return . LMFunction =<< llvmFunSig' args rets (fsLit "a") ExternallyVisible
 
 -- | Llvm Function signature
-llvmFunSig :: LiveGlobalRegs ->  CLabel -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
-llvmFunSig live lbl link = do
+llvmFunSig :: LiveGlobalRegs -> LiveGlobalRegs -> CLabel -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
+llvmFunSig args rets lbl link = do
   lbl' <- strCLabel_llvm lbl
-  llvmFunSig' live lbl' link
+  llvmFunSig' args rets lbl' link
 
-llvmFunSig' :: LiveGlobalRegs -> LMString -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
-llvmFunSig' live lbl link
+llvmFunSig' :: LiveGlobalRegs -> LiveGlobalRegs -> LMString -> LlvmLinkageType -> LlvmM LlvmFunctionDecl
+llvmFunSig' args rets lbl link
   = do let toParams x | isPointer x = (x, [NoAlias, NoCapture]) -- TODO(kavon): add NonNull
                       | otherwise   = (x, [])
        dflags <- getDynFlags
        -- the standard set of argument types passed/returned.
-       let regToTy = getVarType . (lmGlobalRegArg dflags)
-           callConv = map getVarType (llvmFunArgs dflags live)
-           retConv = map regToTy (llvmStdRetConv dflags)
-       -- TODO(kavon): introduce a type alias for the ret struct to reduce bytes output
-           retTy = LMStructU $ retConv
+       let getTypesFor live = map getVarType (llvmFunArgs dflags live)
+           callConv = getTypesFor args
+           retTy = LMStructU $ getTypesFor rets  -- TODO(kavon): introduce type aliases
        return $ LlvmFunctionDecl lbl link (llvmGhcCC dflags) retTy FixedArgs
                                  (map toParams callConv)
                                  (llvmFunAlign dflags)
@@ -149,23 +161,14 @@ llvmFunSection dflags lbl
     | gopt Opt_SplitSections dflags = Just (concatFS [fsLit ".text.", lbl])
     | otherwise                     = Nothing
 
--- | The full set of Cmm registers passed to a function, in the correct order,
---   given the live argument registers.
+-- | The full set of Cmm registers passed to an from a function, in the correct order,
+--   given a live list of values in registers. This list should not include the platform regs.
 llvmStdConv :: DynFlags -> LiveGlobalRegs -> [GlobalReg]
 llvmStdConv dflags live = 
     filter isPassed (activeStgRegs platform)
     where platform = targetPlatform dflags
           isLive r = r `elem` alwaysLive || r `elem` live
           isPassed r = not (isFloatReg r || isVectorReg r) || isLive r
-          
--- | The full set of Cmm registers returned from a function, in the correct order.
-llvmStdRetConv :: DynFlags -> [GlobalReg]
-llvmStdRetConv dflags = 
-    -- NB: the return type of all LLVM fuctions must match up for tail-call optimization,
-    --     so we pick a safe superset of all return types here.
-    filter isPassed (activeStgRegs platform)
-    where platform = targetPlatform dflags
-          isPassed r = not $ isVectorReg r -- TODO(kavon): I see no reason why we can't return a vector reg
           
 isFloatReg :: GlobalReg -> Bool
 isFloatReg (FloatReg _)  = True
@@ -191,6 +194,8 @@ llvmStdFunAttrs = [NoUnwind]
 -- | Llvm standard function definition attributes
 llvmStdFunDefAttrs :: [LlvmFuncAttr]
 llvmStdFunDefAttrs = [NoUnwind]
+
+-- TODO(kavon): the above are identical now, since we no longer need 'naked'. remove
 
 -- | Convert a list of types to a list of function parameters
 -- (each with no parameter attributes)
@@ -233,6 +238,7 @@ data LlvmEnv = LlvmEnv
     -- the following get cleared for every function (see @withClearVars@)
   , envVarMap :: LlvmEnvMap        -- ^ Local variables so far, with type
   , envStackRegs :: [GlobalReg]    -- ^ Non-constant registers (alloca'd in the function prelude)
+  , envRetRegs :: [GlobalReg]      -- ^ The registers this function uses to return values (see @llvmFunTy@)
   }
 
 type LlvmEnvMap = UniqFM LlvmType
@@ -281,6 +287,7 @@ runLlvm dflags ver out us m = do
   where env = LlvmEnv { envFunMap = emptyUFM
                       , envVarMap = emptyUFM
                       , envStackRegs = []
+                      , envRetRegs = []
                       , envUsedVars = []
                       , envAliases = emptyUniqSet
                       , envVersion = ver
@@ -310,8 +317,8 @@ liftStream s = Stream.Stream $ do
 -- | Clear variables from the environment for a subcomputation
 withClearVars :: LlvmM a -> LlvmM a
 withClearVars m = LlvmM $ \env -> do
-    (x, env') <- runLlvmM m env { envVarMap = emptyUFM, envStackRegs = [] }
-    return (x, env' { envVarMap = emptyUFM, envStackRegs = [] })
+    (x, env') <- runLlvmM m env { envVarMap = emptyUFM, envStackRegs = [], envRetRegs = [] }
+    return (x, env' { envVarMap = emptyUFM, envStackRegs = [], envRetRegs = [] })
 
 -- | Insert variables or functions into the environment.
 varInsert, funInsert :: Uniquable key => key -> LlvmType -> LlvmM ()
@@ -388,6 +395,14 @@ setUniqMeta f m = modifyEnv $ \env -> env { envUniqMeta = addToUFM (envUniqMeta 
 -- | Gets metadata node for given unique
 getUniqMeta :: Unique -> LlvmM (Maybe MetaId)
 getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
+
+-- | Set the returned reg list
+setRetRegs :: [GlobalReg] -> LlvmM ()
+setRetRegs rets = modifyEnv $ \env -> env { envRetRegs = rets }
+
+-- | Get the returned reg list
+getRetRegs :: LlvmM [GlobalReg]
+getRetRegs = getEnv envRetRegs
 
 -- ----------------------------------------------------------------------------
 -- * Internal functions
