@@ -91,9 +91,8 @@ def setTestOpts( f ):
 def normal( name, opts ):
     return;
 
-# Never used anywhere.
-# def skip( name, opts ):
-#     opts.skip = 1
+def skip( name, opts ):
+    opts.skip = 1
 
 def expect_fail( name, opts ):
     # The compiler, testdriver, OS or platform is missing a certain
@@ -313,48 +312,6 @@ def extra_files(files):
 
 def _extra_files(name, opts, files):
     opts.extra_files.extend(files)
-
-# -----
-
-# Depreciated. See perf_notes.py for new code.
-# # This code is what is used in the all.T files
-# # It is now useless and we need a different way to do it
-# def stats_num_field( field, expecteds ): # REMOVE
-#     return lambda name, opts, f=field, e=expecteds: _stats_num_field(name, opts, f, e); # REMOVE
-
-# def _stats_num_field( name, opts, field, expecteds ): # REMOVE
-#     if field in opts.stats_range_fields: # REMOVE
-#         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
-
-#     if type(expecteds) is list:
-#         for (b, expected, dev) in expecteds:
-#             if b:
-#                 opts.stats_range_fields[field] = (expected, dev) # REMOVE
-#                 return
-#         framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
-
-#     else:
-#         (expected, dev) = expecteds
-#         opts.stats_range_fields[field] = (expected, dev) # REMOVE
-
-# def compiler_stats_num_field( field, expecteds ): # REMOVE
-#     return lambda name, opts, f=field, e=expecteds: _compiler_stats_num_field(name, opts, f, e); # REMOVE
-
-# def _compiler_stats_num_field( name, opts, field, expecteds ): # REMOVE
-#     if field in opts.compiler_stats_range_fields: # REMOVE
-#         framework_fail(name, 'duplicate-numfield', 'Duplicate ' + field + ' num_field check')
-
-#     # Compiler performance numbers change when debugging is on, making the results
-#     # useless and confusing. Therefore, skip if debugging is on.
-#     if compiler_debugged():
-#         skip(name, opts)
-
-#     for (b, expected, dev) in expecteds:
-#         if b:
-#             opts.compiler_stats_range_fields[field] = (expected, dev) # REMOVE
-#             return
-
-#     framework_warn(name, 'numfield-no-expected', 'No expected value found for ' + field + ' in num_field check')
 
 # -----
 
@@ -1084,16 +1041,14 @@ def multi_compile_and_run( name, way, top_mod, extra_mods, extra_hc_opts ):
     return compile_and_run__( name, way, top_mod, extra_mods, extra_hc_opts)
 
 # -----------------------------------------------------------------------------
-# Check -t stats info # REMOVE
+# Check -t stats info
 
 # Now uses the code in perf_notes.py
 def checkStats(name, way, stats_file, range_fields):
     result = passed()
     opts = getTestOpts()
 
-    # print("sanity check 0")
     if range_fields:
-        # print("sanity check 01")
         try:
             f = open(in_testdir(stats_file))
         except IOError as e:
@@ -1103,6 +1058,7 @@ def checkStats(name, way, stats_file, range_fields):
 
         for (field, (expected, dev)) in range_fields.items():
             result = evaluate_metric(opts, name, field, dev, contents, way)
+            # If the test fails a metric, exit immediately.
             if result['passFail'] == 'fail':
                 return result
 
@@ -1153,9 +1109,9 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
     else:
         to_do = '-c' # just compile
 
-    stats_file = name + '.comp.stats' # REMOVE
-    if opts.compiler_stats_range_fields: # Replace with an is_compiler_perf_test() function. # REMOVE
-        extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS' # REMOVE
+    stats_file = name + '.comp.stats'
+    if opts.is_compiler_test:
+        extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     if backpack:
         extra_hc_opts += ' -outputdir ' + name + '.out'
 
@@ -1187,11 +1143,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    # print ("wtf 01")
     statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields)
 
-    if badResult(statsResult): # REMOVE
-        return statsResult # REMOVE
+    if badResult(statsResult):
+        return statsResult
 
     if should_fail:
         if exit_code == 0:
@@ -1228,14 +1183,14 @@ def simple_run(name, way, prog, extra_run_opts):
 
     my_rts_flags = rts_flags(way)
 
-    stats_file = name + '.stats' # REMOVE
-    if opts.stats_range_fields: # REMOVE
-        stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS' # REMOVE
+    stats_file = name + '.stats'
+    if not opts.is_compiler_test:
+        stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
-        stats_args = '' # REMOVE
+        stats_args = ''
 
     # Put extra_run_opts last: extra_run_opts('+RTS foo') should work.
-    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts # REMOVE
+    cmd = prog + stats_args + ' ' + my_rts_flags + ' ' + extra_run_opts
 
     if opts.cmd_wrapper != None:
         cmd = opts.cmd_wrapper(cmd)
@@ -1267,7 +1222,6 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    # print("wtf 02")
     return checkStats(name, way, stats_file, opts.stats_range_fields)
 
 def rts_flags(way):

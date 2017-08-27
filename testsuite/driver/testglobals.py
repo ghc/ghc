@@ -194,6 +194,10 @@ class TestOptions:
        # Backpack test
        self.compile_backpack = 0
 
+       # This will supersede usage of hacky methods to check if
+       # the current test is a compiler test.
+       self.is_compiler_test = False
+
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we
        # make a new instance of TestOptions.
@@ -221,7 +225,6 @@ class TestOptions:
        #   9300000000,
        #   10)
        # To allow a 10% deviation from 9300000000.
-       # self.compiler_stats_range_fields = {} # REMOVE
        self.stats_range_fields = {}
 
        # should we run this test alone, i.e. not run it in parallel with

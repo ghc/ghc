@@ -7,6 +7,7 @@
 # metrics across arbitrary commits. The file will produce a table comparing
 # metrics between measurements taken for given commits in the environment given
 # by --test-env.
+#
 
 import argparse
 import re
@@ -35,10 +36,6 @@ def main():
                         help="The rest of the arguments will be the commits that will be used.")
     args = parser.parse_args()
 
-    #
-    # Defaults and utilities
-    #
-
     env = 'local'
     name = re.compile('.*')
     # metrics is a dictionary of the form
@@ -47,7 +44,7 @@ def main():
     singleton_commit = len(args.commits) == 1
 
     #
-    # Main logic of program
+    # Main logic of the program when called from the command-line.
     #
 
     if args.commits:
@@ -87,7 +84,7 @@ def main():
     if args.add_note:
         def note_gen(n, commit, delta=''):
             note = []
-            # Generates simple fake data. Likely comprehensive enough to catch all edge cases.
+            # Generates simple fake data. Likely not comprehensive enough to catch all edge cases.
             if not delta:
                 [note.append('\t'.join(['local', 'T'+ str(i*100), 'some_way', 'some_field', str(i*1000)])) for i in range(1,int(int(n)/2)+1)]
                 [note.append('\t'.join(['non-local', 'W'+ str(i*100), 'other_way', 'other_field', str(i*100)])) for i in range(int(int(n)/2)+1,int(n)+1)]
@@ -100,9 +97,11 @@ def main():
         note_gen(args.add_note[0],args.add_note[1],args.add_note[2])
 
 #
-# Comparison tools for commits.
+# Comparison tools for the test driver to use on performance tests.
 #
+
 testing_metrics = ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
+
 def my_passed(reason=''):
     return {'passFail': 'pass', 'reason' : reason}
 
@@ -113,12 +112,8 @@ def my_failBecause(reason, tag=None):
 # - Upon noticing a: 5% regression, leave a comment on phabricator
 # -                 10% regression, flag commit for review on phabricator
 # -                 20% regression, fail test.
-def test_cmp(val, expected, dev=20):
+def test_cmp(full_name, field, val, expected, dev=20):
     result = my_passed()
-    # print("DEV IS\n\n")
-    # print(dev)
-    # print(val)
-    # print(expected)
     lowerBound = trunc(           int(expected) * ((100 - float(dev))/100))
     upperBound = trunc(0.5 + ceil(int(expected) * ((100 + float(dev))/100)))
     deviation = round(((float(val) * 100)/ int(expected)) - 100, 1)
@@ -131,46 +126,44 @@ def test_cmp(val, expected, dev=20):
         result = my_failBecause('value is too high:\nstat is not good enough')
 
     if val < lowerBound or val > upperBound or config.verbose >= 4:
-        verbose_print(expected, val, lowerBound, upperBound, deviation)
+        length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
+
+        def display(descr, val, extra):
+            print(descr, str(val).rjust(length), extra)
+
+        display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
+        display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
+        display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
+        display('    Actual      ' + full_name + ' ' + field + ':', val, '')
+        if val != expected:
+            display('    Deviation   ' + full_name + ' ' + field + ':', deviation, '%')
 
     return result
 
-def verbose_print(expected, val, lowerBound, upperBound, deviation):
-    length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
-
-    def display(descr, val, extra):
-        print(descr, str(val).rjust(length), extra)
-
-    # Fix this so full_name works
-    display('    Expected    ' + full_name + ' ' + field + ':', expected, '+/-' + str(dev) + '%')
-    display('    Lower bound ' + full_name + ' ' + field + ':', lowerBound, '')
-    display('    Upper bound ' + full_name + ' ' + field + ':', upperBound, '')
-    display('    Actual      ' + full_name + ' ' + field + ':', val, '')
-    if val != expected:
-        display('    Deviation   ' + full_name + ' ' + field + ':', deviation, '%')
-
 # To be used instead of stats_num_field
-def comparison(metric, deviation=20, compiler=False):
+# All defaults set for ease of use.
+# Defaults to "test everything, only break on extreme cases, not a compiler test"
+def comparison(metric='all', deviation=20, compiler=False):
     return lambda name, opts, m=metric, d=deviation, c=compiler: _comparison(name, opts, m, d, c)
 
 def _comparison(name, opts, metric, deviation, is_compiler_test):
     tests = parse_git_notes('perf','HEAD^')
-    # print("\n\nTESTS ALL\n\n")
-    # print(tests)
 
     # Might have multiple metrics being measured for a single test.
     test = [t for t in tests if t['test'] == name]
-    # print("\n\nTEST:\n\n")
-    # print(test)
 
     if tests == [] or test == []:
+        # There are no prior metrics for this test.
         opts.stats_range_fields[metric] = (0,0)
-        return # passed('There are no prior metrics for this test')
+        return
 
+    # Compiler performance numbers change when debugging is on, making the results
+    # useless and confusing. Therefore, skip if debugging is on.
     if config.compiler_debugged and is_compiler_test:
+        opts.is_compiler_test = True
         opts.skip = 1
 
-
+    # 'all' is a shorthand to test for bytes allocated, peak megabytes allocated, and max bytes used.
     if isinstance(metric, str):
         if metric == 'all':
             for field in testing_metrics:
@@ -185,28 +178,25 @@ def _comparison(name, opts, metric, deviation, is_compiler_test):
             opts.stats_range_fields[field] = ([t['value'] for t in test if t['metric'] == field][0], deviation)
 
 def evaluate_metric(opts, test, field, deviation, contents, way):
-    # print ("called evaluate_metric")
-    # expected = [t for t in test if t['metric'] == field][0]
+    full_name = test + ' (' + way + ' )'
     (expected,_) = opts.stats_range_fields[field]
 
     m = re.search('\("' + field + '", "([0-9]+)"\)', contents)
     if m == None:
         print('Failed to find field: ', field)
-        return my_failBecause('no such stats field') # I think this is just supposed to blow up in the original code?
+        return my_failBecause('no such stats field')
 
     val = int(m.group(1))
 
     # Add val into the git note if option is set.
-    # print("sanity check 1")
     if config.use_git_notes:
-        # print("sanity check 2")
         test_env = config.test_env
         config.accumulate_metrics.append('\t'.join([test_env, test, way, field, str(val)]))
 
     if expected == 0:
         return my_passed('no prior metrics for this test')
 
-    return test_cmp(val, expected, deviation)
+    return test_cmp(full_name, field, val, expected, deviation)
 
 #
 # String utilities for pretty-printing

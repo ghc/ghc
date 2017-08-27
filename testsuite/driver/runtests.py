@@ -110,7 +110,6 @@ if args.threads:
 if args.verbose:
     config.verbose = args.verbose
 
-# Might need to encase these in if statements.
 config.skip_perf_tests = args.skip_perf_tests
 config.only_perf_tests = args.only_perf_tests
 config.use_git_notes = args.use_git_notes
