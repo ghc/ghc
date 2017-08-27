@@ -108,6 +108,9 @@ copyHtmlBits odir libdir themes = do
     copyLibFile f = copyFile (joinPath [libhtmldir, f]) (joinPath [odir, f])
   mapM_ copyCssFile (cssFiles themes)
   copyLibFile jsFile
+  copyLibFile jsFuseFile
+  copyLibFile jsIndexFile
+  copyLibFile jsPreactFile
   return ()
 
 
@@ -118,6 +121,9 @@ headHtml docTitle themes mathjax_url =
     thetitle << docTitle,
     styleSheet themes,
     script ! [src jsFile, thetype "text/javascript"] << noHtml,
+    script ! [src jsPreactFile, thetype "text/javascript"] << noHtml,
+    script ! [src jsFuseFile, thetype "text/javascript"] << noHtml,
+    script ! [src jsIndexFile, thetype "text/javascript"] << noHtml,
     script ! [src mjUrl, thetype "text/javascript"] << noHtml,
     script ! [thetype "text/javascript"]
         -- NB: Within XHTML, the content of script tags needs to be
