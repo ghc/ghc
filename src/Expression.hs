@@ -1,6 +1,6 @@
 module Expression (
     -- * Expressions
-    Expr, Predicate, Args, Ways, Packages,
+    Expr, Predicate, Args, Ways,
 
     -- ** Construction and modification
     expr, exprIO, arg, remove,
@@ -40,7 +40,6 @@ type Expr a = H.Expr Context Builder a
 -- and 'Packages'.
 type Predicate = H.Predicate Context Builder
 type Args      = H.Args      Context Builder
-type Packages  = Expr [Package]
 type Ways      = Expr [Way]
 
 -- | Get a value from the @package-data.mk@ file of the current context.

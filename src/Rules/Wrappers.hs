@@ -119,7 +119,8 @@ haddockWrapper WrappedBinary{..} = do
 iservBinWrapper :: WrappedBinary -> Expr String
 iservBinWrapper WrappedBinary{..} = do
     expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
-    activePackages <- filter isLibrary <$> getPackages
+    stage <- getStage
+    activePackages <- expr $ filter isLibrary <$> stagePackages stage
     -- TODO: Figure our the reason of this hardcoded exclusion
     let pkgs = activePackages \\ [ cabal, process, haskeline
                                  , terminfo, ghcCompact, hpc, compiler ]

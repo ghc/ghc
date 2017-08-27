@@ -8,16 +8,28 @@ import Expression
 -- * @Action Bool@: a flag whose value can depend on the build environment.
 -- * @Predicate@: a flag whose value can depend on the build environment and
 -- on the current build target.
-data Flavour = Flavour
-    { name               :: String         -- ^ Flavour name, to set from command line.
-    , args               :: Args           -- ^ Use these command line arguments.
-    , packages           :: Packages       -- ^ Build these packages.
-    , integerLibrary     :: Action Package -- ^ Either 'integerGmp' or 'integerSimple'.
-    , libraryWays        :: Ways           -- ^ Build libraries these ways.
-    , rtsWays            :: Ways           -- ^ Build RTS these ways.
-    , splitObjects       :: Predicate      -- ^ Build split objects.
-    , buildHaddock       :: Predicate      -- ^ Build Haddock and documentation.
-    , dynamicGhcPrograms :: Bool           -- ^ Build dynamic GHC programs.
-    , ghciWithDebugger   :: Bool           -- ^ Enable GHCi debugger.
-    , ghcProfiled        :: Bool           -- ^ Build profiled GHC.
-    , ghcDebugged        :: Bool }         -- ^ Build GHC with debug information.
+data Flavour = Flavour {
+    -- | Flavour name, to set from command line.
+    name :: String,
+    -- | Use these command line arguments.
+    args :: Args,
+    -- | Build these packages.
+    packages :: Stage -> Action [Package],
+    -- | Either 'integerGmp' or 'integerSimple'.
+    integerLibrary :: Action Package,
+    -- | Build libraries these ways.
+    libraryWays :: Ways,
+    -- | Build RTS these ways.
+    rtsWays :: Ways,
+    -- | Build split objects.
+    splitObjects :: Predicate,
+    -- | Build Haddock and documentation.
+    buildHaddock :: Predicate,
+    -- | Build dynamic GHC programs.
+    dynamicGhcPrograms :: Bool,
+    -- | Enable GHCi debugger.
+    ghciWithDebugger :: Bool,
+    -- | Build profiled GHC.
+    ghcProfiled :: Bool,
+    -- | Build GHC with debug information.
+    ghcDebugged :: Bool }

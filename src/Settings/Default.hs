@@ -1,6 +1,6 @@
 module Settings.Default (
     SourceArgs (..), sourceArgs, defaultBuilderArgs, defaultPackageArgs,
-    defaultArgs, defaultPackages, defaultLibraryWays, defaultRtsWays,
+    defaultArgs, defaultLibraryWays, defaultRtsWays,
     defaultFlavour, defaultSplitObjects
     ) where
 
@@ -84,79 +84,6 @@ defaultSourceArgs = SourceArgs
     , hsLibrary  = mempty
     , hsCompiler = mempty
     , hsGhc      = mempty }
-
--- | Packages that are built by default. You can change this by editing
--- 'userPackages' in "UserSettings".
-defaultPackages :: Packages
-defaultPackages = mconcat [ stage0 ? stage0Packages
-                          , stage1 ? stage1Packages
-                          , stage2 ? stage2Packages ]
-
-stage0Packages :: Packages
-stage0Packages = do
-    win <- expr windowsHost
-    ios <- expr iosHost
-    pure $ [ binary
-           , cabal
-           , checkApiAnnotations
-           , compareSizes
-           , compiler
-           , deriveConstants
-           , dllSplit
-           , genapply
-           , genprimopcode
-           , ghc
-           , ghcBoot
-           , ghcBootTh
-           , ghcCabal
-           , ghci
-           , ghcPkg
-           , ghcTags
-           , hsc2hs
-           , hp2ps
-           , hpc
-           , mtl
-           , parsec
-           , templateHaskell
-           , text
-           , transformers
-           , unlit                       ] ++
-           [ terminfo | not win, not ios ] ++
-           [ touchy   | win              ]
-
-stage1Packages :: Packages
-stage1Packages = do
-    win    <- expr windowsHost
-    doc    <- buildHaddock =<< expr flavour
-    intLib <- expr (integerLibrary =<< flavour)
-    mconcat [ (filter isLibrary) <$> stage0Packages -- Build all Stage0 libraries in Stage1
-            , pure $ [ array
-                     , base
-                     , bytestring
-                     , containers
-                     , deepseq
-                     , directory
-                     , filepath
-                     , ghc
-                     , ghcCabal
-                     , ghcCompact
-                     , ghcPrim
-                     , haskeline
-                     , hpcBin
-                     , hsc2hs
-                     , intLib
-                     , pretty
-                     , process
-                     , rts
-                     , runGhc
-                     , time               ] ++
-                     [ iservBin | not win ] ++
-                     [ unix     | not win ] ++
-                     [ win32    | win     ] ++
-                     [ xhtml    | doc     ] ]
-
-stage2Packages :: Packages
-stage2Packages = buildHaddock <$> flavour ? pure [ haddock ]
 
 -- | Default build ways for library packages:
 -- * We always build 'vanilla' way.

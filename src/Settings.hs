@@ -1,5 +1,5 @@
 module Settings (
-    getArgs, getPackages, getLibraryWays, getRtsWays, flavour, knownPackages,
+    getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findKnownPackage, getPkgData, getPkgDataList, isLibrary, stagePackages,
     builderPath, getBuilderPath, isSpecified, latestBuildStage, programPath,
     programContext, integerLibraryName, getDestDir, stage1Only, buildDll0
@@ -27,11 +27,10 @@ getLibraryWays = expr flavour >>= libraryWays
 getRtsWays :: Ways
 getRtsWays = expr flavour >>= rtsWays
 
-getPackages :: Packages
-getPackages = expr flavour >>= packages
-
 stagePackages :: Stage -> Action [Package]
-stagePackages stage = interpretInContext (stageContext stage) getPackages
+stagePackages stage = do
+    f <- flavour
+    packages f stage
 
 hadrianFlavours :: [Flavour]
 hadrianFlavours =

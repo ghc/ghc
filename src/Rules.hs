@@ -58,7 +58,7 @@ topLevelTargets = action $ do
 packageTargets :: Bool -> Stage -> Package -> Action [FilePath]
 packageTargets includeGhciLib stage pkg = do
     let context = vanillaContext stage pkg
-    activePackages <- interpretInContext context getPackages
+    activePackages <- stagePackages stage
     if pkg `notElem` activePackages
     then return [] -- Skip inactive packages.
     else if isLibrary pkg

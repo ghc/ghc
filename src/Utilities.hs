@@ -193,10 +193,11 @@ contextDependencies :: Context -> Action [Context]
 contextDependencies Context {..} = case pkgCabalFile package of
     Nothing        -> return [] -- Non-Cabal packages have no dependencies.
     Just cabalFile -> do
-        let pkgContext = \pkg -> Context (min stage Stage1) pkg way
+        let depStage   = min stage Stage1
+            depContext = \pkg -> Context depStage pkg way
         deps <- pkgDependencies cabalFile
-        pkgs <- sort <$> interpretInContext (pkgContext package) getPackages
-        return . map pkgContext $ intersectOrd (compare . pkgName) pkgs deps
+        pkgs <- sort <$> stagePackages depStage
+        return . map depContext $ intersectOrd (compare . pkgName) pkgs deps
 
 -- | Lookup dependencies of a 'Package' in the vanilla Stage1 context.
 stage1Dependencies :: Package -> Action [Package]

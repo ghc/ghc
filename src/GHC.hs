@@ -8,7 +8,7 @@ module GHC (
     hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec,
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
-    defaultKnownPackages,
+    defaultKnownPackages, defaultPackages,
 
     -- * Package information
     builderProvenance, programName, nonCabalContext, nonHsMainPackage, autogenPath,
@@ -21,6 +21,7 @@ import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 
 import Base
+import CommandLine
 import Context
 import Oracles.Setting
 
@@ -124,6 +125,82 @@ cUtil name = cProgram name ("utils" -/- name)
 -- | Amend a package path if it doesn't conform to a typical pattern.
 setPath :: Package -> FilePath -> Package
 setPath pkg path = pkg { pkgPath = path }
+
+-- | Packages that are built by default. You can change this in "UserSettings".
+defaultPackages :: Stage -> Action [Package]
+defaultPackages Stage0 = stage0Packages
+defaultPackages Stage1 = stage1Packages
+defaultPackages Stage2 = stage2Packages
+defaultPackages Stage3 = return []
+
+stage0Packages :: Action [Package]
+stage0Packages = do
+    win <- windowsHost
+    ios <- iosHost
+    return $ [ binary
+             , cabal
+             , checkApiAnnotations
+             , compareSizes
+             , compiler
+             , deriveConstants
+             , dllSplit
+             , genapply
+             , genprimopcode
+             , ghc
+             , ghcBoot
+             , ghcBootTh
+             , ghcCabal
+             , ghci
+             , ghcPkg
+             , ghcTags
+             , hsc2hs
+             , hp2ps
+             , hpc
+             , mtl
+             , parsec
+             , templateHaskell
+             , text
+             , transformers
+             , unlit                       ]
+          ++ [ terminfo | not win, not ios ]
+          ++ [ touchy   | win              ]
+
+stage1Packages :: Action [Package]
+stage1Packages = do
+    win        <- windowsHost
+    doc        <- cmdBuildHaddock
+    intSimple  <- cmdIntegerSimple
+    libraries0 <- filter isLibrary <$> stage0Packages
+    return $ libraries0 -- Build all Stage0 libraries in Stage1
+          ++ [ array
+             , base
+             , bytestring
+             , containers
+             , deepseq
+             , directory
+             , filepath
+             , ghc
+             , ghcCabal
+             , ghcCompact
+             , ghcPrim
+             , haskeline
+             , hpcBin
+             , hsc2hs
+             , if intSimple then integerSimple else integerGmp
+             , pretty
+             , process
+             , rts
+             , runGhc
+             , time               ]
+          ++ [ iservBin | not win ]
+          ++ [ unix     | not win ]
+          ++ [ win32    | win     ]
+          ++ [ xhtml    | doc     ]
+
+stage2Packages :: Action [Package]
+stage2Packages = do
+    doc <- cmdBuildHaddock
+    return [ haddock | doc ]
 
 -- | Some builders are built by this very build system, in which case
 -- 'builderProvenance' returns the corresponding build 'Context' (which includes
