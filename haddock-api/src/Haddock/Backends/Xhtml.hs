@@ -11,7 +11,7 @@
 -- Stability   :  experimental
 -- Portability :  portable
 -----------------------------------------------------------------------------
-{-# LANGUAGE CPP #-}
+{-# LANGUAGE CPP, NamedFieldPuns #-}
 module Haddock.Backends.Xhtml (
   ppHtml, copyHtmlBits,
   ppHtmlIndex, ppHtmlContents,
@@ -31,6 +31,7 @@ import Haddock.ModuleTree
 import Haddock.Types
 import Haddock.Version
 import Haddock.Utils
+import Haddock.Utils.Json
 import Text.XHtml hiding ( name, title, p, quote )
 import Haddock.GhcUtils
 
@@ -87,10 +88,12 @@ ppHtml dflags doctitle maybe_package ifaces odir prologue
         False -- we don't want to display the packages in a single-package contents
         prologue debug (makeContentsQual qual)
 
-  when (isNothing maybe_index_url) $
+  when (isNothing maybe_index_url) $ do
     ppHtmlIndex odir doctitle maybe_package
       themes maybe_mathjax_url maybe_contents_url maybe_source_url maybe_wiki_url
       (map toInstalledIface visible_ifaces) debug
+    ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual
+      visible_ifaces
 
   mapM_ (ppHtmlModule odir doctitle themes
            maybe_mathjax_url maybe_source_url maybe_wiki_url
@@ -340,6 +343,57 @@ mkNode qual ss p (Node s leaf pkg srcPkg short ts) =
 -- * Generate the index
 --------------------------------------------------------------------------------
 
+ppJsonIndex :: FilePath
+           -> SourceURLs                   -- ^ The source URL (--source)
+           -> WikiURLs                     -- ^ The wiki URL (--wiki)
+           -> Bool
+           -> QualOption
+           -> [Interface]
+           -> IO ()
+ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
+  createDirectoryIfMissing True odir
+  writeFile (joinPath [odir, indexJsonFile])
+            (encodeToString modules)
+
+  where
+    modules :: Value
+    modules = Array (concatMap goInterface ifaces)
+
+    goInterface :: Interface -> [Value]
+    goInterface iface =
+        concatMap (goExport mdl qual) (ifaceRnExportItems iface)
+      where
+        aliases = ifaceModuleAliases iface
+        qual    = makeModuleQual qual_opt aliases mdl
+        mdl     = ifaceMod iface
+
+    goExport :: Module -> Qualification -> ExportItem DocName -> [Value]
+    goExport mdl qual item =
+      case processExport True links_info unicode qual item of
+        Nothing -> []
+        Just html ->
+          [ Object
+            [ "display_html" .= String (showHtmlFragment html)
+            , "name"         .= String (intercalate " " (map nameString names))
+            , "module"       .= String (moduleString mdl)
+            , "link"         .= String (fromMaybe "" (listToMaybe (map (nameLink mdl) names)))
+            ]
+          ]
+      where 
+        names = exportName item
+    
+    exportName :: ExportItem DocName -> [DocName]
+    exportName ExportDecl { expItemDecl } = getMainDeclBinder $ unLoc expItemDecl
+    exportName ExportNoDecl { expItemName } = [expItemName]
+    exportName _ = []
+
+    nameString :: NamedThing name => name -> String
+    nameString = occNameString . nameOccName . getName
+
+    nameLink :: NamedThing name => Module -> name -> String
+    nameLink mdl = moduleNameUrl' (moduleName mdl) . nameOccName . getName
+
+    links_info = (maybe_source_url, maybe_wiki_url)
 
 ppHtmlIndex :: FilePath
             -> String

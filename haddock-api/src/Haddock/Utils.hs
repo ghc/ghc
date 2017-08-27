@@ -20,7 +20,7 @@ module Haddock.Utils (
 
   -- * Filename utilities
   moduleHtmlFile, moduleHtmlFile',
-  contentsHtmlFile, indexHtmlFile,
+  contentsHtmlFile, indexHtmlFile, indexJsonFile,
   moduleIndexFrameName, mainFrameName, synopsisFrameName,
   subIndexHtmlFile,
   jsFile,
@@ -254,9 +254,10 @@ moduleHtmlFile' mdl =
     Just fp0 -> HtmlPath.joinPath [fp0, baseName mdl ++ ".html"]
 
 
-contentsHtmlFile, indexHtmlFile :: String
+contentsHtmlFile, indexHtmlFile, indexJsonFile :: String
 contentsHtmlFile = "index.html"
 indexHtmlFile = "doc-index.html"
+indexJsonFile = "doc-index.json"
 
 
 
