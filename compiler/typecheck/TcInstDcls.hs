@@ -1327,8 +1327,7 @@ tcMethods dfun_id clas tyvars dfun_ev_vars inst_tys
         error_rhs dflags = L inst_loc $ HsApp error_fun (error_msg dflags)
         error_fun    = L inst_loc $
                        wrapId (mkWpTyApps
-                                [ getRuntimeRep "tcInstanceMethods.tc_default" meth_tau
-                                , meth_tau])
+                                [ getRuntimeRep meth_tau, meth_tau])
                               nO_METHOD_BINDING_ERROR_ID
         error_msg dflags = L inst_loc (HsLit (HsStringPrim noSourceText
                                               (unsafeMkByteString (error_string dflags))))

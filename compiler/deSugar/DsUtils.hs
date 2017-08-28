@@ -344,7 +344,7 @@ sort_alts = sortWith (dataConTag . alt_pat)
 mkPatSynCase :: Id -> Type -> CaseAlt PatSyn -> CoreExpr -> DsM CoreExpr
 mkPatSynCase var ty alt fail = do
     matcher <- dsLExpr $ mkLHsWrap wrapper $
-                         nlHsTyApp matcher [getRuntimeRep "mkPatSynCase" ty, ty]
+                         nlHsTyApp matcher [getRuntimeRep ty, ty]
     let MatchResult _ mkCont = match_result
     cont <- mkCoreLams bndrs <$> mkCont fail
     return $ mkCoreAppsDs (text "patsyn" <+> ppr var) matcher [Var var, ensure_unstrict cont, Lam voidArgId fail]
@@ -471,7 +471,7 @@ mkErrorAppDs err_id ty msg = do
         full_msg = showSDoc dflags (hcat [ppr src_loc, vbar, msg])
         core_msg = Lit (mkMachString full_msg)
         -- mkMachString returns a result of type String#
-    return (mkApps (Var err_id) [Type (getRuntimeRep "mkErrorAppDs" ty), Type ty, core_msg])
+    return (mkApps (Var err_id) [Type (getRuntimeRep ty), Type ty, core_msg])
 
 {-
 'mkCoreAppDs' and 'mkCoreAppsDs' hand the special-case desugaring of 'seq'.

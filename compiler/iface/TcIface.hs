@@ -1404,7 +1404,7 @@ tcIfaceExpr (IfaceTuple sort args)
        ; let con_tys = map exprType args'
              some_con_args = map Type con_tys ++ args'
              con_args = case sort of
-               UnboxedTuple -> map (Type . getRuntimeRep "tcIfaceExpr") con_tys ++ some_con_args
+               UnboxedTuple -> map (Type . getRuntimeRep) con_tys ++ some_con_args
                _            -> some_con_args
                         -- Put the missing type arguments back in
              con_id   = dataConWorkId (tyConSingleDataCon tc)

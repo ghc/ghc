@@ -396,7 +396,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
        ; op_id  <- tcLookupId op_name
        ; res_ty <- readExpType res_ty
-       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep "tcExpr ($)" res_ty
+       ; let op' = L loc (mkHsWrap (mkWpTyApps [ getRuntimeRep res_ty
                                                , arg2_sigma
                                                , res_ty])
                                    (HsVar (L lv op_id)))
