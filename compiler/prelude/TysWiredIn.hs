@@ -1500,7 +1500,7 @@ mkTupleTy :: Boxity -> [Type] -> Type
 mkTupleTy Boxed   [ty] = ty
 mkTupleTy Boxed   tys  = mkTyConApp (tupleTyCon Boxed (length tys)) tys
 mkTupleTy Unboxed tys  = mkTyConApp (tupleTyCon Unboxed (length tys))
-                                        (map (getRuntimeRep "mkTupleTy") tys ++ tys)
+                                        (map getRuntimeRep tys ++ tys)
 
 -- | Build the type of a small tuple that holds the specified type of thing
 mkBoxedTupleTy :: [Type] -> Type
@@ -1518,7 +1518,7 @@ unitTy = mkTupleTy Boxed []
 
 mkSumTy :: [Type] -> Type
 mkSumTy tys = mkTyConApp (sumTyCon (length tys))
-                         (map (getRuntimeRep "mkSumTy") tys ++ tys)
+                         (map getRuntimeRep tys ++ tys)
 
 {- *********************************************************************
 *                                                                      *

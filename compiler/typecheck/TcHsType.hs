@@ -638,7 +638,7 @@ tc_hs_type mode (HsSumTy hs_tys) exp_kind
   = do { let arity = length hs_tys
        ; arg_kinds <- mapM (\_ -> newOpenTypeKind) hs_tys
        ; tau_tys   <- zipWithM (tc_lhs_type mode) hs_tys arg_kinds
-       ; let arg_reps = map (getRuntimeRepFromKind "tc_hs_type HsSumTy") arg_kinds
+       ; let arg_reps = map getRuntimeRepFromKind arg_kinds
              arg_tys  = arg_reps ++ tau_tys
        ; checkExpectedKind (mkTyConApp (sumTyCon arity) arg_tys)
                            (unboxedSumKind arg_reps)
@@ -768,7 +768,7 @@ finish_tuple tup_sort tau_tys tau_kinds exp_kind
        ; checkExpectedKind (mkTyConApp tycon arg_tys) res_kind exp_kind }
   where
     arity = length tau_tys
-    tau_reps = map (getRuntimeRepFromKind "finish_tuple") tau_kinds
+    tau_reps = map getRuntimeRepFromKind tau_kinds
     res_kind = case tup_sort of
                  UnboxedTuple    -> unboxedTupleKind tau_reps
                  BoxedTuple      -> liftedTypeKind

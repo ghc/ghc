@@ -384,7 +384,7 @@ dsExpr (ExplicitTuple tup_args boxity)
 dsExpr (ExplicitSum alt arity expr types)
   = do { core_expr <- dsLExpr expr
        ; return $ mkCoreConApps (sumDataCon alt arity)
-                                (map (Type . getRuntimeRep "dsExpr ExplicitSum") types ++
+                                (map (Type . getRuntimeRep) types ++
                                  map Type types ++
                                  [core_expr]) }
 
