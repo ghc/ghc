@@ -385,6 +385,7 @@ See also:
 -}
 
 type TyConBinder = TyVarBndr TyVar TyConBndrVis
+                   -- See also Note [TyBinder] in TyCoRep
 
 data TyConBndrVis
   = NamedTCB ArgFlag
@@ -547,10 +548,10 @@ They fit together like so:
 -}
 
 instance Outputable tv => Outputable (TyVarBndr tv TyConBndrVis) where
-  ppr (TvBndr v AnonTCB)              = ppr v
-  ppr (TvBndr v (NamedTCB Required))  = ppr v
-  ppr (TvBndr v (NamedTCB Specified)) = char '@' <> ppr v
-  ppr (TvBndr v (NamedTCB Inferred))  = braces (ppr v)
+  ppr (TvBndr v AnonTCB)              = text "anon" <+> parens (ppr v)
+  ppr (TvBndr v (NamedTCB Required))  = text "req"  <+> parens (ppr v)
+  ppr (TvBndr v (NamedTCB Specified)) = text "spec" <+> parens (ppr v)
+  ppr (TvBndr v (NamedTCB Inferred))  = text "inf"  <+> parens (ppr v)
 
 instance Binary TyConBndrVis where
   put_ bh AnonTCB        = putByte bh 0
