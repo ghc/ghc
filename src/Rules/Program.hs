@@ -17,7 +17,7 @@ import Utilities
 -- TODO: Drop way in build rule generation?
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
-    let installStage = do
+    let installStage = if package == ghc then return stage else do
             stages <- installStages package
             case stages of
                 [s] -> return s
@@ -33,7 +33,7 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
         -- Some binaries in inplace/bin are wrapped
         inplaceBinPath -/- programName context <.> exe %> \bin -> do
             context' <- programContext stage package
-            binStage <- if package == ghc then return stage else installStage
+            binStage <- installStage
             buildBinaryAndWrapper rs (context' { stage = binStage }) bin
 
         inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
