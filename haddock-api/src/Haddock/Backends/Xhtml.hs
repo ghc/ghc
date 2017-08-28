@@ -121,9 +121,6 @@ headHtml docTitle themes mathjax_url =
     thetitle << docTitle,
     styleSheet themes,
     script ! [src jsFile, thetype "text/javascript"] << noHtml,
-    script ! [src jsPreactFile, thetype "text/javascript"] << noHtml,
-    script ! [src jsFuseFile, thetype "text/javascript"] << noHtml,
-    script ! [src jsIndexFile, thetype "text/javascript"] << noHtml,
     script ! [src mjUrl, thetype "text/javascript"] << noHtml,
     script ! [thetype "text/javascript"]
         -- NB: Within XHTML, the content of script tags needs to be
@@ -193,9 +190,12 @@ bodyHtml doctitle iface
       "Produced by " +++
       (anchor ! [href projectUrl] << toHtml projectName) +++
       (" version " ++ projectVersion)
-      )
-    ]
+      ),
 
+    script ! [src jsPreactFile, thetype "text/javascript"] << noHtml,
+    script ! [src jsFuseFile, thetype "text/javascript"] << noHtml,
+    script ! [src jsIndexFile, thetype "text/javascript"] << noHtml
+    ]
 
 moduleInfo :: Interface -> Html
 moduleInfo iface =
@@ -385,9 +385,9 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
             , "link"         .= String (fromMaybe "" (listToMaybe (map (nameLink mdl) names)))
             ]
           ]
-      where 
+      where
         names = exportName item
-    
+
     exportName :: ExportItem DocName -> [DocName]
     exportName ExportDecl { expItemDecl } = getMainDeclBinder $ unLoc expItemDecl
     exportName ExportNoDecl { expItemName } = [expItemName]
