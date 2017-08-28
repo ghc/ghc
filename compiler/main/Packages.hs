@@ -71,6 +71,7 @@ import UniqSet
 import Module
 import Util
 import Panic
+import Platform
 import Outputable
 import Maybes
 
@@ -1966,16 +1967,19 @@ isDllName dflags this_mod name
     -- In the mean time, always force dynamic indirections to be
     -- generated: when the module name isn't the module being
     -- compiled, references are dynamic.
-    = if mod /= this_mod
-      then True
-      else case dllSplit dflags of
-           Nothing -> False
-           Just ss ->
-               let findMod m = let modStr = moduleNameString (moduleName m)
-                               in case find (modStr `Set.member`) ss of
-                                  Just i -> i
-                                  Nothing -> panic ("Can't find " ++ modStr ++ "in DLL split")
-               in findMod mod /= findMod this_mod
+    = case platformOS $ targetPlatform dflags of
+        -- On Windows the hack for #8696 makes it unlinkable.
+        -- As the entire setup of the code from Cmm down to the RTS expects
+        -- the use of trampolines for the imported functions only when
+        -- doing intra-package linking, e.g. refering to a symbol defined in the same
+        -- package should not use a trampoline.
+        -- I much rather have dynamic TH not supported than the entire Dynamic linking
+        -- not due to a hack.
+        -- Also not sure this would break on Windows anyway.
+        OSMinGW32 -> moduleUnitId mod /= moduleUnitId this_mod
+
+        -- For the other platforms, still perform the hack
+        _         -> mod /= this_mod
 
   | otherwise = False  -- no, it is not even an external name
 

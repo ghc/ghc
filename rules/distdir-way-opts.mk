@@ -177,14 +177,6 @@ $1_$2_$3_ALL_HC_OPTS = \
  $$(if $$(findstring YES,$$($1_$2_SplitSections)),$$(if $$(findstring dyn,$3),,-split-sections),) \
  $$(if $$(findstring YES,$$($1_$2_DYNAMIC_TOO)),$$(if $$(findstring v,$3),-dynamic-too))
 
-ifeq "$3" "dyn"
-ifeq "$$(HostOS_CPP)" "mingw32"
-ifneq "$$($1_$2_dll0_MODULES)" ""
-$1_$2_$3_ALL_HC_OPTS += -dll-split $1/$2/dll-split
-endif
-endif
-endif
-
 $1_$2_$3_ALL_CC_OPTS = \
  $$(WAY_$3_CC_OPTS) \
  $$($1_$2_DIST_GCC_CC_OPTS) \
