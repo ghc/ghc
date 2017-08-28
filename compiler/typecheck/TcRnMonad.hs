@@ -19,7 +19,8 @@ module TcRnMonad(
   getEnvs, setEnvs,
   xoptM, doptM, goptM, woptM,
   setXOptM, unsetXOptM, unsetGOptM, unsetWOptM,
-  whenDOptM, whenGOptM, whenWOptM, whenXOptM,
+  whenDOptM, whenGOptM, whenWOptM,
+  whenXOptM, unlessXOptM,
   getGhcMode,
   withDoDynamicToo,
   getEpsVar,
@@ -498,6 +499,10 @@ whenWOptM flag thing_inside = do b <- woptM flag
 whenXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 whenXOptM flag thing_inside = do b <- xoptM flag
                                  when b thing_inside
+
+unlessXOptM :: LangExt.Extension -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
+unlessXOptM flag thing_inside = do b <- xoptM flag
+                                   unless b thing_inside
 
 getGhcMode :: TcRnIf gbl lcl GhcMode
 getGhcMode = do { env <- getTopEnv; return (ghcMode (hsc_dflags env)) }
