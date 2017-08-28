@@ -154,13 +154,24 @@ def _comparison(name, opts, metric, deviation, is_compiler_test):
 
     if tests == [] or test == []:
         # There are no prior metrics for this test.
-        opts.stats_range_fields[metric] = (0,0)
+        if isinstance(metric, str):
+            if metric == 'all':
+                for field in testing_metrics:
+                    opts.stats_range_fields[field] = (0,0)
+            else:
+                opts.stats_range_fields[metric] = (0,0)
+        if isinstance(metric, list):
+            for field in metric:
+                opts.stats_range_fields[field] = (0,0)
+
         return
+
+    if is_compiler_test:
+        opts.is_compiler_test = True
 
     # Compiler performance numbers change when debugging is on, making the results
     # useless and confusing. Therefore, skip if debugging is on.
     if config.compiler_debugged and is_compiler_test:
-        opts.is_compiler_test = True
         opts.skip = 1
 
     # 'all' is a shorthand to test for bytes allocated, peak megabytes allocated, and max bytes used.
@@ -193,7 +204,6 @@ def evaluate_metric(opts, test, field, deviation, contents, way):
         test_env = config.test_env
         config.accumulate_metrics.append('\t'.join([test_env, test, way, field, str(val)]))
 
-    print("WTF 01")
     if expected == 0:
         return my_passed('no prior metrics for this test')
 

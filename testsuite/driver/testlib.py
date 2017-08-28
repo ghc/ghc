@@ -1109,11 +1109,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
     else:
         to_do = '-c' # just compile
 
-    print("SANITY CHECK")
-    print(name)
-    print(opts.is_compiler_test)
     stats_file = name + '.comp.stats'
-    print(stats_file)
     if opts.is_compiler_test:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     if backpack:
@@ -1147,13 +1143,13 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(name, way, stats_file, opts.stats_range_fields)
-    print(stats_file)
-    print(opts.stats_range_fields)
-    print(statsResult)
+    if opts.is_compiler_test:
+        statsResult = checkStats(name, way, stats_file, opts.stats_range_fields)
+    else:
+        statsResult = passed()
 
-    if badResult(statsResult):
-        return statsResult
+    # if badResult(statsResult):
+    #     return statsResult
 
     if should_fail:
         if exit_code == 0:
@@ -1162,7 +1158,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
         if exit_code != 0:
             return failBecause('exit code non-0')
 
-    return passed()
+    return statsResult
 
 # -----------------------------------------------------------------------------
 # Run a program and check its output
@@ -1229,7 +1225,10 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    return checkStats(name, way, stats_file, opts.stats_range_fields)
+    if not opts.is_compiler_test:
+        return checkStats(name, way, stats_file, opts.stats_range_fields)
+    else:
+        return passed()
 
 def rts_flags(way):
     args = config.way_rts_flags.get(way, [])
