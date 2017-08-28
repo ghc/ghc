@@ -5,10 +5,8 @@ import qualified Hadrian.Oracles.DirectoryContents
 import qualified Hadrian.Oracles.Path
 import qualified Hadrian.Oracles.TextFile
 
-import Context
 import Expression
 import Flavour
-import GHC
 import qualified Oracles.ModuleFiles
 import qualified Rules.Compile
 import qualified Rules.Data

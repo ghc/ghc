@@ -1,7 +1,5 @@
 module Settings.Packages.Ghc (ghcPackageArgs) where
 
-import Context (buildPath)
-import GHC
 import Expression
 import Oracles.Setting
 import UserSettings (crossCompiling)

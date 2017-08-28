@@ -3,7 +3,6 @@ module Settings.Packages.Compiler (compilerPackageArgs) where
 import Base
 import Expression
 import Flavour
-import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings

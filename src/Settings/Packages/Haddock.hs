@@ -1,6 +1,5 @@
 module Settings.Packages.Haddock (haddockPackageArgs) where
 
-import GHC
 import Expression
 
 haddockPackageArgs :: Args

@@ -5,9 +5,7 @@ module Rules.Wrappers (
 import Hadrian.Oracles.Path
 
 import Base
-import Context
 import Expression
-import GHC
 import Oracles.Setting
 import Settings
 

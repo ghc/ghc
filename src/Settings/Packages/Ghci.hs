@@ -1,6 +1,5 @@
 module Settings.Packages.Ghci (ghciPackageArgs) where
 
-import GHC
 import Expression
 
 ghciPackageArgs :: Args

@@ -1,8 +1,6 @@
 module Settings.Builders.Common (
     module Base,
-    module Context,
     module Expression,
-    module GHC,
     module Oracles.Flag,
     module Oracles.PackageData,
     module Oracles.Setting,
@@ -12,9 +10,7 @@ module Settings.Builders.Common (
     ) where
 
 import Base
-import Context hiding (stage, package, way)
 import Expression
-import GHC
 import Oracles.Flag
 import Oracles.PackageData
 import Oracles.Setting

@@ -5,7 +5,6 @@ import Hadrian.Haskell.Cabal
 import Base
 import Context
 import Expression hiding (stage, way)
-import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Setting

@@ -1,8 +1,6 @@
 module Settings.Packages.Haskeline (haskelinePackageArgs) where
 
-import Base
 import Expression
-import GHC
 import UserSettings (crossCompiling)
 
 haskelinePackageArgs :: Args

@@ -4,10 +4,8 @@ module Rules.Generate (
     ) where
 
 import Base
-import Context hiding (package)
 import Expression
 import Flavour
-import GHC
 import Oracles.Flag
 import Oracles.ModuleFiles
 import Oracles.Setting

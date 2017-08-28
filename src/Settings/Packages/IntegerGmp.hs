@@ -2,7 +2,6 @@ module Settings.Packages.IntegerGmp (integerGmpPackageArgs) where
 
 import Base
 import Expression
-import GHC
 import Oracles.Setting
 import Rules.Gmp
 

@@ -3,7 +3,6 @@ module Rules.Data (buildPackageData) where
 import Base
 import Context
 import Expression
-import GHC
 import Oracles.Setting
 import Rules.Generate
 import Settings.Packages.Rts

@@ -1,6 +1,5 @@
 module Settings.Packages.GhcPrim (ghcPrimPackageArgs) where
 
-import GHC
 import Oracles.Flag
 import Expression
 

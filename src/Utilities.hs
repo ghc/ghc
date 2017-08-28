@@ -15,7 +15,6 @@ import Hadrian.Utilities
 import CommandLine
 import Context
 import Expression hiding (builder, inputs, outputs, way, stage, package)
-import GHC
 import Oracles.Setting
 import Oracles.PackageData
 import Settings

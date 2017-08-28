@@ -1,7 +1,6 @@
 module Settings.Packages.Base (basePackageArgs) where
 
 import Expression
-import GHC
 import Settings
 
 basePackageArgs :: Args

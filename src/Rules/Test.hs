@@ -3,7 +3,6 @@ module Rules.Test (testRules) where
 import Base
 import Expression
 import Flavour
-import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings

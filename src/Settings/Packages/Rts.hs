@@ -3,9 +3,7 @@ module Settings.Packages.Rts (
     ) where
 
 import Base
-import Context (buildPath)
 import Expression
-import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings

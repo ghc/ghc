@@ -12,16 +12,15 @@ module Expression (
     -- ** Evaluation
     interpret, interpretInContext,
 
-    -- ** Context and Target
-    Context, vanillaContext, stageContext, Target,
-
     -- * Convenient accessors
-    getBuildRoot, getBuildPath, getContext, getPkgData, getPkgDataList, getStage,
-    getPackage, getBuilder, getOutputs, getInputs, getWay, getInput, getOutput,
+    getBuildRoot, getContext, getPkgData, getPkgDataList, getOutputs, getInputs,
+    getInput, getOutput,
 
     -- * Re-exports
     module Base,
-    module Builder
+    module Builder,
+    module Context,
+    module GHC
     ) where
 
 import qualified Hadrian.Expression as H
@@ -29,9 +28,9 @@ import Hadrian.Expression hiding (Expr, Predicate, Args)
 
 import Base
 import Builder
-import Context (Context, vanillaContext, stageContext, getBuildPath, getStage, getPackage, getWay)
+import GHC
+import Context hiding (stage, package, way)
 import Oracles.PackageData
-import Target hiding (builder, inputs, outputs)
 
 -- | @Expr a@ is a computation that produces a value of type @Action a@ and can
 -- read parameters of the current build 'Target'.

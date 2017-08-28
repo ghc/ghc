@@ -4,11 +4,9 @@ module Settings (
     latestBuildStage, programContext, integerLibraryName, getDestDir
     ) where
 
-import Context
 import CommandLine
 import Expression
 import Flavour
-import GHC
 import {-# SOURCE #-} Settings.Default
 import Settings.Flavours.Development
 import Settings.Flavours.Performance

@@ -4,7 +4,6 @@ import Hadrian.Haskell.Cabal
 
 import Base
 import Expression
-import GHC
 import Utilities
 
 ghcCabalPackageArgs :: Args

@@ -9,7 +9,6 @@ import Base
 import Context
 import Expression hiding (way, package)
 import Flavour
-import GHC
 import Oracles.ModuleFiles
 import Oracles.PackageData
 import Oracles.Setting

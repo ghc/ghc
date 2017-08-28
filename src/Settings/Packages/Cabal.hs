@@ -1,6 +1,5 @@
 module Settings.Packages.Cabal where
 
-import GHC
 import Expression
 
 cabalPackageArgs :: Args
