@@ -11,7 +11,7 @@ The @Inst@ type: dictionaries or method instances
 module Inst (
        deeplySkolemise,
        topInstantiate, topInstantiateInferred, deeplyInstantiate,
-       instCall, instDFunType, instStupidTheta,
+       instCall, instDFunType, instStupidTheta, instTyVarsWith,
        newWanted, newWanteds,
 
        tcInstBinders, tcInstBindersX, tcInstBinderX,
@@ -277,6 +277,32 @@ deeply_instantiate orig subst ty
                        , text "new type:" <+> ppr ty'
                        , text "subst:"    <+> ppr subst ])
       ; return (idHsWrapper, ty') }
+
+
+instTyVarsWith :: CtOrigin -> [TyVar] -> [TcType] -> TcM TCvSubst
+-- Use this when you want to instantiate (forall a b c. ty) with
+-- types [ta, tb, tc], but when the kinds of 'a' and 'ta' might
+-- not yet match (perhaps because there are unsolved constraints; Trac #14154)
+-- If they don't match, emit a kind-equality to promise that they will
+-- eventually do so, and thus make a kind-homongeneous substitution.
+instTyVarsWith orig tvs tys
+  = go empty_subst tvs tys
+  where
+    empty_subst = mkEmptyTCvSubst (mkInScopeSet (tyCoVarsOfTypes tys))
+
+    go subst [] []
+      = return subst
+    go subst (tv:tvs) (ty:tys)
+      | tv_kind `tcEqType` ty_kind
+      = go (extendTCvSubst subst tv ty) tvs tys
+      | otherwise
+      = do { co <- emitWantedEq orig KindLevel Nominal ty_kind tv_kind
+           ; go (extendTCvSubst subst tv (ty `mkCastTy` co)) tvs tys }
+      where
+        tv_kind = substTy subst (tyVarKind tv)
+        ty_kind = typeKind ty
+
+    go _ _ _ = pprPanic "instTysWith" (ppr tvs $$ ppr tys)
 
 {-
 ************************************************************************
