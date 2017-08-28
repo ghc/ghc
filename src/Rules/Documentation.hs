@@ -18,7 +18,7 @@ haddockDependencies context = do
     path     <- buildPath context
     depNames <- pkgDataList $ DepNames path
     sequence [ pkgHaddockFile $ vanillaContext Stage1 depPkg
-             | Just depPkg <- map findKnownPackage depNames, depPkg /= rts ]
+             | Just depPkg <- map findPackageByName depNames, depPkg /= rts ]
 
 -- Note: this build rule creates plenty of files, not just the .haddock one.
 -- All of them go into the 'doc' subdirectory. Pedantically tracking all built

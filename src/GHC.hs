@@ -8,17 +8,14 @@ module GHC (
     hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec,
     parallel, pretty, primitive, process, rts, runGhc, stm, templateHaskell,
     terminfo, text, time, touchy, transformers, unlit, unix, win32, xhtml,
-    defaultKnownPackages, defaultPackages,
+    ghcPackages, isGhcPackage, defaultPackages,
 
     -- * Package information
-    builderProvenance, programName, nonCabalContext, nonHsMainPackage, autogenPath,
+    programName, nonCabalContext, nonHsMainPackage, autogenPath,
 
     -- * Miscellaneous
-    systemBuilderPath, ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
+    programPath, ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
     ) where
-
-import Hadrian.Oracles.Path
-import Hadrian.Oracles.TextFile
 
 import Base
 import CommandLine
@@ -27,11 +24,11 @@ import Oracles.Setting
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
--- package 'win32' is built only on Windows. "Settings.Default" defines default
--- conditions for building each package, which can be overridden in
--- @hadrian/src/UserSettings.hs@.
-defaultKnownPackages :: [Package]
-defaultKnownPackages =
+-- package 'win32' is built only on Windows. 'defaultPackages' defines default
+-- conditions for building each package. Users can add their own packages and
+-- modify build default build conditions in "UserSettings".
+ghcPackages :: [Package]
+ghcPackages =
     [ array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes
     , compiler, containers, deepseq, deriveConstants, directory, dllSplit
     , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal
@@ -40,6 +37,10 @@ defaultKnownPackages =
     , mtl, parsec, parallel, pretty, primitive, process, rts, runGhc, stm
     , templateHaskell, terminfo, text, time, touchy, transformers, unlit, unix
     , win32, xhtml ]
+
+-- TODO: Optimise by switching to sets of packages.
+isGhcPackage :: Package -> Bool
+isGhcPackage = (`elem` ghcPackages)
 
 -- | Package definitions, see 'Package'.
 array               = hsLib  "array"
@@ -202,65 +203,6 @@ stage2Packages = do
     doc <- cmdBuildHaddock
     return [ haddock | doc ]
 
--- | Some builders are built by this very build system, in which case
--- 'builderProvenance' returns the corresponding build 'Context' (which includes
--- 'Stage' and GHC 'Package').
-builderProvenance :: Builder -> Maybe Context
-builderProvenance = \case
-    DeriveConstants  -> context Stage0 deriveConstants
-    GenApply         -> context Stage0 genapply
-    GenPrimopCode    -> context Stage0 genprimopcode
-    Ghc _ Stage0     -> Nothing
-    Ghc _ stage      -> context (pred stage) ghc
-    GhcCabal         -> context Stage0 ghcCabal
-    GhcCabalHsColour -> builderProvenance $ GhcCabal
-    GhcPkg _ Stage0  -> Nothing
-    GhcPkg _ _       -> context Stage0 ghcPkg
-    Haddock          -> context Stage2 haddock
-    Hpc              -> context Stage1 hpcBin
-    Hsc2Hs           -> context Stage0 hsc2hs
-    Unlit            -> context Stage0 unlit
-    _                -> Nothing
-  where
-    context s p = Just $ vanillaContext s p
-
--- | Determine the location of a system 'Builder'.
-systemBuilderPath :: Builder -> Action FilePath
-systemBuilderPath builder = case builder of
-    Alex            -> fromKey "alex"
-    Ar Stage0       -> fromKey "system-ar"
-    Ar _            -> fromKey "ar"
-    Cc  _  Stage0   -> fromKey "system-cc"
-    Cc  _  _        -> fromKey "cc"
-    -- We can't ask configure for the path to configure!
-    Configure _     -> return "sh configure"
-    Ghc _  Stage0   -> fromKey "system-ghc"
-    GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
-    Happy           -> fromKey "happy"
-    HsColour        -> fromKey "hscolour"
-    HsCpp           -> fromKey "hs-cpp"
-    Ld              -> fromKey "ld"
-    Make _          -> fromKey "make"
-    Nm              -> fromKey "nm"
-    Objdump         -> fromKey "objdump"
-    Patch           -> fromKey "patch"
-    Perl            -> fromKey "perl"
-    Ranlib          -> fromKey "ranlib"
-    Tar             -> fromKey "tar"
-    _               -> error $ "No entry for " ++ show builder ++ inCfg
-  where
-    inCfg = " in " ++ quote configFile ++ " file."
-    fromKey key = do
-        let unpack = fromMaybe . error $ "Cannot find path to builder "
-                ++ quote key ++ inCfg ++ " Did you skip configure?"
-        path <- unpack <$> lookupValue configFile key
-        if null path
-        then do
-            unless (isOptional builder) . error $ "Non optional builder "
-                ++ quote key ++ " is not specified" ++ inCfg
-            return "" -- TODO: Use a safe interface.
-        else fixAbsolutePathOnWindows =<< lookupInPath path
-
 -- | Given a 'Context', compute the name of the program that is built in it
 -- assuming that the corresponding package's type is 'Program'. For example, GHC
 -- built in 'Stage0' is called @ghc-stage1@. If the given package is a
@@ -272,6 +214,21 @@ programName Context {..}
     | package == runGhc   = "runhaskell"
     | package == iservBin = "ghc-iserv"
     | otherwise           = pkgName package
+
+isInstallContext :: Context -> Action Bool
+isInstallContext Context {..}
+    | not (isGhcPackage package) = return False
+    | otherwise = do
+        stages <- filterM (fmap (package `elem`) . defaultPackages) [Stage0 ..]
+        return (null stages || package == ghc || stage == maximum stages)
+
+-- | The 'FilePath' to a program executable in a given 'Context'.
+programPath :: Context -> Action FilePath
+programPath context@Context {..} = do
+    path    <- buildPath context
+    install <- isInstallContext context
+    let contextPath = if install then inplaceInstallPath package else path
+    return $ contextPath -/- programName context <.> exe
 
 -- | Some contexts are special: their packages do not have @.cabal@ metadata or
 -- we cannot run @ghc-cabal@ on them, e.g. because the latter hasn't been built

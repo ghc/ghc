@@ -72,8 +72,10 @@ packageTargets includeGhciLib stage pkg = do
             return $ [ setup   | nonCabalContext context ]
                   ++ [ haddock | docs && stage == Stage1 ]
                   ++ libs ++ more
-        else -- The only target of a program package is the executable.
-            fmap maybeToList . programPath =<< programContext stage pkg
+        else do -- The only target of a program package is the executable.
+            prgContext <- programContext stage pkg
+            prgPath    <- programPath prgContext
+            return [prgPath]
 
 packageRules :: Rules ()
 packageRules = do

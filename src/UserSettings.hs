@@ -3,7 +3,7 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    userBuildRoot, userFlavours, userKnownPackages, verboseCommands,
+    userBuildRoot, userFlavours, userPackages, verboseCommands,
     buildProgressColour, successColour, defaultStage1Only
     ) where
 
@@ -23,11 +23,11 @@ userBuildRoot = BuildRoot "_build"
 userFlavours :: [Flavour]
 userFlavours = []
 
--- | Add user defined packages. Note, this only let's Hadrian know about the
+-- | Add user defined packages. Note, this only lets Hadrian know about the
 -- existence of a new package; to actually build it you need to create a new
 -- build flavour, modifying the list of packages that are built by default.
-userKnownPackages :: [Package]
-userKnownPackages = []
+userPackages :: [Package]
+userPackages = []
 
 -- | Set to 'True' to print full command lines during the build process. Note:
 -- this is a 'Predicate', hence you can enable verbose output only for certain

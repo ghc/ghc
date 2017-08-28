@@ -20,9 +20,9 @@ ghcBuilderArgs = (builder (Ghc CompileHs) ||^ builder (Ghc LinkHs)) ? do
             , arg "-o", arg =<< getOutput ]
 
 needTouchy :: Expr ()
-needTouchy = notStage0 ? do
-    maybePath <- expr $ programPath (vanillaContext Stage0 touchy)
-    expr . whenJust maybePath $ \path -> need [path]
+needTouchy = notStage0 ? windowsHost ? do
+    touchyPath <- expr $ programPath (vanillaContext Stage0 touchy)
+    expr $ need [touchyPath]
 
 ghcCbuilderArgs :: Args
 ghcCbuilderArgs =

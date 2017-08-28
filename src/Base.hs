@@ -14,7 +14,6 @@ module Base (
     module Development.Shake.Util,
 
     -- * Basic data types
-    module Builder,
     module Hadrian.Package,
     module Stage,
     module Way,
@@ -39,7 +38,6 @@ import Development.Shake.Util
 import Hadrian.Utilities
 import Hadrian.Package
 
-import Builder
 import Stage
 import Way
 

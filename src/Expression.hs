@@ -20,13 +20,15 @@ module Expression (
     getPackage, getBuilder, getOutputs, getInputs, getWay, getInput, getOutput,
 
     -- * Re-exports
-    module Base
+    module Base,
+    module Builder
     ) where
 
 import qualified Hadrian.Expression as H
 import Hadrian.Expression hiding (Expr, Predicate, Args)
 
 import Base
+import Builder
 import Context (Context, vanillaContext, stageContext, getBuildPath, getStage, getPackage, getWay)
 import Oracles.PackageData
 import Target hiding (builder, inputs, outputs)

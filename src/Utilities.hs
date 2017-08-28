@@ -1,6 +1,6 @@
 module Utilities (
     build, buildWithCmdOptions, buildWithResources, applyPatch, runBuilder,
-    runBuilderWith, builderEnvironment, needBuilder, needLibrary,
+    runBuilderWith, builderEnvironment, needLibrary,
     installDirectory, installData, installScript, installProgram, linkSymbolic,
     contextDependencies, stage1Dependencies, libraryTargets, topsortPackages
     ) where
@@ -152,17 +152,6 @@ linkSymbolic source target = do
         liftIO $ IO.createDirectoryIfMissing True dir
         putProgressInfo =<< renderAction "Create symbolic link" source target
         quietly $ cmd lns source target
-
-isInternal :: Builder -> Bool
-isInternal = isJust . builderProvenance
-
--- | Make sure a 'Builder' exists and rebuild it if out of date.
-needBuilder :: Builder -> Action ()
-needBuilder (Configure dir) = need [dir -/- "configure"]
-needBuilder (Make      dir) = need [dir -/- "Makefile"]
-needBuilder builder         = when (isInternal builder) $ do
-    path <- builderPath builder
-    need [path]
 
 -- | Write a Builder's path into a given environment variable.
 builderEnvironment :: String -> Builder -> Action CmdOption

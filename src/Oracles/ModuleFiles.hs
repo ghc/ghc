@@ -6,6 +6,7 @@ module Oracles.ModuleFiles (
 import qualified Data.HashMap.Strict as Map
 
 import Base
+import Builder
 import Context
 import GHC
 import Oracles.PackageData

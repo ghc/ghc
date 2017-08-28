@@ -1,5 +1,6 @@
 module Target (
-    Target, target, context, builder, inputs, outputs, trackArgument
+    Target, target, context, builder, inputs, outputs, trackArgument,
+    module Builder
     ) where
 
 import Data.Char

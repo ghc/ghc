@@ -7,7 +7,6 @@ import Hadrian.Haskell.Cabal
 import Context
 import Flavour
 import Settings.Builders.Common hiding (package)
-import Utilities
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
@@ -118,11 +117,12 @@ withBuilderKey b = case b of
 
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.
 with :: Builder -> Args
-with b = isSpecified b ? do
-    top  <- expr topDirectory
+with b = do
     path <- getBuilderPath b
-    expr $ needBuilder b
-    arg $ withBuilderKey b ++ unifyPath (top </> path)
+    if (null path) then mempty else do
+        top  <- expr topDirectory
+        expr $ needBuilder b
+        arg $ withBuilderKey b ++ unifyPath (top </> path)
 
 withStaged :: (Stage -> Builder) -> Args
 withStaged sb = with . sb =<< getStage

@@ -3,6 +3,7 @@ module Rules.SourceDist (sourceDistRules) where
 import Hadrian.Oracles.DirectoryContents
 
 import Base
+import Builder
 import Oracles.Setting
 import Rules.Clean
 import Utilities
