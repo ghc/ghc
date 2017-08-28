@@ -122,10 +122,9 @@ iservBinWrapper WrappedBinary{..} = do
     -- TODO: Figure our the reason of this hardcoded exclusion
     let pkgs = activePackages \\ [ cabal, process, haskeline
                                  , terminfo, ghcCompact, hpc, compiler ]
-    contexts <- catMaybes <$> mapM (\p -> do
-                                        m <- expr $ latestBuildStage p
-                                        return $ fmap (\s -> vanillaContext s p) m
-                                   ) pkgs
+    contexts <- expr $ concatForM pkgs $ \p -> do
+        ss <- installStages p
+        return [ vanillaContext s p | s <- ss ]
     buildPaths <- expr $ mapM buildPath contexts
     return $ unlines
         [ "#!/bin/bash"

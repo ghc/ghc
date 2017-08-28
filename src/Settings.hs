@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, getPkgData, getPkgDataList, isLibrary, stagePackages,
-    latestBuildStage, programContext, integerLibraryName, getDestDir
+    programContext, integerLibraryName, getDestDir
     ) where
 
 import CommandLine
@@ -60,13 +60,6 @@ knownPackages = sort $ ghcPackages ++ userPackages
 -- Note: this is slow but we keep it simple as there are just ~50 packages
 findPackageByName :: PackageName -> Maybe Package
 findPackageByName name = find (\pkg -> pkgName pkg == name) knownPackages
-
--- | Determine the latest 'Stage' in which a given 'Package' is built. Returns
--- Nothing if the package is never built.
-latestBuildStage :: Package -> Action (Maybe Stage)
-latestBuildStage pkg = do
-    stages <- filterM (fmap (pkg `elem`) . stagePackages) [Stage0 ..]
-    return $ if null stages then Nothing else Just $ maximum stages
 
 -- | Install's DESTDIR setting.
 getDestDir :: Action FilePath

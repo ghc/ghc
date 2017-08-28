@@ -11,7 +11,7 @@ module GHC (
     ghcPackages, isGhcPackage, defaultPackages,
 
     -- * Package information
-    programName, nonCabalContext, nonHsMainPackage, autogenPath,
+    programName, nonCabalContext, nonHsMainPackage, autogenPath, installStages,
 
     -- * Miscellaneous
     programPath, ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
@@ -215,12 +215,20 @@ programName Context {..}
     | package == iservBin = "ghc-iserv"
     | otherwise           = pkgName package
 
-isInstallContext :: Context -> Action Bool
-isInstallContext Context {..}
-    | not (isGhcPackage package) = return False
+-- | Given a 'Package' this action returns the sorted list of stages in which
+-- the package build results are installed. For most GHC packages we install the
+-- /latest/ build stage. The only exception is the GHC itself, whose binaries
+-- are installed in all stages. User packages are not installed, hence the
+-- resulting list is empty.
+installStages :: Package -> Action [Stage]
+installStages pkg
+    | not (isGhcPackage pkg) = return [] -- Only GHC packages are installed.
     | otherwise = do
-        stages <- filterM (fmap (package `elem`) . defaultPackages) [Stage0 ..]
-        return (null stages || package == ghc || stage == maximum stages)
+        stages <- filterM (fmap (pkg `elem`) . defaultPackages) [Stage0 ..]
+        return $ if pkg == ghc then stages else takeEnd 1 stages
+
+isInstallContext :: Context -> Action Bool
+isInstallContext Context {..} = (stage `elem`) <$> installStages package
 
 -- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Action FilePath

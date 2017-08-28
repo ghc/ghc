@@ -18,8 +18,11 @@ import Utilities
 buildProgram :: [(Resource, Int)] -> Context -> Rules ()
 buildProgram rs context@Context {..} = when (isProgram package) $ do
     let installStage = do
-            latest <- latestBuildStage package -- fromJust below is safe
-            return $ if package == ghc then stage else fromJust latest
+            stages <- installStages package
+            case stages of
+                [s] -> return s
+                _   -> error $ "Exactly one install stage expected for package "
+                    ++ quote (pkgName package) ++ " (got " ++ show stages ++ ")."
 
     "//" ++ contextDir context -/- programName context <.> exe %> \bin -> do
         context' <- programContext stage package
@@ -30,7 +33,7 @@ buildProgram rs context@Context {..} = when (isProgram package) $ do
         -- Some binaries in inplace/bin are wrapped
         inplaceBinPath -/- programName context <.> exe %> \bin -> do
             context' <- programContext stage package
-            binStage <- installStage
+            binStage <- if package == ghc then return stage else installStage
             buildBinaryAndWrapper rs (context' { stage = binStage }) bin
 
         inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
@@ -72,10 +75,10 @@ buildBinaryAndWrapper rs context bin = do
         Nothing      -> buildBinary rs context bin -- No wrapper found
         Just wrapper -> do
             top <- topDirectory
-            let libdir = top -/- inplaceLibPath
-            let wrappedBin = inplaceLibBinPath -/- takeFileName bin
+            let libPath    = top -/- inplaceLibPath
+                wrappedBin = inplaceLibBinPath -/- takeFileName bin
             need [wrappedBin]
-            buildWrapper context wrapper bin (WrappedBinary libdir (takeFileName bin))
+            buildWrapper context wrapper bin (WrappedBinary libPath (takeFileName bin))
 
 buildWrapper :: Context -> Wrapper -> FilePath -> WrappedBinary -> Action ()
 buildWrapper context@Context {..} wrapper wrapperPath wrapped = do

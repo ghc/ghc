@@ -46,6 +46,7 @@ installRules = do
         installBins
         installPackages
 
+-- TODO: Get rid of hard-coded list.
 -- | Binaries to install.
 installBinPkgs :: [Package]
 installBinPkgs = [ghc, ghcPkg, ghcSplit, hp2ps, hpc, hsc2hs, runGhc, unlit]
@@ -60,8 +61,7 @@ installLibExecScripts = do
     libExecDir <- getLibExecDir
     destDir <- getDestDir
     installDirectory (destDir ++ libExecDir)
-    forM_ libExecScripts $ \script -> do
-        installScript script (destDir ++ libExecDir)
+    forM_ libExecScripts $ \script -> installScript script (destDir ++ libExecDir)
   where
     libExecScripts :: [FilePath]
     libExecScripts = [ghcSplitPath]
@@ -74,7 +74,7 @@ installLibExecs = do
     destDir <- getDestDir
     installDirectory (destDir ++ libExecDir)
     forM_ installBinPkgs $ \pkg -> do
-        withLatestBuildStage pkg $ \stage -> do
+        withLatestInstallStage pkg $ \stage -> do
             context <- programContext stage pkg
             let bin = inplaceLibBinPath -/- programName context <.> exe
             installProgram bin (destDir ++ libExecDir)
@@ -94,17 +94,15 @@ installBins = do
     when win $
         copyDirectoryContents matchAll (destDir ++ libDir -/- "bin") (destDir ++ binDir)
     unless win $ forM_ installBinPkgs $ \pkg ->
-        withLatestBuildStage pkg $ \stage -> do
+        withLatestInstallStage pkg $ \stage -> do
             context <- programContext stage pkg
             version <- setting ProjectVersion
             -- Name of the binary file
-            let binName = if pkg == ghc
-                          then "ghc-" ++ version <.> exe
-                          else programName context ++ "-" ++ version <.> exe
+            let binName | pkg == ghc = "ghc-" ++ version <.> exe
+                        | otherwise  = programName context ++ "-" ++ version <.> exe
             -- Name of the symbolic link
-            let symName = if pkg == ghc
-                          then "ghc" <.> exe
-                          else programName context <.> exe
+            let symName | pkg == ghc = "ghc" <.> exe
+                        | otherwise  = programName context <.> exe
             case lookup context installWrappers of
                 Nothing -> return ()
                 Just wrapper -> do
@@ -117,12 +115,10 @@ installBins = do
                         linkSymbolic (destDir ++ binDir -/- binName)
                                      (destDir ++ binDir -/- symName)
 
-withLatestBuildStage :: Package -> (Stage -> Action ()) -> Action ()
-withLatestBuildStage pkg m = do
-  maybeStage <- latestBuildStage pkg
-  case maybeStage of
-      Just stage -> m stage
-      Nothing    -> return ()
+withLatestInstallStage :: Package -> (Stage -> Action ()) -> Action ()
+withLatestInstallStage pkg m = do
+    stages <- installStages pkg
+    mapM_ m (takeEnd 1 stages)
 
 pkgConfInstallPath :: Action FilePath
 pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) <&> (-/- "package.conf.install")
@@ -178,10 +174,10 @@ installPackages = do
 
     copyFile ghcBootPlatformHeader (pkgPath compiler -/- "ghc_boot_platform.h")
 
-    activePackages <- filterM ((isJust <$>) . latestBuildStage)
-                              (knownPackages \\ [rts, libffi])
+    installPackages <- filterM ((not . null <$>) . installStages)
+                               (knownPackages \\ [rts, libffi])
 
-    installLibPkgs <- topsortPackages (filter isLibrary activePackages)
+    installLibPkgs <- topsortPackages (filter isLibrary installPackages)
 
     -- TODO (izgzhen): figure out what is the root cause of the missing ghc-gmp.h error
     copyFile (pkgPath integerGmp -/- "gmp/ghc-gmp.h") (pkgPath integerGmp -/- "ghc-gmp.h")
@@ -189,7 +185,7 @@ installPackages = do
     forM_ installLibPkgs $ \pkg -> do
         case pkgCabalFile pkg of
             Nothing -> error $ "Non-Haskell project in installLibPkgs" ++ show pkg
-            Just cabalFile -> withLatestBuildStage pkg $ \stage -> do
+            Just cabalFile -> withLatestInstallStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
                 installDistDir <- buildPath context
@@ -235,28 +231,27 @@ installPackages = do
                                    , confPath ]
 
     forM_ installLibPkgs $ \pkg -> do
-        when (isLibrary pkg) $
-            withLatestBuildStage pkg $ \stage -> do
-                let context = vanillaContext stage pkg
-                top <- topDirectory
-                installDistDir <- (top -/-) <$> buildPath context
-                -- TODO: better reference to the built inplace binary path
-                let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal"
-                pref   <- setting InstallPrefix
-                docDir <- installDocDir
-                r      <- relocatableBuild
-                unit $ cmd ghcCabalInplace
-                    [ "register"
-                    , pkgPath pkg
-                    , installDistDir
-                    , installedGhcReal
-                    , installedGhcPkgReal
-                    , destDir ++ ghcLibDir
-                    , destDir
-                    , destDir ++ pref
-                    , destDir ++ ghcLibDir
-                    , destDir ++ docDir -/- "html/libraries"
-                    , if r then "YES" else "NO" ]
+        withLatestInstallStage pkg $ \stage -> do
+            let context = vanillaContext stage pkg
+            top <- topDirectory
+            installDistDir <- (top -/-) <$> buildPath context
+            -- TODO: better reference to the built inplace binary path
+            let ghcCabalInplace = inplaceBinPath -/- "ghc-cabal"
+            pref   <- setting InstallPrefix
+            docDir <- installDocDir
+            r      <- relocatableBuild
+            unit $ cmd ghcCabalInplace
+                [ "register"
+                , pkgPath pkg
+                , installDistDir
+                , installedGhcReal
+                , installedGhcPkgReal
+                , destDir ++ ghcLibDir
+                , destDir
+                , destDir ++ pref
+                , destDir ++ ghcLibDir
+                , destDir ++ docDir -/- "html/libraries"
+                , if r then "YES" else "NO" ]
 
     confs <- getDirectoryContents installedPackageConf
     forM_ confs (\f -> createData $ installedPackageConf -/- f)
