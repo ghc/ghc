@@ -7,6 +7,7 @@ import GHC
 import Oracles.Flag
 import Oracles.Setting
 import Settings
+import UserSettings (crossCompiling)
 
 compilerPackageArgs :: Args
 compilerPackageArgs = package compiler ? do
@@ -32,6 +33,7 @@ compilerPackageArgs = package compiler ? do
               , ghcWithNativeCodeGen ? arg "--flags=ncg"
               , ghcWithInterpreter ?
                 notStage0 ? arg "--flags=ghci"
+              , crossCompiling ? arg "-f-terminfo"
               , ghcWithInterpreter ?
                 ghcEnableTablesNextToCode ?
                 notM (flag GhcUnregisterised) ?

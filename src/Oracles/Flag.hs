@@ -1,5 +1,5 @@
 module Oracles.Flag (
-    Flag (..), flag, crossCompiling, platformSupportsSharedLibs,
+    Flag (..), flag, platformSupportsSharedLibs,
     ghcWithSMP, ghcWithNativeCodeGen, supportsSplitObjects
     ) where
 
@@ -42,9 +42,6 @@ flag f = do
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
         ++ quote (key ++ " = " ++ value) ++ "cannot be parsed."
     return $ value == "YES"
-
-crossCompiling :: Action Bool
-crossCompiling = flag CrossCompiling
 
 platformSupportsSharedLibs :: Action Bool
 platformSupportsSharedLibs = do

@@ -23,6 +23,7 @@ import qualified Rules.Perl
 import qualified Rules.Program
 import qualified Rules.Register
 import Settings
+import UserSettings (stage1Only)
 import Target
 import Utilities
 

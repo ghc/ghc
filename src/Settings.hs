@@ -1,7 +1,7 @@
 module Settings (
     getArgs, getLibraryWays, getRtsWays, flavour, knownPackages,
     findPackageByName, getPkgData, getPkgDataList, isLibrary, stagePackages,
-    latestBuildStage, programContext, integerLibraryName, getDestDir, stage1Only
+    latestBuildStage, programContext, integerLibraryName, getDestDir
     ) where
 
 import Context
@@ -69,11 +69,6 @@ latestBuildStage :: Package -> Action (Maybe Stage)
 latestBuildStage pkg = do
     stages <- filterM (fmap (pkg `elem`) . stagePackages) [Stage0 ..]
     return $ if null stages then Nothing else Just $ maximum stages
-
--- TODO: Set this from command line
--- | Stage1Only flag.
-stage1Only :: Bool
-stage1Only = defaultStage1Only
 
 -- | Install's DESTDIR setting.
 getDestDir :: Action FilePath

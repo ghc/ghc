@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     userBuildRoot, userFlavours, userPackages, verboseCommands,
-    buildProgressColour, successColour, defaultStage1Only
+    buildProgressColour, successColour, stage1Only, crossCompiling
     ) where
 
 import Hadrian.Utilities
@@ -45,6 +45,11 @@ buildProgressColour = BuildProgressColour (Dull, Magenta)
 successColour :: SuccessColour
 successColour = SuccessColour (Dull, Green)
 
+-- | Build a cross compiling GHC
+-- TODO: Use @Action Bool@ version in @Oracles.Flag@
+crossCompiling :: Bool
+crossCompiling = False
+
 {-
   Stage1Only=YES means:
    - don't build ghc-stage2 (the executable)
@@ -57,5 +62,6 @@ successColour = SuccessColour (Dull, Green)
    - (*do* still build all other libraries)
 -}
 -- | Stage1Only flag, default off
-defaultStage1Only :: Bool
-defaultStage1Only = False
+-- | TODO: Set this dynamically
+stage1Only :: Bool
+stage1Only = False

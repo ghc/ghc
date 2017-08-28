@@ -34,8 +34,10 @@ import Settings.Packages.Compiler
 import Settings.Packages.Ghc
 import Settings.Packages.GhcCabal
 import Settings.Packages.Ghci
+import Settings.Packages.GhcPkg
 import Settings.Packages.GhcPrim
 import Settings.Packages.Haddock
+import Settings.Packages.Haskeline (haskelinePackageArgs)
 import Settings.Packages.IntegerGmp
 import Settings.Packages.Rts
 import Settings.Packages.RunGhc
@@ -207,4 +209,6 @@ defaultPackageArgs = mconcat
     , integerGmpPackageArgs
     , rtsPackageArgs
     , runGhcPackageArgs
-    , disableWarningArgs ]
+    , disableWarningArgs
+    , ghcPkgPackageArgs
+    , haskelinePackageArgs ]
