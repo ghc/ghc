@@ -53,7 +53,7 @@ var PageMenuButton = createClass({
 });
 
 function addSearchPageMenuButton(action) {
-  var pageMenu = document.querySelector('#package-header ul.links');
+  var pageMenu = document.querySelector('#page-menu');
   var dummy = document.createElement('li');
   pageMenu.insertBefore(dummy, pageMenu.firstChild);
   preact.render(h(PageMenuButton, { onClick: action, title: "Search" }), pageMenu, dummy);
