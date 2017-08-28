@@ -1408,6 +1408,12 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
                            -- in scope from an enclosing class, but
                            -- re-adding tvs to the env't doesn't cause
                            -- harm
+
+       ; traceTc "kcHsTyVarBndrs: cusk" $
+         vcat [ ppr name, ppr kv_ns, ppr hs_tvs, ppr dep_names
+              , ppr tc_binders, ppr (mkTyConKind tc_binders res_kind)
+              , ppr qkvs, ppr meta_tvs, ppr good_tvs, ppr final_binders ]
+
        ; return (tycon, stuff) }}
 
   | otherwise
@@ -1421,6 +1427,8 @@ kcHsTyVarBndrs name flav cusk all_kind_vars
                -- must remain lined up with the binders
              tycon = mkTcTyCon name binders res_kind
                                (scoped_kvs ++ binderVars binders) flav
+
+       ; traceTc "kcHsTyVarBndrs: not-cusk" (ppr name <+> ppr binders)
        ; return (tycon, stuff) }
   where
     open_fam = tcFlavourIsOpen flav
@@ -1793,6 +1801,7 @@ tcTyClTyVars tycon_name thing_inside
 
           -- Add the *unzonked* tyvars to the env't, because those
           -- are the ones mentioned in the source.
+       ; traceTc "tcTyClTyVars" (ppr tycon_name <+> ppr binders)
        ; tcExtendTyVarEnv scoped_tvs $
          thing_inside binders res_kind }
 
