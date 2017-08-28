@@ -231,7 +231,7 @@ if config.rootdirs == []:
 
 t_files = list(findTFiles(config.rootdirs))
 
-print('Found', len(t_files), '.T files...')
+print('found', len(t_files), '.T files...')
 
 t = getTestRun()
 

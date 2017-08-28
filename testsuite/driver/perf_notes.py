@@ -193,6 +193,7 @@ def evaluate_metric(opts, test, field, deviation, contents, way):
         test_env = config.test_env
         config.accumulate_metrics.append('\t'.join([test_env, test, way, field, str(val)]))
 
+    print("WTF 01")
     if expected == 0:
         return my_passed('no prior metrics for this test')
 

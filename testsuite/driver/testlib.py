@@ -66,7 +66,7 @@ def setLocalTestOpts(opts):
 
 def isStatsTest():
     opts = getTestOpts()
-    return bool(opts.compiler_stats_range_fields or opts.stats_range_fields) # CHANGE
+    return bool(opts.stats_range_fields)
 
 
 # This can be called at the top of a file of tests, to set default test options
@@ -1109,7 +1109,11 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
     else:
         to_do = '-c' # just compile
 
+    print("SANITY CHECK")
+    print(name)
+    print(opts.is_compiler_test)
     stats_file = name + '.comp.stats'
+    print(stats_file)
     if opts.is_compiler_test:
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     if backpack:
@@ -1143,7 +1147,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    statsResult = checkStats(name, way, stats_file, opts.compiler_stats_range_fields)
+    statsResult = checkStats(name, way, stats_file, opts.stats_range_fields)
+    print(stats_file)
+    print(opts.stats_range_fields)
+    print(statsResult)
 
     if badResult(statsResult):
         return statsResult
