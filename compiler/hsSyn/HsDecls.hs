@@ -1155,9 +1155,9 @@ data ConDecl pass
       , con_qvars     :: Maybe (LHsQTyVars pass)
         -- User-written forall (if any), and its implicit
         -- kind variables
-        -- Non-Nothing needs -XExistentialQuantification
-        --               e.g. data T a = forall b. MkT b (b->a)
-        --               con_qvars = {b}
+        -- Non-Nothing means an explicit user-written forall
+        --     e.g. data T a = forall b. MkT b (b->a)
+        --     con_qvars = {b}
 
       , con_cxt       :: Maybe (LHsContext pass)
         -- ^ User-written context (if any)

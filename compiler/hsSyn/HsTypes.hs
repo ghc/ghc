@@ -254,11 +254,16 @@ type LHsTyVarBndr pass = Located (HsTyVarBndr pass)
 -- | Located Haskell Quantified Type Variables
 data LHsQTyVars pass   -- See Note [HsType binders]
   = HsQTvs { hsq_implicit :: PostRn pass [Name]
-                                               -- implicit (dependent) variables
-           , hsq_explicit :: [LHsTyVarBndr pass]   -- explicit variables
-             -- See Note [HsForAllTy tyvar binders]
+                -- Implicit (dependent) variables
+
+           , hsq_explicit :: [LHsTyVarBndr pass]
+                -- Explicit variables, written by the user
+                -- See Note [HsForAllTy tyvar binders]
+
            , hsq_dependent :: PostRn pass NameSet
-               -- which explicit vars are dependent
+               -- Which members of hsq_explicit are dependent; that is,
+               -- mentioned in the kind of a later hsq_explicit,
+               -- or mentioned in a kind in the scope of this HsQTvs
                -- See Note [Dependent LHsQTyVars] in TcHsType
     }
 

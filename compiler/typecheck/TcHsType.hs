@@ -1290,14 +1290,38 @@ Note [Dependent LHsQTyVars]
 We track (in the renamer) which explicitly bound variables in a
 LHsQTyVars are manifestly dependent; only precisely these variables
 may be used within the LHsQTyVars. We must do this so that kcHsTyVarBndrs
-can produce the right TyConBinders, and tell Anon vs. Named. Earlier,
-I thought it would work simply to do a free-variable check during
-kcHsTyVarBndrs, but this is bogus, because there may be unsolved
-equalities about. And we don't want to eagerly solve the equalities,
-because we may get further information after kcHsTyVarBndrs is called.
-(Recall that kcHsTyVarBndrs is usually called from getInitialKind.
-The only other case is in kcConDecl.) This is what implements the rule
-that all variables intended to be dependent must be manifestly so.
+can produce the right TyConBinders, and tell Anon vs. Required.
+
+Example   data T k1 (a:k1) (b:k2) c
+               = MkT (Proxy a) (Proxy b) (Proxy c)
+
+Here
+  (a:k1),(b:k2),(c:k3)
+       are Anon     (explicitly specified as a binder, not used
+                     in the kind of any other binder
+  k1   is Required  (explicitly specifed as a binder, but used
+                     in the kind of another binder i.e. dependently)
+  k2   is Specified (not explicitly bound, but used in the kind
+                     of another binder)
+  k3   in Inferred  (not lexically in scope at all, but inferred
+                     by kind inference)
+and
+  T :: forall {k3} k1. forall k3 -> k1 -> k2 -> k3 -> *
+
+See Note [TyVarBndrs, TyVarBinders, TyConBinders, and visiblity]
+in TyCoRep.
+
+kcHsTyVarBndrs uses the hsq_dependent field to decide whether
+k1, a, b, c should be Required or Anon.
+
+Earlier, thought it would work simply to do a free-variable check
+during kcHsTyVarBndrs, but this is bogus, because there may be
+unsolved equalities about. And we don't want to eagerly solve the
+equalities, because we may get further information after
+kcHsTyVarBndrs is called.  (Recall that kcHsTyVarBndrs is usually
+called from getInitialKind.  The only other case is in kcConDecl.)
+This is what implements the rule that all variables intended to be
+dependent must be manifestly so.
 
 Sidenote: It's quite possible that later, we'll consider (t -> s)
 as a degenerate case of some (pi (x :: t) -> s) and then this will
@@ -1682,16 +1706,16 @@ Consider
   data T = MkT (forall (a :: k). Proxy a)
   -- from test ghci/scripts/T7873
 
-This is not an existential datatype, but a higher-rank one. Note that
-the forall to the right of MkT. Also consider
+This is not an existential datatype, but a higher-rank one (the forall
+to the right of MkT). Also consider
 
   data S a = MkS (Proxy (a :: k))
 
-According to the rules around implicitly-bound kind variables, those
-k's scope over the whole declarations. The renamer grabs it and adds it
-to the hsq_implicits field of the HsQTyVars of the tycon. So it must
-be in scope during type-checking, but we want to reject T while accepting
-S.
+According to the rules around implicitly-bound kind variables, in both
+cases those k's scope over the whole declaration. The renamer grabs
+it and adds it to the hsq_implicits field of the HsQTyVars of the
+tycon. So it must be in scope during type-checking, but we want to
+reject T while accepting S.
 
 Why reject T? Because the kind variable isn't fixed by anything. For
 a variable like k to be implicit, it needs to be mentioned in the kind
