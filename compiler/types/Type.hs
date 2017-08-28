@@ -2306,7 +2306,7 @@ nonDetCmpTc tc1 tc2
 ************************************************************************
 -}
 
-typeKind :: Type -> Kind
+typeKind :: HasDebugCallStack => Type -> Kind
 typeKind (TyConApp tc tys)     = piResultTys (tyConKind tc) tys
 typeKind (AppTy fun arg)       = piResultTy (typeKind fun) arg
 typeKind (LitTy l)             = typeLiteralKind l
