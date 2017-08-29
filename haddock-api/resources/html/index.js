@@ -80,7 +80,7 @@ var App = createClass({
       activeLinkIndex: -1,
       moduleResults: []
     });
-    loadJSON("doc-index.json", function(data) {
+    loadJSON(baseUrl + "/doc-index.json", function(data) {
       self.setState({
         fuse: new Fuse(data, {
           threshold: 0.4,
