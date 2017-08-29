@@ -691,18 +691,19 @@ repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy ty1 ty2)
-  | Just rep1 <- getRuntimeRep_maybe ty1
-  , Just rep2 <- getRuntimeRep_maybe ty2
   = Just (TyConApp funTyCon [rep1, rep2, ty1], ty2)
+  where
+    rep1 = getRuntimeRep ty1
+    rep2 = getRuntimeRep ty2
 
-  | otherwise
-  = pprPanic "repSplitAppTy_maybe" (ppr ty1 $$ ppr ty2)
 repSplitAppTy_maybe (AppTy ty1 ty2)
   = Just (ty1, ty2)
+
 repSplitAppTy_maybe (TyConApp tc tys)
   | mightBeUnsaturatedTyCon tc || tys `lengthExceeds` tyConArity tc
   , Just (tys', ty') <- snocView tys
   = Just (TyConApp tc tys', ty')    -- Never create unsaturated type family apps!
+
 repSplitAppTy_maybe _other = Nothing
 
 -- this one doesn't braek apart (c => t).
@@ -715,12 +716,12 @@ tcRepSplitAppTy_maybe (FunTy ty1 ty2)
   | isConstraintKind (typeKind ty1)
   = Nothing  -- See Note [Decomposing fat arrow c=>t]
 
-  | Just rep1 <- getRuntimeRep_maybe ty1
-  , Just rep2 <- getRuntimeRep_maybe ty2
-  = Just (TyConApp funTyCon [rep1, rep2, ty1], ty2)
-
   | otherwise
-  = pprPanic "repSplitAppTy_maybe" (ppr ty1 $$ ppr ty2)
+  = Just (TyConApp funTyCon [rep1, rep2, ty1], ty2)
+  where
+    rep1 = getRuntimeRep ty1
+    rep2 = getRuntimeRep ty2
+
 tcRepSplitAppTy_maybe (AppTy ty1 ty2)    = Just (ty1, ty2)
 tcRepSplitAppTy_maybe (TyConApp tc tys)
   | mightBeUnsaturatedTyCon tc || tys `lengthExceeds` tyConArity tc
@@ -743,16 +744,17 @@ tcSplitTyConApp_maybe ty                         = tcRepSplitTyConApp_maybe ty
 -- | Like 'tcSplitTyConApp_maybe' but doesn't look through type synonyms.
 tcRepSplitTyConApp_maybe :: HasCallStack => Type -> Maybe (TyCon, [Type])
 -- Defined here to avoid module loops between Unify and TcType.
-tcRepSplitTyConApp_maybe (TyConApp tc tys)          = Just (tc, tys)
+tcRepSplitTyConApp_maybe (TyConApp tc tys)
+  = Just (tc, tys)
+
 tcRepSplitTyConApp_maybe (FunTy arg res)
-  | Just arg_rep <- getRuntimeRep_maybe arg
-  , Just res_rep <- getRuntimeRep_maybe res
   = Just (funTyCon, [arg_rep, res_rep, arg, res])
+  where
+    arg_rep = getRuntimeRep arg
+    res_rep = getRuntimeRep res
 
-  | otherwise
-  = pprPanic "tcRepSplitTyConApp_maybe" (ppr arg $$ ppr res)
-tcRepSplitTyConApp_maybe _                          = Nothing
-
+tcRepSplitTyConApp_maybe _
+  = Nothing
 
 -------------
 splitAppTy :: Type -> (Type, Type)
@@ -779,13 +781,12 @@ splitAppTys ty = split ty ty []
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split _   (FunTy ty1 ty2) args
-      | Just rep1 <- getRuntimeRep_maybe ty1
-      , Just rep2 <- getRuntimeRep_maybe ty2
       = ASSERT( null args )
         (TyConApp funTyCon [], [rep1, rep2, ty1, ty2])
+      where
+        rep1 = getRuntimeRep ty1
+        rep2 = getRuntimeRep ty2
 
-      | otherwise
-      = pprPanic "splitAppTys" (ppr ty1 $$ ppr ty2 $$ ppr args)
     split orig_ty _                     args  = (orig_ty, args)
 
 -- | Like 'splitAppTys', but doesn't look through type synonyms
@@ -800,13 +801,12 @@ repSplitAppTys ty = split ty []
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
     split (FunTy ty1 ty2) args
-      | Just rep1 <- getRuntimeRep_maybe ty1
-      , Just rep2 <- getRuntimeRep_maybe ty2
       = ASSERT( null args )
         (TyConApp funTyCon [], [rep1, rep2, ty1, ty2])
+      where
+        rep1 = getRuntimeRep ty1
+        rep2 = getRuntimeRep ty2
 
-      | otherwise
-      = pprPanic "repSplitAppTys" (ppr ty1 $$ ppr ty2 $$ ppr args)
     split ty args = (ty, args)
 
 {-
@@ -1085,7 +1085,7 @@ tyConAppArgs_maybe (FunTy arg res)
   | Just rep1 <- getRuntimeRep_maybe arg
   , Just rep2 <- getRuntimeRep_maybe res
   = Just [rep1, rep2, arg, res]
-tyConAppArgs_maybe _                = Nothing
+tyConAppArgs_maybe _  = Nothing
 
 tyConAppArgs :: Type -> [Type]
 tyConAppArgs ty = tyConAppArgs_maybe ty `orElse` pprPanic "tyConAppArgs" (ppr ty)
@@ -1116,12 +1116,9 @@ splitTyConApp_maybe ty                           = repSplitTyConApp_maybe ty
 repSplitTyConApp_maybe :: HasDebugCallStack => Type -> Maybe (TyCon, [Type])
 repSplitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 repSplitTyConApp_maybe (FunTy arg res)
-  | Just rep1 <- getRuntimeRep_maybe arg
-  , Just rep2 <- getRuntimeRep_maybe res
-  = Just (funTyCon, [rep1, rep2, arg, res])
-  | otherwise
-  = pprPanic "repSplitTyConApp_maybe"
-             (ppr arg $$ ppr res $$ ppr (typeKind res))
+  | Just arg_rep <- getRuntimeRep_maybe arg
+  , Just res_rep <- getRuntimeRep_maybe res
+  = Just (funTyCon, [arg_rep, res_rep, arg, res])
 repSplitTyConApp_maybe _ = Nothing
 
 -- | Attempts to tease a list type apart and gives the type of the elements if
@@ -1936,7 +1933,7 @@ isFamFreeTy (CoercionTy _)    = False  -- Not sure about this
 -- levity polymorphic), and panics if the kind does not have the shape
 -- TYPE r.
 isLiftedType_maybe :: HasDebugCallStack => Type -> Maybe Bool
-isLiftedType_maybe ty = go (getRuntimeRep "isLiftedType_maybe" ty)
+isLiftedType_maybe ty = go (getRuntimeRep ty)
   where
     go rr | Just rr' <- coreView rr = go rr'
     go (TyConApp lifted_rep [])
@@ -1956,6 +1953,19 @@ isUnliftedType ty
   = not (isLiftedType_maybe ty `orElse`
          pprPanic "isUnliftedType" (ppr ty <+> dcolon <+> ppr (typeKind ty)))
 
+-- | Is this a type of kind RuntimeRep? (e.g. LiftedRep)
+isRuntimeRepKindedTy :: Type -> Bool
+isRuntimeRepKindedTy = isRuntimeRepTy . typeKind
+
+-- | Drops prefix of RuntimeRep constructors in 'TyConApp's. Useful for e.g.
+-- dropping 'LiftedRep arguments of unboxed tuple TyCon applications:
+--
+--   dropRuntimeRepArgs [ 'LiftedRep, 'IntRep
+--                      , String, Int# ] == [String, Int#]
+--
+dropRuntimeRepArgs :: [Type] -> [Type]
+dropRuntimeRepArgs = dropWhile isRuntimeRepKindedTy
+
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Returns 'Nothing' if this is not
 -- possible.
@@ -1965,24 +1975,21 @@ getRuntimeRep_maybe = getRuntimeRepFromKind_maybe . typeKind
 
 -- | Extract the RuntimeRep classifier of a type. For instance,
 -- @getRuntimeRep_maybe Int = LiftedRep@. Panics if this is not possible.
-getRuntimeRep :: HasDebugCallStack
-              => String   -- ^ Printed in case of an error
-              -> Type -> Type
-getRuntimeRep err ty =
-    case getRuntimeRep_maybe ty of
+getRuntimeRep :: HasDebugCallStack => Type -> Type
+getRuntimeRep ty
+  = case getRuntimeRep_maybe ty of
       Just r  -> r
-      Nothing -> pprPanic "getRuntimeRep"
-                          (text err $$ ppr ty <+> dcolon <+> ppr (typeKind ty))
+      Nothing -> pprPanic "getRuntimeRep" (ppr ty <+> dcolon <+> ppr (typeKind ty))
 
 -- | Extract the RuntimeRep classifier of a type from its kind. For example,
 -- @getRuntimeRepFromKind * = LiftedRep@; Panics if this is not possible.
 getRuntimeRepFromKind :: HasDebugCallStack
-                      => String -> Type -> Type
-getRuntimeRepFromKind err k =
+                      => Type -> Type
+getRuntimeRepFromKind k =
     case getRuntimeRepFromKind_maybe k of
       Just r  -> r
       Nothing -> pprPanic "getRuntimeRepFromKind"
-                          (text err $$ ppr k <+> dcolon <+> ppr (typeKind k))
+                           (ppr k <+> dcolon <+> ppr (typeKind k))
 
 -- | Extract the RuntimeRep classifier of a type from its kind. For example,
 -- @getRuntimeRepFromKind * = LiftedRep@; Returns 'Nothing' if this is not
@@ -2000,14 +2007,14 @@ getRuntimeRepFromKind_maybe = go
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty
-  = tyConAppTyCon (getRuntimeRep "isUnboxedTupleType" ty) `hasKey` tupleRepDataConKey
+  = tyConAppTyCon (getRuntimeRep ty) `hasKey` tupleRepDataConKey
   -- NB: Do not use typePrimRep, as that can't tell the difference between
   -- unboxed tuples and unboxed sums
 
 
 isUnboxedSumType :: Type -> Bool
 isUnboxedSumType ty
-  = tyConAppTyCon (getRuntimeRep "isUnboxedSumType" ty) `hasKey` sumRepDataConKey
+  = tyConAppTyCon (getRuntimeRep ty) `hasKey` sumRepDataConKey
 
 -- | See "Type#type_classification" for what an algebraic type is.
 -- Should only be applied to /types/, as opposed to e.g. partially
@@ -2299,7 +2306,7 @@ nonDetCmpTc tc1 tc2
 ************************************************************************
 -}
 
-typeKind :: Type -> Kind
+typeKind :: HasDebugCallStack => Type -> Kind
 typeKind (TyConApp tc tys)     = piResultTys (tyConKind tc) tys
 typeKind (AppTy fun arg)       = piResultTy (typeKind fun) arg
 typeKind (LitTy l)             = typeLiteralKind l

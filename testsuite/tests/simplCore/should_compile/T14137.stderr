@@ -1,0 +1,63 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 45, types: 41, coercions: 0, joins: 2/2}
+
+-- RHS size: {terms: 30, types: 24, coercions: 0, joins: 2/2}
+f :: forall (t :: * -> *) a. Foldable t => t a -> Maybe Int
+[GblId, Arity=2]
+f = \ (@ (t :: * -> *))
+      (@ a)
+      ($dFoldable :: Foldable t)
+      (xs :: t a) ->
+      join {
+        j :: Maybe Int
+        [LclId[JoinId(0)], Unf=OtherCon []]
+        j = GHC.Base.Just @ Int (length @ t $dFoldable @ a xs) } in
+      joinrec {
+        g [Occ=LoopBreaker] :: Integer -> Maybe Int
+        [LclId[JoinId(1)], Arity=1, Unf=OtherCon []]
+        g (ds :: Integer)
+          = case ==
+                   @ Integer
+                   integer-gmp-1.0.1.0:GHC.Integer.Type.$fEqInteger
+                   ds
+                   (fromInteger @ Integer GHC.Num.$fNumInteger 0)
+            of {
+              False ->
+                jump g
+                  (- @ Integer
+                     GHC.Num.$fNumInteger
+                     ds
+                     (fromInteger @ Integer GHC.Num.$fNumInteger 1));
+              True -> jump j
+            }; } in
+      jump g 7
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule1 = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule2 = GHC.Types.TrNameS $trModule1
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3 :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule3 = "T14137"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4 :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule4 = GHC.Types.TrNameS $trModule3
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T14137.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs]
+T14137.$trModule = GHC.Types.Module $trModule2 $trModule4
+
+
+

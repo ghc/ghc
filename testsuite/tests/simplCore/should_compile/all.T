@@ -269,3 +269,4 @@ test('T12600',
      ['$MAKE -s --no-print-directory T12600'])
 test('T13658', normal, compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
+test('T14137', normal, compile, ['-dsuppress-uniques -ddump-simpl'])

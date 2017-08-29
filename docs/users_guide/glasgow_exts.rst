@@ -10596,13 +10596,13 @@ consistently, or working the same in subsequent releases. See
 :ghc-wiki:`this wiki page <ImpredicativePolymorphism>` for more details.
 
 If you want impredicative polymorphism, the main workaround is to use a
-newtype wrapper. The ``id runST`` example can be written using theis
+newtype wrapper. The ``id runST`` example can be written using this
 workaround like this: ::
 
     runST :: (forall s. ST s a) -> a
     id :: forall b. b -> b
 
-    nwetype Wrap a = Wrap { unWrap :: (forall s. ST s a) -> a }
+    newtype Wrap a = Wrap { unWrap :: (forall s. ST s a) -> a }
 
     foo :: (forall s. ST s a) -> a
     foo = unWrap (id (Wrap runST))

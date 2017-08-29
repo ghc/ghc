@@ -72,7 +72,7 @@ test('T1969',
              # 2017-03-24 9261052 (x86/Linux, 64-bit machine)
              # 2017-04-06 9418680 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 16679176, 15)]),
+           (wordsize(64), 19199872, 15)]),
              # 2014-09-10 10463640, 10  # post-AMP-update (somewhat stabelish)
                # looks like the peak is around ~10M, but we're
                # unlikely to GC exactly on the peak.
@@ -87,6 +87,7 @@ test('T1969',
              # 2017-02-01 19924328 (amd64/Linux) Join points (#12988)
              # 2017-02-14 16393848 Early inline patch
              # 2017-03-31 16679176 Fix memory leak in simplifier
+             # 2017-08-25 19199872 Refactor the Mighty Simplifier
 
       compiler_stats_num_field('bytes allocated',
           [(platform('i386-unknown-mingw32'), 301784492, 5),
@@ -1104,6 +1105,17 @@ test('T12707',
           ]),
      ],
      compile,
+     [''])
+
+test('T12150',
+     [ only_ways(['optasm']),
+       compiler_stats_num_field('bytes allocated',
+          [(wordsize(64), 74358208, 5)
+          # initial:    70773000
+          # 2017-08-25: 74358208  Refactor the Mighty Simplifier
+          ]),
+     ],
+    compile,
      [''])
 
 test('T13379',

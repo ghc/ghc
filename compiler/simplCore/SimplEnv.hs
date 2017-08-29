@@ -8,14 +8,14 @@
 
 module SimplEnv (
         -- * The simplifier mode
-        setMode, getMode, updMode,
+        setMode, getMode, updMode, seDynFlags,
 
         -- * Environments
         SimplEnv(..), StaticEnv, pprSimplEnv,   -- Temp not abstract
         mkSimplEnv, extendIdSubst,
         SimplEnv.extendTvSubst, SimplEnv.extendCvSubst,
         zapSubstEnv, setSubstEnv,
-        getInScope, setInScopeAndZapFloats,
+        getInScope, setInScopeFromE, setInScopeFromF,
         setInScopeSet, modifyInScope, addNewInScopeIds,
         getSimplRules,
 
@@ -29,19 +29,24 @@ module SimplEnv (
         substCo, substCoVar,
 
         -- * Floats
-        Floats, emptyFloats, isEmptyFloats,
-        addNonRec, addLetFloats, addFloats, extendFloats, addFlts,
-        wrapFloats, setFloats, zapFloats, addRecFloats, mapFloats,
-        doFloatFromRhs, getFloatBinds,
+        SimplFloats(..), emptyFloats, mkRecFloats,
+        mkFloatBind, addLetFloats, addJoinFloats, addFloats,
+        extendFloats, wrapFloats,
+        doFloatFromRhs, getTopFloatBinds,
 
-        JoinFloat, JoinFloats, emptyJoinFloats, isEmptyJoinFloats,
-        wrapJoinFloats, wrapJoinFloatsX, zapJoinFloats, addJoinFloats
+        -- * LetFloats
+        LetFloats, letFloatBinds, emptyLetFloats, unitLetFloat,
+        addLetFlts,  mapLetFloats,
+
+        -- * JoinFloats
+        JoinFloat, JoinFloats, emptyJoinFloats,
+        wrapJoinFloats, wrapJoinFloatsX, unitJoinFloat, addJoinFlts
     ) where
 
 #include "HsVersions.h"
 
 import SimplMonad
-import CoreMonad                ( SimplifierMode(..) )
+import CoreMonad                ( SimplMode(..) )
 import CoreSyn
 import CoreUtils
 import Var
@@ -50,6 +55,7 @@ import VarSet
 import OrdList
 import Id
 import MkCore                   ( mkWildValBinder )
+import DynFlags                 ( DynFlags )
 import TysWiredIn
 import qualified Type
 import Type hiding              ( substTy, substTyVar, substTyVarBndr )
@@ -77,12 +83,12 @@ data SimplEnv
      -- Static in the sense of lexically scoped,
      -- wrt the original expression
 
-        seMode      :: SimplifierMode,
+        seMode      :: SimplMode
 
         -- The current substitution
-        seTvSubst   :: TvSubstEnv,      -- InTyVar |--> OutType
-        seCvSubst   :: CvSubstEnv,      -- InCoVar |--> OutCoercion
-        seIdSubst   :: SimplIdSubst,    -- InId    |--> OutExpr
+      , seTvSubst   :: TvSubstEnv      -- InTyVar |--> OutType
+      , seCvSubst   :: CvSubstEnv      -- InCoVar |--> OutCoercion
+      , seIdSubst   :: SimplIdSubst    -- InId    |--> OutExpr
 
      ----------- Dynamic part of the environment -----------
      -- Dynamic in the sense of describing the setup where
@@ -90,23 +96,42 @@ data SimplEnv
 
         -- The current set of in-scope variables
         -- They are all OutVars, and all bound in this module
-        seInScope   :: InScopeSet,      -- OutVars only
-                -- Includes all variables bound
-                -- by seLetFloats and seJoinFloats
-
-        -- Ordinary bindings
-        seLetFloats  :: Floats,
-                -- See Note [Simplifier floats]
-
-        -- Join points
-        seJoinFloats :: JoinFloats
-                -- Handled separately; they don't go very far
-                -- We consider these to be /inside/ seLetFloats
-                -- because join points can refer to ordinary bindings,
-                -- but not vice versa
+      , seInScope   :: InScopeSet       -- OutVars only
     }
 
 type StaticEnv = SimplEnv       -- Just the static part is relevant
+
+data SimplFloats
+  = SimplFloats
+      { -- Ordinary let bindings
+        sfLetFloats  :: LetFloats
+                -- See Note [LetFloats]
+
+        -- Join points
+      , sfJoinFloats :: JoinFloats
+                -- Handled separately; they don't go very far
+                -- We consider these to be /inside/ sfLetFloats
+                -- because join points can refer to ordinary bindings,
+                -- but not vice versa
+
+        -- Includes all variables bound by sfLetFloats and
+        -- sfJoinFloats, plus at least whatever is in scope where
+        -- these bindings land up.
+      , sfInScope :: InScopeSet  -- All OutVars
+      }
+
+instance Outputable SimplFloats where
+  ppr (SimplFloats { sfLetFloats = lf, sfJoinFloats = jf, sfInScope = is })
+    = text "SimplFloats"
+      <+> braces (vcat [ text "lets: " <+> ppr lf
+                       , text "joins:" <+> ppr jf
+                       , text "in_scope:" <+> ppr is ])
+
+emptyFloats :: SimplEnv -> SimplFloats
+emptyFloats env
+  = SimplFloats { sfLetFloats  = emptyLetFloats
+                , sfJoinFloats = emptyJoinFloats
+                , sfInScope    = seInScope env }
 
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
@@ -241,12 +266,10 @@ need to know at the occurrence site that the variable is a join point
 so that we know to drop the context. Thus we remember which join
 points we're substituting. -}
 
-mkSimplEnv :: SimplifierMode -> SimplEnv
+mkSimplEnv :: SimplMode -> SimplEnv
 mkSimplEnv mode
   = SimplEnv { seMode = mode
              , seInScope = init_in_scope
-             , seLetFloats = emptyFloats
-             , seJoinFloats = emptyJoinFloats
              , seTvSubst = emptyVarEnv
              , seCvSubst = emptyVarEnv
              , seIdSubst = emptyVarEnv }
@@ -276,13 +299,16 @@ wild-ids before doing much else.
 It's a very dark corner of GHC.  Maybe it should be cleaned up.
 -}
 
-getMode :: SimplEnv -> SimplifierMode
+getMode :: SimplEnv -> SimplMode
 getMode env = seMode env
 
-setMode :: SimplifierMode -> SimplEnv -> SimplEnv
+seDynFlags :: SimplEnv -> DynFlags
+seDynFlags env = sm_dflags (seMode env)
+
+setMode :: SimplMode -> SimplEnv -> SimplEnv
 setMode mode env = env { seMode = mode }
 
-updMode :: (SimplifierMode -> SimplifierMode) -> SimplEnv -> SimplEnv
+updMode :: (SimplMode -> SimplMode) -> SimplEnv -> SimplEnv
 updMode upd env = env { seMode = upd (seMode env) }
 
 ---------------------
@@ -308,19 +334,11 @@ getInScope env = seInScope env
 setInScopeSet :: SimplEnv -> InScopeSet -> SimplEnv
 setInScopeSet env in_scope = env {seInScope = in_scope}
 
-setInScopeAndZapFloats :: SimplEnv -> SimplEnv -> SimplEnv
--- Set the in-scope set, and *zap* the floats
-setInScopeAndZapFloats env env_with_scope
-  = env { seInScope    = seInScope env_with_scope,
-          seLetFloats  = emptyFloats,
-          seJoinFloats = emptyJoinFloats }
+setInScopeFromE :: SimplEnv -> SimplEnv -> SimplEnv
+setInScopeFromE env env' = env { seInScope = seInScope env' }
 
-setFloats :: SimplEnv -> SimplEnv -> SimplEnv
--- Set the in-scope set *and* the floats
-setFloats env env_with_floats
-  = env { seInScope    = seInScope env_with_floats,
-          seLetFloats  = seLetFloats  env_with_floats,
-          seJoinFloats = seJoinFloats env_with_floats }
+setInScopeFromF :: SimplEnv -> SimplFloats -> SimplEnv
+setInScopeFromF env floats = env { seInScope = sfInScope floats }
 
 addNewInScopeIds :: SimplEnv -> [CoreBndr] -> SimplEnv
         -- The new Ids are guaranteed to be freshly allocated
@@ -353,13 +371,13 @@ mkContEx (SimplEnv { seTvSubst = tvs, seCvSubst = cvs, seIdSubst = ids }) e = Co
 {-
 ************************************************************************
 *                                                                      *
-\subsection{Floats}
+\subsection{LetFloats}
 *                                                                      *
 ************************************************************************
 
-Note [Simplifier floats]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-The Floats is a bunch of bindings, classified by a FloatFlag.
+Note [LetFloats]
+~~~~~~~~~~~~~~~~
+The LetFloats is a bunch of bindings, classified by a FloatFlag.
 
 * All of them satisfy the let/app invariant
 
@@ -378,8 +396,8 @@ Can't happen:
   NonRec x# (f y)       -- Might diverge; does not satisfy let/app
 -}
 
-data Floats = Floats (OrdList OutBind) FloatFlag
-        -- See Note [Simplifier floats]
+data LetFloats = LetFloats (OrdList OutBind) FloatFlag
+                 -- See Note [LetFloats]
 
 type JoinFloat  = OutBind
 type JoinFloats = OrdList JoinFloat
@@ -401,12 +419,12 @@ data FloatFlag
                 --      and not guaranteed cheap
                 --      Do not float these bindings out of a lazy let
 
-instance Outputable Floats where
-  ppr (Floats binds ff) = ppr ff $$ ppr (fromOL binds)
+instance Outputable LetFloats where
+  ppr (LetFloats binds ff) = ppr ff $$ ppr (fromOL binds)
 
 instance Outputable FloatFlag where
-  ppr FltLifted = text "FltLifted"
-  ppr FltOkSpec = text "FltOkSpec"
+  ppr FltLifted  = text "FltLifted"
+  ppr FltOkSpec  = text "FltOkSpec"
   ppr FltCareful = text "FltCareful"
 
 andFF :: FloatFlag -> FloatFlag -> FloatFlag
@@ -415,9 +433,9 @@ andFF FltOkSpec  FltCareful = FltCareful
 andFF FltOkSpec  _          = FltOkSpec
 andFF FltLifted  flt        = flt
 
-doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> OutExpr -> SimplEnv -> Bool
+doFloatFromRhs :: TopLevelFlag -> RecFlag -> Bool -> SimplFloats -> OutExpr -> Bool
 -- If you change this function look also at FloatIn.noFloatFromRhs
-doFloatFromRhs lvl rec str rhs (SimplEnv {seLetFloats = Floats fs ff})
+doFloatFromRhs lvl rec str (SimplFloats { sfLetFloats = LetFloats fs ff }) rhs
   =  not (isNilOL fs) && want_to_float && can_float
   where
      want_to_float = isTopLevel lvl || exprIsCheap rhs || exprIsExpandable rhs
@@ -439,16 +457,16 @@ But there are
 so we must take the 'or' of the two.
 -}
 
-emptyFloats :: Floats
-emptyFloats = Floats nilOL FltLifted
+emptyLetFloats :: LetFloats
+emptyLetFloats = LetFloats nilOL FltLifted
 
 emptyJoinFloats :: JoinFloats
 emptyJoinFloats = nilOL
 
-unitFloat :: OutBind -> Floats
+unitLetFloat :: OutBind -> LetFloats
 -- This key function constructs a singleton float with the right form
-unitFloat bind = ASSERT(all (not . isJoinId) (bindersOf bind))
-                 Floats (unitOL bind) (flag bind)
+unitLetFloat bind = ASSERT(all (not . isJoinId) (bindersOf bind))
+                    LetFloats (unitOL bind) (flag bind)
   where
     flag (Rec {})                = FltLifted
     flag (NonRec bndr rhs)
@@ -465,138 +483,132 @@ unitJoinFloat :: OutBind -> JoinFloats
 unitJoinFloat bind = ASSERT(all isJoinId (bindersOf bind))
                      unitOL bind
 
-addNonRec :: SimplEnv -> OutId -> OutExpr -> SimplEnv
--- Add a non-recursive binding and extend the in-scope set
--- The latter is important; the binder may already be in the
--- in-scope set (although it might also have been created with newId)
--- but it may now have more IdInfo
-addNonRec env@(SimplEnv { seLetFloats  = floats
-                        , seJoinFloats = jfloats
-                        , seInScope = in_scope })
-          id rhs
-  | isJoinId id  -- This test incidentally forces the Id, and hence
-                 -- its IdInfo, and hence any inner substitutions
-  = env { seInScope    = in_scope'
-        , seLetFloats  = floats
-        , seJoinFloats = jfloats' }
-  | otherwise
-  = env { seInScope    = in_scope'
-        , seLetFloats  = floats'
-        , seJoinFloats = jfloats }
+mkFloatBind :: SimplEnv -> OutBind -> (SimplFloats, SimplEnv)
+-- Make a singleton SimplFloats, and
+-- extend the incoming SimplEnv's in-scope set with its binders
+-- These binders may already be in the in-scope set,
+-- but may have by now been augmented with more IdInfo
+mkFloatBind env bind
+  = (floats, env { seInScope = in_scope' })
   where
-    bind      = NonRec id rhs
-    in_scope' = extendInScopeSet in_scope id
-    floats'   = floats  `addFlts`     unitFloat     bind
-    jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
+    floats
+      | isJoinBind bind
+      = SimplFloats { sfLetFloats  = emptyLetFloats
+                    , sfJoinFloats = unitJoinFloat bind
+                    , sfInScope    = in_scope' }
+      | otherwise
+      = SimplFloats { sfLetFloats  = unitLetFloat bind
+                    , sfJoinFloats = emptyJoinFloats
+                    , sfInScope    = in_scope' }
 
-extendFloats :: SimplEnv -> OutBind -> SimplEnv
+    in_scope' = seInScope env `extendInScopeSetBind` bind
+
+extendFloats :: SimplFloats -> OutBind -> SimplFloats
 -- Add this binding to the floats, and extend the in-scope env too
-extendFloats env@(SimplEnv { seLetFloats  = floats
-                           , seJoinFloats = jfloats
-                           , seInScope = in_scope })
+extendFloats (SimplFloats { sfLetFloats  = floats
+                          , sfJoinFloats = jfloats
+                          , sfInScope    = in_scope })
              bind
   | isJoinBind bind
-  = env { seInScope    = in_scope'
-        , seLetFloats  = floats
-        , seJoinFloats = jfloats' }
+  = SimplFloats { sfInScope    = in_scope'
+                , sfLetFloats  = floats
+                , sfJoinFloats = jfloats' }
   | otherwise
-  = env { seInScope    = in_scope'
-        , seLetFloats  = floats'
-        , seJoinFloats = jfloats }
+  = SimplFloats { sfInScope    = in_scope'
+                , sfLetFloats  = floats'
+                , sfJoinFloats = jfloats }
   where
-    bndrs = bindersOf bind
-
-    in_scope' = extendInScopeSetList in_scope bndrs
-    floats'   = floats  `addFlts`     unitFloat bind
+    in_scope' = in_scope `extendInScopeSetBind` bind
+    floats'   = floats  `addLetFlts`  unitLetFloat bind
     jfloats'  = jfloats `addJoinFlts` unitJoinFloat bind
 
-addLetFloats :: SimplEnv -> SimplEnv -> SimplEnv
+addLetFloats :: SimplFloats -> LetFloats -> SimplFloats
 -- Add the let-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger
 -- than that for env1
-addLetFloats env1 env2
-  = env1 { seLetFloats = seLetFloats env1 `addFlts` seLetFloats env2
-         , seInScope   = seInScope env2 }
+addLetFloats floats let_floats@(LetFloats binds _)
+  = floats { sfLetFloats = sfLetFloats floats `addLetFlts` let_floats
+           , sfInScope   = foldlOL extendInScopeSetBind
+                                   (sfInScope floats) binds }
 
-addFloats :: SimplEnv -> SimplEnv -> SimplEnv
+addJoinFloats :: SimplFloats -> JoinFloats -> SimplFloats
+addJoinFloats floats join_floats
+  = floats { sfJoinFloats = sfJoinFloats floats `addJoinFlts` join_floats
+           , sfInScope    = foldlOL extendInScopeSetBind
+                                    (sfInScope floats) join_floats }
+
+extendInScopeSetBind :: InScopeSet -> CoreBind -> InScopeSet
+extendInScopeSetBind in_scope bind
+  = extendInScopeSetList in_scope (bindersOf bind)
+
+addFloats :: SimplFloats -> SimplFloats -> SimplFloats
 -- Add both let-floats and join-floats for env2 to env1;
 -- *plus* the in-scope set for env2, which is bigger
 -- than that for env1
-addFloats env1 env2
-  = env1 { seLetFloats  = seLetFloats env1 `addFlts` seLetFloats env2
-         , seJoinFloats = seJoinFloats env1 `addJoinFlts` seJoinFloats env2
-         , seInScope    = seInScope env2 }
+addFloats (SimplFloats { sfLetFloats = lf1, sfJoinFloats = jf1 })
+          (SimplFloats { sfLetFloats = lf2, sfJoinFloats = jf2, sfInScope = in_scope })
+  = SimplFloats { sfLetFloats  = lf1 `addLetFlts` lf2
+                , sfJoinFloats = jf1 `addJoinFlts` jf2
+                , sfInScope    = in_scope }
 
-addFlts :: Floats -> Floats -> Floats
-addFlts (Floats bs1 l1) (Floats bs2 l2)
-  = Floats (bs1 `appOL` bs2) (l1 `andFF` l2)
+addLetFlts :: LetFloats -> LetFloats -> LetFloats
+addLetFlts (LetFloats bs1 l1) (LetFloats bs2 l2)
+  = LetFloats (bs1 `appOL` bs2) (l1 `andFF` l2)
+
+letFloatBinds :: LetFloats -> [CoreBind]
+letFloatBinds (LetFloats bs _) = fromOL bs
 
 addJoinFlts :: JoinFloats -> JoinFloats -> JoinFloats
 addJoinFlts = appOL
 
-zapFloats :: SimplEnv -> SimplEnv
-zapFloats env = env { seLetFloats  = emptyFloats
-                    , seJoinFloats = emptyJoinFloats }
-
-zapJoinFloats :: SimplEnv -> SimplEnv
-zapJoinFloats env = env { seJoinFloats = emptyJoinFloats }
-
-addJoinFloats :: SimplEnv -> JoinFloats -> SimplEnv
-addJoinFloats env@(SimplEnv { seJoinFloats = fb1 }) fb2
-  = env { seJoinFloats = fb1 `addJoinFlts` fb2 }
-
-addRecFloats :: SimplEnv -> SimplEnv -> SimplEnv
+mkRecFloats :: SimplFloats -> SimplFloats
 -- Flattens the floats from env2 into a single Rec group,
--- prepends the floats from env1, and puts the result back in env2
--- This is all very specific to the way recursive bindings are
--- handled; see Simplify.simplRecBind
-addRecFloats env1 env2@(SimplEnv {seLetFloats  = Floats bs ff
-                                 ,seJoinFloats = jbs })
+-- They must either all be lifted LetFloats or all JoinFloats
+mkRecFloats floats@(SimplFloats { sfLetFloats  = LetFloats bs ff
+                                , sfJoinFloats = jbs
+                                , sfInScope    = in_scope })
   = ASSERT2( case ff of { FltLifted -> True; _ -> False }, ppr (fromOL bs) )
-    env2 {seLetFloats = seLetFloats env1 `addFlts` floats'
-         ,seJoinFloats = seJoinFloats env1 `addJoinFlts` jfloats'}
+    ASSERT2( isNilOL bs || isNilOL jbs, ppr floats )
+    SimplFloats { sfLetFloats  = floats'
+                , sfJoinFloats = jfloats'
+                , sfInScope    = in_scope }
   where
-    floats'  | isNilOL bs  = emptyFloats
-             | otherwise   = unitFloat (Rec (flattenBinds (fromOL bs)))
+    floats'  | isNilOL bs  = emptyLetFloats
+             | otherwise   = unitLetFloat (Rec (flattenBinds (fromOL bs)))
     jfloats' | isNilOL jbs = emptyJoinFloats
              | otherwise   = unitJoinFloat (Rec (flattenBinds (fromOL jbs)))
 
-wrapFloats :: SimplEnv -> OutExpr -> OutExpr
+wrapFloats :: SimplFloats -> OutExpr -> OutExpr
 -- Wrap the floats around the expression; they should all
 -- satisfy the let/app invariant, so mkLets should do the job just fine
-wrapFloats (SimplEnv { seLetFloats  = Floats bs _
-                     , seJoinFloats = jbs }) body
+wrapFloats (SimplFloats { sfLetFloats  = LetFloats bs _
+                        , sfJoinFloats = jbs }) body
   = foldrOL Let (wrapJoinFloats jbs body) bs
      -- Note: Always safe to put the joins on the inside
      -- since the values can't refer to them
 
-wrapJoinFloatsX :: SimplEnv -> OutExpr -> (SimplEnv, OutExpr)
--- Wrap the seJoinFloats of the env around the expression,
+wrapJoinFloatsX :: SimplFloats -> OutExpr -> (SimplFloats, OutExpr)
+-- Wrap the sfJoinFloats of the env around the expression,
 -- and take them out of the SimplEnv
-wrapJoinFloatsX env@(SimplEnv { seJoinFloats = jbs }) body
-  = (zapJoinFloats env, wrapJoinFloats jbs body)
+wrapJoinFloatsX floats body
+  = ( floats { sfJoinFloats = emptyJoinFloats }
+    , wrapJoinFloats (sfJoinFloats floats) body )
 
 wrapJoinFloats :: JoinFloats -> OutExpr -> OutExpr
--- Wrap the seJoinFloats of the env around the expression,
+-- Wrap the sfJoinFloats of the env around the expression,
 -- and take them out of the SimplEnv
 wrapJoinFloats join_floats body
   = foldrOL Let body join_floats
 
-getFloatBinds :: SimplEnv -> [CoreBind]
-getFloatBinds (SimplEnv {seLetFloats = Floats bs _, seJoinFloats = jbs})
-  = fromOL bs ++ fromOL jbs
+getTopFloatBinds :: SimplFloats -> [CoreBind]
+getTopFloatBinds (SimplFloats { sfLetFloats  = lbs
+                              , sfJoinFloats = jbs})
+  = ASSERT( isNilOL jbs )  -- Can't be any top-level join bindings
+    letFloatBinds lbs
 
-isEmptyFloats :: SimplEnv -> Bool
-isEmptyFloats env@(SimplEnv {seLetFloats = Floats bs _})
-  = isNilOL bs && isEmptyJoinFloats env
-
-isEmptyJoinFloats :: SimplEnv -> Bool
-isEmptyJoinFloats (SimplEnv {seJoinFloats = jbs})
-  = isNilOL jbs
-
-mapFloats :: Floats -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> Floats
-mapFloats (Floats fs ff) fun
-   = Floats (mapOL app fs) ff
+mapLetFloats :: LetFloats -> ((Id,CoreExpr) -> (Id,CoreExpr)) -> LetFloats
+mapLetFloats (LetFloats fs ff) fun
+   = LetFloats (mapOL app fs) ff
    where
     app (NonRec b e) = case fun (b,e) of (b',e') -> NonRec b' e'
     app (Rec bs)     = Rec (map fun bs)

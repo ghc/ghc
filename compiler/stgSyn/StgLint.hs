@@ -11,7 +11,7 @@ module StgLint ( lintStgTopBindings ) where
 import StgSyn
 
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
-import Id               ( Id, idType, isLocalId )
+import Id               ( Id, idType, isLocalId, isJoinId )
 import VarSet
 import DataCon
 import CoreSyn          ( AltCon(..) )
@@ -108,7 +108,7 @@ lint_binds_help (binder, rhs)
         _maybe_rhs_ty <- lintStgRhs rhs
 
         -- Check binder doesn't have unlifted type
-        checkL (not (isUnliftedType binder_ty))
+        checkL (isJoinId binder || not (isUnliftedType binder_ty))
                (mkUnliftedTyMsg binder rhs)
 
         -- Check match to RHS type

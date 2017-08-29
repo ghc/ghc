@@ -1554,19 +1554,24 @@ occAnalNonRecRhs :: OccEnv
 occAnalNonRecRhs env bndr bndrs body
   = occAnalLamOrRhs rhs_env bndrs body
   where
-    -- See Note [Cascading inlines]
-    env1 | certainly_inline = env
+    env1 | is_join_point    = env  -- See Note [Join point RHSs]
+         | certainly_inline = env  -- See Note [Cascading inlines]
          | otherwise        = rhsCtxt env
 
     -- See Note [Sources of one-shot information]
     rhs_env = env1 { occ_one_shots = argOneShots dmd }
 
     certainly_inline -- See Note [Cascading inlines]
-      = case idOccInfo bndr of
+      = case occ of
           OneOcc { occ_in_lam = in_lam, occ_one_br = one_br }
-                                 -> not in_lam && one_br && active && not_stable
-          _                      -> False
+            -> not in_lam && one_br && active && not_stable
+          _ -> False
 
+    is_join_point = isAlwaysTailCalled occ
+    -- Like (isJoinId bndr) but happens one step earlier
+    --  c.f. willBeJoinId_maybe
+
+    occ        = idOccInfo bndr
     dmd        = idDemandInfo bndr
     active     = isAlwaysActive (idInlineActivation bndr)
     not_stable = not (isStableUnfolding (idUnfolding bndr))
@@ -1627,7 +1632,18 @@ occAnalRules env mb_expected_join_arity rec_flag id
       = case mb_expected_join_arity of
           Just ar | args `lengthIs` ar -> uds
           _                            -> markAllNonTailCalled uds
-{-
+{- Note [Join point RHSs]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+   x = e
+   join j = Just x
+
+We want to inline x into j right away, so we don't want to give
+the join point a RhsCtxt (Trac #14137).  It's not a huge deal, because
+the FloatIn pass knows to float into join point RHSs; and the simplifier
+does not float things out of join point RHSs.  But it's a simple, cheap
+thing to do.  See Trac #14137.
+
 Note [Cascading inlines]
 ~~~~~~~~~~~~~~~~~~~~~~~~
 By default we use an rhsCtxt for the RHS of a binding.  This tells the
@@ -1654,15 +1670,19 @@ definitely inline the next time round, and so we analyse x3's rhs in
 an ordinary context, not rhsCtxt.  Hence the "certainly_inline" stuff.
 
 Annoyingly, we have to approximate SimplUtils.preInlineUnconditionally.
-If we say "yes" when preInlineUnconditionally says "no" the simplifier iterates
-indefinitely:
+If (a) the RHS is expandable (see isExpandableApp in occAnalApp), and
+   (b) certainly_inline says "yes" when preInlineUnconditionally says "no"
+then the simplifier iterates indefinitely:
         x = f y
-        k = Just x
+        k = Just x   -- We decide that k is 'certainly_inline'
+        v = ...k...  -- but preInlineUnconditionally doesn't inline it
 inline ==>
         k = Just (f y)
+        v = ...k...
 float ==>
         x1 = f y
         k = Just x1
+        v = ...k...
 
 This is worse than the slow cascade, so we only want to say "certainly_inline"
 if it really is certain.  Look at the note with preInlineUnconditionally

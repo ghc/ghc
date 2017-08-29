@@ -83,7 +83,7 @@ import DynFlags
 import FastString
 import Maybes
 import ListSetOps       ( minusList )
-import BasicTypes       ( Arity )
+import BasicTypes       ( Arity, isConLike )
 import Platform
 import Util
 import Pair
@@ -1168,22 +1168,11 @@ type CheapAppFun = Id -> Arity -> Bool
   --    isCheapApp
   --    isExpandableApp
 
-  -- NB: isCheapApp and isExpandableApp are called from outside
-  --     this module, so don't be tempted to move the notRedex
-  --     stuff into the call site in exprIsCheapX, and remove it
-  --     from the CheapAppFun implementations
-
-
-notRedex :: CheapAppFun
-notRedex fn n_val_args
-  =  n_val_args == 0           -- No value args
-  || n_val_args < idArity fn   -- Partial application
-  || isBottomingId fn   -- OK to duplicate calls to bottom;
-                        -- it certainly doesn't need to be shared!
-
 isWorkFreeApp :: CheapAppFun
 isWorkFreeApp fn n_val_args
-  | notRedex fn n_val_args
+  | n_val_args == 0           -- No value args
+  = True
+  | n_val_args < idArity fn   -- Partial application
   = True
   | otherwise
   = case idDetails fn of
@@ -1192,11 +1181,11 @@ isWorkFreeApp fn n_val_args
 
 isCheapApp :: CheapAppFun
 isCheapApp fn n_val_args
-  | notRedex fn n_val_args
-  = True
+  | isWorkFreeApp fn n_val_args = True
+  | isBottomingId fn            = True  -- See Note [isCheapApp: bottoming functions]
   | otherwise
   = case idDetails fn of
-      DataConWorkId {} -> True
+      DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId op      -> primOpIsCheap op
@@ -1208,21 +1197,24 @@ isCheapApp fn n_val_args
 
 isExpandableApp :: CheapAppFun
 isExpandableApp fn n_val_args
-  | notRedex fn n_val_args
-  = True
-  | isConLikeId fn
-  = True
+  | isWorkFreeApp fn n_val_args = True
   | otherwise
   = case idDetails fn of
-      DataConWorkId {} -> True
+      DataConWorkId {} -> True  -- Actually handled by isWorkFreeApp
       RecSelId {}      -> n_val_args == 1  -- See Note [Record selection]
       ClassOpId {}     -> n_val_args == 1
       PrimOpId {}      -> False
-      _                -> all_pred_args n_val_args (idType fn)
+      _ | isBottomingId fn               -> False
+          -- See Note [isExpandableApp: bottoming functions]
+        | isConLike (idRuleMatchInfo fn) -> True
+        | all_args_are_preds             -> True
+        | otherwise                      -> False
 
   where
-  -- See if all the arguments are PredTys (implicit params or classes)
-  -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     -- See if all the arguments are PredTys (implicit params or classes)
+     -- If so we'll regard it as expandable; see Note [Expandable overloadings]
+     all_args_are_preds = all_pred_args n_val_args (idType fn)
+
      all_pred_args n_val_args ty
        | n_val_args == 0
        = True
@@ -1235,7 +1227,35 @@ isExpandableApp fn n_val_args
        | otherwise
        = False
 
-{- Note [Record selection]
+{- Note [isCheapApp: bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+I'm not sure why we have a special case for bottoming
+functions in isCheapApp.  Maybe we don't need it.
+
+Note [isExpandableApp: bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's important that isExpandableApp does not respond True to bottoming
+functions.  Recall  undefined :: HasCallStack => a
+Suppose isExpandableApp responded True to (undefined d), and we had:
+
+  x = undefined <dict-expr>
+
+Then Simplify.prepareRhs would ANF the RHS:
+
+  d = <dict-expr>
+  x = undefined d
+
+This is already bad: we gain nothing from having x bound to (undefined
+var), unlike the case for data constructors.  Worse, we get the
+simplifier loop described in OccurAnal Note [Cascading inlines].
+Suppose x occurs just once; OccurAnal.occAnalNonRecRhs decides x will
+certainly_inline; so we end up inlining d right back into x; but in
+the end x doesn't inline because it is bottom (preInlineUnconditionally);
+so the process repeats.. We could elaborate the certainly_inline logic
+some more, but it's better just to treat bottoming bindings as
+non-expandable, because ANFing them is a bad idea in the first place.
+
+Note [Record selection]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 I'm experimenting with making record selection
 look cheap, so we will substitute it inside a
@@ -1308,16 +1328,16 @@ it's applied only to dictionaries.
 --
 -- We can only do this if the @y + 1@ is ok for speculation: it has no
 -- side effects, and can't diverge or raise an exception.
-exprOkForSpeculation, exprOkForSideEffects :: Expr b -> Bool
+
+exprOkForSpeculation, exprOkForSideEffects :: CoreExpr -> Bool
 exprOkForSpeculation = expr_ok primOpOkForSpeculation
 exprOkForSideEffects = expr_ok primOpOkForSideEffects
-  -- Polymorphic in binder type
-  -- There is one call at a non-Id binder type, in SetLevels
 
-expr_ok :: (PrimOp -> Bool) -> Expr b -> Bool
+expr_ok :: (PrimOp -> Bool) -> CoreExpr -> Bool
 expr_ok _ (Lit _)      = True
 expr_ok _ (Type _)     = True
 expr_ok _ (Coercion _) = True
+
 expr_ok primop_ok (Var v)      = app_ok primop_ok v []
 expr_ok primop_ok (Cast e _)   = expr_ok primop_ok e
 
@@ -1328,10 +1348,18 @@ expr_ok primop_ok (Tick tickish e)
    | tickishCounts tickish = False
    | otherwise             = expr_ok primop_ok e
 
-expr_ok primop_ok (Case e _ _ alts)
-  =  expr_ok primop_ok e  -- Note [exprOkForSpeculation: case expressions]
+expr_ok _ (Let {}) = False
+  -- Lets can be stacked deeply, so just give up.
+  -- In any case, the argument of exprOkForSpeculation is
+  -- usually in a strict context, so any lets will have been
+  -- floated away.
+
+expr_ok primop_ok (Case scrut bndr _ alts)
+  =  -- See Note [exprOkForSpeculation: case expressions]
+     expr_ok primop_ok scrut
+  && isUnliftedType (idType bndr)
   && all (\(_,_,rhs) -> expr_ok primop_ok rhs) alts
-  && altsAreExhaustive alts     -- Note [Exhaustive alts]
+  && altsAreExhaustive alts
 
 expr_ok primop_ok other_expr
   = case collectArgs other_expr of
@@ -1340,7 +1368,7 @@ expr_ok primop_ok other_expr
         _            -> False
 
 -----------------------------
-app_ok :: (PrimOp -> Bool) -> Id -> [Expr b] -> Bool
+app_ok :: (PrimOp -> Bool) -> Id -> [CoreExpr] -> Bool
 app_ok primop_ok fun args
   = case idDetails fun of
       DFunId new_type ->  not new_type
@@ -1376,7 +1404,7 @@ app_ok primop_ok fun args
   where
     (arg_tys, _) = splitPiTys (idType fun)
 
-    arg_ok :: TyBinder -> Expr b -> Bool
+    arg_ok :: TyBinder -> CoreExpr -> Bool
     arg_ok (Named _) _ = True   -- A type argument
     arg_ok (Anon ty) arg        -- A term argument
        | isUnliftedType ty = expr_ok primop_ok arg
@@ -1411,22 +1439,72 @@ isDivOp FloatDivOp       = True
 isDivOp DoubleDivOp      = True
 isDivOp _                = False
 
-{-
-Note [exprOkForSpeculation: case expressions]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's always sound for exprOkForSpeculation to return False, and we
-don't want it to take too long, so it bales out on complicated-looking
-terms.  Notably lets, which can be stacked very deeply; and in any
-case the argument of exprOkForSpeculation is usually in a strict context,
-so any lets will have been floated away.
+{- Note [exprOkForSpeculation: case expressions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+exprOkForSpeculation accepts very special case exprsssions.
+Reason: (a ==# b) is ok-for-speculation, but the litEq rules
+in PrelRules convert it (a ==# 3#) to
+   case a of { DEAFULT -> 0#; 3# -> 1# }
+for excellent reasons described in
+  PrelRules Note [The litEq rule: converting equality to case].
+So, annoyingly, we want that case expression to be
+ok-for-speculation too. Bother.
 
-However, we keep going on case-expressions.  An example like this one
-showed up in DPH code (Trac #3717):
+But we restrict it sharply:
+
+* We restrict it to unlifted scrutinees. Consider this:
+     case x of y {
+       DEFAULT -> ... (let v::Int# = case y of { True  -> e1
+                                               ; False -> e2 }
+                       in ...) ...
+
+  Does the RHS of v satisfy the let/app invariant?  Previously we said
+  yes, on the grounds that y is evaluated.  But the binder-swap done
+  by SetLevels would transform the inner alternative to
+     DEFAULT -> ... (let v::Int# = case x of { ... }
+                     in ...) ....
+  which does /not/ satisfy the let/app invariant, because x is
+  not evaluated. See Note [Binder-swap during float-out]
+  in SetLevels.  To avoid this awkwardness it seems simpler
+  to stick to unlifted scrutinees where the issue does not
+  arise.
+
+* We restrict it to exhaustive alternatives. A non-exhaustive
+  case manifestly isn't ok-for-speculation. Consider
+    case e of x { DEAFULT ->
+      ...(case x of y
+            A -> ...
+            _ -> ...(case (case x of { B -> p; C -> p }) of
+                       I# r -> blah)...
+  If SetLevesls considers the inner nested case as ok-for-speculation
+  it can do case-floating (see Note [Floating cases] in SetLevels).
+  So we'd float to:
+    case e of x { DEAFULT ->
+    case (case x of { B -> p; C -> p }) of I# r ->
+    ...(case x of y
+            A -> ...
+            _ -> ...blah...)...
+  which is utterly bogus (seg fault); see Trac #5453.
+
+  Similarly, this is a valid program (albeit a slightly dodgy one)
+    let v = case x of { B -> ...; C -> ... }
+    in case x of
+         A -> ...
+         _ ->  ...v...v....
+  Should v be considered ok-for-speculation?  Its scrutinee may be
+  evaluated, but the alternatives are incomplete so we should not
+  evalutate it strictly.
+
+  Now, all this is for lifted types, but it'd be the same for any
+  finite unlifted type. We don't have many of them, but we might
+  add unlifted algebraic types in due course.
+
+----- Historical note: Trac #3717: --------
     foo :: Int -> Int
     foo 0 = 0
     foo n = (if n < 5 then 1 else 2) `seq` foo (n-1)
 
-If exprOkForSpeculation doesn't look through case expressions, you get this:
+In earlier GHCs, we got this:
     T.$wfoo =
       \ (ww :: GHC.Prim.Int#) ->
         case ww of ds {
@@ -1435,31 +1513,13 @@ If exprOkForSpeculation doesn't look through case expressions, you get this:
                           GHC.Types.True -> lvl})
                        of _ { __DEFAULT ->
                        T.$wfoo (GHC.Prim.-# ds_XkE 1) };
-          0 -> 0
-        }
+          0 -> 0 }
 
-The inner case is redundant, and should be nuked.
-
-Note [Exhaustive alts]
-~~~~~~~~~~~~~~~~~~~~~~
-We might have something like
-  case x of {
-    A -> ...
-    _ -> ...(case x of { B -> ...; C -> ... })...
-Here, the inner case is fine, because the A alternative
-can't happen, but it's not ok to float the inner case outside
-the outer one (even if we know x is evaluated outside), because
-then it would be non-exhaustive. See Trac #5453.
-
-Similarly, this is a valid program (albeit a slightly dodgy one)
-   let v = case x of { B -> ...; C -> ... }
-   in case x of
-         A -> ...
-         _ ->  ...v...v....
-But we don't want to speculate the v binding.
-
-One could try to be clever, but the easy fix is simpy to regard
-a non-exhaustive case as *not* okForSpeculation.
+Before join-points etc we could only get rid of two cases (which are
+redundant) by recognising that th e(case <# ds 5 of { ... }) is
+ok-for-speculation, even though it has /lifted/ tyupe.  But now join
+points do the job nicely.
+------- End of historical note ------------
 
 
 Note [Primops with lifted arguments]

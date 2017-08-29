@@ -9,7 +9,7 @@ test('haddock.base',
           [(platform('x86_64-unknown-mingw32'), 24286343184, 5)
             # 2017-02-19                        24286343184 (x64/Windows) - Generalize kind of (->)
 
-          ,(wordsize(64), 23677299848, 5)
+          ,(wordsize(64), 19694554424, 5)
             # 2012-08-14:  5920822352 (amd64/Linux)
             # 2012-09-20:  5829972376 (amd64/Linux)
             # 2012-10-08:  5902601224 (amd64/Linux)
@@ -42,6 +42,7 @@ test('haddock.base',
             # 2017-06-05: 27868466432 (x86_64/Linux) - Desugar modules compiled with -fno-code
             # 2017-06-06: 25173968808 (x86_64/Linux) - Don't pass on -dcore-lint in Haddock.mk
             # 2017-07-12: 23677299848 (x86_64/Linux) - Use getNameToInstancesIndex
+            # 2017-08-22: 19694554424 (x86_64/Linux) - Various Haddock optimizations
 
           ,(platform('i386-unknown-mingw32'), 2885173512, 5)
             # 2013-02-10:                     3358693084 (x86/Windows)
@@ -68,7 +69,7 @@ test('haddock.Cabal',
      [extra_files(['../../../../libraries/Cabal/Cabal/dist-install/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
      ,stats_num_field('bytes allocated',
-          [(wordsize(64), 18753963960 , 5)
+          [(wordsize(64), 15857428040, 5)
             # 2012-08-14:  3255435248 (amd64/Linux)
             # 2012-08-29:  3324606664 (amd64/Linux, new codegen)
             # 2012-10-08:  3373401360 (amd64/Linux)
@@ -116,6 +117,7 @@ test('haddock.Cabal',
             # 2017-05-31: 18269309128 (amd64/Linux) - Faster checkFamInstConsistency
             # 2017-06-05: 22294859000 (amd64/Linux) - Desugar modules compiled with -fno-code
             # 2017-06-05: 18753963960 (amd64/Linux) - Don't pass on -dcore-lint in Haddock.mk
+            # 2017-08-22: 15857428040 (amd64/Linux) - Various Haddock optimizations
 
           ,(platform('i386-unknown-mingw32'), 3293415576, 5)
             # 2012-10-30:                     1733638168 (x86/Windows)

@@ -31,7 +31,8 @@ testOneFile :: FilePath -> String -> IO ()
 testOneFile libdir fileName = do
        p <- parseOneFile libdir fileName
        let
-         origAst = showAstData BlankSrcSpan (pm_parsed_source p)
+         origAst = showSDoc unsafeGlobalDynFlags
+                     $ showAstData BlankSrcSpan (pm_parsed_source p)
          pped    = pragmas ++ "\n" ++ pp (pm_parsed_source p)
          anns    = pm_annotations p
          pragmas = getPragmas anns
@@ -45,7 +46,9 @@ testOneFile libdir fileName = do
 
        p' <- parseOneFile libdir newFile
 
-       let newAstStr = showAstData BlankSrcSpan (pm_parsed_source p')
+       let newAstStr :: String
+           newAstStr = showSDoc unsafeGlobalDynFlags
+                         $ showAstData BlankSrcSpan (pm_parsed_source p')
        writeFile newAstFile newAstStr
 
        if origAst == newAstStr

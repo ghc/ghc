@@ -98,6 +98,23 @@ This is used to construct a message of form
    The function 'f' is applied to two arguments
    but its type `Int -> Int' has only one
 
+When visible type applications (e.g., `f @Int 1 2`, as in #13902) enter the
+picture, we have a choice in deciding whether to count the type applications as
+proper arguments:
+
+   The function 'f' is applied to one visible type argument
+     and two value arguments
+   but its type `forall a. a -> a` has only one visible type argument
+     and one value argument
+
+Or whether to include the type applications as part of the herald itself:
+
+   The expression 'f @Int' is applied to two arguments
+   but its type `Int -> Int` has only one
+
+The latter is easier to implement and is arguably easier to understand, so we
+choose to implement that option.
+
 Note [matchExpectedFunTys]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 matchExpectedFunTys checks that a sigma has the form
@@ -1127,24 +1144,41 @@ buildImplication :: SkolemInfo
                  -> TcM result
                  -> TcM (Bag Implication, TcEvBinds, result)
 buildImplication skol_info skol_tvs given thing_inside
-  = do { tc_lvl <- getTcLevel
-       ; deferred_type_errors <- goptM Opt_DeferTypeErrors <||>
-                                 goptM Opt_DeferTypedHoles
-       ; if null skol_tvs && null given && (not deferred_type_errors ||
-                                            not (isTopTcLevel tc_lvl))
-         then do { res <- thing_inside
-                 ; return (emptyBag, emptyTcEvBinds, res) }
-      -- Fast path.  We check every function argument with
-      -- tcPolyExpr, which uses tcSkolemise and hence checkConstraints.
-      -- But with the solver producing unlifted equalities, we need
-      -- to have an EvBindsVar for them when they might be deferred to
-      -- runtime. Otherwise, they end up as top-level unlifted bindings,
-      -- which are verboten. See also Note [Deferred errors for coercion holes]
-      -- in TcErrors.
+  = do { implication_needed <- implicationNeeded skol_tvs given
+
+       ; if implication_needed
+         then do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
+                 ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
+                 ; return (implics, ev_binds, result) }
+
+         else -- Fast path.  We check every function argument with
+              -- tcPolyExpr, which uses tcSkolemise and hence checkConstraints.
+              -- So tihs fast path is well-exercised
+              do { res <- thing_inside
+                 ; return (emptyBag, emptyTcEvBinds, res) } }
+
+implicationNeeded :: [TcTyVar] -> [EvVar] -> TcM Bool
+-- With the solver producing unlifted equalities, we need
+-- to have an EvBindsVar for them when they might be deferred to
+-- runtime. Otherwise, they end up as top-level unlifted bindings,
+-- which are verboten. See also Note [Deferred errors for coercion holes]
+-- in TcErrors.  cf Trac #14149 for an exmample of what goes wrong.
+implicationNeeded skol_tvs given
+  | null skol_tvs
+  , null given
+  = -- Empty skolems and givens
+    do { tc_lvl <- getTcLevel
+       ; if not (isTopTcLevel tc_lvl)  -- No implication needed if we are
+         then return False             -- already inside an implication
          else
-    do { (tclvl, wanted, result) <- pushLevelAndCaptureConstraints thing_inside
-       ; (implics, ev_binds) <- buildImplicationFor tclvl skol_info skol_tvs given wanted
-       ; return (implics, ev_binds, result) }}
+    do { dflags <- getDynFlags       -- If any deferral can happen,
+                                     -- we must build an implication
+       ; return (gopt Opt_DeferTypeErrors dflags ||
+                 gopt Opt_DeferTypedHoles dflags ||
+                 gopt Opt_DeferOutOfScopeVariables dflags) } }
+
+  | otherwise     -- Non-empty skolems or givens
+  = return True   -- Definitely need an implication
 
 buildImplicationFor :: TcLevel -> SkolemInfo -> [TcTyVar]
                    -> [EvVar] -> WantedConstraints

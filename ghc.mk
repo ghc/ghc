@@ -203,16 +203,6 @@ $(error Can not build haddock docs when CrossCompiling or Stage1Only. \
 endif
 endif
 
-ifneq "$(BUILD_SPHINX_HTML) $(BUILD_SPHINX_PDF)" "NO NO"
-# The User's Guide requires mkUserGuidePart, which uses the GHC API.
-ifneq "$(CrossCompiling) $(Stage1Only)" "NO NO"
-$(error Can not build User's Guide when CrossCompiling or Stage1Only. \
-  Set BUILD_SPHINX_HTML=NO, BUILD_SPHINX_PDF=NO in your \
-  mk/build.mk file. \
-  See Note [No stage2 packages when CrossCompiling or Stage1Only])
-endif
-endif
-
 endif # CLEANING
 
 # -----------------------------------------------------------------------------
@@ -568,7 +558,6 @@ utils/haddock/dist/package-data.mk: compiler/stage2/package-data.mk
 utils/ghctags/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-api-annotations/dist-install/package-data.mk: compiler/stage2/package-data.mk
 utils/check-ppr/dist-install/package-data.mk: compiler/stage2/package-data.mk
-utils/mkUserGuidePart/dist/package-data.mk: compiler/stage2/package-data.mk
 
 # add the final package.conf dependency: ghc-prim depends on RTS
 libraries/ghc-prim/dist-install/package-data.mk : rts/dist/package.conf.inplace
@@ -695,7 +684,6 @@ BUILD_DIRS += utils/ghc-cabal
 BUILD_DIRS += utils/hpc
 BUILD_DIRS += utils/runghc
 BUILD_DIRS += ghc
-BUILD_DIRS += utils/mkUserGuidePart
 BUILD_DIRS += docs/users_guide
 BUILD_DIRS += utils/count_lines
 BUILD_DIRS += utils/compare_sizes
@@ -714,7 +702,6 @@ BUILD_DIRS := $(filter-out utils/mkdirhier,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/genprimopcode,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out bindisttest,$(BUILD_DIRS))
 BUILD_DIRS := $(filter-out utils/genapply,$(BUILD_DIRS))
-BUILD_DIRS := $(filter-out utils/mkUserGuidePart,$(BUILD_DIRS))
 endif
 ifeq "$(HADDOCK_DOCS)" "NO"
 BUILD_DIRS := $(filter-out utils/haddock,$(BUILD_DIRS))
@@ -723,7 +710,6 @@ endif
 ifeq "$(BUILD_SPHINX_HTML) $(BUILD_SPHINX_PDF)" "NO NO"
 BUILD_DIRS := $(filter-out docs/users_guide,$(BUILD_DIRS))
 # Don't to build this little utility if we're not building the User's Guide.
-BUILD_DIRS := $(filter-out utils/mkUserGuidePart,$(BUILD_DIRS))
 endif
 ifeq "$(Windows_Host)" "NO"
 BUILD_DIRS := $(filter-out utils/touchy,$(BUILD_DIRS))
@@ -1366,6 +1352,8 @@ clean_files :
 	$(call removeTrees,inplace/bin)
 	$(call removeTrees,inplace/lib)
 	$(call removeTrees,libraries/bootstrapping.conf)
+# Clean the files that ./validate creates.
+	$(call removeFiles,mk/are-validating.mk)
 
 .PHONY: clean_libraries
 clean_libraries: $(patsubst %,clean_libraries/%_dist-install,$(PACKAGES_STAGE1) $(PACKAGES_STAGE2))
@@ -1398,9 +1386,6 @@ clean_bindistprep:
 	$(call removeTrees,bindistprep/)
 
 distclean : clean
-# Clean the files that ./validate creates.
-	$(call removeFiles,mk/are-validating.mk)
-
 # Clean the files that we ask ./configure to create.
 	$(call removeFiles,mk/config.mk)
 	$(call removeFiles,mk/install.mk)
@@ -1519,8 +1504,8 @@ endif
 #  - neither do we register the ghc library (compiler/stage1) that we build
 #    with stage0. TODO Why not? We do build it...
 #  - as a result, we need to a) use ghc-stage2 to build packages that depend on
-#    the ghc library (e.g. ghctags [4] and mkUserGuidePart) and b) exclude
-#    those packages when ghc-stage2 is not available.
+#    the ghc library (e.g. ghctags [4]) and b) exclude those packages when
+#    ghc-stage2 is not available.
 #  - when Stage1Only=YES, it's clear that ghc-stage2 is not available (we just
 #    said we didn't want it), so we have to exclude the stage2 packages from
 #    the build. This includes the case where Stage1Only=YES is combined with

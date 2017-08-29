@@ -1172,7 +1172,13 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                                     Just (ms_mod lcl_mod, type_env_var) }
                 lcl_hsc_env'' <- case finish_loop of
                     Nothing   -> return lcl_hsc_env'
+                    -- In the non-parallel case, the retypecheck prior to
+                    -- typechecking the loop closer includes all modules
+                    -- EXCEPT the loop closer.  However, our precomputed
+                    -- SCCs include the loop closer, so we have to filter
+                    -- it out.
                     Just loop -> typecheckLoop lcl_dflags lcl_hsc_env' $
+                                 filter (/= moduleName (fst this_build_mod)) $
                                  map (moduleName . fst) loop
 
                 -- Compile the module.
@@ -1195,8 +1201,10 @@ parUpsweep_one mod home_mod_map comp_graph_loops lcl_dflags mHscMessage cleanup 
                     let hsc_env' = hsc_env
                                      { hsc_HPT = addToHpt (hsc_HPT hsc_env)
                                                            this_mod mod_info }
-                    -- If this module is a loop finisher, now is the time to
-                    -- re-typecheck the loop.
+                    -- We've finished typechecking the module, now we must
+                    -- retypecheck the loop AGAIN to ensure unfoldings are
+                    -- updated.  This time, however, we include the loop
+                    -- closer!
                     hsc_env'' <- case finish_loop of
                         Nothing   -> return hsc_env'
                         Just loop -> typecheckLoop lcl_dflags hsc_env' $
@@ -1672,6 +1680,42 @@ reTypecheckLoop hsc_env ms graph
   mss = mgModSummaries graph
   appearsAsBoot = (`elemModuleSet` mgBootModules graph)
 
+-- | Given a non-boot ModSummary @ms@ of a module, for which there exists a
+-- corresponding boot file in @graph@, return the set of modules which
+-- transitively depend on this boot file.  This function is slightly misnamed,
+-- but its name "getModLoop" alludes to the fact that, when getModLoop is called
+-- with a graph that does not contain @ms@ (non-parallel case) or is an
+-- SCC with hs-boot nodes dropped (parallel-case), the modules which
+-- depend on the hs-boot file are typically (but not always) the
+-- modules participating in the recursive module loop.  The returned
+-- list includes the hs-boot file.
+--
+-- Example:
+--      let g represent the module graph:
+--          C.hs
+--          A.hs-boot imports C.hs
+--          B.hs imports A.hs-boot
+--          A.hs imports B.hs
+--      genModLoop A.hs g == Just [A.hs-boot, B.hs, A.hs]
+--
+--      It would also be permissible to omit A.hs from the graph,
+--      in which case the result is [A.hs-boot, B.hs]
+--
+-- Example:
+--      A counter-example to the claim that modules returned
+--      by this function participate in the loop occurs here:
+--
+--      let g represent the module graph:
+--          C.hs
+--          A.hs-boot imports C.hs
+--          B.hs imports A.hs-boot
+--          A.hs imports B.hs
+--          D.hs imports A.hs-boot
+--      genModLoop A.hs g == Just [A.hs-boot, B.hs, A.hs, D.hs]
+--
+--      Arguably, D.hs should import A.hs, not A.hs-boot, but
+--      a dependency on the boot file is not illegal.
+--
 getModLoop
   :: ModSummary
   -> [ModSummary]
@@ -1687,6 +1731,8 @@ getModLoop ms graph appearsAsBoot
  where
   this_mod = ms_mod ms
 
+-- NB: sometimes mods has duplicates; this is harmless because
+-- any duplicates get clobbered in addListToHpt and never get forced.
 typecheckLoop :: DynFlags -> HscEnv -> [ModuleName] -> IO HscEnv
 typecheckLoop dflags hsc_env mods = do
   debugTraceMsg dflags 2 $

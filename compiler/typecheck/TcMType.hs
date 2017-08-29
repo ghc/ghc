@@ -580,12 +580,6 @@ instead of the buggous
 ************************************************************************
 -}
 
-mkMetaTyVarName :: Unique -> FastString -> Name
--- Makes a /System/ Name, which is eagerly eliminated by
--- the unifier; see TcUnify.nicer_to_update_tv1, and
--- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
-mkMetaTyVarName uniq str = mkSysTvName uniq str
-
 newSigTyVar :: Name -> Kind -> TcM TcTyVar
 newSigTyVar name kind
   = do { details <- newMetaDetails SigTv
@@ -763,6 +757,12 @@ coercion variables, except for the special case of the promoted Eq#. But,
 that can't ever appear in user code, so we're safe!
 -}
 
+mkMetaTyVarName :: Unique -> FastString -> Name
+-- Makes a /System/ Name, which is eagerly eliminated by
+-- the unifier; see TcUnify.nicer_to_update_tv1, and
+-- TcCanonical.canEqTyVarTyVar (nicer_to_update_tv2)
+mkMetaTyVarName uniq str = mkSystemName uniq (mkTyVarOccFS str)
+
 newAnonMetaTyVar :: MetaInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
 newAnonMetaTyVar meta_info kind
@@ -775,6 +775,21 @@ newAnonMetaTyVar meta_info kind
                         SigTv       -> fsLit "a"
         ; details <- newMetaDetails meta_info
         ; return (mkTcTyVar name kind details) }
+
+cloneAnonMetaTyVar :: MetaInfo -> TyVar -> TcKind -> TcM TcTyVar
+-- Same as newAnonMetaTyVar, but use a supplied TyVar as the source of the print-name
+cloneAnonMetaTyVar info tv kind
+  = do  { uniq    <- newUnique
+        ; details <- newMetaDetails info
+        ; let name = mkSystemName uniq (getOccName tv)
+                       -- See Note [Name of an instantiated type variable]
+        ; return (mkTcTyVar name kind details) }
+
+{- Note [Name of an instantiated type variable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At the moment we give a unification variable a System Name, which
+influences the way it is tidied; see TypeRep.tidyTyVarBndr.
+-}
 
 newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newAnonMetaTyVar TauTv kind
@@ -832,23 +847,20 @@ newWildCardX subst tv
 
 new_meta_tv_x :: MetaInfo -> TCvSubst -> TyVar -> TcM (TCvSubst, TcTyVar)
 new_meta_tv_x info subst tv
-  = do  { uniq <- newUnique
-        ; details <- newMetaDetails info
-        ; let name   = mkSystemName uniq (getOccName tv)
-                       -- See Note [Name of an instantiated type variable]
-              kind   = substTyUnchecked subst (tyVarKind tv)
-                       -- NOTE: Trac #12549 is fixed so we could use
-                       -- substTy here, but the tc_infer_args problem
-                       -- is not yet fixed so leaving as unchecked for now.
-                       -- OLD NOTE:
-                       -- Unchecked because we call newMetaTyVarX from
-                       -- tcInstBinder, which is called from tc_infer_args
-                       -- which does not yet take enough trouble to ensure
-                       -- the in-scope set is right; e.g. Trac #12785 trips
-                       -- if we use substTy here
-              new_tv = mkTcTyVar name kind details
-              subst1 = extendTvSubstWithClone subst tv new_tv
+  = do  { new_tv <- cloneAnonMetaTyVar info tv substd_kind
+        ; let subst1 = extendTvSubstWithClone subst tv new_tv
         ; return (subst1, new_tv) }
+  where
+    substd_kind = substTyUnchecked subst (tyVarKind tv)
+      -- NOTE: Trac #12549 is fixed so we could use
+      -- substTy here, but the tc_infer_args problem
+      -- is not yet fixed so leaving as unchecked for now.
+      -- OLD NOTE:
+      -- Unchecked because we call newMetaTyVarX from
+      -- tcInstBinder, which is called from tc_infer_args
+      -- which does not yet take enough trouble to ensure
+      -- the in-scope set is right; e.g. Trac #12785 trips
+      -- if we use substTy here
 
 newMetaTyVarTyAtLevel :: TcLevel -> TcKind -> TcM TcType
 newMetaTyVarTyAtLevel tc_lvl kind
@@ -860,12 +872,7 @@ newMetaTyVarTyAtLevel tc_lvl kind
                                , mtv_tclvl = tc_lvl }
         ; return (mkTyVarTy (mkTcTyVar name kind details)) }
 
-{- Note [Name of an instantiated type variable]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At the moment we give a unification variable a System Name, which
-influences the way it is tidied; see TypeRep.tidyTyVarBndr.
-
-************************************************************************
+{- *********************************************************************
 *                                                                      *
              Quantification
 *                                                                      *

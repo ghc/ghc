@@ -58,6 +58,7 @@
      tools. See note below.
 
    Note [BFD import library]
+   ~~~~~~~~~~~~~~~~~~~~~~~~~
 
    On Windows, compilers don't link directly to dynamic libraries.
    The reason for this is that the exports are not always by symbol, the
@@ -240,6 +241,13 @@ static void addDLLHandle(pathchar* dll_name, HINSTANCE instance) {
         (PIMAGE_IMPORT_DESCRIPTOR)((BYTE *)instance + header->
         OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
 
+    bool importTableMissing =
+        header->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].Size == 0;
+
+    if (importTableMissing) {
+        return;
+    }
+
     /* Ignore these compatibility shims.  */
     const pathchar* ms_dll = WSTR("api-ms-win-");
     const int len = wcslen(ms_dll);
@@ -395,7 +403,7 @@ COFF_HEADER_INFO* getHeaderInfo ( ObjectCode* oc )
 __attribute__ ((always_inline)) inline
 size_t getSymbolSize ( COFF_HEADER_INFO *info )
 {
-    ASSERT (info);
+    ASSERT(info);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -408,8 +416,8 @@ size_t getSymbolSize ( COFF_HEADER_INFO *info )
 __attribute__ ((always_inline)) inline
 int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -422,8 +430,8 @@ int32_t getSymSectionNumber ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint32_t getSymValue ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -436,8 +444,8 @@ uint32_t getSymValue ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -450,8 +458,8 @@ uint8_t getSymStorageClass ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -464,8 +472,8 @@ uint8_t getSymNumberOfAuxSymbols ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint16_t getSymType ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:
@@ -478,8 +486,8 @@ uint16_t getSymType ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 __attribute__ ((always_inline)) inline
 uint8_t* getSymShortName ( COFF_HEADER_INFO *info, COFF_symbol* sym )
 {
-    ASSERT (info);
-    ASSERT (sym);
+    ASSERT(info);
+    ASSERT(sym);
     switch (info->type)
     {
         case COFF_ANON_BIG_OBJ:

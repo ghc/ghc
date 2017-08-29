@@ -742,7 +742,7 @@ import GHC.Base    ( Alternative(..), Applicative(..), Functor(..)
                    , Monad(..), MonadPlus(..), String, coerce )
 import GHC.Classes ( Eq(..), Ord(..) )
 import GHC.Enum    ( Bounded, Enum )
-import GHC.Read    ( Read(..), lex, readParen )
+import GHC.Read    ( Read(..) )
 import GHC.Show    ( Show(..), showString )
 
 -- Needed for metadata
@@ -775,8 +775,7 @@ instance Ord (U1 p) where
   compare _ _ = EQ
 
 -- | @since 4.9.0.0
-instance Read (U1 p) where
-  readsPrec d = readParen (d > 10) (\r -> [(U1, s) | ("U1",s) <- lex r ])
+deriving instance Read (U1 p)
 
 -- | @since 4.9.0.0
 instance Show (U1 p) where

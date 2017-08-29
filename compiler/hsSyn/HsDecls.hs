@@ -1155,9 +1155,9 @@ data ConDecl pass
       , con_qvars     :: Maybe (LHsQTyVars pass)
         -- User-written forall (if any), and its implicit
         -- kind variables
-        -- Non-Nothing needs -XExistentialQuantification
-        --               e.g. data T a = forall b. MkT b (b->a)
-        --               con_qvars = {b}
+        -- Non-Nothing means an explicit user-written forall
+        --     e.g. data T a = forall b. MkT b (b->a)
+        --     con_qvars = {b}
 
       , con_cxt       :: Maybe (LHsContext pass)
         -- ^ User-written context (if any)
@@ -1330,7 +1330,7 @@ type patterns, i.e. fv(pat_tys).  Note in particular
   '_' gets its own unique.  In this context wildcards behave just like
   an ordinary type variable, only anonymous.
 
-* The hsib_vars *including* type variables that are already in scope
+* The hsib_vars *includes* type variables that are already in scope
 
    Eg   class C s t where
           type F t p :: *

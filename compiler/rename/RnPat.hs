@@ -47,8 +47,8 @@ import RnEnv
 import RnFixity
 import RnUtils             ( HsDocContext(..), newLocalBndrRn, bindLocalNames
                            , warnUnusedMatches, newLocalBndrRn
-                           , checkDupAndShadowedNames, checkTupSize
-                           , unknownSubordinateErr )
+                           , checkDupNames, checkDupAndShadowedNames
+                           , checkTupSize , unknownSubordinateErr )
 import RnTypes
 import PrelNames
 import TyCon               ( tyConName )
@@ -67,7 +67,7 @@ import TysWiredIn          ( nilDataCon )
 import DataCon
 import qualified GHC.LanguageExtensions as LangExt
 
-import Control.Monad       ( when, liftM, ap, unless )
+import Control.Monad       ( when, liftM, ap )
 import qualified Data.List.NonEmpty as NE
 import Data.Ratio
 
@@ -321,10 +321,11 @@ rnPats ctxt pats thing_inside
           --    complain *twice* about duplicates e.g. f (x,x) = ...
           --
           -- See note [Don't report shadowing for pattern synonyms]
-        ; unless (isPatSynCtxt ctxt)
-              (addErrCtxt doc_pat $
-                checkDupAndShadowedNames envs_before $
-                collectPatsBinders pats')
+        ; let bndrs = collectPatsBinders pats'
+        ; addErrCtxt doc_pat $
+          if isPatSynCtxt ctxt
+             then checkDupNames bndrs
+             else checkDupAndShadowedNames envs_before bndrs
         ; thing_inside pats' } }
   where
     doc_pat = text "In" <+> pprMatchContext ctxt

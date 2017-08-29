@@ -1449,7 +1449,7 @@ reifyDataCon isGadtDataCon tys dc
              (ex_tvs, theta, arg_tys)
                  = dataConInstSig dc tys
              -- used for GADTs data constructors
-             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta, g_arg_tys, g_res_ty)
+             (g_univ_tvs, g_ex_tvs, g_eq_spec, g_theta', g_arg_tys', g_res_ty')
                  = dataConFullSig dc
              (srcUnpks, srcStricts)
                  = mapAndUnzip reifySourceBang (dataConSrcBangs dc)
@@ -1459,7 +1459,14 @@ reifyDataCon isGadtDataCon tys dc
              -- Universal tvs present in eq_spec need to be filtered out, as
              -- they will not appear anywhere in the type.
              eq_spec_tvs = mkVarSet (map eqSpecTyVar g_eq_spec)
-             g_unsbst_univ_tvs = filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
+
+       ; (univ_subst, g_unsbst_univ_tvs)
+              -- See Note [Freshen reified GADT constructors' universal tyvars]
+           <- freshenTyVarBndrs $
+              filterOut (`elemVarSet` eq_spec_tvs) g_univ_tvs
+       ; let g_theta   = substTys univ_subst g_theta'
+             g_arg_tys = substTys univ_subst g_arg_tys'
+             g_res_ty  = substTy  univ_subst g_res_ty'
 
        ; r_arg_tys <- reifyTypes (if isGadtDataCon then g_arg_tys else arg_tys)
 
@@ -1497,23 +1504,55 @@ reifyDataCon isGadtDataCon tys dc
        ; ASSERT( arg_tys `equalLength` dcdBangs )
          ret_con }
 
--- Note [Reifying GADT data constructors]
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
--- At this point in the compilation pipeline we have no way of telling whether a
--- data type was declared as a H98 data type or as a GADT.  We have to rely on
--- heuristics here.  We look at dcEqSpec field of all data constructors in a
--- data type declaration.  If at least one data constructor has non-empty
--- dcEqSpec this means that the data type must have been declared as a GADT.
--- Consider these declarations:
---
---   data T a where
---      MkT :: forall a. (a ~ Int) => T a
---
---   data T a where
---      MkT :: T Int
---
--- First declaration will be reified as a GADT.  Second declaration will be
--- reified as a normal H98 data type declaration.
+{-
+Note [Reifying GADT data constructors]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+At this point in the compilation pipeline we have no way of telling whether a
+data type was declared as a H98 data type or as a GADT.  We have to rely on
+heuristics here.  We look at dcEqSpec field of all data constructors in a
+data type declaration.  If at least one data constructor has non-empty
+dcEqSpec this means that the data type must have been declared as a GADT.
+Consider these declarations:
+
+  data T1 a where
+     MkT1 :: T1 Int
+
+  data T2 a where
+     MkT2 :: forall a. (a ~ Int) => T2 a
+
+T1 will be reified as a GADT, as it has a non-empty EqSpec [(a, Int)] due to
+MkT1's return type. T2 will be reified as a normal H98 data type declaration
+since MkT2 uses an explicit type equality in its context instead of an implicit
+equality in its return type, and therefore has an empty EqSpec.
+
+Note [Freshen reified GADT constructors' universal tyvars]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose one were to reify this data type:
+
+  data a :~: b = (a ~ b) => Refl
+
+This will be reified as if it were a GADT definiton, so the reified definition
+will be closer to:
+
+  data a :~: b where
+    Refl :: forall a b. (a ~ b) => a :~: b
+
+We ought to be careful here about the uniques we give to the occurrences of `a`
+and `b` in this definition. That is because in the original DataCon, all uses
+of `a` and `b` have the same unique, since `a` and `b` are both universally
+quantified type variables--that is, they are used in both the (:~:) tycon as
+well as in the constructor type signature. But when we turn the DataCon
+definition into the reified one, the `a` and `b` in the constructor type
+signature becomes differently scoped than the `a` and `b` in `data a :~: b`.
+
+While it wouldn't technically be *wrong* per se to re-use the same uniques for
+`a` and `b` across these two different scopes, it's somewhat annoying for end
+users of Template Haskell, since they wouldn't be able to rely on the
+assumption that all TH names have globally distinct uniques (#13885). For this
+reason, we freshen the universally quantified tyvars that go into the reified
+GADT constructor type signature to give them distinct uniques from their
+counterparts in the tycon.
+-}
 
 ------------------------------
 reifyClass :: Class -> TcM TH.Info

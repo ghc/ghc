@@ -99,6 +99,8 @@ infix  4 `elem`, `notElem`
 --
 -- > fold = foldMap id
 --
+-- > length = getSum . foldMap (Sum . const  1)
+--
 -- @sum@, @product@, @maximum@, and @minimum@ should all be essentially
 -- equivalent to @foldMap@ forms, such as
 --

@@ -3,7 +3,7 @@
 module Type where
 import TyCon
 import Var ( TyCoVar )
-import {-# SOURCE #-} TyCoRep( Type, Coercion, Kind )
+import {-# SOURCE #-} TyCoRep( Type, Coercion )
 import Util
 
 isPredTy     :: Type -> Bool
@@ -13,7 +13,6 @@ mkAppTy :: Type -> Type -> Type
 mkCastTy :: Type -> Coercion -> Type
 piResultTy :: HasDebugCallStack => Type -> Type -> Type
 
-typeKind :: Type -> Kind
 eqType :: Type -> Type -> Bool
 
 partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])

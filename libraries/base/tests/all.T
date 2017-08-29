@@ -205,6 +205,7 @@ test('T12494', normal, compile_and_run, [''])
 test('T12852', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', normal, compile_and_run, ['-threaded -with-rtsopts=-N2'])
+test('T12874', normal, compile_and_run, [''])
 test('T13191',
         [ stats_num_field('bytes allocated',
                           [ (wordsize(64), 185943272, 5) ])
@@ -216,3 +217,7 @@ test('T13191',
 test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
+test('T3474',
+     [stats_num_field('max_bytes_used', [ (wordsize(64), 44504, 5) ]),
+      only_ways(['normal'])],
+     compile_and_run, ['-O'])

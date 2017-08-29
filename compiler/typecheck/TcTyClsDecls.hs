@@ -381,7 +381,8 @@ kcTyClGroup decls
 
                       -- Make sure kc_kind' has the final, zonked kind variables
            ; traceTc "Generalise kind" $
-             vcat [ ppr name, ppr kc_binders, ppr kvs, ppr all_binders, ppr kc_res_kind
+             vcat [ ppr name, ppr kc_binders, ppr (mkTyConKind kc_binders kc_res_kind)
+                  , ppr kvs, ppr all_binders, ppr kc_res_kind
                   , ppr all_binders', ppr kc_res_kind'
                   , ppr kc_tyvars, ppr (tcTyConScopedTyVars tc)]
 
@@ -1630,17 +1631,17 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                       , con_qvars = hs_qvars, con_cxt = hs_ctxt
                       , con_details = hs_details })
   = addErrCtxt (dataConCtxtName [name]) $
-    do { traceTc "tcConDecl 1" (ppr name)
-
-       -- Get hold of the existential type variables
-       -- e.g. data T a = forall (b::k) f. MkT a (f b)
-       -- Here tmpl_bndrs = {a}
-       --          hs_kvs = {k}
-       --          hs_tvs = {f,b}
+    do { -- Get hold of the existential type variables
+         -- e.g. data T a = forall (b::k) f. MkT a (f b)
+         -- Here tmpl_bndrs = {a}
+         --          hs_kvs = {k}
+         --          hs_tvs = {f,b}
        ; let (hs_kvs, hs_tvs) = case hs_qvars of
                Nothing -> ([], [])
                Just (HsQTvs { hsq_implicit = kvs, hsq_explicit = tvs })
                        -> (kvs, tvs)
+
+       ; traceTc "tcConDecl 1" (vcat [ ppr name, ppr hs_kvs, ppr hs_tvs ])
 
        ; (imp_tvs, (exp_tvs, ctxt, arg_tys, field_lbls, stricts))
            <- solveEqualities $
@@ -2423,6 +2424,7 @@ checkValidTyConTyVars tc
                    = text "NB: Implicitly declared kind variables are put first."
                    | otherwise
                    = empty
+       ; traceTc "checkValidTyConTyVars" (ppr tc <+> ppr tvs)
        ; checkValidTelescope (pprTyVars vis_tvs) stripped_tvs extra
          `and_if_that_doesn't_error`
            -- This triggers on test case dependent/should_fail/InferDependency
