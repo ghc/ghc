@@ -740,7 +740,7 @@ HsPar (and ParPat in patterns, HsParTy in types) is used as follows
     https://phabricator.haskell.org/rGHC499e43824bda967546ebf95ee33ec1f84a114a7c
 
   * ParPat and HsParTy are pretty printed as '( .. )' regardless of whether or
-    not they are strictly necssary. This should be addressed when #13238 is
+    not they are strictly necessary. This should be addressed when #13238 is
     completed, to be treated the same as HsPar.
 
 
