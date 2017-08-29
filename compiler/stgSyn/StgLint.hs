@@ -425,52 +425,16 @@ checkFunApp fun_ty arg_tys msg
       | otherwise
       = (Nothing, Nothing)
 
+-- | "Compare" types. We used to try a crude comparison of the type themselves,
+-- but this is essentially impossible in STG as we have discarded. both casts
+-- and type applications, so types might look different but be the same. Now we
+-- simply compare their runtime representations. See #14120.
 stgEqType :: Type -> Type -> Bool
--- Compare types, but crudely because we have discarded
--- both casts and type applications, so types might look
--- different but be the same.  So reply "True" if in doubt.
--- "False" means that the types are definitely different.
---
--- Fundamentally this is a losing battle because of unsafeCoerce
-
-stgEqType orig_ty1 orig_ty2
-  = gos orig_ty1 orig_ty2
+stgEqType ty1 ty2
+  = reps1 == reps2
   where
-    gos :: Type -> Type -> Bool
-    gos ty1   ty2
-        -- These have no prim rep
-      | isRuntimeRepKindedTy ty1 && isRuntimeRepKindedTy ty2
-      = True
-
-        -- We have a unary type
-      | [_] <- reps1, [_] <- reps2
-      = go ty1 ty2
-
-        -- In the case of a tuple just compare prim reps
-      | otherwise
-      = reps1 == reps2
-      where
-        reps1 = typePrimRep ty1
-        reps2 = typePrimRep ty2
-
-    go :: UnaryType -> UnaryType -> Bool
-    go ty1 ty2
-      | Just (tc1, tc_args1) <- splitTyConApp_maybe ty1
-      , Just (tc2, tc_args2) <- splitTyConApp_maybe ty2
-      , let res = if tc1 == tc2
-                  then equalLength tc_args1 tc_args2
-                       && and (zipWith gos tc_args1 tc_args2)
-                  else  -- TyCons don't match; but don't bleat if either is a
-                        -- family TyCon because a coercion might have made it
-                        -- equal to something else
-                    (isFamilyTyCon tc1 || isFamilyTyCon tc2)
-      = if res then True
-        else
-        pprTrace "stgEqType: unequal" (vcat [ppr ty1, ppr ty2])
-        False
-
-      | otherwise = True  -- Conservatively say "fine".
-                          -- Type variables in particular
+    reps1 = typePrimRep ty1
+    reps2 = typePrimRep ty2
 
 checkInScope :: Id -> LintM ()
 checkInScope id = LintM $ \_lf loc scope errs
