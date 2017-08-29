@@ -51,7 +51,8 @@ stg2stg dflags module_name binds
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "Pre unarise:"
                         (pprStgTopBindings processed_binds)
 
-        ; let un_binds = unarise us1 processed_binds
+        ; let un_binds = stg_linter True "Unarise"
+                         $ unarise us1 processed_binds
 
         ; dumpIfSet_dyn dflags Opt_D_dump_stg "STG syntax:"
                         (pprStgTopBindings un_binds)
@@ -60,9 +61,9 @@ stg2stg dflags module_name binds
    }
 
   where
-    stg_linter = if gopt Opt_DoStgLinting dflags
-                 then lintStgTopBindings
-                 else ( \ _whodunnit binds -> binds )
+    stg_linter unarised
+      | gopt Opt_DoStgLinting dflags = lintStgTopBindings unarised
+      | otherwise                    = \ _whodunnit binds -> binds
 
     -------------------------------------------
     do_stg_pass (binds, us, ccs) to_do
@@ -91,7 +92,7 @@ stg2stg dflags module_name binds
       = do -- report verbosely, if required
            dumpIfSet_dyn dflags Opt_D_verbose_stg2stg what
               (vcat (map ppr binds2))
-           let linted_binds = stg_linter what binds2
+           let linted_binds = stg_linter False what binds2
            return (linted_binds, us2, ccs)
             -- return: processed binds
             --         UniqueSupply for the next guy to use
