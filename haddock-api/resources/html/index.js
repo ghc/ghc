@@ -1,3 +1,7 @@
+quickNav = (function() {
+
+var baseUrl;
+
 // alias preact's hyperscript reviver since it's referenced a lot:
 var h = preact.h;
 
@@ -256,7 +260,7 @@ var App = createClass({
 
     var renderItem = function(item) {
       return h('li', { class: 'search-result' },
-        this.navigationLink(item.link, {},
+        this.navigationLink(baseUrl + "/" + item.link, {},
           h(DocHtml, { html: item.display_html })
         )
       );
@@ -379,4 +383,10 @@ var NoResultsMsg = function(props) {
   return messages[(props.searchString || 'a').charCodeAt(0) % messages.length];
 };
 
-preact.render(h(App), document.body);
+return {
+  init: function(docBaseUrl) {
+    baseUrl = docBaseUrl || "";
+    preact.render(h(App), document.body);
+  }
+}
+})();

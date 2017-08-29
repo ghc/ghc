@@ -194,7 +194,12 @@ bodyHtml doctitle iface
 
     script ! [src jsPreactFile, thetype "text/javascript"] << noHtml,
     script ! [src jsFuseFile, thetype "text/javascript"] << noHtml,
-    script ! [src jsIndexFile, thetype "text/javascript"] << noHtml
+    script ! [src jsIndexFile, thetype "text/javascript"] << noHtml,
+    script ! [thetype "text/javascript"]
+        -- NB: Within XHTML, the content of script tags needs to be
+        -- a <![CDATA[ section.
+      << primHtml
+          "//<![CDATA[\nquickNav.init();\n//]]>\n"
     ]
 
 moduleInfo :: Interface -> Html
