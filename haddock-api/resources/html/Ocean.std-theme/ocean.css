@@ -419,9 +419,7 @@ div#style-menu-holder {
   vertical-align: top;
   padding-left: 0.5em;
 }
-#interface td.src {
-  white-space: nowrap;
-}
+
 #interface td.doc p {
   margin: 0;
 }
