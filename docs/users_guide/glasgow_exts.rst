@@ -5730,7 +5730,7 @@ More documentation can be found in the `Haskell Wiki
 
 .. [Jones2000]
     "`Type Classes with Functional
-    Dependencies <http://citeseer.ist.psu.edu/jones00type.html>`__",
+    Dependencies <https://web.cecs.pdx.edu/~mpj/pubs/fundeps.html>`__",
     Mark P. Jones, In *Proceedings of the 9th European Symposium on Programming*,
     ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782, .
 
