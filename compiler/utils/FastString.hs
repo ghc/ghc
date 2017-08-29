@@ -118,6 +118,7 @@ import Data.IORef       ( IORef, newIORef, readIORef, atomicModifyIORef' )
 import Data.Maybe       ( isJust )
 import Data.Char
 import Data.List        ( elemIndex )
+import Data.Semigroup as Semi
 
 import GHC.IO           ( IO(..), unsafeDupablePerformIO )
 
@@ -202,9 +203,12 @@ instance Ord FastString where
 instance IsString FastString where
     fromString = fsLit
 
+instance Semi.Semigroup FastString where
+    (<>) = appendFS
+
 instance Monoid FastString where
     mempty = nilFS
-    mappend = appendFS
+    mappend = (Semi.<>)
     mconcat = concatFS
 
 instance Show FastString where

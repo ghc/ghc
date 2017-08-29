@@ -233,6 +233,7 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.IORef
 import Data.Functor.Identity
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -980,12 +981,14 @@ data CandidatesQTvs  -- See Note [Dependent type variables]
          -- See Note [Dependent type variables]
     }
 
-instance Monoid CandidatesQTvs where
-   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
-   mappend (DV { dv_kvs = kv1, dv_tvs = tv1 })
-           (DV { dv_kvs = kv2, dv_tvs = tv2 })
+instance Semi.Semigroup CandidatesQTvs where
+   (DV { dv_kvs = kv1, dv_tvs = tv1 }) <> (DV { dv_kvs = kv2, dv_tvs = tv2 })
           = DV { dv_kvs = kv1 `unionDVarSet` kv2
                , dv_tvs = tv1 `unionDVarSet` tv2}
+
+instance Monoid CandidatesQTvs where
+   mempty = DV { dv_kvs = emptyDVarSet, dv_tvs = emptyDVarSet }
+   mappend = (Semi.<>)
 
 instance Outputable CandidatesQTvs where
   ppr (DV {dv_kvs = kvs, dv_tvs = tvs })

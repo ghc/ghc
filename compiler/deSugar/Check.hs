@@ -58,6 +58,7 @@ import Control.Monad (forM, when, forM_)
 import Coercion
 import TcEvidence
 import IOEnv
+import qualified Data.Semigroup as Semi
 
 import ListT (ListT(..), fold, select)
 
@@ -186,11 +187,14 @@ instance Outputable Covered where
 
 -- Like the or monoid for booleans
 -- Covered = True, Uncovered = False
+instance Semi.Semigroup Covered where
+  Covered <> _ = Covered
+  _ <> Covered = Covered
+  NotCovered <> NotCovered = NotCovered
+
 instance Monoid Covered where
   mempty = NotCovered
-  Covered `mappend` _ = Covered
-  _ `mappend` Covered = Covered
-  NotCovered `mappend` NotCovered = NotCovered
+  mappend = (Semi.<>)
 
 data Diverged = Diverged | NotDiverged
   deriving Show
@@ -199,11 +203,14 @@ instance Outputable Diverged where
   ppr Diverged = text "Diverged"
   ppr NotDiverged = text "NotDiverged"
 
+instance Semi.Semigroup Diverged where
+  Diverged <> _ = Diverged
+  _ <> Diverged = Diverged
+  NotDiverged <> NotDiverged = NotDiverged
+
 instance Monoid Diverged where
   mempty = NotDiverged
-  Diverged `mappend` _ = Diverged
-  _ `mappend` Diverged = Diverged
-  NotDiverged `mappend` NotDiverged = NotDiverged
+  mappend = (Semi.<>)
 
 -- | When we learned that a given match group is complete
 data Provenance =
@@ -215,11 +222,14 @@ data Provenance =
 instance Outputable Provenance where
   ppr  = text . show
 
+instance Semi.Semigroup Provenance where
+  FromComplete <> _ = FromComplete
+  _ <> FromComplete = FromComplete
+  _ <> _ = FromBuiltin
+
 instance Monoid Provenance where
   mempty = FromBuiltin
-  FromComplete `mappend` _ = FromComplete
-  _ `mappend` FromComplete = FromComplete
-  _ `mappend` _ = FromBuiltin
+  mappend = (Semi.<>)
 
 data PartialResult = PartialResult {
                         presultProvenence :: Provenance
@@ -235,14 +245,19 @@ instance Outputable PartialResult where
            = text "PartialResult" <+> ppr prov <+> ppr c
                                   <+> ppr d <+> ppr vsa
 
+
+instance Semi.Semigroup PartialResult where
+  (PartialResult prov1 cs1 vsa1 ds1)
+    <> (PartialResult prov2 cs2 vsa2 ds2)
+      = PartialResult (prov1 Semi.<> prov2)
+                      (cs1 Semi.<> cs2)
+                      (vsa1 Semi.<> vsa2)
+                      (ds1 Semi.<> ds2)
+
+
 instance Monoid PartialResult where
   mempty = PartialResult mempty mempty [] mempty
-  (PartialResult prov1 cs1 vsa1 ds1)
-    `mappend` (PartialResult prov2 cs2 vsa2 ds2)
-      = PartialResult (prov1 `mappend` prov2)
-                      (cs1 `mappend` cs2)
-                      (vsa1 `mappend` vsa2)
-                      (ds1 `mappend` ds2)
+  mappend = (Semi.<>)
 
 -- newtype ChoiceOf a = ChoiceOf [a]
 

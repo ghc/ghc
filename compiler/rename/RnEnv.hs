@@ -78,6 +78,7 @@ import RnUnbound
 import RnUtils
 import Data.Functor (($>))
 import Data.Maybe (isJust)
+import qualified Data.Semigroup as Semi
 
 {-
 *********************************************************
@@ -584,24 +585,27 @@ instance Outputable DisambigInfo where
   ppr (DisambiguatedOccurrence gre) = text "DiambiguatedOccurrence:" <+> ppr gre
   ppr (AmbiguousOccurrence gres)    = text "Ambiguous:" <+> ppr gres
 
-instance Monoid DisambigInfo where
-  mempty = NoOccurrence
+instance Semi.Semigroup DisambigInfo where
   -- This is the key line: We prefer disambiguated occurrences to other
   -- names.
-  _ `mappend` DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
-  DisambiguatedOccurrence g' `mappend` _ = DisambiguatedOccurrence g'
+  _ <> DisambiguatedOccurrence g' = DisambiguatedOccurrence g'
+  DisambiguatedOccurrence g' <> _ = DisambiguatedOccurrence g'
 
-
-  NoOccurrence `mappend` m = m
-  m `mappend` NoOccurrence = m
-  UniqueOccurrence g `mappend` UniqueOccurrence g'
+  NoOccurrence <> m = m
+  m <> NoOccurrence = m
+  UniqueOccurrence g <> UniqueOccurrence g'
     = AmbiguousOccurrence [g, g']
-  UniqueOccurrence g `mappend` AmbiguousOccurrence gs
+  UniqueOccurrence g <> AmbiguousOccurrence gs
     = AmbiguousOccurrence (g:gs)
-  AmbiguousOccurrence gs `mappend` UniqueOccurrence g'
+  AmbiguousOccurrence gs <> UniqueOccurrence g'
     = AmbiguousOccurrence (g':gs)
-  AmbiguousOccurrence gs `mappend` AmbiguousOccurrence gs'
+  AmbiguousOccurrence gs <> AmbiguousOccurrence gs'
     = AmbiguousOccurrence (gs ++ gs')
+
+instance Monoid DisambigInfo where
+  mempty = NoOccurrence
+  mappend = (Semi.<>)
+
 -- Lookup SubBndrOcc can never be ambiguous
 --
 -- Records the result of looking up a child.

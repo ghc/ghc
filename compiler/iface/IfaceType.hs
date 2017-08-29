@@ -66,6 +66,7 @@ import Util
 
 import Data.Maybe( isJust )
 import Data.List (foldl')
+import qualified Data.Semigroup as Semi
 
 {-
 ************************************************************************
@@ -149,11 +150,14 @@ data IfaceTcArgs
   | ITC_Invis IfaceKind IfaceTcArgs   -- "Invis" means don't show when pretty-printing
                                       --         except with -fprint-explicit-kinds
 
+instance Semi.Semigroup IfaceTcArgs where
+  ITC_Nil <> xs           = xs
+  ITC_Vis ty rest <> xs   = ITC_Vis ty (rest Semi.<> xs)
+  ITC_Invis ki rest <> xs = ITC_Invis ki (rest Semi.<> xs)
+
 instance Monoid IfaceTcArgs where
   mempty = ITC_Nil
-  ITC_Nil `mappend` xs           = xs
-  ITC_Vis ty rest `mappend` xs   = ITC_Vis ty (rest `mappend` xs)
-  ITC_Invis ki rest `mappend` xs = ITC_Invis ki (rest `mappend` xs)
+  mappend = (Semi.<>)
 
 -- Encodes type constructors, kind constructors,
 -- coercion constructors, the lot.
