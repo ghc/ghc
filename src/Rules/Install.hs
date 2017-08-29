@@ -74,7 +74,7 @@ installLibExecs = do
     destDir <- getDestDir
     installDirectory (destDir ++ libExecDir)
     forM_ installBinPkgs $ \pkg -> do
-        withLatestInstallStage pkg $ \stage -> do
+        withInstallStage pkg $ \stage -> do
             context <- programContext stage pkg
             let bin = inplaceLibBinPath -/- programName context <.> exe
             installProgram bin (destDir ++ libExecDir)
@@ -94,7 +94,7 @@ installBins = do
     when win $
         copyDirectoryContents matchAll (destDir ++ libDir -/- "bin") (destDir ++ binDir)
     unless win $ forM_ installBinPkgs $ \pkg ->
-        withLatestInstallStage pkg $ \stage -> do
+        withInstallStage pkg $ \stage -> do
             context <- programContext stage pkg
             version <- setting ProjectVersion
             -- Name of the binary file
@@ -115,10 +115,12 @@ installBins = do
                         linkSymbolic (destDir ++ binDir -/- binName)
                                      (destDir ++ binDir -/- symName)
 
-withLatestInstallStage :: Package -> (Stage -> Action ()) -> Action ()
-withLatestInstallStage pkg m = do
-    stages <- installStages pkg
-    mapM_ m (takeEnd 1 stages)
+-- | Perform an action depending on the install stage or do nothing if the
+-- package is not installed.
+withInstallStage :: Package -> (Stage -> Action ()) -> Action ()
+withInstallStage pkg m = do
+    maybeStage <- installStage pkg
+    case maybeStage of { Just stage -> m stage; Nothing -> return () }
 
 pkgConfInstallPath :: Action FilePath
 pkgConfInstallPath = buildPath (vanillaContext Stage0 rts) <&> (-/- "package.conf.install")
@@ -174,7 +176,7 @@ installPackages = do
 
     copyFile ghcBootPlatformHeader (pkgPath compiler -/- "ghc_boot_platform.h")
 
-    installPackages <- filterM ((not . null <$>) . installStages)
+    installPackages <- filterM ((isJust <$>) . installStage)
                                (knownPackages \\ [rts, libffi])
 
     installLibPkgs <- topsortPackages (filter isLibrary installPackages)
@@ -185,7 +187,7 @@ installPackages = do
     forM_ installLibPkgs $ \pkg -> do
         case pkgCabalFile pkg of
             Nothing -> error $ "Non-Haskell project in installLibPkgs" ++ show pkg
-            Just cabalFile -> withLatestInstallStage pkg $ \stage -> do
+            Just cabalFile -> withInstallStage pkg $ \stage -> do
                 let context = vanillaContext stage pkg
                 top <- topDirectory
                 installDistDir <- buildPath context
@@ -231,7 +233,7 @@ installPackages = do
                                    , confPath ]
 
     forM_ installLibPkgs $ \pkg -> do
-        withLatestInstallStage pkg $ \stage -> do
+        withInstallStage pkg $ \stage -> do
             let context = vanillaContext stage pkg
             top <- topDirectory
             installDistDir <- (top -/-) <$> buildPath context

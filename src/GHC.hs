@@ -11,10 +11,10 @@ module GHC (
     ghcPackages, isGhcPackage, defaultPackages,
 
     -- * Package information
-    programName, nonCabalContext, nonHsMainPackage, autogenPath, installStages,
+    programName, nonCabalContext, nonHsMainPackage, autogenPath, installStage,
 
     -- * Miscellaneous
-    programPath, ghcSplitPath, stripCmdPath, inplaceInstallPath, buildDll0
+    programPath, ghcSplitPath, stripCmdPath, buildDll0
     ) where
 
 import Base
@@ -215,28 +215,38 @@ programName Context {..}
     | package == iservBin = "ghc-iserv"
     | otherwise           = pkgName package
 
--- | Given a 'Package' this action returns the sorted list of stages in which
--- the package build results are installed. For most GHC packages we install the
--- /latest/ build stage. The only exception is the GHC itself, whose binaries
--- are installed in all stages. User packages are not installed, hence the
--- resulting list is empty.
-installStages :: Package -> Action [Stage]
-installStages pkg
-    | not (isGhcPackage pkg) = return [] -- Only GHC packages are installed.
+-- | The build stage whose results are used when installing a package, or
+-- @Nothing@ if the package is not installed, e.g. because it is a user package.
+-- The current implementation installs the /latest/ build stage of a package.
+installStage :: Package -> Action (Maybe Stage)
+installStage pkg
+    | not (isGhcPackage pkg) = return Nothing -- Only GHC packages are installed
     | otherwise = do
         stages <- filterM (fmap (pkg `elem`) . defaultPackages) [Stage0 ..]
-        return $ if pkg == ghc then stages else takeEnd 1 stages
+        return $ if null stages then Nothing else Just (maximum stages)
 
-isInstallContext :: Context -> Action Bool
-isInstallContext Context {..} = (stage `elem`) <$> installStages package
+-- | Is the program corresponding to a given context built 'inplace', i.e. in
+-- the @inplace/bin@ directory? For most programs, only their /latest/ build
+-- stages are built 'inplace'. The only exception is the GHC itself, which is
+-- built 'inplace' in all stages. The function returns @False@ for libraries and
+-- all user packages.
+isBuiltInplace :: Context -> Action Bool
+isBuiltInplace Context {..}
+    | isLibrary package          = return False
+    | not (isGhcPackage package) = return False
+    | package == ghc             = return True
+    | otherwise                  = (Just stage ==) <$> installStage package
 
 -- | The 'FilePath' to a program executable in a given 'Context'.
 programPath :: Context -> Action FilePath
 programPath context@Context {..} = do
     path    <- buildPath context
-    install <- isInstallContext context
-    let contextPath = if install then inplaceInstallPath package else path
+    inplace <- isBuiltInplace context
+    let contextPath = if inplace then inplacePath else path
     return $ contextPath -/- programName context <.> exe
+  where
+    inplacePath | package `elem` [touchy, unlit, iservBin] = inplaceLibBinPath
+                | otherwise                                = inplaceBinPath
 
 -- | Some contexts are special: their packages do not have @.cabal@ metadata or
 -- we cannot run @ghc-cabal@ on them, e.g. because the latter hasn't been built
@@ -259,15 +269,6 @@ autogenPath context@Context {..}
     | otherwise           = autogen $ "build" -/- pkgName package
   where
     autogen dir = buildPath context <&> (-/- dir -/- "autogen")
-
--- | Given a 'Package', return the path where the corresponding program is
--- installed. Most programs are installed in 'programInplacePath'.
-inplaceInstallPath :: Package -> FilePath
-inplaceInstallPath pkg
-    | pkg == touchy   = inplaceLibBinPath
-    | pkg == unlit    = inplaceLibBinPath
-    | pkg == iservBin = inplaceLibBinPath
-    | otherwise       = inplaceBinPath
 
 -- | @ghc-split@ is a Perl script used by GHC with @-split-objs@ flag. It is
 -- generated in "Rules.Generators.GhcSplit".

@@ -96,13 +96,15 @@ packageRules = do
     let dynamicContexts = liftM3 Context [Stage1 ..] knownPackages [dynamic]
     forM_ dynamicContexts Rules.Library.buildDynamicLib
 
+    forM_ (filter isProgram knownPackages) $
+        Rules.Program.buildProgram readPackageDb
+
     forM_ vanillaContexts $ mconcat
         [ Rules.Data.buildPackageData
         , Rules.Dependencies.buildPackageDependencies readPackageDb
         , Rules.Documentation.buildPackageDocumentation
         , Rules.Library.buildPackageGhciLibrary
         , Rules.Generate.generatePackageCode
-        , Rules.Program.buildProgram readPackageDb
         , Rules.Register.registerPackage writePackageDb ]
 
 buildRules :: Rules ()

@@ -118,13 +118,13 @@ iservBinWrapper :: WrappedBinary -> Expr String
 iservBinWrapper WrappedBinary{..} = do
     expr $ need [sourcePath -/- "Rules/Wrappers.hs"]
     stage <- getStage
-    activePackages <- expr $ filter isLibrary <$> stagePackages stage
+    stageLibraries <- expr $ filter isLibrary <$> stagePackages stage
     -- TODO: Figure our the reason of this hardcoded exclusion
-    let pkgs = activePackages \\ [ cabal, process, haskeline
+    let pkgs = stageLibraries \\ [ cabal, process, haskeline
                                  , terminfo, ghcCompact, hpc, compiler ]
     contexts <- expr $ concatForM pkgs $ \p -> do
-        ss <- installStages p
-        return [ vanillaContext s p | s <- ss ]
+        maybeStage <- installStage p
+        return [ vanillaContext s p | s <- maybeToList maybeStage ]
     buildPaths <- expr $ mapM buildPath contexts
     return $ unlines
         [ "#!/bin/bash"

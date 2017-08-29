@@ -14,43 +14,44 @@ import Settings.Packages.Rts
 import Target
 import Utilities
 
--- TODO: Drop way in build rule generation?
-buildProgram :: [(Resource, Int)] -> Context -> Rules ()
-buildProgram rs context@Context {..} = when (isProgram package) $ do
-    let installStage = if package == ghc then return stage else do
-            stages <- installStages package
-            case stages of
-                [s] -> return s
-                _   -> error $ "Exactly one install stage expected for package "
-                    ++ quote (pkgName package) ++ " (got " ++ show stages ++ ")."
+buildProgram :: [(Resource, Int)] -> Package -> Rules ()
+buildProgram rs package = do
+    forM_ [Stage0 ..] $ \stage -> do
+        let context = vanillaContext stage package
 
-    "//" ++ contextDir context -/- programName context <.> exe %> \bin -> do
-        context' <- programContext stage package
-        buildBinaryAndWrapper rs context' bin
-
-    -- Rules for programs built in install directories
-    when (stage == Stage0 || package == ghc) $ do
-        -- Some binaries in inplace/bin are wrapped
-        inplaceBinPath -/- programName context <.> exe %> \bin -> do
+        -- Rules for programs built in 'buildRoot'
+        "//" ++ contextDir context -/- programName context <.> exe %> \bin -> do
             context' <- programContext stage package
-            binStage <- installStage
-            buildBinaryAndWrapper rs (context' { stage = binStage }) bin
+            buildBinaryAndWrapper rs context' bin
 
-        inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
-            binStage <- installStage
-            context' <- programContext stage package
+        -- Rules for the GHC package, which is built 'inplace'
+        when (package == ghc) $
+            inplaceBinPath -/- programName context <.> exe %> \bin -> do
+                context' <- programContext stage package
+                buildBinaryAndWrapper rs context' bin
+
+    -- Rules for other programs built in inplace directories
+    when (package /= ghc) $ do
+        let context0 = vanillaContext Stage0 package -- TODO: get rid of context0
+        inplaceBinPath -/- programName context0 <.> exe %> \bin -> do
+            stage   <- installStage package -- TODO: get rid of fromJust
+            context <- programContext (fromJust stage) package
+            buildBinaryAndWrapper rs context bin
+
+        inplaceLibBinPath -/- programName context0 <.> exe %> \bin -> do
+            stage   <- installStage package -- TODO: get rid of fromJust
+            context <- programContext (fromJust stage) package
             if package /= iservBin then
-                -- We *normally* build only unwrapped binaries in inplace/lib/bin,
-                buildBinary rs (context' { stage = binStage }) bin
+                -- We *normally* build only unwrapped binaries in inplace/lib/bin
+                buildBinary rs context bin
             else
-                -- build both binary and wrapper in inplace/lib/bin
-                -- for ghc-iserv on *nix platform now
-                buildBinaryAndWrapperLib rs (context' { stage = binStage }) bin
+                -- Build both binary and wrapper in inplace/lib/bin for iservBin
+                buildBinaryAndWrapperLib rs context bin
 
-        inplaceLibBinPath -/- programName context <.> "bin" %> \bin -> do
-            binStage <- installStage
-            context' <- programContext stage package
-            buildBinary rs (context' { stage = binStage }) bin
+        inplaceLibBinPath -/- programName context0 <.> "bin" %> \bin -> do
+            stage   <- installStage package -- TODO: get rid of fromJust
+            context <- programContext (fromJust stage) package
+            buildBinary rs context bin
 
 buildBinaryAndWrapperLib :: [(Resource, Int)] -> Context -> FilePath -> Action ()
 buildBinaryAndWrapperLib rs context bin = do
