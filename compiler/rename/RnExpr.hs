@@ -720,7 +720,8 @@ postProcessStmtsForApplicativeDo ctxt stmts
        ; let is_do_expr | DoExpr <- ctxt = True
                         | otherwise = False
        ; if ado_is_on && is_do_expr
-            then rearrangeForApplicativeDo ctxt stmts
+            then do { traceRn "ppsfa" (ppr stmts)
+                    ; rearrangeForApplicativeDo ctxt stmts }
             else noPostProcessStmts ctxt stmts }
 
 -- | strip the FreeVars annotations from statements
@@ -1513,6 +1514,7 @@ rearrangeForApplicativeDo ctxt stmts0 = do
   optimal_ado <- goptM Opt_OptimalApplicativeDo
   let stmt_tree | optimal_ado = mkStmtTreeOptimal stmts
                 | otherwise = mkStmtTreeHeuristic stmts
+  traceRn "rearrangeForADo" (ppr stmt_tree)
   return_name <- lookupSyntaxName' returnMName
   pure_name   <- lookupSyntaxName' pureAName
   let monad_names = MonadNames { return_name = return_name
@@ -1529,6 +1531,13 @@ data StmtTree a
   = StmtTreeOne a
   | StmtTreeBind (StmtTree a) (StmtTree a)
   | StmtTreeApplicative [StmtTree a]
+
+instance Outputable a => Outputable (StmtTree a) where
+  ppr (StmtTreeOne x)          = parens (text "StmtTreeOne" <+> ppr x)
+  ppr (StmtTreeBind x y)       = parens (hang (text "StmtTreeBind")
+                                            2 (sep [ppr x, ppr y]))
+  ppr (StmtTreeApplicative xs) = parens (hang (text "StmtTreeApplicative")
+                                            2 (vcat (map ppr xs)))
 
 flattenStmtTree :: StmtTree a -> [a]
 flattenStmtTree t = go t []
