@@ -374,19 +374,22 @@ ppJsonIndex odir maybe_source_url maybe_wiki_url unicode qual_opt ifaces = do
         mdl     = ifaceMod iface
 
     goExport :: Module -> Qualification -> ExportItem DocName -> [Value]
-    goExport mdl qual item =
-      case processExport True links_info unicode qual item of
-        Nothing -> []
-        Just html ->
-          [ Object
-            [ "display_html" .= String (showHtmlFragment html)
+    goExport mdl qual item
+      | Just item_html <- processExport True links_info unicode qual item
+      = [ Object
+            [ "display_html" .= String (showHtmlFragment item_html)
             , "name"         .= String (intercalate " " (map nameString names))
             , "module"       .= String (moduleString mdl)
             , "link"         .= String (fromMaybe "" (listToMaybe (map (nameLink mdl) names)))
             ]
-          ]
+        ]
+      | otherwise = []
       where
-        names = exportName item
+        names = exportName item ++ exportSubs item
+
+    exportSubs :: ExportItem DocName -> [DocName]
+    exportSubs ExportDecl { expItemSubDocs } = map fst expItemSubDocs
+    exportSubs _ = []
 
     exportName :: ExportItem DocName -> [DocName]
     exportName ExportDecl { expItemDecl } = getMainDeclBinder $ unLoc expItemDecl

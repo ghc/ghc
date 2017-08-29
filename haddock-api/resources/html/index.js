@@ -82,7 +82,8 @@ var App = createClass({
           threshold: 0.4,
           caseSensitive: true,
           includeScore: true,
-          keys: ["name"]
+          tokenize: true,
+          keys: ["name", "module"]
         }),
         moduleResults: []
       });
