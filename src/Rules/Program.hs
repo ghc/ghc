@@ -14,6 +14,7 @@ import Settings.Packages.Rts
 import Target
 import Utilities
 
+-- | TODO: Drop code duplication
 buildProgram :: [(Resource, Int)] -> Package -> Rules ()
 buildProgram rs package = do
     forM_ [Stage0 ..] $ \stage -> do
@@ -25,10 +26,18 @@ buildProgram rs package = do
             buildBinaryAndWrapper rs context' bin
 
         -- Rules for the GHC package, which is built 'inplace'
-        when (package == ghc) $
+        when (package == ghc) $ do
             inplaceBinPath -/- programName context <.> exe %> \bin -> do
                 context' <- programContext stage package
                 buildBinaryAndWrapper rs context' bin
+
+            inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
+                context' <- programContext stage package
+                buildBinary rs context' bin
+
+            inplaceLibBinPath -/- programName context <.> "bin" %> \bin -> do
+                context' <- programContext stage package
+                buildBinary rs context' bin
 
     -- Rules for other programs built in inplace directories
     when (package /= ghc) $ do
