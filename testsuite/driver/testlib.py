@@ -1192,7 +1192,7 @@ def simple_run(name, way, prog, extra_run_opts):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if not opts.is_compiler_test:
+    if isStatsTest() and not opts.is_compiler_test:
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''

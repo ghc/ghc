@@ -102,6 +102,8 @@ def main():
 
 testing_metrics = ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
 
+# These my_ functions are duplicates of functions in testlib.py that I can't import here.
+# and are mostly a consequence of some semi-ugly refactoring.
 def my_passed(reason=''):
     return {'passFail': 'pass', 'reason' : reason}
 
@@ -121,9 +123,9 @@ def test_cmp(full_name, field, val, expected, dev=20):
     if val < lowerBound:
         result = my_failBecause('value is too low:\n(If this is \
         because you have improved GHC, please\nupdate the test so that GHC \
-        doesn\'t regress again)')
+        doesn\'t regress again)','stat')
     if val > upperBound:
-        result = my_failBecause('value is too high:\nstat is not good enough')
+        result = my_failBecause('value is too high:\nstat is not good enough','stat')
 
     if val < lowerBound or val > upperBound or config.verbose >= 4:
         length = max(len(str(x)) for x in [expected, lowerBound, upperBound, val])
@@ -147,6 +149,10 @@ def comparison(metric='all', deviation=20, compiler=False):
     return lambda name, opts, m=metric, d=deviation, c=compiler: _comparison(name, opts, m, d, c)
 
 def _comparison(name, opts, metric, deviation, is_compiler_test):
+    if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
+        # my_framework_fail(name, 'bad_name', 'This test has an invalid name')
+        my_failBecause('This test has an invalid name.')
+
     tests = parse_git_notes('perf','HEAD^')
 
     # Might have multiple metrics being measured for a single test.
