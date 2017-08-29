@@ -340,7 +340,7 @@ hscParse' mod_summary
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" $
                                    ppr rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
-                                   text (showAstData NoBlankSrcSpan rdr_module)
+                                   showAstData NoBlankSrcSpan rdr_module
             liftIO $ dumpIfSet_dyn dflags Opt_D_source_stats "Source Statistics" $
                                    ppSourceStats False rdr_module
 
@@ -1713,7 +1713,7 @@ hscParseThingWithLocation source linenumber parser str
             logWarningsReportErrors (getMessages pst dflags)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed "Parser" (ppr thing)
             liftIO $ dumpIfSet_dyn dflags Opt_D_dump_parsed_ast "Parser AST" $
-                                   text $ showAstData NoBlankSrcSpan thing
+                                   showAstData NoBlankSrcSpan thing
             return thing
 
 
