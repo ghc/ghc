@@ -143,7 +143,7 @@ group is generalised (`Haskell Report, Section
 4.5.2 <http://www.haskell.org/onlinereport/decls.html#sect4.5.2>`__).
 
 Following a suggestion of Mark Jones, in his paper `Typing Haskell in
-Haskell <http://citeseer.ist.psu.edu/424440.html>`__, GHC implements a
+Haskell <https://web.cecs.pdx.edu/~mpj/thih/>`__, GHC implements a
 more general scheme. In GHC *the dependency analysis ignores references to
 variables that have an explicit type signature*. As a result of this refined
 dependency analysis, the dependency groups are smaller, and more bindings will
