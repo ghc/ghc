@@ -539,6 +539,9 @@ utils/runghc/dist-install/package-data.mk: $(fixed_pkg_prev)
 iserv/stage2/package-data.mk: $(fixed_pkg_prev)
 iserv/stage2_p/package-data.mk: $(fixed_pkg_prev)
 iserv/stage2_dyn/package-data.mk: $(fixed_pkg_prev)
+ifeq "$(Windows_Host)" "YES"
+utils/gen-dll/dist-install/package-data.mk: $(fixed_pkg_prev)
+endif
 
 # the GHC package doesn't live in libraries/, so we add its dependency manually:
 compiler/stage2/package-data.mk: $(fixed_pkg_prev)
@@ -646,6 +649,9 @@ BUILD_DIRS += includes
 BUILD_DIRS += rts
 BUILD_DIRS += bindisttest
 BUILD_DIRS += utils/genapply
+ifeq "$(Windows_Host)" "YES"
+BUILD_DIRS += utils/gen-dll
+endif
 
 # When cleaning, don't add any library packages to BUILD_DIRS. We include
 # ghc.mk files for all BUILD_DIRS, but they don't exist until after running
@@ -1393,6 +1399,7 @@ distclean : clean
 	$(call removeFiles,ghc/ghc-bin.cabal)
 	$(call removeFiles,libraries/ghci/ghci.cabal)
 	$(call removeFiles,utils/runghc/runghc.cabal)
+	$(call removeFiles,utils/gen-dll/gen-dll.cabal)
 	$(call removeFiles,settings)
 	$(call removeFiles,docs/users_guide/ug-book.xml)
 	$(call removeFiles,docs/users_guide/ug-ent.xml)

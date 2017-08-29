@@ -152,3 +152,13 @@ Template Haskell
 
 - Blank strings can now be used as values for environment variables using the
   System.Environment.Blank module. See :ghc-ticket:`12494`
+
+Build system
+~~~~~~~~~~~~
+
+- ``dll-split`` has been removed and replaced with an automatic partitioning utility ``gen-dll``.
+  This utility can transparently split and compile any DLLs that require this. Note that the ``rts`` and
+  ``base`` can not be split at this point because of the mutual recursion between ``base`` and ``rts``.
+  There is currently no explicit dependency between the two in the build system and such there is no way
+  to notify ``base`` that the ``rts`` has been split, or vice versa.
+  (see :ghc-ticket:`5987`).

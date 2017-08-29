@@ -391,6 +391,8 @@ then
     OBJDUMP="${mingwbin}objdump.exe"
     fp_prog_ar="${mingwbin}ar.exe"
 
+    AC_PATH_PROG([Genlib],[genlib])
+
     # NB. Download the perl binaries if required
     if ! test -d inplace/perl ||
          test inplace/perl -ot ghc-tarballs/perl/ghc-perl*.tar.gz
@@ -420,13 +422,25 @@ then
     AC_PATH_PROG([OBJDUMP],[objdump])
     AC_PATH_PROG([DllWrap],[dllwrap])
     AC_PATH_PROG([Windres],[windres])
+    AC_PATH_PROG([Genlib],[genlib])
 fi
 
 DllWrapCmd="$DllWrap"
 WindresCmd="$Windres"
 
+HAVE_GENLIB=False
+if test "$HostOS" = "mingw32"
+then
+    if test "$Genlib" != ""; then
+        GenlibCmd="$(cygpath -m $Genlib)"
+        HAVE_GENLIB=True
+    fi
+fi
+
 AC_SUBST([DllWrapCmd])
 AC_SUBST([WindresCmd])
+AC_SUBST([GenlibCmd])
+AC_SUBST([HAVE_GENLIB])
 
 FP_ICONV
 FP_GMP
@@ -587,18 +601,6 @@ esac
 ObjdumpCmd="$OBJDUMP"
 AC_SUBST([ObjdumpCmd])
 
-dnl ** Which ar to use?
-dnl --------------------------------------------------------------
-if test "$HostOS" != "mingw32"; then
-    AC_CHECK_TARGET_TOOL([AR], [ar])
-    if test "$AR" = ":"; then
-        AC_MSG_ERROR([cannot find ar in your PATH])
-    fi
-fi
-ArCmd="$AR"
-fp_prog_ar="$AR"
-AC_SUBST([ArCmd])
-
 dnl ** Which ranlib to use?
 dnl --------------------------------------------------------------
 AC_PROG_RANLIB
@@ -610,9 +612,21 @@ RANLIB="$RanlibCmd"
 
 dnl ** which libtool to use?
 dnl --------------------------------------------------------------
-AC_CHECK_TARGET_TOOL([LIBTOOL], [libtool])
-LibtoolCmd="$LIBTOOL"
-LIBTOOL="$LibtoolCmd"
+# The host normalization on Windows breaks autoconf, it no longer
+# thinks that target == host so it never checks the unqualified
+# tools for Windows. I don't know why we do this whole normalization thing
+# as it just breaks everything.. but for now, just check the unqualified one
+# if on Windows.
+if test "$HostOS" = "mingw32"
+then
+    AC_PATH_PROG([LIBTOOL],[libtool])
+    LibtoolCmd="$(cygpath -m $LIBTOOL)"
+else
+    AC_CHECK_TARGET_TOOL([LIBTOOL], [libtool])
+    LibtoolCmd="$LIBTOOL"
+    LIBTOOL="$LibtoolCmd"
+fi
+AC_SUBST([LibtoolCmd])
 
 # Here is where we re-target which specific version of the LLVM
 # tools we are looking for. In the past, GHC supported a number of
@@ -1249,7 +1263,7 @@ checkMake380() {
 checkMake380 make
 checkMake380 gmake
 
-AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
+AC_CONFIG_FILES([mk/config.mk mk/install.mk mk/project.mk compiler/ghc.cabal ghc/ghc-bin.cabal utils/runghc/runghc.cabal utils/gen-dll/gen-dll.cabal libraries/ghc-boot/ghc-boot.cabal libraries/ghc-boot-th/ghc-boot-th.cabal libraries/ghci/ghci.cabal settings docs/users_guide/ghc_config.py docs/index.html libraries/prologue.txt distrib/configure.ac])
 AC_OUTPUT
 [
 if test "$print_make_warning" = "true"; then
@@ -1302,6 +1316,7 @@ echo "\
    ranlib       : $RanlibCmd
    windres      : $WindresCmd
    dllwrap      : $DllWrapCmd
+   genlib       : $GenlibCmd
    Happy        : $HappyCmd ($HappyVersion)
    Alex         : $AlexCmd ($AlexVersion)
    Perl         : $PerlCmd
