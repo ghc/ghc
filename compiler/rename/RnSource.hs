@@ -715,20 +715,22 @@ rnClsInstDecl (ClsInstDecl { cid_poly_ty = inst_ty, cid_binds = mbinds
              --     strange, but should not matter (and it would be more work
              --     to remove the context).
 
-rnFamInstDecl :: HsDocContext
-              -> Maybe (Name, [Name]) -- Nothing => not associated
-                                        -- Just (cls,tvs) => associated,
-                                        --   and gives class and tyvars of the
-                                        --   parent instance delc
-              -> Located RdrName
-              -> HsTyPats GhcPs
-              -> rhs
-              -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
-              -> RnM (Located Name, HsTyPats GhcRn, rhs', FreeVars)
-rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
+rnFamInstEqn :: HsDocContext
+             -> Maybe (Name, [Name]) -- Nothing => not associated
+                                     -- Just (cls,tvs) => associated,
+                                     --   and gives class and tyvars of the
+                                     --   parent instance delc
+             -> FamInstEqn GhcPs rhs
+             -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
+             -> RnM (FamInstEqn GhcRn rhs', FreeVars)
+rnFamInstEqn doc mb_cls (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
+                                                   , feqn_pats   = pats
+                                                   , feqn_fixity = fixity
+                                                   , feqn_rhs    = payload }})
+            rnPayload
   = do { tycon'   <- lookupFamInstName (fmap fst mb_cls) tycon
        ; let loc = case pats of
-                     []             -> pprPanic "rnFamInstDecl" (ppr tycon)
+                     []             -> pprPanic "rnFamInstEqn" (ppr tycon)
                      (L loc _ : []) -> loc
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
 
@@ -786,67 +788,54 @@ rnFamInstDecl doc mb_cls tycon (HsIB { hsib_body = pats }) payload rnPayload
                         -- Note [Wildcards in family instances]
              all_fvs  = fvs `addOneFV` unLoc tycon'
 
-       ; return (tycon',
-                 HsIB { hsib_body = pats'
-                      , hsib_vars = all_ibs
-                      , hsib_closed = True },
-                 payload',
+       ; return (HsIB { hsib_vars = all_ibs
+                      , hsib_closed = True
+                      , hsib_body
+                          = FamEqn { feqn_tycon  = tycon'
+                                   , feqn_pats   = pats'
+                                   , feqn_fixity = fixity
+                                   , feqn_rhs    = payload' } },
                  all_fvs) }
              -- type instance => use, hence addOneFV
 
 rnTyFamInstDecl :: Maybe (Name, [Name])
                 -> TyFamInstDecl GhcPs
                 -> RnM (TyFamInstDecl GhcRn, FreeVars)
-rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = L loc eqn })
+rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = eqn })
   = do { (eqn', fvs) <- rnTyFamInstEqn mb_cls eqn
-       ; return (TyFamInstDecl { tfid_eqn = L loc eqn'
-                               , tfid_fvs = fvs }, fvs) }
+       ; return (TyFamInstDecl { tfid_eqn = eqn' }, fvs) }
 
 rnTyFamInstEqn :: Maybe (Name, [Name])
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
-rnTyFamInstEqn mb_cls (TyFamEqn { tfe_tycon = tycon
-                                , tfe_pats  = pats
-                                , tfe_fixity = fixity
-                                , tfe_rhs   = rhs })
-  = do { (tycon', pats', rhs', fvs) <-
-           rnFamInstDecl (TySynCtx tycon) mb_cls tycon pats rhs rnTySyn
-       ; return (TyFamEqn { tfe_tycon = tycon'
-                          , tfe_pats  = pats'
-                          , tfe_fixity = fixity
-                          , tfe_rhs   = rhs' }, fvs) }
+rnTyFamInstEqn mb_cls eqn@(HsIB { hsib_body = FamEqn { feqn_tycon  = tycon }})
+  = rnFamInstEqn (TySynCtx tycon) mb_cls eqn rnTySyn
 
 rnTyFamDefltEqn :: Name
                 -> TyFamDefltEqn GhcPs
                 -> RnM (TyFamDefltEqn GhcRn, FreeVars)
-rnTyFamDefltEqn cls (TyFamEqn { tfe_tycon = tycon
-                              , tfe_pats  = tyvars
-                              , tfe_fixity = fixity
-                              , tfe_rhs   = rhs })
+rnTyFamDefltEqn cls (FamEqn { feqn_tycon  = tycon
+                            , feqn_pats   = tyvars
+                            , feqn_fixity = fixity
+                            , feqn_rhs    = rhs })
   = bindHsQTyVars ctx Nothing (Just cls) [] tyvars $ \ tyvars' _ ->
     do { tycon'      <- lookupFamInstName (Just cls) tycon
        ; (rhs', fvs) <- rnLHsType ctx rhs
-       ; return (TyFamEqn { tfe_tycon = tycon'
-                          , tfe_pats  = tyvars'
-                          , tfe_fixity = fixity
-                          , tfe_rhs   = rhs' }, fvs) }
+       ; return (FamEqn { feqn_tycon  = tycon'
+                        , feqn_pats   = tyvars'
+                        , feqn_fixity = fixity
+                        , feqn_rhs    = rhs' }, fvs) }
   where
     ctx = TyFamilyCtx tycon
 
 rnDataFamInstDecl :: Maybe (Name, [Name])
                   -> DataFamInstDecl GhcPs
                   -> RnM (DataFamInstDecl GhcRn, FreeVars)
-rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_tycon = tycon
-                                          , dfid_pats  = pats
-                                          , dfid_fixity = fixity
-                                          , dfid_defn  = defn })
-  = do { (tycon', pats', defn', fvs) <-
-           rnFamInstDecl (TyDataCtx tycon) mb_cls tycon pats defn rnDataDefn
-       ; return (DataFamInstDecl { dfid_tycon = tycon'
-                                 , dfid_pats  = pats'
-                                 , dfid_fixity = fixity
-                                 , dfid_defn  = defn'
-                                 , dfid_fvs   = fvs }, fvs) }
+rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_eqn = eqn@(HsIB { hsib_body =
+                           FamEqn { feqn_tycon  = tycon }})})
+  = do { (eqn', fvs) <-
+           rnFamInstEqn (TyDataCtx tycon) mb_cls eqn rnDataDefn
+       ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.
 
@@ -889,7 +878,7 @@ is the same as
 
 This is implemented as follows: during renaming anonymous wild cards
 '_' are given freshly generated names. These names are collected after
-renaming (rnFamInstDecl) and used to make new type variables during
+renaming (rnFamInstEqn) and used to make new type variables during
 type checking (tc_fam_ty_pats). One should not confuse these wild
 cards with the ones from partial type signatures. The latter generate
 fresh meta-variables whereas the former generate fresh skolems.

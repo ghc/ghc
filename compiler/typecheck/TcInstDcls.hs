@@ -487,7 +487,10 @@ tcClsInstDecl (L loc (ClsInstDecl { cid_poly_ty = poly_ty, cid_binds = binds
         -- from their defaults (if available)
         ; let defined_ats = mkNameSet (map (tyFamInstDeclName . unLoc) ats)
                             `unionNameSet`
-                            mkNameSet (map (unLoc . dfid_tycon . unLoc) adts)
+                            mkNameSet (map (unLoc . feqn_tycon
+                                                  . hsib_body
+                                                  . dfid_eqn
+                                                  . unLoc) adts)
         ; tyfam_insts1 <- mapM (tcATDefault loc mini_subst defined_ats)
                                (classATItems clas)
 
@@ -600,7 +603,7 @@ tcTyFamInstDecl :: Maybe ClsInstInfo
 tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
   = setSrcSpan loc           $
     tcAddTyFamInstCtxt decl  $
-    do { let fam_lname = tfe_tycon (unLoc eqn)
+    do { let fam_lname = feqn_tycon (hsib_body eqn)
        ; fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_lname
 
          -- (0) Check it's an open type family
@@ -609,7 +612,8 @@ tcTyFamInstDecl mb_clsinfo (L loc decl@(TyFamInstDecl { tfid_eqn = eqn }))
        ; checkTc (isOpenTypeFamilyTyCon fam_tc) (notOpenFamily fam_tc)
 
          -- (1) do the work of verifying the synonym group
-       ; co_ax_branch <- tcTyFamInstEqn (famTyConShape fam_tc) mb_clsinfo eqn
+       ; co_ax_branch <- tcTyFamInstEqn (famTyConShape fam_tc) mb_clsinfo
+                                        (L (getLoc fam_lname) eqn)
 
          -- (2) check for validity
        ; checkValidCoAxBranch mb_clsinfo fam_tc co_ax_branch
@@ -623,13 +627,17 @@ tcDataFamInstDecl :: Maybe ClsInstInfo
                   -> LDataFamInstDecl GhcRn -> TcM (FamInst, Maybe DerivInfo)
   -- "newtype instance" and "data instance"
 tcDataFamInstDecl mb_clsinfo
-    (L loc decl@(DataFamInstDecl
-       { dfid_pats = pats
-       , dfid_tycon = fam_tc_name
-       , dfid_fixity = fixity
-       , dfid_defn = HsDataDefn { dd_ND = new_or_data, dd_cType = cType
-                                , dd_ctxt = ctxt, dd_cons = cons
-                                , dd_kindSig = m_ksig, dd_derivs = derivs } }))
+    (L loc decl@(DataFamInstDecl { dfid_eqn = HsIB { hsib_vars = tv_names
+                                                   , hsib_body =
+      FamEqn { feqn_pats   = pats
+             , feqn_tycon  = fam_tc_name
+             , feqn_fixity = fixity
+             , feqn_rhs    = HsDataDefn { dd_ND = new_or_data
+                                        , dd_cType = cType
+                                        , dd_ctxt = ctxt
+                                        , dd_cons = cons
+                                        , dd_kindSig = m_ksig
+                                        , dd_derivs = derivs } }}}))
   = setSrcSpan loc             $
     tcAddDataFamInstCtxt decl  $
     do { fam_tc <- tcFamInstDeclCombined mb_clsinfo fam_tc_name
@@ -640,7 +648,7 @@ tcDataFamInstDecl mb_clsinfo
 
          -- Kind check type patterns
        ; let mb_kind_env = thdOf3 <$> mb_clsinfo
-       ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo pats
+       ; tcFamTyPats (famTyConShape fam_tc) mb_clsinfo tv_names pats
                      (kcDataDefn mb_kind_env decl) $
              \tvs pats res_kind ->
     do { stupid_theta <- solveEqualities $ tcHsContext ctxt

@@ -105,12 +105,12 @@
        (ClosedTypeFamily
         (Just
          [({ DumpRenamedAst.hs:8:3-36 }
-           (TyFamEqn
-            ({ DumpRenamedAst.hs:8:3-8 }
-             {Name: DumpRenamedAst.Length})
-            (HsIB
-             [{Name: a}
-             ,{Name: as}]
+           (HsIB
+            [{Name: a}
+            ,{Name: as}]
+            (FamEqn
+             ({ DumpRenamedAst.hs:8:3-8 }
+              {Name: DumpRenamedAst.Length})
              [({ DumpRenamedAst.hs:8:10-17 }
                (HsParTy
                 ({ DumpRenamedAst.hs:8:11-16 }
@@ -127,47 +127,47 @@
                     (NotPromoted)
                     ({ DumpRenamedAst.hs:8:15-16 }
                      {Name: as})))))))]
-             (True))
-            (Prefix)
-            ({ DumpRenamedAst.hs:8:21-36 }
-             (HsAppTy
-              ({ DumpRenamedAst.hs:8:21-24 }
-               (HsTyVar
-                (NotPromoted)
-                ({ DumpRenamedAst.hs:8:21-24 }
-                 {Name: DumpRenamedAst.Succ})))
-              ({ DumpRenamedAst.hs:8:26-36 }
-               (HsParTy
-                ({ DumpRenamedAst.hs:8:27-35 }
-                 (HsAppTy
-                  ({ DumpRenamedAst.hs:8:27-32 }
-                   (HsTyVar
-                    (NotPromoted)
-                    ({ DumpRenamedAst.hs:8:27-32 }
-                     {Name: DumpRenamedAst.Length})))
-                  ({ DumpRenamedAst.hs:8:34-35 }
-                   (HsTyVar
-                    (NotPromoted)
-                    ({ DumpRenamedAst.hs:8:34-35 }
-                     {Name: as})))))))))))
+             (Prefix)
+             ({ DumpRenamedAst.hs:8:21-36 }
+              (HsAppTy
+               ({ DumpRenamedAst.hs:8:21-24 }
+                (HsTyVar
+                 (NotPromoted)
+                 ({ DumpRenamedAst.hs:8:21-24 }
+                  {Name: DumpRenamedAst.Succ})))
+               ({ DumpRenamedAst.hs:8:26-36 }
+                (HsParTy
+                 ({ DumpRenamedAst.hs:8:27-35 }
+                  (HsAppTy
+                   ({ DumpRenamedAst.hs:8:27-32 }
+                    (HsTyVar
+                     (NotPromoted)
+                     ({ DumpRenamedAst.hs:8:27-32 }
+                      {Name: DumpRenamedAst.Length})))
+                   ({ DumpRenamedAst.hs:8:34-35 }
+                    (HsTyVar
+                     (NotPromoted)
+                     ({ DumpRenamedAst.hs:8:34-35 }
+                      {Name: as}))))))))))
+            (True)))
          ,({ DumpRenamedAst.hs:9:3-24 }
-           (TyFamEqn
-            ({ DumpRenamedAst.hs:9:3-8 }
-             {Name: DumpRenamedAst.Length})
-            (HsIB
-             []
+           (HsIB
+            []
+            (FamEqn
+             ({ DumpRenamedAst.hs:9:3-8 }
+              {Name: DumpRenamedAst.Length})
              [({ DumpRenamedAst.hs:9:10-12 }
                (HsExplicitListTy
                 (Promoted)
                 (PlaceHolder)
                 []))]
-             (True))
-            (Prefix)
-            ({ DumpRenamedAst.hs:9:21-24 }
-             (HsTyVar
-              (NotPromoted)
-              ({ DumpRenamedAst.hs:9:21-24 }
-               {Name: DumpRenamedAst.Zero})))))]))
+             (Prefix)
+             ({ DumpRenamedAst.hs:9:21-24 }
+              (HsTyVar
+               (NotPromoted)
+               ({ DumpRenamedAst.hs:9:21-24 }
+                {Name: DumpRenamedAst.Zero}))))
+            (True)))]))
        ({ DumpRenamedAst.hs:7:13-18 }
         {Name: DumpRenamedAst.Length})
        (HsQTvs

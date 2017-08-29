@@ -1092,7 +1092,8 @@ hsLInstDeclBinders (L _ (TyFamInstD {})) = mempty
 -- the SrcLoc returned are for the whole declarations, not just the names
 hsDataFamInstBinders :: DataFamInstDecl pass
                      -> ([Located (IdP pass)], [LFieldOcc pass])
-hsDataFamInstBinders (DataFamInstDecl { dfid_defn = defn })
+hsDataFamInstBinders (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
+                       FamEqn { feqn_rhs = defn }}})
   = hsDataDefnBinders defn
   -- There can't be repeated symbols because only data instances have binders
 

@@ -1060,7 +1060,7 @@ tcClassATs class_name cls ats at_defs
        ; mapM tc_at ats }
   where
     at_def_tycon :: LTyFamDefltEqn GhcRn -> Name
-    at_def_tycon (L _ eqn) = unLoc (tfe_tycon eqn)
+    at_def_tycon (L _ eqn) = unLoc (feqn_tycon eqn)
 
     at_fam_name :: LFamilyDecl GhcRn -> Name
     at_fam_name (L _ decl) = unLoc (fdLName decl)
@@ -1088,11 +1088,12 @@ tcDefaultAssocDecl _ []
 
 tcDefaultAssocDecl _ (d1:_:_)
   = failWithTc (text "More than one default declaration for"
-                <+> ppr (tfe_tycon (unLoc d1)))
+                <+> ppr (feqn_tycon (unLoc d1)))
 
-tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = lname@(L _ tc_name)
-                                           , tfe_pats = hs_tvs, tfe_fixity = fixity
-                                           , tfe_rhs = rhs })]
+tcDefaultAssocDecl fam_tc [L loc (FamEqn { feqn_tycon = lname@(L _ tc_name)
+                                         , feqn_pats = hs_tvs
+                                         , feqn_fixity = fixity
+                                         , feqn_rhs = rhs })]
   | HsQTvs { hsq_implicit = imp_vars, hsq_explicit = exp_vars } <- hs_tvs
   = -- See Note [Type-checking default assoc decls]
     setSrcSpan loc $
@@ -1110,10 +1111,9 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = lname@(L _ tc_name)
                  (wrongNumberOfParmsErr fam_arity)
 
        -- Typecheck RHS
-       ; let pats = HsIB { hsib_vars = imp_vars ++ map hsLTyVarName exp_vars
-                         , hsib_body = map hsLTyVarBndrToType exp_vars
-                         , hsib_closed = False } -- this field is ignored, anyway
-             pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
+       ; let all_vars = imp_vars ++ map hsLTyVarName exp_vars
+             pats     = map hsLTyVarBndrToType exp_vars
+             pp_lhs   = pprFamInstLHS lname pats fixity [] Nothing
 
           -- NB: Use tcFamTyPats, not tcTyClTyVars. The latter expects to get
           -- the LHsQTyVars used for declaring a tycon, but the names here
@@ -1124,7 +1124,7 @@ tcDefaultAssocDecl fam_tc [L loc (TyFamEqn { tfe_tycon = lname@(L _ tc_name)
           -- type default LHS can mention *different* type variables than the
           -- enclosing class. So it's treated more as a freestanding beast.
        ; (pats', rhs_ty)
-           <- tcFamTyPats shape Nothing pats
+           <- tcFamTyPats shape Nothing all_vars pats
               (kcTyFamEqnRhs Nothing pp_lhs rhs) $
               \tvs pats rhs_kind ->
               do { rhs_ty <- solveEqualities $
@@ -1168,16 +1168,17 @@ proper tcMatchTys here.)  -}
 -------------------------
 kcTyFamInstEqn :: FamTyConShape -> LTyFamInstEqn GhcRn -> TcM ()
 kcTyFamInstEqn fam_tc_shape@(FamTyConShape { fs_name = fam_tc_name })
-    (L loc (TyFamEqn { tfe_tycon  = lname@(L _ eqn_tc_name)
-                     , tfe_pats   = pats
-                     , tfe_fixity = fixity
-                     , tfe_rhs    = hs_ty }))
+    (L loc (HsIB { hsib_vars = tv_names
+                 , hsib_body = FamEqn { feqn_tycon  = lname@(L _ eqn_tc_name)
+                                      , feqn_pats   = pats
+                                      , feqn_fixity = fixity
+                                      , feqn_rhs    = hs_ty }}))
   = setSrcSpan loc $
     do { checkTc (fam_tc_name == eqn_tc_name)
                  (wrongTyFamName fam_tc_name eqn_tc_name)
        ; discardResult $
          tc_fam_ty_pats fam_tc_shape Nothing -- not an associated type
-                        pats (kcTyFamEqnRhs Nothing pp_lhs hs_ty) }
+                        tv_names pats (kcTyFamEqnRhs Nothing pp_lhs hs_ty) }
   where
     pp_lhs = pprFamInstLHS lname pats fixity [] Nothing
 
@@ -1207,13 +1208,14 @@ tcTyFamInstEqn :: FamTyConShape -> Maybe ClsInstInfo -> LTyFamInstEqn GhcRn
 -- Needs to be here, not in TcInstDcls, because closed families
 -- (typechecked here) have TyFamInstEqns
 tcTyFamInstEqn fam_tc_shape@(FamTyConShape { fs_name = fam_tc_name }) mb_clsinfo
-    (L loc (TyFamEqn { tfe_tycon  = lname@(L _ eqn_tc_name)
-                     , tfe_pats   = pats
-                     , tfe_fixity = fixity
-                     , tfe_rhs    = hs_ty }))
+    (L loc (HsIB { hsib_vars = tv_names
+                 , hsib_body = FamEqn { feqn_tycon  = lname@(L _ eqn_tc_name)
+                                      , feqn_pats   = pats
+                                      , feqn_fixity = fixity
+                                      , feqn_rhs    = hs_ty }}))
   = ASSERT( fam_tc_name == eqn_tc_name )
     setSrcSpan loc $
-    tcFamTyPats fam_tc_shape mb_clsinfo pats
+    tcFamTyPats fam_tc_shape mb_clsinfo tv_names pats
                 (kcTyFamEqnRhs mb_clsinfo pp_lhs hs_ty) $
                     \tvs pats res_kind ->
     do { rhs_ty <- solveEqualities $ tcCheckLHsType hs_ty res_kind
@@ -1240,11 +1242,13 @@ kcDataDefn :: Maybe (VarEnv Kind) -- ^ Possibly, instantiations for vars
 -- Used for 'data instance' only
 -- Ordinary 'data' is handled by kcTyClDec
 kcDataDefn mb_kind_env
-           (DataFamInstDecl
-             { dfid_tycon  = fam_name
-             , dfid_pats   = pats
-             , dfid_fixity = fixity
-             , dfid_defn   = HsDataDefn { dd_ctxt = ctxt, dd_cons = cons, dd_kindSig = mb_kind } })
+           (DataFamInstDecl { dfid_eqn = HsIB { hsib_body =
+              FamEqn { feqn_tycon  = fam_name
+                     , feqn_pats   = pats
+                     , feqn_fixity = fixity
+                     , feqn_rhs    = HsDataDefn { dd_ctxt = ctxt
+                                                , dd_cons = cons
+                                                , dd_kindSig = mb_kind } }}})
            res_k
   = do  { _ <- tcHsContext ctxt
         ; checkNoErrs $ mapM_ (wrapLocM kcConDecl) cons
@@ -1373,7 +1377,8 @@ famTyConShape fam_tc
 
 tc_fam_ty_pats :: FamTyConShape
                -> Maybe ClsInstInfo
-               -> HsTyPats GhcRn      -- Patterns
+               -> [Name]              -- Bound kind/type variable names
+               -> HsTyPats GhcRn      -- Type patterns
                -> (TcKind -> TcM r)   -- Kind checker for RHS
                -> TcM ([Type], r)     -- Returns the type-checked patterns
 -- Check the type patterns of a type or data family instance
@@ -1390,7 +1395,7 @@ tc_fam_ty_pats :: FamTyConShape
 tc_fam_ty_pats (FamTyConShape { fs_name = name, fs_arity = arity
                               , fs_flavor = flav, fs_binders = binders
                               , fs_res_kind = res_kind })
-               mb_clsinfo (HsIB { hsib_body = arg_pats, hsib_vars = tv_names })
+               mb_clsinfo tv_names arg_pats
                kind_checker
   = do { -- First, check the arity.
          -- If we wait until validity checking, we'll get kind
@@ -1428,7 +1433,8 @@ tc_fam_ty_pats (FamTyConShape { fs_name = name, fs_arity = arity
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
             -> Maybe ClsInstInfo
-            -> HsTyPats GhcRn        -- patterns
+            -> [Name]          -- Implicitly bound kind/type variable names
+            -> HsTyPats GhcRn  -- Type patterns
             -> (TcKind -> TcM ([TcType], TcKind))
                 -- kind-checker for RHS
                 -- See Note [Instantiating a family tycon]
@@ -1437,11 +1443,12 @@ tcFamTyPats :: FamTyConShape
                 -> TcKind
                 -> TcM a)            -- NB: You can use solveEqualities here.
             -> TcM a
-tcFamTyPats fam_shape@(FamTyConShape { fs_name = name }) mb_clsinfo pats
-            kind_checker thing_inside
+tcFamTyPats fam_shape@(FamTyConShape { fs_name = name }) mb_clsinfo
+            tv_names arg_pats kind_checker thing_inside
   = do { (typats, (more_typats, res_kind))
             <- solveEqualities $  -- See Note [Constraints in patterns]
-               tc_fam_ty_pats fam_shape mb_clsinfo pats kind_checker
+               tc_fam_ty_pats fam_shape mb_clsinfo
+                              tv_names arg_pats kind_checker
 
           {- TODO (RAE): This should be cleverer. Consider this:
 
@@ -3062,9 +3069,10 @@ tcAddTyFamInstCtxt decl
   = tcAddFamInstCtxt (text "type instance") (tyFamInstDeclName decl)
 
 tcMkDataFamInstCtxt :: DataFamInstDecl GhcRn -> SDoc
-tcMkDataFamInstCtxt decl
+tcMkDataFamInstCtxt decl@(DataFamInstDecl { dfid_eqn =
+                            HsIB { hsib_body = eqn }})
   = tcMkFamInstCtxt (pprDataFamInstFlavour decl <+> text "instance")
-                    (unLoc (dfid_tycon decl))
+                    (unLoc (feqn_tycon eqn))
 
 tcAddDataFamInstCtxt :: DataFamInstDecl GhcRn -> TcM a -> TcM a
 tcAddDataFamInstCtxt decl

@@ -357,7 +357,7 @@ repFamilyDecl decl@(L loc (FamilyDecl { fdInfo      = info,
              ClosedTypeFamily Nothing ->
                  notHandled "abstract closed type family" (ppr decl)
              ClosedTypeFamily (Just eqns) ->
-               do { eqns1  <- mapM repTyFamEqn eqns
+               do { eqns1  <- mapM (repTyFamEqn . unLoc) eqns
                   ; eqns2  <- coreList tySynEqnQTyConName eqns1
                   ; result <- repFamilyResultSig resultSig
                   ; inj    <- repInjectivityAnn injectivity
@@ -412,9 +412,9 @@ repAssocTyFamDefaults = mapM rep_deflt
   where
      -- very like repTyFamEqn, but different in the details
     rep_deflt :: LTyFamDefltEqn GhcRn -> DsM (Core TH.DecQ)
-    rep_deflt (L _ (TyFamEqn { tfe_tycon = tc
-                             , tfe_pats  = bndrs
-                             , tfe_rhs   = rhs }))
+    rep_deflt (L _ (FamEqn { feqn_tycon = tc
+                           , feqn_pats  = bndrs
+                           , feqn_rhs   = rhs }))
       = addTyClTyVarBinds bndrs $ \ _ ->
         do { tc1  <- lookupLOcc tc
            ; tys1 <- repLTys (hsLTyVarBndrsToTypes bndrs)
@@ -495,10 +495,10 @@ repTyFamInstD decl@(TyFamInstDecl { tfid_eqn = eqn })
        ; eqn1 <- repTyFamEqn eqn
        ; repTySynInst tc eqn1 }
 
-repTyFamEqn :: LTyFamInstEqn GhcRn -> DsM (Core TH.TySynEqnQ)
-repTyFamEqn (L _ (TyFamEqn { tfe_pats = HsIB { hsib_body = tys
-                                             , hsib_vars = var_names }
-                           , tfe_rhs = rhs }))
+repTyFamEqn :: TyFamInstEqn GhcRn -> DsM (Core TH.TySynEqnQ)
+repTyFamEqn (HsIB { hsib_vars = var_names
+                  , hsib_body = FamEqn { feqn_pats = tys
+                                       , feqn_rhs  = rhs }})
   = do { let hs_tvs = HsQTvs { hsq_implicit = var_names
                              , hsq_explicit = []
                              , hsq_dependent = emptyNameSet }   -- Yuk
@@ -509,9 +509,11 @@ repTyFamEqn (L _ (TyFamEqn { tfe_pats = HsIB { hsib_body = tys
             ; repTySynEqn tys2 rhs1 } }
 
 repDataFamInstD :: DataFamInstDecl GhcRn -> DsM (Core TH.DecQ)
-repDataFamInstD (DataFamInstDecl { dfid_tycon = tc_name
-                                 , dfid_pats = HsIB { hsib_body = tys, hsib_vars = var_names }
-                                 , dfid_defn = defn })
+repDataFamInstD (DataFamInstDecl { dfid_eqn =
+                  (HsIB { hsib_vars = var_names
+                        , hsib_body = FamEqn { feqn_tycon = tc_name
+                                             , feqn_pats  = tys
+                                             , feqn_rhs   = defn }})})
   = do { tc <- lookupLOcc tc_name               -- See note [Binders and occurrences]
        ; let hs_tvs = HsQTvs { hsq_implicit = var_names
                              , hsq_explicit = []

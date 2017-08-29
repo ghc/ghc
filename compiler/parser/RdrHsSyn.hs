@@ -159,14 +159,14 @@ mkATDefault :: LTyFamInstDecl GhcPs
 --
 -- We use the Either monad because this also called
 -- from Convert.hs
-mkATDefault (L loc (TyFamInstDecl { tfid_eqn = L _ e }))
-      | TyFamEqn { tfe_tycon = tc, tfe_pats = pats, tfe_fixity = fixity
-                 , tfe_rhs = rhs } <- e
-      = do { tvs <- checkTyVars (text "default") equalsDots tc (hsib_body pats)
-           ; return (L loc (TyFamEqn { tfe_tycon = tc
-                                     , tfe_pats = tvs
-                                     , tfe_fixity = fixity
-                                     , tfe_rhs = rhs })) }
+mkATDefault (L loc (TyFamInstDecl { tfid_eqn = HsIB { hsib_body = e }}))
+      | FamEqn { feqn_tycon = tc, feqn_pats = pats, feqn_fixity = fixity
+               , feqn_rhs = rhs } <- e
+      = do { tvs <- checkTyVars (text "default") equalsDots tc pats
+           ; return (L loc (FamEqn { feqn_tycon  = tc
+                                   , feqn_pats   = tvs
+                                   , feqn_fixity = fixity
+                                   , feqn_rhs    = rhs })) }
 
 mkTyData :: SrcSpan
          -> NewOrData
@@ -221,10 +221,11 @@ mkTyFamInstEqn :: LHsType GhcPs
                -> P (TyFamInstEqn GhcPs,[AddAnn])
 mkTyFamInstEqn lhs rhs
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False lhs
-       ; return (TyFamEqn { tfe_tycon = tc
-                          , tfe_pats  = mkHsImplicitBndrs tparams
-                          , tfe_fixity = fixity
-                          , tfe_rhs   = rhs },
+       ; return (mkHsImplicitBndrs
+                  (FamEqn { feqn_tycon  = tc
+                          , feqn_pats   = tparams
+                          , feqn_fixity = fixity
+                          , feqn_rhs    = rhs }),
                  ann) }
 
 mkDataFamInst :: SrcSpan
@@ -239,18 +240,17 @@ mkDataFamInst loc new_or_data cType (L _ (mcxt, tycl_hdr)) ksig data_cons maybe_
   = do { (tc, tparams, fixity, ann) <- checkTyClHdr False tycl_hdr
        ; mapM_ (\a -> a loc) ann -- Add any API Annotations to the top SrcSpan
        ; defn <- mkDataDefn new_or_data cType mcxt ksig data_cons maybe_deriv
-       ; return (L loc (DataFamInstD (
-                  DataFamInstDecl { dfid_tycon = tc
-                                  , dfid_pats = mkHsImplicitBndrs tparams
-                                  , dfid_fixity = fixity
-                                  , dfid_defn = defn, dfid_fvs = placeHolderNames }))) }
+       ; return (L loc (DataFamInstD (DataFamInstDecl (mkHsImplicitBndrs
+                  (FamEqn { feqn_tycon = tc
+                          , feqn_pats = tparams
+                          , feqn_fixity = fixity
+                          , feqn_rhs = defn }))))) }
 
 mkTyFamInst :: SrcSpan
-            -> LTyFamInstEqn GhcPs
+            -> TyFamInstEqn GhcPs
             -> P (LInstDecl GhcPs)
 mkTyFamInst loc eqn
-  = return (L loc (TyFamInstD (TyFamInstDecl { tfid_eqn  = eqn
-                                             , tfid_fvs  = placeHolderNames })))
+  = return (L loc (TyFamInstD (TyFamInstDecl eqn)))
 
 mkFamDecl :: SrcSpan
           -> FamilyInfo GhcPs
