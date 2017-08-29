@@ -143,7 +143,7 @@ instance NamedThing LaxDataCon where
     where uniq = mkUniqueGrimily . negate $ dataConTag dc * 1048576 + length (dataConOrigArgTys dc) -- FIXME
           hasStrict = any (\case HsLazy -> False; _ -> True) (dataConImplBangs dc)
           unpacked = isUnboxedTupleCon dc || isUnboxedSumCon dc
-          long = True -- length (dataConOrigArgTys dc) > 0
+          long = null $ dataConOrigArgTys dc -- True -- length (dataConOrigArgTys dc) > 0
   getName (Lax dc) = getName dc
 
 
@@ -353,11 +353,11 @@ stgCseExpr env (StgCase scrut bndr ty alts)
 
 -- A constructor application.
 -- To be removed by a variable use when found in the CSE environment
-stgCseExpr env (StgConApp dataCon args tys)
+stgCseExpr env orig@(StgConApp dataCon args tys)
     | Just bndr' <- envLookup dc args' env
     = (if getKey u < 0 then pprTrace "stgCseExpr" (ppr dataCon <+> text (show $ length (dataConOrigArgTys dataCon))) else id) $ StgApp bndr' []
     | otherwise
-    = StgConApp dataCon args' tys
+    = orig -- StgConApp dataCon args' tys
   where args' = substArgs env args
         dc = Lax dataCon
         u = getUnique (getName dc)
