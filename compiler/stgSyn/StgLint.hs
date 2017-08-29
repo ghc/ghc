@@ -459,7 +459,8 @@ stgEqType orig_ty1 orig_ty2
 checkInScope :: Id -> LintM ()
 checkInScope id = LintM $ \loc scope errs
  -> if isLocalId id && not (id `elemVarSet` scope) then
-        ((), addErr errs (hsep [ppr id, text "is out of scope"]) loc)
+        ((), addErr errs (hsep [ppr id, dcolon, ppr (idType id),
+                                text "is out of scope"]) loc)
     else
         ((), errs)
 
