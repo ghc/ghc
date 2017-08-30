@@ -77,7 +77,6 @@ import qualified GHC.LanguageExtensions as LangExt
 
 import Data.Function
 import Data.List
-import Data.Either
 import qualified Data.Set as Set
 
 {-
@@ -423,9 +422,9 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
 
   | otherwise
   = do { traceTc "Non Application rule" (ppr op)
-       ; (wrap, op', [Left arg1', Left arg2'])
+       ; (wrap, op', [HsValArg arg1', HsValArg arg2'])
            <- tcApp (Just $ mk_op_msg op)
-                     op [Left arg1, Left arg2] res_ty
+                     op [HsValArg arg1, HsValArg arg2] res_ty
        ; return (mkHsWrap wrap $ OpApp arg1' op' fix arg2') }
 
 -- Right sections, equivalent to \ x -> x `op` expr, or
@@ -1122,10 +1121,16 @@ arithSeqEltType (Just fl) res_ty
 ************************************************************************
 -}
 
-type LHsExprArgIn  = Either (LHsExpr GhcRn) (LHsWcType GhcRn)
-type LHsExprArgOut = Either (LHsExpr GhcTcId) (LHsWcType GhcRn)
-   -- Left e   => argument expression
-   -- Right ty => visible type application
+data HsArg tm ty
+  = HsValArg tm   -- Argument is an ordinary expression     (f arg)
+  | HsTypeArg  ty -- Argument is a visible type application (f @ty)
+
+isHsValArg :: HsArg tm ty -> Bool
+isHsValArg (HsValArg {}) = True
+isHsValArg (HsTypeArg {}) = False
+
+type LHsExprArgIn  = HsArg (LHsExpr GhcRn)   (LHsWcType GhcRn)
+type LHsExprArgOut = HsArg (LHsExpr GhcTcId) (LHsWcType GhcRn)
 
 tcApp1 :: HsExpr GhcRn  -- either HsApp or HsAppType
        -> ExpRhoType -> TcM (HsExpr GhcTcId)
@@ -1133,8 +1138,8 @@ tcApp1 e res_ty
   = do { (wrap, fun, args) <- tcApp Nothing (noLoc e) [] res_ty
        ; return (mkHsWrap wrap $ unLoc $ foldl mk_hs_app fun args) }
   where
-    mk_hs_app f (Left a)  = mkHsApp f a
-    mk_hs_app f (Right a) = mkHsAppTypeOut f a
+    mk_hs_app f (HsValArg a)  = mkHsApp f a
+    mk_hs_app f (HsTypeArg a) = mkHsAppTypeOut f a
 
 tcApp :: Maybe SDoc  -- like "The function `f' is applied to"
                      -- or leave out to get exactly that message
@@ -1151,28 +1156,28 @@ tcApp m_herald orig_fun orig_args res_ty
     go :: LHsExpr GhcRn -> [LHsExprArgIn]
        -> TcM (HsWrapper, LHsExpr GhcTcId, [LHsExprArgOut])
     go (L _ (HsPar e))       args = go e  args
-    go (L _ (HsApp e1 e2))   args = go e1 (Left e2:args)
-    go (L _ (HsAppType e t)) args = go e  (Right t:args)
+    go (L _ (HsApp e1 e2))   args = go e1 (HsValArg e2:args)
+    go (L _ (HsAppType e t)) args = go e  (HsTypeArg t:args)
 
     go (L loc (HsVar (L _ fun))) args
       | fun `hasKey` tagToEnumKey
-      , count isLeft args == 1
+      , count isHsValArg args == 1
       = do { (wrap, expr, args) <- tcTagToEnum loc fun args res_ty
            ; return (wrap, expr, args) }
 
       | fun `hasKey` seqIdKey
-      , count isLeft args == 2
+      , count isHsValArg args == 2
       = do { (wrap, expr, args) <- tcSeq loc fun args res_ty
            ; return (wrap, expr, args) }
 
-    go (L loc (HsRecFld (Ambiguous lbl _))) args@(Left (L _ arg) : _)
+    go (L loc (HsRecFld (Ambiguous lbl _))) args@(HsValArg (L _ arg) : _)
       | Just sig_ty <- obviousSig arg
       = do { sig_tc_ty <- tcHsSigWcType ExprSigCtxt sig_ty
            ; sel_name  <- disambiguateSelector lbl sig_tc_ty
            ; go (L loc (HsRecFld (Unambiguous lbl sel_name))) args }
 
     -- See Note [Visible type application for the empty list constructor]
-    go (L loc (ExplicitList _ Nothing [])) [Right ty_arg]
+    go (L loc (ExplicitList _ Nothing [])) [HsTypeArg ty_arg]
       = do { ty_arg' <- tcHsTypeApp ty_arg liftedTypeKind
            ; let list_ty = TyConApp listTyCon [ty_arg']
            ; _ <- tcSubTypeDS (OccurrenceOf nilDataConName) GenSigCtxt
@@ -1199,8 +1204,8 @@ tcApp m_herald orig_fun orig_args res_ty
 
            ; return (wrap_res, mkLHsWrap wrap_fun fun1, args1) }
 
-    mk_hs_app f (Left a)  = mkHsApp f a
-    mk_hs_app f (Right a) = mkHsAppType f a
+    mk_hs_app f (HsValArg a)  = mkHsApp f a
+    mk_hs_app f (HsTypeArg a) = mkHsAppType f a
 
 mk_app_msg :: LHsExpr GhcRn -> [LHsExprArgIn] -> SDoc
 mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)
@@ -1211,7 +1216,7 @@ mk_app_msg fun args = sep [ text "The" <+> text what <+> quotes (ppr expr)
     -- Include visible type arguments (but not other arguments) in the herald.
     -- See Note [Herald for matchExpectedFunTys] in TcUnify.
     expr = mkHsAppTypes fun type_app_args
-    type_app_args = rights args
+    type_app_args = [hs_ty | HsTypeArg hs_ty <- args]
 
 mk_op_msg :: LHsExpr GhcRn -> SDoc
 mk_op_msg op = text "The operator" <+> quotes (ppr op) <+> text "takes"
@@ -1272,11 +1277,11 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
     -- an expression is given in an arity mismatch error, since visible type
     -- arguments reported as a part of the expression herald itself.
     -- See Note [Herald for matchExpectedFunTys] in TcUnify.
-    orig_expr_args_arity = length $ lefts orig_args
+    orig_expr_args_arity = count isHsValArg orig_args
 
     go _ _ fun_ty [] = return (idHsWrapper, [], fun_ty)
 
-    go acc_args n fun_ty (Right hs_ty_arg:args)
+    go acc_args n fun_ty (HsTypeArg hs_ty_arg : args)
       = do { (wrap1, upsilon_ty) <- topInstantiateInferred fun_orig fun_ty
                -- wrap1 :: fun_ty "->" upsilon_ty
            ; case tcSplitForAllTy_maybe upsilon_ty of
@@ -1295,11 +1300,11 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
                     ; let inst_wrap = mkWpTyApps [ty_arg]
                     ; return ( inner_wrap <.> inst_wrap <.> wrap1
-                             , Right hs_ty_arg : args'
+                             , HsTypeArg hs_ty_arg : args'
                              , res_ty ) }
                _ -> ty_app_err upsilon_ty hs_ty_arg }
 
-    go acc_args n fun_ty (Left arg : args)
+    go acc_args n fun_ty (HsValArg arg : args)
       = do { (wrap, [arg_ty], res_ty)
                <- matchActualFunTysPart herald fun_orig (Just (unLoc fun)) 1 fun_ty
                                         acc_args orig_expr_args_arity
@@ -1309,7 +1314,7 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
            ; return ( mkWpFun idHsWrapper inner_wrap arg_ty res_ty doc <.> wrap
-                    , Left arg' : args'
+                    , HsValArg arg' : args'
                     , inner_res_ty ) }
       where
         doc = text "When checking the" <+> speakNth n <+>
@@ -1817,7 +1822,7 @@ tcSeq :: SrcSpan -> Name -> [LHsExprArgIn]
 tcSeq loc fun_name args res_ty
   = do  { fun <- tcLookupId fun_name
         ; (arg1_ty, args1) <- case args of
-            (Right hs_ty_arg1 : args1)
+            (HsTypeArg hs_ty_arg1 : args1)
               -> do { ty_arg1 <- tcHsTypeApp hs_ty_arg1 liftedTypeKind
                     ; return (ty_arg1, args1) }
 
@@ -1825,13 +1830,13 @@ tcSeq loc fun_name args res_ty
                     ; return (arg_ty1, args) }
 
         ; (arg1, arg2, arg2_exp_ty) <- case args1 of
-            [Right hs_ty_arg2, Left term_arg1, Left term_arg2]
+            [HsTypeArg hs_ty_arg2, HsValArg term_arg1, HsValArg term_arg2]
               -> do { arg2_kind <- newOpenTypeKind
                     ; ty_arg2 <- tcHsTypeApp hs_ty_arg2 arg2_kind
                                    -- see Note [Typing rule for seq]
                     ; _ <- tcSubTypeDS (OccurrenceOf fun_name) GenSigCtxt ty_arg2 res_ty
                     ; return (term_arg1, term_arg2, mkCheckExpType ty_arg2) }
-            [Left term_arg1, Left term_arg2]
+            [HsValArg term_arg1, HsValArg term_arg2]
               -> return (term_arg1, term_arg2, res_ty)
             _ -> too_many_args "seq" args
 
@@ -1840,7 +1845,7 @@ tcSeq loc fun_name args res_ty
         ; res_ty <- readExpType res_ty  -- by now, it's surely filled in
         ; let fun'    = L loc (mkHsWrap ty_args (HsVar (L loc fun)))
               ty_args = WpTyApp res_ty <.> WpTyApp arg1_ty
-        ; return (idHsWrapper, fun', [Left arg1', Left arg2']) }
+        ; return (idHsWrapper, fun', [HsValArg arg1', HsValArg arg2']) }
 
 tcTagToEnum :: SrcSpan -> Name -> [LHsExprArgIn] -> ExpRhoType
             -> TcM (HsWrapper, LHsExpr GhcTcId, [LHsExprArgOut])
@@ -1850,15 +1855,15 @@ tcTagToEnum loc fun_name args res_ty
   = do { fun <- tcLookupId fun_name
 
        ; arg <- case args of
-           [Right hs_ty_arg, Left term_arg]
+           [HsTypeArg hs_ty_arg, HsValArg term_arg]
              -> do { ty_arg <- tcHsTypeApp hs_ty_arg liftedTypeKind
                    ; _ <- tcSubTypeDS (OccurrenceOf fun_name) GenSigCtxt ty_arg res_ty
                      -- other than influencing res_ty, we just
                      -- don't care about a type arg passed in.
                      -- So drop the evidence.
                    ; return term_arg }
-           [Left term_arg] -> do { _ <- expTypeToType res_ty
-                                 ; return term_arg }
+           [HsValArg term_arg] -> do { _ <- expTypeToType res_ty
+                                     ; return term_arg }
            _          -> too_many_args "tagToEnum#" args
 
        ; res_ty <- readExpType res_ty
@@ -1883,7 +1888,7 @@ tcTagToEnum loc fun_name args res_ty
        ; let fun' = L loc (mkHsWrap (WpTyApp rep_ty) (HsVar (L loc fun)))
              rep_ty = mkTyConApp rep_tc rep_args
 
-       ; return (mkWpCastR (mkTcSymCo coi), fun', [Left arg']) }
+       ; return (mkWpCastR (mkTcSymCo coi), fun', [HsValArg arg']) }
                  -- coi is a Representational coercion
   where
     doc1 = vcat [ text "Specify the type by giving a type signature"
@@ -1902,8 +1907,8 @@ too_many_args fun args
     hang (text "Too many type arguments to" <+> text fun <> colon)
        2 (sep (map pp args))
   where
-    pp (Left e)                             = ppr e
-    pp (Right (HsWC { hswc_body = L _ t })) = pprHsType t
+    pp (HsValArg e)                             = ppr e
+    pp (HsTypeArg (HsWC { hswc_body = L _ t })) = pprHsType t
 
 
 {-
