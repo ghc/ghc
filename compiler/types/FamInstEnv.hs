@@ -259,7 +259,7 @@ instance Outputable FamInst where
 --     See pprTyThing.pprFamInst for printing for the user
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
-  = hang (pprFamInstHdr famInst) 2 (ifPprDebug debug_stuff)
+  = hang (pprFamInstHdr famInst) 2 (whenPprDebug debug_stuff)
   where
     ax = fi_axiom famInst
     debug_stuff = vcat [ text "Coercion axiom:" <+> ppr ax

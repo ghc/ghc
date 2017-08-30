@@ -1743,6 +1743,9 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
              -- See Note [Wrong visibility for GADTs]
              univ_bndrs = mkTyVarBinders Specified univ_tvs
              ex_bndrs   = mkTyVarBinders Specified ex_tvs
+             ctxt'      = substTys arg_subst ctxt
+             arg_tys'   = substTys arg_subst arg_tys
+             res_ty'    = substTy  arg_subst res_ty
 
        ; fam_envs <- tcGetFamInstEnvs
 
@@ -1757,10 +1760,7 @@ tcConDecl rep_tycon tmpl_bndrs res_tmpl
                             rep_nm
                             stricts Nothing field_lbls
                             univ_bndrs ex_bndrs eq_preds
-                            (substTys arg_subst ctxt)
-                            (substTys arg_subst arg_tys)
-                            (substTy  arg_subst res_ty)
-                            rep_tycon
+                            ctxt' arg_tys' res_ty' rep_tycon
                   -- NB:  we put data_tc, the type constructor gotten from the
                   --      constructor type signature into the data constructor;
                   --      that way checkValidDataCon can complain if it's wrong.

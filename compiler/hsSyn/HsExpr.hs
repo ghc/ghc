@@ -1944,7 +1944,7 @@ pprStmt :: forall idL idR body . (SourceTextX idL, SourceTextX idR,
                                   Outputable body)
         => (StmtLR idL idR body) -> SDoc
 pprStmt (LastStmt expr ret_stripped _)
-  = ifPprDebug (text "[last]") <+>
+  = whenPprDebug (text "[last]") <+>
        (if ret_stripped then text "return" else empty) <+>
        ppr expr
 pprStmt (BindStmt pat expr _ _ _) = hsep [ppr pat, larrow, ppr expr]
@@ -1959,7 +1959,7 @@ pprStmt (RecStmt { recS_stmts = segment, recS_rec_ids = rec_ids
                  , recS_later_ids = later_ids })
   = text "rec" <+>
     vcat [ ppr_do_stmts segment
-         , ifPprDebug (vcat [ text "rec_ids=" <> ppr rec_ids
+         , whenPprDebug (vcat [ text "rec_ids=" <> ppr rec_ids
                             , text "later_ids=" <> ppr later_ids])]
 
 pprStmt (ApplicativeStmt args mb_join _)
@@ -2007,7 +2007,7 @@ pprStmt (ApplicativeStmt args mb_join _)
 pprTransformStmt :: (SourceTextX p, OutputableBndrId p)
                  => [IdP p] -> LHsExpr p -> Maybe (LHsExpr p) -> SDoc
 pprTransformStmt bndrs using by
-  = sep [ text "then" <+> ifPprDebug (braces (ppr bndrs))
+  = sep [ text "then" <+> whenPprDebug (braces (ppr bndrs))
         , nest 2 (ppr using)
         , nest 2 (pprBy by)]
 
@@ -2263,14 +2263,14 @@ pprSplice (HsQuasiQuote n q _ s)      = ppr_quasi n q s
 pprSplice (HsSpliced _ thing)         = ppr thing
 
 ppr_quasi :: OutputableBndr p => p -> p -> FastString -> SDoc
-ppr_quasi n quoter quote = ifPprDebug (brackets (ppr n)) <>
+ppr_quasi n quoter quote = whenPprDebug (brackets (ppr n)) <>
                            char '[' <> ppr quoter <> vbar <>
                            ppr quote <> text "|]"
 
 ppr_splice :: (SourceTextX p, OutputableBndrId p)
            => SDoc -> (IdP p) -> LHsExpr p -> SDoc -> SDoc
 ppr_splice herald n e trail
-    = herald <> ifPprDebug (brackets (ppr n)) <> ppr e <> trail
+    = herald <> whenPprDebug (brackets (ppr n)) <> ppr e <> trail
 
 -- | Haskell Bracket
 data HsBracket p = ExpBr (LHsExpr p)    -- [|  expr  |]
@@ -2519,13 +2519,11 @@ pprStmtContext (PatGuard ctxt) = text "pattern guard for" $$ pprMatchContext ctx
 --          transformed branch of
 --          transformed branch of monad comprehension
 pprStmtContext (ParStmtCtxt c) =
-  sdocWithPprDebug $ \dbg -> if dbg
-    then sep [text "parallel branch of", pprAStmtContext c]
-    else pprStmtContext c
+  ifPprDebug (sep [text "parallel branch of", pprAStmtContext c])
+             (pprStmtContext c)
 pprStmtContext (TransStmtCtxt c) =
-  sdocWithPprDebug $ \dbg -> if dbg
-    then sep [text "transformed branch of", pprAStmtContext c]
-    else pprStmtContext c
+  ifPprDebug (sep [text "transformed branch of", pprAStmtContext c])
+             (pprStmtContext c)
 
 instance (Outputable p, Outputable (NameOrRdrName p))
       => Outputable (HsStmtContext p) where

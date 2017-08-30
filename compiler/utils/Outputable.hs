@@ -15,7 +15,7 @@ module Outputable (
 
         -- * Pretty printing combinators
         SDoc, runSDoc, initSDocContext,
-        docToSDoc, sdocWithPprDebug,
+        docToSDoc,
         interppSP, interpp'SP,
         pprQuotedList, pprWithCommas, quotedListWithOr, quotedListWithNor,
         pprWithBars,
@@ -72,9 +72,11 @@ module Outputable (
         getPprStyle, withPprStyle, withPprStyleDoc, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
-        ifPprDebug, qualName, qualModule, qualPackage,
+        qualName, qualModule, qualPackage,
         mkErrStyle, defaultErrStyle, defaultDumpStyle, mkDumpStyle, defaultUserStyle,
         mkUserStyle, cmdlineParserStyle, Depth(..),
+
+        ifPprDebug, whenPprDebug, getPprDebug,
 
         -- * Error handling and debugging utilities
         pprPanic, pprSorry, assertPprPanic, pprPgmError,
@@ -247,8 +249,8 @@ defaultUserStyle dflags = mkUserStyle dflags neverQualify AllTheWay
 defaultDumpStyle :: DynFlags -> PprStyle
  -- Print without qualifiers to reduce verbosity, unless -dppr-debug
 defaultDumpStyle dflags
-   |  hasPprDebug dflags = PprDebug
-   |  otherwise          = PprDump neverQualify
+   | hasPprDebug dflags = PprDebug
+   | otherwise          = PprDump neverQualify
 
 mkDumpStyle :: DynFlags -> PrintUnqualified -> PprStyle
 mkDumpStyle dflags print_unqual
@@ -339,9 +341,6 @@ withPprStyle sty d = SDoc $ \ctxt -> runSDoc d ctxt{sdocStyle=sty}
 withPprStyleDoc :: DynFlags -> PprStyle -> SDoc -> Doc
 withPprStyleDoc dflags sty d = runSDoc d (initSDocContext dflags sty)
 
-sdocWithPprDebug :: (Bool -> SDoc) -> SDoc
-sdocWithPprDebug f = sdocWithDynFlags $ \dflags -> f (hasPprDebug dflags)
-
 pprDeeper :: SDoc -> SDoc
 pprDeeper d = SDoc $ \ctx -> case ctx of
   SDC{sdocStyle=PprUser _ (PartWay 0) _} -> Pretty.text "..."
@@ -422,11 +421,16 @@ userStyle ::  PprStyle -> Bool
 userStyle (PprUser {}) = True
 userStyle _other       = False
 
-ifPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
-ifPprDebug d = SDoc $ \ctx ->
-    case ctx of
-        SDC{sdocStyle=PprDebug} -> runSDoc d ctx
-        _                       -> Pretty.empty
+getPprDebug :: (Bool -> SDoc) -> SDoc
+getPprDebug d = getPprStyle $ \ sty -> d (debugStyle sty)
+
+ifPprDebug :: SDoc -> SDoc -> SDoc
+-- ^ Says what to do with and without -dppr-debug
+ifPprDebug yes no = getPprDebug $ \ dbg -> if dbg then yes else no
+
+whenPprDebug :: SDoc -> SDoc        -- Empty for non-debug style
+-- ^ Says what to do with -dppr-debug; without, return empty
+whenPprDebug d = ifPprDebug d empty
 
 -- | The analog of 'Pretty.printDoc_' for 'SDoc', which tries to make sure the
 --   terminal doesn't get screwed up by the ANSI color codes if an exception

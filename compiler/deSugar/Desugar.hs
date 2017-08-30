@@ -435,7 +435,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
                                <+> text "might inline first")
                      , text "Probable fix: add an INLINE[n] or NOINLINE[n] pragma for"
                        <+> quotes (ppr lhs_id)
-                     , ifPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
+                     , whenPprDebug (ppr (idInlineActivation lhs_id) $$ ppr rule_act) ])
 
       | check_rules_too
       , bad_rule : _ <- get_bad_rules lhs_id
@@ -446,7 +446,7 @@ warnRuleShadowing rule_name rule_act fn_id arg_ids
                                <+> text "for"<+> quotes (ppr lhs_id)
                                <+> text "might fire first")
                       , text "Probable fix: add phase [n] or [~n] to the competing rule"
-                      , ifPprDebug (ppr bad_rule) ])
+                      , whenPprDebug (ppr bad_rule) ])
 
       | otherwise
       = return ()

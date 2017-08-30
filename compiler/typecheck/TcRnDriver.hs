@@ -1036,7 +1036,7 @@ checkBootTyCon is_boot tc1 tc2
     -- harmless enough.)
     checkRoles roles1 roles2 `andThenCheck`
     check (eqFamFlav fam_flav1 fam_flav2)
-        (ifPprDebug $
+        (whenPprDebug $
             text "Family flavours" <+> ppr fam_flav1 <+> text "and" <+> ppr fam_flav2 <+>
             text "do not match") `andThenCheck`
     check (injInfo1 == injInfo2) (text "Injectivities do not match")
@@ -2559,7 +2559,7 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
                 -- wobbling in testsuite output
 
 ppr_types :: TypeEnv -> SDoc
-ppr_types type_env = sdocWithPprDebug $ \dbg ->
+ppr_types type_env = getPprDebug $ \dbg ->
   let
     ids = [id | id <- typeEnvIds type_env, want_sig id]
     want_sig id | dbg
@@ -2573,7 +2573,7 @@ ppr_types type_env = sdocWithPprDebug $ \dbg ->
   text "TYPE SIGNATURES" $$ nest 2 (ppr_sigs ids)
 
 ppr_tycons :: [FamInst] -> TypeEnv -> SDoc
-ppr_tycons fam_insts type_env = sdocWithPprDebug $ \dbg ->
+ppr_tycons fam_insts type_env = getPprDebug $ \dbg ->
   let
     fi_tycons = famInstsRepTyCons fam_insts
     tycons = [tycon | tycon <- typeEnvTyCons type_env, want_tycon tycon]

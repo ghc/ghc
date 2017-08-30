@@ -1209,8 +1209,9 @@ pprHsForAllExtra extra qtvs cxt
 
 pprHsForAllTvs :: (SourceTextX pass, OutputableBndrId pass)
                => [LHsTyVarBndr pass] -> SDoc
-pprHsForAllTvs qtvs = sdocWithPprDebug $ \debug ->
-  ppWhen (debug || not (null qtvs)) $ forAllLit <+> interppSP qtvs <> dot
+pprHsForAllTvs qtvs
+  | null qtvs = whenPprDebug (forAllLit <+> dot)
+  | otherwise = forAllLit <+> interppSP qtvs <> dot
 
 pprHsContext :: (SourceTextX pass, OutputableBndrId pass)
              => HsContext pass -> SDoc

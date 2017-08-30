@@ -255,9 +255,9 @@ pprCostCentreCore (NormalCC {cc_key = key, cc_name = n, cc_mod = m, cc_loc = loc
                              cc_is_caf = caf})
   = text "__scc" <+> braces (hsep [
         ppr m <> char '.' <> ftext n,
-        ifPprDebug (ppr key),
+        whenPprDebug (ppr key),
         pp_caf caf,
-        ifPprDebug (ppr loc)
+        whenPprDebug (ppr loc)
     ])
 
 pp_caf :: IsCafCC -> SDoc

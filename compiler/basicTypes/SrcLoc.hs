@@ -548,7 +548,7 @@ instance (Outputable l, Outputable e) => Outputable (GenLocated l e) where
                 -- GenLocated:
                 -- Print spans without the file name etc
                 -- ifPprDebug (braces (pprUserSpan False l))
-                ifPprDebug (braces (ppr l))
+                whenPprDebug (braces (ppr l))
              $$ ppr e
 
 {-

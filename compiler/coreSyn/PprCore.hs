@@ -213,7 +213,7 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
              ]
     else add_par $
          sep [sep [sep [ text "case" <+> pprCoreExpr expr
-                       , ifPprDebug (text "return" <+> ppr ty)
+                       , whenPprDebug (text "return" <+> ppr ty)
                        , text "of" <+> ppr_bndr var
                        ]
                   , char '{' <+> ppr_case_pat con args <+> arrow
@@ -228,7 +228,7 @@ ppr_expr add_par (Case expr var ty alts)
   = add_par $
     sep [sep [text "case"
                 <+> pprCoreExpr expr
-                <+> ifPprDebug (text "return" <+> ppr ty),
+                <+> whenPprDebug (text "return" <+> ppr ty),
               text "of" <+> ppr_bndr var <+> char '{'],
          nest 2 (vcat (punctuate semi (map pprCoreAlt alts))),
          char '}'

@@ -789,9 +789,8 @@ tupleParens :: TupleSort -> SDoc -> SDoc
 tupleParens BoxedTuple      p = parens p
 tupleParens UnboxedTuple    p = text "(#" <+> p <+> ptext (sLit "#)")
 tupleParens ConstraintTuple p   -- In debug-style write (% Eq a, Ord b %)
-  = sdocWithPprDebug $ \dbg -> if dbg
-      then text "(%" <+> p <+> ptext (sLit "%)")
-      else parens p
+  = ifPprDebug (text "(%" <+> p <+> ptext (sLit "%)"))
+               (parens p)
 
 {-
 ************************************************************************

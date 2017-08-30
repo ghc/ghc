@@ -996,7 +996,7 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
            | otherwise
            = sep [pp_field_args, arrow <+> pp_res_ty]
 
-    ppr_bang IfNoBang = sdocWithPprDebug $ \dbg -> ppWhen dbg $ char '_'
+    ppr_bang IfNoBang = whenPprDebug $ char '_'
     ppr_bang IfStrict = char '!'
     ppr_bang IfUnpack = text "{-# UNPACK #-}"
     ppr_bang (IfUnpackCo co) = text "! {-# UNPACK #-}" <>

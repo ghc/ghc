@@ -253,7 +253,7 @@ bindsOnlyPass pass guts
 -}
 
 getVerboseSimplStats :: (Bool -> SDoc) -> SDoc
-getVerboseSimplStats = sdocWithPprDebug          -- For now, anyway
+getVerboseSimplStats = getPprDebug          -- For now, anyway
 
 zeroSimplCount     :: DynFlags -> SimplCount
 isZeroSimplCount   :: SimplCount -> Bool

@@ -495,7 +495,7 @@ instance (Outputable arg)
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
         = braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
         where
-          dotdot = text ".." <+> ifPprDebug (ppr (drop n flds))
+          dotdot = text ".." <+> whenPprDebug (ppr (drop n flds))
 
 instance (Outputable p, Outputable arg)
       => Outputable (HsRecField' p arg) where

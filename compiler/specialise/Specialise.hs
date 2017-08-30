@@ -733,7 +733,7 @@ specImport dflags this_mod top_env done callers rb fn calls_for_fn
   = do { warnMsg (vcat [ hang (text "Could not specialise imported function" <+> quotes (ppr fn))
                             2 (vcat [ text "when specialising" <+> quotes (ppr caller)
                                     | caller <- callers])
-                      , ifPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
+                      , whenPprDebug (text "calls:" <+> vcat (map (pprCallInfo fn) calls_for_fn))
                       , text "Probable fix: add INLINABLE pragma on" <+> quotes (ppr fn) ])
        ; return ([], []) }
 

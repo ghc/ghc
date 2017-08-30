@@ -362,10 +362,8 @@ instance Outputable WorkList where
           , ppUnless (null ders) $
             text "Derived =" <+> vcat (map ppr ders)
           , ppUnless (isEmptyBag implics) $
-            sdocWithPprDebug $ \dbg ->
-            if dbg  -- Typically we only want the work list for this level
-            then text "Implics =" <+> vcat (map ppr (bagToList implics))
-            else text "(Implics omitted)"
+            ifPprDebug (text "Implics =" <+> vcat (map ppr (bagToList implics)))
+                       (text "(Implics omitted)")
           ])
 
 

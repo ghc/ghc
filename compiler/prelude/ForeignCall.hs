@@ -196,7 +196,7 @@ instance Outputable CExportSpec where
 
 instance Outputable CCallSpec where
   ppr (CCallSpec fun cconv safety)
-    = hcat [ ifPprDebug callconv, ppr_fun fun ]
+    = hcat [ whenPprDebug callconv, ppr_fun fun ]
     where
       callconv = text "{-" <> ppr cconv <> text "-}"
 

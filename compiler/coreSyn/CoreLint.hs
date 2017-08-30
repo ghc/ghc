@@ -2021,10 +2021,9 @@ addMsg env msgs msg
    locs = le_loc env
    (loc, cxt1) = dumpLoc (head locs)
    cxts        = [snd (dumpLoc loc) | loc <- locs]
-   context     = sdocWithPprDebug $ \dbg -> if dbg
-                  then vcat (reverse cxts) $$ cxt1 $$
-                         text "Substitution:" <+> ppr (le_subst env)
-                  else cxt1
+   context     = ifPprDebug (vcat (reverse cxts) $$ cxt1 $$
+                             text "Substitution:" <+> ppr (le_subst env))
+                            cxt1
 
    mk_msg msg = mkLocMessage SevWarning (mkSrcSpan loc loc) (context $$ msg)
 

@@ -418,14 +418,13 @@ findBest _      (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
-  | debugIsOn = let pp_rule rule = sdocWithPprDebug $ \dbg -> if dbg
-                        then ppr rule
-                        else doubleQuotes (ftext (ruleName rule))
+  | debugIsOn = let pp_rule rule
+                      = ifPprDebug (ppr rule)
+                                   (doubleQuotes (ftext (ruleName rule)))
                 in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
-                         (vcat [ sdocWithPprDebug $ \dbg -> if dbg
-                                   then text "Expression to match:" <+> ppr fn
-                                        <+> sep (map ppr args)
-                                   else empty
+                         (vcat [ whenPprDebug $
+                                 text "Expression to match:" <+> ppr fn
+                                 <+> sep (map ppr args)
                                , text "Rule 1:" <+> pp_rule rule1
                                , text "Rule 2:" <+> pp_rule rule2]) $
                 findBest target (rule1,ans1) prs

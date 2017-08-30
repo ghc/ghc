@@ -516,7 +516,7 @@ pprDataItem' dflags lit
 
 
 asmComment :: SDoc -> SDoc
-asmComment c = ifPprDebug $ text "# " <> c
+asmComment c = whenPprDebug $ text "# " <> c
 
 pprInstr :: Instr -> SDoc
 

@@ -338,22 +338,22 @@ ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   return $ cparen (not (null tt) && p >= app_prec)
                   (text dc_tag <+> pprDeeperList fsep tt_docs)
 
-ppr_termM y p Term{dc=Right dc, subTerms=tt} = do
+ppr_termM y p Term{dc=Right dc, subTerms=tt}
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
   = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2)
     <+> hsep (map (ppr_term1 True) tt)
 -} -- TODO Printing infix constructors properly
-  tt_docs' <- mapM (y app_prec) tt
-  return $ sdocWithPprDebug $ \dbg ->
-    -- Don't show the dictionary arguments to
-    -- constructors unless -dppr-debug is on
-    let tt_docs = if dbg
-           then tt_docs'
-           else dropList (dataConTheta dc) tt_docs'
-    in if null tt_docs
-      then ppr dc
-      else cparen (p >= app_prec) $
-             sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)]
+  = do { tt_docs' <- mapM (y app_prec) tt
+       ; return $ ifPprDebug (show_tm tt_docs')
+                             (show_tm (dropList (dataConTheta dc) tt_docs'))
+                  -- Don't show the dictionary arguments to
+                  -- constructors unless -dppr-debug is on
+       }
+  where
+    show_tm tt_docs
+      | null tt_docs = ppr dc
+      | otherwise    = cparen (p >= app_prec) $
+                       sep [ppr dc, nest 2 (pprDeeperList fsep tt_docs)]
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 ppr_termM y p RefWrap{wrapped_term=t}  = do
@@ -371,7 +371,7 @@ ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{value=words, ty=ty} =
     return $ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{ty=ty, bound_to=Nothing} =
-    return (char '_' <+> ifPprDebug (text "::" <> ppr ty))
+    return (char '_' <+> whenPprDebug (text "::" <> ppr ty))
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
 --  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
