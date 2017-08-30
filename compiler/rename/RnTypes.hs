@@ -113,7 +113,7 @@ rn_hs_sig_wc_type no_implicit_if_forall ctxt
                   thing_inside
   = do { free_vars <- extractFilteredRdrTyVars hs_ty
        ; (tv_rdrs, nwc_rdrs) <- partition_nwcs free_vars
-       ; rnImplicitBndrs no_implicit_if_forall ctxt tv_rdrs hs_ty $ \ vars ->
+       ; rnImplicitBndrs no_implicit_if_forall ctxt hs_ty tv_rdrs $ \ vars ->
     do { (wcs, hs_ty', fvs1) <- rnWcBody ctxt nwc_rdrs hs_ty
        ; let sig_ty' = HsWC { hswc_wcs = wcs, hswc_body = ib_ty' }
              ib_ty'  = mk_implicit_bndrs vars hs_ty' fvs1
@@ -250,7 +250,7 @@ rnHsSigType :: HsDocContext -> LHsSigType GhcPs
 rnHsSigType ctx (HsIB { hsib_body = hs_ty })
   = do { traceRn "rnHsSigType" (ppr hs_ty)
        ; vars <- extractFilteredRdrTyVars hs_ty
-       ; rnImplicitBndrs True ctx vars hs_ty $ \ vars ->
+       ; rnImplicitBndrs True ctx hs_ty vars $ \ vars ->
     do { (body', fvs) <- rnLHsType ctx hs_ty
        ; return ( mk_implicit_bndrs vars body' fvs, fvs ) } }
 
@@ -259,18 +259,27 @@ rnImplicitBndrs :: Bool    -- True <=> no implicit quantification
                            -- E.g.  f :: forall a. a->b
                            -- Do not quantify over 'b' too.
                 -> HsDocContext
-                -> FreeKiTyVars
-                -> LHsType GhcPs
+                -> LHsType GhcPs   -- hs_ty: the type over which the
+                                   -- implicit binders will scope
+                -> FreeKiTyVars    -- Free vars of hs_ty (excluding wildcards)
                 -> ([Name] -> RnM (a, FreeVars))
                 -> RnM (a, FreeVars)
-rnImplicitBndrs no_implicit_if_forall doc
+rnImplicitBndrs no_implicit_if_forall doc (L loc hs_ty)
                 (FKTV { fktv_kis = kvs, fktv_tys = tvs })
-                hs_ty@(L loc _) thing_inside
-  = do { let real_tvs  -- Implicit quantification only if
-                       -- there is no explicit forall
-               | no_implicit_if_forall
-               , L _ (HsForAllTy {}) <- hs_ty = []
-               | otherwise                    = tvs
+                thing_inside
+  = do { let real_tvs | no_implicit_if_forall
+                      , HsForAllTy {} <- hs_ty = []
+                      | otherwise              = tvs
+             -- Quantify over type variables only if there is no
+             -- explicit forall.  E.g.
+             --    f :: Proxy (a :: k) -> b
+             --         Quantify over {k} and {a,b}
+             --    g :: forall a. Proxy (a :: k) -> b
+             --         Quantify over {k} and {}
+             -- Note that we always do the implicit kind-quantification
+             -- but, rather arbitrarily, we switch off the type-quantification
+             -- if there is an explicit forall
+
        ; traceRn "rnImplicitBndrs" (vcat [ ppr hs_ty, ppr kvs, ppr tvs, ppr real_tvs ])
 
        ; vars <- mapM (newLocalBndrRn . L loc . unLoc) (kvs ++ real_tvs)
@@ -278,7 +287,8 @@ rnImplicitBndrs no_implicit_if_forall doc
        ; checkBadKindBndrs doc kvs
 
        ; traceRn "checkMixedVars2" (ppr tvs)
-       ; checkMixedVars kvs tvs
+       ; checkMixedVars kvs tvs  -- E.g.  Either (Proxy (a :: k)) k
+                                 -- Here 'k' is used at kind level and type level
 
        ; bindLocalNamesFV vars $
          thing_inside vars }
@@ -846,21 +856,26 @@ bindHsQTyVars :: forall a b.
               -> [Located RdrName]  -- Kind variables from scope, no dups
               -> (LHsQTyVars GhcPs)
               -> (LHsQTyVars GhcRn -> Bool -> RnM (b, FreeVars))
-                  -- The Bool is True <=> all kind variabless used in the
+                  -- The Bool is True <=> all kind variables used in the
                   -- kind signature are bound on the left.  Reason:
-                  -- tye TypeInType clause of Note [Complete user-supplied
+                  -- the TypeInType clause of Note [Complete user-supplied
                   -- kind signatures] in HsDecls
               -> RnM (b, FreeVars)
 
+-- See Note [bindHsQTyVars examples]
 -- (a) Bring kind variables into scope
 --     both (i)  passed in body_kv_occs
 --     and  (ii) mentioned in the kinds of hsq_bndrs
 -- (b) Bring type variables into scope
+--
 bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
   = do { let hs_tv_bndrs = hsQTvExplicit hsq_bndrs
        ; bndr_kv_occs <- extractHsTyVarBndrsKVs hs_tv_bndrs
        ; rdr_env <- getLocalRdrEnv
-       ; let bndrs, kv_occs, implicit_bndr_kvs,
+
+       ; let -- See Note [bindHsQTyVars examples] for what
+             -- all these various things are doing
+             bndrs, kv_occs, implicit_bndr_kvs,
                     implicit_body_kvs, implicit_kvs :: [Located RdrName]
              bndrs             = map hsLTyVarLocName hs_tv_bndrs
              kv_occs           = body_kv_occs ++ bndr_kv_occs
@@ -871,7 +886,7 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
 
              -- dep_bndrs is the subset of bndrs that are dependent
              --   i.e. appear in bndr/body_kv_occs
-             -- Can't use implicit_kvs because we've deleted bnrs from that!
+             -- Can't use implicit_kvs because we've deleted bndrs from that!
              dep_bndrs = filter (`elemRdr` kv_occs) bndrs
 
        ; traceRn "checkMixedVars3" (ppr bndrs)
@@ -893,7 +908,7 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
     filter_occs :: LocalRdrEnv         -- In scope
                 -> [Located RdrName]   -- Bound here
                 -> [Located RdrName]   -- Potential implicit binders
-                -> [Located RdrName]   -- Final implict binders
+                -> [Located RdrName]   -- Final implicit binders
     -- Filter out any potential implicit binders that are either
     -- already in scope, or are explicitly bound here
     filter_occs rdr_env bndrs occs
@@ -902,12 +917,96 @@ bindHsQTyVars doc mb_in_doc mb_assoc body_kv_occs hsq_bndrs thing_inside
         is_in_scope locc@(L _ occ) = isJust (lookupLocalRdrEnv rdr_env occ)
                                   || locc `elemRdr` bndrs
 
+{- Note [bindHsQTyVars examples]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+   data T k (a::k1) (b::k) :: k2 -> k1 -> *
+
+Then:
+  hs_tv_bndrs = [k, a::k1, b::k], the explicitly-bound variables
+  bndrs       = [k,a,b]
+
+  bndr_kv_occs = [k,k1], kind variables free in kind signatures
+                         of hs_tv_bndrs
+
+  body_kv_occs = [k2,k1], kind variables free in the
+                          result kind signature
+
+  implicit_bndr_kvs = [k1], kind variables free in kind signatures
+                            of hs_tv_bndrs, and not bound by bndrs
+
+  implicit_body_kvs = [k2], kind variables free in the result kind
+                            signature, and not bound either by
+                            bndrs or by implicit_bndr_kvs
+
+* We want to quantify add implicit bindings for
+  implicit_bndr_kvs and implicit_body_kvs
+
+* The "dependent" bndrs (hsq_dependent) are the subset of
+  bndrs that are free in bndr_kv_occs or body_kv_occs
+
+* If implicit_body_kvs is non-empty, then there is a kind variable
+  mentioned in the kind signature that is not bound "on the left".
+  That's one of the rules for a CUSK, so we pass that info on
+  as the second argument to thing_inside.
+
+* Order is not important in these lists.  All we are doing is
+  bring Names into scope.
+
+Finally, you may wonder why filter_occs removes in-scope variables
+from bndr/body_kv_occs.  How can anything be in scope?  Answer:
+HsQTyVars is /also/ used (slightly oddly) for Haskell-98 syntax
+ConDecls
+   data T a = forall (b::k). MkT a b
+The ConDecl has a LHsQTyVars in it; but 'a' scopes over the entire
+ConDecl.  Hence the local RdrEnv may be non-empty and we must filter
+out 'a' from the free vars.  (Mind you, in this situation all the
+implicit kind variables are bound at the data type level, so there
+are none to bind in the ConDecl, so there are no implicitly bound
+variables at all.
+
+Note [Kind variable scoping]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If we have
+  data T (a :: k) k = ...
+we report "k is out of scope" for (a::k).  Reason: k is not brought
+into scope until the explicit k-binding that follows.  It would be
+terribly confusing to bring into scope an /implicit/ k for a's kind
+and a distinct, shadowing explicit k that follows, something like
+  data T {k1} (a :: k1) k = ...
+
+So the rule is:
+
+   the implicit binders never include any
+   of the explicit binders in the group
+
+Note that in the denerate case
+  data T (a :: a) = blah
+we get a complaint the the second 'a' is not in scope.
+
+That applies to foralls too: e.g.
+   forall (a :: k) k . blah
+
+But if the foralls are split, we treat the two groups separately:
+   forall (a :: k). forall k. blah
+Here we bring into scope an implicit k, which is later shadowed
+by the explicit k.
+
+In implementation terms
+
+* In bindHsQTyVars 'k' is free in bndr_kv_occs; then we delete
+  the binders {a,k}, and so end with no implicit binders.  Then we
+  rename the binders left-to-right, and hence see that 'k' is out of
+  scope in the kind of 'a'.
+
+* Similarly in extract_hs_tv_bndrs
+-}
 
 bindLHsTyVarBndrs :: HsDocContext
                   -> Maybe SDoc            -- Just d => check for unused tvs
                                            --   d is a phrase like "in the type ..."
                   -> Maybe a               -- Just _  => an associated type decl
-                  -> [LHsTyVarBndr GhcPs]  -- ... these user-written tyvars
+                  -> [LHsTyVarBndr GhcPs]  -- User-written tyvars
                   -> ([LHsTyVarBndr GhcRn] -> RnM (b, FreeVars))
                   -> RnM (b, FreeVars)
 bindLHsTyVarBndrs doc mb_in_doc mb_assoc tv_bndrs thing_inside
@@ -955,20 +1054,6 @@ newTyVarNameRn mb_assoc (L loc rdr)
               -- Use the same Name as the parent class decl
 
            _                -> newLocalBndrRn (L loc rdr) }
-
-
-{- Note [Kind variable ordering]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If we have
-  data T (a :: k) k = ...
-we report "k is out of scope".  We do /not/ say "oh there are two k's,
-an implicit one from the (a::k) and an explicit one that shadows it".
-No, we bring {a,k} into scope as a group.
-
-In impl terms 'k' is free in bndr_kv_occs; then we delete the binders {a,k},
-and so end with no implicit binders.  Then we rename the binders left-to-right,
-and hence see that 'k' is out of scope in the kind of 'a'.
--}
 
 ---------------------
 collectAnonWildCards :: LHsType GhcRn -> [Name]
@@ -1666,14 +1751,14 @@ extract_hs_tv_bndrs tv_bndrs
        ; return $
          FKTV (filterOut (`elemRdr` tv_bndr_rdrs) (bndr_kvs ++ body_kvs)
                     -- NB: delete all tv_bndr_rdrs from bndr_kvs as well
-                    -- as body_kvs; see Note [Kind variable ordering]
+                    -- as body_kvs; see Note [Kind variable scoping]
                 ++ acc_kvs)
               (filterOut (`elemRdr` tv_bndr_rdrs) body_tvs ++ acc_tvs) }
 
 extract_hs_tv_bndrs_kvs :: [LHsTyVarBndr GhcPs] -> RnM [Located RdrName]
 -- Returns the free kind variables of any explictly-kinded binders
 -- NB: Does /not/ delete the binders themselves.
---     Duplicaes are /not/ removed
+--     Duplicates are /not/ removed
 --     E.g. given  [k1, a:k1, b:k2]
 --          the function returns [k1,k2], even though k1 is bound here
 extract_hs_tv_bndrs_kvs tv_bndrs
