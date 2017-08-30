@@ -63,7 +63,7 @@ import PrelNames
 import DynFlags
 import SrcLoc
 import Util
-import VarEnv  ( emptyTidyEnv )
+import VarEnv  ( emptyTidyEnv, mkInScopeSet )
 import ListSetOps
 import Maybes
 import Outputable
@@ -1236,7 +1236,18 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
                                 , ppr inner_ty, pprTyVar tv
                                 , ppr vis ]) )
                     ; ty_arg <- tcHsTypeApp hs_ty_arg kind
-                    ; let insted_ty = substTyWithUnchecked [tv] [ty_arg] inner_ty
+
+                    ; inner_ty <- zonkTcType inner_ty
+                          -- See Note [Visible type application zonk]
+
+                    ; let in_scope  = mkInScopeSet (tyCoVarsOfTypes [upsilon_ty, ty_arg])
+                          insted_ty = substTyWithInScope in_scope [tv] [ty_arg] inner_ty
+                                      -- NB: tv and ty_arg have the same kind, so this
+                                      --     substitution is kind-respecting
+                    ; traceTc "VTA" (vcat [ppr tv, ppr kind
+                                          , ppr ty_arg
+                                          , ppr (typeKind ty_arg)
+                                          , ppr insted_ty ])
                     ; (inner_wrap, args', res_ty)
                         <- go acc_args (n+1) insted_ty args
                    -- inner_wrap :: insted_ty "->" (map typeOf args') -> res_ty
@@ -1267,6 +1278,35 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; failWith $
                text "Cannot apply expression of type" <+> quotes (ppr ty) $$
                text "to a visible type argument" <+> quotes (ppr arg) }
+
+{- Note [Visible type application zonk]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Substitutions should be kind-preserving, so we need kind(tv) = kind(ty_arg).
+
+* tcHsTypeApp only guarantees that
+    - ty_arg is zonked
+    - kind(zonk(tv)) = kind(ty_arg)
+  (checkExpectedKind zonks as it goes).
+
+So we must zonk inner_ty as well, to guarantee consistency between zonk(tv)
+and inner_ty.  Otherwise we can build an ill-kinded type.  An example was
+Trac #14158, where we had:
+   id :: forall k. forall (cat :: k -> k -> *). forall (a :: k). cat a a
+and we had the visible type application
+  id @(->)
+
+* We instantiated k := kappa, yielding
+    forall (cat :: kappa -> kappa -> *). forall (a :: kappa). cat a a
+* Then we called tcHsTypeApp (->) with expected kind (kappa -> kappa -> *).
+* That instantiated (->) as ((->) q1 q1), and unified kappa := q1,
+  Here q1 :: RuntimeRep
+* Now we substitute
+     cat  :->  (->) q1 q1 :: TYPE q1 -> TYPE q1 -> *
+  but we must first zonk the inner_ty to get
+      forall (a :: TYPE q1). cat a a
+  so that the result of substitution is well-kinded
+  Failing to do so led to Trac #14158.
+-}
 
 ----------------
 tcArg :: LHsExpr Name                    -- The function (for error messages)

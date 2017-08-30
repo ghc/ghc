@@ -178,6 +178,7 @@ module Type (
         substTyUnchecked, substTysUnchecked, substThetaUnchecked,
         substTyWithUnchecked,
         substCoUnchecked, substCoWithUnchecked,
+        substTyWithInScope,
         substTyVarBndr, substTyVar, substTyVars,
         cloneTyVarBndr, cloneTyVarBndrs, lookupTyVar,
 
