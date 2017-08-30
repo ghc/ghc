@@ -1280,8 +1280,11 @@ uType_defer t_or_k origin ty1 ty2
        ; whenDOptM Opt_D_dump_tc_trace $ do
             { ctxt <- getErrCtxt
             ; doc <- mkErrInfo emptyTidyEnv ctxt
-            ; traceTc "utype_defer" (vcat [ppr co, ppr ty1,
-                                           ppr ty2, pprCtOrigin origin, doc])
+            ; traceTc "utype_defer" (vcat [ debugPprType ty1
+                                          , debugPprType ty2
+                                          , pprCtOrigin origin
+                                          , doc])
+            ; traceTc "utype_defer2" (ppr co)
             }
        ; return co }
 

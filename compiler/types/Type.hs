@@ -687,7 +687,7 @@ splitAppTy_maybe ty | Just ty' <- coreView ty
 splitAppTy_maybe ty = repSplitAppTy_maybe ty
 
 -------------
-repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
+repSplitAppTy_maybe :: HasDebugCallStack => Type -> Maybe (Type,Type)
 -- ^ Does the AppTy split as in 'splitAppTy_maybe', but assumes that
 -- any Core view stuff is already done
 repSplitAppTy_maybe (FunTy ty1 ty2)

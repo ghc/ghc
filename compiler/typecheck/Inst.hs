@@ -48,7 +48,7 @@ import CoreSyn     ( isOrphan )
 import FunDeps
 import TcMType
 import Type
-import TyCoRep     ( TyBinder(..) )
+import TyCoRep
 import TcType
 import HscTypes
 import Class( Class )
@@ -196,15 +196,16 @@ top_instantiate inst_all orig ty
        ; let inst_theta' = substTheta subst inst_theta
              sigma'      = substTy subst (mkForAllTys leave_bndrs $
                                           mkFunTys leave_theta rho)
+             inst_tv_tys' = mkTyVarTys inst_tvs'
 
-       ; wrap1 <- instCall orig (mkTyVarTys inst_tvs') inst_theta'
+       ; wrap1 <- instCall orig inst_tv_tys' inst_theta'
        ; traceTc "Instantiating"
                  (vcat [ text "all tyvars?" <+> ppr inst_all
                        , text "origin" <+> pprCtOrigin orig
-                       , text "type" <+> ppr ty
+                       , text "type" <+> debugPprType ty
                        , text "theta" <+> ppr theta
                        , text "leave_bndrs" <+> ppr leave_bndrs
-                       , text "with" <+> ppr inst_tvs'
+                       , text "with" <+> vcat (map debugPprType inst_tv_tys')
                        , text "theta:" <+>  ppr inst_theta' ])
 
        ; (wrap2, rho2) <-

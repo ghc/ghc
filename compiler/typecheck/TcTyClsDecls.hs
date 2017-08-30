@@ -2506,7 +2506,7 @@ checkValidDataCon dflags existential_ok tc con
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
         ; zipWith3M_ check_bang (dataConSrcBangs con) (dataConImplBangs con) [1..]
 
-        ; traceTc "Done validity of data con" (ppr con <+> ppr (dataConRepType con))
+        ; traceTc "Done validity of data con" (ppr con <+> debugPprType (dataConRepType con))
     }
   where
     ctxt = ConArgCtxt (dataConName con)
