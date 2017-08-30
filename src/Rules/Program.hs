@@ -21,54 +21,48 @@ buildProgram rs package = do
         let context = vanillaContext stage package
 
         -- Rules for programs built in 'buildRoot'
-        "//" ++ contextDir context -/- programName context <.> exe %> \bin -> do
-            context' <- programContext stage package
-            buildBinaryAndWrapper rs context' bin
+        "//" ++ contextDir context -/- programName context <.> exe %> \bin ->
+            buildBinaryAndWrapper rs bin =<< programContext stage package
 
         -- Rules for the GHC package, which is built 'inplace'
         when (package == ghc) $ do
-            inplaceBinPath -/- programName context <.> exe %> \bin -> do
-                context' <- programContext stage package
-                buildBinaryAndWrapper rs context' bin
+            inplaceBinPath -/- programName context <.> exe %> \bin ->
+                buildBinaryAndWrapper rs bin =<< programContext stage package
 
-            inplaceLibBinPath -/- programName context <.> exe %> \bin -> do
-                context' <- programContext stage package
-                buildBinary rs context' bin
+            inplaceLibBinPath -/- programName context <.> exe %> \bin ->
+                buildBinary rs bin =<< programContext stage package
 
-            inplaceLibBinPath -/- programName context <.> "bin" %> \bin -> do
-                context' <- programContext stage package
-                buildBinary rs context' bin
+            inplaceLibBinPath -/- programName context <.> "bin" %> \bin ->
+                buildBinary rs bin =<< programContext stage package
 
     -- Rules for other programs built in inplace directories
     when (package /= ghc) $ do
         let context0 = vanillaContext Stage0 package -- TODO: get rid of context0
         inplaceBinPath -/- programName context0 <.> exe %> \bin -> do
-            stage   <- installStage package -- TODO: get rid of fromJust
-            context <- programContext (fromJust stage) package
-            buildBinaryAndWrapper rs context bin
+            stage <- installStage package -- TODO: get rid of fromJust
+            buildBinaryAndWrapper rs bin =<< programContext (fromJust stage) package
 
         inplaceLibBinPath -/- programName context0 <.> exe %> \bin -> do
             stage   <- installStage package -- TODO: get rid of fromJust
             context <- programContext (fromJust stage) package
             if package /= iservBin then
                 -- We *normally* build only unwrapped binaries in inplace/lib/bin
-                buildBinary rs context bin
+                buildBinary rs bin context
             else
                 -- Build both binary and wrapper in inplace/lib/bin for iservBin
-                buildBinaryAndWrapperLib rs context bin
+                buildBinaryAndWrapperLib rs bin context
 
         inplaceLibBinPath -/- programName context0 <.> "bin" %> \bin -> do
-            stage   <- installStage package -- TODO: get rid of fromJust
-            context <- programContext (fromJust stage) package
-            buildBinary rs context bin
+            stage <- installStage package -- TODO: get rid of fromJust
+            buildBinary rs bin =<< programContext (fromJust stage) package
 
-buildBinaryAndWrapperLib :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildBinaryAndWrapperLib rs context bin = do
+buildBinaryAndWrapperLib :: [(Resource, Int)] -> FilePath -> Context -> Action ()
+buildBinaryAndWrapperLib rs bin context = do
     windows <- windowsHost
     if windows
-    then buildBinary rs context bin -- We don't build wrappers on Windows
+    then buildBinary rs bin context -- We don't build wrappers on Windows
     else case lookup context inplaceWrappers of
-        Nothing      -> buildBinary rs context bin -- No wrapper found
+        Nothing      -> buildBinary rs bin context -- No wrapper found
         Just wrapper -> do
             top <- topDirectory
             let libdir = top -/- inplaceLibPath
@@ -76,13 +70,13 @@ buildBinaryAndWrapperLib rs context bin = do
             need [wrappedBin]
             buildWrapper context wrapper bin (WrappedBinary libdir (takeFileName wrappedBin))
 
-buildBinaryAndWrapper :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildBinaryAndWrapper rs context bin = do
+buildBinaryAndWrapper :: [(Resource, Int)] -> FilePath -> Context -> Action ()
+buildBinaryAndWrapper rs bin context = do
     windows <- windowsHost
     if windows
-    then buildBinary rs context bin -- We don't build wrappers on Windows
+    then buildBinary rs bin context -- We don't build wrappers on Windows
     else case lookup context inplaceWrappers of
-        Nothing      -> buildBinary rs context bin -- No wrapper found
+        Nothing      -> buildBinary rs bin context -- No wrapper found
         Just wrapper -> do
             top <- topDirectory
             let libPath    = top -/- inplaceLibPath
@@ -99,8 +93,8 @@ buildWrapper context@Context {..} wrapper wrapperPath wrapped = do
         quote (pkgName package) ++ " (" ++ show stage ++ ")."
 
 -- TODO: Get rid of the Paths_hsc2hs.o hack.
-buildBinary :: [(Resource, Int)] -> Context -> FilePath -> Action ()
-buildBinary rs context@Context {..} bin = do
+buildBinary :: [(Resource, Int)] -> FilePath -> Context -> Action ()
+buildBinary rs bin context@Context {..} = do
     binDeps <- if stage == Stage0 && package == ghcCabal
         then hsSources context
         else do
