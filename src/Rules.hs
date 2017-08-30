@@ -126,5 +126,5 @@ oracleRules = do
     Oracles.ModuleFiles.moduleFilesOracle
 
 programsStage1Only :: [Package]
-programsStage1Only = [ deriveConstants, dllSplit, genapply, genprimopcode, ghc
-                     , ghcCabal, ghcPkg, hp2ps, hpc, hsc2hs, runGhc ]
+programsStage1Only = [ deriveConstants, genapply, genprimopcode, ghc, ghcCabal
+                     , ghcPkg, hp2ps, hpc, hsc2hs, runGhc ]

@@ -2,7 +2,7 @@
 module GHC (
     -- * GHC packages
     array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes,
-    compiler, containers, deepseq, deriveConstants, directory, dllSplit, filepath,
+    compiler, containers, deepseq, deriveConstants, directory, filepath,
     genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact, ghci,
     ghcPkg, ghcPrim, ghcTags, ghcSplit, haddock, haskeline, hsc2hs, hp2ps,
     hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec,
@@ -30,13 +30,12 @@ import Oracles.Setting
 ghcPackages :: [Package]
 ghcPackages =
     [ array, base, binary, bytestring, cabal, checkApiAnnotations, compareSizes
-    , compiler, containers, deepseq, deriveConstants, directory, dllSplit
-    , filepath, genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal
-    , ghcCompact, ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs
-    , hp2ps, hpc, hpcBin, integerGmp, integerSimple, iservBin, libffi
-    , mtl, parsec, parallel, pretty, primitive, process, rts, runGhc, stm
-    , templateHaskell, terminfo, text, time, touchy, transformers, unlit, unix
-    , win32, xhtml ]
+    , compiler, containers, deepseq, deriveConstants, directory, filepath
+    , genapply, genprimopcode, ghc, ghcBoot, ghcBootTh, ghcCabal, ghcCompact
+    , ghci, ghcPkg, ghcPrim, ghcTags, haddock, haskeline, hsc2hs, hp2ps, hpc
+    , hpcBin, integerGmp, integerSimple, iservBin, libffi, mtl, parsec, parallel
+    , pretty, primitive, process, rts, runGhc, stm, templateHaskell, terminfo
+    , text, time, touchy, transformers, unlit, unix, win32, xhtml ]
 
 -- TODO: Optimise by switching to sets of packages.
 isGhcPackage :: Package -> Bool
@@ -55,7 +54,6 @@ containers          = hsLib  "containers"
 deepseq             = hsLib  "deepseq"
 deriveConstants     = hsUtil "deriveConstants"
 directory           = hsLib  "directory"
-dllSplit            = hsUtil "dll-split"
 filepath            = hsLib  "filepath"
 genapply            = hsUtil "genapply"
 genprimopcode       = hsUtil "genprimopcode"
@@ -144,7 +142,6 @@ stage0Packages = do
              , compareSizes
              , compiler
              , deriveConstants
-             , dllSplit
              , genapply
              , genprimopcode
              , ghc
