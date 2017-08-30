@@ -2,6 +2,8 @@
 
  * to be released
 
+ * Haddock now writes additional information about the documentation to `meta.json`
+
  * Fix renaming of type variables after specializing instance method signatures (#613)
 
  * Move markup related data types to haddock-library

@@ -29,6 +29,7 @@ import Data.Version
 import Haddock.Backends.Xhtml
 import Haddock.Backends.Xhtml.Themes (getThemes)
 import Haddock.Backends.LaTeX
+import Haddock.Backends.Meta
 import Haddock.Backends.Hoogle
 import Haddock.Backends.Hyperlinker
 import Haddock.Interface
@@ -319,6 +320,7 @@ render dflags flags qual ifaces installedIfaces extSrcMap = do
                 opt_contents_url opt_index_url unicode qual
                 pretty
     copyHtmlBits odir libDir themes
+    writeHaddockMeta odir
 
   -- TODO: we throw away Meta for both Hoogle and LaTeX right now,
   -- might want to fix that if/when these two get some work on them
@@ -445,9 +447,9 @@ getHaddockLibDir flags =
             exists <- doesDirectoryExist p
             pure $ if exists then Just p else Nothing
 
-      dirs <- mapM check res_dirs  
+      dirs <- mapM check res_dirs
       case [p | Just p <- dirs] of
-        (p : _) -> return p 
+        (p : _) -> return p
         _       -> die "Haddock's resource directory does not exist!\n"
 #endif
     fs -> return (last fs)
