@@ -357,7 +357,7 @@ stgCseExpr env orig@(StgConApp dataCon args tys)
     | Just bndr' <- envLookup dc args' env
     = (if getKey u < 0 then pprTrace "stgCseExpr" (ppr dataCon <+> text (show $ length (dataConOrigArgTys dataCon))) else id) $ StgApp bndr' []
     | otherwise
-    = orig -- StgConApp dataCon args' tys
+    = StgConApp dataCon args' tys
   where args' = substArgs env args
         dc = Lax dataCon
         u = getUnique (getName dc)
