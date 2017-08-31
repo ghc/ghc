@@ -487,7 +487,7 @@ myThreadId = IO $ \s ->
    case (myThreadId# s) of (# s1, tid #) -> (# s1, ThreadId tid #)
 
 
--- |The 'yield' action allows (forces, in a co-operative multitasking
+-- | The 'yield' action allows (forces, in a co-operative multitasking
 -- implementation) a context-switch to any other currently runnable
 -- threads (if any), and is occasionally useful when implementing
 -- concurrency abstractions.
@@ -591,7 +591,7 @@ threadStatus (ThreadId t) = IO $ \s ->
      mk_stat 17 = ThreadDied
      mk_stat _  = ThreadBlocked BlockedOnOther
 
--- | returns the number of the capability on which the thread is currently
+-- | Returns the number of the capability on which the thread is currently
 -- running, and a boolean indicating whether the thread is locked to
 -- that capability or not.  A thread is locked to a capability if it
 -- was created with @forkOn@.
@@ -602,7 +602,7 @@ threadCapability (ThreadId t) = IO $ \s ->
    case threadStatus# t s of
      (# s', _, cap#, locked# #) -> (# s', (I# cap#, isTrue# (locked# /=# 0#)) #)
 
--- | make a weak pointer to a 'ThreadId'.  It can be important to do
+-- | Make a weak pointer to a 'ThreadId'.  It can be important to do
 -- this if you want to hold a reference to a 'ThreadId' while still
 -- allowing the thread to receive the @BlockedIndefinitely@ family of
 -- exceptions (e.g. 'BlockedIndefinitelyOnMVar').  Holding a normal
@@ -714,7 +714,7 @@ instance MonadPlus STM
 unsafeIOToSTM :: IO a -> STM a
 unsafeIOToSTM (IO m) = STM m
 
--- |Perform a series of STM actions atomically.
+-- | Perform a series of STM actions atomically.
 --
 -- You cannot use 'atomically' inside an 'unsafePerformIO' or 'unsafeInterleaveIO'.
 -- Any attempt to do so will result in a runtime error.  (Reason: allowing
@@ -727,19 +727,20 @@ unsafeIOToSTM (IO m) = STM m
 atomically :: STM a -> IO a
 atomically (STM m) = IO (\s -> (atomically# m) s )
 
--- |Retry execution of the current memory transaction because it has seen
--- values in TVars which mean that it should not continue (e.g. the TVars
+-- | Retry execution of the current memory transaction because it has seen
+-- values in 'TVar's which mean that it should not continue (e.g. the 'TVar's
 -- represent a shared buffer that is now empty).  The implementation may
--- block the thread until one of the TVars that it has read from has been
+-- block the thread until one of the 'TVar's that it has read from has been
 -- updated. (GHC only)
 retry :: STM a
 retry = STM $ \s# -> retry# s#
 
--- |Compose two alternative STM actions (GHC only).  If the first action
--- completes without retrying then it forms the result of the orElse.
--- Otherwise, if the first action retries, then the second action is
--- tried in its place.  If both actions retry then the orElse as a
--- whole retries.
+-- | Compose two alternative STM actions (GHC only).
+--
+-- If the first action completes without retrying then it forms the result of
+-- the 'orElse'. Otherwise, if the first action retries, then the second action
+-- is tried in its place. If both actions retry then the 'orElse' as a whole
+-- retries.
 orElse :: STM a -> STM a -> STM a
 orElse (STM m) e = STM $ \s -> catchRetry# m (unSTM e) s
 
@@ -772,16 +773,17 @@ catchSTM (STM m) handler = STM $ catchSTM# m handler'
                      Just e' -> unSTM (handler e')
                      Nothing -> raiseIO# e
 
--- | Low-level primitive on which always and alwaysSucceeds are built.
--- checkInv differs form these in that (i) the invariant is not
--- checked when checkInv is called, only at the end of this and
--- subsequent transcations, (ii) the invariant failure is indicated
--- by raising an exception.
+-- | Low-level primitive on which 'always' and 'alwaysSucceeds' are built.
+-- 'checkInv' differs from these in that,
+--
+-- 1. the invariant is not checked when 'checkInv' is called, only at the end of
+-- this and subsequent transactions
+-- 2. the invariant failure is indicated by raising an exception.
 checkInv :: STM a -> STM ()
 checkInv (STM m) = STM (\s -> case (check# m) s of s' -> (# s', () #))
 
--- | alwaysSucceeds adds a new invariant that must be true when passed
--- to alwaysSucceeds, at the end of the current transaction, and at
+-- | 'alwaysSucceeds' adds a new invariant that must be true when passed
+-- to 'alwaysSucceeds', at the end of the current transaction, and at
 -- the end of every subsequent transaction.  If it fails at any
 -- of those points then the transaction violating it is aborted
 -- and the exception raised by the invariant is propagated.
@@ -789,9 +791,9 @@ alwaysSucceeds :: STM a -> STM ()
 alwaysSucceeds i = do ( i >> retry ) `orElse` ( return () )
                       checkInv i
 
--- | always is a variant of alwaysSucceeds in which the invariant is
--- expressed as an STM Bool action that must return True.  Returning
--- False or raising an exception are both treated as invariant failures.
+-- | 'always' is a variant of 'alwaysSucceeds' in which the invariant is
+-- expressed as an @STM Bool@ action that must return @True@.  Returning
+-- @False@ or raising an exception are both treated as invariant failures.
 always :: STM Bool -> STM ()
 always i = alwaysSucceeds ( do v <- i
                                if (v) then return () else ( errorWithoutStackTrace "Transactional invariant violation" ) )
@@ -803,13 +805,13 @@ data TVar a = TVar (TVar# RealWorld a)
 instance Eq (TVar a) where
         (TVar tvar1#) == (TVar tvar2#) = isTrue# (sameTVar# tvar1# tvar2#)
 
--- |Create a new TVar holding a value supplied
+-- | Create a new 'TVar' holding a value supplied
 newTVar :: a -> STM (TVar a)
 newTVar val = STM $ \s1# ->
     case newTVar# val s1# of
          (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
--- |@IO@ version of 'newTVar'.  This is useful for creating top-level
+-- | @IO@ version of 'newTVar'.  This is useful for creating top-level
 -- 'TVar's using 'System.IO.Unsafe.unsafePerformIO', because using
 -- 'atomically' inside 'System.IO.Unsafe.unsafePerformIO' isn't
 -- possible.
@@ -818,7 +820,7 @@ newTVarIO val = IO $ \s1# ->
     case newTVar# val s1# of
          (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
--- |Return the current value stored in a TVar.
+-- | Return the current value stored in a 'TVar'.
 -- This is equivalent to
 --
 -- >  readTVarIO = atomically . readTVar
@@ -828,11 +830,11 @@ newTVarIO val = IO $ \s1# ->
 readTVarIO :: TVar a -> IO a
 readTVarIO (TVar tvar#) = IO $ \s# -> readTVarIO# tvar# s#
 
--- |Return the current value stored in a TVar
+-- |Return the current value stored in a 'TVar'.
 readTVar :: TVar a -> STM a
 readTVar (TVar tvar#) = STM $ \s# -> readTVar# tvar# s#
 
--- |Write the supplied value into a TVar
+-- |Write the supplied value into a 'TVar'.
 writeTVar :: TVar a -> a -> STM ()
 writeTVar (TVar tvar#) val = STM $ \s1# ->
     case writeTVar# tvar# val s1# of
@@ -842,6 +844,8 @@ writeTVar (TVar tvar#) val = STM $ \s1# ->
 -- MVar utilities
 -----------------------------------------------------------------------------
 
+-- | Provide an 'IO' action with the current value of an 'MVar'. The 'MVar'
+-- will be empty for the duration that the action is running.
 withMVar :: MVar a -> (a -> IO b) -> IO b
 withMVar m io =
   mask $ \restore -> do
@@ -851,6 +855,7 @@ withMVar m io =
     putMVar m a
     return b
 
+-- | Modify the value of an 'MVar'.
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
 modifyMVar_ m io =
   mask $ \restore -> do
