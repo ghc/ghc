@@ -1,18 +1,26 @@
+{-# LANGUAGE InstanceSigs #-}
 module Builder (
+    -- * Data types
     CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..),
-    builderProvenance, systemBuilderPath, builderPath, getBuilderPath,
-    isSpecified, needBuilder,
+
+    -- * Builder properties
+    builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
+    runBuilder, runBuilderWith, runBuilderWithCmdOptions, getBuilderPath
     ) where
 
 import Development.Shake.Classes
 import GHC.Generics
-import Hadrian.Expression
+import qualified Hadrian.Builder as H
+import Hadrian.Builder hiding (Builder)
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
+import Hadrian.Utilities
 
 import Base
 import Context
 import GHC
+import Oracles.Flag
+import Oracles.Setting
 
 -- | C compiler can be used in two different modes:
 -- * Compile or preprocess a source file.
@@ -48,7 +56,7 @@ instance NFData   GhcPkgMode
 -- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@.
 -- @GhcPkg Stage1@ is the one built in Stage0.
 data Builder = Alex
-             | Ar Stage
+             | Ar Stage -- TODO: Add ArMode = Pack | Unpack
              | DeriveConstants
              | Cc CcMode Stage
              | Configure FilePath
@@ -101,13 +109,69 @@ builderProvenance = \case
   where
     context s p = Just $ vanillaContext s p
 
--- | Make sure a 'Builder' exists and rebuild it if out of date.
-needBuilder :: Builder -> Action ()
-needBuilder (Configure dir) = need [dir -/- "configure"]
-needBuilder (Make      dir) = need [dir -/- "Makefile"]
-needBuilder builder         = when (isJust $ builderProvenance builder) $ do
-    path <- builderPath builder
-    need [path]
+instance H.Builder Builder where
+    builderPath :: Builder -> Action FilePath
+    builderPath builder = case builderProvenance builder of
+        Nothing      -> systemBuilderPath builder
+        Just context -> programPath context
+
+    needBuilder :: Builder -> Action ()
+    needBuilder (Configure dir) = need [dir -/- "configure"]
+    needBuilder (Make      dir) = need [dir -/- "Makefile"]
+    needBuilder builder         = when (isJust $ builderProvenance builder) $ do
+        path <- H.builderPath builder
+        need [path]
+
+    runBuilderWith :: Builder -> BuildInfo -> Action ()
+    runBuilderWith builder BuildInfo {..} = do
+        path <- builderPath builder
+        withResources buildResources $ do
+            let input  = fromSingleton msgIn buildInputs
+                msgIn  = "[runBuilderWith] Exactly one input file expected."
+                output = fromSingleton msgOut buildOutputs
+                msgOut = "[runBuilderWith] Exactly one output file expected."
+                captureStdout = do
+                    Stdout stdout <- cmd [path] buildArgs
+                    writeFileChanged output stdout
+
+            case builder of
+                Ar _ -> do
+                    if "//*.a" ?== output
+                    then arCmd path buildArgs
+                    else do
+                        top   <- topDirectory
+                        echo  <- cmdEcho
+                        cmd echo [Cwd output] [path] "x" (top -/- input)
+
+                Configure dir -> do
+                    -- Inject /bin/bash into `libtool`, instead of /bin/sh,
+                    -- otherwise Windows breaks. TODO: Figure out why.
+                    bash <- bashPath
+                    echo <- cmdEcho
+                    let env = AddEnv "CONFIG_SHELL" bash
+                    cmd Shell echo env [Cwd dir] [path] buildOptions buildArgs
+
+                HsCpp    -> captureStdout
+                GenApply -> captureStdout
+
+                GenPrimopCode -> do
+                    stdin <- readFile' input
+                    Stdout stdout <- cmd (Stdin stdin) [path] buildArgs
+                    writeFileChanged output stdout
+
+                Make dir -> do
+                    echo <- cmdEcho
+                    cmd Shell echo path ["-C", dir] buildArgs
+
+                _  -> do
+                    echo <- cmdEcho
+                    cmd echo [path] buildArgs
+
+-- | Suppress build output depending on the Shake's verbosity setting.
+cmdEcho :: Action CmdOption
+cmdEcho = do
+    verbosity <- getVerbosity
+    return $ EchoStdout (verbosity >= Loud)
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
@@ -156,15 +220,40 @@ systemBuilderPath builder = case builder of
             return "" -- TODO: Use a safe interface.
         else fixAbsolutePathOnWindows =<< lookupInPath path
 
--- | Determine the location of a 'Builder'.
-builderPath :: Builder -> Action FilePath
-builderPath builder = case builderProvenance builder of
-    Nothing      -> systemBuilderPath builder
-    Just context -> programPath context
-
 -- | Was the path to a given system 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool
 isSpecified = fmap (not . null) . systemBuilderPath
 
-getBuilderPath :: Builder -> Expr c Builder FilePath
-getBuilderPath = expr . builderPath
+-- This count includes arg "q" and arg file parameters in arBuilderArgs.
+-- Update this value appropriately when changing arBuilderArgs.
+arFlagsCount :: Int
+arFlagsCount = 2
+
+-- | Invoke 'Ar' builder given a path to it and a list of arguments. Take care
+-- not to exceed the limit on command line length, which differs across
+-- supported operating systems (see 'cmdLineLengthLimit'). 'Ar' needs to be
+-- handled in a special way because we sometimes need to archive __a lot__ of
+-- files (in Cabal package, for example, command line length can reach 2MB!).
+-- To work around the limit on the command line length we pass the list of files
+-- to be archived via a temporary file, or alternatively, we split argument list
+-- into chunks and call 'Ar' multiple times (when passing arguments via a
+-- temporary file is not supported).
+arCmd :: FilePath -> [String] -> Action ()
+arCmd path argList = do
+    arSupportsAtFile <- flag ArSupportsAtFile
+    let flagArgs = take arFlagsCount argList
+        fileArgs = drop arFlagsCount argList
+    if arSupportsAtFile
+    then useAtFile path flagArgs fileArgs
+    else useSuccessiveInvocations path flagArgs fileArgs
+
+useAtFile :: FilePath -> [String] -> [String] -> Action ()
+useAtFile path flagArgs fileArgs = withTempFile $ \tmp -> do
+    writeFile' tmp $ unwords fileArgs
+    cmd [path] flagArgs ('@' : tmp)
+
+useSuccessiveInvocations :: FilePath -> [String] -> [String] -> Action ()
+useSuccessiveInvocations path flagArgs fileArgs = do
+    maxChunk <- cmdLineLengthLimit
+    forM_ (chunksOfSize maxChunk fileArgs) $ \argsChunk ->
+        unit . cmd [path] $ flagArgs ++ argsChunk

@@ -6,7 +6,6 @@ import Base
 import Builder
 import Oracles.Setting
 import Rules.Clean
-import Utilities
 
 sourceDistRules :: Rules ()
 sourceDistRules = do
@@ -20,8 +19,9 @@ sourceDistRules = do
             dropTarXz = dropExtension . dropExtension
             treePath  = "sdistprep/ghc" -/- dropTarXz tarName
         prepareTree treePath
-        runBuilderWith [Cwd "sdistprep/ghc"] Tar
-            ["cJf", ".." -/- tarName, dropTarXz tarName]
+        runBuilderWithCmdOptions [Cwd "sdistprep/ghc"] Tar
+            ["cJf", ".." -/- tarName,  dropTarXz tarName]
+            ["cJf", ".." -/- tarName] [dropTarXz tarName]
     "GIT_COMMIT_ID" %> \fname ->
         writeFileChanged fname =<< setting ProjectGitCommitId
     "VERSION" %> \fname ->

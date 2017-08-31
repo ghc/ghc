@@ -1,104 +1,33 @@
 module Utilities (
-    build, buildWithCmdOptions, buildWithResources, applyPatch, runBuilder,
-    runBuilderWith, builderEnvironment, needLibrary,
-    installDirectory, installData, installScript, installProgram, linkSymbolic,
-    contextDependencies, stage1Dependencies, libraryTargets, topsortPackages
+    build, buildWithResources, buildWithCmdOptions, runBuilder, runBuilderWith,
+    builderEnvironment, needLibrary, applyPatch, installDirectory, installData,
+    installScript, installProgram, linkSymbolic, contextDependencies,
+    stage1Dependencies, libraryTargets, topsortPackages
     ) where
 
 import qualified System.Directory.Extra as IO
 
+import qualified Hadrian.Builder as H
 import Hadrian.Haskell.Cabal
-import Hadrian.Oracles.ArgsHash
 import Hadrian.Oracles.Path
 import Hadrian.Utilities
 
-import CommandLine
 import Context
-import Expression hiding (builder, inputs, outputs, way, stage, package)
+import Expression hiding (stage)
 import Oracles.Setting
 import Oracles.PackageData
 import Settings
-import Settings.Builders.Ar
 import Target
 import UserSettings
 
--- | Build a 'Target' with the right 'Builder' and command line arguments.
--- Force a rebuild if the argument list has changed since the last build.
 build :: Target -> Action ()
-build = customBuild [] []
+build target = H.build target getArgs
 
--- | Build a 'Target' with the right 'Builder' and command line arguments,
--- acquiring necessary resources. Force a rebuild if the argument list has
--- changed since the last build.
 buildWithResources :: [(Resource, Int)] -> Target -> Action ()
-buildWithResources rs = customBuild rs []
+buildWithResources rs target = H.buildWithResources rs target getArgs
 
--- | Build a 'Target' with the right 'Builder' and command line arguments,
--- using given options when executing the build command. Force a rebuild if
--- the argument list has changed since the last build.
 buildWithCmdOptions :: [CmdOption] -> Target -> Action ()
-buildWithCmdOptions = customBuild []
-
-customBuild :: [(Resource, Int)] -> [CmdOption] -> Target -> Action ()
-customBuild rs opts target = do
-    let targetBuilder = builder target
-    needBuilder targetBuilder
-    path    <- builderPath targetBuilder
-    argList <- interpret target getArgs
-    verbose <- interpret target verboseCommands
-    let quietlyUnlessVerbose = if verbose then withVerbosity Loud else quietly
-    trackArgsHash target -- Rerun the rule if the hash of argList has changed.
-    withResources rs $ do
-        putInfo target
-        quietlyUnlessVerbose $ case targetBuilder of
-            Ar _ -> do
-                output <- interpret target getOutput
-                if "//*.a" ?== output
-                then arCmd path argList
-                else do
-                    input <- interpret target getInput
-                    top   <- topDirectory
-                    echo  <- cmdEcho
-                    cmd echo [Cwd output] [path] "x" (top -/- input)
-
-            Configure dir -> do
-                -- Inject /bin/bash into `libtool`, instead of /bin/sh, otherwise Windows breaks.
-                -- TODO: Figure out why.
-                bash <- bashPath
-                echo <- cmdEcho
-                let env = AddEnv "CONFIG_SHELL" bash
-                cmd Shell echo env [Cwd dir] [path] opts argList
-
-            HsCpp    -> captureStdout target path argList
-            GenApply -> captureStdout target path argList
-
-            GenPrimopCode -> do
-                src  <- interpret target getInput
-                file <- interpret target getOutput
-                input <- readFile' src
-                Stdout output <- cmd (Stdin input) [path] argList
-                writeFileChanged file output
-
-            Make dir -> do
-                echo <- cmdEcho
-                cmd Shell echo path ["-C", dir] argList
-
-            _  -> do
-                echo <- cmdEcho
-                cmd echo [path] argList
-
--- | Suppress build output depending on the @--progress-info@ flag.
-cmdEcho :: Action CmdOption
-cmdEcho = do
-    progressInfo <- cmdProgressInfo
-    return $ EchoStdout (progressInfo `elem` [Normal, Unicorn])
-
--- | Run a builder, capture the standard output, and write it to a given file.
-captureStdout :: Target -> FilePath -> [String] -> Action ()
-captureStdout target path argList = do
-    file <- interpret target getOutput
-    Stdout output <- cmd [path] argList
-    writeFileChanged file output
+buildWithCmdOptions opts target = H.buildWithCmdOptions opts target getArgs
 
 -- | Apply a patch by executing the 'Patch' builder in a given directory.
 applyPatch :: FilePath -> FilePath -> Action ()
@@ -159,18 +88,6 @@ builderEnvironment variable builder = do
     path <- builderPath builder
     return $ AddEnv variable path
 
-runBuilder :: Builder -> [String] -> Action ()
-runBuilder = runBuilderWith []
-
--- | Run a builder with given list of arguments using custom 'cmd' options.
-runBuilderWith :: [CmdOption] -> Builder -> [String] -> Action ()
-runBuilderWith options builder args = do
-    needBuilder builder
-    path <- builderPath builder
-    let note = if null args then "" else " (" ++ intercalate ", " args ++ ")"
-    putBuild $ "| Run " ++ show builder ++ note
-    quietly $ cmd options [path] args
-
 -- | Given a 'Context' this 'Action' looks up its package dependencies and wraps
 -- the results in appropriate contexts. The only subtlety here is that we never
 -- depend on packages built in 'Stage2' or later, therefore the stage of the
@@ -225,19 +142,3 @@ topsortPackages pkgs = do
       let annotated = map (annotateInDeg es) es
           inDegZero = map snd $ filter ((== 0). fst) annotated
       in  inDegZero ++ topSort (es \\ inDegZero)
-
--- | Print out information about the command being executed.
-putInfo :: Target -> Action ()
-putInfo t = putProgressInfo =<< renderAction
-    ("Run " ++ show (builder t) ++ contextInfo)
-    (digest $ inputs  t)
-    (digest $ outputs t)
-  where
-    contextInfo = concat $ [ " (" ]
-        ++ [ "stage = "     ++ show (stage $ context t) ]
-        ++ [ ", package = " ++ pkgName (package $ context t) ]
-        ++ [ ", way = "     ++ show (way $ context t) | (way $ context t) /= vanilla ]
-        ++ [ ")" ]
-    digest [] = "none"
-    digest [x] = x
-    digest (x:xs) = x ++ " (and " ++ show (length xs) ++ " more)"

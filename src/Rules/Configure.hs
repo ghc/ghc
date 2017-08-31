@@ -3,6 +3,7 @@ module Rules.Configure (configureRules) where
 import qualified System.Info as System
 
 import Base
+import Builder
 import CommandLine
 import Context
 import GHC

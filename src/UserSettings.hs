@@ -3,7 +3,7 @@
 -- If you don't copy the file your changes will be tracked by git and you can
 -- accidentally commit them.
 module UserSettings (
-    userBuildRoot, userFlavours, userPackages, verboseCommands,
+    userBuildRoot, userFlavours, userPackages, verboseCommand,
     buildProgressColour, successColour, stage1Only, crossCompiling
     ) where
 
@@ -31,9 +31,9 @@ userPackages = []
 
 -- | Set to 'True' to print full command lines during the build process. Note:
 -- this is a 'Predicate', hence you can enable verbose output only for certain
--- targets, e.g.: @verboseCommands = package ghcPrim@.
-verboseCommands :: Predicate
-verboseCommands = do
+-- targets, e.g.: @verboseCommand = package ghcPrim@.
+verboseCommand :: Predicate
+verboseCommand = do
     verbosity <- expr getVerbosity
     return $ verbosity >= Loud
 

@@ -285,7 +285,7 @@ installLibsTo libs dir = do
            ".a" -> do
                let out = dir -/- takeFileName lib
                installData [out] dir
-               runBuilder Ranlib [out]
+               runBuilder Ranlib [out] [out] [out]
            _ -> installData [lib] dir
 
 -- ref: includes/ghc.mk

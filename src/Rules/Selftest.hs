@@ -8,7 +8,6 @@ import GHC
 import Oracles.ModuleFiles
 import Oracles.Setting
 import Settings
-import Settings.Builders.Ar
 import Target
 
 instance Arbitrary Way where

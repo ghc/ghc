@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Hadrian.Utilities (
     -- * List manipulation
-    fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll,
+    fromSingleton, replaceEq, minusOrd, intersectOrd, lookupAll, chunksOfSize,
 
     -- * String manipulation
     quote, yesNo,
@@ -98,6 +98,13 @@ lookupAll (x:xs) (y:ys) = case compare x (fst y) of
     LT -> Nothing      : lookupAll xs (y:ys)
     EQ -> Just (snd y) : lookupAll xs (y:ys)
     GT -> lookupAll (x:xs) ys
+
+-- | @chunksOfSize size strings@ splits a given list of strings into chunks not
+-- exceeding the given @size@. If that is impossible, it uses singleton chunks.
+chunksOfSize :: Int -> [String] -> [[String]]
+chunksOfSize n = repeatedly f
+  where
+    f xs = splitAt (max 1 $ length $ takeWhile (<= n) $ scanl1 (+) $ map length xs) xs
 
 -- | Add single quotes around a String.
 quote :: String -> String

@@ -1,6 +1,7 @@
 module Main (main) where
 
 import Development.Shake
+import Hadrian.Expression
 import Hadrian.Utilities
 
 import qualified Base
@@ -21,7 +22,8 @@ main = do
     argsMap <- CommandLine.cmdLineArgsMap
     let extra = insertExtra UserSettings.buildProgressColour
               $ insertExtra UserSettings.successColour
-              $ insertExtra UserSettings.userBuildRoot argsMap
+              $ insertExtra UserSettings.userBuildRoot
+              $ insertExtra (VerboseCommand UserSettings.verboseCommand) argsMap
 
         BuildRoot buildRoot = UserSettings.userBuildRoot
 

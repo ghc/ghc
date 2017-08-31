@@ -7,7 +7,7 @@ module Hadrian.Expression (
     expr, exprIO, arg, remove,
 
     -- ** Predicates
-    (?), input, inputs, output, outputs,
+    (?), input, inputs, output, outputs, VerboseCommand (..), verboseCommand,
 
     -- ** Evaluation
     interpret, interpretInContext,
@@ -21,6 +21,7 @@ import Control.Monad.Trans
 import Control.Monad.Trans.Reader
 import Data.Semigroup
 import Development.Shake
+import Development.Shake.Classes
 
 import qualified Hadrian.Target as Target
 import Hadrian.Target (Target, target)
@@ -144,3 +145,9 @@ output f = any (f ?==) <$> getOutputs
 -- | Does any of the output files match any of the given patterns?
 outputs :: [FilePattern] -> Predicate c b
 outputs = anyM output
+
+newtype VerboseCommand c b = VerboseCommand { predicate :: Predicate c b }
+    deriving Typeable
+
+verboseCommand :: (ShakeValue c, ShakeValue b) => Predicate c b
+verboseCommand = predicate =<< expr (userSetting . VerboseCommand $ return False)
