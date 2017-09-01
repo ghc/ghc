@@ -20,6 +20,9 @@ extra-source-files:
 data-dir:
   resources
 data-files:
+  html/index.js
+  html/fuse.js
+  html/preact.js
   html/solarized.css
   html/haddock-util.js
   html/highlight.js
