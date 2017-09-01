@@ -234,7 +234,7 @@ def withTempDir(String name, Closure f) {
       f()
     }
   } finally {
-    sh "rm -Rf ${name}"
+    //sh "rm -Rf ${name}"
   }
 }
 
