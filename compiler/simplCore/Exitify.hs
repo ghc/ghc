@@ -33,6 +33,9 @@ Example result:
   in …
 
 Now `t` is no longer in a recursive function, and good things happen!
+
+In the final simplifier pass, we inline these exit join points again,
+see Note [Do not inline exit join points].
 -}
 
 import GhcPrelude
@@ -401,6 +404,9 @@ For `postInlineUnconditionally` and unfolding-based inlining, the function
 `simplLetUnfolding` simply gives exit join points no unfolding, which prevents
 this kind of inlining.
 
+In the `final` run of the simplifier, we do allow inlining of exit join points,
+via a `SimplifierMode` flag.
+
 Note [Placement of the exitification pass]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -438,5 +444,4 @@ Positions C and D have their advantages: C decreases allocations in simpl, but D
 
 Assuming we have a budget of _one_ run of Exitification, then C wins (but we
 could get more from running it multiple times, as seen in fish).
-
 -}

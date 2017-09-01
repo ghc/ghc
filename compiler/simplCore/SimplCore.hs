@@ -144,20 +144,26 @@ getCoreToDo dflags
     maybe_strictness_before phase
       = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
 
-    base_mode = SimplMode { sm_phase      = panic "base_mode"
-                          , sm_names      = []
-                          , sm_dflags     = dflags
-                          , sm_rules      = rules_on
-                          , sm_eta_expand = eta_expand_on
-                          , sm_inline     = True
-                          , sm_case_case  = True }
+    base_mode = SimplMode { sm_phase               = panic "base_mode"
+                          , sm_names               = []
+                          , sm_dflags              = dflags
+                          , sm_rules               = rules_on
+                          , sm_eta_expand          = eta_expand_on
+                          , sm_inline              = True
+                          , sm_case_case           = True
+                          , sm_preserve_exit_joins = True
+                              -- see Note [Do not inline exit join points] in Exitify.hs
+                          }
 
-    simpl_phase phase names iter
+    simpl_phase phase names iter is_final
       = CoreDoPasses
       $   [ maybe_strictness_before phase
           , CoreDoSimplify iter
                 (base_mode { sm_phase = Phase phase
-                           , sm_names = names })
+                           , sm_names = names
+                           , sm_preserve_exit_joins = not is_final
+                              -- see Note [Do not inline exit join points] in Exitify.hs
+                           })
 
           , maybe_rule_check (Phase phase) ]
 
@@ -185,7 +191,7 @@ getCoreToDo dflags
                 -- inlined.  I found that spectral/hartel/genfft lost some useful
                 -- strictness in the function sumcode' if augment is not inlined
                 -- before strictness analysis runs
-    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
+    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter False
                                 | phase <- [phases, phases-1 .. 1] ]
 
 
@@ -208,7 +214,7 @@ getCoreToDo dflags
     -- New demand analyser
     demand_analyser = (CoreDoPasses (
                            strictness_pass ++
-                           [simpl_phase 0 ["post-worker-wrapper"] max_iter]
+                           [simpl_phase 0 ["post-worker-wrapper"] max_iter False]
                            ))
 
     -- Static forms are moved to the top level with the FloatOut pass.
@@ -294,7 +300,7 @@ getCoreToDo dflags
                 -- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
                 -- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
                 -- Don't stop now!
-        simpl_phase 0 ["main"] (max max_iter 3),
+        simpl_phase 0 ["main"] (max max_iter 3) False,
 
         runWhen do_float_in CoreDoFloatInwards,
             -- Run float-inwards immediately before the strictness analyser
@@ -305,7 +311,7 @@ getCoreToDo dflags
 
         runWhen call_arity $ CoreDoPasses
             [ CoreDoCallArity
-            , simpl_phase 0 ["post-call-arity"] max_iter
+            , simpl_phase 0 ["post-call-arity"] max_iter False
             ],
 
         runWhen strictness demand_analyser,
@@ -339,7 +345,7 @@ getCoreToDo dflags
                 -- strictness analysis and the simplification which follows it.
         runWhen liberate_case (CoreDoPasses [
             CoreLiberateCase,
-            simpl_phase 0 ["post-liberate-case"] max_iter
+            simpl_phase 0 ["post-liberate-case"] max_iter False
             ]),         -- Run the simplifier after LiberateCase to vastly
                         -- reduce the possibility of shadowing
                         -- Reason: see Note [Shadowing] in SpecConstr.hs
@@ -349,11 +355,11 @@ getCoreToDo dflags
         maybe_rule_check (Phase 0),
 
         -- Final clean-up simplification:
-        simpl_phase 0 ["final"] max_iter,
+        simpl_phase 0 ["final"] max_iter True,
 
         runWhen late_dmd_anal $ CoreDoPasses (
             strictness_pass ++
-            [simpl_phase 0 ["post-late-ww"] max_iter]
+            [simpl_phase 0 ["post-late-ww"] max_iter False]
           ),
 
         -- Final run of the demand_analyser, ensures that one-shot thunks are

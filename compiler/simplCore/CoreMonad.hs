@@ -174,19 +174,22 @@ data SimplMode             -- See comments in SimplMonad
         , sm_inline     :: Bool     -- Whether inlining is enabled
         , sm_case_case  :: Bool     -- Whether case-of-case is enabled
         , sm_eta_expand :: Bool     -- Whether eta-expansion is enabled
+        , sm_preserve_exit_joins :: Bool -- Whether exit join points must be preserved
         }
 
 instance Outputable SimplMode where
     ppr (SimplMode { sm_phase = p, sm_names = ss
                    , sm_rules = r, sm_inline = i
-                   , sm_eta_expand = eta, sm_case_case = cc })
+                   , sm_eta_expand = eta, sm_case_case = cc
+                   , sm_preserve_exit_joins = pej })
        = text "SimplMode" <+> braces (
          sep [ text "Phase =" <+> ppr p <+>
                brackets (text (concat $ intersperse "," ss)) <> comma
              , pp_flag i   (sLit "inline") <> comma
              , pp_flag r   (sLit "rules") <> comma
              , pp_flag eta (sLit "eta-expand") <> comma
-             , pp_flag cc  (sLit "case-of-case") ])
+             , pp_flag cc  (sLit "case-of-case") <> comma
+             , pp_flag pej (sLit "preserve-exit-joins") ])
          where
            pp_flag f s = ppUnless f (text "no") <+> ptext s
 

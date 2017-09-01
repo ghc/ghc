@@ -3236,7 +3236,8 @@ simplLetUnfolding :: SimplEnv-> TopLevelFlag
 simplLetUnfolding env top_lvl cont_mb id new_rhs unf
   | isStableUnfolding unf
   = simplStableUnfolding env top_lvl cont_mb id unf
-  | isExitJoinId id
+  | sm_preserve_exit_joins (getMode env)
+  , isExitJoinId id
   = return noUnfolding -- see Note [Do not inline exit join points]
   | otherwise
   = mkLetUnfolding (seDynFlags env) top_lvl InlineRhs id new_rhs
