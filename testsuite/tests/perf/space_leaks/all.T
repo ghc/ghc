@@ -1,10 +1,10 @@
 
 test('space_leak_001',
      # This could potentially be replaced with
-     # comparison('all',5) to test all 3 with 
+     # collect_stats('all',5) to test all 3 with 
      # 5% possible deviation.
-     [comparison(['peak_megabytes_allocated','bytes allocated'],5),
-      comparison('max_bytes_used',15),
+     [collect_stats(['peak_megabytes_allocated','bytes allocated'],5),
+      collect_stats('max_bytes_used',15),
       omit_ways(['profasm','profthreaded','threaded1','threaded2'])
       ],
      compile_and_run,
@@ -13,14 +13,14 @@ test('space_leak_001',
 test('T4334',
      # Test for a space leak in Data.List.lines (fixed with #4334)
      [extra_run_opts('1000000 2 t'),
-      comparison('peak_megabytes_allocated',2),
+      collect_stats('peak_megabytes_allocated',2),
       # prof ways don't work well with +RTS -V0
       omit_ways(['profasm','profthreaded'])
       ],
      compile_and_run, [''])
 
 test('T2762',
-     [comparison('peak_megabytes_allocated',2),
+     [collect_stats('peak_megabytes_allocated',2),
       only_ways(['normal']),
       extra_run_opts('+RTS -G1 -RTS' ),
       extra_clean(['T2762A.hi', 'T2762A.o'])],
@@ -31,8 +31,9 @@ test('T4018',
      compile_and_run, ['-fno-state-hack'])
 
 test('T4029',
-     [comparison(['peak_megabytes_allocated','max_bytes_used'],10),
+     [collect_stats(['peak_megabytes_allocated','max_bytes_used'],10),
       extra_hc_opts('+RTS -G1 -RTS' ),
       ],
      ghci_script,
      ['T4029.script'])
+

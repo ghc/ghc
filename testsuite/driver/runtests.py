@@ -46,8 +46,8 @@ perf_group = parser.add_mutually_exclusive_group()
 parser.add_argument("-e", action='append', help="A string to execute from the command line.")
 parser.add_argument("--config-file", action="append", help="config file")
 parser.add_argument("--configfile", action="append", help="config file") # Some old tests have this
-parser.add_argument("--config", action='append', help="config field") # Should these config options be mutually exclusive?
-parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)") # This should NOT have a default setting or it fucks up duplicates. How to fix?
+parser.add_argument("--config", action='append', help="config field")
+parser.add_argument("--rootdir", action='append', help="root of tree containing tests (default: .)") # This should NOT have a default setting.
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")

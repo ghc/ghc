@@ -160,7 +160,7 @@ test('topHandler04',
 
 
 test('T8766',
-        [ comparison('bytes allocated',5)
+        [ collect_stats('bytes allocated',5)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -187,7 +187,7 @@ test('T8089',
 test('T8684', expect_broken(8684), compile_and_run, [''])
 test('T9826',normal, compile_and_run,[''])
 test('T9848',
-        [ comparison('bytes allocated')
+        [ collect_stats('bytes allocated')
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])
@@ -200,7 +200,7 @@ test('lazySTexamples', normal, compile_and_run, [''])
 test('T11760', normal, compile_and_run, ['-threaded -with-rtsopts=-N2'])
 test('T12874', normal, compile_and_run, [''])
 test('T13191',
-        [ comparison('bytes allocated', 5)
+        [ collect_stats('bytes allocated', 5)
         , only_ways(['normal'])],
       compile_and_run,
       ['-O'])

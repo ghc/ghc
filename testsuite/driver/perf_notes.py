@@ -17,7 +17,7 @@ from testglobals import *
 from math import ceil, trunc
 from testutil import parse_git_notes
 
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--test-env",
                         help="The given test environment to be compared.")
@@ -104,8 +104,8 @@ testing_metrics = ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_use
 
 # These my_ functions are duplicates of functions in testlib.py that I can't import here.
 # and are mostly a consequence of some semi-ugly refactoring.
-def my_passed(reason=''):
-    return {'passFail': 'pass', 'reason' : reason}
+def my_passed():
+    return {'passFail': 'pass'}
 
 def my_failBecause(reason, tag=None):
     return {'passFail': 'fail', 'reason': reason, 'tag': tag}
@@ -145,10 +145,11 @@ def test_cmp(full_name, field, val, expected, dev=20):
 # To be used instead of stats_num_field
 # All defaults set for ease of use.
 # Defaults to "test everything, only break on extreme cases, not a compiler test"
-def comparison(metric='all', deviation=20, compiler=False):
-    return lambda name, opts, m=metric, d=deviation, c=compiler: _comparison(name, opts, m, d, c)
+# (Rename to collect_stats)
+def collect_stats(metric='all', deviation=20, compiler=False):
+    return lambda name, opts, m=metric, d=deviation, c=compiler: _collect_stats(name, opts, m, d, c)
 
-def _comparison(name, opts, metric, deviation, is_compiler_test):
+def _collect_stats(name, opts, metric, deviation, is_compiler_stats_test):
     if not re.match('^[0-9]*[a-zA-Z][a-zA-Z0-9._-]*$', name):
         # my_framework_fail(name, 'bad_name', 'This test has an invalid name')
         my_failBecause('This test has an invalid name.')
@@ -172,12 +173,12 @@ def _comparison(name, opts, metric, deviation, is_compiler_test):
 
         return
 
-    if is_compiler_test:
-        opts.is_compiler_test = True
+    if is_compiler_stats_test:
+        opts.is_compiler_stats_test = True
 
     # Compiler performance numbers change when debugging is on, making the results
     # useless and confusing. Therefore, skip if debugging is on.
-    if config.compiler_debugged and is_compiler_test:
+    if config.compiler_debugged and is_compiler_stats_test:
         opts.skip = 1
 
     # 'all' is a shorthand to test for bytes allocated, peak megabytes allocated, and max bytes used.
@@ -211,14 +212,14 @@ def evaluate_metric(opts, test, field, deviation, contents, way):
         config.accumulate_metrics.append('\t'.join([test_env, test, way, field, str(val)]))
 
     if expected == 0:
-        return my_passed('no prior metrics for this test')
+        return my_passed()
 
     return test_cmp(full_name, field, val, expected, deviation)
 
 #
 # String utilities for pretty-printing
 #
-def main_2():
+def initialize_output_strings():
     string = ''
     for i in args.commits:
         string+='{:18}'
@@ -261,7 +262,7 @@ def commit_string(test, flag):
 # The pretty-printed output
 #
 
-def main_3():
+def output_metrics():
     header('commit')
     # Printing out metrics.
     for test in latest_commit:
@@ -276,6 +277,6 @@ def main_3():
             print("{:27}{:30}".format(test['test'], test['metric']) + commit_string(test['test'],'percentages'))
 
 if __name__ == '__main__':
-    main()
-    main_2()
-    main_3()
+    parse_arguments()
+    initialize_output_strings()
+    output_metrics()

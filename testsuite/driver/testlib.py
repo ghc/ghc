@@ -23,7 +23,7 @@ import subprocess
 
 from testglobals import *
 from testutil import *
-from perf_notes import comparison, evaluate_metric
+from perf_notes import collect_stats, evaluate_metric
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 if config.use_threads:
@@ -63,6 +63,10 @@ def getTestOpts():
 def setLocalTestOpts(opts):
     global testopts_local
     testopts_local.x=opts
+
+def isCompilerStatsTest():
+    opts = getTestOpts()
+    return bool(opts.is_compiler_stats_test)
 
 def isStatsTest():
     opts = getTestOpts()
@@ -883,8 +887,8 @@ def badResult(result):
     except (KeyError, TypeError):
         return True
 
-def passed(reason=''):
-    return {'passFail': 'pass', 'reason' : reason}
+def passed():
+    return {'passFail': 'pass'}
 
 def failBecause(reason, tag=None):
     return {'passFail': 'fail', 'reason': reason, 'tag': tag}
@@ -1115,7 +1119,7 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
         to_do = '-c' # just compile
 
     stats_file = name + '.comp.stats'
-    if opts.is_compiler_test:
+    if isCompilerStatsTest():
         extra_hc_opts += ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     if backpack:
         extra_hc_opts += ' -outputdir ' + name + '.out'
@@ -1148,13 +1152,10 @@ def simple_build(name, way, extra_hc_opts, should_fail, top_mod, link, addsuf, b
 
     # ToDo: if the sub-shell was killed by ^C, then exit
 
-    if opts.is_compiler_test:
+    if isCompilerStatsTest():
         statsResult = checkStats(name, way, stats_file, opts.stats_range_fields)
     else:
         statsResult = passed()
-
-    # if badResult(statsResult):
-    #     return statsResult
 
     if should_fail:
         if exit_code == 0:
@@ -1192,7 +1193,7 @@ def simple_run(name, way, prog, extra_run_opts):
     my_rts_flags = rts_flags(way)
 
     stats_file = name + '.stats'
-    if isStatsTest() and not opts.is_compiler_test:
+    if isStatsTest() and not isCompilerStatsTest():
         stats_args = ' +RTS -V0 -t' + stats_file + ' --machine-readable -RTS'
     else:
         stats_args = ''
@@ -1230,7 +1231,7 @@ def simple_run(name, way, prog, extra_run_opts):
     if check_prof and not check_prof_ok(name, way):
         return failBecause('bad profile')
 
-    if not opts.is_compiler_test:
+    if not isCompilerStatsTest():
         return checkStats(name, way, stats_file, opts.stats_range_fields)
     else:
         return passed()

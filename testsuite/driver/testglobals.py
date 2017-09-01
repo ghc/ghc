@@ -195,8 +195,8 @@ class TestOptions:
        self.compile_backpack = 0
 
        # This will supersede usage of hacky methods to check if
-       # the current test is a compiler test.
-       self.is_compiler_test = False
+       # the current test targets compiler performance statistics
+       self.is_compiler_stats_test = False
 
        # We sometimes want to modify the compiler_always_flags, so
        # they are copied from config.compiler_always_flags when we

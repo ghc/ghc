@@ -13,8 +13,9 @@ test('T9291', normal, compile_and_run, [''])
 test('T13536', normal, compile_and_run, [''])
 
 test('T13536a',
-        [ comparison('bytes allocated',5),
+        [ collect_stats('bytes allocated',5),
      only_ways(['optasm'])],
     compile_and_run,
     [''])
+
 

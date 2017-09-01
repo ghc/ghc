@@ -5,7 +5,7 @@
 test('haddock.base',
      [extra_files(['../../../../libraries/base/dist-install/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
-     ,comparison('bytes allocated',5),
+     ,collect_stats('bytes allocated',5),
       ],
      stats,
      ['haddock.t'])
@@ -13,7 +13,7 @@ test('haddock.base',
 test('haddock.Cabal',
      [extra_files(['../../../../libraries/Cabal/Cabal/dist-install/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
-     ,comparison('bytes allocated',5),
+     ,collect_stats('bytes allocated',5),
       ],
      stats,
      ['haddock.t'])
@@ -21,7 +21,8 @@ test('haddock.Cabal',
 test('haddock.compiler',
      [extra_files(['../../../../compiler/stage2/haddock.t']),
       unless(in_tree_compiler(), skip), req_haddock
-     ,comparison('bytes allocated',10),
+     ,collect_stats('bytes allocated',10),
       ],
      stats,
      ['haddock.t'])
+
