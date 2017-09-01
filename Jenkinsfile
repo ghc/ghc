@@ -71,13 +71,13 @@ parallel (
       }
     }
   },
-  "linux x86-64 -> aarch64 unreg" : {
-    node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu', unreg: true)}
-  },
-  "linux x86-64 -> aarch64" : {
-    node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu')}
-    node(label: 'linux && aarch64') {testGhc(targetTriple: 'aarch64-linux-gnu')}
-  },
+  //"linux x86-64 -> aarch64 unreg" : {
+  //  node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu', unreg: true)}
+  //},
+  //"linux x86-64 -> aarch64" : {
+  //  node(label: 'linux && amd64') {buildGhc(crossCompiling: true, targetTriple: 'aarch64-linux-gnu')}
+  //  node(label: 'linux && aarch64') {testGhc(targetTriple: 'aarch64-linux-gnu')}
+  //},
   "aarch64"            : {
     node(label: 'linux && aarch64') {buildGhc(targetTriple: 'aarch64-linux-gnu')}
   },
