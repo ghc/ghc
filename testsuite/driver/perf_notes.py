@@ -5,8 +5,8 @@
 #
 # This file will be a utility to help facilitate the comparison of performance
 # metrics across arbitrary commits. The file will produce a table comparing
-# metrics between measurements taken for given commits in the environment given
-# by --test-env.
+# metrics between measurements taken for given commits in the environment
+# (which defaults to 'local' if not given by --test-env).
 #
 
 import argparse
@@ -22,10 +22,10 @@ def parse_arguments():
     parser.add_argument("--test-env",
                         help="The given test environment to be compared.")
     parser.add_argument("--test-name",
-                        help="Optional: If given, filters table to include only \
+                        help="If given, filters table to include only \
                         tests matching the given regular expression.")
     parser.add_argument("--min-delta",type=float,
-                        help="Optional: Display only tests where the relative \
+                        help="Display only tests where the relative \
                         spread is greater than the given value. \
                         This will not be run if you only pass in one commit.")
     parser.add_argument("--add-note", nargs=3,

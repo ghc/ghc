@@ -1,7 +1,7 @@
 GHC Driver Readme
 =================
 
-Greetings and well met. 
+Greetings and well met.
 If you are reading this, I can only assume that you are likely interested in working on the testsuite in some capacity.
 For more detailed documentation, please see [here][1].
 
@@ -9,8 +9,9 @@ For more detailed documentation, please see [here][1].
 
 1. Entry points of the testsuite
 2. Quick overview of program parts
-3. Important Types
-4. Quick answers for "how do I do X"?
+3. How to use the comparison tool
+4. Important Types
+5. Quick answers for "how do I do X"?
 
 
 ## Entry Points of the Testsuite
@@ -39,6 +40,25 @@ The relevant bits of the directory tree are as such:
     └── test.mk              -- Master makefile for running tests.
 ├── tests                    -- Main tests directory.
 ```
+
+## How to Use the Comparison Tool
+
+The comparison tool exists in `/driver/perf_notes.py`.
+
+When the testsuite is ran, the performance metrics of the performance tests are saved automatically in a local git note that will be attached to the commit.
+The comparison tool is designed to help analyze the performance of the compiler across commits using this performance information.
+
+Currently, it can only be ran by executing the file directly, like so:
+```
+$ python3 perf_notes.py (arguments go here)
+```
+
+If you run `perf_notes.py -h` you will see a description of all of the arguments and how to use them.
+The optional arguments exist to filter the output to include only commits that you're interested in.
+The most typical usage of this tool will likely be running `perf_notes.py HEAD 'HEAD~1' '(commit hash)' ...`
+
+The way the performance metrics are stored in git notes remains strictly local to the machine;
+as such, performance metrics will not exist for a commit until you checkout that commit and run the testsuite (or test).
 
 ## Important Types
 
