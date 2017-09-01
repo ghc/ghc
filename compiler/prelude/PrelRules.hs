@@ -1423,7 +1423,7 @@ caseRules dflags (App (App (Var f) (Lit l)) v)   -- x# `op` v
   , Just x  <- isLitValue_maybe l
   , Just adjust_lit <- adjustDyadicLeft x op
   = Just (v, tx_lit_con dflags adjust_lit
-           , \v -> (App (App (Var f) (Var v)) (Lit l)))
+           , \v -> (App (App (Var f) (Lit l)) (Var v)))
 
 
 caseRules dflags (App (Var f) v              )   -- op v
