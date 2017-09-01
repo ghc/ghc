@@ -1,6 +1,7 @@
 quickNav = (function() {
 
 var baseUrl;
+var showHideTrigger;
 
 // alias preact's hyperscript reviver since it's referenced a lot:
 var h = preact.h;
@@ -195,7 +196,7 @@ var App = createClass({
   },
 
   componentDidMount: function() {
-    addSearchPageMenuButton(this.toggleVisibility.bind(this));
+    showHideTrigger(this.toggleVisibility.bind(this));
   },
 
   render: function(props, state) {
@@ -384,8 +385,9 @@ var NoResultsMsg = function(props) {
 };
 
 return {
-  init: function(docBaseUrl) {
+  init: function(docBaseUrl, showHide) {
     baseUrl = docBaseUrl || ".";
+    showHideTrigger = showHide || addSearchPageMenuButton
     preact.render(h(App), document.body);
   }
 }
