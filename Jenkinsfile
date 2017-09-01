@@ -5,7 +5,7 @@
    * Pipeline Utility steps plugin
 
   Linux (Debian) worker dependencies:
-   * xutil-dev curl automake autoconf libtool python3 python3-sphinx, llvm-4.0
+   * xutils-dev curl automake autoconf libtool python3 python3-sphinx llvm-4.0
 
    Requires approvals for:
    * new net.sf.json.JSONObject
