@@ -59,7 +59,6 @@ parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose 
 perf_group.add_argument("--skip-perf-tests", action="store_true", help="skip performance tests")
 perf_group.add_argument("--only-perf-tests", action="store_true", help="Only do performance tests")
 parser.add_argument("--junit", type=argparse.FileType('wb'), help="output testsuite summary in JUnit format")
-parser.add_argument("--use-git-notes", action="store_true", help="use git notes to store metrics. NOTE: This is expected to become the default and will eventually be taken out.")
 parser.add_argument("--test-env", default='local', help="Override default chosen test-env.")
 
 args = parser.parse_args()
@@ -112,7 +111,6 @@ if args.verbose:
 
 config.skip_perf_tests = args.skip_perf_tests
 config.only_perf_tests = args.only_perf_tests
-config.use_git_notes = args.use_git_notes
 
 if args.test_env:
         config.test_env = args.test_env
@@ -327,8 +325,7 @@ else:
     summary(t, sys.stdout, config.no_print_summary)
 
     # Write our accumulated metrics into the git notes for this commit.
-    if config.use_git_notes:
-            note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
+    note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
 
     # This here is loading up all of the git notes into memory.
     # It's most likely in the wrong spot and I haven't fully fleshed out

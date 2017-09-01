@@ -199,10 +199,6 @@ ifeq "$(ONLY_PERF_TESTS)" "YES"
 RUNTEST_OPTS += --only-perf-tests
 endif
 
-ifeq "$(USE_GIT_NOTES)" "YES"
-RUNTEST_OPTS += --use-git-notes
-endif
-
 ifneq "$(TEST_ENV)" ""
 RUNTEST_OPTS += --test_env="$(TEST_ENV)"
 endif

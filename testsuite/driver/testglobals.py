@@ -120,9 +120,8 @@ class TestConfig:
         # Only do performance tests
         self.only_perf_tests = False
 
-        # Should we dump statistics to git notes?
-        self.use_git_notes = False
-        # To accumulate the metrics for the git notes
+        # Git notes is used to store performance results from tests.
+        # This is where we accumulate the metrics for the git notes
         self.accumulate_metrics = []
         # Has the user defined a custom test environment? Local is default.
         self.test_env = 'local'

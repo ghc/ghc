@@ -47,10 +47,17 @@ def lndir(srcdir, dstdir):
             lndir(src, dst)
 
 
-# This function allows one to read in git notes from the commandline
+# This function exists here for legacy reasons but spiritually belongs in perf_notes.py
+#
+# Returns a list of tests; each test is a dict of the form
+#
+# { 'test_env' : 'val',   'test'    : 'val',   'way'     : 'val',
+#   'metric'   : 'val',   'value'   : 'val',   'commit'  : 'val', }
+#
+# It allows one to read in git notes from the commandline
 # and then breaks it into a list of dictionaries that can be parsed
 # later on in the testing functions.
-# Silently returns an empty string if the note is not found.
+# Returns an empty string if the note is not found.
 def parse_git_notes(namespace, commit='HEAD'):
     logFields = ['test_env','test','way','metric','value','commit']
 

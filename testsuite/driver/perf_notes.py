@@ -99,11 +99,31 @@ def parse_arguments():
 #
 # Comparison tools for the test driver to use on performance tests.
 #
+# The chain of functions looks like this:
+#   1. collect_stats() is written in an all.T file by the (human) test writer.
+#   2. In the main test execution loop, at some point, the collect_stats()
+#      functions are evaluated, parse_git_notes is executed, and the expected
+#      values are written into the stats_range_fields dictionary.
+#   3. Then the test is run; after the test is executed,  and the relevant values
+#      are written to a temporary file in a temporary directory for the test.
+#   4. After that, checkStats() is called; it grabs the expected values and
+#      then calls evaluate_metric
+#   5. evaluate_metric writes the results of the test to the accumulate_metrics
+#      file (which will be written to git notes at the end of the test run) and
+#      passes the expected and actual values off to the test_cmp function.
+#   6. test_cmp handles the numerical evaluation of whether or not a test passes
+#      as well as the printing of relevant information in the case of failure
+#      or verbosity level.
+#
+# It looks a bit scary and complicated but it's not too bad.
+# Small note: Step 2 handwaves a bit. There are several execution functions
+# which fire depending on how a test is setup.
+# However, for performance tests, only compile_and_run is used which internally
+# executes simple_build and simple_run_and_run (both in testutil.py) so it is
+# mostly sufficient to consider those three if a closer look is desired.
 
-testing_metrics = ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
-
-# These my_ functions are duplicates of functions in testlib.py that I can't import here.
-# and are mostly a consequence of some semi-ugly refactoring.
+# These my_ functions are duplicates of functions in testlib.py that I can't
+# import here and are mostly a consequence of some semi-ugly refactoring.
 def my_passed():
     return {'passFail': 'pass'}
 
@@ -142,10 +162,26 @@ def test_cmp(full_name, field, val, expected, dev=20):
 
     return result
 
-# To be used instead of stats_num_field
-# All defaults set for ease of use.
-# Defaults to "test everything, only break on extreme cases, not a compiler test"
-# (Rename to collect_stats)
+# Corresponds to 'all' setting for metric parameter in collect_stats function.
+testing_metrics = ['bytes allocated', 'peak_megabytes_allocated', 'max_bytes_used']
+
+# Defaults to "test everything, only break on extreme cases, not a compiler stats test"
+#
+# The inputs to this function are slightly interesting:
+# metric can be either:
+#     - 'all', in which case all 3 possible metrics are collected and compared.
+#     - The specific metric one wants to use in the test.
+#     - A list of the metrics one wants to use in the test.
+#
+# deviation defaults to 20% because the goal is correctness over performance.
+# The testsuite should avoid breaking when there is not an actual error.
+# Instead, the testsuite should notify of regressions in a non-breaking manner.
+#
+# 'compiler' is somewhat of an unfortunate name.
+# If the boolean is set to true, it indicates that this test is one that
+# measures the performance numbers of the compiler.
+# As this is a fairly rare case in the testsuite, it defaults to false to
+# indicate that it is a 'normal' performance test.
 def collect_stats(metric='all', deviation=20, compiler=False):
     return lambda name, opts, m=metric, d=deviation, c=compiler: _collect_stats(name, opts, m, d, c)
 
@@ -207,9 +243,8 @@ def evaluate_metric(opts, test, field, deviation, contents, way):
     val = int(m.group(1))
 
     # Add val into the git note if option is set.
-    if config.use_git_notes:
-        test_env = config.test_env
-        config.accumulate_metrics.append('\t'.join([test_env, test, way, field, str(val)]))
+    test_env = config.test_env
+    config.accumulate_metrics.append('\t'.join([test_env, test, way, field, str(val)]))
 
     if expected == 0:
         return my_passed()
@@ -219,6 +254,7 @@ def evaluate_metric(opts, test, field, deviation, contents, way):
 #
 # String utilities for pretty-printing
 #
+
 def initialize_output_strings():
     string = ''
     for i in args.commits:
