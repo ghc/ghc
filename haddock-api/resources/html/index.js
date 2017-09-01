@@ -385,7 +385,7 @@ var NoResultsMsg = function(props) {
 
 return {
   init: function(docBaseUrl) {
-    baseUrl = docBaseUrl || "";
+    baseUrl = docBaseUrl || ".";
     preact.render(h(App), document.body);
   }
 }
