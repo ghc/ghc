@@ -60,7 +60,7 @@ function addSearchPageMenuButton(action) {
   var pageMenu = document.querySelector('#page-menu');
   var dummy = document.createElement('li');
   pageMenu.insertBefore(dummy, pageMenu.firstChild);
-  preact.render(h(PageMenuButton, { onClick: action, title: "Search" }), pageMenu, dummy);
+  preact.render(h(PageMenuButton, { onClick: action, title: "Quick Jump" }), pageMenu, dummy);
 }
 
 // -------------------------------------------------------------------------- //
