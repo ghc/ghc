@@ -386,4 +386,7 @@ To prevent inlining, we check for that in `preInlineUnconditionally` directly.
 For `postInlineUnconditionally` and unfolding-based inlining, the function
 `simplLetUnfolding` simply gives exit join points no unfolding, which prevents
 this kind of inlining.
+
+In the `final` run of the simplifier, we do allow inlining of exit join points,
+via a `SimplifierMode` flag.
 -}
