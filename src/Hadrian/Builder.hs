@@ -13,7 +13,8 @@
 -----------------------------------------------------------------------------
 module Hadrian.Builder (
     Builder (..), BuildInfo (..), runBuilder, runBuilderWithCmdOptions,
-    build, buildWithResources, buildWithCmdOptions, getBuilderPath
+    build, buildWithResources, buildWithCmdOptions, getBuilderPath,
+    builderEnvironment
     ) where
 
 import Data.List
@@ -116,3 +117,10 @@ putInfo t = putProgressInfo =<< renderAction
 -- | Get the path to the current builder.
 getBuilderPath :: Builder b => b -> Expr c b FilePath
 getBuilderPath = expr . builderPath
+
+-- | Write a builder path into a given environment variable.
+builderEnvironment :: Builder b => String -> b -> Action CmdOption
+builderEnvironment variable builder = do
+    needBuilder builder
+    path <- builderPath builder
+    return $ AddEnv variable path

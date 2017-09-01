@@ -1,20 +1,15 @@
 module Utilities (
     build, buildWithResources, buildWithCmdOptions, runBuilder, runBuilderWith,
-    builderEnvironment, needLibrary, applyPatch, installDirectory, installData,
-    installScript, installProgram, linkSymbolic, contextDependencies,
-    stage1Dependencies, libraryTargets, topsortPackages
+    needLibrary, contextDependencies, stage1Dependencies, libraryTargets,
+    topsortPackages
     ) where
-
-import qualified System.Directory.Extra as IO
 
 import qualified Hadrian.Builder as H
 import Hadrian.Haskell.Cabal
-import Hadrian.Oracles.Path
 import Hadrian.Utilities
 
 import Context
 import Expression hiding (stage)
-import Oracles.Setting
 import Oracles.PackageData
 import Settings
 import Target
@@ -29,66 +24,7 @@ buildWithResources rs target = H.buildWithResources rs target getArgs
 buildWithCmdOptions :: [CmdOption] -> Target -> Action ()
 buildWithCmdOptions opts target = H.buildWithCmdOptions opts target getArgs
 
--- | Apply a patch by executing the 'Patch' builder in a given directory.
-applyPatch :: FilePath -> FilePath -> Action ()
-applyPatch dir patch = do
-    let file = dir -/- patch
-    needBuilder Patch
-    path <- builderPath Patch
-    putBuild $ "| Apply patch " ++ file
-    quietly $ cmd Shell [Cwd dir] [path, "-p0 <", patch]
-
--- | Install a directory.
-installDirectory :: FilePath -> Action ()
-installDirectory dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallDir
-    putBuild $ "| Install directory " ++ dir
-    quietly $ cmd path dir
-
--- | Install data files to a directory and track them.
-installData :: [FilePath] -> FilePath -> Action ()
-installData fs dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallData
-    need fs
-    forM_ fs $ \f -> putBuild $ "| Install data " ++ f ++ " to " ++ dir
-    quietly $ cmd path fs dir
-
--- | Install an executable file to a directory and track it.
-installProgram :: FilePath -> FilePath -> Action ()
-installProgram f dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallProgram
-    need [f]
-    putBuild $ "| Install program " ++ f ++ " to " ++ dir
-    quietly $ cmd path f dir
-
--- | Install an executable script to a directory and track it.
-installScript :: FilePath -> FilePath -> Action ()
-installScript f dir = do
-    path <- fixAbsolutePathOnWindows =<< setting InstallScript
-    need [f]
-    putBuild $ "| Install script " ++ f ++ " to " ++ dir
-    quietly $ cmd path f dir
-
--- | Create a symbolic link from source file to target file (when symbolic links
--- are supported) and track the source file.
-linkSymbolic :: FilePath -> FilePath -> Action ()
-linkSymbolic source target = do
-    lns <- setting LnS
-    unless (null lns) $ do
-        need [source] -- Guarantee source is built before printing progress info.
-        let dir = takeDirectory target
-        liftIO $ IO.createDirectoryIfMissing True dir
-        putProgressInfo =<< renderAction "Create symbolic link" source target
-        quietly $ cmd lns source target
-
--- | Write a Builder's path into a given environment variable.
-builderEnvironment :: String -> Builder -> Action CmdOption
-builderEnvironment variable builder = do
-    needBuilder builder
-    path <- builderPath builder
-    return $ AddEnv variable path
-
--- | Given a 'Context' this 'Action' looks up its package dependencies and wraps
+-- | Given a 'Context' this 'Action' look up the package dependencies and wrap
 -- the results in appropriate contexts. The only subtlety here is that we never
 -- depend on packages built in 'Stage2' or later, therefore the stage of the
 -- resulting dependencies is bounded from above at 'Stage1'. To compute package
