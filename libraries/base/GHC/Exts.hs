@@ -194,6 +194,15 @@ instance IsList [a] where
   fromList = id
   toList = id
 
+-- | @since 4.9.0.0
+instance IsList (NonEmpty a) where
+  type Item (NonEmpty a) = a
+
+  fromList (a:as) = a :| as
+  fromList [] = errorWithoutStackTrace "NonEmpty.fromList: empty list"
+
+  toList ~(a :| as) = a : as
+
 -- | @since 4.8.0.0
 instance IsList Version where
   type (Item Version) = Int

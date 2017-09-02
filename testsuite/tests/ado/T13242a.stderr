@@ -28,10 +28,10 @@ T13242a.hs:13:11: error:
       These potential instances exist:
         instance Eq Ordering -- Defined in ‘GHC.Classes’
         instance Eq Integer
-          -- Defined in ‘integer-gmp-1.0.0.1:GHC.Integer.Type’
+          -- Defined in ‘integer-gmp-1.0.1.0:GHC.Integer.Type’
         instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Base’
         ...plus 22 others
-        ...plus five instances involving out-of-scope types
+        ...plus six instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In a stmt of a 'do' block: return (x == x)
       In the expression:

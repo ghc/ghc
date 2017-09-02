@@ -797,6 +797,35 @@ class (Alternative m, Monad m) => MonadPlus m where
 -- | @since 2.01
 instance MonadPlus Maybe
 
+---------------------------------------------
+-- The non-empty list type
+
+infixr 5 :|
+
+-- | Non-empty (and non-strict) list type.
+--
+-- @since 4.9.0.0
+data NonEmpty a = a :| [a]
+  deriving (Eq, Ord)
+
+-- | @since 4.9.0.0
+instance Functor NonEmpty where
+  fmap f ~(a :| as) = f a :| fmap f as
+  b <$ ~(_ :| as)   = b   :| (b <$ as)
+
+-- | @since 4.9.0.0
+instance Applicative NonEmpty where
+  pure a = a :| []
+  (<*>) = ap
+  liftA2 = liftM2
+
+-- | @since 4.9.0.0
+instance Monad NonEmpty where
+  ~(a :| as) >>= f = b :| (bs ++ bs')
+    where b :| bs = f a
+          bs' = as >>= toList . f
+          toList ~(c :| cs) = c : cs
+
 ----------------------------------------------
 -- The list type
 

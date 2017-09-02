@@ -1137,6 +1137,9 @@ instance Data a => Data [a] where
 
 ------------------------------------------------------------------------------
 
+-- | @since 4.9.0.0
+deriving instance Data a => Data (NonEmpty a)
+
 -- | @since 4.0.0.0
 deriving instance Data a => Data (Maybe a)
 

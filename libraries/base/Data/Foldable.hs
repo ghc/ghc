@@ -296,6 +296,16 @@ instance Foldable [] where
     sum     = List.sum
     toList  = id
 
+-- | @since 4.9.0.0
+instance Foldable NonEmpty where
+  foldr f z ~(a :| as) = f a (List.foldr f z as)
+  foldl f z ~(a :| as) = List.foldl f (f z a) as
+  foldl1 f ~(a :| as) = List.foldl f a as
+  foldMap f ~(a :| as) = f a `mappend` foldMap f as
+  fold ~(m :| ms) = m `mappend` fold ms
+  length (_ :| as) = 1 + List.length as
+  toList ~(a :| as) = a : as
+
 -- | @since 4.7.0.0
 instance Foldable (Either a) where
     foldMap _ (Left _) = mempty

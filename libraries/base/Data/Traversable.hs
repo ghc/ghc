@@ -64,7 +64,7 @@ import Data.Monoid ( Dual(..), Sum(..), Product(..), First(..), Last(..) )
 import Data.Proxy ( Proxy(..) )
 
 import GHC.Arr
-import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..),
+import GHC.Base ( Applicative(..), Monad(..), Monoid, Maybe(..), NonEmpty(..),
                   ($), (.), id, flip )
 import GHC.Generics
 import qualified GHC.List as List ( foldr )
@@ -236,6 +236,10 @@ instance Traversable [] where
     {-# INLINE traverse #-} -- so that traverse can fuse
     traverse f = List.foldr cons_f (pure [])
       where cons_f x ys = liftA2 (:) (f x) ys
+
+-- | @since 4.9.0.0
+instance Traversable NonEmpty where
+  traverse f ~(a :| as) = liftA2 (:|) (f a) (traverse f as)
 
 -- | @since 4.7.0.0
 instance Traversable (Either a) where

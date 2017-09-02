@@ -9,10 +9,10 @@ tcfail072.hs:23:13: error:
       These potential instances exist:
         instance Ord Ordering -- Defined in ‘GHC.Classes’
         instance Ord Integer
-          -- Defined in ‘integer-gmp-1.0.0.1:GHC.Integer.Type’
+          -- Defined in ‘integer-gmp-1.0.1.0:GHC.Integer.Type’
         instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Base’
         ...plus 22 others
-        ...plus two instances involving out-of-scope types
+        ...plus three instances involving out-of-scope types
         (use -fprint-potential-instances to see them all)
     • In the expression: g A
       In an equation for ‘g’: g (B _ _) = g A

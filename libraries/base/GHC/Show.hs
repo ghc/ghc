@@ -198,6 +198,7 @@ showWord w# cs
                    showWord (w# `quotWord#` 10##) (C# c# : cs)
 
 deriving instance Show a => Show (Maybe a)
+deriving instance Show a => Show (NonEmpty a)
 
 -- | @since 2.01
 instance Show TyCon where
