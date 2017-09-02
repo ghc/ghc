@@ -293,10 +293,7 @@ test('T12707',
 
 test('T12150',
      [ only_ways(['optasm']),
-       compiler_stats_num_field('bytes allocated',
-          [(wordsize(64), 74358208, 5)
-          # initial:    70773000
-          # 2017-08-25: 74358208  Refactor the Mighty Simplifier
+       collect_stats('bytes allocated',5,True),
           ]),
      ],
     compile,

@@ -208,6 +208,6 @@ test('T13525', when(opsys('mingw32'), skip), compile_and_run, [''])
 test('T13097', normal, compile_and_run, [''])
 test('functorOperators', normal, compile_and_run, [''])
 test('T3474',
-     [stats_num_field('max_bytes_used', [ (wordsize(64), 44504, 5) ]),
+     [collect_stats('max_bytes_used',5),
       only_ways(['normal'])],
      compile_and_run, ['-O'])
