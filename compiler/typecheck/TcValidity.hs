@@ -39,7 +39,7 @@ import TyCon
 -- others:
 import HsSyn            -- HsType
 import TcRnMonad        -- TcType, amongst others
-import TcEnv       ( tcGetInstEnvs )
+import TcEnv       ( tcGetInstEnvs, tcInitTidyEnv, tcInitOpenTidyEnv )
 import FunDeps
 import InstEnv     ( InstMatch, lookupInstEnv )
 import FamInstEnv  ( isDominatedBy, injectiveBranches,

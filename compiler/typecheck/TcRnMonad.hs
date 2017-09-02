@@ -85,7 +85,7 @@ module TcRnMonad(
   failIfTc, failIfTcM,
   warnIfFlag, warnIf, warnTc, warnTcM,
   addWarnTc, addWarnTcM, addWarn, addWarnAt, add_warn,
-  tcInitTidyEnv, tcInitOpenTidyEnv, mkErrInfo,
+  mkErrInfo,
 
   -- * Type constraints
   newTcEvBinds,
@@ -178,6 +178,8 @@ import Data.Set ( Set )
 import qualified Data.Set as Set
 
 import {-# SOURCE #-} TcSplice ( runRemoteModFinalizers )
+import {-# SOURCE #-} TcEnv    ( tcInitTidyEnv )
+
 import qualified Data.Map as Map
 
 {-
@@ -325,7 +327,6 @@ initTcWithGbl hsc_env gbl_env loc do_this
                 tcl_arrow_ctxt = NoArrowCtxt,
                 tcl_env        = emptyNameEnv,
                 tcl_bndrs      = [],
-                tcl_tidy       = emptyTidyEnv,
                 tcl_tyvars     = tvs_var,
                 tcl_lie        = lie_var,
                 tcl_tclvl      = topTcLevel
@@ -1298,19 +1299,6 @@ add_warn_at reason loc msg extra_info
          let { warn = mkLongWarnMsg dflags loc printer
                                     msg extra_info } ;
          reportWarning reason warn }
-
-tcInitTidyEnv :: TcM TidyEnv
-tcInitTidyEnv
-  = do  { lcl_env <- getLclEnv
-        ; return (tcl_tidy lcl_env) }
-
--- | Get a 'TidyEnv' that includes mappings for all vars free in the given
--- type. Useful when tidying open types.
-tcInitOpenTidyEnv :: [TyCoVar] -> TcM TidyEnv
-tcInitOpenTidyEnv tvs
-  = do { env1 <- tcInitTidyEnv
-       ; let env2 = tidyFreeTyCoVars env1 tvs
-       ; return env2 }
 
 
 {-

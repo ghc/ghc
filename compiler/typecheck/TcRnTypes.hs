@@ -38,7 +38,7 @@ module TcRnTypes(
         WhereFrom(..), mkModDeps, modDepsElts,
 
         -- Typechecker types
-        TcTypeEnv, TcIdBinderStack, TcIdBinder(..),
+        TcTypeEnv, TcBinderStack, TcBinder(..),
         TcTyThing(..), PromotionErr(..),
         IdBindingInfo(..), ClosedTypeId, RhsNames,
         IsGroupClosed(..),
@@ -828,10 +828,8 @@ data TcLclEnv           -- Changes as we move inside an expression
         tcl_env  :: TcTypeEnv,    -- The local type environment:
                                   -- Ids and TyVars defined in this module
 
-        tcl_bndrs :: TcIdBinderStack,   -- Used for reporting relevant bindings
-
-        tcl_tidy :: TidyEnv,      -- Used for tidying types; contains all
-                                  -- in-scope type variables (but not term variables)
+        tcl_bndrs :: TcBinderStack,   -- Used for reporting relevant bindings,
+                                      -- and for tidying types
 
         tcl_tyvars :: TcRef TcTyVarSet, -- The "global tyvars"
                         -- Namely, the in-scope TyVars bound in tcl_env,
@@ -885,34 +883,44 @@ type TcId        = Id
 type TcIdSet     = IdSet
 
 ---------------------------
--- The TcIdBinderStack
+-- The TcBinderStack
 ---------------------------
 
-type TcIdBinderStack = [TcIdBinder]
-   -- This is a stack of locally-bound ids, innermost on top
-   -- Used only in error reporting (relevantBindings in TcError)
+type TcBinderStack = [TcBinder]
+   -- This is a stack of locally-bound ids and tyvars,
+   --   innermost on top
+   -- Used only in error reporting (relevantBindings in TcError),
+   --   and in tidying
    -- We can't use the tcl_env type environment, because it doesn't
    --   keep track of the nesting order
 
-data TcIdBinder
+data TcBinder
   = TcIdBndr
        TcId
        TopLevelFlag    -- Tells whether the binding is syntactically top-level
                        -- (The monomorphic Ids for a recursive group count
                        --  as not-top-level for this purpose.)
+
   | TcIdBndr_ExpType  -- Variant that allows the type to be specified as
                       -- an ExpType
        Name
        ExpType
        TopLevelFlag
 
-instance Outputable TcIdBinder where
+  | TcTvBndr          -- e.g.   case x of P (y::a) -> blah
+       Name           -- We bind the lexical name "a" to the type of y,
+       TyVar          -- which might be an utterly different (perhaps
+                      -- existential) tyvar
+
+instance Outputable TcBinder where
    ppr (TcIdBndr id top_lvl)           = ppr id <> brackets (ppr top_lvl)
    ppr (TcIdBndr_ExpType id _ top_lvl) = ppr id <> brackets (ppr top_lvl)
+   ppr (TcTvBndr name tv)              = ppr name <+> ppr tv
 
-instance HasOccName TcIdBinder where
-    occName (TcIdBndr id _) = (occName (idName id))
-    occName (TcIdBndr_ExpType name _ _) = (occName name)
+instance HasOccName TcBinder where
+    occName (TcIdBndr id _)             = occName (idName id)
+    occName (TcIdBndr_ExpType name _ _) = occName name
+    occName (TcTvBndr name _)           = occName name
 
 ---------------------------
 -- Template Haskell stages and levels
@@ -2934,7 +2942,7 @@ data CtLoc = CtLoc { ctl_origin :: CtOrigin
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
-  --    binder stack:     tcl_bndrs :: TcIdBinderStack
+  --    binder stack:     tcl_bndrs :: TcBinderStack
   --    level:            tcl_tclvl :: TcLevel
 
 mkKindLoc :: TcType -> TcType   -- original *types* being compared

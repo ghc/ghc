@@ -13,6 +13,7 @@ import TcRnTypes
 import TcRnMonad
 import TcMType
 import TcUnify( occCheckForErrors, OccCheckResult(..) )
+import TcEnv( tcInitTidyEnv )
 import TcType
 import RnUnbound ( unknownNameSuggestions )
 import Type
@@ -196,6 +197,7 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes
 
        ; traceTc "reportUnsolved (after zonking):" $
          vcat [ text "Free tyvars:" <+> pprTyVars free_tvs
+              , text "Tidy env:" <+> ppr tidy_env
               , text "Wanted:" <+> ppr wanted ]
 
        ; warn_redundant <- woptM Opt_WarnRedundantConstraints
@@ -442,6 +444,7 @@ reportWanteds ctxt tc_lvl (WC { wc_simple = simples, wc_insol = insols, wc_impl 
                                        , text "Insols =" <+> ppr insols
                                        , text "Suppress =" <+> ppr (cec_suppress ctxt)])
        ; let tidy_cts = bagToList (mapBag (tidyCt env) (insols `unionBags` simples))
+       ; traceTc "rw2" (ppr tidy_cts)
 
          -- First deal with things that are utterly wrong
          -- Like Int ~ Bool (incl nullary TyCons)
@@ -1147,11 +1150,13 @@ validSubstitutions ct | isExprHoleCt ct =
     localsFirst elts = lcl ++ gbl
       where (lcl, gbl) = partition gre_lcl elts
 
-    getBndrOcc :: TcIdBinder -> OccName
-    getBndrOcc (TcIdBndr id _) = occName $ getName id
-    getBndrOcc (TcIdBndr_ExpType name _ _) = occName $ getName name
+    is_id_bind :: TcBinder -> Bool
+    is_id_bind (TcIdBndr {})         = True
+    is_id_bind (TcIdBndr_ExpType {}) = True
+    is_id_bind (TcTvBndr {})         = False
 
-    relBindSet =  mkOccSet $ map getBndrOcc $ tcl_bndrs hole_env
+    relBindSet = mkOccSet $ [ occName b | b <- tcl_bndrs hole_env
+                                        , is_id_bind b ]
 
     shouldBeSkipped :: GlobalRdrElt -> Bool
     shouldBeSkipped el = (occName $ gre_name el) `elemOccSet` relBindSet
@@ -2912,7 +2917,7 @@ relevantBindings want_filtering ctxt ct
 
     ---- fixes #12177
     ---- builds up a list of bindings whose OccName has not been seen before
-    remove_shadowing :: [TcIdBinder] -> [TcIdBinder]
+    remove_shadowing :: [TcBinder] -> [TcBinder]
     remove_shadowing bindings = reverse $ fst $ foldl
       (\(bindingAcc, seenNames) binding ->
         if (occName binding) `elemOccSet` seenNames -- if we've seen it
@@ -2922,13 +2927,14 @@ relevantBindings want_filtering ctxt ct
 
     go :: DynFlags -> TidyEnv -> TcTyVarSet -> Maybe Int -> TcTyVarSet -> [SDoc]
        -> Bool                          -- True <=> some filtered out due to lack of fuel
-       -> [TcIdBinder]
+       -> [TcBinder]
        -> TcM (TidyEnv, [SDoc], Bool)   -- The bool says if we filtered any out
                                         -- because of lack of fuel
     go _ tidy_env _ _ _ docs discards []
       = return (tidy_env, reverse docs, discards)
     go dflags tidy_env ct_tvs n_left tvs_seen docs discards (tc_bndr : tc_bndrs)
       = case tc_bndr of
+          TcTvBndr {} -> discard_it
           TcIdBndr id top_lvl -> go2 (idName id) (idType id) top_lvl
           TcIdBndr_ExpType name et top_lvl ->
             do { mb_ty <- readExpType_maybe et

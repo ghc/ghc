@@ -408,7 +408,7 @@ tcValBinds top_lvl binds sigs thing_inside
 
                 -- Extend the envt right away with all the Ids
                 -- declared with complete type signatures
-                -- Do not extend the TcIdBinderStack; instead
+                -- Do not extend the TcBinderStack; instead
                 -- we extend it on a per-rhs basis in tcExtendForRhs
         ; tcExtendSigIds top_lvl poly_ids $ do
             { (binds', (extra_binds', thing)) <- tcBindGroups top_lvl sig_fn prag_fn binds $ do
@@ -702,7 +702,7 @@ tcPolyCheck prag_fn
 
        ; (ev_binds, (co_fn, matches'))
             <- checkConstraints skol_info skol_tvs ev_vars $
-               tcExtendIdBndrs [TcIdBndr mono_id NotTopLevel]  $
+               tcExtendBinderStack [TcIdBndr mono_id NotTopLevel]  $
                tcExtendTyVarEnv2 tv_prs $
                setSrcSpan loc           $
                tcMatchesFun (L nm_loc mono_name) matches (mkCheckExpType tau)
@@ -1282,7 +1282,7 @@ tcMonoBinds is_rec sig_fn no_gen
             <- tcInferInst $ \ exp_ty ->
                   -- tcInferInst: see TcUnify,
                   -- Note [Deep instantiation of InferResult]
-               tcExtendIdBndrs [TcIdBndr_ExpType name exp_ty NotTopLevel] $
+               tcExtendBinderStack [TcIdBndr_ExpType name exp_ty NotTopLevel] $
                   -- We extend the error context even for a non-recursive
                   -- function so that in type error messages we show the
                   -- type of the thing whose rhs we are type checking
@@ -1470,7 +1470,7 @@ tcExtendTyVarEnvFromSig sig_inst thing_inside
     thing_inside
 
 tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a
--- Extend the TcIdBinderStack for the RHS of the binding, with
+-- Extend the TcBinderStack for the RHS of the binding, with
 -- the monomorphic Id.  That way, if we have, say
 --     f = \x -> blah
 -- and something goes wrong in 'blah', we get a "relevant binding"
@@ -1479,12 +1479,12 @@ tcExtendIdBinderStackForRhs :: [MonoBindInfo] -> TcM a -> TcM a
 --    f :: forall a. [a] -> [a]
 --    f x = True
 -- We can't unify True with [a], and a relevant binding is f :: [a] -> [a]
--- If we had the *polymorphic* version of f in the TcIdBinderStack, it
+-- If we had the *polymorphic* version of f in the TcBinderStack, it
 -- would not be reported as relevant, because its type is closed
 tcExtendIdBinderStackForRhs infos thing_inside
-  = tcExtendIdBndrs [ TcIdBndr mono_id NotTopLevel
-                    | MBI { mbi_mono_id = mono_id } <- infos ]
-                    thing_inside
+  = tcExtendBinderStack [ TcIdBndr mono_id NotTopLevel
+                        | MBI { mbi_mono_id = mono_id } <- infos ]
+                        thing_inside
     -- NotTopLevel: it's a monomorphic binding
 
 ---------------------
