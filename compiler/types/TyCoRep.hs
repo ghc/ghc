@@ -2435,7 +2435,11 @@ pprType       = pprPrecType TopPrec
 pprParendType = pprPrecType TyConPrec
 
 pprPrecType :: TyPrec -> Type -> SDoc
-pprPrecType prec ty = getPprStyle $ \sty -> pprPrecIfaceType prec (tidyToIfaceTypeSty ty sty)
+pprPrecType prec ty
+  = getPprStyle $ \sty ->
+    if debugStyle sty           -- Use pprDebugType when in
+    then debug_ppr_ty prec ty   -- when in debug-style
+    else pprPrecIfaceType prec (tidyToIfaceTypeSty ty sty)
 
 pprTyLit :: TyLit -> SDoc
 pprTyLit = pprIfaceTyLit . toIfaceTyLit
@@ -2561,9 +2565,7 @@ debug_ppr_ty _ (LitTy l)
   = ppr l
 
 debug_ppr_ty _ (TyVarTy tv)
-  = ifPprDebug (parens (ppr tv <+> dcolon
-                        <+> (debugPprType (tyVarKind tv))))
-               (ppr tv)
+  = ppr tv  -- With -dppr-debug we get (tv :: kind)
 
 debug_ppr_ty prec (FunTy arg res)
   = maybeParen prec FunPrec $
@@ -2589,7 +2591,9 @@ debug_ppr_ty _ (CoercionTy co)
 debug_ppr_ty prec ty@(ForAllTy {})
   | (tvs, body) <- split ty
   = maybeParen prec FunPrec $
-    hang (text "forall" <+> fsep (map pp_bndr tvs) <> dot)
+    hang (text "forall" <+> fsep (map ppr tvs) <> dot)
+         -- The (map ppr tvs) will print kind-annotated
+         -- tvs, because we are (usually) in debug-style
        2 (ppr body)
   where
     split ty | ForAllTy tv ty' <- ty
@@ -2597,13 +2601,6 @@ debug_ppr_ty prec ty@(ForAllTy {})
              = (tv:tvs, body)
              | otherwise
              = ([], ty)
-
-    pp_bndr, pp_with_kind :: TyVarBinder -> SDoc
-    pp_bndr tv = ifPprDebug (ppr tv) (pp_with_kind tv)
-
-    pp_with_kind tv
-     = parens (ppr tv <+> dcolon
-               <+> ppr (tyVarKind (binderVar tv)))
 
 {-
 Note [When to print foralls]
