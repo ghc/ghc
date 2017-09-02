@@ -124,6 +124,12 @@ Runtime system
 Template Haskell
 ~~~~~~~~~~~~~~~~
 
+- Template Haskell now reifies data types with GADT syntax accurately.
+  Previously, TH used heuristics to determine whether a data type
+  should be reified using GADT syntax, which could lead to incorrect results,
+  such as ``data T1 a = (a ~ Int) => MkT1`` being reified as a GADT and
+  ``data T2 a where MkT2 :: Show a => T2 a`` *not* being reified as a GADT.
+
 ``ghc`` library
 ~~~~~~~~~~~~~~~
 

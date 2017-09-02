@@ -697,19 +697,18 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
                              ifGadtSyntax = gadt,
                              ifBinders = binders })
 
-  | gadt_style = vcat [ pp_roles
-                      , pp_nd <+> pp_lhs <+> pp_where
-                      , nest 2 (vcat pp_cons)
-                      , nest 2 $ ppShowIface ss pp_extra ]
-  | otherwise  = vcat [ pp_roles
-                      , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
-                      , nest 2 $ ppShowIface ss pp_extra ]
+  | gadt      = vcat [ pp_roles
+                     , pp_nd <+> pp_lhs <+> pp_where
+                     , nest 2 (vcat pp_cons)
+                     , nest 2 $ ppShowIface ss pp_extra ]
+  | otherwise = vcat [ pp_roles
+                     , hang (pp_nd <+> pp_lhs) 2 (add_bars pp_cons)
+                     , nest 2 $ ppShowIface ss pp_extra ]
   where
     is_data_instance = isIfaceDataInstance parent
 
-    gadt_style = gadt || any (not . isVanillaIfaceConDecl) cons
     cons       = visibleIfConDecls condecls
-    pp_where   = ppWhen (gadt_style && not (null cons)) $ text "where"
+    pp_where   = ppWhen (gadt && not (null cons)) $ text "where"
     pp_cons    = ppr_trim (map show_con cons) :: [SDoc]
 
     pp_lhs = case parent of
@@ -732,7 +731,7 @@ pprIfaceDecl ss (IfaceData { ifName = tycon, ifCType = ctype,
     ok_con dc = showSub ss dc || any (showSub ss . flSelector) (ifConFields dc)
 
     show_con dc
-      | ok_con dc = Just $ pprIfaceConDecl ss gadt_style tycon binders parent dc
+      | ok_con dc = Just $ pprIfaceConDecl ss gadt tycon binders parent dc
       | otherwise = Nothing
 
     pp_nd = case condecls of
@@ -953,12 +952,6 @@ pprIfaceDeclHead context ss tc_occ bndrs m_res_kind
           <+> pprIfaceTyConBinders (suppressIfaceInvisibles dflags bndrs bndrs)
         , maybe empty (\res_kind -> dcolon <+> pprIfaceType res_kind) m_res_kind ]
 
-isVanillaIfaceConDecl :: IfaceConDecl -> Bool
-isVanillaIfaceConDecl (IfCon { ifConExTvs  = ex_tvs
-                             , ifConEqSpec = eq_spec
-                             , ifConCtxt   = ctxt })
-  = (null ex_tvs) && (null eq_spec) && (null ctxt)
-
 pprIfaceConDecl :: ShowSub -> Bool
                 -> IfaceTopBndr
                 -> [IfaceTyConBinder]
@@ -969,23 +962,27 @@ pprIfaceConDecl ss gadt_style tycon tc_binders parent
                  ifConExTvs = ex_tvs,
                  ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys,
                  ifConStricts = stricts, ifConFields = fields })
-  | gadt_style            = pp_prefix_con <+> dcolon <+> ppr_ty
-  | not (null fields)     = pp_prefix_con <+> pp_field_args
-  | is_infix
-  , [ty1, ty2] <- pp_args = sep [ ty1
-                                , pprInfixIfDeclBndr how_much (occName name)
-                                , ty2]
-
-  | otherwise             = pp_prefix_con <+> sep pp_args
+  | gadt_style = pp_prefix_con <+> dcolon <+> ppr_gadt_ty
+  | otherwise  = ppr_ex_quant pp_h98_con
   where
+    pp_h98_con
+      | not (null fields) = pp_prefix_con <+> pp_field_args
+      | is_infix
+      , [ty1, ty2] <- pp_args
+      = sep [ ty1
+            , pprInfixIfDeclBndr how_much (occName name)
+            , ty2]
+      | otherwise = pp_prefix_con <+> sep pp_args
+
     how_much = ss_how_much ss
     tys_w_strs :: [(IfaceBang, IfaceType)]
     tys_w_strs = zip stricts arg_tys
     pp_prefix_con = pprPrefixIfDeclBndr how_much (occName name)
 
     (univ_tvs, pp_res_ty) = mk_user_con_res_ty eq_spec
-    ppr_ty = pprIfaceForAllPart (map tv_to_forall_bndr univ_tvs ++ ex_tvs)
-                                ctxt pp_tau
+    ppr_ex_quant = pprIfaceForAllPartMust ex_tvs ctxt
+    ppr_gadt_ty = pprIfaceForAllPart (map tv_to_forall_bndr univ_tvs ++ ex_tvs)
+                                     ctxt pp_tau
 
         -- A bit gruesome this, but we can't form the full con_tau, and ppr it,
         -- because we don't have a Name for the tycon, only an OccName

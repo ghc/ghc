@@ -1430,8 +1430,7 @@ reifyTyCon tc
   = do  { cxt <- reifyCxt (tyConStupidTheta tc)
         ; let tvs      = tyConTyVars tc
               dataCons = tyConDataCons tc
-              -- see Note [Reifying GADT data constructors]
-              isGadt   = any (not . null . dataConEqSpec) dataCons
+              isGadt   = isGadtSyntaxTyCon tc
         ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
         ; r_tvs <- reifyTyVars tvs (Just tc)
         ; let name = reifyName tc
@@ -1443,7 +1442,6 @@ reifyTyCon tc
         ; return (TH.TyConI decl) }
 
 reifyDataCon :: Bool -> [Type] -> DataCon -> TcM TH.Con
--- For GADTs etc, see Note [Reifying GADT data constructors]
 reifyDataCon isGadtDataCon tys dc
   = do { let -- used for H98 data constructors
              (ex_tvs, theta, arg_tys)
@@ -1505,34 +1503,9 @@ reifyDataCon isGadtDataCon tys dc
          ret_con }
 
 {-
-Note [Reifying GADT data constructors]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-At this point in the compilation pipeline we have no way of telling whether a
-data type was declared as a H98 data type or as a GADT.  We have to rely on
-heuristics here.  We look at dcEqSpec field of all data constructors in a
-data type declaration.  If at least one data constructor has non-empty
-dcEqSpec this means that the data type must have been declared as a GADT.
-Consider these declarations:
-
-  data T1 a where
-     MkT1 :: T1 Int
-
-  data T2 a where
-     MkT2 :: forall a. (a ~ Int) => T2 a
-
-T1 will be reified as a GADT, as it has a non-empty EqSpec [(a, Int)] due to
-MkT1's return type. T2 will be reified as a normal H98 data type declaration
-since MkT2 uses an explicit type equality in its context instead of an implicit
-equality in its return type, and therefore has an empty EqSpec.
-
 Note [Freshen reified GADT constructors' universal tyvars]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Suppose one were to reify this data type:
-
-  data a :~: b = (a ~ b) => Refl
-
-This will be reified as if it were a GADT definiton, so the reified definition
-will be closer to:
+Suppose one were to reify this GADT:
 
   data a :~: b where
     Refl :: forall a b. (a ~ b) => a :~: b
@@ -1697,8 +1670,7 @@ reifyFamilyInstance is_poly_tvs inst@(FamInst { fi_flavor = flavor
                  eta_expanded_tvs = mkTyVarTys fam_tvs `chkAppend` etad_tys
                  eta_expanded_lhs = lhs `chkAppend` etad_tys
                  dataCons         = tyConDataCons rep_tc
-                 -- see Note [Reifying GADT data constructors]
-                 isGadt   = any (not . null . dataConEqSpec) dataCons
+                 isGadt           = isGadtSyntaxTyCon rep_tc
            ; cons <- mapM (reifyDataCon isGadt eta_expanded_tvs) dataCons
            ; let types_only = filterOutInvisibleTypes fam_tc eta_expanded_lhs
            ; th_tys <- reifyTypes types_only

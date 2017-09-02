@@ -34,8 +34,8 @@ module IfaceType (
         pprIfaceContext, pprIfaceContextArr,
         pprIfaceIdBndr, pprIfaceLamBndr, pprIfaceTvBndr, pprIfaceTyConBinders,
         pprIfaceBndrs, pprIfaceTcArgs, pprParendIfaceTcArgs,
-        pprIfaceForAllPart, pprIfaceForAll, pprIfaceSigmaType,
-        pprIfaceTyLit,
+        pprIfaceForAllPart, pprIfaceForAllPartMust, pprIfaceForAll,
+        pprIfaceSigmaType, pprIfaceTyLit,
         pprIfaceCoercion, pprParendIfaceCoercion,
         splitIfaceSigmaTy, pprIfaceTypeApp, pprUserIfaceForAll,
         pprIfaceCoTcApp, pprTyTcApp, pprIfacePrefixApp,
@@ -743,6 +743,11 @@ ppr_tc_args ctx_prec args
 pprIfaceForAllPart :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
 pprIfaceForAllPart tvs ctxt sdoc
   = ppr_iface_forall_part ShowForAllWhen tvs ctxt sdoc
+
+-- | Like 'pprIfaceForAllPart', but always uses an explicit @forall@.
+pprIfaceForAllPartMust :: [IfaceForAllBndr] -> [IfacePredType] -> SDoc -> SDoc
+pprIfaceForAllPartMust tvs ctxt sdoc
+  = ppr_iface_forall_part ShowForAllMust tvs ctxt sdoc
 
 pprIfaceForAllCoPart :: [(IfLclName, IfaceCoercion)] -> SDoc -> SDoc
 pprIfaceForAllCoPart tvs sdoc
