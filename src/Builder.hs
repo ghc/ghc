@@ -17,6 +17,7 @@ import Development.Shake.Classes
 import GHC.Generics
 import qualified Hadrian.Builder as H
 import Hadrian.Builder hiding (Builder)
+import Hadrian.Builder.Ar
 import Hadrian.Oracles.Path
 import Hadrian.Oracles.TextFile
 import Hadrian.Utilities
@@ -143,7 +144,10 @@ instance H.Builder Builder where
             case builder of
                 Ar _ -> do
                     if "//*.a" ?== output
-                    then arCmd path buildArgs
+                    then do
+                        useTempFile <- flag ArSupportsAtFile
+                        if useTempFile then runAr                path buildArgs
+                                       else runArWithoutTempFile path buildArgs
                     else do
                         top   <- topDirectory
                         echo  <- cmdEcho
@@ -229,40 +233,6 @@ systemBuilderPath builder = case builder of
 -- | Was the path to a given system 'Builder' specified in configuration files?
 isSpecified :: Builder -> Action Bool
 isSpecified = fmap (not . null) . systemBuilderPath
-
--- This count includes arg "q" and arg file parameters in arBuilderArgs.
--- Update this value appropriately when changing arBuilderArgs.
-arFlagsCount :: Int
-arFlagsCount = 2
-
--- | Invoke 'Ar' builder given a path to it and a list of arguments. Take care
--- not to exceed the limit on command line length, which differs across
--- supported operating systems (see 'cmdLineLengthLimit'). 'Ar' needs to be
--- handled in a special way because we sometimes need to archive __a lot__ of
--- files (in Cabal package, for example, command line length can reach 2MB!).
--- To work around the limit on the command line length we pass the list of files
--- to be archived via a temporary file, or alternatively, we split argument list
--- into chunks and call 'Ar' multiple times (when passing arguments via a
--- temporary file is not supported).
-arCmd :: FilePath -> [String] -> Action ()
-arCmd path argList = do
-    arSupportsAtFile <- flag ArSupportsAtFile
-    let flagArgs = take arFlagsCount argList
-        fileArgs = drop arFlagsCount argList
-    if arSupportsAtFile
-    then useAtFile path flagArgs fileArgs
-    else useSuccessiveInvocations path flagArgs fileArgs
-
-useAtFile :: FilePath -> [String] -> [String] -> Action ()
-useAtFile path flagArgs fileArgs = withTempFile $ \tmp -> do
-    writeFile' tmp $ unwords fileArgs
-    cmd [path] flagArgs ('@' : tmp)
-
-useSuccessiveInvocations :: FilePath -> [String] -> [String] -> Action ()
-useSuccessiveInvocations path flagArgs fileArgs = do
-    maxChunk <- cmdLineLengthLimit
-    forM_ (chunksOfSize maxChunk fileArgs) $ \argsChunk ->
-        unit . cmd [path] $ flagArgs ++ argsChunk
 
 -- | Apply a patch by executing the 'Patch' builder in a given directory.
 applyPatch :: FilePath -> FilePath -> Action ()

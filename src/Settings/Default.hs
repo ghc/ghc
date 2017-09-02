@@ -4,6 +4,8 @@ module Settings.Default (
     defaultFlavour, defaultSplitObjects
     ) where
 
+import qualified Hadrian.Builder.Ar
+
 import CommandLine
 import Expression
 import Flavour
@@ -12,7 +14,6 @@ import Oracles.PackageData
 import Oracles.Setting
 import Settings
 import Settings.Builders.Alex
-import Settings.Builders.Ar
 import Settings.Builders.DeriveConstants
 import Settings.Builders.Cc
 import Settings.Builders.Configure
@@ -138,7 +139,7 @@ defaultSplitObjects = do
 defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
     [ alexBuilderArgs
-    , arBuilderArgs
+    , builder Ar ? Hadrian.Builder.Ar.args
     , ccBuilderArgs
     , configureBuilderArgs
     , deriveConstantsBuilderArgs

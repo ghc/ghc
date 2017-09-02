@@ -27,6 +27,7 @@ executable hadrian
                        , Flavour
                        , GHC
                        , Hadrian.Builder
+                       , Hadrian.Builder.Ar
                        , Hadrian.Expression
                        , Hadrian.Haskell.Cabal
                        , Hadrian.Haskell.Cabal.Parse
@@ -62,7 +63,6 @@ executable hadrian
                        , Rules.Wrappers
                        , Settings
                        , Settings.Builders.Alex
-                       , Settings.Builders.Ar
                        , Settings.Builders.Common
                        , Settings.Builders.Cc
                        , Settings.Builders.Configure

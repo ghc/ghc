@@ -29,7 +29,7 @@ module Hadrian.Utilities (
     RuleResult,
 
     -- * Miscellaneous
-    (<&>), (%%>),
+    (<&>), (%%>), cmdLineLengthLimit,
 
     -- * Useful re-exports
     Dynamic, fromDynamic, toDyn, TypeRep, typeOf
@@ -46,6 +46,7 @@ import Development.Shake hiding (Normal)
 import Development.Shake.Classes
 import Development.Shake.FilePath
 import System.Console.ANSI
+import System.Info.Extra
 
 import qualified Control.Exception.Base as IO
 import qualified Data.HashMap.Strict    as Map
@@ -136,6 +137,20 @@ infixr 6 -/-
 p %%> a = priority (fromIntegral (length p) + 1) $ p %> a
 
 infix 1 %%>
+
+-- | Build command lines can get very long; for example, when building the Cabal
+-- library, they can reach 2MB! Some operating systems do not support command
+-- lines of such length, and this function can be used to obtain a reasonable
+-- approximation of the limit. On Windows, it is theoretically 32768 characters
+-- (since Windows 7). In practice we use 31000 to leave some breathing space for
+-- the builder path & name, auxiliary flags, and other overheads. On Mac OS X,
+-- ARG_MAX is 262144, yet when using @xargs@ on OSX this is reduced by over
+-- 20000. Hence, 200000 seems like a sensible limit. On other operating systems
+-- we currently use the 4194304 setting.
+cmdLineLengthLimit :: Int
+cmdLineLengthLimit | isWindows = 31000
+                   | isMac     = 200000
+                   | otherwise = 4194304
 
 -- | Insert a value into Shake's type-indexed map.
 insertExtra :: Typeable a => a -> HashMap TypeRep Dynamic -> HashMap TypeRep Dynamic

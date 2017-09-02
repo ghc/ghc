@@ -186,23 +186,6 @@ ghcCanonVersion = do
     let leadingZero = [ '0' | length ghcMinorVersion == 1 ]
     return $ ghcMajorVersion ++ leadingZero ++ ghcMinorVersion
 
--- | Command lines have limited size on Windows. Since Windows 7 the limit is
--- 32768 characters (theoretically). In practice we use 31000 to leave some
--- breathing space for the builder's path & name, auxiliary flags, and other
--- overheads. Use this function to set limits for other OSs if necessary.
-cmdLineLengthLimit :: Action Int
-cmdLineLengthLimit = do
-    windows <- windowsHost
-    osx     <- osxHost
-    return $ case (windows, osx) of
-        -- Windows:
-        (True, False) -> 31000
-        -- On Mac OSX ARG_MAX is 262144, yet when using @xargs@ on OSX this is
-        -- reduced by over 20 000. Hence, 200 000 seems like a sensible limit.
-        (False, True) -> 200000
-        -- On all other systems, we try this:
-        _             -> 4194304 -- Cabal library needs a bit more than 2MB!
-
 -- ref: https://ghc.haskell.org/trac/ghc/wiki/Building/Installing#HowGHCfindsitsfiles
 -- | On Windows we normally build a relocatable installation, which assumes that
 -- the library directory @libdir@ is in a fixed location relative to the GHC
