@@ -5096,6 +5096,21 @@ We can then use ``HeadC`` in both expression and pattern contexts. In a pattern
 context it will match the head of any list with length at least one. In an
 expression context it will construct a singleton list.
 
+Explicitly bidirectional pattern synonyms offer greater flexibility than
+implicitly bidirectional ones in terms of the syntax that is permitted. For
+instance, the following is not a legal implicitly bidirectional pattern
+synonym: ::
+
+      pattern StrictJust a = Just !a
+
+This is illegal because the use of :ghc-flag:`-XBangPatterns` on the right-hand
+sides prevents it from being a well formed expression. However, constructing a
+strict pattern synonym is quite possible with an explicitly bidirectional
+pattern synonym: ::
+
+      pattern StrictJust a <- Just !a where
+        StrictJust !a = Just a
+
 The table below summarises where each kind of pattern synonym can be used.
 
 +---------------+----------------+---------------+---------------------------+
@@ -7158,7 +7173,7 @@ Unlike with ordinary data definitions, the result kind of a data family
 does not need to be ``*``: it can alternatively be a kind variable
 (with :ghc-flag:`-XPolyKinds`). Data instances' kinds must end in
 ``*``, however.
-    
+
 .. _data-instance-declarations:
 
 Data instance declarations

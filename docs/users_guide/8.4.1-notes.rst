@@ -27,6 +27,20 @@ Language
   wish to; this is quite like how regular datatypes with a kind signature can omit
   some type variables.
 
+- Implicitly bidirectional pattern synonyms no longer allow bang patterns
+  (``!``) or irrefutable patterns (``~``) on the right-hand side. Previously,
+  this was allowed, although the bang patterns and irrefutable patterns would
+  be silently ignored when used in an expression context. This is now a proper
+  error, and explicitly bidirectional pattern synonyms should be used in their
+  stead. That is, instead of using this (which is an error): ::
+
+      data StrictJust a = Just !a
+
+  Use this: ::
+
+      data StrictJust a <- Just !a where
+        StrictJust !a = Just a
+
 Compiler
 ~~~~~~~~
 

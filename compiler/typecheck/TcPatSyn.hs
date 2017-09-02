@@ -574,7 +574,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
     mb_match_group
        = case dir of
            ExplicitBidirectional explicit_mg -> Right explicit_mg
-           ImplicitBidirectional             -> fmap mk_mg (tcPatToExpr args lpat)
+           ImplicitBidirectional -> fmap mk_mg (tcPatToExpr name args lpat)
            Unidirectional -> panic "tcPatSynBuilderBind"
 
     mk_mg :: LHsExpr GhcRn -> MatchGroup GhcRn (LHsExpr GhcRn)
@@ -621,7 +621,8 @@ add_void need_dummy_arg ty
   | need_dummy_arg = mkFunTy voidPrimTy ty
   | otherwise      = ty
 
-tcPatToExpr :: [Located Name] -> LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
+tcPatToExpr :: Name -> [Located Name] -> LPat GhcRn
+            -> Either MsgDoc (LHsExpr GhcRn)
 -- Given a /pattern/, return an /expression/ that builds a value
 -- that matches the pattern.  E.g. if the pattern is (Just [x]),
 -- the expression is (Just [x]).  They look the same, but the
@@ -630,7 +631,7 @@ tcPatToExpr :: [Located Name] -> LPat GhcRn -> Either MsgDoc (LHsExpr GhcRn)
 --
 -- Returns (Left r) if the pattern is not invertible, for reason r.
 -- See Note [Builder for a bidirectional pattern synonym]
-tcPatToExpr args pat = go pat
+tcPatToExpr name args pat = go pat
   where
     lhsVars = mkNameSet (map unLoc args)
 
@@ -667,8 +668,6 @@ tcPatToExpr args pat = go pat
         | otherwise
         = Left (quotes (ppr var) <+> text "is not bound by the LHS of the pattern synonym")
     go1 (ParPat pat)                = fmap HsPar $ go pat
-    go1 (LazyPat pat)               = go1 (unLoc pat)
-    go1 (BangPat pat)               = go1 (unLoc pat)
     go1 (PArrPat pats ptt)          = do { exprs <- mapM go pats
                                          ; return $ ExplicitPArr ptt exprs }
     go1 (ListPat pats ptt reb)      = do { exprs <- mapM go pats
@@ -689,7 +688,28 @@ tcPatToExpr args pat = go pat
     go1 (SplicePat (HsSpliced _ (HsSplicedPat pat)))
                                     = go1 pat
     go1 (SplicePat (HsSpliced{}))   = panic "Invalid splice variety"
-    go1 p = Left (text "pattern" <+> quotes (ppr p) <+> text "is not invertible")
+
+    -- The following patterns are not invertible.
+    go1 p@(BangPat {})                     = notInvertible p -- #14112
+    go1 p@(LazyPat {})                     = notInvertible p
+    go1 p@(WildPat {})                     = notInvertible p
+    go1 p@(AsPat {})                       = notInvertible p
+    go1 p@(ViewPat {})                     = notInvertible p
+    go1 p@(NPlusKPat {})                   = notInvertible p
+    go1 p@(SplicePat (HsTypedSplice {}))   = notInvertible p
+    go1 p@(SplicePat (HsUntypedSplice {})) = notInvertible p
+    go1 p@(SplicePat (HsQuasiQuote {}))    = notInvertible p
+
+    notInvertible p = Left $
+          text "Pattern" <+> quotes (ppr p) <+> text "is not invertible"
+      $+$ hang (text "Suggestion: instead use an explicitly bidirectional"
+                <+> text "pattern synonym, e.g.")
+             2 (hang (text "pattern" <+> pp_name <+> pp_args <+> larrow
+                      <+> ppr pat <+> text "where")
+                   2 (pp_name <+> pp_args <+> equals <+> text "..."))
+      where
+        pp_name = ppr name
+        pp_args = hsep (map ppr args)
 
 {- Note [Builder for a bidirectional pattern synonym]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
