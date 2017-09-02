@@ -1833,6 +1833,35 @@ data DecidedStrictness = DecidedLazy
                        | DecidedUnpack
         deriving (Show, Eq, Ord, Data, Generic)
 
+-- | A single data constructor.
+--
+-- The constructors for 'Con' can roughly be divided up into two categories:
+-- those for constructors with \"vanilla\" syntax ('NormalC', 'RecC', and
+-- 'InfixC'), and those for constructors with GADT syntax ('GadtC' and
+-- 'RecGadtC'). The 'ForallC' constructor, which quantifies additional type
+-- variables and class contexts, can surround either variety of constructor.
+-- However, the type variables that it quantifies are different depending
+-- on what constructor syntax is used:
+--
+-- * If a 'ForallC' surrounds a constructor with vanilla syntax, then the
+--   'ForallC' will only quantify /existential/ type variables. For example:
+--
+--   @
+--   data Foo a = forall b. MkFoo a b
+--   @
+--
+--   In @MkFoo@, 'ForallC' will quantify @b@, but not @a@.
+--
+-- * If a 'ForallC' surrounds a constructor with GADT syntax, then the
+--   'ForallC' will quantify /all/ type variables used in the constructor.
+--   For example:
+--
+--   @
+--   data Bar a b where
+--     MkBar :: (a ~ b) => c -> MkBar a b
+--   @
+--
+--   In @MkBar@, 'ForallC' will quantify @a@, @b@, and @c@.
 data Con = NormalC Name [BangType]       -- ^ @C Int a@
          | RecC Name [VarBangType]       -- ^ @C { v :: Int, w :: a }@
          | InfixC BangType Name BangType -- ^ @Int :+ a@
