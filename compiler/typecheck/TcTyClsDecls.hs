@@ -2015,14 +2015,13 @@ rejigConRes tmpl_bndrs res_tmpl dc_tvs res_ty
   where
     tmpl_tvs = binderVars tmpl_bndrs
 
-{-
-Note [mkGADTVars]
-~~~~~~~~~~~~~~~~~
-
+{- Note [mkGADTVars]
+~~~~~~~~~~~~~~~~~~~~
 Running example:
 
 data T (k1 :: *) (k2 :: *) (a :: k2) (b :: k2) where
-  MkT :: T x1 * (Proxy (y :: x1), z) z
+  MkT :: forall (x1 : *) (y :: x1) (z :: *).
+         T x1 * (Proxy (y :: x1), z) z
 
 We need the rejigged type to be
 
@@ -2033,19 +2032,24 @@ We need the rejigged type to be
 
 You might naively expect that z should become a universal tyvar,
 not an existential. (After all, x1 becomes a universal tyvar.)
-The problem is that the universal tyvars must have exactly the
-same kinds as the tyConTyVars. z has kind * while b has kind k2.
+But z has kind * while b has kind k2, so the return type
+   T x1 k2 a z
+is ill-kinded.  Another way to say it is this: the universal
+tyvars must have exactly the same kinds as the tyConTyVars.
+
 So we need an existential tyvar and a heterogeneous equality
 constraint. (The b ~ z is a bit redundant with the k2 ~ * that
 comes before in that b ~ z implies k2 ~ *. I'm sure we could do
 some analysis that could eliminate k2 ~ *. But we don't do this
 yet.)
 
-The HsTypes have already been desugared to proper Types:
+The data con signature has already been fully kind-checked.
+The return type
 
   T x1 * (Proxy (y :: x1), z) z
 becomes
-  [x1 :: *, y :: x1, z :: *]. T x1 * (Proxy x1 y, z) z
+  qtkvs    = [x1 :: *, y :: x1, z :: *]
+  res_tmpl = T x1 * (Proxy x1 y, z) z
 
 We start off by matching (T k1 k2 a b) with (T x1 * (Proxy x1 y, z) z). We
 know this match will succeed because of the validity check (actually done
@@ -2110,23 +2114,30 @@ on our example:
   , [k2 ~ *, a ~ (Proxy x1 y, z), b ~ z]
   , {x1 |-> x1} )
 
-`choose` looks up each tycon tyvar in the matching (it *must* be matched!). If
-it finds a bare result tyvar (the first branch of the `case` statement), it
-checks to make sure that the result tyvar isn't yet in the list of univ_tvs.
-If it is in that list, then we have a repeated variable in the return type,
-and we in fact need a GADT equality. We then check to make sure that the
-kind of the result tyvar matches the kind of the template tyvar. This
-check is what forces `z` to be existential, as it should be, explained above.
-Assuming no repeated variables or kind-changing, we wish
-to use the variable name given in the datacon signature (that is, `x1` not
-`k1`), not the tycon signature (which may have been made up by
-GHC). So, we add a mapping from the tycon tyvar to the result tyvar to t_sub.
+`choose` looks up each tycon tyvar in the matching (it *must* be matched!).
 
-If we discover that a mapping in `subst` gives us a non-tyvar (the second
-branch of the `case` statement), then we have a GADT equality to create.
-We create a fresh equality, but we don't extend any substitutions. The
-template variable substitution is meant for use in universal tyvar kinds,
-and these shouldn't be affected by any GADT equalities.
+* If it finds a bare result tyvar (the first branch of the `case`
+  statement), it checks to make sure that the result tyvar isn't yet
+  in the list of univ_tvs.  If it is in that list, then we have a
+  repeated variable in the return type, and we in fact need a GADT
+  equality.
+
+* It then checks to make sure that the kind of the result tyvar
+  matches the kind of the template tyvar. This check is what forces
+  `z` to be existential, as it should be, explained above.
+
+* Assuming no repeated variables or kind-changing, we wish to use the
+  variable name given in the datacon signature (that is, `x1` not
+  `k1`), not the tycon signature (which may have been made up by
+  GHC). So, we add a mapping from the tycon tyvar to the result tyvar
+  to t_sub.
+
+* If we discover that a mapping in `subst` gives us a non-tyvar (the
+  second branch of the `case` statement), then we have a GADT equality
+  to create.  We create a fresh equality, but we don't extend any
+  substitutions. The template variable substitution is meant for use
+  in universal tyvar kinds, and these shouldn't be affected by any
+  GADT equalities.
 
 This whole algorithm is quite delicate, indeed. I (Richard E.) see two ways
 of simplifying it:
@@ -2187,10 +2198,14 @@ mkGADTVars tmpl_tvs dc_tvs subst
               r_tv1  = setTyVarName r_tv (choose_tv_name r_tv t_tv)
               r_ty'  = mkTyVarTy r_tv1
 
-               -- not a simple substitution. make an equality predicate
+               -- Not a simple substitution: make an equality predicate
           _ -> choose (t_tv':univs) (mkEqSpec t_tv' r_ty : eqs)
-                      t_sub r_sub t_tvs
-            where t_tv' = updateTyVarKind (substTy t_sub) t_tv
+                      (extendTvSubst t_sub t_tv (mkTyVarTy t_tv'))
+                         -- We've updated the kind of t_tv,
+                         -- so add it to t_sub (Trac #14162)
+                      r_sub t_tvs
+            where
+              t_tv' = updateTyVarKind (substTy t_sub) t_tv
 
       | otherwise
       = pprPanic "mkGADTVars" (ppr tmpl_tvs $$ ppr subst)
@@ -2522,7 +2537,14 @@ checkValidDataCon dflags existential_ok tc con
           --                data T = MkT {-# UNPACK #-} !a      -- Can't unpack
         ; zipWith3M_ check_bang (dataConSrcBangs con) (dataConImplBangs con) [1..]
 
-        ; traceTc "Done validity of data con" (ppr con <+> debugPprType (dataConRepType con))
+        ; traceTc "Done validity of data con" $
+          vcat [ ppr con
+               , text "Datacon user type:" <+> ppr (dataConUserType con)
+               , text "Datacon rep type:" <+> ppr (dataConRepType con)
+               , text "Rep typcon binders:" <+> ppr (tyConBinders (dataConTyCon con))
+               , case tyConFamInst_maybe (dataConTyCon con) of
+                   Nothing -> text "not family"
+                   Just (f, _) -> ppr (tyConBinders f) ]
     }
   where
     ctxt = ConArgCtxt (dataConName con)
