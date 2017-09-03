@@ -73,7 +73,7 @@ module TyCon(
         tyConSkolem,
         tyConKind,
         tyConUnique,
-        tyConTyVars,
+        tyConTyVars, tyConVisibleTyVars,
         tyConCType, tyConCType_maybe,
         tyConDataCons, tyConDataCons_maybe,
         tyConSingleDataCon_maybe, tyConSingleDataCon,
@@ -418,8 +418,11 @@ isNamedTyConBinder _                        = False
 
 isVisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
-isVisibleTyConBinder (TvBndr _ (NamedTCB vis)) = isVisibleArgFlag vis
-isVisibleTyConBinder (TvBndr _ AnonTCB)        = True
+isVisibleTyConBinder (TvBndr _ tcb_vis) = isVisibleTcbVis tcb_vis
+
+isVisibleTcbVis :: TyConBndrVis -> Bool
+isVisibleTcbVis (NamedTCB vis) = isVisibleArgFlag vis
+isVisibleTcbVis AnonTCB        = True
 
 isInvisibleTyConBinder :: TyVarBndr tv TyConBndrVis -> Bool
 -- Works for IfaceTyConBinder too
@@ -444,6 +447,11 @@ tyConTyVarBinders tc_bndrs
                 AnonTCB           -> Specified
                 NamedTCB Required -> Specified
                 NamedTCB vis      -> vis
+
+tyConVisibleTyVars :: TyCon -> [TyVar]
+tyConVisibleTyVars tc
+  = [ tv | TvBndr tv vis <- tyConBinders tc
+         , isVisibleTcbVis vis ]
 
 {- Note [Building TyVarBinders from TyConBinders]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

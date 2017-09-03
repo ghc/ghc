@@ -15,8 +15,6 @@ piResultTy :: HasDebugCallStack => Type -> Type -> Type
 
 eqType :: Type -> Type -> Bool
 
-partitionInvisibles :: TyCon -> (a -> Type) -> [a] -> ([a], [a])
-
 coreView :: Type -> Maybe Type
 tcView :: Type -> Maybe Type
 

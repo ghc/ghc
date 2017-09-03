@@ -58,7 +58,7 @@ module Type (
         stripCoercionTy, splitCoercionType_maybe,
 
         splitPiTysInvisible, filterOutInvisibleTypes,
-        filterOutInvisibleTyVars, partitionInvisibles,
+        partitionInvisibles,
         synTyConResKind,
 
         modifyJoinResTy, setJoinResTy,
@@ -1429,10 +1429,6 @@ splitPiTysInvisible ty = split ty ty []
 -- | Given a tycon and its arguments, filters out any invisible arguments
 filterOutInvisibleTypes :: TyCon -> [Type] -> [Type]
 filterOutInvisibleTypes tc tys = snd $ partitionInvisibles tc id tys
-
--- | Like 'filterOutInvisibles', but works on 'TyVar's
-filterOutInvisibleTyVars :: TyCon -> [TyVar] -> [TyVar]
-filterOutInvisibleTyVars tc tvs = snd $ partitionInvisibles tc mkTyVarTy tvs
 
 -- | Given a tycon and a list of things (which correspond to arguments),
 -- partitions the things into

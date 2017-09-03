@@ -1357,7 +1357,7 @@ reifyAxBranch fam_tc (CoAxBranch { cab_lhs = lhs, cab_rhs = rhs })
        ; rhs'  <- reifyType rhs
        ; return (TH.TySynEqn annot_th_lhs rhs') }
   where
-    fam_tvs = filterOutInvisibleTyVars fam_tc (tyConTyVars fam_tc)
+    fam_tvs = tyConVisibleTyVars fam_tc
 
 reifyTyCon :: TyCon -> TcM TH.Info
 reifyTyCon tc
@@ -1391,7 +1391,7 @@ reifyTyCon tc
                                      injRHS = map (reifyName . tyVarName)
                                                   (filterByList ms tvs)
                      in (sig, inj)
-       ; tvs' <- reifyTyVars tvs (Just tc)
+       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
        ; let tfHead =
                TH.TypeFamilyHead (reifyName tc) tvs' resultSig injectivity
        ; if isOpenTypeFamilyTyCon tc
@@ -1408,20 +1408,19 @@ reifyTyCon tc
                       []) } }
 
   | isDataFamilyTyCon tc
-  = do { let tvs      = tyConTyVars tc
-             res_kind = tyConResKind tc
+  = do { let res_kind = tyConResKind tc
 
        ; kind' <- fmap Just (reifyKind res_kind)
 
-       ; tvs' <- reifyTyVars tvs (Just tc)
+       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
        ; fam_envs <- tcGetFamInstEnvs
        ; instances <- reifyFamilyInstances tc (familyInstances fam_envs tc)
        ; return (TH.FamilyI
                        (TH.DataFamilyD (reifyName tc) tvs' kind') instances) }
 
-  | Just (tvs, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
+  | Just (_, rhs) <- synTyConDefn_maybe tc  -- Vanilla type synonym
   = do { rhs' <- reifyType rhs
-       ; tvs' <- reifyTyVars tvs (Just tc)
+       ; tvs' <- reifyTyVars (tyConVisibleTyVars tc)
        ; return (TH.TyConI
                    (TH.TySynD (reifyName tc) tvs' rhs'))
        }
@@ -1432,7 +1431,7 @@ reifyTyCon tc
               dataCons = tyConDataCons tc
               isGadt   = isGadtSyntaxTyCon tc
         ; cons <- mapM (reifyDataCon isGadt (mkTyVarTys tvs)) dataCons
-        ; r_tvs <- reifyTyVars tvs (Just tc)
+        ; r_tvs <- reifyTyVars (tyConVisibleTyVars tc)
         ; let name = reifyName tc
               deriv = []        -- Don't know about deriving
               decl | isNewTyCon tc =
@@ -1497,7 +1496,7 @@ reifyDataCon isGadtDataCon tys dc
              ret_con | null ex_tvs' && null theta' = return main_con
                      | otherwise                   = do
                          { cxt <- reifyCxt theta'
-                         ; ex_tvs'' <- reifyTyVars ex_tvs' Nothing
+                         ; ex_tvs'' <- reifyTyVars ex_tvs'
                          ; return (TH.ForallC ex_tvs'' cxt main_con) }
        ; ASSERT( arg_tys `equalLength` dcdBangs )
          ret_con }
@@ -1535,7 +1534,7 @@ reifyClass cls
         ; insts <- reifyClassInstances cls (InstEnv.classInstances inst_envs cls)
         ; assocTys <- concatMapM reifyAT ats
         ; ops <- concatMapM reify_op op_stuff
-        ; tvs' <- reifyTyVars tvs (Just $ classTyCon cls)
+        ; tvs' <- reifyTyVars (tyConVisibleTyVars (classTyCon cls))
         ; let dec = TH.ClassD cxt (reifyName cls) tvs' fds' (assocTys ++ ops)
         ; return (TH.ClassI dec insts) }
   where
@@ -1607,7 +1606,7 @@ reifyClassInstances :: Class -> [ClsInst] -> TcM [TH.Dec]
 reifyClassInstances cls insts
   = mapM (reifyClassInstance (mkIsPolyTvs tvs)) insts
   where
-    tvs = filterOutInvisibleTyVars (classTyCon cls) (classTyVars cls)
+    tvs = tyConVisibleTyVars (classTyCon cls)
 
 reifyClassInstance :: [Bool]  -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
@@ -1635,7 +1634,7 @@ reifyFamilyInstances :: TyCon -> [FamInst] -> TcM [TH.Dec]
 reifyFamilyInstances fam_tc fam_insts
   = mapM (reifyFamilyInstance (mkIsPolyTvs fam_tvs)) fam_insts
   where
-    fam_tvs = filterOutInvisibleTyVars fam_tc (tyConTyVars fam_tc)
+    fam_tvs = tyConVisibleTyVars fam_tc
 
 reifyFamilyInstance :: [Bool] -- True <=> the corresponding tv is poly-kinded
                               -- includes only *visible* tvs
@@ -1703,7 +1702,7 @@ reify_for_all :: TyCoRep.Type -> TcM TH.Type
 reify_for_all ty
   = do { cxt' <- reifyCxt cxt;
        ; tau' <- reifyType tau
-       ; tvs' <- reifyTyVars tvs Nothing
+       ; tvs' <- reifyTyVars tvs
        ; return (TH.ForallT tvs' cxt' tau') }
   where
     (tvs, cxt, tau) = tcSplitSigmaTy ty
@@ -1721,9 +1720,9 @@ reifyPatSynType
 -- signature; see NOTE [Pattern synonym signatures and Template
 -- Haskell]
 reifyPatSynType (univTyVars, req, exTyVars, prov, argTys, resTy)
-  = do { univTyVars' <- reifyTyVars univTyVars Nothing
+  = do { univTyVars' <- reifyTyVars univTyVars
        ; req'        <- reifyCxt req
-       ; exTyVars'   <- reifyTyVars exTyVars Nothing
+       ; exTyVars'   <- reifyTyVars exTyVars
        ; prov'       <- reifyCxt prov
        ; tau'        <- reifyType (mkFunTys argTys resTy)
        ; return $ TH.ForallT univTyVars' req'
@@ -1738,16 +1737,9 @@ reifyCxt   = mapM reifyPred
 reifyFunDep :: ([TyVar], [TyVar]) -> TH.FunDep
 reifyFunDep (xs, ys) = TH.FunDep (map reifyName xs) (map reifyName ys)
 
-reifyTyVars :: [TyVar]
-            -> Maybe TyCon  -- the tycon if the tycovars are from a tycon.
-                            -- Used to detect which tvs are implicit.
-            -> TcM [TH.TyVarBndr]
-reifyTyVars tvs m_tc = mapM reify_tv tvs'
+reifyTyVars :: [TyVar] -> TcM [TH.TyVarBndr]
+reifyTyVars tvs = mapM reify_tv tvs
   where
-    tvs' = case m_tc of
-             Just tc -> filterOutInvisibleTyVars tc tvs
-             Nothing -> tvs
-
     -- even if the kind is *, we need to include a kind annotation,
     -- in case a poly-kind would be inferred without the annotation.
     -- See #8953 or test th/T8953
