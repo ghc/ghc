@@ -1,6 +1,6 @@
 
 T13877.hs:65:17: error:
-    • Couldn't match type ‘p xs’ with ‘Apply p xs’
+    • Couldn't match type ‘Apply p (x : xs)’ with ‘p (x : xs)’
       Expected type: Sing x
                      -> Sing xs -> App [a] (':->) * p xs -> App [a] (':->) * p (x : xs)
         Actual type: Sing x -> Sing xs -> (p @@ xs) -> p @@ (x : xs)
