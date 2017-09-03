@@ -139,7 +139,8 @@ defaultSplitObjects = do
 defaultBuilderArgs :: Args
 defaultBuilderArgs = mconcat
     [ alexBuilderArgs
-    , builder Ar ? Hadrian.Builder.Ar.args
+    , builder (Ar Pack  ) ? Hadrian.Builder.Ar.args Pack
+    , builder (Ar Unpack) ? Hadrian.Builder.Ar.args Unpack
     , ccBuilderArgs
     , configureBuilderArgs
     , deriveConstantsBuilderArgs

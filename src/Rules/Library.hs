@@ -57,8 +57,8 @@ buildPackageLibrary context@Context {..} = do
         asuf <- libsuf way
         let isLib0 = ("//*-0" ++ asuf) ?== a
         removeFile a
-        if isLib0 then build $ target context (Ar stage) []   [a] -- TODO: Scan for dlls
-                  else build $ target context (Ar stage) objs [a]
+        if isLib0 then build $ target context (Ar Pack stage) []   [a] -- TODO: Scan for dlls
+                  else build $ target context (Ar Pack stage) objs [a]
 
         synopsis <- traverse pkgSynopsis (pkgCabalFile package)
         unless isLib0 . putSuccess $ renderLibrary

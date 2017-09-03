@@ -40,7 +40,7 @@ gmpBuildInfoPath = pkgPath integerGmp -/- "integer-gmp.buildinfo"
 
 configureEnvironment :: Action [CmdOption]
 configureEnvironment = sequence [ builderEnvironment "CC" $ Cc CompileC Stage1
-                                , builderEnvironment "AR" (Ar Stage1)
+                                , builderEnvironment "AR" (Ar Unpack Stage1)
                                 , builderEnvironment "NM" Nm ]
 
 gmpRules :: Rules ()
@@ -59,8 +59,9 @@ gmpRules = do
             gmpPath <- gmpBuildPath
             need [gmpPath -/- gmpLibrary]
             createDirectory (gmpPath -/- gmpObjectsDir)
-            build $ target gmpContext (Ar Stage1) [gmpPath -/- gmpLibrary   ]
-                                                  [gmpPath -/- gmpObjectsDir]
+            top <- topDirectory
+            build $ target gmpContext (Ar Unpack Stage1)
+                [top -/- gmpPath -/- gmpLibrary] [gmpPath -/- gmpObjectsDir]
             copyFile (gmpPath -/- "gmp.h") header
             copyFile (gmpPath -/- "gmp.h") (gmpPath -/- gmpLibraryInTreeH)
 

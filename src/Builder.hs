@@ -1,7 +1,7 @@
 {-# LANGUAGE InstanceSigs #-}
 module Builder (
     -- * Data types
-    CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..),
+    ArMode (..), CcMode (..), GhcMode (..), GhcPkgMode (..), Builder (..),
 
     -- * Builder properties
     builderProvenance, systemBuilderPath, builderPath, isSpecified, needBuilder,
@@ -63,7 +63,7 @@ instance NFData   GhcPkgMode
 -- @GhcPkg Stage0@ is the bootstrapping @GhcPkg@.
 -- @GhcPkg Stage1@ is the one built in Stage0.
 data Builder = Alex
-             | Ar Stage -- TODO: Add ArMode = Pack | Unpack
+             | Ar ArMode Stage
              | DeriveConstants
              | Cc CcMode Stage
              | Configure FilePath
@@ -133,31 +133,29 @@ instance H.Builder Builder where
     runBuilderWith builder BuildInfo {..} = do
         path <- builderPath builder
         withResources buildResources $ do
+            verbosity <- getVerbosity
             let input  = fromSingleton msgIn buildInputs
                 msgIn  = "[runBuilderWith] Exactly one input file expected."
                 output = fromSingleton msgOut buildOutputs
                 msgOut = "[runBuilderWith] Exactly one output file expected."
+                -- Suppress stdout depending on the Shake's verbosity setting.
+                echo = EchoStdout (verbosity >= Loud)
+                -- Capture stdout and write it to the output file.
                 captureStdout = do
                     Stdout stdout <- cmd [path] buildArgs
                     writeFileChanged output stdout
-
             case builder of
-                Ar _ -> do
-                    if "//*.a" ?== output
-                    then do
-                        useTempFile <- flag ArSupportsAtFile
-                        if useTempFile then runAr                path buildArgs
-                                       else runArWithoutTempFile path buildArgs
-                    else do
-                        top   <- topDirectory
-                        echo  <- cmdEcho
-                        cmd echo [Cwd output] [path] "x" (top -/- input)
+                Ar Pack _ -> do
+                    useTempFile <- flag ArSupportsAtFile
+                    if useTempFile then runAr                path buildArgs
+                                   else runArWithoutTempFile path buildArgs
+
+                Ar Unpack _ -> cmd echo [Cwd output] [path] buildArgs
 
                 Configure dir -> do
                     -- Inject /bin/bash into `libtool`, instead of /bin/sh,
                     -- otherwise Windows breaks. TODO: Figure out why.
                     bash <- bashPath
-                    echo <- cmdEcho
                     let env = AddEnv "CONFIG_SHELL" bash
                     cmd Shell echo env [Cwd dir] [path] buildOptions buildArgs
 
@@ -169,19 +167,9 @@ instance H.Builder Builder where
                     Stdout stdout <- cmd (Stdin stdin) [path] buildArgs
                     writeFileChanged output stdout
 
-                Make dir -> do
-                    echo <- cmdEcho
-                    cmd Shell echo path ["-C", dir] buildArgs
+                Make dir -> cmd Shell echo path ["-C", dir] buildArgs
 
-                _  -> do
-                    echo <- cmdEcho
-                    cmd echo [path] buildArgs
-
--- | Suppress build output depending on the Shake's verbosity setting.
-cmdEcho :: Action CmdOption
-cmdEcho = do
-    verbosity <- getVerbosity
-    return $ EchoStdout (verbosity >= Loud)
+                _  -> cmd echo [path] buildArgs
 
 -- TODO: Some builders are required only on certain platforms. For example,
 -- Objdump is only required on OpenBSD and AIX, as mentioned in #211. Add
@@ -197,8 +185,8 @@ isOptional = \case
 systemBuilderPath :: Builder -> Action FilePath
 systemBuilderPath builder = case builder of
     Alex            -> fromKey "alex"
-    Ar Stage0       -> fromKey "system-ar"
-    Ar _            -> fromKey "ar"
+    Ar _ Stage0     -> fromKey "system-ar"
+    Ar _ _          -> fromKey "ar"
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!

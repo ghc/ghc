@@ -27,7 +27,7 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , bootPackageConstraints
             , withStaged $ Cc CompileC
             , notStage0 ? with Ld
-            , withStaged Ar
+            , withStaged (Ar Pack)
             , with Alex
             , with Happy
             , verbosity < Chatty ? pure [ "-v0", "--configure-option=--quiet"
@@ -104,7 +104,7 @@ cppArgs = do
 
 withBuilderKey :: Builder -> String
 withBuilderKey b = case b of
-    Ar _       -> "--with-ar="
+    Ar _ _     -> "--with-ar="
     Ld         -> "--with-ld="
     Cc  _ _    -> "--with-gcc="
     Ghc _ _    -> "--with-ghc="
