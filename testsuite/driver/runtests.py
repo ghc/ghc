@@ -51,8 +51,8 @@ parser.add_argument("--rootdir", action='append', help="root of tree containing 
 parser.add_argument("--summary-file", help="file in which to save the (human-readable) summary")
 parser.add_argument("--no-print-summary", action="store_true", help="should we print the summary?")
 parser.add_argument("--only", action="append", help="just this test (can be give multiple --only= flags)")
-parser.add_argument("--way", choices=config.run_ways+config.compile_ways+config.other_ways, help="just this way")
-parser.add_argument("--skipway", action="append", choices=config.run_ways+config.compile_ways+config.other_ways, help="skip this way")
+parser.add_argument("--way", action="append", help="just this way")
+parser.add_argument("--skipway", action="append", help="skip this way")
 parser.add_argument("--threads", type=int, help="threads to run simultaneously")
 parser.add_argument("--check-files-written", help="check files aren't written by multiple tests") # NOTE: This doesn't seem to exist?
 parser.add_argument("--verbose", type=int, choices=[0,1,2,3,4,5], help="verbose (Values 0 through 5 accepted)")
@@ -71,6 +71,7 @@ for arg in args.config:
     field, value = arg.split('=', 1)
     setattr(config, field, value)
 
+all_ways = config.run_ways+config.compile_ways+config.other_ways
 config.rootdirs = args.rootdir
 config.summary_file = args.summary_file
 config.no_print_summary = args.no_print_summary
@@ -80,15 +81,23 @@ if args.only:
     config.run_only_some_tests = True
 
 if args.way:
-    config.cmdline_ways = [args.way] + config.cmdline_ways
-    if (args.way in config.other_ways):
-        config.run_ways = [args.way] + config.run_ways
-        config.compile_ways = [args.way] + config.compile_ways
+    for way in args.way:
+        if way not in all_ways:
+            print('WARNING: Unknown WAY %s in --way' % way)
+        else:
+            config.cmdline_ways += [way]
+            if way in config.other_ways:
+                config.run_ways += [way]
+                config.compile_ways += [way]
 
 if args.skipway:
-    config.other_ways = [w for w in config.other_ways if w != args.skipway]
-    config.run_ways = [w for w in config.run_ways if w != args.skipway]
-    config.compile_ways = [w for w in config.compile_ways if w != args.skipway]
+    for way in args.skipway:
+        if way not in all_ways:
+            print('WARNING: Unknown WAY %s in --skipway' % way)
+
+    config.other_ways = [w for w in config.other_ways if w not in args.skipway]
+    config.run_ways = [w for w in config.run_ways if w not in args.skipway]
+    config.compile_ways = [w for w in config.compile_ways if w not in args.skipway]
 
 if args.threads:
     config.threads = args.threads
