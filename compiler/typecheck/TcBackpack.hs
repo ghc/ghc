@@ -158,7 +158,7 @@ checkHsigIface tcg_env gr sig_iface
             -- TODO: Actually this error swizzle doesn't work
             let p (L _ ie) = name `elem` ieNames ie
                 loc = case tcg_rn_exports tcg_env of
-                       Just es | Just e <- find p es
+                       Just es | Just e <- find p (map fst es)
                          -- TODO: maybe we can be a little more
                          -- precise here and use the Located
                          -- info for the *specific* name we matched.

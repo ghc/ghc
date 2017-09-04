@@ -97,6 +97,7 @@ import Panic
 import ConLike
 import Control.Concurrent
 
+import Avail            ( Avails )
 import Module
 import Packages
 import RdrName
@@ -383,7 +384,7 @@ hscParse' mod_summary
 -- can become a Nothing and decide whether this should instead throw an
 -- exception/signal an error.
 type RenamedStuff =
-        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [LIE GhcRn],
+        (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
                 Maybe LHsDocString))
 
 -- | Rename and typecheck a module, additionally returning the renamed syntax

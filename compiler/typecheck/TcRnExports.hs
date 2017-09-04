@@ -91,13 +91,13 @@ You just have to use an explicit export list:
 data ExportAccum        -- The type of the accumulating parameter of
                         -- the main worker function in rnExports
      = ExportAccum
-        [LIE GhcRn]            --  Export items with Names
+        [(LIE GhcRn, Avails)] -- Export items with names and
+                                   -- their exported stuff
+                                   --   Not nub'd!
         ExportOccMap           --  Tracks exported occurrence names
-        [AvailInfo]            --  The accumulated exported stuff
-                               --   Not nub'd!
 
 emptyExportAccum :: ExportAccum
-emptyExportAccum = ExportAccum [] emptyOccEnv []
+emptyExportAccum = ExportAccum [] emptyOccEnv
 
 type ExportOccMap = OccEnv (Name, IE GhcPs)
         -- Tracks what a particular exported OccName
@@ -170,7 +170,11 @@ exports_from_avail :: Maybe (Located [LIE GhcPs])
                          -- 'module Foo' export is valid (it's not valid
                          -- if we didn't import Foo!)
                    -> Module
-                   -> RnM (Maybe [LIE GhcRn], [AvailInfo])
+                   -> RnM (Maybe [(LIE GhcRn, Avails)], Avails)
+                         -- (Nothing, _) <=> no explicit export list
+                         -- if explicit export list is present it contains
+                         -- each renamed export item together with its exported
+                         -- names.
 
 exports_from_avail Nothing rdr_env _imports _this_mod
    -- The same as (module M) where M is the current module name,
@@ -197,10 +201,10 @@ exports_from_avail Nothing rdr_env _imports _this_mod
 
 
 exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
-  = do ExportAccum ie_names _ exports
+  = do ExportAccum ie_avails _
         <-  foldAndRecoverM do_litem emptyExportAccum rdr_items
-       let final_exports = nubAvails exports -- Combine families
-       return (Just ie_names, final_exports)
+       let final_exports = nubAvails (concat (map snd ie_avails)) -- Combine families
+       return (Just ie_avails, final_exports)
   where
     do_litem :: ExportAccum -> LIE GhcPs -> RnM ExportAccum
     do_litem acc lie = setSrcSpan (getLoc lie) (exports_from_item acc lie)
@@ -215,10 +219,10 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                        , imv <- importedByUser xs ]
 
     exports_from_item :: ExportAccum -> LIE GhcPs -> RnM ExportAccum
-    exports_from_item acc@(ExportAccum ie_names occs exports)
+    exports_from_item acc@(ExportAccum ie_avails occs)
                       (L loc (IEModuleContents (L lm mod)))
         | let earlier_mods = [ mod
-                             | (L _ (IEModuleContents (L _ mod))) <- ie_names ]
+                             | ((L _ (IEModuleContents (L _ mod))), _) <- ie_avails ]
         , mod `elem` earlier_mods    -- Duplicate export of M
         = do { warnIfFlag Opt_WarnDuplicateExports True
                           (dupModuleExport mod) ;
@@ -251,14 +255,14 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
              ; traceRn "export_mod"
                        (vcat [ ppr mod
                              , ppr new_exports ])
-             ; return (ExportAccum (L loc (IEModuleContents (L lm mod)) : ie_names)
-                                   occs'
-                                   (new_exports ++ exports)) }
 
-    exports_from_item acc@(ExportAccum lie_names occs exports) (L loc ie)
+             ; return (ExportAccum (((L loc (IEModuleContents (L lm mod))), new_exports) : ie_avails)
+                                   occs') }
+
+    exports_from_item acc@(ExportAccum lie_avails occs) (L loc ie)
         | isDoc ie
         = do new_ie <- lookup_doc_ie ie
-             return (ExportAccum (L loc new_ie : lie_names) occs exports)
+             return (ExportAccum ((L loc new_ie, []) : lie_avails) occs)
 
         | otherwise
         = do (new_ie, avail) <-
@@ -269,7 +273,7 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
 
                     occs' <- check_occs ie occs (availNames avail)
 
-                    return (ExportAccum (L loc new_ie : lie_names) occs' (avail : exports))
+                    return (ExportAccum ((L loc new_ie, [avail]) : lie_avails) occs')
 
     -------------
     lookup_ie :: IE GhcPs -> RnM (IE GhcRn, AvailInfo)
