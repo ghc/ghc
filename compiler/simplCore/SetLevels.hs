@@ -558,7 +558,8 @@ lvlMFE env _ (_, AnnType ty)
 -- and then inline lvl.  Better just to float out the payload.
 lvlMFE env strict_ctxt (_, AnnTick t e)
   = do { e' <- lvlMFE env strict_ctxt e
-       ; return (Tick t e') }
+       ; let t' = substTickish (le_subst env) t
+       ; return (Tick t' e') }
 
 lvlMFE env strict_ctxt (_, AnnCast e (_, co))
   = do  { e' <- lvlMFE env strict_ctxt e
