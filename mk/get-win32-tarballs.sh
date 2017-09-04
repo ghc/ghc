@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 
 tarball_dir='ghc-tarballs'
 missing_files=0
