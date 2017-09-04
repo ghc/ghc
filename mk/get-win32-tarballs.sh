@@ -3,6 +3,9 @@
 tarball_dir='ghc-tarballs'
 missing_files=0
 
+# see #12502
+if test -z "$FIND"; then FIND="find"; fi
+
 fail() {
     echo >&2
     echo "$1" >&2
@@ -148,16 +151,16 @@ sync_binaries_and_sources() {
     verify=0
     download_sources
 
-    for f in $(find ghc-tarballs/mingw-w64 -iname '*.sig'); do
+    for f in $($FIND ghc-tarballs/mingw-w64 -iname '*.sig'); do
         echo "Verifying $f"
         gpg --verify $f
     done
 
-    md5sum `find ghc-tarballs -type f -a -not -iname '*.sig'` >| mk/win32-tarballs.md5sum
+    md5sum `$FIND ghc-tarballs -type f -a -not -iname '*.sig'` >| mk/win32-tarballs.md5sum
     chmod -R ugo+rX ghc-tarballs
 
     rsync -av ghc-tarballs/mingw-w64/* downloads.haskell.org:public_html/mingw
-    for f in $(find ghc-tarballs/mingw-w64); do
+    for f in $($FIND ghc-tarballs/mingw-w64); do
         curl -XPURGE http://downloads.haskell.org/~ghc/mingw/$f
     done
 }
