@@ -687,6 +687,10 @@ All the different profile types yield a graph of live heap against time,
 but they differ in how the live heap is broken down into bands. The
 following RTS options select which break-down to use:
 
+.. rts-flag:: -hT
+
+    Breaks down the graph by heap closure type.
+
 .. rts-flag:: -hc
               -h
 
