@@ -660,35 +660,36 @@ following RTS options select which break-down to use:
 .. rts-flag:: -hc
               -h
 
-    (can be shortened to :rts-flag:`-h`). Breaks down the graph by the
-    cost-centre stack which produced the data.
+    *Requires :ghc-flag:`-prof`.* Breaks down the graph by the cost-centre stack
+    which produced the data.
 
 .. rts-flag:: -hm
 
-    Break down the live heap by the module containing the code which
-    produced the data.
+    *Requires :ghc-flag:`-prof`.* Break down the live heap by the module
+    containing the code which produced the data.
 
 .. rts-flag:: -hd
 
-    Breaks down the graph by closure description. For actual data, the
-    description is just the constructor name, for other closures it is a
-    compiler-generated string identifying the closure.
+    *Requires :ghc-flag:`-prof`.* Breaks down the graph by closure description.
+    For actual data, the description is just the constructor name, for other
+    closures it is a compiler-generated string identifying the closure.
 
 .. rts-flag:: -hy
 
-    Breaks down the graph by type. For closures which have function type
-    or unknown/polymorphic type, the string will represent an
-    approximation to the actual type.
+    *Requires :ghc-flag:`-prof`.* Breaks down the graph by type. For closures
+    which have function type or unknown/polymorphic type, the string will
+    represent an approximation to the actual type.
 
 .. rts-flag:: -hr
 
-    Break down the graph by retainer set. Retainer profiling is
-    described in more detail below (:ref:`retainer-prof`).
+    *Requires :ghc-flag:`-prof`.* Break down the graph by retainer set. Retainer
+    profiling is described in more detail below (:ref:`retainer-prof`).
 
 .. rts-flag:: -hb
 
-    Break down the graph by biography. Biographical profiling is
-    described in more detail below (:ref:`biography-prof`).
+    *Requires :ghc-flag:`-prof`.* Break down the graph by biography.
+    Biographical profiling is described in more detail below
+    (:ref:`biography-prof`).
 
 .. rts-flag:: -l
 
