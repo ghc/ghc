@@ -33,12 +33,13 @@ A single fixed-width event emitted during program start-up describing the sample
    * ``Word64``: Sampling period in nanoseconds
    * ``Word32``: Sample break-down type. One of,
 
-      * ``SAMPLE_TYPE_COST_CENTER`` (output from ``-hc``)
-      * ``SAMPLE_TYPE_CLOSURE_DESCR`` (output from ``-hd``)
-      * ``SAMPLE_TYPE_RETAINER`` (output from ``-hr``)
-      * ``SAMPLE_TYPE_MODULE`` (output from ``-hm``)
-      * ``SAMPLE_TYPE_TYPE_DESCR`` (output from ``-hy``)
-      * ``SAMPLE_TYPE_BIOGRAPHY`` (output from ``-hb``)
+      * ``HEAP_PROF_BREAKDOWN_COST_CENTER`` (output from :rts-flag:`-hc`)
+      * ``HEAP_PROF_BREAKDOWN_CLOSURE_DESCR`` (output from :rts-flag:`-hd`)
+      * ``HEAP_PROF_BREAKDOWN_RETAINER`` (output from :rts-flag:`-hr`)
+      * ``HEAP_PROF_BREAKDOWN_MODULE`` (output from :rts-flag:`-hm`)
+      * ``HEAP_PROF_BREAKDOWN_TYPE_DESCR`` (output from :rts-flag:`-hy`)
+      * ``HEAP_PROF_BREAKDOWN_BIOGRAPHY`` (output from :rts-flag:`-hb`)
+      * ``HEAP_PROF_BREAKDOWN_CLOSURE_TYPE`` (output from :rts-flag:`-hT`)
 
    * ``String``: Module filter
    * ``String``: Closure description filter

@@ -1094,15 +1094,6 @@ void postBlockMarker (EventsBuf *eb)
     postCapNo(eb, eb->capno);
 }
 
-typedef enum {
-    HEAP_PROF_BREAKDOWN_COST_CENTRE = 0x1,
-    HEAP_PROF_BREAKDOWN_MODULE,
-    HEAP_PROF_BREAKDOWN_CLOSURE_DESCR,
-    HEAP_PROF_BREAKDOWN_TYPE_DESCR,
-    HEAP_PROF_BREAKDOWN_RETAINER,
-    HEAP_PROF_BREAKDOWN_BIOGRAPHY,
-} HeapProfBreakdown;
-
 static HeapProfBreakdown getHeapProfBreakdown(void)
 {
     switch (RtsFlags.ProfFlags.doHeapProfile) {

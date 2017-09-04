@@ -231,6 +231,18 @@
 #define CAPSET_TYPE_OSPROCESS   2  /* caps belong to the same OS process */
 #define CAPSET_TYPE_CLOCKDOMAIN 3  /* caps share a local clock/time      */
 
+/*
+ * Heap profile breakdown types. See EVENT_HEAP_PROF_BEGIN.
+ */
+typedef enum {
+    HEAP_PROF_BREAKDOWN_COST_CENTRE = 0x1,
+    HEAP_PROF_BREAKDOWN_MODULE,
+    HEAP_PROF_BREAKDOWN_CLOSURE_DESCR,
+    HEAP_PROF_BREAKDOWN_TYPE_DESCR,
+    HEAP_PROF_BREAKDOWN_RETAINER,
+    HEAP_PROF_BREAKDOWN_BIOGRAPHY,
+} HeapProfBreakdown;
+
 #if !defined(EVENTLOG_CONSTANTS_ONLY)
 
 typedef StgWord16 EventTypeNum;
