@@ -490,7 +490,7 @@ mkAlgAltMsg3 :: DataCon -> [Id] -> MsgDoc
 mkAlgAltMsg3 con alts
   = vcat [
         text "In some algebraic case alternative, number of arguments doesn't match constructor:",
-        ppr con,
+        ppr con <+> parens (text "arity" <+> ppr (dataConRepArity con)),
         ppr alts
     ]
 
