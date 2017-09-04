@@ -14,7 +14,7 @@ module TcValidity (
   ClsInstInfo, checkValidCoAxiom, checkValidCoAxBranch,
   checkValidTyFamEqn,
   arityErr, badATErr,
-  checkValidTelescope, checkZonkValidTelescope, checkValidInferredKinds,
+  checkValidTelescope,
   allDistinctTyVars
   ) where
 
@@ -29,7 +29,6 @@ import TcUnify    ( tcSubType_NC )
 import TcSimplify ( simplifyAmbiguityCheck )
 import TyCoRep
 import TcType hiding ( sizeType, sizeTypes )
-import TcMType
 import PrelNames
 import Type
 import Coercion
@@ -50,7 +49,6 @@ import FamInst     ( makeInjectivityErrors )
 import Name
 import VarEnv
 import VarSet
-import UniqSet
 import Var         ( TyVarBndr(..), mkTyVar )
 import ErrUtils
 import DynFlags
@@ -354,6 +352,12 @@ checkValidType ctxt ty
                  SpecInstCtxt   -> rank1
                  ThBrackCtxt    -> rank1
                  GhciCtxt       -> ArbitraryRank
+
+                 TyVarBndrKindCtxt _ -> rank0
+                 DataKindCtxt _      -> rank1
+                 TySynKindCtxt _     -> rank1
+                 TyFamResKindCtxt _  -> rank1
+
                  _              -> panic "checkValidType"
                                           -- Can't happen; not used for *user* sigs
 
@@ -457,7 +461,7 @@ check_type :: TidyEnv -> UserTypeCtxt -> Rank -> Type -> TcM ()
 -- Rank 0 means no for-alls anywhere
 
 check_type env ctxt rank ty
-  | not (null tvs && null theta)
+  | not (null tvbs && null theta)
   = do  { traceTc "check_type" (ppr ty $$ ppr (forAllAllowed rank))
         ; checkTcM (forAllAllowed rank) (forAllTyErr env rank ty)
                 -- Reject e.g. (Maybe (?x::Int => Int)),
@@ -468,14 +472,18 @@ check_type env ctxt rank ty
                 -- but not   type T = ?x::Int
 
         ; check_type env' ctxt rank tau      -- Allow foralls to right of arrow
+
         ; checkTcM (not (any (`elemVarSet` tyCoVarsOfType phi_kind) tvs))
                    (forAllEscapeErr env' ty tau_kind)
         }
   where
-    (tvs, theta, tau) = tcSplitSigmaTy ty
-    tau_kind          = typeKind tau
-    (env', _)         = tidyTyCoVarBndrs env tvs
+    (tvbs, phi)  = tcSplitForAllTyVarBndrs ty
+    (theta, tau) = tcSplitPhiTy phi
 
+    tvs          = binderVars tvbs
+    (env', _)    = tidyTyCoVarBndrs env tvs
+
+    tau_kind              = typeKind tau
     phi_kind | null theta = tau_kind
              | otherwise  = liftedTypeKind
         -- If there are any constraints, the kind is *. (#11405)
@@ -489,7 +497,7 @@ check_type env ctxt rank (FunTy arg_ty res_ty)
     (arg_rank, res_rank) = funArgResRank rank
 
 check_type env ctxt rank (AppTy ty1 ty2)
-  = do  { check_arg_type env ctxt rank ty1
+  = do  { check_type env ctxt rank ty1
         ; check_arg_type env ctxt rank ty2 }
 
 check_type env ctxt rank ty@(TyConApp tc tys)
@@ -915,13 +923,16 @@ okIPCtxt (DataTyCtxt {})        = True
 okIPCtxt (PatSynCtxt {})        = True
 okIPCtxt (TySynCtxt {})         = True   -- e.g.   type Blah = ?x::Int
                                          -- Trac #11466
-
-okIPCtxt (ClassSCCtxt {})  = False
-okIPCtxt (InstDeclCtxt {}) = False
-okIPCtxt (SpecInstCtxt {}) = False
-okIPCtxt (RuleSigCtxt {})  = False
-okIPCtxt DefaultDeclCtxt   = False
-okIPCtxt DerivClauseCtxt   = False
+okIPCtxt (ClassSCCtxt {})       = False
+okIPCtxt (InstDeclCtxt {})      = False
+okIPCtxt (SpecInstCtxt {})      = False
+okIPCtxt (RuleSigCtxt {})       = False
+okIPCtxt DefaultDeclCtxt        = False
+okIPCtxt DerivClauseCtxt        = False
+okIPCtxt (TyVarBndrKindCtxt {}) = False
+okIPCtxt (DataKindCtxt {})      = False
+okIPCtxt (TySynKindCtxt {})     = False
+okIPCtxt (TyFamResKindCtxt {})  = False
 
 {-
 Note [Kind polymorphic type classes]
@@ -1840,23 +1851,16 @@ this is bogus. (We could probably figure out to put b between a and c.
 But I think this is doing users a disservice, in the long run.)
 (Testcase: dependent/should_fail/BadTelescope4)
 
-3. t3 :: forall a. (forall k (b :: k). SameKind a b) -> ()
+To catch these errors, we call checkValidTelescope during kind-checking
+datatype declarations. This must be done *before* kind-generalization,
+because kind-generalization might observe, say, T1, see that k is free
+in a's kind, and generalize over it, producing nonsense. It also must
+be done *after* kind-generalization, in order to catch the T2 case, which
+becomes apparent only after generalizing.
 
-This is a straightforward skolem escape. Note that a and b need to have
-the same kind.
-(Testcase: polykinds/T11142)
+Note [Keeping scoped variables in order: Explicit] discusses how this
+check works for `forall x y z.` written in a type.
 
-How do we deal with all of this? For TyCons, we have checkValidTyConTyVars.
-That function looks to see if any of the tyConTyVars are repeated, but
-it's really a telescope check. It works because all tycons are kind-generalized.
-If there is a bad telescope, the kind-generalization will end up generalizing
-over a variable bound later in the telescope.
-
-For non-tycons, we do scope checking when we bring tyvars into scope,
-in tcImplicitTKBndrs and tcExplicitTKBndrs. Note that we also have to
-sort implicit binders into a well-scoped order whenever we have implicit
-binders to worry about. This is done in quantifyTyVars and in
-tcImplicitTKBndrs.
 -}
 
 -- | Check a list of binders to see if they make a valid telescope.
@@ -1868,29 +1872,21 @@ tcImplicitTKBndrs.
 -- general validity checking, because once we kind-generalise, this sort
 -- of problem is harder to spot (as we'll generalise over the unbound
 -- k in a's type.) See also Note [Bad telescopes].
-checkValidTelescope :: SDoc        -- the original user-written telescope
-                    -> [TyVar]     -- explicit vars (not necessarily zonked)
-                    -> SDoc        -- note to put at bottom of message
+checkValidTelescope :: [TyConBinder]   -- explicit vars (zonked)
+                    -> SDoc            -- original, user-written telescope
+                    -> SDoc            -- extra text to print
                     -> TcM ()
-checkValidTelescope hs_tvs orig_tvs extra
-  = discardResult $ checkZonkValidTelescope hs_tvs orig_tvs extra
+checkValidTelescope tvbs user_tyvars extra
+  = do { let tvs      = binderVars tvbs
 
--- | Like 'checkZonkValidTelescope', but returns the zonked tyvars
-checkZonkValidTelescope :: SDoc
-                        -> [TyVar]
-                        -> SDoc
-                        -> TcM [TyVar]
-checkZonkValidTelescope hs_tvs orig_tvs extra
-  = do { orig_tvs <- mapM zonkTyCoVarKind orig_tvs
-       ; let (_, sorted_tidied_tvs) = tidyTyCoVarBndrs emptyTidyEnv $
-                                      toposortTyVars orig_tvs
-       ; unless (go [] emptyVarSet orig_tvs) $
+             (_, sorted_tidied_tvs) = tidyTyCoVarBndrs emptyTidyEnv $
+                                      toposortTyVars tvs
+       ; unless (go [] emptyVarSet (binderVars tvbs)) $
          addErr $
-         vcat [ hang (text "These kind and type variables:" <+> hs_tvs $$
+         vcat [ hang (text "These kind and type variables:" <+> user_tyvars $$
                       text "are out of dependency order. Perhaps try this ordering:")
-                   2 (sep (map pprTyVar sorted_tidied_tvs))
-              , extra ]
-       ; return orig_tvs }
+                   2 (pprTyVars sorted_tidied_tvs)
+              , extra ] }
 
   where
     go :: [TyVar]  -- misplaced variables
@@ -1904,37 +1900,6 @@ checkZonkValidTelescope hs_tvs orig_tvs extra
       = let bad_tvs = filterOut (`elemVarSet` in_scope) $
                       tyCoVarsOfTypeList (tyVarKind tv)
         in go (bad_tvs ++ errs) (in_scope `extendVarSet` tv) tvs
-
--- | After inferring kinds of type variables, check to make sure that the
--- inferred kinds any of the type variables bound in a smaller scope.
--- This is a skolem escape check. See also Note [Bad telescopes].
-checkValidInferredKinds :: [TyVar]     -- ^ vars to check (zonked)
-                        -> TyVarSet    -- ^ vars out of scope
-                        -> SDoc        -- ^ suffix to error message
-                        -> TcM ()
-checkValidInferredKinds orig_kvs out_of_scope extra
-  = do { let bad_pairs = [ (tv, kv)
-                         | kv <- orig_kvs
-                         , Just tv <- map (lookupVarSet out_of_scope)
-                                          (tyCoVarsOfTypeList (tyVarKind kv)) ]
-             report (tidyTyVarOcc env -> tv, tidyTyVarOcc env -> kv)
-               = addErr $
-                 text "The kind of variable" <+>
-                 quotes (ppr kv) <> text ", namely" <+>
-                 quotes (ppr (tyVarKind kv)) <> comma $$
-                 text "depends on variable" <+>
-                 quotes (ppr tv) <+> text "from an inner scope" $$
-                 text "Perhaps bind" <+> quotes (ppr kv) <+>
-                 text "sometime after binding" <+>
-                 quotes (ppr tv) $$
-                 extra
-       ; mapM_ report bad_pairs }
-
-  where
-    (env1, _) = tidyTyCoVarBndrs emptyTidyEnv orig_kvs
-    (env, _)  = tidyTyCoVarBndrs env1         (nonDetEltsUniqSet out_of_scope)
-      -- It's OK to use nonDetEltsUniqSet here because it's only used for
-      -- generating the error message
 
 {-
 ************************************************************************

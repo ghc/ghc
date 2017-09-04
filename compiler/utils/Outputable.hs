@@ -69,6 +69,7 @@ module Outputable (
         alwaysQualifyPackages, neverQualifyPackages,
         QualifyName(..), queryQual,
         sdocWithDynFlags, sdocWithPlatform,
+        updSDocDynFlags,
         getPprStyle, withPprStyle, withPprStyleDoc, setStyleColoured,
         pprDeeper, pprDeeperList, pprSetDepth,
         codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
@@ -386,6 +387,10 @@ sdocWithDynFlags f = SDoc $ \ctx -> runSDoc (f (sdocDynFlags ctx)) ctx
 
 sdocWithPlatform :: (Platform -> SDoc) -> SDoc
 sdocWithPlatform f = sdocWithDynFlags (f . targetPlatform)
+
+updSDocDynFlags :: (DynFlags -> DynFlags) -> SDoc -> SDoc
+updSDocDynFlags upd doc
+  = SDoc $ \ctx -> runSDoc doc (ctx { sdocDynFlags = upd (sdocDynFlags ctx) })
 
 qualName :: PprStyle -> QueryQualifyName
 qualName (PprUser q _ _) mod occ = queryQualifyName q mod occ

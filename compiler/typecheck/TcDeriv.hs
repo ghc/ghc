@@ -717,6 +717,9 @@ deriveTyData tvs tc tc_args deriv_strat deriv_pred
   = setSrcSpan (getLoc (hsSigType deriv_pred)) $
     -- Use loc of the 'deriving' item
     do  { (deriv_tvs, cls, cls_tys, cls_arg_kinds)
+                   -- Why not scopeTyVars? Because these are *TyVar*s, not TcTyVars.
+                   -- Their kinds are fully settled. No need to worry about skolem
+                   -- escape.
                 <- tcExtendTyVarEnv tvs $
                    tcHsDeriv deriv_pred
                 -- Deriving preds may (now) mention

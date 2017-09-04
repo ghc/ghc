@@ -88,7 +88,7 @@ module TcRnMonad(
   mkErrInfo,
 
   -- * Type constraints
-  newTcEvBinds,
+  newTcEvBinds, newNoTcEvBinds,
   addTcEvBind,
   getTcEvTyCoVars, getTcEvBindsMap, setTcEvBindsMap,
   chooseUniqueOccTc,
@@ -97,7 +97,7 @@ module TcRnMonad(
   emitImplication, emitImplications, emitInsoluble,
   discardConstraints, captureConstraints, tryCaptureConstraints,
   pushLevelAndCaptureConstraints,
-  pushTcLevelM_, pushTcLevelM,
+  pushTcLevelM_, pushTcLevelM, pushTcLevelsM,
   getTcLevel, setTcLevel, isTouchableTcM,
   getLclTypeEnv, setLclTypeEnv,
   traceTcConstraints, emitWildCardHoleConstraints,
@@ -1370,17 +1370,35 @@ newTcEvBinds = do { binds_ref <- newTcRef emptyEvBindMap
                                        , ebv_tcvs = tcvs_ref
                                        , ebv_uniq = uniq }) }
 
+-- | Creates an EvBindsVar incapable of holding any bindings. It still
+-- tracks covar usages (see comments on ebv_tcvs in TcEvidence), thus
+-- must be made monadically
+newNoTcEvBinds :: TcM EvBindsVar
+newNoTcEvBinds
+  = do { tcvs_ref  <- newTcRef emptyVarSet
+       ; uniq <- newUnique
+       ; traceTc "newNoTcEvBinds" (text "unique =" <+> ppr uniq)
+       ; return (NoEvBindsVar { ebv_tcvs = tcvs_ref
+                              , ebv_uniq = uniq }) }
+
 getTcEvTyCoVars :: EvBindsVar -> TcM TyCoVarSet
-getTcEvTyCoVars (EvBindsVar { ebv_tcvs = ev_ref })
-  = readTcRef ev_ref
+getTcEvTyCoVars ev_binds_var
+  = readTcRef (ebv_tcvs ev_binds_var)
 
 getTcEvBindsMap :: EvBindsVar -> TcM EvBindMap
 getTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref })
   = readTcRef ev_ref
+getTcEvBindsMap (NoEvBindsVar {})
+  = return emptyEvBindMap
 
 setTcEvBindsMap :: EvBindsVar -> EvBindMap -> TcM ()
 setTcEvBindsMap (EvBindsVar { ebv_binds = ev_ref }) binds
   = writeTcRef ev_ref binds
+setTcEvBindsMap v@(NoEvBindsVar {}) ev_binds
+  | isEmptyEvBindMap ev_binds
+  = return ()
+  | otherwise
+  = pprPanic "setTcEvBindsMap" (ppr v $$ ppr ev_binds)
 
 addTcEvBind :: EvBindsVar -> EvBind -> TcM ()
 -- Add a binding to the TcEvBinds by side effect
@@ -1389,6 +1407,8 @@ addTcEvBind (EvBindsVar { ebv_binds = ev_ref, ebv_uniq = u }) ev_bind
                                  ppr ev_bind
        ; bnds <- readTcRef ev_ref
        ; writeTcRef ev_ref (extendEvBinds bnds ev_bind) }
+addTcEvBind (NoEvBindsVar { ebv_uniq = u }) ev_bind
+  = pprPanic "addTcEvBind NoEvBindsVar" (ppr ev_bind $$ ppr u)
 
 chooseUniqueOccTc :: (OccSet -> OccName) -> TcM OccName
 chooseUniqueOccTc fn =
@@ -1485,6 +1505,7 @@ captureConstraints thing_inside
            Left _    -> do { emitConstraints lie; failM }
            Right res -> return (res, lie) }
 
+-- | The name says it all. The returned TcLevel is the *inner* TcLevel.
 pushLevelAndCaptureConstraints :: TcM a -> TcM (TcLevel, WantedConstraints, a)
 pushLevelAndCaptureConstraints thing_inside
   = do { env <- getLclEnv
@@ -1503,6 +1524,15 @@ pushTcLevelM thing_inside
        ; let tclvl' = pushTcLevel (tcl_tclvl env)
        ; res <- setLclEnv (env { tcl_tclvl = tclvl' })
                           thing_inside
+       ; return (res, tclvl') }
+
+-- Returns pushed TcLevel
+pushTcLevelsM :: Int -> TcM a -> TcM (a, TcLevel)
+pushTcLevelsM num_levels thing_inside
+  = do { env <- getLclEnv
+       ; let tclvl' = nTimes num_levels pushTcLevel (tcl_tclvl env)
+       ; res <- setLclEnv (env { tcl_tclvl = tclvl' }) $
+                thing_inside
        ; return (res, tclvl') }
 
 getTcLevel :: TcM TcLevel

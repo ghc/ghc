@@ -189,6 +189,7 @@ module Type (
         pprKind, pprParendKind, pprSourceTyCon,
         TyPrec(..), maybeParen,
         pprTyVar, pprTyVars,
+        pprWithTYPE,
 
         -- * Tidying type related things up for printing
         tidyType,      tidyTypes,
@@ -234,6 +235,7 @@ import Util
 import Outputable
 import FastString
 import Pair
+import DynFlags  ( gopt_set, GeneralFlag(Opt_PrintExplicitRuntimeReps) )
 import ListSetOps
 import Digraph
 import Unique ( nonDetCmpUnique )
@@ -2458,3 +2460,20 @@ setJoinResTy :: Int  -- Number of binders to skip
 -- INVARIANT: Same as for modifyJoinResTy
 setJoinResTy ar new_res_ty ty
   = modifyJoinResTy ar (const new_res_ty) ty
+
+{-
+%************************************************************************
+%*                                                                      *
+         Pretty-printing
+%*                                                                      *
+%************************************************************************
+
+Most pretty-printing is either in TyCoRep or IfaceType.
+
+-}
+
+-- | This variant preserves any use of TYPE in a type, effectively
+-- locally setting -fprint-explicit-runtime-reps.
+pprWithTYPE :: Type -> SDoc
+pprWithTYPE ty = updSDocDynFlags (flip gopt_set Opt_PrintExplicitRuntimeReps) $
+                 ppr ty

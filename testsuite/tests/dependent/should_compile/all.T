@@ -32,3 +32,5 @@ test('T13938', [extra_files(['T13938a.hs'])], run_command,
      ['$MAKE -s --no-print-directory T13938'])
 test('T14556', normal, compile, [''])
 test('T14720', normal, compile, [''])
+test('T14066a', normal, compile, [''])
+test('T14749', normal, compile, [''])

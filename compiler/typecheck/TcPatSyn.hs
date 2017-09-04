@@ -263,7 +263,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
             2 (text "mentions existential type variable" <> plural bad_tvs
                <+> pprQuotedList bad_tvs)
 
-         -- See Note [The pattern-synonym signature splitting rule]
+         -- See Note [The pattern-synonym signature splitting rule] in TcSigs
        ; let univ_fvs = closeOverKinds $
                         (tyCoVarsOfTypes (pat_ty : req_theta) `extendVarSetList` explicit_univ_tvs)
              (extra_univ, extra_ex) = partition ((`elemVarSet` univ_fvs) . binderVar) implicit_tvs

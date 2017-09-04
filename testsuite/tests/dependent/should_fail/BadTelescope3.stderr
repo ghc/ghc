@@ -1,6 +1,6 @@
 
 BadTelescope3.hs:9:1: error:
-    • These kind and type variables: (a :: k) k (b :: k)
+    • These kind and type variables: a k (b :: k)
       are out of dependency order. Perhaps try this ordering:
         k (a :: k) (b :: k)
     • In the type synonym declaration for ‘S’

@@ -30,6 +30,31 @@ T14846.hs:38:8: error:
                       ríki a a
       In the instance declaration for ‘Category (Hom ríki)’
 
+T14846.hs:39:12: error:
+    • Could not deduce (StructI xx1 (Structured a cls))
+        arising from a use of ‘struct’
+      from the context: Category ríki
+        bound by the instance declaration at T14846.hs:37:10-65
+      or from: StructI xx a
+        bound by the type signature for:
+                   i :: forall (xx :: k0) (a :: Struct cls0).
+                        StructI xx a =>
+                        Hom ríki a a
+        at T14846.hs:38:8-48
+      The type variable ‘xx1’ is ambiguous
+      Relevant bindings include
+        i :: Hom ríki a a (bound at T14846.hs:39:3)
+      These potential instance exist:
+        instance forall k (xx :: k) (cls :: k
+                                            -> Constraint) (structured :: Struct cls).
+                 (Structured xx cls ~ structured, cls xx) =>
+                 StructI xx structured
+          -- Defined at T14846.hs:28:10
+    • In the expression: struct :: AStruct (Structured a cls)
+      In the expression: case struct :: AStruct (Structured a cls) of
+      In an equation for ‘i’:
+          i = case struct :: AStruct (Structured a cls) of
+
 T14846.hs:39:44: error:
     • Expected kind ‘Struct cls0 -> Constraint’,
         but ‘cls’ has kind ‘k4 -> Constraint’

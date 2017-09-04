@@ -10,7 +10,5 @@
     • Relevant bindings include
         it :: f (Maybe a) (bound at <interactive>:2:1)
       Valid substitutions include
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ (and originally defined in ‘GHC.Err’))

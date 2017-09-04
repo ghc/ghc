@@ -32,7 +32,7 @@ module TyCoRep (
         -- * Coercions
         Coercion(..),
         UnivCoProvenance(..),
-        CoercionHole(..), coHoleCoVar,
+        CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
         CoercionN, CoercionR, CoercionP, KindCoercion,
 
         -- * Functions over types
@@ -811,7 +811,7 @@ isLiftedTypeKind = isTYPE is_lifted
 isUnliftedTypeKind :: Kind -> Bool
 isUnliftedTypeKind = isTYPE is_unlifted
   where
-    is_unlifted (TyConApp rr _args) = not (rr `hasKey` liftedRepDataConKey)
+    is_unlifted (TyConApp rr _args) = elem (getUnique rr) unliftedRepDataConKeys
     is_unlifted _                   = False
 
 -- | Is this the type 'RuntimeRep'?
@@ -1301,6 +1301,9 @@ data CoercionHole
 
 coHoleCoVar :: CoercionHole -> CoVar
 coHoleCoVar = ch_co_var
+
+setCoHoleCoVar :: CoercionHole -> CoVar -> CoercionHole
+setCoHoleCoVar h cv = h { ch_co_var = cv }
 
 instance Data.Data CoercionHole where
   -- don't traverse?
@@ -2241,6 +2244,7 @@ isValidTCvSubst (TCvSubst in_scope tenv cenv) =
 -- Note [The substitution invariant].
 checkValidSubst :: HasCallStack => TCvSubst -> [Type] -> [Coercion] -> a -> a
 checkValidSubst subst@(TCvSubst in_scope tenv cenv) tys cos a
+-- TODO (RAE): Change back to ASSERT
   = WARN( not (isValidTCvSubst subst),
              text "in_scope" <+> ppr in_scope $$
              text "tenv" <+> ppr tenv $$

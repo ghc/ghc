@@ -393,9 +393,11 @@ runSolverPipeline :: [(String,SimplifierStage)] -- The pipeline
 runSolverPipeline pipeline workItem
   = do { wl <- getWorkList
        ; inerts <- getTcSInerts
+       ; tclevel <- getTcLevel
        ; traceTcS "----------------------------- " empty
        ; traceTcS "Start solver pipeline {" $
-                  vcat [ text "work item =" <+> ppr workItem
+                  vcat [ text "tclevel =" <+> ppr tclevel
+                       , text "work item =" <+> ppr workItem
                        , text "inerts =" <+> ppr inerts
                        , text "rest of worklist =" <+> ppr wl ]
 
@@ -673,6 +675,18 @@ that this chain of events won't happen, but that's very fragile.)
                    interactIrred
 *                                                                               *
 *********************************************************************************
+
+Note [Multiple matching irreds]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+You might think that it's impossible to have multiple irreds all match the
+work item; after all, interactIrred looks for matches and solves one from the
+other. However, note that interacting insoluble, non-droppable irreds does not
+do this matching. We thus might end up with several insoluble, non-droppable,
+matching irreds in the inert set. When another irred comes along that we have
+not yet labeled insoluble, we can find multiple matches. These multiple matches
+cause no harm, but it would be wrong to ASSERT that they aren't there (as we
+once had done). This problem can be tickled by typecheck/should_compile/holes.
+
 -}
 
 -- Two pieces of irreducible evidence: if their types are *exactly identical*
@@ -690,10 +704,10 @@ interactIrred inerts workItem@(CIrredCan { cc_ev = ev_w, cc_insol = insoluble })
   = continueWith workItem
 
   | let (matching_irreds, others) = findMatchingIrreds (inert_irreds inerts) ev_w
-  , ((ct_i, swap) : rest) <- bagToList matching_irreds
+  , ((ct_i, swap) : _rest) <- bagToList matching_irreds
+        -- See Note [Multiple matching irreds]
   , let ev_i = ctEvidence ct_i
-  = ASSERT( null rest )
-    do { what_next <- solveOneFromTheOther ev_i ev_w
+  = do { what_next <- solveOneFromTheOther ev_i ev_w
        ; traceTcS "iteractIrred" (ppr workItem $$ ppr what_next $$ ppr ct_i)
        ; case what_next of
             KeepInert -> do { setEvBindIfWanted ev_w (swap_me swap ev_i)

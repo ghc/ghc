@@ -41,7 +41,9 @@ import TcEvidence( HsWrapper, (<.>) )
 import Type( mkTyVarBinders )
 
 import DynFlags
-import Var      ( TyVar, tyVarName, tyVarKind )
+import Var      ( TyVar, tyVarKind )
+import VarSet
+import VarEnv   ( mkInScopeSet )
 import Id       ( Id, idName, idType, idInlinePragma, setInlinePragma, mkLocalId )
 import PrelNames( mkUnboundName )
 import BasicTypes
@@ -49,7 +51,6 @@ import Bag( foldrBag )
 import Module( getModule )
 import Name
 import NameEnv
-import VarSet
 import Outputable
 import SrcLoc
 import Util( singleton )
@@ -70,7 +71,7 @@ especially on value bindings.  Here's an overview.
     f = ...g...
     g = ...f...
 
-* HsSyn: a signature in a binding starts of as a TypeSig, in
+* HsSyn: a signature in a binding starts off as a TypeSig, in
   type HsBinds.Sig
 
 * When starting a mutually recursive group, like f/g above, we
@@ -299,38 +300,34 @@ Once we get to type checking, we decompose it into its parts, in tcPatSynSig.
 
 tcPatSynSig :: Name -> LHsSigType GhcRn -> TcM TcPatSynInfo
 -- See Note [Pattern synonym signatures]
+-- See Note [Recipe for checking a signature] in TcHsType
 tcPatSynSig name sig_ty
   | HsIB { hsib_vars = implicit_hs_tvs
          , hsib_body = hs_ty }  <- sig_ty
   , (univ_hs_tvs, hs_req,  hs_ty1)     <- splitLHsSigmaTy hs_ty
   , (ex_hs_tvs,   hs_prov, hs_body_ty) <- splitLHsSigmaTy hs_ty1
-  = do { (implicit_tvs, (univ_tvs, req, ex_tvs, prov, body_ty))
-           <- solveEqualities $
-              tcImplicitTKBndrs implicit_hs_tvs $
-              tcExplicitTKBndrs univ_hs_tvs  $ \ univ_tvs ->
-              tcExplicitTKBndrs ex_hs_tvs    $ \ ex_tvs   ->
+  = do { (implicit_tvs, (univ_tvs, (ex_tvs, (req, prov, body_ty))))
+           <-  -- NB: tcImplicitTKBndrs calls solveEqualities
+              tcImplicitTKBndrs skol_info implicit_hs_tvs $
+              tcExplicitTKBndrs skol_info univ_hs_tvs     $
+              tcExplicitTKBndrs skol_info ex_hs_tvs       $
               do { req     <- tcHsContext hs_req
                  ; prov    <- tcHsContext hs_prov
                  ; body_ty <- tcHsOpenType hs_body_ty
                      -- A (literal) pattern can be unlifted;
                      -- e.g. pattern Zero <- 0#   (Trac #12094)
-                 ; let bound_tvs
-                         = unionVarSets [ allBoundVariabless req
-                                        , allBoundVariabless prov
-                                        , allBoundVariables body_ty
-                                        ]
-                 ; return ( (univ_tvs, req, ex_tvs, prov, body_ty)
-                          , bound_tvs) }
+                 ; return (req, prov, body_ty) }
+
+       ; ungen_patsyn_ty <- zonkPromoteType $
+                            build_patsyn_type [] implicit_tvs univ_tvs req
+                                              ex_tvs prov body_ty
 
        -- Kind generalisation
-       ; kvs <- kindGeneralize $
-                build_patsyn_type [] implicit_tvs univ_tvs req
-                                  ex_tvs prov body_ty
+       ; kvs <- kindGeneralize ungen_patsyn_ty
 
        -- These are /signatures/ so we zonk to squeeze out any kind
-       -- unification variables.  Do this after quantifyTyVars which may
+       -- unification variables.  Do this after kindGeneralize which may
        -- default kind variables to *.
-       ; traceTc "about zonk" empty
        ; implicit_tvs <- mapM zonkTcTyCoVarBndr implicit_tvs
        ; univ_tvs     <- mapM zonkTcTyCoVarBndr univ_tvs
        ; ex_tvs       <- mapM zonkTcTyCoVarBndr ex_tvs
@@ -338,33 +335,46 @@ tcPatSynSig name sig_ty
        ; prov         <- zonkTcTypes prov
        ; body_ty      <- zonkTcType  body_ty
 
+       -- Skolems have TcLevels too, though they're used only for debugging.
+       -- If you don't do this, the debugging checks fail in TcPatSyn.
+       -- Test case: patsyn/should_compile/T13441
+       ; tclvl <- getTcLevel
+       ; let env0                  = mkEmptyTCvSubst $ mkInScopeSet $ mkVarSet kvs
+             (env1, implicit_tvs') = promoteSkolemsX tclvl env0 implicit_tvs
+             (env2, univ_tvs')     = promoteSkolemsX tclvl env1 univ_tvs
+             (env3, ex_tvs')       = promoteSkolemsX tclvl env2 ex_tvs
+             req'                  = substTys env3 req
+             prov'                 = substTys env3 prov
+             body_ty'              = substTy  env3 body_ty
+
        -- Now do validity checking
        ; checkValidType ctxt $
-         build_patsyn_type kvs implicit_tvs univ_tvs req ex_tvs prov body_ty
+         build_patsyn_type kvs implicit_tvs' univ_tvs' req' ex_tvs' prov' body_ty'
 
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
-       ; let (arg_tys, _) = tcSplitFunTys body_ty
+       ; let (arg_tys, _) = tcSplitFunTys body_ty'
        ; mapM_ (checkForLevPoly empty) arg_tys
 
        ; traceTc "tcTySig }" $
-         vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs
+         vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs'
               , text "kvs" <+> ppr_tvs kvs
-              , text "univ_tvs" <+> ppr_tvs univ_tvs
-              , text "req" <+> ppr req
-              , text "ex_tvs" <+> ppr_tvs ex_tvs
-              , text "prov" <+> ppr prov
-              , text "body_ty" <+> ppr body_ty ]
+              , text "univ_tvs" <+> ppr_tvs univ_tvs'
+              , text "req" <+> ppr req'
+              , text "ex_tvs" <+> ppr_tvs ex_tvs'
+              , text "prov" <+> ppr prov'
+              , text "body_ty" <+> ppr body_ty' ]
        ; return (TPSI { patsig_name = name
-                      , patsig_implicit_bndrs = mkTyVarBinders Inferred kvs ++
-                                                mkTyVarBinders Specified implicit_tvs
-                      , patsig_univ_bndrs     = univ_tvs
-                      , patsig_req            = req
-                      , patsig_ex_bndrs       = ex_tvs
-                      , patsig_prov           = prov
-                      , patsig_body_ty        = body_ty }) }
+                      , patsig_implicit_bndrs = mkTyVarBinders Inferred  kvs ++
+                                                mkTyVarBinders Specified implicit_tvs'
+                      , patsig_univ_bndrs     = univ_tvs'
+                      , patsig_req            = req'
+                      , patsig_ex_bndrs       = ex_tvs'
+                      , patsig_prov           = prov'
+                      , patsig_body_ty        = body_ty' }) }
   where
     ctxt = PatSynCtxt name
+    skol_info = SigTypeSkol ctxt
 
     build_patsyn_type kvs imp univ req ex prov body
       = mkInvForAllTys kvs $
@@ -404,7 +414,7 @@ tcInstSig sig@(PartialSig { psig_hs_ty = hs_ty
                           , sig_ctxt = ctxt
                           , sig_loc = loc })
   = setSrcSpan loc $  -- Set the binding site of the tyvars
-    do { (wcs, wcx, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
+    do { (wcs, wcx, tv_names, tvs, theta, tau) <- tcHsPartialSigType ctxt hs_ty
 
         -- Clone the quantified tyvars
         -- Reason: we might have    f, g :: forall a. a -> _ -> a
@@ -413,8 +423,17 @@ tcInstSig sig@(PartialSig { psig_hs_ty = hs_ty
         --         the easiest way to do so, and is very similar to
         --         the tcInstType in the CompleteSig case
         -- See Trac #14643
-        ; (subst, tvs') <- instSkolTyCoVars mk_sig_tv tvs
-        ; let tv_prs = map tyVarName tvs `zip` tvs'
+       ; let in_scope = mkInScopeSet $ closeOverKinds $ unionVarSets
+                          [ mkVarSet (map snd wcs)
+                          , maybe emptyVarSet tyCoVarsOfType wcx
+                          , mkVarSet tvs
+                          , tyCoVarsOfTypes theta
+                          , tyCoVarsOfType tau ]
+               -- the in_scope is a bit bigger than nec'y, but too big is always
+               -- safe
+             empty_subst = mkEmptyTCvSubst in_scope
+       ; (subst, tvs') <- instSkolTyCoVarsX mk_sig_tv empty_subst tvs
+       ; let tv_prs = tv_names `zip` tvs'
 
        ; return (TISI { sig_inst_sig   = sig
                       , sig_inst_skols = tv_prs

@@ -8641,7 +8641,8 @@ Principles of kind inference
 
 Generally speaking, when :extension:`PolyKinds` is on, GHC tries to infer the
 most general kind for a declaration.
-In this case the definition has a right-hand side to inform kind
+In many cases (for example, in a datatype declaration)
+the definition has a right-hand side to inform kind
 inference. But that is not always the case. Consider ::
 
     type family F a
@@ -9075,6 +9076,30 @@ scenario are theoretical (inferring this dependency would mean our type
 system does not have principal types) or merely practical (inferring this
 dependency is hard, given GHC's implementation). So, GHC takes the easy
 way out and requires a little help from the user.
+
+Inferring dependency in user-written ``forall``\s
+-------------------------------------------------
+
+A programmer may use ``forall`` in a type to introduce new quantified type
+variables. These variables may depend on each other, even in the same
+``forall``. However, GHC requires that the dependency be inferrable from
+the body of the ``forall``. Here are some examples::
+
+  data Proxy k (a :: k) = MkProxy   -- just to use below
+  
+  f :: forall k a. Proxy k a        -- This is just fine. We see that (a :: k).
+  f = undefined
+
+  g :: Proxy k a -> ()              -- This is to use below.
+  g = undefined
+
+  data Sing a
+  h :: forall k a. Sing k -> Sing a -> ()  -- No obvious relationship between k and a
+  h _ _ = g (MkProxy :: Proxy k a)  -- This fails. We didn't know that a should have kind k.
+
+Note that in the last example, it's impossible to learn that ``a`` depends on ``k`` in the
+body of the ``forall`` (that is, the ``Sing k -> Sing a -> ()``). And so GHC rejects
+the program.
 
 Kind defaulting without :extension:`PolyKinds`
 -----------------------------------------------

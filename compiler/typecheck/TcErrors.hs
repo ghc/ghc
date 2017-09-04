@@ -38,7 +38,7 @@ import Name
 import RdrName ( lookupGlobalRdrEnv, lookupGRE_Name, GlobalRdrEnv
                , mkRdrUnqual, isLocalGRE, greSrcSpan, pprNameProvenance
                , GlobalRdrElt (..), globalRdrEnvElts )
-import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey )
+import PrelNames ( typeableClassName, hasKey, liftedRepDataConKey, tYPETyConKey )
 import Id
 import Var
 import VarSet
@@ -130,7 +130,7 @@ reportUnsolved wanted
        ; defer_errors <- goptM Opt_DeferTypeErrors
        ; warn_errors <- woptM Opt_WarnDeferredTypeErrors -- implement #10283
        ; let type_errors | not defer_errors = TypeError
-                         | warn_errors      = TypeWarn
+                         | warn_errors      = TypeWarn (Reason Opt_WarnDeferredTypeErrors)
                          | otherwise        = TypeDefer
 
        ; defer_holes <- goptM Opt_DeferTypedHoles
@@ -151,7 +151,7 @@ reportUnsolved wanted
                                 | warn_out_of_scope      = HoleWarn
                                 | otherwise              = HoleDefer
 
-       ; report_unsolved binds_var False type_errors expr_holes
+       ; report_unsolved binds_var type_errors expr_holes
           type_holes out_of_scope_holes wanted
 
        ; ev_binds <- getTcEvBindsMap binds_var
@@ -166,8 +166,8 @@ reportUnsolved wanted
 -- and for simplifyDefault.
 reportAllUnsolved :: WantedConstraints -> TcM ()
 reportAllUnsolved wanted
-  = do { ev_binds <- newTcEvBinds
-       ; report_unsolved ev_binds False TypeError
+  = do { ev_binds <- newNoTcEvBinds
+       ; report_unsolved ev_binds TypeError
                          HoleError HoleError HoleError wanted }
 
 -- | Report all unsolved goals as warnings (but without deferring any errors to
@@ -176,23 +176,27 @@ reportAllUnsolved wanted
 warnAllUnsolved :: WantedConstraints -> TcM ()
 warnAllUnsolved wanted
   = do { ev_binds <- newTcEvBinds
-       ; report_unsolved ev_binds True TypeWarn
+       ; report_unsolved ev_binds (TypeWarn NoReason)
                          HoleWarn HoleWarn HoleWarn wanted }
 
 -- | Report unsolved goals as errors or warnings.
 report_unsolved :: EvBindsVar        -- cec_binds
-                -> Bool              -- Errors as warnings
                 -> TypeErrorChoice   -- Deferred type errors
                 -> HoleChoice        -- Expression holes
                 -> HoleChoice        -- Type holes
                 -> HoleChoice        -- Out of scope holes
                 -> WantedConstraints -> TcM ()
-report_unsolved mb_binds_var err_as_warn type_errors expr_holes
+report_unsolved mb_binds_var type_errors expr_holes
     type_holes out_of_scope_holes wanted
   | isEmptyWC wanted
   = return ()
   | otherwise
-  = do { traceTc "reportUnsolved (before zonking and tidying)" (ppr wanted)
+  = do { traceTc "reportUnsolved warning/error settings:" $
+           vcat [ text "type errors:" <+> ppr type_errors
+                , text "expr holes:" <+> ppr expr_holes
+                , text "type holes:" <+> ppr type_holes
+                , text "scope holes:" <+> ppr out_of_scope_holes ]
+       ; traceTc "reportUnsolved (before zonking and tidying)" (ppr wanted)
 
        ; wanted <- zonkWC wanted   -- Zonk to reveal all information
        ; env0 <- tcInitTidyEnv
@@ -210,7 +214,6 @@ report_unsolved mb_binds_var err_as_warn type_errors expr_holes
        ; let err_ctxt = CEC { cec_encl  = []
                             , cec_tidy  = tidy_env
                             , cec_defer_type_errors = type_errors
-                            , cec_errors_as_warns = err_as_warn
                             , cec_expr_holes = expr_holes
                             , cec_type_holes = type_holes
                             , cec_out_of_scope_holes = out_of_scope_holes
@@ -275,7 +278,11 @@ valid_substitutions docs = mempty { report_valid_substitutions = [docs] }
 
 data TypeErrorChoice   -- What to do for type errors found by the type checker
   = TypeError     -- A type error aborts compilation with an error message
-  | TypeWarn      -- A type error is deferred to runtime, plus a compile-time warning
+  | TypeWarn WarnReason
+                  -- A type error is deferred to runtime, plus a compile-time warning
+                  -- The WarnReason should usually be (Reason Opt_WarnDeferredTypeErrors)
+                  -- but it isn't for the Safe Haskell Overlapping Instances warnings
+                  -- see warnAllUnsolved
   | TypeDefer     -- A type error is deferred to runtime; no error or warning at compile time
 
 data HoleChoice
@@ -289,9 +296,9 @@ instance Outputable HoleChoice where
   ppr HoleDefer = text "HoleDefer"
 
 instance Outputable TypeErrorChoice  where
-  ppr TypeError = text "TypeError"
-  ppr TypeWarn  = text "TypeWarn"
-  ppr TypeDefer = text "TypeDefer"
+  ppr TypeError         = text "TypeError"
+  ppr (TypeWarn reason) = text "TypeWarn" <+> ppr reason
+  ppr TypeDefer         = text "TypeDefer"
 
 data ReportErrCtxt
     = CEC { cec_encl :: [Implication]  -- Enclosing implications
@@ -303,10 +310,6 @@ data ReportErrCtxt
                                        -- into warnings, and emit evidence bindings
                                        -- into 'cec_binds' for unsolved constraints
 
-          , cec_errors_as_warns :: Bool   -- Turn all errors into warnings
-                                          -- (except for Holes, which are
-                                          -- controlled by cec_type_holes and
-                                          -- cec_expr_holes)
           , cec_defer_type_errors :: TypeErrorChoice -- Defer type errors until runtime
 
           -- cec_expr_holes is a union of:
@@ -327,7 +330,6 @@ data ReportErrCtxt
 
 instance Outputable ReportErrCtxt where
   ppr (CEC { cec_binds              = bvar
-           , cec_errors_as_warns    = ew
            , cec_defer_type_errors  = dte
            , cec_expr_holes         = eh
            , cec_type_holes         = th
@@ -336,13 +338,27 @@ instance Outputable ReportErrCtxt where
            , cec_suppress           = sup })
     = text "CEC" <+> braces (vcat
          [ text "cec_binds"              <+> equals <+> ppr bvar
-         , text "cec_errors_as_warns"    <+> equals <+> ppr ew
          , text "cec_defer_type_errors"  <+> equals <+> ppr dte
          , text "cec_expr_holes"         <+> equals <+> ppr eh
          , text "cec_type_holes"         <+> equals <+> ppr th
          , text "cec_out_of_scope_holes" <+> equals <+> ppr osh
          , text "cec_warn_redundant"     <+> equals <+> ppr wr
          , text "cec_suppress"           <+> equals <+> ppr sup ])
+
+-- | Returns True <=> the ReportErrCtxt indicates that something is deferred
+deferringAnyBindings :: ReportErrCtxt -> Bool
+  -- Don't check cec_type_holes, as these don't cause bindings to be deferred
+deferringAnyBindings (CEC { cec_defer_type_errors  = TypeError
+                          , cec_expr_holes         = HoleError
+                          , cec_out_of_scope_holes = HoleError }) = False
+deferringAnyBindings _                                            = True
+
+-- | Transforms a 'ReportErrCtxt' into one that does not defer any bindings
+-- at all.
+noDeferredBindings :: ReportErrCtxt -> ReportErrCtxt
+noDeferredBindings ctxt = ctxt { cec_defer_type_errors  = TypeError
+                               , cec_expr_holes         = HoleError
+                               , cec_out_of_scope_holes = HoleError }
 
 {-
 Note [Suppressing error messages]
@@ -359,7 +375,8 @@ Specifically (see reportWanteds)
 -}
 
 reportImplic :: ReportErrCtxt -> Implication -> TcM ()
-reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
+reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_telescope = m_telescope
+                                 , ic_given = given
                                  , ic_wanted = wanted, ic_binds = evb
                                  , ic_status = status, ic_info = info
                                  , ic_env = tcl_env, ic_tclvl = tc_lvl })
@@ -374,7 +391,8 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
   = do { traceTc "reportImplic" (ppr implic')
        ; reportWanteds ctxt' tc_lvl wanted
        ; when (cec_warn_redundant ctxt) $
-         warnRedundantConstraints ctxt' tcl_env info' dead_givens }
+         warnRedundantConstraints ctxt' tcl_env info' dead_givens
+       ; when bad_telescope $ reportBadTelescope ctxt tcl_env m_telescope tvs }
   where
     insoluble    = isInsolubleStatus status
     (env1, tvs') = mapAccumL tidyTyCoVarBndr (cec_tidy ctxt) tvs
@@ -382,8 +400,9 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
     implic' = implic { ic_skols = tvs'
                      , ic_given = map (tidyEvVar env1) given
                      , ic_info  = info' }
-    ctxt1 | termEvidenceAllowed info = ctxt
-          | otherwise                = ctxt { cec_defer_type_errors = TypeError }
+    ctxt1 | NoEvBindsVar{} <- evb    = noDeferredBindings ctxt
+          | termEvidenceAllowed info = ctxt
+          | otherwise                = noDeferredBindings ctxt
           -- If we go inside an implication that has no term
           -- evidence (i.e. unifying under a forall), we can't defer
           -- type errors.  You could imagine using the /enclosing/
@@ -405,6 +424,10 @@ reportImplic ctxt implic@(Implic { ic_skols = tvs, ic_given = given
     dead_givens = case status of
                     IC_Solved { ics_dead = dead } -> dead
                     _                             -> []
+
+    bad_telescope = case status of
+              IC_BadTelescope -> True
+              _               -> False
 
 warnRedundantConstraints :: ReportErrCtxt -> TcLclEnv -> SkolemInfo -> [EvVar] -> TcM ()
 -- See Note [Tracking redundant constraints] in TcSimplify
@@ -435,6 +458,20 @@ warnRedundantConstraints ctxt env info ev_vars
 
    improving ev_var = any isImprovementPred $
                       transSuperClasses (idType ev_var)
+
+reportBadTelescope :: ReportErrCtxt -> TcLclEnv -> Maybe SDoc -> [TcTyVar] -> TcM ()
+reportBadTelescope ctxt env (Just telescope) skols
+  = do { msg <- mkErrorReport ctxt env (important doc)
+       ; reportError msg }
+  where
+    doc = hang (text "These kind and type variables:" <+> telescope $$
+                text "are out of dependency order. Perhaps try this ordering:")
+             2 (pprTyVars sorted_tvs)
+
+    sorted_tvs = toposortTyVars skols
+
+reportBadTelescope _ _ Nothing skols
+  = pprPanic "reportBadTelescope" (ppr skols)
 
 {- Note [Redundant constraints in instance decls]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -792,19 +829,17 @@ maybeReportError ctxt err
   | cec_suppress ctxt    -- Some worse error has occurred;
   = return ()            -- so suppress this error/warning
 
-  | cec_errors_as_warns ctxt
-  = reportWarning NoReason err
-
   | otherwise
   = case cec_defer_type_errors ctxt of
-      TypeDefer -> return ()
-      TypeWarn  -> reportWarning (Reason Opt_WarnDeferredTypeErrors) err
-      TypeError -> reportError err
+      TypeDefer       -> return ()
+      TypeWarn reason -> reportWarning reason err
+      TypeError       -> reportError err
 
 addDeferredBinding :: ReportErrCtxt -> ErrMsg -> Ct -> TcM ()
 -- See Note [Deferring coercion errors to runtime]
 addDeferredBinding ctxt err ct
-  | CtWanted { ctev_pred = pred, ctev_dest = dest } <- ctEvidence ct
+  | deferringAnyBindings ctxt
+  , CtWanted { ctev_pred = pred, ctev_dest = dest } <- ctEvidence ct
     -- Only add deferred bindings for Wanted constraints
   = do { dflags <- getDynFlags
        ; let err_msg = pprLocErrMsg err
@@ -1229,7 +1264,7 @@ validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
                   (vcat (map (pprHoleFit showProvenance) sortedRSubs)
                     $$ ppWhen rDiscards refSubsDiscardMsg) }
        else return empty
-     ; traceTc "}" empty
+     ; traceTc "findingValidSubstitutionsFor }" empty
      ; return (vMsg $$ refMsg)}
   where
     hole_loc = ctEvLoc $ ctEvidence ct
@@ -1334,7 +1369,13 @@ validSubstitutions simples (CEC {cec_encl = implics}) ct | isExprHoleCt ct =
     getHoleCloningSubst :: TcType -> TcM TCvSubst
     getHoleCloningSubst hole_ty = mkTvSubstPrs <$> getClonedVars
       where cloneFV :: TyVar -> TcM (TyVar, Type)
-            cloneFV fv = ((,) fv) <$> newFlexiTyVarTy (varType fv)
+            cloneFV fv = ((,) fv) <$> pushTcLevelM_ (newFlexiTyVarTy (varType fv))
+             -- The subsumption check pushes the level, so as to be sure that
+             -- its invocation of the solver doesn't unify type variables floating
+             -- about that are unrelated to the subsumption check. However, these
+             -- cloned variables in the hole type *should* be unified, so we make
+             -- sure to bump the level before creating them
+
             getClonedVars :: TcM [(TyVar, Type)]
             getClonedVars = mapM cloneFV (fvVarList $ tyCoFVsOfType hole_ty)
 
@@ -2314,13 +2355,22 @@ mkExpectedActualMsg ty1 ty2 (TypeEqOrigin { uo_actual = act
                , maybe (text "found something with kind")
                        (\thing -> quotes thing <+> text "has kind")
                        maybe_thing
-               , quotes (ppr act) ]
+               , quotes (pprWithTYPE act) ]
 
     msg5 th = hang (text "Expected" <+> kind_desc <> comma)
                  2 (text "but" <+> quotes th <+> text "has kind" <+>
                     quotes (ppr act))
       where
         kind_desc | isConstraintKind exp = text "a constraint"
+
+                    -- TYPE t0
+                  | Just (tc, [arg]) <- tcSplitTyConApp_maybe exp
+                  , tc `hasKey` tYPETyConKey
+                  , tcIsTyVarTy arg      = sdocWithDynFlags $ \dflags ->
+                                           if gopt Opt_PrintExplicitRuntimeReps dflags
+                                           then text "kind" <+> quotes (ppr exp)
+                                           else text "a type"
+
                   | otherwise            = text "kind" <+> quotes (ppr exp)
 
     num_args_msg = case level of

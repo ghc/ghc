@@ -11,7 +11,8 @@
 module Coercion (
         -- * Main data type
         Coercion, CoercionN, CoercionR, CoercionP,
-        UnivCoProvenance, CoercionHole, LeftOrRight(..),
+        UnivCoProvenance, CoercionHole(..), coHoleCoVar, setCoHoleCoVar,
+        LeftOrRight(..),
         Var, CoVar, TyCoVar,
         Role(..), ltRole,
 

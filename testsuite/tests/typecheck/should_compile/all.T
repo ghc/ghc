@@ -602,4 +602,3 @@ test('T14934', [extra_files(['T14934.hs', 'T14934a.hs'])], run_command,
 test('T13643', normal, compile, [''])
 test('SplitWD', expect_broken(14119), compile, [''])
 test('T14441', normal, compile, [''])
-test('T14749', normal, compile, [''])

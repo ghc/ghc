@@ -40,7 +40,7 @@ import FamInstEnv( normaliseType )
 import FamInst( tcGetFamInstEnvs )
 import TyCon
 import TcType
-import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe)
+import Type( mkStrLitTy, tidyOpenType, splitTyConApp_maybe, mkCastTy)
 import TysPrim
 import TysWiredIn( mkBoxedTupleTy )
 import Id
@@ -987,14 +987,14 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
       | otherwise -- Can't happen; by now we know it's a partial sig
       = pprPanic "report_sig_tv_err" (ppr sig)
 
-    choose_psig_context :: VarSet -> TcThetaType -> Maybe TcTyVar
+    choose_psig_context :: VarSet -> TcThetaType -> Maybe TcType
                         -> TcM (VarSet, TcThetaType)
     choose_psig_context _ annotated_theta Nothing
       = do { let free_tvs = closeOverKinds (tyCoVarsOfTypes annotated_theta
                                             `unionVarSet` tau_tvs)
            ; return (free_tvs, annotated_theta) }
 
-    choose_psig_context psig_qtvs annotated_theta (Just wc_var)
+    choose_psig_context psig_qtvs annotated_theta (Just wc_var_ty)
       = do { let free_tvs = closeOverKinds (growThetaTyVars inferred_theta seed_tvs)
                             -- growThetaVars just like the no-type-sig case
                             -- Omitting this caused #12844
@@ -1012,7 +1012,13 @@ chooseInferredQuantifiers inferred_theta tau_tvs qtvs
                                  | pred <- my_theta
                                  , all (not . (`eqType` pred)) annotated_theta ]
            ; ctuple <- mk_ctuple inferred_diff
-           ; writeMetaTyVar wc_var ctuple
+
+           ; case tcGetCastedTyVar_maybe wc_var_ty of
+               -- We know that wc_co must have type kind(wc_var) ~ Constraint, as it
+               -- comes from the checkExpectedKind in TcHsType.tcWildCardOcc. So, to
+               -- make the kinds work out, we reverse the cast here.
+               Just (wc_var, wc_co) -> writeMetaTyVar wc_var (ctuple `mkCastTy` mkTcSymCo wc_co)
+               Nothing              -> pprPanic "chooseInferredQuantifiers 1" (ppr wc_var_ty)
 
            ; traceTc "completeTheta" $
                 vcat [ ppr sig
@@ -1517,6 +1523,7 @@ tcExtendTyVarEnvForRhs (Just sig) thing_inside
 tcExtendTyVarEnvFromSig :: TcIdSigInst -> TcM a -> TcM a
 tcExtendTyVarEnvFromSig sig_inst thing_inside
   | TISI { sig_inst_skols = skol_prs, sig_inst_wcs = wcs } <- sig_inst
+     -- Note [Use tcExtendTyVar not scopeTyVars in tcRhs]
   = tcExtendTyVarEnv2 wcs $
     tcExtendTyVarEnv2 skol_prs $
     thing_inside
@@ -1655,6 +1662,30 @@ Example for (E2), we generate
      q :: beta:1, with constraint (forall:3 a. Integral a => Int ~ beta)
 The beta is untoucable, but floats out of the constraint and can
 be solved absolutely fine.
+
+Note [Use tcExtendTyVar not scopeTyVars in tcRhs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Normally, any place that corresponds to Λ or ∀ in Core should be flagged
+with a call to scopeTyVars, which arranges for an implication constraint
+to be made, bumps the TcLevel, and (crucially) prevents a unification
+variable created outside the scope of a local skolem to unify with that
+skolem.
+
+We do not need to do this here, however.
+
+- Note that this happens only in the case of a partial signature.
+  Complete signatures go via tcPolyCheck, not tcPolyInfer.
+
+- The TcLevel is incremented in tcPolyInfer, right outside the call
+  to tcMonoBinds. We thus don't have to worry about outer metatvs unifying
+  with local skolems.
+
+- The other potential concern is that we need SkolemInfo associated with
+  the skolems. This, too, is OK, though: the constraints pass through
+  simplifyInfer (which doesn't report errors), at the end of which
+  the skolems will get quantified and put into an implication constraint.
+  Thus, by the time any errors are reported, the SkolemInfo will be
+  in place.
 
 ************************************************************************
 *                                                                      *

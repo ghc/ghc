@@ -1036,13 +1036,13 @@ splitLHsSigmaTy ty
   = (tvs, ctxt, ty2)
 
 splitLHsForAllTy :: LHsType pass -> ([LHsTyVarBndr pass], LHsType pass)
+splitLHsForAllTy (L _ (HsParTy ty)) = splitLHsForAllTy ty
 splitLHsForAllTy (L _ (HsForAllTy { hst_bndrs = tvs, hst_body = body })) = (tvs, body)
-splitLHsForAllTy (L _ (HsParTy t)) = splitLHsForAllTy t
 splitLHsForAllTy body              = ([], body)
 
 splitLHsQualTy :: LHsType pass -> (LHsContext pass, LHsType pass)
+splitLHsQualTy (L _ (HsParTy ty)) = splitLHsQualTy ty
 splitLHsQualTy (L _ (HsQualTy { hst_ctxt = ctxt, hst_body = body })) = (ctxt,     body)
-splitLHsQualTy (L _ (HsParTy t)) = splitLHsQualTy t
 splitLHsQualTy body              = (noLoc [], body)
 
 splitLHsInstDeclTy :: LHsSigType GhcRn

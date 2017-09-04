@@ -28,7 +28,7 @@ module TcSMonad (
     -- Evidence creation and transformation
     MaybeNew(..), freshGoals, isFresh, getEvExpr,
 
-    newTcEvBinds,
+    newTcEvBinds, newNoTcEvBinds,
     newWantedEq, emitNewWantedEq,
     newWanted, newWantedEvVar, newWantedNC, newWantedEvVarNC, newDerivedNC,
     newBoundEvVarId,
@@ -95,11 +95,12 @@ module TcSMonad (
     cloneMetaTyVar, demoteUnfilledFmv,
     tcInstType, tcInstSkolTyVarsX,
 
-    TcLevel, isTouchableMetaTyVarTcS,
+    TcLevel,
     isFilledMetaTyVar_maybe, isFilledMetaTyVar,
     zonkTyCoVarsAndFV, zonkTcType, zonkTcTypes, zonkTcTyVar, zonkCo,
     zonkTyCoVarsAndFVList,
     zonkSimples, zonkWC,
+    zonkTcTyCoVarBndr,
 
     -- References
     newTcRef, readTcRef, updTcRef,
@@ -2566,7 +2567,7 @@ runTcSDeriveds tcs
 -- | This can deal only with equality constraints.
 runTcSEqualities :: TcS a -> TcM a
 runTcSEqualities thing_inside
-  = do { ev_binds_var <- TcM.newTcEvBinds
+  = do { ev_binds_var <- TcM.newNoTcEvBinds
        ; runTcSWithEvBinds ev_binds_var thing_inside }
 
 runTcSWithEvBinds :: EvBindsVar
@@ -2893,11 +2894,6 @@ checkWellStagedDFun pred dfun_id loc
 pprEq :: TcType -> TcType -> SDoc
 pprEq ty1 ty2 = pprParendType ty1 <+> char '~' <+> pprParendType ty2
 
-isTouchableMetaTyVarTcS :: TcTyVar -> TcS Bool
-isTouchableMetaTyVarTcS tv
-  = do { tclvl <- getTcLevel
-       ; return $ isTouchableMetaTyVar tclvl tv }
-
 isFilledMetaTyVar_maybe :: TcTyVar -> TcS (Maybe Type)
 isFilledMetaTyVar_maybe tv
  = case tcTyVarDetails tv of
@@ -2935,6 +2931,8 @@ zonkSimples cts = wrapTcS (TcM.zonkSimples cts)
 zonkWC :: WantedConstraints -> TcS WantedConstraints
 zonkWC wc = wrapTcS (TcM.zonkWC wc)
 
+zonkTcTyCoVarBndr :: TcTyCoVar -> TcS TcTyCoVar
+zonkTcTyCoVarBndr tv = wrapTcS (TcM.zonkTcTyCoVarBndr tv)
 
 {- *********************************************************************
 *                                                                      *
@@ -3085,6 +3083,7 @@ instFlexiHelper subst tv
        ; let name = setNameUnique (tyVarName tv) uniq
              kind = substTyUnchecked subst (tyVarKind tv)
              ty'  = mkTyVarTy (mkTcTyVar name kind details)
+       ; TcM.traceTc "instFlexi" (ppr ty')
        ; return (extendTvSubst subst tv ty') }
 
 tcInstType :: ([TyVar] -> TcM (TCvSubst, [TcTyVar]))
@@ -3121,7 +3120,8 @@ setEvBind ev_bind
 -- | Mark variables as used filling a coercion hole
 useVars :: CoVarSet -> TcS ()
 useVars vars
-  = do { EvBindsVar { ebv_tcvs = ref } <- getTcEvBindsVar
+  = do { ev_binds_var <- getTcEvBindsVar
+       ; let ref = ebv_tcvs ev_binds_var
        ; wrapTcS $
          do { tcvs <- TcM.readTcRef ref
             ; let tcvs' = tcvs `unionVarSet` vars
@@ -3159,6 +3159,9 @@ setEvBindIfWanted ev tm
 
 newTcEvBinds :: TcS EvBindsVar
 newTcEvBinds = wrapTcS TcM.newTcEvBinds
+
+newNoTcEvBinds :: TcS EvBindsVar
+newNoTcEvBinds = wrapTcS TcM.newNoTcEvBinds
 
 newEvVar :: TcPredType -> TcS EvVar
 newEvVar pred = wrapTcS (TcM.newEvVar pred)

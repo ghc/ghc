@@ -12,9 +12,7 @@ hole_constraints.hs:8:6: warning: [-Wtyped-holes (in -Wdefault)]
       Constraints include Eq a (from hole_constraints.hs:7:1-15)
       Valid substitutions include
         f1 :: forall a. Eq a => a (defined at hole_constraints.hs:8:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Err’))
 
@@ -35,9 +33,7 @@ hole_constraints.hs:12:6: warning: [-Wtyped-holes (in -Wdefault)]
         f2 :: forall a. (Show a, Eq a) => a
           (defined at hole_constraints.hs:12:1)
         f1 :: forall a. Eq a => a (defined at hole_constraints.hs:8:1)
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Err’))
 
@@ -58,9 +54,7 @@ hole_constraints.hs:16:35: warning: [-Wtyped-holes (in -Wdefault)]
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Err’))
 
@@ -77,9 +71,7 @@ hole_constraints.hs:20:19: warning: [-Wtyped-holes (in -Wdefault)]
         castWith :: (a :~: b) -> a -> b (bound at hole_constraints.hs:20:1)
       Constraints include b ~ a (from hole_constraints.hs:20:10-13)
       Valid substitutions include
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Err’))
 
@@ -101,8 +93,6 @@ hole_constraints.hs:27:32: warning: [-Wtyped-holes (in -Wdefault)]
         mempty :: forall a. Monoid a => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Base’))
-        undefined :: forall (a :: TYPE r).
-                     GHC.Stack.Types.HasCallStack =>
-                     a
+        undefined :: forall a. GHC.Stack.Types.HasCallStack => a
           (imported from ‘Prelude’ at hole_constraints.hs:3:8-22
            (and originally defined in ‘GHC.Err’))

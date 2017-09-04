@@ -151,7 +151,7 @@ import HscTypes
 import TcEvidence
 import Type
 import Class    ( Class )
-import TyCon    ( TyCon, tyConKind )
+import TyCon    ( TyCon, TyConFlavour, tyConKind )
 import TyCoRep  ( CoercionHole(..), coHoleCoVar )
 import Coercion ( Coercion, mkHoleCo )
 import ConLike  ( ConLike(..) )
@@ -1516,8 +1516,11 @@ data TcIdSigInst
                -- wildcards scope over the binding, and hence their
                -- Names may appear in type signatures in the binding
 
-         , sig_inst_wcx   :: Maybe TcTyVar
+         , sig_inst_wcx   :: Maybe TcType
                -- Extra-constraints wildcard to fill in, if any
+               -- If this exists, it is surely of the form (meta_tv |> co)
+               -- (where the co might be reflexive). This is filled in
+               -- only from the return value of TcHsType.tcWildCardOcc
          }
 
 {- Note [sig_inst_tau may be polymorphic]
@@ -1554,7 +1557,7 @@ data TcPatSynInfo
         patsig_name           :: Name,
         patsig_implicit_bndrs :: [TyVarBinder], -- Implicitly-bound kind vars (Inferred) and
                                                 -- implicitly-bound type vars (Specified)
-          -- See Note [The pattern-synonym signature splitting rule] in TcPatSyn
+          -- See Note [The pattern-synonym signature splitting rule] in TcSigs
         patsig_univ_bndrs     :: [TyVar],       -- Bound by explicit user forall
         patsig_req            :: TcThetaType,
         patsig_ex_bndrs       :: [TyVar],       -- Bound by explicit user forall
@@ -2329,8 +2332,9 @@ isSolvedStatus (IC_Solved {}) = True
 isSolvedStatus _              = False
 
 isInsolubleStatus :: ImplicStatus -> Bool
-isInsolubleStatus IC_Insoluble = True
-isInsolubleStatus _            = False
+isInsolubleStatus IC_Insoluble    = True
+isInsolubleStatus IC_BadTelescope = True
+isInsolubleStatus _               = False
 
 insolubleImplic :: Implication -> Bool
 insolubleImplic ic = isInsolubleStatus (ic_status ic)
@@ -2432,6 +2436,11 @@ data Implication
       ic_skols :: [TcTyVar],     -- Introduced skolems
       ic_info  :: SkolemInfo,    -- See Note [Skolems in an implication]
                                  -- See Note [Shadowing in a constraint]
+      ic_telescope :: Maybe SDoc,  -- User-written telescope, if there is one
+                                   -- The list of skolems is order-checked
+                                   -- if and only if this is a Just.
+                                   -- See Note [Keeping scoped variables in order: Explicit]
+                                   -- in TcHsType
 
       ic_given  :: [EvVar],      -- Given evidence variables
                                  --   (order does not matter)
@@ -2472,6 +2481,7 @@ newImplication
 
              -- The rest have sensible default values
            , ic_skols      = []
+           , ic_telescope  = Nothing
            , ic_given      = []
            , ic_wanted     = emptyWC
            , ic_no_eqs     = False
@@ -2485,6 +2495,9 @@ data ImplicStatus
          -- See Note [Tracking redundant constraints] in TcSimplify
 
   | IC_Insoluble  -- At least one insoluble constraint in the tree
+
+  | IC_BadTelescope  -- solved, but the skolems in the telescope are out of
+                     -- dependency order
 
   | IC_Unsolved   -- Neither of the above; might go either way
 
@@ -2507,8 +2520,9 @@ instance Outputable Implication where
                , pprSkolInfo info ] <+> rbrace)
 
 instance Outputable ImplicStatus where
-  ppr IC_Insoluble   = text "Insoluble"
-  ppr IC_Unsolved    = text "Unsolved"
+  ppr IC_Insoluble    = text "Insoluble"
+  ppr IC_BadTelescope = text "Bad telescope"
+  ppr IC_Unsolved     = text "Unsolved"
   ppr (IC_Solved { ics_dead = dead })
     = text "Solved" <+> (braces (text "Dead givens =" <+> ppr dead))
 
@@ -3154,7 +3168,11 @@ data SkolemInfo
        [(Name,TcTyVar)]    -- Maps the original name of the skolemised tyvar
                            -- to its instantiated version
 
-  | ClsSkol Class       -- Bound at a class decl
+  | SigTypeSkol UserTypeCtxt
+                 -- like SigSkol, but when we're kind-checking the *type*
+                 -- hence, we have less info
+
+  | ForAllSkol SDoc     -- Bound by a user-written "forall".
 
   | DerivSkol Type      -- Bound by a 'deriving' clause;
                         -- the type is the instance we are trying to derive
@@ -3166,7 +3184,6 @@ data SkolemInfo
                         --    then TypeSize = sizeTypes [ty1, .., tyn]
                         -- See Note [Solving superclass constraints] in TcInstDcls
 
-  | DataSkol            -- Bound at a data type declaration
   | FamInstSkol         -- Bound at a family instance decl
   | PatSkol             -- An existential type variable bound by a pattern for
       ConLike           -- a data constructor with an existential type.
@@ -3192,6 +3209,13 @@ data SkolemInfo
   | UnifyForAllSkol     -- We are unifying two for-all types
        TcType           -- The instantiated type *inside* the forall
 
+  | TyConSkol TyConFlavour Name  -- bound in a type declaration of the given flavour
+
+  | DataConSkol Name    -- bound as an existential in a Haskell98 datacon decl or
+                        -- as any variable in a GADT datacon decl
+
+  | ReifySkol           -- Bound during Template Haskell reification
+
   | UnkSkol             -- Unhelpful info (until I improve it)
 
 instance Outputable SkolemInfo where
@@ -3208,13 +3232,13 @@ termEvidenceAllowed _                    = True
 pprSkolInfo :: SkolemInfo -> SDoc
 -- Complete the sentence "is a rigid type variable bound by..."
 pprSkolInfo (SigSkol cx ty _) = pprSigSkolInfo cx ty
+pprSkolInfo (SigTypeSkol cx)  = pprUserTypeCtxt cx
+pprSkolInfo (ForAllSkol doc)  = quotes doc
 pprSkolInfo (IPSkol ips)      = text "the implicit-parameter binding" <> plural ips <+> text "for"
                                  <+> pprWithCommas ppr ips
-pprSkolInfo (ClsSkol cls)     = text "the class declaration for" <+> quotes (ppr cls)
 pprSkolInfo (DerivSkol pred)  = text "the deriving clause for" <+> quotes (ppr pred)
 pprSkolInfo InstSkol          = text "the instance declaration"
 pprSkolInfo (InstSC n)        = text "the instance declaration" <> whenPprDebug (parens (ppr n))
-pprSkolInfo DataSkol          = text "a data type declaration"
 pprSkolInfo FamInstSkol       = text "a family instance declaration"
 pprSkolInfo BracketSkol       = text "a Template Haskell bracket"
 pprSkolInfo (RuleSkol name)   = text "the RULE" <+> pprRuleName name
@@ -3225,6 +3249,9 @@ pprSkolInfo (InferSkol ids)   = hang (text "the inferred type" <> plural ids <+>
                                    2 (vcat [ ppr name <+> dcolon <+> ppr ty
                                                    | (name,ty) <- ids ])
 pprSkolInfo (UnifyForAllSkol ty) = text "the type" <+> ppr ty
+pprSkolInfo (TyConSkol flav name) = text "the" <+> ppr flav <+> text "declaration for" <+> quotes (ppr name)
+pprSkolInfo (DataConSkol name)= text "the data constructor" <+> quotes (ppr name)
+pprSkolInfo ReifySkol         = text "the type being reified"
 
 -- UnkSkol
 -- For type variables the others are dealt with by pprSkolTvBinding.

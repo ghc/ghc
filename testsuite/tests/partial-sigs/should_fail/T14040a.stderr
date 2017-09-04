@@ -1,9 +1,30 @@
 
 T14040a.hs:21:18: error:
-    • The kind of variable ‘wl1’, namely ‘WeirdList a1’,
-      depends on variable ‘a1’ from an inner scope
-      Perhaps bind ‘wl1’ sometime after binding ‘a1’
-    • In the type signature:
+    • Couldn't match type ‘k0’ with ‘a’
+        because type variable ‘a’ would escape its scope
+      This (rigid, skolem) type variable is bound by
+        the type signature for:
+          elimWeirdList :: forall a1 (wl :: WeirdList a1) (p :: forall x.
+                                                                x -> WeirdList x -> *).
+                           Sing wl
+                           -> (forall y. p k0 w0 'WeirdNil)
+                           -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
+                               Sing x -> Sing xs -> p k1 w1 xs -> p k2 w2 ('WeirdCons x xs))
+                           -> p k3 w3 wl
+        at T14040a.hs:(21,18)-(28,23)
+      Expected type: Sing wl
+                     -> (forall y. p k1 w0 'WeirdNil)
+                     -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
+                         Sing x -> Sing xs -> p k0 w1 xs -> p k2 w2 ('WeirdCons x xs))
+                     -> p k3 w3 wl
+        Actual type: Sing wl
+                     -> (forall y. p k1 w0 'WeirdNil)
+                     -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
+                         Sing x -> Sing xs -> p k0 w1 xs -> p k2 w2 ('WeirdCons x xs))
+                     -> p k3 w3 wl
+    • In the ambiguity check for ‘elimWeirdList’
+      To defer the ambiguity check to use sites, enable AllowAmbiguousTypes
+      In the type signature:
         elimWeirdList :: forall (a :: Type)
                                 (wl :: WeirdList a)
                                 (p :: forall (x :: Type). x -> WeirdList x -> Type).
@@ -15,13 +36,11 @@ T14040a.hs:21:18: error:
 
 T14040a.hs:34:8: error:
     • Cannot apply expression of type ‘Sing wl
-                                       -> (forall y. p x0 w0 'WeirdNil)
+                                       -> (forall y. p k0 w0 'WeirdNil)
                                        -> (forall z1 (x :: z1) (xs :: WeirdList (WeirdList z1)).
                                            Sing x
-                                           -> Sing xs
-                                           -> p (WeirdList z1) w1 xs
-                                           -> p z1 w2 ('WeirdCons x xs))
-                                       -> p a1 w3 wl’
+                                           -> Sing xs -> p k1 w1 xs -> p k2 w2 ('WeirdCons x xs))
+                                       -> p k3 w3 wl’
       to a visible type argument ‘(WeirdList z)’
     • In the sixth argument of ‘pWeirdCons’, namely
         ‘(elimWeirdList @(WeirdList z) @xs @p xs pWeirdNil pWeirdCons)’
