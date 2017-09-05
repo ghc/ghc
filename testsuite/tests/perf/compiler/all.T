@@ -131,7 +131,6 @@ test('parsing001',
 
 test('T783',
      [ only_ways(['normal']),  # no optimisation for this one
-      # expected value: 175,569,928 (x86/Linux)
       collect_stats('bytes allocated',10,True),
 
       extra_hc_opts('-static')
@@ -294,7 +293,6 @@ test('T12707',
 test('T12150',
      [ only_ways(['optasm']),
        collect_stats('bytes allocated',5,True),
-          ]),
      ],
     compile,
      [''])
