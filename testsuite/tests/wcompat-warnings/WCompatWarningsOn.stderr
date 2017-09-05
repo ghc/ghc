@@ -26,7 +26,7 @@ WCompatWarningsOn.hs:16:1: warning: [-Wsemigroup (in -Wcompat)]
 
 WCompatWarningsOn.hs:22:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]
     Noncanonical ‘(<>) = mappend’ definition detected
-    in the instance declaration for ‘Semi.Semigroup S’.
+    in the instance declaration for ‘Semigroup S’.
     Move definition from ‘mappend’ to ‘(<>)’
 
 WCompatWarningsOn.hs:25:3: warning: [-Wnoncanonical-monoid-instances (in -Wcompat)]

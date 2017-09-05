@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE Trustworthy #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -130,6 +131,17 @@ data  Either a b  =  Left a | Right b
 instance Functor (Either a) where
     fmap _ (Left x) = Left x
     fmap f (Right y) = Right (f y)
+
+-- | @since 4.9.0.0
+instance Semigroup (Either a b) where
+    Left _ <> b = b
+    a      <> _ = a
+#if !defined(__HADDOCK_VERSION__)
+    -- workaround https://github.com/haskell/haddock/issues/680
+    stimes n x
+      | n <= 0 = errorWithoutStackTrace "stimes: positive multiplier expected"
+      | otherwise = x
+#endif
 
 -- | @since 3.0
 instance Applicative (Either e) where

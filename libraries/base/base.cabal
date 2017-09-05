@@ -317,6 +317,7 @@ Library
         Control.Monad.ST.Lazy.Imp
         Data.Functor.Utils
         Data.OldList
+        Data.Semigroup.Internal
         Data.Typeable.Internal
         Foreign.ForeignPtr.Imp
         GHC.StaticPtr.Internal

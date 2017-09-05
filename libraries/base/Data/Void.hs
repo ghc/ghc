@@ -28,6 +28,7 @@ import Control.Exception
 import Data.Data
 import Data.Ix
 import GHC.Generics
+import Data.Semigroup (Semigroup(..), stimesIdempotent)
 
 -- | Uninhabited data type
 --
@@ -63,6 +64,11 @@ instance Ix Void where
 
 -- | @since 4.8.0.0
 instance Exception Void
+
+-- | @since 4.9.0.0
+instance Semigroup Void where
+    a <> _ = a
+    stimes = stimesIdempotent
 
 -- | Since 'Void' values logically don't exist, this witnesses the
 -- logical reasoning tool of \"ex falso quodlibet\".

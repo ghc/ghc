@@ -11,7 +11,7 @@ module Data.Functor.Utils where
 
 import Data.Coerce (Coercible, coerce)
 import GHC.Base ( Applicative(..), Functor(..), Maybe(..), Monoid(..), Ord(..)
-                , ($), otherwise )
+                , Semigroup(..), ($), otherwise )
 
 -- We don't expose Max and Min because, as Edward Kmett pointed out to me,
 -- there are two reasonable ways to define them. One way is to use Maybe, as we
@@ -22,27 +22,31 @@ import GHC.Base ( Applicative(..), Functor(..), Maybe(..), Monoid(..), Ord(..)
 newtype Max a = Max {getMax :: Maybe a}
 newtype Min a = Min {getMin :: Maybe a}
 
+-- | @since 4.11.0.0
+instance Ord a => Semigroup (Max a) where
+    {-# INLINE (<>) #-}
+    m <> Max Nothing = m
+    Max Nothing <> n = n
+    (Max m@(Just x)) <> (Max n@(Just y))
+      | x >= y    = Max m
+      | otherwise = Max n
+
 -- | @since 4.8.0.0
 instance Ord a => Monoid (Max a) where
-  mempty = Max Nothing
+    mempty = Max Nothing
 
-  {-# INLINE mappend #-}
-  m `mappend` Max Nothing = m
-  Max Nothing `mappend` n = n
-  (Max m@(Just x)) `mappend` (Max n@(Just y))
-    | x >= y    = Max m
-    | otherwise = Max n
+-- | @since 4.11.0.0
+instance Ord a => Semigroup (Min a) where
+    {-# INLINE (<>) #-}
+    m <> Min Nothing = m
+    Min Nothing <> n = n
+    (Min m@(Just x)) <> (Min n@(Just y))
+      | x <= y    = Min m
+      | otherwise = Min n
 
 -- | @since 4.8.0.0
 instance Ord a => Monoid (Min a) where
-  mempty = Min Nothing
-
-  {-# INLINE mappend #-}
-  m `mappend` Min Nothing = m
-  Min Nothing `mappend` n = n
-  (Min m@(Just x)) `mappend` (Min n@(Just y))
-    | x <= y    = Min m
-    | otherwise = Min n
+    mempty = Min Nothing
 
 -- left-to-right state transformer
 newtype StateL s a = StateL { runStateL :: s -> (s, a) }

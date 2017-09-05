@@ -1,8 +1,0 @@
-
-SemigroupWarnings.hs:17:10: warning: [-Wsemigroup (in -Wcompat)]
-    ‘LacksSemigroup’ is an instance of Monoid but not Semigroup.
-    This will become an error in a future release.
-
-SemigroupWarnings.hs:34:1: warning: [-Wsemigroup (in -Wcompat)]
-    Local definition of ‘<>’ clashes with a future Prelude name.
-    This will become an error in a future release.

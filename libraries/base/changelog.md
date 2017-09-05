@@ -8,6 +8,12 @@
   * Add instances `Num`, `Functor`, `Applicative`, `Monad`, `Semigroup`
     and `Monoid` for `Data.Ord.Down` (#13097).
 
+  * Add `Semigroup` instance for `EventLifetime`.
+
+  * Make `Semigroup` a superclass of `Monoid`;
+    export `Semigroup` from `Prelude`; remove `Monoid` reexport
+    from `Data.Semigroup` (#14191).
+
   * Add `infixl 9 !!` declaration for `Data.List.NonEmpty.!!`
 
   * Add `<&>` operator to `Data.Functor` (#14029)

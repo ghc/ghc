@@ -98,10 +98,15 @@ instance Ix (Proxy s) where
     unsafeIndex _ _   = 0
     unsafeRangeSize _ = 1
 
+-- | @since 4.9.0.0
+instance Semigroup (Proxy s) where
+    _ <> _ = Proxy
+    sconcat _ = Proxy
+    stimes _ _ = Proxy
+
 -- | @since 4.7.0.0
 instance Monoid (Proxy s) where
     mempty = Proxy
-    mappend _ _ = Proxy
     mconcat _ = Proxy
 
 -- | @since 4.7.0.0

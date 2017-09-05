@@ -43,7 +43,7 @@ import Data.Functor.Utils ((#.))
 import Foreign.Storable (Storable)
 import GHC.Arr (Ix)
 import GHC.Base ( Applicative(..), Eq(..), Functor(..), Monad(..)
-                , Monoid, Ord(..), ($), (.) )
+                , Semigroup, Monoid, Ord(..), ($), (.) )
 import GHC.Enum (Bounded, Enum)
 import GHC.Float (Floating, RealFloat)
 import GHC.Generics (Generic, Generic1)
@@ -58,7 +58,7 @@ import GHC.Types (Bool(..))
 -- @since 4.8.0.0
 newtype Identity a = Identity { runIdentity :: a }
     deriving ( Bits, Bounded, Enum, Eq, FiniteBits, Floating, Fractional
-             , Generic, Generic1, Integral, Ix, Monoid, Num, Ord
+             , Generic, Generic1, Integral, Ix, Semigroup, Monoid, Num, Ord
              , Real, RealFrac, RealFloat, Storable)
 
 -- | This instance would be equivalent to the derived instances of the

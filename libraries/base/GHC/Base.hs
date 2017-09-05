@@ -129,6 +129,14 @@ import {-# SOURCE #-} GHC.IO (failIO,mplusIO)
 import GHC.Tuple ()     -- Note [Depend on GHC.Tuple]
 import GHC.Integer ()   -- Note [Depend on GHC.Integer]
 
+-- for 'class Semigroup'
+import {-# SOURCE #-} GHC.Real (Integral)
+import {-# SOURCE #-} Data.Semigroup.Internal ( stimesDefault
+                                              , stimesMaybe
+                                              , stimesList
+                                              , stimesIdempotentMonoid
+                                              )
+
 infixr 9  .
 infixr 5  ++
 infixl 4  <$
@@ -204,16 +212,53 @@ foldr = errorWithoutStackTrace "urk"
 data  Maybe a  =  Nothing | Just a
   deriving (Eq, Ord)
 
+infixr 6 <>
+
+-- | The class of semigroups (types with an associative binary operation).
+--
+-- Instances should satisfy the associativity law:
+--
+--  * @x '<>' (y '<>' z) = (x '<>' y) '<>' z@
+--
+-- @since 4.9.0.0
+class Semigroup a where
+        -- | An associative operation.
+        (<>) :: a -> a -> a
+
+        -- | Reduce a non-empty list with @\<\>@
+        --
+        -- The default definition should be sufficient, but this can be
+        -- overridden for efficiency.
+        --
+        sconcat :: NonEmpty a -> a
+        sconcat (a :| as) = go a as where
+          go b (c:cs) = b <> go c cs
+          go b []     = b
+
+        -- | Repeat a value @n@ times.
+        --
+        -- Given that this works on a 'Semigroup' it is allowed to fail if
+        -- you request 0 or fewer repetitions, and the default definition
+        -- will do so.
+        --
+        -- By making this a member of the class, idempotent semigroups
+        -- and monoids can upgrade this to execute in /O(1)/ by
+        -- picking @stimes = 'stimesIdempotent'@ or @stimes =
+        -- 'stimesIdempotentMonoid'@ respectively.
+        stimes :: Integral b => b -> a -> a
+        stimes = stimesDefault
+
+
 -- | The class of monoids (types with an associative binary operation that
 -- has an identity).  Instances should satisfy the following laws:
 --
---  * @'mappend' 'mempty' x = x@
+--  * @x '<>' 'mempty' = x@
 --
---  * @'mappend' x 'mempty' = x@
+--  * @'mempty' '<>' x = x@
 --
---  * @'mappend' x ('mappend' y z) = 'mappend' ('mappend' x y) z@
+--  * @x '<>' (y '<>' z) = (x '<>' y) '<>' z@ ('Semigroup' law)
 --
---  * @'mconcat' = 'foldr' 'mappend' 'mempty'@
+--  * @'mconcat' = 'foldr' '(<>)' 'mempty'@
 --
 -- The method names refer to the monoid of lists under concatenation,
 -- but there are many other instances.
@@ -222,27 +267,39 @@ data  Maybe a  =  Nothing | Just a
 -- e.g. both addition and multiplication on numbers.
 -- In such cases we often define @newtype@s and make those instances
 -- of 'Monoid', e.g. 'Sum' and 'Product'.
-
-class Monoid a where
+--
+-- __NOTE__: 'Semigroup' is a superclass of 'Monoid' since /base-4.11.0.0/.
+class Semigroup a => Monoid a where
+        -- | Identity of 'mappend'
         mempty  :: a
-        -- ^ Identity of 'mappend'
-        mappend :: a -> a -> a
-        -- ^ An associative operation
-        mconcat :: [a] -> a
 
-        -- ^ Fold a list using the monoid.
+        -- | An associative operation
+        --
+        -- __NOTE__: This method is redundant and has the default
+        -- implementation @'mappend' = '(<>)'@ since /base-4.11.0.0/.
+        mappend :: a -> a -> a
+        mappend = (<>)
+        {-# INLINE mappend #-}
+
+        -- | Fold a list using the monoid.
+        --
         -- For most types, the default definition for 'mconcat' will be
         -- used, but the function is included in the class definition so
         -- that an optimized version can be provided for specific types.
-
+        mconcat :: [a] -> a
         mconcat = foldr mappend mempty
+
+-- | @since 4.9.0.0
+instance Semigroup [a] where
+        (<>) = (++)
+        {-# INLINE (<>) #-}
+
+        stimes = stimesList
 
 -- | @since 2.01
 instance Monoid [a] where
         {-# INLINE mempty #-}
         mempty  = []
-        {-# INLINE mappend #-}
-        mappend = (++)
         {-# INLINE mconcat #-}
         mconcat xss = [x | xs <- xss, x <- xs]
 -- See Note: [List comprehensions and inlining]
@@ -266,52 +323,92 @@ needed to make foldr/build forms efficient are turned off, we'll get reasonably
 efficient translations anyway.
 -}
 
+-- | @since 4.9.0.0
+instance Semigroup (NonEmpty a) where
+        (a :| as) <> ~(b :| bs) = a :| (as ++ b : bs)
+
+-- | @since 4.9.0.0
+instance Semigroup b => Semigroup (a -> b) where
+        f <> g = \x -> f x <> g x
+        stimes n f e = stimes n (f e)
+
 -- | @since 2.01
 instance Monoid b => Monoid (a -> b) where
         mempty _ = mempty
-        mappend f g x = f x `mappend` g x
+
+-- | @since 4.9.0.0
+instance Semigroup () where
+        _ <> _      = ()
+        sconcat _   = ()
+        stimes  _ _ = ()
 
 -- | @since 2.01
 instance Monoid () where
         -- Should it be strict?
         mempty        = ()
-        _ `mappend` _ = ()
         mconcat _     = ()
+
+-- | @since 4.9.0.0
+instance (Semigroup a, Semigroup b) => Semigroup (a, b) where
+        (a,b) <> (a',b') = (a<>a',b<>b')
+        stimes n (a,b) = (stimes n a, stimes n b)
 
 -- | @since 2.01
 instance (Monoid a, Monoid b) => Monoid (a,b) where
         mempty = (mempty, mempty)
-        (a1,b1) `mappend` (a2,b2) =
-                (a1 `mappend` a2, b1 `mappend` b2)
+
+-- | @since 4.9.0.0
+instance (Semigroup a, Semigroup b, Semigroup c) => Semigroup (a, b, c) where
+        (a,b,c) <> (a',b',c') = (a<>a',b<>b',c<>c')
+        stimes n (a,b,c) = (stimes n a, stimes n b, stimes n c)
 
 -- | @since 2.01
 instance (Monoid a, Monoid b, Monoid c) => Monoid (a,b,c) where
         mempty = (mempty, mempty, mempty)
-        (a1,b1,c1) `mappend` (a2,b2,c2) =
-                (a1 `mappend` a2, b1 `mappend` b2, c1 `mappend` c2)
+
+-- | @since 4.9.0.0
+instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d)
+         => Semigroup (a, b, c, d) where
+        (a,b,c,d) <> (a',b',c',d') = (a<>a',b<>b',c<>c',d<>d')
+        stimes n (a,b,c,d) = (stimes n a, stimes n b, stimes n c, stimes n d)
 
 -- | @since 2.01
 instance (Monoid a, Monoid b, Monoid c, Monoid d) => Monoid (a,b,c,d) where
         mempty = (mempty, mempty, mempty, mempty)
-        (a1,b1,c1,d1) `mappend` (a2,b2,c2,d2) =
-                (a1 `mappend` a2, b1 `mappend` b2,
-                 c1 `mappend` c2, d1 `mappend` d2)
+
+-- | @since 4.9.0.0
+instance (Semigroup a, Semigroup b, Semigroup c, Semigroup d, Semigroup e)
+         => Semigroup (a, b, c, d, e) where
+        (a,b,c,d,e) <> (a',b',c',d',e') = (a<>a',b<>b',c<>c',d<>d',e<>e')
+        stimes n (a,b,c,d,e) =
+            (stimes n a, stimes n b, stimes n c, stimes n d, stimes n e)
 
 -- | @since 2.01
 instance (Monoid a, Monoid b, Monoid c, Monoid d, Monoid e) =>
                 Monoid (a,b,c,d,e) where
         mempty = (mempty, mempty, mempty, mempty, mempty)
-        (a1,b1,c1,d1,e1) `mappend` (a2,b2,c2,d2,e2) =
-                (a1 `mappend` a2, b1 `mappend` b2, c1 `mappend` c2,
-                 d1 `mappend` d2, e1 `mappend` e2)
+
+
+-- | @since 4.9.0.0
+instance Semigroup Ordering where
+    LT <> _ = LT
+    EQ <> y = y
+    GT <> _ = GT
+
+    stimes = stimesIdempotentMonoid
 
 -- lexicographical ordering
 -- | @since 2.01
 instance Monoid Ordering where
-        mempty         = EQ
-        LT `mappend` _ = LT
-        EQ `mappend` y = y
-        GT `mappend` _ = GT
+    mempty             = EQ
+
+-- | @since 4.9.0.0
+instance Semigroup a => Semigroup (Maybe a) where
+    Nothing <> b       = b
+    a       <> Nothing = a
+    Just a  <> Just b  = Just (a <> b)
+
+    stimes = stimesMaybe
 
 -- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
 -- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
@@ -322,10 +419,7 @@ instance Monoid Ordering where
 --
 -- @since 2.01
 instance Monoid a => Monoid (Maybe a) where
-  mempty = Nothing
-  Nothing `mappend` m = m
-  m `mappend` Nothing = m
-  Just m1 `mappend` Just m2 = Just (m1 `mappend` m2)
+    mempty = Nothing
 
 -- | For tuples, the 'Monoid' constraint on @a@ determines
 -- how the first values merge.
@@ -337,17 +431,20 @@ instance Monoid a => Monoid (Maybe a) where
 -- @since 2.01
 instance Monoid a => Applicative ((,) a) where
     pure x = (mempty, x)
-    (u, f) <*> (v, x) = (u `mappend` v, f x)
-    liftA2 f (u, x) (v, y) = (u `mappend` v, f x y)
+    (u, f) <*> (v, x) = (u <> v, f x)
+    liftA2 f (u, x) (v, y) = (u <> v, f x y)
 
 -- | @since 4.9.0.0
 instance Monoid a => Monad ((,) a) where
-    (u, a) >>= k = case k a of (v, b) -> (u `mappend` v, b)
+    (u, a) >>= k = case k a of (v, b) -> (u <> v, b)
+
+-- | @since 4.10.0.0
+instance Semigroup a => Semigroup (IO a) where
+    (<>) = liftA2 (<>)
 
 -- | @since 4.9.0.0
 instance Monoid a => Monoid (IO a) where
     mempty = pure mempty
-    mappend = liftA2 mappend
 
 {- | The 'Functor' class is used for types that can be mapped over.
 Instances of 'Functor' should satisfy the following laws:
