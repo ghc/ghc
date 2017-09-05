@@ -13,14 +13,8 @@ import shutil
 import tempfile
 import time
 import re
-
-# We don't actually need subprocess in runtests.py, but:
-# * We do need it in testlibs.py
-# * We can't import testlibs.py until after we have imported ctypes
-# * If we import ctypes before subprocess on cygwin, then sys.exit(0)
-#   says "Aborted" and we fail with exit code 134.
-# So we import it here first, so that the testsuite doesn't appear to fail.
 import subprocess
+import time
 
 from testutil import *
 from testglobals import *
@@ -325,7 +319,15 @@ else:
     summary(t, sys.stdout, config.no_print_summary)
 
     # Write our accumulated metrics into the git notes for this commit.
+    # Try up to 5 times to write to git notes should it fail for some reason.
+    # Each try will wait 1 second.
+    tries = 0
     note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
+    while b'Git - fatal' in note and tries < 4:
+            time.sleep(1)
+            tries += 1
+            note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
+
 
     if config.summary_file:
         with open(config.summary_file, 'w') as file:
