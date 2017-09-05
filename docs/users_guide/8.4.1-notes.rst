@@ -27,6 +27,24 @@ Language
   wish to; this is quite like how regular datatypes with a kind signature can omit
   some type variables.
 
+- There are now fewer restrictions regarding whether kind variables can appear
+  on the right-hand sides of type and data family instances. Before, there was
+  a strict requirements that all kind variables on the RHS had to be explicitly
+  bound by type patterns on the LHS. Now, kind variables can be *implicitly*
+  bound, which allows constructions like these: ::
+
+    data family Nat :: k -> k -> *
+    -- k is implicitly bound by an invisible kind pattern
+    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
+      Nat :: (forall xx. f xx -> g xx) -> Nat f g
+
+    class Funct f where
+      type Codomain f :: *
+    instance Funct ('KProxy :: KProxy o) where
+      -- o is implicitly bound by the kind signature
+      -- of the LHS type pattern ('KProxy)
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
+
 - Implicitly bidirectional pattern synonyms no longer allow bang patterns
   (``!``) or irrefutable patterns (``~``) on the right-hand side. Previously,
   this was allowed, although the bang patterns and irrefutable patterns would

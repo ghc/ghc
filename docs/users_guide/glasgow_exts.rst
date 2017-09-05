@@ -7659,8 +7659,23 @@ Note the following points:
    instance declarations of the class in which the family was declared,
    just as with the equations of the methods of a class.
 
--  The variables on the right hand side of the type family equation
-   must, as usual, be bound on the left hand side.
+-  The type variables on the right hand side of the type family equation
+   must, as usual, be explicitly bound by the left hand side. This restriction
+   is relaxed for *kind* variables, however, as the right hand side is allowed
+   to mention kind variables that are implicitly bound. For example, these are
+   legitimate: ::
+
+    data family Nat :: k -> k -> *
+    -- k is implicitly bound by an invisible kind pattern
+    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
+      Nat :: (forall xx. f xx -> g xx) -> Nat f g
+
+    class Funct f where
+      type Codomain f :: *
+    instance Funct ('KProxy :: KProxy o) where
+      -- o is implicitly bound by the kind signature
+      -- of the LHS type pattern ('KProxy)
+      type Codomain 'KProxy = NatTr (Proxy :: o -> *)
 
 -  The instance for an associated type can be omitted in class
    instances. In that case, unless there is a default instance (see
@@ -7715,15 +7730,18 @@ Note the following points:
 
 -  The default declaration must mention only type *variables* on the
    left hand side, and the right hand side must mention only type
-   variables bound on the left hand side. However, unlike the associated
-   type family declaration itself, the type variables of the default
-   instance are independent of those of the parent class.
+   variables that are explicitly bound on the left hand side. This restriction
+   is relaxed for *kind* variables, however, as the right hand side is allowed
+   to mention kind variables that are implicitly bound on the left hand side.
+
+-  Unlike the associated type family declaration itself, the type variables of
+   the default instance are independent of those of the parent class.
 
 Here are some examples:
 
 ::
 
-      class C a where
+      class C (a :: *) where
         type F1 a :: *
         type instance F1 a = [a]     -- OK
         type instance F1 a = a->a    -- BAD; only one default instance is allowed
@@ -7737,6 +7755,21 @@ Here are some examples:
 
         type F4 a
         type F4 b = a                -- BAD; 'a' is not in scope  in the RHS
+
+        type F5 a :: [k]
+        type F5 a = ('[] :: [x])     -- OK; the kind variable x is implicitly
+                                            bound by an invisible kind pattern
+                                            on the LHS
+
+        type F6 a
+        type F6 a =
+          Proxy ('[] :: [x])         -- BAD; the kind variable x is not bound,
+                                             even by an invisible kind pattern
+
+        type F7 (x :: a) :: [a]
+        type F7 x = ('[] :: [a])     -- OK; the kind variable a is implicitly
+                                            bound by the kind signature of the
+                                            LHS type pattern
 
 .. _scoping-class-params:
 
@@ -7759,6 +7792,33 @@ Hence, the following instance declaration is invalid: ::
 Here, the right-hand side of the data instance mentions the type
 variable ``d`` that does not occur in its left-hand side. We cannot
 admit such data instances as they would compromise type safety.
+
+Bear in mind that it is also possible for the *right*-hand side of an
+associated family instance to contain *kind* parameters (by using the
+:ghc-flag:`-XPolyKinds` extension). For instance, this class and instance are
+perfectly admissible: ::
+
+    class C k where
+      type T :: k
+
+    instance C (Maybe a) where
+      type T = (Nothing :: Maybe a)
+
+Here, although the right-hand side ``(Nothing :: Maybe a)`` mentions a kind
+variable ``a`` which does not occur on the left-hand side, this is acceptable,
+because ``a`` is *implicitly* bound by ``T``'s kind pattern.
+
+A kind variable can also be bound implicitly in a LHS type pattern, as in this
+example: ::
+
+    class C a where
+      type T (x :: a) :: [a]
+
+    instance C (Maybe a) where
+      type T x = ('[] :: [Maybe a])
+
+In ``('[] :: [Maybe a])``, the kind variable ``a`` is implicitly bound by the
+kind signature of the LHS type pattern ``x``.
 
 Instance contexts and associated type and data instances
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

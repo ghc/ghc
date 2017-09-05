@@ -1380,7 +1380,9 @@ tc_fam_ty_pats :: FamTyConShape
                -> [Name]              -- Bound kind/type variable names
                -> HsTyPats GhcRn      -- Type patterns
                -> (TcKind -> TcM r)   -- Kind checker for RHS
-               -> TcM ([Type], r)     -- Returns the type-checked patterns
+               -> TcM ( [TcTyVar]     -- Returns the type-checked patterns,
+                      , [TcType]      -- the type variables that scope over
+                      , r )           -- them, and the thing inside
 -- Check the type patterns of a type or data family instance
 --     type instance F <pat1> <pat2> = <type>
 -- The 'tyvars' are the free type variables of pats
@@ -1413,7 +1415,7 @@ tc_fam_ty_pats (FamTyConShape { fs_name = name, fs_arity = arity
 
          -- Kind-check and quantify
          -- See Note [Quantifying over family patterns]
-       ; (_, result) <- tcImplicitTKBndrs tv_names $
+       ; (arg_tvs, (args, stuff)) <- tcImplicitTKBndrs tv_names $
          do { let loc          = nameSrcSpan name
                   lhs_fun      = L loc (HsTyVar NotPromoted (L loc name))
                   bogus_fun_ty = pprPanic "tc_fam_ty_pats" (ppr name $$ ppr arg_pats)
@@ -1428,7 +1430,7 @@ tc_fam_ty_pats (FamTyConShape { fs_name = name, fs_arity = arity
 
             ; return ((args, stuff), emptyVarSet) }
 
-       ; return result }
+       ; return (arg_tvs, args, stuff) }
 
 -- See Note [tc_fam_ty_pats vs tcFamTyPats]
 tcFamTyPats :: FamTyConShape
@@ -1443,9 +1445,9 @@ tcFamTyPats :: FamTyConShape
                 -> TcKind
                 -> TcM a)            -- NB: You can use solveEqualities here.
             -> TcM a
-tcFamTyPats fam_shape@(FamTyConShape { fs_name = name }) mb_clsinfo
-            tv_names arg_pats kind_checker thing_inside
-  = do { (typats, (more_typats, res_kind))
+tcFamTyPats fam_shape@(FamTyConShape { fs_name = name, fs_flavor = fam_flav })
+            mb_clsinfo tv_names arg_pats kind_checker thing_inside
+  = do { (fam_used_tvs, typats, (more_typats, res_kind))
             <- solveEqualities $  -- See Note [Constraints in patterns]
                tc_fam_ty_pats fam_shape mb_clsinfo
                               tv_names arg_pats kind_checker
@@ -1481,7 +1483,21 @@ tcFamTyPats fam_shape@(FamTyConShape { fs_name = name }) mb_clsinfo
            -- bit is cleverer.
 
        ; traceTc "tcFamTyPats" (ppr name $$ ppr all_pats $$ ppr qtkvs)
-            -- Don't print out too much, as we might be in the knot
+           -- Don't print out too much, as we might be in the knot
+
+           -- See Note [Free-floating kind vars] in TcHsType
+       ; let tc_flav = case fam_flav of
+                         TypeFam -> OpenTypeFamilyFlavour
+                         DataFam -> DataFamilyFlavour
+             all_mentioned_tvs = mkVarSet qtkvs
+                                   -- qtkvs has all the tyvars bound by LHS
+                                   -- type patterns
+             unmentioned_tvs   = filterOut (`elemVarSet` all_mentioned_tvs)
+                                           fam_used_tvs
+                                   -- If there are tyvars left over, we can
+                                   -- assume they're free-floating, since they
+                                   -- aren't bound by a type pattern
+       ; checkNoErrs $ reportFloatingKvs name tc_flav qtkvs unmentioned_tvs
 
        ; tcExtendTyVarEnv qtkvs $
             -- Extend envt with TcTyVars not TyVars, because the

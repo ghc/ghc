@@ -54,7 +54,7 @@ import Maybes           ( orElse )
 import FastString
 import SrcLoc
 import DynFlags
-import Util             ( debugIsOn, lengthExceeds, partitionWith )
+import Util             ( debugIsOn, filterOut, lengthExceeds, partitionWith )
 import HscTypes         ( HscEnv, hsc_dflags )
 import ListSetOps       ( findDupsEq, removeDups, equivClasses )
 import Digraph          ( SCC, flattenSCC, flattenSCCs, Node(..)
@@ -720,14 +720,15 @@ rnFamInstEqn :: HsDocContext
                                      -- Just (cls,tvs) => associated,
                                      --   and gives class and tyvars of the
                                      --   parent instance delc
+             -> [Located RdrName]    -- Kind variables from the equation's RHS
              -> FamInstEqn GhcPs rhs
              -> (HsDocContext -> rhs -> RnM (rhs', FreeVars))
              -> RnM (FamInstEqn GhcRn rhs', FreeVars)
-rnFamInstEqn doc mb_cls (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
-                                                   , feqn_pats   = pats
-                                                   , feqn_fixity = fixity
-                                                   , feqn_rhs    = payload }})
-            rnPayload
+rnFamInstEqn doc mb_cls rhs_kvars
+    (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
+                               , feqn_pats   = pats
+                               , feqn_fixity = fixity
+                               , feqn_rhs    = payload }}) rn_payload
   = do { tycon'   <- lookupFamInstName (fmap fst mb_cls) tycon
        ; let loc = case pats of
                      []             -> pprPanic "rnFamInstEqn" (ppr tycon)
@@ -735,18 +736,25 @@ rnFamInstEqn doc mb_cls (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                      (L loc _ : ps) -> combineSrcSpans loc (getLoc (last ps))
 
        ; pat_kity_vars_with_dups <- extractHsTysRdrTyVarsDups pats
+       ; let pat_vars = freeKiTyVarsAllVars $
+                        rmDupsInRdrTyVars pat_kity_vars_with_dups
              -- Use the "...Dups" form because it's needed
              -- below to report unsed binder on the LHS
-       ; var_names <- mapM (newTyVarNameRn mb_cls . L loc . unLoc) $
-                      freeKiTyVarsAllVars $
-                      rmDupsInRdrTyVars pat_kity_vars_with_dups
+       ; pat_var_names <- mapM (newTyVarNameRn mb_cls . L loc . unLoc) pat_vars
+
+             -- Make sure to filter out the kind variables that were explicitly
+             -- bound in the type patterns.
+       ; let payload_vars = filterOut (`elemRdr` pat_vars) rhs_kvars
+       ; payload_var_names <- mapM (newTyVarNameRn mb_cls) payload_vars
+
+       ; let all_var_names = pat_var_names ++ payload_var_names
 
              -- All the free vars of the family patterns
              -- with a sensible binding location
        ; ((pats', payload'), fvs)
-              <- bindLocalNamesFV var_names $
+              <- bindLocalNamesFV all_var_names $
                  do { (pats', pat_fvs) <- rnLHsTypes (FamPatCtx tycon) pats
-                    ; (payload', rhs_fvs) <- rnPayload doc payload
+                    ; (payload', rhs_fvs) <- rn_payload doc payload
 
                        -- Report unused binders on the LHS
                        -- See Note [Unused type variables in family instances]
@@ -766,13 +774,13 @@ rnFamInstEqn doc mb_cls (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                           inst_tvs = case mb_cls of
                                        Nothing            -> []
                                        Just (_, inst_tvs) -> inst_tvs
-                    ; warnUnusedTypePatterns var_names tv_nms_used
+                    ; warnUnusedTypePatterns pat_var_names tv_nms_used
 
                          -- See Note [Renaming associated types]
                     ; let bad_tvs = case mb_cls of
                                       Nothing           -> []
                                       Just (_,cls_tkvs) -> filter is_bad cls_tkvs
-                          var_name_set = mkNameSet var_names
+                          var_name_set = mkNameSet all_var_names
 
                           is_bad cls_tkv = cls_tkv `elemNameSet` rhs_fvs
                                         && not (cls_tkv `elemNameSet` var_name_set)
@@ -781,12 +789,13 @@ rnFamInstEqn doc mb_cls (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                     ; return ((pats', payload'), rhs_fvs `plusFV` pat_fvs) }
 
        ; let anon_wcs = concatMap collectAnonWildCards pats'
-             all_ibs  = anon_wcs ++ var_names
+             all_ibs  = anon_wcs ++ all_var_names
                         -- all_ibs: include anonymous wildcards in the implicit
                         -- binders In a type pattern they behave just like any
                         -- other type variable except for being anoymous.  See
                         -- Note [Wildcards in family instances]
              all_fvs  = fvs `addOneFV` unLoc tycon'
+                        -- type instance => use, hence addOneFV
 
        ; return (HsIB { hsib_vars = all_ibs
                       , hsib_closed = True
@@ -796,7 +805,6 @@ rnFamInstEqn doc mb_cls (HsIB { hsib_body = FamEqn { feqn_tycon  = tycon
                                    , feqn_fixity = fixity
                                    , feqn_rhs    = payload' } },
                  all_fvs) }
-             -- type instance => use, hence addOneFV
 
 rnTyFamInstDecl :: Maybe (Name, [Name])
                 -> TyFamInstDecl GhcPs
@@ -808,8 +816,10 @@ rnTyFamInstDecl mb_cls (TyFamInstDecl { tfid_eqn = eqn })
 rnTyFamInstEqn :: Maybe (Name, [Name])
                -> TyFamInstEqn GhcPs
                -> RnM (TyFamInstEqn GhcRn, FreeVars)
-rnTyFamInstEqn mb_cls eqn@(HsIB { hsib_body = FamEqn { feqn_tycon  = tycon }})
-  = rnFamInstEqn (TySynCtx tycon) mb_cls eqn rnTySyn
+rnTyFamInstEqn mb_cls eqn@(HsIB { hsib_body = FamEqn { feqn_tycon = tycon
+                                                     , feqn_rhs   = rhs }})
+  = do { rhs_kvs <- extractHsTyRdrTyVarsKindVars rhs
+       ; rnFamInstEqn (TySynCtx tycon) mb_cls rhs_kvs eqn rnTySyn }
 
 rnTyFamDefltEqn :: Name
                 -> TyFamDefltEqn GhcPs
@@ -818,13 +828,14 @@ rnTyFamDefltEqn cls (FamEqn { feqn_tycon  = tycon
                             , feqn_pats   = tyvars
                             , feqn_fixity = fixity
                             , feqn_rhs    = rhs })
-  = bindHsQTyVars ctx Nothing (Just cls) [] tyvars $ \ tyvars' _ ->
+  = do { kvs <- extractHsTyRdrTyVarsKindVars rhs
+       ; bindHsQTyVars ctx Nothing (Just cls) kvs tyvars $ \ tyvars' _ ->
     do { tycon'      <- lookupFamInstName (Just cls) tycon
        ; (rhs', fvs) <- rnLHsType ctx rhs
        ; return (FamEqn { feqn_tycon  = tycon'
                         , feqn_pats   = tyvars'
                         , feqn_fixity = fixity
-                        , feqn_rhs    = rhs' }, fvs) }
+                        , feqn_rhs    = rhs' }, fvs) } }
   where
     ctx = TyFamilyCtx tycon
 
@@ -832,9 +843,11 @@ rnDataFamInstDecl :: Maybe (Name, [Name])
                   -> DataFamInstDecl GhcPs
                   -> RnM (DataFamInstDecl GhcRn, FreeVars)
 rnDataFamInstDecl mb_cls (DataFamInstDecl { dfid_eqn = eqn@(HsIB { hsib_body =
-                           FamEqn { feqn_tycon  = tycon }})})
-  = do { (eqn', fvs) <-
-           rnFamInstEqn (TyDataCtx tycon) mb_cls eqn rnDataDefn
+                           FamEqn { feqn_tycon = tycon
+                                  , feqn_rhs   = rhs }})})
+  = do { rhs_kvs <- extractDataDefnKindVars rhs
+       ; (eqn', fvs) <-
+           rnFamInstEqn (TyDataCtx tycon) mb_cls rhs_kvs eqn rnDataDefn
        ; return (DataFamInstDecl { dfid_eqn = eqn' }, fvs) }
 
 -- Renaming of the associated types in instances.
@@ -914,7 +927,7 @@ Relevant tickets: #3699, #10586, #10982 and #11451.
 
 Note [Renaming associated types]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Check that the RHS of the decl mentions only type variables
+Check that the RHS of the decl mentions only type variables that are explicitly
 bound on the LHS.  For example, this is not ok
    class C a b where
       type F a x :: *
@@ -922,13 +935,26 @@ bound on the LHS.  For example, this is not ok
       type F (p,q) x = (x, r)   -- BAD: mentions 'r'
 c.f. Trac #5515
 
-The same thing applies to kind variables, of course (Trac #7938, #9574):
+Kind variables, on the other hand, are allowed to be implicitly or explicitly
+bound. As examples, this (#9574) is acceptable:
    class Funct f where
       type Codomain f :: *
    instance Funct ('KProxy :: KProxy o) where
+      -- o is implicitly bound by the kind signature
+      -- of the LHS type pattern ('KProxy)
       type Codomain 'KProxy = NatTr (Proxy :: o -> *)
-Here 'o' is mentioned on the RHS of the Codomain function, but
-not on the LHS.
+And this (#14131) is also acceptable:
+    data family Nat :: k -> k -> *
+    -- k is implicitly bound by an invisible kind pattern
+    newtype instance Nat :: (k -> *) -> (k -> *) -> * where
+      Nat :: (forall xx. f xx -> g xx) -> Nat f g
+We could choose to disallow this, but then associated type families would not
+be able to be as expressive as top-level type synonyms. For example, this type
+synonym definition is allowed:
+    type T = (Nothing :: Maybe a)
+So for parity with type synonyms, we also allow:
+    type family   T :: Maybe a
+    type instance T = (Nothing :: Maybe a)
 
 All this applies only for *instance* declarations.  In *class*
 declarations there is no RHS to worry about, and the class variables
@@ -1643,7 +1669,7 @@ rnTyClDecl (FamDecl { tcdFam = decl })
 rnTyClDecl (SynDecl { tcdLName = tycon, tcdTyVars = tyvars,
                       tcdFixity = fixity, tcdRhs = rhs })
   = do { tycon' <- lookupLocatedTopBndrRn tycon
-       ; kvs <- freeKiTyVarsKindVars <$> extractHsTyRdrTyVars rhs
+       ; kvs <- extractHsTyRdrTyVarsKindVars rhs
        ; let doc = TySynCtx tycon
        ; traceRn "rntycl-ty" (ppr tycon <+> ppr kvs)
        ; bindHsQTyVars doc Nothing Nothing kvs tyvars $ \ tyvars' _ ->
@@ -1993,6 +2019,7 @@ are no data constructors we allow h98_style = True
 badAssocRhs :: [Name] -> RnM ()
 badAssocRhs ns
   = addErr (hang (text "The RHS of an associated type declaration mentions"
+                  <+> text "out-of-scope variable" <> plural ns
                   <+> pprWithCommas (quotes . ppr) ns)
                2 (text "All such variables must be bound on the LHS"))
 

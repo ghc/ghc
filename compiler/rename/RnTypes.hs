@@ -26,10 +26,12 @@ module RnTypes (
         bindLHsTyVarBndr,
         bindSigTyVarsFV, bindHsQTyVars, bindLRdrNames,
         extractFilteredRdrTyVars, extractFilteredRdrTyVarsDups,
-        extractHsTyRdrTyVars, extractHsTyRdrTyVarsDups, extractHsTysRdrTyVars,
+        extractHsTyRdrTyVars, extractHsTyRdrTyVarsKindVars,
+        extractHsTyRdrTyVarsDups, extractHsTysRdrTyVars,
         extractHsTysRdrTyVarsDups, rmDupsInRdrTyVars,
         extractRdrKindSigVars, extractDataDefnKindVars,
-        freeKiTyVarsAllVars, freeKiTyVarsKindVars, freeKiTyVarsTypeVars
+        freeKiTyVarsAllVars, freeKiTyVarsKindVars, freeKiTyVarsTypeVars,
+        elemRdr
   ) where
 
 import {-# SOURCE #-} RnSplice( rnSpliceType )
@@ -1660,6 +1662,15 @@ extractHsTyRdrTyVars ty
 extractHsTyRdrTyVarsDups :: LHsType GhcPs -> RnM FreeKiTyVarsWithDups
 extractHsTyRdrTyVarsDups ty
   = extract_lty TypeLevel ty emptyFKTV
+
+-- | Extracts the free kind variables (but not the type variables) of an
+-- 'HsType'. Does not return any wildcards.
+-- When the same name occurs multiple times in the type, only the first
+-- occurrence is returned.
+-- See Note [Kind and type-variable binders]
+extractHsTyRdrTyVarsKindVars :: LHsType GhcPs -> RnM [Located RdrName]
+extractHsTyRdrTyVarsKindVars ty
+  = freeKiTyVarsKindVars <$> extractHsTyRdrTyVars ty
 
 -- | Extracts free type and kind variables from types in a list.
 -- When the same name occurs multiple times in the types, only the first
