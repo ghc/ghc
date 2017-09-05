@@ -174,15 +174,8 @@ data Width   = W8 | W16 | W32 | W64
 instance Outputable Width where
    ppr rep = ptext (mrStr rep)
 
-mrStr :: Width -> PtrString
-mrStr W8   = sLit("W8")
-mrStr W16  = sLit("W16")
-mrStr W32  = sLit("W32")
-mrStr W64  = sLit("W64")
-mrStr W128 = sLit("W128")
-mrStr W256 = sLit("W256")
-mrStr W512 = sLit("W512")
-
+mrStr :: Width -> LitString
+mrStr = sLit . show
 
 
 -------- Common Widths  ------------
