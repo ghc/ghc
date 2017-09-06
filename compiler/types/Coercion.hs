@@ -237,7 +237,7 @@ ppr_fun_co :: TyPrec -> Coercion -> SDoc
 ppr_fun_co p co = pprArrowChain p (split co)
   where
     split :: Coercion -> [SDoc]
-    split (FunCo _ _ _ arg res) -- arnaud: TODO: print multiplicities as well somehow
+    split (FunCo _ arg res)
       = ppr_co FunPrec arg : split res
     split co = [ppr_co TopPrec co]
 
@@ -340,9 +340,8 @@ splitTyConAppCo_maybe (Refl r ty)
        ; let args = zipWith mkReflCo (tyConRolesX r tc) tys
        ; return (tc, args) }
 splitTyConAppCo_maybe (TyConAppCo _ tc cos) = Just (tc, cos)
-splitTyConAppCo_maybe (FunCo _ w1 w2 arg res) | w1 == w2 = Just (funTyCon w1, cos)
+splitTyConAppCo_maybe (FunCo _ arg res)     = Just (funTyCon Omega, cos)
   where cos = [mkRuntimeRepCo arg, mkRuntimeRepCo res, arg, res]
-  -- arnaud: TODO: when `w1` and `w2` are different I think it does not make sense to return `Just` something as we have formally changed the type constructor during the coercion. However, since I don't know how this function is actually used, I don't know whether this can hide surprises.
 splitTyConAppCo_maybe _                     = Nothing
 
 -- first result has role equal to input; third result is Nominal
@@ -364,7 +363,7 @@ splitAppCo_maybe (Refl r ty)
 splitAppCo_maybe _ = Nothing
 
 splitFunCo_maybe :: Coercion -> Maybe (Coercion, Coercion)
-splitFunCo_maybe (FunCo _ _ _ arg res) = Just (arg, res)
+splitFunCo_maybe (FunCo _ arg res) = Just (arg, res)
 splitFunCo_maybe _ = Nothing
 
 splitForAllCo_maybe :: Coercion -> Maybe (TyVar, Coercion, Coercion)
@@ -586,12 +585,12 @@ mkNomReflCo = mkReflCo Nominal
 -- caller's responsibility to get the roles correct on argument coercions.
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkTyConAppCo r tc cos
-  | Just w <- isFunTyConWeight tc
+  | tc `hasKey` funTyConKey
   , [_rep1, _rep2, co1, co2] <- cos   -- See Note [Function coercions]
   = -- (a :: TYPE ra) -> (b :: TYPE rb)  ~  (c :: TYPE rc) -> (d :: TYPE rd)
     -- rep1 :: ra  ~  rc        rep2 :: rb  ~  rd
     -- co1  :: a   ~  c         co2  :: b   ~  d
-    mkFunCo r w w co1 co2
+    mkFunCo r co1 co2
 
                -- Expand type synonyms
   | Just (tv_co_prs, rhs_ty, leftover_cos) <- expandSynTyCon_maybe tc cos
@@ -604,19 +603,17 @@ mkTyConAppCo r tc cos
 
 -- | Build a function 'Coercion' from two other 'Coercion's. That is,
 -- given @co1 :: a ~ b@ and @co2 :: x ~ y@ produce @co :: (a -> x) ~ (b -> y)@.
-mkFunCo :: Role -> Rig -> Rig -> Coercion -> Coercion -> Coercion
-mkFunCo r w1 w2 co1 co2
+mkFunCo :: Role -> Coercion -> Coercion -> Coercion
+mkFunCo r co1 co2
     -- See Note [Refl invariant]
   | Just (ty1, _) <- isReflCo_maybe co1
   , Just (ty2, _) <- isReflCo_maybe co2
-  , w1 == w2
-  = Refl r (mkFunTy w1 ty1 ty2)
-  | otherwise = FunCo r w1 w2 co1 co2
+  = Refl r (mkFunTyOm ty1 ty2)
+  | otherwise = FunCo r co1 co2
 
 -- | Make nested function 'Coercion's
 mkFunCos :: Role -> [Coercion] -> Coercion -> Coercion
-mkFunCos r cos res_co = foldr (mkFunCo r Omega Omega) res_co cos
--- TODO: arnaud: I don't think that is used, otherwise, Omega may not be wise
+mkFunCos r cos res_co = foldr (mkFunCo r) res_co cos
 
 -- | Apply a 'Coercion' to another 'Coercion'.
 -- The second coercion must be Nominal, unless the first is Phantom.
@@ -923,7 +920,7 @@ mkNthCo 0 (ForAllCo _ kind_co _) = kind_co
   -- If co :: (forall a1:k1. t1) ~ (forall a2:k2. t2)
   -- then (nth 0 co :: k1 ~ k2)
 
-mkNthCo n co@(FunCo _ _ _ arg res)
+mkNthCo n co@(FunCo _ arg res)
   -- See Note [Function coercions]
   -- If FunCo _ arg_co res_co ::   (s1:TYPE sk1 -> s2:TYPE sk2)
   --                             ~ (t1:TYPE tk1 -> t2:TYPE tk2)
@@ -1001,8 +998,8 @@ mkSubCo :: Coercion -> Coercion
 mkSubCo (Refl Nominal ty) = Refl Representational ty
 mkSubCo (TyConAppCo Nominal tc cos)
   = TyConAppCo Representational tc (applyRoles tc cos)
-mkSubCo (FunCo Nominal w1 w2 arg res)
-  = FunCo Representational w1 w2
+mkSubCo (FunCo Nominal arg res)
+  = FunCo Representational
           (downgradeRole Representational Nominal arg)
           (downgradeRole Representational Nominal res)
 mkSubCo co = ASSERT2( coercionRole co == Nominal, ppr co <+> ppr (coercionRole co) )
@@ -1072,10 +1069,10 @@ setNominalRole_maybe (Refl _ ty) = Just $ Refl Nominal ty
 setNominalRole_maybe (TyConAppCo Representational tc cos)
   = do { cos' <- mapM setNominalRole_maybe cos
        ; return $ TyConAppCo Nominal tc cos' }
-setNominalRole_maybe (FunCo Representational w1 w2 co1 co2)
+setNominalRole_maybe (FunCo Representational co1 co2)
   = do { co1' <- setNominalRole_maybe co1
        ; co2' <- setNominalRole_maybe co2
-       ; return $ FunCo Nominal w1 w2 co1' co2'
+       ; return $ FunCo Nominal co1' co2'
        }
 setNominalRole_maybe (SymCo co)
   = SymCo <$> setNominalRole_maybe co
@@ -1185,7 +1182,7 @@ promoteCoercion co = case co of
     ForAllCo _ _ g
       -> promoteCoercion g
 
-    FunCo _ _ _ _ _
+    FunCo _ _ _
       -> mkNomReflCo liftedTypeKind
 
     CoVarCo {}
@@ -1299,7 +1296,7 @@ mkPiCos r vs co = foldr (mkPiCo r) co vs
 -- are quantified over the same type variable.
 mkPiCo  :: Role -> Var -> Coercion -> Coercion
 mkPiCo r v co | isTyVar v = mkHomoForAllCos [v] co
-              | otherwise = mkFunCo r Omega Omega (mkReflCo r (varType v)) co
+              | otherwise = mkFunCo r (mkReflCo r (varType v)) co
 
 -- The second coercion is sometimes lifted (~) and sometimes unlifted (~#).
 -- So, we have to make sure to supply the right parameter to decomposeCo.
@@ -1606,7 +1603,7 @@ ty_co_subst lc role ty
                              liftCoSubstTyVar lc r tv
     go r (AppTy ty1 ty2)   = mkAppCo (go r ty1) (go Nominal ty2)
     go r (TyConApp tc tys) = mkTyConAppCo r tc (zipWith go (tyConRolesX r tc) tys)
-    go r (FunTy w ty1 ty2) = mkFunCo r w w (go r ty1) (go r ty2)
+    go r (FunTy _ ty1 ty2) = mkFunCo r (go r ty1) (go r ty2)
                              -- only in Core, which ignores linearity so we can leave Omega here.
     go r (ForAllTy (TvBndr v _) ty)
                            = let (lc', v', h) = liftCoSubstVarBndr lc v in
@@ -1743,7 +1740,7 @@ seqCo (TyConAppCo r tc cos)     = r `seq` tc `seq` seqCos cos
 seqCo (AppCo co1 co2)           = seqCo co1 `seq` seqCo co2
 seqCo (ForAllCo tv k co)        = seqType (tyVarKind tv) `seq` seqCo k
                                                          `seq` seqCo co
-seqCo (FunCo r w1 w2 co1 co2)   = r `seq` w1 `seq` w2 `seq` seqCo co1 `seq` seqCo co2
+seqCo (FunCo r co1 co2)         = r `seq` seqCo co1 `seq` seqCo co2
 seqCo (CoVarCo cv)              = cv `seq` ()
 seqCo (AxiomInstCo con ind cos) = con `seq` ind `seq` seqCos cos
 seqCo (UnivCo p r t1 t2)
@@ -1818,7 +1815,7 @@ coercionKind co = go co
             -- This is doing repeated substitutions and probably doesn't
             -- need to, see #11735
         mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2'
-    go (FunCo _ w1 w2 co1 co2)    = Pair (mkFunTy w1) (mkFunTy w2) <*> go co1 <*> go co2
+    go (FunCo _ co1 co2)    = mkFunTyOm <$> go co1 <*> go co2
     go (CoVarCo cv)         = coVarTypes cv
     go (AxiomInstCo ax ind cos)
       | CoAxBranch { cab_tvs = tvs, cab_cvs = cvs
@@ -1899,8 +1896,8 @@ coercionKindRole = go
             -- This is doing repeated substitutions and probably doesn't
             -- need to, see #11735
         (mkInvForAllTy <$> Pair tv1 tv2 <*> Pair ty1 ty2', r)
-    go (FunCo r w1 w2 co1 co2)
-      = (Pair (mkFunTy w1) (mkFunTy w2) <*> coercionKind co1 <*> coercionKind co2, r)
+    go (FunCo r co1 co2)
+      = (mkFunTyOm <$> coercionKind co1 <*> coercionKind co2, r)
     go (CoVarCo cv) = (coVarTypes cv, coVarRole cv)
     go co@(AxiomInstCo ax _ _) = (coercionKind co, coAxiomRole ax)
     go (UnivCo _ r ty1 ty2)  = (Pair ty1 ty2, r)

@@ -805,9 +805,8 @@ data Coercion
   | ForAllCo TyVar KindCoercion Coercion
          -- ForAllCo :: _ -> N -> e -> e
 
-  | FunCo Role Rig Rig Coercion Coercion         -- lift FunTy
+  | FunCo Role Coercion Coercion         -- lift FunTy
          -- FunCo :: "e" -> e -> e -> e
-         -- TODO: arnaud: expand comment with the fact that we consider weight equal in Core at this stage
 
   -- These are special
   | CoVarCo CoVar      -- :: _ -> (N or R)
@@ -1461,7 +1460,7 @@ tyCoFVsOfCo (AppCo co arg) fv_cand in_scope acc
   = (tyCoFVsOfCo co `unionFV` tyCoFVsOfCo arg) fv_cand in_scope acc
 tyCoFVsOfCo (ForAllCo tv kind_co co) fv_cand in_scope acc
   = (delFV tv (tyCoFVsOfCo co) `unionFV` tyCoFVsOfCo kind_co) fv_cand in_scope acc
-tyCoFVsOfCo (FunCo _ _ _ co1 co2)    fv_cand in_scope acc
+tyCoFVsOfCo (FunCo _ co1 co2)    fv_cand in_scope acc
   = (tyCoFVsOfCo co1 `unionFV` tyCoFVsOfCo co2) fv_cand in_scope acc
 tyCoFVsOfCo (CoVarCo v) fv_cand in_scope acc
   = (unitFV v `unionFV` tyCoFVsOfType (varType v)) fv_cand in_scope acc
@@ -1523,7 +1522,7 @@ coVarsOfCo (TyConAppCo _ _ args) = coVarsOfCos args
 coVarsOfCo (AppCo co arg)      = coVarsOfCo co `unionVarSet` coVarsOfCo arg
 coVarsOfCo (ForAllCo tv kind_co co)
   = coVarsOfCo co `delVarSet` tv `unionVarSet` coVarsOfCo kind_co
-coVarsOfCo (FunCo _ _ _ co1 co2)   = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
+coVarsOfCo (FunCo _ co1 co2)   = coVarsOfCo co1 `unionVarSet` coVarsOfCo co2
 coVarsOfCo (CoVarCo v)         = unitVarSet v `unionVarSet` coVarsOfType (varType v)
 coVarsOfCo (AxiomInstCo _ _ args) = coVarsOfCos args
 coVarsOfCo (UnivCo p _ t1 t2)  = coVarsOfProv p `unionVarSet` coVarsOfTypes [t1, t2]
@@ -1590,7 +1589,7 @@ noFreeVarsOfCo (Refl _ ty)            = noFreeVarsOfType ty
 noFreeVarsOfCo (TyConAppCo _ _ args)  = all noFreeVarsOfCo args
 noFreeVarsOfCo (AppCo c1 c2)          = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo co@(ForAllCo {})       = isEmptyVarSet (tyCoVarsOfCo co)
-noFreeVarsOfCo (FunCo _ _ _ c1 c2)    = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
+noFreeVarsOfCo (FunCo _ c1 c2)        = noFreeVarsOfCo c1 && noFreeVarsOfCo c2
 noFreeVarsOfCo (CoVarCo _)            = False
 noFreeVarsOfCo (AxiomInstCo _ _ args) = all noFreeVarsOfCo args
 noFreeVarsOfCo (UnivCo p _ t1 t2)     = noFreeVarsOfProv p &&
@@ -2264,7 +2263,7 @@ subst_co subst co
     go (ForAllCo tv kind_co co)
       = case substForAllCoBndrUnchecked subst tv kind_co of { (subst', tv', kind_co') ->
           ((mkForAllCo $! tv') $! kind_co') $! subst_co subst' co }
-    go (FunCo r w1 w2 co1 co2) = (mkFunCo r w1 w2 $! go co1) $! go co2
+    go (FunCo r co1 co2)     = (mkFunCo r $! go co1) $! go co2
     go (CoVarCo cv)          = substCoVar subst cv
     go (AxiomInstCo con ind cos) = mkAxiomInstCo con ind $! map go cos
     go (UnivCo p r t1 t2)    = (((mkUnivCo $! go_prov p) $! r) $!
@@ -2799,7 +2798,7 @@ tidyCo env@(_, subst) co
                                where (envp, tvp) = tidyTyCoVarBndr env tv
             -- the case above duplicates a bit of work in tidying h and the kind
             -- of tv. But the alternative is to use coercionKind, which seems worse.
-    go (FunCo r w1 w2 co1 co2) = (FunCo r w1 w2 $! go co1) $! go co2
+    go (FunCo r co1 co2)     = (FunCo r $! go co1) $! go co2
     go (CoVarCo cv)          = case lookupVarEnv subst cv of
                                  Nothing  -> CoVarCo cv
                                  Just cv' -> CoVarCo cv'
@@ -2862,7 +2861,7 @@ coercionSize (Refl _ ty)         = typeSize ty
 coercionSize (TyConAppCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (AppCo co arg)      = coercionSize co + coercionSize arg
 coercionSize (ForAllCo _ h co)   = 1 + coercionSize co + coercionSize h
-coercionSize (FunCo _ _ _ co1 co2) = 1 + coercionSize co1 + coercionSize co2
+coercionSize (FunCo _ co1 co2)   = 1 + coercionSize co1 + coercionSize co2
 coercionSize (CoVarCo _)         = 1
 coercionSize (AxiomInstCo _ _ args) = 1 + sum (map coercionSize args)
 coercionSize (UnivCo p _ t1 t2)  = 1 + provSize p + typeSize t1 + typeSize t2

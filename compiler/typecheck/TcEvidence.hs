@@ -45,7 +45,6 @@ import Coercion
 import PprCore ()   -- Instance OutputableBndr TyVar
 import TcType
 import Type
-import Weight
 import TyCon
 import Class( Class )
 import PrelNames
@@ -92,7 +91,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> Rig -> Rig -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
