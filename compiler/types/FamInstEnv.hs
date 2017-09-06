@@ -1430,7 +1430,7 @@ normalise_type ty
       = do { (co1, nty1) <- go ty1
            ; (co2, nty2) <- go ty2
            ; r <- getRole
-           ; return (mkFunCo r co1 co2, mkFunTy w nty1 nty2) }
+           ; return (mkFunCo r w w co1 co2, mkFunTy w nty1 nty2) }
     go (ForAllTy (TvBndr tyvar vis) ty)
       = do { (lc', tv', h, ki') <- normalise_tyvar_bndr tyvar
            ; (co, nty)          <- withLC lc' $ normalise_type ty
@@ -1693,7 +1693,7 @@ allTyVarsInTy = go
     go_co (AppCo co arg)        = go_co co `unionVarSet` go_co arg
     go_co (ForAllCo tv h co)
       = unionVarSets [unitVarSet tv, go_co co, go_co h]
-    go_co (FunCo _ c1 c2)       = go_co c1 `unionVarSet` go_co c2
+    go_co (FunCo _ _ _ c1 c2)   = go_co c1 `unionVarSet` go_co c2
     go_co (CoVarCo cv)          = unitVarSet cv
     go_co (AxiomInstCo _ _ cos) = go_cos cos
     go_co (UnivCo p _ t1 t2)    = go_prov p `unionVarSet` go t1 `unionVarSet` go t2

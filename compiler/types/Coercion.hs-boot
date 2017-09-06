@@ -11,12 +11,13 @@ import Var
 import Outputable
 import Pair
 import Util
+import Weight
 
 mkReflCo :: Role -> Type -> Coercion
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
 mkForAllCo :: TyVar -> Coercion -> Coercion -> Coercion
-mkFunCo :: Role -> Coercion -> Coercion -> Coercion
+mkFunCo :: Role -> Rig -> Rig -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion
