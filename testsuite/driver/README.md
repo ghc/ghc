@@ -23,6 +23,35 @@ The purpose of the function is to tell the test driver what metrics to compare w
 From the perspective of the test-suite, its entry point is the runtests.py file.
 In that file contains the main logic for running the individual tests, collecting information, handling failure, and outputting the final results.
 
+## Overview of how the performance test bits work.
+During a Haskell Summer of Code project, an intern went through and revamped most of the performance test code, as such there have been a few changes to it that might be unusual to anyone previously familiar with the testsuite.
+One of the biggest immediate benefits is that all platform differences, compiler differences, and things such as that are not necessary to be considered by the test writer anymore.
+This is due to the fact that the test comparison relies entirely on locally collected metrics on the testing machine.
+
+As such, it is perfectly sufficient to write `collect_stats('all',5)` to measure the 3 potential stats that can be collected for that test and automatically test them for regressions, failing if there is more than a 5% change in any direction.
+In fact, even that is not necessary as `collect_stats()` defaults to 'all', and 20% deviation allowed.
+See the implementation of collect_stats in /driver/perf_notes.py for more information.
+
+If the performance of a test is improved so much that the test fails, the value will still be recorded and treated as the new best value in subsequent commits.
+The warning that will be emitted is merely a precaution so that the programmer can double-check that they didn't introduce a bug;
+something that might be suspicious if the test suddenly improves by 70%, for example.
+
+Performance metrics for performance tests are now stored in git notes under the namespace 'perf'.
+The format of the git note file is that each line represents a single metric for a particular test:
+`$test_env $test_name $test_way $metric_measured $value_collected` (delimited by tabs).
+
+One can view the maximum deviation a test allows by looking inside its respective all.T file;
+additionally, if one sets the verbosity level of the test-suite to a value >= 4, they will see a good amount of output per test detailing all the information about values.
+This information will also print if the test falls outside of the allowed bounds.
+(see the test_cmp function in /driver/perf_notes.py for exact formatting of the message)
+
+The git notes are only appended to by the testsuite in a single atomic python subprocess at the end of the test run;
+if the run is canceled at any time, the notes will not be written.
+The note appending command will be retried up to 4 times in the event of a failure (such as one happening due to a lock on the repo) although this is never anticipated to happen.
+If, for some reason, the 5 attempts were not enough, an error message will be printed out.
+Further, there is no current process or method for stripping duplicates, updating values, etc, so if the testsuite is ran multiple times per commit there will be multiple values in the git notes corresponding to the tests ran.
+This does seem to be the most sane behavior; as such, only the latest appearing "version" of a test is considered per commit.
+
 ## Quick overview of program parts
 
 The relevant bits of the directory tree are as such:
@@ -75,6 +104,7 @@ as such, performance metrics will not exist for a commit until you checkout that
         'value'   : 'val',
         'commit'  : 'val', }
         ```
+        (Occasionally slightly different names are used in the source code; 'test' is usually called 'name' in testutil.py, for example)
 * stats_range_fields
     - Exists in testglobals.py.
     - Is a list of tuples of the form `('metric', value, allowed deviation)`

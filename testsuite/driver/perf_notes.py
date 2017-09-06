@@ -63,8 +63,7 @@ def test_cmp(full_name, field, val, expected, dev=20):
 
     if val < lowerBound:
         result = my_failBecause('value is too low:\n(If this is \
-        because you have improved GHC, please\nupdate the test so that GHC \
-        doesn\'t regress again)','stat')
+        because you have improved GHC, feel\nfree to ignore this error)','stat')
     if val > upperBound:
         result = my_failBecause('value is too high:\nstat is not good enough','stat')
 
@@ -142,15 +141,19 @@ def _collect_stats(name, opts, metric, deviation, is_compiler_stats_test):
     if isinstance(metric, str):
         if metric == 'all':
             for field in testing_metrics:
-                opts.stats_range_fields[field] = ([t['value'] for t in test if t['metric'] == field][0], deviation)
+                # As there might be multiple "duplicates" of a test, the list
+                # comprehension considers the latest (ie the last item) to be
+                # the one we care about.
+                # (Ideally the list comprehension would result in a singleton list)
+                opts.stats_range_fields[field] = ([t['value'] for t in test if t['metric'] == field][-1], deviation)
                 return
         else:
-            opts.stats_range_fields[metric] = ([t['value'] for t in test if t['metric'] == metric][0], deviation)
+            opts.stats_range_fields[metric] = ([t['value'] for t in test if t['metric'] == metric][-1], deviation)
             return
 
     if isinstance(metric, list):
         for field in metric:
-            opts.stats_range_fields[field] = ([t['value'] for t in test if t['metric'] == field][0], deviation)
+            opts.stats_range_fields[field] = ([t['value'] for t in test if t['metric'] == field][-1], deviation)
 
 def evaluate_metric(opts, test, field, deviation, contents, way):
     full_name = test + ' (' + way + ' )'

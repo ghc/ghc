@@ -323,7 +323,7 @@ else:
     # Each try will wait 1 second.
     tries = 0
     note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
-    while b'Git - fatal' in note and tries < 4:
+    while b'Git - fatal' in note and tries < 5:
             time.sleep(1)
             tries += 1
             note = subprocess.check_output(["git","notes","--ref=perf","append","-m", "\n".join(config.accumulate_metrics)])
@@ -335,6 +335,10 @@ else:
 
     if args.junit:
         junit(t).write(args.junit)
+
+    if b'Git - fatal' in note and tries >= 5:
+            print("\nAn error occured while writing the performance metrics to git notes.\n \
+            This is usually due to a lock-file existing somewhere in the git repo.")
 
 cleanup_and_exit(0)
 
