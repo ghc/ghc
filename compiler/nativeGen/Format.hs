@@ -68,6 +68,7 @@ floatFormat width
  = case width of
         W32     -> FF32
         W64     -> FF64
+        W80     -> FF80
         other   -> pprPanic "Format.floatFormat" (ppr other)
 
 
