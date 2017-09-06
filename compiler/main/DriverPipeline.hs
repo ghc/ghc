@@ -67,7 +67,7 @@ import System.Directory
 import System.FilePath
 import System.IO
 import Control.Monad
-import Data.List        ( isSuffixOf )
+import Data.List        ( isSuffixOf, intercalate )
 import Data.Maybe
 import Data.Version
 
@@ -818,6 +818,63 @@ getOutputFilename stop_phase output basename dflags next_phase maybe_location
              | Just d <- odir = d </> persistent
              | otherwise      = persistent
 
+
+-- | The fast LLVM Pipeline skips the mangler and assembler,
+-- emiting object code dirctly from llc.
+--
+-- slow: opt -> llc -> .s -> mangler -> as -> .o
+-- fast: opt -> llc -> .o
+--
+-- hidden flag: -ffast-llvm
+--
+-- if keep-s-files is specified, we need to go through
+-- the slow pipeline (Kavon Farvardin requested this).
+fastLlvmPipeline :: DynFlags -> Bool
+fastLlvmPipeline dflags
+  = not (gopt Opt_KeepSFiles dflags) && gopt Opt_FastLlvm dflags
+
+-- | LLVM Options. These are flags to be passed to opt and llc, to ensure
+-- consistency we list them in pairs, so that they form groups.
+llvmOptions :: DynFlags
+            -> [(String, String)]  -- ^ pairs of (opt, llc) arguments
+llvmOptions dflags =
+       [("-enable-tbaa -tbaa",  "-enable-tbaa") | gopt Opt_LlvmTBAA dflags ]
+    ++ [("-relocation-model=" ++ rmodel
+        ,"-relocation-model=" ++ rmodel) | not (null rmodel)]
+    ++ [("-stack-alignment=" ++ (show align)
+        ,"-stack-alignment=" ++ (show align)) | align > 0 ]
+    ++ [("", "-filetype=obj") | fastLlvmPipeline dflags ]
+
+    -- Additional llc flags
+    ++ [("", "-mcpu=" ++ mcpu)   | not (null mcpu) ]
+    ++ [("", "-mattr=" ++ attrs) | not (null attrs) ]
+
+  where target = LLVM_TARGET
+        Just (LlvmTarget _ mcpu mattr) = lookup target (llvmTargets dflags)
+
+        -- Relocation models
+        rmodel | gopt Opt_PIC dflags        = "pic"
+               | positionIndependent dflags = "pic"
+               | WayDyn `elem` ways dflags  = "dynamic-no-pic"
+               | otherwise                  = "static"
+
+        align :: Int
+        align = case platformArch (targetPlatform dflags) of
+                  ArchX86_64 | isAvxEnabled dflags -> 32
+                  _                                -> 0
+
+        attrs :: String
+        attrs = intercalate "," $ mattr
+              ++ ["+sse42"   | isSse4_2Enabled dflags   ]
+              ++ ["+sse2"    | isSse2Enabled dflags     ]
+              ++ ["+sse"     | isSseEnabled dflags      ]
+              ++ ["+avx512f" | isAvx512fEnabled dflags  ]
+              ++ ["+avx2"    | isAvx2Enabled dflags     ]
+              ++ ["+avx"     | isAvxEnabled dflags      ]
+              ++ ["+avx512cd"| isAvx512cdEnabled dflags ]
+              ++ ["+avx512er"| isAvx512erEnabled dflags ]
+              ++ ["+avx512pf"| isAvx512pfEnabled dflags ]
+
 -- -----------------------------------------------------------------------------
 -- | Each phase in the pipeline returns the next phase to execute, and the
 -- name of the file in which the output was placed.
@@ -1419,121 +1476,115 @@ runPhase (RealPhase SplitAs) _input_fn dflags
 
 -----------------------------------------------------------------------------
 -- LlvmOpt phase
-
 runPhase (RealPhase LlvmOpt) input_fn dflags
   = do
-    let opt_lvl  = max 0 (min 2 $ optLevel dflags)
-        -- don't specify anything if user has specified commands. We do this
-        -- for opt but not llc since opt is very specifically for optimisation
-        -- passes only, so if the user is passing us extra options we assume
-        -- they know what they are doing and don't get in the way.
-        optFlag  = if null (getOpts dflags opt_lo)
-                       then map SysTools.Option $ words (llvmOpts !! opt_lvl)
-                       else []
-        tbaa | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
-             | otherwise                = "--enable-tbaa=false"
-
-
     output_fn <- phaseOutputFilename LlvmLlc
 
     liftIO $ SysTools.runLlvmOpt dflags
-               ([ SysTools.FileOption "" input_fn,
-                    SysTools.Option "-o",
-                    SysTools.FileOption "" output_fn]
-                ++ optFlag
-                ++ [SysTools.Option tbaa])
+               (   optFlag
+                ++ defaultOptions ++
+                [ SysTools.FileOption "" input_fn
+                , SysTools.Option "-o"
+                , SysTools.FileOption "" output_fn]
+                )
 
     return (RealPhase LlvmLlc, output_fn)
   where
         -- we always (unless -optlo specified) run Opt since we rely on it to
         -- fix up some pretty big deficiencies in the code we generate
-        llvmOpts =  [ "-mem2reg -globalopt"
-                    , "-O1 -globalopt"
-                    , "-O2"
-                    ]
+        llvmOpts = case optLevel dflags of
+          0 -> "-mem2reg -globalopt"
+          1 -> "-O1 -globalopt"
+          _ -> "-O2"
+
+        -- don't specify anything if user has specified commands. We do this
+        -- for opt but not llc since opt is very specifically for optimisation
+        -- passes only, so if the user is passing us extra options we assume
+        -- they know what they are doing and don't get in the way.
+        optFlag = if null (getOpts dflags opt_lo)
+                  then map SysTools.Option $ words llvmOpts
+                  else []
+
+        defaultOptions = map SysTools.Option . concat . fmap words . fst
+                       $ unzip (llvmOptions dflags)
 
 -----------------------------------------------------------------------------
 -- LlvmLlc phase
 
 runPhase (RealPhase LlvmLlc) input_fn dflags
   = do
-    let opt_lvl = max 0 (min 2 $ optLevel dflags)
-        -- iOS requires external references to be loaded indirectly from the
-        -- DATA segment or dyld traps at runtime writing into TEXT: see #7722
-        rmodel | platformOS (targetPlatform dflags) == OSiOS = "dynamic-no-pic"
-               | positionIndependent dflags                  = "pic"
-               | WayDyn `elem` ways dflags                   = "dynamic-no-pic"
-               | otherwise                                   = "static"
-        tbaa | gopt Opt_LlvmTBAA dflags = "--enable-tbaa=true"
-             | otherwise                = "--enable-tbaa=false"
-
-    -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
-    let next_phase = case gopt Opt_NoLlvmMangler dflags of
-                         False                            -> LlvmMangle
-                         True | gopt Opt_SplitObjs dflags -> Splitter
-                         True                             -> As False
+    next_phase <- if fastLlvmPipeline dflags
+                  then maybeMergeForeign
+                  -- hidden debugging flag '-dno-llvm-mangler' to skip mangling
+                  else case gopt Opt_NoLlvmMangler dflags of
+                         False                            -> return LlvmMangle
+                         True | gopt Opt_SplitObjs dflags -> return Splitter
+                         True                             -> return (As False)
 
     output_fn <- phaseOutputFilename next_phase
 
     liftIO $ SysTools.runLlvmLlc dflags
-                ([ SysTools.Option (llvmOpts !! opt_lvl),
-                    SysTools.Option $ "-relocation-model=" ++ rmodel,
-                    SysTools.FileOption "" input_fn,
-                    SysTools.Option "-o", SysTools.FileOption "" output_fn]
-                ++ [SysTools.Option tbaa]
-                ++ map SysTools.Option fpOpts
-                ++ map SysTools.Option abiOpts
-                ++ map SysTools.Option sseOpts
-                ++ map SysTools.Option avxOpts
-                ++ map SysTools.Option avx512Opts
-                ++ map SysTools.Option stackAlignOpts)
+                (  optFlag
+                ++ defaultOptions
+                ++ [ SysTools.FileOption "" input_fn
+                   , SysTools.Option "-o"
+                   , SysTools.FileOption "" output_fn
+                   ]
+                )
 
     return (RealPhase next_phase, output_fn)
   where
-        -- Bug in LLVM at O3 on OSX.
-        llvmOpts = if platformOS (targetPlatform dflags) == OSDarwin
-                   then ["-O1", "-O2", "-O2"]
-                   else ["-O1", "-O2", "-O3"]
-        -- On ARMv7 using LLVM, LLVM fails to allocate floating point registers
-        -- while compiling GHC source code. It's probably due to fact that it
-        -- does not enable VFP by default. Let's do this manually here
-        fpOpts = case platformArch (targetPlatform dflags) of
-                   ArchARM ARMv7 ext _ -> if (elem VFPv3 ext)
-                                      then ["-mattr=+v7,+vfp3"]
-                                      else if (elem VFPv3D16 ext)
-                                           then ["-mattr=+v7,+vfp3,+d16"]
-                                           else []
-                   ArchARM ARMv6 ext _ -> if (elem VFPv2 ext)
-                                          then ["-mattr=+v6,+vfp2"]
-                                          else ["-mattr=+v6"]
-                   _                 -> []
-        -- On Ubuntu/Debian with ARM hard float ABI, LLVM's llc still
-        -- compiles into soft-float ABI. We need to explicitly set abi
-        -- to hard
-        abiOpts = case platformArch (targetPlatform dflags) of
-                    ArchARM _ _ HARD -> ["-float-abi=hard"]
-                    ArchARM _ _ _    -> []
-                    _                -> []
+    -- Note [Clamping of llc optimizations]
+    --
+    -- See #13724
+    --
+    -- we clamp the llc optimization between [1,2]. This is because passing -O0
+    -- to llc 3.9 or llc 4.0, the naive register allocator can fail with
+    --
+    --   Error while trying to spill R1 from class GPR: Cannot scavenge register
+    --   without an emergency spill slot!
+    --
+    -- Observed at least with target 'arm-unknown-linux-gnueabihf'.
+    --
+    --
+    -- With LLVM4, llc -O3 crashes when ghc-stage1 tries to compile
+    --   rts/HeapStackCheck.cmm
+    --
+    -- llc -O3 '-mtriple=arm-unknown-linux-gnueabihf' -enable-tbaa /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc -o /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_7.lm_s
+    -- 0  llc                      0x0000000102ae63e8 llvm::sys::PrintStackTrace(llvm::raw_ostream&) + 40
+    -- 1  llc                      0x0000000102ae69a6 SignalHandler(int) + 358
+    -- 2  libsystem_platform.dylib 0x00007fffc23f4b3a _sigtramp + 26
+    -- 3  libsystem_c.dylib        0x00007fffc226498b __vfprintf + 17876
+    -- 4  llc                      0x00000001029d5123 llvm::SelectionDAGISel::LowerArguments(llvm::Function const&) + 5699
+    -- 5  llc                      0x0000000102a21a35 llvm::SelectionDAGISel::SelectAllBasicBlocks(llvm::Function const&) + 3381
+    -- 6  llc                      0x0000000102a202b1 llvm::SelectionDAGISel::runOnMachineFunction(llvm::MachineFunction&) + 1457
+    -- 7  llc                      0x0000000101bdc474 (anonymous namespace)::ARMDAGToDAGISel::runOnMachineFunction(llvm::MachineFunction&) + 20
+    -- 8  llc                      0x00000001025573a6 llvm::MachineFunctionPass::runOnFunction(llvm::Function&) + 134
+    -- 9  llc                      0x000000010274fb12 llvm::FPPassManager::runOnFunction(llvm::Function&) + 498
+    -- 10 llc                      0x000000010274fd23 llvm::FPPassManager::runOnModule(llvm::Module&) + 67
+    -- 11 llc                      0x00000001027501b8 llvm::legacy::PassManagerImpl::run(llvm::Module&) + 920
+    -- 12 llc                      0x000000010195f075 compileModule(char**, llvm::LLVMContext&) + 12133
+    -- 13 llc                      0x000000010195bf0b main + 491
+    -- 14 libdyld.dylib            0x00007fffc21e5235 start + 1
+    -- Stack dump:
+    -- 0.  Program arguments: llc -O3 -mtriple=arm-unknown-linux-gnueabihf -enable-tbaa /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc -o /var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_7.lm_s
+    -- 1.  Running pass 'Function Pass Manager' on module '/var/folders/fv/xqjrpfj516n5xq_m_ljpsjx00000gn/T/ghc33674_0/ghc_6.bc'.
+    -- 2.  Running pass 'ARM Instruction Selection' on function '@"stg_gc_f1$def"'
+    --
+    -- Observed at least with -mtriple=arm-unknown-linux-gnueabihf -enable-tbaa
+    --
+    llvmOpts = case optLevel dflags of
+      0 -> "-O1" -- required to get the non-naive reg allocator. Passing -regalloc=greedy is not sufficient.
+      1 -> "-O1"
+      _ -> "-O2"
 
-        sseOpts | isSse4_2Enabled dflags = ["-mattr=+sse42"]
-                | isSse2Enabled dflags   = ["-mattr=+sse2"]
-                | isSseEnabled dflags    = ["-mattr=+sse"]
-                | otherwise              = []
+    optFlag = if null (getOpts dflags opt_lc)
+              then map SysTools.Option $ words llvmOpts
+              else []
 
-        avxOpts | isAvx512fEnabled dflags = ["-mattr=+avx512f"]
-                | isAvx2Enabled dflags    = ["-mattr=+avx2"]
-                | isAvxEnabled dflags     = ["-mattr=+avx"]
-                | otherwise               = []
+    defaultOptions = map SysTools.Option . concat . fmap words . snd
+                   $ unzip (llvmOptions dflags)
 
-        avx512Opts =
-          [ "-mattr=+avx512cd" | isAvx512cdEnabled dflags ] ++
-          [ "-mattr=+avx512er" | isAvx512erEnabled dflags ] ++
-          [ "-mattr=+avx512pf" | isAvx512pfEnabled dflags ]
-
-        stackAlignOpts =
-            case platformArch (targetPlatform dflags) of
-              ArchX86_64 | isAvxEnabled dflags -> ["-stack-alignment=32"]
-              _                                -> []
 
 -----------------------------------------------------------------------------
 -- LlvmMangle phase

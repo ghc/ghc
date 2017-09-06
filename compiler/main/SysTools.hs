@@ -13,6 +13,7 @@
 module SysTools (
         -- Initialisation
         initSysTools,
+        initLlvmTargets,
 
         -- Interface to system tools
         runUnlit, runCpp, runCc, -- [Option] -> IO ()
@@ -187,6 +188,20 @@ stuff.
 ************************************************************************
 -}
 
+initLlvmTargets :: Maybe String
+                -> IO LlvmTargets
+initLlvmTargets mbMinusB
+  = do top_dir <- findTopDir mbMinusB
+       let llvmTargetsFile = top_dir </> "llvm-targets"
+       llvmTargetsStr <- readFile llvmTargetsFile
+       case maybeReadFuzzy llvmTargetsStr of
+         Just s -> return (fmap mkLlvmTarget <$> s)
+         Nothing -> pgmError ("Can't parse " ++ show llvmTargetsFile)
+  where
+    mkLlvmTarget :: (String, String, String) -> LlvmTarget
+    mkLlvmTarget (dl, cpu, attrs) = LlvmTarget dl cpu (words attrs)
+
+
 initSysTools :: Maybe String    -- Maybe TopDir path (without the '-B' prefix)
              -> IO Settings     -- Set all the mutable variables above, holding
                                 --      (a) the system programs
@@ -322,6 +337,7 @@ initSysTools mbMinusB
        -- We just assume on command line
        lc_prog <- getSetting "LLVM llc command"
        lo_prog <- getSetting "LLVM opt command"
+       lcc_prog <- getSetting "LLVM clang command"
 
        let iserv_prog = libexec "ghc-iserv"
 
@@ -365,6 +381,7 @@ initSysTools mbMinusB
                     sPgm_libtool = libtool_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
+                    sPgm_lcc = (lcc_prog,[]),
                     sPgm_i   = iserv_prog,
                     sOpt_L       = [],
                     sOpt_P       = [],
@@ -373,6 +390,7 @@ initSysTools mbMinusB
                     sOpt_a       = [],
                     sOpt_l       = [],
                     sOpt_windres = [],
+                    sOpt_lcc     = [],
                     sOpt_lo      = [],
                     sOpt_lc      = [],
                     sOpt_i       = [],
@@ -587,8 +605,7 @@ runLlvmLlc dflags args = do
 -- assembler)
 runClang :: DynFlags -> [Option] -> IO ()
 runClang dflags args = do
-  -- we simply assume its available on the PATH
-  let clang = "clang"
+  let (clang,_) = pgm_lcc dflags
       -- be careful what options we call clang with
       -- see #5903 and #7617 for bugs caused by this.
       (_,args0) = pgm_a dflags

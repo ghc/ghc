@@ -587,6 +587,12 @@ AC_SUBST([LlvmVersion])
 sUPPORTED_LLVM_VERSION=$(echo \($LlvmVersion\) | sed 's/\./,/')
 AC_DEFINE_UNQUOTED([sUPPORTED_LLVM_VERSION], ${sUPPORTED_LLVM_VERSION}, [The supported LLVM version number])
 
+dnl ** Which LLVM clang to use?
+dnl --------------------------------------------------------------
+AC_CHECK_TARGET_TOOL([CLANG], [clang])
+ClangCmd="$CLANG"
+AC_SUBST([ClangCmd])
+
 dnl ** Which LLVM llc to use?
 dnl --------------------------------------------------------------
 FIND_LLVM_PROG([LLC], [llc], [llc], [$LlvmVersion])
@@ -1263,6 +1269,7 @@ echo "\
    xelatex      : $XELATEX
 
    Using LLVM tools
+      clang : $ClangCmd
       llc   : $LlcCmd
       opt   : $OptCmd"
 

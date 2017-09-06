@@ -29,6 +29,7 @@
  ("target has RTS linker", "@HaskellHaveRTSLinker@"),
  ("Unregisterised", "@Unregisterised@"),
  ("LLVM llc command", "@SettingsLlcCommand@"),
- ("LLVM opt command", "@SettingsOptCommand@")
+ ("LLVM opt command", "@SettingsOptCommand@"),
+ ("LLVM clang command", "@SettingsClangCommand@")
  ]
 

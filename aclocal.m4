@@ -481,6 +481,12 @@ AC_DEFUN([FP_SETTINGS],
         SettingsLibtoolCommand="libtool"
         SettingsTouchCommand='touch'
     fi
+    if test -z "$ClangCmd"
+    then
+        SettingsClangCommand="clang"
+    else
+        SettingsClangCommand="$ClangCmd"
+    fi
     if test -z "$LlcCmd"
     then
       SettingsLlcCommand="llc"
@@ -511,6 +517,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsWindresCommand)
     AC_SUBST(SettingsLibtoolCommand)
     AC_SUBST(SettingsTouchCommand)
+    AC_SUBST(SettingsClangCommand)
     AC_SUBST(SettingsLlcCommand)
     AC_SUBST(SettingsOptCommand)
 ])

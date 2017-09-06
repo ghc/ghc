@@ -1035,6 +1035,7 @@ $(eval $(call bindist-list,.,\
     INSTALL \
     configure config.sub config.guess install-sh \
     settings.in \
+    llvm-targets \
     packages \
     Makefile \
     mk/config.mk.in \
@@ -1061,7 +1062,7 @@ $(eval $(call bindist-list,.,\
     $(wildcard compiler/stage2/doc) \
     $(wildcard libraries/*/dist-install/doc/) \
     $(wildcard libraries/*/*/dist-install/doc/) \
-    $(filter-out settings,$(INSTALL_LIBS)) \
+    $(filter-out settings llvm-targets,$(INSTALL_LIBS)) \
     $(RTS_INSTALL_LIBS) \
     $(filter-out %/project.mk mk/config.mk %/mk/install.mk,$(MAKEFILE_LIST)) \
     mk/project.mk \
@@ -1094,7 +1095,7 @@ BIN_DIST_MK = $(BIN_DIST_PREP_DIR)/bindist.mk
 unix-binary-dist-prep:
 	$(call removeTrees,bindistprep/)
 	"$(MKDIRHIER)" $(BIN_DIST_PREP_DIR)
-	set -e; for i in packages LICENSE compiler ghc iserv rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
+	set -e; for i in packages LICENSE compiler ghc iserv rts libraries utils docs libffi includes driver mk rules Makefile aclocal.m4 config.sub config.guess install-sh settings.in llvm-targets ghc.mk inplace distrib/configure.ac distrib/README distrib/INSTALL; do ln -s ../../$$i $(BIN_DIST_PREP_DIR)/; done
 	echo "HADDOCK_DOCS       = $(HADDOCK_DOCS)"       >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_HTML  = $(BUILD_SPHINX_HTML)"  >> $(BIN_DIST_MK)
 	echo "BUILD_SPHINX_PDF   = $(BUILD_SPHINX_PDF)"   >> $(BIN_DIST_MK)
@@ -1192,7 +1193,7 @@ SRC_DIST_GHC_DIRS = mk rules docs distrib bindisttest libffi includes \
 SRC_DIST_GHC_FILES += \
     configure.ac config.guess config.sub configure \
     aclocal.m4 README.md ANNOUNCE HACKING.md INSTALL.md LICENSE Makefile \
-    install-sh settings.in VERSION GIT_COMMIT_ID \
+    install-sh settings.in llvm-targets VERSION GIT_COMMIT_ID \
     boot packages ghc.mk MAKEHELP.md
 
 .PHONY: VERSION
