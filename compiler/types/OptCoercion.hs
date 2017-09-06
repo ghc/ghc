@@ -207,11 +207,11 @@ opt_co4 env sym rep r (ForAllCo tv k_co co)
                             opt_co4_wrap env' sym rep r co
      -- Use the "mk" functions to check for nested Refls
 
-opt_co4 env sym rep r (FunCo _r co1 co2)
+opt_co4 env sym rep r (FunCo _r w co1 co2)
   = ASSERT( r == _r )
     if rep
-    then mkFunCo Representational co1' co2'
-    else mkFunCo r co1' co2'
+    then mkFunCo Representational w co1' co2'
+    else mkFunCo r w co1' co2'
   where
     co1' = opt_co4_wrap env sym rep r co1
     co2' = opt_co4_wrap env sym rep r co2

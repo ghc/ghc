@@ -91,7 +91,7 @@ mkTcNomReflCo          :: TcType -> TcCoercionN
 mkTcRepReflCo          :: TcType -> TcCoercionR
 mkTcTyConAppCo         :: Role -> TyCon -> [TcCoercion] -> TcCoercion
 mkTcAppCo              :: TcCoercion -> TcCoercionN -> TcCoercion
-mkTcFunCo              :: Role -> TcCoercion -> TcCoercion -> TcCoercion
+mkTcFunCo              :: Role -> Rig -> TcCoercion -> TcCoercion -> TcCoercion
 mkTcAxInstCo           :: Role -> CoAxiom br -> BranchIndex
                        -> [TcType] -> [TcCoercion] -> TcCoercion
 mkTcUnbranchedAxInstCo :: CoAxiom Unbranched -> [TcType]
@@ -269,9 +269,9 @@ mkWpFun w1 w2 co1          co2          t1 _  d | w1 /= w2 = WpFun co1 co2 t1 d
 -- multiplicities as they are ignored by core anyway.
 -- arnaud: TODO: add an assertion that w1 is a subweight of w2
 mkWpFun _  _  WpHole       WpHole       _  _  _ = WpHole
-mkWpFun _  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun _  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun _  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
+mkWpFun w  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational w (mkTcRepReflCo t1) co2)
+mkWpFun w  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun w  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational w (mkTcSymCo co1) co2)
 mkWpFun _  _  co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 -- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,

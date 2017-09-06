@@ -639,8 +639,8 @@ rnIfaceLamBndr (bndr, oneshot) = (,) <$> rnIfaceBndr bndr <*> pure oneshot
 
 rnIfaceCo :: Rename IfaceCoercion
 rnIfaceCo (IfaceReflCo role ty) = IfaceReflCo role <$> rnIfaceType ty
-rnIfaceCo (IfaceFunCo role co1 co2)
-    = IfaceFunCo role <$> rnIfaceCo co1 <*> rnIfaceCo co2
+rnIfaceCo (IfaceFunCo role w co1 co2)
+    = IfaceFunCo role w <$> rnIfaceCo co1 <*> rnIfaceCo co2
 rnIfaceCo (IfaceTyConAppCo role tc cos)
     = IfaceTyConAppCo role <$> rnIfaceTyCon tc <*> mapM rnIfaceCo cos
 rnIfaceCo (IfaceAppCo co1 co2)

@@ -1582,14 +1582,14 @@ lintCoercion (ForAllCo tv1 kind_co co)
                    substTy subst t2
        ; return (k3, k4, tyl, tyr, r) } }
 
-lintCoercion co@(FunCo r co1 co2)
+lintCoercion co@(FunCo r w co1 co2)
   = do { (k1,k'1,s1,t1,r1) <- lintCoercion co1
        ; (k2,k'2,s2,t2,r2) <- lintCoercion co2
        ; k <- lintArrow (text "coercion" <+> quotes (ppr co)) k1 k2
        ; k' <- lintArrow (text "coercion" <+> quotes (ppr co)) k'1 k'2
        ; lintRole co1 r r1
        ; lintRole co2 r r2
-       ; return (k, k', mkFunTyOm s1 s2, mkFunTyOm t1 t2, r) }
+       ; return (k, k', mkFunTy w s1 s2, mkFunTy w t1 t2, r) }
 
 lintCoercion (CoVarCo cv)
   | not (isCoVar cv)

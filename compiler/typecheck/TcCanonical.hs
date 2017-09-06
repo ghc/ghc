@@ -1819,7 +1819,7 @@ unifyWanted loc role orig_ty1 orig_ty2
     go (FunTy w1 s1 t1) (FunTy w2 s2 t2) | w1 == w2
       = do { co_s <- unifyWanted loc role s1 s2
            ; co_t <- unifyWanted loc role t1 t2
-           ; return (mkFunCo role co_s co_t) }
+           ; return (mkFunCo role w1 co_s co_t) }
     go (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       | tc1 == tc2, tys1 `equalLength` tys2
       , isInjectiveTyCon tc1 role -- don't look under newtypes at Rep equality

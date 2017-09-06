@@ -6,6 +6,7 @@ import {-# SOURCE #-} TyCoRep
 import {-# SOURCE #-} TyCon
 
 import BasicTypes ( LeftOrRight )
+import Weight
 import CoAxiom
 import Var
 import Outputable
@@ -16,7 +17,7 @@ mkReflCo :: Role -> Type -> Coercion
 mkTyConAppCo :: HasDebugCallStack => Role -> TyCon -> [Coercion] -> Coercion
 mkAppCo :: Coercion -> Coercion -> Coercion
 mkForAllCo :: TyVar -> Coercion -> Coercion -> Coercion
-mkFunCo :: Role -> Coercion -> Coercion -> Coercion
+mkFunCo :: Role -> Rig -> Coercion -> Coercion -> Coercion
 mkCoVarCo :: CoVar -> Coercion
 mkAxiomInstCo :: CoAxiom Branched -> BranchIndex -> [Coercion] -> Coercion
 mkPhantomCo :: Coercion -> Type -> Type -> Coercion

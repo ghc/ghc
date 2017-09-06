@@ -2109,11 +2109,11 @@ tryEtaReduce bndrs body
        , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
     ok_arg bndr (Var v) co
        | bndr == v   = let reflCo = mkRepReflCo (idType bndr)
-                       in Just (mkFunCo Representational reflCo co, [])
+                       in Just (mkFunCo Representational Omega reflCo co, []) -- TODO: arnaud: Omega here (and below) is not accurate. But to do better, we will have to start storing multiplicities in vars, along their types. In order to reconstruct the right kind of arrow. See Var.hs.
     ok_arg bndr (Cast e co_arg) co
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , bndr == v
-       = Just (mkFunCo Representational (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCo Representational Omega (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co

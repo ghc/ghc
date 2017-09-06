@@ -969,7 +969,7 @@ flatten_one (FunTy weight ty1 ty2)
   = do { (xi1,co1) <- flatten_one ty1
        ; (xi2,co2) <- flatten_one ty2
        ; role <- getRole
-       ; return (mkFunTy weight xi1 xi2, mkFunCo role co1 co2) }
+       ; return (mkFunTy weight xi1 xi2, mkFunCo role weight co1 co2) }
 
 flatten_one ty@(ForAllTy {})
 -- TODO (RAE): This is inadequate, as it doesn't flatten the kind of

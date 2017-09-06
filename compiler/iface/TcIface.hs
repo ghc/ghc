@@ -1307,7 +1307,7 @@ tcIfaceCo :: IfaceCoercion -> IfL Coercion
 tcIfaceCo = go
   where
     go (IfaceReflCo r t)         = Refl r <$> tcIfaceType t
-    go (IfaceFunCo r c1 c2)      = mkFunCo r <$> go c1 <*> go c2
+    go (IfaceFunCo r w c1 c2)    = mkFunCo r w <$> go c1 <*> go c2
     go (IfaceTyConAppCo r tc cs)
       = TyConAppCo r <$> tcIfaceTyCon tc <*> mapM go cs
     go (IfaceAppCo c1 c2)        = AppCo <$> go c1 <*> go c2

@@ -1290,7 +1290,7 @@ uType origin t_or_k orig_ty1 orig_ty2
     go (FunTy w1 fun1 arg1) (FunTy w2 fun2 arg2) | w1 == w2
       = do { co_l <- uType origin t_or_k fun1 fun2
            ; co_r <- uType origin t_or_k arg1 arg2
-           ; return $ mkFunCo Nominal co_l co_r }
+           ; return $ mkFunCo Nominal w1 co_l co_r }
 
         -- Always defer if a type synonym family (type function)
         -- is involved.  (Data families behave rigidly.)
@@ -2069,9 +2069,9 @@ occCheckExpand tv ty
                                      env' = extendVarEnv env tv' tv''
                                ; body' <- go_co env' body_co
                                ; return (ForAllCo tv'' kind_co' body') }
-    go_co env (FunCo r co1 co2)         = do { co1' <- go_co env co1
+    go_co env (FunCo r w co1 co2)       = do { co1' <- go_co env co1
                                              ; co2' <- go_co env co2
-                                             ; return (mkFunCo r co1' co2') }
+                                             ; return (mkFunCo r w co1' co2') }
     go_co env (CoVarCo c)               = do { k' <- go env (varType c)
                                              ; return (mkCoVarCo (setVarType c k')) }
     go_co env (AxiomInstCo ax ind args) = do { args' <- mapM (go_co env) args

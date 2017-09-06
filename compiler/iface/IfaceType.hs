@@ -239,7 +239,7 @@ data IfaceTyConInfo   -- Used to guide pretty-printing
 
 data IfaceCoercion
   = IfaceReflCo       Role IfaceType
-  | IfaceFunCo        Role IfaceCoercion IfaceCoercion
+  | IfaceFunCo        Role Rig IfaceCoercion IfaceCoercion
   | IfaceTyConAppCo   Role IfaceTyCon [IfaceCoercion]
   | IfaceAppCo        IfaceCoercion IfaceCoercion
   | IfaceForAllCo     IfaceTvBndr IfaceCoercion IfaceCoercion
@@ -389,7 +389,7 @@ substIfaceType env ty
     go (IfaceCoercionTy co)   = IfaceCoercionTy (go_co co)
 
     go_co (IfaceReflCo r ty)     = IfaceReflCo r (go ty)
-    go_co (IfaceFunCo r c1 c2)   = IfaceFunCo r (go_co c1) (go_co c2)
+    go_co (IfaceFunCo r w c1 c2)   = IfaceFunCo r w (go_co c1) (go_co c2)
     go_co (IfaceTyConAppCo r tc cos) = IfaceTyConAppCo r tc (go_cos cos)
     go_co (IfaceAppCo c1 c2)         = IfaceAppCo (go_co c1) (go_co c2)
     go_co (IfaceForAllCo {})         = pprPanic "substIfaceCoercion" (ppr ty)
@@ -1112,11 +1112,11 @@ pprParendIfaceCoercion = ppr_co TyConPrec
 
 ppr_co :: TyPrec -> IfaceCoercion -> SDoc
 ppr_co _         (IfaceReflCo r ty) = angleBrackets (ppr ty) <> ppr_role r
-ppr_co ctxt_prec (IfaceFunCo r co1 co2)
+ppr_co ctxt_prec (IfaceFunCo r _ co1 co2) -- TODO: arnaud: print multiplicity somehow
   = maybeParen ctxt_prec FunPrec $
     sep (ppr_co FunPrec co1 : ppr_fun_tail co2)
   where
-    ppr_fun_tail (IfaceFunCo r co1 co2)
+    ppr_fun_tail (IfaceFunCo r _ co1 co2)
       = (arrow <> ppr_role r <+> ppr_co FunPrec co1) : ppr_fun_tail co2
     ppr_fun_tail other_co
       = [arrow <> ppr_role r <+> pprIfaceCoercion other_co]
@@ -1396,9 +1396,10 @@ instance Binary IfaceCoercion where
           putByte bh 1
           put_ bh a
           put_ bh b
-  put_ bh (IfaceFunCo a b c) = do
+  put_ bh (IfaceFunCo a w b c) = do
           putByte bh 2
           put_ bh a
+          put_ bh w
           put_ bh b
           put_ bh c
   put_ bh (IfaceTyConAppCo a b c) = do
@@ -1470,9 +1471,10 @@ instance Binary IfaceCoercion where
                    b <- get bh
                    return $ IfaceReflCo a b
            2 -> do a <- get bh
+                   w <- get bh
                    b <- get bh
                    c <- get bh
-                   return $ IfaceFunCo a b c
+                   return $ IfaceFunCo a w b c
            3 -> do a <- get bh
                    b <- get bh
                    c <- get bh

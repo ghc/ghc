@@ -1385,7 +1385,7 @@ freeNamesIfType (IfaceCoercionTy c)   = freeNamesIfCoercion c
 
 freeNamesIfCoercion :: IfaceCoercion -> NameSet
 freeNamesIfCoercion (IfaceReflCo _ t) = freeNamesIfType t
-freeNamesIfCoercion (IfaceFunCo _ c1 c2)
+freeNamesIfCoercion (IfaceFunCo _ _ c1 c2)
   = freeNamesIfCoercion c1 &&& freeNamesIfCoercion c2
 freeNamesIfCoercion (IfaceTyConAppCo _ tc cos)
   = freeNamesIfTc tc &&& fnList freeNamesIfCoercion cos

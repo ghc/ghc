@@ -237,8 +237,8 @@ toIfaceCoercionX fr co
       | tc `hasKey` funTyConKey
       , [_,_,_,_] <- cos         = pprPanic "toIfaceCoercion" (ppr co)
       | otherwise                = IfaceTyConAppCo r (toIfaceTyCon tc) (map go cos)
-    go (FunCo r co1 co2)   = IfaceFunCo r (toIfaceCoercion co1)
-                                          (toIfaceCoercion co2)
+    go (FunCo r w co1 co2)  = IfaceFunCo r w (toIfaceCoercion co1)
+                                             (toIfaceCoercion co2)
 
     go (ForAllCo tv k co) = IfaceForAllCo (toIfaceTvBndr tv)
                                           (toIfaceCoercionX fr' k)
