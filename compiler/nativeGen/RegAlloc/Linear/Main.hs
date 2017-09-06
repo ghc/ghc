@@ -496,7 +496,7 @@ genRaInsn block_live new_instrs block_id instr r_dying w_dying = do
     -- debugging
 {-    freeregs <- getFreeRegsR
     assig    <- getAssigR
-    pprDebugAndThen (defaultDynFlags Settings{ sTargetPlatform=platform }) trace "genRaInsn"
+    pprDebugAndThen (defaultDynFlags Settings{ sTargetPlatform=platform } undefined) trace "genRaInsn"
         (ppr instr
                 $$ text "r_dying      = " <+> ppr r_dying
                 $$ text "w_dying      = " <+> ppr w_dying
