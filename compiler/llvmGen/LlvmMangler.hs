@@ -12,9 +12,9 @@
 module LlvmMangler ( llvmFixupAsm, ManglerInfo, ManglerStr ) where
 
 import DynFlags ( DynFlags, targetPlatform )
-import Platform ( platformArch, Arch(..) )
+import Platform ( platformArch, Arch(..), platformOS, OS(..) )
 import ErrUtils ( withTiming )
-import Outputable ( text )
+import Outputable ( text, panic )
 
 import Control.Exception
 import qualified Data.ByteString.Char8 as B
@@ -80,15 +80,22 @@ type LabRewrite = State -> Rewrite
 -- | This rewrite looks for return points of a llvm.cpscall and adds GC info
 -- above that label.
 addInfoTable :: LabelMap ManglerStr -> LabRewrite
-addInfoTable info FirstLabel _ line = do
+addInfoTable info FirstLabel dflags line = do
         retPt <- B.stripPrefix labPrefix line
         (i, _) <- B.readInt retPt
         statics <- mapLookup (toKey i) info
         fullName <- B.stripSuffix colon line
         return $ B.concat $ (map (\f -> f fullName) statics) ++ [line]
     where
-        -- TODO(kavon): check if prefix changes on different platforms.
-        labPrefix = B.pack "L" 
+        
+        -- At a minimum, Mac and Linux assembly output from LLVM use different prefixes
+        -- basic block labels. It may be the case that one of the prefixes is very common,
+        -- but I have not looked into it (kavon)
+        labPrefix = case platformOS (targetPlatform dflags) of
+                        OSDarwin -> B.pack "L" 
+                        OSLinux  -> B.pack ".L"
+                        otherwise -> panic "Please update LLVM Mangler for this OS."
+                        
         colon = B.pack ":"
         toKey = uniqueToLbl . intToUnique
         
