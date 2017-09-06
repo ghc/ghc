@@ -79,7 +79,7 @@ hashWord(const HashTable *table, StgWord key)
 int
 hashStr(const HashTable *table, char *key)
 {
-#if x86_64_HOST_ARCH
+#ifdef x86_64_HOST_ARCH
     StgWord h = XXH64 (key, strlen(key), 1048583);
 #else
     StgWord h = XXH32 (key, strlen(key), 1048583);
