@@ -404,7 +404,7 @@ tcExpr expr@(OpApp arg1 op fix arg2) res_ty
              -- op' :: (a2_ty -> res_ty) -> a2_ty -> res_ty
 
              -- wrap1 :: arg1_ty "->" (arg2_sigma -> res_ty)
-             wrap1 = mkWpFun idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
+             wrap1 = mkWpFun Omega Omega idHsWrapper wrap_res (weightedThing arg2_sigma) res_ty doc
                      <.> wrap_arg1
              doc = text "When looking at the argument to ($)"
 
@@ -1263,7 +1263,8 @@ tcArgs fun orig_fun_ty fun_orig orig_args herald
            ; (inner_wrap, args', inner_res_ty)
                <- go (arg_ty : acc_args) (n+1) res_ty args
                -- inner_wrap :: res_ty "->" (map typeOf args') -> inner_res_ty
-           ; return ( mkWpFun idHsWrapper inner_wrap (weightedThing arg_ty) res_ty doc <.> wrap
+           ; let w = weightedWeight arg_ty
+           ; return ( mkWpFun w w idHsWrapper inner_wrap (weightedThing arg_ty) res_ty doc <.> wrap
                     , Left arg' : args'
                     , inner_res_ty ) }
       where
@@ -1365,7 +1366,7 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
            ; return (result, mkWpCastN list_co) }
 
     go rho_ty (SynFun mult_shape arg_shape res_shape)
-      = do { ( ( ( (result, arg_ty, res_ty)
+      = do { ( ( ( (result, arg_ty, res_ty, op_mult, res_mult)
                  , res_wrapper )                   -- :: res_ty_out "->" res_ty
                , arg_wrapper1, [], arg_wrapper2 )  -- :: arg_ty "->" arg_ty_out
              , match_wrapper )         -- :: (arg_ty -> res_ty) "->" rho_ty
@@ -1382,30 +1383,30 @@ tcSynArgE orig sigma_ty syn_ty thing_inside
                                , text "Too many nested arrows in SyntaxOpType" $$
                                  pprCtOrigin orig )
 
-                     ; arg_inferred_mult <- synMult (weightedWeight arg_ty)
+                     ; (op_mult, res_mult, arg_inferred_mult) <- synMult (weightedWeight arg_ty)
                      ; tcSynArgA orig arg_tc_ty [] arg_shape $
                        \ arg_results arg_res_weights ->
                        tcSynArgE orig res_tc_ty res_shape $
                        \ res_results res_res_weights ->
                        do { result <- thing_inside (arg_results ++ res_results) (arg_inferred_mult ++ arg_res_weights ++ res_res_weights)
-                          ; return (result, arg_tc_ty, res_tc_ty) }}
+                          ; return (result, arg_tc_ty, res_tc_ty, op_mult, res_mult) }}
 
            ; return ( result
                     , match_wrapper <.>
-                      mkWpFun (arg_wrapper2 <.> arg_wrapper1) res_wrapper
+                      mkWpFun op_mult res_mult (arg_wrapper2 <.> arg_wrapper1) res_wrapper
                               arg_ty res_ty doc ) }
       where
         herald = text "This rebindable syntax expects a function with"
         doc = text "When checking a rebindable syntax operator arising from" <+> ppr orig
         synMult arg_mult =
           case mult_shape of
-            SynAnyMult -> return [arg_mult]
+            SynAnyMult -> return (arg_mult, arg_mult, [arg_mult])
             SynMult mult ->
-              if arg_mult == mult then -- TODO: arnaud: should be sub-multiplicity here, but I need, then to return a wrapper. Fix when the wrappers for multiplicity are about
-                return []
+              if subweight arg_mult mult then
+                return (arg_mult, mult, [])
               else
                 addErrTc (text "Incorrect multiplicity in rebindable syntax") >> -- TODO: arnaud: helpful error message required here
-                return []
+                return (mult, mult, [])
 
     go rho_ty (SynType the_ty)
       = do { wrap   <- tcSubTypeET orig GenSigCtxt the_ty rho_ty

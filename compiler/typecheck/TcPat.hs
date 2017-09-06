@@ -393,7 +393,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
          -- expression must be a function
         ; let expr_orig = lexprCtOrigin expr
               herald    = text "A view pattern expression expects"
-        ; (expr_wrap1, [Weighted _ inf_arg_ty], inf_res_ty) -- TODO: arnaud: probably need to do something with the weight here.
+        ; (expr_wrap1, [Weighted weight inf_arg_ty], inf_res_ty) -- TODO: arnaud: probably need to compare this weight with the pattern's weight.
             <- matchActualFunTys herald expr_orig (Just expr) 1 expr'_inferred
             -- expr_wrap1 :: expr'_inferred "->" (inf_arg_ty -> inf_res_ty)
 
@@ -405,7 +405,7 @@ tc_pat penv (ViewPat expr pat _) overall_pat_ty thing_inside
         ; (pat', res) <- tc_lpat pat (overall_pat_ty `weightedSet` mkCheckExpType inf_res_ty) penv thing_inside
 
         ; overall_pat_ty <- readExpType (weightedThing overall_pat_ty)
-        ; let expr_wrap2' = mkWpFun expr_wrap2 idHsWrapper
+        ; let expr_wrap2' = mkWpFun weight weight expr_wrap2 idHsWrapper -- TODO: arnaud: maybe one of the two `weight` ought to be the pattern's weight?
                                     overall_pat_ty inf_res_ty doc
                -- expr_wrap2' :: (inf_arg_ty -> inf_res_ty) "->"
                --                (overall_pat_ty -> inf_res_ty)

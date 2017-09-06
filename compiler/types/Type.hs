@@ -2251,9 +2251,8 @@ nonDetCmpTypeX env orig_t1 orig_t2 =
       | Just (s1, t1) <- repSplitAppTy_maybe ty1
       = go env s1 s2 `thenCmpTy` go env t1 t2
     go env (FunTy w1 s1 t1) (FunTy w2 s2 t2)
-      = -- TODO: XXX: arnaud: fixme: I should compare weights as well, otherwise we will most likely have type unsafety. But since unrestricted constructors, there seem to be lost data (possibly via interfaces), so that some code does not compile anymore. Deactivating weight-comparison was the easy fix.
-        -- liftOrdering (compare w1 w2) `thenCmpTy`
-      go env s1 s2 `thenCmpTy` go env t1 t2
+      = liftOrdering (compare w1 w2) `thenCmpTy`
+        go env s1 s2 `thenCmpTy` go env t1 t2
     go env (TyConApp tc1 tys1) (TyConApp tc2 tys2)
       = liftOrdering (tc1 `nonDetCmpTc` tc2) `thenCmpTy` gos env tys1 tys2
     go _   (LitTy l1)          (LitTy l2)          = liftOrdering (compare l1 l2)

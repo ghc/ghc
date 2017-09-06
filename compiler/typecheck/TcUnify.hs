@@ -146,7 +146,7 @@ matchExpectedFunTys herald arity orig_ty thing_inside
         do { (result, wrap_res) <- go ((Weighted weight $ mkCheckExpType arg_ty) : acc_arg_tys)
                                       (n-1) res_ty
            ; return ( result
-                    , mkWpFun idHsWrapper wrap_res arg_ty res_ty doc ) }
+                    , mkWpFun weight weight idHsWrapper wrap_res arg_ty res_ty doc ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
               quotes (ppr orig_ty)
@@ -275,7 +275,7 @@ matchActualFunTysPart herald ct_orig mb_thing arity orig_ty
     go n acc_args (FunTy w arg_ty res_ty)
       = ASSERT( not (isPredTy arg_ty) )
         do { (wrap_res, tys, ty_r) <- go (n-1) (Weighted w arg_ty : acc_args) res_ty
-           ; return ( mkWpFun idHsWrapper wrap_res arg_ty ty_r doc -- TODO: arnaud: the wrapper may need linear type information
+           ; return ( mkWpFun w w idHsWrapper wrap_res arg_ty ty_r doc
                     , Weighted w arg_ty : tys, ty_r ) }
       where
         doc = text "When inferring the argument type of a function with type" <+>
@@ -719,11 +719,11 @@ tc_sub_type_ds eq_orig inst_orig ctxt ty_actual ty_expected
     go (FunTy act_weight act_arg act_res) (FunTy exp_weight exp_arg exp_res)
       | not (isPredTy act_arg)
       , not (isPredTy exp_arg)
-      , subweight act_weight exp_weight -- arnaud: TODO: this probably needs to be turned into a coercion for core
+      , subweight act_weight exp_weight
       = -- See Note [Co/contra-variance of subsumption checking]
         do { res_wrap <- tc_sub_type_ds eq_orig inst_orig  ctxt act_res exp_res
            ; arg_wrap <- tc_sub_tc_type eq_orig given_orig ctxt exp_arg act_arg
-           ; return (mkWpFun arg_wrap res_wrap exp_arg exp_res doc) }
+           ; return (mkWpFun act_weight exp_weight arg_wrap res_wrap exp_arg exp_res doc) }
                -- arg_wrap :: exp_arg ~> act_arg
                -- res_wrap :: act-res ~> exp_res
       where

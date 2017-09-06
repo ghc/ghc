@@ -256,17 +256,23 @@ WpHole <.> c = c
 c <.> WpHole = c
 c1 <.> c2    = c1 `WpCompose` c2
 
-mkWpFun :: HsWrapper -> HsWrapper
+mkWpFun :: Rig -> Rig -- the multiplicities on the arrows of the worker and wrapper respectively
+        -> HsWrapper -> HsWrapper
         -> TcType    -- the "from" type of the first wrapper
         -> TcType    -- either type of the second wrapper (used only when the
                      -- second wrapper is the identity)
         -> SDoc      -- what caused you to want a WpFun? Something like "When converting ..."
         -> HsWrapper
-mkWpFun WpHole       WpHole       _  _  _ = WpHole
-mkWpFun WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
-mkWpFun (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
-mkWpFun (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
-mkWpFun co1          co2          t1 _  d = WpFun co1 co2 t1 d
+mkWpFun w1 w2 co1          co2          t1 _  d | w1 /= w2 = WpFun co1 co2 t1 d
+-- When the multiplicities are not the same, always make a proper wrapper.
+-- We don't currently need to actually record the source and target
+-- multiplicities as they are ignored by core anyway.
+-- arnaud: TODO: add an assertion that w1 is a subweight of w2
+mkWpFun _  _  WpHole       WpHole       _  _  _ = WpHole
+mkWpFun _  _  WpHole       (WpCast co2) t1 _  _ = WpCast (mkTcFunCo Representational (mkTcRepReflCo t1) co2)
+mkWpFun _  _  (WpCast co1) WpHole       _  t2 _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) (mkTcRepReflCo t2))
+mkWpFun _  _  (WpCast co1) (WpCast co2) _  _  _ = WpCast (mkTcFunCo Representational (mkTcSymCo co1) co2)
+mkWpFun _  _  co1          co2          t1 _  d = WpFun co1 co2 t1 d
 
 -- | @mkWpFuns [(ty1, wrap1), (ty2, wrap2)] ty_res wrap_res@,
 -- where @wrap1 :: ty1 "->" ty1'@ and @wrap2 :: ty2 "->" ty2'@,
@@ -281,7 +287,7 @@ mkWpFuns args res_ty res_wrap doc = snd $ go args res_ty res_wrap
     go [] res_ty res_wrap = (res_ty, res_wrap)
     go ((arg_ty, arg_wrap) : args) res_ty res_wrap
       = let (tail_ty, tail_wrap) = go args res_ty res_wrap in
-        (arg_ty `mkFunTyOm` tail_ty, mkWpFun arg_wrap tail_wrap arg_ty tail_ty doc)
+        (arg_ty `mkFunTyOm` tail_ty, mkWpFun Omega Omega arg_wrap tail_wrap arg_ty tail_ty doc)
 
 mkWpCastR :: TcCoercionR -> HsWrapper
 mkWpCastR co
