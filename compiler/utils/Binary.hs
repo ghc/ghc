@@ -498,7 +498,7 @@ instance Binary DiffTime where
 --
 -- TODO  This instance is not architecture portable.  GMP stores numbers as
 -- arrays of machine sized words, so the byte format is not portable across
--- architectures with different endianess and word size.
+-- architectures with different endianness and word size.
 --
 -- This makes it hard (impossible) to make an equivalent instance
 -- with code that is compilable with non-GHC.  Do we need any instance

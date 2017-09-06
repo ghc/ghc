@@ -1013,7 +1013,7 @@ drop_dicts drops dictionary bindings on the LHS where possible.
              RULE forall s (d :: MonadAbstractIOST (ReaderT s)).
                 useAbstractMonad (ReaderT s) d = $suseAbstractMonad s
 
-   Trac #8848 is a good example of where there are some intersting
+   Trac #8848 is a good example of where there are some interesting
    dictionary bindings to discard.
 
 The drop_dicts algorithm is based on these observations:

@@ -426,7 +426,7 @@ checkFunApp fun_ty arg_tys msg
       = (Nothing, Nothing)
 
 -- | "Compare" types. We used to try a crude comparison of the type themselves,
--- but this is essentially impossible in STG as we have discarded. both casts
+-- but this is essentially impossible in STG as we have discarded both casts
 -- and type applications, so types might look different but be the same. Now we
 -- simply compare their runtime representations. See #14120.
 stgEqType :: Type -> Type -> Bool

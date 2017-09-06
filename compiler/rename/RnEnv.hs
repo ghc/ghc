@@ -1253,7 +1253,7 @@ It is enabled by default and disabled by the flag
 
 Note [Safe Haskell and GHCi]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We DONT do this Safe Haskell as we need to check imports. We can
+We DON'T do this Safe Haskell as we need to check imports. We can
 and should instead check the qualified import but at the moment
 this requires some refactoring so leave as a TODO
 -}

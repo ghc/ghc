@@ -134,7 +134,7 @@ unboxArg :: CoreExpr                    -- The supplied argument, not levity-pol
 -- always returns a non-levity-polymorphic expression
 
 unboxArg arg
-  -- Primtive types: nothing to unbox
+  -- Primitive types: nothing to unbox
   | isPrimitiveType arg_ty
   = return (arg, \body -> body)
 

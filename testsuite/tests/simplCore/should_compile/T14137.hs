@@ -1,7 +1,7 @@
 module T14137 where
 
 -- The point of this test is that we should inline 'thunk'
--- into j's RHS, and we can do so quite agressively, even
+-- into j's RHS, and we can do so quite aggressively, even
 -- when we aren't optimising. See the ticket.
 --
 -- It's not a big deal, because in the end FloatIn

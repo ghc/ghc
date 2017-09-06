@@ -1153,7 +1153,7 @@ buildImplication skol_info skol_tvs given thing_inside
 
          else -- Fast path.  We check every function argument with
               -- tcPolyExpr, which uses tcSkolemise and hence checkConstraints.
-              -- So tihs fast path is well-exercised
+              -- So this fast path is well-exercised
               do { res <- thing_inside
                  ; return (emptyBag, emptyTcEvBinds, res) } }
 
@@ -1162,7 +1162,7 @@ implicationNeeded :: [TcTyVar] -> [EvVar] -> TcM Bool
 -- to have an EvBindsVar for them when they might be deferred to
 -- runtime. Otherwise, they end up as top-level unlifted bindings,
 -- which are verboten. See also Note [Deferred errors for coercion holes]
--- in TcErrors.  cf Trac #14149 for an exmample of what goes wrong.
+-- in TcErrors.  cf Trac #14149 for an example of what goes wrong.
 implicationNeeded skol_tvs given
   | null skol_tvs
   , null given

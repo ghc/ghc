@@ -120,7 +120,7 @@ data FloatSpec
   = FloatMe Level       -- Float to just inside the binding
                         --    tagged with this level
   | StayPut Level       -- Stay where it is; binding is
-                        --     tagged with tihs level
+                        --     tagged with this level
 
 floatSpecLevel :: FloatSpec -> Level
 floatSpecLevel (FloatMe l) = l

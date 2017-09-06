@@ -38,9 +38,9 @@ createBCOs bcos = do
 createBCO :: Array Int HValue -> ResolvedBCO -> IO HValue
 createBCO _   ResolvedBCO{..} | resolvedBCOIsLE /= isLittleEndian
   = throwIO (ErrorCall $
-        unlines [ "The endianess of the ResolvedBCO does not match"
-                , "the systems endianess. Using ghc and iserv in a"
-                , "mixed endianess setup is not supported!"
+        unlines [ "The endianness of the ResolvedBCO does not match"
+                , "the systems endianness. Using ghc and iserv in a"
+                , "mixed endianness setup is not supported!"
                 ])
 createBCO arr bco
    = do BCO bco# <- linkBCO' arr bco

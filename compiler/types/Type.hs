@@ -868,7 +868,7 @@ pprUserTypeErrorTy ty =
       | tyConName tc == typeErrorVAppendDataConName ->
         pprUserTypeErrorTy t1 $$ pprUserTypeErrorTy t2
 
-    -- An uneavaluated type function
+    -- An unevaluated type function
     _ -> ppr ty
 
 
@@ -1186,7 +1186,7 @@ to differ, leading to a contradiction. Thus, co is reflexive.
 Accordingly, by eliminating reflexive casts, splitTyConApp need not worry
 about outermost casts to uphold (*).
 
-Unforunately, that's not the end of the story. Consider comparing
+Unfortunately, that's not the end of the story. Consider comparing
   (T a b c)      =?       (T a b |> (co -> <Type>)) (c |> sym co)
 These two types have the same kind (Type), but the left type is a TyConApp
 while the right type is not. To handle this case, we will have to implement

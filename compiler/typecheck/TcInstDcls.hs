@@ -1670,7 +1670,7 @@ generic default methods.
 Note [INLINE and default methods]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Default methods need special case.  They are supposed to behave rather like
-macros.  For exmample
+macros.  For example
 
   class Foo a where
     op1, op2 :: Bool -> a -> a

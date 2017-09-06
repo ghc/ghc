@@ -170,7 +170,7 @@ we treat it like this (occAnalRecBind):
 
 4. To do so we form a new set of Nodes, with the same details, but
    different edges, the "loop-breaker nodes". The loop-breaker nodes
-   have both more and fewer depedencies than the scope edges
+   have both more and fewer dependencies than the scope edges
    (see Note [Choosing loop breakers])
 
    More edges: if f calls g, and g has an active rule that mentions h

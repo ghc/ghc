@@ -439,7 +439,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
           if (!SECTION_INDEX_VALID(shdr[i].sh_link)) {
             if (shdr[i].sh_link == SHN_UNDEF)
               errorBelch("\n%s: relocation section #%d has no symbol table\n"
-                         "This object file has probably been fully striped. "
+                         "This object file has probably been fully stripped. "
                          "Such files cannot be linked.\n",
                          oc->archiveMemberName ? oc->archiveMemberName : oc->fileName, i);
             else

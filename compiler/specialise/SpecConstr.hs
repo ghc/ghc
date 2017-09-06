@@ -586,7 +586,7 @@ more than N times (controlled by -fspec-constr-recursive=N) we check
     specialisations.  If sc_count is "no limit" then we arbitrarily
     choose 10 as the limit (ugh).
 
-See Trac #5550.   Also Trac #13623, where this test had become over-agressive,
+See Trac #5550.   Also Trac #13623, where this test had become over-aggressive,
 and we lost a wonderful specialisation that we really wanted!
 
 Note [NoSpecConstr]

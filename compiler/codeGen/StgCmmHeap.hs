@@ -226,7 +226,7 @@ mkStaticClosure dflags info_lbl ccs payload padding static_link_field saved_info
   ++ static_link_field
   ++ saved_info_field
 
--- JD: Simon had ellided this padding, but without it the C back end asserts
+-- JD: Simon had elided this padding, but without it the C back end asserts
 -- failure. Maybe it's a bad assertion, and this padding is indeed unnecessary?
 padLitToWord :: DynFlags -> CmmLit -> [CmmLit]
 padLitToWord dflags lit = lit : padding pad_length

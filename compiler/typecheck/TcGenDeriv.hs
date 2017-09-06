@@ -458,7 +458,7 @@ gen_Ord_binds loc tycon = do
 
     mkTagCmp :: DynFlags -> OrdOp -> LHsExpr GhcPs
     -- Both constructors known to be nullary
-    -- genreates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
+    -- generates (case data2Tag a of a# -> case data2Tag b of b# -> a# `op` b#
     mkTagCmp dflags op =
       untag_Expr dflags tycon[(a_RDR, ah_RDR),(b_RDR, bh_RDR)] $
         unliftedOrdOp tycon intPrimTy op ah_RDR bh_RDR
