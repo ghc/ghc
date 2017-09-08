@@ -223,7 +223,12 @@ tcUserTypeSig loc hs_sig_ty mb_name
   | isCompleteHsSig hs_sig_ty
   = do { sigma_ty <- tcHsSigWcType ctxt_F hs_sig_ty
        ; return $
-         CompleteSig { sig_bndr  = mkLocalId name sigma_ty
+         CompleteSig { sig_bndr  = mkLocalId name Omega sigma_ty
+                                   -- We use `Omega' as the multiplicity here,
+                                   -- as if this identifier corresponds to
+                                   -- anything, it is a top-level
+                                   -- definition. Which are all unrestricted in
+                                   -- the current implementation.
                      , sig_ctxt  = ctxt_T
                      , sig_loc   = loc } }
                        -- Location of the <type> in   f :: <type>

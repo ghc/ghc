@@ -206,9 +206,10 @@ tcPatBndr penv@(PE { pe_ctxt = LetPat { pc_lvl    = bind_lvl
        ; return (mkWpCastN co, bndr_id) }
 
 tcPatBndr _ bndr_name pat_ty
-  = do { pat_ty <- expTypeToType (weightedThing pat_ty)
+  = do { let pat_weight = weightedWeight pat_ty
+       ; pat_ty <- expTypeToType (weightedThing pat_ty)
        ; traceTc "tcPatBndr(not let)" (ppr bndr_name $$ ppr pat_ty)
-       ; return (idHsWrapper, mkLocalId bndr_name pat_ty) }
+       ; return (idHsWrapper, mkLocalId bndr_name pat_weight pat_ty) }
                -- Whether or not there is a sig is irrelevant,
                -- as this is local
 
@@ -225,9 +226,11 @@ newLetBndr :: LetBndrSpec -> Name -> TcType -> TcM TcId
 --    and we use the original name directly
 newLetBndr LetLclBndr name ty
   = do { mono_name <- cloneLocalName name
-       ; return (mkLocalId mono_name ty) }
+       ; return (mkLocalId mono_name Omega ty) }
 newLetBndr (LetGblBndr prags) name ty
-  = addInlinePrags (mkLocalId name ty) (lookupPragEnv prags name)
+  = addInlinePrags (mkLocalId name Omega ty) (lookupPragEnv prags name)
+-- TODO: arnaud: let-binder must eventually take a multiplicity, and the two
+-- occurrences of Omega, above, must be replaced.
 
 tcSubTypePat :: PatEnv -> ExpSigmaType -> TcSigmaType -> TcM HsWrapper
 -- tcSubTypeET with the UserTypeCtxt specialised to GenSigCtxt

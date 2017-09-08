@@ -1312,7 +1312,7 @@ mkLamTypes :: [Var] -> Type -> Type
 
 mkLamType v ty
    | isTyVar v = ForAllTy    (TvBndr v Inferred) ty
-   | otherwise = FunTy Omega (varType v)         ty
+   | otherwise = FunTy (varWeight v) (varType v) ty
 
 mkLamTypes vs ty = foldr mkLamType ty vs
 

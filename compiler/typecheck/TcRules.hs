@@ -138,7 +138,7 @@ tcRuleBndrs []
 tcRuleBndrs (L _ (RuleBndr (L _ name)) : rule_bndrs)
   = do  { ty <- newOpenFlexiTyVarTy
         ; vars <- tcRuleBndrs rule_bndrs
-        ; return (mkLocalId name ty : vars) }
+        ; return (mkLocalId name Omega ty : vars) }
 tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
 --  e.g         x :: a->a
 --  The tyvar 'a' is brought into scope first, just as if you'd written

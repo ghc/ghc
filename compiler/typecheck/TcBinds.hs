@@ -635,7 +635,7 @@ recoveryCode binder_names sig_fn
       , Just poly_id <- completeSigPolyId_maybe sig
       = poly_id
       | otherwise
-      = mkLocalId name forall_a_a
+      = mkLocalId name Omega forall_a_a
 
 forall_a_a :: TcType
 forall_a_a = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] openAlphaTy
@@ -695,7 +695,7 @@ tcPolyCheck prag_fn
 
        ; mono_name <- newNameAt (nameOccName name) nm_loc
        ; ev_vars   <- newEvVars theta
-       ; let mono_id   = mkLocalId mono_name tau
+       ; let mono_id   = mkLocalId mono_name (idWeight poly_id) tau
              skol_info = SigSkol ctxt (idType poly_id) tv_prs
              skol_tvs  = map snd tv_prs
 

@@ -875,7 +875,7 @@ tcDoStmt ctxt (RecStmt { recS_stmts = stmts, recS_later_ids = later_names
          res_ty thing_inside
   = do  { let tup_names = rec_names ++ filterOut (`elem` rec_names) later_names
         ; tup_elt_tys <- newFlexiTyVarTys (length tup_names) liftedTypeKind
-        ; let tup_ids = zipWith mkLocalId tup_names tup_elt_tys
+        ; let tup_ids = zipWith (\n t -> mkLocalId n Omega t) tup_names tup_elt_tys -- Omega because it's a recursive definition
               tup_ty  = mkBigCoreTupTy tup_elt_tys
 
         ; tcExtendIdEnv (map unrestricted tup_ids) $ do

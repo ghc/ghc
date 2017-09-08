@@ -43,7 +43,7 @@ module Id (
         mkWorkerId,
 
         -- ** Taking an Id apart
-        idName, idType, idUnique, idInfo, idDetails,
+        idName, idType, idWeight, idUnique, idInfo, idDetails,
         recordSelectorTyCon,
 
         -- ** Modifying an Id
@@ -126,7 +126,7 @@ import BasicTypes
 import Var( Id, CoVar, DictId, JoinId,
             InId,  InVar,
             OutId, OutVar,
-            idInfo, idDetails, setIdDetails, globaliseId, varType,
+            idInfo, idDetails, setIdDetails, globaliseId, varType, varWeight,
             isId, isLocalId, isGlobalId, isExportedId )
 import qualified Var
 
@@ -183,6 +183,9 @@ idUnique  = Var.varUnique
 idType   :: Id -> Kind
 idType    = Var.varType
 
+idWeight :: Id -> Rig
+idWeight  = Var.varWeight
+
 setIdName :: Id -> Name -> Id
 setIdName = Var.setVarName
 
@@ -207,7 +210,7 @@ localiseId id
   | ASSERT( isId id ) isLocalId id && isInternalName name
   = id
   | otherwise
-  = Var.mkLocalVar (idDetails id) (localiseName name) (idType id) (idInfo id)
+  = Var.mkLocalVar (idDetails id) (localiseName name) (idWeight id)(idType id) (idInfo id)
   where
     name = idName id
 
@@ -262,8 +265,8 @@ mkVanillaGlobalWithInfo = mkGlobalId VanillaId
 
 
 -- | For an explanation of global vs. local 'Id's, see "Var#globalvslocal"
-mkLocalId :: Name -> Type -> Id
-mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
+mkLocalId :: Name -> Rig -> Type -> Id
+mkLocalId name w ty = mkLocalIdWithInfo name w ty vanillaIdInfo
  -- It's tempting to ASSERT( not (isCoercionType ty) ), but don't. Sometimes,
  -- the type is a panic. (Search invented_id)
 
@@ -271,26 +274,33 @@ mkLocalId name ty = mkLocalIdWithInfo name ty vanillaIdInfo
 mkLocalCoVar :: Name -> Type -> CoVar
 mkLocalCoVar name ty
   = ASSERT( isCoercionType ty )
-    Var.mkLocalVar CoVarId name ty vanillaIdInfo
+    Var.mkLocalVar CoVarId name Omega ty vanillaIdInfo
+    -- TODO: arnaud: should coercions be of multiplicity 0?
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
 mkLocalIdOrCoVar :: Name -> Type -> Id
 mkLocalIdOrCoVar name ty
   | isCoercionType ty = mkLocalCoVar name ty
-  | otherwise         = mkLocalId    name ty
+  | otherwise         = mkLocalId    name Omega ty
+  -- TODO: arnaud: I'm assuming that because we don't know whether it is a
+  -- coercion or a regular variable, it must be an unrestricted variable. Is
+  -- that a correct assumption?
 
 -- | Make a local id, with the IdDetails set to CoVarId if the type indicates
 -- so.
 mkLocalIdOrCoVarWithInfo :: Name -> Type -> IdInfo -> Id
 mkLocalIdOrCoVarWithInfo name ty info
-  = Var.mkLocalVar details name ty info
+  = Var.mkLocalVar details name Omega ty info
+  -- TODO: arnaud: I'm assuming that because we don't know whether it is a
+  -- coercion or a regular variable, it must be an unrestricted variable. Is
+  -- that a correct assumption?
   where
     details | isCoercionType ty = CoVarId
             | otherwise         = VanillaId
 
     -- proper ids only; no covars!
-mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = Var.mkLocalVar VanillaId name ty info
+mkLocalIdWithInfo :: Name -> Rig -> Type -> IdInfo -> Id
+mkLocalIdWithInfo name w ty info = Var.mkLocalVar VanillaId name w ty info
         -- Note [Free type variables]
 
 -- | Create a local 'Id' that is marked as exported.
@@ -309,7 +319,9 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 -- that are created by the compiler out of thin air
 mkSysLocal :: FastString -> Unique -> Type -> Id
 mkSysLocal fs uniq ty = ASSERT( not (isCoercionType ty) )
-                        mkLocalId (mkSystemVarName uniq fs) ty
+                        mkLocalId (mkSystemVarName uniq fs) Omega ty
+  -- TODO: arnaud: it's possibly wrong to assume that the compiler cannot create
+  -- linear variables.
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
 mkSysLocalOrCoVar :: FastString -> Unique -> Type -> Id
@@ -324,9 +336,9 @@ mkSysLocalOrCoVarM fs ty
   = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq ty))
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
-mkUserLocal :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocal occ uniq ty loc = ASSERT( not (isCoercionType ty) )
-                              mkLocalId (mkInternalName uniq occ loc) ty
+mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
+mkUserLocal occ uniq w ty loc = ASSERT( not (isCoercionType ty) )
+                                mkLocalId (mkInternalName uniq occ loc) w ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
 mkUserLocalOrCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id

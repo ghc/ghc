@@ -1718,7 +1718,7 @@ tcUnboundId unbound res_ty
  = do { ty <- newOpenFlexiTyVarTy  -- Allow Int# etc (Trac #12531)
       ; let occ = unboundVarOcc unbound
       ; name <- newSysName occ
-      ; let ev = mkLocalId name ty
+      ; let ev = mkLocalId name Omega ty
       ; loc <- getCtLocM HoleOrigin Nothing
       ; let can = CHoleCan { cc_ev = CtWanted { ctev_pred = ty
                                               , ctev_dest = EvVarDest ev
@@ -2324,7 +2324,7 @@ tcRecordField con_like flds_w_tys (L loc (FieldOcc lbl sel_name)) rhs
         do { rhs' <- tcPolyExprNC rhs field_ty
            ; let field_id = mkUserLocal (nameOccName sel_name)
                                         (nameUnique sel_name)
-                                        field_ty loc
+                                        Omega field_ty loc
                 -- Yuk: the field_id has the *unique* of the selector Id
                 --          (so we can find it easily)
                 --      but is a LocalId with the appropriate type of the RHS

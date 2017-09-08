@@ -236,7 +236,7 @@ emitWantedEvVars orig = mapM (emitWantedEvVar orig)
 newDict :: Class -> [TcType] -> TcM DictId
 newDict cls tys
   = do { name <- newSysName (mkDictOcc (getOccName cls))
-       ; return (mkLocalId name (mkClassPred cls tys)) }
+       ; return (mkLocalId name Omega (mkClassPred cls tys)) }
 
 predTypeOccName :: PredType -> OccName
 predTypeOccName ty = case classifyPredType ty of
