@@ -1990,7 +1990,7 @@ linkBinary' staticLink dflags o_files dep_packages = do
                       -- on x86.
                       ++ (if sLdSupportsCompactUnwind mySettings &&
                              not staticLink &&
-                             (platformOS platform == OSDarwin || platformOS platform == OSiOS) &&
+                             (platformOS platform == OSDarwin) &&
                              case platformArch platform of
                                ArchX86 -> True
                                ArchX86_64 -> True

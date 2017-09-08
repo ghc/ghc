@@ -835,9 +835,6 @@ getLinkerInfo' dflags = do
                  -- that doesn't support --version. We can just assume that's
                  -- what we're using.
                  return $ DarwinLD []
-               OSiOS ->
-                 -- Ditto for iOS
-                 return $ DarwinLD []
                OSMinGW32 ->
                  -- GHC doesn't support anything but GNU ld on Windows anyway.
                  -- Process creation is also fairly expensive on win32, so
@@ -1683,7 +1680,7 @@ linkDynLib dflags0 o_files dep_packages
                  ++ pkg_lib_path_opts
                  ++ pkg_link_opts
                 ))
-        _ | os `elem` [OSDarwin, OSiOS] -> do
+        _ | os == OSDarwin -> do
             -------------------------------------------------------------------
             -- Making a darwin dylib
             -------------------------------------------------------------------
