@@ -1,3 +1,6 @@
+**Note:** This document is currently out-of-date and will be fixed after
+[a major refactoring](https://github.com/snowleopard/hadrian/issues/347).
+
 # User settings
 
 You can customise Hadrian by copying the file `hadrian/src/UserSettings.hs` to
