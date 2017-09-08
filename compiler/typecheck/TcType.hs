@@ -1617,7 +1617,7 @@ tcSplitDFunTy ty
   = case tcSplitForAllTys ty   of { (tvs, rho)    ->
     case splitFunTys rho       of { (theta, tau)  ->
     case tcSplitDFunHead tau   of { (clas, tys)   ->
-    (tvs, theta, clas, tys) }}}
+    (tvs, map weightedThing theta, clas, tys) }}}
 
 tcSplitDFunHead :: Type -> (Class, [Type])
 tcSplitDFunHead = getClassPredTys

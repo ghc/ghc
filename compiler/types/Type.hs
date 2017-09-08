@@ -211,6 +211,7 @@ import BasicTypes
 
 import Kind
 import TyCoRep
+import Weight
 
 -- friends:
 import Var
@@ -911,24 +912,24 @@ See #11714.
 isFunTy :: Type -> Bool
 isFunTy ty = isJust (splitFunTy_maybe ty)
 
-splitFunTy :: Type -> (Type, Type)
+splitFunTy :: Type -> (Weighted Type, Type)
 -- ^ Attempts to extract the argument and result types from a type, and
 -- panics if that is not possible. See also 'splitFunTy_maybe'
 splitFunTy ty | Just ty' <- coreView ty = splitFunTy ty'
-splitFunTy (FunTy _ arg res) = (arg, res) -- TODO: arnaud: the weight information is probably needed. I don't know how yet.
+splitFunTy (FunTy w arg res) = (Weighted w arg, res)
 splitFunTy other           = pprPanic "splitFunTy" (ppr other)
 
-splitFunTy_maybe :: Type -> Maybe (Type, Type)
+splitFunTy_maybe :: Type -> Maybe (Weighted Type, Type)
 -- ^ Attempts to extract the argument and result types from a type
 splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
-splitFunTy_maybe (FunTy _ arg res) = Just (arg, res) -- TODO: arnaud: the weight information is probably needed. I don't know how yet.
+splitFunTy_maybe (FunTy w arg res) = Just (Weighted w arg, res)
 splitFunTy_maybe _               = Nothing
 
-splitFunTys :: Type -> ([Type], Type)
+splitFunTys :: Type -> ([Weighted Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
-    split args _       (FunTy _ arg res) = split (arg:args) res res -- TODO: arnaud: the weight information is probably needed. I don't know how yet.
+    split args _       (FunTy w arg res) = split ((Weighted w arg):args) res res
     split args orig_ty _               = (reverse args, orig_ty)
 
 funResultTy :: Type -> Type

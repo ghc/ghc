@@ -278,22 +278,16 @@ mkLocalCoVar name ty
     -- TODO: arnaud: should coercions be of multiplicity 0?
 
 -- | Like 'mkLocalId', but checks the type to see if it should make a covar
-mkLocalIdOrCoVar :: Name -> Type -> Id
-mkLocalIdOrCoVar name ty
-  | isCoercionType ty = mkLocalCoVar name ty
-  | otherwise         = mkLocalId    name Omega ty
-  -- TODO: arnaud: I'm assuming that because we don't know whether it is a
-  -- coercion or a regular variable, it must be an unrestricted variable. Is
-  -- that a correct assumption?
+mkLocalIdOrCoVar :: Name -> Rig -> Type -> Id
+mkLocalIdOrCoVar name w ty
+  | isCoercionType ty = mkLocalCoVar name   ty -- TODO: arnaud: is it the right thing to ignore the multiplicity for coercion variables?
+  | otherwise         = mkLocalId    name w ty
 
 -- | Make a local id, with the IdDetails set to CoVarId if the type indicates
 -- so.
-mkLocalIdOrCoVarWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdOrCoVarWithInfo name ty info
-  = Var.mkLocalVar details name Omega ty info
-  -- TODO: arnaud: I'm assuming that because we don't know whether it is a
-  -- coercion or a regular variable, it must be an unrestricted variable. Is
-  -- that a correct assumption?
+mkLocalIdOrCoVarWithInfo :: Name -> Rig -> Type -> IdInfo -> Id
+mkLocalIdOrCoVarWithInfo name w ty info
+  = Var.mkLocalVar details name w ty info -- TODO: arnaud: contrary to the above function, I don't ignore the multiplicity for coercion variables here…
   where
     details | isCoercionType ty = CoVarId
             | otherwise         = VanillaId
@@ -317,23 +311,21 @@ mkExportedVanillaId name ty = Var.mkExportedLocalVar VanillaId name ty vanillaId
 
 -- | Create a system local 'Id'. These are local 'Id's (see "Var#globalvslocal")
 -- that are created by the compiler out of thin air
-mkSysLocal :: FastString -> Unique -> Type -> Id
-mkSysLocal fs uniq ty = ASSERT( not (isCoercionType ty) )
-                        mkLocalId (mkSystemVarName uniq fs) Omega ty
-  -- TODO: arnaud: it's possibly wrong to assume that the compiler cannot create
-  -- linear variables.
+mkSysLocal :: FastString -> Unique -> Rig -> Type -> Id
+mkSysLocal fs uniq w ty = ASSERT( not (isCoercionType ty) )
+                        mkLocalId (mkSystemVarName uniq fs) w ty
 
 -- | Like 'mkSysLocal', but checks to see if we have a covar type
-mkSysLocalOrCoVar :: FastString -> Unique -> Type -> Id
-mkSysLocalOrCoVar fs uniq ty
-  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) ty
+mkSysLocalOrCoVar :: FastString -> Unique -> Rig -> Type -> Id
+mkSysLocalOrCoVar fs uniq w ty
+  = mkLocalIdOrCoVar (mkSystemVarName uniq fs) w ty
 
-mkSysLocalM :: MonadUnique m => FastString -> Type -> m Id
-mkSysLocalM fs ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq ty))
+mkSysLocalM :: MonadUnique m => FastString -> Rig -> Type -> m Id
+mkSysLocalM fs w ty = getUniqueM >>= (\uniq -> return (mkSysLocal fs uniq w ty))
 
-mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Type -> m Id
-mkSysLocalOrCoVarM fs ty
-  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq ty))
+mkSysLocalOrCoVarM :: MonadUnique m => FastString -> Rig -> Type -> m Id
+mkSysLocalOrCoVarM fs w ty
+  = getUniqueM >>= (\uniq -> return (mkSysLocalOrCoVar fs uniq w ty))
 
 -- | Create a user local 'Id'. These are local 'Id's (see "Var#globalvslocal") with a name and location that the user might recognize
 mkUserLocal :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
@@ -341,9 +333,9 @@ mkUserLocal occ uniq w ty loc = ASSERT( not (isCoercionType ty) )
                                 mkLocalId (mkInternalName uniq occ loc) w ty
 
 -- | Like 'mkUserLocal', but checks if we have a coercion type
-mkUserLocalOrCoVar :: OccName -> Unique -> Type -> SrcSpan -> Id
-mkUserLocalOrCoVar occ uniq ty loc
-  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) ty
+mkUserLocalOrCoVar :: OccName -> Unique -> Rig -> Type -> SrcSpan -> Id
+mkUserLocalOrCoVar occ uniq w ty loc
+  = mkLocalIdOrCoVar (mkInternalName uniq occ loc) w ty
 
 {-
 Make some local @Ids@ for a template @CoreExpr@.  These have bogus
@@ -354,11 +346,11 @@ instantiated before use.
 -- | Workers get local names. "CoreTidy" will externalise these if necessary
 mkWorkerId :: Unique -> Id -> Type -> Id
 mkWorkerId uniq unwrkr ty
-  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) ty
+  = mkLocalIdOrCoVar (mkDerivedInternalName mkWorkerOcc uniq (getName unwrkr)) Omega ty
 
 -- | Create a /template local/: a family of system local 'Id's in bijection with @Int@s, typically used in unfoldings
 mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) ty
+mkTemplateLocal i ty = mkSysLocalOrCoVar (fsLit "v") (mkBuiltinUnique i) Omega ty
 
 -- | Create a template local for a series of types
 mkTemplateLocals :: [Type] -> [Id]

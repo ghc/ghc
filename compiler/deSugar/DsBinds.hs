@@ -1130,7 +1130,7 @@ dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
                                    ; return (w1 . w2) }
  -- See comments on WpFun in TcEvidence for an explanation of what
  -- the specification of this clause is
-dsHsWrapper (WpFun c1 c2 t1 doc)
+dsHsWrapper (WpFun w c1 c2 t1 doc)
                               = do { x  <- newSysLocalDsNoLP t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
