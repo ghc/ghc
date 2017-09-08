@@ -237,13 +237,10 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
 
     checkOS() {
         case [$]1 in
-        linux)
+        linux|linux-android)
             test -z "[$]2" || eval "[$]2=OSLinux"
             ;;
-        ios)
-            test -z "[$]2" || eval "[$]2=OSiOS"
-            ;;
-        darwin)
+        darwin|ios)
             test -z "[$]2" || eval "[$]2=OSDarwin"
             ;;
         solaris2)
@@ -278,9 +275,6 @@ AC_DEFUN([FPTOOLS_SET_HASKELL_PLATFORM_VARS],
             ;;
         aix)
             test -z "[$]2" || eval "[$]2=OSAIX"
-            ;;
-        linux-android)
-            test -z "[$]2" || eval "[$]2=OSAndroid"
             ;;
         *)
             echo "Unknown OS '[$]1'"

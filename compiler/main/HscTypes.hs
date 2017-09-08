@@ -2602,7 +2602,6 @@ soExt :: Platform -> FilePath
 soExt platform
     = case platformOS platform of
       OSDarwin  -> "dylib"
-      OSiOS     -> "dylib"
       OSMinGW32 -> "dll"
       _         -> "so"
 
