@@ -46,6 +46,7 @@ data Setting = BuildArch
              | TargetPlatform
              | TargetPlatformFull
              | TargetVendor
+             | LlvmTarget
              | FfiIncludeDir
              | FfiLibDir
              | GmpIncludeDir
@@ -104,6 +105,7 @@ setting key = lookupValueOrError configFile $ case key of
     TargetPlatform     -> "target-platform"
     TargetPlatformFull -> "target-platform-full"
     TargetVendor       -> "target-vendor"
+    LlvmTarget         -> "llvm-target"
     FfiIncludeDir      -> "ffi-include-dir"
     FfiLibDir          -> "ffi-lib-dir"
     GmpIncludeDir      -> "gmp-include-dir"

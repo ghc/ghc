@@ -63,6 +63,7 @@ target-platform-full  = @TargetPlatformFull@
 target-arch           = @TargetArch_CPP@
 target-os             = @TargetOS_CPP@
 target-vendor         = @TargetVendor_CPP@
+llvm-target           = @LLVMTarget_CPP@
 
 cross-compiling       = @CrossCompiling@
 

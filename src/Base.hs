@@ -106,6 +106,7 @@ inplaceLibCopyTargets :: [FilePath]
 inplaceLibCopyTargets = map (inplaceLibPath -/-)
     [ "ghc-usage.txt"
     , "ghci-usage.txt"
+    , "llvm-targets"
     , "platformConstants"
     , "settings"
     , "template-hsc.h" ]

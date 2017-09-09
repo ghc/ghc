@@ -11,9 +11,9 @@ import Oracles.ModuleFiles
 import Oracles.Setting
 import Rules.Gmp
 import Rules.Libffi
+import Target
 import Settings
 import Settings.Packages.Rts
-import Target
 import Utilities
 
 -- | Track this file to rebuild generated files whenever it changes.
@@ -145,6 +145,7 @@ copyRules :: Rules ()
 copyRules = do
     (inplaceLibPath -/- "ghc-usage.txt")     <~ return "driver"
     (inplaceLibPath -/- "ghci-usage.txt"  )  <~ return "driver"
+    (inplaceLibPath -/- "llvm-targets")      <~ return "."
     (inplaceLibPath -/- "platformConstants") <~ (buildRoot <&> (-/- generatedDir))
     (inplaceLibPath -/- "settings")          <~ return "."
     (inplaceLibPath -/- "template-hsc.h")    <~ return (pkgPath hsc2hs)
@@ -394,6 +395,7 @@ generateGhcBootPlatformH = do
     hostVendor     <- chooseSetting HostVendor    TargetVendor
     targetPlatform <- getSetting TargetPlatform
     targetArch     <- getSetting TargetArch
+    llvmTarget     <- getSetting LlvmTarget
     targetOs       <- getSetting TargetOs
     targetVendor   <- getSetting TargetVendor
     return $ unlines
@@ -414,6 +416,7 @@ generateGhcBootPlatformH = do
         , "#define BUILD_ARCH "  ++ show buildArch
         , "#define HOST_ARCH "   ++ show hostArch
         , "#define TARGET_ARCH " ++ show targetArch
+        , "#define LLVM_TARGET " ++ show llvmTarget
         , ""
         , "#define " ++ buildOs  ++ "_BUILD_OS 1"
         , "#define " ++ hostOs   ++ "_HOST_OS 1"
