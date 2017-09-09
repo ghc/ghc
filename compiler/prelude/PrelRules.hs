@@ -56,9 +56,7 @@ import Coercion     (mkUnbranchedAxInstCo,mkSymCo,Role(..))
 import Control.Applicative ( Alternative(..) )
 
 import Control.Monad
-#if __GLASGOW_HASKELL__ > 710
 import qualified Control.Monad.Fail as MonadFail
-#endif
 import Data.Bits as Bits
 import qualified Data.ByteString as BS
 import Data.Int
@@ -651,10 +649,8 @@ instance Monad RuleM where
     Just r -> runRuleM (g r) dflags iu e
   fail _ = mzero
 
-#if __GLASGOW_HASKELL__ > 710
 instance MonadFail.MonadFail RuleM where
     fail _ = mzero
-#endif
 
 instance Alternative RuleM where
   empty = RuleM $ \_ _ _ -> Nothing
