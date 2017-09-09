@@ -19,13 +19,9 @@ CABAL_VERSION := $(subst .,$(comma),$(CABAL_DOTTED_VERSION))
 CABAL_CONSTRAINT := --constraint="Cabal == $(CABAL_DOTTED_VERSION)"
 
 # Starting with GHC 8.0 we make use of GHC's native ability to
-# generate MIN_VERSION_<pkgname>() CPP macros (rather than relying on
-# the fragile `cabal_macros_boot.h` hack). The generation of those
+# generate MIN_VERSION_<pkgname>() CPP macros. The generation of those
 # macros is triggered by `-hide-all-packages`, so we have to explicitly
-# enumerate all packages we need in scope. In order to simplify the logic,
-# we pass `-hide-all-packages` also to GHCs < 8, and we include
-# `cabal_macros_boot.h` also for GHC >= 8 (in which case it becomes a
-# dummy include that doesn't contribute any macro definitions).
+# enumerate all packages we need in scope.
 ifeq "$(Windows_Host)" "YES"
 CABAL_BUILD_DEPS := ghc-prim base array transformers time containers bytestring deepseq process pretty directory Win32
 else
@@ -68,7 +64,6 @@ $(ghc-cabal_DIST_BINARY): $(CABAL_LEXER_DEP) utils/ghc-cabal/Main.hs $(TOUCH_DEP
 	       -DCABAL_VERSION=$(CABAL_VERSION) \
 	       -DCABAL_PARSEC \
 	       -DBOOTSTRAPPING \
-	       -optP-include -optPutils/ghc-cabal/cabal_macros_boot.h \
 	       -odir  bootstrapping \
 	       -hidir bootstrapping \
 	       $(CABAL_LEXER_DEP) \
