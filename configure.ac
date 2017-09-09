@@ -176,11 +176,6 @@ fi
 GHC_PACKAGE_DB_FLAG=package-db
 AC_SUBST(GHC_PACKAGE_DB_FLAG)
 
-FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[7.11],
-                    SUPPORTS_THIS_UNIT_ID=NO,
-                    SUPPORTS_THIS_UNIT_ID=YES)
-AC_SUBST(SUPPORTS_THIS_UNIT_ID)
-
 # GHC is passed to Cabal, so we need a native path
 if test "${WithGhc}" != ""
 then

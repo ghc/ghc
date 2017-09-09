@@ -105,20 +105,10 @@ define distdir-way-opts # args: $1 = dir, $2 = distdir, $3 = way, $4 = stage
 # $1_$2_$3_MOST_HC_OPTS is also passed to C compilations when we use
 # GHC as the C compiler.
 
-ifeq "$(SUPPORTS_THIS_UNIT_ID)" "NO"
-ifeq "$4" "0"
-$4_USE_THIS_UNIT_ID=NO
-endif
-endif
-
 $1_$2_$4_DEP_OPTS = \
  $$(foreach pkg,$$($1_$2_DEP_IPIDS),-package-id $$(pkg))
 
-ifeq "$($4_USE_THIS_UNIT_ID)" "NO"
-$4_THIS_UNIT_ID = -this-package-key
-else
 $4_THIS_UNIT_ID = -this-unit-id
-endif
 
 $1_$2_$3_MOST_HC_OPTS = \
  $$(WAY_$3_HC_OPTS) \
