@@ -2291,7 +2291,7 @@ instance Applicative TcS where
   (<*>) = ap
 
 instance Monad TcS where
-  fail err  = TcS (\_ -> fail err)
+  fail = MonadFail.fail
   m >>= k   = TcS (\ebs -> unTcS m ebs >>= \r -> unTcS (k r) ebs)
 
 instance MonadFail.MonadFail TcS where

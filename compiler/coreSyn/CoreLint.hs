@@ -1948,7 +1948,7 @@ instance Applicative LintM where
       (<*>) = ap
 
 instance Monad LintM where
-  fail err = failWithL (text err)
+  fail = MonadFail.fail
   m >>= k  = LintM (\ env errs ->
                        let (res, errs') = unLintM m env errs in
                          case res of

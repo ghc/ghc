@@ -1034,7 +1034,7 @@ instance Applicative UM where
       (<*>)  = ap
 
 instance Monad UM where
-  fail _   = UM (\_ -> SurelyApart) -- failed pattern match
+  fail     = MonadFail.fail
   m >>= k  = UM (\state ->
                   do { (state', v) <- unUM m state
                      ; unUM (k v) state' })

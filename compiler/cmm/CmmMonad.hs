@@ -29,7 +29,7 @@ instance Applicative PD where
 
 instance Monad PD where
   (>>=) = thenPD
-  fail = failPD
+  fail = MonadFail.fail
 
 instance MonadFail.MonadFail PD where
   fail = failPD

@@ -647,7 +647,7 @@ instance Monad RuleM where
   RuleM f >>= g = RuleM $ \dflags iu e -> case f dflags iu e of
     Nothing -> Nothing
     Just r -> runRuleM (g r) dflags iu e
-  fail _ = mzero
+  fail = MonadFail.fail
 
 instance MonadFail.MonadFail RuleM where
     fail _ = mzero

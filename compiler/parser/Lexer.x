@@ -77,7 +77,7 @@ module Lexer (
 
 -- base
 import Control.Monad
-import Control.Monad.Fail
+import Control.Monad.Fail as MonadFail
 import Data.Bits
 import Data.Char
 import Data.List
@@ -1890,7 +1890,7 @@ instance Applicative P where
 
 instance Monad P where
   (>>=) = thenP
-  fail = failP
+  fail = MonadFail.fail
 
 instance MonadFail P where
   fail = failP

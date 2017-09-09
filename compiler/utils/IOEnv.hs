@@ -56,7 +56,7 @@ unIOEnv (IOEnv m) = m
 instance Monad (IOEnv m) where
     (>>=)  = thenM
     (>>)   = (*>)
-    fail _ = failM -- Ignore the string
+    fail   = MonadFail.fail
 
 instance MonadFail.MonadFail (IOEnv m) where
     fail _ = failM -- Ignore the string

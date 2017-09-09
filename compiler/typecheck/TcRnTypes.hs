@@ -3513,7 +3513,7 @@ instance Applicative TcPluginM where
   (<*>) = ap
 
 instance Monad TcPluginM where
-  fail x   = TcPluginM (const $ fail x)
+  fail = MonadFail.fail
   TcPluginM m >>= k =
     TcPluginM (\ ev -> do a <- m ev
                           runTcPluginM (k a) ev)

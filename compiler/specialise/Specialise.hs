@@ -2285,7 +2285,7 @@ instance Monad SpecM where
                                case f y of
                                    SpecM z ->
                                        z
-    fail str = SpecM $ fail str
+    fail = MonadFail.fail
 
 instance MonadFail.MonadFail SpecM where
     fail str = SpecM $ fail str
