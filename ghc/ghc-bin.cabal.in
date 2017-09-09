@@ -45,6 +45,9 @@ Executable ghc
     C-Sources: hschooks.c
 
     GHC-Options: -Wall
+                 -Wnoncanonical-monad-instances
+                 -Wnoncanonical-monoid-instances
+
     if flag(ghci)
         -- NB: this is never built by the bootstrapping GHC+libraries
         Build-depends:

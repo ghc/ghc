@@ -49,7 +49,7 @@ import UniqFM
 import Unique
 import Outputable
 
-import Data.Semigroup   ( Semigroup(..) )
+import Data.Semigroup as Semi ( Semigroup(..) )
 import Data.Coerce
 import Data.Maybe
 import Data.Typeable
@@ -65,7 +65,7 @@ instance Semigroup (UniqMap k a) where
 
 instance Monoid (UniqMap k a) where
     mempty = emptyUniqMap
-    mappend = plusUniqMap
+    mappend = (Semi.<>)
 
 instance (Outputable k, Outputable a) => Outputable (UniqMap k a) where
     ppr (UniqMap m) =

@@ -73,7 +73,10 @@ Library
             Build-Depends: terminfo == 0.4.*
         Build-Depends: unix   == 2.7.*
 
-    GHC-Options: -Wall -fno-warn-name-shadowing
+    GHC-Options: -Wall
+                 -Wno-name-shadowing
+                 -Wnoncanonical-monad-instances
+                 -Wnoncanonical-monoid-instances
 
     if flag(ghci)
         CPP-Options: -DGHCI

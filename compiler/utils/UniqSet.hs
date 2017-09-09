@@ -52,7 +52,7 @@ import Data.Coerce
 import Outputable
 import Data.Foldable (foldl')
 import Data.Data
-import qualified Data.Semigroup
+import qualified Data.Semigroup as Semi
 
 -- Note [UniqSet invariant]
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,7 +61,8 @@ import qualified Data.Semigroup
 -- It means that to implement mapUniqSet you have to update
 -- both the keys and the values.
 
-newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a} deriving Data
+newtype UniqSet a = UniqSet {getUniqSet' :: UniqFM a}
+                  deriving (Data, Semi.Semigroup, Monoid)
 
 emptyUniqSet :: UniqSet a
 emptyUniqSet = UniqSet emptyUFM
@@ -186,11 +187,6 @@ unsafeUFMToUniqSet = UniqSet
 
 instance Outputable a => Outputable (UniqSet a) where
     ppr = pprUniqSet ppr
-instance Data.Semigroup.Semigroup (UniqSet a) where
-  (<>) = mappend
-instance Monoid (UniqSet a) where
-  mempty = UniqSet mempty
-  UniqSet s `mappend` UniqSet t = UniqSet (s `mappend` t)
 
 pprUniqSet :: (a -> SDoc) -> UniqSet a -> SDoc
 pprUniqSet f (UniqSet s) = pprUniqFM f s

@@ -1867,8 +1867,7 @@ instance Semigroup LlvmAccum where
 
 instance Monoid LlvmAccum where
     mempty = LlvmAccum nilOL []
-    LlvmAccum stmtsA declsA `mappend` LlvmAccum stmtsB declsB =
-        LlvmAccum (stmtsA `mappend` stmtsB) (declsA `mappend` declsB)
+    mappend = (Semigroup.<>)
 
 liftExprData :: LlvmM ExprData -> WriterT LlvmAccum LlvmM LlvmVar
 liftExprData action = do
