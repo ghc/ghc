@@ -496,7 +496,7 @@ test('T783',
             # 2016-04-06: 249332816 (x86/Linux, 64-bit machine)
             # 2017-03-24: 225911912 (x86/Linux, 64-bit machine)
 
-           (wordsize(64), 436978192, 10)]),
+           (wordsize(64), 481875416, 10)]),
             # prev:       349263216 (amd64/Linux)
             # 07/08/2012: 384479856 (amd64/Linux)
             # 29/08/2012: 436927840 (amd64/Linux)
@@ -526,6 +526,7 @@ test('T783',
             # 2016-02-03: 488592288 (amd64/Linux)
             #    (D1795: Another overhaul of pattern match checker, #11374)
             # 2017-02-14    436978192    Early inlining: 5% improvement
+            # 2017-09-08    481875416    Unknown
 
       extra_hc_opts('-static')
       ],
