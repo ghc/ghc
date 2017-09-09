@@ -49,7 +49,7 @@ Library
     Default-Language: Haskell2010
     Exposed: False
 
-    Build-Depends: base       >= 4   && < 5,
+    Build-Depends: base       >= 4.9 && < 5,
                    deepseq    >= 1.4 && < 1.5,
                    directory  >= 1   && < 1.4,
                    process    >= 1   && < 1.7,
@@ -111,14 +111,8 @@ Library
     Include-Dirs: . parser utils
 
     -- We need to set the unit id to ghc (without a version number)
-    -- as it's magic.  But we can't set it for old versions of GHC (e.g.
-    -- when bootstrapping) because those versions of GHC don't understand
-    -- that GHC is wired-in.
-    if impl ( ghc >= 7.11 )
-        GHC-Options: -this-unit-id ghc
-    else
-        if impl( ghc >= 7.9 )
-            GHC-Options: -this-package-key ghc
+    -- as it's magic.
+    GHC-Options: -this-unit-id ghc
 
     if flag(stage1)
         Include-Dirs: stage1

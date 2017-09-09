@@ -51,18 +51,12 @@ Library
         Language.Haskell.TH.Lib.Map
 
     build-depends:
-        base        >= 4.8 && < 4.11,
+        base        >= 4.9 && < 4.11,
         ghc-boot-th == 8.3,
         pretty      == 1.1.*
 
-    -- We need to set the unit ID to template-haskell (without a
-    -- version number) as it's magic.
     ghc-options: -Wall
 
-    if impl( ghc >= 7.11 )
-        ghc-options:  -this-unit-id template-haskell
-    else
-        if impl( ghc >= 7.9 )
-            ghc-options:  -this-package-key template-haskell
-        else
-            ghc-options:  -package-name template-haskell
+    -- We need to set the unit ID to template-haskell (without a
+    -- version number) as it's magic.
+    ghc-options: -this-unit-id template-haskell
