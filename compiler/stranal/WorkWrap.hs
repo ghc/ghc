@@ -374,6 +374,10 @@ it appears in the first place in the defining module.
 At one stage I tried making the wrapper inlining always-active, and
 that had a very bad effect on nofib/imaginary/x2n1; a wrapper was
 inlined before the specialisation fired.
+
+The use an inl_inline of NoUserInline to distinguish this pragma from one
+that was given by the user. In particular, CSE will not happen if there is a
+user-specified pragma, but should happen for w/w’ed things (#14186).
 -}
 
 tryWW   :: DynFlags
@@ -521,7 +525,7 @@ splitFun dflags fam_envs fn_id fn_info wrap_dmds res_info rhs
             wrap_act  = ActiveAfter NoSourceText 0
             wrap_rhs  = wrap_fn work_id
             wrap_prag = InlinePragma { inl_src = SourceText "{-# INLINE"
-                                     , inl_inline = Inline
+                                     , inl_inline = NoUserInline
                                      , inl_sat    = Nothing
                                      , inl_act    = wrap_act
                                      , inl_rule   = rule_match_info }

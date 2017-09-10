@@ -273,4 +273,4 @@ test('T13708', normal, compile, [''])
 # thunk should inline here, so check whether or not it appears in the Core
 test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
 # bar and foo should CSEd here, so check for that in the Core
-test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo'), expect_broken(14186) ], compile, ['-ddump-simpl'])
+test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])

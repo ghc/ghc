@@ -85,7 +85,7 @@ module BasicTypes(
         isNeverActive, isAlwaysActive, isEarlyActive,
 
         RuleMatchInfo(..), isConLike, isFunLike,
-        InlineSpec(..), isEmptyInlineSpec,
+        InlineSpec(..), noUserInlineSpec,
         InlinePragma(..), defaultInlinePragma, alwaysInlinePragma,
         neverInlinePragma, dfunInlinePragma,
         isDefaultInlinePragma,
@@ -1221,8 +1221,8 @@ data InlineSpec   -- What the user's INLINE pragma looked like
   = Inline
   | Inlinable
   | NoInline
-  | EmptyInlineSpec  -- Used in a place-holder InlinePragma in SpecPrag or IdInfo,
-                     -- where there isn't any real inline pragma at all
+  | NoUserInline -- Used when the pragma did not come from the user,
+                 -- e.g. in `defaultInlinePragma` or when created by CSE
   deriving( Eq, Data, Show )
         -- Show needed for Lexer.x
 
@@ -1232,7 +1232,7 @@ This data type mirrors what you can write in an INLINE or NOINLINE pragma in
 the source program.
 
 If you write nothing at all, you get defaultInlinePragma:
-   inl_inline = EmptyInlineSpec
+   inl_inline = NoUserInline
    inl_act    = AlwaysActive
    inl_rule   = FunLike
 
@@ -1305,16 +1305,16 @@ isFunLike :: RuleMatchInfo -> Bool
 isFunLike FunLike = True
 isFunLike _       = False
 
-isEmptyInlineSpec :: InlineSpec -> Bool
-isEmptyInlineSpec EmptyInlineSpec = True
-isEmptyInlineSpec _               = False
+noUserInlineSpec :: InlineSpec -> Bool
+noUserInlineSpec NoUserInline = True
+noUserInlineSpec _            = False
 
 defaultInlinePragma, alwaysInlinePragma, neverInlinePragma, dfunInlinePragma
   :: InlinePragma
 defaultInlinePragma = InlinePragma { inl_src = SourceText "{-# INLINE"
                                    , inl_act = AlwaysActive
                                    , inl_rule = FunLike
-                                   , inl_inline = EmptyInlineSpec
+                                   , inl_inline = NoUserInline
                                    , inl_sat = Nothing }
 
 alwaysInlinePragma = defaultInlinePragma { inl_inline = Inline }
@@ -1334,7 +1334,7 @@ isDefaultInlinePragma :: InlinePragma -> Bool
 isDefaultInlinePragma (InlinePragma { inl_act = activation
                                     , inl_rule = match_info
                                     , inl_inline = inline })
-  = isEmptyInlineSpec inline && isAlwaysActive activation && isFunLike match_info
+  = noUserInlineSpec inline && isAlwaysActive activation && isFunLike match_info
 
 isInlinePragma :: InlinePragma -> Bool
 isInlinePragma prag = case inl_inline prag of
@@ -1379,10 +1379,10 @@ instance Outputable RuleMatchInfo where
    ppr FunLike = text "FUNLIKE"
 
 instance Outputable InlineSpec where
-   ppr Inline          = text "INLINE"
-   ppr NoInline        = text "NOINLINE"
-   ppr Inlinable       = text "INLINABLE"
-   ppr EmptyInlineSpec = empty
+   ppr Inline       = text "INLINE"
+   ppr NoInline     = text "NOINLINE"
+   ppr Inlinable    = text "INLINABLE"
+   ppr NoUserInline = text "NOUSERINLINE" -- what is better?
 
 instance Outputable InlinePragma where
   ppr = pprInline

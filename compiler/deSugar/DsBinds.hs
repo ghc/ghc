@@ -362,10 +362,10 @@ makeCorePair dflags gbl_id is_default_method dict_arity rhs
 
   | otherwise
   = case inlinePragmaSpec inline_prag of
-          EmptyInlineSpec -> (gbl_id, rhs)
-          NoInline        -> (gbl_id, rhs)
-          Inlinable       -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
-          Inline          -> inline_pair
+          NoUserInline -> (gbl_id, rhs)
+          NoInline     -> (gbl_id, rhs)
+          Inlinable    -> (gbl_id `setIdUnfolding` inlinable_unf, rhs)
+          Inline       -> inline_pair
 
   where
     inline_prag   = idInlinePragma gbl_id

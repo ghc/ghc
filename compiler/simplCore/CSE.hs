@@ -24,7 +24,8 @@ import Type             ( tyConAppArgs )
 import CoreSyn
 import Outputable
 import BasicTypes       ( TopLevelFlag(..), isTopLevel
-                        , isAlwaysActive, isAnyInlinePragma )
+                        , isAlwaysActive, isAnyInlinePragma,
+                          inlinePragmaSpec, noUserInlineSpec )
 import TrieMap
 import Util             ( filterOut )
 import Data.List        ( mapAccumL )
@@ -204,6 +205,10 @@ is small).  The conclusion here is this:
   that is, if its 'activation' not always active.  Otherwise we
   might replace <rhs> by 'bar', and then later be unable to see that it
   really was <rhs>.
+
+An except to the rule is when the INLINE pragma is not from the user, e.g. from
+WorkWrap (see Note [Wrapper activation]). We can tell because noUserInlineSpec
+is then true.
 
 Note that we do not (currently) do CSE on the unfolding stored inside
 an Id, even if is a 'stable' unfolding.  That means that when an
@@ -386,7 +391,8 @@ addBinding env in_id out_id rhs'
                    _      -> False
 
 noCSE :: InId -> Bool
-noCSE id =  not (isAlwaysActive (idInlineActivation id))
+noCSE id =  not (isAlwaysActive (idInlineActivation id)) &&
+            not (noUserInlineSpec (inlinePragmaSpec (idInlinePragma id)))
              -- See Note [CSE for INLINE and NOINLINE]
          || isAnyInlinePragma (idInlinePragma id)
              -- See Note [CSE for stable unfoldings]

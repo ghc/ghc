@@ -660,7 +660,7 @@ cvtPragmaD (SpecialiseP nm ty inline phases)
        ; let (inline', dflt,srcText) = case inline of
                Just inline1 -> (cvtInline inline1, dfltActivation inline1,
                                 src inline1)
-               Nothing      -> (EmptyInlineSpec,   AlwaysActive,
+               Nothing      -> (NoUserInline,   AlwaysActive,
                                 "{-# SPECIALISE")
        ; let ip = InlinePragma { inl_src    = SourceText srcText
                                , inl_inline = inline'

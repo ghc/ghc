@@ -540,7 +540,7 @@ addInlinePrags poly_id prags_for_me
 
     warn_multiple_inlines inl1@(L loc prag1) (inl2@(L _ prag2) : inls)
        | inlinePragmaActivation prag1 == inlinePragmaActivation prag2
-       , isEmptyInlineSpec (inlinePragmaSpec prag1)
+       , noUserInlineSpec (inlinePragmaSpec prag1)
        =    -- Tiresome: inl1 is put there by virtue of being in a hs-boot loop
             -- and inl2 is a user NOINLINE pragma; we don't want to complain
          warn_multiple_inlines inl2 inls

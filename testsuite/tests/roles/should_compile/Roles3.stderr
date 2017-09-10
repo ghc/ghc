@@ -30,7 +30,7 @@ COERCION AXIOMS
     C4 a b = a -> F4 b -> F4 b -- Defined at Roles3.hs:18:1
 Dependent modules: []
 Dependent packages: [base-4.10.0.0, ghc-prim-0.5.1.0,
-                     integer-gmp-1.0.0.1]
+                     integer-gmp-1.0.1.0]
 
 ==================== Typechecker ====================
 Roles3.$tcC4
@@ -81,24 +81,26 @@ Roles3.$tc'C:C1
       (GHC.Types.TrNameS "'C:C1"#)
       1
       $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 0
-$krep [InlPrag=[~]] = GHC.Types.KindRepVar 1
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun $krep $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=[~]] = GHC.Types.KindRepFun GHC.Types.krep$* $krep
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 0
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepVar 1
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]] = GHC.Types.KindRepFun $krep $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=NOUSERINLINE[~]]
+  = GHC.Types.KindRepFun GHC.Types.krep$* $krep
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp GHC.Types.$tcConstraint []
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp
       Data.Type.Equality.$tc~
       ((:) GHC.Types.krep$* ((:) $krep ((:) $krep [])))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles3.$tcC2 ((:) $krep ((:) $krep []))
-$krep [InlPrag=[~]]
+$krep [InlPrag=NOUSERINLINE[~]]
   = GHC.Types.KindRepTyConApp Roles3.$tcC1 ((:) $krep [])
 Roles3.$trModule
   = GHC.Types.Module

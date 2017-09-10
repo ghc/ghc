@@ -70,7 +70,7 @@ T3772.$wfoo
       }
 
 -- RHS size: {terms: 6, types: 3, coercions: 0, joins: 0/0}
-foo [InlPrag=INLINE[0]] :: Int -> ()
+foo [InlPrag=NOUSERINLINE[0]] :: Int -> ()
 [GblId,
  Arity=1,
  Caf=NoCafRefs,
