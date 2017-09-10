@@ -115,18 +115,13 @@ wayGhcArgs = do
             , (way == debug || way == debugDynamic) ?
               pure ["-ticky", "-DTICKY_TICKY"] ]
 
--- FIXME: Get rid of to-be-deprecated -this-package-key.
 packageGhcArgs :: Args
 packageGhcArgs = withHsPackage $ \cabalFile -> do
-    pkgId   <- expr $ pkgIdentifier cabalFile
-    thisArg <- do
-        not0 <- notStage0
-        unit <- expr $ flag SupportsThisUnitId
-        return $ if not0 || unit then "-this-unit-id " else "-this-package-key "
+    pkgId <- expr $ pkgIdentifier cabalFile
     mconcat [ arg "-hide-all-packages"
             , arg "-no-user-package-db"
             , bootPackageDatabaseArgs
-            , libraryPackage ? arg (thisArg ++ pkgId)
+            , libraryPackage ? arg ("-this-unit-id " ++ pkgId)
             , map ("-package-id " ++) <$> getPkgDataList DepIds ]
 
 includeGhcArgs :: Args

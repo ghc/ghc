@@ -17,7 +17,6 @@ data Flag = ArSupportsAtFile
           | LeadingUnderscore
           | SolarisBrokenShld
           | SplitObjectsBroken
-          | SupportsThisUnitId
           | WithLibdw
           | UseSystemFfi
 
@@ -35,12 +34,11 @@ flag f = do
             LeadingUnderscore  -> "leading-underscore"
             SolarisBrokenShld  -> "solaris-broken-shld"
             SplitObjectsBroken -> "split-objects-broken"
-            SupportsThisUnitId -> "supports-this-unit-id"
             WithLibdw          -> "with-libdw"
             UseSystemFfi       -> "use-system-ffi"
     value <- lookupValueOrError configFile key
     when (value `notElem` ["YES", "NO", ""]) . error $ "Configuration flag "
-        ++ quote (key ++ " = " ++ value) ++ "cannot be parsed."
+        ++ quote (key ++ " = " ++ value) ++ " cannot be parsed."
     return $ value == "YES"
 
 platformSupportsSharedLibs :: Action Bool
