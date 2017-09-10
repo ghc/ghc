@@ -520,6 +520,19 @@ def normalise_errmsg_fun( *fs ):
 def _normalise_errmsg_fun( name, opts, *fs ):
     opts.extra_errmsg_normaliser =  join_normalisers(opts.extra_errmsg_normaliser, fs)
 
+def check_errmsg(needle):
+    def norm(str):
+        if needle in str:
+            return "%s contained in -ddump-simpl\n" % needle
+        else:
+            return "%s not contained in -ddump-simpl\n" % needle
+    return normalise_errmsg_fun(norm)
+
+def grep_errmsg(needle):
+    def norm(str):
+        return "".join(filter(lambda l: re.search(needle, l), str.splitlines(True)))
+    return normalise_errmsg_fun(norm)
+
 def normalise_whitespace_fun(f):
     return lambda name, opts: _normalise_whitespace_fun(name, opts, f)
 

@@ -1,0 +1,57 @@
+
+==================== Tidy Core ====================
+Result size of Tidy Core
+  = {terms: 52, types: 99, coercions: 0, joins: 0/0}
+
+-- RHS size: {terms: 18, types: 29, coercions: 0, joins: 0/0}
+foo
+  :: forall t1 b t2.
+     (t1 -> b) -> (t2 -> t1) -> (t2, [t2]) -> (b, [b])
+[GblId, Arity=3]
+foo
+  = \ (@ t_aUk)
+      (@ b_aUs)
+      (@ t1_aUo)
+      (f_apH :: t_aUk -> b_aUs)
+      (g_apI :: t1_aUo -> t_aUk)
+      (ds_dVH :: (t1_aUo, [t1_aUo])) ->
+      case ds_dVH of { (x_apJ, xs_apK) ->
+      (f_apH (g_apI x_apJ),
+       map
+         @ t1_aUo @ b_aUs (. @ t_aUk @ b_aUs @ t1_aUo f_apH g_apI) xs_apK)
+      }
+
+-- RHS size: {terms: 18, types: 29, coercions: 0, joins: 0/0}
+bar
+  :: forall t1 b t2.
+     (t1 -> b) -> (t2 -> t1) -> (t2, [t2]) -> (b, [b])
+[GblId, Arity=3]
+bar = foo
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule1_rVy :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule1_rVy = "main"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule2_rVX :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule2_rVX = GHC.Types.TrNameS $trModule1_rVy
+
+-- RHS size: {terms: 1, types: 0, coercions: 0, joins: 0/0}
+$trModule3_rVY :: GHC.Prim.Addr#
+[GblId, Caf=NoCafRefs]
+$trModule3_rVY = "T14186"#
+
+-- RHS size: {terms: 2, types: 0, coercions: 0, joins: 0/0}
+$trModule4_rVZ :: GHC.Types.TrName
+[GblId, Caf=NoCafRefs]
+$trModule4_rVZ = GHC.Types.TrNameS $trModule3_rVY
+
+-- RHS size: {terms: 3, types: 0, coercions: 0, joins: 0/0}
+T14186.$trModule :: GHC.Types.Module
+[GblId, Caf=NoCafRefs]
+T14186.$trModule = GHC.Types.Module $trModule2_rVX $trModule4_rVZ
+
+
+

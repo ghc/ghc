@@ -269,4 +269,8 @@ test('T12600',
      ['$MAKE -s --no-print-directory T12600'])
 test('T13658', normal, compile, ['-dcore-lint'])
 test('T13708', normal, compile, [''])
-test('T14137', normal, compile, ['-dsuppress-uniques -ddump-simpl'])
+
+# thunk should inline here, so check whether or not it appears in the Core
+test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
+# bar and foo should CSEd here, so check for that in the Core
+test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo'), expect_broken(14186) ], compile, ['-ddump-simpl'])
