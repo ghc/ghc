@@ -17,8 +17,6 @@ ghcCabalPackageArgs = stage0 ? package ghcCabal ? builder Ghc ? do
         , arg ("-DCABAL_VERSION=" ++ replace "." "," cabalVersion)
         , arg "-DBOOTSTRAPPING"
         , arg "-DMIN_VERSION_binary_0_8_0"
-        , arg "-optP-include"
-        , arg $ "-optP" ++ pkgPath ghcCabal -/- "cabal_macros_boot.h"
         , arg "-ilibraries/Cabal/Cabal"
         , arg "-ilibraries/binary/src"
         , arg "-ilibraries/filepath"
