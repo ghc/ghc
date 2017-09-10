@@ -2522,7 +2522,8 @@ checkValidDataCon dflags existential_ok tc con
                 -- See Note [Wrong visibility for GADTs], though.
               is_invisible_eq_spec eq_spec
                 = let eq_tv    = eqSpecTyVar eq_spec
-                      tv_index = expectJust "checkValidDataCon" $
+                      tv_index = pprTrace "checkValidDataCon" (ppr eq_tv $$ ppr univ_tvs) $
+                                 expectJust "checkValidDataCon" $
                                  elemIndex eq_tv univ_tvs
                       tc_bndr  = tc_bndrs `getNth` tv_index
                   in
