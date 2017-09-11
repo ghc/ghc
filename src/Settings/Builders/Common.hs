@@ -24,8 +24,9 @@ cIncludeArgs = do
     path    <- getBuildPath
     incDirs <- getPkgDataList IncludeDirs
     depDirs <- getPkgDataList DepIncludeDirs
+    cross   <- expr crossCompiling
     compilerOrGhc <- package compiler ||^ package ghc
-    mconcat [ not (crossCompiling && compilerOrGhc) ? arg "-Iincludes"
+    mconcat [ not (cross && compilerOrGhc) ? arg "-Iincludes"
             , arg $ "-I" ++ root -/- generatedDir
             , arg $ "-I" ++ path
             , pure [ "-I" ++ pkgPath pkg -/- dir | dir <- incDirs ]

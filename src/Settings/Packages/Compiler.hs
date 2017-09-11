@@ -6,7 +6,7 @@ import Flavour
 import Oracles.Flag
 import Oracles.Setting
 import Settings
-import UserSettings (crossCompiling)
+import Oracles.Flag (crossCompiling)
 
 compilerPackageArgs :: Args
 compilerPackageArgs = package compiler ? do

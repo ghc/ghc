@@ -1,7 +1,7 @@
 module Settings.Packages.Haskeline (haskelinePackageArgs) where
 
 import Expression
-import UserSettings (crossCompiling)
+import Oracles.Flag (crossCompiling)
 
 haskelinePackageArgs :: Args
 haskelinePackageArgs =

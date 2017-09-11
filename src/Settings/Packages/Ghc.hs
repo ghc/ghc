@@ -2,7 +2,7 @@ module Settings.Packages.Ghc (ghcPackageArgs) where
 
 import Expression
 import Oracles.Setting
-import UserSettings (crossCompiling)
+import Oracles.Flag (crossCompiling)
 
 ghcPackageArgs :: Args
 ghcPackageArgs = package ghc ? do

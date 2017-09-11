@@ -13,6 +13,7 @@ import Settings.Flavours.Performance
 import Settings.Flavours.Profiled
 import Settings.Flavours.Quick
 import Settings.Flavours.Quickest
+import Settings.Flavours.QuickCross
 import UserSettings
 
 getArgs :: Args
@@ -32,7 +33,8 @@ stagePackages stage = do
 hadrianFlavours :: [Flavour]
 hadrianFlavours =
     [ defaultFlavour, developmentFlavour Stage1, developmentFlavour Stage2
-    , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour ]
+    , performanceFlavour, profiledFlavour, quickFlavour, quickestFlavour
+    , quickCrossFlavour ]
 
 flavour :: Action Flavour
 flavour = do

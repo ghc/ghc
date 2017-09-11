@@ -1,7 +1,7 @@
 module Settings.Packages.GhcPkg (ghcPkgPackageArgs) where
 
 import Expression
-import UserSettings (crossCompiling)
+import Oracles.Flag (crossCompiling)
 
 ghcPkgPackageArgs :: Args
-ghcPkgPackageArgs = crossCompiling ? package ghcPkg ? builder GhcCabal ? arg "-f-terminfo"
+ghcPkgPackageArgs = package ghcPkg ? builder GhcCabal ? crossCompiling ? arg "-f-terminfo"

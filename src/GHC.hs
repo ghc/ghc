@@ -21,6 +21,7 @@ import Base
 import CommandLine
 import Context
 import Oracles.Setting
+import Oracles.Flag (crossCompiling)
 
 -- | These are all GHC packages we know about. Build rules will be generated for
 -- all of them. However, not all of these packages will be built. For example,
@@ -136,6 +137,7 @@ stage0Packages :: Action [Package]
 stage0Packages = do
     win <- windowsHost
     ios <- iosHost
+    cross <- crossCompiling
     return $ [ binary
              , cabal
              , checkApiAnnotations
@@ -160,7 +162,7 @@ stage0Packages = do
              , text
              , transformers
              , unlit                       ]
-          ++ [ terminfo | not win, not ios ]
+          ++ [ terminfo | not win, not ios, not cross ]
           ++ [ touchy   | win              ]
 
 stage1Packages :: Action [Package]

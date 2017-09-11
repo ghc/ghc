@@ -14,7 +14,7 @@ developmentArgs :: Stage -> Args
 developmentArgs ghcStage = do
     stage <- getStage
     sourceArgs $ SourceArgs
-        { hsDefault  = pure ["-O", "-H32m"]
+        { hsDefault  = pure ["-O", "-H64m"]
         , hsLibrary  = notStage0 ? arg "-dcore-lint"
         , hsCompiler = succ stage == ghcStage ? pure ["-O0", "-DDEBUG"]
         , hsGhc      = succ stage == ghcStage ? pure ["-O0", "-DDEBUG"] }

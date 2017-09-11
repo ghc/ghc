@@ -15,7 +15,7 @@ quickFlavour = defaultFlavour
 
 quickArgs :: Args
 quickArgs = sourceArgs $ SourceArgs
-    { hsDefault  = pure ["-O0", "-H32m"]
+    { hsDefault  = pure ["-O0", "-H64m"]
     , hsLibrary  = notStage0 ? arg "-O"
     , hsCompiler =    stage0 ? arg "-O"
     , hsGhc      =    stage0 ? arg "-O" }

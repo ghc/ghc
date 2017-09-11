@@ -4,7 +4,7 @@
 -- accidentally commit them.
 module UserSettings (
     userBuildRoot, userFlavours, userPackages, verboseCommand,
-    buildProgressColour, successColour, stage1Only, crossCompiling
+    buildProgressColour, successColour, stage1Only
     ) where
 
 import Hadrian.Utilities
@@ -44,11 +44,6 @@ buildProgressColour = BuildProgressColour (Dull, Magenta)
 -- | Set colour for success messages (e.g. a package is built successfully).
 successColour :: SuccessColour
 successColour = SuccessColour (Dull, Green)
-
--- | Build a cross compiling GHC
--- TODO: Use @Action Bool@ version in @Oracles.Flag@
-crossCompiling :: Bool
-crossCompiling = False
 
 {-
   Stage1Only=YES means:
