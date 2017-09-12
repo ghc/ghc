@@ -274,3 +274,8 @@ test('T13708', normal, compile, [''])
 test('T14137', [ check_errmsg(r'thunk') ], compile, ['-dsuppress-uniques -ddump-simpl'])
 # bar and foo should CSEd here, so check for that in the Core
 test('T14186', [ only_ways(['optasm']), check_errmsg(r'bar = foo') ], compile, ['-ddump-simpl'])
+
+test('T14140',
+     normal,
+     run_command,
+     ['$MAKE -s --no-print-directory T14140'])

@@ -230,3 +230,10 @@ T11272:
 .PHONY: T12600
 T12600:
 	'$(TEST_HC)' $(TEST_HC_OPTS) -c -O -ddump-prep -dsuppress-all -dsuppress-uniques -dno-suppress-type-signatures -dppr-cols=200 T12600.hs | grep "wfoo" | head -n 1
+
+# We don't expect to case match on any literal numbers other than
+# 0 or 1. See T14140.hs for an explanation.
+T14140:
+	$(RM) -f T14140.o T14140.hi
+	-'$(TEST_HC)' $(TEST_HC_OPTS) -O -c -ddump-simpl T14140.hs | grep '[2-9]# *->'
+# Expecting no output from the grep, hence "-"
