@@ -1417,7 +1417,7 @@ tcIfaceExpr (IfaceCase scrut case_bndr alts)  = do
     case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
         scrut_ty   = exprType scrut'
-        case_bndr' = mkLocalIdOrCoVar case_bndr_name scrut_ty
+        case_bndr' = mkLocalIdOrCoVar case_bndr_name Omega scrut_ty -- TODO: arnaud: I think this is 0 when the case expression is linear
         tc_app     = splitTyConApp scrut_ty
                 -- NB: Won't always succeed (polymorphic case)
                 --     but won't be demanded in those cases
@@ -1434,7 +1434,7 @@ tcIfaceExpr (IfaceLet (IfaceNonRec (IfLetBndr fs ty info ji) rhs) body)
         ; ty'     <- tcIfaceType ty
         ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
                               name ty' info
-        ; let id = mkLocalIdOrCoVarWithInfo name ty' id_info
+        ; let id = mkLocalIdOrCoVarWithInfo name Omega ty' id_info -- TODO: arnaud: will eventually depend on linearity
                      `asJoinId_maybe` tcJoinInfo ji
         ; rhs' <- tcIfaceExpr rhs
         ; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
@@ -1450,7 +1450,7 @@ tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
    tc_rec_bndr (IfLetBndr fs ty _ ji)
      = do { name <- newIfaceName (mkVarOccFS fs)
           ; ty'  <- tcIfaceType ty
-          ; return (mkLocalIdOrCoVar name ty' `asJoinId_maybe` tcJoinInfo ji) }
+          ; return (mkLocalIdOrCoVar name Omega ty' `asJoinId_maybe` tcJoinInfo ji) } -- TODO: arnaud: it probably gets to stay Omega, because it's recursive in something. Do check
    tc_pair (IfLetBndr _ _ info _, rhs) id
      = do { rhs' <- tcIfaceExpr rhs
           ; id_info <- tcIdInfo False {- Don't ignore prags; we are inside one! -}
@@ -1787,7 +1787,7 @@ bindIfaceId :: IfaceIdBndr -> (Id -> IfL a) -> IfL a
 bindIfaceId (fs, ty) thing_inside
   = do  { name <- newIfaceName (mkVarOccFS fs)
         ; ty' <- tcIfaceType ty
-        ; let id = mkLocalIdOrCoVar name ty'
+        ; let id = mkLocalIdOrCoVar name Omega ty' -- TODO: arnaud: check that this is consistent with the usage
         ; extendIfaceIdEnv [id] (thing_inside id) }
 
 bindIfaceIds :: [IfaceIdBndr] -> ([Id] -> IfL a) -> IfL a

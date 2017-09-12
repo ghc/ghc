@@ -722,7 +722,7 @@ mkIds :: FastString -> [UnaryType] -> UniqSM [Id]
 mkIds fs tys = mapM (mkId fs) tys
 
 mkId :: FastString -> UnaryType -> UniqSM Id
-mkId = mkSysLocalOrCoVarM
+mkId s t = mkSysLocalOrCoVarM s Omega t
 
 isMultiValBndr :: Id -> Bool
 isMultiValBndr id

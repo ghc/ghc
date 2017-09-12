@@ -510,7 +510,7 @@ mkDataConRep dflags fam_envs wrap_name mb_bangs data_con
   = return NoDataConRep
 
   | otherwise
-  = do { wrap_args <- mapM newLocal (map weightedThing wrap_arg_tys) -- TODO: arnaud: is this part of the type of the wrapper? To check make a datatype with a wrapper (like a newtype), if it loses linearity information, then this is probably wrong.
+  = do { wrap_args <- mapM newLocal wrap_arg_tys
        ; wrap_body <- mk_rep_app (wrap_args `zip` dropList eq_spec unboxers)
                                  initial_wrap_app
 
@@ -661,9 +661,9 @@ dataConOrigArgTys of the DataCon.
 -}
 
 -------------------------
-newLocal :: Type -> UniqSM Var
-newLocal ty = do { uniq <- getUniqueM
-                 ; return (mkSysLocalOrCoVar (fsLit "dt") uniq ty) }
+newLocal :: Weighted Type -> UniqSM Var
+newLocal (Weighted w ty) = do { uniq <- getUniqueM
+                              ; return (mkSysLocalOrCoVar (fsLit "dt") uniq w ty) }
 
 -- | Unpack/Strictness decisions from source module
 dataConSrcToImplBang
@@ -737,14 +737,14 @@ wrapCo :: Coercion -> Type -> (Unboxer, Boxer) -> (Unboxer, Boxer)
 wrapCo co rep_ty (unbox_rep, box_rep)  -- co :: arg_ty ~ rep_ty
   = (unboxer, boxer)
   where
-    unboxer arg_id = do { rep_id <- newLocal rep_ty
+    unboxer arg_id = do { rep_id <- newLocal (unrestricted rep_ty)
                         ; (rep_ids, rep_fn) <- unbox_rep rep_id
                         ; let co_bind = NonRec rep_id (Var arg_id `Cast` co)
                         ; return (rep_ids, Let co_bind . rep_fn) }
     boxer = Boxer $ \ subst ->
             do { (rep_ids, rep_expr)
                     <- case box_rep of
-                         UnitBox -> do { rep_id <- newLocal (TcType.substTy subst rep_ty)
+                         UnitBox -> do { rep_id <- newLocal (unrestricted $ TcType.substTy subst rep_ty)
                                        ; return ([rep_id], Var rep_id) }
                          Boxer boxer -> boxer subst
                ; let sco = substCoUnchecked subst co
@@ -776,13 +776,13 @@ dataConArgUnpack (Weighted arg_weight arg_ty)
   = ASSERT( isVanillaDataCon con )
     ( rep_tys `zip` dataConRepStrictness con
     ,( \ arg_id ->
-       do { rep_ids <- mapM (newLocal . weightedThing) rep_tys
+       do { rep_ids <- mapM newLocal rep_tys
           ; let unbox_fn body
                   = Case (Var arg_id) arg_id (exprType body)
                          [(DataAlt con, rep_ids, body)]
           ; return (rep_ids, unbox_fn) }
      , Boxer $ \ subst ->
-       do { rep_ids <- mapM (newLocal . TcType.substTyUnchecked subst . weightedThing ) rep_tys
+       do { rep_ids <- mapM (newLocal . fmap (TcType.substTyUnchecked subst)) rep_tys
           ; return (rep_ids, Var (dataConWorkId con)
                              `mkTyApps` (substTysUnchecked subst tc_args)
                              `mkVarApps` rep_ids ) } ) )
@@ -1553,7 +1553,7 @@ voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy
                              `setNeverLevPoly`  voidPrimTy)
 
 voidArgId :: Id       -- Local lambda-bound :: Void#
-voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
+voidArgId = mkSysLocal (fsLit "void") voidArgIdKey Omega voidPrimTy
 
 coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG

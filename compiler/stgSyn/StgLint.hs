@@ -389,7 +389,7 @@ checkFunApp fun_ty arg_tys msg
       = (if accurate then Just fun_ty else Nothing, Nothing)
 
   cfa accurate fun_ty arg_tys@(arg_ty':arg_tys')
-      | Just (arg_ty, res_ty) <- splitFunTy_maybe fun_ty
+      | Just (Weighted _ arg_ty, res_ty) <- splitFunTy_maybe fun_ty
       = if accurate && not (arg_ty `stgEqType` arg_ty')
         then (Nothing, Just msg)       -- Arg type mismatch
         else cfa accurate res_ty arg_tys'

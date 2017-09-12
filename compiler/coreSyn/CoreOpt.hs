@@ -1034,7 +1034,7 @@ pushCoValArg co
   | otherwise
   = Nothing
   where
-    (arg, res)   = splitFunTy tyR
+    (Weighted _ arg, res)   = splitFunTy tyR
     Pair tyL tyR = coercionKind co
 
 pushCoercionIntoLambda
@@ -1051,7 +1051,7 @@ pushCoercionIntoLambda in_scope x e co
     = let (co1, co2) = decomposeFunCo co
           -- Should we optimize the coercions here?
           -- Otherwise they might not match too well
-          x' = x `setIdType` t1
+          x' = x `setIdType` weightedThing t1
           in_scope' = in_scope `extendInScopeSet` x'
           subst = extendIdSubst (mkEmptySubst in_scope')
                                 x

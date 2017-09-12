@@ -38,6 +38,7 @@ import Id( idType, isNaughtyRecordSelector )
 import CoAxiom ( TypeEqn, CoAxiom(..), CoAxBranch(..), fromBranches )
 import Class
 import TyCon
+import Weight
 import DataCon( dataConWrapId )
 import FieldLabel
 import FunDeps
@@ -2415,8 +2416,8 @@ matchTypeable clas [k,t]  -- clas = Typeable
 matchTypeable _ _ = return NoInstance
 
 -- | Representation for a type @ty@ of the form @arg -> ret@.
-doFunTy :: Class -> Type -> Type -> Type -> TcS LookupInstResult
-doFunTy clas ty arg_ty ret_ty
+doFunTy :: Class -> Type -> Weighted Type -> Type -> TcS LookupInstResult
+doFunTy clas ty (Weighted _ arg_ty) ret_ty -- arnaud: TODO: bug here, where linear and unrestricted arrows are considered the same type in Typeable. Change EvTypeableTrFun below to have weight information
   = do { let preds = map (mk_typeable_pred clas) [arg_ty, ret_ty]
              build_ev [arg_ev, ret_ev] =
                  EvTypeable ty $ EvTypeableTrFun arg_ev ret_ev

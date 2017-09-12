@@ -44,6 +44,7 @@ import Coercion
 import SrcLoc
 import Kind
 import Type
+import Weight
 import RepType
 import TyCoRep       -- checks validity of types/coercions
 import TyCon
@@ -1029,7 +1030,7 @@ lintTyApp fun_ty arg_ty
 -----------------
 lintValApp :: CoreExpr -> OutType -> OutType -> LintM OutType
 lintValApp arg fun_ty arg_ty
-  | Just (arg,res) <- splitFunTy_maybe fun_ty
+  | Just (Weighted _ arg,res) <- splitFunTy_maybe fun_ty -- arnaud: TODO: we will have to scale the usage of variables in the argument somewhere. Is it here?
   = do { ensureEqTys arg arg_ty err1
        ; return res }
   | otherwise

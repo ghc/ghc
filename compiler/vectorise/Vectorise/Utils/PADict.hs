@@ -15,6 +15,7 @@ import CoreUtils
 import FamInstEnv
 import Coercion
 import Type
+import Weight
 import TyCoRep
 import TyCon
 import CoAxiom
@@ -215,6 +216,7 @@ prDFunApply dfun tys
     ctxs = fmap (map fst)
          $ sequence
          $ map splitTyConApp_maybe
+         $ map weightedThing
          $ fst
          $ splitFunTys
          $ snd

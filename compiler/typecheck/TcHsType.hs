@@ -256,7 +256,7 @@ tcHsDeriv hs_ty
        ; let (tvs, pred) = splitForAllTys ty
        ; let (args, _) = splitFunTys cls_kind
        ; case getClassPredTys_maybe pred of
-           Just (cls, tys) -> return (tvs, cls, tys, args)
+           Just (cls, tys) -> return (tvs, cls, tys, map weightedThing args)
            Nothing -> failWithTc (text "Illegal deriving item" <+> quotes (ppr hs_ty)) }
 
 tcHsClsInstType :: UserTypeCtxt    -- InstDeclCtxt or SpecInstCtxt

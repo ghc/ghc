@@ -144,7 +144,7 @@ deeplySkolemise ty
     go subst ty
       | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
       = do { let arg_tys' = substTys subst arg_tys
-           ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
+           ; ids1           <- newSysLocalIds (fsLit "dk") (map unrestricted arg_tys') -- TODO: arnaud: probably 0 instead, if I'm right and they are all type variables
            ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
@@ -254,7 +254,7 @@ deeply_instantiate :: CtOrigin
 deeply_instantiate orig subst ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
   = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; ids1  <- newSysLocalIds (fsLit "di") (substTys subst' arg_tys)
+       ; ids1  <- newSysLocalIds (fsLit "di") (map unrestricted $ substTys subst' arg_tys) -- TODO: arnaud: probably 0 instead, if I'm right and they are all type variables
        ; let theta' = substTheta subst' theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
        ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig

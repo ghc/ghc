@@ -897,7 +897,7 @@ mkInferredPolyId qtvs inferred_theta poly_name mb_sig_inst mono_ty
          checkValidType (InfSigCtxt poly_name) inferred_poly_ty
          -- See Note [Validity of inferred types]
 
-       ; return (mkLocalIdOrCoVar poly_name inferred_poly_ty) }
+       ; return (mkLocalIdOrCoVar poly_name Omega inferred_poly_ty) }
 
 
 chooseInferredQuantifiers :: TcThetaType   -- inferred

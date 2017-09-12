@@ -28,6 +28,7 @@ import CoreSyn
 import CoreSubst
 import MkCore hiding( FloatBind(..) )   -- We use our own FloatBind here
 import Type
+import Weight
 import Literal
 import Coercion
 import TcEnv
@@ -887,8 +888,8 @@ cpeApp top_env expr
                    ([],            _)     -> (topDmd, [])
             (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
                                splitFunTy_maybe fun_ty
-        (fs, arg') <- cpeArg top_env ss1 arg arg_ty
-        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
+        (fs, arg') <- cpeArg top_env ss1 arg (weightedThing arg_ty)
+        rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest -- TODO: arnaud: I'm not sure, but I may have to provide the multiplicity information in this line
       CpeCast co ->
         let Pair _ty1 ty2 = coercionKind co
         in rebuild_app as (Cast fun' co) ty2 floats ss
@@ -1528,7 +1529,7 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocalOrCoVar (fsLit "sat") uniq ty)
+     return (mkSysLocalOrCoVar (fsLit "sat") uniq Omega ty) -- arnaud: I don't know where this is used. It's probably wrong.
 
 
 ------------------------------------------------------------------------------

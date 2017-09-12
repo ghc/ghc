@@ -399,7 +399,7 @@ vectExpr e@(_, AnnApp fn arg)
     ; mkClosureApp varg_ty vres_ty vfn varg
     }
   where
-    (arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
+    (Weighted _ arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
 
 vectExpr (_, AnnCase scrut bndr ty alts)
   | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
@@ -625,7 +625,7 @@ vectScalarFun expr
   = do
     { traceVt "vectScalarFun:" (ppr expr)
     ; let (arg_tys, res_ty) = splitFunTys (exprType expr)
-    ; mkScalarFun arg_tys res_ty expr
+    ; mkScalarFun (map weightedThing arg_tys) res_ty expr
     }
 
 -- Generate code for a scalar function by generating a scalar closure.  If the function is a
@@ -1189,7 +1189,7 @@ vectAvoidInfoType :: Type -> VM VectAvoidInfo
 vectAvoidInfoType ty
   | isPredTy ty
   = return VIDict
-  | Just (arg, res) <- splitFunTy_maybe ty
+  | Just (Weighted _ arg, res) <- splitFunTy_maybe ty
   = do
     { argVI <- vectAvoidInfoType arg
     ; resVI <- vectAvoidInfoType res

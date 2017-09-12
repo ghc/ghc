@@ -129,7 +129,7 @@ mkCoreApp d fun arg           = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d
                                 mk_val_app fun arg arg_ty res_ty
                               where
                                 fun_ty = exprType fun
-                                (arg_ty, res_ty) = splitFunTy fun_ty
+                                (Weighted _ arg_ty, res_ty) = splitFunTy fun_ty
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
@@ -146,7 +146,7 @@ mkCoreApps orig_fun orig_args
                                                               $$ ppr orig_args )
                                      go (mk_val_app fun arg arg_ty res_ty) res_ty args
                                    where
-                                     (arg_ty, res_ty) = splitFunTy fun_ty
+                                     (Weighted _ arg_ty, res_ty) = splitFunTy fun_ty
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to that of a data constructor expression. The leftmost expression
@@ -186,7 +186,7 @@ mkWildEvBinder pred = mkWildValBinder pred
 -- easy to get into difficulties with shadowing.  That's why it is used so little.
 -- See Note [WildCard binders] in SimplEnv
 mkWildValBinder :: Type -> Id
-mkWildValBinder ty = mkLocalIdOrCoVar wildCardName ty
+mkWildValBinder ty = mkLocalIdOrCoVar wildCardName Omega ty
 
 mkWildCase :: CoreExpr -> Type -> Type -> [CoreAlt] -> CoreExpr
 -- Make a case expression whose case binder is unused
@@ -513,7 +513,7 @@ mkTupleCase uniqs vars body scrut_var scrut
 
     one_tuple_case chunk_vars (us, vs, body)
       = let (uniq, us') = takeUniqFromSupply us
-            scrut_var = mkSysLocal (fsLit "ds") uniq
+            scrut_var = mkSysLocal (fsLit "ds") uniq Omega -- TODO: arnaud: I'll soon need to parametrise this by a multiplicity, rather than using Omega
               (mkBoxedTupleTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us', scrut_var:vs, body')
@@ -607,7 +607,7 @@ mkBuildExpr elt_ty mk_build_inside = do
     [n_tyvar] <- newTyVars [alphaTyVar]
     let n_ty = mkTyVarTy n_tyvar
         c_ty = mkFunTys [unrestricted elt_ty, unrestricted n_ty] n_ty
-    [c, n] <- sequence [mkSysLocalM (fsLit "c") c_ty, mkSysLocalM (fsLit "n") n_ty]
+    [c, n] <- sequence [mkSysLocalM (fsLit "c") Omega c_ty, mkSysLocalM (fsLit "n") Omega n_ty]
 
     build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
 

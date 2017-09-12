@@ -164,7 +164,7 @@ newEvVars theta = mapM newEvVar theta
 newEvVar :: TcPredType -> TcRnIf gbl lcl EvVar
 -- Creates new *rigid* variables for predicates
 newEvVar ty = do { name <- newSysName (predTypeOccName ty)
-                 ; return (mkLocalIdOrCoVar name ty) }
+                 ; return (mkLocalIdOrCoVar name Omega ty) }
 
 newWanted :: CtOrigin -> Maybe TypeOrKind -> PredType -> TcM CtEvidence
 -- Deals with both equality and non-equality predicates
