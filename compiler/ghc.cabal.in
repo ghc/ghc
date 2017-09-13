@@ -162,6 +162,7 @@ Library
         vectorise
 
     Exposed-Modules:
+        Ar
         FileCleanup
         DriverBkp
         BkpSyn

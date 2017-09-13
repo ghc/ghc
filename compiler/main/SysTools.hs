@@ -20,6 +20,7 @@ module SysTools (
         runPp,                   -- [Option] -> IO ()
         runSplit,                -- [Option] -> IO ()
         runAs, runLink, runLibtool, -- [Option] -> IO ()
+        runAr, askAr, runRanlib,
         runMkDLL,
         runWindres,
         runLlvmOpt,
@@ -292,6 +293,8 @@ initSysTools mbMinusB
 
        windres_path <- getSetting "windres command"
        libtool_path <- getSetting "libtool command"
+       ar_path <- getSetting "ar command"
+       ranlib_path <- getSetting "ranlib command"
 
        tmpdir <- getTemporaryDirectory
 
@@ -366,6 +369,8 @@ initSysTools mbMinusB
                     sPgm_T   = touch_path,
                     sPgm_windres = windres_path,
                     sPgm_libtool = libtool_path,
+                    sPgm_ar = ar_path,
+                    sPgm_ranlib = ranlib_path,
                     sPgm_lo  = (lo_prog,[]),
                     sPgm_lc  = (lc_prog,[]),
                     sPgm_lcc = (lcc_prog,[]),
@@ -419,7 +424,7 @@ runCpp dflags args =   do
                 ++ [Option "-Wundef" | wopt Opt_WarnCPPUndef dflags]
   mb_env <- getGccEnv args2
   runSomethingFiltered dflags id  "C pre-processor" p
-                       (args0 ++ args1 ++ args2 ++ args) mb_env
+                       (args0 ++ args1 ++ args2 ++ args) Nothing mb_env
 
 runPp :: DynFlags -> [Option] -> IO ()
 runPp dflags args =   do
@@ -571,7 +576,7 @@ runAs dflags args = do
       args1 = map Option (getOpts dflags opt_a)
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags id "Assembler" p args2 mb_env
+  runSomethingFiltered dflags id "Assembler" p args2 Nothing mb_env
 
 -- | Run the LLVM Optimiser
 runLlvmOpt :: DynFlags -> [Option] -> IO ()
@@ -600,7 +605,7 @@ runClang dflags args = do
       args2 = args0 ++ args1 ++ args
   mb_env <- getGccEnv args2
   Exception.catch (do
-        runSomethingFiltered dflags id "Clang (Assembler)" clang args2 mb_env
+        runSomethingFiltered dflags id "Clang (Assembler)" clang args2 Nothing mb_env
     )
     (\(err :: SomeException) -> do
         errorMsg dflags $
@@ -982,14 +987,30 @@ runLibtool dflags args = do
       args2      = [Option "-static"] ++ args1 ++ args ++ linkargs
       libtool    = pgm_libtool dflags
   mb_env <- getGccEnv args2
-  runSomethingFiltered dflags id "Linker" libtool args2 mb_env
+  runSomethingFiltered dflags id "Linker" libtool args2 Nothing mb_env
+
+runAr :: DynFlags -> Maybe FilePath -> [Option] -> IO ()
+runAr dflags cwd args = do
+  let ar = pgm_ar dflags
+  runSomethingFiltered dflags id "Ar" ar args cwd Nothing
+
+askAr :: DynFlags -> Maybe FilePath -> [Option] -> IO String
+askAr dflags mb_cwd args = do
+  let ar = pgm_ar dflags
+  runSomethingWith dflags "Ar" ar args $ \real_args ->
+    readCreateProcessWithExitCode' (proc ar real_args){ cwd = mb_cwd }
+
+runRanlib :: DynFlags -> [Option] -> IO ()
+runRanlib dflags args = do
+  let ranlib = pgm_ranlib dflags
+  runSomethingFiltered dflags id "Ranlib" ranlib args Nothing Nothing
 
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
   let (p,args0) = pgm_dll dflags
       args1 = args0 ++ args
   mb_env <- getGccEnv (args0++args)
-  runSomethingFiltered dflags id "Make DLL" p args1 mb_env
+  runSomethingFiltered dflags id "Make DLL" p args1 Nothing mb_env
 
 runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
@@ -1012,7 +1033,7 @@ runWindres dflags args = do
             : Option "--use-temp-file"
             : args
   mb_env <- getGccEnv gcc_args
-  runSomethingFiltered dflags id "Windres" windres args' mb_env
+  runSomethingFiltered dflags id "Windres" windres args' Nothing mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
@@ -1054,7 +1075,7 @@ runSomething :: DynFlags
              -> IO ()
 
 runSomething dflags phase_name pgm args =
-  runSomethingFiltered dflags id phase_name pgm args Nothing
+  runSomethingFiltered dflags id phase_name pgm args Nothing Nothing
 
 -- | Run a command, placing the arguments in an external response file.
 --
@@ -1073,7 +1094,7 @@ runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
     runSomethingWith dflags phase_name pgm args $ \real_args -> do
         fp <- getResponseFile real_args
         let args = ['@':fp]
-        r <- builderMainLoop dflags filter_fn pgm args mb_env
+        r <- builderMainLoop dflags filter_fn pgm args Nothing mb_env
         return (r,())
   where
     getResponseFile args = do
@@ -1114,11 +1135,11 @@ runSomethingResponseFile dflags filter_fn phase_name pgm args mb_env =
 
 runSomethingFiltered
   :: DynFlags -> (String->String) -> String -> String -> [Option]
-  -> Maybe [(String,String)] -> IO ()
+  -> Maybe FilePath -> Maybe [(String,String)] -> IO ()
 
-runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
+runSomethingFiltered dflags filter_fn phase_name pgm args mb_cwd mb_env = do
     runSomethingWith dflags phase_name pgm args $ \real_args -> do
-        r <- builderMainLoop dflags filter_fn pgm real_args mb_env
+        r <- builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env
         return (r,())
 
 runSomethingWith
@@ -1150,9 +1171,9 @@ handleProc pgm phase_name proc = do
 
 
 builderMainLoop :: DynFlags -> (String -> String) -> FilePath
-                -> [String] -> Maybe [(String, String)]
+                -> [String] -> Maybe FilePath -> Maybe [(String, String)]
                 -> IO ExitCode
-builderMainLoop dflags filter_fn pgm real_args mb_env = do
+builderMainLoop dflags filter_fn pgm real_args mb_cwd mb_env = do
   chan <- newChan
 
   -- We use a mask here rather than a bracket because we want
@@ -1162,7 +1183,7 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
   let safely inner = mask $ \restore -> do
         -- acquire
         (hStdIn, hStdOut, hStdErr, hProcess) <- restore $
-          runInteractiveProcess pgm real_args Nothing mb_env
+          runInteractiveProcess pgm real_args mb_cwd mb_env
         let cleanup_handles = do
               hClose hStdIn
               hClose hStdOut

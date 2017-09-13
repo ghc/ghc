@@ -14,6 +14,7 @@
  ("ar command", "@SettingsArCommand@"),
  ("ar flags", "@ArArgs@"),
  ("ar supports at file", "@ArSupportsAtFile@"),
+ ("ranlib command", "@SettingsRanlibCommand@"),
  ("touch command", "@SettingsTouchCommand@"),
  ("dllwrap command", "@SettingsDllWrapCommand@"),
  ("windres command", "@SettingsWindresCommand@"),

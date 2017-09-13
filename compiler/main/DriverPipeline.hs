@@ -63,6 +63,7 @@ import TcRnTypes
 import Hooks
 import qualified GHC.LanguageExtensions as LangExt
 import FileCleanup
+import Ar
 
 import Exception
 import System.Directory
@@ -423,7 +424,7 @@ link' dflags batch_attempt_linking hpt
         -- Don't showPass in Batch mode; doLink will do that for us.
         let link = case ghcLink dflags of
                 LinkBinary    -> linkBinary
-                LinkStaticLib -> linkStaticLibCheck
+                LinkStaticLib -> linkStaticLib
                 LinkDynLib    -> linkDynLibCheck
                 other         -> panicBadLink other
         link dflags obj_files pkg_deps
@@ -574,7 +575,7 @@ doLink dflags stop_phase o_files
   = case ghcLink dflags of
         NoLink        -> return ()
         LinkBinary    -> linkBinary         dflags o_files []
-        LinkStaticLib -> linkStaticLibCheck dflags o_files []
+        LinkStaticLib -> linkStaticLib      dflags o_files []
         LinkDynLib    -> linkDynLibCheck    dflags o_files []
         other         -> panicBadLink other
 
@@ -2129,9 +2130,35 @@ linkDynLibCheck dflags o_files dep_packages
 
     linkDynLib dflags o_files dep_packages
 
-linkStaticLibCheck :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
-linkStaticLibCheck dflags o_files dep_packages
- = linkBinary' True dflags o_files dep_packages
+-- | Linking a static lib will not really link anything. It will merely produce
+-- a static archive of all dependent static libraries. The resulting library
+-- will still need to be linked with any remaining link flags.
+linkStaticLib :: DynFlags -> [String] -> [InstalledUnitId] -> IO ()
+linkStaticLib dflags o_files dep_packages = do
+  let extra_ld_inputs = [ f | FileOption _ f <- ldInputs dflags ]
+      modules = o_files ++ extra_ld_inputs
+      output_fn = exeFileName True dflags
+
+  full_output_fn <- if isAbsolute output_fn
+                    then return output_fn
+                    else do d <- getCurrentDirectory
+                            return $ normalise (d </> output_fn)
+  output_exists <- doesFileExist full_output_fn
+  (when output_exists) $ removeFile full_output_fn
+
+  pkg_cfgs <- getPreloadPackagesAnd dflags dep_packages
+  archives <- concat <$> mapM (collectArchives dflags) pkg_cfgs
+
+  ar <- foldl mappend
+        <$> (Archive <$> mapM loadObj modules)
+        <*> mapM loadAr archives
+
+  if sLdIsGnuLd (settings dflags)
+    then writeGNUAr output_fn $ afilter (not . isGNUSymdef) ar
+    else writeBSDAr output_fn $ afilter (not . isBSDSymdef) ar
+
+  -- run ranlib over the archive. write*Ar does *not* create the symbol index.
+  runRanlib dflags [SysTools.FileOption "" output_fn]
 
 -- -----------------------------------------------------------------------------
 -- Running CPP

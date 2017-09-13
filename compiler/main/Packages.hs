@@ -46,6 +46,7 @@ module Packages (
         getPackageConfigMap,
         getPreloadPackagesAnd,
 
+        collectArchives,
         collectIncludeDirs, collectLibraryPaths, collectLinkOpts,
         packageHsLibs,
 
@@ -1688,6 +1689,13 @@ collectLinkOpts dflags ps =
         concatMap (map ("-l" ++) . extraLibraries) ps,
         concatMap ldOptions ps
     )
+collectArchives :: DynFlags -> PackageConfig -> IO [FilePath]
+collectArchives dflags pc =
+  filterM doesFileExist [ searchPath </> ("lib" ++ lib ++ ".a")
+                        | searchPath <- searchPaths
+                        , lib <- libs ]
+  where searchPaths = nub . filter notNull . libraryDirsForWay dflags $ pc
+        libs        = packageHsLibs dflags pc ++ extraLibraries pc
 
 packageHsLibs :: DynFlags -> PackageConfig -> [String]
 packageHsLibs dflags p = map (mkDynName . addSuffix) (hsLibraries p)

@@ -470,6 +470,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="\$topdir/../${mingw_bin_prefix}ld.exe"
         SettingsArCommand="\$topdir/../${mingw_bin_prefix}ar.exe"
+        SettingsRanlibCommand="\$topdir/../${mingw_bin_prefix}ranlib.exe"
         SettingsPerlCommand='$topdir/../perl/perl.exe'
         SettingsDllWrapCommand="\$topdir/../${mingw_bin_prefix}dllwrap.exe"
         SettingsWindresCommand="\$topdir/../${mingw_bin_prefix}windres.exe"
@@ -492,6 +493,7 @@ AC_DEFUN([FP_SETTINGS],
         SettingsHaskellCPPFlags="$HaskellCPPArgs"
         SettingsLdCommand="$LdCmd"
         SettingsArCommand="$ArCmd"
+        SettingsRanlibCommand="$RanlibCmd"
         SettingsPerlCommand="$PerlCmd"
         if test -z "$DllWrapCmd"
         then
@@ -544,6 +546,7 @@ AC_DEFUN([FP_SETTINGS],
     AC_SUBST(SettingsLdCommand)
     AC_SUBST(SettingsLdFlags)
     AC_SUBST(SettingsArCommand)
+    AC_SUBST(SettingsRanlibCommand)
     AC_SUBST(SettingsPerlCommand)
     AC_SUBST(SettingsDllWrapCommand)
     AC_SUBST(SettingsWindresCommand)
