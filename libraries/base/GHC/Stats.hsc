@@ -45,14 +45,14 @@ foreign import ccall "getRTSStats" getRTSStats_ :: Ptr () -> IO ()
 
 -- | Returns whether GC stats have been enabled (with @+RTS -T@, for example).
 --
--- @since 4.9.0.0
+-- @since 4.10.0.0
 foreign import ccall "getRTSStatsEnabled" getRTSStatsEnabled :: IO Bool
 
 --
 -- | Statistics about runtime activity since the start of the
 -- program.  This is a mirror of the C @struct RTSStats@ in @RtsAPI.h@
 --
--- @since 4.9.0.0
+-- @since 4.10.0.0
 --
 data RTSStats = RTSStats {
   -- -----------------------------------
@@ -148,7 +148,7 @@ data GCDetails = GCDetails {
 -- | Time values from the RTS, using a fixed resolution of nanoseconds.
 type RtsTime = Int64
 
--- @since 4.9.0.0
+-- @since 4.10.0.0
 --
 getRTSStats :: IO RTSStats
 getRTSStats = do
