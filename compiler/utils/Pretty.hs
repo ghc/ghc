@@ -113,14 +113,9 @@ module Pretty  (
 
 import GhcPrelude hiding (error)
 
-import BufWrite
 import FastString
-import Panic
 import System.IO
-
---for a RULES
-import GHC.Base ( unpackCString# )
-import GHC.Ptr  ( Ptr(..) )
+import Prelude hiding (error)
 
 import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
