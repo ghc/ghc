@@ -387,25 +387,47 @@ type RenamedStuff =
         (Maybe (HsGroup GhcRn, [LImportDecl GhcRn], Maybe [(LIE GhcRn, Avails)],
                 Maybe LHsDocString))
 
--- | Rename and typecheck a module, additionally returning the renamed syntax
-hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
-                   -> IO (TcGblEnv, RenamedStuff)
-hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
-    tc_result <- hscTypecheck True mod_summary (Just rdr_module)
+-- -----------------------------------------------------------------------------
+-- | If the renamed source has been kept, extract it. Dump it if requested.
+extract_renamed_stuff :: TcGblEnv -> Hsc (TcGblEnv, RenamedStuff)
+extract_renamed_stuff tc_result = do
 
-        -- This 'do' is in the Maybe monad!
+    -- This 'do' is in the Maybe monad!
     let rn_info = do decl <- tcg_rn_decls tc_result
                      let imports = tcg_rn_imports tc_result
                          exports = tcg_rn_exports tc_result
                          doc_hdr = tcg_doc_hdr tc_result
                      return (decl,imports,exports,doc_hdr)
 
+    dflags <- getDynFlags
+    liftIO $ dumpIfSet_dyn dflags Opt_D_dump_rn_ast "Renamer" $
+                           showAstData NoBlankSrcSpan rn_info
+
     return (tc_result, rn_info)
+
+
+-- -----------------------------------------------------------------------------
+-- | Rename and typecheck a module, additionally returning the renamed syntax
+hscTypecheckRename :: HscEnv -> ModSummary -> HsParsedModule
+                   -> IO (TcGblEnv, RenamedStuff)
+hscTypecheckRename hsc_env mod_summary rdr_module = runHsc hsc_env $ do
+    tc_result <- hscTypecheck True mod_summary (Just rdr_module)
+    extract_renamed_stuff tc_result
+
 
 hscTypecheck :: Bool -- ^ Keep renamed source?
              -> ModSummary -> Maybe HsParsedModule
              -> Hsc TcGblEnv
 hscTypecheck keep_rn mod_summary mb_rdr_module = do
+    tc_result <- hscTypecheck' keep_rn mod_summary mb_rdr_module
+    _ <- extract_renamed_stuff tc_result
+    return tc_result
+
+
+hscTypecheck' :: Bool -- ^ Keep renamed source?
+              -> ModSummary -> Maybe HsParsedModule
+              -> Hsc TcGblEnv
+hscTypecheck' keep_rn mod_summary mb_rdr_module = do
     hsc_env <- getHscEnv
     let hsc_src = ms_hsc_src mod_summary
         dflags = hsc_dflags hsc_env

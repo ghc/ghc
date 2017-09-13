@@ -224,8 +224,9 @@ initTc hsc_env hsc_src keep_rn_syntax mod loc do_this
 
              maybe_rn_syntax :: forall a. a -> Maybe a ;
              maybe_rn_syntax empty_val
-                | keep_rn_syntax = Just empty_val
-                | otherwise      = Nothing ;
+                | dopt Opt_D_dump_rn_ast dflags = Just empty_val
+                | keep_rn_syntax                = Just empty_val
+                | otherwise                     = Nothing ;
 
              gbl_env = TcGblEnv {
                 tcg_th_topdecls      = th_topdecls_var,

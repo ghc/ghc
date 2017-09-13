@@ -2512,9 +2512,7 @@ loadUnqualIfaces hsc_env ictxt
 
 rnDump :: (Outputable a, Data a) => a -> TcRn ()
 -- Dump, with a banner, if -ddump-rn
-rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn))
-               ; traceOptTcRn Opt_D_dump_rn_ast
-                 (mkDumpDoc "Renamer" (showAstData NoBlankSrcSpan rn)) }
+rnDump rn = do { traceOptTcRn Opt_D_dump_rn (mkDumpDoc "Renamer" (ppr rn)) }
 
 tcDump :: TcGblEnv -> TcRn ()
 tcDump env
