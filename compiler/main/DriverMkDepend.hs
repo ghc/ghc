@@ -19,7 +19,6 @@ import GhcMonad
 import DynFlags
 import Util
 import HscTypes
-import FileCleanup      ( newTempName )
 import qualified SysTools
 import Module
 import Digraph          ( SCC(..) )
