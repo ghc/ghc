@@ -140,6 +140,8 @@ import GHC.Real              -- So we can give Data instance for Ratio
 --import GHC.IOBase            -- So we can give Data instance for IO, Handle
 import GHC.Ptr               -- So we can give Data instance for Ptr
 import GHC.ForeignPtr        -- So we can give Data instance for ForeignPtr
+import Foreign.Ptr (IntPtr(..), WordPtr(..))
+                             -- So we can give Data instance for IntPtr and WordPtr
 --import GHC.Stable            -- So we can give Data instance for StablePtr
 --import GHC.ST                -- So we can give Data instance for ST
 --import GHC.Conc              -- So we can give Data instance for MVar & Co.
@@ -1203,6 +1205,12 @@ instance Data a => Data (ForeignPtr a) where
   gunfold _ _  = errorWithoutStackTrace "Data.Data.gunfold(ForeignPtr)"
   dataTypeOf _ = mkNoRepType "GHC.ForeignPtr.ForeignPtr"
   dataCast1 x  = gcast1 x
+
+-- | @since 4.11.0.0
+deriving instance Data IntPtr
+
+-- | @since 4.11.0.0
+deriving instance Data WordPtr
 
 ------------------------------------------------------------------------------
 -- The Data instance for Array preserves data abstraction at the cost of
