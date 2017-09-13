@@ -1636,7 +1636,8 @@ openStatsFile (char *filename,           // filename, or NULL
             }
             /* default <program>.<ext> */
             char stats_filename[STATS_FILENAME_MAXLEN];
-            sprintf(stats_filename, filename_fmt, prog_name);
+            snprintf(stats_filename, STATS_FILENAME_MAXLEN, filename_fmt,
+                prog_name);
             f = fopen(stats_filename,"w");
         }
         if (f == NULL) {
