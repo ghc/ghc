@@ -2512,7 +2512,8 @@ checkValidDataCon dflags existential_ok tc con
                   (badExistential con)
 
         ; typeintype <- xoptM LangExt.TypeInType
-        ; let invisible_gadt_eq_specs = filter is_invisible_eq_spec (dataConEqSpec con)
+        ; let invisible_gadt_eq_specs = pprTrace "checkValidDataCon2" (ppr (dataConEqSpec con) $$ ppr (dataConExTyVars con) $$ ppr univ_tvs $$ ppr tc_bndrs)
+                                        $ filter is_invisible_eq_spec (dataConEqSpec con)
               univ_tvs = dataConUnivTyVars con
               tc_bndrs = tyConBinders tc
 
@@ -2522,7 +2523,7 @@ checkValidDataCon dflags existential_ok tc con
                 -- See Note [Wrong visibility for GADTs], though.
               is_invisible_eq_spec eq_spec
                 = let eq_tv    = eqSpecTyVar eq_spec
-                      tv_index = pprTrace "checkValidDataCon" (ppr eq_tv $$ ppr univ_tvs) $
+                      tv_index = pprTrace "checkValidDataCon" (ppr con $$ ppr eq_tv $$ ppr univ_tvs) $
                                  expectJust "checkValidDataCon" $
                                  elemIndex eq_tv univ_tvs
                       tc_bndr  = tc_bndrs `getNth` tv_index

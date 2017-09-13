@@ -1680,7 +1680,8 @@ kindGeneralize :: TcType -> TcM [KindVar]
 -- In the latter case the type is closed, so it has no free
 -- type variables.  So in both cases, all the free vars are kind vars
 kindGeneralize kind_or_type
-  = do { kvs <- zonkTcTypeAndFV kind_or_type
+  = --pprTrace "kindGeneralize" (ppr kind_or_type) $
+    do { kvs <- zonkTcTypeAndFV kind_or_type
        ; let dvs = DV { dv_kvs = kvs, dv_tvs = emptyDVarSet }
        ; gbl_tvs <- tcGetGlobalTyCoVars -- Already zonked
        ; quantifyTyVars gbl_tvs dvs }
