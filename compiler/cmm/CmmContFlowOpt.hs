@@ -1,4 +1,5 @@
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE BangPatterns #-}
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 module CmmContFlowOpt
     ( cmmCfgOpts
@@ -194,7 +195,7 @@ blockConcat splitting_procs g@CmmGraph { g_entry = entry_id }
      maybe_concat :: CmmBlock
                   -> (LabelMap CmmBlock, LabelMap BlockId, LabelMap Int)
                   -> (LabelMap CmmBlock, LabelMap BlockId, LabelMap Int)
-     maybe_concat block (blocks, shortcut_map, backEdges)
+     maybe_concat block (!blocks, !shortcut_map, !backEdges)
         -- If:
         --   (1) current block ends with unconditional branch to b' and
         --   (2) it has exactly one predecessor (namely, current block)
@@ -416,4 +417,4 @@ removeUnreachableBlocksProc proc@(CmmProc info lbl live g)
      used_blocks = postorderDfs g
 
      used_lbls :: LabelSet
-     used_lbls = foldr (setInsert . entryLabel) setEmpty used_blocks
+     used_lbls = setFromList $ map entryLabel used_blocks
