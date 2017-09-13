@@ -2817,8 +2817,9 @@ pseudoop "proxy#"
 pseudoop   "seq"
    a -> b -> b
    { The value of {\tt seq a b} is bottom if {\tt a} is bottom, and
-     otherwise equal to {\tt b}. {\tt seq} is usually introduced to
-     improve performance by avoiding unneeded laziness.
+     otherwise equal to {\tt b}. In other words, it evaluates the first 
+     argument {\tt a} to weak head normal form (WHNF). {\tt seq} is usually 
+     introduced to improve performance by avoiding unneeded laziness.
 
      A note on evaluation order: the expression {\tt seq a b} does
      {\it not} guarantee that {\tt a} will be evaluated before {\tt b}.
