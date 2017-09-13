@@ -1440,6 +1440,7 @@ postProcessDmdType du@(JD { sd = ss }) (DmdType fv _ res_ty)
 postProcessDmdResult :: Str () -> DmdResult -> DmdResult
 postProcessDmdResult Lazy           _         = topRes
 postProcessDmdResult (Str ExnStr _) ThrowsExn = topRes  -- Key point!
+-- Note that only ThrowsExn results can be caught, not Diverges
 postProcessDmdResult _              res       = res
 
 postProcessDmdEnv :: DmdShell -> DmdEnv -> DmdEnv
