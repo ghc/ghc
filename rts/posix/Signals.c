@@ -539,6 +539,7 @@ backtrace_handler(int sig STG_UNUSED)
 #if USE_LIBDW
     LibdwSession *session = libdwInit();
     Backtrace *bt = libdwGetBacktrace(session);
+    fprintf(stderr, "\nCaught SIGUSR2; Backtrace:\n");
     libdwPrintBacktrace(session, stderr, bt);
     backtraceFree(bt);
     libdwFree(session);
