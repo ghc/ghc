@@ -277,22 +277,34 @@ class Typeable a => Data a where
 ------------------------------------------------------------------------------
 
   -- | Mediate types and unary type constructors.
-  -- In 'Data' instances of the form @T a@, 'dataCast1' should be defined
-  -- as 'gcast1'.
+  --
+  -- In 'Data' instances of the form
+  --
+  -- @
+  --     instance (Data a, ...) => Data (T a)
+  -- @
+  --
+  -- 'dataCast1' should be defined as 'gcast1'.
   --
   -- The default definition is @'const' 'Nothing'@, which is appropriate
-  -- for non-unary type constructors.
+  -- for instances of other forms.
   dataCast1 :: Typeable t
             => (forall d. Data d => c (t d))
             -> Maybe (c a)
   dataCast1 _ = Nothing
 
   -- | Mediate types and binary type constructors.
-  -- In 'Data' instances of the form @T a b@, 'dataCast2' should be
-  -- defined as 'gcast2'.
+  --
+  -- In 'Data' instances of the form
+  --
+  -- @
+  --     instance (Data a, Data b, ...) => Data (T a b)
+  -- @
+  --
+  -- 'dataCast2' should be defined as 'gcast2'.
   --
   -- The default definition is @'const' 'Nothing'@, which is appropriate
-  -- for non-binary type constructors.
+  -- for instances of other forms.
   dataCast2 :: Typeable t
             => (forall d e. (Data d, Data e) => c (t d e))
             -> Maybe (c a)
