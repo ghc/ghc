@@ -216,7 +216,7 @@ infixl 6 <+>
 infixl 5 $$, $+$
 -}
 ($+$) :: Doc a -> Doc a -> Doc a
-($+$) a b = vsep [a, b]
+($+$) a b = a <> hardlineCollapse 1 <> b
 
 ($$) :: Doc a -> Doc a -> Doc a
 ($$) = ($+$)
