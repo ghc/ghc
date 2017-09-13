@@ -121,7 +121,7 @@ selectMatchVar (ParPat pat)  = selectMatchVar (unLoc pat)
 selectMatchVar (VarPat var)  = return (localiseId (unLoc var))
                                   -- Note [Localise pattern binders]
 selectMatchVar (AsPat var _) = return (unLoc var)
-selectMatchVar other_pat     = newSysLocalDsNoLP (hsPatType other_pat)
+selectMatchVar other_pat     = newSysLocalDsNoLP Omega (hsPatType other_pat) -- TODO: arnaud: I'm pretty sure I actually need to take the multiplicity of the pattern as an argument, though not knowing what the variable is used for, I don't know how I would use it quite yet
                                   -- OK, better make up one...
 
 {-
@@ -427,7 +427,7 @@ mkPArrCase dflags var ty sorted_alts fail = do
     len lengthP = mkApps (Var lengthP) [Type elemTy, Var var]
     --
     unboxAlt = do
-        l      <- newSysLocalDs intPrimTy
+        l      <- newSysLocalDs Omega intPrimTy
         indexP <- dsDPHBuiltin indexPVar
         alts   <- mapM (mkAlt indexP) sorted_alts
         return (DataAlt intDataCon, [l], mkWildCase (Var l) intPrimTy ty (dft : alts))
@@ -723,7 +723,8 @@ work out well:
      ; y = case v of K x y -> y }
   which is better.
 -}
-
+-- Remark: pattern selectors only occur in unrestricted patterns so we are free
+-- to select Omega as the multiplicity of every let-expression introduced.
 mkSelectorBinds :: [[Tickish Id]] -- ^ ticks to add, possibly
                 -> LPat Id        -- ^ The pattern
                 -> CoreExpr       -- ^ Expression to which the pattern is bound
@@ -738,7 +739,7 @@ mkSelectorBinds ticks pat val_expr
 
   | is_flat_prod_lpat pat'           -- Special case (B)
   = do { let pat_ty = hsLPatType pat'
-       ; val_var <- newSysLocalDsNoLP pat_ty
+       ; val_var <- newSysLocalDsNoLP Omega pat_ty
 
        ; let mk_bind tick bndr_var
                -- (mk_bind sv bv)  generates  bv = case sv of { pat -> bv }
@@ -756,7 +757,7 @@ mkSelectorBinds ticks pat val_expr
        ; return ( val_var, (val_var, val_expr) : binds) }
 
   | otherwise                          -- General case (C)
-  = do { tuple_var  <- newSysLocalDs tuple_ty
+  = do { tuple_var  <- newSysLocalDs Omega tuple_ty
        ; error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID tuple_ty (ppr pat')
        ; tuple_expr <- matchSimply val_expr PatBindRhs pat
                                    local_tuple error_expr
@@ -912,8 +913,8 @@ mkFailurePair :: CoreExpr       -- Result type of the whole case expression
                       CoreExpr) -- Fail variable applied to realWorld#
 -- See Note [Failure thunks and CPR]
 mkFailurePair expr
-  = do { fail_fun_var <- newFailLocalDs (voidPrimTy `mkFunTyOm` ty)
-       ; fail_fun_arg <- newSysLocalDs voidPrimTy
+  = do { fail_fun_var <- newFailLocalDs Omega (voidPrimTy `mkFunTyOm` ty)
+       ; fail_fun_arg <- newSysLocalDs Omega voidPrimTy
        ; let real_arg = setOneShotLambda fail_fun_arg
        ; return (NonRec fail_fun_var (Lam real_arg expr),
                  App (Var fail_fun_var) (Var voidPrimId)) }
@@ -958,7 +959,7 @@ mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique
        this_mod <- getModule
-       let bndr1 = mkSysLocal (fsLit "t1") uq boolTy
+       let bndr1 = mkSysLocal (fsLit "t1") uq Omega boolTy
        let
            falseBox = Tick (HpcTick this_mod ixF) (Var falseDataConId)
            trueBox  = Tick (HpcTick this_mod ixT) (Var trueDataConId)

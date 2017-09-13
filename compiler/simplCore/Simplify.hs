@@ -693,7 +693,7 @@ makeTrivialWithInfo top_lvl env context info expr
   | otherwise           -- See Note [Take care] below
   = do  { uniq <- getUniqueM
         ; let name = mkSystemVarName uniq context
-              var = mkLocalIdOrCoVarWithInfo name expr_ty info
+              var = mkLocalIdOrCoVarWithInfo name Omega expr_ty info -- TODO: arnaud: another place where it's not obvious how to choose the multiplicity for a binding.
         ; env'  <- completeNonRecX top_lvl env False var var expr
         ; expr' <- simplVar env' var
         ; return (env', expr') }
@@ -2551,7 +2551,7 @@ improveSeq :: (FamInstEnv, FamInstEnv) -> SimplEnv
 -- Note [Improving seq]
 improveSeq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
   | Just (co, ty2) <- topNormaliseType_maybe fam_envs (idType case_bndr1)
-  = do { case_bndr2 <- newId (fsLit "nt") ty2
+  = do { case_bndr2 <- newId (fsLit "nt") Omega ty2 -- TODO: arnaud: yet another place where it's not obvious to choose the multiplicity
         ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCo co)
               env2 = extendIdSubst env case_bndr rhs
         ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -3055,7 +3055,7 @@ mkDupableAlt env case_bndr (con, bndrs', rhs') = do
               final_args    -- Note [Join point abstraction]
                 = varsToCoreExprs final_bndrs'
 
-        ; join_bndr <- newId (fsLit "$j") (mkLamTypes final_bndrs' rhs_ty')
+        ; join_bndr <- newId (fsLit "$j") Omega (mkLamTypes final_bndrs' rhs_ty') -- TODO: arnaud: yet another place where it's not obvious how to choose the multiplicity of binders
                 -- Note [Funky mkLamTypes]
 
         ; let   -- We make the lambdas into one-shot-lambdas.  The

@@ -1703,7 +1703,7 @@ spec_one env fn arg_bndrs body (call_pat@(qvars, pats), rule_number)
 
               spec_join_arity | isJoinId fn = Just (length spec_lam_args)
                               | otherwise   = Nothing
-              spec_id    = mkLocalIdOrCoVar spec_name
+              spec_id    = mkLocalIdOrCoVar spec_name Omega
                                             (mkLamTypes spec_lam_args body_ty)
                              -- See Note [Transfer strictness]
                              `setIdStrictness` spec_str
@@ -2160,7 +2160,7 @@ argToPat _env _in_scope _val_env arg _arg_occ
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty
   = do { uniq <- getUniqueM
-       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq ty
+       ; let id = mkSysLocalOrCoVar (fsLit "sc") uniq Omega ty
        ; return (False, varToCoreExpr id) }
 
 argsToPats :: ScEnv -> InScopeSet -> ValueEnv

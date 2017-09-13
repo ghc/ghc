@@ -52,6 +52,7 @@ import Outputable
 import SrcLoc
 import Util( singleton )
 import Maybes( orElse )
+import Data.Functor.Compose
 import Data.Maybe( mapMaybe )
 import Control.Monad( unless )
 
@@ -395,7 +396,7 @@ tcPatSynSig name sig_ty
        -- arguments become the types of binders. We thus cannot allow
        -- levity polymorphism here
        ; let (arg_tys, _) = tcSplitFunTys body_ty
-       ; mapM_ (checkForLevPoly empty) arg_tys
+       ; mapM_ (checkForLevPoly empty) (Compose arg_tys)
 
        ; traceTc "tcTySig }" $
          vcat [ text "implicit_tvs" <+> ppr_tvs implicit_tvs

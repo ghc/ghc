@@ -246,10 +246,10 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
     -- compatible with the pattern synonym
     ASSERT2((and [ univ_tvs `equalLength` univ_tvs1
                  , ex_tvs `equalLength` ex_tvs1
-                 , pat_ty `eqType` substTy subst pat_ty1
+                 , pat_ty `eqType` substTy subst (weightedThing pat_ty1)
                  , prov_theta `eqTypes` substTys subst prov_theta1
                  , req_theta `eqTypes` substTys subst req_theta1
-                 , compareArgTys arg_tys (substTys subst arg_tys1)
+                 , compareArgTys arg_tys (substTys subst (map weightedThing arg_tys1))
                  ])
             , (vcat [ ppr univ_tvs <+> twiddle <+> ppr univ_tvs1
                     , ppr ex_tvs <+> twiddle <+> ppr ex_tvs1
@@ -264,7 +264,7 @@ buildPatSyn src_name declared_infix matcher@(matcher_id,_) builder
   where
     ((_:_:univ_tvs1), req_theta1, tau) = tcSplitSigmaTy $ idType matcher_id
     ([pat_ty1, cont_sigma, _], _)      = tcSplitFunTys tau
-    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy cont_sigma
+    (ex_tvs1, prov_theta1, cont_tau)   = tcSplitSigmaTy (weightedThing cont_sigma) -- TODO: arnaud: this function is all wrong, I need to think about pattern synonyms
     (arg_tys1, _) = (tcSplitFunTys cont_tau)
     twiddle = char '~'
     subst = zipTvSubst (univ_tvs1 ++ ex_tvs1)

@@ -247,7 +247,7 @@ dsFCall fn_id co fcall mDeclHeader = do
                       mHeadersArgTypeList
                           = [ (header, cType <+> char 'a' <> int n)
                             | (t, n) <- zip arg_tys [1..]
-                            , let (header, cType) = toCType t ]
+                            , let (header, cType) = toCType (weightedThing t) ]
                       (mHeaders, argTypeList) = unzip mHeadersArgTypeList
                       argTypes = if null argTypeList
                                  then text "void"
@@ -266,7 +266,7 @@ dsFCall fn_id co fcall mDeclHeader = do
         tvs           = map binderVar tv_bndrs
         the_ccall_app = mkFCall dflags ccall_uniq fcall' val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
+        work_id       = mkSysLocal (fsLit "$wccall") work_uniq Omega worker_ty
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
@@ -302,6 +302,7 @@ dsPrimCall fn_id co fcall = do
         (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
 
     args <- newSysLocalsDs arg_tys  -- no FFI levity-polymorphism
+      -- TODO: arnaud: not clue whether the above unrestricted is correct
 
     ccall_uniq <- newUnique
     dflags <- getDynFlags
@@ -411,7 +412,7 @@ dsFExportDynamic :: Id
                  -> CCallConv
                  -> DsM ([Binding], SDoc, SDoc)
 dsFExportDynamic id co0 cconv = do
-    fe_id <-  newSysLocalDs ty
+    fe_id <-  newSysLocalDs Omega ty -- TODO: not sure about Omega here
     mod <- getModule
     dflags <- getDynFlags
     let
@@ -421,14 +422,14 @@ dsFExportDynamic id co0 cconv = do
         -- to FastString at all now, rather than sticking with FastZString?
         fe_nm    = mkFastString (zString (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName dflags fe_id)
 
-    cback <- newSysLocalDs arg_ty
+    cback <- newSysLocalDs arg_weight arg_ty
     newStablePtrId <- dsLookupGlobalId newStablePtrName
     stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
     let
         stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
-        export_ty     = mkFunTy Omega stable_ptr_ty arg_ty
+        export_ty     = mkFunTy Omega stable_ptr_ty arg_ty -- TODO: not sure about Omega here
     bindIOId <- dsLookupGlobalId bindIOName
-    stbl_value <- newSysLocalDs stable_ptr_ty
+    stbl_value <- newSysLocalDs Omega stable_ptr_ty -- TODO: not sure about Omega here
     (h_code, c_code, typestring, args_size) <- dsFExport id (mkRepReflCo export_ty) fe_nm cconv True
     let
          {-
@@ -475,7 +476,7 @@ dsFExportDynamic id co0 cconv = do
  where
   ty                       = pFst (coercionKind co0)
   (tvs,sans_foralls)       = tcSplitForAllTys ty
-  ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
+  ([Weighted arg_weight arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty)     = tcSplitIOType_maybe fn_res_ty
         -- Must have an IO type; hence Just
 

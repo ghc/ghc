@@ -84,7 +84,7 @@ import Literal          ( litIsTrivial )
 import Demand           ( StrictSig, isStrictDmd, splitStrictSig, increaseStrictSigArity )
 import Name             ( getOccName, mkSystemVarName )
 import OccName          ( occNameString )
-import Type             ( isUnliftedType, Type, mkLamTypes, splitTyConApp_maybe )
+import Type             ( isUnliftedType, Type, mkLamTypes, splitTyConApp_maybe, Rig(..) )
 import BasicTypes       ( Arity, RecFlag(..), isRec )
 import DataCon          ( dataConOrigResTy )
 import TysWiredIn
@@ -1544,7 +1544,7 @@ newPolyBndrs dest_lvl
 
     mk_poly_bndr bndr uniq = transferPolyIdInfo bndr abs_vars $         -- Note [transferPolyIdInfo] in Id.hs
                              transfer_join_info bndr $
-                             mkSysLocalOrCoVar (mkFastString str) uniq poly_ty
+                             mkSysLocalOrCoVar (mkFastString str) uniq (idWeight bndr) poly_ty
                            where
                              str     = "poly_" ++ occNameString (getOccName bndr)
                              poly_ty = mkLamTypes abs_vars (CoreSubst.substTy subst (idType bndr))
@@ -1579,7 +1579,7 @@ newLvlVar lvld_rhs join_arity_maybe is_mk_static
       = mkExportedVanillaId (mkSystemVarName uniq (mkFastString "static_ptr"))
                             rhs_ty
       | otherwise
-      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) rhs_ty
+      = mkLocalIdOrCoVar (mkSystemVarName uniq (mkFastString "lvl")) Omega rhs_ty -- arnaud: TODO: ouch! we're creating a new binder for an expression which may contain linear variables, but we don't know that, so we're acting blind. On the other hand, we can't necessarily make a linear binder, because of the use-site.
 
 cloneCaseBndrs :: LevelEnv -> Level -> [Var] -> LvlM (LevelEnv, [Var])
 cloneCaseBndrs env@(LE { le_subst = subst, le_lvl_env = lvl_env, le_env = id_env })

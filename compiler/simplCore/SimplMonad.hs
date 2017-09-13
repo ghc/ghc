@@ -20,7 +20,7 @@ module SimplMonad (
     ) where
 
 import Id               ( Id, mkSysLocalOrCoVar )
-import Type             ( Type )
+import Type             ( Type, Rig(..) )
 import FamInstEnv       ( FamInstEnv )
 import CoreSyn          ( RuleEnv(..) )
 import UniqSupply
@@ -173,9 +173,9 @@ getSimplRules = SM (\st_env us sc -> return (st_rules st_env, us, sc))
 getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> return (st_fams st_env, us, sc))
 
-newId :: FastString -> Type -> SimplM Id
-newId fs ty = do uniq <- getUniqueM
-                 return (mkSysLocalOrCoVar fs uniq ty)
+newId :: FastString -> Rig -> Type -> SimplM Id
+newId fs w ty = do uniq <- getUniqueM
+                   return (mkSysLocalOrCoVar fs uniq w ty)
 
 {-
 ************************************************************************

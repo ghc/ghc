@@ -18,6 +18,7 @@ import TcSMonad
 import TcEvidence
 import Class
 import TyCon
+import Weight
 import TyCoRep   -- cleverly decomposes types, good for completeness checking
 import Coercion
 import FamInstEnv ( FamInstEnvs )
@@ -672,11 +673,12 @@ zonk_eq_types = go
     -- RuntimeReps of the argument and result types. This can be observed in
     -- testcase tc269.
     go ty1 ty2
-      | Just (arg1, res1) <- split1
-      , Just (arg2, res2) <- split2
+      | Just (Weighted w1 arg1, res1) <- split1
+      , Just (Weighted w2 arg2, res2) <- split2
+      , w1 == w2
       = do { res_a <- go arg1 arg2
            ; res_b <- go res1 res2
-           ; return $ combine_rev mkFunTyOm res_b res_a
+           ; return $ combine_rev (mkFunTy w1) res_b res_a
            }
       | isJust split1 || isJust split2
       = bale_out ty1 ty2

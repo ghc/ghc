@@ -67,6 +67,7 @@ import Outputable
 import qualified GHC.LanguageExtensions as LangExt
 
 import Control.Monad( unless )
+import Data.Functor.Compose
 
 {-
 ************************************************************************
@@ -143,8 +144,8 @@ deeplySkolemise ty
 
     go subst ty
       | Just (arg_tys, tvs, theta, ty') <- tcDeepSplitSigmaTy_maybe ty
-      = do { let arg_tys' = substTys subst arg_tys
-           ; ids1           <- newSysLocalIds (fsLit "dk") (map unrestricted arg_tys') -- TODO: arnaud: probably 0 instead, if I'm right and they are all type variables
+      = do { let arg_tys' = getCompose $ substTys subst (Compose arg_tys)
+           ; ids1           <- newSysLocalIds (fsLit "dk") arg_tys'
            ; (subst', tvs1) <- tcInstSkolTyVarsX subst tvs
            ; ev_vars1       <- newEvVars (substTheta subst' theta)
            ; (wrap, tvs_prs2, ev_vars2, rho) <- go subst' ty'
@@ -156,7 +157,7 @@ deeplySkolemise ty
                       <.> mkWpEvVarApps ids1
                     , tv_prs1  ++ tvs_prs2
                     , ev_vars1 ++ ev_vars2
-                    , mkFunTys (map unrestricted arg_tys') rho ) } -- TODO: arnaud: check: possibly a bug here.
+                    , mkFunTys arg_tys' rho ) }
 
       | otherwise
       = return (idHsWrapper, [], [], substTy subst ty)
@@ -254,7 +255,7 @@ deeply_instantiate :: CtOrigin
 deeply_instantiate orig subst ty
   | Just (arg_tys, tvs, theta, rho) <- tcDeepSplitSigmaTy_maybe ty
   = do { (subst', tvs') <- newMetaTyVarsX subst tvs
-       ; ids1  <- newSysLocalIds (fsLit "di") (map unrestricted $ substTys subst' arg_tys) -- TODO: arnaud: probably 0 instead, if I'm right and they are all type variables
+       ; ids1  <- newSysLocalIds (fsLit "di") (getCompose $ substTys subst' (Compose arg_tys))
        ; let theta' = substTheta subst' theta
        ; wrap1 <- instCall orig (mkTyVarTys tvs') theta'
        ; traceTc "Instantiating (deeply)" (vcat [ text "origin" <+> pprCtOrigin orig
@@ -268,7 +269,7 @@ deeply_instantiate orig subst ty
                     <.> wrap2
                     <.> wrap1
                     <.> mkWpEvVarApps ids1,
-                 mkFunTys (map unrestricted arg_tys) rho2) }
+                 mkFunTys arg_tys rho2) }
 
   | otherwise
   = do { let ty' = substTy subst ty

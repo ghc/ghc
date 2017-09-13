@@ -1442,13 +1442,13 @@ tcSplitNestedSigmaTys ty
     -- underneath it.
   | Just (arg_tys, tvs1, theta1, rho1) <- tcDeepSplitSigmaTy_maybe ty
   = let (tvs2, theta2, rho2) = tcSplitNestedSigmaTys rho1
-    in (tvs1 ++ tvs2, theta1 ++ theta2, mkFunTys (map unrestricted arg_tys) rho2) -- TODO: arnaud: I don't know what this is yet, but unrestricted, here, is most certainly wrong.
+    in (tvs1 ++ tvs2, theta1 ++ theta2, mkFunTys arg_tys rho2)
     -- If there's no forall, we're done.
   | otherwise = ([], [], ty)
 
 -----------------------
 tcDeepSplitSigmaTy_maybe
-  :: TcSigmaType -> Maybe ([TcType], [TyVar], ThetaType, TcSigmaType)
+  :: TcSigmaType -> Maybe ([Weighted TcType], [TyVar], ThetaType, TcSigmaType)
 -- Looks for a *non-trivial* quantified type, under zero or more function arrows
 -- By "non-trivial" we mean either tyvars or constraints are non-empty
 
@@ -1513,16 +1513,16 @@ tcRepSplitTyConApp_maybe' _                          = Nothing
 
 
 -----------------------
-tcSplitFunTys :: Type -> ([Type], Type)
+tcSplitFunTys :: Type -> ([Weighted Type], Type)
 tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
                         Nothing        -> ([], ty)
                         Just (arg,res) -> (arg:args, res')
                                        where
                                           (args,res') = tcSplitFunTys res
 
-tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
+tcSplitFunTy_maybe :: Type -> Maybe (Weighted Type, Type)
 tcSplitFunTy_maybe ty | Just ty' <- tcView ty         = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy _ arg res) | not (isPredTy arg) = Just (arg, res)
+tcSplitFunTy_maybe (FunTy w arg res) | not (isPredTy arg) = Just (Weighted w arg, res)
 tcSplitFunTy_maybe _                                    = Nothing
         -- Note the typeKind guard
         -- Consider     (?x::Int) => Bool
@@ -1535,7 +1535,7 @@ tcSplitFunTy_maybe _                                    = Nothing
 tcSplitFunTysN :: Arity                      -- N: Number of desired args
                -> TcRhoType
                -> Either Arity               -- Number of missing arrows
-                        ([TcSigmaType],      -- Arg types (always N types)
+                        ([Weighted TcSigmaType],-- Arg types (always N types)
                          TcSigmaType)        -- The rest of the type
 -- ^ Split off exactly the specified number argument types
 -- Returns
@@ -1551,10 +1551,10 @@ tcSplitFunTysN n ty
  | otherwise
  = Left n
 
-tcSplitFunTy :: Type -> (Type, Type)
+tcSplitFunTy :: Type -> (Weighted Type, Type)
 tcSplitFunTy  ty = expectJust "tcSplitFunTy" (tcSplitFunTy_maybe ty)
 
-tcFunArgTy :: Type -> Type
+tcFunArgTy :: Type -> Weighted Type
 tcFunArgTy    ty = fst (tcSplitFunTy ty)
 
 tcFunResultTy :: Type -> Type

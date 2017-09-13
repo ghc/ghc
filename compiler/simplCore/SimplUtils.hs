@@ -52,6 +52,7 @@ import Var
 import Demand
 import SimplMonad
 import Type     hiding( substTy )
+import Weight
 import Coercion hiding( substCo )
 import DataCon          ( dataConWorkId )
 import VarEnv
@@ -480,7 +481,7 @@ mkArgInfo fun rules n_val_args call_cont
             | Just (_, fun_ty') <- splitForAllTy_maybe fun_ty       -- Includes coercions
             = go fun_ty' strs
         go fun_ty (str:strs)      -- Add strict-type info
-            | Just (arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
+            | Just (Weighted _ arg_ty, fun_ty') <- splitFunTy_maybe fun_ty
             = (str || Just False == isLiftedType_maybe arg_ty) : go fun_ty' strs
                -- If the type is levity-polymorphic, we can't know whether it's
                -- strict. isLiftedType_maybe will return Just False only when
@@ -1651,7 +1652,7 @@ abstractFloats main_tvs body_env body
            ; let  poly_name = setNameUnique (idName var) uniq           -- Keep same name
                   poly_ty   = mkInvForAllTys tvs_here (idType var) -- But new type of course
                   poly_id   = transferPolyIdInfo var tvs_here $ -- Note [transferPolyIdInfo] in Id.hs
-                              mkLocalIdOrCoVar poly_name poly_ty
+                              mkLocalIdOrCoVar poly_name (idWeight var) poly_ty
            ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
                 -- In the olden days, it was crucial to copy the occInfo of the original var,
                 -- because we were looking at occurrence-analysed but as yet unsimplified code!
