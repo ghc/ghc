@@ -121,10 +121,9 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.IO as TL
 
-import Data.Text.Prettyprint.Doc
--- PI = PrettyprinterInternal
-import Data.Text.Prettyprint.Doc.Internal as PI
-
+import Data.Text.Prettyprint.Doc hiding (vcat)
+import qualified Data.Text.Prettyprint.Doc as P
+import qualified Data.Text.Prettyprint.Doc.Internal as PI
 import Data.Text.Prettyprint.Doc.Render.Text
 
 import  GHC.Float (float2Double)
@@ -221,6 +220,8 @@ infixl 5 $$, $+$
 ($$) :: Doc a -> Doc a -> Doc a
 ($$) = ($+$)
 
+vcat :: [Doc a] -> Doc a
+vcat = foldr ($$) mempty
 
 -- ---------------------------------------------------------------------------
 -- The Doc data type
