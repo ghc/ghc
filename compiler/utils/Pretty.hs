@@ -394,7 +394,7 @@ isEmpty _     = False
 
 -- | @hang d1 n d2 = sep [d1, nest n d2]@
 hang :: Doc a -> Int -> Doc a -> Doc a
-hang d1 n d2 = sep [d1, nest n d2]
+hang d1 n d2 = nest n (sep [d1, d2])
 
 
 

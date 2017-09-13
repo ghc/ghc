@@ -706,9 +706,9 @@ fsep ds = SDoc $ \sty -> Pretty.fsep [runSDoc d sty | d <- ds]
 fcat ds = SDoc $ \sty -> Pretty.fcat [runSDoc d sty | d <- ds]
 
 hang :: SDoc  -- ^ The header
-      -> Int  -- ^ Amount to indent the hung body
-      -> SDoc -- ^ The hung body, indented and placed below the header
-      -> SDoc
+     -> Int  -- ^ Amount to indent the hung body
+     -> SDoc -- ^ The hung body, indented and placed below the header
+     -> SDoc
 hang d1 n d2   = SDoc $ \sty -> Pretty.hang (runSDoc d1 sty) n (runSDoc d2 sty)
 
 -- | This behaves like 'hang', but does not indent the second document
