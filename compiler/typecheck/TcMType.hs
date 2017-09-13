@@ -1265,7 +1265,7 @@ zonkTcTypeAndFV :: TcType -> TcM DTyCoVarSet
 -- where k2:=k1 is in the substitution.  We don't want
 -- k2 to look free in this type!
 -- NB: This might be called from within the knot, so don't use
--- smart constructors. See Note [Zonking within the knot] in TcHsType
+-- smart constructors. See Note [Type-checking inside the knot] in TcHsType
 zonkTcTypeAndFV ty
   = tyCoVarsOfTypeDSet <$> zonkTcTypeInKnot ty
 
