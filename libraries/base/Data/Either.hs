@@ -34,8 +34,6 @@ import GHC.Base
 import GHC.Show
 import GHC.Read
 
-import Data.Type.Equality
-
 -- $setup
 -- Allow the use of some Prelude functions in doctests.
 -- >>> import Prelude ( (+), (*), length, putStrLn )
@@ -329,13 +327,6 @@ fromLeft a _        = a
 fromRight :: b -> Either a b -> b
 fromRight _ (Right b) = b
 fromRight b _         = b
-
--- instance for the == Boolean type-level equality operator
-type family EqEither a b where
-  EqEither ('Left x)  ('Left y)  = x == y
-  EqEither ('Right x) ('Right y) = x == y
-  EqEither a          b          = 'False
-type instance a == b = EqEither a b
 
 {-
 {--------------------------------------------------------------------

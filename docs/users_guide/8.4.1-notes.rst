@@ -191,6 +191,14 @@ Template Haskell
 - Blank strings can now be used as values for environment variables using the
   System.Environment.Blank module. See :ghc-ticket:`12494`
 
+- ``Data.Type.Equality.==`` is now a closed type family. It works for all kinds
+  out of the box. Any modules that previously declared instances of this family
+  will need to remove them. Whereas the previous definition was somewhat ad
+  hoc, the behavior is now completely uniform. As a result, some applications
+  that used to reduce no longer do, and conversely. Most notably, ``(==)`` no
+  longer treats the ``*``, ``j -> k``, or ``()`` kinds specially; equality is
+  tested structurally in all cases.
+
 Build system
 ~~~~~~~~~~~~
 

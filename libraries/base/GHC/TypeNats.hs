@@ -9,7 +9,6 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE UndecidableInstances #-}  -- for compiling instances of (==)
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE PolyKinds #-}
@@ -37,7 +36,7 @@ module GHC.TypeNats
 
   ) where
 
-import GHC.Base(Eq(..), Ord(..), Bool(True,False), Ordering(..), otherwise)
+import GHC.Base(Eq(..), Ord(..), Bool(True), Ordering(..), otherwise)
 import GHC.Types( Nat )
 import GHC.Natural(Natural)
 import GHC.Show(Show(..))
@@ -45,7 +44,7 @@ import GHC.Read(Read(..))
 import GHC.Prim(magicDict, Proxy#)
 import Data.Maybe(Maybe(..))
 import Data.Proxy (Proxy(..))
-import Data.Type.Equality(type (==), (:~:)(Refl))
+import Data.Type.Equality((:~:)(Refl))
 import Unsafe.Coerce(unsafeCoerce)
 
 --------------------------------------------------------------------------------
@@ -94,11 +93,6 @@ instance Show SomeNat where
 instance Read SomeNat where
   readsPrec p xs = do (a,ys) <- readsPrec p xs
                       [(someNatVal a, ys)]
-
-type family EqNat (a :: Nat) (b :: Nat) where
-  EqNat a a = 'True
-  EqNat a b = 'False
-type instance a == b = EqNat a b
 
 --------------------------------------------------------------------------------
 
