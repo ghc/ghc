@@ -2072,7 +2072,7 @@ primop  AtomicallyOp "atomically#" GenPrimOp
    out_of_line = True
    has_side_effects = True
 
--- NB: retry#'s strictness information specifies it to return bottom.
+-- NB: retry#'s strictness information specifies it to throw an exception
 -- This lets the compiler perform some extra simplifications, since retry#
 -- will technically never return.
 --
@@ -2082,10 +2082,13 @@ primop  AtomicallyOp "atomically#" GenPrimOp
 -- with:
 --   retry# s1
 -- where 'e' would be unreachable anyway.  See Trac #8091.
+--
+-- Note that it *does not* return botRes as the "exception" that is throw may be
+-- "caught" by catchRetry#. This mistake caused #14171.
 primop  RetryOp "retry#" GenPrimOp
    State# RealWorld -> (# State# RealWorld, a #)
    with
-   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] botRes }
+   strictness  = { \ _arity -> mkClosedStrictSig [topDmd] exnRes }
    out_of_line = True
    has_side_effects = True
 
