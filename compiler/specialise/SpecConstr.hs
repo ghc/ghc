@@ -33,6 +33,7 @@ import Coercion         hiding( substCo )
 import Rules
 import Type             hiding ( substTy )
 import TyCon            ( tyConName )
+import Weight
 import Id
 import PprCore          ( pprParendExpr )
 import MkCore           ( mkImpossibleExpr )
@@ -1001,7 +1002,7 @@ ignoreTyCon env tycon
 forceSpecBndr env var = forceSpecFunTy env . snd . splitForAllTys . varType $ var
 
 forceSpecFunTy :: ScEnv -> Type -> Bool
-forceSpecFunTy env = any (forceSpecArgTy env) . fst . splitFunTys
+forceSpecFunTy env = any (forceSpecArgTy env) . map weightedThing . fst . splitFunTys
 
 forceSpecArgTy :: ScEnv -> Type -> Bool
 forceSpecArgTy env ty

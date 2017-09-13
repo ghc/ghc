@@ -785,7 +785,7 @@ mkWWcpr opt_CprAnal fam_envs body_ty res
                        return (False, id, id, body_ty)
 
 mkWWcpr_help :: (DataCon, [Type], [(Weighted Type,StrictnessMark)], Coercion)
-             -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Weighted Type)
+             -> UniqSM (Bool, CoreExpr -> CoreExpr, CoreExpr -> CoreExpr, Type)
 
 mkWWcpr_help (data_con, inst_tys, arg_tys, co)
   | [arg1@(arg_ty1, _)] <- arg_tys
@@ -803,7 +803,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
                 , \ body     -> mkUnpackCase body co work_uniq data_con [arg] (varToCoreExpr arg)
                                 -- varToCoreExpr important here: arg can be a coercion
                                 -- Lacking this caused Trac #10658
-                , arg_ty1 ) }
+                , weightedThing arg_ty1 ) }
 
   | otherwise   -- The general case
         -- Wrapper: case (..call worker..) of (# a, b #) -> C a b
@@ -812,7 +812,7 @@ mkWWcpr_help (data_con, inst_tys, arg_tys, co)
        ; let wrap_wild   = mk_ww_local wild_uniq (unrestricted ubx_tup_ty,MarkedStrict) -- arnaud: TODO: should be 0 instead of unrestricted, when the case is linear
              args        = zipWith mk_ww_local uniqs arg_tys
              ubx_tup_ty  = exprType ubx_tup_app
-             ubx_tup_app = mkCoreUbxTup (map fst arg_tys) (map varToCoreExpr args)
+             ubx_tup_app = mkCoreUbxTup (map (weightedThing . fst) arg_tys) (map varToCoreExpr args)
              con_app     = mkConApp2 data_con inst_tys args `mkCast` mkSymCo co
 
        ; return (True
