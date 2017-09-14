@@ -983,14 +983,15 @@ tcConArgs con_like arg_tys (RecCon (HsRecFields rpats dd)) penv thing_inside
     tc_field (L l (HsRecField (L loc (FieldOcc (L lr rdr) sel)) pat pun)) penv
                                                                     thing_inside
       = do { sel'   <- tcLookupId sel
-           ; pat_ty <- setSrcSpan loc $ find_field_ty (occNameFS $ rdrNameOcc rdr)
+           ; pat_ty <- setSrcSpan loc $ find_field_ty sel
+                                          (occNameFS $ rdrNameOcc rdr)
            ; (pat', res) <- tcConArg (pat, pat_ty) penv thing_inside
            ; return (L l (HsRecField (L loc (FieldOcc (L lr rdr) sel')) pat'
                                                                     pun), res) }
 
-    find_field_ty :: FieldLabelString -> TcM TcType
-    find_field_ty lbl
-        = case [ty | (fl, ty) <- field_tys, flLabel fl == lbl] of
+    find_field_ty :: Name -> FieldLabelString -> TcM TcType
+    find_field_ty sel lbl
+        = case [ty | (fl, ty) <- field_tys, flSelector fl == sel] of
 
                 -- No matching field; chances are this field label comes from some
                 -- other record type (or maybe none).  If this happens, just fail,
