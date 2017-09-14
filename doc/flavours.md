@@ -61,9 +61,9 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
     <td>-O0<br>-H32m</td>
     <td></td>
     <td></td>
+    <td>-O</td>
     <td></td>
-    <td></td>
-    <td></td>
+    <td>-O</td>
     <td></td>
   </tr>
   <tr>

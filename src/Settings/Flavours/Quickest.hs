@@ -15,8 +15,8 @@ quickestArgs :: Args
 quickestArgs = sourceArgs $ SourceArgs
     { hsDefault  = pure ["-O0", "-H64m"]
     , hsLibrary  = mempty
-    , hsCompiler = mempty
-    , hsGhc      = mempty }
+    , hsCompiler = stage0 ? arg "-O"
+    , hsGhc      = stage0 ? arg "-O" }
 
 quickestRtsWays :: Ways
 quickestRtsWays = mconcat
