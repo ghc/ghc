@@ -124,6 +124,8 @@ instance H.Builder Builder where
 
     needBuilder :: Builder -> Action ()
     needBuilder (Configure dir) = need [dir -/- "configure"]
+    needBuilder Hsc2Hs          = do path <- H.builderPath Hsc2Hs
+                                     need [path, templateHscPath]
     needBuilder (Make      dir) = need [dir -/- "Makefile"]
     needBuilder builder         = when (isJust $ builderProvenance builder) $ do
         path <- H.builderPath builder
