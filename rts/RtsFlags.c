@@ -185,11 +185,12 @@ void initRtsFlagsDefaults(void)
     RtsFlags.DebugFlags.compact         = false;
 
 #if defined(PROFILING)
-    RtsFlags.CcFlags.doCostCentres      = 0;
+    RtsFlags.CcFlags.doCostCentres      = COST_CENTRES_NONE;
+    RtsFlags.CcFlags.outputFileNameStem = NULL;
 #endif /* PROFILING */
 
     RtsFlags.ProfFlags.doHeapProfile      = false;
-    RtsFlags.ProfFlags. heapProfileInterval = USToTime(100000); // 100ms
+    RtsFlags.ProfFlags.heapProfileInterval = USToTime(100000); // 100ms
 
 #if defined(PROFILING)
     RtsFlags.ProfFlags.includeTSOs        = false;
@@ -1142,6 +1143,14 @@ error = true;
                     break;
                   case 'j':
                       RtsFlags.CcFlags.doCostCentres = COST_CENTRES_JSON;
+                      break;
+                  case 'o':
+                      if (rts_argv[arg][3] == '\0') {
+                        errorBelch("flag -po expects an argument");
+                        error = true;
+                        break;
+                      }
+                      RtsFlags.CcFlags.outputFileNameStem = rts_argv[arg]+3;
                       break;
                   case '\0':
                       if (rts_argv[arg][1] == 'P') {
