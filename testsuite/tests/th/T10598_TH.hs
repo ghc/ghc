@@ -31,12 +31,12 @@ $(do fooDataName  <- newName "Foo"
                 (normalC mkFooConName
                   [ bangType (bang noSourceUnpackedness noSourceStrictness)
                              [t| Int |] ])
-                [ derivClause (Just StockStrategy)    [ [t| Eq   |] ]
-                , derivClause (Just AnyclassStrategy) [ [t| C    |] ]
-                , derivClause (Just NewtypeStrategy)  [ [t| Read |] ] ]
-             , standaloneDerivWithStrategyD (Just StockStrategy)
+                [ derivClause (Just stockStrategy)    [ [t| Eq   |] ]
+                , derivClause (Just anyclassStrategy) [ [t| C    |] ]
+                , derivClause (Just newtypeStrategy)  [ [t| Read |] ] ]
+             , standaloneDerivWithStrategyD (Just stockStrategy)
                  (cxt []) [t| Ord $(fooType) |]
-             , standaloneDerivWithStrategyD (Just AnyclassStrategy)
+             , standaloneDerivWithStrategyD (Just anyclassStrategy)
                  (cxt []) [t| D $(fooType) |]
-             , standaloneDerivWithStrategyD (Just NewtypeStrategy)
+             , standaloneDerivWithStrategyD (Just newtypeStrategy)
                  (cxt []) [t| Show $(fooType) |] ])

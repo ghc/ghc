@@ -347,10 +347,11 @@ cvtDec (TH.RoleAnnotD tc roles)
 
 cvtDec (TH.StandaloneDerivD ds cxt ty)
   = do { cxt' <- cvtContext cxt
+       ; ds'  <- traverse cvtDerivStrategy ds
        ; L loc ty'  <- cvtType ty
        ; let inst_ty' = mkHsQualTy cxt loc cxt' $ L loc ty'
        ; returnJustL $ DerivD $
-         DerivDecl { deriv_strategy = fmap (L loc . cvtDerivStrategy) ds
+         DerivDecl { deriv_strategy = ds'
                    , deriv_type = mkLHsSigType inst_ty'
                    , deriv_overlap_mode = Nothing } }
 
@@ -1176,14 +1177,16 @@ cvtPred = cvtType
 cvtDerivClause :: TH.DerivClause
                -> CvtM (LHsDerivingClause GhcPs)
 cvtDerivClause (TH.DerivClause ds ctxt)
-  = do { ctxt'@(L loc _) <- fmap (map mkLHsSigType) <$> cvtContext ctxt
-       ; let ds' = fmap (L loc . cvtDerivStrategy) ds
+  = do { ctxt' <- fmap (map mkLHsSigType) <$> cvtContext ctxt
+       ; ds'   <- traverse cvtDerivStrategy ds
        ; returnL $ HsDerivingClause ds' ctxt' }
 
-cvtDerivStrategy :: TH.DerivStrategy -> Hs.DerivStrategy
-cvtDerivStrategy TH.StockStrategy    = Hs.StockStrategy
-cvtDerivStrategy TH.AnyclassStrategy = Hs.AnyclassStrategy
-cvtDerivStrategy TH.NewtypeStrategy  = Hs.NewtypeStrategy
+cvtDerivStrategy :: TH.DerivStrategy -> CvtM (Hs.LDerivStrategy GhcPs)
+cvtDerivStrategy TH.StockStrategy    = returnL Hs.StockStrategy
+cvtDerivStrategy TH.AnyclassStrategy = returnL Hs.AnyclassStrategy
+cvtDerivStrategy TH.NewtypeStrategy  = returnL Hs.NewtypeStrategy
+cvtDerivStrategy (TH.ViaStrategy ty) = do { ty' <- cvtType ty
+                                          ; returnL $ Hs.ViaStrategy ty' }
 
 cvtType :: TH.Type -> CvtM (LHsType GhcPs)
 cvtType = cvtTypeKind "type"

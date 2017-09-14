@@ -381,11 +381,12 @@ ppr_dec _ (PatSynSigD name ty)
   = pprPatSynSig name ty
 
 ppr_deriv_strategy :: DerivStrategy -> Doc
-ppr_deriv_strategy ds = text $
+ppr_deriv_strategy ds =
   case ds of
-    StockStrategy    -> "stock"
-    AnyclassStrategy -> "anyclass"
-    NewtypeStrategy  -> "newtype"
+    StockStrategy    -> text "stock"
+    AnyclassStrategy -> text "anyclass"
+    NewtypeStrategy  -> text "newtype"
+    ViaStrategy ty   -> text "via" <+> parens (ppr ty)
 
 ppr_overlap :: Overlap -> Doc
 ppr_overlap o = text $

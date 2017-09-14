@@ -414,6 +414,7 @@ are the most common patterns, rewritten as regular expressions for clarity:
  'static'       { L _ ITstatic }  -- for static pointers extension
  'stock'        { L _ ITstock }    -- for DerivingStrategies extension
  'anyclass'     { L _ ITanyclass } -- for DerivingStrategies extension
+ 'via'          { L _ ITvia }      -- for DerivingStrategies extension
 
  'unit'         { L _ ITunit }
  'signature'    { L _ ITsignature }
@@ -1109,13 +1110,15 @@ overlap_pragma :: { Maybe (Located OverlapMode) }
                                        [mo $1,mc $2] }
   | {- empty -}                 { Nothing }
 
-deriv_strategy :: { Maybe (Located DerivStrategy) }
+deriv_strategy :: { Maybe (LDerivStrategy GhcPs) }
   : 'stock'                     {% ajs (Just (sL1 $1 StockStrategy))
                                        [mj AnnStock $1] }
   | 'anyclass'                  {% ajs (Just (sL1 $1 AnyclassStrategy))
                                        [mj AnnAnyclass $1] }
   | 'newtype'                   {% ajs (Just (sL1 $1 NewtypeStrategy))
                                        [mj AnnNewtype $1] }
+  | 'via' '(' type ')'          {% ajs (Just (sLL $1 $> (ViaStrategy $3)))
+                                       [mj AnnVia $1,mop $2,mop $4] }
   | {- empty -}                 { Nothing }
 
 -- Injective type families
@@ -3294,6 +3297,7 @@ special_id
         | 'group'               { sL1 $1 (fsLit "group") }
         | 'stock'               { sL1 $1 (fsLit "stock") }
         | 'anyclass'            { sL1 $1 (fsLit "anyclass") }
+        | 'via'                 { sL1 $1 (fsLit "via") }
         | 'unit'                { sL1 $1 (fsLit "unit") }
         | 'dependency'          { sL1 $1 (fsLit "dependency") }
         | 'signature'           { sL1 $1 (fsLit "signature") }

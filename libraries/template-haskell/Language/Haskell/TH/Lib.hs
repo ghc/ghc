@@ -21,7 +21,7 @@ module Language.Haskell.TH.Lib (
         StmtQ, RangeQ, SourceStrictnessQ, SourceUnpackednessQ, BangQ,
         BangTypeQ, VarBangTypeQ, StrictTypeQ, VarStrictTypeQ, FieldExpQ, PatQ,
         FieldPatQ, RuleBndrQ, TySynEqnQ, PatSynDirQ, PatSynArgsQ,
-        FamilyResultSigQ,
+        FamilyResultSigQ, DerivStrategyQ,
 
     -- ** Constructors lifted to 'Q'
     -- *** Literals
@@ -79,7 +79,9 @@ module Language.Haskell.TH.Lib (
     -- *** Top Level Declarations
     -- **** Data
     valD, funD, tySynD, dataD, newtypeD,
-    derivClause, DerivClause(..), DerivStrategy(..),
+    derivClause, DerivClause(..),
+    stockStrategy, anyclassStrategy, newtypeStrategy,
+    viaStrategy, DerivStrategy(..),
     -- **** Class
     classD, instanceD, instanceWithOverlapD, Overlap(..),
     sigD, standaloneDerivD, standaloneDerivWithStrategyD, defaultSigD,

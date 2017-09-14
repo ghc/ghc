@@ -45,6 +45,8 @@ module HsDecls (
 
   -- ** Standalone deriving declarations
   DerivDecl(..), LDerivDecl,
+  -- ** Deriving strategies
+  DerivStrategy(..), LDerivStrategy,
   -- ** @RULE@ declarations
   LRuleDecls,RuleDecls(..),RuleDecl(..), LRuleDecl, RuleBndr(..),LRuleBndr,
   collectRuleBndrSigTys,
@@ -1080,7 +1082,7 @@ type LHsDerivingClause pass = Located (HsDerivingClause pass)
 data HsDerivingClause pass
   -- See Note [Deriving strategies] in TcDeriv
   = HsDerivingClause
-    { deriv_clause_strategy :: Maybe (Located DerivStrategy)
+    { deriv_clause_strategy :: Maybe (LDerivStrategy pass)
       -- ^ The user-specified strategy (if any) to use when deriving
       -- 'deriv_clause_tys'.
     , deriv_clause_tys :: Located [LHsSigType pass]
@@ -1572,7 +1574,8 @@ instance (SourceTextX pass, OutputableBndrId pass)
         top_matter = text "instance" <+> ppOverlapPragma mbOverlap
                                              <+> ppr inst_ty
 
-ppDerivStrategy :: Maybe (Located DerivStrategy) -> SDoc
+ppDerivStrategy :: (SourceTextX pass, OutputableBndrId pass)
+                => Maybe (LDerivStrategy pass) -> SDoc
 ppDerivStrategy mb =
   case mb of
     Nothing       -> empty
@@ -1623,7 +1626,7 @@ type LDerivDecl pass = Located (DerivDecl pass)
 -- | Deriving Declaration
 data DerivDecl pass = DerivDecl
         { deriv_type         :: LHsSigType pass
-        , deriv_strategy     :: Maybe (Located DerivStrategy)
+        , deriv_strategy     :: Maybe (LDerivStrategy pass)
         , deriv_overlap_mode :: Maybe (Located OverlapMode)
          -- ^ - 'ApiAnnotation.AnnKeywordId' : 'ApiAnnotation.AnnDeriving',
          --        'ApiAnnotation.AnnInstance', 'ApiAnnotation.AnnStock',
@@ -1644,6 +1647,38 @@ instance (SourceTextX pass, OutputableBndrId pass)
                , text "instance"
                , ppOverlapPragma o
                , ppr ty ]
+
+{-
+************************************************************************
+*                                                                      *
+                Deriving strategies
+*                                                                      *
+************************************************************************
+-}
+
+-- | A 'Located' 'DerivStrategy'.
+type LDerivStrategy pass = Located (DerivStrategy pass)
+
+-- | Which technique the user explicitly requested when deriving an instance.
+data DerivStrategy pass
+  -- See Note [Deriving strategies] in TcDeriv
+  = StockStrategy    -- ^ GHC's \"standard\" strategy, which is to implement a
+                     --   custom instance for the data type. This only works
+                     --   for certain types that GHC knows about (e.g., 'Eq',
+                     --   'Show', 'Functor' when @-XDeriveFunctor@ is enabled,
+                     --   etc.)
+  | AnyclassStrategy -- ^ @-XDeriveAnyClass@
+  | NewtypeStrategy  -- ^ @-XGeneralizedNewtypeDeriving@
+  | ViaStrategy (LHsType pass) -- ^ @deriving via@
+                               -- TODO: More documentation
+deriving instance DataId pass => Data (DerivStrategy pass)
+
+instance (SourceTextX pass, OutputableBndrId pass)
+      => Outputable (DerivStrategy pass) where
+    ppr StockStrategy    = text "stock"
+    ppr AnyclassStrategy = text "anyclass"
+    ppr NewtypeStrategy  = text "newtype"
+    ppr (ViaStrategy ty) = text "via" <+> parens (ppr ty)
 
 {-
 ************************************************************************
