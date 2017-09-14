@@ -32,7 +32,7 @@ allStages = [minBound ..]
 -- 'Stage1Only' flag.
 topLevelTargets :: Rules ()
 topLevelTargets = action $ do
-    let libraryPackages = filter isLibrary (knownPackages \\ [rts, libffi])
+    let libraryPackages = filter isLibrary (knownPackages \\ [libffi])
     need =<< if stage1Only
              then do
                  libs <- concatForM [Stage0, Stage1] $ \stage ->
@@ -41,10 +41,9 @@ topLevelTargets = action $ do
                  return $ libs ++ prgs ++ inplaceLibCopyTargets
              else do
                  targets <- concatForM allStages $ \stage ->
-                     concatForM (knownPackages \\ [rts, libffi]) $
+                     concatForM (knownPackages \\ [libffi]) $
                         packageTargets False stage
                  return $ targets ++ inplaceLibCopyTargets
-
 
 -- TODO: Get rid of the @includeGhciLib@ hack.
 -- | Return the list of targets associated with a given 'Stage' and 'Package'.
@@ -62,14 +61,15 @@ packageTargets includeGhciLib stage pkg = do
     then return [] -- Skip inactive packages.
     else if isLibrary pkg
         then do -- Collect all targets of a library package.
-            ways    <- interpretInContext context getLibraryWays
+            let pkgWays = if pkg == rts then getRtsWays else getLibraryWays
+            ways    <- interpretInContext context pkgWays
             libs    <- mapM (pkgLibraryFile . Context stage pkg) ways
             docs    <- interpretInContext context =<< buildHaddock <$> flavour
             more    <- libraryTargets includeGhciLib context
             setup   <- pkgSetupConfigFile context
             haddock <- pkgHaddockFile     context
-            return $ [ setup   | nonCabalContext context ]
-                  ++ [ haddock | docs && stage == Stage1 ]
+            return $ [ setup   | not $ nonCabalContext context ]
+                  ++ [ haddock | pkg /= rts && docs && stage == Stage1 ]
                   ++ libs ++ more
         else do -- The only target of a program package is the executable.
             prgContext <- programContext stage pkg
