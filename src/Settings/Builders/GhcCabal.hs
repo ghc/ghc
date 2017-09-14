@@ -6,15 +6,14 @@ import Hadrian.Haskell.Cabal
 
 import Context
 import Flavour
-import Settings.Builders.Common hiding (package)
+import Settings.Builders.Common
 
 ghcCabalBuilderArgs :: Args
 ghcCabalBuilderArgs = builder GhcCabal ? do
     verbosity <- expr getVerbosity
     top       <- expr topDirectory
-    context   <- getContext
     path      <- getBuildPath
-    when (package context /= deriveConstants) $ expr (need inplaceLibCopyTargets)
+    notStage0 ? expr (need inplaceLibCopyTargets)
     mconcat [ arg "configure"
             , arg =<< pkgPath <$> getPackage
             , arg $ top -/- path
