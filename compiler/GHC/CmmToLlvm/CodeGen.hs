@@ -62,7 +62,7 @@ genLlvmProc (CmmProc infos lbl live graph)
   | Just blocks <- nonEmpty $ toBlockListEntryFirstFalseFallthrough graph = do
     (lmblocks, lmdata) <- basicBlocksCodeGen live blocks
     let info = mapLookup (g_entry graph) infos
-        proc = CmmProc info lbl live (ListGraph lmblocks)
+        proc = CmmProc (g_entry graph, info) lbl live (ListGraph lmblocks)
     return (proc:lmdata)
 
 genLlvmProc _ = panic "genLlvmProc: case that shouldn't reach here!"
@@ -78,9 +78,9 @@ newtype UnreachableBlockId = UnreachableBlockId BlockId
 
 -- | Generate code for a list of blocks that make up a complete
 -- procedure. The first block in the list is expected to be the entry
--- point.
+-- point and will get the prologue.
 basicBlocksCodeGen :: LiveGlobalRegUses -> NonEmpty CmmBlock
-                      -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
+                   -> LlvmM ([LlvmBasicBlock], [LlvmCmmDecl])
 basicBlocksCodeGen live cmmBlocks
   = do -- Emit the prologue
        -- N.B. this must be its own block to ensure that the entry block of the

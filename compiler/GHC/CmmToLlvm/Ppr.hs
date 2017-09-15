@@ -20,6 +20,12 @@ import GHC.Cmm
 import GHC.Data.FastString
 import GHC.Utils.Outputable
 import GHC.Types.Unique
+import GHC.Types.SrcLoc
+import GHC.Types.Tickish ( GenTickish(SourceNote) )
+
+import Data.Maybe ( maybeToList )
+import GHC.Cmm.Dataflow.Label (mapLookup, LabelMap)
+import GHC.Cmm.DebugBlock
 
 -- ----------------------------------------------------------------------------
 -- * Top level
@@ -43,13 +49,13 @@ pprLlvmData cfg (globals, types) =
 -- The HDoc we return is used to produce the final LLVM file, with the
 -- SDoc being returned alongside for use when @Opt_D_dump_llvm@ is set
 -- as we can't (currently) dump HDocs.
-pprLlvmCmmDecl :: LlvmCmmDecl -> LlvmM (HDoc, SDoc)
-pprLlvmCmmDecl (CmmData _ lmdata) = do
+pprLlvmCmmDecl :: LabelMap DebugBlock -> LlvmCmmDecl -> LlvmM (HDoc, SDoc)
+pprLlvmCmmDecl _ (CmmData _ lmdata) = do
   opts <- getConfig
   return ( vcat $ map (pprLlvmData opts) lmdata
          , vcat $ map (pprLlvmData opts) lmdata)
 
-pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
+pprLlvmCmmDecl debug_map (CmmProc (label, mb_info) entry_lbl live (ListGraph blks))
   = do let lbl = case mb_info of
                      Nothing -> entry_lbl
                      Just (CmmStaticsRaw info_lbl _) -> info_lbl
@@ -74,9 +80,42 @@ pprLlvmCmmDecl (CmmProc mb_info entry_lbl live (ListGraph blks))
                        let infoTy = LMStruct $ map getStatType infoStatics
                        return $ Just $ LMStaticStruc infoStatics infoTy
 
+       -- generate debug information metadata
+       subprogAnnot <-
+           case mapLookup label debug_map >>= dblSourceTick of
+             Just (SourceNote span name) -> do
+               let disName = getLexicalFastString name
+               let defName = llvmDefLabel disName
+               subprogMeta <- getMetaUniqueId
+               fileMeta <- getMetaUniqueId
+               typeMeta <- getMetaUniqueId
+               let fileDef = MetaUnnamed fileMeta
+                             $ MetaDIFile { difFilename = srcSpanFile span
+                                           , difDirectory = fsLit "TODO"
+                                           }
+                   typeMetaDef =
+                       MetaUnnamed typeMeta
+                       $ MetaDISubroutineType [MetaVar $ LMLitVar $ LMNullLit i1]
+                   subprog =
+                       MetaDISubprogram { disName        = disName
+                                       , disLinkageName  = defName
+                                       , disScope        = fileMeta
+                                       , disFile         = fileMeta
+                                       , disLine         = srcSpanStartLine span
+                                       , disType         = typeMeta
+                                       , disIsDefinition = True
+                                       }
+               addMetaDecl fileDef
+               addMetaDecl typeMetaDef
+               addSubprogram subprogMeta subprog
+               return $ Just $ MetaAnnot (fsLit "dbg") (MetaNode subprogMeta)
+             _   -> return Nothing
+
+       let funcMetas = maybeToList subprogAnnot
+
 
        let fun = LlvmFunction funDec funArgs llvmStdFunAttrs funSect
-                              prefix lmblocks
+                              prefix funcMetas lmblocks
            name = decName $ funcDecl fun
            defName = llvmDefLabel name
            funcDecl' = (funcDecl fun) { decName = defName }

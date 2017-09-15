@@ -1,6 +1,8 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 --------------------------------------------------------------------------------
 -- | Pretty print LLVM IR Code.
@@ -160,7 +162,7 @@ ppLlvmFunction opts fun =
                         Nothing -> empty
     in vcat
         [line $ text "define" <+> ppLlvmFunctionHeader (funcDecl fun) (funcArgs fun)
-              <+> attrDoc <+> secDoc <+> prefixDoc
+              <+> attrDoc <+> secDoc <+> prefixDoc <+> ppMetaAnnots opts (funcMetadata fun)
         , line lbrace
         , ppLlvmBlocks opts (funcBody fun)
         , line rbrace
@@ -302,6 +304,44 @@ ppMetaExpr opts = \case
   MetaNode   n                     -> ppMetaId n
   MetaVar    v                     -> ppVar opts v
   MetaStruct es                    -> char '!' <> braces (ppCommaJoin (ppMetaExpr opts) es)
+  MetaDIFile {..} ->
+      specialMetadata "DIFile"
+      [ ("filename" , doubleQuotes $ ftext difFilename)
+      , ("directory", doubleQuotes $ ftext difDirectory)
+      ]
+  MetaDISubroutineType {..} ->
+      specialMetadata "DISubroutineType"
+      [ ("types", ppMetaExpr opts $ MetaStruct distType ) ]
+  MetaDICompileUnit {..} ->
+      specialMetadata "DICompileUnit"
+      [ ("language"   , ftext dicuLanguage)
+      , ("file"       , ppMetaId dicuFile)
+      , ("producer"   , doubleQuotes $ ftext dicuProducer)
+      , ("isOptimized", if dicuIsOptimized
+                            then text "true"
+                            else text "false")
+      , ("subprograms", ppMetaExpr opts $ dicuSubprograms)
+      ]
+  MetaDISubprogram {..} ->
+      specialMetadata "DISubprogram"
+      [ ("name"        , doubleQuotes $ ftext disName)
+      , ("linkageName" , doubleQuotes $ ftext disLinkageName)
+      , ("scope"       , ppMetaId disScope)
+      , ("file"        , ppMetaId disFile)
+      , ("line"        , int disLine)
+      , ("type"        , ppMetaId disType)
+      , ("isDefinition", if disIsDefinition
+                              then text "true"
+                              else text "false")
+      ]
+  where
+    specialMetadata :: IsLine doc => String -> [(String, doc)] -> doc
+    specialMetadata nodeName fields =
+        char '!'
+        <> text nodeName
+        <> parens (hsep $ punctuate comma $ map (\(k,v) -> text k <> colon <+> v) fields)
+
+
 {-# SPECIALIZE ppMetaExpr :: LlvmCgConfig -> MetaExpr -> SDoc #-}
 {-# SPECIALIZE ppMetaExpr :: LlvmCgConfig -> MetaExpr -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
@@ -589,15 +629,15 @@ ppShuffle opts v1 v2 idxs =
 
 ppMetaAnnotExpr :: IsLine doc => LlvmCgConfig -> [MetaAnnot] -> LlvmExpression -> doc
 ppMetaAnnotExpr opts meta expr =
-   ppLlvmExpression opts expr <> ppMetaAnnots opts meta
+   ppLlvmExpression opts expr <> comma <+> ppMetaAnnots opts meta
 {-# SPECIALIZE ppMetaAnnotExpr :: LlvmCgConfig -> [MetaAnnot] -> LlvmExpression -> SDoc #-}
 {-# SPECIALIZE ppMetaAnnotExpr :: LlvmCgConfig -> [MetaAnnot] -> LlvmExpression -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
 ppMetaAnnots :: IsLine doc => LlvmCgConfig -> [MetaAnnot] -> doc
-ppMetaAnnots opts meta = hcat $ map ppMeta meta
+ppMetaAnnots opts meta = hcat $ punctuate comma $ map ppMeta meta
   where
     ppMeta (MetaAnnot name e)
-        = comma <+> exclamation <> ftext name <+>
+        = exclamation <> ftext name <+>
           case e of
             MetaNode n    -> ppMetaId n
             MetaStruct ms -> exclamation <> braces (ppCommaJoin (ppMetaExpr opts) ms)
