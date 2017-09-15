@@ -616,7 +616,8 @@ isIrrefutableHsPat pat
     go1 (SigPatIn pat _)    = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
-    go1 (SumPat pat _ _  _) = go pat
+    go1 (SumPat _ _ _ _)    = False
+                    -- See Note [Unboxed sum patterns aren't irrefutable]
     go1 (ListPat {})        = False
     go1 (PArrPat {})        = False     -- ?
 
@@ -636,6 +637,28 @@ isIrrefutableHsPat pat
     -- We conservatively assume that no TH splices are irrefutable
     -- since we cannot know until the splice is evaluated.
     go1 (SplicePat {})      = False
+
+{- Note [Unboxed sum patterns aren't irrefutable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Unlike unboxed tuples, unboxed sums are *not* irrefutable when used as
+patterns. A simple example that demonstrates this is from #14228:
+
+  pattern Just' x = (# x | #)
+  pattern Nothing' = (# | () #)
+
+  foo x = case x of
+    Nothing' -> putStrLn "nothing"
+    Just'    -> putStrLn "just"
+
+In foo, the pattern Nothing' (that is, (# x | #)) is certainly not irrefutable,
+as does not match an unboxed sum value of the same arity—namely, (# | y #)
+(covered by Just'). In fact, no unboxed sum pattern is irrefutable, since the
+minimum unboxed sum arity is 2.
+
+Failing to mark unboxed sum patterns as non-irrefutable would cause the Just'
+case in foo to be unreachable, as GHC would mistakenly believe that Nothing'
+is the only thing that could possibly be matched!
+-}
 
 hsPatNeedsParens :: Pat a -> Bool
 hsPatNeedsParens (NPlusKPat {})      = True
