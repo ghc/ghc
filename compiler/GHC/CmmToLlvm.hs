@@ -131,29 +131,29 @@ debugInfoGen dflags location
         renderLlvm (ppLlvmMetas cfg metaSubs) (ppLlvmMetas cfg metaSubs)
         subprograms <- getSubprograms
         let metaHeader =
-              [ MetaUnnamed fileMeta $ MetaDIFile
+              [ MetaUnnamed fileMeta NotDistinct $ MetaDIFile
                 { difFilename     = fsLit $ fromMaybe "TODO" (ml_hs_file location)
                 , difDirectory    = fsLit ""
                 }
-              , MetaUnnamed cuMeta $ MetaDICompileUnit
+              , MetaUnnamed cuMeta Distinct $ MetaDICompileUnit
                 { dicuLanguage    = fsLit "DW_LANG_Haskell"
                 , dicuFile        = fileMeta
                 , dicuProducer    = fsLit "ghc"
                 , dicuIsOptimized = llvmOptLevel dflags > 0
                 , dicuSubprograms = MetaStruct $ map MetaNode subprograms
                 }
-              , MetaNamed (fsLit "llvm.dbg.cu") [ cuMeta ]
-              , MetaUnnamed subprogramsMeta $ MetaStruct []
-              , MetaNamed (fsLit "llvm.module.flags")
+              , MetaNamed (fsLit "llvm.dbg.cu") NotDistinct [ cuMeta ]
+              , MetaUnnamed subprogramsMeta NotDistinct $ MetaStruct []
+              , MetaNamed (fsLit "llvm.module.flags") NotDistinct
                 [ dwarfVersionMeta
                 , debugInfoVersionMeta
                 ]
-              , MetaUnnamed dwarfVersionMeta $ MetaStruct
+              , MetaUnnamed dwarfVersionMeta NotDistinct $ MetaStruct
                 [ MetaVar $ LMLitVar $ LMIntLit 2 i32
                 , MetaStr $ fsLit "Dwarf Version"
                 , MetaVar $ LMLitVar $ LMIntLit 4 i32
                 ]
-              , MetaUnnamed debugInfoVersionMeta $ MetaStruct
+              , MetaUnnamed debugInfoVersionMeta NotDistinct $ MetaStruct
                 [ MetaVar $ LMLitVar $ LMIntLit 2 i32
                 , MetaStr $ fsLit "Debug Info Version"
                 , MetaVar $ LMLitVar $ LMIntLit 3 i32
@@ -259,7 +259,7 @@ cmmMetaLlvmPrelude = do
     setUniqMeta uniq tbaaId
     parentId <- maybe (return Nothing) getUniqMeta parent
     -- Build definition
-    return $ MetaUnnamed tbaaId $ MetaStruct $
+    return $ MetaUnnamed tbaaId NotDistinct $ MetaStruct $
           case parentId of
               Just p  -> [ MetaStr name, MetaNode p ]
               -- As of LLVM 4.0, a node without parents should be rendered as
@@ -284,18 +284,19 @@ cmmMetaLlvmPrelude = do
   renderLlvm (ppLlvmMetas cfg metas)
              (ppLlvmMetas cfg metas)
 
-mkNamedMeta :: LMString -> [MetaExpr] -> LlvmM [MetaDecl]
-mkNamedMeta name exprs = do
-    (ids, decls) <- unzip <$> mapM f exprs
-    return $ decls ++ [MetaNamed name ids]
   where
-    f expr = do
-      i <- getMetaUniqueId
-      return (i, MetaUnnamed i expr)
+    mkModuleFlagsMeta :: [ModuleFlag] -> LlvmM [MetaDecl]
+    mkModuleFlagsMeta =
+        mkNamedMeta "llvm.module.flags" . map moduleFlagToMetaExpr
 
-mkModuleFlagsMeta :: [ModuleFlag] -> LlvmM [MetaDecl]
-mkModuleFlagsMeta =
-    mkNamedMeta "llvm.module.flags" . map moduleFlagToMetaExpr
+    mkNamedMeta :: LMString -> [MetaExpr] -> LlvmM [MetaDecl]
+    mkNamedMeta name exprs = do
+        (ids, decls) <- unzip <$> mapM f exprs
+        return $ decls ++ [MetaNamed name NotDistinct ids]
+      where
+        f expr = do
+          i <- getMetaUniqueId
+          return (i, MetaUnnamed i NotDistinct expr)
 
 mkStackAlignmentMeta :: Integer -> ModuleFlag
 mkStackAlignmentMeta alignment =
