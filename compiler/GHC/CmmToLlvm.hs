@@ -41,16 +41,18 @@ import qualified GHC.Data.Stream as Stream
 import Control.Monad ( when, forM_ )
 import Data.Maybe ( fromMaybe, catMaybes, isNothing )
 import System.IO
+import GHC.Cmm.DebugBlock
+import GHC.Unit.Module.Location
 
 -- -----------------------------------------------------------------------------
 -- | Top-level of the LLVM Code generator
 --
-llvmCodeGen :: Logger -> LlvmCgConfig -> Handle
+llvmCodeGen :: Logger -> LlvmCgConfig -> DynFlags -> ModLocation -> Handle
             -> DUniqSupply -- ^ The deterministic uniq supply to run the CgStream.
                            -- See Note [Deterministic Uniques in the CG]
             -> CgStream RawCmmGroup a
             -> IO a
-llvmCodeGen logger cfg h dus cmm_stream
+llvmCodeGen logger cfg dflags location h dus cmm_stream
   = withTiming logger (text "LLVM CodeGen") (const ()) $ do
        bufh <- newBufHandle h
 
@@ -87,22 +89,22 @@ llvmCodeGen logger cfg h dus cmm_stream
 
        -- run code generation
        (a, _) <- runLlvm logger cfg llvm_ver bufh dus $
-         llvmCodeGen' cfg cmm_stream
+         llvmCodeGen' dflags location cfg cmm_stream
 
        bFlush bufh
 
        return a
 
-llvmCodeGen' :: LlvmCgConfig
+llvmCodeGen' :: DynFlags -> ModLocation -> LlvmCgConfig
              -> CgStream RawCmmGroup a -> LlvmM a
-llvmCodeGen' cfg cmm_stream
+llvmCodeGen' dflags location cfg cmm_stream
   = do  -- Preamble
         renderLlvm (llvmHeader cfg) (llvmHeader cfg)
         ghcInternalFunctions
         cmmMetaLlvmPrelude
 
         -- Procedures
-        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens)
+        a <- Stream.consume cmm_stream (GHC.CmmToLlvm.Base.liftUDSMT) (llvmGroupLlvmGens dflags location)
 
         -- Declare aliases for forward references
         decls <- generateExternDecls
@@ -112,7 +114,52 @@ llvmCodeGen' cfg cmm_stream
         -- Postamble
         cmmUsedLlvmGens
 
+        -- Debug metadata
+        debugInfoGen dflags location
+
         return a
+
+debugInfoGen :: DynFlags -> ModLocation -> LlvmM ()
+debugInfoGen dflags location
+  = do  fileMeta <- getMetaUniqueId
+        subprogramsMeta <- getMetaUniqueId
+        cuMeta <- getMetaUniqueId
+        dwarfVersionMeta <- getMetaUniqueId
+        debugInfoVersionMeta <- getMetaUniqueId
+        cfg <- getConfig
+        metaSubs <- getMetaDecls
+        renderLlvm (ppLlvmMetas cfg metaSubs) (ppLlvmMetas cfg metaSubs)
+        subprograms <- getSubprograms
+        let metaHeader =
+              [ MetaUnnamed fileMeta $ MetaDIFile
+                { difFilename     = fsLit $ fromMaybe "TODO" (ml_hs_file location)
+                , difDirectory    = fsLit ""
+                }
+              , MetaUnnamed cuMeta $ MetaDICompileUnit
+                { dicuLanguage    = fsLit "DW_LANG_Haskell"
+                , dicuFile        = fileMeta
+                , dicuProducer    = fsLit "ghc"
+                , dicuIsOptimized = llvmOptLevel dflags > 0
+                , dicuSubprograms = MetaStruct $ map MetaNode subprograms
+                }
+              , MetaNamed (fsLit "llvm.dbg.cu") [ cuMeta ]
+              , MetaUnnamed subprogramsMeta $ MetaStruct []
+              , MetaNamed (fsLit "llvm.module.flags")
+                [ dwarfVersionMeta
+                , debugInfoVersionMeta
+                ]
+              , MetaUnnamed dwarfVersionMeta $ MetaStruct
+                [ MetaVar $ LMLitVar $ LMIntLit 2 i32
+                , MetaStr $ fsLit "Dwarf Version"
+                , MetaVar $ LMLitVar $ LMIntLit 4 i32
+                ]
+              , MetaUnnamed debugInfoVersionMeta $ MetaStruct
+                [ MetaVar $ LMLitVar $ LMIntLit 2 i32
+                , MetaStr $ fsLit "Debug Info Version"
+                , MetaVar $ LMLitVar $ LMIntLit 3 i32
+                ]
+              ]
+        renderLlvm (ppLlvmMetas cfg metaHeader) (ppLlvmMetas cfg metaHeader)
 
 llvmHeader :: IsDoc doc => LlvmCgConfig -> doc
 llvmHeader cfg =
@@ -133,8 +180,12 @@ llvmHeader cfg =
 {-# SPECIALIZE llvmHeader :: LlvmCgConfig -> SDoc #-}
 {-# SPECIALIZE llvmHeader :: LlvmCgConfig -> HDoc #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
-llvmGroupLlvmGens :: RawCmmGroup -> LlvmM ()
-llvmGroupLlvmGens cmm = do
+llvmGroupLlvmGens :: DynFlags -> ModLocation -> RawCmmGroup -> LlvmM ()
+llvmGroupLlvmGens dflags location cmm = do
+        let debug_map :: LabelMap DebugBlock
+            debug_map
+              | (debugLevel dflags) >= 1 = debugToMap $ cmmDebugGen location cmm
+              | otherwise    = mapEmpty
 
         -- Insert functions into map, collect data
         let split (CmmData s d' )     = return $ Just (s, d')
@@ -151,7 +202,7 @@ llvmGroupLlvmGens cmm = do
         {-# SCC "llvm_datas_gen" #-}
           cmmDataLlvmGens cdata
         {-# SCC "llvm_procs_gen" #-}
-          mapM_ cmmLlvmGen cmm
+          mapM_ (cmmLlvmGen debug_map) cmm
 
 -- -----------------------------------------------------------------------------
 -- | Do LLVM code generation on all these Cmms data sections.
@@ -174,8 +225,8 @@ cmmDataLlvmGens statics
                   (pprLlvmData cfg (concat gss', concat tss))
 
 -- | Complete LLVM code generation phase for a single top-level chunk of Cmm.
-cmmLlvmGen ::RawCmmDecl -> LlvmM ()
-cmmLlvmGen cmm@CmmProc{} = do
+cmmLlvmGen :: LabelMap DebugBlock -> RawCmmDecl -> LlvmM ()
+cmmLlvmGen debug_map cmm@CmmProc{} = do
 
     -- rewrite assignments to global regs
     platform <- getPlatform
@@ -190,11 +241,11 @@ cmmLlvmGen cmm@CmmProc{} = do
     -- pretty print - print as we go, since we produce HDocs, we know
     -- no nesting state needs to be maintained for the SDocs.
     forM_ llvmBC (\decl -> do
-        (hdoc, sdoc) <- pprLlvmCmmDecl decl
+        (hdoc, sdoc) <- pprLlvmCmmDecl debug_map decl
         renderLlvm (hdoc $$ empty) (sdoc $$ empty)
       )
 
-cmmLlvmGen _ = return ()
+cmmLlvmGen _ _ = return ()
 
 -- -----------------------------------------------------------------------------
 -- | Generate meta data nodes

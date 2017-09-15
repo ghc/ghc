@@ -64,6 +64,9 @@ data LlvmFunction = LlvmFunction {
     -- | Prefix data
     funcPrefix    :: Maybe LlvmStatic,
 
+    -- | Function metadata
+    funcMetadata  :: [MetaAnnot],
+
     -- | The body of the functions.
     funcBody      :: LlvmBlocks
   }
