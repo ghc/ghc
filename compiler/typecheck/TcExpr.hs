@@ -2421,17 +2421,20 @@ checkMissingFields con_like rbinds
   = if any isBanged field_strs then
         -- Illegal if any arg is strict
         addErrTc (missingStrictFields con_like [])
-    else
-        return ()
+    else do
+        warn <- woptM Opt_WarnMissingFields
+        when (warn && notNull field_strs && null field_labels)
+             (warnTc (Reason Opt_WarnMissingFields) True
+                 (missingFields con_like []))
 
   | otherwise = do              -- A record
     unless (null missing_s_fields)
            (addErrTc (missingStrictFields con_like missing_s_fields))
 
     warn <- woptM Opt_WarnMissingFields
-    unless (not (warn && notNull missing_ns_fields))
-           (warnTc (Reason Opt_WarnMissingFields) True
-               (missingFields con_like missing_ns_fields))
+    when (warn && notNull missing_ns_fields)
+         (warnTc (Reason Opt_WarnMissingFields) True
+             (missingFields con_like missing_ns_fields))
 
   where
     missing_s_fields
@@ -2692,8 +2695,12 @@ missingStrictFields con fields
 
 missingFields :: ConLike -> [FieldLabelString] -> SDoc
 missingFields con fields
-  = text "Fields of" <+> quotes (ppr con) <+> ptext (sLit "not initialised:")
-        <+> pprWithCommas ppr fields
+  = header <> rest
+  where
+    rest | null fields = Outputable.empty
+         | otherwise = colon <+> pprWithCommas ppr fields
+    header = text "Fields of" <+> quotes (ppr con) <+>
+             text "not initialised"
 
 -- callCtxt fun args = text "In the call" <+> parens (ppr (foldl mkHsApp fun args))
 
