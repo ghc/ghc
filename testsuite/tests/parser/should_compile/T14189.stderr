@@ -1,0 +1,89 @@
+
+==================== Renamer ====================
+
+(HsGroup 
+ (ValBindsOut 
+  [] 
+  []) 
+ [] 
+ [
+  (TyClGroup 
+   [
+    ({ T14189.hs:6:1-42 }
+     (DataDecl 
+      ({ T14189.hs:6:6-11 }{Name: main:T14189.MyType{tc}}) 
+      (HsQTvs 
+       [] 
+       [] {NameSet: 
+       []}) 
+      (Prefix) 
+      (HsDataDefn 
+       (DataType) 
+       ({ <no location info> }
+        []) 
+       (Nothing) 
+       (Nothing) 
+       [
+        ({ T14189.hs:6:15-20 }
+         (ConDeclH98 
+          ({ T14189.hs:6:15-16 }{Name: main:T14189.MT{d}}) 
+          (Nothing) 
+          (Just 
+           ({ <no location info> }
+            [])) 
+          (PrefixCon 
+           [
+            ({ T14189.hs:6:18-20 }
+             (HsTyVar 
+              (NotPromoted) 
+              ({ T14189.hs:6:18-20 }{Name: ghc-prim:GHC.Types.Int{(w) tc}})))]) 
+          (Nothing))),
+        ({ T14189.hs:6:24-25 }
+         (ConDeclH98 
+          ({ T14189.hs:6:24-25 }{Name: main:T14189.NT{d}}) 
+          (Nothing) 
+          (Just 
+           ({ <no location info> }
+            [])) 
+          (PrefixCon 
+           []) 
+          (Nothing))),
+        ({ T14189.hs:6:29-42 }
+         (ConDeclH98 
+          ({ T14189.hs:6:29 }{Name: main:T14189.F{d}}) 
+          (Nothing) 
+          (Just 
+           ({ <no location info> }
+            [])) 
+          (RecCon 
+           ({ T14189.hs:6:31-42 }
+            [
+             ({ T14189.hs:6:33-40 }
+              (ConDeclField 
+               [
+                ({ T14189.hs:6:33 }
+                 (FieldOcc 
+                  ({ T14189.hs:6:33 }
+                   (Unqual {OccName: f})) {Name: main:T14189.f{v}}))] 
+               ({ T14189.hs:6:38-40 }
+                (HsTyVar 
+                 (NotPromoted) 
+                 ({ T14189.hs:6:38-40 }{Name: ghc-prim:GHC.Types.Int{(w) tc}}))) 
+               (Nothing)))])) 
+          (Nothing)))] 
+       ({ <no location info> }
+        [])) 
+      (True) {NameSet: 
+      [{Name: ghc-prim:GHC.Types.Int{(w) tc}}]}))] 
+   [] 
+   [])] 
+ [] 
+ [] 
+ [] 
+ [] 
+ [] 
+ [] 
+ [] 
+ [] 
+ [])
+
