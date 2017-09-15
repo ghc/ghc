@@ -1162,11 +1162,12 @@ congruenceNewtypes lhs rhs = go lhs rhs >>= \rhs' -> return (lhs,rhs')
                           ppr tv, equals, ppr ty_v]
          go ty_v r
 -- FunTy inductive case
-    | Just (l1,l2) <- splitFunTy_maybe l
-    , Just (r1,r2) <- splitFunTy_maybe r
+    | Just (Weighted w1 l1,l2) <- splitFunTy_maybe l
+    , Just (Weighted w2 r1,r2) <- splitFunTy_maybe r
+    , w1 == w2
     = do r2' <- go l2 r2
          r1' <- go l1 r1
-         return (mkFunTyOm r1' r2')
+         return (mkFunTy w1 r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, _) <- tcSplitTyConApp_maybe lhs
     , Just (tycon_r, _) <- tcSplitTyConApp_maybe rhs
@@ -1240,7 +1241,7 @@ isMonomorphicOnNonPhantomArgs ty
                            , tyv `notElem` phantom_vars]
   = all isMonomorphicOnNonPhantomArgs concrete_args
   | Just (ty1, ty2) <- splitFunTy_maybe ty
-  = all isMonomorphicOnNonPhantomArgs [ty1,ty2]
+  = all isMonomorphicOnNonPhantomArgs [weightedThing ty1,ty2]
   | otherwise = isMonomorphic ty
 
 tyConPhantomTyVars :: TyCon -> [TyVar]

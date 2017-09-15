@@ -1139,7 +1139,7 @@ dataConInstOrigArgTys
         :: DataCon      -- Works for any DataCon
         -> [Type]       -- Includes existential tyvar args, but NOT
                         -- equality constraints or dicts
-        -> [Type]
+        -> [Weighted Type]
 -- For vanilla datacons, it's all quite straightforward
 -- But for the call in MatchCon, we really do want just the value args
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
@@ -1147,14 +1147,14 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
                                   dcExTyVars = ex_tvs}) inst_tys
   = ASSERT2( length tyvars == length inst_tys
           , text "dataConInstOrigArgTys" <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-    map (substTyWith tyvars inst_tys) (map weightedThing arg_tys)
+    map (fmap $ substTyWith tyvars inst_tys) arg_tys
   where
     tyvars = binderVars (univ_tvs ++ ex_tvs)
 
 -- | Returns the argument types of the wrapper, excluding all dictionary arguments
 -- and without substituting for any type variables
-dataConOrigArgTys :: DataCon -> [Type]
-dataConOrigArgTys dc = map weightedThing $ dcOrigArgTys dc
+dataConOrigArgTys :: DataCon -> [Weighted Type]
+dataConOrigArgTys dc = dcOrigArgTys dc
 
 -- | Returns the arg types of the worker, including *all*
 -- evidence, after any flattening has been done and without substituting for

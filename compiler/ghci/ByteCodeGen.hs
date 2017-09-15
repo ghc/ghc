@@ -1792,7 +1792,7 @@ getTopStrings = BcM $ \st -> return (st, topStrings st)
 newId :: Type -> BcM Id
 newId ty = do
     uniq <- newUnique
-    return $ mkSysLocal tickFS uniq ty
+    return $ mkSysLocal tickFS uniq Omega ty
 
 tickFS :: FastString
 tickFS = fsLit "ticked"

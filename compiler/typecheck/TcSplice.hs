@@ -1712,7 +1712,7 @@ reifyKind :: Kind -> TcM TH.Kind
 reifyKind  ki
   = do { let (kis, ki') = splitFunTys ki
        ; ki'_rep <- reifyNonArrowKind ki'
-       ; kis_rep <- mapM reifyKind kis
+       ; kis_rep <- mapM reifyKind (map weightedThing kis)
        ; return (foldr (TH.AppT . TH.AppT TH.ArrowT) ki'_rep kis_rep) }
   where
     reifyNonArrowKind k | isLiftedTypeKind k = return TH.StarT

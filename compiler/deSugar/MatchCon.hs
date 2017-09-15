@@ -18,6 +18,7 @@ import HsSyn
 import DsBinds
 import ConLike
 import TcType
+import Weight
 import DsMonad
 import DsUtils
 import MkCore   ( mkCoreLets )
@@ -206,12 +207,12 @@ same_fields flds1 flds2
 
 
 -----------------
-selectConMatchVars :: [Type] -> ConArgPats -> DsM [Id]
+selectConMatchVars :: [Weighted Type] -> ConArgPats -> DsM [Id]
 selectConMatchVars arg_tys (RecCon {})      = newSysLocalsDsNoLP arg_tys
 selectConMatchVars _       (PrefixCon ps)   = selectMatchVars (map unLoc ps)
 selectConMatchVars _       (InfixCon p1 p2) = selectMatchVars [unLoc p1, unLoc p2]
 
-conArgPats :: [Type]      -- Instantiated argument types
+conArgPats :: [Weighted Type]-- Instantiated argument types
                           -- Used only to fill in the types of WildPats, which
                           -- are probably never looked at anyway
            -> ConArgPats
@@ -219,7 +220,7 @@ conArgPats :: [Type]      -- Instantiated argument types
 conArgPats _arg_tys (PrefixCon ps)   = map unLoc ps
 conArgPats _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
 conArgPats  arg_tys (RecCon (HsRecFields { rec_flds = rpats }))
-  | null rpats = map WildPat arg_tys
+  | null rpats = map WildPat (map weightedThing arg_tys)
         -- Important special case for C {}, which can be used for a
         -- datacon that isn't declared to have fields at all
   | otherwise  = map (unLoc . hsRecFieldArg . unLoc) rpats

@@ -671,7 +671,7 @@ tcExpr expr@(RecordCon { rcon_con_name = L loc con_name
                Just con_id -> do {
                   res_wrap <- tcSubTypeHR (Shouldn'tHappenOrigin "RecordCon")
                                           (Just expr) actual_res_ty res_ty
-                ; rbinds' <- tcRecordBinds con_like arg_tys rbinds
+                ; rbinds' <- tcRecordBinds con_like (map weightedThing arg_tys) rbinds -- TODO: arnaud: with this `weightedThing`, I'm guessing that record syntax for construction/update is broken
                 ; return $
                   mkHsWrap res_wrap $
                   RecordCon { rcon_con_name = L loc con_id
@@ -1610,7 +1610,7 @@ tcCheckRecSelId f@(Unambiguous (L _ lbl) _) res_ty
 tcCheckRecSelId (Ambiguous lbl _) res_ty
   = case tcSplitFunTy_maybe =<< checkingExpType_maybe res_ty of
       Nothing       -> ambiguousSelector lbl
-      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl arg
+      Just (arg, _) -> do { sel_name <- disambiguateSelector lbl (weightedThing arg)
                           ; tcCheckRecSelId (Unambiguous lbl sel_name) res_ty }
 
 ------------------------

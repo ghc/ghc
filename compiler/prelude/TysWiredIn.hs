@@ -527,13 +527,19 @@ pcDataConWithFixity' declared_infix dc_name wrk_key rri tyvars ex_tyvars arg_tys
                 (mkTyVarBinders Specified ex_tyvars)
                 []      -- No equality spec
                 []      -- No theta
-                (map linear arg_tys) -- Here, we're assuming that we don't need non-linear wired-in types.
+                (map assign_weight arg_tys)
                 (mkTyConApp tycon (mkTyVarTys tyvars))
                 rri
                 tycon
                 []      -- No stupid theta
                 (mkDataConWorkId wrk_name data_con)
                 NoDataConRep    -- Wired-in types are too simple to need wrappers
+
+     -- We assume that we don't need non-linear wired-in types. Constraints are,
+     -- on the other hand, always unrestricted (constraint arguments occur, in
+     -- particular, in @Eq#@)
+    assign_weight ty | isPredTy ty = unrestricted ty
+    assign_weight ty | otherwise = linear ty
 
     no_bang = HsSrcBang NoSourceText NoSrcUnpack NoSrcStrict
 

@@ -145,7 +145,7 @@ tcRuleBndrs (L _ (RuleBndrSig (L _ name) rn_ty) : rule_bndrs)
 --              a::*, x :: a->a
   = do  { let ctxt = RuleSigCtxt name
         ; (_ , tvs, id_ty) <- tcHsPatSigType ctxt rn_ty
-        ; let id  = mkLocalIdOrCoVar name id_ty
+        ; let id  = mkLocalIdOrCoVar name Omega id_ty
                     -- See Note [Pattern signature binders] in TcHsType
 
               -- The type variables scope over subsequent bindings; yuk

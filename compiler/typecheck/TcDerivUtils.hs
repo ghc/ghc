@@ -45,6 +45,7 @@ import TcRnMonad
 import TcType
 import THNames (liftClassKey)
 import TyCon
+import Weight
 import Type
 import Util
 import VarSet
@@ -424,7 +425,7 @@ cond_stdOK Nothing permissive _ rep_tc
       = bad "has existential type variables in its type"
       | not (null theta)
       = bad "has constraints in its type"
-      | not (permissive || all isTauTy (dataConOrigArgTys con))
+      | not (permissive || all isTauTy (map weightedThing $ dataConOrigArgTys con))
       = bad "has a higher-rank type"
       | otherwise
       = IsValid
@@ -456,7 +457,7 @@ cond_args cls _ tc
                              2 (text "for type" <+> quotes (ppr ty)))
   where
     bad_args = [ arg_ty | con <- tyConDataCons tc
-                        , arg_ty <- dataConOrigArgTys con
+                        , Weighted _ arg_ty <- dataConOrigArgTys con
                         , isUnliftedType arg_ty
                         , not (ok_ty arg_ty) ]
 

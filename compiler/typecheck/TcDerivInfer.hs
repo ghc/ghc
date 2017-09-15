@@ -31,6 +31,7 @@ import TcRnMonad
 import TcType
 import TyCon
 import Type
+import Weight
 import TcSimplify
 import TcValidity (validDerivPred)
 import TcUnify (buildImplicationFor)
@@ -112,7 +113,7 @@ inferConstraints tvs main_cls cls_tys inst_ty
       = let (predss, mbSubsts) = unzip
               [ preds_and_mbSubst
               | data_con <- tyConDataCons rep_tc
-              , (arg_n, arg_t_or_k, arg_ty)
+              , (arg_n, arg_t_or_k, Weighted _ arg_ty)
                   <- zip3 [1..] t_or_ks $
                      dataConInstOrigArgTys data_con all_rep_tc_args
                 -- No constraints for unlifted types

@@ -804,7 +804,7 @@ isUnpackableType dflags fam_envs ty
   | otherwise
   = False
   where
-    ok_arg tcs (ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
+    ok_arg tcs (Weighted _ ty, bang) = not (attempt_unpack bang) || ok_ty tcs norm_ty
         where
           norm_ty = topNormaliseType fam_envs ty
     ok_ty tcs ty

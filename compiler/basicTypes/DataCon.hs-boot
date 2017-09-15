@@ -21,7 +21,7 @@ dataConExTyVars  :: DataCon -> [TyVar]
 dataConExTyVarBinders :: DataCon -> [TyVarBinder]
 dataConSourceArity  :: DataCon -> Arity
 dataConFieldLabels :: DataCon -> [FieldLabel]
-dataConInstOrigArgTys  :: DataCon -> [Type] -> [Type]
+dataConInstOrigArgTys  :: DataCon -> [Type] -> [Weighted Type]
 dataConStupidTheta :: DataCon -> ThetaType
 dataConFullSig :: DataCon
                -> ([TyVar], [TyVar], [EqSpec], ThetaType, [Weighted Type], Type)

@@ -16,7 +16,7 @@ import HsSyn
 import TcPat
 import Type( mkTyVarBinders, mkEmptyTCvSubst
            , tidyTyVarBinders, tidyTypes, tidyType )
-import Weight ( unrestricted )
+import Weight
 import TcRnMonad
 import TcSigs( emptyPragEnv, completeSigFromId )
 import TcEnv
@@ -164,7 +164,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
                   -- substitution.
                   -- See also Note [The substitution invariant] in TyCoRep.
               ; prov_dicts <- mapM (emitWanted (ProvCtxtOrigin psb)) prov_theta'
-              ; args'      <- zipWithM (tc_arg subst) arg_names arg_tys
+              ; args'      <- zipWithM (tc_arg subst) arg_names (map weightedThing arg_tys)
               ; return (ex_tvs', prov_dicts, args') }
 
        ; let skol_info = SigSkol (PatSynCtxt name) pat_ty []
@@ -185,7 +185,7 @@ tcCheckPatSynDecl psb@PSB{ psb_id = lname@(L _ name), psb_args = details
        ; tc_patsyn_finish lname dir is_infix lpat'
                           (univ_bndrs, req_theta, ev_binds, req_dicts)
                           (ex_bndrs, mkTyVarTys ex_tvs', prov_theta, prov_dicts)
-                          (args', arg_tys)
+                          (args', (map weightedThing arg_tys))
                           pat_ty rec_fields }
   where
     tc_arg :: TCvSubst -> Name -> Type -> TcM (LHsExpr TcId)
@@ -407,9 +407,9 @@ tcPatSynMatcher (L loc name) lpat
              fail_ty  = mkFunTyOm voidPrimTy res_ty -- TODO: arnaud: unsure about Omega here
 
        ; matcher_name <- newImplicitBinder name mkMatcherOcc
-       ; scrutinee    <- newSysLocalId (fsLit "scrut") pat_ty
-       ; cont         <- newSysLocalId (fsLit "cont")  cont_ty
-       ; fail         <- newSysLocalId (fsLit "fail")  fail_ty
+       ; scrutinee    <- newSysLocalId (fsLit "scrut") Omega pat_ty -- TODO: arnaud: unsure about Omega here
+       ; cont         <- newSysLocalId (fsLit "cont")  Omega cont_ty -- TODO: arnaud: unsure about Omega here
+       ; fail         <- newSysLocalId (fsLit "fail")  Omega fail_ty -- TODO: arnaud: unsure about Omega here
 
        ; let matcher_tau   = mkFunTys (map unrestricted [pat_ty, cont_ty, fail_ty]) res_ty
              matcher_sigma = mkInfSigmaTy (rr_tv:res_tv:univ_tvs) req_theta matcher_tau

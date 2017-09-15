@@ -106,11 +106,11 @@ conLikeFieldLabels (PatSynCon pat_syn)    = patSynFieldLabels pat_syn
 
 -- | Returns just the instantiated /value/ argument types of a 'ConLike',
 -- (excluding dictionary args)
-conLikeInstOrigArgTys :: ConLike -> [Type] -> [Type]
+conLikeInstOrigArgTys :: ConLike -> [Type] -> [Weighted Type]
 conLikeInstOrigArgTys (RealDataCon data_con) tys =
     dataConInstOrigArgTys data_con tys
 conLikeInstOrigArgTys (PatSynCon pat_syn) tys =
-    patSynInstArgTys pat_syn tys
+    map unrestricted $ patSynInstArgTys pat_syn tys -- TODO: arnaud: fix when pattern synonyms are fixed
 
 -- | Existentially quantified type variables
 conLikeExTyVars :: ConLike -> [TyVar]

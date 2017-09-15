@@ -1984,6 +1984,14 @@ There are some particularly delicate points here:
 
   So it's important to do the right thing.
 
+* With linear types, eta-reduction can break type-checking:
+        f :: A ⊸ B
+        g:: A -> B
+        g = \x. f x
+
+  The above is correct, but eta-reducing g would yield g=f, the linter will
+  complain that g and f don't have the same type.
+
 * Note [Arity care]: we need to be careful if we just look at f's
   arity. Currently (Dec07), f's arity is visible in its own RHS (see
   Note [Arity robustness] in SimplEnv) so we must *not* trust the
@@ -2109,11 +2117,12 @@ tryEtaReduce bndrs body
        , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
     ok_arg bndr (Var v) co
        | bndr == v   = let reflCo = mkRepReflCo (idType bndr)
-                       in Just (mkFunCo Representational Omega reflCo co, []) -- TODO: arnaud: Omega here (and below) is not accurate. But to do better, we will have to start storing multiplicities in vars, along their types. In order to reconstruct the right kind of arrow. See Var.hs.
+                           weight = idWeight v
+                       in Just (mkFunCo Representational weight reflCo co, [])
     ok_arg bndr (Cast e co_arg) co
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , bndr == v
-       = Just (mkFunCo Representational Omega (mkSymCo co_arg) co, ticks)
+       = Just (mkFunCo Representational (idWeight v) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
     ok_arg bndr (Tick t arg) co

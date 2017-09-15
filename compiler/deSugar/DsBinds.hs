@@ -42,6 +42,7 @@ import TyCon
 import TcEvidence
 import TcType
 import Type
+import Weight
 import Coercion
 import TysWiredIn ( typeNatKind, typeSymbolKind )
 import Id
@@ -245,7 +246,7 @@ dsHsBind dflags
                              mkLet core_bind $
                              tup_expr
 
-        ; poly_tup_id <- newSysLocalDs (exprType poly_tup_rhs)
+        ; poly_tup_id <- newSysLocalDs Omega (exprType poly_tup_rhs)
 
         -- Find corresponding global or make up a new one: sometimes
         -- we need to make new export to desugar strict binds, see
@@ -256,7 +257,7 @@ dsHsBind dflags
                            , abe_poly = global
                            , abe_mono = local, abe_prags = spec_prags })
                          -- See Note [AbsBinds wrappers] in HsBinds
-                = do { tup_id  <- newSysLocalDs tup_ty
+                = do { tup_id  <- newSysLocalDs Omega tup_ty
                      ; core_wrap <- dsHsWrapper wrap
                      ; let rhs = core_wrap $ mkLams tyvars $ mkLams dicts $
                                  mkTupleSelector all_locals local tup_id $
@@ -314,7 +315,7 @@ dsHsBind dflags
             ([],[]) lcls
 
     mk_export local =
-      do global <- newSysLocalDs
+      do global <- newSysLocalDs Omega
                      (exprType (mkLams tyvars (mkLams dicts (Var local))))
          return (ABE {abe_poly = global
                      ,abe_mono = local
@@ -1131,7 +1132,7 @@ dsHsWrapper (WpCompose c1 c2) = do { w1 <- dsHsWrapper c1
  -- See comments on WpFun in TcEvidence for an explanation of what
  -- the specification of this clause is
 dsHsWrapper (WpFun w c1 c2 t1 doc)
-                              = do { x  <- newSysLocalDsNoLP t1
+                              = do { x  <- newSysLocalDsNoLP w t1
                                    ; w1 <- dsHsWrapper c1
                                    ; w2 <- dsHsWrapper c2
                                    ; let app f a = mkCoreAppDs (text "dsHsWrapper") f a
@@ -1268,12 +1269,12 @@ ds_ev_typeable ty (EvTypeableTyApp ev1 ev2)
        ; mkTrApp <- dsLookupGlobalId mkTrAppName
                     -- mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
                     --            TypeRep a -> TypeRep b -> TypeRep (a b)
-       ; let (k1, k2) = splitFunTy (typeKind t1)
+       ; let (Weighted _ k1, k2) = splitFunTy (typeKind t1)
        ; return $ mkApps (mkTyApps (Var mkTrApp) [ k1, k2, t1, t2 ])
                          [ e1, e2 ] }
 
 ds_ev_typeable ty (EvTypeableTrFun ev1 ev2)
-  | Just (t1,t2) <- splitFunTy_maybe ty
+  | Just (Weighted _ t1,t2) <- splitFunTy_maybe ty
   = do { e1 <- getRep ev1 t1
        ; e2 <- getRep ev2 t2
        ; mkTrFun <- dsLookupGlobalId mkTrFunName

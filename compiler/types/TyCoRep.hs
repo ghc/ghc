@@ -2161,10 +2161,10 @@ substTys subst tys
 -- Note [The substitution invariant].
 -- The goal of #11371 is to migrate all the calls of substTysUnchecked to
 -- substTys and remove this function. Please don't use in new code.
-substTysUnchecked :: TCvSubst -> [Type] -> [Type]
+substTysUnchecked :: (Functor f) => TCvSubst -> f Type -> f Type
 substTysUnchecked subst tys
                  | isEmptyTCvSubst subst = tys
-                 | otherwise             = map (subst_ty subst) tys
+                 | otherwise             = fmap (subst_ty subst) tys
 
 -- | Substitute within a 'ThetaType'
 -- The substitution has to satisfy the invariants described in

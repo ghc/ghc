@@ -727,7 +727,7 @@ translateConPatVec fam_insts  univ_tys  ex_tvs c (RecCon (HsRecFields fs _))
       return (arg_var_pats ++ guards)
   where
     -- The actual argument types (instantiated)
-    arg_tys = conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs)
+    arg_tys = map weightedThing $ conLikeInstOrigArgTys c (univ_tys ++ mkTyVarTys ex_tvs) -- TODO: arnaud: probably a bug eventually, see my other comment below
 
     -- Some label information
     orig_lbls    = map flSelector $ conLikeFieldLabels c
