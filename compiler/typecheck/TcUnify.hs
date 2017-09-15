@@ -31,8 +31,6 @@ module TcUnify (
   matchActualFunTys, matchActualFunTysPart,
   matchExpectedFunKind,
 
-  wrapFunResCoercion,
-
   occCheckExpand, metaTyVarUpdateOK,
   occCheckForErrors, OccCheckResult(..)
 
@@ -64,7 +62,6 @@ import Util
 import Pair( pFst )
 import qualified GHC.LanguageExtensions as LangExt
 import Outputable
-import FastString
 
 import Control.Monad
 import Control.Arrow ( second )
@@ -829,20 +826,6 @@ tcWrapResultO orig rn_expr expr actual_ty res_ty
        ; cow <- tcSubTypeDS_NC_O orig GenSigCtxt
                                  (Just rn_expr) actual_ty res_ty
        ; return (mkHsWrap cow expr) }
-
------------------------------------
-wrapFunResCoercion
-        :: [TcType]        -- Type of args
-        -> HsWrapper       -- HsExpr a -> HsExpr b
-        -> TcM HsWrapper   -- HsExpr (arg_tys -> a) -> HsExpr (arg_tys -> b)
-wrapFunResCoercion arg_tys co_fn_res
-  | isIdHsWrapper co_fn_res
-  = return idHsWrapper
-  | null arg_tys
-  = return co_fn_res
-  | otherwise
-  = do  { arg_ids <- newSysLocalIds (fsLit "sub") arg_tys
-        ; return (mkWpLams arg_ids <.> co_fn_res <.> mkWpEvVarApps arg_ids) }
 
 
 {- **********************************************************************
