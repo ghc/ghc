@@ -302,28 +302,27 @@ exports_from_avail (Just (L _ rdr_items)) rdr_env imports this_mod
                 NoIEWildcard -> return (lname, [], [])
                 IEWildcard _ -> lookup_ie_all ie l
             let name = unLoc lname
-                subs' = map (replaceLWrappedName l . unLoc) subs
-            return (IEThingWith (replaceLWrappedName l name) wc subs'
-                                (map noLoc (flds ++ all_flds)),
+            return (IEThingWith (replaceLWrappedName l name) wc subs
+                                (flds ++ (map noLoc all_flds)),
                     AvailTC name (name : avails ++ all_avail)
-                                 (flds ++ all_flds))
-
-
+                                 (map unLoc flds ++ all_flds))
 
 
     lookup_ie _ = panic "lookup_ie"    -- Other cases covered earlier
 
+
     lookup_ie_with :: LIEWrappedName RdrName -> [LIEWrappedName RdrName]
-                   -> RnM (Located Name, [Located Name], [Name], [FieldLabel])
+                   -> RnM (Located Name, [LIEWrappedName Name], [Name],
+                           [Located FieldLabel])
     lookup_ie_with (L l rdr) sub_rdrs
         = do name <- lookupGlobalOccRn $ ieWrappedName rdr
-             (non_flds, flds) <- lookupChildrenExport name
-                                                  (map ieLWrappedName sub_rdrs)
+             (non_flds, flds) <- lookupChildrenExport name sub_rdrs
              if isUnboundName name
                 then return (L l name, [], [name], [])
                 else return (L l name, non_flds
-                            , map unLoc non_flds
-                            , map unLoc flds)
+                            , map (ieWrappedName . unLoc) non_flds
+                            , flds)
+
     lookup_ie_all :: IE GhcPs -> LIEWrappedName RdrName
                   -> RnM (Located Name, [Name], [FieldLabel])
     lookup_ie_all ie (L l rdr) =
@@ -404,8 +403,8 @@ isDoc _ = False
 
 
 
-lookupChildrenExport :: Name -> [Located RdrName]
-                     -> RnM ([Located Name], [Located FieldLabel])
+lookupChildrenExport :: Name -> [LIEWrappedName RdrName]
+                     -> RnM ([LIEWrappedName Name], [Located FieldLabel])
 lookupChildrenExport parent rdr_items =
   do
     xs <- mapAndReportM doOne rdr_items
@@ -420,11 +419,11 @@ lookupChildrenExport parent rdr_items =
           | ns == tcName  = [dataName, tcName]
           | otherwise = [ns]
         -- Process an individual child
-        doOne :: Located RdrName
-              -> RnM (Either (Located Name) (Located FieldLabel))
+        doOne :: LIEWrappedName RdrName
+              -> RnM (Either (LIEWrappedName Name) (Located FieldLabel))
         doOne n = do
 
-          let bareName = unLoc n
+          let bareName = (ieWrappedName . unLoc) n
               lkup v = lookupSubBndrOcc_helper False True
                         parent (setRdrNameSpace bareName v)
 
@@ -446,9 +445,11 @@ lookupChildrenExport parent rdr_items =
           traceRn "lookupChildrenExport" (ppr name')
 
           case name' of
-            NameNotFound -> Left . L (getLoc n) <$> reportUnboundName unboundName
+            NameNotFound -> do { ub <- reportUnboundName unboundName
+                               ; let l = getLoc n
+                               ; return (Left (L l (IEName (L l ub))))}
             FoundFL fls -> return $ Right (L (getLoc n) fls)
-            FoundName _p name -> return $ Left (L (getLoc n) name)
+            FoundName _p name -> return $ Left (replaceLWrappedName n name)
             NameErr err_msg -> reportError err_msg >> failM
             IncorrectParent p g td gs -> do
               mkDcErrMsg p g td gs >>= reportError
