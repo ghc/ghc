@@ -10,6 +10,7 @@ module GHC.Llvm.MetaData
   , ModuleFlagBehavior(..)
   , ModuleFlag(..)
   , moduleFlagToMetaExpr
+  , Distinction(..)
   ) where
 
 import GHC.Prelude
@@ -113,14 +114,17 @@ data MetaExpr = MetaStr !LMString
 data MetaAnnot = MetaAnnot LMString MetaExpr
                deriving (Eq)
 
+-- | Is a metadata node @distinct@?
+data Distinction = Distinct | NotDistinct
+
 -- | Metadata declarations. Metadata can only be declared in global scope.
 data MetaDecl
     -- | Named metadata. Only used for communicating module information to
     -- LLVM. ('!name = !{ [!\<n>] }' form).
-    = MetaNamed !LMString [MetaId]
+    = MetaNamed !LMString Distinction [MetaId]
     -- | Metadata node declaration.
     -- ('!0 = metadata !{ \<metadata expression> }' form).
-    | MetaUnnamed !MetaId !MetaExpr
+    | MetaUnnamed !MetaId Distinction !MetaExpr
 
 ----------------------------------------------------------------
 -- Module flags

@@ -443,7 +443,7 @@ getUniqMeta s = getEnv (flip lookupUFM s . envUniqMeta)
 addSubprogram :: MetaId -> MetaExpr -> LlvmM ()
 addSubprogram metaId metaExpr = do
     modifyEnv $ \env -> env { envSubprograms = metaId : envSubprograms env }
-    addMetaDecl (MetaUnnamed metaId metaExpr)
+    addMetaDecl (MetaUnnamed metaId Distinct metaExpr)
 
 getSubprograms :: LlvmM [MetaId]
 getSubprograms = LlvmM $ \env -> return (envSubprograms env, env { envSubprograms = [] })
