@@ -42,6 +42,7 @@ module GHC.Llvm (
 
         -- ** Metadata types
         MetaExpr(..), MetaAnnot(..), MetaDecl(..), MetaId(..),
+        Distinction(..),
         -- *** Module flags
         ModuleFlagBehavior(..),
         ModuleFlag(..),

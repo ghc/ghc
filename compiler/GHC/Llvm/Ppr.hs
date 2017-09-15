@@ -133,16 +133,19 @@ ppLlvmMetas opts metas = lines_ $ map (ppLlvmMeta opts) metas
 
 -- | Print out an LLVM metadata definition.
 ppLlvmMeta :: IsLine doc => LlvmCgConfig -> MetaDecl -> doc
-ppLlvmMeta opts (MetaUnnamed n m)
-  = ppMetaId n <+> equals <+> ppMetaExpr opts m
+ppLlvmMeta opts (MetaUnnamed n d m)
+  = ppMetaId n <+> equals <+> ppDistinction d <+> ppMetaExpr opts m
 
-ppLlvmMeta _opts (MetaNamed n m)
-  = exclamation <> ftext n <+> equals <+> exclamation <> braces nodes
+ppLlvmMeta _opts (MetaNamed n d m)
+  = exclamation <> ftext n <+> equals <+> ppDistinction d <+> exclamation <> braces nodes
   where
     nodes = hcat $ intersperse comma $ map ppMetaId m
 {-# SPECIALIZE ppLlvmMeta :: LlvmCgConfig -> MetaDecl -> SDoc #-}
 {-# SPECIALIZE ppLlvmMeta :: LlvmCgConfig -> MetaDecl -> HLine #-} -- see Note [SPECIALIZE to HDoc] in GHC.Utils.Outputable
 
+ppDistinction :: IsLine doc => Distinction -> doc
+ppDistinction Distinct    = text "distinct"
+ppDistinction NotDistinct = empty
 
 -- | Print out a list of function definitions.
 ppLlvmFunctions :: IsDoc doc => LlvmCgConfig -> LlvmFunctions -> doc
