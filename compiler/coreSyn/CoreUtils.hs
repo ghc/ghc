@@ -2073,7 +2073,7 @@ tryEtaReduce bndrs body
       -- Float app ticks: \x -> Tick t (e x) ==> Tick t e
 
     go (b : bs) (App fun arg) co
-      | Just (co', ticks) <- ok_arg b arg co
+      | Just (co', ticks) <- ok_arg b arg co (exprType fun)
       = fmap (flip (foldr mkTick) ticks) $ go bs fun co'
             -- Float arg ticks: \x -> e (Tick t x) ==> Tick t e
 
@@ -2108,28 +2108,32 @@ tryEtaReduce bndrs body
     ok_arg :: Var              -- Of type bndr_t
            -> CoreExpr         -- Of type arg_t
            -> Coercion         -- Of kind (t1~t2)
+           -> Type             -- Type of the function to which the argument is applied
            -> Maybe (Coercion  -- Of type (arg_t -> t1 ~  bndr_t -> t2)
                                --   (and similarly for tyvars, coercion args)
                     , [Tickish Var])
     -- See Note [Eta reduction with casted arguments]
-    ok_arg bndr (Type ty) co
+    ok_arg bndr (Type ty) co _
        | Just tv <- getTyVar_maybe ty
        , bndr == tv  = Just (mkHomoForAllCos [tv] co, [])
-    ok_arg bndr (Var v) co
-       | bndr == v   = let reflCo = mkRepReflCo (idType bndr)
-                           weight = idWeight v
-                       in Just (mkFunCo Representational weight reflCo co, [])
-    ok_arg bndr (Cast e co_arg) co
+    ok_arg bndr (Var v) co fun_ty
+       | bndr == v
+       , let weight = idWeight v
+       , Just (Weighted fun_weight _, _) <- splitFunTy_maybe fun_ty -- TODO: arnaud: it is probably a bit slow to compute the type every time but it simplifies the implementation tremendously for now
+       , weight == fun_weight -- There is no change in multiplicity, otherwise we must abort
+       = let reflCo = mkRepReflCo (idType bndr)
+         in Just (mkFunCo Representational weight reflCo co, [])
+    ok_arg bndr (Cast e co_arg) co _
        | (ticks, Var v) <- stripTicksTop tickishFloatable e
        , bndr == v
        = Just (mkFunCo Representational (idWeight v) (mkSymCo co_arg) co, ticks)
        -- The simplifier combines multiple casts into one,
        -- so we can have a simple-minded pattern match here
-    ok_arg bndr (Tick t arg) co
-       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co
+    ok_arg bndr (Tick t arg) co fun_ty
+       | tickishFloatable t, Just (co', ticks) <- ok_arg bndr arg co fun_ty
        = Just (co', t:ticks)
 
-    ok_arg _ _ _ = Nothing
+    ok_arg _ _ _ _ = Nothing
 
 {-
 Note [Eta reduction of an eval'd function]
