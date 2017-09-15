@@ -12,6 +12,7 @@
 {-# LANGUAGE ExplicitNamespaces     #-}
 {-# LANGUAGE MultiParamTypeClasses  #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TypeInType             #-}
 {-# LANGUAGE Trustworthy            #-}
 
 -----------------------------------------------------------------------------
