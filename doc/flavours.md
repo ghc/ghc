@@ -35,8 +35,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>default<br></td>
-    <td>-O<br>-H32m<br></td>
-    <td>-O2<br>-H32m</td>
+    <td>-O<br>-H64m<br></td>
+    <td>-O2<br>-H64m</td>
     <td></td>
     <td></td>
     <td></td>
@@ -46,8 +46,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>quick</td>
-    <td>-O0<br>-H32m</td>
-    <td>-O0<br>-H32m</td>
+    <td>-O0<br>-H64m</td>
+    <td>-O0<br>-H64m</td>
     <td></td>
     <td>-O</td>
     <td>-O</td>
@@ -57,8 +57,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>quickest</td>
-    <td>-O0<br>-H32m</td>
-    <td>-O0<br>-H32m</td>
+    <td>-O0<br>-H64m</td>
+    <td>-O0<br>-H64m</td>
     <td></td>
     <td></td>
     <td>-O</td>
@@ -68,8 +68,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>perf</td>
-    <td>-O<br>-H32m</td>
-    <td>-O<br>-H32m</td>
+    <td>-O<br>-H64m</td>
+    <td>-O<br>-H64m</td>
     <td></td>
     <td>-O2</td>
     <td>-O</td>
@@ -79,8 +79,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>prof</td>
-    <td>-O0<br>-H32m</td>
-    <td>-O0<br>-H32m</td>
+    <td>-O0<br>-H64m</td>
+    <td>-O0<br>-H64m</td>
     <td></td>
     <td>-O</td>
     <td>-O</td>
@@ -90,8 +90,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>devel1</td>
-    <td>-O<br>-H32m</td>
-    <td>-O<br>-H32m</td>
+    <td>-O<br>-H64m</td>
+    <td>-O<br>-H64m</td>
     <td></td>
     <td>-dcore-lint</td>
     <td>-O0<br>-DDEBUG</td>
@@ -101,8 +101,8 @@ when compiling the `compiler` library, and `hsGhc` when compiling/linking the GH
   </tr>
   <tr>
     <th>devel2</td>
-    <td>-O<br>-H32m</td>
-    <td>-O<br>-H32m</td>
+    <td>-O<br>-H64m</td>
+    <td>-O<br>-H64m</td>
     <td></td>
     <td>-dcore-lint</td>
     <td></td>
