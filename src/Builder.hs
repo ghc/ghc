@@ -185,7 +185,7 @@ instance H.Builder Builder where
                     -- otherwise Windows breaks. TODO: Figure out why.
                     bash <- bashPath
                     let env = AddEnv "CONFIG_SHELL" bash
-                    cmd Shell echo env [Cwd dir] [path] buildOptions buildArgs
+                    cmd echo env [Cwd dir] ["sh", path] buildOptions buildArgs
 
                 HsCpp    -> captureStdout
                 GenApply -> captureStdout
@@ -195,16 +195,15 @@ instance H.Builder Builder where
                     Stdout stdout <- cmd (Stdin stdin) [path] buildArgs
                     writeFileChanged output stdout
 
-                Make dir -> cmd Shell echo path ["-C", dir] buildArgs
+                Make dir -> cmd echo path ["-C", dir] buildArgs
 
                 Xelatex -> do
-                    unit $ cmd Shell [Cwd output] [path] buildArgs
-                    unit $ cmd Shell [Cwd output] [path] buildArgs
-                    unit $ cmd Shell [Cwd output] [path] buildArgs
-                    unit $ cmd Shell [Cwd output] ["makeindex"]
-                                     (input -<.> "idx")
-                    unit $ cmd Shell [Cwd output] [path] buildArgs
-                    cmd Shell [Cwd output] [path] buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] ["makeindex"] (input -<.> "idx")
+                    unit $ cmd [Cwd output] [path]        buildArgs
+                    unit $ cmd [Cwd output] [path]        buildArgs
 
                 _  -> cmd echo [path] buildArgs
 
@@ -226,7 +225,7 @@ systemBuilderPath builder = case builder of
     Cc  _  Stage0   -> fromKey "system-cc"
     Cc  _  _        -> fromKey "cc"
     -- We can't ask configure for the path to configure!
-    Configure _     -> return "sh configure"
+    Configure _     -> return "configure"
     Ghc _  Stage0   -> fromKey "system-ghc"
     GhcPkg _ Stage0 -> fromKey "system-ghc-pkg"
     Happy           -> fromKey "happy"
@@ -266,7 +265,7 @@ applyPatch dir patch = do
     needBuilder Patch
     path <- builderPath Patch
     putBuild $ "| Apply patch " ++ file
-    quietly $ cmd Shell [Cwd dir] [path, "-p0 <", patch]
+    quietly $ cmd [Cwd dir, FileStdin file] [path, "-p0"]
 
 -- | Install a directory.
 installDirectory :: FilePath -> Action ()
