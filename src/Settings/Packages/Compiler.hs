@@ -43,4 +43,4 @@ compilerPackageArgs = package compiler ? do
               , ghcProfiled <$> flavour ?
                 notStage0 ? arg "--ghc-pkg-option=--force" ]
 
-            , builder Haddock ? arg ("--optghc=-I" ++ path) ]
+            , builder (Haddock BuildPackage) ? arg ("--optghc=-I" ++ path) ]

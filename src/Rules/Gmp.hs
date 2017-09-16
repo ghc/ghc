@@ -104,7 +104,7 @@ gmpRules = do
         withTempDir $ \dir -> do
             let tmp = unifyPath dir
             need [tarball]
-            build $ target gmpContext Tar [tarball] [tmp]
+            build $ target gmpContext (Tar Extract) [tarball] [tmp]
 
             let patch     = gmpBase -/- "gmpsrc.patch"
                 patchName = takeFileName patch

@@ -77,7 +77,9 @@ executable hadrian
                        , Settings.Builders.HsCpp
                        , Settings.Builders.Ld
                        , Settings.Builders.Make
+                       , Settings.Builders.Sphinx
                        , Settings.Builders.Tar
+                       , Settings.Builders.Xelatex
                        , Settings.Default
                        , Settings.Flavours.Development
                        , Settings.Flavours.Performance

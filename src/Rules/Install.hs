@@ -210,9 +210,6 @@ installPackages = do
                 quietly $ copyDirectoryContentsUntracked (Not excluded)
                     installDistDir (installDistDir -/- "build")
 
-                whenM (isSpecified HsColour) $
-                    build $ target context GhcCabalHsColour [cabalFile] []
-
                 pref <- setting InstallPrefix
                 unit $ cmd ghcCabalInplace [ "copy"
                                            , pkgPath pkg

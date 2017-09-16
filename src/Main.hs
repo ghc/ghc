@@ -9,6 +9,7 @@ import qualified CommandLine
 import qualified Environment
 import qualified Rules
 import qualified Rules.Clean
+import qualified Rules.Documentation
 import qualified Rules.Install
 import qualified Rules.SourceDist
 import qualified Rules.Selftest
@@ -38,6 +39,7 @@ main = do
         rules :: Rules ()
         rules = do
             Rules.buildRules
+            Rules.Documentation.documentationRules
             Rules.Clean.cleanRules
             Rules.Install.installRules
             Rules.oracleRules

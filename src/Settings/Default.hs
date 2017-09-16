@@ -27,7 +27,9 @@ import Settings.Builders.Hsc2Hs
 import Settings.Builders.HsCpp
 import Settings.Builders.Ld
 import Settings.Builders.Make
+import Settings.Builders.Sphinx
 import Settings.Builders.Tar
+import Settings.Builders.Xelatex
 import Settings.Packages.Base
 import Settings.Packages.Cabal
 import Settings.Packages.Compiler
@@ -148,7 +150,6 @@ defaultBuilderArgs = mconcat
     , ghcBuilderArgs
     , ghcCbuilderArgs
     , ghcCabalBuilderArgs
-    , ghcCabalHsColourBuilderArgs
     , ghcMBuilderArgs
     , ghcPkgBuilderArgs
     , haddockBuilderArgs
@@ -157,7 +158,9 @@ defaultBuilderArgs = mconcat
     , hsCppBuilderArgs
     , ldBuilderArgs
     , makeBuilderArgs
-    , tarBuilderArgs ]
+    , sphinxBuilderArgs
+    , tarBuilderArgs
+    , xelatexBuilderArgs ]
 
 -- TODO: Disable warnings for Windows specifics.
 -- TODO: Move this elsewhere?

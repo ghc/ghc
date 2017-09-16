@@ -88,7 +88,7 @@ libffiRules = do
         removeDirectory (root -/- libname)
         -- TODO: Simplify.
         actionFinally (do
-            build $ target libffiContext Tar [tarball] [root]
+            build $ target libffiContext (Tar Extract) [tarball] [root]
             moveDirectory (root -/- libname) libffiPath) $
                 removeFiles root [libname <//> "*"]
 

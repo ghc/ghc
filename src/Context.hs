@@ -109,10 +109,10 @@ pkgSetupConfigFile context = do
 -- | Path to the haddock file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/doc/html/array/array.haddock@.
 pkgHaddockFile :: Context -> Action FilePath
-pkgHaddockFile context@Context {..} = do
-    path <- buildPath context
+pkgHaddockFile Context {..} = do
+    root <- buildRoot
     let name = pkgName package
-    return $ path -/- "doc/html" -/- name -/- name <.> "haddock"
+    return $ root -/- "docs/html/libraries" -/- name -/- name <.> "haddock"
 
 -- | Path to the library file of a given 'Context', e.g.:
 -- @_build/stage1/libraries/array/build/libHSarray-0.5.1.0.a@.

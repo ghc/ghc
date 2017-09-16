@@ -10,12 +10,12 @@ ar             = @ArCmd@
 cc             = @CC@
 happy          = @HappyCmd@
 hs-cpp         = @HaskellCPPCmd@
-hscolour       = @HSCOLOUR@
 ld             = @LdCmd@
 make           = @MakeCmd@
 nm             = @NmCmd@
 objdump        = @ObjdumpCmd@
 ranlib         = @REAL_RANLIB_CMD@
+sphinx-build   = @SPHINXBUILD@
 system-ar      = @AR_STAGE0@
 system-cc      = @CC_STAGE0@
 system-ghc     = @WithGhc@
@@ -24,6 +24,7 @@ tar            = @TarCmd@
 patch          = @PatchCmd@
 perl           = @PerlCmd@
 ln-s           = @LN_S@
+xelatex        = @XELATEX@
 
 # Information about builders:
 #============================

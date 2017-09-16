@@ -1,5 +1,5 @@
 module Settings.Builders.GhcCabal (
-    ghcCabalBuilderArgs, ghcCabalHsColourBuilderArgs
+    ghcCabalBuilderArgs
     ) where
 
 import Hadrian.Haskell.Cabal
@@ -21,7 +21,6 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , withStaged (GhcPkg Update)
             , bootPackageDatabaseArgs
             , libraryArgs
-            , with HsColour
             , configureArgs
             , bootPackageConstraints
             , withStaged $ Cc CompileC
@@ -31,13 +30,6 @@ ghcCabalBuilderArgs = builder GhcCabal ? do
             , with Happy
             , verbosity < Chatty ? pure [ "-v0", "--configure-option=--quiet"
                 , "--configure-option=--disable-option-checking"  ] ]
-
-ghcCabalHsColourBuilderArgs :: Args
-ghcCabalHsColourBuilderArgs = builder GhcCabalHsColour ? do
-    srcPath <- pkgPath <$> getPackage
-    top     <- expr topDirectory
-    path    <- getBuildPath
-    pure [ "hscolour", srcPath, top -/- path ]
 
 -- TODO: Isn't vanilla always built? If yes, some conditions are redundant.
 -- TODO: Need compiler_stage1_CONFIGURE_OPTS += --disable-library-for-ghci?
@@ -110,7 +102,6 @@ withBuilderKey b = case b of
     Alex       -> "--with-alex="
     Happy      -> "--with-happy="
     GhcPkg _ _ -> "--with-ghc-pkg="
-    HsColour   -> "--with-hscolour="
     _          -> error $ "withBuilderKey: not supported builder " ++ show b
 
 -- Expression 'with Alex' appends "--with-alex=/path/to/alex" and needs Alex.

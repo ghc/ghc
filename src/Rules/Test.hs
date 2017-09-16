@@ -31,7 +31,7 @@ testRules = do
         top      <- topDirectory
         compiler <- builderPath $ Ghc CompileHs Stage2
         ghcPkg   <- builderPath $ GhcPkg Update Stage1
-        haddock  <- builderPath Haddock
+        haddock  <- builderPath (Haddock BuildPackage)
         threads  <- shakeThreads <$> getShakeOptions
         debugged <- ghcDebugged <$> flavour
         ghcWithNativeCodeGenInt <- fromEnum <$> ghcWithNativeCodeGen

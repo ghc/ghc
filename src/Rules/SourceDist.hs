@@ -19,7 +19,7 @@ sourceDistRules = do
             dropTarXz = dropExtension . dropExtension
             treePath  = "sdistprep/ghc" -/- dropTarXz tarName
         prepareTree treePath
-        runBuilderWithCmdOptions [Cwd "sdistprep/ghc"] Tar
+        runBuilderWithCmdOptions [Cwd "sdistprep/ghc"] (Tar Create)
             ["cJf", ".." -/- tarName,  dropTarXz tarName]
             ["cJf", ".." -/- tarName] [dropTarXz tarName]
     "GIT_COMMIT_ID" %> \fname ->
