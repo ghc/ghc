@@ -26,6 +26,7 @@ module GHC.ST (
 
 import GHC.Base
 import GHC.Show
+import qualified Control.Monad.Fail as Fail
 
 default ()
 
