@@ -429,7 +429,9 @@ eval_obj:
             // https://ghc.haskell.org/trac/ghc/wiki/Commentary/Rts/HaskellExecution/PointerTagging
             tagged_obj =
                 newEmptyPAP(cap,
-                            arity <= TAG_MASK ? obj + arity : obj,
+                            arity <= TAG_MASK
+                              ? (StgClosure *) ((intptr_t) obj + arity)
+                              : obj,
                             arity);
         }
 #endif
