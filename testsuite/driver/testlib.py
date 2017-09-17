@@ -23,7 +23,7 @@ import subprocess
 
 from testglobals import *
 from testutil import *
-from perf_notes import collect_stats, evaluate_metric
+from perf_notes import collect_compiler_stats, collect_stats, evaluate_metric
 extra_src_files = {'T4198': ['exitminus1.c']} # TODO: See #12223
 
 if config.use_threads:
