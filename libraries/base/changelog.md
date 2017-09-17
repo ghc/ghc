@@ -40,6 +40,8 @@
 
   * Add `Data` instances for `IntPtr` and `WordPtr` (#13115)
 
+  * Add missing `MonadFail` instance for `Control.Monad.Strict.ST.ST`
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 
