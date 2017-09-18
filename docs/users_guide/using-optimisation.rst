@@ -182,6 +182,16 @@ by saying ``-fno-wombat``.
 
     Enable call-arity analysis.
 
+.. ghc-flag:: -fexitification
+    :shortdesc: Enables exitification optimisation. Implied by :ghc-flag:`-O`.
+    :type: dynamic
+    :reverse: -fno-exitification
+    :category:
+
+    :default: on
+
+    Enables the floating of exit paths out of recursive functions.
+
 .. ghc-flag:: -fcmm-elim-common-blocks
     :shortdesc: Enable Cmm common block elimination. Implied by :ghc-flag:`-O`.
     :type: dynamic

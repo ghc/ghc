@@ -43,6 +43,7 @@ import Specialise       ( specProgram)
 import SpecConstr       ( specConstrProgram)
 import DmdAnal          ( dmdAnalProgram )
 import CallArity        ( callArityAnalProgram )
+import Exitify          ( exitifyProgram )
 import WorkWrap         ( wwTopBinds )
 import Vectorise        ( vectorise )
 import SrcLoc
@@ -120,6 +121,7 @@ getCoreToDo dflags
     max_iter      = maxSimplIterations dflags
     rule_check    = ruleCheck          dflags
     call_arity    = gopt Opt_CallArity                    dflags
+    exitification = gopt Opt_Exitification                dflags
     strictness    = gopt Opt_Strictness                   dflags
     full_laziness = gopt Opt_FullLaziness                 dflags
     do_specialise = gopt Opt_Specialise                   dflags
@@ -140,20 +142,23 @@ getCoreToDo dflags
     maybe_strictness_before phase
       = runWhen (phase `elem` strictnessBefore dflags) CoreDoStrictness
 
-    base_mode = SimplMode { sm_phase      = panic "base_mode"
-                          , sm_names      = []
-                          , sm_dflags     = dflags
-                          , sm_rules      = rules_on
-                          , sm_eta_expand = eta_expand_on
-                          , sm_inline     = True
-                          , sm_case_case  = True }
+    base_mode = SimplMode { sm_phase               = panic "base_mode"
+                          , sm_names               = []
+                          , sm_dflags              = dflags
+                          , sm_rules               = rules_on
+                          , sm_eta_expand          = eta_expand_on
+                          , sm_inline              = True
+                          , sm_case_case           = True
+                          , sm_preserve_exit_joins = True}
 
     simpl_phase phase names iter
       = CoreDoPasses
       $   [ maybe_strictness_before phase
           , CoreDoSimplify iter
                 (base_mode { sm_phase = Phase phase
-                           , sm_names = names })
+                           , sm_names = names
+                           , sm_preserve_exit_joins = names /= ["final"]
+                           })
 
           , maybe_rule_check (Phase phase) ]
 
@@ -244,6 +249,9 @@ getCoreToDo dflags
 
         -- initial simplify: mk specialiser happy: minimum effort please
         simpl_gently,
+
+        -- Exitification
+        runWhen exitification CoreDoExitify,
 
         -- Specialisation is best done before full laziness
         -- so that overloaded functions have all their dictionary lambdas manifest
@@ -473,6 +481,9 @@ doCorePass CoreDoStaticArgs          = {-# SCC "StaticArgs" #-}
 
 doCorePass CoreDoCallArity           = {-# SCC "CallArity" #-}
                                        doPassD callArityAnalProgram
+
+doCorePass CoreDoExitify             = {-# SCC "Exitify" #-}
+                                       doPass exitifyProgram
 
 doCorePass CoreDoStrictness          = {-# SCC "NewStranal" #-}
                                        doPassDFM dmdAnalProgram
