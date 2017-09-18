@@ -20,15 +20,6 @@
 typedef void SymbolAddr;
 typedef char SymbolName;
 
-/* See Linker.c Note [runtime-linker-phases] */
-typedef enum {
-    OBJECT_LOADED,
-    OBJECT_NEEDED,
-    OBJECT_RESOLVED,
-    OBJECT_UNLOADED,
-    OBJECT_DONT_RESOLVE
-} OStatus;
-
 /* Indication of section kinds for loaded objects.  Needed by
    the GC for deciding whether or not a pointer on the stack
    is a code pointer.

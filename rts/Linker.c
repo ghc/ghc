@@ -1708,6 +1708,30 @@ HsInt purgeObj (pathchar *path)
     return r;
 }
 
+static OStatus getObjectLoadStatus_ (pathchar *path)
+{
+    ObjectCode *o;
+    for (o = objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return o->status;
+       }
+    }
+    for (o = unloaded_objects; o; o = o->next) {
+       if (0 == pathcmp(o->fileName, path)) {
+           return o->status;
+       }
+    }
+    return OBJECT_NOT_LOADED;
+}
+
+OStatus getObjectLoadStatus (pathchar *path)
+{
+    ACQUIRE_LOCK(&linker_mutex);
+    OStatus r = getObjectLoadStatus_(path);
+    RELEASE_LOCK(&linker_mutex);
+    return r;
+}
+
 /* -----------------------------------------------------------------------------
  * Sanity checking.  For each ObjectCode, maintain a list of address ranges
  * which may be prodded during relocation, and abort if we try and write
