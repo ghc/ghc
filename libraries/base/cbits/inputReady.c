@@ -17,6 +17,9 @@
  * descriptor 'fd' within 'msecs' milliseconds (or indefinitely if 'msecs' is
  * negative). "Input is available" is defined as 'can I safely read at least a
  * *character* from this file object without blocking?'
+ *
+ * This function blocks until either `msecs` have passed, or input is
+ * available.
  */
 int
 fdReady(int fd, int write, int msecs, int isSock)
@@ -100,7 +103,7 @@ fdReady(int fd, int write, int msecs, int isSock)
     } else {
         DWORD rc;
         HANDLE hFile = (HANDLE)_get_osfhandle(fd);
-        DWORD avail;
+        DWORD avail = 0;
 
         Time remaining = MSToTime(msecs);
 
@@ -187,23 +190,34 @@ fdReady(int fd, int write, int msecs, int isSock)
                 // WaitForMultipleObjects() doesn't work for pipes (it
                 // always returns WAIT_OBJECT_0 even when no data is
                 // available).  If the HANDLE is a pipe, therefore, we try
-                // PeekNamedPipe:
+                // PeekNamedPipe():
                 //
-                rc = PeekNamedPipe( hFile, NULL, 0, NULL, &avail, NULL );
-                if (rc != 0) {
-                    if (avail != 0) {
-                        return 1;
+                // PeekNamedPipe() does not block, so if it returns that
+                // there is no new data, we have to sleep and try again.
+                while (avail == 0) {
+                    rc = PeekNamedPipe( hFile, NULL, 0, NULL, &avail, NULL );
+                    if (rc != 0) {
+                        if (avail != 0) {
+                            return 1;
+                        } else { // no new data
+                            if (msecs > 0) {
+                                Time now = getProcessElapsedTime();
+                                if (now >= endTime) return 0;
+                                Sleep(1); // 1 millisecond (smallest possible time on Windows)
+                                continue;
+                            } else {
+                                return 0;
+                            }
+                        }
                     } else {
-                        return 0;
-                    }
-                } else {
-                    rc = GetLastError();
-                    if (rc == ERROR_BROKEN_PIPE) {
-                        return 1; // this is probably what we want
-                    }
-                    if (rc != ERROR_INVALID_HANDLE && rc != ERROR_INVALID_FUNCTION) {
-                        maperrno();
-                        return -1;
+                        rc = GetLastError();
+                        if (rc == ERROR_BROKEN_PIPE) {
+                            return 1; // this is probably what we want
+                        }
+                        if (rc != ERROR_INVALID_HANDLE && rc != ERROR_INVALID_FUNCTION) {
+                            maperrno();
+                            return -1;
+                        }
                     }
                 }
                 /* PeekNamedPipe didn't work - fall through to the general case */
