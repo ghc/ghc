@@ -1559,11 +1559,22 @@ neededEvVars :: (EvBindMap, TcTyVarSet) -> VarSet -> VarSet
 -- Find all the evidence variables that are "needed",
 --    and then delete all those bound by the evidence bindings
 -- See Note [Tracking redundant constraints]
+--
+--   - Start from initial_seeds (from nested implications)
+--   - Add free vars of RHS of all Wanted evidence bindings
+--     and coercion variables accumulated in tcvs (all Wanted)
+--   - Do transitive closure through Given bindings
+--     e.g.   Neede {a,b}
+--            Given  a = sc_sel a2
+--            Then a2 is needed too
+--   - Finally delete all the binders of the evidence bindings
+--
 neededEvVars (ev_binds, tcvs) initial_seeds
- = (needed `unionVarSet` tcvs) `minusVarSet` bndrs
+ = needed `minusVarSet` bndrs
  where
-   seeds  = foldEvBindMap add_wanted initial_seeds ev_binds
    needed = transCloVarSet also_needs seeds
+   seeds  = foldEvBindMap add_wanted initial_seeds ev_binds
+            `unionVarSet` tcvs
    bndrs  = foldEvBindMap add_bndr emptyVarSet ev_binds
 
    add_wanted :: EvBind -> VarSet -> VarSet
