@@ -33,7 +33,7 @@ module TcEvidence (
   mkTcKindCo,
   tcCoercionKind, coVarsOfTcCo,
   mkTcCoVarCo,
-  isTcReflCo, isTcReflexiveCo,
+  isTcReflCo,
   tcCoercionRole,
   unwrapIP, wrapIP
   ) where
@@ -115,10 +115,6 @@ tcCoercionRole         :: TcCoercion -> Role
 coVarsOfTcCo           :: TcCoercion -> TcTyCoVarSet
 isTcReflCo             :: TcCoercion -> Bool
 
--- | This version does a slow check, calculating the related types and seeing
--- if they are equal.
-isTcReflexiveCo        :: TcCoercion -> Bool
-
 mkTcReflCo             = mkReflCo
 mkTcSymCo              = mkSymCo
 mkTcTransCo            = mkTransCo
@@ -147,7 +143,7 @@ tcCoercionKind         = coercionKind
 tcCoercionRole         = coercionRole
 coVarsOfTcCo           = coVarsOfCo
 isTcReflCo             = isReflCo
-isTcReflexiveCo        = isReflexiveCo
+
 
 {-
 %************************************************************************

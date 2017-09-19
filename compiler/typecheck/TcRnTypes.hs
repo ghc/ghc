@@ -106,7 +106,7 @@ module TcRnTypes(
         termEvidenceAllowed,
 
         CtEvidence(..), TcEvDest(..),
-        mkKindLoc, toKindLoc, mkGivenLoc,
+        mkGivenLoc, mkKindLoc, toKindLoc,
         isWanted, isGiven, isDerived, isGivenOrWDeriv,
         ctEvRole,
 
@@ -1586,7 +1586,7 @@ data Ct
        --   * tv not in tvs(rhs)   (occurs check)
        --   * If tv is a TauTv, then rhs has no foralls
        --       (this avoids substituting a forall for the tyvar in other types)
-       --   * typeKind ty `tcEqKind` typeKind tv; Note [Ct kind invariant]
+       --   * typeKind ty `tcEqKind` typeKind tv
        --   * rhs may have at most one top-level cast
        --   * rhs (perhaps under the one cast) is not necessarily function-free,
        --       but it has no top-level function.
@@ -1609,7 +1609,7 @@ data Ct
   | CFunEqCan {  -- F xis ~ fsk
        -- Invariants:
        --   * isTypeFamilyTyCon cc_fun
-       --   * typeKind (F xis) = tyVarKind fsk; Note [Ct kind invariant]
+       --   * typeKind (F xis) = tyVarKind fsk
        --   * always Nominal role
       cc_ev     :: CtEvidence,  -- See Note [Ct/evidence invariant]
       cc_fun    :: TyCon,       -- A type function
@@ -1686,14 +1686,6 @@ built (in TcCanonical).
 In contrast, the type of the evidence *term* (ctev_dest / ctev_evar) in
 the evidence may *not* be fully zonked; we are careful not to look at it
 during constraint solving. See Note [Evidence field of CtEvidence].
-
-Note [Ct kind invariant]
-~~~~~~~~~~~~~~~~~~~~~~~~
-CTyEqCan and CFunEqCan both require that the kind of the lhs matches the kind
-of the rhs. This is necessary because both constraints are used for substitutions
-during solving. If the kinds differed, then the substitution would take a well-kinded
-type to an ill-kinded one.
-
 -}
 
 mkNonCanonical :: CtEvidence -> Ct
@@ -2879,19 +2871,24 @@ The 'CtLoc' gives information about where a constraint came from.
 This is important for decent error message reporting because
 dictionaries don't appear in the original source code.
 type will evolve...
-
 -}
 
 data CtLoc = CtLoc { ctl_origin :: CtOrigin
                    , ctl_env    :: TcLclEnv
                    , ctl_t_or_k :: Maybe TypeOrKind  -- OK if we're not sure
                    , ctl_depth  :: !SubGoalDepth }
-
   -- The TcLclEnv includes particularly
   --    source location:  tcl_loc   :: RealSrcSpan
   --    context:          tcl_ctxt  :: [ErrCtxt]
   --    binder stack:     tcl_bndrs :: TcIdBinderStack
   --    level:            tcl_tclvl :: TcLevel
+
+mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
+mkGivenLoc tclvl skol_info env
+  = CtLoc { ctl_origin = GivenOrigin skol_info
+          , ctl_env    = env { tcl_tclvl = tclvl }
+          , ctl_t_or_k = Nothing    -- this only matters for error msgs
+          , ctl_depth  = initialSubGoalDepth }
 
 mkKindLoc :: TcType -> TcType   -- original *types* being compared
           -> CtLoc -> CtLoc
@@ -2902,13 +2899,6 @@ mkKindLoc s1 s2 loc = setCtLocOrigin (toKindLoc loc)
 -- | Take a CtLoc and moves it to the kind level
 toKindLoc :: CtLoc -> CtLoc
 toKindLoc loc = loc { ctl_t_or_k = Just KindLevel }
-
-mkGivenLoc :: TcLevel -> SkolemInfo -> TcLclEnv -> CtLoc
-mkGivenLoc tclvl skol_info env
-  = CtLoc { ctl_origin = GivenOrigin skol_info
-          , ctl_env    = env { tcl_tclvl = tclvl }
-          , ctl_t_or_k = Nothing    -- this only matters for error msgs
-          , ctl_depth  = initialSubGoalDepth }
 
 ctLocEnv :: CtLoc -> TcLclEnv
 ctLocEnv = ctl_env

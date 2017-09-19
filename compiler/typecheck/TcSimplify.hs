@@ -614,7 +614,7 @@ simplifyInfer rhs_tclvl infer_mode sigs name_taus wanteds
        ; wanted_transformed_incl_derivs
             <- setTcLevel rhs_tclvl $
                runTcSWithEvBinds ev_binds_var $
-               do { let loc         = mkGivenLoc rhs_tclvl UnkSkol tc_lcl_env
+               do { let loc = mkGivenLoc rhs_tclvl UnkSkol tc_lcl_env
                         psig_givens = mkGivens loc psig_theta_vars
                   ; _ <- solveSimpleGivens psig_givens
                          -- See Note [Add signature contexts as givens]
@@ -1998,8 +1998,7 @@ floatEqualities skols no_given_eqs
     skol_set = mkVarSet skols
     (float_eqs, remaining_simples) = partitionBag (usefulToFloat skol_set) simples
 
-usefulToFloat :: VarSet        -- ^ the skolems in the implication
-              -> Ct -> Bool
+usefulToFloat :: VarSet -> Ct -> Bool
 usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalised
   = is_meta_var_eq pred &&
     (tyCoVarsOfType pred `disjointVarSet` skol_set)
@@ -2011,7 +2010,6 @@ usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalis
       -- See Note [Which equalities to float]
     is_meta_var_eq pred
       | EqPred NomEq ty1 ty2 <- classifyPredType pred
-      , is_homogeneous ty1 ty2
       = case (tcGetTyVar_maybe ty1, tcGetTyVar_maybe ty2) of
           (Just tv1, _) -> float_tv_eq tv1 ty2
           (_, Just tv2) -> float_tv_eq tv2 ty1
@@ -2022,17 +2020,6 @@ usefulToFloat skol_set ct   -- The constraint is un-flattened and de-canonicalis
     float_tv_eq tv1 ty2  -- See Note [Which equalities to float]
       =  isMetaTyVar tv1
       && (not (isSigTyVar tv1) || isTyVarTy ty2)
-
-    is_homogeneous ty1 ty2
-      = not has_heterogeneous_form ||  -- checking the shape is quicker
-                                       -- than looking at kinds
-        typeKind ty1 `tcEqType` typeKind ty2
-
-    has_heterogeneous_form = case ct of
-      CIrredEvCan {}   -> True
-      CNonCanonical {} -> True
-      _                -> False
-
 
 {- Note [Float equalities from under a skolem binding]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2063,22 +2050,13 @@ Which equalities should we float?  We want to float ones where there
 is a decent chance that floating outwards will allow unification to
 happen.  In particular:
 
-   Float out homogeneous equalities of form (alpha ~ ty) or (ty ~ alpha), where
+   Float out equalities of form (alpha ~ ty) or (ty ~ alpha), where
 
    * alpha is a meta-tyvar.
 
    * And 'alpha' is not a SigTv with 'ty' being a non-tyvar.  In that
      case, floating out won't help either, and it may affect grouping
      of error messages.
-
-Why homogeneous (i.e., the kinds of the types are the same)? Because heterogeneous
-equalities have derived kind equalities. See Note [Equalities with incompatible kinds]
-in TcCanonical. If we float out a hetero equality, then it will spit out the
-same derived kind equality again, which might create duplicate error messages.
-Instead, we do float out the kind equality (if it's worth floating out, as
-above). If/when we solve it, we'll be able to rewrite the original hetero equality
-to be homogeneous, and then perhaps make progress / float it out. The duplicate
-error message was spotted in typecheck/should_fail/T7368.
 
 Note [Skolem escape]
 ~~~~~~~~~~~~~~~~~~~~
@@ -2214,8 +2192,10 @@ disambigGroup (default_ty:default_tys) group@(the_tv, wanteds)
     try_group
       | Just subst <- mb_subst
       = do { lcl_env <- TcS.getLclEnv
-           ; tc_lvl <- TcS.getTcLevel
-           ; let loc = mkGivenLoc tc_lvl UnkSkol lcl_env
+           ; let loc = CtLoc { ctl_origin = GivenOrigin UnkSkol
+                             , ctl_env    = lcl_env
+                             , ctl_t_or_k = Nothing
+                             , ctl_depth  = initialSubGoalDepth }
            ; wanted_evs <- mapM (newWantedEvVarNC loc . substTy subst . ctPred)
                                 wanteds
            ; fmap isEmptyWC $

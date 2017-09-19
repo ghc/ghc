@@ -436,8 +436,5 @@ test('T13320', normal, compile_fail, [''])
 test('T13677', normal, compile_fail, [''])
 test('T11963', normal, compile_fail, [''])
 test('T14000', normal, compile_fail, [''])
-test('T13530', normal, compile_fail, [''])
-test('T12373', normal, compile_fail, [''])
-test('T13610', normal, compile_fail, [''])
 test('T11672', normal, compile_fail, [''])
 

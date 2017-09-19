@@ -1500,16 +1500,11 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
       | canSolveByUnification cur_lvl tv1 ty2
       , Just ty2' <- metaTyVarUpdateOK dflags tv1 ty2
       = do { co_k <- uType kind_origin KindLevel (typeKind ty2') (tyVarKind tv1)
-           ; if isTcReflCo co_k  -- only proceed if the kinds matched.
-
-             then do { writeMetaTyVar tv1 ty2'
-                     ; return (mkTcNomReflCo ty2') }
-             else defer } -- this cannot be solved now.
-                          -- See Note [Equalities with incompatible kinds]
-                          -- in TcCanonical
+           ; co   <- updateMeta tv1 ty2' co_k
+           ; return (maybe_sym swapped co) }
 
       | otherwise
-      = defer
+      = unSwap swapped (uType_defer origin t_or_k) ty1 ty2
                -- Occurs check or an untouchable: just defer
                -- NB: occurs check isn't necessarily fatal:
                --     eg tv1 occured in type family parameter
@@ -1517,7 +1512,10 @@ uUnfilledVar2 origin t_or_k swapped tv1 ty2
     ty1 = mkTyVarTy tv1
     kind_origin = KindEqOrigin ty1 (Just ty2) origin (Just t_or_k)
 
-    defer = unSwap swapped (uType_defer origin t_or_k) ty1 ty2
+-- | apply sym iff swapped
+maybe_sym :: SwapFlag -> Coercion -> Coercion
+maybe_sym IsSwapped  = mkSymCo
+maybe_sym NotSwapped = id
 
 swapOverTyVars :: TcTyVar -> TcTyVar -> Bool
 swapOverTyVars tv1 tv2
@@ -1741,6 +1739,18 @@ lookupTcTyVar tyvar
   = return (Unfilled details)
   where
     details = tcTyVarDetails tyvar
+
+-- | Fill in a meta-tyvar
+updateMeta :: TcTyVar            -- ^ tv to fill in, tv :: k1
+           -> TcType             -- ^ ty2 :: k2
+           -> Coercion           -- ^ kind_co :: k2 ~N k1
+           -> TcM Coercion       -- ^ :: tv ~N ty2 (= ty2 |> kind_co ~N ty2)
+updateMeta tv1 ty2 kind_co
+  = do { let ty2'     = ty2 `mkCastTy` kind_co
+             ty2_refl = mkNomReflCo ty2
+             co       = mkCoherenceLeftCo ty2_refl kind_co
+       ; writeMetaTyVar tv1 ty2'
+       ; return co }
 
 {-
 Note [Unifying untouchables]
