@@ -102,6 +102,8 @@ fdReady(int fd, int write, int msecs, int isSock)
         HANDLE hFile = (HANDLE)_get_osfhandle(fd);
         DWORD avail;
 
+        Time remaining = MSToTime(msecs);
+
         switch (GetFileType(hFile)) {
 
             case FILE_TYPE_CHAR:
@@ -119,7 +121,11 @@ fdReady(int fd, int write, int msecs, int isSock)
 
                     while (1) // keep trying until we find a real key event
                     {
-                        rc = WaitForSingleObject( hFile, msecs );
+                        // WaitForSingleObject takes an unsigned number,
+                        // `remaining` can be negative. Wait 0 if so.
+                        DWORD wait_ms = (DWORD) max(0, TimeToMS(remaining));
+
+                        rc = WaitForSingleObject( hFile, wait_ms );
                         switch (rc) {
                             case WAIT_TIMEOUT: return 0;
                             case WAIT_OBJECT_0: break;
@@ -167,6 +173,9 @@ fdReady(int fd, int write, int msecs, int isSock)
                                 }
                             }
                         }
+
+                        Time now = getProcessElapsedTime();
+                        remaining = endTime - now;
                     }
                 }
 
