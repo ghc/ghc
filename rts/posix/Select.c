@@ -256,9 +256,14 @@ awaitEvent(bool wait)
       for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
         next = tso->_link;
 
-      /* On FreeBSD FD_SETSIZE is unsigned. Cast it to signed int
+      /* On older FreeBSDs, FD_SETSIZE is unsigned. Cast it to signed int
        * in order to switch off the 'comparison between signed and
        * unsigned error message
+       * Newer versions of FreeBSD have switched to unsigned int:
+       *   https://github.com/freebsd/freebsd/commit/12ae7f74a071f0439763986026525094a7032dfd
+       *   http://fa.freebsd.cvs-all.narkive.com/bCWNHbaC/svn-commit-r265051-head-sys-sys
+       * So the (int) cast should be removed across the code base once
+       * GHC requires a version of FreeBSD that has that change in it.
        */
         switch (tso->why_blocked) {
         case BlockedOnRead:
