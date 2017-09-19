@@ -80,8 +80,7 @@ fdReady(int fd, int write, int msecs, int isSock)
         struct timeval remaining_tv;
 
         if ((fd >= (int)FD_SETSIZE) || (fd < 0)) {
-            fprintf(stderr, "fdReady: fd is too big");
-            abort();
+            barf("fdReady: fd is too big: %d but FD_SETSIZE is %d", fd, (int)FD_SETSIZE);
         }
         FD_ZERO(&rfd);
         FD_ZERO(&wfd);
