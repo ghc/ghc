@@ -47,6 +47,8 @@
 
   * Make `zipWith` and `zipWith3` inlinable (#14224)
 
+  * `Type.Reflection.App` now matches on function types (fixes #14236)
+
 ## 4.10.0.0 *April 2017*
   * Bundled with GHC *TBA*
 

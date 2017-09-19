@@ -138,7 +138,7 @@ instance a ~ b => Enum (a :~: b) where
 -- | @since 4.7.0.0
 deriving instance a ~ b => Bounded (a :~: b)
 
--- | Kind heterogeneous propositional equality. Like '(:~:)', @a :~~: b@ is
+-- | Kind heterogeneous propositional equality. Like ':~:', @a :~~: b@ is
 -- inhabited by a terminating value if and only if @a@ is the same type as @b@.
 --
 -- @since 4.10.0.0
