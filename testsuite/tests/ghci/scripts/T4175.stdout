@@ -34,7 +34,7 @@ instance Applicative Maybe -- Defined in ‘GHC.Base’
 instance Eq a => Eq (Maybe a) -- Defined in ‘GHC.Base’
 instance Functor Maybe -- Defined in ‘GHC.Base’
 instance Monad Maybe -- Defined in ‘GHC.Base’
-instance Monoid a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
+instance Semigroup a => Monoid (Maybe a) -- Defined in ‘GHC.Base’
 instance Ord a => Ord (Maybe a) -- Defined in ‘GHC.Base’
 instance Semigroup a => Semigroup (Maybe a)
   -- Defined in ‘GHC.Base’

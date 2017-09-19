@@ -14,6 +14,9 @@
     export `Semigroup` from `Prelude`; remove `Monoid` reexport
     from `Data.Semigroup` (#14191).
 
+  * Generalise `instance Monoid a => Monoid (Maybe a)` to
+    `instance Semigroup a => Monoid (Maybe a)`.
+
   * Add `infixl 9 !!` declaration for `Data.List.NonEmpty.!!`
 
   * Add `<&>` operator to `Data.Functor` (#14029)

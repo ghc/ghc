@@ -413,12 +413,13 @@ instance Semigroup a => Semigroup (Maybe a) where
 -- | Lift a semigroup into 'Maybe' forming a 'Monoid' according to
 -- <http://en.wikipedia.org/wiki/Monoid>: \"Any semigroup @S@ may be
 -- turned into a monoid simply by adjoining an element @e@ not in @S@
--- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\" Since
--- there used to be no \"Semigroup\" typeclass providing just 'mappend',
--- we use 'Monoid' instead.
+-- and defining @e*e = e@ and @e*s = s = s*e@ for all @s ∈ S@.\"
+--
+-- /Since 4.11.0/: constraint on inner @a@ value generalised from
+-- 'Monoid' to 'Semigroup'.
 --
 -- @since 2.01
-instance Monoid a => Monoid (Maybe a) where
+instance Semigroup a => Monoid (Maybe a) where
     mempty = Nothing
 
 -- | For tuples, the 'Monoid' constraint on @a@ determines
