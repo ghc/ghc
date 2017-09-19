@@ -59,6 +59,24 @@ Language
       data StrictJust a <- Just !a where
         StrictJust !a = Just a
 
+- GADTs with kind-polymorphic type arguments now require :ghc-flag:`TypeInType`.
+  For instance, consider the following, ::
+
+      data G :: k -> * where
+        GInt   :: G Int
+        GMaybe :: G Maybe
+
+  In previous releases this would compile with :ghc-flag:`PolyKinds` alone due
+  to bug :ghc-ticket:`13391`. As of GHC 8.4, however, this requires
+  :ghc-flag:`TypeInType`. Note that since GADT kind signatures aren't generalized,
+  this will also require that you provide a :ref:`CUSK
+  <complete-kind-signatures>` by explicitly quantifying over the kind argument,
+  ``k``, ::
+
+      data G :: forall k. k -> * where
+        GInt   :: G Int
+        GMaybe :: G Maybe
+
 Compiler
 ~~~~~~~~
 
