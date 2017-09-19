@@ -20,13 +20,11 @@ import qualified GHC.Integer.GMP.Internals as I
 recipModInteger :: Integer -> Integer -> Integer
 recipModInteger = I.recipModInteger
 
--- FIXME: Lacks GMP2 version
 gcdExtInteger :: Integer -> Integer -> (Integer, Integer)
 gcdExtInteger a b = case I.gcdExtInteger a b of (# g, s #) -> (g, s)
 
--- FIXME: Lacks GMP2 version
 powModSecInteger :: Integer -> Integer -> Integer -> Integer
-powModSecInteger = powModInteger
+powModSecInteger = I.powModSecInteger
 
 powModInteger :: Integer -> Integer -> Integer -> Integer
 powModInteger = I.powModInteger

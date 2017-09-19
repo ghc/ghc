@@ -25,6 +25,7 @@
 module GHC.Integer.Type where
 
 #include "MachDeps.h"
+#include "HsIntegerGmp.h"
 
 -- Sanity check as CPP defines are implicitly 0-valued when undefined
 #if !(defined(SIZEOF_LONG) && defined(SIZEOF_HSWORD) \
@@ -1376,6 +1377,32 @@ powModInteger b e m = case m of
     b' = integerToSBigNat b
     e' = integerToSBigNat e
 
+-- | \"@'powModSecInteger' /b/ /e/ /m/@\" computes base @/b/@ raised to
+-- exponent @/e/@ modulo @/m/@. It is required that @/e/ >= 0@ and
+-- @/m/@ is odd.
+--
+-- This is a \"secure\" variant of 'powModInteger' using the
+-- @mpz_powm_sec()@ function which is designed to be resilient to side
+-- channel attacks and is therefore intended for cryptographic
+-- applications.
+--
+-- This primitive is only available when the underlying GMP library
+-- supports it (GMP >= 5). Otherwise, it internally falls back to
+-- @'powModInteger'@, and a warning will be emitted when used.
+--
+-- @since TODO
+{-# NOINLINE powModSecInteger #-}
+powModSecInteger :: Integer -> Integer -> Integer -> Integer
+powModSecInteger b e m = bigNatToInteger (powModSecSBigNat b' e' m')
+  where
+    b' = integerToSBigNat b
+    e' = integerToSBigNat e
+    m' = absSBigNat (integerToSBigNat m)
+
+#if HAVE_SECURE_POWM == 0
+{-# WARNING powModSecInteger "The underlying GMP library does not support a secure version of powModInteger which is side-channel resistant - you need at least GMP version 5 to support this" #-}
+#endif
+
 -- | Version of 'powModInteger' operating on 'BigNat's
 --
 -- @since 1.0.0.0
@@ -1427,6 +1454,27 @@ powModSBigNatWord b e m# = integer_gmp_powm1# b# bn# e# en# m#
 foreign import ccall unsafe "integer_gmp_powm1"
   integer_gmp_powm1# :: ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
                         -> GmpLimb# -> GmpLimb#
+
+-- internal non-exported helper
+powModSecSBigNat :: SBigNat -> SBigNat -> BigNat -> BigNat
+powModSecSBigNat b e m@(BN# m#) = runS $ do
+    r@(MBN# r#) <- newBigNat# mn#
+    I# rn_# <- liftIO (integer_gmp_powm_sec# r# b# bn# e# en# m# mn#)
+    let rn# = narrowGmpSize# rn_#
+    case isTrue# (rn# ==# mn#) of
+        False -> unsafeShrinkFreezeBigNat# r rn#
+        True  -> unsafeFreezeBigNat# r
+  where
+    !(BN# b#) = absSBigNat b
+    !(BN# e#) = absSBigNat e
+    bn# = ssizeofSBigNat# b
+    en# = ssizeofSBigNat# e
+    mn# = sizeofBigNat# m
+
+foreign import ccall unsafe "integer_gmp_powm_sec"
+  integer_gmp_powm_sec# :: MutableByteArray# RealWorld
+                           -> ByteArray# -> GmpSize# -> ByteArray# -> GmpSize#
+                           -> ByteArray# -> GmpSize# -> IO GmpSize
 
 
 -- | \"@'recipModInteger' /x/ /m/@\" computes the inverse of @/x/@ modulo @/m/@. If
