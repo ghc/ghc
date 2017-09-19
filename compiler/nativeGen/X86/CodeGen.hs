@@ -63,7 +63,6 @@ import SrcLoc           ( srcSpanFile, srcSpanStartLine, srcSpanStartCol )
 import ForeignCall      ( CCallConv(..) )
 import OrdList
 import Outputable
-import Unique
 import FastString
 import DynFlags
 import Util
@@ -326,7 +325,7 @@ is32BitInteger i = i64 <= 0x7fffffff && i64 >= -0x80000000
 jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
 jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel (getUnique blockid)
+    where blockLabel = blockLbl blockid
 
 
 -- -----------------------------------------------------------------------------
@@ -2764,7 +2763,7 @@ createJumpTable dflags ids section lbl
                           = CmmStaticLit (CmmInt 0 (wordWidth dflags))
                       jumpTableEntryRel (Just blockid)
                           = CmmStaticLit (CmmLabelDiffOff blockLabel lbl 0)
-                          where blockLabel = mkAsmTempLabel (getUnique blockid)
+                          where blockLabel = blockLbl blockid
                   in map jumpTableEntryRel ids
             | otherwise = map (jumpTableEntry dflags) ids
       in CmmData section (1, Statics lbl jumpTable)

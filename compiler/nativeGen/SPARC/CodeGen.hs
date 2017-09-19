@@ -58,7 +58,6 @@ import FastString
 import OrdList
 import Outputable
 import Platform
-import Unique
 
 import Control.Monad    ( mapAndUnzipM )
 
@@ -185,7 +184,7 @@ temporary, then do the other computation, and then use the temporary:
 jumpTableEntry :: DynFlags -> Maybe BlockId -> CmmStatic
 jumpTableEntry dflags Nothing = CmmStaticLit (CmmInt 0 (wordWidth dflags))
 jumpTableEntry _ (Just blockid) = CmmStaticLit (CmmLabel blockLabel)
-    where blockLabel = mkAsmTempLabel (getUnique blockid)
+    where blockLabel = blockLbl blockid
 
 
 
