@@ -1723,6 +1723,12 @@ we can sort them into the right place when doing dependency analysis.
 -}
 
 occAnal env (Tick tickish body)
+  | SourceNote{} <- tickish
+  = (usage, Tick tickish body')
+                  -- SourceNotes are best-effort; so we just proceed as usual.
+                  -- If we drop a tick due to the issues described below it's
+                  -- not the end of the world.
+
   | tickish `tickishScopesLike` SoftScope
   = (markAllNonTailCalled usage, Tick tickish body')
 
@@ -1742,6 +1748,7 @@ occAnal env (Tick tickish body)
                   -- Making j a join point may cause the simplifier to drop t
                   -- (if the tick is put into the continuation). So we don't
                   -- count j 1 as a tail call.
+                  -- See #14242.
 
 occAnal env (Cast expr co)
   = case occAnal env expr of { (usage, expr') ->
