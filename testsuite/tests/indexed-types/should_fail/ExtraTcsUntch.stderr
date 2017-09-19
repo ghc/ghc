@@ -1,12 +1,12 @@
 
 ExtraTcsUntch.hs:23:18: error:
-    • Couldn't match expected type ‘F Int’ with actual type ‘[x]’
+    • Couldn't match expected type ‘F Int’ with actual type ‘[p]’
     • In the first argument of ‘h’, namely ‘[x]’
       In the expression: h [x]
       In an equation for ‘g1’: g1 _ = h [x]
     • Relevant bindings include
-        x :: x (bound at ExtraTcsUntch.hs:21:3)
-        f :: x -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
+        x :: p (bound at ExtraTcsUntch.hs:21:3)
+        f :: p -> ((), ((), ())) (bound at ExtraTcsUntch.hs:21:1)
 
 ExtraTcsUntch.hs:25:38: error:
     • Couldn't match expected type ‘F Int’ with actual type ‘[[a0]]’
