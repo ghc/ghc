@@ -1302,7 +1302,6 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 
 -- ----------------------------------------------------------------------------
 
-#if 0
 
 -- ToDo:
 --   - Data and Typeable instances for HsSyn.
@@ -1316,7 +1315,6 @@ pprParenSymName a = parenSymOcc (getOccName a) (ppr (getName a))
 -- :browse will use either lm_toplev or inspect lm_interface, depending
 -- on whether the module is interpreted or not.
 
-#endif
 
 -- Extract the filename, stringbuffer content and dynflags associed to a module
 --
