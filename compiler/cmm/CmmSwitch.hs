@@ -66,9 +66,9 @@ maxJumpTableHole = 7
 
 -- | Minimum size of a jump table. If the number is smaller, the switch is
 -- implemented using conditionals.
--- Currently 5, because an if-then-else tree of 4 values is nice and compact.
+-- Currently 3, because that's the heuristic GCC and clang seem to use
 minJumpTableSize :: Int
-minJumpTableSize = 5
+minJumpTableSize = 3
 
 -- | Minimum non-zero offset for a jump table. See Note [Jump Table Offset].
 minJumpTableOffset :: Integer
@@ -302,7 +302,7 @@ splitAtHoles holeSize m = map (\range -> restrictMap range m) nonHoles
 -- (into singleton maps, for now).
 breakTooSmall :: M.Map Integer a -> [M.Map Integer a]
 breakTooSmall m
-  | M.size m > minJumpTableSize = [m]
+  | M.size m >= minJumpTableSize = [m]
   | otherwise                   = [M.singleton k v | (k,v) <- M.toList m]
 
 ---
