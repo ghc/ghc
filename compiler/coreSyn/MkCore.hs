@@ -120,34 +120,43 @@ mkCoreLets :: [CoreBind] -> CoreExpr -> CoreExpr
 mkCoreLets binds body = foldr mkCoreLet body binds
 
 -- | Construct an expression which represents the application of one expression
--- to the other
-mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+-- paired with its type to an argument. The result is paired with its type. This
+-- function is not exported and used in the definition of 'mkCoreApp' and
+-- 'mkCoreApps'.
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
-mkCoreApp _ fun (Type ty)     = App fun (Type ty)
-mkCoreApp _ fun (Coercion co) = App fun (Coercion co)
-mkCoreApp d fun arg           = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
-                                mk_val_app fun arg arg_ty res_ty
-                              where
-                                fun_ty = exprType fun
-                                (arg_ty, res_ty) = splitFunTy fun_ty
+mkCoreAppTyped :: SDoc -> (CoreExpr, Type) -> CoreExpr -> (CoreExpr, Type)
+mkCoreAppTyped _ (fun, fun_ty) (Type ty)
+  = (App fun (Type ty), piResultTy fun_ty ty)
+mkCoreAppTyped _ (fun, fun_ty) (Coercion co)
+  = (App fun (Coercion co), res_ty)
+  where
+    (_, res_ty) = splitFunTy fun_ty
+mkCoreAppTyped d (fun, fun_ty) arg
+  = ASSERT2( isFunTy fun_ty, ppr fun $$ ppr arg $$ d )
+    (mk_val_app fun arg arg_ty res_ty, res_ty)
+  where
+    (arg_ty, res_ty) = splitFunTy fun_ty
+
+-- | Construct an expression which represents the application of one expression
+-- to the other
+-- Respects the let/app invariant by building a case expression where necessary
+--   See CoreSyn Note [CoreSyn let/app invariant]
+mkCoreApp :: SDoc -> CoreExpr -> CoreExpr -> CoreExpr
+mkCoreApp s fun arg
+  = fst $ mkCoreAppTyped s (fun, exprType fun) arg
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to another. The leftmost expression in the list is applied first
 -- Respects the let/app invariant by building a case expression where necessary
 --   See CoreSyn Note [CoreSyn let/app invariant]
 mkCoreApps :: CoreExpr -> [CoreExpr] -> CoreExpr
--- Slightly more efficient version of (foldl mkCoreApp)
-mkCoreApps orig_fun orig_args
-  = go orig_fun (exprType orig_fun) orig_args
+mkCoreApps fun args
+  = fst $
+    foldl' (mkCoreAppTyped doc_string) (fun, fun_ty) args
   where
-    go fun _      []               = fun
-    go fun fun_ty (Type ty : args) = go (App fun (Type ty)) (piResultTy fun_ty ty) args
-    go fun fun_ty (arg     : args) = ASSERT2( isFunTy fun_ty, ppr fun_ty $$ ppr orig_fun
-                                                              $$ ppr orig_args )
-                                     go (mk_val_app fun arg arg_ty res_ty) res_ty args
-                                   where
-                                     (arg_ty, res_ty) = splitFunTy fun_ty
+    doc_string = ppr fun_ty $$ ppr fun $$ ppr args
+    fun_ty = exprType fun
 
 -- | Construct an expression which represents the application of a number of
 -- expressions to that of a data constructor expression. The leftmost expression
