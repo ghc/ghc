@@ -323,13 +323,14 @@ splitApp rep@(TrFun _ a b) = Just (IsApp (mkTrApp arr a) b)
 splitApp (TrTyCon{})       = Nothing
 
 -- | Use a 'TypeRep' as 'Typeable' evidence.
-withTypeable :: forall a r. TypeRep a -> (Typeable a => r) -> r
+withTypeable :: forall (a :: k) (r :: TYPE rep). ()
+             => TypeRep a -> (Typeable a => r) -> r
 withTypeable rep k = unsafeCoerce k' rep
   where k' :: Gift a r
         k' = Gift k
 
 -- | A helper to satisfy the type checker in 'withTypeable'.
-newtype Gift a r = Gift (Typeable a => r)
+newtype Gift a (r :: TYPE rep) = Gift (Typeable a => r)
 
 -- | Pattern match on a type constructor
 pattern Con :: forall k (a :: k). TyCon -> TypeRep a
